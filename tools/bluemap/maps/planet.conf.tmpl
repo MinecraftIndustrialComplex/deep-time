@@ -1,0 +1,25 @@
+# The Deep Time overworld as a player sees it.
+world: "@WORLD@"
+dimension: "minecraft:overworld"
+name: "Deep Time planet — surface"
+sorting: 0
+start-pos: { x: 0, z: 0 }
+sky-color: "#7dabff"
+void-color: "#000000"
+sky-light: 1
+ambient-light: 0.1
+# Deep Time's floor is y -352; caves below sea level are hidden as in BlueMap's default look.
+remove-caves-below-y: 55
+cave-detection-ocean-floor: -5
+cave-detection-uses-block-light: false
+min-inhabited-time: 0
+render-mask: [ {} ]
+render-edges: true
+edge-light-strength: 8
+enable-perspective-view: true
+enable-flat-view: true
+enable-free-flight-view: true
+enable-hires: true
+storage: "file"
+ignore-missing-light-data: true
+marker-sets: {}

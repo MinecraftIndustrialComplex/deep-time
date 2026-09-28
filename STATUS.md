@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 0 · Next: finish P0-06 (Sable, structures, 16k/32k smoke, review page), P0-08 (agent), then P0-11 … P0-15 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 0 · Next: P0-06 rest, P0-11, P0-13, P1-01, P1-02 and the seam page (agents), then P0-12 (me), P0-14, P0-15 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -14,13 +14,13 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-05 | Generator skeleton on the analytic test terrain | done | 2026-09-28 | 33f1cd9 | ./gametest.sh → all pass (heightMatchesReference cornerMax 0, maxAbsDiff 0; periodicAcrossSeam 0 mismatches; veins off); planet server (Mac) boots with level-type deeptime:planet, probe column 0 0 → surfaceY 14 for H 14.99. -PwithMic run: with P0-04 |
 | P0-06 | Toroidal World spike (server-side items) | doing | 2026-09-28 | — | planet server (Mac): probe tw stamped/loopsX/!loopsZ/1024 chunks; columnscontinuous PASS (16 rows, 0 bad folds, 0 jumps); entitycrossesseam PASS (x=-8191.79 after crossing). Left: Sable jetCrossesSeam 20/20, sable_straddle, structure/shaft tests, pole prototype, smoke at 16k/32k with region span check, review page |
 | P0-07 | JNI hello world, native loader and the five failure classes | done | 2026-09-28 | c813177 | Mac: JUnit tests=30 failures=0; NativeSmoke OK + 5 forced classes; ./gametest.sh NativeGameTests pass: native version=0.0.1 format=0.0 target=aarch64-apple-darwin selftest=1997318690096807936. Linux load path first runs in CI |
-| P0-08 | Cross-builds and the OS load matrix | todo | | | |
+| P0-08 | Cross-builds and the OS load matrix | done | 2026-09-28 | b20fbb8 | Mac: `nix run .#natives` → 8 libraries, gnu GLIBC_2.17, musl NEEDED libc.so only; `gradlew build -Prelease` → 8 in the jar, tests=30 failures=0; [natives.yml run 36492319610](https://github.com/MinecraftIndustrialComplex/deep-time/actions/runs/36492319610): all 9 jobs success, 8/8 load jobs `status=OK version=0.0.1` (Windows arm64 included) |
 | P0-09 | World-data format v0, synthetic planets, Java reader | done | 2026-09-28 | 75d90d3 | Mac: cargo test ok (format 15 tests); synth wrap-test 16k → format_version 0.0, viewer bundle; TilePackParityTest + Lz4RoundTripTest pass; wrap-test equals AnalyticTestTerrain within 1/32 block |
 | P0-10 | The generator on world data | done | 2026-09-28 | — | Mac ./gametest.sh → All 10 required tests passed: heightMatchesRaster cornerMax 0 maxAbsDiff 1; strataClassesResolve checked=32 wrong=0; spawnOnLand y=456 > 63. StagingMover deferred to P1-11 (no staging before the editor exists) |
 | P0-11 | `deeptime-inspect` | todo | | | |
-| P0-12 | Terralith, TerraBlender and Biomes O' Plenty checks | todo | | | |
+| P0-12 | Terralith, TerraBlender and Biomes O' Plenty checks | done | 2026-09-28 | 00db177 | Mac: ./gametest.sh default/-PwithMic/-PwithTerraBlender → All 13 passed; terralith=3008 of 4096 land samples (MIC), biomesoplenty=1325 of 4096 (TB), surface painted 24/24; smoke mic --synth wrap-test (production server) PASS: probe tw stamped/loopsX/!loopsZ/1024, locate village found, no C2ME/DH errors, chunky done, regions outside span 0 |
 | P0-13 | Water above sea level holds | todo | | | |
-| P0-14 | BlueMap renders on MIC blocks | todo | | | |
+| P0-14 | BlueMap renders on MIC blocks | doing | 2026-09-28 | — | Mac: tools/review/render-bluemap.sh renders the MIC smoke world (surface map + a below-y-0 strata map) in ~30 s; web app 645 MB uncompressed (962 hires tiles × ~0.65 MB, 992-block height). Hosting on spacesheep undecided: gzip tiles + a decompressing service worker, or a smaller render mask |
 | P0-15 | Phase 0 exit | todo | | | |
 | P1-01 | Session, checkpoints, keyframes, event log and site formats | todo | | | |
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | todo | | | |
@@ -54,6 +54,38 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 — P0-08 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Created.** `tools/natives/build-natives.sh` (`nix run .#natives`; the app re-enters the dev
+  shell so build scripts get a host linker on macOS too): cargo-zigbuild for Linux (gnu at `.2.17`)
+  and macOS, cargo-xwin for Windows, then per-file checks (ELF/PE/Mach-O machine, musl NEEDED and
+  GLIBC, gnu floor ≤ 2.17, macOS minos ≤ 11.7.1 and `/usr/lib`-only dylibs, no `target-cpu` in
+  RUSTFLAGS) and `natives.json` (schema 1, same fields and glibc scan as `hostNatives`). Gradle
+  `-Prelease` packs `target/natives-dist` after `checkReleaseNatives` (exactly the eight keys,
+  size + sha256 per file, version/format equal to Cargo.toml, no stray files; clear message if
+  missing). `.github/workflows/natives.yml`: build job (natives + release jar, both uploaded) and
+  eight `NativeSmoke` load jobs against the release jar, each also asserting `platform=<its key>`.
+- **Measured on the Mac** (`tools/remote/mac.sh -- 'nix run .#natives'`, then readelf/file):
+  `file` → 2 PE32+ (x86-64, ARM64), 2 Mach-O (x86_64, arm64), 4 ELF (2 x86-64, 2 aarch64); musl
+  NEEDED `libc.so` only (no `libgcc_s`: zig links the unwinder); gnu x86_64 and aarch64 highest
+  `GLIBC_2.17`; `./gradlew build -Prelease` → 8 libraries in the jar, tests=30 failures=0, and
+  NativeSmoke on that jar on the Mac → `status=OK … platform=macos-aarch64`.
+- **CI** ([run 36492319610](https://github.com/MinecraftIndustrialComplex/deep-time/actions/runs/36492319610),
+  first attempt): every job success; each load job printed `status=OK version=0.0.1 format=0.0
+  selftest=1997318690096807936` with its own platform key (windows-x86_64, windows-aarch64 on
+  `windows-11-arm`, macos-aarch64, macos-x86_64, linux-{x86_64,aarch64}-gnu, and
+  linux-{x86_64,aarch64}-musl in Alpine). Cold build job 25 min (natives 18, Gradle 5); caches
+  are saved now. `workflow_dispatch` returns 404 until natives.yml is on master, so the bring-up
+  used a temporary push trigger on branch `p0-08-natives` (reverted).
+- **Contradicts the plan (now §6.4 "Measured in P0-08").** macOS natives use cargo-zigbuild on the
+  Mac as well: a plain `cargo build` in the Nix shell linked `/nix/store/…/libiconv.2.dylib`. zig
+  0.13 sets minos 11.7.1 on both macOS libraries. The dylibs get install name
+  `@rpath/libdeeptime_jni.dylib` (`.cargo/config.toml`). Windows DLLs import `VCRUNTIME140.dll`
+  (the JVM loads it itself; no static CRT). cargo-xwin is 0.23.1 in nixpkgs and CI. cargo-xwin's
+  README asks only for clang and "LLVM tools"; the shell's clang-cl, lld-link and llvm-lib suffice.
+- **Next.** Merge; after natives.yml is on master, `gh workflow run natives.yml` works as written.
+  Actions still warns that checkout/cache/setup-java/artifact @v4 run on Node 20 (forced to 24).
+
 
 ### 2026-09-28 (later) — builds moved to the Mac; P0-06 shaping; P0-07 and P0-09 merged
 - **Builds run on Ben's M6 Mac mini** (his instruction, after parallel builds overloaded the laptop):
