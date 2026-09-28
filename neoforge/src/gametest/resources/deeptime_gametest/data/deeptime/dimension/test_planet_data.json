@@ -1,0 +1,9 @@
+{
+  "type": "deeptime:planet_overworld",
+  "generator": {
+    "type": "deeptime:geologic",
+    "biome_source": {"type": "minecraft:multi_noise", "preset": "minecraft:overworld"},
+    "settings": "deeptime:planet_nocaves",
+    "world_data": {"folder": "deeptime-test", "circumference_blocks": 1024}
+  }
+}
