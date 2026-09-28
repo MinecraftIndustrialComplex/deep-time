@@ -5,6 +5,7 @@
 pub mod error;
 pub mod log;
 pub mod session;
+pub mod sphere;
 
 pub use deeptime_format::FORMAT_VERSION;
 pub use error::CoreError;
