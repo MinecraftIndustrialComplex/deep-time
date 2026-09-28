@@ -9,3 +9,5 @@ repository.workspace = true
 
 [dependencies]
 deeptime-format.workspace = true
+rayon.workspace = true
+serde_json.workspace = true

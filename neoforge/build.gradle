@@ -228,9 +228,131 @@ def checkVersions = tasks.register('checkVersions') {
 tasks.named('check') { dependsOn checkVersions }
 tasks.named('build') { dependsOn checkVersions }
 
+// A `key = "value"` line inside one [section] of Cargo.toml: a line scan, the same one
+// deeptime-format's build.rs does, so the two can never read different values.
+def cargoTomlValue = { String section, String key ->
+    def inSection = false
+    for (line in cargoToml.readLines()*.trim()) {
+        if (line.startsWith('[')) { inSection = (line == "[${section}]".toString()); continue }
+        if (!inSection) continue
+        def m = line =~ /^${key}\s*=\s*"([^"]*)"/
+        if (m.find()) return m.group(1)
+    }
+    throw new GradleException("No ${key} in [${section}] of ${cargoToml}")
+}
+// The world-data format version has one source: Cargo.toml [workspace.metadata.deeptime].
+def formatVersion = cargoTomlValue('workspace.metadata.deeptime', 'format_version')
+def cargoVersion = cargoTomlValue('workspace.package', 'version')
+
+// ---------------------------------------------------------------------------
+// Natives in the jar (plan §4.3, §6.5). Dev builds pack the host library that
+// hostNatives stages in ../target/natives-host/; nothing else is packed, so a leftover
+// natives-dist/ never leaks into a dev jar.
+// ---------------------------------------------------------------------------
+def osName = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+def hostLibName = osName.startsWith('windows') ? 'deeptime_jni.dll'
+                : (osName.startsWith('mac') || osName.contains('darwin')) ? 'libdeeptime_jni.dylib'
+                : 'libdeeptime_jni.so'
+def builtHostLib = new File(repoRoot, "target/release/${hostLibName}")
+def nativesHostDir = new File(repoRoot, 'target/natives-host')
+
+// Rust target triple -> platform key (plan §6.4).
+def platformKeys = [
+    'x86_64-unknown-linux-gnu'  : 'linux-x86_64-gnu',
+    'aarch64-unknown-linux-gnu' : 'linux-aarch64-gnu',
+    'x86_64-unknown-linux-musl' : 'linux-x86_64-musl',
+    'aarch64-unknown-linux-musl': 'linux-aarch64-musl',
+    'x86_64-pc-windows-msvc'    : 'windows-x86_64',
+    'aarch64-pc-windows-msvc'   : 'windows-aarch64',
+    'x86_64-apple-darwin'       : 'macos-x86_64',
+    'aarch64-apple-darwin'      : 'macos-aarch64',
+]
+
+def cargoBuildJni = tasks.register('cargoBuildJni', Exec) {
+    description = 'cargo build --release -p deeptime-jni (plain cargo: the dev shell locally, rustup in CI).'
+    workingDir repoRoot
+    commandLine 'cargo', 'build', '--release', '-p', 'deeptime-jni'
+    // cargo keeps its own up-to-date state; running it when nothing changed takes a second.
+    outputs.upToDateWhen { false }
+}
+
+def hostNatives = tasks.register('hostNatives') {
+    description = 'Builds the host native library and stages it with natives.json in ../target/natives-host/.'
+    dependsOn cargoBuildJni
+    inputs.file builtHostLib
+    inputs.property 'version', cargoVersion
+    inputs.property 'formatVersion', formatVersion
+    outputs.dir nativesHostDir
+    doLast {
+        def rustc = new ProcessBuilder('rustc', '-vV').redirectErrorStream(true).start()
+        def rustcOut = rustc.inputStream.text
+        if (rustc.waitFor() != 0) throw new GradleException("rustc -vV failed:\n${rustcOut}")
+        def triple = rustcOut.readLines().find { it.startsWith('host: ') }?.substring(6)?.trim()
+        def key = platformKeys[triple]
+        if (key == null) throw new GradleException("Host target ${triple} has no platform key (plan §6.4)")
+
+        nativesHostDir.deleteDir()
+        def dest = new File(nativesHostDir, key)
+        dest.mkdirs()
+        def staged = new File(dest, hostLibName)
+        java.nio.file.Files.copy(builtHostLib.toPath(), staged.toPath())
+
+        def md = java.security.MessageDigest.getInstance('SHA-256')
+        staged.withInputStream { s -> byte[] buf = new byte[65536]; int n; while ((n = s.read(buf)) > 0) md.update(buf, 0, n) }
+        def sha = md.digest().encodeHex().toString()
+
+        // glibc floor: the highest GLIBC_x.y version the library needs (gnu targets only).
+        String floor = null
+        if (triple.endsWith('-linux-gnu')) {
+            def text = new String(staged.bytes, 'ISO-8859-1')
+            def versions = (text =~ /GLIBC_(\d+)\.(\d+)(?:\.(\d+))?/).collect { m ->
+                [m[1] as int, m[2] as int, (m[3] ?: '0') as int]
+            }
+            def max = versions.max { a, b -> a[0] <=> b[0] ?: a[1] <=> b[1] ?: a[2] <=> b[2] }
+            if (max != null) floor = max[2] == 0 ? "${max[0]}.${max[1]}" : "${max[0]}.${max[1]}.${max[2]}"
+        }
+
+        // The natives.json schema of plan §6.5 (schema 1).
+        def manifest = [
+            schema        : 1,
+            version       : cargoVersion,
+            format_version: formatVersion,
+            libraries     : [[
+                platform   : key,
+                file       : hostLibName,
+                rust_target: triple,
+                glibc_floor: floor,
+                sha256     : sha,
+                size       : staged.length(),
+            ]],
+        ]
+        new File(nativesHostDir, 'natives.json').setText(
+            groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(manifest)) + '\n', 'UTF-8')
+        logger.lifecycle("hostNatives: ${key} ${hostLibName} (${staged.length()} bytes, sha256 ${sha.substring(0, 12)}…)")
+    }
+}
+
+tasks.named('processResources', ProcessResources) {
+    if (project.hasProperty('release')) {
+        // TODO(P0-08): release jars pack ../target/natives-dist/ (all eight libraries and its
+        // natives.json, from `nix run .#natives` or the natives.yml artifacts) and check that
+        // natives.json lists 8 libraries. Until then -Prelease fails rather than ship a dev jar.
+        doFirst { throw new GradleException('-Prelease (natives-dist packing) arrives with P0-08') }
+    } else {
+        dependsOn hostNatives
+        from(nativesHostDir) { into 'natives/deeptime' }
+    }
+}
+
 tasks.named('test', Test) {
     useJUnitPlatform()
-    testLogging { events 'passed', 'failed' }
+    dependsOn hostNatives
+    // Every test class runs in its own JVM: a native library links at most once per JVM, and
+    // several classes link it (plan §4.3).
+    forkEvery = 1
+    systemProperty 'deeptime.test.version', cargoVersion
+    systemProperty 'deeptime.test.formatVersion', formatVersion
+    testLogging { events 'passed', 'failed'; exceptionFormat 'full' }
 }
 
 // ---------------------------------------------------------------------------

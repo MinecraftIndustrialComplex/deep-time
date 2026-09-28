@@ -2,7 +2,12 @@
 //! The Deep Time simulation core (plan §8). Depends on the format crate only; no Minecraft and
 //! no JNI types, so the civ module and future planets can reuse it as a plain library.
 
+pub mod error;
+pub mod log;
+pub mod session;
+
 pub use deeptime_format::FORMAT_VERSION;
+pub use error::CoreError;
 
 /// The crate version, which is the Cargo workspace version (the mod's version too).
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
