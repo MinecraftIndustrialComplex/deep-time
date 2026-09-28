@@ -47,6 +47,8 @@ FATAL = re.compile(
     r"|Failed to start the minecraft server|Mod [Ll]oading has failed|Cannot find class"
 )
 DONE = re.compile(r"Done \(")
+# RCON comes up after "Done (", sometimes tens of seconds later: wait for it before any command.
+RCON_UP = re.compile(r"RCON running on")
 MIXING = re.compile(r"Mixing (\S+) from (\S+\.mixins\.json) into (\S+)")
 PROBE = re.compile(r"\[deeptime-probe\]\s*(\{.*\})")
 # Configs whose every declared mixin must have applied by "Done (": Deep Time's own, whose
@@ -79,7 +81,7 @@ class Server:
         self.lines, self.fatal, self.done_at, self.started, self._proc = [], None, None, None, None
 
     def start(self):
-        self.lines, self.fatal, self.done_at = [], None, None
+        self.lines, self.fatal, self.done_at, self.rcon_up = [], None, None, False
         self.started = time.time()
         self._log = open(self.log_path, "a", buffering=1, errors="replace")
         self._log.write(f"\n===== start {datetime.now(timezone.utc).isoformat()} =====\n")
@@ -94,6 +96,8 @@ class Server:
             self.lines.append(line)
             if self.done_at is None and DONE.search(line):
                 self.done_at = time.time()
+            if RCON_UP.search(line):
+                self.rcon_up = True
             if self.fatal is None and FATAL.search(line):
                 self.fatal = line.rstrip()
 
@@ -109,7 +113,7 @@ class Server:
     def wait_for_done(self, timeout):
         deadline, last = time.time() + timeout, 0.0
         while time.time() < deadline:
-            if self.done_at:
+            if self.done_at and self.rcon_up:
                 return True
             if self.fatal:
                 return False

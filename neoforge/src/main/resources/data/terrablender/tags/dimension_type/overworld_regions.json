@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "deeptime:planet_overworld",
+      "required": false
+    }
+  ]
+}
