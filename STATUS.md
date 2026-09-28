@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 0 · Next: finish P0-06 (Sable, structures, 16k/32k smoke, review page), P0-08 (agent), then P0-11 … P0-15 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 0 · Next: P0-06 rest, P0-11, P0-13, P1-01, P1-02 and the seam page (agents), then P0-12 (me), P0-14, P0-15 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
