@@ -63,6 +63,9 @@ dependencies {
     // The game's own lz4-java, named explicitly so the test classpath does not depend on
     // how ModDevGradle exposes Minecraft's libraries (plan §4.3).
     testImplementation 'org.lz4:lz4-java:1.8.0'
+    // Likewise Guava and Gson, which the world-data reader uses (the game's own versions).
+    testImplementation 'com.google.guava:guava:32.1.2-jre'
+    testImplementation 'com.google.code.gson:gson:2.10.1'
 }
 
 // ---------------------------------------------------------------------------
@@ -228,6 +231,39 @@ tasks.named('build') { dependsOn checkVersions }
 tasks.named('test', Test) {
     useJUnitPlatform()
     testLogging { events 'passed', 'failed' }
+}
+
+// ---------------------------------------------------------------------------
+// World-data fixtures for the JUnit parity tests (P0-09): `deeptime synth` at C = 1,024 writes
+// build/test-worlds/{wrap1024,lake1024} and their sample dumps. Plain `cargo`, never
+// `nix develop` (cold-read review 2, gap 15): the dev shell provides it locally, rustup in CI.
+// ---------------------------------------------------------------------------
+def testWorldsDir = layout.buildDirectory.dir('test-worlds')
+def testWorldTasks = [wrap1024: 'wrap-test', lake1024: 'lake-test'].collect { name, kind ->
+    tasks.register("testWorld${name.capitalize()}", Exec) {
+        description = "Writes the ${kind} world-data fixture (C = 1024) with deeptime synth."
+        inputs.files(fileTree(new File(repoRoot, 'crates')) { exclude '**/target/**' })
+        inputs.files(new File(repoRoot, 'Cargo.toml'), new File(repoRoot, 'Cargo.lock'))
+        def out = testWorldsDir.map { it.dir(name) }
+        def samples = testWorldsDir.map { it.file("${name}-samples.json") }
+        outputs.dir out
+        outputs.file samples
+        workingDir repoRoot
+        doFirst { delete out }
+        commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
+                'synth', '--kind', kind, '--size', '1024',
+                '--out', out.get().asFile.absolutePath,
+                '--dump-samples', samples.get().asFile.absolutePath
+    }
+}
+def testWorlds = tasks.register('testWorlds') {
+    description = 'Writes every synthetic world-data fixture the JUnit tests read.'
+    dependsOn testWorldTasks
+}
+tasks.named('test', Test) {
+    dependsOn testWorlds
+    systemProperty 'deeptime.testWorlds', testWorldsDir.get().asFile.absolutePath
+    systemProperty 'deeptime.repoRoot', repoRoot.absolutePath
 }
 
 var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {

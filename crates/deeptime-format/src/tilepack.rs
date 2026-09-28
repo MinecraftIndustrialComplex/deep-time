@@ -108,6 +108,11 @@ pub fn encode_tile_pack(desc: &LayerDesc, cells: &[u8]) -> Result<Vec<u8>> {
     Ok(out)
 }
 
+/// Compresses `data` into one LZ4 raw block, exactly as `lz4_block` tiles are stored.
+pub fn lz4_block(data: &[u8]) -> Vec<u8> {
+    lz4_flex::block::compress(data)
+}
+
 /// Writes a tile pack atomically (tmp + fsync + rename) and returns its size and CRC32.
 pub fn write_tile_pack(path: &Path, desc: &LayerDesc, cells: &[u8]) -> Result<Written> {
     let bytes = encode_tile_pack(desc, cells)?;
@@ -168,9 +173,8 @@ impl TilePackReader {
         let size = tw as usize * th as usize * self.desc.cell_bytes();
         let cells = match self.desc.codec {
             Codec::Raw => stored.to_vec(),
-            Codec::Lz4Block => lz4_flex::block::decompress(stored, size).map_err(|err| {
-                FormatError::corrupt(&self.path, format!("tile {t}: LZ4: {err}"))
-            })?,
+            Codec::Lz4Block => lz4_flex::block::decompress(stored, size)
+                .map_err(|err| FormatError::corrupt(&self.path, format!("tile {t}: LZ4: {err}")))?,
         };
         if cells.len() != size {
             return Err(FormatError::corrupt(
@@ -205,7 +209,10 @@ fn u32_at(b: &[u8], at: usize) -> u32 {
 
 fn parse_header(path: &Path, b: &[u8]) -> Result<LayerDesc> {
     if b.len() < HEADER_BYTES {
-        return Err(FormatError::corrupt(path, "shorter than the 16-byte header"));
+        return Err(FormatError::corrupt(
+            path,
+            "shorter than the 16-byte header",
+        ));
     }
     if b[..4] != MAGIC {
         return Err(FormatError::corrupt(
@@ -266,7 +273,10 @@ fn parse_index(path: &Path, b: &[u8], desc: &LayerDesc) -> Result<Vec<TileEntry>
             crc32: u32_at(b, e + 12),
         };
         if offset.saturating_add(u64::from(entry.length)) > b.len() as u64 {
-            return Err(FormatError::corrupt(path, format!("tile {t} past end of file")));
+            return Err(FormatError::corrupt(
+                path,
+                format!("tile {t} past end of file"),
+            ));
         }
         index.push(entry);
     }
@@ -329,7 +339,7 @@ mod tests {
             let c = w_cells * r;
             let grid = GridDesc::for_planet("L", c, r).unwrap();
             let dtype = dtypes[(rng.next() % dtypes.len() as u64) as usize];
-            let codec = if rng.next() % 2 == 0 {
+            let codec = if rng.next().is_multiple_of(2) {
                 Codec::Raw
             } else {
                 Codec::Lz4Block
@@ -344,7 +354,7 @@ mod tests {
             let mut cells = Vec::with_capacity(n);
             let mut v = 0u8;
             while cells.len() < n {
-                if rng.next() % 3 == 0 {
+                if rng.next().is_multiple_of(3) {
                     v = rng.next() as u8;
                 }
                 cells.push(v);
@@ -384,7 +394,10 @@ mod tests {
         let mut b = good.clone();
         b[HEADER_BYTES + 3] ^= 0x20;
         std::fs::write(&p, &b).unwrap();
-        assert!(matches!(TilePackReader::open(&p), Err(FormatError::Crc { .. }) | Err(FormatError::Json { .. })));
+        assert!(matches!(
+            TilePackReader::open(&p),
+            Err(FormatError::Crc { .. }) | Err(FormatError::Json { .. })
+        ));
 
         // A flipped byte in the last tile: tile CRC.
         std::fs::write(&p, &good).unwrap();
@@ -406,7 +419,10 @@ mod tests {
         let mut b = good;
         b[0] = b'X';
         std::fs::write(&p, &b).unwrap();
-        assert!(matches!(TilePackReader::open(&p), Err(FormatError::Corrupt { .. })));
+        assert!(matches!(
+            TilePackReader::open(&p),
+            Err(FormatError::Corrupt { .. })
+        ));
         std::fs::remove_file(&p).unwrap();
     }
 

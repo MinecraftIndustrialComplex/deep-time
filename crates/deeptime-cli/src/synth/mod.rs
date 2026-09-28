@@ -69,7 +69,7 @@ pub struct Summary {
 /// Writes a synthetic world.
 pub fn run(opts: &Options) -> Result<Summary, FormatError> {
     let c = opts.size;
-    if c < 2 * TILE || c % 64 != 0 {
+    if c < 2 * TILE || !c.is_multiple_of(64) {
         return Err(FormatError::Invalid(format!(
             "--size {c}: the circumference must be a multiple of 64 and at least {}",
             2 * TILE
@@ -94,7 +94,15 @@ pub fn run(opts: &Options) -> Result<Summary, FormatError> {
     let mut layers: Vec<LoadedLayer> = Vec::new();
 
     let elev = sample_i16(&l3, |x, z| quantise(terrain.height(x, z) * 16.0));
-    layers.push(layer_i16("elevation", "block", 1.0 / 16.0, None, &l3, opts.codec, &elev)?);
+    layers.push(layer_i16(
+        "elevation",
+        "block",
+        1.0 / 16.0,
+        None,
+        &l3,
+        opts.codec,
+        &elev,
+    )?);
 
     let water = sample_i16(&l3, |x, z| match terrain.water_level(x, z) {
         Some(y) => quantise(y * 16.0),
@@ -112,7 +120,15 @@ pub fn run(opts: &Options) -> Result<Summary, FormatError> {
 
     for name in CLIMATE {
         let ras = sample_i16(&l2, |x, z| quantise(terrain.raster(name, x, z) * 10_000.0));
-        layers.push(layer_i16(name, "vanilla_param", 1e-4, None, &l2, opts.codec, &ras)?);
+        layers.push(layer_i16(
+            name,
+            "vanilla_param",
+            1e-4,
+            None,
+            &l2,
+            opts.codec,
+            &ras,
+        )?);
     }
 
     let strata = strata_layer(&l1, &layers[0], opts.codec)?;
@@ -228,7 +244,8 @@ pub fn quantise(v: f64) -> i16 {
         return NODATA_I16;
     }
     // Keep −32768 for nodata.
-    v.round().clamp(f64::from(i16::MIN + 1), f64::from(i16::MAX)) as i16
+    v.round()
+        .clamp(f64::from(i16::MIN + 1), f64::from(i16::MAX)) as i16
 }
 
 /// Samples `f(block_x, block_z)` at every cell, rows split across threads.
@@ -279,7 +296,11 @@ fn layer_i16(
 /// The strata placeholder: per L1 cell three horizons below the surface sampled from the L3
 /// elevation at the same block — sandstone from the surface, red beds from 6 blocks down, granite
 /// from 40 blocks down to the bottom of the world.
-fn strata_layer(l1: &GridDesc, elevation: &LoadedLayer, codec: Codec) -> Result<LoadedLayer, FormatError> {
+fn strata_layer(
+    l1: &GridDesc,
+    elevation: &LoadedLayer,
+    codec: Codec,
+) -> Result<LoadedLayer, FormatError> {
     const K: usize = 3;
     let depths = [0i32, 6 * 16, 40 * 16];
     let e = &elevation.desc.grid;
@@ -394,7 +415,10 @@ fn dump_samples(manifest: &Manifest, layers: &[LoadedLayer], strata: &LoadedLaye
     let mut out_layers = serde_json::Map::new();
     let mut bilinear = serde_json::Map::new();
     for name in DUMPED {
-        let l = layers.iter().find(|l| l.desc.name == name).expect("dumped layer");
+        let l = layers
+            .iter()
+            .find(|l| l.desc.name == name)
+            .expect("dumped layer");
         let d = &l.desc;
         let mut cells: Vec<Value> = Vec::new();
         let last = d.tile_count() - 1;
@@ -428,8 +452,10 @@ fn dump_samples(manifest: &Manifest, layers: &[LoadedLayer], strata: &LoadedLaye
             let mut pts: Vec<Value> = Vec::new();
             for _ in 0..200 {
                 // Thousandths of a block, a few cells past the seam and the poles.
-                let bx = (-c / 2 - 3 * r) as f64 + rng.below(((c + 6 * r) * 1000) as u64) as f64 / 1000.0;
-                let bz = (-c / 4 - 3 * r) as f64 + rng.below(((c / 2 + 6 * r) * 1000) as u64) as f64 / 1000.0;
+                let bx = (-c / 2 - 3 * r) as f64
+                    + rng.below(((c + 6 * r) * 1000) as u64) as f64 / 1000.0;
+                let bz = (-c / 4 - 3 * r) as f64
+                    + rng.below(((c / 2 + 6 * r) * 1000) as u64) as f64 / 1000.0;
                 pts.push(json!([bx, bz, l.bilinear(bx, bz)]));
             }
             bilinear.insert(name.into(), Value::Array(pts));
@@ -449,8 +475,40 @@ fn dump_samples(manifest: &Manifest, layers: &[LoadedLayer], strata: &LoadedLaye
         "circumference": manifest.scale.circumference_blocks,
         "layers": out_layers,
         "bilinear": bilinear,
-        "horizons": { "stack_depth": k, "cells": stacks }
+        "horizons": { "stack_depth": k, "cells": stacks },
+        "lz4_vectors": lz4_vectors()
     })
+}
+
+/// Inputs and their `lz4_flex` blocks, for `Lz4RoundTripTest` (lz4-java must decode each block
+/// back to its input).
+fn lz4_vectors() -> Value {
+    let mut rng = SplitMix(0x1234_5678);
+    let text = "Deep Time world data: lz4_flex block -> lz4-java safe decompressor. ".repeat(20);
+    let noise: Vec<u8> = (0..65_536).map(|_| rng.next_u64() as u8).collect();
+    let smooth: Vec<u8> = (0..32_768)
+        .flat_map(|i| (((f64::from(i) / 900.0).sin() * 4000.0) as i16).to_le_bytes())
+        .collect();
+    let zeros = vec![0u8; 131_072];
+    let cases: [(&str, &[u8]); 5] = [
+        ("tiny", b"a"),
+        ("text", text.as_bytes()),
+        ("noise", &noise),
+        ("smooth_i16", &smooth),
+        ("zeros", &zeros),
+    ];
+    Value::Array(
+        cases
+            .iter()
+            .map(|(name, data)| {
+                json!({
+                    "name": name,
+                    "input": deeptime_viewer::base64(data),
+                    "block": deeptime_viewer::base64(&deeptime_format::tilepack::lz4_block(data))
+                })
+            })
+            .collect(),
+    )
 }
 
 #[cfg(test)]
@@ -493,11 +551,23 @@ mod tests {
             let h = e.bilinear(x as f64, z as f64);
             assert!((h - t.height(x, z)).abs() <= 1.0 / 32.0, "H({x},{z}) {h}");
         }
-        for f in ["index.html", "viewer.js", "ramps.json", "layers/elevation.png"] {
+        for f in [
+            "index.html",
+            "viewer.js",
+            "ramps.json",
+            "layers/elevation.png",
+        ] {
             assert!(dir.join("v").join(f).exists(), "{f}");
         }
-        let dump: Value = serde_json::from_slice(&std::fs::read(dir.join("s.json")).unwrap()).unwrap();
-        assert_eq!(dump["layers"]["elevation"]["cells"].as_array().unwrap().len(), 2 * 65536 + 1000);
+        let dump: Value =
+            serde_json::from_slice(&std::fs::read(dir.join("s.json")).unwrap()).unwrap();
+        assert_eq!(
+            dump["layers"]["elevation"]["cells"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2 * 65536 + 1000
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
