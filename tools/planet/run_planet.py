@@ -44,7 +44,8 @@ def tools():
 
 class Planet:
     def __init__(self, gradle_args, log_path):
-        self.cmd = ["nix", "develop", "-c", "./gradlew", "runPlanetServer", "--console=plain", *gradle_args]
+        dev = [] if os.environ.get("IN_NIX_SHELL") else ["nix", "develop", "-c"]
+        self.cmd = [*dev, "./gradlew", "runPlanetServer", "--console=plain", *gradle_args]
         self.log_path = log_path
         self.lines, self.fatal, self.done, self.rcon_up = [], None, False, False
 
