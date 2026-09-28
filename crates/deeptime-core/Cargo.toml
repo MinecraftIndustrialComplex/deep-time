@@ -9,5 +9,9 @@ repository.workspace = true
 
 [dependencies]
 deeptime-format.workspace = true
+# Checkpoints: stage state serialised with postcard (plan §3.3, P1-01). MIT OR Apache-2.0.
+postcard = { version = "1.1.3", default-features = false, features = ["use-std"] }
+serde = { version = "1.0.229", features = ["derive"] }
+crc32fast = "1.5.0"
 rayon.workspace = true
 serde_json.workspace = true

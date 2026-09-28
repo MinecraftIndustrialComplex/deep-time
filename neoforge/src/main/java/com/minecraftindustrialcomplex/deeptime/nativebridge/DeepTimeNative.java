@@ -33,7 +33,7 @@ final class DeepTimeNative {
     /** The fixed-input Rayon reduction; must equal {@link NativeLoader#expectedSelfTest()}. */
     static native long selfTest();
 
-    /** JSON: peak bytes, per-stage bytes and seconds. Phase 0: {@code {"peak_bytes":0,"stages":[]}}. */
+    /** JSON {@code {"peak_bytes":P,"stages":[{"bytes":B,"name":N,"seconds":S},…]}} (plan §5.7.5). */
     static native String estimate(String presetJson, String contentJson);
 
     /** Returns a session id (never a pointer). {@code threads} 0 = all processors; {@code memCapBytes} 0 = 4 GiB. */
@@ -48,13 +48,23 @@ final class DeepTimeNative {
     /** Fills the first {@link #PROGRESS_FIELDS} longs of {@code out}. */
     static native void progress(long session, long[] out);
 
+    /** Keyframes produced so far (frames 0 … count − 1 stay readable after the ring drops them). */
     static native int keyframeCount(long session);
 
+    /**
+     * JSON {@code {"h","layers","n","stage","t","w"}} of a keyframe. {@link UnsupportedOperationException}
+     * when the preset produces no keyframes at all, {@link IllegalArgumentException} for an index not
+     * produced yet.
+     */
     static native String keyframeInfo(long session, int index);
 
+    /** Copies layer {@code layer} of a keyframe as RGBA8 into a direct buffer of at least w·h·4 bytes. */
     static native void copyKeyframe(long session, int index, int layer, ByteBuffer dstRgba);
 
-    /** JSON array of events after {@code cursor}. Phase 0: {@code []}. */
+    /**
+     * JSON array of at most {@code max} events after {@code cursor}, which counts events in emission
+     * order (pass the number already received). The event JSON is specified in {@code EVENTS.md}.
+     */
     static native String eventsSince(long session, long cursor, int max);
 
     /**

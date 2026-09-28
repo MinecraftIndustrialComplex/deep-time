@@ -22,7 +22,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-13 | Water above sea level holds | todo | | | |
 | P0-14 | BlueMap renders on MIC blocks | todo | | | |
 | P0-15 | Phase 0 exit | todo | | | |
-| P1-01 | Session, checkpoints, keyframes, event log and site formats | todo | | | |
+| P1-01 | Session, checkpoints, keyframes, event log and site formats | done | 2026-09-28 | — | Mac: cargo test -p deeptime-format 27 ok (segments + sites round-trip, two writers merge with no id collision); run --preset dummy.json → manifest.json, events/1-0.dtev, keyframes/index.json (13 events, 9 keyframes, 3 sites); test --workspace, fmt, clippy -D warnings, deny licenses bans clean; gradlew build test tests=31 failures=0; ./gametest.sh all 10 pass |
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | todo | | | |
 | P1-03 | Plates and crust | todo | | | |
 | P1-04 | Deep-time surface processes on L1 | todo | | | |
@@ -54,6 +54,58 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 — P1-01 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Formats** (`crates/deeptime-format`, spec in `FORMAT.md` and the new `EVENTS.md`). Every new
+  binary file is one "sectioned file" (`container.rs`): the §5.7.2 16-byte header, per-type fixed
+  fields, a section table (u64 offset, u32 length, u32 CRC32) and 8-byte-aligned sections.
+  `DTEV` event segments `events/<writer>-<n>.dtev` (string table, 64-byte records sorted by
+  (t_start, id), causes, 16-byte typed params, a 64-record time index) + `events/index.json`
+  (writers, segments with first/last seq, t range, bytes, CRC); `EventWriter` continues a writer's
+  numbering from the index and `clear()`s only its own segments on a re-run; `EventLog` merges all
+  writers and indexes by time, kind, cause (reverse links, `cause_chain`) and L1 cell. `DTSR` site
+  records (104 bytes) + `DTSI` 512-block grid (CSR, x wraps). `DTKF` keyframes (RGBA8 per layer,
+  LZ4 block) + `keyframes/index.json`. `ramps.rs`: the one colour code for ramps.json (core
+  keyframes and viewer). Format version stays 0.0; no existing file's bytes changed.
+- **Core.** `stage.rs` (Stage: name, estimate, total/steps_done, `step(world, ctx)` with the
+  deadline in `ctx.until`, keyframe_layers, `save_state`/`load_state` — the plan's `checkpoint(w)`
+  is split so the session builds checkpoints), `world.rs` (`WorldState`: clock, named f32 fields,
+  events as writer 1, sites), `dummy.rs` (the dummy preset grows optional `stages` and `world`: a
+  drifting continent, a causal event chain, deposit sites; without them it is exactly P0-07's),
+  `keyframes.rs` (render with ramps, ring of 16, every frame on disk at once, dropped frames read
+  back), `checkpoint.rs` (`DTCP`: JSON summary + postcard 1.1.3 body; schema constant). The session
+  runs a list of stages, publishes events for `eventsSince` (cursor = count in emission order),
+  takes keyframes on an interval grid counted from the run's start and at each stage end, resumes
+  from checkpoints (mid-stage too; a resumed run ends in the identical world — unit test), and
+  `finalize_write` writes preset.json, events, sites, keyframes/index.json and the standard
+  `Manifest` last (source `run:dummy`, every file listed with size and CRC).
+- **CLI.** `run --preset --out [--viewer] [--checkpoints]`, `stage <name> (--in|--preset) [--out]
+  [--viewer]` (refuses a stage the checkpoint already ran), `bench --preset --threads --out
+  [--viewer]` (per-stage ms incl. keyframes, finalize, peak bytes from a counting allocator).
+- **Viewer.** Keyframe strip, scrubber with play, event ticker (events up to the frame, new ones
+  bold), site list, details with params, causes/effects and the "Why here?" chain; markers on the
+  frame; `events.json`/`sites.json`; the layer map hides itself when a bundle has no layers.
+  Bench page: per-thread-count bars on one scale + table. Checked in headless Chromium.
+- **Measured (Mac, `tools/remote/mac.sh`).** `cargo test -p deeptime-format` 27 passed;
+  `cargo run -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/dummy.json --out
+  $TMPDIR/p1-01/dummy --viewer review/out/p1-dummy` → 2 stages, 13 events, 9 keyframes, 3 sites,
+  peak 1.5 MiB, 0.19 s; `cargo test --workspace` (core 18, format 27, cli 10, jni 7, viewer 4),
+  `fmt --check`, `clippy -D warnings`, `deny check licenses bans` clean; `gradlew build test`
+  tests=31 failures=0 (NativeLinkTest gains `keyframesAndEventsCrossTheBoundary`);
+  `mac.sh --server -- ./gametest.sh` → All 10 required tests passed (NativeGameTests
+  `dummySessionRunsAndCancels`: steps=5 manifest ok, cancelled run wrote no manifest). Bench of the
+  dummy (debug build): stages 36.7 ms at 1 thread → 7.7 ms at 8.
+- **Contract changes to note.** The session's `manifest.json` is now the standard `Manifest`
+  (P0-07 wrote an ad-hoc one; Java only ever checked `format_version`). `estimate` lists every
+  stage (`{"peak_bytes":0,"stages":[{"bytes":0,"name":"dummy","seconds":0.0}]}`; NativeLinkTest
+  updated). `keyframeInfo`/`copyKeyframe` are wired: `UnsupportedOperationException` only when the
+  preset makes no keyframes (the Phase 0 dummy), `IllegalArgumentException` for an index not yet
+  produced or a short/heap buffer. New `CoreError::{InvalidArgument, Format}` (JNI maps them to
+  `IllegalArgumentException` and `DeepTimeIoException`).
+- **Not done / later.** Region and path places are not cell-indexed (masks and paths are stored
+  from P1-03); geology writes its events as one segment at `finalizeWrite` (no streaming yet);
+  `run --data <jar|dir>` is `--content <file>` until P1-07; the kinds table in `EVENTS.md` reserves
+  every v1 kind with "params set by P1-xx".
 
 ### 2026-09-28 (later) — builds moved to the Mac; P0-06 shaping; P0-07 and P0-09 merged
 - **Builds run on Ben's M6 Mac mini** (his instruction, after parallel builds overloaded the laptop):
