@@ -82,6 +82,7 @@
             java
             pkgs.gradle
             pkgs.python3
+            pkgs.git            # the Mac's /usr/bin/git is a stub without Xcode's tools
             pkgs.mcrcon
             pkgs.unzip
             pkgs.zip

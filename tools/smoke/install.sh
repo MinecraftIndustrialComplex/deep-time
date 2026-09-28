@@ -173,14 +173,42 @@ if [ "$PROFILE" = mic ]; then
         PACK_REF="$(git -C "$PACK" rev-parse --short HEAD)"
         git -C "$PACK" archive HEAD | tar -xf - -C "$SNAP"
     fi
-    cp "$SNAP/index.toml" "$CACHE/pack-index.toml.orig"
-    ( cd "$SNAP" && nix run nixpkgs#packwiz -- refresh >/dev/null )
-    PACK_STALE="$(python3 - "$CACHE/pack-index.toml.orig" "$SNAP/index.toml" <<'PY2'
-import re, sys
-def entries(p):
-    return dict(re.findall(r'file = "([^"]+)"\nhash = "([^"]+)"', open(p).read()))
-a, b = entries(sys.argv[1]), entries(sys.argv[2])
-print(",".join(sorted(f for f in b if a.get(f) != b[f])))
+    # Fix stale hashes only: recompute the sha256 of every file the index already lists, then the
+    # index's own hash in pack.toml. (A full `packwiz refresh` would also add committed .pw.toml files
+    # that the index leaves out -- the pack has one, mods/rpl.pw.toml -- and so install jars real
+    # players never get.)
+    PACK_STALE="$(python3 - "$SNAP" "$PACK" <<'PY2'
+import hashlib, os, re, shutil, sys
+snap, pack = sys.argv[1], sys.argv[2]
+idx_path = os.path.join(snap, "index.toml")
+idx = open(idx_path).read()
+stale = []
+# The index lists a few raw jars that the pack's .gitignore keeps out of git (Destroy, Dice,
+# Playing Cards on 2026-09-28): they exist only in the pack's working tree, so copy them in.
+for rel in re.findall(r'file = "([^"]+)"', idx):
+    dst = os.path.join(snap, rel)
+    src = os.path.join(pack, rel)
+    if not os.path.exists(dst) and os.path.exists(src):
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+        print(f"   copied untracked pack file {rel}", file=sys.stderr)
+def fix(m):
+    rel, old = m.group(1), m.group(2)
+    path = os.path.join(snap, rel)
+    if not os.path.exists(path):
+        return m.group(0)
+    new = hashlib.sha256(open(path, "rb").read()).hexdigest()
+    if new != old:
+        stale.append(rel)
+    return m.group(0).replace(old, new)
+idx = re.sub(r'file = "([^"]+)"\nhash = "([0-9a-f]+)"', fix, idx)
+open(idx_path, "w").write(idx)
+pack_path = os.path.join(snap, "pack.toml")
+pack = open(pack_path).read()
+idx_hash = hashlib.sha256(idx.encode()).hexdigest()
+pack = re.sub(r'(\[index\][^\[]*?hash = ")[0-9a-f]+(")', lambda m: m.group(1) + idx_hash + m.group(2), pack, flags=re.S)
+open(pack_path, "w").write(pack)
+print(",".join(stale))
 PY2
 )"
     [ -n "$PACK_STALE" ] && echo "   PACK FINDING: the pack index had stale hashes for: $PACK_STALE"

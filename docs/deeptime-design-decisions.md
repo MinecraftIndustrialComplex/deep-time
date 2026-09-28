@@ -119,3 +119,4 @@ the log entry once a question is answered. A newer log entry overrides an older 
 | 2026-09-28 | Build range per world? (plan Q5) | Fixed at −352..639 until 1.0 |
 | 2026-09-28 | "Why here?" in v1? (plan Q13) | Site API + `/deeptime why <site>` + the HTML viewer; an in-game screen waits for the prospecting plan |
 | 2026-09-28 | When do paint-and-pin constraints arrive? (plan Q14) | "I'd put them even after the fantasy features, it's a nice to have but not something I think I'll personally use" |
+| 2026-09-28 | When does Deep Time go into the MIC pack? | "don't merge your mod into the actual MIC pack immediately, at best keep it on a branch for now." Pack changes for Deep Time (the mod, the rock-tag datapack of Q16) go on a pack branch, never straight onto the pack's master |

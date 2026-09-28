@@ -1,0 +1,7 @@
+# Jars (glob patterns) left out of the GameTest server run with -PwithMic only. Each one is a
+# known incompatibility with NeoForge's GameTestServer (not a DedicatedServer), not with Deep Time;
+# the planet server and the smoke servers keep them.
+#
+# Distant Horizons 3.3.0 casts the server to DedicatedServer in its ServerAboutToStart listener
+# (AbstractModInitializer_neoforge line 158) -> ClassCastException on the GameTest server.
+DistantHorizons-*.jar

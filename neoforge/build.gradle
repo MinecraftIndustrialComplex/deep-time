@@ -148,6 +148,8 @@ def serverSetFor = { String run ->
     return null
 }
 
+// The mod ids a jar declares: every modId inside a [[mods]] block of its neoforge.mods.toml
+// (dependency blocks name other mods and are skipped).
 def modIdsOf = { File jar ->
     def ids = []
     try {
@@ -155,16 +157,18 @@ def modIdsOf = { File jar ->
         try {
             def entry = zip.getEntry('META-INF/neoforge.mods.toml')
             if (entry != null) {
+                def inMods = false
                 zip.getInputStream(entry).text.eachLine { line ->
-                    def m = line =~ /^\s*modId\s*=\s*"([^"]+)"/
-                    if (m.find()) ids << m.group(1)
+                    def t = line.trim()
+                    if (t.startsWith('[[') || (t.startsWith('[') && !t.startsWith('[[')))
+                        inMods = t.startsWith('[[mods]]')
+                    def m = t =~ /^modId\s*=\s*"([^"]+)"/
+                    if (inMods && m.find()) ids << m.group(1)
                 }
             }
         } finally { zip.close() }
     } catch (Exception ignored) {}
-    // The first modId under [[mods]] is the mod; later ones are dependency entries,
-    // which only appear inside [[dependencies.*]] blocks with a different indent/key.
-    return ids.isEmpty() ? [] : [ids[0]]
+    return ids
 }
 
 ['gameTestServer', 'planetServer', 'client', 'server'].each { runName ->
@@ -186,9 +190,72 @@ def modIdsOf = { File jar ->
                 def setMods = new File(repoRoot, "smoke/${set}/server/mods")
                 if (!setMods.isDirectory())
                     throw new GradleException("Server set '${set}' is not installed: run tools/smoke/install.sh ${set}")
-                jars += setMods.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }
+                def setJars = setMods.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }
+                if (setJars.isEmpty())
+                    throw new GradleException("Server set '${set}' has no jars in ${setMods}: re-run tools/smoke/install.sh ${set}")
+                jars += setJars
             }
             def onClasspath = ['deeptime', 'toroidal_world_bundle', 'toroidal_world'] as Set
+            // Sinytra Connector cannot run in a dev run ("Could not determine clean minecraft artifact
+            // path"), so dev runs leave it out together with the Fabric-only jars it would load. The
+            // production-launched smoke servers (tools/smoke/run.py) keep the whole pack.
+            def devSkipped = []
+            jars = jars.findAll { jar ->
+                def z = new java.util.zip.ZipFile(jar)
+                try {
+                    def fabricOnly = z.getEntry('fabric.mod.json') != null && z.getEntry('META-INF/neoforge.mods.toml') == null
+                    def connector = jar.name.startsWith('connector-')
+                    if (fabricOnly || connector) { devSkipped << jar.name; return false }
+                    return true
+                } finally { z.close() }
+            }
+            // ...and, to a fixed point, every jar that hard-requires a mod left out.
+            def skippedIds = ['connector'] as Set
+            def requires = { File jar ->
+                def z = new java.util.zip.ZipFile(jar)
+                try {
+                    def e = z.getEntry('META-INF/neoforge.mods.toml')
+                    if (e == null) return [] as Set
+                    def req = [] as Set
+                    def depId = null, required = false, inDep = false
+                    def flush = { if (inDep && depId && required) req << depId }
+                    z.getInputStream(e).text.eachLine { line ->
+                        def t = line.trim()
+                        if (t.startsWith('[')) { flush(); inDep = t.startsWith('[[dependencies'); depId = null; required = false }
+                        def m = t =~ /^modId\s*=\s*"([^"]+)"/
+                        if (m.find()) depId = m.group(1)
+                        if (t ==~ /^type\s*=\s*"required".*/ || t ==~ /^mandatory\s*=\s*true.*/) required = true
+                    }
+                    flush()
+                    return req
+                } finally { z.close() }
+            }
+            def changed = true
+            while (changed) {
+                changed = false
+                jars = jars.findAll { jar ->
+                    if (!requires(jar).intersect(skippedIds).isEmpty()) {
+                        devSkipped << jar.name
+                        skippedIds.addAll(modIdsOf(jar))
+                        changed = true
+                        return false
+                    }
+                    return true
+                }
+            }
+            // Per-set GameTest-server exclusions (tools/smoke/profiles/<set>.gametest-excluded).
+            def gtExcluded = set == null ? null : new File(repoRoot, "tools/smoke/profiles/${set}.gametest-excluded")
+            if (runName == 'gameTestServer' && gtExcluded?.isFile()) {
+                def globs = gtExcluded.readLines().collect { it.trim() }.findAll { it && !it.startsWith('#') }
+                def fs = java.nio.file.FileSystems.default
+                def matchers = globs.collect { fs.getPathMatcher("glob:${it}") }
+                jars = jars.findAll { jar ->
+                    if (matchers.any { it.matches(java.nio.file.Paths.get(jar.name)) }) { devSkipped << jar.name; return false }
+                    return true
+                }
+            }
+            if (devSkipped)
+                logger.lifecycle("linkRunMods: left out of this dev run (Connector, Fabric-only, and what requires them): ${devSkipped.join(', ')}")
             def seen = [:]
             jars.each { jar ->
                 def ids = modIdsOf(jar)
@@ -197,12 +264,20 @@ def modIdsOf = { File jar ->
                     logger.lifecycle("linkRunMods: skipping ${jar.name} (${id} is provided by the build)")
                     return
                 }
-                if (id != null && seen.containsKey(id))
-                    throw new GradleException("Two jars declare mod id '${id}': ${seen[id]} and ${jar.name}")
-                if (id != null) seen[id] = jar.name
+                if (id != null && seen.containsKey(id)) {
+                    // FML loads one of two byte-identical jars (the MIC pack pins Ritchie's
+                    // Projectile Library twice); two different jars for one mod id are a hard failure.
+                    def first = seen[id]
+                    if (java.util.Arrays.equals(first.bytes, jar.bytes)) {
+                        logger.warn("linkRunMods: ${jar.name} is a byte-identical duplicate of ${first.name} (mod id ${id}); linking one")
+                        return
+                    }
+                    throw new GradleException("Two different jars declare mod id '${id}': ${first.name} and ${jar.name}")
+                }
+                if (id != null) seen[id] = jar
                 java.nio.file.Files.createSymbolicLink(new File(modsDir, jar.name).toPath(), jar.toPath())
             }
-            logger.lifecycle("linkRunMods: ${seen.size()} mod jars linked into ${modsDir} (set: ${set ?: 'none'})")
+            logger.lifecycle("linkRunMods: ${seen.size()} mods linked into ${modsDir} (set: ${set ?: 'none'})")
         }
     }
     tasks.matching { it.name == "run${cap}" }.configureEach { dependsOn linkTask }

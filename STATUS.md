@@ -10,7 +10,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-01 | Repository bootstrap and the docs move | done | 2026-09-28 | 2725107 | gh repo view → PRIVATE; 14 docs copied, sha256 equal; nix develop: rustc 1.98.1, JDK 21.0.12.1, zig-0.13.0, cargo-xwin 0.23.1; mic/Docs pointers written |
 | P0-02 | Cargo workspace and CI | done | 2026-09-28 | 677b6e6 | cargo test --workspace ok (6 crates); clippy -D warnings ok; cargo deny: bans ok, licenses ok. CI run: see build log |
 | P0-03 | Gradle NeoForge module skeleton | done | 2026-09-28 | 774a3ef | gradlew build → BUILD SUCCESSFUL; junit-summary tests=1 failures=0; ./gametest.sh → All 1 required tests passed; checkVersions fails on 0.0.2 |
-| P0-04 | Deep Time's server sets and smoke harness | doing | 2026-09-28 | 1d62258 | standalone and mic smoke PASS (level-type minecraft:normal); ./gametest.sh -PwithMic pending |
+| P0-04 | Deep Time's server sets and smoke harness | done | 2026-09-28 | — | standalone + mic smoke PASS (laptop run); Mac: ./gametest.sh -PwithMic → All 7 required tests passed with 160 MIC mods (dev-run exclusions: Connector, antique-atlas, surveyor, Distant Horizons; see build log) |
 | P0-05 | Generator skeleton on the analytic test terrain | done | 2026-09-28 | 33f1cd9 | ./gametest.sh → all pass (heightMatchesReference cornerMax 0, maxAbsDiff 0; periodicAcrossSeam 0 mismatches; veins off); planet server (Mac) boots with level-type deeptime:planet, probe column 0 0 → surfaceY 14 for H 14.99. -PwithMic run: with P0-04 |
 | P0-06 | Toroidal World spike (server-side items) | doing | 2026-09-28 | ca88695 | probe tw on the planet server: stamped=true loopsX=true loopsZ=false widthChunks=1024 (chunks -512..512). Seam GameTests being fixed |
 | P0-07 | JNI hello world, native loader and the five failure classes | done | 2026-09-28 | c813177 | Mac: JUnit tests=30 failures=0; NativeSmoke OK + 5 forced classes; ./gametest.sh NativeGameTests pass: native version=0.0.1 format=0.0 target=aarch64-apple-darwin selftest=1997318690096807936. Linux load path first runs in CI |
@@ -69,6 +69,24 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **GameTest naming.** With `@PrefixGameTestTemplate(false)` a test is named by its lower-case method
   name without the class prefix, so `/test runall <class>` finds nothing; the planet harness runs
   tests by name (`--run name1,name2@x,y,z`).
+- **MIC in dev runs (`-PwithMic`).** Sinytra Connector cannot start in a ModDevGradle dev run ("Could
+  not determine clean minecraft artifact path"), so dev runs leave out Connector, Fabric-only jars and
+  whatever hard-requires them (antique-atlas, surveyor); Distant Horizons 3.3.0 casts the server to
+  `DedicatedServer` and crashes the GameTest server, so it is in `tools/smoke/profiles/mic.gametest-excluded`.
+  Production-launched smoke servers keep the whole pack. `linkRunMods` links one of two byte-identical
+  jars (as FML does) and fails only on differing duplicates.
+- **Pack findings for Ben** (the pack is not modified; decisions log 2026-09-28: Deep Time changes to
+  MIC go on a pack branch):
+  1. `index.toml` at 303fd89 has a stale hash for `kubejs/server_scripts/destroy_metallurgy_integration.js`,
+     so packwiz-installer rejects the pack ("Hash invalid!").
+  2. Ritchie's Projectile Library is pinned twice (`mods/rpl.pw.toml` and
+     `mods/ritchies-projectile-library.pw.toml`, same 2.1.2 jar under two names).
+  3. `index.toml` lists three raw jars that `.gitignore` keeps out of git (`mods/destroy-1.21.1-0.4.1.jar`,
+     `mods/Dice-neoforge-1.0.0.jar`, `mods/playingcards-2.0.1-neoforge.jar`): they exist only in the
+     laptop's working tree, so a fresh clone of the pack cannot install. `install.sh mic` copies them
+     from the working tree into its snapshot.
+- **The Mac has no real git** (`/usr/bin/git` is Apple's stub): `mac.sh` keeps a GC-rooted nixpkgs git
+  on the SSD, and the dev shell carries git.
 - **TW semantics for tests:** TW moves an entity that *steps* over the border (its movement path);
   `setPos` is a teleport and stays unfolded.
 - **P0-07 (agent, merged):** see the P0-07 entry below. **P0-09 (agent, merged):** on-disk layout in
