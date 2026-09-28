@@ -68,6 +68,7 @@ public final class SableSeamGameTests {
         SableTestOps.addVelocity(level, id, new Vec3(SPEED, 0, 0));
         long t0 = helper.getTick();
         long[] crossedAt = {-1};
+        int[] pushes = {1};
         helper.onEachTick(() -> {
             long t = helper.getTick() - t0;
             Vec3 pos = SableTestOps.position(level, id);
@@ -75,11 +76,18 @@ public final class SableSeamGameTests {
                 finish(helper, level, id, false, String.format("hull %s vanished after %d ticks", id, t));
                 return;
             }
+            // If the body joined the physics pipeline only after the first push, push again (once).
+            Vec3 v0 = SableTestOps.velocity(level, id);
+            if (crossedAt[0] < 0 && t >= 1 && pushes[0] < 2 && v0 != null && v0.x < SPEED / 2) {
+                SableTestOps.addVelocity(level, id, new Vec3(SPEED - v0.x, 0, 0));
+                pushes[0]++;
+            }
             if (crossedAt[0] < 0) {
                 if (pos.x < 0)
                     crossedAt[0] = t;   // folded: it now flies on from the west edge
                 else if (t > MAX_FLIGHT_TICKS)
-                    finish(helper, level, id, false, String.format("no fold after %d ticks: x=%.2f (edge %d)", t, pos.x, c / 2));
+                    finish(helper, level, id, false, String.format("no fold after %d ticks: x=%.2f (edge %d) vx=%.2f pushes=%d",
+                            t, pos.x, c / 2, v0 == null ? Double.NaN : v0.x, pushes[0]));
                 return;
             }
             if (t - crossedAt[0] < 2)
@@ -91,9 +99,9 @@ public final class SableSeamGameTests {
             boolean folded = shape.fold(BlockPos.containing(pos)).getX() == BlockPos.containing(pos).getX();
             boolean ok = blocks0 == hull.size() && blocks == blocks0 && inSpan && nearWestEdge && folded;
             finish(helper, level, id, ok, String.format(
-                    "C=%d start.x=%.2f crossedAtTick=%d x=%.2f y=%.2f blocks=%d/%d assembled=%d vx=%.2f inSpan=%s",
+                    "C=%d start.x=%.2f crossedAtTick=%d x=%.2f y=%.2f blocks=%d/%d assembled=%d vx=%.2f pushes=%d inSpan=%s",
                     c, start == null ? Double.NaN : start.x, crossedAt[0], pos.x, pos.y, blocks, blocks0, hull.size(),
-                    v == null ? Double.NaN : v.x, inSpan));
+                    v == null ? Double.NaN : v.x, pushes[0], inSpan));
         });
     }
 

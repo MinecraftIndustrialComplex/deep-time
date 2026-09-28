@@ -6,6 +6,7 @@
 #
 #   ./gametest-planet.sh --boot-only                 start, wait for Done, probe column 0 0, stop
 #   ./gametest-planet.sh --run columnscontinuous,entitycrossesseam@8185,250,0 [--run ...]
+#                                                    one test at a time (a /test run cancels any running test)
 #   ./gametest-planet.sh --run prototypepushback@0,300,3527~16,160   forceload x±16, z±160
 #   ./gametest-planet.sh --scenario sable_straddle   hull across the seam survives save + restart
 #   ./gametest-planet.sh --size 32768 ...            the 32k preset
