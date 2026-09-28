@@ -10,8 +10,8 @@
 #   --pack         also sync the MIC pack (…/mic/pack, with its .git) for tools/smoke/install.sh mic
 #   --pull <path>  after the command, copy <path> (relative to the repo root) back from the Mac;
 #                  repeatable (e.g. --pull smoke/mic/report.md --pull neoforge/build/gametest.log)
-#   <command>      run from the repo root on the Mac inside a login shell, e.g.
-#                  'nix develop -c cargo test --workspace'  or  './gametest.sh'
+#   <command>      run from the repo root on the Mac, already inside the repo's dev shell, e.g.
+#                  'cargo test --workspace'  or  './gametest.sh'
 #
 # Layout on the Mac, all on the external SSD (/Volumes/Graphide; the internal disk is small and
 # /nix is already on the SSD):
@@ -46,9 +46,15 @@ done
 [ $# -gt 0 ] || { echo "usage: tools/remote/mac.sh [--no-sync] [--pack] [--pull <path>]... -- <command>" >&2; exit 2; }
 CMD="$*"
 
-SSH=(ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30 "$HOST")
+# -n: never let ssh read (and drain) this script's stdin.
+SSH=(ssh -n -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30 "$HOST")
 
 # The SSD must be mounted, or everything would silently land on the small internal disk.
+# The Mac is shared with graphide's agents: respect their "keep off Nix" markers.
+if "${SSH[@]}" 'test -e /Users/Shared/graphide-nix-maintenance -o -e /Users/Shared/graphide-nix-unhealthy'; then
+    echo "mac.sh: the Mac's Nix is under maintenance or unhealthy (/Users/Shared/graphide-nix-*); not running" >&2
+    exit 75
+fi
 "${SSH[@]}" "test -d /Volumes/Graphide/ban && mkdir -p '$REMOTE' '$CACHE/gradle' '$CACHE/cargo' '$CACHE/xwin' '$CACHE/tmp' '$SSD/mic/pack'" \
     || { echo "mac.sh: /Volumes/Graphide is not mounted on $HOST" >&2; exit 1; }
 
@@ -66,8 +72,15 @@ if [ "$PACK" = 1 ]; then
     rsync -a --delete -e "ssh -o BatchMode=yes" "$PACKDIR/" "$HOST:$SSD/mic/pack/"
 fi
 
+# The command runs inside the repo's dev shell, entered through a GC-rooted profile keyed on
+# flake.nix + flake.lock. Evaluating the flake afresh on every call would copy the synced tree
+# into /nix/store each time (that pattern filled the Mac's SSD twice in September 2026); the
+# repo's scripts see IN_NIX_SHELL and skip their own `nix develop`.
+KEY="$(cat "$REPO/flake.nix" "$REPO/flake.lock" | sha256sum | cut -c1-16)"
+PROFILE="$CACHE/devshell-$KEY"
+INNER="cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac && { [ -e '$PROFILE' ] || nix develop --profile '$PROFILE' -c true; } && exec nix develop '$PROFILE' -c zsh -c $(printf '%q' "$CMD")"
 set +e
-"${SSH[@]}" "cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac && exec zsh -lc $(printf '%q' "$CMD")"
+"${SSH[@]}" "exec zsh -lc $(printf '%q' "$INNER")"
 status=$?
 set -e
 
