@@ -2692,8 +2692,11 @@ of Phase 0 is built on it.
 - **Depends on.** P0-10, P0-11.
 - **Acceptance.**
   - `./gametest.sh` → `lakeHolds` passes; log `[gametest] lakeHolds before=<N> after=<N> expected=<N> outside=0`
-  - `nix develop -c cargo run -p deeptime-inspect -- section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at <lake z> --from <a> --to <b>`
-    → a PNG with the water surface at y 120
+    with before = after = expected, and `[gametest] lakeHolds water_top_y=120` (the top face of the
+    highest water block at the lake centre, `notes.lake.centre_block`; cold-read review 2, gap 18)
+  - `nix develop -c cargo run -p deeptime-inspect -- section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at 0 --from -88 --to 212`
+    → a PNG with the water surface at y 120 (the lake centre is z 0 and the channel runs along it
+    to x 160; −88…212 is `lakeHolds`' scanned box; a review picture, P0-11)
 - **Ben reviews.** The cross-section and the BlueMap view of the lake.
 
 #### P0-14 BlueMap renders on MIC blocks
