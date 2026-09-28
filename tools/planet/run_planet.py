@@ -99,8 +99,8 @@ def main():
     ap.add_argument("--boot-only", action="store_true")
     ap.add_argument("--size", type=int, default=16384, choices=(16384, 32768))
     ap.add_argument("--test-terrain", default="wrap-test")
-    ap.add_argument("--run", action="append", default=[], metavar="CLASS@X,Y,Z",
-                    help="run a test class positioned at X,Y,Z (repeatable)")
+    ap.add_argument("--run", action="append", default=[], metavar="TEST[,TEST...]@X,Y,Z",
+                    help="run tests by name (lower-case method names) positioned at X,Y,Z (repeatable)")
     ap.add_argument("--timeout", type=int, default=1200)
     ap.add_argument("gradle_args", nargs="*")
     a = ap.parse_args()
@@ -154,28 +154,30 @@ def main():
             if not m:
                 failures.append("probe tw did not answer")
             for spec in a.run:
-                cls, _, pos = spec.partition("@")
+                # "<test>[,<test>...]@x,y,z". A test's name is its method name in lower case:
+                # Deep Time's holders use @PrefixGameTestTemplate(false), which also drops the class
+                # prefix that `/test runall <class>` would match, so tests are run by name.
+                names_part, _, pos = spec.partition("@")
+                names = [n.strip().lower() for n in names_part.split(",") if n.strip()]
                 x, y, z = (pos or "0,100,0").split(",")
                 rcon("deeptime gametest reset")
                 rcon(f"forceload add {int(x) - 32} {int(z) - 32} {int(x) + 32} {int(z) + 32}")
-                print(f"   /test runall {cls} at {x},{y},{z}", flush=True)
-                print("     " + rcon(f"execute positioned {x} {y} {z} run test runall {cls}"), flush=True)
+                for name in names:
+                    print(f"   /test run {name} at {x},{y},{z}: " + rcon(f"execute positioned {x} {y} {z} run test run {name}"), flush=True)
                 end = time.time() + a.timeout
-                summary = None
+                summary = {}
                 while time.time() < end:
-                    time.sleep(5)
+                    time.sleep(3)
                     m = SUMMARY.search(rcon("deeptime gametest summary"))
-                    if m:
-                        summary = json.loads(m.group(1))
-                        if not any("Running" in l and "tests" in l for l in srv.lines[-5:]) and summary["passed"] + summary["failed"] > 0:
-                            # Settle: a later poll with the same counts means the batch is done.
-                            time.sleep(10)
-                            again = json.loads(SUMMARY.search(rcon("deeptime gametest summary")).group(1))
-                            if again == summary:
-                                break
-                print(f"   [gametest-summary] {cls}: {json.dumps(summary)}", flush=True)
-                if not summary or summary["failed"] or summary["passed"] == 0:
-                    failures.append(f"{cls}: {summary}")
+                    summary = json.loads(m.group(1)) if m else {}
+                    if all(n in summary.get("tests", {}) for n in names):
+                        break
+                tests = summary.get("tests", {})
+                for n in names:
+                    r = tests.get(n)
+                    print(f"   [gametest-summary] {n}: {r if r else 'NO RESULT (timeout)'}", flush=True)
+                    if not r or r["fail"] or not r["pass"]:
+                        failures.append(f"{n}: {r}")
     finally:
         srv.stop(rcon)
     print("PASS" if not failures else "FAIL: " + "; ".join(failures), flush=True)

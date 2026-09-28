@@ -5,7 +5,7 @@
 # planet with Toroidal World's wrap, where the seam, Sable and pole tests live.
 #
 #   ./gametest-planet.sh --boot-only                 start, wait for Done, probe column 0 0, stop
-#   ./gametest-planet.sh --run SeamGameTests@8190,100,0 [--run ...]
+#   ./gametest-planet.sh --run columnscontinuous,entitycrossesseam@8185,250,0 [--run ...]
 #   ./gametest-planet.sh --size 32768 ...            the 32k preset
 #   ./gametest-planet.sh --test-terrain wrap-test    the analytic terrain (the default until P0-10)
 #   ./gametest-planet.sh ... -- -PwithMic            extra Gradle arguments after --
