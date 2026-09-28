@@ -1,0 +1,66 @@
+{
+  "_comment": "Colour ramps of the Deep Time viewer (plan §9.3). Stops are [physical value, #rrggbb], linearly interpolated, clamped at the ends. 'layers' maps a layer name to its ramp; unknown layers use 'default'. The Rust bundle writer colours layers/*.png with these and embeds this file in bundle.js for the legend.",
+  "ramps": {
+    "elevation": {
+      "stops": [
+        [-352, "#08142e"],
+        [-100, "#123a6b"],
+        [40, "#2f6fb0"],
+        [62.99, "#7fb3e0"],
+        [63, "#3f7f3a"],
+        [100, "#76a852"],
+        [180, "#c2b36b"],
+        [300, "#9a7b55"],
+        [450, "#7a6a60"],
+        [560, "#e6e6e6"],
+        [639, "#ffffff"]
+      ]
+    },
+    "water": {
+      "stops": [
+        [63, "#9ad0ff"],
+        [200, "#2f7fd8"],
+        [639, "#0b3c8c"]
+      ]
+    },
+    "temperature": {
+      "stops": [
+        [-1, "#313695"],
+        [-0.45, "#74add1"],
+        [0, "#ffffbf"],
+        [0.55, "#f46d43"],
+        [1, "#a50026"]
+      ]
+    },
+    "vegetation": {
+      "stops": [
+        [-1, "#8c510a"],
+        [0, "#f6e8c3"],
+        [1, "#01665e"]
+      ]
+    },
+    "diverging": {
+      "stops": [
+        [-1, "#2166ac"],
+        [0, "#f7f7f7"],
+        [1, "#b2182b"]
+      ]
+    },
+    "grey": {
+      "stops": [
+        [-1, "#111111"],
+        [1, "#f0f0f0"]
+      ]
+    }
+  },
+  "layers": {
+    "elevation": "elevation",
+    "water_level": "water",
+    "climate/temperature": "temperature",
+    "climate/vegetation": "vegetation",
+    "climate/continents": "diverging",
+    "climate/erosion": "grey",
+    "climate/ridges": "grey"
+  },
+  "default": "grey"
+}
