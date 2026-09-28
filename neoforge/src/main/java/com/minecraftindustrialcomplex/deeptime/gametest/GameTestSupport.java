@@ -3,7 +3,19 @@ package com.minecraftindustrialcomplex.deeptime.gametest;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackSource;
+import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.IEventBus;
+import net.minecraft.gametest.framework.GlobalTestReporter;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.AddPackFindersEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 
 /**
@@ -32,6 +44,10 @@ public final class GameTestSupport {
 
     public static final BlockPos CENTRE = new BlockPos(2, 1, 2);
 
+    /** The analytic test terrain's level (C = 16,384), defined by the gametest pack (plan §9.4). */
+    public static final ResourceKey<Level> TEST_PLANET =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_planet"));
+
     private GameTestSupport() {}
 
     /** True in the two dev GameTest runtimes (both set {@code -Ddeeptime.gametest=true}). */
@@ -44,5 +60,24 @@ public final class GameTestSupport {
             return;
         modBus.addListener(RegisterGameTestsEvent.class,
                 e -> DeepTime.LOGGER.info("[gametest] Deep Time GameTest support enabled"));
+        modBus.addListener(AddPackFindersEvent.class, GameTestSupport::addTestPack);
+        // The planet server is a normal dedicated server with /test enabled: give it a reporter
+        // that logs passes (the GameTest server logs its own summary).
+        if (Boolean.getBoolean("neoforge.enableGameTest"))
+            NeoForge.EVENT_BUS.addListener(ServerStartingEvent.class, e -> {
+                GlobalTestReporter.replaceWith(DeepTimeTestReporter.INSTANCE);
+                DeepTime.LOGGER.info("[gametest] Deep Time test reporter installed");
+            });
+    }
+
+    /**
+     * The gametest pack ({@code src/gametest/resources/deeptime_gametest/}): test dimensions and
+     * biomes. It is part of the mod only in dev runs (the gametest source set), and required
+     * (always active) there. The GameTest server enables every available pack anyway.
+     */
+    private static void addTestPack(AddPackFindersEvent event) {
+        event.addPackFinders(ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "deeptime_gametest"),
+                PackType.SERVER_DATA, Component.literal("Deep Time GameTest"), PackSource.BUILT_IN, true,
+                Pack.Position.TOP);
     }
 }

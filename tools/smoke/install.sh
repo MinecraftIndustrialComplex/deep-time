@@ -61,6 +61,7 @@ esac
 SMOKE="$REPO/smoke/$PROFILE"
 SERVER="$SMOKE/server"
 say() { printf '\n== %s\n' "$*"; }
+dev() { if [ -n "${IN_NIX_SHELL:-}" ]; then "$@"; else nix develop -c "$@"; fi; }
 
 [ -f "$PACK/pack.toml" ] || { echo "install.sh: no pack at $PACK" >&2; exit 1; }
 if [ "$CLEAN" = 1 ]; then say "removing $SERVER"; rm -rf "$SERVER"; fi
@@ -260,7 +261,7 @@ fi
 if [ -n "$SYNTH" ]; then
     say "writing synthetic world data ($SYNTH, C=$SIZE)"
     rm -rf "$SERVER/planet"
-    ( cd "$REPO" && nix develop -c cargo run --release -q -p deeptime-cli -- synth --kind "$SYNTH" --size "$SIZE" --out "$SERVER/planet/deeptime" )
+    ( cd "$REPO" && dev cargo run --release -q -p deeptime-cli -- synth --kind "$SYNTH" --size "$SIZE" --out "$SERVER/planet/deeptime" )
 fi
 
 cat > "$SMOKE/install.json" <<EOF

@@ -16,6 +16,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 
+# Inside the dev shell already (tools/remote/mac.sh enters it once)? Then run directly.
+dev() { if [ -n "${IN_NIX_SHELL:-}" ]; then "$@"; else nix develop -c "$@"; fi; }
+
 LOG=neoforge/build/gametest.log
 mkdir -p neoforge/build
 
@@ -41,7 +44,7 @@ sampler=$!
 trap 'kill "$sampler" 2>/dev/null; rm -f "$peak_rss_file"' EXIT
 
 start=$(date +%s)
-(cd neoforge && nix develop -c ./gradlew runGameTestServer --console=plain "$@") 2>&1 | tee "$LOG"
+(cd neoforge && dev ./gradlew runGameTestServer --console=plain "$@") 2>&1 | tee "$LOG"
 status=${PIPESTATUS[0]}
 elapsed=$(( $(date +%s) - start ))
 peak_kb=$(cat "$peak_rss_file")

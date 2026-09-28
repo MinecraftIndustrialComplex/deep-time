@@ -4,7 +4,9 @@
   "package": "com.minecraftindustrialcomplex.deeptime.mixin.gametest",
   "compatibilityLevel": "JAVA_21",
   "plugin": "com.minecraftindustrialcomplex.deeptime.mixin.DeepTimeMixinPlugin",
-  "mixins": [],
+  "mixins": [
+    "GameTestServerMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

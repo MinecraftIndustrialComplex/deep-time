@@ -2,8 +2,11 @@
 package com.minecraftindustrialcomplex.deeptime;
 
 import com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport;
+import com.minecraftindustrialcomplex.deeptime.server.DeepTimeCommands;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +22,8 @@ public final class DeepTime {
     public static final Logger LOGGER = LoggerFactory.getLogger(MODID);
 
     public DeepTime(IEventBus modBus) {
+        DeepTimeRegistries.register(modBus);
+        NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, e -> DeepTimeCommands.register(e.getDispatcher()));
         GameTestSupport.init(modBus);
     }
 }
