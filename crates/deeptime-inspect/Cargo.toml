@@ -7,8 +7,25 @@ license.workspace = true
 publish.workspace = true
 repository.workspace = true
 
+[lib]
+name = "deeptime_inspect"
+path = "src/lib.rs"
+
 [[bin]]
 name = "deeptime-inspect"
 path = "src/main.rs"
 
 [dependencies]
+# World data (the heights and horizons that `compare`, `seam` and `section` check against).
+deeptime-format.workspace = true
+serde_json.workspace = true
+# Command line. MIT OR Apache-2.0.
+clap = { version = "4.5", features = ["derive"] }
+# Region-file chunks (zlib, gzip) and jar entries (deflate). MIT OR Apache-2.0.
+flate2 = "1.1.10"
+# Region-file chunks written with region-file-compression=lz4 (lz4-java's LZ4Block stream). MIT.
+lz4_flex = "0.14.0"
+# Renders and texture decoding. MIT OR Apache-2.0.
+png = "0.18.1"
+# Mod jars are mapped, not read, when `colors` indexes a pack's mods folder. MIT OR Apache-2.0.
+memmap2 = "0.9.11"
