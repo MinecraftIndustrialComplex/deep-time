@@ -52,6 +52,14 @@ public final class GameTestSupport {
     public static final ResourceKey<Level> TEST_PLANET_DATA =
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_planet_data"));
 
+    /**
+     * The lake-test level (C = 1,024, folder {@code deeptime-lake}; gametest.sh writes it): a fixed
+     * biome with no carvers and no features, {@code deeptime:test_bare}, so nothing but the
+     * generator touches the basin (plan §9.4, P0-13).
+     */
+    public static final ResourceKey<Level> TEST_LAKE =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_lake"));
+
     private GameTestSupport() {}
 
     /** True in the two dev GameTest runtimes (both set {@code -Ddeeptime.gametest=true}). */
