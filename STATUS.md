@@ -45,6 +45,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 ## Review pages
 | Name | URL | Version label | Date |
 |---|---|---|---|
+| seams (how the seams work, interactive) | https://spacesheep.dev/@benmac/deeptime-seams | seams v2 2026-09-28 | 2026-09-28 |
 
 ## Pending questions
 Questions asked of Ben and not yet answered. Answers go into the decisions file's log

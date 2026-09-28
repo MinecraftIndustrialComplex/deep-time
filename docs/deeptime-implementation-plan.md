@@ -282,7 +282,7 @@ nix shell nixpkgs#nodejs_22 -c npx -y spacesheep@1.17.0 deploy . \
   `--visibility`, `--org`, `-m` and `--json`; 1.13.0 (whose `--help` this plan first used) had the same
   options without `--new`. Re-check the README before bumping the pin.
 - **Space ids are recorded in the repo.** A first deploy creates a space and writes `.spacesheep.json`
-  (`{"space": "<uuid>", "url": "https://spacesheep.dev/@ben-6b8e/<slug>"}`) into the deployed folder,
+  (`{"space": "<uuid>", "url": "https://spacesheep.dev/@benmac/<slug>"}`) into the deployed folder,
   and later deploys from that folder publish a **new version of the same space**. Review folders live
   under the gitignored `review/out/`, so `publish.sh` also copies each page's space id into
   `tools/review/spaces.json` (committed) and passes `--space` on every later deploy. That keeps Ben's
