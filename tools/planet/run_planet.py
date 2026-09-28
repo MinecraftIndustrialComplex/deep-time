@@ -166,7 +166,7 @@ def main():
     sys.exit(0 if not failures else 1)
 
 
-def forceload(rcon, c, x0, z0, x1, z1, wait=180):
+def forceload(rcon, c, x0, z0, x1, z1, wait=180, points=()):
     """Forceload the block box [x0, x1] x [z0, z1] on the planet, then wait until it is loaded.
 
     Toroidal World's /forceload accepts canonical coordinates only (-C/2 <= x < C/2: "8217 is
@@ -181,7 +181,9 @@ def forceload(rcon, c, x0, z0, x1, z1, wait=180):
     boxes = [(a, b)] if b < half else [(a, half - 1), (-half, b - c)]
     for bx0, bx1 in boxes:
         print(f"   forceload add {bx0} {z0} {bx1} {z1}: " + rcon(f"forceload add {bx0} {z0} {bx1} {z1}"), flush=True)
-    corners = [(x, z) for bx0, bx1 in boxes for x in (bx0, bx1) for z in (z0, z1)]
+    # Every corner, and every extra point (the test spots): the box's chunks do not all arrive
+    # at once, and a test whose own chunk is late lands at the bottom of the world.
+    corners = [(x, z) for bx0, bx1 in boxes for x in (bx0, bx1) for z in (z0, z1)] + list(points)
     end = time.time() + wait
     while time.time() < end:
         missing = [(x, z) for x, z in corners if "passed" not in rcon(f"execute if loaded {x} 0 {z}").lower()]
@@ -209,7 +211,9 @@ def run_tests(spec, rcon, timeout, c):
     dx, dz = (int(v) for v in (extent or "32,32").split(","))
     rcon("deeptime gametest reset")
     last_z = z + 8 * (len(names) - 1)
-    if not forceload(rcon, c, x - dx, z - dz, x + dx, last_z + dz):
+    # `/test run` at (x, z) puts the test at (x, surface + 1, z + 3).
+    spots = [(x, z + 8 * i + 3) for i in range(len(names))]
+    if not forceload(rcon, c, x - dx, z - dz, x + dx, last_z + dz, points=spots):
         return [f"{','.join(names)}: forceloaded chunks never loaded"]
     # One test at a time: 1.21.1's `/test run` begins with TestCommand.stopTests(), which cancels
     # every test still running, so a second /test run issued before the first test reported
@@ -218,6 +222,10 @@ def run_tests(spec, rcon, timeout, c):
     summary = {}
     for n_i, name in enumerate(names):
         tz = z + 8 * n_i
+        m = PROBE.search(rcon(f"deeptime probe column {x} {tz + 3}"))
+        where = json.loads(m.group(1)) if m else {}
+        print(f"   spot {x},{tz + 3}: chunkLoaded={where.get('chunkLoaded')} worldSurface={where.get('worldSurface')} "
+              f"surfaceY={where.get('surfaceY')}", flush=True)
         print(f"   /test run {name} at {x},{y},{tz}: " + rcon(f"execute positioned {x} {y} {tz} run test run {name}"), flush=True)
         end = time.time() + timeout
         while time.time() < end:

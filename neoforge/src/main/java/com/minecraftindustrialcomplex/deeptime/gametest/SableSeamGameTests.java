@@ -52,7 +52,7 @@ public final class SableSeamGameTests {
             helper.fail("Sable is not loaded on this server");
             return;
         }
-        BlockPos spot = helper.absolutePos(GameTestSupport.CENTRE);
+        BlockPos spot = SeamGameTests.surfaceSpot(helper);
         int y = spot.getY() + 30, z = spot.getZ();
         BlockPos anchor = new BlockPos(c / 2 - START_WEST, y, z);
         List<BlockPos> hull = new ArrayList<>();
