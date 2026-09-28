@@ -30,7 +30,9 @@ pub trait Terrain: Sync {
     fn raster(&self, layer: &str, x: i64, z: i64) -> f64 {
         match layer {
             "climate/temperature" => 0.9 - 1.8 * self.latitude(z).abs() / (PI / 2.0),
-            "climate/continents" => (-1.0f64).max(1.0f64.min(-0.15 + (self.height(x, z) - 63.0) / 80.0)),
+            "climate/continents" => {
+                (-1.0f64).max(1.0f64.min(-0.15 + (self.height(x, z) - 63.0) / 80.0))
+            }
             "climate/erosion" => 0.2,
             "climate/ridges" => 0.35,
             _ => 0.0,
@@ -173,8 +175,12 @@ mod tests {
                 assert!((-35.0..598.0).contains(&h), "H({x},{z}) = {h}");
             }
         }
-        // Beyond the pole the value holds.
-        assert_eq!(t.height(7, -256), t.height(7, -400));
+        // Beyond the pole latitude holds (the range's Gaussian still uses the raw z, as in Java).
+        assert_eq!(t.latitude(-256), t.latitude(-400));
+        assert_eq!(
+            t.raster("climate/temperature", 7, -256),
+            t.raster("climate/temperature", 7, -400)
+        );
         // The range peak at (C/8, C/32).
         assert!(t.height(128, 32) > 450.0);
     }

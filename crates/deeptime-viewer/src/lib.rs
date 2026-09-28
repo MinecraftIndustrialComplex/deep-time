@@ -25,6 +25,8 @@ const VIEWER_JS: &str = include_str!("../assets/viewer.js");
 pub const MAX_IMAGE_W: u32 = 2048;
 /// Widest value grid written per layer.
 pub const MAX_VALUES_W: u32 = 1024;
+/// Widest horizon-stack grid written for the inspector (3K bytes per cell).
+pub const MAX_STRATA_W: u32 = 512;
 
 /// Page header facts.
 pub struct BundleInfo {
@@ -74,7 +76,11 @@ impl Ramp {
         for w in stops.windows(2) {
             let (a, b) = (&w[0], &w[1]);
             if v <= b.0 {
-                let t = if b.0 > a.0 { (v - a.0) / (b.0 - a.0) } else { 1.0 };
+                let t = if b.0 > a.0 {
+                    (v - a.0) / (b.0 - a.0)
+                } else {
+                    1.0
+                };
                 let (ca, cb) = (parse_hex(&a.1).0, parse_hex(&b.1).0);
                 return std::array::from_fn(|k| {
                     let (x, y) = (f64::from(ca[k]), f64::from(cb[k]));
@@ -106,7 +112,10 @@ pub fn write_bundle(
 ) -> io::Result<()> {
     let ramps: Ramps = serde_json::from_str(RAMPS_JSON).map_err(io::Error::other)?;
     fs::create_dir_all(dir.join("layers"))?;
-    fs::write(dir.join("index.html"), INDEX_HTML.replace("{{TITLE}}", &html_escape(&info.title)))?;
+    fs::write(
+        dir.join("index.html"),
+        INDEX_HTML.replace("{{TITLE}}", &html_escape(&info.title)),
+    )?;
     fs::write(dir.join("viewer.js"), VIEWER_JS)?;
     fs::write(dir.join("ramps.json"), RAMPS_JSON)?;
 
@@ -138,7 +147,7 @@ pub fn write_bundle(
     if let Some(st) = strata {
         let d = &st.layer.desc;
         let k = d.stack_depth.unwrap_or(0);
-        let stride = stride_for(d.grid.w, MAX_VALUES_W);
+        let stride = stride_for(d.grid.w, MAX_STRATA_W);
         let (vw, vh) = (d.grid.w.div_ceil(stride), d.grid.h.div_ceil(stride));
         let mut tops = Vec::with_capacity((vw * vh * k * 2) as usize);
         let mut classes = Vec::with_capacity((vw * vh * k) as usize);
@@ -163,14 +172,18 @@ pub fn write_bundle(
         strata_json = json!({ "file": "layers/strata.js" });
     }
 
-    let ramps_value: serde_json::Value = serde_json::from_str(RAMPS_JSON).map_err(io::Error::other)?;
+    let ramps_value: serde_json::Value =
+        serde_json::from_str(RAMPS_JSON).map_err(io::Error::other)?;
     let bundle = json!({
         "title": info.title, "source": info.source, "circumference": info.circumference,
         "sea_level_y": info.sea_level_y, "format_version": info.format_version,
         "created_utc": info.created_utc, "layers": entries, "strata": strata_json,
         "ramps": ramps_value
     });
-    fs::write(dir.join("bundle.js"), format!("window.DT_BUNDLE = {bundle};\n"))?;
+    fs::write(
+        dir.join("bundle.js"),
+        format!("window.DT_BUNDLE = {bundle};\n"),
+    )?;
     Ok(())
 }
 
@@ -227,7 +240,9 @@ fn write_values(path: &Path, l: &LoadedLayer) -> io::Result<(u32, u32, u32)> {
 }
 
 fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 /// Standard base64 with padding.
@@ -235,12 +250,24 @@ pub fn base64(data: &[u8]) -> String {
     const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
-        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+        let b = [
+            chunk[0],
+            *chunk.get(1).unwrap_or(&0),
+            *chunk.get(2).unwrap_or(&0),
+        ];
         let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
         out.push(T[(n >> 18) as usize & 63] as char);
         out.push(T[(n >> 12) as usize & 63] as char);
-        out.push(if chunk.len() > 1 { T[(n >> 6) as usize & 63] as char } else { '=' });
-        out.push(if chunk.len() > 2 { T[n as usize & 63] as char } else { '=' });
+        out.push(if chunk.len() > 1 {
+            T[(n >> 6) as usize & 63] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            T[n as usize & 63] as char
+        } else {
+            '='
+        });
     }
     out
 }

@@ -84,7 +84,7 @@ impl GridDesc {
     /// The grid of a planet with circumference `c` blocks at `r` blocks per cell: W = C/r,
     /// H = W/2, origin (−C/2, −C/4).
     pub fn for_planet(name: &str, c: u32, r: u32) -> Result<GridDesc> {
-        if r == 0 || c % (2 * r) != 0 {
+        if r == 0 || !c.is_multiple_of(2 * r) {
             return Err(FormatError::Invalid(format!(
                 "circumference {c} is not a multiple of 2·r = {}",
                 2 * r
@@ -225,7 +225,11 @@ impl LayerDesc {
         }
         match (self.dtype, self.stack_depth) {
             (DType::HorizonStack, Some(k)) if (1..=255).contains(&k) => {}
-            (DType::HorizonStack, k) => return bad(format!("horizon_stack needs stack_depth 1..=255, got {k:?}")),
+            (DType::HorizonStack, k) => {
+                return bad(format!(
+                    "horizon_stack needs stack_depth 1..=255, got {k:?}"
+                ));
+            }
             (_, Some(_)) => return bad("stack_depth on a scalar layer".into()),
             _ => {}
         }
@@ -457,7 +461,10 @@ mod tests {
         let l = LoadedLayer::new(d, ras.to_le_bytes()).unwrap();
         assert!(l.get(3, 0).is_nan());
         assert_eq!(l.get(2, 0), 7.0);
-        assert!(l.bilinear(l.desc.grid.block_x(2) as f64 + 1.0, 0.0).is_nan());
+        assert!(
+            l.bilinear(l.desc.grid.block_x(2) as f64 + 1.0, 0.0)
+                .is_nan()
+        );
     }
 
     #[test]

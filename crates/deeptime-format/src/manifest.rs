@@ -205,7 +205,10 @@ impl Manifest {
 
 /// Formats a time as RFC 3339 UTC with second precision (no date crate needed).
 pub fn rfc3339_utc(t: SystemTime) -> String {
-    let secs = t.duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let secs = t
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
     let days = (secs / 86_400) as i64;
     let rem = secs % 86_400;
     // Howard Hinnant's civil_from_days.
@@ -246,10 +249,8 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let crc = write_atomic(&dir.join("side.json"), b"{}").unwrap();
         let mut m = Manifest::new("test", Writer::this("unit"), Scale::default_for(1024));
-        m.grids.insert(
-            "L3".into(),
-            GridDesc::for_planet("L3", 1024, 2).unwrap(),
-        );
+        m.grids
+            .insert("L3".into(), GridDesc::for_planet("L3", 1024, 2).unwrap());
         m.files.push(FileEntry {
             path: "side.json".into(),
             bytes: 2,

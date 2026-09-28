@@ -8,7 +8,10 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub enum FormatError {
     /// An I/O error, with the file it happened on.
-    Io { path: PathBuf, source: std::io::Error },
+    Io {
+        path: PathBuf,
+        source: std::io::Error,
+    },
     /// A JSON document (manifest or layer descriptor) did not parse.
     Json {
         what: String,
