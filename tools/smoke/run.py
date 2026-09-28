@@ -319,6 +319,14 @@ def main():
                 m = PROBE.search(out)
                 steps.check("/deeptime probe column 0 0 answers", "[deeptime-probe] JSON", out[:200], m is not None)
 
+            if is_planet:
+                out = rcon("locate structure #minecraft:village", check=False)
+                steps.check("locate structure #minecraft:village", "The nearest …", out[:160],
+                            "nearest" in out.lower())
+                # Deep Time's density functions under C2ME's compiler, and DH's world hooks.
+                errs = server.grep(r"(?i)\[(c2me|distanthorizons|DistantHorizons)[^\]]*\].*(ERROR|Exception)|/ERROR\].*(c2me|distanthorizons)", 5)
+                steps.check("no C2ME or Distant Horizons errors in the boot log", "none", "; ".join(errs)[:300] or "none", not errs)
+
             if a.chunky:
                 rcon("chunky center 0 0")
                 rcon(f"chunky radius {a.chunky}")
