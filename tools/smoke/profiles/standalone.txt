@@ -1,0 +1,9 @@
+# Deep Time's standalone server set (plan §9.5): NeoForge + Deep Time + Toroidal World, plus
+# the ship stack the seam tests need. One jar per line: <slug> <Modrinth version id>.
+# Sable, Aeronautics and Create follow the MIC pack's pins (pack/mods/*.pw.toml); install.sh
+# warns when they drift. Every required dependency is pinned here, so nothing floats.
+toroidal-world      8YTSYi9y   # 0.19.3+mc1.21.1 (bundle; MIT)
+sable               U678xqle   # 2.0.5+mc1.21.1 (pack pin)
+create-aeronautics  44pLdPGg   # 1.3.2+mc1.21.1 (pack pin; requires Sable and Create)
+create              UjX6dr61   # 6.0.10+mc1.21.1 (pack pin)
+chunky              LuFhm4eU   # 1.4.23 (pregeneration in smoke runs; GPL-3.0 tool, never linked)

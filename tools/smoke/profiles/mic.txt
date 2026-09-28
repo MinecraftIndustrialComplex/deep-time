@@ -1,0 +1,4 @@
+# The mic set is the current MIC pack, server side, installed by packwiz-installer from
+# /home/greencheetah/Projects/mic/pack/pack.toml. Any pack copy of Deep Time or Toroidal
+# World is removed and replaced by the fresh Deep Time jar and the pinned TW bundle below.
+toroidal-world      8YTSYi9y   # 0.19.3+mc1.21.1

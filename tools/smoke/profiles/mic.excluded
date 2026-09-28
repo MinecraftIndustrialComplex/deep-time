@@ -1,0 +1,2 @@
+# Jars (glob patterns) moved to server/mods-excluded/ for the mic profile, one per line.
+# Every exclusion is recorded in the smoke report.

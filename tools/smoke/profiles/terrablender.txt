@@ -1,0 +1,6 @@
+# The standalone set plus TerraBlender and Biomes O' Plenty (plan §9.5). MIC has no
+# TerraBlender, so region steering is tested here.
+@include standalone
+terrablender        6e8GCrLb   # 4.1.0.8
+biomes-o-plenty     BtZKRp69   # 21.1.0.14 (requires GlitchCore and TerraBlender)
+glitchcore          S2TfWrZR   # 2.1.0.2
