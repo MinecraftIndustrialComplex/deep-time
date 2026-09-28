@@ -148,6 +148,11 @@ def main():
             print(f"   probe column 0 0: {m.group(1) if m else out}", flush=True)
             if not m:
                 failures.append("probe column 0 0 did not answer")
+            out = rcon("deeptime probe tw")
+            m = PROBE.search(out)
+            print(f"   probe tw: {m.group(1) if m else out}", flush=True)
+            if not m:
+                failures.append("probe tw did not answer")
             for spec in a.run:
                 cls, _, pos = spec.partition("@")
                 x, y, z = (pos or "0,100,0").split(",")
