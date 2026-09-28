@@ -77,6 +77,22 @@ public final class SeamGameTests {
     }
 
     /**
+     * The test's centre, which the tests build relative to. {@code /test run} puts a test on the
+     * WORLD_SURFACE heightmap at its position, and that reads the bottom of the world while the
+     * chunk is not loaded yet (P0-06 finding); such a spot is refused with a clear message instead
+     * of failing later inside rock.
+     */
+    static BlockPos surfaceSpot(GameTestHelper helper) {
+        BlockPos spot = helper.absolutePos(GameTestSupport.CENTRE);
+        if (spot.getY() < helper.getLevel().getMinBuildHeight() + 16) {
+            helper.fail("the test was placed at y=" + spot.getY() + ", the bottom of the world: its chunk was not "
+                    + "loaded when /test run read the surface (the harness waits for forceloaded spots)");
+            throw new IllegalStateException();
+        }
+        return spot;
+    }
+
+    /**
      * The chunk holding {@code pos} after folding, only if it is already loaded (the harness
      * forceloads the seam strip). Never forces a load: a synchronous load of a seam chunk can wait
      * in TW's seam-generation queue (P0-06 finding).
@@ -126,6 +142,9 @@ public final class SeamGameTests {
             int b = east.getHeight(Heightmap.Types.OCEAN_FLOOR, c / 2 - 1, z);
             int across = west.getHeight(Heightmap.Types.OCEAN_FLOOR, -c / 2, z);
             int after = west.getHeight(Heightmap.Types.OCEAN_FLOOR, -c / 2 + 1, z);
+            if (i == 8)
+                detail.append(" sample(z=").append(z).append("):").append(a).append(',').append(b).append("|")
+                        .append(across).append(',').append(after);
             if (Math.abs(across - b) > Math.max(Math.max(Math.abs(b - a), Math.abs(after - across)), 2)) {
                 jumps++;
                 detail.append(" jump(z=").append(z).append("):").append(b).append("->").append(across);
@@ -210,7 +229,7 @@ public final class SeamGameTests {
             helper.fail("no vanilla village house template found");
             return;
         }
-        BlockPos spot = helper.absolutePos(GameTestSupport.CENTRE);
+        BlockPos spot = surfaceSpot(helper);
         int sizeX = template.getSize().getX();
         // (sizeX + 1) / 2 columns end at C/2 - 1; the rest lie past the edge.
         BlockPos origin = new BlockPos(c / 2 - (sizeX + 1) / 2, spot.getY() + 40, spot.getZ());
@@ -293,7 +312,7 @@ public final class SeamGameTests {
         ServerLevel level = helper.getLevel();
         int c = circumference(helper);
         ToroidalShape shape = shape(helper);
-        BlockPos spot = helper.absolutePos(GameTestSupport.CENTRE);
+        BlockPos spot = surfaceSpot(helper);
         BlockPos trunk = new BlockPos(c / 2 - 1, spot.getY() + 60, spot.getZ());
         var oak = level.registryAccess().registryOrThrow(Registries.CONFIGURED_FEATURE)
                 .getHolder(ResourceKey.create(Registries.CONFIGURED_FEATURE, ResourceLocation.withDefaultNamespace("oak")));
@@ -364,7 +383,7 @@ public final class SeamGameTests {
             helper.succeed();
             return;
         }
-        BlockPos spot = helper.absolutePos(GameTestSupport.CENTRE);
+        BlockPos spot = surfaceSpot(helper);
         int y = spot.getY() + 20, z = spot.getZ();
         BlockState motorState = motor.defaultBlockState();
         if (motorState.hasProperty(BlockStateProperties.FACING))

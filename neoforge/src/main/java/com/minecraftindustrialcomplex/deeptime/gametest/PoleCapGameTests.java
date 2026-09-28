@@ -42,7 +42,7 @@ public final class PoleCapGameTests {
     public static void prototypePushback(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         int c = SeamGameTests.circumference(helper);
-        BlockPos spot = helper.absolutePos(GameTestSupport.CENTRE);
+        BlockPos spot = SeamGameTests.surfaceSpot(helper);
         double y = spot.getY() + 10.5;
         List<BlockPos> starts = new ArrayList<>();
         for (double lat : LATITUDES)

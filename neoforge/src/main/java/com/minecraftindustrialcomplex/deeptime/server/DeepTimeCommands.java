@@ -90,6 +90,11 @@ public final class DeepTimeCommands {
             for (String layer : new String[]{"temperature", "vegetation", "continents", "erosion", "ridges"})
                 o.addProperty(layer, terrain.raster("climate/" + layer, x, z));
         }
+        // The loaded chunk's own heightmap, without loading anything (null when not loaded).
+        var chunk = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
+        o.addProperty("chunkLoaded", chunk != null);
+        if (chunk != null)
+            o.addProperty("worldSurface", chunk.getHeight(Heightmap.Types.WORLD_SURFACE, x & 15, z & 15));
         var biome = level.getBiome(new BlockPos(x, generator.getSeaLevel(), z));
         o.addProperty("biome", biome.unwrapKey().map(k -> k.location().toString()).orElse("?"));
         return emit(ctx.getSource(), o);
