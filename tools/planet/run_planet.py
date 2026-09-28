@@ -157,7 +157,7 @@ def main():
             if not m:
                 failures.append("probe tw did not answer")
             for spec in a.run:
-                failures += run_tests(spec, rcon, a.timeout)
+                failures += run_tests(spec, rcon, a.timeout, a.size)
             if a.scenario:
                 failures += SCENARIOS[a.scenario](a, srv, rcon)
     finally:
@@ -166,13 +166,41 @@ def main():
     sys.exit(0 if not failures else 1)
 
 
-def run_tests(spec, rcon, timeout):
+def forceload(rcon, c, x0, z0, x1, z1, wait=180):
+    """Forceload the block box [x0, x1] x [z0, z1] on the planet, then wait until it is loaded.
+
+    Toroidal World's /forceload accepts canonical coordinates only (-C/2 <= x < C/2: "8217 is
+    outside this world"), so a box across the seam is folded and split into two canonical boxes.
+    Forceloading is asynchronous; `/test run` puts a test on the WORLD_SURFACE heightmap of its
+    position, which reads y = min build height (-352) until the chunk is there, so the harness
+    waits (execute if loaded, every corner) before running anything.
+    """
+    half = c // 2
+    a = (x0 + half) % c - half
+    b = a + (x1 - x0)
+    boxes = [(a, b)] if b < half else [(a, half - 1), (-half, b - c)]
+    for bx0, bx1 in boxes:
+        print(f"   forceload add {bx0} {z0} {bx1} {z1}: " + rcon(f"forceload add {bx0} {z0} {bx1} {z1}"), flush=True)
+    corners = [(x, z) for bx0, bx1 in boxes for x in (bx0, bx1) for z in (z0, z1)]
+    end = time.time() + wait
+    while time.time() < end:
+        missing = [(x, z) for x, z in corners if "passed" not in rcon(f"execute if loaded {x} 0 {z}").lower()]
+        if not missing:
+            return True
+        time.sleep(2)
+    print(f"   forceload: not loaded after {wait}s: {missing}", flush=True)
+    return False
+
+
+def run_tests(spec, rcon, timeout, c):
     """Run one `--run` spec and return its failures.
 
     Spec: "<test>[,<test>...]@x,y,z[~dx,dz]". A test's name is its method name in lower case:
     Deep Time's holders use @PrefixGameTestTemplate(false), which also drops the class prefix
     that `/test runall <class>` would match, so tests are run by name. The harness forceloads
-    x±dx, z±dz (default 32, 32) around the spot plus the 8-block z steps between tests.
+    x±dx, z±dz (default 32, 32) around the spot plus the 8-block z steps between tests. `/test
+    run` ignores y: vanilla puts the test on the surface at x, z + 3 (TestCommand
+    .createTestPositionAround), so tests place things relative to their own position.
     """
     names_part, _, where = spec.partition("@")
     names = [n.strip().lower() for n in names_part.split(",") if n.strip()]
@@ -181,8 +209,8 @@ def run_tests(spec, rcon, timeout):
     dx, dz = (int(v) for v in (extent or "32,32").split(","))
     rcon("deeptime gametest reset")
     last_z = z + 8 * (len(names) - 1)
-    print(f"   forceload {x - dx} {z - dz} {x + dx} {last_z + dz}: "
-          + rcon(f"forceload add {x - dx} {z - dz} {x + dx} {last_z + dz}"), flush=True)
+    if not forceload(rcon, c, x - dx, z - dz, x + dx, last_z + dz):
+        return [f"{','.join(names)}: forceloaded chunks never loaded"]
     # One test at a time: 1.21.1's `/test run` begins with TestCommand.stopTests(), which cancels
     # every test still running, so a second /test run issued before the first test reported
     # silently kills it (P0-06 finding). Each test also gets its own spot, 8 blocks apart in z,
@@ -235,8 +263,8 @@ def scenario_sable_straddle(a, srv, rcon):
     z = 0
     # The hull and its neighbourhood stay loaded before and after the restart (forced chunks
     # persist in the world), so the sub-level's holding chunk loads with the world.
-    print("   forceload: " + rcon(f"forceload add {c // 2 - 32} {z - 32} {c // 2 + 31} {z + 32}"), flush=True)
-    time.sleep(15)   # let the forced seam chunks generate
+    if not forceload(rcon, c, c // 2 - 32, z - 32, c // 2 + 31, z + 32):
+        return ["sable_straddle: the seam chunks never loaded"]
     out = rcon(f"deeptime gametest sable straddle {z}")
     m = PROBE.search(out)
     print(f"   assemble: {m.group(1) if m else out}", flush=True)
