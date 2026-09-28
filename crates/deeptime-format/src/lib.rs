@@ -16,11 +16,10 @@ pub use manifest::{FileEntry, LayerEntry, Manifest, Scale, Writer};
 pub use raster::{Cell, Codec, DType, GridDesc, LayerDesc, LoadedLayer, Raster, RasterRead, TILE};
 pub use tilepack::{TilePackReader, Written, encode_tile_pack, write_tile_pack};
 
-/// The world-data format version this crate reads and writes (plan §5.7.2). It mirrors
-/// `[workspace.metadata.deeptime] format_version` in the workspace `Cargo.toml`, the one place
-/// the version is set (cold-read review 2, gap 14); `format_version_matches_workspace` below
-/// fails when the two drift.
-pub const FORMAT_VERSION: &str = "0.0";
+/// The world-data format version this crate reads and writes (plan §5.7.2). Its one source is the
+/// workspace `Cargo.toml` (`[workspace.metadata.deeptime] format_version`), read by `build.rs`;
+/// Gradle reads the same line for `natives.json`.
+pub const FORMAT_VERSION: &str = env!("DEEPTIME_FORMAT_VERSION");
 
 /// The minor part of [`FORMAT_VERSION`], written into every file header (plan §5.7.2).
 pub const FORMAT_MINOR: u16 = 0;
