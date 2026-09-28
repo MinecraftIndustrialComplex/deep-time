@@ -18,6 +18,9 @@ name: natives
 on:
   push:
     tags: ["v*"]
+    # TEMPORARY (P0-08 bring-up): workflow_dispatch only finds workflows on master; reverted
+    # before the merge.
+    branches: [p0-08-natives]
   workflow_dispatch:
 
 concurrency:
