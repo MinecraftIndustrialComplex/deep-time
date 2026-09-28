@@ -45,8 +45,10 @@
         # 0.23.4 documents.
         cargoZigbuild = pkgs.cargo-zigbuild.override { zig = pkgs.zig_0_13; };
 
-        # Client runs (gametest-client.sh style) need GL/X on LD_LIBRARY_PATH.
-        clientLibs = with pkgs; [
+        # Client runs (gametest-client.sh style) need GL/X on LD_LIBRARY_PATH. Linux only: the
+        # shell also runs on Ben's Apple-silicon Mac, where builds and servers are offloaded
+        # (tools/remote/mac.sh) and no client is ever started.
+        clientLibs = lib.optionals pkgs.stdenv.hostPlatform.isLinux (with pkgs; [
           libGL
           libx11
           libxext
@@ -58,7 +60,7 @@
           openal
           flite
           udev
-        ];
+        ]);
       in {
         _module.args.pkgs = import inputs.nixpkgs {
           inherit system;
@@ -87,8 +89,9 @@
             pkgs.binutils
           ];
           buildInputs = clientLibs;
-          env = {
+          env = lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
             LD_LIBRARY_PATH = lib.makeLibraryPath clientLibs;
+          } // {
             JAVA_HOME = "${java.home}";
             RUST_SRC_PATH = "${rust}/lib/rustlib/src/rust/library";
           };

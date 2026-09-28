@@ -113,6 +113,8 @@ neoForge {
             systemProperty 'neoforge.enableGameTest', 'true'
             systemProperty 'neoforge.enabledGameTestNamespaces', 'deeptime_planet'
             systemProperty 'deeptime.gametest', 'true'
+            // Set by tools/planet/run_planet.py (--test-terrain); blank means world data.
+            systemProperty 'deeptime.testTerrain', System.getenv('DEEPTIME_TEST_TERRAIN') ?: ''
             jvmArgument '-Xmx6G'
             gameDirectory = file('../run-planet')
         }
