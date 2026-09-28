@@ -61,9 +61,14 @@ fi
 EXCLUDES=(--exclude=/target/ --exclude=/smoke/ --exclude=/run/ --exclude=/run-gametest/ --exclude=/run-planet/
           --exclude=/libs/ --exclude=/review/out/ --exclude=/neoforge/build/ --exclude=/neoforge/.gradle/
           --exclude=.gradle/ --exclude=/.graphide/ --exclude=/.claude/ --exclude=/.git)
+# The Mac's /usr/bin/git is Apple's stub (no Xcode command-line tools), so a nixpkgs git is kept,
+# GC-rooted, on the SSD. It matters: without a git index Nix would treat the synced tree as a path
+# flake and copy all of it, build outputs included, into the store.
+GIT="$CACHE/git/bin/git"
+"${SSH[@]}" "exec zsh -lc $(printf '%q' "[ -x '$GIT' ] || nix build nixpkgs#git --out-link '$CACHE/git'")"
 if [ "$SYNC" = 1 ]; then
     rsync -a --delete "${EXCLUDES[@]}" -e "ssh -o BatchMode=yes" "$REPO/" "$HOST:$REMOTE/"
-    "${SSH[@]}" "cd '$REMOTE' && { [ -d .git ] || git init -q -b master; } && git add -A >/dev/null 2>&1; true"
+    "${SSH[@]}" "cd '$REMOTE' && { [ -d .git ] || '$GIT' init -q -b master; } && '$GIT' add -A"
 fi
 if [ "$PACK" = 1 ]; then
     # The pack sits two levels above the main checkout; a worktree elsewhere uses the known path.
