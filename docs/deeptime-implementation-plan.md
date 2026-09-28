@@ -1634,7 +1634,12 @@ the terrain surface, it fills the air between them with water source blocks (ice
 the climate layer says frozen), without scheduling fluid ticks, so a basin stays still until a
 neighbour changes. The bake guarantees `water_level` never exceeds the lowest rim of its basin
 (Fill–Spill–Merge levels, Phase 2); Phase 0 proves the mechanism with a hand-made basin and channel
-(P0-13). Carvers run after this pass and can open caves under a lake; that drains into caves the way
+(P0-13). The generated ground is the density interpolated over 4-block noise cells, so on a steep
+shore it lies a block or two below the elevation raster: a column whose own `water_level` cell is dry
+takes the level of the nearest wet cell within one noise cell (P0-13's first run left two shore
+pockets that the woken lake filled), and the bake must therefore keep each rim above its level for at
+least one noise cell beyond the last wet cell. (P0-13: the ice comes from vanilla's
+`freeze_top_layer` feature, which every overworld biome runs after this pass.) Carvers run after this pass and can open caves under a lake; that drains into caves the way
 vanilla lakes do and is accepted.
 
 ### 7.10 Toroidal World: the cylinder shape
@@ -2707,8 +2712,11 @@ of Phase 0 is built on it.
 - **Depends on.** P0-10, P0-11.
 - **Acceptance.**
   - `./gametest.sh` → `lakeHolds` passes; log `[gametest] lakeHolds before=<N> after=<N> expected=<N> outside=0`
-  - `nix develop -c cargo run -p deeptime-inspect -- section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at <lake z> --from <a> --to <b>`
-    → a PNG with the water surface at y 120
+    with before = after = expected, and `[gametest] lakeHolds water_top_y=120` (the top face of the
+    highest water block at the lake centre, `notes.lake.centre_block`; cold-read review 2, gap 18)
+  - `nix develop -c cargo run -p deeptime-inspect -- section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at 0 --from -88 --to 212`
+    → a PNG with the water surface at y 120 (the lake centre is z 0 and the channel runs along it
+    to x 160; −88…212 is `lakeHolds`' scanned box; a review picture, P0-11)
 - **Ben reviews.** The cross-section and the BlueMap view of the lake.
 
 #### P0-14 BlueMap renders on MIC blocks
