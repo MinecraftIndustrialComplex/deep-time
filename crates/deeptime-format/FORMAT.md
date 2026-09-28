@@ -24,11 +24,22 @@ test on each side fails when they drift.
   strata/horizons.dtr           L1, horizon_stack, K = 3 in the synthetic worlds
   strata/classes.json           class index → rock class name
   spawn/candidates.json         land cells for spawn selection
+  preset.json                   the exact preset of a run (canonical JSON; `deeptime run`, the game)
+  events/index.json             the event log's writers and segments (EVENTS.md)
+  events/<writer>-<n>.dtev      event segments (EVENTS.md); geology is writer 1
+  sites/sites.dtsr              the site registry's records
+  sites/index.dtsi              512-block grid → site ids
+  keyframes/index.json          the timelapse frames
+  keyframes/kf-<n>.dtk          one frame: RGBA8 per layer, LZ4
+  checkpoints/<i>-<stage>.dtcp  optional stage checkpoints (dev and CLI only; never needed to play)
 ```
 
 Every file is written as `<name>.tmp`, fsynced, renamed and its directory fsynced. A writer
 deletes an existing `manifest.json` before it starts, so an interrupted write leaves a folder with
-no manifest, which readers treat as absent.
+no manifest, which readers treat as absent. A run (`deeptime run`, or the game through JNI) writes
+`preset.json`, `events/`, `sites/` and `keyframes/index.json` in every folder, empty when the preset
+produced nothing; keyframe files are written while the run goes, the rest by `finalizeWrite`, the
+manifest last. The synthetic worlds have none of these.
 
 ## `manifest.json`
 
@@ -53,6 +64,14 @@ no manifest, which readers treat as absent.
 
 A reader checks `format_version` **before** parsing anything else. `bytes` and `crc32` (CRC-32/ISO-HDLC,
 the zlib CRC, as an unsigned JSON number) cover each whole file; readers may verify them lazily.
+
+A run's manifest (P1-01) has `source` `run:<preset name>` (`run:dummy` until P1-03), one writer
+`deeptime-core`, `preset_hash` `crc32:<8 hex>` of the canonical preset JSON, `planet.radius_m`,
+`grids` and `layers` empty until the bake (P1-08) writes rasters, and every other file in `files`:
+`preset.json`, `events/index.json` and each segment, `sites/sites.dtsr`, `sites/index.dtsi`,
+`keyframes/index.json` and each frame. `notes.run` records per-stage steps and milliseconds, the
+final `t_years` and the event, site and keyframe counts. (P0-07's session wrote an ad-hoc manifest
+with `writer`, `preset` and `created_unix_ms`; from P1-01 the session writes this one.)
 
 ## Grids
 
@@ -130,6 +149,109 @@ horizon k+1's top, the last one down to `min_y`. Unused horizons have top −327
 
 Block coordinates of L3 sample points that are dry land, gently sloping, spread apart, ordered by
 distance from (0, 0).
+
+## Sectioned files (`DTEV`, `DTSR`, `DTSI`, `DTKF`, `DTCP`)
+
+Every binary file other than a tile pack shares one container (`container.rs`): the 16-byte header
+of plan §5.7.2, fixed fields of the file type, a section table and the sections.
+
+```text
+offset   size  field
+0        4     magic
+4        4     u32 header_len = 16 + F + 16·K (F fixed bytes, K sections)
+8        2     u16 format_minor (0 for "0.0")
+10       2     u16 flags, reserved, 0
+12       4     u32 CRC32 of bytes 0..12 followed by bytes 16..header_len
+16       F     fixed fields (per type, below)
+16 + F   16·K  section table: u64 offset (absolute), u32 length, u32 CRC32 of the section's bytes
+…              sections, each starting on a multiple of 8, zero padding between and after
+```
+
+A reader checks the magic, then the minor (refusing another one with the version message), then
+`header_len` against its type's F and K, the header CRC, and each section's bounds and CRC. String
+tables are `u32 byte length + UTF-8 bytes`, back to back, with the count in the fixed fields.
+
+| Magic | File | F | K | Spec |
+|---|---|---|---|---|
+| `DTEV` | `events/<w>-<n>.dtev` | 32 | 5 | `EVENTS.md` |
+| `DTSR` | `sites/sites.dtsr` | 16 | 3 | below |
+| `DTSI` | `sites/index.dtsi` | 32 | 2 | below |
+| `DTKF` | `keyframes/kf-<n>.dtk` | 24 | 1 + layers | below |
+| `DTCP` | `checkpoints/*.dtcp` | 8 | 2 | below (dev only) |
+
+## `preset.json`
+
+The run's preset as canonical JSON (keys sorted), pretty-printed. The dummy
+preset's keys are documented in `crates/deeptime-core/src/dummy.rs`; the real preset schema
+arrives with P1-03 (`crates/deeptime-format/schema/preset.schema.json`, plan §5.1).
+
+## Sites (`sites/sites.dtsr`, `sites/index.dtsi`)
+
+Plan §5.6. `DTSR` fixed fields: `u32 N sites, u32 S strings, u32 P products, u32 reserved`.
+Sections: 0 strings (deposit types, materials, roles, COE vein ids), 1 N records of 104 bytes
+sorted by id, 2 P products of 24 bytes.
+
+```text
+site record                               product entry
+0    4  u32 id (u32::MAX reserved)        0   4  u32 material (string index)
+4    1  u8 kind: 0 deposit, 1 reservoir,  4   4  f32 grade (mass fraction for ores)
+        2 placer, 3 supergene, 4 fantasy  8   8  f64 tonnage_t
+5    1  u8 flags: bit 0 finite            16  4  u32 role (string index: primary, byproduct, …)
+6    2  reserved, 0                       20  4  reserved, 0
+8    4  u32 deposit type (string index)
+12   4  u32 body id (u32::MAX = none; bodies/ arrives with P1-14)
+16   12 i32 × 3 centre (block x, y, z; x in the canonical span)
+28   8  f32 × 2 latitude, longitude (degrees)
+36   24 i32 × 6 AABB min x, y, z, max x, y, z (inclusive; x may leave the canonical span)
+60   4  u32 parent site (u32::MAX = none)
+64   8  u64 forming event id (EVENTS.md)
+72   4  u32 first product
+76   4  u32 product count
+80   8  f64 amount_base
+88   4  u32 COE vein (string index, u32::MAX = none)
+92   4  reserved, 0
+96   8  u64 CDG charge in mB (u64::MAX = none)
+```
+
+`DTSI` fixed fields: `u32 C, u32 cell_blocks (512), u32 cols = ceil(C/512), u32 rows =
+ceil(C/2/512), i32 origin_x (−C/2), i32 origin_z (−C/4), u32 entries, u32 reserved`. Section 0 is
+`cols·rows + 1` u32 offsets, section 1 `entries` u32 site ids: cell `c = row·cols + col` holds
+`ids[offsets[c] .. offsets[c+1]]`, ascending — every site whose AABB footprint (x, z) touches the
+cell, with columns wrapping in x. Block (x, z) is in column `floor((x − origin_x)/512) mod cols`
+and row `clamp(floor((z − origin_z)/512), 0, rows − 1)`.
+
+The viewer's `sites.json` holds one object per site: `id, kind, deposit_type, center, lat_lon, aabb,
+body, products [{material, grade, tonnage_t, role}], forming_event, parent, extraction {finite,
+amount_base, coe_vein, cdg_charge_mb}`.
+
+## Keyframes (`keyframes/index.json`, `keyframes/kf-<n>.dtk`)
+
+Timelapse frames (plan §6.1), written while a run goes; frame `n` counts from 0.
+
+```json
+{"format_version": "0.0",
+ "frames": [{"n": 0, "t": -390000000.0, "stage": "dummy_drift", "w": 256, "h": 128,
+             "layers": ["elevation"], "path": "keyframes/kf-0.dtk", "bytes": 5321, "crc32": 1}]}
+```
+
+`DTKF` fixed fields: `u32 n, u32 w, u32 h, u32 L layers, f64 t (years)`. Section 0 is a string
+table of `1 + L` strings: the stage, then the layer names in section order. Sections `1 … L` are
+one LZ4 raw block each (as tile packs), decoding to `w·h·4` bytes of RGBA8, row-major, row 0 north.
+Pixel (px, py) is centred on longitude −180° + 360°·px/w and latitude 90° − 180°·py/h, the nearest
+cell of the field it was drawn from, coloured with `crates/deeptime-viewer/assets/ramps.json`
+(the same ramps the viewer and the game use); alpha 0 is nodata. Frames are taken when the clock
+passes the next multiple of the preset's keyframe interval (counted from the run's start) and at
+the end of each stage.
+
+## Checkpoints (`*.dtcp`, dev and CLI only)
+
+`DTCP` fixed fields: `u32 schema, u32 reserved`. Section 0 is a JSON summary (`core_version`,
+`schema`, `stage_names`, `next_stage`, `next_stage_name`, `mid_stage`, `t_years`, `events`, `sites`,
+`fields`); section 1 is the postcard encoding of `deeptime_core::checkpoint::Checkpoint` (the
+canonical preset, the content bundle, the pipeline, the next stage, that stage's saved state when
+taken mid-stage, and the whole `WorldState`). Postcard is not self-describing: a checkpoint is read
+only by a build with the same schema number and core version, and is never part of a world's
+contract with Java.
 
 ## Synthetic worlds (`deeptime synth`)
 

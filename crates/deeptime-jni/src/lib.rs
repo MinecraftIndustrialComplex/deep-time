@@ -237,13 +237,18 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
     mut env: EnvUnowned<'l>,
     _class: JClass<'l>,
     session: jlong,
-    _index: jint,
+    index: jint,
 ) -> JString<'l> {
-    guard(&mut env, |_env| {
-        with_session(session, |_s| {
-            Err(CoreError::Unsupported("keyframeInfo (Phase 0 has no keyframes)").into())
-        })
+    guard(&mut env, |env| {
+        let index = non_negative(index, "index")?;
+        let json = with_session(session, |s| Ok(s.keyframe_info(index)?))?;
+        Ok(env.new_string(json)?)
     })
+}
+
+fn non_negative(v: jint, name: &str) -> BridgeResult<u32> {
+    u32::try_from(v)
+        .map_err(|_| BridgeError::IllegalArgument(format!("{name} must be ≥ 0, got {v}")))
 }
 
 #[unsafe(no_mangle)]
@@ -253,14 +258,33 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
     mut env: EnvUnowned<'l>,
     _class: JClass<'l>,
     session: jlong,
-    _index: jint,
-    _layer: jint,
-    _dst_rgba: JByteBuffer<'l>,
+    index: jint,
+    layer: jint,
+    dst_rgba: JByteBuffer<'l>,
 ) {
-    guard(&mut env, |_env| {
-        with_session(session, |_s| {
-            Err(CoreError::Unsupported("copyKeyframe (Phase 0 has no keyframes)").into())
-        })
+    guard(&mut env, |env| {
+        let index = non_negative(index, "index")?;
+        let layer = non_negative(layer, "layer")?;
+        if dst_rgba.is_null() {
+            return Err(BridgeError::IllegalArgument("dstRgba is null".into()));
+        }
+        let not_direct = |_| BridgeError::IllegalArgument("dstRgba is not a direct buffer".into());
+        let capacity = env
+            .get_direct_buffer_capacity(&dst_rgba)
+            .map_err(not_direct)?;
+        let address = env
+            .get_direct_buffer_address(&dst_rgba)
+            .map_err(not_direct)?;
+        if address.is_null() {
+            return Err(BridgeError::IllegalArgument(
+                "dstRgba is not a direct buffer".into(),
+            ));
+        }
+        // SAFETY: a direct buffer's memory is `capacity` bytes at `address` and stays valid while
+        // Java holds `dst_rgba`, which it does for the whole call; no other Rust reference to it
+        // exists.
+        let dst = unsafe { std::slice::from_raw_parts_mut(address, capacity) };
+        with_session(session, |s| Ok(s.copy_keyframe(index, layer, dst)?))
     })
 }
 

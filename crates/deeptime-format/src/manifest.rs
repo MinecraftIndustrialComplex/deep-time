@@ -78,12 +78,25 @@ pub struct LayerEntry {
     pub crc32: u32,
 }
 
-/// Any other file of the folder (JSON side files).
+/// Any other file of the folder (JSON side files, events, sites, keyframes).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FileEntry {
     pub path: String,
     pub bytes: u64,
     pub crc32: u32,
+}
+
+impl FileEntry {
+    /// The entry of `<dir>/<rel>` as it is on disk now.
+    pub fn of(dir: &Path, rel: &str) -> Result<FileEntry> {
+        let path = dir.join(rel);
+        let data = std::fs::read(&path).map_err(|e| FormatError::io(&path, e))?;
+        Ok(FileEntry {
+            path: rel.to_owned(),
+            bytes: data.len() as u64,
+            crc32: crc32fast::hash(&data),
+        })
+    }
 }
 
 /// `manifest.json`.
@@ -162,14 +175,19 @@ impl Manifest {
         })
     }
 
-    /// Writes `<dir>/manifest.json` atomically. Call it after every file it lists is written.
-    pub fn write(&self, dir: &Path) -> Result<()> {
+    /// The exact bytes [`Manifest::write`] puts on disk: pretty JSON and a final newline.
+    pub fn to_json_bytes(&self) -> Result<Vec<u8>> {
         let mut json = serde_json::to_vec_pretty(self).map_err(|source| FormatError::Json {
             what: "manifest".into(),
             source,
         })?;
         json.push(b'\n');
-        write_atomic(&dir.join(MANIFEST), &json)?;
+        Ok(json)
+    }
+
+    /// Writes `<dir>/manifest.json` atomically. Call it after every file it lists is written.
+    pub fn write(&self, dir: &Path) -> Result<()> {
+        write_atomic(&dir.join(MANIFEST), &self.to_json_bytes()?)?;
         Ok(())
     }
 
