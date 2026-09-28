@@ -91,7 +91,7 @@ if [ "$SERVER" = 1 ]; then
     # three hours is taken to be stale (its holder died without releasing it).
     LOCK="$CACHE/server.lock"
     CMD="while ! mkdir '$LOCK' 2>/dev/null; do
-           age=\$(( \$(date +%s) - \$(stat -f %m '$LOCK' 2>/dev/null || date +%s) ))
+           age=\$(( \$(date +%s) - \$(/usr/bin/stat -f %m '$LOCK' 2>/dev/null || date +%s) ))
            if [ \$age -gt 10800 ]; then echo 'mac.sh: breaking a stale server lock'; rm -rf '$LOCK'; continue; fi
            echo \"mac.sh: waiting for the server lock (held by \$(cat '$LOCK/owner' 2>/dev/null))\"; sleep 30
          done

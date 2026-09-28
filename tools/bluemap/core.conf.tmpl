@@ -1,0 +1,13 @@
+# Written by tools/review/render-bluemap.sh. accept-download: Ben accepted Mojang's EULA and owns
+# Java Edition (plan §2.7), so BlueMap may download the client jar for vanilla resources.
+accept-download: true
+data: "@DATA@"
+render-thread-count: @THREADS@
+update-cooldown: 60
+full-update-interval: 1440
+scan-for-mod-resources: true
+metrics: false
+log: {
+  file: "@DATA@/logs/debug.log"
+  append: false
+}
