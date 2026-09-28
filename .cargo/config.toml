@@ -9,5 +9,10 @@ rustflags = ["-C", "target-feature=-crt-static"]
 rustflags = ["-C", "target-feature=-crt-static"]
 
 # Sable needed codegen-units=2 on Intel macOS to avoid a rustc hang; copied as a precaution.
+# Both macOS targets: a relocatable install name instead of the build machine's path (the linker's
+# default); System.load ignores it, but it keeps /home/runner/… out of the shipped library.
 [target.x86_64-apple-darwin]
-rustflags = ["-C", "codegen-units=2"]
+rustflags = ["-C", "codegen-units=2", "-C", "link-arg=-Wl,-install_name,@rpath/libdeeptime_jni.dylib"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-install_name,@rpath/libdeeptime_jni.dylib"]
