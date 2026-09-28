@@ -16,9 +16,6 @@ public final class TerrainSources {
                         + "(development only)", test.get(), ref.folder());
             return AnalyticTestTerrain.of(test.get(), ref.circumferenceBlocks());
         }
-        // World data arrives in P0-10 (WorldDataTerrain). Until then a Deep Time level without a
-        // test terrain has nothing to generate from: fail loudly rather than build flat garbage.
-        throw new IllegalStateException("Deep Time level '" + ref.folder() + "' has no world data reader yet (P0-10) and no "
-                + "test terrain; start the server with -Ddeeptime.testTerrain=" + AnalyticTestTerrain.WRAP_TEST);
+        return new WorldDataTerrain(ref);
     }
 }

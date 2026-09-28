@@ -26,6 +26,10 @@ mkdir -p neoforge/build
 # older build would be tested again, so they go first.
 rm -rf run-gametest/world
 
+# World data for the test_planet_data level (P0-10): the analytic terrain written as world data.
+dev cargo run --release -q -p deeptime-cli -- synth --kind wrap-test --size 1024 --out run-gametest/world/deeptime-test \
+    || { echo "FAILED: deeptime synth"; exit 1; }
+
 peak_rss_file=$(mktemp)
 echo 0 > "$peak_rss_file"
 (
