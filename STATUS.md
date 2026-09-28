@@ -13,7 +13,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-04 | Deep Time's server sets and smoke harness | doing | 2026-09-28 | 1d62258 | standalone and mic smoke PASS (level-type minecraft:normal); ./gametest.sh -PwithMic pending |
 | P0-05 | Generator skeleton on the analytic test terrain | doing | 2026-09-28 | — | ./gametest.sh → All 5 required tests passed (heights exact, seam continuous, veins off); planet boot pending |
 | P0-06 | Toroidal World spike (server-side items) | todo | | | |
-| P0-07 | JNI hello world, native loader and the five failure classes | todo | | | |
+| P0-07 | JNI hello world, native loader and the five failure classes | doing | 2026-09-28 | branch worktree-agent-a6a42ce5d68728e81 | on the Mac (macos-aarch64): cargo test/clippy/fmt/deny ok; gradlew build test → tests=18 failures=0 errors=0; NativeSmoke status=OK + all 5 forced classes, exit 0. Left: ./gametest.sh (NativeGameTests compile, not yet run) and CI on Linux |
 | P0-08 | Cross-builds and the OS load matrix | todo | | | |
 | P0-09 | World-data format v0, synthetic planets, Java reader | todo | | | |
 | P0-10 | The generator on world data | todo | | | |
@@ -86,6 +86,43 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Blocker fix (gap 1).** `DeepTimeTestReporter` logs `[gametest-result]` lines on the planet
   server, and `/deeptime gametest summary` prints `[gametest-summary]` JSON that
   `gametest-planet.sh` polls.
+
+### 2026-09-28 — P0-07 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Built and measured on the Mac mini** (`tools/remote/mac.sh`), so the host native there is
+  `macos-aarch64` / `libdeeptime_jni.dylib` (1,055,136 bytes). `cargo test --workspace`, clippy
+  `-D warnings`, `fmt --check`, `deny check licenses bans` all ok; `gradlew build test` →
+  `tests=18 failures=0 errors=0` (NativeLoaderTest 9, NativeLinkTest 4, PlatformKeyTest 4, Sanity 1);
+  `java -cp <jar> tools/natives/NativeSmoke.java <fresh dir>` → `status=OK version=0.0.1 format=0.0
+  selftest=1997318690096807936`, and each forcing property → `status=FAILED class=<its class>`,
+  exit 0 every time. The Linux paths (PT_INTERP, gnu/musl order, glibc floor scan) are unit-tested
+  with synthetic ELF files and a Groovy check; CI's ubuntu Gradle job is their first real run.
+- **The five failure classes and their guidance** (`FailureClass.guidance`, plan §6.6):
+  - `UNSUPPORTED_PLATFORM`: "Deep Time has no native library that runs on this platform (<key>).
+    Existing Deep Time worlds still play. To create a new one, run `deeptime run` (the Deep Time CLI)
+    on a supported machine and copy its deeptime/ folder into the world folder."
+  - `LIBC_MISMATCH`: "The native library needs a C library this system does not provide (<error>).
+    Install the musl build, or update glibc (the floor is 2.17)." + the CLI route.
+  - `ANTIVIRUS_SUSPECTED`: "The extracted native library vanished or changed between writing and
+    loading, which is what antivirus quarantine looks like. Add an exclusion for <dir>, or start the
+    game with -Ddeeptime.natives.path=<a copy of the library>."
+  - `IO_ERROR`: "Could not create, lock, write or move files in <dir> (<exception>). Check that the
+    folder is writable and the disk has space."
+  - `VERSION_MISMATCH`: "The native library does not match this Deep Time (<what differs>).
+    Reinstall the mod; a stray -Ddeeptime.natives.path library is the usual cause."
+- **Implementation details.** `natives.json` schema 1 is now in plan §6.5 (gap 14); the format
+  version's one source is `Cargo.toml` `[workspace.metadata.deeptime]`, read by `deeptime-format`'s
+  new `build.rs` and by Gradle with the same line scan. `NativeLoader` is JDK-only (gap 13): a
+  built-in JSON reader (`MiniJson`) and a `NativeLogSink` callback that `DeepTime` points at SLF4J.
+  `forkEvery = 1` is on `test` (gap 17), so CI's single results folder holds everything; the fourth
+  extraction case is four concurrent extractions into one directory (exactly one writes).
+  jni-rs 0.22.4 matched the plan's sketch (`EnvUnowned`, `with_env`, `resolve::<P>()`); the policy's
+  `Captures` must be `()` for `resolve`. Extra entry-point rules: `drainLog(0)` drains the
+  process-wide ring; `destroy` and `drainLog` still work on a poisoned session. The dummy preset
+  takes two optional test keys, `reserve_bytes` (memory cap) and `panic_at_step` (panic guard).
+  `SimSession.start` creates the native session on the caller's thread so a bad preset throws at
+  once; the worker thread advances, finalizes and destroys. `serde_json` joins the workspace.
+- **Next.** Ben runs `./gametest.sh` for `NativeGameTests` (log line
+  `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
 - The plan is at revision 2 plus a partial revision 3 (the decisions-log rule in §1.2). The 29 gaps of

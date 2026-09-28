@@ -518,8 +518,10 @@ segments and read sites) and on `deeptime-core` only if it needs the planet mode
     schema). Only this folder is packed, so a leftover `natives-dist/` never leaks into a dev jar.
   - **Release builds** (`-Prelease`): `natives-dist/` from `nix run .#natives` or from the
     `natives.yml` artifacts, all eight libraries, and its `natives.json`.
-  - The format version comes from `crates/deeptime-format/FORMAT_VERSION` (§6.5); Gradle reads that
-    file, as the Rust crate does, rather than keeping a copy.
+  - The format version has one source, the workspace `Cargo.toml`
+    (`[workspace.metadata.deeptime] format_version`, §6.5): `deeptime-format`'s `build.rs` turns it
+    into `FORMAT_VERSION`, and Gradle reads the same line with the same line scan rather than keeping
+    a copy (P0-07; cold-read review 2, gap 14).
 - **JUnit.** Plain JUnit, without `neoForge.unitTest`, because these tests touch no Minecraft class:
   `testImplementation platform('org.junit:junit-bom:5.14.4')` (the last 5.x release; 6.x, which
   needs Java 17 or later, would also run here, so moving to it later is a free choice),
@@ -1216,8 +1218,41 @@ all processors at server first start and in the CLI. Rust threads never attach t
 
 The jar carries `natives/deeptime/<platform key>/<file>` and `natives/deeptime/natives.json`
 (per file: sha256, size, Rust target, glibc floor; plus the Cargo workspace version and the format
-version). `NativeLoader` has no Minecraft or NeoForge
-imports, so it also runs on a bare JVM (`NativeSmoke`, CI). The mod constructor calls
+version). Its schema (schema 1; written by Gradle `hostNatives` and by `build-natives.sh`, read by
+`NativeLoader`; P0-07):
+
+```json
+{
+  "schema": 1,
+  "version": "0.0.1",
+  "format_version": "0.0",
+  "libraries": [
+    {
+      "platform": "linux-x86_64-gnu",
+      "file": "libdeeptime_jni.so",
+      "rust_target": "x86_64-unknown-linux-gnu",
+      "glibc_floor": "2.17",
+      "sha256": "<64 lowercase hex digits>",
+      "size": 1234567
+    }
+  ]
+}
+```
+
+- `schema` is 1; the loader refuses any other value (reported as `VERSION_MISMATCH`: reinstall).
+- `version` is the Cargo `[workspace.package] version`; `format_version` is
+  `[workspace.metadata.deeptime] format_version`, the format version's one source (the writers read
+  it from `Cargo.toml`; `deeptime-format`'s `build.rs` makes it `FORMAT_VERSION`, so the Rust constant
+  and the JSON cannot drift).
+- `libraries` has one entry per platform key of §6.4 (one in a dev jar, eight in a release jar);
+  the file sits at `natives/deeptime/<platform>/<file>`.
+- `glibc_floor` is the highest `GLIBC_x.y` symbol version the library needs (the writer scans the
+  file), `null` for non-gnu targets. `size` is in bytes. An optional `git_sha` is informational.
+
+`NativeLoader` is **JDK-only**: no Minecraft, NeoForge, Gson, SLF4J or Guava types, because
+`NativeSmoke` runs it on a bare JVM with only the mod jar on the classpath. It parses
+`natives.json` with a small built-in JSON reader and logs through a `NativeLogSink` callback, which
+the mod points at SLF4J (default: `System.Logger`). The mod constructor calls
 `NativeLoader.load(FMLPaths.GAMEDIR.get())` once on both sides; it **never throws** and returns a
 `NativeStatus`. Extraction and verification are separate from `System.load`
 (`NativeLoader.extract(gameDir) → ExtractResult` and `NativeLoader.link(ExtractResult) → NativeStatus`),
@@ -1255,7 +1290,11 @@ when they differ.
 ### 6.6 When natives fail to load
 
 `NativeStatus.failure(FailureClass, platformKey, attemptedPath, cause, guidance)` is logged once as an
-ERROR with the full cause and a guidance block. Nothing crashes. What still works and what does not:
+ERROR with the full cause and a guidance block. Nothing crashes. Errors outside the table below are
+folded into the nearest class (P0-07): an `UnsatisfiedLinkError` that names no libc, with the file
+intact, is `UNSUPPORTED_PLATFORM` (the library cannot run here); a missing `natives.json` is
+`UNSUPPORTED_PLATFORM`, an unreadable one `VERSION_MISMATCH`; any unexpected exception in the loader
+is `IO_ERROR` with its text. What still works and what does not:
 
 | Situation | Behaviour |
 |---|---|
@@ -2525,9 +2564,10 @@ of Phase 0 is built on it.
     `status=FAILED class=<FailureClass>` from the returned `NativeStatus` (it never touches the
     package-private `DeepTimeNative`).
   - JUnit `NativeLoaderTest` for extraction (temporary game directories: first extraction, reuse without
-    rewriting, re-extraction of a corrupted file, and one case per failure class through its forcing
-    property); `NativeLinkTest` links once per JVM and checks version and self-test (Gradle
-    `forkEvery = 1` for the test classes that link).
+    rewriting, re-extraction of a corrupted file, four concurrent extractions into one directory of
+    which exactly one writes, and one case per failure class through its forcing property);
+    `NativeLinkTest` links once per JVM and checks version and self-test (`forkEvery = 1` on the
+    `test` task, so every test class gets its own JVM).
   - GameTests `NativeGameTests.{loadsAndSelfTests, dummySessionRunsAndCancels}` (the dummy preset of
     §6.1).
 - **Depends on.** P0-02, P0-03.
