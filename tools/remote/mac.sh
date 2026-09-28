@@ -8,6 +8,10 @@
 #
 #   --no-sync      skip the rsync of this checkout (the Mac copy is already current)
 #   --pack         also sync the MIC pack (…/mic/pack, with its .git) for tools/smoke/install.sh mic
+#   --server       hold the Mac's Deep Time server lock while the command runs: use it for every
+#                  command that boots Minecraft (gametest.sh, gametest-planet.sh, smoke run.py,
+#                  BlueMap). Several agents build at once, but only one test server runs at a time
+#                  (fixed ports, 16 GB shared with graphide's agents). Waits for the lock.
 #   --pull <path>  after the command, copy <path> (relative to the repo root) back from the Mac;
 #                  repeatable (e.g. --pull smoke/mic/report.md --pull neoforge/build/gametest.log)
 #   <command>      run from the repo root on the Mac, already inside the repo's dev shell, e.g.
@@ -33,11 +37,12 @@ NAME="$(basename "$REPO")"
 REMOTE="$SSD/mic/mods/$NAME"
 CACHE="$SSD/deeptime-cache"
 
-SYNC=1; PACK=0; PULLS=()
+SYNC=1; PACK=0; SERVER=0; PULLS=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --no-sync) SYNC=0; shift ;;
         --pack) PACK=1; shift ;;
+        --server) SERVER=1; shift ;;
         --pull) PULLS+=("$2"); shift 2 ;;
         --) shift; break ;;
         *) break ;;
@@ -81,6 +86,18 @@ fi
 # flake.nix + flake.lock. Evaluating the flake afresh on every call would copy the synced tree
 # into /nix/store each time (that pattern filled the Mac's SSD twice in September 2026); the
 # repo's scripts see IN_NIX_SHELL and skip their own `nix develop`.
+if [ "$SERVER" = 1 ]; then
+    # mkdir is atomic: the lock is a directory holding who took it and when. A lock older than
+    # three hours is taken to be stale (its holder died without releasing it).
+    LOCK="$CACHE/server.lock"
+    CMD="while ! mkdir '$LOCK' 2>/dev/null; do
+           age=\$(( \$(date +%s) - \$(stat -f %m '$LOCK' 2>/dev/null || date +%s) ))
+           if [ \$age -gt 10800 ]; then echo 'mac.sh: breaking a stale server lock'; rm -rf '$LOCK'; continue; fi
+           echo \"mac.sh: waiting for the server lock (held by \$(cat '$LOCK/owner' 2>/dev/null))\"; sleep 30
+         done
+         echo '$NAME' > '$LOCK/owner'; trap \"rm -rf '$LOCK'\" EXIT INT TERM
+         $CMD"
+fi
 KEY="$(cat "$REPO/flake.nix" "$REPO/flake.lock" | sha256sum | cut -c1-16)"
 PROFILE="$CACHE/devshell-$KEY"
 INNER="cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac && { [ -e '$PROFILE' ] || nix develop --profile '$PROFILE' -c true; } && exec nix develop '$PROFILE' -c zsh -c $(printf '%q' "$CMD")"

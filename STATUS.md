@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 0 · Next: P0-06 (seam GameTests, Sable), P0-04/05 -PwithMic runs on the Mac, then P0-08 and P0-10 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 0 · Next: finish P0-06 (Sable, structures, 16k/32k smoke, review page), P0-08 (agent), then P0-11 … P0-15 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -12,11 +12,11 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-03 | Gradle NeoForge module skeleton | done | 2026-09-28 | 774a3ef | gradlew build → BUILD SUCCESSFUL; junit-summary tests=1 failures=0; ./gametest.sh → All 1 required tests passed; checkVersions fails on 0.0.2 |
 | P0-04 | Deep Time's server sets and smoke harness | done | 2026-09-28 | — | standalone + mic smoke PASS (laptop run); Mac: ./gametest.sh -PwithMic → All 7 required tests passed with 160 MIC mods (dev-run exclusions: Connector, antique-atlas, surveyor, Distant Horizons; see build log) |
 | P0-05 | Generator skeleton on the analytic test terrain | done | 2026-09-28 | 33f1cd9 | ./gametest.sh → all pass (heightMatchesReference cornerMax 0, maxAbsDiff 0; periodicAcrossSeam 0 mismatches; veins off); planet server (Mac) boots with level-type deeptime:planet, probe column 0 0 → surfaceY 14 for H 14.99. -PwithMic run: with P0-04 |
-| P0-06 | Toroidal World spike (server-side items) | doing | 2026-09-28 | ca88695 | probe tw on the planet server: stamped=true loopsX=true loopsZ=false widthChunks=1024 (chunks -512..512). Seam GameTests being fixed |
+| P0-06 | Toroidal World spike (server-side items) | doing | 2026-09-28 | — | planet server (Mac): probe tw stamped/loopsX/!loopsZ/1024 chunks; columnscontinuous PASS (16 rows, 0 bad folds, 0 jumps); entitycrossesseam PASS (x=-8191.79 after crossing). Left: Sable jetCrossesSeam 20/20, sable_straddle, structure/shaft tests, pole prototype, smoke at 16k/32k with region span check, review page |
 | P0-07 | JNI hello world, native loader and the five failure classes | done | 2026-09-28 | c813177 | Mac: JUnit tests=30 failures=0; NativeSmoke OK + 5 forced classes; ./gametest.sh NativeGameTests pass: native version=0.0.1 format=0.0 target=aarch64-apple-darwin selftest=1997318690096807936. Linux load path first runs in CI |
 | P0-08 | Cross-builds and the OS load matrix | done | 2026-09-28 | b20fbb8 | Mac: `nix run .#natives` → 8 libraries, gnu GLIBC_2.17, musl NEEDED libc.so only; `gradlew build -Prelease` → 8 in the jar, tests=30 failures=0; [natives.yml run 36492319610](https://github.com/MinecraftIndustrialComplex/deep-time/actions/runs/36492319610): all 9 jobs success, 8/8 load jobs `status=OK version=0.0.1` (Windows arm64 included) |
 | P0-09 | World-data format v0, synthetic planets, Java reader | done | 2026-09-28 | 75d90d3 | Mac: cargo test ok (format 15 tests); synth wrap-test 16k → format_version 0.0, viewer bundle; TilePackParityTest + Lz4RoundTripTest pass; wrap-test equals AnalyticTestTerrain within 1/32 block |
-| P0-10 | The generator on world data | todo | | | |
+| P0-10 | The generator on world data | done | 2026-09-28 | — | Mac ./gametest.sh → All 10 required tests passed: heightMatchesRaster cornerMax 0 maxAbsDiff 1; strataClassesResolve checked=32 wrong=0; spawnOnLand y=456 > 63. StagingMover deferred to P1-11 (no staging before the editor exists) |
 | P0-11 | `deeptime-inspect` | todo | | | |
 | P0-12 | Terralith, TerraBlender and Biomes O' Plenty checks | todo | | | |
 | P0-13 | Water above sea level holds | todo | | | |
@@ -119,6 +119,17 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
      from the working tree into its snapshot.
 - **The Mac has no real git** (`/usr/bin/git` is Apple's stub): `mac.sh` keeps a GC-rooted nixpkgs git
   on the SSD, and the dev shell carries git.
+- **P0-10.** `WorldDataTerrain` reads the world data through `ActiveWorldData`, filled by
+  `WorldDataBinder` at `ServerAboutToStartEvent` (HIGHEST) for every Deep Time stem without a test
+  terrain. `StrataPass` v0 paints horizon stacks over stone/deepslate after the pack's surface rules;
+  `RockPalette` v0 takes the first member of `#deeptime:rock/<class>` (Deep Time ships the 20 vanilla
+  entries of the MIC rock tags). `SpawnHandler` takes the first spawn candidate that is dry land.
+- **Seam tests need TW's rules:** TW folds a non-player entity at the end of its own server tick
+  (`ServerLevelMixin.tickNonPassenger` TAIL), so a test entity must move under its own motion; and a
+  position past the edge must be folded with `ToroidalShape.fold` before use. A synchronous load of a
+  seam chunk from a test can wait indefinitely in TW's seam-generation queue, so seam tests read only
+  forceloaded chunks (`getChunkNow`). Two `/test run` at one position cancel each other: the harness
+  spaces tests 8 blocks apart.
 - **TW semantics for tests:** TW moves an entity that *steps* over the border (its movement path);
   `setPos` is a teleport and stays unfolded.
 - **P0-07 (agent, merged):** see the P0-07 entry below. **P0-09 (agent, merged):** on-disk layout in

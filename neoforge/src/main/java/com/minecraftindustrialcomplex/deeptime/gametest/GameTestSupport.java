@@ -48,6 +48,10 @@ public final class GameTestSupport {
     public static final ResourceKey<Level> TEST_PLANET =
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_planet"));
 
+    /** The synthetic world-data level (C = 1,024, folder {@code deeptime-test}; gametest.sh writes it). */
+    public static final ResourceKey<Level> TEST_PLANET_DATA =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_planet_data"));
+
     private GameTestSupport() {}
 
     /** True in the two dev GameTest runtimes (both set {@code -Ddeeptime.gametest=true}). */
