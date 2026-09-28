@@ -1,0 +1,82 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+package com.minecraftindustrialcomplex.deeptime.mixin;
+
+import net.neoforged.fml.loading.LoadingModList;
+import org.objectweb.asm.tree.ClassNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
+import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Gates Deep Time's mixins.
+ *
+ * <ul>
+ *   <li>A mixin in the sub-package {@code mixin.compat.<modid>} applies only when that mod
+ *       is installed (COE, CDG, TerraBlender, ...).</li>
+ *   <li>A mixin in {@code mixin.gametest} applies only with {@code -Ddeeptime.gametest=true},
+ *       so test-only fixes never reach a player's game.</li>
+ *   <li>Everything else always applies.</li>
+ * </ul>
+ *
+ * <p>This runs during mixin bootstrap, before the mod list is built, so it touches no other
+ * Deep Time class and checks mods through FML's loading mod list.
+ */
+public class DeepTimeMixinPlugin implements IMixinConfigPlugin {
+
+    private static final String COMPAT = "com.minecraftindustrialcomplex.deeptime.mixin.compat.";
+    private static final String GAMETEST = "com.minecraftindustrialcomplex.deeptime.mixin.gametest.";
+
+    private static final Logger LOGGER = LoggerFactory.getLogger("deeptime");
+
+    @Override
+    public void onLoad(String mixinPackage) {}
+
+    @Override
+    public String getRefMapperConfig() {
+        return null;
+    }
+
+    @Override
+    public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        if (mixinClassName.startsWith(GAMETEST)) {
+            boolean on = Boolean.getBoolean("deeptime.gametest");
+            if (!on)
+                LOGGER.debug("Skipping gametest mixin {}", mixinClassName);
+            return on;
+        }
+        String modid = requiredMod(mixinClassName);
+        if (modid == null)
+            return true;
+        LoadingModList mods = LoadingModList.get();
+        if (mods == null || mods.getModFileById(modid) != null)
+            return true;
+        LOGGER.info("Skipping mixin {}: {} is not installed", mixinClassName, modid);
+        return false;
+    }
+
+    private static String requiredMod(String mixinClassName) {
+        if (!mixinClassName.startsWith(COMPAT))
+            return null;
+        String rest = mixinClassName.substring(COMPAT.length());
+        int dot = rest.indexOf('.');
+        return dot <= 0 ? null : rest.substring(0, dot);
+    }
+
+    @Override
+    public void acceptTargets(Set<String> myTargets, Set<String> otherTargets) {}
+
+    @Override
+    public List<String> getMixins() {
+        return null;
+    }
+
+    @Override
+    public void preApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {}
+
+    @Override
+    public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {}
+}

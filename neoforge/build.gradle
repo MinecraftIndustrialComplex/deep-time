@@ -1,0 +1,255 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.74'
+}
+
+version = mod_version
+group   = mod_group_id
+
+base {
+    archivesName = "${mod_id}-${minecraft_version}"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+def repoRoot = rootProject.projectDir.parentFile
+
+repositories {
+    maven { url = 'https://maven.neoforged.net/releases' }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter {
+            includeGroup 'maven.modrinth'
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Toroidal World: resolve the bundle once, unpack the NeoForge build for compiling.
+// ---------------------------------------------------------------------------
+configurations {
+    twBundle {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = false
+    }
+}
+dependencies {
+    twBundle "maven.modrinth:toroidal-world:${tw_version}"
+}
+
+def twInnerDir = layout.buildDirectory.dir('toroidal-world')
+def extractToroidalWorld = tasks.register('extractToroidalWorld', Copy) {
+    description = "Unpacks Toroidal World's NeoForge jar (the API) from the Modrinth bundle."
+    from({ zipTree(configurations.twBundle.singleFile) }) {
+        include "META-INF/jarjar/${tw_inner_jar}"
+        eachFile { it.path = it.name }
+        includeEmptyDirs = false
+    }
+    into twInnerDir
+}
+
+dependencies {
+    compileOnly files(twInnerDir.map { it.file(tw_inner_jar) }).builtBy(extractToroidalWorld)
+
+    testImplementation platform("org.junit:junit-bom:${junit_version}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // The game's own lz4-java, named explicitly so the test classpath does not depend on
+    // how ModDevGradle exposes Minecraft's libraries (plan §4.3).
+    testImplementation 'org.lz4:lz4-java:1.8.0'
+}
+
+// ---------------------------------------------------------------------------
+// The gametest source set: resources only (templates, the test datapack). It joins
+// the mod in dev runs but never the jar.
+// ---------------------------------------------------------------------------
+sourceSets {
+    // Default dirs: src/gametest/resources (no Java).
+    gametest {
+        java.srcDirs = []
+    }
+}
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        // Every game directory sits at the repository root, next to the scripts that
+        // clean it (plan §4.3).
+        client {
+            client()
+            gameDirectory = file('../run')
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            gameDirectory = file('../run')
+        }
+        // ./gametest.sh -- the headless GameTest server; namespace `deeptime`.
+        gameTestServer {
+            type = 'gameTestServer'
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'deeptime'
+            systemProperty 'deeptime.gametest', 'true'
+            jvmArgument '-Xmx6G'
+            if (project.hasProperty('gametestDebugLog')) logLevel = org.slf4j.event.Level.DEBUG
+            gameDirectory = file('../run-gametest')
+        }
+        // ./gametest-planet.sh -- a dev dedicated server with a real Deep Time + TW
+        // overworld; namespace `deeptime_planet` (plan §9.4).
+        planetServer {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enableGameTest', 'true'
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'deeptime_planet'
+            systemProperty 'deeptime.gametest', 'true'
+            jvmArgument '-Xmx6G'
+            gameDirectory = file('../run-planet')
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+            sourceSet(sourceSets.gametest)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Runtime mods by folder (plan §4.3). Every run loads Toroidal World's bundle plus the
+// jars of one server set from its mods/ folder. linkRunMods empties the folder of what
+// it put there before, then links the run's set, skipping any jar whose mod id is
+// already on the classpath and failing on a duplicate mod id.
+// ---------------------------------------------------------------------------
+def serverSetFor = { String run ->
+    if (project.hasProperty('withMic')) return 'mic'
+    if (run == 'gameTestServer') {
+        if (project.hasProperty('withTerraBlender')) return 'terrablender'
+        if (project.hasProperty('withEv')) return 'ev'
+        return null
+    }
+    if (run == 'planetServer') return 'standalone'
+    return null
+}
+
+def modIdsOf = { File jar ->
+    def ids = []
+    try {
+        def zip = new java.util.zip.ZipFile(jar)
+        try {
+            def entry = zip.getEntry('META-INF/neoforge.mods.toml')
+            if (entry != null) {
+                zip.getInputStream(entry).text.eachLine { line ->
+                    def m = line =~ /^\s*modId\s*=\s*"([^"]+)"/
+                    if (m.find()) ids << m.group(1)
+                }
+            }
+        } finally { zip.close() }
+    } catch (Exception ignored) {}
+    // The first modId under [[mods]] is the mod; later ones are dependency entries,
+    // which only appear inside [[dependencies.*]] blocks with a different indent/key.
+    return ids.isEmpty() ? [] : [ids[0]]
+}
+
+['gameTestServer', 'planetServer', 'client', 'server'].each { runName ->
+    def cap = runName.capitalize()
+    def gameDir = runName == 'gameTestServer' ? file('../run-gametest')
+                : runName == 'planetServer' ? file('../run-planet') : file('../run')
+    def linkTask = tasks.register("linkRunMods${cap}") {
+        description = "Links Toroidal World and the run's server set into ${gameDir}/mods."
+        dependsOn configurations.twBundle
+        doLast {
+            def modsDir = new File(gameDir, 'mods')
+            modsDir.mkdirs()
+            modsDir.listFiles().each { f ->
+                if (java.nio.file.Files.isSymbolicLink(f.toPath())) f.delete()
+            }
+            def jars = [configurations.twBundle.singleFile]
+            def set = serverSetFor(runName)
+            if (set != null) {
+                def setMods = new File(repoRoot, "smoke/${set}/server/mods")
+                if (!setMods.isDirectory())
+                    throw new GradleException("Server set '${set}' is not installed: run tools/smoke/install.sh ${set}")
+                jars += setMods.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }
+            }
+            def onClasspath = ['deeptime', 'toroidal_world_bundle', 'toroidal_world'] as Set
+            def seen = [:]
+            jars.each { jar ->
+                def ids = modIdsOf(jar)
+                def id = ids ? ids[0] : null
+                if (jar != configurations.twBundle.singleFile && id in onClasspath) {
+                    logger.lifecycle("linkRunMods: skipping ${jar.name} (${id} is provided by the build)")
+                    return
+                }
+                if (id != null && seen.containsKey(id))
+                    throw new GradleException("Two jars declare mod id '${id}': ${seen[id]} and ${jar.name}")
+                if (id != null) seen[id] = jar.name
+                java.nio.file.Files.createSymbolicLink(new File(modsDir, jar.name).toPath(), jar.toPath())
+            }
+            logger.lifecycle("linkRunMods: ${seen.size()} mod jars linked into ${modsDir} (set: ${set ?: 'none'})")
+        }
+    }
+    tasks.matching { it.name == "run${cap}" }.configureEach { dependsOn linkTask }
+}
+
+// ---------------------------------------------------------------------------
+// One version source: the Cargo workspace (plan §6.5).
+// ---------------------------------------------------------------------------
+def cargoToml = new File(repoRoot, 'Cargo.toml')
+def checkVersions = tasks.register('checkVersions') {
+    description = 'Fails when mod_version differs from the Cargo workspace version.'
+    inputs.file cargoToml
+    inputs.property 'modVersion', mod_version
+    doLast {
+        def text = cargoToml.text
+        def section = text.substring(text.indexOf('[workspace.package]'))
+        def m = section =~ /(?m)^version\s*=\s*"([^"]+)"/
+        if (!m.find()) throw new GradleException("No version in [workspace.package] of ${cargoToml}")
+        if (m.group(1) != mod_version)
+            throw new GradleException("mod_version ${mod_version} != Cargo workspace version ${m.group(1)}")
+    }
+}
+tasks.named('check') { dependsOn checkVersions }
+tasks.named('build') { dependsOn checkVersions }
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+    testLogging { events 'passed', 'failed' }
+}
+
+var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    var replaceProperties = [
+        minecraft_version      : minecraft_version,
+        minecraft_version_range: minecraft_version_range,
+        neo_version            : neo_version,
+        neo_version_range      : neo_version_range,
+        loader_version_range   : loader_version_range,
+        mod_id                 : mod_id,
+        mod_name               : mod_name,
+        mod_license            : mod_license,
+        mod_version            : mod_version,
+        mod_authors            : mod_authors,
+        mod_description        : mod_description
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from 'src/main/templates'
+    into 'build/generated/sources/modMetadata'
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
