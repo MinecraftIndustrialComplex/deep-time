@@ -81,9 +81,22 @@ public final class DeepTimeCommands {
         JsonObject o = new JsonObject();
         o.addProperty("probe", "tw");
         o.addProperty("level", level.dimension().location().toString());
-        o.addProperty("generator", level.getChunkSource().getGenerator().getClass().getName());
-        // The shape fields (stamped, loopsX, loopsZ, widthChunks, climateCompression) arrive
-        // with Deep Time's Toroidal World shape in P0-06.
+        var generator = level.getChunkSource().getGenerator();
+        o.addProperty("generator", generator.getClass().getName());
+        var shape = com.toroidalworld.api.v1.ToroidalWorldApi.shapeOf(level);
+        // A NoiseBasedChunkGenerator subclass is never rebuilt by TW (exact-class check), only
+        // stamped: a shape on a Geologic level therefore means "stamped".
+        o.addProperty("stamped", shape.isPresent() && generator instanceof GeologicChunkGenerator);
+        shape.ifPresent(s -> {
+            o.addProperty("loopsX", s.loops(net.minecraft.core.Direction.Axis.X));
+            o.addProperty("loopsZ", s.loops(net.minecraft.core.Direction.Axis.Z));
+            o.addProperty("widthChunks", s.widthChunks(net.minecraft.core.Direction.Axis.X));
+            o.addProperty("minChunkX", s.minChunk(net.minecraft.core.Direction.Axis.X));
+            o.addProperty("maxChunkX", s.maxChunk(net.minecraft.core.Direction.Axis.X));
+        });
+        // TW's climate compression matches vanilla's climate density functions only; Deep Time's
+        // climate is deeptime:raster, so compression cannot apply.
+        o.addProperty("climateCompression", "off");
         return emit(ctx.getSource(), o);
     }
 

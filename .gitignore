@@ -26,3 +26,6 @@ build/
 .idea/
 .vscode/
 .graphide/
+
+# Claude Code agent worktrees and settings (never part of the project)
+/.claude/
