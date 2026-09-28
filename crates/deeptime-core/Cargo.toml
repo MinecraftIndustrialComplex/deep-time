@@ -11,3 +11,6 @@ repository.workspace = true
 deeptime-format.workspace = true
 rayon.workspace = true
 serde_json.workspace = true
+# L0 geometry (P1-02, plan §5.2 and §13): vectors and the k-d tree. Both MIT OR Apache-2.0.
+glam = "0.33.11"
+kiddo = { version = "6.3.0", default-features = false, features = ["multi-threaded"] }
