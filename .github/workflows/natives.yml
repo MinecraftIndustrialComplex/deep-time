@@ -1,0 +1,172 @@
+# The eight natives and the OS load matrix (plan §4.5, §6.4, P0-08). Tags and manual dispatch
+# only: the organisation is on GitHub's free plan (2,000 private-repo minutes a month, macOS
+# minutes billed at about ten Linux minutes), so this never runs on ordinary pushes.
+#
+#   build   one Linux runner cross-compiles all eight libraries (tools/natives/build-natives.sh:
+#           cargo-zigbuild for Linux and macOS, cargo-xwin for Windows, readelf/PE/Mach-O checks),
+#           then packs the release jar (./gradlew jar -Prelease) and uploads both.
+#   load    runs tools/natives/NativeSmoke.java against that jar on each real OS/arch, so every
+#           platform extracts and links its library from the jar exactly as the mod does. The
+#           musl rows run it in eclipse-temurin:21-jdk-alpine (JavaScript actions do not run in
+#           Alpine containers on arm64 runners, so the container runs only the test).
+#
+# Run by hand: gh workflow run natives.yml -R MinecraftIndustrialComplex/deep-time [--ref <branch>]
+#              id=$(gh run list -R MinecraftIndustrialComplex/deep-time -w natives.yml -L 1 --json databaseId -q '.[0].databaseId')
+#              gh run watch "$id" -R MinecraftIndustrialComplex/deep-time --exit-status
+name: natives
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: natives-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # cargo-xwin downloads the Microsoft CRT and Windows SDK here (licence: NOTICE.md).
+      XWIN_CACHE_DIR: /home/runner/.cache/cargo-xwin
+    steps:
+      - uses: actions/checkout@v4
+      # rustup reads rust-toolchain.toml (the pinned channel); the eight targets of plan §6.4.
+      - name: Rust toolchain and targets
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup target add x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu \
+            x86_64-unknown-linux-musl aarch64-unknown-linux-musl \
+            x86_64-pc-windows-msvc aarch64-pc-windows-msvc \
+            x86_64-apple-darwin aarch64-apple-darwin
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.13.0
+      # cargo-xwin needs clang-cl, lld-link and llvm-lib; Ubuntu ships them unversioned only
+      # under /usr/lib/llvm-18/bin. That directory also has llvm-objdump for the Mach-O checks.
+      - name: clang, lld and LLVM tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends clang-18 lld-18 llvm-18
+          echo /usr/lib/llvm-18/bin >> "$GITHUB_PATH"
+      # The versions the Nix dev shell carries.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild@0.23.4,cargo-xwin@0.23.1
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: natives-cargo-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml') }}
+          restore-keys: natives-cargo-
+      - uses: actions/cache@v4
+        with:
+          path: /home/runner/.cache/cargo-xwin
+          key: xwin-0.23.1
+      - name: Build the eight natives
+        run: tools/natives/build-natives.sh
+      - name: Summary
+        run: |
+          {
+            echo '### natives-dist'
+            echo '```'
+            (cd target/natives-dist && file -- */*)
+            echo
+            jq -c '.libraries[] | {platform, size, glibc_floor, sha256: .sha256[0:12]}' target/natives-dist/natives.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: natives-gradle-${{ hashFiles('neoforge/*.gradle', 'neoforge/gradle.properties') }}
+          restore-keys: natives-gradle-
+      # -Prelease packs target/natives-dist (checkReleaseNatives verifies all eight first).
+      - name: Release jar
+        working-directory: neoforge
+        run: |
+          ./gradlew checkVersions jar -Prelease --console=plain
+          n=$(unzip -l build/libs/deeptime-*.jar | grep -c 'natives/deeptime/.*\.\(so\|dll\|dylib\)')
+          echo "release jar: $n libraries"
+          [ "$n" = 8 ]
+      - uses: actions/upload-artifact@v4
+        with:
+          name: natives-dist
+          path: target/natives-dist
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deeptime-jar
+          path: neoforge/build/libs/deeptime-*.jar
+          if-no-files-found: error
+
+  load:
+    needs: build
+    name: load ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: windows-x86_64, runner: windows-latest }
+          - { platform: windows-aarch64, runner: windows-11-arm }
+          - { platform: macos-aarch64, runner: macos-14 }
+          - { platform: macos-x86_64, runner: macos-15-intel }
+          - { platform: linux-x86_64-gnu, runner: ubuntu-24.04 }
+          - { platform: linux-aarch64-gnu, runner: ubuntu-24.04-arm }
+          - { platform: linux-x86_64-musl, runner: ubuntu-24.04, alpine: true }
+          - { platform: linux-aarch64-musl, runner: ubuntu-24.04-arm, alpine: true }
+    steps:
+      # Only NativeSmoke.java and Cargo.toml (for the expected version) are needed.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/natives
+      - uses: actions/download-artifact@v4
+        with:
+          name: deeptime-jar
+          path: dist
+      - if: ${{ !matrix.alpine }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: NativeSmoke
+        shell: bash
+        run: |
+          version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version *= *"\(.*\)"/\1/p' Cargo.toml)
+          jar=$(echo dist/deeptime-*.jar)
+          if [ "${{ matrix.alpine }}" = true ]; then
+            # libgcc_s is what a Rust musl cdylib usually needs on Alpine (rust-lang/rust#82521).
+            docker run --rm -v "$PWD:/w" -w /w eclipse-temurin:21-jdk-alpine \
+              sh -c "apk add --no-cache libgcc >/dev/null && java -cp $jar tools/natives/NativeSmoke.java /tmp/gd" \
+              > smoke.out 2> smoke.err || true
+          else
+            java -cp "$jar" tools/natives/NativeSmoke.java "$RUNNER_TEMP/gd" > smoke.out 2> smoke.err || true
+          fi
+          cat smoke.err
+          cat smoke.out
+          line=$(grep '^status=' smoke.out || echo 'status=MISSING')
+          echo "**${{ matrix.platform }}** (${{ matrix.runner }}): \`$line\`" >> "$GITHUB_STEP_SUMMARY"
+          case "$line" in
+            "status=OK version=$version "*) ;;
+            *) echo "::error::${{ matrix.platform }}: $line"; exit 1 ;;
+          esac
+          # The loader must have picked this row's library (e.g. musl on Alpine, not gnu).
+          grep -q "platform=${{ matrix.platform }} " smoke.err \
+            || { echo "::error::${{ matrix.platform }}: the loader did not load this platform's library"; exit 1; }

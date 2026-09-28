@@ -1,0 +1,25 @@
+# Only blocks below y 0: the rock strata seen from above, and the check that BlueMap handles the
+# -352..639 build range (plan §9.6, P0-14).
+world: "@WORLD@"
+dimension: "minecraft:overworld"
+name: "Deep Time planet — below y 0 (strata)"
+sorting: 1
+start-pos: { x: 0, z: 0 }
+sky-color: "#7dabff"
+void-color: "#000000"
+sky-light: 1
+ambient-light: 0.6
+remove-caves-below-y: -10000
+cave-detection-ocean-floor: -5
+cave-detection-uses-block-light: false
+min-inhabited-time: 0
+render-mask: [ { max-y: 0 } ]
+render-edges: true
+edge-light-strength: 8
+enable-perspective-view: true
+enable-flat-view: true
+enable-free-flight-view: true
+enable-hires: true
+storage: "file"
+ignore-missing-light-data: true
+marker-sets: {}
