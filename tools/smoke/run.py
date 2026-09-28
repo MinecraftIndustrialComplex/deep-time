@@ -89,6 +89,8 @@ class Server:
                                       stderr=subprocess.STDOUT, text=True, errors="replace",
                                       bufsize=1, start_new_session=True)
         threading.Thread(target=self._read, daemon=True).start()
+        if not os.path.exists(f"/proc/{self._proc.pid}/status"):
+            threading.Thread(target=self._sample_rss, daemon=True).start()
 
     def _read(self):
         for line in self._proc.stdout:
@@ -102,13 +104,23 @@ class Server:
                 self.fatal = line.rstrip()
 
     def peak_rss_kb(self):
+        """VmHWM on Linux; elsewhere (macOS) the highest RSS the sampler thread saw."""
         try:
             for line in open(f"/proc/{self._proc.pid}/status"):
                 if line.startswith("VmHWM:"):
                     return int(line.split()[1])
         except (OSError, AttributeError):
             pass
-        return None
+        return getattr(self, "_peak_sampled", None)
+
+    def _sample_rss(self):
+        # macOS has no /proc: sample the JVM's RSS every 2 s while it runs.
+        self._peak_sampled = 0
+        while self._proc.poll() is None:
+            r = subprocess.run(["ps", "-o", "rss=", "-p", str(self._proc.pid)], capture_output=True, text=True)
+            if r.stdout.strip().isdigit():
+                self._peak_sampled = max(self._peak_sampled, int(r.stdout.strip()))
+            time.sleep(2)
 
     def wait_for_done(self, timeout):
         deadline, last = time.time() + timeout, 0.0
