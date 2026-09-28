@@ -19,7 +19,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-10 | The generator on world data | done | 2026-09-28 | — | Mac ./gametest.sh → All 10 required tests passed: heightMatchesRaster cornerMax 0 maxAbsDiff 1; strataClassesResolve checked=32 wrong=0; spawnOnLand y=456 > 63. StagingMover deferred to P1-11 (no staging before the editor exists) |
 | P0-11 | `deeptime-inspect` | todo | | | |
 | P0-12 | Terralith, TerraBlender and Biomes O' Plenty checks | done | 2026-09-28 | 00db177 | Mac: ./gametest.sh default/-PwithMic/-PwithTerraBlender → All 13 passed; terralith=3008 of 4096 land samples (MIC), biomesoplenty=1325 of 4096 (TB), surface painted 24/24; smoke mic --synth wrap-test (production server) PASS: probe tw stamped/loopsX/!loopsZ/1024, locate village found, no C2ME/DH errors, chunky done, regions outside span 0 |
-| P0-13 | Water above sea level holds | todo | | | |
+| P0-13 | Water above sea level holds | done | 2026-09-28 | — | Mac ./gametest.sh → All 14 required tests passed: lakeHolds before=65304 after=65304 expected=65304 outside=0 (every source woken by a fluid tick, 400 ticks forceloaded), water_top_y=120 at the lake centre, generatedFluidTicks=0. The inspect section PNG (review picture) comes with P0-11 |
 | P0-14 | BlueMap renders on MIC blocks | doing | 2026-09-28 | — | Mac: tools/review/render-bluemap.sh renders the MIC smoke world (surface map + a below-y-0 strata map) in ~30 s; web app 645 MB uncompressed (962 hires tiles × ~0.65 MB, 992-block height). Hosting on spacesheep undecided: gzip tiles + a decompressing service worker, or a smaller render mask |
 | P0-15 | Phase 0 exit | todo | | | |
 | P1-01 | Session, checkpoints, keyframes, event log and site formats | todo | | | |
@@ -54,6 +54,48 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 — P0-13 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Created.** `worldgen/WaterPass` (after `StrataPass` in `buildSurface`; fills air below the water
+  surface down to the ground with water sources through `ProtoChunk.setBlockState`, so the worldgen
+  heightmaps stay current and no fluid tick or post-processing mark is made), `worldgen/WaterLevels`
+  (plain-Java level lookup, JUnit-tested on the lake fixture), the gametest level `deeptime:test_lake`
+  (folder `deeptime-lake`, C 1024, `planet_nocaves`, fixed biome `deeptime:test_bare`: no carvers, no
+  features, temperature 0.8), `WaterGameTests.lakeHolds`; `gametest.sh` also writes
+  `synth --kind lake-test --size 1024`.
+- **Measured** (Mac, `tools/remote/mac.sh --server -- './gametest.sh'` → All 14 required tests passed):
+  `[gametest] lakeHolds before=65304 after=65304 expected=65304 outside=0 outsideAtGeneration=0
+  columns=7299 shoreColumns=2 reach=4 woken=65304 ticks=400 generatedFluidTicks=0
+  pendingFluidTicksAfter=0 analytic=66062 floorCornerMaxDiff=0 cornerColumns=442 chunks=240` and
+  `[gametest] lakeHolds water_top_y=120 at=(0, 0) top_water_block_y=119 floor_y=109` (gap 18's
+  printed value; the plan's P0-13 acceptance now names it and fills in the section's z and x range).
+  lakeHolds takes ~20 s (240 forceloaded chunks generated synchronously, then 400 ticks). JUnit
+  tests=33 failures=0.
+- **The test is stricter than the plan's:** after the first count it schedules a fluid tick on every
+  water source it counted (as a changed neighbour would), so "after" proves the basin is watertight,
+  not only that nothing ticked. `expected` is every open block (air or water) between each footprint
+  column's ground and its surface; `outside` is any water in a box 48 blocks past the footprint,
+  y 84…141, that is not in those blocks. `floorCornerMaxDiff=0` ties the basin to the raster at
+  noise-cell corners; `analytic` is the same count from the raster's H (informational: bilinear
+  interpolation over 4-block noise cells moves the shore by a block or two).
+- **Shore rule (contradicts nothing in the plan; a new bake requirement).** The first run failed with
+  `outside=2`: two shore columns (27,33)/(33,27) at d = 2.64 had ground 118 under the surface 120
+  (raster H 119.89), but their nearest `water_level` cell (28,34) sits at d = 4.05, outside the synth's
+  wet ring (d ≤ 4); the woken lake turned those pockets into new sources. Generated ground is the
+  density interpolated bilinearly over 4-block noise cells, so on a steep shore it lies below the
+  raster. `WaterLevels.levelAt` therefore gives a dry-celled column the level of the nearest wet cell
+  within one noise cell (`reach` = the settings' cell width, 4); only air below the level is ever
+  filled, so this adds no water on ground above the level. **Phase 2's bake must keep each basin's
+  rim above its level for at least one noise cell (4 blocks) beyond the last wet cell.**
+- **Ice (plan §7.9) is not placed by WaterPass:** vanilla's `freeze_top_layer` feature, present in
+  every overworld biome, freezes the top water block where the biome is cold, and the lake exists
+  before features run. A `SpreadingSnowyDirtBlock` (grass, mycelium) left under the water by the
+  surface rules becomes dirt, as vanilla's underwater rule would make it (its random tick would
+  otherwise do so later and wake the water).
+- **Not run:** `./gametest.sh -PwithMic` (a pack biome modifier that targets every biome could give
+  `test_bare` features); the `deeptime-inspect section` PNG waits for P0-11.
+- **Next.** P0-11's `section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at 0
+  --from -88 --to 212` for the review picture.
 
 ### 2026-09-28 — P0-08 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Created.** `tools/natives/build-natives.sh` (`nix run .#natives`; the app re-enters the dev

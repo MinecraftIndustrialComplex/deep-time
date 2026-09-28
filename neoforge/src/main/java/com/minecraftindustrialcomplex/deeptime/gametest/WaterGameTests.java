@@ -3,9 +3,10 @@ package com.minecraftindustrialcomplex.deeptime.gametest;
 
 import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
-import com.minecraftindustrialcomplex.deeptime.worldgen.WaterPass;
+import com.minecraftindustrialcomplex.deeptime.worldgen.WaterLevels;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -44,15 +45,11 @@ public final class WaterGameTests {
     private WaterGameTests() {}
 
     /** The scanned box, from the manifest's {@code notes.lake} geometry. */
-    record Box(int minX, int maxX, int minZ, int maxZ, int minY, int maxY) {
-        int chunks() {
-            return ((maxX >> 4) - (minX >> 4) + 1) * ((maxZ >> 4) - (minZ >> 4) + 1);
-        }
-    }
+    record Box(int minX, int maxX, int minZ, int maxZ, int minY, int maxY) {}
 
     /** One count over the box. */
-    record Count(long expected, long sources, long outside, int columns, long analytic, int floorCornerMaxDiff,
-                 int cornerColumns, List<BlockPos> water, String detail) {}
+    record Count(long expected, long sources, long outside, int columns, int shoreColumns, long analytic,
+                 int floorCornerMaxDiff, int cornerColumns, List<BlockPos> water, String detail) {}
 
     /**
      * Counts the water sources in the basin after generation, wakes every one of them with a fluid
@@ -88,7 +85,8 @@ public final class WaterGameTests {
                 chunks.add(level.getChunk(cx, cz));
             }
         int generatedTicks = pendingFluidTicks(chunks);
-        Count before = count(level, t, box);
+        int reach = g.waterReach();
+        Count before = count(level, t, reach, box);
 
         // Wake the whole lake: a leak anywhere in the basin would now flow.
         long now = level.getGameTime();
@@ -96,22 +94,22 @@ public final class WaterGameTests {
             level.getChunkAt(p).getFluidTicks().schedule(new ScheduledTick<>(Fluids.WATER, p, now + 1, level.nextSubTickCount()));
 
         helper.runAfterDelay(WAIT_TICKS, () -> {
-            Count after = count(level, t, box);
+            Count after = count(level, t, reach, box);
             int pendingAfter = pendingFluidTicks(chunks);
             int[] centre = centreColumn(level, lake);
             for (LevelChunk c : chunks)
                 level.setChunkForced(c.getPos().x, c.getPos().z, false);
 
             DeepTime.LOGGER.info("[gametest] lakeHolds before={} after={} expected={} outside={} outsideAtGeneration={} "
-                            + "columns={} woken={} ticks={} generatedFluidTicks={} pendingFluidTicksAfter={} analytic={} "
-                            + "floorCornerMaxDiff={} cornerColumns={} chunks={}",
+                            + "columns={} shoreColumns={} reach={} woken={} ticks={} generatedFluidTicks={} pendingFluidTicksAfter={} "
+                            + "analytic={} floorCornerMaxDiff={} cornerColumns={} chunks={}",
                     before.sources(), after.sources(), before.expected(), after.outside(), before.outside(),
-                    before.columns(), before.water().size(), WAIT_TICKS, generatedTicks, pendingAfter, before.analytic(),
-                    before.floorCornerMaxDiff(), before.cornerColumns(), chunks.size());
+                    before.columns(), before.shoreColumns(), reach, before.water().size(), WAIT_TICKS, generatedTicks,
+                    pendingAfter, before.analytic(), before.floorCornerMaxDiff(), before.cornerColumns(), chunks.size());
             if (!before.detail().isEmpty() || !after.detail().isEmpty())
                 DeepTime.LOGGER.info("[gametest] lakeHolds escaped water: atGeneration{} after{}", before.detail(), after.detail());
             double waterLevel = lake.get("water_level_y").getAsDouble();
-            int wantTop = WaterPass.topWaterBlock(waterLevel) + 1;
+            int wantTop = WaterLevels.topWaterBlock(waterLevel) + 1;
             DeepTime.LOGGER.info("[gametest] lakeHolds water_top_y={} at=({}, {}) top_water_block_y={} floor_y={} water_level={}",
                     centre[2], centre[0], centre[1], centre[2] - 1, centre[3], waterLevel);
 
@@ -149,30 +147,33 @@ public final class WaterGameTests {
     }
 
     /**
-     * A footprint column is one whose {@code water_level} cell has a value (WaterPass's own rule).
+     * A footprint column is one that has a water level by WaterPass's own rule ({@link WaterLevels#levelAt}:
+     * its nearest cell, else a wet cell within {@code reach}; a shore column is the latter kind).
      * In it, the floor is the first block below the water surface that is neither air nor water;
      * every block between the floor and the surface should be a water source. Anything else that
      * holds water in the box is outside.
      */
-    static Count count(ServerLevel level, WorldDataTerrain t, Box box) {
-        WorldData wd = t.data();
+    static Count count(ServerLevel level, WorldDataTerrain t, int reach, Box box) {
+        RasterSampler levels = t.data().layer(WorldData.WATER_LEVEL);
         long expected = 0, sources = 0, outside = 0, analytic = 0;
-        int columns = 0, cornerMax = 0, corners = 0;
+        int columns = 0, shore = 0, cornerMax = 0, corners = 0;
         List<BlockPos> water = new ArrayList<>();
         StringBuilder detail = new StringBuilder();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int x = box.minX(); x <= box.maxX(); x++) {
             for (int z = box.minZ(); z <= box.maxZ(); z++) {
                 LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
-                double wl = wd.waterLevel(x, z);
+                double wl = WaterLevels.levelAt(levels, x, z, reach);
                 int top = Integer.MIN_VALUE, floor = Integer.MIN_VALUE;
                 if (!Double.isNaN(wl)) {
-                    top = WaterPass.topWaterBlock(wl);
+                    top = WaterLevels.topWaterBlock(wl);
                     floor = top;
                     while (floor > level.getMinBuildHeight() && open(chunk.getBlockState(pos.set(x, floor, z))))
                         floor--;
                     if (top > floor) {
                         columns++;
+                        if (Double.isNaN(levels.nearest(x, z)))
+                            shore++;
                         expected += top - floor;
                         int rasterFloor = (int) Math.ceil(t.height(x, z)) - 1;
                         analytic += Math.max(0, top - rasterFloor);
@@ -207,7 +208,7 @@ public final class WaterGameTests {
                 }
             }
         }
-        return new Count(expected, sources, outside, columns, analytic, cornerMax, corners, water, detail.toString());
+        return new Count(expected, sources, outside, columns, shore, analytic, cornerMax, corners, water, detail.toString());
     }
 
     /** Air or a water block (source or flowing): what the lake should fill. */
