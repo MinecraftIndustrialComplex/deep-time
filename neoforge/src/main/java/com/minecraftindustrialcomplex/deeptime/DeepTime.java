@@ -4,7 +4,10 @@ package com.minecraftindustrialcomplex.deeptime;
 import com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLoader;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLogSink;
+import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.server.DeepTimeCommands;
+import com.minecraftindustrialcomplex.deeptime.server.SpawnHandler;
+import com.minecraftindustrialcomplex.deeptime.server.WorldDataBinder;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
@@ -30,6 +33,9 @@ public final class DeepTime {
     public DeepTime(IEventBus modBus) {
         DeepTimeRegistries.register(modBus);
         NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, e -> DeepTimeCommands.register(e.getDispatcher()));
+        WorldDataBinder.init();
+        SpawnHandler.init();
+        RockPalette.init();
         GameTestSupport.init(modBus);
         loadNatives();
     }

@@ -162,8 +162,11 @@ def main():
                 x, y, z = (pos or "0,100,0").split(",")
                 rcon("deeptime gametest reset")
                 rcon(f"forceload add {int(x) - 32} {int(z) - 32} {int(x) + 32} {int(z) + 32}")
-                for name in names:
-                    print(f"   /test run {name} at {x},{y},{z}: " + rcon(f"execute positioned {x} {y} {z} run test run {name}"), flush=True)
+                # One spot per test, 8 blocks apart in z: a second /test run at the same spot replaces
+                # the first test's structure, and that test never reports.
+                for n_i, name in enumerate(names):
+                    tz = int(z) + 8 * n_i
+                    print(f"   /test run {name} at {x},{y},{tz}: " + rcon(f"execute positioned {x} {y} {tz} run test run {name}"), flush=True)
                 end = time.time() + a.timeout
                 summary = {}
                 while time.time() < end:

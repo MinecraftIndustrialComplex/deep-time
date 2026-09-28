@@ -6,8 +6,6 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -33,72 +31,88 @@ public final class SeamGameTests {
     }
 
     /**
-     * Across the seam the world continues: column x = C/2 + k is the same column as x = −C/2 + k
-     * (TW folds it), and the step from x = C/2 − 1 to x = C/2 is no larger than the terrain's own
-     * steps next to it.
+     * Across the seam the world continues. Positions past the edge are folded through TW's API
+     * first (TW's rule: fold a position before using it; a raw read at chunk C/32 can stall in TW's
+     * seam-generation queue): x = C/2 + k folds to −C/2 + k, and the step from the last canonical
+     * column (C/2 − 1) to the first (−C/2) is no larger than the terrain's own steps beside it.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
     public static void columnsContinuous(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         int c = circumference(helper);
-        int folded = 0, jumps = 0;
+        var shape = com.toroidalworld.api.v1.ToroidalWorldApi.shapeOf(level).orElse(null);
+        if (shape == null) {
+            helper.fail("the level has no Toroidal World shape");
+            return;
+        }
+        int badFolds = 0, jumps = 0, rows = 0, unloadedRows = 0;
         StringBuilder detail = new StringBuilder();
-        // Rows inside the strip the harness forceloads around the seam (x = C/2 ± 32, z ± 32), so no
-        // far chunk is generated synchronously on the server thread.
+        // Rows inside the strip the harness forceloads around the seam (z ± 32).
         for (int i = 0; i < 16; i++) {
             int z = (i - 8) * 4 + 1;
             for (int k = 0; k < 4; k++) {
-                int beyond = level.getHeight(Heightmap.Types.WORLD_SURFACE, c / 2 + k, z);
-                int canonical = level.getHeight(Heightmap.Types.WORLD_SURFACE, -c / 2 + k, z);
-                if (beyond != canonical) {
-                    folded++;
-                    detail.append(" fold(z=").append(z).append(",k=").append(k).append("):").append(beyond).append("!=").append(canonical);
+                var folded = shape.fold(new net.minecraft.core.BlockPos(c / 2 + k, 64, z));
+                if (folded.getX() != -c / 2 + k || folded.getZ() != z) {
+                    badFolds++;
+                    detail.append(" fold(").append(c / 2 + k).append(")=").append(folded.getX());
                 }
             }
-            int a = level.getHeight(Heightmap.Types.OCEAN_FLOOR, c / 2 - 2, z);
-            int b = level.getHeight(Heightmap.Types.OCEAN_FLOOR, c / 2 - 1, z);
-            int across = level.getHeight(Heightmap.Types.OCEAN_FLOOR, c / 2, z);
-            int after = level.getHeight(Heightmap.Types.OCEAN_FLOOR, c / 2 + 1, z);
+            // Only chunks the harness's forceload already holds: a synchronous load of a seam chunk
+            // can wait in TW's seam-generation queue (P0-06 finding), so the test never forces one.
+            var east = level.getChunkSource().getChunkNow((c / 2 - 1) >> 4, z >> 4);
+            var west = level.getChunkSource().getChunkNow((-c / 2) >> 4, z >> 4);
+            if (east == null || west == null) {
+                unloadedRows++;
+                continue;
+            }
+            rows++;
+            int a = east.getHeight(Heightmap.Types.OCEAN_FLOOR, c / 2 - 2, z);
+            int b = east.getHeight(Heightmap.Types.OCEAN_FLOOR, c / 2 - 1, z);
+            int across = west.getHeight(Heightmap.Types.OCEAN_FLOOR, -c / 2, z);
+            int after = west.getHeight(Heightmap.Types.OCEAN_FLOOR, -c / 2 + 1, z);
             if (Math.abs(across - b) > Math.max(Math.max(Math.abs(b - a), Math.abs(after - across)), 2)) {
                 jumps++;
                 detail.append(" jump(z=").append(z).append("):").append(b).append("->").append(across);
             }
         }
-        DeepTime.LOGGER.info("[gametest] columnsContinuous C={} foldMismatches={} seamJumps={}{}", c, folded, jumps, detail);
-        helper.assertTrue(folded == 0 && jumps == 0, "seam discontinuities:" + detail);
+        DeepTime.LOGGER.info("[gametest] columnsContinuous C={} rows={} unloadedRows={} badFolds={} seamJumps={}{}", c, rows,
+                unloadedRows, badFolds, jumps, detail);
+        helper.assertTrue(rows >= 8, "only " + rows + " seam rows loaded");
+        helper.assertTrue(badFolds == 0 && jumps == 0, "seam discontinuities:" + detail);
         helper.succeed();
     }
 
-    /** An entity moved across the seam is still one entity, now inside the canonical span. */
+    /**
+     * An entity that moves itself across the seam is still one entity, now inside the canonical
+     * span. TW folds a non-player entity at the end of its own server tick, so the entity must move
+     * under its own motion (a gravity-free snowball flying east), not be pushed from outside.
+     */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 200)
     public static void entityCrossesSeam(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         int c = circumference(helper);
-        ArmorStand stand = EntityType.ARMOR_STAND.create(level);
-        if (stand == null) {
-            helper.fail("could not create an armor stand");
+        var ball = net.minecraft.world.entity.EntityType.SNOWBALL.create(level);
+        if (ball == null) {
+            helper.fail("could not create a snowball");
             return;
         }
-        double y = level.getHeight(Heightmap.Types.MOTION_BLOCKING, c / 2 - 2, 0) + 1;
-        stand.setNoGravity(true);
-        stand.moveTo(c / 2.0 - 1.5, y, 0.5, 0, 0);
-        level.addFreshEntity(stand);
-        var id = stand.getUUID();
-        // Walk it east across x = C/2 through Entity.move, a quarter block per tick: TW moves an
-        // entity that steps over the border to the other side in the same tick. (A bare setPos
-        // is a teleport and is not folded.)
-        for (int t = 0; t < 16; t++)
-            helper.runAfterDelay(5 + t, () -> stand.move(net.minecraft.world.entity.MoverType.SELF,
-                    new net.minecraft.world.phys.Vec3(0.25, 0, 0)));
+        double y = 300;   // clear air, far above any terrain near the seam
+        ball.setNoGravity(true);
+        ball.moveTo(c / 2.0 - 3.5, y, 0.5, 0, 0);
+        ball.setDeltaMovement(0.25, 0, 0);   // 5 blocks a second eastward, across x = C/2
+        level.addFreshEntity(ball);
+        var id = ball.getUUID();
         helper.runAfterDelay(40, () -> {
             var found = level.getEntity(id);
             double x = found == null ? Double.NaN : found.getX();
             boolean inSpan = found != null && x >= -c / 2.0 && x < c / 2.0;
-            DeepTime.LOGGER.info("[gametest] entityCrossesSeam C={} found={} x={} inCanonicalSpan={}", c, found != null, x, inSpan);
+            boolean crossed = found != null && x < 0;   // it now flies on from the west edge
+            DeepTime.LOGGER.info("[gametest] entityCrossesSeam C={} found={} x={} inCanonicalSpan={} crossed={}", c,
+                    found != null, x, inSpan, crossed);
             if (found != null)
                 found.discard();
             helper.assertTrue(found != null, "the entity vanished at the seam");
-            helper.assertTrue(inSpan, "entity at x=" + x + " is outside the canonical span [" + (-c / 2) + ", " + (c / 2) + ")");
+            helper.assertTrue(inSpan && crossed, "entity at x=" + x + ": expected just east of " + (-c / 2) + " after crossing");
             helper.succeed();
         });
     }

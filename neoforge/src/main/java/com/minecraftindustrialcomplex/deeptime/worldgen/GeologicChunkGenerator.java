@@ -98,6 +98,14 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
     }
 
     @Override
+    public void buildSurface(net.minecraft.server.level.WorldGenRegion region, net.minecraft.world.level.StructureManager structures,
+                             net.minecraft.world.level.levelgen.RandomState random, net.minecraft.world.level.chunk.ChunkAccess chunk) {
+        super.buildSurface(region, structures, random, chunk);   // the pack's surface rules repaint the default block
+        if (terrain() instanceof WorldDataTerrain w)
+            StrataPass.apply(chunk, w.data());
+    }
+
+    @Override
     protected MapCodec<? extends ChunkGenerator> codec() {
         return CODEC;
     }
