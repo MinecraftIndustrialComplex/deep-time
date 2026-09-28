@@ -1,0 +1,28 @@
+# Rust and Gradle build outputs
+/target/
+neoforge/build/
+neoforge/.gradle/
+neoforge/bin/
+.gradle/
+build/
+
+# Local runtimes. Each holds downloaded pack jars, logs and RCON passwords --
+# never commit or publish these (plan §2.7).
+/run/
+/run-gametest/
+/run-planet/
+/smoke/
+/libs/
+/review/out/
+
+# spacesheep writes this into every deployed folder; space ids live in
+# tools/review/spaces.json instead.
+.spacesheep.json
+
+# Editor and tooling state
+.direnv/
+.eclipse/
+.settings/
+.idea/
+.vscode/
+.graphide/
