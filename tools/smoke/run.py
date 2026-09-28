@@ -236,18 +236,22 @@ def port_free(port):
 
 
 def region_span_check(world, circumference):
-    """Every region file of the overworld must satisfy -C/1024 <= rx < C/1024 (plan §9.5)."""
+    """Every region file of the overworld must satisfy -C/1024 <= rx < C/1024 (plan §9.5).
+
+    Returns (total, outside, outside_empty). A 0-byte file holds no chunk: the game creates the
+    file when it merely looks a chunk up (Toroidal World folds the lookup, and nothing is
+    written), so those are listed apart and do not fail the check."""
     region_dir = os.path.join(world, "region")
     half = circumference // 1024
-    outside, total = [], 0
+    outside, empty, total = [], [], 0
     if os.path.isdir(region_dir):
         for f in os.listdir(region_dir):
             m = re.match(r"r\.(-?\d+)\.(-?\d+)\.mca$", f)
             if m:
                 total += 1
                 if not (-half <= int(m.group(1)) < half):
-                    outside.append(f)
-    return total, outside
+                    (empty if os.path.getsize(os.path.join(region_dir, f)) == 0 else outside).append(f)
+    return total, outside, empty
 
 
 def main():
@@ -370,8 +374,10 @@ def main():
             rcon("save-all flush")
             time.sleep(3)
             if is_planet:
-                total, outside = region_span_check(world, install["size"])
-                steps.check("region files inside the canonical span", "outside=0", f"outside={len(outside)} of {total}", not outside)
+                total, outside, empty = region_span_check(world, install["size"])
+                steps.check("region files inside the canonical span", "outside=0", f"outside={len(outside)} of {total}", not outside,
+                            note=", ".join(sorted(outside)))
+                steps.record("empty (0-byte) region files outside the span", f"{len(empty)}: {', '.join(sorted(empty)) or 'none'}")
 
             steps.record("peak RSS (MB)", (server.peak_rss_kb() or 0) // 1024)
             server.stop(rcon)

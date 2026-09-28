@@ -200,6 +200,15 @@ dependencies = [
 [[package]]
 name = "deeptime-inspect"
 version = "0.0.1"
+dependencies = [
+ "clap",
+ "deeptime-format",
+ "flate2",
+ "lz4_flex",
+ "memmap2",
+ "png",
+ "serde_json",
+]
 
 [[package]]
 name = "deeptime-jni"
