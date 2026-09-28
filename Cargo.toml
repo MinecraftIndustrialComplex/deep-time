@@ -1,0 +1,32 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+# The one version: gradle.properties `mod_version` must equal it (Gradle task checkVersions).
+version = "0.0.1"
+edition = "2024"
+# The highest MSRV among the pinned crates (kiddo 6.3.0).
+rust-version = "1.89"
+license = "LGPL-3.0-or-later"
+publish = false
+repository = "https://github.com/MinecraftIndustrialComplex/deep-time"
+
+[workspace.metadata.deeptime]
+# The world-data format version (plan §5.7.2). Read by deeptime-format's build.rs, by
+# Gradle (hostNatives / natives.json) and by tools/natives/build-natives.sh.
+format_version = "0.0"
+
+[workspace.dependencies]
+deeptime-format = { path = "crates/deeptime-format" }
+deeptime-core = { path = "crates/deeptime-core" }
+deeptime-viewer = { path = "crates/deeptime-viewer" }
+
+[profile.release]
+# Keep unwinding: jni-rs' with_env catches panics only when they unwind (plan §6.3).
+panic = "unwind"
+lto = "thin"
+
+[profile.dev.package."*"]
+# Dependencies optimised even in dev builds; simulation kernels are unusable at -O0.
+opt-level = 2

@@ -1,0 +1,13 @@
+# Per-target flags for the eight native builds (plan §6.4).
+
+# rustc drops `cdylib` for musl unless the C runtime is dynamic (rust-lang/cargo#10143). The
+# resulting .so needs libgcc_s on Alpine (rust-lang/rust#82521).
+[target.x86_64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=-crt-static"]
+
+[target.aarch64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=-crt-static"]
+
+# Sable needed codegen-units=2 on Intel macOS to avoid a rustc hang; copied as a precaution.
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "codegen-units=2"]

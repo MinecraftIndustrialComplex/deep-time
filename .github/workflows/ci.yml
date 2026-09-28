@@ -1,0 +1,69 @@
+# Continuous integration (plan §4.5). The organisation is on GitHub's free plan: 2,000 Actions
+# minutes a month for private repositories, so documentation-only pushes (STATUS.md updates,
+# plan edits) do not trigger a run, and a newer push cancels an older run on the same ref.
+name: ci
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - "STATUS.md"
+      - "docs/**"
+      - "**/*.md"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rustup reads rust-toolchain.toml: the pinned channel, host target only.
+      - name: Install toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: cargo-${{ runner.os }}-
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check licenses bans advisories sources
+
+  gradle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      # Gradle tasks call plain `cargo` (hostNatives, test fixtures): rustup provides it here,
+      # the Nix dev shell locally.
+      - name: Install toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.cargo/registry
+            target
+          key: gradle-${{ runner.os }}-${{ hashFiles('neoforge/*.gradle', 'neoforge/gradle.properties', 'Cargo.lock') }}
+          restore-keys: gradle-${{ runner.os }}-
+      - name: Build and test
+        working-directory: neoforge
+        run: ./gradlew build test --console=plain
+      - name: JUnit summary
+        if: always()
+        run: python3 tools/ci/junit-summary.py neoforge/build/test-results/test
