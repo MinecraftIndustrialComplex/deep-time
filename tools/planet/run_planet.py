@@ -183,21 +183,23 @@ def run_tests(spec, rcon, timeout):
     last_z = z + 8 * (len(names) - 1)
     print(f"   forceload {x - dx} {z - dz} {x + dx} {last_z + dz}: "
           + rcon(f"forceload add {x - dx} {z - dz} {x + dx} {last_z + dz}"), flush=True)
-    # One spot per test, 8 blocks apart in z: a second /test run at the same spot replaces the
-    # first test's structure, and that test never reports.
+    # One test at a time: 1.21.1's `/test run` begins with TestCommand.stopTests(), which cancels
+    # every test still running, so a second /test run issued before the first test reported
+    # silently kills it (P0-06 finding). Each test also gets its own spot, 8 blocks apart in z,
+    # so no test's structure lands on another's leftovers.
+    summary = {}
     for n_i, name in enumerate(names):
         tz = z + 8 * n_i
         print(f"   /test run {name} at {x},{y},{tz}: " + rcon(f"execute positioned {x} {y} {tz} run test run {name}"), flush=True)
-    end = time.time() + timeout
-    summary = {}
-    while time.time() < end:
-        time.sleep(3)
-        m = SUMMARY.search(rcon("deeptime gametest summary"))
-        summary = json.loads(m.group(1)) if m else {}
-        tests = summary.get("tests", {})
-        # A repeated test reports its attempts before its one final result: wait for the result.
-        if all(n in tests and tests[n]["pass"] + tests[n]["fail"] > 0 for n in names):
-            break
+        end = time.time() + timeout
+        while time.time() < end:
+            time.sleep(2)
+            m = SUMMARY.search(rcon("deeptime gametest summary"))
+            summary = json.loads(m.group(1)) if m else {}
+            r = summary.get("tests", {}).get(name)
+            # A repeated test reports its attempts before its one final result: wait for the result.
+            if r and r["pass"] + r["fail"] > 0:
+                break
     failures = []
     tests = summary.get("tests", {})
     for n in names:
