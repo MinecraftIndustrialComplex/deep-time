@@ -23,7 +23,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-14 | BlueMap renders on MIC blocks | todo | | | |
 | P0-15 | Phase 0 exit | todo | | | |
 | P1-01 | Session, checkpoints, keyframes, event log and site formats | todo | | | |
-| P1-02 | Fibonacci sphere, triangulation and raster coupling | todo | | | |
+| P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
 | P1-03 | Plates and crust | todo | | | |
 | P1-04 | Deep-time surface processes on L1 | todo | | | |
 | P1-05 | Climate | todo | | | |
@@ -54,6 +54,46 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 — P1-02 L0 geometry (agent worktree agent-ab52c5f47be5db0ae)
+- **What.** `crates/deeptime-core/src/sphere/{mod,fibonacci,hull,kdtree,coupling}.rs` and
+  `crates/deeptime-core/examples/sphere_bench.rs`. New deps in deeptime-core only: glam 0.33.11 and
+  kiddo 6.3.0 (default features off, `multi-threaded` on, which drops `fixed`), both MIT OR
+  Apache-2.0; `cargo deny check licenses bans` → ok. Nothing ported, so NOTICE.md is unchanged.
+- **Hull algorithm.** Randomized incremental 3D convex hull with conflict buckets (Clarkson & Shor
+  1989; de Berg et al. 2008 ch. 11; the bucketing of Guibas, Knuth & Sharir 1992), inserted in a
+  BRIO order (Amenta, Choi & Rote 2003), expected O(n log n). Exact predicates: coordinates snapped
+  to multiples of 2⁻³⁸ (≤ 3.2e-12 movement), orientation by a float evaluation with Shewchuk's
+  stage-A bound and an i128 fallback. Duplicates are skipped and listed (`skipped()`); cocircular
+  sets (cube, octahedron) triangulate; point sets that do not surround the centre fail with
+  `NotCovering`. Point location is a stochastic visibility walk; barycentrics are gnomonic (ray from
+  the centre to the face plane).
+- **Measured** with `tools/remote/mac.sh -- 'cargo build --release -p deeptime-core --example
+  sphere_bench && ./target/release/examples/sphere_bench [--threads 1 250000]'` (M6 Mac mini, 12
+  threads, min of 3): 250k samples → Fibonacci 0.2 ms, **hull 255 ms** (280 ms on 1 thread; the
+  hull is sequential), k-d tree 7.8 ms, L1 coupling 12 ms at 1024×512 and 41 ms at 2048×1024
+  (98 / 351 ms on 1 thread); 100k → hull 98 ms, tree 2.9 ms, coupling 10 / 36 ms. V − E + F = 2,
+  nothing skipped, 0 bad cells on all four presets' L1 grids. BRIO saves ~6% over a plain shuffle
+  (254 vs 270 ms, A/B in one session). Next to Cortial's Table 2 (1.24 s per regular step at 250k),
+  re-triangulating at every resampling is cheap.
+- **Conventions fixed in `coupling.rs`.** λ = 360°·(x + C/2)/C ∈ [0°, 360°) (§5.2; the seam
+  x = −C/2 is λ = 0), φ = −360°·z/C (north is −z), v = (cos φ cos λ, cos φ sin λ, sin φ) with +Z
+  the north pole and +X the seam meridian; raster cells are `GridDesc` point samples (row 0 = north
+  pole). **Differs from existing code:** the viewer's inspector (`viewer.js` `inspect`) prints
+  longitude 360°·x/C (seam at ±180°), and `AnalyticTestTerrain` uses θ = 2πx/C and φ = πz/(C/2)
+  (+z north). Both are a constant 180° longitude shift (and, for the test terrain, a latitude sign
+  that its |φ|/cos φ formulas never see); align the viewer's label when it next changes.
+- **Coupling layout.** `CellLink { tri, nearest, w: [f32; 3] }`, 20 B per cell (42 MB at
+  2048×1024). `Coupling::refresh(mesh, tree, stale)` re-links only the cells a predicate marks;
+  P1-03 supplies "the cell's triangle left its plate". `interpolate` (barycentric) and
+  `categorical` (nearest sample) sample L0 fields onto the grid.
+- **Tests** (`cargo test -p deeptime-core sphere::`, 23 tests, 3.1 s debug): Euler and exact
+  local-Delaunay/neighbour checks on Fibonacci 12…100k and 10k random points, a brute-force
+  convexity check, degenerate sets, every L1 cell of the 16k-quick ladder (100k samples,
+  1024×512), k-d nearest against brute force on 10,000 random points (100k Fibonacci and 20k random
+  samples), and property tests for block ↔ lat/lon ↔ unit vector (round trips, x wraps at ±C/2,
+  the columns either side of the seam one block apart).
+- **Next.** P1-03 (plates) builds on `SphereMesh`, `SampleTree` and `Coupling`.
 
 ### 2026-09-28 (later) — builds moved to the Mac; P0-06 shaping; P0-07 and P0-09 merged
 - **Builds run on Ben's M6 Mac mini** (his instruction, after parallel builds overloaded the laptop):
