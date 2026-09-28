@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 0 · Next: P0-05 (planet boot), then P0-06 (Toroidal World spike) · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 0 · Next: P0-06 (seam GameTests, Sable), P0-04/05 -PwithMic runs on the Mac, then P0-08 and P0-10 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -11,11 +11,11 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-02 | Cargo workspace and CI | done | 2026-09-28 | 677b6e6 | cargo test --workspace ok (6 crates); clippy -D warnings ok; cargo deny: bans ok, licenses ok. CI run: see build log |
 | P0-03 | Gradle NeoForge module skeleton | done | 2026-09-28 | 774a3ef | gradlew build → BUILD SUCCESSFUL; junit-summary tests=1 failures=0; ./gametest.sh → All 1 required tests passed; checkVersions fails on 0.0.2 |
 | P0-04 | Deep Time's server sets and smoke harness | doing | 2026-09-28 | 1d62258 | standalone and mic smoke PASS (level-type minecraft:normal); ./gametest.sh -PwithMic pending |
-| P0-05 | Generator skeleton on the analytic test terrain | doing | 2026-09-28 | — | ./gametest.sh → All 5 required tests passed (heights exact, seam continuous, veins off); planet boot pending |
-| P0-06 | Toroidal World spike (server-side items) | todo | | | |
-| P0-07 | JNI hello world, native loader and the five failure classes | doing | 2026-09-28 | branch worktree-agent-a6a42ce5d68728e81 | on the Mac (macos-aarch64): cargo test/clippy/fmt/deny ok; gradlew build test → tests=18 failures=0 errors=0; NativeSmoke status=OK + all 5 forced classes, exit 0. Left: ./gametest.sh (NativeGameTests compile, not yet run) and CI on Linux |
+| P0-05 | Generator skeleton on the analytic test terrain | done | 2026-09-28 | 33f1cd9 | ./gametest.sh → all pass (heightMatchesReference cornerMax 0, maxAbsDiff 0; periodicAcrossSeam 0 mismatches; veins off); planet server (Mac) boots with level-type deeptime:planet, probe column 0 0 → surfaceY 14 for H 14.99. -PwithMic run: with P0-04 |
+| P0-06 | Toroidal World spike (server-side items) | doing | 2026-09-28 | ca88695 | probe tw on the planet server: stamped=true loopsX=true loopsZ=false widthChunks=1024 (chunks -512..512). Seam GameTests being fixed |
+| P0-07 | JNI hello world, native loader and the five failure classes | done | 2026-09-28 | c813177 | Mac: JUnit tests=30 failures=0; NativeSmoke OK + 5 forced classes; ./gametest.sh NativeGameTests pass: native version=0.0.1 format=0.0 target=aarch64-apple-darwin selftest=1997318690096807936. Linux load path first runs in CI |
 | P0-08 | Cross-builds and the OS load matrix | todo | | | |
-| P0-09 | World-data format v0, synthetic planets, Java reader | todo | | | |
+| P0-09 | World-data format v0, synthetic planets, Java reader | done | 2026-09-28 | 75d90d3 | Mac: cargo test ok (format 15 tests); synth wrap-test 16k → format_version 0.0, viewer bundle; TilePackParityTest + Lz4RoundTripTest pass; wrap-test equals AnalyticTestTerrain within 1/32 block |
 | P0-10 | The generator on world data | todo | | | |
 | P0-11 | `deeptime-inspect` | todo | | | |
 | P0-12 | Terralith, TerraBlender and Biomes O' Plenty checks | todo | | | |
@@ -54,6 +54,27 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 (later) — builds moved to the Mac; P0-06 shaping; P0-07 and P0-09 merged
+- **Builds run on Ben's M6 Mac mini** (his instruction, after parallel builds overloaded the laptop):
+  `tools/remote/mac.sh` rsyncs the checkout to `/Volumes/Graphide/ban/mic/mods/<name>` on the external
+  SSD and runs the command inside a GC-rooted dev-shell profile there (never a fresh flake eval per call:
+  that pattern filled the Mac's SSD twice). Host native on the Mac: `macos-aarch64`.
+- **Toroidal World shaping (P0-06).** TW's `ShapeModule` path runs only from its Create World button
+  and never on a dedicated server (TW 0.19.3 source, `client/shape/mixin/CreateWorldScreenMixin`), so
+  Deep Time shapes its own worlds from `WorldDimensions.bake` (`WorldDimensionsShapeMixin` →
+  `wrap/PlanetShape`) with TW's public `ShapeDimensions.withSpans`: X loops over C/16 chunks, Nether
+  1:8, End unlooped. Verified on a dedicated planet server: stamped, loopsX, not loopsZ, 1024 chunks.
+  TW's climate compression matches vanilla climate functions only, so it never applies to Deep Time's.
+- **GameTest naming.** With `@PrefixGameTestTemplate(false)` a test is named by its lower-case method
+  name without the class prefix, so `/test runall <class>` finds nothing; the planet harness runs
+  tests by name (`--run name1,name2@x,y,z`).
+- **TW semantics for tests:** TW moves an entity that *steps* over the border (its movement path);
+  `setPos` is a teleport and stays unfolded.
+- **P0-07 (agent, merged):** see the P0-07 entry below. **P0-09 (agent, merged):** on-disk layout in
+  `crates/deeptime-format/FORMAT.md`; climate layers are named after the router fields
+  (`climate/{temperature,vegetation,continents,erosion,ridges}`); lake-test geometry in its manifest
+  `notes.lake`; no `bodies/` yet.
 
 ### 2026-09-28 — P0-01 to P0-05 (session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Repo.** Created `MinecraftIndustrialComplex/deep-time` (private) and moved the docs in; `mic/Docs`

@@ -43,8 +43,10 @@ public final class SeamGameTests {
         int c = circumference(helper);
         int folded = 0, jumps = 0;
         StringBuilder detail = new StringBuilder();
+        // Rows inside the strip the harness forceloads around the seam (x = C/2 ± 32, z ± 32), so no
+        // far chunk is generated synchronously on the server thread.
         for (int i = 0; i < 16; i++) {
-            int z = (i - 8) * 200 + 5;
+            int z = (i - 8) * 4 + 1;
             for (int k = 0; k < 4; k++) {
                 int beyond = level.getHeight(Heightmap.Types.WORLD_SURFACE, c / 2 + k, z);
                 int canonical = level.getHeight(Heightmap.Types.WORLD_SURFACE, -c / 2 + k, z);
@@ -82,7 +84,12 @@ public final class SeamGameTests {
         stand.moveTo(c / 2.0 - 1.5, y, 0.5, 0, 0);
         level.addFreshEntity(stand);
         var id = stand.getUUID();
-        helper.runAfterDelay(5, () -> stand.setPos(c / 2.0 + 2.5, y, 0.5));   // walk it 4 blocks east, across x = C/2
+        // Walk it east across x = C/2 through Entity.move, a quarter block per tick: TW moves an
+        // entity that steps over the border to the other side in the same tick. (A bare setPos
+        // is a teleport and is not folded.)
+        for (int t = 0; t < 16; t++)
+            helper.runAfterDelay(5 + t, () -> stand.move(net.minecraft.world.entity.MoverType.SELF,
+                    new net.minecraft.world.phys.Vec3(0.25, 0, 0)));
         helper.runAfterDelay(40, () -> {
             var found = level.getEntity(id);
             double x = found == null ? Double.NaN : found.getX();
