@@ -56,8 +56,9 @@ tools/review/publish.sh <name> <folder>                 # private spacesheep pag
   Gradle build, GameTest, smoke/planet server and BlueMap render goes through
   `tools/remote/mac.sh [--pack] [--pull <path>]... -- '<command>'`, which rsyncs this checkout to the
   Mac's external SSD (`/Volumes/Graphide/ban/mic/…`; /nix, Gradle and cargo caches are there too)
-  and runs the command in a login shell there. The laptop edits, commits and pushes. Do not start
-  several heavy jobs at once even on the Mac (12 cores, 16 GB).
+  and runs the command in a login shell there. The laptop edits, commits and pushes. Builds from
+  several agents may overlap; anything that boots Minecraft (GameTests, planet/smoke servers,
+  BlueMap) must pass `--server`, which holds the Mac's single server lock (fixed ports, 16 GB shared).
 - Ben cannot launch the game. Every check must be runnable here and reviewable in a browser.
 - LGPL-3.0-or-later. No GPL code, no line-by-line port of GPL code, GPL tools only in tools/validation/.
   Attribute every port in NOTICE.md and the file header (`SPDX-License-Identifier: LGPL-3.0-or-later`).
