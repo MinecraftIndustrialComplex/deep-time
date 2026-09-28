@@ -1,0 +1,200 @@
+{
+  "sea_level": 63,
+  "disable_mob_generation": false,
+  "aquifers_enabled": false,
+  "ore_veins_enabled": false,
+  "legacy_random_source": false,
+  "default_block": {
+    "Name": "minecraft:stone"
+  },
+  "default_fluid": {
+    "Name": "minecraft:water",
+    "Properties": {
+      "level": "0"
+    }
+  },
+  "noise": {
+    "min_y": -352,
+    "height": 992,
+    "size_horizontal": 1,
+    "size_vertical": 2
+  },
+  "noise_router": {
+    "barrier": {
+      "type": "minecraft:noise",
+      "noise": "minecraft:aquifer_barrier",
+      "xz_scale": 1.0,
+      "y_scale": 0.5
+    },
+    "fluid_level_floodedness": {
+      "type": "minecraft:noise",
+      "noise": "minecraft:aquifer_fluid_level_floodedness",
+      "xz_scale": 1.0,
+      "y_scale": 0.67
+    },
+    "fluid_level_spread": {
+      "type": "minecraft:noise",
+      "noise": "minecraft:aquifer_fluid_level_spread",
+      "xz_scale": 1.0,
+      "y_scale": 0.7142857142857143
+    },
+    "lava": {
+      "type": "minecraft:noise",
+      "noise": "minecraft:aquifer_lava",
+      "xz_scale": 1.0,
+      "y_scale": 1.0
+    },
+    "temperature": {
+      "type": "minecraft:flat_cache",
+      "argument": {
+        "type": "deeptime:raster",
+        "layer": "climate/temperature"
+      }
+    },
+    "vegetation": {
+      "type": "minecraft:flat_cache",
+      "argument": {
+        "type": "deeptime:raster",
+        "layer": "climate/vegetation"
+      }
+    },
+    "continents": {
+      "type": "minecraft:flat_cache",
+      "argument": {
+        "type": "deeptime:raster",
+        "layer": "climate/continents"
+      }
+    },
+    "erosion": {
+      "type": "minecraft:flat_cache",
+      "argument": {
+        "type": "deeptime:raster",
+        "layer": "climate/erosion"
+      }
+    },
+    "ridges": {
+      "type": "minecraft:flat_cache",
+      "argument": {
+        "type": "deeptime:raster",
+        "layer": "climate/ridges"
+      }
+    },
+    "depth": {
+      "type": "deeptime:depth"
+    },
+    "initial_density_without_jaggedness": {
+      "type": "deeptime:terrain",
+      "mode": "initial"
+    },
+    "final_density": {
+      "type": "minecraft:squeeze",
+      "argument": {
+        "type": "minecraft:mul",
+        "argument1": 0.64,
+        "argument2": {
+          "type": "minecraft:interpolated",
+          "argument": {
+            "type": "minecraft:blend_density",
+            "argument": {
+              "type": "minecraft:add",
+              "argument1": 0.1171875,
+              "argument2": {
+                "type": "minecraft:mul",
+                "argument1": {
+                  "type": "minecraft:y_clamped_gradient",
+                  "from_value": 0.0,
+                  "from_y": -352,
+                  "to_value": 1.0,
+                  "to_y": -328
+                },
+                "argument2": {
+                  "type": "minecraft:add",
+                  "argument1": -0.1171875,
+                  "argument2": {
+                    "type": "minecraft:add",
+                    "argument1": -0.078125,
+                    "argument2": {
+                      "type": "minecraft:mul",
+                      "argument1": {
+                        "type": "minecraft:y_clamped_gradient",
+                        "from_value": 1.0,
+                        "from_y": 624,
+                        "to_value": 0.0,
+                        "to_y": 640
+                      },
+                      "argument2": {
+                        "type": "minecraft:add",
+                        "argument1": 0.078125,
+                        "argument2": {
+                          "type": "deeptime:terrain",
+                          "mode": "final"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "vein_toggle": 0.0,
+    "vein_ridged": 0.0,
+    "vein_gap": 0.0
+  },
+  "spawn_target": [
+    {
+      "continentalness": [
+        -0.11,
+        1.0
+      ],
+      "depth": 0.0,
+      "erosion": [
+        -1.0,
+        1.0
+      ],
+      "humidity": [
+        -1.0,
+        1.0
+      ],
+      "offset": 0.0,
+      "temperature": [
+        -1.0,
+        1.0
+      ],
+      "weirdness": [
+        -1.0,
+        -0.16
+      ]
+    },
+    {
+      "continentalness": [
+        -0.11,
+        1.0
+      ],
+      "depth": 0.0,
+      "erosion": [
+        -1.0,
+        1.0
+      ],
+      "humidity": [
+        -1.0,
+        1.0
+      ],
+      "offset": 0.0,
+      "temperature": [
+        -1.0,
+        1.0
+      ],
+      "weirdness": [
+        0.16,
+        1.0
+      ]
+    }
+  ],
+  "surface_rule": {
+    "type": "deeptime:delegate",
+    "settings": "minecraft:overworld"
+  }
+}

@@ -1,17 +1,17 @@
 # Deep Time — status
 
-Phase: 0 · Next: P0-02 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 0 · Next: P0-05 (planet boot), then P0-06 (Toroidal World spike) · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
-MIC pack tested against: not yet (P0-04)
+MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
 ## Tasks
 | ID | Title | State | Date | Commit | Evidence |
 |---|---|---|---|---|---|
-| P0-01 | Repository bootstrap and the docs move | doing | 2026-09-28 | — | started by session f981c0d3-5144-49ec-8686-2946d755872c |
-| P0-02 | Cargo workspace and CI | todo | | | |
-| P0-03 | Gradle NeoForge module skeleton | todo | | | |
-| P0-04 | Deep Time's server sets and smoke harness | todo | | | |
-| P0-05 | Generator skeleton on the analytic test terrain | todo | | | |
+| P0-01 | Repository bootstrap and the docs move | done | 2026-09-28 | 2725107 | gh repo view → PRIVATE; 14 docs copied, sha256 equal; nix develop: rustc 1.98.1, JDK 21.0.12.1, zig-0.13.0, cargo-xwin 0.23.1; mic/Docs pointers written |
+| P0-02 | Cargo workspace and CI | done | 2026-09-28 | 677b6e6 | cargo test --workspace ok (6 crates); clippy -D warnings ok; cargo deny: bans ok, licenses ok. CI run: see build log |
+| P0-03 | Gradle NeoForge module skeleton | done | 2026-09-28 | 774a3ef | gradlew build → BUILD SUCCESSFUL; junit-summary tests=1 failures=0; ./gametest.sh → All 1 required tests passed; checkVersions fails on 0.0.2 |
+| P0-04 | Deep Time's server sets and smoke harness | doing | 2026-09-28 | 1d62258 | standalone and mic smoke PASS (level-type minecraft:normal); ./gametest.sh -PwithMic pending |
+| P0-05 | Generator skeleton on the analytic test terrain | doing | 2026-09-28 | — | ./gametest.sh → All 5 required tests passed (heights exact, seam continuous, veins off); planet boot pending |
 | P0-06 | Toroidal World spike (server-side items) | todo | | | |
 | P0-07 | JNI hello world, native loader and the five failure classes | todo | | | |
 | P0-08 | Cross-builds and the OS load matrix | todo | | | |
@@ -54,6 +54,38 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 — P0-01 to P0-05 (session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Repo.** Created `MinecraftIndustrialComplex/deep-time` (private) and moved the docs in; `mic/Docs`
+  now holds pointers. Dev shell builds (cargo-zigbuild with zig 0.13 is rebuilt on XiaServer the
+  first time). nixpkgs now carries cargo-xwin 0.23.1, not 0.22.0 as the plan says.
+- **Toroidal World is a bundle.** Its Modrinth file is a `lowcodefml` jar carrying the NeoForge and
+  Fabric builds as jar-in-jar; the NeoForge build (`toroidal_world`, API `com.toroidalworld.api.v1`)
+  nests MixinSquared. Gradle therefore compiles against the extracted inner jar
+  (`extractToroidalWorld`) and every run loads the bundle from its `mods/` folder (`linkRunMods*`),
+  exactly as players install it. `localRuntime` carries nothing.
+- **Smoke.** `standalone` boots in about 30 s, peak RSS 1.97 GB; `mic` (168 server jars) boots in
+  about 290 s, peak RSS 4.26 GB. TW compat configs that applied in MIC: aeronautics, c2me, create,
+  distanthorizons, lithium, sable, simpleclouds. TW mixins count as recorded, not required: 235 of
+  278 applied by `Done (` in MIC; the rest target classes an idle server never loads.
+- **Pack finding.** The MIC pack's committed `index.toml` (303fd89) has a stale hash for
+  `kubejs/server_scripts/destroy_metallurgy_integration.js`, so packwiz-installer rejects the pack
+  from HEAD as well as from the working tree. `install.sh mic` installs from a snapshot re-indexed
+  with `packwiz refresh` and records every hash it had to fix (`smoke/mic/install.json`).
+- **Router design (plan §7.1 deviation, implementation detail).** The router is Deep Time's own
+  noise settings (`deeptime:planet`, `deeptime:planet_nocaves`), generated from vanilla's by
+  `tools/dev/gen_worldgen.py`, rather than derived in Java from the pack's `minecraft:overworld`
+  (Tectonic replaces that router in MIC). Per-level binding (review 2, gap 4): the generator overrides
+  `generatorSettings()` with a lazily bound copy whose `deeptime:*` functions read that level's
+  terrain source; `ChunkMap` builds the level's `RandomState` from it. The surface rule is
+  `deeptime:delegate` → the pack's `minecraft:overworld` rule, resolved when applied. Slides:
+  −352→−328 and 624→640 (gap 8). `planet_nocaves` also has aquifers off: with them on, a local
+  aquifer put barrier stone 3 blocks above an ocean floor and moved the measured surface.
+- **GameTests.** The GameTest-server mixin passes only `deeptime:*` datapack stems (gap 9);
+  `heightMatchesReference` max difference 0 on all 128 columns; `periodicAcrossSeam` 0 mismatches.
+- **Blocker fix (gap 1).** `DeepTimeTestReporter` logs `[gametest-result]` lines on the planet
+  server, and `/deeptime gametest summary` prints `[gametest-summary]` JSON that
+  `gametest-planet.sh` polls.
 
 ## Known issues and open questions
 - The plan is at revision 2 plus a partial revision 3 (the decisions-log rule in §1.2). The 29 gaps of

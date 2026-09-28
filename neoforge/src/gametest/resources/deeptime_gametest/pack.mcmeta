@@ -1,0 +1,6 @@
+{
+  "pack": {
+    "description": "Deep Time GameTest data: test dimensions and biomes (dev runs only; never in the jar)",
+    "pack_format": 48
+  }
+}
