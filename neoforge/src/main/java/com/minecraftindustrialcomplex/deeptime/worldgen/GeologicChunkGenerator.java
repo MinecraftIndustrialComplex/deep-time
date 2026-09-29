@@ -101,8 +101,15 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
     public void buildSurface(net.minecraft.server.level.WorldGenRegion region, net.minecraft.world.level.StructureManager structures,
                              net.minecraft.world.level.levelgen.RandomState random, net.minecraft.world.level.chunk.ChunkAccess chunk) {
         super.buildSurface(region, structures, random, chunk);   // the pack's surface rules repaint the default block
-        if (terrain() instanceof WorldDataTerrain w)
+        if (terrain() instanceof WorldDataTerrain w) {
             StrataPass.apply(chunk, w.data());
+            WaterPass.apply(chunk, w.data(), waterReach());    // lakes above sea level (plan §7.9)
+        }
+    }
+
+    /** How far {@link WaterPass} carries a lake's level past its last wet cell: one noise cell. */
+    public int waterReach() {
+        return sourceSettings.value().noiseSettings().getCellWidth();
     }
 
     @Override
