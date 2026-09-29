@@ -197,6 +197,45 @@ enum Cmd {
         #[arg(long, allow_hyphen_values = true)]
         y_to: Option<i32>,
     },
+    /// One box as a voxel file for the browser workbench's 3D preview (P1-20 stage 2): a palette,
+    /// run-length-encoded columns, the strata stack per column, deposit-body tags, and the sites
+    /// with their "why here" chains (area.rs documents the format). x may cross the seam.
+    ExportArea {
+        /// The world or dimension folder (the one holding region/).
+        #[arg(long)]
+        world: PathBuf,
+        /// x0,z0,x1,z1 (x1, z1 exclusive); x is folded, so the box may straddle the seam.
+        #[arg(long = "box", allow_hyphen_values = true)]
+        bbox: String,
+        /// lo,hi, inclusive (default: -352,639 with world data, else the chunks' build range).
+        #[arg(long, allow_hyphen_values = true)]
+        y: Option<String>,
+        /// The output file; gzipped when it ends in .gz.
+        #[arg(long)]
+        out: PathBuf,
+        /// Default: <world>/deeptime if present (strata, bodies, sites, events, C).
+        #[arg(long)]
+        world_data: Option<PathBuf>,
+        /// The circumference C (default: the world data's).
+        #[arg(long)]
+        span: Option<i64>,
+        /// The runner's probes.jsonl (`/deeptime probe palette|claims`, `sites near`, `why`,
+        /// `probe site`), merged into the header.
+        #[arg(long)]
+        probes: Option<PathBuf>,
+        /// Colour table from `colors` (default: built-in fallback colours).
+        #[arg(long)]
+        colors: Option<PathBuf>,
+        /// A JSON file copied into the header's `meta` (the job's description).
+        #[arg(long)]
+        meta: Option<PathBuf>,
+        /// The largest width or depth accepted.
+        #[arg(long, default_value_t = deeptime_inspect::area::MAX_SIDE)]
+        max_side: i32,
+        /// Decode the written file and compare it with the world, block by block.
+        #[arg(long)]
+        verify: bool,
+    },
     /// Lists region files; prints outside=<n> for files outside -C/1024 <= rx < C/1024.
     Regions {
         #[arg(long)]
@@ -480,6 +519,31 @@ fn run(cli: Cli) -> Result<()> {
             let pairs = deeptime_inspect::hosts::ore_hosts(&w, o.as_ref(), area, y);
             print_json(&deeptime_inspect::hosts::to_json(area, &pairs))?;
         }
+        Cmd::ExportArea {
+            world,
+            bbox,
+            y,
+            out,
+            world_data,
+            span,
+            probes,
+            colors,
+            meta,
+            max_side,
+            verify,
+        } => export_area(ExportArgs {
+            world,
+            bbox,
+            y,
+            out,
+            world_data,
+            span,
+            probes,
+            colors,
+            meta,
+            max_side,
+            verify,
+        })?,
         Cmd::Regions { world, span, json } => {
             let wd = default_world_data(&world, None)?;
             let span = span_of(&world, span, wd.as_ref())?;
@@ -568,6 +632,124 @@ fn run(cli: Cli) -> Result<()> {
         }
     }
     Ok(())
+}
+
+struct ExportArgs {
+    world: PathBuf,
+    bbox: String,
+    y: Option<String>,
+    out: PathBuf,
+    world_data: Option<PathBuf>,
+    span: Option<i64>,
+    probes: Option<PathBuf>,
+    colors: Option<PathBuf>,
+    meta: Option<PathBuf>,
+    max_side: i32,
+    verify: bool,
+}
+
+/// `export-area` (P1-20 stage 2; the format is in area.rs).
+fn export_area(a: ExportArgs) -> Result<()> {
+    use deeptime_inspect::area::{self, AreaBox, Context, Probes};
+    let t0 = std::time::Instant::now();
+    let (x0, z0, x1, z1) = AreaBox::parse_xz(&a.bbox).map_err(Error)?;
+    if x1 - x0 > a.max_side || z1 - z0 > a.max_side {
+        return Err(Error(format!(
+            "box {}x{} is larger than --max-side {}",
+            x1 - x0,
+            z1 - z0,
+            a.max_side
+        )));
+    }
+    let wd = default_world_data(&a.world, a.world_data.as_ref())?;
+    let wd_dir = a
+        .world_data
+        .clone()
+        .unwrap_or_else(|| a.world.join("deeptime"));
+    let c = a.span.or(wd.as_ref().map(|w| w.circumference)).unwrap_or(0);
+    let y_given = match &a.y {
+        Some(s) => Some(AreaBox::parse_y(s).map_err(Error)?),
+        None if wd.is_some() => Some((-352, 639)),
+        None => None,
+    };
+    let (y0, y1) = y_given.unwrap_or((0, 0));
+    let mut bx = AreaBox::new(x0, z0, x1, z1, y0, y1).normalised(c);
+    let w = area::load_world(&a.world, &bx, c)?;
+    if y_given.is_none() {
+        bx.y0 = w.chunks.values().map(|ch| ch.min_y()).min().unwrap_or(0);
+        bx.y1 = w.chunks.values().map(|ch| ch.max_y()).max().unwrap_or(16) - 1;
+    }
+    let (bodies, sites, events) = if wd.is_some() {
+        (
+            deeptime_format::bodies::read_bodies(&wd_dir)?.unwrap_or_default(),
+            deeptime_format::sites::read_sites(&wd_dir)?
+                .map(|(s, _)| s)
+                .unwrap_or_default(),
+            deeptime_format::EventLog::load(&wd_dir).ok(),
+        )
+    } else {
+        (Vec::new(), Vec::new(), None)
+    };
+    let probes = match &a.probes {
+        Some(p) => Probes::read(p)?,
+        None => Probes::default(),
+    };
+    let table = ColorTable::from_arg(a.colors.as_deref())?;
+    let meta = match &a.meta {
+        Some(p) => serde_json::from_str(&std::fs::read_to_string(p).map_err(|e| Error::io(p, e))?)?,
+        None => serde_json::Value::Null,
+    };
+    let ctx = Context {
+        circumference: c,
+        world_data: wd.as_ref(),
+        bodies: &bodies,
+        sites: &sites,
+        events: events.as_ref(),
+        probes: &probes,
+        colors: &table,
+        meta,
+    };
+    let t_load = t0.elapsed().as_secs_f64();
+    let e = area::build(&w, &bx, &ctx)?;
+    let t_build = t0.elapsed().as_secs_f64() - t_load;
+    let bytes = area::write(&a.out, &e)?;
+    let mut summary = serde_json::json!({
+        "out": a.out.display().to_string(),
+        "bytes": bytes,
+        "box": e.header["box"],
+        "y0": bx.y0,
+        "y1": bx.y1,
+        "circumference": c,
+        "seam": e.header["seam"],
+        "chunks_read": w.chunks.len(),
+        "bodies": e.header["bodies"].as_array().map_or(0, Vec::len),
+        "sites": e.header["sites"].as_array().map_or(0, Vec::len),
+        "stats": e.header["stats"],
+        "seconds": {"load": t_load, "build": t_build, "total": t0.elapsed().as_secs_f64()},
+    });
+    if a.verify {
+        let d = area::decode(&std::fs::read(&a.out).map_err(|er| Error::io(&a.out, er))?)?;
+        let mut wrong = 0u64;
+        for zk in 0..d.depth {
+            for i in 0..d.width {
+                let wx = bx.world_x(i as i32, c);
+                let z = bx.z0 + zk as i32;
+                for y in bx.y0..=bx.y1 {
+                    if d.block(i, zk, y) != w.reg.name(w.block(wx, y, z)) {
+                        wrong += 1;
+                    }
+                }
+            }
+        }
+        summary["verify"] = serde_json::json!({"blocks_compared": d.voxels.len(), "wrong": wrong});
+        if wrong > 0 {
+            print_json(&summary)?;
+            return Err(Error(format!(
+                "verify: {wrong} blocks differ from the world"
+            )));
+        }
+    }
+    print_json(&summary)
 }
 
 fn main() -> ExitCode {
