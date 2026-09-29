@@ -51,7 +51,8 @@
       ["zn_pct", "pb_pct", 0.72]
     ],
     "ore_density_t_m3": 3.2,
-    "density_per_1e5km2": {"p90": 0.5, "p50": 2, "p10": 8},
+    "density_per_1e5km2": {"p90": 1, "p50": 5, "p10": 12.5},
+    "density_basis": "estimate",
     "min_separation_m": 2000,
     "tract_threshold": 0.2,
     "clustering": {"model": "thomas", "camp_spacing_km": 50, "cluster_radius_km": 15}
@@ -85,9 +86,9 @@
   "requires_fields": {},
   "notes": [
     "Sizing: USGS OFR 2009-1252 (Singer, Berger & Moring 2009), model SHam (shale-hosted, amagmatic), n = 25, Table 2 p. 10: tonnage 5 / 25 / 300 Mt, Zn 2.3 / 8 / 14 %, Pb 0.88 / 2.1 / 5.3 %, Ag 0 / 21 / 71 g/t, Cu 0 / 0 / 1.0 % (unreported grades counted as zero); Zn–Pb r = 0.72 (text); 2 km same-deposit rule (p. 2). All 25 SHam deposits are labelled SEDEX (they are 25 of the report's 179 SEDEX-labelled deposits). presence = n_reported / 25 from the report's database. Bulletin 1693 model 31a (n = 45) is in data/usgs/sedex_zn_pb.json extra. Au (4 of 25) is left out.",
-    "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 3.2 (sulfide-rich shale), density_per_1e5km2 0.5 / 2 / 8 (no USGS SEDEX deposit density exists), formation_depth_m 100 (syn-sedimentary to early diagenetic).",
+    "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 3.2 (sulfide-rich shale), formation_depth_m 100 (syn-sedimentary to early diagenetic).",
     "Geometry: stratiform sheet; aspect 0.03 from the database's median ore area 0.86 km² and ore bodies up to a few tens of metres thick (B1693 m31a); the Cu → Pb → Zn lateral zoning away from the feeder (Leach et al. 2010).",
     "Create stones (decisions file): dolostone (asurine → zinc) is a preferred host at 1.5; the sheet turns its host to black shale.",
-    "Counts (survivor formula, decisions log 2026-09-29, plan §8.6 as built): the density counts deposits that survive to the present, as USGS does; the engine forms more (deposits/survival.rs) so that the expected survivors are ρ_p50 · permissive area · count_mult. balance.count_mult stays 1: a pack lever, not a calibration. With the placeholder density the euxinic rift tracts of a 16k planet (6,500–22,000 km²) expect 0.1–0.45 survivors, so SEDEX is on a minority of planets (STATUS.md, 2026-09-29)."
+    "Density (research 2026-09-29, decisions log \"Research real densities\"): no USGS deposit-density model covers sedex (PP 1640-A Table 1 has none; SIR 2010-5070-N, Emsbo et al. 2016, gives none). The 1998 USGS National Mineral Resource Assessment (Circular 1178; tract data at mrdata.usgs.gov/nmra) estimated undiscovered sedimentary-exhalative Zn-Pb deposits (model 31a) tract by tract; its 12 tracts with numeric estimates cover 207,508 km² and sum to about 2 / 10 / 26 deposits at P90 / P50 / P10 (e.g. Brooks Range AK-BR23, 29,735 km², 2 / 5 / 7; Belt basin NR39, 100,100 km², 0 / 2 / 4), about 1 / 5 / 12.5 per 100,000 km². Percentiles do not add, and known deposits are not in those counts, so this is an estimate (P50 used, not the mean) and a lower bound. Counts (survivor formula, decisions log 2026-09-29, plan §8.6 as built): the density counts deposits that survive to the present, as USGS does; the engine forms more (deposits/survival.rs) so that the expected survivors are ρ_p50 · permissive area · count_mult. balance.count_mult stays 1: a pack lever, not a calibration. With the placeholder density the euxinic rift tracts of a 16k planet (6,500–22,000 km²) expect 0.1–0.45 survivors, so SEDEX is on a minority of planets (STATUS.md, 2026-09-29)."
   ]
 }
