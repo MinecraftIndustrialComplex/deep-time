@@ -291,7 +291,7 @@
   // =================================================================================================
   // The map
   // =================================================================================================
-  const FADE_YEARS = 40e6;
+  const FADE_YEARS = 24e6;
   const placeLatLon = e => (e.place && e.place.type === 'point') ? [e.place.lat, e.place.lon] : null;
   // Keyframe pixel px is centred on lon 360°·px/w (the seam is 0°), py on lat 90° − 180°·py/h.
   function mapXY(lat, lon, f, W) {
@@ -649,7 +649,8 @@
     const box = $('ticker'), p = P(), r = p.run;
     if (!r) { box.className = 'hint'; box.textContent = 'No run.'; $('evcount').textContent = ''; return; }
     const t = p.cur >= 0 ? r.frames[p.cur].t : -Infinity, t0 = p.cur > 0 ? r.frames[p.cur - 1].t : -Infinity;
-    const upto = r.events.filter(e => e.t_start <= t);
+    // Events are logged when they end; the ticker lists them by when they began.
+    const upto = r.events.filter(e => e.t_start <= t).sort((a, b) => a.t_start - b.t_start);
     $('evcount').textContent = r.events.length ? `${upto.length} of ${r.events.length}` : '';
     const shown = upto.slice(-150).reverse();
     if (!shown.length) { box.className = 'hint'; box.textContent = 'No events yet.'; return; }
