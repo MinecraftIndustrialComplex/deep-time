@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · In flight (agent worktrees under .claude/worktrees/, not yet merged): P1-05 climate, P1-07 rock classes/strata, P1-20 workbench stage 1 (live runs + editor controls) and stage 2 (3D area preview), MIC pack branch `deep-time` (EV + gap configs + rock tags; pack worktree ../../pack-deeptime) · Next after those land: P1-14 wires the recorded history, then P1-06, P1-08 · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · In flight (agent worktrees under .claude/worktrees/, not yet merged): P1-05 climate, P1-07 rock classes/strata, P1-14 deposits in the pipeline, P1-17 early (parallel pflood/SPL), P1-20 workbench stage 1 (live runs + editor controls) and stage 2 (3D area preview), macOS free-memory fix + Q10 client launcher fold, MIC pack branch `deep-time` (EV + gap configs + rock tags; pack worktree ../../pack-deeptime) · Next after those land: P1-06, then P1-08 · Sub-agents on Sonnet 5.5 from 2026-09-29 (Ben) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
