@@ -3,13 +3,14 @@
 """Plan Q10 review pages ("Excavated Variants in MIC?"), from what tools/review/q10-ev.sh and
 tools/client/ev-assets.sh left in review/out/q10/ (pull it from the Mac first).
 
-    python3 tools/review/q10_ev.py merge     # review/out/q10-map-src: one BlueMap app, four maps
+    python3 tools/review/q10_ev.py merge     # BlueMap apps: all four maps, and one per world
     python3 tools/review/q10_ev.py shots     # headless Chromium screenshots of the maps
     python3 tools/review/q10_ev.py page      # review/out/q10-page-src: the review page
 
-then tools/review/publish.sh q10-ev-map review/out/q10-map-src and
-tools/review/publish.sh q10-ev review/out/q10-page-src (two private spaces: the four maps alone take
-198 of a space's 200 files). Standard library only (Pillow, if present, trims screenshots).
+then publish three private spaces: tools/review/publish.sh q10-map-plain review/out/q10-map-plain-src,
+q10-map-ev review/out/q10-map-ev-src (one per world: a space takes about 25 MB), then (after `page`,
+so it links the maps) q10-ev review/out/q10-page-src. Standard library only (Pillow, if present,
+trims screenshots).
 """
 import base64
 import collections
@@ -57,34 +58,49 @@ def load(path, default=None):
 
 
 # ---------------------------------------------------------------------------------------------
-# merge: one BlueMap web app holding both worlds' maps.
+# merge: the BlueMap web apps. One app with all four maps (review/out/q10-map-src) for the screenshots,
+# and one per world for publishing (q10-map-plain-src, q10-map-ev-src): the page host takes about
+# 25 MB per space (a 33 MB deploy failed after 24.2 MB; P0-14's 24 MB went through), and each world's
+# app is about 17 MB.
 # ---------------------------------------------------------------------------------------------
-def merge():
-    shutil.rmtree(MAP, ignore_errors=True)
-    base = os.path.join(Q, "bluemap-mic", "web")
-    shutil.copytree(base, MAP)
-    shutil.copytree(os.path.join(Q, "bluemap-mic-ev", "web", "maps"), os.path.join(MAP, "maps"), dirs_exist_ok=True)
-    maps = sorted(os.listdir(os.path.join(MAP, "maps")),
-                  key=lambda m: load(os.path.join(MAP, "maps", m, "settings.json"), {}).get("sorting", 0))
-    s = load(os.path.join(MAP, "settings.json"))
+MAP_WORLD = {prefix: os.path.join(REPO, "review", "out", f"q10-map-{prefix}-src") for prefix, _ in PROFILES.values()}
+MAP_SPACE = {prefix: f"q10-map-{prefix}" for prefix, _ in PROFILES.values()}
+
+
+def prepare(dest, profiles, title, desc):
+    shutil.rmtree(dest, ignore_errors=True)
+    shutil.copytree(os.path.join(Q, f"bluemap-{profiles[0]}", "web"), dest)
+    for prof in profiles[1:]:
+        shutil.copytree(os.path.join(Q, f"bluemap-{prof}", "web", "maps"), os.path.join(dest, "maps"), dirs_exist_ok=True)
+    maps = sorted(os.listdir(os.path.join(dest, "maps")),
+                  key=lambda m: load(os.path.join(dest, "maps", m, "settings.json"), {}).get("sorting", 0))
+    s = load(os.path.join(dest, "settings.json"))
     s["maps"] = maps
-    json.dump(s, open(os.path.join(MAP, "settings.json"), "w"))
+    json.dump(s, open(os.path.join(dest, "settings.json"), "w"))
     # 200 files per space: the web app manifest and its two icons are not needed for a review page.
-    for f in glob.glob(os.path.join(MAP, "assets", "logoCircle*.png")) + glob.glob(os.path.join(MAP, "assets", "manifest-*.webmanifest")):
+    for f in glob.glob(os.path.join(dest, "assets", "logoCircle*.png")) + glob.glob(os.path.join(dest, "assets", "manifest-*.webmanifest")):
         os.remove(f)
-    idx = open(os.path.join(MAP, "index.html")).read()
+    idx = open(os.path.join(dest, "index.html")).read()
     idx = re.sub(r'\s*<link rel="manifest"[^>]*>', "", idx)
-    idx = re.sub(r"<title>.*?</title>", "<title>Deep Time — Q10 maps: MIC without and with EV</title>", idx)
-    desc = ("BlueMap renders of the same Deep Time deposits in the MIC pack, without Excavated Variants and with it: "
-            "surface and a cut at the ore level for three sites.")
+    idx = re.sub(r"<title>.*?</title>", f"<title>{html.escape(title)}</title>", idx)
     idx = idx.replace("<head>", f'<head><meta name="description" content="{html.escape(desc)}">', 1)
-    open(os.path.join(MAP, "index.html"), "w").write(idx)
-    files = sum(len(fs) for _, _, fs in os.walk(MAP))
-    size = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(MAP) for f in fs)
-    big = max((os.path.getsize(os.path.join(r, f)), f) for r, _, fs in os.walk(MAP) for f in fs)
-    print(f"merge: {MAP}: maps {maps}; {files} files, {size / 1e6:.1f} MB, largest {big[1]} {big[0] / 1e6:.1f} MB")
-    if files > 199 or big[0] > 10e6:
-        sys.exit("merge: over the page host's limits (200 files per space, 10 MB per file)")
+    open(os.path.join(dest, "index.html"), "w").write(idx)
+    files = sum(len(fs) for _, _, fs in os.walk(dest))
+    size = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(dest) for f in fs)
+    big = max((os.path.getsize(os.path.join(r, f)), f) for r, _, fs in os.walk(dest) for f in fs)
+    print(f"merge: {os.path.relpath(dest, REPO)}: maps {maps}; {files} files, {size / 1e6:.1f} MB, largest {big[1]} {big[0] / 1e6:.1f} MB")
+    return files, size, big[0]
+
+
+def merge():
+    prepare(MAP, list(PROFILES), "Deep Time — Q10 maps: MIC without and with EV", "all four maps (local screenshots only)")
+    for prof, (prefix, label) in PROFILES.items():
+        files, size, big = prepare(
+            MAP_WORLD[prefix], [prof], f"Deep Time — Q10 map: MIC {label}",
+            f"BlueMap render of Deep Time's synthetic deposit world in the MIC pack {label.replace('EV', 'Excavated Variants')}: "
+            "three sites, surface and a cut at the ore level (plan Q10).")
+        if files > 199 or big > 10e6 or size > 24e6:
+            sys.exit("merge: over the page host's limits (200 files, 10 MB per file, about 25 MB per space)")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -295,7 +311,7 @@ def page():
     shutil.rmtree(PAGE, ignore_errors=True)
     os.makedirs(os.path.join(PAGE, "img"))
     spaces = load(SPACES, {})
-    map_url = (spaces.get("q10-ev-map") or {}).get("url", "")
+    map_url = {prefix: (spaces.get(MAP_SPACE[prefix]) or {}).get("url", "") for prefix in MAP_SPACE}
     stone_block, ev = stone_blocks()
     ev_stone_blocks = set(stone_block.values())
     cls = classes_of()
@@ -333,9 +349,13 @@ def page():
         else:
             unchanged += n
 
-    def counter_cell(c):
-        return "".join(f'<div class="ob">{tile(b, 24)}<span>{esc(short(b))}</span><b>{n:,}</b></div>'
-                       for b, n in c.most_common())
+    def counter_cell(c, n_all):
+        out = "".join(f'<div class="ob">{tile(b, 24)}<span>{esc(short(b))}</span><b>{n:,}</b></div>'
+                      for b, n in c.most_common())
+        gap = n_all - sum(c.values())
+        if gap > 0:
+            out += f'<div class="ob t"><span>not ore at these positions in this world</span><b>{gap:,}</b></div>'
+        return out
 
     host_rows = []
     for host, h in sorted(by_host.items(), key=lambda kv: -kv[1]["n"]):
@@ -349,7 +369,8 @@ def page():
         classes = ", ".join(sorted(set(cls.get(host, []))))
         host_rows.append(
             f"<tr><td>{tile(host, 32)}</td><td><code>{esc(host)}</code><div class='t'>{esc(classes) or 'not a rock class'}</div></td>"
-            f"<td class='c'>{cover}</td><td class='r'>{h['n']:,}</td><td>{counter_cell(h['plain'])}</td><td>{counter_cell(h['ev'])}</td></tr>")
+            f"<td class='c'>{cover}</td><td class='r'>{h['n']:,}<div class='t'>{h['exact']:,} exact</div></td>"
+            f"<td>{counter_cell(h['plain'], h['n'])}</td><td>{counter_cell(h['ev'], h['n'])}</td></tr>")
 
     # --- EV coverage of the MIC rock classes -----------------------------------------------------
     cover_rows = []
@@ -368,17 +389,17 @@ def page():
             f"<div><div class='lab'>with EV</div>{f'<img src={b!r} alt={cap!r}>' if b else '<i>missing</i>'}</div></div></figure>"
             for cap, a, b in items)
 
-    shot_items = []
+    shot_items = {"planet": [], "underground": []}
     for name, x0, x1, z0, z1, cut, what in BOXES:
-        for kind, label in (("planet", "surface"), ("underground", f"cut at y {cut}: only blocks at or below it")):
+        for kind, label in (("planet", "surface"), ("underground", f"cut at y {cut}: only blocks at or below it, from above")):
             a = img(os.path.join(SHOTS, f"{name}-{kind}-plain.png"), f"shot-{name}-{kind}-plain.png")
             b = img(os.path.join(SHOTS, f"{name}-{kind}-ev.png"), f"shot-{name}-{kind}-ev.png")
             links = ""
-            if map_url:
-                for stem, mid, h in views():
-                    if stem.startswith(f"{name}-{kind}-"):
-                        links += f" · <a href='{esc(map_url)}{esc(h)}'>open {esc(mid)}</a>"
-            shot_items.append((f"{esc(what)} — {label} (box x {x0}…{x1}, z {z0}…{z1}){links}", a, b))
+            for stem, mid, h in views():
+                prefix = stem.rsplit("-", 1)[1]
+                if stem.startswith(f"{name}-{kind}-") and map_url.get(prefix):
+                    links += f" · <a href='{esc(map_url[prefix])}{esc(h)}'>open {'with' if prefix == 'ev' else 'without'} EV</a>"
+            shot_items[kind].append((f"{esc(what)} — {label} (box x {x0}…{x1}, z {z0}…{z1}){links}", a, b))
     section_items = []
     for name, cap in SECTIONS:
         pa = glob.glob(os.path.join(Q, "mic", "inspect", f"section-{name}", "*.png"))
@@ -415,8 +436,8 @@ def page():
     def fmt(v, unit="", nd=1):
         return "—" if v is None else f"{v:,.{nd}f}{unit}"
 
-    def samples(v):
-        return ", ".join(fmt(x, "", 1) for x in (v or []) if x is not None) or "—"
+    def samples(v, nd=1):
+        return ", ".join(fmt(x, "", nd) for x in (v or []) if x is not None) or "—"
 
     ev_line = next((l for l in open(os.path.join(Q, "mic-ev", "server-lines.txt"), errors="replace")
                     if "Ore blocks: Excavated Variants" in l), "") if os.path.exists(os.path.join(Q, "mic-ev", "server-lines.txt")) else ""
@@ -428,6 +449,16 @@ def page():
     gen = summary.get("generated_by_kind", {})
     gen_ms = summary.get("generation_ms_by_kind", {})
     client_secs = summary.get("client_log_seconds") or {}
+    if not client_secs and os.path.exists(os.path.join(Q, "ev-assets", "client.log")):
+        stamps = {}
+        for line in open(os.path.join(Q, "ev-assets", "client.log"), errors="replace"):
+            m = re.search(r"\[(\d\d):(\d\d):(\d\d)", line)
+            for key, rx in (("modlauncher", r"ModLauncher running"), ("reload", r"Reloading ResourceManager"),
+                            ("atlas", r"Created: .*minecraft:textures/atlas/blocks\.png-atlas")):
+                if m and key not in stamps and re.search(rx, line):
+                    stamps[key] = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
+        if "modlauncher" in stamps:
+            client_secs = {k: v - stamps["modlauncher"] for k, v in stamps.items()}
     boot_delta = (med(ce.get("boots")) or 0) - (med(cp.get("boots")) or 0) if cp.get("boots") and ce.get("boots") else None
     rss_delta = (med(ce.get("rss")) or 0) - (med(cp.get("rss")) or 0) if cp.get("rss") and ce.get("rss") else None
     cost_rows = [
@@ -440,7 +471,7 @@ def page():
          f"samples without EV: {samples(cp.get('boots'))}; with EV: {samples(ce.get('boots'))} (existing world, no generation; "
          f"difference of medians {fmt(boot_delta, ' s')}; other agents' builds share the Mac, so single samples are noisy)"),
         ("RSS at “Done (” (MB), median", fmt(med(cp.get("rss")), nd=0), fmt(med(ce.get("rss")), nd=0),
-         f"samples without EV: {samples(cp.get('rss'))}; with EV: {samples(ce.get('rss'))} (difference of medians {fmt(rss_delta, ' MB', 0)})"),
+         f"samples without EV: {samples(cp.get('rss'), 0)}; with EV: {samples(ce.get('rss'), 0)} (difference of medians {fmt(rss_delta, ' MB', 0)})"),
         ("First start (world generation, 2 Chunky squares): boot / peak RSS", f"{fmt(cp.get('first_boot_s'), ' s')} / {fmt(cp.get('peak_rss'), ' MB', 0)}",
          f"{fmt(ce.get('first_boot_s'), ' s')} / {fmt(ce.get('peak_rss'), ' MB', 0)}", "one sample each"),
         ("Server data made at start", "—", "2 generated data packs",
@@ -450,7 +481,8 @@ def page():
          f"summed generation time {fmt(summary.get('generation_ms_total'), ' ms', 0)} (textures {fmt(gen_ms.get('textures'), ' ms', 0)}), "
          f"from Dynamic Asset Generator's own timing on the Mac mini M6; on every resource reload unless DAG's cache has them"),
         ("Client start to the block atlas (s)", "not measured", fmt(client_secs.get("atlas"), " s", 0),
-         "a 5-mod client (Deep Time, Toroidal World, EV, DAG, Create), not the MIC client; "
+         f"from the client log: ModLauncher start, resource reload at {fmt(client_secs.get('reload'), ' s', 0)}, block atlas; "
+         "a 5-mod client (Deep Time, Toroidal World, EV, DAG, Create), not the MIC client, and no client without EV to compare; "
          f"client RSS at the atlas {fmt(summary.get('client_rss_mb_at_atlas') or summary.get('client_rss_mb'), ' MB', 0)}"),
         ("Recipe viewer", "—", f"Almost Unified hides EV's variant items ({len(hide_tags)} ore tags)",
          "MIC's Almost Unified auto-hides the variants from recipe viewers, e.g. “Hiding 17/22 items for tag '#c:ores/iron'”"),
@@ -519,35 +551,27 @@ The two worlds differ only by two jars: Excavated Variants (EV) 4.3.1 and Dynami
 so nothing else changes: the other mods' ores (uranium, nickel, fluorite, platinum, …) and vanilla's diamond, lapis and redstone are
 identical in both worlds ({sum(other_ores.values()):,} such blocks in the boxes). {total_ores:,} ore positions were compared; {diff_pos} hold
 ore in only one of the two worlds (feature placement differs very slightly between runs).
-{"<a href='" + esc(map_url) + "'><b>Open the 3D maps</b></a> (one BlueMap app, four maps: pick “MIC without EV” or “MIC with EV”, surface or cut, from the menu)." if map_url else ""}</div>
+{("<b>3D maps</b> (BlueMap; surface and cut maps in its menu): <a href='" + esc(map_url.get("plain", "")) + "'>without EV</a> · <a href='" + esc(map_url.get("ev", "")) + "'>with EV</a> (two spaces: one holds about 25 MB).") if map_url.get("plain") else ""}</div>
 
 <h2>The same blocks, side by side</h2>
 <p class="t">Top: a host rock in these worlds. Middle: the ore block Deep Time places in it without EV (the pack's stone or deepslate ore).
 Bottom: the block with EV. The most frequent pair per host; textures from the jars and from DAG's output on a client.</p>
 <div class="strip">{tiles_html}</div>
 
-<h2>3D: BlueMap</h2>
-<p class="t">Screenshots of the four maps from the same camera; the links open the live map at that view.
-The cut maps keep only blocks at or below the box's cut height, so the ore bodies show inside the rock.</p>
-{pairs_html(shot_items)}
-
-<h2>2D: sections and ore maps</h2>
-<p class="t"><code>deeptime-inspect section</code> (4 px per block, colours from each set's textures: with EV the colour table includes DAG's textures)
-and <code>deeptime-inspect ore</code> (materials, so it is the same in both worlds by design: it shows where the ore is, not which block).</p>
-{pairs_html(section_items)}
-{pairs_html(ore_items)}
+<h2>3D: cut at the ore level (BlueMap)</h2>
+<p class="t">Screenshots of the cut maps, same camera in both worlds: each box keeps only the blocks at or below its cut height (the layer
+with the most ore of its site), seen straight down, so the ore shows inside the rock. The links open the live map at that view.</p>
+{pairs_html(shot_items["underground"])}
 
 <h2>Which ore block each host rock gets</h2>
 <p class="t">Deep Time's own ores only (claimed materials), all three boxes, every height. Host = EV's stone where the EV world has a variant (exact),
 otherwise the most common rock beside the ore block in the same layer (estimate; where both exist the estimate matched EV's stone for
-{agree:,} of {total:,} positions, {100 * agree / max(total, 1):.0f}%). “EV stone?” = EV (or Deep Time's stand-in list) has a stone config for this block.</p>
+{agree:,} of {total:,} positions, {100 * agree / max(total, 1):.0f}%). “exact” counts the blocks whose host an EV variant names; the rest
+are estimated, so a “yes” row whose ore did not change and has 0 exact is most likely an estimate that put ore beside that rock rather than in
+it (e.g. coal-seam edges: the seam's own rock is black argillite). “EV stone?” = EV (or Deep Time's stand-in list) has a stone config for this
+block.</p>
 <table><tr><th></th><th>Host rock (rock classes it stands for in MIC)</th><th>EV stone?</th><th>Ore blocks</th><th>Without EV</th><th>With EV</th></tr>
 {''.join(host_rows)}</table>
-
-<h2>Which MIC rock blocks EV covers</h2>
-<p class="t">Every block the MIC rock tags resolve a class to (the probe palette of the world). “no” means ore in that rock is a stone or deepslate
-ore with and without EV.</p>
-<table><tr><th></th><th>Block</th><th>Rock classes</th><th>EV stone?</th></tr>{''.join(cover_rows)}</table>
 
 <h2>What EV costs</h2>
 <table><tr><th></th><th>Without EV</th><th>With EV</th><th>Notes</th></tr>{cost_html}</table>
@@ -564,8 +588,10 @@ are added (the way Deep Time adds its four). It has no ore config for Create Nuc
 <li><b>Mods and upkeep.</b> Two more mods (three with the bundled DefaultResources), {n_var} more blocks and items, generated tags and loot
 tables. EV and DAG were last released for 1.21.1 in August 2024. EV's own ore replacer stays on in the pack's other dimensions (only Deep Time
 levels switch it off).</li>
-<li><b>Start-up.</b> The server-side difference is inside the noise of these samples (table above); each client paints EV's textures when
-it loads resources (about {fmt(summary.get('generation_ms_total'), ' ms', 0)} of work on the M6 for {gen.get('textures', '?')} textures).</li>
+<li><b>Start-up.</b> Server boot to “Done (” medians {fmt(med(cp.get("boots")), ' s')} without and {fmt(med(ce.get("boots")), ' s')} with EV
+(overlapping samples); resident memory at “Done (” medians {fmt(med(cp.get("rss")), ' MB', 0)} and {fmt(med(ce.get("rss")), ' MB', 0)}
+({fmt(rss_delta, ' MB', 0)}, overlapping ranges). Each client paints EV's textures when it loads resources (about
+{fmt(summary.get('generation_ms_total'), ' ms', 0)} of summed work on the M6 for {gen.get('textures', '?')} textures).</li>
 <li><b>Items.</b> Each variant is its own block and item with its own name; MIC's Almost Unified hides the items in recipe viewers.
 EV generates their loot tables and tags at server start (drops were not tested here).</li>
 <li><b>Deep Time either way.</b> The deposits, their positions and their sizes are the same; only the block ids differ. Deep Time works with
@@ -581,7 +607,27 @@ or without EV; no Deep Time code change is needed to keep or drop it.</li>
 <li>The world is Deep Time's synthetic deposit world (real presets wait for P1-03…P1-08); the host rocks are its every-class strata, so every rock
 class occurs, more evenly mixed than a real planet's.</li>
 <li>Item and loot behaviour of EV's variants was not tested here (no player).</li>
+<li>Found on the way: Deep Time's EV bridge kept one EV stone per block, and EV has two for smooth basalt (its own overworld stone and
+Create's nether one), so ore in smooth basalt never became a variant. Fixed on this branch (<code>EvBridgeImpl</code> tries every stone of a
+block; <code>./gametest.sh -PwithEv</code> checks copper in smooth basalt) and the EV world was regenerated with the fix. With EV, the first start and the restart
+sample ran the fixed jar, the three boot-only samples the jar before it (the change is a lookup table built at start).</li>
 </ul></div>
+
+<h2>3D: the surface (context)</h2>
+<p class="t">The same boxes from above at an angle. The ore lies below the surface, so the two worlds look alike here; the box walls show the
+every-class strata of the synthetic world.</p>
+{pairs_html(shot_items["planet"])}
+
+<h2>2D: sections and ore maps</h2>
+<p class="t"><code>deeptime-inspect section</code> (4 px per block, colours from each set's textures: with EV the colour table includes DAG's textures)
+and <code>deeptime-inspect ore</code> (materials, so it is the same in both worlds by design: it shows where the ore is, not which block).</p>
+{pairs_html(section_items)}
+{pairs_html(ore_items)}
+
+<h2>Which MIC rock blocks EV covers</h2>
+<p class="t">Every block the MIC rock tags resolve a class to (the probe palette of the world). “no” means ore in that rock is a stone or deepslate
+ore with and without EV.</p>
+<table><tr><th></th><th>Block</th><th>Rock classes</th><th>EV stone?</th></tr>{''.join(cover_rows)}</table>
 
 <h2>Reproduce</h2>
 <div class="box t"><code>tools/remote/mac.sh --pack -- 'tools/review/q10-ev.sh install'</code> ·

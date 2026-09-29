@@ -52,6 +52,9 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | p1-surface (500 Myr of plates + erosion, deposition, strata; 16k quick pipeline; PNGs losslessly recompressed to fit the 25 MB Free-plan deploy cap) | https://spacesheep.dev/@benmac/deeptime-p1-surface | P1-04 surface processes, 500 Myr 2026-09-28 | 2026-09-28 |
 | p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
 | p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
+| q10-ev (Q10 evidence: the same deposits in MIC without and with Excavated Variants; cut screenshots, per-host ore table, costs, trade-offs) | https://spacesheep.dev/@benmac/deeptime-q10-ev | Q10 evidence 2026-09-28 | 2026-09-28 |
+| q10-map-plain (BlueMap, MIC without EV: 3 sites, surface + cut maps; linked from q10-ev) | https://spacesheep.dev/@benmac/deeptime-q10-map-plain | Q10 map without EV 2026-09-28 | 2026-09-28 |
+| q10-map-ev (BlueMap, MIC with EV + the EV bridge fix; linked from q10-ev) | https://spacesheep.dev/@benmac/deeptime-q10-map-ev | Q10 map with EV, EV bridge fix (smooth basalt) 2026-09-28 | 2026-09-28 |
 
 ## Pending questions
 Questions asked of Ben and not yet answered. Answers go into the decisions file's log
@@ -59,9 +62,76 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
-| 2026-09-28 | P1-15 | **Q10 (plan §14): Excavated Variants in MIC?** Ben (log 2026-09-28): decide after side-by-side BlueMap renders of the same deposits with and without EV in the MIC pack. Next: produce and publish those renders, then ask. | AskUserQuestion |
+| 2026-09-28 | P1-15 | **Q10 (plan §14): Excavated Variants in MIC?** Ben (log 2026-09-28): decide after side-by-side BlueMap renders of the same deposits with and without EV in the MIC pack. Evidence published 2026-09-28: https://spacesheep.dev/@benmac/deeptime-q10-ev (build log "Q10 evidence"). Next: Ben reads it and decides. | AskUserQuestion |
 
 ## Build log
+
+### 2026-09-28 — Q10 evidence: Excavated Variants in MIC, side by side (agent worktree agent-a8b970576f8fca34f, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** The renders Ben asked for before deciding Q10 (decisions log 2026-09-28), not a decision:
+  https://spacesheep.dev/@benmac/deeptime-q10-ev (page), linking two BlueMap spaces,
+  https://spacesheep.dev/@benmac/deeptime-q10-map-plain and https://spacesheep.dev/@benmac/deeptime-q10-map-ev (all
+  private; `spacesheep list` confirms). One MIC world per set from the same recipe: `deposits_world_16k.json`
+  (every-class strata), the MIC rock-tag datapack, level seed 7, first-start generation, pack 303fd89 (HEAD snapshot;
+  the pack's working tree was dirty and was not used). The EV set is the mic set + EV 4.3.1 + DAG 6.1.2 (168 → 170
+  jars). Both worlds hold the same 42 sites (`sites/` and `bodies/` byte-identical); 8,947 ore positions compared in
+  the three boxes, 39 hold ore in only one world (feature placement jitter).
+- **Tooling (committed on the branch).** `install.sh`: profiles `mic-ev` (= `@include mic` + `@include ev`, pins
+  listed once) and `ev-client` (ev + Create), `--seed` (level-seed). `run.py`: `--chunky-at x,z,r` (repeatable), boot
+  time / the server's Done figure / RSS at Done for the first boot and the restart. `render-bluemap.sh`:
+  `BLUEMAP_BOXES` (several boxes, the second map becomes a cut at each box's height, ambient light 1.0),
+  `BLUEMAP_MAP_PREFIX/LABEL/SORT`, `BLUEMAP_PACKS` (BlueMap reads `<config>/packs/`), rstate dropped; the old
+  single-box behaviour is unchanged. `deeptime-inspect ore-hosts [--other <world>]`: ore blocks by host rock (the most
+  common rock among the 8 same-layer neighbours, then the 5×5 layer, then 3D; strata are horizontal, a thin seam's
+  rock above/below is another horizon), with `--other` a position-by-position pairing of two worlds and per-y counts;
+  `blocks` takes negative areas. `neoforge/build.gradle`: `-PrunSet=<set>` links any installed set into a run.
+  `tools/client/ev-assets.sh` (laptop) → `ev-assets-mac.sh` (Mac): drive lease on graphide's m6lock + the server lock,
+  the dev client with `-PrunSet=ev-client` in ban's desktop session via `sudo launchctl asuser`, DAG config
+  `full_cache`/`time_resources`, stops at the block atlas; `ev-assets-pack.py` turns DAG's cache (blockstates/models
+  under `cache/<mod>/assets/`, painted sprites under `cache/dynamic_asset_generator/tex_sources__minecraft__blocks/`)
+  into a resource pack (the DAG atlas file left out). Master's newer `tools/client/mac-client.sh` (lease renewal, pid
+  marker) covers the same launch; folding ev-assets into it is a follow-up. `tools/review/q10-ev.sh` (Mac steps:
+  install, worlds, inspect, tiles, bluemap, boots; `Q10_PROFILES` redoes one world), `q10_ev.py` (merge, shots, page),
+  `block-tiles.py` (a block's 16×16 texture from blockstate → model → texture), `shot-page.py` (a page folder in
+  headless Chromium over HTTP).
+- **Why a client.** EV's textures do not exist on a server: DAG paints them when a client loads resources (EV's
+  models are plain `cube_all` with 4 random variants; the sprites come from a DAG `foreground_transfer` of the ore
+  over the new stone). With DAG's full cache the 5-mod client wrote 338 sprites, 488 models, 190 blockstates; BlueMap
+  and `deeptime-inspect colors` then draw EV's blocks like any other (colour table 4,304 → 4,494 blocks). No other
+  MIC mod has an EV ore or stone config, so the 5-mod client's variant set equals MIC's (190).
+- **Bug found and fixed: `EvBridgeImpl` kept one EV stone per block.** EV 4.3.1 ships two stones for
+  `minecraft:smooth_basalt` (`excavated_variants:minecraft/smooth_basalt`, overworld; `…:create/smooth_basalt`,
+  nether), the map kept the last, and ore in smooth basalt (MIC's basalt, gabbro, chert, amphibolite) never became a
+  variant. Now every stone of a block is kept in id order and the first with a block for the ore wins;
+  `DepositGameTests.evVariantWhenInstalled` also checks copper in smooth basalt. `mac.sh --server --
+  './gametest.sh -PwithEv'` (merged with master 8da1d6b) → **All 45 required tests passed**. The EV world was
+  regenerated, re-inspected and re-rendered with the fix.
+- **Measured.** Deep Time's own ore (claimed materials) in the three boxes: 2,506 blocks; with EV 1,350 are a
+  different block (an ore-in-this-rock variant); 935 sit in hosts EV has no stone for. Per host (ore / changed):
+  black argillite 483 / 0 (MIC's coal, shale, slate, phyllite rock), fired black argillite 390 / 0, veridium 375 / 366,
+  diorite 241 / 240, crimsite 232 / 232, granite 229 / 220, stone 168 / 0 (the variant is the original), dripstone
+  70 / 70, scoria 59 / 58, calcite 42 / 27, dirt 40 / 0, ochrum 26 / 19, smooth basalt 24 / 24 (after the fix),
+  packed mud 17 / 16, asurine 16 / 16, limestone 16 / 16, tuff 14 / 13, obsidian 10 / 0, cobblestone 9 / 9. The host
+  estimate matched EV's own stone for 1,253 of 1,333 variant positions (94%); "smooth sandstone 14 / 0" rows are
+  estimate errors (coal-seam edges). Other mods' ores and vanilla's diamond/lapis/redstone (6,451 blocks) are
+  identical in both worlds. Cuts chosen from `ore-hosts` per-y counts: porphyry y 128 (156 ore, 73 differ), placer
+  y 162 (gold in gravel, none differ), spawn y 66 (213 coal in argillite, 1 differs).
+  Costs: `q10-ev.sh boots` + the restarts (existing world): boot to Done medians 17.4 s without / 17.8 s with EV
+  (samples 17.1–20.7 / 17.2–19.5), RSS at Done medians 3,300 / 3,398 MB (overlapping); first start with 2 Chunky
+  squares 27.4 s / 5,447 MB peak vs 23.9 s / 5,671 MB (one sample each; the three EV boot-only samples ran the jar
+  before the bridge fix). EV registers 190 blocks (171 ores, 111 stones known), two generated data packs; MIC's
+  Almost Unified hides the variant items in 7 ore tags. Client: DAG's summed generation time 1,024 ms (textures
+  892 ms) on the M6; block atlas 6 s after ModLauncher start on the 5-mod client (RSS 2,188 MB; no no-EV client run).
+  EV and DAG: LGPL-3.0-or-later, last released 2024-08-13 (still the newest 1.21.1 builds).
+- **Publishing limits.** One BlueMap app with all four maps (195 files, 33 MB) failed twice after 24.2 MB uploaded
+  ("fetch failed"), consistent with the ~25 MB per-deploy cap the P1-04 agent met; one space per world (103 files,
+  17 MB each) went through (one transient "fetch failed" on an update, fine on retry). Headless Chromium repeats the
+  page from the top in captures taller than about 8,200 px, so long pages were reviewed in parts.
+- **Checks.** cargo test -p deeptime-inspect 21 + 7, clippy -D warnings, fmt clean (Mac). Every screenshot on the page
+  (12 BlueMap views, 8 sections, 6 ore maps) and the page itself were looked at in headless Chromium over plain HTTP
+  before publishing; the hosted spaces are private, so their first real load is Ben's.
+- **Next.** Ben decides Q10 from the page. Options the evidence points at, not decided: EV stone configs for Born in
+  Chaos's argillites (the largest host EV lacks in MIC, like Deep Time's four stand-ins); EV ore configs for Create
+  Nuclear lead / Ice and Fire silver. Rerun `q10-ev.sh` on the real presets after P1-08.
 
 ### 2026-09-28 — P1-16 COE and CDG hooks (agent worktree agent-a8ca83a89f23c10ef, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Signatures** (javap + cfr on the Mac MIC set's jars, `createoreexcavation-1.21-1.6.8.jar` sha512
