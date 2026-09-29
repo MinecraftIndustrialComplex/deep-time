@@ -101,13 +101,14 @@ sections
 | Place tag | Meaning | a | b |
 |---|---|---|---|
 | 0 | global | 0 | 0 |
-| 1 | point | f32 latitude (degrees, north +) bits | f32 longitude (degrees, east +) bits |
+| 1 | point | f32 latitude (degrees, north +) bits | f32 longitude (degrees in [0, 360), east of the seam) bits |
 | 2 | plate | plate id | 0 |
 | 3 | region | L1 mask id (masks are stored from P1-03 on) | 0 |
 | 4 | site | site id (`sites/sites.dtsr`) | 0 |
 | 5 | path | polyline id (paths are stored from P1-03 on) | 0 |
 
-A point is at block x = lon/360 · C, z = −lat/90 · C/4 (north is −z; `FORMAT.md`, "Grids").
+Longitude is plan §5.2's 360°·(x + C/2)/C, so the seam is 0° and a point is at block
+x = lon/360 · C − C/2, z = −lat/90 · C/4 (north is −z; `FORMAT.md`, "Grids").
 
 ### Param entry (16 bytes)
 
@@ -160,7 +161,7 @@ appears twice, and merges all writers by (t_start, id). It keeps:
 ```json
 {"id": 281474976710665, "writer": 1, "seq": 9, "t_start": -3.6e8, "t_end": -3.6e8,
  "kind": "deeptime:erosion_pulse", "source": "deeptime:dummy",
- "place": {"type": "point", "lat": 12.5, "lon": -40.0}, "magnitude": 0.6,
+ "place": {"type": "point", "lat": 12.5, "lon": 320.0}, "magnitude": 0.6,
  "causes": [281474976710664],
  "params": {"stage": "dummy_drift", "step": 35, "peak_y": 363.0, "parent": {"id": 281474976710600}}}
 ```

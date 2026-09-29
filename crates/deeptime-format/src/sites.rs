@@ -126,7 +126,7 @@ pub struct Site {
     pub deposit_type: String,
     /// Block space, canonical span (x ∈ [−C/2, C/2)).
     pub center: [i32; 3],
-    /// Degrees, north and east positive.
+    /// Degrees: latitude (north positive), longitude in [0°, 360°) east of the seam (plan §5.2).
     pub lat_lon: [f32; 2],
     /// Inclusive block-space bounds of every body of the site: [min, max]. x may leave the
     /// canonical span near the seam; readers wrap it.

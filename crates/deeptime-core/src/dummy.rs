@@ -373,7 +373,7 @@ impl DummyStage {
                 .for_each(|(j, row)| {
                     let lat = 90.0 - 180.0 * j as f64 / gh as f64;
                     for (i, v) in row.iter_mut().enumerate() {
-                        let lon = -180.0 + 360.0 * i as f64 / gw as f64;
+                        let lon = 360.0 * i as f64 / gw as f64; // plan §5.2: the seam is 0°
                         *v = continent.elevation(lat, lon) as f32;
                     }
                 });
@@ -422,7 +422,7 @@ impl DummyStage {
             let id = world.next_site_id();
             let lat = (c.lat + 4.0 * (f64::from(k) - f64::from(w.sites) / 2.0)).clamp(-70.0, 70.0);
             let lon = c.lon + 6.0 * f64::from(k);
-            let lon = (lon + 180.0).rem_euclid(360.0) - 180.0;
+            let lon = lon.rem_euclid(360.0);
             let placer = k % 2 == 1;
             let mut e = world
                 .event(world.t_years, "deeptime:deposit_formation", SOURCE)
@@ -486,7 +486,7 @@ impl Continent {
     fn at(p: f64) -> Continent {
         Continent {
             lat: 25.0 * (2.0 * PI * p).sin(),
-            lon: -150.0 + 300.0 * p,
+            lon: 30.0 + 300.0 * p,
             peak_m: 1500.0 + 6000.0 * (PI * p).sin(),
         }
     }
