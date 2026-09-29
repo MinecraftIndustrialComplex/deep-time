@@ -147,9 +147,19 @@ mod tests {
         assert_eq!(e.colour(1000.0), [255, 255, 255]);
         assert_eq!(e.rgba(f64::NAN), [0, 0, 0, 0]);
         assert_eq!(r.for_layer("no/such/layer").0, r.default);
-        assert_eq!(r.for_layer("deposits/favourability/bif_fe").0, "favourability");
-        assert_eq!(r.for_layer("input/elevation_m").0, "relief", "an exact entry beats a pattern");
+        assert_eq!(
+            r.for_layer("deposits/favourability/bif_fe").0,
+            "favourability"
+        );
+        assert_eq!(
+            r.for_layer("input/elevation_m").0,
+            "relief",
+            "an exact entry beats a pattern"
+        );
         assert_eq!(r.for_layer("input/coal_facies").0, "unit");
-        assert_eq!(r.for_layer("deposits/sites").1.colour(3.0), [0xff, 0xd7, 0x00]);
+        assert_eq!(
+            r.for_layer("deposits/sites").1.colour(3.0),
+            [0xff, 0xd7, 0x00]
+        );
     }
 }

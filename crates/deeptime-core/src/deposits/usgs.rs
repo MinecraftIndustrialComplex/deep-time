@@ -12,13 +12,22 @@ use serde_json::Value;
 
 /// The tables, by id.
 pub const TABLES: &[(&str, &str)] = &[
-    ("porphyry_cu", include_str!("../../data/usgs/porphyry_cu.json")),
-    ("supergene_cu", include_str!("../../data/usgs/supergene_cu.json")),
+    (
+        "porphyry_cu",
+        include_str!("../../data/usgs/porphyry_cu.json"),
+    ),
+    (
+        "supergene_cu",
+        include_str!("../../data/usgs/supergene_cu.json"),
+    ),
     ("placer_au", include_str!("../../data/usgs/placer_au.json")),
     ("bif_fe", include_str!("../../data/usgs/bif_fe.json")),
     ("coal", include_str!("../../data/usgs/coal.json")),
     ("mvt_zn_pb", include_str!("../../data/usgs/mvt_zn_pb.json")),
-    ("sedex_zn_pb", include_str!("../../data/usgs/sedex_zn_pb.json")),
+    (
+        "sedex_zn_pb",
+        include_str!("../../data/usgs/sedex_zn_pb.json"),
+    ),
     ("petroleum", include_str!("../../data/usgs/petroleum.json")),
 ];
 
@@ -125,8 +134,16 @@ mod tests {
             let keys: Vec<&str> = t.sources.iter().map(|s| s.key.as_str()).collect();
             let check = |what: &str, s: &Sourced| {
                 if let Some(src) = &s.source {
-                    for part in src.split([',', ';', '+']).map(str::trim).filter(|p| !p.is_empty()) {
-                        assert!(keys.contains(&part), "{}: {what} cites unknown source {part}", t.id);
+                    for part in src
+                        .split([',', ';', '+'])
+                        .map(str::trim)
+                        .filter(|p| !p.is_empty())
+                    {
+                        assert!(
+                            keys.contains(&part),
+                            "{}: {what} cites unknown source {part}",
+                            t.id
+                        );
                     }
                 }
                 if s.is_usgs() {
@@ -151,9 +168,21 @@ mod tests {
             let s = &ty.sizing;
             let t = table(&s.grade_tonnage).unwrap_or_else(|| panic!("{}: no table", ty.id));
             if t.tonnage_mt.is_usgs() {
-                assert!(close(s.tonnage_mt.p90, t.tonnage_mt.p90.unwrap()), "{} p90", ty.id);
-                assert!(close(s.tonnage_mt.p50, t.tonnage_mt.p50.unwrap()), "{} p50", ty.id);
-                assert!(close(s.tonnage_mt.p10, t.tonnage_mt.p10.unwrap()), "{} p10", ty.id);
+                assert!(
+                    close(s.tonnage_mt.p90, t.tonnage_mt.p90.unwrap()),
+                    "{} p90",
+                    ty.id
+                );
+                assert!(
+                    close(s.tonnage_mt.p50, t.tonnage_mt.p50.unwrap()),
+                    "{} p50",
+                    ty.id
+                );
+                assert!(
+                    close(s.tonnage_mt.p10, t.tonnage_mt.p10.unwrap()),
+                    "{} p10",
+                    ty.id
+                );
             }
             for (k, g) in &s.grades {
                 let Some(tg) = t.grades.get(k).filter(|x| x.is_usgs()) else {
@@ -161,31 +190,51 @@ mod tests {
                 };
                 assert!(close(g.p50, tg.p50.unwrap_or(0.0)), "{} {k} p50", ty.id);
                 assert!(close(g.p10, tg.p10.unwrap_or(0.0)), "{} {k} p10", ty.id);
-                assert!(close(g.p90.unwrap_or(0.0), tg.p90.unwrap_or(0.0)), "{} {k} p90", ty.id);
+                assert!(
+                    close(g.p90.unwrap_or(0.0), tg.p90.unwrap_or(0.0)),
+                    "{} {k} p90",
+                    ty.id
+                );
                 if let (Some(n), Some(total)) = (tg.n_reported, t.n_deposits) {
-                    assert!((g.presence - n / total).abs() < 0.005, "{} {k} presence", ty.id);
+                    assert!(
+                        (g.presence - n / total).abs() < 0.005,
+                        "{} {k} presence",
+                        ty.id
+                    );
                 }
             }
             for (a, b, r) in &s.correlations {
-                let found = t.correlations.iter().find(|c| {
-                    (c.a == *a && c.b == *b) || (c.a == *b && c.b == *a)
-                });
+                let found = t
+                    .correlations
+                    .iter()
+                    .find(|c| (c.a == *a && c.b == *b) || (c.a == *b && c.b == *a));
                 if let Some(c) = found {
                     assert!(close(*r, c.r), "{} {a}–{b}", ty.id);
                 }
             }
             if t.ore_density_t_m3.is_usgs() {
-                assert!(close(s.ore_density_t_m3, t.ore_density_t_m3.value.unwrap()), "{} density", ty.id);
+                assert!(
+                    close(s.ore_density_t_m3, t.ore_density_t_m3.value.unwrap()),
+                    "{} density",
+                    ty.id
+                );
             }
             if t.deposits_per_1e5_km2.is_usgs() {
                 assert!(
-                    close(s.density_per_1e5km2.p50, t.deposits_per_1e5_km2.p50.unwrap()),
+                    close(
+                        s.density_per_1e5km2.p50,
+                        t.deposits_per_1e5_km2.p50.unwrap()
+                    ),
                     "{} deposit density",
                     ty.id
                 );
             }
             if t.min_separation_m.is_usgs() {
-                assert!(close(s.min_separation_m, t.min_separation_m.value.unwrap()), "{} separation", ty.id);
+                assert!(
+                    close(s.min_separation_m, t.min_separation_m.value.unwrap()),
+                    "{} separation",
+                    ty.id
+                );
             }
         }
     }

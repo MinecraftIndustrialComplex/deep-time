@@ -87,6 +87,7 @@ impl CauseIndex {
     /// The best event of `kinds` for a deposit at block (x, z) formed at `t`: within
     /// `radius_blocks`, started by `t + slack`, and (unless `any_time`) ended no earlier than
     /// `t − LOOKBACK_YEARS`. Ranked by distance / radius + time gap / 100 Myr.
+    #[allow(clippy::too_many_arguments)]
     pub fn find(
         &self,
         kinds: &[String],
@@ -99,7 +100,7 @@ impl CauseIndex {
     ) -> Option<EventId> {
         let mut best: Option<(f64, EventId)> = None;
         for e in &self.entries {
-            if !kinds.iter().any(|k| *k == e.kind) || e.t0 > t + slack {
+            if !kinds.contains(&e.kind) || e.t0 > t + slack {
                 continue;
             }
             if !any_time && e.t1 < t - LOOKBACK_YEARS {
@@ -163,14 +164,23 @@ mod tests {
         let idx = CauseIndex::new(c, &events, &[]);
         let (x, z) = block_of(4096.0, 10.0, 62.0);
         let kinds = vec!["deeptime:subduction_onset".to_string()];
-        assert_eq!(idx.find(&kinds, x, z, -1.0e8, 200.0, 0.0, false), Some(EventId::new(1, 0)));
+        assert_eq!(
+            idx.find(&kinds, x, z, -1.0e8, 200.0, 0.0, false),
+            Some(EventId::new(1, 0))
+        );
         // Formed before the subduction started: not a cause.
         assert_eq!(idx.find(&kinds, x, z, -4.0e8, 200.0, 0.0, false), None);
         // A collision that ended 240 Myr before is too old, unless the type dates by its cause.
         let col = vec!["deeptime:collision".to_string()];
         assert_eq!(idx.find(&col, x, z, -1.0e8, 200.0, 0.0, false), None);
-        assert_eq!(idx.find(&col, x, z, -1.0e8, 200.0, 0.0, true), Some(EventId::new(1, 2)));
-        assert_eq!(idx.nearest_before(x, z, -2.0e8, 200.0), Some(EventId::new(1, 2)));
+        assert_eq!(
+            idx.find(&col, x, z, -1.0e8, 200.0, 0.0, true),
+            Some(EventId::new(1, 2))
+        );
+        assert_eq!(
+            idx.nearest_before(x, z, -2.0e8, 200.0),
+            Some(EventId::new(1, 2))
+        );
         let back = lat_lon_of(4096.0, x, z);
         assert!((back[0] - 10.0).abs() < 1e-4 && (back[1] - 62.0).abs() < 1e-3);
     }

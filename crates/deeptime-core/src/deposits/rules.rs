@@ -113,10 +113,7 @@ impl Compiled {
 
 /// A term with its field resolved in one frame.
 enum Resolved<'a> {
-    Leaf {
-        values: Values<'a>,
-        term: &'a Term,
-    },
+    Leaf { values: Values<'a>, term: &'a Term },
     AnyOf(Vec<Resolved<'a>>),
 }
 
@@ -125,7 +122,11 @@ impl Resolved<'_> {
         match self {
             Resolved::Leaf { values, term } => {
                 let m = term.curve_at(f64::from(values.at(cell)));
-                if term.weight == 1.0 { m } else { m.powf(term.weight) }
+                if term.weight == 1.0 {
+                    m
+                } else {
+                    m.powf(term.weight)
+                }
             }
             Resolved::AnyOf(alts) => alts.iter().map(|a| a.score(cell)).fold(0.0, f64::max),
         }
@@ -312,7 +313,10 @@ mod tests {
         t.clock_gates = vec!["deeptime:clock/x".into()];
         t.hosts = Default::default();
         let rules = Compiled::new(&t);
-        let f = frame(&[("deeptime:a", 0.8), ("deeptime:b", 0.5)], &[("deeptime:clock/x", 1.0)]);
+        let f = frame(
+            &[("deeptime:a", 0.8), ("deeptime:b", 0.5)],
+            &[("deeptime:clock/x", 1.0)],
+        );
         let e = FrameEval::new(&rules, &f).unwrap();
         let s = e.at(0);
         assert!((s.f - 0.4).abs() < 1e-6);
@@ -327,7 +331,10 @@ mod tests {
         accumulate(&mut acc, &e, 1, 10.0);
         assert!((acc[0].favourability() - (1.0 - 0.36)).abs() < 1e-6);
         // A closed clock zeroes everything.
-        let shut = frame(&[("deeptime:a", 1.0), ("deeptime:b", 1.0)], &[("deeptime:clock/x", 0.0)]);
+        let shut = frame(
+            &[("deeptime:a", 1.0), ("deeptime:b", 1.0)],
+            &[("deeptime:clock/x", 0.0)],
+        );
         assert_eq!(FrameEval::new(&rules, &shut).unwrap().at(0).f, 0.0);
         // A frame without the field cannot evaluate the type.
         assert!(FrameEval::new(&rules, &frame(&[("deeptime:a", 1.0)], &[])).is_none());

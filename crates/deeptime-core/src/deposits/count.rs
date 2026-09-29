@@ -105,9 +105,13 @@ mod tests {
     /// Acceptance: over 10,000 draws the Poisson counts average ρ·A·F within sampling error.
     #[test]
     fn poisson_counts_match_the_mean() {
-        for (i, &(rho, area, f)) in [(15.0, 76_000.0, 0.42), (3.0, 20_000.0, 0.3), (60.0, 150_000.0, 0.8)]
-            .iter()
-            .enumerate()
+        for (i, &(rho, area, f)) in [
+            (15.0, 76_000.0, 0.42),
+            (3.0, 20_000.0, 0.3),
+            (60.0, 150_000.0, 0.8),
+        ]
+        .iter()
+        .enumerate()
         {
             let lambda = expected(rho, area, f, 1.0, 1.0);
             let draws = 10_000;
@@ -122,7 +126,10 @@ mod tests {
             let var = sq / draws as f64 - mean * mean;
             let se = (lambda / draws as f64).sqrt();
             assert!((mean - lambda).abs() < 4.0 * se, "λ={lambda}: mean {mean}");
-            assert!((var / lambda - 1.0).abs() < 0.1, "λ={lambda}: variance {var}");
+            assert!(
+                (var / lambda - 1.0).abs() < 0.1,
+                "λ={lambda}: variance {var}"
+            );
         }
     }
 

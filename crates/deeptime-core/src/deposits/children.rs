@@ -62,7 +62,12 @@ pub fn supergene_window(
 }
 
 /// A blanket from a parent: (tonnage t, grade as mass fraction, leached parent tonnage t).
-pub fn blanket(parent_tonnage_t: f64, parent_grade: f64, leached_fraction: f64, k: f64) -> (f64, f64, f64) {
+pub fn blanket(
+    parent_tonnage_t: f64,
+    parent_grade: f64,
+    leached_fraction: f64,
+    k: f64,
+) -> (f64, f64, f64) {
     let leached = parent_tonnage_t * leached_fraction.clamp(0.0, 1.0);
     let k = k.max(1.0);
     (leached / k, (parent_grade * k).min(1.0), leached)
@@ -90,7 +95,8 @@ pub fn placer_cell(
         if next == cell || elevation_m[next as usize] < 0.0 {
             break;
         }
-        let step_km = distance(c, cell_xz(grid, cell), cell_xz(grid, next)) * m_per_block_h / 1000.0;
+        let step_km =
+            distance(c, cell_xz(grid, cell), cell_xz(grid, next)) * m_per_block_h / 1000.0;
         if travelled + step_km > rules.transport_km {
             break;
         }
@@ -165,13 +171,22 @@ mod tests {
         let (t0, myr) = supergene_window(&rules(), 120.0, &series).unwrap();
         assert_eq!(myr, 30.0);
         assert_eq!(t0, -30.0e6);
-        assert!(supergene_window(&rules(), 900.0, &series).is_none(), "too deep");
+        assert!(
+            supergene_window(&rules(), 900.0, &series).is_none(),
+            "too deep"
+        );
         let mut wet = series.clone();
         wet[3].precip_mm = 3000.0;
-        assert!(supergene_window(&rules(), 120.0, &wet).is_none(), "too wet now");
+        assert!(
+            supergene_window(&rules(), 120.0, &wet).is_none(),
+            "too wet now"
+        );
         let mut fast = series.clone();
         fast[3].erosion_m_myr = 300.0;
-        assert!(supergene_window(&rules(), 120.0, &fast).is_none(), "eroding too fast");
+        assert!(
+            supergene_window(&rules(), 120.0, &fast).is_none(),
+            "eroding too fast"
+        );
         // Copper is conserved: 100 Mt × 20 % leached at 0.5 % → 10 Mt at 1.0 % (k = 2).
         let (t, g, leached) = blanket(100.0e6, 0.005, 0.2, 2.0);
         assert!((t - 10.0e6).abs() < 1.0 && (g - 0.01).abs() < 1e-12);
@@ -195,7 +210,13 @@ mod tests {
             };
         }
         let rec: Vec<u32> = (0..n as u32)
-            .map(|c| if (c as usize) >= row && (c as usize) < row + 31 { c + 1 } else { c })
+            .map(|c| {
+                if (c as usize) >= row && (c as usize) < row + 31 {
+                    c + 1
+                } else {
+                    c
+                }
+            })
             .collect();
         let r = PlacerRules {
             transport_km: 50.0,
@@ -205,8 +226,14 @@ mod tests {
         let (cell, km) = placer_cell(&grid, Some(&rec), &elev, row as u32, &r, 300.0);
         assert_eq!(cell as usize, row + 3, "stops where the gradient flattens");
         assert!((km - 3.0 * 4.8).abs() < 1e-9);
-        let short = PlacerRules { transport_km: 5.0, ..r.clone() };
-        assert_eq!(placer_cell(&grid, Some(&rec), &elev, row as u32, &short, 300.0).0 as usize, row + 1);
+        let short = PlacerRules {
+            transport_km: 5.0,
+            ..r.clone()
+        };
+        assert_eq!(
+            placer_cell(&grid, Some(&rec), &elev, row as u32, &short, 300.0).0 as usize,
+            row + 1
+        );
         assert_eq!(placer_cell(&grid, None, &elev, 7, &r, 300.0), (7, 0.0));
     }
 }
