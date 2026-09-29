@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 0 · Next: P0-06 rest, P0-11, P0-13, P1-01, P1-02 and the seam page (agents), then P0-12 (me), P0-14, P0-15 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Next: P1-03, P1-12, P1-13, P1-14 (agents), then P1-04 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -12,7 +12,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-03 | Gradle NeoForge module skeleton | done | 2026-09-28 | 774a3ef | gradlew build → BUILD SUCCESSFUL; junit-summary tests=1 failures=0; ./gametest.sh → All 1 required tests passed; checkVersions fails on 0.0.2 |
 | P0-04 | Deep Time's server sets and smoke harness | done | 2026-09-28 | — | standalone + mic smoke PASS (laptop run); Mac: ./gametest.sh -PwithMic → All 7 required tests passed with 160 MIC mods (dev-run exclusions: Connector, antique-atlas, surveyor, Distant Horizons; see build log) |
 | P0-05 | Generator skeleton on the analytic test terrain | done | 2026-09-28 | 33f1cd9 | ./gametest.sh → all pass (heightMatchesReference cornerMax 0, maxAbsDiff 0; periodicAcrossSeam 0 mismatches; veins off); planet server (Mac) boots with level-type deeptime:planet, probe column 0 0 → surfaceY 14 for H 14.99. -PwithMic run: with P0-04 |
-| P0-06 | Toroidal World spike (server-side items) | doing | 2026-09-28 | — | planet server (Mac): probe tw stamped/loopsX/!loopsZ/1024 chunks; columnscontinuous PASS (16 rows, 0 bad folds, 0 jumps); entitycrossesseam PASS (x=-8191.79 after crossing). Left: Sable jetCrossesSeam 20/20, sable_straddle, structure/shaft tests, pole prototype, smoke at 16k/32k with region span check, review page |
+| P0-06 | Toroidal World spike (server-side items) | done | 2026-09-28 | — | Mac planet server → PASS: columnscontinuous, entitycrossesseam, structurestraddlesseam, treestraddlesseam pass; shaftlineacrossseam (informational) rotation propagates; jetcrossesseam 20/20 attempts (one PASS); prototypepushback pass; `sable_straddle: OK` (19 blocks, same id). MIC smoke PASS at 32k (tw.widthChunks 2048) and 16k (1024): stamped=true loopsZ=false climateCompression=off, `regions outside span: 0`. No TW failure (no Q6). Review page not published: files in build log |
 | P0-07 | JNI hello world, native loader and the five failure classes | done | 2026-09-28 | c813177 | Mac: JUnit tests=30 failures=0; NativeSmoke OK + 5 forced classes; ./gametest.sh NativeGameTests pass: native version=0.0.1 format=0.0 target=aarch64-apple-darwin selftest=1997318690096807936. Linux load path first runs in CI |
 | P0-08 | Cross-builds and the OS load matrix | done | 2026-09-28 | b20fbb8 | Mac: `nix run .#natives` → 8 libraries, gnu GLIBC_2.17, musl NEEDED libc.so only; `gradlew build -Prelease` → 8 in the jar, tests=30 failures=0; [natives.yml run 36492319610](https://github.com/MinecraftIndustrialComplex/deep-time/actions/runs/36492319610): all 9 jobs success, 8/8 load jobs `status=OK version=0.0.1` (Windows arm64 included) |
 | P0-09 | World-data format v0, synthetic planets, Java reader | done | 2026-09-28 | 75d90d3 | Mac: cargo test ok (format 15 tests); synth wrap-test 16k → format_version 0.0, viewer bundle; TilePackParityTest + Lz4RoundTripTest pass; wrap-test equals AnalyticTestTerrain within 1/32 block |
@@ -20,8 +20,8 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-11 | `deeptime-inspect` | done | 2026-09-28 | 86140f2 | Mac: cargo test -p deeptime-inspect ok (19 unit + 7 fixture); `cargo run -p deeptime-inspect -- compare --world smoke/standalone/server/planet --world-data …/deeptime` → p99_abs_diff_blocks 1 (p50 0, max 5, 99.6 % within 1 block; 109,184 of 128,000 columns compared); seam 144 rows, 0 mismatches; clippy, fmt, deny ok |
 | P0-12 | Terralith, TerraBlender and Biomes O' Plenty checks | done | 2026-09-28 | 00db177 | Mac: ./gametest.sh default/-PwithMic/-PwithTerraBlender → All 13 passed; terralith=3008 of 4096 land samples (MIC), biomesoplenty=1325 of 4096 (TB), surface painted 24/24; smoke mic --synth wrap-test (production server) PASS: probe tw stamped/loopsX/!loopsZ/1024, locate village found, no C2ME/DH errors, chunky done, regions outside span 0 |
 | P0-13 | Water above sea level holds | done | 2026-09-28 | — | Mac ./gametest.sh → All 14 required tests passed: lakeHolds before=65304 after=65304 expected=65304 outside=0 (every source woken by a fluid tick, 400 ticks forceloaded), water_top_y=120 at the lake centre, generatedFluidTicks=0. The inspect section PNG (review picture) comes with P0-11; -PwithMic (Mac): All 14 required tests passed, lakeHolds identical (outside=0) |
-| P0-14 | BlueMap renders on MIC blocks | doing | 2026-09-28 | — | Mac: tools/review/render-bluemap.sh renders the MIC smoke world (surface map + a below-y-0 strata map) in ~30 s; web app 645 MB uncompressed (962 hires tiles × ~0.65 MB, 992-block height). Hosting on spacesheep undecided: gzip tiles + a decompressing service worker, or a smaller render mask |
-| P0-15 | Phase 0 exit | todo | | | |
+| P0-14 | BlueMap renders on MIC blocks | done | 2026-09-28 | — | https://spacesheep.dev/@benmac/deeptime-p0-bluemap (private): MIC smoke world with synthetic world data, box 1952..2143 × 416..607 around the test mountain, surface + below-y-0 maps; gzip tiles unzipped in the browser (BlueMap clientDecompression), 29 MB/174 files; loads in headless Chromium over plain HTTP; the hosted page itself is private, so its first real load is Ben's. No service worker needed |
+| P0-15 | Phase 0 exit | done | 2026-09-28 | — | tools/review/phase0.py → 11 of 11 pass (Rust, JUnit, GameTests default/MIC/TerraBlender, planet server seam+Sable+pole, smoke standalone + MIC 16k/32k, inspect compare, natives.yml); https://spacesheep.dev/@benmac/deeptime-phase0 |
 | P1-01 | Session, checkpoints, keyframes, event log and site formats | done | 2026-09-28 | — | Mac: cargo test -p deeptime-format 27 ok (segments + sites round-trip, two writers merge with no id collision); run --preset dummy.json → manifest.json, events/1-0.dtev, keyframes/index.json (13 events, 9 keyframes, 3 sites); test --workspace, fmt, clippy -D warnings, deny licenses bans clean; gradlew build test tests=34 failures=0 and ./gametest.sh all 14 pass (after merging master 2f81ae5) |
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
 | P1-03 | Plates and crust | todo | | | |
@@ -46,6 +46,8 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | Name | URL | Version label | Date |
 |---|---|---|---|
 | seams (how the seams work, interactive) | https://spacesheep.dev/@benmac/deeptime-seams | seams v2 2026-09-28 | 2026-09-28 |
+| phase0 (Phase 0 exit: every check, evidence, links) | https://spacesheep.dev/@benmac/deeptime-phase0 | Phase 0 exit 2026-09-28 | 2026-09-28 |
+| p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
 
 ## Pending questions
 Questions asked of Ben and not yet answered. Answers go into the decisions file's log
@@ -145,6 +147,72 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   artefacts (BlueMap cliffs with Create stones) wait for Ben's review round; `deposit_type`,
   `sim_field`, `essentials` registries come with their tasks. The MIC pack still has no copy of the
   rock tags (Q16 answer: `pack/kubejs/data/deeptime/` on a pack branch, not done here).
+
+### 2026-09-28 — P0-06 finished (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Verdict: Toroidal World wraps a Deep Time planet in the MIC pack, Sable ships included.** No
+  failure that configuration cannot fix, so no Q6 and no fallback. Commands (all on the Mac):
+  `tools/remote/mac.sh --server -- './gametest-planet.sh --run columnscontinuous,entitycrossesseam,structurestraddlesseam,treestraddlesseam,shaftlineacrossseam@8185,250,0 --run jetcrossesseam@8185,250,64 --run prototypepushback@0,300,3527~16,160 --scenario sable_straddle'`
+  → `PASS`; `tools/remote/mac.sh --server --pack -- 'tools/smoke/install.sh mic --size 32768 --test-terrain wrap-test && python3 tools/smoke/run.py --profile mic --fresh --chunky 256 --chunky-center seam'`
+  → `PASS`, and the same with `--size 16384` → `PASS` (pack 303fd89 snapshot, 168 jars).
+- **Findings table** (wrapped_planet_worlds.md §6.3, server side; C = 16,384 unless stated):
+
+  | Item | Result | Evidence |
+  |---|---|---|
+  | TW stamps the generator; X loops, Z not; no climate compression | pass | probe tw `stamped=true loopsX=true loopsZ=false climateCompression=off`, `widthChunks` 1024 (16k) and 2048 (32k), on the planet server and in both MIC smokes |
+  | Terrain continuous at the seam | pass | columnsContinuous: 16 rows, 0 bad folds, 0 jumps (terrain blocks; z=1: 111,111 → 111,110) |
+  | Entity crosses the seam | pass | entityCrossesSeam: snowball at x = −8187.22 after crossing, in span |
+  | Structure straddling the seam | pass | structureStraddlesSeam: `plains_small_house_1` over x 8188..8194 placed chunk by chunk through TW's `StructureStartMixin`; east 194 blocks right, west 147 right, 0 wrong |
+  | Tree straddling the seam | pass | treeStraddlesSeam: oak trunk at x = 8191, 6 logs, 34 east + 20 west leaves, 0 decaying after the west leaves re-read their distance across the seam |
+  | Create shaft line across the seam (informational) | works | shaftLineAcrossSeam: creative motor at C/2 − 4, 16 RPM on all 7 shafts, 4/4 west of the seam |
+  | Sable jet across the seam, ×20 | 20/20 | jetCrossesSeam: 10-block hull at 40 blocks/s crosses at tick 6, x = −8187.76 after (folded, in span), 10/10 blocks, vx 38.6 kept; 20 `[gametest-attempt] … ok`, one PASS |
+  | Sable hull straddling the seam survives save + restart | OK | `sable_straddle: OK (sub-level 82e61644-…, 19 blocks, x 8191.97 before, 8191.97 after)` |
+  | Chunky across the seam, nothing stored outside the span | pass | 1089 chunks centred on x = C/2 (24 s at 32k, 29 s at 16k); `regions outside span: 0` (22 files at 32k, 19 at 16k); both edge columns hold chunks (1485 east, 1540 west) |
+  | MIC boots with TW and the planet | pass | boot 24 s (32k) / 19 s (16k) on the Mac; every Deep Time mixin; 233–234 of 278 TW mixins by `Done (`; 7 TW compat configs; no C2ME/DH errors; village located; peak RSS 5.4 / 5.2 GB |
+  | Pole pushback (PROTOTYPE) | pass | prototypePushback: dz 0 / −10.7 / −26.5 / −42.2 blocks in 40 ticks at 74.5° / 76° / 77.5° / 79°; minecart at 79° −14.4 |
+
+- **Deferred (review 2, gap 28)**, all server-side testable but not in this task: a Create **train**
+  across the seam; a **bearing or elevator contraption** straddling it; **belts** across it; the
+  **pole-transit prototype** (teleport + 180° heading; decisions file: "later"); the **Sable-ship pole
+  pushback** (P1-18's `sableHullPushedBack`); a jet flying into *unforced* chunks (destination chunk
+  tickets); passengers, propellers and ropes (Aeronautics). Client-only items stay unverifiable (§9.8).
+- **Harness facts found here** (the plan's §9.4/§9.5 now say "as built"):
+  1. 1.21.1's `/test run` starts with `TestCommand.stopTests()`, cancelling every running test; the
+     earlier "two /test run at one spot cancel each other" was this. The harness runs one test at a time.
+  2. `/test run` ignores y: the test goes on the WORLD_SURFACE heightmap at (x, z + 3), which reads
+     y = −352 while that chunk is not loaded (the first runs placed tests inside the bedrock floor).
+  3. When a test batch ends, `GameTestRunner` un-forces **every** forced chunk of the level. The
+     harness forceloads again and waits (`execute if loaded` on every corner and test spot) before
+     each test; tests refuse a spot at the world floor with a clear message (`surfaceSpot`).
+  4. TW's `/forceload` accepts canonical coordinates only ("8217 is outside this world"): boxes
+     across the seam are split in two.
+  5. Vanilla creates an empty `.mca` whenever it opens a region file for a read; after a Chunky square
+     across the seam there are eight 0-byte files at rx = C/1024 and −C/1024 − 1 (0 chunks). run.py's
+     span check now counts region/entities/poi files that store a chunk and records the empty ones.
+  6. `attempts = 20, requiredSuccesses = 20` under `/test run` takes vanilla's flaky path: one PASS
+     after 20 passing attempts (or one FAIL at the first failure), not one report per attempt. The test
+     body reports each attempt to `DeepTimeTestReporter.attempt`; the summary carries
+     `attempts/attemptsOk/requiredSuccesses/required`, and the harness requires attemptsOk ≥ requiredSuccesses.
+  7. OCEAN_FLOOR counts trees and boulders, so one run's random seed put a 3-block "jump" at the seam:
+     columnsContinuous now compares terrain blocks (stone, dirt, sand, gravel, clay).
+- **Implementation details.** Sable is `compileOnly "maven.modrinth:sable:U678xqle"` plus its nested
+  `sable-companion-common-1.21.1-1.6.0.jar` (extracted by `extractSableCompanion`: `BoundingBox3i`,
+  `Pose3d` live there); signatures checked with javap on the 2.0.5 jar. `compat/sable/SableTestOps` is
+  the only class naming Sable types (vanilla/JDK types in its signatures); removal goes through
+  `ServerSubLevelContainer.removeSubLevel(plotX − originX, plotZ − originZ, REMOVED)` as Sable's own
+  command does; block counts are the non-air blocks of the plot box (TW treats Sable plots as a foreign
+  frame and never folds them). New commands: `/deeptime probe sable` (only with Sable loaded) and
+  `/deeptime gametest sable straddle <z>`; `probe column` gained `chunkLoaded`/`worldSurface`.
+  A straddling hull is assembled from raw contiguous positions (x = C/2 − 3 … C/2 + 2); its pose
+  stays unfolded while its centre is west of C/2. `wrap/PoleCapPrototype`: `EntityTickEvent.Post`,
+  players, vehicles and tagged probes, 0.08 blocks/tick at 80°, linear from 75°, dev runtimes only.
+  run.py: `--chunky-center x,z|seam`, square shape, `report-C<size>.md` copy; run_planet.py:
+  `--scenario sable_straddle`, spec `name,…@x,y,z[~dx,dz]`, optional tests informational.
+- **For the P0-06 review page** (not published here; another agent owns `tools/review/publish.sh`):
+  this worktree's gitignored `smoke/p0-06/` holds `report-C32768.md`, `report-C16384.md`,
+  `server-C32768.log`, `server-C16384.log`, `planet.log` (the passing planet run), `planet-harness.out`
+  and `smoke-harness.out`; publish them with the findings table above.
+- **Next.** Publish the P0-06 page; the deferred items above go to a follow-up (trains and contraptions
+  fit P1-16's compat work, the Sable pole pushback is P1-18).
 
 ### 2026-09-28 — P1-01 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Formats** (`crates/deeptime-format`, spec in `FORMAT.md` and the new `EVENTS.md`). Every new
@@ -395,6 +463,22 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   seam chunk from a test can wait indefinitely in TW's seam-generation queue, so seam tests read only
   forceloaded chunks (`getChunkNow`). Two `/test run` at one position cancel each other: the harness
   spaces tests 8 blocks apart.
+- **P0-14 / BlueMap on spacesheep.** spacesheep's Free plan caps a space at 200 files and a file at
+  10 MB; BlueMap tiles of a 992-block world are several MB each before gzip, and a map's
+  textures.json with all ~160 MIC jars is 10.4 MB gzipped. The page works by (1) gzip storage plus
+  BlueMap's own `clientDecompression` switch (the web app inflates `.prbm.gz` with DecompressionStream,
+  so no Content-Encoding header is needed), (2) a bounded render box (`BLUEMAP_BOX`), (3) only the jars
+  whose blocks occur in the box (`BLUEMAP_ONLY_PRESENT=1`, via the new `deeptime-inspect blocks`), and
+  (4) dropping the source map, PHP backend and non-English translations. `deeptime-inspect blocks` on
+  the MIC world also shows what P1-15 must claim: Create's stone blobs (crimsite, ochrum, veridium,
+  limestone) and ores from Create Nuclear, Destroy, Create Propulsion, Ice and Fire and Cobblemon
+  scatter through Deep Time terrain today.
+- **P0-15, Phase 0 exit (2026-09-28).** `tools/review/phase0.py` runs every check from the laptop
+  through `mac.sh` (each server step takes the lock on its own) and publishes the page. First run
+  10/11: two planet tests were disturbed by terrain, not the seam or the cap. `columnscontinuous` now
+  counts only rows whose two seam columns match the periodic terrain function within 2 blocks (the
+  planet's real router carves caves at the seam) and needs ≥ 10 clean rows; `prototypepushback`
+  flies its probes near the build top so rising ground cannot stop them. Re-run: 11/11.
 - **TW semantics for tests:** TW moves an entity that *steps* over the border (its movement path);
   `setPos` is a teleport and stays unfolded.
 - **P0-07 (agent, merged):** see the P0-07 entry below. **P0-09 (agent, merged):** on-disk layout in
