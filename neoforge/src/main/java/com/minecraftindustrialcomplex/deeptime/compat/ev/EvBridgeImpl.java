@@ -11,6 +11,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -25,11 +27,15 @@ import java.util.Set;
  * before blocks register; after that every {@link Ore}'s {@link Ore#getStones()} maps each stone to
  * the ore's block in it: the original ore blocks (copper ore in stone, deepslate copper ore in
  * deepslate) and the variants EV generated for its other stones. A host block is an EV stone when
- * some {@link Stone#block} is it.
+ * some {@link Stone#block} is it. One block can be several stones: EV 4.3.1 ships
+ * {@code excavated_variants:minecraft/smooth_basalt} (overworld ores) and
+ * {@code excavated_variants:create/smooth_basalt} (nether ores) for {@code minecraft:smooth_basalt}, so
+ * a host's stones are all kept, in id order, and the first one the ore has a block in wins (Q10: with
+ * only the last stone kept, ore in smooth basalt never became a variant).
  */
 final class EvBridgeImpl implements EvBridge {
 
-    private final Map<Block, ResourceKey<Stone>> stoneByBlock = new HashMap<>();
+    private final Map<Block, List<ResourceKey<Stone>>> stonesByBlock = new HashMap<>();
     private final Map<Block, Ore> oreByBlock = new HashMap<>();
     private final Map<Block, ResourceKey<Stone>> stoneOfOreBlock = new HashMap<>();
     private final Set<Block> variants = new HashSet<>();
@@ -42,7 +48,10 @@ final class EvBridgeImpl implements EvBridge {
         if (oreReg == null || stoneReg == null)
             throw new IllegalStateException("Excavated Variants' ore or stone registry is missing");
         for (var e : stoneReg.entrySet())
-            BuiltInRegistries.BLOCK.getOptional(e.getValue().block).ifPresent(b -> stoneByBlock.put(b, e.getKey()));
+            BuiltInRegistries.BLOCK.getOptional(e.getValue().block)
+                    .ifPresent(b -> stonesByBlock.computeIfAbsent(b, k -> new ArrayList<>()).add(e.getKey()));
+        Comparator<ResourceKey<Stone>> byId = Comparator.comparing(k -> k.location().toString());
+        stonesByBlock.values().forEach(l -> l.sort(byId));
         for (var e : oreReg.entrySet()) {
             Ore ore = e.getValue();
             Set<ResourceKey<Block>> originals = ore.originalBlocks;
@@ -67,26 +76,29 @@ final class EvBridgeImpl implements EvBridge {
 
     @Override
     public BlockState variant(List<BlockState> oreStates, BlockState host) {
-        ResourceKey<Stone> stone = stoneByBlock.get(host.getBlock());
-        if (stone == null)
+        List<ResourceKey<Stone>> stones = stonesByBlock.get(host.getBlock());
+        if (stones == null)
             return null;
-        for (BlockState s : oreStates) {
-            Ore ore = oreByBlock.get(s.getBlock());
-            if (ore == null)
-                continue;
-            ResourceKey<Block> in = ore.getStones().get(stone);
-            if (in == null)
-                continue;
-            Block b = BuiltInRegistries.BLOCK.getOptional(in).orElse(null);
-            if (b != null)
-                return b.defaultBlockState();
+        for (ResourceKey<Stone> stone : stones) {
+            for (BlockState s : oreStates) {
+                Ore ore = oreByBlock.get(s.getBlock());
+                if (ore == null)
+                    continue;
+                ResourceKey<Block> in = ore.getStones().get(stone);
+                if (in == null)
+                    continue;
+                Block b = BuiltInRegistries.BLOCK.getOptional(in).orElse(null);
+                if (b != null)
+                    return b.defaultBlockState();
+            }
         }
         return null;
     }
 
     @Override
     public Optional<ResourceLocation> stoneOf(BlockState host) {
-        return Optional.ofNullable(stoneByBlock.get(host.getBlock())).map(ResourceKey::location);
+        List<ResourceKey<Stone>> stones = stonesByBlock.get(host.getBlock());
+        return stones == null ? Optional.empty() : Optional.of(stones.getFirst().location());
     }
 
     @Override

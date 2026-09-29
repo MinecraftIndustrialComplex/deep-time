@@ -24,7 +24,7 @@ OUT=review/out/q10
 PRESET="$PWD/crates/deeptime-core/tests/presets/deposits_world_16k.json"
 TAGS=../../Docs/datapacks/deeptime-mic-rock-tags
 SEED="${Q10_SEED:-7}"
-PROFILES="mic mic-ev"
+PROFILES="${Q10_PROFILES:-mic mic-ev}"   # Q10_PROFILES=mic-ev redoes one world (e.g. after a Deep Time fix)
 # Chunky squares "x,z,radius": the porphyry/supergene/placer cluster west of 0 and the coal/BIF
 # guarantee next to spawn (P1-15's standalone run of the same preset).
 CHUNKY="${Q10_CHUNKY:--5582,-1022,112 -16,-2144,80}"
@@ -45,7 +45,7 @@ porphyry10 x -5554 -1060 -960 90 180
 placer z -1086 -5640 -5540 130 180
 spawn x -16 -2174 -2111 20 90}"
 
-step="${1:?usage: q10-ev.sh <install|worlds|inspect|bluemap|boots>}"
+step="${1:?usage: q10-ev.sh <install|worlds|inspect|tiles|bluemap|boots>}"
 mkdir -p "$OUT"
 inspect() { cargo run -q --release -p deeptime-inspect -- "$@"; }
 
@@ -143,11 +143,14 @@ PY
         inspect ore-hosts --world smoke/mic/server/planet --other smoke/mic-ev/server/planet \
             --area="$x0,$z0,$((x1 + 1)),$((z1 + 1))" > "$OUT/pairs-$name.json"
     done <<< "$BOXES"
-    # A 16 x 16 texture for every block the pairs name (ores both ways, host rocks) for the page.
-    if [ -n "$vanilla" ]; then
-        rm -rf "$OUT/tiles"
-        python3 tools/review/block-tiles.py --jars "$OUT/colors-jars-mic-ev" --vanilla "$vanilla" --out "$OUT/tiles" "$OUT"/pairs-*.json
-    fi ;;
+    "$0" tiles ;;
+tiles)
+    # A 16 x 16 texture for every block the pairs name (ores both ways, host rocks) and every rock block
+    # of the probe palette, for the page (needs inspect's colors-jars-mic-ev folder).
+    vanilla="$(find neoforge/build/moddev/artifacts -name '*client-extra*.jar' | head -1)"
+    rm -rf "$OUT/tiles"
+    python3 tools/review/block-tiles.py --jars "$OUT/colors-jars-mic-ev" --vanilla "$vanilla" --out "$OUT/tiles" \
+        "$OUT"/pairs-*.json "$OUT"/mic/palette.json ;;
 bluemap)
     for p in $PROFILES; do
         boxes="$(awk 'NF { printf "%s%s %s %s %s %s", (n++ ? "; " : ""), $2, $3, $4, $5, $6 }' <<< "$BOXES")"
