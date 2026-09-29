@@ -363,11 +363,58 @@ impl Preset {
 
     /// The synthetic terrain a placeholder preset bakes at `finalize_write`, if any.
     pub fn synth(&self) -> Option<synth::Kind> {
+        self.bake().map(|b| match b {
+            Bake::Analytic(k) => k,
+            Bake::DepositHistory { .. } => synth::Kind::DepositHistory,
+        })
+    }
+
+    /// What `finalize_write` bakes into the world data besides the run's own files.
+    pub fn bake(&self) -> Option<Bake> {
         match &self.body {
-            PresetBody::Dummy(p) => p.synth,
-            PresetBody::DepositsSynthetic(_) => None,
+            PresetBody::Dummy(p) => p.synth.map(Bake::Analytic),
+            PresetBody::DepositsSynthetic(p) => p.terrain.as_ref().map(|t| Bake::DepositHistory {
+                params: p.synthetic(),
+                strata: t.strata(),
+                essentials: p.deposits.essentials.clone(),
+            }),
         }
     }
+
+    /// This preset with the game's content bundle applied (plan §5.4): the bundle's
+    /// `essentials` (the `deeptime:essentials` registry, P1-15) replace the preset's list. An empty
+    /// bundle, or one without `essentials`, changes nothing; the dummy pipeline has no essentials.
+    pub fn with_content(mut self, content_json: &str) -> Result<Preset, CoreError> {
+        if content_json.trim().is_empty() {
+            return Ok(self);
+        }
+        let v: Value = serde_json::from_str(content_json)
+            .map_err(|e| CoreError::preset("content", format!("not valid JSON: {e}")))?;
+        let Some(ess) = v.get("essentials") else {
+            return Ok(self);
+        };
+        let list: Vec<crate::deposits::playability::Essential> =
+            serde_json::from_value(ess.clone())
+                .map_err(|e| CoreError::preset("content.essentials", e.to_string()))?;
+        if let PresetBody::DepositsSynthetic(p) = &mut self.body {
+            p.deposits.essentials = list;
+        }
+        Ok(self)
+    }
+}
+
+/// What a preset bakes at `finalize_write` (the stand-ins for P1-08's bake).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Bake {
+    /// A P0-09 synthetic terrain (`"synth": "wrap-test"` of a dummy preset, P1-13).
+    Analytic(synth::Kind),
+    /// A synthetic deposit world's terrain (`deposits_synthetic.terrain`, P1-15): the history's
+    /// present elevation, the given horizons, and spawn candidates ranked by the essentials.
+    DepositHistory {
+        params: crate::deposits::synthetic::SyntheticParams,
+        strata: synth::Strata,
+        essentials: Vec<crate::deposits::playability::Essential>,
+    },
 }
 
 /// The circumference of a dummy preset without a `world` (`DummyParams::initial_world`).

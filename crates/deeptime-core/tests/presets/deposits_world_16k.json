@@ -1,0 +1,26 @@
+{
+  "scale": {"circumference_blocks": 16384},
+  "deposits_synthetic": {
+    "seed": 7,
+    "circumference": 16384,
+    "grid_r": 16,
+    "t_start_years": -500000000.0,
+    "t_end_years": 0.0,
+    "snapshot_every_years": 10000000.0,
+    "keyframe_every_years": 50000000.0,
+    "keyframe_size": [1024, 512],
+    "deposits": {
+      "count_mult": 1.0,
+      "province": "strong",
+      "province_km": 800.0,
+      "types": [],
+      "essentials": [
+        {"material": "c:iron", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": false, "max_blocks_from_spawn": 3072},
+        {"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": false, "max_blocks_from_spawn": 3072},
+        {"material": "c:coal", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": true, "max_blocks_from_spawn": 3072},
+        {"material": "c:zinc", "min_sites_per_region": 1, "region_blocks": 16384, "exposed": false}
+      ]
+    },
+    "terrain": {"strata": "every-class"}
+  }
+}

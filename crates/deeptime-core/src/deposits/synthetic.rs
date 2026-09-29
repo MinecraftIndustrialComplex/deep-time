@@ -334,6 +334,11 @@ impl SyntheticHistory {
         &self.params
     }
 
+    /// The present-day elevation (m) per L1 cell: the last frame's `deeptime:elevation_m`.
+    pub fn present_elevation_m(&self) -> Vec<f32> {
+        self.elevation(self.params.t_end_years / 1.0e6)
+    }
+
     fn map(&self, f: impl Fn(usize) -> f64 + Sync) -> Vec<f32> {
         (0..self.grid.cells())
             .into_par_iter()
@@ -793,6 +798,37 @@ impl FieldHistory for SyntheticHistory {
 
 /// D8 steepest descent on `elev` (x wraps): each cell's lowest lower neighbour, itself for a
 /// pit and for sea cells (elevation below 0).
+/// The terrain of a synthetic deposit world (P1-15): the history's present elevation, sampled
+/// bilinearly on L1 and turned into block y exactly as the deposit stage places bodies
+/// ([`super::surface_y`], [`super::bilinear_cells`]), so a truncated body's clip sits at the ground
+/// and a buried one at its recorded depth below it.
+pub struct HistoryTerrain {
+    grid: GridDesc,
+    elevation_m: Vec<f32>,
+    scales: super::geometry::Scales,
+}
+
+impl HistoryTerrain {
+    pub fn new(history: &SyntheticHistory) -> HistoryTerrain {
+        HistoryTerrain {
+            grid: history.grid.clone(),
+            elevation_m: history.present_elevation_m(),
+            scales: super::geometry::Scales::default(),
+        }
+    }
+}
+
+impl crate::synth::terrain::Terrain for HistoryTerrain {
+    fn circumference(&self) -> u32 {
+        self.grid.circumference() as u32
+    }
+
+    fn height(&self, x: i64, z: i64) -> f64 {
+        let e = super::bilinear_cells(&self.grid, &self.elevation_m, x as f64, z as f64);
+        super::surface_y(e as f32, &self.scales)
+    }
+}
+
 pub fn steepest_descent(grid: &GridDesc, elev: &[f32]) -> Vec<u32> {
     let (w, h) = (i64::from(grid.w), i64::from(grid.h));
     (0..grid.cells())
