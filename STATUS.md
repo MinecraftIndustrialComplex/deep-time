@@ -73,6 +73,66 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — Deposits: USGS mean density, survivors within the assessment depth, researched densities; GameTest cdgOilFromTrap fixed (agent worktree agent-afa559c18eb85c3f6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **GameTest `cdgOilFromTrap` (failed on master 62c87c9: trap 66, 9,393,132 of 9,600,610 mB).** Cause:
+  the test's accounting, not the engine. The survivor formula forms more traps; in the synthetic
+  deposit world two traps now reach one chunk, `SiteChunks.covering` hands that chunk to the trap
+  that fills it more, and the test skipped the chunk before adding the other trap's share to its
+  sum. Fix (810d33b): every chunk a trap reaches adds its share; the per-chunk comparison with what
+  CDG is told still runs only on the chunks the trap supplies. After it trap 66 sums to 9,600,611
+  mB. Mac `./gametest.sh` → All 48 required tests passed; `tools/smoke/install.sh mic` + `./gametest.sh
+  -PwithMic` → All 48 passed (a first MIC run died of `OutOfMemoryError: Java heap space` in C2ME
+  workers 10 min after the last test logged, while two other agents' workbenches held the Mac; the
+  rerun passed).
+- **Ben's answers (decisions log 2026-09-29) as built.** (1) `sizing.density_basis`: `measured` → the
+  survivor target uses the mean of the split lognormal through P90/P50/P10 (`Lognormal::mean`),
+  `estimate` (default) → P50, never inflated. Only porphyry is measured (Singer, Berger, Menzie &
+  Berger 2005: 4 / 15 / 35 → mean 17.8). (2) `preservation.assessment_depth_m` (default 1000): only
+  survivors whose top lies within it count toward N\* (USGS Circular 1178 p. 15: assessments count
+  deposits to 1 km, a deposit counting if any part is within it); λ_i now uses p̄₁ (survive within
+  the depth), deeper survivors are sites on top. Coal 1,800 m (Circular 891: coal deeper than 6,000
+  ft is excluded, printed p. 24), petroleum 10 km (USGS petroleum assessments have no fixed cut-off;
+  deep gas below 4.5 km, Dyman et al. 2002). Census: `density`, `counted` (sites within the depth),
+  `expected` (counted expected), `expected_sites` (all). (3) Research (Sonnet sub-agent): no USGS
+  deposit-density model covers sedex (PP 1640-A, SIR 2010-5070-N); the 1998 National Mineral Resource
+  Assessment's sedex tracts (Circular 1178, mrdata.usgs.gov/nmra) give undiscovered-deposit
+  estimates, 12 numeric tracts over 207,508 km² summing to about 2 / 10 / 26 → SEDEX density 1 / 5 /
+  12.5 per 100,000 km² (was the placeholder 0.5 / 2 / 8; an estimate and a lower bound, P50 used).
+  No published coal deposit density exists (Circular 891, PP 1809, IEA CCC/32 checked): coal's 30
+  stays a placeholder. Sources cited in the type JSONs and the plan's §8.6 note.
+- **Counts** (the six landscapes regenerated at checkpoint schema 6 after the master merge; `stage
+  deposits --in`, sites median (range), planets with any; counted = sites with top within the
+  assessment depth, against the target):
+
+  | type | sites | counted (target) |
+  |---|---|---|
+  | porphyry | 13.5 (10–19), 6/6 | 5–12 (7.0–14.6) |
+  | MVT | 18 (7–22), 6/6 | 1–17 (2.6–11.0) |
+  | SEDEX | 4 (0–11), 5/6 | 0–2 (0.33–1.11) |
+  | petroleum | 3.5 (1–5), 6/6 | = sites (2.1–4.5) |
+  | coal | 47.5 (25–56), 6/6 | 17–35 (15–44) |
+  | placer Au | 11.5 (5–34) | children of eroded porphyries |
+
+  The 1 km rule is what moves the numbers: a porphyry formed at 1.5 km, an MVT at 1 km and a SEDEX
+  sheet buried in a subsiding rift mostly lie deeper than 1 km, so more form and the deep survivors
+  are extra sites (porphyry ~2×, MVT ~4×, SEDEX mostly deep). SEDEX preservation within 1 km is 5–30 %,
+  so it is capped at 20 formed per counted survivor on two landscapes. Porphyry forms 28–92 per
+  planet, hence more placers.
+- **Tests.** `survival::tests` gain the counted window (uniform erosion: counted share = the closed
+  form of the age window); `sizing::tests::split_lognormal_mean` (porphyry 17.8, symmetric case,
+  numerical integral); `recorded_tests::the_survivor_formula_hits_its_target_in_expectation` now checks
+  counted survivors = target (P̄₁ closed form), all sites = target·P̄/P̄₁, formed = target/P̄₁.
+- **Gates** (Mac, on 29c4aef = master b8788a7 merged + this work): `cargo test --workspace --locked`
+  (core 231 + 3 ignored), clippy `-D warnings`, fmt, deny clean; `./gradlew build test` → tests=125
+  failures=0; `./gametest.sh` → All 48 required tests passed; `-PwithMic` → see below.
+- **Deposit stage time** (seed 1 scattered, `--in`, 6 threads, `--verbose`): in memory 15.6 s wall,
+  `--history-mem 0` (all 50 frames on disk, `50 frames on disk`) 13.9 s wall; pass 2 over 14,522
+  tract cells 3.7 / 3.9 s; frames read in 0.04–0.1 s either way. Pass 2 reads frames once each, in
+  order (the trace reads origins last-to-first once).
+- **Decisions for Ben** (not asked): MVT now has 7–22 sites per planet (formation depth 1 km sits on
+  the 1 km line, so most are "deep extras"); coal's density is still a placeholder (what is a coal
+  deposit?); SEDEX's density is a lower bound from undiscovered-deposit estimates.
+
 ### 2026-09-29 — P1-17 partial: the diffusion solve fused into two passes per CG iteration, bit-identical (agent worktree agent-a0f4f991a0d939f16, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Only `surface/diffusion.rs` (plus the new `surface/diffusion/parity.rs`). The Jacobi-PCG iteration was seven
   parallel regions over ~22 vector streams of 4 MB; it is now two passes over strips of 8 rows: **pass 1** forms the direction
