@@ -1077,6 +1077,7 @@ mod tests {
                 max_steps: None,
                 out,
                 viewer,
+                viewer_layers: Vec::new(),
                 work: None,
                 common: quiet(),
             })
@@ -1093,7 +1094,7 @@ mod tests {
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
         assert_eq!(
             end.stage_names,
-            ["plates", "surface", "structure", "deposits"]
+            ["plates", "climate", "surface", "structure", "deposits"]
         );
         assert_eq!(end.next_stage_name(), None, "the run is complete");
         assert!(

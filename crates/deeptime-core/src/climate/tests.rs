@@ -170,7 +170,7 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
     let s = session(&json, &dir, 2);
     assert_eq!(
         s.stage_names(),
-        ["plates", "climate", "surface", "structure"]
+        ["plates", "climate", "surface", "structure", "deposits"]
     );
     finish(&s);
     let world = s.checkpoint().unwrap().world;
