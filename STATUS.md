@@ -69,6 +69,25 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 ## Build log
 
+### 2026-09-29 — MIC pack branch `deep-time`: Excavated Variants and its gaps (Q10), rock tags (Q16) (agent, pack worktree ../../pack-deeptime)
+- **What.** Pack branch `deep-time` pushed at 16dfd80 (on pack master 303fd89; master untouched): EV 4.3.1 + DAG 6.1.2
+  (packwiz, Modrinth); EV configs under `globalresources/mic/globaldata/excavated_variants/excavated_variants/` for
+  Born in Chaos black and fired black argillite, Create Nuclear lead ore (with `createnuclear:lead_ores`), Ice and Fire
+  silver ore; the rock-tag datapack as `kubejs/data/deeptime/` (120 files, byte-identical); an Almost Unified
+  `unification/materials.json`; the branch report `modDocs/deeptime-branch.md` (force-added, packwiz-ignored).
+  index.toml edited by hand (additions only, no `packwiz refresh`).
+- **Measured** (Q10 recipe on the Mac, `deposits_world_16k`, seed 7, Deep Time 84759b0; install via the new
+  `DEEPTIME_PACK=<dir> tools/smoke/install.sh mic|mic-ev`): EV variants 252 (Q10 190). Q10 boxes: 2,291 of 2,507
+  Deep Time ore blocks are EV variants (Q10 1,350); black argillite 549/549, fired 395/395. Zn–Pb boxes (MVT sites
+  23/24, SEDEX 25): lead 262/262, silver 46/46, zinc 3,176/3,176 variants. No EV/DAG/DefaultResources errors; both
+  worlds pass every smoke check incl. restart. Still plain: ore in stone (its variant is the original), dirt, obsidian.
+- **Found.** MIC's Almost Unified config is never read, on master too: AU 1.4.2 reads only
+  `config/almostunified/unification/*.json`; the pack's `unify.json` is the 0.x layout, so its priorities
+  (e.g. `c:ingots/lead → destroy`) do not apply. Asked Ben (pack-wide).
+- **Not checked.** DAG's generated textures for the new variants in a client.
+- **Leftovers on the Mac** (safe to delete later): /Volumes/Graphide/ban/mic/evpack-verify/,
+  /Volumes/Graphide/ban/mic/mods/pack-deeptime-verify/.
+
 ### 2026-09-28 — wrap page merged; snowball figure settled (main session f981c0d3)
 - **Snowball.** entityCrossesSeam starts the gravity-free snowball at x = 8,188.5 with 0.25 blocks/tick and
   reads it after 40 ticks: 0.25 × (1 − 0.99⁴⁰)/0.01 = 8.28 blocks → 8,196.78 → stored −8,187.22, exactly the
