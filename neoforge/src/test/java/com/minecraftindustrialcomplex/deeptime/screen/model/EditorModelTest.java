@@ -81,8 +81,8 @@ class EditorModelTest {
         assertEquals("earthlike_quick_32k", m.presetName());
         m.selectFamily("earthlike_full");
         assertEquals("earthlike_full_32k", m.presetName(), "the size is kept across families");
-        assertTrue(m.info().placeholder());
-        assertTrue(has(m.problems(), "editor.warning.placeholder"));
+        assertFalse(m.info().placeholder(), "the built-ins are simulated planets since P1-08");
+        assertFalse(has(m.problems(), "editor.warning.placeholder"));
     }
 
     /** No default story: Run is disabled until both parts of the timeline are chosen. */
@@ -204,16 +204,26 @@ class EditorModelTest {
         assertFalse(m.canRun());
     }
 
-    /** Placeholder presets carry no parameter paths: every field is unavailable and edits change nothing. */
+    /**
+     * A field is editable exactly when the preset carries its path: a placeholder preset (the dummy
+     * pipeline, P1-13's stand-in) carries none, so every field is unavailable and edits change
+     * nothing; the built-ins carry the planet's.
+     */
     @Test
     void fieldsFollowThePreset() {
         EditorModel m = model();
+        assertTrue(m.importShareCode(ShareCode.encode(
+                "{\"name\":\"stand_in\",\"placeholder\":true,\"scale\":{\"circumference_blocks\":16384},"
+                        + "\"dummy\":{\"steps\":1,\"sleep_ms\":0}}")).isEmpty());
+        assertTrue(m.info().placeholder());
+        assertTrue(has(m.problems(), "editor.warning.placeholder"));
         String before = m.effectivePresetJson();
         for (EditorFields.Field f : EditorFields.ALL) {
             assertFalse(m.available(f), f.id());
             m.setFieldText(f, "1");
         }
         assertEquals(before, m.effectivePresetJson());
+        assertTrue(model().available(EditorFields.byId("gravity")), "a built-in carries the planet's paths");
 
         // A preset that carries planet.gravity_m_s2 (imported through a share code).
         JsonObject p = Presets.parseObject(Presets.builtin("earthlike_quick_16k").orElseThrow());

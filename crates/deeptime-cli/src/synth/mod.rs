@@ -226,7 +226,7 @@ mod tests {
         run(&opts).unwrap();
         let m = Manifest::read(&opts.out).unwrap();
         m.verify(&opts.out).unwrap();
-        assert_eq!(m.format_version, "0.0");
+        assert_eq!(m.format_version, "0.1");
         assert_eq!(m.layers.len(), 8);
         let e = TilePackReader::open(&opts.out.join("rasters/elevation.dtr"))
             .unwrap()

@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
-# Deep Time world-data format 0.0
+# Deep Time world-data format 0.1
 
 The contract between the Rust writer (`crates/deeptime-format`) and the Java reader
 (`neoforge/src/main/java/com/minecraftindustrialcomplex/deeptime/worlddata`). Plan §5.3 and §5.7
@@ -12,6 +12,12 @@ The version lives in one place: `[workspace.metadata.deeptime] format_version` i
 `Cargo.toml`. `deeptime_format::FORMAT_VERSION` and Java's `FormatVersion.CURRENT` mirror it, and a
 test on each side fails when they drift.
 
+**0.1 (P1-08)** over 0.0: every header's minor is 1; a planet run bakes every chunk-time layer of
+plan §5.3 into its folder (the table below, `notes.bake`); the terrain height includes the detail
+term a baked world declares ("The terrain height"); the first horizon of a baked stack reaches over
+the amplified terrain ("The P1-08 bake"); and the column evaluator both sides implement is specified
+("Columns"). Nothing a 0.0 world held changed its bytes, only the minor.
+
 ## Folder layout
 
 ```text
@@ -22,9 +28,17 @@ test on each side fails when they drift.
   rasters/detail/amplitude.dtr  L3, u8, 1/16 block: amplitude of the sub-cell detail term (P1-06)
   rasters/climate/<name>.dtr    L2, i16, vanilla parameter × 10,000
                                 (<name> ∈ temperature, vegetation, continents, erosion, ridges)
-  strata/horizons.dtr           L1, horizon_stack, K = 3 in the synthetic worlds (8 with --strata every-class)
+  rasters/climate/t_mean_c.dtr  L1, i16, 0.01 °C            ┐
+  rasters/climate/p_mm.dtr      L1, u16, mm/yr              │ a baked planet run only
+  rasters/climate/koppen.dtr    L1, u8, Köppen code index   │ (P1-08, "The bake" below)
+  rasters/surface/*.dtr         L2, u8                      │
+  rasters/meta/*.dtr            L1, u16                     ┘
+  strata/horizons.dtr           L1, horizon_stack, K = 3 in the synthetic worlds (8 with --strata every-class,
+                                32 in a baked run)
   strata/classes.json           class index → rock class name
   spawn/candidates.json         land cells for spawn selection
+  parity/columns.json           optional: the column evaluator on 500 columns (`deeptime parity`; not listed
+                                in the manifest, never read by the game)
   preset.json                   the exact preset of a run (canonical JSON; `deeptime run`, the game)
   events/index.json             the event log's writers and segments (EVENTS.md)
   events/<writer>-<n>.dtev      event segments (EVENTS.md); geology is writer 1
@@ -47,7 +61,7 @@ manifest last. The synthetic worlds have none of these.
 
 ```json
 {
-  "format_version": "0.0",
+  "format_version": "0.1",
   "writers": [{"name": "deeptime-cli", "version": "0.0.1", "format_crate": "0.0.1"}],
   "source": "synth:wrap-test",
   "preset_hash": null,
@@ -69,11 +83,41 @@ the zlib CRC, as an unsigned JSON number) cover each whole file; readers may ver
 
 A run's manifest (P1-01) has `source` `run:<preset name>` (`run:dummy` until P1-03), one writer
 `deeptime-core`, `preset_hash` `crc32:<8 hex>` of the canonical preset JSON, `planet.radius_m`,
-`grids` and `layers` empty until the bake (P1-08) writes rasters, and every other file in `files`:
+`grids` and `layers` (empty for a run that bakes nothing; a planet run's bake lists every layer, see
+"The bake"), and every other file in `files`:
 `preset.json`, `events/index.json` and each segment, `sites/sites.dtsr`, `sites/index.dtsi`,
 `keyframes/index.json` and each frame. `notes.run` records per-stage steps and milliseconds, the
 final `t_years` and the event, site and keyframe counts. (P0-07's session wrote an ad-hoc manifest
 with `writer`, `preset` and `created_unix_ms`; from P1-01 the session writes this one.)
+
+## The bake (a planet run, P1-08)
+
+`Session::finalize_write` bakes every planet preset (`deeptime_core::bake`; plan §5.3, §8.8) after
+the amplify stage's L3 packs are listed and before the manifest. `manifest.scale` is the preset's
+own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `l2_r`, L3 = C /
+`l3_r`; all LZ4 tiles):
+
+| Layer | Grid | dtype | scale, units | nodata | What |
+|---|---|---|---|---|---|
+| `elevation` | L3 | i16 | 1/16, block | — | terrain y: the amplifier's; without the amplify stage the young landscape (L2) or the deep-time surface (L1) upsampled bilinearly |
+| `detail/amplitude` | L3 | u8 | 1/16, block | — | the detail term's A (P1-06; absent without the amplify stage) |
+| `water_level` | L3 | i16 | 1/16, block | −32768 | every cell nodata: lakes and rivers are Phase 2 |
+| `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks, the first top raised ("The P1-08 bake") |
+| `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
+| `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
+| `climate/koppen` | L1 | u8 | 1, code index | 255 | `notes.bake.climate.koppen_codes[i]` (31 = sea) |
+| `climate/{temperature,vegetation,continents,erosion,ridges}` | L2 | i16 | 1e-4, vanilla_param | — | the router's five biome inputs; a provisional mapping until P1-09 (its anchors are in `notes.bake.climate.anchors`) |
+| `surface/regolith_blocks` | L2 | u8 | 1/16, block | — | regolith thickness |
+| `surface/class_top` | L2 | u8 | 1, class index | 255 | the rock class at the surface (`strata/classes.json`) |
+| `meta/plate_id` | L1 | u16 | 1, plate id | 65535 | the plate |
+| `meta/crust_age_myr` | L1 | u16 | 1, Myr | 65535 | oceanic crust age; nodata on continental crust |
+| `meta/province` | L1 | u16 | 1, province id | — | contiguous geologic provinces ≥ 50,000 km² (`notes.bake.meta.provinces`) |
+
+`notes.bake`: `version` (1), `baked`, per part (`terrain`, `strata`, `climate`, `surface`, `meta`)
+what it did, `millis` per part, `bytes` and `layers` written, and **`detail`** — the game's detail
+term: `{"layer": "detail/amplitude", "seed": "<u64, decimal>", "salt": 1729, "octaves": 3,
+"wavelength_blocks": 32.0}` (present exactly when `detail/amplitude` is). A preset without the
+deep-time surface (plate-only) bakes nothing (`baked: false`).
 
 ## Grids
 
@@ -97,7 +141,7 @@ Equirectangular in block space (plan §5.2). A grid has `w` × `h` cells with `w
 offset        size  field
 0             4     magic "DTR1" (0x44 0x54 0x52 0x31)
 4             4     u32 header_len = 16 + json_len (bytes from file start to the end of the JSON)
-8             2     u16 format_minor (0 for "0.0")
+8             2     u16 format_minor (1 for "0.1")
 10            2     u16 flags, reserved, 0
 12            4     u32 CRC32 of bytes 0..12 followed by the JSON bytes
 16            json  LayerDesc, UTF-8 JSON, no BOM
@@ -145,7 +189,7 @@ between the four cells around (u, v) (the nearest cell's top where a corner lack
 floored to a block and never above the horizon over it; the walk stops at the first unused horizon
 of the nearest cell.
 
-**The P1-07 bake** (`deeptime_core::structure::bake_horizons`) writes stacks with these properties:
+**The P1-07 bake** (`deeptime_core::structure::bake_horizons`) makes stacks with these properties:
 the first horizon's top is the cell's surface (y = sea_level_y + (h − sea level)/m_per_block_v,
 clamped to [min_y + 1, max_y]); every horizon is at least one block (16 raw) thick, the last one
 down to `min_y` too; at most K are used; neighbours differ in class. A stack walks the column of
@@ -153,6 +197,25 @@ down to `min_y` too; at most K are used; neighbours differ in class. A stack wal
 deposit as its `loose_equivalent`, buried loose material and palaeosols as their `lithifies_to`),
 the plate model's rock pools less the log, and peridotite below the crust. Plutons are bodies
 (role `pluton`, below), not horizons.
+
+**The P1-08 bake** writes them with one change: the first horizon's top of every cell is raised,
+never lowered, to ⌈max E + max A⌉ + 1 blocks (at most `max_y`), E and A the `elevation` and
+`detail/amplitude` of the L3 cells in the 4 × 4 L1 cells i − 2 … i + 1, j − 2 … j + 1 (x wraps, z
+clamps) — every L3 cell any block interpolating from this cell reads. The column rule interpolates
+tops between the four cells around a block, so the first horizon then reaches over the terrain
+everywhere and the rock of the top unit fills amplified ridges; deeper tops are the history's.
+
+## The terrain height (format 0.1)
+
+The height H(x, z) a Deep Time generator builds (`deeptime:terrain`, `deeptime:depth`, spawn) is,
+with x folded into [−C/2, C/2) and both terms evaluated there as doubles:
+
+  H = E(x, z) + A(x, z) · N(x, z)
+
+E the `elevation` layer bilinear, A the layer `notes.bake.detail.layer` bilinear, N =
+`Noise::fbm(x, z, wavelength_blocks, octaves, salt)` of `Noise::new(seed, C)` below. A world without
+`notes.bake.detail` (every synthetic world) has H = E. Java: `WorldData.height`; Rust:
+`deeptime_format::ColumnWorld::height`.
 
 ## The detail layer (`rasters/detail/amplitude.dtr`, P1-06)
 
@@ -169,7 +232,8 @@ preset's `surface.drama` (0 to 2, default 1). Defaults: f = 0.12, m = 6 blocks, 
 a₁ = 250 km² (`amplify.detail`).
 
 **N(x, z)** (block coordinates, IEEE-754 double arithmetic with `+ − × /`, `floor` and `round` only;
-`surface/detail.rs` is the reference, `worldgen/DetailNoise` its Java twin from P1-08):
+`deeptime_format::detail::Noise` is the reference (moved there from `surface/detail.rs` in P1-08),
+`worlddata/DetailNoise` its Java twin; both tests pin the same values):
 value noise of wavelength λ has n = max(1, round(C/λ)) lattice cells around the planet, spacing
 s = C/n, u = (x + C/2)/s, v = z/s; the corners are (⌊u⌋ mod n, ⌊v⌋), (⌊u⌋ + 1 mod n, ⌊v⌋),
 (⌊u⌋ mod n, ⌊v⌋ + 1), (⌊u⌋ + 1 mod n, ⌊v⌋ + 1) with lattice value
@@ -179,6 +243,36 @@ z = (z ⊕ z>>30)·0xBF58476D1CE4E5B9; z = (z ⊕ z>>27)·0x94D049BB133111EB; z 
 bilinearly with the fade f²(3 − 2f). N is `octaves` (default 3) of them at λ, λ/2, λ/4 (salt + octave)
 with weights 1, ½, ¼ divided by their sum, λ = `amplify.detail.wavelength_blocks` (32). It is
 periodic in x with period C (the lattice is indexed mod n), which is what keeps the wrap seamless.
+
+## Columns (the column evaluator, format 0.1)
+
+What Deep Time decides for block column (x, z) — Rust `deeptime_format::column::ColumnWorld::sample`
+(behind `deeptime inspect-column`, `deeptime parity` and the JNI `sampleColumn`), Java
+`worlddata/Columns.sample` (which the strata pass's column rule is part of). Both must give equal
+answers for every column (`ColumnParityTest`):
+
+1. `wx` = x folded into [−C/2, C/2). `elevation` = E(wx, z), `detail` = A·N at (wx, z) (0 without a
+   detail term), `surface` = H = E + A·N (E alone without a detail term); `top_y` = ⌈H⌉ − 1 clamped
+   to [min_y − 1, max_y] (min_y − 1 when H is not finite).
+2. `water` = the `water_level` layer's nearest cell at (wx, z), null where nodata or absent.
+3. `horizons` = the stack at (x, z) by the column rule of "`horizon_stack` cells": `[top y, class
+   index]`, top-down.
+4. `bodies`: every body whose AABB footprint holds (wx, z) (z inside [min z, max z]; wx inside the x
+   span with wrap), ascending id; for each, y from min(aabb max y, max_y) down to max(aabb min y,
+   min_y) located at block (wx, y, z) ("Bodies", step 1–3); each maximal run of inside blocks is
+   `[body id, top y, bottom y]`.
+5. `rock`: for y from `top_y` down to min_y, the class name of the horizon holding y (none above the
+   first top, or for an index outside `strata/classes.json`), then for each body of step 4 in order
+   that holds block (wx, y, z), its `rock_class`, a zone's where one applies (the last zone that
+   applies and names one); a body naming none leaves the class as it is. Runs of equal class are
+   `[top y, bottom y, class or null]`.
+
+`parity/columns.json` (`deeptime parity --world-data <dir>`): `{"format_version", "world" (the
+manifest's source), "circumference", "min_y", "max_y", "seed" (decimal), "classes", "columns": [ … ]}`,
+each column the object above plus its `x` and `z`. Numbers are serde_json's shortest round-trip
+form: read them with a correctly rounded parser (Java's `Double.parseDouble`) and compare exactly.
+The 500 columns: 10 % within 40 blocks of the seam, 10 % near and past the poles, 20 % inside
+random bodies' boxes (none when the world has no bodies), the rest anywhere with x over two laps.
 
 ## `strata/classes.json`
 
@@ -212,7 +306,7 @@ of plan §5.7.2, fixed fields of the file type, a section table and the sections
 offset   size  field
 0        4     magic
 4        4     u32 header_len = 16 + F + 16·K (F fixed bytes, K sections)
-8        2     u16 format_minor (0 for "0.0")
+8        2     u16 format_minor (1 for "0.1")
 10       2     u16 flags, reserved, 0
 12       4     u32 CRC32 of bytes 0..12 followed by bytes 16..header_len
 16       F     fixed fields (per type, below)
@@ -370,7 +464,7 @@ truncated, eroded, too_deep, children, guaranteed, dropped_separation`, plus `pr
 Timelapse frames (plan §6.1), written while a run goes; frame `n` counts from 0.
 
 ```json
-{"format_version": "0.0",
+{"format_version": "0.1",
  "frames": [{"n": 0, "t": -390000000.0, "stage": "dummy_drift", "w": 256, "h": 128,
              "layers": ["elevation"], "path": "keyframes/kf-0.dtk", "bytes": 5321, "crc32": 1}]}
 ```

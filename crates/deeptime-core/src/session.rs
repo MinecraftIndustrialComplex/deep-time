@@ -1138,6 +1138,14 @@ impl Session {
         }
         // The L3 layers the amplify stage spilled into the folder (P1-06).
         crate::surface::amplify::register(world, &mut m)?;
+        // P1-08: a planet run's chunk-time layers (plan §5.3, §8.8).
+        if let crate::preset::PresetBody::Planet(p) = &self.preset.body {
+            let note = self
+                .pool
+                .install(|| crate::bake::bake(world, p, dir, &mut m))?;
+            self.log.push(Level::Info, crate::bake::summary_line(&note));
+            m.notes.insert(crate::bake::NOTES_KEY.into(), note);
+        }
         let mut files = std::mem::take(&mut m.files);
 
         let mut preset = serde_json::to_vec_pretty(&self.preset.to_json())
@@ -1397,9 +1405,9 @@ mod tests {
         assert!(matches!(s.keyframe_info(0), Err(CoreError::Unsupported(_))));
         let manifest = s.finalize_write().unwrap();
         let v: Value = serde_json::from_str(&manifest).unwrap();
-        assert_eq!(v["format_version"], "0.0");
+        assert_eq!(v["format_version"], "0.1");
         assert_eq!(v["layers"], json!([]));
-        assert!(manifest.contains("\"format_version\": \"0.0\""));
+        assert!(manifest.contains("\"format_version\": \"0.1\""));
         assert!(manifest.contains("\"layers\": []"));
         let on_disk = std::fs::read_to_string(dir.join("manifest.json")).unwrap();
         assert_eq!(on_disk, manifest);

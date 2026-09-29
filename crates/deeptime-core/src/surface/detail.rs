@@ -16,7 +16,8 @@
 //!
 //! where smoothstep is the cubic 3t² − 2t³ on the clamped t = (area − a₀)/(a₁ − a₀).
 //!
-//! **The noise** ([`Noise`]) is exactly specified so the Java twin (`worldgen/DetailNoise`, P1-08)
+//! **The noise** ([`Noise`], defined in `deeptime_format::detail` since P1-08: it is part of the
+//! world-data contract) is exactly specified so the Java twin (`worldgen/DetailNoise`, P1-08)
 //! reproduces it: everything is IEEE-754 double arithmetic with `+ − × /`, `floor` and `round`
 //! only (no `sin`, no library `pow`), and integers hash with splitmix64's finaliser. Value noise
 //! of wavelength λ (blocks): n = max(1, round(C/λ)) lattice cells around the planet, spacing
@@ -107,146 +108,13 @@ impl DetailParams {
     }
 }
 
-/// splitmix64's finaliser.
-#[inline]
-fn mix(mut x: u64) -> u64 {
-    x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-    x ^ (x >> 31)
-}
-
-/// Periodic value noise (see the module documentation for the exact definition).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Noise {
-    pub seed: u64,
-    /// C, blocks: the period in x.
-    pub circumference: u32,
-}
-
-impl Noise {
-    pub fn new(seed: u64, circumference: u32) -> Noise {
-        Noise {
-            seed,
-            circumference,
-        }
-    }
-
-    /// The lattice value at (ix, jz) for `salt`, in [−1, 1].
-    #[inline]
-    pub fn lattice(&self, salt: u32, ix: i64, jz: i64) -> f64 {
-        let a = mix(self.seed ^ u64::from(salt).wrapping_mul(0x9E37_79B9_7F4A_7C15));
-        let b = mix(a ^ (ix as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93));
-        let h = mix(b ^ (jz as u64).wrapping_mul(0xA076_1D64_78BD_642F));
-        ((h >> 11) as f64) * (2.0 / 9_007_199_254_740_992.0) - 1.0
-    }
-
-    /// Value noise of wavelength `wavelength` blocks at block (x, z), in [−1, 1], periodic in x
-    /// with period C.
-    pub fn value(&self, x: f64, z: f64, wavelength: f64, salt: u32) -> f64 {
-        let c = f64::from(self.circumference);
-        let n = (c / wavelength).round().max(1.0);
-        let s = c / n;
-        let u = (x + c / 2.0) / s;
-        let v = z / s;
-        let (fu, fv) = (u.floor(), v.floor());
-        let (fx, fz) = (u - fu, v - fv);
-        let n_i = n as i64;
-        let ix0 = (fu as i64).rem_euclid(n_i);
-        let ix1 = (ix0 + 1) % n_i;
-        let jz0 = fv as i64;
-        let jz1 = jz0 + 1;
-        let tx = fx * fx * (3.0 - 2.0 * fx);
-        let tz = fz * fz * (3.0 - 2.0 * fz);
-        let h00 = self.lattice(salt, ix0, jz0);
-        let h10 = self.lattice(salt, ix1, jz0);
-        let h01 = self.lattice(salt, ix0, jz1);
-        let h11 = self.lattice(salt, ix1, jz1);
-        let a = h00 + (h10 - h00) * tx;
-        let b = h01 + (h11 - h01) * tx;
-        a + (b - a) * tz
-    }
-
-    /// `octaves` of [`Noise::value`] at λ, λ/2, λ/4, … with weights 1, ½, ¼, … (salt + octave),
-    /// normalised to [−1, 1].
-    pub fn fbm(&self, x: f64, z: f64, wavelength: f64, octaves: u32, salt: u32) -> f64 {
-        let (mut sum, mut norm, mut weight, mut wl) = (0.0, 0.0, 1.0, wavelength);
-        for o in 0..octaves {
-            sum += weight * self.value(x, z, wl, salt.wrapping_add(o));
-            norm += weight;
-            weight *= 0.5;
-            wl *= 0.5;
-        }
-        sum / norm
-    }
-}
+/// The value noise the game's detail term uses: the world-data contract's own
+/// (`deeptime_format::detail`, FORMAT.md), which the Java reader mirrors.
+pub use deeptime_format::detail::Noise;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn the_noise_is_periodic_in_x_and_bounded() {
-        for c in [16_384u32, 32_768, 4096, 1000] {
-            let n = Noise::new(7, c);
-            let cf = f64::from(c);
-            for k in 0..500 {
-                let x = -cf / 2.0 + (k as f64) * 13.37 % cf;
-                let z = -cf / 4.0 + (k as f64) * 7.91 % (cf / 2.0);
-                for wl in [4.0, 8.0, 32.0, 100.0] {
-                    let a = n.value(x, z, wl, 3);
-                    assert!((-1.0..=1.0).contains(&a));
-                    // A lap changes the input's low bits, so equal to rounding, not to the bit.
-                    let east = n.value(x + cf, z, wl, 3);
-                    let west = n.value(x - 2.0 * cf, z, wl, 3);
-                    assert!((a - east).abs() < 1e-9, "one lap east, wl {wl}: {a} {east}");
-                    assert!((a - west).abs() < 1e-9, "two laps west: {a} {west}");
-                }
-                let f = n.fbm(x, z, 32.0, 3, 1);
-                assert!((-1.0..=1.0).contains(&f));
-                assert!((f - n.fbm(x + cf, z, 32.0, 3, 1)).abs() < 1e-9);
-            }
-        }
-    }
-
-    #[test]
-    fn the_seam_is_continuous() {
-        let c = 16_384.0;
-        let n = Noise::new(1, 16_384);
-        // The seam is at x = ±C/2: a step of a tenth of a block across it changes the value like
-        // a step anywhere else does.
-        let mut worst_seam = 0.0f64;
-        let mut worst_else = 0.0f64;
-        for k in 0..200 {
-            let z = -3000.0 + f64::from(k) * 29.3;
-            worst_seam = worst_seam.max(
-                (n.fbm(c / 2.0 - 0.05, z, 32.0, 3, 1) - n.fbm(-c / 2.0 + 0.05, z, 32.0, 3, 1))
-                    .abs(),
-            );
-            worst_else = worst_else.max(
-                (n.fbm(1000.0 - 0.05, z, 32.0, 3, 1) - n.fbm(1000.0 + 0.05, z, 32.0, 3, 1)).abs(),
-            );
-        }
-        assert!(
-            worst_seam < 0.05 && worst_else < 0.05,
-            "{worst_seam} {worst_else}"
-        );
-    }
-
-    #[test]
-    fn noise_is_deterministic_and_seed_dependent() {
-        let a = Noise::new(1, 1024);
-        let b = Noise::new(2, 1024);
-        let v = a.value(10.5, 20.25, 16.0, 0);
-        assert_eq!(v, Noise::new(1, 1024).value(10.5, 20.25, 16.0, 0));
-        assert_ne!(v, b.value(10.5, 20.25, 16.0, 0));
-        assert_ne!(v, a.value(10.5, 20.25, 16.0, 1), "salt");
-        // A lattice point returns the lattice value exactly.
-        let s = 1024.0 / (1024.0f64 / 16.0).round();
-        assert_eq!(
-            a.value(-512.0 + 3.0 * s, 5.0 * s, 16.0, 0),
-            a.lattice(0, 3, 5)
-        );
-    }
 
     #[test]
     fn amplitude_follows_relief_drama_and_channels() {

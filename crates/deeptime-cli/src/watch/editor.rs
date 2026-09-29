@@ -3,9 +3,9 @@
 //! `screen/model/EditorModel`) over the definitions the game itself uses, so the browser and the
 //! game build the same preset — and the same share code — from the same choices:
 //!
-//! - **Presets**: the core's built-ins (`preset::BUILTIN`, the game's list) plus the planet
-//!   pipelines (`params::PLATES_BUILTIN`, `PIPELINE_BUILTIN`: the real simulation until P1-08 makes
-//!   them the built-ins), grouped into families by their `_<n>k` size suffix as
+//! - **Presets**: the core's built-ins (`preset::BUILTIN`, the game's list: since P1-08 the planet
+//!   pipeline under its game names) plus the planet pipelines (`params::PLATES_BUILTIN`,
+//!   `PIPELINE_BUILTIN`), grouped into families by their `_<n>k` size suffix as
 //!   `EditorModel.familyOf` does.
 //! - **Fields**: `editor_fields.json`, the catalogue the game's `EditorFields` reads from its jar.
 //!   A field is editable exactly when the selected preset carries its path.
@@ -488,13 +488,13 @@ mod tests {
         assert_eq!(family_of("a_k"), "a_k");
         let c = cat();
         let j = c.to_json();
-        assert!(
-            j["presets"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|p| p["name"] == "earthlike_quick_16k" && p["placeholder"] == true)
-        );
+        assert!(j["presets"].as_array().unwrap().iter().any(|p| {
+            p["name"] == "earthlike_quick_16k"
+                && p["placeholder"] == false
+                && p["stages"]
+                    .as_array()
+                    .is_some_and(|s| s.last() == Some(&json!("amplify")))
+        }));
         assert!(
             j["presets"]
                 .as_array()
@@ -573,6 +573,8 @@ mod tests {
                 "ocean_fraction",
                 "m_per_block_h",
                 "m_per_block_v",
+                // The deposit count multiplier (P1-08 pointed it at `deposits.count_mult`).
+                "deposit_count",
                 // The drama slider (P1-06): the pipeline presets carry `surface.drama`.
                 "drama"
             ]
@@ -598,7 +600,8 @@ mod tests {
         let d = c.decode(r["share_code"].as_str().unwrap());
         assert_eq!(d["preset"], "plates_quick_16k");
         assert_eq!(d["length_myr"], 100.0);
-        // Placeholders carry no parameter paths: every field unavailable, edits ignored.
+        // The built-ins are simulated planets since P1-08: their fields are editable, and they
+        // need a timeline like the pipeline presets.
         let p =
             c.effective(&json!({ "preset": "earthlike_quick_16k", "fields": { "gravity": 3 } }));
         assert!(
@@ -606,7 +609,7 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .iter()
-                .all(|f| f["available"] == false)
+                .any(|f| f["id"] == "gravity" && f["available"] == true)
         );
         assert_eq!(p["can_run"], false, "no timeline yet");
         assert!(
@@ -631,8 +634,8 @@ mod tests {
         assert!(c.decode("hello").get("error").is_some());
         assert!(c.runnable(r["json"].as_str().unwrap()).is_ok());
         assert!(
-            c.runnable(p["json"].as_str().unwrap()).is_ok(),
-            "a placeholder needs no timeline"
+            c.runnable(p["json"].as_str().unwrap()).is_err(),
+            "a built-in needs a timeline"
         );
         let no_timeline = c.effective(&json!({ "preset": "pipeline_quick_16k" }));
         assert!(c.runnable(no_timeline["json"].as_str().unwrap()).is_err());

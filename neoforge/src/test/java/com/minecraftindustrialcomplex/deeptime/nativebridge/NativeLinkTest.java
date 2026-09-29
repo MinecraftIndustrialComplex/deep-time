@@ -61,7 +61,9 @@ class NativeLinkTest {
             assertEquals(0, DeepTimeNative.keyframeCount(id));
             assertEquals("[]", DeepTimeNative.eventsSince(id, 0, 10));
             assertThrows(UnsupportedOperationException.class, () -> DeepTimeNative.keyframeInfo(id, 0));
-            assertThrows(UnsupportedOperationException.class, () -> DeepTimeNative.sampleColumn("x", 0, 0));
+            // P1-08: the column evaluator answers; a folder without world data is an I/O error.
+            assertThrows(DeepTimeIoException.class,
+                    () -> DeepTimeNative.sampleColumn(gameDir.resolve("nowhere").toString(), 0, 0));
             assertThrows(IllegalStateException.class, () -> DeepTimeNative.finalizeWrite(id), "not done yet");
             long[] p = new long[DeepTimeNative.PROGRESS_FIELDS];
             DeepTimeNative.progress(id, p);
@@ -192,5 +194,25 @@ class NativeLinkTest {
             assertEquals(SimSession.Progress.CANCELLED, s.progress().state());
         }
         assertFalse(Files.exists(cancelled.resolve("manifest.json")));
+    }
+
+    /**
+     * The JNI oracle (plan §6.1, §9.2) answers exactly what {@code deeptime parity} wrote for the
+     * real test planet: the same evaluator behind both, the same JSON text.
+     */
+    @Test
+    void sampleColumnIsTheParityFixture() throws Exception {
+        Path world = Path.of(System.getProperty("deeptime.testWorlds")).resolve("planet4k");
+        String text = Files.readString(world.resolve("parity/columns.json"));
+        var cols = com.google.gson.JsonParser.parseString(text).getAsJsonObject().getAsJsonArray("columns");
+        int checked = 0;
+        for (var e : cols) {
+            var o = e.getAsJsonObject();
+            String json = DeepTimeNative.sampleColumn(world.toString(), o.get("x").getAsInt(), o.get("z").getAsInt());
+            assertTrue(text.contains(json), "sampleColumn(" + o.get("x") + ", " + o.get("z") + ") = " + json);
+            checked++;
+        }
+        assertEquals(500, checked);
+        System.out.println("[junit] sampleColumnIsTheParityFixture columns=" + checked);
     }
 }
