@@ -73,6 +73,81 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — P1-17 partial: the diffusion solve fused into two passes per CG iteration, bit-identical (agent worktree agent-a0f4f991a0d939f16, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Only `surface/diffusion.rs` (plus the new `surface/diffusion/parity.rs`). The Jacobi-PCG iteration was seven
+  parallel regions over ~22 vector streams of 4 MB; it is now two passes over strips of 8 rows: **pass 1** forms the direction
+  (z, then z + βp), applies the operator to it and reduces p·Ap; **pass 2** does x += αp, r −= αAp, z = r/diag and reduces r·r
+  and r·z. The operator is applied one term at a time per row (same order per cell, so it vectorises); each strip keeps a
+  three-row ring of the direction so neighbouring strips never read what another writes. Also parallel now: `Operator::new`
+  (was serial), the final residual correction, and `lod`'s z-sweep scatter (columns are solved in blocks of 8, so one cache
+  line serves eight columns; each column is solved exactly as before).
+- **Bit-identical, and how the reductions work.** The old `dot` was already thread-count independent: a sum per row in
+  ascending column order (`.sum()`), the row sums collected and added in ascending row order on one thread. The fused passes
+  keep exactly that: per-row sums, started from the same value `Iterator::sum` starts from (`sum_zero()`: -0.0 today, so a row
+  of negative zeros keeps its sign), then the `h` row sums added serially in row order; four rows are summed side by side
+  only to overlap latencies, never within a row. Nothing depends on the strip height (verified at 1, 3, 16) or the pool. No FMA
+  (Rust never contracts), no reciprocal for a division, A·p's terms in the old order (diag, east, west, south, north).
+  **Evidence:** (1) `diffusion/parity.rs` keeps the old `step`/`lod`/`Operator`/`dot`/`cg` verbatim and compares bit patterns
+  of the field and the iteration counts on random wrapping grids with stiff diffusivities (0, 1e-20, 5, 300, 1e5), on fractal
+  terrain with the surface stage's real diffusivities (`submarine_kd`: open sea of 300 m²/yr next to 2 m²/yr coasts, 5/40/78/100 %
+  of cells in the sea, wrapping and not), 30 awkward shapes (1×1, 1×9, 9×1, 2×n, heights around the strip), multi-step runs,
+  kd = 0 (loop never starts), a flat field and the iteration cap, each on pools of 1, 2, 4 and 8 threads (and the reference on
+  each pool too). Mutation checks: swapping the east/west term order fails 4 of 6 tests; splitting a row sum over two
+  accumulators fails 2. (2) Real 500 Myr `pipeline_quick_16k` worlds, old binary (master) at 4 threads against the new binary at
+  12 and at 1 thread: every world file (12 keyframes, events, sites, bodies, indices, preset; sha256 over all files but
+  `manifest.json`) identical, `surface_final` line identical (108.8 CG iterations per step); `manifest.json` differs only in
+  `created_utc` and the `millis` timings. That was on c79b38f; after merging master 455b57f (P1-06 young/amplify stages) I
+  repeated it: scattered_continents old@4 = new@12 = new@1, and supercontinent old@4 = new@12, all byte-identical. The
+  `run --checkpoints` whole-file compare is not usable now: the checkpoint embeds stage summaries with timing text whose length
+  varies, so the files are byte-identical apart from the header CRC/length and those numbers (checked by re-aligning the diff:
+  every difference is digits or a length prefix inside a summary JSON).
+- **Measured (Mac M6, load average 2–4, so quiet), one 500 Myr-sized step on a 1024×512 L1 raster with earthlike
+  diffusivities, min of 12 interleaved old/new pairs (`cargo test --release -p deeptime-core diffusion_timing -- --ignored
+  --nocapture`; `DEEPTIME_TIMING_REPS` sets the pairs; 101 CG iterations):**
+
+  ```
+  threads  cg old ms  cg new ms  ms/iter old→new   lod old→new   operator old→new   step old→new
+  1        193.9      102.3      1.92 → 1.01       14.4 → 13.3   0.8 → 0.7          208.5 → 116.6   (1.79x)
+  2        101.2       55.1      1.00 → 0.55        9.0 →  7.1   0.8 → 0.4          111.1 →  63.0   (1.76x)
+  4         70.8       41.9      0.70 → 0.42        5.5 →  4.0   0.8 → 0.3           77.6 →  46.0   (1.69x)
+  8         55.1       30.9      0.55 → 0.31        3.8 →  2.4   0.8 → 0.2           59.0 →  33.5   (1.76x)
+  12        51.7       28.6      0.51 → 0.28        3.5 →  1.9   0.8 → 0.2           62.3 →  33.1   (1.88x)
+  ```
+  Scaling of the new step: 1 → 12 threads 3.5x (old 3.3x); the solve is ~1.8x faster at every thread count, and at 1 thread
+  too, so the gain is mostly memory traffic, not only barriers. The kd fill in `surface/mod.rs` is serial and 1.4–1.6 ms.
+  **End to end (`bench --preset pipeline_quick_16k --start scattered_continents --length-myr 500`, old and new binaries
+  interleaved, 3 rounds, on c79b38f; the Mac's load average was 2–27 from other agents, min..max):**
+
+  ```
+  threads code   total s        surface s      diffusion s    spl s        surface−diffusion s
+  12      old    77.0..204.3    40.9..136.2    15.5..82.5     4.1..11.2    25.4..53.7
+  12      new    74.4..145.9    36.5..81.3     10.0..29.9     4.3..12.1    26.5..51.4
+  4       old    103.5..224.2   52.6..133.0    21.0..70.7     7.8..15.3    31.6..62.3
+  4       new    95.8..121.1    44.4..57.1     12.7..18.5     7.8..9.6     31.7..38.6
+  1       old    274.2..391.8   133.8..192.8   64.0..93.4     28.5..36.4   69.8..99.4
+  1       new    288.4..329.1   124.8..145.1   45.5..54.8     30.8..33.9   79.3..90.3
+  ```
+  Diffusion per run (s), round 1/2/3: 12 threads old 82.5/16.4/15.5, new 29.9/19.2/10.0; 4 threads old 21.0/70.7/31.1, new
+  12.7/14.3/18.5; 1 thread old 71.6/64.0/93.4, new 45.5/54.8/46.7. The whole-run numbers are dominated by the Mac's load (the
+  same binary swung 15–82 s at 12 threads); read the minima and the microbench. Diffusion minima: 15.5 → 10.0 s at 12 threads,
+  21.0 → 12.7 s at 4, 64.0 → 45.5 s at 1. On the merged tree (master 455b57f, which adds the young/amplify stages; one round, old then new, scattered_continents,
+  load average 5 → 40–50 during the runs, other agents' jobs): 12 threads diffusion 252.7 → 70.0 s, surface 428.5 → 214.2 s, total 635 → 397 s;
+  4 threads diffusion 73.4 → 30.0 s, surface 166.5 → 99.4 s, total 314 → 231 s. Loaded numbers, so only the direction counts;
+  the machine was never quiet for a whole end-to-end run.
+  Per-step diffusion in the best 12-thread run: 10.0 s / 250 = 40 ms, against the microbench's 33 ms plus the stage's kd fill and copies.
+- **What is left for the preconditioner step.** Diffusion is still 25–35 % of the surface stage: 101 iterations × ~0.28–1.0 ms.
+  A coarse-grid correction (111 → ~10 iterations) is now worth ~10× on this phase, but it changes results, so it needs the
+  calibration agent's agreement; if it goes in, the two-pass structure stays (pass 1 gets the correction's prolongation in the
+  direction formation, pass 2 the restriction sums; the reduction scheme, row sums added in row order, must stay for
+  thread-count independence). Without changing results there is little more here: the iteration is at ~0.28 ms per iteration =
+  ~14 GB/s of traffic on 12 threads, near what the Mac gives, and the serial remainder of the step (kd fill 1.5 ms, `before`
+  clone, the difference loop after `step` in `surface/mod.rs`, ~3–5 ms in all) is now a few percent of it.
+- **Gates on this branch (merged with master 455b57f):** `cargo fmt --check`, clippy `-D warnings`, `cargo deny check licenses
+  bans` clean; `cargo test --workspace --no-fail-fast` all green (core 211 + 3 ignored, cli 25, format 33, inspect 28+2+7, jni 7,
+  viewer 5). One flake seen once: `tests::surface_stage_runs_from_a_plates_checkpoint` failed ("keyframes/index.json: No such
+  file" in `$TMPDIR/deeptime-stage-<pid>`, the shared Mac temp dir, while other agents' jobs ran); it passed on the immediate
+  re-run with nothing changed. It is a temp-dir race in `stage` with `--work` unset (`deeptime-stage-{pid}`), not diffusion.
+
 ### 2026-09-29 — Workbench: a run over its memory cap is refused before it starts; the default cap is 8 GiB (agent worktree agent-afd5b3eb4fa7751da, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **The bug.** Ben's `pipeline_full_32k`, supercontinent, 1000 Myr: `POST /api/preset` estimated `peak_bytes`
   5,532,931,904 against the 4 GiB default cap and still answered `can_run: true`; the run started and failed 15
