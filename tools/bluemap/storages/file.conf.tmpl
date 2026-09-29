@@ -1,4 +1,6 @@
-# Uncompressed tiles: spacesheep is a plain static host and cannot send Content-Encoding: gzip.
+# Gzip tiles, unzipped in the browser: render-bluemap.sh sets "clientDecompression": true in the web
+# app's settings.json, so BlueMap's own loader fetches <tile>.prbm.gz and inflates it with
+# DecompressionStream. A plain static host (spacesheep) needs no Content-Encoding header that way.
 storage-type: file
 root: "@WEBROOT@/maps"
-compression: none
+compression: gzip
