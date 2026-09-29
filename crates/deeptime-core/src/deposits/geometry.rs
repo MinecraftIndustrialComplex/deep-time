@@ -11,8 +11,8 @@
 
 use std::collections::BTreeMap;
 
-use deeptime_format::bodies::{Body, NO_CLIP, Shape, Zone};
 use deeptime_format::SiteId;
+use deeptime_format::bodies::{Body, NO_CLIP, Shape, Zone};
 
 use super::types::{DepositType, ExtraBody, When, ZoneDef};
 
@@ -193,12 +193,20 @@ fn extra(
 
 /// The vertical half-height in metres of the ore body (before size_mult_v), for the ledger.
 pub fn half_height_m(t: &DepositType, tonnage_t: f64) -> f64 {
-    semi_axes_m(t.shape(), t.geometry.aspect, tonnage_t / t.sizing.ore_density_t_m3)[1]
+    semi_axes_m(
+        t.shape(),
+        t.geometry.aspect,
+        tonnage_t / t.sizing.ore_density_t_m3,
+    )[1]
 }
 
 /// The horizontal radius in blocks (the larger horizontal semi-axis), for separation.
 pub fn radius_blocks(t: &DepositType, tonnage_t: f64, sc: &Scales) -> f64 {
-    let semi = semi_axes_m(t.shape(), t.geometry.aspect, tonnage_t / t.sizing.ore_density_t_m3);
+    let semi = semi_axes_m(
+        t.shape(),
+        t.geometry.aspect,
+        tonnage_t / t.sizing.ore_density_t_m3,
+    );
     let b = to_blocks(semi, t, sc);
     f64::from(b[0].max(b[2]))
 }
@@ -249,7 +257,11 @@ mod tests {
         assert_eq!(ore.site, Some(4));
         assert_eq!(ore.clip_top_y, 120);
         assert!(ore.aabb[1][1] <= 120);
-        assert!(ore.zones.iter().any(|z| z.material.as_deref() == Some("c:copper") && z.grade > 0.0));
+        assert!(
+            ore.zones
+                .iter()
+                .any(|z| z.material.as_deref() == Some("c:copper") && z.grade > 0.0)
+        );
         assert!(ore.validate().is_ok());
         assert!(b.iter().all(|x| x.id > 10));
     }

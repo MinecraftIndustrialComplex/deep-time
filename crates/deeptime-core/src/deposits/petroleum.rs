@@ -61,7 +61,12 @@ impl Default for CellPet {
 
 /// Folds one frame into the maturity accumulators. `rules` gives the petroleum field names; a
 /// coal type passes only its temperature field (`trap`/`toc` then read as zero).
-pub fn accumulate(acc: &mut [CellPet], frame: &FieldFrame, temp: &str, rules: Option<&PetroleumRules>) {
+pub fn accumulate(
+    acc: &mut [CellPet],
+    frame: &FieldFrame,
+    temp: &str,
+    rules: Option<&PetroleumRules>,
+) {
     let Some(tv) = frame.values(temp) else { return };
     let zero = Values::Uniform(0.0);
     let (trap, toc) = match rules {
@@ -71,9 +76,10 @@ pub fn accumulate(acc: &mut [CellPet], frame: &FieldFrame, temp: &str, rules: Op
         ),
         None => (zero, zero),
     };
-    let (onset, peak, end, trap_th) = rules.map_or((f64::INFINITY, f64::INFINITY, f64::INFINITY, f64::INFINITY), |r| {
-        (r.tti_onset, r.tti_peak, r.tti_end, r.trap_threshold)
-    });
+    let (onset, peak, end, trap_th) = rules.map_or(
+        (f64::INFINITY, f64::INFINITY, f64::INFINITY, f64::INFINITY),
+        |r| (r.tti_onset, r.tti_peak, r.tti_end, r.trap_threshold),
+    );
     let t = frame.t_years as f32;
     let dt = frame.dt_myr();
     acc.par_iter_mut().enumerate().for_each(|(c, a)| {
@@ -110,7 +116,12 @@ pub struct Kitchen {
     pub centre: u32,
 }
 
-pub fn kitchens(grid: &GridDesc, acc: &[CellPet], r: &PetroleumRules, m_per_block_h: f64) -> Vec<Kitchen> {
+pub fn kitchens(
+    grid: &GridDesc,
+    acc: &[CellPet],
+    r: &PetroleumRules,
+    m_per_block_h: f64,
+) -> Vec<Kitchen> {
     let mature: Vec<f64> = acc
         .iter()
         .map(|a| {
@@ -134,8 +145,14 @@ pub fn kitchens(grid: &GridDesc, acc: &[CellPet], r: &PetroleumRules, m_per_bloc
                 .map(|c| f64::from(acc[*c as usize].t_last_gen))
                 .filter(|t| t.is_finite())
                 .fold(f64::NEG_INFINITY, f64::max);
-            let tti_max = cells.iter().map(|c| f64::from(acc[*c as usize].tti)).fold(0.0, f64::max);
-            let toc_mean = cells.iter().map(|c| f64::from(acc[*c as usize].toc_max)).sum::<f64>()
+            let tti_max = cells
+                .iter()
+                .map(|c| f64::from(acc[*c as usize].tti))
+                .fold(0.0, f64::max);
+            let toc_mean = cells
+                .iter()
+                .map(|c| f64::from(acc[*c as usize].toc_max))
+                .sum::<f64>()
                 / cells.len() as f64;
             let c = grid.circumference() as f64;
             // The cell with the smallest summed distance to a sample of the others.
@@ -253,9 +270,15 @@ mod tests {
         let kitchen_cells = [8 * 32 + 10, 8 * 32 + 11];
         let early_trap = 8 * 32 + 12; // one cell (4.8 km) away
         let late_trap = 8 * 32 + 13;
-        for (k, (t_myr, temp)) in [(-100.0, 90.0), (-90.0, 112.0), (-80.0, 118.0), (-70.0, 60.0), (-60.0, 60.0)]
-            .iter()
-            .enumerate()
+        for (k, (t_myr, temp)) in [
+            (-100.0, 90.0),
+            (-90.0, 112.0),
+            (-80.0, 118.0),
+            (-70.0, 60.0),
+            (-60.0, 60.0),
+        ]
+        .iter()
+        .enumerate()
         {
             let mut f = FieldFrame {
                 t_years: t_myr * 1.0e6,
@@ -290,10 +313,27 @@ mod tests {
         let ks = kitchens(&grid, &acc, &r, 300.0);
         assert_eq!(ks.len(), 1);
         assert_eq!(ks[0].t_onset, -90.0e6);
-        let early = charge(&grid, &ks, early_trap as u32, f64::from(acc[early_trap].t_trap), &r, 300.0);
+        let early = charge(
+            &grid,
+            &ks,
+            early_trap as u32,
+            f64::from(acc[early_trap].t_trap),
+            &r,
+            300.0,
+        );
         let early = early.expect("charged");
         assert_eq!(early.t_charge, -90.0e6);
         assert!((early.migration_km - 4.8).abs() < 1e-9);
-        assert!(charge(&grid, &ks, late_trap as u32, f64::from(acc[late_trap].t_trap), &r, 300.0).is_none());
+        assert!(
+            charge(
+                &grid,
+                &ks,
+                late_trap as u32,
+                f64::from(acc[late_trap].t_trap),
+                &r,
+                300.0
+            )
+            .is_none()
+        );
     }
 }

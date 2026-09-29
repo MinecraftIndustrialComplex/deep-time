@@ -638,7 +638,13 @@ pub fn rock_group(name: &str) -> Option<&'static [&'static str]> {
         "deeptime:rock/carbonate" => &["limestone", "dolostone", "chalk", "travertine", "marble"],
         "deeptime:rock/evaporite" => &["halite", "gypsum", "anhydrite"],
         "deeptime:rock/iron_formation" => &["ironstone", "banded_iron_formation"],
-        "deeptime:rock/felsic" => &["granite", "granodiorite", "rhyolite", "pegmatite", "greisen"],
+        "deeptime:rock/felsic" => &[
+            "granite",
+            "granodiorite",
+            "rhyolite",
+            "pegmatite",
+            "greisen",
+        ],
         "deeptime:rock/intermediate" => &["diorite", "andesite"],
         "deeptime:rock/mafic" => &[
             "gabbro",
@@ -818,7 +824,10 @@ impl DepositType {
         }
         for (k, p) in self.products.iter().enumerate() {
             if !is_namespaced(&p.material) {
-                return Err(format!("products[{k}]: material {:?} is not namespaced", p.material));
+                return Err(format!(
+                    "products[{k}]: material {:?} is not namespaced",
+                    p.material
+                ));
             }
             if let Some(g) = &p.grade_key
                 && !self.sizing.grades.contains_key(g)
@@ -889,7 +898,10 @@ impl DepositType {
             return Err("sizing.clustering: model thomas with radii ≥ 0".into());
         }
         if Shape::from_name(&self.geometry.shape).is_none() {
-            return Err(format!("geometry.shape {:?} is unknown", self.geometry.shape));
+            return Err(format!(
+                "geometry.shape {:?} is unknown",
+                self.geometry.shape
+            ));
         }
         if !self.geometry.aspect.iter().all(|v| *v > 0.0) {
             return Err("geometry.aspect must be > 0".into());
@@ -940,7 +952,10 @@ pub fn validate_set(types: &[DepositType]) -> Result<(), CoreError> {
     let mut seen = BTreeSet::new();
     for t in types {
         if !seen.insert(t.id.as_str()) {
-            return Err(CoreError::preset("deposit_types", format!("{} twice", t.id)));
+            return Err(CoreError::preset(
+                "deposit_types",
+                format!("{} twice", t.id),
+            ));
         }
     }
     for t in types {
@@ -958,7 +973,10 @@ pub fn validate_set(types: &[DepositType]) -> Result<(), CoreError> {
             if !child.child_only || !fits {
                 return Err(CoreError::preset(
                     format!("deposit_type {}", t.id),
-                    format!("child {} must be child_only and fit {:?}", c.type_id, c.relation),
+                    format!(
+                        "child {} must be child_only and fit {:?}",
+                        c.type_id, c.relation
+                    ),
                 ));
             }
         }
@@ -1018,9 +1036,12 @@ mod tests {
     fn host_weights_expand_groups_and_bias() {
         let h = Hosts {
             any_of: vec!["#deeptime:rock/carbonate".into(), "black_shale".into()],
-            host_bias: [("dolostone".to_string(), 2.0), ("serpentinite".to_string(), 0.5)]
-                .into_iter()
-                .collect(),
+            host_bias: [
+                ("dolostone".to_string(), 2.0),
+                ("serpentinite".to_string(), 0.5),
+            ]
+            .into_iter()
+            .collect(),
         };
         let w = h.weights().unwrap();
         assert_eq!(w["limestone"], 1.0);

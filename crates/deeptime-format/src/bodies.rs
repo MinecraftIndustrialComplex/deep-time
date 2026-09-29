@@ -269,7 +269,9 @@ impl Body {
         let l: [f64; 3] = std::array::from_fn(|i| r[i][0] * dx + r[i][1] * dy + r[i][2] * dz);
         let [a, b, cc] = self.axes.map(|v| f64::from(v).max(1e-6));
         let d = match self.shape.metric() {
-            Metric::Ellipsoid => ((l[0] / a).powi(2) + (l[1] / b).powi(2) + (l[2] / cc).powi(2)).sqrt(),
+            Metric::Ellipsoid => {
+                ((l[0] / a).powi(2) + (l[1] / b).powi(2) + (l[2] / cc).powi(2)).sqrt()
+            }
             Metric::Cylinder => ((l[0] / a).powi(2) + (l[2] / cc).powi(2))
                 .sqrt()
                 .max((l[1] / b).abs()),
@@ -438,8 +440,8 @@ pub fn decode_bodies(path: &Path, b: &[u8]) -> Result<Vec<Body>> {
     for r in 0..n {
         let rec = &records[r * BODY_BYTES..(r + 1) * BODY_BYTES];
         let id = u32_at(rec, 0);
-        let shape =
-            Shape::from_code(rec[8]).ok_or_else(|| corrupt(format!("body {id}: shape {}", rec[8])))?;
+        let shape = Shape::from_code(rec[8])
+            .ok_or_else(|| corrupt(format!("body {id}: shape {}", rec[8])))?;
         let (zf, zn) = (u32_at(rec, 88) as usize, u32_at(rec, 92) as usize);
         if (zf + zn) * ZONE_BYTES > zones.len() {
             return Err(corrupt(format!("body {id}: zones past the section")));
@@ -567,7 +569,11 @@ mod tests {
     #[test]
     fn locate_agrees_with_aabb_and_zones() {
         let c = 4096;
-        for (shape, dip) in [(Shape::StockworkShell, 0.0), (Shape::Dyke, 1.1), (Shape::Seam, 0.2)] {
+        for (shape, dip) in [
+            (Shape::StockworkShell, 0.0),
+            (Shape::Dyke, 1.1),
+            (Shape::Seam, 0.2),
+        ] {
             let mut b = porphyry(1);
             b.shape = shape;
             b.dip = dip;
@@ -593,7 +599,10 @@ mod tests {
                 }
             }
             let ratio = f64::from(inside) / b.volume_blocks();
-            assert!((0.8..1.25).contains(&ratio), "{shape:?} volume ratio {ratio}");
+            assert!(
+                (0.8..1.25).contains(&ratio),
+                "{shape:?} volume ratio {ratio}"
+            );
         }
         let b = porphyry(1);
         let at = b.locate(c, 100, -40, -8).unwrap();

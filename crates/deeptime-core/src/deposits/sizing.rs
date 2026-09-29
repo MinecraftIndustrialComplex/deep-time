@@ -101,7 +101,11 @@ impl Lognormal {
     }
 
     pub fn at(&self, z: f64) -> f64 {
-        let s = if z < 0.0 { self.sigma_lo } else { self.sigma_hi };
+        let s = if z < 0.0 {
+            self.sigma_lo
+        } else {
+            self.sigma_hi
+        };
         (self.mu + s * z).exp()
     }
 
@@ -116,7 +120,11 @@ impl Lognormal {
             return 0.0;
         }
         let d = x.ln() - self.mu;
-        let s = if d < 0.0 { self.sigma_lo } else { self.sigma_hi };
+        let s = if d < 0.0 {
+            self.sigma_lo
+        } else {
+            self.sigma_hi
+        };
         if s <= 0.0 {
             return if d < 0.0 { 0.0 } else { 1.0 };
         }

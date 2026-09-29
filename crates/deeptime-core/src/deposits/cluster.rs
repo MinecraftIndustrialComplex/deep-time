@@ -137,7 +137,10 @@ pub fn place(
         if !camps.is_empty() {
             let camp = camps[rng.below(camps.len() as u64) as usize];
             for _ in 0..64 {
-                let p = (camp.0 + s.sigma * rng.normal(), camp.1 + s.sigma * rng.normal());
+                let p = (
+                    camp.0 + s.sigma * rng.normal(),
+                    camp.1 + s.sigma * rng.normal(),
+                );
                 if let Some(cell) = fits(p, r, placed) {
                     done = Some((p, cell));
                     break;
@@ -181,7 +184,11 @@ mod tests {
             let (x, z) = cell_xz(&grid, cell);
             assert_eq!(cell_of(&grid, x + 3.0, z - 7.0), cell);
         }
-        assert_eq!(cell_of(&grid, 511.0, -512.0), 0, "x = C/2 − 1 rounds to the seam cell");
+        assert_eq!(
+            cell_of(&grid, 511.0, -512.0),
+            0,
+            "x = C/2 − 1 rounds to the seam cell"
+        );
         assert!((distance(1024.0, (-510.0, 0.0), (510.0, 0.0)) - 4.0).abs() < 1e-9);
         assert_eq!(wrap_x(1024.0, 600.0), -424.0);
     }
@@ -229,7 +236,10 @@ mod tests {
                 assert_eq!(cell_of(&grid, p.x, p.z), p.cell);
                 for q in &out[a + 1..] {
                     let d = distance(2048.0, (p.x, p.z), (q.x, q.z));
-                    assert!(d >= s.min_sep.max(p.radius + q.radius) - 1e-9, "seed {seed}: {d}");
+                    assert!(
+                        d >= s.min_sep.max(p.radius + q.radius) - 1e-9,
+                        "seed {seed}: {d}"
+                    );
                 }
             }
         }

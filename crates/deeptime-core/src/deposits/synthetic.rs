@@ -209,12 +209,10 @@ impl Static {
                 // Andean arc on A's west coast, 2–9° inland, 25° S – 45° N.
                 let din = dlon(lon, a_west_coast(lat));
                 let lat_ok = window(lat, -25.0, 45.0, 4.0);
-                let arc = (smoothstep(1.5, 3.0, din) * (1.0 - smoothstep(6.5, 9.5, din)))
-                    * lat_ok
-                    * a;
-                let forearc = (smoothstep(-0.5, 0.5, din) * (1.0 - smoothstep(1.5, 2.5, din)))
-                    * lat_ok
-                    * a;
+                let arc =
+                    (smoothstep(1.5, 3.0, din) * (1.0 - smoothstep(6.5, 9.5, din))) * lat_ok * a;
+                let forearc =
+                    (smoothstep(-0.5, 0.5, din) * (1.0 - smoothstep(1.5, 2.5, din))) * lat_ok * a;
                 let strike = ((lat + 25.0) / 70.0).clamp(0.0, 1.0);
                 // B's suture at 208° and the platform and foreland east of it.
                 let lat_b = window(lat, 12.0, 46.0, 4.0) * b;
@@ -349,7 +347,8 @@ impl SyntheticHistory {
             let land = f64::from(s.land[c]);
             let relief = f64::from(s.relief_noise[c]) - 0.5;
             let base_land = 250.0 + 600.0 * relief;
-            let arc = f64::from(s.arc[c]) * (1200.0 + 1500.0 * arc_activity(t, f64::from(s.strike[c])))
+            let arc = f64::from(s.arc[c])
+                * (1200.0 + 1500.0 * arc_activity(t, f64::from(s.strike[c])))
                 * smoothstep(-330.0, -300.0, t);
             let oro = f64::from(s.orogen[c])
                 * (3500.0 * orogeny(t) + 900.0 * smoothstep(-350.0, -330.0, t));
@@ -407,7 +406,8 @@ impl SyntheticHistory {
             self.map(|c| {
                 let land = g(&s.land, c);
                 let arc = g(&s.arc, c) * 22.0 * smoothstep(-320.0, -120.0, t);
-                let oro = g(&s.orogen, c) * (25.0 * orogeny(t) + 12.0 * smoothstep(-350.0, -330.0, t));
+                let oro =
+                    g(&s.orogen, c) * (25.0 * orogeny(t) + 12.0 * smoothstep(-350.0, -330.0, t));
                 land * (34.0 + arc + oro) + (1.0 - land) * 7.0
             }),
         );
@@ -415,7 +415,8 @@ impl SyntheticHistory {
             &mut f,
             "deeptime:fault_density",
             self.map(|c| {
-                (0.15 + 0.7 * g(&s.arc, c) * (0.4 + 0.6 * arc_act(c))
+                (0.15
+                    + 0.7 * g(&s.arc, c) * (0.4 + 0.6 * arc_act(c))
                     + 0.7 * g(&s.orogen, c) * orogeny(t)
                     + 0.6 * g(&s.rift, c) * window(t, -400.0, -370.0, 5.0))
                 .min(1.0)
@@ -424,15 +425,15 @@ impl SyntheticHistory {
         put(
             &mut f,
             "deeptime:orogenic_uplift_m_myr",
-            self.map(|c| {
-                g(&s.orogen, c) * 800.0 * orogeny(t) + g(&s.arc, c) * 150.0 * arc_act(c)
-            }),
+            self.map(|c| g(&s.orogen, c) * 800.0 * orogeny(t) + g(&s.arc, c) * 150.0 * arc_act(c)),
         );
         put(
             &mut f,
             "deeptime:rift_subsidence_m_myr",
             self.map(|c| {
-                g(&s.rift, c) * (300.0 * window(t, -400.0, -372.0, 4.0) + 40.0 * window(t, -370.0, -262.0, 6.0))
+                g(&s.rift, c)
+                    * (300.0 * window(t, -400.0, -372.0, 4.0)
+                        + 40.0 * window(t, -370.0, -262.0, 6.0))
             }),
         );
         put(
@@ -468,7 +469,8 @@ impl SyntheticHistory {
                 land * (6.0 - 4.0 * g(&s.craton_core, c)
                     + g(&s.arc, c) * (20.0 + 60.0 * arc_act(c))
                     + g(&s.forearc, c) * 40.0 * subduct
-                    + g(&s.orogen, c) * (450.0 * orogeny(t) + 60.0 * window(t, -300.0, -200.0, 20.0))
+                    + g(&s.orogen, c)
+                        * (450.0 * orogeny(t) + 60.0 * window(t, -300.0, -200.0, 20.0))
                     + g(&s.rift, c) * 60.0 * window(t, -255.0, -240.0, 3.0))
             }),
         );
@@ -612,30 +614,142 @@ impl SyntheticHistory {
         // A's margin: subduction, arc compression phases, fore-arc accretion, exhumation.
         for lat in [-20.0, -5.0, 10.0, 25.0, 40.0] {
             let lon = a_west_coast(lat) + 4.0;
-            ev("deeptime:subduction_onset", -322.0, 0.0, lat, lon - 4.0, 0.8, "A margin");
-            ev("deeptime:terrane_accretion", -330.0, -326.0, lat, lon - 3.0, 0.5, "A fore-arc");
+            ev(
+                "deeptime:subduction_onset",
+                -322.0,
+                0.0,
+                lat,
+                lon - 4.0,
+                0.8,
+                "A margin",
+            );
+            ev(
+                "deeptime:terrane_accretion",
+                -330.0,
+                -326.0,
+                lat,
+                lon - 3.0,
+                0.5,
+                "A fore-arc",
+            );
             for (c, w) in [(-280.0, 20.0), (-110.0, 14.0), (-25.0, 16.0)] {
-                ev("deeptime:orogeny_phase", c - w, c + w, lat, lon, 0.7, "A arc flare-up");
-                ev("deeptime:erosion_pulse", c - w, c + w + 10.0, lat, lon, 0.5, "A arc exhumation");
+                ev(
+                    "deeptime:orogeny_phase",
+                    c - w,
+                    c + w,
+                    lat,
+                    lon,
+                    0.7,
+                    "A arc flare-up",
+                );
+                ev(
+                    "deeptime:erosion_pulse",
+                    c - w,
+                    c + w + 10.0,
+                    lat,
+                    lon,
+                    0.5,
+                    "A arc exhumation",
+                );
             }
         }
         // B: collision, orogeny, platform, foreland basin.
         for lat in [16.0, 29.0, 42.0] {
-            ev("deeptime:collision", -352.0, -348.0, lat, 208.0, 0.9, "B suture");
-            ev("deeptime:orogeny_phase", -350.0, -305.0, lat, 208.0, 0.9, "B orogen");
-            ev("deeptime:erosion_pulse", -305.0, -200.0, lat, 208.0, 0.4, "B orogen");
-            ev("deeptime:marine_transgression", -462.0, -335.0, lat, 216.0, 0.5, "B platform");
+            ev(
+                "deeptime:collision",
+                -352.0,
+                -348.0,
+                lat,
+                208.0,
+                0.9,
+                "B suture",
+            );
+            ev(
+                "deeptime:orogeny_phase",
+                -350.0,
+                -305.0,
+                lat,
+                208.0,
+                0.9,
+                "B orogen",
+            );
+            ev(
+                "deeptime:erosion_pulse",
+                -305.0,
+                -200.0,
+                lat,
+                208.0,
+                0.4,
+                "B orogen",
+            );
+            ev(
+                "deeptime:marine_transgression",
+                -462.0,
+                -335.0,
+                lat,
+                216.0,
+                0.5,
+                "B platform",
+            );
         }
         for lat in [33.0, 42.0] {
-            ev("deeptime:basin_subsidence", -345.0, -250.0, lat, 218.0, 0.6, "B foreland");
+            ev(
+                "deeptime:basin_subsidence",
+                -345.0,
+                -250.0,
+                lat,
+                218.0,
+                0.6,
+                "B foreland",
+            );
         }
         // C: the BIF shelf sea 2.1 Gyr ago, the rift, the sag basin and its inversion.
-        ev("deeptime:marine_transgression", -2200.0, -2000.0, -30.0, 300.0, 0.6, "C BIF sea");
-        ev("deeptime:marine_transgression", -2200.0, -2000.0, -33.0, 292.0, 0.6, "C BIF sea");
+        ev(
+            "deeptime:marine_transgression",
+            -2200.0,
+            -2000.0,
+            -30.0,
+            300.0,
+            0.6,
+            "C BIF sea",
+        );
+        ev(
+            "deeptime:marine_transgression",
+            -2200.0,
+            -2000.0,
+            -33.0,
+            292.0,
+            0.6,
+            "C BIF sea",
+        );
         for lon in [290.0, 301.0, 312.0] {
-            ev("deeptime:rift_onset", -400.0, -396.0, -7.5, lon, 0.8, "C rift");
-            ev("deeptime:basin_subsidence", -396.0, -262.0, -7.5, lon, 0.7, "C sag basin");
-            ev("deeptime:orogeny_phase", -258.0, -245.0, -7.5, lon, 0.4, "C inversion");
+            ev(
+                "deeptime:rift_onset",
+                -400.0,
+                -396.0,
+                -7.5,
+                lon,
+                0.8,
+                "C rift",
+            );
+            ev(
+                "deeptime:basin_subsidence",
+                -396.0,
+                -262.0,
+                -7.5,
+                lon,
+                0.7,
+                "C sag basin",
+            );
+            ev(
+                "deeptime:orogeny_phase",
+                -258.0,
+                -245.0,
+                -7.5,
+                lon,
+                0.4,
+                "C inversion",
+            );
         }
         out
     }
@@ -691,7 +805,11 @@ pub fn steepest_descent(grid: &GridDesc, elev: &[f32]) -> Vec<u32> {
                         continue;
                     }
                     let n = (jj * w + (i + di).rem_euclid(w)) as usize;
-                    let dist = if di != 0 && dj != 0 { std::f32::consts::SQRT_2 } else { 1.0 };
+                    let dist = if di != 0 && dj != 0 {
+                        std::f32::consts::SQRT_2
+                    } else {
+                        1.0
+                    };
                     let slope = (elev[cell] - elev[n]) / dist;
                     if slope > best.1 {
                         best = (n, slope);

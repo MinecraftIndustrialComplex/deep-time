@@ -50,9 +50,7 @@ pub mod usgs;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Mutex, OnceLock};
 
-use deeptime_format::{
-    Body, Event, EventId, Extraction, GridDesc, Place, Product, Site,
-};
+use deeptime_format::{Body, Event, EventId, Extraction, GridDesc, Place, Product, Site};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -72,9 +70,7 @@ use rules::{CellAcc, Compiled, FrameEval};
 use sites::{CauseIndex, lat_lon_of};
 use sizing::{SizeDraw, SizeModel, mass_fraction};
 use synthetic::{SyntheticHistory, SyntheticParams};
-use types::{
-    COMPONENTS, DepositType, ErosionBehavior, FormationTime, Province, Relation,
-};
+use types::{COMPONENTS, DepositType, ErosionBehavior, FormationTime, Province, Relation};
 
 /// The stage's name in a pipeline (`deeptime stage deposits`).
 pub const STAGE_NAME: &str = "deposits";
@@ -253,7 +249,10 @@ pub struct DepositStage {
 
 impl DepositStage {
     /// The stage on a synthetic history.
-    pub fn synthetic(sp: SyntheticParams, params: DepositParams) -> Result<DepositStage, CoreError> {
+    pub fn synthetic(
+        sp: SyntheticParams,
+        params: DepositParams,
+    ) -> Result<DepositStage, CoreError> {
         let mut types = types::builtin()?;
         if !params.types.is_empty() {
             for id in &params.types {
@@ -314,10 +313,9 @@ impl DepositStage {
 
     /// Index of the petroleum type, if loaded and enabled.
     fn petroleum_type(&self) -> Option<usize> {
-        self.types
-            .iter()
-            .enumerate()
-            .position(|(k, t)| t.petroleum.is_some() && self.state.enabled.get(k).copied().unwrap_or(false))
+        self.types.iter().enumerate().position(|(k, t)| {
+            t.petroleum.is_some() && self.state.enabled.get(k).copied().unwrap_or(false)
+        })
     }
 
     /// The field whose TTI the petroleum and coal rules read.
@@ -336,7 +334,8 @@ impl DepositStage {
         let grid = self.grid();
         let n = grid.cells();
         let names = ctx.pool.install(|| self.history().map(|h| h.names()))?;
-        let frame_times: Vec<(f64, f64)> = (0..self.frames).map(|k| self.synthetic_time(k)).collect();
+        let frame_times: Vec<(f64, f64)> =
+            (0..self.frames).map(|k| self.synthetic_time(k)).collect();
         let bytes = (self.types.len() as u64 * n as u64 * std::mem::size_of::<CellAcc>() as u64)
             + n as u64 * std::mem::size_of::<CellPet>() as u64;
         ctx.reserve(bytes)?;
@@ -397,13 +396,15 @@ impl DepositStage {
         (sp.t_start_years + (k as f64 + 1.0) * dt, dt)
     }
 
-    fn ingest(&mut self, k: usize, world: &mut WorldState, ctx: &StageContext<'_>) -> Result<(), CoreError> {
+    fn ingest(
+        &mut self,
+        k: usize,
+        world: &mut WorldState,
+        ctx: &StageContext<'_>,
+    ) -> Result<(), CoreError> {
         let grid = self.grid();
         let burial = self.burial_field();
-        let pet_rules = self
-            .types
-            .iter()
-            .find_map(|t| t.petroleum.clone());
+        let pet_rules = self.types.iter().find_map(|t| t.petroleum.clone());
         let frame = ctx.pool.install(|| self.history()?.frame(k))?;
         let types = &self.types;
         let state = &mut self.state;
@@ -557,7 +558,8 @@ struct Finish {
 
 fn surface_y(elev_m: f32, sc: &Scales) -> f64 {
     // Plan §8.8: y = 63 + h / 20, sea floors stay where they are (deposits there are rare).
-    (63.0 + f64::from(elev_m) / sc.m_per_block_v).clamp(f64::from(sc.min_y + 8), f64::from(sc.max_y))
+    (63.0 + f64::from(elev_m) / sc.m_per_block_v)
+        .clamp(f64::from(sc.min_y + 8), f64::from(sc.max_y))
 }
 
 fn favourability_of(acc: &[CellAcc]) -> Vec<f64> {
@@ -597,12 +599,26 @@ impl Finish {
             return Vec::new();
         }
         self.causes
-            .find(&t.causes.preservation, x, z, t_ev, self.radius_blocks(t), 1.0e7, false)
+            .find(
+                &t.causes.preservation,
+                x,
+                z,
+                t_ev,
+                self.radius_blocks(t),
+                1.0e7,
+                false,
+            )
             .into_iter()
             .collect()
     }
 
-    fn emit(&mut self, world: &mut WorldState, e: Event, x: f64, z: f64) -> Result<EventId, CoreError> {
+    fn emit(
+        &mut self,
+        world: &mut WorldState,
+        e: Event,
+        x: f64,
+        z: f64,
+    ) -> Result<EventId, CoreError> {
         self.causes.push(&e, x, z);
         world.emit(e)
     }
@@ -658,9 +674,9 @@ impl DepositStage {
             .cloned()
             .unwrap_or_else(|| vec![0.0; n]);
         let radius_km = c * sc.m_per_block_h / 1000.0 / (2.0 * std::f64::consts::PI);
-        let provinces = ctx
-            .pool
-            .install(|| count::Provinces::new(&grid, self.seed, self.params.province_km, radius_km));
+        let provinces = ctx.pool.install(|| {
+            count::Provinces::new(&grid, self.seed, self.params.province_km, radius_km)
+        });
         let receivers: Option<Vec<u32>> = hist.receivers().map(<[u32]>::to_vec);
         let mut f = Finish {
             grid: grid.clone(),
@@ -720,8 +736,18 @@ impl DepositStage {
                 kitchen_events.push(f.emit(world, e, x, z)?);
             }
             // Charged-trap favourability: charge × trap × seal × reservoir (present values).
-            let get = |name: &str| f.present.fields.get(name).cloned().unwrap_or_else(|| vec![0.0; n]);
-            let (trap, seal, res) = (get(&r.trap_field), get(&r.seal_field), get(&r.reservoir_field));
+            let get = |name: &str| {
+                f.present
+                    .fields
+                    .get(name)
+                    .cloned()
+                    .unwrap_or_else(|| vec![0.0; n])
+            };
+            let (trap, seal, res) = (
+                get(&r.trap_field),
+                get(&r.seal_field),
+                get(&r.reservoir_field),
+            );
             pet_f = (0..n)
                 .map(|cell| {
                     let a = &self.state.pet[cell];
@@ -731,8 +757,16 @@ impl DepositStage {
                     {
                         return 0.0;
                     }
-                    match petroleum::charge(&grid, &kitchens, cell as u32, f64::from(a.t_trap), r, sc.m_per_block_h) {
-                        Some(_) => f64::from(trap[cell] * seal[cell].min(1.0) * res[cell].min(1.0)).min(1.0),
+                    match petroleum::charge(
+                        &grid,
+                        &kitchens,
+                        cell as u32,
+                        f64::from(a.t_trap),
+                        r,
+                        sc.m_per_block_h,
+                    ) {
+                        Some(_) => f64::from(trap[cell] * seal[cell].min(1.0) * res[cell].min(1.0))
+                            .min(1.0),
                         None => 0.0,
                     }
                 })
@@ -762,7 +796,8 @@ impl DepositStage {
             }
             let strength = t.province(self.params.province);
             let endow = provinces.endowment(&t.id, strength);
-            let tracts = tracts::find_tracts(&grid, &fv, t.sizing.tract_threshold, sc.m_per_block_h);
+            let tracts =
+                tracts::find_tracts(&grid, &fv, t.sizing.tract_threshold, sc.m_per_block_h);
             let model = SizeModel::new(&t.sizing);
             let mut rng = Rng::stream(self.seed, &format!("deposits/{}", t.id));
             let count_mult = self.params.count_mult * t.balance.count_mult;
@@ -820,7 +855,8 @@ impl DepositStage {
                     weights: &weights,
                     allowed: &allowed,
                 };
-                let (pts, dropped) = cluster::place(&mut rng, &space, &spacing, &radii, &mut f.placed[ti]);
+                let (pts, dropped) =
+                    cluster::place(&mut rng, &space, &spacing, &radii, &mut f.placed[ti]);
                 f.census[ti].dropped_separation += dropped;
                 f.census[ti].placed += pts.len();
                 for (k, p) in &pts {
@@ -868,7 +904,14 @@ impl DepositStage {
 
         // ---- materialise: ledger, sites, bodies, events, children -------------------------
         for cand in &candidates {
-            self.materialise(&mut f, world, cand, &series, receivers.as_deref(), &kitchen_events)?;
+            self.materialise(
+                &mut f,
+                world,
+                cand,
+                &series,
+                receivers.as_deref(),
+                &kitchen_events,
+            )?;
         }
 
         // ---- playability -------------------------------------------------------------------
@@ -888,7 +931,8 @@ impl DepositStage {
             while x <= f64::from(hi[0]) + r {
                 let mut z = f64::from(lo[2]);
                 while z <= f64::from(hi[2]) + r {
-                    let cell = cluster::cell_of(&grid, x.min(f64::from(hi[0])), z.min(f64::from(hi[2])));
+                    let cell =
+                        cluster::cell_of(&grid, x.min(f64::from(hi[0])), z.min(f64::from(hi[2])));
                     layer[cell as usize] = (ti + 1) as f32;
                     z += r;
                 }
@@ -913,7 +957,9 @@ impl DepositStage {
             "bodies": world.bodies.len(),
             "formula": "expected_formula = Σ_tracts ρ_p50/1e5 · A_km2 · mean_F · count_mult (plan §8.6); expected multiplies each tract by its province endowment",
         });
-        world.notes.insert(STAGE_NAME.to_owned(), census.to_string());
+        world
+            .notes
+            .insert(STAGE_NAME.to_owned(), census.to_string());
         for tc in &f.census {
             ctx.log.push(
                 crate::log::Level::Info,
@@ -955,11 +1001,18 @@ impl DepositStage {
                 let (te, dt) = self.state.frame_times[a.k_best as usize];
                 te - dt * rng.uniform()
             }
-            _ => self.state.frame_times.last().map_or(world.t_years, |(t, _)| *t),
+            _ => self
+                .state
+                .frame_times
+                .last()
+                .map_or(world.t_years, |(t, _)| *t),
         };
         let mut causes = f.cause_ids(t, x, z, t_form, slack);
         if t.formation_time == FormationTime::Cause
-            && let Some(first) = causes.iter().filter_map(|id| f.causes.start_of(*id)).reduce(f64::min)
+            && let Some(first) = causes
+                .iter()
+                .filter_map(|id| f.causes.start_of(*id))
+                .reduce(f64::min)
         {
             t_form = first;
         }
@@ -1021,7 +1074,10 @@ impl DepositStage {
                 f.census[ti].eroded += 1;
                 // The deposit existed; its formation and destruction stay in the history.
                 let e = base_event(world, "deeptime:deposit_formation", t_form)
-                    .at(Place::Point { lat: ll[0], lon: ll[1] })
+                    .at(Place::Point {
+                        lat: ll[0],
+                        lon: ll[1],
+                    })
                     .param("site", -1i64)
                     .param("fate", "eroded");
                 let formed = f.emit(world, e, x, z)?;
@@ -1029,7 +1085,10 @@ impl DepositStage {
                     .unwrap_or(t_form);
                 let mut ex = world
                     .event(t_gone, "deeptime:deposit_exhumation", SOURCE)
-                    .at(Place::Point { lat: ll[0], lon: ll[1] })
+                    .at(Place::Point {
+                        lat: ll[0],
+                        lon: ll[1],
+                    })
                     .param("deposit_type", t.id.as_str())
                     .param("site", -1i64)
                     .param("eroded_m", eroded_m)
@@ -1041,8 +1100,22 @@ impl DepositStage {
                 }
                 let gone = f.emit(world, ex, x, z)?;
                 if t.preservation.erosion_behavior == ErosionBehavior::SpawnPlacer {
-                    for child in t.geometry.children.iter().filter(|c| c.relation == Relation::Downstream) {
-                        self.spawn_placer(f, world, cand, &child.type_id, gone, t_gone, receivers, &mut rng)?;
+                    for child in t
+                        .geometry
+                        .children
+                        .iter()
+                        .filter(|c| c.relation == Relation::Downstream)
+                    {
+                        self.spawn_placer(
+                            f,
+                            world,
+                            cand,
+                            &child.type_id,
+                            gone,
+                            t_gone,
+                            receivers,
+                            &mut rng,
+                        )?;
                     }
                 }
                 return Ok(());
@@ -1063,7 +1136,9 @@ impl DepositStage {
             f.census[ti].buried += 1;
         }
         let dip = if t.geometry.dip_deg[1] > t.geometry.dip_deg[0] {
-            (t.geometry.dip_deg[0] + rng.uniform() * (t.geometry.dip_deg[1] - t.geometry.dip_deg[0])).to_radians()
+            (t.geometry.dip_deg[0]
+                + rng.uniform() * (t.geometry.dip_deg[1] - t.geometry.dip_deg[0]))
+                .to_radians()
         } else {
             t.geometry.dip_deg[0].to_radians()
         };
@@ -1091,7 +1166,10 @@ impl DepositStage {
             }
         }
         let site_id = world.next_site_id();
-        let bodies = geometry::bodies_for(t, site_id, tonnage_t, &grades, &placement, &sc, &mut || world.next_body_id());
+        let bodies =
+            geometry::bodies_for(t, site_id, tonnage_t, &grades, &placement, &sc, &mut || {
+                world.next_body_id()
+            });
         let mut remaining_t = tonnage_t * left;
         // The forming event.
         let kind = if cand.charge.is_some() {
@@ -1105,10 +1183,13 @@ impl DepositStage {
             .param("fate", fate.name())
             .param("fraction_left", left);
         if let Some((k, _, km)) = cand.charge {
-            e = e.param("kitchen", k as i64).param("migration_km", km).param(
-                "trap_formed_years",
-                f64::from(self.state.pet[cell as usize].t_trap),
-            );
+            e = e
+                .param("kitchen", k as i64)
+                .param("migration_km", km)
+                .param(
+                    "trap_formed_years",
+                    f64::from(self.state.pet[cell as usize].t_trap),
+                );
         }
         if let Some(coal) = &t.coal
             && let Some(p) = self.state.pet.get(cell as usize)
@@ -1126,7 +1207,8 @@ impl DepositStage {
         let mut exhumation = None;
         if truncated {
             // When erosion first reached the body's top.
-            let t_exp = time_eroded_to(col, t_form, t.preservation.formation_depth_m - half_m).unwrap_or(t_form);
+            let t_exp = time_eroded_to(col, t_form, t.preservation.formation_depth_m - half_m)
+                .unwrap_or(t_form);
             let mut ex = world
                 .event(t_exp, "deeptime:deposit_exhumation", SOURCE)
                 .at(Place::Site { site: site_id })
@@ -1143,26 +1225,41 @@ impl DepositStage {
         }
         // Supergene child (the parent's copper is conserved: the leached part becomes cap).
         let mut child_site = None;
-        for child in t.geometry.children.iter().filter(|c| c.relation == Relation::AboveWatertable) {
-            let Some(ct) = self.types.iter().position(|x| x.id == child.type_id) else { continue };
+        for child in t
+            .geometry
+            .children
+            .iter()
+            .filter(|c| c.relation == Relation::AboveWatertable)
+        {
+            let Some(ct) = self.types.iter().position(|x| x.id == child.type_id) else {
+                continue;
+            };
             if !self.state.enabled[ct] {
                 continue;
             }
             let rules = self.types[ct].weathering.as_ref().expect("validated");
             let top_depth = (centre_depth - half_m).max(0.0);
-            let Some((t0, stable)) = children::supergene_window(rules, top_depth, col) else { continue };
-            let Some(cu) = grades.get("c:copper").copied() else { continue };
-            let k = rules.grade_mult[0] + rng.uniform() * (rules.grade_mult[1] - rules.grade_mult[0]);
+            let Some((t0, stable)) = children::supergene_window(rules, top_depth, col) else {
+                continue;
+            };
+            let Some(cu) = grades.get("c:copper").copied() else {
+                continue;
+            };
+            let k =
+                rules.grade_mult[0] + rng.uniform() * (rules.grade_mult[1] - rules.grade_mult[0]);
             let metric = t.shape().metric();
             let u_s = (centre_depth / half_m).clamp(-1.0, 1.0);
             let u_l = ((centre_depth - rules.leach_depth_m) / half_m).clamp(-1.0, 1.0);
-            let leached_frac = ledger::fraction_below(metric, u_s) - ledger::fraction_below(metric, u_l);
+            let leached_frac =
+                ledger::fraction_below(metric, u_s) - ledger::fraction_below(metric, u_l);
             let (bt, bg, leached) = children::blanket(tonnage_t, cu, leached_frac, k);
             if bt <= 0.0 {
                 continue;
             }
             remaining_t = (remaining_t - leached).max(0.0);
-            let wt = col.last().map_or(rules.min_water_table_m, |s| s.water_table_m);
+            let wt = col
+                .last()
+                .map_or(rules.min_water_table_m, |s| s.water_table_m);
             child_site = Some((ct, bt, bg, k, stable, t0, wt));
         }
         // Register the parent site.
@@ -1174,7 +1271,9 @@ impl DepositStage {
             deposit_type: t.id.clone(),
             center: [
                 x.round() as i32,
-                centre_y.round().clamp(f64::from(sc.min_y), f64::from(sc.max_y)) as i32,
+                centre_y
+                    .round()
+                    .clamp(f64::from(sc.min_y), f64::from(sc.max_y)) as i32,
                 z.round() as i32,
             ],
             lat_lon: ll,
@@ -1211,7 +1310,10 @@ impl DepositStage {
                 truncated: false,
             };
             let cgrades: Grades = [("c:copper".to_string(), bg)].into_iter().collect();
-            let cbodies = geometry::bodies_for(ctype, child_id, bt, &cgrades, &place, &sc, &mut || world.next_body_id());
+            let cbodies =
+                geometry::bodies_for(ctype, child_id, bt, &cgrades, &place, &sc, &mut || {
+                    world.next_body_id()
+                });
             let mut ce = world
                 .event(t0, "deeptime:supergene_enrichment", SOURCE)
                 .until(self.state.frame_times.last().map_or(t0, |(t, _)| t.max(t0)))
@@ -1232,12 +1334,19 @@ impl DepositStage {
                 ce = ce.caused_by(id);
             }
             let cev = f.emit(world, ce, x, z)?;
-            let cu_role = ctype.products.first().map_or("primary".to_string(), |p| p.role.clone());
+            let cu_role = ctype
+                .products
+                .first()
+                .map_or("primary".to_string(), |p| p.role.clone());
             let site = Site {
                 id: child_id,
                 kind: ctype.site_kind.site_kind(),
                 deposit_type: ctype.id.clone(),
-                center: [x.round() as i32, (surf - depth / sc.m_per_block_v).round() as i32, z.round() as i32],
+                center: [
+                    x.round() as i32,
+                    (surf - depth / sc.m_per_block_v).round() as i32,
+                    z.round() as i32,
+                ],
                 lat_lon: ll,
                 aabb: union_aabb(&cbodies),
                 body: cbodies.first().map(|b| b.id),
@@ -1275,7 +1384,9 @@ impl DepositStage {
         rng: &mut Rng,
     ) -> Result<(), CoreError> {
         let parent = &self.types[cand.ty];
-        let Some(ct) = self.types.iter().position(|t| t.id == child_id) else { return Ok(()) };
+        let Some(ct) = self.types.iter().position(|t| t.id == child_id) else {
+            return Ok(());
+        };
         if !self.state.enabled[ct] {
             return Ok(());
         }
@@ -1297,7 +1408,14 @@ impl DepositStage {
             return Ok(());
         }
         let sc = f.sc;
-        let (cell, km) = children::placer_cell(&f.grid, receivers, &f.elev, cand.point.cell, rules, sc.m_per_block_h);
+        let (cell, km) = children::placer_cell(
+            &f.grid,
+            receivers,
+            &f.elev,
+            cand.point.cell,
+            rules,
+            sc.m_per_block_h,
+        );
         let (cx, cz) = cluster::cell_xz(&f.grid, cell);
         let r = f64::from(f.grid.r);
         let (x, z) = (
@@ -1307,7 +1425,11 @@ impl DepositStage {
         let model = SizeModel::new(&child.sizing);
         let mut size = model.draw(rng);
         // Cap the placer's gold at the captured share of what the parent lost.
-        let key = child.products.iter().find_map(|p| p.grade_key.clone()).unwrap_or_default();
+        let key = child
+            .products
+            .iter()
+            .find_map(|p| p.grade_key.clone())
+            .unwrap_or_default();
         if let Some(g) = size.grades.get(&key).copied() {
             let held = size.tonnage_mt * 1.0e6 * mass_fraction(&key, g);
             let cap = rules.capture_fraction * lost_t;
@@ -1331,8 +1453,12 @@ impl DepositStage {
         // Follow the drainage direction.
         let next = receivers.map_or(cell, |rec| rec[cell as usize]);
         let (nx, nz) = cluster::cell_xz(&f.grid, next);
-        let yaw = if next == cell { rng.uniform() * std::f64::consts::PI } else {
-            cluster::wrap_x(f.c, nx - cx).atan2(nz - cz).mul_add(-1.0, std::f64::consts::FRAC_PI_2)
+        let yaw = if next == cell {
+            rng.uniform() * std::f64::consts::PI
+        } else {
+            cluster::wrap_x(f.c, nx - cx)
+                .atan2(nz - cz)
+                .mul_add(-1.0, std::f64::consts::FRAC_PI_2)
         };
         let placement = Placement {
             x,
@@ -1352,7 +1478,15 @@ impl DepositStage {
             }
         }
         let site_id = world.next_site_id();
-        let bodies = geometry::bodies_for(child, site_id, tonnage_t, &grades, &placement, &sc, &mut || world.next_body_id());
+        let bodies = geometry::bodies_for(
+            child,
+            site_id,
+            tonnage_t,
+            &grades,
+            &placement,
+            &sc,
+            &mut || world.next_body_id(),
+        );
         let ll = lat_lon_of(f.c, x, z);
         let mut e = world
             .event(t_gone, "deeptime:placer_formation", SOURCE)
@@ -1463,7 +1597,8 @@ impl DepositStage {
                     continue;
                 }
                 if ess.exposed {
-                    let cell = cluster::cell_of(&f.grid, f64::from(s.center[0]), f64::from(s.center[2]));
+                    let cell =
+                        cluster::cell_of(&f.grid, f64::from(s.center[0]), f64::from(s.center[2]));
                     let surf = surface_y(f.elev[cell as usize], &sc);
                     if f64::from(s.aabb[1][1]) < surf - EXPOSED_BLOCKS {
                         continue;
@@ -1480,15 +1615,17 @@ impl DepositStage {
                     self.state.enabled[*k]
                         && !t.child_only
                         && !self.state.acc[*k].is_empty()
-                        && t.products.iter().any(|p| p.material == ess.material && p.role == "primary")
+                        && t.products
+                            .iter()
+                            .any(|p| p.material == ess.material && p.role == "primary")
                 })
                 .map(|(k, _)| k)
                 .collect();
             if producers.is_empty() {
                 continue;
             }
-            for region in 0..regions.count() {
-                let mut short = ess.min_sites_per_region.saturating_sub(have[region]);
+            for (region, &count) in have.iter().enumerate() {
+                let mut short = ess.min_sites_per_region.saturating_sub(count);
                 while short > 0 {
                     // The best (type, land cell) in the region.
                     let mut best: Option<(f64, usize, u32)> = None;
@@ -1507,11 +1644,15 @@ impl DepositStage {
                             if best.is_some_and(|b| b.0 >= score) {
                                 continue;
                             }
-                            let r = geometry::radius_blocks(t, SizeModel::new(&t.sizing).smallest_plausible().tonnage_mt * 1.0e6, &sc);
-                            if f.placed[ti]
-                                .iter()
-                                .any(|q| cluster::distance(f.c, (x, z), (q.x, q.z)) < min_sep.max(r + q.radius))
-                            {
+                            let r = geometry::radius_blocks(
+                                t,
+                                SizeModel::new(&t.sizing).smallest_plausible().tonnage_mt * 1.0e6,
+                                &sc,
+                            );
+                            if f.placed[ti].iter().any(|q| {
+                                cluster::distance(f.c, (x, z), (q.x, q.z))
+                                    < min_sep.max(r + q.radius)
+                            }) {
                                 continue;
                             }
                             best = Some((score, ti, cell as u32));
@@ -1552,13 +1693,18 @@ impl DepositStage {
             // size_mult_v about its centre.
             half_m * t.balance.size_mult_v
         } else {
-            t.preservation.formation_depth_m.min((surf - f64::from(sc.min_y + 16)) * sc.m_per_block_v)
+            t.preservation
+                .formation_depth_m
+                .min((surf - f64::from(sc.min_y + 16)) * sc.m_per_block_v)
         };
         let acc = self.state.acc[ti][cell as usize];
         let t_ev = if acc.k_best != u16::MAX {
             self.state.frame_times[acc.k_best as usize].0
         } else {
-            self.state.frame_times.last().map_or(world.t_years, |(t, _)| *t)
+            self.state
+                .frame_times
+                .last()
+                .map_or(world.t_years, |(t, _)| *t)
         };
         let slack = self.state.frame_times.first().map_or(1.0e7, |(_, dt)| *dt);
         let causes = f.cause_ids(t, x, z, t_ev, slack);
@@ -1585,7 +1731,10 @@ impl DepositStage {
             dip: 0.0,
             truncated: false,
         };
-        let bodies = geometry::bodies_for(t, site_id, tonnage_t, &grades, &placement, &sc, &mut || world.next_body_id());
+        let bodies =
+            geometry::bodies_for(t, site_id, tonnage_t, &grades, &placement, &sc, &mut || {
+                world.next_body_id()
+            });
         let (col, row) = (region as u32 % regions.cols, region as u32 / regions.cols);
         let mut e = world
             .event(t_ev, "deeptime:guaranteed_occurrence", SOURCE)
@@ -1607,7 +1756,11 @@ impl DepositStage {
             id: site_id,
             kind: t.site_kind.site_kind(),
             deposit_type: t.id.clone(),
-            center: [x.round() as i32, (surf - depth / sc.m_per_block_v).round() as i32, z.round() as i32],
+            center: [
+                x.round() as i32,
+                (surf - depth / sc.m_per_block_v).round() as i32,
+                z.round() as i32,
+            ],
             lat_lon: lat_lon_of(f.c, x, z),
             aabb: union_aabb(&bodies),
             body: bodies.first().map(|b| b.id),
@@ -1642,8 +1795,14 @@ fn union_aabb(bodies: &[Body]) -> [[i32; 3]; 2] {
 }
 
 /// The sites of a type in a world (tests and the CLI).
-pub fn sites_of<'a>(world: &'a WorldState, type_id: &'a str) -> impl Iterator<Item = &'a Site> + 'a {
-    world.sites.iter().filter(move |s| s.deposit_type == type_id)
+pub fn sites_of<'a>(
+    world: &'a WorldState,
+    type_id: &'a str,
+) -> impl Iterator<Item = &'a Site> + 'a {
+    world
+        .sites
+        .iter()
+        .filter(move |s| s.deposit_type == type_id)
 }
 
 #[cfg(test)]
@@ -1700,16 +1859,31 @@ mod tests {
                 .iter()
                 .find(|e| e.id == s.forming_event)
                 .expect("every site has its forming event in the log");
-            assert!(!e.causes.is_empty(), "site {} ({}) has no causes", s.id, s.deposit_type);
+            assert!(
+                !e.causes.is_empty(),
+                "site {} ({}) has no causes",
+                s.id,
+                s.deposit_type
+            );
             for c in &e.causes {
-                assert!(w.events.iter().any(|x| x.id == *c), "cause {c} is in the log");
+                assert!(
+                    w.events.iter().any(|x| x.id == *c),
+                    "cause {c} is in the log"
+                );
             }
-            assert_eq!(e.params.get("site"), Some(&ParamValue::Int(i64::from(s.id))));
+            assert_eq!(
+                e.params.get("site"),
+                Some(&ParamValue::Int(i64::from(s.id)))
+            );
             assert_eq!(e.place, Place::Site { site: s.id });
             let first = s.body.expect("a site has a body");
             let body = w.bodies.iter().find(|b| b.id == first).expect("its body");
             assert_eq!(body.site, Some(s.id));
-            assert!(s.products.iter().all(|p| (0.0..=1.0).contains(&p.grade) && p.tonnage_t >= 0.0));
+            assert!(
+                s.products
+                    .iter()
+                    .all(|p| (0.0..=1.0).contains(&p.grade) && p.tonnage_t >= 0.0)
+            );
         }
         for b in &w.bodies {
             b.validate().unwrap();
@@ -1728,7 +1902,13 @@ mod tests {
                         (f64::from(s.center[0]), f64::from(s.center[2])),
                         (f64::from(q.center[0]), f64::from(q.center[2])),
                     );
-                    assert!(d >= min_sep - 1.5, "{}: sites {} and {} are {d} blocks apart", t.id, s.id, q.id);
+                    assert!(
+                        d >= min_sep - 1.5,
+                        "{}: sites {} and {} are {d} blocks apart",
+                        t.id,
+                        s.id,
+                        q.id
+                    );
                 }
             }
         }

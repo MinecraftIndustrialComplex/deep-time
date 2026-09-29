@@ -50,7 +50,8 @@ impl Regions {
 
     /// The region (col, row) of block (x, z).
     pub fn of(&self, x: f64, z: f64) -> (u32, u32) {
-        let col = (((x + self.c / 2.0) / self.size).floor() as i64).rem_euclid(i64::from(self.cols));
+        let col =
+            (((x + self.c / 2.0) / self.size).floor() as i64).rem_euclid(i64::from(self.cols));
         let row = ((z + self.c / 4.0) / self.size)
             .floor()
             .clamp(0.0, f64::from(self.rows - 1));
