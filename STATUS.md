@@ -130,7 +130,10 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   the standalone router, steep slopes between noise-cell corners).
 - **Gates** (branch merged with master 455b57f): cargo fmt, clippy `--locked -D warnings`, deny licenses bans clean;
   cargo test --workspace (cli 26, core 209 + 2 ignored, format 39, inspect 28 + 2 + 7, jni 7, viewer 5); `./gradlew
-  build test` tests=124 failures=0; GameTests: see below.
+  build test` tests=124 failures=0; `mac.sh --server -- ./gametest.sh` → **All 48 required tests passed**
+  (realPlanetHeightMatchesTheBake 47 corner columns max diff 0, all ≤ 1, 91 of 94 with a detail term;
+  realPlanetRockMatchesTheParityFixture 48 columns, 124 samples, 0 wrong; realPlanetSpawnOnLand (112, 66, −494));
+  `./gametest-planet.sh` (analytic terrain) seam set + entitypushedback, hardstopat80, worldinfochannelrequired PASS.
 - **Found and fixed on the way.** `DepositGameTests.siteApiAndProbes` required a block with d < 0.3 in the target body,
   which the calibrated synthetic deposit world's body 0 (a clipped body) has none of: it now takes the most central
   block (not caused by P1-08; the calibration merge had not rerun GameTests). `NativeGameTests` pinned format "0.0";
