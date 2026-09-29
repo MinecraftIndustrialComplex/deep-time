@@ -485,6 +485,12 @@ def checkReleaseNatives = tasks.register('checkReleaseNatives') {
 }
 
 tasks.named('processResources', ProcessResources) {
+    // The built-in presets (plan §5.1, P1-13): one source, compiled into the core with include_str!
+    // and shipped here as deeptime/presets/<name>.json for Presets.builtin (no natives needed).
+    from(new File(repoRoot, 'crates/deeptime-core/presets')) {
+        include '*.json'
+        into 'deeptime/presets'
+    }
     if (project.hasProperty('release')) {
         dependsOn checkReleaseNatives
         from(nativesDistDir) { into 'natives/deeptime' }

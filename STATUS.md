@@ -34,7 +34,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
 | P1-11 | Customize editor, timelapse and staging | todo | | | |
 | P1-12 | Strata pass with rock tags and `rock_states` | todo | | | |
-| P1-13 | Dedicated server: generate on first start | todo | | | |
+| P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 147910a | Mechanism done on placeholder presets (Mac): smoke standalone `--preset earthlike_quick_16k --fresh --restart` PASS (generation 11.9 s, progress lines ≤ 5 s apart, restart `world data present`); `--scenario` first_start_no_config / _circumference_mismatch / _native_failure: OK (exit 1, no crash report, nothing but vanilla's level.dat); JUnit 45/45 incl. ShareCodeTest cross-fixture; GameTests 14/14. Left: rerun with the real presets after P1-08 |
 | P1-14 | Deposit engine: the four families | todo | | | |
 | P1-15 | Deposits in the world | todo | | | |
 | P1-16 | COE and CDG hooks | todo | | | |
@@ -57,6 +57,79 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 — P1-13 first-start generation, the mechanism (agent worktree agent-a31ba4add1e8bb6d2)
+- **What.** A dedicated server whose overworld is Deep Time's (no test terrain, no staging) and whose
+  world has no `deeptime/manifest.json` now generates on its first start (plan §7.13, updated):
+  `server/FirstStartGenerator` (called by `WorldDataBinder`'s one HIGHEST `ServerAboutToStartEvent`
+  listener before it binds — P0-10's binder therefore binds what generation wrote, and the order
+  never depends on the bus ordering two HIGHEST listeners), `server/ServerConfig`
+  (`config/deeptime/server.json` with `timeline` — review 2 gap 21 — and a valid-JSON template whose
+  explanations are `_` keys), `server/ServerStop` + `mixin/DedicatedServerFirstStartMixin`
+  (`server` side) + `mixin/MinecraftServerFirstStartMixin`, `preset/{ShareCode, Presets,
+  PresetException}`, `SimSession.estimate`. Rust: `deeptime_core::{preset, share_code, synth}`,
+  CLI `run --preset <name|file|DT1…> [--start] [--length-myr]`, `stage`/`bench` take the same
+  preset argument, `deeptime preset list|show|encode|decode`. Smoke: `install.sh --start
+  --length-myr --memory-cap-gib`, `run.py` generation checks and `--scenario`.
+- **Placeholders, not presets.** The real stages (P1-03…P1-08) do not exist, so the four built-in
+  presets (`crates/deeptime-core/presets/*.json`, one source: `include_str!` in the core, copied into
+  the jar as `deeptime/presets/<name>.json` by `processResources`) are `"placeholder": true`: the
+  dummy pipeline (P1-01's `stages`/`world`, 25 or 50 steps per stage at 200 ms) plus a new dummy key
+  `"synth": "wrap-test"` that bakes P0-09's synthetic layers at `finalize_write` (the synth module
+  moved from `deeptime-cli` to `deeptime-core::synth`; `deeptime synth` output is unchanged). The
+  server logs a WARN for a placeholder. Nothing in the Java path knows about the dummy: when P1-08
+  lands, replacing the four JSON files is the whole change.
+- **Preset header (core).** `Preset` is now `{header, body}` (`preset.rs`; `session::Preset`
+  re-exported): header keys `schema`, `name`, `description`, `placeholder`,
+  `scale.circumference_blocks` (must equal the dummy world's C) and `timeline` (`start` ∈
+  supercontinent | scattered_continents | random, `length_myr` 1…4600). On a dummy world the
+  timeline sets the clock to −length…0 with eight keyframe intervals. `manifest.source` is
+  `run:<name>`; `notes.run` gains `timeline` and `placeholder`.
+- **Share codes.** `DT1.` + unpadded base64url(raw DEFLATE level 9 (canonical JSON)). Canonical =
+  serde_json's compact sorted form; Java's `Presets.canonical` reproduces it byte for byte, including
+  serde_json 1.0.151's float layout — it formats with **zmij**, not ryu: positive exponents carry a
+  `+` (`1.5e+300`, `1e+16`), decimals for 1e-5 ≤ |x| < 1e16. Pinned by the same expected string in
+  `share_code::canonical_numbers_follow_serde` and `PresetsTest.canonicalJsonIsSerdes`.
+  Cross-test: `crates/deeptime-core/tests/share-codes.json` (3 cases) holds the code Rust writes and
+  the code Java writes (`ShareCodeTest` writes `neoforge/build/share-codes-java.json`;
+  `tools/dev/share_code_fixture.py` fills the fixture); both suites decode both, and Rust also checks
+  its own code is stable. For two cases the two encoders' codes differ (zlib vs miniz_oxide), for one
+  they are equal. Decoding caps the inflated text at 1 MiB.
+- **The clean stop.** Vanilla has no clean "stop before loadLevel": `initServer` returning false or
+  an exception both end in a crash report plus an NPE in `stopServer` (no overworld). So `ServerStop`
+  halts the server and the mixins make `initServer` return `true` right after the event (before
+  "Preparing level", RCON, the watchdog, `ServerStartingEvent`), skip `ServerStartedEvent`,
+  `ServerStoppingEvent` and `saveAllChunks`; `stopServer` still closes the listener and
+  `session.lock`, `ServerStoppedEvent` still fires, and a non-daemon `deeptime-stop` thread exits
+  the JVM with status 1 after the server thread ends. **Finding:** `net.minecraft.server.Main`
+  writes `level.dat` (line 276, `saveDataTag`) before the server thread starts, so it exists before
+  any mod event and already records the level-type; the mismatch message therefore says to delete
+  the world folder, not only change `level-type`. The smoke checks it is not rewritten at the stop.
+- **Measured (Mac, `tools/remote/mac.sh`).** `cargo test --workspace` all ok (core 56 incl. preset 4,
+  share_code 5, synth 2, session `placeholder_preset_bakes_terrain_next_to_the_run`); `cargo fmt
+  --check`, `clippy --workspace --all-targets -D warnings`, `deny check licenses bans` clean
+  (flate2 1.1.10 joins deeptime-core; already in the lock via deeptime-inspect). `gradlew build
+  test` → tests=45 failures=0. `mac.sh --server -- ./gametest.sh` → All 14 required tests passed.
+  `mac.sh --server -- 'tools/smoke/install.sh standalone --preset earthlike_quick_16k && python3
+  tools/smoke/run.py --profile standalone --fresh --restart'` → PASS: generation 11.9 s,
+  `[deeptime] dummy_drift 84% (−580 Ma) · total 42% · 5s elapsed · ~7s left · native 0.0/4.0 GiB`,
+  `… world data written to …/planet/deeptime in 11s (13 events, 3 sites, 9 keyframes, 8 layers,
+  source run:earthlike_quick_16k)`, native `baked the synthetic terrain wrap-test (C = 16384): 8
+  layers, 21.0 MiB in 833 ms`, `Done (15.111s)`; restart `[deeptime] world data present at …:
+  not regenerating`, `Done (0.676s)`, manifest mtime unchanged. `run.py --scenario
+  first_start_no_config | first_start_circumference_mismatch | first_start_native_failure` → each
+  `OK` (exit 1, no `Done (`, no `Preparing level`, no region/entities/data/deeptime, `level.dat`
+  older than the stop line, no crash report or shutdown exception; the template parses; the
+  mismatch line names `C = 32768` and `C = 16384`; the native case logs the UNSUPPORTED_PLATFORM
+  guidance and `deeptime run --preset earthlike_quick_16k --start supercontinent --length-myr
+  1000.0 --out …/planet/deeptime`). `deeptime run --preset earthlike_quick_16k --start
+  supercontinent --length-myr 1000 --out …` → the same layout (8 layers, 17 files), 11.6 s.
+- **Known limits.** The estimate of a placeholder is 0 bytes (the dummy estimates nothing and the
+  bake runs at finalize; the CLI measured a 403 MiB peak for the 16k bake). Built-in presets are
+  located by name only in `Presets.BUILTIN` (a test checks it equals the core's folder).
+  `tools/smoke/__pycache__/run.cpython-313.pyc` is tracked in git (not by this task); left as is.
+- **Next.** P1-08's bake replaces the placeholder JSON files; then rerun the acceptance above
+  unchanged. P1-11 (staging) can hook into `WorldDataBinder.onAboutToStart` the same way.
 
 ### 2026-09-28 — P0-06 finished (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Verdict: Toroidal World wraps a Deep Time planet in the MIC pack, Sable ships included.** No

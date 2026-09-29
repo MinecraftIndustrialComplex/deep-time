@@ -21,6 +21,11 @@
 //! the very end, and keyframes of `elevation` every `keyframe_every_years`. Two test hooks:
 //! `reserve_bytes` asks the memory cap for that much before a stage's first step, and
 //! `panic_at_step` panics at that step of every stage (the panic guard and session poisoning).
+//!
+//! `"synth": "wrap-test" | "lake-test"` (P1-13, needs `world`) makes the run's world data
+//! playable: `finalize_write` bakes that synthetic terrain (`crate::synth`, P0-09's layers) at the
+//! world's circumference next to the events, sites and keyframes. The built-in placeholder
+//! presets use it until the real stages and the bake (P1-03…P1-08) exist.
 
 use std::f64::consts::PI;
 use std::time::Duration;
@@ -30,6 +35,7 @@ use serde_json::{Map, Value, json};
 
 use crate::error::CoreError;
 use crate::stage::{Stage, StageContext, StageEstimate, from_state, to_state};
+use crate::synth;
 use crate::world::{Field, WorldState};
 
 const MAX_DUMMY_STEPS: u64 = 10_000_000;
@@ -72,6 +78,8 @@ pub struct DummyParams {
     /// Stage names, in order.
     pub stages: Vec<String>,
     pub world: Option<DummyWorld>,
+    /// The synthetic terrain `finalize_write` bakes (needs `world`).
+    pub synth: Option<synth::Kind>,
 }
 
 type Obj = Map<String, Value>;
@@ -129,6 +137,7 @@ impl DummyParams {
                 "panic_at_step",
                 "stages",
                 "world",
+                "synth",
             ],
         )?;
         let required = |name: &str, max: u64| -> Result<u64, CoreError> {
@@ -145,6 +154,10 @@ impl DummyParams {
             None => None,
             Some(v) => Some(parse_world(v)?),
         };
+        let synth = match obj.get("synth") {
+            None => None,
+            Some(v) => Some(parse_synth(v, world.as_ref())?),
+        };
         Ok(DummyParams {
             steps,
             sleep_ms,
@@ -152,6 +165,7 @@ impl DummyParams {
             panic_at_step: uint(obj, path, "panic_at_step", u64::MAX)?,
             stages,
             world,
+            synth,
         })
     }
 
@@ -180,6 +194,9 @@ impl DummyParams {
                 "seed": w.seed,
             });
         }
+        if let Some(k) = self.synth {
+            dummy["synth"] = json!(k.name());
+        }
         json!({ "dummy": dummy })
     }
 
@@ -197,6 +214,23 @@ impl DummyParams {
             None => WorldState::new(0, 16_384, 0.0),
         }
     }
+}
+
+fn parse_synth(v: &Value, world: Option<&DummyWorld>) -> Result<synth::Kind, CoreError> {
+    let path = "$.dummy.synth";
+    let names = synth::Kind::ALL.map(synth::Kind::name).join(", ");
+    let kind = v
+        .as_str()
+        .and_then(synth::Kind::from_name)
+        .ok_or_else(|| preset_err(path, format!("expected one of {names}")))?;
+    let w = world.ok_or_else(|| preset_err(path, "needs $.dummy.world (its circumference)"))?;
+    synth::check_circumference(w.circumference).map_err(|e| {
+        preset_err(
+            "$.dummy.world.circumference",
+            format!("{} for synth: {e}", w.circumference),
+        )
+    })?;
+    Ok(kind)
 }
 
 fn parse_stage_names(v: &Value) -> Result<Vec<String>, CoreError> {
