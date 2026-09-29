@@ -96,7 +96,7 @@
     "cdg_reservoir": false,
     "ore_block_policy": "ev_then_vanilla"
   },
-  "balance": {"count_mult": 10.0, "size_mult_h": 12.0, "size_mult_v": 1.0, "richness_mult": 1.0},
+  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 1.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
     "Sizing: USGS OFR 2008-1155 (Singer, Berger & Moring 2008), Table 1 (PDF p. 9): all porphyry Cu deposits, n = 422; by-product percentiles count unreported grades as zero; presence = n_reported / 422 from the report's data file PorCuTX2008.txt; correlations (Pearson r of log10) from the text, PDF p. 8. See crates/deeptime-core/data/usgs/porphyry_cu.json.",
@@ -105,6 +105,6 @@
     "Geometry: aspect from SIR 2010-5070-B (median ore area 0.6 km², Table E1 p. 28; hypogene ore generally 1–1.5 km tall, p. 25); formation depth 1.5 km = median emplacement depth of the Cu subtype (OFR 2008-1155 Fig. 24, digitised).",
     "Design values: curves' tails, tract_threshold, clustering radii, zoning fractions and densities, lithocap and gossan sizes, size_mult_h 12 (a median porphyry ≈ 20 blocks across).",
     "Create stones (decisions file): serpentinite (veridium) is a preferred copper host at weight 1.5; the gossan is ironstone (ochrum → gold) and carries gold.",
-    "Balance (P1-17 calibration, 2026-09-29): count_mult 10. On the recorded 500-Myr history the §8.6 formula falls short of the plan's 'about 11 at 16k' twice over: the permissive arcs' mean favourability is about 0.33 (the plan's estimate took F ≈ 1 on 1 % arcs), and the preservation ledger erodes half to four fifths of the deposits drawn over the whole history, whereas the USGS density counts the deposits preserved today. 10 × brings the preserved count on 500-Myr pipeline_quick_16k runs to the plan's order (STATUS.md, P1-17 partial: calibration)."
+    "Counts (survivor formula, decisions log 2026-09-29, plan §8.6 as built): the density counts deposits that survive to the present, as USGS does; the engine forms more (deposits/survival.rs) so that the expected survivors are ρ_p50 · permissive area · count_mult. balance.count_mult stays 1: a pack lever, not a calibration. On the six 500-Myr pipeline_quick_16k test landscapes the permissive arcs cover 40,000–82,000 km², so 6–12 survivors are expected; a third to a half of the porphyries formed survive (STATUS.md, 2026-09-29 survivor formula)."
   ]
 }
