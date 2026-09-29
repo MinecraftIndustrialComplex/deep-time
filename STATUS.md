@@ -46,6 +46,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | Name | URL | Version label | Date |
 |---|---|---|---|
 | seams (where the wrap is, what crossing does, checked against TW 0.19.3 code; links the wrap graphics page) | https://spacesheep.dev/@benmac/deeptime-seams | wrap explainer 2026-09-28 | 2026-09-28 |
+| wrap (how the east–west wrap works: 3D planet, server vs client views of a crossing, two players, a lap, Nether 1:8) | https://spacesheep.dev/@benmac/deeptime-wrap | how the wrap works 2026-09-28 | 2026-09-28 |
 | phase0 (Phase 0 exit: every check, evidence, links) | https://spacesheep.dev/@benmac/deeptime-phase0 | Phase 0 exit 2026-09-28 | 2026-09-28 |
 | p1-editor (real-client screenshots of the Create World editor, timelapse, review, world) | https://spacesheep.dev/@benmac/deeptime-p1-editor | P1-11 client screenshots 2026-09-28 | 2026-09-28 |
 | p1-plates (500 Myr of plates, 100k samples, keyframes + events) | https://spacesheep.dev/@benmac/deeptime-p1-plates | P1-03 plates 100k 500 Myr 2026-09-28 | 2026-09-28 |
@@ -63,6 +64,12 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+
+### 2026-09-28 — wrap page merged; snowball figure settled (main session f981c0d3)
+- **Snowball.** entityCrossesSeam starts the gravity-free snowball at x = 8,188.5 with 0.25 blocks/tick and
+  reads it after 40 ticks: 0.25 × (1 − 0.99⁴⁰)/0.01 = 8.28 blocks → 8,196.78 → stored −8,187.22, exactly the
+  P0-06 log. The seams page's −8,191.79 was wrong; it now says −8,187.22 forty ticks later.
+- **Pages.** https://spacesheep.dev/@benmac/deeptime-wrap (graphics) and the rewritten seams page are both up.
 
 ### 2026-09-28 — Seams page rewritten from TW's code; correction to the P0-06 teleport note (agent worktree agent-aa125dc28bc6eb2a3)
 - **What.** tools/review/pages/seams/ now opens with where the seam is (x = −C/2 ≡ C/2, pole to pole) and a
@@ -387,6 +394,23 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Needs from Ben:** nothing while `ban` stays logged in at the Mac (auto-login or a Screen Sharing
   login); with nobody logged in the runner stops with `BLOCKED: … no GUI session` (exit 4). A
   locked screen is only warned about (untested: every run here had `ban` unlocked at the console).
+### 2026-09-28 — wrap review page (agent worktree agent-abdcd741641764e1f)
+- **New page `tools/review/pages/wrap/`, published private as https://spacesheep.dev/@benmac/deeptime-wrap**
+  (`tools/review/publish.sh wrap tools/review/pages/wrap -m "how the wrap works" --emoji 🌀`; space
+  87492f6d-8791-4d7d-8f43-d96f19f63913, recorded in `tools/review/spaces.json`). One self-contained HTML file, raw WebGL for
+  the rolling planet, canvas for the rest; follows the 16k/32k switch; light and dark; checked with headless Chromium at
+  1400 px and in a 390 px iframe (`--use-angle=swiftshader-webgl --enable-unsafe-swiftshader`; plain
+  `--use-gl=swiftshader` gives no WebGL), and every control clicked once with no script errors. `#shot` in the URL runs the
+  crossing to just past the seam for screenshots.
+- **Mechanics read from TW 0.19.3's source** (github.com/anyttng/toroidal_world at 3c1f3a3, the 0.19.3 build stamp; key
+  classes and F3 strings confirmed in the jar). They agree point for point with the sibling note's §7 in
+  `docs/research/notes/wrapped_planet_worlds.md`. The page labels each claim "seen on a test server", "read in code" or
+  "not yet watched in a client".
+- **Corrections to other docs, found here:** spawn is not at x = 0 (Deep Time picks it from `spawn/candidates.json`, so it
+  can be near the seam); the seams page's snowball figure (came out at x = −8,191.79) differs from P0-06's build log
+  (x = −8,187.22).
+- **Next:** the seams page can link to this one; everything client-side on it stays unverified until
+  `tools/client/mac-screenshots.sh` (or a successor) walks a real client across the seam.
 
 ### 2026-09-28 — P1-11 Customize editor, timelapse and staging, on the placeholder presets (agent worktree agent-a61f0e6a8e0a67dfa)
 - **Shape.** Client-only screens in `screen/` (reached only through `screen/ClientSetup`, a
