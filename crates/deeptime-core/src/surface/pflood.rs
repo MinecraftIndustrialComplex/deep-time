@@ -16,9 +16,21 @@
 //! Land that no base-level cell can reach (a closed continent with no sea) is drained through its
 //! lowest cell, which becomes a sink.
 //!
-//! **Parallelism:** the flood is serial (Barnes 2016's tiled parallel version is the optimisation
-//! plan §8.2 names; on L1 the serial flood over land cells costs a few tens of milliseconds, so it
-//! is not needed yet — see STATUS.md P1-04).
+//! **Parallelism (P1-17): the flood stays serial, on purpose.** On an L1 raster (0.52 M cells,
+//! 116 k land) it costs about 10 ms per step, with `open_sea` another 5 ms: 5 % of a step at one
+//! thread, and the largest serial piece left at twelve (STATUS.md, P1-17 partial). It is not tiled
+//! (Barnes 2016) because its *result* depends on the order it runs in. A cell in a flat or a pit
+//! takes `next_up` of whichever neighbour the FIFO pit queue popped first, so where a flat is fed
+//! from two sides at exactly the same elevation the serial order shows in the ulps. A flood that is
+//! independent of its own order (tiled with a spill graph, or Dijkstra with exact ties; both compute
+//! the least fixed point of the ε relaxation) equals the serial one on generic heights (a test in
+//! `routing/parity.rs` checks it) but not on flats, and lakes are flats by construction: a lake's
+//! sediment fill leaves its cells within ulps of one another. Measured on the 500-Myr
+//! `pipeline_quick_16k` run, the least fixed point differs from this flood in 168 of 250 steps, in
+//! about 170 of the ~13 000 raised cells per step. Every checkpoint is compared bit for bit, so the
+//! serial order is the definition. (A radix heap and a parallel seed scan made it no faster either:
+//! `routing/parity.rs::surface_timing`.) The routing (`routing.rs`) and the stream-power solve
+//! (`spl.rs`) next to it are parallel and bit-identical to their serial loops.
 
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
