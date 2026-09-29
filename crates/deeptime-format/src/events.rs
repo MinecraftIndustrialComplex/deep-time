@@ -1218,11 +1218,10 @@ mod tests {
     fn cell_index_places_points_and_sites() {
         let grid = GridDesc::for_planet("L1", 1024, 16).unwrap(); // 64 × 32
         let log = EventLog::from_events(vec![
-            Event::new(EventId::new(1, 0), 0.0, "deeptime:a", "deeptime:s")
-                .at(Place::Point {
-                    lat: 0.0,
-                    lon: 180.0,
-                }),
+            Event::new(EventId::new(1, 0), 0.0, "deeptime:a", "deeptime:s").at(Place::Point {
+                lat: 0.0,
+                lon: 180.0,
+            }),
             Event::new(EventId::new(1, 1), 1.0, "deeptime:a", "deeptime:s")
                 .at(Place::Site { site: 3 }),
             Event::new(EventId::new(1, 2), 2.0, "deeptime:a", "deeptime:s"),

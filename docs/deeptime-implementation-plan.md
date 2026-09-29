@@ -282,7 +282,7 @@ nix shell nixpkgs#nodejs_22 -c npx -y spacesheep@1.17.0 deploy . \
   `--visibility`, `--org`, `-m` and `--json`; 1.13.0 (whose `--help` this plan first used) had the same
   options without `--new`. Re-check the README before bumping the pin.
 - **Space ids are recorded in the repo.** A first deploy creates a space and writes `.spacesheep.json`
-  (`{"space": "<uuid>", "url": "https://spacesheep.dev/@ben-6b8e/<slug>"}`) into the deployed folder,
+  (`{"space": "<uuid>", "url": "https://spacesheep.dev/@benmac/<slug>"}`) into the deployed folder,
   and later deploys from that folder publish a **new version of the same space**. Review folders live
   under the gitignored `review/out/`, so `publish.sh` also copies each page's space id into
   `tools/review/spaces.json` (committed) and passes `--space` on every later deploy. That keeps Ben's
@@ -616,14 +616,18 @@ macOS minute costs about ten Linux minutes. The workflows are shaped around that
   - a build job on `ubuntu-latest` adds the eight targets with `rustup target add`, installs zig 0.13.0
     (`mlugg/setup-zig`), clang and lld, caches `XWIN_CACHE_DIR`, cross-compiles with cargo-zigbuild and
     cargo-xwin (Sable's single-runner approach, `aeronautics_rust_bridge.md` §6), runs the `readelf`
-    assertions and uploads `natives-dist`;
-  - load jobs with `fail-fast: false` run `NativeSmoke` (§10.2, P0-07) on `windows-latest`,
+    assertions and uploads `natives-dist`; it also packs the release jar (`./gradlew jar -Prelease`)
+    and uploads it, so every load job tests the jar players get (P0-08);
+  - load jobs with `fail-fast: false` run `NativeSmoke` (§10.2, P0-07) against that jar on
+    `windows-latest`, `windows-11-arm`,
     `macos-14` (arm64), `macos-15-intel` (x64; `macos-13` was retired on 2025-12-04), `ubuntu-24.04`,
     `ubuntu-24.04-arm`, and `docker run eclipse-temurin:21-jdk-alpine` for musl on x64 and on
     `ubuntu-24.04-arm` (JavaScript actions do not run inside Alpine containers on arm64 runners, so the
-    container only runs the test). Windows arm64 is load-tested if a Windows arm64 runner label is
-    available to the repository; otherwise STATUS marks it untested. This is the only way to test the
+    container only runs the test). Each job also checks that the loader picked its own platform key.
+    This is the only way to test the
     macOS extraction path that breaks Sable (§6.5); this laptop cannot.
+  - `workflow_dispatch` finds a workflow only once it is on `master`; before that, a run needs a
+    push trigger on the branch (P0-08's bring-up used one and reverted it).
 - **Licences.** `cargo deny check licenses` allows only MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause,
   ISC, Zlib, Unicode-3.0, CC0-1.0, MPL-2.0 and **LGPL-3.0-or-later** (cargo-deny checks workspace
   members too, and Deep Time's own crates declare exactly `LGPL-3.0-or-later`; since cargo-deny 0.18.4
@@ -1212,7 +1216,16 @@ all processors at server first start and in the CLI. Rust threads never attach t
   them (`https://go.microsoft.com/fwlink/?LinkId=2086102`), which Ben accepted on 2026-09-28 (§2.7).
   `NOTICE.md` records it.
 - Every musl artifact is checked with `readelf -d` in CI: no `NEEDED libc.so.6`, no `ld-linux`, no
-  `GLIBC_*` versions.
+  `GLIBC_*` versions. `tools/natives/build-natives.sh` runs these checks wherever it builds (P0-08).
+- **Measured in P0-08.** The macOS natives are built with cargo-zigbuild on every host, the Mac
+  included: a plain `cargo build` inside the Nix dev shell on macOS links the Nix store's
+  `libiconv.2.dylib`, which no player's Mac has. zig 0.13 raises the minimum macOS of both macOS
+  libraries to 11.7.1 (its own floor; rustc's defaults are 10.12 and 11.0). They link only
+  `/usr/lib/lib{System.B,iconv.2,charset.1}.dylib`, and `.cargo/config.toml` gives them the install
+  name `@rpath/libdeeptime_jni.dylib` instead of the build path. The zig-built musl libraries need
+  only `libc.so` (musl's loader itself; no `libgcc_s`). The Windows DLLs import `VCRUNTIME140.dll`
+  and the UCRT; every JVM loads `VCRUNTIME140.dll` itself, so no static CRT flag is needed.
+  nixpkgs carries cargo-xwin 0.23.1; CI pins the same with cargo-zigbuild 0.23.4.
 
 ### 6.5 Native loading and extraction
 
@@ -1621,7 +1634,12 @@ the terrain surface, it fills the air between them with water source blocks (ice
 the climate layer says frozen), without scheduling fluid ticks, so a basin stays still until a
 neighbour changes. The bake guarantees `water_level` never exceeds the lowest rim of its basin
 (Fill–Spill–Merge levels, Phase 2); Phase 0 proves the mechanism with a hand-made basin and channel
-(P0-13). Carvers run after this pass and can open caves under a lake; that drains into caves the way
+(P0-13). The generated ground is the density interpolated over 4-block noise cells, so on a steep
+shore it lies a block or two below the elevation raster: a column whose own `water_level` cell is dry
+takes the level of the nearest wet cell within one noise cell (P0-13's first run left two shore
+pockets that the woken lake filled), and the bake must therefore keep each rim above its level for at
+least one noise cell beyond the last wet cell. (P0-13: the ice comes from vanilla's
+`freeze_top_layer` feature, which every overworld biome runs after this pass.) Carvers run after this pass and can open caves under a lake; that drains into caves the way
 vanilla lakes do and is accepted.
 
 ### 7.10 Toroidal World: the cylinder shape
@@ -2603,8 +2621,10 @@ of Phase 0 is built on it.
     → `GLIBC_2.17` or lower
   - `cd neoforge && nix develop -c ./gradlew build -Prelease` → the jar contains 8 libraries
     (`unzip -l … | grep -c 'natives/deeptime/.*\.\(so\|dll\|dylib\)'` → `8`)
-  - `gh workflow run natives.yml -R MinecraftIndustrialComplex/deep-time`, then `gh run watch` → all
-    jobs `success`; each load log ends `status=OK version=0.0.1`
+  - `gh workflow run natives.yml -R MinecraftIndustrialComplex/deep-time`, then
+    `gh run list -R … -w natives.yml -L 1 --json databaseId -q '.[0].databaseId'` and
+    `gh run watch <id> -R … --exit-status` (review 2, gap 17) → all jobs `success`; each load log
+    prints `status=OK version=0.0.1 …` and `platform=<its key>`
 - **Ben reviews.** The Actions run page, linked from STATUS.
 
 #### P0-09 World-data format v0, synthetic planets, Java reader
@@ -2692,8 +2712,11 @@ of Phase 0 is built on it.
 - **Depends on.** P0-10, P0-11.
 - **Acceptance.**
   - `./gametest.sh` → `lakeHolds` passes; log `[gametest] lakeHolds before=<N> after=<N> expected=<N> outside=0`
-  - `nix develop -c cargo run -p deeptime-inspect -- section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at <lake z> --from <a> --to <b>`
-    → a PNG with the water surface at y 120
+    with before = after = expected, and `[gametest] lakeHolds water_top_y=120` (the top face of the
+    highest water block at the lake centre, `notes.lake.centre_block`; cold-read review 2, gap 18)
+  - `nix develop -c cargo run -p deeptime-inspect -- section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at 0 --from -88 --to 212`
+    → a PNG with the water surface at y 120 (the lake centre is z 0 and the channel runs along it
+    to x 160; −88…212 is `lakeHolds`' scanned box; a review picture, P0-11)
 - **Ben reviews.** The cross-section and the BlueMap view of the lake.
 
 #### P0-14 BlueMap renders on MIC blocks

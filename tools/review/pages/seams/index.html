@@ -1,0 +1,1851 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
+<!-- Deep Time review page: how the seams work. Source: tools/review/pages/seams/ (plan §2.6).
+     Self-contained: no build step and no network. spacesheep's viewer CSP blocks web fonts, so the
+     faces below are used when installed and fall back to system faces otherwise. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deep Time — How the seams work</title>
+<meta name="description" content="An interactive explainer of Deep Time's planet mapping: the east–west seam closed by Toroidal World, the soft polar caps, the Nether and End, and what has been verified.">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#ECF0EF; --bg-2:#E1E7E6; --panel:#F8FAF9; --panel-2:#F0F4F3;
+  --ink:#13222A; --ink-2:#43545D; --ink-3:#5E6E76;
+  --rule:#C3CDCD; --rule-2:#D6DEDD;
+  --seam:#C2185F; --seam-bg:#F6DCE7;
+  --cap:#D8961A; --cap-ink:#7A5300;
+  --stop:#C43A2E; --stop-ink:#A32C22;
+  --ice:#DCE8ED;
+  --ok:#1D6F43; --ok-bg:#D6EEDF;
+  --pend:#7A5300; --pend-bg:#F4E5C2;
+  --unv:#56468A; --unv-bg:#E5E0F3;
+  --later:#43545D; --later-bg:#E1E7E6;
+  --btn:#13222A; --btn-ink:#F8FAF9;
+  --f-display:"Archivo","Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif;
+  --f-body:"Source Serif 4","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0E161A; --bg-2:#152027; --panel:#16222A; --panel-2:#1B2931;
+    --ink:#E2EAEC; --ink-2:#A8B7BD; --ink-3:#8A9BA2;
+    --rule:#2D3C44; --rule-2:#223038;
+    --seam:#FF5C9D; --seam-bg:#3B1929;
+    --cap:#F0B240; --cap-ink:#F3C467;
+    --stop:#FF6F61; --stop-ink:#FF8C80;
+    --ice:#21343D;
+    --ok:#6AD39B; --ok-bg:#16372A;
+    --pend:#F3C467; --pend-bg:#3A2F12;
+    --unv:#BDAAF2; --unv-bg:#2A2444;
+    --later:#A8B7BD; --later-bg:#22313A;
+    --btn:#E2EAEC; --btn-ink:#0E161A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0E161A; --bg-2:#152027; --panel:#16222A; --panel-2:#1B2931;
+  --ink:#E2EAEC; --ink-2:#A8B7BD; --ink-3:#8A9BA2;
+  --rule:#2D3C44; --rule-2:#223038;
+  --seam:#FF5C9D; --seam-bg:#3B1929;
+  --cap:#F0B240; --cap-ink:#F3C467;
+  --stop:#FF6F61; --stop-ink:#FF8C80;
+  --ice:#21343D;
+  --ok:#6AD39B; --ok-bg:#16372A;
+  --pend:#F3C467; --pend-bg:#3A2F12;
+  --unv:#BDAAF2; --unv-bg:#2A2444;
+  --later:#A8B7BD; --later-bg:#22313A;
+  --btn:#E2EAEC; --btn-ink:#0E161A;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:70px}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.55}
+.wrap{max-width:1160px;margin-inline:auto;padding-inline:24px}
+@media (max-width:520px){.wrap{padding-inline:16px}body{font-size:16px}}
+a{color:inherit;text-decoration-color:var(--seam);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--seam);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;line-height:1.1;letter-spacing:-.012em}
+h1{font-size:clamp(2.1rem,1.2rem + 3.6vw,3.7rem);font-weight:760;font-stretch:84%}
+h2{font-size:clamp(1.55rem,1.1rem + 1.6vw,2.2rem);font-weight:720;font-stretch:88%}
+h3{font-size:1rem;font-weight:680;letter-spacing:0}
+p{margin:0;max-width:68ch}
+.eyebrow{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin:0}
+code,.mono{font-family:var(--f-mono);font-size:.86em}
+code{background:var(--bg-2);padding:.06em .32em;border-radius:3px;overflow-wrap:anywhere}
+.small{font-size:.88rem;color:var(--ink-2)}
+.dim{color:var(--ink-3)}
+
+/* top bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--rule)}
+.bar-in{display:flex;align-items:center;gap:14px;min-height:54px}
+.brand{font-family:var(--f-display);font-weight:720;font-stretch:88%;font-size:1.02rem;text-decoration:none;white-space:nowrap}
+.brand span{color:var(--seam)}
+.nav{display:flex;gap:2px;margin-inline:auto;overflow-x:auto;scrollbar-width:none}
+.nav a{font-family:var(--f-display);font-size:.85rem;text-decoration:none;color:var(--ink-2);padding:6px 8px;border-radius:4px;white-space:nowrap}
+.nav a:hover{color:var(--ink);background:var(--bg-2)}
+@media (max-width:940px){.nav{display:none}.bar .seg{margin-left:auto}}
+
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--panel);flex:none}
+.seg button{font-family:var(--f-display);font-size:.84rem;font-weight:620;border:0;background:transparent;color:var(--ink-2);padding:6px 10px;cursor:pointer;display:flex;gap:6px;align-items:baseline;white-space:nowrap;line-height:1.25}
+.seg button small{font-weight:450;font-size:.74rem;color:inherit;opacity:.85}
+.seg button[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink)}
+.seg button+button{border-left:1px solid var(--rule)}
+@media (max-width:430px){.bar .seg button small{display:none}}
+.stage .seg,.readout .seg{max-width:100%}
+.stage .seg button,.stage .seg button+button{min-width:0;white-space:normal;text-align:center}
+
+.btn{font-family:var(--f-display);font-size:.84rem;font-weight:620;border:1px solid var(--rule);background:var(--panel);color:var(--ink);padding:6px 11px;border-radius:6px;cursor:pointer;line-height:1.25}
+.btn:hover{border-color:var(--ink-3)}
+.btn.primary{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}
+.btn[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools .sep{flex:1 1 auto}
+.check{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-display);font-size:.84rem;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.check input{accent-color:var(--seam);margin:0}
+input[type=range]{accent-color:var(--seam);width:100%}
+
+/* hero */
+.hero{padding-block:44px 48px;display:grid;gap:22px}
+.lede{font-size:1.14rem;color:var(--ink-2)}
+.gist{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:6px 0 0;border-top:2px solid var(--ink)}
+.gist>div{padding:14px 18px 2px 0}
+.gist>div+div{padding-left:18px;border-left:1px solid var(--rule)}
+.gist dt{font-family:var(--f-display);font-weight:700;font-size:.98rem;display:flex;gap:9px;align-items:center}
+.gist dd{margin:6px 0 0;color:var(--ink-2);font-size:.98rem}
+.sw{width:18px;height:4px;border-radius:2px;display:inline-block;flex:none}
+@media (max-width:760px){.gist{grid-template-columns:minmax(0,1fr)}.gist>div+div{padding-left:0;border-left:0;border-top:1px solid var(--rule)}}
+.numbers{display:grid;gap:10px}
+.numbers-head{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;justify-content:space-between}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:8px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule-2);vertical-align:top}
+thead th{font-family:var(--f-display);font-weight:650;font-size:.8rem;letter-spacing:.02em;color:var(--ink-2);background:var(--panel-2);white-space:nowrap}
+tbody tr:last-child>*{border-bottom:0}
+tbody th{font-family:var(--f-display);font-weight:600;font-size:.88rem}
+td.v{font-family:var(--f-mono);font-size:.84rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+td.v.on,th.on{background:var(--seam-bg)}
+td.how{font-family:var(--f-mono);font-size:.8rem;color:var(--ink-3);white-space:nowrap}
+
+/* plates */
+.plate{border-top:1px solid var(--rule);padding-block:56px}
+.plate-head{display:grid;gap:12px;margin-bottom:24px}
+.plate-head>p:not(.eyebrow){color:var(--ink-2)}
+.fig{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:18px;align-items:start}
+@media (max-width:920px){.fig{grid-template-columns:minmax(0,1fr)}}
+.stage{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px;display:grid;gap:12px;min-width:0}
+canvas{display:block;width:100%;max-width:100%;border-radius:4px}
+canvas:focus-visible{outline:2px solid var(--seam);outline-offset:3px}
+.hint{font-family:var(--f-display);font-size:.8rem;color:var(--ink-3);margin:0}
+.readout{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px 16px;font-size:.92rem;min-width:0;display:grid;gap:10px;align-content:start}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 12px;margin:0}
+.kv dt{font-family:var(--f-display);font-size:.8rem;color:var(--ink-3);padding-top:2px;white-space:nowrap}
+.kv dd{margin:0;font-family:var(--f-mono);font-size:.82rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pill{display:inline-block;font-family:var(--f-display);font-size:.74rem;font-weight:650;padding:2px 8px;border-radius:999px;letter-spacing:.01em;white-space:nowrap;line-height:1.5}
+.pill.ok,.pill.open{background:var(--ok-bg);color:var(--ok)}
+.pill.pend{background:var(--pend-bg);color:var(--pend)}
+.pill.cap{background:var(--pend-bg);color:var(--cap-ink)}
+.pill.stop{background:var(--seam-bg);color:var(--stop-ink)}
+.pill.unv{background:var(--unv-bg);color:var(--unv)}
+.pill.later{background:var(--later-bg);color:var(--later)}
+.pill.pole{background:var(--ice);color:var(--ink-2)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-family:var(--f-display);font-size:.8rem;color:var(--ink-2);margin:0;padding:0;list-style:none}
+.legend li{display:inline-flex;align-items:center;gap:7px}
+.key{width:16px;height:10px;border-radius:2px;display:inline-block;flex:none}
+.formula{font-family:var(--f-mono);font-size:.84rem;background:var(--bg-2);border-radius:6px;padding:10px 12px;overflow-x:auto;white-space:pre;max-width:100%;margin:0;line-height:1.6}
+.rules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 30px;margin:30px 0 0}
+.rules>div{min-width:0}
+.rules dt{font-family:var(--f-display);font-weight:700;font-size:.96rem}
+.rules dd{margin:4px 0 0;color:var(--ink-2);font-size:.96rem}
+@media (max-width:760px){.rules{grid-template-columns:minmax(0,1fr)}}
+.flag{display:flex;gap:10px;align-items:baseline;font-size:.92rem;color:var(--ink-2)}
+.flag .pill{flex:none}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:920px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.cards{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:12px 14px;min-width:0;display:grid;gap:8px;align-content:start}
+.log{list-style:none;margin:0;padding:0;font-family:var(--f-mono);font-size:.78rem;display:grid;gap:5px;color:var(--ink-2)}
+.log li{display:grid;grid-template-columns:3.4em minmax(0,1fr);gap:6px}
+.log .tk{color:var(--ink-3)}
+.log .f{color:var(--seam)}
+.caption{font-size:.95rem;color:var(--ink-2);min-height:3.2em}
+.two{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:920px){.two{grid-template-columns:minmax(0,1fr)}}
+.polar{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;justify-items:center}
+.polar svg{display:block}
+.polar p{justify-self:stretch}
+@media (max-width:920px) and (min-width:560px){.polar{grid-template-columns:200px minmax(0,1fr);align-items:center}}
+svg text{font-family:var(--f-mono)}
+.s-ink{stroke:var(--ink-3)} .s-rule{stroke:var(--rule)} .f-ink{fill:var(--ink)} .f-ink2{fill:var(--ink-2)} .f-ink3{fill:var(--ink-3)}
+.s-seam{stroke:var(--seam)} .f-seam{fill:var(--seam)} .s-cap{stroke:var(--cap)} .s-stop{stroke:var(--stop)} .f-stop{fill:var(--stop)}
+.f-panel{fill:var(--panel)} .f-bg2{fill:var(--bg-2)}
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.status td:nth-child(2){white-space:nowrap}
+.status td.ev{font-family:var(--f-mono);font-size:.8rem;color:var(--ink-2);min-width:18em}
+.status tr[hidden]{display:none}
+@media (max-width:640px){
+  table.status thead{display:none}
+  table.status,table.status tbody,table.status tr,table.status td{display:block;width:100%}
+  table.status tr{padding:10px 14px;border-bottom:1px solid var(--rule-2)}
+  table.status tbody tr:last-child{border-bottom:0}
+  table.status td{border:0;padding:3px 0}
+  table.status td.ev{min-width:0;overflow-wrap:anywhere}
+  table.status tr[hidden]{display:none}
+}
+.tally{font-family:var(--f-display);font-size:.9rem;color:var(--ink-2)}
+footer{border-top:1px solid var(--rule);padding-block:34px 60px;color:var(--ink-3);font-size:.9rem}
+footer ul{margin:8px 0 0;padding-left:1.1em}
+footer li{margin:2px 0}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="wrap bar-in">
+    <a class="brand" href="#top">Deep Time <span>seams</span></a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#map">Map</a><a href="#seam">The seam</a><a href="#round">Why round</a><a href="#poles">Poles</a><a href="#dims">Nether &amp; End</a><a href="#status">Status</a>
+    </nav>
+    <div class="seg" role="group" aria-label="Planet size">
+      <button type="button" id="c16" data-c="16384" aria-pressed="true">16,384 <small>singleplayer</small></button>
+      <button type="button" id="c32" data-c="32768" aria-pressed="false">32,768 <small>server</small></button>
+    </div>
+  </div>
+</div>
+
+<header class="wrap hero" id="top" data-ss-section="top">
+  <p class="eyebrow" data-ss-id="top-p-1">Deep Time · review page · 2026-09-28 · P0-06</p>
+  <h1 data-ss-id="top-h1-1">How Deep Time's seams work</h1>
+  <p class="lede" data-ss-id="top-p-2">Deep Time plays a whole planet on Minecraft's flat block grid. East–west it loops: walk <span data-v="C">16,384</span> blocks east and you are back where you started, with no edge anywhere. North–south it cannot loop, so the poles get a soft cap. Every figure below is interactive, and every number follows the planet size picked in the bar above.</p>
+  <dl class="gist">
+    <div data-ss-id="top-item-1"><dt><span class="sw" style="background:var(--seam)"></span>East–west: a seamless loop</dt><dd>The overworld is a cylinder in x, closed by the Toroidal World mod. Mountains, rivers and biomes run straight through the seam; mobs, items and ships cross it.</dd></div>
+    <div data-ss-id="top-item-2"><dt><span class="sw" style="background:var(--cap)"></span>North–south: a soft cap</dt><dd>From 75° latitude a pushback toward the equator grows, with a warning and a storm. At 80° it becomes a hard stop.</dd></div>
+    <div data-ss-id="top-item-3"><dt><span class="sw" style="background:var(--ink-3)"></span>Later: pole transit</dt><dd>Crossing a pole may one day teleport you to the opposite longitude, heading south. Not built yet.</dd></div>
+  </dl>
+  <div class="numbers">
+    <div class="numbers-head">
+      <h3 data-ss-id="top-h3-1">The numbers (plan §5.1)</h3>
+      <p class="hint" data-ss-id="top-p-3">The highlighted column is the planet size selected above.</p>
+    </div>
+    <div class="tablewrap">
+      <table id="numtable" data-ss-id="top-table-1">
+        <thead><tr><th scope="col">Quantity</th><th scope="col" data-col="16384">Singleplayer</th><th scope="col" data-col="32768">Server</th><th scope="col">From</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Circumference C</th><td class="v" data-col="16384">16,384 blocks</td><td class="v" data-col="32768">32,768 blocks</td><td class="how">chosen per world</td></tr>
+          <tr><th scope="row">Loop width</th><td class="v" data-col="16384">1,024 chunks</td><td class="v" data-col="32768">2,048 chunks</td><td class="how">C / 16</td></tr>
+          <tr><th scope="row">Stored x span</th><td class="v" data-col="16384">−8,192 … 8,191</td><td class="v" data-col="32768">−16,384 … 16,383</td><td class="how">[−C/2, C/2)</td></tr>
+          <tr><th scope="row">Stored chunks</th><td class="v" data-col="16384">−512 … 511</td><td class="v" data-col="32768">−1,024 … 1,023</td><td class="how">[−C/32, C/32)</td></tr>
+          <tr><th scope="row">Region files r.&lt;rx&gt;</th><td class="v" data-col="16384">rx −16 … 15</td><td class="v" data-col="32768">rx −32 … 31</td><td class="how">−C/1024 ≤ rx &lt; C/1024</td></tr>
+          <tr><th scope="row">Pole to pole</th><td class="v" data-col="16384">8,192 blocks</td><td class="v" data-col="32768">16,384 blocks</td><td class="how">C/2; z ∈ [−C/4, C/4)</td></tr>
+          <tr><th scope="row">Latitude per block of z</th><td class="v" data-col="16384">0.02197°</td><td class="v" data-col="32768">0.01099°</td><td class="how">180° / (C/2)</td></tr>
+          <tr><th scope="row">Soft cap starts, ±75°</th><td class="v" data-col="16384">z = ±3,413</td><td class="v" data-col="32768">z = ±6,827</td><td class="how">(75/90) · C/4</td></tr>
+          <tr><th scope="row">Hard stop, ±80°</th><td class="v" data-col="16384">z = ±3,641</td><td class="v" data-col="32768">z = ±7,282</td><td class="how">(80/90) · C/4</td></tr>
+          <tr><th scope="row">Radius, at 300 m per block</th><td class="v" data-col="16384">782 km</td><td class="v" data-col="32768">1,565 km</td><td class="how">C · 300 m / 2π</td></tr>
+          <tr><th scope="row">Nether loop</th><td class="v" data-col="16384">128 chunks</td><td class="v" data-col="32768">256 chunks</td><td class="how">C / 16 / 8</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ MAP -->
+<section class="plate" id="map" aria-labelledby="map-h" data-ss-section="map">
+  <div class="wrap">
+    <div class="plate-head">
+      <p class="eyebrow" data-ss-id="map-p-1">Plan §5.1, §5.2</p>
+      <h2 id="map-h" data-ss-id="map-h">The planet, unrolled</h2>
+      <p data-ss-id="map-p-2">The overworld is an equirectangular map of a small planet: x is longitude, z is latitude. A block is about 300 m across and 20 m tall, and the map is C blocks around and C/2 blocks from pole to pole, so each block of z is <span data-v="latPer">0.02197°</span> of latitude. The continents below are a made-up example planet; the grid, bands and numbers are the real ones.</p>
+      <pre class="formula" data-ss-id="map-code-1">longitude = 360° · (x + C/2) / C        x from −C/2 (0°) to C/2 − 1 (just under 360°)
+latitude  = −z · 360° / C               north is −z; the pole edges are z = −C/4 and z = C/4</pre>
+    </div>
+    <div class="fig">
+      <div class="stage" data-ss-id="map-figure-1">
+        <div class="tools">
+          <button type="button" class="btn" id="map-centre">Centre on the seam</button>
+          <button type="button" class="btn" id="map-span">Show the stored span</button>
+          <span class="sep"></span>
+          <label class="check"><input type="checkbox" id="map-seam" checked> Seam line</label>
+          <label class="check"><input type="checkbox" id="map-regions"> Region files</label>
+          <label class="check"><input type="checkbox" id="map-distort"> Stretch</label>
+        </div>
+        <canvas id="mapc" tabindex="0" role="img" aria-label="Equirectangular map of the planet with the east–west seam, the 75° soft-cap band, the area past the 80° hard stop, and the ice beyond the pole edges. Drag sideways to spin it; point at it for coordinates."></canvas>
+        <ul class="legend">
+          <li><span class="key" style="background:var(--seam)"></span>Seam, x = ±C/2</li>
+          <li><span class="key" style="background:var(--cap)"></span>Soft cap, 75°–80°</li>
+          <li><span class="key" style="background:repeating-linear-gradient(135deg,var(--stop) 0 2px,transparent 2px 5px)"></span>Past the hard stop, 80°–90°</li>
+          <li><span class="key" style="background:#CDDEE6;border:1px solid var(--rule)"></span>Beyond the pole edge: ice-sheet ocean</li>
+        </ul>
+        <p class="hint" data-ss-id="map-p-3">Drag sideways to spin the planet: the terrain never ends. Point or tap for coordinates; arrow keys move the pin (Shift for bigger steps).</p>
+      </div>
+      <aside class="readout" id="map-read" aria-live="polite" data-ss-id="map-panel-1"></aside>
+    </div>
+    <p class="small" style="margin-top:16px" id="stretch-note" data-ss-id="map-p-4"><strong>Why the far north looks smeared.</strong> Planet-scale features (continents, mountain belts) are sampled at their true latitude and longitude, so on this map they are stretched east–west by sec φ: 1.0 at the equator, 2.0 at 60°, 3.9 at 75°. Erosion, rivers and valleys are computed in block space, so they keep their shape wherever they are. The stretch near the poles is one more reason for the caps. Tick <em>Stretch</em> to see circles that are 10° across on the planet.</p>
+  </div>
+</section>
+
+<!-- ============================================================ SEAM -->
+<section class="plate" id="seam" aria-labelledby="seam-h" data-ss-section="seam">
+  <div class="wrap">
+    <div class="plate-head">
+      <p class="eyebrow" data-ss-id="seam-p-1">Plan §7.10 · Toroidal World 0.19.3</p>
+      <h2 id="seam-h" data-ss-id="seam-h">The seam, up close</h2>
+      <p data-ss-id="seam-p-2">The server stores exactly one copy of the planet: x from <span data-v="negHalfC">−8,192</span> to <span data-v="halfCm1">8,191</span>. Nothing past it exists on disk. The Toroidal World mod (TW) makes that edge disappear in two ways: anything that crosses it is moved back into the span in the same tick, and each player is sent the copy of the world nearest to them.</p>
+      <p data-ss-id="seam-p-3">Below is a top-down strip of the two ends of the span, one pixel square per block. Launch something east across the seam, then flip between what the server stores and what a player standing next to the seam is sent.</p>
+    </div>
+    <div class="stage" data-ss-id="seam-figure-1">
+      <div class="tools">
+        <div class="seg" role="group" aria-label="View">
+          <button type="button" id="view-server" aria-pressed="true">What the server stores</button>
+          <button type="button" id="view-player" aria-pressed="false">What a player sees</button>
+        </div>
+        <span class="sep"></span>
+        <label class="check"><input type="checkbox" id="strip-slow" checked> Slow motion ×¼</label>
+      </div>
+      <canvas id="stripc" tabindex="0" aria-label="Top-down strip of blocks at both ends of the stored span, with entities crossing the seam." style="touch-action:pan-y"></canvas>
+      <div class="tools">
+        <button type="button" class="btn primary" data-spawn="snowball">Throw a snowball</button>
+        <button type="button" class="btn" data-spawn="minecart">Send a minecart</button>
+        <button type="button" class="btn" data-spawn="zombie">Spawn a zombie</button>
+        <button type="button" class="btn" data-spawn="ship">Launch a Sable ship</button>
+        <span class="sep"></span>
+        <button type="button" class="btn" id="step-w" aria-label="Step one block west">◂ Step west</button>
+        <button type="button" class="btn" id="step-e" aria-label="Step one block east">Step east ▸</button>
+        <button type="button" class="btn" id="strip-clear">Clear</button>
+      </div>
+      <p class="hint" data-ss-id="seam-p-4">Numbers above the strip are chunk x, below it block x; a <span style="color:var(--seam)">magenta</span> number with * is a chunk sent to you at a shifted position. Drag in the strip to walk (across the seam only in the player's view); ← → keys step one block.</p>
+      <p class="caption" id="strip-caption" data-ss-id="seam-p-5"></p>
+    </div>
+    <div class="cards" style="margin-top:14px">
+      <div class="card" id="strip-ent" aria-live="polite" data-ss-id="seam-card-1"></div>
+      <div class="card" id="strip-you" data-ss-id="seam-card-2"></div>
+      <div class="card" data-ss-id="seam-card-3"><h3 data-ss-id="seam-h3-1">Server log</h3><ol class="log" id="strip-log"></ol></div>
+    </div>
+    <dl class="rules">
+      <div data-ss-id="seam-item-1"><dt>Crossing, on the server</dt><dd>A mob, item, projectile, minecart or ship entity that ends its tick at x ≥ C/2 is moved to x − C in the same tick (x &lt; −C/2 → x + C), with its passengers, velocity and pathfinding target. Players are moved when their movement packet crosses. Coordinates therefore stay inside the stored span.</dd></div>
+      <div data-ss-id="seam-item-2"><dt>What players are sent</dt><dd>Chunks, entity positions and block updates are rewritten to the copy nearest each player, so there is no visible edge. Distances for mob AI, sounds, projectiles, explosions and compasses are also measured to the nearest copy: the world behaves round, not just looks round.</dd></div>
+      <div data-ss-id="seam-item-3"><dt>Terrain continuity is Deep Time's job</dt><dd>Every simulation raster wraps in x (cell index modulo width) and the sub-cell detail noise has period C, so column −C/2 continues column C/2 − 1 exactly. The river and the rail in the strip run straight through.</dd></div>
+      <div data-ss-id="seam-item-4"><dt>Chunk keys</dt><dd>A chunk request past the edge is folded to the stored chunk by TW. Deep Time code folds a position with TW's <code>ToroidalShape.fold</code> before using it as a key.</dd></div>
+      <div data-ss-id="seam-item-5"><dt>How Deep Time shapes its world</dt><dd>TW's own shape picker runs only from its Create World button, never on a dedicated server, so a mixin on <code>WorldDimensions.bake</code> calls TW's public <code>ShapeDimensions.withSpans</code>. Deep Time's generator subclasses <code>NoiseBasedChunkGenerator</code>, so TW <em>stamps</em> it (same object, shape attached) and wraps its noise-fill and biome passes.</dd></div>
+      <div data-ss-id="seam-item-6"><dt>World border, structures, fallback</dt><dd>Along x the border never gets in the way once it covers the loop; along z it is vanilla, but the pole cap limits z first. TW moves structure starts across the seam (test pending). Had TW failed, Deep Time would teleport entities at the seam itself; not needed so far.</dd></div>
+      <div data-ss-id="seam-item-7"><dt>One subtlety from the tests</dt><dd>TW folds <em>movement</em>: an entity that steps over the border is moved. A position set directly past the edge (a teleport) is not folded by that rule, so the seam tests move entities under their own motion (STATUS.md, P0-06 notes).</dd></div>
+      <div data-ss-id="seam-item-8"><dt>Not checkable without a client</dt><dd>How crossing looks and feels (a hitch, pop-in, a ship's hull staying whole on screen), entity tracking across the seam in multiplayer, and how contraptions render at the seam. The player's view above is TW's documented behaviour, not something anyone has watched yet.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- ============================================================ ROUND -->
+<section class="plate" id="round" aria-labelledby="round-h" data-ss-section="round">
+  <div class="wrap">
+    <div class="plate-head">
+      <p class="eyebrow" data-ss-id="round-p-1">wrapped_planet_worlds.md §5.1 · plan §7.10, §7.11</p>
+      <h2 id="round-h" data-ss-id="round-h">Round one way, capped the other</h2>
+      <p data-ss-id="round-p-2">Roll the stored span east–west and its two ends meet: that is the cylinder TW plays, and every row of blocks closes on itself. The real planet is a sphere, where each polar row, C blocks long, would have to shrink to a single point. The block grid cannot do that, and closing the pole edge any other way makes a mirror.</p>
+    </div>
+    <div class="two">
+      <div class="stage" data-ss-id="round-figure-1">
+        <div class="tools">
+          <div class="seg" role="group" aria-label="Shape">
+            <button type="button" data-shape="0" aria-pressed="false">Flat span</button>
+            <button type="button" data-shape="1" aria-pressed="true">Cylinder</button>
+            <button type="button" data-shape="2" aria-pressed="false">Sphere</button>
+          </div>
+          <button type="button" class="btn" id="roll-play">Play ▸</button>
+        </div>
+        <canvas id="rollc" aria-label="The map rolled into a cylinder; drag to turn it." style="touch-action:pan-y"></canvas>
+        <label class="visually-hidden" for="roll-s">Shape: flat, cylinder, sphere</label>
+        <input type="range" id="roll-s" min="0" max="2" step="0.01" value="1">
+        <p class="caption" id="roll-caption" data-ss-id="round-p-3"></p>
+      </div>
+      <div class="stage" data-ss-id="round-figure-2">
+        <div class="tools">
+          <div class="seg" role="group" aria-label="Pole option">
+            <button type="button" data-mir="mirror" aria-pressed="true">Seamless pole</button>
+            <button type="button" data-mir="transit" aria-pressed="false">Pole transit</button>
+            <button type="button" data-mir="cap" aria-pressed="false">Soft cap</button>
+          </div>
+          <button type="button" class="btn" id="mir-play">Replay ▸</button>
+        </div>
+        <canvas id="mirc" aria-label="The northern edge of the map, with a ship sailing north under the selected pole option."></canvas>
+        <p class="caption" id="mir-caption" data-ss-id="round-p-4"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ POLES -->
+<section class="plate" id="poles" aria-labelledby="poles-h" data-ss-section="poles">
+  <div class="wrap">
+    <div class="plate-head">
+      <p class="eyebrow" data-ss-id="poles-p-1">Plan §7.11 · P1-18 · prototype in P0-06</p>
+      <h2 id="poles-h" data-ss-id="poles-h">The poles: a soft cap, then a wall</h2>
+      <p data-ss-id="poles-p-2">From 75° a pushback toward the equator grows with latitude, an action-bar warning appears, and a storm (fog and particles, drawn by the client) thickens. Sable ships get wind: their velocity is pushed toward the equator. At 80° the pushback becomes a hard stop. Terrain exists all the way to the pole edge; past it (|z| ≥ C/4), chunks that load at view distance are an ice-sheet ocean.</p>
+      <p class="flag" data-ss-id="poles-p-3"><span class="pill pend">Not built</span><span>Planned in P1-18. The plan fixes where the cap starts and where the stop is, not the shape of the curves: the curves, the storm and the warning text below are illustrations.</span></p>
+    </div>
+    <div class="fig">
+      <div class="stage" data-ss-id="poles-figure-1">
+        <div class="tools">
+          <label for="lat" class="check" style="flex:none">Latitude</label>
+          <input type="range" id="lat" min="60" max="90" step="0.1" value="77" style="flex:1 1 200px;width:auto">
+          <button type="button" class="btn" id="walk">Walk north ▸</button>
+        </div>
+        <canvas id="scenec" aria-label="Illustration of the view north at the chosen latitude: storm, fog and the action-bar warning."></canvas>
+        <ul class="legend">
+          <li><span class="key" style="background:var(--ink)"></span>Pushback (illustrative)</li>
+          <li><span class="key" style="background:repeating-linear-gradient(90deg,var(--ink-3) 0 4px,transparent 4px 7px)"></span>Storm (illustrative)</li>
+          <li><span class="key" style="background:var(--stop)"></span>Hard stop, 80°</li>
+        </ul>
+        <canvas id="polec" aria-label="Chart of pushback and storm strength against latitude from 60 to 90 degrees."></canvas>
+      </div>
+      <div class="readout-col" style="display:grid;gap:14px;min-width:0">
+        <aside class="readout" id="pole-read" aria-live="polite" data-ss-id="poles-panel-1"></aside>
+        <div class="readout">
+          <h3 data-ss-id="poles-h3-1">Later: pole transit</h3>
+          <div class="polar">
+            <svg viewBox="0 0 200 200" role="img" aria-labelledby="polar-t" style="width:100%;max-width:200px;height:auto">
+              <title id="polar-t">Looking down on the north pole: a ship heading north goes straight over the pole and arrives at the opposite longitude heading south.</title>
+              <circle cx="100" cy="100" r="90" class="f-bg2 s-rule" stroke-width="1"/>
+              <g class="s-rule" stroke-width="0.8">
+                <line x1="100" y1="10" x2="100" y2="190"/><line x1="10" y1="100" x2="190" y2="100"/>
+                <line x1="36.4" y1="36.4" x2="163.6" y2="163.6"/><line x1="163.6" y1="36.4" x2="36.4" y2="163.6"/>
+              </g>
+              <circle cx="100" cy="100" r="45" fill="none" class="s-cap" stroke-width="2"/>
+              <circle cx="100" cy="100" r="30" fill="none" class="s-stop" stroke-width="2"/>
+              <path d="M100 178 L100 30" class="s-seam" stroke-width="2.2" stroke-dasharray="5 4" fill="none"/>
+              <path d="M94 36 L100 24 L106 36 Z" class="f-seam"/>
+              <rect x="90" y="128" width="20" height="4" class="f-stop"/>
+              <circle cx="100" cy="100" r="2.6" class="f-ink"/>
+              <text x="104" y="96" font-size="8.5" class="f-ink2">pole</text>
+              <text x="140" y="148" font-size="8" class="f-ink3">75°</text>
+              <text x="122" y="128" font-size="8" class="f-ink3">80°</text>
+              <text x="100" y="196" font-size="8.5" text-anchor="middle" class="f-ink2">you, heading north</text>
+              <text x="100" y="17" font-size="8.5" text-anchor="middle" class="f-seam">arrive heading south</text>
+            </svg>
+            <p class="small" id="transit-text" data-ss-id="poles-p-4"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ NETHER / END -->
+<section class="plate" id="dims" aria-labelledby="dims-h" data-ss-section="dims">
+  <div class="wrap">
+    <div class="plate-head">
+      <p class="eyebrow" data-ss-id="dims-p-1">Plan §5.1, §7.10 · wrap/PlanetShape.java</p>
+      <h2 id="dims-h" data-ss-id="dims-h">Nether and End</h2>
+      <p data-ss-id="dims-p-2">The Nether loops too, at exactly 1:8: <span data-v="nether">128</span> chunks against the overworld's <span data-v="chunks">1,024</span>, so one Nether block still stands for 8 overworld blocks everywhere, including across both seams, and portals stay consistent. TW requires the Nether width to be exactly the overworld's divided by 8 (and at least 16 chunks). The End is vanilla: it does not loop.</p>
+      <pre class="formula" data-ss-id="dims-code-1">// wrap/PlanetShape.java, called from the mixin on WorldDimensions.bake
+LoopSpans spans = LoopSpans.ofWidth(Direction.Axis.X, chunks);        // chunks = C / 16
+return ShapeDimensions.withSpans(dims, spans, spans.scaledDown(NETHER_SCALE),   // NETHER_SCALE = 8
+        LoopSpans.NONE, GenerationOptions.DEFAULT);                     // End: no loop</pre>
+    </div>
+    <div class="fig">
+      <div class="stage" data-ss-id="dims-figure-1">
+        <div class="tools">
+          <label for="nx" class="check" style="flex:none">Nether x</label>
+          <input type="range" id="nx" min="-1024" max="1023" step="1" value="1019" style="flex:1 1 200px;width:auto">
+          <button type="button" class="btn" id="nwalk">Walk east ▸</button>
+        </div>
+        <div class="two" style="align-items:center">
+          <svg id="rings" viewBox="0 0 280 280" role="img" aria-labelledby="rings-t" style="width:100%;max-width:340px;height:auto;margin-inline:auto;display:block">
+            <title id="rings-t">The overworld loop (outer ring) and the Nether loop (inner ring), with the seam at the top and a portal linking a Nether position to its overworld position.</title>
+            <g id="rings-g"></g>
+          </svg>
+          <div style="display:grid;gap:10px">
+            <div class="seg" role="group" aria-label="Nether width">
+              <button type="button" id="nw-exact" aria-pressed="true">Exact 1:8</button>
+              <button type="button" id="nw-off" aria-pressed="false">What if not?</button>
+            </div>
+            <dl class="kv" id="nether-read" aria-live="polite"></dl>
+            <p class="small" id="nether-note" data-ss-id="dims-p-3"></p>
+          </div>
+        </div>
+      </div>
+      <aside class="readout" data-ss-id="dims-panel-1">
+        <h3 data-ss-id="dims-h3-1">The End: no loop</h3>
+        <svg viewBox="0 0 260 120" role="img" aria-labelledby="end-t" style="width:100%;height:auto">
+          <title id="end-t">The End: the main island at the origin and outer islands, with open space to either side and no seam.</title>
+          <line x1="8" y1="60" x2="252" y2="60" class="s-rule" stroke-width="1" stroke-dasharray="3 4"/>
+          <ellipse cx="130" cy="60" rx="26" ry="16" class="f-ink3" opacity=".55"/>
+          <ellipse cx="44" cy="52" rx="10" ry="6" class="f-ink3" opacity=".35"/>
+          <ellipse cx="206" cy="70" rx="12" ry="7" class="f-ink3" opacity=".35"/>
+          <ellipse cx="236" cy="48" rx="6" ry="4" class="f-ink3" opacity=".3"/>
+          <ellipse cx="20" cy="74" rx="6" ry="4" class="f-ink3" opacity=".3"/>
+          <text x="130" y="96" font-size="9" text-anchor="middle" class="f-ink2">main island, x = 0</text>
+          <text x="8" y="112" font-size="8.5" class="f-ink3">← goes on</text>
+          <text x="252" y="112" font-size="8.5" text-anchor="end" class="f-ink3">goes on →</text>
+        </svg>
+        <p class="small" data-ss-id="dims-p-4"><code>LoopSpans.NONE</code>: the End keeps vanilla's shape, with no seam and the usual world border.</p>
+        <p class="flag" data-ss-id="dims-p-5"><span class="pill pend">Not probed</span><span>The Nether and End spans are set in code; the probe run so far covered the overworld only.</span></p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ STATUS -->
+<section class="plate" id="status" aria-labelledby="status-h" data-ss-section="status">
+  <div class="wrap">
+    <div class="plate-head">
+      <p class="eyebrow" data-ss-id="status-p-1">STATUS.md · plan P0-06, P1-18, §10.6</p>
+      <h2 id="status-h" data-ss-id="status-h">What is verified, and what is not</h2>
+      <p data-ss-id="status-p-2">Verified on 2026-09-28 on a dedicated planet server running the analytic test terrain at C = 16,384. Nothing here has been looked at through a game client: Ben cannot launch the game, so everything is checked by server-side tests and probes.</p>
+    </div>
+    <div class="tools" style="margin-bottom:12px">
+      <div class="filters" role="group" aria-label="Filter rows">
+        <button type="button" class="btn" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" class="btn" data-filter="ok" aria-pressed="false">Verified</button>
+        <button type="button" class="btn" data-filter="pend" aria-pressed="false">Pending</button>
+        <button type="button" class="btn" data-filter="unv" aria-pressed="false">Needs a client</button>
+      </div>
+      <span class="sep"></span>
+      <span class="tally" id="tally"></span>
+    </div>
+    <div class="tablewrap">
+      <table class="status" data-ss-id="status-table-1">
+        <thead><tr><th scope="col">Claim</th><th scope="col">State</th><th scope="col">Evidence, or what will decide it</th></tr></thead>
+        <tbody>
+          <tr data-s="ok" data-ss-id="status-row-1"><td>Deep Time shapes its own world; TW stamps the generator; x loops, z does not</td><td><span class="pill ok">Verified</span></td><td class="ev">/deeptime probe tw → stamped=true, loopsX=true, loopsZ=false, widthChunks=1024 (chunks −512 … 511)</td></tr>
+          <tr data-s="ok" data-ss-id="status-row-2"><td>Terrain is continuous across the seam</td><td><span class="pill ok">Verified</span></td><td class="ev">GameTest columnscontinuous: 16 rows at the seam, 0 bad folds, 0 height jumps</td></tr>
+          <tr data-s="ok" data-ss-id="status-row-3"><td>An entity crossing the seam is folded back into the span</td><td><span class="pill ok">Verified</span></td><td class="ev">GameTest entitycrossesseam: a snowball flying east from x = 8,188.5 came out at x = −8,191.79</td></tr>
+          <tr data-s="ok" data-ss-id="status-row-4"><td>Generated heights equal the terrain function; the terrain is periodic across the seam</td><td><span class="pill ok">Verified</span></td><td class="ev">GameTests (P0-05): heightMatchesReference max difference 0 on all 128 sampled columns; periodicAcrossSeam 0 mismatches</td></tr>
+          <tr data-s="pend" data-ss-id="status-row-5"><td>Sable ships cross the seam</td><td><span class="pill pend">Pending</span></td><td class="ev">SableSeamGameTests.jetCrossesSeam must pass 20 of 20 (P0-06)</td></tr>
+          <tr data-s="pend" data-ss-id="status-row-6"><td>A ship saved straddling the seam reloads intact</td><td><span class="pill pend">Pending</span></td><td class="ev">scenario sable_straddle: same sub-level id and block count after save-all flush, stop, start (P0-06)</td></tr>
+          <tr data-s="pend" data-ss-id="status-row-7"><td>Structures straddling the seam are moved across it</td><td><span class="pill pend">Pending</span></td><td class="ev">structureStraddlesSeam (P0-06)</td></tr>
+          <tr data-s="pend" data-ss-id="status-row-8"><td>Create kinetic networks and trains across the seam</td><td><span class="pill pend">Pending</span></td><td class="ev">informational: shaftLineAcrossSeam logs whether a kinetic network works across the seam (P0-06)</td></tr>
+          <tr data-s="pend" data-ss-id="status-row-9"><td>Region files stay inside the span, at 16k and at 32k</td><td><span class="pill pend">Pending</span></td><td class="ev">smoke mic with Chunky over a rectangle straddling the seam: regions outside span 0; tw.widthChunks=1024 and 2048 (P0-06)</td></tr>
+          <tr data-s="pend" data-ss-id="status-row-10"><td>Nether loops at 1:8; the End does not loop</td><td><span class="pill pend">Pending</span></td><td class="ev">set in PlanetShape (spans.scaledDown(8), LoopSpans.NONE); the probe so far covers the overworld only</td></tr>
+          <tr data-s="pend" data-ss-id="status-row-11"><td>Pole pushback, warning, ship wind, hard stop at 80°</td><td><span class="pill pend">Pending</span></td><td class="ev">PoleCapGameTests.prototypePushback (P0-06); then entityPushedBack, sableHullPushedBack, hardStopAt80 (P1-18)</td></tr>
+          <tr data-s="later" data-ss-id="status-row-12"><td>Pole transit to longitude +180°</td><td><span class="pill later">Later</span></td><td class="ev">plan §10.6; not designed in detail</td></tr>
+          <tr data-s="unv" data-ss-id="status-row-13"><td>How crossing the seam looks and feels: a hitch, pop-in, a ship's hull staying whole on screen</td><td><span class="pill unv">Needs a client</span></td><td class="ev">no server-side test can show it</td></tr>
+          <tr data-s="unv" data-ss-id="status-row-14"><td>Entity tracking across the seam in multiplayer</td><td><span class="pill unv">Needs a client</span></td><td class="ev">needs connected clients on both sides of the seam</td></tr>
+          <tr data-s="unv" data-ss-id="status-row-15"><td>Rendering of contraptions at the seam</td><td><span class="pill unv">Needs a client</span></td><td class="ev">client rendering</td></tr>
+          <tr data-s="unv" data-ss-id="status-row-16"><td>The polar storm and the action-bar warning</td><td><span class="pill unv">Needs a client</span></td><td class="ev">client-side only; P1-18 has nothing visual to review</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer data-ss-section="footer">
+  <div class="wrap">
+    <p data-ss-id="footer-p-1">Sources, all in the Deep Time repository: <code>docs/deeptime-implementation-plan.md</code> §5.1, §5.2, §7.10, §7.11, §10.6 and P0-06; <code>docs/research/notes/wrapped_planet_worlds.md</code> §5.1, §5.3; <code>STATUS.md</code> (build log, 2026-09-28); <code>neoforge/…/wrap/PlanetShape.java</code>. Page source: <code>tools/review/pages/seams/</code>.</p>
+    <p style="margin-top:8px" data-ss-id="footer-p-2">The planet on this page is procedural decoration. The coordinates, bands, spans and folds are computed with the formulas above.</p>
+  </div>
+</footer>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------------------------------------------------------------- basics */
+const MINUS = '−';
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const mod = (a, n) => ((a % n) + n) % n;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FM = '"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace';
+const FD = '"Archivo", "Helvetica Neue", Arial, sans-serif';
+
+function num(n, d = 0) {
+  let r = Number(Number(n).toFixed(d));
+  if (r === 0) r = 0;
+  const s = Math.abs(r).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  return (r < 0 ? MINUS : '') + s;
+}
+
+/* ---------------------------------------------------------------- planet */
+const P = { C: 16384 };
+const subs = [];
+const fold = (x, C = P.C) => mod(x + C / 2, C) - C / 2;       // TW's fold into [−C/2, C/2)
+const latOf = (z, C = P.C) => -z * 360 / C;                     // north is −z
+const lonRaster = (x, C = P.C) => 360 * mod(x + C / 2, C) / C; // plan §5.2
+const lonPM = (x, C = P.C) => 360 * fold(x, C) / C;             // the HTML viewer's ±180° form
+const chunkOf = (v) => Math.floor(v / 16);
+const regionOf = (v) => Math.floor(v / 512);
+function zoneOf(z, C = P.C) {
+  if (z < -C / 4 || z >= C / 4) return 'pole';
+  const a = Math.abs(latOf(z + 0.5, C));
+  if (a >= 80) return 'stop';
+  if (a >= 75) return 'cap';
+  return 'open';
+}
+const ZONES = {
+  open: ['open', 'Open world'],
+  cap: ['cap', 'Soft cap: pushback, warning, storm'],
+  stop: ['stop', 'Past the 80° hard stop: unreachable'],
+  pole: ['pole', 'Beyond the pole edge: ice-sheet ocean'],
+};
+function derived(C) {
+  const s80 = Math.round(80 / 90 * C / 4);
+  return {
+    C: num(C), halfC: num(C / 2), halfCm1: num(C / 2 - 1), negHalfC: num(-C / 2),
+    chunks: num(C / 16), nether: num(C / 128), latPer: (360 / C).toFixed(5) + '°',
+    cap75: num(Math.round(75 / 90 * C / 4)), stop80: num(s80), qC: num(C / 4),
+    gap: num(C / 4 - s80), gapChunks: num(Math.floor((C / 4 - s80) / 16)),
+  };
+}
+function applyDerived() {
+  const d = derived(P.C);
+  $$('[data-v]').forEach((el) => { const k = el.getAttribute('data-v'); if (k in d) el.textContent = d[k]; });
+  $$('#numtable [data-col]').forEach((el) => el.classList.toggle('on', +el.getAttribute('data-col') === P.C));
+  $$('.bar .seg button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.c === P.C)));
+}
+function setC(C) { if (C === P.C) return; P.C = C; applyDerived(); subs.forEach((f) => f()); }
+$$('.bar .seg button').forEach((b) => b.addEventListener('click', () => setC(+b.dataset.c)));
+
+/* ---------------------------------------------------------------- theme */
+let T = {};
+function hexRgb(h) {
+  h = String(h).replace('#', '').trim();
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  const n = parseInt(h.slice(0, 6), 16) || 0;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgba(hex, a) { const [r, g, b] = hexRgb(hex); return `rgba(${r},${g},${b},${a})`; }
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = (n) => cs.getPropertyValue(n).trim();
+  T = { bg: g('--bg'), bg2: g('--bg-2'), panel: g('--panel'), ink: g('--ink'), ink2: g('--ink-2'), ink3: g('--ink-3'),
+        rule: g('--rule'), seam: g('--seam'), cap: g('--cap'), capInk: g('--cap-ink'), stop: g('--stop'),
+        stopInk: g('--stop-ink'), ice: g('--ice') };
+  const [r, gg, b] = hexRgb(T.bg);
+  T.dark = (0.2126 * r + 0.7152 * gg + 0.0722 * b) < 110;
+}
+
+/* ---------------------------------------------------------------- canvas helpers */
+function prep(canvas, cssH) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = canvas.clientWidth;
+  canvas.style.height = cssH + 'px';
+  const W = Math.max(1, Math.round(w * dpr)), H = Math.max(1, Math.round(cssH * dpr));
+  if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h: cssH };
+}
+function hatch(ctx, color, bg) {
+  const c = document.createElement('canvas'); c.width = c.height = 8;
+  const x = c.getContext('2d');
+  if (bg) { x.fillStyle = bg; x.fillRect(0, 0, 8, 8); }
+  x.strokeStyle = color; x.lineWidth = 1.3;
+  x.beginPath(); x.moveTo(-2, 10); x.lineTo(10, -2); x.moveTo(-2, 2); x.lineTo(2, -2); x.moveTo(6, 10); x.lineTo(10, 6); x.stroke();
+  return ctx.createPattern(c, 'repeat');
+}
+function text(ctx, s, x, y, o) {
+  ctx.font = o.font; ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'middle';
+  if (o.halo) { ctx.lineJoin = 'round'; ctx.lineWidth = o.hw || 3; ctx.strokeStyle = o.halo; ctx.strokeText(s, x, y); }
+  ctx.fillStyle = o.color; ctx.fillText(s, x, y);
+}
+function tag(ctx, s, x, y, bg, fg, font) {
+  ctx.font = font; const w = ctx.measureText(s).width + 10, h = 17;
+  ctx.fillStyle = bg; ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x - w / 2, y - h / 2, w, h, 4); else ctx.rect(x - w / 2, y - h / 2, w, h);
+  ctx.fill();
+  ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s, x, y + 0.5);
+  return w;
+}
+
+/* ---------------------------------------------------------------- noise and the example planet */
+function hash3(x, y, z, seed) {
+  let h = seed ^ Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(z | 0, 0x1b873593);
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function vnoise3(x, y, z, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const u = smooth(x - xi), v = smooth(y - yi), w = smooth(z - zi);
+  const a = lerp(hash3(xi, yi, zi, seed), hash3(xi + 1, yi, zi, seed), u);
+  const b = lerp(hash3(xi, yi + 1, zi, seed), hash3(xi + 1, yi + 1, zi, seed), u);
+  const c = lerp(hash3(xi, yi, zi + 1, seed), hash3(xi + 1, yi, zi + 1, seed), u);
+  const d = lerp(hash3(xi, yi + 1, zi + 1, seed), hash3(xi + 1, yi + 1, zi + 1, seed), u);
+  return lerp(lerp(a, b, v), lerp(c, d, v), w);
+}
+function fbm3(x, y, z, oct, seed) {
+  let s = 0, a = 1, f = 1, n = 0;
+  for (let o = 0; o < oct; o++) { s += a * vnoise3(x * f, y * f, z * f, seed + o * 1013); n += a; a *= 0.5; f *= 2.07; }
+  return s / n;
+}
+// A 2D value noise that is periodic in x: the lattice index wraps modulo `period`.
+function pnoise2(x, y, period, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const u = smooth(x - xi), v = smooth(y - yi);
+  const x0 = mod(xi, period), x1 = mod(xi + 1, period);
+  return lerp(lerp(hash3(x0, yi, 0, seed), hash3(x1, yi, 0, seed), u),
+              lerp(hash3(x0, yi + 1, 0, seed), hash3(x1, yi + 1, 0, seed), u), v);
+}
+const SEED = 20260928 | 0;
+let LON_OFF = 0;
+// Elevation sampled on the unit sphere, so it is periodic in longitude and shows the sec φ stretch.
+function elev(lonDeg, latDeg) {
+  const l = (lonDeg + LON_OFF) * Math.PI / 180, p = latDeg * Math.PI / 180;
+  const cx = Math.cos(p) * Math.cos(l), cy = Math.cos(p) * Math.sin(l), cz = Math.sin(p);
+  const k = 1.7;
+  const wx = fbm3(cx * k + 11.3, cy * k, cz * k, 3, SEED + 7) - 0.5;
+  const wy = fbm3(cx * k, cy * k + 23.1, cz * k, 3, SEED + 9) - 0.5;
+  const wz = fbm3(cx * k, cy * k, cz * k + 37.7, 3, SEED + 13) - 0.5;
+  const F = 1.35;
+  return fbm3(cx * F + wx * 1.2 + 5, cy * F + wy * 1.2 + 5, cz * F + wz * 1.2 + 5, 6, SEED);
+}
+const MAP = { iw: 640, ih: 320, canvas: null, data: null };
+const LAND = [[0, [104, 142, 82]], [0.2, [137, 160, 92]], [0.45, [178, 162, 108]], [0.72, [150, 128, 104]], [1, [232, 228, 220]]];
+const mix3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+function ramp(stops, t) {
+  for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) {
+    const [t0, c0] = stops[i - 1], [t1, c1] = stops[i];
+    return mix3(c0, c1, (t - t0) / (t1 - t0));
+  }
+  return stops[stops.length - 1][1].slice();
+}
+function buildMap() {
+  const { iw, ih } = MAP;
+  let best = -Infinity, bestOff = 0;
+  for (let off = 0; off < 360; off += 5) {         // turn the planet so a continent straddles the seam
+    LON_OFF = off;
+    const s = elev(0, 0) + elev(0, 12) + elev(0, -8) + elev(6, 4) + elev(354, -2);
+    if (s > best) { best = s; bestOff = off; }
+  }
+  LON_OFF = bestOff;
+  const E = new Float32Array(iw * ih);
+  for (let j = 0; j < ih; j++) {
+    const lat = 90 - (j + 0.5) * 180 / ih;
+    for (let i = 0; i < iw; i++) E[j * iw + i] = elev((i + 0.5) * 360 / iw, lat);
+  }
+  const sorted = Float32Array.from(E).sort();
+  const thr = sorted[Math.floor(sorted.length * 0.63)], emin = sorted[0], emax = sorted[sorted.length - 1];
+  const img = new ImageData(iw, ih), d = img.data;
+  for (let j = 0; j < ih; j++) {
+    const lat = 90 - (j + 0.5) * 180 / ih, al = Math.abs(lat);
+    const jn = Math.max(0, j - 1), js = Math.min(ih - 1, j + 1);
+    for (let i = 0; i < iw; i++) {
+      const k = j * iw + i, e = E[k];
+      let c;
+      if (e < thr) {
+        const t = clamp((thr - e) / (thr - emin) * 1.9, 0, 1);
+        c = mix3([80, 140, 170], [26, 60, 88], Math.sqrt(t));
+        if (al > 73) c = mix3(c, [206, 222, 230], smooth((al - 73) / 9));
+      } else {
+        const t = (e - thr) / (emax - thr);
+        c = ramp(LAND, t);
+        const ex = E[j * iw + (i + 1) % iw] - E[j * iw + (i - 1 + iw) % iw];
+        const ey = E[js * iw + i] - E[jn * iw + i];
+        const sh = clamp(1 + (ey - ex) * 12, 0.74, 1.22);
+        c = [c[0] * sh, c[1] * sh, c[2] * sh];
+        const iceLine = 69 - 12 * t;
+        if (al > iceLine) c = mix3(c, [236, 242, 245], smooth((al - iceLine) / 5));
+      }
+      d[k * 4] = c[0]; d[k * 4 + 1] = c[1]; d[k * 4 + 2] = c[2]; d[k * 4 + 3] = 255;
+    }
+  }
+  const cv = document.createElement('canvas'); cv.width = iw; cv.height = ih;
+  cv.getContext('2d').putImageData(img, 0, 0);
+  MAP.canvas = cv; MAP.data = d;
+}
+
+/* ================================================================ 1. MAP */
+const M = { view: 180, pin: null, hover: null, regions: false, distort: false, seam: true, drag: null, geo: null };
+function drawMap() {
+  const cv = $('#mapc'); const w = cv.clientWidth; if (!w) return;
+  const band = Math.round(clamp(w * 0.022, 10, 20)), axis = 26, mh = Math.round(w / 2);
+  const h = band * 2 + mh + axis;
+  const { ctx } = prep(cv, h);
+  const top = band, C = P.C;
+  M.geo = { w, h, top, mh, band };
+  const X = (lon) => mod(lon - M.view, 360) / 360 * w;
+  const Y = (lat) => top + (90 - lat) / 180 * mh;
+  ctx.clearRect(0, 0, w, h);
+  // beyond the pole edges
+  ctx.fillStyle = '#CDDEE6'; ctx.fillRect(0, 0, w, band); ctx.fillRect(0, top + mh, w, band);
+  ctx.fillStyle = hatch(ctx, 'rgba(60,96,118,.35)'); ctx.fillRect(0, 0, w, band); ctx.fillRect(0, top + mh, w, band);
+  // the planet, drawn twice so it wraps
+  const x0 = X(0);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(MAP.canvas, x0 - w, top, w, mh);
+  ctx.drawImage(MAP.canvas, x0, top, w, mh);
+  // cap bands
+  const stopPat = hatch(ctx, 'rgba(196,58,46,.85)', 'rgba(196,58,46,.16)');
+  for (const s of [1, -1]) {
+    const y75 = Y(75 * s), y80 = Y(80 * s), y90 = Y(90 * s);
+    ctx.fillStyle = 'rgba(216,150,26,.34)'; ctx.fillRect(0, Math.min(y75, y80), w, Math.abs(y80 - y75));
+    ctx.fillStyle = stopPat; ctx.fillRect(0, Math.min(y80, y90), w, Math.abs(y90 - y80));
+    ctx.fillStyle = 'rgba(216,150,26,.95)'; ctx.fillRect(0, y75 - 0.75, w, 1.5);
+    ctx.fillStyle = 'rgba(196,58,46,.95)'; ctx.fillRect(0, y80 - 0.75, w, 1.5);
+  }
+  // graticule: parallels every 15°, meridians every 45° (x multiples of C/8)
+  ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.26)';
+  ctx.beginPath();
+  for (let lat = -60; lat <= 60; lat += 15) { if (lat === 0) continue; const y = Math.round(Y(lat)) + 0.5; ctx.moveTo(0, y); ctx.lineTo(w, y); }
+  for (let lon = 45; lon < 360; lon += 45) { const x = Math.round(X(lon)) + 0.5; ctx.moveTo(x, top); ctx.lineTo(x, top + mh); }
+  ctx.stroke();
+  ctx.setLineDash([6, 4]); ctx.strokeStyle = 'rgba(255,255,255,.55)';
+  ctx.beginPath(); ctx.moveTo(0, Y(0)); ctx.lineTo(w, Y(0)); ctx.stroke(); ctx.setLineDash([]);
+  // region files
+  if (M.regions) {
+    ctx.strokeStyle = 'rgba(255,255,255,.42)'; ctx.lineWidth = 0.7; ctx.beginPath();
+    for (let rx = -C / 1024; rx < C / 1024; rx++) { const x = Math.round(X(lonRaster(rx * 512))) + 0.5; ctx.moveTo(x, top); ctx.lineTo(x, top + mh); }
+    for (let rz = -C / 2048; rz <= C / 2048; rz++) { const y = Math.round(Y(latOf(rz * 512))) + 0.5; ctx.moveTo(0, y); ctx.lineTo(w, y); }
+    ctx.stroke();
+  }
+  // stretch: circles 10° across on the planet, as they land on the map
+  if (M.distort) {
+    const lc = 67.5;
+    for (const lat of [0, 30, 45, 60, 75]) {
+      const sec = 1 / Math.cos(lat * Math.PI / 180);
+      const rx = 5 * sec / 360 * w, ry = 5 / 180 * mh;
+      for (const dx of [0, -w, w]) {
+        const cx = X(lc) + dx, cy = Y(lat);
+        if (cx + rx < 0 || cx - rx > w) continue;
+        ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fill();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke();
+        text(ctx, '×' + sec.toFixed(1), cx, cy, { font: `600 11px ${FM}`, align: 'center', color: '#fff', halo: 'rgba(0,0,0,.55)' });
+      }
+    }
+  }
+  // seam
+  const xs = X(0);
+  if (M.seam) {
+    ctx.fillStyle = T.seam; ctx.fillRect(Math.round(xs) - 1, 0, 2, top + mh + band);
+    const lab = `seam · x = ${num(C / 2 - 1)} | ${num(-C / 2)}`;
+    ctx.font = `600 11px ${FM}`;
+    const tw = ctx.measureText(lab).width + 10;
+    tag(ctx, lab, clamp(xs, tw / 2 + 2, w - tw / 2 - 2), top + 14, T.seam, '#fff', `600 11px ${FM}`);
+  }
+  // parallel labels
+  const labs = [[60, '60°N'], [30, '30°N'], [0, 'equator'], [-30, '30°S'], [-60, '60°S']];
+  for (const [lat, s] of labs) text(ctx, s, 6, Y(lat) - 7, { font: `500 10.5px ${FM}`, color: '#fff', halo: 'rgba(0,0,0,.5)' });
+  if (mh > 220) {
+    text(ctx, '75°', w - 6, Y(77.5), { font: `600 10.5px ${FM}`, align: 'right', color: '#FFD27A', halo: 'rgba(0,0,0,.6)' });
+    text(ctx, '80°', w - 6, Y(85), { font: `600 10.5px ${FM}`, align: 'right', color: '#FFB0A6', halo: 'rgba(0,0,0,.6)' });
+  }
+  text(ctx, 'beyond the pole edge · ice-sheet ocean', 6, band / 2 + 0.5, { font: `600 ${band > 13 ? 10 : 8.5}px ${FD}`, color: '#23404F' });
+  // x axis
+  const ay = top + mh + band + axis / 2 + 1;
+  ctx.fillStyle = T.ink3;
+  let lastX = -1e9;
+  const ticks = [];
+  for (let k = 0; k < 8; k++) ticks.push(-C / 2 + k * C / 8);
+  ticks.map((x) => [X(lonRaster(x)), x]).sort((a, b) => a[0] - b[0]).forEach(([sx, x]) => {
+    if (sx - lastX < 58 || sx < 22 || sx > w - 22) return;
+    lastX = sx;
+    const isSeam = x === -C / 2;
+    text(ctx, isSeam ? '±' + num(C / 2) : num(x), sx, ay, { font: `${isSeam ? 600 : 500} 10.5px ${FM}`, align: 'center', color: isSeam ? T.seam : T.ink3 });
+    ctx.fillStyle = T.rule; ctx.fillRect(Math.round(sx), top + mh + band, 1, 4);
+  });
+  text(ctx, 'x', 4, ay, { font: `600 10.5px ${FM}`, color: T.ink3 });
+  // pin and hover
+  const mark = (p, strong) => {
+    const x = X(p.lon), y = top + (90 - p.lat) / 180 * mh;
+    if (strong) {
+      ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, top + mh + band); ctx.moveTo(0, y + 0.5); ctx.lineTo(w, y + 0.5); ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.beginPath(); ctx.arc(x, y, strong ? 6 : 4.5, 0, Math.PI * 2);
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.stroke();
+    ctx.lineWidth = 1.6; ctx.strokeStyle = '#fff'; ctx.stroke();
+  };
+  if (M.pin) mark(M.pin, true);
+  if (M.hover) mark(M.hover, false);
+}
+function blockOf(p, C = P.C) {
+  const x = clamp(Math.floor(p.lon / 360 * C - C / 2), -C / 2, C / 2 - 1);
+  const z = Math.floor(-p.lat * C / 360);
+  return { x, z };
+}
+function mapReadout() {
+  const p = M.hover || M.pin; const C = P.C;
+  const { x, z } = blockOf(p);
+  const zone = zoneOf(z);
+  const latc = latOf(z + 0.5), lonr = lonRaster(x + 0.5), lonp = lonPM(x + 0.5);
+  const east = C / 2 - x, west = x + C / 2 + 1;
+  const toSeam = east <= west ? `${num(east)} blocks east` : `${num(west)} blocks west`;
+  const sec = 1 / Math.cos(Math.min(89.9, Math.abs(latc)) * Math.PI / 180);
+  const [zc, zt] = ZONES[zone];
+  const latTxt = zone === 'pole' ? `past the pole edge (|z| ≥ ${num(C / 4)})` : `${Math.abs(latc).toFixed(3)}° ${latc >= 0 ? 'N' : 'S'}`;
+  $('#map-read').innerHTML = `
+    <h3>${M.hover ? 'Pointer' : 'Pin'} at block ${num(x)}, ${num(z)}</h3>
+    <dl class="kv">
+      <dt>Latitude</dt><dd>${latTxt}</dd>
+      <dt>Longitude</dt><dd>${lonr.toFixed(3)}°<br><span class="dim">${Math.abs(lonp).toFixed(3)}° ${lonp >= 0 ? 'E' : 'W'} in the viewer's ±180° form</span></dd>
+      <dt>Chunk</dt><dd>${num(chunkOf(x))}, ${num(chunkOf(z))}</dd>
+      <dt>Region file</dt><dd>r.${regionOf(x)}.${regionOf(z)}.mca</dd>
+      <dt>To the seam</dt><dd>${toSeam}</dd>
+      <dt>Zone</dt><dd><span class="pill ${zc}">${zt}</span></dd>
+      <dt>Stretch</dt><dd>${zone === 'pole' ? '—' : '×' + sec.toFixed(2) + ' east–west'}</dd>
+    </dl>
+    <p class="small">At C = ${num(C)}: ${num(C / 1024 * 2)} region columns (r.${-C / 1024} … r.${C / 1024 - 1}) exist on disk, and no region file past them is ever written.</p>`;
+}
+function mapPick(e) {
+  const r = $('#mapc').getBoundingClientRect(), g = M.geo;
+  const sx = e.clientX - r.left, sy = e.clientY - r.top;
+  if (!g || sy > g.top + g.mh + g.band || sy < 0) return null;
+  return { lon: mod(M.view + sx / g.w * 360, 360), lat: clamp(90 - (sy - g.top) / g.mh * 180, -90 - g.band / g.mh * 180, 90 + g.band / g.mh * 180) };
+}
+function initMap() {
+  const cv = $('#mapc');
+  cv.style.touchAction = 'pan-y';
+  cv.addEventListener('pointerdown', (e) => {
+    M.drag = { x0: e.clientX, v0: M.view, moved: false };
+    try { cv.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (M.drag) {
+      const dx = e.clientX - M.drag.x0;
+      if (Math.abs(dx) > 4) M.drag.moved = true;
+      if (M.drag.moved) { M.view = mod(M.drag.v0 - dx / M.geo.w * 360, 360); M.hover = null; drawMap(); return; }
+    }
+    if (e.pointerType === 'mouse') { M.hover = mapPick(e); drawMap(); mapReadout(); }
+  });
+  cv.addEventListener('pointerup', (e) => {
+    if (M.drag && !M.drag.moved) { const p = mapPick(e); if (p) { M.pin = p; M.hover = null; } }
+    M.drag = null; drawMap(); mapReadout();
+  });
+  cv.addEventListener('pointercancel', () => { M.drag = null; });
+  cv.addEventListener('pointerleave', () => { if (!M.drag) { M.hover = null; drawMap(); mapReadout(); } });
+  cv.addEventListener('keydown', (e) => {
+    const step = (e.shiftKey ? 8 : 1) * 512 / P.C * 360;   // 512 blocks (one region), or 8 regions
+    const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key];
+    if (!d) return;
+    e.preventDefault();
+    M.pin = { lon: mod(M.pin.lon + d[0], 360), lat: clamp(M.pin.lat + d[1], -90, 90) };
+    M.hover = null; drawMap(); mapReadout();
+  });
+  $('#map-centre').addEventListener('click', () => { M.view = 180; drawMap(); });
+  $('#map-span').addEventListener('click', () => { M.view = 0; drawMap(); });
+  $('#map-seam').addEventListener('change', (e) => { M.seam = e.target.checked; drawMap(); });
+  $('#map-regions').addEventListener('change', (e) => { M.regions = e.target.checked; drawMap(); });
+  $('#map-distort').addEventListener('change', (e) => { M.distort = e.target.checked; drawMap(); });
+  M.pin = { lon: 330, lat: 45 };
+}
+
+/* ================================================================ 2. SEAM STRIP */
+const RAIL_Z = 5;
+const S = { P: 32, G: 10, R: 18, zTop: -9, view: 0, anim: 0, slow: true, player: null, ents: [], tick: 0, acc: 0,
+            raf: 0, last: 0, flashes: [], log: [], tracked: null, tex: null, texKey: '', geo: null, drag: false, seq: 0 };
+const KIND = {
+  snowball: { name: 'Snowball', note: () => `Replays the GameTest entitycrossesseam: spawned at x = ${num(P.C / 2 - 3.5, 1)} flying east. At C = 16,384 the test found it at x = −8,191.79; the speed here is picked so the replay lands on that number.` },
+  minecart: { name: 'Minecart', note: () => 'On a rail line that runs straight through the seam. Passengers and velocity move with it.' },
+  zombie: { name: 'Zombie, chasing you', note: () => 'Its pathfinding target and every distance it measures are folded, so it walks to you through the seam, not the long way round the planet.' },
+  ship: { name: 'Sable ship', note: () => 'Crossing goes through TW\'s Sable compat and is untested: P0-06 needs 20 of 20 jets across the seam, and a hull saved straddling the seam must reload intact. How a straddling hull looks on screen needs a client.' },
+};
+function tileColor(x, z) {
+  const C = P.C, xm = mod(x, C);
+  const h = 0.62 * pnoise2(xm / 8, z / 8, C / 8, 91) + 0.38 * pnoise2(xm / 4, z / 4, C / 4, 92);
+  const zr = -3 + 2.4 * Math.sin(2 * Math.PI * xm / 64) + 1.1 * Math.sin(2 * Math.PI * xm / 32 + 1.3);
+  const dr = Math.abs(z + 0.5 - zr);
+  if (dr < 1.25) return [58, 112, 170];
+  if (dr < 2.1) return [214, 200, 150];
+  if (h > 0.7) return [134, 136, 130];
+  if (hash3(xm, z, 7, 99) < 0.075 && h < 0.62) return [46, 92, 44];
+  const t = clamp((h - 0.25) / 0.45, 0, 1);
+  return [Math.round(lerp(124, 84, t)), Math.round(lerp(178, 138, t)), Math.round(lerp(88, 64, t))];
+}
+function stripTex() {
+  const key = P.C + ':' + S.P;
+  if (S.texKey === key) return S.tex;
+  const mk = (start) => {
+    const c = document.createElement('canvas'); c.width = S.P; c.height = S.R;
+    const g = c.getContext('2d'), im = g.createImageData(S.P, S.R);
+    for (let j = 0; j < S.R; j++) for (let i = 0; i < S.P; i++) {
+      const col = tileColor(start + i, S.zTop + j), k = (j * S.P + i) * 4;
+      im.data[k] = col[0]; im.data[k + 1] = col[1]; im.data[k + 2] = col[2]; im.data[k + 3] = 255;
+    }
+    g.putImageData(im, 0, 0); return c;
+  };
+  S.tex = { W: mk(-P.C / 2), E: mk(P.C / 2 - S.P) }; S.texKey = key;
+  return S.tex;
+}
+const inStrip = (x, C = P.C) => (x >= -C / 2 && x < -C / 2 + S.P) || (x >= C / 2 - S.P && x < C / 2);
+function logEvent(s, f) { S.log.unshift({ tick: S.tick, s, f: !!f }); S.log.length = Math.min(S.log.length, 7); renderLog(); }
+function renderLog() {
+  $('#strip-log').innerHTML = S.log.map((l) => `<li><span class="tk">t${l.tick}</span><span class="${l.f ? 'f' : ''}">${l.s}</span></li>`).join('');
+}
+function resetStrip() {
+  const C = P.C;
+  S.player = { x: C / 2 - 9.5, z: 0.5 };
+  S.ents = []; S.tick = 0; S.acc = 0; S.log = []; S.tracked = null; S.flashes = [];
+  logEvent(`You stand at x = ${num(S.player.x, 1)}, ${num(C / 2 - S.player.x, 1)} blocks west of the seam.`);
+  stripReadout();
+}
+function spawn(kind) {
+  const C = P.C, pl = S.player;
+  let e;
+  if (kind === 'snowball') e = { x: C / 2 - 3.5, z: pl.z, vx: 1.86432 };
+  else if (kind === 'minecart') e = { x: C / 2 - 12.5, z: RAIL_Z + 0.5, vx: 0.4 };
+  else if (kind === 'zombie') e = { x: pl.x >= 0 ? -C / 2 + 4.5 : C / 2 - 4.5, z: clamp(pl.z + 3, S.zTop + 1, S.zTop + S.R - 1), speed: 0.3 };
+  else e = { x: C / 2 - 14, z: -3.5, vx: 0.5, len: 6, wid: 3 };
+  Object.assign(e, { kind, raw: e.x, prevX: e.x, prevZ: e.z, age: 0, folds: [], id: ++S.seq });
+  S.ents.push(e); if (S.ents.length > 6) S.ents.shift();
+  S.tracked = e;
+  logEvent(`${KIND[kind].name.split(',')[0]} #${e.id} at x = ${num(e.x, 2)}.`);
+  stripReadout(); kickStrip();
+}
+function tickOnce() {
+  S.tick++;
+  const C = P.C, pl = S.player;
+  for (const e of S.ents) {
+    e.prevX = e.x; e.prevZ = e.z;
+    let dx = 0, dz = 0;
+    if (e.kind === 'snowball') { dx = e.vx; e.vx *= 0.99; }
+    else if (e.kind === 'zombie') {
+      const tx = fold(pl.x - e.x), tz = pl.z - e.z, d = Math.hypot(tx, tz);
+      if (d > 1.4) { dx = tx / d * e.speed; dz = tz / d * e.speed; }
+    } else dx = e.vx;
+    e.x += dx; e.z += dz; e.raw += dx; e.age++;
+    // End of the entity's tick: TW moves it back into the span, same tick.
+    if (e.x >= C / 2 || e.x < -C / 2) {
+      const before = e.x; e.x = fold(e.x);
+      const east = before >= C / 2;
+      e.folds.push({ tick: S.tick, before, after: e.x });
+      logEvent(`#${e.id} ended the tick at ${num(before, 2)} ${east ? '≥' : '<'} ${num(east ? C / 2 : -C / 2)} → moved to ${num(e.x, 2)}`, true);
+      S.flashes.push({ t0: performance.now(), dir: east ? 1 : -1, z: e.z });
+    }
+  }
+  const gone = S.ents.filter((e) => !inStrip(e.x) || (e.kind === 'snowball' && e.age > 90));
+  for (const e of gone) logEvent(`#${e.id} left the strip at x = ${num(e.x, 1)}.`);
+  if (gone.length) S.ents = S.ents.filter((e) => !gone.includes(e));
+}
+function clampPlayer() {
+  const C = P.C, pl = S.player;
+  if (!inStrip(pl.x)) pl.x = pl.x >= 0 ? C / 2 - S.P + 0.5 : -C / 2 + S.P - 0.5;
+  pl.z = clamp(pl.z, S.zTop + 0.5, S.zTop + S.R - 0.5);
+}
+function movePlayerTo(nx) {
+  const C = P.C, pl = S.player;
+  let x = nx, crossed = 0;
+  if (x >= C / 2) { x -= C; crossed = 1; } else if (x < -C / 2) { x += C; crossed = -1; }
+  pl.x = x;
+  if (crossed) logEvent(`Your movement crossed x = ${num(crossed > 0 ? C / 2 : -C / 2)}: moved to x ${crossed > 0 ? '−' : '+'} ${num(C)} = ${num(x, 2)}`, true);
+  clampPlayer();
+}
+function stepPlayer(d) {
+  const C = P.C, pl = S.player;
+  let nx = pl.x + d;
+  // stay inside the strip: walking away from the seam stops at the strip's inner edge
+  if (pl.x >= 0 && nx < C / 2 - S.P) nx = C / 2 - S.P + 0.5;
+  if (pl.x < 0 && nx >= -C / 2 + S.P) nx = -C / 2 + S.P - 0.5;
+  movePlayerTo(nx);
+  stripReadout(); kickStrip();
+}
+function drawStrip() {
+  const cv = $('#stripc'); const w = cv.clientWidth; if (!w) return;
+  const nP = w < 560 ? 20 : 32;
+  if (nP !== S.P) { S.P = nP; S.texKey = ''; S.ents = S.ents.filter((e) => inStrip(e.x)); clampPlayer(); }
+  S.G = w < 560 ? 8 : 10;
+  const tex = stripTex();
+  const u = w / (2 * S.P + S.G);
+  const top = 36, bot = 30, sh = S.R * u, h = Math.round(top + sh + bot);
+  const { ctx } = prep(cv, h);
+  const C = P.C, t = smooth(S.anim), now = performance.now();
+  const pw = { start: -C / 2, off: lerp(0, S.G / 2 + S.P, t), tex: tex.W, key: 'W' };
+  const pe = { start: C / 2 - S.P, off: lerp(S.P + S.G, S.G / 2, t), tex: tex.E, key: 'E' };
+  S.geo = { w, u, top, sh, h, pw, pe };
+  ctx.clearRect(0, 0, w, h);
+  // the gap between the two ends: the rest of the stored planet
+  const gapA = clamp(1 - t * 2.4, 0, 1);
+  if (gapA > 0) {
+    ctx.globalAlpha = gapA;
+    const gx = S.P * u, gw = S.G * u;
+    ctx.fillStyle = hatch(ctx, rgba(T.ink3, 0.28), T.bg2); ctx.fillRect(gx, top, gw, sh);
+    const mid = gx + gw / 2;
+    if (gw >= 64) {
+      text(ctx, num(C - 2 * S.P), mid, top + sh / 2 - 13, { font: `650 12px ${FD}`, align: 'center', color: T.ink, halo: T.bg2 });
+      text(ctx, 'blocks of', mid, top + sh / 2 + 2, { font: `500 10.5px ${FD}`, align: 'center', color: T.ink2, halo: T.bg2 });
+      text(ctx, 'planet', mid, top + sh / 2 + 15, { font: `500 10.5px ${FD}`, align: 'center', color: T.ink2, halo: T.bg2 });
+    } else {
+      text(ctx, num(C - 2 * S.P), mid, top + sh / 2, { font: `650 9px ${FD}`, align: 'center', color: T.ink, halo: T.bg2 });
+    }
+    ctx.globalAlpha = 1;
+  }
+  // the two ends of the span
+  ctx.imageSmoothingEnabled = false;
+  const panel = (p, alpha) => {
+    const x0 = p.off * u;
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.drawImage(p.tex, x0, top, S.P * u, sh);
+    const ry = top + (RAIL_Z - S.zTop) * u;
+    ctx.fillStyle = 'rgba(96,66,40,.95)';
+    for (let i = 0; i < S.P; i++) ctx.fillRect(x0 + (i + 0.35) * u, ry + 0.08 * u, 0.3 * u, 0.84 * u);
+    ctx.fillStyle = '#A7A7A2';
+    ctx.fillRect(x0, ry + 0.24 * u, S.P * u, Math.max(1, 0.12 * u)); ctx.fillRect(x0, ry + 0.64 * u, S.P * u, Math.max(1, 0.12 * u));
+    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    for (let x = Math.ceil(p.start / 16) * 16; x < p.start + S.P; x += 16) {
+      if (x === p.start) continue;
+      const sx = Math.round(x0 + (x - p.start) * u) + 0.5; ctx.moveTo(sx, top); ctx.lineTo(sx, top + sh);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.restore();
+  };
+  panel(pe, 1);
+  panel(pw, 1 - 0.55 * Math.sin(Math.PI * t));
+  // seam lines
+  const xe = (pe.off + S.P) * u, xw = pw.off * u;
+  ctx.fillStyle = T.seam;
+  if (t < 0.98) { ctx.fillRect(Math.min(xe, w) - 2, top - 4, 2.5, sh + 8); ctx.fillRect(Math.max(xw, 0) - 0.5, top - 4, 2.5, sh + 8); }
+  else {
+    ctx.save(); ctx.strokeStyle = T.seam; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(xe, top - 4); ctx.lineTo(xe, top + sh + 4); ctx.stroke(); ctx.restore();
+  }
+  // labels: chunk x above, block x below
+  const east = S.player.x >= 0;
+  const shift = (p) => (t < 0.5 ? 0 : (east && p.key === 'W' ? C : (!east && p.key === 'E' ? -C : 0)));
+  for (const p of [pw, pe]) {
+    const sft = shift(p);
+    for (let cx = Math.floor(p.start / 16); cx * 16 < p.start + S.P; cx++) {
+      const a = Math.max(cx * 16, p.start), b = Math.min(cx * 16 + 16, p.start + S.P);
+      if ((b - a) * u < 34) continue;
+      const mx = (p.off + (a + b) / 2 - p.start) * u;
+      text(ctx, num(cx + sft / 16) + (sft ? '*' : ''), mx, top - 11, { font: `${sft ? 600 : 500} 10.5px ${FM}`, align: 'center', color: sft ? T.seam : T.ink2 });
+    }
+    let lastLab = -1e9;
+    for (let x = Math.ceil(p.start / 16) * 16; x <= p.start + S.P; x += 16) {
+      const sx = (p.off + x - p.start) * u;
+      if (sx < 18 || sx > w - 18 || Math.abs(sx - lastLab) < 44) continue;
+      if (t >= 0.5 && p.key === (east ? 'W' : 'E') && Math.abs(sx - xe) < 4) continue;
+      lastLab = sx;
+      const isSeam = x === -C / 2 || x === C / 2;
+      text(ctx, num(x + sft), sx, top + sh + 15, { font: `${isSeam ? 600 : 500} 10.5px ${FM}`, align: 'center', color: isSeam || sft ? T.seam : T.ink3 });
+    }
+  }
+  if (t < 0.5) {
+    text(ctx, num(-C / 2), Math.max(xw, 0) + 3, top + sh + 15, { font: `600 10.5px ${FM}`, color: T.seam });
+    text(ctx, num(C / 2) + ' →', Math.min(xe, w) - 3, top + sh + 15, { font: `600 10.5px ${FM}`, align: 'right', color: T.seam });
+  }
+  // entities
+  const fr = S.anim >= 0.999 ? clamp(S.acc, 0, 1) : 1;
+  const xsOf = (x) => (x >= 0 ? x : x + C);
+  const screenX = (x, xPrev) => {
+    if (t >= 0.5) {
+      const xs = lerp(xsOf(xPrev), xsOf(x), fr);
+      return xs < C / 2 ? (pe.off + xs - pe.start) * u : (pw.off + xs - C - pw.start) * u;
+    }
+    return x >= 0 ? (pe.off + x - pe.start) * u : (pw.off + x - pw.start) * u;
+  };
+  const clipTo = (x) => {
+    ctx.save(); ctx.beginPath();
+    if (t >= 0.5) ctx.rect(Math.min(pe.off, pw.off) * u, top, 2 * S.P * u, sh);
+    else { const p = x >= 0 ? pe : pw; ctx.rect(p.off * u, top, S.P * u, sh); }
+    ctx.clip();
+  };
+  for (const e of S.ents) {
+    const sx = screenX(e.x, e.prevX), sy = top + (lerp(e.prevZ, e.z, fr) - S.zTop) * u;
+    clipTo(e.x);
+    drawEntity(ctx, e, sx, sy, u);
+    ctx.restore();
+    if (e.kind === 'ship' && t < 0.5) {   // the part of a hull that overhangs the stored end
+      const p = e.x >= 0 ? pe : pw, L = e.len * u, x0 = p.off * u, x1 = (p.off + S.P) * u;
+      if (sx + L / 2 > x1 || sx - L / 2 < x0) {
+        ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = T.ink2; ctx.lineWidth = 1.2;
+        ctx.strokeRect(sx - L / 2, sy - e.wid * u / 2, L, e.wid * u); ctx.restore();
+      }
+    }
+    if (e === S.tracked) {
+      ctx.save(); clipTo(e.x);
+      ctx.beginPath(); ctx.arc(sx, sy, Math.max(9, (e.kind === 'ship' ? 3.8 : 1.1) * u), 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]); ctx.stroke();
+      ctx.restore(); ctx.restore();
+    }
+  }
+  // you
+  const pl = S.player;
+  const px = screenX(pl.x, pl.x), py = top + (pl.z - S.zTop) * u;
+  ctx.beginPath(); ctx.arc(px, py, Math.max(5, 0.5 * u), 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#13222A'; ctx.stroke();
+  text(ctx, 'you', px, py - Math.max(5, 0.5 * u) - 8, { font: `650 11px ${FD}`, align: 'center', color: '#fff', halo: 'rgba(0,0,0,.65)' });
+  // folds
+  for (const f of S.flashes) {
+    const a = clamp(1 - (now - f.t0) / 1500, 0, 1);
+    if (t < 0.5) {
+      const x1 = f.dir > 0 ? Math.min(xe, w - 2) : Math.max(xw, 2), x2 = f.dir > 0 ? Math.max(xw, 2) : Math.min(xe, w - 2);
+      ctx.strokeStyle = rgba(T.seam, a); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x1, top - 2); ctx.quadraticCurveTo((x1 + x2) / 2, -top * 0.75, x2, top - 2); ctx.stroke();
+      ctx.fillStyle = rgba(T.seam, a);
+      ctx.beginPath(); ctx.moveTo(x2, top); ctx.lineTo(x2 - 5, top - 9); ctx.lineTo(x2 + 5, top - 9); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = a;
+      tag(ctx, f.dir > 0 ? `moved to x − ${num(C)}` : `moved to x + ${num(C)}`, (x1 + x2) / 2, 11, T.seam, '#fff', `600 10.5px ${FM}`);
+      ctx.globalAlpha = 1;
+    } else {
+      const r = (1 - a) * 2.5 * u + 4;
+      ctx.beginPath(); ctx.arc(xe, top + (f.z - S.zTop) * u, r, 0, Math.PI * 2);
+      ctx.strokeStyle = rgba(T.seam, a); ctx.lineWidth = 2; ctx.stroke();
+    }
+  }
+  if (t >= 0.98 && !S.flashes.length) {
+    ctx.globalAlpha = 0.95;
+    tag(ctx, 'seam: no edge in game', xe, 10, T.seam, '#fff', `600 10.5px ${FD}`);
+    ctx.globalAlpha = 1;
+  }
+}
+function drawEntity(ctx, e, x, y, u) {
+  if (e.kind === 'snowball') {
+    ctx.beginPath(); ctx.arc(x, y, Math.max(3.2, 0.34 * u), 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.lineWidth = 1.4; ctx.strokeStyle = '#38505C'; ctx.stroke();
+  } else if (e.kind === 'minecart') {
+    const w = 1.1 * u, h = 0.8 * u;
+    ctx.fillStyle = '#5B5E63'; ctx.fillRect(x - w / 2, y - h / 2, w, h);
+    ctx.strokeStyle = '#23262A'; ctx.lineWidth = 1.2; ctx.strokeRect(x - w / 2, y - h / 2, w, h);
+    ctx.fillStyle = '#34373B'; ctx.fillRect(x - w / 2 + 0.18 * u, y - h / 2 + 0.16 * u, w - 0.36 * u, h - 0.32 * u);
+  } else if (e.kind === 'zombie') {
+    const s = Math.max(6, 0.8 * u);
+    ctx.fillStyle = '#4F8A3C'; ctx.fillRect(x - s / 2, y - s / 2, s, s);
+    ctx.strokeStyle = '#1F3A18'; ctx.lineWidth = 1.2; ctx.strokeRect(x - s / 2, y - s / 2, s, s);
+    ctx.fillStyle = '#10200C'; ctx.fillRect(x - s * 0.3, y - s * 0.12, s * 0.2, s * 0.18); ctx.fillRect(x + s * 0.1, y - s * 0.12, s * 0.2, s * 0.18);
+  } else {
+    const L = e.len * u, W = e.wid * u;
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(-L / 2 + 0.3 * u, -W / 2 + 0.4 * u, L, W);
+    ctx.beginPath();
+    ctx.moveTo(L / 2, 0); ctx.lineTo(L / 2 - W * 0.55, -W / 2); ctx.lineTo(-L / 2, -W / 2); ctx.lineTo(-L / 2, W / 2); ctx.lineTo(L / 2 - W * 0.55, W / 2); ctx.closePath();
+    ctx.fillStyle = '#8A5A32'; ctx.fill(); ctx.strokeStyle = '#3B2412'; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.fillStyle = '#C79A64'; ctx.fillRect(-L / 2 + 0.5 * u, -W / 2 + 0.5 * u, L - 1.9 * u, W - u);
+    ctx.fillStyle = '#E9DCC3'; ctx.fillRect(-L / 2 + 0.7 * u, -W / 2 + 0.7 * u, 1.3 * u, 1.1 * u);
+    ctx.fillStyle = '#3B2412'; ctx.beginPath(); ctx.arc(0.3 * u, 0, Math.max(1.5, 0.22 * u), 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+function stripReadout() {
+  const C = P.C, pl = S.player, e = S.tracked;
+  const east = pl.x >= 0;
+  $('#strip-you').innerHTML = `<h3>You</h3><dl class="kv">
+    <dt>Stored x, z</dt><dd>${num(pl.x, 2)}, ${num(pl.z, 2)}</dd>
+    <dt>Chunk</dt><dd>${num(chunkOf(pl.x))}, ${num(chunkOf(pl.z))}</dd>
+    <dt>Region file</dt><dd>r.${regionOf(pl.x)}.${regionOf(pl.z)}.mca</dd>
+    <dt>Far side</dt><dd>${east ? `x = ${num(-C / 2)} … is sent to you as ${num(C / 2)} …` : `x = ${num(C / 2 - 1)} … is sent to you as ${num(-C / 2 - 1)} …`}</dd>
+  </dl>`;
+  if (!e) {
+    $('#strip-ent').innerHTML = '<h3>Tracked entity</h3><p class="small">Launch something: the snowball replays the GameTest that crossed the seam on the planet server.</p>';
+    return;
+  }
+  const sent = pl.x + fold(e.x - pl.x);
+  const dNear = Math.hypot(fold(e.x - pl.x), e.z - pl.z);
+  const f = e.folds[e.folds.length - 1];
+  const alive = S.ents.includes(e);
+  $('#strip-ent').innerHTML = `<h3>${KIND[e.kind].name} #${e.id}${alive ? '' : ' <span class="dim">(gone)</span>'}</h3><dl class="kv">
+    <dt>Stored x</dt><dd>${num(e.x, 2)}</dd>
+    <dt>Raw x</dt><dd>${num(e.raw, 2)} <span class="dim">if nothing folded</span></dd>
+    <dt>Sent to you at</dt><dd>${num(sent, 2)}</dd>
+    <dt>Stored chunk</dt><dd>${num(chunkOf(e.x))} · r.${regionOf(e.x)}</dd>
+    <dt>Distance</dt><dd>${num(dNear, 1)} to your nearest copy<br><span class="dim">naive |Δx| would be ${num(Math.abs(e.x - pl.x), 1)}</span></dd>
+    <dt>Fold</dt><dd>${f ? `tick ${f.tick}: ${num(f.before, 2)} → ${num(f.after, 2)}` : 'not yet'}</dd>
+  </dl><p class="small">${KIND[e.kind].note()}</p>`;
+}
+function stripCaption() {
+  const C = P.C;
+  $('#strip-caption').innerHTML = S.view === 0
+    ? `<strong>What the server stores: one copy.</strong> The west end of the span (x from ${num(-C / 2)}) and the east end (x up to ${num(C / 2 - 1)}) are ${num(C - 2 * S.P)} blocks apart on disk. Anything that ends a tick past the east end is moved to the west end in that same tick; nothing is ever stored past x = ${num(C / 2)}.`
+    : `<strong>What a player next to the seam is sent: the nearest copy of everything.</strong> Standing east of the seam, you are sent the chunks of x = ${num(-C / 2)} … as if they were at ${num(C / 2)} …, so the river and the rail simply continue. Walk across and the numbers change, the picture does not. This is TW's documented behaviour; nobody has watched it through a client yet.`;
+}
+let lastReadTick = -1;
+function stripLoop(now) {
+  S.raf = 0;
+  const dt = S.last ? Math.min(0.1, (now - S.last) / 1000) : 0; S.last = now;
+  if (S.anim !== S.view) S.anim = reduceMotion ? S.view : clamp(S.anim + (S.view ? 1 : -1) * dt / 0.75, 0, 1);
+  if (S.ents.length) {
+    S.acc += dt * 20 * (S.slow ? 0.25 : 1);
+    while (S.acc >= 1) { S.acc -= 1; tickOnce(); }
+  } else S.acc = 0;
+  S.flashes = S.flashes.filter((f) => now - f.t0 < 1500);
+  drawStrip();
+  if (S.tick !== lastReadTick) { lastReadTick = S.tick; stripReadout(); }
+  if (S.ents.length || S.anim !== S.view || S.flashes.length) S.raf = requestAnimationFrame(stripLoop);
+  else S.last = 0;
+}
+function kickStrip() { if (!S.raf) { S.last = 0; S.raf = requestAnimationFrame(stripLoop); } }
+function replaySnowball() {
+  spawn('snowball');
+  for (let i = 0; i < 4; i++) tickOnce();   // tick 2 is the fold: 8,192.21 → −8,191.79 at 16k
+  stripReadout();
+}
+function initStrip() {
+  resetStrip(); stripCaption(); replaySnowball();
+  $$('[data-spawn]').forEach((b) => b.addEventListener('click', () => spawn(b.dataset.spawn)));
+  $('#strip-clear').addEventListener('click', () => { resetStrip(); drawStrip(); });
+  $('#step-w').addEventListener('click', () => stepPlayer(-1));
+  $('#step-e').addEventListener('click', () => stepPlayer(1));
+  $('#strip-slow').addEventListener('change', (e) => { S.slow = e.target.checked; });
+  const setView = (v) => {
+    S.view = v;
+    $('#view-server').setAttribute('aria-pressed', String(v === 0));
+    $('#view-player').setAttribute('aria-pressed', String(v === 1));
+    stripCaption(); kickStrip();
+  };
+  $('#view-server').addEventListener('click', () => setView(0));
+  $('#view-player').addEventListener('click', () => setView(1));
+  const cv = $('#stripc');
+  cv.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); stepPlayer((e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 4 : 1)); }
+  });
+  const dragTo = (e) => {
+    const g = S.geo; if (!g) return;
+    const r = cv.getBoundingClientRect();
+    const bx = (e.clientX - r.left) / g.u, bz = S.zTop + (e.clientY - r.top - g.top) / g.u;
+    const C = P.C, pl = S.player;
+    pl.z = clamp(bz, S.zTop + 0.5, S.zTop + S.R - 0.5);
+    if (S.anim >= 0.5) {
+      const xs = clamp(C / 2 - S.P + (bx - g.pe.off), C / 2 - S.P + 0.5, C / 2 + S.P - 0.5);
+      movePlayerTo(pl.x < 0 ? xs - C : xs);   // strip coordinate → stored x; crossing the seam folds
+    } else {
+      const p = pl.x >= 0 ? g.pe : g.pw;
+      pl.x = clamp(p.start + (bx - p.off), p.start + 0.5, p.start + S.P - 0.5);
+    }
+    stripReadout(); kickStrip();
+  };
+  cv.addEventListener('pointerdown', (e) => { S.drag = true; try { cv.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } dragTo(e); });
+  cv.addEventListener('pointermove', (e) => { if (S.drag) dragTo(e); });
+  cv.addEventListener('pointerup', () => { S.drag = false; });
+  cv.addEventListener('pointercancel', () => { S.drag = false; });
+}
+
+/* ================================================================ 3. ROLL (flat → cylinder → sphere) */
+const R = { s: 1, yaw: Math.PI - 0.55, pitch: 0.36, target: null, play: null, raf: 0, NU: 72, NV: 36, cols: null, drag: null };
+const CAP_RGB = [216, 150, 26], STOP_RGB = [196, 58, 46];
+function rollColors() {
+  const { iw, ih, data } = MAP, cols = [];
+  for (let j = 0; j < R.NV; j++) for (let i = 0; i < R.NU; i++) {
+    const px = Math.floor((i + 0.5) / R.NU * iw), py = Math.floor((j + 0.5) / R.NV * ih), k = (py * iw + px) * 4;
+    let c = [data[k], data[k + 1], data[k + 2]];
+    const lat = Math.abs(90 - (j + 0.5) / R.NV * 180);
+    if (lat >= 80) c = mix3(c, STOP_RGB, 0.45); else if (lat >= 75) c = mix3(c, CAP_RGB, 0.45);
+    cols.push(c);
+  }
+  R.cols = cols;
+}
+function rollVertex(u, v, s) {
+  const phi = Math.PI / 2 - v * Math.PI;
+  let X, Y, Z;
+  if (s <= 1) {
+    if (s < 1e-3) { X = (u - 0.5) * 2 * Math.PI; Z = 0; }
+    else { const r = 1 / s, a = (u - 0.5) * 2 * Math.PI * s; X = r * Math.sin(a); Z = r * Math.cos(a) - r; }
+    Y = phi;
+  } else {
+    const b = smooth(s - 1), a = (u - 0.5) * 2 * Math.PI, rr = lerp(1, Math.cos(phi), b);
+    X = rr * Math.sin(a); Z = rr * Math.cos(a) - 1; Y = lerp(phi, Math.sin(phi), b);
+  }
+  return [X, Y, Z + 1];
+}
+function drawRoll() {
+  const cv = $('#rollc'); const w = cv.clientWidth; if (!w || !R.cols) return;
+  const h = Math.round(clamp(w * 0.66, 250, 440));
+  const { ctx } = prep(cv, h);
+  ctx.clearRect(0, 0, w, h);
+  const { NU, NV } = R, s = R.s;
+  const cy = Math.cos(R.yaw), sy = Math.sin(R.yaw), cp = Math.cos(R.pitch), sp = Math.sin(R.pitch);
+  const D = 7;
+  const ew = s <= 1 ? (s < 1e-3 ? Math.PI : Math.sin(Math.min(Math.PI * s, Math.PI / 2)) / s) : 1;
+  const eh = s <= 1 ? Math.PI / 2 : lerp(Math.PI / 2, 1, smooth(s - 1));
+  const f = D * Math.min(0.43 * w / (ew * 1.12), 0.42 * h / (eh + 0.3 * Math.abs(sp)));
+  const n = (NU + 1) * (NV + 1);
+  const P3 = new Float32Array(n * 3), P2 = new Float32Array(n * 2);
+  for (let j = 0; j <= NV; j++) for (let i = 0; i <= NU; i++) {
+    const [X, Y, Z] = rollVertex(i / NU, j / NV, s);
+    const x1 = X * cy + Z * sy, z1 = -X * sy + Z * cy;
+    const y2 = Y * cp - z1 * sp, z2 = Y * sp + z1 * cp;
+    const k = j * (NU + 1) + i, q = f / (D - z2);
+    P3[k * 3] = x1; P3[k * 3 + 1] = y2; P3[k * 3 + 2] = z2;
+    P2[k * 2] = w / 2 + x1 * q; P2[k * 2 + 1] = h / 2 - y2 * q;
+  }
+  const L = [-0.35, 0.55, 0.76];
+  const items = [];
+  for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) {
+    const a = j * (NU + 1) + i, b = a + 1, d = a + NU + 1, c = d + 1;
+    const z = (P3[a * 3 + 2] + P3[b * 3 + 2] + P3[c * 3 + 2] + P3[d * 3 + 2]) / 4;
+    items.push({ z, q: [a, b, c, d], col: R.cols[j * NU + i] });
+  }
+  const seg = (k1, k2, color, width) => items.push({ z: (P3[k1 * 3 + 2] + P3[k2 * 3 + 2]) / 2 + 0.02, l: [k1, k2], color, width });
+  for (let j = 0; j < NV; j++) {
+    seg(j * (NU + 1), (j + 1) * (NU + 1), T.seam, 2.6);
+    seg(j * (NU + 1) + NU, (j + 1) * (NU + 1) + NU, T.seam, 2.6);
+  }
+  for (const [row, color] of [[3, '#E3A12A'], [2, '#D8493C'], [33, '#E3A12A'], [34, '#D8493C']]) {
+    for (let i = 0; i < NU; i++) seg(row * (NU + 1) + i, row * (NU + 1) + i + 1, color, 1.6);
+  }
+  items.sort((p, q) => p.z - q.z);
+  for (const it of items) {
+    if (it.q) {
+      const [a, b, c, d] = it.q;
+      const ux = P3[b * 3] - P3[a * 3], uy = P3[b * 3 + 1] - P3[a * 3 + 1], uz = P3[b * 3 + 2] - P3[a * 3 + 2];
+      const vx = P3[d * 3] - P3[a * 3], vy = P3[d * 3 + 1] - P3[a * 3 + 1], vz = P3[d * 3 + 2] - P3[a * 3 + 2];
+      let nx = vy * uz - vz * uy, ny = vz * ux - vx * uz, nz = vx * uy - vy * ux;
+      const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+      const vxv = -P3[a * 3], vyv = -P3[a * 3 + 1], vzv = D - P3[a * 3 + 2];
+      const front = nx * vxv + ny * vyv + nz * vzv > 0;
+      let br = Math.min(1.08, 0.64 + 0.46 * Math.abs(nx * L[0] + ny * L[1] + nz * L[2]));
+      if (!front) br *= 0.58;
+      const col = `rgb(${it.col[0] * br | 0},${it.col[1] * br | 0},${it.col[2] * br | 0})`;
+      ctx.beginPath();
+      ctx.moveTo(P2[a * 2], P2[a * 2 + 1]); ctx.lineTo(P2[b * 2], P2[b * 2 + 1]); ctx.lineTo(P2[c * 2], P2[c * 2 + 1]); ctx.lineTo(P2[d * 2], P2[d * 2 + 1]);
+      ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 0.7; ctx.stroke();
+    } else {
+      const [k1, k2] = it.l;
+      ctx.beginPath(); ctx.moveTo(P2[k1 * 2], P2[k1 * 2 + 1]); ctx.lineTo(P2[k2 * 2], P2[k2 * 2 + 1]);
+      ctx.strokeStyle = it.color; ctx.lineWidth = it.width; ctx.lineCap = 'round'; ctx.stroke();
+    }
+  }
+  // tag the seam where it is nearest the viewer
+  const kS = (NV / 2) * (NU + 1), kE = kS + NU;
+  const k = P3[kS * 3 + 2] > P3[kE * 3 + 2] ? kS : kE;
+  tag(ctx, s > 0.97 && s < 1.03 ? 'seam (closed)' : 'seam', clamp(P2[k * 2] + 44, 44, w - 44), clamp(P2[k * 2 + 1], 12, h - 12), T.seam, '#fff', `600 10.5px ${FM}`);
+  if (s > 1.6) {
+    text(ctx, w < 420 ? 'pole: a whole row squeezed to a point' : 'north pole: a whole row of blocks squeezed to a point', w / 2, Math.max(14, P2[1] - 14),
+      { font: `600 11px ${FD}`, align: 'center', color: T.ink, halo: T.panel, hw: 4 });
+  }
+}
+function rollCaption() {
+  const s = R.s, C = P.C;
+  let t;
+  if (s < 0.08) t = `<strong>The stored world:</strong> one flat span, x from ${num(-C / 2)} to ${num(C / 2 - 1)}. The magenta edges are the two ends of the span.`;
+  else if (s < 0.95) t = '<strong>Rolling east–west.</strong> The two magenta edges come together. Nothing is stretched or cut: every row of blocks keeps its length.';
+  else if (s <= 1.05) t = `<strong>The cylinder Deep Time plays.</strong> Toroidal World joins x = ${num(C / 2 - 1)} to x = ${num(-C / 2)}: every row closes on itself, and the amber (75°) and red (80°) rings mark the soft cap and the hard stop.`;
+  else if (s < 1.95) t = '<strong>Pinching toward a sphere.</strong> Each polar row, C blocks long, would have to shrink as it nears the pole. Blocks cannot shrink, which is why the far north looks stretched on the flat map.';
+  else t = '<strong>The planet the map stands for.</strong> A block grid cannot make this pinch, and gluing the pole edge to itself makes a mirror (right). So the playable world stops at the caps.';
+  $('#roll-caption').innerHTML = t;
+  $$('[data-shape]').forEach((b) => b.setAttribute('aria-pressed', String(Math.abs(+b.dataset.shape - s) < 0.03)));
+}
+function rollFrame(now) {
+  R.raf = 0;
+  let more = false;
+  if (R.play) {
+    const p = (now - R.play) / 5600;
+    R.s = clamp(p * 2.25 - 0.12, 0, 2);
+    R.yaw = lerp(0.15, Math.PI - 0.55, smooth(p * 1.7));
+    R.pitch = lerp(0.12, 0.36, smooth(p * 1.7));
+    if (p >= 1) R.play = null; else more = true;
+    $('#roll-s').value = R.s;
+  } else if (R.target) {
+    const k = reduceMotion ? 1 : 0.14;
+    R.s += (R.target.s - R.s) * k; R.yaw += (R.target.yaw - R.yaw) * k; R.pitch += (R.target.pitch - R.pitch) * k;
+    if (Math.abs(R.target.s - R.s) + Math.abs(R.target.yaw - R.yaw) + Math.abs(R.target.pitch - R.pitch) < 0.004) {
+      R.s = R.target.s; R.yaw = R.target.yaw; R.pitch = R.target.pitch; R.target = null;
+    } else more = true;
+    $('#roll-s').value = R.s;
+  }
+  drawRoll(); rollCaption();
+  if (more) R.raf = requestAnimationFrame(rollFrame);
+}
+function kickRoll() { if (!R.raf) R.raf = requestAnimationFrame(rollFrame); }
+function initRoll() {
+  rollColors();
+  $('#roll-s').addEventListener('input', (e) => { R.play = null; R.target = null; R.s = +e.target.value; kickRoll(); });
+  $$('[data-shape]').forEach((b) => b.addEventListener('click', () => {
+    const s = +b.dataset.shape; R.play = null;
+    R.target = s === 0 ? { s: 0, yaw: 0, pitch: 0.12 } : { s, yaw: Math.PI - 0.55, pitch: 0.36 };
+    // keep turning the short way round
+    R.yaw = R.target.yaw + fold(R.yaw - R.target.yaw, 2 * Math.PI);
+    kickRoll();
+  }));
+  $('#roll-play').addEventListener('click', () => {
+    R.target = null;
+    if (reduceMotion) { R.s = 1; R.yaw = Math.PI - 0.55; $('#roll-s').value = 1; kickRoll(); return; }
+    R.play = performance.now(); kickRoll();
+  });
+  const cv = $('#rollc');
+  cv.addEventListener('pointerdown', (e) => { R.drag = { x: e.clientX, y: e.clientY, yaw: R.yaw, pitch: R.pitch }; R.play = null; R.target = null; try { cv.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } });
+  cv.addEventListener('pointermove', (e) => {
+    if (!R.drag) return;
+    R.yaw = R.drag.yaw + (e.clientX - R.drag.x) * 0.009;
+    if (e.pointerType === 'mouse') R.pitch = clamp(R.drag.pitch + (e.clientY - R.drag.y) * 0.006, -1.1, 1.1);
+    kickRoll();
+  });
+  cv.addEventListener('pointerup', () => { R.drag = null; });
+  cv.addEventListener('pointercancel', () => { R.drag = null; });
+}
+
+/* ================================================================ 3b. MIRROR (what closing the pole would do) */
+const MR = { mode: 'mirror', p: 0.72, play: null, raf: 0 };
+const MIR_TEXT = {
+  mirror: '<strong>Seamless pole: impossible.</strong> To close the pole edge like a real pole, a point just past it must join the point just inside it at x + C/2. On a square grid that join is a glide reflection: the ship comes back heading south as its own mirror image (the red port light is now on its starboard side), and past the edge you would see the far side of the planet flipped. No arrangement of blocks makes that seamless; TW refuses to build a fold that flips handedness, and its Sable code throws "a reflection is not a rigid-body rotation".',
+  transit: '<strong>Pole transit: later (§10.6).</strong> At the pole, teleport the ship to x + C/2 with z mirrored, and turn its heading and velocity 180° (Sable: <code>PhysicsPipeline.teleport</code> plus a velocity rotation). It is moved as a rigid body, so it arrives whole and the right way round. What is lost is only the view across the pole.',
+  cap: '<strong>Soft cap: what Deep Time does.</strong> From 75° the ship meets a pushback and wind toward the equator that grow with latitude; at 80° it stops. Nothing crosses the pole, so nothing needs mirroring.',
+};
+function shipAt(ctx, x, y, L, rot) {
+  const W = L * 0.46;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+  ctx.beginPath();
+  ctx.moveTo(0, -L / 2); ctx.quadraticCurveTo(W / 2, -L / 4, W / 2, L / 6); ctx.lineTo(W / 2, L / 2); ctx.lineTo(-W / 2, L / 2); ctx.lineTo(-W / 2, L / 6);
+  ctx.quadraticCurveTo(-W / 2, -L / 4, 0, -L / 2); ctx.closePath();
+  ctx.fillStyle = '#8A5A32'; ctx.fill(); ctx.strokeStyle = '#2B1A0C'; ctx.lineWidth = 1.4; ctx.stroke();
+  ctx.fillStyle = '#EFE3CB'; ctx.fillRect(-W / 2 + W * 0.14, L * 0.1, W * 0.4, L * 0.28);
+  const r = Math.max(2.6, W * 0.17);
+  ctx.beginPath(); ctx.arc(-W / 2, -L * 0.04, r, 0, Math.PI * 2); ctx.fillStyle = '#FF3B30'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.beginPath(); ctx.arc(W / 2, -L * 0.04, r, 0, Math.PI * 2); ctx.fillStyle = '#2FD06A'; ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+function drawMirror() {
+  const cv = $('#mirc'); const w = cv.clientWidth; if (!w) return;
+  const h = Math.round(clamp(w * 0.6, 230, 330));
+  const { ctx } = prep(cv, h);
+  const latMin = 60, beyond = 10;
+  const Y = (lat) => (90 + beyond - lat) / (90 + beyond - latMin) * h;
+  const X = (u) => mod(u, 1) * w;
+  const yE = Y(90), rows = (90 - latMin) / 180 * MAP.ih;
+  ctx.clearRect(0, 0, w, h);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(MAP.canvas, 0, 0, MAP.iw, rows, 0, yE, w, h - yE);
+  const mode = MR.mode;
+  // beyond the edge
+  if (mode === 'mirror') {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, yE); ctx.clip();
+    ctx.translate(0, 2 * yE); ctx.scale(1, -1);
+    ctx.drawImage(MAP.canvas, 0, 0, MAP.iw, rows, w / 2, yE, w, h - yE);
+    ctx.drawImage(MAP.canvas, 0, 0, MAP.iw, rows, w / 2 - w, yE, w, h - yE);
+    ctx.restore();
+    ctx.fillStyle = 'rgba(20,10,30,.28)'; ctx.fillRect(0, 0, w, yE);
+    text(ctx, 'past the edge: the far side, flipped', 8, yE / 2, { font: `600 11px ${FD}`, color: '#fff', halo: 'rgba(0,0,0,.6)' });
+  } else {
+    ctx.fillStyle = '#CDDEE6'; ctx.fillRect(0, 0, w, yE);
+    ctx.fillStyle = hatch(ctx, 'rgba(60,96,118,.35)'); ctx.fillRect(0, 0, w, yE);
+    text(ctx, mode === 'cap' ? 'ice-sheet ocean, never reached' : 'no seam here: a teleport', 8, yE - 11, { font: `600 11px ${FD}`, color: '#23404F' });
+  }
+  // cap bands (faint when the thought experiment ignores them)
+  const capA = mode === 'cap' ? 1 : 0.35;
+  ctx.globalAlpha = capA;
+  ctx.fillStyle = 'rgba(216,150,26,.34)'; ctx.fillRect(0, Y(80), w, Y(75) - Y(80));
+  ctx.fillStyle = hatch(ctx, 'rgba(196,58,46,.85)', 'rgba(196,58,46,.16)'); ctx.fillRect(0, yE, w, Y(80) - yE);
+  ctx.fillStyle = '#E3A12A'; ctx.fillRect(0, Y(75) - 0.75, w, 1.5);
+  ctx.fillStyle = '#D8493C'; ctx.fillRect(0, Y(80) - 0.75, w, 1.5);
+  ctx.globalAlpha = 1;
+  text(ctx, '75°', w - 6, Y(75) + 9, { font: `600 10.5px ${FM}`, align: 'right', color: '#FFD27A', halo: 'rgba(0,0,0,.6)' });
+  text(ctx, '80°', w - 6, Y(80) + 9, { font: `600 10.5px ${FM}`, align: 'right', color: '#FFB0A6', halo: 'rgba(0,0,0,.6)' });
+  if (mode !== 'cap') text(ctx, 'caps ignored in this thought experiment', 8, yE + 12, { font: `500 10px ${FD}`, color: '#fff', halo: 'rgba(0,0,0,.6)' });
+  // pole edge
+  ctx.fillStyle = T.dark ? '#E2EAEC' : '#13222A'; ctx.fillRect(0, yE - 1, w, 2);
+  text(ctx, 'pole edge 90°, z = −C/4', w - 6, yE - 9, { font: `600 10.5px ${FD}`, align: 'right', color: '#fff', halo: 'rgba(0,0,0,.65)' });
+  // the ship
+  const u0 = 0.25, L = 5 / (90 + beyond - latMin) * h * 1.25, p = MR.p;
+  const markX = (u, s) => text(ctx, s, X(u), h - 10, { font: `600 10.5px ${FM}`, align: 'center', color: '#fff', halo: 'rgba(0,0,0,.65)' });
+  markX(u0, 'x'); markX(u0 + 0.5, 'x + C/2');
+  ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.setLineDash([3, 4]); ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(X(u0), Y(latMin + 4)); ctx.lineTo(X(u0), yE); ctx.moveTo(X(u0 + 0.5), yE); ctx.lineTo(X(u0 + 0.5), Y(latMin + 4)); ctx.stroke(); ctx.restore();
+  const below = () => { ctx.save(); ctx.beginPath(); ctx.rect(0, yE, w, h - yE); ctx.clip(); };
+  if (mode === 'mirror') {
+    const lat = lerp(68, 112, p);
+    below(); shipAt(ctx, X(u0), Y(lat), L, 0); ctx.restore();
+    below(); ctx.translate(0, 2 * yE); ctx.scale(1, -1); shipAt(ctx, X(u0 + 0.5), Y(lat), L, 0); ctx.restore();
+    if (lat > 94) text(ctx, 'mirror image: red port light on the starboard side', clamp(X(u0 + 0.5), 150, w - 150), Y(180 - lat) + L * 0.9,
+      { font: `600 11px ${FD}`, align: 'center', color: '#fff', halo: 'rgba(0,0,0,.7)', hw: 4 });
+  } else if (mode === 'transit') {
+    if (p < 0.5) { below(); shipAt(ctx, X(u0), Y(lerp(68, 88, p / 0.5)), L, 0); ctx.restore(); }
+    else {
+      below(); shipAt(ctx, X(u0 + 0.5), Y(lerp(88, 68, (p - 0.5) / 0.5)), L, Math.PI); ctx.restore();
+      if (p > 0.55) text(ctx, 'same ship, turned 180°: port light still to port', clamp(X(u0 + 0.5), 140, w - 140), Y(lerp(88, 68, (p - 0.5) / 0.5)) + L * 0.9,
+        { font: `600 11px ${FD}`, align: 'center', color: '#fff', halo: 'rgba(0,0,0,.7)', hw: 4 });
+    }
+    const fa = p > 0.42 ? clamp(1 - Math.max(0, 0.6 - p) / 0.18, 0, 1) * (p > 0.9 ? 0.75 : 1) : 0;
+    if (fa > 0) {
+      ctx.save(); ctx.globalAlpha = clamp(fa, 0, 1); ctx.strokeStyle = T.seam; ctx.lineWidth = 2.2; ctx.setLineDash([6, 4]);
+      const x1 = X(u0), x2 = X(u0 + 0.5);
+      ctx.beginPath(); ctx.moveTo(x1, yE); ctx.bezierCurveTo(x1, yE - yE * 0.9, x2, yE - yE * 0.9, x2, yE); ctx.stroke();
+      ctx.setLineDash([]);
+      tag(ctx, 'teleport: x + C/2, heading +180°', (x1 + x2) / 2, Math.max(11, yE * 0.28), T.seam, '#fff', `600 10.5px ${FM}`);
+      ctx.restore();
+    }
+  } else {
+    const lat = 68 + 11.2 * (1 - Math.pow(1 - clamp(p * 1.15, 0, 1), 3)) - (p > 0.87 ? Math.sin((p - 0.87) * 24) * 0.25 : 0);
+    const st = smooth((lat - 75) / 5);
+    if (st > 0) {
+      const g = ctx.createRadialGradient(X(u0), Y(lat), 4, X(u0), Y(lat), L * 3.2);
+      g.addColorStop(0, `rgba(236,242,246,${0.75 * st})`); g.addColorStop(1, 'rgba(236,242,246,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, yE, w, h - yE);
+    }
+    below(); shipAt(ctx, X(u0), Y(lat), L, 0); ctx.restore();
+    if (lat > 75) {
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2;
+      for (const dx of [-L * 0.9, L * 0.9]) {
+        const x = X(u0) + dx, y = Y(lat) - L * 0.3;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + L * 0.9); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x - 4, y + L * 0.9 - 6); ctx.lineTo(x, y + L * 0.9); ctx.lineTo(x + 4, y + L * 0.9 - 6); ctx.stroke();
+      }
+      text(ctx, lat >= 79 ? 'held short of the 80° stop' : 'pushback + wind toward the equator', clamp(X(u0) + L * 1.5, 0, w - 200), Y(lat) + 3,
+        { font: `600 11px ${FD}`, color: '#fff', halo: 'rgba(0,0,0,.7)', hw: 4 });
+    }
+  }
+}
+function mirFrame(now) {
+  MR.raf = 0;
+  if (MR.play) {
+    MR.p = clamp((now - MR.play) / 4200, 0, 1);
+    if (MR.p >= 1) MR.play = null;
+  }
+  drawMirror();
+  if (MR.play) MR.raf = requestAnimationFrame(mirFrame);
+}
+function setMirror(mode, play) {
+  MR.mode = mode;
+  $$('[data-mir]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mir === mode)));
+  $('#mir-caption').innerHTML = MIR_TEXT[mode];
+  if (play && !reduceMotion) { MR.play = performance.now(); MR.p = 0; if (!MR.raf) MR.raf = requestAnimationFrame(mirFrame); }
+  else { MR.p = mode === 'mirror' ? 0.72 : mode === 'transit' ? 0.64 : 1; drawMirror(); }
+}
+function initMirror() {
+  $$('[data-mir]').forEach((b) => b.addEventListener('click', () => setMirror(b.dataset.mir, true)));
+  $('#mir-play').addEventListener('click', () => setMirror(MR.mode, true));
+  setMirror('mirror', false);
+}
+
+/* ================================================================ 4. POLES */
+const PL = { lat: 77, walk: false, raf: 0, last: 0, parts: [], sceneRaf: 0, visible: false };
+const push = (lat) => (lat < 75 ? 0 : lat >= 80 ? 1 : Math.pow((lat - 75) / 5, 1.6));
+const storm = (lat) => (lat < 75 ? 0 : Math.pow(clamp((lat - 75) / 5, 0, 1), 0.8));
+function drawPoleChart() {
+  const cv = $('#polec'); const w = cv.clientWidth; if (!w) return;
+  const h = Math.round(clamp(w * 0.36, 190, 250));
+  const { ctx } = prep(cv, h);
+  const l = 14, r = 14, t = 20, b = 46, C = P.C;
+  const X = (lat) => l + (lat - 60) / 30 * (w - l - r), Y = (v) => t + (1 - v) * (h - t - b);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = rgba(T.cap, 0.18); ctx.fillRect(X(75), t, X(80) - X(75), h - t - b);
+  ctx.fillStyle = hatch(ctx, rgba(T.stop, 0.5), rgba(T.stop, 0.08)); ctx.fillRect(X(80), t, X(90) - X(80), h - t - b);
+  ctx.strokeStyle = T.rule; ctx.lineWidth = 1; ctx.beginPath();
+  for (const v of [0, 0.5, 1]) { const y = Math.round(Y(v)) + 0.5; ctx.moveTo(l, y); ctx.lineTo(w - r, y); }
+  ctx.stroke();
+  text(ctx, 'none', l + 2, Y(0) - 8, { font: `500 10px ${FD}`, color: T.ink3 });
+  text(ctx, 'full', l + 2, Y(1) - 8, { font: `500 10px ${FD}`, color: T.ink3 });
+  const curve = (fn, color, dash) => {
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 2.2; if (dash) ctx.setLineDash(dash);
+    ctx.beginPath();
+    for (let lat = 60; lat <= 80.001; lat += 0.1) { const x = X(lat), y = Y(fn(lat)); if (lat === 60) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+    ctx.stroke(); ctx.restore();
+  };
+  curve(storm, T.ink3, [5, 4]);
+  curve(push, T.ink, null);
+  ctx.fillStyle = T.stop; ctx.fillRect(X(80) - 1.5, Y(1) - 4, 3, Y(0) - Y(1) + 4);
+  text(ctx, 'hard stop', X(80) + 6, Y(1) + 10, { font: `650 11px ${FD}`, color: T.stopInk, halo: T.panel });
+  // marker
+  const x = X(Math.min(PL.lat, 90));
+  ctx.strokeStyle = T.seam; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(x, t - 6); ctx.lineTo(x, h - b); ctx.stroke(); ctx.setLineDash([]);
+  if (PL.lat <= 80) { ctx.beginPath(); ctx.arc(x, Y(push(PL.lat)), 4.5, 0, Math.PI * 2); ctx.fillStyle = T.seam; ctx.fill(); }
+  text(ctx, PL.lat.toFixed(1) + '°', clamp(x, 24, w - 24), 9, { font: `600 11px ${FM}`, align: 'center', color: T.seam });
+  // axis
+  const narrow = w < 480;
+  for (let lat = 60; lat <= 90; lat += 5) {
+    const xx = X(lat);
+    text(ctx, lat + '°', clamp(xx, 12, w - 14), h - b + 13, { font: `500 10.5px ${FM}`, align: 'center', color: T.ink2 });
+    if (!narrow || lat === 60 || lat === 75 || lat === 90) {
+      text(ctx, num(-Math.round(lat / 90 * C / 4)), clamp(xx, 20, w - 22), h - b + 28, { font: `500 10px ${FM}`, align: 'center', color: T.ink3 });
+    }
+  }
+  text(ctx, 'z (north)', w - r, h - 6, { font: `500 10px ${FD}`, align: 'right', color: T.ink3 });
+}
+const RIDGES = [[0, 0.62], [0.08, 0.57], [0.16, 0.6], [0.27, 0.53], [0.36, 0.58], [0.45, 0.55], [0.55, 0.6], [0.66, 0.52], [0.76, 0.57], [0.87, 0.54], [1, 0.6]];
+function drawScene() {
+  const cv = $('#scenec'); const w = cv.clientWidth; if (!w) return;
+  const h = Math.round(clamp(w * 0.42, 170, 280));
+  const { ctx } = prep(cv, h);
+  const s = storm(PL.lat), lat = PL.lat;
+  const sky = ctx.createLinearGradient(0, 0, 0, h * 0.62);
+  sky.addColorStop(0, '#7FA9C6'); sky.addColorStop(1, '#D8E6EE');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 1 - s * 0.9; ctx.fillStyle = '#FFF6DA';
+  ctx.beginPath(); ctx.arc(w * 0.2, h * 0.3, h * 0.07, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+  ctx.fillStyle = '#6F8494'; ctx.beginPath(); ctx.moveTo(0, h);
+  for (const [x, y] of RIDGES) ctx.lineTo(x * w, y * h);
+  ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
+  const g = ctx.createLinearGradient(0, h * 0.6, 0, h);
+  g.addColorStop(0, '#E9F1F5'); g.addColorStop(1, '#C8D8E1');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, h * 0.66);
+  for (let i = 0; i <= 10; i++) ctx.lineTo(i / 10 * w, h * (0.64 + 0.025 * Math.sin(i * 1.7)));
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = `rgba(228,236,241,${0.86 * s})`; ctx.fillRect(0, 0, w, h);
+  // snow driven toward the viewer (equatorward)
+  const n = Math.floor(220 * s);
+  while (PL.parts.length < n) PL.parts.push({ x: Math.random(), y: Math.random(), v: 0.4 + Math.random() * 0.8 });
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.3; ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const p = PL.parts[i], x = p.x * w, y = p.y * h;
+    ctx.moveTo(x, y); ctx.lineTo(x - 7 * p.v, y + 4 * p.v);
+  }
+  ctx.stroke();
+  // the action bar
+  if (lat >= 75) {
+    const msg = lat >= 80 ? 'You cannot go any further north' : 'Polar storm: the wind is pushing you back';
+    ctx.font = `600 ${w < 420 ? 11.5 : 13}px ${FD}`;
+    const tw = ctx.measureText(msg).width + 22, bx = w / 2 - tw / 2, by = h - 40;
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(bx, by, tw, 24);
+    ctx.fillStyle = lat >= 80 ? '#FF9C92' : '#FFD27A'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(msg, w / 2, by + 12.5);
+  }
+  text(ctx, 'illustration · client-side, not built', w - 8, 12, { font: `500 10px ${FD}`, align: 'right', color: '#23404F', halo: 'rgba(255,255,255,.7)' });
+  text(ctx, `facing north at ${lat.toFixed(1)}°`, 8, 12, { font: `600 10.5px ${FM}`, color: '#23404F', halo: 'rgba(255,255,255,.7)' });
+}
+function sceneFrame(now) {
+  PL.sceneRaf = 0;
+  const dt = PL.last ? Math.min(0.05, (now - PL.last) / 1000) : 0; PL.last = now;
+  for (const p of PL.parts) { p.x -= dt * 0.9 * p.v; p.y += dt * 0.5 * p.v; if (p.x < -0.05 || p.y > 1.05) { p.x = 1 + Math.random() * 0.1; p.y = Math.random() * 0.9 - 0.1; } }
+  if (PL.walk) {
+    PL.lat = Math.min(80, PL.lat + dt * 2.4 * (1 - 0.9 * push(PL.lat)));
+    if (PL.lat >= 80) { PL.walk = false; $('#walk').textContent = 'Walk north ▸'; }
+    $('#lat').value = PL.lat; drawPoleChart(); poleReadout();
+  }
+  drawScene();
+  if ((PL.visible && storm(PL.lat) > 0 && !reduceMotion) || PL.walk) PL.sceneRaf = requestAnimationFrame(sceneFrame);
+  else PL.last = 0;
+}
+function kickScene() { if (!PL.sceneRaf) { PL.last = 0; PL.sceneRaf = requestAnimationFrame(sceneFrame); } }
+function poleReadout() {
+  const C = P.C, lat = PL.lat;
+  const z = Math.round(lat / 90 * C / 4);
+  const zone = lat >= 80 ? 'stop' : lat >= 75 ? 'cap' : 'open';
+  const zoneTxt = { open: 'Open world', cap: 'Soft cap', stop: 'Hard stop' }[zone];
+  const toStop = Math.max(0, Math.round(80 / 90 * C / 4) - z);
+  const sec = 1 / Math.cos(Math.min(lat, 89.9) * Math.PI / 180);
+  const pu = push(lat), st = storm(lat);
+  $('#pole-read').innerHTML = `<h3>At ${lat.toFixed(1)}° north</h3><dl class="kv">
+    <dt>z</dt><dd>${num(-z)} north · ${num(z)} south</dd>
+    <dt>Zone</dt><dd><span class="pill ${zone}">${zoneTxt}</span></dd>
+    <dt>Pushback</dt><dd>${zone === 'open' ? 'none' : zone === 'stop' ? 'hard stop' : Math.round(pu * 100) + '% <span class="dim">(illustrative)</span>'}</dd>
+    <dt>Warning</dt><dd>${zone === 'open' ? 'none' : 'action bar'}</dd>
+    <dt>Storm</dt><dd>${Math.round(st * 100)}% <span class="dim">(client-side)</span></dd>
+    <dt>Ships</dt><dd>${zone === 'open' ? 'no wind' : 'wind: velocity pushed toward the equator'}</dd>
+    <dt>To the stop</dt><dd>${zone === 'stop' ? '—' : num(toStop) + ' blocks of z'}</dd>
+    <dt>Stretch</dt><dd>×${sec.toFixed(1)} east–west</dd>
+  </dl>
+  <p class="small">The hard stop (z = ±${num(Math.round(80 / 90 * C / 4))}) sits ${num(C / 4 - Math.round(80 / 90 * C / 4))} blocks, about ${Math.floor((C / 4 - Math.round(80 / 90 * C / 4)) / 16)} chunks, short of the pole edge at z = ±${num(C / 4)}. Chunks past the edge that load anyway at view distance are ice-sheet ocean.</p>`;
+  const xs = 1000, xd = fold(xs + C / 2);
+  $('#transit-text').innerHTML = `On the real planet, going straight over the pole puts you on the opposite meridian, heading south. Pole transit would do exactly that as a teleport: leave at x = ${num(xs)} heading north, arrive at x = ${num(xd)} (x + C/2, folded) heading south, with z mirrored and velocity turned 180°. Until then, the red hard stop at 80° blocks the way.`;
+}
+function initPoles() {
+  $('#lat').addEventListener('input', (e) => { PL.lat = +e.target.value; PL.walk = false; $('#walk').textContent = 'Walk north ▸'; drawPoleChart(); poleReadout(); drawScene(); kickScene(); });
+  $('#walk').addEventListener('click', () => {
+    if (PL.walk) { PL.walk = false; $('#walk').textContent = 'Walk north ▸'; return; }
+    if (PL.lat >= 79.9) PL.lat = 70;
+    if (reduceMotion) { PL.lat = 80; $('#lat').value = 80; drawPoleChart(); poleReadout(); drawScene(); return; }
+    PL.walk = true; $('#walk').textContent = 'Stop ■'; kickScene();
+  });
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((es) => { PL.visible = es[0].isIntersecting; if (PL.visible) kickScene(); }).observe($('#scenec'));
+  }
+}
+
+/* ================================================================ 5. NETHER */
+const NE = { x: 1019, off: false, walk: false, raf: 0, last: 0, acc: 0 };
+function netherW() { const C = P.C; return NE.off ? C / 8 - C / 128 : C / 8; }   // blocks; the what-if is 15/16 of exact
+function arcPath(cx, cy, r, a0, a1) {
+  const p = (a) => [cx + r * Math.sin(a), cy - r * Math.cos(a)];
+  const [x0, y0] = p(a0), [x1, y1] = p(a1);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+function drawNether() {
+  const C = P.C, Wn = netherW();
+  const sl = $('#nx'); sl.min = -Wn / 2; sl.max = Wn / 2 - 1;
+  NE.x = clamp(NE.x, -Wn / 2, Wn / 2 - 1); sl.value = Math.floor(NE.x);
+  const xn = Math.floor(NE.x), xo = 8 * xn;
+  const aN = 2 * Math.PI * (xn + Wn / 2) / Wn, aO = 2 * Math.PI * (xo + C / 2) / C;
+  const cx = 140, cy = 140, rO = 116, rN = 72;
+  const pt = (r, a) => [cx + r * Math.sin(a), cy - r * Math.cos(a)];
+  const [ox, oy] = pt(rO, aO), [nx, ny] = pt(rN, aN);
+  let s = '';
+  s += `<circle cx="${cx}" cy="${cy}" r="${rO}" fill="none" class="s-ink" stroke-width="10" stroke-opacity=".22"/>`;
+  s += `<circle cx="${cx}" cy="${cy}" r="${rN}" fill="none" class="s-stop" stroke-width="10" stroke-opacity=".28"/>`;
+  if (NE.off) {   // overworld positions no portal can reach
+    const a0 = 2 * Math.PI * (C / 2 - 4 * Wn) / C, a1 = 2 * Math.PI * (C / 2 + 4 * Wn) / C;
+    s += `<path d="${arcPath(cx, cy, rO, 0, a0)}" fill="none" class="s-seam" stroke-width="10" stroke-opacity=".55"/>`;
+    s += `<path d="${arcPath(cx, cy, rO, a1, 2 * Math.PI - 0.0001)}" fill="none" class="s-seam" stroke-width="10" stroke-opacity=".55"/>`;
+  }
+  s += `<line x1="${cx}" y1="${cy - rO - 12}" x2="${cx}" y2="${cy - rN + 12}" class="s-seam" stroke-width="2.4"/>`;
+  s += `<text x="${cx + 5}" y="${cy - rO - 4}" font-size="9.5" class="f-seam">seam</text>`;
+  s += `<text x="${cx}" y="${cy + rO + 20}" font-size="9.5" text-anchor="middle" class="f-ink2">overworld · ${num(C / 16)} chunks</text>`;
+  s += `<text x="${cx}" y="${cy + rN - 14}" font-size="9.5" text-anchor="middle" class="f-ink2">Nether · ${num(Wn / 16)} chunks</text>`;
+  s += `<text x="${cx}" y="${cy + 3}" font-size="9" text-anchor="middle" class="f-ink3">east is clockwise</text>`;
+  s += `<line x1="${nx.toFixed(1)}" y1="${ny.toFixed(1)}" x2="${ox.toFixed(1)}" y2="${oy.toFixed(1)}" class="s-seam" stroke-width="1.6" stroke-dasharray="3 3"/>`;
+  s += `<circle cx="${ox.toFixed(1)}" cy="${oy.toFixed(1)}" r="7" class="f-panel s-seam" stroke-width="2.5"/>`;
+  s += `<rect x="${(nx - 5).toFixed(1)}" y="${(ny - 7).toFixed(1)}" width="10" height="14" rx="1.5" fill="#7B3FD0" stroke="#2B1150" stroke-width="1.5"/>`;
+  $('#rings-g').innerHTML = s;
+  // one Nether block east from here
+  const nx2 = fold(xn + 1, Wn), step = fold(8 * nx2 - xo, C);
+  const ok = step === 8;
+  $('#nether-read').innerHTML = `
+    <dt>Nether x</dt><dd>${num(xn)} <span class="dim">(span ${num(-Wn / 2)} … ${num(Wn / 2 - 1)})</span></dd>
+    <dt>Portal leads to</dt><dd>overworld x = ${num(xo)}</dd>
+    <dt>One block east</dt><dd>Nether ${num(nx2)} → overworld ${num(8 * nx2)}</dd>
+    <dt>Overworld moves</dt><dd>${num(step)} blocks ${ok ? '<span class="pill ok">1:8 holds</span>' : '<span class="pill stop">not 8</span>'}</dd>`;
+  $('#nether-note').innerHTML = NE.off
+    ? `With a Nether loop of ${num(Wn / 16)} chunks instead of ${num(C / 128)}, portals only reach overworld x from ${num(-4 * Wn)} to ${num(4 * Wn - 8)}; the magenta arcs are unreachable, and one step across the Nether seam jumps ${num(fold(8 * (-Wn / 2) - 8 * (Wn / 2 - 1), C))} blocks in the overworld. TW refuses such a width; this is why.`
+    : `Walk up to the Nether seam and across it: the Nether seam and the overworld seam line up, so every Nether step is 8 overworld blocks, even across both seams.`;
+}
+function netherFrame(now) {
+  NE.raf = 0;
+  const dt = NE.last ? Math.min(0.1, (now - NE.last) / 1000) : 0; NE.last = now;
+  if (NE.walk) {
+    const Wn = netherW();
+    NE.x += dt * 6;
+    if (NE.x >= Wn / 2) NE.x -= Wn;
+    drawNether();
+    NE.raf = requestAnimationFrame(netherFrame);
+  } else NE.last = 0;
+}
+function initNether() {
+  $('#nx').addEventListener('input', (e) => { NE.x = +e.target.value; drawNether(); });
+  $('#nwalk').addEventListener('click', () => {
+    NE.walk = !NE.walk; $('#nwalk').textContent = NE.walk ? 'Stop ■' : 'Walk east ▸';
+    if (NE.walk) { if (reduceMotion) { NE.walk = false; $('#nwalk').textContent = 'Walk east ▸'; NE.x = netherW() / 2 - 1; drawNether(); return; } NE.raf = requestAnimationFrame(netherFrame); }
+  });
+  const setOff = (v) => {
+    NE.off = v;
+    $('#nw-exact').setAttribute('aria-pressed', String(!v)); $('#nw-off').setAttribute('aria-pressed', String(v));
+    NE.x = netherW() / 2 - 5; drawNether();
+  };
+  $('#nw-exact').addEventListener('click', () => setOff(false));
+  $('#nw-off').addEventListener('click', () => setOff(true));
+}
+
+/* ================================================================ 6. STATUS filter */
+function initStatus() {
+  const rows = $$('.status tbody tr');
+  const count = (s) => rows.filter((r) => r.dataset.s === s).length;
+  $('#tally').textContent = `${count('ok')} verified · ${count('pend')} pending · ${count('later')} later · ${count('unv')} need a client`;
+  $$('[data-filter]').forEach((b) => b.addEventListener('click', () => {
+    const f = b.dataset.filter;
+    $$('[data-filter]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    rows.forEach((r) => { r.hidden = f !== 'all' && r.dataset.s !== f; });
+  }));
+}
+
+/* ================================================================ wiring */
+function drawAll() {
+  readTheme();
+  drawMap(); mapReadout();
+  drawStrip();
+  drawRoll(); rollCaption();
+  drawMirror();
+  drawPoleChart(); drawScene(); poleReadout();
+  drawNether();
+}
+function init() {
+  readTheme();
+  buildMap();
+  applyDerived();
+  initMap(); initStrip(); initRoll(); initMirror(); initPoles(); initNether(); initStatus();
+  subs.push(() => {
+    M.pin = M.pin || { lon: 330, lat: 45 };
+    S.texKey = ''; resetStrip(); stripCaption(); replaySnowball();
+    NE.x = netherW() / 2 - 5;
+    drawAll();
+  });
+  drawAll();
+  let rt = 0, lastW = document.documentElement.clientWidth;
+  const onResize = () => {
+    const w = document.documentElement.clientWidth;
+    if (w === lastW) return;
+    lastW = w; cancelAnimationFrame(rt); rt = requestAnimationFrame(drawAll);
+  };
+  if ('ResizeObserver' in window) new ResizeObserver(onResize).observe(document.body); else window.addEventListener('resize', onResize);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawAll);
+  new MutationObserver(drawAll).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawAll);
+}
+init();
+})();
+</script>
+</body>
+</html>

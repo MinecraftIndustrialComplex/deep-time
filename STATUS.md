@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 0 · Next: finish P0-06 (Sable, structures, 16k/32k smoke, review page), P0-08 (agent), then P0-11 … P0-15 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 0 · Next: P0-06 rest, P0-11, P0-13, P1-01, P1-02 and the seam page (agents), then P0-12 (me), P0-14, P0-15 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -14,16 +14,16 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-05 | Generator skeleton on the analytic test terrain | done | 2026-09-28 | 33f1cd9 | ./gametest.sh → all pass (heightMatchesReference cornerMax 0, maxAbsDiff 0; periodicAcrossSeam 0 mismatches; veins off); planet server (Mac) boots with level-type deeptime:planet, probe column 0 0 → surfaceY 14 for H 14.99. -PwithMic run: with P0-04 |
 | P0-06 | Toroidal World spike (server-side items) | doing | 2026-09-28 | — | planet server (Mac): probe tw stamped/loopsX/!loopsZ/1024 chunks; columnscontinuous PASS (16 rows, 0 bad folds, 0 jumps); entitycrossesseam PASS (x=-8191.79 after crossing). Left: Sable jetCrossesSeam 20/20, sable_straddle, structure/shaft tests, pole prototype, smoke at 16k/32k with region span check, review page |
 | P0-07 | JNI hello world, native loader and the five failure classes | done | 2026-09-28 | c813177 | Mac: JUnit tests=30 failures=0; NativeSmoke OK + 5 forced classes; ./gametest.sh NativeGameTests pass: native version=0.0.1 format=0.0 target=aarch64-apple-darwin selftest=1997318690096807936. Linux load path first runs in CI |
-| P0-08 | Cross-builds and the OS load matrix | todo | | | |
+| P0-08 | Cross-builds and the OS load matrix | done | 2026-09-28 | b20fbb8 | Mac: `nix run .#natives` → 8 libraries, gnu GLIBC_2.17, musl NEEDED libc.so only; `gradlew build -Prelease` → 8 in the jar, tests=30 failures=0; [natives.yml run 36492319610](https://github.com/MinecraftIndustrialComplex/deep-time/actions/runs/36492319610): all 9 jobs success, 8/8 load jobs `status=OK version=0.0.1` (Windows arm64 included) |
 | P0-09 | World-data format v0, synthetic planets, Java reader | done | 2026-09-28 | 75d90d3 | Mac: cargo test ok (format 15 tests); synth wrap-test 16k → format_version 0.0, viewer bundle; TilePackParityTest + Lz4RoundTripTest pass; wrap-test equals AnalyticTestTerrain within 1/32 block |
 | P0-10 | The generator on world data | done | 2026-09-28 | — | Mac ./gametest.sh → All 10 required tests passed: heightMatchesRaster cornerMax 0 maxAbsDiff 1; strataClassesResolve checked=32 wrong=0; spawnOnLand y=456 > 63. StagingMover deferred to P1-11 (no staging before the editor exists) |
 | P0-11 | `deeptime-inspect` | todo | | | |
-| P0-12 | Terralith, TerraBlender and Biomes O' Plenty checks | todo | | | |
-| P0-13 | Water above sea level holds | todo | | | |
-| P0-14 | BlueMap renders on MIC blocks | todo | | | |
+| P0-12 | Terralith, TerraBlender and Biomes O' Plenty checks | done | 2026-09-28 | 00db177 | Mac: ./gametest.sh default/-PwithMic/-PwithTerraBlender → All 13 passed; terralith=3008 of 4096 land samples (MIC), biomesoplenty=1325 of 4096 (TB), surface painted 24/24; smoke mic --synth wrap-test (production server) PASS: probe tw stamped/loopsX/!loopsZ/1024, locate village found, no C2ME/DH errors, chunky done, regions outside span 0 |
+| P0-13 | Water above sea level holds | done | 2026-09-28 | — | Mac ./gametest.sh → All 14 required tests passed: lakeHolds before=65304 after=65304 expected=65304 outside=0 (every source woken by a fluid tick, 400 ticks forceloaded), water_top_y=120 at the lake centre, generatedFluidTicks=0. The inspect section PNG (review picture) comes with P0-11; -PwithMic (Mac): All 14 required tests passed, lakeHolds identical (outside=0) |
+| P0-14 | BlueMap renders on MIC blocks | doing | 2026-09-28 | — | Mac: tools/review/render-bluemap.sh renders the MIC smoke world (surface map + a below-y-0 strata map) in ~30 s; web app 645 MB uncompressed (962 hires tiles × ~0.65 MB, 992-block height). Hosting on spacesheep undecided: gzip tiles + a decompressing service worker, or a smaller render mask |
 | P0-15 | Phase 0 exit | todo | | | |
 | P1-01 | Session, checkpoints, keyframes, event log and site formats | done | 2026-09-28 | — | Mac: cargo test -p deeptime-format 27 ok (segments + sites round-trip, two writers merge with no id collision); run --preset dummy.json → manifest.json, events/1-0.dtev, keyframes/index.json (13 events, 9 keyframes, 3 sites); test --workspace, fmt, clippy -D warnings, deny licenses bans clean; gradlew build test tests=31 failures=0; ./gametest.sh all 10 pass |
-| P1-02 | Fibonacci sphere, triangulation and raster coupling | todo | | | |
+| P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
 | P1-03 | Plates and crust | todo | | | |
 | P1-04 | Deep-time surface processes on L1 | todo | | | |
 | P1-05 | Climate | todo | | | |
@@ -45,6 +45,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 ## Review pages
 | Name | URL | Version label | Date |
 |---|---|---|---|
+| seams (how the seams work, interactive) | https://spacesheep.dev/@benmac/deeptime-seams | seams v2 2026-09-28 | 2026-09-28 |
 
 ## Pending questions
 Questions asked of Ben and not yet answered. Answers go into the decisions file's log
@@ -106,6 +107,122 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   from P1-03); geology writes its events as one segment at `finalizeWrite` (no streaming yet);
   `run --data <jar|dir>` is `--content <file>` until P1-07; the kinds table in `EVENTS.md` reserves
   every v1 kind with "params set by P1-xx".
+- **Longitude.** Events, sites, keyframes and the dummy world use plan §5.2's longitude
+  360°·(x + C/2)/C (the seam is 0°), as P1-02's coupling and master's viewer do.
+
+### 2026-09-28 — P0-13 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Created.** `worldgen/WaterPass` (after `StrataPass` in `buildSurface`; fills air below the water
+  surface down to the ground with water sources through `ProtoChunk.setBlockState`, so the worldgen
+  heightmaps stay current and no fluid tick or post-processing mark is made), `worldgen/WaterLevels`
+  (plain-Java level lookup, JUnit-tested on the lake fixture), the gametest level `deeptime:test_lake`
+  (folder `deeptime-lake`, C 1024, `planet_nocaves`, fixed biome `deeptime:test_bare`: no carvers, no
+  features, temperature 0.8), `WaterGameTests.lakeHolds`; `gametest.sh` also writes
+  `synth --kind lake-test --size 1024`.
+- **Measured** (Mac, `tools/remote/mac.sh --server -- './gametest.sh'` → All 14 required tests passed):
+  `[gametest] lakeHolds before=65304 after=65304 expected=65304 outside=0 outsideAtGeneration=0
+  columns=7299 shoreColumns=2 reach=4 woken=65304 ticks=400 generatedFluidTicks=0
+  pendingFluidTicksAfter=0 analytic=66062 floorCornerMaxDiff=0 cornerColumns=442 chunks=240` and
+  `[gametest] lakeHolds water_top_y=120 at=(0, 0) top_water_block_y=119 floor_y=109` (gap 18's
+  printed value; the plan's P0-13 acceptance now names it and fills in the section's z and x range).
+  lakeHolds takes ~20 s (240 forceloaded chunks generated synchronously, then 400 ticks). JUnit
+  tests=33 failures=0.
+- **The test is stricter than the plan's:** after the first count it schedules a fluid tick on every
+  water source it counted (as a changed neighbour would), so "after" proves the basin is watertight,
+  not only that nothing ticked. `expected` is every open block (air or water) between each footprint
+  column's ground and its surface; `outside` is any water in a box 48 blocks past the footprint,
+  y 84…141, that is not in those blocks. `floorCornerMaxDiff=0` ties the basin to the raster at
+  noise-cell corners; `analytic` is the same count from the raster's H (informational: bilinear
+  interpolation over 4-block noise cells moves the shore by a block or two).
+- **Shore rule (contradicts nothing in the plan; a new bake requirement).** The first run failed with
+  `outside=2`: two shore columns (27,33)/(33,27) at d = 2.64 had ground 118 under the surface 120
+  (raster H 119.89), but their nearest `water_level` cell (28,34) sits at d = 4.05, outside the synth's
+  wet ring (d ≤ 4); the woken lake turned those pockets into new sources. Generated ground is the
+  density interpolated bilinearly over 4-block noise cells, so on a steep shore it lies below the
+  raster. `WaterLevels.levelAt` therefore gives a dry-celled column the level of the nearest wet cell
+  within one noise cell (`reach` = the settings' cell width, 4); only air below the level is ever
+  filled, so this adds no water on ground above the level. **Phase 2's bake must keep each basin's
+  rim above its level for at least one noise cell (4 blocks) beyond the last wet cell.**
+- **Ice (plan §7.9) is not placed by WaterPass:** vanilla's `freeze_top_layer` feature, present in
+  every overworld biome, freezes the top water block where the biome is cold, and the lake exists
+  before features run. A `SpreadingSnowyDirtBlock` (grass, mycelium) left under the water by the
+  surface rules becomes dirt, as vanilla's underwater rule would make it (its random tick would
+  otherwise do so later and wake the water).
+- **Not run:** `./gametest.sh -PwithMic` (a pack biome modifier that targets every biome could give
+  `test_bare` features); the `deeptime-inspect section` PNG waits for P0-11.
+- **Next.** P0-11's `section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at 0
+  --from -88 --to 212` for the review picture.
+
+### 2026-09-28 — P0-08 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Created.** `tools/natives/build-natives.sh` (`nix run .#natives`; the app re-enters the dev
+  shell so build scripts get a host linker on macOS too): cargo-zigbuild for Linux (gnu at `.2.17`)
+  and macOS, cargo-xwin for Windows, then per-file checks (ELF/PE/Mach-O machine, musl NEEDED and
+  GLIBC, gnu floor ≤ 2.17, macOS minos ≤ 11.7.1 and `/usr/lib`-only dylibs, no `target-cpu` in
+  RUSTFLAGS) and `natives.json` (schema 1, same fields and glibc scan as `hostNatives`). Gradle
+  `-Prelease` packs `target/natives-dist` after `checkReleaseNatives` (exactly the eight keys,
+  size + sha256 per file, version/format equal to Cargo.toml, no stray files; clear message if
+  missing). `.github/workflows/natives.yml`: build job (natives + release jar, both uploaded) and
+  eight `NativeSmoke` load jobs against the release jar, each also asserting `platform=<its key>`.
+- **Measured on the Mac** (`tools/remote/mac.sh -- 'nix run .#natives'`, then readelf/file):
+  `file` → 2 PE32+ (x86-64, ARM64), 2 Mach-O (x86_64, arm64), 4 ELF (2 x86-64, 2 aarch64); musl
+  NEEDED `libc.so` only (no `libgcc_s`: zig links the unwinder); gnu x86_64 and aarch64 highest
+  `GLIBC_2.17`; `./gradlew build -Prelease` → 8 libraries in the jar, tests=30 failures=0, and
+  NativeSmoke on that jar on the Mac → `status=OK … platform=macos-aarch64`.
+- **CI** ([run 36492319610](https://github.com/MinecraftIndustrialComplex/deep-time/actions/runs/36492319610),
+  first attempt): every job success; each load job printed `status=OK version=0.0.1 format=0.0
+  selftest=1997318690096807936` with its own platform key (windows-x86_64, windows-aarch64 on
+  `windows-11-arm`, macos-aarch64, macos-x86_64, linux-{x86_64,aarch64}-gnu, and
+  linux-{x86_64,aarch64}-musl in Alpine). Cold build job 25 min (natives 18, Gradle 5); caches
+  are saved now. `workflow_dispatch` returns 404 until natives.yml is on master, so the bring-up
+  used a temporary push trigger on branch `p0-08-natives` (reverted).
+- **Contradicts the plan (now §6.4 "Measured in P0-08").** macOS natives use cargo-zigbuild on the
+  Mac as well: a plain `cargo build` in the Nix shell linked `/nix/store/…/libiconv.2.dylib`. zig
+  0.13 sets minos 11.7.1 on both macOS libraries. The dylibs get install name
+  `@rpath/libdeeptime_jni.dylib` (`.cargo/config.toml`). Windows DLLs import `VCRUNTIME140.dll`
+  (the JVM loads it itself; no static CRT). cargo-xwin is 0.23.1 in nixpkgs and CI. cargo-xwin's
+  README asks only for clang and "LLVM tools"; the shell's clang-cl, lld-link and llvm-lib suffice.
+- **Next.** Merge; after natives.yml is on master, `gh workflow run natives.yml` works as written.
+  Actions still warns that checkout/cache/setup-java/artifact @v4 run on Node 20 (forced to 24).
+
+
+### 2026-09-28 — P1-02 L0 geometry (agent worktree agent-ab52c5f47be5db0ae)
+- **What.** `crates/deeptime-core/src/sphere/{mod,fibonacci,hull,kdtree,coupling}.rs` and
+  `crates/deeptime-core/examples/sphere_bench.rs`. New deps in deeptime-core only: glam 0.33.11 and
+  kiddo 6.3.0 (default features off, `multi-threaded` on, which drops `fixed`), both MIT OR
+  Apache-2.0; `cargo deny check licenses bans` → ok. Nothing ported, so NOTICE.md is unchanged.
+- **Hull algorithm.** Randomized incremental 3D convex hull with conflict buckets (Clarkson & Shor
+  1989; de Berg et al. 2008 ch. 11; the bucketing of Guibas, Knuth & Sharir 1992), inserted in a
+  BRIO order (Amenta, Choi & Rote 2003), expected O(n log n). Exact predicates: coordinates snapped
+  to multiples of 2⁻³⁸ (≤ 3.2e-12 movement), orientation by a float evaluation with Shewchuk's
+  stage-A bound and an i128 fallback. Duplicates are skipped and listed (`skipped()`); cocircular
+  sets (cube, octahedron) triangulate; point sets that do not surround the centre fail with
+  `NotCovering`. Point location is a stochastic visibility walk; barycentrics are gnomonic (ray from
+  the centre to the face plane).
+- **Measured** with `tools/remote/mac.sh -- 'cargo build --release -p deeptime-core --example
+  sphere_bench && ./target/release/examples/sphere_bench [--threads 1 250000]'` (M6 Mac mini, 12
+  threads, min of 3): 250k samples → Fibonacci 0.2 ms, **hull 255 ms** (280 ms on 1 thread; the
+  hull is sequential), k-d tree 7.8 ms, L1 coupling 12 ms at 1024×512 and 41 ms at 2048×1024
+  (98 / 351 ms on 1 thread); 100k → hull 98 ms, tree 2.9 ms, coupling 10 / 36 ms. V − E + F = 2,
+  nothing skipped, 0 bad cells on all four presets' L1 grids. BRIO saves ~6% over a plain shuffle
+  (254 vs 270 ms, A/B in one session). Next to Cortial's Table 2 (1.24 s per regular step at 250k),
+  re-triangulating at every resampling is cheap.
+- **Conventions fixed in `coupling.rs`.** λ = 360°·(x + C/2)/C ∈ [0°, 360°) (§5.2; the seam
+  x = −C/2 is λ = 0), φ = −360°·z/C (north is −z), v = (cos φ cos λ, cos φ sin λ, sin φ) with +Z
+  the north pole and +X the seam meridian; raster cells are `GridDesc` point samples (row 0 = north
+  pole). **Differs from existing code:** the viewer's inspector (`viewer.js` `inspect`) prints
+  longitude 360°·x/C (seam at ±180°), and `AnalyticTestTerrain` uses θ = 2πx/C and φ = πz/(C/2)
+  (+z north). Both are a constant 180° longitude shift (and, for the test terrain, a latitude sign
+  that its |φ|/cos φ formulas never see); align the viewer's label when it next changes.
+- **Coupling layout.** `CellLink { tri, nearest, w: [f32; 3] }`, 20 B per cell (42 MB at
+  2048×1024). `Coupling::refresh(mesh, tree, stale)` re-links only the cells a predicate marks;
+  P1-03 supplies "the cell's triangle left its plate". `interpolate` (barycentric) and
+  `categorical` (nearest sample) sample L0 fields onto the grid.
+- **Tests** (`cargo test -p deeptime-core sphere::`, 23 tests, 3.1 s debug): Euler and exact
+  local-Delaunay/neighbour checks on Fibonacci 12…100k and 10k random points, a brute-force
+  convexity check, degenerate sets, every L1 cell of the 16k-quick ladder (100k samples,
+  1024×512), k-d nearest against brute force on 10,000 random points (100k Fibonacci and 20k random
+  samples), and property tests for block ↔ lat/lon ↔ unit vector (round trips, x wraps at ±C/2,
+  the columns either side of the seam one block apart).
+- **Next.** P1-03 (plates) builds on `SphereMesh`, `SampleTree` and `Coupling`.
 
 ### 2026-09-28 (later) — builds moved to the Mac; P0-06 shaping; P0-07 and P0-09 merged
 - **Builds run on Ben's M6 Mac mini** (his instruction, after parallel builds overloaded the laptop):

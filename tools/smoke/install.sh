@@ -234,6 +234,9 @@ while read -r slug vid; do
     fi
 done < <(profile_lines "$PROFILE")
 
+# Always the current sources: an old jar left in build/libs once installed pre-P0-10 code.
+say "building the Deep Time jar"
+( cd "$REPO/neoforge" && dev ./gradlew jar -q --console=plain )
 JAR="$(find "$REPO/neoforge/build/libs" -maxdepth 1 -name 'deeptime-1.21.1-*.jar' ! -name '*-sources.jar' 2>/dev/null | sort | tail -1)"
 [ -n "$JAR" ] || { echo "install.sh: no Deep Time jar -- run (cd neoforge && nix develop -c ./gradlew build) first" >&2; exit 1; }
 cp "$JAR" "$SERVER/mods/"
