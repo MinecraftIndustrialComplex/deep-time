@@ -944,7 +944,7 @@
     jobs: [], seq: 0,
     async inspect(run, frame, x, z, lat, lon) {
       const job = this.add({ kind: 'column', title: `Column x ${fmtInt(x)}, z ${fmtInt(z)}`, sub: `${latLonText(lat, lon)} · ${runName(run)} at ${fmtT(frame.t)}`,
-        retry: () => this.inspect(run, frame, x, z, lat, lon) });
+        run, lat, lon, retry: () => this.inspect(run, frame, x, z, lat, lon) });
       const q = new URLSearchParams({ run: run.id, frame: frame.n, x, z, lat, lon });
       this.answer(job, await api(`api/inspect?${q}`));
     },
@@ -969,6 +969,8 @@
       else job.st = b;
       if (job.st.state === 'done' || job.st.url) this.finished(job);
       this.render(job);
+      // A column answered from the run's bake (no job): the full answer goes to the Details tab.
+      if (job.st.inspect) showColumn(job);
       this.follow(job);
     },
     follow(job) {
@@ -1007,8 +1009,9 @@
       if (!job.el) { this.renderAll(); return; }
       const st = job.st;
       // An answer that is neither a job nor a viewer (a direct column answer, after P1-08): shown as it is.
-      const plain = !st.url && !st.status_url && !st.state && !st.error;
-      const state = st.url ? 'done' : plain ? 'answer' : st.state || 'queued';
+      const direct = !!st.inspect;
+      const plain = !direct && !st.url && !st.status_url && !st.state && !st.error;
+      const state = st.url ? 'done' : direct || plain ? 'answer' : st.state || 'queued';
       const key = [state, st.message, st.error, st.url, st.note, job.embed].join('|');
       const active = !['done', 'failed', 'unavailable', 'answer'].includes(state);
       job.el.classList.toggle('active', active);
@@ -1030,15 +1033,20 @@
         h += `<div class="jacts"><button class="btn btn-sm" data-jact="retry">${ic('refresh', 'ic-s')}Try again</button></div>`;
       } else if (state === 'unavailable') {
         h += `<div class="callout warn" style="margin-top:10px">${ic('info')}<div><b>3D preview is off on this workbench.</b> ${esc(st.message || '')}</div></div>`;
+      } else if (state === 'answer' && direct) {
+        const c = st.inspect, n = (c.body_details || []).length, sn = (c.sites || []).length;
+        h += `<div class="jrow" style="margin-top:8px"><span style="display:flex;gap:5px;align-items:center;white-space:nowrap">${ic('check', 'ic-s')}From the run's bake</span><span class="elapsed" style="text-align:right">${fmtInt(st.seconds * 1000)} ms</span></div>` +
+          `<div class="jmsg">Terrain ${fmtInt(st.terrain_height)} blocks · ${n ? `${n} ore ${n === 1 ? 'body' : 'bodies'}` : 'no ore body'}${sn ? ` · ${sn} ${sn === 1 ? 'site' : 'sites'}` : ''}</div>` +
+          `<div class="jacts"><button class="btn btn-primary btn-sm" data-jact="details">${ic('info', 'ic-s')}Show details</button></div>`;
       } else if (state === 'answer') {
         h += `<pre class="lines" style="margin-top:10px;max-height:260px;overflow:auto">${esc(JSON.stringify(Object.assign({}, st, { note: undefined }), null, 1))}</pre>`;
       } else {
-        h += `<div class="jrow" style="margin-top:8px"><span style="display:flex;gap:5px;align-items:center;white-space:nowrap">${ic('check', 'ic-s')}Real generator</span><span class="elapsed" style="text-align:right"></span></div>`;
+        h += `<div class="jrow" style="margin-top:8px"><span style="display:flex;gap:5px;align-items:center;white-space:nowrap">${ic('check', 'ic-s')}${st.note_kind === 'run' ? "The run's own terrain" : 'Real generator'}</span><span class="elapsed" style="text-align:right"></span></div>`;
         if (job.embed) h += `<div class="embed"><iframe src="${esc(embedURL(st.url))}" title="3D preview" loading="lazy"></iframe></div>`;
         h += `<div class="jacts"><button class="btn btn-primary btn-sm" data-jact="open">${ic('cube', 'ic-s')}Open 3D view</button><a class="btn btn-sm" href="${esc(st.url)}" target="_blank" rel="noopener">${ic('ext', 'ic-s')}New tab</a></div>`;
       }
       if (st.note) {
-        const lead = /P1-08/.test(st.note) ? 'A test world at this latitude and longitude, until P1-08.' : 'About this preview.';
+        const lead = st.note_kind === 'run' ? "This run's own terrain." : st.note_kind === 'test-world' ? 'A test world, not this run.' : 'About this preview.';
         h += `<div class="callout">${ic('info')}<div><b>${esc(lead)}</b> <span class="clamp3 notetext">${esc(st.note)}</span> <button class="linkbtn" data-jact="more">More</button></div></div>`;
       }
       job.el.innerHTML = h;
@@ -1066,6 +1074,7 @@
     const job = Stage2.jobs.find(j => j.el && j.el.contains(b));
     if (!job) return;
     if (b.dataset.jact === 'open') openViewer(job.st.url, job.title);
+    else if (b.dataset.jact === 'details') showColumn(job);
     else if (b.dataset.jact === 'retry') job.retry();
     else if (b.dataset.jact === 'more') { const t = job.el.querySelector('.notetext'); t.classList.toggle('clamp3'); b.textContent = t.classList.contains('clamp3') ? 'More' : 'Less'; }
   });
@@ -1581,6 +1590,55 @@
     if (ll) { G.lon0 = ((ll[1] % 360) + 360) % 360; G.lat0 = clamp(ll[0], -80, 80); G.spin = false; spinButton(); globeDirty = true; }
     mapDirty = true; evShownKey = ''; tickerDirty = true;
   }
+  // A column answered from the run's bake (`deeptime inspect-column --why` through /api/inspect):
+  // the terrain, the rock from the top block down, the ore bodies and each site's "why here".
+  function showColumn(job) {
+    const st = job.st, c = st.inspect, r = job.run;
+    if (!c) return;
+    selectedEvent = null;
+    const i = Math.max(0, panes.findIndex(p => p.run === r));
+    const rows = a => a.map(([k, v]) => `<div>${k}</div><div>${v}</div>`).join('');
+    const yr = (t, b) => `<span class="tnum">y ${fmtInt(t)} → ${fmtInt(b)}</span>`;
+    const ev = e => {
+      const id = Number(e.id);
+      return r && r.byId.has(id) ? evLink(r, id)
+        : `<span class="none">${esc(prettyKind(e.kind))} · ${esc(fmtT(e.t_start))}</span>`;
+    };
+    const rock = c.rock || [], shown = rock.slice(0, 14);
+    const bodies = c.body_details || [], sites = c.sites || [];
+    const site = id => sites.find(s => s.id === id);
+    let h = `<div class="dh" style="--c:#7cc4ff"><span class="d"></span><div><h4>Column x ${fmtInt(c.x)}, z ${fmtInt(c.z)}</h4>` +
+      `<div class="id">${esc(latLonText(c.lat, c.lon))} · from the run's bake · ${fmtInt(st.seconds * 1000)} ms</div></div></div>` +
+      `<div class="kv">${rows([
+        ['Terrain height', `<b class="tnum">${numText(c.surface)}</b> blocks (top block y ${fmtInt(c.top_y)})`],
+        ['Elevation', `${numText(c.elevation)} + ${numText(c.detail)} of detail`],
+        ['Water', c.water === null || c.water === undefined ? 'none' : `surface at y ${numText(c.water)}`],
+        ['Horizons', `${(c.strata || []).length} in the column's stack`],
+      ])}</div>` +
+      `<h5>Rock, top block down</h5><div class="kv">${rows(shown.map(([t, b, k]) => [yr(t, b), k ? esc(k.replace(/^deeptime:/, '').replace(/_/g, ' ')) : '<span class="none">unclassified</span>']))}` +
+      `${rock.length > shown.length ? `<div></div><div class="none">… and ${rock.length - shown.length} more</div>` : ''}</div>` +
+      `<h5>Ore bodies here</h5>` +
+      (bodies.length ? `<div class="kv">${rows(bodies.map(b => [yr(b.top, b.bottom),
+        `${esc(cap1(String(b.role || 'body').replace(/_/g, ' ')))} of ${esc(String(b.shape || 'body'))}${b.rock_class ? ` in ${esc(String(b.rock_class).replace(/^deeptime:/, '').replace(/_/g, ' '))}` : ''}${b.site != null ? ` · site ${b.site}` : ''}`]))}</div>`
+        : '<div class="chain"><span class="none">The column passes through no ore body.</span></div>');
+    for (const s of sites) {
+      const why = s.why || {};
+      const prods = (s.products || []).map(p => `${esc(shortKind(p.material))}${p.role ? ` (${esc(p.role)})` : ''} · grade ${numText(p.grade)} · ${numText(p.tonnage_t)} t`).join('<br>');
+      h += `<h5>Why here: ${esc(prettyKind(s.deposit_type || s.kind))} (site ${s.id})</h5>` +
+        `<div class="kv">${rows([['Kind', esc(String(s.kind))], ['Yields', prods || '—']])}</div>` +
+        `<div class="chain" style="margin-top:8px">${why.forming_event ? `${ev(why.forming_event)}` : `<span class="none">${esc(why.error || 'No forming event recorded.')}</span>`}` +
+        `${(why.chain || []).map(ev).join('')}</div>`;
+    }
+    for (const b of bodies) if (b.site != null && !site(b.site)) { h += `<div class="desc" style="margin-top:8px">Site ${b.site} owns body ${b.id}; its box is not over this column.</div>`; break; }
+    h += `<div class="callout" style="margin-top:12px">${ic('info')}<div><b>This run's own terrain.</b> What Deep Time decides for the column, read from the run's bake: it does not include what other mods' features add. The 3D preview shows the placed blocks.</div></div>` +
+      `<div class="acts"><button class="btn btn-sm" data-dact="area">${ic('cube', 'ic-s')}Preview 256 × 256 here</button></div>`;
+    $('details').innerHTML = h;
+    $('details').dataset.curEv = '';
+    $('details').dataset.pt = JSON.stringify({ i, lat: job.lat, lon: job.lon });
+    setITab('details', true);
+    if (narrow.matches) setMTab('inspect');
+    evShownKey = ''; tickerDirty = true;
+  }
   function showPoint(p, lat, lon) {
     const r = p.run;
     selectedEvent = null;
@@ -1774,7 +1832,7 @@
     vp.classList.toggle('tool-area', t === 'area');
     const hint = $('maphint');
     hint.hidden = t === 'select' || TV;
-    if (t === 'inspect') hint.innerHTML = `${ic('crosshair')}Click a column to inspect it in 3D <span class="dim">· about a minute</span><button class="btn btn-ghost btn-sm" data-tool="select">Done <kbd>Esc</kbd></button>`;
+    if (t === 'inspect') hint.innerHTML = `${ic('crosshair')}Click a column to inspect it <span class="dim">· from the run's bake</span><button class="btn btn-ghost btn-sm" data-tool="select">Done <kbd>Esc</kbd></button>`;
     if (t === 'area') hint.innerHTML = `${ic('box')}Drag a box, or click for 256 × 256 blocks <span class="dim">· 1–2 min</span><button class="btn btn-ghost btn-sm" data-tool="select">Done <kbd>Esc</kbd></button>`;
     for (const p of panes) p.drag = null;
     mapDirty = true;
