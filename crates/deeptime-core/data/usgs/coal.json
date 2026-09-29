@@ -36,7 +36,7 @@
     "source": "cir891",
     "where": "PLACEHOLDER built from Circular 891 parameters: indicated-coal radius p. 25-26 (PDF p. 32-33); reserve-base thickness classes Table 3 and text p. 24 (PDF p. 31); bituminous density Table 2 p. 22 (PDF p. 29)",
     "method": "placeholder",
-    "note": "NOT a USGS distribution. No USGS grade-tonnage (deposit-size) model for coal exists in the sources found. USGS assesses coal by bed or zone per coalfield or basin, not as a population of 'deposits'. Placeholder = one mine-sized block = a circle of radius 1.2 km (the 3/4-mile limit of measured + indicated coal around one thickness measurement, Circ. 891 p. 25-26; area 4.52 km2) x seam thickness x 1.32 t/m3 (bituminous, Table 2). Seam thickness 28 in / 84 in / 168 in (0.71 / 2.13 / 4.27 m) are the bituminous reserve-base thickness-class boundaries (Circ. 891 p. 24), taken as p90 / p50 / p10 by this compiler's choice. Result 4.25 / 12.7 / 25.5 Mt, rounded to 4.2 / 13 / 25. For scale, real coalfields are 10^4-10^5 times larger (extra.prb_*)."
+    "note": "SUPERSEDED in deposit_type/coal_seam.json (2026-09-29: a deposit is a seam field, 540 / 2,500 / 10,000 Mt, an estimate). NOT a USGS distribution. No USGS grade-tonnage (deposit-size) model for coal exists in the sources found. USGS assesses coal by bed or zone per coalfield or basin, not as a population of 'deposits'. Placeholder = one mine-sized block = a circle of radius 1.2 km (the 3/4-mile limit of measured + indicated coal around one thickness measurement, Circ. 891 p. 25-26; area 4.52 km2) x seam thickness x 1.32 t/m3 (bituminous, Table 2). Seam thickness 28 in / 84 in / 168 in (0.71 / 2.13 / 4.27 m) are the bituminous reserve-base thickness-class boundaries (Circ. 891 p. 24), taken as p90 / p50 / p10 by this compiler's choice. Result 4.25 / 12.7 / 25.5 Mt, rounded to 4.2 / 13 / 25. For scale, real coalfields are 10^4-10^5 times larger (extra.prb_*)."
   },
   "grades": {},
   "correlations": [],
@@ -54,7 +54,7 @@
     "source": null,
     "where": "Circular 891, PP 1625-A chapters PN and PG, and PP 1640-A searched",
     "method": "not found",
-    "note": "No USGS density of coal deposits per area exists in the sources found. Coal is assessed as continuous beds or zones."
+    "note": "No USGS density of coal deposits per area exists in the sources found. Coal is assessed as continuous beds or zones. NOT a USGS figure: the coal_seam deposit type uses an estimate of 4 / 14 / 40 seam fields per 100,000 km2 of permissive tract (2026-09-29), derived from coalfield counts and basin areas (derivation in deposit_type/coal_seam.json notes)."
   },
   "min_separation_m": {
     "value": null,
