@@ -25,6 +25,37 @@ pub struct Common {
     pub threads: usize,
     pub mem_cap: u64,
     pub verbose: bool,
+    /// `--set path=value` overrides of the preset (`apply_overrides`).
+    pub set: Vec<String>,
+}
+
+/// Applies `--set a.b.c=value` overrides to preset JSON (the value is JSON, else a string; missing
+/// objects on the way are made). The result goes through the preset parser like any preset, so
+/// an unknown key or an out-of-range value is refused naming its path.
+pub(crate) fn apply_overrides(json: &str, set: &[String]) -> CliResult<String> {
+    if set.is_empty() {
+        return Ok(json.to_owned());
+    }
+    let mut v: Value = serde_json::from_str(json)?;
+    for item in set {
+        let (path, value) = item
+            .split_once('=')
+            .ok_or_else(|| format!("--set {item}: expected PATH=VALUE"))?;
+        let value: Value = serde_json::from_str(value).unwrap_or_else(|_| json!(value));
+        let mut at = &mut v;
+        let keys: Vec<&str> = path.split('.').collect();
+        for (n, key) in keys.iter().enumerate() {
+            let obj = at
+                .as_object_mut()
+                .ok_or_else(|| format!("--set {item}: {} is not an object", keys[..n].join(".")))?;
+            if n + 1 == keys.len() {
+                obj.insert((*key).to_owned(), value);
+                break;
+            }
+            at = obj.entry((*key).to_owned()).or_insert_with(|| json!({}));
+        }
+    }
+    Ok(v.to_string())
 }
 
 pub(crate) fn read_text(path: &Path, what: &str) -> CliResult<String> {
@@ -229,6 +260,162 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
     ))
 }
 
+/// The planet's hypsometry at the end of the surface (P1-17 calibration), true-area weighted
+/// (cos φ; the surface line's `land_frac` counts cells, which is the in-game share): land share,
+/// land elevation mean and quantiles, the share of land above 1, 2 and 3 km, the median sea
+/// depth, the shelf share of the sea (0–200 m), the continental crust's share of the planet and
+/// the share of it above the sea (the plate model's crust type), and the share of the planet per
+/// 1-km band from −7 to +6 km (Earth's bimodal curve). Earth on GMT's 1° relief, the same way:
+/// land 0.289, median 427 m, p90 2,022 m, above 2 km 0.102, sea median 4,062 m (STATUS.md, P1-17).
+pub(crate) fn hypsometry_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    use deeptime_core::deposits::fields::cell_area_km2;
+    let st = world.surface.as_ref()?;
+    let g = &st.grid;
+    let (w, h) = (g.w as usize, g.h as usize);
+    // m_per_block_h only scales every weight alike; 1 is enough for shares.
+    let mut land: Vec<(f64, f64)> = Vec::new();
+    let mut sea: Vec<(f64, f64)> = Vec::new();
+    let mut bands = [0.0f64; 13];
+    let mut total = 0.0;
+    // Continental crust (the plate model's crust type): its share and the share of it above sea.
+    let crust = world
+        .fields
+        .get("plates/crust_type")
+        .filter(|f| f.data.len() == w * h);
+    let (mut cont, mut cont_dry) = (0.0, 0.0);
+    for j in 0..h {
+        let a = cell_area_km2(g, j as u32, 1.0);
+        for i in 0..w {
+            let z = f64::from(st.elevation_m[j * w + i]) - st.sea_level_m;
+            total += a;
+            if crust.is_some_and(|f| f.data[j * w + i] >= 0.5) {
+                cont += a;
+                if z > 0.0 {
+                    cont_dry += a;
+                }
+            }
+            if z > 0.0 {
+                land.push((z, a));
+            } else {
+                sea.push((-z, a));
+            }
+            let b = ((z / 1000.0).floor() + 7.0).clamp(0.0, 12.0) as usize;
+            bands[b] += a;
+        }
+    }
+    let quant = |v: &mut Vec<(f64, f64)>, qs: &[f64]| -> Vec<f64> {
+        v.sort_by(|x, y| x.0.total_cmp(&y.0));
+        let sum: f64 = v.iter().map(|x| x.1).sum();
+        let mut out = vec![0.0; qs.len()];
+        let mut acc = 0.0;
+        let mut k = 0;
+        for &(z, a) in v.iter() {
+            acc += a;
+            while k < qs.len() && acc >= qs[k] * sum {
+                out[k] = z;
+                k += 1;
+            }
+        }
+        out
+    };
+    let land_a: f64 = land.iter().map(|x| x.1).sum();
+    let sea_a: f64 = sea.iter().map(|x| x.1).sum();
+    let above = |km: f64| {
+        land.iter()
+            .filter(|x| x.0 > km * 1000.0)
+            .map(|x| x.1)
+            .sum::<f64>()
+            / land_a.max(1e-12)
+    };
+    let mean = land.iter().map(|x| x.0 * x.1).sum::<f64>() / land_a.max(1e-12);
+    let (a1, a2, a3) = (above(1.0), above(2.0), above(3.0));
+    let shelf = sea
+        .iter()
+        .filter(|x| x.0 <= 200.0)
+        .map(|x| x.1)
+        .sum::<f64>()
+        / sea_a.max(1e-12);
+    let lq = quant(&mut land, &[0.1, 0.25, 0.5, 0.75, 0.9]);
+    let sq = quant(&mut sea, &[0.5]);
+    Some(format!(
+        "hypsometry land_frac_area={:.3} land_mean_m={:.0} land_z_p10_m={:.0} land_z_p25_m={:.0} \
+         land_z_p50_m={:.0} land_z_p75_m={:.0} land_z_p90_m={:.0} land_above_1km={:.3} \
+         land_above_2km={:.3} land_above_3km={:.3} sea_depth_p50_m={:.0} shelf_frac_of_sea={:.3} \
+         continental_frac={:.3} continental_dry={:.3} bands_km[-7..6]={}",
+        land_a / total.max(1e-12),
+        mean,
+        lq[0],
+        lq[1],
+        lq[2],
+        lq[3],
+        lq[4],
+        a1,
+        a2,
+        a3,
+        sq[0],
+        shelf,
+        cont / total.max(1e-12),
+        cont_dry / cont.max(1e-12),
+        bands
+            .iter()
+            .map(|b| format!("{:.3}", b / total.max(1e-12)))
+            .collect::<Vec<_>>()
+            .join("/")
+    ))
+}
+
+/// How the planet's surface evolved (P1-17 calibration), from the deposit engine's recorded frames
+/// (10-Myr means) every 50 Myr, true-area weighted: `t:land/land_z_p50_m`, land being the frame's
+/// mean elevation above the datum (the sea-level cycles move the shore by ±100 m).
+pub(crate) fn evolution_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    use deeptime_core::deposits::fields::{FieldHistory, cell_area_km2};
+    let h = world.history.as_ref()?;
+    let g = h.grid.clone();
+    let w = g.w as usize;
+    let n = h.frame_count();
+    let mut parts = Vec::new();
+    for k in (0..n)
+        .rev()
+        .step_by(5)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+    {
+        let f = h.frame(k).ok()?;
+        let z = f.fields.get("deeptime:elevation_m")?;
+        let (mut tot, mut land) = (0.0, 0.0);
+        let mut lz: Vec<(f32, f64)> = Vec::new();
+        for (c, &zc) in z.iter().enumerate() {
+            let a = cell_area_km2(&g, (c / w) as u32, 1.0);
+            tot += a;
+            if zc > 0.0 {
+                land += a;
+                lz.push((zc, a));
+            }
+        }
+        lz.sort_by(|x, y| x.0.total_cmp(&y.0));
+        let mut acc = 0.0;
+        let mut med = 0.0;
+        for &(zc, a) in &lz {
+            acc += a;
+            if acc >= 0.5 * land {
+                med = zc;
+                break;
+            }
+        }
+        parts.push(format!(
+            "{:.0}:{:.3}/{:.0}",
+            f.t_years / 1.0e6,
+            land / tot.max(1e-12),
+            med
+        ));
+    }
+    Some(format!(
+        "evolution t_myr:land/land_z_p50_m {}",
+        parts.join(" ")
+    ))
+}
+
 /// The climate's summary line (P1-05): `climate_final=<snapshots> t_surface_c=… koppen_land=A…/B…
 /// …`, from the last snapshot, when the run had a climate stage.
 fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -274,6 +461,25 @@ fn structure_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     Some(deeptime_core::structure::summary_line(&v))
 }
 
+/// The young landscape's summary line (P1-06): `young_final=… land_z_p50_m=a->b …`, when the
+/// pipeline ran it.
+fn young_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note = world.notes.get(deeptime_core::surface::young::STAGE_NAME)?;
+    let v: Value = serde_json::from_str(note).ok()?;
+    v.get("after")?;
+    Some(deeptime_core::surface::young::summary_line(&v))
+}
+
+/// The amplifier's summary line (P1-06): `amplify_final=8192x4096 mode=… sinks=0 passes[…]`, when
+/// the pipeline ran it.
+fn amplify_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note = world
+        .notes
+        .get(deeptime_core::surface::amplify::STAGE_NAME)?;
+    let v: Value = serde_json::from_str(note).ok()?;
+    Some(deeptime_core::surface::amplify::summary_line(&v))
+}
+
 /// The deposit engine's recorded history (P1-04): per field of the last frame, the share of cells
 /// where it is non-zero and its mean there.
 fn history_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -313,6 +519,7 @@ pub(crate) fn timings_line(
         deeptime_core::surface::STAGE_NAME,
         deeptime_core::climate::STAGE_NAME,
         deeptime_core::structure::STAGE_NAME,
+        deeptime_core::surface::young::STAGE_NAME,
     ] {
         if let Some(note) = world
             .notes
@@ -354,6 +561,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         o.start.as_deref(),
         o.length_myr,
     )?;
+    let preset = apply_overrides(&preset, &o.common.set)?;
     let content = match &o.content {
         Some(p) => read_text(p, "content bundle")?,
         None => String::new(),
@@ -398,6 +606,12 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         println!("deeptime run: {line}");
     }
     if let Some(line) = structure_line(&world) {
+        println!("deeptime run: {line}");
+    }
+    if let Some(line) = young_line(&world) {
+        println!("deeptime run: {line}");
+    }
+    if let Some(line) = amplify_line(&world) {
         println!("deeptime run: {line}");
     }
     println!(
@@ -447,7 +661,8 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     let opts = session_options(&work, &o.common);
     let s = match (&o.input, &o.preset) {
         (Some(input), None) => {
-            let ck = Checkpoint::read(input)?;
+            let mut ck = Checkpoint::read(input)?;
+            ck.preset_json = apply_overrides(&ck.preset_json, &o.common.set)?;
             // A stage coupled to others (plates + surface) runs with its group, which starts at
             // the group's lead: a checkpoint whose next stage is the lead serves any member.
             let group = deeptime_core::preset::Preset::from_json(&ck.preset_json)
@@ -483,6 +698,7 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         }
         (None, Some(preset)) => {
             let json = load_preset_with(preset, o.start.as_deref(), o.length_myr)?;
+            let json = apply_overrides(&json, &o.common.set)?;
             let s = Session::create(&json, "", opts, Arc::new(AllocGauge))?;
             let stages = s.preset().stages();
             let target = group_of(&stages, &o.name).map(|g| g.start).ok_or_else(|| {
@@ -552,10 +768,22 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     if let Some(line) = surface_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
+    if let Some(line) = hypsometry_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = evolution_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
     if let Some(line) = climate_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = structure_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = young_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = amplify_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = history_line(&ck.world) {
@@ -586,6 +814,12 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             for k in &mut keyframes {
                 k.layers.retain(|(name, _)| o.viewer_layers.contains(name));
             }
+        } else if o.name == deeptime_core::surface::young::STAGE_NAME
+            || o.name == deeptime_core::surface::amplify::STAGE_NAME
+        {
+            // P1-06: the young landscape's and the amplifier's own frames (the deep-time frames
+            // belong to the surface bundle); the before/after views come from the L3 layer.
+            keyframes.retain(|k| k.stage.starts_with("young") || k.stage.starts_with("amplify"));
         } else if o.name == deeptime_core::deposits::STAGE_NAME {
             // The deposit bundle keeps the map context (elevation, plates, crust age, regime,
             // drainage, the rock and the trap structure) and the deposit layers; the surface's
@@ -617,12 +851,22 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         // the deposit stage's bundle leaves the strata inspector to the structure stage's own (its
         // layers alone are ~20 MB, and the deposit bundles stay under the review cap).
         let structure = if o.name == deeptime_core::deposits::STAGE_NAME
+            || o.name == deeptime_core::surface::young::STAGE_NAME
+            || o.name == deeptime_core::surface::amplify::STAGE_NAME
             || !(o.viewer_layers.is_empty()
                 || o.viewer_layers.iter().any(|l| l.starts_with("structure")))
         {
             None
         } else {
             crate::structure_view::build(&ck.world, &ck.preset_json)?
+        };
+        // P1-06: the hill-shaded before/after views of the amplifier.
+        let amplified = if o.name == deeptime_core::surface::young::STAGE_NAME
+            || o.name == deeptime_core::surface::amplify::STAGE_NAME
+        {
+            crate::amplify_view::build(&ck.world, &ck.preset_json, &work)?
+        } else {
+            None
         };
         let layers: Vec<&deeptime_format::LoadedLayer> =
             structure.iter().flat_map(|v| v.layers.iter()).collect();
@@ -653,6 +897,20 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
                 o.name,
                 v.sections.len(),
                 dir.join("sections").display()
+            );
+        }
+        if let Some(v) = &amplified {
+            let am = crate::amplify_view::write(dir, v)?;
+            report
+                .get_or_insert_with(|| json!({}))
+                .as_object_mut()
+                .expect("an object")
+                .insert("amplify".into(), am);
+            println!(
+                "deeptime stage {}: {} before/after views -> {}",
+                o.name,
+                v.regions.len(),
+                dir.join("amplify").display()
             );
         }
         if let Some(report) = report {
@@ -729,6 +987,12 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             println!("deeptime bench: threads={threads} {line}");
         }
         if let Some(line) = climate_line(&world) {
+            println!("deeptime bench: threads={threads} {line}");
+        }
+        if let Some(line) = young_line(&world) {
+            println!("deeptime bench: threads={threads} {line}");
+        }
+        if let Some(line) = amplify_line(&world) {
             println!("deeptime bench: threads={threads} {line}");
         }
         println!(

@@ -2068,6 +2068,15 @@ community ports) are not opened for code.
   diffusivity with 2D implicit diffusion (conjugate gradients), carbonates, evaporites, weathering
   with laterites, local isostasy smoothed over 50 km, and the deposit engine's frames every 10 Myr.
   Runoff comes from `climate/{t_mean_c,precip_mm}` when P1-05 writes them, else a zonal stand-in.
+  *Calibrated with the climate on (P1-17 partial, 2026-09-29; STATUS.md has the runs):* the
+  pipeline presets narrow the plate model's Andean uplift band to 800 km and its collision surges
+  to 2,000 km (Cortial's 1,800 / 4,200 km domed whole continents), build island arcs at 0.3 mm/yr,
+  start continents with flooded margins (`tectonics.continental_shelf_share` 0.29, Earth's 29 %
+  land on 41 % continental crust), deepen the ocean floor (ridge −2.5 km, damping 0.05 mm/yr), and
+  use K = 2·10⁻⁹, Airy isostasy 0.8 and Landlab's marine diffusivity (100 m²/yr, wave base 60 m);
+  the ice-sheet feedback is on. 500-Myr `pipeline_quick_16k` runs now end with Earth-like
+  hypsometry (land median 0.6–1.1 km, Earth 0.43; above 2 km 7–30 %, Earth 10 %), land 27–33 %,
+  and Köppen shares near Earth's.
 - **Young landscape on L2** for the last 2–10 Myr at finer resolution, starting from L1 upsampled.
 - **Amplification to L3.** Schott et al. 2024, "Terrain Amplification using Multi-scale Erosion"
   (ACM TOG 43(4)); its code, `H-Schott/MultiScaleErosion` (MIT, commit 964a3d5), is GLSL compute
@@ -2086,6 +2095,39 @@ community ports) are not opened for code.
   L1 0.52 M cells → 131 s single-threaded (33–44 s parallel); L1 2.1 M → 524 s (131–175 s). Young
   landscape, 100 steps: L2 2.1 M → 210 s (52–70 s); L2 8.4 M → 839 s (210–280 s). Amplification has
   no published timing (research gap); P1-17 measures it.
+- **As built in P1-06** (`surface/{young.rs, amplify.rs, amplify/{window, resample, kernels, tiles}.rs,
+  thermal.rs, detail.rs}`; STATUS.md has the numbers). Two more stages follow the deposits in a
+  planet preset with the sections `young` and `amplify` (both in the four `pipeline_*` presets;
+  every key optional): `young` upsamples the final L1 surface to L2 (clamped Catmull–Rom), fills
+  the depressions the interpolation made (under 5 m; deeper ones are L1's lakes) and runs 4 LEM
+  steps of the deep-time physics (`spl`, `pflood`, `routing`, `diffusion`) for 2 Myr with uplift
+  equal to the last step's erosion rate (`balance`; `plates` and `none` exist), without advancing
+  the clock; `amplify` doubles L2 to L3 in `doublings(l2_r, l3_r)` levels (2 in every built-in
+  preset but 16k full). Each level: Catmull–Rom terrain clamped between its two nearest samples,
+  the level below's exact drainage area as a prior (log-interpolated, less the coarse cell's own
+  area), lakes inherited and grown a cell; relief-seeding noise; a Priority-Flood+ε repair; 40
+  iterations (×3 on the levels before the last) of multiple-flow drainage area (flow exponent 2,
+  Schott's `flow_p` is 1.3) and stream-power incision (`incision_m` metres at 100 km² and slope 0.1,
+  area term capped at 300 km², at most 30 % of the drop to the receiver per iteration and 3 × the
+  initial drop to the lowest neighbour in all); 24 iterations of thermal slumping with the critical
+  slope 0.6 × (0.25 + 0.75 · drama) and ±25 % noise; 12 of deposition of the eroded material along
+  the same weights (capped at half the gap to the lowest higher neighbour, so it cannot make a
+  pit); the flood again. **Every pass is a Jacobi iteration on a window**, so the last level runs in
+  tiles of 2,048 cells with a halo of `radius + 2 · repair_margin + 3` = 196 cells and gives the
+  same bits as the whole raster (tests, and 512 of 512 tiles of both L3 layers of the 500 Myr
+  planet: one thread, twelve, streamed); it spills `rasters/elevation.dtr` (i16, 1/16 block) and
+  `rasters/detail/amplitude.dtr` (u8, 1/16 block) tile by tile (`TilePackWriter`) into the run
+  folder, `finalize_write` lists them in the manifest, and a thinned copy (`amplify/{elevation,
+  detail, drainage}` on the `L3p` grid) feeds the keyframes and the workbench. The stream is
+  `auto`: the levels stream when the gauge says their buffers would not fit under the cap. **Drama**
+  (`surface.drama`, the editor's slider, 0..2) scales the critical slope and the detail amplitude
+  (`detail.rs`, FORMAT.md defines the C-periodic noise the game adds). Deviations from the plan:
+  the working set is 46–50 B a cell (67 B while a tile runs) against the plan's 20, so 16k quick
+  needs 2.1 GiB whole; the halo is derived from the iteration counts (196 cells) not fixed at 64;
+  the flood is the one non-local pass (its reach, `repair_margin_cells` 32, is in the halo);
+  drama maps to 0.25 + 0.75 · drama times the base slope, not drama times it, so 0 is smooth and
+  not flat; the young stage adds erosion time without advancing the clock; the fine drainage area
+  refines the coarse level's exact area instead of starting from zero.
 - **Oracle.** `tools/validation/fastscape_compare.py` runs fastscapelib (GPL-3.0, installed with
   `nix shell` + pip in a throwaway venv, never vendored) on the same uplift and parameters on a
   256² grid and compares hypsometry, χ/steepness statistics and drainage-area distributions with the
@@ -3099,6 +3141,13 @@ a smoke benchmark and again at the end.
   - timings per pass recorded (feeds P1-17)
 - **Ben reviews.** Before/after amplification views in the viewer.
 
+- *As run (P1-06):* the acceptance ran on `pipeline_quick_16k` (`stage young`, `stage amplify`; the
+  built-ins stay placeholders until P1-08). `cargo test -p deeptime-core surface::amplify` passes (25
+  tests: no new sink outside the lakes on a wrapped test planet with a lake, streamed = whole-raster
+  to the bit, tiled middle level = whole, 1 = 5 threads, the seam, the flood, drama, the pack
+  round trip, the coupled pipeline on 1 and 3 threads and a resume); timings per pass are in
+  STATUS.md and `notes.amplify` of every run (`amplify_final=…` line).
+
 #### P1-07 Rock classes, column strata and metamorphism
 - **Goal.** §5.4.1 data for all 59 classes; §8.5's Phase 1 column strata; horizon bake.
 - **Inputs.** §5.4.1, §5.7.4, §8.5; the rock-tag README's class table.
@@ -3304,6 +3353,11 @@ a smoke benchmark and again at the end.
   - `peak_native_bytes` ≤ the estimate shown to players; any overshoot fixes the estimator
   - LZ4 compression ratio per layer recorded
 - **Ben reviews.** The bench page: time per stage, scaling with threads, memory vs estimate.
+- *As run so far (early calibration, 2026-09-29; decisions log 2026-09-29, STATUS.md "P1-17
+  partial: calibration"):* the four pipeline presets, the surface/climate/structure defaults and four
+  deposit types' `balance.count_mult` were recalibrated with P1-05's climate on, against Earth's
+  hypsometry (GMT earth_relief_01d) and Köppen shares (Peel et al. 2007); the final numbers wait
+  for P1-06 and the bench.
 
 #### P1-18 Pole cap and client info
 - **Goal.** §7.11 and §7.15.

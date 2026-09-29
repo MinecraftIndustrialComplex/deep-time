@@ -7,6 +7,18 @@
     "space": "02a626d5-1131-49be-a132-daec08d6ea19",
     "url": "https://spacesheep.dev/@benmac/deeptime-p0-bluemap"
   },
+  "p1-amplify": {
+    "space": "3837bffd-e47d-450b-99b3-8000291ae5ae",
+    "url": "https://spacesheep.dev/@benmac/deeptime-p1-amplify"
+  },
+  "p1-calib": {
+    "space": "45624208-cec8-4e90-a13a-8106ff73eb44",
+    "url": "https://spacesheep.dev/@benmac/deeptime-p1-calib"
+  },
+  "p1-calib-super": {
+    "space": "18481fb8-0705-4113-9ab0-ec3d43e8b884",
+    "url": "https://spacesheep.dev/@benmac/deeptime-p1-calib-super"
+  },
   "p1-deposits": {
     "space": "16b4c7ae-53bc-4c07-8d48-f6eb9b8c8862",
     "url": "https://spacesheep.dev/@benmac/deeptime-p1-deposits"

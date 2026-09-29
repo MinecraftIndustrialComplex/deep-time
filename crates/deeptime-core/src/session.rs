@@ -559,6 +559,7 @@ impl Session {
                 let ctx = StageContext {
                     pool: &self.pool,
                     log: &self.log,
+                    out_dir: &self.out_dir,
                     until,
                     gauge: self.gauge.as_ref(),
                     mem_cap: self.mem_cap,
@@ -903,6 +904,8 @@ impl Session {
                 ),
             );
         }
+        // The L3 layers the amplify stage spilled into the folder (P1-06).
+        crate::surface::amplify::register(world, &mut m)?;
         let mut files = std::mem::take(&mut m.files);
 
         let mut preset = serde_json::to_vec_pretty(&self.preset.to_json())

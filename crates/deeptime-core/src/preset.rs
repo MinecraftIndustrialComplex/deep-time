@@ -395,6 +395,18 @@ impl Preset {
                             .expect("checked when the preset was parsed"),
                     ));
                 }
+                if p.young.is_some() {
+                    // The last Myr of erosion on L2, then amplification to L3 (P1-06). After the
+                    // deposits: they read the L1 history and neither waits for L2 or L3.
+                    stages.push(Box::new(crate::surface::young::YoungStage::new(
+                        (**p).clone(),
+                    )));
+                    if p.amplify.is_some() {
+                        stages.push(Box::new(crate::surface::amplify::AmplifyStage::new(
+                            (**p).clone(),
+                        )));
+                    }
+                }
                 stages
             }
         }

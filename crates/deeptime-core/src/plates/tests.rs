@@ -68,6 +68,7 @@ fn run_stage(
         let ctx = StageContext {
             pool: &pool,
             log: &log,
+            out_dir: std::path::Path::new("."),
             until: std::time::Instant::now(),
             gauge: &gauge,
             mem_cap: u64::MAX,
@@ -393,5 +394,48 @@ fn statistics_over_500_myr() {
             s.areas[0].1
         );
         assert!(st.counters.rifts >= 1 && st.counters.subduction_onsets >= 3);
+    }
+}
+
+/// P1-17: with `continental_shelf_share` s the continental crust is (1 − ocean_fraction)/(1 − s)
+/// of the planet, its dry part still (1 − ocean_fraction), the rest a shelf from 0 m at the coast
+/// to the shelf break at the ocean's edge; s = 0 keeps every continent dry (P1-03).
+#[test]
+fn the_shelf_share_floods_the_continents_margins() {
+    for start in ["supercontinent", "scattered_continents", "random"] {
+        let mut p = preset(6000, 20.0, start, 5);
+        let env0 = PlatesStage::new(p.clone()).env(&p.tectonics, 1);
+        let (st0, _) = init::initial_state(&p, &env0).unwrap();
+        let n = st0.samples.len() as f64;
+        let dry = (1.0 - p.planet.ocean_fraction) * n;
+        let cont0 = st0.samples.iter().filter(|s| s.is_continental()).count() as f64;
+        assert!((cont0 - dry).abs() <= 1.0, "{start}: {cont0} vs {dry}");
+        assert!(
+            st0.samples
+                .iter()
+                .filter(|s| s.is_continental())
+                .all(|s| s.elevation_m > 0.0)
+        );
+
+        p.tectonics.continental_shelf_share = 0.29;
+        let env = PlatesStage::new(p.clone()).env(&p.tectonics, 1);
+        let (st, _) = init::initial_state(&p, &env).unwrap();
+        let cont: Vec<&state::Sample> = st.samples.iter().filter(|s| s.is_continental()).collect();
+        let want = dry / 0.71;
+        assert!(
+            (cont.len() as f64 - want).abs() <= 1.0,
+            "{start}: {} continental samples, want {want}",
+            cont.len()
+        );
+        let wet = cont.iter().filter(|s| s.elevation_m <= 0.0).count() as f64;
+        assert!(
+            (cont.len() as f64 - wet - dry).abs() <= 1.0,
+            "{start}: dry continental samples"
+        );
+        assert!(
+            cont.iter()
+                .all(|s| s.elevation_m > 0.0 || (-130.0..=0.0).contains(&s.elevation_m)),
+            "{start}: the shelf lies between 0 and −130 m"
+        );
     }
 }
