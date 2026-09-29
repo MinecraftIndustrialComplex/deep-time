@@ -146,7 +146,9 @@ neoForge {
             systemProperty 'neoforge.enabledGameTestNamespaces', 'deeptime'
             systemProperty 'deeptime.gametest', 'true'
             if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
-            jvmArgument '-Xmx6G'
+            // The 160-mod MIC set needs more heap than the default runtime (an intermittent
+            // OutOfMemoryError in lakeHolds under -PwithMic, P1-12); one server runs at a time.
+            jvmArgument(project.hasProperty('withMic') ? '-Xmx8G' : '-Xmx6G')
             if (project.hasProperty('gametestDebugLog')) logLevel = org.slf4j.event.Level.DEBUG
             gameDirectory = file('../run-gametest')
         }
