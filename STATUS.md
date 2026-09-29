@@ -41,7 +41,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
-| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log) |
+| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log) |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -69,6 +69,82 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — P1-20 stage 2: 3D area preview and click-to-inspect from the real generator (agent worktree agent-a63e3a8af506069de, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Approach.** The Rust column evaluator is a stub until P1-08, so stage 2 runs the real mod headless
+  on the Mac and exports what it placed: Deep Time's density, strata pass and deposits and the
+  pack's surface rules and ores, as a player's world gets them.
+- **`deeptime-inspect export-area`** (`crates/deeptime-inspect/src/area.rs`, format in its docs):
+  a box of at most 256 × 256 (`--max-side`), y −352..639 or `--y`, written as `.dtva(.gz)`: a JSON
+  header, then u16 run counts per column, u16 run values and lengths (bottom-up), and the strata stack
+  per column (K × i16 tops, K × u8 classes, read through P1-07's `LoadedLayer::stack_at`, the same
+  column the Java strata pass builds). A run value is a (block, tag) entry; a tag lists the deposit
+  bodies and zones whose SDF holds the block centre. x0 is folded into [−C/2, C/2) and the box runs
+  east, so a box may straddle the seam (column i = world x fold(x0 + i), unwrapped x0 + i). The header
+  carries blocks (colour from `colors`, category, ore material, the rock classes a block belongs to),
+  the bodies and sites in the box with their "why here" chains (from `/deeptime why` when the runner
+  recorded it, else the world data's event log), the palette and claims probes, and stats: categories,
+  ore in bodies / claimed scatter / unclaimed, how much rock is its horizon's (or body's) class, and
+  whether the `probe site` answers match the export's blocks and body tags. `--verify` decodes the file
+  and compares it with the region files block by block. Tests: 7 unit (round trip, RLE runs maximal
+  and summing to the height, runs past the stored sections, a box across the seam at C = 128 given in
+  three frames, a body across the seam, probes parsing, categories) + 2 on the real fixture region
+  (80 × 64 × 384 blocks equal the world's; the same columns one lap away; proto and missing chunks
+  reported).
+- **Job runner** `tools/workbench/preview.py` (stdlib; `/usr/bin/python3` 3.9 on the Mac runs it):
+  installs the profile's server set if missing, prepares the job's own world
+  (`smoke/workbench/jobs/<job>/world`, booted with `--universe <job> --world world`, so smoke worlds
+  are untouched; synthetic data, a world-data folder, a first-start preset or a test terrain), takes
+  the Mac's server lock (the one `mac.sh --server` holds; waits, never breaks it), Chunky per box (a
+  seam box in its two canonical pieces), the probes, stop, `export-area --verify`, deletes the world.
+  From the laptop: `tools/workbench/preview-area.sh`. Contract in `tools/workbench/README.md`.
+- **Viewer** `tools/review/pages/area3d/` (three.js 0.169 from jsDelivr): greedy-meshed 32³ sections,
+  a section re-meshed only when a cut, toggle or colour mode changes what it shows; top cut, x/z
+  cross-section, category toggles and presets (everything / hide stone / ores and deposits with bodies
+  see-through), colour by block, rock horizon or body, vivid ores (ore textures average to their stone,
+  so ores are painted by material by default); the seam drawn in red; click a block for id, folded and
+  unwrapped position, chunk, horizon and whether the strata pass painted it, the body and zones, the
+  site with products and why-here chain, and the column's strata stack; "cut here" makes a notch through
+  a site's ore body. Light and dark, 390 px. URL state (`site`, `pick`, `pickcol`, `cuty`, `sec`, …).
+- **Wired into the workbench** (stage 1 at 9e34b45): `deeptime watch --preview <preview.py>` forwards
+  `POST /api/preview`, `GET /api/preview/…`, `GET /api/inspect`, `GET /area3d/…` to `preview.py http`
+  (new `crates/deeptime-cli/src/watch/stage2.rs`; `http.rs` asks it first, 501 without `--preview`);
+  `mac-watch.sh` passes the checkout's preview.py (`--no-preview` to leave it off); `workbench.js`
+  `Stage2` passes lat/lon to inspect and shows the answer's `note`. **What a preview is:** runs are
+  rasters, not worlds, so until P1-08 a preview is the synthetic deposit world (deposits_world_16k,
+  500 Myr, C = 16,384) at the box's latitude and longitude; every answer, the panel and the viewer say
+  so. Inspect answers from a finished preview holding the column (the viewer opens on the column's top
+  block), else starts a 32 × 32 preview. The P1-08 plug-in points are in the README ("Later").
+- **Measured (Mac)**, `tools/workbench/preview-area.sh`, all `verify` 0 wrong:
+  | Box | Profile, world | Boot | First start | Chunky | Total | File |
+  |---|---|---|---|---|---|---|
+  | 256 × 256 × 992 at −5698,−1158 | standalone, deposits_world_16k | 12.7 s | 3.3 s | 361 chunks 9.1 s | 43.8 s | 0.94 MB, 31.3 M blocks, 1.26 M runs |
+  | same, after merging P1-07 | standalone | 17.0 s | 4.5 s | 361 chunks 11.1 s | 63.1 s (with the jar rebuild) | 1.02 MB |
+  | same | MIC, 168 mods, pack 303fd89 | 50.3 s | 5.8 s | 361 chunks 25.3 s | 89.9 s | 1.09 MB, 173 block types |
+  | 128 × 128 across the seam (8128..8256) | standalone, wrap-test every-class | 21.4 s | — | 2 × 55 chunks 9.4 s | 54.5 s | 0.19 MB |
+  | 63 × 27 through the workbench | standalone, deposits_world_16k | — | — | 35 chunks | 27.2 s | 34 kB |
+  Export itself 0.5 s for the largest box. 6 of 6 `probe site` answers agree with the export's blocks
+  and body tags (standalone after the merge, and MIC). Strata: 99.2 % (standalone) and 98.5 % (MIC) of
+  rock below the first horizon top is its horizon's or body's class; crust 2,091 / 134,146 blocks
+  (MIC: stone that features put back). Seam box: terrain top continuous (largest step between the two
+  seam columns 4, mean 0.62; a neighbouring pair: 4, 0.10; the seam's carvers, as P0-15 saw).
+  `tools/workbench/check-watch.sh` (a private `deeptime watch --preview` on port 8653): POST with the
+  page's body → 202 + note → polled → done in 115 s (90 s of it waiting for another session's server
+  lock) → export 34 kB, `/area3d/` 200, inspect of a column inside a finished box → the viewer URL with
+  `pickcol`. Screenshots (headless Chromium, SwiftShader; about 15 s to load and mesh 256 × 256 × 992):
+  `review/out/area3d-shots/` (overview, notch cutaway through the supergene blanket with a copper ore
+  selected, ores-and-deposits, seam, MIC overview and cutaway, 390 px dark, the workbench-made preview).
+  Review bundle (not published): `review/out/area3d/` (viewer + 4 exports, 2.3 MB, 7 files).
+- **Gates** after merging master 6d8171f: `cargo fmt --check`, `clippy --workspace --all-targets -D
+  warnings`, `test --workspace --locked` (cli 22 incl. 2 stage2, core 149, format 32, inspect 28 + 2 +
+  7, jni 7, viewer 5), `deny check licenses bans` clean. `fmt` also needed master's b150ea0 watch test
+  reformatted (done here). No Java changed, so no JUnit/GameTest rerun.
+- **Findings.** In the MIC box the unclaimed ores are many (uranium 5,420, nickel 3,682, fluorite
+  2,262, platinum 1,840 blocks in 256 × 256): kept by design, since claiming covers Deep Time's
+  materials only. The same blanket holds 337 ore blocks in the standalone world and 367 in MIC (MIC's
+  Create stones are hosts where vanilla's stand-ins are not).
+- **Next.** Publish `review/out/area3d/` (parent session). After P1-08: point `workbench_preview` at
+  the run's bake and answer `/api/inspect` from `deeptime inspect-column` (README "Later").
+
 ### 2026-09-29 — macOS free memory in MachineInfo; the Q10 client launcher folded into mac-client's launch path (agent worktree agent-aab6da56089b714ed, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **1. macOS free memory (the twin of P1-11's Linux `MemFree` fix).** The JDK is not right on the Mac:
   `OperatingSystemMXBean.getFreeMemorySize()` was 1,068,990,464 B (0.996 GiB) on the 16 GB M6 with 6+ GiB
