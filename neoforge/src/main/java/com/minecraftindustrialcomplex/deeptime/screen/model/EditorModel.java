@@ -294,7 +294,7 @@ public final class EditorModel {
         fieldTexts.put(f.id(), text);
         double v = Formats.parse(text);
         if (f.inRange(v))
-            overrides.put(f.id(), new JsonPrimitive(v));
+            overrides.put(f.id(), f.number(v));
         else
             overrides.remove(f.id());
         changed();
