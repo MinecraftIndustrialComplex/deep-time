@@ -72,11 +72,7 @@ impl Preview {
             stdin.write_all(body)?;
         }
         let mut out = Vec::new();
-        child
-            .stdout
-            .take()
-            .expect("piped")
-            .read_to_end(&mut out)?;
+        child.stdout.take().expect("piped").read_to_end(&mut out)?;
         let mut err = String::new();
         let _ = child.stderr.take().expect("piped").read_to_string(&mut err);
         let status = child.wait()?;
@@ -128,7 +124,13 @@ mod tests {
         ] {
             assert!(handles(p), "{p}");
         }
-        for p in ["/api/runs", "/", "/api/previews", "/area3dx", "/workbench.js"] {
+        for p in [
+            "/api/runs",
+            "/",
+            "/api/previews",
+            "/area3dx",
+            "/workbench.js",
+        ] {
             assert!(!handles(p), "{p}");
         }
         assert_eq!(static_type("application/json"), "application/json");
@@ -155,7 +157,10 @@ mod tests {
         let a = p.call("POST", "/api/preview?x=1", b"{}").unwrap();
         assert_eq!(a.status, 202);
         assert_eq!(a.content_type, "application/json");
-        assert_eq!(String::from_utf8(a.body).unwrap(), "POST /api/preview?x=1 {}");
+        assert_eq!(
+            String::from_utf8(a.body).unwrap(),
+            "POST /api/preview?x=1 {}"
+        );
         std::fs::write(&script, "echo nothing-useful >&2; exit 3\n").unwrap();
         let e = p.call("GET", "/api/inspect", b"").err().unwrap();
         assert!(e.to_string().contains("nothing-useful"), "{e}");
