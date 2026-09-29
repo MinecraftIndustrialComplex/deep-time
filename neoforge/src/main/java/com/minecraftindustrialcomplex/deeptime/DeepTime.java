@@ -4,6 +4,7 @@ package com.minecraftindustrialcomplex.deeptime;
 import com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLoader;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLogSink;
+import com.minecraftindustrialcomplex.deeptime.ore.OreBlockResolver;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.server.DeepTimeCommands;
 import com.minecraftindustrialcomplex.deeptime.server.SpawnHandler;
@@ -37,6 +38,7 @@ public final class DeepTime {
         WorldDataBinder.init();
         SpawnHandler.init();
         RockPalette.init();
+        OreBlockResolver.init();
         GameTestSupport.init(modBus);
         PoleCapPrototype.init();
         loadNatives();

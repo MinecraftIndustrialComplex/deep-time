@@ -6,7 +6,8 @@
   "plugin": "com.minecraftindustrialcomplex.deeptime.mixin.DeepTimeMixinPlugin",
   "mixins": [
     "MinecraftServerFirstStartMixin",
-    "WorldDimensionsShapeMixin"
+    "WorldDimensionsShapeMixin",
+    "compat.excavated_variants.OreReplacerMixin"
   ],
   "server": [
     "DedicatedServerFirstStartMixin"

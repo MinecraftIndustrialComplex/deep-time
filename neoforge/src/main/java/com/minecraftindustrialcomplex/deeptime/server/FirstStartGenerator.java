@@ -218,8 +218,11 @@ public final class FirstStartGenerator {
         long cap = config.memoryCapBytes();
         List<String> stageNames = new ArrayList<>();
         long peak;
+        // The content bundle (plan §5.4): today the deeptime:essentials registry, which replaces the
+        // preset's essentials in the core's playability pass (P1-15).
+        String contentJson = com.minecraftindustrialcomplex.deeptime.ore.OreData.contentJson(server);
         try {
-            JsonObject est = Presets.parseObject(SimSession.estimate(presetJson, ""));
+            JsonObject est = Presets.parseObject(SimSession.estimate(presetJson, contentJson));
             peak = est.get("peak_bytes").getAsLong();
             for (JsonElement st : est.getAsJsonArray("stages"))
                 stageNames.add(st.getAsJsonObject().get("name").getAsString());
@@ -252,7 +255,8 @@ public final class FirstStartGenerator {
                 name.equals(resolved.label()) ? name : name + " (" + resolved.label() + ")", c, timeline, threads,
                 gib(cap), gib(peak), stageNames.size(), dir);
         long started = System.nanoTime();
-        String manifestJson = run(server, presetJson, work, threads, cap, stageNames, started);
+        DeepTime.LOGGER.info("[deeptime] content bundle: {}", contentJson);
+        String manifestJson = run(server, presetJson, contentJson, work, threads, cap, stageNames, started);
 
         // 5. Into place, whole.
         try {
@@ -272,11 +276,11 @@ public final class FirstStartGenerator {
     }
 
     /** Runs the session to completion on this (the server) thread's watch; returns the manifest JSON. */
-    private static String run(MinecraftServer server, String presetJson, Path work, int threads, long cap,
-            List<String> stageNames, long started) throws Stop {
+    private static String run(MinecraftServer server, String presetJson, String contentJson, Path work, int threads,
+            long cap, List<String> stageNames, long started) throws Stop {
         SimSession session;
         try {
-            session = SimSession.start(presetJson, "", work, threads, cap);
+            session = SimSession.start(presetJson, contentJson, work, threads, cap);
         } catch (RuntimeException e) {
             deleteQuietly(work);
             throw new Stop("the simulation could not start: " + e.getMessage(), "Nothing was written.");

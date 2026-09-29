@@ -1,0 +1,13 @@
+{
+  "material": "c:gold",
+  "clusters_per_chunk": 0.3,
+  "size": 4,
+  "y_window": [
+    0.3,
+    1.0
+  ],
+  "host_bias": {
+    "*": 1.0
+  },
+  "_comment": "Rare small gold pockets, deep. Background scatter (plan §7.8): values are initial, judged against the deposit renders; packs override or add files under data/<ns>/deeptime/scatter/."
+}

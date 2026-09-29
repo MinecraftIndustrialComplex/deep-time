@@ -1,0 +1,10 @@
+{
+  "types": [
+    "excavated_variants:overworld"
+  ],
+  "translations": {
+    "en_us": "Cobblestone"
+  },
+  "block": "minecraft:cobblestone",
+  "ore_tags": []
+}

@@ -1,0 +1,13 @@
+{
+  "material": "c:zinc",
+  "clusters_per_chunk": 0.5,
+  "size": 5,
+  "y_window": [
+    0.1,
+    0.7
+  ],
+  "host_bias": {
+    "*": 1.0
+  },
+  "_comment": "Small zinc pods; places nothing without a #c:ores/zinc block (Create). Background scatter (plan §7.8): values are initial, judged against the deposit renders; packs override or add files under data/<ns>/deeptime/scatter/."
+}
