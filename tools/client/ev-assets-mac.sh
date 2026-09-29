@@ -40,7 +40,10 @@ XMX=4G   # what the run configuration gave the client before (a quarter of the 1
 mc_start
 
 # A screenshot run's `linkRunModsClient` (no -PrunSet) empties what an ev-client one linked.
-compgen -G "$GAMEDIR/mods/*xcavated*" >/dev/null \
+# (A glob loop: the dev shell's bash is Nix's non-interactive one, which has no compgen.)
+ev_linked=0
+for jar in "$GAMEDIR"/mods/*xcavated*; do [ -e "$jar" ] && ev_linked=1; done
+[ "$ev_linked" = 1 ] \
     || { mc_log "the ev-client set is not linked into $GAMEDIR/mods (tools/client/ev-assets.sh runs tools/smoke/install.sh ev-client and ./gradlew -PrunSet=ev-client linkRunModsClient)"; exit 1; }
 
 mkdir -p "$GAMEDIR/config"
