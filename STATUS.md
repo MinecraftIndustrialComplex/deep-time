@@ -38,10 +38,10 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-14 | Deposit engine: the four families | done | 2026-09-29 | — | On the real recorded history (plates → surface → structure → deposits, `pipeline_{quick,full}_{16k,32k}` have a `deposits` section). Mac: cargo test --workspace ok (core 155 + 1 ignored incl. deposits::recorded_tests 6: 1 vs 3 threads give identical sites/bodies/events/census, a checkpoint inside the deposit stage resumes on another thread count to the same sites, favourability of a rigidly drifting crust = the fixed-crust map moved cell for cell, missing fields skip exactly the types that read them and change nothing else, every family on recorded frames; cli 21 incl. `stage deposits` on the real history; format 32, inspect 28, jni 7, viewer 5); clippy -D warnings, deny licenses bans clean; gradlew build test 118/0; fmt clean for every file this task touches (watch/editor.rs on master is not); `stage deposits --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-deposits-real` → 154 s (plates 30.0, surface 111.6, structure 5.0, deposits 4.4), 5 sites at count_mult 1 (porphyry 1, coal 4; MVT, SEDEX, petroleum expected 0.00 / 0.00 / 0.11), 42 at count_mult 10; 17 MB bundle. Ben reviews: ore provinces, site list, three chains; see the build log for what is empty and why |
 | P1-15 | Deposits in the world | doing | 2026-09-28 | — | On the synthetic deposit world (real fields wait for P1-03…P1-08). Mac: ./gametest.sh, -PwithEv, -PwithMic → All 30 required tests passed each (DepositGameTests body 1222/1222 ore exact, 0 missed, 0 unexplained, regeneration 0 of 44,880 differ; ClaimGameTests; SpawnGameTests); ./gametest-planet.sh claimoninplanetworld PASS standalone (19 removed) and -PwithMic (38 removed); JUnit 62/0 incl. DepositDataParityTest (19,649 body samples, worst Δ 3.3e-16); smoke standalone first-start deposit world PASS + `deeptime-inspect ore` render |
 | P1-16 | COE and CDG hooks | done | 2026-09-28 | — | Mac: `./gametest.sh` and `-PwithMic` → All 45 required tests passed each; CompatGameTests with COE 1.6.8 + CDG 1.3.15: 7 of 7 site chunks = the site's vein in COE, 30 of 30 claimed noise veins dropped (COE picks them in the overworld), 34 unclaimed kept, 33 stored randomMul = the site's quantile (24 = Rust's drawn quantile, worst Δ 2.8e-8), 16 trap chunks = charge × cdg_scale × share, 111 chunks outside traps 0. MIC smoke (16k deposit world) PASS: `probe coe` at 9 site chunks = the site's vein (agrees), `probe cdg` over trap 27 > 0 (infinite / 553,979 mB), 0 elsewhere; `/coe locate` copper not found, redstone found. JUnit 106/0; cargo fmt/clippy/test/deny clean. Driven by the synthetic deposit world (see build log) |
-| P1-17 | Benchmark gate and preset tuning | todo | | | |
+| P1-17 | Benchmark gate and preset tuning | doing | 2026-09-29 | | Partial (surface parallelism, branch worktree-agent-a9bc0ab99e68b4a07): stream-power solve 34.0 → 6.5 s at 12 threads, bit-identical; flood left serial on purpose; diffusion is now the largest surface cost; see the build log entry "P1-17 partial" |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
-| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log) |
+| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log). **UI overhaul** (branch worktree-agent-a95571be05fdd89d6, Ben: "should be dark themed"): dark map-first layout, run cards, sectioned editor with the estimate by Run, split/side-by-side compare, timeline dock, stage-2 job cards, `?tv` HUD, 390 px; placeholders hidden; Mac gates clean, JUnit 118/0; before/after in review/out/workbench-ui/ (see build log) |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -70,6 +70,176 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — P1-20: the workbench UI overhaul, dark (agent worktree agent-a95571be05fdd89d6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben opened the workbench: "Sorry, that looks shit. … a complete UI overhaul to look WAYY better.
+  (Also, should be dark themed.)" Then, from real use: he ran `earthlike_full_32k` for 4,600 Myr and got
+  one green blob, because the placeholder presets sat next to the real ones.
+- **What changed (front end; the HTTP/SSE contract, the POST guard and the stage-2 contract are as they
+  were).** `crates/deeptime-viewer/assets/workbench.{html,js}` rewritten (still plain HTML/CSS/JS, embedded
+  with `include_str!`; Inter and JetBrains Mono from Google Fonts with a system fallback; icons inline SVG).
+  One dark palette as CSS custom properties (elevation layers, one indigo accent, live/queued/done/failed
+  colours), the map on near-black so ramps.json's colours read as in the game (ramps untouched).
+  Layout: top bar (run title and chips, the Mac's slot with progress and time left, connection); left
+  sidebar, collapsible (`E`; a drawer below 1180 px): run cards (status, progress bar, simulated share and
+  time left, preset/start/length/seed chips, Open / Compare / Settings / Cancel with an inline confirm),
+  grouped "On the Mac" and "Finished"; the editor: preset cards (friendly names such as "Earth-like ·
+  quick", the raw family as secondary text, the stages as chips), size as a segmented control, start as
+  three picture cards, length as a log slider with quick picks, the memory cap, every catalogue section
+  with its description and every field with its hint (a section this preset lacks folds away and says
+  why), share code copy/paste-to-import, and a sticky footer with the estimate as two tiles (peak memory
+  with a bar against the cap; time on the Mac) above the reasons Run is off (click one to jump to its
+  field) and warnings for near-cap and long runs; Run says "Queue run" when the Mac is busy. The stage:
+  the map as the hero with a graticule, lat/lon axes and the seam marked, a crosshair and a readout
+  (lat, lon, block x/z, the layer's value read back from the colour), event markers with glowing fresh
+  ones, tools Select / Inspect / Area 3D with a hint pill, Events and Grid toggles, and compare as Single /
+  Split (one map, a draggable divider; arrow keys on it) / Side by side (stacked when that gives larger
+  maps) with a run-B picker and swap. Right panel: the globe (lit sphere, atmosphere rim, graticule, the
+  seam dashed, lat/lon on hover, spin), the layer picker (grouped popover with swatches; ↑/↓ and 1–9) and
+  its legend (ticks, units, Köppen and other labelled classes by name), the inspector (Events with a
+  kind filter; Details: an event's fields, its causes and effects as clickable chips, "go to this step",
+  or a clicked point's values with "inspect this column" / "preview 256 × 256 here"; 3D: stage-2 job
+  cards; Run: the summary lines as stat tiles, share code, load settings). The dock: transport, a large
+  time readout, speed −/+ (`[` `]`), Live / Jump to end, and a timeline over the run's whole planned span
+  (computed part, live edge, playhead, Myr-ago ticks, an event histogram by kind); drag or click to seek.
+  Tooltips with shortcuts, toasts, a shortcuts sheet (`?`), focus rings, `prefers-reduced-motion`
+  honoured. `?tv`: no chrome; title, the time in 3.6 rem type, a LIVE badge with the share simulated and
+  time left, the newest events, the legend and a globe float over a full-screen map; follows new runs and
+  replays the last one after 25 s idle. Phones (390 px): one column, map, dock, then a tab bar (Layers,
+  Inspect, Globe, Runs, New run); no horizontal scroll. Empty, loading and not-answering states drawn.
+- **Placeholders (the coordinator's addition).** Placeholder presets are hidden behind "Show placeholder
+  presets (dev)"; the real `pipeline_*` / `plates_*` families come first under friendly names. A
+  placeholder run carries a "placeholder" chip on its card and in the top bar, a map badge
+  "PLACEHOLDER · NOT THE REAL SIMULATION" and a warning in its Run tab.
+- **Stage 2 in the page.** Inspect and Area 3D make job cards: steps (queued → waiting for the lock →
+  booting → generating → exporting), elapsed "usually 1–2 min", the runner's message, the note's lead
+  ("A test world at this latitude and longitude, until P1-08.") with More; when done the 3D view runs in
+  the card (`area3d/?…&embed=1`) and opens full size over the page. A failure shows the error and Try
+  again; a 501 says preview is off. `tools/review/pages/area3d/` takes the same look (dark by default,
+  light one click away, `?embed=1` shows the scene alone). A direct, non-job answer (P1-08's column
+  route) is shown as it is.
+- **Server and catalogue (minimal).** `GET /api/catalog` also sends the catalogue's new `sections`
+  (a description per section); every field gained a one-line `hint` (`editor_fields.json`; Java's
+  `EditorFields` ignores both, JUnit 118/0). `GET /api/runs` rows gained `seed`, `elapsed_ms`, `eta_ms`.
+  Progress in the page is the share of the history simulated (`t_years` over `length_myr`) with the
+  time left at the pace so far: the core's `total_permille` read 3 % at 20 % of a run.
+- **Measured.** Private `deeptime watch --preview` on the Mac, port 8653 (`deeptime-cache/workbench-ui/`,
+  standalone profile, runs copied from the live folder plus new ones), reached over an ssh tunnel; shots
+  by a batch DevTools driver (headless Chromium, SwiftShader WebGL). End to end through the new UI: a run
+  started from the editor (random, 200 Myr: 101 frames, 491 events, 2:24), a running run cancelled from
+  its card (kept 210 frames), compare split and side by side, an inspect and an area preview (standalone,
+  77 s job, the 3D view in the card and the modal). Playback at 20 Myr/s on a 251-frame run, same
+  machine and data: new page 57.6 fps with 1 long task in 8 s, old page 43.8 fps with 37.
+  Screenshots: `review/out/workbench-ui/{before,after}/` and `index.html` (9 before/after pairs + 20 new
+  states: 1600 × 900, 1920 × 1080, 1280, 1024, 390 px, `?tv` at 1080p and 4K).
+- **Gates** (Mac, after merging master c79b38f): cargo fmt --check, clippy --workspace --all-targets
+  -D warnings, test --workspace --locked (cli 23, core 173 + 2 ignored, format 32, inspect 28 + 2 + 7,
+  jni 7, viewer 5), deny licenses bans clean; `cd neoforge && ./gradlew build test` → tests=118
+  failures=0 (the catalogue change).
+- **Found, not fixed here.** Every preview on the live 8642 server failed ("the preset …
+  deposits_world_16k.json is not valid: $.deposits_synthetic: unknown key"): the main checkout's
+  `smoke/mic` on the Mac holds a Deep Time jar from 2026-09-28 19:33, older than P1-15's synthetic deposit
+  preset, and `preview.py` installs a profile only when `install.json` is missing. Fix: re-run
+  `tools/smoke/install.sh mic` for that checkout (mac.sh --pack); later, have `preview.py` reinstall when
+  the checkout's jar is newer.
+- **Next.** The parent merges, restarts 8642 with `mac-watch.sh` and puts `?tv` on the TV. Open for Ben:
+  the accent colour, whether the TV should replay when idle, whether the placeholder toggle should go.
+
+===
+### 2026-09-29 — P1-17 partial: the surface stage's serial solves run in parallel (agent worktree agent-a9bc0ab99e68b4a07, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** `surface/routing/forest.rs` (new): the drainage forest in stack order (cells by position, receivers,
+  donors as CSR in ascending cell index, subtree sizes, tops, leaves, river mouths) and two schedulers,
+  `Forest::down` (each cell after its receiver: a work-stealing walk; a worker keeps a stack of ready subtrees,
+  runs the heaviest child next and gives the oldest, largest entries away once it holds two grains, 256 cells)
+  and `Forest::up` (each cell after all its donors: leaves in chunks, and the last donor to finish, an
+  acquire-release countdown, carries on to the receiver). `spl::solve`, `spl::families` and
+  `routing::accumulate` are rewritten on them; `routing::stack` builds the forest. No `unsafe`: values that
+  tasks write and others read live in `SharedF64` (relaxed atomics over `f64` bits; the schedulers supply the
+  ordering). `pflood.rs` is unchanged except its doc comment. New tests in `routing/parity.rs`; nothing else
+  moved (`surface/mod.rs` untouched).
+- **Bit-identical, by construction and by test.** A cell reads only finished values and writes only itself. Every
+  sum over donors is a *gather* by the receiver, over the donors in ascending cell index, starting from the
+  receiver's own term: exactly the order in which the serial reverse-stack loop's `acc[rc] += x[c]` adds them
+  (the stack lists a cell's donors highest index first, so the reverse walk meets the lowest first), so the
+  floating-point sums are the serial ones, not close to them. The loop-invariant `F = K A^m Δt / L^n` (two `powf`
+  per cell) is computed once per solve instead of once per iteration: the same expression on the same inputs.
+  **Evidence:** (1) `parity.rs` keeps P1-04's serial `accumulate`/`solve`/`families` verbatim and compares bit
+  patterns of area, elevation, inflow, iteration count, residual and the source mix on random wrapping grids
+  (160×96, ties from quantised heights, a grid that does not wrap, land with no sea so the flood makes sinks,
+  3- and 5-wide bands where x = 0 and x = w−1 are neighbours and donors sit on both sides of the seam) with
+  n = 1/G = 0, n = 2/G = 1 with a critical slope, and n = 1.5, each on pools of 1, 2, 4 and 8 threads; reversing
+  the donor order in `Forest::build` makes three of the five tests fail, so they see summation order. (2) The
+  500 Myr `pipeline_quick_16k` run (`run --checkpoints`, scattered_continents) before and after, on master
+  6d8171f with P1-07's structure stage in the group: the whole 596 MB checkpoint (plates + surface + structure,
+  incl. the 220 MiB history) of the old code at 4 threads and of the new code at 12 threads is byte-identical
+  except the length/crc bytes at offsets 13–56 and the `"millis"` timing text inside the stage summaries;
+  every world file (keyframes, events, sites, bodies) is identical (`cmp`); the same holds on the pre-merge
+  master (old code 6 threads vs new 6 threads, checkpoint included) and on the final merge with master
+  43f087d (P1-05 climate, P1-07 structure, P1-14 deposits in the pipeline): old code at 4 threads against new
+  code at 12 threads and at 1 thread, every world file (12 keyframes, events, sites, bodies) byte-identical and
+  the `surface_final` line the same. (3) P1-04's `the_coupled_pipeline_runs_and_resumes` and the
+  rest of the suite are green (core 173 + 2 ignored, cli, format).
+- **Measured (Mac, pipeline_quick_16k, scattered_continents, 500 Myr, `bench --threads 12,4,1`, old and new
+  binaries interleaved, 3 rounds; the Mac's load average was 5–40 from other agents, so min..max is shown).**
+
+  ```
+  threads code   total s        surface s      spl s         diffusion s    surface−diffusion s
+  12      old    101.9..170.1   74.5..130.7    34.0..39.3    17.8..58.2     56.7..72.5
+  12      new     92.3..119.9   60.7..82.8      6.5..8.5     27.3..43.5     33.4..39.3
+  4       old    131.3..155.4   89.5..106.6    35.9..39.7    26.4..34.9     63.1..71.7
+  4       new    109.8..132.7   66.4..82.2     10.6..12.0     27.3..36.2     39.1..46.0
+  1       old    259.0..319.3   146.9..182.0   36.6..42.9     66.6..83.5     80.3..99.0
+  1       new    251.9..316.8   142.1..180.2   35.2..38.8     64.3..85.2     77.8..95.0
+  ```
+  (P1-04's own bench, a quieter machine and before P1-07: surface 65.9 / 79.0 / 137.0 s.) The stream-power
+  solve is 5.2× faster at 12 threads by the minima (34.0 → 6.5 s), 3.4× at 4, and 1.04× at one thread (the
+  hoisted `powf`s); what the solve costs is now 6.5 s of 60.7. **The surface total moves much less because the
+  diffusion, which the change does not touch, is the largest piece and swings 17–58 s with the Mac's load**
+  (the same binary, back to back); taking it out, the surface stage went 56.7 → 33.4 s at 12 threads
+  (scaling 1.4× → 2.3× against one thread). Whole-run minima at 12 threads: 101.9 → 92.3 s total (plates +
+  surface + structure; the plates stage moved 23–34 s between runs of the *same* binary). The min-run stage line
+  of the new binary: `plates=27.0s surface=60.7s structure=4.6s surface[advect=3.4s,carbonate=0.6s,
+  diffusion=27.3s,fields_events=8.0s,isostasy=1.9s,marine_fill=0.5s,outputs=1.5s,pflood=3.9s,routing=1.6s,
+  setup=3.9s,spl=6.5s,strata=1.2s]`. `routing` rose 1.0–1.3 → 1.6–1.8 s (building the forest, ~2 ms per step).
+  **Per phase, one LEM step on an L1-sized fractal terrain, best of ten** (`cargo test --release -p
+  deeptime-core surface_timing -- --ignored --nocapture`; the Mac's load average was 20 while it ran, and a
+  perfectly parallel calibration loop got 5× at 8 and 12 threads there): P1-04's serial loops accumulate 0.33 +
+  solve 81.2 + families 1.2 = 82.7 ms; the parallel passes at 1 / 2 / 4 / 8 / 12 threads: solve 78.7 / 42.5 /
+  25.8 / 15.5 / 17.8 ms (5.1× at 8, the calibration loop's own scaling), families 1.6 / 1.8 / 1.3 / 1.5 / 1.6,
+  accumulate ~0.7 (too small to gain), receivers 2.3 → 0.5; serial: open_sea 4.3, flood 6.4, stack 3.8–4.0.
+  **32k quick** (`pipeline_quick_32k`, 500 Myr, 12 threads, one run each, Mac load 18–24 the whole time; its L1
+  is the same 1024×512 grid at dx 9.6 km, so the cost is the same): old surface 160.4 s (spl 38.0, diffusion
+  67.3) → new 142.0 s (spl 13.6, diffusion 70.1); total 221.4 → 207.2 s; identical `surface_final` line.
+- **What is still serial, and why.** `pflood::open_sea` (4–5 ms per step), `pflood::flood` (6–10 ms) and
+  `routing::stack` (4 ms; the DFS that fixes the stack order and builds the forest): about 15 ms of the ~34
+  ms that routing and the solve cost per step at 12 threads on an L1 raster (98 ms with P1-04's serial
+  loops), 3.7 s of the 500 Myr. The flood is not tiled *on purpose*: its result depends
+  on its own processing order where a flat is fed from two sides at exactly the same elevation (the FIFO pit
+  queue gives the cell `next_up` of whichever neighbour it popped first), and the order-independent flood (the
+  least fixed point of the ε relaxation: what a tiled flood merged through a spill graph, or Dijkstra with exact
+  ties, computes) equals it on generic heights (a test) but not on flats. Lakes are flats by construction
+  (sediment fills them to their level, leaving the cells within ulps of one another). Measured on this very
+  run (a throw-away hook computing both floods at every step, not committed): **the least fixed point differs
+  from the serial flood in 168 of 250 steps, in ~170 (43,038 over the run) of ~13,000 raised cells per step**,
+  and ~12,700 land cells per step are lakes. So a tiled flood changes worlds; it is not the "sound method"
+  this task asked for. A radix heap and a parallel seed scan made the serial flood no faster (6–8 ms on a
+  fractal L1 terrain), and a 4 ms `stack` is not worth a parallel counting sort.
+- **Findings for P1-17 proper.** (1) P1-04's "33 of 66 s serial" was mostly the stream-power solve
+  (`spl` 34–44 s at every thread count before; `pflood` 3.6–5 s, `routing` 1–1.6 s); the flood was never the
+  bottleneck. (2) **Diffusion (Jacobi-PCG, `diffusion.rs`, ~111 CG iterations per step) is now the largest
+  piece of the surface stage and scales poorly**: at 12 threads 17.8–58.2 s over the six old and new runs,
+  against 64–85 s at one thread (3.6× at best, hardly any when the Mac is busy), and in one determinism
+  run on the merged pipeline under a load average above 20 it took 268 s at 12 threads against 66 s at
+  one. Each iteration streams ~20 vectors of 4 MB through 7 parallel regions, so it is memory- and
+  barrier-bound, and it is what makes the end-to-end 12-thread number swing with the machine's load. Next
+  speed-ups, in order: fuse the CG vector loops into two passes per iteration (same per-element arithmetic,
+  same row-ordered sums, so still thread-count independent), then a better preconditioner (a coarse-grid
+  correction: 111 iterations become ~10). (3) Nothing here touches the plan's determinism rule; the per-phase
+  table above comes from `cargo test --release -p deeptime-core surface_timing -- --ignored --nocapture` (best
+  of ten per phase on an L1-sized fractal terrain, the P1-04 serial loops beside the parallel passes).
+- **Next step.** P1-17 proper (bench gate, presets) starts from these numbers; the CG speed-up above is the
+  next thing to buy. Gates on this branch (merged with master 43f087d): `cargo test --workspace`, clippy
+  `-D warnings`, `cargo fmt --check` and `cargo deny check licenses bans` all clean.
+
 ### 2026-09-29 — P1-14: the deposit engine on the real recorded history (agent worktree agent-a1861e86fd3f0f213, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** `DepositStage::recorded(&PlanetPreset)` reads `WorldState::history` (P1-04's frames plus P1-07's `trap_structure`
   and `host/<class>`), the synthetic path is unchanged (`Source::{Synthetic, Recorded}`). A planet preset with a `deposits`
@@ -2255,6 +2425,18 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
+- **Long runs (parked by Ben, 2026-09-29: "DW about it for now").** A real 4,600 Myr run (timeline max, plan
+  §5.1) is estimated by the workbench at ~45 min / 3.8 GB (pipeline_quick_16k) and ~3 h / 14.6 GB
+  (pipeline_full_32k, too big for the 16 GB Mac): the deposit engine's recorded history (a frame every
+  10 Myr) is held in memory and grows with length. The physics is tested only over 500 Myr and starts from
+  existing continents (no early-Earth phase). Options offered: history on disk (flat memory), an early-Earth
+  phase, or a 1 Gyr cap. Revisit in P1-17 or when Ben raises it.
+- The workbench offered the placeholder `earthlike_*` presets (dummy pipeline) next to the real `pipeline_*`
+  ones; Ben ran one and got a single blob. The UI overhaul hides them behind a dev toggle and marks a
+  placeholder run (build log 2026-09-29, UI overhaul).
+- Workbench previews on the live server fail until the main checkout's `smoke/mic` on the Mac is
+  reinstalled (its Deep Time jar predates P1-15's synthetic deposit preset; build log 2026-09-29, UI
+  overhaul).
 - The plan is at revision 2 plus a partial revision 3 (the decisions-log rule in §1.2). The 29 gaps of
   docs/plan-reviews/2026-09-28-cold-read-review-2.md are fixed in the plan by the task that hits each
   one; the build log names each fix as it lands.

@@ -43,9 +43,12 @@
 //! outlets. **Change:** Landlab lets the removed rock "dissolve away"; here it becomes sediment of
 //! the cell (it enters the flux pass as erosion), so landslides feed the rivers and mass is kept.
 
+use rayon::prelude::*;
+
 use super::grid::Dims;
 use super::pflood::{BASE, SINK};
 use super::routing::Routing;
+use super::routing::forest::{NONE, SharedF64};
 
 pub use super::pflood::LAKE_TOL_M;
 
@@ -91,7 +94,7 @@ pub struct SplReport {
     pub residual_m: f64,
 }
 
-fn incise(b: f64, base: f64, f: f64, n: f64) -> f64 {
+pub(super) fn incise(b: f64, base: f64, f: f64, n: f64) -> f64 {
     if b <= base {
         return b;
     }
@@ -113,9 +116,45 @@ fn incise(b: f64, base: f64, f: f64, n: f64) -> f64 {
     x
 }
 
+/// Cells handed to another thread by the downstream pass (`Forest::down`): the solve costs a
+/// Newton iteration (two `powf` calls per step) per cell, about 100 ns.
+const DOWN_GRAIN: u32 = 256;
+/// Leaves handed to one task by the upstream passes.
+const UP_CHUNK: usize = 64;
+
+/// Everything a cell needs from the rest of the solve, gathered once in stack order (dense, so
+/// the passes walk contiguous memory). All values are the very expressions the serial loop
+/// computed per iteration, hoisted out of it: `factor` (F of the module documentation) does not
+/// change between iterations, so computing it once is bit-identical to computing it six times.
+#[derive(Clone, Copy)]
+struct Cell {
+    h0: f64,
+    filled: f64,
+    /// Drainage area, floored at 1 % of a cell, m².
+    ar: f64,
+    /// Distance to the receiver, metres (at least 1e-9).
+    len: f64,
+    /// F = K A^m Δt / L^n.
+    factor: f64,
+    /// Base level of a base-level receiver, or the filled level of a lake receiver.
+    rfix: f64,
+    /// 0: the receiver is a base-level cell, 1: a lake, 2: an ordinary cell.
+    rmode: u8,
+    /// Not a sink and not a lake: the cell incises (or aggrades).
+    solved: bool,
+    lake: bool,
+    sink: bool,
+}
+
 /// Solves one step of fluvial erosion and deposition into `h` (which holds h* for base cells on
 /// return, unchanged). `qin` returns the sediment inflow of every cell (m³/yr), so a base-level
 /// cell's `qin` is what its basin delivers to it.
+///
+/// **Parallel and bit-identical to the serial loop.** The downstream pass (every cell after its
+/// receiver) and the flux pass (every cell after its donors) run over the drainage forest with
+/// `Forest::down` and `Forest::up`; the inflow of a cell is summed over its donors in ascending
+/// order, which is the order the serial reverse-stack loop added them in (see `forest.rs`), so the
+/// result does not depend on the thread count and equals the serial solve to the last bit.
 pub fn solve(
     d: &Dims,
     r: &Routing,
@@ -126,67 +165,102 @@ pub fn solve(
 ) -> SplReport {
     let a = d.cell_area();
     let n = d.cells();
+    let f = &r.forest;
+    let l = f.len();
     h.copy_from_slice(input.h0);
     qin.iter_mut().for_each(|q| *q = 0.0);
-    let mut report = SplReport::default();
     let kind = input.kind;
-    for it in 0..p.max_iter.max(1) {
-        let mut change: f64 = 0.0;
-        // Downstream first: every receiver is solved before its donors.
-        for &c in &r.stack {
+    let cells: Vec<Cell> = r
+        .stack
+        .par_iter()
+        .map(|&c| {
             let c = c as usize;
-            let before = h[c];
             let h0 = input.h0[c];
-            // Sinks and lakes only take sediment: the flux pass fills them.
-            if kind[c] != SINK && input.filled[c] - h0 <= LAKE_TOL_M {
-                let rc = r.rcv[c] as usize;
-                let base = if kind[rc] == BASE {
-                    input.base_z[rc]
-                } else if input.filled[rc] - input.h0[rc] > LAKE_TOL_M {
-                    h[rc].max(input.filled[rc])
-                } else {
-                    h[rc]
-                };
-                let ar = input.area[c].max(0.01 * a);
-                let len = f64::from(r.len[c]).max(1e-9);
-                let b = h0 + p.g * qin[c] / ar * p.dt;
-                let f = input.kf[c] * ar.powf(p.m) * p.dt / len.powf(p.n);
-                let mut x = incise(b, base, f, p.n);
-                if x > base + p.sc * len {
-                    x = base + p.sc * len;
-                }
-                h[c] = x;
+            let rc = r.rcv[c] as usize;
+            let (rmode, rfix) = if kind[rc] == BASE {
+                (0, input.base_z[rc])
+            } else if input.filled[rc] - input.h0[rc] > LAKE_TOL_M {
+                (1, input.filled[rc])
+            } else {
+                (2, 0.0)
+            };
+            let ar = input.area[c].max(0.01 * a);
+            let len = f64::from(r.len[c]).max(1e-9);
+            Cell {
+                h0,
+                filled: input.filled[c],
+                ar,
+                len,
+                factor: input.kf[c] * ar.powf(p.m) * p.dt / len.powf(p.n),
+                rfix,
+                rmode,
+                solved: kind[c] != SINK && input.filled[c] - h0 <= LAKE_TOL_M,
+                lake: input.filled[c] - h0 > LAKE_TOL_M,
+                sink: kind[c] == SINK,
             }
-            change = change.max((h[c] - before).abs());
-        }
+        })
+        .collect();
+    let hs = SharedF64::new(l, 0.0);
+    (0..l).into_par_iter().for_each(|i| hs.set(i, cells[i].h0));
+    let qs = SharedF64::new(l, 0.0);
+    let out = SharedF64::new(l, 0.0);
+    let delta = SharedF64::new(l, 0.0);
+    let mut report = SplReport::default();
+    for it in 0..p.max_iter.max(1) {
+        // Downstream first: every receiver is solved before its donors. Sinks and lakes only
+        // take sediment: the flux pass fills them.
+        f.down(DOWN_GRAIN, |i| {
+            let c = &cells[i];
+            if !c.solved {
+                return;
+            }
+            let before = hs.get(i);
+            let rp = f.rpos[i];
+            debug_assert!(c.rmode == 0 || rp != NONE);
+            let base = match c.rmode {
+                0 => c.rfix,
+                1 => hs.get(rp as usize).max(c.rfix),
+                _ => hs.get(rp as usize),
+            };
+            let b = c.h0 + p.g * qs.get(i) / c.ar * p.dt;
+            let mut x = incise(b, base, c.factor, p.n);
+            if x > base + p.sc * c.len {
+                x = base + p.sc * c.len;
+            }
+            hs.set(i, x);
+            delta.set(i, (x - before).abs());
+        });
+        // The change is the largest one of a cell that was solved, as in the serial loop (cells
+        // that were not keep h, whose change is 0).
+        let change = delta.max().max(0.0);
         // Upstream first: the fluxes of this solution; sinks keep all they get, lakes fill up to
         // their level, and deposition is capped by the supply.
-        qin.iter_mut().for_each(|q| *q = 0.0);
-        for &c in r.stack.iter().rev() {
-            let c = c as usize;
-            let h0 = input.h0[c];
-            let supply = qin[c] * p.dt / a;
-            let out = if kind[c] == SINK {
-                h[c] = h0 + supply;
+        f.up(UP_CHUNK, |i| {
+            let mut inflow = 0.0;
+            for &dp in &f.dpos[f.dptr[i] as usize..f.dptr[i + 1] as usize] {
+                inflow += out.get(dp as usize);
+            }
+            qs.set(i, inflow);
+            let c = &cells[i];
+            let supply = inflow * p.dt / a;
+            let o = if c.sink {
+                hs.set(i, c.h0 + supply);
                 0.0
-            } else if input.filled[c] - h0 > LAKE_TOL_M {
-                let dep = supply.min(input.filled[c] - h0);
-                h[c] = h0 + dep;
-                (qin[c] - dep * a / p.dt).max(0.0)
+            } else if c.lake {
+                let dep = supply.min(c.filled - c.h0);
+                hs.set(i, c.h0 + dep);
+                (inflow - dep * a / p.dt).max(0.0)
             } else {
-                let out = qin[c] + (h0 - h[c]) * a / p.dt;
-                if out < 0.0 {
-                    h[c] = h0 + supply;
+                let o = inflow + (c.h0 - hs.get(i)) * a / p.dt;
+                if o < 0.0 {
+                    hs.set(i, c.h0 + supply);
                     0.0
                 } else {
-                    out
+                    o
                 }
             };
-            let rc = r.rcv[c] as usize;
-            if rc != c {
-                qin[rc] += out;
-            }
-        }
+            out.set(i, o);
+        });
         report.iterations = it + 1;
         report.residual_m = if it == 0 { f64::INFINITY } else { change };
         if it > 0 && change < p.tol_m {
@@ -198,13 +272,26 @@ pub fn solve(
             break;
         }
     }
+    for (i, &c) in r.stack.iter().enumerate() {
+        h[c as usize] = hs.get(i);
+        qin[c as usize] = qs.get(i);
+    }
+    // What each basin delivers to its base-level cell.
+    for (k, &o) in f.outlets.iter().enumerate() {
+        let mut inflow = 0.0;
+        for &dp in &f.opos[f.optr[k] as usize..f.optr[k + 1] as usize] {
+            inflow += out.get(dp as usize);
+        }
+        qin[o as usize] = inflow;
+    }
     debug_assert_eq!(h.len(), n);
     report
 }
 
 /// The source-rock mix of the sediment flux: for every cell, the flux entering it split by the
 /// family of the rock it came from (`fam[c]` of each eroding cell), m³/yr, after a [`solve`].
-/// Deposition takes from the entering flux in proportion.
+/// Deposition takes from the entering flux in proportion. Parallel over the drainage forest and
+/// bit-identical to the serial reverse-stack loop, like [`solve`].
 pub fn families(
     d: &Dims,
     r: &Routing,
@@ -215,25 +302,58 @@ pub fn families(
     mix: &mut Vec<[f64; FAMILIES]>,
 ) {
     let a = d.cell_area();
-    mix.clear();
-    mix.resize(d.cells(), [0.0; FAMILIES]);
-    for &c in r.stack.iter().rev() {
-        let c = c as usize;
-        let fin = mix[c];
-        let qin: f64 = fin.iter().sum();
-        let e = (input.h0[c] - h[c]) * a / dt;
-        let mut out = fin;
-        if e > 0.0 {
-            out[usize::from(fam[c]).min(FAMILIES - 1)] += e;
-        } else if qin > 0.0 {
-            let keep = ((qin + e) / qin).clamp(0.0, 1.0);
-            out.iter_mut().for_each(|x| *x *= keep);
-        }
-        let rc = r.rcv[c] as usize;
-        if rc != c {
-            for k in 0..FAMILIES {
-                mix[rc][k] += out[k];
+    let f = &r.forest;
+    let l = f.len();
+    // The erosion rate of each cell (negative: deposition) and its family, in stack order.
+    let ev: Vec<f64> = r
+        .stack
+        .par_iter()
+        .map(|&c| (input.h0[c as usize] - h[c as usize]) * a / dt)
+        .collect();
+    let fv: Vec<usize> = r
+        .stack
+        .par_iter()
+        .map(|&c| usize::from(fam[c as usize]).min(FAMILIES - 1))
+        .collect();
+    let out = SharedF64::new(l * FAMILIES, 0.0);
+    let fin = SharedF64::new(l * FAMILIES, 0.0);
+    f.up(UP_CHUNK, |i| {
+        let mut inflow = [0.0f64; FAMILIES];
+        for &dp in &f.dpos[f.dptr[i] as usize..f.dptr[i + 1] as usize] {
+            for (k, x) in inflow.iter_mut().enumerate() {
+                *x += out.get(dp as usize * FAMILIES + k);
             }
         }
+        for (k, &x) in inflow.iter().enumerate() {
+            fin.set(i * FAMILIES + k, x);
+        }
+        let qin: f64 = inflow.iter().sum();
+        let e = ev[i];
+        let mut o = inflow;
+        if e > 0.0 {
+            o[fv[i]] += e;
+        } else if qin > 0.0 {
+            let keep = ((qin + e) / qin).clamp(0.0, 1.0);
+            o.iter_mut().for_each(|x| *x *= keep);
+        }
+        for (k, &x) in o.iter().enumerate() {
+            out.set(i * FAMILIES + k, x);
+        }
+    });
+    mix.clear();
+    mix.resize(d.cells(), [0.0; FAMILIES]);
+    for (i, &c) in r.stack.iter().enumerate() {
+        for (k, x) in mix[c as usize].iter_mut().enumerate() {
+            *x = fin.get(i * FAMILIES + k);
+        }
+    }
+    for (j, &o) in f.outlets.iter().enumerate() {
+        let mut inflow = [0.0f64; FAMILIES];
+        for &dp in &f.opos[f.optr[j] as usize..f.optr[j + 1] as usize] {
+            for (k, x) in inflow.iter_mut().enumerate() {
+                *x += out.get(dp as usize * FAMILIES + k);
+            }
+        }
+        mix[o as usize] = inflow;
     }
 }

@@ -172,6 +172,7 @@ impl Catalog {
                 "placeholder": p.placeholder, "description": p.description, "stages": p.stages,
             })).collect::<Vec<_>>(),
             "fields": self.fields_json["fields"],
+            "sections": self.fields_json["sections"],
             "labels": self.labels,
             "start_configs": StartConfig::ALL.iter().map(|c| c.name()).collect::<Vec<_>>(),
             "length_myr": { "min": LENGTH_MYR_RANGE.0, "max": LENGTH_MYR_RANGE.1 },
