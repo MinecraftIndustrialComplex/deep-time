@@ -813,6 +813,8 @@ mod tests {
         v["resolution"]["l1_r"] = serde_json::json!(64);
         v["keyframes"]["size"] = serde_json::json!([64, 32]);
         v["keyframes"]["every_myr"] = serde_json::json!(10.0);
+        // This test is about the plates + surface group; `stage deposits` has its own test.
+        v.as_object_mut().unwrap().remove("deposits");
         let preset = dir.join("small.json");
         std::fs::write(&preset, v.to_string()).unwrap();
         let stage = |name: &str,

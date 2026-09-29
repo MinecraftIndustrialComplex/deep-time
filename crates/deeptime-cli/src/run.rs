@@ -74,6 +74,24 @@ pub fn print_census(census: &Value) {
         census["provinces"],
         census["count_mult"],
     );
+    if let Some(h) = census["history"].as_object() {
+        println!(
+            "deposits: history {} · {} frames · {} names",
+            h["source"].as_str().unwrap_or("?"),
+            h["frames"],
+            h["names"].as_array().map_or(0, Vec::len),
+        );
+    }
+    for s in census["skipped"].as_array().into_iter().flatten() {
+        println!(
+            "deposits SKIPPED {}: the history lacks {}",
+            s["type"].as_str().unwrap_or("?"),
+            s["missing"]
+        );
+    }
+    for note in census["fallbacks"].as_array().into_iter().flatten() {
+        println!("deposits FALLBACK: {}", note.as_str().unwrap_or("?"));
+    }
     for t in census["types"].as_array().into_iter().flatten() {
         let f = |k: &str| t[k].as_f64().unwrap_or(0.0);
         println!(

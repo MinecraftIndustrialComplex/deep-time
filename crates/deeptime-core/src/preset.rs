@@ -380,6 +380,13 @@ impl Preset {
                     // Coupled to the plates: one surface step after every plate step (plan §8).
                     stages.push(Box::new(crate::surface::SurfaceStage::new((**p).clone())));
                 }
+                if p.deposits.is_some() {
+                    // After the group: reads the history the plates and surface recorded (P1-14).
+                    stages.push(Box::new(
+                        crate::deposits::DepositStage::recorded(p)
+                            .expect("checked when the preset was parsed"),
+                    ));
+                }
                 stages
             }
         }
@@ -452,8 +459,14 @@ impl Preset {
         let list: Vec<crate::deposits::playability::Essential> =
             serde_json::from_value(ess.clone())
                 .map_err(|e| CoreError::preset("content.essentials", e.to_string()))?;
-        if let PresetBody::DepositsSynthetic(p) = &mut self.body {
-            p.deposits.essentials = list;
+        match &mut self.body {
+            PresetBody::DepositsSynthetic(p) => p.deposits.essentials = list,
+            PresetBody::Planet(p) => {
+                if let Some(d) = &mut p.deposits {
+                    d.essentials = list;
+                }
+            }
+            PresetBody::Dummy(_) => {}
         }
         Ok(self)
     }
