@@ -137,6 +137,22 @@ within the tile, `cell_bytes` each, so its decoded size is `tw · th · cell_byt
 `strata/classes.json`). Horizons are ordered top-down; horizon k's rock fills from its top down to
 horizon k+1's top, the last one down to `min_y`. Unused horizons have top −32768 and class 255.
 
+A column at block (x, z) is read as the Java strata pass reads it (`StrataPass.column`;
+`LoadedLayer::stack_at` in Rust): x wrapped into [−C/2, C/2), u = (x − origin_x)/r, v = (z −
+origin_z)/r; each horizon's class from the nearest cell (⌊u + ½⌋, ⌊v + ½⌋), its top bilinear
+between the four cells around (u, v) (the nearest cell's top where a corner lacks the horizon),
+floored to a block and never above the horizon over it; the walk stops at the first unused horizon
+of the nearest cell.
+
+**The P1-07 bake** (`deeptime_core::structure::bake_horizons`) writes stacks with these properties:
+the first horizon's top is the cell's surface (y = sea_level_y + (h − sea level)/m_per_block_v,
+clamped to [min_y + 1, max_y]); every horizon is at least one block (16 raw) thick, the last one
+down to `min_y` too; at most K are used; neighbours differ in class. A stack walks the column of
+`structure::columns` from the top: regolith, the strata log (the young, shallow part of a clastic
+deposit as its `loose_equivalent`, buried loose material and palaeosols as their `lithifies_to`),
+the plate model's rock pools less the log, and peridotite below the crust. Plutons are bodies
+(role `pluton`, below), not horizons.
+
 ## `strata/classes.json`
 
 `{"classes": ["sandstone", "red_bed", "granite"]}` — index → rock class id (plan §5.4.1,
@@ -303,6 +319,13 @@ horizon rock inside it, and the deposit feature turns a host block into ore wher
 per block, a hash of the canonical block position and the body id, falls below the running sum of
 the densities of the zones with a material that apply there, in zone order (so overlapping zones
 share the block's probability, capped at 1).
+
+**Plutons** (P1-07, `structure::plutons`): ellipsoid bodies with no site, role `pluton`, the
+body's `rock_class` its intrusion (granodiorite, granite or diorite), and, where the roof's host
+was a carbonate or another non-crystalline rock, one zone `aureole` (no material, density 0) whose
+`rock_class` (skarn or hornfels) holds the outer shell d ∈ [0.85, 1] (`structure.aureole_shell`).
+Their ids come before any deposit body the deposit stage adds later, so where they overlap the
+pluton paints first.
 
 The AABB is conservative: the world extent along axis i is `Σ_j |R_ji|·h_j` around the centre
 (R the rotation above, h the semi-axes), clipped at `clip_top_y`. The viewer's `report.js` carries

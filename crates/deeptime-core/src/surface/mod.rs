@@ -313,7 +313,10 @@ impl PlateFields {
 }
 
 /// The basement's rock class where no sediment or regolith covers it: from the crust type, the
-/// regime, the orogeny and the top rock pool of the plate model's column.
+/// regime, the orogeny and the top rock pool of the plate model's column. Arcs are andesite; a
+/// young Andean orogeny (the plate model's subduction uplift, which reaches far behind the arc)
+/// makes only its volcanic pool andesite (P1-07: at first every basement under a young Andean
+/// orogeny was andesite, a third of the land at 16k).
 pub fn basement_class(
     cls: &Classes,
     crust_type: u8,
@@ -333,13 +336,19 @@ pub fn basement_class(
     if reg == regime::HOTSPOT {
         return cls.basalt;
     }
-    if reg == regime::ARC || (orogeny == OROGENY_ANDEAN && young(30.0)) {
+    if reg == regime::ARC {
         return cls.andesite;
     }
     match usize::from(top_pool) {
         pool::SEDIMENT => cls.mudstone,
         pool::SEDIMENTARY => cls.sandstone,
-        pool::FELSIC_VOLCANIC => cls.rhyolite,
+        pool::FELSIC_VOLCANIC => {
+            if orogeny == OROGENY_ANDEAN && young(30.0) {
+                cls.andesite
+            } else {
+                cls.rhyolite
+            }
+        }
         pool::MAFIC_VOLCANIC => cls.basalt,
         pool::METAMORPHIC => {
             if orogeny == OROGENY_HIMALAYAN && young(100.0) {
