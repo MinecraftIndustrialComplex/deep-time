@@ -336,6 +336,12 @@ public final class DepositGameTests {
         helper.assertTrue(missing.isEmpty(), "Deep Time's EV stone configs did not load for " + missing);
         helper.assertTrue(inGranite != null && ev.isVariant(inGranite)
                 && ev.stoneOfVariant(inGranite).equals(ev.stoneOf(granite)), "copper in granite is " + inGranite);
+        // A block that is two EV stones (smooth basalt: EV's overworld stone and Create's nether one) still
+        // gets its overworld variant (Q10).
+        BlockState inBasalt = ores.resolve(copper, Blocks.SMOOTH_BASALT.defaultBlockState(), 20);
+        DeepTime.LOGGER.info("[gametest] evVariantWhenInstalled: copper in smooth basalt={} variant={}",
+                inBasalt, inBasalt != null && ev.isVariant(inBasalt));
+        helper.assertTrue(inBasalt != null && ev.isVariant(inBasalt), "copper in smooth basalt is " + inBasalt);
         // In the world: the site's ore blocks in EV stones are variants in those stones.
         ServerLevel level = level(helper, GameTestSupport.TEST_DEPOSITS);
         WorldData wd = data(helper, level);

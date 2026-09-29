@@ -10,6 +10,7 @@
         [--chunky-center <x,z>|seam]  its centre (default 0,0); `seam` is x = C/2, z = 0, so the
                                   square straddles the seam and the region check below proves
                                   nothing was written outside the canonical span (P0-06)
+        [--chunky-at <x,z,r>]     one more Chunky square (repeatable; Q10 renders two sites)
         [--chunky-seam]           also pregenerate at least 128 columns either side of the
                                   seam (x = C/2), z in [-64, 80), inside the canonical span
                                   (deeptime-inspect seam, plan §9.7)
@@ -125,6 +126,21 @@ class Server:
                 self.rcon_up = True
             if self.fatal is None and FATAL.search(line):
                 self.fatal = line.rstrip()
+
+    def rss_now_kb(self):
+        """The JVM's resident set size now (ps works on Linux and macOS), or None."""
+        if self._proc is None or self._proc.poll() is not None:
+            return None
+        r = subprocess.run(["ps", "-o", "rss=", "-p", str(self._proc.pid)], capture_output=True, text=True)
+        return int(r.stdout.strip()) if r.stdout.strip().isdigit() else None
+
+    def done_seconds(self):
+        """The server's own "Done (12.345s)!" figure (world loading, after mod loading), or None."""
+        for line in self.lines:
+            m = re.search(r"Done \((\d+(?:\.\d+)?)s\)", line)
+            if m:
+                return float(m.group(1))
+        return None
 
     def peak_rss_kb(self):
         """VmHWM on Linux; elsewhere (macOS) the highest RSS the sampler thread saw."""
@@ -501,6 +517,8 @@ def main():
     ap.add_argument("--chunky-center", default="0,0", metavar="X,Z|seam",
                     help="centre of the Chunky square; `seam` is x = C/2, z = 0 (P0-06)")
     ap.add_argument("--chunky-seam", action="store_true")
+    ap.add_argument("--chunky-at", action="append", default=[], metavar="X,Z,R",
+                    help="one more Chunky square of radius R around X,Z (repeatable)")
     ap.add_argument("--restart", action="store_true")
     ap.add_argument("--scenario", choices=sorted(SCENARIOS))
     ap.add_argument("--timeout", type=int, default=1500)
@@ -561,6 +579,12 @@ def main():
     server.start()
     ok = server.wait_for_done(a.timeout)
     boot_s = (server.done_at or time.time()) - server.started
+    # Boot costs (plan Q10 compares sets): the JVM start to "Done (", the server's own figure, and
+    # the resident set size once RCON is up (before any chunk generation).
+    rss_done = server.rss_now_kb() if ok else None
+    steps.record("boot: JVM start to Done ( (s)", f"{boot_s:.1f}")
+    steps.record("boot: the server's Done (…s) figure", server.done_seconds())
+    steps.record("RSS at Done (MB)", (rss_done or 0) // 1024)
     steps.check("server reaches Done (", "Done (", "Done" if ok else server.fatal, ok)
     gen_s = check_generation(steps, server, install)
     try:
@@ -630,6 +654,10 @@ def main():
                 cx, cz = chunky_center(a.chunky_center, install["size"])
                 steps.record("chunky square", f"centre {cx},{cz} radius {a.chunky} (x {cx - a.chunky}..{cx + a.chunky})")
                 tasks.append(("chunky pregeneration finished", cx, cz, a.chunky))
+            for spec in a.chunky_at:
+                x, z, r = (int(v) for v in spec.split(","))
+                steps.record("chunky square", f"centre {x},{z} radius {r}")
+                tasks.append((f"chunky {x},{z} r{r} finished", x, z, r))
             if a.chunky_seam and is_planet:
                 # Chunky's square is the chunks (int) centre >> 4 ± ceil(radius / 16): with
                 # centre ±(C/2 - 72) and radius 64 that is x in [C/2 - 144, C/2) and
@@ -708,6 +736,10 @@ def main():
                 server.start()
                 ok2 = server.wait_for_done(a.timeout)
                 steps.check("restart reaches Done (", "Done (", "Done" if ok2 else server.fatal, ok2)
+                if ok2:
+                    steps.record("restart boot: JVM start to Done ( (s)", f"{server.done_at - server.started:.1f}")
+                    steps.record("restart boot: the server's Done (…s) figure", server.done_seconds())
+                    steps.record("restart RSS at Done (MB)", (server.rss_now_kb() or 0) // 1024)
                 after = os.path.getmtime(manifest) if os.path.exists(manifest) else None
                 steps.check("world data not regenerated on restart", before, after, before == after)
                 if install.get("preset") and not install.get("synth"):
