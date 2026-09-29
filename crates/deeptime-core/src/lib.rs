@@ -18,6 +18,11 @@ pub mod log;
 pub mod session;
 pub mod sphere;
 
+// Presets, share codes and the synthetic terrains of the placeholder presets (P1-13).
+pub mod preset;
+pub mod share_code;
+pub mod synth;
+
 pub use deeptime_format::FORMAT_VERSION;
 pub use error::CoreError;
 

@@ -21,7 +21,7 @@ use deeptime_format::fsutil::write_atomic;
 use deeptime_format::manifest::MANIFEST;
 use deeptime_format::sites::{INDEX_PATH as SITE_INDEX_PATH, SITES_PATH, write_sites};
 use deeptime_format::{
-    Event, EventWriter, FileEntry, GEOLOGY_WRITER, Manifest, Ramps, Scale, Writer,
+    Codec, Event, EventWriter, FileEntry, GEOLOGY_WRITER, Manifest, Ramps, Scale, Writer,
 };
 use serde_json::{Value, json};
 
@@ -32,6 +32,7 @@ use crate::log::{Level, LogRing};
 use crate::world::WorldState;
 
 pub use crate::dummy::{DummyParams, DummyStage};
+pub use crate::preset::Preset;
 pub use crate::stage::{Stage, StageContext, StageEstimate};
 
 /// Number of `long`s `progress` fills (plan §6.1).
@@ -102,99 +103,6 @@ impl MemoryGauge for NoGauge {
     }
     fn peak(&self) -> u64 {
         0
-    }
-}
-
-/// A parsed preset. Until the real stages exist (P1-03 on) the presets are the dummy one
-/// (`dummy.rs`) and P1-14's synthetic deposit run (`deposits::SyntheticPreset`, key
-/// `deposits_synthetic`); anything else is `PresetInvalid`.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Preset {
-    Dummy(DummyParams),
-    DepositsSynthetic(crate::deposits::SyntheticPreset),
-}
-
-impl Preset {
-    pub fn from_json(json: &str) -> Result<Preset, CoreError> {
-        let value: Value = serde_json::from_str(json)
-            .map_err(|e| CoreError::preset("$", format!("not valid JSON: {e}")))?;
-        let obj = value
-            .as_object()
-            .ok_or_else(|| CoreError::preset("$", "expected a JSON object"))?;
-        if let Some(key) = obj
-            .keys()
-            .find(|k| !["dummy", "deposits_synthetic"].contains(&k.as_str()))
-        {
-            return Err(CoreError::preset(
-                format!("$.{key}"),
-                "unknown key (only the dummy and deposits_synthetic presets exist before P1-03)",
-            ));
-        }
-        if let Some(d) = obj.get("deposits_synthetic") {
-            if obj.len() > 1 {
-                return Err(CoreError::preset("$", "give one preset kind"));
-            }
-            let p = crate::deposits::SyntheticPreset::from_json(d)?;
-            p.stages()?;
-            return Ok(Preset::DepositsSynthetic(p));
-        }
-        let dummy = obj.get("dummy").ok_or_else(|| {
-            CoreError::preset(
-                "$",
-                r#"only the dummy preset {"dummy":{"steps":N,"sleep_ms":M}} exists before P1-03"#,
-            )
-        })?;
-        Ok(Preset::Dummy(DummyParams::from_json(dummy)?))
-    }
-
-    /// The canonical preset (what `preset.json` and checkpoints store).
-    pub fn to_json(&self) -> Value {
-        match self {
-            Preset::Dummy(p) => p.to_json(),
-            Preset::DepositsSynthetic(p) => json!({
-                "deposits_synthetic": serde_json::to_value(p).expect("a preset serialises"),
-            }),
-        }
-    }
-
-    /// The preset's name, for `manifest.json` `source` (`run:<name>`).
-    pub fn name(&self) -> &str {
-        match self {
-            Preset::Dummy(_) => "dummy",
-            Preset::DepositsSynthetic(_) => "deposits_synthetic",
-        }
-    }
-
-    /// The pipeline, in order.
-    pub fn stages(&self) -> Vec<Box<dyn Stage>> {
-        match self {
-            Preset::Dummy(p) => p.stages(),
-            Preset::DepositsSynthetic(p) => p.stages().expect("checked when the preset was parsed"),
-        }
-    }
-
-    /// The world before the first stage.
-    pub fn initial_world(&self) -> WorldState {
-        match self {
-            Preset::Dummy(p) => p.initial_world(),
-            Preset::DepositsSynthetic(p) => p.initial_world(),
-        }
-    }
-
-    pub fn keyframe_policy(&self) -> KeyframePolicy {
-        match self {
-            Preset::Dummy(p) => match &p.world {
-                Some(w) => KeyframePolicy {
-                    every_years: Some(w.keyframe_every_years),
-                    size: w.keyframe_size,
-                },
-                None => KeyframePolicy::NONE,
-            },
-            Preset::DepositsSynthetic(p) => KeyframePolicy {
-                every_years: Some(p.keyframe_every_years),
-                size: (p.keyframe_size[0], p.keyframe_size[1]),
-            },
-        }
     }
 }
 
@@ -840,7 +748,39 @@ impl Session {
             Err(e) => return Err(CoreError::io(manifest_path, e)),
         }
         let world = &s.world;
-        let mut files = Vec::new();
+        let c = world.circumference;
+        let mut m = Manifest::new(
+            &format!("run:{}", self.preset.name()),
+            Writer::this("deeptime-core"),
+            Scale::default_for(c),
+        );
+        m.preset_hash = Some(format!(
+            "crc32:{:08x}",
+            crc32fast::hash(self.preset_json.as_bytes())
+        ));
+        m.planet.insert(
+            "radius_m".into(),
+            json!(f64::from(c) * 300.0 / (2.0 * std::f64::consts::PI)),
+        );
+
+        // A placeholder preset's terrain (P1-13): the synthetic layers P0-09's `synth` writes,
+        // until the bake of P1-08 exists.
+        if let Some(kind) = self.preset.synth() {
+            let started = Instant::now();
+            let baked = crate::synth::build(kind, c, Codec::Lz4Block)?;
+            let bytes = baked.write_into(dir, &mut m)?;
+            self.log.push(
+                Level::Info,
+                format!(
+                    "baked the synthetic terrain {} (C = {c}): {} layers, {:.1} MiB in {} ms",
+                    kind.name(),
+                    m.layers.len(),
+                    bytes as f64 / 1_048_576.0,
+                    started.elapsed().as_millis()
+                ),
+            );
+        }
+        let mut files = std::mem::take(&mut m.files);
 
         let mut preset = serde_json::to_vec_pretty(&self.preset.to_json())
             .map_err(|e| CoreError::InvalidState(format!("preset serialisation: {e}")))?;
@@ -893,34 +833,26 @@ impl Session {
             });
         }
 
-        let c = world.circumference;
-        let mut m = Manifest::new(
-            &format!("run:{}", self.preset.name()),
-            Writer::this("deeptime-core"),
-            Scale::default_for(c),
-        );
-        m.preset_hash = Some(format!(
-            "crc32:{:08x}",
-            crc32fast::hash(self.preset_json.as_bytes())
-        ));
-        m.planet.insert(
-            "radius_m".into(),
-            json!(f64::from(c) * 300.0 / (2.0 * std::f64::consts::PI)),
-        );
         m.files = files;
-        m.notes.insert(
-            "run".into(),
-            json!({
-                "stages": s.timings.iter().map(|t| json!({
-                    "name": t.name, "steps": t.steps, "millis": t.millis,
-                })).collect::<Vec<_>>(),
-                "t_years": world.t_years,
-                "events": world.events.len(),
-                "sites": world.sites.len(),
-                "bodies": world.bodies.len(),
-                "keyframes": kf.frames.len(),
-            }),
-        );
+        let mut run = json!({
+            "stages": s.timings.iter().map(|t| json!({
+                "name": t.name, "steps": t.steps, "millis": t.millis,
+            })).collect::<Vec<_>>(),
+            "t_years": world.t_years,
+            "events": world.events.len(),
+            "sites": world.sites.len(),
+            "bodies": world.bodies.len(),
+            "keyframes": kf.frames.len(),
+        });
+        let header = &self.preset.header;
+        if let Some(t) = header.timeline {
+            run["timeline"] = json!({ "start": t.start.name(), "length_myr": t.length_myr });
+        }
+        if header.placeholder {
+            run["placeholder"] = json!(true);
+        }
+        m.notes.insert("run".into(), run);
+        // Stage summaries (the deposit census of P1-14).
         for (stage, text) in &world.notes {
             let v: Value = serde_json::from_str(text).unwrap_or_else(|_| json!(text));
             m.notes.insert(stage.clone(), v);
@@ -982,6 +914,47 @@ mod tests {
             }
         }
         panic!("the run never finished");
+    }
+
+    /// A placeholder preset (P1-13): the dummy run plus a baked synthetic terrain, with the
+    /// header keys and a timeline, is one complete, verifiable world-data folder.
+    #[test]
+    fn placeholder_preset_bakes_terrain_next_to_the_run() {
+        let dir = temp_dir("synth");
+        let preset = r#"{"name":"tiny","placeholder":true,"scale":{"circumference_blocks":1024},
+            "timeline":{"start":"supercontinent","length_myr":200},
+            "dummy":{"steps":4,"sleep_ms":0,"stages":["dummy_drift","dummy_erode"],"synth":"wrap-test",
+                     "world":{"circumference":1024,"grid_r":16,"keyframe_size":[32,16],"sites":2}}}"#;
+        let s = Session::create(preset, "", options(&dir), Arc::new(NoGauge)).unwrap();
+        run_to_done(&s);
+        s.finalize_write().unwrap();
+        let m = Manifest::read(&dir).unwrap();
+        m.verify(&dir).unwrap();
+        assert_eq!(m.source, "run:tiny");
+        assert_eq!(m.scale.circumference_blocks, 1024);
+        assert_eq!(
+            m.layers.len(),
+            8,
+            "elevation, water_level, 5 climate, strata"
+        );
+        assert!(m.layer("elevation").is_some() && m.layer("strata/horizons").is_some());
+        for f in [
+            "spawn/candidates.json",
+            "strata/classes.json",
+            PRESET_PATH,
+            SITES_PATH,
+        ] {
+            assert!(m.files.iter().any(|e| e.path == f), "{f} listed");
+        }
+        assert_eq!(m.notes["synthetic"]["kind"], "wrap-test");
+        assert_eq!(m.notes["run"]["timeline"]["start"], "supercontinent");
+        assert_eq!(m.notes["run"]["placeholder"], true);
+        // The timeline set the clock: 200 Myr ago to now.
+        let written: Value =
+            serde_json::from_slice(&std::fs::read(dir.join(PRESET_PATH)).unwrap()).unwrap();
+        assert_eq!(written["dummy"]["world"]["t_start_years"], -2.0e8);
+        assert_eq!(written["timeline"]["length_myr"], 200.0);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

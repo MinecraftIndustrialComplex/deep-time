@@ -54,8 +54,37 @@ def extractToroidalWorld = tasks.register('extractToroidalWorld', Copy) {
     into twInnerDir
 }
 
+// ---------------------------------------------------------------------------
+// Sable (PolyForm Shield): compileOnly, for the planet-server tests' helper
+// compat/sable/SableTestOps only. Never on a run's classpath (the planet server loads Sable
+// from the standalone set's mods/ folder) and never in the jar. Its companion jar (math
+// types used in the API's signatures) is nested, so it is extracted for javac.
+// ---------------------------------------------------------------------------
+configurations {
+    sableJar {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = false
+    }
+}
+dependencies {
+    sableJar "maven.modrinth:sable:${sable_version}"
+}
+def sableCompanionDir = layout.buildDirectory.dir('sable')
+def extractSableCompanion = tasks.register('extractSableCompanion', Copy) {
+    description = "Unpacks Sable's companion jar (BoundingBox3i, Pose3d) from the Sable jar."
+    from({ zipTree(configurations.sableJar.singleFile) }) {
+        include "META-INF/jarjar/${sable_companion_jar}"
+        eachFile { it.path = it.name }
+        includeEmptyDirs = false
+    }
+    into sableCompanionDir
+}
+
 dependencies {
     compileOnly files(twInnerDir.map { it.file(tw_inner_jar) }).builtBy(extractToroidalWorld)
+    compileOnly("maven.modrinth:sable:${sable_version}") { transitive = false }
+    compileOnly files(sableCompanionDir.map { it.file(sable_companion_jar) }).builtBy(extractSableCompanion)
 
     testImplementation platform("org.junit:junit-bom:${junit_version}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -456,6 +485,12 @@ def checkReleaseNatives = tasks.register('checkReleaseNatives') {
 }
 
 tasks.named('processResources', ProcessResources) {
+    // The built-in presets (plan §5.1, P1-13): one source, compiled into the core with include_str!
+    // and shipped here as deeptime/presets/<name>.json for Presets.builtin (no natives needed).
+    from(new File(repoRoot, 'crates/deeptime-core/presets')) {
+        include '*.json'
+        into 'deeptime/presets'
+    }
     if (project.hasProperty('release')) {
         dependsOn checkReleaseNatives
         from(nativesDistDir) { into 'natives/deeptime' }

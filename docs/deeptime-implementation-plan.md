@@ -718,6 +718,18 @@ timeline has no default story: the editor makes the player choose a start config
 (supercontinent / scattered continents / random) and a length before Run is enabled; the server
 config must name them explicitly.
 
+*As built in P1-13:* "deflate" is raw DEFLATE (RFC 1951, level 9; Java `new Inflater(true)`),
+base64url is unpadded (decoders accept padding and skip whitespace), and canonical JSON is
+serde_json's compact form with sorted keys (Java's `Presets.canonical` writes the same bytes,
+serde_json 1.0.151's zmij float layout included); `crates/deeptime-core/tests/share-codes.json`
+holds codes written by each side and both test suites decode both. A decoded code may inflate to
+at most 1 MiB. The preset's header keys are `schema`, `name`, `description`, `placeholder`,
+`scale.circumference_blocks` and `timeline` (`{"start": "supercontinent" | "scattered_continents" |
+"random", "length_myr": 1…4600}`). Until the real stages exist the four built-in presets are
+placeholders (`"placeholder": true`: the dummy pipeline plus the `wrap-test` synthetic terrain
+baked at their C); they name no timeline. Their one source is `crates/deeptime-core/presets/`
+(compiled into the core, copied into the jar as `deeptime/presets/<name>.json`).
+
 ### 5.2 The grids
 
 **Choice.** Two geometries, joined by resampling:
@@ -1762,12 +1774,32 @@ level exists and while RCON is down:
 2. If `<world>/deeptime/manifest.json` exists (a previous start, or a CLI run copied in), bind and
    continue.
 3. Otherwise read `config/deeptime/server.json`
-   (`{"preset": "earthlike_full_32k" | "<file>" | "DT1.<share code>", "memory_cap_gib": 4, "threads": 0}`);
+   (`{"preset": "earthlike_full_32k" | "<file>" | "DT1.<share code>", "timeline": {"start":
+   "supercontinent" | "scattered_continents" | "random", "length_myr": 1000}, "memory_cap_gib": 4,
+   "threads": 0}`; review 2 gap 21: `timeline` is required unless the preset itself names one, and
+   wins when both do);
    if the preset's circumference differs from the generator's `circumference_blocks` (set by the
    chosen `level-type`), stop with a message naming both. Then
    run a `SimSession` to completion on this thread, and log a progress line every 5 s
    (`[deeptime] plates 37% (−312 Ma) · 1m12s elapsed · ~2m40s left · native 1.3/4.0 GiB`).
-4. If the config is missing, write a commented template, log what to do, and stop the server.
+4. If the config is missing, write a template, log what to do, and stop the server. The template
+   is valid JSON (gap 21): its explanations are `_`-prefixed keys, which the reader ignores, and its
+   `preset` and `timeline` are empty, so as written it starts nothing.
+
+*As built in P1-13:* `WorldDataBinder`'s one HIGHEST listener calls `FirstStartGenerator.prepare`
+before it binds (so the order never depends on two listeners of one priority). The session writes
+into `<world>/deeptime.generating/`, which is renamed to `<world>/deeptime/` once its manifest
+exists; a Ctrl-C during the run cancels it. The progress line adds the run's total
+(`dummy_drift 84% (−580 Ma) · total 42% · 5s elapsed · ~7s left · native 0.0/4.0 GiB`). Natives
+that did not load stop the server with their guidance block and the equivalent
+`deeptime run --preset … --start … --length-myr … --out <world>/deeptime` command. Every stop
+(`server/ServerStop`) leaves `initServer` right after the event (`DedicatedServerFirstStartMixin`),
+skips `ServerStartedEvent`/`ServerStoppingEvent` and `saveAllChunks`
+(`MinecraftServerFirstStartMixin`), writes no crash report, and exits with status 1. The world
+folder then holds only what vanilla wrote before any mod event: `level.dat` (written by
+`net.minecraft.server.Main` before the server thread starts, so it already records the
+level-type: after a circumference mismatch the folder must be deleted, not only `level-type`
+changed), `session.lock` and `serverconfig/`.
 
 `server.properties` needs `level-type=deeptime\:planet` (16,384) or `level-type=deeptime\:planet_32k`
 (32,768) before the first start (`level-type` is resolved as a world-preset key; `generator-settings`
@@ -2190,6 +2222,12 @@ depends on (`mixinextras-neoforge` 0.5.3 in its POM); `WorldLoader.DataLoadConte
    live, because they need a real TW-shaped Deep Time overworld. Flags: `--boot-only` (start, wait for
    `Done (`, run `/deeptime probe column 0 0`, stop), `--size 16384|32768`, `--scenario <name>` (one
    scripted scenario, such as P0-06's `sable_straddle`), `-PwithMic`.
+   *As built (P0-06):* tests run by name (`--run name,…@x,y,z[~dx,dz]`), **one at a time**, because
+   1.21.1's `/test run` begins with `TestCommand.stopTests()` and cancels any test still running;
+   `/test run` ignores y and puts the test on the WORLD_SURFACE heightmap at (x, z + 3), which reads
+   the world's floor until that chunk is loaded, so the harness forceloads first and waits for every
+   test spot (`execute if loaded`); TW's `/forceload` accepts canonical coordinates only, so a box
+   across the seam is split into two. Results come from `DeepTimeTestReporter` (§9.4 gap 1).
 
 GameTest classes by task: `BootGameTests` (P0-03, P0-05), `GeneratorGameTests` (P0-05, P0-10),
 `SeamGameTests`, `SableSeamGameTests`, `PoleCapGameTests` (P0-06, P1-18), `NativeGameTests` (P0-07),
@@ -2239,7 +2277,10 @@ once from nixpkgs). Every byte they produce lands under Deep Time's own gitignor
   and compare them with the world data; `locate structure #minecraft:village`; pregenerate with
   Chunky (`chunky center <x> <z>`, `chunky radius 256`, `chunky start`, poll `chunky progress`);
   check that every `region/r.<rx>.<rz>.mca` file name has −C/1024 ≤ rx < C/1024 (a 512-block region
-  file; nothing written outside the canonical span); `save-all flush`; stop; start again and confirm
+  file; nothing written outside the canonical span) — as built (P0-06), every region, entities and
+  poi file *that stores a chunk*: vanilla creates an empty `.mca` whenever it opens a region file for
+  a read, and on a TW world some reads use raw coordinates past the edge (0-byte files at
+  rx = C/1024 and −C/1024 − 1), which are recorded, not failed; `save-all flush`; stop; start again and confirm
   the world data was not regenerated; write `smoke/<profile>/report.md` (pass/fail table, boot time,
   generation time, peak RSS, mixins, probes, exclusions, the pack commit).
 - The resulting world folder feeds BlueMap (§9.6) and `deeptime-inspect` (§9.7).
@@ -2265,7 +2306,12 @@ once from nixpkgs). Every byte they produce lands under Deep Time's own gitignor
   wrong or not at all; worldgen output is mostly static-model rock, so this matters little. Custom
   world height (−352..639) is not confirmed to work (BlueMap issue #517 fixed a crash with inline
   dimension types; current behaviour untested): P0-14 verifies it.
-- **Static hosting.** By default BlueMap's file storage writes tiles gzip-compressed (`*.prbm.gz`) and
+- **As built (P0-14, 2026-09-28).** Storage stays gzip and `render-bluemap.sh` sets the web app's
+  `clientDecompression: true`, so BlueMap's loader fetches `.prbm.gz`/`textures.json.gz` and inflates
+  them in the browser; no service worker and no Content-Encoding header. spacesheep's Free plan limits
+  (200 files per space, 10 MB per file) bound a review render: `BLUEMAP_BOX` picks the area and
+  `BLUEMAP_ONLY_PRESENT=1` gives BlueMap only the jars whose blocks occur there.
+- **Static hosting (original analysis).** By default BlueMap's file storage writes tiles gzip-compressed (`*.prbm.gz`) and
   expects the web server to send `Content-Encoding: gzip`, and 204 for missing tiles; spacesheep is a
   plain static host. BlueMap 5.28's `storages/file.conf` has a `compression` key whose documented
   values are `gzip` (the default), `zstd`, `deflate` and `none`
@@ -2979,6 +3025,15 @@ a smoke benchmark and again at the end.
   `[deeptime]` progress lines at most 5 s apart, `Done (` follows, the report records the generation
   time; a second start logs `world data present` and does not regenerate; with the config removed
   the server writes the template and stops cleanly (`first_start_no_config: OK`).
+- **As built (mechanism before P1-08).** The mechanism landed ahead of P1-08 on the placeholder
+  built-in presets (§5.1). `install.sh --preset <p> [--start <s>] [--length-myr <n>]` writes the
+  timeline too (the harness names supercontinent / 1000 when only `--preset` is given; the mod has
+  no default). `run.py … --fresh --restart` runs the acceptance above; `run.py --scenario
+  first_start_no_config | first_start_circumference_mismatch | first_start_native_failure`
+  (`-Ddeeptime.natives.forceFail=unsupported`) each expect a clean stop (exit 1, no `Done (`, no
+  region/data/world data, `level.dat` not rewritten, no crash report) and print `<scenario>: OK`.
+  When P1-08's bake exists, the real presets replace the files in `crates/deeptime-core/presets/`
+  and nothing in `FirstStartGenerator` changes; rerun the acceptance then.
 - **Ben reviews.** The smoke report.
 
 #### P1-14 Deposit engine: the four families

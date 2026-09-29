@@ -27,9 +27,16 @@ enum Command {
     Version,
     /// Run a whole planet from a preset and write its world-data folder (what the game writes).
     Run {
-        /// Preset JSON file (tests/presets/dummy.json until the real stages exist).
+        /// A built-in preset name, a preset JSON file or a share code (DT1.…).
         #[arg(long)]
-        preset: PathBuf,
+        preset: String,
+        /// Timeline start configuration (supercontinent, scattered_continents, random): sets
+        /// timeline.start, as config/deeptime/server.json does on a server.
+        #[arg(long)]
+        start: Option<String>,
+        /// Timeline length in millions of years: sets timeline.length_myr.
+        #[arg(long)]
+        length_myr: Option<f64>,
         /// Content bundle JSON (rock classes, deposit types; plan §5.4). Optional for now.
         #[arg(long)]
         content: Option<PathBuf>,
@@ -53,9 +60,9 @@ enum Command {
         /// Checkpoint to start from; its next stage must be <name>.
         #[arg(long = "in")]
         input: Option<PathBuf>,
-        /// Preset to start from instead of a checkpoint.
+        /// Preset to start from instead of a checkpoint (name, file or share code).
         #[arg(long)]
-        preset: Option<PathBuf>,
+        preset: Option<String>,
         /// Checkpoint to write after the stage.
         #[arg(long)]
         out: Option<PathBuf>,
@@ -70,8 +77,9 @@ enum Command {
     },
     /// Run a preset once per thread count with per-stage timings and peak native memory.
     Bench {
+        /// A built-in preset name, a preset JSON file or a share code.
         #[arg(long)]
-        preset: PathBuf,
+        preset: String,
         /// Thread counts, comma-separated.
         #[arg(long, value_delimiter = ',', default_value = "1,2,4,8")]
         threads: Vec<usize>,
@@ -90,6 +98,11 @@ enum Command {
         /// Print DEBUG log lines too.
         #[arg(long)]
         verbose: bool,
+    },
+    /// Built-in presets and share codes (plan §5.1).
+    Preset {
+        #[command(subcommand)]
+        action: PresetAction,
     },
     /// Write a synthetic world-data folder (Phase 0 and the GameTests).
     Synth {
@@ -112,6 +125,18 @@ enum Command {
         #[arg(long, value_enum, default_value_t = CodecArg::Lz4)]
         codec: CodecArg,
     },
+}
+
+#[derive(Subcommand)]
+enum PresetAction {
+    /// List the built-in presets.
+    List,
+    /// Print a preset's canonical JSON (a built-in name, a file or a share code).
+    Show { preset: String },
+    /// Print a preset's share code (DT1.…).
+    Encode { preset: String },
+    /// Print the JSON a share code carries.
+    Decode { code: String },
 }
 
 #[derive(clap::Args)]
@@ -174,6 +199,8 @@ fn main() -> ExitCode {
         }
         Some(Command::Run {
             preset,
+            start,
+            length_myr,
             content,
             out,
             viewer,
@@ -183,6 +210,8 @@ fn main() -> ExitCode {
             "run",
             run::run(&run::RunOptions {
                 preset,
+                start,
+                length_myr,
                 content,
                 out,
                 viewer,
@@ -230,6 +259,7 @@ fn main() -> ExitCode {
                 verbose,
             }),
         ),
+        Some(Command::Preset { action }) => finish("preset", preset_command(action)),
         Some(Command::Synth {
             kind,
             size,
@@ -275,6 +305,36 @@ fn main() -> ExitCode {
     }
 }
 
+fn preset_command(action: PresetAction) -> run::CliResult<()> {
+    use deeptime_core::{preset, share_code};
+    match action {
+        PresetAction::List => {
+            for (name, json) in preset::BUILTIN {
+                let p = preset::Preset::from_json(json)?;
+                println!(
+                    "{name}\tC={}{}",
+                    p.circumference(),
+                    if p.header.placeholder {
+                        "\tplaceholder (Phase 1 in progress)"
+                    } else {
+                        ""
+                    }
+                );
+            }
+        }
+        PresetAction::Show { preset: arg } => {
+            let json = preset::resolve(&arg)?;
+            let v: serde_json::Value = serde_json::from_str(&share_code::canonical(&json)?)?;
+            println!("{}", serde_json::to_string_pretty(&v)?);
+        }
+        PresetAction::Encode { preset: arg } => {
+            println!("{}", share_code::encode(&preset::resolve(&arg)?)?);
+        }
+        PresetAction::Decode { code } => println!("{}", share_code::decode(&code)?),
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use clap::CommandFactory;
@@ -295,11 +355,12 @@ mod tests {
         d
     }
 
-    fn dummy_preset() -> std::path::PathBuf {
-        std::path::PathBuf::from(concat!(
+    fn dummy_preset() -> String {
+        concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../deeptime-core/tests/presets/dummy.json"
-        ))
+        )
+        .to_owned()
     }
 
     fn quiet() -> super::run::Common {
@@ -316,6 +377,8 @@ mod tests {
         let dir = tmp("run");
         super::run::run(&super::run::RunOptions {
             preset: dummy_preset(),
+            start: None,
+            length_myr: None,
             content: None,
             out: dir.join("dummy"),
             viewer: Some(dir.join("viewer")),
@@ -343,10 +406,11 @@ mod tests {
     #[test]
     fn stage_deposits_on_synthetic_fields() {
         let dir = tmp("deposits");
-        let preset = std::path::PathBuf::from(concat!(
+        let preset = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../deeptime-core/tests/presets/deposits_synthetic_4k.json"
-        ));
+        )
+        .to_owned();
         super::run::stage(&super::run::StageOptions {
             name: "deposits".into(),
             input: None,

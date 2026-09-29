@@ -99,8 +99,11 @@ def main():
     ap.add_argument("--boot-only", action="store_true")
     ap.add_argument("--size", type=int, default=16384, choices=(16384, 32768))
     ap.add_argument("--test-terrain", default="wrap-test")
-    ap.add_argument("--run", action="append", default=[], metavar="TEST[,TEST...]@X,Y,Z",
-                    help="run tests by name (lower-case method names) positioned at X,Y,Z (repeatable)")
+    ap.add_argument("--run", action="append", default=[], metavar="TEST[,TEST...]@X,Y,Z[~DX,DZ]",
+                    help="run tests by name (lower-case method names) positioned at X,Y,Z, forceloading "
+                         "X±DX, Z±DZ (default 32,32) (repeatable)")
+    ap.add_argument("--scenario", choices=("sable_straddle",),
+                    help="one scripted scenario after the tests (plan §9.4)")
     ap.add_argument("--timeout", type=int, default=1200)
     ap.add_argument("gradle_args", nargs="*")
     a = ap.parse_args()
@@ -154,37 +157,172 @@ def main():
             if not m:
                 failures.append("probe tw did not answer")
             for spec in a.run:
-                # "<test>[,<test>...]@x,y,z". A test's name is its method name in lower case:
-                # Deep Time's holders use @PrefixGameTestTemplate(false), which also drops the class
-                # prefix that `/test runall <class>` would match, so tests are run by name.
-                names_part, _, pos = spec.partition("@")
-                names = [n.strip().lower() for n in names_part.split(",") if n.strip()]
-                x, y, z = (pos or "0,100,0").split(",")
-                rcon("deeptime gametest reset")
-                rcon(f"forceload add {int(x) - 32} {int(z) - 32} {int(x) + 32} {int(z) + 32}")
-                # One spot per test, 8 blocks apart in z: a second /test run at the same spot replaces
-                # the first test's structure, and that test never reports.
-                for n_i, name in enumerate(names):
-                    tz = int(z) + 8 * n_i
-                    print(f"   /test run {name} at {x},{y},{tz}: " + rcon(f"execute positioned {x} {y} {tz} run test run {name}"), flush=True)
-                end = time.time() + a.timeout
-                summary = {}
-                while time.time() < end:
-                    time.sleep(3)
-                    m = SUMMARY.search(rcon("deeptime gametest summary"))
-                    summary = json.loads(m.group(1)) if m else {}
-                    if all(n in summary.get("tests", {}) for n in names):
-                        break
-                tests = summary.get("tests", {})
-                for n in names:
-                    r = tests.get(n)
-                    print(f"   [gametest-summary] {n}: {r if r else 'NO RESULT (timeout)'}", flush=True)
-                    if not r or r["fail"] or not r["pass"]:
-                        failures.append(f"{n}: {r}")
+                failures += run_tests(spec, rcon, a.timeout, a.size)
+            if a.scenario:
+                failures += SCENARIOS[a.scenario](a, srv, rcon)
     finally:
         srv.stop(rcon)
     print("PASS" if not failures else "FAIL: " + "; ".join(failures), flush=True)
     sys.exit(0 if not failures else 1)
+
+
+def forceload(rcon, c, x0, z0, x1, z1, wait=180, points=()):
+    """Forceload the block box [x0, x1] x [z0, z1] on the planet, then wait until it is loaded.
+
+    Toroidal World's /forceload accepts canonical coordinates only (-C/2 <= x < C/2: "8217 is
+    outside this world"), so a box across the seam is folded and split into two canonical boxes.
+    Forceloading is asynchronous; `/test run` puts a test on the WORLD_SURFACE heightmap of its
+    position, which reads y = min build height (-352) until the chunk is there, so the harness
+    waits (execute if loaded, every corner) before running anything. Re-adding forced chunks is
+    harmless (the command reports that nothing changed), so this runs before every test.
+    """
+    half = c // 2
+    a = (x0 + half) % c - half
+    b = a + (x1 - x0)
+    boxes = [(a, b)] if b < half else [(a, half - 1), (-half, b - c)]
+    for bx0, bx1 in boxes:
+        print(f"   forceload add {bx0} {z0} {bx1} {z1}: " + rcon(f"forceload add {bx0} {z0} {bx1} {z1}"), flush=True)
+    # Every corner, and every extra point (the test spots): the box's chunks do not all arrive
+    # at once, and a test whose own chunk is late lands at the bottom of the world.
+    corners = [(x, z) for bx0, bx1 in boxes for x in (bx0, bx1) for z in (z0, z1)] + list(points)
+    end = time.time() + wait
+    while time.time() < end:
+        missing = [(x, z) for x, z in corners if "passed" not in rcon(f"execute if loaded {x} 0 {z}").lower()]
+        if not missing:
+            return True
+        time.sleep(2)
+    print(f"   forceload: not loaded after {wait}s: {missing}", flush=True)
+    return False
+
+
+def run_tests(spec, rcon, timeout, c):
+    """Run one `--run` spec and return its failures.
+
+    Spec: "<test>[,<test>...]@x,y,z[~dx,dz]". A test's name is its method name in lower case:
+    Deep Time's holders use @PrefixGameTestTemplate(false), which also drops the class prefix
+    that `/test runall <class>` would match, so tests are run by name. The harness forceloads
+    x±dx, z±dz (default 32, 32) around the spot plus the 8-block z steps between tests. `/test
+    run` ignores y: vanilla puts the test on the surface at x, z + 3 (TestCommand
+    .createTestPositionAround), so tests place things relative to their own position.
+    """
+    names_part, _, where = spec.partition("@")
+    names = [n.strip().lower() for n in names_part.split(",") if n.strip()]
+    pos, _, extent = (where or "0,100,0").partition("~")
+    x, y, z = (int(v) for v in pos.split(","))
+    dx, dz = (int(v) for v in (extent or "32,32").split(","))
+    rcon("deeptime gametest reset")
+    last_z = z + 8 * (len(names) - 1)
+    # `/test run` at (x, z) puts the test at (x, surface + 1, z + 3).
+    spots = [(x, z + 8 * i + 3) for i in range(len(names))]
+    # One test at a time: 1.21.1's `/test run` begins with TestCommand.stopTests(), which cancels
+    # every test still running, so a second /test run issued before the first test reported
+    # silently kills it (P0-06 finding). Each test also gets its own spot, 8 blocks apart in z,
+    # so no test's structure lands on another's leftovers.
+    summary = {}
+    for n_i, name in enumerate(names):
+        tz = z + 8 * n_i
+        # Forceload again before every test: when a test batch ends, vanilla's GameTestRunner
+        # un-forces every forced chunk of the level (level.getForcedChunks()), the harness's too.
+        if not forceload(rcon, c, x - dx, z - dz, x + dx, last_z + dz, points=spots):
+            return [f"{name}: forceloaded chunks never loaded"]
+        m = PROBE.search(rcon(f"deeptime probe column {x} {tz + 3}"))
+        where = json.loads(m.group(1)) if m else {}
+        print(f"   spot {x},{tz + 3}: chunkLoaded={where.get('chunkLoaded')} worldSurface={where.get('worldSurface')} "
+              f"surfaceY={where.get('surfaceY')}", flush=True)
+        print(f"   /test run {name} at {x},{y},{tz}: " + rcon(f"execute positioned {x} {y} {tz} run test run {name}"), flush=True)
+        end = time.time() + timeout
+        while time.time() < end:
+            time.sleep(2)
+            m = SUMMARY.search(rcon("deeptime gametest summary"))
+            summary = json.loads(m.group(1)) if m else {}
+            r = summary.get("tests", {}).get(name)
+            # A repeated test reports its attempts before its one final result: wait for the result.
+            if r and r["pass"] + r["fail"] > 0:
+                break
+    failures = []
+    tests = summary.get("tests", {})
+    for n in names:
+        r = tests.get(n)
+        print(f"   [gametest-summary] {n}: {r if r else 'NO RESULT (timeout)'}", flush=True)
+        if not r or r["pass"] + r["fail"] == 0:
+            failures.append(f"{n}: no result")
+            continue
+        passed = r["pass"] > 0 and r["fail"] == 0
+        # Repeated tests: the one PASS vanilla reports means requiredSuccesses passing attempts;
+        # when the body reports its attempts, they must agree.
+        if passed and "attempts" in r and r["attempts"] > 0 and r["attemptsOk"] < r["requiredSuccesses"]:
+            passed = False
+        if "attempts" in r:
+            print(f"   {n}: {r.get('attemptsOk', 0)}/{r.get('requiredSuccesses')} attempts passed "
+                  f"({r.get('attempts', 0)} run, max {r.get('maxAttempts')})", flush=True)
+        if not passed:
+            if r.get("required", True):
+                failures.append(f"{n}: {r}")
+            else:
+                print(f"   {n}: optional test did not pass (informational)", flush=True)
+    return failures
+
+
+def scenario_sable_straddle(a, srv, rcon):
+    """Plan P0-06 step 4: a Sable hull straddling the seam survives save, stop and start.
+
+    Assembles a hull across x = C/2 (/deeptime gametest sable straddle), lets it settle, records
+    /deeptime probe sable, saves, stops, starts the same world again and waits until the same
+    sub-level id is back; prints `sable_straddle: OK` or the difference.
+    """
+    c = a.size
+    z = 0
+    # The hull and its neighbourhood stay loaded before and after the restart (forced chunks
+    # persist in the world), so the sub-level's holding chunk loads with the world.
+    if not forceload(rcon, c, c // 2 - 32, z - 32, c // 2 + 31, z + 32):
+        return ["sable_straddle: the seam chunks never loaded"]
+    out = rcon(f"deeptime gametest sable straddle {z}")
+    m = PROBE.search(out)
+    print(f"   assemble: {m.group(1) if m else out}", flush=True)
+    if not m or "id" not in json.loads(m.group(1)):
+        return [f"sable_straddle: assembly failed: {out[:300]}"]
+    made = json.loads(m.group(1))
+    hull = made["id"]
+    time.sleep(10)   # let it fall and settle before saving
+
+    def probe():
+        m = PROBE.search(rcon("deeptime probe sable"))
+        return json.loads(m.group(1)) if m else None
+
+    before = probe()
+    print(f"   before: {before}", flush=True)
+    mine = next((s for s in (before or {}).get("subLevels", []) if s["id"] == hull), None)
+    if mine is None:
+        return [f"sable_straddle: hull {hull} not in the probe before saving: {before}"]
+    print("   save-all flush: " + rcon("save-all flush"), flush=True)
+    srv.stop(rcon)
+    print("   restarting", flush=True)
+    srv.start()
+    if not srv.wait_done(a.timeout):
+        return [f"sable_straddle: restart failed: {srv.fatal}"]
+    after, again = None, None
+    end = time.time() + 120
+    while time.time() < end:
+        after = probe()
+        again = next((s for s in (after or {}).get("subLevels", []) if s["id"] == hull), None)
+        if again is not None:
+            break
+        time.sleep(3)
+    print(f"   after: {after}", flush=True)
+    if again is None:
+        # Diagnostics: what Sable itself has on disk.
+        print("   /sable storage find_all_sub_levels: " + rcon("sable storage find_all_sub_levels")[:600], flush=True)
+        print(f"sable_straddle: FAIL (sub-level {hull} is gone after the restart)", flush=True)
+        return [f"sable_straddle: sub-level {hull} missing after restart"]
+    if again["blocks"] != mine["blocks"]:
+        print(f"sable_straddle: FAIL (blocks {mine['blocks']} before, {again['blocks']} after)", flush=True)
+        return [f"sable_straddle: block count {mine['blocks']} -> {again['blocks']}"]
+    print(f"sable_straddle: OK (sub-level {hull}, {again['blocks']} blocks, "
+          f"x {mine['x']:.2f} before, {again['x']:.2f} after)", flush=True)
+    return []
+
+
+SCENARIOS = {"sable_straddle": scenario_sable_straddle}
 
 
 if __name__ == "__main__":
