@@ -201,12 +201,15 @@ final class RunPage implements PlanetEditorScreen.Page {
             updateMessage();
         }
 
-        /** Moves the knob to the model's frame (live following moves it along). */
+        private int shownIndex = -2;
+
+        /** Moves the knob to the model's frame (live following moves it along) and relabels it. */
         void sync() {
             int n = model.frameCount();
             double v = n <= 1 ? 1.0 : Math.max(0, model.index()) / (double) (n - 1);
-            if (Math.abs(v - value) > 1e-9) {
+            if (Math.abs(v - value) > 1e-9 || model.index() != shownIndex) {
                 value = v;
+                shownIndex = model.index();
                 updateMessage();
             }
             active = n > 1;

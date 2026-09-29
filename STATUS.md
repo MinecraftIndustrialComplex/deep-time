@@ -32,7 +32,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-08 | Bake, world data v1 and parity | todo | | | |
 | P1-09 | Climate mapping and biomes | todo | | | |
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
-| P1-11 | Customize editor, timelapse and staging | doing | 2026-09-28 | d42375e | Screens, models and staging built on the placeholder presets (real stages pending). Mac: JUnit tests=91 failures=0 (EditorModelTest, TimelapseModelTest, ModelHelpersTest, StagingMoverTest, TimelineAcrossJniTest, ScreenSourcesTest); ./gametest.sh → All 25 required tests passed (EditorModelGameTests acceptBuildsGenerator, stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel); cargo fmt/clippy/test/deny and gradlew build clean. Client check: see build log. Rerun with the real presets after P1-08; biome names on the review page with P1-09 |
+| P1-11 | Customize editor, timelapse and staging | doing | 2026-09-28 | d42375e | Screens, models and staging built on the placeholder presets (real stages pending). Mac: JUnit tests=93 failures=0 (EditorModelTest, TimelapseModelTest, ModelHelpersTest, StagingMoverTest, TimelineAcrossJniTest, ScreenSourcesTest); ./gametest.sh → All 25 required tests passed (EditorModelGameTests acceptBuildsGenerator, stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel); cargo fmt/clippy/test/deny and gradlew build clean. Client (laptop, HeadlessMC + Xvfb): whole walk Create World → editor → run → review → Accept → world created from the moved staging, no crash; guidance panel with natives forced off; screenshots in review/out/p1-11-client. Rerun with the real presets after P1-08; biome names on the review page with P1-09 |
 | P1-12 | Strata pass with rock tags and `rock_states` | done | 2026-09-28 | — | Mac: ./gametest.sh and -PwithMic (+ MIC rock tags via -Ddeeptime.extraDatapack) → All 21 required tests passed each; coal stone / black argillite; Create stones in their classes; loess = projectatmosphere:dust[layers=8]; everyClassInTheWorld 59/59 classes, 240 samples 0 wrong; MIC smoke probe palette 59/59 (member 24, fallback 35); JUnit 46/0; bodies deferred (P1-08/P1-14) |
 | P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 743b69d | Mechanism verified on placeholder presets (dummy pipeline + wrap-test bake): standalone and MIC first starts generate in ~12 s with progress lines ≤ 5 s apart, restart does not regenerate; no-config / circumference-mismatch / native-failure all stop cleanly before loadLevel. Rerun with the real presets after P1-08 |
 | P1-14 | Deposit engine: the four families | doing | 2026-09-28 | 7f4858c | Engine on a synthetic field history (real fields wait for P1-03…P1-07). Mac: cargo test --workspace ok (core 82 incl. 41 deposits::, format 31, cli 11); porphyry σ 1.4892; Poisson means within 4 SE over 10,000 draws; tonnage P90/P50/P10 within 4 SE; min separation holds (200 seeds + the run); every site has a forming event with causes; `stage deposits --preset …/deposits_synthetic_16k.json --viewer review/out/p1-deposits` → 32 sites of all 8 types, counts next to ρ·A·F (porphyry 9 drawn / 9.41), 0.83 GB peak; fmt, clippy -D warnings, deny clean |
@@ -117,13 +117,13 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Found on master:** `Cargo.lock` lacked `flate2` under `deeptime-core` (a merge slip after
   P1-13), so every `--locked` build refused to run (`build-natives.sh`, `cargo tree --locked`);
   unlocked builds rewrote the lock silently. Fixed in commit 6c6298d.
-- **Tests.** JUnit (Mac, `cd neoforge && ./gradlew build`): tests=91 failures=0 — `EditorModelTest`
+- **Tests.** JUnit (Mac, `cd neoforge && ./gradlew build`): tests=93 failures=0 — `EditorModelTest`
   (9: families and sizes, Run disabled without a timeline, stale estimates, cap, natives missing,
   fields follow the preset, share-code round trip, staging folders across run/accept/discard/cancel,
   launch failure), `TimelapseModelTest` (8: live following, event cursor and freshness, layers,
-  off-thread ring, bounded ring, playback, cleanup, progress line), `ModelHelpersTest` (6: ramps
+  off-thread ring, bounded ring, playback, cleanup, progress line), `ModelHelpersTest` (7: ramps
   parity, globe, formats, province hints, real presets carry every field — vacuous until P1-08 —,
-  guidance),
+  MemAvailable, guidance),
   `StagingMoverTest` (7: rename, copy+verify, corrupted manifest keeps staging, incomplete refused,
   partial target replaced, cleanup by age/held), `TimelineAcrossJniTest` (2: JNI pixels = disk
   pixels for every frame, a launched session feeds the timelapse, create errors and early cancel
@@ -135,6 +135,23 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   from world data, spawn marker, 1 province → Accept → rename into the world → bound, max error
   0.031), `shareCodeThroughModel` (the core refuses a preset with a `planet` section: "$.planet:
   unknown key"). cargo fmt, clippy -D warnings, test --workspace, deny: clean.
+- **Client check (best effort, laptop, real GL).** `tools/client/screenshots.sh <jar> <linux .so>`
+  (jar built on the Mac with `./gradlew jar`, the Linux library with `tools/natives/build-natives.sh
+  --only linux-x86_64-gnu`, both pulled; HeadlessMC 2.10.0 under Xvfb + Mesa, Deep Time + TW only,
+  `ScreenshotDriver` walks the screens): Create World with "Deep Time Planet" and Create disabled
+  (`NOT_SIMULATED`) → setup page (Run disabled: "Choose how the continents start", estimate 2.0 MiB /
+  ~10 s / 2 stages) → timeline set, Run → timelapse live (map, then globe) → done (9 keyframes, 13
+  events), scrubbed to 5/9 → review (final map from world data, spawn −8.3° N 204.4° E, 6 province
+  cells) → Accept → Create enabled → the world is created: `Moved staged Deep Time world data …
+  (rename)`, `Bound … staged as <id>`, player in the world at (1114, 66, 377) — the review's spawn
+  marker. With `GUIDANCE=1` (`-Ddeeptime.natives.forceFail=unsupported`): the guidance panel, and
+  Create blocked (`NATIVES`). Twelve screenshots in `review/out/p1-11-client/` (gitignored), no
+  client crash. Three things it took: HeadlessMC's `--jvm` passes only its first token (the -D
+  properties go through `JAVA_TOOL_OPTIONS`); offline it stubs LWJGL (black screenshots) unless
+  `hmc.check.xvfb=true` lets it see Xvfb; the game's STB PNG writer fails there, so the driver
+  writes PNGs with ImageIO. It fixed two screen bugs: the scrubber label lagged while following
+  live, and Linux "free memory" was `MemFree` (0.7 GiB of 15.4) — now `MemAvailable`. Layout and
+  feel remain unreviewed by a person (plan §9.8).
 - **Next.** When P1-08's real presets land: rerun `./gametest.sh` and the client check with them,
   make the `EditorFields` paths match the real schema (`ModelHelpersTest.realPresetsCarryEveryField`
   fails for a real built-in that lacks one), add P1-09's biome names and staged climate mapping at Accept.
