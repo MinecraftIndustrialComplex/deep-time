@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Next: P1-05 and P1-07 (critical path; P1-04 done, P1-14 wires its recorded history), P1-11, P1-15, P1-18 (agents) · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · In flight (agent worktrees under .claude/worktrees/, not yet merged): P1-05 climate, P1-07 rock classes/strata, P1-14 deposits in the pipeline, P1-17 early (parallel pflood/SPL), P1-20 workbench stage 1 (live runs + editor controls) and stage 2 (3D area preview), macOS free-memory fix + Q10 client launcher fold, MIC pack branch `deep-time` (EV + gap configs + rock tags; pack worktree ../../pack-deeptime) · Next after those land: P1-06, then P1-08 · Sub-agents on Sonnet 5.5 from 2026-09-29 (Ben) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -41,17 +41,23 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
+| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. |
 
 ## Review pages
 | Name | URL | Version label | Date |
 |---|---|---|---|
-| seams (how the seams work, interactive) | https://spacesheep.dev/@benmac/deeptime-seams | seams v2 2026-09-28 | 2026-09-28 |
+| hub (every review page in one place; update it when a page is added) | https://spacesheep.dev/@benmac/deeptime-hub | hub 2026-09-28 | 2026-09-28 |
+| seams (where the wrap is, what crossing does, checked against TW 0.19.3 code; links the wrap graphics page) | https://spacesheep.dev/@benmac/deeptime-seams | wrap explainer 2026-09-28 | 2026-09-28 |
+| wrap (how the east–west wrap works: 3D planet, server vs client views of a crossing, two players, a lap, Nether 1:8) | https://spacesheep.dev/@benmac/deeptime-wrap | how the wrap works 2026-09-28 | 2026-09-28 |
 | phase0 (Phase 0 exit: every check, evidence, links) | https://spacesheep.dev/@benmac/deeptime-phase0 | Phase 0 exit 2026-09-28 | 2026-09-28 |
 | p1-editor (real-client screenshots of the Create World editor, timelapse, review, world) | https://spacesheep.dev/@benmac/deeptime-p1-editor | P1-11 client screenshots 2026-09-28 | 2026-09-28 |
 | p1-plates (500 Myr of plates, 100k samples, keyframes + events) | https://spacesheep.dev/@benmac/deeptime-p1-plates | P1-03 plates 100k 500 Myr 2026-09-28 | 2026-09-28 |
 | p1-surface (500 Myr of plates + erosion, deposition, strata; 16k quick pipeline; PNGs losslessly recompressed to fit the 25 MB Free-plan deploy cap) | https://spacesheep.dev/@benmac/deeptime-p1-surface | P1-04 surface processes, 500 Myr 2026-09-28 | 2026-09-28 |
 | p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
 | p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
+| q10-ev (Q10 evidence: the same deposits in MIC without and with Excavated Variants; cut screenshots, per-host ore table, costs, trade-offs) | https://spacesheep.dev/@benmac/deeptime-q10-ev | Q10 evidence 2026-09-28 | 2026-09-28 |
+| q10-map-plain (BlueMap, MIC without EV: 3 sites, surface + cut maps; linked from q10-ev) | https://spacesheep.dev/@benmac/deeptime-q10-map-plain | Q10 map without EV 2026-09-28 | 2026-09-28 |
+| q10-map-ev (BlueMap, MIC with EV + the EV bridge fix; linked from q10-ev) | https://spacesheep.dev/@benmac/deeptime-q10-map-ev | Q10 map with EV, EV bridge fix (smooth basalt) 2026-09-28 | 2026-09-28 |
 
 ## Pending questions
 Questions asked of Ben and not yet answered. Answers go into the decisions file's log
@@ -59,9 +65,114 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
-| 2026-09-28 | P1-15 | **Q10 (plan §14): Excavated Variants in MIC?** Ben (log 2026-09-28): decide after side-by-side BlueMap renders of the same deposits with and without EV in the MIC pack. Next: produce and publish those renders, then ask. | AskUserQuestion |
+| 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+
+### 2026-09-29 — MIC pack branch `deep-time`: Excavated Variants and its gaps (Q10), rock tags (Q16) (agent, pack worktree ../../pack-deeptime)
+- **What.** Pack branch `deep-time` pushed at 16dfd80 (on pack master 303fd89; master untouched): EV 4.3.1 + DAG 6.1.2
+  (packwiz, Modrinth); EV configs under `globalresources/mic/globaldata/excavated_variants/excavated_variants/` for
+  Born in Chaos black and fired black argillite, Create Nuclear lead ore (with `createnuclear:lead_ores`), Ice and Fire
+  silver ore; the rock-tag datapack as `kubejs/data/deeptime/` (120 files, byte-identical); an Almost Unified
+  `unification/materials.json`; the branch report `modDocs/deeptime-branch.md` (force-added, packwiz-ignored).
+  index.toml edited by hand (additions only, no `packwiz refresh`).
+- **Measured** (Q10 recipe on the Mac, `deposits_world_16k`, seed 7, Deep Time 84759b0; install via the new
+  `DEEPTIME_PACK=<dir> tools/smoke/install.sh mic|mic-ev`): EV variants 252 (Q10 190). Q10 boxes: 2,291 of 2,507
+  Deep Time ore blocks are EV variants (Q10 1,350); black argillite 549/549, fired 395/395. Zn–Pb boxes (MVT sites
+  23/24, SEDEX 25): lead 262/262, silver 46/46, zinc 3,176/3,176 variants. No EV/DAG/DefaultResources errors; both
+  worlds pass every smoke check incl. restart. Still plain: ore in stone (its variant is the original), dirt, obsidian.
+- **Found.** MIC's Almost Unified config is never read, on master too: AU 1.4.2 reads only
+  `config/almostunified/unification/*.json`; the pack's `unify.json` is the 0.x layout, so its priorities
+  (e.g. `c:ingots/lead → destroy`) do not apply. Asked Ben (pack-wide).
+- **Not checked.** DAG's generated textures for the new variants in a client.
+- **Leftovers on the Mac** (safe to delete later): /Volumes/Graphide/ban/mic/evpack-verify/,
+  /Volumes/Graphide/ban/mic/mods/pack-deeptime-verify/.
+
+### 2026-09-28 — wrap page merged; snowball figure settled (main session f981c0d3)
+- **Snowball.** entityCrossesSeam starts the gravity-free snowball at x = 8,188.5 with 0.25 blocks/tick and
+  reads it after 40 ticks: 0.25 × (1 − 0.99⁴⁰)/0.01 = 8.28 blocks → 8,196.78 → stored −8,187.22, exactly the
+  P0-06 log. The seams page's −8,191.79 was wrong; it now says −8,187.22 forty ticks later.
+- **Pages.** https://spacesheep.dev/@benmac/deeptime-wrap (graphics) and the rewritten seams page are both up.
+
+### 2026-09-28 — Seams page rewritten from TW's code; correction to the P0-06 teleport note (agent worktree agent-aa125dc28bc6eb2a3)
+- **What.** tools/review/pages/seams/ now opens with where the seam is (x = −C/2 ≡ C/2, pole to pole) and a
+  step-by-step of a crossing; docs/research/notes/wrapped_planet_worlds.md §7 records the mechanics read from
+  TW 0.19.3's decompiled code: the client keeps its own unfolded x (reset only on login, respawn, dimension
+  change); a walking crossing sends no position packet; F3's XYZ/Block/Chunk show the folded x and TW adds
+  "Unwrapped" lines; commands refuse absolute x outside [−C/2, C/2) and fold `~`; `/fill`, `/fillbiome`,
+  `/clone` refuse boxes across the seam; spawn may land on the seam (spawn.rs uses wrapped distances).
+- **Correction.** The P0-06 note that "`setPos` is a teleport and stays unfolded" is too strong: a non-player
+  entity past the edge is folded at the end of its next tick, and one added past the edge is folded on
+  `addEntity`. The seam tests' use of self-motion is still right, since it exercises the crossing itself.
+- **Next.** F3 screenshots on each side of the seam with tools/client/mac-screenshots.sh would settle the
+  "Needs a client" rows.
+
+### 2026-09-28 — Q10 evidence: Excavated Variants in MIC, side by side (agent worktree agent-a8b970576f8fca34f, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** The renders Ben asked for before deciding Q10 (decisions log 2026-09-28), not a decision:
+  https://spacesheep.dev/@benmac/deeptime-q10-ev (page), linking two BlueMap spaces,
+  https://spacesheep.dev/@benmac/deeptime-q10-map-plain and https://spacesheep.dev/@benmac/deeptime-q10-map-ev (all
+  private; `spacesheep list` confirms). One MIC world per set from the same recipe: `deposits_world_16k.json`
+  (every-class strata), the MIC rock-tag datapack, level seed 7, first-start generation, pack 303fd89 (HEAD snapshot;
+  the pack's working tree was dirty and was not used). The EV set is the mic set + EV 4.3.1 + DAG 6.1.2 (168 → 170
+  jars). Both worlds hold the same 42 sites (`sites/` and `bodies/` byte-identical); 8,947 ore positions compared in
+  the three boxes, 39 hold ore in only one world (feature placement jitter).
+- **Tooling (committed on the branch).** `install.sh`: profiles `mic-ev` (= `@include mic` + `@include ev`, pins
+  listed once) and `ev-client` (ev + Create), `--seed` (level-seed). `run.py`: `--chunky-at x,z,r` (repeatable), boot
+  time / the server's Done figure / RSS at Done for the first boot and the restart. `render-bluemap.sh`:
+  `BLUEMAP_BOXES` (several boxes, the second map becomes a cut at each box's height, ambient light 1.0),
+  `BLUEMAP_MAP_PREFIX/LABEL/SORT`, `BLUEMAP_PACKS` (BlueMap reads `<config>/packs/`), rstate dropped; the old
+  single-box behaviour is unchanged. `deeptime-inspect ore-hosts [--other <world>]`: ore blocks by host rock (the most
+  common rock among the 8 same-layer neighbours, then the 5×5 layer, then 3D; strata are horizontal, a thin seam's
+  rock above/below is another horizon), with `--other` a position-by-position pairing of two worlds and per-y counts;
+  `blocks` takes negative areas. `neoforge/build.gradle`: `-PrunSet=<set>` links any installed set into a run.
+  `tools/client/ev-assets.sh` (laptop) → `ev-assets-mac.sh` (Mac): drive lease on graphide's m6lock + the server lock,
+  the dev client with `-PrunSet=ev-client` in ban's desktop session via `sudo launchctl asuser`, DAG config
+  `full_cache`/`time_resources`, stops at the block atlas; `ev-assets-pack.py` turns DAG's cache (blockstates/models
+  under `cache/<mod>/assets/`, painted sprites under `cache/dynamic_asset_generator/tex_sources__minecraft__blocks/`)
+  into a resource pack (the DAG atlas file left out). Master's newer `tools/client/mac-client.sh` (lease renewal, pid
+  marker) covers the same launch; folding ev-assets into it is a follow-up. `tools/review/q10-ev.sh` (Mac steps:
+  install, worlds, inspect, tiles, bluemap, boots; `Q10_PROFILES` redoes one world), `q10_ev.py` (merge, shots, page),
+  `block-tiles.py` (a block's 16×16 texture from blockstate → model → texture), `shot-page.py` (a page folder in
+  headless Chromium over HTTP).
+- **Why a client.** EV's textures do not exist on a server: DAG paints them when a client loads resources (EV's
+  models are plain `cube_all` with 4 random variants; the sprites come from a DAG `foreground_transfer` of the ore
+  over the new stone). With DAG's full cache the 5-mod client wrote 338 sprites, 488 models, 190 blockstates; BlueMap
+  and `deeptime-inspect colors` then draw EV's blocks like any other (colour table 4,304 → 4,494 blocks). No other
+  MIC mod has an EV ore or stone config, so the 5-mod client's variant set equals MIC's (190).
+- **Bug found and fixed: `EvBridgeImpl` kept one EV stone per block.** EV 4.3.1 ships two stones for
+  `minecraft:smooth_basalt` (`excavated_variants:minecraft/smooth_basalt`, overworld; `…:create/smooth_basalt`,
+  nether), the map kept the last, and ore in smooth basalt (MIC's basalt, gabbro, chert, amphibolite) never became a
+  variant. Now every stone of a block is kept in id order and the first with a block for the ore wins;
+  `DepositGameTests.evVariantWhenInstalled` also checks copper in smooth basalt. `mac.sh --server --
+  './gametest.sh -PwithEv'` (merged with master 8da1d6b) → **All 45 required tests passed**. The EV world was
+  regenerated, re-inspected and re-rendered with the fix.
+- **Measured.** Deep Time's own ore (claimed materials) in the three boxes: 2,506 blocks; with EV 1,350 are a
+  different block (an ore-in-this-rock variant); 935 sit in hosts EV has no stone for. Per host (ore / changed):
+  black argillite 483 / 0 (MIC's coal, shale, slate, phyllite rock), fired black argillite 390 / 0, veridium 375 / 366,
+  diorite 241 / 240, crimsite 232 / 232, granite 229 / 220, stone 168 / 0 (the variant is the original), dripstone
+  70 / 70, scoria 59 / 58, calcite 42 / 27, dirt 40 / 0, ochrum 26 / 19, smooth basalt 24 / 24 (after the fix),
+  packed mud 17 / 16, asurine 16 / 16, limestone 16 / 16, tuff 14 / 13, obsidian 10 / 0, cobblestone 9 / 9. The host
+  estimate matched EV's own stone for 1,253 of 1,333 variant positions (94%); "smooth sandstone 14 / 0" rows are
+  estimate errors (coal-seam edges). Other mods' ores and vanilla's diamond/lapis/redstone (6,451 blocks) are
+  identical in both worlds. Cuts chosen from `ore-hosts` per-y counts: porphyry y 128 (156 ore, 73 differ), placer
+  y 162 (gold in gravel, none differ), spawn y 66 (213 coal in argillite, 1 differs).
+  Costs: `q10-ev.sh boots` + the restarts (existing world): boot to Done medians 17.4 s without / 17.8 s with EV
+  (samples 17.1–20.7 / 17.2–19.5), RSS at Done medians 3,300 / 3,398 MB (overlapping); first start with 2 Chunky
+  squares 27.4 s / 5,447 MB peak vs 23.9 s / 5,671 MB (one sample each; the three EV boot-only samples ran the jar
+  before the bridge fix). EV registers 190 blocks (171 ores, 111 stones known), two generated data packs; MIC's
+  Almost Unified hides the variant items in 7 ore tags. Client: DAG's summed generation time 1,024 ms (textures
+  892 ms) on the M6; block atlas 6 s after ModLauncher start on the 5-mod client (RSS 2,188 MB; no no-EV client run).
+  EV and DAG: LGPL-3.0-or-later, last released 2024-08-13 (still the newest 1.21.1 builds).
+- **Publishing limits.** One BlueMap app with all four maps (195 files, 33 MB) failed twice after 24.2 MB uploaded
+  ("fetch failed"), consistent with the ~25 MB per-deploy cap the P1-04 agent met; one space per world (103 files,
+  17 MB each) went through (one transient "fetch failed" on an update, fine on retry). Headless Chromium repeats the
+  page from the top in captures taller than about 8,200 px, so long pages were reviewed in parts.
+- **Checks.** cargo test -p deeptime-inspect 21 + 7, clippy -D warnings, fmt clean; `gradlew build test` tests=106 failures=0 (Mac). Every screenshot on the page
+  (12 BlueMap views, 8 sections, 6 ore maps) and the page itself were looked at in headless Chromium over plain HTTP
+  before publishing; the hosted spaces are private, so their first real load is Ben's.
+- **Next.** Ben decides Q10 from the page. Options the evidence points at, not decided: EV stone configs for Born in
+  Chaos's argillites (the largest host EV lacks in MIC, like Deep Time's four stand-ins); EV ore configs for Create
+  Nuclear lead / Ice and Fire silver. Rerun `q10-ev.sh` on the real presets after P1-08.
 
 ### 2026-09-28 — P1-16 COE and CDG hooks (agent worktree agent-a8ca83a89f23c10ef, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Signatures** (javap + cfr on the Mac MIC set's jars, `createoreexcavation-1.21-1.6.8.jar` sha512
@@ -373,6 +484,23 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Needs from Ben:** nothing while `ban` stays logged in at the Mac (auto-login or a Screen Sharing
   login); with nobody logged in the runner stops with `BLOCKED: … no GUI session` (exit 4). A
   locked screen is only warned about (untested: every run here had `ban` unlocked at the console).
+### 2026-09-28 — wrap review page (agent worktree agent-abdcd741641764e1f)
+- **New page `tools/review/pages/wrap/`, published private as https://spacesheep.dev/@benmac/deeptime-wrap**
+  (`tools/review/publish.sh wrap tools/review/pages/wrap -m "how the wrap works" --emoji 🌀`; space
+  87492f6d-8791-4d7d-8f43-d96f19f63913, recorded in `tools/review/spaces.json`). One self-contained HTML file, raw WebGL for
+  the rolling planet, canvas for the rest; follows the 16k/32k switch; light and dark; checked with headless Chromium at
+  1400 px and in a 390 px iframe (`--use-angle=swiftshader-webgl --enable-unsafe-swiftshader`; plain
+  `--use-gl=swiftshader` gives no WebGL), and every control clicked once with no script errors. `#shot` in the URL runs the
+  crossing to just past the seam for screenshots.
+- **Mechanics read from TW 0.19.3's source** (github.com/anyttng/toroidal_world at 3c1f3a3, the 0.19.3 build stamp; key
+  classes and F3 strings confirmed in the jar). They agree point for point with the sibling note's §7 in
+  `docs/research/notes/wrapped_planet_worlds.md`. The page labels each claim "seen on a test server", "read in code" or
+  "not yet watched in a client".
+- **Corrections to other docs, found here:** spawn is not at x = 0 (Deep Time picks it from `spawn/candidates.json`, so it
+  can be near the seam); the seams page's snowball figure (came out at x = −8,191.79) differs from P0-06's build log
+  (x = −8,187.22).
+- **Next:** the seams page can link to this one; everything client-side on it stays unverified until
+  `tools/client/mac-screenshots.sh` (or a successor) walks a real client across the seam.
 
 ### 2026-09-28 — P1-11 Customize editor, timelapse and staging, on the placeholder presets (agent worktree agent-a61f0e6a8e0a67dfa)
 - **Shape.** Client-only screens in `screen/` (reached only through `screen/ClientSetup`, a

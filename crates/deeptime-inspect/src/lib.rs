@@ -12,6 +12,7 @@ pub mod blocks;
 pub mod chunk;
 pub mod colors;
 pub mod error;
+pub mod hosts;
 pub mod image;
 pub mod nbt;
 pub mod palette;
