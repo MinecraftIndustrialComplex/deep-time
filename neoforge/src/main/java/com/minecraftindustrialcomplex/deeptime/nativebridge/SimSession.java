@@ -78,6 +78,22 @@ public final class SimSession implements AutoCloseable {
         return s;
     }
 
+    /**
+     * The memory and time estimate of a preset (plan §5.7.5), as JSON
+     * {@code {"peak_bytes":P,"stages":[{"bytes":B,"name":N,"seconds":S},…]}}, without creating a
+     * session. Cheap; safe from any thread.
+     *
+     * @throws PresetInvalidException if the preset or content is malformed
+     * @throws IllegalStateException  if the native library is not linked
+     */
+    public static String estimate(String presetJson, String contentJson) {
+        Objects.requireNonNull(presetJson, "presetJson");
+        if (!NativeLoader.isLinked())
+            throw new IllegalStateException("the Deep Time native library is not linked"
+                    + NativeLoader.status().map(s -> ": " + s.summary()).orElse(""));
+        return DeepTimeNative.estimate(presetJson, contentJson == null ? "" : contentJson);
+    }
+
     /** The native session id (diagnostics only). */
     public long id() {
         return id;
