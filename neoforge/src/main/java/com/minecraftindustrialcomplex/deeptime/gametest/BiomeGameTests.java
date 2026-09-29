@@ -113,8 +113,10 @@ public final class BiomeGameTests {
      * first calibrated run, standalone and MIC; see STATUS.md's P1-09 build log). A family with
      * fewer than {@link #MIN_COLUMNS} columns on the test planet is logged, not asserted.
      */
-    static final Map<String, Double> FLOORS = Map.of(
-            "A", 0.0, "Af", 0.0, "BW", 0.0, "BS", 0.0, "C", 0.0, "D", 0.0, "Dsub", 0.0, "E", 0.0, "sea", 0.0);
+    static final Map<String, Double> FLOORS = Map.ofEntries(
+            Map.entry("A", 0.0), Map.entry("Af", 0.0), Map.entry("BW", 0.0), Map.entry("BS", 0.0), Map.entry("C", 0.0),
+            Map.entry("D", 0.0), Map.entry("Dsub", 0.0), Map.entry("E", 0.0), Map.entry("sea", 0.0),
+            Map.entry("BW:desert", 0.0), Map.entry("Af:jungle", 0.0), Map.entry("Dfc:taiga", 0.0), Map.entry("E:snow", 0.0));
     static final int MIN_COLUMNS = 20;
 
     /**
