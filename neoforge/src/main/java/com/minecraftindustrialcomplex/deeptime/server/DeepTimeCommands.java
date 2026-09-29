@@ -7,8 +7,11 @@ import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.compat.sable.SableTestOps;
 import com.minecraftindustrialcomplex.deeptime.gametest.DeepTimeTestReporter;
 import com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport;
+import com.minecraftindustrialcomplex.deeptime.net.DeepTimeNetwork;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.wrap.PoleCap;
+import com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -43,6 +46,11 @@ public final class DeepTimeCommands {
                                 .then(Commands.argument("z", IntegerArgumentType.integer())
                                         .executes(DeepTimeCommands::probeColumn))))
                 .then(Commands.literal("tw").executes(DeepTimeCommands::probeTw))
+                .then(Commands.literal("pole")
+                        .executes(c -> probePole(c.getSource(), c.getSource().getPosition().z))
+                        .then(Commands.argument("z", IntegerArgumentType.integer())
+                                .executes(c -> probePole(c.getSource(), IntegerArgumentType.getInteger(c, "z")))))
+                .then(Commands.literal("network").executes(c -> probeNetwork(c.getSource())))
                 .then(Commands.literal("palette").executes(c -> probePalette(c.getSource())));
         var gametest = Commands.literal("gametest").requires(s -> GameTestSupport.enabled());
         // Sable is optional: its probe and test commands exist only when it is loaded, and every
@@ -216,6 +224,56 @@ public final class DeepTimeCommands {
         }
         o.addProperty("seamX", c / 2);
         return emit(ctx.getSource(), o);
+    }
+
+    /**
+     * The pole cap (plan §7.11) of the source's level at block z (default: the source's own z):
+     * the lines, the latitude and what the cap does there.
+     */
+    private static int probePole(CommandSourceStack source, double z) {
+        ServerLevel level = source.getLevel();
+        JsonObject o = new JsonObject();
+        o.addProperty("probe", "pole");
+        o.addProperty("level", level.dimension().location().toString());
+        PoleCapCurve cap = PoleCap.capOf(level);
+        o.addProperty("planet", cap != null);
+        if (cap != null) {
+            o.addProperty("circumference", cap.circumference());
+            o.addProperty("capDeg", cap.capDeg());
+            o.addProperty("stopDeg", cap.stopDeg());
+            o.addProperty("capZ", cap.capZ());
+            o.addProperty("stopZ", cap.stopZ());
+            o.addProperty("z", z);
+            o.addProperty("latitude", cap.latitudeDeg(z));
+            o.addProperty("zone", cap.zone(z).name());
+            o.addProperty("depth", cap.depth(z));
+            o.addProperty("storm", cap.storm(z));
+            o.addProperty("push", cap.push(z));
+            o.addProperty("wind", cap.wind(z));
+        }
+        return emit(source, o);
+    }
+
+    /**
+     * Every payload channel NeoForge has registered (plan §7.15): protocol, id, version, flow and
+     * whether it is optional. gametest-planet.sh's {@code refuse_client} scenario builds its fake
+     * clients' channel lists from this.
+     */
+    private static int probeNetwork(CommandSourceStack source) {
+        JsonObject o = new JsonObject();
+        o.addProperty("probe", "network");
+        JsonArray channels = new JsonArray();
+        for (DeepTimeNetwork.Channel c : DeepTimeNetwork.registrations()) {
+            JsonObject j = new JsonObject();
+            j.addProperty("protocol", c.protocol().name());
+            j.addProperty("id", c.id().toString());
+            j.addProperty("version", c.version());
+            j.addProperty("flow", c.flow().map(Enum::name).orElse(null));
+            j.addProperty("optional", c.optional());
+            channels.add(j);
+        }
+        o.add("channels", channels);
+        return emit(source, o);
     }
 
     static int emit(CommandSourceStack source, JsonObject o) {

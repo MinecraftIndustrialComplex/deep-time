@@ -1705,6 +1705,17 @@ becomes a hard stop. The level's sub-levels come from Sable's public
 (`List<ServerSubLevel>`; `javap` on Sable 2.0.5). Terrain exists all the way to the poles;
 beyond the pole edge (|z| ≥ C/4) `deeptime:beyond_pole` makes an ice-sheet ocean.
 
+*As built in P1-18:* the lines are the generator's `world_data.pole_cap_deg` / `pole_stop_deg`
+(defaults 75 / 80; `wrap/PoleCapCurve` holds the geometry and curves). With s the depth into the
+band: pushback 0.10·s^1.5 blocks/tick² toward the equator, storm s^0.7, Sable wind 1.0·s^1.5
+blocks/s per tick. A player's own movement belongs to its client, so the server sends the wind in
+`PoleStormPayload` and Deep Time's client adds it (to the player or the vehicle it steers); the
+server pushes the vehicles it simulates itself (a player's root vehicle, e.g. a minecart) and
+enforces the hard stop (absolute teleport onto the line; vehicles moved with their riders; riders
+of contraptions dismounted). Creative: storm, warning and stop, no wind; spectator: storm only.
+Sable: wind at the pose, stop by the hull's poleward edge (poleward velocity cancelled, never a
+teleport). Details in STATUS.md's P1-18 entry.
+
 ### 7.12 World preset, dimension type and the Customize editor
 
 Resources in `neoforge/src/main/resources/data/`:
@@ -1887,6 +1898,17 @@ client uses for the pole storm, an F3 latitude/longitude line and, later, maps. 
 declares `minecraft`, `neoforge` and `toroidal_world` as required with `side = "BOTH"`; COE, CDG,
 TerraBlender, Excavated Variants, Sable and Distant Horizons as optional.
 
+*As built in P1-18:* `net/DeepTimeNetwork` registers two required play-to-client channels,
+version "1": `deeptime:world_info` (`WorldInfoPayload`: planet flag, dimension, format version,
+C, m per block h/v, cap and stop latitudes, planet name; sent on login, dimension change and
+respawn) and `deeptime:pole_storm` (`PoleStormPayload`: storm 0…1 and the client's wind). NeoForge
+has no public view of its registrations, so `DeepTimeNetwork.registrations()` reads
+`NetworkRegistry.PAYLOAD_REGISTRATIONS` by reflection (`/deeptime probe network`);
+`NetworkGameTests.worldInfoChannelRequired` feeds it to `NetworkComponentNegotiator`, and the
+planet harness's `--scenario refuse_client` logs in over TCP as a NeoForge client without Deep
+Time (refused, naming exactly the two channels), with every channel (accepted) and as a vanilla
+client (refused). The F3 line: `Deep Time: 76.904° N 90.000° E · <planet> (C 16384, 300 m/block)`.
+
 ### 7.16 Commands for tests and debugging
 
 `/deeptime probe column <x> <z>` (surface y, water level, climate parameters, biome, Köppen,
@@ -1962,6 +1984,8 @@ community ports) are not opened for code.
   rifting every 20–120 Myr. For a 500 Myr timeline (250 steps): 100k → 70 s + 4–25 events × 1.43 s
   = 76–106 s; 250k → 310 s + 4–25 × 5.08 s = 330–437 s. Deep Time's timelines are chosen by the
   player, so the estimate is computed per preset, and P1-17 replaces these figures with measurements.
+  **Measured (P1-03, M6 Mac mini, release, 500 Myr, shared with other builds):** 100k → 8.3 s on
+  12 threads (10.5 s on 4, 23 s on 1); 250k → 25–31 s on 12 threads, 72 s on 1 (STATUS.md, P1-03).
 - **Outputs.** Per-step uplift/subsidence rate, crust type, orogeny type/age, fold trend and regime
   sampled to L1 (§5.2); plate/rift/collision/arc/hotspot events; keyframes of elevation, plates and
   crust age.
@@ -2920,8 +2944,11 @@ a smoke benchmark and again at the end.
 - **Acceptance.**
   - `nix develop -c cargo test -p deeptime-core plates::` → area conserved across rifting (relative
     error < 1e-9); no sample in two plates; ages non-negative
-  - `nix develop -c cargo run --release -p deeptime-cli -- stage plates --preset earthlike_quick_16k --timeline-myr 500 --viewer review/out/p1-plates`
-    → prints `plates_final=<n> ocean_age_p90_myr=<a> steps=250 seconds=<s>` and writes the viewer
+  - `nix develop -c cargo run --release -p deeptime-cli -- stage plates --preset plates_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-plates`
+    → prints `plates_final=<n> ocean_age_p90_myr=<a> … steps=250 seconds=<s>` and writes the viewer
+    (`--start` is required: the presets leave the start configuration to the player, decisions
+    file "Timeline"; `plates_quick_16k` is the plate pipeline's preset while `earthlike_quick_16k`
+    stays P1-13's placeholder until P1-08)
 - **Ben reviews.** "Deep Time — P1 plates": the timelapse of plates, crust age and elevation, with
   the rift/collision ticker.
 

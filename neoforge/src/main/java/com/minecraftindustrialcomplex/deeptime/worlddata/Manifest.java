@@ -21,9 +21,13 @@ import java.util.Map;
  */
 public record Manifest(String formatVersion, String source, String createdUtc, int circumference, int seaLevelY,
                        int minY, int maxY, Map<String, GridDesc> grids, List<LayerEntry> layers,
-                       List<FileEntry> files, JsonObject notes) {
+                       List<FileEntry> files, JsonObject notes, double mPerBlockH, double mPerBlockV) {
 
     public static final String FILE = "manifest.json";
+
+    /** Plan §5.1 defaults, for manifests that do not name the scales. */
+    public static final double DEFAULT_M_PER_BLOCK_H = 300.0;
+    public static final double DEFAULT_M_PER_BLOCK_V = 20.0;
 
     /** One tile pack of the folder. */
     public record LayerEntry(String name, String path, String grid, long bytes, long crc32) {}
@@ -81,10 +85,21 @@ public record Manifest(String formatVersion, String source, String createdUtc, i
                     Map.copyOf(grids),
                     List.copyOf(layers),
                     List.copyOf(files),
-                    o.has("notes") ? o.getAsJsonObject("notes") : new JsonObject());
+                    o.has("notes") ? o.getAsJsonObject("notes") : new JsonObject(),
+                    scale.has("m_per_block_h") ? scale.get("m_per_block_h").getAsDouble() : DEFAULT_M_PER_BLOCK_H,
+                    scale.has("m_per_block_v") ? scale.get("m_per_block_v").getAsDouble() : DEFAULT_M_PER_BLOCK_V);
         } catch (RuntimeException e) {
             throw new WorldDataException(file + ": malformed manifest: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * The planet's name for players (the F3 line, maps): the preset of a run ({@code run:<preset>}),
+     * the kind of a synthetic world ({@code synth:<kind>}), else the source as written.
+     */
+    public String planetName() {
+        int colon = source.indexOf(':');
+        return colon >= 0 && colon + 1 < source.length() ? source.substring(colon + 1) : source;
     }
 
     /** The entry of layer {@code name}, or null. */

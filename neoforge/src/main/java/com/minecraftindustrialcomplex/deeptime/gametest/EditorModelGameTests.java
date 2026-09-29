@@ -23,6 +23,7 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.PlanetGenerators;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataRef;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import com.minecraftindustrialcomplex.deeptime.wrap.PlanetShape;
+import com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve;
 import com.mojang.serialization.JsonOps;
 import com.toroidalworld.api.v1.shape.LoopSpans;
 import com.toroidalworld.api.v1.shape.ShapeDimensions;
@@ -65,6 +66,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *       and a bound generator whose terrain is the run's baked terrain.</li>
  *   <li>{@link #shareCodeThroughModel}: codes round-trip through the model and the core validates
  *       what the model builds.</li>
+ *   <li>{@link #realPresetFieldsLightUp}: a P1-03 planet preset enables the planet and scale
+ *       fields, an edit lands where the core reads it, and the core accepts the result.</li>
  * </ul>
  */
 @GameTestHolder(GameTestSupport.NS)
@@ -198,7 +201,8 @@ public final class EditorModelGameTests {
         Path world = helper.getLevel().getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
         String id = stageTestWorld(helper);
         Path staging = Staging.dir(gameDir(), id);
-        WorldDataRef ref = new WorldDataRef("deeptime-staged", 1024, Optional.empty(), Optional.of(id));
+        WorldDataRef ref = new WorldDataRef("deeptime-staged", 1024, Optional.empty(), Optional.of(id),
+                PoleCapCurve.DEFAULT_CAP_DEG, PoleCapCurve.DEFAULT_STOP_DEG);
         Path target = world.resolve(ref.folder());
         try {
             Staging.deleteTree(target);
@@ -273,7 +277,7 @@ public final class EditorModelGameTests {
             // The world's start: move the staged data into a world folder and bind it.
             Path world = helper.getLevel().getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
             WorldDataRef ref = new WorldDataRef("deeptime-e2e", accepted.dataRef().circumferenceBlocks(), Optional.empty(),
-                    accepted.dataRef().stagingId());
+                    accepted.dataRef().stagingId(), accepted.dataRef().poleCapDeg(), accepted.dataRef().poleStopDeg());
             try {
                 Staging.deleteTree(world.resolve(ref.folder()));
                 var r = WorldDataBinder.moveStaged(gameDir(), world, ref, false).orElseThrow();
@@ -314,18 +318,56 @@ public final class EditorModelGameTests {
         var info = Presets.info(Presets.parseObject(ShareCode.decode(code)));
         helper.assertTrue(info.timeline().orElseThrow().equals(new Presets.Timeline("scattered_continents", 2500.0)), "timeline kept");
 
-        // A preset with a section the core does not know yet is refused by the core, not hidden.
+        // A preset with a section the core does not know is refused by the core (Run stays off), not hidden.
         JsonObject custom = Presets.parseObject(ShareCode.decode(code));
-        JsonObject planet = new JsonObject();
-        planet.addProperty("gravity_m_s2", 9.81);
-        custom.add("planet", planet);
+        custom.add("no_such_section", new JsonObject());
         EditorModel c = model();
         helper.assertTrue(c.importShareCode(ShareCode.encode(custom.toString())).isEmpty(), "imports");
         c.refreshEstimate();
         helper.assertTrue(c.estimateError().isPresent() && !c.canRun(),
-                "the core refuses unknown keys before P1-03: " + c.estimateError().orElse("(accepted)"));
+                "the core refuses an unknown key: " + c.estimateError().orElse("(accepted)"));
         DeepTime.LOGGER.info("[gametest] shareCodeThroughModel code={}… ({} chars) customRefused={}", code.substring(0, 16), code.length(),
                 c.estimateError().orElse(""));
+        helper.succeed();
+    }
+
+    /**
+     * A real planet preset (P1-03's pipeline, {@code params.rs}) lights up the editor's planet and
+     * scale fields with no screen change, an edit lands at the path the core reads, and the core
+     * accepts what the model builds (its estimate validates every section).
+     */
+    static final String PLANET = "{\"schema\":0,\"name\":\"gametest_planet\",\"seed\":7,"
+            + "\"planet\":{\"gravity_m_s2\":9.81,\"day_length_h\":24,\"axial_tilt_deg\":23.4,\"star_flux_rel\":1.0,"
+            + "\"ocean_fraction\":0.7,\"regime\":\"mobile_lid\"},"
+            + "\"scale\":{\"circumference_blocks\":16384,\"m_per_block_h\":300,\"m_per_block_v\":20},"
+            + "\"resolution\":{\"l0_samples\":20000,\"l1_r\":16}}";
+
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 200)
+    public static void realPresetFieldsLightUp(GameTestHelper helper) {
+        EditorModel m = model();
+        helper.assertTrue(m.importShareCode(ShareCode.encode(PLANET)).isEmpty(), "imports");
+        helper.assertTrue(m.isImported() && m.circumference() == 16_384, "custom preset at C 16,384");
+        List<String> available = new java.util.ArrayList<>();
+        for (var f : com.minecraftindustrialcomplex.deeptime.screen.model.EditorFields.ALL)
+            if (m.available(f))
+                available.add(f.id());
+        helper.assertTrue(available.containsAll(List.of("gravity", "day_length", "axial_tilt", "star_flux", "ocean_fraction",
+                "m_per_block_h", "m_per_block_v")), "planet and scale fields editable: " + available);
+        helper.assertTrue(!available.contains("sky_islands"), "fantasy toggles stay off (Phase 3)");
+        var gravity = com.minecraftindustrialcomplex.deeptime.screen.model.EditorFields.byId("gravity");
+        m.setFieldText(gravity, "3.71");
+        m.setStart("scattered_continents");
+        m.setLengthText("500");
+        m.refreshEstimate();
+        helper.assertTrue(m.estimateError().isEmpty(), "the core accepts the edited preset: " + m.estimateError().orElse(""));
+        helper.assertTrue(m.effectivePresetJson().contains("\"gravity_m_s2\":3.71"), "the edit is at planet.gravity_m_s2");
+        helper.assertTrue(m.canRun(), "Run enabled: " + m.problems());
+        // A value the core's validation refuses shows as the core's message, and Run stays off.
+        var ocean = com.minecraftindustrialcomplex.deeptime.screen.model.EditorFields.byId("ocean_fraction");
+        m.setFieldText(ocean, "0.99");
+        helper.assertTrue(!m.fieldValid(ocean) && !m.canRun(), "0.99 is outside the editor's (and the core's) range");
+        DeepTime.LOGGER.info("[gametest] realPresetFieldsLightUp available={} estimate={}", available,
+                m.estimate().map(e -> e.peakBytes() + " B, " + e.stages().size() + " stages").orElse("-"));
         helper.succeed();
     }
 }

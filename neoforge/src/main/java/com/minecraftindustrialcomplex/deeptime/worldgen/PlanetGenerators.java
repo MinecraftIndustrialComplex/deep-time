@@ -55,7 +55,9 @@ public final class PlanetGenerators {
             throw new IllegalArgumentException("not a staging id: " + stagingId);
         GeologicChunkGenerator base = overworld(dims).orElseGet(() -> presetOverworld(registries));
         WorldDataRef old = base.dataRef();
-        WorldDataRef ref = new WorldDataRef(old.folder(), circumference, Optional.empty(), Optional.of(stagingId));
+        // The pole cap lines stay the world preset's (P1-18); folder likewise.
+        WorldDataRef ref = new WorldDataRef(old.folder(), circumference, Optional.empty(), Optional.of(stagingId),
+                old.poleCapDeg(), old.poleStopDeg());
         ChunkGenerator generator = new GeologicChunkGenerator(base.getBiomeSource(), base.sourceSettings(), ref);
         return dims.replaceOverworldGenerator(registries, generator);
     }

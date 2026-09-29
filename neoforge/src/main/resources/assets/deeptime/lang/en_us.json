@@ -154,5 +154,9 @@
   "deeptime.event.supergene_enrichment": "Supergene enrichment",
   "deeptime.event.petroleum_generation": "Oil generation",
   "deeptime.event.trap_charge": "Oil trap fills",
-  "deeptime.event.guaranteed_occurrence": "Guaranteed deposit"
+  "deeptime.event.guaranteed_occurrence": "Guaranteed deposit",
+
+  "deeptime.polecap.storm": "Polar storm (%s): the wind is pushing you back toward the equator",
+  "deeptime.polecap.storm.no_wind": "Polar storm (%s): the world ends at %s",
+  "deeptime.polecap.stop": "You cannot go any further: %s is the edge of the world"
 }
