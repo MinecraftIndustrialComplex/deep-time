@@ -2434,9 +2434,6 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - The workbench offered the placeholder `earthlike_*` presets (dummy pipeline) next to the real `pipeline_*`
   ones; Ben ran one and got a single blob. The UI overhaul hides them behind a dev toggle and marks a
   placeholder run (build log 2026-09-29, UI overhaul).
-- Workbench previews on the live server fail until the main checkout's `smoke/mic` on the Mac is
-  reinstalled (its Deep Time jar predates P1-15's synthetic deposit preset; build log 2026-09-29, UI
-  overhaul).
 - The plan is at revision 2 plus a partial revision 3 (the decisions-log rule in §1.2). The 29 gaps of
   docs/plan-reviews/2026-09-28-cold-read-review-2.md are fixed in the plan by the task that hits each
   one; the build log names each fix as it lands.
