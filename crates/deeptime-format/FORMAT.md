@@ -454,10 +454,12 @@ each body as JSON: `id, site, shape, metric, role, center, axes, yaw, dip, clip_
 aabb, rock_class, zones [{name, material, rock_class, d, v, grade, density}]`.
 
 `manifest.json` `notes.deposits` (runs with the deposit stage) is the stage's census: per type
-`id, sites, expected_formula (Σ ρ·A·F·count_mult over the tracts, plan §8.6), expected (after the
-province redistribution; the same total), drawn, tracts, permissive_km2, mean_f, buried,
-truncated, eroded, too_deep, children, guaranteed, dropped_separation`, plus `province`,
-`provinces`, `count_mult`, `sites`, `bodies`.
+`id, sites, target (the survivors the density asks for: count_mult · ρ · Σ permissive area, plan
+§8.6), preservation (the formation-weighted share the planet preserves), formation_mult, capped,
+expected_formed, expected (the survivors expected; = target unless capped), drawn (deposits
+formed), tracts, permissive_km2, mean_f, buried, truncated, eroded, too_deep, children, guaranteed,
+dropped_separation`, plus `province`, `provinces`, `count_mult`, `max_formed_per_survivor`,
+`brine_flow_km`, `sites`, `bodies`. A forming event's `p_survive` is its cell's survival chance.
 
 ## Keyframes (`keyframes/index.json`, `keyframes/kf-<n>.dtk`)
 
