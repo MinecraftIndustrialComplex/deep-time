@@ -134,7 +134,7 @@ p=\$(cat '$PIDF' 2>/dev/null || true)
 if [ -n \"\$p\" ] && ps -p \"\$p\" >/dev/null; then echo \"workbench: running (pid \$p)\"; else echo 'workbench: not running'; fi
 \"\$TS\" serve status 2>&1 | sed 's/^/tailscale: /'
 tail -3 '$LOG' 2>/dev/null | sed 's/^/log: /'"
-    curl -sS -m 5 "${URL}api/runs" 2>/dev/null | python3 -c 'import json,sys; j=json.load(sys.stdin); print("runs:", len(j["runs"]), "kept; running:", j["running"], "; queue:", len(j["queue"]))' || echo "not answering at $URL"
+    curl -sS -m 5 "${URL}api/runs" 2>/dev/null | python3 -c 'import json,sys; j=json.load(sys.stdin); print("runs:", len(j["runs"]), "kept; running:", j["running"], "; queue:", len(j["queue"]))' 2>/dev/null || echo "not answering at $URL"
     exit 0 ;;
 tv) tv_open; exit $? ;;
 esac
