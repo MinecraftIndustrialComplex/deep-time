@@ -471,6 +471,8 @@ struct Candidate {
     point: Point,
     size: SizeDraw,
     endowment: f64,
+    /// The favourability at its cell (the charged-trap score for petroleum).
+    fav: f64,
     /// Petroleum: (kitchen, charge time, migration km).
     charge: Option<(usize, f64, f64)>,
 }
@@ -898,6 +900,7 @@ impl DepositStage {
                         point: *p,
                         size,
                         endowment: endow[provinces.of_cell[p.cell as usize] as usize],
+                        fav: fv[p.cell as usize],
                         charge,
                     });
                 }
@@ -1066,22 +1069,28 @@ impl DepositStage {
                 r.host_classes.get(a.host as usize).cloned()
             })
             .unwrap_or_default();
-        let favourability = acc.map_or(1.0, |a| a.favourability());
+        let favourability = cand.fav;
         let neighbours = self.neighbours_limited_by(cand.ty, cell, &f.grid);
         let base_event = |world: &mut WorldState, kind: &str, t0: f64| {
             let mut e = world
                 .event(t0, kind, SOURCE)
                 .param("deposit_type", t.id.as_str())
-                .param("favourability", favourability)
-                .param("score_source", scores[0])
-                .param("score_driver", scores[1])
-                .param("score_pathway", scores[2])
-                .param("score_trap", scores[3])
-                .param("score_host", scores[4])
-                .param("score_clock", scores[5])
-                .param("limiting", limiting)
-                .param("neighbours_limited_by", neighbours.as_str())
-                .param("host_class", host_class.as_str())
+                .param("favourability", favourability);
+            // Rule-based types record their component scores; petroleum's favourability is the
+            // charged trap × seal × reservoir and has none.
+            if acc.is_some() {
+                e = e
+                    .param("score_source", scores[0])
+                    .param("score_driver", scores[1])
+                    .param("score_pathway", scores[2])
+                    .param("score_trap", scores[3])
+                    .param("score_host", scores[4])
+                    .param("score_clock", scores[5])
+                    .param("limiting", limiting)
+                    .param("neighbours_limited_by", neighbours.as_str())
+                    .param("host_class", host_class.as_str());
+            }
+            let mut e = e
                 .param("tonnage_mt", cand.size.tonnage_mt)
                 .param("tonnage_quantile", cand.size.tonnage_q)
                 .param("formation_depth_m", t.preservation.formation_depth_m)
