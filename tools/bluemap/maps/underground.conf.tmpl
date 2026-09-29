@@ -4,7 +4,7 @@ world: "@WORLD@"
 dimension: "minecraft:overworld"
 name: "Deep Time planet — below y 0 (strata)"
 sorting: 1
-start-pos: { x: 0, z: 0 }
+start-pos: { x: @CX@, z: @CZ@ }
 sky-color: "#7dabff"
 void-color: "#000000"
 sky-light: 1
@@ -13,7 +13,7 @@ remove-caves-below-y: -10000
 cave-detection-ocean-floor: -5
 cave-detection-uses-block-light: false
 min-inhabited-time: 0
-render-mask: [ { max-y: 0 } ]
+render-mask: [ { min-x: @MINX@, max-x: @MAXX@, min-z: @MINZ@, max-z: @MAXZ@, max-y: 0 } ]
 render-edges: true
 edge-light-strength: 8
 enable-perspective-view: true

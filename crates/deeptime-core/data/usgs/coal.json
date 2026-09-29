@@ -1,0 +1,296 @@
+{
+  "id": "coal",
+  "title": "Coal deposits (anthracite to lignite)",
+  "percentile_convention": "USGS: p90 is the value that 90% of deposits equal or exceed (the small end); p10 the large end",
+  "sources": [
+    {
+      "key": "cir891",
+      "citation": "Wood, G.H., Jr., Kehn, T.M., Carter, M.D., and Culbertson, W.C., 1983, Coal resource classification system of the U.S. Geological Survey: U.S. Geological Survey Circular 891, vii, 65 p. (report.pdf, 72 PDF pages; printed page = PDF page - 7)",
+      "url": "https://pubs.usgs.gov/circ/1983/0891/report.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "pp1625a-pn",
+      "citation": "Ellis, M.S., Gunther, G.L., Ochs, A.M., Roberts, S.B., Wilde, E.M., Schuenemeyer, J.H., Power, H.C., Stricker, G.D., and Blake, Dorsey, 1999, Coal resources, Powder River Basin, chap. PN of U.S. Geological Survey Fort Union Coal Assessment Team, 1999 resource assessment of selected Tertiary coal beds and zones in the northern Rocky Mountains and Great Plains region: U.S. Geological Survey Professional Paper 1625-A (chapter PDF PN.pdf; page PN-n = PDF page n+3)",
+      "url": "https://pubs.usgs.gov/pp/p1625a/Chapters/PN.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "pp1625a-pg",
+      "citation": "Ellis, M.S., Flores, R.M., Ochs, A.M., Stricker, G.D., Gunther, G.L., Rossi, G.S., Bader, L.R., Schuenemeyer, J.H., and Power, H.C., 1999, Gillette coalfield, Powder River Basin: Geology, coal quality, and coal resources, chap. PG of U.S. Geological Survey Professional Paper 1625-A (chapter PDF PG.pdf)",
+      "url": "https://pubs.usgs.gov/pp/p1625a/Chapters/PG.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "ofr94-220",
+      "citation": "Nuccio, V.F., 1994, Vitrinite reflectance data for the Paleocene Fort Union and Eocene Wind River Formations, and burial history of a drill hole located in central Wind River Basin, Wyoming: U.S. Geological Survey Open-File Report 94-220, 43 p.",
+      "url": "https://pubs.usgs.gov/of/1994/0220/report.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    }
+  ],
+  "n_deposits": null,
+  "tonnage_mt": {
+    "p90": 4.2,
+    "p50": 13,
+    "p10": 25,
+    "source": "cir891",
+    "where": "PLACEHOLDER built from Circular 891 parameters: indicated-coal radius p. 25-26 (PDF p. 32-33); reserve-base thickness classes Table 3 and text p. 24 (PDF p. 31); bituminous density Table 2 p. 22 (PDF p. 29)",
+    "method": "placeholder",
+    "note": "NOT a USGS distribution. No USGS grade-tonnage (deposit-size) model for coal exists in the sources found. USGS assesses coal by bed or zone per coalfield or basin, not as a population of 'deposits'. Placeholder = one mine-sized block = a circle of radius 1.2 km (the 3/4-mile limit of measured + indicated coal around one thickness measurement, Circ. 891 p. 25-26; area 4.52 km2) x seam thickness x 1.32 t/m3 (bituminous, Table 2). Seam thickness 28 in / 84 in / 168 in (0.71 / 2.13 / 4.27 m) are the bituminous reserve-base thickness-class boundaries (Circ. 891 p. 24), taken as p90 / p50 / p10 by this compiler's choice. Result 4.25 / 12.7 / 25.5 Mt, rounded to 4.2 / 13 / 25. For scale, real coalfields are 10^4-10^5 times larger (extra.prb_*)."
+  },
+  "grades": {},
+  "correlations": [],
+  "ore_density_t_m3": {
+    "value": 1.32,
+    "source": "cir891",
+    "where": "Table 2 ('Average specific gravity and average weight of unbroken coal per unit volume of different ranks'), printed p. 22 (PDF p. 29)",
+    "method": "table",
+    "note": "Bituminous coal, specific gravity 1.32 (numerically t/m3). Other ranks are in extra.density_*. The values are 'close to the average specific gravities of unbroken or unmined coal in the ground (in situ)' and are to be used in USGS resource estimates (p. 21-22)."
+  },
+  "deposits_per_1e5_km2": {
+    "p90": null,
+    "p50": null,
+    "p10": null,
+    "source": null,
+    "where": "Circular 891, PP 1625-A chapters PN and PG, and PP 1640-A searched",
+    "method": "not found",
+    "note": "No USGS density of coal deposits per area exists in the sources found. Coal is assessed as continuous beds or zones."
+  },
+  "min_separation_m": {
+    "value": null,
+    "source": "cir891",
+    "where": "reliability categories, printed p. 25-27 (PDF p. 32-34)",
+    "method": "not found",
+    "note": "Circular 891 defines no deposit-aggregation rule. The nearest spatial rules are the reliability radii around a point of thickness measurement: measured < 1/4 mile (0.4 km), indicated 1/4-3/4 mile (0.4-1.2 km), inferred 3/4-3 miles (1.2-4.8 km), hypothetical > 3 miles (4.8 km). See extra.reliability_*."
+  },
+  "extra": {
+    "grade_tonnage_model": {
+      "value": null,
+      "unit": null,
+      "source": null,
+      "where": "USGS Publications Warehouse, Circular 891, PP 1625-A searched",
+      "method": "not found",
+      "note": "No USGS grade-tonnage model for coal exists (none found). PP 1625-A chapter PN Table PN-2 lists Wyodak-Anderson resources per 7.5-minute quadrangle (PDF p. 24-27). An empirical block-size distribution could be derived from it; this compiler did not do so."
+    },
+    "density_anthracite_semianthracite_t_m3": {
+      "value": 1.47,
+      "unit": "t/m3 (specific gravity)",
+      "source": "cir891",
+      "where": "Table 2, printed p. 22 (PDF p. 29)",
+      "method": "table",
+      "note": "2,000 short tons per acre-foot; 1,814 metric tons per acre-foot; 14,700 metric tons per square hectometre-metre."
+    },
+    "density_bituminous_t_m3": {
+      "value": 1.32,
+      "unit": "t/m3 (specific gravity)",
+      "source": "cir891",
+      "where": "Table 2, printed p. 22 (PDF p. 29)",
+      "method": "table",
+      "note": "1,800 short tons per acre-foot; 1,633 metric tons per acre-foot; 13,200 metric tons per square hectometre-metre."
+    },
+    "density_subbituminous_t_m3": {
+      "value": 1.3,
+      "unit": "t/m3 (specific gravity)",
+      "source": "cir891",
+      "where": "Table 2, printed p. 22 (PDF p. 29)",
+      "method": "table",
+      "note": "1,770 short tons per acre-foot (the factor PP 1625-A used for the Powder River Basin, PN-3); 1,605 metric tons per acre-foot; 13,000 metric tons per square hectometre-metre."
+    },
+    "density_lignite_t_m3": {
+      "value": 1.29,
+      "unit": "t/m3 (specific gravity)",
+      "source": "cir891",
+      "where": "Table 2, printed p. 22 (PDF p. 29)",
+      "method": "table",
+      "note": "1,750 short tons per acre-foot; 1,588 metric tons per acre-foot; 12,900 metric tons per square hectometre-metre. The lignite row is garbled in the PDF text layer; the value was read from the rendered page."
+    },
+    "short_tons_per_acre_ft_bituminous": {
+      "value": 1800,
+      "unit": "short tons per acre-foot",
+      "source": "cir891",
+      "where": "Table 2, printed p. 22 (PDF p. 29)",
+      "method": "table",
+      "note": "Anthracite 2,000; subbituminous 1,770; lignite 1,750."
+    },
+    "min_thickness_resource_anthracite_bituminous_m": {
+      "value": 0.35,
+      "unit": "m (14 in)",
+      "source": "cir891",
+      "where": "Table 3, printed p. 24 (PDF p. 31); text p. 23-24",
+      "method": "table",
+      "note": "Identified and undiscovered resources: anthracite and bituminous beds >= 14 in (35 cm). Thinner beds are 'generally excluded from resource consideration unless currently being mined'. The metric values are rounded as printed."
+    },
+    "min_thickness_resource_subbituminous_lignite_m": {
+      "value": 0.75,
+      "unit": "m (30 in)",
+      "source": "cir891",
+      "where": "Table 3, printed p. 24 (PDF p. 31); text p. 23-24",
+      "method": "table",
+      "note": "Subbituminous coal and lignite >= 30 in (75 cm). One passage (p. 25, hypothetical resources) prints '30 inches (70 cm)', an internal inconsistency; Table 3 says 75 cm."
+    },
+    "max_depth_resources_m": {
+      "value": 1800,
+      "unit": "m (6,000 ft)",
+      "source": "cir891",
+      "where": "Table 3, printed p. 24 (PDF p. 31); text p. 24",
+      "method": "table",
+      "note": "'All coal beds deeper than 6,000 feet (1,800 m) are excluded.'"
+    },
+    "max_ash_pct_us": {
+      "value": 33,
+      "unit": "percent ash",
+      "source": "cir891",
+      "where": "printed p. 24 (PDF p. 31)",
+      "method": "text",
+      "note": "'In the United States, beds that contain more than 33 percent ash also are excluded.'"
+    },
+    "reserve_base_min_thickness_anthracite_bituminous_m": {
+      "value": 0.7,
+      "unit": "m (28 in), to depths of 1,000 ft (300 m)",
+      "source": "cir891",
+      "where": "Table 3, printed p. 24 (PDF p. 31)",
+      "method": "table",
+      "note": "Reserve base and inferred reserve base."
+    },
+    "reserve_base_min_thickness_subbituminous_m": {
+      "value": 1.5,
+      "unit": "m (60 in), to depths of 1,000 ft (300 m)",
+      "source": "cir891",
+      "where": "Table 3, printed p. 24 (PDF p. 31)",
+      "method": "table",
+      "note": ""
+    },
+    "reserve_base_min_thickness_lignite_m": {
+      "value": 1.5,
+      "unit": "m (60 in), to depths of 500 ft (150 m)",
+      "source": "cir891",
+      "where": "Table 3, printed p. 24 (PDF p. 31); lignite discussion p. 26",
+      "method": "table",
+      "note": "The maximum overburden for surface-minable lignite reserves and reserve base is set at 500 ft (150 m) (p. 26)."
+    },
+    "depth_categories_ft": {
+      "value": null,
+      "unit": "ft of overburden",
+      "source": "cir891",
+      "where": "glossary 'depth (overburden) categories', printed p. 9 (PDF p. 16); p. 25 (PDF p. 32)",
+      "method": "text",
+      "note": "0-500 ft (0-150 m); 500-1,000 ft (150-300 m); 1,000-2,000 ft (300-600 m); 2,000-3,000 ft (600-900 m); 3,000-6,000 ft (900-1,800 m)."
+    },
+    "reserve_thickness_classes_bituminous_in": {
+      "value": null,
+      "unit": "inches",
+      "source": "cir891",
+      "where": "printed p. 24 (PDF p. 31)",
+      "method": "text",
+      "note": "Anthracite and bituminous reserves: 28-42 in (70-105 cm), 42-84 in (105-215 cm), 84-168 in (215-430 cm), > 168 in (> 430 cm). Overburden 0-500 ft and 500-1,000 ft. Resources add a 14-28 in (35-70 cm) class (p. 25)."
+    },
+    "reserve_thickness_classes_lignite_ft": {
+      "value": null,
+      "unit": "feet",
+      "source": "cir891",
+      "where": "printed p. 26 (PDF p. 33)",
+      "method": "text",
+      "note": "Lignite reserves: 5-10 ft (1.5-3.0 m), 10-20 ft (3-6 m), 20-40 ft (6-12 m), > 40 ft (> 12 m); overburden 0-500 ft (0-150 m)."
+    },
+    "reliability_indicated_radius_km": {
+      "value": 1.2,
+      "unit": "km (3/4 mile), outer limit of indicated coal",
+      "source": "cir891",
+      "where": "printed p. 25 (PDF p. 32)",
+      "method": "text",
+      "note": "Indicated coal lies between 1/4 mile (0.4 km) and 3/4 mile (1.2 km) from a point of thickness measurement. Measured coal lies within a radius of 1/4 mile (0.4 km) (p. 27, PDF p. 34)."
+    },
+    "reliability_inferred_radius_km": {
+      "value": 4.8,
+      "unit": "km (3 miles), outer limit of inferred coal",
+      "source": "cir891",
+      "where": "printed p. 26 (PDF p. 33); hypothetical p. 25",
+      "method": "text",
+      "note": "Inferred coal lies 3/4-3 miles (1.2-4.8 km) from a measurement point. Hypothetical resources lie beyond 3 miles (4.8 km)."
+    },
+    "rank_anthracite_class_fixed_carbon_pct": {
+      "value": null,
+      "unit": "percent fixed carbon, dry mineral-matter-free",
+      "source": "cir891",
+      "where": "Table 1 ('Classification of coals by rank', from ASTM 1981 [D388]), printed p. 17 (PDF p. 24)",
+      "method": "table",
+      "note": "Meta-anthracite FC >= 98, VM <= 2. Anthracite FC 92-98, VM 2-8. Semianthracite FC 86-92, VM 8-14 (volatile matter, dmmf %). All nonagglomerating."
+    },
+    "rank_bituminous_class_limits": {
+      "value": null,
+      "unit": "FC/VM percent dmmf; calorific value Btu/lb moist mmf",
+      "source": "cir891",
+      "where": "Table 1, printed p. 17 (PDF p. 24)",
+      "method": "table",
+      "note": "Low-volatile bituminous: FC 78-86, VM 14-22. Medium-volatile: FC 69-78, VM 22-31. High-volatile A: FC < 69, VM > 31, CV >= 14,000. High-volatile B: CV 13,000-14,000. High-volatile C: CV 11,500-13,000, or 10,500-11,500 if agglomerating. Coals with FC >= 69% dmmf are classed by fixed carbon regardless of calorific value (footnote D). 1 Btu/lb = 0.002326 MJ/kg."
+    },
+    "rank_subbituminous_calorific_btu_lb": {
+      "value": null,
+      "min": 8300,
+      "max": 11500,
+      "unit": "Btu/lb, moist mineral-matter-free",
+      "source": "cir891",
+      "where": "Table 1, printed p. 17 (PDF p. 24); glossary 'subbituminous coal' p. 22",
+      "method": "table",
+      "note": "Subbituminous A 10,500-11,500; B 9,500-10,500; C 8,300-9,500. Nonagglomerating."
+    },
+    "rank_lignite_calorific_btu_lb": {
+      "value": null,
+      "min": null,
+      "max": 8300,
+      "unit": "Btu/lb, moist mineral-matter-free",
+      "source": "cir891",
+      "where": "Table 1, printed p. 17 (PDF p. 24)",
+      "method": "table",
+      "note": "Lignite A 6,300-8,300; lignite B < 6,300."
+    },
+    "rank_vitrinite_reflectance": {
+      "value": null,
+      "unit": "percent Ro",
+      "source": "ofr94-220",
+      "where": "Methods, PDF p. 2",
+      "method": "not found",
+      "note": "No USGS table of vitrinite reflectance limits per coal rank was found. Circular 891 Table 1 (ASTM D388) uses fixed carbon, volatile matter and calorific value only. OFR 94-220 states only that Ro 'can be directly converted to coal rank', with no table. Its Ro oil and gas thresholds are in petroleum.json."
+    },
+    "prb_wyodak_anderson_total_resource_mst": {
+      "value": 550000,
+      "unit": "million short tons (MST)",
+      "source": "pp1625a-pn",
+      "where": "Table PN-1, grand total (PDF p. 23)",
+      "method": "table",
+      "note": "One coal zone in one basin (Powder River Basin, Wyoming and Montana): measured 44,000, indicated 170,000, inferred 300,000, hypothetical 36,000 MST. Excludes mine and lease areas, clinker, and net coal < 2.5 ft. 90% confidence limits for the whole area: 459,300-642,100 MST (Table PN-6, PDF p. 32)."
+    },
+    "prb_wyodak_anderson_resource_area_acres": {
+      "value": 5414000,
+      "unit": "acres (about 2,190,971 ha)",
+      "source": "pp1625a-pn",
+      "where": "p. PN-4 (PDF p. 7)",
+      "method": "text",
+      "note": "Final resource area meeting all criteria. The full study area is about 5,972,000 acres (2,416,786 ha)."
+    },
+    "prb_net_coal_cutoff_ft": {
+      "value": 2.5,
+      "unit": "ft net coal",
+      "source": "pp1625a-pn",
+      "where": "p. PN-4 (PDF p. 7)",
+      "method": "text",
+      "note": "Areas with net coal < 2.5 ft were deleted from the resource data set."
+    },
+    "prb_net_coal_thickness_semivariogram_range_mi": {
+      "value": 2.357,
+      "unit": "miles (exponential model range)",
+      "source": "pp1625a-pn",
+      "where": "p. PN-5 (PDF p. 8)",
+      "method": "text",
+      "note": "Spatial correlation of detrended net coal thickness from 4,462 drill-hole or measured-section locations: exponential semivariogram with sill 529.75 ft2 and nugget 212.04 ft2. This is a USGS measure of how fast seam thickness varies laterally (about 3.8 km)."
+    },
+    "gillette_coalfield_resource_mst": {
+      "value": 110000,
+      "unit": "million short tons (MST)",
+      "source": "pp1625a-pg",
+      "where": "Table PG-2, grand total (PDF p. 81); area statement PDF p. 23",
+      "method": "table",
+      "note": "Wyodak-Anderson zone in the Gillette coalfield: measured 14,000, indicated 48,000, inferred 51,000, hypothetical 1,800 MST, over a final resource area of about 892,000 acres (360,980 ha). Net-coal thickness classes in Table PG-2 run up to 150-200 ft."
+    }
+  }
+}

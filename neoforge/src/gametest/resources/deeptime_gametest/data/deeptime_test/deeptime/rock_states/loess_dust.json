@@ -1,0 +1,13 @@
+{
+  "class": "loess",
+  "use": "member",
+  "entries": [
+    {
+      "block": "projectatmosphere:dust",
+      "state": {
+        "layers": "8"
+      },
+      "required": false
+    }
+  ]
+}

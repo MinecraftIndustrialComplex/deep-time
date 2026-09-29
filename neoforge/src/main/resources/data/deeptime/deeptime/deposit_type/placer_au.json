@@ -1,0 +1,73 @@
+{
+  "id": "deeptime:placer_au",
+  "family": "placer",
+  "site_kind": "placer",
+  "child_only": true,
+  "description": "Alluvial gold placer: gold shed by an eroded porphyry, concentrated at the base of stream gravels where the gradient flattens.",
+  "products": [
+    {"material": "c:gold", "grade_key": "au_gpt", "role": "primary"},
+    {"material": "c:silver", "grade_key": "ag_gpt", "role": "byproduct"}
+  ],
+  "components": {"combine": "product"},
+  "clock_gates": [],
+  "integration_myr": 10,
+  "formation_time": "peak",
+  "hosts": {"any_of": ["gravel", "sand"], "host_bias": {}},
+  "causes": {
+    "preservation": ["deeptime:erosion_pulse"]
+  },
+  "cause_radius_km": 600,
+  "sizing": {
+    "grade_tonnage": "placer_au",
+    "tonnage_mt": {"p90": 0.022, "p50": 1.1, "p10": 50},
+    "grades": {
+      "au_gpt": {"p90": 0.084, "p50": 0.2, "p10": 0.48, "presence": 1.0},
+      "ag_gpt": {"p90": 0.0, "p50": 0.0, "p10": 0.036, "presence": 0.2462}
+    },
+    "correlations": [
+      ["tonnage_mt", "au_gpt", -0.35],
+      ["au_gpt", "ag_gpt", 0.66]
+    ],
+    "ore_density_t_m3": 2.0,
+    "density_per_1e5km2": {"p90": 1, "p50": 1, "p10": 1},
+    "min_separation_m": 1600,
+    "tract_threshold": 0.5,
+    "clustering": {"model": "thomas", "camp_spacing_km": 0, "cluster_radius_km": 1}
+  },
+  "geometry": {
+    "shape": "channel",
+    "aspect": [8.0, 0.02, 1.0],
+    "dip_deg": [0, 0],
+    "rock_class": "gravel",
+    "zoning": [
+      {"zone": "pay_streak", "v": [0.5, 1.0], "material": "c:gold", "grade_mult": 2.0, "density": 0.08},
+      {"zone": "pay_streak_ag", "v": [0.5, 1.0], "material": "c:silver", "grade_mult": 1.0, "density": 0.01}
+    ],
+    "extra_bodies": [],
+    "children": []
+  },
+  "preservation": {
+    "formation_depth_m": 0,
+    "vertical_extent_m": 5,
+    "erosion_behavior": "truncate",
+    "resistates": ["c:gold"]
+  },
+  "placer": {
+    "transport_km": 5,
+    "capture_fraction": 0.5,
+    "flatten_gradient_m_km": 5
+  },
+  "minecraft": {
+    "coe_vein": "createoreexcavation:ore_vein_type/gold",
+    "cdg_reservoir": false,
+    "ore_block_policy": "ev_then_vanilla"
+  },
+  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 10.0, "richness_mult": 1.0},
+  "requires_fields": {},
+  "notes": [
+    "Sizing: USGS Bulletin 1693 (Cox & Singer eds. 1986) model 39a, Placer Au-PGE (Orris & Bliss), n = 65: tonnage 0.022 / 1.1 / 50 Mt of gravel (Fig. 196, p. 263) and Au 0.084 / 0.2 / 0.48 g/t (Fig. 197A, p. 264), figure intercepts; Ag p10 0.036 g/t, 16 of 65 deposits report Ag (p. 262); Au–tonnage r = −0.35 and Au–Ag r = 0.66 (p. 262); 2.0 t/m³, 'the average density of wet sand and gravel' (p. 262); deposits within one mile (1.6 km) are one deposit (p. 262). See crates/deeptime-core/data/usgs/placer_au.json.",
+    "A child of deeptime:porphyry_cu_mo_au: a placer forms where an eroded porphyry lost gold, and holds at most capture_fraction of it.",
+    "PLACEHOLDERS: density_per_1e5km2 and clustering (unused by a child; no USGS placer density found), capture_fraction 0.5 (no quantitative rule for placer concentration efficiency was found; ore_genesis_modeling.md Q5 gaps).",
+    "Design values: transport_km 5 ('a few km'; no USGS distance found), flatten_gradient_m_km 5, aspect (a long thin gravel ribbon), the pay streak at the gravel base (B1693 m39a: gold sits at the base of the gravel and in bedrock traps), size_mult_v 10 so the ribbon is at least one block thick."
+  ]
+}

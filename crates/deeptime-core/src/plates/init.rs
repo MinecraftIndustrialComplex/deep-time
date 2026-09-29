@@ -6,7 +6,8 @@
 //! Start configurations (plan §5.1, decisions file "Timeline"):
 //! - **supercontinent**: one continent of the whole continental area, centred on the largest
 //!   plate, with a noise-warped outline;
-//! - **scattered**: `scattered_continents` continents of mixed sizes at spread-out centres;
+//! - **scattered_continents**: `scattered_continents` continents of mixed sizes at spread-out
+//!   centres;
 //! - **random**: the lowest values of a fractal noise, so continents and islands of every size.
 //!
 //! In every case the continental area is (1 − ocean_fraction) of the planet, to one sample, and
@@ -24,7 +25,8 @@ use super::state::{
     CONTINENTAL, Counters, Group, Hotspot, OCEANIC, Plate, PlateState, Sample, pool, regime,
 };
 use crate::error::CoreError;
-use crate::params::{PlanetPreset, StartConfig};
+use crate::params::PlanetPreset;
+use crate::preset::StartConfig;
 use crate::sphere::SplitMix64;
 
 /// A uniformly random rotation (Shoemake 1992, "Uniform random rotations").
@@ -114,7 +116,7 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
                 continental[i as usize] = true;
             }
         }
-        StartConfig::Scattered => {
+        StartConfig::ScatteredContinents => {
             let m = k.scattered_continents.max(1) as usize;
             let mut sizes: Vec<f64> = (0..m).map(|_| rng.range(0.35, 1.6).powi(2)).collect();
             let total: f64 = sizes.iter().sum();

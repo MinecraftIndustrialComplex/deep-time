@@ -1,0 +1,9 @@
+{
+  "class": "test_state_fallback",
+  "family": "intrusive_igneous",
+  "density_kg_m3": 2650,
+  "erodibility": 1.0,
+  "diffusivity": 1.0,
+  "vanilla_fallback": "minecraft:andesite",
+  "notes": "GameTest class (StrataGameTests.firstInstalledFallback): no members and no fallback tag; its rock_states fallback entries are an absent optional block, then polished_granite."
+}

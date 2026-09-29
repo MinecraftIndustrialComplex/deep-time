@@ -19,50 +19,6 @@ pub type CliResult<T> = Result<T, Box<dyn std::error::Error>>;
 /// Budget of one `advance` call; the CLI only needs it to print progress between calls.
 const ADVANCE_BUDGET: Duration = Duration::from_millis(250);
 
-/// The timeline choices a CLI run passes beside a planet preset (plan §5.1: the preset leaves
-/// them to the player).
-#[derive(Clone, Default)]
-pub struct Timeline {
-    pub start: Option<String>,
-    pub length_myr: Option<f64>,
-}
-
-/// Reads `--preset`: a JSON file, or the name of a built-in preset (`earthlike_quick_16k`, …),
-/// with the timeline choices applied.
-pub fn load_preset(preset: &Path, timeline: &Timeline) -> CliResult<String> {
-    let json = if preset.is_file() {
-        read_text(preset, "preset")?
-    } else {
-        let name = preset.to_string_lossy();
-        match deeptime_core::params::builtin(&name) {
-            Some(j) => j.to_owned(),
-            None => {
-                let names: Vec<&str> = deeptime_core::params::BUILTIN.iter().map(|b| b.0).collect();
-                return Err(format!(
-                    "preset {}: no such file, and not a built-in preset ({})",
-                    preset.display(),
-                    names.join(", ")
-                )
-                .into());
-            }
-        }
-    };
-    Ok(deeptime_core::params::with_timeline(
-        &json,
-        timeline.start.as_deref(),
-        timeline.length_myr,
-    )?)
-}
-
-/// The plate model's summary line (plan P1-03: `plates_final=<n> ocean_age_p90_myr=<a> …`), when
-/// the world has plates.
-fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
-    world
-        .plates
-        .as_ref()
-        .map(|st| deeptime_core::plates::stats::summary(st).line())
-}
-
 /// Options shared by the subcommands that run a session.
 pub struct Common {
     pub threads: usize,
@@ -110,9 +66,75 @@ fn drive(
     }
 }
 
+/// Prints the deposit stage's census: sites per type next to the plan §8.6 expectation.
+pub fn print_census(census: &Value) {
+    println!(
+        "deposits: province={} ({} provinces) count_mult={} — expected(§8.6) = Σ_tracts ρ_p50/1e5 · A_km2 · mean_F · count_mult",
+        census["province"].as_str().unwrap_or("?"),
+        census["provinces"],
+        census["count_mult"],
+    );
+    for t in census["types"].as_array().into_iter().flatten() {
+        let f = |k: &str| t[k].as_f64().unwrap_or(0.0);
+        println!(
+            "deposits {:<30} sites={:>3} expected={:>7.2} with_provinces={:>7.2} drawn={:>3} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={}",
+            t["id"].as_str().unwrap_or("?"),
+            f("sites"),
+            f("expected_formula"),
+            f("expected"),
+            f("drawn"),
+            f("tracts"),
+            f("permissive_km2"),
+            f("mean_f"),
+            f("buried"),
+            f("truncated"),
+            f("eroded"),
+            f("too_deep"),
+            f("children"),
+            f("guaranteed"),
+            f("dropped_separation"),
+        );
+    }
+}
+
+fn census_of(notes: &std::collections::BTreeMap<String, String>) -> Option<Value> {
+    serde_json::from_str(notes.get(deeptime_core::deposits::STAGE_NAME)?).ok()
+}
+
+/// A preset argument: a built-in name, a file or a share code (`deeptime_core::preset::resolve`).
+fn load_preset(arg: &str) -> CliResult<String> {
+    Ok(deeptime_core::preset::resolve(arg)?)
+}
+
+/// A preset argument with the timeline choices applied (`--start`, `--length-myr`).
+pub fn load_preset_with(
+    arg: &str,
+    start: Option<&str>,
+    length_myr: Option<f64>,
+) -> CliResult<String> {
+    Ok(deeptime_core::preset::with_timeline(
+        &load_preset(arg)?,
+        start,
+        length_myr,
+    )?)
+}
+
+/// The plate model's summary line (plan P1-03: `plates_final=<n> ocean_age_p90_myr=<a> …`), when
+/// the world has plates.
+fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    world
+        .plates
+        .as_ref()
+        .map(|st| deeptime_core::plates::stats::summary(st).line())
+}
+
 pub struct RunOptions {
-    pub preset: PathBuf,
-    pub timeline: Timeline,
+    /// A built-in name, a file or a share code.
+    pub preset: String,
+    /// `timeline.start`, as `config/deeptime/server.json` sets it on a server.
+    pub start: Option<String>,
+    /// `timeline.length_myr`.
+    pub length_myr: Option<f64>,
     pub content: Option<PathBuf>,
     pub out: PathBuf,
     pub viewer: Option<PathBuf>,
@@ -123,7 +145,11 @@ pub struct RunOptions {
 /// `deeptime run`: a whole planet into `--out`.
 pub fn run(o: &RunOptions) -> CliResult<()> {
     let started = Instant::now();
-    let preset = load_preset(&o.preset, &o.timeline)?;
+    let preset = deeptime_core::preset::with_timeline(
+        &load_preset(&o.preset)?,
+        o.start.as_deref(),
+        o.length_myr,
+    )?;
     let content = match &o.content {
         Some(p) => read_text(p, "content bundle")?,
         None => String::new(),
@@ -140,6 +166,12 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     drive(&s, o.common.verbose, |_, st| st == AdvanceStatus::Done)?;
     s.finalize_write()?;
     forward_log(&s, o.common.verbose);
+    if let Some(c) = deeptime_format::Manifest::read(&o.out)?
+        .notes
+        .get(deeptime_core::deposits::STAGE_NAME)
+    {
+        print_census(c);
+    }
     let p = s.progress();
     println!(
         "deeptime run: {} -> {} ({} stages, {} events, {} keyframes, peak {:.1} MiB) in {:.2}s",
@@ -151,16 +183,11 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         alloc::peak() as f64 / 1048576.0,
         started.elapsed().as_secs_f64()
     );
-    let world = s.checkpoint()?.world;
-    if let Some(line) = plates_line(&world) {
+    if let Some(line) = plates_line(&s.checkpoint()?.world) {
         println!("deeptime run: {line}");
     }
     if let Some(dir) = &o.viewer {
-        let title = format!(
-            "Deep Time — run {} ({})",
-            s.preset().name(),
-            o.preset.display()
-        );
+        let title = format!("Deep Time — run {} ({})", s.preset().name(), o.preset);
         deeptime_viewer::write_world_bundle(dir, &o.out, &title)?;
         println!(
             "deeptime run: viewer -> {}",
@@ -173,8 +200,11 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
 pub struct StageOptions {
     pub name: String,
     pub input: Option<PathBuf>,
-    pub preset: Option<PathBuf>,
-    pub timeline: Timeline,
+    pub preset: Option<String>,
+    /// `timeline.start` for `--preset`.
+    pub start: Option<String>,
+    /// `timeline.length_myr` for `--preset`.
+    pub length_myr: Option<f64>,
     /// Stop after this many steps of the stage (a mid-stage checkpoint).
     pub max_steps: Option<u64>,
     pub out: Option<PathBuf>,
@@ -223,12 +253,8 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             Session::resume(ck, opts, Arc::new(AllocGauge))?
         }
         (None, Some(preset)) => {
-            let s = Session::create(
-                &load_preset(preset, &o.timeline)?,
-                "",
-                opts,
-                Arc::new(AllocGauge),
-            )?;
+            let json = load_preset_with(preset, o.start.as_deref(), o.length_myr)?;
+            let s = Session::create(&json, "", opts, Arc::new(AllocGauge))?;
             let target = s
                 .stage_names()
                 .iter()
@@ -247,11 +273,7 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             }
             s
         }
-        _ => {
-            return Err(
-                "give exactly one of --in <checkpoint> and --preset <file or built-in name>".into(),
-            );
-        }
+        _ => return Err("give exactly one of --in <checkpoint> and --preset <preset>".into()),
     };
     let events_before = s.progress().events_total;
     let stepping = Instant::now();
@@ -291,6 +313,10 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         p.keyframes_ready,
         seconds
     );
+    let census = census_of(&ck.world.notes);
+    if let Some(c) = &census {
+        print_census(c);
+    }
     if let Some(line) = plates_line(&ck.world) {
         println!(
             "deeptime stage {}: {line} steps={timing} seconds={seconds:.3}",
@@ -332,6 +358,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
                 sites: ck.world.sites.clone(),
             },
         )?;
+        if let Some(report) = deeptime_viewer::deposit_report(census.as_ref(), &ck.world.bodies) {
+            deeptime_viewer::write_report(dir, &report)?;
+        }
         println!(
             "deeptime stage {}: viewer -> {}",
             o.name,
@@ -345,8 +374,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
 }
 
 pub struct BenchOptions {
-    pub preset: PathBuf,
-    pub timeline: Timeline,
+    pub preset: String,
+    pub start: Option<String>,
+    pub length_myr: Option<f64>,
     pub threads: Vec<usize>,
     pub out: PathBuf,
     pub viewer: Option<PathBuf>,
@@ -358,7 +388,7 @@ pub struct BenchOptions {
 /// `deeptime bench`: the preset once per thread count, with per-stage wall time and peak native
 /// memory, into `bench.json` and a timing page (the Phase 1 budget gate's skeleton, P1-17).
 pub fn bench(o: &BenchOptions) -> CliResult<()> {
-    let preset = load_preset(&o.preset, &o.timeline)?;
+    let preset = load_preset_with(&o.preset, o.start.as_deref(), o.length_myr)?;
     let temp = o.work.is_none();
     let work = o.work.clone().unwrap_or_else(|| {
         std::env::temp_dir().join(format!("deeptime-bench-{}", std::process::id()))
@@ -418,7 +448,7 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
     }
     let bench = json!({
         "preset": name,
-        "preset_file": o.preset.display().to_string(),
+        "preset_file": o.preset,
         "version": deeptime_core::VERSION,
         "host": format!(
             "{}-{} ({} processors)",

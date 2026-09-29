@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime;
 
+import com.minecraftindustrialcomplex.deeptime.rock.RockClass;
+import com.minecraftindustrialcomplex.deeptime.rock.RockClassRegistry;
+import com.minecraftindustrialcomplex.deeptime.rock.RockStates;
+import com.minecraftindustrialcomplex.deeptime.rock.RockStatesRegistry;
 import com.minecraftindustrialcomplex.deeptime.worldgen.DelegatingRuleSource;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.BeyondPoleDensity;
@@ -13,6 +17,7 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.SurfaceRules;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DataPackRegistryEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /** Codec registrations. Deep Time registers no blocks or items (decisions file). */
@@ -40,5 +45,13 @@ public final class DeepTimeRegistries {
         CHUNK_GENERATORS.register(modBus);
         DENSITY_FUNCTIONS.register(modBus);
         RULES.register(modBus);
+        // The datapack registries of plan §5.4 that exist so far: data/<ns>/deeptime/rock_class/
+        // and data/<ns>/deeptime/rock_states/. No network codec: clients never need them (the
+        // Create World screen loads the datapacks itself). deposit_type (P1-14), sim_field
+        // (Phase 3) and essentials (P1-15) join here with their tasks.
+        modBus.addListener(DataPackRegistryEvent.NewRegistry.class, e -> {
+            e.dataPackRegistry(RockClassRegistry.KEY, RockClass.CODEC);
+            e.dataPackRegistry(RockStatesRegistry.KEY, RockStates.CODEC);
+        });
     }
 }

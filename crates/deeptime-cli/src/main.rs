@@ -27,11 +27,16 @@ enum Command {
     Version,
     /// Run a whole planet from a preset and write its world-data folder (what the game writes).
     Run {
-        /// Preset JSON file, or a built-in preset's name (earthlike_quick_16k, …).
+        /// A built-in preset name, a preset JSON file or a share code (DT1.…).
         #[arg(long)]
-        preset: PathBuf,
-        #[command(flatten)]
-        timeline: TimelineArgs,
+        preset: String,
+        /// Timeline start configuration (supercontinent, scattered_continents, random): sets
+        /// timeline.start, as config/deeptime/server.json does on a server.
+        #[arg(long)]
+        start: Option<String>,
+        /// Timeline length in millions of years: sets timeline.length_myr.
+        #[arg(long)]
+        length_myr: Option<f64>,
         /// Content bundle JSON (rock classes, deposit types; plan §5.4). Optional for now.
         #[arg(long)]
         content: Option<PathBuf>,
@@ -55,11 +60,16 @@ enum Command {
         /// Checkpoint to start from; its next stage must be <name>.
         #[arg(long = "in")]
         input: Option<PathBuf>,
-        /// Preset to start from instead of a checkpoint (a file or a built-in name).
+        /// Preset to start from instead of a checkpoint (name, file or share code).
         #[arg(long)]
-        preset: Option<PathBuf>,
-        #[command(flatten)]
-        timeline: TimelineArgs,
+        preset: Option<String>,
+        /// Timeline start configuration for --preset (supercontinent, scattered_continents,
+        /// random).
+        #[arg(long)]
+        start: Option<String>,
+        /// Timeline length for --preset, in millions of years.
+        #[arg(long)]
+        length_myr: Option<f64>,
         /// Stop after this many steps of the stage and write a mid-stage checkpoint.
         #[arg(long)]
         max_steps: Option<u64>,
@@ -77,11 +87,15 @@ enum Command {
     },
     /// Run a preset once per thread count with per-stage timings and peak native memory.
     Bench {
-        /// Preset JSON file, or a built-in preset's name.
+        /// A built-in preset name, a preset JSON file or a share code.
         #[arg(long)]
-        preset: PathBuf,
-        #[command(flatten)]
-        timeline: TimelineArgs,
+        preset: String,
+        /// Timeline start configuration (supercontinent, scattered_continents, random).
+        #[arg(long)]
+        start: Option<String>,
+        /// Timeline length in millions of years.
+        #[arg(long)]
+        length_myr: Option<f64>,
         /// Thread counts, comma-separated.
         #[arg(long, value_delimiter = ',', default_value = "1,2,4,8")]
         threads: Vec<usize>,
@@ -101,11 +115,19 @@ enum Command {
         #[arg(long)]
         verbose: bool,
     },
+    /// Built-in presets and share codes (plan §5.1).
+    Preset {
+        #[command(subcommand)]
+        action: PresetAction,
+    },
     /// Write a synthetic world-data folder (Phase 0 and the GameTests).
     Synth {
         /// Which synthetic world.
         #[arg(long, value_enum)]
         kind: SynthKind,
+        /// Which horizon stacks the world carries.
+        #[arg(long, value_enum, default_value_t = StrataArg::Placeholder)]
+        strata: StrataArg,
         /// Circumference C in blocks (a multiple of 64, at least 512).
         #[arg(long)]
         size: u32,
@@ -124,24 +146,16 @@ enum Command {
     },
 }
 
-/// The timeline a planet preset leaves to the player (there is no default story).
-#[derive(clap::Args)]
-struct TimelineArgs {
-    /// Start configuration: supercontinent, scattered or random.
-    #[arg(long, value_parser = ["supercontinent", "scattered", "random"])]
-    start: Option<String>,
-    /// Length of the history in Myr.
-    #[arg(long = "timeline-myr")]
-    timeline_myr: Option<f64>,
-}
-
-impl TimelineArgs {
-    fn timeline(&self) -> run::Timeline {
-        run::Timeline {
-            start: self.start.clone(),
-            length_myr: self.timeline_myr,
-        }
-    }
+#[derive(Subcommand)]
+enum PresetAction {
+    /// List the built-in presets.
+    List,
+    /// Print a preset's canonical JSON (a built-in name, a file or a share code).
+    Show { preset: String },
+    /// Print a preset's share code (DT1.…).
+    Encode { preset: String },
+    /// Print the JSON a share code carries.
+    Decode { code: String },
 }
 
 #[derive(clap::Args)]
@@ -165,6 +179,15 @@ impl CommonArgs {
             verbose: self.verbose,
         }
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum StrataArg {
+    /// Three horizons: sandstone, red beds from 6 blocks down, granite from 40 (P0-09).
+    Placeholder,
+    /// All 59 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
+    /// columns hold every class 20 or more blocks below the surface (P1-12's GameTests).
+    EveryClass,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -204,7 +227,8 @@ fn main() -> ExitCode {
         }
         Some(Command::Run {
             preset,
-            timeline,
+            start,
+            length_myr,
             content,
             out,
             viewer,
@@ -214,7 +238,8 @@ fn main() -> ExitCode {
             "run",
             run::run(&run::RunOptions {
                 preset,
-                timeline: timeline.timeline(),
+                start,
+                length_myr,
                 content,
                 out,
                 viewer,
@@ -226,7 +251,8 @@ fn main() -> ExitCode {
             name,
             input,
             preset,
-            timeline,
+            start,
+            length_myr,
             max_steps,
             out,
             viewer,
@@ -238,7 +264,8 @@ fn main() -> ExitCode {
                 name,
                 input,
                 preset,
-                timeline: timeline.timeline(),
+                start,
+                length_myr,
                 max_steps,
                 out,
                 viewer,
@@ -248,7 +275,8 @@ fn main() -> ExitCode {
         ),
         Some(Command::Bench {
             preset,
-            timeline,
+            start,
+            length_myr,
             threads,
             out,
             viewer,
@@ -259,7 +287,8 @@ fn main() -> ExitCode {
             "bench",
             run::bench(&run::BenchOptions {
                 preset,
-                timeline: timeline.timeline(),
+                start,
+                length_myr,
                 threads,
                 out,
                 viewer,
@@ -268,8 +297,10 @@ fn main() -> ExitCode {
                 verbose,
             }),
         ),
+        Some(Command::Preset { action }) => finish("preset", preset_command(action)),
         Some(Command::Synth {
             kind,
+            strata,
             size,
             out,
             viewer,
@@ -280,6 +311,10 @@ fn main() -> ExitCode {
                 kind: match kind {
                     SynthKind::WrapTest => synth::Kind::WrapTest,
                     SynthKind::LakeTest => synth::Kind::LakeTest,
+                },
+                strata: match strata {
+                    StrataArg::Placeholder => synth::Strata::Placeholder,
+                    StrataArg::EveryClass => synth::Strata::EveryClass,
                 },
                 size,
                 out,
@@ -313,6 +348,36 @@ fn main() -> ExitCode {
     }
 }
 
+fn preset_command(action: PresetAction) -> run::CliResult<()> {
+    use deeptime_core::{preset, share_code};
+    match action {
+        PresetAction::List => {
+            for (name, json) in preset::BUILTIN {
+                let p = preset::Preset::from_json(json)?;
+                println!(
+                    "{name}\tC={}{}",
+                    p.circumference(),
+                    if p.header.placeholder {
+                        "\tplaceholder (Phase 1 in progress)"
+                    } else {
+                        ""
+                    }
+                );
+            }
+        }
+        PresetAction::Show { preset: arg } => {
+            let json = preset::resolve(&arg)?;
+            let v: serde_json::Value = serde_json::from_str(&share_code::canonical(&json)?)?;
+            println!("{}", serde_json::to_string_pretty(&v)?);
+        }
+        PresetAction::Encode { preset: arg } => {
+            println!("{}", share_code::encode(&preset::resolve(&arg)?)?);
+        }
+        PresetAction::Decode { code } => println!("{}", share_code::decode(&code)?),
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use clap::CommandFactory;
@@ -333,11 +398,12 @@ mod tests {
         d
     }
 
-    fn dummy_preset() -> std::path::PathBuf {
-        std::path::PathBuf::from(concat!(
+    fn dummy_preset() -> String {
+        concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../deeptime-core/tests/presets/dummy.json"
-        ))
+        )
+        .to_owned()
     }
 
     fn quiet() -> super::run::Common {
@@ -354,7 +420,8 @@ mod tests {
         let dir = tmp("run");
         super::run::run(&super::run::RunOptions {
             preset: dummy_preset(),
-            timeline: Default::default(),
+            start: None,
+            length_myr: None,
             content: None,
             out: dir.join("dummy"),
             viewer: Some(dir.join("viewer")),
@@ -377,6 +444,39 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// P1-14: `deeptime stage deposits --preset <synthetic> --viewer` writes the sites, the
+    /// census and the bodies into the viewer.
+    #[test]
+    fn stage_deposits_on_synthetic_fields() {
+        let dir = tmp("deposits");
+        let preset = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../deeptime-core/tests/presets/deposits_synthetic_4k.json"
+        )
+        .to_owned();
+        super::run::stage(&super::run::StageOptions {
+            name: "deposits".into(),
+            input: None,
+            preset: Some(preset),
+            start: None,
+            length_myr: None,
+            max_steps: None,
+            out: Some(dir.join("deposits.dtcp")),
+            viewer: Some(dir.join("viewer")),
+            work: None,
+            common: quiet(),
+        })
+        .unwrap();
+        let sites: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(dir.join("viewer/sites.json")).unwrap())
+                .unwrap();
+        assert!(!sites.as_array().unwrap().is_empty());
+        let report = std::fs::read_to_string(dir.join("viewer/report.js")).unwrap();
+        assert!(report.contains("\"deposits\"") && report.contains("\"bodies\""));
+        assert!(dir.join("viewer/keyframes").is_dir());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     /// `stage` from a preset, then from the checkpoint it wrote, then bench.
     #[test]
     fn stage_chain_and_bench() {
@@ -385,7 +485,8 @@ mod tests {
             name: "dummy_drift".into(),
             input: None,
             preset: Some(dummy_preset()),
-            timeline: Default::default(),
+            start: None,
+            length_myr: None,
             max_steps: None,
             out: Some(dir.join("a.dtcp")),
             viewer: None,
@@ -397,7 +498,8 @@ mod tests {
             name: "dummy_erode".into(),
             input: Some(dir.join("a.dtcp")),
             preset: None,
-            timeline: Default::default(),
+            start: None,
+            length_myr: None,
             max_steps: None,
             out: Some(dir.join("b.dtcp")),
             viewer: Some(dir.join("viewer")),
@@ -421,7 +523,8 @@ mod tests {
 
         super::run::bench(&super::run::BenchOptions {
             preset: dummy_preset(),
-            timeline: Default::default(),
+            start: None,
+            length_myr: None,
             threads: vec![1, 2],
             out: dir.join("bench.json"),
             viewer: Some(dir.join("bench")),
@@ -439,74 +542,75 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// The P1-03 CLI path in miniature: a planet preset by built-in name with the timeline
-    /// chosen on the command line, stopped mid-stage, then finished from the checkpoint.
+    /// The P1-03 CLI path in miniature: a plate preset by name with the timeline chosen on the
+    /// command line, stopped mid-stage, then finished from the checkpoint.
     #[test]
     fn plates_stage_runs_from_a_checkpoint() {
         let dir = tmp("plates");
         std::fs::create_dir_all(&dir).unwrap();
-        let json = super::run::load_preset(
-            std::path::Path::new("earthlike_quick_16k"),
-            &super::run::Timeline {
-                start: Some("scattered".into()),
-                length_myr: Some(20.0),
-            },
+        let json = super::run::load_preset_with(
+            "plates_quick_16k",
+            Some("scattered_continents"),
+            Some(20.0),
         )
         .unwrap();
         let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
         v["resolution"]["l0_samples"] = serde_json::json!(3000);
         v["resolution"]["l1_r"] = serde_json::json!(64);
-        v["timeline"]["keyframe_size"] = serde_json::json!([64, 32]);
-        v["timeline"]["keyframe_every_myr"] = serde_json::json!(10.0);
+        v["keyframes"]["size"] = serde_json::json!([64, 32]);
+        v["keyframes"]["every_myr"] = serde_json::json!(10.0);
         let preset = dir.join("small.json");
         std::fs::write(&preset, v.to_string()).unwrap();
-        // No start chosen: refused (no default story).
-        assert!(
-            super::run::load_preset(
-                std::path::Path::new("earthlike_quick_16k"),
-                &Default::default()
-            )
-            .is_ok()
+        let stage = |input: Option<std::path::PathBuf>,
+                     preset: Option<String>,
+                     max_steps: Option<u64>,
+                     out: Option<std::path::PathBuf>,
+                     viewer: Option<std::path::PathBuf>,
+                     work: Option<std::path::PathBuf>| {
+            super::run::stage(&super::run::StageOptions {
+                name: "plates".into(),
+                input,
+                preset,
+                start: None,
+                length_myr: None,
+                max_steps,
+                out,
+                viewer,
+                work,
+                common: quiet(),
+            })
+        };
+        // No start chosen: refused (there is no default story).
+        let refused = stage(
+            None,
+            Some("plates_quick_16k".into()),
+            Some(1),
+            None,
+            None,
+            Some(dir.join("refused")),
         );
-        let refused = super::run::stage(&super::run::StageOptions {
-            name: "plates".into(),
-            input: None,
-            preset: Some("earthlike_quick_16k".into()),
-            timeline: Default::default(),
-            max_steps: Some(1),
-            out: None,
-            viewer: None,
-            work: Some(dir.join("refused")),
-            common: quiet(),
-        });
         assert!(refused.unwrap_err().to_string().contains("timeline.start"));
-        super::run::stage(&super::run::StageOptions {
-            name: "plates".into(),
-            input: None,
-            preset: Some(preset.clone()),
-            timeline: Default::default(),
-            max_steps: Some(4),
-            out: Some(dir.join("mid.dtcp")),
-            viewer: None,
-            work: None,
-            common: quiet(),
-        })
+        stage(
+            None,
+            Some(preset.to_string_lossy().into_owned()),
+            Some(4),
+            Some(dir.join("mid.dtcp")),
+            None,
+            None,
+        )
         .unwrap();
         let mid = deeptime_core::checkpoint::Checkpoint::read(&dir.join("mid.dtcp")).unwrap();
         assert_eq!(mid.next_stage_name(), Some("plates"));
         assert!(!mid.stage_state.is_empty());
         assert_eq!(mid.world.t_years, -1.2e7);
-        super::run::stage(&super::run::StageOptions {
-            name: "plates".into(),
-            input: Some(dir.join("mid.dtcp")),
-            preset: None,
-            timeline: Default::default(),
-            max_steps: None,
-            out: Some(dir.join("end.dtcp")),
-            viewer: Some(dir.join("viewer")),
-            work: None,
-            common: quiet(),
-        })
+        stage(
+            Some(dir.join("mid.dtcp")),
+            None,
+            None,
+            Some(dir.join("end.dtcp")),
+            Some(dir.join("viewer")),
+            None,
+        )
         .unwrap();
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
         assert_eq!(end.next_stage, 1);
