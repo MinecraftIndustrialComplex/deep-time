@@ -14,10 +14,10 @@
       "province_km": 800.0,
       "types": [],
       "essentials": [
-        {"material": "c:iron", "min_sites_per_region": 1, "region_blocks": 4096, "exposed": false},
-        {"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 4096, "exposed": false},
-        {"material": "c:coal", "min_sites_per_region": 1, "region_blocks": 4096, "exposed": true},
-        {"material": "c:zinc", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": false}
+        {"material": "c:iron", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": false},
+        {"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": false},
+        {"material": "c:coal", "min_sites_per_region": 1, "region_blocks": 8192, "exposed": true},
+        {"material": "c:zinc", "min_sites_per_region": 1, "region_blocks": 16384, "exposed": false}
       ]
     }
   }

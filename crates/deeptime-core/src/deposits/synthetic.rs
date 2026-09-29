@@ -465,21 +465,26 @@ impl SyntheticHistory {
             fields::EROSION,
             self.map(|c| {
                 let land = g(&s.land, c);
-                // Cratons erode slowly (≈2 m/Myr), other land ≈6 m/Myr.
-                land * (6.0 - 4.0 * g(&s.craton_core, c)
-                    + g(&s.arc, c) * (20.0 + 60.0 * arc_act(c))
-                    + g(&s.forearc, c) * 40.0 * subduct
-                    + g(&s.orogen, c)
-                        * (450.0 * orogeny(t) + 60.0 * window(t, -300.0, -200.0, 20.0))
-                    + g(&s.rift, c) * 60.0 * window(t, -255.0, -240.0, 3.0))
+                // Stable land erodes at ≈3 m/Myr, cratons ≈1.5, low-lying basins ≈1.
+                let basin = g(&s.rift, c)
+                    .max(g(&s.coal_basin, c))
+                    .max(g(&s.platform, c));
+                land * (3.0 - 1.5 * g(&s.craton_core, c) - 2.0 * basin).max(land)
+                    + land
+                        * (g(&s.arc, c) * (20.0 + 60.0 * arc_act(c))
+                            + g(&s.forearc, c) * 40.0 * subduct
+                            + g(&s.orogen, c)
+                                * (450.0 * orogeny(t) + 60.0 * window(t, -300.0, -200.0, 20.0))
+                            + g(&s.rift, c) * 60.0 * window(t, -255.0, -240.0, 3.0))
             }),
         );
         put(
             &mut f,
             fields::DEPOSITION,
             self.map(|c| {
-                g(&s.rift, c) * (120.0 * window(t, -395.0, -262.0, 5.0))
-                    + g(&s.coal_basin, c) * 90.0 * window(t, -345.0, -250.0, 5.0)
+                // ≈4 km of rift and sag fill, ≈3.8 km of foreland fill.
+                g(&s.rift, c) * (30.0 * window(t, -395.0, -262.0, 5.0))
+                    + g(&s.coal_basin, c) * 40.0 * window(t, -345.0, -250.0, 5.0)
                     + g(&s.platform, c) * 40.0 * window(t, -460.0, -335.0, 5.0)
                     + (1.0 - g(&s.land, c)) * 5.0
             }),
