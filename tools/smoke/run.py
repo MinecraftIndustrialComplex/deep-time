@@ -6,8 +6,10 @@
         [--fresh]                 delete the world first
         [--level-type <preset>]   override server.properties' level-type (boot-only runs,
                                   e.g. minecraft:normal before Deep Time's preset exists)
-        [--chunky <radius>]       pregenerate a square of this radius around 0,0 (and the seam
-                                  once the planet preset exists)
+        [--chunky <radius>]       pregenerate a square of this radius around 0,0
+        [--chunky-seam]           also pregenerate at least 128 columns either side of the
+                                  seam (x = C/2), z in [-64, 80), inside the canonical span
+                                  (deeptime-inspect seam, plan §9.7)
         [--restart]               stop, start again and confirm the world data was not regenerated
         [--timeout <s>]           how long to wait for "Done (" (default 1500)
 
@@ -234,18 +236,22 @@ def port_free(port):
 
 
 def region_span_check(world, circumference):
-    """Every region file of the overworld must satisfy -C/1024 <= rx < C/1024 (plan §9.5)."""
+    """Every region file of the overworld must satisfy -C/1024 <= rx < C/1024 (plan §9.5).
+
+    Returns (total, outside, outside_empty). A 0-byte file holds no chunk: the game creates the
+    file when it merely looks a chunk up (Toroidal World folds the lookup, and nothing is
+    written), so those are listed apart and do not fail the check."""
     region_dir = os.path.join(world, "region")
     half = circumference // 1024
-    outside, total = [], 0
+    outside, empty, total = [], [], 0
     if os.path.isdir(region_dir):
         for f in os.listdir(region_dir):
             m = re.match(r"r\.(-?\d+)\.(-?\d+)\.mca$", f)
             if m:
                 total += 1
                 if not (-half <= int(m.group(1)) < half):
-                    outside.append(f)
-    return total, outside
+                    (empty if os.path.getsize(os.path.join(region_dir, f)) == 0 else outside).append(f)
+    return total, outside, empty
 
 
 def main():
@@ -254,6 +260,7 @@ def main():
     ap.add_argument("--fresh", action="store_true")
     ap.add_argument("--level-type")
     ap.add_argument("--chunky", type=int, default=0)
+    ap.add_argument("--chunky-seam", action="store_true")
     ap.add_argument("--restart", action="store_true")
     ap.add_argument("--timeout", type=int, default=1500)
     a = ap.parse_args()
@@ -339,23 +346,38 @@ def main():
                 errs = server.grep(r"(?i)\[(c2me|distanthorizons|DistantHorizons)[^\]]*\].*(ERROR|Exception)|/ERROR\].*(c2me|distanthorizons)", 5)
                 steps.check("no C2ME or Distant Horizons errors in the boot log", "none", "; ".join(errs)[:300] or "none", not errs)
 
+            tasks = []
             if a.chunky:
-                rcon("chunky center 0 0")
-                rcon(f"chunky radius {a.chunky}")
+                tasks.append(("chunky pregeneration finished", 0, 0, a.chunky))
+            if a.chunky_seam and is_planet:
+                # Chunky's square is the chunks (int) centre >> 4 ± ceil(radius / 16): with
+                # centre ±(C/2 - 72) and radius 64 that is x in [C/2 - 144, C/2) and
+                # [-C/2, -C/2 + 144), z in [-64, 80): no chunk outside the canonical span
+                # (the region check below).
+                half = install["size"] // 2
+                tasks.append(("chunky seam east finished", half - 72, 0, 64))
+                tasks.append(("chunky seam west finished", -(half - 72), 0, 64))
+            finished = re.compile(r"Task finished for|Task complete")
+            for name, cx, cz, radius in tasks:
+                before = len(server.grep(finished.pattern, 10**9))
+                rcon(f"chunky center {cx} {cz}")
+                rcon(f"chunky radius {radius}")
                 rcon("chunky start")
                 deadline = time.time() + 1800
                 while time.time() < deadline:
                     time.sleep(10)
-                    if server.grep(r"Task finished for|Task complete", 1):
+                    if len(server.grep(finished.pattern, 10**9)) > before:
                         break
-                steps.check("chunky pregeneration finished", "finished", "finished" if server.grep(r"Task finished|Task complete", 1) else "timeout",
-                            bool(server.grep(r"Task finished|Task complete", 1)))
+                done = len(server.grep(finished.pattern, 10**9)) > before
+                steps.check(name, "finished", "finished" if done else "timeout", done)
 
             rcon("save-all flush")
             time.sleep(3)
             if is_planet:
-                total, outside = region_span_check(world, install["size"])
-                steps.check("region files inside the canonical span", "outside=0", f"outside={len(outside)} of {total}", not outside)
+                total, outside, empty = region_span_check(world, install["size"])
+                steps.check("region files inside the canonical span", "outside=0", f"outside={len(outside)} of {total}", not outside,
+                            note=", ".join(sorted(outside)))
+                steps.record("empty (0-byte) region files outside the span", f"{len(empty)}: {', '.join(sorted(empty)) or 'none'}")
 
             steps.record("peak RSS (MB)", (server.peak_rss_kb() or 0) // 1024)
             server.stop(rcon)
