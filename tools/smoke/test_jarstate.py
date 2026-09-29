@@ -8,7 +8,9 @@ no Gradle, no Minecraft. Standard library only (Python 3.9 on the Mac too):
     tools/remote/mac.sh -- 'python3 -m unittest discover -s tools/smoke -p "test_*.py" -v'
 """
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -187,6 +189,9 @@ class PreviewRefresh(FakeCheckout):
         self.jobs = os.path.join(self.tmp, "jobs")
         os.environ["DEEPTIME_WORKBENCH_JOBS"] = self.jobs
         self.addCleanup(os.environ.pop, "DEEPTIME_WORKBENCH_JOBS", None)
+        quiet = contextlib.redirect_stdout(io.StringIO())   # Job.say prints its progress lines
+        quiet.__enter__()
+        self.addCleanup(quiet.__exit__, None, None, None)
         self.preview = load_preview()
         self.preview.REPO = self.repo
         self.smoke = os.path.join(self.repo, "smoke", "mic")
