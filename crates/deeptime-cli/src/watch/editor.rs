@@ -360,14 +360,12 @@ mod tests {
                 .iter()
                 .any(|p| p["name"] == "earthlike_quick_16k" && p["placeholder"] == true)
         );
-        assert!(
-            j["presets"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|p| p["name"] == "pipeline_quick_16k"
-                    && p["stages"].as_array().is_some_and(|s| s.len() >= 2 && s[0] == "plates" && s[1] == "surface"))
-        );
+        assert!(j["presets"].as_array().unwrap().iter().any(|p| {
+            p["name"] == "pipeline_quick_16k"
+                && p["stages"]
+                    .as_array()
+                    .is_some_and(|s| s.len() >= 2 && s[0] == "plates" && s[1] == "surface")
+        }));
         for f in c.fields() {
             assert!(
                 j["labels"][format!("deeptime.editor.field.{}", f.id)].is_string(),
