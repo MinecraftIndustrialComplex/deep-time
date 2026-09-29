@@ -2255,6 +2255,14 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
+- **Long runs (parked by Ben, 2026-09-29: "DW about it for now").** A real 4,600 Myr run (timeline max, plan
+  §5.1) is estimated by the workbench at ~45 min / 3.8 GB (pipeline_quick_16k) and ~3 h / 14.6 GB
+  (pipeline_full_32k, too big for the 16 GB Mac): the deposit engine's recorded history (a frame every
+  10 Myr) is held in memory and grows with length. The physics is tested only over 500 Myr and starts from
+  existing continents (no early-Earth phase). Options offered: history on disk (flat memory), an early-Earth
+  phase, or a 1 Gyr cap. Revisit in P1-17 or when Ben raises it.
+- The workbench offered the placeholder `earthlike_*` presets (dummy pipeline) next to the real `pipeline_*`
+  ones; Ben ran one and got a single blob. The UI redesign hides placeholders (P1-20).
 - The plan is at revision 2 plus a partial revision 3 (the decisions-log rule in §1.2). The 29 gaps of
   docs/plan-reviews/2026-09-28-cold-read-review-2.md are fixed in the plan by the task that hits each
   one; the build log names each fix as it lands.
