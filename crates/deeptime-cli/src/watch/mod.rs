@@ -165,7 +165,12 @@ pub fn serve(o: &WatchOptions) -> CliResult<Served> {
     let app = Arc::new(http::App {
         wb: Arc::clone(&wb),
         page: deeptime_viewer::workbench_page("Deep Time workbench"),
-        preview: o.preview.clone(),
+        preview: o.preview.clone().map(|mut p| {
+            // The runner reads runs' bakes from the same folder and asks this binary for columns.
+            p.runs = Some(std::path::absolute(&o.runs).unwrap_or_else(|_| o.runs.clone()));
+            p.deeptime = std::env::current_exe().ok();
+            p
+        }),
     });
     let server = http::Server::start(SocketAddr::new(o.bind, o.port), app).map_err(|e| {
         wb.close();
