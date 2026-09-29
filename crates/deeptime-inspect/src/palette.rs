@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! Block → rock class, for the `rock` render. From a palette dump (`--palette`, the format
-//! `/deeptime probe palette` will write: `{"classes": {"granite": ["minecraft:granite", …]}}`, or
+//! `/deeptime probe palette` writes: `{"classes": {"granite": ["minecraft:granite", …]}}` (block
+//! states are cut to their block id; the probe's log line works as is), or
 //! a flat `{"blocks": {"minecraft:granite": "granite"}}`), else from the `#deeptime:rock/<class>`
 //! block tags found in jars, datapack zips and folders (`data/<ns>/tags/block/…`), with `#tag`
 //! references resolved.
@@ -27,10 +28,14 @@ impl Palette {
         self.blocks.get(block).map(String::as_str)
     }
 
-    /// Reads a palette dump.
+    /// Reads a palette dump: a JSON file, or a log line holding `[deeptime-probe] {…}`.
     pub fn from_dump(path: &Path) -> Result<Palette> {
         let text = std::fs::read_to_string(path).map_err(|e| Error::io(path, e))?;
-        let v: Value = serde_json::from_str(&text)?;
+        let json = match text.find("[deeptime-probe]") {
+            Some(i) => text[i..].find('{').map_or(&text[i..], |j| &text[i + j..]),
+            None => text.as_str(),
+        };
+        let v: Value = serde_json::from_str(json.trim())?;
         let mut p = Palette {
             blocks: HashMap::new(),
             first: BTreeMap::new(),
@@ -59,6 +64,9 @@ impl Palette {
     }
 
     fn add(&mut self, class: &str, block: &str) {
+        // `/deeptime probe palette` lists block states ("minecraft:snow[layers=8]"); the renders
+        // map block ids.
+        let block = block.split('[').next().unwrap_or(block);
         self.blocks
             .entry(block.to_owned())
             .or_insert_with(|| class.to_owned());
@@ -242,6 +250,15 @@ mod tests {
             Palette::from_dump(&dump).unwrap().class_of("minecraft:mud"),
             Some("mud")
         );
+        // The probe's log line, with block states.
+        std::fs::write(
+            &dump,
+            "[12:00:00] [Server thread/INFO] [deeptime/]: [deeptime-probe] {\"probe\":\"palette\",\"classes\":{\"loess\":[\"projectatmosphere:dust[layers=8]\"]}}\n",
+        )
+        .unwrap();
+        let p = Palette::from_dump(&dump).unwrap();
+        assert_eq!(p.class_of("projectatmosphere:dust"), Some("loess"));
+        assert_eq!(p.first["loess"], "projectatmosphere:dust");
         std::fs::remove_dir_all(&dir).ok();
     }
 }

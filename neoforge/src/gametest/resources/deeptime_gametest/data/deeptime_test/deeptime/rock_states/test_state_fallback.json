@@ -1,0 +1,8 @@
+{
+  "class": "test_state_fallback",
+  "use": "fallback",
+  "entries": [
+    {"block": "deeptime_absent:no_such_block", "required": false},
+    {"block": "minecraft:polished_granite"}
+  ]
+}

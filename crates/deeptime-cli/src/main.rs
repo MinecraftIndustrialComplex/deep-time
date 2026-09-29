@@ -109,6 +109,9 @@ enum Command {
         /// Which synthetic world.
         #[arg(long, value_enum)]
         kind: SynthKind,
+        /// Which horizon stacks the world carries.
+        #[arg(long, value_enum, default_value_t = StrataArg::Placeholder)]
+        strata: StrataArg,
         /// Circumference C in blocks (a multiple of 64, at least 512).
         #[arg(long)]
         size: u32,
@@ -160,6 +163,15 @@ impl CommonArgs {
             verbose: self.verbose,
         }
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum StrataArg {
+    /// Three horizons: sandstone, red beds from 6 blocks down, granite from 40 (P0-09).
+    Placeholder,
+    /// All 59 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
+    /// columns hold every class 20 or more blocks below the surface (P1-12's GameTests).
+    EveryClass,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -262,6 +274,7 @@ fn main() -> ExitCode {
         Some(Command::Preset { action }) => finish("preset", preset_command(action)),
         Some(Command::Synth {
             kind,
+            strata,
             size,
             out,
             viewer,
@@ -272,6 +285,10 @@ fn main() -> ExitCode {
                 kind: match kind {
                     SynthKind::WrapTest => synth::Kind::WrapTest,
                     SynthKind::LakeTest => synth::Kind::LakeTest,
+                },
+                strata: match strata {
+                    StrataArg::Placeholder => synth::Strata::Placeholder,
+                    StrataArg::EveryClass => synth::Strata::EveryClass,
                 },
                 size,
                 out,

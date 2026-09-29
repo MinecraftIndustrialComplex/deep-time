@@ -7,6 +7,10 @@
 #   tools/smoke/install.sh <standalone|mic|terrablender|ev>
 #       [--size 16384|32768]      world circumference -> level-type deeptime:planet[_32k]
 #       [--synth <kind>]          write synthetic world data before the first start (P0-09+)
+#       [--strata <kind>]         the synthetic horizons: placeholder (default) or every-class (P1-12)
+#       [--datapack <folder>]     copy a datapack folder into the world's datapacks/ (e.g. the MIC
+#                                 rock tags, …/mic/Docs/datapacks/deeptime-mic-rock-tags, until the
+#                                 pack ships them; P1-12)
 #       [--test-terrain <kind>]   -Ddeeptime.testTerrain=<kind> (the analytic terrain, P0-05+)
 #       [--preset <p>]            config/deeptime/server.json preset (P1-13+): a built-in name, a
 #                                 file or a share code; the server generates on its first start
@@ -41,12 +45,14 @@ GAME_PORT=25665
 RCON_PORT=25675
 
 PROFILE="${1:-}"; shift || true
-SIZE=16384; SYNTH=""; TEST_TERRAIN=""; PRESET=""; CLEAN=0; PACK_WORKTREE=0
+SIZE=16384; SYNTH=""; STRATA=placeholder; DATAPACK=""; TEST_TERRAIN=""; PRESET=""; CLEAN=0; PACK_WORKTREE=0
 START=""; LENGTH_MYR=""; MEMORY_CAP_GIB=4
 while [ $# -gt 0 ]; do
     case "$1" in
         --size) SIZE="$2"; shift 2 ;;
         --synth) SYNTH="$2"; shift 2 ;;
+        --strata) STRATA="$2"; shift 2 ;;
+        --datapack) DATAPACK="$2"; shift 2 ;;
         --test-terrain) TEST_TERRAIN="$2"; shift 2 ;;
         --preset) PRESET="$2"; shift 2 ;;
         --start) START="$2"; shift 2 ;;
@@ -59,7 +65,7 @@ while [ $# -gt 0 ]; do
 done
 case "$PROFILE" in
     standalone|mic|terrablender|ev) ;;
-    *) echo "usage: install.sh <standalone|mic|terrablender|ev> [--size N] [--synth K] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--clean]" >&2; exit 2 ;;
+    *) echo "usage: install.sh <standalone|mic|terrablender|ev> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--clean]" >&2; exit 2 ;;
 esac
 case "$SIZE" in
     16384) LEVEL_TYPE='deeptime\:planet' ;;
@@ -315,11 +321,18 @@ fi
 if [ -n "$SYNTH" ]; then
     say "writing synthetic world data ($SYNTH, C=$SIZE)"
     rm -rf "$SERVER/planet"
-    ( cd "$REPO" && dev cargo run --release -q -p deeptime-cli -- synth --kind "$SYNTH" --size "$SIZE" --out "$SERVER/planet/deeptime" )
+    ( cd "$REPO" && dev cargo run --release -q -p deeptime-cli -- synth --kind "$SYNTH" --strata "$STRATA" --size "$SIZE" --out "$SERVER/planet/deeptime" )
+fi
+if [ -n "$DATAPACK" ]; then
+    [ -f "$DATAPACK/pack.mcmeta" ] || { echo "install.sh: --datapack $DATAPACK has no pack.mcmeta" >&2; exit 1; }
+    say "world datapack $(basename "$DATAPACK")"
+    mkdir -p "$SERVER/planet/datapacks"
+    rm -rf "$SERVER/planet/datapacks/$(basename "$DATAPACK")"
+    cp -R "$DATAPACK" "$SERVER/planet/datapacks/$(basename "$DATAPACK")"
 fi
 
 cat > "$SMOKE/install.json" <<EOF
-{"profile": "$PROFILE", "size": $SIZE, "level_type": "$(echo "$LEVEL_TYPE" | tr -d '\\')", "synth": "$SYNTH",
+{"profile": "$PROFILE", "size": $SIZE, "level_type": "$(echo "$LEVEL_TYPE" | tr -d '\\')", "synth": "$SYNTH", "strata": "$STRATA", "datapack": "$DATAPACK",
  "preset": "$PRESET", "timeline_start": "$START", "timeline_length_myr": "$LENGTH_MYR",
  "test_terrain": "$TEST_TERRAIN", "neoforge": "$NEO", "pack": "$PACK_DESC", "pack_dirty_hash": "$PACK_DIRTY_HASH",
  "pack_ref": "${PACK_REF:-}", "pack_stale_hashes": "${PACK_STALE:-}",

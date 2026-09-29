@@ -7,7 +7,10 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.PackSelectionConfig;
 import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.PathPackResources;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.world.level.Level;
@@ -73,6 +76,7 @@ public final class GameTestSupport {
         modBus.addListener(RegisterGameTestsEvent.class,
                 e -> DeepTime.LOGGER.info("[gametest] Deep Time GameTest support enabled"));
         modBus.addListener(AddPackFindersEvent.class, GameTestSupport::addTestPack);
+        extraDatapack().ifPresent(dir -> modBus.addListener(AddPackFindersEvent.class, e -> addExtraPack(e, dir)));
         // The planet server is a normal dedicated server with /test enabled: give it a reporter
         // that logs passes (the GameTest server logs its own summary).
         if (Boolean.getBoolean("neoforge.enableGameTest"))
@@ -91,5 +95,47 @@ public final class GameTestSupport {
         event.addPackFinders(ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "deeptime_gametest"),
                 PackType.SERVER_DATA, Component.literal("Deep Time GameTest"), PackSource.BUILT_IN, true,
                 Pack.Position.TOP);
+    }
+
+    /** The pack id {@link #addExtraPack} gives the extra datapack. */
+    public static final String EXTRA_PACK_ID = "deeptime_extra";
+
+    /**
+     * {@code -Ddeeptime.extraDatapack=<folder>}: one more datapack folder, from outside the mod
+     * (P1-12: the MIC rock-tag datapack for {@code ./gametest.sh -PwithMic}). Honoured only together
+     * with {@code -Ddeeptime.gametest=true}; {@link #init} never runs otherwise.
+     */
+    public static java.util.Optional<java.nio.file.Path> extraDatapack() {
+        String p = System.getProperty("deeptime.extraDatapack", "");
+        return p.isBlank() ? java.util.Optional.empty() : java.util.Optional.of(java.nio.file.Path.of(p).toAbsolutePath().normalize());
+    }
+
+    /** True when the extra datapack is among the server's selected packs. */
+    public static boolean extraDatapackActive(net.minecraft.server.MinecraftServer server) {
+        return server.getPackRepository().getSelectedIds().contains(EXTRA_PACK_ID);
+    }
+
+    /**
+     * Registers the extra datapack as a required pack at the top. {@code addPackFinders} resolves
+     * paths inside the mod file, so a folder elsewhere goes through {@code addRepositorySource}
+     * with a {@link PathPackResources.PathResourcesSupplier} (cold-read review 2, gap 29).
+     */
+    private static void addExtraPack(AddPackFindersEvent event, java.nio.file.Path dir) {
+        if (event.getPackType() != PackType.SERVER_DATA)
+            return;
+        if (!java.nio.file.Files.isRegularFile(dir.resolve("pack.mcmeta"))) {
+            DeepTime.LOGGER.error("[gametest] -Ddeeptime.extraDatapack={}: no pack.mcmeta there; not added", dir);
+            return;
+        }
+        var info = new PackLocationInfo(EXTRA_PACK_ID, Component.literal("Deep Time extra datapack: " + dir.getFileName()),
+                PackSource.BUILT_IN, java.util.Optional.empty());
+        Pack pack = Pack.readMetaAndCreate(info, new PathPackResources.PathResourcesSupplier(dir), PackType.SERVER_DATA,
+                new PackSelectionConfig(true, Pack.Position.TOP, false));
+        if (pack == null) {
+            DeepTime.LOGGER.error("[gametest] -Ddeeptime.extraDatapack={}: unreadable pack.mcmeta; not added", dir);
+            return;
+        }
+        event.addRepositorySource(consumer -> consumer.accept(pack));
+        DeepTime.LOGGER.info("[gametest] extra datapack {} added as '{}'", dir, EXTRA_PACK_ID);
     }
 }

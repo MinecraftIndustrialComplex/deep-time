@@ -1,0 +1,26 @@
+{
+  "class": "sandstone",
+  "family": "clastic_sedimentary",
+  "groups": [
+    "deeptime:rock/clastic",
+    "deeptime:rock/sedimentary"
+  ],
+  "density_kg_m3": 2350,
+  "erodibility": 1.5,
+  "diffusivity": 1.3,
+  "metamorphic_path": [
+    "quartzite"
+  ],
+  "weathers_to": "sand",
+  "tags": [
+    "reservoir"
+  ],
+  "vanilla_fallback": "minecraft:sandstone",
+  "sources": {
+    "density_kg_m3": "typical value, cf. the rock-density tables of Telford, Geldart & Sheriff 1990 (Applied Geophysics, 2nd ed.) and Schön 2015 (Physical Properties of Rocks, 2nd ed.); rounded to 10 kg/m³; initial value, tuned in P1-07",
+    "erodibility": "judgment, relative to granite: weaker than granite; strongly dependent on its cement; bedrock ranked by rock strength: river incision scales roughly with tensile strength^-2 (Sklar & Dietrich 2001, Geology 29(12):1087–1090) and lithologic K contrasts span orders of magnitude (Stock & Montgomery 1999, JGR 104(B3):4983–4993); the strength-based contrast is compressed to its square root, so bedrock spans about 0.3–4; initial value, tuned in P1-07",
+    "diffusivity": "judgment, relative to granite: soft sedimentary rock that sheds sand; hillslope transport coefficient D of Roering, Kirchner & Dietrich 1999 (WRR 35(3):853–870), used as a linear creep multiplier and scaled by how readily the rock makes mobile soil (soil production function, Heimsath et al. 1997, Nature 388:358–361): loose and friable classes 2–5, soft sedimentary 1.2–2, crystalline 0.5–1; initial value, tuned in P1-07",
+    "vanilla_fallback": "vanilla member (MIC rock-tag README, Classes table)"
+  },
+  "notes": "Sandstone, quartz arenite, arkose and greywacke/turbidite sand. Laid down by rivers, wind, waves and turbidity currents, so no single facies rule."
+}

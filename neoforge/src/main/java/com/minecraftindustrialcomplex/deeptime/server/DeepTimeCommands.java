@@ -7,6 +7,7 @@ import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.compat.sable.SableTestOps;
 import com.minecraftindustrialcomplex.deeptime.gametest.DeepTimeTestReporter;
 import com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport;
+import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -41,7 +42,8 @@ public final class DeepTimeCommands {
                         .then(Commands.argument("x", IntegerArgumentType.integer())
                                 .then(Commands.argument("z", IntegerArgumentType.integer())
                                         .executes(DeepTimeCommands::probeColumn))))
-                .then(Commands.literal("tw").executes(DeepTimeCommands::probeTw));
+                .then(Commands.literal("tw").executes(DeepTimeCommands::probeTw))
+                .then(Commands.literal("palette").executes(c -> probePalette(c.getSource())));
         var gametest = Commands.literal("gametest").requires(s -> GameTestSupport.enabled());
         // Sable is optional: its probe and test commands exist only when it is loaded, and every
         // Sable call goes through SableTestOps (loaded on first use).
@@ -122,6 +124,18 @@ public final class DeepTimeCommands {
         // climate is deeptime:raster, so compression cannot apply.
         o.addProperty("climateCompression", "off");
         return emit(ctx.getSource(), o);
+    }
+
+    /**
+     * Every rock class → its resolved blocks (plan §7.16): {@code classes} (class → block states,
+     * the primary first; what {@code deeptime-inspect rock --palette} reads), {@code source},
+     * {@code state}, {@code unresolved} and {@code problems} ({@link RockPalette#toJson}).
+     */
+    public static int probePalette(CommandSourceStack source) {
+        JsonObject o = new JsonObject();
+        o.addProperty("probe", "palette");
+        RockPalette.get().toJson().entrySet().forEach(e -> o.add(e.getKey(), e.getValue()));
+        return emit(source, o);
     }
 
     /**

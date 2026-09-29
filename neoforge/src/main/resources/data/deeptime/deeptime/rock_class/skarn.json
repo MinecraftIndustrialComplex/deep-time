@@ -1,0 +1,24 @@
+{
+  "class": "skarn",
+  "family": "metamorphic",
+  "groups": [
+    "deeptime:rock/metamorphic"
+  ],
+  "density_kg_m3": 3200,
+  "erodibility": 0.6,
+  "diffusivity": 0.6,
+  "metamorphic_path": [],
+  "weathers_to": "saprolite",
+  "facies_rule": "contact_metasomatism",
+  "tags": [
+    "ore_host"
+  ],
+  "vanilla_fallback": "minecraft:granite",
+  "sources": {
+    "density_kg_m3": "judgment from mineralogy: garnet and pyroxene with some calcite; rounded to 10 kg/m³; initial value, tuned in P1-07",
+    "erodibility": "judgment, relative to granite: tough garnet-pyroxene rock; bedrock ranked by rock strength: river incision scales roughly with tensile strength^-2 (Sklar & Dietrich 2001, Geology 29(12):1087–1090) and lithologic K contrasts span orders of magnitude (Stock & Montgomery 1999, JGR 104(B3):4983–4993); the strength-based contrast is compressed to its square root, so bedrock spans about 0.3–4; initial value, tuned in P1-07",
+    "diffusivity": "judgment, relative to granite: tough crystalline rock; hillslope transport coefficient D of Roering, Kirchner & Dietrich 1999 (WRR 35(3):853–870), used as a linear creep multiplier and scaled by how readily the rock makes mobile soil (soil production function, Heimsath et al. 1997, Nature 388:358–361): loose and friable classes 2–5, soft sedimentary 1.2–2, crystalline 0.5–1; initial value, tuned in P1-07",
+    "vanilla_fallback": "last fallback entry (MIC rock-tag README, Fallbacks table)"
+  },
+  "notes": "Skarn and tactite: calc-silicate rock where magma meets carbonate; hosts tungsten, copper, iron, zinc and gold skarn ores."
+}

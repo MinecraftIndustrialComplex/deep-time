@@ -567,6 +567,24 @@ def main():
                 out = rcon("deeptime probe column 0 0", check=False)
                 m = PROBE.search(out)
                 steps.check("/deeptime probe column 0 0 answers", "[deeptime-probe] JSON", out[:200], m is not None)
+                # Every rock class -> its resolved blocks (P1-12), for `deeptime-inspect rock --palette`.
+                out = rcon("deeptime probe palette", check=False)
+                time.sleep(1)   # RCON may cut a long reply; the server log has the whole line
+                pal = None
+                for cand in [PROBE.search(out)] + [PROBE.search(l) for l in reversed(server.lines) if '"probe":"palette"' in l]:
+                    try:
+                        pal = json.loads(cand.group(1)) if cand else None
+                    except ValueError:
+                        pal = None
+                    if pal:
+                        break
+                steps.check("/deeptime probe palette answers", "[deeptime-probe] JSON", "ok" if pal else out[:120], pal is not None)
+                if pal:
+                    with open(os.path.join(smoke, "palette.json"), "w") as f:
+                        json.dump(pal, f, indent=1)
+                    steps.check("every rock class resolves", f"{pal.get('count')} of {pal.get('count')}",
+                                f"{pal.get('resolved')} of {pal.get('count')}", pal.get("resolved") == pal.get("count"),
+                                note=f"sources {pal.get('sources')}; written to smoke/{a.profile}/palette.json")
 
             if is_planet:
                 out = rcon("locate structure #minecraft:village", check=False)

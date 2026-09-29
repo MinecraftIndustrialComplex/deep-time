@@ -4,7 +4,9 @@
 # Deep Time's headless GameTest suite (plan §9.4), adapted from mic-climate's script.
 #
 #   ./gametest.sh                    Deep Time + Toroidal World only
-#   ./gametest.sh -PwithMic          plus the current MIC server set (smoke/mic/server/mods)
+#   ./gametest.sh -PwithMic          plus the current MIC server set (smoke/mic/server/mods) and the
+#                                    MIC rock-tag datapack (-Ddeeptime.extraDatapack; see build.gradle)
+#   ./gametest.sh -PextraDatapack=<folder>   one more datapack folder for any profile
 #   ./gametest.sh -PwithTerraBlender plus TerraBlender, Biomes O' Plenty, GlitchCore
 #   ./gametest.sh -PwithEv           plus Excavated Variants and Dynamic Asset Generator
 #
@@ -26,8 +28,9 @@ mkdir -p neoforge/build
 # older build would be tested again, so they go first.
 rm -rf run-gametest/world
 
-# World data for the test_planet_data level (P0-10): the analytic terrain written as world data.
-dev cargo run --release -q -p deeptime-cli -- synth --kind wrap-test --size 1024 --out run-gametest/world/deeptime-test \
+# World data for the test_planet_data level (P0-10): the analytic terrain written as world data,
+# with every rock class in its horizons (P1-12's StrataGameTests.everyClassInTheWorld).
+dev cargo run --release -q -p deeptime-cli -- synth --kind wrap-test --strata every-class --size 1024 --out run-gametest/world/deeptime-test \
     || { echo "FAILED: deeptime synth"; exit 1; }
 # World data for the test_lake level (P0-13): a basin and a closed channel holding water at y 120.
 dev cargo run --release -q -p deeptime-cli -- synth --kind lake-test --size 1024 --out run-gametest/world/deeptime-lake \
