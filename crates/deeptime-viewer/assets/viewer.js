@@ -435,7 +435,39 @@
         `<span>${esc(shortKind(e.kind))}</span></div>`).join('');
     }
 
+    // The keyframe layer's legend: swatches for a categorical ramp with 'labels' (Köppen), else a
+    // gradient between its first and last stop.
+    function rampOf(name) {
+      const R = B.ramps || {};
+      const L = R.layers || {};
+      let key = L[name];
+      if (!key) {
+        let best = -1;
+        for (const [k, v] of Object.entries(L)) {
+          if (k.endsWith('*') && name.startsWith(k.slice(0, -1)) && k.length > best) { key = v; best = k.length; }
+        }
+      }
+      return (R.ramps || {})[key || R.default];
+    }
+    function kfLegend() {
+      const box = document.getElementById('kflegend');
+      const ramp = layer ? rampOf(layer) : null;
+      if (!ramp || !ramp.stops || !ramp.stops.length) { box.innerHTML = ''; return; }
+      if (ramp.labels) {
+        box.innerHTML = ramp.labels.map((lab, k) => {
+          const stop = ramp.stops.find(s => s[0] === k);
+          return stop ? `<span class="sw"><i style="background:${stop[1]}"></i>${esc(lab)}</span>` : '';
+        }).join('');
+        return;
+      }
+      const lo = ramp.stops[0][0], hi = ramp.stops[ramp.stops.length - 1][0];
+      const grad = ramp.stops.map(([v, c]) => `${c} ${(100 * (v - lo) / ((hi - lo) || 1)).toFixed(1)}%`).join(', ');
+      box.innerHTML = `<div class="bar" style="background: linear-gradient(to right, ${grad})"></div>` +
+        `<div class="ends"><span>${lo}</span><span>${esc(layer)}</span><span>${hi}</span></div>`;
+    }
+
     function show() {
+      kfLegend();
       if (K.length) {
         const f = K[idx];
         scrub.value = idx;
