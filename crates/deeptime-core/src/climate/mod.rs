@@ -26,8 +26,8 @@
 //! latitude's reference. Glaciation events are decided at snapshots.
 //!
 //! The EBM's state is kept from snapshot to snapshot (a warm start of `ebm_warm_years`), and the
-//! ice sheets of one snapshot can brighten the EBM's land at the next (`ice_sheet_feedback`, off
-//! by default for now).
+//! ice sheets of one snapshot can brighten the EBM's land at the next (`ice_sheet_feedback`, on
+//! by default since P1-17's calibration made the continents Earth-low).
 
 pub mod belts;
 pub mod ebm;

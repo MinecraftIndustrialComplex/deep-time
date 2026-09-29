@@ -229,6 +229,162 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
     ))
 }
 
+/// The planet's hypsometry at the end of the surface (P1-17 calibration), true-area weighted
+/// (cos φ; the surface line's `land_frac` counts cells, which is the in-game share): land share,
+/// land elevation mean and quantiles, the share of land above 1, 2 and 3 km, the median sea
+/// depth, the shelf share of the sea (0–200 m), the continental crust's share of the planet and
+/// the share of it above the sea (the plate model's crust type), and the share of the planet per
+/// 1-km band from −7 to +6 km (Earth's bimodal curve). Earth on GMT's 1° relief, the same way:
+/// land 0.289, median 427 m, p90 2,022 m, above 2 km 0.102, sea median 4,062 m (STATUS.md, P1-17).
+pub(crate) fn hypsometry_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    use deeptime_core::deposits::fields::cell_area_km2;
+    let st = world.surface.as_ref()?;
+    let g = &st.grid;
+    let (w, h) = (g.w as usize, g.h as usize);
+    // m_per_block_h only scales every weight alike; 1 is enough for shares.
+    let mut land: Vec<(f64, f64)> = Vec::new();
+    let mut sea: Vec<(f64, f64)> = Vec::new();
+    let mut bands = [0.0f64; 13];
+    let mut total = 0.0;
+    // Continental crust (the plate model's crust type): its share and the share of it above sea.
+    let crust = world
+        .fields
+        .get("plates/crust_type")
+        .filter(|f| f.data.len() == w * h);
+    let (mut cont, mut cont_dry) = (0.0, 0.0);
+    for j in 0..h {
+        let a = cell_area_km2(g, j as u32, 1.0);
+        for i in 0..w {
+            let z = f64::from(st.elevation_m[j * w + i]) - st.sea_level_m;
+            total += a;
+            if crust.is_some_and(|f| f.data[j * w + i] >= 0.5) {
+                cont += a;
+                if z > 0.0 {
+                    cont_dry += a;
+                }
+            }
+            if z > 0.0 {
+                land.push((z, a));
+            } else {
+                sea.push((-z, a));
+            }
+            let b = ((z / 1000.0).floor() + 7.0).clamp(0.0, 12.0) as usize;
+            bands[b] += a;
+        }
+    }
+    let quant = |v: &mut Vec<(f64, f64)>, qs: &[f64]| -> Vec<f64> {
+        v.sort_by(|x, y| x.0.total_cmp(&y.0));
+        let sum: f64 = v.iter().map(|x| x.1).sum();
+        let mut out = vec![0.0; qs.len()];
+        let mut acc = 0.0;
+        let mut k = 0;
+        for &(z, a) in v.iter() {
+            acc += a;
+            while k < qs.len() && acc >= qs[k] * sum {
+                out[k] = z;
+                k += 1;
+            }
+        }
+        out
+    };
+    let land_a: f64 = land.iter().map(|x| x.1).sum();
+    let sea_a: f64 = sea.iter().map(|x| x.1).sum();
+    let above = |km: f64| {
+        land.iter()
+            .filter(|x| x.0 > km * 1000.0)
+            .map(|x| x.1)
+            .sum::<f64>()
+            / land_a.max(1e-12)
+    };
+    let mean = land.iter().map(|x| x.0 * x.1).sum::<f64>() / land_a.max(1e-12);
+    let (a1, a2, a3) = (above(1.0), above(2.0), above(3.0));
+    let shelf = sea
+        .iter()
+        .filter(|x| x.0 <= 200.0)
+        .map(|x| x.1)
+        .sum::<f64>()
+        / sea_a.max(1e-12);
+    let lq = quant(&mut land, &[0.1, 0.25, 0.5, 0.75, 0.9]);
+    let sq = quant(&mut sea, &[0.5]);
+    Some(format!(
+        "hypsometry land_frac_area={:.3} land_mean_m={:.0} land_z_p10_m={:.0} land_z_p25_m={:.0} \
+         land_z_p50_m={:.0} land_z_p75_m={:.0} land_z_p90_m={:.0} land_above_1km={:.3} \
+         land_above_2km={:.3} land_above_3km={:.3} sea_depth_p50_m={:.0} shelf_frac_of_sea={:.3} \
+         continental_frac={:.3} continental_dry={:.3} bands_km[-7..6]={}",
+        land_a / total.max(1e-12),
+        mean,
+        lq[0],
+        lq[1],
+        lq[2],
+        lq[3],
+        lq[4],
+        a1,
+        a2,
+        a3,
+        sq[0],
+        shelf,
+        cont / total.max(1e-12),
+        cont_dry / cont.max(1e-12),
+        bands
+            .iter()
+            .map(|b| format!("{:.3}", b / total.max(1e-12)))
+            .collect::<Vec<_>>()
+            .join("/")
+    ))
+}
+
+/// How the planet's surface evolved (P1-17 calibration), from the deposit engine's recorded frames
+/// (10-Myr means) every 50 Myr, true-area weighted: `t:land/land_z_p50_m`, land being the frame's
+/// mean elevation above the datum (the sea-level cycles move the shore by ±100 m).
+pub(crate) fn evolution_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    use deeptime_core::deposits::fields::{FieldHistory, cell_area_km2};
+    let h = world.history.as_ref()?;
+    let g = h.grid.clone();
+    let w = g.w as usize;
+    let n = h.frame_count();
+    let mut parts = Vec::new();
+    for k in (0..n)
+        .rev()
+        .step_by(5)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+    {
+        let f = h.frame(k).ok()?;
+        let z = f.fields.get("deeptime:elevation_m")?;
+        let (mut tot, mut land) = (0.0, 0.0);
+        let mut lz: Vec<(f32, f64)> = Vec::new();
+        for (c, &zc) in z.iter().enumerate() {
+            let a = cell_area_km2(&g, (c / w) as u32, 1.0);
+            tot += a;
+            if zc > 0.0 {
+                land += a;
+                lz.push((zc, a));
+            }
+        }
+        lz.sort_by(|x, y| x.0.total_cmp(&y.0));
+        let mut acc = 0.0;
+        let mut med = 0.0;
+        for &(zc, a) in &lz {
+            acc += a;
+            if acc >= 0.5 * land {
+                med = zc;
+                break;
+            }
+        }
+        parts.push(format!(
+            "{:.0}:{:.3}/{:.0}",
+            f.t_years / 1.0e6,
+            land / tot.max(1e-12),
+            med
+        ));
+    }
+    Some(format!(
+        "evolution t_myr:land/land_z_p50_m {}",
+        parts.join(" ")
+    ))
+}
+
 /// The climate's summary line (P1-05): `climate_final=<snapshots> t_surface_c=… koppen_land=A…/B…
 /// …`, from the last snapshot, when the run had a climate stage.
 fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -550,6 +706,12 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         );
     }
     if let Some(line) = surface_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = hypsometry_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = evolution_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = climate_line(&ck.world) {
