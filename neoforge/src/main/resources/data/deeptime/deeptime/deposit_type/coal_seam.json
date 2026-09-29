@@ -2,7 +2,7 @@
   "id": "deeptime:coal_seam",
   "family": "fuel",
   "site_kind": "deposit",
-  "description": "Coal seams: peat mires preserved where accommodation kept pace with peat production, after land plants; rank from burial heating.",
+  "description": "Coal seam fields: one deposit is one minable seam field, tens of km across (300-3,000 km2: a Gillette, Jharia or Newcastle-sized field; not a mine block, not a whole basin). Peat mires preserved where accommodation kept pace with peat production, after land plants; rank from burial heating.",
   "products": [
     {"material": "c:coal", "grade_key": null, "role": "primary"}
   ],
@@ -30,18 +30,19 @@
   "cause_radius_km": 600,
   "sizing": {
     "grade_tonnage": "coal",
-    "tonnage_mt": {"p90": 4.2, "p50": 13, "p10": 25},
+    "tonnage_mt": {"p90": 540, "p50": 2500, "p10": 10000},
     "grades": {},
     "correlations": [],
     "ore_density_t_m3": 1.32,
-    "density_per_1e5km2": {"p90": 10, "p50": 30, "p10": 80},
-    "min_separation_m": 2400,
+    "density_per_1e5km2": {"p90": 4, "p50": 14, "p10": 40},
+    "density_basis": "estimate",
+    "min_separation_m": 26000,
     "tract_threshold": 0.2,
-    "clustering": {"model": "thomas", "camp_spacing_km": 20, "cluster_radius_km": 8}
+    "clustering": {"model": "thomas", "camp_spacing_km": 100, "cluster_radius_km": 40}
   },
   "geometry": {
     "shape": "seam",
-    "aspect": [1.0, 0.001, 1.5],
+    "aspect": [1.0, 6.5e-5, 1.5],
     "dip_deg": [0, 8],
     "rock_class": "coal",
     "zoning": [
@@ -72,13 +73,17 @@
     "cdg_reservoir": false,
     "ore_block_policy": "ev_then_vanilla"
   },
-  "balance": {"count_mult": 1.0, "size_mult_h": 6.0, "size_mult_v": 20.0, "richness_mult": 1.0},
+  "balance": {"count_mult": 1.0, "size_mult_h": 1.0, "size_mult_v": 20.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
-    "No USGS grade–tonnage model exists for coal. Density 1.32 t/m³ for bituminous coal: USGS Circular 891 (Wood et al. 1983), Table 2 p. 22 (1,800 short tons per acre-foot; anthracite 1.47, subbituminous 1.30, lignite 1.29 in data/usgs/coal.json).",
-    "PLACEHOLDER tonnage 4.2 / 13 / 25 Mt: one mine-sized block of 1.2 km radius (Circular 891's indicated-reliability radius) × seams of 28, 84 and 168 in (Circular 891 thickness class limits) × 1.32 t/m³ — not a USGS distribution. The aspect follows (a 2 m seam over a 1–1.5 km block).",
-    "PLACEHOLDERS: density_per_1e5km2 10 / 30 / 80 (no USGS density), min_separation_m 2400 (two block radii), formation_depth_m 800.",
-    "Rank from Lopatin TTI of the coal layer: TTI 75 ↔ Ro ≈ 1.1 % (Waples' correspondence as tabulated by the Kansas Geological Survey, non-USGS; the high-volatile bituminous limit). The lignite, subbituminous and low-volatile bounds are PLACEHOLDERS (no USGS table of reflectance by rank was found).",
-    "Density (research 2026-09-29, decisions log \"Research real densities\"): no published coal deposit density exists — USGS coal assessments count tonnage in beds, not deposits per area (Circular 891; the Powder River assessment, PP 1809: 47 beds over ~50,500 km²; IEA CCC/32 lists basins of 450–90,000 km²). The 30 per 100,000 km² stays a placeholder (P50, not inflated; decision for Ben: what a coal deposit is). The assessment depth is USGS Circular 891's: coal deeper than 6,000 ft (1,800 m) is excluded from resources (printed p. 24, Table 3 p. 14). Design values: the curves, clustering, dip, size_mult_v 20 (a 2 m seam is a tenth of a block at 20 m per block)."
+    "DEFINITION (Ben, decisions log 2026-09-29, \"OK; define coal as seams\"): one deposit is ONE MINABLE SEAM FIELD, a contiguous area of coal-bearing strata with minable seams, tens of km across: field area 300 / 1,000 / 3,000 km2 (P90 / P50 / P10; about 20-60 km across). Comparable units: the Gillette coalfield (study area ~4,150 km2), India's Gondwana coalfields (Jharia 280-450, Raniganj 440-1,500, North Karanpura 1,230, Singrauli ~2,200 km2 of which ~10 % promising), a Pennsylvania anthracite field (four fields, 1,250 km2 in all, mean 313 km2). Not a mine-sized measured block (Circular 891: measured radius 0.4 km, indicated 1.2 km) and not a whole basin or coal province (Circular 891 glossary: a coal FIELD is 'a discrete area underlain by strata containing one or more coal beds'; a region holds fields, a province holds regions). ESTIMATE, not a USGS figure: no source counts minable seam fields.",
+    "DENSITY 4 / 14 / 40 per 100,000 km2 of permissive coal-bearing tract (P90 / P50 / P10; density_basis 'estimate', so the survivor formula uses the P50, 14). Derivation (2026-09-29; research by a Sonnet sub-agent; every field count is a judgement about what to call a field), density = fields / tract area x 1e5: Powder River (Fort Union Formation, 22,000 mi2 = 57,000 km2, PP 1625-A chap. PS; named coalfields Gillette, Sheridan, Decker, Rosebud/Colstrip, Ashland, Glenrock = 6-9 fields): 10.5-15.8. Sydney Basin onshore (36,000 km2, five onshore coalfields; Bioregional Assessments context statement; the tract includes non-coal strata, so this is low): 14-17. Upper Silesia (5,600 km2, three coal areas; the tract is the coal basin itself, so this is a high case): 54. Illinois Basin (~95,000 km2, three state-level fields of 30,000 km2 or more; a low bound): ~3. India (~113 coalfields and occurrences over 3.29 million km2 of land, 34.7 thousand km2 of coalfield; land is not a tract, so this is a floor): 3.4. Geometric check, 1e5 x f / A with f the minable share of the tract and A the field area: f 0.10 with A 3,000 km2 gives 3.3; f 0.25 with A 1,000 gives 25; f 0.5 with A 300 gives 167. P50 14 = the Powder River and Sydney agreement (both ~14), below the geometric median of 25 (14 is f 0.14 at A 1,000 km2); P90 4 = Illinois-style large fields; P10 40 = Silesia-like tracts (fields of 1,500-2,500 km2 filling about half the basin). Above ~60 needs fields under 300 km2 or a tract trimmed to the coal outline. Was 10 / 30 / 80 (placeholder). NOT verified by the research: Illinois Basin 36,800 mi2, Gondwana basin outcrop areas, South African coalfield areas (19 coalfields, SAIMM J. 105(2) p. 95), Bowen Basin area (Geoscience Australia ~160,000 km2, Wikipedia >60,000), Chinese and European coalfield counts.",
+    "SOURCES: USGS Circular 891 (Wood et al. 1983) glossary and Table 3; Averitt 1975, USGS Bulletin 1412 (coal-bearing rocks 458,600 mi2 = 13 % of the US; Mammoth bed 3,300 mi2 originally, 484 mi2 preserved in four fields); USGS PP 1625-A chap. PG (Gillette coalfield, 1,026,000 acres) and chap. PS (Fort Union, 22,000 mi2); USGS OFR 2011-1296 Table 1 (Indian coalfields; ~34.7 thousand km2 of coalfield, CFRI 1993); Bioregional Assessments Programme, context statement for the Sydney Basin (36,000 km2 onshore, five coalfields); SAIMM J. 105(2) (South African coalfields); Wikipedia for Upper Silesia (5,400-5,600 km2) and some Indian field areas (weak).",
+    "TONNAGE 540 / 2,500 / 10,000 Mt (P90 / P50 / P10) = field area x cumulative minable seam thickness x 1.32 t/m3, with area 300 / 1,000 / 3,000 km2 and thickness 0.71 / 2.13 / 4.27 m (the bituminous reserve-base thickness classes of Circular 891 p. 24, taken as P90 / P50 / P10 by this compiler's choice), the two treated as independent split lognormals and combined by simulation (P90 540, P50 ~2,500, P10 ~10,000 Mt; the product of the medians is 2,810 Mt). An ESTIMATE, not a USGS distribution. Was the PLACEHOLDER 4.2 / 13 / 25 Mt of one 1.2 km-radius mine block: about 200 times too small for a field, with its body drawn 6 times wider (size_mult_h 6) to hide that.",
+    "GEOMETRY: aspect (1, 6.5e-5, 1.5): the seam is a cylinder with x : z = 1 : 1.5 and thickness 2b, so at the median tonnage the semi-axes are 14.6 km x 0.95 m x 21.9 km, a 1,000 km2 field 1.9 m thick (29 x 44 km across; 49 x 73 blocks semi-axis at 300 m per block). The engine scales all three axes by the cube root of volume, so P90 gives 360 km2 x 1.1 m and P10 2,500 km2 x 3.0 m: the area spread (7x) is a little narrower than the sourced 10x. size_mult_h is 1.0 (was 6.0): the body now IS the field, nothing is enlarged. size_mult_v 20 stays: a 2 m seam is a tenth of a block at 20 m per block, x20 makes it about 2 blocks.",
+    "SEPARATION AND CLUSTERING (design values): min_separation_m 26,000 (twice the P90 field radius of 13 km; the engine also keeps every pair at least the sum of their radii apart), camp_spacing_km 100 and cluster_radius_km 40 (fields cluster in coalfield districts within a basin; the old 20 / 8 km suited 1 km blocks).",
+    "Density of coal in the ground 1.32 t/m3 for bituminous coal: USGS Circular 891 (Wood et al. 1983), Table 2 p. 22 (1,800 short tons per acre-foot; anthracite 1.47, subbituminous 1.30, lignite 1.29 in data/usgs/coal.json).",
+    "PLACEHOLDERS that remain: formation_depth_m 800. The assessment depth is USGS Circular 891's: coal deeper than 6,000 ft (1,800 m) is excluded from resources (printed p. 24, Table 3 p. 14). Design values: the curves, dip, size_mult_v 20.",
+    "Rank from Lopatin TTI of the coal layer: TTI 75 <-> Ro ~ 1.1 % (Waples' correspondence as tabulated by the Kansas Geological Survey, non-USGS; the high-volatile bituminous limit). The lignite, subbituminous and low-volatile bounds are PLACEHOLDERS (no USGS table of reflectance by rank was found)."
   ]
 }
