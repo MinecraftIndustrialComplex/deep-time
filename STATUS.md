@@ -32,7 +32,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-08 | Bake, world data v1 and parity | todo | | | |
 | P1-09 | Climate mapping and biomes | todo | | | |
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
-| P1-11 | Customize editor, timelapse and staging | todo | | | |
+| P1-11 | Customize editor, timelapse and staging | doing | 2026-09-28 | d42375e | Screens, models and staging built on the placeholder presets (real stages pending). Mac, merged with master f14d258 (P1-03, P1-18): JUnit tests=101 failures=0 (new: EditorModelTest, TimelapseModelTest, ModelHelpersTest, StagingMoverTest, TimelineAcrossJniTest, ScreenSourcesTest); ./gametest.sh → All 31 required tests passed (EditorModelGameTests acceptBuildsGenerator, stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel, realPresetFieldsLightUp); cargo fmt/clippy -D warnings/test --locked (193 passed)/deny clean; gradlew build clean. Client (laptop, HeadlessMC + Xvfb): whole walk Create World → editor → run → review → Accept → world created from the moved staging, no crash; guidance panel with natives forced off; screenshots in review/out/p1-11-client. Rerun with the real presets after P1-08; biome names on the review page with P1-09 |
 | P1-12 | Strata pass with rock tags and `rock_states` | done | 2026-09-28 | — | Mac: ./gametest.sh and -PwithMic (+ MIC rock tags via -Ddeeptime.extraDatapack) → All 21 required tests passed each; coal stone / black argillite; Create stones in their classes; loess = projectatmosphere:dust[layers=8]; everyClassInTheWorld 59/59 classes, 240 samples 0 wrong; MIC smoke probe palette 59/59 (member 24, fallback 35); JUnit 46/0; bodies deferred (P1-08/P1-14) |
 | P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 743b69d | Mechanism verified on placeholder presets (dummy pipeline + wrap-test bake): standalone and MIC first starts generate in ~12 s with progress lines ≤ 5 s apart, restart does not regenerate; no-config / circumference-mismatch / native-failure all stop cleanly before loadLevel. Rerun with the real presets after P1-08 |
 | P1-14 | Deposit engine: the four families | doing | 2026-09-28 | 7f4858c | Engine on a synthetic field history (real fields wait for P1-03…P1-07). Mac: cargo test --workspace ok (core 82 incl. 41 deposits::, format 31, cli 11); porphyry σ 1.4892; Poisson means within 4 SE over 10,000 draws; tonnage P90/P50/P10 within 4 SE; min separation holds (200 seeds + the run); every site has a forming event with causes; `stage deposits --preset …/deposits_synthetic_16k.json --viewer review/out/p1-deposits` → 32 sites of all 8 types, counts next to ρ·A·F (porphyry 9 drawn / 9.41), 0.83 GB peak; fmt, clippy -D warnings, deny clean |
@@ -60,6 +60,114 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-15 | **Q10 (plan §14): Excavated Variants in MIC?** Ben (log 2026-09-28): decide after side-by-side BlueMap renders of the same deposits with and without EV in the MIC pack. Next: produce and publish those renders, then ask. | AskUserQuestion |
 
 ## Build log
+
+### 2026-09-28 — P1-11 Customize editor, timelapse and staging, on the placeholder presets (agent worktree agent-a61f0e6a8e0a67dfa)
+- **Shape.** Client-only screens in `screen/` (reached only through `screen/ClientSetup`, a
+  `@Mod(dist = CLIENT)` class: preset editor for `deeptime:planet` and `planet_32k`, the Create
+  guard, the staging cleanup, the dev screenshot driver); all rules in plain-Java `screen/model/`
+  (no Minecraft imports; `ScreenSourcesTest` enforces both). Plan §7.12 has an "As built in P1-11"
+  paragraph; §10.3 P1-11 lists the class names that differ from the plan's (`EditorModel`,
+  `TimelapseModel`, `ReviewModel` instead of `PlanetEditorModel`/`RunModel`; share codes stay in
+  P1-13's `preset/ShareCode`; `worldgen/PlanetGenerators.withStaging` instead of
+  `GeologicChunkGenerator.forStaging`).
+- **Setup page** (`EditorModel`, `EditorFields`): preset = built-in family (`earthlike_quick`,
+  `earthlike_full`) × size (16k/32k picks the built-in), or an imported code (size fixed); timeline
+  start and length with no default, Run disabled until both are chosen (plus: estimate in, peak ≤
+  cap, numbers in range, natives linked); the §5.1 parameter catalogue (planet, scale, multipliers,
+  essentials, fantasy toggles as Phase 3 placeholders) where **a field is editable only when the
+  preset carries its JSON path** — the placeholders carry none and the core rejects unknown keys, so
+  they show unavailable, and the real presets light them up without a screen change (the paths are
+  my proposal for §5.1's structs: `planet.gravity_m_s2`, `scale.m_per_block_h`,
+  `deposits.count_multiplier`, `scale.feature_scale.rivers`, `surface.drama`,
+  `playability.essentials`, …; P1-03…P1-17 must use them or change the catalogue line). Memory cap
+  default 4 GiB, any value ≥ 0.25 accepted, warnings when above the machine's RAM or free memory;
+  the estimate runs off the render thread, stale answers dropped. Share codes: export = the
+  effective preset (timeline included); import selects the built-in when the code is one, else a
+  custom preset.
+- **Run page** (`TimelapseModel`, `SessionRunHandle`): `SimSession.launch` (new) creates the session
+  on the `deeptime-sim` worker (plan §6.2; `start` keeps creating on the caller for the server) and,
+  with `collectTimeline`, gathers keyframe infos and events after each step and before destroy, so
+  the last step's output is never lost; `SimSession.copyKeyframe` while alive, `worlddata/KeyframeFiles`
+  (pure-Java `DTKF` reader over the new `worlddata/Container`) after. Frames decode on a loader
+  thread into a 64 MiB LRU ring; the view follows the newest frame until scrubbed back; events show
+  up to the frame's time, fresh ones (after the previous frame) highlighted and drawn larger; layer
+  buttons are data-driven (every layer a frame names); playback 400 ms/frame; the globe is an
+  orthographic projection on the CPU (`GlobeProjection`, 256² texture). Closing the editor leaves a
+  run going; reopening Customize (one model per Create World screen) shows it. Cancelled and failed
+  runs delete their staging folder from the completion future (no polling needed).
+- **Review page** (`ReviewModel`): the staged world data's `elevation` sampled 512×256 and coloured
+  with `Ramps` (Java port of `deeptime_format::Ramps`; `ramps.json` now copied into the jar as
+  `deeptime/ramps.json`; `ModelHelpersTest` checks the Rust test's colours plus a half-way
+  rounding case), fallback the last keyframe; spawn marker = first `spawn/candidates.json` entry
+  above sea level; ore-province hints (`ProvinceHints`: dominant deposit type per 30° cell, each site
+  weighing 1 in its cell and 0.5 in the eight around, shown at ≥ 1; `worlddata/SiteRecords` reads
+  `sites.dtsr`). Biome names and the staged §7.2 mapping: P1-09.
+- **Guidance panel** (`GuidanceModel`) when the natives did not load and nothing finished to review.
+- **Staging**: `server/Staging` (`<gamedir>/deeptime/staging/<uuid>/`, ids validated as lower-case
+  UUIDs, `cleanupAbandoned`: untouched 24 h and held by no open editor), `server/StagingMover`
+  (target already has a manifest → nothing; rename with `ATOMIC_MOVE`; else copy to
+  `<target>.staging-copy` comparing each file's CRC32 with the source, check every manifest entry
+  with plain reads — a memory-mapped tile pack would block the rename on Windows —, rename into
+  place, then delete the staging folder; any failure removes the partial copy and leaves staging
+  untouched). `WorldDataBinder`'s HIGHEST listener now runs `moveStaged` → `FirstStartGenerator.prepare`
+  → bind (a failed move stops a dedicated server through `ServerStop`, throws on an integrated one);
+  cleanup runs in the background at every server start and at client setup. Accept =
+  `PlanetGenerators.withStaging` (current overworld's biome source and settings; `WorldDataRef`
+  with the staging id and the preset's C; TW's shape follows at bake). **Create is disabled** for a
+  Deep Time world until staged data exists (`PlanetGenerators.createBlock`: no accepted run, natives
+  missing, staging folder gone), Enter held back too (`screen/CreateWorldGuard`); a world type
+  switched away and back gets the accepted binding back when Customize reopens.
+- **Found on master:** `Cargo.lock` lacked `flate2` under `deeptime-core` (a merge slip after
+  P1-13), so every `--locked` build refused to run (`build-natives.sh`, `cargo tree --locked`);
+  unlocked builds rewrote the lock silently. Fixed in commit 6c6298d.
+- **Tests.** JUnit (Mac, `cd neoforge && ./gradlew build`): tests=93 failures=0 — `EditorModelTest`
+  (9: families and sizes, Run disabled without a timeline, stale estimates, cap, natives missing,
+  fields follow the preset, share-code round trip, staging folders across run/accept/discard/cancel,
+  launch failure), `TimelapseModelTest` (8: live following, event cursor and freshness, layers,
+  off-thread ring, bounded ring, playback, cleanup, progress line), `ModelHelpersTest` (7: ramps
+  parity, globe, formats, province hints, real presets carry every field — vacuous until P1-08 —,
+  MemAvailable, guidance),
+  `StagingMoverTest` (7: rename, copy+verify, corrupted manifest keeps staging, incomplete refused,
+  partial target replaced, cleanup by age/held), `TimelineAcrossJniTest` (2: JNI pixels = disk
+  pixels for every frame, a launched session feeds the timelapse, create errors and early cancel
+  fail the completion), `ScreenSourcesTest` (2). GameTests (Mac, `./gametest.sh`): All 25 required
+  tests passed — `acceptBuildsGenerator` (codec keeps `staging_id`, C 32,768 → TW 2,048 chunks,
+  Create blocked/unblocked/blocked again), `stagingMovedOnStart` (copy route, restart moves nothing,
+  bound terrain within 0.031 blocks of the analytic terrain), `editorRunsAcceptsAndBinds` (share code
+  → timeline → real estimate → run of a fast placeholder at C 1,024 → 9 frames, 8 events → review map
+  from world data, spawn marker, 1 province → Accept → rename into the world → bound, max error
+  0.031), `shareCodeThroughModel` (the core refuses a preset with a `planet` section: "$.planet:
+  unknown key"). cargo fmt, clippy -D warnings, test --workspace, deny: clean.
+- **Client check (best effort, laptop, real GL).** `tools/client/screenshots.sh <jar> <linux .so>`
+  (jar built on the Mac with `./gradlew jar`, the Linux library with `tools/natives/build-natives.sh
+  --only linux-x86_64-gnu`, both pulled; HeadlessMC 2.10.0 under Xvfb + Mesa, Deep Time + TW only,
+  `ScreenshotDriver` walks the screens): Create World with "Deep Time Planet" and Create disabled
+  (`NOT_SIMULATED`) → setup page (Run disabled: "Choose how the continents start", estimate 2.0 MiB /
+  ~10 s / 2 stages) → timeline set, Run → timelapse live (map, then globe) → done (9 keyframes, 13
+  events), scrubbed to 5/9 → review (final map from world data, spawn −8.3° N 204.4° E, 6 province
+  cells) → Accept → Create enabled → the world is created: `Moved staged Deep Time world data …
+  (rename)`, `Bound … staged as <id>`, player in the world at (1114, 66, 377) — the review's spawn
+  marker. With `GUIDANCE=1` (`-Ddeeptime.natives.forceFail=unsupported`): the guidance panel, and
+  Create blocked (`NATIVES`). Twelve screenshots in `review/out/p1-11-client/` (gitignored), no
+  client crash. Three things it took: HeadlessMC's `--jvm` passes only its first token (the -D
+  properties go through `JAVA_TOOL_OPTIONS`); offline it stubs LWJGL (black screenshots) unless
+  `hmc.check.xvfb=true` lets it see Xvfb; the game's STB PNG writer fails there, so the driver
+  writes PNGs with ImageIO. It fixed two screen bugs: the scrubber label lagged while following
+  live, and Linux "free memory" was `MemFree` (0.7 GiB of 15.4) — now `MemAvailable`. Layout and
+  feel remain unreviewed by a person (plan §9.8).
+- **Merged master f14d258 (P1-03 plates, P1-18 pole cap) into this branch.** Conflicts: STATUS.md
+  (both build-log entries kept) and `en_us.json` (P1-18 added one too; keys unioned). Adapted:
+  P1-18's six-field `WorldDataRef` (Accept keeps the world preset's pole-cap lines), and
+  `ScreenSourcesTest` treats P1-18's `client/` package as client-only too. P1-03's planet pipeline
+  (`params.rs`) uses exactly the catalogue's `planet.*` and `scale.m_per_block_*` paths; the
+  catalogue's ranges now match its validation (tilt 0–180°, ocean fraction 0.05–0.95), and the new
+  GameTest `realPresetFieldsLightUp` imports a P1-03 planet preset: those seven fields become
+  editable, an edit lands at the path the core reads, and the core's estimate accepts it (174 MiB,
+  1 stage). After the merge: JUnit tests=101 failures=0; ./gametest.sh All 31 required tests
+  passed; cargo fmt, clippy -D warnings, test --locked (193 passed), deny clean.
+- **Next.** When P1-08's real presets land: rerun `./gametest.sh` and the client check with them,
+  make the `EditorFields` paths match the real schema (`ModelHelpersTest.realPresetsCarryEveryField`
+  fails for a real built-in that lacks one), add P1-09's biome names and staged climate mapping at Accept.
 
 ### 2026-09-28 — P1-18 pole cap and client info (agent worktree agent-a4399e9f8080242f4)
 - **The cap** (`wrap/PoleCap`, `wrap/PoleCapCurve`; replaces P0-06's `PoleCapPrototype` and its
