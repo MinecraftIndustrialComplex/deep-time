@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI · In flight: history spill to SSD, diffusion loop fusion, workbench memory-cap refusal · Next: P1-08 bake (critical path), deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI · In flight: history spill to SSD, diffusion loop fusion, workbench memory-cap refusal · P1-08 bake + format 0.1 done on its branch (built-ins are real planets) · Next: P1-09 climate mapping, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -29,7 +29,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-05 | Climate | done | 2026-09-29 | — | Mac: cargo test --workspace ok (core 162 + 1 ignored incl. climate:: 14: EBM balance |ASR−OLR| < 0.2 W/m², energy conserved by diffusion/ice to 1e-9, ridge windward > 3× lee with a rain shadow, Köppen Af/BWh/Cfb/Dfc/ET/EF/Aw/Csa/Dwd hand-built cases, idealised planet has all five groups, coupled pipeline resumes identically on 1 vs 3 threads); `stage climate --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-climate` → 51 snapshots, climate 11.7 s of 191 s, t_surface 11.3 °C, EBM 15.6 °C, net TOA 0.006 W/m², land Köppen A 0.10/B 0.12/C 0.21/D 0.04/E 0.53; bench 12 vs 1 thread identical; Earth relief (`climate-dem`): 19/24 cities in the right Köppen group; clippy, fmt, deny clean; gradlew build test 118/0 (after merging master 6d8171f) |
 | P1-06 | Young landscape, amplification and the detail layer | done | 2026-09-29 | — | On `pipeline_quick_16k` (built-ins stay placeholders until P1-08). Mac: `cargo test -p deeptime-core surface::amplify` → 25 passed (no new sink outside the lakes on a wrapped planet with a lake, the flood repairs a pit nobody declared, streamed = whole-raster to the bit, tiled middle level = whole, 1 = 5 threads, the seam, drama, pack round trip, coupled pipeline on 1 and 3 threads, resume); workspace tests ok (core 204 + 2 ignored, cli 23, format 33, inspect 37, jni 7, viewer 5), clippy -D warnings, fmt, deny clean; 500 Myr planet: `stage young` 7.6 s, `stage amplify` 8192×4096 → sinks=0, 18.7 s on 12 threads / 53 s on 1 (erode 7.6/24.1, thermal 3.3/14.1, deposit 3.3/8.9, flood 3.2/2.9), streamed (8 tiles, halo 196) and 1 thread give all 512 of 512 tiles of both L3 layers identical to the in-memory run; 134 M-cell L3 (32k full's size) streams in 58.5 s; views: review/out/p1-amplify (16 MB, not published). Ben reviews: the before/after views and the drama figure |
 | P1-07 | Rock classes, column strata and metamorphism | done | 2026-09-29 | — | On the coupled pipeline preset (built-ins stay placeholders until P1-08). Mac: cargo test --workspace ok (core 149 + 1 ignored incl. structure:: 11: stacks ordered top-down, ≥ 1 block thick, classes valid, ≤ K; resume identical; every built-in deposit type finds all its fields incl. trap_structure and host/*), fmt, clippy -D warnings, deny clean; gradlew build test 106/0; ./gametest.sh All 45 passed (everyClassInTheWorld 59/59, 240 samples 0 wrong); `stage structure --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-structure` → horizon_check=ok, 3.88 horizons/cell, 22,000 plutons (8,138 bodies), 50 frames published; structure 4.8 s of 122 s |
-| P1-08 | Bake, world data v1 and parity | doing | 2026-09-29 | | Agent worktree agent-a09db47c6d05e1417 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), branch worktree-agent-a09db47c6d05e1417 |
+| P1-08 | Bake, world data v1 and parity | done | 2026-09-29 | — | Format 0.1; `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --out … --viewer review/out/p1-q16` → format_version 0.1 (752 s on a loaded Mac, bake 1.1 s, folder 156 MB); `./gradlew test --tests '*ColumnParityTest'` → tests=2 failures=0 errors=0 (500 of 500 columns equal, 77 through bodies, JNI sampleColumn identical); JUnit 124/0; real-preset first start PASS (generation 492 s, 441 chunks in 19 s); built-ins are the pipeline presets; see build log |
 | P1-09 | Climate mapping and biomes | todo | | | |
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
 | P1-11 | Customize editor, timelapse and staging | doing | 2026-09-28 | d42375e | Screens, models and staging built on the placeholder presets (real stages pending). Mac, merged with master f14d258 (P1-03, P1-18): JUnit tests=101 failures=0 (new: EditorModelTest, TimelapseModelTest, ModelHelpersTest, StagingMoverTest, TimelineAcrossJniTest, ScreenSourcesTest); ./gametest.sh → All 31 required tests passed (EditorModelGameTests acceptBuildsGenerator, stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel, realPresetFieldsLightUp); cargo fmt/clippy -D warnings/test --locked (193 passed)/deny clean; gradlew build clean. Client (laptop, HeadlessMC + Xvfb): whole walk Create World → editor → run → review → Accept → world created from the moved staging, no crash; guidance panel with natives forced off; screenshots in review/out/p1-11-client. Rerun with the real presets after P1-08; biome names on the review page with P1-09 |
@@ -73,6 +73,85 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — P1-08 bake, world data 0.1 and parity (agent worktree agent-a09db47c6d05e1417, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** (1) **Format 0.1** (`Cargo.toml`, `FORMAT_MINOR`, Java `FormatVersion`): every header's minor is 1; FORMAT.md
+  gains "The bake" (layer table, `notes.bake`), "The terrain height" (H = E + A·N), "The P1-08 bake" (top horizon)
+  and "Columns" (the evaluator and `parity/columns.json`). (2) **`deeptime-core/src/bake/{mod, terrain, strata,
+  climate, surface, meta, tests}.rs`**, called by `Session::finalize_write` for every planet preset: keeps the
+  amplifier's L3 `elevation` + `detail/amplitude` (or upsamples young L2 / surface L1 when a preset has no amplify
+  stage), writes `water_level` (all nodata: lakes are Phase 2), `strata/horizons` + `classes.json` (P1-07's stacks),
+  `climate/{t_mean_c, p_mm, koppen}` (L1), the five router inputs `climate/{temperature, vegetation, continents,
+  erosion, ridges}` (L2, a **provisional piecewise mapping until P1-09**, anchors on OverworldBiomeBuilder's band
+  edges, recorded in `notes.bake.climate`), `surface/{regolith_blocks, class_top}` (L2), `meta/{plate_id,
+  crust_age_myr, province}` (L1; provinces = connected regions of one setting (regime + land/sea + highland) ≥ 50,000
+  km², smaller ones absorbed), spawn candidates (ranked by essentials when the content bundle has them, else the synth
+  rule, both now over any `RasterRead`), the preset's scale in the manifest, and `notes.bake` (incl. `detail`: seed as
+  a decimal string, salt 1729, octaves, wavelength). **Top horizon raise:** P1-07 put each cell's first top at the
+  L1 surface, so amplified ridges above it stayed unclassified stone; the bake raises the first top (only upwards) to
+  ⌈max E + max A⌉ + 1 over the 4 × 4 L1 cells around (every L3 cell the bilinear column rule reaches), so the top unit
+  fills ridges; deeper tops stay the history's. (3) **The column evaluator** in the format crate
+  (`deeptime_format::column::ColumnWorld`, over the new `LazyLayer`: tiles decode on demand; `raster::stack_at` is now
+  one shared function), with the detail noise moved into the contract crate (`deeptime_format::detail`; core
+  re-exports it). `deeptime inspect-column --world-data D X Z [--parity]`, `deeptime parity --world-data D [--out]
+  [--columns 500]`, JNI `sampleColumn` (cached world) — one evaluator. (4) **Java reader v1:** `worlddata/DetailNoise`,
+  `WorldData.height` = E + A·N (`elevation()`, `detail()`, `classes()`), `worlddata/Columns` (the evaluator; StrataPass's
+  column rule moved there, `StrataPass.column`/`Column` delegate). (5) **Real built-ins:** `earthlike_*` = `pipeline_*`
+  (name/description only differ; `tools/dev/sync_builtin_presets.py` writes them, `builtins_are_the_pipeline_presets`
+  fails on drift; mapping quick_16k/full_16k/quick_32k/full_32k one to one). The placeholder mechanism stays (dummy +
+  synth + `placeholder: true`; tests use inline placeholders); no placeholder is built in any more, so the workbench's
+  dev toggle lists none. (6) **Tests/fixtures:** `tests/presets/planet_world_4k.json` (small real planet, C 4096,
+  every stage, 150 Myr); Gradle `testWorldPlanet4k` (run + parity); `ColumnParityTest`, `DetailNoiseTest`,
+  `NativeLinkTest.sampleColumnIsTheParityFixture`; GameTest level `deeptime:test_planet_real` + `RealPlanetGameTests`
+  (heights, rock vs the parity fixture, spawn; gametest.sh bakes it); core `bake::tests`, CLI
+  `a_planet_run_bakes_and_parity_samples_it`. `deeptime-inspect`'s height includes the detail term; ramps for the new
+  layers.
+- **Acceptance.** `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --out
+  $S/q16 --viewer review/out/p1-q16` (a real preset names no timeline, so `--start/--length-myr` are needed: deviation)
+  → `jq -r .format_version $S/q16/manifest.json` → **0.1**. `cd neoforge && ./gradlew test --tests '*ColumnParityTest'`
+  → junit-summary **tests=2 failures=0 errors=0** (`columns=500 equal=500 throughBodies=77 withDetail=454`); the JNI
+  oracle gives the fixture's exact JSON for all 500.
+- **Sizes and timings (Mac M6, load 40–57 from other agents: timings noisy).** Run 752 s wall (plates 135, climate 57,
+  surface 470, structure 14, deposits 12, young 14, amplify 30 s; **bake 1.1 s**: terrain 0.23, strata 0.42, climate
+  0.35, surface 0.04, meta 0.04), alloc peak 3,439 MiB, peak footprint 4.64 GB. World folder **156 MB**: rasters 81 MB
+  (`elevation` 49.1 MB and `detail/amplitude` 15.7 MB are the amplifier's; the bake's own layers ~25 MB: strata 6.8,
+  L2 biome inputs 16.6, L1 climate 1.3, surface 0.5, meta 0.5, water 0.3), keyframes 69 MB, events/bodies/sites < 1 MB.
+  Viewer bundle 108 MB (not published). 20 provinces; top horizon raised on 522,798 of 524,288 cells, largest raise
+  449.5 blocks (a trench cell beside a high neighbour: the raise covers every block interpolating from it).
+- **Smoke (first start with the real preset).** `mac.sh --server -- 'tools/smoke/install.sh standalone --preset
+  earthlike_quick_16k --start scattered_continents --length-myr 500 && python3 tools/smoke/run.py --profile standalone
+  --fresh --restart --chunky 160 --chunky-center 2880,-900 --timeout 2400'` → **PASS**: generation 491.6 s in the
+  server (progress lines ≤ 5 s apart, native peak 3.1/4.0 GiB), Done in 498 s, RSS 2.76 GB; Chunky **441 chunks in 19 s
+  (≈ 43 ms per chunk, wall, parallel, loaded Mac)**; restart does not regenerate (Done 1.1 s). Renders
+  (`review/out/p1-08/`, `deeptime-inspect topdown|rock|section|compare` over x 2720..3040, z −1060..−740, 21° N): a
+  6.8-km snow-capped peak (EF, −21 °C at the top) dropping to forested lowlands and a bay with sand beaches; the
+  z = −930 and x = 2900 sections show the horizon stacks under the terrain to the surface (no unclassified stone at the
+  top: the rock render's unmapped blocks are only ores and magma), columnar steps at L1 cell edges (P1-07's design),
+  pluton lenses, caves. `compare`: p50 0, 80 % within 1 block, p99 18, max 38 (a negative tail: caves and carvers of
+  the standalone router, steep slopes between noise-cell corners).
+- **Gates** (branch merged with master 455b57f): cargo fmt, clippy `--locked -D warnings`, deny licenses bans clean;
+  cargo test --workspace (cli 26, core 209 + 2 ignored, format 39, inspect 28 + 2 + 7, jni 7, viewer 5); `./gradlew
+  build test` tests=124 failures=0; GameTests: see below.
+- **Found and fixed on the way.** `DepositGameTests.siteApiAndProbes` required a block with d < 0.3 in the target body,
+  which the calibrated synthetic deposit world's body 0 (a clipped body) has none of: it now takes the most central
+  block (not caused by P1-08; the calibration merge had not rerun GameTests). `NativeGameTests` pinned format "0.0";
+  the share-code GameTest asked for 2,500 Myr, whose real estimate would pass the default 4 GiB cap (now 500 Myr).
+  `editor_fields.json`: `deposit_count` → `deposits.count_mult`; eight fields whose preset key does not exist yet
+  (size/richness multipliers, province strength, feature scales, essentials) are marked `"planned": true`, which
+  `ModelHelpersTest.realPresetsCarryEveryField` exempts (it now checks 4 real built-ins).
+- **Deviations.** Acceptance command needs a timeline (above). `water_level` is nodata (plan: Phase 2). The biome
+  inputs are a provisional mapping (P1-09 replaces it). Horizon keys stay (index, class) — no unit ids yet. The
+  evaluator lives in `deeptime-format` (the contract crate), not `core::bake`; `DetailNoise` is `worlddata/`, not
+  `worldgen/`. `ColumnParityTest` runs on a small real planet (C 4096), not a synthetic world. The planet GameTest
+  harness still runs on the analytic terrain (its seam/pole tests compare against that closed form); the real bake is
+  covered by `test_planet_real` and the smoke.
+- **Follow-ups the plan names.** Re-run P1-11 (`./gametest.sh`, client check), P1-13 (first-start acceptance: done
+  above on earthlike_quick_16k, 500 Myr) and P1-15 (deposit GameTests, `-PwithEv`, `-PwithMic`, planet claim test,
+  ore render) on the real presets; point the workbench's 3D preview (`preview.py workbench_preview`) at a run's bake
+  and answer `/api/inspect` from `deeptime inspect-column` (tools/workbench/README "Later"); P1-09 replaces the
+  provisional biome mapping; P1-10 maps `meta/province` to regions; the workbench catalogue lists `earthlike_*` and
+  `pipeline_*` (identical) side by side — drop one family there.
+- **Next.** Merge into master (the parent), then P1-09.
+
 ### 2026-09-29 — Workbench: a run over its memory cap is refused before it starts; the default cap is 8 GiB (agent worktree agent-afd5b3eb4fa7751da, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **The bug.** Ben's `pipeline_full_32k`, supercontinent, 1000 Myr: `POST /api/preset` estimated `peak_bytes`
   5,532,931,904 against the 4 GiB default cap and still answered `can_run: true`; the run started and failed 15
@@ -2873,7 +2952,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   of failing partway, so a run like this now says why before it starts.
 - The workbench offered the placeholder `earthlike_*` presets (dummy pipeline) next to the real `pipeline_*`
   ones; Ben ran one and got a single blob. The UI overhaul hides them behind a dev toggle and marks a
-  placeholder run (build log 2026-09-29, UI overhaul).
+  placeholder run (build log 2026-09-29, UI overhaul). Since P1-08 the `earthlike_*` built-ins are the real
+  pipeline presets (no placeholder is built in); the workbench lists both families, identical.
 - The plan is at revision 2 plus a partial revision 3 (the decisions-log rule in §1.2). The 29 gaps of
   docs/plan-reviews/2026-09-28-cold-read-review-2.md are fixed in the plan by the task that hits each
   one; the build log names each fix as it lands.
