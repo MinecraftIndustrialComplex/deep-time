@@ -5,6 +5,7 @@ import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorModel;
 import com.minecraftindustrialcomplex.deeptime.screen.model.TimelapseModel;
 import com.minecraftindustrialcomplex.deeptime.worldgen.PlanetGenerators;
+import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.Button;
@@ -19,6 +20,11 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -60,10 +66,28 @@ final class ScreenshotDriver {
         stepTicks = 0;
     }
 
+    /**
+     * Reads the framebuffer ({@code Screenshot.takeScreenshot}) and writes the PNG with ImageIO:
+     * the game's own writer (STB) failed under Xvfb on NixOS ("Could not write image to the PNG file").
+     */
     private static void shot(String name) {
         Minecraft mc = Minecraft.getInstance();
-        Screenshot.grab(mc.gameDirectory, name + ".png", mc.getMainRenderTarget(),
-                msg -> DeepTime.LOGGER.info("[deeptime-shot] {} -> {}", name, msg.getString()));
+        try (NativeImage img = Screenshot.takeScreenshot(mc.getMainRenderTarget())) {
+            int w = img.getWidth(), h = img.getHeight();
+            BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++) {
+                    int abgr = img.getPixelRGBA(x, y);
+                    out.setRGB(x, y, (abgr & 0xff) << 16 | (abgr & 0xff00) | (abgr >> 16) & 0xff);
+                }
+            Path dir = mc.gameDirectory.toPath().resolve("screenshots");
+            Files.createDirectories(dir);
+            Path file = dir.resolve(name + ".png");
+            ImageIO.write(out, "png", file.toFile());
+            DeepTime.LOGGER.info("[deeptime-shot] {} -> {} ({}x{})", name, file, w, h);
+        } catch (IOException | RuntimeException e) {
+            DeepTime.LOGGER.error("[deeptime-shot] screenshot {} failed", name, e);
+        }
     }
 
     private static void tick() {
@@ -111,6 +135,8 @@ final class ScreenshotDriver {
                     }
                 }
                 case EDITOR -> {
+                    if (!(screen instanceof PlanetEditorScreen))
+                        stepTicks = 0;
                     if (screen instanceof PlanetEditorScreen ed && stepTicks == 20) {
                         model = ed.model();
                         guidance = ed.guidanceOnly();
@@ -156,9 +182,11 @@ final class ScreenshotDriver {
                 }
                 case DONE -> {
                     TimelapseModel run = model.run().orElseThrow();
-                    if (run.state() != TimelapseModel.State.RUNNING && screen instanceof PlanetEditorScreen ed) {
-                        if (stepTicks < 40)
-                            return;
+                    if (run.state() == TimelapseModel.State.RUNNING || !(screen instanceof PlanetEditorScreen ed)) {
+                        stepTicks = 0; // count from the end of the run
+                        return;
+                    }
+                    {
                         if (stepTicks == 40) {
                             DeepTime.LOGGER.info("[deeptime-shot] run {}: {} keyframes, {} events, layers {}", run.state(), run.frameCount(),
                                     run.events().size(), run.layers());
@@ -188,6 +216,8 @@ final class ScreenshotDriver {
                     }
                 }
                 case ACCEPTED -> {
+                    if (!(screen instanceof CreateWorldScreen))
+                        stepTicks = 0;
                     if (screen instanceof CreateWorldScreen cws) {
                         if (stepTicks == 2)
                             worldTab(cws);
@@ -217,6 +247,8 @@ final class ScreenshotDriver {
                         go(Step.IN_WORLD);
                 }
                 case IN_WORLD -> {
+                    if (mc.screen != null)
+                        stepTicks = Math.min(stepTicks, 100); // still loading terrain: wait for the world view
                     if (stepTicks == 200) {
                         shot("10-in-world");
                         DeepTime.LOGGER.info("[deeptime-shot] in world at {}", mc.player == null ? "?" : mc.player.blockPosition());
