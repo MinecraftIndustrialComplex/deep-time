@@ -27,8 +27,8 @@ build range −352..639), one world source (`--synth <kind> [--strata placeholde
 `--preset <name|file> [--start S] [--length-myr N]`, `--world-data <dir>` (a run's bake),
 `--test-terrain <kind>`), `--datapack <dir>` (repeatable; MIC profiles add the MIC rock tags
 themselves unless `--no-mic-rock-tags`), `--seed N`, `--keep-world`, `--install` (re-run
-`tools/smoke/install.sh <profile>` first; needed after Java changes, since a server set carries the
-Deep Time jar it was installed with), `--pack` (sync the MIC pack to the Mac; MIC profiles).
+`tools/smoke/install.sh <profile>` first: for a changed pack or jar set; Java and Rust changes do not need
+it, see step 1 below), `--pack` (sync the MIC pack to the Mac; MIC profiles).
 
 To look at an export, serve the viewer folder and pass `?src=`:
 `python3 tools/workbench/preview.py serve` (on the Mac: the contract below plus the viewer at
@@ -37,7 +37,22 @@ To look at an export, serve the viewer folder and pass `?src=`:
 
 ## What a job does
 
-1. **install** only when `smoke/<profile>/install.json` is missing, or with `--install`;
+1. **install** the profile's server set only when `smoke/<profile>/install.json` is missing, or with
+   `--install`; **then, on every job, refresh the Deep Time jar**: `./gradlew jar` (Gradle tracks the
+   Java sources, resources and presets and, through `hostNatives`, the Rust natives the jar packs; a
+   no-op is about one second), then the built jar's sha256 is compared with the set's copy and the copy
+   is replaced (written aside, renamed into place; any other `deeptime-*.jar` removed) when the bytes
+   differ. A server set's jar is a copy taken at install time under a name that never changes
+   (`deeptime-1.21.1-0.0.1.jar`), so it used to go stale silently: on 2026-09-29 every preview died on
+   `$.deposits_synthetic: unknown key` because `smoke/mic` still carried the jar of 2026-09-28. The
+   job's `status.json` says what happened (`jar`: `refreshed`, `sha256`, `was`, `src_rev`, `src_hash`,
+   `seconds`; the message "refreshed the Deep Time jar …" or "the Deep Time jar is current …"), and
+   `install.json` keeps the record (`deeptime_jar_sha256`, `deeptime_src_rev`, `deeptime_src_commit`,
+   `deeptime_src_hash`: the laptop revision `tools/remote/mac.sh` wrote to `.sync-rev` at the last
+   sync, and a content hash of the trees the jar is built from). A jar that does not build fails the
+   job with Gradle's output; it never boots older code. The logic and its tests are
+   `tools/smoke/jarstate.py` and `tools/smoke/test_jarstate.py`; `tools/smoke/install.sh` records the
+   same fields, and the smoke report prints them (and says STALE when the sources have changed since);
 2. **prepare** the job's own world `<job>/world` (synthetic world data, a copied world-data folder, or
    a `config/deeptime/server.json` preset the server generates from on its first start; datapacks);
    the profile's `server.properties` and `config/deeptime/server.json` are restored afterwards;
@@ -63,8 +78,11 @@ generation 3.3 s, Chunky 361 chunks 9.1 s, probes 0.1 s, stop 2.9 s, export 0.5 
 (`crates/deeptime-cli/src/watch/stage2.rs`) forwards `POST /api/preview`, `GET /api/preview/…`,
 `GET /api/inspect` and `GET /area3d/…` to `preview.py http <METHOD> <path?query>` (body on stdin;
 stdout: one JSON line `{"status", "content_type", "length"}`, then the body). The page's `Stage2`
-object (`workbench.js`) does the rest: a box drawn with ▭ posts `{run, frame, t_years, box, lat_lon}`,
-the answer's `status_url` is polled, and `url` (the viewer on the export) opens in the panel.
+object (`workbench.js`) does the rest: a box drawn with the Area 3D tool (or a click, for 256 × 256)
+posts `{run, frame, t_years, box, lat_lon}` and the Inspect tool asks `/api/inspect`; each answer
+becomes a job card in the inspector's 3D tab, its `status_url` is polled (the card shows the step:
+waiting for the lock, booting, generating, exporting), and `url` (the viewer on the export, with
+`&embed=1` in the card) opens in the card and full size over the page.
 
 **Which world a preview shows.** A workbench run is a raster history on the simulation grid, not a
 Minecraft world, and no run can be baked into one until P1-08. So a preview is **the synthetic
@@ -135,7 +153,7 @@ bake) or `test_terrain`. Paths must lie under the repo, the jobs folder or `…/
 `status.json`: `job`, `state` (`queued` → `waiting` (for the server lock) → `installing` →
 `preparing` → `booting` → `generating` → `probing` → `stopping` → `exporting` → `done` | `failed`),
 `message`, `created`, `updated`, `finished`, `error`, `spec`, `install` (profile, NeoForge, pack,
-jar), `timings` (`boot_s`, `first_start_generation_s`, `chunky` per piece, `probes_s`, `stop_s`,
+jar, its sha256 and source), `jar` (the refresh above), `timings` (`jar_s`, `boot_s`, `first_start_generation_s`, `chunky` per piece, `probes_s`, `stop_s`,
 `total_s`), `exports` (`box`, `file`, `url` = `<job>/<file>`, `bytes`, `summary` = export-area's JSON:
 stats, bodies, sites, verify).
 

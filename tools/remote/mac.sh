@@ -76,6 +76,16 @@ GIT="$CACHE/git/bin/git"
 if [ "$SYNC" = 1 ]; then
     rsync -a --delete "${EXCLUDES[@]}" -e "ssh -o BatchMode=yes" "$REPO/" "$HOST:$REMOTE/"
     "${SSH[@]}" "cd '$REMOTE' && { [ -d .git ] || '$GIT' init -q -b master; } && '$GIT' add -A"
+    # Which laptop revision this copy is (the Mac's .git has no commits, and Apple's git there is a
+    # stub): tools/smoke/jarstate.py reads it into smoke/<profile>/install.json. Written after
+    # `git add -A`, so it stays untracked and invisible to Nix flakes; rsync --delete removes it on
+    # the next sync before it is written again.
+    SYNC_REV="$(printf '{"describe": "%s", "commit": "%s", "branch": "%s", "synced": "%s"}' \
+        "$(git -C "$REPO" describe --always --dirty --abbrev=8 2>/dev/null | tr -cd 'A-Za-z0-9._/@+-')" \
+        "$(git -C "$REPO" rev-parse HEAD 2>/dev/null | tr -cd '0-9a-f')" \
+        "$(git -C "$REPO" rev-parse --abbrev-ref HEAD 2>/dev/null | tr -cd 'A-Za-z0-9._/@+-')" \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
+    "${SSH[@]}" "printf '%s\n' '$SYNC_REV' > '$REMOTE/.sync-rev'"
 fi
 if [ "$PACK" = 1 ]; then
     # The pack sits two levels above the main checkout; a worktree elsewhere uses the known path.

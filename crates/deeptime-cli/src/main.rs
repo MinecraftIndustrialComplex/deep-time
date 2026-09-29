@@ -2,6 +2,7 @@
 //! `deeptime`: the standalone driver for every simulation stage (plan §9.3).
 
 mod alloc;
+mod amplify_view;
 mod climate_dem;
 mod dump;
 mod run;
@@ -61,7 +62,9 @@ enum Command {
     /// globe, layers and events every step; pause, step, rewind, speed, follow live, compare two
     /// runs). Runs go one at a time; finished ones are kept under --runs. Serves loopback or a
     /// Tailscale address only, never the LAN; tools/viewer/mac-watch.sh runs it on the Mac and
-    /// puts it on the tailnet.
+    /// puts it on the tailnet. --mem-cap is the default memory cap of its runs (the page's Memory
+    /// field sets another for one run); a run whose estimate is over its cap is refused before
+    /// it starts.
     Watch {
         /// A run to start right away (a built-in preset name, a preset JSON file or a share code);
         /// the page starts others.
@@ -299,6 +302,11 @@ struct CommonArgs {
     /// Print DEBUG log lines too.
     #[arg(long)]
     verbose: bool,
+    /// Sets a preset value before the run, `--set amplify.incision_m=8` (repeatable; the value
+    /// is JSON, else a string). On `stage --in` it edits the checkpoint's preset, so a later
+    /// stage's parameters can be swept without re-running the earlier ones.
+    #[arg(long = "set", value_name = "PATH=VALUE")]
+    set: Vec<String>,
 }
 
 impl CommonArgs {
@@ -307,6 +315,7 @@ impl CommonArgs {
             threads: self.threads,
             mem_cap: self.mem_cap,
             verbose: self.verbose,
+            set: self.set.clone(),
         }
     }
 }
@@ -678,6 +687,7 @@ mod tests {
             threads: 2,
             mem_cap: 0,
             verbose: false,
+            set: Vec::new(),
         }
     }
 
@@ -942,6 +952,8 @@ mod tests {
         v["keyframes"]["every_myr"] = serde_json::json!(10.0);
         // This test is about the plates + surface group; `stage deposits` has its own test.
         v.as_object_mut().unwrap().remove("deposits");
+        v.as_object_mut().unwrap().remove("young");
+        v.as_object_mut().unwrap().remove("amplify");
         let preset = dir.join("small.json");
         std::fs::write(&preset, v.to_string()).unwrap();
         let stage = |name: &str,
@@ -1061,6 +1073,9 @@ mod tests {
         v["keyframes"]["size"] = serde_json::json!([64, 32]);
         v["keyframes"]["every_myr"] = serde_json::json!(10.0);
         v["deposits"]["count_mult"] = serde_json::json!(200.0);
+        // The young landscape and amplification (P1-06) have their own CLI test.
+        v.as_object_mut().unwrap().remove("young");
+        v.as_object_mut().unwrap().remove("amplify");
         let preset = dir.join("small.json");
         std::fs::write(&preset, v.to_string()).unwrap();
         let stage = |name: &str,
