@@ -84,6 +84,31 @@ public final class RasterSampler {
         return a + (b - a) * fv;
     }
 
+    /**
+     * An odd field at block (bx, bz): the magnitude bilinear over the corners' absolute values, the
+     * sign of the nearest corner. A sign change then is a sharp edge instead of a ramp through zero
+     * (P1-09: the weirdness input, whose sign picks vanilla's variant biomes and whose |w| near 0 is
+     * the river-valley slice).
+     */
+    public double bilinearOdd(double bx, double bz) {
+        double u = (bx - (double) grid.originBlockX()) / (double) grid.r();
+        double v = (bz - (double) grid.originBlockZ()) / (double) grid.r();
+        double fi = Math.floor(u);
+        double fj = Math.floor(v);
+        double fu = u - fi;
+        double fv = v - fj;
+        long i0 = (long) fi, j0 = (long) fj;
+        double v00 = get(i0, j0);
+        double v10 = get(i0 + 1, j0);
+        double v01 = get(i0, j0 + 1);
+        double v11 = get(i0 + 1, j0 + 1);
+        double a = Math.abs(v00) + (Math.abs(v10) - Math.abs(v00)) * fu;
+        double b = Math.abs(v01) + (Math.abs(v11) - Math.abs(v01)) * fu;
+        double m = a + (b - a) * fv;
+        double near = fv < 0.5 ? (fu < 0.5 ? v00 : v10) : (fu < 0.5 ? v01 : v11);
+        return Math.copySign(m, near);
+    }
+
     /** Horizons in each stack (K); 0 for scalar layers. */
     public int stackDepth() {
         return desc.stackDepth();

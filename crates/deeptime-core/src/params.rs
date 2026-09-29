@@ -98,7 +98,7 @@ pub fn planet_builtin(name: &str) -> Option<&'static str> {
 }
 
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 11] = [
+pub const PLANET_KEYS: [&str; 12] = [
     "seed",
     "planet",
     "keyframes",
@@ -110,6 +110,7 @@ pub const PLANET_KEYS: [&str; 11] = [
     "deposits",
     "young",
     "amplify",
+    "biomes",
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
@@ -524,6 +525,9 @@ pub struct PlanetPreset {
     /// Amplification to L3 (P1-06) and the detail layer; `None` writes no L3. It needs a
     /// `young` section.
     pub amplify: Option<crate::surface::amplify::AmplifyParams>,
+    /// The knobs of the climate → biome-input mapping (P1-09, plan §7.2); the bake uses the
+    /// defaults when the section is absent.
+    pub biomes: Option<crate::bake::biomes::BiomeParams>,
 }
 
 type Obj = Map<String, Value>;
@@ -565,6 +569,7 @@ impl PlanetPreset {
         let deposits: Option<crate::deposits::DepositParams> = section(obj, "deposits")?;
         let young: Option<crate::surface::young::YoungParams> = section(obj, "young")?;
         let amplify: Option<crate::surface::amplify::AmplifyParams> = section(obj, "amplify")?;
+        let biomes: Option<crate::bake::biomes::BiomeParams> = section(obj, "biomes")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
         let seed = match obj.get("seed") {
             None => 1,
@@ -587,6 +592,7 @@ impl PlanetPreset {
             deposits,
             young,
             amplify,
+            biomes,
         };
         preset.validate()?;
         Ok(preset)
@@ -828,6 +834,9 @@ impl PlanetPreset {
                 "C must be a multiple of 2·l3_r",
             )?;
         }
+        if let Some(b) = &self.biomes {
+            b.validate()?;
+        }
         Ok(())
     }
 
@@ -859,6 +868,9 @@ impl PlanetPreset {
         }
         if let Some(a) = &self.amplify {
             v["amplify"] = json!(a);
+        }
+        if let Some(b) = &self.biomes {
+            v["biomes"] = json!(b);
         }
         v
     }

@@ -8,7 +8,7 @@
 //! |---|---|---|
 //! | terrain | `elevation` (the amplifier's, or L2/L1 upsampled without one), `water_level` (nodata: lakes are Phase 2), `spawn/candidates.json` | [`terrain`] |
 //! | strata | `strata/horizons` (P1-07's stacks, the top horizon raised over the amplified terrain), `strata/classes.json` | [`strata`] |
-//! | climate | `climate/{t_mean_c, p_mm, koppen}` on L1; `climate/{temperature, vegetation, continents, erosion, ridges}` on L2 (a provisional mapping until P1-09) | [`climate`] |
+//! | climate | `climate/{t_mean_c, p_mm, koppen}` on L1; `climate/{temperature, vegetation, continents, erosion, ridges}` on L2 (the §7.2 mapping, [`biomes`]) | [`climate`], [`biomes`] |
 //! | surface | `surface/regolith_blocks`, `surface/class_top` on L2 | [`surface`] |
 //! | meta | `meta/{plate_id, crust_age_myr, province}` on L1 | [`meta`] |
 //!
@@ -17,6 +17,7 @@
 //! The Java reader and the column evaluator (`deeptime_format::column`) read what this writes;
 //! FORMAT.md is the contract.
 
+pub mod biomes;
 pub mod climate;
 pub mod meta;
 pub mod strata;

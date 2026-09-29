@@ -37,6 +37,9 @@ the amplified terrain ("The P1-08 bake"); and the column evaluator both sides im
                                 32 in a baked run)
   strata/classes.json           class index → rock class name
   spawn/candidates.json         land cells for spawn selection
+  climate_mapping.json          written by the game at the world's first start (P1-09, plan §7.2; not listed
+                                in the manifest): the tables from the baked biome inputs to the pack's
+                                (see "The climate mapping")
   parity/columns.json           optional: the column evaluator on 500 columns (`deeptime parity`; not listed
                                 in the manifest, never read by the game)
   preset.json                   the exact preset of a run (canonical JSON; `deeptime run`, the game)
@@ -106,7 +109,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
 | `climate/koppen` | L1 | u8 | 1, code index | 255 | `notes.bake.climate.koppen_codes[i]` (31 = sea) |
-| `climate/{temperature,vegetation,continents,erosion,ridges}` | L2 | i16 | 1e-4, vanilla_param | — | the router's five biome inputs; a provisional mapping until P1-09 (its anchors are in `notes.bake.climate.anchors`) |
+| `climate/{temperature,vegetation,continents,erosion,ridges}` | L2 | i16 | 1e-4, vanilla_param | — | the router's five biome inputs, placed against the reference bands and vanilla's land distributions (P1-09, "The climate mapping") |
 | `surface/regolith_blocks` | L2 | u8 | 1/16, block | — | regolith thickness |
 | `surface/class_top` | L2 | u8 | 1, class index | 255 | the rock class at the surface (`strata/classes.json`) |
 | `meta/plate_id` | L1 | u16 | 1, plate id | 65535 | the plate |
@@ -118,6 +121,30 @@ what it did, `millis` per part, `bytes` and `layers` written, and **`detail`** �
 term: `{"layer": "detail/amplitude", "seed": "<u64, decimal>", "salt": 1729, "octaves": 3,
 "wavelength_blocks": 32.0}` (present exactly when `detail/amplitude` is). A preset without the
 deep-time surface (plate-only) bakes nothing (`baked: false`).
+
+### The climate mapping (P1-09)
+
+The bake (`deeptime_core::bake::biomes`, plan §7.2) writes the five biome inputs in vanilla units
+against a **reference**: the band edges of `OverworldBiomeBuilder` (1.21.1) and the land
+distribution of vanilla's own erosion and peaks-and-valleys (quantiles at u = i/64, measured from
+the `minecraft:overworld` router), the file `crates/deeptime-core/data/climate_mapping/default.json`
+(shipped in the jar as `data/deeptime/deeptime/climate_mapping/default.json`). `notes.bake.climate`
+records `mapping: "p1-09"`, the preset's `params` (its `biomes` section, defaults filled in),
+`reference` (`bands`, and `reference` with `erosion`, `peaks_valleys`, `land_min_continents`), the
+mean band coordinates per Köppen class (`koppen_bands`) and the land share of each band
+(`land_shares`).
+
+At the world's first start the game builds `climate_mapping.json` next to the manifest and reads
+it on every later start (so a pack update never moves biomes in unexplored chunks): `schema` 1,
+`tables` — per layer `climate/<name>` a monotone table `{"from": [...], "to": [...]}`
+(piecewise linear, clamped with slope 1 outside; `odd: true` for `climate/ridges`, applied to |w|
+with the sign kept) from the baked value to the pack's — plus `mapping`, `computed_utc`, `why`,
+`pack` (`bands` from the pack's copy of the resource, `router`: the pack router's land quantiles,
+the points sampled) and `reference` (copied from the notes). Temperature, vegetation and
+continentalness map band edge to band edge; erosion maps the reference's land quantiles below E6
+onto the pack's below its E6, then E6 edge to edge; weirdness maps the peaks-and-valleys
+quantiles above the valley slice on the rising branch (|w| = (PV + 1)/3). A folder without a
+P1-09 record (the synthetic worlds, older bakes) gets no file: its values are used as written.
 
 ## Grids
 

@@ -1,0 +1,236 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+package com.minecraftindustrialcomplex.deeptime.climate;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
+import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
+import net.minecraft.core.Holder;
+import net.minecraft.core.QuartPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.biome.Biome;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.IntPredicate;
+
+/**
+ * Surface biomes against the Köppen map (P1-09): a grid of columns over a Deep Time level, each
+ * with its Köppen class (the baked {@code climate/koppen}, nearest cell) and the biome the level's
+ * biome source places at the terrain surface — what {@code /locate biome} and chunk generation
+ * use, without loading a chunk. Per {@link Check}, the share of a Köppen family's columns whose
+ * biome carries one of its NeoForge {@code c:} tags (Terralith and Biomes O' Plenty tag theirs the
+ * same way). Used by {@code BiomeGameTests.climateConsistent} and {@code /deeptime probe biomes},
+ * which can also write the whole grid for the review page.
+ */
+public final class BiomeCensus {
+
+    private BiomeCensus() {}
+
+    static TagKey<Biome> c(String path) {
+        return TagKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath("c", path));
+    }
+
+    /** A Köppen family and the tags its biomes should carry. */
+    public record Check(String name, String classes, IntPredicate koppen, List<TagKey<Biome>> tags) {}
+
+    /** Köppen class indices (`koppen::CODES`): 0–3 A, 4–7 B, 8–16 C, 17–28 D, 29–30 E, 31 sea. */
+    public static final List<Check> CHECKS = List.of(
+            new Check("A", "Af Am Aw As", k -> k <= 3, List.of(c("is_hot"), c("is_jungle"), c("is_savanna"), c("is_wet"))),
+            new Check("Af", "Af", k -> k == 0, List.of(c("is_jungle"), c("is_wet"))),
+            new Check("BW", "BWh BWk", k -> k == 4 || k == 5, List.of(c("is_desert"), c("is_badlands"), c("is_dry"), c("is_sandy"))),
+            new Check("BS", "BSh BSk", k -> k == 6 || k == 7, List.of(c("is_dry"), c("is_savanna"), c("is_plains"), c("is_sparse_vegetation"))),
+            new Check("C", "C*", k -> k >= 8 && k <= 16, List.of(c("is_temperate"))),
+            new Check("D", "D*", k -> k >= 17 && k <= 28, List.of(c("is_cold"), c("is_temperate"), c("is_taiga"), c("is_tree/coniferous"))),
+            new Check("Dsub", "Dsc Dsd Dwc Dwd Dfc Dfd", k -> k == 19 || k == 20 || k == 23 || k == 24 || k == 27 || k == 28,
+                    List.of(c("is_taiga"), c("is_tree/coniferous"), c("is_snowy"), c("is_cold"))),
+            new Check("E", "ET EF", k -> k == 29 || k == 30, List.of(c("is_snowy"), c("is_icy"), c("is_cold"))),
+            new Check("sea", "sea (below sea level)", k -> k == 31, List.of(c("is_ocean"), c("is_deep_ocean"), c("is_aquatic"))),
+            // The narrow ones Ben asked to see: deserts in BW, rainforest in Af, taiga in Dfc, snow and ice in ET/EF.
+            new Check("BW:desert", "BWh BWk", k -> k == 4 || k == 5, List.of(c("is_desert"), c("is_badlands"))),
+            new Check("Af:jungle", "Af", k -> k == 0, List.of(c("is_jungle"))),
+            new Check("Dfc:taiga", "Dfc", k -> k == 27, List.of(c("is_taiga"), c("is_tree/coniferous"))),
+            new Check("E:snow", "ET EF", k -> k == 29 || k == 30, List.of(c("is_snowy"), c("is_icy"))));
+
+    public static final String[] KOPPEN = {"Af", "Am", "Aw", "As", "BWh", "BWk", "BSh", "BSk", "Csa", "Csb", "Csc", "Cwa", "Cwb",
+            "Cwc", "Cfa", "Cfb", "Cfc", "Dsa", "Dsb", "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb", "Dfc", "Dfd", "ET", "EF",
+            "sea"};
+
+    /** Counts per check: matching columns, columns. */
+    public record Result(Map<String, int[]> checks, JsonObject json) {
+        public double share(String check) {
+            int[] c = checks.get(check);
+            return c == null || c[1] == 0 ? Double.NaN : c[0] / (double) c[1];
+        }
+
+        public int total(String check) {
+            int[] c = checks.get(check);
+            return c == null ? 0 : c[1];
+        }
+    }
+
+    /**
+     * Samples every {@code step} blocks inside the pole edge (|z| ≤ C/4 − {@code poleMargin}).
+     *
+     * @param mapFile write the whole grid (palette, biome indices, Köppen classes, heights) here as
+     *                JSON with base64 arrays, or null
+     */
+    public static Result run(ServerLevel level, int step, int poleMargin, Path mapFile) throws IOException {
+        if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g) || !(g.terrain() instanceof WorldDataTerrain t))
+            throw new IllegalStateException(level.dimension().location() + " is not a Deep Time level on world data");
+        WorldData wd = t.data();
+        RasterSampler kp = wd.layer("climate/koppen");
+        var sampler = level.getChunkSource().randomState().sampler();
+        int c = t.circumference(), sea = g.getSeaLevel();
+        int w = c / step, h = c / (2 * step);
+        short[] biomeIdx = new short[w * h];
+        byte[] koppen = new byte[w * h];
+        short[] height = new short[w * h];
+        Map<String, Integer> palette = new LinkedHashMap<>();
+        Map<Holder<Biome>, Integer> byHolder = new HashMap<>();
+        List<Holder<Biome>> holders = new ArrayList<>();
+        Map<String, int[]> checks = new LinkedHashMap<>();
+        for (Check ch : CHECKS)
+            checks.put(ch.name(), new int[2]);
+        Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
+        for (int j = 0; j < h; j++) {
+            int z = -c / 4 + step / 2 + j * step;
+            for (int i = 0; i < w; i++) {
+                int x = -c / 2 + step / 2 + i * step;
+                int cell = j * w + i;
+                double kv = kp.nearest(x, z);
+                int k = Double.isNaN(kv) ? 31 : (int) Math.round(kv);
+                if (k < 0 || k > 31)
+                    k = 31;
+                double y = t.height(x, z);
+                boolean land = k != 31 && y > sea;
+                Holder<Biome> b = g.getBiomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock((int) Math.floor(y)),
+                        QuartPos.fromBlock(z), sampler);
+                Integer idx = byHolder.get(b);
+                if (idx == null) {
+                    idx = holders.size();
+                    holders.add(b);
+                    byHolder.put(b, idx);
+                    palette.put(b.unwrapKey().map(key -> key.location().toString()).orElse("?" + idx), idx);
+                }
+                biomeIdx[cell] = (short) (int) idx;
+                koppen[cell] = (byte) k;
+                height[cell] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(y)));
+                if (Math.abs(z) > c / 4 - poleMargin)
+                    continue;
+                if (k == 31 ? y < sea - 4 : land) {
+                    for (Check ch : CHECKS) {
+                        if (!ch.koppen().test(k))
+                            continue;
+                        int[] n = checks.get(ch.name());
+                        n[1]++;
+                        for (TagKey<Biome> tag : ch.tags())
+                            if (b.is(tag)) {
+                                n[0]++;
+                                break;
+                            }
+                    }
+                    classBiomes.computeIfAbsent(k, kk -> new HashMap<>()).merge(idx, 1, Integer::sum);
+                }
+            }
+        }
+        JsonObject o = new JsonObject();
+        o.addProperty("level", level.dimension().location().toString());
+        o.addProperty("step", step);
+        o.addProperty("w", w);
+        o.addProperty("h", h);
+        o.addProperty("mapping", t.mapping().isIdentity() ? "identity" : t.mapping().summary());
+        JsonObject cj = new JsonObject();
+        for (Check ch : CHECKS) {
+            int[] n = checks.get(ch.name());
+            JsonObject e = new JsonObject();
+            e.addProperty("classes", ch.classes());
+            e.addProperty("columns", n[1]);
+            e.addProperty("matching", n[0]);
+            e.addProperty("share", n[1] == 0 ? null : Math.round(n[0] * 1000.0 / n[1]) / 1000.0);
+            JsonArray tags = new JsonArray();
+            ch.tags().forEach(tg -> tags.add("#" + tg.location()));
+            e.add("tags", tags);
+            cj.add(ch.name(), e);
+        }
+        o.add("checks", cj);
+        // The five commonest biomes of each Köppen class present.
+        JsonObject top = new JsonObject();
+        for (int k = 0; k < 32; k++) {
+            Map<Integer, Integer> m = classBiomes.get(k);
+            if (m == null)
+                continue;
+            int total = m.values().stream().mapToInt(Integer::intValue).sum();
+            JsonObject e = new JsonObject();
+            e.addProperty("columns", total);
+            JsonArray list = new JsonArray();
+            m.entrySet().stream().sorted(Map.Entry.<Integer, Integer>comparingByValue(Comparator.reverseOrder())).limit(5)
+                    .forEach(en -> list.add(nameOf(holders.get(en.getKey())) + " " + Math.round(en.getValue() * 100.0 / total) + "%"));
+            e.add("top", list);
+            top.add(KOPPEN[k], e);
+        }
+        o.add("by_koppen", top);
+        o.addProperty("biomes", palette.size());
+        if (mapFile != null) {
+            JsonObject map = new JsonObject();
+            map.addProperty("schema", 1);
+            map.addProperty("level", level.dimension().location().toString());
+            map.addProperty("circumference", c);
+            map.addProperty("step", step);
+            map.addProperty("x0", -c / 2 + step / 2);
+            map.addProperty("z0", -c / 4 + step / 2);
+            map.addProperty("w", w);
+            map.addProperty("h", h);
+            map.addProperty("sea_level", sea);
+            JsonArray pal = new JsonArray();
+            for (Holder<Biome> b : holders) {
+                JsonObject e = new JsonObject();
+                e.addProperty("id", nameOf(b));
+                JsonArray tags = new JsonArray();
+                b.tags().filter(tg -> tg.location().getNamespace().equals("c")).forEach(tg -> tags.add(tg.location().getPath()));
+                e.add("c_tags", tags);
+                pal.add(e);
+            }
+            map.add("palette", pal);
+            JsonArray codes = new JsonArray();
+            for (String s : KOPPEN)
+                codes.add(s);
+            map.add("koppen_codes", codes);
+            map.addProperty("biome_u16le", b64(biomeIdx));
+            map.addProperty("koppen_u8", Base64.getEncoder().encodeToString(koppen));
+            map.addProperty("height_i16le", b64(height));
+            map.add("census", o.deepCopy());
+            Files.createDirectories(mapFile.getParent());
+            Files.writeString(mapFile, map.toString(), StandardCharsets.UTF_8);
+            o.addProperty("file", mapFile.toString());
+        }
+        return new Result(checks, o);
+    }
+
+    static String nameOf(Holder<Biome> b) {
+        return b.unwrapKey().map(key -> key.location().toString()).orElse("?");
+    }
+
+    private static String b64(short[] v) {
+        ByteBuffer bb = ByteBuffer.allocate(v.length * 2).order(ByteOrder.LITTLE_ENDIAN);
+        for (short s : v)
+            bb.putShort(s);
+        return Base64.getEncoder().encodeToString(bb.array());
+    }
+}

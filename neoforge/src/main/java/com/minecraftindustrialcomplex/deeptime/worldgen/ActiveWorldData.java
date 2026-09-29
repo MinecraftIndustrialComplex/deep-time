@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
+import com.minecraftindustrialcomplex.deeptime.climate.ClimateMapping;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 
 import java.util.Map;
@@ -15,11 +16,23 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ActiveWorldData {
 
     private static final Map<String, WorldData> BY_FOLDER = new ConcurrentHashMap<>();
+    private static final Map<String, ClimateMapping> MAPPINGS = new ConcurrentHashMap<>();
 
     private ActiveWorldData() {}
 
     public static void put(String folder, WorldData data) {
         BY_FOLDER.put(folder, data);
+        MAPPINGS.remove(folder);
+    }
+
+    /** Binds the world's climate mapping (P1-09); without one its biome inputs are used as baked. */
+    public static void putMapping(String folder, ClimateMapping mapping) {
+        MAPPINGS.put(folder, mapping);
+    }
+
+    /** The bound climate mapping of a folder, or {@link ClimateMapping#IDENTITY}. */
+    public static ClimateMapping mapping(String folder) {
+        return MAPPINGS.getOrDefault(folder, ClimateMapping.IDENTITY);
     }
 
     /** The bound world data, or an exception naming the folder: never plausible garbage. */
@@ -37,5 +50,6 @@ public final class ActiveWorldData {
 
     public static void clear() {
         BY_FOLDER.clear();
+        MAPPINGS.clear();
     }
 }
