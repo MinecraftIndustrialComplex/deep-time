@@ -12,7 +12,7 @@ use deeptime_inspect::palette::Palette;
 use deeptime_inspect::region;
 use deeptime_inspect::render::{self, Axis, Out, SeamArgs, SectionArgs};
 use deeptime_inspect::surface::ExcludeOpts;
-use deeptime_inspect::world::Area;
+use deeptime_inspect::world::{Area, World};
 use deeptime_inspect::worlddata::WorldData;
 use deeptime_inspect::{Error, Result};
 
@@ -168,6 +168,16 @@ enum Cmd {
         colors: Option<PathBuf>,
         #[command(flatten)]
         exclude: Exclude,
+    },
+    /// Counts the distinct blocks in an area (all heights), by block id and by namespace. Used to
+    /// give BlueMap only the mod jars whose blocks a review render actually contains.
+    Blocks {
+        /// The world or dimension folder (the one holding region/).
+        #[arg(long)]
+        world: PathBuf,
+        /// x0,z0,x1,z1 (x1, z1 exclusive).
+        #[arg(long, value_parser = Area::parse)]
+        area: Area,
     },
     /// Lists region files; prints outside=<n> for files outside -C/1024 <= rx < C/1024.
     Regions {
@@ -373,6 +383,37 @@ fn run(cli: Cli) -> Result<()> {
                 v["png"],
                 v["diff_png"]
             );
+        }
+        Cmd::Blocks { world, area } => {
+            let w = World::load_area(&world, Some(area))?;
+            let mut by_id: std::collections::BTreeMap<String, u64> = Default::default();
+            let mut counts: std::collections::HashMap<u32, u64> = std::collections::HashMap::new();
+            for (&(cx, cz), chunk) in &w.chunks {
+                if !area.contains_chunk(cx, cz) {
+                    continue;
+                }
+                for x in 0..16 {
+                    for z in 0..16 {
+                        let (bx, bz) = (cx * 16 + x as i32, cz * 16 + z as i32);
+                        if bx < area.x0 || bx >= area.x1 || bz < area.z0 || bz >= area.z1 {
+                            continue;
+                        }
+                        for y in chunk.min_y()..=chunk.max_y() {
+                            *counts.entry(chunk.get(x, y, z)).or_default() += 1;
+                        }
+                    }
+                }
+            }
+            let mut by_ns: std::collections::BTreeMap<String, u64> = Default::default();
+            for (id, n) in counts {
+                let name = w.reg.states[id as usize].name.clone();
+                let ns = name.split(':').next().unwrap_or("minecraft").to_string();
+                *by_ns.entry(ns).or_default() += n;
+                *by_id.entry(name).or_default() += n;
+            }
+            print_json(
+                &serde_json::json!({"area": area.to_json(), "namespaces": by_ns, "blocks": by_id}),
+            )?;
         }
         Cmd::Regions { world, span, json } => {
             let wd = default_world_data(&world, None)?;

@@ -2274,7 +2274,12 @@ once from nixpkgs). Every byte they produce lands under Deep Time's own gitignor
   wrong or not at all; worldgen output is mostly static-model rock, so this matters little. Custom
   world height (−352..639) is not confirmed to work (BlueMap issue #517 fixed a crash with inline
   dimension types; current behaviour untested): P0-14 verifies it.
-- **Static hosting.** By default BlueMap's file storage writes tiles gzip-compressed (`*.prbm.gz`) and
+- **As built (P0-14, 2026-09-28).** Storage stays gzip and `render-bluemap.sh` sets the web app's
+  `clientDecompression: true`, so BlueMap's loader fetches `.prbm.gz`/`textures.json.gz` and inflates
+  them in the browser; no service worker and no Content-Encoding header. spacesheep's Free plan limits
+  (200 files per space, 10 MB per file) bound a review render: `BLUEMAP_BOX` picks the area and
+  `BLUEMAP_ONLY_PRESENT=1` gives BlueMap only the jars whose blocks occur there.
+- **Static hosting (original analysis).** By default BlueMap's file storage writes tiles gzip-compressed (`*.prbm.gz`) and
   expects the web server to send `Content-Encoding: gzip`, and 204 for missing tiles; spacesheep is a
   plain static host. BlueMap 5.28's `storages/file.conf` has a `compression` key whose documented
   values are `gzip` (the default), `zstd`, `deflate` and `none`

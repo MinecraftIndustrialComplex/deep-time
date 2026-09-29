@@ -3,11 +3,11 @@ world: "@WORLD@"
 dimension: "minecraft:overworld"
 name: "Deep Time planet — surface"
 sorting: 0
-start-pos: { x: 0, z: 0 }
+start-pos: { x: @CX@, z: @CZ@ }
 sky-color: "#7dabff"
 void-color: "#000000"
 sky-light: 1
-ambient-light: 0.1
+ambient-light: 0.6   # Chunky-generated chunks may lack sky light; keep them readable
 # Deep Time's floor is y -352; caves below sea level are hidden as in BlueMap's default look.
 remove-caves-below-y: 55
 cave-detection-ocean-floor: -5
