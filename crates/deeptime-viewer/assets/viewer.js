@@ -133,7 +133,7 @@
       drawWrapped(images.water_level, waterLayer, 0.85);
     }
     if (document.getElementById('grat').checked) {
-      for (let lon = -150; lon <= 180; lon += 30) vline(lon / 360 * C, 'rgba(255,255,255,0.35)', [2, 4], null);
+      for (let lon = 30; lon < 360; lon += 30) vline(lon / 360 * C - C / 2, 'rgba(255,255,255,0.35)', [2, 4], null);   // meridians every 30° (plan §5.2 longitude)
       for (let lat = -60; lat <= 60; lat += 30) hline(-lat / 90 * C / 4, 'rgba(255,255,255,0.35)');
     }
     if (document.getElementById('seam').checked) {
@@ -201,11 +201,11 @@
 
   function inspect(x, z) {
     lastClick = { x, z };
-    const lat = -z / (C / 4) * 90, lon = x / C * 360;
+    const lat = -z / (C / 4) * 90, lon = (x + C / 2) / C * 360;   // plan §5.2: the seam is 0°
     const rows = [
       ['block x, z', `${Math.floor(x)}, ${Math.floor(z)}`],
       ['latitude', `${Math.abs(lat).toFixed(3)}° ${lat >= 0 ? 'N' : 'S'}  (north is −z)`],
-      ['longitude', `${Math.abs(lon).toFixed(3)}° ${lon >= 0 ? 'E' : 'W'}  (θ = 360°·x/C; seam at ±180°)`],
+      ['longitude', `${lon.toFixed(3)}°  (360°·(x + C/2)/C; the seam x = ±C/2 is 0°)`],
     ];
     for (const l of B.layers) {
       const s = sample(l, x, z);
