@@ -275,6 +275,7 @@ name = "deeptime-jni"
 version = "0.0.1"
 dependencies = [
  "deeptime-core",
+ "deeptime-format",
  "jni",
  "rayon",
  "serde_json",

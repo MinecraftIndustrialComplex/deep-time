@@ -20,11 +20,15 @@
 //!   the editor or `config/deeptime/server.json` supplies it. `start` is one of
 //!   [`StartConfig`]; `length_myr` the simulated span in millions of years. On a dummy world it
 //!   sets the clock to run from −length to 0 with eight keyframe intervals.
-//! - `placeholder: true` marks the Phase 1 stand-ins shipped as the built-in presets before the real
-//!   stages exist; the server logs a warning for them.
+//! - `placeholder: true` marks a stand-in that is not a simulated planet (the dummy pipeline with a
+//!   synthetic terrain; P1-13's built-ins until P1-08, now only test presets); the server logs a
+//!   warning for one and the workbench hides them behind its dev toggle.
 //!
 //! Built-in presets are JSON files in `crates/deeptime-core/presets/`, compiled into the core and
-//! copied into the mod jar (`deeptime/presets/<name>.json`, Gradle `processResources`).
+//! copied into the mod jar (`deeptime/presets/<name>.json`, Gradle `processResources`). Since P1-08
+//! they are the planet pipeline presets under their game names (`earthlike_quick_16k` =
+//! `pipeline_quick_16k`, … ; `tools/dev/sync_builtin_presets.py` writes them from the pipeline
+//! files, `builtins_are_the_pipeline_presets` keeps the two equal).
 
 use serde_json::{Map, Value, json};
 
@@ -620,7 +624,10 @@ mod tests {
         for (name, json) in BUILTIN {
             let p = Preset::from_json(json).unwrap_or_else(|e| panic!("{name}: {e}"));
             assert_eq!(p.name(), name);
-            assert!(p.header.placeholder, "{name} is a Phase 1 placeholder");
+            assert!(
+                !p.header.placeholder,
+                "{name} is a simulated planet since P1-08"
+            );
             assert!(p.header.timeline.is_none(), "{name}: no default story");
             let want = if name.ends_with("_32k") {
                 32_768
@@ -628,12 +635,47 @@ mod tests {
                 16_384
             };
             assert_eq!(p.circumference(), want, "{name}");
-            assert_eq!(p.synth(), Some(synth::Kind::WrapTest), "{name}");
+            assert_eq!(p.synth(), None, "{name}");
+            let stages: Vec<String> = p.stages().iter().map(|s| s.name().to_owned()).collect();
+            assert_eq!(
+                stages,
+                [
+                    "plates",
+                    "climate",
+                    "surface",
+                    "structure",
+                    "deposits",
+                    "young",
+                    "amplify"
+                ],
+                "{name} runs the whole pipeline"
+            );
             // Canonical and stable: parsing the canonical form gives the same preset.
             let again = Preset::from_json(&p.to_json().to_string()).unwrap();
             assert_eq!(again, p, "{name}");
         }
         assert_eq!(resolve("earthlike_quick_16k").unwrap(), BUILTIN[0].1);
+    }
+
+    /// The built-ins are the calibrated pipeline presets under their game names; only `name` and
+    /// `description` differ (`tools/dev/sync_builtin_presets.py` writes them).
+    #[test]
+    fn builtins_are_the_pipeline_presets() {
+        for (name, json) in BUILTIN {
+            let pipeline = name.replace("earthlike_", "pipeline_");
+            let mut ours: Value = serde_json::from_str(json).unwrap();
+            let mut theirs: Value =
+                serde_json::from_str(crate::params::planet_builtin(&pipeline).unwrap()).unwrap();
+            for v in [&mut ours, &mut theirs] {
+                let o = v.as_object_mut().unwrap();
+                o.remove("name");
+                o.remove("description");
+            }
+            assert!(
+                ours == theirs,
+                "{name} differs from {pipeline}: run tools/dev/sync_builtin_presets.py"
+            );
+        }
     }
 
     #[test]
@@ -662,9 +704,25 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// A placeholder preset as P1-13 shipped them: the dummy pipeline plus a synthetic terrain.
+    const PLACEHOLDER: &str = r#"{"schema":0,"name":"placeholder_16k","placeholder":true,
+        "scale":{"circumference_blocks":16384},
+        "dummy":{"steps":2,"sleep_ms":0,"stages":["dummy_drift","dummy_erode"],"synth":"wrap-test",
+                 "world":{"circumference":16384,"grid_r":16,"t_start_years":-1.0e9,"t_end_years":0.0,
+                          "keyframe_every_years":1.25e8,"keyframe_size":[256,128],
+                          "event_every_steps":5,"sites":3,"seed":1}}}"#;
+
+    #[test]
+    fn placeholders_still_parse_and_bake_their_synthetic_terrain() {
+        let p = Preset::from_json(PLACEHOLDER).unwrap();
+        assert!(p.header.placeholder);
+        assert_eq!(p.synth(), Some(synth::Kind::WrapTest));
+        assert_eq!(p.circumference(), 16_384);
+    }
+
     #[test]
     fn timeline_drives_the_dummy_clock() {
-        let json = with_timeline(BUILTIN[0].1, Some("scattered_continents"), Some(800.0)).unwrap();
+        let json = with_timeline(PLACEHOLDER, Some("scattered_continents"), Some(800.0)).unwrap();
         let p = Preset::from_json(&json).unwrap();
         assert_eq!(
             p.header.timeline,
