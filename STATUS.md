@@ -146,15 +146,22 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **After merging master c7af155 (P0-06, P0-14, P0-15)** into the branch (conflicts: the probe
   builder in `DeepTimeCommands`, this log): cargo test/clippy/fmt/deny clean, JUnit 46/0,
   `./gametest.sh` → All 21 required tests passed, `./gametest.sh -PwithMic` → All 21 required tests
-  passed (same palette numbers as above).
-- **`-PwithMic` heap (gametest.sh changed).** Two merged `-PwithMic` runs died of
-  `OutOfMemoryError: Java heap space` (the 6 GB GameTest heap) during `lakeHolds`, the last test;
-  the process then hung and had to be killed. TaCZ and Mega Showdown unpack ~190 MB of packs into
-  `run-gametest/tacz` and `run-gametest/showdown` on a first run and load them on every later one:
-  the first (cold) MIC run passed, both warm ones ran out of heap, a cold one passed again.
-  `gametest.sh` now deletes those two folders with the world; a warm rerun then passed (All 21).
-  The heap stays tight with MIC (160 mods, 240 forceloaded lake chunks); if it recurs, raise
-  `-Xmx` for `-PwithMic` rather than trimming tests.
+  passed (same palette numbers as above). **After merging master 3b05d00 (P1-13)**, which moved the
+  synthetic worlds into `deeptime_core::synth`: the strata option moved with them (`Strata`,
+  `EVERY_CLASS`, `build(kind, strata, c, codec)`; the session's placeholder presets bake
+  `Strata::Placeholder`, so P1-13's worlds are unchanged). cargo test (core 59, cli 7, …), clippy,
+  fmt, deny clean; JUnit 57/0; `./gametest.sh` → All 21 required tests passed; `./gametest.sh
+  -PwithMic` → All 21 required tests passed (and one stalled run, below).
+- **Known issue: `-PwithMic` `lakeHolds` hangs, then runs out of heap (flaky).** Of seven
+  `-PwithMic` runs of this branch, four passed (All 21) and three stalled in `lakeHolds` (every other
+  test done; it forceloads 240 test_lake chunks synchronously), then died of `OutOfMemoryError: Java
+  heap space` (6 GB) 20 s to 5 min later; the JVM then ignores SIGTERM and needs `kill -9`, holding
+  the server lock. No Deep Time frame in any stack; C2ME's workers report the OOM. One control run
+  of master 3b05d00 (14 tests) passed. A first guess (TaCZ/Mega Showdown's unpacked packs in
+  `run-gametest/`) was wrong: a run with both folders deleted also failed. The stall (a synchronous
+  chunk load under C2ME that never returns, with memory growing while it waits) is the thing to chase;
+  a thread dump (`jstack`) during a stall would show it. Until then, rerun a `-PwithMic` gate that
+  stalls in `lakeHolds`.
 - **Not done / next.** Bodies in the strata pass (needs P1-08/P1-14's `bodies/`); the review
   artefacts (BlueMap cliffs with Create stones) wait for Ben's review round; `deposit_type`,
   `sim_field`, `essentials` registries come with their tasks. The MIC pack still has no copy of the
