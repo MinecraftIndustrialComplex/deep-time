@@ -25,9 +25,10 @@ import org.junit.jupiter.api.Test;
  * Static checks over the mod's sources (P1-11):
  * <ul>
  *   <li><b>Dist separation.</b> Client-only types ({@code net.minecraft.client}, {@code com.mojang.blaze3d},
- *       NeoForge's client events) appear only in the {@code screen} package, whose entry point is the
- *       {@code dist = CLIENT} mod class; nothing outside it references it except its plain-Java
- *       {@code screen.model}, which references no Minecraft type at all, so JUnit and GameTests run it.</li>
+ *       NeoForge's client events) appear only in the client packages: {@code screen} (whose entry point
+ *       is the {@code dist = CLIENT} mod class) and P1-18's {@code client}; nothing outside them
+ *       references a screen class, and the plain-Java {@code screen.model} references no Minecraft type
+ *       at all, so JUnit and GameTests run it.</li>
  *   <li><b>Language keys.</b> Every key the screens and models name exists in {@code en_us.json}.</li>
  * </ul>
  */
@@ -61,7 +62,8 @@ class ScreenSourcesTest {
         for (Path p : javaFiles()) {
             String r = rel(p);
             String text = Files.readString(p, StandardCharsets.UTF_8);
-            boolean screen = r.startsWith("screen/") && !r.startsWith("screen/model/");
+            // Client-only packages: screen/ (P1-11, not screen/model/) and client/ (P1-18).
+            boolean screen = (r.startsWith("screen/") && !r.startsWith("screen/model/")) || r.startsWith("client/");
             if (!screen && CLIENT_IMPORT.matcher(text).find())
                 bad.add(r + " imports a client-only type");
             if (!screen && SCREEN_REF.matcher(text).find())

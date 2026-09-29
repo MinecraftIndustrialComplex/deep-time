@@ -102,8 +102,8 @@ def main():
     ap.add_argument("--run", action="append", default=[], metavar="TEST[,TEST...]@X,Y,Z[~DX,DZ]",
                     help="run tests by name (lower-case method names) positioned at X,Y,Z, forceloading "
                          "X±DX, Z±DZ (default 32,32) (repeatable)")
-    ap.add_argument("--scenario", choices=("sable_straddle",),
-                    help="one scripted scenario after the tests (plan §9.4)")
+    ap.add_argument("--scenario", action="append", default=[], choices=("sable_straddle", "refuse_client"),
+                    help="a scripted scenario after the tests (plan §9.4; repeatable)")
     ap.add_argument("--timeout", type=int, default=1200)
     ap.add_argument("gradle_args", nargs="*")
     a = ap.parse_args()
@@ -158,8 +158,8 @@ def main():
                 failures.append("probe tw did not answer")
             for spec in a.run:
                 failures += run_tests(spec, rcon, a.timeout, a.size)
-            if a.scenario:
-                failures += SCENARIOS[a.scenario](a, srv, rcon)
+            for scenario in a.scenario:
+                failures += SCENARIOS[scenario](a, srv, rcon)
     finally:
         srv.stop(rcon)
     print("PASS" if not failures else "FAIL: " + "; ".join(failures), flush=True)
@@ -322,7 +322,61 @@ def scenario_sable_straddle(a, srv, rcon):
     return []
 
 
-SCENARIOS = {"sable_straddle": scenario_sable_straddle}
+def scenario_refuse_client(a, srv, rcon):
+    """P1-18 (plan §7.15): a client without Deep Time cannot join; one with it gets past the check.
+
+    Reads the server's own channel list (/deeptime probe network), then connects over TCP three
+    times with tools/planet/mcclient.py: a NeoForge client offering every channel except Deep
+    Time's must be refused with exactly Deep Time's required channels named; one offering every
+    channel must pass the negotiation (neoforge:network); a vanilla client must be refused.
+    Prints `refuse_client: OK` or what differed.
+    """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import mcclient
+    # ~200 channels make a probe line of ~20 kB, and RCON returns only its first 4 kB: read the
+    # server's own log line instead.
+    rcon("deeptime probe network")
+    channels, end = None, time.time() + 30
+    while channels is None and time.time() < end:
+        for line in reversed(srv.lines):
+            m = PROBE.search(line)
+            if m and '"probe":"network"' in line:
+                channels = json.loads(m.group(1))["channels"]
+                break
+        else:
+            time.sleep(0.5)
+    if channels is None:
+        return ["refuse_client: /deeptime probe network did not answer"]
+    ours = [c for c in channels if c["id"].startswith("deeptime:")]
+    required_ours = sorted(c["id"] for c in ours if not c["optional"])
+    print(f"   server channels: {len(channels)} ({len(ours)} Deep Time: "
+          + ", ".join(f"{c['id']} {c['protocol']} v{c['version']} {'optional' if c['optional'] else 'required'}" for c in ours)
+          + ")", flush=True)
+    failures = []
+    if not required_ours:
+        failures.append("refuse_client: Deep Time has no required channel")
+    without = [c for c in channels if not c["id"].startswith("deeptime:")]
+    host = "127.0.0.1"
+    r = mcclient.attempt(host, GAME_PORT, "neoforge", without)
+    print(f"   NeoForge client without Deep Time: {r['outcome']}, refused channels {sorted(r['refused_channels'])}, "
+          f"disconnect {r['disconnect'][:2]} {r.get('error', '')}", flush=True)
+    if r["outcome"] != "refused" or sorted(r["refused_channels"]) != required_ours:
+        failures.append(f"refuse_client: a client without Deep Time: {r['outcome']} {sorted(r['refused_channels'])} "
+                        f"(expected refused {required_ours}) {r.get('error', '')} events {r['events'][-6:]}")
+    r = mcclient.attempt(host, GAME_PORT, "neoforge", channels)
+    print(f"   NeoForge client with every channel: {r['outcome']} {r.get('error', '')}", flush=True)
+    if r["outcome"] != "accepted":
+        failures.append(f"refuse_client: a client with every channel: {r['outcome']} {r['refused_channels']} "
+                        f"{r['disconnect'][:2]} {r.get('error', '')}")
+    r = mcclient.attempt(host, GAME_PORT, "vanilla")
+    print(f"   vanilla client: {r['outcome']}, disconnect {r['disconnect'][:2]} {r.get('error', '')}", flush=True)
+    if r["outcome"] != "refused":
+        failures.append(f"refuse_client: a vanilla client: {r['outcome']} {r.get('error', '')}")
+    print("refuse_client: OK" if not failures else "refuse_client: FAIL", flush=True)
+    return failures
+
+
+SCENARIOS = {"sable_straddle": scenario_sable_straddle, "refuse_client": scenario_refuse_client}
 
 
 if __name__ == "__main__":

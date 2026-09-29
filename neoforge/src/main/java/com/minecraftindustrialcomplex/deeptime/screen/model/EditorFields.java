@@ -67,13 +67,18 @@ public final class EditorFields {
         return new Field(id, s, Kind.NUMBER, path, min, max, unit, false);
     }
 
-    /** Every field, in the setup page's order. Ranges are the editor's sanity bounds, not physics. */
+    /**
+     * Every field, in the setup page's order. The planet and scale paths and ranges are P1-03's
+     * {@code params.rs} ({@code PlanetParams}, {@code ScaleParams}, {@code PlanetPreset::validate});
+     * the others are proposals for the stages that have not landed (their ranges are the editor's
+     * sanity bounds; the core validates in the end).
+     */
     public static final List<Field> ALL = List.of(
-            number("gravity", Section.PLANET, "planet.gravity_m_s2", 0.1, 100, "m/s²"),
+            number("gravity", Section.PLANET, "planet.gravity_m_s2", 0.1, 99.9, "m/s²"),
             number("day_length", Section.PLANET, "planet.day_length_h", 1, 10_000, "h"),
-            number("axial_tilt", Section.PLANET, "planet.axial_tilt_deg", 0, 90, "°"),
+            number("axial_tilt", Section.PLANET, "planet.axial_tilt_deg", 0, 180, "°"),
             number("star_flux", Section.PLANET, "planet.star_flux_rel", 0.1, 10, "×"),
-            number("ocean_fraction", Section.PLANET, "planet.ocean_fraction", 0, 1, ""),
+            number("ocean_fraction", Section.PLANET, "planet.ocean_fraction", 0.05, 0.95, ""),
             number("m_per_block_h", Section.SCALE, "scale.m_per_block_h", 10, 10_000, "m"),
             number("m_per_block_v", Section.SCALE, "scale.m_per_block_v", 1, 200, "m"),
             number("deposit_count", Section.MULTIPLIERS, "deposits.count_multiplier", 0, 10, "×"),

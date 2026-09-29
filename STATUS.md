@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Next: P1-03, P1-12, P1-13, P1-14 (agents), then P1-04 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Next: P1-04 (agent, critical path), P1-11, P1-15, P1-18 (agents), then P1-05/P1-07 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -24,7 +24,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-15 | Phase 0 exit | done | 2026-09-28 | — | tools/review/phase0.py → 11 of 11 pass (Rust, JUnit, GameTests default/MIC/TerraBlender, planet server seam+Sable+pole, smoke standalone + MIC 16k/32k, inspect compare, natives.yml); https://spacesheep.dev/@benmac/deeptime-phase0 |
 | P1-01 | Session, checkpoints, keyframes, event log and site formats | done | 2026-09-28 | — | Mac: cargo test -p deeptime-format 27 ok (segments + sites round-trip, two writers merge with no id collision); run --preset dummy.json → manifest.json, events/1-0.dtev, keyframes/index.json (13 events, 9 keyframes, 3 sites); test --workspace, fmt, clippy -D warnings, deny licenses bans clean; gradlew build test tests=34 failures=0 and ./gametest.sh all 14 pass (after merging master 2f81ae5) |
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
-| P1-03 | Plates and crust | todo | | | |
+| P1-03 | Plates and crust | done | 2026-09-28 | 0867a61 | Mac: cargo test --workspace ok (plates::/params::/preset:: 20 + 1 ignored: rift area conserved exactly, partition, ages ≥ 0, hull invariants after every resampling, byte-identical resume); 500 Myr 20k: p90 ocean age 167/169/245 Myr, 98/97/90.5 % < 250 Myr; `stage plates --preset plates_quick_16k --start scattered_continents --length-myr 500` → plates_final=13 ocean_age_p90_myr=202.3 steps=250 seconds=8.3; 100k 8.3 s (12 thr) / 23 s (1 thr), 250k 25–31 s / 72 s vs Cortial 76–106 / 330–437 s; clippy, fmt, deny clean |
 | P1-04 | Deep-time surface processes on L1 | todo | | | |
 | P1-05 | Climate | todo | | | |
 | P1-06 | Young landscape, amplification and the detail layer | todo | | | |
@@ -32,14 +32,14 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-08 | Bake, world data v1 and parity | todo | | | |
 | P1-09 | Climate mapping and biomes | todo | | | |
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
-| P1-11 | Customize editor, timelapse and staging | doing | 2026-09-28 | d42375e | Screens, models and staging built on the placeholder presets (real stages pending). Mac: JUnit tests=93 failures=0 (EditorModelTest, TimelapseModelTest, ModelHelpersTest, StagingMoverTest, TimelineAcrossJniTest, ScreenSourcesTest); ./gametest.sh → All 25 required tests passed (EditorModelGameTests acceptBuildsGenerator, stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel); cargo fmt/clippy/test/deny and gradlew build clean. Client (laptop, HeadlessMC + Xvfb): whole walk Create World → editor → run → review → Accept → world created from the moved staging, no crash; guidance panel with natives forced off; screenshots in review/out/p1-11-client. Rerun with the real presets after P1-08; biome names on the review page with P1-09 |
+| P1-11 | Customize editor, timelapse and staging | doing | 2026-09-28 | d42375e | Screens, models and staging built on the placeholder presets (real stages pending). Mac, merged with master f14d258 (P1-03, P1-18): JUnit tests=101 failures=0 (new: EditorModelTest, TimelapseModelTest, ModelHelpersTest, StagingMoverTest, TimelineAcrossJniTest, ScreenSourcesTest); ./gametest.sh → All 31 required tests passed (EditorModelGameTests acceptBuildsGenerator, stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel, realPresetFieldsLightUp); cargo fmt/clippy -D warnings/test --locked (193 passed)/deny clean; gradlew build clean. Client (laptop, HeadlessMC + Xvfb): whole walk Create World → editor → run → review → Accept → world created from the moved staging, no crash; guidance panel with natives forced off; screenshots in review/out/p1-11-client. Rerun with the real presets after P1-08; biome names on the review page with P1-09 |
 | P1-12 | Strata pass with rock tags and `rock_states` | done | 2026-09-28 | — | Mac: ./gametest.sh and -PwithMic (+ MIC rock tags via -Ddeeptime.extraDatapack) → All 21 required tests passed each; coal stone / black argillite; Create stones in their classes; loess = projectatmosphere:dust[layers=8]; everyClassInTheWorld 59/59 classes, 240 samples 0 wrong; MIC smoke probe palette 59/59 (member 24, fallback 35); JUnit 46/0; bodies deferred (P1-08/P1-14) |
 | P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 743b69d | Mechanism verified on placeholder presets (dummy pipeline + wrap-test bake): standalone and MIC first starts generate in ~12 s with progress lines ≤ 5 s apart, restart does not regenerate; no-config / circumference-mismatch / native-failure all stop cleanly before loadLevel. Rerun with the real presets after P1-08 |
 | P1-14 | Deposit engine: the four families | doing | 2026-09-28 | 7f4858c | Engine on a synthetic field history (real fields wait for P1-03…P1-07). Mac: cargo test --workspace ok (core 82 incl. 41 deposits::, format 31, cli 11); porphyry σ 1.4892; Poisson means within 4 SE over 10,000 draws; tonnage P90/P50/P10 within 4 SE; min separation holds (200 seeds + the run); every site has a forming event with causes; `stage deposits --preset …/deposits_synthetic_16k.json --viewer review/out/p1-deposits` → 32 sites of all 8 types, counts next to ρ·A·F (porphyry 9 drawn / 9.41), 0.83 GB peak; fmt, clippy -D warnings, deny clean |
 | P1-15 | Deposits in the world | todo | | | |
 | P1-16 | COE and CDG hooks | todo | | | |
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
-| P1-18 | Pole cap and client info | todo | | | |
+| P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
 
 ## Review pages
@@ -47,6 +47,8 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 |---|---|---|---|
 | seams (how the seams work, interactive) | https://spacesheep.dev/@benmac/deeptime-seams | seams v2 2026-09-28 | 2026-09-28 |
 | phase0 (Phase 0 exit: every check, evidence, links) | https://spacesheep.dev/@benmac/deeptime-phase0 | Phase 0 exit 2026-09-28 | 2026-09-28 |
+| p1-plates (500 Myr of plates, 100k samples, keyframes + events) | https://spacesheep.dev/@benmac/deeptime-p1-plates | P1-03 plates 100k 500 Myr 2026-09-28 | 2026-09-28 |
+| p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
 | p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
 
 ## Pending questions
@@ -152,9 +154,255 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   writes PNGs with ImageIO. It fixed two screen bugs: the scrubber label lagged while following
   live, and Linux "free memory" was `MemFree` (0.7 GiB of 15.4) — now `MemAvailable`. Layout and
   feel remain unreviewed by a person (plan §9.8).
+- **Merged master f14d258 (P1-03 plates, P1-18 pole cap) into this branch.** Conflicts: STATUS.md
+  (both build-log entries kept) and `en_us.json` (P1-18 added one too; keys unioned). Adapted:
+  P1-18's six-field `WorldDataRef` (Accept keeps the world preset's pole-cap lines), and
+  `ScreenSourcesTest` treats P1-18's `client/` package as client-only too. P1-03's planet pipeline
+  (`params.rs`) uses exactly the catalogue's `planet.*` and `scale.m_per_block_*` paths; the
+  catalogue's ranges now match its validation (tilt 0–180°, ocean fraction 0.05–0.95), and the new
+  GameTest `realPresetFieldsLightUp` imports a P1-03 planet preset: those seven fields become
+  editable, an edit lands at the path the core reads, and the core's estimate accepts it (174 MiB,
+  1 stage). After the merge: JUnit tests=101 failures=0; ./gametest.sh All 31 required tests
+  passed; cargo fmt, clippy -D warnings, test --locked (193 passed), deny clean.
 - **Next.** When P1-08's real presets land: rerun `./gametest.sh` and the client check with them,
   make the `EditorFields` paths match the real schema (`ModelHelpersTest.realPresetsCarryEveryField`
   fails for a real built-in that lacks one), add P1-09's biome names and staged climate mapping at Accept.
+
+### 2026-09-28 — P1-18 pole cap and client info (agent worktree agent-a4399e9f8080242f4)
+- **The cap** (`wrap/PoleCap`, `wrap/PoleCapCurve`; replaces P0-06's `PoleCapPrototype` and its
+  `prototypepushback` test). Runs after every tick of a Deep Time level (`LevelTickEvent.Post`).
+  Lines per level from the generator's `world_data`: new optional codec fields `pole_cap_deg`
+  (default 75) and `pole_stop_deg` (default 80), validated cap < stop ≤ 90 and written out in
+  both world presets (and `tools/dev/gen_worldgen.py`); `WorldDataRef.poleCap()`. The Rust
+  preset's `scale.pole_cap_deg` (plan §5.1) reaches the generator when P1-11 writes world presets
+  from a preset; the placeholder presets name neither.
+- **The curves** (the seam page's were illustrations; now the real ones, documented in
+  `PoleCapCurve`, pinned by `PoleCapCurveTest`): s = depth into the 75°–80° band. Pushback
+  0.10·s^1.5 blocks/tick² toward the equator (76° 0.0089, 77.5° 0.0354, 79° 0.0716, 80° 0.10;
+  ground friction makes a per-tick push p a drift of 2.2p, the same factor as the walking input
+  0.1, so at 80° walking is cancelled exactly, sprinting creeps, and anything airborne (factor 11)
+  or gliding is thrown back hard). Storm s^0.7 (0.20 at 75.5°, 0.62 at 77.5°). Sable wind
+  1.0·s^1.5 blocks/s added per tick (20 blocks/s² at the stop; a 40 blocks/s jet entering at 75°
+  turns at 78.6° at 16k).
+- **Player policy** (decided here): survival/adventure get wind, warning and stop; **creative**
+  gets the storm, the warning and the hard stop but no wind (the vanilla border stops creative
+  players too; builders at 76° should not be blown about); **spectators** only see the storm (no
+  wind, no stop, no warning, as they pass the vanilla border); fake players are ignored.
+  **Vehicles**: a player's root vehicle, under the strongest policy of its riders; empty vehicles and
+  mob-only stacks are not capped (nothing gained).
+- **Who moves whom.** A player's own movement (and a vehicle it steers: boat, horse) is its
+  client's; a server motion packet would *replace* the client's velocity every tick (no momentum,
+  broken jumps), so the server sends the wind in `PoleStormPayload.push` and Deep Time's client adds
+  it before the player moves (`client/PolarStorm`). Vehicles the server simulates (minecarts, any
+  ridden-but-not-steered root) are pushed server-side. The hard stop is always the server's: a
+  player past the line is teleported onto it, 0.05 blocks inside (absolute teleport, which zeroes
+  the client's velocity; y lifted out of terrain if the line cuts rising ground), a vehicle is moved
+  with its riders (plus `ClientboundMoveVehiclePacket` when a client steers it), riders of anything
+  else (Create contraptions, modded seats) are dismounted and stopped alone. Action bar: gold storm
+  line on entry and every 40 ticks, red stop line at once (`assets/deeptime/lang/en_us.json`).
+- **Sable** (`compat/sable/SablePoleCap`, loaded only with Sable; with `SableTestOps` the only
+  classes naming Sable types): every sub-level of the level from
+  `SubLevelContainer.getContainer(level).getAllSubLevels()`; wind at the pose through
+  `RigidBodyHandle.addLinearAndAngularVelocity`; stop when the hull's poleward edge (global bounds)
+  is past the line: poleward velocity cancelled plus the full wind, never a teleport (a teleport
+  would leave the deck's players behind). Sable declared `optional` `[2.0.5,)` in mods.toml.
+- **Networking** (`net/`): `DeepTimeNetwork` registers `deeptime:world_info` (`WorldInfoPayload`:
+  planet flag, dimension, world-data format version, C, m/block h and v (manifest, new optional
+  fields), cap and stop, planet name = the manifest source's preset/kind; sent on login, dimension
+  change, respawn) and `deeptime:pole_storm` (`PoleStormPayload`: storm, push; sent on a change of
+  0.02 storm or 0.002 push, and on every change to or from zero; clamped on arrival), both
+  play-to-client, version "1", **required**. `ClientHandlers` only stores into `ClientPlanetState`
+  (no client classes, safe on a dedicated server). NeoForge has no public view of its
+  registrations: `DeepTimeNetwork.registrations()` reads `NetworkRegistry.PAYLOAD_REGISTRATIONS` by
+  reflection. New probes: `/deeptime probe pole [z]`, `/deeptime probe network`.
+- **Client** (`client/DeepTimeClient`, `client/PolarStorm`; loaded only when
+  `FMLEnvironment.dist == CLIENT`): the F3 line (`net/PlanetDebugLine`, left column:
+  `Deep Time: 76.904° N 90.000° E · wrap-test (C 16384, 300 m/block) · polar storm 62%`), the wind,
+  fog (far plane from the render distance down to 20 blocks at full storm, near plane to 0,
+  colour toward pale grey; camera in air only) and up to 16 snowflakes a tick blown equatorward;
+  the drawn storm eases 0.02/tick. **Compiled only**: no client was booted. mic-climate's
+  HeadlessMC route is not cheap here: its `-lwjgl` mode never got past "Waiting for player to
+  load", its Xvfb mode is Linux-only (the Mac has no X server; the laptop must not run heavy
+  jobs), and reaching the storm would also need a Deep Time world with the player at 75°+.
+- **Tests.** Players are `gametest/MockPlayers`: real `ServerPlayer`s placed through
+  `PlayerList.placeNewPlayer` on an `EmbeddedChannel` connection NeoForge treats as a full NeoForge
+  client (`NetworkRegistry.configureMockConnection`), so tests read the packets the server sends
+  (storm payloads, action bar = system chat with overlay) and see its teleports; nothing moves
+  them. Planet namespace (`PoleCapGameTests`; each test forces its own polar chunk strips at
+  y = max − 20.5, so the harness only needs a loaded spot): `entityPushedBack`, `hardStopAt80`,
+  `sableHullPushedBack`. GameTest namespace (`NetworkGameTests`): `worldInfoRoundTrip`,
+  `poleStormRoundTrip`, `worldInfoChannelRequired` (registration + NeoForge's own negotiator),
+  `planetDebugLine`, `worldInfoFollowsThePlayer` (own batch). The planet server now also enables
+  the `deeptime` namespace so `worldinfochannelrequired` runs there too. Headless connection test:
+  `gametest-planet.sh --scenario refuse_client` (new `tools/planet/mcclient.py`, stdlib, protocol
+  767 with compression) logs in over TCP three times with the channel list from
+  `/deeptime probe network` (read from the server log: RCON returns only 4 kB of the 20 kB line).
+  `--scenario` is repeatable now. `tools/review/phase0.py` runs the new pole tests instead of the
+  prototype; the seam page shows the real curves, texts and "Verified".
+- **Measured** (Mac; numbers from the planet run of the final commit):
+  `tools/remote/mac.sh --server -- '(cd neoforge && ./gradlew build test) ; ./gametest.sh ;
+  tools/smoke/install.sh standalone ; ./gametest-planet.sh --run columnscontinuous,entitycrossesseam,structurestraddlesseam,treestraddlesseam,shaftlineacrossseam@8185,250,0 --run jetcrossesseam@8185,250,64 --run entitypushedback,hardstopat80,sablehullpushedback,worldinfochannelrequired@0,300,64 --scenario sable_straddle --scenario refuse_client'`
+  → JUnit `tests=65 failures=0 errors=0` (PoleCapCurveTest 8 new); GameTest server `All 26 required
+  tests passed`; planet server `PASS`: the five seam tests, jetcrossesseam 20/20, sable_straddle OK,
+  and the four P1-18 tests. entityPushedBack (C = 16,384, 40 ticks): players N and S identical —
+  74.5° storm 0 / push 0 / no bar; 76° 0.3241 / 0.0089; 77.5° 0.6156 / 0.0354; 79° 0.8554 / 0.0716,
+  bar each; creative 77.5° storm 0.616 push 0 + no-wind bar; spectator storm 0.616 push 0, no bar;
+  minecarts with riders dz 0 / −3.91 / −12.95 / −14.58 at 74.5 / 76 / 77.5 / 79° S (the 0.4
+  blocks/tick off-rail limit flattens the top) and +12.85 at 77.5° N, riders sent push 0.
+  hardStopAt80: survival 80.5° N and 82° S and creative 80.5° S put at |z| 3640.84 (79.9989°, line
+  3640.89); spectator at 81° N untouched; carts (one placed at 80.5° N, one running poleward at 0.4
+  from 79.995° S) never observed past 79.9989°, riders still aboard. sableHullPushedBack (40 ticks):
+  dz 0 at 74.5° S, −5.90 at 76.5° S, −20.81 at 78.5° S, +12.70 at 77.5° N; the 60 blocks/s hull
+  from 79.3° N: poleward edge max 80.051° (allowed 80.088°, one tick of travel + a block), ends at
+  79.60° moving back at 26.2 blocks/s. worldInfoChannelRequired: 199 channels (188 play); without
+  Deep Time's two → refused naming exactly them. refuse_client over TCP: NeoForge client without
+  Deep Time refused (`neoforge:modded_network_setup_failed` names deeptime:pole_storm and
+  deeptime:world_info, then `multiplayer.disconnect.incompatible`), with every channel accepted
+  (`neoforge:network`), vanilla refused (NeoForge's "you are not running NeoForge"). Logs:
+  gitignored `review/out/p1-18/{junit,gametest,planet}.txt` and `run-planet/planet.log` in this worktree.
+- **Next.** Merge; P1-19 lists the four planet tests and `refuse_client` in the Phase 1 exit. A
+  real client boot (the storm visuals, the F3 line, the client-side wind) stays unverified (plan
+  §9.8).
+
+### 2026-09-28 — P1-03 plates and crust (agent worktree agent-a634f0216bff6a4a4, branch worktree-agent-a634f0216bff6a4a4)
+- **What.** `crates/deeptime-core/src/plates/` (mod, state, kinematics, geometry, init, subduction,
+  collision, rifting, ridges, hotspots, pools, events, normalise, noise, l1, stats, tests) — the
+  plates stage of §8.1 implemented from Cortial, Peytavie, Galin & Guérin 2019 (the paper only;
+  the community ports were not opened), rock pools ported from tectonics.js `RockColumn.js`/
+  `Crust.js` (CC BY 4.0, commit ce371fa; NOTICE.md and the header of `pools.rs`).
+  `params.rs` (`PlanetPreset`: planet, full scale, keyframes, resolution and a full `tectonics`
+  section = Cortial's Appendix A + the design constants below) plugged into P1-13's preset layer
+  as `PresetBody::Planet` (a preset with a `planet` section; the header keeps name, description,
+  scale and timeline), with `Preset::check_runnable` (a planet preset without a timeline is
+  refused by create/resume/estimate: no default story). The plate pipeline's presets are
+  `presets/plates/plates_{quick,full}_{16k,32k}.json`, resolved by name like the built-ins; the
+  `earthlike_*` built-ins stay P1-13's placeholders (the game bakes their synthetic terrain until
+  P1-08) and take the plates sections when the stages up to P1-08 land. `WorldState.plates`
+  holds the L0 crust (checkpoint schema 2 → 3); `Coupling::relink` (P1-02) lets moving crust be
+  sampled through the coupling. CLI: `stage` and `bench` take `--start`/`--length-myr` like
+  `run`, `stage --max-steps N` writes a mid-stage checkpoint, `run`/`stage`/`bench` print the
+  plates summary line. `tools/dev/plates_sweep.py` runs tectonics overrides on the Mac for tuning.
+  New ramps `plates`, `crust_age`, `regime` in `ramps.json`; `EVENTS.md` documents every plate
+  event's params, magnitudes and causes. No new dependencies.
+- **Model, per 2-Myr step.** Rigid rotation of each plate's groups about its Euler pole; overlap
+  detection (8 nearest samples; a sample inside another plate's lattice triangle, located in that
+  group's frame); contacts with a polarity (oceanic under continental, older under younger, the
+  smaller plate forced under in continent–continent) and hidden subducted crust; Cortial's uplift
+  ũ = u₀·f(d)·g(v)·h(z̃) within r_s = 1,800 km of the overriding plate's front (multi-source
+  Dijkstra inside rigid groups), fold directions, Andean orogeny; arc magma, oxidation proxy,
+  convergence/obliquity/slab age at the nearest trench and a heat-flow proxy per sample (the
+  deposit accumulators); continental collision at 300 km of continental interpenetration with
+  terrane transfer and Δz = Δc·A·(1−(d/r)²)², r = r_c√(v/v₀·A/A₀); hotspots and LIPs;
+  continental erosion, oceanic dampening, trench accretion; rock pools (erosion one hop downhill,
+  lithification 2.2 MPa, metamorphism 300 MPa, `Crust.overlap` accretion at resampling); Poisson
+  rifting into 2–4 plates; global resampling every 10–60 steps (1,500 km of drift) onto a freshly
+  rotated Fibonacci lattice with the hull rebuilt, Cortial's α-blend ridge crust in the gaps.
+- **Design choices and deviations (all in module docs; tunable in `tectonics`).**
+  1. Samples live in rigid *groups* (lattice position + the group's accumulated rotation), so rift
+     fragments and transferred terranes need no remeshing between resamplings; a lattice triangle
+     belongs to a plate only while its three corners share a group. Cortial reuses one mesh; here
+     each resampling uses a new random rotation of the Fibonacci set and rebuilds the hull.
+  2. The front is the overriding plate's own lattice boundary (fixed in its frame; no trench
+     roll-back). f(d) is a piecewise cubic peaking at `subduction_peak_km` = 300 km; h(z̃) = z̃² as
+     in the paper, which leaves abyssal overriding crust sinking, so an **arc band** (Gaussian at
+     200 ± 60 km) adds `arc_uplift_mm_yr` = 0.1 to submarine overriding crust and arc crust that
+     emerges becomes continental (island arcs, the continental crust factory).
+  3. **Isostatic ceiling**: uplift of crust above sea level is scaled by (1 − z/z_c); without it
+     repeated collisions saturated whole continents at z_c = 10 km (first run).
+  4. **Collision**: d is measured from the contact (forced-subducted continental crust), not the
+     whole terrane; Δc·A is capped at 4 km (Δc·A of a continent is tens of km); the receiving
+     plate takes the area-weighted mean angular velocity. Events by terrane size: < 0.5 % of A₀
+     silent, < 10 % terrane_accretion only, ≥ 10 % collision + terrane_accretion + orogeny_phase.
+  5. **Polarity reversal** (continental crust on the subducting side of an oceanic overriding
+     plate reverses the contact; Cortial's "an oceanic plate always plunges beneath a continental
+     plate" applied continuously) and **locked sutures** (continental crust with a Himalayan
+     orogeny < 30 Myr old is never forced under again). Without them a continent at a junction of
+     three trenches was handed round the three plates every 2–8 Myr (309 "collisions" in the
+     first 500-Myr run).
+  6. **Subduction initiation** at ocean floor older than 150 Myr on plates that subduct nowhere
+     (Poisson, rate 0.1 per A₀ of old crust per step): the old part splits off and converges on the
+     rest. **Slab pull on speed**: a plate with ≥ 3,000 km of front relaxes (20 Myr) to 80 mm/yr at
+     its centroid, others to the middle of `plate_speed_mm_yr`; plus Cortial's axis pull and a small
+     Euler-pole random walk. Without these the oceans never recycled (p90 age 327 Myr).
+  7. Rifting: f(x_P) = 0.08 + 0.92·x_P²; fragments diverge from the other fragments' centroid at
+     20–50 mm/yr on top of the parent's motion; a LIP ×4 boosts the plate under it for 20 Myr.
+  8. Resampling: a new point within 0.75 spacings of an old visible sample but in no whole
+     triangle (a plate's boundary strip) copies that sample; only farther points are gaps that get
+     new crust (at first every boundary strip became ridge crust and continents frayed).
+  9. Events: subduction_onset only once a contact lasts 3 steps, converging ≥ 10 mm/yr over
+     ≥ max(3, n/10,000) samples (dated to its start); ridge_birth once per plate pair when
+     ≥ max(3, n/2,000) samples of new crust lie between them; Andean orogeny_phase only after
+     ≥ 10 Myr. All places are points (region masks and paths are not stored yet).
+  10. Initial planet: noise-warped weighted Voronoi plates; every continent rides whole on its
+      majority plate; oceanic ages from the boundaries that diverge; ocean fraction exact to one
+      sample; supercontinent/scattered/random as §5.1. A final resampling at the last step leaves
+      no gaps or hidden slabs in the world P1-04 receives.
+  11. L1: every cell is relinked from a k-d-tree query at each sampling (not only cells whose
+      triangle left its plate), so sampling is history-free and a resumed run is bit-identical.
+      L1 is sampled at the keyframe times and the end (`l1_every_steps` = 0); P1-04 sets 1.
+  12. Keyframe layers `elevation` (block y), `plates` (colour index id·7 mod 20), `crust_age`
+      (−1 on continents), `regime`; outputs `plates/{elevation_m, uplift_mm_yr, crust_type,
+      orogeny_type, orogeny_age_myr, fold_trend_deg, plate_id}` on L1.
+- **Measured** (`tools/remote/mac.sh`, M6 Mac mini, 12 threads, shared with other agents' builds,
+  load average 9–14): `cargo test --workspace` → core 57 passed + 1 ignored (plates:: 11 incl.
+  `rifting_conserves_area_exactly` (integer sample counts: relative error 0), `runs_keep_their_
+  invariants` (partition, ages ≥ 0, finite fields, hull V − E + F = 2 + mutual neighbours + CCW
+  after every resampling, all three starts, 80 steps), `resumed_run_is_identical` (byte-equal
+  worlds), `a_preset_without_a_timeline_is_refused`), cli 11, format 27, inspect 19, jni 7,
+  viewer 4; `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --check`,
+  `cargo deny check licenses bans` clean. `cargo test --release -p deeptime-core
+  plates::tests::statistics -- --ignored` (20k samples, 500 Myr) → supercontinent p90 167 Myr,
+  98 % < 250 Myr, 15 plates (8 ≥ 5 %); scattered 169 Myr, 97 %, 21 plates (7 ≥ 5 %); random
+  245 Myr, 90.5 %, 8 plates (4 ≥ 5 %).
+  `deeptime stage plates --preset plates_quick_16k --start scattered_continents --length-myr 500` (100k)
+  → `plates_final=13 ocean_age_p90_myr=202.3 ocean_age_p50_myr=69.7 ocean_younger_250=0.925
+  ocean_frac=0.740 largest_plate_frac=0.179 plates_over_5pct=8 plates_under_1pct=0 … steps=250
+  seconds=8.315`; 610 events (orogeny_phase 149, subduction_onset 142, ridge_birth 134,
+  terrane_accretion 96, collision 26, hotspot_track 21, plate_death 15, plate_birth 14, LIP 7,
+  rift_onset 6), 11 keyframes, peak 208 MiB. `plates_full_16k` (250k) → `plates_final=16
+  ocean_age_p90_myr=122.0 ocean_younger_250=0.999 ocean_frac=0.692 … seconds=24.840`, 1,218 events.
+  `deeptime bench --preset plates_quick_16k --start scattered_continents --length-myr 500
+  --threads 1,4,12` → 23.0 / 10.5 / 8.3 s (load average 5; 29.8 / 15.7 / 9.3 s at load 10–14),
+  peak 208 MiB; `plates_full_16k --threads 1,12` → 72.2 / 30.7 s, peak 538 MiB; identical
+  results on every thread count. **Against Cortial's Table 2 estimate (§8.1): 100k 76–106 s →
+  8.3 s (23 s single-threaded); 250k 330–437 s → 25–31 s (72 s single-threaded).** Checkpoint chain: `stage plates … --max-steps 100 --out mid.dtcp` (33.6 MB) then
+  `stage plates --in mid.dtcp --out end.dtcp --viewer review/out/p1-plates-resumed` → the same
+  final summary as the straight run; running it again from `end.dtcp` is refused ("already ran").
+  Sweep (`tools/dev/plates_sweep.py`, 100k, 3 starts × 2 seeds): p90 141–228 Myr, 92.5–99.4 %
+  younger than 250 Myr, ocean fraction 0.73–0.76, 10–22 plates.
+  `deeptime run --preset plates_quick_16k --start scattered_continents --length-myr 500 --out …`
+  → manifest, events/, keyframes/ (11 frames × 4 layers), sites/, bodies/; `stage plates --preset
+  plates_quick_16k` without `--start` → "$.timeline.start: choose a start configuration …".
+  All re-run on the tree after merging master a3a0e30 (P1-12/13/14): identical summaries;
+  `cargo test --workspace` → cli 9, core 116 + 1 ignored (plates::/params::/preset:: 20),
+  format 31, inspect 19, jni 7, viewer 4; clippy -D warnings, fmt and `cargo deny check licenses
+  bans` clean; `cd neoforge && ./gradlew build test` → tests=57 failures=0 errors=0.
+- **What the keyframes show** (review/out/p1-plates, pulled back and looked at): at −498 Myr six
+  low green continents in a deep ocean with trench lines along plate boundaries in the oceans;
+  by −348 Myr the continents have drifted and one has swung over the north pole, their margins
+  raised to 1–2 km (Andean belts) and green island arcs trail across the eastern ocean; by
+  −148 Myr a continent is splitting along a narrow new ocean (a rift opening like the Red Sea),
+  arcs and accreted terranes fringe the others; at 0 Myr the continents are rearranged and
+  scattered south and east with raised margins, trenches along active margins, and the crust-age
+  map shows spreading ridges with symmetric red→blue age bands and a few old (blue) basins —
+  plausible drifting, colliding and rifting. The plates map shows 13 plates with clean, slightly
+  irregular boundaries (plates whose ids differ by 20 share a colour).
+- **Not done / later.** Region masks and paths for events (points only). The review page
+  "Deep Time — P1 plates" is not published (the main session publishes review/out/p1-plates).
+  Continental area is resolution-dependent (ocean fraction 0.74 at 100k, 0.69 at 250k, 0.82–0.85
+  at 20k: arc emergence and forced-subduction consumption scale with sample spacing) and the
+  event count grows with resolution (610 → 1,218 events from 100k to 250k); both for P1-17's
+  tuning. No Java change: JUnit passes on the merged tree (`{"planet":{}}` still fails at
+  `$.planet`, as NativeLinkTest expects); GameTests not rerun (no server-side change).
+- **P1-14's field interface.** The deposit engine's `FieldHistory` (`deposits/fields.rs`) expects
+  per-frame L1 fields from P1-03 (`deeptime:arc_magma_flux`, `magma_oxidation`,
+  `convergence_rate_km_myr`, `obliquity_deg`, `slab_age_myr`, `crust_thickness_km`,
+  `fault_density`, `orogenic_uplift_m_myr`, `rift_subsidence_m_myr`, `heat_flow_mw_m2`,
+  `dist_litho_step_km`, `inherited_bif`). The L0 accumulators behind most of them exist per sample
+  (arc magma by type, oxidation, convergence, obliquity, slab age, heat flow, thickness, uplift);
+  publishing them as frames is not done here (P1-14 landed while this task ran).
+- **Next.** P1-04 (surface processes on L1) reads `plates/uplift_mm_yr` and the other `plates/*`
+  fields; its pipeline should set `tectonics.l1_every_steps` = 1. Then the frames P1-14 reads.
 
 ### 2026-09-28 — P1-12 strata pass with rock tags and `rock_states` (agent worktree agent-a9583db34fe66882c)
 - **Datapack registries** (`DeepTimeRegistries`, NeoForge `DataPackRegistryEvent.NewRegistry`, no
