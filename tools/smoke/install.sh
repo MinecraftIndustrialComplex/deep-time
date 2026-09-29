@@ -25,6 +25,9 @@
 #                                 or vanilla's features, caves and scatter differ between them
 #       [--clean]                 throw the server away first
 #
+# DEEPTIME_PACK=<dir> installs mic/mic-ev from that pack checkout instead of ../../pack (a git
+# checkout with a .git directory: its HEAD, or its working tree with --pack-worktree).
+#
 # mic-ev is the mic set plus Excavated Variants and Dynamic Asset Generator (profiles/ev.txt's pins),
 # for the plan Q10 comparison; ev-client is the ev set plus Create, the smallest set a client needs to
 # generate EV's variant textures for every ore and stone the MIC pack has (tools/client/ev-assets.sh).
@@ -39,7 +42,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-PACK="$(cd "$REPO/../../pack" && pwd)"
+# DEEPTIME_PACK: another pack checkout (e.g. a copy of the pack's deep-time branch); default ../../pack.
+PACK="$(cd "${DEEPTIME_PACK:-$REPO/../../pack}" && pwd)"
 PROFILES="$REPO/tools/smoke/profiles"
 CACHE="$REPO/smoke/cache"
 

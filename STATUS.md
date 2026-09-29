@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · In flight (agent worktrees under .claude/worktrees/, not yet merged): P1-05 climate, P1-07 rock classes/strata, P1-20 workbench stage 1 (live runs + editor controls) and stage 2 (3D area preview), MIC pack branch `deep-time` (EV + gap configs + rock tags; pack worktree ../../pack-deeptime) · Next after those land: P1-14 wires the recorded history, then P1-06, P1-08 · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · In flight (agent worktrees under .claude/worktrees/, not yet merged): P1-05 climate, P1-07 rock classes/strata (done on its branch), P1-14 deposits in the pipeline, P1-17 early (parallel pflood/SPL), P1-20 workbench stage 1 (live runs + editor controls) and stage 2 (3D area preview), macOS free-memory fix + Q10 client launcher fold, MIC pack branch `deep-time` (EV + gap configs + rock tags; pack worktree ../../pack-deeptime) · Next after those land: P1-06, then P1-08 · Sub-agents on Sonnet 5.5 from 2026-09-29 (Ben) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -28,7 +28,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-04 | Deep-time surface processes on L1 | done | 2026-09-28 | 50dd95f | Mac: cargo test --workspace ok (core 139 incl. surface:: 20: receivers acyclic, depressions resolved, diffusion Σh conserved, SPL ramp = analytic within 1e-6 (n 1) / 1e-3 (n 2), strata-log invariants, coupled pipeline resume identical; cli 11); `stage surface --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-surface` → 250 steps 96 s (plates 22 s, surface 74 s), land_frac 0.215, mass residual −6e-4 km³ of 1.2e8 eroded, 50 frames, 70 erosion pulses / 265 basins / 3 sea events; bench 1 thread surface 137 s = 1.05 µs/cell/step vs the 131 s cost model; fastscapelib oracle hypsometry_ks=0.0209 chi_slope_ratio=1.0000 PASS; fmt, clippy -D warnings, deny clean; gradlew build test 106/0 |
 | P1-05 | Climate | todo | | | |
 | P1-06 | Young landscape, amplification and the detail layer | todo | | | |
-| P1-07 | Rock classes, column strata and metamorphism | todo | | | |
+| P1-07 | Rock classes, column strata and metamorphism | done | 2026-09-29 | — | On the coupled pipeline preset (built-ins stay placeholders until P1-08). Mac: cargo test --workspace ok (core 149 + 1 ignored incl. structure:: 11: stacks ordered top-down, ≥ 1 block thick, classes valid, ≤ K; resume identical; every built-in deposit type finds all its fields incl. trap_structure and host/*), fmt, clippy -D warnings, deny clean; gradlew build test 106/0; ./gametest.sh All 45 passed (everyClassInTheWorld 59/59, 240 samples 0 wrong); `stage structure --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-structure` → horizon_check=ok, 3.88 horizons/cell, 22,000 plutons (8,138 bodies), 50 frames published; structure 4.8 s of 122 s |
 | P1-08 | Bake, world data v1 and parity | todo | | | |
 | P1-09 | Climate mapping and biomes | todo | | | |
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
@@ -53,6 +53,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | p1-editor (real-client screenshots of the Create World editor, timelapse, review, world) | https://spacesheep.dev/@benmac/deeptime-p1-editor | P1-11 client screenshots 2026-09-28 | 2026-09-28 |
 | p1-plates (500 Myr of plates, 100k samples, keyframes + events) | https://spacesheep.dev/@benmac/deeptime-p1-plates | P1-03 plates 100k 500 Myr 2026-09-28 | 2026-09-28 |
 | p1-surface (500 Myr of plates + erosion, deposition, strata; 16k quick pipeline; PNGs losslessly recompressed to fit the 25 MB Free-plan deploy cap) | https://spacesheep.dev/@benmac/deeptime-p1-surface | P1-04 surface processes, 500 Myr 2026-09-28 | 2026-09-28 |
+| p1-structure (P1-07: surface rock, bedrock, metamorphic grade, trap structure, plutons, six pole-to-pole cross-sections; trimmed to 23 MB) | https://spacesheep.dev/@benmac/deeptime-p1-structure | P1-07 rock classes and strata, 500 Myr 2026-09-29 | 2026-09-29 |
 | p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
 | p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
 | q10-ev (Q10 evidence: the same deposits in MIC without and with Excavated Variants; cut screenshots, per-host ore table, costs, trade-offs) | https://spacesheep.dev/@benmac/deeptime-q10-ev | Q10 evidence 2026-09-28 | 2026-09-28 |
@@ -68,6 +69,118 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+
+### 2026-09-29 — P1-07 rock classes, column strata and metamorphism (agent worktree agent-a660cc7be45a80cf6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** New stage `structure` (`crates/deeptime-core/src/structure/{mod, params, columns,
+  metamorphism, plutons, traps, hosts, bake_horizons, tests}.rs`), the third member of the coupled
+  group: every planet preset with a `surface` section now runs `[plates, surface, structure]`, one
+  step each per plate step (optional preset section `structure`, `PLANET_KEYS` + `PlanetPreset`,
+  refused without `surface`). Additive to the pipeline: `preset.rs` pushes one more stage; the
+  pipeline preset JSONs are unchanged (defaults apply). P1-05's files were not touched.
+  - **Metamorphism** in the surface's strata log itself (irreversible; metamorphic rock erodes as
+    what it became): each layer steps along its class's `metamorphic_path` as far as the temperature
+    at its mid-depth allows. Linear geotherm T_s + q/k·z (q = `plates/heat_flow_mw_m2` capped at
+    `max_heat_flow_mw_m2` 120, k 2.5, T_s from `climate/t_mean_c` when P1-05 writes it, else 10 °C);
+    under an active collision (collision regime, or Himalayan orogeny < 30 Myr) depths scale by
+    β = clamp(e/35 km, 1, 2). Continental crust only. Formation temperatures: anhydrite 50, slate 250,
+    quartzite/marble/greenstone 300, phyllite 350, schist 450, amphibolite 500, gneiss 650 °C (rounded
+    textbook facies boundaries, cited in the module). No blueschist/eclogite (Q8, P2-02).
+  - **Plutons:** Poisson under arcs (`arc_magma_flux` intensity) and collision zones (×0.3),
+    1e-4 per km² of full-intensity arc per Myr (Coastal Batholith order), L lognormal median 10 km
+    [3, 40], T = 0.6·L^0.6 (Cruden 1998), roof 2–6 km; granodiorite/granite/diorite by setting; ride
+    their plate with its finite rotation, unroofed by `surface/material_m`, lost when their oceanic
+    crust is subducted. At the end: ellipsoid bodies (no site, role `pluton`, `rock_class` the
+    intrusion) with an `aureole` zone (d 0.85–1) of skarn (carbonate host) or hornfels
+    (non-crystalline host). FORMAT.md documents them.
+  - **Columns:** regolith, then the strata log (the young < 20 Myr and shallow < 150 m part of a
+    clastic layer shown as its new `loose_equivalent`, buried loose material and palaeosols as their
+    new `lithifies_to`), then the plate model's rock pools less the log (new L1 fields
+    `plates/pool/<pool>_m`, **interpolated** — nearest-sample pools gave checkerboard columns), each
+    pool one unit by the surface's basement rule, split at the isotherms of its metamorphic path by
+    the present geotherm (a thick sedimentary pool turns quartzite below 300 °C), oceanic sediment
+    as chalk above a 4.5 km CCD, then peridotite.
+  - **Horizon bake:** a column → ≤ K (32) horizons in block space, surface first, every horizon
+    ≥ 1 block (thin ones merge into the thinner neighbour, then the thinnest adjacent pair while > K;
+    the thicker member's class). `Horizons::check` is the acceptance. The bake is on demand
+    (`bake_horizons::bake`); P1-08 writes it and the pluton bodies into world data.
+  - **Deposit fields (the task's P1-04 hand-off):** every frame the surface closes gets
+    `deeptime:trap_structure` (fold-thrust belts ≤ 300 km from an active orogen, salt domes, rift fault
+    blocks, growth faults, drape; `traps.rs`) and `deeptime:host/<class>` for every class a built-in
+    type names (share of the top 2 km of the column, plutons included; 8-bit) through the new
+    `RecordedHistory::add_fields`. The P1-04 test that listed `trap_structure` as missing now asserts
+    **no missing field for any built-in type** (`surface::tests::the_coupled_pipeline_runs_and_resumes`,
+    and `structure::tests` also checks every host field exists and sums ≤ 1).
+- **Rock classes.** The 59 JSONs stay P1-12's numbers (reviewed against the maps and sections, kept;
+  sources now say so). `tools/dev/gen_rock_classes.py` adds `lithifies_to` (10 loose classes) and
+  `loose_equivalent` (7 clastic rocks), validated; the Java codec (`RockClass`) and `RockDataTest`
+  read them; the generator's docstring lists the facies-rule names the core forms. P1-12's strata pass
+  and tags are unaffected (GameTests below).
+- **Surface change:** `surface::basement_class` made every basement under a young Andean orogeny
+  andesite (a third of the land in the first rock map); now only arcs and the felsic-volcanic pool
+  there are andesite. This changes P1-04's surface class and erodibility slightly.
+- **Viewer / CLI.** `stage` with `--viewer` on a structure run writes the baked stacks (the strata
+  inspector, only the horizons used), map layers `elevation`, `strata/outcrop`, `strata/bedrock`
+  (under the regolith), keyframes `structure/{rock, log_grade, trap_structure}`, and six meridian
+  cross-sections (`deeptime_viewer::section`: each pixel column the stack as the Java strata pass
+  reads it — `LoadedLayer::stack_at` mirrors `StrataPass.column`, unit-tested — with pluton bodies
+  painted over). CLI prints `structure_final=…` and `structure[…]` timings. `report.js` now carries
+  only sited bodies (8,000 plutons made it 3 MB).
+- **Measured (Mac; shared, load 10–23).** `cargo fmt --check`, `clippy --workspace --all-targets
+  -D warnings`, `test --workspace` (cli 11, core 149 + 1 ignored, format 32, inspect 21 + 7, jni 7,
+  viewer 4), `deny check licenses bans` clean; `gradlew build test` → 106/0; `mac.sh --server --
+  ./gametest.sh` → All 45 required tests passed (everyClassInTheWorld 59/59, 240 samples, 0 wrong;
+  vanillaOnlyResolvesEveryClass 68 checked, 0 wrong). **Acceptance:** `target/release/deeptime stage
+  structure --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --out
+  build/p107/end.dtcp --viewer review/out/p1-structure` → `structure_final=250 plutons_emplaced=22000
+  plutons_alive=10619 plutons_eroded=9291 plutons_subducted=2090 pluton_bodies=8138
+  metamorphosed_km3=9.565e6 frames_published=50 horizons_k=32 mean_horizons=3.88 horizon_check=ok`;
+  land_frac 0.342, 1,439 events. **Timings (P1-17):** stage 122.2 s = plates 26.5 + surface 90.8 +
+  structure 4.8 s (frame_fields 2.7, plutons 0.5, outputs 0.3, metamorphism 0.2); 129 s wall with
+  the viewer bake and sections; max RSS 2.13 GB, peak footprint 3.9 GB (`/usr/bin/time -l`, CLI incl.
+  viewer). Earlier runs of the same preset under other load: structure 4.5–7.3 s.
+- **What the pictures show** (review/out/p1-structure; review bundle review/out/p1-structure-review,
+  23 MB after dropping the non-structure keyframe layers, halving the inspector grid and oxipng; not
+  published). Rock at the surface on land: sandstone 29 %, mudstone 20 %, sand 8 %, basalt 5.5 %,
+  gravel 5.4 %, granodiorite 5 %, saprolite 4.5 %, conglomerate 4 %, andesite 3.6 %, gneiss 3.5 %,
+  shale 3.5 %, schist 1.6 %; sea floor chalk 33 %, shale 31 %, mudstone 14 %, mud 11 %, basalt 6 %.
+  Right: sediment-covered continents with crystalline (gneiss, granite, granodiorite) and
+  metamorphic belts where orogens exhumed them, loose sand/gravel on young basins, pelagic chalk and
+  deep-sea mud on ocean floors, basalt at ridges and on young ocean crust, pluton outcrops and hornfels
+  aureoles in arcs, horizons thin up and down with relief. Wrong or doubtful: (1) the continents are
+  P1-04's domed highlands, so pole-to-pole sections show 6–9 km plateaus and the stacks' deep parts are
+  mostly basement — geologically the columns are thin sediment over thick crust; (2) plutons are many
+  and small at 16k (8,138 bodies, ~10 km); P1-17 may lower the rate or merge them into batholiths;
+  (3) no folds, faults or dipping beds (Phase 2), so sections are layer-cake with columnar jumps
+  between L1 cells (the per-cell section shows the raw stacks; the Java bilinear tops smooth them);
+  (4) little evaporite/coal reaches the surface (0.3 %) — P1-04's facies volumes.
+- **Deviations.** (1) Acceptance on `pipeline_quick_16k`, not `earthlike_quick_16k` (placeholder
+  until P1-08). (2) The work item's `rock_class/*.json` already existed (P1-12); P1-07 extended and
+  reviewed them rather than creating them. (3) Metamorphism uses the present geotherm for the pool
+  basement (no burial history for pools) and a collision burial factor for the log, not full P–T–t.
+  (4) The horizon layer is not yet written into world data (P1-08); plutons are in
+  `WorldState::bodies` and written by `finalize_write` as bodies without a site. (5) `inherited_bif`
+  is still 0 (no pre-run craton ages).
+- **Next.** P1-08 bakes `strata/horizons` from `bake_horizons` and the pluton bodies; P1-14 wires
+  `RecordedHistory` (now complete for every built-in type) into `DepositStage`; P1-17 tunes pluton
+  rate/size and the metamorphic heat-flow cap.
+### 2026-09-29 — MIC pack branch `deep-time`: Excavated Variants and its gaps (Q10), rock tags (Q16) (agent, pack worktree ../../pack-deeptime)
+- **What.** Pack branch `deep-time` pushed at 16dfd80 (on pack master 303fd89; master untouched): EV 4.3.1 + DAG 6.1.2
+  (packwiz, Modrinth); EV configs under `globalresources/mic/globaldata/excavated_variants/excavated_variants/` for
+  Born in Chaos black and fired black argillite, Create Nuclear lead ore (with `createnuclear:lead_ores`), Ice and Fire
+  silver ore; the rock-tag datapack as `kubejs/data/deeptime/` (120 files, byte-identical); an Almost Unified
+  `unification/materials.json`; the branch report `modDocs/deeptime-branch.md` (force-added, packwiz-ignored).
+  index.toml edited by hand (additions only, no `packwiz refresh`).
+- **Measured** (Q10 recipe on the Mac, `deposits_world_16k`, seed 7, Deep Time 84759b0; install via the new
+  `DEEPTIME_PACK=<dir> tools/smoke/install.sh mic|mic-ev`): EV variants 252 (Q10 190). Q10 boxes: 2,291 of 2,507
+  Deep Time ore blocks are EV variants (Q10 1,350); black argillite 549/549, fired 395/395. Zn–Pb boxes (MVT sites
+  23/24, SEDEX 25): lead 262/262, silver 46/46, zinc 3,176/3,176 variants. No EV/DAG/DefaultResources errors; both
+  worlds pass every smoke check incl. restart. Still plain: ore in stone (its variant is the original), dirt, obsidian.
+- **Found.** MIC's Almost Unified config is never read, on master too: AU 1.4.2 reads only
+  `config/almostunified/unification/*.json`; the pack's `unify.json` is the 0.x layout, so its priorities
+  (e.g. `c:ingots/lead → destroy`) do not apply. Asked Ben (pack-wide).
+- **Not checked.** DAG's generated textures for the new variants in a client.
+- **Leftovers on the Mac** (safe to delete later): /Volumes/Graphide/ban/mic/evpack-verify/,
+  /Volumes/Graphide/ban/mic/mods/pack-deeptime-verify/.
 
 ### 2026-09-28 — wrap page merged; snowball figure settled (main session f981c0d3)
 - **Snowball.** entityCrossesSeam starts the gravity-free snowball at x = 8,188.5 with 0.25 blocks/tick and
