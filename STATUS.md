@@ -170,7 +170,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   plates_quick_16k` without `--start` → "$.timeline.start: choose a start configuration …".
   All re-run on the tree after merging master a3a0e30 (P1-12/13/14): identical summaries;
   `cargo test --workspace` → cli 9, core 116 + 1 ignored (plates::/params::/preset:: 20),
-  format 31, inspect 19, jni 7, viewer 4; clippy -D warnings and fmt clean.
+  format 31, inspect 19, jni 7, viewer 4; clippy -D warnings, fmt and `cargo deny check licenses
+  bans` clean; `cd neoforge && ./gradlew build test` → tests=57 failures=0 errors=0.
 - **What the keyframes show** (review/out/p1-plates, pulled back and looked at): at −498 Myr six
   low green continents in a deep ocean with trench lines along plate boundaries in the oceans;
   by −348 Myr the continents have drifted and one has swung over the north pole, their margins
@@ -186,8 +187,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   Continental area is resolution-dependent (ocean fraction 0.74 at 100k, 0.69 at 250k, 0.82–0.85
   at 20k: arc emergence and forced-subduction consumption scale with sample spacing) and the
   event count grows with resolution (610 → 1,218 events from 100k to 250k); both for P1-17's
-  tuning. No Java change: JUnit/GameTests not rerun (`{"planet":{}}` still fails at `$.planet`,
-  as NativeLinkTest expects).
+  tuning. No Java change: JUnit passes on the merged tree (`{"planet":{}}` still fails at
+  `$.planet`, as NativeLinkTest expects); GameTests not rerun (no server-side change).
 - **P1-14's field interface.** The deposit engine's `FieldHistory` (`deposits/fields.rs`) expects
   per-frame L1 fields from P1-03 (`deeptime:arc_magma_flux`, `magma_oxidation`,
   `convergence_rate_km_myr`, `obliquity_deg`, `slab_age_myr`, `crust_thickness_km`,
