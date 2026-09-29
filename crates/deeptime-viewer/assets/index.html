@@ -56,7 +56,18 @@
   table.census th, table.census td { padding: 2px 6px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
   table.census th:first-child, table.census td:first-child { text-align: left; }
   table.census th { color: var(--muted); font-weight: 600; }
-  #structure { padding: 0 16px 16px; }
+  #structure, #amplify { padding: 0 16px 16px; }
+  .cmp { position: relative; width: 100%; max-width: 1024px; aspect-ratio: 1 / 1; border: 1px solid var(--line); background: #000; overflow: hidden; touch-action: none; user-select: none; }
+  .cmp img { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+  .cmp .top { clip-path: inset(0 0 0 50%); }
+  .cmp .bar { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 3px #000; pointer-events: none; }
+  .cmp .tag { position: absolute; top: 6px; padding: 1px 6px; font-size: 11px; background: rgba(0,0,0,.6); color: #fff; border-radius: 3px; pointer-events: none; }
+  .cmp .tag.l { left: 6px; } .cmp .tag.r { right: 6px; }
+  .cmpwrap { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; margin-bottom: 18px; }
+  .cmpwrap > div { flex: 1 1 420px; min-width: 0; max-width: 1024px; }
+  .cmpwrap .side { flex: 0 1 300px; min-width: 240px; }
+  .cmpwrap .side img { width: 100%; max-width: 300px; image-rendering: pixelated; border: 1px solid var(--line); display: block; }
+  .cmpwrap h3 { margin: 0 0 4px; font-size: 14px; }
   figure.xsec { margin: 0 0 12px; }
   figure.xsec img { display: block; max-width: 100%; height: auto; image-rendering: pixelated; border: 1px solid var(--line); }
   figure.xsec figcaption { font-size: 12px; color: var(--muted); margin-top: 3px; }
@@ -110,6 +121,9 @@
 </section>
 <section id="census" hidden>
   <div class="panel"><h2>Deposit census</h2><div id="censusbody"></div></div>
+</section>
+<section id="amplify" hidden>
+  <div class="panel"><h2>Amplification to L3: before and after</h2><div id="amplifybody"></div></div>
 </section>
 <section id="structure" hidden>
   <div class="panel"><h2>Column strata: cross-sections along meridians</h2><div id="structurebody"></div></div>
