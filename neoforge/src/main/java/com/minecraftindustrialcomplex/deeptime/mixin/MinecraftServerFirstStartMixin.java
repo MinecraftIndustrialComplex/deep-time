@@ -33,7 +33,7 @@ abstract class MinecraftServerFirstStartMixin {
             original.call(server);
     }
 
-    /** No level, no {@code level.dat}: vanilla would throw on the missing overworld here. */
+    /** Nothing to save without a level: vanilla would throw on the missing overworld here. */
     @Inject(method = "saveAllChunks", at = @At("HEAD"), cancellable = true)
     private void deeptime$nothingToSave(boolean suppressLog, boolean flush, boolean forced,
             CallbackInfoReturnable<Boolean> cir) {
