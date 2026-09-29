@@ -388,6 +388,52 @@ impl LoadedLayer {
         let class = self.bytes[cell + 2 * depth + k as usize];
         (top, class)
     }
+
+    /// The horizon stack at block (x, z) exactly as the Java strata pass builds a column
+    /// (`StrataPass.column`, plan §7.5): classes from the nearest cell, each top bilinear between
+    /// the four surrounding cells (the nearest cell's where a corner lacks the horizon), floored to
+    /// a block and never above the horizon over it. `out` gets (top block y, class index),
+    /// top-down; horizon h fills from its top down to the next horizon's top + 1, the last down to
+    /// the world's floor.
+    pub fn stack_at(&self, x: i64, z: i64, out: &mut Vec<(i32, u8)>) {
+        out.clear();
+        let d = &self.desc;
+        let g = &d.grid;
+        let k = d.stack_depth.unwrap_or(0);
+        let c = i64::from(g.w) * i64::from(g.r);
+        let wx = (x + c / 2).rem_euclid(c) - c / 2;
+        let u = (wx - g.origin_block_x) as f64 / f64::from(g.r);
+        let v = (z - g.origin_block_z) as f64 / f64::from(g.r);
+        let (i_n, j_n) = ((u + 0.5).floor() as i64, (v + 0.5).floor() as i64);
+        let (i0, j0) = (u.floor() as i64, v.floor() as i64);
+        let (fu, fv) = (u - i0 as f64, v - j0 as f64);
+        let top_at = |i: i64, j: i64, h: u32| -> f64 {
+            let (t, _) = self.horizon(g.wrap_i(i), g.clamp_j(j), h);
+            if t == i16::MIN {
+                f64::NAN
+            } else {
+                f64::from(t) * d.scale + d.offset
+            }
+        };
+        let mut prev = i32::MAX;
+        for h in 0..k {
+            let (_, class) = self.horizon(g.wrap_i(i_n), g.clamp_j(j_n), h);
+            let nearest = top_at(i_n, j_n, h);
+            if class == 255 || nearest.is_nan() {
+                break;
+            }
+            let (t00, t10) = (top_at(i0, j0, h), top_at(i0 + 1, j0, h));
+            let (t01, t11) = (top_at(i0, j0 + 1, h), top_at(i0 + 1, j0 + 1, h));
+            let top = if [t00, t10, t01, t11].iter().any(|t| t.is_nan()) {
+                nearest
+            } else {
+                (t00 + (t10 - t00) * fu) * (1.0 - fv) + (t01 + (t11 - t01) * fu) * fv
+            };
+            let t = (top.floor() as i32).min(prev);
+            out.push((t, class));
+            prev = t;
+        }
+    }
 }
 
 impl RasterRead for LoadedLayer {
@@ -413,6 +459,35 @@ mod tests {
         d.scale = 0.5;
         d.nodata = Some(-32768.0);
         LoadedLayer::new(d, ras.to_le_bytes()).unwrap()
+    }
+
+    #[test]
+    fn stack_at_follows_the_java_column_rule() {
+        // Two horizons on a 2 × 1 grid (r 32, C 64): tops 10 and 0 blocks at cell 0, 20 and 5 at
+        // cell 1; classes 3, 4 and 7, 8.
+        let grid = GridDesc::for_planet("L1", 64, 32).unwrap();
+        let mut d = LayerDesc::scalar("strata/horizons", DType::HorizonStack, grid, Codec::Raw);
+        d.scale = 1.0 / 16.0;
+        d.stack_depth = Some(2);
+        let mut bytes = Vec::new();
+        for (tops, classes) in [([160i16, 0], [3u8, 4]), ([320, 80], [7, 8])] {
+            for t in tops {
+                bytes.extend_from_slice(&t.to_le_bytes());
+            }
+            bytes.extend_from_slice(&classes);
+        }
+        let l = LoadedLayer::new(d, bytes).unwrap();
+        let mut out = Vec::new();
+        // Cell 0 sits at block x −32, cell 1 at 0; x −24 is a quarter of the way: tops 12.5 → 12
+        // and 1.25 → 1, classes of the nearest (cell 0).
+        l.stack_at(-24, -16, &mut out);
+        assert_eq!(out, [(12, 3), (1, 4)]);
+        // x −8: three quarters, nearest cell 1.
+        l.stack_at(-8, -16, &mut out);
+        assert_eq!(out, [(17, 7), (3, 8)]);
+        // x wraps: 40 ≡ −24.
+        l.stack_at(40, -16, &mut out);
+        assert_eq!(out, [(12, 3), (1, 4)]);
     }
 
     #[test]

@@ -72,8 +72,14 @@ class RockDataTest {
                 bad.add(name + ": vanilla_fallback is filler " + vf);
             List<String> refs = new ArrayList<>();
             o.getAsJsonArray("metamorphic_path").forEach(e -> refs.add(e.getAsString()));
-            if (o.has("weathers_to"))
-                refs.add(o.get("weathers_to").getAsString());
+            for (String key : List.of("weathers_to", "lithifies_to", "loose_equivalent"))
+                if (o.has(key))
+                    refs.add(o.get(key).getAsString());
+            String family = o.get("family").getAsString();
+            if (o.has("lithifies_to") && !family.equals("unconsolidated"))
+                bad.add(name + ": lithifies_to on a " + family + " class");
+            if (o.has("loose_equivalent") && family.equals("unconsolidated"))
+                bad.add(name + ": loose_equivalent on a loose class");
             for (String r : refs)
                 if (!classes.containsKey(r))
                     bad.add(name + ": unknown class " + r);
@@ -83,6 +89,8 @@ class RockDataTest {
         });
         assertTrue(bad.isEmpty(), bad.toString());
         assertEquals("minecraft:stone", classes.get("coal").get("vanilla_fallback").getAsString());
+        assertEquals("sandstone", classes.get("sand").get("lithifies_to").getAsString());
+        assertEquals("sand", classes.get("sandstone").get("loose_equivalent").getAsString());
     }
 
     @Test
