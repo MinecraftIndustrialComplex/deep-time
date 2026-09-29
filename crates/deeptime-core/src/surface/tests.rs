@@ -392,7 +392,7 @@ fn the_coupled_pipeline_runs_and_resumes() {
     let json = pipeline_json(3000, 60.0, 5);
     let dir = temp_dir("straight");
     let s = session(&json, &dir);
-    assert_eq!(s.stage_names(), ["plates", "surface"]);
+    assert_eq!(s.stage_names(), ["plates", "surface", "structure"]);
     finish(&s);
     let world = s.checkpoint().unwrap().world;
     let st = world.surface.as_ref().expect("the surface ran");
@@ -428,9 +428,6 @@ fn the_coupled_pipeline_runs_and_resumes() {
     assert_eq!(h.frame_count(), 6);
     let names = h.names();
     for f in crate::deposits::fields::FIELDS {
-        if f.name == "deeptime:trap_structure" {
-            continue;
-        }
         assert!(
             names.iter().any(|n| n == f.name),
             "{} not published",
@@ -446,19 +443,15 @@ fn the_coupled_pipeline_runs_and_resumes() {
         ..Default::default()
     };
     assert!(routing::check_acyclic(&routing));
-    // Every built-in deposit type finds its fields, except the petroleum trap's structural
-    // closure (P1-07).
+    // Every built-in deposit type finds its fields (the trap structure and the host fractions
+    // come from the structure stage, P1-07).
     for t in crate::deposits::types::builtin().unwrap() {
         let missing: Vec<String> = t
             .fields()
             .into_iter()
             .filter(|f| !names.contains(f))
             .collect();
-        if t.petroleum.is_some() {
-            assert_eq!(missing, ["deeptime:trap_structure"], "{}", t.id);
-        } else {
-            assert!(missing.is_empty(), "{} lacks {missing:?}", t.id);
-        }
+        assert!(missing.is_empty(), "{} lacks {missing:?}", t.id);
     }
     // Resume from a checkpoint in the middle of the group: the same world.
     let dir2 = temp_dir("resumed");
@@ -487,6 +480,7 @@ fn the_coupled_pipeline_runs_and_resumes() {
     assert_eq!(a.log, st.log);
     assert_eq!(got.events.len(), world.events.len());
     assert_eq!(got.history, world.history);
+    assert_eq!(got.bodies, world.bodies);
     for d in [dir, dir2] {
         let _ = std::fs::remove_dir_all(d);
     }

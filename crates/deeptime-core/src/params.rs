@@ -96,13 +96,14 @@ pub fn planet_builtin(name: &str) -> Option<&'static str> {
 }
 
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 7] = [
+pub const PLANET_KEYS: [&str; 8] = [
     "seed",
     "planet",
     "keyframes",
     "resolution",
     "tectonics",
     "surface",
+    "structure",
     "deposits",
 ];
 
@@ -462,6 +463,9 @@ pub struct PlanetPreset {
     pub tectonics: TectonicParams,
     /// The deep-time surface (P1-04); `None` runs the plates alone.
     pub surface: Option<crate::surface::SurfaceParams>,
+    /// Column strata, metamorphism and plutons (P1-07); runs with the surface, with the
+    /// defaults when the section is absent.
+    pub structure: Option<crate::structure::StructureParams>,
     /// The deposit engine (P1-14) on the history the surface stage records; `None` stops after
     /// the surface. It needs a `surface` section.
     pub deposits: Option<crate::deposits::DepositParams>,
@@ -501,6 +505,7 @@ impl PlanetPreset {
         let tectonics: Option<TectonicParams> = section(obj, "tectonics")?;
         let keyframes: Option<KeyframeParams> = section(obj, "keyframes")?;
         let surface: Option<crate::surface::SurfaceParams> = section(obj, "surface")?;
+        let structure: Option<crate::structure::StructureParams> = section(obj, "structure")?;
         let deposits: Option<crate::deposits::DepositParams> = section(obj, "deposits")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
         let seed = match obj.get("seed") {
@@ -519,6 +524,7 @@ impl PlanetPreset {
             resolution: resolution.ok_or_else(|| missing("resolution"))?,
             tectonics: tectonics.unwrap_or_default(),
             surface,
+            structure,
             deposits,
         };
         preset.validate()?;
@@ -660,6 +666,14 @@ impl PlanetPreset {
         ] {
             check((0.0..=1.0).contains(&v), key, "must be in [0, 1]")?;
         }
+        if let Some(s) = &self.structure {
+            s.validate()?;
+            check(
+                self.surface.is_some(),
+                "$.structure",
+                "needs a surface section (the structure stage reads the strata log)",
+            )?;
+        }
         if let Some(s) = &self.surface {
             s.validate()?;
             check(
@@ -694,6 +708,9 @@ impl PlanetPreset {
         });
         if let Some(s) = &self.surface {
             v["surface"] = json!(s);
+        }
+        if let Some(s) = &self.structure {
+            v["structure"] = json!(s);
         }
         if let Some(d) = &self.deposits {
             v["deposits"] = json!(d);
