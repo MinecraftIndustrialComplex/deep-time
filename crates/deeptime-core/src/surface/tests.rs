@@ -451,7 +451,10 @@ fn the_coupled_pipeline_runs_and_resumes() {
     };
     assert!(routing::check_acyclic(&routing));
     // Every built-in deposit type finds its fields (the trap structure and the host fractions
-    // come from the structure stage, P1-07).
+    // come from the structure stage, P1-07; the regional fields the deposit engine derives on
+    // reading, `deposits::regional`).
+    let mut names = names;
+    names.extend(crate::deposits::regional::derivable(&names));
     for t in crate::deposits::types::builtin().unwrap() {
         let missing: Vec<String> = t
             .fields()

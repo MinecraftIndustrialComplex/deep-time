@@ -345,6 +345,11 @@ struct CommonArgs {
     /// stage's parameters can be swept without re-running the earlier ones.
     #[arg(long = "set", value_name = "PATH=VALUE")]
     set: Vec<String>,
+    /// Holds at most this many bytes of the recorded history's frames in memory, whatever the
+    /// cap; the rest goes to a spill file in the run's folder (0 = every frame; default: the
+    /// memory cap decides). Results are the same either way; for measuring the spill.
+    #[arg(long)]
+    history_mem: Option<u64>,
 }
 
 impl CommonArgs {
@@ -354,6 +359,7 @@ impl CommonArgs {
             mem_cap: self.mem_cap,
             verbose: self.verbose,
             set: self.set.clone(),
+            history_mem: self.history_mem,
         }
     }
 }
@@ -805,6 +811,7 @@ mod tests {
             mem_cap: 0,
             verbose: false,
             set: Vec::new(),
+            history_mem: None,
         }
     }
 
@@ -1128,7 +1135,7 @@ mod tests {
             end.world
                 .history
                 .as_ref()
-                .is_some_and(|h| h.frames.len() == 2)
+                .is_some_and(|h| h.frame_count() == 2)
         );
         assert!(
             dir.join("viewer/keyframes/kf-0-surface_drainage.png")

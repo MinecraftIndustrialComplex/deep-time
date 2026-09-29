@@ -163,7 +163,16 @@ public final class SimSession implements AutoCloseable {
         return outDir;
     }
 
+    /**
+     * The worker: create, advance until done, finalize, destroy. {@link #completion()} completes
+     * only after the native session is destroyed, so whoever waits on it (the first-start
+     * generator moving its work folder into the world, the staging mover) never races a session
+     * that still holds files in {@link #outDir()} (P1-17: the recorded history's spill file, which
+     * on Windows lives there until the session closes it).
+     */
     private void run(Creator creator) {
+        String manifest = null;
+        Throwable failure = null;
         try {
             if (id == 0) {
                 long created = creator.create();
@@ -179,19 +188,18 @@ public final class SimSession implements AutoCloseable {
                 collect();
                 NativeLoader.forwardNativeLog(DeepTimeNative.drainLog(id));
                 if (st == DeepTimeNative.DONE) {
-                    String manifest = DeepTimeNative.finalizeWrite(id);
+                    manifest = DeepTimeNative.finalizeWrite(id);
                     refreshProgress();
                     collect();
-                    completion.complete(manifest);
                     return;
                 }
                 if (st == DeepTimeNative.CANCELLED) {
-                    completion.completeExceptionally(new CancelledException("the session was cancelled"));
+                    failure = new CancelledException("the session was cancelled");
                     return;
                 }
             }
         } catch (Throwable t) {
-            completion.completeExceptionally(t);
+            failure = t;
         } finally {
             long sid = id;
             if (sid != 0) {
@@ -216,6 +224,12 @@ public final class SimSession implements AutoCloseable {
             } catch (RuntimeException ignored) {
                 // the log is best effort
             }
+            if (failure != null)
+                completion.completeExceptionally(failure);
+            else if (manifest != null)
+                completion.complete(manifest);
+            else
+                completion.completeExceptionally(new IllegalStateException("the simulation worker stopped without a result"));
         }
     }
 

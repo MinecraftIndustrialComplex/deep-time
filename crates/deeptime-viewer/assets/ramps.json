@@ -196,6 +196,14 @@
         [500, "#ffe08a"]
       ]
     },
+    "basin_brine": {
+      "_comment": "deposits/regional.rs: the share of hot sedimentary basin within the brine-flow reach; MVT's source is full at 0.035.",
+      "stops": [[0, "#141414"], [0.01, "#2c4a6e"], [0.035, "#4fa3c7"], [0.08, "#e8f4a0"]]
+    },
+    "head_drop": {
+      "_comment": "deposits/regional.rs: the regional head drop from a rising orogen within the reach, m/km; MVT's driver is full at 3.3.",
+      "stops": [[0, "#141414"], [1, "#5b3a7a"], [3.3, "#c26a4a"], [8, "#ffe08a"]]
+    },
     "sites": {
       "stops": [
         [1, "#d7301f"],
@@ -491,6 +499,8 @@
     "deposits/sites": "sites",
     "input/elevation_m": "relief",
     "input/erosion_rate_m_myr": "erosion",
+    "input/basin_brine": "basin_brine",
+    "input/regional_head_drop_m_km": "head_drop",
     "input/*": "unit",
     "plates": "plates",
     "crust_age": "crust_age",
