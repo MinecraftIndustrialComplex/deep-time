@@ -6,7 +6,7 @@
 # the laptop.
 #
 #   tools/viewer/mac-watch.sh [start] [--preset P --start S --length-myr L] [--port N]
-#                             [--keep N] [--threads N] [--every-myr M] [--no-build] [--tv]
+#                             [--keep N] [--threads N] [--every-myr M] [--mem-cap SIZE] [--no-build] [--tv]
 #   tools/viewer/mac-watch.sh stop [--port N]      stop the server, its tailnet forward, the TV's caffeinate
 #   tools/viewer/mac-watch.sh status [--port N]
 #   tools/viewer/mac-watch.sh tv [--port N]        open the running workbench fullscreen on the Mac's screen
@@ -16,6 +16,10 @@
 #   --port        default 8642 → http://mac-mini:8642/
 #   --keep        finished runs kept on the SSD (default 8, ~1 GB each for a 500-Myr 16k run)
 #   --threads     Rayon threads per run (default all 12; the Mac is shared)
+#   --mem-cap     the workbench's default memory cap per run: bytes, or a size like 8G / 12GiB
+#                 (default 8 GiB, Ben 2026-09-29; 0 = the core's own 4 GiB). The page shows it,
+#                 holds every run's estimate to it and refuses a run over it before it starts;
+#                 the editor's Memory field still sets another cap for one run
 #   --no-build    skip the sync and the release build (the Mac's binary is current)
 #   --tv          also open the page fullscreen in Safari on the Mac's own screen (Ben's TV)
 #   --no-preview  leave stage 2 off (the 3D preview and click-to-inspect answer 501); by default
@@ -56,12 +60,14 @@ SSH=(command ssh -n -o BatchMode=yes -o ConnectTimeout=15 "$HOST")
 CMD=start
 case "${1:-}" in start|stop|status|tv) CMD="$1"; shift ;; esac
 PORT=8642; BUILD=1; TV=0; KEEP=8; THREADS=0; EVERY=""; PRESET=();
+MEM_CAP=8589934592   # 8 GiB
 while [ $# -gt 0 ]; do
     case "$1" in
         --port) PORT="$2"; shift 2 ;;
         --keep) KEEP="$2"; shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --every-myr) EVERY="$2"; shift 2 ;;
+        --mem-cap) MEM_CAP="$2"; shift 2 ;;
         --preset|--start|--length-myr) PRESET+=("$1" "$2"); shift 2 ;;
         --no-build) BUILD=0; shift ;;
         --tv) TV=1; shift ;;
@@ -71,6 +77,11 @@ while [ $# -gt 0 ]; do
     esac
 done
 [[ "$PORT" =~ ^[0-9]+$ ]] || { echo "mac-watch: --port must be a number" >&2; exit 2; }
+# --mem-cap SIZE → bytes: 8589934592, 8G, 8GiB or 12.5G (GiB).
+if [[ "$MEM_CAP" =~ ^[0-9]+$ ]]; then :
+elif [[ "$MEM_CAP" =~ ^([0-9]+(\.[0-9]+)?)(G|GiB)$ ]]; then
+    MEM_CAP="$(awk -v g="${BASH_REMATCH[1]}" 'BEGIN { printf "%.0f", g * 1073741824 }')"
+else echo "mac-watch: --mem-cap must be bytes or a size like 8G / 12GiB" >&2; exit 2; fi
 URL="http://$TAILNET_NAME:$PORT/"
 PIDF="$WB/watch-$PORT.pid"
 CAFF="$WB/caffeinate-$PORT.pid"
@@ -147,7 +158,7 @@ if [ "$BUILD" = 1 ]; then
     tools/remote/mac.sh -- 'cargo build --release -p deeptime-cli 2>&1 | tail -2'
 fi
 stop_remote >/dev/null
-ARGS=(watch --bind 127.0.0.1 --port "$PORT" --runs "$WB/runs" --keep "$KEEP" --threads "$THREADS")
+ARGS=(watch --bind 127.0.0.1 --port "$PORT" --runs "$WB/runs" --keep "$KEEP" --threads "$THREADS" --mem-cap "$MEM_CAP")
 # Stage 2 (P1-20): the preview runner of the checkout this script synced; the Mac's own Python 3.9
 # runs it (stdlib-only), and it enters the dev shell itself for cargo.
 [ "${PREVIEW:-1}" = 1 ] && ARGS+=(--preview "$REMOTE/tools/workbench/preview.py" --python /usr/bin/python3)
