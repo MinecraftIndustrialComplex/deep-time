@@ -437,7 +437,9 @@ mod tests {
                 "star_flux",
                 "ocean_fraction",
                 "m_per_block_h",
-                "m_per_block_v"
+                "m_per_block_v",
+                // The drama slider (P1-06): the pipeline presets carry `surface.drama`.
+                "drama"
             ]
         );
         // The share code round-trips to the same form state, as an imported preset (edited).

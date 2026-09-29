@@ -68,6 +68,7 @@ fn run_stage(
         let ctx = StageContext {
             pool: &pool,
             log: &log,
+            out_dir: std::path::Path::new("."),
             until: std::time::Instant::now(),
             gauge: &gauge,
             mem_cap: u64::MAX,
