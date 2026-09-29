@@ -103,9 +103,9 @@ sections
 | 0 | global | 0 | 0 |
 | 1 | point | f32 latitude (degrees, north +) bits | f32 longitude (degrees in [0, 360), east of the seam) bits |
 | 2 | plate | plate id | 0 |
-| 3 | region | L1 mask id (masks are stored from P1-03 on) | 0 |
+| 3 | region | L1 mask id (reserved: no writer stores masks yet; the plates' events use points) | 0 |
 | 4 | site | site id (`sites/sites.dtsr`) | 0 |
-| 5 | path | polyline id (paths are stored from P1-03 on) | 0 |
+| 5 | path | polyline id (reserved: no writer stores paths yet) | 0 |
 
 Longitude is plan §5.2's 360°·(x + C/2)/C, so the seam is 0° and a point is at block
 x = lon/360 · C − C/2, z = −lat/90 · C/4 (north is −z; `FORMAT.md`, "Grids").
@@ -181,16 +181,16 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 
 | Kind | Meaning | Emitted by | Params |
 |---|---|---|---|
-| `deeptime:plate_birth` | a plate appears (rifting splits one) | plates (P1-03) | set by P1-03 |
-| `deeptime:plate_death` | a plate is consumed | plates (P1-03) | set by P1-03 |
-| `deeptime:rift_onset` | continental rifting starts | plates (P1-03); dummy | dummy: see below |
-| `deeptime:ridge_birth` | a spreading ridge forms | plates (P1-03) | set by P1-03 |
-| `deeptime:subduction_onset` | a subduction zone starts | plates (P1-03) | set by P1-03 |
-| `deeptime:collision` | continents collide | plates (P1-03); dummy | dummy: see below |
-| `deeptime:terrane_accretion` | a terrane docks | plates (P1-03) | set by P1-03 |
-| `deeptime:orogeny_phase` | mountain building, with a duration | plates (P1-03); dummy | dummy: see below |
-| `deeptime:hotspot_track` | a hotspot's track over a plate | plates (P1-03) | set by P1-03 |
-| `deeptime:large_igneous_province` | a LIP eruption | plates (P1-03) | set by P1-03 |
+| `deeptime:plate_birth` | a plate appears (rifting splits one) | plates (P1-03) | see "The plate model's events" |
+| `deeptime:plate_death` | a plate is consumed | plates (P1-03) | see below |
+| `deeptime:rift_onset` | continental rifting starts | plates (P1-03); dummy | see below; dummy: see below |
+| `deeptime:ridge_birth` | a spreading ridge forms | plates (P1-03) | see below |
+| `deeptime:subduction_onset` | a subduction zone starts | plates (P1-03) | see below |
+| `deeptime:collision` | continents collide | plates (P1-03); dummy | see below; dummy: see below |
+| `deeptime:terrane_accretion` | a terrane docks | plates (P1-03) | see below |
+| `deeptime:orogeny_phase` | mountain building, with a duration | plates (P1-03); dummy | see below; dummy: see below |
+| `deeptime:hotspot_track` | a hotspot's track over a plate | plates (P1-03) | see below |
+| `deeptime:large_igneous_province` | a LIP eruption | plates (P1-03) | see below |
 | `deeptime:basin_subsidence` | a sedimentary basin subsides | surface (P1-04) | set by P1-04 |
 | `deeptime:marine_transgression` | the sea advances over land | surface (P1-04) | set by P1-04 |
 | `deeptime:marine_regression` | the sea retreats | surface (P1-04) | set by P1-04 |
@@ -203,6 +203,39 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 | `deeptime:petroleum_generation` | a source rock enters the oil window | deposits (P1-14) | below |
 | `deeptime:trap_charge` | a trap fills with petroleum | deposits (P1-14) | below |
 | `deeptime:guaranteed_occurrence` | a deposit added by the playability pass (plan §7.8) | deposits (P1-14) | below |
+
+### The plate model's events (source `deeptime:plates`, P1-03)
+
+Written by `crates/deeptime-core/src/plates/` (plan §8.1). Every place is a **point** (the
+feature's centre on the map); plate ids are params (`i64`, indices that are never reused).
+Areas (`*_km2`) and lengths (`*_km`) are on the real planet; speeds (`*_mm_yr`) are
+Earth-normalized, as the plates move in the model (decisions file, "Tectonics scaling"). Times are
+the step at which it happened unless stated.
+
+| Kind | Params | Magnitude | Causes |
+|---|---|---|---|
+| `plate_birth` | `plate`, `parent`, `origin` (`rift` or `subduction_initiation`), `area_km2`, `speed_mm_yr`; rifts add `continental_frac`, initiations `mean_ocean_age_myr` | area / average initial plate area | its `rift_onset` (rifts) |
+| `plate_death` | `plate`, `fate` (`consumed`: no crust left; `absorbed`: too small, merged), `absorbed_by` | 0 | the plate's last `subduction_onset` or the `collision` that took its crust, when known |
+| `rift_onset` | `plate` (the parent), `fragments`, `continental_frac`, `area_km2` | continental fraction | the `large_igneous_province` under the plate, when one boosted it |
+| `ridge_birth` | `plate_a`, `plate_b`, `spreading_mm_yr`, `new_samples` (L0 samples of new crust between them) | spreading / 100 mm/yr | the `rift_onset` that separated them, if any |
+| `subduction_onset` | `subducting_plate`, `overriding_plate`, `setting` (`ocean_ocean`, `ocean_continent`, `continent_continent`), `convergence_mm_yr`, `slab_age_myr` | convergence / 100 mm/yr | — |
+| `collision` | `plate_a` (the terrane's former plate), `plate_b` (the receiving plate), `terrane_area_km2`, `uplift_m`, `radius_km`, `convergence_mm_yr` | uplift, km | the contact's `subduction_onset` |
+| `terrane_accretion` | `from_plate`, `to_plate`, `area_km2`, `samples`; without a collision also `uplift_m` | area / average initial plate area | its `collision`, or the contact's `subduction_onset` |
+| `orogeny_phase` | `orogeny` (`andean` or `himalayan`), `plate`; Andean: `subducting_plate`, `max_uplift_mm_yr`, `ongoing` (1 when the run ended first); Himalayan: `uplift_m`, `uplifted_samples` | uplift / u_0 (Andean), uplift in km (Himalayan) | `subduction_onset` (Andean), `collision` (Himalayan) |
+| `hotspot_track` | `hotspot`, `plates` (the plates it sat under, e.g. `"3,7,12"`), `track_km`, `uplift_mm_yr`, `ongoing` | strength relative to the preset's | its `large_igneous_province`, if it had a plume head |
+| `large_igneous_province` | `area_km2`, `volume_km3`, `thickness_m`, `plate` | lava pile, km | — |
+
+- `subduction_onset` is written once a contact has lasted 3 steps while converging at ≥ 10 mm/yr
+  over ≥ max(3, n/10,000) samples, and dated to when the contact began; flickers at transform
+  boundaries never get one. A polarity reversal closes the contact and later writes a new onset.
+- `orogeny_phase` spans `t_start`–`t_end`: an Andean one from its subduction onset to when the
+  contact closed (only when it uplifted continental crust for ≥ 10 Myr), a Himalayan one
+  `collision_orogeny_myr` from its collision.
+- `hotspot_track` spans the hotspot's life (from the run's start for hotspots older than it).
+- Terranes below `terrane_event_min_frac` of the average initial plate area accrete without an
+  event; below `collision_min_frac` they make a `terrane_accretion` only.
+- The L1 layer `plates/regime` uses these codes: 0 ocean basin, 1 ridge, 2 trench, 3 arc,
+  4 back-arc, 5 collision, 6 rift, 7 hotspot, 8 craton, 9 passive margin.
 
 ### The dummy preset's events (source `deeptime:dummy`, until P1-03)
 
