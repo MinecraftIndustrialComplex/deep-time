@@ -512,3 +512,275 @@ fn a_world_without_history_is_a_clear_error() {
     let e = stage.step(&mut world, &ctx).unwrap_err().to_string();
     assert!(e.contains("field history") && e.contains("surface"), "{e}");
 }
+
+// ---- the survivor formula and the regional MVT driver (2026-09-29) -----------------------------
+
+/// A recorded history on a planet of `circumference` blocks with L1 cells of `r` blocks: `frames`
+/// frames of 10 Myr ending now, each named field's value at (frame, name, column, row) from
+/// `value`.
+fn history_of(
+    circumference: u32,
+    r: u32,
+    frames: usize,
+    names: &[&str],
+    clocks: &[(&str, f32)],
+    value: &dyn Fn(usize, &str, usize, usize) -> f32,
+) -> RecordedHistory {
+    let grid = deeptime_format::GridDesc::for_planet("L1", circumference, r).unwrap();
+    let (w, n) = (grid.w as usize, grid.cells());
+    let mut h = RecordedHistory::new(grid);
+    for k in 0..frames {
+        let mut frame = fields::FieldFrame {
+            t_years: -1.0e7 * (frames - 1 - k) as f64,
+            dt_years: 1.0e7,
+            ..Default::default()
+        };
+        for name in names {
+            frame.fields.insert(
+                (*name).to_owned(),
+                (0..n).map(|c| value(k, name, c % w, c / w)).collect(),
+            );
+        }
+        for (name, v) in clocks {
+            frame.clocks.insert((*name).to_owned(), *v);
+        }
+        h.push(&frame);
+    }
+    h
+}
+
+/// The deposit stage of a pipeline preset on `circumference`/`r`, seeded `seed`, with `count_mult`
+/// and provinces off, over `history` (no events in the log), running `types` when given.
+fn run_on(
+    circumference: u32,
+    r: u32,
+    seed: u64,
+    count_mult: f64,
+    history: RecordedHistory,
+    types: Option<Vec<types::DepositType>>,
+) -> (WorldState, Value) {
+    let sp = SyntheticParams {
+        seed,
+        circumference,
+        grid_r: r,
+        t_start_years: -1.0e8,
+        t_end_years: 0.0,
+        snapshot_every_years: 1.0e7,
+    };
+    let mut p = preset_for(&sp, count_mult);
+    p.deposits.as_mut().unwrap().province = Province::Off;
+    let mut world = WorldState::new(seed, circumference, 0.0);
+    world.history = Some(history);
+    let mut stage = DepositStage::recorded(&p).unwrap();
+    if let Some(t) = types {
+        stage = stage.with_types(t);
+    }
+    drive(&mut stage, &mut world);
+    let census: Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
+    (world, census)
+}
+
+/// L1 (column, row) of a site's centre (the engine's own mapping; a centre jittered to the edge of
+/// its cell and rounded to whole blocks may land in the next one).
+fn site_cell(s: &deeptime_format::Site, circumference: u32, r: u32) -> (usize, usize) {
+    let grid = deeptime_format::GridDesc::for_planet("L1", circumference, r).unwrap();
+    let cell = cluster::cell_of(&grid, f64::from(s.center[0]), f64::from(s.center[2]));
+    ((cell % grid.w) as usize, (cell / grid.w) as usize)
+}
+
+/// The survivor formula (plan §8.6 as built 2026-09-29) on a history whose preservation is known:
+/// a block of crust fully favourable for 100 Myr that erodes 40 m/Myr everywhere. Deposits form
+/// uniformly in time, so a deposit of half-height h formed at depth z survives when its age is
+/// below (z + h)/(40 m/Myr): P̄ = E_T[min(1, (z + h(T))/4 km)]. The engine's preservation is that
+/// closed form, and over 300 planets the mean number of survivors is the density's target ρ·A
+/// within sampling error, while about target / P̄ form.
+#[test]
+fn the_survivor_formula_hits_its_target_in_expectation() {
+    let (circumference, r) = (2048u32, 16u32);
+    let block = |i: usize, j: usize| (40..60).contains(&i) && (28..36).contains(&j);
+    let near_block = |i: usize, j: usize| (39..61).contains(&i) && (27..37).contains(&j);
+    let rate = 40.0f32;
+    let history = || {
+        history_of(
+            circumference,
+            r,
+            10,
+            &[
+                "test:fertile",
+                fields::ELEVATION,
+                fields::EROSION,
+                fields::DEPOSITION,
+            ],
+            &[],
+            &|_, name, i, j| match name {
+                "test:fertile" if block(i, j) => 1.0,
+                fields::ELEVATION => 100.0,
+                fields::EROSION => rate,
+                _ => 0.0,
+            },
+        )
+    };
+    // The block's true area, and a density that asks for three survivors.
+    let grid = deeptime_format::GridDesc::for_planet("L1", circumference, r).unwrap();
+    let area: f64 = (0..grid.h)
+        .map(|j| {
+            (0..grid.w)
+                .filter(|&i| block(i as usize, j as usize))
+                .count() as f64
+                * fields::cell_area_km2(&grid, j, 300.0)
+        })
+        .sum();
+    let rho = 3.0 * 1.0e5 / area;
+    let mut t = types::builtin().unwrap().remove(0); // porphyry's sizes and formation depth
+    t.id = "test:uniform".into();
+    t.components = types::Components {
+        source: vec![types::Term {
+            field: Some("test:fertile".into()),
+            curve: vec![[0.0, 0.0], [1.0, 1.0]],
+            weight: 1.0,
+            any_of: vec![],
+            note: None,
+        }],
+        ..types::Components::default()
+    };
+    t.clock_gates.clear();
+    t.hosts = types::Hosts::default();
+    t.geometry.children.clear();
+    t.preservation.erosion_behavior = types::ErosionBehavior::Truncate;
+    t.sizing.density_per_1e5km2 = types::Percentiles {
+        p90: rho / 4.0,
+        p50: rho,
+        p10: rho * 2.0,
+    };
+    t.validate().unwrap();
+    // The closed form, on a fine tonnage quadrature.
+    let tonnage = sizing::SizeModel::new(&t.sizing).tonnage;
+    let nodes = 20_000;
+    let span_m = f64::from(rate) * 100.0;
+    let want_p: f64 = (0..nodes)
+        .map(|m| {
+            let q = (m as f64 + 0.5) / f64::from(nodes);
+            let h = geometry::half_height_m(&t, tonnage.quantile(q) * 1.0e6);
+            ((t.preservation.formation_depth_m + h) / span_m).min(1.0)
+        })
+        .sum::<f64>()
+        / f64::from(nodes);
+    assert!(want_p > 0.3 && want_p < 0.8, "a test with something to say: {want_p}");
+    let runs = 300u64;
+    let (mut survivors, mut formed) = (0usize, 0u64);
+    for seed in 0..runs {
+        let (w, census) = run_on(circumference, r, seed, 1.0, history(), Some(vec![t.clone()]));
+        let c = &census["types"][0];
+        assert_eq!(c["id"], "test:uniform");
+        let target = c["target"].as_f64().unwrap();
+        assert!((target - 3.0).abs() < 1e-6, "target {target}");
+        let p = c["preservation"].as_f64().unwrap();
+        assert!((p - want_p).abs() < 0.01, "preservation {p} vs {want_p}");
+        assert!((c["expected"].as_f64().unwrap() - 3.0).abs() < 1e-6);
+        assert_eq!(c["capped"], false);
+        survivors += w.sites.len();
+        formed += c["drawn"].as_u64().unwrap();
+        for s in &w.sites {
+            let (i, j) = site_cell(s, circumference, r);
+            assert!(near_block(i, j), "a site outside the fertile block at {i},{j}");
+        }
+    }
+    let n = runs as f64;
+    let mean = survivors as f64 / n;
+    let se = (3.0 / n).sqrt();
+    assert!(
+        (mean - 3.0).abs() < 4.0 * se + 0.03,
+        "mean survivors {mean} vs target 3 (±{se:.3})"
+    );
+    let mean_formed = formed as f64 / n;
+    let want_formed = 3.0 / want_p;
+    assert!(
+        (mean_formed - want_formed).abs() < 4.0 * (want_formed / n).sqrt() + 0.05,
+        "mean formed {mean_formed} vs {want_formed}"
+    );
+    eprintln!(
+        "survivor formula: P̄ {want_p:.4}, mean survivors {mean:.3} (target 3), mean formed \
+         {mean_formed:.2} ({want_formed:.2} expected) over {runs} planets"
+    );
+}
+
+/// The regional MVT driver: a carbonate platform beside a hot foreland basin in front of a rising
+/// orogen gets MVT ore, though neither the basin nor the orogen reaches the platform; the same
+/// platform far from both, or with the orogen no longer rising, or beside a cold basin, gets none.
+#[test]
+fn mvt_forms_where_a_basin_lies_beside_carbonate() {
+    // 256 × 128 cells of 9.6 km: an orogen in columns 10–20, a foreland basin in 21–40, platform A
+    // in 41–55 (beside the basin), platform B in 150–165 (about 1,000 km from either).
+    let (circumference, r) = (8192u32, 32u32);
+    let orogen = |i: usize| (10..=20).contains(&i);
+    let basin = |i: usize| (21..=40).contains(&i);
+    let platform = |i: usize| (41..=55).contains(&i) || (150..=165).contains(&i);
+    let names = [
+        fields::ELEVATION,
+        fields::EROSION,
+        fields::DEPOSITION,
+        fields::BURIAL_TEMP,
+        "deeptime:orogenic_uplift_m_myr",
+        "deeptime:crust_thickness_km",
+        "deeptime:fault_density",
+        "deeptime:carbonate_platform",
+        "deeptime:host/dolostone",
+    ];
+    let clocks = [("deeptime:clock/oxygenated_oceans", 1.0f32)];
+    let run = |uplift: f32, basin_t: f32| {
+        let h = history_of(
+            circumference,
+            r,
+            5,
+            &names,
+            &clocks,
+            &|_, name, i, _| match name {
+                fields::ELEVATION if orogen(i) => 2500.0,
+                fields::ELEVATION => 150.0,
+                fields::DEPOSITION if basin(i) => 60.0,
+                fields::BURIAL_TEMP if basin(i) => basin_t,
+                fields::BURIAL_TEMP => 20.0,
+                "deeptime:orogenic_uplift_m_myr" if orogen(i) => uplift,
+                "deeptime:crust_thickness_km" => 38.0,
+                "deeptime:fault_density" => 0.3,
+                "deeptime:carbonate_platform" if platform(i) => 0.4,
+                "deeptime:host/dolostone" if platform(i) => 0.1,
+                _ => 0.0,
+            },
+        );
+        let mvt: Vec<types::DepositType> = types::builtin()
+            .unwrap()
+            .into_iter()
+            .filter(|t| t.id == "deeptime:mvt_zn_pb")
+            .collect();
+        run_on(circumference, r, 7, 5.0, h, Some(mvt))
+    };
+    let (w, census) = run(300.0, 110.0);
+    let fav = &w.fields["deposits/favourability/mvt_zn_pb"];
+    let mean_in = |cols: std::ops::RangeInclusive<usize>| {
+        let v: Vec<f32> = (0..fav.data.len())
+            .filter(|c| cols.contains(&(c % 256)))
+            .map(|c| fav.data[c])
+            .collect();
+        v.iter().sum::<f32>() / v.len() as f32
+    };
+    let (a, b) = (mean_in(41..=55), mean_in(150..=165));
+    assert!(a > 0.5, "platform A favourability {a}");
+    assert_eq!(b, 0.0, "platform B favourability");
+    assert_eq!(mean_in(21..=40), 0.0, "the basin itself has no carbonate");
+    assert!(!w.sites.is_empty(), "{}", census["types"][0]);
+    for s in &w.sites {
+        let (i, _) = site_cell(s, circumference, r);
+        assert!((40..=56).contains(&i), "MVT site in column {i}");
+    }
+    // No rising orogen: no drive. A cold basin: no brine.
+    for (uplift, t) in [(0.0, 110.0), (300.0, 20.0)] {
+        let (w, _) = run(uplift, t);
+        let fav = &w.fields["deposits/favourability/mvt_zn_pb"];
+        assert!(
+            fav.data.iter().all(|v| *v == 0.0),
+            "uplift {uplift}, basin {t} °C"
+        );
+        assert!(w.sites.is_empty());
+    }
+}

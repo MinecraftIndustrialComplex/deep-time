@@ -81,7 +81,7 @@
     "cdg_reservoir": false,
     "ore_block_policy": "ev_then_vanilla"
   },
-  "balance": {"count_mult": 20.0, "size_mult_h": 12.0, "size_mult_v": 4.0, "richness_mult": 1.0},
+  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 4.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
     "Sizing: USGS OFR 2009-1252 (Singer, Berger & Moring 2009), model SHam (shale-hosted, amagmatic), n = 25, Table 2 p. 10: tonnage 5 / 25 / 300 Mt, Zn 2.3 / 8 / 14 %, Pb 0.88 / 2.1 / 5.3 %, Ag 0 / 21 / 71 g/t, Cu 0 / 0 / 1.0 % (unreported grades counted as zero); Zn–Pb r = 0.72 (text); 2 km same-deposit rule (p. 2). All 25 SHam deposits are labelled SEDEX (they are 25 of the report's 179 SEDEX-labelled deposits). presence = n_reported / 25 from the report's database. Bulletin 1693 model 31a (n = 45) is in data/usgs/sedex_zn_pb.json extra. Au (4 of 25) is left out.",
