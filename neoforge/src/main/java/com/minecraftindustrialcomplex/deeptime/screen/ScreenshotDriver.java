@@ -2,6 +2,8 @@
 package com.minecraftindustrialcomplex.deeptime.screen;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.preset.ShareCode;
+import com.minecraftindustrialcomplex.deeptime.screen.model.EditorFields;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorModel;
 import com.minecraftindustrialcomplex.deeptime.screen.model.TimelapseModel;
 import com.minecraftindustrialcomplex.deeptime.worldgen.PlanetGenerators;
@@ -43,7 +45,7 @@ final class ScreenshotDriver {
     private static final String PROP = "deeptime.dev.screenshots";
     private static final int STEP_TIMEOUT_TICKS = 20 * 180;
 
-    private enum Step { TITLE, CREATE_SCREEN, EDITOR, TIMELINE, RUNNING, GLOBE, DONE, REVIEW, ACCEPTED, CREATING, IN_WORLD, QUIT }
+    private enum Step { TITLE, CREATE_SCREEN, EDITOR, ADVANCED, TIMELINE, RUNNING, GLOBE, DONE, REVIEW, ACCEPTED, CREATING, IN_WORLD, QUIT }
 
     private static Step step = Step.TITLE;
     private static int ticks;
@@ -147,7 +149,33 @@ final class ScreenshotDriver {
                         if (guidance) {
                             ed.onClose();
                             go(Step.ACCEPTED);
+                        } else if (advancedPreset() != null && model.importShareCode(ShareCode.encode(advancedPreset())).isEmpty()) {
+                            // settings audit: the Advanced settings, on a preset that carries every knob.
+                            model.setAdvancedOpen(true);
+                            SetupPage.showAdvanced();
+                            ed.refresh();
+                            go(Step.ADVANCED);
                         } else {
+                            model.setStart("supercontinent");
+                            model.setLengthText("1000");
+                            ed.refresh();
+                            go(Step.TIMELINE);
+                        }
+                    }
+                }
+                case ADVANCED -> {
+                    if (screen instanceof PlanetEditorScreen ed) {
+                        if (stepTicks == 30) {
+                            shot("02b-setup-advanced");
+                            DeepTime.LOGGER.info("[deeptime-shot] advanced: {} of {} settings in the imported preset",
+                                    model.advancedAvailable(), EditorFields.advancedFields().size());
+                            SetupPage.scrollRows(16);
+                            ed.refresh();
+                        } else if (stepTicks == 60) {
+                            shot("02c-setup-advanced-scrolled");
+                            // Back to the built-in preset, Advanced closed, for the rest of the walk.
+                            model.setAdvancedOpen(false);
+                            model.selectFamily(model.families().get(0));
                             model.setStart("supercontinent");
                             model.setLengthText("1000");
                             ed.refresh();
@@ -266,6 +294,23 @@ final class ScreenshotDriver {
         } catch (RuntimeException e) {
             DeepTime.LOGGER.error("[deeptime-shot] FAILED at step {}", step, e);
             go(Step.QUIT);
+        }
+    }
+
+    /**
+     * The preset JSON of {@code -Ddeeptime.dev.screenshots.preset=<file>} (tools/client/mac-client.sh passes
+     * a pipeline preset), or null: the built-in presets carry none of the Advanced settings until P1-08, so
+     * the driver imports one to show them.
+     */
+    private static String advancedPreset() {
+        String path = System.getProperty(PROP + ".preset");
+        if (path == null || path.isBlank())
+            return null;
+        try {
+            return Files.readString(Path.of(path));
+        } catch (IOException e) {
+            DeepTime.LOGGER.error("[deeptime-shot] FAILED: cannot read the advanced-settings preset {}", path, e);
+            return null;
         }
     }
 

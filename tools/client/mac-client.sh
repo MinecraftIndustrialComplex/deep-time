@@ -22,7 +22,7 @@
 # tools/client/ev-assets-mac.sh shares; read its header. --lease-wait is how long to wait for a busy
 # desktop (default 600 s).
 #
-# Passes: `main` (create=true unless --no-create: 01..10) and, unless --no-guidance, `guidance`
+# Passes: `main` (create=true unless --no-create: 01..10, plus 02b and 02c, the Advanced settings) and, unless --no-guidance, `guidance`
 # (-Ddeeptime.natives.forceFail=unsupported: its two shots land as 11-guidance-panel and
 # 12-create-world-natives-missing). Output: review/out/<name>/ (PNGs, client-<pass>.log,
 # shots.txt, runner.log, crash reports); tools/remote/mac.sh --pull brings it to the laptop.
@@ -52,7 +52,10 @@ mc_start
 
 failed=0
 set +e
-mc_run_pass main -Ddeeptime.dev.screenshots=true "-Ddeeptime.dev.screenshots.create=$CREATE"; st=$?
+# The built-in presets are still P1-13's placeholders, which carry none of the Advanced settings
+# (settings audit): the driver imports the pipeline preset to show them (02b, 02c), then goes back.
+mc_run_pass main -Ddeeptime.dev.screenshots=true "-Ddeeptime.dev.screenshots.create=$CREATE" \
+    "-Ddeeptime.dev.screenshots.preset=$REPO/crates/deeptime-core/presets/pipeline/pipeline_quick_16k.json"; st=$?
 set -e
 [ "$st" = 0 ] || failed=1
 cp "$GAMEDIR"/screenshots/*.png "$OUT/" 2>/dev/null || true
@@ -66,7 +69,7 @@ if [ "$GUIDANCE" = 1 ]; then
     cp "$GAMEDIR/screenshots/03-create-world-natives-missing.png" "$OUT/12-create-world-natives-missing.png" 2>/dev/null || true
 fi
 
-expected=(01-create-world-deeptime 02-setup-no-timeline 03-setup-ready 04-run-map-live 05-run-globe-live
+expected=(01-create-world-deeptime 02-setup-no-timeline 02b-setup-advanced 02c-setup-advanced-scrolled 03-setup-ready 04-run-map-live 05-run-globe-live
           06-run-done 07-run-scrubbed 08-review 09-create-world-accepted)
 [ "$CREATE" = true ] && expected+=(10-in-world)
 [ "$GUIDANCE" = 1 ] && expected+=(11-guidance-panel 12-create-world-natives-missing)

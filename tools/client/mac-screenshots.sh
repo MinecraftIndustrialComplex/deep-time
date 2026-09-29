@@ -23,8 +23,8 @@
 # tools/client/mac-client.sh there, under Deep Time's server lock: it takes graphide's `drive`
 # lease, launches the client in the desktop session (sudo -n launchctl asuser), lets
 # ScreenshotDriver walk the screens, renews the lease while the client runs, releases it, and kills
-# only its own client on any failure; (4) mac.sh --pull brings review/out/<name>/ back: the twelve
-# PNGs (01..10 from the main pass, 11-12 from the guidance pass), client-<pass>.log, shots.txt
+# only its own client on any failure; (4) mac.sh --pull brings review/out/<name>/ back: the fourteen
+# PNGs (01..10 plus 02b, 02c from the main pass, 11-12 from the guidance pass), client-<pass>.log, shots.txt
 # (the driver's [deeptime-shot] lines) and runner.log (session, lease and exit lines).
 # Ctrl-C stops the Mac side too (the runner's pid file), which releases the lease.
 

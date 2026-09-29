@@ -110,6 +110,7 @@ public final class EditorModel {
     private String capText = Formats.number(DEFAULT_CAP_GIB);
     private final Map<String, String> fieldTexts = new LinkedHashMap<>();
     private final Map<String, JsonElement> overrides = new LinkedHashMap<>();
+    private boolean advancedOpen;         // the Advanced settings, collapsed until asked for
     private String effective;             // cached effective preset JSON
 
     private Page page = Page.SETUP;
@@ -317,20 +318,62 @@ public final class EditorModel {
         changed();
     }
 
-    /** The choices of a choice field (the essentials lists), the current value first when unknown. */
+    /**
+     * The choices of a choice field: its fixed options (the catalogue's {@code options}), else the
+     * essentials lists; the current value is added when it is none of them.
+     */
     public List<String> choices(EditorFields.Field f) {
-        Set<String> out = new LinkedHashSet<>();
+        Set<String> out = new LinkedHashSet<>(f.options());
         if ("essentials".equals(f.id()))
             out.addAll(deps.essentials().get());
         value(f).filter(JsonElement::isJsonPrimitive).map(JsonElement::getAsString).ifPresent(out::add);
         return List.copyOf(out);
     }
 
+    /** The current choice of a choice field (its preset value unless the player picked another). */
+    public Optional<String> choice(EditorFields.Field f) {
+        return value(f).filter(JsonElement::isJsonPrimitive).map(JsonElement::getAsString);
+    }
+
+    /** Picks a choice; a value outside a fixed option list is ignored. */
     public void setChoice(EditorFields.Field f, String id) {
         if (f.kind() != EditorFields.Kind.CHOICE || !available(f))
             return;
+        if (!f.options().isEmpty() && !f.options().contains(id))
+            return;
         overrides.put(f.id(), new JsonPrimitive(id));
         changed();
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // The Advanced settings (settings audit)
+    // ------------------------------------------------------------------------------------------
+
+    /** Whether the setup page shows the advanced sections (collapsed by default). */
+    public boolean advancedOpen() {
+        return advancedOpen;
+    }
+
+    public void setAdvancedOpen(boolean open) {
+        advancedOpen = open;
+    }
+
+    /** How many advanced settings the selected preset carries (the others show as unavailable). */
+    public int advancedAvailable() {
+        int n = 0;
+        for (EditorFields.Field f : EditorFields.advancedFields())
+            if (available(f))
+                n++;
+        return n;
+    }
+
+    /** How many advanced settings the player has edited (a valid value typed or picked). */
+    public int advancedEdited() {
+        int n = 0;
+        for (EditorFields.Field f : EditorFields.advancedFields())
+            if (overrides.containsKey(f.id()))
+                n++;
+        return n;
     }
 
     /** Drops every edit of the parameters (not the timeline or the cap). */

@@ -1834,6 +1834,19 @@ folder gone); Enter is held back too (`screen/CreateWorldGuard`). Abandoned stag
 (untouched for 24 h and held by no open editor) are deleted at client setup and at every server
 start. A running simulation keeps going when the editor is closed; reopening Customize shows it.
 
+*As built in the settings audit (2026-09-29; Ben: tuning knobs are settings):* the catalogue
+(`editor_fields.json`, shared with the workbench) grew a `terrain` section (`surface.drama`, and the
+**terrain carving** `amplify.incision_cap`: subtle 0.5, medium 3 = the default, dramatic 10) and five
+`advanced_sections` (`adv_plates`, `adv_surface`, `adv_climate`, `adv_rocks`, `adv_deposits`, one
+per stage) holding the audited world-shaping knobs, each with a plain-language `hint`; the deposit
+count and the province strength now name the keys the core reads (`deposits.count_mult`,
+`deposits.province`, a fixed-list `choice` with `options`). The pipeline presets carry every such key
+at its calibrated value (a field is editable only where the preset carries its path), so a default
+run is byte-identical; a number in a path indexes an array (`structure.pluton_length_km.0`). In the
+game the Advanced sections sit behind one collapsed header in the setup page's scrolling list
+(`EditorModel.advancedOpen`); in the workbench each is a section that starts folded. The list of
+what was left out on purpose is in the catalogue's `_comment`.
+
 Tectonic 3.0.28 ships a client mixin, `WorldCreationUiStateMixin.tectonic$removeUnusablePresets`
 (injected at the return of `WorldCreationUiState.getNonEmptyList`). Decompiled, it only removes
 presets in the tag `#tectonic:incompatible`, whose shipped entries are `minecraft:large_biomes` and

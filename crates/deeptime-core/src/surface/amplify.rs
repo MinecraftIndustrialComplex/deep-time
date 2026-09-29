@@ -123,6 +123,13 @@ pub struct AmplifyParams {
     pub max_incision_frac: f64,
     /// … and by at most this fraction of its initial drop to its lowest neighbour in all: the
     /// erosion is scaled by the cell size, a stream cuts a valley of a few cells' relief.
+    ///
+    /// The editor's "Terrain carving" (settings audit; Ben, 2026-09-29: configurable, default medium):
+    /// subtle 0.5, **medium 3 (the default)**, dramatic 10. On the 100 Myr `pipeline_quick_16k`
+    /// planet the eroded volume of the amplification is 0.39 / 0.56 / 0.69 / 0.84 / 0.92 / 0.97 /
+    /// 0.98 / 1.00 of the uncapped run's at 0.25 / 0.5 / 1 / 3 / 5 / 8 / 12 / ∞, so about 10 and
+    /// above is "no cap"; the flood then repairs the deeper slots (its largest raise 3 m at 3,
+    /// 13 m at 12, 82 m uncapped, on a small steep island).
     pub incision_cap: f64,
     /// A cell stays at least this gradient above its receiver.
     pub min_gradient: f64,
@@ -225,8 +232,8 @@ impl AmplifyParams {
         if !(self.max_incision_frac > 0.0 && self.max_incision_frac <= 1.0) {
             return Err(bad("max_incision_frac", "must be in (0, 1]"));
         }
-        if !(self.incision_cap > 0.0 && self.incision_cap <= 5.0) {
-            return Err(bad("incision_cap", "must be in (0, 5]"));
+        if !(self.incision_cap > 0.0 && self.incision_cap <= 100.0) {
+            return Err(bad("incision_cap", "must be in (0, 100]"));
         }
         if !(0.0..0.1).contains(&self.min_gradient) {
             return Err(bad("min_gradient", "must be in [0, 0.1)"));
