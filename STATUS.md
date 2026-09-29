@@ -230,7 +230,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   presets got the same values without their own runs: K acts on drainage areas in real m², so a 32k planet (twice the
   real length scale) erodes more; P1-17 proper should check its hypsometry. (3) Deposit counts use per-type balance
   multipliers rather than new densities (MVT/SEDEX densities stay the placeholders P1-14 recorded).
-- **Measured gates** (Mac, on the branch merged with master c79b38f): `cargo test --workspace --locked` → the test
+- **Measured gates** (Mac, on the branch merged with master c79b38f and again with ae27fb7, same results both times): `cargo test --workspace --locked` → the test
   binaries report 23 / 174 (+ 2 ignored) / 32 / 28 / 2 / 7 / 7 / 5 passed, 0 failed (core's 174 include the new
   `plates::tests::the_shelf_share_floods_the_continents_margins`; the coupled pipeline tests — resume on another
   thread count, mass balance, deposits identical on 1 vs 3 threads — pass on the recalibrated preset); `cargo clippy --workspace --all-targets --locked
@@ -241,8 +241,9 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Decisions for Ben** (proposals; none asked yet). (1) Deposit counts: the four balance multipliers (porphyry 10,
   MVT 20, SEDEX 20, petroleum 3) make the families appear on a 16k planet; the alternative is to let USGS densities
   count *preserved* deposits (draw ρ·A·F / preservation) — a change to the engine's §8.6 formula. (2) `ocean_fraction`
-  now means the water's share on the pipeline presets (continents born with flooded margins); the Create World slider
-  should say so when P1-08 wires the real presets. (3) MVT is still absent on half the planets: accept (essentials
+  now is the water's share on the pipeline presets (continents born with flooded margins), which is what the
+  workbench editor's hint already says ("Share of the surface under the sea. Earth: about 0.71."); the plate-only
+  presets keep P1-03's crust share (their continents never flood) — confirm, or make the shelf share the default. (3) MVT is still absent on half the planets: accept (essentials
   guarantee what a pack needs) or redesign its driver as a regional one in P1-17 proper.
 - **Next.** P1-17 proper: bench and the 32k/full presets' hypsometry; a GDH1-shaped ocean subsidence (an asymptote
   at −5.65 km instead of the trench) if the old-ocean tail matters; MVT's driver as a regional one (an orogen within a
