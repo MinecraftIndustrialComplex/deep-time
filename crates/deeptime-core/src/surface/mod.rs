@@ -534,15 +534,19 @@ impl SurfaceStage {
                     });
                 st.log = log;
                 // Crust born this step starts bare.
-                for c in 0..n {
+                let mut newborn = vec![false; n];
+                for (c, born) in newborn.iter_mut().enumerate() {
                     let age = pf.crust_age[c];
                     if age >= 0.0 && age < dt_myr as f32 {
                         st.offset_m[c] = 0.0;
                         st.regolith_m[c] = 0.0;
                         st.regolith_kind[c] = weathering::SOIL;
                         st.log.clear(c);
+                        *born = true;
                     }
                 }
+                // The frame keeps where each cell's crust was when the frame began (P1-14).
+                st.acc.compose_back(&nearest, &newborn);
                 st
             }
             None => {

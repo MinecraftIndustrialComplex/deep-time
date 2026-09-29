@@ -96,7 +96,7 @@ pub fn planet_builtin(name: &str) -> Option<&'static str> {
 }
 
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 8] = [
+pub const PLANET_KEYS: [&str; 9] = [
     "seed",
     "planet",
     "keyframes",
@@ -105,6 +105,7 @@ pub const PLANET_KEYS: [&str; 8] = [
     "surface",
     "climate",
     "structure",
+    "deposits",
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
@@ -468,6 +469,9 @@ pub struct PlanetPreset {
     /// Column strata, metamorphism and plutons (P1-07); runs with the surface, with the
     /// defaults when the section is absent.
     pub structure: Option<crate::structure::StructureParams>,
+    /// The deposit engine (P1-14) on the history the surface stage records; `None` stops after
+    /// the surface. It needs a `surface` section.
+    pub deposits: Option<crate::deposits::DepositParams>,
 }
 
 type Obj = Map<String, Value>;
@@ -506,6 +510,7 @@ impl PlanetPreset {
         let surface: Option<crate::surface::SurfaceParams> = section(obj, "surface")?;
         let climate: Option<crate::climate::ClimateParams> = section(obj, "climate")?;
         let structure: Option<crate::structure::StructureParams> = section(obj, "structure")?;
+        let deposits: Option<crate::deposits::DepositParams> = section(obj, "deposits")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
         let seed = match obj.get("seed") {
             None => 1,
@@ -525,6 +530,7 @@ impl PlanetPreset {
             surface,
             climate,
             structure,
+            deposits,
         };
         preset.validate()?;
         Ok(preset)
@@ -691,6 +697,15 @@ impl PlanetPreset {
                  after every plate step)",
             )?;
         }
+        if let Some(d) = &self.deposits {
+            d.validate("$.deposits")?;
+            check(
+                self.surface.is_some(),
+                "$.deposits",
+                "needs a surface section: the deposit stage reads the field history the surface \
+                 stage records",
+            )?;
+        }
         Ok(())
     }
 
@@ -713,6 +728,9 @@ impl PlanetPreset {
         }
         if let Some(s) = &self.structure {
             v["structure"] = json!(s);
+        }
+        if let Some(d) = &self.deposits {
+            v["deposits"] = json!(d);
         }
         v
     }

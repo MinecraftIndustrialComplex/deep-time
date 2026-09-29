@@ -205,7 +205,11 @@ struct Stepper {
     /// Keyframe times are `kf_origin + k · every_years`.
     kf_origin: f64,
     next_kf: f64,
-    last_kf_t: Option<f64>,
+    /// Time and group (its lead's index) of the last keyframe: a group's closing keyframe is
+    /// skipped when one was just drawn at the same instant, but a *later* group (the deposit
+    /// stage runs at the end of time, where the plates and surface just drew theirs) still gets
+    /// its own.
+    last_kf_t: Option<(f64, usize)>,
     timings: Vec<StageTiming>,
 }
 
@@ -622,7 +626,7 @@ impl Session {
         stage: &str,
         layers: &[&str],
     ) -> Result<(), CoreError> {
-        if s.last_kf_t == Some(s.world.t_years) {
+        if s.last_kf_t == Some((s.world.t_years, s.current)) {
             return Ok(());
         }
         let n = self.keyframes.next_n();
@@ -630,7 +634,7 @@ impl Session {
             keyframes::render(&s.world, &self.ramps, stage, layers, n, self.policy.size)
         {
             self.keyframes.push(frame)?;
-            s.last_kf_t = Some(s.world.t_years);
+            s.last_kf_t = Some((s.world.t_years, s.current));
             self.log.push(
                 Level::Debug,
                 format!("keyframe {n} at t={} ({stage})", s.world.t_years),

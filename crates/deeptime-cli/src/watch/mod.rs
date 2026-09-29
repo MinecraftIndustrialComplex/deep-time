@@ -265,6 +265,9 @@ mod tests {
         v["resolution"]["l1_r"] = json!(64);
         v["keyframes"]["size"] = json!([64, 32]);
         v["keyframes"]["every_myr"] = json!(10.0);
+        // The streaming tests read the coupled group (plates, surface, structure) as the whole
+        // pipeline; the deposit stage after it (P1-14) has its own tests.
+        v.as_object_mut().unwrap().remove("deposits");
         v.to_string()
     }
 

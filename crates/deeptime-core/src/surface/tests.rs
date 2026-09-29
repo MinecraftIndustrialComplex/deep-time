@@ -347,6 +347,9 @@ fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
     v["keyframes"]["size"] = serde_json::json!([128, 64]);
     v["keyframes"]["every_myr"] = serde_json::json!(20.0);
     v["seed"] = serde_json::json!(seed);
+    // These tests are about the plates and the surface; the deposit stage has its own
+    // (`deposits::tests`).
+    v.as_object_mut().unwrap().remove("deposits");
     v.to_string()
 }
 
