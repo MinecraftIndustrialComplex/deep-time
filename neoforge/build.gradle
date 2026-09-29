@@ -513,6 +513,12 @@ tasks.named('processResources', ProcessResources) {
         include '*.json'
         into 'deeptime/presets'
     }
+    // The colour ramps the core's keyframes, the viewer and the game share (plan §3.3, P1-11):
+    // one file, read by screen/model/Ramps as deeptime/ramps.json.
+    from(new File(repoRoot, 'crates/deeptime-viewer/assets')) {
+        include 'ramps.json'
+        into 'deeptime'
+    }
     if (project.hasProperty('release')) {
         dependsOn checkReleaseNatives
         from(nativesDistDir) { into 'natives/deeptime' }
