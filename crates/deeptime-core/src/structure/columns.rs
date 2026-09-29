@@ -215,7 +215,7 @@ pub fn pool_class(t: &Tables, cell: &Cell<'_>, p: usize) -> u16 {
 }
 
 fn push(out: &mut Vec<Unit>, class: u16, thickness_m: f64, source: Source) {
-    if !(thickness_m > 0.0) {
+    if thickness_m.is_nan() || thickness_m <= 0.0 {
         return;
     }
     if let Some(last) = out.last_mut()
@@ -257,7 +257,7 @@ pub fn build(
     let mut log_total = 0.0f64;
     for l in cell.log.iter().rev() {
         let th = f64::from(l.thickness_m);
-        if !(th > 0.0) {
+        if th.is_nan() || th <= 0.0 {
             continue;
         }
         log_total += th;
