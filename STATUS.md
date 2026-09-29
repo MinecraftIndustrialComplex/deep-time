@@ -138,7 +138,9 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   mul = q (all **infinite**, see findings); no vein at (0,0) or the trap; CDG over trap 27 (62 Mt,
   73,317,183,120 mB): (334,25) and (333,25) infinite, (336,27) 553,979 mB, (−348,−65) and (0,0) 0 —
   CDG's base and pumpjack amounts equal Deep Time's in all 5; `/coe locate …/copper` → "Could not
-  find", `/coe locate …/redstone` → 2,073 blocks away.
+  find", `/coe locate …/redstone` → 2,073 blocks away. **After merging master 82ca8ea (P1-04)**:
+  cargo fmt/clippy/deny clean, test ok (core 139 + 1 ignored), `gradlew build test` 106/0,
+  `./gametest.sh` and `-PwithMic` → All 45 passed each (the same compat numbers).
 - **Findings for Ben.** (1) **MIC's COE veins are all infinite**: COE's `defaultInfinite` is true
   and the pack ships no COE server config, so the tonnage quantile changes nothing in MIC today (it
   is stored, and the finite amounts it would give are in the table: copper 10,021–11,576, coal
