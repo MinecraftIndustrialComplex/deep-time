@@ -2291,16 +2291,32 @@ writes PNGs plus a JSON summary:
   `deeptime-inspect colors --jars <mods dir> --vanilla <client-extra jar>` builds from the jars' own
   top textures (average colour per block).
 - `rock` — the rock class of the first solid non-surface block per column (block → class from
-  `/deeptime probe palette`'s dump).
+  `/deeptime probe palette`'s dump; until that probe exists, from the `#deeptime:rock/<class>` tags
+  in the world's jars and datapacks).
 - `ore` — ore blocks by material, projected from above with depth shading.
 - `section --axis x|z --at <n> --from <a> --to <b>` — a vertical cross-section, blocks by colour,
-  with site bodies and horizon lines overlaid from the world data.
+  with site bodies and horizon lines overlaid from the world data. `--axis z --at <n>` is the plane
+  z = n, running along x. It prints `water_top_y=<y> water_block_y=<y−1> columns=<n>` for every
+  water surface it crosses: `water_top_y` is the top face of the highest block holding water above
+  the terrain surface, as P0-13's `lakeHolds` logs it (sea level 63 gives 63), `water_block_y` that
+  block's y (cold-read review 2, gap 18).
 - `seam` — the 128 columns on either side of x = C/2 as one strip, and the per-column height
   difference between the region files and the world data.
-- `compare --world-data <dir>` — generated surface height vs `elevation`, as a histogram and a map.
+- `compare --world <dir> --world-data <dir>` — generated surface height vs `elevation`, as a
+  histogram and a map (cold-read review 2, gap 18). **Measured** is the y of the highest block that
+  is not air, fluid or a feature (vegetation, logs, wood, leaves, roots, huge mushrooms, coral,
+  sea pickles, snow layers, sheet ice, …): `OCEAN_FLOOR` minus logs, leaves and features.
+  **Expected** is `⌈H⌉ − 1`, H the bilinear `elevation` (the GameTests' expected top). Only `full`
+  chunks count, and two kinds of column are left out and counted: `structure` (within 12 blocks of
+  a structure piece that reaches the surface) and `carved` (within 2 columns of a pit: at least 2
+  blocks below the morphological closing, half-width up to 32, of the measured surface after an
+  opening of half-width 4 that removes narrow bumps; the test reads only the measured surface,
+  never the world data). The JSON reports `p99_abs_diff_blocks` (nearest rank over |measured −
+  expected|), the histogram and the exclusion counts.
 - `regions --world <dir> --span <C>` — lists region files and counts any outside the canonical span
   (−C/1024 ≤ rx < C/1024), printing `outside=<n>`; the same check `run.py` does by file name, kept
-  here for worlds that did not come from a smoke run.
+  here for worlds that did not come from a smoke run. A 0-byte file holds no chunk (the game
+  creates it when it merely looks a chunk up) and is counted apart as `outside_empty`.
 
 ### 9.8 Publishing and what stays unverifiable
 
@@ -2676,11 +2692,12 @@ of Phase 0 is built on it.
 - **Creates.** `crates/deeptime-inspect` with `colors`, `topdown`, `rock`, `ore`, `section`, `seam`,
   `regions`, `compare`; a small region fixture copied from the standalone smoke world for its tests.
 - **Depends on.** P0-04, P0-09, P0-10 (a standalone smoke world with world data:
-  `tools/smoke/install.sh standalone --synth wrap-test --size 16384 && python3 tools/smoke/run.py --profile standalone`).
+  `tools/smoke/install.sh standalone --synth wrap-test --size 16384 && python3 tools/smoke/run.py --profile standalone --fresh --chunky 128 --chunky-seam`;
+  `--chunky-seam` pregenerates the columns either side of the seam for `seam`).
 - **Acceptance.**
   - `nix develop -c cargo test -p deeptime-inspect` → ok
   - `nix develop -c cargo run -p deeptime-inspect -- compare --world smoke/standalone/server/planet --world-data smoke/standalone/server/planet/deeptime`
-    → JSON with `"p99_abs_diff_blocks"` ≤ 1
+    → JSON with `"p99_abs_diff_blocks"` ≤ 1 (measured and expected as §9.7 defines them)
 - **Ben reviews.** Top-down, section and seam PNGs on the Phase 0 page.
 
 #### P0-12 Terralith, TerraBlender and Biomes O' Plenty checks
@@ -2715,8 +2732,8 @@ of Phase 0 is built on it.
     with before = after = expected, and `[gametest] lakeHolds water_top_y=120` (the top face of the
     highest water block at the lake centre, `notes.lake.centre_block`; cold-read review 2, gap 18)
   - `nix develop -c cargo run -p deeptime-inspect -- section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at 0 --from -88 --to 212`
-    → a PNG with the water surface at y 120 (the lake centre is z 0 and the channel runs along it
-    to x 160; −88…212 is `lakeHolds`' scanned box; a review picture, P0-11)
+    → a PNG with the water surface at y 120 and the printed line `water_top_y=120` (the lake centre
+    is z 0 and the channel runs along it to x 160; −88…212 is `lakeHolds`' scanned box; P0-11)
 - **Ben reviews.** The cross-section and the BlueMap view of the lake.
 
 #### P0-14 BlueMap renders on MIC blocks
