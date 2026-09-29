@@ -56,6 +56,12 @@
   table.census th, table.census td { padding: 2px 6px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
   table.census th:first-child, table.census td:first-child { text-align: left; }
   table.census th { color: var(--muted); font-weight: 600; }
+  #structure { padding: 0 16px 16px; }
+  figure.xsec { margin: 0 0 12px; }
+  figure.xsec img { display: block; max-width: 100%; height: auto; image-rendering: pixelated; border: 1px solid var(--line); }
+  figure.xsec figcaption { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; margin-right: 4px; vertical-align: -2px; border: 1px solid var(--line); }
   svg.section { display: block; width: 100%; height: auto; margin-top: 6px; background: var(--bg); border: 1px solid var(--line); }
   svg.section text { font: 10px system-ui, sans-serif; fill: var(--muted); }
 </style>
@@ -104,6 +110,9 @@
 </section>
 <section id="census" hidden>
   <div class="panel"><h2>Deposit census</h2><div id="censusbody"></div></div>
+</section>
+<section id="structure" hidden>
+  <div class="panel"><h2>Column strata: cross-sections along meridians</h2><div id="structurebody"></div></div>
 </section>
 <script src="bundle.js"></script>
 <script src="report.js"></script>

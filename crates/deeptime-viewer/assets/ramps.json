@@ -451,6 +451,20 @@
         [40, "#c06a30"],
         [120, "#ffb070"]
       ]
+    },
+    "metamorphic_grade": {
+      "_comment": "Categorical: metamorphic grade 0-4 (none, very low: slate, low: phyllite/greenschist, medium: schist/amphibolite, high: gneiss; structure/metamorphism.rs).",
+      "stops": [
+        [0, "#1a1a1a"],
+        [0.999, "#1a1a1a"],
+        [1, "#4a6a8a"],
+        [1.999, "#4a6a8a"],
+        [2, "#5aa05a"],
+        [2.999, "#5aa05a"],
+        [3, "#d0a040"],
+        [3.999, "#d0a040"],
+        [4, "#e04030"]
+      ]
     }
   },
   "layers": {
@@ -482,7 +496,12 @@
     "surface/sediment_m": "sediment",
     "surface/class": "rock_class",
     "surface/drainage": "drainage",
-    "surface/regolith_m": "regolith"
+    "surface/regolith_m": "regolith",
+    "structure/rock": "rock_class",
+    "strata/outcrop": "rock_class",
+    "strata/bedrock": "rock_class",
+    "structure/log_grade": "metamorphic_grade",
+    "structure/trap_structure": "unit"
   },
   "default": "grey"
 }
