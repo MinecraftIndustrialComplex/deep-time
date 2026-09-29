@@ -51,7 +51,15 @@ public final class DeepTimeCommands {
                         .then(Commands.argument("z", IntegerArgumentType.integer())
                                 .executes(c -> probePole(c.getSource(), IntegerArgumentType.getInteger(c, "z")))))
                 .then(Commands.literal("network").executes(c -> probeNetwork(c.getSource())))
-                .then(Commands.literal("palette").executes(c -> probePalette(c.getSource())));
+                .then(Commands.literal("palette").executes(c -> probePalette(c.getSource())))
+                .then(Commands.literal("site")
+                        .then(Commands.argument("x", IntegerArgumentType.integer())
+                                .then(Commands.argument("y", IntegerArgumentType.integer())
+                                        .then(Commands.argument("z", IntegerArgumentType.integer())
+                                                .executes(c -> SiteCommands.probeSite(c.getSource(),
+                                                        IntegerArgumentType.getInteger(c, "x"), IntegerArgumentType.getInteger(c, "y"),
+                                                        IntegerArgumentType.getInteger(c, "z")))))))
+                .then(Commands.literal("claims").executes(c -> SiteCommands.probeClaims(c.getSource())));
         var gametest = Commands.literal("gametest").requires(s -> GameTestSupport.enabled());
         // Sable is optional: its probe and test commands exist only when it is loaded, and every
         // Sable call goes through SableTestOps (loaded on first use).
@@ -62,8 +70,21 @@ public final class DeepTimeCommands {
                             .then(Commands.argument("z", IntegerArgumentType.integer())
                                     .executes(DeepTimeCommands::sableStraddle))));
         }
+        var sites = Commands.literal("sites")
+                .then(Commands.literal("near")
+                        .then(Commands.argument("x", IntegerArgumentType.integer())
+                                .then(Commands.argument("z", IntegerArgumentType.integer())
+                                        .then(Commands.argument("radius", IntegerArgumentType.integer(1, 1 << 20))
+                                                .executes(c -> SiteCommands.sitesNear(c.getSource(),
+                                                        IntegerArgumentType.getInteger(c, "x"), IntegerArgumentType.getInteger(c, "z"),
+                                                        IntegerArgumentType.getInteger(c, "radius")))))));
+        var why = Commands.literal("why")
+                .then(Commands.argument("siteId", IntegerArgumentType.integer(0))
+                        .executes(c -> SiteCommands.why(c.getSource(), IntegerArgumentType.getInteger(c, "siteId"))));
         dispatcher.register(Commands.literal("deeptime").requires(s -> s.hasPermission(2))
                 .then(probe)
+                .then(sites)
+                .then(why)
                 .then(gametest
                         .then(Commands.literal("reset").executes(c -> {
                             DeepTimeTestReporter.INSTANCE.reset();
@@ -276,7 +297,7 @@ public final class DeepTimeCommands {
         return emit(source, o);
     }
 
-    static int emit(CommandSourceStack source, JsonObject o) {
+    public static int emit(CommandSourceStack source, JsonObject o) {
         String line = PROBE_PREFIX + o;
         DeepTime.LOGGER.info(line);
         source.sendSuccess(() -> Component.literal(line), false);

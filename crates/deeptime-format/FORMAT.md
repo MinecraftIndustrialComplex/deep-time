@@ -151,6 +151,15 @@ horizon k+1's top, the last one down to `min_y`. Unused horizons have top −327
 Block coordinates of L3 sample points that are dry land, gently sloping, spread apart, ordered by
 distance from (0, 0).
 
+A world whose essentials set `max_blocks_from_spawn` (P1-15, plan §7.8; a synthetic deposit world
+today) ranks its candidates instead (`deeptime_core::deposits::spawn`): points on a 16-block lattice
+that are dry, at least sea level + 2 and within one block of their L3 neighbours, ordered by the
+number of such essentials whose nearest site is out of reach (`unmet`), then
+`score` = Σ min(d / max_blocks_from_spawn, 4), then distance from (0, 0); at most 10, 64 blocks apart.
+The file then also has `ranked_by` (`[{material, max_blocks_from_spawn, sites}]`) and each candidate
+`unmet`, `score` and `essentials` (`[{material, site, distance, max_blocks_from_spawn}]`). The game
+takes the dry candidate with the fewest `unmet`, file order breaking ties (`SpawnHandler`).
+
 ## Sectioned files (`DTEV`, `DTSR`, `DTSI`, `DTKF`, `DTCP`)
 
 Every binary file other than a tile pack shares one container (`container.rs`): the 16-byte header
@@ -284,6 +293,14 @@ block (x, y, z) on a planet of circumference C — Java must do exactly this:
    may overlap (several products in one place); a zone with no material only changes the rock
    (`rock_class`), and a zone density of 0 places no ore (fluids, alteration halos).
 
+In the game (P1-15; `neoforge/…/worlddata/Body.java` is this evaluation, checked against Rust by
+`DepositDataParityTest` over `deeptime dump-deposits`): the strata pass paints a body's
+`rock_class` (a zone's, where one applies, winning; of several zones the last) over the crust or
+horizon rock inside it, and the deposit feature turns a host block into ore where one uniform draw
+per block, a hash of the canonical block position and the body id, falls below the running sum of
+the densities of the zones with a material that apply there, in zone order (so overlapping zones
+share the block's probability, capped at 1).
+
 The AABB is conservative: the world extent along axis i is `Σ_j |R_ji|·h_j` around the centre
 (R the rotation above, h the semi-axes), clipped at `clip_top_y`. The viewer's `report.js` carries
 each body as JSON: `id, site, shape, metric, role, center, axes, yaw, dip, clip_top_y (null = none),
@@ -332,7 +349,15 @@ contract with Java.
   continents from H, erosion 0.2, ridges 0.35, vegetation 0).
 - `lake-test` — a plain at y 100 with a round basin and a closed channel; its geometry is in
   `manifest.json` `notes.lake`. Floor y 110, rim crest y 125, `water_level` 120 inside the rim.
-- Both: a three-horizon strata placeholder on L1 (`notes.strata`); with `--strata every-class`
+- `deposit-history` (P1-15) — not a `synth --kind`: a `deposits_synthetic` preset with
+  `"terrain": {"strata": "placeholder" | "every-class"}` bakes it at `finalize_write` next to the run's
+  sites, bodies and events. `elevation` = round(16·(63 + h/20)) of the synthetic history's present
+  elevation h (m) sampled bilinearly on L1 at each L3 point — the same surface the deposit stage
+  placed and clipped the bodies against (`deposits::bilinear_cells`, `surface_y`); `water_level` all
+  nodata; climate as wrap-test's formulas on this terrain; spawn candidates ranked by the preset's
+  (or the content bundle's) essentials. `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json`
+  are the GameTest and smoke worlds.
+- All: a three-horizon strata placeholder on L1 (`notes.strata`); with `--strata every-class`
   (P1-12) eight horizons 10 blocks apart holding all 59 rock classes, horizon h of L1 cell column
   i having class (6·i + h) mod 59, so any ten neighbouring cell columns show every class at
   h ≥ 2 (`notes.strata.class_rule`).
