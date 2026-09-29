@@ -114,6 +114,24 @@ pub fn print_census(census: &Value) {
             f("dropped_separation"),
             f("on_land"),
         );
+        if let Some(b) = t["best_cell"].as_object() {
+            let g = |k: &str| b[k].as_f64().unwrap_or(0.0);
+            println!(
+                "  best cell F={:.2} at lat {:.1} lon {:.1}, limited by {} (scores {})",
+                g("favourability"),
+                g("lat"),
+                g("lon"),
+                b["limiting"].as_str().unwrap_or("?"),
+                b["scores"]
+                    .as_object()
+                    .map(|m| m
+                        .iter()
+                        .map(|(k, v)| format!("{k} {:.2}", v.as_f64().unwrap_or(0.0)))
+                        .collect::<Vec<_>>()
+                        .join(", "))
+                    .unwrap_or_default()
+            );
+        }
     }
 }
 
@@ -496,11 +514,28 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     }
     if let Some(dir) = &o.viewer {
         let index = KeyframeIndex::read(&work)?;
-        let keyframes = index
+        let mut keyframes = index
             .frames
             .iter()
             .map(|e| read_keyframe(&work, e))
             .collect::<Result<Vec<_>, _>>()?;
+        if o.name == deeptime_core::deposits::STAGE_NAME {
+            // The deposit bundle keeps the map context (elevation, plates, crust age, regime,
+            // drainage, the rock and the trap structure) and the deposit layers; the surface's
+            // bulk layers stay in the surface bundle. Keeps a 500 Myr bundle under the review cap.
+            const LEFT_TO_THE_SURFACE_BUNDLE: [&str; 6] = [
+                "surface/erosion_m_myr",
+                "surface/deposition_m_myr",
+                "surface/sediment_m",
+                "surface/regolith_m",
+                "surface/class",
+                "structure/log_grade",
+            ];
+            for k in &mut keyframes {
+                k.layers
+                    .retain(|(name, _)| !LEFT_TO_THE_SURFACE_BUNDLE.contains(&name.as_str()));
+            }
+        }
         let info = deeptime_viewer::BundleInfo {
             title: format!("Deep Time — stage {}", o.name),
             source: format!("stage:{}", o.name),

@@ -69,8 +69,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Mutex, OnceLock};
 
 use deeptime_format::{Body, Event, EventId, Extraction, GridDesc, Place, Product, Site};
-use serde::{Deserialize, Serialize};
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::error::CoreError;
@@ -773,6 +773,9 @@ struct TypeCensus {
     /// Sites whose centre is above sea level at the end of the history (a sanity check on where
     /// the geology put them).
     on_land: usize,
+    /// The most favourable cell of the planet: where, how favourable, and the component that
+    /// limits it (the answer to "why so few?" for a type with an empty map).
+    best_cell: Option<Value>,
 }
 
 impl Stage for DepositStage {
@@ -876,7 +879,13 @@ fn carry<T: Copy + Send + Sync>(v: &mut Vec<T>, origin: &[u32], fresh: T) {
     let old = std::mem::take(v);
     *v = origin
         .par_iter()
-        .map(|&q| if q == NO_ORIGIN { fresh } else { old[q as usize] })
+        .map(|&q| {
+            if q == NO_ORIGIN {
+                fresh
+            } else {
+                old[q as usize]
+            }
+        })
         .collect();
 }
 
@@ -1228,6 +1237,26 @@ impl DepositStage {
                 per_camp,
             };
             f.census[ti].tracts = tracts.len();
+            if let Some((cell, &fmax)) = fv
+                .iter()
+                .enumerate()
+                .max_by(|a, b| a.1.total_cmp(b.1).then(b.0.cmp(&a.0)))
+                && let Some(a) = self.state.acc[ti].get(cell)
+            {
+                let (x, z) = cluster::cell_xz(&grid, cell as u32);
+                let ll = lat_lon_of(c, x, z);
+                f.census[ti].best_cell = Some(json!({
+                    "lat": ll[0],
+                    "lon": ll[1],
+                    "favourability": fmax,
+                    "limiting": COMPONENTS[a.limiting()],
+                    "scores": COMPONENTS
+                        .iter()
+                        .zip(a.scores)
+                        .map(|(n, q)| (*n, rules::dq8(q)))
+                        .collect::<BTreeMap<_, _>>(),
+                }));
+            }
             // The §8.6 expectation per tract, then the province endowments redistribute it:
             // λ_i = formula_i · E_i · Σ formula / Σ formula·E, so the planet's expected count stays
             // the formula's while rich provinces take more of it.
@@ -1328,8 +1357,11 @@ impl DepositStage {
         let paths = ctx.pool.install(|| trace(hist, self.frames, &cells))?;
         for k in 0..self.frames {
             let frame = ctx.pool.install(|| hist.frame(k))?;
-            let live: Vec<usize> = (0..cells.len())
-                .filter(|&i| paths[i][k] != NO_ORIGIN)
+            let live: Vec<usize> = paths
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| p[k] != NO_ORIGIN)
+                .map(|(i, _)| i)
                 .collect();
             let at: Vec<u32> = live.iter().map(|&i| paths[i][k]).collect();
             for (&i, s) in live.iter().zip(children::sample(&frame, &at)) {
@@ -2013,12 +2045,7 @@ impl DepositStage {
             .param("tonnage_mt", size.tonnage_mt)
             .magnitude(size.tonnage_q as f32)
             .caused_by(gone_event);
-        let (xp, zp) = self.xz_at(
-            f,
-            cand.point.cell,
-            (cand.point.x, cand.point.z),
-            t_gone,
-        );
+        let (xp, zp) = self.xz_at(f, cand.point.cell, (cand.point.x, cand.point.z), t_gone);
         for id in f.preservation_causes(child, xp, zp, t_gone) {
             e = e.caused_by(id);
         }

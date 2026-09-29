@@ -5,7 +5,7 @@
 //! deposits riding rigidly drifting crust, and histories with fields missing.
 
 use std::collections::BTreeMap as Map;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -49,9 +49,9 @@ fn temp_dir(name: &str) -> PathBuf {
     dir
 }
 
-fn options(dir: &PathBuf, threads: usize) -> SessionOptions {
+fn options(dir: &Path, threads: usize) -> SessionOptions {
     SessionOptions {
-        out_dir: dir.clone(),
+        out_dir: dir.to_path_buf(),
         threads,
         mem_cap: 0,
     }
@@ -71,7 +71,10 @@ fn finish(s: &Session) {
 fn run(json: &str, threads: usize, name: &str) -> (WorldState, Value) {
     let dir = temp_dir(name);
     let s = Session::create(json, "", options(&dir, threads), Arc::new(NoGauge)).unwrap();
-    assert_eq!(s.stage_names(), ["plates", "surface", "structure", "deposits"]);
+    assert_eq!(
+        s.stage_names(),
+        ["plates", "surface", "structure", "deposits"]
+    );
     finish(&s);
     let world = s.checkpoint().unwrap().world;
     let census: Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
@@ -87,17 +90,22 @@ fn sites_by_type(w: &WorldState) -> Map<&str, usize> {
     out
 }
 
-/// A run of the coupled pipeline on 1 thread and on 3: the same sites, bodies, events and census;
-/// and the sites hold every family whose fields the history has.
+/// A run of the coupled pipeline on 1 thread and on 3: the same sites, bodies, events and census,
+/// from the history the plates, surface and structure stages recorded.
 #[test]
-fn coupled_pipeline_places_every_family_and_is_deterministic_across_threads() {
+fn coupled_pipeline_reads_its_own_history_and_is_deterministic_across_threads() {
     let json = pipeline_json(3000, 100.0, 5, 40.0);
     let (a, census) = run(&json, 1, "one");
     let (b, census_b) = run(&json, 3, "three");
     for t in census["types"].as_array().unwrap() {
         eprintln!(
             "TYPE {} enabled={} tracts={} permissive_km2={:.0} drawn={} sites={}",
-            t["id"], t["enabled"], t["tracts"], t["permissive_km2"].as_f64().unwrap(), t["drawn"], t["sites"]
+            t["id"],
+            t["enabled"],
+            t["tracts"],
+            t["permissive_km2"].as_f64().unwrap(),
+            t["drawn"],
+            t["sites"]
         );
     }
     eprintln!("sites by type: {:?}", sites_by_type(&a));
@@ -107,7 +115,11 @@ fn coupled_pipeline_places_every_family_and_is_deterministic_across_threads() {
     assert_eq!(a.events, b.events, "events differ");
     assert_eq!(census, census_b, "census differs");
     let bits = |w: &WorldState| -> Vec<u32> {
-        w.fields["deposits/sites"].data.iter().map(|v| v.to_bits()).collect()
+        w.fields["deposits/sites"]
+            .data
+            .iter()
+            .map(|v| v.to_bits())
+            .collect()
     };
     assert_eq!(bits(&a), bits(&b), "sites layer differs");
     // The history is still in the world after the stage (a checkpoint carries it).
@@ -121,14 +133,20 @@ fn coupled_pipeline_places_every_family_and_is_deterministic_across_threads() {
     assert_eq!(census["fallbacks"], serde_json::json!([]));
     let names = census["history"]["names"].as_array().unwrap();
     for wanted in ["deeptime:trap_structure", "deeptime:host/granodiorite"] {
-        assert!(names.iter().any(|n| n == wanted), "{wanted} not in the history");
+        assert!(
+            names.iter().any(|n| n == wanted),
+            "{wanted} not in the history"
+        );
     }
     // A 100 Myr run on 3,000 samples is young: the petroleum system, which needs source, seal,
     // reservoir and structure in one basin, is the family that develops (the synthetic-history
     // test below has every family; the 500 Myr acceptance run is in STATUS.md). Its sites are
     // real, with kitchens in the log.
     let by = sites_by_type(&a);
-    assert!(by.get("deeptime:petroleum_trap").copied().unwrap_or(0) > 0, "{by:?}");
+    assert!(
+        by.get("deeptime:petroleum_trap").copied().unwrap_or(0) > 0,
+        "{by:?}"
+    );
     assert!(
         a.events
             .iter()
@@ -144,7 +162,11 @@ fn coupled_pipeline_places_every_family_and_is_deterministic_across_threads() {
             .expect("the forming event is in the log");
         assert!(!e.causes.is_empty(), "site {} ({})", s.id, s.deposit_type);
         for c in &e.causes {
-            let cause = a.events.iter().find(|x| x.id == *c).expect("cause in the log");
+            let cause = a
+                .events
+                .iter()
+                .find(|x| x.id == *c)
+                .expect("cause in the log");
             assert_ne!(cause.source, synthetic::SOURCE);
         }
     }
@@ -170,10 +192,13 @@ fn a_checkpoint_inside_the_deposit_stage_resumes_to_the_same_sites() {
     }
     let ck = s.checkpoint().unwrap();
     assert_eq!(ck.next_stage_name(), Some("deposits"));
-    assert!(ck.world.history.is_some(), "the checkpoint carries the history");
+    assert!(
+        ck.world.history.is_some(),
+        "the checkpoint carries the history"
+    );
     let bytes = ck.to_bytes().unwrap();
     drop(s);
-    let ck = Checkpoint::from_bytes(std::path::Path::new("ck"), &bytes).unwrap();
+    let ck = Checkpoint::from_bytes(Path::new("ck"), &bytes).unwrap();
     let s = Session::resume(ck, options(&dir, 3), Arc::new(NoGauge)).unwrap();
     finish(&s);
     let resumed = s.checkpoint().unwrap().world;
@@ -287,7 +312,11 @@ fn world_with(sp: &SyntheticParams, history: RecordedHistory) -> WorldState {
     world
 }
 
-fn run_recorded(sp: &SyntheticParams, history: RecordedHistory, count_mult: f64) -> (WorldState, Vec<String>) {
+fn run_recorded(
+    sp: &SyntheticParams,
+    history: RecordedHistory,
+    count_mult: f64,
+) -> (WorldState, Vec<String>) {
     let p = preset_for(sp, count_mult);
     let mut world = world_with(sp, history);
     let mut stage = DepositStage::recorded(&p).unwrap();
@@ -366,9 +395,8 @@ fn deposits_ride_a_rigidly_drifting_crust() {
 fn missing_fields_skip_the_types_that_need_them_and_nothing_else() {
     let sp = synthetic_params();
     let (full, _) = run_recorded(&sp, drifting(&sp, 0, &|_| true), 25.0);
-    let lacking = |name: &str| {
-        name != "deeptime:trap_structure" && name != "deeptime:carbonate_platform"
-    };
+    let lacking =
+        |name: &str| name != "deeptime:trap_structure" && name != "deeptime:carbonate_platform";
     let (part, log) = run_recorded(&sp, drifting(&sp, 0, &lacking), 25.0);
     let census: Value = serde_json::from_str(&part.notes[STAGE_NAME]).unwrap();
     let skipped: Map<String, Vec<String>> = census["skipped"]
@@ -408,7 +436,8 @@ fn missing_fields_skip_the_types_that_need_them_and_nothing_else() {
     );
     for id in skipped.keys() {
         assert!(
-            log.iter().any(|l| l.contains("skipped") && l.contains(id.as_str())),
+            log.iter()
+                .any(|l| l.contains("skipped") && l.contains(id.as_str())),
             "{id} is not in the log: {log:?}"
         );
         assert!(
@@ -417,7 +446,10 @@ fn missing_fields_skip_the_types_that_need_them_and_nothing_else() {
         );
     }
     // The types that kept their fields are untouched.
-    for t in types.iter().filter(|t| !skipped.contains_key(&t.id) && !t.child_only) {
+    for t in types
+        .iter()
+        .filter(|t| !skipped.contains_key(&t.id) && !t.child_only)
+    {
         let name = format!("deposits/favourability/{}", t.short());
         let (a, b) = (&full.fields[&name], &part.fields[&name]);
         let same = a
@@ -427,7 +459,11 @@ fn missing_fields_skip_the_types_that_need_them_and_nothing_else() {
             .all(|(x, y)| x.to_bits() == y.to_bits());
         assert!(same, "{} changed when unrelated fields went missing", t.id);
     }
-    assert_eq!(census["fallbacks"], serde_json::json!([]), "the hosts are there");
+    assert_eq!(
+        census["fallbacks"],
+        serde_json::json!([]),
+        "the hosts are there"
+    );
     // Without any host-rock field the fallback is documented, not a skip: every type still runs,
     // the log and the census say the lithology opinion is gone.
     let no_hosts = |name: &str| !name.starts_with(HOST_PREFIX);
@@ -441,7 +477,10 @@ fn missing_fields_skip_the_types_that_need_them_and_nothing_else() {
             .any(|f| f.as_str().unwrap().contains(HOST_PREFIX)),
         "{fallbacks:?}"
     );
-    assert!(log.iter().any(|l| l.contains("no lithology opinion")), "{log:?}");
+    assert!(
+        log.iter().any(|l| l.contains("no lithology opinion")),
+        "{log:?}"
+    );
     assert!(!bare.sites.is_empty());
 }
 
