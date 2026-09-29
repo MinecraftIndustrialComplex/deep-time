@@ -27,6 +27,10 @@ mkdir -p neoforge/build
 # The GameTest server reuses its world folder; stale test levels and world data from an
 # older build would be tested again, so they go first.
 rm -rf run-gametest/world
+# With -PwithMic, TaCZ and Mega Showdown unpack ~190 MB of packs into these folders on a first run
+# and load them on every later one; on a warm folder the 6 GB heap then ran out during lakeHolds
+# (P1-12: two OutOfMemoryErrors warm, two passes cold). Start cold every time.
+rm -rf run-gametest/tacz run-gametest/showdown
 
 # World data for the test_planet_data level (P0-10): the analytic terrain written as world data,
 # with every rock class in its horizons (P1-12's StrataGameTests.everyClassInTheWorld).

@@ -143,6 +143,18 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   Create's veridium/asurine/ochrum/crimsite among them). A block → class map is ambiguous where
   stand-ins share a block (calcite is marble, chalk, halite, …; the render names the alphabetically
   first class).
+- **After merging master c7af155 (P0-06, P0-14, P0-15)** into the branch (conflicts: the probe
+  builder in `DeepTimeCommands`, this log): cargo test/clippy/fmt/deny clean, JUnit 46/0,
+  `./gametest.sh` → All 21 required tests passed, `./gametest.sh -PwithMic` → All 21 required tests
+  passed (same palette numbers as above).
+- **`-PwithMic` heap (gametest.sh changed).** Two merged `-PwithMic` runs died of
+  `OutOfMemoryError: Java heap space` (the 6 GB GameTest heap) during `lakeHolds`, the last test;
+  the process then hung and had to be killed. TaCZ and Mega Showdown unpack ~190 MB of packs into
+  `run-gametest/tacz` and `run-gametest/showdown` on a first run and load them on every later one:
+  the first (cold) MIC run passed, both warm ones ran out of heap, a cold one passed again.
+  `gametest.sh` now deletes those two folders with the world; a warm rerun then passed (All 21).
+  The heap stays tight with MIC (160 mods, 240 forceloaded lake chunks); if it recurs, raise
+  `-Xmx` for `-PwithMic` rather than trimming tests.
 - **Not done / next.** Bodies in the strata pass (needs P1-08/P1-14's `bodies/`); the review
   artefacts (BlueMap cliffs with Create stones) wait for Ben's review round; `deposit_type`,
   `sim_field`, `essentials` registries come with their tasks. The MIC pack still has no copy of the
