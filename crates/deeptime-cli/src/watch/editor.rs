@@ -32,6 +32,8 @@ pub struct Field {
     pub max: f64,
     pub integer: bool,
     pub phase3: bool,
+    /// The values of a `choice` with a fixed list (empty: any string, the essentials lists).
+    pub options: Vec<String>,
 }
 
 /// A preset the form offers.
@@ -66,26 +68,50 @@ pub fn family_of(name: &str) -> String {
     name.to_owned()
 }
 
+/// One step down a path: an object's key, or an array's index (`structure.pluton_length_km.0`).
+fn step<'a>(e: &'a Value, p: &str) -> Option<&'a Value> {
+    match e {
+        Value::Object(o) => o.get(p),
+        Value::Array(a) => p.parse::<usize>().ok().and_then(|i| a.get(i)),
+        _ => None,
+    }
+}
+
 fn get<'a>(v: &'a Value, path: &[String]) -> Option<&'a Value> {
     let mut e = v;
     for p in path {
-        e = e.as_object()?.get(p)?;
+        e = step(e, p)?;
     }
     (!e.is_null()).then_some(e)
 }
 
+/// Sets `path` (the twin of `EditorFields.set`): objects on the way are created, an array's
+/// element must exist (a field is edited only where the preset carries its path, so it does).
 fn set(v: &mut Value, path: &[String], value: Value) {
     let mut e = v;
     for p in &path[..path.len() - 1] {
-        let o = e.as_object_mut().expect("objects on the way");
-        let next = o.entry(p.clone()).or_insert_with(|| json!({}));
-        if !next.is_object() {
+        let next = match e {
+            Value::Object(o) => Some(o.entry(p.clone()).or_insert_with(|| json!({}))),
+            Value::Array(a) => p.parse::<usize>().ok().and_then(|i| a.get_mut(i)),
+            _ => None,
+        };
+        let Some(next) = next else { return };
+        if !next.is_object() && !next.is_array() {
             *next = json!({});
         }
         e = next;
     }
-    if let Some(o) = e.as_object_mut() {
-        o.insert(path[path.len() - 1].clone(), value);
+    let last = &path[path.len() - 1];
+    match e {
+        Value::Object(o) => {
+            o.insert(last.clone(), value);
+        }
+        Value::Array(a) => {
+            if let Some(slot) = last.parse::<usize>().ok().and_then(|i| a.get_mut(i)) {
+                *slot = value;
+            }
+        }
+        _ => {}
     }
 }
 
@@ -115,6 +141,14 @@ impl Catalog {
                 max: f["max"].as_f64().unwrap_or(0.0),
                 integer: f["integer"].as_bool().unwrap_or(false),
                 phase3: f["phase3"].as_bool().unwrap_or(false),
+                options: f["options"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|o| o.as_str().map(str::to_owned))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
             });
         }
         let lang: Value = serde_json::from_str(deeptime_viewer::LANG_EN_US_JSON)
@@ -173,6 +207,7 @@ impl Catalog {
             })).collect::<Vec<_>>(),
             "fields": self.fields_json["fields"],
             "sections": self.fields_json["sections"],
+            "advanced_sections": self.fields_json["advanced_sections"],
             "labels": self.labels,
             "start_configs": StartConfig::ALL.iter().map(|c| c.name()).collect::<Vec<_>>(),
             "length_myr": { "min": LENGTH_MYR_RANGE.0, "max": LENGTH_MYR_RANGE.1 },
@@ -293,10 +328,14 @@ impl Catalog {
                 .as_bool()
                 .map(Value::Bool)
                 .ok_or_else(|| "on or off".into()),
-            "choice" => v
-                .as_str()
-                .map(|s| json!(s))
-                .ok_or_else(|| "a choice".into()),
+            "choice" => {
+                let s = v.as_str().ok_or("a choice")?;
+                if f.options.is_empty() || f.options.iter().any(|o| o == s) {
+                    Ok(json!(s))
+                } else {
+                    Err(format!("one of {}", f.options.join(", ")))
+                }
+            }
             k => Err(format!("unknown field kind {k}")),
         }
     }
@@ -391,14 +430,20 @@ mod tests {
         let mut fields = Map::new();
         for f in c.fields() {
             if f.kind == "number" {
-                let v = if f.integer {
+                // A short decimal, as a player types it (a 17-digit midpoint can come back one
+                // ulp off from serde_json's parser).
+                let mid: f64 = format!("{:.3e}", (f.min + f.max) / 2.0).parse().unwrap();
+                let v = if f.id == "seed" {
                     json!(42)
+                } else if f.integer {
+                    json!(mid.round() as u64)
                 } else {
-                    json!((f.min + f.max) / 2.0)
+                    json!(mid)
                 };
                 fields.insert(f.id.clone(), v);
             }
         }
+        fields.insert("province_strength".into(), json!("weak"));
         fields.insert("gravity".into(), json!("3.71"));
         fields.insert("ocean_fraction".into(), json!(0.5));
         fields.insert("day_length".into(), json!(9));
@@ -421,38 +466,303 @@ mod tests {
         );
         assert!(text.contains("\"timeline\":{\"length_myr\":300.0,\"start\":\"supercontinent\"}"));
         assert!(r["estimate"]["peak_bytes"].as_u64().unwrap() > 0);
-        let avail: Vec<&str> = r["fields"]
+        // The tuning knobs (settings audit): each lands at the key the core reads, whether an object's
+        // (incision_cap), an integer (plate_count), an array's element (pluton_length_km.0, the
+        // sea-level cycle) or a choice (province).
+        assert!(text.contains("\"incision_cap\":5.125"), "{text}");
+        assert!(
+            text.contains("\"initial_plates\":22,"),
+            "an integer knob stays an integer"
+        );
+        assert!(
+            text.contains("\"pluton_length_km\":[44.0,8.0,80.0]"),
+            "{text}"
+        );
+        assert!(
+            text.contains(
+                "\"cycles\":[{\"amplitude_m\":100.0,\"period_myr\":250.0,\"phase_deg\":0.0},"
+            ),
+            "{text}"
+        );
+        assert!(text.contains("\"province\":\"weak\""));
+        assert!(
+            text.contains("\"count_mult\":5.0"),
+            "the deposit count multiplier"
+        );
+        let unavailable: Vec<&str> = r["fields"]
             .as_array()
             .unwrap()
             .iter()
-            .filter(|f| f["available"] == true)
+            .filter(|f| f["available"] == false)
             .map(|f| f["id"].as_str().unwrap())
             .collect();
         assert_eq!(
-            avail,
+            unavailable,
             [
-                "seed",
-                "gravity",
-                "day_length",
-                "axial_tilt",
-                "star_flux",
-                "ocean_fraction",
-                "m_per_block_h",
-                "m_per_block_v",
-                // The drama slider (P1-06): the pipeline presets carry `surface.drama`.
-                "drama"
-            ]
+                // Proposals for engine features that do not exist yet, and Phase 3.
+                "deposit_size",
+                "deposit_richness",
+                "feature_deposits",
+                "feature_rivers",
+                "feature_canyons",
+                "feature_strata",
+                "fantasy_fields",
+                "sky_islands",
+                "exotic_landforms",
+                "essentials"
+            ],
+            "every other field is editable in a pipeline preset"
         );
         // The share code round-trips to the same form state, as an imported preset (edited).
         let d = c.decode(r["share_code"].as_str().unwrap());
         assert_eq!(d["preset"], Value::Null);
         assert_eq!(d["start"], "supercontinent");
         assert_eq!(d["imported"]["planet"]["gravity_m_s2"], 3.71);
+        assert_eq!(d["imported"]["amplify"]["incision_cap"], 5.125);
+        assert_eq!(d["imported"]["structure"]["pluton_length_km"][0], 44.0);
         let again = c.effective(&json!({
             "imported": d["imported"], "start": d["start"], "length_myr": d["length_myr"],
         }));
         assert_eq!(again["json"], r["json"]);
         assert_eq!(again["share_code"], r["share_code"]);
+        // The imported preset shows every edit as the value of its field.
+        for f in again["fields"].as_array().unwrap() {
+            let id = f["id"].as_str().unwrap();
+            let sent = &r["fields"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|x| x["id"] == f["id"])
+                .unwrap();
+            assert_eq!(f["value"], sent["value"], "{id} survives the round trip");
+        }
+    }
+
+    /// The presets a form starts from.
+    const PIPELINES: [&str; 4] = [
+        "pipeline_quick_16k",
+        "pipeline_full_16k",
+        "pipeline_quick_32k",
+        "pipeline_full_32k",
+    ];
+
+    /// The tuning knobs (settings audit) are in every pipeline preset at a value the editor accepts, and
+    /// the core accepts both ends of every range and every option: a knob never lets a player
+    /// build a preset the core refuses. (`STATUS.md` records the same ends run on a small planet.)
+    #[test]
+    fn every_knob_is_in_every_pipeline_preset_and_both_ends_are_valid() {
+        let c = cat();
+        let timeline = |name: &str, fields: Value| {
+            c.effective(&json!({
+                "preset": name, "start": "scattered_continents", "length_myr": 100,
+                "fields": fields,
+            }))
+        };
+        for name in PIPELINES {
+            let base = &c.preset(name).unwrap().base;
+            let mut knobs = 0;
+            for f in c.fields() {
+                let Some(v) = get(base, &f.path) else {
+                    continue;
+                };
+                knobs += 1;
+                match f.kind.as_str() {
+                    "number" => {
+                        let x = v.as_f64().unwrap_or(f64::NAN);
+                        assert!(
+                            x >= f.min && x <= f.max,
+                            "{name}: {} = {x} is outside its range {}..{}",
+                            f.id,
+                            f.min,
+                            f.max
+                        );
+                        for end in [f.min, f.max] {
+                            let value = if f.integer {
+                                json!(end as u64)
+                            } else {
+                                json!(end)
+                            };
+                            let r = timeline(name, json!({ f.id.clone(): value }));
+                            assert_eq!(r["problems"], json!([]), "{name}: {} = {end}: {r:#}", f.id);
+                            assert_eq!(r["field_problems"], json!({}), "{name}: {}", f.id);
+                        }
+                        // One step outside is refused by the editor itself.
+                        for out in [
+                            f.min - 1.0e-3 * (f.max - f.min),
+                            f.max + 1.0e-3 * (f.max - f.min),
+                        ] {
+                            let r = timeline(name, json!({ f.id.clone(): out }));
+                            assert!(
+                                r["field_problems"][&f.id].is_string(),
+                                "{name}: {} = {out}",
+                                f.id
+                            );
+                            assert_eq!(r["can_run"], false);
+                        }
+                    }
+                    "choice" if !f.options.is_empty() => {
+                        assert!(
+                            f.options.iter().any(|o| v == o.as_str()),
+                            "{name}: {}",
+                            f.id
+                        );
+                        for o in &f.options {
+                            let r = timeline(name, json!({ f.id.clone(): o }));
+                            assert_eq!(r["problems"], json!([]), "{name}: {} = {o}: {r:#}", f.id);
+                            assert_eq!(
+                                get(
+                                    &serde_json::from_str::<Value>(r["json"].as_str().unwrap())
+                                        .unwrap(),
+                                    &f.path
+                                ),
+                                Some(&json!(o))
+                            );
+                        }
+                        let r = timeline(name, json!({ f.id.clone(): "everything" }));
+                        assert!(r["field_problems"][&f.id].is_string());
+                    }
+                    _ => {}
+                }
+            }
+            assert!(knobs >= 35, "{name} carries only {knobs} catalogue paths");
+        }
+    }
+
+    /// The cross-language fixture (`deeptime-core/tests/share-codes.json`, also read by the game's
+    /// `ShareCodeTest` and `AdvancedSettingsTest`).
+    const SHARE_FIXTURE: &str = include_str!("../../../deeptime-core/tests/share-codes.json");
+
+    /// The workbench's side of the game ↔ workbench round trip (settings audit): the tuned pipeline preset
+    /// of the fixture, as the game encodes it (`java`) and as Rust does (`rust`), loads into the
+    /// form with every tuned value in its field and comes back out as the very same JSON.
+    #[test]
+    fn a_tuned_code_from_the_game_loads_unchanged() {
+        let c = cat();
+        let fx: Value = serde_json::from_str(SHARE_FIXTURE).unwrap();
+        let case = fx["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == "pipeline_quick_16k_tuned")
+            .expect("the fixture has the tuned pipeline case");
+        let json = case["json"].as_str().unwrap();
+        for who in ["rust", "java"] {
+            let d = c.decode(case[who].as_str().unwrap());
+            assert_eq!(
+                d["preset"],
+                Value::Null,
+                "{who}: a tuned preset is a custom one"
+            );
+            assert_eq!(d["start"], "scattered_continents");
+            assert_eq!(d["length_myr"], 100.0);
+            let r = c.effective(&json!({
+                "imported": d["imported"], "start": d["start"], "length_myr": d["length_myr"],
+            }));
+            assert_eq!(r["problems"], json!([]), "{who}: {r:#}");
+            assert_eq!(
+                r["json"].as_str().unwrap(),
+                json,
+                "{who}: nothing added, dropped or rounded"
+            );
+            assert_eq!(
+                share_code::decode(r["share_code"].as_str().unwrap()).unwrap(),
+                json
+            );
+            let value = |id: &str| {
+                r["fields"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|f| f["id"] == id)
+                    .unwrap()["value"]
+                    .clone()
+            };
+            assert_eq!(value("carving"), 10.0);
+            assert_eq!(value("plate_count"), 22);
+            assert_eq!(value("erosion_strength"), 5e-9);
+            assert_eq!(value("ridge_depth"), -3000.0);
+            assert_eq!(value("pluton_size"), 40.0);
+            assert_eq!(value("sea_level_swing"), 120.0);
+            assert_eq!(value("province_strength"), "medium");
+        }
+    }
+
+    /// The catalogue's structure: advanced sections exist, hold fields, and come last.
+    #[test]
+    fn the_catalogue_groups_the_advanced_settings() {
+        let c = cat();
+        let j = c.to_json();
+        let adv: Vec<&str> = j["advanced_sections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap())
+            .collect();
+        assert_eq!(adv.len(), 5);
+        let fields = j["fields"].as_array().unwrap();
+        let sections: Vec<&str> = fields
+            .iter()
+            .map(|f| f["section"].as_str().unwrap())
+            .collect();
+        for s in &adv {
+            assert!(j["sections"][s].is_string(), "{s} has a description");
+            assert!(
+                j["labels"][format!("deeptime.editor.section.{s}")].is_string(),
+                "the game has a title for {s}"
+            );
+            assert!(sections.contains(s), "{s} holds fields");
+        }
+        let first_adv = sections.iter().position(|s| adv.contains(s)).unwrap();
+        assert!(
+            sections[first_adv..].iter().all(|s| adv.contains(s)),
+            "the advanced sections come last, so both editors can fold them"
+        );
+        for f in fields {
+            let id = f["id"].as_str().unwrap();
+            assert!(
+                f["hint"].as_str().is_some_and(|h| h.len() > 20),
+                "{id} has a hint"
+            );
+            assert!(
+                j["sections"][f["section"].as_str().unwrap()].is_string(),
+                "the section of {id} has a description"
+            );
+            for s in f["stops"].as_array().into_iter().flatten() {
+                let v = s["value"].as_f64().unwrap();
+                assert!(
+                    v >= f["min"].as_f64().unwrap() && v <= f["max"].as_f64().unwrap(),
+                    "{id}: the stop {s} is outside the range"
+                );
+                assert!(s["label"].as_str().is_some_and(|l| !l.is_empty()));
+            }
+            if f["kind"] == "choice" && f["options"].is_array() {
+                for o in f["options"].as_array().unwrap() {
+                    let key = format!("deeptime.editor.option.{id}.{}", o.as_str().unwrap());
+                    assert!(j["labels"][key.as_str()].is_string(), "{key}");
+                }
+            }
+        }
+        assert_eq!(
+            get(
+                &json!({"a": [{"b": 1}, 2]}),
+                &["a".into(), "0".into(), "b".into()]
+            ),
+            Some(&json!(1)),
+            "a number in a path indexes an array"
+        );
+        assert_eq!(get(&json!({"a": [1]}), &["a".into(), "3".into()]), None);
+        // Terrain carving (Ben, 2026-09-29): the default is the medium stop.
+        let carving = fields.iter().find(|f| f["id"] == "carving").unwrap();
+        let medium = carving["stops"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["label"] == "Medium")
+            .unwrap();
+        for name in PIPELINES {
+            let base = &c.preset(name).unwrap().base;
+            assert_eq!(base["amplify"]["incision_cap"], medium["value"], "{name}");
+        }
     }
 
     #[test]

@@ -28,7 +28,9 @@
     ]
   },
   "young": {},
-  "amplify": {},
+  "amplify": {
+    "incision_cap": 3.0
+  },
   "resolution": {
     "l0_samples": 250000,
     "l1_r": 16,
@@ -231,5 +233,13 @@
     "ela_offset_c": 0.0,
     "glaciation_on_frac": 0.02,
     "glaciation_off_frac": 0.01
+  },
+  "structure": {
+    "pluton_rate_km2_myr": 1e-05,
+    "pluton_length_km": [
+      25.0,
+      8.0,
+      80.0
+    ]
   }
 }

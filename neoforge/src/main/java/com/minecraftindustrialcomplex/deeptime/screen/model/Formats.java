@@ -84,14 +84,18 @@ public final class Formats {
     }
 
     /**
-     * A number for an edit box: integers without a fraction, others with up to six significant
-     * decimals and no trailing zeros ({@code 9.81}, {@code 300}, {@code 0.001}).
+     * A number for an edit box: integers without a fraction, others with up to six decimals and no
+     * trailing zeros ({@code 9.81}, {@code 300}, {@code 0.001}); a magnitude under 1e-4 in
+     * scientific form, which six decimals would round away ({@code 2e-9}, the erosion constant).
+     * {@link #parse} reads every form back.
      */
     public static String number(double v) {
         if (!Double.isFinite(v))
             return "";
         if (v == Math.rint(v) && Math.abs(v) < 1e15)
             return Long.toString((long) v);
+        if (Math.abs(v) < 1e-4)
+            return Double.toString(v).replace("E", "e").replace(".0e", "e");
         String s = String.format(Locale.ROOT, "%.6f", v);
         s = s.replaceAll("0+$", "");
         return s.endsWith(".") ? s.substring(0, s.length() - 1) : s;
