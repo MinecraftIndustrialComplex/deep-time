@@ -23,6 +23,18 @@
     "space": "80ddbda8-204c-43aa-80f9-b1c355fbc7c5",
     "url": "https://spacesheep.dev/@benmac/deeptime-phase0"
   },
+  "q10-ev": {
+    "space": "3bd937e4-a21c-4652-8292-a79f9194439e",
+    "url": "https://spacesheep.dev/@benmac/deeptime-q10-ev"
+  },
+  "q10-map-ev": {
+    "space": "d53233c4-47d7-4a6d-933d-dd433956cb5a",
+    "url": "https://spacesheep.dev/@benmac/deeptime-q10-map-ev"
+  },
+  "q10-map-plain": {
+    "space": "a9b49b40-f2d5-49fd-8b5f-f66eff3c8c0e",
+    "url": "https://spacesheep.dev/@benmac/deeptime-q10-map-plain"
+  },
   "seams": {
     "space": "a5205c2a-4480-4578-8f0d-e9b8f774e326",
     "url": "https://spacesheep.dev/@benmac/deeptime-seams"
