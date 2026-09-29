@@ -389,7 +389,10 @@ fn the_coupled_pipeline_runs_and_resumes() {
     let json = pipeline_json(3000, 60.0, 5);
     let dir = temp_dir("straight");
     let s = session(&json, &dir);
-    assert_eq!(s.stage_names(), ["plates", "climate", "surface", "structure"]);
+    assert_eq!(
+        s.stage_names(),
+        ["plates", "climate", "surface", "structure"]
+    );
     finish(&s);
     let world = s.checkpoint().unwrap().world;
     let st = world.surface.as_ref().expect("the surface ran");

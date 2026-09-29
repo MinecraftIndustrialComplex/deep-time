@@ -522,7 +522,7 @@ mod tests {
         assert_eq!(frames.len(), 10, "one frame per 2-Myr step");
         for (i, f) in frames.iter().enumerate() {
             assert_eq!(f["n"], i);
-            assert_eq!(f["stage"], "plates+surface");
+            assert_eq!(f["stage"], "plates+climate+surface+structure");
             assert_eq!(
                 f["layers"].as_array().unwrap().len(),
                 f["ramps"].as_array().unwrap().len()
