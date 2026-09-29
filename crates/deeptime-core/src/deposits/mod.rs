@@ -1166,7 +1166,7 @@ impl Finish {
 /// The frame drawn ∝ `hazard` by a uniform `u` ∈ [0, 1) (`None` when the hazard is zero).
 fn draw_frame(hazard: &[f32], u: f64) -> Option<usize> {
     let total: f64 = hazard.iter().map(|h| f64::from(*h)).sum();
-    if !(total > 0.0) {
+    if total.is_nan() || total <= 0.0 {
         return None;
     }
     let mut left = u * total;
@@ -1440,7 +1440,10 @@ impl DepositStage {
                         .collect::<BTreeMap<_, _>>(),
                 }));
             }
-            let mut cells: Vec<u32> = tracts.iter().flat_map(|tr| tr.cells.iter().copied()).collect();
+            let mut cells: Vec<u32> = tracts
+                .iter()
+                .flat_map(|tr| tr.cells.iter().copied())
+                .collect();
             cells.sort_unstable();
             let formation = if Some(ti) == pet_ty {
                 FormationKind::Charge
@@ -1508,7 +1511,11 @@ impl DepositStage {
                                 let (te, dt) = self.state.frame_times[k];
                                 survival::Formation::At {
                                     k,
-                                    u: if dt > 0.0 { (te - ch.t_charge) / dt } else { 0.0 },
+                                    u: if dt > 0.0 {
+                                        (te - ch.t_charge) / dt
+                                    } else {
+                                        0.0
+                                    },
                                 }
                             }
                         };
@@ -1516,11 +1523,7 @@ impl DepositStage {
                     })
                     .collect()
             });
-            let p_of = |cell: u32| {
-                plan.cells
-                    .binary_search(&cell)
-                    .map_or(0.0, |j| p_cell[j])
-            };
+            let p_of = |cell: u32| plan.cells.binary_search(&cell).map_or(0.0, |j| p_cell[j]);
             // Per tract: its endowment E_i, its formation weight φ_i = A·F̄·E and its preservation
             // p̄_i (p averaged with the position weights F·E).
             let mut areas = Vec::with_capacity(tracts.len());
@@ -1784,6 +1787,7 @@ impl DepositStage {
     /// Pass 2 (see the module doc): replays every frame at every tract cell, where its crust was
     /// then, recording the column's erosion, deposition, water table and precipitation and each
     /// hazard type's favourability hazard.
+    #[allow(clippy::needless_range_loop)] // frame k indexes every path and every array
     fn column_pass(
         &self,
         plans: &[TypeTracts],

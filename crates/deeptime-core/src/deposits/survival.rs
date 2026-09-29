@@ -232,7 +232,7 @@ pub fn plan(
     let target = count_mult * rho / 1.0e5 * area_km2.iter().sum::<f64>();
     let sphi: f64 = phi.iter().sum();
     let kept: f64 = phi.iter().zip(pbar).map(|(f, p)| f * p).sum();
-    if !(sphi > 0.0) || !(target > 0.0) {
+    if sphi.is_nan() || sphi <= 0.0 || target.is_nan() || target <= 0.0 {
         return Plan {
             target: target.max(0.0),
             preservation: 0.0,
@@ -338,7 +338,14 @@ mod tests {
 
     #[test]
     fn the_plan_hits_the_target_in_expectation_and_caps() {
-        let p = plan(15.0, 1.0, &[1.0e4, 3.0e4], &[5.0e3, 1.0e4], &[0.2, 0.6], 20.0);
+        let p = plan(
+            15.0,
+            1.0,
+            &[1.0e4, 3.0e4],
+            &[5.0e3, 1.0e4],
+            &[0.2, 0.6],
+            20.0,
+        );
         assert!((p.target - 6.0).abs() < 1e-12);
         assert!((p.expected_survivors - p.target).abs() < 1e-9);
         assert!(!p.capped);

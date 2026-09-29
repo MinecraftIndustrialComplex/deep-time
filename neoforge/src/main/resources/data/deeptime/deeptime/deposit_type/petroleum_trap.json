@@ -77,6 +77,6 @@
     "Design values: migration_km 50, the trap/seal/reservoir thresholds, min_source 1 wt% TOC, min_kitchen_km2 500 (about 22 L1 cells: a real history has thousands of one-cell hot spots that are not generative basins), the gas/oil/water legs; a layer generates only while hotter than 80 °C (petroleum.rs).",
     "erosion_behavior destroy: erosion into a trap breaches it. Fluids place no blocks (ore_block_policy none); the charge goes to CDG (P1-16) as cdg_charge_mb = oil tonnes / 0.85 t/m³ × 1000.",
     "cdg_scale 0.02 (P1-16, a gameplay value, judged): CDG sees 2 % of the physical charge, split over the trap's chunks by the dome's volume in each, so a chunk holds a few million mB like CDG's own oil chunks (threshold 4,000,000, infinite above 10,000,000 by default) and the thickest chunks of large traps reach CDG's infinite threshold.",
-    "Balance (P1-17 calibration, 2026-09-29): count_mult 3, so a 16k planet has a few charged traps (0–4 kept on 500-Myr pipeline_quick_16k runs) rather than 0–2 (STATUS.md, P1-17 partial: calibration)."
+    "Counts (survivor formula, decisions log 2026-09-29, plan §8.6 as built): the density counts deposits that survive to the present, as USGS does; the engine forms more (deposits/survival.rs) so that the expected survivors are ρ_p50 · permissive area · count_mult. balance.count_mult stays 1: a pack lever, not a calibration. Formation is the trap's charge; a trap that erosion reaches is breached (erosion_behavior destroy), so about three quarters of those charged survive."
   ]
 }

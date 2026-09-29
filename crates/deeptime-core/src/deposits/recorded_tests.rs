@@ -665,11 +665,21 @@ fn the_survivor_formula_hits_its_target_in_expectation() {
         })
         .sum::<f64>()
         / f64::from(nodes);
-    assert!(want_p > 0.3 && want_p < 0.8, "a test with something to say: {want_p}");
+    assert!(
+        want_p > 0.3 && want_p < 0.8,
+        "a test with something to say: {want_p}"
+    );
     let runs = 300u64;
     let (mut survivors, mut formed) = (0usize, 0u64);
     for seed in 0..runs {
-        let (w, census) = run_on(circumference, r, seed, 1.0, history(), Some(vec![t.clone()]));
+        let (w, census) = run_on(
+            circumference,
+            r,
+            seed,
+            1.0,
+            history(),
+            Some(vec![t.clone()]),
+        );
         let c = &census["types"][0];
         assert_eq!(c["id"], "test:uniform");
         let target = c["target"].as_f64().unwrap();
@@ -682,7 +692,10 @@ fn the_survivor_formula_hits_its_target_in_expectation() {
         formed += c["drawn"].as_u64().unwrap();
         for s in &w.sites {
             let (i, j) = site_cell(s, circumference, r);
-            assert!(near_block(i, j), "a site outside the fertile block at {i},{j}");
+            assert!(
+                near_block(i, j),
+                "a site outside the fertile block at {i},{j}"
+            );
         }
     }
     let n = runs as f64;

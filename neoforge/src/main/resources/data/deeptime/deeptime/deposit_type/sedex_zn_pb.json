@@ -88,6 +88,6 @@
     "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 3.2 (sulfide-rich shale), density_per_1e5km2 0.5 / 2 / 8 (no USGS SEDEX deposit density exists), formation_depth_m 100 (syn-sedimentary to early diagenetic).",
     "Geometry: stratiform sheet; aspect 0.03 from the database's median ore area 0.86 km² and ore bodies up to a few tens of metres thick (B1693 m31a); the Cu → Pb → Zn lateral zoning away from the feeder (Leach et al. 2010).",
     "Create stones (decisions file): dolostone (asurine → zinc) is a preferred host at 1.5; the sheet turns its host to black shale.",
-    "Balance (P1-17 calibration, 2026-09-29): count_mult 20. The placeholder density gives 0.1–0.3 deposits on a 16k planet's 7,000–30,000 km² of permissive euxinic rift basins; 20 × gives a few per 500-Myr pipeline_quick_16k run (STATUS.md, P1-17 partial: calibration)."
+    "Counts (survivor formula, decisions log 2026-09-29, plan §8.6 as built): the density counts deposits that survive to the present, as USGS does; the engine forms more (deposits/survival.rs) so that the expected survivors are ρ_p50 · permissive area · count_mult. balance.count_mult stays 1: a pack lever, not a calibration. With the placeholder density the euxinic rift tracts of a 16k planet (6,500–22,000 km²) expect 0.1–0.45 survivors, so SEDEX is on a minority of planets (STATUS.md, 2026-09-29)."
   ]
 }

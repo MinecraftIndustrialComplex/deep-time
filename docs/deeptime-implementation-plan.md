@@ -2279,6 +2279,50 @@ exists to reuse; this is Deep Time's own engine.
      sites for CDG.
 8. **Playability pass** (§7.8), then the site registry and the events.
 
+*As built (2026-09-29; decisions log 2026-09-29, "Change the formula" and "Rework its driver";
+`deposits/survival.rs`, `deposits/regional.rs`; STATUS.md build log "survivor formula and the
+regional MVT driver"):*
+
+- **Counts are survivors.** USGS densities count the deposits known today in exposed permissive
+  rock (Singer, Berger, Menzie & Berger 2005), i.e. the ones that survived burial, uplift and
+  erosion (Kesler & Wilkinson 2008: of ~126,000 Phanerozoic porphyries ~48,000 remain). Step 2
+  becomes: a type's expected survivors are **N\* = count_mult · ρ_P50/10⁵ · Σ A_i** over its
+  permissive tracts — density × permissive area, Singer's three-part method; mean F no longer
+  scales the total. Formation is spread over the tracts ∝ φ_i = A_i · F̄_i · E_i (area, mean
+  favourability, province endowment), within a tract ∝ F·E (step 3), and in time ∝ each cell's
+  favourability hazard −(Δt/τ)·ln(1 − F_t), the terms whose sum is the integrated F (step 1), so a
+  cell favourable for 100 Myr forms deposits throughout them. **p(c)**, the chance that a deposit
+  formed in cell c survives — its centre D = z_f + B − E below today's surface with D > −h (D ≥ h
+  for `destroy` types) and its body still in the build range — is integrated over that time
+  distribution (exactly within each frame, where D is linear in the instant) and over 32 tonnage
+  quantiles, from every tract cell's column replayed through the recorded history with the crust's
+  motion (pass 2 now runs over all tract cells, not only the chosen ones). p̄_i is p averaged over
+  tract i with the position weights. **One formation rate per type**: λ_i = N\* · φ_i / Σ_j φ_j p̄_j,
+  so Σ λ_i p̄_i = N\*: deposits form where the geology was favourable and survive where
+  preservation was good, as on Earth. Petroleum forms at its charge time; `formation_time: cause`
+  types before the history. If the planet preserves less than 1/`max_formed_per_survivor`
+  (preset, default 20) of what forms, formation stops at that multiple and the census says
+  `capped`. The per-type `balance.count_mult` of the calibration (10/20/20/3) are back to 1 and stay
+  a pack lever; the preset's `count_mult` stays the global one. Tested: on a history with known
+  preservation the engine's p̄ equals the closed form and the mean survivors over 300 planets equal
+  N\* (`recorded_tests::the_survivor_formula_hits_its_target_in_expectation`). The census reports
+  `target`, `preservation`, `expected_formed`, `expected` (survivors), `drawn` (formed) and
+  `expected_at_positions`.
+- **MVT's driver is regional.** MVT ore forms where basin-scale, topography-driven flow from a
+  rising orogen sweeps hot basinal brines across a foreland basin into platform carbonates at its
+  margin (Garven & Freeze 1984; Garven 1985; Bethke & Marshak 1990; Leach et al. 2001, 2005, 2010;
+  Bradley & Leach 2003; Oliver 1986). The engine derives two fields from every frame it reads
+  (not recorded, so the history's storage is unchanged): `deeptime:basin_brine`, the tapered share
+  of hot (burial temperature 50→100 °C), aggrading, continental basin within `brine_flow_km`
+  (preset, default 600 km: the USGS MVT tract criterion, platform carbonates "less than ~600 km
+  inboard of Phanerozoic orogenic belts", SIR 2010-5070-A), and `deeptime:regional_head_drop_m_km`,
+  the head of ground rising ≥ 0.1 mm/yr within that reach above the cell's own, per km of reach
+  (full drive at 3.3 m/km, Garven & Freeze's base case). MVT = source(basin_brine) ·
+  driver(head drop) · pathway(faults, continental crust) · trap(carbonate in the column) · host
+  (carbonate classes, `hosts.full_at` 0.05: a ~100 m unit in the 2 km window counts fully). Windows
+  are octagons of the disk's area, exact under east–west shifts. The schema gains `hosts.full_at`
+  (default 1; Java ignores it).
+
 ### 8.7 Fantasy processes — `core::fantasy` (Phase 3)
 
 - **Fantasy fields** (§5.4.2) are computed on L1 alongside real fields each step, so fantasy
@@ -3357,7 +3401,8 @@ a smoke benchmark and again at the end.
   partial: calibration"):* the four pipeline presets, the surface/climate/structure defaults and four
   deposit types' `balance.count_mult` were recalibrated with P1-05's climate on, against Earth's
   hypsometry (GMT earth_relief_01d) and Köppen shares (Peel et al. 2007); the final numbers wait
-  for P1-06 and the bench.
+  for P1-06 and the bench. The four `balance.count_mult` were replaced on 2026-09-29 by the survivor formula (§8.6
+  as built) and MVT's driver by the regional one.
 
 #### P1-18 Pole cap and client info
 - **Goal.** §7.11 and §7.15.
