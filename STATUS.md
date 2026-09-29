@@ -154,10 +154,10 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `params::tests::the_pipeline_presets_write_out_the_tuning_knobs_at_their_defaults`, incision-cap range, the ocean-floor refusal, several
   editor tests); `cd neoforge && ./gradlew build test`: tests=134 failures=0 (new `AdvancedSettingsTest` 9, `Formats`, lang keys).
   GameTests not re-run.
-- **Screenshots** (gitignored, `review/out/settings/` on the laptop and the Mac): real client
+- **Screenshots** (gitignored, on the laptop): real client
   (`tools/client/mac-screenshots.sh --name settings --no-guidance --no-create`, the Mac's desktop, exit 0): `02b-setup-advanced.png`,
   `02c-setup-advanced-scrolled.png` (the Advanced header open and the list scrolled to the erosion and climate sections) next to the
-  usual `01`…`09`; workbench from a private instance on port 8653 (`tools/viewer/shot.py`, headless Chromium through an ssh tunnel; the live
+  usual `01`…`09` (`review/out/settings/`); workbench (`review/out/settings-workbench/`) from a private instance on port 8653 (`tools/viewer/shot.py`, headless Chromium through an ssh tunnel; the live
   8642 was not touched): `workbench-editor-default.png` (Earth-like · quick default, only the two families), `workbench-terrain-carving.png`
   (the carving with its stops, the Multipliers), `workbench-advanced-open.png`.
 - **Next.** Rivers and canyons scales with Phase 2; the essentials list with the datapack loader. P1-17 proper should re-check that
