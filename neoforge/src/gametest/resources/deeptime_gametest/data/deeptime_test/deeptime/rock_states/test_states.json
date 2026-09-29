@@ -1,0 +1,8 @@
+{
+  "class": "test_states",
+  "use": "member",
+  "entries": [
+    {"block": "deeptime_absent:no_such_block", "state": {"layers": "8"}, "required": false},
+    {"block": "minecraft:snow", "state": {"layers": "8"}}
+  ]
+}

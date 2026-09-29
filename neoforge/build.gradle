@@ -54,8 +54,37 @@ def extractToroidalWorld = tasks.register('extractToroidalWorld', Copy) {
     into twInnerDir
 }
 
+// ---------------------------------------------------------------------------
+// Sable (PolyForm Shield): compileOnly, for the planet-server tests' helper
+// compat/sable/SableTestOps only. Never on a run's classpath (the planet server loads Sable
+// from the standalone set's mods/ folder) and never in the jar. Its companion jar (math
+// types used in the API's signatures) is nested, so it is extracted for javac.
+// ---------------------------------------------------------------------------
+configurations {
+    sableJar {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = false
+    }
+}
+dependencies {
+    sableJar "maven.modrinth:sable:${sable_version}"
+}
+def sableCompanionDir = layout.buildDirectory.dir('sable')
+def extractSableCompanion = tasks.register('extractSableCompanion', Copy) {
+    description = "Unpacks Sable's companion jar (BoundingBox3i, Pose3d) from the Sable jar."
+    from({ zipTree(configurations.sableJar.singleFile) }) {
+        include "META-INF/jarjar/${sable_companion_jar}"
+        eachFile { it.path = it.name }
+        includeEmptyDirs = false
+    }
+    into sableCompanionDir
+}
+
 dependencies {
     compileOnly files(twInnerDir.map { it.file(tw_inner_jar) }).builtBy(extractToroidalWorld)
+    compileOnly("maven.modrinth:sable:${sable_version}") { transitive = false }
+    compileOnly files(sableCompanionDir.map { it.file(sable_companion_jar) }).builtBy(extractSableCompanion)
 
     testImplementation platform("org.junit:junit-bom:${junit_version}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -78,6 +107,18 @@ sourceSets {
         java.srcDirs = []
     }
 }
+
+// -Ddeeptime.extraDatapack=<folder> (P1-12, cold-read review 2 gap 29): -PextraDatapack=<folder>, or
+// with -PwithMic the MIC rock-tag datapack next to the pack (…/mic/Docs/datapacks/deeptime-mic-rock-tags;
+// tools/remote/mac.sh --pack syncs the Mac's copy). The mod honours it only with -Ddeeptime.gametest=true.
+def micRockTags = [new File(repoRoot, '../../Docs/datapacks/deeptime-mic-rock-tags'),
+                   new File('/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags')]
+        .find { new File(it, 'pack.mcmeta').isFile() }
+def extraDatapack = project.findProperty('extraDatapack')
+        ?: (project.hasProperty('withMic') ? micRockTags?.canonicalPath : null)
+if (project.hasProperty('withMic') && !project.hasProperty('extraDatapack') && micRockTags == null)
+    logger.warn("-PwithMic: no MIC rock-tag datapack at ${new File(repoRoot, '../../Docs/datapacks/deeptime-mic-rock-tags')} " +
+            "(tools/remote/mac.sh --pack syncs it); the runs go without the rock tags")
 
 neoForge {
     version = project.neo_version
@@ -104,7 +145,10 @@ neoForge {
             type = 'gameTestServer'
             systemProperty 'neoforge.enabledGameTestNamespaces', 'deeptime'
             systemProperty 'deeptime.gametest', 'true'
-            jvmArgument '-Xmx6G'
+            if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
+            // The 160-mod MIC set needs more heap than the default runtime (an intermittent
+            // OutOfMemoryError in lakeHolds under -PwithMic, P1-12); one server runs at a time.
+            jvmArgument(project.hasProperty('withMic') ? '-Xmx8G' : '-Xmx6G')
             if (project.hasProperty('gametestDebugLog')) logLevel = org.slf4j.event.Level.DEBUG
             gameDirectory = file('../run-gametest')
         }
@@ -118,6 +162,7 @@ neoForge {
             systemProperty 'deeptime.gametest', 'true'
             // Set by tools/planet/run_planet.py (--test-terrain); blank means world data.
             systemProperty 'deeptime.testTerrain', System.getenv('DEEPTIME_TEST_TERRAIN') ?: ''
+            if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
             jvmArgument '-Xmx6G'
             gameDirectory = file('../run-planet')
         }
@@ -456,6 +501,12 @@ def checkReleaseNatives = tasks.register('checkReleaseNatives') {
 }
 
 tasks.named('processResources', ProcessResources) {
+    // The built-in presets (plan §5.1, P1-13): one source, compiled into the core with include_str!
+    // and shipped here as deeptime/presets/<name>.json for Presets.builtin (no natives needed).
+    from(new File(repoRoot, 'crates/deeptime-core/presets')) {
+        include '*.json'
+        into 'deeptime/presets'
+    }
     if (project.hasProperty('release')) {
         dependsOn checkReleaseNatives
         from(nativesDistDir) { into 'natives/deeptime' }

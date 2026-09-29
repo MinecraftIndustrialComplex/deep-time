@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 0 · Next: P0-06 rest, P0-11, P0-13, P1-01, P1-02 and the seam page (agents), then P0-12 (me), P0-14, P0-15 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Next: P1-03, P1-12, P1-13, P1-14 (agents), then P1-04 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -12,7 +12,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-03 | Gradle NeoForge module skeleton | done | 2026-09-28 | 774a3ef | gradlew build → BUILD SUCCESSFUL; junit-summary tests=1 failures=0; ./gametest.sh → All 1 required tests passed; checkVersions fails on 0.0.2 |
 | P0-04 | Deep Time's server sets and smoke harness | done | 2026-09-28 | — | standalone + mic smoke PASS (laptop run); Mac: ./gametest.sh -PwithMic → All 7 required tests passed with 160 MIC mods (dev-run exclusions: Connector, antique-atlas, surveyor, Distant Horizons; see build log) |
 | P0-05 | Generator skeleton on the analytic test terrain | done | 2026-09-28 | 33f1cd9 | ./gametest.sh → all pass (heightMatchesReference cornerMax 0, maxAbsDiff 0; periodicAcrossSeam 0 mismatches; veins off); planet server (Mac) boots with level-type deeptime:planet, probe column 0 0 → surfaceY 14 for H 14.99. -PwithMic run: with P0-04 |
-| P0-06 | Toroidal World spike (server-side items) | doing | 2026-09-28 | — | planet server (Mac): probe tw stamped/loopsX/!loopsZ/1024 chunks; columnscontinuous PASS (16 rows, 0 bad folds, 0 jumps); entitycrossesseam PASS (x=-8191.79 after crossing). Left: Sable jetCrossesSeam 20/20, sable_straddle, structure/shaft tests, pole prototype, smoke at 16k/32k with region span check, review page |
+| P0-06 | Toroidal World spike (server-side items) | done | 2026-09-28 | — | Mac planet server → PASS: columnscontinuous, entitycrossesseam, structurestraddlesseam, treestraddlesseam pass; shaftlineacrossseam (informational) rotation propagates; jetcrossesseam 20/20 attempts (one PASS); prototypepushback pass; `sable_straddle: OK` (19 blocks, same id). MIC smoke PASS at 32k (tw.widthChunks 2048) and 16k (1024): stamped=true loopsZ=false climateCompression=off, `regions outside span: 0`. No TW failure (no Q6). Review page not published: files in build log |
 | P0-07 | JNI hello world, native loader and the five failure classes | done | 2026-09-28 | c813177 | Mac: JUnit tests=30 failures=0; NativeSmoke OK + 5 forced classes; ./gametest.sh NativeGameTests pass: native version=0.0.1 format=0.0 target=aarch64-apple-darwin selftest=1997318690096807936. Linux load path first runs in CI |
 | P0-08 | Cross-builds and the OS load matrix | done | 2026-09-28 | b20fbb8 | Mac: `nix run .#natives` → 8 libraries, gnu GLIBC_2.17, musl NEEDED libc.so only; `gradlew build -Prelease` → 8 in the jar, tests=30 failures=0; [natives.yml run 36492319610](https://github.com/MinecraftIndustrialComplex/deep-time/actions/runs/36492319610): all 9 jobs success, 8/8 load jobs `status=OK version=0.0.1` (Windows arm64 included) |
 | P0-09 | World-data format v0, synthetic planets, Java reader | done | 2026-09-28 | 75d90d3 | Mac: cargo test ok (format 15 tests); synth wrap-test 16k → format_version 0.0, viewer bundle; TilePackParityTest + Lz4RoundTripTest pass; wrap-test equals AnalyticTestTerrain within 1/32 block |
@@ -20,11 +20,11 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-11 | `deeptime-inspect` | done | 2026-09-28 | 86140f2 | Mac: cargo test -p deeptime-inspect ok (19 unit + 7 fixture); `cargo run -p deeptime-inspect -- compare --world smoke/standalone/server/planet --world-data …/deeptime` → p99_abs_diff_blocks 1 (p50 0, max 5, 99.6 % within 1 block; 109,184 of 128,000 columns compared); seam 144 rows, 0 mismatches; clippy, fmt, deny ok |
 | P0-12 | Terralith, TerraBlender and Biomes O' Plenty checks | done | 2026-09-28 | 00db177 | Mac: ./gametest.sh default/-PwithMic/-PwithTerraBlender → All 13 passed; terralith=3008 of 4096 land samples (MIC), biomesoplenty=1325 of 4096 (TB), surface painted 24/24; smoke mic --synth wrap-test (production server) PASS: probe tw stamped/loopsX/!loopsZ/1024, locate village found, no C2ME/DH errors, chunky done, regions outside span 0 |
 | P0-13 | Water above sea level holds | done | 2026-09-28 | — | Mac ./gametest.sh → All 14 required tests passed: lakeHolds before=65304 after=65304 expected=65304 outside=0 (every source woken by a fluid tick, 400 ticks forceloaded), water_top_y=120 at the lake centre, generatedFluidTicks=0. The inspect section PNG (review picture) comes with P0-11; -PwithMic (Mac): All 14 required tests passed, lakeHolds identical (outside=0) |
-| P0-14 | BlueMap renders on MIC blocks | doing | 2026-09-28 | — | Mac: tools/review/render-bluemap.sh renders the MIC smoke world (surface map + a below-y-0 strata map) in ~30 s; web app 645 MB uncompressed (962 hires tiles × ~0.65 MB, 992-block height). Hosting on spacesheep undecided: gzip tiles + a decompressing service worker, or a smaller render mask |
-| P0-15 | Phase 0 exit | todo | | | |
+| P0-14 | BlueMap renders on MIC blocks | done | 2026-09-28 | — | https://spacesheep.dev/@benmac/deeptime-p0-bluemap (private): MIC smoke world with synthetic world data, box 1952..2143 × 416..607 around the test mountain, surface + below-y-0 maps; gzip tiles unzipped in the browser (BlueMap clientDecompression), 29 MB/174 files; loads in headless Chromium over plain HTTP; the hosted page itself is private, so its first real load is Ben's. No service worker needed |
+| P0-15 | Phase 0 exit | done | 2026-09-28 | — | tools/review/phase0.py → 11 of 11 pass (Rust, JUnit, GameTests default/MIC/TerraBlender, planet server seam+Sable+pole, smoke standalone + MIC 16k/32k, inspect compare, natives.yml); https://spacesheep.dev/@benmac/deeptime-phase0 |
 | P1-01 | Session, checkpoints, keyframes, event log and site formats | done | 2026-09-28 | — | Mac: cargo test -p deeptime-format 27 ok (segments + sites round-trip, two writers merge with no id collision); run --preset dummy.json → manifest.json, events/1-0.dtev, keyframes/index.json (13 events, 9 keyframes, 3 sites); test --workspace, fmt, clippy -D warnings, deny licenses bans clean; gradlew build test tests=34 failures=0 and ./gametest.sh all 14 pass (after merging master 2f81ae5) |
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
-| P1-03 | Plates and crust | done | 2026-09-28 | 0867a61 | Mac: cargo test --workspace ok (plates:: 13 + 1 ignored, params:: 3: rift area conserved exactly, partition, ages ≥ 0, hull invariants after every resampling, byte-identical resume); 500 Myr 20k: p90 ocean age 167/169/245 Myr, 98/97/90.5 % < 250 Myr; `stage plates --preset earthlike_quick_16k --start scattered --timeline-myr 500` → plates_final=13 ocean_age_p90_myr=202.3 steps=250 seconds=11.6; 100k 9.3 s (12 thr) / 29.8 s (1 thr), 250k 33 s vs Cortial 76–106 / 330–437 s; clippy, fmt, deny clean |
+| P1-03 | Plates and crust | done | 2026-09-28 | 0867a61 | Mac: cargo test --workspace ok (plates::/params::/preset:: 20 + 1 ignored: rift area conserved exactly, partition, ages ≥ 0, hull invariants after every resampling, byte-identical resume); 500 Myr 20k: p90 ocean age 167/169/245 Myr, 98/97/90.5 % < 250 Myr; `stage plates --preset plates_quick_16k --start scattered_continents --length-myr 500` → plates_final=13 ocean_age_p90_myr=202.3 steps=250 seconds=8.3; 100k 8.3 s (12 thr) / 23 s (1 thr), 250k 25–31 s / 72 s vs Cortial 76–106 / 330–437 s; clippy, fmt, deny clean |
 | P1-04 | Deep-time surface processes on L1 | todo | | | |
 | P1-05 | Climate | todo | | | |
 | P1-06 | Young landscape, amplification and the detail layer | todo | | | |
@@ -33,9 +33,9 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-09 | Climate mapping and biomes | todo | | | |
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
 | P1-11 | Customize editor, timelapse and staging | todo | | | |
-| P1-12 | Strata pass with rock tags and `rock_states` | todo | | | |
-| P1-13 | Dedicated server: generate on first start | todo | | | |
-| P1-14 | Deposit engine: the four families | todo | | | |
+| P1-12 | Strata pass with rock tags and `rock_states` | done | 2026-09-28 | — | Mac: ./gametest.sh and -PwithMic (+ MIC rock tags via -Ddeeptime.extraDatapack) → All 21 required tests passed each; coal stone / black argillite; Create stones in their classes; loess = projectatmosphere:dust[layers=8]; everyClassInTheWorld 59/59 classes, 240 samples 0 wrong; MIC smoke probe palette 59/59 (member 24, fallback 35); JUnit 46/0; bodies deferred (P1-08/P1-14) |
+| P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 743b69d | Mechanism verified on placeholder presets (dummy pipeline + wrap-test bake): standalone and MIC first starts generate in ~12 s with progress lines ≤ 5 s apart, restart does not regenerate; no-config / circumference-mismatch / native-failure all stop cleanly before loadLevel. Rerun with the real presets after P1-08 |
+| P1-14 | Deposit engine: the four families | doing | 2026-09-28 | 7f4858c | Engine on a synthetic field history (real fields wait for P1-03…P1-07). Mac: cargo test --workspace ok (core 82 incl. 41 deposits::, format 31, cli 11); porphyry σ 1.4892; Poisson means within 4 SE over 10,000 draws; tonnage P90/P50/P10 within 4 SE; min separation holds (200 seeds + the run); every site has a forming event with causes; `stage deposits --preset …/deposits_synthetic_16k.json --viewer review/out/p1-deposits` → 32 sites of all 8 types, counts next to ρ·A·F (porphyry 9 drawn / 9.41), 0.83 GB peak; fmt, clippy -D warnings, deny clean |
 | P1-15 | Deposits in the world | todo | | | |
 | P1-16 | COE and CDG hooks | todo | | | |
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
@@ -46,6 +46,9 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | Name | URL | Version label | Date |
 |---|---|---|---|
 | seams (how the seams work, interactive) | https://spacesheep.dev/@benmac/deeptime-seams | seams v2 2026-09-28 | 2026-09-28 |
+| phase0 (Phase 0 exit: every check, evidence, links) | https://spacesheep.dev/@benmac/deeptime-phase0 | Phase 0 exit 2026-09-28 | 2026-09-28 |
+| p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
+| p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
 
 ## Pending questions
 Questions asked of Ben and not yet answered. Answers go into the decisions file's log
@@ -62,13 +65,18 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   plates stage of §8.1 implemented from Cortial, Peytavie, Galin & Guérin 2019 (the paper only;
   the community ports were not opened), rock pools ported from tectonics.js `RockColumn.js`/
   `Crust.js` (CC BY 4.0, commit ce371fa; NOTICE.md and the header of `pools.rs`).
-  `params.rs` + `presets/earthlike_{quick,full}_{16k,32k}.json` (planet, scale, timeline,
-  resolution and a full `tectonics` section = Cortial's Appendix A + the design constants below).
-  `WorldState.plates` holds the L0 crust (checkpoint schema 1 → 2); `Preset::Planet` runs the
-  plates stage; `Coupling::relink` (P1-02) lets moving crust be sampled through the coupling.
-  CLI: `--preset` takes a file or a built-in name, `--start`/`--timeline-myr` choose the timeline,
-  `stage --max-steps N` writes a mid-stage checkpoint, `run`/`stage`/`bench` print the plates
-  summary line. `tools/dev/plates_sweep.py` runs tectonics overrides on the Mac for tuning.
+  `params.rs` (`PlanetPreset`: planet, full scale, keyframes, resolution and a full `tectonics`
+  section = Cortial's Appendix A + the design constants below) plugged into P1-13's preset layer
+  as `PresetBody::Planet` (a preset with a `planet` section; the header keeps name, description,
+  scale and timeline), with `Preset::check_runnable` (a planet preset without a timeline is
+  refused by create/resume/estimate: no default story). The plate pipeline's presets are
+  `presets/plates/plates_{quick,full}_{16k,32k}.json`, resolved by name like the built-ins; the
+  `earthlike_*` built-ins stay P1-13's placeholders (the game bakes their synthetic terrain until
+  P1-08) and take the plates sections when the stages up to P1-08 land. `WorldState.plates`
+  holds the L0 crust (checkpoint schema 2 → 3); `Coupling::relink` (P1-02) lets moving crust be
+  sampled through the coupling. CLI: `stage` and `bench` take `--start`/`--length-myr` like
+  `run`, `stage --max-steps N` writes a mid-stage checkpoint, `run`/`stage`/`bench` print the
+  plates summary line. `tools/dev/plates_sweep.py` runs tectonics overrides on the Mac for tuning.
   New ramps `plates`, `crust_age`, `regime` in `ramps.json`; `EVENTS.md` documents every plate
   event's params, magnitudes and causes. No new dependencies.
 - **Model, per 2-Myr step.** Rigid rotation of each plate's groups about its Euler pole; overlap
@@ -131,7 +139,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
       (−1 on continents), `regime`; outputs `plates/{elevation_m, uplift_mm_yr, crust_type,
       orogeny_type, orogeny_age_myr, fold_trend_deg, plate_id}` on L1.
 - **Measured** (`tools/remote/mac.sh`, M6 Mac mini, 12 threads, shared with other agents' builds,
-  load average 9–14): `cargo test --workspace` → core 57 passed + 1 ignored (plates:: 13 + the ignored statistics test, params:: 3; incl.
+  load average 9–14): `cargo test --workspace` → core 57 passed + 1 ignored (plates:: 11 incl.
   `rifting_conserves_area_exactly` (integer sample counts: relative error 0), `runs_keep_their_
   invariants` (partition, ages ≥ 0, finite fields, hull V − E + F = 2 + mutual neighbours + CCW
   after every resampling, all three starts, 80 steps), `resumed_run_is_identical` (byte-equal
@@ -141,23 +149,28 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   plates::tests::statistics -- --ignored` (20k samples, 500 Myr) → supercontinent p90 167 Myr,
   98 % < 250 Myr, 15 plates (8 ≥ 5 %); scattered 169 Myr, 97 %, 21 plates (7 ≥ 5 %); random
   245 Myr, 90.5 %, 8 plates (4 ≥ 5 %).
-  `deeptime stage plates --preset earthlike_quick_16k --start scattered --timeline-myr 500` (100k)
+  `deeptime stage plates --preset plates_quick_16k --start scattered_continents --length-myr 500` (100k)
   → `plates_final=13 ocean_age_p90_myr=202.3 ocean_age_p50_myr=69.7 ocean_younger_250=0.925
   ocean_frac=0.740 largest_plate_frac=0.179 plates_over_5pct=8 plates_under_1pct=0 … steps=250
-  seconds=11.607`; 610 events (orogeny_phase 149, subduction_onset 142, ridge_birth 134,
+  seconds=8.315`; 610 events (orogeny_phase 149, subduction_onset 142, ridge_birth 134,
   terrane_accretion 96, collision 26, hotspot_track 21, plate_death 15, plate_birth 14, LIP 7,
-  rift_onset 6), 11 keyframes, peak 208 MiB. `earthlike_full_16k` (250k) → `plates_final=16
-  ocean_age_p90_myr=122.0 ocean_younger_250=0.999 ocean_frac=0.692 … seconds=32.965`, 1,218 events.
-  `deeptime bench --preset earthlike_quick_16k --start scattered --timeline-myr 500 --threads
-  1,4,12` → 29.8 / 15.7 / 9.3 s, identical results on every thread count. **Against Cortial's
-  Table 2 estimate (§8.1): 100k 76–106 s → 9.3 s (29.8 s single-threaded); 250k 330–437 s →
-  33 s.** Checkpoint chain: `stage plates … --max-steps 100 --out mid.dtcp` (33.6 MB) then
+  rift_onset 6), 11 keyframes, peak 208 MiB. `plates_full_16k` (250k) → `plates_final=16
+  ocean_age_p90_myr=122.0 ocean_younger_250=0.999 ocean_frac=0.692 … seconds=24.840`, 1,218 events.
+  `deeptime bench --preset plates_quick_16k --start scattered_continents --length-myr 500
+  --threads 1,4,12` → 23.0 / 10.5 / 8.3 s (load average 5; 29.8 / 15.7 / 9.3 s at load 10–14),
+  peak 208 MiB; `plates_full_16k --threads 1,12` → 72.2 / 30.7 s, peak 538 MiB; identical
+  results on every thread count. **Against Cortial's Table 2 estimate (§8.1): 100k 76–106 s →
+  8.3 s (23 s single-threaded); 250k 330–437 s → 25–31 s (72 s single-threaded).** Checkpoint chain: `stage plates … --max-steps 100 --out mid.dtcp` (33.6 MB) then
   `stage plates --in mid.dtcp --out end.dtcp --viewer review/out/p1-plates-resumed` → the same
   final summary as the straight run; running it again from `end.dtcp` is refused ("already ran").
   Sweep (`tools/dev/plates_sweep.py`, 100k, 3 starts × 2 seeds): p90 141–228 Myr, 92.5–99.4 %
   younger than 250 Myr, ocean fraction 0.73–0.76, 10–22 plates.
-  `deeptime run --preset earthlike_quick_16k --start scattered --timeline-myr 500 --out … --viewer
-  review/out/p1-plates` → manifest, events/, keyframes/ (11 frames × 4 layers), viewer bundle.
+  `deeptime run --preset plates_quick_16k --start scattered_continents --length-myr 500 --out …`
+  → manifest, events/, keyframes/ (11 frames × 4 layers), sites/, bodies/; `stage plates --preset
+  plates_quick_16k` without `--start` → "$.timeline.start: choose a start configuration …".
+  All re-run on the tree after merging master a3a0e30 (P1-12/13/14): identical summaries;
+  `cargo test --workspace` → cli 9, core 116 + 1 ignored (plates::/params::/preset:: 20),
+  format 31, inspect 19, jni 7, viewer 4; clippy -D warnings and fmt clean.
 - **What the keyframes show** (review/out/p1-plates, pulled back and looked at): at −498 Myr six
   low green continents in a deep ocean with trench lines along plate boundaries in the oceans;
   by −348 Myr the continents have drifted and one has swung over the north pole, their margins
@@ -175,8 +188,383 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   event count grows with resolution (610 → 1,218 events from 100k to 250k); both for P1-17's
   tuning. No Java change: JUnit/GameTests not rerun (`{"planet":{}}` still fails at `$.planet`,
   as NativeLinkTest expects).
+- **P1-14's field interface.** The deposit engine's `FieldHistory` (`deposits/fields.rs`) expects
+  per-frame L1 fields from P1-03 (`deeptime:arc_magma_flux`, `magma_oxidation`,
+  `convergence_rate_km_myr`, `obliquity_deg`, `slab_age_myr`, `crust_thickness_km`,
+  `fault_density`, `orogenic_uplift_m_myr`, `rift_subsidence_m_myr`, `heat_flow_mw_m2`,
+  `dist_litho_step_km`, `inherited_bif`). The L0 accumulators behind most of them exist per sample
+  (arc magma by type, oxidation, convergence, obliquity, slab age, heat flow, thickness, uplift);
+  publishing them as frames is not done here (P1-14 landed while this task ran).
 - **Next.** P1-04 (surface processes on L1) reads `plates/uplift_mm_yr` and the other `plates/*`
-  fields; its pipeline should set `tectonics.l1_every_steps` = 1.
+  fields; its pipeline should set `tectonics.l1_every_steps` = 1. Then the frames P1-14 reads.
+
+### 2026-09-28 — P1-12 strata pass with rock tags and `rock_states` (agent worktree agent-a9583db34fe66882c)
+- **Datapack registries** (`DeepTimeRegistries`, NeoForge `DataPackRegistryEvent.NewRegistry`, no
+  network codec: clients never need them): `deeptime:rock_class` (`rock/RockClass`, codec per §5.4.1
+  plus `sources` and `notes`; `vanilla_fallback` optional so third-party classes need none) and
+  `deeptime:rock_states` (`rock/RockStates`, the adopted format: `class`, `use` member|fallback,
+  `entries` of `block`, `state` (strings), `required` (default true)). `RockClassRegistry` /
+  `RockStatesRegistry` hold the keys and list entries sorted by id. `deposit_type`, `sim_field` and
+  `essentials` are not registered yet (P1-14, Phase 3, P1-15).
+- **The 59 classes** ship in `neoforge/src/main/resources/data/deeptime/deeptime/rock_class/`, generated
+  by `tools/dev/gen_rock_classes.py` (one table, validated: 59 classes, known names in paths, no
+  filler except coal's stone, vanilla-only fallbacks, no terracotta). Values are initial and marked
+  "tuned in P1-07": 1.0 = crystalline basement (granite, gneiss); erodibility 0.3 (chert, quartzite)
+  … 4.0 (halite) for bedrock, 4–10 for unconsolidated (Sklar & Dietrich 2001 strength scaling,
+  compressed by a square root; Stock & Montgomery 1999); diffusivity 0.5–5.0 (Roering et al. 1999 D
+  used as a linear multiplier, Heimsath et al. 1997); density 700 (pumice) – 3400 (BIF, eclogite)
+  kg/m³. `vanilla_fallback` = the README's vanilla member or last fallback entry. Judgment calls in
+  the table: loose sediments carry their lithified equivalent's `metamorphic_path` (the schema has
+  no lithification field; P1-07 needs its own rule), `facies_rule` names beyond the plan's example
+  are placeholders for P1-07, `karst`/`ore_host` tags added. Deep Time still ships **no fallback
+  tags** (Q15; `RockDataTest.noFallbackTagsShipped`).
+- **`RockPalette`** (plan §7.5): the rules live in plain Java (`rock/PaletteRules`, JUnit-tested):
+  members = `#deeptime:rock/<c>` in tag order, then `rock_states` member entries (absent
+  `required: false` blocks skipped); else the first of `#deeptime:rock_fallback/<c>` then
+  `rock_states` fallback entries; else `vanilla_fallback`; else unclassified crust. Air, stone and
+  deepslate are rejected everywhere except coal → stone (reported as problems). Several members: one
+  per horizon, `members[mix(key) mod n]` (SplitMix64 finaliser), primary = tag order's first. The
+  palette is an immutable snapshot rebuilt on `TagsUpdatedEvent` with cause `SERVER_DATA_LOAD`
+  (server start after tags bind, `/reload`); client tag syncs are ignored. `RockPalette.View`
+  also builds the "vanilla only" palette (only `minecraft:` members, no fallback tags, no
+  rock_states) the tests compare against. **Deviation:** a first version also rejected blocks that do
+  not block motion (worldgen heightmaps); vanilla snow and Project Atmosphere's dust are
+  `forceSolidOff`, so it rejected the adopted `rock_states` example; dropped (only air is rejected).
+- **`StrataPass` v1:** per column the horizon tops are bilinear between the four strata cells (the
+  nearest cell's top where a corner lacks the horizon), classes from the nearest; integer tops T_h,
+  horizon h fills T_{h+1} < y ≤ T_h (v0's boundary rule differed from `classAt` at integer tops;
+  both now share `StrataPass.column`). Runs are computed per column, then written section by section
+  straight into the section palettes, skipping sections without stone or deepslate. Horizon key =
+  `(h << 8) | classIndex` until world data carries unit ids (P1-08). **Bodies are not done:** the
+  `bodies/` format arrives with P1-08/P1-14; the pass has no body hook yet.
+- **`/deeptime probe palette`**: one `[deeptime-probe]` JSON line: `count`, `resolved`, `sources`
+  (per-source counts), `classes` (class → block states, primary first), `source`, `state`,
+  `unresolved`, `problems`. `deeptime-inspect rock --palette` now reads it (block states cut to
+  their id; a raw log line works). `tools/smoke/run.py` writes it to `smoke/<profile>/palette.json`.
+- **`-Ddeeptime.extraDatapack=<folder>`** (gap 29, plan §7.12 fixed): `GameTestSupport` adds the
+  folder through `addRepositorySource` + `PathPackResources.PathResourcesSupplier` as the required
+  top pack `deeptime_extra`, only with `-Ddeeptime.gametest=true`. Gradle sets it from
+  `-PextraDatapack=<folder>`; `-PwithMic` defaults it to `<repo>/../../Docs/datapacks/deeptime-mic-rock-tags`
+  (warns and goes without if absent). `tools/remote/mac.sh --pack` now also syncs that datapack to
+  `/Volumes/Graphide/ban/mic/Docs/datapacks/`. The MIC datapack and `pack/` were not modified.
+- **Synth:** `deeptime synth --strata every-class` (default `placeholder`): 8 horizons 10 blocks
+  apart, horizon h of L1 cell column i has class (6·i + h) mod 59, so any ten neighbouring cell
+  columns hold every class ≥ 20 blocks down; `gametest.sh` writes `deeptime-test` with it.
+  `install.sh` gains `--strata` and `--datapack <folder>` (copied into the world's `datapacks/`).
+- **Tests.** JUnit `PaletteRulesTest` (9) and `RockDataTest` (3); cargo `synth` +3
+  (`every_class_matches_the_rock_class_data` keeps Rust's list equal to the JSON files).
+  GameTests `StrataGameTests.{vanillaOnlyResolvesEveryClass, coalFallsBackToStone,
+  firstInstalledFallback, rockStatesMember, createStonesKeepTheirClasses, everyClassInTheWorld,
+  probePaletteListsEveryClass}`; `WorldDataGameTests.strataClassesResolve` now picks the member by
+  horizon key. The gametest pack adds three test classes (`deeptime_test:test_fallback`,
+  `test_state_fallback`, `test_states`), a fallback tag (absent optional block, stone, polished
+  andesite, andesite) and the README's `rock_states` example (`projectatmosphere:dust[layers=8]` as
+  loess, `required: false`).
+- **Measured (Mac).** `mac.sh -- 'cargo test --workspace'` (cli 13, core 41, format 27, inspect 19+7,
+  jni 7, viewer 4), `clippy --workspace --all-targets -D warnings`, `fmt --check`, `deny check licenses
+  bans` clean; `gradlew build test` → tests=46 failures=0. `mac.sh --pack --server -- './gametest.sh'`
+  → **All 21 required tests passed** (vanillaOnlyResolvesEveryClass sources member=16
+  vanilla_fallback=43; coal=minecraft:stone; everyClassInTheWorld 59 of 59 classes, 240 samples, 0
+  wrong; probe palette 62 classes, 62 resolved: member 17, fallback 2, vanilla_fallback 43).
+  `mac.sh --pack --server -- './gametest.sh -PwithMic'` (160 mods, MIC pack 303fd89 via
+  `install.sh mic`, the rock tags as `deeptime_extra`) → **All 21 required tests passed**: coal =
+  born_in_chaos_v1:black_argillite; limestone/dolostone/ironstone/BIF/serpentinite/scoria =
+  create:limestone/asurine/ochrum/crimsite/veridium/scoria; shale = black argillite, peridotite =
+  create:veridium (first installed fallbacks); loess = projectatmosphere:dust[layers=8];
+  everyClassInTheWorld 240 samples 0 wrong; probe palette 62 of 62 resolved: member 26, fallback 36,
+  vanilla_fallback 0.
+- **Smoke and rock render (Mac, production MIC server, pack 303fd89).** `install.sh mic --synth
+  wrap-test --strata every-class --datapack ../../Docs/datapacks/deeptime-mic-rock-tags` then
+  `mac.sh --server -- 'python3 tools/smoke/run.py --profile mic --fresh --chunky 96'` → PASS; the
+  probe palette (no gametest pack here) resolves **59 of 59: member 24, fallback 35** — exactly the
+  README's 24 classes with a real MIC block and 35 stand-in classes. `cargo run -p deeptime-inspect --
+  rock --world smoke/mic/server/planet --palette smoke/mic/palette.json --colors <colors table>` →
+  `review/out/p1-12/mic-rock/rock-0.png` (55,808 columns, 16-block bands of horizon-0 classes with
+  Create's veridium/asurine/ochrum/crimsite among them). A block → class map is ambiguous where
+  stand-ins share a block (calcite is marble, chalk, halite, …; the render names the alphabetically
+  first class).
+- **After merging master c7af155 (P0-06, P0-14, P0-15)** into the branch (conflicts: the probe
+  builder in `DeepTimeCommands`, this log): cargo test/clippy/fmt/deny clean, JUnit 46/0,
+  `./gametest.sh` → All 21 required tests passed, `./gametest.sh -PwithMic` → All 21 required tests
+  passed (same palette numbers as above). **After merging master 3b05d00 (P1-13)**, which moved the
+  synthetic worlds into `deeptime_core::synth`: the strata option moved with them (`Strata`,
+  `EVERY_CLASS`, `build(kind, strata, c, codec)`; the session's placeholder presets bake
+  `Strata::Placeholder`, so P1-13's worlds are unchanged). cargo test (core 59, cli 7, …), clippy,
+  fmt, deny clean; JUnit 57/0; `./gametest.sh` → All 21 required tests passed; `./gametest.sh
+  -PwithMic` → All 21 required tests passed (and one stalled run, below).
+- **Known issue: `-PwithMic` `lakeHolds` hangs, then runs out of heap (flaky).** Of seven
+  `-PwithMic` runs of this branch, four passed (All 21) and three stalled in `lakeHolds` (every other
+  test done; it forceloads 240 test_lake chunks synchronously), then died of `OutOfMemoryError: Java
+  heap space` (6 GB) 20 s to 5 min later; the JVM then ignores SIGTERM and needs `kill -9`, holding
+  the server lock. No Deep Time frame in any stack; C2ME's workers report the OOM. One control run
+  of master 3b05d00 (14 tests) passed. A first guess (TaCZ/Mega Showdown's unpacked packs in
+  `run-gametest/`) was wrong: a run with both folders deleted also failed. The stall (a synchronous
+  chunk load under C2ME that never returns, with memory growing while it waits) is the thing to chase;
+  a thread dump (`jstack`) during a stall would show it. Until then, rerun a `-PwithMic` gate that
+  stalls in `lakeHolds`.
+- **Not done / next.** Bodies in the strata pass (needs P1-08/P1-14's `bodies/`); the review
+  artefacts (BlueMap cliffs with Create stones) wait for Ben's review round; `deposit_type`,
+  `sim_field`, `essentials` registries come with their tasks. The MIC pack still has no copy of the
+  rock tags (Q16 answer: `pack/kubejs/data/deeptime/` on a pack branch, not done here).
+
+### 2026-09-28 — P1-14, first pass: the deposit engine on synthetic fields (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Scope.** Everything that does not need P1-03…P1-07: the data, the schema, the engine behind a
+  named-field interface, a synthetic field history, the CLI path and the viewer. The row stays
+  `doing` until the real history feeds it.
+- **Data** (`crates/deeptime-core/data/usgs/*.json`, public-domain USGS, digitised by two Opus
+  sub-agents with the report, table or figure, page and method of every number; placeholders say
+  so). Porphyry Cu: OFR 2008-1155 Table 1 (PDF p. 9), n 422, 33 / 240 / 1,500 Mt, Cu 0.24 / 0.44 /
+  **0.75** % (the research note's 0.80 was a figure tick), Mo, Au, Ag with reporting fractions,
+  r(tonnage, Au) −0.28 and three more (text, PDF p. 8), 2 km rule (p. 4), density 4 / 15 / 35 per
+  10⁵ km² (Singer, Berger & Menzie 2005, USGS record 70197200). MVT and SEDEX: OFR 2009-1252
+  (Singer, Berger & Moring 2009) has **no MVT or SEDEX model**; its CAam (carbonate-hosted
+  amagmatic, n 132, 93 of them MVT) and SHam (shale-hosted amagmatic, n 25, all SEDEX) models are
+  used (Table 2 pp. 9–10), MVT-only SIR 2010-5070-A Table 1 and Bulletin 1693 31a/32a-b in `extra`.
+  BIF: Bulletin 1693 model 34a (covers Algoma too), 11 / 170 / 2,400 Mt, Fe 30 / 53 / 66 %.
+  Placer Au: Bulletin 1693 model 39a, 0.022 / 1.1 / 50 Mt, Au 0.084 / 0.2 / 0.48 g/t, 2.0 t/m³,
+  1.6 km rule. Supergene: SIR 2010-5070-B facts (≤3× Andes, 0.4–1.7 % Cu, ≤200 m thick). Coal:
+  Circular 891 densities and thickness limits (no USGS grade–tonnage model for coal exists; the
+  4.2 / 13 / 25 Mt block is a placeholder). Petroleum: Waples 1980 TTI 15 / 75 / 160 (journal
+  fact), field sizes from the DDS-60 Niger Delta assessment unit (2.4 / 12 / 89 MMBO, p90 and p10
+  read off the histogram). **Not found anywhere (placeholders):** deposit densities per area for
+  MVT, SEDEX, BIF, coal and oil; ore densities for porphyry, MVT, SEDEX, BIF; separations for BIF,
+  coal, oil; a USGS table of reflectance by coal rank.
+- **Deposit types** (datapack JSON, `neoforge/src/main/resources/data/deeptime/deeptime/deposit_type/`,
+  compiled into the core): `porphyry_cu_mo_au` (children `supergene_cu_blanket`, `placer_au`),
+  `bif_fe`, `coal_seam`, `mvt_zn_pb`, `sedex_zn_pb`, `petroleum_trap`. Schema
+  `crates/deeptime-format/schema/deposit_type.schema.json` (a test compares its properties with the
+  parser, which refuses unknown keys; another checks every non-placeholder number against its USGS
+  table). Create stones as preferred hosts: serpentinite (veridium) 1.5 for copper, dolostone
+  (asurine) 1.5 for MVT and SEDEX, banded_iron_formation (crimsite) 2.0 and the BIF sheet's own
+  class, the porphyry gossan is ironstone (ochrum) and carries gold. `minecraft`: COE vein ids
+  `createoreexcavation:ore_vein_type/{copper,gold,iron,coal,zinc}` (read from the COE 1.6.8 jar),
+  `cdg_reservoir` for oil, `ore_block_policy` `ev_then_vanilla` (`none` for oil).
+- **Engine** (`crates/deeptime-core/src/deposits/`, stage `deposits`): `fields` (the interface),
+  `types`, `usgs`, `rules` (membership curves, product/min/geometric mean, host and clock scores,
+  time integration F = 1 − Π(1 − F_t)^(Δt/τ), limiting component), `tracts`, `count` (Poisson,
+  Voronoi provinces), `cluster` (Thomas positions, separation max(USGS rule, r_i + r_j)), `sizing`
+  (split lognormal + Gaussian copula), `geometry`, `ledger`, `children` (supergene, placers),
+  `petroleum` (Lopatin TTI, kitchens, charge in order), `playability`, `sites` (cause lookup),
+  `synthetic`, `random` (xoshiro256++, PTRS Poisson). Pass 1 = one frame per step; the last step
+  places, replays the frames at the chosen cells (pass 2: ledger, supergene windows) and writes
+  sites, bodies and events. New `bodies/bodies.dtb` (`DTBD`, FORMAT.md "Bodies": 11 shape names on
+  two metrics, zones by normalised distance and vertical position, erosion clip), written by
+  `finalize_write`; `WorldState` gains `bodies` and `notes` (the census goes to `manifest.json`
+  notes), checkpoint schema 2. Preset `{"deposits_synthetic": {…}}` (`session::Preset`).
+- **CLI and viewer.** `deeptime stage deposits --preset <file> --viewer <dir>` (and `run`) print the
+  census per type next to ρ·A·F; the viewer draws sites coloured by type on the keyframes (layers
+  `deposits/favourability/<type>`, `deposits/sites`, `input/*`), a census table, and per site the
+  component scores, weakest component, host rock, fate, the "Why here?" chain and a plan/section of
+  its bodies (`report.js`; `index.html?site=<id>` opens a site).
+- **Measured (Mac, `tools/remote/mac.sh`).** `cargo test --workspace` ok (core 82 of which 41
+  `deposits::`, format 31, cli 11, jni 7, viewer 4, inspect 26); `cargo fmt --all -- -l` clean,
+  `cargo clippy --workspace --all-targets -- -D warnings` clean, `cargo deny check licenses bans` ok.
+  `cargo run --release -p deeptime-cli -- stage deposits --preset
+  crates/deeptime-core/tests/presets/deposits_synthetic_16k.json --viewer review/out/p1-deposits`
+  (C 16,384, L1 1024 × 512, 50 frames of 10 Myr, strong provinces, count_mult 1): 52 steps, 32
+  sites, 38 bodies, 110 events, 19.6 s wall and 0.83 GB peak footprint on the shared Mac.
+
+  | type | ρ·A·F (§8.6) | drawn | sites | notes |
+  |---|---|---|---|---|
+  | porphyry_cu_mo_au | 9.41 | 9 | 6 | 1 buried, 4 truncated, 4 eroded; 1 guaranteed |
+  | supergene_cu_blanket | — | — | 4 | over truncated porphyries in the dry arc |
+  | placer_au | — | — | 2 | below eroded porphyries |
+  | bif_fe | 2.50 | 4 | 5 | inherited, dated by the 2.2 Ga shelf-sea event; 1 guaranteed |
+  | coal_seam | 9.69 | 8 | 10 | ranks from TTI; 2 guaranteed (exposed) |
+  | mvt_zn_pb | 3.74 | 2 | 2 | |
+  | sedex_zn_pb | 1.11 | 2 | 2 | |
+  | petroleum_trap | 1.08 | 1 | 1 | charged 255 Myr ago by the rift kitchen |
+
+  The pulled PNGs (`review/out/p1-deposits/keyframes/`) show the porphyry favourability on A's
+  Andean arc, coal and MVT in B's foreland, SEDEX and oil in C's rift, BIF on C's craton; headless
+  Chromium screenshots of `?site=` pages show the chains (placer ← exhumation ← erosion pulse,
+  formation ← flare-up ← subduction onset; reservoir ← generation, subsidence, inversion).
+- **Deviations from the plan.** (1) The acceptance run uses the synthetic preset file, not
+  `earthlike_quick_16k` (which P1-03 creates). (2) The lognormal is split at the median so all
+  three USGS percentiles are reproduced; its mean σ is the plan's (1.49 for porphyry). (3) Province
+  endowments (lognormal, σ 0 / 0.35 / 0.7 / 1.2) redistribute a type's ρ·A·F between tracts and
+  within them; they do not change the planet's expected count. (4) Iron is BIF only (no Fe skarn).
+  (5) The essentials list comes from the preset until P1-15's `deeptime:essentials` registry;
+  `guaranteed_occurrence` is emitted by the deposit stage (EVENTS.md updated). (6) Custom deposit
+  types from datapacks are parsed by the same code but not yet passed in (the content bundle is not
+  wired to the stage). (7) Causes are matched by point places (region masks arrive with P1-03).
+  (8) The last frame's favourability is drawn one year before its end so the closing keyframe
+  (sites) is a separate frame; a real pipeline that reaches the deposit stage at t = 0 needs a
+  different trigger.
+- **Field inputs the engine expects from P1-03…P1-07** (per L1 cell, per frame; frames oldest
+  first, each standing for Δt years, **replayable** — pass 2 rereads them; `FieldHistory` in
+  `deposits/fields.rs`, a `MemoryHistory` is there to record into):
+
+  | field | units | provider |
+  |---|---|---|
+  | `deeptime:arc_magma_flux`, `deeptime:magma_oxidation` | 0–1 | P1-03 |
+  | `deeptime:convergence_rate_km_myr`, `deeptime:obliquity_deg`, `deeptime:slab_age_myr` | km/Myr, °, Myr | P1-03 |
+  | `deeptime:crust_thickness_km`, `deeptime:fault_density` | km, 0–1 | P1-03 |
+  | `deeptime:orogenic_uplift_m_myr`, `deeptime:rift_subsidence_m_myr`, `deeptime:heat_flow_mw_m2` | m/Myr, m/Myr, mW/m² | P1-03 |
+  | `deeptime:dist_litho_step_km` | km | P1-03 |
+  | `deeptime:inherited_bif` | 0–1 | P1-03 (craton ages) + P1-07 |
+  | `deeptime:elevation_m`, `deeptime:erosion_rate_m_myr`, `deeptime:deposition_rate_m_myr` | m, m/Myr | P1-04 |
+  | `deeptime:topographic_gradient_m_km`, `deeptime:shelf` | m/km, 0–1 | P1-04 |
+  | `deeptime:carbonate_platform`, `deeptime:evaporite`, `deeptime:euxinic_basin`, `deeptime:coal_facies` | 0–1 facies | P1-04 (strata log) |
+  | `deeptime:source_rock_toc`, `deeptime:reservoir_quality`, `deeptime:seal` | wt%, 0–1 | P1-04 |
+  | `deeptime:burial_temp_c` | °C of the organic layer | P1-04 + P1-07 |
+  | `deeptime:trap_structure` | 0–1 closure | P1-07 |
+  | `deeptime:water_table_depth_m` | m | P1-04 + P1-05 |
+  | `deeptime:precip_mm`, `deeptime:t_mean_c` | mm/yr, °C | P1-05 |
+  | `deeptime:host/<rock class>` | 0–1 fraction in the ore window | P1-07 (optional; absent = no lithology opinion) |
+  | clocks `deeptime:clock/{oxygenated_oceans,land_plants,bif_acme}` | 0–1 per frame | the preset's `planet.atmosphere` (P1-03/P1-05) |
+  | present-day drainage receivers (L1 cell → downstream cell) | — | P1-04 |
+
+  Plus point-placed tectonic events for "Why here?" (`subduction_onset`, `collision`,
+  `orogeny_phase`, `terrane_accretion`, `rift_onset`, `basin_subsidence`, `marine_transgression`,
+  `erosion_pulse`) with t_start/t_end spanning the activity.
+- **Not done.** Real-field integration (record frames in P1-03…P1-07, then a preset pipeline that
+  ends with this stage); datapack content passed to the stage; Fe skarn; spawn ranking (§7.8);
+  the Java side of bodies and its parity test (P1-15); size multipliers tuned on in-world renders
+  (P1-15); merging placers that land on one drainage cell (the second is dropped by separation);
+  a spacesheep review page. Tuning note: time integration saturates F near 1 inside long-lived
+  systems (mean F 0.87–0.98), so counts follow ρ·A and favourability mostly shapes tracts.
+- **Next step.** P1-03…P1-07 publish their fields as frames (`FieldHistory`); then point the
+  real preset's pipeline at `DepositStage` and rerun the acceptance on `earthlike_quick_16k`.
+
+### 2026-09-28 — P1-13 first-start generation, the mechanism (agent worktree agent-a31ba4add1e8bb6d2)
+- **What.** A dedicated server whose overworld is Deep Time's (no test terrain, no staging) and whose
+  world has no `deeptime/manifest.json` now generates on its first start (plan §7.13, updated):
+  `server/FirstStartGenerator` (called by `WorldDataBinder`'s one HIGHEST `ServerAboutToStartEvent`
+  listener before it binds — P0-10's binder therefore binds what generation wrote, and the order
+  never depends on the bus ordering two HIGHEST listeners), `server/ServerConfig`
+  (`config/deeptime/server.json` with `timeline` — review 2 gap 21 — and a valid-JSON template whose
+  explanations are `_` keys), `server/ServerStop` + `mixin/DedicatedServerFirstStartMixin`
+  (`server` side) + `mixin/MinecraftServerFirstStartMixin`, `preset/{ShareCode, Presets,
+  PresetException}`, `SimSession.estimate`. Rust: `deeptime_core::{preset, share_code, synth}`,
+  CLI `run --preset <name|file|DT1…> [--start] [--length-myr]`, `stage`/`bench` take the same
+  preset argument, `deeptime preset list|show|encode|decode`. Smoke: `install.sh --start
+  --length-myr --memory-cap-gib`, `run.py` generation checks and `--scenario`.
+- **Placeholders, not presets.** The real stages (P1-03…P1-08) do not exist, so the four built-in
+  presets (`crates/deeptime-core/presets/*.json`, one source: `include_str!` in the core, copied into
+  the jar as `deeptime/presets/<name>.json` by `processResources`) are `"placeholder": true`: the
+  dummy pipeline (P1-01's `stages`/`world`, 25 or 50 steps per stage at 200 ms) plus a new dummy key
+  `"synth": "wrap-test"` that bakes P0-09's synthetic layers at `finalize_write` (the synth module
+  moved from `deeptime-cli` to `deeptime-core::synth`; `deeptime synth` output is unchanged). The
+  server logs a WARN for a placeholder. Nothing in the Java path knows about the dummy: when P1-08
+  lands, replacing the four JSON files is the whole change.
+- **Preset header (core).** `Preset` is now `{header, body}` (`preset.rs`; `session::Preset`
+  re-exported): header keys `schema`, `name`, `description`, `placeholder`,
+  `scale.circumference_blocks` (must equal the dummy world's C) and `timeline` (`start` ∈
+  supercontinent | scattered_continents | random, `length_myr` 1…4600). On a dummy world the
+  timeline sets the clock to −length…0 with eight keyframe intervals. `manifest.source` is
+  `run:<name>`; `notes.run` gains `timeline` and `placeholder`.
+- **Share codes.** `DT1.` + unpadded base64url(raw DEFLATE level 9 (canonical JSON)). Canonical =
+  serde_json's compact sorted form; Java's `Presets.canonical` reproduces it byte for byte, including
+  serde_json 1.0.151's float layout — it formats with **zmij**, not ryu: positive exponents carry a
+  `+` (`1.5e+300`, `1e+16`), decimals for 1e-5 ≤ |x| < 1e16. Pinned by the same expected string in
+  `share_code::canonical_numbers_follow_serde` and `PresetsTest.canonicalJsonIsSerdes`.
+  Cross-test: `crates/deeptime-core/tests/share-codes.json` (3 cases) holds the code Rust writes and
+  the code Java writes (`ShareCodeTest` writes `neoforge/build/share-codes-java.json`;
+  `tools/dev/share_code_fixture.py` fills the fixture); both suites decode both, and Rust also checks
+  its own code is stable. For two cases the two encoders' codes differ (zlib vs miniz_oxide), for one
+  they are equal. Decoding caps the inflated text at 1 MiB.
+- **The clean stop.** Vanilla has no clean "stop before loadLevel": `initServer` returning false or
+  an exception both end in a crash report plus an NPE in `stopServer` (no overworld). So `ServerStop`
+  halts the server and the mixins make `initServer` return `true` right after the event (before
+  "Preparing level", RCON, the watchdog, `ServerStartingEvent`), skip `ServerStartedEvent`,
+  `ServerStoppingEvent` and `saveAllChunks`; `stopServer` still closes the listener and
+  `session.lock`, `ServerStoppedEvent` still fires, and a non-daemon `deeptime-stop` thread exits
+  the JVM with status 1 after the server thread ends. **Finding:** `net.minecraft.server.Main`
+  writes `level.dat` (line 276, `saveDataTag`) before the server thread starts, so it exists before
+  any mod event and already records the level-type; the mismatch message therefore says to delete
+  the world folder, not only change `level-type`. The smoke checks it is not rewritten at the stop.
+- **Measured (Mac, `tools/remote/mac.sh`).** `cargo test --workspace` all ok (core 56 incl. preset 4,
+  share_code 5, synth 2, session `placeholder_preset_bakes_terrain_next_to_the_run`); `cargo fmt
+  --check`, `clippy --workspace --all-targets -D warnings`, `deny check licenses bans` clean
+  (flate2 1.1.10 joins deeptime-core; already in the lock via deeptime-inspect). `gradlew build
+  test` → tests=45 failures=0. `mac.sh --server -- ./gametest.sh` → All 14 required tests passed.
+  `mac.sh --server -- 'tools/smoke/install.sh standalone --preset earthlike_quick_16k && python3
+  tools/smoke/run.py --profile standalone --fresh --restart'` → PASS: generation 11.9 s,
+  `[deeptime] dummy_drift 84% (−580 Ma) · total 42% · 5s elapsed · ~7s left · native 0.0/4.0 GiB`,
+  `… world data written to …/planet/deeptime in 11s (13 events, 3 sites, 9 keyframes, 8 layers,
+  source run:earthlike_quick_16k)`, native `baked the synthetic terrain wrap-test (C = 16384): 8
+  layers, 21.0 MiB in 833 ms`, `Done (15.111s)`; restart `[deeptime] world data present at …:
+  not regenerating`, `Done (0.676s)`, manifest mtime unchanged. `run.py --scenario
+  first_start_no_config | first_start_circumference_mismatch | first_start_native_failure` → each
+  `OK` (exit 1, no `Done (`, no `Preparing level`, no region/entities/data/deeptime, `level.dat`
+  older than the stop line, no crash report or shutdown exception; the template parses; the
+  mismatch line names `C = 32768` and `C = 16384`; the native case logs the UNSUPPORTED_PLATFORM
+  guidance and `deeptime run --preset earthlike_quick_16k --start supercontinent --length-myr
+  1000.0 --out …/planet/deeptime`). `deeptime run --preset earthlike_quick_16k --start
+  supercontinent --length-myr 1000 --out …` → the same layout (8 layers, 17 files), 11.6 s.
+- **Known limits.** The estimate of a placeholder is 0 bytes (the dummy estimates nothing and the
+  bake runs at finalize; the CLI measured a 403 MiB peak for the 16k bake). Built-in presets are
+  located by name only in `Presets.BUILTIN` (a test checks it equals the core's folder).
+  `tools/smoke/__pycache__/run.cpython-313.pyc` is tracked in git (not by this task); left as is.
+- **Next.** P1-08's bake replaces the placeholder JSON files; then rerun the acceptance above
+  unchanged. P1-11 (staging) can hook into `WorldDataBinder.onAboutToStart` the same way.
+
+### 2026-09-28 — P0-06 finished (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Verdict: Toroidal World wraps a Deep Time planet in the MIC pack, Sable ships included.** No
+  failure that configuration cannot fix, so no Q6 and no fallback. Commands (all on the Mac):
+  `tools/remote/mac.sh --server -- './gametest-planet.sh --run columnscontinuous,entitycrossesseam,structurestraddlesseam,treestraddlesseam,shaftlineacrossseam@8185,250,0 --run jetcrossesseam@8185,250,64 --run prototypepushback@0,300,3527~16,160 --scenario sable_straddle'`
+  → `PASS`; `tools/remote/mac.sh --server --pack -- 'tools/smoke/install.sh mic --size 32768 --test-terrain wrap-test && python3 tools/smoke/run.py --profile mic --fresh --chunky 256 --chunky-center seam'`
+  → `PASS`, and the same with `--size 16384` → `PASS` (pack 303fd89 snapshot, 168 jars).
+- **Findings table** (wrapped_planet_worlds.md §6.3, server side; C = 16,384 unless stated):
+
+  | Item | Result | Evidence |
+  |---|---|---|
+  | TW stamps the generator; X loops, Z not; no climate compression | pass | probe tw `stamped=true loopsX=true loopsZ=false climateCompression=off`, `widthChunks` 1024 (16k) and 2048 (32k), on the planet server and in both MIC smokes |
+  | Terrain continuous at the seam | pass | columnsContinuous: 16 rows, 0 bad folds, 0 jumps (terrain blocks; z=1: 111,111 → 111,110) |
+  | Entity crosses the seam | pass | entityCrossesSeam: snowball at x = −8187.22 after crossing, in span |
+  | Structure straddling the seam | pass | structureStraddlesSeam: `plains_small_house_1` over x 8188..8194 placed chunk by chunk through TW's `StructureStartMixin`; east 194 blocks right, west 147 right, 0 wrong |
+  | Tree straddling the seam | pass | treeStraddlesSeam: oak trunk at x = 8191, 6 logs, 34 east + 20 west leaves, 0 decaying after the west leaves re-read their distance across the seam |
+  | Create shaft line across the seam (informational) | works | shaftLineAcrossSeam: creative motor at C/2 − 4, 16 RPM on all 7 shafts, 4/4 west of the seam |
+  | Sable jet across the seam, ×20 | 20/20 | jetCrossesSeam: 10-block hull at 40 blocks/s crosses at tick 6, x = −8187.76 after (folded, in span), 10/10 blocks, vx 38.6 kept; 20 `[gametest-attempt] … ok`, one PASS |
+  | Sable hull straddling the seam survives save + restart | OK | `sable_straddle: OK (sub-level 82e61644-…, 19 blocks, x 8191.97 before, 8191.97 after)` |
+  | Chunky across the seam, nothing stored outside the span | pass | 1089 chunks centred on x = C/2 (24 s at 32k, 29 s at 16k); `regions outside span: 0` (22 files at 32k, 19 at 16k); both edge columns hold chunks (1485 east, 1540 west) |
+  | MIC boots with TW and the planet | pass | boot 24 s (32k) / 19 s (16k) on the Mac; every Deep Time mixin; 233–234 of 278 TW mixins by `Done (`; 7 TW compat configs; no C2ME/DH errors; village located; peak RSS 5.4 / 5.2 GB |
+  | Pole pushback (PROTOTYPE) | pass | prototypePushback: dz 0 / −10.7 / −26.5 / −42.2 blocks in 40 ticks at 74.5° / 76° / 77.5° / 79°; minecart at 79° −14.4 |
+
+- **Deferred (review 2, gap 28)**, all server-side testable but not in this task: a Create **train**
+  across the seam; a **bearing or elevator contraption** straddling it; **belts** across it; the
+  **pole-transit prototype** (teleport + 180° heading; decisions file: "later"); the **Sable-ship pole
+  pushback** (P1-18's `sableHullPushedBack`); a jet flying into *unforced* chunks (destination chunk
+  tickets); passengers, propellers and ropes (Aeronautics). Client-only items stay unverifiable (§9.8).
+- **Harness facts found here** (the plan's §9.4/§9.5 now say "as built"):
+  1. 1.21.1's `/test run` starts with `TestCommand.stopTests()`, cancelling every running test; the
+     earlier "two /test run at one spot cancel each other" was this. The harness runs one test at a time.
+  2. `/test run` ignores y: the test goes on the WORLD_SURFACE heightmap at (x, z + 3), which reads
+     y = −352 while that chunk is not loaded (the first runs placed tests inside the bedrock floor).
+  3. When a test batch ends, `GameTestRunner` un-forces **every** forced chunk of the level. The
+     harness forceloads again and waits (`execute if loaded` on every corner and test spot) before
+     each test; tests refuse a spot at the world floor with a clear message (`surfaceSpot`).
+  4. TW's `/forceload` accepts canonical coordinates only ("8217 is outside this world"): boxes
+     across the seam are split in two.
+  5. Vanilla creates an empty `.mca` whenever it opens a region file for a read; after a Chunky square
+     across the seam there are eight 0-byte files at rx = C/1024 and −C/1024 − 1 (0 chunks). run.py's
+     span check now counts region/entities/poi files that store a chunk and records the empty ones.
+  6. `attempts = 20, requiredSuccesses = 20` under `/test run` takes vanilla's flaky path: one PASS
+     after 20 passing attempts (or one FAIL at the first failure), not one report per attempt. The test
+     body reports each attempt to `DeepTimeTestReporter.attempt`; the summary carries
+     `attempts/attemptsOk/requiredSuccesses/required`, and the harness requires attemptsOk ≥ requiredSuccesses.
+  7. OCEAN_FLOOR counts trees and boulders, so one run's random seed put a 3-block "jump" at the seam:
+     columnsContinuous now compares terrain blocks (stone, dirt, sand, gravel, clay).
+- **Implementation details.** Sable is `compileOnly "maven.modrinth:sable:U678xqle"` plus its nested
+  `sable-companion-common-1.21.1-1.6.0.jar` (extracted by `extractSableCompanion`: `BoundingBox3i`,
+  `Pose3d` live there); signatures checked with javap on the 2.0.5 jar. `compat/sable/SableTestOps` is
+  the only class naming Sable types (vanilla/JDK types in its signatures); removal goes through
+  `ServerSubLevelContainer.removeSubLevel(plotX − originX, plotZ − originZ, REMOVED)` as Sable's own
+  command does; block counts are the non-air blocks of the plot box (TW treats Sable plots as a foreign
+  frame and never folds them). New commands: `/deeptime probe sable` (only with Sable loaded) and
+  `/deeptime gametest sable straddle <z>`; `probe column` gained `chunkLoaded`/`worldSurface`.
+  A straddling hull is assembled from raw contiguous positions (x = C/2 − 3 … C/2 + 2); its pose
+  stays unfolded while its centre is west of C/2. `wrap/PoleCapPrototype`: `EntityTickEvent.Post`,
+  players, vehicles and tagged probes, 0.08 blocks/tick at 80°, linear from 75°, dev runtimes only.
+  run.py: `--chunky-center x,z|seam`, square shape, `report-C<size>.md` copy; run_planet.py:
+  `--scenario sable_straddle`, spec `name,…@x,y,z[~dx,dz]`, optional tests informational.
+- **For the P0-06 review page** (not published here; another agent owns `tools/review/publish.sh`):
+  this worktree's gitignored `smoke/p0-06/` holds `report-C32768.md`, `report-C16384.md`,
+  `server-C32768.log`, `server-C16384.log`, `planet.log` (the passing planet run), `planet-harness.out`
+  and `smoke-harness.out`; publish them with the findings table above.
+- **Next.** Publish the P0-06 page; the deferred items above go to a follow-up (trains and contraptions
+  fit P1-16's compat work, the Sable pole pushback is P1-18).
 
 ### 2026-09-28 — P1-01 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Formats** (`crates/deeptime-format`, spec in `FORMAT.md` and the new `EVENTS.md`). Every new
@@ -289,7 +677,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **The test is stricter than the plan's:** after the first count it schedules a fluid tick on every
   water source it counted (as a changed neighbour would), so "after" proves the basin is watertight,
   not only that nothing ticked. `expected` is every open block (air or water) between each footprint
-  column's ground and its surface; `outside` is any water in a box 48 blocks past the footprint,
+  column's ground and its surface; `outside` is any water in a box 16 blocks past the footprint (48 until P1-12),
   y 84…141, that is not in those blocks. `floorCornerMaxDiff=0` ties the basin to the raster at
   noise-cell corners; `analytic` is the same count from the raster's H (informational: bilinear
   interpolation over 4-block noise cells moves the shore by a block or two).
@@ -427,6 +815,22 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   seam chunk from a test can wait indefinitely in TW's seam-generation queue, so seam tests read only
   forceloaded chunks (`getChunkNow`). Two `/test run` at one position cancel each other: the harness
   spaces tests 8 blocks apart.
+- **P0-14 / BlueMap on spacesheep.** spacesheep's Free plan caps a space at 200 files and a file at
+  10 MB; BlueMap tiles of a 992-block world are several MB each before gzip, and a map's
+  textures.json with all ~160 MIC jars is 10.4 MB gzipped. The page works by (1) gzip storage plus
+  BlueMap's own `clientDecompression` switch (the web app inflates `.prbm.gz` with DecompressionStream,
+  so no Content-Encoding header is needed), (2) a bounded render box (`BLUEMAP_BOX`), (3) only the jars
+  whose blocks occur in the box (`BLUEMAP_ONLY_PRESENT=1`, via the new `deeptime-inspect blocks`), and
+  (4) dropping the source map, PHP backend and non-English translations. `deeptime-inspect blocks` on
+  the MIC world also shows what P1-15 must claim: Create's stone blobs (crimsite, ochrum, veridium,
+  limestone) and ores from Create Nuclear, Destroy, Create Propulsion, Ice and Fire and Cobblemon
+  scatter through Deep Time terrain today.
+- **P0-15, Phase 0 exit (2026-09-28).** `tools/review/phase0.py` runs every check from the laptop
+  through `mac.sh` (each server step takes the lock on its own) and publishes the page. First run
+  10/11: two planet tests were disturbed by terrain, not the seam or the cap. `columnscontinuous` now
+  counts only rows whose two seam columns match the periodic terrain function within 2 blocks (the
+  planet's real router carves caves at the seam) and needs ≥ 10 clean rows; `prototypepushback`
+  flies its probes near the build top so rising ground cannot stop them. Re-run: 11/11.
 - **TW semantics for tests:** TW moves an entity that *steps* over the border (its movement path);
   `setPos` is a teleport and stays unfolded.
 - **P0-07 (agent, merged):** see the P0-07 entry below. **P0-09 (agent, merged):** on-disk layout in

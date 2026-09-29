@@ -3,7 +3,7 @@
 """Parameter sweep for the plates stage (P1-03 tuning): runs `deeptime stage plates` on a built-in
 preset with tectonics overrides and prints each run's summary line.
 
-    python3 tools/dev/plates_sweep.py [--preset earthlike_quick_16k] [--start scattered]
+    python3 tools/dev/plates_sweep.py [--preset plates_quick_16k] [--start scattered_continents]
         [--myr 500] [--samples N] 'name:key=value,key=value' ...
 
 Run it on the Mac (tools/remote/mac.sh) after `cargo build --release -p deeptime-cli`.
@@ -22,20 +22,19 @@ sys.path.insert(0, ROOT)
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--preset", default="earthlike_quick_16k")
-    ap.add_argument("--start", default="scattered")
+    ap.add_argument("--preset", default="plates_quick_16k")
+    ap.add_argument("--start", default="scattered_continents")
     ap.add_argument("--myr", type=float, default=500.0)
     ap.add_argument("--samples", type=int, default=0)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("variants", nargs="*", default=["default:"])
     a = ap.parse_args()
-    base = json.load(open(os.path.join(ROOT, "crates/deeptime-core/presets", a.preset + ".json")))
+    base = json.load(open(os.path.join(ROOT, "crates/deeptime-core/presets/plates", a.preset + ".json")))
     exe = os.path.join(ROOT, "target/release/deeptime")
     for v in a.variants:
         name, _, rest = v.partition(":")
         p = json.loads(json.dumps(base))
-        p["timeline"]["start"] = a.start
-        p["timeline"]["length_myr"] = a.myr
+        p["timeline"] = {"start": a.start, "length_myr": a.myr}
         if a.samples:
             p["resolution"]["l0_samples"] = a.samples
         if a.seed:

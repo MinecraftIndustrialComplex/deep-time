@@ -9,13 +9,14 @@ use std::time::Duration;
 
 use super::*;
 use crate::checkpoint::Checkpoint;
-use crate::params::{StartConfig, builtin, with_timeline};
+use crate::params::plates_builtin;
+use crate::preset::{Preset, PresetBody, StartConfig, with_timeline};
 use crate::session::{AdvanceStatus, NoGauge, Session, SessionOptions};
 
 /// A small planet preset: `n` samples, `myr` of history, the given start.
 fn preset_json(n: u32, myr: f64, start: &str, seed: u64) -> String {
     let json = with_timeline(
-        builtin("earthlike_quick_16k").unwrap(),
+        plates_builtin("plates_quick_16k").unwrap(),
         Some(start),
         Some(myr),
     )
@@ -23,15 +24,20 @@ fn preset_json(n: u32, myr: f64, start: &str, seed: u64) -> String {
     let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
     v["resolution"]["l0_samples"] = serde_json::json!(n);
     v["resolution"]["l1_r"] = serde_json::json!(64);
-    v["timeline"]["keyframe_size"] = serde_json::json!([128, 64]);
-    v["timeline"]["keyframe_every_myr"] = serde_json::json!(20.0);
+    v["keyframes"]["size"] = serde_json::json!([128, 64]);
+    v["keyframes"]["every_myr"] = serde_json::json!(20.0);
     v["seed"] = serde_json::json!(seed);
     v.to_string()
 }
 
 fn preset(n: u32, myr: f64, start: &str, seed: u64) -> PlanetPreset {
-    let v: serde_json::Value = serde_json::from_str(&preset_json(n, myr, start, seed)).unwrap();
-    PlanetPreset::from_obj(v.as_object().unwrap()).unwrap()
+    match Preset::from_json(&preset_json(n, myr, start, seed))
+        .unwrap()
+        .body
+    {
+        PresetBody::Planet(p) => *p,
+        other => panic!("not a planet preset: {other:?}"),
+    }
 }
 
 fn temp_dir(name: &str) -> PathBuf {
@@ -145,7 +151,11 @@ fn rifting_conserves_area_exactly() {
 
 #[test]
 fn runs_keep_their_invariants() {
-    for (start, seed) in [("supercontinent", 1), ("scattered", 2), ("random", 3)] {
+    for (start, seed) in [
+        ("supercontinent", 1),
+        ("scattered_continents", 2),
+        ("random", 3),
+    ] {
         let p = preset(5000, 160.0, start, seed);
         let mut resamplings = 0;
         let norm = PlatesStage::new(p.clone()).norm();
@@ -282,7 +292,7 @@ fn finish(s: &Session) {
 /// A run checkpointed mid-stage through bytes and resumed ends in exactly the straight run's world.
 #[test]
 fn resumed_run_is_identical() {
-    let json = preset_json(3000, 60.0, "scattered", 9);
+    let json = preset_json(3000, 60.0, "scattered_continents", 9);
     let straight = session(&json, &temp_dir("straight"));
     finish(&straight);
     let expect = straight.checkpoint().unwrap().world;
@@ -312,7 +322,7 @@ fn resumed_run_is_identical() {
     assert_eq!(got.t_years, 0.0);
     same_world(&got, &expect);
     let manifest: serde_json::Value = serde_json::from_str(&s.finalize_write().unwrap()).unwrap();
-    assert_eq!(manifest["source"], "run:earthlike_quick_16k");
+    assert_eq!(manifest["source"], "run:plates_quick_16k");
     assert!(dir.join("keyframes/index.json").is_file());
     for d in [dir, temp_dir("straight")] {
         let _ = std::fs::remove_dir_all(d);
@@ -322,7 +332,7 @@ fn resumed_run_is_identical() {
 #[test]
 fn a_preset_without_a_timeline_is_refused() {
     let err = Session::create(
-        builtin("earthlike_quick_16k").unwrap(),
+        plates_builtin("plates_quick_16k").unwrap(),
         "",
         SessionOptions {
             out_dir: temp_dir("refused"),
@@ -344,7 +354,7 @@ fn a_preset_without_a_timeline_is_refused() {
     let secs = est["stages"][0]["seconds"].as_f64().unwrap();
     // The plan's §8.1 model: 250 × 0.28 s + 13 × (1.22 + 0.21) s ≈ 88.6 s.
     assert!((secs - 88.59).abs() < 0.1, "{secs}");
-    assert_eq!(StartConfig::parse("random"), Some(StartConfig::Random));
+    assert_eq!(StartConfig::from_name("random"), Some(StartConfig::Random));
 }
 
 /// The statistical targets of plan §8.1 over 500 Myr: oceanic crust mostly younger than about
@@ -352,7 +362,11 @@ fn a_preset_without_a_timeline_is_refused() {
 #[test]
 #[ignore = "500 Myr at 20k samples; run with --release -- --ignored"]
 fn statistics_over_500_myr() {
-    for (start, seed) in [("supercontinent", 11), ("scattered", 12), ("random", 13)] {
+    for (start, seed) in [
+        ("supercontinent", 11),
+        ("scattered_continents", 12),
+        ("random", 13),
+    ] {
         let p = preset(20_000, 500.0, start, seed);
         let world = run_stage(&p, |_, _, _| {});
         let st = world.plates.as_ref().unwrap();

@@ -1,0 +1,28 @@
+{
+  "class": "banded_iron_formation",
+  "family": "chemical_sedimentary",
+  "groups": [
+    "deeptime:rock/chemical",
+    "deeptime:rock/sedimentary",
+    "deeptime:rock/iron_formation"
+  ],
+  "density_kg_m3": 3400,
+  "erodibility": 0.4,
+  "diffusivity": 0.5,
+  "metamorphic_path": [],
+  "weathers_to": "gravel",
+  "facies_rule": "ferruginous_ocean",
+  "tags": [
+    "fe_rich",
+    "ore_host",
+    "create_metal_host:iron"
+  ],
+  "vanilla_fallback": "minecraft:granite",
+  "sources": {
+    "density_kg_m3": "judgment: chert bands (about 2650 kg/m³) alternating with hematite/magnetite (about 5200 kg/m³), roughly a third iron oxide by volume; rounded to 10 kg/m³; initial value, tuned in P1-07",
+    "erodibility": "judgment, relative to granite: hard chert and iron-oxide laminae that hold up ridges; bedrock ranked by rock strength: river incision scales roughly with tensile strength^-2 (Sklar & Dietrich 2001, Geology 29(12):1087–1090) and lithologic K contrasts span orders of magnitude (Stock & Montgomery 1999, JGR 104(B3):4983–4993); the strength-based contrast is compressed to its square root, so bedrock spans about 0.3–4; initial value, tuned in P1-07",
+    "diffusivity": "judgment, relative to granite: very resistant, makes little soil; hillslope transport coefficient D of Roering, Kirchner & Dietrich 1999 (WRR 35(3):853–870), used as a linear creep multiplier and scaled by how readily the rock makes mobile soil (soil production function, Heimsath et al. 1997, Nature 388:358–361): loose and friable classes 2–5, soft sedimentary 1.2–2, crystalline 0.5–1; initial value, tuned in P1-07",
+    "vanilla_fallback": "last fallback entry (MIC rock-tag README, Fallbacks table)"
+  },
+  "notes": "Banded iron formation, jaspilite and granular iron formation, the world's main iron ore. Create's crimsite (iron) is its member; metamorphosed BIF stays in the class."
+}

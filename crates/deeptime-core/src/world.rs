@@ -2,12 +2,12 @@
 //! The shared state every stage reads and writes (plan §8 `WorldState`): the simulated clock, the
 //! named fields stages exchange and keyframes are drawn from, the event log written as geology
 //! (writer 1, plan §5.5) and the site registry (§5.6). It is what a checkpoint stores, so every
-//! field serialises with postcard; stages add their own state here as they arrive (the L0 crust
-//! of the plates stage since P1-03, the L1 surface in P1-04, …).
+//! field serialises with postcard; stages add their own state here as they arrive (plates in
+//! P1-03, the L1 surface in P1-04, …).
 
 use std::collections::BTreeMap;
 
-use deeptime_format::{Event, EventId, GEOLOGY_WRITER, GridDesc, Site, SiteId};
+use deeptime_format::{Body, BodyId, Event, EventId, GEOLOGY_WRITER, GridDesc, Site, SiteId};
 use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
@@ -55,10 +55,16 @@ pub struct WorldState {
     /// Events emitted so far, in emission order (the order `eventsSince` cursors count).
     pub events: Vec<Event>,
     pub sites: Vec<Site>,
+    /// Deposit bodies and other geometry (plan §5.7.4; P1-14).
+    pub bodies: Vec<Body>,
+    /// Per-stage summaries as JSON text (the deposit census of P1-14, …), copied into
+    /// `manifest.json` `notes` by `finalize_write`.
+    pub notes: BTreeMap<String, String>,
     /// The plate model's L0 crust (plan §8.1), once the plates stage has started.
     pub plates: Option<crate::plates::PlateState>,
     next_event_seq: u64,
     next_site_id: SiteId,
+    next_body_id: BodyId,
 }
 
 impl WorldState {
@@ -70,9 +76,12 @@ impl WorldState {
             fields: BTreeMap::new(),
             events: Vec::new(),
             sites: Vec::new(),
+            bodies: Vec::new(),
+            notes: BTreeMap::new(),
             plates: None,
             next_event_seq: 0,
             next_site_id: 0,
+            next_body_id: 0,
         }
     }
 
@@ -116,6 +125,27 @@ impl WorldState {
         }
         let id = site.id;
         self.sites.push(site);
+        Ok(id)
+    }
+
+    /// The next body id.
+    pub fn next_body_id(&mut self) -> BodyId {
+        let id = self.next_body_id;
+        self.next_body_id += 1;
+        id
+    }
+
+    /// Registers `body` (its id from [`WorldState::next_body_id`]).
+    pub fn add_body(&mut self, body: Body) -> Result<BodyId, CoreError> {
+        body.validate()?;
+        if body.id >= self.next_body_id || self.bodies.iter().any(|b| b.id == body.id) {
+            return Err(CoreError::InvalidArgument(format!(
+                "body {} was not allocated by this world, or is registered twice",
+                body.id
+            )));
+        }
+        let id = body.id;
+        self.bodies.push(body);
         Ok(id)
     }
 

@@ -5,6 +5,10 @@
 // The stage runner and its persistence (P1-01).
 pub mod checkpoint;
 pub mod dummy;
+
+// Deposits (P1-14).
+pub mod deposits;
+
 pub mod keyframes;
 pub mod stage;
 pub mod world;
@@ -15,6 +19,11 @@ pub mod params;
 pub mod plates;
 pub mod session;
 pub mod sphere;
+
+// Presets, share codes and the synthetic terrains of the placeholder presets (P1-13).
+pub mod preset;
+pub mod share_code;
+pub mod synth;
 
 pub use deeptime_format::FORMAT_VERSION;
 pub use error::CoreError;

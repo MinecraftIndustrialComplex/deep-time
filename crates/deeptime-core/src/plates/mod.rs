@@ -127,7 +127,7 @@ impl PlatesStage {
     }
 
     fn dt_myr(&self) -> f64 {
-        self.preset.timeline.length_myr.unwrap_or(0.0) / self.total.max(1) as f64
+        self.preset.length_myr() / self.total.max(1) as f64
     }
 
     fn norm(&self) -> Norm {
@@ -252,7 +252,7 @@ impl PlatesStage {
 
         self.done = step;
         let last = self.done >= self.total;
-        let kf_every = self.preset.timeline.keyframe_every_myr * 1.0e6;
+        let kf_every = self.preset.keyframes.every_myr * 1.0e6;
         let kf_due = world.t_years >= self.next_output_years;
         if kf_due {
             let origin = self.preset.t_start_years();
@@ -457,7 +457,7 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let c = u64::from(p.scale.circumference_blocks);
     let r = u64::from(p.resolution.l1_r);
     let cells = (c / r) * (c / r / 2);
-    let [kw, kh] = p.timeline.keyframe_size;
+    let [kw, kh] = p.keyframes.size;
     let sample = std::mem::size_of::<state::Sample>() as u64;
     let n = u64::from(p.resolution.l0_samples);
     let bytes = n * (3 * sample + 400)

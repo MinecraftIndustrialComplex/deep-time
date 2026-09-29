@@ -37,8 +37,13 @@ public final class WaterGameTests {
 
     /** Ticks the forceloaded chunks run between the two counts. */
     static final int WAIT_TICKS = 400;
-    /** Blocks scanned for escaped water around the footprint: past the rim's outer slope (d = 36). */
-    static final int MARGIN = 48;
+    /**
+     * Blocks scanned for escaped water around the footprint. Escaping water must cross the rim, and
+     * flowing water stays connected to its source, so any leak shows within 16 blocks. (It was 48,
+     * past the rim's outer slope at d = 36; that forceloaded ~2× the chunks and ran the 160-mod MIC
+     * GameTest server out of heap intermittently, P1-12.)
+     */
+    static final int MARGIN = 16;
     /** Blocks scanned below the plain and above the rim crest. */
     static final int Y_MARGIN = 16;
 

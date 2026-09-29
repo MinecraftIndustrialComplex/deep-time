@@ -1,57 +1,81 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! Planet presets (plan §5.1): the planet, its scales, the timeline the player chose, the grid
-//! ladder and the tectonic constants, as JSON.
+//! The planet preset (plan §5.1): the sections a preset running the real pipeline carries next to
+//! the header every preset has (`preset.rs`: schema, name, description, placeholder, scale,
+//! timeline).
 //!
 //! ```json
-//! {"schema": 1, "name": "earthlike_quick_16k", "seed": 1,
+//! {"schema": 0, "name": "plates_quick_16k", "seed": 1,
 //!  "planet": {"gravity_m_s2": 9.81, "day_length_h": 24, "axial_tilt_deg": 23.4,
 //!             "star_flux_rel": 1.0, "ocean_fraction": 0.7, "regime": "mobile_lid"},
-//!  "scale": {"circumference_blocks": 16384},
-//!  "timeline": {"start": "scattered", "length_myr": 500, "keyframe_every_myr": 50},
+//!  "scale": {"circumference_blocks": 16384, "m_per_block_h": 300, …},
+//!  "timeline": {"start": "scattered_continents", "length_myr": 500},
+//!  "keyframes": {"every_myr": 50, "size": [1024, 512]},
 //!  "resolution": {"l0_samples": 100000, "l1_r": 16},
 //!  "tectonics": {…every key optional, Cortial et al. 2019 Appendix A by default…}}
 //! ```
 //!
-//! **The timeline has no default story** (decisions file, "Timeline"): the built-in presets leave
-//! `timeline.start` and `timeline.length_myr` empty and a run refuses to start until they are set
-//! (the editor, the server config or the CLI's `--start`/`--timeline-myr` fill them in).
+//! A preset with a `planet` section runs the plates stage (P1-03); later stages add their sections
+//! (`surface`, `climate`, …). **The timeline has no default story** (decisions file, "Timeline"):
+//! the plate presets leave `timeline` out and a run refuses to start until it is set (the editor,
+//! `config/deeptime/server.json` or the CLI's `--start`/`--length-myr`).
+//!
+//! The built-in `earthlike_*` presets are still P1-13's placeholders (the game bakes their
+//! synthetic terrain until P1-08 exists); the plate pipeline's presets are `plates_*`
+//! (`presets/plates/`, [`PLATES_BUILTIN`]), resolved by name like the built-ins. When the stages up
+//! to P1-08 land, their sections move into the `earthlike_*` files.
 //!
 //! Sections are parsed with serde, one at a time, so an error names the section
 //! (`$.planet: missing field gravity_m_s2`); range checks name the exact key. Every section
-//! rejects unknown keys. `surface`, `climate`, `deposits`, … arrive with their stages.
+//! rejects unknown keys.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::error::CoreError;
+use crate::preset::{StartConfig, Timeline};
 
-/// The preset schema version (independent of the world-data format).
-pub const PRESET_SCHEMA: u32 = 1;
-
-/// The built-in presets (plan §5.1), shipped as JSON in the core.
-pub const BUILTIN: [(&str, &str); 4] = [
+/// The plate pipeline's presets (`crates/deeptime-core/presets/plates/`): the Earth-like planets
+/// of plan §5.1 with their tectonic section, not shipped as game built-ins until P1-08.
+pub const PLATES_BUILTIN: [(&str, &str); 4] = [
     (
-        "earthlike_quick_16k",
-        include_str!("../presets/earthlike_quick_16k.json"),
+        "plates_quick_16k",
+        include_str!("../presets/plates/plates_quick_16k.json"),
     ),
     (
-        "earthlike_full_16k",
-        include_str!("../presets/earthlike_full_16k.json"),
+        "plates_full_16k",
+        include_str!("../presets/plates/plates_full_16k.json"),
     ),
     (
-        "earthlike_quick_32k",
-        include_str!("../presets/earthlike_quick_32k.json"),
+        "plates_quick_32k",
+        include_str!("../presets/plates/plates_quick_32k.json"),
     ),
     (
-        "earthlike_full_32k",
-        include_str!("../presets/earthlike_full_32k.json"),
+        "plates_full_32k",
+        include_str!("../presets/plates/plates_full_32k.json"),
     ),
 ];
 
-/// The JSON of built-in preset `name`.
-pub fn builtin(name: &str) -> Option<&'static str> {
-    BUILTIN.iter().find(|(n, _)| *n == name).map(|(_, j)| *j)
+/// The JSON of a plate preset.
+pub fn plates_builtin(name: &str) -> Option<&'static str> {
+    PLATES_BUILTIN
+        .iter()
+        .find(|(n, _)| *n == name)
+        .map(|(_, j)| *j)
 }
+
+/// The top-level keys a planet preset adds to the header's.
+pub const PLANET_KEYS: [&str; 5] = ["seed", "planet", "keyframes", "resolution", "tectonics"];
+
+/// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
+pub const SCALE_KEYS: [&str; 7] = [
+    "circumference_blocks",
+    "m_per_block_h",
+    "m_per_block_v",
+    "min_y",
+    "max_y",
+    "sea_level_y",
+    "pole_cap_deg",
+];
 
 /// The tectonic regime (plan §5.1). v1 simulates only a mobile lid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -120,59 +144,31 @@ impl ScaleParams {
     }
 }
 
-/// The start configuration the player chooses (plan §5.1; decisions file, "Timeline").
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum StartConfig {
-    /// One large continent (a Pangaea) on one or two plates.
-    Supercontinent,
-    /// Several continents of mixed sizes.
-    Scattered,
-    /// Continents from a thresholded fractal noise.
-    Random,
-}
-
-impl StartConfig {
-    pub fn name(self) -> &'static str {
-        match self {
-            StartConfig::Supercontinent => "supercontinent",
-            StartConfig::Scattered => "scattered",
-            StartConfig::Random => "random",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<StartConfig> {
-        match s {
-            "supercontinent" => Some(StartConfig::Supercontinent),
-            "scattered" => Some(StartConfig::Scattered),
-            "random" => Some(StartConfig::Random),
-            _ => None,
-        }
-    }
-}
-
-fn d_keyframe_every_myr() -> f64 {
+fn d_every_myr() -> f64 {
     50.0
 }
 fn d_keyframe_size() -> [u32; 2] {
     [1024, 512]
 }
 
-/// The timeline (plan §5.1): chosen by the player, no default story.
+/// Timelapse keyframes (plan §6.1).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct TimelineParams {
-    /// Required before a run: supercontinent, scattered or random.
-    #[serde(default)]
-    pub start: Option<StartConfig>,
-    /// Required before a run: how many million years of history end at world creation.
-    #[serde(default)]
-    pub length_myr: Option<f64>,
-    #[serde(default = "d_keyframe_every_myr")]
-    pub keyframe_every_myr: f64,
-    /// Keyframe width and height in pixels.
+pub struct KeyframeParams {
+    #[serde(default = "d_every_myr")]
+    pub every_myr: f64,
+    /// Width and height in pixels.
     #[serde(default = "d_keyframe_size")]
-    pub keyframe_size: [u32; 2],
+    pub size: [u32; 2],
+}
+
+impl Default for KeyframeParams {
+    fn default() -> Self {
+        KeyframeParams {
+            every_myr: d_every_myr(),
+            size: d_keyframe_size(),
+        }
+    }
 }
 
 fn d_l2_r() -> u32 {
@@ -412,31 +408,21 @@ impl Default for TectonicParams {
     }
 }
 
-/// A planet preset (plan §5.1): everything a run needs.
+/// A planet preset's body (plan §5.1).
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlanetPreset {
-    pub schema: u32,
     pub name: String,
     pub seed: u64,
     pub planet: PlanetParams,
     pub scale: ScaleParams,
-    pub timeline: TimelineParams,
+    /// The header's timeline: required before a run.
+    pub timeline: Option<Timeline>,
+    pub keyframes: KeyframeParams,
     pub resolution: ResolutionParams,
     pub tectonics: TectonicParams,
 }
 
 type Obj = Map<String, Value>;
-
-const SECTIONS: [&str; 8] = [
-    "schema",
-    "name",
-    "seed",
-    "planet",
-    "scale",
-    "timeline",
-    "resolution",
-    "tectonics",
-];
 
 fn section<T: serde::de::DeserializeOwned>(obj: &Obj, key: &str) -> Result<Option<T>, CoreError> {
     match obj.get(key) {
@@ -456,47 +442,20 @@ fn check(ok: bool, path: &str, reason: &str) -> Result<(), CoreError> {
 }
 
 impl PlanetPreset {
-    /// Parses a planet preset from the top-level object. Sections present are parsed in
-    /// document order first, so the first malformed section is reported before a missing one.
-    pub fn from_obj(obj: &Obj) -> Result<PlanetPreset, CoreError> {
-        if let Some(k) = obj.keys().find(|k| !SECTIONS.contains(&k.as_str())) {
-            return Err(CoreError::preset(
-                format!("$.{k}"),
-                "unknown key (a planet preset has schema, name, seed, planet, scale, timeline, \
-                 resolution and tectonics)",
-            ));
-        }
+    /// Parses the planet sections of a preset whose header is already parsed. Sections present
+    /// are parsed in a fixed order before missing ones are reported, so a malformed `planet`
+    /// section is named even when others are missing.
+    pub fn from_obj(
+        obj: &Obj,
+        name: Option<&str>,
+        timeline: Option<Timeline>,
+    ) -> Result<PlanetPreset, CoreError> {
         let planet: Option<PlanetParams> = section(obj, "planet")?;
         let scale: Option<ScaleParams> = section(obj, "scale")?;
-        let timeline: Option<TimelineParams> = section(obj, "timeline")?;
         let resolution: Option<ResolutionParams> = section(obj, "resolution")?;
         let tectonics: Option<TectonicParams> = section(obj, "tectonics")?;
+        let keyframes: Option<KeyframeParams> = section(obj, "keyframes")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
-        let schema = match obj.get("schema") {
-            None => PRESET_SCHEMA,
-            Some(v) => v
-                .as_u64()
-                .filter(|&s| s == u64::from(PRESET_SCHEMA))
-                .ok_or_else(|| {
-                    CoreError::preset(
-                        "$.schema",
-                        format!("this build reads schema {PRESET_SCHEMA}"),
-                    )
-                })? as u32,
-        };
-        let name = match obj.get("name") {
-            None => "planet".to_owned(),
-            Some(v) => v
-                .as_str()
-                .filter(|s| {
-                    !s.is_empty()
-                        && s.len() <= 64
-                        && s.chars()
-                            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
-                })
-                .ok_or_else(|| CoreError::preset("$.name", "1–64 of [A-Za-z0-9_-]"))?
-                .to_owned(),
-        };
         let seed = match obj.get("seed") {
             None => 1,
             Some(v) => v
@@ -504,12 +463,12 @@ impl PlanetPreset {
                 .ok_or_else(|| CoreError::preset("$.seed", "expected an integer ≥ 0"))?,
         };
         let preset = PlanetPreset {
-            schema,
-            name,
+            name: name.unwrap_or("planet").to_owned(),
             seed,
             planet: planet.ok_or_else(|| missing("planet"))?,
             scale: scale.ok_or_else(|| missing("scale"))?,
-            timeline: timeline.ok_or_else(|| missing("timeline"))?,
+            timeline,
+            keyframes: keyframes.unwrap_or_default(),
             resolution: resolution.ok_or_else(|| missing("resolution"))?,
             tectonics: tectonics.unwrap_or_default(),
         };
@@ -543,13 +502,6 @@ impl PlanetPreset {
         )?;
         let s = &self.scale;
         check(
-            s.circumference_blocks >= 1024
-                && s.circumference_blocks <= 1 << 17
-                && s.circumference_blocks.is_multiple_of(64),
-            "$.scale.circumference_blocks",
-            "must be a multiple of 64 in [1024, 131072]",
-        )?;
-        check(
             s.m_per_block_h > 0.0,
             "$.scale.m_per_block_h",
             "must be > 0",
@@ -564,22 +516,11 @@ impl PlanetPreset {
             "$.scale.sea_level_y",
             "must lie between min_y and max_y",
         )?;
-        let t = &self.timeline;
-        if let Some(len) = t.length_myr {
-            check(
-                len.is_finite() && (2.0..=5000.0).contains(&len),
-                "$.timeline.length_myr",
-                "must be in [2, 5000]",
-            )?;
-        }
+        let kf = &self.keyframes;
+        check(kf.every_myr > 0.0, "$.keyframes.every_myr", "must be > 0")?;
         check(
-            t.keyframe_every_myr > 0.0,
-            "$.timeline.keyframe_every_myr",
-            "must be > 0",
-        )?;
-        check(
-            (16..=4096).contains(&t.keyframe_size[0]) && (8..=4096).contains(&t.keyframe_size[1]),
-            "$.timeline.keyframe_size",
+            (16..=4096).contains(&kf.size[0]) && (8..=4096).contains(&kf.size[1]),
+            "$.keyframes.size",
             "width in [16, 4096], height in [8, 4096]",
         )?;
         let r = &self.resolution;
@@ -612,6 +553,8 @@ impl PlanetPreset {
             k.collision_threshold_km,
             "$.tectonics.collision_threshold_km",
         )?;
+        pos(k.slab_pull_relax_myr, "$.tectonics.slab_pull_relax_myr")?;
+        pos(k.slab_pull_front_km, "$.tectonics.slab_pull_front_km")?;
         check(
             k.subduction_peak_km > 0.0 && k.subduction_peak_km < k.subduction_distance_km,
             "$.tectonics.subduction_peak_km",
@@ -661,33 +604,24 @@ impl PlanetPreset {
                 "[min, max] with min ≤ max",
             )?;
         }
-        check(
-            (0.0..=1.0).contains(&k.min_plate_area_frac),
-            "$.tectonics.min_plate_area_frac",
-            "must be in [0, 1]",
-        )?;
-        check(
-            (0.0..=1.0).contains(&k.trench_relax),
-            "$.tectonics.trench_relax",
-            "must be in [0, 1]",
-        )?;
-        check(
-            (0.0..=1.0).contains(&k.lip_probability),
-            "$.tectonics.lip_probability",
-            "must be in [0, 1]",
-        )?;
+        for (v, key) in [
+            (k.min_plate_area_frac, "$.tectonics.min_plate_area_frac"),
+            (k.trench_relax, "$.tectonics.trench_relax"),
+            (k.lip_probability, "$.tectonics.lip_probability"),
+        ] {
+            check((0.0..=1.0).contains(&v), key, "must be in [0, 1]")?;
+        }
         Ok(())
     }
 
-    /// The canonical JSON (what `preset.json` and checkpoints store).
+    /// The body's canonical JSON; `Preset::to_json` adds the header (schema, name, description,
+    /// placeholder, timeline).
     pub fn to_json(&self) -> Value {
         json!({
-            "schema": self.schema,
-            "name": self.name,
             "seed": self.seed,
             "planet": self.planet,
             "scale": self.scale,
-            "timeline": self.timeline,
+            "keyframes": self.keyframes,
             "resolution": self.resolution,
             "tectonics": self.tectonics,
         })
@@ -695,159 +629,127 @@ impl PlanetPreset {
 
     /// The chosen start, or the error a run reports when the player has not chosen one.
     pub fn start(&self) -> Result<StartConfig, CoreError> {
-        self.timeline.start.ok_or_else(|| {
+        self.timeline.map(|t| t.start).ok_or_else(|| {
             CoreError::preset(
                 "$.timeline.start",
-                "choose a start configuration: supercontinent, scattered or random \
+                "choose a start configuration: supercontinent, scattered_continents or random \
                  (there is no default story)",
-            )
-        })
-    }
-
-    /// The chosen length in Myr, or the error a run reports when none was chosen.
-    pub fn length_myr(&self) -> Result<f64, CoreError> {
-        self.timeline.length_myr.ok_or_else(|| {
-            CoreError::preset(
-                "$.timeline.length_myr",
-                "choose a timeline length in Myr (there is no default story)",
             )
         })
     }
 
     /// Checks that everything a run needs is chosen.
     pub fn check_runnable(&self) -> Result<(), CoreError> {
-        self.start()?;
-        self.length_myr()?;
-        Ok(())
+        self.start().map(|_| ())
+    }
+
+    /// The history's length in Myr (0 before a timeline is chosen).
+    pub fn length_myr(&self) -> f64 {
+        self.timeline.map_or(0.0, |t| t.length_myr)
     }
 
     /// Plate steps of the run: length / δt, rounded (δt is stretched to fit).
     pub fn plate_steps(&self) -> u64 {
-        let len = self.timeline.length_myr.unwrap_or(0.0);
-        (len / self.tectonics.time_step_myr).round().max(1.0) as u64
+        (self.length_myr() / self.tectonics.time_step_myr)
+            .round()
+            .max(1.0) as u64
     }
 
     /// Years at the start of the history (negative).
     pub fn t_start_years(&self) -> f64 {
-        -self.timeline.length_myr.unwrap_or(0.0) * 1.0e6
+        -self.length_myr() * 1.0e6
     }
-}
-
-/// Applies the timeline choices a CLI or server passes beside a preset (`--start`,
-/// `--timeline-myr`) to preset JSON, returning the edited JSON. A dummy preset is returned as is.
-pub fn with_timeline(
-    json: &str,
-    start: Option<&str>,
-    length_myr: Option<f64>,
-) -> Result<String, CoreError> {
-    if start.is_none() && length_myr.is_none() {
-        return Ok(json.to_owned());
-    }
-    let mut v: Value = serde_json::from_str(json)
-        .map_err(|e| CoreError::preset("$", format!("not valid JSON: {e}")))?;
-    let obj = v
-        .as_object_mut()
-        .ok_or_else(|| CoreError::preset("$", "expected a JSON object"))?;
-    if obj.contains_key("dummy") {
-        return Err(CoreError::preset(
-            "$.dummy",
-            "the dummy preset has no timeline to choose",
-        ));
-    }
-    let timeline = obj
-        .entry("timeline")
-        .or_insert_with(|| json!({}))
-        .as_object_mut()
-        .ok_or_else(|| CoreError::preset("$.timeline", "expected a JSON object"))?;
-    if let Some(s) = start {
-        if StartConfig::parse(s).is_none() {
-            return Err(CoreError::preset(
-                "$.timeline.start",
-                format!("{s:?} is not supercontinent, scattered or random"),
-            ));
-        }
-        timeline.insert("start".into(), json!(s));
-    }
-    if let Some(l) = length_myr {
-        timeline.insert("length_myr".into(), json!(l));
-    }
-    Ok(v.to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::preset::{Preset, PresetBody, with_timeline};
 
-    fn parse(json: &str) -> Result<PlanetPreset, CoreError> {
-        let v: Value = serde_json::from_str(json).unwrap();
-        PlanetPreset::from_obj(v.as_object().unwrap())
+    fn planet(json: &str) -> PlanetPreset {
+        match Preset::from_json(json).unwrap().body {
+            PresetBody::Planet(p) => *p,
+            other => panic!("not a planet preset: {other:?}"),
+        }
     }
 
     fn path_of(json: &str) -> String {
-        match parse(json) {
+        match Preset::from_json(json) {
             Err(CoreError::PresetInvalid { path, .. }) => path,
             other => panic!("expected PresetInvalid, got {other:?}"),
         }
     }
 
     #[test]
-    fn builtins_parse_and_need_a_timeline() {
-        for (name, json) in BUILTIN {
-            let p = parse(json).unwrap_or_else(|e| panic!("{name}: {e}"));
+    fn plate_presets_parse_and_need_a_timeline() {
+        for (name, json) in PLATES_BUILTIN {
+            let p = planet(json);
             assert_eq!(p.name, name);
-            assert!(p.timeline.start.is_none() && p.timeline.length_myr.is_none());
+            assert!(p.timeline.is_none(), "{name}: no default story");
             assert!(matches!(
                 p.check_runnable(),
                 Err(CoreError::PresetInvalid { ref path, .. }) if path == "$.timeline.start"
             ));
             // The canonical JSON parses back to the same preset.
-            let again = parse(&p.to_json().to_string()).unwrap();
-            assert_eq!(again, p);
+            let pr = Preset::from_json(json).unwrap();
+            assert_eq!(Preset::from_json(&pr.to_json().to_string()).unwrap(), pr);
+            assert_eq!(pr.circumference(), p.scale.circumference_blocks);
         }
-        let quick = parse(builtin("earthlike_quick_16k").unwrap()).unwrap();
+        let quick = planet(plates_builtin("plates_quick_16k").unwrap());
         assert_eq!(quick.resolution.l0_samples, 100_000);
         assert_eq!(quick.resolution.l1_r, 16);
         assert_eq!(quick.tectonics, TectonicParams::default());
         assert!((quick.scale.radius_m() - 782_278.4).abs() < 1.0);
-        let full = parse(builtin("earthlike_full_16k").unwrap()).unwrap();
+        let full = planet(plates_builtin("plates_full_16k").unwrap());
         assert_eq!(full.resolution.l0_samples, 250_000);
     }
 
     #[test]
     fn timeline_choices_apply() {
         let json = with_timeline(
-            builtin("earthlike_quick_16k").unwrap(),
-            Some("scattered"),
+            plates_builtin("plates_quick_16k").unwrap(),
+            Some("scattered_continents"),
             Some(500.0),
         )
         .unwrap();
-        let p = parse(&json).unwrap();
+        let p = planet(&json);
         p.check_runnable().unwrap();
-        assert_eq!(p.start().unwrap(), StartConfig::Scattered);
+        assert_eq!(p.start().unwrap(), StartConfig::ScatteredContinents);
         assert_eq!(p.plate_steps(), 250);
         assert_eq!(p.t_start_years(), -5.0e8);
-        assert!(with_timeline("{}", Some("pangaea"), None).is_err());
     }
 
     #[test]
     fn errors_name_the_key() {
-        assert_eq!(path_of("{}"), "$");
         assert_eq!(path_of(r#"{"planet":{}}"#), "$.planet");
-        assert_eq!(path_of(r#"{"x":1}"#), "$.x");
         let base = with_timeline(
-            builtin("earthlike_quick_16k").unwrap(),
+            plates_builtin("plates_quick_16k").unwrap(),
             Some("random"),
             Some(100.0),
         )
         .unwrap();
-        let mut v: Value = serde_json::from_str(&base).unwrap();
-        v["tectonics"]["nope"] = json!(1);
-        assert_eq!(path_of(&v.to_string()), "$.tectonics");
-        let mut v: Value = serde_json::from_str(&base).unwrap();
-        v["planet"]["ocean_fraction"] = json!(1.5);
-        assert_eq!(path_of(&v.to_string()), "$.planet.ocean_fraction");
-        let mut v: Value = serde_json::from_str(&base).unwrap();
-        v["resolution"]["l1_r"] = json!(7);
-        assert_eq!(path_of(&v.to_string()), "$.resolution.l1_r");
+        let edit = |f: &dyn Fn(&mut Value)| {
+            let mut v: Value = serde_json::from_str(&base).unwrap();
+            f(&mut v);
+            path_of(&v.to_string())
+        };
+        assert_eq!(edit(&|v| v["tectonics"]["nope"] = json!(1)), "$.tectonics");
+        assert_eq!(
+            edit(&|v| v["planet"]["ocean_fraction"] = json!(1.5)),
+            "$.planet.ocean_fraction"
+        );
+        assert_eq!(
+            edit(&|v| v["resolution"]["l1_r"] = json!(7)),
+            "$.resolution.l1_r"
+        );
+        assert_eq!(edit(&|v| v["scale"]["radius"] = json!(1)), "$.scale.radius");
+        assert_eq!(
+            edit(&|v| v["keyframes"]["every_myr"] = json!(0)),
+            "$.keyframes.every_myr"
+        );
+        assert_eq!(
+            edit(&|v| v["dummy"] = json!({"steps": 1, "sleep_ms": 0})),
+            "$"
+        );
     }
 }

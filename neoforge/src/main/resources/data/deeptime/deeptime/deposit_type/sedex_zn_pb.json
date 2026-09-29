@@ -1,0 +1,92 @@
+{
+  "id": "deeptime:sedex_zn_pb",
+  "family": "basin_brine",
+  "site_kind": "deposit",
+  "description": "Sedimentary exhalative (clastic-dominated) zinc-lead: stratiform sulfide in euxinic black shale of a rift or sag basin beside a thick–thin lithosphere step, zoned Cu → Pb → Zn away from its feeder.",
+  "products": [
+    {"material": "c:zinc", "grade_key": "zn_pct", "role": "primary"},
+    {"material": "c:lead", "grade_key": "pb_pct", "role": "coproduct"},
+    {"material": "c:silver", "grade_key": "ag_gpt", "role": "byproduct"},
+    {"material": "c:copper", "grade_key": "cu_pct", "role": "byproduct"}
+  ],
+  "components": {
+    "combine": "product",
+    "source": [
+      {"field": "deeptime:euxinic_basin", "curve": [[0.1, 0], [0.5, 1]], "note": "euxinic, reduced basin (Leach et al. 2010)"}
+    ],
+    "driver": [
+      {"field": "deeptime:rift_subsidence_m_myr", "curve": [[10, 0], [100, 1]], "note": "active rift or sag subsidence with growth faults (design thresholds)"},
+      {"field": "deeptime:heat_flow_mw_m2", "curve": [[50, 0.3], [80, 1]], "note": "basinal brines heated to 100–200 °C (SIR 2010-5070-N p. 2); thresholds are design"}
+    ],
+    "pathway": [
+      {"field": "deeptime:dist_litho_step_km", "curve": [[0, 1], [200, 1], [400, 0]], "note": "85 % of sediment-hosted base metals lie within 200 km of a thick–thin lithosphere step (Hoggard et al. 2020); the taper is design"},
+      {"field": "deeptime:fault_density", "curve": [[0, 0.3], [0.5, 1]], "note": "synsedimentary faults as feeders (design)"}
+    ],
+    "trap": []
+  },
+  "clock_gates": ["deeptime:clock/oxygenated_oceans"],
+  "integration_myr": 10,
+  "formation_time": "peak",
+  "hosts": {
+    "any_of": ["black_shale", "shale", "mudstone"],
+    "host_bias": {"dolostone": 1.5}
+  },
+  "causes": {
+    "source": ["deeptime:basin_subsidence"],
+    "driver": ["deeptime:rift_onset", "deeptime:basin_subsidence"],
+    "pathway": ["deeptime:rift_onset"],
+    "preservation": ["deeptime:erosion_pulse", "deeptime:orogeny_phase"]
+  },
+  "cause_radius_km": 600,
+  "sizing": {
+    "grade_tonnage": "sedex_zn_pb",
+    "tonnage_mt": {"p90": 5.0, "p50": 25.0, "p10": 300.0},
+    "grades": {
+      "zn_pct": {"p90": 2.3, "p50": 8.0, "p10": 14.0, "presence": 1.0},
+      "pb_pct": {"p90": 0.88, "p50": 2.1, "p10": 5.3, "presence": 1.0},
+      "ag_gpt": {"p90": 0.0, "p50": 21.0, "p10": 71.0, "presence": 0.72},
+      "cu_pct": {"p90": 0.0, "p50": 0.0, "p10": 1.0, "presence": 0.28}
+    },
+    "correlations": [
+      ["zn_pct", "pb_pct", 0.72]
+    ],
+    "ore_density_t_m3": 3.2,
+    "density_per_1e5km2": {"p90": 0.5, "p50": 2, "p10": 8},
+    "min_separation_m": 2000,
+    "tract_threshold": 0.2,
+    "clustering": {"model": "thomas", "camp_spacing_km": 50, "cluster_radius_km": 15}
+  },
+  "geometry": {
+    "shape": "sheet",
+    "aspect": [1.0, 0.03, 1.0],
+    "dip_deg": [0, 10],
+    "rock_class": "black_shale",
+    "zoning": [
+      {"zone": "feeder_cu", "d": [0.0, 0.25], "material": "c:copper", "grade_mult": 1.0, "density": 0.08},
+      {"zone": "proximal_pb", "d": [0.1, 0.55], "material": "c:lead", "grade_mult": 1.3, "density": 0.2},
+      {"zone": "proximal_ag", "d": [0.1, 0.55], "material": "c:silver", "grade_mult": 1.0, "density": 0.02},
+      {"zone": "distal_zn", "d": [0.3, 1.0], "material": "c:zinc", "grade_mult": 1.1, "density": 0.35}
+    ],
+    "extra_bodies": [],
+    "children": []
+  },
+  "preservation": {
+    "formation_depth_m": 100,
+    "vertical_extent_m": 20,
+    "erosion_behavior": "truncate",
+    "resistates": []
+  },
+  "minecraft": {
+    "coe_vein": "createoreexcavation:ore_vein_type/zinc",
+    "cdg_reservoir": false,
+    "ore_block_policy": "ev_then_vanilla"
+  },
+  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 4.0, "richness_mult": 1.0},
+  "requires_fields": {},
+  "notes": [
+    "Sizing: USGS OFR 2009-1252 (Singer, Berger & Moring 2009), model SHam (shale-hosted, amagmatic), n = 25, Table 2 p. 10: tonnage 5 / 25 / 300 Mt, Zn 2.3 / 8 / 14 %, Pb 0.88 / 2.1 / 5.3 %, Ag 0 / 21 / 71 g/t, Cu 0 / 0 / 1.0 % (unreported grades counted as zero); Zn–Pb r = 0.72 (text); 2 km same-deposit rule (p. 2). All 25 SHam deposits are labelled SEDEX (they are 25 of the report's 179 SEDEX-labelled deposits). presence = n_reported / 25 from the report's database. Bulletin 1693 model 31a (n = 45) is in data/usgs/sedex_zn_pb.json extra. Au (4 of 25) is left out.",
+    "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 3.2 (sulfide-rich shale), density_per_1e5km2 0.5 / 2 / 8 (no USGS SEDEX deposit density exists), formation_depth_m 100 (syn-sedimentary to early diagenetic).",
+    "Geometry: stratiform sheet; aspect 0.03 from the database's median ore area 0.86 km² and ore bodies up to a few tens of metres thick (B1693 m31a); the Cu → Pb → Zn lateral zoning away from the feeder (Leach et al. 2010).",
+    "Create stones (decisions file): dolostone (asurine → zinc) is a preferred host at 1.5; the sheet turns its host to black shale."
+  ]
+}

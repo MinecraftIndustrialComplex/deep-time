@@ -1,0 +1,20 @@
+{
+  "deposits_synthetic": {
+    "seed": 11,
+    "circumference": 4096,
+    "grid_r": 16,
+    "t_start_years": -500000000.0,
+    "t_end_years": 0.0,
+    "snapshot_every_years": 25000000.0,
+    "keyframe_every_years": 100000000.0,
+    "keyframe_size": [256, 128],
+    "deposits": {
+      "count_mult": 25.0,
+      "province": "weak",
+      "essentials": [
+        {"material": "c:iron", "min_sites_per_region": 1, "region_blocks": 2048, "exposed": true},
+        {"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 2048, "exposed": false}
+      ]
+    }
+  }
+}
