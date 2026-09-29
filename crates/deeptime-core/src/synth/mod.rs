@@ -126,6 +126,13 @@ impl Strata {
         }
     }
 
+    /// The strata called `name` (`placeholder`, `every-class`).
+    pub fn from_name(name: &str) -> Option<Strata> {
+        [Strata::Placeholder, Strata::EveryClass]
+            .into_iter()
+            .find(|s| s.name() == name)
+    }
+
     /// The class list written to `strata/classes.json`.
     pub fn classes(self) -> &'static [&'static str] {
         match self {
@@ -155,15 +162,21 @@ impl Strata {
 pub enum Kind {
     WrapTest,
     LakeTest,
+    /// A synthetic deposit world's terrain (P1-15): the deposit history's present elevation
+    /// (`crate::deposits::synthetic::HistoryTerrain`). Needs the history, so it is baked through
+    /// [`build_with`] only and is not in [`Kind::ALL`].
+    DepositHistory,
 }
 
 impl Kind {
+    /// The kinds [`build`] makes from a name alone.
     pub const ALL: [Kind; 2] = [Kind::WrapTest, Kind::LakeTest];
 
     pub fn name(self) -> &'static str {
         match self {
             Kind::WrapTest => "wrap-test",
             Kind::LakeTest => "lake-test",
+            Kind::DepositHistory => "deposit-history",
         }
     }
 
@@ -202,12 +215,34 @@ pub struct SynthWorld {
 
 /// Samples a synthetic world of `kind` with `strata` horizons at circumference `c`.
 pub fn build(kind: Kind, strata: Strata, c: u32, codec: Codec) -> Result<SynthWorld, FormatError> {
-    check_circumference(c).map_err(|e| FormatError::Invalid(format!("--size {c}: {e}")))?;
     let terrain: Box<dyn Terrain> = match kind {
         Kind::WrapTest => Box::new(WrapTest::new(c)),
         Kind::LakeTest => Box::new(LakeTest { c }),
+        Kind::DepositHistory => {
+            return Err(FormatError::Invalid(
+                "deposit-history needs its history: bake it with build_with".into(),
+            ));
+        }
     };
-    let terrain = terrain.as_ref();
+    build_with(terrain.as_ref(), kind, strata, c, codec)
+}
+
+/// Samples a synthetic world of `terrain` (named `kind`) with `strata` horizons at circumference
+/// `c`.
+pub fn build_with(
+    terrain: &dyn Terrain,
+    kind: Kind,
+    strata: Strata,
+    c: u32,
+    codec: Codec,
+) -> Result<SynthWorld, FormatError> {
+    check_circumference(c).map_err(|e| FormatError::Invalid(format!("--size {c}: {e}")))?;
+    if terrain.circumference() != c {
+        return Err(FormatError::Invalid(format!(
+            "the terrain's circumference {} is not {c}",
+            terrain.circumference()
+        )));
+    }
 
     let l3 = GridDesc::for_planet("L3", c, R_L3)?;
     let l2 = GridDesc::for_planet("L2", c, R_L2)?;
@@ -319,7 +354,7 @@ impl SynthWorld {
             json!({
                 "kind": self.kind.name(),
                 "sampling": "cell (i, j) holds the value at block (origin_block_x + i·r, origin_block_z + j·r)",
-                "elevation": "round(16·H(x, z)); H is AnalyticTestTerrain's closed form for wrap-test",
+                "elevation": "round(16·H(x, z)); H is AnalyticTestTerrain's closed form for wrap-test, and 63 + h/20 of the deposit history's present elevation h (m, bilinear on L1) for deposit-history",
                 "climate": "round(10000·p) of AnalyticTestTerrain.raster's formulas, with H from this kind's terrain"
             }),
         );

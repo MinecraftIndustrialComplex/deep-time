@@ -235,6 +235,17 @@ pub fn is_surface_material(path: &str) -> bool {
 /// dropped (`minecraft:deepslate_iron_ore` → `iron`), `ancient_debris` → `netherite`,
 /// `raw_*_block` → the metal. None for anything else.
 pub fn ore_material(name: &str) -> Option<String> {
+    // Excavated Variants' generated blocks (P1-15): `excavated_variants:<ore ns>__<ore path>__
+    // <stone ns>__<stone path>` with `/` as `_`, e.g. `excavated_variants__minecraft_copper_ore__
+    // excavated_variants__minecraft_granite`: the material is the ore path's last word before `_ore`.
+    if name.starts_with("excavated_variants:") {
+        let parts: Vec<&str> = path_of(name).split("__").collect();
+        if parts.len() == 4 {
+            let ore = parts[1].strip_suffix("_ore").unwrap_or(parts[1]);
+            let m = ore.rsplit('_').next().unwrap_or(ore);
+            return (!m.is_empty()).then(|| m.to_owned());
+        }
+    }
     let path = path_of(name);
     if path == "ancient_debris" {
         return Some("netherite".into());
@@ -342,6 +353,18 @@ mod tests {
         assert_eq!(
             ore_material("minecraft:raw_copper_block").as_deref(),
             Some("copper")
+        );
+        assert_eq!(
+            ore_material(
+                "excavated_variants:excavated_variants__minecraft_copper_ore__excavated_variants__minecraft_granite"
+            )
+            .as_deref(),
+            Some("copper")
+        );
+        assert_eq!(
+            ore_material("excavated_variants:excavated_variants__create_zinc_ore__excavated_variants__create_asurine")
+                .as_deref(),
+            Some("zinc")
         );
         assert_eq!(
             ore_material("minecraft:ancient_debris").as_deref(),

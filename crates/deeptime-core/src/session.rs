@@ -123,6 +123,7 @@ pub fn check_content(json: &str) -> Result<(), CoreError> {
 pub fn estimate(preset_json: &str, content_json: &str) -> Result<String, CoreError> {
     let preset = Preset::from_json(preset_json)?;
     check_content(content_json)?;
+    let preset = preset.with_content(content_json)?;
     let mut peak = 0u64;
     let stages: Vec<Value> = preset
         .stages()
@@ -298,6 +299,9 @@ impl Session {
         next_stage: usize,
         stage_state: &[u8],
     ) -> Result<Session, CoreError> {
+        // The content bundle's essentials replace the preset's (P1-15); the canonical preset the
+        // run records (preset.json, checkpoints) therefore carries the list it ran with.
+        let preset = preset.with_content(content_json)?;
         let threads = if options.threads == 0 {
             std::thread::available_parallelism().map_or(1, |n| n.get())
         } else {
@@ -765,10 +769,42 @@ impl Session {
 
         // A placeholder preset's terrain (P1-13): the synthetic layers P0-09's `synth` writes,
         // until the bake of P1-08 exists.
-        if let Some(kind) = self.preset.synth() {
+        if let Some(bake) = self.preset.bake() {
             let started = Instant::now();
-            let baked =
-                crate::synth::build(kind, crate::synth::Strata::Placeholder, c, Codec::Lz4Block)?;
+            let (kind, baked) = match bake {
+                crate::preset::Bake::Analytic(kind) => (
+                    kind,
+                    crate::synth::build(
+                        kind,
+                        crate::synth::Strata::Placeholder,
+                        c,
+                        Codec::Lz4Block,
+                    )?,
+                ),
+                // P1-15: a synthetic deposit world's terrain follows the history's present
+                // elevation, and its spawn candidates are ranked by the essentials.
+                crate::preset::Bake::DepositHistory {
+                    params,
+                    strata,
+                    essentials,
+                } => {
+                    let history = crate::deposits::synthetic::SyntheticHistory::new(params)?;
+                    let terrain = crate::deposits::synthetic::HistoryTerrain::new(&history);
+                    let kind = crate::synth::Kind::DepositHistory;
+                    let mut baked =
+                        crate::synth::build_with(&terrain, kind, strata, c, Codec::Lz4Block)?;
+                    if let Some(ranked) = crate::deposits::spawn::ranked_candidates(
+                        &baked.layers[0],
+                        &baked.layers[1],
+                        m.scale.sea_level_y,
+                        &world.sites,
+                        &essentials,
+                    ) {
+                        baked.spawn = ranked;
+                    }
+                    (kind, baked)
+                }
+            };
             let bytes = baked.write_into(dir, &mut m)?;
             self.log.push(
                 Level::Info,
