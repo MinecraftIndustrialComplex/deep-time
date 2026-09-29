@@ -91,58 +91,13 @@ impl WorldData {
             .map_or(0, |s| s.desc.stack_depth.unwrap_or(0) as usize)
     }
 
-    /// Horizon `k`'s top at cell (i, j) in blocks, `RasterSampler.horizonTop`: i wraps, j clamps,
-    /// NaN where the horizon is unused.
-    fn horizon_top(s: &deeptime_format::LoadedLayer, i: i64, j: i64, k: u32) -> f64 {
-        let g = &s.desc.grid;
-        let (top, _) = s.horizon(g.wrap_i(i), g.clamp_j(j), k);
-        if top == i16::MIN {
-            f64::NAN
-        } else {
-            f64::from(top) * s.desc.scale + s.desc.offset
-        }
-    }
-
-    /// One column's horizons as `StrataPass.column` (v1, P1-12) builds them: tops bilinear
-    /// between the four surrounding cells (the nearest cell's top where a corner lacks the
-    /// horizon), classes from the nearest cell, integer tops ⌊top⌋ that never rise with depth.
-    /// Top-down (top y, class index); horizon h fills tops[h+1] < y ≤ tops[h], the last one to
-    /// the bottom of the world. The operations follow the Java line by line (same rounding).
+    /// One column's horizons as the strata pass builds them (`StrataPass.column`, through
+    /// `LoadedLayer::stack_at`): top-down (top block y, class index); horizon h fills
+    /// tops[h+1] < y ≤ tops[h], the last one to the bottom of the world. Empty without strata.
     pub fn strata_column(&self, x: i32, z: i32) -> Vec<(i32, u8)> {
-        let Some(s) = &self.strata else {
-            return Vec::new();
-        };
-        let g = &s.desc.grid;
-        let c = self.circumference;
-        let k = s.desc.stack_depth.unwrap_or(0);
-        // Java: Math.floorMod(x + c / 2, c) - c / 2 in int arithmetic, then widened.
-        let wx = ((i64::from(x) + c / 2).rem_euclid(c) - c / 2) as f64;
-        let u = (wx - g.origin_block_x as f64) / f64::from(g.r);
-        let v = (f64::from(z) - g.origin_block_z as f64) / f64::from(g.r);
-        let (i_n, j_n) = ((u + 0.5).floor() as i64, (v + 0.5).floor() as i64);
-        let (i0, j0) = (u.floor() as i64, v.floor() as i64);
-        let (fu, fv) = (u - i0 as f64, v - j0 as f64);
         let mut out = Vec::new();
-        let mut prev = i32::MAX;
-        for h in 0..k {
-            let (_, cls) = s.horizon(g.wrap_i(i_n), g.clamp_j(j_n), h);
-            let nearest = Self::horizon_top(s, i_n, j_n, h);
-            if cls == 255 || nearest.is_nan() {
-                break;
-            }
-            let t00 = Self::horizon_top(s, i0, j0, h);
-            let t10 = Self::horizon_top(s, i0 + 1, j0, h);
-            let t01 = Self::horizon_top(s, i0, j0 + 1, h);
-            let t11 = Self::horizon_top(s, i0 + 1, j0 + 1, h);
-            let top = if t00.is_nan() || t10.is_nan() || t01.is_nan() || t11.is_nan() {
-                nearest
-            } else {
-                (t00 + (t10 - t00) * fu) * (1.0 - fv) + (t01 + (t11 - t01) * fu) * fv
-            };
-            // Java's (int) Math.floor saturates like Rust's `as`.
-            let t = (top.floor() as i32).min(prev);
-            out.push((t, cls));
-            prev = t;
+        if let Some(s) = &self.strata {
+            s.stack_at(i64::from(x), i64::from(z), &mut out);
         }
         out
     }

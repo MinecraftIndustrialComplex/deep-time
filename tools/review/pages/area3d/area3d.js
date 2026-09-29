@@ -696,7 +696,20 @@ async function load(src, label) {
     const [x, y, z] = params.get('pick').split(',').map(Number);
     const i = colOf(x);
     if (i != null) setTimeout(() => select([i, y - A.y0 - A.yLo, z - A.h.box.z0]), 0);
+  } else if (params.get('pickcol')) {
+    // The column's top block (the workbench's click-to-inspect lands here).
+    const [x, z] = params.get('pickcol').split(',').map(Number);
+    const i = colOf(x), zk = z - A.h.box.z0;
+    if (i != null && zk >= 0 && zk < A.D) {
+      const base = (zk * A.W + i) * A.Hc;
+      let yy = A.Hc - 1;
+      while (yy > 0 && A.h.blocks[A.entBlock[A.dense[base + yy]]].cat === 'air') yy--;
+      setTimeout(() => select([i, yy, zk]), 0);
+    }
   }
+  const note = A.h.meta?.note;
+  $('note').hidden = !note;
+  $('note').textContent = note || '';
   const st = A.h.stats;
   A.statusLine = `${label || ''}${label ? ' · ' : ''}${(bytes / 1e6).toFixed(2)} MB · ${fmt(st.non_air)} blocks · ${A.W}×${A.D}×${A.H} · click a block`;
   $('subtitle').textContent = `x ${A.h.box.x0}..${A.h.box.x1 - 1}, z ${A.h.box.z0}..${A.h.box.z1 - 1}` +
