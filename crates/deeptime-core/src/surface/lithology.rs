@@ -3,7 +3,8 @@
 //! (`neoforge/src/main/resources/data/deeptime/deeptime/rock_class/*.json`, P1-12), compiled in, in
 //! the order of `synth::EVERY_CLASS` (a class's index is its position there; the strata log
 //! stores it as a u16). The surface uses `erodibility` (a multiplier on the stream-power K),
-//! `diffusivity` (on the hillslope κ), `family` and `groups` (provenance), and `tags`.
+//! `diffusivity` (on the hillslope κ), `family` and `groups` (provenance), and `tags`; the
+//! structure stage (P1-07) `metamorphic_path`, `lithifies_to`, `loose_equivalent` and `groups`.
 //!
 //! Datapack overrides of the classes reach the core with the content bundle (plan §5.4); until the
 //! bundle is wired to the stages the built-in table is used (the same numbers the jar ships).
@@ -97,6 +98,12 @@ struct File {
     erodibility: f64,
     diffusivity: f64,
     #[serde(default)]
+    metamorphic_path: Vec<String>,
+    #[serde(default)]
+    lithifies_to: Option<String>,
+    #[serde(default)]
+    loose_equivalent: Option<String>,
+    #[serde(default)]
     tags: Vec<String>,
 }
 
@@ -112,6 +119,14 @@ pub struct RockClass {
     /// 2 sedimentary (recycled), 3 metamorphic.
     pub source_family: u8,
     pub tags: Vec<String>,
+    /// The group tags (`deeptime:rock/carbonate`, …).
+    pub groups: Vec<String>,
+    /// The prograde metamorphic sequence, as class indices.
+    pub metamorphic_path: Vec<u16>,
+    /// What a loose class becomes once buried (P1-07).
+    pub lithifies_to: Option<u16>,
+    /// How the young, shallow part of a deposit of this class is shown (P1-07).
+    pub loose_equivalent: Option<u16>,
 }
 
 /// The table, in `EVERY_CLASS` order.
@@ -138,6 +153,13 @@ pub fn table() -> &'static [RockClass] {
                     _ if felsic => 0,
                     _ => 1,
                 };
+                let resolve = |c: &str| {
+                    EVERY_CLASS
+                        .iter()
+                        .position(|&x| x == c)
+                        .unwrap_or_else(|| panic!("rock_class/{name}.json names {c}"))
+                        as u16
+                };
                 RockClass {
                     name,
                     family: f.family,
@@ -146,6 +168,10 @@ pub fn table() -> &'static [RockClass] {
                     diffusivity: f.diffusivity,
                     source_family,
                     tags: f.tags,
+                    metamorphic_path: f.metamorphic_path.iter().map(|c| resolve(c)).collect(),
+                    lithifies_to: f.lithifies_to.as_deref().map(resolve),
+                    loose_equivalent: f.loose_equivalent.as_deref().map(resolve),
+                    groups: f.groups,
                 }
             })
             .collect()
@@ -253,6 +279,10 @@ mod tests {
         assert!(has_tag(index("sandstone"), "reservoir"));
         assert!(has_tag(index("black_shale"), "source_rock"));
         assert!(t.iter().all(|c| c.erodibility > 0.0 && c.diffusivity > 0.0));
+        let shale = &t[usize::from(index("shale"))];
+        assert_eq!(shale.metamorphic_path.first(), Some(&index("slate")));
+        assert_eq!(shale.loose_equivalent, Some(index("mud")));
+        assert_eq!(t[usize::from(index("sand"))].lithifies_to, Some(index("sandstone")));
         let _ = Classes::get();
         let _ = t[0].density_kg_m3;
     }

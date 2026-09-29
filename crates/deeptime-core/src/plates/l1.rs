@@ -15,7 +15,8 @@
 //! Scalar fields interpolate barycentrically; categorical ones (plate, crust type, orogeny type,
 //! regime) and the fold trend take the nearest sample. Layers (world.fields): the keyframe layers
 //! `elevation` (block y), `plates` (a colour index of the plate id), `crust_age` (Myr, −1 on
-//! continental crust) and `regime`, and the outputs P1-04 and later stages read: `plates/*`.
+//! continental crust) and `regime`, and the outputs P1-04 and later stages read: `plates/*`
+//! (P1-07 added the nearest sample's rock pools, `plates/pool/*`, for the basement columns).
 
 use glam::{DQuat, DVec3};
 use rayon::prelude::*;
@@ -211,6 +212,18 @@ pub fn sample(
             ]
         })
         .collect();
+    // The rock pools of the nearest sample (P1-07's basement columns, `structure::columns`); gap
+    // cells get the fresh ridge crust the next resampling makes.
+    let pools: Vec<[f32; POOL_FIELDS.len()]> = (0..cells)
+        .into_par_iter()
+        .map(|c| {
+            if info[c].mode == GAP {
+                super::pools::oceanic_column()
+            } else {
+                samples[links[c].nearest as usize].pools
+            }
+        })
+        .collect();
     let per_cell: Vec<[f32; 11]> = (0..cells)
         .into_par_iter()
         .map(|c| {
@@ -311,8 +324,28 @@ pub fn sample(
                 .enumerate()
                 .map(|(f, &name)| (name, extra.iter().map(|v| v[f]).collect())),
         )
+        .chain(
+            POOL_FIELDS
+                .iter()
+                .enumerate()
+                .map(|(f, &name)| (name, pools.iter().map(|v| v[f]).collect())),
+        )
         .collect()
 }
+
+/// The L1 fields holding the nearest sample's rock pools, metres, in [`pool`] order
+/// (`plates/pool/<name>_m`; P1-07 builds the basement below the strata log from them).
+///
+/// [`pool`]: super::state::pool
+pub const POOL_FIELDS: [&str; super::state::pool::COUNT] = [
+    "plates/pool/sediment_m",
+    "plates/pool/sedimentary_m",
+    "plates/pool/metamorphic_m",
+    "plates/pool/felsic_plutonic_m",
+    "plates/pool/felsic_volcanic_m",
+    "plates/pool/mafic_volcanic_m",
+    "plates/pool/mafic_plutonic_m",
+];
 
 /// The pools in the order erosion meets them from the top (the surface's basement rock,
 /// `plates/top_pool`): the first holding more than [`TOP_POOL_M`].
