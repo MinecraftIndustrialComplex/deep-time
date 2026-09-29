@@ -14,11 +14,25 @@ The vocabulary (class names, families, groups, stand-ins) is MIC's rock-tag READ
 its Classes table in order, GROUPS its Groups table. `vanilla_fallback` is the class's vanilla member
 there, or the last entry of its fallback list.
 
-The numbers are initial values. density_kg_m3 is a typical dry bulk density (bulk density of the
-loose material for unconsolidated classes). erodibility and diffusivity are relative multipliers on
-the stream-power K and the hillslope diffusivity, with generic crystalline basement (granite, gneiss:
-what "unclassified crust" means) at 1.0. P1-07 tunes all three against the viewer; every file says
-where each value came from.
+density_kg_m3 is a typical dry bulk density (bulk density of the loose material for unconsolidated
+classes). erodibility and diffusivity are relative multipliers on the stream-power K and the hillslope
+diffusivity, with generic crystalline basement (granite, gneiss: what "unclassified crust" means) at
+1.0. P1-12 set them; P1-07 reviewed them against the rock map and meridian cross-sections of the
+coupled pipeline (STATUS.md, P1-07); every file says where each value came from.
+
+P1-07 adds two optional keys that the structure stage reads (crates/deeptime-core/src/structure/):
+`lithifies_to` on unconsolidated classes (what loose material and buried regolith become once
+buried below the lithification depth or older than the lithification age) and `loose_equivalent` on
+the clastic rocks the facies rules lay down (how the young, shallow part of such a deposit is shown:
+sandstone's top as sand). The metamorphic path is the prograde regional sequence the stage steps a
+class along; the temperature of each step is the structure stage's (metamorphism.rs).
+
+`facies_rule` names the setting that forms a class. The Phase 1 core forms these: carbonate_platform,
+dolomitisation, evaporite_basin, euxinic_basin, marine_shelf_mud, floodplain, alluvial_fan,
+peat_swamp (surface/facies.rs), pedogenesis, deep_weathering, tropical_weathering
+(surface/weathering.rs), regional_metamorphism (structure/metamorphism.rs), arc_plutonism, batholith,
+contact_aureole, contact_metasomatism (structure/plutons.rs). The others name settings later stages
+may simulate; the core does not read the key.
 """
 import glob
 import json
@@ -75,7 +89,8 @@ FILLER_EXCEPTIONS = {("coal", "minecraft:stone")}  # README "Coal stand-in (deci
 
 REFERENCE_CLASSES = {"granite", "gneiss"}
 
-TUNED = "initial value, tuned in P1-07"
+TUNED = ("set in P1-12; reviewed in P1-07 against the rock map and meridian cross-sections of "
+         "pipeline_quick_16k and kept (STATUS.md, P1-07)")
 DENSITY_TYPICAL = ("typical value, cf. the rock-density tables of Telford, Geldart & Sheriff 1990 "
                    "(Applied Geophysics, 2nd ed.) and Schön 2015 (Physical Properties of Rocks, 2nd ed.)")
 K_BEDROCK = ("bedrock ranked by rock strength: river incision scales roughly with tensile strength^-2 "
@@ -93,6 +108,23 @@ VF_MEMBER = "vanilla member (MIC rock-tag README, Classes table)"
 VF_FALLBACK = "last fallback entry (MIC rock-tag README, Fallbacks table)"
 
 PELITE = ["slate", "phyllite", "schist", "gneiss"]
+
+# P1-07: what loose material becomes once buried (structure/columns.rs). Buried regolith (the
+# palaeosols of the strata log) lithifies too: soil and saprolite to mudstone (palaeosol claystone),
+# laterite to ironstone. Bauxite stays bauxite (buried bauxites keep their class), and there is no
+# entry for classes without a loose state.
+LITHIFIES_TO = {
+    "soil": "mudstone", "saprolite": "mudstone", "laterite": "ironstone",
+    "gravel": "conglomerate", "sand": "sandstone", "clay": "mudstone", "mud": "shale",
+    "till": "conglomerate", "loess": "mudstone", "volcanic_ash": "tuff",
+}
+# P1-07: how the young, shallow part of a clastic deposit is shown (structure/columns.rs): the
+# facies rules lay down the rock class, and sediment still within the lithification depth and age is
+# its loose equivalent. Red beds show as sand (the sand class holds red sand).
+LOOSE_EQUIVALENT = {
+    "conglomerate": "gravel", "sandstone": "sand", "red_bed": "sand", "mudstone": "clay",
+    "shale": "mud", "black_shale": "mud", "tuff": "volcanic_ash",
+}
 MAFIC = ["greenstone", "amphibolite"]
 
 # One row per class, in the README's Classes-table order.
@@ -487,8 +519,8 @@ CLASSES = [
          d=3.0, d_why="loose, coarse sediment",
          path=["quartzite"], wx=None, facies="fluvial_channel", tags=["porous", "ore_host"],
          vf="minecraft:gravel", vf_from="member",
-         notes="Gravel, alluvium and placer gravel. Its metamorphic path is conglomerate's, for gravel "
-               "buried without a separate lithification step."),
+         notes="Gravel, alluvium and placer gravel. Lithifies to conglomerate on burial; its "
+               "metamorphic path is conglomerate's."),
     dict(name="sand", family="unconsolidated", rho=1600,
          rho_src="judgment: loose quartz sand, about 40% porosity",
          k=9.0, k_why="cohesionless; moves at the lowest flow speeds",
@@ -496,22 +528,23 @@ CLASSES = [
          path=["quartzite"], wx=None, facies=None, tags=["porous", "ore_host"],
          vf="minecraft:sand", vf_from="member",
          notes="Sand, dune sand and heavy-mineral beach sand; laid down by rivers, wind and waves, so no "
-               "single facies rule. Its metamorphic path is sandstone's."),
+               "single facies rule. Lithifies to sandstone on burial; its metamorphic path is sandstone's."),
     dict(name="clay", family="unconsolidated", rho=1600,
          rho_src="judgment: dry bulk density of compacted clay",
          k=5.0, k_why="cohesive: needs stronger flows than silt or fine sand",
          d=3.0, d_why="creeps readily when wet",
          path=PELITE, wx=None, facies=None, tags=["seal"],
          vf="minecraft:clay", vf_from="member",
-         notes="Clay and kaolin, from weathering or quiet water, so no single facies rule. Its metamorphic "
-               "path is mudstone's."),
+         notes="Clay and kaolin, from weathering or quiet water, so no single facies rule. Lithifies to "
+               "mudstone on burial; its metamorphic path is mudstone's."),
     dict(name="mud", family="unconsolidated", rho=1500,
          rho_src="judgment: bulk density of fresh, water-saturated mud",
          k=7.0, k_why="soft, water-rich, weakly cohesive",
          d=4.0, d_why="soft, water-rich, flows easily",
          path=PELITE, wx=None, facies=None, tags=["reduced"],
          vf="minecraft:mud", vf_from="member",
-         notes="Mud of tidal flats and lakes, so no single facies rule. Its metamorphic path is mudstone's."),
+         notes="Mud of tidal flats, lakes and the sea floor, so no single facies rule. Lithifies to "
+               "shale on burial; its metamorphic path is the pelites'."),
     dict(name="till", family="unconsolidated", rho=2000,
          rho_src="judgment: dense, overconsolidated lodgement till",
          k=4.5, k_why="dense, bouldery, overconsolidated diamict",
@@ -525,8 +558,8 @@ CLASSES = [
          d=4.0, d_why="cohesionless silt",
          path=PELITE, wx="soil", facies="aeolian", tags=["porous", "friable"],
          vf="minecraft:smooth_sandstone", vf_from="fallback",
-         notes="Loess: wind-blown silt, parent of fertile steppe soils. Its metamorphic path is that of "
-               "siltstone (mudstone)."),
+         notes="Loess: wind-blown silt, parent of fertile steppe soils. Lithifies to siltstone "
+               "(mudstone), whose metamorphic path it takes."),
     dict(name="volcanic_ash", family="unconsolidated", rho=1000,
          rho_src="judgment: loose tephra",
          k=10.0, k_why="loose, fine, light tephra; top of the range",
@@ -568,8 +601,15 @@ def expand_groups():
     return {g: members(g) for g, _ in GROUPS}
 
 
+CLASS_FAMILY = {r["name"]: r["family"] for r in CLASSES}
+
+
 def validate(groups):
     errors = []
+    for table, what in ((LITHIFIES_TO, "LITHIFIES_TO"), (LOOSE_EQUIVALENT, "LOOSE_EQUIVALENT")):
+        for k in table:
+            if k not in CLASS_FAMILY:
+                errors.append(f"{what}: unknown class {k}")
     names = [r["name"] for r in CLASSES]
     known = set(names)
     if len(CLASSES) != 59:
@@ -608,6 +648,14 @@ def validate(groups):
                 errors.append(f"{n}: metamorphic_path names unknown class {p}")
         if r["wx"] is not None and (r["wx"] not in known or r["wx"] == n):
             errors.append(f"{n}: bad weathers_to {r['wx']}")
+        lith = LITHIFIES_TO.get(n)
+        if lith is not None and (lith not in known or r["family"] != "unconsolidated"
+                                 or CLASS_FAMILY.get(lith) == "unconsolidated"):
+            errors.append(f"{n}: lithifies_to {lith} must take a loose class to a rock class")
+        loose = LOOSE_EQUIVALENT.get(n)
+        if loose is not None and (CLASS_FAMILY.get(loose) != "unconsolidated"
+                                  or r["family"] == "unconsolidated"):
+            errors.append(f"{n}: loose_equivalent {loose} must take a rock class to a loose class")
         if r["facies"] is not None and not SNAKE.match(r["facies"]):
             errors.append(f"{n}: facies_rule is not snake_case")
         for t in r["tags"]:
@@ -668,6 +716,10 @@ def document(r, groups):
     }
     if r["wx"] is not None:
         doc["weathers_to"] = r["wx"]
+    if r["name"] in LITHIFIES_TO:
+        doc["lithifies_to"] = LITHIFIES_TO[r["name"]]
+    if r["name"] in LOOSE_EQUIVALENT:
+        doc["loose_equivalent"] = LOOSE_EQUIVALENT[r["name"]]
     if r["facies"] is not None:
         doc["facies_rule"] = r["facies"]
     doc["tags"] = list(r["tags"])

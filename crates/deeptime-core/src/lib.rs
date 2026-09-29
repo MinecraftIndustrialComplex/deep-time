@@ -23,6 +23,9 @@ pub mod sphere;
 // Deep-time surface processes on L1 (P1-04).
 pub mod surface;
 
+// Column strata, metamorphism, plutons and the horizon bake (P1-07).
+pub mod structure;
+
 // Presets, share codes and the synthetic terrains of the placeholder presets (P1-13).
 pub mod preset;
 pub mod share_code;
