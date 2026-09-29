@@ -2268,7 +2268,10 @@
   function presetName(name) {
     if (!name) return '';
     const p = catalog && catalog.presets.find(x => x.name === name);
-    if (!p) return String(name).replace(/_/g, ' ');
+    if (!p) {   // a preset the page no longer lists (the pipeline and plates presets): its family, still
+      const m = /^(.*)_(\d+)k$/.exec(String(name));
+      return m && FAMILY[m[1]] ? `${FAMILY[m[1]][0]} · ${m[2]}k` : String(name).replace(/_/g, ' ');
+    }
     return `${familyName(p.family)} · ${sizeShort(p.circumference)}`;
   }
   const sizeLabel = c => L(`size.${c / 1024}k`) || L('size.other', c.toLocaleString('en')) || `${c} blocks`;
@@ -2304,14 +2307,17 @@
       for (const f of catalog.fields.filter(x => x.section === s)) {
         const name = L(`field.${f.id}`) || f.id;
         let ctl;
-        if (f.kind === 'number' && f.integer) ctl = `<div class="ctl"><input class="input" type="number" data-f="${f.id}" id="fi_${f.id}" step="1" min="${f.min}"><button type="button" class="btn btn-icon" data-dice="${f.id}" aria-label="A random seed" data-tip="A random seed">${ic('dice')}</button></div>`;
+        const isSeed = f.kind === 'number' && f.integer && f.id === 'seed';   // only the seed gets the dice
+        if (isSeed) ctl = `<div class="ctl"><input class="input" type="number" data-f="${f.id}" id="fi_${f.id}" step="1" min="${f.min}"><button type="button" class="btn btn-icon" data-dice="${f.id}" aria-label="A random seed" data-tip="A random seed">${ic('dice')}</button></div>`;
         else if (f.kind === 'number') {
           const log = f.min > 0 && f.max / f.min >= 100;
-          ctl = `<div class="ctl"><input type="range" data-r="${f.id}" min="0" max="1000" ${log ? 'data-log="1"' : ''} aria-label="${esc(name)}"><div class="withunit"><input class="input" type="number" data-f="${f.id}" id="fi_${f.id}" step="any" min="${f.min}" max="${f.max}"><span class="unit">${esc(f.unit || '')}</span></div></div>`;
+          ctl = `<div class="ctl"><input type="range" data-r="${f.id}" min="0" max="1000" ${log ? 'data-log="1"' : ''} aria-label="${esc(name)}"><div class="withunit"><input class="input" type="number" data-f="${f.id}" id="fi_${f.id}" step="${f.integer ? 1 : 'any'}" min="${f.min}" max="${f.max}"><span class="unit">${esc(f.unit || '')}</span></div></div>`;
         } else if (f.kind === 'toggle') ctl = `<label class="switch"><input type="checkbox" data-f="${f.id}" id="fi_${f.id}"><span></span></label>`;
-        else ctl = `<select class="input" data-f="${f.id}" id="fi_${f.id}"></select>`;
-        const range = f.kind === 'number' && !f.integer ? `${numText(f.min)} – ${numText(f.max)}${f.unit ? ` ${f.unit}` : ''}` : '';
-        body += `<div class="field off" id="row_${f.id}"><div class="fh"><label for="fi_${f.id}">${esc(name)}</label><span class="val">${esc(range)}</span><span class="lock">${ic('lock', 'ic-s')}not in this preset</span></div>${f.kind === 'toggle' ? `<div class="ctl">${ctl}<span class="hint" style="margin:0">${esc(f.hint || '')}</span></div>` : `${ctl}<div class="hint">${esc(f.hint || '')}</div>`}<div class="err" hidden></div></div>`;
+        else ctl = `<select class="input" data-f="${f.id}" id="fi_${f.id}">${(f.options || []).map(o => `<option value="${esc(o)}">${esc(L(`option.${f.id}.${o}`) || o)}</option>`).join('')}</select>`;
+        const stops = (f.stops || []).length ? `<div class="quick" data-stops="${f.id}">${f.stops.map(s => `<button type="button" data-stopv="${s.value}">${esc(s.label)} · ${s.value}</button>`).join('')}</div>` : '';
+        const num = v => f.integer ? fmtInt(v) : numText(v);
+        const range = f.kind === 'number' && !isSeed ? `${num(f.min)} – ${num(f.max)}${f.unit ? ` ${f.unit}` : ''}` : '';
+        body += `<div class="field off" id="row_${f.id}"><div class="fh"><label for="fi_${f.id}">${esc(name)}</label><span class="val">${esc(range)}</span><span class="lock">${ic('lock', 'ic-s')}not in this preset</span></div>${f.kind === 'toggle' ? `<div class="ctl">${ctl}<span class="hint" style="margin:0">${esc(f.hint || '')}</span></div>` : `${ctl}<div class="hint">${esc(f.hint || '')}</div>${stops}`}<div class="err" hidden></div></div>`;
       }
       h += sec(`s_${s}`, esc(L(`section.${s}`) || cap1(s)), (catalog.sections || {})[s] || '', `<div class="offnote" hidden>${ic('lock', 'ic-s')}<span></span></div>${body}`, `<span class="badge s-idle secbadge" hidden>not in this preset</span>`);
     }
@@ -2354,6 +2360,13 @@
       if (st) { form.start = st.dataset.start; startButtons(); refresh(); return; }
       const ql = ev.target.closest('[data-len]');
       if (ql) { form.length = ql.dataset.len; $('f_length').value = form.length; lengthUI(); refresh(); return; }
+      const stop = ev.target.closest('[data-stopv]');   // a named stop of a field (catalogue `stops`)
+      if (stop && !stop.disabled) {
+        const inp = fm.querySelector(`[data-f="${stop.parentElement.dataset.stops}"]`);
+        inp.value = stop.dataset.stopv;
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
       const dice = ev.target.closest('[data-dice]');
       if (dice) {
         const v = Math.floor(Math.random() * 2 ** 32);
@@ -2378,6 +2391,7 @@
       f._set = v => {   // show the effective value without firing
         if (document.activeElement === input) return;
         if (f.kind === 'toggle') input.checked = v === true;
+        else if (f.kind === 'choice' && f.options && f.options.length) input.value = v === null ? '' : v;   // a fixed list: the options are in the markup
         else if (f.kind === 'choice') input.innerHTML = v === null ? `<option>${esc(L('field.none') || '—')}</option>` : `<option>${esc(Array.isArray(v) ? (v.length ? v.join(', ') : (L('field.none') || 'none')) : v)}</option>`;
         else input.value = v === null ? '' : v;
         if (slider && typeof v === 'number') { slider.value = toSlider(f, v, !!slider.dataset.log); fillRange(slider); }
@@ -2389,7 +2403,7 @@
         refresh();
       });
       if (slider) slider.addEventListener('input', () => {
-        const v = tidy(fromSlider(f, Number(slider.value), !!slider.dataset.log));
+        const v = f.integer ? Math.round(fromSlider(f, Number(slider.value), !!slider.dataset.log)) : tidy(fromSlider(f, Number(slider.value), !!slider.dataset.log));
         input.value = v; form.fields[f.id] = v; fillRange(slider); refresh();
       });
     }
@@ -2501,7 +2515,8 @@
       const note = sec.querySelector('.offnote');
       note.hidden = !off;
       note.querySelector('span').textContent = sec.dataset.sec === 's_fantasy' ? (L('field.phase3') || 'Arrives in Phase 3.') : 'This preset has none of these yet: they arrive with the simulation stages.';
-      if (had !== String(off)) { sec.dataset.off = String(off); sec.classList.toggle('closed', off); }
+      // Advanced sections (the catalogue's advanced_sections) start closed too; opening one sticks.
+      if (had !== String(off)) { sec.dataset.off = String(off); sec.classList.toggle('closed', off || (catalog.advanced_sections || []).includes(sec.dataset.sec.slice(2))); }
     }
     const probs = eff.problems.map(p => `<li${/memory cap/.test(p) ? ' class="err"' : ''} data-prob="${esc(p)}">${ic('alert', 'ic-s')}<span>${esc(cap1(p))}</span></li>`);
     $('problems').innerHTML = probs.join('');
@@ -2632,7 +2647,7 @@
     catalog = res.body;
     form.cap = defaultCapGiB();
     buildForm();
-    const def = catalog.presets.find(p => p.name === 'pipeline_quick_16k') || catalog.presets.find(p => !p.placeholder) || catalog.presets[0];
+    const def = catalog.presets.find(p => p.name === 'earthlike_quick_16k') || catalog.presets.find(p => !p.placeholder) || catalog.presets[0];
     form.preset = def.name;
     startButtons(); lengthUI();
     presetChanged();
