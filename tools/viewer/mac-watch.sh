@@ -18,6 +18,9 @@
 #   --threads     Rayon threads per run (default all 12; the Mac is shared)
 #   --no-build    skip the sync and the release build (the Mac's binary is current)
 #   --tv          also open the page fullscreen in Safari on the Mac's own screen (Ben's TV)
+#   --no-preview  leave stage 2 off (the 3D preview and click-to-inspect answer 501); by default
+#                 the server forwards them to this checkout's tools/workbench/preview.py on the Mac,
+#                 which boots the checkout's smoke/standalone server set (tools/smoke/install.sh)
 #
 # How it is served. The server binds 127.0.0.1 on the Mac and `tailscale serve --bg --tcp <port>`
 # forwards the tailnet (100.96.0.7 / mac-mini) to it: nothing listens on the LAN, and no
@@ -62,6 +65,7 @@ while [ $# -gt 0 ]; do
         --preset|--start|--length-myr) PRESET+=("$1" "$2"); shift 2 ;;
         --no-build) BUILD=0; shift ;;
         --tv) TV=1; shift ;;
+        --no-preview) PREVIEW=0; shift ;;
         -h|--help) sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//' | sed '$d'; exit 0 ;;
         *) echo "mac-watch: unknown argument $1 (see --help)" >&2; exit 2 ;;
     esac
@@ -144,6 +148,9 @@ if [ "$BUILD" = 1 ]; then
 fi
 stop_remote >/dev/null
 ARGS=(watch --bind 127.0.0.1 --port "$PORT" --runs "$WB/runs" --keep "$KEEP" --threads "$THREADS")
+# Stage 2 (P1-20): the preview runner of the checkout this script synced; the Mac's own Python 3.9
+# runs it (stdlib-only), and it enters the dev shell itself for cargo.
+[ "${PREVIEW:-1}" = 1 ] && ARGS+=(--preview "$REMOTE/tools/workbench/preview.py" --python /usr/bin/python3)
 [ -n "$EVERY" ] && ARGS+=(--every-myr "$EVERY")
 ARGS+=("${PRESET[@]}")
 remote "$TS_SETUP

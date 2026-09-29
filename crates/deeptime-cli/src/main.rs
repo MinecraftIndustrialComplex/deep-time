@@ -2,6 +2,7 @@
 //! `deeptime`: the standalone driver for every simulation stage (plan §9.3).
 
 mod alloc;
+mod climate_dem;
 mod dump;
 mod run;
 mod structure_view;
@@ -91,6 +92,13 @@ enum Command {
         /// Stop once nothing runs or waits (after --preset's run; default: serve until stopped).
         #[arg(long)]
         exit_when_done: bool,
+        /// Stage 2 (P1-20): tools/workbench/preview.py of a checkout with smoke server sets, which
+        /// then answers the 3D preview, click-to-inspect and /area3d/ routes (default: 501).
+        #[arg(long)]
+        preview: Option<PathBuf>,
+        /// The Python that runs --preview (stdlib-only; /usr/bin/python3 on the Mac).
+        #[arg(long, default_value = "python3")]
+        python: PathBuf,
         #[command(flatten)]
         common: CommonArgs,
     },
@@ -121,6 +129,11 @@ enum Command {
         /// Also write an HTML viewer bundle (the stage's keyframes, all events and sites) here.
         #[arg(long)]
         viewer: Option<PathBuf>,
+        /// Only these keyframe layers go into the viewer bundle (comma-separated field names,
+        /// e.g. `elevation,climate/koppen`; default all), to keep a review page small. The
+        /// structure stage's map layers and sections come only when a `structure…` name is given.
+        #[arg(long, value_delimiter = ',')]
+        viewer_layers: Vec<String>,
         /// Folder for the stage's keyframes (default <out>.work, or a temporary folder).
         #[arg(long)]
         work: Option<PathBuf>,
@@ -156,6 +169,26 @@ enum Command {
         /// Print DEBUG log lines too.
         #[arg(long)]
         verbose: bool,
+    },
+    /// One climate snapshot (P1-05) on a given relief — e.g. Earth's — to check the climate
+    /// against a planet whose Köppen map is known. The raster is raw little-endian f32 metres,
+    /// W × W/2 cells, row 0 at the north pole, column i at longitude 360°·i/W.
+    ClimateDem {
+        /// The relief raster.
+        #[arg(long)]
+        dem: PathBuf,
+        /// Cells around (W); the raster has W/2 rows.
+        #[arg(long)]
+        width: u32,
+        /// A preset whose `climate` and `planet` sections apply (default: the defaults).
+        #[arg(long)]
+        preset: Option<String>,
+        /// The planet's circumference in km (Earth: 40,030).
+        #[arg(long, default_value_t = 40030.0)]
+        circumference_km: f64,
+        /// Also write an HTML viewer bundle (Köppen, temperature, precipitation) here.
+        #[arg(long)]
+        viewer: Option<PathBuf>,
     },
     /// The surface kernels (P1-04) on a plain raster, for the fastscapelib oracle
     /// (tools/validation/fastscape_compare.py): periodic in x, the first and last rows fixed at
@@ -354,6 +387,8 @@ fn main() -> ExitCode {
             keep,
             every_myr,
             exit_when_done,
+            preview,
+            python,
             common,
         }) => finish(
             "watch",
@@ -367,6 +402,7 @@ fn main() -> ExitCode {
                 keep,
                 every_myr,
                 exit_when_done,
+                preview: preview.map(|script| watch::stage2::Preview { python, script }),
                 common: common.common(),
             }),
         ),
@@ -379,6 +415,7 @@ fn main() -> ExitCode {
             max_steps,
             out,
             viewer,
+            viewer_layers,
             work,
             common,
         }) => finish(
@@ -392,6 +429,7 @@ fn main() -> ExitCode {
                 max_steps,
                 out,
                 viewer,
+                viewer_layers,
                 work,
                 common: common.common(),
             }),
@@ -421,6 +459,23 @@ fn main() -> ExitCode {
             }),
         ),
         Some(Command::Preset { action }) => finish("preset", preset_command(action)),
+        Some(Command::ClimateDem {
+            dem,
+            width,
+            preset,
+            circumference_km,
+            viewer,
+        }) => finish(
+            "climate-dem",
+            climate_dem::run(&climate_dem::Options {
+                dem,
+                w: width,
+                h: width / 2,
+                preset,
+                circumference_km,
+                viewer,
+            }),
+        ),
         Some(Command::Lem {
             grid,
             height,
@@ -675,6 +730,7 @@ mod tests {
             max_steps: None,
             out: Some(dir.join("deposits.dtcp")),
             viewer: Some(dir.join("viewer")),
+            viewer_layers: Vec::new(),
             work: None,
             common: quiet(),
         })
@@ -732,6 +788,7 @@ mod tests {
             max_steps: None,
             out: Some(dir.join("a.dtcp")),
             viewer: None,
+            viewer_layers: Vec::new(),
             work: None,
             common: quiet(),
         };
@@ -745,6 +802,7 @@ mod tests {
             max_steps: None,
             out: Some(dir.join("b.dtcp")),
             viewer: Some(dir.join("viewer")),
+            viewer_layers: Vec::new(),
             work: None,
             common: quiet(),
         };
@@ -758,6 +816,7 @@ mod tests {
             input: Some(dir.join("b.dtcp")),
             out: None,
             viewer: None,
+            viewer_layers: Vec::new(),
             ..second
         };
         let err = super::run::stage(&again).unwrap_err().to_string();
@@ -818,6 +877,7 @@ mod tests {
                 max_steps,
                 out,
                 viewer,
+                viewer_layers: Vec::new(),
                 work,
                 common: quiet(),
             })
@@ -880,6 +940,8 @@ mod tests {
         v["resolution"]["l1_r"] = serde_json::json!(64);
         v["keyframes"]["size"] = serde_json::json!([64, 32]);
         v["keyframes"]["every_myr"] = serde_json::json!(10.0);
+        // This test is about the plates + surface group; `stage deposits` has its own test.
+        v.as_object_mut().unwrap().remove("deposits");
         let preset = dir.join("small.json");
         std::fs::write(&preset, v.to_string()).unwrap();
         let stage = |name: &str,
@@ -897,6 +959,7 @@ mod tests {
                 max_steps,
                 out,
                 viewer,
+                viewer_layers: Vec::new(),
                 work: None,
                 common: quiet(),
             })
@@ -912,8 +975,12 @@ mod tests {
         .unwrap();
         let mid = deeptime_core::checkpoint::Checkpoint::read(&dir.join("plates.dtcp")).unwrap();
         assert_eq!(mid.next_stage_name(), Some("plates"));
-        assert_eq!(mid.stage_names, ["plates", "surface", "structure"]);
-        assert!(mid.world.surface.is_some(), "the group steps both stages");
+        assert_eq!(
+            mid.stage_names,
+            ["plates", "climate", "surface", "structure"]
+        );
+        assert!(mid.world.surface.is_some(), "the group steps every member");
+        assert!(mid.world.fields.contains_key("climate/koppen"));
         stage(
             "surface",
             Some(dir.join("plates.dtcp")),
@@ -924,7 +991,7 @@ mod tests {
         )
         .unwrap();
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
-        assert_eq!(end.next_stage, 3);
+        assert_eq!(end.next_stage, 4);
         assert_eq!(end.world.t_years, 0.0);
         let st = end.world.surface.as_ref().unwrap();
         assert_eq!(st.totals.steps, 10);
@@ -949,7 +1016,20 @@ mod tests {
         );
         assert!(dir.join("viewer/layers/strata.js").is_file());
         assert!(dir.join("viewer/sections/section-0.png").is_file());
-        // `stage surface --preset` runs the group from the start.
+        assert!(
+            dir.join("viewer/keyframes/kf-0-climate_koppen.png")
+                .is_file()
+        );
+        // `stage surface --preset` runs the group from the start, and so does `stage climate`.
+        stage(
+            "climate",
+            None,
+            Some(preset.to_string_lossy().into_owned()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
         stage(
             "surface",
             None,
@@ -959,6 +1039,97 @@ mod tests {
             None,
         )
         .unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+    /// P1-14: `stage deposits --preset pipeline_quick_16k` runs plates, surface and structure and
+    /// then the deposit stage on the history they recorded; the census names the recorded history,
+    /// the viewer bundle carries the deposit layers and the sites, and a checkpoint taken before
+    /// the deposit stage continues with `stage deposits --in`.
+    #[test]
+    fn deposit_stage_reads_the_recorded_history() {
+        let dir = tmp("deposits-real");
+        std::fs::create_dir_all(&dir).unwrap();
+        let json = super::run::load_preset_with(
+            "pipeline_quick_16k",
+            Some("scattered_continents"),
+            Some(20.0),
+        )
+        .unwrap();
+        let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        v["resolution"]["l0_samples"] = serde_json::json!(3000);
+        v["resolution"]["l1_r"] = serde_json::json!(64);
+        v["keyframes"]["size"] = serde_json::json!([64, 32]);
+        v["keyframes"]["every_myr"] = serde_json::json!(10.0);
+        v["deposits"]["count_mult"] = serde_json::json!(200.0);
+        let preset = dir.join("small.json");
+        std::fs::write(&preset, v.to_string()).unwrap();
+        let stage = |name: &str,
+                     input: Option<std::path::PathBuf>,
+                     preset: Option<String>,
+                     out: Option<std::path::PathBuf>,
+                     viewer: Option<std::path::PathBuf>| {
+            super::run::stage(&super::run::StageOptions {
+                name: name.into(),
+                input,
+                preset,
+                start: None,
+                length_myr: None,
+                max_steps: None,
+                out,
+                viewer,
+                viewer_layers: Vec::new(),
+                work: None,
+                common: quiet(),
+            })
+        };
+        // From the preset: the stages before it run first.
+        stage(
+            "deposits",
+            None,
+            Some(preset.to_string_lossy().into_owned()),
+            Some(dir.join("end.dtcp")),
+            Some(dir.join("viewer")),
+        )
+        .unwrap();
+        let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
+        assert_eq!(
+            end.stage_names,
+            ["plates", "climate", "surface", "structure", "deposits"]
+        );
+        assert_eq!(end.next_stage_name(), None, "the run is complete");
+        assert!(
+            end.world.history.is_some(),
+            "the history stays in the world"
+        );
+        let census: serde_json::Value =
+            serde_json::from_str(&end.world.notes[deeptime_core::deposits::STAGE_NAME]).unwrap();
+        assert_eq!(census["history"]["source"], "recorded");
+        assert_eq!(census["skipped"], serde_json::json!([]));
+        assert!(
+            std::fs::read_dir(dir.join("viewer/keyframes"))
+                .unwrap()
+                .any(|e| e
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .contains("deposits_sites"))
+        );
+        assert!(dir.join("viewer/sites.json").is_file());
+        assert!(dir.join("viewer/report.js").is_file());
+        // The strata inspector stays with the structure bundle (its layers are ~20 MB).
+        assert!(!dir.join("viewer/layers/strata.js").exists());
+        // From a checkpoint taken before the stage: the group's end, next stage deposits.
+        stage(
+            "structure",
+            None,
+            Some(preset.to_string_lossy().into_owned()),
+            Some(dir.join("group.dtcp")),
+            None,
+        )
+        .unwrap();
+        let group = deeptime_core::checkpoint::Checkpoint::read(&dir.join("group.dtcp")).unwrap();
+        assert_eq!(group.next_stage_name(), Some("deposits"));
+        stage("deposits", Some(dir.join("group.dtcp")), None, None, None).unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

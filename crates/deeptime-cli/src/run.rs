@@ -75,10 +75,28 @@ pub fn print_census(census: &Value) {
         census["provinces"],
         census["count_mult"],
     );
+    if let Some(h) = census["history"].as_object() {
+        println!(
+            "deposits: history {} · {} frames · {} names",
+            h["source"].as_str().unwrap_or("?"),
+            h["frames"],
+            h["names"].as_array().map_or(0, Vec::len),
+        );
+    }
+    for s in census["skipped"].as_array().into_iter().flatten() {
+        println!(
+            "deposits SKIPPED {}: the history lacks {}",
+            s["type"].as_str().unwrap_or("?"),
+            s["missing"]
+        );
+    }
+    for note in census["fallbacks"].as_array().into_iter().flatten() {
+        println!("deposits FALLBACK: {}", note.as_str().unwrap_or("?"));
+    }
     for t in census["types"].as_array().into_iter().flatten() {
         let f = |k: &str| t[k].as_f64().unwrap_or(0.0);
         println!(
-            "deposits {:<30} sites={:>3} expected={:>7.2} with_provinces={:>7.2} drawn={:>3} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={}",
+            "deposits {:<30} sites={:>3} expected={:>7.2} with_provinces={:>7.2} drawn={:>3} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={}",
             t["id"].as_str().unwrap_or("?"),
             f("sites"),
             f("expected_formula"),
@@ -94,7 +112,26 @@ pub fn print_census(census: &Value) {
             f("children"),
             f("guaranteed"),
             f("dropped_separation"),
+            f("on_land"),
         );
+        if let Some(b) = t["best_cell"].as_object() {
+            let g = |k: &str| b[k].as_f64().unwrap_or(0.0);
+            println!(
+                "  best cell F={:.2} at lat {:.1} lon {:.1}, limited by {} (scores {})",
+                g("favourability"),
+                g("lat"),
+                g("lon"),
+                b["limiting"].as_str().unwrap_or("?"),
+                b["scores"]
+                    .as_object()
+                    .map(|m| m
+                        .iter()
+                        .map(|(k, v)| format!("{k} {:.2}", v.as_f64().unwrap_or(0.0)))
+                        .collect::<Vec<_>>()
+                        .join(", "))
+                    .unwrap_or_default()
+            );
+        }
     }
 }
 
@@ -144,13 +181,27 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
     let dx = f64::from(st.grid.r) * 300.0;
     let sediment: f64 = (0..st.log.cells()).map(|c| st.log.total(c)).sum::<f64>() * dx * dx / 1e9;
     let layers: f64 = st.log.count.iter().map(|&c| f64::from(c)).sum::<f64>() / n;
+    // Hypsometry of the land (P1-05: the climate reads it), m above the sea.
+    let mut lz: Vec<f64> = st
+        .elevation_m
+        .iter()
+        .map(|&z| f64::from(z) - st.sea_level_m)
+        .filter(|&z| z > 0.0)
+        .collect();
+    lz.sort_by(f64::total_cmp);
+    let q = |f: f64| {
+        lz.get(((lz.len().max(1) - 1) as f64 * f).round() as usize)
+            .copied()
+            .unwrap_or(0.0)
+    };
+    let (z50, z90) = (q(0.5), q(0.9));
     let hist = world.history.as_ref();
     Some(format!(
         "surface_final={} land_frac={:.3} max_elevation_m={:.0} sea_level_m={:.1} sediment_km3={:.3e} \
          eroded_km3={:.3e} fluvial_km3={:.3e} lake_km3={:.3e} marine_km3={:.3e} carbonate_km3={:.3e} \
          evaporite_km3={:.3e} to_sea_km3={:.3e} mass_residual_km3={:.3e} mean_log_layers={:.2} \
          spl_iterations_per_step={:.2} cg_iterations_per_step={:.1} sinks={} erosion_pulses={} basins={} sea_events={} frames={} \
-         history_mib={:.1}",
+         history_mib={:.1} land_z_p50_m={:.0} land_z_p90_m={:.0}",
         t.steps,
         land / n,
         peak,
@@ -173,6 +224,45 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         st.events.counts[2],
         hist.map_or(0, |h| h.frames.len()),
         hist.map_or(0.0, |h| h.bytes() as f64 / 1048576.0),
+        z50,
+        z90,
+    ))
+}
+
+/// The climate's summary line (P1-05): `climate_final=<snapshots> t_surface_c=… koppen_land=A…/B…
+/// …`, from the last snapshot, when the run had a climate stage.
+fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note: Value =
+        serde_json::from_str(world.notes.get(deeptime_core::climate::STAGE_NAME)?).ok()?;
+    let last = &note["last"];
+    let f = |v: &Value| v.as_f64().unwrap_or(f64::NAN);
+    let shares = last["koppen_land_share"]
+        .as_object()
+        .map(|o| {
+            o.iter()
+                .map(|(k, v)| format!("{k}{:.2}", f(v)))
+                .collect::<Vec<_>>()
+                .join("/")
+        })
+        .unwrap_or_default();
+    Some(format!(
+        "climate_final={} t_surface_c={:.1} t_land_c={:.1} precip_land_mm={:.0} koppen_land={} \
+         glaciated_land_frac={:.3} glaciations={} ebm_t_global_c={:.1} ebm_net_toa_w_m2={:.3} \
+         itcz_deg={:.1}..{:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_above_2km={:.3}",
+        note["snapshots"],
+        f(&last["t_surface_c"]),
+        f(&last["t_land_c"]),
+        f(&last["precip_land_mm"]),
+        shares,
+        f(&last["glaciated_land_frac"]),
+        note["glaciations"],
+        f(&last["ebm_t_global_c"]),
+        f(&last["ebm_net_toa_w_m2"]),
+        f(&last["itcz_range_deg"][0]),
+        f(&last["itcz_range_deg"][1]),
+        f(&last["land_z_p50_m"]),
+        f(&last["land_z_p90_m"]),
+        f(&last["land_above_2km"]),
     ))
 }
 
@@ -209,7 +299,8 @@ fn history_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     Some(parts.join(" "))
 }
 
-/// Per-stage wall time, and the surface's per-process split when it ran to the end.
+/// Per-stage wall time, and the surface's and the climate's per-process split when they ran to
+/// the end.
 pub(crate) fn timings_line(
     timings: &[deeptime_core::session::StageTiming],
     world: &deeptime_core::world::WorldState,
@@ -220,6 +311,7 @@ pub(crate) fn timings_line(
         .collect();
     for stage in [
         deeptime_core::surface::STAGE_NAME,
+        deeptime_core::climate::STAGE_NAME,
         deeptime_core::structure::STAGE_NAME,
     ] {
         if let Some(note) = world
@@ -302,6 +394,9 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     if let Some(line) = surface_line(&world) {
         println!("deeptime run: {line}");
     }
+    if let Some(line) = climate_line(&world) {
+        println!("deeptime run: {line}");
+    }
     if let Some(line) = structure_line(&world) {
         println!("deeptime run: {line}");
     }
@@ -332,6 +427,8 @@ pub struct StageOptions {
     pub max_steps: Option<u64>,
     pub out: Option<PathBuf>,
     pub viewer: Option<PathBuf>,
+    /// Keyframe layers the viewer bundle keeps (empty: all).
+    pub viewer_layers: Vec<String>,
     pub work: Option<PathBuf>,
     pub common: Common,
 }
@@ -455,6 +552,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     if let Some(line) = surface_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
+    if let Some(line) = climate_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
     if let Some(line) = structure_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
@@ -477,11 +577,32 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     }
     if let Some(dir) = &o.viewer {
         let index = KeyframeIndex::read(&work)?;
-        let keyframes = index
+        let mut keyframes = index
             .frames
             .iter()
             .map(|e| read_keyframe(&work, e))
             .collect::<Result<Vec<_>, _>>()?;
+        if !o.viewer_layers.is_empty() {
+            for k in &mut keyframes {
+                k.layers.retain(|(name, _)| o.viewer_layers.contains(name));
+            }
+        } else if o.name == deeptime_core::deposits::STAGE_NAME {
+            // The deposit bundle keeps the map context (elevation, plates, crust age, regime,
+            // drainage, the rock and the trap structure) and the deposit layers; the surface's
+            // bulk layers stay in the surface bundle. Keeps a 500 Myr bundle under the review cap.
+            const LEFT_TO_THE_SURFACE_BUNDLE: [&str; 6] = [
+                "surface/erosion_m_myr",
+                "surface/deposition_m_myr",
+                "surface/sediment_m",
+                "surface/regolith_m",
+                "surface/class",
+                "structure/log_grade",
+            ];
+            for k in &mut keyframes {
+                k.layers
+                    .retain(|(name, _)| !LEFT_TO_THE_SURFACE_BUNDLE.contains(&name.as_str()));
+            }
+        }
         let info = deeptime_viewer::BundleInfo {
             title: format!("Deep Time — stage {}", o.name),
             source: format!("stage:{}", o.name),
@@ -492,7 +613,17 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         };
         // P1-07: the baked horizon stacks (the inspector), the elevation and the rock at the
         // surface as map layers, and meridian cross-sections.
-        let structure = crate::structure_view::build(&ck.world, &ck.preset_json)?;
+        // `--viewer-layers` without `structure` leaves them out (a climate-only page stays small);
+        // the deposit stage's bundle leaves the strata inspector to the structure stage's own (its
+        // layers alone are ~20 MB, and the deposit bundles stay under the review cap).
+        let structure = if o.name == deeptime_core::deposits::STAGE_NAME
+            || !(o.viewer_layers.is_empty()
+                || o.viewer_layers.iter().any(|l| l.starts_with("structure")))
+        {
+            None
+        } else {
+            crate::structure_view::build(&ck.world, &ck.preset_json)?
+        };
         let layers: Vec<&deeptime_format::LoadedLayer> =
             structure.iter().flat_map(|v| v.layers.iter()).collect();
         deeptime_viewer::write_bundle_with(
@@ -595,6 +726,9 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             println!("deeptime bench: threads={threads} {line}");
         }
         if let Some(line) = surface_line(&world) {
+            println!("deeptime bench: threads={threads} {line}");
+        }
+        if let Some(line) = climate_line(&world) {
             println!("deeptime bench: threads={threads} {line}");
         }
         println!(

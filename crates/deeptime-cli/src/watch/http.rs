@@ -23,7 +23,9 @@
 //!   `bye`; a comment line every 15 s), `/api/runs/<id>/state.json` (the `hello`),
 //!   `/api/runs/<id>/frames/<n>/<layer index>.png` (encoded on first request, cached in the run's
 //!   `frames/`)
-//! - stage 2 (P1-20, a sibling worktree builds it): `POST /api/preview` (a box of a run's world →
+//! - stage 2 (P1-20): with `--preview`, `POST /api/preview`, `GET /api/preview/…`,
+//!   `GET /api/inspect` and `GET /area3d/…` go to tools/workbench/preview.py ([`super::stage2`]).
+//!   Without it: `POST /api/preview` (a box of a run's world →
 //!   a 3D block preview job) and `GET /api/inspect?run=&x=&z=` (a column's rock layers, ore bodies
 //!   and "why here"); both answer 501 with `{"available": false, "message"}` until it lands.
 
@@ -89,6 +91,31 @@ pub struct App {
     pub wb: Arc<Workbench>,
     /// The page with its title.
     pub page: String,
+    /// Stage 2's runner (`--preview`), which answers the preview, inspect and viewer routes.
+    pub preview: Option<super::stage2::Preview>,
+}
+
+/// A stage-2 route forwarded to the preview runner (stage2.rs), when one is configured.
+fn stage2(app: &App, req: &Request) -> Option<Response> {
+    let p = app.preview.as_ref()?;
+    if !super::stage2::handles(&req.path) {
+        return None;
+    }
+    let target = if req.query.is_empty() {
+        req.path.clone()
+    } else {
+        format!("{}?{}", req.path, req.query)
+    };
+    let method = if req.method == "POST" { "POST" } else { "GET" };
+    Some(match p.call(method, &target, &req.body) {
+        Ok(a) => Response {
+            status: a.status,
+            content_type: a.content_type,
+            cache: "no-store",
+            body: a.body,
+        },
+        Err(e) => Response::error(502, format!("the preview runner failed: {e}")),
+    })
 }
 
 pub struct Server {
@@ -228,6 +255,7 @@ fn reason(status: u16) -> &'static str {
     match status {
         200 => "OK",
         201 => "Created",
+        202 => "Accepted",
         204 => "No Content",
         400 => "Bad Request",
         403 => "Forbidden",
@@ -237,6 +265,7 @@ fn reason(status: u16) -> &'static str {
         413 => "Payload Too Large",
         415 => "Unsupported Media Type",
         501 => "Not Implemented",
+        502 => "Bad Gateway",
         503 => "Service Unavailable",
         _ => "Internal Server Error",
     }
@@ -417,6 +446,9 @@ fn query_param<'a>(query: &'a str, key: &str) -> Option<&'a str> {
 }
 
 fn get(app: &App, req: &Request) -> Response {
+    if let Some(r) = stage2(app, req) {
+        return r;
+    }
     let path = req.path.as_str();
     match path {
         "/" | "/index.html" => Response::ok(
@@ -501,6 +533,9 @@ fn post_refusal(req: &Request) -> Option<Response> {
 fn post(app: &App, req: &Request) -> Response {
     if let Some(refused) = post_refusal(req) {
         return refused;
+    }
+    if let Some(r) = stage2(app, req) {
+        return r;
     }
     let body: Value = match serde_json::from_slice(&req.body) {
         Ok(v) => v,

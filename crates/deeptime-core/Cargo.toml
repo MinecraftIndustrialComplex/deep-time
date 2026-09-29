@@ -23,3 +23,6 @@ kiddo = { version = "6.3.0", default-features = false, features = ["multi-thread
 # The deposit engine's recorded field history (P1-04): LZ4 block compression of packed frames,
 # the codec the format crate already uses for tile packs. MIT.
 lz4_flex = "0.14.0"
+# Orographic precipitation (P1-05, plan §8.3 item 4): Smith & Barstad's transfer function is
+# applied in Fourier space. MIT OR Apache-2.0.
+rustfft = "6.4.1"

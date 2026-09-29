@@ -347,6 +347,9 @@ fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
     v["keyframes"]["size"] = serde_json::json!([128, 64]);
     v["keyframes"]["every_myr"] = serde_json::json!(20.0);
     v["seed"] = serde_json::json!(seed);
+    // These tests are about the plates and the surface; the deposit stage has its own
+    // (`deposits::tests`).
+    v.as_object_mut().unwrap().remove("deposits");
     v.to_string()
 }
 
@@ -389,7 +392,10 @@ fn the_coupled_pipeline_runs_and_resumes() {
     let json = pipeline_json(3000, 60.0, 5);
     let dir = temp_dir("straight");
     let s = session(&json, &dir);
-    assert_eq!(s.stage_names(), ["plates", "surface", "structure"]);
+    assert_eq!(
+        s.stage_names(),
+        ["plates", "climate", "surface", "structure"]
+    );
     finish(&s);
     let world = s.checkpoint().unwrap().world;
     let st = world.surface.as_ref().expect("the surface ran");

@@ -30,6 +30,9 @@ fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
     v["seed"] = serde_json::json!(seed);
     // Plenty of plutons on the small test planet.
     v["structure"] = serde_json::json!({"pluton_rate_km2_myr": 2e-3});
+    // These tests are about the structure stage; the deposit stage after it has its own
+    // (`deposits::recorded_tests`).
+    v.as_object_mut().unwrap().remove("deposits");
     v.to_string()
 }
 
@@ -72,7 +75,10 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     let json = pipeline_json(3000, 60.0, 7);
     let dir = temp_dir("bake");
     let s = session(&json, &dir, 2);
-    assert_eq!(s.stage_names(), ["plates", "surface", "structure"]);
+    assert_eq!(
+        s.stage_names(),
+        ["plates", "climate", "surface", "structure"]
+    );
     finish(&s);
     let world = s.checkpoint().unwrap().world;
     let preset = match &Preset::from_json(&json).unwrap().body {
