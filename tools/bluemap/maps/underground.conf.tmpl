@@ -13,7 +13,7 @@ remove-caves-below-y: -10000
 cave-detection-ocean-floor: -5
 cave-detection-uses-block-light: false
 min-inhabited-time: 0
-render-mask: [ { max-y: 0 } ]
+render-mask: [ { min-x: @MINX@, max-x: @MAXX@, min-z: @MINZ@, max-z: @MAXZ@, max-y: 0 } ]
 render-edges: true
 edge-light-strength: 8
 enable-perspective-view: true
