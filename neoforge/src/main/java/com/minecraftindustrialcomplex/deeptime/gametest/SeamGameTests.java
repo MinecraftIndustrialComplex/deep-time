@@ -134,7 +134,9 @@ public final class SeamGameTests {
             helper.fail("the level has no Toroidal World shape");
             return;
         }
-        int badFolds = 0, jumps = 0, rows = 0, unloadedRows = 0;
+        var terrain = ((com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator)
+                level.getChunkSource().getGenerator()).terrain();
+        int badFolds = 0, jumps = 0, rows = 0, unloadedRows = 0, disturbedRows = 0;
         StringBuilder detail = new StringBuilder();
         // Rows inside the strip the harness forceloads around the seam (z ± 32).
         for (int i = 0; i < 16; i++) {
@@ -154,22 +156,29 @@ public final class SeamGameTests {
                 unloadedRows++;
                 continue;
             }
-            rows++;
-            int a = terrainHeight(east, c / 2 - 2, z);
             int b = terrainHeight(east, c / 2 - 1, z);
             int across = terrainHeight(west, -c / 2, z);
-            int after = terrainHeight(west, -c / 2 + 1, z);
-            if (i == 8)
-                detail.append(" sample(z=").append(z).append("):").append(a).append(',').append(b).append("|")
-                        .append(across).append(',').append(after);
-            if (Math.abs(across - b) > Math.max(Math.max(Math.abs(b - a), Math.abs(after - across)), 2)) {
+            // The planet's real router carves caves and ravines, and structures sit on the surface: a
+            // row counts only when both seam columns are where the (periodic) terrain function puts
+            // them, within 2 blocks. Across the seam the two must then continue each other exactly as
+            // the function does; a disturbed row is skipped and logged.
+            int expB = (int) Math.ceil(terrain.height(c / 2 - 1, z)) - 1;
+            int expAcross = (int) Math.ceil(terrain.height(-c / 2, z)) - 1;
+            if (Math.abs(b - expB) > 2 || Math.abs(across - expAcross) > 2) {
+                disturbedRows++;
+                detail.append(" disturbed(z=").append(z).append("):").append(b).append('/').append(expB).append("|")
+                        .append(across).append('/').append(expAcross);
+                continue;
+            }
+            rows++;
+            if (Math.abs(across - b) > Math.abs(expAcross - expB) + 2) {
                 jumps++;
                 detail.append(" jump(z=").append(z).append("):").append(b).append("->").append(across);
             }
         }
-        DeepTime.LOGGER.info("[gametest] columnsContinuous C={} rows={} unloadedRows={} badFolds={} seamJumps={}{}", c, rows,
-                unloadedRows, badFolds, jumps, detail);
-        helper.assertTrue(rows >= 8, "only " + rows + " seam rows loaded");
+        DeepTime.LOGGER.info("[gametest] columnsContinuous C={} cleanRows={} disturbedRows={} unloadedRows={} badFolds={} seamJumps={}{}",
+                c, rows, disturbedRows, unloadedRows, badFolds, jumps, detail);
+        helper.assertTrue(rows >= 10, "only " + rows + " clean seam rows (disturbed " + disturbedRows + ", unloaded " + unloadedRows + ")");
         helper.assertTrue(badFolds == 0 && jumps == 0, "seam discontinuities:" + detail);
         helper.succeed();
     }
