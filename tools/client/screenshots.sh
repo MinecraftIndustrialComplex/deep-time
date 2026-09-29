@@ -22,6 +22,15 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 REPO="$PWD"
 
+# Ben, 2026-09-28: real-client runs go to the Mac's logged-in desktop session, never the laptop's
+# Xvfb. tools/client/mac-screenshots.sh is the route (same driver, same twelve shots); this script
+# stays as the record of P1-11's HeadlessMC + Xvfb run and runs only when asked for explicitly.
+if [ "${DEEPTIME_XVFB_CLIENT:-0}" != 1 ]; then
+    echo "screenshots.sh: real-client runs go to the Mac's desktop (CLAUDE.md): use tools/client/mac-screenshots.sh" >&2
+    echo "  (DEEPTIME_XVFB_CLIENT=1 runs this HeadlessMC + Xvfb route anyway; never on the laptop)" >&2
+    exit 2
+fi
+
 JAR="${1:?usage: tools/client/screenshots.sh <deeptime jar> [<native library>]}"
 NATIVE="${2:-}"
 JAR="$(realpath "$JAR")"

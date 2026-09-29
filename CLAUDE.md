@@ -44,6 +44,7 @@ cd neoforge && nix develop -c ./gradlew build test && python3 ../tools/ci/junit-
 ./gametest.sh [-PwithMic|-PwithTerraBlender|-PwithEv]   # GameTest server (+ the test dimensions)
 ./gametest-planet.sh [-PwithMic]                        # dev server with a real Deep Time + TW overworld
 tools/smoke/install.sh <standalone|mic|terrablender> [--size N] [--synth K] && python3 tools/smoke/run.py --profile <p>
+tools/client/mac-screenshots.sh [--name N] [--no-guidance] [--no-create]   # real client on the Mac's desktop → review/out/N/
 tools/review/publish.sh <name> <folder>                 # private spacesheep page (plan §2.6)
 
 ## Rules
@@ -62,6 +63,11 @@ tools/review/publish.sh <name> <folder>                 # private spacesheep pag
 - **Real-client runs** (booting a Minecraft client for screenshots) go to the Mac's logged-in desktop
   session too, never the laptop's Xvfb (Ben, 2026-09-28). That desktop is shared with graphide's
   agents: take a "drive" lease with graphide's `utilities/scripts/mactest/m6lock.sh` first.
+  `tools/client/mac-screenshots.sh` does all of it from the laptop (sync and build, Deep Time's server
+  lock, the drive lease, the launch in the desktop session, the PNGs back in review/out/<name>/);
+  the ScreenshotDriver's walk is the model for any other client check. The old laptop route
+  (`tools/client/screenshots.sh`, HeadlessMC + Xvfb) refuses to run without DEEPTIME_XVFB_CLIENT=1;
+  never set it on the laptop.
 - Ben cannot launch the game. Every check must be runnable here and reviewable in a browser.
 - LGPL-3.0-or-later. No GPL code, no line-by-line port of GPL code, GPL tools only in tools/validation/.
   Attribute every port in NOTICE.md and the file header (`SPDX-License-Identifier: LGPL-3.0-or-later`).
