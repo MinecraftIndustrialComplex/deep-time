@@ -76,6 +76,10 @@ def biome_rgb(bid):
     return (ch(0), ch(8), ch(16))
 
 
+def css(rgb):
+    return "#%02x%02x%02x" % rgb
+
+
 def write_png(path, w, h, rgb_rows):
     raw = b"".join(b"\x00" + bytes(r) for r in rgb_rows)
 
@@ -202,8 +206,8 @@ def page(sections, out):
                                           "Dfa", "Dfb", "Dfc", "Dfd", "ET", "EF", "sea"].index(k), (k, v))
                                         for k, v in c["by_koppen"].items())))
         leg = "".join(
-            f'<div><span class="sw" style="background:#%02x%02x%02x"></span>{html.escape(s["palette"][b])} '
-            f'<span class=muted>{100 * n_ / s["land"]:.1f} %</span></div>' % biome_rgb(s["palette"][b])
+            f'<div><span class="sw" style="background:{css(biome_rgb(s["palette"][b]))}"></span>{html.escape(s["palette"][b])} '
+            f'<span class=muted>{100 * n_ / s["land"]:.1f} %</span></div>'
             for b, n_ in s["legend"][:60])
         insp = ""
         for stem, v, imgs in s["inspect"]:

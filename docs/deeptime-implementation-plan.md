@@ -3221,6 +3221,24 @@ a smoke benchmark and again at the end.
   share of sampled columns whose biome carries the matching NeoForge biome tag is logged, and each
   share meets the floor recorded in the test at its first calibrated run.
 - **Ben reviews.** A viewer layer with the pack's biome names beside the Köppen map.
+- *As built (P1-09):* the physical → vanilla step runs in the **bake** (Rust,
+  `deeptime-core/src/bake/biomes.rs`), in band coordinates against a reference file
+  (`crates/deeptime-core/data/climate_mapping/default.json`: `OverworldBiomeBuilder`'s edges and
+  vanilla's measured land distributions of erosion and peaks-and-valleys), because the CLI, the
+  workbench and the game all bake and only the bake has every physical field. Java
+  (`climate/{OverworldBands, ClimateMapping, ClimateMappingBuilder}`) then maps those values onto the
+  pack's bands (its copy of `data/deeptime/deeptime/climate_mapping/default.json`) and its own
+  router's distribution once per world, at the first start (`WorldDataBinder`), stored as
+  `climate_mapping.json` and applied by `WorldDataTerrain.raster`. The knobs that shape the world
+  are the preset's `biomes` section (editor fields: temperature and humidity shifts, beach width,
+  terrain-biome and variant patch sizes, wetlands). Temperature comes from the Köppen class and the
+  warmest/coldest months (not from the mean annual temperature alone), humidity from the aridity
+  index held inside each class's range; no river biomes until Phase 2. `BiomeGameTests.
+  climateConsistent` runs on `test_planet_real` through `climate/BiomeCensus` (also `/deeptime probe
+  biomes [step]`, which writes the whole grid for the review page); `bandsAreTheBuilders` checks the
+  reference edges against the class. The review page is `tools/review/biome_map.py` over the probe's
+  grid and `deeptime-inspect biomes` of Chunky areas. FORMAT.md, "The climate mapping", is the
+  contract. The Create World review page's biome names stay a P1-11 follow-up.
 
 #### P1-10 TerraBlender regions follow provinces
 - **Goal.** §7.3.
