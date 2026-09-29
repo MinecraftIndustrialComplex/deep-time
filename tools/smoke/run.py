@@ -52,6 +52,8 @@ import zipfile
 from datetime import datetime, timezone
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import jarstate  # noqa: E402  (what install.sh recorded about the Deep Time jar)
 
 FATAL = re.compile(
     r"InjectionError|MixinTransformerError|MixinApplyError|Mixin apply failed"
@@ -763,6 +765,16 @@ def main():
     sys.exit(0 if passed else 1)
 
 
+def deeptime_build(install):
+    """The jar's sha256 and source revision from install.json (install.sh, or a workbench preview that
+    refreshed the jar), and whether this tree's sources still match what it was built from."""
+    if not install.get("deeptime_jar_sha256"):
+        return "not recorded (installed before install.json kept the jar's source): re-run tools/smoke/install.sh"
+    ok, why = jarstate.status(REPO, install)
+    return (f"sha256 {install['deeptime_jar_sha256'][:12]}, source {install.get('deeptime_src_rev', '?')}, "
+            f"tree {install.get('deeptime_src_hash', '?')}" + ("" if ok else f" -- STALE: {why}"))
+
+
 def write_report(smoke, a, install, steps, level_type, boot_s, started, passed, server, gen_s=None):
     excluded = open(os.path.join(smoke, "excluded.txt")).read().split() if os.path.exists(os.path.join(smoke, "excluded.txt")) else []
     mods = sorted(f for f in os.listdir(os.path.join(smoke, "server", "mods")) if f.endswith(".jar"))
@@ -772,7 +784,8 @@ def write_report(smoke, a, install, steps, level_type, boot_s, started, passed, 
         r.write("| Field | Value |\n|---|---|\n")
         for k, v in [("Profile", a.profile), ("Level type", level_type), ("Circumference", install["size"]),
                      ("NeoForge", install["neoforge"]), ("MIC pack", install["pack"] + (f" (working tree {install['pack_dirty_hash']})" if install.get("pack_dirty_hash") else "")),
-                     ("Deep Time jar", install["deeptime_jar"]), ("Mod jars", len(mods)),
+                     ("Deep Time jar", install["deeptime_jar"]), ("Deep Time build", deeptime_build(install)),
+                     ("Mod jars", len(mods)),
                      ("Boot time", f"{boot_s:.0f} s"),
                      ("First-start preset", (install.get("preset") or "none") + (
                          f" (timeline {install.get('timeline_start')} / {install.get('timeline_length_myr')} Myr)"

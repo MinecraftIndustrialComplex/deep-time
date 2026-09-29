@@ -7,7 +7,9 @@ it through tools/workbench/preview-area.sh. README.md next to this file document
 A job generates one or more boxes of a world on a headless server and exports each with
 `deeptime-inspect export-area`:
 
-    install (only if the profile's server set is missing, or --install)
+    install  the profile's server set, only if it is missing (or --install); then, always, the Deep Time
+             jar: Gradle builds it (a one-second no-op when nothing changed) and the set's copy is
+             replaced when its bytes differ, so a preview never boots older code than its checkout
     prepare  the job's own world folder <job>/world: synthetic world data, a world-data folder
              (a run's bake), or a preset the server generates from on its first start; datapacks
     boot     the profile's server with --universe <job> --world world (the smoke world is untouched)
@@ -18,6 +20,8 @@ A job generates one or more boxes of a world on a headless server and exports ea
 
 Commands:
     preview.py run    [spec options] [--job ID] [--lock-held] [--install] [--keep-world]
+    preview.py refresh-jar --profile P        build the Deep Time jar and replace the profile's copy if it
+                                              differs (what every `run` does first); no server, no job
     preview.py submit [spec options]          start `run` detached; prints {"job", "dir", ...}
     preview.py status <job>                   the job's status.json
     preview.py list                           every job, newest first
@@ -48,10 +52,14 @@ import socket
 import string
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(REPO, "tools", "smoke"))
+import jarstate  # noqa: E402  (tools/smoke/jarstate.py: the jar comparison install.sh's record shares)
+
 VIEWER = os.path.join(REPO, "tools", "review", "pages", "area3d")
 PROFILES = ("standalone", "mic", "mic-ev", "terrablender", "ev")
 MAX_SIDE = 256
@@ -331,15 +339,29 @@ def dev(cmd):
     return ["nix", "develop", REPO, "-c"] + cmd
 
 
+def tool_env():
+    """The environment for Gradle, cargo and friends. tools/remote/mac.sh exports the Mac's
+    shared caches for every command it runs, but the live workbench's `deeptime watch` (started by
+    tools/viewer/mac-watch.sh) has none of that: its jobs would fill the small internal disk with a
+    second ~/.gradle and ~/.cargo. So on the Mac, point them at the SSD's caches unless set."""
+    env = dict(os.environ)
+    if cache_dir() == MAC_CACHE:
+        for var, sub in (("GRADLE_USER_HOME", "gradle"), ("CARGO_HOME", "cargo")):
+            if not env.get(var) and os.path.isdir(os.path.join(MAC_CACHE, sub)):
+                env[var] = os.path.join(MAC_CACHE, sub)
+    return env
+
+
 def run_cmd(job, cmd, cwd=REPO, log_name=None, check=True):
     """Runs cmd; with log_name its output goes to that log in the job folder, else stdout is
     captured (stderr goes to runner.log)."""
     job.say("$ " + " ".join(cmd))
+    env = tool_env()
     if log_name:
         with open(os.path.join(job.dir, log_name), "a") as out:
-            r = subprocess.run(cmd, cwd=cwd, stdout=out, stderr=subprocess.STDOUT, text=True)
+            r = subprocess.run(cmd, cwd=cwd, env=env, stdout=out, stderr=subprocess.STDOUT, text=True)
     else:
-        r = subprocess.run(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        r = subprocess.run(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if r.stderr:
             job.log.write(r.stderr)
     if check and r.returncode != 0:
@@ -512,6 +534,53 @@ def install_profile(job, spec):
                   "--size", str(spec["size"])], log_name="install.log")
     job.timing("install_s", round(time.time() - t, 1))
     return smoke
+
+
+def build_deeptime_jar(job):
+    """Gradle's `jar` task on this checkout: it tracks the Java sources, the resources and presets,
+    and (hostNatives -> cargo) the Rust natives the jar packs. A no-op takes about a second."""
+    try:
+        run_cmd(job, dev(["./gradlew", "jar", "-q", "--console=plain"]), cwd=os.path.join(REPO, "neoforge"),
+                log_name="build.log")
+    except RuntimeError as e:
+        tail = ""
+        try:
+            tail = open(os.path.join(job.dir, "build.log"), errors="replace").read()[-1500:]
+        except OSError:
+            pass
+        raise RuntimeError(f"the Deep Time jar does not build, so the preview would boot older code: {e}\n{tail}")
+
+
+def refresh_deeptime_jar(job, smoke, build=build_deeptime_jar):
+    """Makes the profile's server set carry the jar this checkout builds now. The set's copy is
+    taken when install.sh runs and the file name never changes, so it goes stale silently (a
+    jar from before P1-15's synthetic deposit preset failed every preview with `unknown key`).
+    Staleness is therefore decided by content: build (Gradle), compare sha256, replace when
+    different (tools/smoke/jarstate.py). The result is in the job status as `jar` and in install.json."""
+    t = time.time()
+    job.set("preparing", "building the Deep Time jar (Gradle; the natives are packed into it)")
+    build(job)
+    built = jarstate.built_jar(REPO)
+    res = jarstate.refresh(built, os.path.join(smoke, "server", "mods"))
+    fields = jarstate.jar_fields(REPO, built)
+    install_json = os.path.join(smoke, "install.json")
+    with open(install_json) as f:
+        install = json.load(f)
+    if any(install.get(k) != v for k, v in fields.items() if k != "deeptime_jar_recorded"):
+        jarstate.record(install_json, fields)   # a refresh, or an install.json from before the record
+    seconds = round(time.time() - t, 1)
+    src = f"source {fields['deeptime_src_rev']}, tree {fields['deeptime_src_hash']}"
+    if res["changed"]:
+        was = ", ".join(f"{w['name']} {w['sha256'][:12]}" for w in res["was"]) or "none installed"
+        msg = f"refreshed the Deep Time jar in smoke/{os.path.basename(smoke)}: {was} -> {res['name']} {res['sha256'][:12]} ({src})"
+    else:
+        msg = f"the Deep Time jar is current: {res['name']} {res['sha256'][:12]} ({src})"
+    job.st["jar"] = {"refreshed": res["changed"], "sha256": res["sha256"], "src_rev": fields["deeptime_src_rev"],
+                     "src_hash": fields["deeptime_src_hash"], "was": [w["sha256"] for w in res["was"]],
+                     "seconds": seconds}
+    job.st["timings"]["jar_s"] = seconds
+    job.set(message=msg)
+    return res
 
 
 def build_tools(job, smoke):
@@ -720,8 +789,10 @@ def run_job(job, lock_held=False):
     try:
         write_json(os.path.join(job.dir, "spec.json"), spec)
         smoke = install_profile(job, spec)
+        refresh_deeptime_jar(job, smoke)
         install = json.load(open(os.path.join(smoke, "install.json")))
-        job.st["install"] = {k: install.get(k) for k in ("profile", "neoforge", "pack", "pack_ref", "deeptime_jar")}
+        job.st["install"] = {k: install.get(k) for k in ("profile", "neoforge", "pack", "pack_ref", "deeptime_jar",
+                                                          "deeptime_jar_sha256", "deeptime_src_rev", "deeptime_src_hash")}
         tools = load_env(os.path.join(REPO, "smoke", "tools.env"))
         inspect, colors = build_tools(job, smoke)
         if not lock_held:
@@ -754,7 +825,8 @@ def run_job(job, lock_held=False):
         if not spec.get("keep_world"):
             shutil.rmtree(world, ignore_errors=True)
         job.timing("total_s", round(time.time() - t_all, 1))
-        job.set("done", "exported", finished=now(), export=job.st["exports"][0]["file"] if job.st["exports"] else None)
+        job.set("done", "exported" + ("; refreshed the Deep Time jar first" if job.st.get("jar", {}).get("refreshed") else ""),
+                finished=now(), export=job.st["exports"][0]["file"] if job.st["exports"] else None)
         return 0
     except Exception as e:
         job.set("failed", str(e)[:2000], finished=now(), error=str(e)[:2000])
@@ -1065,6 +1137,8 @@ def main():
     st = sub.add_parser("status")
     st.add_argument("job")
     sub.add_parser("list")
+    rj = sub.add_parser("refresh-jar", help="bring a profile's Deep Time jar up to date (no server, no job)")
+    rj.add_argument("--profile", default="mic", choices=PROFILES)
     sv = sub.add_parser("serve")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8765)
@@ -1079,6 +1153,18 @@ def main():
         print(json.dumps(status(a.job), indent=1))
     elif a.cmd == "list":
         print(json.dumps(list_jobs(), indent=1))
+    elif a.cmd == "refresh-jar":
+        smoke = os.path.join(REPO, "smoke", a.profile)
+        if not os.path.exists(os.path.join(smoke, "install.json")):
+            sys.exit(f"preview.py: no {smoke}/install.json: run tools/smoke/install.sh {a.profile}")
+        # Not a job: its folder is a throwaway, so the workbench's job list never shows it.
+        os.environ["DEEPTIME_WORKBENCH_JOBS"] = tempfile.mkdtemp(prefix="deeptime-refresh-jar-")
+        j = Job("refresh-jar", {})
+        try:
+            refresh_deeptime_jar(j, smoke)
+        except RuntimeError as e:
+            sys.exit(f"preview.py: {e}")
+        print(json.dumps(j.st["jar"], indent=1))
     elif a.cmd == "serve":
         serve(a.host, a.port)
     elif a.cmd == "submit":
