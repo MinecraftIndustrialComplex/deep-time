@@ -576,11 +576,14 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let l3 = cells(p.resolution.l3_r);
     let l2 = cells(p.resolution.l2_r);
     let levels = doublings(p.resolution.l2_r, p.resolution.l3_r).unwrap_or(1);
-    let world = super::estimate(p).bytes + l2 * LEVEL_BYTES_PER_CELL;
+    let surface = super::estimate(p);
+    let world = surface.bytes + l2 * LEVEL_BYTES_PER_CELL;
     let cap = crate::session::DEFAULT_MEM_CAP;
     // A level streams when its buffers would not fit next to the rest of the world under the
     // default cap (plan §5.7.5: "any preset whose estimate exceeds its cap streams L3
     // automatically"); a tile's window is the tile and a halo of about 200 cells on each side.
+    // The recorded history's frames give way to the buffers first (P1-17: `reserve` spills them).
+    let base = world - surface.history_bytes;
     let window = |r: u32| {
         let w = (u64::from(a.tile_cells) + 2 * 200).min(width(r));
         w * w.min(width(r) / 2) * TILE_BYTES_PER_CELL
@@ -588,7 +591,7 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let pick = |whole: u64, streamed: u64| match a.stream {
         StreamMode::Always => streamed,
         StreamMode::Never => whole,
-        StreamMode::Auto if world + whole > cap => streamed,
+        StreamMode::Auto if base + whole > cap => streamed,
         StreamMode::Auto => whole,
     };
     let last = pick(l3 * TILE_BYTES_PER_CELL, window(p.resolution.l3_r));
@@ -608,6 +611,7 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     StageEstimate {
         bytes: world + peak,
         seconds: l3 as f64 * 1.2e-6 + mid_cells as f64 * 3.0e-6,
+        history_bytes: surface.history_bytes,
     }
 }
 

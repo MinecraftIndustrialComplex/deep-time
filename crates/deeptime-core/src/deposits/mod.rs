@@ -67,6 +67,7 @@ pub mod rules;
 pub mod sites;
 pub mod sizing;
 pub mod spawn;
+pub mod spill;
 pub mod survival;
 pub mod synthetic;
 pub mod tracts;
@@ -635,13 +636,13 @@ impl DepositStage {
                         h.grid, grid
                     )));
                 }
-                if h.frames.is_empty() {
+                let times = h.frame_times();
+                if times.is_empty() {
                     return Err(CoreError::InvalidState(
                         "the recorded history has no frames (the surface stage has not finished)"
                             .into(),
                     ));
                 }
-                let times = h.frames.iter().map(|f| (f.t_years, f.dt_years)).collect();
                 (h.names(), times)
             };
         // The regional fields every frame gets on reading.
@@ -758,6 +759,11 @@ impl DepositStage {
         Ok(())
     }
 
+    /// Bytes of one frame unpacked (every name the history carries as a full field).
+    fn frame_bytes(&self) -> u64 {
+        self.grid().cells() as u64 * 4 * self.state.field_names.len().max(1) as u64
+    }
+
     fn synthetic_time(&self, k: usize) -> (f64, f64) {
         let Source::Synthetic(sp) = &self.source else {
             unreachable!("only a synthetic history is timed by the preset");
@@ -773,6 +779,11 @@ impl DepositStage {
         ctx: &StageContext<'_>,
     ) -> Result<(), CoreError> {
         let grid = self.grid();
+        // The frame unpacked, the crust's origins, one carried accumulator and the favourability
+        // layer being replaced (P1-17: on a long run the recorded history's frames give way to
+        // them).
+        let per_cell = 12 + 4 + std::mem::size_of::<CellAcc>() + std::mem::size_of::<CellPet>();
+        ctx.reserve(self.frame_bytes() + grid.cells() as u64 * per_cell as u64)?;
         let burial = self.burial_field();
         let pet_rules = self.types.iter().find_map(|t| t.petroleum.clone());
         let t0 = std::time::Instant::now();
@@ -1022,6 +1033,7 @@ impl Stage for DepositStage {
         StageEstimate {
             bytes,
             seconds: 2.0e-8 * n as f64 * self.frames as f64 * (self.types.len() as f64 + 30.0),
+            history_bytes: 0,
         }
     }
 
@@ -1309,6 +1321,8 @@ impl DepositStage {
         if let Some((t_end, _)) = self.state.frame_times.last() {
             world.t_years = world.t_years.max(*t_end);
         }
+        // The present frame, kept, and pass 2's frames one at a time.
+        ctx.reserve(2 * self.frame_bytes())?;
         let present = ctx.pool.install(|| hist.frame(last))?;
         let elev = present
             .fields
@@ -2867,6 +2881,9 @@ pub fn sites_of<'a>(
 
 #[cfg(test)]
 mod recorded_tests;
+
+#[cfg(test)]
+mod spill_tests;
 
 #[cfg(test)]
 mod tests {

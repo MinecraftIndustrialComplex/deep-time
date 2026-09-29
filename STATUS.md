@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI · In flight: history spill to SSD, diffusion loop fusion, workbench memory-cap refusal · P1-08 bake + format 0.1 done on its branch (built-ins are real planets) · Next: P1-09 climate mapping, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · Next: P1-09 climate mapping, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -38,7 +38,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-14 | Deposit engine: the four families | done | 2026-09-29 | — | On the real recorded history (plates → surface → structure → deposits, `pipeline_{quick,full}_{16k,32k}` have a `deposits` section). Mac: cargo test --workspace ok (core 155 + 1 ignored incl. deposits::recorded_tests 6: 1 vs 3 threads give identical sites/bodies/events/census, a checkpoint inside the deposit stage resumes on another thread count to the same sites, favourability of a rigidly drifting crust = the fixed-crust map moved cell for cell, missing fields skip exactly the types that read them and change nothing else, every family on recorded frames; cli 21 incl. `stage deposits` on the real history; format 32, inspect 28, jni 7, viewer 5); clippy -D warnings, deny licenses bans clean; gradlew build test 118/0; fmt clean for every file this task touches (watch/editor.rs on master is not); `stage deposits --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-deposits-real` → 154 s (plates 30.0, surface 111.6, structure 5.0, deposits 4.4), 5 sites at count_mult 1 (porphyry 1, coal 4; MVT, SEDEX, petroleum expected 0.00 / 0.00 / 0.11), 42 at count_mult 10; 17 MB bundle. Ben reviews: ore provinces, site list, three chains; see the build log for what is empty and why |
 | P1-15 | Deposits in the world | doing | 2026-09-28 | — | On the synthetic deposit world (real fields wait for P1-03…P1-08). Mac: ./gametest.sh, -PwithEv, -PwithMic → All 30 required tests passed each (DepositGameTests body 1222/1222 ore exact, 0 missed, 0 unexplained, regeneration 0 of 44,880 differ; ClaimGameTests; SpawnGameTests); ./gametest-planet.sh claimoninplanetworld PASS standalone (19 removed) and -PwithMic (38 removed); JUnit 62/0 incl. DepositDataParityTest (19,649 body samples, worst Δ 3.3e-16); smoke standalone first-start deposit world PASS + `deeptime-inspect ore` render |
 | P1-16 | COE and CDG hooks | done | 2026-09-28 | — | Mac: `./gametest.sh` and `-PwithMic` → All 45 required tests passed each; CompatGameTests with COE 1.6.8 + CDG 1.3.15: 7 of 7 site chunks = the site's vein in COE, 30 of 30 claimed noise veins dropped (COE picks them in the overworld), 34 unclaimed kept, 33 stored randomMul = the site's quantile (24 = Rust's drawn quantile, worst Δ 2.8e-8), 16 trap chunks = charge × cdg_scale × share, 111 chunks outside traps 0. MIC smoke (16k deposit world) PASS: `probe coe` at 9 site chunks = the site's vein (agrees), `probe cdg` over trap 27 > 0 (infinite / 553,979 mB), 0 elsewhere; `/coe locate` copper not found, redstone found. JUnit 106/0; cargo fmt/clippy/test/deny clean. Driven by the synthetic deposit world (see build log) |
-| P1-17 | Benchmark gate and preset tuning | doing | 2026-09-29 | | Partial (surface parallelism, branch worktree-agent-a9bc0ab99e68b4a07): stream-power solve 34.0 → 6.5 s at 12 threads, bit-identical; flood left serial on purpose; diffusion is now the largest surface cost; see the build log entry "P1-17 partial". Partial (calibration with the real climate, branch worktree-agent-ae48007457b607716, Ben 2026-09-29): pipeline presets + surface/climate/structure defaults + four deposit balance multipliers; Mac: `stage deposits --preset pipeline_quick_16k --length-myr 500` scattered / supercontinent → land median 2,352 / 1,743 → 601 / 624 m (Earth 427), above 2 km 0.56 / 0.45 → 0.11 / 0.07 (Earth 0.10), land 0.233 / 0.215 → 0.270 / 0.282, Köppen E 0.53 / 0.64 → 0.18 / 0.23, glaciated 0.31 (feedback off) → 0.06 / 0.07 (on), sites porphyry 1 / 1 → 5 / 34 (median 8 over 3 seeds × 2 starts), SEDEX, MVT, oil on 4, 3, 5 of 6 planets, plutons 7,830 / 5,374 → 1,192 / 885 bodies, mass residual ≤ 1.9e-3 km³; Earth check 19/24 (unchanged), 9.7 % glaciated with the feedback; cargo test/clippy/fmt/deny clean, gradlew build test 118/0; bundles review/out/p1-calib-{scattered_continents,supercontinent} (20 / 15 MB, not published); see the build log entry "P1-17 partial: calibration" |
+| P1-17 | Benchmark gate and preset tuning | doing | 2026-09-29 | | Partial (surface parallelism, branch worktree-agent-a9bc0ab99e68b4a07): stream-power solve 34.0 → 6.5 s at 12 threads, bit-identical; flood left serial on purpose; diffusion is now the largest surface cost; see the build log entry "P1-17 partial". Partial (calibration with the real climate, branch worktree-agent-ae48007457b607716, Ben 2026-09-29): pipeline presets + surface/climate/structure defaults + four deposit balance multipliers; Mac: `stage deposits --preset pipeline_quick_16k --length-myr 500` scattered / supercontinent → land median 2,352 / 1,743 → 601 / 624 m (Earth 427), above 2 km 0.56 / 0.45 → 0.11 / 0.07 (Earth 0.10), land 0.233 / 0.215 → 0.270 / 0.282, Köppen E 0.53 / 0.64 → 0.18 / 0.23, glaciated 0.31 (feedback off) → 0.06 / 0.07 (on), sites porphyry 1 / 1 → 5 / 34 (median 8 over 3 seeds × 2 starts), SEDEX, MVT, oil on 4, 3, 5 of 6 planets, plutons 7,830 / 5,374 → 1,192 / 885 bodies, mass residual ≤ 1.9e-3 km³; Earth check 19/24 (unchanged), 9.7 % glaciated with the feedback; cargo test/clippy/fmt/deny clean, gradlew build test 118/0; bundles review/out/p1-calib-{scattered_continents,supercontinent} (20 / 15 MB, not published); see the build log entry "P1-17 partial: calibration" Partial (history spill, branch worktree-agent-a33c2dc374c0ccd2f, Ben 2026-09-29): the recorded history spills to the run folder over the memory cap; `pipeline_full_32k` 1000 Myr finishes under 4 GiB (2.3 GiB on disk); spilled = in-memory byte for byte; see the build log entry "the recorded history spills to the SSD" |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
 | P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log). **UI overhaul** (branch worktree-agent-a95571be05fdd89d6, Ben: "should be dark themed"): dark map-first layout, run cards, sectioned editor with the estimate by Run, split/side-by-side compare, timeline dock, stage-2 job cards, `?tv` HUD, 390 px; placeholders hidden; Mac gates clean, JUnit 118/0; before/after in review/out/workbench-ui/ (see build log) |
@@ -73,6 +73,176 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — P1-17 partial: the diffusion solve fused into two passes per CG iteration, bit-identical (agent worktree agent-a0f4f991a0d939f16, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Only `surface/diffusion.rs` (plus the new `surface/diffusion/parity.rs`). The Jacobi-PCG iteration was seven
+  parallel regions over ~22 vector streams of 4 MB; it is now two passes over strips of 8 rows: **pass 1** forms the direction
+  (z, then z + βp), applies the operator to it and reduces p·Ap; **pass 2** does x += αp, r −= αAp, z = r/diag and reduces r·r
+  and r·z. The operator is applied one term at a time per row (same order per cell, so it vectorises); each strip keeps a
+  three-row ring of the direction so neighbouring strips never read what another writes. Also parallel now: `Operator::new`
+  (was serial), the final residual correction, and `lod`'s z-sweep scatter (columns are solved in blocks of 8, so one cache
+  line serves eight columns; each column is solved exactly as before).
+- **Bit-identical, and how the reductions work.** The old `dot` was already thread-count independent: a sum per row in
+  ascending column order (`.sum()`), the row sums collected and added in ascending row order on one thread. The fused passes
+  keep exactly that: per-row sums, started from the same value `Iterator::sum` starts from (`sum_zero()`: -0.0 today, so a row
+  of negative zeros keeps its sign), then the `h` row sums added serially in row order; four rows are summed side by side
+  only to overlap latencies, never within a row. Nothing depends on the strip height (verified at 1, 3, 16) or the pool. No FMA
+  (Rust never contracts), no reciprocal for a division, A·p's terms in the old order (diag, east, west, south, north).
+  **Evidence:** (1) `diffusion/parity.rs` keeps the old `step`/`lod`/`Operator`/`dot`/`cg` verbatim and compares bit patterns
+  of the field and the iteration counts on random wrapping grids with stiff diffusivities (0, 1e-20, 5, 300, 1e5), on fractal
+  terrain with the surface stage's real diffusivities (`submarine_kd`: open sea of 300 m²/yr next to 2 m²/yr coasts, 5/40/78/100 %
+  of cells in the sea, wrapping and not), 30 awkward shapes (1×1, 1×9, 9×1, 2×n, heights around the strip), multi-step runs,
+  kd = 0 (loop never starts), a flat field and the iteration cap, each on pools of 1, 2, 4 and 8 threads (and the reference on
+  each pool too). Mutation checks: swapping the east/west term order fails 4 of 6 tests; splitting a row sum over two
+  accumulators fails 2. (2) Real 500 Myr `pipeline_quick_16k` worlds, old binary (master) at 4 threads against the new binary at
+  12 and at 1 thread: every world file (12 keyframes, events, sites, bodies, indices, preset; sha256 over all files but
+  `manifest.json`) identical, `surface_final` line identical (108.8 CG iterations per step); `manifest.json` differs only in
+  `created_utc` and the `millis` timings. That was on c79b38f; after merging master 455b57f (P1-06 young/amplify stages) I
+  repeated it: scattered_continents old@4 = new@12 = new@1, and supercontinent old@4 = new@12, all byte-identical. The
+  `run --checkpoints` whole-file compare is not usable now: the checkpoint embeds stage summaries with timing text whose length
+  varies, so the files are byte-identical apart from the header CRC/length and those numbers (checked by re-aligning the diff:
+  every difference is digits or a length prefix inside a summary JSON).
+- **Measured (Mac M6, load average 2–4, so quiet), one 500 Myr-sized step on a 1024×512 L1 raster with earthlike
+  diffusivities, min of 12 interleaved old/new pairs (`cargo test --release -p deeptime-core diffusion_timing -- --ignored
+  --nocapture`; `DEEPTIME_TIMING_REPS` sets the pairs; 101 CG iterations):**
+
+  ```
+  threads  cg old ms  cg new ms  ms/iter old→new   lod old→new   operator old→new   step old→new
+  1        193.9      102.3      1.92 → 1.01       14.4 → 13.3   0.8 → 0.7          208.5 → 116.6   (1.79x)
+  2        101.2       55.1      1.00 → 0.55        9.0 →  7.1   0.8 → 0.4          111.1 →  63.0   (1.76x)
+  4         70.8       41.9      0.70 → 0.42        5.5 →  4.0   0.8 → 0.3           77.6 →  46.0   (1.69x)
+  8         55.1       30.9      0.55 → 0.31        3.8 →  2.4   0.8 → 0.2           59.0 →  33.5   (1.76x)
+  12        51.7       28.6      0.51 → 0.28        3.5 →  1.9   0.8 → 0.2           62.3 →  33.1   (1.88x)
+  ```
+  Scaling of the new step: 1 → 12 threads 3.5x (old 3.3x); the solve is ~1.8x faster at every thread count, and at 1 thread
+  too, so the gain is mostly memory traffic, not only barriers. The kd fill in `surface/mod.rs` is serial and 1.4–1.6 ms.
+  **End to end (`bench --preset pipeline_quick_16k --start scattered_continents --length-myr 500`, old and new binaries
+  interleaved, 3 rounds, on c79b38f; the Mac's load average was 2–27 from other agents, min..max):**
+
+  ```
+  threads code   total s        surface s      diffusion s    spl s        surface−diffusion s
+  12      old    77.0..204.3    40.9..136.2    15.5..82.5     4.1..11.2    25.4..53.7
+  12      new    74.4..145.9    36.5..81.3     10.0..29.9     4.3..12.1    26.5..51.4
+  4       old    103.5..224.2   52.6..133.0    21.0..70.7     7.8..15.3    31.6..62.3
+  4       new    95.8..121.1    44.4..57.1     12.7..18.5     7.8..9.6     31.7..38.6
+  1       old    274.2..391.8   133.8..192.8   64.0..93.4     28.5..36.4   69.8..99.4
+  1       new    288.4..329.1   124.8..145.1   45.5..54.8     30.8..33.9   79.3..90.3
+  ```
+  Diffusion per run (s), round 1/2/3: 12 threads old 82.5/16.4/15.5, new 29.9/19.2/10.0; 4 threads old 21.0/70.7/31.1, new
+  12.7/14.3/18.5; 1 thread old 71.6/64.0/93.4, new 45.5/54.8/46.7. The whole-run numbers are dominated by the Mac's load (the
+  same binary swung 15–82 s at 12 threads); read the minima and the microbench. Diffusion minima: 15.5 → 10.0 s at 12 threads,
+  21.0 → 12.7 s at 4, 64.0 → 45.5 s at 1. On the merged tree (master 455b57f, which adds the young/amplify stages; one round, old then new, scattered_continents,
+  load average 5 → 40–50 during the runs, other agents' jobs): 12 threads diffusion 252.7 → 70.0 s, surface 428.5 → 214.2 s, total 635 → 397 s;
+  4 threads diffusion 73.4 → 30.0 s, surface 166.5 → 99.4 s, total 314 → 231 s. Loaded numbers, so only the direction counts;
+  the machine was never quiet for a whole end-to-end run.
+  Per-step diffusion in the best 12-thread run: 10.0 s / 250 = 40 ms, against the microbench's 33 ms plus the stage's kd fill and copies.
+- **What is left for the preconditioner step.** Diffusion is still 25–35 % of the surface stage: 101 iterations × ~0.28–1.0 ms.
+  A coarse-grid correction (111 → ~10 iterations) is now worth ~10× on this phase, but it changes results, so it needs the
+  calibration agent's agreement; if it goes in, the two-pass structure stays (pass 1 gets the correction's prolongation in the
+  direction formation, pass 2 the restriction sums; the reduction scheme, row sums added in row order, must stay for
+  thread-count independence). Without changing results there is little more here: the iteration is at ~0.28 ms per iteration =
+  ~14 GB/s of traffic on 12 threads, near what the Mac gives, and the serial remainder of the step (kd fill 1.5 ms, `before`
+  clone, the difference loop after `step` in `surface/mod.rs`, ~3–5 ms in all) is now a few percent of it.
+- **Gates on this branch (merged with master 455b57f):** `cargo fmt --check`, clippy `-D warnings`, `cargo deny check licenses
+  bans` clean; `cargo test --workspace --no-fail-fast` all green (core 211 + 3 ignored, cli 25, format 33, inspect 28+2+7, jni 7,
+  viewer 5). One flake seen once: `tests::surface_stage_runs_from_a_plates_checkpoint` failed ("keyframes/index.json: No such
+  file" in `$TMPDIR/deeptime-stage-<pid>`, the shared Mac temp dir, while other agents' jobs ran); it passed on the immediate
+  re-run with nothing changed. It is a temp-dir race in `stage` with `--work` unset (`deeptime-stage-{pid}`), not diffusion.
+
+### 2026-09-29 — P1-17 partial: the recorded history spills to the SSD instead of failing at the memory cap (agent worktree agent-a33c2dc374c0ccd2f, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben, 2026-09-29, "Spill history to the SSD (Recommended)" (decisions log). The failing run (`pipeline_full_32k`,
+  supercontinent, 1000 Myr, 4 GiB) died at the surface stage's first `reserve(estimate / 2)`: the estimate counted the
+  whole 2.5 GB history, so that one reservation asked 2.65 GB on ~1.65 GB in use (the workbench entry's reading).
+- **What grows with length (measured).** Only the recorded history: 12.7 B per L1 cell per frame at 32k full (2,540.9 MiB
+  for 100 frames of 2048 × 1024), 5.3 MiB per frame at 16k quick. The base in use at the end of the surface group,
+  without the history, is flat in length: 16k quick 761 MiB in use at 500 Myr, 931 MiB at 2000 Myr (+170 MiB for 4× the length, most likely the keyframe
+  ring filling to its 16 frames; not traced). Events (7,391 at 32k × 1000 Myr), sites, the
+  pluton list, the keyframe ring (16 frames, the rest on disk) and the log ring are small or bounded; checkpoints are disk
+  and are now streamed (below). Documented, not spilled.
+- **Design** (`deposits/{recorded, spill}.rs`, `session.rs`, `stage.rs`, `checkpoint.rs`).
+  - `RecordedHistory` keeps each frame as `Memory(Arc<PackedFrame>)` or `Disk(head + file + offset + CRC32)`; a frame on
+    disk is its fields' LZ4 blobs back to back (the existing encoding, same bytes), its head (names, ranges, bits,
+    lengths) stays in memory, so the crust-origin offsets (`origins(k)`, read by `trace`) are two small reads.
+  - The session owns a `SpillStore` in `out_dir` (the workbench's run folder, the game's staging folder, the server's
+    `<world>/<folder>.generating`); the spill file `history-<pid>-<n>.spill` is created on the first eviction and is
+    anonymous: unlinked at once on Unix, delete-on-close on Windows. Nothing is left behind after a crash, and nothing
+    can be moved into a world. Its size is reported (`notes.run.history.spilled_bytes`, the CLI's `history` line).
+  - Eviction, oldest-written first: (1) `StageContext::reserve` — when a reservation would pass the cap and the history's
+    frames in memory can cover the excess, they go to disk first and the reservation is checked again; only a base that
+    does not fit fails (`MemoryCap`, as before); (2) after every stage step the history is trimmed while the gauge is over
+    `cap − cap/16`. Frames read back are not cached (flat memory; the OS page cache caches); a forward scan (the deposit
+    engine's pass 1 and pass 2) reads the next frame ahead on a thread of its own. A frame a later stage adds fields to
+    (P1-07's host fractions) comes back into memory and is written again when evicted.
+  - Reservations that were missing or counted the history: the surface's first reservation now excludes the history;
+    the deposit stage reserves its unpacked frame (ingest, placement), so on a long run its ~0.5 GB of decoded fields at
+    32k make the history give way instead of passing the cap unreserved.
+  - `--history-mem N` (CLI) / `Session::set_history_budget`: at most N bytes of frames in memory whatever the cap
+    (0 = every frame to disk after its step), for tests and measurements. `Session::needed_peak` / `needed_base_peak`:
+    the largest reservation with and without the history's frames (`notes.run.history.reserved_*`).
+- **Checkpoints, schema 5 → 6.** Fixed fields `u32 schema, u32 history_frames`; section 1 is the body without the
+  history's data plus its head; one section per frame holds its record. Written streamed (`<path>.tmp`, fsync, rename;
+  new `container::StreamWriter`, same bytes as `encode`; the body straight from the world with `postcard::to_io`; frames
+  copied from memory or the spill file) — no copy of the world or the history is made, and the session's own
+  checkpoints borrow the world (`CheckpointRef`, `Session::write_checkpoint`). `Checkpoint::read` checks every section's
+  CRC but leaves the frames in the file (the history reads them from the checkpoint on demand); schema 5 is refused
+  naming both schemas. (Sections stay u32-long: a frame is ≤ ~100 MB; the body of a 32k world is ~2 GB.)
+- **Estimate.** `session::estimate_for(preset, content, cap)` (and `estimate` = the default 4 GiB) adds `base_bytes`,
+  `history_bytes`, `spill_bytes`, `mem_cap` (run and per stage; `StageEstimate::history_bytes`); `peak_bytes` = base +
+  the history that fits, so `peak_bytes > cap` only when the base is over. The workbench (master's cap check) asks for the
+  estimate under its cap less the 512 MiB server overhead, so it refuses only runs whose base does not fit, and shows
+  "… of history to disk" in the estimate tile and a warning instead of "near the cap". Java: `Estimate` reads the new
+  fields (`exceeds(cap)` = base over cap, `peakUnder/spillUnder(cap)`); the Create World editor blocks on the base and
+  warns `editor.warning.spill`; the first-start generator refuses on the base and logs the spill. `SimSession` completes
+  its future only after the native session is destroyed, so the first-start move of the work folder and the staging
+  cleanup never race an open spill file (Windows).
+- **Determinism evidence.**
+  - `deposits::spill_tests::a_history_spilled_to_disk_gives_the_same_world_and_census`: the coupled pipeline (256 × 128,
+    100 Myr) with every frame on disk (1 thread), a two-frame budget (2 threads) and all in memory (3 threads): the same
+    world byte for byte (postcard body), notes but for timings, census and history.
+  - `…::a_checkpoint_with_a_spilled_history_resumes_to_the_same_result`: checkpoints taken inside the plates–surface
+    group and inside the deposit stage from spilled histories, written to files, read back (frames left in the file) and
+    resumed on 3 and 2 threads with other budgets: the same world as a straight in-memory run; the checkpoint streamed
+    from the spill file equals one written from memory.
+  - `tests/history_cap.rs` (own binary, counting allocator): cap = max(unlimited peak − history/2, largest base
+    reservation + 2 MiB) → 26 of 50 frames spilled, peak 46.6 MiB against 54.6 MiB unlimited, the world byte-identical; a
+    1 MiB cap fails cleanly with `MemoryCap`.
+  - Unit tests for the container writer/reader, fsutil, the spill file, evicted frames (origins, add_fields, clone,
+    head + records, a flipped byte caught by the CRC), checkpoints with frames, the estimate under caps.
+  - **At scale** (Mac, release, `deeptime run --preset pipeline_quick_16k --start supercontinent --length-myr 500
+    --threads 4`, in memory vs `--history-mem 0`, run side by side): all 23 world-data files identical (117 MiB: events,
+    sites, bodies, keyframes, the L3 tile packs) and every manifest note equal but for its timings (56 sites, same census);
+    50 frames, 266.9 MiB of history, 478.8 MiB written (each frame twice: once by the surface, again after the structure
+    stage added its fields), 787.8 MiB read back.
+  - **At scale, 32k:** the failing run under 4 GiB (91 of 100 frames on disk) vs the same run under 8 GiB (5 frames
+    spilled, by the amplifier's whole-raster reservation; its middle level then ran whole, 1 tile instead of 8): all 33
+    world-data files identical (368.7 MiB, the L3 tile packs included), the deposit census and every note equal but for
+    timings (118 sites, 7,391 events). Wall time 2,421 s (4 GiB) vs 2,534 s (8 GiB), both on the shared Mac under other
+    agents' load: no slowdown to measure; 8 GiB run: max RSS 4.76 GB, peak footprint 9.17 GB, gauge peak 8,182 MiB.
+- **Timings and memory.**
+  - 16k quick 500 Myr side by side on the loaded Mac: 798 s in memory vs 795 s all on disk (noise); deposits 7.4 vs
+    6.2 s; spill I/O 0.74 s writing, 0.24 s reading. Gauge peak 3,373 vs 3,106 MiB (the young/amplify stages dominate the
+    peak at 16k), max RSS 1.40 GB both.
+  - **The run that failed**, `pipeline_full_32k`, supercontinent, 1000 Myr, `--mem-cap 4294967296`, 8 threads (Mac
+    load 40–78 from other agents' runs): **finished**, 2,421 s (40 min; plates 483, climate 187, surface 1,571, structure
+    55, deposits 37.7, young 9.8, amplify 77.6 s streamed in 32 tiles), 118 sites, 7,391 events. History 2,540.9 MiB in 100
+    frames; the first spill at 3,285 of 4,096 MiB in use (a reservation), 69 frames on disk after the surface group (2,970
+    MiB in use), 91 at the end; **disk: 2,325.6 MiB written to the spill file** (2.3 GiB for a 1000 Myr 32k full run;
+    ~2.5 GiB is the bound, the history's size), gone when the run ended. Gauge peak 4,405.5 MiB (the young and amplify
+    stages allocate without reserving; P1-06's own finding), max RSS 4.61 GB, macOS peak footprint 6.69 GB.
+  - **The long run** (parked question), `pipeline_quick_16k`, supercontinent, **2000 Myr**, `--mem-cap 4294967296`, 6
+    threads: **finished**, 1,459 s (24 min on the loaded Mac; plates 343, climate 132, surface 911, structure 38, deposits
+    20, young 2.5, amplify 13.8 s), 21 sites, 5,961 events. History 1,356.3 MiB in 200 frames (13.0 B per cell per frame);
+    it all stayed in memory until the amplifier's whole-raster reservation, which sent 116 frames (762.5 MiB) to disk and
+    ran in memory. Gauge peak 3,805 MiB, max RSS 3.38 GB. Deposits on 2000 Myr of history at `count_mult` as calibrated:
+    porphyry 3, placer 10, coal 7, petroleum 1 (most drawn deposits eroded: 19 of 24 porphyries) — physics, not tuned here.
+- **Gates** (Mac, after merging master 64752e6, P1-08 included): `cargo fmt --all -- --check` clean; `cargo clippy
+  --workspace --all-targets -- -D warnings` clean; `cargo test --workspace --no-fail-fast` all ok (core 215 + 2 ignored,
+  history_cap 1, cli 27, format 40, …); `./gametest.sh --server` All 48 required tests passed (before the merge
+  `siteApiAndProbes` failed on master's deposit world too; P1-08 fixed it); `cargo deny check licenses bans` ok; `cargo check --target x86_64-pc-windows-msvc -p
+  deeptime-core` ok (the Windows spill-file code); `cd neoforge && ./gradlew build test` → JUnit 125/0.
+- **Next.** P1-17 proper: re-measure the workbench's 512 MiB overhead with the flat history (the method in the
+  workbench entry); make young and amplify reserve what they allocate (the 32k run passed its 4 GiB gauge cap by
+  ~0.3 GiB there, unreserved); the 12 B/cell/frame history constant in `surface::estimate` holds (12.7 measured at 32k).
+
 ### 2026-09-29 — P1-08 bake, world data 0.1 and parity (agent worktree agent-a09db47c6d05e1417, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** (1) **Format 0.1** (`Cargo.toml`, `FORMAT_MINOR`, Java `FormatVersion`): every header's minor is 1; FORMAT.md
   gains "The bake" (layer table, `notes.bake`), "The terrain height" (H = E + A·N), "The P1-08 bake" (top horizon)
@@ -3040,14 +3210,14 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   L1 scratch after its last step, so the `young`/`amplify` estimates (world + own) exceed 4 GiB on the
   full presets although the gauge reads ~1 GiB there; P1-17 could drop it. (4) The amplifier's working
   set is 46 B a cell (67 B while a tile runs), not the plan's 20.
-- **Long runs (parked by Ben, 2026-09-29: "DW about it for now").** A real 4,600 Myr run (timeline max, plan
-  §5.1) is estimated by the workbench at ~45 min / 3.8 GB (pipeline_quick_16k) and ~3 h / 14.6 GB
-  (pipeline_full_32k, too big for the 16 GB Mac): the deposit engine's recorded history (a frame every
-  10 Myr) is held in memory and grows with length. The physics is tested only over 500 Myr and starts from
-  existing continents (no early-Earth phase). Options offered: history on disk (flat memory), an early-Earth
-  phase, or a 1 Gyr cap. Revisit in P1-17 or when Ben raises it. Since the memory-cap fix (build log,
-  2026-09-29) the workbench refuses a run whose estimate plus 512 MiB is over its cap (default 8 GiB) instead
-  of failing partway, so a run like this now says why before it starts.
+- **Long runs (parked by Ben, 2026-09-29: "DW about it for now"; memory part solved 2026-09-29, history spill).** The
+  recorded history no longer has to fit in memory: over the cap its oldest frames go to a spill file in the run's folder
+  and the run gets slower instead of failing (build log 2026-09-29, "the recorded history spills to the SSD"). The 1000
+  Myr `pipeline_full_32k` run that failed at 4 GiB now finishes under 4 GiB (40 min on a loaded Mac, 2.3 GiB of disk);
+  `pipeline_quick_16k` 2000 Myr finishes under 4 GiB (24 min, 3.8 GiB gauge peak). A 4,600 Myr 32k full run needs its history on disk (~11 GiB, 12.7 B per L1 cell per frame) plus a base
+  of ~4.2 GiB (the amplifier; ~3 GiB before it), so it fits an 8 GiB cap now; its time (~3 h) is untested. Still open:
+  the physics is tested only over 500 Myr and starts from existing continents (no early-Earth phase); the young and
+  amplify stages allocate ~0.3 GiB at 32k without reserving it.
 - The workbench offered the placeholder `earthlike_*` presets (dummy pipeline) next to the real `pipeline_*`
   ones; Ben ran one and got a single blob. The UI overhaul hides them behind a dev toggle and marks a
   placeholder run (build log 2026-09-29, UI overhaul). Since P1-08 the `earthlike_*` built-ins are the real

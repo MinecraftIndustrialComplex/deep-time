@@ -2500,11 +2500,13 @@
     }
     const need = neededBytes();
     const secs = estimateSeconds(), scale = Math.max(cap * 1.15, need * 1.05), over = need > cap;
+    // Over the cap by its recorded history only: that goes to the SSD (P1-17), the run just slows.
+    const spill = !over && e.spill_bytes > 0 ? ` · ${fmtBytes(e.spill_bytes)} of history to disk` : '';
     const [mv, mu] = fmtBytes(need).split(' ');
     const tt = fmtHuman(secs).split(' ');
     box.innerHTML = `<div class="est${estimating ? ' pending' : ''}" data-tip="${esc(`The estimate, ${fmtBytes(e.peak_bytes)}, plus ${fmtBytes(need - e.peak_bytes)} for the server itself: what the run holds against its cap`)}"><div class="k">${ic('chip', 'ic-s')}Peak memory</div><div class="v">${esc(mv)}<small>${esc(mu)}</small></div>` +
       `<div class="membar"><span class="${over ? 'over' : ''}" style="width:${(100 * need / scale).toFixed(1)}%;${!over && need > 0.8 * cap ? 'background:var(--queued)' : ''}"></span><i style="left:${(100 * cap / scale).toFixed(1)}%"></i></div>` +
-      `<div class="sub">${esc(capText)}</div></div>` +
+      `<div class="sub">${esc(capText + spill)}</div></div>` +
       `<div class="est${estimating ? ' pending' : ''}"><div class="k">${ic('clock', 'ic-s')}Time on the Mac</div><div class="v">${esc(tt[0])}<small>${esc(tt.slice(1).join(' '))}</small></div>` +
       `<div class="sub" data-tip="${esc(e.stages.map(s => `${s.name} ${fmtHuman(s.seconds)}`).join(' · '))}">${esc(e.stages.map(s => s.name).join(' · '))}</div></div>`;
     warnings(e, secs);
@@ -2516,7 +2518,8 @@
     // Over the cap is a problem the server reports (eff.problems, with Run off); here only "near it".
     const cap = capGiB() * 2 ** 30, out = [];
     const need = neededBytes();
-    if (need <= cap && need > 0.8 * cap) out.push(['', `Near the memory cap: about ${fmtBytes(need)} of ${fmtCap(capGiB())}.`]);
+    if (need <= cap && e.spill_bytes > 0) out.push(['', `Over the cap by its recorded history: about ${fmtBytes(e.spill_bytes)} of it goes to the SSD in the run's folder while it runs. Slower, same planet.`]);
+    else if (need <= cap && need > 0.8 * cap) out.push(['', `Near the memory cap: about ${fmtBytes(need)} of ${fmtCap(capGiB())}.`]);
     if (secs > 3600) out.push(['', `A long run: about ${fmtHuman(secs)} of the Mac's time, and nothing else runs meanwhile.`]);
     else if (secs > 900) out.push(['', `About ${fmtHuman(secs)} of the Mac's time.`]);
     for (const [cls, text] of out) {

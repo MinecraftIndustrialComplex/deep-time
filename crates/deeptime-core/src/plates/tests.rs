@@ -73,6 +73,8 @@ fn run_stage(
             gauge: &gauge,
             mem_cap: u64::MAX,
             state: &state,
+            history: None,
+            needed_peak: None,
         };
         stage.step(&mut world, &ctx).unwrap();
         let st = world.plates.as_ref().unwrap();
