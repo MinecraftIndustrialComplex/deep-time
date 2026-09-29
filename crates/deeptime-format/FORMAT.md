@@ -21,7 +21,7 @@ test on each side fails when they drift.
   rasters/water_level.dtr       L3, i16, 1/16 block, nodata −32768
   rasters/climate/<name>.dtr    L2, i16, vanilla parameter × 10,000
                                 (<name> ∈ temperature, vegetation, continents, erosion, ridges)
-  strata/horizons.dtr           L1, horizon_stack, K = 3 in the synthetic worlds
+  strata/horizons.dtr           L1, horizon_stack, K = 3 in the synthetic worlds (8 with --strata every-class)
   strata/classes.json           class index → rock class name
   spawn/candidates.json         land cells for spawn selection
   preset.json                   the exact preset of a run (canonical JSON; `deeptime run`, the game)
@@ -261,4 +261,7 @@ contract with Java.
   continents from H, erosion 0.2, ridges 0.35, vegetation 0).
 - `lake-test` — a plain at y 100 with a round basin and a closed channel; its geometry is in
   `manifest.json` `notes.lake`. Floor y 110, rim crest y 125, `water_level` 120 inside the rim.
-- Both: a three-horizon strata placeholder on L1 (`notes.strata`).
+- Both: a three-horizon strata placeholder on L1 (`notes.strata`); with `--strata every-class`
+  (P1-12) eight horizons 10 blocks apart holding all 59 rock classes, horizon h of L1 cell column
+  i having class (6·i + h) mod 59, so any ten neighbouring cell columns show every class at
+  h ≥ 2 (`notes.strata.class_rule`).

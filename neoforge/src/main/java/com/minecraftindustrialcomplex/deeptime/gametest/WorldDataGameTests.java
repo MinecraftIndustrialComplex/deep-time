@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -91,17 +92,20 @@ public final class WorldDataGameTests {
             int surface = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z);
             for (int depth : new int[]{20, 80}) {
                 int y = surface - depth;
-                var cls = StrataPass.classAt(wd, x, y, z);
-                if (cls.isEmpty())
+                var horizon = StrataPass.horizonAt(wd, x, y, z);
+                if (horizon.isEmpty())
                     continue;
-                var expected = RockPalette.resolve(cls.get());
+                var expected = RockPalette.get().block(horizon.get().rockClass(), horizon.get().key());
+                if (expected == null)
+                    expected = Blocks.STONE.defaultBlockState();   // unresolved: the crust stays (deepslate below 0)
                 var actual = chunk.getBlockState(new BlockPos(x, y, z));
                 checked++;
-                if (expected.isEmpty() || actual != expected.get()) {
+                boolean ok = expected.is(Blocks.STONE) ? StrataPass.isCrust(actual) : actual == expected;
+                if (!ok) {
                     wrong++;
                     if (detail.length() < 400)
-                        detail.append(" (").append(x).append(',').append(y).append(',').append(z).append(") ").append(cls.get())
-                                .append(": ").append(actual.getBlock()).append(';');
+                        detail.append(" (").append(x).append(',').append(y).append(',').append(z).append(") ")
+                                .append(horizon.get().rockClass()).append(": ").append(actual.getBlock()).append(';');
                 }
             }
         }
