@@ -177,7 +177,7 @@ fn case(w: usize, hgt: usize, seed: u64, wrap: bool, sea: bool, coarse: bool) ->
             } else {
                 noise
             };
-            let pit = if (c / 7 + seed as usize) % 23 == 0 {
+            let pit = if (c / 7 + seed as usize).is_multiple_of(23) {
                 -300.0
             } else {
                 0.0
@@ -391,7 +391,13 @@ fn one_thread_and_twelve_walk_the_same_forest() {
 fn least_fixed_point(d: &Dims, h: &[f64], base_z: &[f64], kind: &[u8]) -> Vec<f64> {
     let n = d.cells();
     let mut w: Vec<f64> = (0..n)
-        .map(|c| if kind[c] == BASE { base_z[c] } else { f64::INFINITY })
+        .map(|c| {
+            if kind[c] == BASE {
+                base_z[c]
+            } else {
+                f64::INFINITY
+            }
+        })
         .collect();
     loop {
         let mut changed = false;
@@ -435,7 +441,10 @@ fn the_serial_flood_is_the_least_fixed_point_except_on_exact_ties() {
         assert_eq!(differing(false, seed), 0, "untied heights, seed {seed}");
     }
     let tied: usize = (1..8).map(|seed| differing(true, seed)).sum();
-    assert!(tied > 0, "tied heights: the serial order matters in the ulps");
+    assert!(
+        tied > 0,
+        "tied heights: the serial order matters in the ulps"
+    );
 }
 
 /// A fractal terrain like the L1 elevations: value noise of eight octaves on a wrapping raster.

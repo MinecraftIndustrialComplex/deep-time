@@ -201,9 +201,7 @@ pub fn solve(
         })
         .collect();
     let hs = SharedF64::new(l, 0.0);
-    (0..l)
-        .into_par_iter()
-        .for_each(|i| hs.set(i, cells[i].h0));
+    (0..l).into_par_iter().for_each(|i| hs.set(i, cells[i].h0));
     let qs = SharedF64::new(l, 0.0);
     let out = SharedF64::new(l, 0.0);
     let delta = SharedF64::new(l, 0.0);
@@ -345,8 +343,8 @@ pub fn families(
     mix.clear();
     mix.resize(d.cells(), [0.0; FAMILIES]);
     for (i, &c) in r.stack.iter().enumerate() {
-        for k in 0..FAMILIES {
-            mix[c as usize][k] = fin.get(i * FAMILIES + k);
+        for (k, x) in mix[c as usize].iter_mut().enumerate() {
+            *x = fin.get(i * FAMILIES + k);
         }
     }
     for (j, &o) in f.outlets.iter().enumerate() {

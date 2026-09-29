@@ -161,7 +161,10 @@ impl Forest {
         for &c in stack {
             let c = c as usize;
             for &d in &cdon[cptr[c] as usize..cptr[c + 1] as usize] {
-                debug_assert_ne!(pos[d as usize], NONE, "a donor of a stack cell is in the stack");
+                debug_assert_ne!(
+                    pos[d as usize], NONE,
+                    "a donor of a stack cell is in the stack"
+                );
                 self.dpos.push(pos[d as usize]);
             }
             self.dptr.push(self.dpos.len() as u32);
