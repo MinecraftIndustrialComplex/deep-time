@@ -126,7 +126,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   ("fetch failed"), consistent with the ~25 MB per-deploy cap the P1-04 agent met; one space per world (103 files,
   17 MB each) went through (one transient "fetch failed" on an update, fine on retry). Headless Chromium repeats the
   page from the top in captures taller than about 8,200 px, so long pages were reviewed in parts.
-- **Checks.** cargo test -p deeptime-inspect 21 + 7, clippy -D warnings, fmt clean (Mac). Every screenshot on the page
+- **Checks.** cargo test -p deeptime-inspect 21 + 7, clippy -D warnings, fmt clean; `gradlew build test` tests=106 failures=0 (Mac). Every screenshot on the page
   (12 BlueMap views, 8 sections, 6 ore maps) and the page itself were looked at in headless Chromium over plain HTTP
   before publishing; the hosted spaces are private, so their first real load is Ben's.
 - **Next.** Ben decides Q10 from the page. Options the evidence points at, not decided: EV stone configs for Born in
