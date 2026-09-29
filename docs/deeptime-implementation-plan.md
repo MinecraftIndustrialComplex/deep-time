@@ -2068,6 +2068,15 @@ community ports) are not opened for code.
   diffusivity with 2D implicit diffusion (conjugate gradients), carbonates, evaporites, weathering
   with laterites, local isostasy smoothed over 50 km, and the deposit engine's frames every 10 Myr.
   Runoff comes from `climate/{t_mean_c,precip_mm}` when P1-05 writes them, else a zonal stand-in.
+  *Calibrated with the climate on (P1-17 partial, 2026-09-29; STATUS.md has the runs):* the
+  pipeline presets narrow the plate model's Andean uplift band to 800 km and its collision surges
+  to 2,000 km (Cortial's 1,800 / 4,200 km domed whole continents), build island arcs at 0.3 mm/yr,
+  start continents with flooded margins (`tectonics.continental_shelf_share` 0.29, Earth's 29 %
+  land on 41 % continental crust), deepen the ocean floor (ridge −2.5 km, damping 0.05 mm/yr), and
+  use K = 2·10⁻⁹, Airy isostasy 0.8 and Landlab's marine diffusivity (100 m²/yr, wave base 60 m);
+  the ice-sheet feedback is on. 500-Myr `pipeline_quick_16k` runs now end with Earth-like
+  hypsometry (land median 0.6–1.1 km, Earth 0.43; above 2 km 7–30 %, Earth 10 %), land 27–33 %,
+  and Köppen shares near Earth's.
 - **Young landscape on L2** for the last 2–10 Myr at finer resolution, starting from L1 upsampled.
 - **Amplification to L3.** Schott et al. 2024, "Terrain Amplification using Multi-scale Erosion"
   (ACM TOG 43(4)); its code, `H-Schott/MultiScaleErosion` (MIT, commit 964a3d5), is GLSL compute
@@ -3304,6 +3313,11 @@ a smoke benchmark and again at the end.
   - `peak_native_bytes` ≤ the estimate shown to players; any overshoot fixes the estimator
   - LZ4 compression ratio per layer recorded
 - **Ben reviews.** The bench page: time per stage, scaling with threads, memory vs estimate.
+- *As run so far (early calibration, 2026-09-29; decisions log 2026-09-29, STATUS.md "P1-17
+  partial: calibration"):* the four pipeline presets, the surface/climate/structure defaults and four
+  deposit types' `balance.count_mult` were recalibrated with P1-05's climate on, against Earth's
+  hypsometry (GMT earth_relief_01d) and Köppen shares (Peel et al. 2007); the final numbers wait
+  for P1-06 and the bench.
 
 #### P1-18 Pole cap and client info
 - **Goal.** §7.11 and §7.15.
