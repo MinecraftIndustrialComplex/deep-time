@@ -67,6 +67,8 @@ def hexrgb(h):
 
 
 def biome_rgb(bid):
+    if bid == "terralith:deep_warm_ocean":
+        return hexrgb("#000060")
     if bid.startswith("minecraft:") and bid[10:] in BIOME_COLOURS:
         return hexrgb(BIOME_COLOURS[bid[10:]])
     h = 0x811C9DC5

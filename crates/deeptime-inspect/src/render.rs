@@ -271,6 +271,9 @@ const BIOME_COLOURS: [(&str, &str); 52] = [
 
 /// A biome's map colour.
 pub fn biome_colour(id: &str) -> Rgba {
+    if id == "terralith:deep_warm_ocean" {
+        return [0x00, 0x00, 0x60, 255];
+    }
     let path = id.strip_prefix("minecraft:");
     if let Some(p) = path
         && let Some((_, c)) = BIOME_COLOURS.iter().find(|(n, _)| *n == p)

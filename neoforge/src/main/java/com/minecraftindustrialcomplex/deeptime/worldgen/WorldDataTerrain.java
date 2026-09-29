@@ -53,8 +53,17 @@ public final class WorldDataTerrain implements TerrainSource {
         return data().height(wrapX(x), z);
     }
 
+    /**
+     * A biome input through the world's mapping. In a world the P1-09 bake wrote, the weirdness is
+     * sampled as an odd field ({@code RasterSampler.bilinearOdd}): its sign flips at the variant
+     * noise's zero line, and a plain bilinear ramp through 0 there would draw lines of river biome
+     * (the valley slice) across the land.
+     */
     @Override
     public double raster(String layer, int x, int z) {
-        return mapping().apply(layer, data().raster(layer, wrapX(x), z));
+        ClimateMapping m = mapping();
+        if (!m.isIdentity() && ClimateMapping.RIDGES.equals(layer))
+            return m.apply(layer, data().layer(layer).bilinearOdd(wrapX(x), z));
+        return m.apply(layer, data().raster(layer, wrapX(x), z));
     }
 }
