@@ -45,6 +45,8 @@ pub struct Region {
     pub y0: i64,
     pub lat: f64,
     pub lon: f64,
+    /// Ticks on the picture's edges where tile boundaries cross it: (vertical line?, pixel).
+    pub ticks: Vec<(bool, usize)>,
 }
 
 /// The rendered pictures of one region (PNG bytes).
@@ -107,6 +109,7 @@ fn render(
     cfg: &Cfg,
     ramp: &Ramp,
     rivers: Option<&[f32]>,
+    ticks: &[(bool, usize)],
 ) -> Vec<u8> {
     let light = {
         let (x, yy, z) = (-0.6f64, 0.6f64, 0.7f64);
@@ -138,6 +141,23 @@ fn render(
             out[c + 1] = g as u8;
             out[c + 2] = b as u8;
             out[c + 3] = 255;
+        }
+    }
+    // Red ticks on the edges where tile boundaries cross the picture.
+    for &(vertical, at) in ticks {
+        for d in 0..14 {
+            for t in -1i64..=1 {
+                let m = (at as i64 + t).clamp(0, if vertical { w } else { h } as i64 - 1) as usize;
+                let cells = if vertical {
+                    [(m, d), (m, h - 1 - d)]
+                } else {
+                    [(d, m), (w - 1 - d, m)]
+                };
+                for (i, j) in cells {
+                    let c = (j * w + i) * 4;
+                    out[c..c + 4].copy_from_slice(&[255, 40, 40, 255]);
+                }
+            }
         }
     }
     if let Some(area) = rivers {
@@ -334,6 +354,7 @@ fn pick_regions(
             y0,
             lat,
             lon,
+            ticks: Vec::new(),
         }
     };
     let far = |regions: &[Region], x0: i64, y0: i64| {
@@ -452,41 +473,61 @@ fn pick_regions(
             ));
         }
     }
-    // Where four tiles of a streamed run meet: the interior tile corner with the most land round it.
-    if let Some(t) = tile.filter(|&t| t > 0 && t * 2 <= gw.min(gh * 2) && t < gh) {
-        let mut best = (0usize, 0i64, 0i64);
-        for m in 1..gh.div_ceil(t) {
-            for k in 1..gw.div_ceil(t) {
-                let (cx, cy) = ((k * t) as i64, (m * t) as i64);
-                let mut land = 0usize;
-                for j in (0..SIDE).step_by(8) {
-                    for i in (0..SIDE).step_by(8) {
-                        let (gi, gj) = (
-                            cx + i as i64 - SIDE as i64 / 2,
-                            cy + j as i64 - SIDE as i64 / 2,
-                        );
-                        if f64::from(l3.y(gi, gj)) > cfg.sea_y {
-                            land += 1;
-                        }
-                    }
-                }
-                if land > best.0 {
-                    best = (land, cx, cy);
-                }
+    // Where the tiles of a streamed run meet: the window round a tile boundary whose line runs
+    // over the highest ground.
+    if let Some(t) = tile.filter(|&t| t > 0 && t < gh && t < gw) {
+        let mut best = (0.0f64, 0i64, 0i64);
+        let half = SIDE as i64 / 2;
+        let mut consider = |cx: i64, cy: i64, vertical: bool| {
+            let mut score = 0.0f64;
+            for d in (-half..half).step_by(4) {
+                let y = if vertical {
+                    l3.y(cx, cy + d)
+                } else {
+                    l3.y(cx + d, cy)
+                };
+                score += (f64::from(y) - cfg.sea_y).max(0.0);
+            }
+            if score > best.0 {
+                best = (score, cx, cy);
+            }
+        };
+        for k in 1..gw.div_ceil(t) {
+            for j in (half..gh as i64 - half).step_by(64) {
+                consider((k * t) as i64, j, true);
             }
         }
-        if best.0 > 0 {
-            let (x0, y0) = (best.1 - SIDE as i64 / 2, best.2 - SIDE as i64 / 2);
-            regions.push(place(
+        for m in 1..gh.div_ceil(t) {
+            for i in (0..gw as i64).step_by(64) {
+                consider(i, (m * t) as i64, false);
+            }
+        }
+        if best.0 > 0.0 {
+            let (cx, cy) = (best.1, best.2);
+            let (x0, y0) = (cx - half, (cy - half).clamp(0, gh as i64 - SIDE as i64));
+            let mut r = place(
                 "tiles",
-                "Where four tiles of the streamed run meet",
-                format!(
-                    "the corner at cell ({}, {}); each tile is computed in its own window",
-                    best.1, best.2
-                ),
+                "Across the boundaries of the streamed run's tiles",
+                "each tile is computed in its own window with a halo; the red ticks on the \
+                 edges mark where tile boundaries cross the picture"
+                    .into(),
                 x0,
                 y0,
-            ));
+            );
+            // Boundaries inside the window: multiples of the tile size, in pixels.
+            for k in 1..gw.div_ceil(t) {
+                let px = (k * t) as i64 - x0;
+                if (0..SIDE as i64).contains(&px) {
+                    r.ticks.push((true, px as usize));
+                }
+            }
+            for m in 1..gh.div_ceil(t) {
+                let py = (m * t) as i64 - r.y0;
+                if (0..SIDE as i64).contains(&py) {
+                    r.ticks.push((false, py as usize));
+                }
+            }
+            regions.push(r);
         }
     }
     // The seam: the window centred on x = ±C/2 with the most land.
@@ -602,10 +643,26 @@ pub fn build(world: &WorldState, preset_json: &str, work: &Path) -> CliResult<Op
         let (diff, mean_abs) = diff_image(&before, &after, SIDE, SIDE, &cfg);
         let png = |rgba: Vec<u8>| deeptime_viewer::encode_png(SIDE as u32, SIDE as u32, &rgba);
         rendered.push(Rendered {
-            before: png(render(&before, SIDE, SIDE, &cfg, ramp, None))?,
-            after: png(render(&after, SIDE, SIDE, &cfg, ramp, None))?,
-            before_rivers: png(render(&before, SIDE, SIDE, &cfg, ramp, Some(&rb)))?,
-            after_rivers: png(render(&after, SIDE, SIDE, &cfg, ramp, Some(&ra)))?,
+            before: png(render(&before, SIDE, SIDE, &cfg, ramp, None, &region.ticks))?,
+            after: png(render(&after, SIDE, SIDE, &cfg, ramp, None, &region.ticks))?,
+            before_rivers: png(render(
+                &before,
+                SIDE,
+                SIDE,
+                &cfg,
+                ramp,
+                Some(&rb),
+                &region.ticks,
+            ))?,
+            after_rivers: png(render(
+                &after,
+                SIDE,
+                SIDE,
+                &cfg,
+                ramp,
+                Some(&ra),
+                &region.ticks,
+            ))?,
             diff: png(diff)?,
             mean_abs_change_m: mean_abs,
             river_cells: (count(&rb, &before), count(&ra, &after)),
