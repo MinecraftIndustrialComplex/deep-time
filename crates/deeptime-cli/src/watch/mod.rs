@@ -236,6 +236,7 @@ mod tests {
             mem_cap: 0,
             verbose: false,
             set: Vec::new(),
+            history_mem: None,
         }
     }
 
