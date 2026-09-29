@@ -28,7 +28,9 @@
 //! | `precip_mm`, `t_mean_c` | climate (P1-05, `crate::climate`), read through `climate.rs`; the zonal stand-in without a `climate` section | the climate the surface step ran with |
 //! | clocks `oxygenated_oceans`, `land_plants`, `bif_acme` | stand-in | 1, 1, 0 (a Phanerozoic Earth) until the preset carries `planet.atmosphere` |
 //!
-//! `trap_structure` (P1-07) and the `host/<class>` fractions are not published yet.
+//! `trap_structure` and the `host/<class>` fractions come from the structure stage (P1-07,
+//! `structure/traps.rs`, `structure/hosts.rs`), which adds them to each frame after this stage
+//! closes it.
 
 use std::collections::BTreeMap;
 

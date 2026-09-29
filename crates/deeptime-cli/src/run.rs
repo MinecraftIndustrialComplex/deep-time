@@ -20,17 +20,18 @@ pub type CliResult<T> = Result<T, Box<dyn std::error::Error>>;
 const ADVANCE_BUDGET: Duration = Duration::from_millis(250);
 
 /// Options shared by the subcommands that run a session.
+#[derive(Clone)]
 pub struct Common {
     pub threads: usize,
     pub mem_cap: u64,
     pub verbose: bool,
 }
 
-fn read_text(path: &Path, what: &str) -> CliResult<String> {
+pub(crate) fn read_text(path: &Path, what: &str) -> CliResult<String> {
     std::fs::read_to_string(path).map_err(|e| format!("{what} {}: {e}", path.display()).into())
 }
 
-fn session_options(out: &Path, c: &Common) -> SessionOptions {
+pub(crate) fn session_options(out: &Path, c: &Common) -> SessionOptions {
     SessionOptions {
         out_dir: out.to_path_buf(),
         threads: c.threads,
@@ -39,7 +40,7 @@ fn session_options(out: &Path, c: &Common) -> SessionOptions {
 }
 
 /// Prints the session's log lines to stderr (DEBUG only when verbose).
-fn forward_log(s: &Session, verbose: bool) {
+pub(crate) fn forward_log(s: &Session, verbose: bool) {
     for line in s.log().drain() {
         if verbose || !line.starts_with("DEBUG") {
             eprintln!("  {}", line.replacen('\t', " ", 1));
@@ -121,7 +122,7 @@ pub fn load_preset_with(
 
 /// The plate model's summary line (plan P1-03: `plates_final=<n> ocean_age_p90_myr=<a> …`), when
 /// the world has plates.
-fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     world
         .plates
         .as_ref()
@@ -130,7 +131,7 @@ fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
 
 /// The surface's summary line (P1-04): `surface_final=<steps> land_frac=… sediment_km3=… …`,
 /// when the world has a surface.
-fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     let st = world.surface.as_ref()?;
     let t = &st.totals;
     let n = st.log.cells().max(1) as f64;
@@ -228,6 +229,14 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     ))
 }
 
+/// The structure stage's summary line (P1-07): `structure_final=<steps> plutons_emplaced=… …`,
+/// when the pipeline ran it.
+fn structure_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note = world.notes.get(deeptime_core::structure::STAGE_NAME)?;
+    let v: Value = serde_json::from_str(note).ok()?;
+    Some(deeptime_core::structure::summary_line(&v))
+}
+
 /// The deposit engine's recorded history (P1-04): per field of the last frame, the share of cells
 /// where it is non-zero and its mean there.
 fn history_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -255,7 +264,7 @@ fn history_line(world: &deeptime_core::world::WorldState) -> Option<String> {
 
 /// Per-stage wall time, and the surface's and the climate's per-process split when they ran to
 /// the end.
-fn timings_line(
+pub(crate) fn timings_line(
     timings: &[deeptime_core::session::StageTiming],
     world: &deeptime_core::world::WorldState,
 ) -> String {
@@ -266,6 +275,7 @@ fn timings_line(
     for stage in [
         deeptime_core::surface::STAGE_NAME,
         deeptime_core::climate::STAGE_NAME,
+        deeptime_core::structure::STAGE_NAME,
     ] {
         if let Some(note) = world
             .notes
@@ -348,6 +358,9 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         println!("deeptime run: {line}");
     }
     if let Some(line) = climate_line(&world) {
+        println!("deeptime run: {line}");
+    }
+    if let Some(line) = structure_line(&world) {
         println!("deeptime run: {line}");
     }
     println!(
@@ -505,6 +518,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     if let Some(line) = climate_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
+    if let Some(line) = structure_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
     if let Some(line) = history_line(&ck.world) {
         println!("deeptime stage {}: history {line}", o.name);
     }
@@ -542,18 +558,41 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             format_version: deeptime_format::FORMAT_VERSION.to_owned(),
             created_utc: rfc3339_utc(SystemTime::now()),
         };
+        // P1-07: the baked horizon stacks (the inspector), the elevation and the rock at the
+        // surface as map layers, and meridian cross-sections.
+        let structure = crate::structure_view::build(&ck.world, &ck.preset_json)?;
+        let layers: Vec<&deeptime_format::LoadedLayer> =
+            structure.iter().flat_map(|v| v.layers.iter()).collect();
         deeptime_viewer::write_bundle_with(
             dir,
             &info,
-            &[],
-            None,
+            &layers,
+            structure.as_ref().map(|v| deeptime_viewer::Strata {
+                layer: &v.strata,
+                classes: v.classes.clone(),
+            }),
             &deeptime_viewer::Timeline {
                 keyframes,
                 events: ck.world.events.clone(),
                 sites: ck.world.sites.clone(),
             },
         )?;
-        if let Some(report) = deeptime_viewer::deposit_report(census.as_ref(), &ck.world.bodies) {
+        let mut report = deeptime_viewer::deposit_report(census.as_ref(), &ck.world.bodies);
+        if let Some(v) = &structure {
+            let st = crate::structure_view::write(dir, v)?;
+            report
+                .get_or_insert_with(|| json!({}))
+                .as_object_mut()
+                .expect("an object")
+                .insert("structure".into(), st);
+            println!(
+                "deeptime stage {}: {} cross-sections -> {}",
+                o.name,
+                v.sections.len(),
+                dir.join("sections").display()
+            );
+        }
+        if let Some(report) = report {
             deeptime_viewer::write_report(dir, &report)?;
         }
         println!(

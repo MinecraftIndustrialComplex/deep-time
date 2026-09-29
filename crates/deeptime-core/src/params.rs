@@ -96,7 +96,7 @@ pub fn planet_builtin(name: &str) -> Option<&'static str> {
 }
 
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 7] = [
+pub const PLANET_KEYS: [&str; 8] = [
     "seed",
     "planet",
     "keyframes",
@@ -104,6 +104,7 @@ pub const PLANET_KEYS: [&str; 7] = [
     "tectonics",
     "surface",
     "climate",
+    "structure",
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
@@ -464,6 +465,9 @@ pub struct PlanetPreset {
     pub surface: Option<crate::surface::SurfaceParams>,
     /// The climate (P1-05); `None` leaves the surface on its zonal stand-in.
     pub climate: Option<crate::climate::ClimateParams>,
+    /// Column strata, metamorphism and plutons (P1-07); runs with the surface, with the
+    /// defaults when the section is absent.
+    pub structure: Option<crate::structure::StructureParams>,
 }
 
 type Obj = Map<String, Value>;
@@ -501,6 +505,7 @@ impl PlanetPreset {
         let keyframes: Option<KeyframeParams> = section(obj, "keyframes")?;
         let surface: Option<crate::surface::SurfaceParams> = section(obj, "surface")?;
         let climate: Option<crate::climate::ClimateParams> = section(obj, "climate")?;
+        let structure: Option<crate::structure::StructureParams> = section(obj, "structure")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
         let seed = match obj.get("seed") {
             None => 1,
@@ -519,6 +524,7 @@ impl PlanetPreset {
             tectonics: tectonics.unwrap_or_default(),
             surface,
             climate,
+            structure,
         };
         preset.validate()?;
         Ok(preset)
@@ -659,6 +665,14 @@ impl PlanetPreset {
         ] {
             check((0.0..=1.0).contains(&v), key, "must be in [0, 1]")?;
         }
+        if let Some(s) = &self.structure {
+            s.validate()?;
+            check(
+                self.surface.is_some(),
+                "$.structure",
+                "needs a surface section (the structure stage reads the strata log)",
+            )?;
+        }
         if let Some(s) = &self.surface {
             s.validate()?;
             check(
@@ -696,6 +710,9 @@ impl PlanetPreset {
         }
         if let Some(c) = &self.climate {
             v["climate"] = json!(c);
+        }
+        if let Some(s) = &self.structure {
+            v["structure"] = json!(s);
         }
         v
     }

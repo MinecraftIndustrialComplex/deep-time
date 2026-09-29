@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use deeptime_format::GridDesc;
 use serde::{Deserialize, Serialize};
 
-use super::fields::{FieldFrame, FieldHistory, spec};
+use super::fields::{FieldFrame, FieldHistory, HOST_PREFIX, spec};
 use crate::error::CoreError;
 
 /// One packed field of a frame.
@@ -57,7 +57,9 @@ const WIDE: [&str; 3] = [
 ];
 
 fn bits_for(name: &str) -> u8 {
-    if WIDE.contains(&name) || spec(name).is_none() {
+    // Host-rock fractions (`deeptime:host/<class>`, 0–1) are an open family outside the specs.
+    let known = spec(name).is_some() || name.starts_with(HOST_PREFIX);
+    if WIDE.contains(&name) || !known {
         16
     } else {
         8
@@ -156,6 +158,35 @@ impl RecordedHistory {
         });
     }
 
+    /// Adds fields to frame `k` (packed like [`RecordedHistory::push`]), replacing fields of the
+    /// same name: stages that step after the one that closed the frame publish into it this way
+    /// (P1-07's `trap_structure` and host fractions). Keeps the frame's fields in name order.
+    pub fn add_fields(
+        &mut self,
+        k: usize,
+        fields: &BTreeMap<String, Vec<f32>>,
+    ) -> Result<(), CoreError> {
+        let cells = self.grid.cells();
+        let frame = self
+            .frames
+            .get_mut(k)
+            .ok_or_else(|| CoreError::InvalidArgument(format!("no frame {k}")))?;
+        for (name, v) in fields {
+            if v.len() != cells {
+                return Err(CoreError::InvalidArgument(format!(
+                    "history field {name}: {} cells, the grid has {cells}",
+                    v.len()
+                )));
+            }
+            let packed = pack(name, v);
+            match frame.fields.binary_search_by(|f| f.name.as_str().cmp(name)) {
+                Ok(i) => frame.fields[i] = packed,
+                Err(i) => frame.fields.insert(i, packed),
+            }
+        }
+        Ok(())
+    }
+
     /// Compressed bytes held.
     pub fn bytes(&self) -> u64 {
         self.frames
@@ -250,5 +281,18 @@ mod tests {
         assert_eq!(h.names().len(), 4);
         // Two dense 16-bit fields of incompressible test data and a nearly empty fraction.
         assert!(h.bytes() < (n * 5) as u64, "{} bytes", h.bytes());
+        // A later stage adds a field and replaces one; the names stay sorted.
+        let mut more = BTreeMap::new();
+        more.insert("deeptime:trap_structure".to_owned(), vec![0.25f32; n]);
+        more.insert("deeptime:shelf".to_owned(), vec![1.0f32; n]);
+        h.add_fields(0, &more).unwrap();
+        let back = h.frame(0).unwrap();
+        assert!((back.fields["deeptime:trap_structure"][7] - 0.25).abs() < 1e-6);
+        assert!(back.fields["deeptime:shelf"].iter().all(|&x| x == 1.0));
+        let names: Vec<&str> = h.frames[0].fields.iter().map(|f| f.name.as_str()).collect();
+        let mut sorted = names.clone();
+        sorted.sort_unstable();
+        assert_eq!(names, sorted);
+        assert!(h.add_fields(3, &more).is_err());
     }
 }
