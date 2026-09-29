@@ -481,6 +481,183 @@ Use a Prism instance with MIC 2.1.3 plus TW 0.19.3 (NeoForge 21.1.249) and no ga
 
 ---
 
+## 7. What crossing the seam does, read from TW 0.19.3's code (added 2026-09-28)
+
+Added 2026-09-28 because the seams review page did not say where the wrap is or what a player experiences when crossing it.
+Sections 1.2 and 4 relied on TW's docs; this section checks each claim against the shipped code.
+
+**Method.** I decompiled the inner jar `libs/ref/twx/META-INF/jarjar/toroidal_world-neoforge-0.19.3+mc1.21.1.jar` (sha256
+`e4537c2de1d05d54…`) with CFR 0.152 and read its mixin configs (`toroidal_world.mixins.json`, 289 core mixins plus 11 client
+mixins). I re-read `docs/how-it-works.md`, `docs/modding.md` and `DESCRIPTION.md` on branch `mc/1.21` as of 2026-09-28. Vanilla
+behaviour comes from the NeoForge 21.1.249 sources (`libs/neoforge-src/`). Class names below are TW's
+(`com.toroidalworld.…`) unless marked vanilla or Deep Time. No client was run, so everything here is what the code does, not
+something anyone has watched. Numbers are for C = 16,384; at 32k, double them.
+
+### 7.1 Where the seam is
+
+- **[V] It is one north–south line at x = −C/2 ≡ +C/2: x = −8,192 ≡ 8,192 at 16k, and ±16,384 at 32k.**
+  - `LoopSpans.ofWidth(X, C/16)` (Deep Time `wrap/PlanetShape.java`) builds `WorldLoopBounds.Looped.ofWidth(w)` with
+    `minChunk = −w/2` and `maxChunk = w/2`. That is chunks −512 … 511 and blocks [−8,192, 8,192).
+  - `Looped.isOver(x)` is `x < minBlock || x ≥ maxBlock`, so block 8,191 is the last stored column and block −8,192 the first.
+  - The line runs the full z length: Z is not looped (`LoopSpans.NONE` on Z), and the pole cap at ±80° is Deep Time's.
+- **[V] Nothing else sits on the seam.**
+  - Deep Time sets no world border (no border code in `neoforge/src/main/java`), so the vanilla border applies: centre 0,0,
+    diameter 59,999,968.
+  - TW's `WorldBorderMixin` measures the border through the seam (`isWithinBounds`, `getDistanceToBorder`, `clampToBounds`,
+    `getCollisionShape`), and a border wider than the loop never blocks x.
+- **[V] The seam is not placed away from spawn on purpose.** x = 0 is half a lap from the seam (longitude 180° in Deep Time's
+  λ = 360°·(x + C/2)/C). Spawn, however, is the best-ranked candidate in `spawn/candidates.json`. The core's ranking measures
+  east–west distance with `wrapped_dx` (`crates/deeptime-core/src/deposits/spawn.rs`) and does not avoid the seam
+  (`server/SpawnHandler.java`). [I] A spawn near the seam is possible.
+
+### 7.2 Two coordinate systems: the server's and each client's
+
+- **[V] The server keeps one copy, x ∈ [−8,192, 8,192).** Every server-side position is folded back into it, where "fold"
+  means adding or subtracting C until the coordinate is inside.
+- **[V] Each client keeps its own unfolded x, which is never folded while you stay in one dimension.**
+  - The server records this per connection as a "mirror": `engine/seam/ClientPosition` (`record Mirror(x, z, space, …)`), held
+    by `ServerGamePacketListenerImplMixin`.
+  - Walking east from 8,190 across the seam, the client's own x goes 8,191, 8,192, 8,193 … and keeps growing. After one full
+    lap east it is about 16,384 + where you started, and it keeps growing lap after lap.
+  - modding.md: "A client level's own engine believes the world is infinite" and "Client coordinates near the seam run whole
+    world widths away from the server's".
+- **[V] The mirror is re-based to the server's folded position at exactly three moments.** "Re-based" means reset to the
+  folded coordinate: the client's x jumps back into [−8,192, 8,192).
+  - Login: `ServerGamePacketListenerImplMixin.toroidal$seedMirror`, at the TAIL of the listener's constructor.
+  - Respawn: `PlayerListMixin.toroidal$rebaseMirrorOnRespawn`.
+  - Dimension change: `PacketTranslator.playerPosition`. When the mirror does not describe the current dimension, it calls
+    `rebase` and sends the position packet unchanged.
+
+  All three happen behind a loading screen anyway. Nothing re-bases a client that has walked many laps.
+- **[V + I] The limit on laps is far away.**
+  - [V] Vanilla's `ServerGamePacketListenerImpl.clampHorizontal` clamps a reported x to ±3.0E7.
+  - [I] Reaching that needs about 1,830 laps at 16k (916 at 32k) without a relog, death or portal, so it is not a practical
+    limit.
+- **[V] F3 shows the folded coordinates, plus the unfolded ones on extra lines.**
+  - `mixin/DebugEntryPositionMixin`, a `@ModifyReturnValue` on `DebugScreenOverlay.getGameInformation`, rewrites the "XYZ:",
+    "Block:" and "Chunk:" lines with `transformer.fold(…)`. The Chunk line's region file becomes the stored one.
+  - It inserts "Unwrapped XYZ", "Unwrapped Block" and "Unwrapped Chunk" lines holding the client's raw coordinates.
+  - Crossing east at the seam, F3's XYZ therefore jumps from 8,191.9 to −8,191.9, while "Unwrapped XYZ" reads 8,192.1.
+  - The right-hand "Targeted Block"/"Targeted Fluid" lines (`getSystemInformation`) are not hooked. [I] They show the client's
+    raw coordinates.
+
+### 7.3 A player walking across
+
+- **[V] The client sends its unfolded position. The server moves the player back into the span and tells the client nothing.**
+  - `ServerGamePacketListenerImplMixin.toroidal$continuousX`/`Z` (a `@WrapOperation` on `clampHorizontal` in
+    `handleMovePlayer`) records the reported x into the mirror (`MirrorWriter.PLAYER_MOVE`).
+  - It then hands vanilla the copy of that x nearest the player's current server x (`WrapDomain.unwrapAround`), and does the
+    same for `firstGoodX`/`lastGoodX`. Vanilla's "moved too quickly" and "moved wrongly" checks therefore see an ordinary
+    small step.
+  - `toroidal$wrapIntoBounds` at `handleMovePlayer` RETURN: if the new server position is past the edge, `SeamSnap.withPassengers`
+    moves the player (and any passengers) by ±C and resets the good positions. It then calls `ServerChunkCache.move(player)`.
+  - No `ClientboundPlayerPositionPacket` is sent, so there is no teleport and no loading screen. The client never learns it
+    was moved.
+- **[V] Chunks do not reload at the crossing.**
+  - The server's chunk view centre jumps from chunk 511 to −512. `ChunkTrackingViewMixin.difference` walks both views in folded
+    chunk space and reports only the chunks that really enter or leave, the same one-column strip as any other step.
+  - `ChunkTrackingViewPositionedMixin` makes `contains`/`forEach` wrap.
+  - Every chunk packet is placed at the copy nearest the client's mirror:
+    - `PacketTranslator.chunkPosition` for chunk data and light;
+    - `chunkCacheCenter` for the view centre;
+    - `forgetChunk` for unloads, via `TranslationContext.toClient(ChunkPos)`, which is `transformer.nearestCopy(anchor, pos)`.
+  - Stored chunk −512 therefore arrives at client chunk 512, beside 511.
+- **[V] A client is sent one copy of each chunk, never two.**
+  - modding.md: "A client near a seam is sent one copy of a chunk and not the others".
+  - TW caps view and simulation distance at `chunkWidth/2 − 3` (`WorldLoopBounds.Looped.maxViewDistance`, applied in
+    `PlayerListMixin`, `ChunkMapMixin`, `TranslationContext`). That is 509 chunks at 16k and 1,021 at 32k.
+  - [I] Vanilla's 32-chunk maximum is far below that cap, so it never binds, and you can never see the same place twice or
+    your own back.
+- **[V] Teleports (`/tp`, and anything else that goes through `ServerGamePacketListenerImpl.teleport`) land on the copy
+  nearest the client.**
+  - `ServerGamePacketListenerImplMixin.toroidal$wrapTeleportX`/`Z` folds the destination on the server.
+  - `PacketTranslator.playerPosition` sends the client `ClientPosition.destinationOf(…)`: an absolute destination is unwrapped
+    around the mirror, and a relative one is mirror + folded delta.
+  - Before and after the teleport, `toroidal$dropChunksBeforeTeleport`/`toroidal$resendChunksAfterTeleport` resend only the
+    chunks whose nearest copy flips.
+
+### 7.4 Everything else that crosses
+
+- **[V] Non-player entities (mobs, items, arrows, snowballs, minecarts, boats) are folded at the end of their own tick,
+  however they got past the edge.**
+  - The fold is `ServerLevelMixin.toroidal$wrapEntityIntoBounds`, at `ServerLevel.tickNonPassenger` TAIL, through
+    `SeamSnap.withPassengers`.
+  - It sets the position, shifts `xo`/`xOld` (so the next frame interpolates smoothly), shifts a mob's navigation, move and
+    look targets by the same ±C, and recurses into passengers.
+  - An entity that joins the level past the edge is folded on `PersistentEntitySectionManager.addEntity`
+    (`EntitySectionManagerMixin`).
+  - This contradicts, or at least narrows, STATUS.md's P0-06 note that "`setPos` is a teleport and stays unfolded". [I] That
+    holds only until the entity's next tick. The test probably read the position before then.
+- **[V] What the players watching it see.**
+  - The fold moves the entity about 16,384 blocks on the server, which is more than a relative-move packet can carry.
+  - Vanilla's `ServerEntity.sendChanges` therefore sends an absolute `ClientboundTeleportEntityPacket` (delta outside
+    ±32,767 in 1/4096 units).
+  - TW's `PacketTranslator.teleportEntity` rewrites that packet to the copy nearest each watcher, so on each client the entity
+    lands where it was heading. `addEntity`, `moveVehicle`, sounds, particles, block events and explosions go through the same
+    translator.
+- **[V] Vehicles and riders.**
+  - A player driving a boat or horse: `handleMoveVehicle` is wrapped the same way (`toroidal$vehicleContinuousX`/`Z`,
+    `toroidal$wrapVehicleIntoBounds`), and the vehicle is folded with all its passengers.
+  - A player riding something they do not steer, such as a minecart: the vehicle is folded in its own tick, and the rider's
+    mirror is re-seated next to its old value (`MirrorWriter.PASSENGER`).
+- **[V] Sable ships are folded by the centroid of their constraint group.**
+  - `compat/sable/SablePoseFold.reseat` runs from `SubLevelPhysicsSystemMixin` on `updatePose`. When the group's centre is
+    past the edge, every body in it is moved with `PhysicsPipeline.teleport`.
+  - Any velocity the teleport dropped is added back, `lastNetworkedPose` is shifted, and the collision sections are
+    re-uploaded.
+  - A ship straddling the seam therefore stays stored on the side its centre is on.
+  - Client snapshots are re-seated by `ClientboundSableSnapshotDualPacketMixin`/`ClientboundStartTrackingSubLevelPacketMixin`.
+  - [V] Deep Time's `jetCrossesSeam` passed 20 of 20 on the planet server (STATUS.md P0-06). [unverified] How the hull looks on
+    a client at the crossing.
+- **[V] Two players on opposite sides.** Take A at server x = 8,100 and B at −8,100, 184 blocks apart through the seam.
+  - Entity tracking measures that distance through the seam (`TrackedEntityMixin.updatePlayer` wraps the `subtract`).
+  - A's client gets B at the copy of −8,100 nearest A's mirror. If A's mirror is 8,100, that is 8,284.
+  - B's client gets A at −8,284, if B's mirror is −8,100.
+  - Each sees the other 184 blocks away, at different client coordinates. Sounds use `PlayerListMixin.broadcast`, which sends
+    each listener the nearest copy.
+
+### 7.5 Coordinates in commands, maps, compasses and spawn points
+
+- **[V] Commands use server (folded) coordinates.**
+  - `CommandCoordinatesMixin` refuses an absolute x or z outside the span with "%s is outside this world — it must be between
+    %s and %s" (`SeamCommandErrors`, `argument.toroidal_world.pos.outside_world`). At 16k the span is −8192 to 8191.
+  - Relative `~` coordinates are allowed past the edge and folded (7.3).
+  - [I] The numbers on F3's XYZ line, which are folded, can be typed into `/tp`, while "Unwrapped" numbers past the span are
+    refused.
+  - `/fill`, `/fillbiome`, `/clone` and Create's glue command refuse a box that crosses the seam with "That area crosses the
+    world seam and could mean either side of it — run the command once per side" (`commands.toroidal_world.region.across_seam`).
+  - `/locate` measures its distance through the seam (`LocateCommandMixin`).
+- **[V] Compasses and lodestones point the short way.**
+  - `CompassAngleStateMixin` points the needle at the copy of the target nearest the holder.
+  - `minecraft:lodestone_tracker` is a known position component (modding.md), read "seated" on the client.
+- **[V] Maps.**
+  - `MapItemMixin.update` measures the holder from the nearest copy of the map's centre.
+  - `MapItemSavedDataMixin` places markers and banners at the nearest copy.
+  - [I] Server block reads are folded (`LevelMixin.getChunk`, `ServerChunkCacheMixin`), so a map next to the seam fills in
+    both sides.
+- **[V] Stored spawn points are inside the span.** World spawn goes through `ServerLevelMixin.setDefaultSpawnPos`, and beds
+  and anchors through `ServerPlayerMixin.setRespawnPosition`; both go through `SeamRespawnData.insideBounds`.
+  `ClientAnchorSync` keeps re-sending the client the nearest copy of the spawn, border centre and chunk-cache centre as it moves.
+- **[V] Going all the way round.**
+  - `engine/seam/circumnavigation/SeamTravel` adds each tick's folded x step per dimension. When the running total reaches ±C,
+    it grants the advancement "Back Where You Started" ("Travel a full lap around the world") and subtracts C.
+  - It counts net travel: 8,000 blocks east then 8,000 west is no lap.
+  - Nothing else happens at a lap. The client's x has grown by C, the server's is where it started, and the terrain is the
+    same blocks.
+
+### 7.6 What this changes in earlier text
+
+- Section 1.2 and the seams page said players are "moved when their movement packet crosses". **[V]** That is right, with
+  two additions: the client is not told, and F3 shows the folded number anyway.
+- The seams page's "What a player sees" view was right that chunks arrive beside you at shifted positions. It said nothing
+  about F3 (folded plus "Unwrapped" lines), about re-basing on login, respawn and dimension change, or about commands
+  refusing out-of-span coordinates.
+- STATUS.md's "`setPos` is a teleport and stays unfolded" is too strong (7.4).
+- Still unverified without a client: whether the crossing is visually seamless (no hitch or pop-in), how contraptions and
+  ship hulls render at the seam, and Simple Voice Chat, Antique Atlas and other unlisted mods near the seam (6.2).
+
+---
+
 ## Sources
 
 - **Toroidal World.**
