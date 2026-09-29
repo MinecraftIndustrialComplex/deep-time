@@ -29,3 +29,7 @@ build/
 
 # Claude Code agent worktrees and settings (never part of the project)
 /.claude/
+
+# Python bytecode
+__pycache__/
+*.pyc
