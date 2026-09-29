@@ -211,13 +211,29 @@ def write_json(path, data):
     os.replace(tmp, path)
 
 
+TERMINAL = ("done", "failed")
+
+
+def pid_alive(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
 def status(job):
-    """The job's status.json (README.md, "Status"), or {"job", "state": "unknown"}."""
+    """The job's status.json (README.md, "Status"), or {"job", "state": "unknown"}. A job whose
+    runner died without finishing (a crash, a reboot) reads as failed."""
     p = os.path.join(job_dir(job), "status.json")
     try:
-        return json.load(open(p))
+        st = json.load(open(p))
     except (OSError, ValueError):
         return {"job": job, "state": "unknown"}
+    if st.get("state") not in TERMINAL and st.get("pid") and not pid_alive(st["pid"]):
+        st["state"], st["error"] = "failed", "the runner stopped without finishing (see runner.log)"
+        st["message"] = st["error"]
+    return st
 
 
 def list_jobs():
@@ -233,7 +249,9 @@ class Job:
         self.id, self.spec, self.dir = job, spec, job_dir(job)
         os.makedirs(self.dir, exist_ok=True)
         self.st = {"job": job, "state": "queued", "spec": spec, "created": now(), "updated": now(),
-                   "timings": {}, "exports": [], "message": ""}
+                   "timings": {}, "exports": [], "message": "", "pid": os.getpid()}
+        if spec.get("note"):
+            self.st["note"] = spec["note"]
         self.log = open(os.path.join(self.dir, "runner.log"), "a", buffering=1)
 
     def set(self, state=None, message=None, **kw):
@@ -671,7 +689,8 @@ def export(job, spec, inspect, colors, probes):
     world = os.path.join(job.dir, "world")
     meta = os.path.join(job.dir, "meta.json")
     write_json(meta, {"job": job.id, "profile": spec["profile"], "size": spec["size"], "world": spec["world"],
-                      "install": job.st.get("install"), "created": job.st["created"]})
+                      "install": job.st.get("install"), "created": job.st["created"], "note": spec.get("note"),
+                      "request": spec.get("request")})
     exports = []
     for bi, box in enumerate(spec["boxes"]):
         job.set("exporting", f"box {bi + 1}/{len(spec['boxes'])}: deeptime-inspect export-area")
@@ -755,40 +774,199 @@ def run_job(job, lock_held=False):
 def submit(spec, job=None):
     """Starts a job in the background; returns its first status. Raises ValueError on a bad spec."""
     spec = normalise_spec(spec)
+    active = [s for s in list_jobs() if s.get("state") not in TERMINAL]
+    if len(active) >= MAX_ACTIVE:
+        raise Busy(f"{len(active)} previews are already queued or running (one server boots at a time); "
+                   f"wait for {active[-1]['job']} to finish")
     job = job or new_job_id()
     j = Job(job, spec)
     j.set("queued", "starting the runner")
     write_json(os.path.join(j.dir, "spec.json"), spec)
     log = open(os.path.join(j.dir, "runner.out"), "a")
-    subprocess.Popen([sys.executable, os.path.abspath(__file__), "run", "--job", job, "--from-spec"],
-                     cwd=REPO, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    child = subprocess.Popen([sys.executable, os.path.abspath(__file__), "run", "--job", job, "--from-spec"],
+                             cwd=REPO, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    j.set(pid=child.pid)   # the runner's, until it writes its own status
     return j.st
+
+
+MAX_ACTIVE = 3
+
+
+class Busy(Exception):
+    pass
+
+
+# ---------------------------------------------------------------------------------------------
+# The workbench's stage-2 routes (crates/deeptime-cli/src/watch/http.rs proxies them here).
+# A workbench run is a raster history on the simulation grid, not a Minecraft world: until P1-08
+# bakes a run into world data, a preview generates the synthetic deposit world at the same block
+# coordinates, and every answer says so.
+# ---------------------------------------------------------------------------------------------
+
+PREVIEW_C = 16384
+PREVIEW_PRESET = os.path.join(REPO, "crates", "deeptime-core", "tests", "presets", "deposits_world_16k.json")
+PREVIEW_LENGTH_MYR = 500
+INSPECT_SIDE = 32
+
+
+def preview_world_note(run):
+    return (f"Not run {run}'s terrain. Workbench runs are rasters on the simulation grid and become a "
+            f"Minecraft world only through P1-08's bake, which does not exist yet. This preview is Deep Time's "
+            f"synthetic deposit world (deposits_world_16k, {PREVIEW_LENGTH_MYR} Myr, C = {PREVIEW_C:,}) generated "
+            f"by the real mod on the Mac's headless {os.environ.get('DEEPTIME_WORKBENCH_PROFILE', 'standalone')} "
+            f"server, at the latitude and longitude you picked. Its sites cluster near x -5,600, z -1,000.")
+
+
+def latlon_to_block(lat, lon, c=PREVIEW_C):
+    """workbench.js blockXZ: x = longitude east of the seam scaled to C from −C/2; north is −z."""
+    return round(lon / 360 * c - c / 2), round(-lat / 360 * c)
+
+
+def box_on_preview_world(req):
+    """The request's box on the C = 16,384 preview planet (from lat_lon when given), at most
+    256 × 256 around its centre; returns (box, a note about any shrinking)."""
+    ll = req.get("lat_lon") or {}
+    if all(isinstance(ll.get(k), (int, float)) for k in ("north", "south", "west", "east")):
+        x0, z0 = latlon_to_block(ll["north"], ll["west"])
+        x1, z1 = latlon_to_block(ll["south"], ll["east"])
+    else:
+        b = req.get("box") or {}
+        try:
+            x0, z0, x1, z1 = (int(b[k]) for k in ("x0", "z0", "x1", "z1"))
+        except (KeyError, TypeError, ValueError):
+            raise ValueError("give box {x0, z0, x1, z1} or lat_lon {north, south, west, east}")
+    x0, x1, z0, z1 = min(x0, x1), max(x0, x1), min(z0, z1), max(z0, z1)
+    note = ""
+    w, d = max(16, x1 - x0), max(16, z1 - z0)
+    if w > MAX_SIDE or d > MAX_SIDE:
+        note = f"The box you drew ({x1 - x0} × {z1 - z0} blocks) was cut to its central {min(w, MAX_SIDE)} × {min(d, MAX_SIDE)}. "
+    cx, cz = (x0 + x1) // 2, (z0 + z1) // 2
+    w, d = min(w, MAX_SIDE), min(d, MAX_SIDE)
+    x0, z0 = cx - w // 2, max(-PREVIEW_C // 4, min(PREVIEW_C // 4 - d, cz - d // 2))
+    return [fold(x0, PREVIEW_C), z0, fold(x0, PREVIEW_C) + w, z0 + d], note
+
+
+def viewer_url(job, st, pick=None):
+    f = st.get("export") or "area-0.dtva.gz"
+    q = f"src=../api/preview/{job}/{f}"
+    if pick:
+        q += f"&pickcol={pick[0]},{pick[1]}"
+    return f"area3d/?{q}"
+
+
+def for_page(st):
+    """A status as the workbench page's Stage2.render wants it: `status_url` while it runs, `url`
+    (the viewer on the export) when done, `message`/`error` otherwise; `note` always."""
+    out = dict(st)
+    out.pop("spec", None)
+    job = st.get("job")
+    if st.get("state") == "done":
+        out["url"] = viewer_url(job, st, (st.get("spec") or {}).get("pick"))
+    elif st.get("state") == "failed":
+        out["error"] = st.get("error") or st.get("message") or "failed"
+    elif st.get("state") != "unknown":
+        out["status_url"] = f"api/preview/{job}"
+    return out
+
+
+def workbench_preview(req):
+    run = req.get("run", "?")
+    box, shrink = box_on_preview_world(req)
+    spec = {"profile": os.environ.get("DEEPTIME_WORKBENCH_PROFILE", "standalone"), "size": PREVIEW_C,
+            "boxes": [box],
+            "world": {"preset": PREVIEW_PRESET, "start": "supercontinent", "length_myr": PREVIEW_LENGTH_MYR},
+            "note": shrink + preview_world_note(run),
+            "request": {k: req.get(k) for k in ("run", "frame", "t_years", "box", "lat_lon")}}
+    return 202, for_page(submit(spec))
+
+
+def workbench_inspect(q):
+    """One column: from a finished preview that holds it (the viewer opens with the column's top
+    block selected), else the preview being made of it, else a new 32 × 32 preview around it.
+    There is no fast column path until P1-08 (README.md, "Later")."""
+    run = q.get("run", "?")
+    try:
+        if q.get("lat") not in (None, "") and q.get("lon") not in (None, ""):
+            x, z = latlon_to_block(float(q["lat"]), float(q["lon"]))
+        else:
+            x, z = int(q["x"]), int(q["z"])
+    except (KeyError, ValueError):
+        raise ValueError("give x and z (or lat and lon)")
+    x = fold(x, PREVIEW_C)
+    if abs(z) > PREVIEW_C // 4 - INSPECT_SIDE:
+        raise ValueError(f"z {z} is past the preview planet's pole cap")
+    for st in list_jobs():
+        spec = st.get("spec") or {}
+        if spec.get("size") != PREVIEW_C or not spec.get("boxes"):
+            continue
+        bx0, bz0, bx1, bz1 = spec["boxes"][0]
+        inside = (x - bx0) % PREVIEW_C < bx1 - bx0 and bz0 <= z < bz1
+        if not inside or st.get("state") == "failed":
+            continue
+        out = for_page(st)
+        if st.get("state") == "done":
+            out["url"] = viewer_url(st["job"], st, (x, z))
+        out["column"] = {"x": x, "z": z}
+        out["note"] = out.get("note") or preview_world_note(run)
+        return 200, out
+    h = INSPECT_SIDE // 2
+    spec = {"profile": os.environ.get("DEEPTIME_WORKBENCH_PROFILE", "standalone"), "size": PREVIEW_C,
+            "boxes": [[x - h, z - h, x + h, z + h]], "pick": [x, z],
+            "world": {"preset": PREVIEW_PRESET, "start": "supercontinent", "length_myr": PREVIEW_LENGTH_MYR},
+            "note": ("There is no fast column answer until P1-08; this generates the 32 × 32 blocks around the "
+                     "column (about a minute) and opens it with the column's top block selected. ")
+            + preview_world_note(run),
+            "request": {"run": run, "frame": q.get("frame"), "x": q.get("x"), "z": q.get("z")}}
+    out = for_page(submit(spec))
+    out["column"] = {"x": x, "z": z}
+    return 202, out
+
+
+def static_file(name):
+    f = os.path.realpath(os.path.join(VIEWER, name or "index.html"))
+    if not (f.startswith(os.path.realpath(VIEWER) + os.sep) and os.path.isfile(f)):
+        return None
+    ctype = {"html": "text/html; charset=utf-8", "js": "text/javascript; charset=utf-8",
+             "css": "text/css; charset=utf-8", "json": "application/json"}.get(f.rsplit(".", 1)[-1], "application/octet-stream")
+    return 200, ctype, open(f, "rb").read()
 
 
 def api(method, path, body=b""):
     """The HTTP contract (README.md) for a server to mount: returns (status, content type, bytes).
 
-    POST /api/preview            body: a spec (JSON)    -> 202 {"job", "status_url", ...}
-    GET  /api/preview                                   -> 200 [status, …] newest first
-    GET  /api/preview/<job>                             -> 200 status.json
-    GET  /api/preview/<job>/<file>                      -> the job's files (area-0.dtva.gz, probes.jsonl, logs)
+    POST /api/preview        body: a spec, or the workbench's {run, frame, t_years, box, lat_lon}
+                                                   -> 202 {"job", "status_url", "note", ...}
+    GET  /api/preview                              -> 200 [status, …] newest first
+    GET  /api/preview/<job>                        -> 200 the status (+ `url` when done, `status_url` while running)
+    GET  /api/preview/<job>/<file>                 -> the job's files (area-0.dtva.gz, probes.jsonl, logs)
+    GET  /api/inspect?run=&frame=&x=&z=[&lat=&lon=] -> one column (see workbench_inspect)
+    GET  /area3d/[<file>]                          -> the viewer
     """
     def js(code, obj):
         return code, "application/json", json.dumps(obj, indent=1).encode()
 
-    parts = [p for p in path.split("?")[0].split("/") if p]
-    if parts[:2] != ["api", "preview"]:
-        return js(404, {"error": "not found"})
+    from urllib.parse import parse_qsl
+    route, _, query = path.partition("?")
+    parts = [p for p in route.split("/") if p]
+    if parts[:1] == ["area3d"] and method == "GET":
+        return static_file("/".join(parts[1:])) or js(404, {"error": "not found"})
     try:
+        if parts == ["api", "inspect"] and method == "GET":
+            return js(*workbench_inspect(dict(parse_qsl(query))))
+        if parts[:2] != ["api", "preview"]:
+            return js(404, {"error": "not found"})
         if method == "POST" and len(parts) == 2:
-            st = submit(json.loads(body or b"{}"))
-            st["status_url"] = f"/api/preview/{st['job']}"
+            req = json.loads(body or b"{}")
+            if "run" in req and "boxes" not in req:
+                return js(*workbench_preview(req))
+            st = submit(req)
+            st["status_url"] = f"api/preview/{st['job']}"
             return js(202, st)
         if method == "GET" and len(parts) == 2:
             return js(200, list_jobs())
         if method == "GET" and len(parts) == 3:
             st = status(parts[2])
-            return js(200 if st.get("state") != "unknown" else 404, st)
+            return js(200 if st.get("state") != "unknown" else 404, for_page(st))
         if method == "GET" and len(parts) == 4:
             d = job_dir(parts[2])
             name = parts[3]
@@ -800,9 +978,26 @@ def api(method, path, body=b""):
             ctype = {"json": "application/json", "jsonl": "application/x-ndjson", "log": "text/plain",
                      "out": "text/plain"}.get(name.rsplit(".", 1)[-1], "application/octet-stream")
             return 200, ctype, open(p, "rb").read()
+    except Busy as e:
+        return js(503, {"error": str(e)})
     except ValueError as e:
         return js(400, {"error": str(e)})
     return js(405, {"error": "method not allowed"})
+
+
+def http_once(method, path):
+    """`preview.py http METHOD PATH`: one request through api() for a server that proxies (the
+    workbench's Rust server): the body on stdin; on stdout one JSON line {"status", "content_type",
+    "length"} and then exactly `length` bytes of body."""
+    body = sys.stdin.buffer.read() if method == "POST" else b""
+    try:
+        code, ctype, data = api(method, path, body)
+    except Exception as e:   # never leave the proxy without an answer
+        code, ctype, data = 500, "application/json", json.dumps({"error": f"preview.py: {e}"}).encode()
+    out = sys.stdout.buffer
+    out.write(json.dumps({"status": code, "content_type": ctype, "length": len(data)}).encode() + b"\n")
+    out.write(data)
+    out.flush()
 
 
 def serve(host, port):
@@ -819,21 +1014,12 @@ def serve(host, port):
             self.wfile.write(data)
 
         def do_GET(self):
-            p = self.path.split("?")[0]
-            if p in ("/", "/area3d"):
+            if self.path.split("?")[0] in ("/", "/area3d"):
                 self.send_response(302)
                 self.send_header("Location", "/area3d/")
                 self.end_headers()
                 return
-            if p.startswith("/area3d/"):
-                name = p[len("/area3d/"):] or "index.html"
-                f = os.path.realpath(os.path.join(VIEWER, name))
-                if f.startswith(os.path.realpath(VIEWER)) and os.path.isfile(f):
-                    ctype = {"html": "text/html", "js": "text/javascript", "css": "text/css"}.get(f.rsplit(".", 1)[-1],
-                                                                                                "application/octet-stream")
-                    return self._send(200, ctype + ("; charset=utf-8" if ctype.startswith("text") else ""), open(f, "rb").read())
-                return self._send(404, "text/plain", b"not found")
-            self._send(*api("GET", p))
+            self._send(*api("GET", self.path))
 
         def do_POST(self):
             n = int(self.headers.get("Content-Length") or 0)
@@ -880,7 +1066,12 @@ def main():
     sv = sub.add_parser("serve")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8765)
+    hp = sub.add_parser("http", help="one request through the contract (the workbench server's proxy)")
+    hp.add_argument("method", choices=["GET", "POST"])
+    hp.add_argument("path")
     a = ap.parse_args()
+    if a.cmd == "http":
+        return http_once(a.method, a.path)
 
     if a.cmd == "status":
         print(json.dumps(status(a.job), indent=1))
