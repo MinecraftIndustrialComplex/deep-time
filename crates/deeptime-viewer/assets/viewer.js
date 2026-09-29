@@ -11,6 +11,12 @@
   const values = {};   // layer name -> {w, h, stride, view: DataView, type}
   let strata = null;
   const images = {};   // layer name -> HTMLImageElement
+  // Site markers by deposit type: the same colours as ramps.json's `sites` ramp (P1-14).
+  const TYPE_COLOURS = {
+    'deeptime:porphyry_cu_mo_au': '#d7301f', 'deeptime:supergene_cu_blanket': '#fdae61',
+    'deeptime:placer_au': '#ffd700', 'deeptime:bif_fe': '#a6611a', 'deeptime:coal_seam': '#9e9e9e',
+    'deeptime:mvt_zn_pb': '#1a9850', 'deeptime:sedex_zn_pb': '#66c2a5', 'deeptime:petroleum_trap': '#8073ac',
+  };
 
   function decode(b64) {
     const bin = atob(b64);
@@ -270,9 +276,35 @@
     legend();
   }
 
+  // ---- the deposit census (P1-14): counts per type next to the §8.6 expectation --------------
+  function census(c) {
+    const box = document.getElementById('censusbody');
+    document.getElementById('census').hidden = false;
+    const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const f = (v, d) => (typeof v === 'number') ? v.toFixed(d) : esc(v ?? '—');
+    const cols = [['id', 'type', v => esc(String(v).replace(/^deeptime:/, ''))], ['sites', 'sites', v => f(v, 0)],
+      ['expected_formula', 'ρ·A·F (§8.6)', v => f(v, 2)], ['expected', 'with provinces', v => f(v, 2)], ['drawn', 'drawn', v => f(v, 0)],
+      ['tracts', 'tracts', v => f(v, 0)], ['permissive_km2', 'permissive km²', v => f(v, 0)], ['mean_f', 'mean F', v => f(v, 2)],
+      ['buried', 'buried', v => f(v, 0)], ['truncated', 'truncated', v => f(v, 0)], ['eroded', 'eroded', v => f(v, 0)],
+      ['too_deep', 'too deep', v => f(v, 0)], ['children', 'children', v => f(v, 0)], ['guaranteed', 'guaranteed', v => f(v, 0)],
+      ['dropped_separation', 'dropped', v => f(v, 0)]];
+    let h = `<p class="hint">Regional specialisation ${esc(c.province)} (${esc(c.provinces)} provinces of ≈${esc(c.province_km)} km) · count_mult ${esc(c.count_mult)} · ${esc(c.sites)} sites, ${esc(c.bodies)} bodies. ${esc(c.formula || '')}</p>`;
+    h += '<table class="census"><tr>' + cols.map(x => `<th>${esc(x[1])}</th>`).join('') + '</tr>';
+    for (const t of c.types || []) h += '<tr>' + cols.map(x => `<td>${x[2](t[x[0]])}</td>`).join('') + '</tr>';
+    box.innerHTML = h + '</table>';
+  }
+
   // ---- timelapse: keyframes, scrubber, event ticker, sites (P1-01) ----------------------------
   function timelapse() {
     const K = B.keyframes || [], E = B.events || [], S = B.sites || [];
+    const R = window.DT_REPORT || null;   // P1-14: {deposits: census, bodies: [...]}
+    const bodiesOf = new Map();
+    for (const b of (R && R.bodies) || []) {
+      if (b.site === null) continue;
+      if (!bodiesOf.has(b.site)) bodiesOf.set(b.site, []);
+      bodiesOf.get(b.site).push(b);
+    }
+    if (R && R.deposits) census(R.deposits);
     if (!K.length && !E.length && !S.length) return;
     document.getElementById('timelapse').hidden = false;
     const byId = new Map(E.map(e => [e.id, e]));
@@ -366,7 +398,7 @@
         const [x, y] = toCanvas(s.lat_lon[0], s.lat_lon[1], f);
         ctx.beginPath();
         ctx.moveTo(x, y - 1.8 * r); ctx.lineTo(x + 1.8 * r, y); ctx.lineTo(x, y + 1.8 * r); ctx.lineTo(x - 1.8 * r, y); ctx.closePath();
-        ctx.fillStyle = '#ffb000'; ctx.fill(); ctx.lineWidth = dpr; ctx.strokeStyle = '#000'; ctx.stroke();
+        ctx.fillStyle = TYPE_COLOURS[s.deposit_type] || '#ffb000'; ctx.fill(); ctx.lineWidth = dpr; ctx.strokeStyle = '#000'; ctx.stroke();
       }
     }
 
@@ -485,8 +517,7 @@
       const products = s.products.map(p =>
         `${esc(p.material)} (${esc(p.role)}): ${esc((p.grade * 100).toPrecision(3))} % · ${esc(Number(p.tonnage_t).toExponential(2))} t`).join('<br>') || '—';
       const chain = whyHere(s.forming_event, 6).map(([d, c]) => `${'&nbsp;'.repeat(2 * d)}↳ ${evLink(c)}`).join('<br>');
-      details.className = '';
-      details.innerHTML = kv([
+      const rows = [
         ['site', esc(s.id)],
         ['kind', esc(s.kind)],
         ['type', esc(s.deposit_type)],
@@ -496,14 +527,73 @@
         ['products', products],
         ['parent', s.parent === null ? '—' : `<a class="ref" data-site="${s.parent}">site ${s.parent}</a>`],
         ['formed by', evLink(s.forming_event)],
-        ['why here?', chain || '—'],
-      ]);
+      ];
+      // P1-14: the mineral-system scores behind the forming event ("Why here?").
+      const fe = byId.get(s.forming_event);
+      if (fe && fe.params && 'favourability' in fe.params) {
+        const p = fe.params, pct = v => (v === null || v === undefined) ? '—' : `${Math.round(100 * v)} %`;
+        rows.push(['favourability', esc(pct(p.favourability))]);
+        if ('score_source' in p) {
+          rows.push(['components', esc(`source ${pct(p.score_source)} · driver ${pct(p.score_driver)} · pathway ${pct(p.score_pathway)} · trap ${pct(p.score_trap)} · host ${pct(p.score_host)} · clock ${pct(p.score_clock)}`)]);
+        }
+        if (p.limiting) rows.push(['weakest here', esc(p.limiting)]);
+        if (p.neighbours_limited_by) rows.push(['barren nearby for lack of', esc(p.neighbours_limited_by)]);
+        if (p.host_class) rows.push(['host rock', esc(p.host_class)]);
+        if (p.fate) rows.push(['preservation', esc(`${p.fate}${p.fraction_left !== undefined && p.fraction_left !== null ? ` (${pct(p.fraction_left)} left)` : ''}`)]);
+        if (p.rank) rows.push(['coal rank', esc(p.rank)]);
+      }
+      rows.push(['why here?', chain || '—']);
+      const bodies = bodiesOf.get(s.id) || [];
+      if (bodies.length) rows.push(['bodies', bodies.map(b => esc(`${b.role}: ${b.shape} ${b.axes.map(v => v.toFixed(1)).join(' × ')} blocks`)).join('<br>') + section(bodies)]);
+      details.className = '';
+      details.innerHTML = kv(rows);
+    }
+
+    // A plan view and a vertical section of a site's bodies (blocks; zones as nested outlines).
+    function section(bodies) {
+      const W = 300, H = 150, pad = 14;
+      const ore = bodies[0];
+      let ext = 1, yLo = Infinity, yHi = -Infinity;
+      for (const b of bodies) {
+        ext = Math.max(ext, b.axes[0], b.axes[2]);
+        yLo = Math.min(yLo, b.center[1] - b.axes[1]);
+        yHi = Math.max(yHi, b.center[1] + b.axes[1]);
+      }
+      const clip = bodies.map(b => b.clip_top_y).find(v => v !== null && v !== undefined);
+      if (clip !== undefined) yHi = Math.max(yHi, clip + 2);
+      const half = W / 2 - pad;
+      const sp = (half - pad) / ext;                          // plan scale (left half)
+      const ss = Math.min((half - pad) / ext, (H - 2 * pad) / Math.max(1, yHi - yLo)); // section scale
+      const colours = ['#c0392b', '#e67e22', '#f1c40f', '#27ae60', '#2980b9', '#8e44ad'];
+      let svg = `<svg class="section" viewBox="0 0 ${W} ${H}" role="img" aria-label="plan and section of the site's bodies">`;
+      svg += `<text x="4" y="11">plan</text><text x="${W / 2 + 4}" y="11">section (x–y)</text>`;
+      const pcx = W / 4, pcy = H / 2, scx = 3 * W / 4;
+      const sy = y => H - pad - (y - yLo) * ss;
+      bodies.forEach((b, bi) => {
+        const dx = (b.center[0] - ore.center[0]), dz = (b.center[2] - ore.center[2]);
+        const rot = b.yaw * 180 / Math.PI;
+        const shells = [1, ...b.zones.map(z => z.d[1]).filter(d => d < 1)].sort((a, c) => c - a);
+        shells.forEach((d, k) => {
+          const col = colours[(bi * 2 + k) % colours.length];
+          svg += `<ellipse cx="${pcx + dx * sp}" cy="${pcy + dz * sp}" rx="${Math.max(0.5, b.axes[0] * d * sp)}" ry="${Math.max(0.5, b.axes[2] * d * sp)}" transform="rotate(${rot} ${pcx + dx * sp} ${pcy + dz * sp})" fill="none" stroke="${col}" stroke-width="1"/>`;
+          const x0 = scx + dx * ss, y0 = sy(b.center[1]);
+          if (b.metric === 'ellipsoid') {
+            svg += `<ellipse cx="${x0}" cy="${y0}" rx="${Math.max(0.5, b.axes[0] * d * ss)}" ry="${Math.max(0.5, b.axes[1] * d * ss)}" fill="none" stroke="${col}" stroke-width="1"/>`;
+          } else {
+            svg += `<rect x="${x0 - b.axes[0] * d * ss}" y="${y0 - b.axes[1] * d * ss}" width="${Math.max(0.5, 2 * b.axes[0] * d * ss)}" height="${Math.max(0.5, 2 * b.axes[1] * d * ss)}" fill="none" stroke="${col}" stroke-width="1"/>`;
+          }
+        });
+      });
+      if (clip !== undefined) svg += `<line x1="${W / 2 + 2}" x2="${W - 2}" y1="${sy(clip)}" y2="${sy(clip)}" stroke="#7f8c8d" stroke-dasharray="4 3"/><text x="${W - 60}" y="${sy(clip) - 3}">eroded to</text>`;
+      svg += `<text x="4" y="${H - 3}">${esc(`${(2 * ext).toFixed(0)} blocks across`)}</text></svg>`;
+      return svg;
     }
     const sitesBox = document.getElementById('sites');
     if (S.length) {
       sitesBox.className = '';
+      const mt = s => s.products.length ? `${(s.products[0].tonnage_t / 1e6).toPrecision(2)} Mt` : '';
       sitesBox.innerHTML = S.map(s =>
-        `<div class="row" data-site="${s.id}"><span class="t">#${s.id}</span><span>${esc(s.kind)} · ${esc(s.deposit_type.replace(/^deeptime:/, ''))}</span></div>`).join('');
+        `<div class="row" data-site="${s.id}"><span class="t">#${s.id}</span><span>${esc(s.kind)} · ${esc(s.deposit_type.replace(/^deeptime:/, ''))} · ${esc(mt(s))}</span></div>`).join('');
     }
     document.getElementById('timelapse').addEventListener('click', ev => {
       const el = ev.target.closest('[data-ev],[data-site]');

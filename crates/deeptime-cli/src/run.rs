@@ -66,6 +66,41 @@ fn drive(
     }
 }
 
+/// Prints the deposit stage's census: sites per type next to the plan §8.6 expectation.
+pub fn print_census(census: &Value) {
+    println!(
+        "deposits: province={} ({} provinces) count_mult={} — expected(§8.6) = Σ_tracts ρ_p50/1e5 · A_km2 · mean_F · count_mult",
+        census["province"].as_str().unwrap_or("?"),
+        census["provinces"],
+        census["count_mult"],
+    );
+    for t in census["types"].as_array().into_iter().flatten() {
+        let f = |k: &str| t[k].as_f64().unwrap_or(0.0);
+        println!(
+            "deposits {:<30} sites={:>3} expected={:>7.2} with_provinces={:>7.2} drawn={:>3} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={}",
+            t["id"].as_str().unwrap_or("?"),
+            f("sites"),
+            f("expected_formula"),
+            f("expected"),
+            f("drawn"),
+            f("tracts"),
+            f("permissive_km2"),
+            f("mean_f"),
+            f("buried"),
+            f("truncated"),
+            f("eroded"),
+            f("too_deep"),
+            f("children"),
+            f("guaranteed"),
+            f("dropped_separation"),
+        );
+    }
+}
+
+fn census_of(notes: &std::collections::BTreeMap<String, String>) -> Option<Value> {
+    serde_json::from_str(notes.get(deeptime_core::deposits::STAGE_NAME)?).ok()
+}
+
 pub struct RunOptions {
     pub preset: PathBuf,
     pub content: Option<PathBuf>,
@@ -95,6 +130,12 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     drive(&s, o.common.verbose, |_, st| st == AdvanceStatus::Done)?;
     s.finalize_write()?;
     forward_log(&s, o.common.verbose);
+    if let Some(c) = deeptime_format::Manifest::read(&o.out)?
+        .notes
+        .get(deeptime_core::deposits::STAGE_NAME)
+    {
+        print_census(c);
+    }
     let p = s.progress();
     println!(
         "deeptime run: {} -> {} ({} stages, {} events, {} keyframes, peak {:.1} MiB) in {:.2}s",
@@ -221,6 +262,10 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         p.keyframes_ready,
         seconds
     );
+    let census = census_of(&ck.world.notes);
+    if let Some(c) = &census {
+        print_census(c);
+    }
     if let Some(out) = &o.out {
         ck.write(out)?;
         println!(
@@ -256,6 +301,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
                 sites: ck.world.sites.clone(),
             },
         )?;
+        if let Some(report) = deeptime_viewer::deposit_report(census.as_ref(), &ck.world.bodies) {
+            deeptime_viewer::write_report(dir, &report)?;
+        }
         println!(
             "deeptime stage {}: viewer -> {}",
             o.name,
