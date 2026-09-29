@@ -22,15 +22,24 @@ import java.nio.file.Path;
  * terrain gets {@code <world>/<folder>/} opened into {@link ActiveWorldData}. A missing folder is
  * logged, not thrown: chunk generation then fails with a message naming it.
  *
- * <p>Staging from the Create World screen (P1-11) and first-start generation (P1-13) hook in here.
+ * <p>First-start generation (P1-13) hooks in here: the one HIGHEST listener runs
+ * {@link FirstStartGenerator#prepare} first and binds only what it leaves in place, so the order
+ * never depends on how the event bus orders two listeners of one priority. When it stops the
+ * server, nothing is bound. Staging from the Create World screen (P1-11) will hook in the same way.
  */
 public final class WorldDataBinder {
 
     private WorldDataBinder() {}
 
     public static void init() {
-        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, ServerAboutToStartEvent.class, WorldDataBinder::bind);
+        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, ServerAboutToStartEvent.class, WorldDataBinder::onAboutToStart);
         NeoForge.EVENT_BUS.addListener(ServerStoppedEvent.class, e -> ActiveWorldData.clear());
+    }
+
+    private static void onAboutToStart(ServerAboutToStartEvent event) {
+        if (!FirstStartGenerator.prepare(event.getServer()))
+            return; // the server stops before loadLevel(): nothing to bind
+        bind(event);
     }
 
     private static void bind(ServerAboutToStartEvent event) {

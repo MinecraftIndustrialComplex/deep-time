@@ -1,0 +1,32 @@
+{
+  "schema": 0,
+  "name": "earthlike_quick_16k",
+  "placeholder": true,
+  "description": "PLACEHOLDER - Phase 1 in progress. Not a simulated planet: the dummy pipeline (a drifting toy continent, a causal event chain, three deposit sites and keyframes; 25 steps per stage at 200 ms) plus P0-09's synthetic wrap-test terrain baked at C = 16384. The real earthlike_quick_16k replaces this file when the stages of P1-03 to P1-08 land (tuned in P1-17). It names no timeline: the editor or config/deeptime/server.json does.",
+  "scale": {
+    "circumference_blocks": 16384
+  },
+  "dummy": {
+    "steps": 25,
+    "sleep_ms": 200,
+    "stages": [
+      "dummy_drift",
+      "dummy_erode"
+    ],
+    "synth": "wrap-test",
+    "world": {
+      "circumference": 16384,
+      "grid_r": 16,
+      "t_start_years": -1000000000.0,
+      "t_end_years": 0.0,
+      "keyframe_every_years": 125000000.0,
+      "keyframe_size": [
+        256,
+        128
+      ],
+      "event_every_steps": 5,
+      "sites": 3,
+      "seed": 1
+    }
+  }
+}
