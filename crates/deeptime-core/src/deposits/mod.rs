@@ -1563,7 +1563,7 @@ impl DepositStage {
             );
             {
                 let cen = &mut f.census[ti];
-                cen.permissive_km2 = areas.iter().sum();
+                cen.permissive_km2 = areas.iter().sum::<f64>() + 0.0;
                 cen.mean_f = if cen.permissive_km2 > 0.0 {
                     tracts.iter().map(|tr| tr.mean_f * tr.area_km2).sum::<f64>()
                         / cen.permissive_km2
