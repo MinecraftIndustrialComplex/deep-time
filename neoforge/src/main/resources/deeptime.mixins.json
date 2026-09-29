@@ -7,7 +7,11 @@
   "mixins": [
     "MinecraftServerFirstStartMixin",
     "WorldDimensionsShapeMixin",
-    "compat.excavated_variants.OreReplacerMixin"
+    "compat.excavated_variants.OreReplacerMixin",
+    "compat.createoreexcavation.OreVeinGeneratorMixin",
+    "compat.createoreexcavation.OreDataMixin",
+    "compat.createoreexcavation.RandomSpreadGeneratorMixin",
+    "compat.createdieselgenerators.OilChunksSavedDataMixin"
   ],
   "server": [
     "DedicatedServerFirstStartMixin"

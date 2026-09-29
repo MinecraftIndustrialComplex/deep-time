@@ -246,6 +246,7 @@ class Rcon:
 class Steps:
     def __init__(self):
         self.rows = []
+        self.compat = []   # P1-16: one row per `probe coe` / `probe cdg` (compat_row)
 
     def check(self, name, expected, actual, ok, note=""):
         self.rows.append((name, expected, str(actual), bool(ok), note))
@@ -259,6 +260,25 @@ class Steps:
     @property
     def failed(self):
         return [r for r in self.rows if not r[3]]
+
+
+def compat_row(p):
+    """One row of the report's COE/CDG table from a `probe coe` or `probe cdg` JSON line (P1-16)."""
+    chunk = ",".join(str(v) for v in p.get("chunk", []))
+    short = lambda s: (s or "none").split("/")[-1].split(":")[-1]
+    if p["probe"] == "coe":
+        sv, coe = p.get("site_vein"), p.get("coe") or {}
+        site = f"{sv['site']} {short(sv['type'])}" if sv else "none"
+        decided = f"{short(sv['vein'])} q {sv['quantile']:.3f} ({sv['ore_blocks_in_chunk']} ore blocks)" if sv else "no site vein"
+        mod = (f"{short(coe.get('vein'))} mul {coe.get('random_mul', 0):.3f} amount {coe.get('amount')}"
+               + (" (infinite)" if coe.get("infinite") else "")) if coe else "COE not installed"
+    else:
+        trap, cdg = p.get("trap"), p.get("cdg") or {}
+        site = f"{trap['site']} {short(trap['type'])}" if trap else "none"
+        decided = (f"{p.get('deep_time_amount')} mB (charge {trap['charge_mb']} × {trap['cdg_scale']} × share {trap['share']:.3f})"
+                   if trap else f"{p.get('deep_time_amount')} mB")
+        mod = f"base {cdg.get('base')} amount {cdg.get('amount')} mB" if cdg else "CDG not installed"
+    return (p["probe"].upper(), chunk, site, decided, mod, p.get("agrees"))
 
 
 def port_free(port):
@@ -647,6 +667,14 @@ def main():
                 with open(os.path.join(smoke, "rcon.jsonl"), "a") as f:
                     f.write(json.dumps({"command": cmd, "probe": json.loads(line) if line else None, "reply": out}) + "\n")
                 print(f"   rcon {cmd}: {(line or out)[:200]}", flush=True)
+                # P1-16: `probe coe` / `probe cdg` compare Deep Time's decision with what COE / CDG
+                # hold for the chunk; the report gets a row per probe and a check that they agree.
+                probe = json.loads(line) if line else None
+                if probe and probe.get("probe") in ("coe", "cdg"):
+                    steps.compat.append(compat_row(probe))
+                    if "agrees" in probe:
+                        steps.check(f"{cmd}: Deep Time and {probe['probe'].upper()} agree", "true",
+                                    str(probe["agrees"]).lower(), probe["agrees"] is True)
 
             rcon("save-all flush")
             time.sleep(3)
@@ -724,6 +752,12 @@ def write_report(smoke, a, install, steps, level_type, boot_s, started, passed, 
         for name, exp, act, ok, note in steps.rows:
             act = act.replace("|", "\\|")
             r.write(f"| {name} | {exp} | {act} | {'PASS' if ok else 'FAIL'} | {note} |\n")
+        if steps.compat:
+            r.write("\n## COE and CDG (plan §7.14)\n\nDeep Time's decision for the chunk and what the mod holds "
+                    "there (`/deeptime probe coe|cdg <chunkX> <chunkZ>`).\n\n"
+                    "| Mod | Chunk | Site | Deep Time | The mod | Agree |\n|---|---|---|---|---|---|\n")
+            for mod, chunk, site, decided, held, agrees in steps.compat:
+                r.write(f"| {mod} | {chunk} | {site} | {decided} | {held} | {'' if agrees is None else ('yes' if agrees else 'NO')} |\n")
         if server.fatal:
             r.write(f"\n## First fatal line\n\n```\n{server.fatal}\n```\n")
         r.write("\n## Mod jars\n\n" + "\n".join(f"- {m}" for m in mods) + "\n")

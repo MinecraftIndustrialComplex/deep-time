@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime;
 
+import com.minecraftindustrialcomplex.deeptime.compat.CompatHooks;
 import com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLoader;
 import com.minecraftindustrialcomplex.deeptime.net.DeepTimeNetwork;
@@ -46,6 +47,8 @@ public final class DeepTime {
         GameTestSupport.init(modBus);
         DeepTimeNetwork.init(modBus);
         PoleCap.init();
+        // COE and CDG hooks (P1-16): their mixins' targets load now, so a drifted signature fails the boot.
+        CompatHooks.preloadTargets();
         // The F3 line and the polar storm; never loaded on a dedicated server.
         if (FMLEnvironment.dist == Dist.CLIENT)
             com.minecraftindustrialcomplex.deeptime.client.DeepTimeClient.init(modBus);
