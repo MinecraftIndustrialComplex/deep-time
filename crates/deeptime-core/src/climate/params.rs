@@ -54,11 +54,12 @@ pub struct ClimateParams {
     pub land_ocean_exchange_w_m2_k: f64,
     /// Poleward heat transport of the slab ocean (diffusion through the sea), W/m²/K.
     pub ocean_diffusivity_w_m2_k: f64,
-    /// How much the ice sheets of the previous snapshot brighten the EBM's land (0–1). 0 by
-    /// default while the surface stage's continents are domed (P1-04): their 3–4 km interiors
-    /// glaciate at any latitude, and at 1 the feedback froze most of the land (46 % glaciated at
-    /// the end of the 500-Myr acceptance run, STATUS.md P1-05). Snow and sea ice keep their
-    /// albedo feedback through the temperature either way.
+    /// How much the ice sheets of the previous snapshot brighten the EBM's land (0–1). 1 by
+    /// default since the P1-17 calibration made the continents Earth-low (median 0.6 km): the
+    /// 500-Myr pipeline runs then end with 4–8 % of the land glaciated (Earth today ≈ 10 %,
+    /// Antarctica and Greenland). While P1-04's continents were domed (3–4 km interiors) it froze
+    /// 46 % of the land, so it was off (P1-05). Snow and sea ice keep their albedo feedback
+    /// through the temperature either way.
     pub ice_sheet_feedback: f64,
     /// Latitude bands of the EBM (climlab `num_lat` 90).
     pub ebm_bands: u32,
@@ -170,7 +171,7 @@ impl Default for ClimateParams {
             land_depth_m: 3.0,
             land_ocean_exchange_w_m2_k: 10.0,
             ocean_diffusivity_w_m2_k: 0.3,
-            ice_sheet_feedback: 0.0,
+            ice_sheet_feedback: 1.0,
             ebm_bands: 90,
             ebm_steps_per_year: 72,
             ebm_spinup_years: 40,

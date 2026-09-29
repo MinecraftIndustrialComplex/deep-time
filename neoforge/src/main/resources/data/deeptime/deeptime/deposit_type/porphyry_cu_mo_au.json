@@ -96,7 +96,7 @@
     "cdg_reservoir": false,
     "ore_block_policy": "ev_then_vanilla"
   },
-  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 1.0, "richness_mult": 1.0},
+  "balance": {"count_mult": 8.0, "size_mult_h": 12.0, "size_mult_v": 1.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
     "Sizing: USGS OFR 2008-1155 (Singer, Berger & Moring 2008), Table 1 (PDF p. 9): all porphyry Cu deposits, n = 422; by-product percentiles count unreported grades as zero; presence = n_reported / 422 from the report's data file PorCuTX2008.txt; correlations (Pearson r of log10) from the text, PDF p. 8. See crates/deeptime-core/data/usgs/porphyry_cu.json.",

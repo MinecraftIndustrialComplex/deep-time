@@ -10,8 +10,12 @@
 //!   centres;
 //! - **random**: the lowest values of a fractal noise, so continents and islands of every size.
 //!
-//! In every case the continental area is (1 − ocean_fraction) of the planet, to one sample, and
-//! every continent starts whole on the plate most of it lies on.
+//! In every case the dry continental area is (1 − ocean_fraction) of the planet, to one sample, and
+//! every continent starts whole on the plate most of it lies on. With `continental_shelf_share`
+//! s > 0 (P1-17) the continental crust is (1 − ocean_fraction)/(1 − s) and its part nearest the
+//! ocean starts as a flooded shelf, so `ocean_fraction` stays the share of the surface under water
+//! once erosion and the sea have drowned the continents' margins as on Earth; with s = 0 (the
+//! default) all continental crust starts dry.
 
 use glam::{DQuat, DVec3};
 use rayon::prelude::*;
@@ -28,6 +32,10 @@ use crate::error::CoreError;
 use crate::params::PlanetPreset;
 use crate::preset::StartConfig;
 use crate::sphere::SplitMix64;
+
+/// Depth of the initial continental shelf at its seaward edge, m (Earth's shelf break averages
+/// about 130 m: Shepard 1963, "Submarine Geology").
+const SHELF_BREAK_M: f64 = -130.0;
 
 /// A uniformly random rotation (Shoemake 1992, "Uniform random rotations").
 pub fn random_rotation(rng: &mut SplitMix64) -> DQuat {
@@ -87,8 +95,14 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         .collect();
     connect_plates(&geo, &mut plate, |_| true);
 
-    // Continents.
-    let target = ((1.0 - preset.planet.ocean_fraction) * n as f64).round() as usize;
+    // Continents: (1 − ocean_fraction) of the planet dry, plus the share of continental crust
+    // under the sea (`continental_shelf_share`, 0 by default: the continental crust is then
+    // exactly the dry share, P1-03's rule).
+    let dry = ((1.0 - preset.planet.ocean_fraction) * n as f64).round() as usize;
+    let target = ((1.0 - preset.planet.ocean_fraction) / (1.0 - k.continental_shelf_share)
+        * n as f64)
+        .round()
+        .min(n as f64) as usize;
     let warp = k.coast_warp_rad;
     let mut continental = vec![false; n];
     match start {
@@ -272,6 +286,44 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         std::f64::consts::PI,
     );
 
+    // The continental shelf: the continental crust nearest the ocean beyond the dry share starts
+    // under the sea, from 0 m at the coast to `SHELF_BREAK_M` at the ocean's edge (continents are
+    // born with their passive margins flooded, as Earth's are).
+    let mut shelf_z: Vec<Option<f32>> = vec![None; n];
+    let shelf = target.saturating_sub(dry);
+    if shelf > 0 {
+        let coast: Vec<(u32, f64, u32)> = (0..n as u32)
+            .filter(|&v| {
+                continental[v as usize] && geo.edges(v).any(|(u, _)| !continental[u as usize])
+            })
+            .map(|v| (v, 0.0, 0))
+            .collect();
+        let (inland, _) = dijkstra(
+            &geo,
+            &coast,
+            |a, b| continental[a as usize] && continental[b as usize],
+            std::f64::consts::PI,
+        );
+        let score: Vec<f64> = (0..n)
+            .map(|i| {
+                if continental[i] {
+                    inland[i]
+                } else {
+                    f64::INFINITY
+                }
+            })
+            .collect();
+        let outer = lowest(&score, shelf);
+        let widest = outer
+            .iter()
+            .map(|&i| inland[i as usize])
+            .fold(0.0, f64::max)
+            .max(1e-12);
+        for &i in &outer {
+            shelf_z[i as usize] = Some((SHELF_BREAK_M * (1.0 - inland[i as usize] / widest)) as f32);
+        }
+    }
+
     let (zr, zt) = (k.ridge_elevation_m, k.trench_elevation_m);
     let s4 = seed.wrapping_add(23);
     let samples: Vec<Sample> = (0..n)
@@ -283,9 +335,11 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
             if continental[i] {
                 let f = 0.5 + 0.5 * fbm(p, 4.0, 4, s4);
                 s.kind = CONTINENTAL;
-                s.elevation_m = (k.continent_elevation_m[0]
-                    + f * (k.continent_elevation_m[1] - k.continent_elevation_m[0]))
-                    as f32;
+                s.elevation_m = shelf_z[i].unwrap_or(
+                    (k.continent_elevation_m[0]
+                        + f * (k.continent_elevation_m[1] - k.continent_elevation_m[0]))
+                        as f32,
+                );
                 s.pools = continental_column();
                 s.regime = regime::CRATON;
                 s.heat_flow_mw_m2 = 60.0;
