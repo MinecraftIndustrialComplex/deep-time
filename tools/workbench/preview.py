@@ -991,11 +991,12 @@ def http_once(method, path):
     workbench's Rust server): the body on stdin; on stdout one JSON line {"status", "content_type",
     "length"} and then exactly `length` bytes of body."""
     body = sys.stdin.buffer.read() if method == "POST" else b""
+    out = sys.stdout.buffer
+    sys.stdout = sys.stderr   # progress lines (Job.say) must not reach the protocol stream
     try:
         code, ctype, data = api(method, path, body)
     except Exception as e:   # never leave the proxy without an answer
         code, ctype, data = 500, "application/json", json.dumps({"error": f"preview.py: {e}"}).encode()
-    out = sys.stdout.buffer
     out.write(json.dumps({"status": code, "content_type": ctype, "length": len(data)}).encode() + b"\n")
     out.write(data)
     out.flush()
