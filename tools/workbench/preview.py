@@ -507,9 +507,15 @@ def build_tools(job, smoke):
     stamp_file = colors + ".mods"
     fresh = os.path.exists(colors) and os.path.exists(stamp_file) and open(stamp_file).read().strip() == stamp
     if not fresh:
-        art = os.path.join(REPO, "neoforge", "build", "moddev", "artifacts")
-        vanilla = next((os.path.join(art, f) for f in sorted(os.listdir(art)) if "client-extra" in f), None) \
-            if os.path.isdir(art) else None
+        # Minecraft's client resources jar: this checkout's Gradle build, else the main checkout's
+        # (a worktree's Mac copy has no neoforge/build until it runs Gradle itself).
+        vanilla = None
+        for art in (os.path.join(REPO, "neoforge", "build", "moddev", "artifacts"),
+                    os.path.join(os.path.dirname(REPO), "deep-time", "neoforge", "build", "moddev", "artifacts")):
+            if os.path.isdir(art):
+                vanilla = next((os.path.join(art, f) for f in sorted(os.listdir(art)) if "client-extra" in f), None)
+            if vanilla:
+                break
         if vanilla:
             job.set(message="building the block colour table from the mod jars")
             run_cmd(job, [inspect, "colors", "--jars", mods, "--vanilla", vanilla, "--out", colors], log_name="build.log")
@@ -650,7 +656,10 @@ def probe(job, server, spec):
             why_done.add(s["id"])
             rec(f"deeptime why {s['id']}")
             sx, sy, sz = s["center"]
+            # `probe site` reports the block only from a loaded chunk; Chunky's are unloaded.
+            server.rcon(f"forceload add {sx} {sz}")
             rec(f"deeptime probe site {sx} {sy} {sz}")
+            server.rcon(f"forceload remove {sx} {sz}")
     with open(path, "w") as f:
         for l in lines:
             f.write(json.dumps(l) + "\n")
