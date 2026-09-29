@@ -37,7 +37,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 743b69d | Mechanism verified on placeholder presets (dummy pipeline + wrap-test bake): standalone and MIC first starts generate in ~12 s with progress lines ≤ 5 s apart, restart does not regenerate; no-config / circumference-mismatch / native-failure all stop cleanly before loadLevel. Rerun with the real presets after P1-08 |
 | P1-14 | Deposit engine: the four families | doing | 2026-09-28 | 7f4858c | Engine on a synthetic field history (real fields wait for P1-03…P1-07). Mac: cargo test --workspace ok (core 82 incl. 41 deposits::, format 31, cli 11); porphyry σ 1.4892; Poisson means within 4 SE over 10,000 draws; tonnage P90/P50/P10 within 4 SE; min separation holds (200 seeds + the run); every site has a forming event with causes; `stage deposits --preset …/deposits_synthetic_16k.json --viewer review/out/p1-deposits` → 32 sites of all 8 types, counts next to ρ·A·F (porphyry 9 drawn / 9.41), 0.83 GB peak; fmt, clippy -D warnings, deny clean |
 | P1-15 | Deposits in the world | doing | 2026-09-28 | — | On the synthetic deposit world (real fields wait for P1-03…P1-08). Mac: ./gametest.sh, -PwithEv, -PwithMic → All 30 required tests passed each (DepositGameTests body 1222/1222 ore exact, 0 missed, 0 unexplained, regeneration 0 of 44,880 differ; ClaimGameTests; SpawnGameTests); ./gametest-planet.sh claimoninplanetworld PASS standalone (19 removed) and -PwithMic (38 removed); JUnit 62/0 incl. DepositDataParityTest (19,649 body samples, worst Δ 3.3e-16); smoke standalone first-start deposit world PASS + `deeptime-inspect ore` render |
-| P1-16 | COE and CDG hooks | todo | | | |
+| P1-16 | COE and CDG hooks | done | 2026-09-28 | — | Mac: `./gametest.sh` and `-PwithMic` → All 45 required tests passed each; CompatGameTests with COE 1.6.8 + CDG 1.3.15: 7 of 7 site chunks = the site's vein in COE, 30 of 30 claimed noise veins dropped (COE picks them in the overworld), 34 unclaimed kept, 33 stored randomMul = the site's quantile (24 = Rust's drawn quantile, worst Δ 2.8e-8), 16 trap chunks = charge × cdg_scale × share, 111 chunks outside traps 0. MIC smoke (16k deposit world) PASS: `probe coe` at 9 site chunks = the site's vein (agrees), `probe cdg` over trap 27 > 0 (infinite / 553,979 mB), 0 elsewhere; `/coe locate` copper not found, redstone found. JUnit 106/0; cargo fmt/clippy/test/deny clean. Driven by the synthetic deposit world (see build log) |
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
@@ -61,6 +61,109 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-15 | **Q10 (plan §14): Excavated Variants in MIC?** Ben (log 2026-09-28): decide after side-by-side BlueMap renders of the same deposits with and without EV in the MIC pack. Next: produce and publish those renders, then ask. | AskUserQuestion |
 
 ## Build log
+
+### 2026-09-28 — P1-16 COE and CDG hooks (agent worktree agent-a8ca83a89f23c10ef, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Signatures** (javap + cfr on the Mac MIC set's jars, `createoreexcavation-1.21-1.6.8.jar` sha512
+  844ae32f…, `createdieselgenerators-1.21.1-1.3.15.jar` 1507ebcd…, both = the pack's pins; both MIT):
+  `public static RecipeHolder<VeinRecipe> OreVeinGenerator.pick(LevelChunk)`, `public void
+  OreData.populate(LevelChunk)` (sets `recipe` and `randomMul = rngFromChunk.nextFloat()` only when
+  pick returns a vein), private `RandomSpreadGenerator.pick(ServerLevel, ChunkPos, RecipeHolder)` (the
+  vein finder's far search and `/coe locate`), `public static int OilChunksSavedData.getBaseOilAmount(
+  ServerLevel, ChunkPos)` (reached by the pumpjack through `getChunkOilAmount`, which stores what is
+  left once pumping starts and reads a stored value above the infinite threshold as infinite). §7.14
+  matched; no drift. `grep -rn calculateOilChunks pack/kubejs` → nothing (re-checked).
+- **MIC's COE vein ids** = COE 1.6.8's own 15 `createoreexcavation:vein` recipes (scanned every
+  recipe JSON of the 168 MIC jars: only COE's jar has vein or drilling recipes; `pack/kubejs`,
+  `config`, `defaultconfigs` name none). Deep Time's deposit types already name them, so **no MIC
+  override is needed** (none written). Mapping (`minecraft.coe_vein`): porphyry_cu_mo_au and
+  supergene_cu_blanket → `ore_vein_type/copper`, placer_au → `gold`, bif_fe → `iron`, coal_seam →
+  `coal`, mvt_zn_pb and sedex_zn_pb → `zinc`, petroleum_trap → none (CDG). Left to COE's noise in
+  Deep Time levels: diamond, emerald, hardened_diamond, lapis, redstone, water (and the nether
+  veins). Override path for a pack: a datapack copy of `data/deeptime/deeptime/deposit_type/<type>.json`
+  with another `coe_vein` (read at run time from the registry, so existing worlds follow).
+- **Built.** `compat/SiteChunks` (a site covers a chunk when its `ore` bodies have blocks in the
+  chunk's column; volume per canonical chunk, computed once per site, coarser lattice above 2 M
+  evaluations; the site filling the chunk most wins), `compat/coe/CoeBridge` (vein = the registry
+  type's `coe_vein`, else the record's; none without products; claimed = the types' veins + the
+  records'; q = the site's present tonnage as a quantile of its type's split lognormal
+  `sizing.tonnage_mt`, `OreData.Percentiles.cdf` with the core's erf), `compat/cdg/CdgBridge`
+  (chunk amount = round(`cdg_charge_mb` × `cdg_scale` × the chunk's share of the ore body's
+  volume), `Integer.MAX_VALUE` above CDG's infinite threshold like CDG's own generator, 0 away from
+  traps), `CoeAccess`/`CdgAccess` + `*Impl` (the mods' own calls, reflective like `EvBridge`), the
+  mixins `mixin/compat/createoreexcavation/{OreVeinGeneratorMixin (HEAD site vein, RETURN drop
+  claimed), OreDataMixin (populate RETURN → setRandomMul(q)), RandomSpreadGeneratorMixin}` and
+  `mixin/compat/createdieselgenerators/OilChunksSavedDataMixin` (HEAD), `compat/CompatHooks` (loads
+  the four target classes at mod construction so `defaultRequire 1` fails the boot, and so the smoke's
+  "every declared mixin applied" check sees them), `server/CompatCommands` (`probe coe|cdg <chunkX>
+  <chunkZ>`: Deep Time's decision, the mod's stored state, `agrees`), `sites near` lists each site's
+  `ore_chunk`, `tools/smoke/run.py` adds a check per coe/cdg probe that they agree and a "COE and
+  CDG" table to the report. Deposit-type key **`minecraft.cdg_scale`** (Rust struct + validation,
+  schema, Java codec; default 1; `petroleum_trap` 0.02, judged: a median trap's chunks hold a few
+  million mB like CDG's own oil chunks, large traps' cores reach CDG's infinite threshold); the Java
+  codec also reads `sizing.tonnage_mt`. compileOnly `maven.modrinth:create-ore-excavation:tivxiPTo`
+  and `create-diesel-generators:UoPH8lO1`; `neoforge.mods.toml` declares both optional
+  (`[1.6.8,)`, `[1.21.1-1.3.15,)`). Plan §7.14 and §10.3 P1-16 have "As built" notes; FORMAT.md and
+  the schema describe the run-time scaling.
+- **Tests** (`CompatGameTests`, namespace `deeptime`, on the GameTest server's Deep Time level
+  `deeptime:test_deposits`; the flat overworld is the control where COE and CDG decide alone):
+  `coePicksSiteVein` (per type the first vein site's best chunk, generated; COE's stored vein via
+  `OreDataAttachment.getData` and `pick` = Deep Time's; every type's vein is a COE recipe),
+  `coeDropsClaimedNoise` (COE's own placement grid within ±512 chunks, six grid chunks per vein
+  outside every site, as detached plains `LevelChunk`s so COE's biome filter passes: the overworld
+  gets the claimed vein, test_deposits none; unclaimed veins identical in both),
+  `coeAmountScalesWithTonnage` (q against Rust's `tonnage_quantile` for intact deposits, monotone in
+  tonnage per type, COE's populate stores it), `cdgOilFromTrap` (block-by-block volume per chunk,
+  base and pumpjack amounts), `cdgZeroElsewhere` (vein-site chunks, the ring round each trap, a grid).
+  Without the mods each still checks Deep Time's side and skips the mods' calls.
+- **Measured (Mac).** `cargo fmt --check`, `clippy -D warnings`, `test --workspace --locked` (core
+  118 + 1 ignored, format 31, …), `deny check licenses bans` clean. `gradlew build test` → tests=106
+  failures=0. `./gametest.sh` → **All 45 required tests passed** (compat mixins skipped, Deep Time's
+  side: 7 vein sites, 24 quantiles = Rust's, worst |Δ| 2.8e-8; 16 trap chunks; 111 zero chunks).
+  `tools/smoke/install.sh mic` (pack 303fd89) then `./gametest.sh -PwithMic` → **All 45 passed**:
+  "createoreexcavation hooks bound", "createdieselgenerators hooks bound"; coePicksSiteVein 7 of 7
+  agree (bif 13 iron mul 0.995, coal 19, mvt 29 zinc 0.976, placer 6 gold 0.556, porphyry 2 copper
+  0.654, sedex 36 zinc 0.073, supergene 1 copper 0.001); coeDropsClaimedNoise 888 grid candidates,
+  30 claimed tried, COE picks all 30 in the overworld, 30 dropped in Deep Time (6 each of coal,
+  copper, gold, iron, zinc), 56 unclaimed tried, 34 kept, 0 differ; coeAmountScalesWithTonnage 33
+  stored = q, 6 types ordered; cdgOilFromTrap trap 37 (0.41 Mt, 480,030,524 mB × 0.02) over 6 chunks,
+  max 4,275,128 mB, sum 9,600,610; trap 38 (3.95 Mt) over 10 chunks, max 28,254,828 (4 chunks
+  infinite); cdgZeroElsewhere 111 chunks 0 in Deep Time, CDG's own noise finds oil in 65 of 72 of
+  the control chunks in the overworld. **MIC smoke** (install `--preset deposits_world_16k.json
+  --length-myr 500 --datapack deeptime-mic-rock-tags`; `run.py --profile mic --fresh --rcon "deeptime
+  sites near 0 0 12000"`, then `run.py --profile mic` with 16 probes) → **PASS** both boots:
+  first start 2.3 s, 42 sites, every declared Deep Time mixin applied by Done, and the report's COE/CDG
+  table: porphyry 10 (−348,−65) copper q 0.079, porphyry 2 (−348,−63) copper 0.001, supergene 1
+  copper, placer 8 gold 0.754, BIF 11 iron 0.791, coal 15 0.991, MVT 23 zinc 0.559, SEDEX 25 zinc
+  0.736, the guaranteed coal+iron pair at (−2,−135) → coal 29 (the fuller), COE stores each with
+  mul = q (all **infinite**, see findings); no vein at (0,0) or the trap; CDG over trap 27 (62 Mt,
+  73,317,183,120 mB): (334,25) and (333,25) infinite, (336,27) 553,979 mB, (−348,−65) and (0,0) 0 —
+  CDG's base and pumpjack amounts equal Deep Time's in all 5; `/coe locate …/copper` → "Could not
+  find", `/coe locate …/redstone` → 2,073 blocks away. **After merging master 82ca8ea (P1-04)**:
+  cargo fmt/clippy/deny clean, test ok (core 139 + 1 ignored), `gradlew build test` 106/0,
+  `./gametest.sh` and `-PwithMic` → All 45 passed each (the same compat numbers).
+- **Findings for Ben.** (1) **MIC's COE veins are all infinite**: COE's `defaultInfinite` is true
+  and the pack ships no COE server config, so the tonnage quantile changes nothing in MIC today (it
+  is stored, and the finite amounts it would give are in the table: copper 10,021–11,576, coal
+  17,500–39,772 at `finiteAmountBase` 1000). Finite, size-scaled site veins need
+  `defaultconfigs/createoreexcavation-server.toml` with `defaultInfinite = false` on MIC's pack
+  branch — a gameplay decision (with infinite veins, unlimited drilling is already confined to
+  Deep Time's sites, the decisions file's "unlimited-mining sites"). (2) COE's vein finder "far" line
+  and `/coe locate` no longer point at claimed veins in Deep Time levels but do not find sites either
+  (prospecting is planned separately). (3) P1-15's stacked guarantees (coal and BIF on one cell) give
+  one vein per chunk, the fuller body's. (4) The 16k synthetic trap 27 holds 62 Mt (five times the
+  type's P10), so most of its chunks are infinite at `cdg_scale` 0.02; retune on the real presets
+  (P1-17).
+- **Deviations.** (1) The five tests run on the GameTest server's Deep Time test level, not
+  `./gametest-planet.sh -PwithMic` (the planet server has no deposit world; the hooks work in any
+  Deep Time level) — the MIC smoke covers a real Deep Time + TW overworld. (2) A third COE mixin
+  (`RandomSpreadGeneratorMixin`) the plan did not list. (3) `cdg_scale` added to the deposit-type
+  schema (the core only accepts and validates it). (4) q from the site's present tonnage (after
+  truncation and leaching), not the drawn quantile; equal for intact deposits. (5) No MIC override
+  file: MIC's ids are COE's defaults. (6) CDG's config in the GameTest run is CDG's default (normal
+  oil on), MIC's (normal ×0.0) only in the smoke; neither matters inside Deep Time levels.
+- **Next step.** After P1-08, rerun `./gametest.sh -PwithMic` and the two-phase MIC smoke above on
+  the real preset (pick probe chunks from `sites near`'s `ore_chunk`); P1-17 retunes `cdg_scale`;
+  Ben decides (1).
 
 ### 2026-09-28 — P1-04 deep-time surface processes on L1 (agent worktree agent-a7fbbf1cc57a46cda, branch worktree-agent-a7fbbf1cc57a46cda)
 - **What.** `crates/deeptime-core/src/surface/` (mod, params, grid, advect, pflood, routing, spl,

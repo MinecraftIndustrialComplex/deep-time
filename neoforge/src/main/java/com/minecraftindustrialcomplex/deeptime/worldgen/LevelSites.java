@@ -48,7 +48,7 @@ public final class LevelSites implements DeepTimeSites {
         this.sites = CONVERTED.computeIfAbsent(deposits, LevelSites::convert);
     }
 
-    public static DeepTimeSites of(ServerLevel level) {
+    public static LevelSites of(ServerLevel level) {
         if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g))
             return NONE;
         return of(g);

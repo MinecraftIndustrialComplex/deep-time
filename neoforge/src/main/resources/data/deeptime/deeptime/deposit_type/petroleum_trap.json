@@ -64,6 +64,7 @@
   "minecraft": {
     "coe_vein": null,
     "cdg_reservoir": true,
+    "cdg_scale": 0.02,
     "ore_block_policy": "none"
   },
   "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 2.0, "richness_mult": 1.0},
@@ -73,6 +74,7 @@
     "Field size: the example of USGS World Petroleum Assessment 2000 (DDS-60), Niger Delta Agbada Reservoirs assessment unit 71920101, undiscovered oil fields: median 12 MMBO from the data form; p90 ≈ 2.4 and p10 ≈ 89 MMBO measured off the USGS histogram (the digitiser's log interpolation). Converted to tonnes at 0.1364 t per barrel (a design conversion for crude of 0.858 t/m³): 0.327 / 1.637 / 12.14 Mt. One province's distribution, not a global model.",
     "PLACEHOLDERS (not found): density_per_1e5km2 5 / 20 / 160 fields per 100,000 km² of charged-trap area, min_separation_m 2000, formation_depth_m 2000; ore_density_t_m3 0.13 is oil tonnes per m³ of reservoir rock (20 % porosity × 75 % oil saturation × 0.85 t/m³, a design value), so the dome is the reservoir's volume.",
     "Design values: migration_km 50, the trap/seal/reservoir thresholds, min_source 1 wt% TOC, the gas/oil/water legs; a layer generates only while hotter than 80 °C (petroleum.rs).",
-    "erosion_behavior destroy: erosion into a trap breaches it. Fluids place no blocks (ore_block_policy none); the charge goes to CDG (P1-16) as cdg_charge_mb = oil tonnes / 0.85 t/m³ × 1000."
+    "erosion_behavior destroy: erosion into a trap breaches it. Fluids place no blocks (ore_block_policy none); the charge goes to CDG (P1-16) as cdg_charge_mb = oil tonnes / 0.85 t/m³ × 1000.",
+    "cdg_scale 0.02 (P1-16, a gameplay value, judged): CDG sees 2 % of the physical charge, split over the trap's chunks by the dome's volume in each, so a chunk holds a few million mB like CDG's own oil chunks (threshold 4,000,000, infinite above 10,000,000 by default) and the thickest chunks of large traps reach CDG's infinite threshold."
   ]
 }

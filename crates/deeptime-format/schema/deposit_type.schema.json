@@ -254,8 +254,9 @@
       "additionalProperties": false,
       "required": ["ore_block_policy"],
       "properties": {
-        "coe_vein": {"type": ["string", "null"], "description": "a Create Ore Excavation vein recipe id (createoreexcavation:ore_vein_type/copper) or null"},
+        "coe_vein": {"type": ["string", "null"], "description": "a Create Ore Excavation vein recipe id (createoreexcavation:ore_vein_type/copper) or null; a site of the type is that vein in every chunk its ore body reaches, and COE's own noise no longer hands the vein out in Deep Time levels (plan §7.14, P1-16). A pack remaps it by overriding this file in a datapack"},
         "cdg_reservoir": {"type": "boolean", "default": false, "description": "sites feed Create: Diesel Generators oil (plan §7.14)"},
+        "cdg_scale": {"type": "number", "minimum": 0, "default": 1, "description": "the fraction of a reservoir's charge (cdg_charge_mb, the physical oil volume) that Create: Diesel Generators sees, spread over the chunks of the ore body by volume (plan §7.14, P1-16); 1 = physical"},
         "ore_block_policy": {"enum": ["ev_then_vanilla", "none"], "description": "Excavated Variants when installed, else stone/deepslate ores (decisions file); none for fluids"}
       }
     },

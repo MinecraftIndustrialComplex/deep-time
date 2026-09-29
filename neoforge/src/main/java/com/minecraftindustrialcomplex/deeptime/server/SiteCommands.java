@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.api.DeepTimeSites;
 import com.minecraftindustrialcomplex.deeptime.api.GeoEvent;
 import com.minecraftindustrialcomplex.deeptime.api.Site;
+import com.minecraftindustrialcomplex.deeptime.compat.SiteChunks;
 import com.minecraftindustrialcomplex.deeptime.ore.ClaimOresBiomeModifier;
 import com.minecraftindustrialcomplex.deeptime.ore.ClaimRules;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Body;
@@ -169,6 +170,16 @@ public final class SiteCommands {
         for (var e : found) {
             JsonObject so = siteJson(e.getValue());
             so.addProperty("distance", Math.round(e.getKey() * 10) / 10.0);
+            // P1-16: the chunk its ore body fills most (the chunk to probe with `probe coe` / `probe cdg`).
+            if (sites instanceof LevelSites ls) {
+                var best = SiteChunks.footprint(ls, e.getValue()).best();
+                if (best != null) {
+                    JsonArray bc = new JsonArray();
+                    bc.add(best.x);
+                    bc.add(best.z);
+                    so.add("ore_chunk", bc);
+                }
+            }
             arr.add(so);
         }
         o.addProperty("count", found.size());
