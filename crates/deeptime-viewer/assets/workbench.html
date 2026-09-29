@@ -33,7 +33,7 @@
   #conn { font-size: .8em; white-space: nowrap; }
   #conn::before { content: '● '; color: var(--warn); }
   #conn.ok::before { color: var(--ok); }
-  #app { flex: 1 1 auto; display: grid; grid-template-columns: 340px minmax(0, 1fr) minmax(280px, 26%); gap: 12px; padding: 12px 16px; min-height: 0; }
+  #app { flex: 1 1 auto; display: grid; grid-template-columns: 360px minmax(0, 1fr) minmax(280px, 26%); gap: 12px; padding: 12px 16px; min-height: 0; }
   #app.nosidebar { grid-template-columns: minmax(0, 1fr) minmax(280px, 28%); }
   #app.nosidebar #sidebar { display: none; }
   @media (max-width: 1100px) { #app, #app.nosidebar { grid-template-columns: 1fr; } }
@@ -46,11 +46,14 @@
   .bad { color: var(--bad); }
   /* the editor and the runs */
   #sidebar { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; max-height: calc(100vh - 70px); }
-  .frow { display: grid; grid-template-columns: 42% 1fr; gap: 4px 8px; align-items: center; margin: 3px 0; font-size: .9em; }
+  .frow { display: grid; grid-template-columns: 38% minmax(0, 1fr); gap: 4px 8px; align-items: center; margin: 3px 0; font-size: .9em; }
   .frow > label { color: var(--muted); overflow-wrap: anywhere; }
   .frow .ctl { display: flex; gap: 6px; align-items: center; min-width: 0; }
   .frow .ctl input[type=range] { flex: 1 1 auto; min-width: 40px; }
-  .frow .ctl input[type=number] { width: 7.5em; }
+  .frow .ctl input[type=number] { width: 6.5em; min-width: 0; }
+  .frow .ctl select { min-width: 0; width: 100%; }
+  .frow .ctl .hint { min-width: 2.2em; }
+  #runbar { position: sticky; bottom: -8px; background: var(--panel); padding: 6px 0 8px; border-top: 1px solid var(--line); margin-top: 6px; }
   .frow.off { opacity: .55; }
   .frow.invalid input { border-color: var(--bad); color: var(--bad); }
   .fsec { font-size: .75em; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 10px 0 2px; border-bottom: 1px solid var(--line); }
@@ -135,12 +138,6 @@
     <details class="panel" id="newrun" open>
       <summary><span>New run</span><span class="hint" id="presetnote"></span></summary>
       <div id="form"><div class="hint">Loading the editor…</div></div>
-      <ul id="problems"></ul>
-      <div id="estimate"></div>
-      <div class="brow">
-        <button class="primary" id="runbtn" disabled>Run</button>
-        <input id="label" placeholder="label (optional)" style="flex:1 1 8em; min-width: 6em">
-      </div>
       <div class="fsec">Share code</div>
       <textarea id="sharecode" readonly spellcheck="false" aria-label="share code of this preset"></textarea>
       <div class="brow">
@@ -149,6 +146,14 @@
         <button id="importbtn">Import</button>
       </div>
       <div class="hint" id="importmsg"></div>
+      <div id="runbar">
+        <ul id="problems"></ul>
+        <div id="estimate"></div>
+        <div class="brow">
+          <button class="primary" id="runbtn" disabled>Run</button>
+          <input id="label" placeholder="label (optional)" style="flex:1 1 8em; min-width: 6em">
+        </div>
+      </div>
     </details>
     <div class="panel" id="runsbox"><h2><span>Runs</span><span class="hint" id="runscount"></span></h2><div id="runlist" class="hint">No runs yet.</div></div>
   </nav>
