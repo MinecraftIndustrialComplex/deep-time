@@ -113,10 +113,14 @@ public final class BiomeGameTests {
      * first calibrated run, standalone and MIC; see STATUS.md's P1-09 build log). A family with
      * fewer than {@link #MIN_COLUMNS} columns on the test planet is logged, not asserted.
      */
+    // First calibrated runs (2026-09-29, test_planet_real, standalone / MIC): BW 0.765 / 0.824, BS 0.738 / 0.825,
+    // C 0.86 / 0.86, D 1.0 / 1.0, Dsub 0.969 / 0.987, E 1.0 / 1.0, sea 1.0 / 1.0, BW:desert — / 0.588,
+    // Dfc:taiga — / 0.657, E:snow 1.0 / 1.0; the small planet has no A and only 17 BW columns (logged only).
+    // Floors sit about 0.1 under the lower of the two.
     static final Map<String, Double> FLOORS = Map.ofEntries(
-            Map.entry("A", 0.0), Map.entry("Af", 0.0), Map.entry("BW", 0.0), Map.entry("BS", 0.0), Map.entry("C", 0.0),
-            Map.entry("D", 0.0), Map.entry("Dsub", 0.0), Map.entry("E", 0.0), Map.entry("sea", 0.0),
-            Map.entry("BW:desert", 0.0), Map.entry("Af:jungle", 0.0), Map.entry("Dfc:taiga", 0.0), Map.entry("E:snow", 0.0));
+            Map.entry("A", 0.6), Map.entry("Af", 0.6), Map.entry("BW", 0.65), Map.entry("BS", 0.6), Map.entry("C", 0.75),
+            Map.entry("D", 0.9), Map.entry("Dsub", 0.85), Map.entry("E", 0.9), Map.entry("sea", 0.95),
+            Map.entry("BW:desert", 0.45), Map.entry("Af:jungle", 0.5), Map.entry("Dfc:taiga", 0.5), Map.entry("E:snow", 0.9));
     static final int MIN_COLUMNS = 20;
 
     /**
