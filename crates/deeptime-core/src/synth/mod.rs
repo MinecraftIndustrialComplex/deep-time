@@ -482,9 +482,14 @@ fn strata_notes(kind: Strata) -> Value {
 }
 
 /// Land cells for spawn: dry, above sea level + 2, locally flat (≤ 1 block to each L3 neighbour),
-/// at least 64 blocks apart, nearest to (0, 0) first; at most 8.
-fn spawn_candidates(elevation: &LoadedLayer, water: &LoadedLayer, sea_level: i32) -> Value {
-    let g = &elevation.desc.grid;
+/// at least 64 blocks apart, nearest to (0, 0) first; at most 8. The bake of a planet run uses it
+/// too when no essential sets a reach (`bake::terrain`).
+pub fn spawn_candidates(
+    elevation: &impl RasterRead,
+    water: &impl RasterRead,
+    sea_level: i32,
+) -> Value {
+    let g = &elevation.desc().grid;
     let c = g.circumference() as i64;
     let stride = 4i64; // every 8 blocks at r 2
     let mut found: Vec<(i64, i64, i64, i64, f64)> = Vec::new(); // (dist², x, z, …)

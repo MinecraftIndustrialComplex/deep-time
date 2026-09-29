@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 deeptime-core.workspace = true
+deeptime-format.workspace = true
 jni.workspace = true
 rayon.workspace = true
 serde_json.workspace = true

@@ -34,8 +34,9 @@ import java.util.regex.Pattern;
  * class only reads what the game needs to decide before it calls the natives.
  *
  * <p>Built-in presets are {@code crates/deeptime-core/presets/*.json}, copied into the jar at
- * {@code deeptime/presets/<name>.json} by Gradle's {@code processResources}. Until the real
- * stages exist (P1-03…P1-08) they are placeholders: the dummy pipeline plus a synthetic terrain.
+ * {@code deeptime/presets/<name>.json} by Gradle's {@code processResources}. Since P1-08 they
+ * are simulated planets (the planet pipeline under its game names); a preset marked {@code placeholder}
+ * (the dummy pipeline plus a synthetic terrain, P1-13's stand-ins) still runs, with a warning.
  */
 public final class Presets {
 

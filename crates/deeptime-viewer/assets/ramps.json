@@ -520,7 +520,11 @@
     "young/drainage": "drainage",
     "amplify/elevation": "elevation",
     "amplify/detail": "detail",
-    "amplify/drainage": "drainage"
+    "amplify/drainage": "drainage",
+    "climate/p_mm": "precip",
+    "detail/amplitude": "detail",
+    "surface/class_top": "rock_class",
+    "meta/crust_age_myr": "crust_age"
   },
   "default": "grey"
 }

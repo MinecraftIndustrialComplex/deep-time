@@ -11,7 +11,7 @@
 //! smallest Σ min(d / max_blocks_from_spawn, 4) over the essentials that set a reach, then the
 //! nearest to (0, 0); picks are at least 64 blocks apart.
 
-use deeptime_format::{LoadedLayer, RasterRead, Site};
+use deeptime_format::{RasterRead, Site};
 use rayon::prelude::*;
 use serde_json::{Value, json};
 
@@ -67,13 +67,13 @@ struct Candidate {
 /// `spawn/candidates.json` ranked by the essentials that set `max_blocks_from_spawn`, or `None`
 /// when none does (the caller keeps its unranked candidates).
 pub fn ranked_candidates(
-    elevation: &LoadedLayer,
-    water: &LoadedLayer,
+    elevation: &(impl RasterRead + Sync),
+    water: &(impl RasterRead + Sync),
     sea_level: i32,
     sites: &[Site],
     essentials: &[Essential],
 ) -> Option<Value> {
-    let g = &elevation.desc.grid;
+    let g = &elevation.desc().grid;
     let c = g.circumference() as f64;
     let reaches: Vec<Reach> = essentials
         .iter()
