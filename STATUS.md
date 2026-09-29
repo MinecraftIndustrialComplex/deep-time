@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Next: P1-04 (agent, critical path), P1-11, P1-15, P1-18 (agents), then P1-05/P1-07 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Next: P1-05 and P1-07 (critical path; P1-04 done, P1-14 wires its recorded history), P1-11, P1-15, P1-18 (agents) · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -25,7 +25,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-01 | Session, checkpoints, keyframes, event log and site formats | done | 2026-09-28 | — | Mac: cargo test -p deeptime-format 27 ok (segments + sites round-trip, two writers merge with no id collision); run --preset dummy.json → manifest.json, events/1-0.dtev, keyframes/index.json (13 events, 9 keyframes, 3 sites); test --workspace, fmt, clippy -D warnings, deny licenses bans clean; gradlew build test tests=34 failures=0 and ./gametest.sh all 14 pass (after merging master 2f81ae5) |
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
 | P1-03 | Plates and crust | done | 2026-09-28 | 0867a61 | Mac: cargo test --workspace ok (plates::/params::/preset:: 20 + 1 ignored: rift area conserved exactly, partition, ages ≥ 0, hull invariants after every resampling, byte-identical resume); 500 Myr 20k: p90 ocean age 167/169/245 Myr, 98/97/90.5 % < 250 Myr; `stage plates --preset plates_quick_16k --start scattered_continents --length-myr 500` → plates_final=13 ocean_age_p90_myr=202.3 steps=250 seconds=8.3; 100k 8.3 s (12 thr) / 23 s (1 thr), 250k 25–31 s / 72 s vs Cortial 76–106 / 330–437 s; clippy, fmt, deny clean |
-| P1-04 | Deep-time surface processes on L1 | todo | | | |
+| P1-04 | Deep-time surface processes on L1 | done | 2026-09-28 | 50dd95f | Mac: cargo test --workspace ok (core 139 incl. surface:: 20: receivers acyclic, depressions resolved, diffusion Σh conserved, SPL ramp = analytic within 1e-6 (n 1) / 1e-3 (n 2), strata-log invariants, coupled pipeline resume identical; cli 11); `stage surface --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-surface` → 250 steps 96 s (plates 22 s, surface 74 s), land_frac 0.215, mass residual −6e-4 km³ of 1.2e8 eroded, 50 frames, 70 erosion pulses / 265 basins / 3 sea events; bench 1 thread surface 137 s = 1.05 µs/cell/step vs the 131 s cost model; fastscapelib oracle hypsometry_ks=0.0209 chi_slope_ratio=1.0000 PASS; fmt, clippy -D warnings, deny clean; gradlew build test 106/0 |
 | P1-05 | Climate | todo | | | |
 | P1-06 | Young landscape, amplification and the detail layer | todo | | | |
 | P1-07 | Rock classes, column strata and metamorphism | todo | | | |
@@ -37,7 +37,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 743b69d | Mechanism verified on placeholder presets (dummy pipeline + wrap-test bake): standalone and MIC first starts generate in ~12 s with progress lines ≤ 5 s apart, restart does not regenerate; no-config / circumference-mismatch / native-failure all stop cleanly before loadLevel. Rerun with the real presets after P1-08 |
 | P1-14 | Deposit engine: the four families | doing | 2026-09-28 | 7f4858c | Engine on a synthetic field history (real fields wait for P1-03…P1-07). Mac: cargo test --workspace ok (core 82 incl. 41 deposits::, format 31, cli 11); porphyry σ 1.4892; Poisson means within 4 SE over 10,000 draws; tonnage P90/P50/P10 within 4 SE; min separation holds (200 seeds + the run); every site has a forming event with causes; `stage deposits --preset …/deposits_synthetic_16k.json --viewer review/out/p1-deposits` → 32 sites of all 8 types, counts next to ρ·A·F (porphyry 9 drawn / 9.41), 0.83 GB peak; fmt, clippy -D warnings, deny clean |
 | P1-15 | Deposits in the world | doing | 2026-09-28 | — | On the synthetic deposit world (real fields wait for P1-03…P1-08). Mac: ./gametest.sh, -PwithEv, -PwithMic → All 30 required tests passed each (DepositGameTests body 1222/1222 ore exact, 0 missed, 0 unexplained, regeneration 0 of 44,880 differ; ClaimGameTests; SpawnGameTests); ./gametest-planet.sh claimoninplanetworld PASS standalone (19 removed) and -PwithMic (38 removed); JUnit 62/0 incl. DepositDataParityTest (19,649 body samples, worst Δ 3.3e-16); smoke standalone first-start deposit world PASS + `deeptime-inspect ore` render |
-| P1-16 | COE and CDG hooks | todo | | | |
+| P1-16 | COE and CDG hooks | done | 2026-09-28 | — | Mac: `./gametest.sh` and `-PwithMic` → All 45 required tests passed each; CompatGameTests with COE 1.6.8 + CDG 1.3.15: 7 of 7 site chunks = the site's vein in COE, 30 of 30 claimed noise veins dropped (COE picks them in the overworld), 34 unclaimed kept, 33 stored randomMul = the site's quantile (24 = Rust's drawn quantile, worst Δ 2.8e-8), 16 trap chunks = charge × cdg_scale × share, 111 chunks outside traps 0. MIC smoke (16k deposit world) PASS: `probe coe` at 9 site chunks = the site's vein (agrees), `probe cdg` over trap 27 > 0 (infinite / 553,979 mB), 0 elsewhere; `/coe locate` copper not found, redstone found. JUnit 106/0; cargo fmt/clippy/test/deny clean. Driven by the synthetic deposit world (see build log) |
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
@@ -49,6 +49,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | phase0 (Phase 0 exit: every check, evidence, links) | https://spacesheep.dev/@benmac/deeptime-phase0 | Phase 0 exit 2026-09-28 | 2026-09-28 |
 | p1-editor (real-client screenshots of the Create World editor, timelapse, review, world) | https://spacesheep.dev/@benmac/deeptime-p1-editor | P1-11 client screenshots 2026-09-28 | 2026-09-28 |
 | p1-plates (500 Myr of plates, 100k samples, keyframes + events) | https://spacesheep.dev/@benmac/deeptime-p1-plates | P1-03 plates 100k 500 Myr 2026-09-28 | 2026-09-28 |
+| p1-surface (500 Myr of plates + erosion, deposition, strata; 16k quick pipeline; PNGs losslessly recompressed to fit the 25 MB Free-plan deploy cap) | https://spacesheep.dev/@benmac/deeptime-p1-surface | P1-04 surface processes, 500 Myr 2026-09-28 | 2026-09-28 |
 | p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
 | p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
 
@@ -61,6 +62,317 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-15 | **Q10 (plan §14): Excavated Variants in MIC?** Ben (log 2026-09-28): decide after side-by-side BlueMap renders of the same deposits with and without EV in the MIC pack. Next: produce and publish those renders, then ask. | AskUserQuestion |
 
 ## Build log
+
+### 2026-09-28 — P1-16 COE and CDG hooks (agent worktree agent-a8ca83a89f23c10ef, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Signatures** (javap + cfr on the Mac MIC set's jars, `createoreexcavation-1.21-1.6.8.jar` sha512
+  844ae32f…, `createdieselgenerators-1.21.1-1.3.15.jar` 1507ebcd…, both = the pack's pins; both MIT):
+  `public static RecipeHolder<VeinRecipe> OreVeinGenerator.pick(LevelChunk)`, `public void
+  OreData.populate(LevelChunk)` (sets `recipe` and `randomMul = rngFromChunk.nextFloat()` only when
+  pick returns a vein), private `RandomSpreadGenerator.pick(ServerLevel, ChunkPos, RecipeHolder)` (the
+  vein finder's far search and `/coe locate`), `public static int OilChunksSavedData.getBaseOilAmount(
+  ServerLevel, ChunkPos)` (reached by the pumpjack through `getChunkOilAmount`, which stores what is
+  left once pumping starts and reads a stored value above the infinite threshold as infinite). §7.14
+  matched; no drift. `grep -rn calculateOilChunks pack/kubejs` → nothing (re-checked).
+- **MIC's COE vein ids** = COE 1.6.8's own 15 `createoreexcavation:vein` recipes (scanned every
+  recipe JSON of the 168 MIC jars: only COE's jar has vein or drilling recipes; `pack/kubejs`,
+  `config`, `defaultconfigs` name none). Deep Time's deposit types already name them, so **no MIC
+  override is needed** (none written). Mapping (`minecraft.coe_vein`): porphyry_cu_mo_au and
+  supergene_cu_blanket → `ore_vein_type/copper`, placer_au → `gold`, bif_fe → `iron`, coal_seam →
+  `coal`, mvt_zn_pb and sedex_zn_pb → `zinc`, petroleum_trap → none (CDG). Left to COE's noise in
+  Deep Time levels: diamond, emerald, hardened_diamond, lapis, redstone, water (and the nether
+  veins). Override path for a pack: a datapack copy of `data/deeptime/deeptime/deposit_type/<type>.json`
+  with another `coe_vein` (read at run time from the registry, so existing worlds follow).
+- **Built.** `compat/SiteChunks` (a site covers a chunk when its `ore` bodies have blocks in the
+  chunk's column; volume per canonical chunk, computed once per site, coarser lattice above 2 M
+  evaluations; the site filling the chunk most wins), `compat/coe/CoeBridge` (vein = the registry
+  type's `coe_vein`, else the record's; none without products; claimed = the types' veins + the
+  records'; q = the site's present tonnage as a quantile of its type's split lognormal
+  `sizing.tonnage_mt`, `OreData.Percentiles.cdf` with the core's erf), `compat/cdg/CdgBridge`
+  (chunk amount = round(`cdg_charge_mb` × `cdg_scale` × the chunk's share of the ore body's
+  volume), `Integer.MAX_VALUE` above CDG's infinite threshold like CDG's own generator, 0 away from
+  traps), `CoeAccess`/`CdgAccess` + `*Impl` (the mods' own calls, reflective like `EvBridge`), the
+  mixins `mixin/compat/createoreexcavation/{OreVeinGeneratorMixin (HEAD site vein, RETURN drop
+  claimed), OreDataMixin (populate RETURN → setRandomMul(q)), RandomSpreadGeneratorMixin}` and
+  `mixin/compat/createdieselgenerators/OilChunksSavedDataMixin` (HEAD), `compat/CompatHooks` (loads
+  the four target classes at mod construction so `defaultRequire 1` fails the boot, and so the smoke's
+  "every declared mixin applied" check sees them), `server/CompatCommands` (`probe coe|cdg <chunkX>
+  <chunkZ>`: Deep Time's decision, the mod's stored state, `agrees`), `sites near` lists each site's
+  `ore_chunk`, `tools/smoke/run.py` adds a check per coe/cdg probe that they agree and a "COE and
+  CDG" table to the report. Deposit-type key **`minecraft.cdg_scale`** (Rust struct + validation,
+  schema, Java codec; default 1; `petroleum_trap` 0.02, judged: a median trap's chunks hold a few
+  million mB like CDG's own oil chunks, large traps' cores reach CDG's infinite threshold); the Java
+  codec also reads `sizing.tonnage_mt`. compileOnly `maven.modrinth:create-ore-excavation:tivxiPTo`
+  and `create-diesel-generators:UoPH8lO1`; `neoforge.mods.toml` declares both optional
+  (`[1.6.8,)`, `[1.21.1-1.3.15,)`). Plan §7.14 and §10.3 P1-16 have "As built" notes; FORMAT.md and
+  the schema describe the run-time scaling.
+- **Tests** (`CompatGameTests`, namespace `deeptime`, on the GameTest server's Deep Time level
+  `deeptime:test_deposits`; the flat overworld is the control where COE and CDG decide alone):
+  `coePicksSiteVein` (per type the first vein site's best chunk, generated; COE's stored vein via
+  `OreDataAttachment.getData` and `pick` = Deep Time's; every type's vein is a COE recipe),
+  `coeDropsClaimedNoise` (COE's own placement grid within ±512 chunks, six grid chunks per vein
+  outside every site, as detached plains `LevelChunk`s so COE's biome filter passes: the overworld
+  gets the claimed vein, test_deposits none; unclaimed veins identical in both),
+  `coeAmountScalesWithTonnage` (q against Rust's `tonnage_quantile` for intact deposits, monotone in
+  tonnage per type, COE's populate stores it), `cdgOilFromTrap` (block-by-block volume per chunk,
+  base and pumpjack amounts), `cdgZeroElsewhere` (vein-site chunks, the ring round each trap, a grid).
+  Without the mods each still checks Deep Time's side and skips the mods' calls.
+- **Measured (Mac).** `cargo fmt --check`, `clippy -D warnings`, `test --workspace --locked` (core
+  118 + 1 ignored, format 31, …), `deny check licenses bans` clean. `gradlew build test` → tests=106
+  failures=0. `./gametest.sh` → **All 45 required tests passed** (compat mixins skipped, Deep Time's
+  side: 7 vein sites, 24 quantiles = Rust's, worst |Δ| 2.8e-8; 16 trap chunks; 111 zero chunks).
+  `tools/smoke/install.sh mic` (pack 303fd89) then `./gametest.sh -PwithMic` → **All 45 passed**:
+  "createoreexcavation hooks bound", "createdieselgenerators hooks bound"; coePicksSiteVein 7 of 7
+  agree (bif 13 iron mul 0.995, coal 19, mvt 29 zinc 0.976, placer 6 gold 0.556, porphyry 2 copper
+  0.654, sedex 36 zinc 0.073, supergene 1 copper 0.001); coeDropsClaimedNoise 888 grid candidates,
+  30 claimed tried, COE picks all 30 in the overworld, 30 dropped in Deep Time (6 each of coal,
+  copper, gold, iron, zinc), 56 unclaimed tried, 34 kept, 0 differ; coeAmountScalesWithTonnage 33
+  stored = q, 6 types ordered; cdgOilFromTrap trap 37 (0.41 Mt, 480,030,524 mB × 0.02) over 6 chunks,
+  max 4,275,128 mB, sum 9,600,610; trap 38 (3.95 Mt) over 10 chunks, max 28,254,828 (4 chunks
+  infinite); cdgZeroElsewhere 111 chunks 0 in Deep Time, CDG's own noise finds oil in 65 of 72 of
+  the control chunks in the overworld. **MIC smoke** (install `--preset deposits_world_16k.json
+  --length-myr 500 --datapack deeptime-mic-rock-tags`; `run.py --profile mic --fresh --rcon "deeptime
+  sites near 0 0 12000"`, then `run.py --profile mic` with 16 probes) → **PASS** both boots:
+  first start 2.3 s, 42 sites, every declared Deep Time mixin applied by Done, and the report's COE/CDG
+  table: porphyry 10 (−348,−65) copper q 0.079, porphyry 2 (−348,−63) copper 0.001, supergene 1
+  copper, placer 8 gold 0.754, BIF 11 iron 0.791, coal 15 0.991, MVT 23 zinc 0.559, SEDEX 25 zinc
+  0.736, the guaranteed coal+iron pair at (−2,−135) → coal 29 (the fuller), COE stores each with
+  mul = q (all **infinite**, see findings); no vein at (0,0) or the trap; CDG over trap 27 (62 Mt,
+  73,317,183,120 mB): (334,25) and (333,25) infinite, (336,27) 553,979 mB, (−348,−65) and (0,0) 0 —
+  CDG's base and pumpjack amounts equal Deep Time's in all 5; `/coe locate …/copper` → "Could not
+  find", `/coe locate …/redstone` → 2,073 blocks away. **After merging master 82ca8ea (P1-04)**:
+  cargo fmt/clippy/deny clean, test ok (core 139 + 1 ignored), `gradlew build test` 106/0,
+  `./gametest.sh` and `-PwithMic` → All 45 passed each (the same compat numbers).
+- **Findings for Ben.** (1) **MIC's COE veins are all infinite**: COE's `defaultInfinite` is true
+  and the pack ships no COE server config, so the tonnage quantile changes nothing in MIC today (it
+  is stored, and the finite amounts it would give are in the table: copper 10,021–11,576, coal
+  17,500–39,772 at `finiteAmountBase` 1000). Finite, size-scaled site veins need
+  `defaultconfigs/createoreexcavation-server.toml` with `defaultInfinite = false` on MIC's pack
+  branch — a gameplay decision (with infinite veins, unlimited drilling is already confined to
+  Deep Time's sites, the decisions file's "unlimited-mining sites"). (2) COE's vein finder "far" line
+  and `/coe locate` no longer point at claimed veins in Deep Time levels but do not find sites either
+  (prospecting is planned separately). (3) P1-15's stacked guarantees (coal and BIF on one cell) give
+  one vein per chunk, the fuller body's. (4) The 16k synthetic trap 27 holds 62 Mt (five times the
+  type's P10), so most of its chunks are infinite at `cdg_scale` 0.02; retune on the real presets
+  (P1-17).
+- **Deviations.** (1) The five tests run on the GameTest server's Deep Time test level, not
+  `./gametest-planet.sh -PwithMic` (the planet server has no deposit world; the hooks work in any
+  Deep Time level) — the MIC smoke covers a real Deep Time + TW overworld. (2) A third COE mixin
+  (`RandomSpreadGeneratorMixin`) the plan did not list. (3) `cdg_scale` added to the deposit-type
+  schema (the core only accepts and validates it). (4) q from the site's present tonnage (after
+  truncation and leaching), not the drawn quantile; equal for intact deposits. (5) No MIC override
+  file: MIC's ids are COE's defaults. (6) CDG's config in the GameTest run is CDG's default (normal
+  oil on), MIC's (normal ×0.0) only in the smoke; neither matters inside Deep Time levels.
+- **Next step.** After P1-08, rerun `./gametest.sh -PwithMic` and the two-phase MIC smoke above on
+  the real preset (pick probe chunks from `sites near`'s `ore_chunk`); P1-17 retunes `cdg_scale`;
+  Ben decides (1).
+
+### 2026-09-28 — P1-04 deep-time surface processes on L1 (agent worktree agent-a7fbbf1cc57a46cda, branch worktree-agent-a7fbbf1cc57a46cda)
+- **What.** `crates/deeptime-core/src/surface/` (mod, params, grid, advect, pflood, routing, spl,
+  diffusion, marine, carbonate, weathering, strata_log, facies, lithology, climate, fields, events,
+  oracle, tests) — the surface stage of plan §8.2's deep-time half — plus `deposits/recorded.rs`
+  (the deposit engine's recorded field history). From papers: Braun & Willett 2013 (implicit stream
+  power, stack), Yuan et al. 2019 (erosion–deposition G, iterated), Barnes et al. 2014
+  (Priority-Flood+ε with the pit queue; RichDEM not opened), Bosscher & Schlager 1992, Fu 1981
+  (Budyko). Ported from Landlab (MIT; NOTICE.md and file headers): `ExponentialWeatherer(Integrated)`,
+  `Lithology`/`LithoLayers` (the log's layer model), `ThresholdEroder` (critical slope),
+  `SimpleSubmarineDiffuser` (D(z)), `CarbonateProducer` (equations and defaults). fastscapelib
+  only as the oracle (`tools/validation/fastscape_compare.py`, venv, never vendored). New dependency:
+  `lz4_flex` in the core (already in the tree via the format crate, MIT). Checkpoint schema 3 → 4.
+- **Coupling (the design).** `Stage::coupled_to` + session *groups*: a planet preset with a
+  `surface` section builds `[plates, surface]`, and the session steps plates once, then surface once,
+  per plate step (keyframes draw the union of the group's layers; a checkpoint inside the group
+  stores every member's state; `stage_groups`/`group_of` in `session.rs`). The surface keeps
+  `h = plates/elevation_m + offset`; the offset, regolith and strata log are advected
+  semi-Lagrangianly with each cell's plate (R(−Ω·Δt), Ω stored at the end of the previous step,
+  parents' Ω for plates born in the step); crust born this step starts bare. The surface's net
+  change (`surface/feedback_m`, material `surface/material_m`) is splatted onto L0 samples with the
+  last coupling's barycentric weights at the start of the next plate step (elevation and rock pools),
+  which writes back what it applied (`surface/feedback_applied_m`) and the surface takes that off
+  its offset — so L0 and L1 never drift apart and uplift is exactly the plate model's. Pipeline
+  presets `presets/pipeline/pipeline_{quick,full}_{16k,32k}.json` = the plate presets +
+  `l1_every_steps: 1`, `continental_erosion_mm_yr: 0` (the surface erodes) + a full `surface`
+  section; a planet preset with `surface` and `l1_every_steps ≠ 1` is refused. `plates/l1.rs`
+  publishes 8 more L1 fields per step (`plates/{flags, top_pool, oxidation, convergence_mm_yr,
+  obliquity_deg, slab_age_myr, heat_flow_mw_m2, thickness_m}`).
+- **One step (2 Myr, `substeps` = 1).** Open sea = below-sea cells in a connected body ≥ W·H/500
+  cells (smaller closed basins are lakes); Priority-Flood+ε from the sea; D8 on the filled surface
+  (MFD rejected: the O(n) implicit solve needs one receiver; P1-06 draws channels at block scale);
+  runoff-weighted areas; Braun–Willett + Yuan G = 1 with Newton for n ≠ 1, lakes trap sediment to
+  their level, deposition capped by supply, critical slope 0.35 with the cut rock routed as sediment;
+  river loads fill the sea from each mouth outwards (priority by depth, to sea level − 0 m deepening
+  0.5 m/km; a full closed sea spreads the rest over the cells it reached — the first version dumped
+  it on one cell and made 160-km towers); Bosscher–Schlager carbonates (× water temperature, ×
+  e^(−clastic/20 m), capped at sea level); evaporites 100 m/Myr in restricted (ocean fraction within
+  ~150 km < 0.4) arid shallow seas and arid lakes; **2D implicit diffusion by Jacobi-PCG** (land κ
+  = 2 m²/yr × rock diffusivity, sea Landlab D(z) with D₀ 300, wave base 100 m) — the first version's
+  LOD splitting left N–S streaks on the shelves (D·Δt/Δx² ≈ 26), so LOD is now only the initial
+  guess; the residual's sum is returned so Σh is exact; then the strata log (facies rules in
+  `facies.rs`: the research's proposal + red beds, dolostone, black shale in restricted deep warm
+  water, halite/gypsum by aridity, coal in humid flat aggrading mires), regolith (Landlab integrated
+  exponential weathering, w₀ 50 m/Myr × climate; laterite/bauxite rule; buried regolith becomes a
+  palaeosol layer), local isostasy (net load × 0.6 (× 0.7 at sea), box-blurred over 50 km).
+  Erodibility/diffusivity from the surface rock (regolith only when ≥ 10 m, else the log's top, else
+  the basement from the plates' crust type/regime/orogeny/top pool), the 59-class table compiled in
+  from the P1-12 JSON (`include_str!`). Runoff: `climate/{t_mean_c,precip_mm}` if a climate stage
+  wrote them (P1-05), else a documented zonal stand-in (T = 28 − 42 sin²φ − 6.5 °C/km; belts of P;
+  orographic and continentality factors; Fu's Budyko curve). Strata log K = 32, 12 B/layer, merge of
+  same-class neighbours, cap by merging the thinnest adjacent pair; base ages, provenance = dominant
+  source family and its share (`strata_log::provenance`).
+- **Calibration (tuning runs, 100–500 Myr on 16k quick; `build/tune/*.json` variants, not
+  committed).** n = 1, m = 0.5: at K 2e-6 whole continents eroded at 50–150 m/Myr and flattened in
+  ~20 Myr; lower K only raised relief (erosion at steady state = uplift / (1 − isostasy)). Defaults
+  now **n = 2, m = 1, K = 3e-10**, isostasy 0.6, κ 2, deltas fill to sea level: land fraction 0.30 →
+  0.26 → 0.215 over 300–500 Myr instead of 0.15; orogens erode fast, cratons slowly. Continents
+  still end up domed (interior highlands up to ~3–4 km with erosion rims) — the plate model's broad
+  uplift inboard of trenches; P1-17 tunes.
+- **Deposit engine frames (P1-14's interface).** Every step adds its fields to an accumulator;
+  every 10 Myr a time-averaged frame is packed (16-bit elevation, erosion and deposition rates,
+  8-bit the rest, LZ4) into `WorldState::history` (`RecordedHistory: FieldHistory`); receivers of
+  the last routing at the end. **Published:** P1-03's `arc_magma_flux`, `magma_oxidation`,
+  `convergence_rate_km_myr`, `obliquity_deg`, `slab_age_myr`, `crust_thickness_km`,
+  `fault_density` (regime proxy), `orogenic_uplift_m_myr`, `rift_subsidence_m_myr`,
+  `heat_flow_mw_m2`, `dist_litho_step_km` (chamfer distance to craton edges), `inherited_bif` (0:
+  no pre-run crust ages); P1-04's `elevation_m`, `erosion_rate_m_myr`, `deposition_rate_m_myr`,
+  `topographic_gradient_m_km`, `shelf`, `carbonate_platform`, `evaporite`, `euxinic_basin`,
+  `coal_facies`, `source_rock_toc`, `burial_temp_c`, `reservoir_quality`, `seal`,
+  `water_table_depth_m`; stand-ins until P1-05: `precip_mm`, `t_mean_c`; clocks `oxygenated_oceans`
+  1, `land_plants` 1, `bif_acme` 0 (a Phanerozoic Earth until the preset has `planet.atmosphere`).
+  Definitions in `surface/fields.rs`. **Missing:** `trap_structure` (P1-07), `host/<class>` (P1-07).
+  The coupled test checks every built-in deposit type finds all its fields except the petroleum
+  trap's `trap_structure`. `DepositStage` still only builds a synthetic history (wiring
+  `RecordedHistory` in is P1-14's next step).
+- **Events** (`EVENTS.md`, "The surface's events"): `erosion_pulse` (≥ 200 m/Myr, ≥ 3,000 km²),
+  `basin_subsidence` (≥ 80 m/Myr, with the regime as `setting`), `marine_transgression`/`regression`
+  (zigzag of the flooded share of continental crust, ≥ 0.04), tracked across frames, written when
+  they end (`ongoing` at the end of the run), with causes (nearest orogeny/collision/subduction,
+  rift/ridge…).
+- **Measured (Mac, `tools/remote/mac.sh`, M6 Mac mini, 12 threads, shared).** `cargo test
+  --workspace` → core 139 + 1 ignored (surface:: 20: receivers acyclic and every land cell drains to
+  the sea on 5 noisy DEMs; depressions resolved (strictly lower neighbour on the filled surface);
+  land without a sea drains to one sink; diffusion Σh conserved to 1e-9 on wrapping/closed/2-wide/
+  1-wide grids with D from 0 to 1e5; **stream-power steady state on a 4 × 40 ramp equals the
+  analytic profile S_j = (U/(K A_j^m))^(1/n)** within 1e-6 (n = 1) and 1e-3 (n = 2) relative;
+  erosion–deposition + mouth fill + diffusion conserve mass to 1e-9; strata log invariants over
+  4,000 random deposits/erosions with K = 6; the coupled plates + surface pipeline (3,000 samples,
+  60 Myr): log invariants on every cell, mass residual < 1e-6 of the eroded volume, 6 frames with
+  every field, acyclic present-day receivers, a checkpoint taken inside the group and resumed on
+  another thread count gives the identical surface, log, events and history), cli 11 (new: `stage
+  plates --max-steps 3 --out plates.dtcp` then `stage surface --in plates.dtcp` finishes the group;
+  `stage surface --preset` runs it from the start), format 31, inspect 19, jni 7+7, viewer 4;
+  `cargo fmt`, `cargo clippy --workspace --all-targets -D warnings`, `cargo deny check licenses bans`
+  clean; `cd neoforge && ./gradlew build test` → BUILD SUCCESSFUL, tests=106 failures=0.
+  **Acceptance run:** `deeptime stage surface --preset pipeline_quick_16k --start scattered_continents
+  --length-myr 500 --viewer review/out/p1-surface` (L0 100k, L1 1024 × 512) → 250 steps in 96 s
+  (plates 22.3 s, surface 74.0 s: spl 29.9, diffusion 21.1 (112 CG iterations/step), fields+events
+  7.0, pflood 3.2, setup 3.1, advect 2.9, isostasy 1.7, outputs 1.3, strata 1.0, routing 0.9,
+  carbonate 0.6, marine fill 0.5), peak footprint 1.63 GB (counting allocator 1.11 GB);
+  `surface_final=250 land_frac=0.215 max_elevation_m=10048 sediment_km3=9.6e6 eroded_km3=1.20e8
+  marine_km3=1.06e8 fluvial_km3=1.1e7 lake_km3=3.1e6 carbonate_km3=6.9e5 evaporite_km3=1.4e5
+  mass_residual_km3=-6.2e-4 mean_log_layers=1.71 erosion_pulses=70 basins=265 sea_events=3
+  frames=50 history_mib=220`; 1,238 events (338 from the surface, 320 with causes). **Bench**
+  (`deeptime bench --preset pipeline_quick_16k --start scattered_continents --length-myr 500
+  --threads 12,4,1`, identical results on every thread count): total 86.6 / 111.8 / 235.1 s; plates
+  20.7 / 32.7 / 98.0 s; surface 65.9 / 79.0 / 137.0 s. **Against §8.2's cost model** (L1 0.52 M
+  cells × 250 steps × 1 µs = 131 s single-threaded, 33–44 s parallel): **137 s single-threaded
+  (1.05 µs/cell/step)**, 66 s on 12 threads (2.1×: priority-flood and the stream-power solve are
+  serial, 33 s of the 66). The plates stage costs 2.5× its P1-03 time in the pipeline (8.3 → 20.7 s)
+  because it now samples L1 every step (relink + 19 fields).
+- **Oracle** (`tools/remote/mac.sh -- 'nix shell nixpkgs#python312 -c python3
+  tools/validation/fastscape_compare.py --grid 256'`, fastscapelib 0.3.0 in a venv under
+  review/out/validation/; 256², dx 4.8 km, K 2e-6, m 0.5, n 1, U 1 mm/yr, 500 × 0.1 Myr, same
+  initial noise) → `hypsometry_ks=0.0209 chi_slope_ratio=1.0000 chi_fit_ratio=0.9997
+  area_log10_ks=0.0038`, PASS (tolerances in the script: KS ≤ 0.06 from seeds 1–5 (0.010–0.040),
+  χ ratio 0.98–1.02 (1.0000 on every seed; k_s = U/K = 500 both), area KS ≤ 0.02). From the same
+  mature surface one step agrees cell for cell (99.98–100 % identical areas, mean |Δz| 2 mm); the
+  networks diverge from the initial noise because Deep Time fills lakes with sediment at G = 0 and
+  fastscapelib does not (intended here) and the floods break ties differently. Deep Time 2.5 s vs
+  fastscapelib 3.6 s per run.
+- **What the keyframes show** (review/out/p1-surface, 11 frames × 10 layers, pulled back and looked
+  at): at −498 Myr six low green continents; by −348 Myr they carry interior highlands (tan to brown,
+  2–4 km) with erosion concentrated on escarpments and active margins, dendritic river networks
+  (drainage layer) running to every coast, and light-blue shelves prograding from the river mouths;
+  at −248 Myr a northern supercontinent with deposition strung along its margins (shelf wedges,
+  deltas, a restricted interior sea) while the regime layer shows back-arc belts inboard of trenches
+  and cratonic interiors; at 0 Myr scattered continents with snow-white peaks (≥ 4.7 km) in collision
+  and arc belts, erosion rims around domed interiors, thick sediment (≥ 2 km) on passive margins and
+  in basins beside orogens, laterite/saprolite over the tropical lowlands, andesite on arc margins,
+  shale veneers on shelves and basalt on bare ocean floor. Mass balance: 88 % of eroded rock reaches
+  the sea; the log keeps 9.6e6 km³ (the rest was subducted with its crust or cleared by new crust).
+- **Deviations from the plan.** (1) The acceptance command is `stage surface --preset
+  pipeline_quick_16k`, not `stage erosion --preset earthlike_quick_16k` (the built-ins stay P1-13's
+  placeholders until P1-08; the stage is named `surface`). (2) Interleaving is a session feature
+  (coupled groups), so `stage surface --in` takes a checkpoint whose next stage is the plates lead.
+  (3) Priority-flood and the stream-power solve are serial (plan: tiled flood, per-basin parallel
+  solve) — they are 33 s of 66 s on 12 threads; the obvious speed-up for P1-17. (4) Diffusion is 2D
+  PCG, not ADI (ADI/LOD streaks at deep-time steps). (5) Default stream power n = 2, m = 1 (not the
+  plan's implied n = 1). (6) Isostasy (not in the plan) is needed for sediment basins and orogen
+  persistence.
+- **Not done / next.** Wire `RecordedHistory` into `DepositStage` and put `deposits` after the group
+  in the pipeline presets (P1-14); `trap_structure` and host fractions (P1-07); P1-05 replaces the
+  climate stand-in by writing `climate/{t_mean_c,precip_mm}`; tuning (domed continents, event counts
+  — 265 basins in 500 Myr is many; history is 4.4 MiB per frame at 16k quick, 220 MiB per 500 Myr,
+  ~4× that at 16k full) and parallel flood/solve in P1-17. A spacesheep review page "Deep Time — P1
+  erosion" is not published (the bundle is review/out/p1-surface on the Mac and laptop).
+
+### 2026-09-28 — Real-client screenshots on the Mac's desktop session (agent worktree agent-ab0d4cbba4384f9e5)
+- **Why.** Ben (2026-09-28, CLAUDE.md "Real-client runs"): clients boot in the M6 Mac mini's
+  logged-in desktop session, never under the laptop's Xvfb. P1-11's `tools/client/screenshots.sh`
+  (HeadlessMC + Xvfb, laptop) now refuses to run unless `DEEPTIME_XVFB_CLIENT=1`.
+- **Shape.** `tools/client/mac-screenshots.sh [--name N] [--no-build] [--no-guidance] [--no-create]
+  [--size WxH] [--timeout S] [--lease-wait S]` on the laptop: (1) `tools/remote/mac.sh` syncs
+  and runs `./gradlew classes gametestClasses createClientLaunchScript linkRunModsClient`;
+  (2) copies graphide's `utilities/scripts/mactest/m6lock.sh` (read-only source; `M6LOCK_SH`
+  overrides the path) to `/Volumes/Graphide/ban/deeptime-cache/m6lock.sh`; (3) `mac.sh --no-sync
+  --server --pull review/out/<name>` runs `tools/client/mac-client.sh` on the Mac, so Deep Time's
+  server lock is held for the whole client run (the client starts an integrated server); (4) prints
+  the driver's lines and the PNG list. Ctrl-C/TERM on the laptop TERMs the Mac runner through its
+  pid file (`neoforge/build/mac-client/runner.pid`).
+- **Launch.** Not HeadlessMC: offline it stubs LWJGL unless it sees Xvfb, and its dummy assets are
+  what made P1-11's backgrounds dark red. Instead ModDevGradle's own dev launch:
+  `createClientLaunchScript` writes `neoforge/build/moddev/runClient.sh` (one line, `(cd run; exec
+  java @clientRunClasspath.txt @clientRunVmArgs.txt -Dfml.modFolders=… net.neoforged.devlaunch.Main
+  @clientRunProgramArgs.txt)`, `-XstartOnFirstThread` already in the VM args on macOS; real assets
+  from the Gradle cache). The runner reads its words back, adds `-Ddeeptime.client.run=<id>` (the
+  kill marker), `-Xmx3G`, `-Ddeeptime.dev.screenshots=true` and the pass's properties, and starts it
+  with `sudo -n launchctl asuser 501 sudo -n -u ban -H env -i … /bin/bash launch-<pass>.sh`
+  (graphide's mactest pattern: from sshd a process is in the `Background` launchd manager and gets
+  no WindowServer; this puts it in `Aqua`, checked with `launchctl managername`). Deep Time loads
+  from the build output (natives `aarch64-apple-darwin` from build/resources), Toroidal World
+  0.19.3's bundle from run/mods (linkRunModsClient); the log shows both and TW's 1,024-chunk
+  cylinder. `options.txt` as P1-11's plus master/music volume 0 (Ben's speakers) and no pause on
+  lost focus; NeoForge's early window off; `caffeinate -d -w <pid>` keeps the display awake. PNGs
+  come from the GL framebuffer (ScreenshotDriver), so no macOS Screen Recording permission is
+  involved (`screencapture` would need one; graphide notes nothing grants it).
+- **Lease.** graphide's M6 lock, kind `drive` (excludes other desktop walks and the perf lane;
+  graphide's `tests` runs may continue beside it), holder `deeptime-client:<checkout name>`, TTL
+  300 s, renewed every 60 s while the client runs (`acquire` again; if that fails — the lease lapsed
+  and someone else took the desktop — the client is stopped), released on every exit path. Waits up
+  to `--lease-wait` (600 s) for a busy desktop and never breaks another holder's lease. Order:
+  Deep Time's server lock first (mac.sh), then the lease. Every failure, timeout, lost lease or
+  signal kills only this run's JVM: its pid from the launch script, checked against the marker.
+- **Measured (Mac, `tools/client/mac-screenshots.sh --name p1-11-mac`, about 1 min 15 s end to end
+  with an up-to-date build; three full runs, the same every time):** main pass 46–47 s (~680 ticks:
+  Create World with "Deep Time Planet" and Create blocked `NOT_SIMULATED` → setup → timeline → run
+  live, map then globe → done, 9 keyframes, 13 events → scrubbed 5/9 → review, spawn −8.3° N
+  204.4° E, 6 province cells → Accept → `Moved staged … (rename)`, `Bound … C = 16384` → in world,
+  last run at (1110, 65, 373)); guidance pass 14–17 s (Create blocked `NATIVES`).
+  Twelve 854×480 PNGs in `review/out/p1-11-mac/` (gitignored), the same twelve as P1-11's laptop
+  set, same content; differences: the real title panorama (blurred) behind every screen instead of
+  the dark fallback, Steve's arm, and the in-world view (random seed: other vegetation, a coast in
+  view). Failure paths tried: `--timeout 15` → client stopped at 15 s, lease released, 5 PNGs, exit 1;
+  SIGTERM to the laptop's process group during a client run → runner stopped the client, released
+  the lease, server lock gone, no process of this checkout left; the same while waiting for the
+  server lock (another agent's `q10-ev.sh` held it) → nothing left behind. The drive lease and the
+  server lock were free after every run.
+- **Found:** the setup page reads "This machine: 1.0 GiB free of 16.0 GiB" on the Mac:
+  `MachineInfo` falls back to `OperatingSystemMXBean.getFreeMemorySize()`, which on macOS counts only
+  free pages (inactive and purgeable memory, which the system hands out on demand, are left out) —
+  the macOS twin of the Linux `MemFree` bug P1-11 fixed. The memory warnings will misfire on Macs.
+  Next step for P1-11: a macOS reading (vm_stat free + inactive + speculative pages, as graphide's
+  m6lock `avail_gb` does, or `host_statistics64` through the JNI side).
+- **Needs from Ben:** nothing while `ban` stays logged in at the Mac (auto-login or a Screen Sharing
+  login); with nobody logged in the runner stops with `BLOCKED: … no GUI session` (exit 4). A
+  locked screen is only warned about (untested: every run here had `ban` unlocked at the console).
 
 ### 2026-09-28 — P1-11 Customize editor, timelapse and staging, on the placeholder presets (agent worktree agent-a61f0e6a8e0a67dfa)
 - **Shape.** Client-only screens in `screen/` (reached only through `screen/ClientSetup`, a

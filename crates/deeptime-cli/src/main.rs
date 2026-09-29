@@ -116,6 +116,51 @@ enum Command {
         #[arg(long)]
         verbose: bool,
     },
+    /// The surface kernels (P1-04) on a plain raster, for the fastscapelib oracle
+    /// (tools/validation/fastscape_compare.py): periodic in x, the first and last rows fixed at
+    /// 0 m, uniform uplift. Writes initial.f32, final.f32, area.f32 (row-major little-endian) and
+    /// meta.json into --out.
+    Lem {
+        /// Cells per side (W = H), unless --height is given.
+        #[arg(long, default_value_t = 256)]
+        grid: usize,
+        /// Rows (H), default = --grid.
+        #[arg(long)]
+        height: Option<usize>,
+        /// Cell size, metres.
+        #[arg(long, default_value_t = 4800.0)]
+        dx: f64,
+        /// Time steps.
+        #[arg(long, default_value_t = 200)]
+        steps: usize,
+        /// Time step, years.
+        #[arg(long, default_value_t = 1.0e5)]
+        dt_yr: f64,
+        /// Stream-power K, m^(1−2m)/yr.
+        #[arg(long, default_value_t = 2.0e-6)]
+        k: f64,
+        /// Area exponent m.
+        #[arg(long, default_value_t = 0.5)]
+        m: f64,
+        /// Slope exponent n.
+        #[arg(long, default_value_t = 1.0)]
+        n: f64,
+        /// Yuan et al.'s deposition coefficient G.
+        #[arg(long, default_value_t = 0.0)]
+        g: f64,
+        /// Uniform uplift, mm/yr.
+        #[arg(long, default_value_t = 1.0)]
+        uplift_mm_yr: f64,
+        /// Linear diffusivity, m²/yr (0 = none).
+        #[arg(long, default_value_t = 0.0)]
+        kd: f64,
+        /// Seed of the initial noise.
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        /// Output folder.
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Built-in presets and share codes (plan §5.1).
     Preset {
         #[command(subcommand)]
@@ -309,6 +354,40 @@ fn main() -> ExitCode {
             }),
         ),
         Some(Command::Preset { action }) => finish("preset", preset_command(action)),
+        Some(Command::Lem {
+            grid,
+            height,
+            dx,
+            steps,
+            dt_yr,
+            k,
+            m,
+            n,
+            g,
+            uplift_mm_yr,
+            kd,
+            seed,
+            out,
+        }) => finish(
+            "lem",
+            lem(
+                &deeptime_core::surface::oracle::RasterParams {
+                    w: grid,
+                    h: height.unwrap_or(grid),
+                    dx,
+                    steps,
+                    dt_yr,
+                    k,
+                    m,
+                    n,
+                    g,
+                    uplift_m_yr: uplift_mm_yr * 1.0e-3,
+                    kd_m2_yr: kd,
+                    seed,
+                },
+                &out,
+            ),
+        ),
         Some(Command::DumpDeposits { world, out }) => match dump::run(&world, &out) {
             Ok((sites, bodies, inside)) => {
                 println!(
@@ -370,6 +449,48 @@ fn main() -> ExitCode {
             }
         }
     }
+}
+
+/// `deeptime lem`: the surface kernels on a plain raster (the oracle's input).
+fn lem(
+    p: &deeptime_core::surface::oracle::RasterParams,
+    out: &std::path::Path,
+) -> run::CliResult<()> {
+    if p.w < 3 || p.h < 3 || p.steps == 0 {
+        return Err("--grid and --height ≥ 3, --steps ≥ 1".into());
+    }
+    std::fs::create_dir_all(out)?;
+    let r = deeptime_core::surface::oracle::run(p);
+    let write = |name: &str, v: &[f64]| -> std::io::Result<()> {
+        let bytes: Vec<u8> = v.iter().flat_map(|&x| (x as f32).to_le_bytes()).collect();
+        std::fs::write(out.join(name), bytes)
+    };
+    write("initial.f32", &r.initial)?;
+    write("final.f32", &r.elevation)?;
+    write("area.f32", &r.area_m2)?;
+    let max = r.elevation.iter().copied().fold(f64::MIN, f64::max);
+    let mean = r.elevation.iter().sum::<f64>() / r.elevation.len() as f64;
+    let meta = serde_json::json!({
+        "w": p.w, "h": p.h, "dx": p.dx, "steps": p.steps, "dt_yr": p.dt_yr,
+        "k": p.k, "m": p.m, "n": p.n, "g": p.g, "uplift_m_yr": p.uplift_m_yr, "kd_m2_yr": p.kd_m2_yr,
+        "seed": p.seed, "boundary": "periodic x, rows 0 and h−1 fixed at 0 m",
+        "dtype": "f32 little-endian, row-major (row j = y index)",
+        "seconds": r.seconds, "max_elevation_m": max, "mean_elevation_m": mean,
+    });
+    std::fs::write(out.join("meta.json"), serde_json::to_vec_pretty(&meta)?)?;
+    println!(
+        "deeptime lem: {}x{} dx={} steps={} dt_yr={} -> {} (max {:.1} m, mean {:.1} m) in {:.2}s",
+        p.w,
+        p.h,
+        p.dx,
+        p.steps,
+        p.dt_yr,
+        out.display(),
+        max,
+        mean,
+        r.seconds
+    );
+    Ok(())
 }
 
 fn preset_command(action: PresetAction) -> run::CliResult<()> {
@@ -672,6 +793,98 @@ mod tests {
         assert!(end.world.plates.is_some());
         assert!(dir.join("viewer/keyframes/kf-0-elevation.png").is_file());
         assert!(dir.join("viewer/keyframes/kf-0-crust_age.png").is_file());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// P1-04: `stage surface` runs the plates + surface group; a checkpoint written at the plates
+    /// stage (`stage plates --max-steps`) continues with `stage surface --in`.
+    #[test]
+    fn surface_stage_runs_from_a_plates_checkpoint() {
+        let dir = tmp("surface");
+        std::fs::create_dir_all(&dir).unwrap();
+        let json = super::run::load_preset_with(
+            "pipeline_quick_16k",
+            Some("scattered_continents"),
+            Some(20.0),
+        )
+        .unwrap();
+        let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        v["resolution"]["l0_samples"] = serde_json::json!(3000);
+        v["resolution"]["l1_r"] = serde_json::json!(64);
+        v["keyframes"]["size"] = serde_json::json!([64, 32]);
+        v["keyframes"]["every_myr"] = serde_json::json!(10.0);
+        let preset = dir.join("small.json");
+        std::fs::write(&preset, v.to_string()).unwrap();
+        let stage = |name: &str,
+                     input: Option<std::path::PathBuf>,
+                     preset: Option<String>,
+                     max_steps: Option<u64>,
+                     out: Option<std::path::PathBuf>,
+                     viewer: Option<std::path::PathBuf>| {
+            super::run::stage(&super::run::StageOptions {
+                name: name.into(),
+                input,
+                preset,
+                start: None,
+                length_myr: None,
+                max_steps,
+                out,
+                viewer,
+                work: None,
+                common: quiet(),
+            })
+        };
+        stage(
+            "plates",
+            None,
+            Some(preset.to_string_lossy().into_owned()),
+            Some(3),
+            Some(dir.join("plates.dtcp")),
+            None,
+        )
+        .unwrap();
+        let mid = deeptime_core::checkpoint::Checkpoint::read(&dir.join("plates.dtcp")).unwrap();
+        assert_eq!(mid.next_stage_name(), Some("plates"));
+        assert_eq!(mid.stage_names, ["plates", "surface"]);
+        assert!(mid.world.surface.is_some(), "the group steps both stages");
+        stage(
+            "surface",
+            Some(dir.join("plates.dtcp")),
+            None,
+            None,
+            Some(dir.join("end.dtcp")),
+            Some(dir.join("viewer")),
+        )
+        .unwrap();
+        let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
+        assert_eq!(end.next_stage, 2);
+        assert_eq!(end.world.t_years, 0.0);
+        let st = end.world.surface.as_ref().unwrap();
+        assert_eq!(st.totals.steps, 10);
+        assert!(
+            end.world
+                .history
+                .as_ref()
+                .is_some_and(|h| h.frames.len() == 2)
+        );
+        assert!(
+            dir.join("viewer/keyframes/kf-0-surface_drainage.png")
+                .is_file()
+        );
+        assert!(
+            dir.join("viewer/keyframes/kf-0-surface_class.png")
+                .is_file()
+        );
+        // `stage surface --preset` runs the group from the start.
+        stage(
+            "surface",
+            None,
+            Some(preset.to_string_lossy().into_owned()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
