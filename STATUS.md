@@ -41,7 +41,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-17 | Benchmark gate and preset tuning | doing | 2026-09-29 | | Partial (surface parallelism, branch worktree-agent-a9bc0ab99e68b4a07): stream-power solve 34.0 → 6.5 s at 12 threads, bit-identical; flood left serial on purpose; diffusion is now the largest surface cost; see the build log entry "P1-17 partial". Partial (calibration with the real climate, branch worktree-agent-ae48007457b607716, Ben 2026-09-29): pipeline presets + surface/climate/structure defaults + four deposit balance multipliers; Mac: `stage deposits --preset pipeline_quick_16k --length-myr 500` scattered / supercontinent → land median 2,352 / 1,743 → 601 / 624 m (Earth 427), above 2 km 0.56 / 0.45 → 0.11 / 0.07 (Earth 0.10), land 0.233 / 0.215 → 0.270 / 0.282, Köppen E 0.53 / 0.64 → 0.18 / 0.23, glaciated 0.31 (feedback off) → 0.06 / 0.07 (on), sites porphyry 1 / 1 → 5 / 34 (median 8 over 3 seeds × 2 starts), SEDEX, MVT, oil on 4, 3, 5 of 6 planets, plutons 7,830 / 5,374 → 1,192 / 885 bodies, mass residual ≤ 1.9e-3 km³; Earth check 19/24 (unchanged), 9.7 % glaciated with the feedback; cargo test/clippy/fmt/deny clean, gradlew build test 118/0; bundles review/out/p1-calib-{scattered_continents,supercontinent} (20 / 15 MB, not published); see the build log entry "P1-17 partial: calibration" Partial (history spill, branch worktree-agent-a33c2dc374c0ccd2f, Ben 2026-09-29): the recorded history spills to the run folder over the memory cap; `pipeline_full_32k` 1000 Myr finishes under 4 GiB (2.3 GiB on disk); spilled = in-memory byte for byte; see the build log entry "the recorded history spills to the SSD" |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
-| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log). **UI overhaul** (branch worktree-agent-a95571be05fdd89d6, Ben: "should be dark themed"): dark map-first layout, run cards, sectioned editor with the estimate by Run, split/side-by-side compare, timeline dock, stage-2 job cards, `?tv` HUD, 390 px; placeholders hidden; Mac gates clean, JUnit 118/0; before/after in review/out/workbench-ui/ (see build log) |
+| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log). **Follow-up** (branch worktree-agent-afd5791e0f5ea82cd): a run with a bake is previewed and inspected as its own terrain (`/api/inspect` from `deeptime inspect-column --why` in 60-90 ms, previews boot the mod on the run's bake; height p50 0 vs the bake); runs without a bake keep the test world and say so (see build log). **UI overhaul** (branch worktree-agent-a95571be05fdd89d6, Ben: "should be dark themed"): dark map-first layout, run cards, sectioned editor with the estimate by Run, split/side-by-side compare, timeline dock, stage-2 job cards, `?tv` HUD, 390 px; placeholders hidden; Mac gates clean, JUnit 118/0; before/after in review/out/workbench-ui/ (see build log) |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -73,6 +73,64 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — P1-20 stage 2 follow-up: previews and click-to-inspect show the run's own terrain (agent worktree agent-afd5791e0f5ea82cd, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What a finished workbench run leaves.** `deeptime watch` already bakes: `Run::drive` calls
+  `Session::finalize_write`, which bakes every planet preset, so `<runs>/<id>/world/` holds manifest `format_version`
+  0.1 with `notes.bake`, the rasters, `strata/horizons`, bodies, sites and events (a 150-Myr `earthlike_quick_16k` run:
+  433 MB, 355 MB of it `keyframes/`). No change to the run path was needed. Runs from before P1-08 (format 0.0), placeholders
+  and runs still running have no bake. The manifest is written last, so its presence means the run finished.
+- **Server → runner.** `stage2::Preview` gained `runs` and `deeptime`; `watch::serve` fills them (the `--runs` folder,
+  made absolute, and its own `current_exe()`), and `Preview::call` passes them to `preview.py` as
+  `DEEPTIME_WORKBENCH_RUNS` and `DEEPTIME_WORKBENCH_DEEPTIME`. The runs folder is also an allowed `world_data` root.
+- **`deeptime inspect-column --why`** (new flag): puts `why` on each site of the answer: its forming event and the cause chain
+  (4 links) from the world data's event log, as the 3D export's site cards have it. `attach_why` in `main.rs`.
+- **`preview.py`.** `run_bake(run)` (format >= 0.1, `notes.bake`, not a placeholder, terrain and strata layers, C in
+  16,384/32,768) returns the bake or the reason there is none.
+  - `GET /api/inspect` for a run with a bake answers at once (`200`, no job) from `deeptime inspect-column --world-data
+    <run>/world --why X Z`: `terrain_height`, `top_y`, `seconds`, `note`, `note_kind: "run"` and the whole column under `inspect`
+    (horizons, `rock` from the top block down, `body_details`, `sites` with `why`, every other layer's value). x, z come from the
+    page (the run's own C), folded.
+  - `POST /api/preview` for a run with a bake builds a job whose `world.world_data` is the run's bake (copied without
+    `keyframes/`), `size` = the manifest's C, the box in the run's blocks; the real mod boots on it ("world data present …: not
+    regenerating; Bound Deep Time world data (format 0.1, C = 16384)"). `note` says it is the run's terrain and that a bake is the
+    planet at the end of the run (`note_kind: "run"`). The job contract (status, `status_url`, `url`, files) is unchanged.
+  - Runs without a bake keep the synthetic deposit world at the drawn latitude and longitude, with a note that says why it is not
+    the run's terrain (`note_kind: "test-world"`), and the 32 x 32 inspect preview. A finished-preview lookup now only matches
+    test-world jobs.
+- **`workbench.js` / `workbench.html`.** A direct column answer (`inspect` present) fills the inspector's Details tab
+  (`showColumn`: terrain height, elevation + detail, water, the rock rows top block down, ore bodies with their y range and
+  role, and per site the yields and the forming event and cause chain, as links into the run's event list when the event is
+  known; "Preview 256 x 256 here" works from it) and leaves a small card in the 3D tab. The note callout's lead follows
+  `note_kind`; the intro text and tool hints no longer promise a test world. Look unchanged otherwise.
+- **Tests.** `tools/workbench/test_preview.py` (8 tests, stdlib: bake detection for baked/old/placeholder/running/odd
+  runs, the runs root as an allowed path, a 32k preview's spec and box, the fallback spec and note, inspect through a fake
+  binary with the exact arguments, folding, a failing evaluator, the fallback inspect preview); Rust: the stage2 forwarder
+  passes the two env vars, the CLI planet test exercises `attach_why` on a column inside a site.
+- **Verified on the Mac (private `deeptime watch --preview` on 8654: 8653 was already taken by another session's watch; 8642
+  untouched).** `earthlike_quick_16k`, scattered continents, 150 Myr, through `/api/preset` + `/api/runs`: 251 s on a loaded Mac
+  (load 20-35), manifest 0.1.
+  - *Inspect vs the CLI:* `/api/inspect` answers in 60-90 ms wall (evaluator 8-37 ms) and its `inspect` equals `deeptime
+    inspect-column --why` on the same world for 5 of 5 columns (a site column with a 3-event chain from `deposit_formation`, a
+    placer site with 8, a 406-block mountain, a body column, a plain one; a lap-shifted x differs only in the echoed x).
+  - *Preview:* a 64 x 64 box of the run's highest ground (x 1856..1920, z -2112..-2048; bake 406 blocks) through
+    `POST /api/preview` with the page's body: done in 64.8 s (jar refresh 20.9 s, the first Gradle build in this copy; boot 22.1 s;
+    Chunky 49 chunks 11.0 s; stop 3.6 s), export 0.18 MB, `verify` 4,063,232 blocks 0 wrong, top at y 414.
+  - *Height vs the bake, `deeptime-inspect compare` on a kept world (same job, two boxes; carved columns excluded by its rules):*
+    mountain box 3,170 of 4,096 columns, **p50 |diff| 0**, 94.9 % within 1 block, p99 3, max 6, mean -0.30; a second box at the
+    coast (x 1856..1920, z -2432..-2368; a body there) 2,078 columns, p50 0, 89.0 % within 1, p99 3, max 4, mean -0.50. The
+    same shape as P1-08's comparison (negative tail: caves and carvers).
+  - *Screenshots* (headless Chromium over an ssh tunnel to 8654, `tools/viewer/shot.py`): `review/out/workbench-bake/` inspect of
+    the site column (Details tab with rock, sites, why chain), the Area 3D card ("This run's own terrain", waiting for the server
+    lock behind another session), the workbench-made preview in the viewer.
+- **Gates** (branch merged with master b8788a7): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings`,
+  `deny check licenses bans`, `cargo test --workspace --locked` all pass (cli 27, core 230 + 3 ignored, format 40, inspect 28 + 2 + 7, jni 7,
+  viewer 5, history cap 1); `python3 tools/workbench/test_preview.py` and `tools/smoke/test_jarstate.py` pass. No Java changed.
+- **Not done / found.** The MIC default profile and the per-job jar refresh are untouched. A click in the viewer outside every
+  exported box still does not ask the column route (README "Still to do"). The run card's tag reads "Placeholder · Earth-like
+  (quick)" although `earthlike_*` are real since P1-08 (`familyName` in `workbench.js`); not changed here.
+  Deep Time's answer for a column is not the placed blocks (other mods' features, carvers): the 3D export stays the truth for those.
+- **Next.** Publish the screenshots if Ben wants them; the viewer's `describe()` could reuse the column route.
+
 ### 2026-09-29 — P1-17 partial: the diffusion solve fused into two passes per CG iteration, bit-identical (agent worktree agent-a0f4f991a0d939f16, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Only `surface/diffusion.rs` (plus the new `surface/diffusion/parity.rs`). The Jacobi-PCG iteration was seven
   parallel regions over ~22 vector streams of 4 MB; it is now two passes over strips of 8 rows: **pass 1** forms the direction
