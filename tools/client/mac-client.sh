@@ -32,14 +32,14 @@ cd "$(dirname "$0")/../.."
 REPO="$PWD"
 source tools/client/mac-client-lib.sh
 
-NAME=""; M6LOCK=""; GUIDANCE=1; CREATE=true; SIZE=""; TIMEOUT=1200; LEASE_WAIT=600
+NAME=""; M6LOCK=""; GUIDANCE=1; CREATE=true; WINDOW_SIZE=""; TIMEOUT=1200; LEASE_WAIT=600
 while [ $# -gt 0 ]; do
     case "$1" in
         --name) NAME="$2"; shift 2 ;;
         --m6lock) M6LOCK="$2"; shift 2 ;;
         --no-guidance) GUIDANCE=0; shift ;;
         --no-create) CREATE=false; shift ;;
-        --size) SIZE="$2"; shift 2 ;;
+        --size) WINDOW_SIZE="$2"; shift 2 ;;
         --timeout) TIMEOUT="$2"; shift 2 ;;
         --lease-wait) LEASE_WAIT="$2"; shift 2 ;;
         *) echo "mac-client: unknown argument $1" >&2; exit 2 ;;

@@ -26,7 +26,8 @@
 #   M6LOCK      graphide's m6lock.sh, copied to the Mac (the laptop side does that)
 #   PURPOSE     the lease's purpose text
 #   TIMEOUT     seconds per pass (default 1200)      LEASE_WAIT  seconds to wait for the desktop (600)
-#   SIZE        optional WxH window size             XMX         the client's -Xmx (default 3G)
+#   WINDOW_SIZE optional WxH window size (not SIZE: nix's stdenv exports SIZE=size)
+#   XMX         the client's -Xmx (default 3G)
 # then calls
 #   mc_start                     the session and sudo checks, the launch line, the traps, the lease;
 #                                exits 4 (no GUI session, no sudo, or the screen is locked), 75 (desktop busy), 1 (other);
@@ -50,9 +51,9 @@ MC_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mc_start() {
     cd "$MC_LIB_DIR/../.." || exit 1
     REPO="$PWD"
-    TIMEOUT="${TIMEOUT:-1200}"; LEASE_WAIT="${LEASE_WAIT:-600}"; SIZE="${SIZE:-}"; XMX="${XMX:-3G}"
+    TIMEOUT="${TIMEOUT:-1200}"; LEASE_WAIT="${LEASE_WAIT:-600}"; WINDOW_SIZE="${WINDOW_SIZE:-}"; XMX="${XMX:-3G}"
     [[ "$NAME" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "mac-client: NAME must be one plain word (got '$NAME')" >&2; exit 2; }
-    [ -z "$SIZE" ] || [[ "$SIZE" =~ ^[0-9]+x[0-9]+$ ]] || { echo "mac-client: --size is WxH (got '$SIZE')" >&2; exit 2; }
+    [ -z "$WINDOW_SIZE" ] || [[ "$WINDOW_SIZE" =~ ^[0-9]+x[0-9]+$ ]] || { echo "mac-client: --size is WxH (got '$WINDOW_SIZE')" >&2; exit 2; }
     [ "$(uname -s)" = Darwin ] || { echo "mac-client: runs only on the Mac (real-client runs never use the laptop)" >&2; exit 2; }
     [ -f "$M6LOCK" ] || { echo "mac-client: no m6lock.sh at '$M6LOCK' (the laptop side copies graphide's there)" >&2; exit 2; }
 
@@ -189,7 +190,7 @@ mc_run_pass() {
     mc_write_options
     local jvm=("-Ddeeptime.client.run=$RUNID" "-Xmx$XMX" "-Djava.io.tmpdir=$WORK/tmp" "$@")
     local prog=()
-    [ -z "$SIZE" ] || prog=(--width "${SIZE%x*}" --height "${SIZE#*x}")
+    [ -z "$WINDOW_SIZE" ] || prog=(--width "${WINDOW_SIZE%x*}" --height "${WINDOW_SIZE#*x}")
     {
         echo '#!/bin/bash'
         echo "cd $(printf '%q' "$GAMEDIR") || exit 90"

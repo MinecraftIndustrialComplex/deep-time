@@ -35,6 +35,7 @@ done
 
 OUT="$REPO/review/out/q10/ev-assets"
 PURPOSE="Deep Time Q10: a Minecraft client makes Excavated Variants textures"
+WINDOW_SIZE=""
 XMX=4G   # what the run configuration gave the client before (a quarter of the 16 GB)
 mc_start
 
