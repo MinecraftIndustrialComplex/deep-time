@@ -328,7 +328,9 @@ public final class CompatGameTests {
      * A trap's oil: in every chunk its ore body reaches, the base oil is the trap's charge × the
      * type's {@code cdg_scale} × the chunk's share of the body's volume (counted here block by
      * block), infinite above CDG's threshold; what a pumpjack reads ({@code getChunkOilAmount}) is
-     * the same; the finite shares add up to the scaled charge.
+     * the same; the finite shares add up to the scaled charge. Where two traps reach one chunk,
+     * the one that fills it more supplies it ({@code SiteChunks.covering}): each trap's shares
+     * still add up to its scaled charge, and the per-chunk check runs on the chunks it supplies.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
     public static void cdgOilFromTrap(GameTestHelper helper) {
@@ -351,12 +353,18 @@ public final class CompatGameTests {
             boolean exact = SiteChunks.footprint(sites, t).stride() == 1;
             for (var e : counts.entrySet()) {
                 ChunkPos p = new ChunkPos(e.getKey());
-                var covering = CdgBridge.charge(level, p.x, p.z);
-                if (covering.isEmpty() || covering.get().site().id() != t.id())
-                    continue;   // another trap fills this chunk more
-                chunks++;
                 long mb = Math.round((double) charge * scale * e.getValue() / total);
                 int expected = mb > threshold ? Integer.MAX_VALUE : (int) mb;
+                // The trap's own share of every chunk it reaches adds up to its scaled charge,
+                // whether or not it is the trap that fills the chunk.
+                if (expected == Integer.MAX_VALUE)
+                    trapInfinite++;
+                else
+                    sum += expected;
+                var covering = CdgBridge.charge(level, p.x, p.z);
+                if (covering.isEmpty() || covering.get().site().id() != t.id())
+                    continue;   // another trap fills this chunk more: CDG sees that one there
+                chunks++;
                 int decided = CdgBridge.baseOilAmount(level, p, threshold).orElse(-1);
                 boolean ok = exact ? decided == expected : Math.abs(decided - expected) <= 0.02 * expected + 1;
                 if (!ok)
@@ -366,12 +374,8 @@ public final class CompatGameTests {
                     if (base != decided || amount != decided)
                         problems.add("trap " + t.id() + " chunk " + p + ": CDG base " + base + " amount " + amount + ", Deep Time " + decided);
                 }
-                if (expected == Integer.MAX_VALUE) {
+                if (expected == Integer.MAX_VALUE)
                     infinite++;
-                    trapInfinite++;
-                } else {
-                    sum += expected;
-                }
                 if (expected > 0) {
                     positive++;
                     trapPositive++;
