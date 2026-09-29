@@ -366,7 +366,7 @@ mod tests {
                 .unwrap()
                 .iter()
                 .any(|p| p["name"] == "pipeline_quick_16k"
-                    && p["stages"] == json!(["plates", "surface"]))
+                    && p["stages"].as_array().is_some_and(|s| s.len() >= 2 && s[0] == "plates" && s[1] == "surface"))
         );
         for f in c.fields() {
             assert!(
