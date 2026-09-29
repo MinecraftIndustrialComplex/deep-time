@@ -2902,7 +2902,12 @@ mod tests {
         let tuned = select_types(&p, 2.0).unwrap();
         assert_eq!(tuned.len(), base.len());
         for (b, t) in base.iter().zip(&tuned) {
-            assert_eq!(t.sizing.tonnage_mt.p50, b.sizing.tonnage_mt.p50 * 2.5, "{}", b.id);
+            assert_eq!(
+                t.sizing.tonnage_mt.p50,
+                b.sizing.tonnage_mt.p50 * 2.5,
+                "{}",
+                b.id
+            );
             assert_eq!(t.sizing.tonnage_mt.p10, b.sizing.tonnage_mt.p10 * 2.5);
             assert_eq!(t.sizing.tonnage_mt.p90, b.sizing.tonnage_mt.p90 * 2.5);
             assert_eq!(t.balance.richness_mult, b.balance.richness_mult * 1.5);
@@ -2931,10 +2936,17 @@ mod tests {
         let sc = Scales::default();
         let semi = |m: f64| {
             let vol = 240.0e6 * m / t0.sizing.ore_density_t_m3;
-            geometry::to_blocks(geometry::semi_axes_m(t0.shape(), t0.geometry.aspect, vol), t0, &sc)
+            geometry::to_blocks(
+                geometry::semi_axes_m(t0.shape(), t0.geometry.aspect, vol),
+                t0,
+                &sc,
+            )
         };
         let (a, b) = (semi(1.0), semi(8.0));
-        assert!((f64::from(b[0]) / f64::from(a[0]) - 2.0).abs() < 1e-3, "8x the ore, 2x the width");
+        assert!(
+            (f64::from(b[0]) / f64::from(a[0]) - 2.0).abs() < 1e-3,
+            "8x the ore, 2x the width"
+        );
     }
 
     use std::sync::Arc;
