@@ -511,7 +511,13 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         };
         // P1-07: the baked horizon stacks (the inspector), the elevation and the rock at the
         // surface as map layers, and meridian cross-sections.
-        let structure = crate::structure_view::build(&ck.world, &ck.preset_json)?;
+        // (The deposit stage's bundle leaves the strata inspector to the structure stage's own:
+        // its layers alone are ~20 MB, and the deposit bundles stay under the review cap.)
+        let structure = if o.name == deeptime_core::deposits::STAGE_NAME {
+            None
+        } else {
+            crate::structure_view::build(&ck.world, &ck.preset_json)?
+        };
         let layers: Vec<&deeptime_format::LoadedLayer> =
             structure.iter().flat_map(|v| v.layers.iter()).collect();
         deeptime_viewer::write_bundle_with(
