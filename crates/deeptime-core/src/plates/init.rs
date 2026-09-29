@@ -320,7 +320,8 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
             .fold(0.0, f64::max)
             .max(1e-12);
         for &i in &outer {
-            shelf_z[i as usize] = Some((SHELF_BREAK_M * (1.0 - inland[i as usize] / widest)) as f32);
+            shelf_z[i as usize] =
+                Some((SHELF_BREAK_M * (1.0 - inland[i as usize] / widest)) as f32);
         }
     }
 
