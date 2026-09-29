@@ -23,7 +23,7 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use deeptime_core::preset::Preset;
-use deeptime_core::session::{AdvanceStatus, Session, SessionOptions};
+use deeptime_core::session::{AdvanceStatus, DEFAULT_MEM_CAP, Session, SessionOptions};
 use deeptime_format::Ramps;
 use deeptime_format::keyframes::{KeyframeIndex, read_keyframe};
 use deeptime_format::manifest::rfc3339_utc;
@@ -145,7 +145,8 @@ impl Run {
             "id": self.id, "label": self.label, "created_utc": self.created_utc,
             "preset": meta["preset"], "start": meta["start"], "length_myr": meta["length_myr"],
             "stages": meta["stages"], "circumference": meta["circumference"], "seed": seed,
-            "share_code": self.share_code, "state": status["state"], "message": status["message"],
+            "share_code": self.share_code, "mem_cap": self.mem_cap,
+            "state": status["state"], "message": status["message"],
             "seconds": status["seconds"], "frames": frames, "events": events,
             "total_permille": progress["total_permille"], "t_years": progress["t_years"],
             "elapsed_ms": progress["elapsed_ms"], "eta_ms": progress["eta_ms"],
@@ -247,7 +248,7 @@ impl Workbench {
     ) -> CliResult<Arc<Workbench>> {
         std::fs::create_dir_all(runs_dir)?;
         let ramps = Ramps::builtin();
-        let catalog = Catalog::load()?;
+        let catalog = Catalog::load()?.with_default_cap(common.mem_cap);
         let mut runs = Vec::new();
         let mut dirs: Vec<PathBuf> = std::fs::read_dir(runs_dir)?
             .flatten()
@@ -291,7 +292,9 @@ impl Workbench {
         lock(&self.runs).iter().find(|r| r.id == id).cloned()
     }
 
-    /// Queues a run of `preset_json` (a complete preset, as the editor builds it).
+    /// Queues a run of `preset_json` (a complete preset, as the editor builds it) with a memory cap
+    /// of `mem_cap` bytes (0 = the workbench's default). A run whose estimated peak is over its cap
+    /// is refused here, whatever the page said: it would fail on the cap partway through.
     pub fn submit(
         &self,
         preset_json: &str,
@@ -299,6 +302,14 @@ impl Workbench {
         mem_cap: u64,
     ) -> Result<Arc<Run>, Refusal> {
         let canon = self.catalog.runnable(preset_json).map_err(|e| (400, e))?;
+        let mem_cap = if mem_cap == 0 {
+            self.catalog.default_cap()
+        } else {
+            mem_cap
+        };
+        self.catalog
+            .within_cap(&canon, mem_cap)
+            .map_err(|e| (400, e))?;
         let mut sched = lock(&self.sched);
         if sched.closing {
             return Err((503, "the workbench is stopping".into()));
@@ -366,11 +377,7 @@ impl Workbench {
             label,
             preset_json: preset_json.to_owned(),
             share_code: deeptime_core::share_code::encode(preset_json)?,
-            mem_cap: if mem_cap == 0 {
-                self.common.mem_cap
-            } else {
-                mem_cap
-            },
+            mem_cap,
             live,
             session: Mutex::new(None),
             cancel: AtomicBool::new(false),
@@ -726,7 +733,11 @@ fn restore(dir: &Path, ramps: &Ramps) -> CliResult<Run> {
         label,
         share_code: v["share_code"].as_str().unwrap_or("").to_owned(),
         preset_json,
-        mem_cap: v["mem_cap"].as_u64().unwrap_or(0),
+        // 0 (a run of before the workbench had a default) ran with the core's default cap.
+        mem_cap: v["mem_cap"]
+            .as_u64()
+            .filter(|&c| c != 0)
+            .unwrap_or(DEFAULT_MEM_CAP),
         live,
         session: Mutex::new(None),
         cancel: AtomicBool::new(false),
