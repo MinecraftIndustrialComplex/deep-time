@@ -1,0 +1,5 @@
+{
+  "deeptime.polecap.storm": "Polar storm (%s): the wind is pushing you back toward the equator",
+  "deeptime.polecap.storm.no_wind": "Polar storm (%s): the world ends at %s",
+  "deeptime.polecap.stop": "You cannot go any further: %s is the edge of the world"
+}

@@ -39,7 +39,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-15 | Deposits in the world | todo | | | |
 | P1-16 | COE and CDG hooks | todo | | | |
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
-| P1-18 | Pole cap and client info | todo | | | |
+| P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
 
 ## Review pages
@@ -59,6 +59,102 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 — P1-18 pole cap and client info (agent worktree agent-a4399e9f8080242f4)
+- **The cap** (`wrap/PoleCap`, `wrap/PoleCapCurve`; replaces P0-06's `PoleCapPrototype` and its
+  `prototypepushback` test). Runs after every tick of a Deep Time level (`LevelTickEvent.Post`).
+  Lines per level from the generator's `world_data`: new optional codec fields `pole_cap_deg`
+  (default 75) and `pole_stop_deg` (default 80), validated cap < stop ≤ 90 and written out in
+  both world presets (and `tools/dev/gen_worldgen.py`); `WorldDataRef.poleCap()`. The Rust
+  preset's `scale.pole_cap_deg` (plan §5.1) reaches the generator when P1-11 writes world presets
+  from a preset; the placeholder presets name neither.
+- **The curves** (the seam page's were illustrations; now the real ones, documented in
+  `PoleCapCurve`, pinned by `PoleCapCurveTest`): s = depth into the 75°–80° band. Pushback
+  0.10·s^1.5 blocks/tick² toward the equator (76° 0.0089, 77.5° 0.0354, 79° 0.0716, 80° 0.10;
+  ground friction makes a per-tick push p a drift of 2.2p, the same factor as the walking input
+  0.1, so at 80° walking is cancelled exactly, sprinting creeps, and anything airborne (factor 11)
+  or gliding is thrown back hard). Storm s^0.7 (0.20 at 75.5°, 0.62 at 77.5°). Sable wind
+  1.0·s^1.5 blocks/s added per tick (20 blocks/s² at the stop; a 40 blocks/s jet entering at 75°
+  turns at 78.6° at 16k).
+- **Player policy** (decided here): survival/adventure get wind, warning and stop; **creative**
+  gets the storm, the warning and the hard stop but no wind (the vanilla border stops creative
+  players too; builders at 76° should not be blown about); **spectators** only see the storm (no
+  wind, no stop, no warning, as they pass the vanilla border); fake players are ignored.
+  **Vehicles**: a player's root vehicle, under the strongest policy of its riders; empty vehicles and
+  mob-only stacks are not capped (nothing gained).
+- **Who moves whom.** A player's own movement (and a vehicle it steers: boat, horse) is its
+  client's; a server motion packet would *replace* the client's velocity every tick (no momentum,
+  broken jumps), so the server sends the wind in `PoleStormPayload.push` and Deep Time's client adds
+  it before the player moves (`client/PolarStorm`). Vehicles the server simulates (minecarts, any
+  ridden-but-not-steered root) are pushed server-side. The hard stop is always the server's: a
+  player past the line is teleported onto it, 0.05 blocks inside (absolute teleport, which zeroes
+  the client's velocity; y lifted out of terrain if the line cuts rising ground), a vehicle is moved
+  with its riders (plus `ClientboundMoveVehiclePacket` when a client steers it), riders of anything
+  else (Create contraptions, modded seats) are dismounted and stopped alone. Action bar: gold storm
+  line on entry and every 40 ticks, red stop line at once (`assets/deeptime/lang/en_us.json`).
+- **Sable** (`compat/sable/SablePoleCap`, loaded only with Sable; with `SableTestOps` the only
+  classes naming Sable types): every sub-level of the level from
+  `SubLevelContainer.getContainer(level).getAllSubLevels()`; wind at the pose through
+  `RigidBodyHandle.addLinearAndAngularVelocity`; stop when the hull's poleward edge (global bounds)
+  is past the line: poleward velocity cancelled plus the full wind, never a teleport (a teleport
+  would leave the deck's players behind). Sable declared `optional` `[2.0.5,)` in mods.toml.
+- **Networking** (`net/`): `DeepTimeNetwork` registers `deeptime:world_info` (`WorldInfoPayload`:
+  planet flag, dimension, world-data format version, C, m/block h and v (manifest, new optional
+  fields), cap and stop, planet name = the manifest source's preset/kind; sent on login, dimension
+  change, respawn) and `deeptime:pole_storm` (`PoleStormPayload`: storm, push; sent on a change of
+  0.02 storm or 0.002 push, and on every change to or from zero; clamped on arrival), both
+  play-to-client, version "1", **required**. `ClientHandlers` only stores into `ClientPlanetState`
+  (no client classes, safe on a dedicated server). NeoForge has no public view of its
+  registrations: `DeepTimeNetwork.registrations()` reads `NetworkRegistry.PAYLOAD_REGISTRATIONS` by
+  reflection. New probes: `/deeptime probe pole [z]`, `/deeptime probe network`.
+- **Client** (`client/DeepTimeClient`, `client/PolarStorm`; loaded only when
+  `FMLEnvironment.dist == CLIENT`): the F3 line (`net/PlanetDebugLine`, left column:
+  `Deep Time: 76.904° N 90.000° E · wrap-test (C 16384, 300 m/block) · polar storm 62%`), the wind,
+  fog (far plane from the render distance down to 20 blocks at full storm, near plane to 0,
+  colour toward pale grey; camera in air only) and up to 16 snowflakes a tick blown equatorward;
+  the drawn storm eases 0.02/tick. **Compiled only**: no client was booted. mic-climate's
+  HeadlessMC route is not cheap here: its `-lwjgl` mode never got past "Waiting for player to
+  load", its Xvfb mode is Linux-only (the Mac has no X server; the laptop must not run heavy
+  jobs), and reaching the storm would also need a Deep Time world with the player at 75°+.
+- **Tests.** Players are `gametest/MockPlayers`: real `ServerPlayer`s placed through
+  `PlayerList.placeNewPlayer` on an `EmbeddedChannel` connection NeoForge treats as a full NeoForge
+  client (`NetworkRegistry.configureMockConnection`), so tests read the packets the server sends
+  (storm payloads, action bar = system chat with overlay) and see its teleports; nothing moves
+  them. Planet namespace (`PoleCapGameTests`; each test forces its own polar chunk strips at
+  y = max − 20.5, so the harness only needs a loaded spot): `entityPushedBack`, `hardStopAt80`,
+  `sableHullPushedBack`. GameTest namespace (`NetworkGameTests`): `worldInfoRoundTrip`,
+  `poleStormRoundTrip`, `worldInfoChannelRequired` (registration + NeoForge's own negotiator),
+  `planetDebugLine`, `worldInfoFollowsThePlayer` (own batch). The planet server now also enables
+  the `deeptime` namespace so `worldinfochannelrequired` runs there too. Headless connection test:
+  `gametest-planet.sh --scenario refuse_client` (new `tools/planet/mcclient.py`, stdlib, protocol
+  767 with compression) logs in over TCP three times with the channel list from
+  `/deeptime probe network` (read from the server log: RCON returns only 4 kB of the 20 kB line).
+  `--scenario` is repeatable now. `tools/review/phase0.py` runs the new pole tests instead of the
+  prototype; the seam page shows the real curves, texts and "Verified".
+- **Measured** (Mac; numbers from the planet run of the final commit):
+  `tools/remote/mac.sh --server -- '(cd neoforge && ./gradlew build test) ; ./gametest.sh ;
+  tools/smoke/install.sh standalone ; ./gametest-planet.sh --run columnscontinuous,entitycrossesseam,structurestraddlesseam,treestraddlesseam,shaftlineacrossseam@8185,250,0 --run jetcrossesseam@8185,250,64 --run entitypushedback,hardstopat80,sablehullpushedback,worldinfochannelrequired@0,300,64 --scenario sable_straddle --scenario refuse_client'`
+  → JUnit `tests=65 failures=0 errors=0` (PoleCapCurveTest 8 new); GameTest server `All 26 required
+  tests passed`; planet server `PASS`: the five seam tests, jetcrossesseam 20/20, sable_straddle OK,
+  and the four P1-18 tests. entityPushedBack (C = 16,384, 40 ticks): players N and S identical —
+  74.5° storm 0 / push 0 / no bar; 76° 0.3241 / 0.0089; 77.5° 0.6156 / 0.0354; 79° 0.8554 / 0.0716,
+  bar each; creative 77.5° storm 0.616 push 0 + no-wind bar; spectator storm 0.616 push 0, no bar;
+  minecarts with riders dz 0 / −3.91 / −12.95 / −14.58 at 74.5 / 76 / 77.5 / 79° S (the 0.4
+  blocks/tick off-rail limit flattens the top) and +12.85 at 77.5° N, riders sent push 0.
+  hardStopAt80: survival 80.5° N and 82° S and creative 80.5° S put at |z| 3640.84 (79.9989°, line
+  3640.89); spectator at 81° N untouched; carts (one placed at 80.5° N, one running poleward at 0.4
+  from 79.995° S) never observed past 79.9989°, riders still aboard. sableHullPushedBack (40 ticks):
+  dz 0 at 74.5° S, −5.90 at 76.5° S, −20.81 at 78.5° S, +12.70 at 77.5° N; the 60 blocks/s hull
+  from 79.3° N: poleward edge max 80.051° (allowed 80.088°, one tick of travel + a block), ends at
+  79.60° moving back at 26.2 blocks/s. worldInfoChannelRequired: 199 channels (188 play); without
+  Deep Time's two → refused naming exactly them. refuse_client over TCP: NeoForge client without
+  Deep Time refused (`neoforge:modded_network_setup_failed` names deeptime:pole_storm and
+  deeptime:world_info, then `multiplayer.disconnect.incompatible`), with every channel accepted
+  (`neoforge:network`), vanilla refused (NeoForge's "you are not running NeoForge"). Logs:
+  gitignored `review/out/p1-18/{junit,gametest,planet}.txt` and `run-planet/planet.log` in this worktree.
+- **Next.** Merge; P1-19 lists the four planet tests and `refuse_client` in the Phase 1 exit. A
+  real client boot (the storm visuals, the F3 line, the client-side wind) stays unverified (plan
+  §9.8).
 
 ### 2026-09-28 — P1-03 plates and crust (agent worktree agent-a634f0216bff6a4a4, branch worktree-agent-a634f0216bff6a4a4)
 - **What.** `crates/deeptime-core/src/plates/` (mod, state, kinematics, geometry, init, subduction,

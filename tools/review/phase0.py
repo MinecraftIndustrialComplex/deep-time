@@ -27,10 +27,11 @@ OUT = os.path.join(REPO, "review", "out", "phase0-src")
 LOGS = os.path.join(OUT, "logs")
 MAC = os.path.join(REPO, "tools", "remote", "mac.sh")
 
-# The seam tests of P0-06, as their agent ran them (one at a time; positions next to the seam).
+# The seam tests of P0-06, as their agent ran them (one at a time; positions next to the seam). The
+# pole prototype (prototypepushback) became P1-18's cap: its tests load their own polar chunks.
 PLANET_RUNS = ("--run columnscontinuous,entitycrossesseam,structurestraddlesseam,treestraddlesseam,"
                "shaftlineacrossseam@8185,250,0 --run jetcrossesseam@8185,250,64 "
-               "--run prototypepushback@0,300,3527~16,160 --scenario sable_straddle")
+               "--run entitypushedback,hardstopat80@0,300,64 --scenario sable_straddle")
 
 
 def step_defs():
