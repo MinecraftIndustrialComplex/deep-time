@@ -122,6 +122,7 @@ pub fn check_content(json: &str) -> Result<(), CoreError> {
 /// peak working set, shared world state included, so the run's peak is their maximum.
 pub fn estimate(preset_json: &str, content_json: &str) -> Result<String, CoreError> {
     let preset = Preset::from_json(preset_json)?;
+    preset.check_runnable()?;
     check_content(content_json)?;
     let mut peak = 0u64;
     let stages: Vec<Value> = preset
@@ -246,6 +247,7 @@ impl Session {
         gauge: Arc<dyn MemoryGauge>,
     ) -> Result<Session, CoreError> {
         let preset = Preset::from_json(preset_json)?;
+        preset.check_runnable()?;
         check_content(content_json)?;
         let world = preset.initial_world();
         Session::build(preset, content_json, options, gauge, world, 0, &[])
@@ -259,6 +261,7 @@ impl Session {
         gauge: Arc<dyn MemoryGauge>,
     ) -> Result<Session, CoreError> {
         let preset = Preset::from_json(&checkpoint.preset_json)?;
+        preset.check_runnable()?;
         check_content(&checkpoint.content_json)?;
         let names: Vec<String> = preset
             .stages()

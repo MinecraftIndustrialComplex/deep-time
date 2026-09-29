@@ -60,6 +60,8 @@ pub struct WorldState {
     /// Per-stage summaries as JSON text (the deposit census of P1-14, …), copied into
     /// `manifest.json` `notes` by `finalize_write`.
     pub notes: BTreeMap<String, String>,
+    /// The plate model's L0 crust (plan §8.1), once the plates stage has started.
+    pub plates: Option<crate::plates::PlateState>,
     next_event_seq: u64,
     next_site_id: SiteId,
     next_body_id: BodyId,
@@ -76,6 +78,7 @@ impl WorldState {
             sites: Vec::new(),
             bodies: Vec::new(),
             notes: BTreeMap::new(),
+            plates: None,
             next_event_seq: 0,
             next_site_id: 0,
             next_body_id: 0,
