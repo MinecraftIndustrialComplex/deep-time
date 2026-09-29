@@ -70,7 +70,7 @@ pub fn resolve(arg: &str) -> Result<String, CoreError> {
     if share_code::is_share_code(arg) {
         return share_code::decode(arg);
     }
-    if let Some(json) = builtin(arg).or_else(|| crate::params::plates_builtin(arg)) {
+    if let Some(json) = builtin(arg).or_else(|| crate::params::planet_builtin(arg)) {
         return Ok(json.to_owned());
     }
     match std::fs::read_to_string(arg) {
@@ -79,10 +79,11 @@ pub fn resolve(arg: &str) -> Result<String, CoreError> {
             Err(CoreError::preset(
                 "preset",
                 format!(
-                    "'{arg}' is not a built-in preset ({}; plate pipeline: {}), a file or a share \
-                     code (DT1.…)",
+                    "'{arg}' is not a built-in preset ({}; plate pipeline: {}; plates and \
+                     surface: {}), a file or a share code (DT1.…)",
                     BUILTIN.map(|(n, _)| n).join(", "),
-                    crate::params::PLATES_BUILTIN.map(|(n, _)| n).join(", ")
+                    crate::params::PLATES_BUILTIN.map(|(n, _)| n).join(", "),
+                    crate::params::PIPELINE_BUILTIN.map(|(n, _)| n).join(", ")
                 ),
             ))
         }
@@ -372,7 +373,15 @@ impl Preset {
             PresetBody::DepositsSynthetic(p) => {
                 p.stages().expect("checked when the preset was parsed")
             }
-            PresetBody::Planet(p) => vec![Box::new(PlatesStage::new((**p).clone()))],
+            PresetBody::Planet(p) => {
+                let mut stages: Vec<Box<dyn Stage>> =
+                    vec![Box::new(PlatesStage::new((**p).clone()))];
+                if p.surface.is_some() {
+                    // Coupled to the plates: one surface step after every plate step (plan §8).
+                    stages.push(Box::new(crate::surface::SurfaceStage::new((**p).clone())));
+                }
+                stages
+            }
         }
     }
 

@@ -171,7 +171,46 @@ pub fn sample(
     let links = coupling.links();
     let elevation_m = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].elevation_m));
     let uplift = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].uplift_mm_yr));
+    let oxidation = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].oxidation));
+    let heat = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].heat_flow_mw_m2));
+    let thick = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].thickness_m));
     let cells = links.len();
+    // The deposit engine's inputs and the surface's basement (P1-04): the nearest sample's flags,
+    // top rock pool and trench values; the rest interpolated.
+    let extra: Vec<[f32; 8]> = (0..cells)
+        .into_par_iter()
+        .map(|c| {
+            let s = &samples[links[c].nearest as usize];
+            if info[c].mode == GAP {
+                let age = gap_of(&info[c], links[c].nearest).1;
+                return [
+                    0.0,
+                    super::state::pool::MAFIC_VOLCANIC as f32,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    super::pools::ocean_heat_flow(age) as f32,
+                    7000.0,
+                ];
+            }
+            let top = TOP_ORDER
+                .iter()
+                .copied()
+                .find(|&k| s.pools[k] > TOP_POOL_M)
+                .map_or(255.0, |k| k as f32);
+            [
+                f32::from(s.flags),
+                top,
+                oxidation[c] as f32,
+                s.convergence_mm_yr,
+                s.obliquity_deg,
+                s.slab_age_myr,
+                heat[c] as f32,
+                thick[c] as f32,
+            ]
+        })
+        .collect();
     let per_cell: Vec<[f32; 11]> = (0..cells)
         .into_par_iter()
         .map(|c| {
@@ -252,9 +291,40 @@ pub fn sample(
         "plates/fold_trend_deg",
         "plates/plate_id",
     ];
+    let extra_names: [&'static str; 8] = [
+        "plates/flags",
+        "plates/top_pool",
+        "plates/oxidation",
+        "plates/convergence_mm_yr",
+        "plates/obliquity_deg",
+        "plates/slab_age_myr",
+        "plates/heat_flow_mw_m2",
+        "plates/thickness_m",
+    ];
     names
         .iter()
         .enumerate()
         .map(|(f, &name)| (name, per_cell.iter().map(|v| v[f]).collect()))
+        .chain(
+            extra_names
+                .iter()
+                .enumerate()
+                .map(|(f, &name)| (name, extra.iter().map(|v| v[f]).collect())),
+        )
         .collect()
 }
+
+/// The pools in the order erosion meets them from the top (the surface's basement rock,
+/// `plates/top_pool`): the first holding more than [`TOP_POOL_M`].
+pub const TOP_ORDER: [usize; 7] = [
+    super::state::pool::SEDIMENT,
+    super::state::pool::SEDIMENTARY,
+    super::state::pool::FELSIC_VOLCANIC,
+    super::state::pool::MAFIC_VOLCANIC,
+    super::state::pool::METAMORPHIC,
+    super::state::pool::FELSIC_PLUTONIC,
+    super::state::pool::MAFIC_PLUTONIC,
+];
+
+/// A pool thinner than this does not count as the top rock, metres.
+pub const TOP_POOL_M: f32 = 50.0;
