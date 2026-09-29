@@ -61,7 +61,12 @@ public final class BiomeCensus {
             new Check("Dsub", "Dsc Dsd Dwc Dwd Dfc Dfd", k -> k == 19 || k == 20 || k == 23 || k == 24 || k == 27 || k == 28,
                     List.of(c("is_taiga"), c("is_tree/coniferous"), c("is_snowy"), c("is_cold"))),
             new Check("E", "ET EF", k -> k == 29 || k == 30, List.of(c("is_snowy"), c("is_icy"), c("is_cold"))),
-            new Check("sea", "sea (below sea level)", k -> k == 31, List.of(c("is_ocean"), c("is_deep_ocean"), c("is_aquatic"))));
+            new Check("sea", "sea (below sea level)", k -> k == 31, List.of(c("is_ocean"), c("is_deep_ocean"), c("is_aquatic"))),
+            // The narrow ones Ben asked to see: deserts in BW, rainforest in Af, taiga in Dfc, snow and ice in ET/EF.
+            new Check("BW:desert", "BWh BWk", k -> k == 4 || k == 5, List.of(c("is_desert"), c("is_badlands"))),
+            new Check("Af:jungle", "Af", k -> k == 0, List.of(c("is_jungle"))),
+            new Check("Dfc:taiga", "Dfc", k -> k == 27, List.of(c("is_taiga"), c("is_tree/coniferous"))),
+            new Check("E:snow", "ET EF", k -> k == 29 || k == 30, List.of(c("is_snowy"), c("is_icy"))));
 
     public static final String[] KOPPEN = {"Af", "Am", "Aw", "As", "BWh", "BWk", "BSh", "BSk", "Csa", "Csb", "Csc", "Cwa", "Cwb",
             "Cwc", "Cfa", "Cfb", "Cfc", "Dsa", "Dsb", "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb", "Dfc", "Dfd", "ET", "EF",
