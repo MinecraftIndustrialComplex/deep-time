@@ -1,0 +1,25 @@
+{
+  "class": "laterite",
+  "family": "unconsolidated",
+  "groups": [
+    "deeptime:rock/unconsolidated"
+  ],
+  "density_kg_m3": 2000,
+  "erodibility": 4.0,
+  "diffusivity": 2.0,
+  "metamorphic_path": [],
+  "facies_rule": "tropical_weathering",
+  "tags": [
+    "fe_rich",
+    "oxidised",
+    "ore_host"
+  ],
+  "vanilla_fallback": "minecraft:red_sand",
+  "sources": {
+    "density_kg_m3": "judgment: iron-oxide-rich regolith; indurated ferricrete is denser; rounded to 10 kg/m³; initial value, tuned in P1-07",
+    "erodibility": "judgment, relative to granite: ferricrete crusts cap mesas; the least erodible regolith; loose sediment, ranked above all bedrock (about 4–10) by ease of entrainment: silt and fine sand move at the lowest flow speeds, cohesive clay and coarse gravel need more (Hjulström 1935, Bull. Geol. Inst. Univ. Uppsala 25); initial value, tuned in P1-07",
+    "diffusivity": "judgment, relative to granite: partly indurated regolith; hillslope transport coefficient D of Roering, Kirchner & Dietrich 1999 (WRR 35(3):853–870), used as a linear creep multiplier and scaled by how readily the rock makes mobile soil (soil production function, Heimsath et al. 1997, Nature 388:358–361): loose and friable classes 2–5, soft sedimentary 1.2–2, crystalline 0.5–1; initial value, tuned in P1-07",
+    "vanilla_fallback": "last fallback entry (MIC rock-tag README, Fallbacks table)"
+  },
+  "notes": "Laterite, ferricrete and Ni-Co laterite: iron-rich tropical regolith."
+}

@@ -1,0 +1,695 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
+"""Generate Deep Time's 59 rock-class definitions (plan §5.4.1) from the table below.
+
+    tools/dev/gen_rock_classes.py [<output dir>]
+
+The output is committed; re-run after editing the table. It goes to
+neoforge/src/main/resources/data/deeptime/deeptime/rock_class/<class>.json (the datapack registry
+`deeptime:rock_class`). Stale *.json files there are deleted first, and nothing is written unless
+the whole table validates.
+
+The vocabulary (class names, families, groups, stand-ins) is MIC's rock-tag README,
+/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md: CLASSES follows
+its Classes table in order, GROUPS its Groups table. `vanilla_fallback` is the class's vanilla member
+there, or the last entry of its fallback list.
+
+The numbers are initial values. density_kg_m3 is a typical dry bulk density (bulk density of the
+loose material for unconsolidated classes). erodibility and diffusivity are relative multipliers on
+the stream-power K and the hillslope diffusivity, with generic crystalline basement (granite, gneiss:
+what "unclassified crust" means) at 1.0. P1-07 tunes all three against the viewer; every file says
+where each value came from.
+"""
+import glob
+import json
+import os
+import re
+import sys
+
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
+    REPO, "neoforge", "src", "main", "resources", "data", "deeptime", "deeptime", "rock_class")
+
+# README families, in its order.
+FAMILIES = (
+    "intrusive_igneous",     # Intrusive igneous
+    "volcanic",              # Volcanic
+    "clastic_sedimentary",   # Clastic sedimentary
+    "chemical_sedimentary",  # Chemical and biogenic sedimentary
+    "metamorphic",           # Metamorphic
+    "special_host",          # Special hosts
+    "unconsolidated",        # Unconsolidated and regolith
+)
+
+# README Groups table, in its order; "#x" is another group. `any` is left out of the files.
+GROUPS = (
+    ("intrusive", "granite granodiorite diorite gabbro anorthosite peridotite"),
+    ("volcanic", "rhyolite andesite basalt tuff obsidian scoria pumice"),
+    ("special", "kimberlite carbonatite pegmatite greisen"),
+    ("igneous", "#intrusive #volcanic kimberlite carbonatite pegmatite"),
+    ("clastic", "conglomerate sandstone red_bed mudstone shale black_shale"),
+    ("chemical", "limestone dolostone chalk chert travertine halite gypsum anhydrite coal ironstone "
+                 "banded_iron_formation phosphorite"),
+    ("sedimentary", "#clastic #chemical"),
+    ("metamorphic", "slate phyllite schist blueschist greenstone gneiss quartzite marble amphibolite "
+                    "eclogite hornfels skarn serpentinite greisen"),
+    ("unconsolidated", "soil saprolite laterite bauxite gravel sand clay mud till loess volcanic_ash"),
+    ("felsic", "granite granodiorite rhyolite pegmatite greisen"),
+    ("intermediate", "diorite andesite"),
+    ("mafic", "gabbro anorthosite basalt scoria amphibolite greenstone"),
+    ("ultramafic", "peridotite serpentinite kimberlite"),
+    ("carbonate", "limestone dolostone chalk travertine marble"),
+    ("evaporite", "halite gypsum anhydrite"),
+    ("iron_formation", "ironstone banded_iron_formation"),
+    ("any", "#igneous #sedimentary #metamorphic #special #unconsolidated #unclassified_crust"),
+)
+EXCLUDED_GROUPS = {"any"}
+NON_CLASS_MEMBERS = {"unclassified_crust"}  # a filler tag, not a class
+
+# README "Create ore stones" table: the class of each Create ore stone and its metal.
+CREATE_METAL_HOSTS = {"banded_iron_formation": "iron", "ironstone": "gold",
+                      "serpentinite": "copper", "dolostone": "zinc"}
+
+FILLER = {"minecraft:stone", "minecraft:deepslate"}
+FILLER_EXCEPTIONS = {("coal", "minecraft:stone")}  # README "Coal stand-in (decided)"
+
+REFERENCE_CLASSES = {"granite", "gneiss"}
+
+TUNED = "initial value, tuned in P1-07"
+DENSITY_TYPICAL = ("typical value, cf. the rock-density tables of Telford, Geldart & Sheriff 1990 "
+                   "(Applied Geophysics, 2nd ed.) and Schön 2015 (Physical Properties of Rocks, 2nd ed.)")
+K_BEDROCK = ("bedrock ranked by rock strength: river incision scales roughly with tensile strength^-2 "
+             "(Sklar & Dietrich 2001, Geology 29(12):1087–1090) and lithologic K contrasts span orders of "
+             "magnitude (Stock & Montgomery 1999, JGR 104(B3):4983–4993); the strength-based contrast is "
+             "compressed to its square root, so bedrock spans about 0.3–4")
+K_LOOSE = ("loose sediment, ranked above all bedrock (about 4–10) by ease of entrainment: silt and fine "
+           "sand move at the lowest flow speeds, cohesive clay and coarse gravel need more "
+           "(Hjulström 1935, Bull. Geol. Inst. Univ. Uppsala 25)")
+D_BASIS = ("hillslope transport coefficient D of Roering, Kirchner & Dietrich 1999 (WRR 35(3):853–870), "
+           "used as a linear creep multiplier and scaled by how readily the rock makes mobile soil "
+           "(soil production function, Heimsath et al. 1997, Nature 388:358–361): loose and friable "
+           "classes 2–5, soft sedimentary 1.2–2, crystalline 0.5–1")
+VF_MEMBER = "vanilla member (MIC rock-tag README, Classes table)"
+VF_FALLBACK = "last fallback entry (MIC rock-tag README, Fallbacks table)"
+
+PELITE = ["slate", "phyllite", "schist", "gneiss"]
+MAFIC = ["greenstone", "amphibolite"]
+
+# One row per class, in the README's Classes-table order.
+#   rho / rho_src: density and, where it is not a textbook typical value, why (else DENSITY_TYPICAL)
+#   k / k_why, d / d_why: erodibility and diffusivity with the judgment behind them
+#   path: prograde regional-metamorphism sequence; wx: weathers_to (temperate), None to omit
+#   facies: facies_rule, None to omit; vf / vf_from: vanilla_fallback and "member" or "fallback"
+CLASSES = [
+    # ---- Intrusive igneous
+    dict(name="granite", family="intrusive_igneous", rho=2650,
+         k=1.0, k_why=None, d=1.0, d_why=None,
+         path=["gneiss"], wx="saprolite", facies="batholith", tags=[],
+         vf="minecraft:granite", vf_from="member",
+         notes="Granite, monzogranite, leucogranite and syenite. With gneiss, the reference class "
+               "(erodibility and diffusivity 1.0) for generic crystalline crust."),
+    dict(name="granodiorite", family="intrusive_igneous", rho=2720,
+         k=1.0, k_why="mechanically like granite", d=1.0, d_why="weathers to grus like granite",
+         path=["gneiss"], wx="saprolite", facies="arc_plutonism", tags=["ore_host"],
+         vf="minecraft:diorite", vf_from="fallback",
+         notes="Granodiorite and tonalite, including the stocks that host porphyry copper deposits."),
+    dict(name="diorite", family="intrusive_igneous", rho=2850,
+         k=0.8, k_why="finer, less quartz-rich and tougher than granite",
+         d=0.9, d_why="makes less grus than granite",
+         path=["gneiss"], wx="saprolite", facies="arc_plutonism", tags=[],
+         vf="minecraft:diorite", vf_from="member",
+         notes="Diorite and monzodiorite."),
+    dict(name="gabbro", family="intrusive_igneous", rho=3000,
+         k=0.6, k_why="tough interlocking pyroxene and plagioclase",
+         d=0.8, d_why="massive crystalline rock with thin soils",
+         path=MAFIC, wx="saprolite", facies=None, tags=[],
+         vf="minecraft:smooth_basalt", vf_from="fallback",
+         notes="Gabbro, norite and dolerite/diabase: coarse intrusive basalt. Forms in ocean crust, "
+               "layered intrusions and sills, so no single facies rule."),
+    dict(name="anorthosite", family="intrusive_igneous", rho=2730,
+         rho_src="judgment from mineralogy: almost all plagioclase (about 2620–2760 kg/m³)",
+         k=0.9, k_why="coarse plagioclase rock, close to granite",
+         d=0.9, d_why="coarse crystalline rock, close to granite",
+         path=["gneiss"], wx="saprolite", facies="layered_intrusion", tags=["ore_host"],
+         vf="minecraft:calcite", vf_from="fallback",
+         notes="Anorthosite, host of Fe-Ti-V oxide ores in layered intrusions and massif anorthosites. "
+               "Metamorphosed anorthosite is taken as anorthositic gneiss."),
+    dict(name="peridotite", family="intrusive_igneous", rho=3300,
+         k=0.8, k_why="strong when fresh, but serpentinises and weathers quickly",
+         d=0.8, d_why="massive crystalline rock",
+         path=["serpentinite"], wx="saprolite", facies="mantle_exhumation", tags=["ore_host"],
+         vf="minecraft:tuff", vf_from="fallback",
+         notes="Peridotite, dunite, harzburgite, pyroxenite and komatiite cumulates: upper mantle and "
+               "ultramafic cumulates (Cr, Ni, PGE hosts). Hydrates to serpentinite."),
+    # ---- Volcanic
+    dict(name="rhyolite", family="volcanic", rho=2500,
+         k=0.7, k_why="fine-grained siliceous lava, stronger than granite",
+         d=0.7, d_why="fine siliceous rock that makes thin soils",
+         path=["gneiss"], wx="saprolite", facies="silicic_volcanism", tags=[],
+         vf="minecraft:granite", vf_from="fallback",
+         notes="Rhyolite, dacite, felsic porphyry and ignimbrite matrix: the volcanic equivalent of granite."),
+    dict(name="andesite", family="volcanic", rho=2600,
+         k=0.8, k_why="fine-grained lava, stronger than granite but jointed",
+         d=0.8, d_why="fine-grained lava",
+         path=MAFIC, wx="saprolite", facies="arc_volcanism", tags=[],
+         vf="minecraft:andesite", vf_from="member",
+         notes="Andesite and other arc lavas."),
+    dict(name="basalt", family="volcanic", rho=2900,
+         k=0.7, k_why="dense, strong lava; columnar joints let rivers pluck it",
+         d=0.8, d_why="fine-grained lava",
+         path=MAFIC, wx="saprolite", facies=None, tags=[],
+         vf="minecraft:smooth_basalt", vf_from="member",
+         notes="Basalt, MORB, flood basalt, pillow lava and komatiite flows. Erupts at ridges, plumes and "
+               "arcs, so no single facies rule."),
+    dict(name="tuff", family="volcanic", rho=1900,
+         rho_src="judgment: a mid value for dry tuff, whose density varies widely with porosity and welding",
+         k=2.5, k_why="weak, porous consolidated ash",
+         d=1.8, d_why="soft rock that breaks down into thick mobile regolith",
+         path=["schist", "gneiss"], wx="clay", facies="explosive_volcanism", tags=["porous", "friable"],
+         vf="minecraft:tuff", vf_from="member",
+         notes="Tuff, welded ignimbrite and volcaniclastic rock: consolidated ash (loose ash is "
+               "volcanic_ash). Glassy ash alters readily to clay."),
+    dict(name="obsidian", family="volcanic", rho=2400,
+         rho_src="judgment: density of rhyolitic glass",
+         k=0.5, k_why="massive, strong glass that weathers slowly",
+         d=0.5, d_why="weathers very slowly and makes little mobile soil",
+         path=["gneiss"], wx="clay", facies="silicic_lava_flow", tags=["glassy"],
+         vf="minecraft:obsidian", vf_from="member",
+         notes="Obsidian and other volcanic glass. Glass devitrifies over geological time, so old "
+               "obsidian is rare."),
+    dict(name="scoria", family="volcanic", rho=1500,
+         rho_src="judgment: highly vesicular basaltic rock, far below solid basalt",
+         k=3.0, k_why="vesicular, weakly welded cinder",
+         d=2.0, d_why="loose, cindery surface",
+         path=MAFIC, wx="clay", facies="cinder_cone", tags=["porous", "friable"],
+         vf="minecraft:smooth_basalt", vf_from="fallback",
+         notes="Red and black scoria and cinder."),
+    dict(name="pumice", family="volcanic", rho=700,
+         rho_src="judgment: pumice is often lighter than water",
+         k=3.5, k_why="frothy glass, very weak",
+         d=2.2, d_why="very weak, breaks down readily",
+         path=["schist", "gneiss"], wx="clay", facies="plinian_eruption",
+         tags=["glassy", "porous", "friable"],
+         vf="minecraft:diorite", vf_from="fallback",
+         notes="Pumice: frothy silicic glass from explosive eruptions."),
+    # ---- Clastic sedimentary
+    dict(name="conglomerate", family="clastic_sedimentary", rho=2550,
+         rho_src="judgment: between sandstone and its pebbles",
+         k=1.3, k_why="strength set by matrix and cement; the clasts resist",
+         d=1.2, d_why="cemented sediment that sheds gravel",
+         path=["quartzite"], wx="gravel", facies="alluvial_fan", tags=["reservoir", "ore_host"],
+         vf="minecraft:cobblestone", vf_from="fallback",
+         notes="Conglomerate, breccia and quartz-pebble conglomerate (host of Witwatersrand-type "
+               "gold-uranium palaeoplacers). Metaconglomerate is taken as quartzite."),
+    dict(name="sandstone", family="clastic_sedimentary", rho=2350,
+         k=1.5, k_why="weaker than granite; strongly dependent on its cement",
+         d=1.3, d_why="soft sedimentary rock that sheds sand",
+         path=["quartzite"], wx="sand", facies=None, tags=["reservoir"],
+         vf="minecraft:sandstone", vf_from="member",
+         notes="Sandstone, quartz arenite, arkose and greywacke/turbidite sand. Laid down by rivers, "
+               "wind, waves and turbidity currents, so no single facies rule."),
+    dict(name="red_bed", family="clastic_sedimentary", rho=2400,
+         rho_src="judgment: a mix of sandstone and mudstone",
+         k=1.8, k_why="weakly cemented continental sandstone and mudstone",
+         d=1.5, d_why="soft sedimentary rock",
+         path=["quartzite"], wx="sand", facies="floodplain",
+         tags=["reservoir", "oxidised", "ore_host"],
+         vf="minecraft:red_sandstone", vf_from="member",
+         notes="Continental red beds: hematite-stained sandstone and mudstone of oxidising floodplains "
+               "and dunes; host of sediment-hosted copper."),
+    dict(name="mudstone", family="clastic_sedimentary", rho=2350,
+         k=3.0, k_why="weak mudrock that slakes on wetting and drying",
+         d=1.8, d_why="soft mudrock that makes thick clay-rich soil",
+         path=PELITE, wx="clay", facies=None, tags=["seal"],
+         vf="minecraft:packed_mud", vf_from="fallback",
+         notes="Mudstone, siltstone and claystone. Laid down in lakes, floodplains and offshore, so no "
+               "single facies rule."),
+    dict(name="shale", family="clastic_sedimentary", rho=2450,
+         k=2.5, k_why="weak, fissile mudrock",
+         d=1.6, d_why="soft mudrock",
+         path=PELITE, wx="clay", facies="marine_shelf_mud", tags=["seal"],
+         vf="minecraft:polished_tuff", vf_from="fallback",
+         notes="Grey shale and argillite: fissile offshore mudrock."),
+    dict(name="black_shale", family="clastic_sedimentary", rho=2400,
+         rho_src="plan §5.4.1 example value; organic matter puts it below grey shale",
+         k=1.6, k_why="plan §5.4.1 example value; below grey shale because many organic-rich "
+                      "shales are quartz-rich and brittle",
+         d=1.2, d_why="plan §5.4.1 example value",
+         path=PELITE, wx="clay", facies="euxinic_basin", tags=["source_rock", "reduced"],
+         vf="minecraft:smooth_basalt", vf_from="fallback",
+         notes="Organic-rich (euxinic) black shale, the classic petroleum source rock. Matches the plan's "
+               "§5.4.1 example row."),
+    # ---- Chemical and biogenic sedimentary
+    dict(name="limestone", family="chemical_sedimentary", rho=2600,
+         k=1.2, k_why="mechanically close to granite; solution adds to it in humid climates",
+         d=0.8, d_why="dissolves rather than creeping; thin residual soils",
+         path=["marble"], wx="clay", facies="carbonate_platform", tags=["reservoir", "karst"],
+         vf="minecraft:calcite", vf_from="fallback",
+         notes="Limestone and reef carbonate. Weathers by solution, leaving residual clay."),
+    dict(name="dolostone", family="chemical_sedimentary", rho=2750,
+         k=1.1, k_why="slightly stronger and less soluble than limestone",
+         d=0.8, d_why="dissolves rather than creeping, like limestone",
+         path=["marble"], wx="clay", facies="dolomitisation",
+         tags=["reservoir", "karst", "ore_host", "create_metal_host:zinc"],
+         vf="minecraft:dripstone_block", vf_from="fallback",
+         notes="Dolostone, host of Mississippi Valley-type and SEDEX zinc-lead deposits. Create's "
+               "asurine (zinc) is its member."),
+    dict(name="chalk", family="chemical_sedimentary", rho=1900,
+         rho_src="judgment: porous chalk sits far below calcite's 2710 kg/m³",
+         k=3.0, k_why="soft, porous, weakly cemented carbonate",
+         d=1.8, d_why="soft, frost-shattered rock under soil-mantled slopes",
+         path=["marble"], wx="clay", facies="pelagic_carbonate",
+         tags=["reservoir", "porous", "friable"],
+         vf="minecraft:calcite", vf_from="fallback",
+         notes="Chalk: pelagic coccolith ooze. Weathers to clay-with-flints."),
+    dict(name="chert", family="chemical_sedimentary", rho=2600,
+         rho_src="judgment: microcrystalline quartz with a little porosity, just under quartz's 2650 kg/m³",
+         k=0.3, k_why="microcrystalline quartz, among the most resistant rocks",
+         d=0.5, d_why="breaks into hard fragments, makes little soil",
+         path=["quartzite"], wx="gravel", facies="siliceous_ooze", tags=["ore_host"],
+         vf="minecraft:smooth_basalt", vf_from="fallback",
+         notes="Chert, flint, jasper and exhalite (the siliceous horizon over volcanogenic "
+               "massive-sulphide ores). Metachert is taken as quartzite."),
+    dict(name="travertine", family="chemical_sedimentary", rho=2400,
+         rho_src="judgment: porous calcite rock",
+         k=1.6, k_why="porous carbonate, weaker than limestone",
+         d=1.2, d_why="soft, porous carbonate",
+         path=["marble"], wx="clay", facies="spring_carbonate", tags=["porous"],
+         vf="minecraft:dripstone_block", vf_from="member",
+         notes="Travertine, tufa and speleothem flowstone: carbonate precipitated from springs and cave water."),
+    dict(name="halite", family="chemical_sedimentary", rho=2160,
+         rho_src="mineral density of halite",
+         k=4.0, k_why="weak and highly soluble; top of the bedrock range",
+         d=1.5, d_why="flows and dissolves; rarely soil-mantled",
+         path=[], wx=None, facies="evaporite_basin", tags=["soluble", "seal"],
+         vf="minecraft:calcite", vf_from="fallback",
+         notes="Rock salt and potash (sylvite) beds. Dissolves at the surface, leaving nothing to weather "
+               "to; flows and rises in diapirs at depth."),
+    dict(name="gypsum", family="chemical_sedimentary", rho=2310,
+         rho_src="mineral density of gypsum",
+         k=3.5, k_why="soft (Mohs 2) and soluble",
+         d=1.6, d_why="soft and soluble",
+         path=["anhydrite"], wx=None, facies="evaporite_basin", tags=["soluble", "seal"],
+         vf="minecraft:calcite", vf_from="fallback",
+         notes="Gypsum and alabaster. Dehydrates to anhydrite on burial and dissolves at the surface."),
+    dict(name="anhydrite", family="chemical_sedimentary", rho=2950,
+         rho_src="close to the mineral density of anhydrite",
+         k=1.8, k_why="mechanically stronger than gypsum, but soluble and hydrates to gypsum at the surface",
+         d=1.2, d_why="harder than gypsum but still soluble",
+         path=[], wx="gypsum", facies="evaporite_basin", tags=["soluble", "seal"],
+         vf="minecraft:diorite", vf_from="fallback",
+         notes="Anhydrite. Hydrates back to gypsum near the surface."),
+    dict(name="coal", family="chemical_sedimentary", rho=1300,
+         k=3.0, k_why="weak, cleated, brittle",
+         d=2.0, d_why="friable, breaks into small fragments",
+         path=[], wx=None, facies="peat_swamp", tags=["source_rock", "reduced", "friable"],
+         vf="minecraft:stone", vf_from="fallback",
+         notes="Coal from lignite to anthracite; rank rises within the class, so no metamorphic path. Its "
+               "vanilla fallback is stone, the one allowed filler exception."),
+    dict(name="ironstone", family="chemical_sedimentary", rho=3000,
+         rho_src="judgment: iron-oxide-rich oolitic sedimentary rock",
+         k=1.3, k_why="moderately strong ferruginous rock",
+         d=1.0, d_why="moderately strong ferruginous rock",
+         path=[], wx="clay", facies="ironstone_shelf",
+         tags=["fe_rich", "oxidised", "ore_host", "create_metal_host:gold"],
+         vf="minecraft:red_sandstone", vf_from="fallback",
+         notes="Phanerozoic oolitic ironstone and gossan. Create's ochrum (gold) is its member."),
+    dict(name="banded_iron_formation", family="chemical_sedimentary", rho=3400,
+         rho_src="judgment: chert bands (about 2650 kg/m³) alternating with hematite/magnetite "
+                 "(about 5200 kg/m³), roughly a third iron oxide by volume",
+         k=0.4, k_why="hard chert and iron-oxide laminae that hold up ridges",
+         d=0.5, d_why="very resistant, makes little soil",
+         path=[], wx="gravel", facies="ferruginous_ocean",
+         tags=["fe_rich", "ore_host", "create_metal_host:iron"],
+         vf="minecraft:granite", vf_from="fallback",
+         notes="Banded iron formation, jaspilite and granular iron formation, the world's main iron ore. "
+               "Create's crimsite (iron) is its member; metamorphosed BIF stays in the class."),
+    dict(name="phosphorite", family="chemical_sedimentary", rho=2700,
+         rho_src="judgment: carbonate-fluorapatite pellets (about 3100 kg/m³) in a porous sandy or muddy matrix",
+         k=1.8, k_why="soft pelletal sediment",
+         d=1.5, d_why="soft sedimentary rock",
+         path=[], wx="clay", facies="upwelling_shelf", tags=["ore_host"],
+         vf="minecraft:packed_mud", vf_from="fallback",
+         notes="Phosphorite, U-bearing marine phosphate formed where upwelling feeds the shelf."),
+    # ---- Metamorphic
+    dict(name="slate", family="metamorphic", rho=2780,
+         k=0.9, k_why="strong and fine, though it parts on cleavage",
+         d=0.8, d_why="makes thin, platy rubble",
+         path=["phyllite", "schist", "gneiss"], wx="clay", facies="regional_metamorphism",
+         tags=["foliated"],
+         vf="minecraft:smooth_basalt", vf_from="fallback",
+         notes="Slate: the lowest grade of the pelite sequence (slate, phyllite, schist, gneiss)."),
+    dict(name="phyllite", family="metamorphic", rho=2740,
+         rho_src="judgment: between slate and schist",
+         k=1.4, k_why="micaceous, parts easily on its foliation",
+         d=1.0, d_why="micaceous, weathers faster than slate",
+         path=["schist", "gneiss"], wx="saprolite", facies="regional_metamorphism", tags=["foliated"],
+         vf="minecraft:polished_tuff", vf_from="fallback",
+         notes="Phyllite: one grade above slate."),
+    dict(name="schist", family="metamorphic", rho=2750,
+         k=1.3, k_why="mica-rich foliation lowers its strength",
+         d=1.1, d_why="micaceous, weathers faster than gneiss",
+         path=["gneiss"], wx="saprolite", facies="regional_metamorphism", tags=["foliated"],
+         vf="minecraft:tuff", vf_from="fallback",
+         notes="Mica schist and pelitic schist."),
+    dict(name="blueschist", family="metamorphic", rho=3100,
+         rho_src="judgment from mineralogy: glaucophane, lawsonite and epidote are denser than their "
+                 "greenschist equivalents",
+         k=0.7, k_why="dense, tough high-pressure rock",
+         d=0.7, d_why="dense crystalline rock",
+         path=["eclogite"], wx="saprolite", facies="subduction_high_p", tags=["foliated"],
+         vf="minecraft:smooth_basalt", vf_from="fallback",
+         notes="Blueschist: high-pressure, low-temperature subduction facies; becomes eclogite with depth."),
+    dict(name="greenstone", family="metamorphic", rho=2900,
+         rho_src="judgment: metabasalt, close to basalt",
+         k=0.8, k_why="tough metabasalt",
+         d=0.8, d_why="massive crystalline rock",
+         path=["amphibolite"], wx="saprolite", facies="regional_metamorphism",
+         tags=["foliated", "ore_host"],
+         vf="minecraft:tuff", vf_from="fallback",
+         notes="Greenstone, greenschist and metabasalt; host of greenstone-belt (orogenic) gold."),
+    dict(name="gneiss", family="metamorphic", rho=2700,
+         k=1.0, k_why=None, d=1.0, d_why=None,
+         path=[], wx="saprolite", facies="regional_metamorphism", tags=["foliated"],
+         vf="minecraft:granite", vf_from="fallback",
+         notes="Gneiss, orthogneiss, migmatite and granulite: the top of the regional sequence. With "
+               "granite, the reference class (erodibility and diffusivity 1.0)."),
+    dict(name="quartzite", family="metamorphic", rho=2640,
+         rho_src="close to the mineral density of quartz",
+         k=0.3, k_why="recrystallised quartz, among the most resistant rocks",
+         d=0.5, d_why="barely weathers chemically; thin, sandy soils",
+         path=[], wx="sand", facies="regional_metamorphism", tags=[],
+         vf="minecraft:calcite", vf_from="fallback",
+         notes="Quartzite: metamorphosed quartz sandstone, among the hardest rocks at the surface."),
+    dict(name="marble", family="metamorphic", rho=2700,
+         rho_src="close to the mineral density of calcite",
+         k=1.2, k_why="mechanically close to limestone; soluble",
+         d=0.8, d_why="dissolves rather than creeping, like limestone",
+         path=[], wx="clay", facies="regional_metamorphism", tags=["karst"],
+         vf="minecraft:calcite", vf_from="member",
+         notes="Marble: metamorphosed limestone or dolostone."),
+    dict(name="amphibolite", family="metamorphic", rho=3000,
+         k=0.6, k_why="tough hornblende-plagioclase rock",
+         d=0.7, d_why="dense crystalline rock",
+         path=[], wx="saprolite", facies="regional_metamorphism", tags=["foliated"],
+         vf="minecraft:smooth_basalt", vf_from="fallback",
+         notes="Amphibolite: amphibolite-facies metabasalt."),
+    dict(name="eclogite", family="metamorphic", rho=3400,
+         k=0.35, k_why="very dense, strong garnet-omphacite rock",
+         d=0.5, d_why="very strong, makes little soil",
+         path=[], wx="saprolite", facies="subduction_high_p", tags=[],
+         vf="minecraft:tuff", vf_from="fallback",
+         notes="Eclogite: the highest-pressure metabasalt, from subducted oceanic crust."),
+    dict(name="hornfels", family="metamorphic", rho=2800,
+         rho_src="judgment: dense, fine-grained baked mudrock, above its shale protolith",
+         k=0.35, k_why="fine, massive, very hard contact rock",
+         d=0.5, d_why="very hard; breaks into angular scree",
+         path=[], wx="gravel", facies="contact_aureole", tags=[],
+         vf="minecraft:smooth_basalt", vf_from="fallback",
+         notes="Hornfels: fine, hard rock baked in a contact aureole."),
+    dict(name="skarn", family="metamorphic", rho=3200,
+         rho_src="judgment from mineralogy: garnet and pyroxene with some calcite",
+         k=0.6, k_why="tough garnet-pyroxene rock",
+         d=0.6, d_why="tough crystalline rock",
+         path=[], wx="saprolite", facies="contact_metasomatism", tags=["ore_host"],
+         vf="minecraft:granite", vf_from="fallback",
+         notes="Skarn and tactite: calc-silicate rock where magma meets carbonate; hosts tungsten, copper, "
+               "iron, zinc and gold skarn ores."),
+    dict(name="serpentinite", family="metamorphic", rho=2600,
+         k=1.8, k_why="weak, sheared and slippery; landslide-prone",
+         d=1.5, d_why="weak, sheared rock prone to slow earthflows",
+         path=[], wx="clay", facies="ophiolite", tags=["ore_host", "create_metal_host:copper"],
+         vf="minecraft:tuff", vf_from="fallback",
+         notes="Serpentinite and the ophiolite mantle section. Create's veridium (copper) is its member."),
+    # ---- Special hosts
+    dict(name="kimberlite", family="special_host", rho=2800,
+         rho_src="judgment: fresh hypabyssal kimberlite; weathered and volcaniclastic kimberlite is lighter",
+         k=2.0, k_why="weathers fast; pipes erode into depressions",
+         d=1.5, d_why="weathers quickly to clay-rich 'yellow ground'",
+         path=[], wx="clay", facies="kimberlite_pipe", tags=["ore_host"],
+         vf="minecraft:smooth_basalt", vf_from="fallback",
+         notes="Kimberlite and lamproite pipes, the primary source of diamonds."),
+    dict(name="carbonatite", family="special_host", rho=2900,
+         rho_src="judgment from mineralogy: calcite and dolomite with apatite and magnetite",
+         k=1.3, k_why="carbonate rock, weathers like marble",
+         d=1.0, d_why="carbonate rock under deep residual regolith",
+         path=[], wx="saprolite", facies="alkaline_complex", tags=["ore_host"],
+         vf="minecraft:dripstone_block", vf_from="fallback",
+         notes="Carbonatite, ijolite and fenite of alkaline complexes; host of rare-earth and niobium ores."),
+    dict(name="pegmatite", family="special_host", rho=2620,
+         rho_src="judgment: quartz and feldspar, like granite without its mafic minerals",
+         k=1.1, k_why="very coarse; cleavage and grain boundaries weaken it",
+         d=1.0, d_why="coarse granitic rock, like granite",
+         path=["gneiss"], wx="saprolite", facies="pegmatite_field", tags=["ore_host"],
+         vf="minecraft:granite", vf_from="fallback",
+         notes="Granitic pegmatite (LCT and NYF), host of lithium, tantalum, tin and rare-element ores."),
+    dict(name="greisen", family="special_host", rho=2750,
+         rho_src="judgment from mineralogy: quartz and muscovite with topaz",
+         k=1.0, k_why="quartz-mica rock, close to granite",
+         d=0.9, d_why="quartz-rich altered granite",
+         path=[], wx="saprolite", facies="granite_cupola", tags=["ore_host"],
+         vf="minecraft:diorite", vf_from="fallback",
+         notes="Greisen: quartz-mica altered granite cupola hosting tin and tungsten. Also in the "
+               "metamorphic group (metasomatised granite)."),
+    # ---- Unconsolidated and regolith
+    dict(name="soil", family="unconsolidated", rho=1300,
+         rho_src="judgment: typical dry bulk density of mineral topsoil",
+         k=6.0, k_why="loose, though roots and clay give it some cohesion",
+         d=4.0, d_why="the mobile layer itself",
+         path=[], wx=None, facies="pedogenesis", tags=[],
+         vf="minecraft:dirt", vf_from="member",
+         notes="Soil and subsoil."),
+    dict(name="saprolite", family="unconsolidated", rho=1600,
+         rho_src="judgment: between soil and fresh rock",
+         k=4.5, k_why="rotted in place but keeps some rock fabric",
+         d=3.0, d_why="friable weathered rock that feeds the soil",
+         path=[], wx="soil", facies="deep_weathering", tags=["friable"],
+         vf="minecraft:coarse_dirt", vf_from="fallback",
+         notes="Saprolite: rock weathered in place that keeps its fabric; the weathering product of most "
+               "crystalline classes."),
+    dict(name="laterite", family="unconsolidated", rho=2000,
+         rho_src="judgment: iron-oxide-rich regolith; indurated ferricrete is denser",
+         k=4.0, k_why="ferricrete crusts cap mesas; the least erodible regolith",
+         d=2.0, d_why="partly indurated regolith",
+         path=[], wx=None, facies="tropical_weathering", tags=["fe_rich", "oxidised", "ore_host"],
+         vf="minecraft:red_sand", vf_from="fallback",
+         notes="Laterite, ferricrete and Ni-Co laterite: iron-rich tropical regolith."),
+    dict(name="bauxite", family="unconsolidated", rho=1900,
+         rho_src="judgment: porous gibbsite-rich regolith",
+         k=4.5, k_why="earthy to pisolitic, partly indurated",
+         d=2.5, d_why="earthy regolith",
+         path=[], wx=None, facies="tropical_weathering", tags=["oxidised", "ore_host"],
+         vf="minecraft:red_sand", vf_from="fallback",
+         notes="Bauxite: aluminium-rich tropical regolith, the aluminium ore."),
+    dict(name="gravel", family="unconsolidated", rho=1800,
+         rho_src="judgment: typical dry bulk density of loose gravel",
+         k=5.0, k_why="coarse clasts need strong flows to move",
+         d=3.0, d_why="loose, coarse sediment",
+         path=["quartzite"], wx=None, facies="fluvial_channel", tags=["porous", "ore_host"],
+         vf="minecraft:gravel", vf_from="member",
+         notes="Gravel, alluvium and placer gravel. Its metamorphic path is conglomerate's, for gravel "
+               "buried without a separate lithification step."),
+    dict(name="sand", family="unconsolidated", rho=1600,
+         rho_src="judgment: loose quartz sand, about 40% porosity",
+         k=9.0, k_why="cohesionless; moves at the lowest flow speeds",
+         d=4.5, d_why="cohesionless, highly mobile",
+         path=["quartzite"], wx=None, facies=None, tags=["porous", "ore_host"],
+         vf="minecraft:sand", vf_from="member",
+         notes="Sand, dune sand and heavy-mineral beach sand; laid down by rivers, wind and waves, so no "
+               "single facies rule. Its metamorphic path is sandstone's."),
+    dict(name="clay", family="unconsolidated", rho=1600,
+         rho_src="judgment: dry bulk density of compacted clay",
+         k=5.0, k_why="cohesive: needs stronger flows than silt or fine sand",
+         d=3.0, d_why="creeps readily when wet",
+         path=PELITE, wx=None, facies=None, tags=["seal"],
+         vf="minecraft:clay", vf_from="member",
+         notes="Clay and kaolin, from weathering or quiet water, so no single facies rule. Its metamorphic "
+               "path is mudstone's."),
+    dict(name="mud", family="unconsolidated", rho=1500,
+         rho_src="judgment: bulk density of fresh, water-saturated mud",
+         k=7.0, k_why="soft, water-rich, weakly cohesive",
+         d=4.0, d_why="soft, water-rich, flows easily",
+         path=PELITE, wx=None, facies=None, tags=["reduced"],
+         vf="minecraft:mud", vf_from="member",
+         notes="Mud of tidal flats and lakes, so no single facies rule. Its metamorphic path is mudstone's."),
+    dict(name="till", family="unconsolidated", rho=2000,
+         rho_src="judgment: dense, overconsolidated lodgement till",
+         k=4.5, k_why="dense, bouldery, overconsolidated diamict",
+         d=2.5, d_why="dense but loose-textured sediment",
+         path=[], wx="soil", facies="glacial", tags=[],
+         vf="minecraft:coarse_dirt", vf_from="member",
+         notes="Glacial till and diamict."),
+    dict(name="loess", family="unconsolidated", rho=1400,
+         rho_src="judgment: loess is characteristically light and open-structured",
+         k=10.0, k_why="cohesionless silt that gullies readily; top of the range",
+         d=4.0, d_why="cohesionless silt",
+         path=PELITE, wx="soil", facies="aeolian", tags=["porous", "friable"],
+         vf="minecraft:smooth_sandstone", vf_from="fallback",
+         notes="Loess: wind-blown silt, parent of fertile steppe soils. Its metamorphic path is that of "
+               "siltstone (mudstone)."),
+    dict(name="volcanic_ash", family="unconsolidated", rho=1000,
+         rho_src="judgment: loose tephra",
+         k=10.0, k_why="loose, fine, light tephra; top of the range",
+         d=5.0, d_why="loose, fine, light tephra",
+         path=["schist", "gneiss"], wx="clay", facies="tephra_fall",
+         tags=["glassy", "porous", "friable"],
+         vf="minecraft:tuff", vf_from="fallback",
+         notes="Unconsolidated volcanic ash and tephra; lithifies to tuff, whose metamorphic path it takes."),
+]
+
+SNAKE = re.compile(r"^[a-z][a-z0-9_]*$")
+TAG = re.compile(r"^[a-z][a-z0-9_]*(:[a-z][a-z0-9_]*)?$")
+
+
+def expand_groups():
+    """Group name -> set of classes it contains, following #group references."""
+    table = dict(GROUPS)
+    memo = {}
+
+    def members(group, seen=()):
+        if group in memo:
+            return memo[group]
+        if group in seen:
+            raise SystemExit(f"group cycle through {group}")
+        out = set()
+        for m in table[group].split():
+            if m.startswith("#"):
+                ref = m[1:]
+                if ref in NON_CLASS_MEMBERS:
+                    continue
+                if ref not in table:
+                    raise SystemExit(f"group {group}: unknown group {m}")
+                out |= members(ref, seen + (group,))
+            else:
+                out.add(m)
+        memo[group] = out
+        return out
+
+    return {g: members(g) for g, _ in GROUPS}
+
+
+def validate(groups):
+    errors = []
+    names = [r["name"] for r in CLASSES]
+    known = set(names)
+    if len(CLASSES) != 59:
+        errors.append(f"expected 59 classes, got {len(CLASSES)}")
+    if len(known) != len(names):
+        errors.append("duplicate class names")
+    if len(GROUPS) != 17:
+        errors.append(f"expected 17 group tags, got {len(GROUPS)}")
+    for g, members in groups.items():
+        for m in members - known:
+            errors.append(f"group {g}: unknown class {m}")
+    last_family = 0
+    for r in CLASSES:
+        n = r["name"]
+        if not SNAKE.match(n):
+            errors.append(f"{n}: name is not snake_case")
+        if r["family"] not in FAMILIES:
+            errors.append(f"{n}: unknown family {r['family']}")
+        else:
+            i = FAMILIES.index(r["family"])
+            if i < last_family:
+                errors.append(f"{n}: out of README family order")
+            last_family = i
+        if not class_groups(n, groups):
+            errors.append(f"{n}: in no group")
+        if not (isinstance(r["rho"], int) and r["rho"] > 0 and r["rho"] % 10 == 0):
+            errors.append(f"{n}: density must be a positive multiple of 10")
+        for key in ("k", "d"):
+            if not (isinstance(r[key], float) and r[key] > 0):
+                errors.append(f"{n}: {key} must be a float > 0")
+        path = r["path"]
+        if len(set(path)) != len(path) or n in path:
+            errors.append(f"{n}: metamorphic_path repeats a class or contains itself")
+        for p in path:
+            if p not in known:
+                errors.append(f"{n}: metamorphic_path names unknown class {p}")
+        if r["wx"] is not None and (r["wx"] not in known or r["wx"] == n):
+            errors.append(f"{n}: bad weathers_to {r['wx']}")
+        if r["facies"] is not None and not SNAKE.match(r["facies"]):
+            errors.append(f"{n}: facies_rule is not snake_case")
+        for t in r["tags"]:
+            if not TAG.match(t):
+                errors.append(f"{n}: bad tag {t}")
+        if len(set(r["tags"])) != len(r["tags"]):
+            errors.append(f"{n}: duplicate tags")
+        metals = [t.split(":", 1)[1] for t in r["tags"] if t.startswith("create_metal_host:")]
+        want = [CREATE_METAL_HOSTS[n]] if n in CREATE_METAL_HOSTS else []
+        if metals != want:
+            errors.append(f"{n}: create_metal_host tags {metals}, README says {want}")
+        vf = r["vf"]
+        if not vf.startswith("minecraft:"):
+            errors.append(f"{n}: vanilla_fallback {vf} is not in the minecraft namespace")
+        if vf in FILLER and (n, vf) not in FILLER_EXCEPTIONS:
+            errors.append(f"{n}: vanilla_fallback {vf} is filler")
+        if r["vf_from"] not in ("member", "fallback"):
+            errors.append(f"{n}: vf_from must be member or fallback")
+        for ident in [vf] + class_groups(n, groups):
+            if "terracotta" in ident:
+                errors.append(f"{n}: id {ident} contains terracotta")
+        if not r["notes"].strip():
+            errors.append(f"{n}: empty notes")
+    if errors:
+        raise SystemExit("rock-class table invalid:\n  " + "\n  ".join(errors))
+
+
+def class_groups(name, groups):
+    return [f"deeptime:rock/{g}" for g, _ in GROUPS
+            if g not in EXCLUDED_GROUPS and name in groups[g]]
+
+
+def sources(r):
+    n = r["name"]
+    rho = f"{r['rho_src'] if r.get('rho_src') else DENSITY_TYPICAL}; rounded to 10 kg/m³; {TUNED}"
+    if n in REFERENCE_CLASSES:
+        k = f"reference: generic crystalline basement (granite, gneiss) is 1.0; {K_BEDROCK}; {TUNED}"
+        d = f"reference: generic crystalline basement (granite, gneiss) is 1.0; {D_BASIS}; {TUNED}"
+    else:
+        basis = K_LOOSE if r["family"] == "unconsolidated" else K_BEDROCK
+        k = f"judgment, relative to granite: {r['k_why']}; {basis}; {TUNED}"
+        d = f"judgment, relative to granite: {r['d_why']}; {D_BASIS}; {TUNED}"
+    vf = VF_MEMBER if r["vf_from"] == "member" else VF_FALLBACK
+    if (n, r["vf"]) in FILLER_EXCEPTIONS:
+        vf += "; stone is the one allowed filler exception (Ben's pick 2026-09-27)"
+    return {"density_kg_m3": rho, "erodibility": k, "diffusivity": d, "vanilla_fallback": vf}
+
+
+def document(r, groups):
+    doc = {
+        "class": r["name"],
+        "family": r["family"],
+        "groups": class_groups(r["name"], groups),
+        "density_kg_m3": r["rho"],
+        "erodibility": r["k"],
+        "diffusivity": r["d"],
+        "metamorphic_path": list(r["path"]),
+    }
+    if r["wx"] is not None:
+        doc["weathers_to"] = r["wx"]
+    if r["facies"] is not None:
+        doc["facies_rule"] = r["facies"]
+    doc["tags"] = list(r["tags"])
+    doc["vanilla_fallback"] = r["vf"]
+    doc["sources"] = sources(r)
+    doc["notes"] = r["notes"]
+    return doc
+
+
+def main():
+    groups = expand_groups()
+    validate(groups)
+    docs = [document(r, groups) for r in CLASSES]
+    os.makedirs(OUT, exist_ok=True)
+    for stale in glob.glob(os.path.join(OUT, "*.json")):
+        os.remove(stale)
+    for doc in docs:
+        with open(os.path.join(OUT, doc["class"] + ".json"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(doc, indent=2, ensure_ascii=False))
+            f.write("\n")
+    print(f"wrote {len(docs)} rock classes to {os.path.relpath(OUT, REPO)}")
+
+
+if __name__ == "__main__":
+    main()
