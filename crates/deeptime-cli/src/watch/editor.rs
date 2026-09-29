@@ -559,6 +559,8 @@ mod tests {
                 "ocean_fraction",
                 "m_per_block_h",
                 "m_per_block_v",
+                // The deposit count multiplier (P1-08 pointed it at `deposits.count_mult`).
+                "deposit_count",
                 // The drama slider (P1-06): the pipeline presets carry `surface.drama`.
                 "drama"
             ]
