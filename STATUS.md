@@ -162,6 +162,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   range; counting only deposits within ~1 km of the surface (USGS "exposed permissive rock") would add
   deeper extra sites.
 - **Next.** Main session merges the branch; Ben's answers on (1)–(4); P1-17 proper.
+
 ### 2026-09-29 — Workbench: a run over its memory cap is refused before it starts; the default cap is 8 GiB (agent worktree agent-afd5b3eb4fa7751da, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **The bug.** Ben's `pipeline_full_32k`, supercontinent, 1000 Myr: `POST /api/preset` estimated `peak_bytes`
   5,532,931,904 against the 4 GiB default cap and still answered `can_run: true`; the run started and failed 15
