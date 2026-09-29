@@ -11,7 +11,7 @@
 //! grade–tonnage values, deposit density and same-deposit separation, copied from
 //! `crates/deeptime-core/data/usgs/<grade_tonnage>.json`, which a test checks); `geometry` and
 //! zoning with children; `preservation`; the child rules (`weathering` for supergene blankets,
-//! `placer`, `petroleum`, `coal`); `minecraft` (`coe_vein`, `cdg_reservoir`, `ore_block_policy`);
+//! `placer`, `petroleum`, `coal`); `minecraft` (`coe_vein`, `cdg_reservoir`, `cdg_scale`, `ore_block_policy`);
 //! and `balance`.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -477,6 +477,11 @@ pub struct MinecraftMapping {
     /// Whether sites feed Create: Diesel Generators' oil (P1-16).
     #[serde(default)]
     pub cdg_reservoir: bool,
+    /// The fraction of a reservoir's charge (`cdg_charge_mb`, the physical oil volume) that Create:
+    /// Diesel Generators sees, spread over the chunks of the ore body by volume (P1-16). Read by
+    /// the Java hook only; the site records keep the physical charge. 1 = physical.
+    #[serde(default = "one")]
+    pub cdg_scale: f64,
     /// `ev_then_vanilla` (decisions file: Excavated Variants, else stone/deepslate ores) or
     /// `none` (fluids).
     pub ore_block_policy: String,
@@ -932,6 +937,9 @@ impl DepositType {
             .all(|v| *v >= 0.0 && v.is_finite())
         {
             return Err("balance multipliers must be ≥ 0".into());
+        }
+        if !(self.minecraft.cdg_scale >= 0.0 && self.minecraft.cdg_scale.is_finite()) {
+            return Err("minecraft.cdg_scale must be ≥ 0".into());
         }
         if !["ev_then_vanilla", "none"].contains(&self.minecraft.ore_block_policy.as_str()) {
             return Err("minecraft.ore_block_policy must be ev_then_vanilla or none".into());
