@@ -1705,6 +1705,17 @@ becomes a hard stop. The level's sub-levels come from Sable's public
 (`List<ServerSubLevel>`; `javap` on Sable 2.0.5). Terrain exists all the way to the poles;
 beyond the pole edge (|z| ≥ C/4) `deeptime:beyond_pole` makes an ice-sheet ocean.
 
+*As built in P1-18:* the lines are the generator's `world_data.pole_cap_deg` / `pole_stop_deg`
+(defaults 75 / 80; `wrap/PoleCapCurve` holds the geometry and curves). With s the depth into the
+band: pushback 0.10·s^1.5 blocks/tick² toward the equator, storm s^0.7, Sable wind 1.0·s^1.5
+blocks/s per tick. A player's own movement belongs to its client, so the server sends the wind in
+`PoleStormPayload` and Deep Time's client adds it (to the player or the vehicle it steers); the
+server pushes the vehicles it simulates itself (a player's root vehicle, e.g. a minecart) and
+enforces the hard stop (absolute teleport onto the line; vehicles moved with their riders; riders
+of contraptions dismounted). Creative: storm, warning and stop, no wind; spectator: storm only.
+Sable: wind at the pose, stop by the hull's poleward edge (poleward velocity cancelled, never a
+teleport). Details in STATUS.md's P1-18 entry.
+
 ### 7.12 World preset, dimension type and the Customize editor
 
 Resources in `neoforge/src/main/resources/data/`:
@@ -1850,6 +1861,17 @@ login) carries the format version, circumference, scales, cap latitude and plane
 client uses for the pole storm, an F3 latitude/longitude line and, later, maps. `neoforge.mods.toml`
 declares `minecraft`, `neoforge` and `toroidal_world` as required with `side = "BOTH"`; COE, CDG,
 TerraBlender, Excavated Variants, Sable and Distant Horizons as optional.
+
+*As built in P1-18:* `net/DeepTimeNetwork` registers two required play-to-client channels,
+version "1": `deeptime:world_info` (`WorldInfoPayload`: planet flag, dimension, format version,
+C, m per block h/v, cap and stop latitudes, planet name; sent on login, dimension change and
+respawn) and `deeptime:pole_storm` (`PoleStormPayload`: storm 0…1 and the client's wind). NeoForge
+has no public view of its registrations, so `DeepTimeNetwork.registrations()` reads
+`NetworkRegistry.PAYLOAD_REGISTRATIONS` by reflection (`/deeptime probe network`);
+`NetworkGameTests.worldInfoChannelRequired` feeds it to `NetworkComponentNegotiator`, and the
+planet harness's `--scenario refuse_client` logs in over TCP as a NeoForge client without Deep
+Time (refused, naming exactly the two channels), with every channel (accepted) and as a vanilla
+client (refused). The F3 line: `Deep Time: 76.904° N 90.000° E · <planet> (C 16384, 300 m/block)`.
 
 ### 7.16 Commands for tests and debugging
 
