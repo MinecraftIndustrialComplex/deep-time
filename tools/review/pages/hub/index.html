@@ -5,6 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Deep Time Review Hub</title>
+<meta name="description" content="Every Deep Time review page in one place.">
 <style>
   :root { --bg:#f6f4ef; --card:#fffdf8; --ink:#1f1d1a; --muted:#6b665d; --line:#e2ddd2; --accent:#b4542d; --pill:#efe9dc; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#141311; --card:#1d1b18; --ink:#ece8df; --muted:#a39d91; --line:#34302a; --accent:#e0875f; --pill:#2a2722; } }
@@ -29,7 +30,7 @@
 <body>
 <main>
   <h1>Deep Time</h1>
-  <p class="lede">Every review page built so far, in one place. Deep Time simulates a planet's geologic history in Rust and plays it as a Minecraft world that wraps east–west. All pages are private to you. Updated 2026-09-28.</p>
+  <p class="lede">Every review page built so far, in one place. Deep Time simulates a planet's geologic history in Rust and plays it as a Minecraft world that wraps east–west. All pages are private to you. Updated 2026-09-29.</p>
 
   <h2>How the world wraps</h2>
   <div class="grid">
@@ -39,7 +40,8 @@
 
   <h2>The simulation</h2>
   <div class="grid">
-    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p1-surface"><h3>Plates + erosion, 500 Myr</h3><p>Plate tectonics coupled with rivers, erosion, deposition, strata and isostasy on a 16k planet. Scrub through time, switch layers, read events.</p><span class="tag">P1-04 · newest</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p1-structure"><h3>Rock and strata, 500 Myr</h3><p>What rock is at the surface and under the soil, metamorphic belts, plutons with their aureoles, and six pole-to-pole cross-sections through the strata.</p><span class="tag">P1-07 · newest</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p1-surface"><h3>Plates + erosion, 500 Myr</h3><p>Plate tectonics coupled with rivers, erosion, deposition, strata and isostasy on a 16k planet. Scrub through time, switch layers, read events.</p><span class="tag">P1-04</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p1-plates"><h3>Plates only, 500 Myr</h3><p>The plate model alone: 100k samples, rifting, collisions, crust age, keyframes and events.</p><span class="tag">P1-03</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p1-deposits"><h3>Ore deposits</h3><p>The deposit engine's four families on synthetic fields, each site with its "why here" chain.</p><span class="tag">P1-14</span></a>
   </div>
@@ -61,7 +63,7 @@
   <h2>Coming</h2>
   <div class="grid">
     <div class="card soon"><h3>Workbench on the Mac</h3><p>Editor controls in the browser, live runs with pause, rewind and speed, side-by-side runs, then click-to-inspect and a 3D block preview of any area. Served from the Mac on your tailnet.</p><span class="tag">P1-20 · in progress</span></div>
-    <div class="card soon"><h3>Climate, rock classes</h3><p>Köppen, temperature and precipitation through time; the rock map and a pole-to-pole cross-section of strata.</p><span class="tag">P1-05 · P1-07 · in progress</span></div>
+    <div class="card soon"><h3>Climate</h3><p>Köppen, temperature and precipitation through time.</p><span class="tag">P1-05 · in progress</span></div>
   </div>
 
   <footer>Source: <code>tools/review/pages/hub/</code> in the Deep Time repo; the page list is <code>tools/review/spaces.json</code> and STATUS.md's "Review pages".</footer>
