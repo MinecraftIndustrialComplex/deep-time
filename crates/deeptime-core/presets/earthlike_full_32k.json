@@ -1,32 +1,251 @@
 {
   "schema": 0,
   "name": "earthlike_full_32k",
-  "placeholder": true,
-  "description": "PLACEHOLDER - Phase 1 in progress. Not a simulated planet: the dummy pipeline (a drifting toy continent, a causal event chain, three deposit sites and keyframes; 50 steps per stage at 200 ms) plus P0-09's synthetic wrap-test terrain baked at C = 32768. The real earthlike_full_32k replaces this file when the stages of P1-03 to P1-08 land (tuned in P1-17). It names no timeline: the editor or config/deeptime/server.json does.",
-  "scale": {
-    "circumference_blocks": 32768
+  "description": "An Earth-like planet, full (server size, C = 32768 blocks): plates and crust, climate, deep-time erosion and strata, rock and metamorphism, ore deposits, the young landscape and its amplification, baked for the game. L0 250000 samples, L1 2048x1024, L2 4096x2048, L3 16384x8192. The same parameters as pipeline_full_32k (calibrated 2026-09-29, final numbers in P1-17). It names no timeline: choose the start and the length in the editor or config/deeptime/server.json.",
+  "seed": 1,
+  "planet": {
+    "gravity_m_s2": 9.81,
+    "day_length_h": 24.0,
+    "axial_tilt_deg": 23.4,
+    "star_flux_rel": 1.0,
+    "ocean_fraction": 0.7,
+    "regime": "mobile_lid"
   },
-  "dummy": {
-    "steps": 50,
-    "sleep_ms": 200,
-    "stages": [
-      "dummy_drift",
-      "dummy_erode"
-    ],
-    "synth": "wrap-test",
-    "world": {
-      "circumference": 32768,
-      "grid_r": 32,
-      "t_start_years": -1000000000.0,
-      "t_end_years": 0.0,
-      "keyframe_every_years": 125000000.0,
-      "keyframe_size": [
-        256,
-        128
-      ],
-      "event_every_steps": 5,
-      "sites": 3,
-      "seed": 1
+  "scale": {
+    "circumference_blocks": 32768,
+    "m_per_block_h": 300.0,
+    "m_per_block_v": 20.0,
+    "min_y": -352,
+    "max_y": 639,
+    "sea_level_y": 63,
+    "pole_cap_deg": 75.0,
+    "feature_scale": {
+      "deposits": 1.0,
+      "strata": 1.0
     }
+  },
+  "keyframes": {
+    "every_myr": 50.0,
+    "size": [
+      1024,
+      512
+    ]
+  },
+  "young": {},
+  "amplify": {
+    "incision_cap": 3.0
+  },
+  "resolution": {
+    "l0_samples": 250000,
+    "l1_r": 16,
+    "l2_r": 8,
+    "l3_r": 2
+  },
+  "deposits": {
+    "count_mult": 1.0,
+    "size_mult": 1.0,
+    "richness_mult": 1.0,
+    "province": "strong",
+    "province_km": 800.0,
+    "types": [],
+    "essentials": []
+  },
+  "tectonics": {
+    "time_step_myr": 2.0,
+    "model_radius_km": 6370.0,
+    "ridge_elevation_m": -2500.0,
+    "abyssal_elevation_m": -6000.0,
+    "trench_elevation_m": -10000.0,
+    "max_elevation_m": 10000.0,
+    "subduction_distance_km": 800.0,
+    "collision_distance_km": 2000.0,
+    "collision_coefficient_per_km": 1.3e-05,
+    "max_plate_speed_mm_yr": 100.0,
+    "oceanic_damping_mm_yr": 0.05,
+    "continental_erosion_mm_yr": 0.0,
+    "sediment_accretion_mm_yr": 0.3,
+    "subduction_uplift_mm_yr": 0.6,
+    "collision_threshold_km": 300.0,
+    "subduction_peak_km": 300.0,
+    "collision_uplift_max_m": 4000.0,
+    "slab_pull_rad_per_1000km_myr": 0.002,
+    "slab_pull_speed_mm_yr": 80.0,
+    "slab_pull_front_km": 3000.0,
+    "slab_pull_relax_myr": 20.0,
+    "motion_jitter_per_sqrt_myr": 0.02,
+    "initial_plates": 14,
+    "plate_size_variety_rad": 0.35,
+    "plate_speed_mm_yr": [
+      20.0,
+      70.0
+    ],
+    "continental_speed_factor": 0.6,
+    "continent_elevation_m": [
+      150.0,
+      900.0
+    ],
+    "continental_shelf_share": 0.29,
+    "scattered_continents": 6,
+    "coast_warp_rad": 0.25,
+    "rift_lambda0": 0.012,
+    "rift_ocean_weight": 0.08,
+    "rift_fragments": [
+      2,
+      4
+    ],
+    "rift_speed_mm_yr": [
+      20.0,
+      50.0
+    ],
+    "rift_warp_rad": 0.2,
+    "min_plate_area_frac": 0.003,
+    "max_plates": 40,
+    "resample_min_steps": 10,
+    "resample_max_steps": 60,
+    "resample_drift_km": 1500.0,
+    "arc_distance_km": 200.0,
+    "arc_width_km": 60.0,
+    "arc_uplift_mm_yr": 0.3,
+    "arc_magma_m_per_myr": 20.0,
+    "trench_relax": 0.5,
+    "pelagic_m_per_myr": 5.0,
+    "hotspots_initial": 8,
+    "hotspot_births_per_100myr": 3.0,
+    "hotspot_lifetime_myr": [
+      40.0,
+      150.0
+    ],
+    "hotspot_radius_km": 150.0,
+    "hotspot_uplift_mm_yr": 0.3,
+    "lip_probability": 0.5,
+    "lip_radius_km": 900.0,
+    "lip_thickness_m": 1500.0,
+    "lip_rift_boost": 4.0,
+    "lip_rift_boost_myr": 20.0,
+    "terrane_event_min_frac": 0.005,
+    "collision_min_frac": 0.1,
+    "subduction_initiation_age_myr": 150.0,
+    "subduction_initiation_rate": 0.1,
+    "subduction_initiation_speed_mm_yr": [
+      30.0,
+      60.0
+    ],
+    "contact_timeout_steps": 12,
+    "collision_orogeny_myr": 30.0,
+    "l1_every_steps": 1
+  },
+  "surface": {
+    "k_spl": 2e-09,
+    "m_spl": 1.0,
+    "n_spl": 2.0,
+    "g_deposition": 1.0,
+    "runoff_ref_m_yr": 0.5,
+    "threshold_slope": 0.35,
+    "kd_land_m2_yr": 2.0,
+    "kd_marine_m2_yr": 100.0,
+    "wave_base_m": 60.0,
+    "tidal_range_m": 2.0,
+    "marine_fill_depth_m": 0.0,
+    "shelf_slope": 0.0005,
+    "carbonate_max_mm_yr": 10.0,
+    "carbonate_extinction_per_m": 0.1,
+    "carbonate_surface_light": 2000.0,
+    "carbonate_saturating_light": 400.0,
+    "carbonate_min_temp_c": 18.0,
+    "carbonate_clastic_m": 20.0,
+    "evaporite_m_myr": 100.0,
+    "weathering_max_m_myr": 50.0,
+    "weathering_decay_depth_m": 5.0,
+    "isostasy": 0.8,
+    "isostasy_radius_km": 50.0,
+    "sea_level": {
+      "base_m": 0.0,
+      "cycles": [
+        {
+          "amplitude_m": 80.0,
+          "period_myr": 250.0,
+          "phase_deg": 0.0
+        },
+        {
+          "amplitude_m": 25.0,
+          "period_myr": 36.0,
+          "phase_deg": 90.0
+        }
+      ],
+      "curve": []
+    },
+    "log_layers": 32,
+    "drama": 1.0,
+    "substeps": 1,
+    "frame_every_myr": 10.0,
+    "erosion_pulse_m_myr": 200.0,
+    "basin_m_myr": 80.0,
+    "event_min_area_km2": 3000.0,
+    "transgression_frac": 0.04,
+    "spl_max_iter": 6
+  },
+  "climate": {
+    "snapshot_every_myr": 10.0,
+    "solar_constant_w_m2": 1365.2,
+    "olr_a_w_m2": 203.3,
+    "olr_b_w_m2_k": 2.09,
+    "diffusivity_w_m2_k": 0.649,
+    "albedo_a0": 0.33,
+    "albedo_a2": 0.25,
+    "albedo_ice": 0.62,
+    "ice_temp_c": -10.0,
+    "ocean_depth_m": 50.0,
+    "land_depth_m": 3.0,
+    "land_ocean_exchange_w_m2_k": 10.0,
+    "ocean_diffusivity_w_m2_k": 0.3,
+    "ice_sheet_feedback": 1.0,
+    "ebm_bands": 90,
+    "ebm_steps_per_year": 72,
+    "ebm_spinup_years": 40,
+    "ebm_warm_years": 6,
+    "lapse_c_per_km": 6.5,
+    "trade_wind_m_s": 7.0,
+    "westerly_m_s": 10.0,
+    "polar_wind_m_s": 5.0,
+    "itcz_max_shift_deg": 22.0,
+    "itcz_smooth_km": 1500.0,
+    "subtropical_shift_deg": 6.0,
+    "moisture_decay_km": 3500.0,
+    "moisture_floor": 0.3,
+    "recycling": 1.5,
+    "ocean_recharge_km": 600.0,
+    "maritime_decay_km": 1200.0,
+    "coast_km": 250.0,
+    "air_mixing_km": 300.0,
+    "vapour_scale_m": 2500.0,
+    "barrier_recover_km": 1500.0,
+    "plateau_m": 1500.0,
+    "plateau_scale_m": 2500.0,
+    "sst_subtropical_cold_c": 5.0,
+    "sst_subtropical_warm_c": 3.0,
+    "sst_midlatitude_warm_c": 6.0,
+    "sst_midlatitude_cold_c": 5.0,
+    "subsidence": 0.55,
+    "onshore": 1.0,
+    "oro_conv_time_s": 1000.0,
+    "oro_fall_time_s": 1000.0,
+    "oro_nm": 0.01,
+    "oro_hw_m": 3400.0,
+    "oro_cw_kg_m3": 0.01295,
+    "oro_ref_temp_c": 6.0,
+    "oro_hours_per_day": 0.5,
+    "oro_lee_floor": 0.3,
+    "precip_min_mm": 10.0,
+    "ela_offset_c": 0.0,
+    "glaciation_on_frac": 0.02,
+    "glaciation_off_frac": 0.01
+  },
+  "structure": {
+    "pluton_rate_km2_myr": 1e-05,
+    "pluton_length_km": [
+      25.0,
+      8.0,
+      80.0
+    ]
   }
 }

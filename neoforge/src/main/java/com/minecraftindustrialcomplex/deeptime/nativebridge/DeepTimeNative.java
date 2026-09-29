@@ -78,6 +78,10 @@ final class DeepTimeNative {
 
     static native void destroy(long session);
 
-    /** Parity oracle for tests (plan §9.2); throws {@link UnsupportedOperationException} until P1-08. */
+    /**
+     * Parity oracle for tests (plan §6.1, §9.2): column (x, z) of a world-data folder as Rust's column
+     * evaluator answers it, the JSON {@code parity/columns.json} holds per column (FORMAT.md,
+     * "Columns"). The Java twin is {@code worlddata/Columns}.
+     */
     static native String sampleColumn(String worldDataDir, int x, int z);
 }

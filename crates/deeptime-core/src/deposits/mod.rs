@@ -116,6 +116,17 @@ pub struct DepositParams {
     /// Global count multiplier (§8.6 step 2; 1 = real densities).
     #[serde(default = "one")]
     pub count_mult: f64,
+    /// Global tonnage multiplier (the editor's "Deposit size"): every type's grade–tonnage
+    /// percentiles are scaled by it before the draw, so each deposit holds this many times the
+    /// ore and its body grows with it (its volume follows the tonnage); the counts and the
+    /// grades stay. 1 = the USGS models.
+    #[serde(default = "one")]
+    pub size_mult: f64,
+    /// Global grade multiplier (the editor's "Deposit richness"): multiplies every type's
+    /// `balance.richness_mult`, the zone grades of the bodies and the metal each site holds
+    /// (grades stay at most 1). 1 = the USGS models.
+    #[serde(default = "one")]
+    pub richness_mult: f64,
     /// Regional specialisation (decisions file: default strong).
     #[serde(default)]
     pub province: Province,
@@ -134,6 +145,8 @@ impl Default for DepositParams {
     fn default() -> Self {
         DepositParams {
             count_mult: 1.0,
+            size_mult: 1.0,
+            richness_mult: 1.0,
             province: Province::Strong,
             province_km: province_km(),
             types: Vec::new(),
@@ -321,7 +334,11 @@ pub struct DepositStage {
 }
 
 /// The types a run uses: every built-in type, or the requested ones and the children they spawn.
-fn select_types(params: &DepositParams) -> Result<Vec<DepositType>, CoreError> {
+/// The deposit types a run uses: the built-ins (or the requested ones and their children) with the
+/// preset's global multipliers folded into each type's own: `size_mult` scales the tonnage
+/// percentiles, `richness_mult` the balance's, and `feature` (`scale.feature_scale.deposits`) the
+/// balance's horizontal and vertical body size. Every multiplier at 1 leaves the types as they are.
+fn select_types(params: &DepositParams, feature: f64) -> Result<Vec<DepositType>, CoreError> {
     let mut types = types::builtin()?;
     if !params.types.is_empty() {
         for id in &params.types {
@@ -341,6 +358,15 @@ fn select_types(params: &DepositParams) -> Result<Vec<DepositType>, CoreError> {
         }
         types.retain(|t| keep.contains(&t.id));
     }
+    for t in &mut types {
+        let s = params.size_mult;
+        t.sizing.tonnage_mt.p10 *= s;
+        t.sizing.tonnage_mt.p50 *= s;
+        t.sizing.tonnage_mt.p90 *= s;
+        t.balance.richness_mult *= params.richness_mult;
+        t.balance.size_mult_h *= feature;
+        t.balance.size_mult_v *= feature;
+    }
     Ok(types)
 }
 
@@ -354,7 +380,18 @@ impl DepositParams {
                 "count_mult ≥ 0 and province_km > 0 are required",
             ));
         }
-        select_types(self).map(|_| ())
+        for (v, key) in [
+            (self.size_mult, "size_mult"),
+            (self.richness_mult, "richness_mult"),
+        ] {
+            if !(v.is_finite() && v > 0.0 && v <= 100.0) {
+                return Err(CoreError::preset(
+                    format!("{path}.{key}"),
+                    "must be in (0, 100]",
+                ));
+            }
+        }
+        select_types(self, 1.0).map(|_| ())
     }
 }
 
@@ -364,7 +401,7 @@ impl DepositStage {
         sp: SyntheticParams,
         params: DepositParams,
     ) -> Result<DepositStage, CoreError> {
-        let types = select_types(&params)?;
+        let types = select_types(&params, 1.0)?;
         let span = sp.t_end_years - sp.t_start_years;
         let frames = (span / sp.snapshot_every_years).ceil().max(1.0) as usize;
         Ok(DepositStage::build(
@@ -381,7 +418,7 @@ impl DepositStage {
     /// preset with `surface` and `deposits` sections; the preset's scales, grid and seed).
     pub fn recorded(preset: &crate::params::PlanetPreset) -> Result<DepositStage, CoreError> {
         let params = preset.deposits.clone().unwrap_or_default();
-        let types = select_types(&params)?;
+        let types = select_types(&params, preset.scale.feature_scale.deposits)?;
         let every = preset.surface.as_ref().map_or(10.0, |s| s.frame_every_myr);
         // The surface stage's frame count is known only from its history; this is the estimate
         // the stage reports until set-up reads the real one.
@@ -2372,6 +2409,73 @@ mod recorded_tests;
 
 #[cfg(test)]
 mod tests {
+    use super::types::DepositType;
+
+    fn base_types() -> Vec<DepositType> {
+        select_types(&DepositParams::default(), 1.0).unwrap()
+    }
+
+    /// The editor's Multipliers (the settings audit) fold into the types before anything is
+    /// drawn: `size_mult` the tonnage percentiles, `richness_mult` the grade multiplier,
+    /// `feature` the body size in blocks; all at 1 leave every type as it was.
+    #[test]
+    fn the_global_multipliers_fold_into_the_types() {
+        let base = base_types();
+        assert_eq!(
+            select_types(
+                &DepositParams {
+                    size_mult: 1.0,
+                    richness_mult: 1.0,
+                    ..DepositParams::default()
+                },
+                1.0
+            )
+            .unwrap(),
+            base
+        );
+        let p = DepositParams {
+            size_mult: 2.5,
+            richness_mult: 1.5,
+            ..DepositParams::default()
+        };
+        let tuned = select_types(&p, 2.0).unwrap();
+        assert_eq!(tuned.len(), base.len());
+        for (b, t) in base.iter().zip(&tuned) {
+            assert_eq!(t.sizing.tonnage_mt.p50, b.sizing.tonnage_mt.p50 * 2.5, "{}", b.id);
+            assert_eq!(t.sizing.tonnage_mt.p10, b.sizing.tonnage_mt.p10 * 2.5);
+            assert_eq!(t.sizing.tonnage_mt.p90, b.sizing.tonnage_mt.p90 * 2.5);
+            assert_eq!(t.balance.richness_mult, b.balance.richness_mult * 1.5);
+            assert_eq!(t.balance.size_mult_h, b.balance.size_mult_h * 2.0);
+            assert_eq!(t.balance.size_mult_v, b.balance.size_mult_v * 2.0);
+            // Counts, densities and clustering are not touched.
+            assert_eq!(t.balance.count_mult, b.balance.count_mult);
+            assert_eq!(t.sizing.density_per_1e5km2, b.sizing.density_per_1e5km2);
+        }
+        for bad in [0.0, -1.0, 101.0, f64::NAN] {
+            for p in [
+                DepositParams {
+                    size_mult: bad,
+                    ..DepositParams::default()
+                },
+                DepositParams {
+                    richness_mult: bad,
+                    ..DepositParams::default()
+                },
+            ] {
+                assert!(p.validate("$.deposits").is_err(), "{bad}");
+            }
+        }
+        // A bigger body from a bigger deposit: the volume follows the tonnage.
+        let t0 = &base[0];
+        let sc = Scales::default();
+        let semi = |m: f64| {
+            let vol = 240.0e6 * m / t0.sizing.ore_density_t_m3;
+            geometry::to_blocks(geometry::semi_axes_m(t0.shape(), t0.geometry.aspect, vol), t0, &sc)
+        };
+        let (a, b) = (semi(1.0), semi(8.0));
+        assert!((f64::from(b[0]) / f64::from(a[0]) - 2.0).abs() < 1e-3, "8x the ore, 2x the width");
+    }
+
     use std::sync::Arc;
     use std::time::Duration;
 

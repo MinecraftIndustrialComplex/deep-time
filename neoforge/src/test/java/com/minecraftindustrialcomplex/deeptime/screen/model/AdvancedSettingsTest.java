@@ -35,9 +35,12 @@ class AdvancedSettingsTest {
 
     static final List<String> PIPELINES = List.of("pipeline_quick_16k", "pipeline_full_16k", "pipeline_quick_32k", "pipeline_full_32k");
 
-    /** Fields no core parameter backs yet (proposals for engine features that do not exist) and Phase 3. */
-    static final Set<String> NO_PARAMETER = Set.of("deposit_size", "deposit_richness", "feature_deposits", "feature_rivers",
-            "feature_canyons", "feature_strata", "fantasy_fields", "sky_islands", "exotic_landforms", "essentials");
+    /**
+     * Fields no core parameter backs yet: rivers and canyons (Phase 2), the pack-defined essentials
+     * lists (the datapack loader), and Phase 3's fantasy toggles.
+     */
+    static final Set<String> NO_PARAMETER = Set.of("feature_rivers", "feature_canyons", "fantasy_fields", "sky_islands",
+            "exotic_landforms", "essentials");
 
     EditorModel model() {
         return new EditorModel(new EditorModel.Deps(json -> "{\"peak_bytes\":1000,\"stages\":[{\"bytes\":1,\"name\":\"plates\",\"seconds\":5.0}]}",
@@ -91,6 +94,18 @@ class AdvancedSettingsTest {
         assertEquals(PIPELINES.size() * (EditorFields.ALL.size() - NO_PARAMETER.size()), knobs);
     }
 
+    /** The game's built-ins are the pipeline presets under their names (P1-08): every knob is in each. */
+    @Test
+    void builtInPresetsCarryEveryKnob() {
+        for (String name : Presets.BUILTIN) {
+            JsonObject o = Presets.parseObject(Presets.builtin(name).orElseThrow());
+            for (EditorFields.Field f : EditorFields.ALL) {
+                boolean carried = f.availableIn(o);
+                assertEquals(!NO_PARAMETER.contains(f.id()), carried, name + ": " + f.id() + " at " + f.path());
+            }
+        }
+    }
+
     /** The Advanced settings are closed until asked for, and counted against what the preset carries. */
     @Test
     void advancedSettingsAreClosedByDefault() throws IOException {
@@ -98,9 +113,15 @@ class AdvancedSettingsTest {
         List<EditorFields.Field> adv = EditorFields.advancedFields();
         assertTrue(adv.size() >= 25, "the audit's knobs: " + adv.size());
         assertFalse(m.advancedOpen(), "collapsed by default");
-        assertEquals(0, m.advancedAvailable(), "a placeholder preset carries none of them");
+        assertEquals(adv.size(), m.advancedAvailable(), "the built-in Earth-like presets carry every one of them");
         for (EditorFields.Field f : adv)
-            assertFalse(m.available(f), f.id());
+            assertTrue(m.available(f), f.id());
+
+        // A stand-in preset (the dummy pipeline) carries none.
+        EditorModel none = model();
+        assertTrue(none.importShareCode(ShareCode.encode("{\"name\":\"stand_in\",\"placeholder\":true,"
+                + "\"scale\":{\"circumference_blocks\":16384},\"dummy\":{\"steps\":1,\"sleep_ms\":0}}")).isEmpty());
+        assertEquals(0, none.advancedAvailable());
 
         EditorModel p = imported("pipeline_quick_16k");
         assertFalse(p.advancedOpen(), "a new preset does not open them");
@@ -284,6 +305,10 @@ class AdvancedSettingsTest {
             assertEquals("-3000", m.fieldText(EditorFields.byId("ridge_depth")));
             assertEquals("40", m.fieldText(EditorFields.byId("pluton_size")));
             assertEquals("120", m.fieldText(EditorFields.byId("sea_level_swing")));
+            assertEquals("2.5", m.fieldText(EditorFields.byId("deposit_size")));
+            assertEquals("1.5", m.fieldText(EditorFields.byId("deposit_richness")));
+            assertEquals("2", m.fieldText(EditorFields.byId("feature_deposits")));
+            assertEquals("0.5", m.fieldText(EditorFields.byId("feature_strata")));
             assertEquals(java.util.Optional.of("medium"), m.choice(EditorFields.byId("province_strength")));
             assertEquals(json, m.effectivePresetJson(), "nothing is added, dropped or rounded");
             assertEquals(json, ShareCode.decode(m.exportShareCode()));

@@ -3,9 +3,9 @@
 //! `screen/model/EditorModel`) over the definitions the game itself uses, so the browser and the
 //! game build the same preset — and the same share code — from the same choices:
 //!
-//! - **Presets**: the core's built-ins (`preset::BUILTIN`, the game's list) plus the planet
-//!   pipelines (`params::PLATES_BUILTIN`, `PIPELINE_BUILTIN`: the real simulation until P1-08 makes
-//!   them the built-ins), grouped into families by their `_<n>k` size suffix as
+//! - **Presets**: the core's built-ins (`preset::BUILTIN`, the game's list: since P1-08 the planet
+//!   pipeline under its game names) plus the planet pipelines (`params::PLATES_BUILTIN`,
+//!   `PIPELINE_BUILTIN`), grouped into families by their `_<n>k` size suffix as
 //!   `EditorModel.familyOf` does.
 //! - **Fields**: `editor_fields.json`, the catalogue the game's `EditorFields` reads from its jar.
 //!   A field is editable exactly when the selected preset carries its path.
@@ -68,6 +68,9 @@ pub struct PresetEntry {
     pub stages: Vec<String>,
     /// The preset without a timeline.
     pub base: Value,
+    /// An internal or test preset (`pipeline_*`, `plates_*`): resolved by name, never offered by
+    /// the page (Ben, 2026-09-29: the workbench lists only the game's Earth-like family).
+    pub hidden: bool,
 }
 
 pub struct Catalog {
@@ -202,6 +205,7 @@ impl Catalog {
                 description: p.header.description.clone().unwrap_or_default(),
                 stages: p.stages().iter().map(|s| s.name().to_owned()).collect(),
                 base,
+                hidden: !preset::BUILTIN.iter().any(|(n, _)| n == name),
             });
         }
         Ok(Catalog {
@@ -253,7 +257,7 @@ impl Catalog {
     /// `GET /api/catalog`: what the form is built from.
     pub fn to_json(&self) -> Value {
         json!({
-            "presets": self.presets.iter().map(|p| json!({
+            "presets": self.presets.iter().filter(|p| !p.hidden).map(|p| json!({
                 "name": p.name, "family": p.family, "circumference": p.circumference,
                 "placeholder": p.placeholder, "description": p.description, "stages": p.stages,
             })).collect::<Vec<_>>(),
@@ -429,7 +433,7 @@ impl Catalog {
         let builtin = self
             .presets
             .iter()
-            .find(|p| p.base == base)
+            .find(|p| !p.hidden && p.base == base)
             .map(|p| p.name.clone());
         json!({
             "preset": builtin,
@@ -513,24 +517,40 @@ mod tests {
         assert_eq!(family_of("a_k"), "a_k");
         let c = cat();
         let j = c.to_json();
-        assert!(
-            j["presets"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|p| p["name"] == "earthlike_quick_16k" && p["placeholder"] == true)
+        assert!(j["presets"].as_array().unwrap().iter().any(|p| {
+            p["name"] == "earthlike_quick_16k"
+                && p["placeholder"] == false
+                && p["stages"]
+                    .as_array()
+                    .is_some_and(|s| s.last() == Some(&json!("amplify")))
+        }));
+        // The page offers the Earth-like family only; the pipeline and plates presets stay
+        // resolvable by name (tests, the CLI) but are not listed.
+        let listed: Vec<&str> = j["presets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            listed,
+            [
+                "earthlike_quick_16k",
+                "earthlike_full_16k",
+                "earthlike_quick_32k",
+                "earthlike_full_32k"
+            ]
         );
-        assert!(
-            j["presets"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|p| p["name"] == "pipeline_quick_16k"
-                    && p["stages"]
-                        .as_array()
-                        .is_some_and(|s| s.first() == Some(&json!("plates"))
-                            && s.contains(&json!("surface"))))
+        assert!(c.preset("pipeline_quick_16k").is_some_and(|p| p.hidden));
+        assert!(c.preset("plates_quick_16k").is_some_and(|p| p.hidden));
+        assert!(c.preset("earthlike_quick_16k").is_some_and(|p| !p.hidden));
+        // A code of a hidden preset loads as an imported one, not as a name the page cannot show.
+        let hidden = c.effective(
+            &json!({ "preset": "plates_quick_16k", "start": "random", "length_myr": 100 }),
         );
+        let d = c.decode(hidden["share_code"].as_str().unwrap());
+        assert_eq!(d["preset"], Value::Null);
+        assert_eq!(d["imported"]["name"], "plates_quick_16k");
         for f in c.fields() {
             assert!(
                 j["labels"][format!("deeptime.editor.field.{}", f.id)].is_string(),
@@ -609,6 +629,14 @@ mod tests {
             text.contains("\"count_mult\":5.0"),
             "the deposit count multiplier"
         );
+        // The Multipliers section is wired to the core (Ben, 2026-09-29): tonnage, grade, and the
+        // feature scales of ore bodies and rock layers.
+        assert!(text.contains("\"size_mult\":5.05"), "{text}");
+        assert!(text.contains("\"richness_mult\":5.05"), "{text}");
+        assert!(
+            text.contains("\"feature_scale\":{\"deposits\":5.05,\"strata\":5.05}"),
+            "{text}"
+        );
         let unavailable: Vec<&str> = r["fields"]
             .as_array()
             .unwrap()
@@ -619,13 +647,9 @@ mod tests {
         assert_eq!(
             unavailable,
             [
-                // Proposals for engine features that do not exist yet, and Phase 3.
-                "deposit_size",
-                "deposit_richness",
-                "feature_deposits",
+                // Rivers and canyons (Phase 2), Phase 3, and the pack-defined essentials lists.
                 "feature_rivers",
                 "feature_canyons",
-                "feature_strata",
                 "fantasy_fields",
                 "sky_islands",
                 "exotic_landforms",
@@ -803,6 +827,10 @@ mod tests {
             assert_eq!(value("ridge_depth"), -3000.0);
             assert_eq!(value("pluton_size"), 40.0);
             assert_eq!(value("sea_level_swing"), 120.0);
+            assert_eq!(value("deposit_size"), 2.5);
+            assert_eq!(value("deposit_richness"), 1.5);
+            assert_eq!(value("feature_deposits"), 2.0);
+            assert_eq!(value("feature_strata"), 0.5);
             assert_eq!(value("province_strength"), "medium");
         }
     }
@@ -893,12 +921,13 @@ mod tests {
     fn a_built_in_code_selects_the_built_in_and_bad_input_is_named() {
         let c = cat();
         let r = c.effective(
-            &json!({ "preset": "plates_quick_16k", "start": "random", "length_myr": 100 }),
+            &json!({ "preset": "earthlike_quick_16k", "start": "random", "length_myr": 100 }),
         );
         let d = c.decode(r["share_code"].as_str().unwrap());
-        assert_eq!(d["preset"], "plates_quick_16k");
+        assert_eq!(d["preset"], "earthlike_quick_16k");
         assert_eq!(d["length_myr"], 100.0);
-        // Placeholders carry no parameter paths: every field unavailable, edits ignored.
+        // The built-ins are simulated planets since P1-08: their fields are editable, and they
+        // need a timeline like the pipeline presets.
         let p =
             c.effective(&json!({ "preset": "earthlike_quick_16k", "fields": { "gravity": 3 } }));
         assert!(
@@ -906,7 +935,7 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .iter()
-                .all(|f| f["available"] == false)
+                .any(|f| f["id"] == "gravity" && f["available"] == true)
         );
         assert_eq!(p["can_run"], false, "no timeline yet");
         assert!(
@@ -931,8 +960,8 @@ mod tests {
         assert!(c.decode("hello").get("error").is_some());
         assert!(c.runnable(r["json"].as_str().unwrap()).is_ok());
         assert!(
-            c.runnable(p["json"].as_str().unwrap()).is_ok(),
-            "a placeholder needs no timeline"
+            c.runnable(p["json"].as_str().unwrap()).is_err(),
+            "a built-in needs a timeline"
         );
         let no_timeline = c.effective(&json!({ "preset": "pipeline_quick_16k" }));
         assert!(c.runnable(no_timeline["json"].as_str().unwrap()).is_err());

@@ -36,6 +36,13 @@ dev cargo run --release -q -p deeptime-cli -- synth --kind wrap-test --strata ev
 # events) with a terrain baked from the synthetic history's present elevation, C = 4096.
 dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/deposits_world_4k.json --out run-gametest/world/deeptime-deposits \
     || { echo "FAILED: deeptime run deposits_world_4k"; exit 1; }
+# World data for the test_planet_real level (P1-08): a small real planet (every stage, baked, format
+# 0.1) and Rust's column evaluator on 500 of its columns (parity/columns.json), which the real-planet
+# GameTests compare placed blocks with.
+dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/planet_world_4k.json --out run-gametest/world/deeptime-real \
+    || { echo "FAILED: deeptime run planet_world_4k"; exit 1; }
+dev cargo run --release -q -p deeptime-cli -- parity --world-data run-gametest/world/deeptime-real \
+    || { echo "FAILED: deeptime parity"; exit 1; }
 # World data for the test_lake level (P0-13): a basin and a closed channel holding water at y 120.
 dev cargo run --release -q -p deeptime-cli -- synth --kind lake-test --size 1024 --out run-gametest/world/deeptime-lake \
     || { echo "FAILED: deeptime synth lake-test"; exit 1; }
