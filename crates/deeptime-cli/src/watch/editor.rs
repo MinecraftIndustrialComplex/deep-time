@@ -881,7 +881,11 @@ mod tests {
             .unwrap();
         for name in PIPELINES {
             let base = &c.preset(name).unwrap().base;
-            assert_eq!(base["amplify"]["incision_cap"], medium["value"], "{name}");
+            assert_eq!(
+                base["amplify"]["incision_cap"].as_f64(),
+                medium["value"].as_f64(),
+                "{name}"
+            );
         }
     }
 
