@@ -42,16 +42,21 @@ pub struct StructureParams {
     /// porphyry stocks are emplaced within a few km of the palaeosurface and sediment-hosted
     /// Zn–Pb, coal and petroleum reservoirs sit in the top ~2 km of their basins.
     pub host_window_m: f64,
-    /// Plutons emplaced per km² of full-intensity arc per Myr. Design value of the order of the
-    /// Coastal Batholith of Peru (roughly a thousand plutons in a 1,600 × 60 km arc over some
-    /// 60 Myr, i.e. ~1e-4 per km² per Myr).
+    /// Plutons emplaced per km² of full-intensity arc per Myr. Each pluton stands for an
+    /// intrusive suite (P1-17): the increments of a batholith merge at 300 m per block, and the
+    /// Coastal Batholith of Peru's roughly thousand plutons in a 1,600 × 60 km arc over some
+    /// 60 Myr (~1e-4 per km² per Myr at ~10 km, P1-07's first rate) group into a few dozen
+    /// super-units. The rate is P1-07's scaled by (10/25)^2.6 = 0.09 (rounded to 1e-5), the
+    /// volume ratio of a median 10-km and a median 25-km pluton (V ∝ L²·T ∝ L^2.6), so arcs
+    /// emplace about the same volume in a tenth as many bodies.
     pub pluton_rate_km2_myr: f64,
     /// Collision (S-type, crustal-melt) granites per km² of collision zone, relative to the arc
     /// rate.
     pub collision_pluton_factor: f64,
     /// Pluton length L (the long horizontal axis), km: [median, min, max] of a lognormal with
     /// `pluton_length_sigma`. Thickness T = 0.6·L^0.6 km (the tabular-pluton scaling of Cruden
-    /// 1998, J. Geol. Soc. 155:853–862).
+    /// 1998, J. Geol. Soc. 155:853–862). Median 25 km (P1-17; P1-07 had 10): an intrusive suite
+    /// such as the Sierra Nevada's Tuolumne (~1,100 km², ~45 × 25 km; Bateman & Chappell 1979).
     pub pluton_length_km: [f64; 3],
     pub pluton_length_sigma: f64,
     /// Depth of a pluton's roof below the surface when it is emplaced, km [min, max] (epizonal to
@@ -87,9 +92,9 @@ impl Default for StructureParams {
             loose_depth_m: 150.0,
             loose_age_myr: 20.0,
             host_window_m: 2000.0,
-            pluton_rate_km2_myr: 1.0e-4,
+            pluton_rate_km2_myr: 1.0e-5,
             collision_pluton_factor: 0.3,
-            pluton_length_km: [10.0, 3.0, 40.0],
+            pluton_length_km: [25.0, 8.0, 80.0],
             pluton_length_sigma: 0.5,
             pluton_roof_km: [2.0, 6.0],
             aureole_shell: 0.15,

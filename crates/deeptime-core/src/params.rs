@@ -96,7 +96,7 @@ pub fn planet_builtin(name: &str) -> Option<&'static str> {
 }
 
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 9] = [
+pub const PLANET_KEYS: [&str; 11] = [
     "seed",
     "planet",
     "keyframes",
@@ -106,6 +106,8 @@ pub const PLANET_KEYS: [&str; 9] = [
     "climate",
     "structure",
     "deposits",
+    "young",
+    "amplify",
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
@@ -303,6 +305,14 @@ pub struct TectonicParams {
     pub continental_speed_factor: f64,
     /// Initial continental elevation range, metres.
     pub continent_elevation_m: [f64; 2],
+    /// Share of the continental crust under the sea (shelves, slopes, epeiric seas): the initial
+    /// continental area is (1 − ocean_fraction)/(1 − this), its part nearest the ocean born as a
+    /// flooded shelf, so `planet.ocean_fraction` is the share of the surface under water rather
+    /// than of oceanic crust. Earth: 29 % land on 41 % continental crust (Cogley 1984, Rev.
+    /// Geophys. 22:101–122) → 0.29, the pipeline presets' value, whose surface stage floods the
+    /// continents' margins. 0 (the default) makes all continental crust dry at the start (P1-03;
+    /// the plate-only presets, whose continents never flood).
+    pub continental_shelf_share: f64,
     /// Continents of the `scattered` start.
     pub scattered_continents: u32,
     /// Coastline irregularity (noise warp of the distance, radians).
@@ -410,6 +420,7 @@ impl Default for TectonicParams {
             plate_speed_mm_yr: [20.0, 70.0],
             continental_speed_factor: 0.6,
             continent_elevation_m: [150.0, 900.0],
+            continental_shelf_share: 0.0,
             scattered_continents: 6,
             coast_warp_rad: 0.25,
             rift_lambda0: 0.012,
@@ -472,6 +483,12 @@ pub struct PlanetPreset {
     /// The deposit engine (P1-14) on the history the surface stage records; `None` stops after
     /// the surface. It needs a `surface` section.
     pub deposits: Option<crate::deposits::DepositParams>,
+    /// The young landscape on L2 (P1-06); `None` leaves the surface on L1. It needs a `surface`
+    /// section.
+    pub young: Option<crate::surface::young::YoungParams>,
+    /// Amplification to L3 (P1-06) and the detail layer; `None` writes no L3. It needs a
+    /// `young` section.
+    pub amplify: Option<crate::surface::amplify::AmplifyParams>,
 }
 
 type Obj = Map<String, Value>;
@@ -511,6 +528,8 @@ impl PlanetPreset {
         let climate: Option<crate::climate::ClimateParams> = section(obj, "climate")?;
         let structure: Option<crate::structure::StructureParams> = section(obj, "structure")?;
         let deposits: Option<crate::deposits::DepositParams> = section(obj, "deposits")?;
+        let young: Option<crate::surface::young::YoungParams> = section(obj, "young")?;
+        let amplify: Option<crate::surface::amplify::AmplifyParams> = section(obj, "amplify")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
         let seed = match obj.get("seed") {
             None => 1,
@@ -531,6 +550,8 @@ impl PlanetPreset {
             climate,
             structure,
             deposits,
+            young,
+            amplify,
         };
         preset.validate()?;
         Ok(preset)
@@ -671,6 +692,11 @@ impl PlanetPreset {
         ] {
             check((0.0..=1.0).contains(&v), key, "must be in [0, 1]")?;
         }
+        check(
+            (0.0..0.9).contains(&k.continental_shelf_share),
+            "$.tectonics.continental_shelf_share",
+            "must be in [0, 0.9)",
+        )?;
         if let Some(s) = &self.structure {
             s.validate()?;
             check(
@@ -706,6 +732,42 @@ impl PlanetPreset {
                  stage records",
             )?;
         }
+        if let Some(y) = &self.young {
+            y.validate()?;
+            check(
+                self.surface.is_some(),
+                "$.young",
+                "needs a surface section: the young landscape starts from the deep-time surface",
+            )?;
+            check(
+                crate::surface::amplify::doublings(r.l1_r, r.l2_r).is_some(),
+                "$.resolution.l2_r",
+                "l1_r must be a power of two times l2_r (L2 is L1 doubled once or more)",
+            )?;
+            check(
+                s.circumference_blocks.is_multiple_of(2 * r.l2_r),
+                "$.resolution.l2_r",
+                "C must be a multiple of 2·l2_r",
+            )?;
+        }
+        if let Some(a) = &self.amplify {
+            a.validate()?;
+            check(
+                self.young.is_some(),
+                "$.amplify",
+                "needs a young section: the amplifier starts from the young landscape",
+            )?;
+            check(
+                crate::surface::amplify::doublings(r.l2_r, r.l3_r).is_some_and(|n| n >= 1),
+                "$.resolution.l3_r",
+                "l2_r must be a power of two times l3_r, and larger (L3 is L2 doubled once or more)",
+            )?;
+            check(
+                s.circumference_blocks.is_multiple_of(2 * r.l3_r),
+                "$.resolution.l3_r",
+                "C must be a multiple of 2·l3_r",
+            )?;
+        }
         Ok(())
     }
 
@@ -731,6 +793,12 @@ impl PlanetPreset {
         }
         if let Some(d) = &self.deposits {
             v["deposits"] = json!(d);
+        }
+        if let Some(y) = &self.young {
+            v["young"] = json!(y);
+        }
+        if let Some(a) = &self.amplify {
+            v["amplify"] = json!(a);
         }
         v
     }

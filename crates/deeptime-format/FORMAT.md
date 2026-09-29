@@ -19,6 +19,7 @@ test on each side fails when they drift.
   manifest.json                 written last (tmp + fsync + rename); present ⇒ folder complete
   rasters/elevation.dtr         L3, i16, 1/16 block
   rasters/water_level.dtr       L3, i16, 1/16 block, nodata −32768
+  rasters/detail/amplitude.dtr  L3, u8, 1/16 block: amplitude of the sub-cell detail term (P1-06)
   rasters/climate/<name>.dtr    L2, i16, vanilla parameter × 10,000
                                 (<name> ∈ temperature, vegetation, continents, erosion, ridges)
   strata/horizons.dtr           L1, horizon_stack, K = 3 in the synthetic worlds (8 with --strata every-class)
@@ -152,6 +153,32 @@ down to `min_y` too; at most K are used; neighbours differ in class. A stack wal
 deposit as its `loose_equivalent`, buried loose material and palaeosols as their `lithifies_to`),
 the plate model's rock pools less the log, and peridotite below the crust. Plutons are bodies
 (role `pluton`, below), not horizons.
+
+## The detail layer (`rasters/detail/amplitude.dtr`, P1-06)
+
+`deeptime:terrain` (plan §7.1) adds **A(x, z) · N(x, z)** to the L3 height, where A is this layer
+(u8, physical = raw / 16 blocks, L3 grid, sampled bilinearly like `elevation`) and N the noise
+below. The amplifier writes `elevation` and this layer tile by tile, in any tile order (the tile
+pack's index is patched when the last tile is in, `deeptime_format::TilePackWriter`; the file is
+byte for byte what `write_tile_pack` writes for the same cells).
+
+A = min(drama · f · relief, m · drama) · (1 − smoothstep(a₀, a₁, area_km²)), where relief is the
+range of the L3 heights over the 5 × 5 cells around the cell, in blocks, `area` the cell's effective
+drainage area, smoothstep(t) = 3t² − 2t³ on the clamped t = (area − a₀)/(a₁ − a₀), and drama the
+preset's `surface.drama` (0 to 2, default 1). Defaults: f = 0.12, m = 6 blocks, a₀ = 25 km²,
+a₁ = 250 km² (`amplify.detail`).
+
+**N(x, z)** (block coordinates, IEEE-754 double arithmetic with `+ − × /`, `floor` and `round` only;
+`surface/detail.rs` is the reference, `worldgen/DetailNoise` its Java twin from P1-08):
+value noise of wavelength λ has n = max(1, round(C/λ)) lattice cells around the planet, spacing
+s = C/n, u = (x + C/2)/s, v = z/s; the corners are (⌊u⌋ mod n, ⌊v⌋), (⌊u⌋ + 1 mod n, ⌊v⌋),
+(⌊u⌋ mod n, ⌊v⌋ + 1), (⌊u⌋ + 1 mod n, ⌊v⌋ + 1) with lattice value
+h(salt, i, j) = ((mix(mix(mix(seed ⊕ salt·0x9E3779B97F4A7C15) ⊕ i·0xD6E8FEB86659FD93) ⊕
+j·0xA0761D6478BD642F) >> 11) · 2⁻⁵² − 1 (u64 wrapping arithmetic, `mix` splitmix64's finaliser
+z = (z ⊕ z>>30)·0xBF58476D1CE4E5B9; z = (z ⊕ z>>27)·0x94D049BB133111EB; z ⊕ z>>31), blended
+bilinearly with the fade f²(3 − 2f). N is `octaves` (default 3) of them at λ, λ/2, λ/4 (salt + octave)
+with weights 1, ½, ¼ divided by their sum, λ = `amplify.detail.wavelength_blocks` (32). It is
+periodic in x with period C (the lattice is indexed mod n), which is what keeps the wrap seamless.
 
 ## `strata/classes.json`
 
