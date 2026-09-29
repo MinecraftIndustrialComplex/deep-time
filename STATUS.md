@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · In flight (agent worktrees under .claude/worktrees/, not yet merged): P1-05 climate, P1-07 rock classes/strata (done on its branch), P1-14 deposits in the pipeline, P1-17 early (parallel pflood/SPL), P1-20 workbench stage 1 (live runs + editor controls) and stage 2 (3D area preview), macOS free-memory fix + Q10 client launcher fold, MIC pack branch `deep-time` (EV + gap configs + rock tags; pack worktree ../../pack-deeptime) · Next after those land: P1-06, then P1-08 · Sub-agents on Sonnet 5.5 from 2026-09-29 (Ben) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · In flight (agent worktrees under .claude/worktrees/, not yet merged): P1-05 climate (done on its branch), P1-07 rock classes/strata (done on its branch), P1-14 deposits in the pipeline, P1-17 early (parallel pflood/SPL), P1-20 workbench stage 1 (live runs + editor controls) and stage 2 (3D area preview), macOS free-memory fix + Q10 client launcher fold, MIC pack branch `deep-time` (EV + gap configs + rock tags; pack worktree ../../pack-deeptime) · Next after those land: P1-06, then P1-08 · Sub-agents on Sonnet 5.5 from 2026-09-29 (Ben) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -26,7 +26,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
 | P1-03 | Plates and crust | done | 2026-09-28 | 0867a61 | Mac: cargo test --workspace ok (plates::/params::/preset:: 20 + 1 ignored: rift area conserved exactly, partition, ages ≥ 0, hull invariants after every resampling, byte-identical resume); 500 Myr 20k: p90 ocean age 167/169/245 Myr, 98/97/90.5 % < 250 Myr; `stage plates --preset plates_quick_16k --start scattered_continents --length-myr 500` → plates_final=13 ocean_age_p90_myr=202.3 steps=250 seconds=8.3; 100k 8.3 s (12 thr) / 23 s (1 thr), 250k 25–31 s / 72 s vs Cortial 76–106 / 330–437 s; clippy, fmt, deny clean |
 | P1-04 | Deep-time surface processes on L1 | done | 2026-09-28 | 50dd95f | Mac: cargo test --workspace ok (core 139 incl. surface:: 20: receivers acyclic, depressions resolved, diffusion Σh conserved, SPL ramp = analytic within 1e-6 (n 1) / 1e-3 (n 2), strata-log invariants, coupled pipeline resume identical; cli 11); `stage surface --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-surface` → 250 steps 96 s (plates 22 s, surface 74 s), land_frac 0.215, mass residual −6e-4 km³ of 1.2e8 eroded, 50 frames, 70 erosion pulses / 265 basins / 3 sea events; bench 1 thread surface 137 s = 1.05 µs/cell/step vs the 131 s cost model; fastscapelib oracle hypsometry_ks=0.0209 chi_slope_ratio=1.0000 PASS; fmt, clippy -D warnings, deny clean; gradlew build test 106/0 |
-| P1-05 | Climate | doing | 2026-09-28 | | agent worktree agent-ac0e58a6cc29f08bf (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c) |
+| P1-05 | Climate | done | 2026-09-29 | — | Mac: cargo test --workspace ok (core 162 + 1 ignored incl. climate:: 14: EBM balance |ASR−OLR| < 0.2 W/m², energy conserved by diffusion/ice to 1e-9, ridge windward > 3× lee with a rain shadow, Köppen Af/BWh/Cfb/Dfc/ET/EF/Aw/Csa/Dwd hand-built cases, idealised planet has all five groups, coupled pipeline resumes identically on 1 vs 3 threads); `stage climate --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-climate` → 51 snapshots, climate 11.7 s of 191 s, t_surface 11.3 °C, EBM 15.6 °C, net TOA 0.006 W/m², land Köppen A 0.10/B 0.12/C 0.21/D 0.04/E 0.53; bench 12 vs 1 thread identical; Earth relief (`climate-dem`): 19/24 cities in the right Köppen group; clippy, fmt, deny clean; gradlew build test 106/0 |
 | P1-06 | Young landscape, amplification and the detail layer | todo | | | |
 | P1-07 | Rock classes, column strata and metamorphism | done | 2026-09-29 | — | On the coupled pipeline preset (built-ins stay placeholders until P1-08). Mac: cargo test --workspace ok (core 149 + 1 ignored incl. structure:: 11: stacks ordered top-down, ≥ 1 block thick, classes valid, ≤ K; resume identical; every built-in deposit type finds all its fields incl. trap_structure and host/*), fmt, clippy -D warnings, deny clean; gradlew build test 106/0; ./gametest.sh All 45 passed (everyClassInTheWorld 59/59, 240 samples 0 wrong); `stage structure --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-structure` → horizon_check=ok, 3.88 horizons/cell, 22,000 plutons (8,138 bodies), 50 frames published; structure 4.8 s of 122 s |
 | P1-08 | Bake, world data v1 and parity | todo | | | |
@@ -69,6 +69,127 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+
+### 2026-09-29 — P1-05 climate (agent worktree agent-ac0e58a6cc29f08bf, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** `crates/deeptime-core/src/climate/` (mod, params, insolation, ebm, belts, lapse,
+  orographic, koppen, glaciers, snapshot, tests) — plan §8.3. Ported (NOTICE.md, file headers):
+  fastscape-lem/orographic-precipitation (MIT, commit baf8a0c: Smith & Barstad's Fourier transfer
+  function and defaults) and climlab's EBM equations (MIT, commit fcbde37: `EBM_seasonal`,
+  `StepFunctionAlbedo`, `AplusBT`, `MeridionalHeatDiffusion`, daily insolation — equations, not
+  code). New dependency: `rustfft` 6.4.1 (MIT OR Apache-2.0; `cargo deny` clean). Also: preset
+  section `climate` (every key optional, `deny_unknown_fields`, range checks naming the key; all
+  four `presets/pipeline/*.json` carry it), `PlanetPreset.climate`, the `climate_final` CLI line,
+  climate per-process timings, EVENTS.md "The climate's events" (`glaciation`), ramps
+  `climate_t`, `precip`, `aridity`, `koppen` (categorical, with `labels`) in ramps.json, a keyframe
+  legend in the viewer (swatches for Köppen), `deeptime stage --viewer-layers a,b,…` (keeps a review
+  page small; without a `structure…` name it also leaves P1-07's structure view out), and a dev
+  subcommand `deeptime climate-dem --dem <f32> --width W [--preset P] [--viewer D]` (one snapshot on
+  a given relief). Plan §8.3 and §10.3 P1-05 have "As built"/"As run" notes.
+- **Wiring.** The climate is a stage coupled to the plates, placed *before* the surface: the group is
+  now `plates → climate → surface → structure` (preset.rs pushes climate when the preset has a
+  `climate` section). Each plate step it computes the ground the surface is about to erode (the
+  plate model's L1 elevation + the surface's offset advected with the plates exactly as the surface
+  will) and writes `climate/{t_mean_c, precip_mm}` (read by `surface/climate.rs` for runoff,
+  weathering, facies, carbonate water temperature — now the stage's temperature, not the zonal
+  stand-in — and by P1-07's metamorphism via `climate/t_mean_c`) plus `climate/{koppen, t_warm_c,
+  t_cold_c, aridity, glacier, ela_m}` and the carried anomalies `climate/anomaly/*`. The deposit
+  frames' `precip_mm` and `t_mean_c` therefore are the real climate (checked in the coupled test:
+  the last frame's mean precipitation within 20 % of the field's). Without a `climate` section the
+  surface keeps its stand-in. Checkpoint schema unchanged (the stage keeps its state in its own
+  postcard blob: EBM state, ice sheets, row references, glaciation tracker).
+- **Snapshots.** Full snapshot at the first step, every 10 Myr and the last step (51 in 500 Myr);
+  between them each cell's sea-level departure from its row's reference (EBM ocean temperature;
+  ln of the belts' precipitation), ELA, aridity and Köppen move with the plates (semi-Lagrangian,
+  `surface::advect`) and the lapse rate is re-applied on the current ground; land risen from the sea
+  gets a Köppen from a sinusoidal year. The EBM warm-starts from the previous snapshot (6 years;
+  40 at spin-up; early stop at 0.005 K).
+- **Model decisions (implementation details, recorded here).** EBM: climlab's equation with North,
+  Cahalan & Coakley 1981's A 203.3 W/m², B 2.09, D 0.649 (climlab's 210/2/0.555 ran this model's
+  Earth 3 °C cold) and climlab's `EBM_seasonal` albedos (a₀ 0.33, a₂ 0.25, a_i 0.62, T_f −10 °C);
+  per band a land surface (3 m of water) and a sea surface layer over a 50-m slab (coupled 30 W/m²/K,
+  k/h through sea ice), latent sea ice at −1.8 °C, slab heat diffusion 0.3 W/m²/K, land–sea
+  exchange 10 W/m²/K, 72 backward-Euler steps a year, circular orbit. Belts: trades/westerlies/polar
+  easterlies by belt latitude, the ITCZ per column and month as the thermal equator (soft max of
+  the land/sea-mixed EBM temperature over ±35°, smoothed 1,500 Earth km, ≤ 22°), monsoon westerlies
+  where trades cross the equator, the highs shifted ±6° × sin(tilt)/sin 23.4°; gyre SST anomalies
+  and drying under the highs' eastern flanks from each ocean cell's basin position; summer onshore
+  air on east coasts 15–45° (`onshore` 1.0). Moisture decays inland over 3,500 Earth km (× (1 + 1.5 ×
+  belt wetness) for recycling) to a floor of 0.3; rain shadow e^(−Δz/2,500 m) behind barriers;
+  plateau drying above 1.5 km. Orographic: one FFT per wind regime over the rows it can reach,
+  0.5 rain-hours/day, lee drying proportional with a 0.3 floor. Köppen: Peel et al. 2007 + As/Aw.
+  Glaciers: ELA from Ohmura et al. 1992. `ice_sheet_feedback` = 0 by default (see findings).
+- **Measured (Mac, M6 mini, 12 threads, shared — other agents' builds and a Gradle daemon were
+  running; load 5–10).** `cargo test --workspace --locked` → cli 20, core 162 + 1 ignored (climate::
+  14: insolation limits (S₀/π at the equator on an equinox, S₀ sin ε at the pole on the solstice,
+  global mean S₀/4 within 0.2 %); EBM converges with |ASR − OLR| < 0.2 W/m², global 5–20 °C, land
+  seasons > 2 × sea at 55°N; diffusion + ice conserve Σ C·T − latent to 1e-9, +5 % star warms > 3 K;
+  Smith–Barstad ridge across a westerly: windward mean > 0.5 mm/h, lee < a third of it, negative in
+  the shadow, easterly mirror-symmetric to 1e-6; Köppen Af, BWh, Cfb, Dfc, ET, Csa (southern), EF,
+  Aw, Dwd; belts and basins; the air's march; ELA; one glaciation event; an idealised planet has
+  all five groups, a rain shadow (windward > 1.5 × lee), glaciated polar land; the coupled
+  pipeline (3,000 samples, 60 Myr, 256 × 128) writes every field, the surface reads it
+  (`from_stage`), 7 snapshots, and a checkpoint resumed on 3 threads (from 1) gives identical
+  climate fields, surface, history and events), format 31, inspect 21 + 7, jni 7 + 7, viewer 4;
+  `cargo clippy --workspace --all-targets -D warnings`, `cargo fmt --check`, `cargo deny check
+  licenses bans` clean; `cd neoforge && ./gradlew build test` → tests=106 failures=0 (ramps.json in
+  the jar still parses).
+  **Acceptance:** `deeptime stage climate --preset pipeline_quick_16k --start scattered_continents
+  --length-myr 500 --viewer review/out/p1-climate --viewer-layers elevation,climate/koppen,
+  climate/t_mean_c,climate/precip_mm,surface/class,surface/drainage` (after merging P1-07) →
+  250 steps, 191 s (plates 37.1, climate 11.7, surface 135.8, structure 6.5; climate: snapshot 7.7
+  (cells 4.5, belts 1.7, orographic 0.9, EBM 0.1), topography 2.3, advect 1.7), peak footprint
+  2.5 GB; `climate_final=51 t_surface_c=11.3 t_land_c=-0.1 precip_land_mm=536
+  koppen_land=A0.10/B0.12/C0.21/D0.04/E0.53 glaciated_land_frac=0.307 glaciations=1
+  ebm_t_global_c=15.6 ebm_net_toa_w_m2=0.006 itcz_deg=-8.0..9.0 land_z_p50_m=2496
+  land_z_p90_m=5407 land_above_2km=0.598`. **Bench** (before the P1-07 merge; `deeptime bench
+  --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --threads 12,1`):
+  12 threads 192 s (plates 36.7, climate 13.3, surface 142.2), 1 thread 373 s (143.0 / 37.1 /
+  193.1), peak 1.20 GB, **identical summaries on both thread counts**. The climate costs ~5–7 % of
+  the run (§8.3's "one or two erosion steps per snapshot" holds: 51 snapshots ≈ 8 s). The surface's
+  diffusion took 65–73 s here against 21 s in P1-04's run — the Mac was loaded, not a regression
+  (the same code; P1-17 should bench on a quiet machine).
+  **Earth check:** `deeptime climate-dem --dem build/earth/earth_720.f32 --width 720 --preset
+  pipeline_quick_16k --viewer review/out/p1-climate/earth` on GMT's `earth_relief_01d_p`
+  (SRTM15+, 1°, doubled to 720 × 360; a local file, not committed) → EBM 15.6 °C, net TOA 0.013,
+  land 8.1 °C / 562 mm/yr (Earth ≈ 8.5 °C / 715 mm), groups A 0.17 / B 0.26 / C 0.10 / D 0.25 /
+  E 0.23, 19 of 24 reference cities in the right main group (5 exact: London Cfb, Manaus Af,
+  Kinshasa Aw, Chicago Dfa, Vostok EF). The map is recognisably Earth's: Sahara–Arabia–Australia
+  deserts, Amazon/Congo/Indonesia A, Siberia/Canada D, Mediterranean C, Andes and Tibet cold.
+  Misses: Mumbai (the ITCZ reaches only ~12°N, no Indian monsoon), Beijing/Buenos Aires/Sydney too
+  dry (east-coast humid subtropics are weak), Denver/Lhasa/Anchorage too cold, land 20 % dry overall.
+- **What the maps show** (review/out/p1-climate, pulled back and looked at; 16 MB after oxipng,
+  6 keyframe layers × 11 frames plus `earth/`): temperature has clean zonal bands with continents
+  hot in the tropics and cold on their highlands (the lapse rate over the domed interiors is the
+  dominant land signal), polar continents deep blue; precipitation has the ITCZ wet belt, the
+  subtropical dry belts, the westerlies' wet belt, sharp windward/leeward contrasts on every range
+  (orographic stripes on the ridges, dry lees) and drier continental interiors; faint east–west
+  streaks off some coasts from the row-wise march survive the 300-km smoothing. Köppen: coastal
+  rims of A (tropics), B (subtropical west coasts and lees), C and D, with E (ET/EF) over high
+  interiors and polar land; at −450 Myr, when the continents were still low, the Köppen map looks
+  Earth-like (large BWh/BSh interiors, Af/Am/Aw equatorial belts, C/D mid-latitudes).
+- **Findings for Ben / P1-17.** (1) **Land is too high and therefore too cold.** With the real
+  climate the continents end 2.5–3.1 km high at the median (land above 2 km: 60–68 %) against
+  1.35 km with the stand-in: dry interiors and rain shadows cut runoff, so the stream-power erosion
+  calibrated in P1-04 on the stand-in's wetter interiors no longer holds P1-04's domed continents
+  down. Half the land ends in Köppen E. The climate is doing what it should with that relief (the
+  Earth check shows it); the fix belongs to the surface's calibration with the climate on (K,
+  `runoff_ref_m_yr`, the domed uplift inboard of trenches) — P1-17's tuning, or a decision to
+  recalibrate now. (2) The ice-sheet albedo feedback is implemented but off
+  (`ice_sheet_feedback` 0): at 1 it froze most of that high land (46 % glaciated). Turn it on once
+  the hypsometry is Earth-like. (3) No glacial erosion exists (glaciers are only diagnosed).
+- **Deviations from the plan.** (1) Acceptance on `pipeline_quick_16k` (placeholders until P1-08),
+  as P1-04. (2) The climate is a coupled member of the plates group, not a stage after it (the plan's
+  §8 order says "then climate snapshots"; the surface needs runoff every step). (3) The fixed
+  §8.3 files exist except `sealevel.rs` (sea level stays in `surface::params::SeaLevel`); `lapse.rs`
+  holds the continentality march; `snapshot.rs` assembles. (4) Smith–Barstad FFT per wind regime
+  over the whole width (not per band's latitude strip only; a regime is solved over the rows its
+  weights reach). (5) Monthly fields are not stored (annual mean, warmest/coldest month); §5.3's
+  `climate/p_mm` is named `climate/precip_mm` (P1-04's interface).
+- **Next.** P1-17: recalibrate the surface with the climate on (see finding 1), then
+  `ice_sheet_feedback`; P1-09 reads `climate/{koppen, t_mean_c, t_warm_c, t_cold_c, precip_mm,
+  aridity}`. The review page is review/out/p1-climate (not published; `earth/index.html` inside
+  is the Earth check).
+
 
 ### 2026-09-29 — P1-07 rock classes, column strata and metamorphism (agent worktree agent-a660cc7be45a80cf6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** New stage `structure` (`crates/deeptime-core/src/structure/{mod, params, columns,
