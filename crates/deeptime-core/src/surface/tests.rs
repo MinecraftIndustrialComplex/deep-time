@@ -443,6 +443,20 @@ fn the_coupled_pipeline_runs_and_resumes() {
         ..Default::default()
     };
     assert!(routing::check_acyclic(&routing));
+    // Every built-in deposit type finds its fields, except the petroleum trap's structural
+    // closure (P1-07).
+    for t in crate::deposits::types::builtin().unwrap() {
+        let missing: Vec<String> = t
+            .fields()
+            .into_iter()
+            .filter(|f| !names.contains(f))
+            .collect();
+        if t.petroleum.is_some() {
+            assert_eq!(missing, ["deeptime:trap_structure"], "{}", t.id);
+        } else {
+            assert!(missing.is_empty(), "{} lacks {missing:?}", t.id);
+        }
+    }
     // Resume from a checkpoint in the middle of the group: the same world.
     let dir2 = temp_dir("resumed");
     let s2 = session(&json, &dir2);

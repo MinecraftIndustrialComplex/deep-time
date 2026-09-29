@@ -175,6 +175,31 @@ fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     ))
 }
 
+/// The deposit engine's recorded history (P1-04): per field of the last frame, the share of cells
+/// where it is non-zero and its mean there.
+fn history_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    use deeptime_core::deposits::fields::FieldHistory;
+    let h = world.history.as_ref()?;
+    let k = h.frame_count().checked_sub(1)?;
+    let f = h.frame(k).ok()?;
+    let mut parts = vec![format!("frames={} last_t={}", h.frame_count(), f.t_years)];
+    for (name, v) in &f.fields {
+        let nz: Vec<f32> = v
+            .iter()
+            .copied()
+            .filter(|x| x.is_finite() && *x != 0.0)
+            .collect();
+        let mean = nz.iter().map(|&x| f64::from(x)).sum::<f64>() / nz.len().max(1) as f64;
+        parts.push(format!(
+            "{}={:.1}%/{:.3}",
+            name.trim_start_matches("deeptime:"),
+            100.0 * nz.len() as f64 / v.len().max(1) as f64,
+            mean
+        ));
+    }
+    Some(parts.join(" "))
+}
+
 /// Per-stage wall time, and the surface's per-process split when it ran to the end.
 fn timings_line(
     timings: &[deeptime_core::session::StageTiming],
@@ -412,6 +437,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     }
     if let Some(line) = surface_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = history_line(&ck.world) {
+        println!("deeptime stage {}: history {line}", o.name);
     }
     println!(
         "deeptime stage {}: timings {}",
