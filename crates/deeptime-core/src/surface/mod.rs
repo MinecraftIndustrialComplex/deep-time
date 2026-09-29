@@ -419,6 +419,7 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     StageEstimate {
         bytes: cells * per_cell + history + crate::plates::estimate(p).bytes,
         seconds: cells as f64 * steps * 1.0e-6,
+        history_bytes: history,
     }
 }
 
@@ -554,7 +555,10 @@ impl SurfaceStage {
                 st
             }
             None => {
-                ctx.reserve(estimate(&self.preset).bytes / 2)?;
+                // The state and scratch; not the recorded history, which grows a frame at a
+                // time and goes to disk when the cap needs the room (P1-17).
+                let e = estimate(&self.preset);
+                ctx.reserve((e.bytes - e.history_bytes) / 2)?;
                 SurfaceState {
                     grid: grid.clone(),
                     step: 0,
@@ -1158,7 +1162,7 @@ pub fn summary(
             "basin_subsidence": st.events.counts[1],
             "transgression_regression": st.events.counts[2],
         },
-        "history_frames": history.map_or(0, |h| h.frames.len()),
+        "history_frames": history.map_or(0, |h| h.frame_count()),
         "history_bytes": history.map_or(0, |h| h.bytes()),
         "millis": timings,
     })

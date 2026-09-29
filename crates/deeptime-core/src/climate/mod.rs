@@ -136,6 +136,7 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     StageEstimate {
         bytes: group.bytes + cells * 110,
         seconds: cells as f64 * (snaps * 2.0e-6 + steps * 0.2e-6),
+        history_bytes: group.history_bytes,
     }
 }
 
