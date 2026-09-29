@@ -45,7 +45,8 @@
 //! (`recorded_tests::deposits_ride_a_rigidly_drifting_crust`). A frame that already carries a
 //! field of either name keeps it (a later stage may publish a better one).
 
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use deeptime_format::GridDesc;
 use rayon::prelude::*;
@@ -76,6 +77,9 @@ pub const AGGRADING_M_MYR: f64 = 10.0;
 pub const BRINE_T_C: [f64; 2] = [50.0, 100.0];
 /// Uplift rate at which ground counts as an active orogen (m/Myr = 0.1 mm/yr; design).
 pub const ACTIVE_UPLIFT_M_MYR: f64 = 100.0;
+
+/// Window normalisations by (width, height, radius).
+type NormCache = BTreeMap<(usize, usize, usize), Arc<Vec<i64>>>;
 
 /// Fixed-point scale of the exact box sums.
 const FIXED: f64 = 1_048_576.0;
@@ -113,13 +117,18 @@ pub fn derivable(names: &[String]) -> Vec<String> {
         .collect()
 }
 
-/// Adds the derived fields `frame` can have and does not carry yet.
-pub fn add(frame: &mut FieldFrame, grid: &GridDesc, p: &Regional) {
+/// The derived names.
+pub const DERIVED: [&str; 2] = [BASIN_BRINE, HEAD_DROP];
+
+/// Adds the derived fields among `want` that `frame` can have and does not carry yet.
+pub fn add(frame: &mut FieldFrame, grid: &GridDesc, p: &Regional, want: &[String]) {
     let (w, h) = (grid.w as usize, grid.h as usize);
     let n = w * h;
     let have = |f: &FieldFrame, name: &str| f.fields.get(name).is_some_and(|v| v.len() == n);
+    let wants = |name: &str| want.iter().any(|x| x == name);
     let reach = p.cells(p.flow_km);
-    if !have(frame, BASIN_BRINE) && INPUTS[0].1.iter().all(|i| have(frame, i)) {
+    if wants(BASIN_BRINE) && !have(frame, BASIN_BRINE) && INPUTS[0].1.iter().all(|i| have(frame, i))
+    {
         let (dep, crust, temp) = (
             &frame.fields[DEPOSITION],
             &frame.fields[CRUST],
@@ -143,7 +152,7 @@ pub fn add(frame: &mut FieldFrame, grid: &GridDesc, p: &Regional) {
         let mean = octagon_mean(w, h, &b, reach);
         frame.fields.insert(BASIN_BRINE.to_owned(), mean);
     }
-    if !have(frame, HEAD_DROP) && INPUTS[1].1.iter().all(|i| have(frame, i)) {
+    if wants(HEAD_DROP) && !have(frame, HEAD_DROP) && INPUTS[1].1.iter().all(|i| have(frame, i)) {
         // Fixed point: exact sums whatever the order.
         let fixed = |v: &[f32], lo: f64| -> Vec<i64> {
             v.par_iter()
@@ -192,20 +201,6 @@ impl Line {
         match self {
             Line::Row => h,
             Line::Col | Line::Diag(_) => w,
-        }
-    }
-
-    /// The cells of line `k`, in order, and whether the line closes on itself.
-    fn cells(self, w: usize, h: usize, k: usize) -> (Vec<usize>, bool) {
-        match self {
-            Line::Row => ((0..w).map(|i| k * w + i).collect(), true),
-            Line::Col => ((0..h).map(|j| j * w + k).collect(), false),
-            Line::Diag(d) => (
-                (0..h)
-                    .map(|j| j * w + (k as i64 + d * j as i64).rem_euclid(w as i64) as usize)
-                    .collect(),
-                false,
-            ),
         }
     }
 }
@@ -285,19 +280,26 @@ fn pass<T: Copy + Default + Send + Sync>(
     line: Line,
     f: &(dyn Fn(&[T], bool) -> Vec<T> + Sync),
 ) -> Vec<T> {
-    let lines: Vec<(Vec<usize>, Vec<T>)> = (0..line.count(w, h))
+    if line == Line::Row {
+        return v.par_chunks(w).flat_map_iter(|row| f(row, true)).collect();
+    }
+    let index = |k: usize, j: usize| -> usize {
+        match line {
+            Line::Diag(d) => j * w + (k as i64 + d * j as i64).rem_euclid(w as i64) as usize,
+            _ => j * w + k,
+        }
+    };
+    let lines: Vec<Vec<T>> = (0..line.count(w, h))
         .into_par_iter()
         .map(|k| {
-            let (cells, circular) = line.cells(w, h, k);
-            let seq: Vec<T> = cells.iter().map(|&c| v[c]).collect();
-            let out = f(&seq, circular);
-            (cells, out)
+            let seq: Vec<T> = (0..h).map(|j| v[index(k, j)]).collect();
+            f(&seq, false)
         })
         .collect();
     let mut out = vec![T::default(); w * h];
-    for (cells, vals) in lines {
-        for (c, x) in cells.into_iter().zip(vals) {
-            out[c] = x;
+    for (k, vals) in lines.into_iter().enumerate() {
+        for (j, x) in vals.into_iter().enumerate() {
+            out[index(k, j)] = x;
         }
     }
     out
@@ -337,7 +339,22 @@ pub fn octagon_mean(w: usize, h: usize, v: &[i64], r: usize) -> Vec<f32> {
         x
     };
     let num = sums(v);
-    let den = sums(&vec![1i64; w * h]);
+    // The normalisation depends on the grid and the radius only: computed once.
+    static DEN: OnceLock<Mutex<NormCache>> = OnceLock::new();
+    let cache = DEN.get_or_init(Default::default);
+    let known = cache
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&(w, h, r))
+        .cloned();
+    let den = known.unwrap_or_else(|| {
+        let d = Arc::new(sums(&vec![1i64; w * h]));
+        cache
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert((w, h, r), d.clone());
+        d
+    });
     num.par_iter()
         .zip(den.par_iter())
         .map(|(&a, &b)| (a as f64 / b as f64 / FIXED) as f32)
@@ -452,6 +469,10 @@ mod tests {
         }
     }
 
+    fn all() -> Vec<String> {
+        DERIVED.iter().map(|s| (*s).to_owned()).collect()
+    }
+
     #[test]
     fn a_basin_beside_an_orogen_drives_brine_to_its_margin() {
         // 128 × 64 cells of 4.8 km: a rising orogen (2 km, 300 m/Myr) in columns 0–7, a hot
@@ -497,7 +518,7 @@ mod tests {
         );
         f.fields.insert(CRUST.into(), vec![38.0; n]);
         let p = Regional::new(&grid, 300.0, 100.0);
-        add(&mut f, &grid, &p);
+        add(&mut f, &grid, &p, &all());
         let brine = &f.fields[BASIN_BRINE];
         let drop = &f.fields[HEAD_DROP];
         let at = |v: &[f32], i: usize| v[(h / 2) * w + i];
@@ -514,7 +535,7 @@ mod tests {
         // The same orogen, no longer rising, drives nothing.
         f.fields.remove(HEAD_DROP);
         f.fields.insert(UPLIFT.into(), vec![0.0; n]);
-        add(&mut f, &grid, &p);
+        add(&mut f, &grid, &p, &all());
         assert!(at(&f.fields[HEAD_DROP], 30) < 1e-6);
     }
 }
