@@ -121,6 +121,9 @@ pub struct ClimateParams {
     pub sst_midlatitude_cold_c: f64,
     /// Drying under the eastern side of the subtropical highs (west coasts), 0–1.
     pub subsidence: f64,
+    /// Summer onshore (easterly) moisture on east coasts from 15° to 45° — the highs' western
+    /// flanks and the monsoons that make Earth's humid subtropical east coasts, 0–1.
+    pub onshore: f64,
 
     // --- Orographic precipitation (Smith & Barstad 2004; fastscape-lem/orographic-precipitation
     // defaults, MIT; `orographic.rs`).
@@ -179,8 +182,8 @@ impl Default for ClimateParams {
             itcz_max_shift_deg: 22.0,
             itcz_smooth_km: 1500.0,
             subtropical_shift_deg: 6.0,
-            moisture_decay_km: 2500.0,
-            moisture_floor: 0.15,
+            moisture_decay_km: 3500.0,
+            moisture_floor: 0.3,
             recycling: 1.5,
             ocean_recharge_km: 600.0,
             maritime_decay_km: 1200.0,
@@ -195,6 +198,7 @@ impl Default for ClimateParams {
             sst_midlatitude_warm_c: 6.0,
             sst_midlatitude_cold_c: 5.0,
             subsidence: 0.55,
+            onshore: 1.0,
             oro_conv_time_s: 1000.0,
             oro_fall_time_s: 1000.0,
             oro_nm: 0.01,
@@ -238,6 +242,7 @@ impl ClimateParams {
             (self.subsidence, "subsidence"),
             (self.ice_sheet_feedback, "ice_sheet_feedback"),
             (self.oro_lee_floor, "oro_lee_floor"),
+            (self.onshore, "onshore"),
         ] {
             check((0.0..=1.0).contains(&v), key, "must be in [0, 1]")?;
         }
