@@ -125,12 +125,54 @@ pub fn run(o: &Options) -> CliResult<()> {
         s.ice.frac(),
         started.elapsed().as_secs_f64()
     );
+    // Land means (cos φ-weighted) and the main groups' shares of the land.
+    let (mut la, mut lt, mut lp) = (0.0, 0.0, 0.0);
+    let mut groups = std::collections::BTreeMap::new();
+    for j in 0..h {
+        let wgt = lat[j].to_radians().cos();
+        for i in 0..w {
+            let c = j * w + i;
+            if z[c] > 0.0 {
+                la += wgt;
+                lt += wgt * f64::from(s.t_mean[c]);
+                lp += wgt * f64::from(s.precip[c]);
+                *groups.entry(koppen::group(s.koppen[c])).or_insert(0.0) += wgt;
+            }
+        }
+    }
+    println!(
+        "deeptime climate-dem: land T {:.1} °C, P {:.0} mm/yr, groups {}",
+        lt / la,
+        lp / la,
+        groups
+            .iter()
+            .map(|(g, a)| format!("{g}{:.2}", a / la))
+            .collect::<Vec<_>>()
+            .join("/")
+    );
     // The printed check: the class at each known place, and whether its group matches.
     let (mut same, mut group) = (0, 0);
     for (name, la, lo, want) in PLACES {
         let j = (((90.0 - la) / 180.0 * h as f64).floor() as usize).min(h - 1);
         let i = ((lo.rem_euclid(360.0) / 360.0 * w as f64).floor() as usize) % w;
-        let c = j * w + i;
+        // Coastal cities can fall in a sea cell at this resolution: take the nearest land cell
+        // within two cells.
+        let mut c = j * w + i;
+        if s.koppen[c] == koppen::SEA {
+            let mut best = (i64::MAX, c);
+            for dj in -2i64..=2 {
+                for di in -2i64..=2 {
+                    let jj = (j as i64 + dj).clamp(0, h as i64 - 1) as usize;
+                    let ii = (i as i64 + di).rem_euclid(w as i64) as usize;
+                    let cc = jj * w + ii;
+                    let d2 = di * di + dj * dj;
+                    if s.koppen[cc] != koppen::SEA && d2 < best.0 {
+                        best = (d2, cc);
+                    }
+                }
+            }
+            c = best.1;
+        }
         let got = koppen::CODES[s.koppen[c] as usize];
         let g = got.chars().next() == want.chars().next();
         same += usize::from(got == want);

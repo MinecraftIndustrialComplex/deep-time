@@ -371,6 +371,14 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
                 glacier: vec![0; w],
             };
             let plateau = |zz: f64| (-(zz - p.plateau_m).max(0.0) / p.plateau_scale_m).exp();
+            // How much each month is this row's summer (0 winter, 1 summer; follows the tilt).
+            let onshore: [f64; 12] = std::array::from_fn(|m| {
+                let h = belts::hemispheric_shift(p, inp.planet.axial_tilt_deg, m);
+                let k = (p.subtropical_shift_deg * inp.planet.axial_tilt_deg.to_radians().sin()
+                    / 23.4f64.to_radians().sin())
+                .max(1e-9);
+                (0.5 + 0.5 * h.signum() * phi.signum() * (h.abs() / k).min(1.0)).clamp(0.0, 1.0)
+            });
             for i in 0..w {
                 let c = r0 + i;
                 let mut t = [0.0f64; 12];
@@ -381,15 +389,21 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
                     let wt = belts::regime_weights(phi, pb);
                     let fe: f64 = (0..REGIMES).filter(|&r| EASTWARD[r]).map(|r| wt[r]).sum();
                     let fw = 1.0 - fe;
-                    let q = fe * air[0][c] + fw * air[1][c];
+                    // Summer onshore flow round the subtropical highs' western flanks: east coasts
+                    // from 15° to 45° get easterly (sea) air for moisture whatever the belt says.
+                    let fw_q = fw.max(onshore[m] * p.onshore * belts::bump(pb.abs(), 30.0, 15.0));
+                    let fe_q = 1.0 - fw_q;
+                    let q = fe_q * air[0][c] + fw_q * air[1][c];
+                    let bas_q = fe_q * air[4][c] + fw_q * air[5][c];
+                    let mar_q = fe_q * air[2][c] + fw_q * air[3][c];
                     let (tsl, a_eff, d_eff) = if land[c] {
                         let mar = fe * air[2][c] + fw * air[3][c];
-                        let bas = fe * air[4][c] + fw * air[5][c];
+                        let bas = bas_q * mar_q;
                         let dcar = fe * air[6][c] + fw * air[7][c];
                         let cont = 1.0 - mar.max(sea_near[c]).clamp(0.0, 1.0);
                         (
                             t_o[j][m] + cont * (t_l[j][m] - t_o[j][m]) + mar * dcar,
-                            bas * mar,
+                            bas,
                             mar * dcar,
                         )
                     } else {
