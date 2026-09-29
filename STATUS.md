@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-07 rock classes/strata, P1-14 deposits on the recorded history, P1-20 stage 1 workbench · In flight (agent worktrees under .claude/worktrees/): P1-17 early (parallel pflood/SPL), P1-20 stage 2 (3D area preview; done on its branch), MIC pack AU port (au-port-steel-guard) · Next: P1-06, then P1-08 · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-07 rock classes/strata, P1-14 deposits on the recorded history, P1-20 stage 1 workbench; P1-06 young landscape + L3 amplification done on its branch (worktree-agent-af500836f573f424e, not merged) · In flight (agent worktrees under .claude/worktrees/): P1-17 early (parallel pflood/SPL), P1-20 stage 2 (3D area preview; done on its branch), MIC pack AU port (au-port-steel-guard) · Next: P1-08 (bake the L3 layers) · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -27,7 +27,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-03 | Plates and crust | done | 2026-09-28 | 0867a61 | Mac: cargo test --workspace ok (plates::/params::/preset:: 20 + 1 ignored: rift area conserved exactly, partition, ages ≥ 0, hull invariants after every resampling, byte-identical resume); 500 Myr 20k: p90 ocean age 167/169/245 Myr, 98/97/90.5 % < 250 Myr; `stage plates --preset plates_quick_16k --start scattered_continents --length-myr 500` → plates_final=13 ocean_age_p90_myr=202.3 steps=250 seconds=8.3; 100k 8.3 s (12 thr) / 23 s (1 thr), 250k 25–31 s / 72 s vs Cortial 76–106 / 330–437 s; clippy, fmt, deny clean |
 | P1-04 | Deep-time surface processes on L1 | done | 2026-09-28 | 50dd95f | Mac: cargo test --workspace ok (core 139 incl. surface:: 20: receivers acyclic, depressions resolved, diffusion Σh conserved, SPL ramp = analytic within 1e-6 (n 1) / 1e-3 (n 2), strata-log invariants, coupled pipeline resume identical; cli 11); `stage surface --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-surface` → 250 steps 96 s (plates 22 s, surface 74 s), land_frac 0.215, mass residual −6e-4 km³ of 1.2e8 eroded, 50 frames, 70 erosion pulses / 265 basins / 3 sea events; bench 1 thread surface 137 s = 1.05 µs/cell/step vs the 131 s cost model; fastscapelib oracle hypsometry_ks=0.0209 chi_slope_ratio=1.0000 PASS; fmt, clippy -D warnings, deny clean; gradlew build test 106/0 |
 | P1-05 | Climate | done | 2026-09-29 | — | Mac: cargo test --workspace ok (core 162 + 1 ignored incl. climate:: 14: EBM balance |ASR−OLR| < 0.2 W/m², energy conserved by diffusion/ice to 1e-9, ridge windward > 3× lee with a rain shadow, Köppen Af/BWh/Cfb/Dfc/ET/EF/Aw/Csa/Dwd hand-built cases, idealised planet has all five groups, coupled pipeline resumes identically on 1 vs 3 threads); `stage climate --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-climate` → 51 snapshots, climate 11.7 s of 191 s, t_surface 11.3 °C, EBM 15.6 °C, net TOA 0.006 W/m², land Köppen A 0.10/B 0.12/C 0.21/D 0.04/E 0.53; bench 12 vs 1 thread identical; Earth relief (`climate-dem`): 19/24 cities in the right Köppen group; clippy, fmt, deny clean; gradlew build test 118/0 (after merging master 6d8171f) |
-| P1-06 | Young landscape, amplification and the detail layer | doing | 2026-09-29 | | Session f981c0d3-5144-49ec-8686-2946d755872c (agent worktree agent-af500836f573f424e, branch worktree-agent-af500836f573f424e) |
+| P1-06 | Young landscape, amplification and the detail layer | done | 2026-09-29 | — | On `pipeline_quick_16k` (built-ins stay placeholders until P1-08). Mac: `cargo test -p deeptime-core surface::amplify` → 25 passed (no new sink outside the lakes on a wrapped planet with a lake, the flood repairs a pit nobody declared, streamed = whole-raster to the bit, tiled middle level = whole, 1 = 5 threads, the seam, drama, pack round trip, coupled pipeline on 1 and 3 threads, resume); workspace tests ok (core 204 + 2 ignored, cli 23, format 33, inspect 37, jni 7, viewer 5), clippy -D warnings, fmt, deny clean; 500 Myr planet: `stage young` 7.6 s, `stage amplify` 8192×4096 → sinks=0, 18.7 s on 12 threads / 53 s on 1 (erode 7.6/24.1, thermal 3.3/14.1, deposit 3.3/8.9, flood 3.2/2.9), streamed (8 tiles, halo 196) and 1 thread give all 512 of 512 tiles of both L3 layers identical to the in-memory run; 134 M-cell L3 (32k full's size) streams in 58.5 s; views: review/out/p1-amplify (16 MB, not published). Ben reviews: the before/after views and the drama figure |
 | P1-07 | Rock classes, column strata and metamorphism | done | 2026-09-29 | — | On the coupled pipeline preset (built-ins stay placeholders until P1-08). Mac: cargo test --workspace ok (core 149 + 1 ignored incl. structure:: 11: stacks ordered top-down, ≥ 1 block thick, classes valid, ≤ K; resume identical; every built-in deposit type finds all its fields incl. trap_structure and host/*), fmt, clippy -D warnings, deny clean; gradlew build test 106/0; ./gametest.sh All 45 passed (everyClassInTheWorld 59/59, 240 samples 0 wrong); `stage structure --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-structure` → horizon_check=ok, 3.88 horizons/cell, 22,000 plutons (8,138 bodies), 50 frames published; structure 4.8 s of 122 s |
 | P1-08 | Bake, world data v1 and parity | todo | | | |
 | P1-09 | Climate mapping and biomes | todo | | | |
@@ -56,6 +56,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | p1-structure (P1-07: surface rock, bedrock, metamorphic grade, trap structure, plutons, six pole-to-pole cross-sections; trimmed to 23 MB) | https://spacesheep.dev/@benmac/deeptime-p1-structure | P1-07 rock classes and strata, 500 Myr 2026-09-29 | 2026-09-29 |
 | p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
 | p1-deposits-real (P1-14: deposits on the real 500 Myr history; not published, review/out/p1-deposits-real on the laptop and the Mac, 17 MB) | — | P1-14 real history 2026-09-29 | 2026-09-29 |
+| p1-amplify (P1-06: hill-shaded before/after views of L3 with a slider, D8 rivers of each terrain, the change, the tile corner and the seam, the drama slider; not published, review/out/p1-amplify on the laptop and the Mac, 16 MB) | — | P1-06 amplification 2026-09-29 | 2026-09-29 |
 | p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
 | q10-ev (Q10 evidence: the same deposits in MIC without and with Excavated Variants; cut screenshots, per-host ore table, costs, trade-offs) | https://spacesheep.dev/@benmac/deeptime-q10-ev | Q10 evidence 2026-09-28 | 2026-09-28 |
 | q10-map-plain (BlueMap, MIC without EV: 3 sites, surface + cut maps; linked from q10-ev) | https://spacesheep.dev/@benmac/deeptime-q10-map-plain | Q10 map without EV 2026-09-28 | 2026-09-28 |
@@ -70,6 +71,107 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — P1-06 young landscape, amplification and the detail layer (agent worktree agent-af500836f573f424e, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Two stages after the deposits in every planet preset with the sections `young` and `amplify`
+  (all four `pipeline_*` carry them, `{}` = the defaults): `young` (`surface/young.rs`) and `amplify`
+  (`surface/amplify.rs` + `amplify/{window, resample, kernels, tiles, tests}.rs`, `surface/thermal.rs`,
+  `surface/detail.rs`). New: `surface.drama` (0..2, default 1; the editor's slider, its lang key and field
+  existed, the pipeline presets now carry the path so the workbench lights it up),
+  `deeptime_format::TilePackWriter` (tiles in any order, index patched at the end, same bytes as
+  `write_tile_pack`), `StageContext.out_dir`, `amplify::register` (`finalize_write` lists the L3 layers in the
+  manifest), CLI `stage young|amplify` lines (`young_final=…`, `amplify_final=…`), `--set PATH=VALUE`
+  (edits the preset before a run or a checkpoint's preset before a later stage), the before/after views
+  (`crates/deeptime-cli/src/amplify_view.rs`, `viewer.js`/`index.html` section), `tools/review/amplify_extras.py`
+  (the drama figure), ramps for `young/*` and `amplify/*`, NOTICE.md (MultiScaleErosion, MIT, 964a3d5), FORMAT.md
+  ("The detail layer": layer, formula and the C-periodic noise the game adds), plan §8.2 "As built" and §10.3
+  "As run". Layers written: `rasters/elevation.dtr` (L3, i16, 1/16 block) and `rasters/detail/amplitude.dtr`
+  (L3, u8, 1/16 block); keyframes `young/{elevation, drainage}` and `amplify/{elevation, detail, drainage}`
+  (the workbench discovers them, no workbench change).
+- **Method.** *Young* (L2): L1 surface → L2 by Catmull–Rom clamped between the two nearest samples (no
+  coastal rims), depressions under 5 m filled (deeper ones are L1's lakes), 4 LEM steps of 0.5 Myr with the
+  deep-time physics (`pflood`, `routing`, `spl` with erosion–deposition and the critical slope, `diffusion`),
+  runoff weights from the climate fields, K from the surface rock, uplift = the last deep-time step's erosion
+  rate (`balance`), the clock not advanced. *Amplify*: `doublings(l2_r, l3_r)` ×2 levels (2 in every preset but
+  16k full). Per level, all on a window: upsample (terrain, the coarse level's exact drainage area as a prior,
+  runoff weight, erodibility, lake footprint grown a cell); relief seeding; Priority-Flood+ε (`flood_repair`;
+  outlets are the sea, the inherited lakes and open window edges); 40 erosion iterations (×3 on the levels
+  before the last) of multiple-flow drainage area (p = 2) refined from its prior and stream-power incision
+  (area term capped at 300 km², ≤ 30 % of the drop to the receiver per iteration, ≤ 3 × the initial drop to the
+  lowest neighbour in all, sea = base level, lakes and filled depressions untouched); 24 thermal iterations
+  (critical slope 0.6 × (0.25 + 0.75 · drama), ±25 % noise, pairwise excess-proportional transfer, mass
+  conserved); 12 deposition iterations (the eroded load along the same weights, settling where the capacity
+  falls under the load, capped at half the gap to the lowest higher neighbour: it cannot make a pit); the flood
+  again. **No new sinks:** the two floods leave every land cell outside the inherited lakes a strictly lower
+  neighbour; the stage counts violations over the finished cores (`notes.amplify.sinks`, 0 on every run) and the
+  tests count them on the assembled planet. **Tiles:** every pass is a Jacobi iteration on a window (x wraps when
+  the window holds every column, else the edge is replicated; a planet edge is absent), so a tile with a halo of
+  `radius + 2 · repair_margin + 3` cells (196 with the defaults; 136 in the first tuning) gives the whole-raster
+  bits; the flood is the one non-local pass, its reach (32 cells) is in the halo. The levels before the last
+  stream too (`LevelSink`) when the gauge says their buffers would not fit. **Detail layer:** amplitude =
+  min(drama · 0.12 · relief5, 6 · drama) blocks × (1 − smoothstep(25, 250 km²)); noise per FORMAT.md.
+- **How the parameters were chosen (all in `AmplifyParams`, editable with `--set amplify.KEY=V`).** On the real
+  500 Myr `pipeline_quick_16k` planet, by looking at the hill-shaded mountains and reading the flood's
+  largest raise. Findings that changed the design: erosion of a surface with an undrained pit carved
+  1-cell-wide slots 500 m deep ending in the pit (170 m of fill afterwards) → a flood after the seeding and
+  again at the end, filled depressions frozen against erosion, a cumulative cap on each cell's incision
+  (3 × its initial drop to its lowest neighbour: the largest fill is now 27 m, at a coast) and an area cap;
+  flow exponent 2 (1.5 combed the gullies); relief seeding 0.25; incision 8 m per iteration at 100 km² and
+  slope 0.1. A stronger setting (no cap) shows dramatic gullies but cuts 250–400 m off small steep
+  islands; a weaker one (cap 0.5) is nearly the interpolation. Ben's call, see below.
+- **Measured (Mac, M6, 12 threads, shared: load 18–38 during the runs).** `stage young --in deposits.dtcp` (a
+  500 Myr `pipeline_quick_16k` checkpoint made with `stage deposits`, 9 min 38 s) 7.6 s: land p50 2,518 → 2,645 m, p90 5,397 → 5,476,
+  max 10,578 → 10,594 (balance uplift keeps the relief), 7,558 lake cells, 972 small depressions filled, sinks 0
+  (setup 0.1, route 0.4, spl 1.8, diffusion 5.2 s). `stage amplify` 8192 × 4096 (L3 r = 2, 33.6 M cells; levels
+  2048 × 1024 → 4096 × 2048 → 8192 × 4096): **in memory 18.7 s** (passes over both levels: erode 7.6, thermal
+  3.3, deposit 3.3, flood 3.2, seed 0.1; sample 0.2, detail 0.4, sink 0.4), **one thread 53.2 s** (erode 24.1,
+  thermal 14.1, deposit 8.9, flood 2.9 (serial), seed 0.7; sample 1.2, detail 0.7), streamed with 8 tiles
+  25.1 s. Gauge 903 MiB in use before the stage; the last level needs 2,272 MiB whole (67 B a cell) and the
+  auto rule picks memory; process peak 5.3 GB in memory, 3.05 GB streamed (the checkpoint's world included).
+  **Streamed = in memory = one thread: all 512 of 512 tiles of both layers have identical CRCs** (`dtr_cmp.py`
+  over the tile indexes), sinks = 0, 15,684 cells raised by the first flood and 934 (≤ 27 m) by the last, mean
+  |Δ| over land 15.5 m, 7.1e4 km³ eroded of which 3.6e4 km³ left in transit, mean detail amplitude 0.29 / 1.16 /
+  2.32 blocks at drama 0.25 / 1 / 2. **134 M-cell L3** (`--set resolution.l2_r=4 --set resolution.l3_r=1` on the
+  same checkpoint: the size of 32k full): young at 4096 × 2048 30.7 s, amplify 16384 × 8192 **58.5 s**, streamed
+  (auto: 9,088 MiB whole, 1,221 MiB in use) in 32 tiles, middle level 8192 × 4096 whole (erode 23.9, thermal
+  11.2, flood 10.7, deposit 8.1, seed 0.8; sample 1.0, detail 1.0, sink 0.9); peak footprint 4.5 GB with the
+  checkpoint's world; L3 layers 164 MB + 45 MB. Gates on the tree merged with master da1827e (see the
+  commit): `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`, `deny check licenses bans`,
+  `test --workspace --locked` (core 204 + 2 ignored, cli 23, format 33, inspect 28 + 2 + 7, jni 7, viewer 5).
+- **What the pictures show** (review/out/p1-amplify; seven 512 × 512-cell views of 307 km at 16k quick (mountains, highlands, a coast, the biggest river's lower course, the deepest lake, a tile boundary, the seam),
+  before = L2 interpolated to L3 with no erosion pass, after = the L3 layer as the game reads it, sliding
+  comparison, D8 rivers of each terrain (≥ 80 km²), the height change, and the drama figure). Steep faces and
+  scarps that were smooth ramps grow gully and ridge networks a few km apart, the network is denser (rivers
+  6,288 → 9,403 cells in the mountain view), plateau tops, broad valley floors, plains and the sea floor do not
+  change; the change picture is blue (cut) on steep faces and red (a little fill) at valley mouths. The seam
+  view (a range and a coast crossing x = ±C/2) and the tile view (a tile boundary of the streamed run over a
+  plateau and its gullied escarpment, red ticks on the edges mark the boundary) show no mark. **Doubtful:** the gullies still run mostly along the grid's axes and 45° (multiple
+  flow on a square grid); D8 rivers on flat polar plains are drawn as straight lines by the viewer's drainage
+  analysis (a viewer artefact, not terrain); the coastlines keep the L2 staircase of the young landscape; the
+  drama slider changes the terrain only a little (thermal slumping reaches a few dozen cells) and the game-time
+  detail in proportion (0.29 → 2.32 blocks of mean amplitude).
+- **Deviations.** (1) Acceptance on `pipeline_quick_16k`, not `earthlike_*` (placeholders until P1-08).
+  (2) The stages sit after the deposits (the plan's §8 lists them before structure); nothing reads L2/L3 yet and
+  `stage deposits` stays fast. (3) Young adds erosion time without moving the clock (`t` stays 0); the plan's
+  "last 2–10 Myr" is redone on L2, not cut from L1's timeline. (4) Halo derived from the iteration counts
+  (196), not the plan's fixed 64; tile 2,048 as planned. (5) Working set 46–50 B a cell (67 with a tile's
+  copies) against 20; the estimate accounts for it and streams when the default cap says so. (6) Drama maps
+  to 0.25 + 0.75 · drama times the base slope (floor so that 0 is smooth, not flat). (7) Fine drainage area
+  refines the coarse level's exact area instead of starting from zero (Schott needs hundreds of iterations
+  for that). (8) The flood is a serial Priority-Flood per window, not a Jacobi pass; equality across tilings
+  rests on every depression the amplifier makes lying within `repair_margin_cells` of its spill (tested, and
+  identical on the real planet). (9) `water_level` (lakes) is not written: Phase 2.
+- **Findings for Ben / P1-17.** (1) Amplification is cheap: 19 s on 12 threads for 16k quick, 59 s for 32k
+  full's L3 size, with the erosion passes 40 % of it; P1-17 has room to raise the iterations if the pictures ask
+  for more. (2) The plan's 20 B/cell working set was not reachable with the arrays these passes need; 32k full
+  peaks near 4.5 GB with the world on the Mac, so the cap decides. (3) The surface stage keeps its scratch
+  after its last step (known issues). (4) The calibration agent's changes to `surface`/`climate` parameters
+  do not touch this; when it lands, tests that derive from a `pipeline_*` preset need the two `remove(...)`
+  lines. (5) 7.1e4 km³ eroded, half left "in transit": deposition only settles material within its reach
+  (12 cells), the rest leaves the amplifier (no mass claim beyond the pass).
+- **Next.** P1-08 bakes: it reads `world.notes["amplify"]` (layers, grid, preview) and the tile packs already
+  in the run folder (`rasters/elevation.dtr`, `rasters/detail/amplitude.dtr`) and adds `water_level`; the Java
+  `deeptime:terrain` term (`worldgen/DetailNoise`, formula in FORMAT.md) comes with it.
+
 ### 2026-09-29 — P1-20: the workbench UI overhaul, dark (agent worktree agent-a95571be05fdd89d6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Ben opened the workbench: "Sorry, that looks shit. … a complete UI overhaul to look WAYY better.
   (Also, should be dark themed.)" Then, from real use: he ran `earthlike_full_32k` for 4,600 Myr and got
@@ -2425,6 +2527,13 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
+- **P1-06 caveats.** (1) A checkpoint carries the preset it was made with, defaults included: to pick up
+  a changed default of a stage that has not run, resume with `--set "amplify={}"` (or the key). (2) Tests
+  that derive a small planet from a `pipeline_*` preset must remove the `young` and `amplify` sections
+  (their L2/L3 are far finer than a test's L1); every existing helper does. (3) The surface stage keeps its
+  L1 scratch after its last step, so the `young`/`amplify` estimates (world + own) exceed 4 GiB on the
+  full presets although the gauge reads ~1 GiB there; P1-17 could drop it. (4) The amplifier's working
+  set is 46 B a cell (67 B while a tile runs), not the plan's 20.
 - **Long runs (parked by Ben, 2026-09-29: "DW about it for now").** A real 4,600 Myr run (timeline max, plan
   §5.1) is estimated by the workbench at ~45 min / 3.8 GB (pipeline_quick_16k) and ~3 h / 14.6 GB
   (pipeline_full_32k, too big for the 16 GB Mac): the deposit engine's recorded history (a frame every
