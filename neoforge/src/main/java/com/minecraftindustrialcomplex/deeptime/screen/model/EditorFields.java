@@ -14,7 +14,7 @@ import java.util.Optional;
  * (P1-13) carry only {@code scale.circumference_blocks}, and the Rust core rejects unknown keys, so
  * these fields show as unavailable; when the real presets of P1-03…P1-17 land with their sections,
  * the fields light up without a screen change. If the real schema names a path differently, the
- * one line here changes ({@code EditorFieldsTest.realPresetsCarryEveryField} fails until it does).
+ * one line here changes ({@code ModelHelpersTest.realPresetsCarryEveryField} fails until it does).
  *
  * <p>The size (circumference) and the timeline are not in this list: every preset carries them
  * (the size picks the built-in preset; the timeline has no default, plan §5.1).
