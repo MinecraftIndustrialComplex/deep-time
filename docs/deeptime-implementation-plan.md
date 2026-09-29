@@ -1911,6 +1911,31 @@ CDG 1.3.15):
   before. MIC's KubeJS scripts do not use that hook (no `calculateOilChunks` anywhere under
   `pack/kubejs/` on 2026-09-28; the CDG hits are recipe scripts), so nothing of MIC's is bypassed.
 
+*As built in P1-16:* the mixins live in `mixin/compat/createoreexcavation/` and
+`mixin/compat/createdieselgenerators/` (the plugin gates a compat mixin by its package, which is the
+mod id); the decisions are plain Java in `compat/coe/CoeBridge` and `compat/cdg/CdgBridge` (vanilla
+types only), COE's and CDG's own calls for probes and tests in `CoeAccess`/`CdgAccess` (their
+`*Impl`, loaded reflectively when the mod is present). Signatures re-checked with javap on the MIC
+set's jars (sha512 = the pack's pins). **"A site covers the chunk"** = the site's `ore` bodies have
+blocks in the chunk's column (`compat/SiteChunks`: body volume per canonical chunk, computed once per
+site; the site whose ore fills the chunk most wins). **Vein ids** are read at run time from the
+`deeptime:deposit_type` registry (a pack remaps them by overriding the type's file in a datapack),
+falling back to the site record's; a site without products has no vein. **Claimed veins** = every
+loaded type's `coe_vein` plus those the site records name; the RETURN drops one unless the chunk is
+that vein's site. **q** = the site's present tonnage (after erosion and leaching) as a quantile of its
+type's split lognormal (`sizing.tonnage_mt`), equal to the core's drawn `tonnage_quantile` for intact
+deposits. A third COE mixin, `RandomSpreadGeneratorMixin` (RETURN of the private
+`pick(ServerLevel, ChunkPos, RecipeHolder)`), applies the same claimed-vein rule to COE's vein
+search (the vein finder's "far" line and `/coe locate`), which walks the placement grid and checks a
+chunk's stored vein only when the chunk is loaded. **CDG amount** per chunk = `round(cdg_charge_mb ×
+cdg_scale × the chunk's share of the ore body's volume)`, infinite (`Integer.MAX_VALUE`) above CDG's
+infinite threshold as in CDG's own generator; `cdg_scale` is a new `minecraft` key of the deposit
+type (default 1; `petroleum_trap` 0.02, judged: a median trap gives chunks of a few million mB, the
+cores of large traps reach CDG's infinite threshold). `compat/CompatHooks` loads the four target
+classes while the mod is constructed, so a drifted signature fails the boot rather than the first
+drill. Probes: `/deeptime probe coe|cdg <chunkX> <chunkZ>` (Deep Time's decision, the mod's stored
+state, `agrees`); `sites near` lists each site's `ore_chunk`.
+
 ### 7.15 Networking: required on both sides
 
 `RegisterPayloadHandlersEvent` → `event.registrar("1")` → `playToClient(WorldInfoPayload.TYPE,
@@ -3190,6 +3215,14 @@ a smoke benchmark and again at the end.
 - **Depends on.** P1-15.
 - **Acceptance.** `./gametest-planet.sh -PwithMic` → the five pass; the MIC smoke report contains
   `probe coe <chunk>` = the site's vein id and `probe cdg <chunk>` > 0 over a trap.
+- *As built (P1-16):* the mixins are `mixin/compat/createoreexcavation/{OreVeinGeneratorMixin,
+  OreDataMixin, RandomSpreadGeneratorMixin}` and `mixin/compat/createdieselgenerators/
+  OilChunksSavedDataMixin` (the plugin gates by package); plus `compat/{SiteChunks, CompatHooks}`,
+  `compat/coe/{CoeAccess, CoeAccessImpl}`, `compat/cdg/{CdgAccess, CdgAccessImpl}`,
+  `server/CompatCommands` and the deposit-type key `minecraft.cdg_scale` (§7.14 "As built"). The
+  five tests run on the GameTest server's Deep Time level `deeptime:test_deposits` (P1-15's synthetic
+  deposit world; the flat overworld is the control), so `./gametest.sh -PwithMic` is their gate;
+  `./gametest.sh` runs Deep Time's side of each and skips the mods' calls.
 - **Ben reviews.** The report's COE/CDG table.
 
 #### P1-17 Benchmark gate and preset tuning

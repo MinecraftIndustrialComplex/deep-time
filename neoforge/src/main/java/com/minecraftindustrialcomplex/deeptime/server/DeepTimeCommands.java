@@ -59,7 +59,18 @@ public final class DeepTimeCommands {
                                                 .executes(c -> SiteCommands.probeSite(c.getSource(),
                                                         IntegerArgumentType.getInteger(c, "x"), IntegerArgumentType.getInteger(c, "y"),
                                                         IntegerArgumentType.getInteger(c, "z")))))))
-                .then(Commands.literal("claims").executes(c -> SiteCommands.probeClaims(c.getSource())));
+                .then(Commands.literal("claims").executes(c -> SiteCommands.probeClaims(c.getSource())))
+                // P1-16: what Deep Time and COE / CDG hold for a chunk (work without the mods too).
+                .then(Commands.literal("coe")
+                        .then(Commands.argument("chunkX", IntegerArgumentType.integer())
+                                .then(Commands.argument("chunkZ", IntegerArgumentType.integer())
+                                        .executes(c -> CompatCommands.probeCoe(c.getSource(),
+                                                IntegerArgumentType.getInteger(c, "chunkX"), IntegerArgumentType.getInteger(c, "chunkZ"))))))
+                .then(Commands.literal("cdg")
+                        .then(Commands.argument("chunkX", IntegerArgumentType.integer())
+                                .then(Commands.argument("chunkZ", IntegerArgumentType.integer())
+                                        .executes(c -> CompatCommands.probeCdg(c.getSource(),
+                                                IntegerArgumentType.getInteger(c, "chunkX"), IntegerArgumentType.getInteger(c, "chunkZ"))))));
         var gametest = Commands.literal("gametest").requires(s -> GameTestSupport.enabled());
         // Sable is optional: its probe and test commands exist only when it is loaded, and every
         // Sable call goes through SableTestOps (loaded on first use).
