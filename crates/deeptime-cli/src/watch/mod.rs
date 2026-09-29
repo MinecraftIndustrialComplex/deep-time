@@ -798,4 +798,127 @@ mod tests {
         served.stop();
         std::fs::remove_dir_all(&dir).unwrap();
     }
+
+    /// The bug (pipeline_full_32k, supercontinent, 1000 Myr: estimate ~5.5 GB against the 4 GiB
+    /// cap, "can_run": true, and a run that failed 15 minutes in): the POST that creates a run
+    /// refuses it, whatever the page said, and creates nothing; the estimate the form shows is
+    /// held to the same cap (`--mem-cap`, else 4 GiB; the editor's field overrides both).
+    #[test]
+    fn the_run_request_refuses_a_run_over_its_memory_cap() {
+        let dir = tmp("memcap");
+        let big =
+            load_preset_with("pipeline_full_32k", Some("supercontinent"), Some(1000.0)).unwrap();
+        let form = json!({
+            "preset": "pipeline_full_32k", "start": "supercontinent", "length_myr": 1000,
+        });
+        let cap_of = |list: &Value, id: &str| {
+            list["runs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|r| r["id"] == id)
+                .map(|r| r["mem_cap"].clone())
+        };
+
+        // No --mem-cap: the core's 4 GiB.
+        let runs = dir.join("runs");
+        let served = serve(&options(&runs, 8, LOCAL)).unwrap();
+        let addr = served.addr();
+        served.wb.hold(true);
+        assert_eq!(get_json(addr, "/api/catalog")["mem_cap_bytes"], 4u64 << 30);
+        let (status, eff) = post(addr, "/api/preset", &form);
+        assert_eq!(status, 200);
+        assert_eq!(eff["can_run"], false, "{eff}");
+        let reason = eff["problems"][0].as_str().unwrap().to_owned();
+        assert!(reason.contains("the memory cap is 4 GiB"), "{reason}");
+        for extra in [json!({}), json!({ "cap_gib": 4 }), json!({ "cap_gib": 0 })] {
+            let mut body = json!({ "json": big, "label": "too big" });
+            body.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            let (status, refused) = post(addr, "/api/runs", &body);
+            assert_eq!(status, 400, "{refused}");
+            assert_eq!(
+                refused["error"],
+                reason.as_str(),
+                "the form's reason, word for word"
+            );
+        }
+        let (status, refused) = post(addr, "/api/runs", &json!({ "json": big, "cap_gib": 0.1 }));
+        assert_eq!(status, 400);
+        assert!(
+            refused["error"]
+                .as_str()
+                .unwrap()
+                .contains("at least 0.25 GiB")
+        );
+        assert_eq!(
+            get_json(addr, "/api/runs")["runs"],
+            json!([]),
+            "nothing was created"
+        );
+        assert!(
+            std::fs::read_dir(&runs).unwrap().next().is_none(),
+            "no run folder either"
+        );
+
+        // A raised cap in the editor's field starts it (queued: the queue is held), and the run
+        // keeps the cap it got.
+        let mut raised = form.clone();
+        raised["cap_gib"] = json!(8);
+        let (_, eff) = post(addr, "/api/preset", &raised);
+        assert_eq!(eff["can_run"], true, "{eff}");
+        let (status, created) = post(addr, "/api/runs", &json!({ "json": big, "cap_gib": 8 }));
+        assert_eq!(status, 201, "{created}");
+        let id = created["id"].as_str().unwrap().to_owned();
+        assert_eq!(
+            cap_of(&get_json(addr, "/api/runs"), &id),
+            Some(json!(8u64 << 30))
+        );
+        assert_eq!(run_state(addr, &id)["state"], "queued");
+        assert_eq!(
+            post(addr, &format!("/api/runs/{id}/cancel"), &json!({})).0,
+            200
+        );
+        served.stop();
+
+        // --mem-cap 8 GiB: the default of every run whose field is unset or 0.
+        let mut o = options(&runs, 8, LOCAL);
+        o.common.mem_cap = 8 << 30;
+        let served = serve(&o).unwrap();
+        let addr = served.addr();
+        served.wb.hold(true);
+        assert_eq!(get_json(addr, "/api/catalog")["mem_cap_bytes"], 8u64 << 30);
+        let (_, eff) = post(addr, "/api/preset", &form);
+        assert_eq!(eff["can_run"], true, "{eff}");
+        assert_eq!(eff["cap_bytes"], 8u64 << 30);
+        for extra in [json!({}), json!({ "cap_gib": 0 })] {
+            let mut body = json!({ "json": big });
+            body.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            let (status, created) = post(addr, "/api/runs", &body);
+            assert_eq!(status, 201, "{created}");
+            let id = created["id"].as_str().unwrap().to_owned();
+            assert_eq!(
+                cap_of(&get_json(addr, "/api/runs"), &id),
+                Some(json!(8u64 << 30))
+            );
+            assert_eq!(
+                post(addr, &format!("/api/runs/{id}/cancel"), &json!({})).0,
+                200
+            );
+        }
+        // The field can still lower it for one run.
+        let (status, refused) = post(addr, "/api/runs", &json!({ "json": big, "cap_gib": 4 }));
+        assert_eq!(status, 400);
+        assert!(
+            refused["error"]
+                .as_str()
+                .unwrap()
+                .contains("the memory cap is 4 GiB")
+        );
+        served.stop();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

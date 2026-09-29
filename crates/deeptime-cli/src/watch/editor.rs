@@ -15,12 +15,33 @@
 //!   `preset/ShareCode` is tested against it), validation and the estimate by the core.
 //! - **Labels**: the game's lang file (`deeptime.editor.*`).
 //!
+//! - **Memory**: a run whose estimated peak is over its memory cap is refused, by the same rule
+//!   in the form's answer ([`Catalog::effective`], the reason Run is off) and in the request that
+//!   starts a run ([`Catalog::within_cap`]), so a stale page cannot start it either. The cap is the
+//!   editor's field when set, else the workbench's default (`deeptime watch --mem-cap`, else the
+//!   core's 4 GiB).
+//!
 //! The server computes the effective preset (not the page), so these rules live in one language
 //! beside the game's.
 
 use deeptime_core::preset::{self, LENGTH_MYR_RANGE, Preset, StartConfig};
+use deeptime_core::session::DEFAULT_MEM_CAP;
 use deeptime_core::{params, session, share_code};
 use serde_json::{Map, Value, json};
+
+/// The smallest memory cap the editor takes, in GiB (the game's `EditorModel.MIN_CAP_GIB`).
+pub const MIN_CAP_GIB: f64 = 0.25;
+
+const GIB: f64 = (1u64 << 30) as f64;
+
+/// What the process holds beyond the stages' estimate (`session::estimate`): the server, the
+/// preset, the frames of the run being watched. The memory cap counts the whole process (the
+/// allocator's gauge), so a run needs its estimate plus this. Measured on the Mac (2026-09-29,
+/// release build, private workbench): a finished run's peak minus its estimate was +0.40 GB for
+/// `pipeline_quick_16k` at 100, 250 and 500 Myr and +0.49 GB for `pipeline_full_32k` at 30 Myr,
+/// so the estimate alone runs low by about that much. A preset that estimates nothing (the
+/// placeholders) needs nothing.
+pub const SERVER_OVERHEAD_BYTES: u64 = 512 << 20;
 
 /// One editable parameter (an entry of `editor_fields.json`).
 #[derive(Debug, Clone)]
@@ -52,6 +73,8 @@ pub struct Catalog {
     fields_json: Value,
     presets: Vec<PresetEntry>,
     labels: Value,
+    /// The memory cap of a run whose editor field is 0 or unset, in bytes.
+    default_cap: u64,
 }
 
 /// `pipeline_quick_16k` → `pipeline_quick` (`EditorModel.familyOf`).
@@ -152,7 +175,36 @@ impl Catalog {
             fields_json,
             presets,
             labels: Value::Object(labels),
+            default_cap: DEFAULT_MEM_CAP,
         })
+    }
+
+    /// The workbench's default memory cap (`--mem-cap`); 0 keeps the core's 4 GiB.
+    pub fn with_default_cap(mut self, bytes: u64) -> Catalog {
+        if bytes != 0 {
+            self.default_cap = bytes;
+        }
+        self
+    }
+
+    /// The memory cap of a run whose editor field is 0 or unset, in bytes.
+    pub fn default_cap(&self) -> u64 {
+        self.default_cap
+    }
+
+    /// A request's memory cap in bytes: `cap_gib` when given (a number from [`MIN_CAP_GIB`] up),
+    /// else the default (absent, null or 0), or why the field is refused.
+    pub fn cap_bytes(&self, cap_gib: &Value) -> Result<u64, String> {
+        match cap_gib {
+            Value::Null => Ok(self.default_cap),
+            v => match v.as_f64() {
+                Some(0.0) => Ok(self.default_cap),
+                Some(g) if g.is_finite() && g >= MIN_CAP_GIB => Ok((g * GIB) as u64),
+                _ => Err(format!(
+                    "the memory cap must be a number of at least {MIN_CAP_GIB} GiB"
+                )),
+            },
+        }
     }
 
     #[cfg(test)]
@@ -176,15 +228,26 @@ impl Catalog {
             "labels": self.labels,
             "start_configs": StartConfig::ALL.iter().map(|c| c.name()).collect::<Vec<_>>(),
             "length_myr": { "min": LENGTH_MYR_RANGE.0, "max": LENGTH_MYR_RANGE.1 },
+            "mem_cap_bytes": self.default_cap,
+            "min_cap_gib": MIN_CAP_GIB,
+            "server_overhead_bytes": SERVER_OVERHEAD_BYTES,
         })
     }
 
     /// `POST /api/preset`: the effective preset of a form state
     /// `{"preset": <built-in name>} | {"imported": <preset object>}`, `"start"`, `"length_myr"`,
-    /// `"fields": {id: value}` → the canonical JSON, its share code, each field's availability and
-    /// value, the problems, and the core's estimate once the preset is complete.
+    /// `"fields": {id: value}`, `"cap_gib"` (the memory cap field; 0 or absent = the default) →
+    /// the canonical JSON, its share code, each field's availability and value, the problems, the
+    /// core's estimate once the preset is complete, what the run needs of the cap (`needed_bytes`:
+    /// the estimate's peak plus [`SERVER_OVERHEAD_BYTES`]) and the cap it was held to
+    /// (`cap_bytes`). A run that needs more than its cap is `can_run: false`, with the reason
+    /// among the problems.
     pub fn effective(&self, req: &Value) -> Value {
         let mut problems: Vec<String> = Vec::new();
+        let cap = self.cap_bytes(&req["cap_gib"]).unwrap_or_else(|e| {
+            problems.push(e);
+            self.default_cap
+        });
         let mut field_problems = Map::new();
         let (mut base, name) = match (req["preset"].as_str(), req.get("imported")) {
             (Some(n), _) => match self.preset(n) {
@@ -242,10 +305,15 @@ impl Catalog {
             Err(e) => return json!({ "error": e.to_string() }),
         };
         let mut estimate = Value::Null;
+        let mut needed = None;
         if problems.is_empty() {
             match Preset::from_json(&json).and_then(|p| p.check_runnable()) {
                 Ok(()) => match session::estimate(&json, "") {
-                    Ok(e) => estimate = serde_json::from_str(&e).unwrap_or(Value::Null),
+                    Ok(e) => {
+                        estimate = serde_json::from_str(&e).unwrap_or(Value::Null);
+                        needed = needed_bytes(&estimate);
+                        problems.extend(over_cap(&estimate, cap));
+                    }
                     Err(e) => problems.push(e.to_string()),
                 },
                 Err(e) => problems.push(e.to_string()),
@@ -261,6 +329,8 @@ impl Catalog {
             "field_problems": field_problems,
             "problems": problems,
             "estimate": estimate,
+            "needed_bytes": needed,
+            "cap_bytes": cap,
             "can_run": problems.is_empty(),
         })
     }
@@ -336,6 +406,56 @@ impl Catalog {
         p.check_runnable().map_err(|e| e.to_string())?;
         share_code::canonical(json).map_err(|e| e.to_string())
     }
+
+    /// Whether a run of `json` (complete and runnable) fits a memory cap of `cap` bytes: the rule
+    /// of [`Catalog::effective`] applied again where the run is created, so a page that predates
+    /// it, or never asked, cannot start a run that would only fail on the cap later.
+    pub fn within_cap(&self, json: &str, cap: u64) -> Result<(), String> {
+        let estimate = session::estimate(json, "").map_err(|e| e.to_string())?;
+        let estimate: Value = serde_json::from_str(&estimate).map_err(|e| e.to_string())?;
+        over_cap(&estimate, cap).map_or(Ok(()), Err)
+    }
+}
+
+/// What a run needs of the memory cap: the estimate's peak plus [`SERVER_OVERHEAD_BYTES`] (0 for
+/// a preset that estimates nothing); `None` when there is no estimate.
+fn needed_bytes(estimate: &Value) -> Option<u64> {
+    let peak = estimate["peak_bytes"].as_u64()?;
+    Some(if peak == 0 {
+        0
+    } else {
+        peak.saturating_add(SERVER_OVERHEAD_BYTES)
+    })
+}
+
+/// The reason a run does not fit `cap` bytes of memory, or `None` when it does: what it needs
+/// against the cap the run gets.
+fn over_cap(estimate: &Value, cap: u64) -> Option<String> {
+    let needed = needed_bytes(estimate)?;
+    (needed > cap).then(|| {
+        format!(
+            "needs about {} (the estimate, {}, and {} for the server itself); the memory cap is \
+             {}: raise the cap in Memory, or shorten the run or pick a smaller preset",
+            gib_up(needed),
+            gib_up(needed - SERVER_OVERHEAD_BYTES),
+            gib_up(SERVER_OVERHEAD_BYTES),
+            gib(cap)
+        )
+    })
+}
+
+/// `bytes` in GiB to one decimal, rounded up (so a run just over the cap never reads as equal).
+fn gib_up(bytes: u64) -> String {
+    if bytes < 1 << 30 {
+        return format!("{} MiB", bytes.div_ceil(1 << 20));
+    }
+    format!("{:.1} GiB", (bytes as f64 / GIB * 10.0).ceil() / 10.0)
+}
+
+/// A cap in GiB, without trailing zeros (`4 GiB`, `0.25 GiB`).
+fn gib(bytes: u64) -> String {
+    let text = format!("{:.2}", bytes as f64 / GIB);
+    format!("{} GiB", text.trim_end_matches('0').trim_end_matches('.'))
 }
 
 #[cfg(test)]
@@ -503,5 +623,114 @@ mod tests {
         );
         let no_timeline = c.effective(&json!({ "preset": "pipeline_quick_16k" }));
         assert!(c.runnable(no_timeline["json"].as_str().unwrap()).is_err());
+    }
+
+    /// The bug: `pipeline_full_32k`, supercontinent, 1000 Myr estimates about 5.5 GB, and the
+    /// workbench answered `can_run: true` against a 4 GiB cap; the run failed 15 minutes in
+    /// ("needed 4300143147 bytes, cap 4294967296 bytes"). The estimate is held to the run's cap now:
+    /// the editor's field when set, else the workbench's default.
+    #[test]
+    fn a_run_over_its_memory_cap_is_refused_and_a_raised_cap_allows_it() {
+        let c = cat();
+        assert_eq!(c.default_cap(), DEFAULT_MEM_CAP);
+        let req = json!({
+            "preset": "pipeline_full_32k", "start": "supercontinent", "length_myr": 1000,
+        });
+        let r = c.effective(&req);
+        let peak = r["estimate"]["peak_bytes"].as_u64().unwrap();
+        assert!(
+            peak > DEFAULT_MEM_CAP && peak + SERVER_OVERHEAD_BYTES < 8 << 30,
+            "the scenario: over 4 GiB, within 8 GiB (peak {peak})"
+        );
+        assert_eq!(r["can_run"], false, "{r:#}");
+        assert_eq!(r["cap_bytes"], DEFAULT_MEM_CAP);
+        let reason = r["problems"][0].as_str().unwrap();
+        assert!(reason.starts_with("needs about "), "{reason}");
+        assert!(reason.contains("for the server itself"), "{reason}");
+        assert!(reason.contains("the memory cap is 4 GiB"), "{reason}");
+        assert!(reason.contains("raise the cap in Memory"), "{reason}");
+        assert_eq!(r["problems"].as_array().unwrap().len(), 1);
+        assert!(
+            c.within_cap(r["json"].as_str().unwrap(), DEFAULT_MEM_CAP)
+                .is_err()
+        );
+
+        // The editor's field raises the cap for this run; the estimate is unchanged.
+        let mut raised = req.clone();
+        raised["cap_gib"] = json!(8);
+        let r8 = c.effective(&raised);
+        assert_eq!(r8["problems"], json!([]), "{r8:#}");
+        assert_eq!(r8["can_run"], true);
+        assert_eq!(r8["cap_bytes"], 8u64 << 30);
+        assert_eq!(r8["estimate"]["peak_bytes"], r["estimate"]["peak_bytes"]);
+        assert!(c.within_cap(r8["json"].as_str().unwrap(), 8 << 30).is_ok());
+
+        // What the run needs is the estimate plus the server's own memory (the estimate alone ran
+        // low by that much when measured). A cap just under it still refuses; just over allows.
+        let needed = r["needed_bytes"].as_u64().unwrap();
+        assert_eq!(needed, peak + SERVER_OVERHEAD_BYTES);
+        let gib_of = |bytes: u64| bytes as f64 / (1u64 << 30) as f64;
+        let mut edge = req.clone();
+        edge["cap_gib"] = json!(gib_of(needed) - 0.01);
+        assert_eq!(c.effective(&edge)["can_run"], false);
+        edge["cap_gib"] = json!(gib_of(needed) + 0.01);
+        assert_eq!(c.effective(&edge)["can_run"], true);
+        edge["cap_gib"] = json!(gib_of(peak) + 0.01);
+        assert_eq!(
+            c.effective(&edge)["can_run"],
+            false,
+            "the estimate alone would have fitted"
+        );
+
+        // The workbench's default (`--mem-cap`) is what a run without a field gets; 0 is "unset";
+        // a field still overrides it in either direction.
+        let c8 = Catalog::load().unwrap().with_default_cap(8 << 30);
+        assert_eq!(c8.to_json()["mem_cap_bytes"], 8u64 << 30);
+        let d = c8.effective(&req);
+        assert_eq!(d["can_run"], true, "{d:#}");
+        assert_eq!(d["cap_bytes"], 8u64 << 30);
+        let mut zero = req.clone();
+        zero["cap_gib"] = json!(0);
+        assert_eq!(c8.effective(&zero)["can_run"], true);
+        let mut four = req.clone();
+        four["cap_gib"] = json!(4);
+        let f = c8.effective(&four);
+        assert_eq!(f["can_run"], false);
+        assert!(
+            f["problems"][0]
+                .as_str()
+                .unwrap()
+                .contains("the memory cap is 4 GiB")
+        );
+        assert_eq!(
+            Catalog::load().unwrap().with_default_cap(0).default_cap(),
+            DEFAULT_MEM_CAP,
+            "0 keeps the core's default"
+        );
+
+        // A cap the editor cannot take is a problem of its own (the game's minimum, 0.25 GiB).
+        for bad in [json!(0.1), json!(-3), json!("lots")] {
+            let mut b = req.clone();
+            b["cap_gib"] = bad;
+            let r = c.effective(&b);
+            assert_eq!(r["can_run"], false);
+            assert!(
+                r["problems"][0]
+                    .as_str()
+                    .unwrap()
+                    .contains("at least 0.25 GiB"),
+                "{r:#}"
+            );
+        }
+        // Small runs are untouched by a small cap.
+        let small = c.effective(&json!({
+            "preset": "pipeline_quick_16k", "start": "random", "length_myr": 50, "cap_gib": 4,
+        }));
+        assert_eq!(small["can_run"], true, "{small:#}");
+        assert_eq!(gib_up(5_532_931_904), "5.2 GiB");
+        assert_eq!(gib_up(3 << 29), "1.5 GiB");
+        assert_eq!(gib_up(100 << 20), "100 MiB");
+        assert_eq!(gib(4 << 30), "4 GiB");
+        assert_eq!(gib(1 << 28), "0.25 GiB");
     }
 }

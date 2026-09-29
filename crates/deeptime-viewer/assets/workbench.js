@@ -1648,12 +1648,13 @@
       h += `<div class="runcard" style="cursor:default;animation:none"><div class="prog" style="margin-top:0"><div class="bar"><span style="width:${100 * (pg.p || 0)}%"></span></div>` +
         `<div class="row"><span><b>${(100 * (pg.p || 0)).toFixed(1)}%</b> · ${esc(pr.stage || '')}</span><span>${esc(etaText(pg))}</span></div></div></div>`;
     }
+    const runCap = (lastRuns.find(x => x.id === r.id) || {}).mem_cap;
     const rows = [
       ['Preset', `${esc(presetName(m.preset))} <span class="dim mono">${esc(m.preset)}</span>`], ['Start', esc(startName(m.start) || '—')],
       ['Length', esc(m.length_myr ? `${fmtInt(m.length_myr)} Myr` : '—')], ['Stages', esc((m.stages || []).join(' → '))],
       ['Size', esc(`${fmtInt(m.circumference)} blocks around`)],
       ['Elapsed', esc(pr.elapsed_ms !== undefined ? fmtDur(pr.elapsed_ms) : st.seconds ? fmtDur(st.seconds * 1000) : '—')],
-      ['Peak memory', esc(pr.bytes_peak ? fmtBytes(pr.bytes_peak) : '—')], ['Threads', esc(m.threads || '—')],
+      ['Peak memory', esc(pr.bytes_peak ? fmtBytes(pr.bytes_peak) : '—')], ['Memory cap', esc(runCap ? fmtBytes(runCap) : '—')], ['Threads', esc(m.threads || '—')],
       ['Created', esc(m.created_utc ? `${m.created_utc.replace('T', ' ').replace(/:\d\dZ$/, 'Z')} (${relTime(m.created_utc)})` : '—')],
       ['Core', esc(m.version || '—')],
     ];
@@ -2175,7 +2176,14 @@
   // =================================================================================================
   let catalog = null, eff = null, effSeq = 0, effTimer = null, estimating = false;
   let showPlaceholders = store.get('showPlaceholders', false);
-  const form = { preset: null, imported: null, start: '', length: '', fields: {}, cap: 4 };
+  // cap: the memory cap field in GiB; the server sets it to the workbench's default (deeptime watch
+  // --mem-cap) when the catalogue arrives. 0 or empty means "the default", as the server reads it.
+  const form = { preset: null, imported: null, start: '', length: '', fields: {}, cap: 0 };
+  const defaultCapGiB = () => catalog && catalog.mem_cap_bytes ? catalog.mem_cap_bytes / 2 ** 30 : 4;
+  const capGiB = () => form.cap > 0 ? form.cap : defaultCapGiB();
+  // What the server is told: nothing (0) while the field holds the default, so the server's own default applies.
+  const capToSend = () => form.cap === 0 || Math.abs(form.cap - defaultCapGiB()) < 1e-9 ? 0 : form.cap;
+  const fmtCap = g => `${Number(g.toFixed(2))} GiB`;
   const L = (key, ...args) => {
     let s = catalog && catalog.labels[`deeptime.editor.${key}`];
     if (s === undefined || s === null) return null;
@@ -2224,8 +2232,9 @@
       `<div class="field"><div class="fh"><label for="f_length">History length</label><span class="val">${esc(L('timeline.length.hint', catalog.length_myr.min, fmtInt(catalog.length_myr.max)) || '')} Myr</span></div>` +
       `<div class="ctl"><input type="range" id="f_lenr" min="0" max="1000" aria-label="History length"><div class="withunit"><input class="input" type="number" id="f_length" min="${catalog.length_myr.min}" max="${catalog.length_myr.max}" step="any" placeholder="—"><span class="unit">Myr</span></div></div>` +
       `<div class="quick" id="f_quick">${QUICK_LENGTHS.map(v => `<button type="button" data-len="${v}">${fmtInt(v)} Myr</button>`).join('')}</div></div>`);
-    h += sec('memory', esc(L('section.memory') || 'Memory'), L('cap.tooltip') || '',
-      `<div class="field"><div class="fh"><label for="f_cap">${esc(L('cap') || 'Memory cap (GiB)')}</label></div><div class="ctl"><input type="range" id="f_capr" min="1" max="32" step="0.25" aria-label="Memory cap"><div class="withunit"><input class="input" type="number" id="f_cap" min="0.25" step="0.25" value="4"><span class="unit">GiB</span></div></div></div>`);
+    // Not the game's tooltip ("Default 4 GiB"): this workbench has its own default, and refuses a run over its cap.
+    h += sec('memory', esc(L('section.memory') || 'Memory'), `The simulation's own memory. The default is ${fmtCap(defaultCapGiB())}; a run whose estimate is over its cap is refused before it starts, not partway through. Raise it for one run if the Mac has the RAM.`,
+      `<div class="field"><div class="fh"><label for="f_cap">${esc(L('cap') || 'Memory cap (GiB)')}</label><span class="val" id="f_capval"></span></div><div class="ctl"><input type="range" id="f_capr" min="1" max="${Math.max(32, Math.ceil(defaultCapGiB()))}" step="0.25" aria-label="Memory cap"><div class="withunit"><input class="input" type="number" id="f_cap" min="${catalog.min_cap_gib || 0.25}" step="0.25" value="${form.cap}"><span class="unit">GiB</span></div></div></div>`);
     const sections = [];
     for (const f of catalog.fields) if (!sections.includes(f.section)) sections.push(f.section);
     for (const s of sections) {
@@ -2297,9 +2306,10 @@
       form.length = String(v >= 100 ? Math.round(v / 10) * 10 : v >= 10 ? Math.round(v) : Number(v.toFixed(1)));
       $('f_length').value = form.length; lengthUI(); refresh();
     });
-    $('f_cap').addEventListener('input', () => { form.cap = Number($('f_cap').value); $('f_capr').value = form.cap; fillRange($('f_capr')); renderEstimate(); });
-    $('f_capr').addEventListener('input', () => { form.cap = Number($('f_capr').value); $('f_cap').value = form.cap; fillRange($('f_capr')); renderEstimate(); });
-    $('f_capr').value = form.cap; fillRange($('f_capr'));
+    // A new cap changes the answer (can this run?), which the server decides: ask it again.
+    $('f_cap').addEventListener('input', () => { form.cap = Number($('f_cap').value); $('f_capr').value = capGiB(); fillRange($('f_capr')); capNote(); refresh(); });
+    $('f_capr').addEventListener('input', () => { form.cap = Number($('f_capr').value); $('f_cap').value = form.cap; fillRange($('f_capr')); capNote(); refresh(); });
+    $('f_capr').value = capGiB(); fillRange($('f_capr')); capNote();
     $('f_reset').addEventListener('click', () => { form.fields = {}; refresh(true); toast('Parameters reset to the preset', 'ok'); });
     for (const f of catalog.fields) {
       const input = fm.querySelector(`[data-f="${f.id}"]`), slider = fm.querySelector(`[data-r="${f.id}"]`);
@@ -2380,6 +2390,14 @@
     refresh(true);
   }
 
+  // The cap in use, beside the field: the default, or the raised/lowered value for this run.
+  function capNote() {
+    const el = $('f_capval');
+    if (!el) return;
+    const g = capGiB(), d = defaultCapGiB();
+    el.textContent = Math.abs(g - d) < 1e-9 ? `${fmtCap(g)} · the default` : `${fmtCap(g)} for this run · default ${fmtCap(d)}`;
+  }
+
   function refresh(now) {
     clearTimeout(effTimer);
     estimating = true; renderEstimate();
@@ -2389,6 +2407,7 @@
   async function computeEffective() {
     const seq = ++effSeq;
     const req = { fields: form.fields };
+    if (capToSend() !== 0) req.cap_gib = capToSend();
     if (form.imported) req.imported = form.imported; else req.preset = form.preset;
     if (form.start) req.start = form.start;
     if (form.length !== '' && isFinite(Number(form.length))) req.length_myr = Number(form.length);
@@ -2422,7 +2441,7 @@
       note.querySelector('span').textContent = sec.dataset.sec === 's_fantasy' ? (L('field.phase3') || 'Arrives in Phase 3.') : 'This preset has none of these yet: they arrive with the simulation stages.';
       if (had !== String(off)) { sec.dataset.off = String(off); sec.classList.toggle('closed', off); }
     }
-    const probs = eff.problems.map(p => `<li data-prob="${esc(p)}">${ic('alert', 'ic-s')}<span>${esc(cap1(p))}</span></li>`);
+    const probs = eff.problems.map(p => `<li${/memory cap/.test(p) ? ' class="err"' : ''} data-prob="${esc(p)}">${ic('alert', 'ic-s')}<span>${esc(cap1(p))}</span></li>`);
     $('problems').innerHTML = probs.join('');
     $('sharecode').textContent = eff.share_code || '—';
     renderEstimate();
@@ -2433,31 +2452,42 @@
     if (!li) return;
     const p = li.dataset.prob;
     const target = /continents start/.test(p) ? $('f_start') : /length|million years/.test(p) ? $('f_length') : /red fields|not valid/.test(p) ? document.querySelector('.field.invalid .input') : /memory cap|GiB cap/.test(p) ? $('f_cap') : null;
-    if (target) { target.scrollIntoView({ block: 'center', behavior: reducedMotion.matches ? 'auto' : 'smooth' }); (target.querySelector('button') || target).focus(); }
+    if (target) {
+      const sec = target.closest('.ed-sec');
+      if (sec) sec.classList.remove('closed');   // a folded section would hide the field it is about
+      target.scrollIntoView({ block: 'center', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+      (target.querySelector('button') || target).focus();
+    }
   });
 
   function estimateSeconds() {
     const e = eff && eff.estimate;
     return e && e.stages ? e.stages.reduce((s, x) => s + (x.seconds || 0), 0) : null;
   }
-  function overCap() { const e = eff && eff.estimate; return !!(e && e.peak_bytes && e.peak_bytes > form.cap * 2 ** 30); }
+  // The server decides (eff.can_run holds the reason among eff.problems); this keeps Run off in the
+  // moment between a new cap and the server's answer, and draws the bar.
+  // What the run needs of the cap: the estimate's peak plus the server's own memory (the server adds it).
+  const neededBytes = () => { const e = eff && !eff.error ? eff.estimate : null; return e && e.peak_bytes ? (eff.needed_bytes || e.peak_bytes) : 0; };
+  function overCap() { return neededBytes() > capGiB() * 2 ** 30; }
   function renderEstimate() {
     const box = $('estimate');
     const e = eff && !eff.error ? eff.estimate : null;
-    const cap = form.cap * 2 ** 30;
+    const cap = capGiB() * 2 ** 30;
+    const capText = Math.abs(capGiB() - defaultCapGiB()) < 1e-9 ? `cap ${fmtCap(capGiB())} · default` : `cap ${fmtCap(capGiB())} · default ${fmtCap(defaultCapGiB())}`;
     if (!e || !e.peak_bytes) {
       const why = estimating ? 'Estimating…' : 'After start and length';
-      box.innerHTML = `<div class="est pending"><div class="k">${ic('chip', 'ic-s')}Peak memory</div><div class="v">—</div><div class="sub">${esc(why)}</div></div>` +
+      box.innerHTML = `<div class="est pending"><div class="k">${ic('chip', 'ic-s')}Peak memory</div><div class="v">—</div><div class="sub">${esc(why)} · ${esc(capText)}</div></div>` +
         `<div class="est pending"><div class="k">${ic('clock', 'ic-s')}Time on the Mac</div><div class="v">—</div><div class="sub">${esc(why)}</div></div>`;
       warnings(null);
       return;
     }
-    const secs = estimateSeconds(), scale = Math.max(cap * 1.15, e.peak_bytes * 1.05), over = e.peak_bytes > cap;
-    const [mv, mu] = fmtBytes(e.peak_bytes).split(' ');
+    const need = neededBytes();
+    const secs = estimateSeconds(), scale = Math.max(cap * 1.15, need * 1.05), over = need > cap;
+    const [mv, mu] = fmtBytes(need).split(' ');
     const tt = fmtHuman(secs).split(' ');
-    box.innerHTML = `<div class="est${estimating ? ' pending' : ''}"><div class="k">${ic('chip', 'ic-s')}Peak memory</div><div class="v">${esc(mv)}<small>${esc(mu)}</small></div>` +
-      `<div class="membar"><span class="${over ? 'over' : ''}" style="width:${(100 * e.peak_bytes / scale).toFixed(1)}%;${!over && e.peak_bytes > 0.8 * cap ? 'background:var(--queued)' : ''}"></span><i style="left:${(100 * cap / scale).toFixed(1)}%"></i></div>` +
-      `<div class="sub">cap ${esc(form.cap)} GiB</div></div>` +
+    box.innerHTML = `<div class="est${estimating ? ' pending' : ''}" data-tip="${esc(`The estimate, ${fmtBytes(e.peak_bytes)}, plus ${fmtBytes(need - e.peak_bytes)} for the server itself: what the run holds against its cap`)}"><div class="k">${ic('chip', 'ic-s')}Peak memory</div><div class="v">${esc(mv)}<small>${esc(mu)}</small></div>` +
+      `<div class="membar"><span class="${over ? 'over' : ''}" style="width:${(100 * need / scale).toFixed(1)}%;${!over && need > 0.8 * cap ? 'background:var(--queued)' : ''}"></span><i style="left:${(100 * cap / scale).toFixed(1)}%"></i></div>` +
+      `<div class="sub">${esc(capText)}</div></div>` +
       `<div class="est${estimating ? ' pending' : ''}"><div class="k">${ic('clock', 'ic-s')}Time on the Mac</div><div class="v">${esc(tt[0])}<small>${esc(tt.slice(1).join(' '))}</small></div>` +
       `<div class="sub" data-tip="${esc(e.stages.map(s => `${s.name} ${fmtHuman(s.seconds)}`).join(' · '))}">${esc(e.stages.map(s => s.name).join(' · '))}</div></div>`;
     warnings(e, secs);
@@ -2466,9 +2496,10 @@
   function warnings(e, secs) {
     for (const li of $('problems').querySelectorAll('li.w')) li.remove();
     if (!e) return;
-    const cap = form.cap * 2 ** 30, out = [];
-    if (e.peak_bytes > cap) out.push(['err', L('problem.over_cap', fmtBytes(e.peak_bytes), form.cap) || `Needs about ${fmtBytes(e.peak_bytes)}, above the ${form.cap} GiB cap.`]);
-    else if (e.peak_bytes > 0.8 * cap) out.push(['', `Near the memory cap: about ${fmtBytes(e.peak_bytes)} of ${form.cap} GiB.`]);
+    // Over the cap is a problem the server reports (eff.problems, with Run off); here only "near it".
+    const cap = capGiB() * 2 ** 30, out = [];
+    const need = neededBytes();
+    if (need <= cap && need > 0.8 * cap) out.push(['', `Near the memory cap: about ${fmtBytes(need)} of ${fmtCap(capGiB())}.`]);
     if (secs > 3600) out.push(['', `A long run: about ${fmtHuman(secs)} of the Mac's time, and nothing else runs meanwhile.`]);
     else if (secs > 900) out.push(['', `About ${fmtHuman(secs)} of the Mac's time.`]);
     for (const [cls, text] of out) {
@@ -2506,8 +2537,8 @@
   $('runbtn').addEventListener('click', async () => {
     if (!eff || !eff.can_run || overCap()) return;
     $('runbtn').disabled = true;
-    const res = await api('api/runs', { json: eff.json, label: $('label').value, cap_gib: form.cap });
-    if (!res.ok) { toast(res.body.error || 'The run was refused', 'bad', 6000); $('problems').insertAdjacentHTML('afterbegin', `<li class="err">${ic('alert', 'ic-s')}<span>${esc(res.body.error)}</span></li>`); runButton(); return; }
+    const res = await api('api/runs', { json: eff.json, label: $('label').value, cap_gib: capToSend() });
+    if (!res.ok) { toast(res.body.error || 'The run was refused', 'bad', 6000); $('problems').insertAdjacentHTML('afterbegin', `<li class="err" data-prob="${esc(res.body.error)}">${ic('alert', 'ic-s')}<span>${esc(cap1(res.body.error))}</span></li>`); runButton(); return; }
     $('label').value = '';
     const queued = lastRuns.some(r => r.state === 'running');
     toast(queued ? 'Queued: it starts when the Mac is free' : 'Started on the Mac', 'ok');
@@ -2534,6 +2565,7 @@
   api('api/catalog').then(res => {
     if (!res.ok) { $('form').innerHTML = `<div class="empty">${ic('alert', 'art')}<h4>The editor did not load</h4><p>${esc(res.body.error || '')}</p></div>`; return; }
     catalog = res.body;
+    form.cap = defaultCapGiB();
     buildForm();
     const def = catalog.presets.find(p => p.name === 'pipeline_quick_16k') || catalog.presets.find(p => !p.placeholder) || catalog.presets[0];
     form.preset = def.name;
