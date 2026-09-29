@@ -21,8 +21,10 @@ use crate::world::WorldState;
 
 /// Magic of a checkpoint file.
 pub const MAGIC: [u8; 4] = *b"DTCP";
-/// Bump whenever [`Checkpoint`], [`WorldState`] or any stage's saved state changes shape.
-pub const CHECKPOINT_SCHEMA: u32 = 4;
+/// Bump whenever [`Checkpoint`], [`WorldState`] or any stage's saved state changes shape (5: the
+/// surface's frame accumulator keeps the crust's origin and the deposit stage's state its frame
+/// count, P1-14).
+pub const CHECKPOINT_SCHEMA: u32 = 5;
 const FIXED_BYTES: usize = 8;
 
 /// A run paused between (or inside) stages.
