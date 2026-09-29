@@ -56,6 +56,41 @@ impl PartialOrd for Entry {
     }
 }
 
+/// Marks the open sea: cells at or below `sea_level` in a connected (8-neighbour, x wrapping)
+/// body of at least `min_cells` cells are [`BASE`]; everything else is [`LAND`] — a small closed
+/// basin below sea level (a rift floor, a Dead Sea) is a depression the flood fills as a lake, not
+/// a sea that river loads could never leave.
+pub fn open_sea(d: &Dims, h: &[f64], sea_level: f64, min_cells: usize, kind: &mut [u8]) {
+    let n = d.cells();
+    let mut label = vec![u32::MAX; n];
+    let mut todo: Vec<u32> = Vec::new();
+    let mut members: Vec<u32> = Vec::new();
+    kind.iter_mut().for_each(|k| *k = LAND);
+    for s in 0..n {
+        if label[s] != u32::MAX || h[s] > sea_level {
+            continue;
+        }
+        label[s] = s as u32;
+        todo.clear();
+        members.clear();
+        todo.push(s as u32);
+        while let Some(c) = todo.pop() {
+            members.push(c);
+            for (m, _) in d.neighbours(c as usize) {
+                if label[m] == u32::MAX && h[m] <= sea_level {
+                    label[m] = s as u32;
+                    todo.push(m as u32);
+                }
+            }
+        }
+        if members.len() >= min_cells {
+            for &c in &members {
+                kind[c as usize] = BASE;
+            }
+        }
+    }
+}
+
 /// Fills `filled` with the ε-filled surface of `h`. `kind[c]` is [`BASE`] for base-level cells on
 /// entry (their filled level is `base_z[c]`); on return, land cells that had to become sinks are
 /// marked [`SINK`]. Returns the number of sinks made.

@@ -3,10 +3,12 @@
 //! for the deposit engine (`fields.rs`), kept in the world state so a checkpoint carries them and
 //! pass 2 can replay them.
 //!
-//! Frames are packed: each field is quantised over its own range in that frame — 8 bits for the
-//! 0–1 fractions, 16 bits for everything else (code 0 is NaN) — and LZ4-compressed (most facies
-//! and arc fields are zero over most of the planet and shrink to almost nothing). The error is at
-//! most half a step of the frame's range: 1/510 of the range for fractions, 1/131,070 otherwise.
+//! Frames are packed: each field is quantised over its own range in that frame — 16 bits for the
+//! elevation and the erosion and deposition rates, 8 bits for the rest (code 0 is NaN) — and
+//! LZ4-compressed (most facies and arc fields are zero over most of the planet and shrink to almost
+//! nothing). The error is at
+//! most half a step of the frame's range: 1/131,070 of it at 16 bits, 1/508 at 8 bits (1 °C of
+//! burial temperature, 12 m of elevation-sized ranges). 16k quick: about 4 MiB per frame.
 
 use std::collections::BTreeMap;
 
@@ -46,10 +48,19 @@ pub struct RecordedHistory {
     pub receivers: Option<Vec<u32>>,
 }
 
+/// Fields kept at 16 bits: the ones whose small values matter over a wide range (elevation for
+/// the ledger's burial, the heavy-tailed rates). Everything else is 8-bit over the frame's range.
+const WIDE: [&str; 3] = [
+    "deeptime:elevation_m",
+    "deeptime:erosion_rate_m_myr",
+    "deeptime:deposition_rate_m_myr",
+];
+
 fn bits_for(name: &str) -> u8 {
-    match spec(name) {
-        Some(s) if s.units == "0–1" => 8,
-        _ => 16,
+    if WIDE.contains(&name) || spec(name).is_none() {
+        16
+    } else {
+        8
     }
 }
 

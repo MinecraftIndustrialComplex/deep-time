@@ -148,7 +148,7 @@ fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
         "surface_final={} land_frac={:.3} max_elevation_m={:.0} sea_level_m={:.1} sediment_km3={:.3e} \
          eroded_km3={:.3e} fluvial_km3={:.3e} lake_km3={:.3e} marine_km3={:.3e} carbonate_km3={:.3e} \
          evaporite_km3={:.3e} to_sea_km3={:.3e} mass_residual_km3={:.3e} mean_log_layers={:.2} \
-         spl_iterations_per_step={:.2} sinks={} erosion_pulses={} basins={} sea_events={} frames={} \
+         spl_iterations_per_step={:.2} cg_iterations_per_step={:.1} sinks={} erosion_pulses={} basins={} sea_events={} frames={} \
          history_mib={:.1}",
         t.steps,
         land / n,
@@ -165,6 +165,7 @@ fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
         t.mass_residual_km3,
         layers,
         t.spl_iterations as f64 / (t.steps.max(1)) as f64,
+        t.diffusion_iterations as f64 / (t.steps.max(1)) as f64,
         t.sinks,
         st.events.counts[0],
         st.events.counts[1],
