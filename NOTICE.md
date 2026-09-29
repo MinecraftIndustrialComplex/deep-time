@@ -7,6 +7,7 @@ and contribute no code.
 
 | Source | Licence | Used for | Deep Time files |
 |---|---|---|---|
+| [tectonics.js](https://github.com/davidson16807/tectonics.js) by Carl Davidson — `noncompiled/models/lithosphere/RockColumn.js` and `Crust.js` (commit ce371fa) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | The plate model's rock pools: the seven pools, the conserved felsic family, `Crust.overlap` accretion, the lithification and metamorphosis thresholds, top-down erosion (adapted: metres instead of kg/m², L0 samples instead of rasters, rules rewritten) | `crates/deeptime-core/src/plates/pools.rs`, `crates/deeptime-core/src/plates/state.rs` (`pool`) |
 
 ## Data
 

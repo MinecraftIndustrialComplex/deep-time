@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! Presets (plan §5.1): parsing, the built-in presets, and how a preset argument is resolved.
 //!
-//! Until the real stages exist (P1-03 on) the pipelines are the dummy one (`dummy.rs`) and P1-14's
-//! deposit stage on a synthetic history (`{"deposits_synthetic": {…}}`,
-//! `deposits::SyntheticPreset`). A preset is `{"dummy": {…}}` (or `{"deposits_synthetic": {…}}`)
-//! plus optional header keys that every preset will carry:
+//! The pipelines are the dummy one (`dummy.rs`), P1-14's deposit stage on a synthetic history
+//! (`{"deposits_synthetic": {…}}`, `deposits::SyntheticPreset`) and, from P1-03, the planet
+//! pipeline (a preset with a `planet` section, `params::PlanetPreset`: the plates stage first). A
+//! preset is its pipeline's keys plus optional header keys that every preset carries:
 //!
 //! ```json
 //! {"schema": 0, "name": "earthlike_quick_16k", "description": "…", "placeholder": true,
@@ -31,6 +31,8 @@ use serde_json::{Map, Value, json};
 use crate::dummy::DummyParams;
 use crate::error::CoreError;
 use crate::keyframes::KeyframePolicy;
+use crate::params::{PLANET_KEYS, PlanetPreset, SCALE_KEYS};
+use crate::plates::PlatesStage;
 use crate::share_code;
 use crate::stage::Stage;
 use crate::synth;
@@ -61,13 +63,14 @@ pub fn builtin(name: &str) -> Option<&'static str> {
     BUILTIN.iter().find(|(n, _)| *n == name).map(|(_, j)| *j)
 }
 
-/// Turns a preset argument into preset JSON: a share code (`DT1.…`), a built-in name, or a file.
+/// Turns a preset argument into preset JSON: a share code (`DT1.…`), a built-in name (or a plate
+/// preset's, `params::PLATES_BUILTIN`), or a file.
 pub fn resolve(arg: &str) -> Result<String, CoreError> {
     let arg = arg.trim();
     if share_code::is_share_code(arg) {
         return share_code::decode(arg);
     }
-    if let Some(json) = builtin(arg) {
+    if let Some(json) = builtin(arg).or_else(|| crate::params::plates_builtin(arg)) {
         return Ok(json.to_owned());
     }
     match std::fs::read_to_string(arg) {
@@ -76,8 +79,10 @@ pub fn resolve(arg: &str) -> Result<String, CoreError> {
             Err(CoreError::preset(
                 "preset",
                 format!(
-                    "'{arg}' is not a built-in preset ({}), a file or a share code (DT1.…)",
-                    BUILTIN.map(|(n, _)| n).join(", ")
+                    "'{arg}' is not a built-in preset ({}; plate pipeline: {}), a file or a share \
+                     code (DT1.…)",
+                    BUILTIN.map(|(n, _)| n).join(", "),
+                    crate::params::PLATES_BUILTIN.map(|(n, _)| n).join(", ")
                 ),
             ))
         }
@@ -179,6 +184,8 @@ pub enum PresetBody {
     /// P1-14: the deposit stage on a synthetic field history (`{"deposits_synthetic": {…}}`,
     /// `crate::deposits::SyntheticPreset`), until P1-03…P1-07 publish real fields.
     DepositsSynthetic(crate::deposits::SyntheticPreset),
+    /// The planet pipeline (a `planet` section; `params.rs`): the plates stage (P1-03).
+    Planet(Box<PlanetPreset>),
 }
 
 /// A parsed preset.
@@ -204,16 +211,32 @@ impl Preset {
         let obj = value
             .as_object()
             .ok_or_else(|| CoreError::preset("$", "expected a JSON object"))?;
+        let planet = obj.contains_key("planet");
         if let Some(key) = obj.keys().find(|k| {
             !["dummy", "deposits_synthetic"].contains(&k.as_str())
                 && !HEADER_KEYS.contains(&k.as_str())
+                && !(planet && PLANET_KEYS.contains(&k.as_str()))
         }) {
             return Err(CoreError::preset(
                 format!("$.{key}"),
-                "unknown key (only the dummy and deposits_synthetic presets exist before P1-03)",
+                "unknown key (a preset is a dummy, deposits_synthetic or planet pipeline plus \
+                 its header)",
             ));
         }
-        let header = parse_header(obj)?;
+        let header = parse_header(obj, planet)?;
+        if planet {
+            if obj.contains_key("dummy") || obj.contains_key("deposits_synthetic") {
+                return Err(CoreError::preset(
+                    "$",
+                    "give one pipeline: dummy, deposits_synthetic or planet",
+                ));
+            }
+            let p = PlanetPreset::from_obj(obj, header.name.as_deref(), header.timeline)?;
+            return Ok(Preset {
+                header,
+                body: PresetBody::Planet(Box::new(p)),
+            });
+        }
         if let Some(d) = obj.get("deposits_synthetic") {
             if obj.contains_key("dummy") {
                 return Err(CoreError::preset(
@@ -280,7 +303,9 @@ impl Preset {
             PresetBody::DepositsSynthetic(p) => json!({
                 "deposits_synthetic": serde_json::to_value(p).expect("a preset serialises"),
             }),
+            PresetBody::Planet(p) => p.to_json(),
         };
+        let full_scale = matches!(self.body, PresetBody::Planet(_));
         let h = &self.header;
         let obj = v.as_object_mut().expect("a preset is an object");
         if let Some(s) = h.schema {
@@ -295,7 +320,9 @@ impl Preset {
         if h.placeholder {
             obj.insert("placeholder".into(), json!(true));
         }
-        if let Some(c) = h.circumference {
+        if let Some(c) = h.circumference
+            && !full_scale
+        {
             obj.insert("scale".into(), json!({ "circumference_blocks": c }));
         }
         if let Some(t) = h.timeline {
@@ -313,6 +340,16 @@ impl Preset {
             (Some(n), _) => n,
             (None, PresetBody::Dummy(_)) => "dummy",
             (None, PresetBody::DepositsSynthetic(_)) => "deposits_synthetic",
+            (None, PresetBody::Planet(p)) => &p.name,
+        }
+    }
+
+    /// Checks that the preset can run: a planet preset needs its timeline chosen (there is no
+    /// default story); the placeholder pipelines run without one.
+    pub fn check_runnable(&self) -> Result<(), CoreError> {
+        match &self.body {
+            PresetBody::Planet(p) => p.check_runnable(),
+            _ => Ok(()),
         }
     }
 
@@ -324,6 +361,7 @@ impl Preset {
                 .as_ref()
                 .map_or(DEFAULT_DUMMY_CIRCUMFERENCE, |w| w.circumference),
             PresetBody::DepositsSynthetic(p) => p.circumference,
+            PresetBody::Planet(p) => p.scale.circumference_blocks,
         })
     }
 
@@ -334,6 +372,7 @@ impl Preset {
             PresetBody::DepositsSynthetic(p) => {
                 p.stages().expect("checked when the preset was parsed")
             }
+            PresetBody::Planet(p) => vec![Box::new(PlatesStage::new((**p).clone()))],
         }
     }
 
@@ -342,6 +381,9 @@ impl Preset {
         match &self.body {
             PresetBody::Dummy(p) => p.initial_world(),
             PresetBody::DepositsSynthetic(p) => p.initial_world(),
+            PresetBody::Planet(p) => {
+                WorldState::new(p.seed, p.scale.circumference_blocks, p.t_start_years())
+            }
         }
     }
 
@@ -358,6 +400,10 @@ impl Preset {
                 every_years: Some(p.keyframe_every_years),
                 size: (p.keyframe_size[0], p.keyframe_size[1]),
             },
+            PresetBody::Planet(p) => KeyframePolicy {
+                every_years: Some(p.keyframes.every_myr * 1.0e6),
+                size: (p.keyframes.size[0], p.keyframes.size[1]),
+            },
         }
     }
 
@@ -365,7 +411,7 @@ impl Preset {
     pub fn synth(&self) -> Option<synth::Kind> {
         match &self.body {
             PresetBody::Dummy(p) => p.synth,
-            PresetBody::DepositsSynthetic(_) => None,
+            PresetBody::DepositsSynthetic(_) | PresetBody::Planet(_) => None,
         }
     }
 }
@@ -373,7 +419,7 @@ impl Preset {
 /// The circumference of a dummy preset without a `world` (`DummyParams::initial_world`).
 const DEFAULT_DUMMY_CIRCUMFERENCE: u32 = 16_384;
 
-fn parse_header(obj: &Map<String, Value>) -> Result<PresetHeader, CoreError> {
+fn parse_header(obj: &Map<String, Value>, planet: bool) -> Result<PresetHeader, CoreError> {
     let mut h = PresetHeader::default();
     if let Some(v) = obj.get("schema") {
         h.schema = Some(
@@ -408,7 +454,10 @@ fn parse_header(obj: &Map<String, Value>) -> Result<PresetHeader, CoreError> {
         let s = v
             .as_object()
             .ok_or_else(|| CoreError::preset("$.scale", "expected a JSON object"))?;
-        if let Some(k) = s.keys().find(|k| k.as_str() != "circumference_blocks") {
+        // A planet preset's scale carries more keys (`params::ScaleParams` checks them).
+        if let Some(k) = s.keys().find(|k| {
+            k.as_str() != "circumference_blocks" && !(planet && SCALE_KEYS.contains(&k.as_str()))
+        }) {
             return Err(CoreError::preset(format!("$.scale.{k}"), "unknown key"));
         }
         if let Some(c) = s.get("circumference_blocks") {
