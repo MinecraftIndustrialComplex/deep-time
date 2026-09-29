@@ -35,7 +35,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-11 | Customize editor, timelapse and staging | todo | | | |
 | P1-12 | Strata pass with rock tags and `rock_states` | todo | | | |
 | P1-13 | Dedicated server: generate on first start | todo | | | |
-| P1-14 | Deposit engine: the four families | todo | | | |
+| P1-14 | Deposit engine: the four families | doing | 2026-09-28 | 7f4858c | Engine on a synthetic field history (real fields wait for P1-03…P1-07). Mac: cargo test --workspace ok (core 82 incl. 41 deposits::, format 31, cli 11); porphyry σ 1.4892; Poisson means within 4 SE over 10,000 draws; tonnage P90/P50/P10 within 4 SE; min separation holds (200 seeds + the run); every site has a forming event with causes; `stage deposits --preset …/deposits_synthetic_16k.json --viewer review/out/p1-deposits` → 32 sites of all 8 types, counts next to ρ·A·F (porphyry 9 drawn / 9.41), 0.83 GB peak; fmt, clippy -D warnings, deny clean |
 | P1-15 | Deposits in the world | todo | | | |
 | P1-16 | COE and CDG hooks | todo | | | |
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
@@ -55,6 +55,126 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 — P1-14, first pass: the deposit engine on synthetic fields (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Scope.** Everything that does not need P1-03…P1-07: the data, the schema, the engine behind a
+  named-field interface, a synthetic field history, the CLI path and the viewer. The row stays
+  `doing` until the real history feeds it.
+- **Data** (`crates/deeptime-core/data/usgs/*.json`, public-domain USGS, digitised by two Opus
+  sub-agents with the report, table or figure, page and method of every number; placeholders say
+  so). Porphyry Cu: OFR 2008-1155 Table 1 (PDF p. 9), n 422, 33 / 240 / 1,500 Mt, Cu 0.24 / 0.44 /
+  **0.75** % (the research note's 0.80 was a figure tick), Mo, Au, Ag with reporting fractions,
+  r(tonnage, Au) −0.28 and three more (text, PDF p. 8), 2 km rule (p. 4), density 4 / 15 / 35 per
+  10⁵ km² (Singer, Berger & Menzie 2005, USGS record 70197200). MVT and SEDEX: OFR 2009-1252
+  (Singer, Berger & Moring 2009) has **no MVT or SEDEX model**; its CAam (carbonate-hosted
+  amagmatic, n 132, 93 of them MVT) and SHam (shale-hosted amagmatic, n 25, all SEDEX) models are
+  used (Table 2 pp. 9–10), MVT-only SIR 2010-5070-A Table 1 and Bulletin 1693 31a/32a-b in `extra`.
+  BIF: Bulletin 1693 model 34a (covers Algoma too), 11 / 170 / 2,400 Mt, Fe 30 / 53 / 66 %.
+  Placer Au: Bulletin 1693 model 39a, 0.022 / 1.1 / 50 Mt, Au 0.084 / 0.2 / 0.48 g/t, 2.0 t/m³,
+  1.6 km rule. Supergene: SIR 2010-5070-B facts (≤3× Andes, 0.4–1.7 % Cu, ≤200 m thick). Coal:
+  Circular 891 densities and thickness limits (no USGS grade–tonnage model for coal exists; the
+  4.2 / 13 / 25 Mt block is a placeholder). Petroleum: Waples 1980 TTI 15 / 75 / 160 (journal
+  fact), field sizes from the DDS-60 Niger Delta assessment unit (2.4 / 12 / 89 MMBO, p90 and p10
+  read off the histogram). **Not found anywhere (placeholders):** deposit densities per area for
+  MVT, SEDEX, BIF, coal and oil; ore densities for porphyry, MVT, SEDEX, BIF; separations for BIF,
+  coal, oil; a USGS table of reflectance by coal rank.
+- **Deposit types** (datapack JSON, `neoforge/src/main/resources/data/deeptime/deeptime/deposit_type/`,
+  compiled into the core): `porphyry_cu_mo_au` (children `supergene_cu_blanket`, `placer_au`),
+  `bif_fe`, `coal_seam`, `mvt_zn_pb`, `sedex_zn_pb`, `petroleum_trap`. Schema
+  `crates/deeptime-format/schema/deposit_type.schema.json` (a test compares its properties with the
+  parser, which refuses unknown keys; another checks every non-placeholder number against its USGS
+  table). Create stones as preferred hosts: serpentinite (veridium) 1.5 for copper, dolostone
+  (asurine) 1.5 for MVT and SEDEX, banded_iron_formation (crimsite) 2.0 and the BIF sheet's own
+  class, the porphyry gossan is ironstone (ochrum) and carries gold. `minecraft`: COE vein ids
+  `createoreexcavation:ore_vein_type/{copper,gold,iron,coal,zinc}` (read from the COE 1.6.8 jar),
+  `cdg_reservoir` for oil, `ore_block_policy` `ev_then_vanilla` (`none` for oil).
+- **Engine** (`crates/deeptime-core/src/deposits/`, stage `deposits`): `fields` (the interface),
+  `types`, `usgs`, `rules` (membership curves, product/min/geometric mean, host and clock scores,
+  time integration F = 1 − Π(1 − F_t)^(Δt/τ), limiting component), `tracts`, `count` (Poisson,
+  Voronoi provinces), `cluster` (Thomas positions, separation max(USGS rule, r_i + r_j)), `sizing`
+  (split lognormal + Gaussian copula), `geometry`, `ledger`, `children` (supergene, placers),
+  `petroleum` (Lopatin TTI, kitchens, charge in order), `playability`, `sites` (cause lookup),
+  `synthetic`, `random` (xoshiro256++, PTRS Poisson). Pass 1 = one frame per step; the last step
+  places, replays the frames at the chosen cells (pass 2: ledger, supergene windows) and writes
+  sites, bodies and events. New `bodies/bodies.dtb` (`DTBD`, FORMAT.md "Bodies": 11 shape names on
+  two metrics, zones by normalised distance and vertical position, erosion clip), written by
+  `finalize_write`; `WorldState` gains `bodies` and `notes` (the census goes to `manifest.json`
+  notes), checkpoint schema 2. Preset `{"deposits_synthetic": {…}}` (`session::Preset`).
+- **CLI and viewer.** `deeptime stage deposits --preset <file> --viewer <dir>` (and `run`) print the
+  census per type next to ρ·A·F; the viewer draws sites coloured by type on the keyframes (layers
+  `deposits/favourability/<type>`, `deposits/sites`, `input/*`), a census table, and per site the
+  component scores, weakest component, host rock, fate, the "Why here?" chain and a plan/section of
+  its bodies (`report.js`; `index.html?site=<id>` opens a site).
+- **Measured (Mac, `tools/remote/mac.sh`).** `cargo test --workspace` ok (core 82 of which 41
+  `deposits::`, format 31, cli 11, jni 7, viewer 4, inspect 26); `cargo fmt --all -- -l` clean,
+  `cargo clippy --workspace --all-targets -- -D warnings` clean, `cargo deny check licenses bans` ok.
+  `cargo run --release -p deeptime-cli -- stage deposits --preset
+  crates/deeptime-core/tests/presets/deposits_synthetic_16k.json --viewer review/out/p1-deposits`
+  (C 16,384, L1 1024 × 512, 50 frames of 10 Myr, strong provinces, count_mult 1): 52 steps, 32
+  sites, 38 bodies, 110 events, 19.6 s wall and 0.83 GB peak footprint on the shared Mac.
+
+  | type | ρ·A·F (§8.6) | drawn | sites | notes |
+  |---|---|---|---|---|
+  | porphyry_cu_mo_au | 9.41 | 9 | 6 | 1 buried, 4 truncated, 4 eroded; 1 guaranteed |
+  | supergene_cu_blanket | — | — | 4 | over truncated porphyries in the dry arc |
+  | placer_au | — | — | 2 | below eroded porphyries |
+  | bif_fe | 2.50 | 4 | 5 | inherited, dated by the 2.2 Ga shelf-sea event; 1 guaranteed |
+  | coal_seam | 9.69 | 8 | 10 | ranks from TTI; 2 guaranteed (exposed) |
+  | mvt_zn_pb | 3.74 | 2 | 2 | |
+  | sedex_zn_pb | 1.11 | 2 | 2 | |
+  | petroleum_trap | 1.08 | 1 | 1 | charged 255 Myr ago by the rift kitchen |
+
+  The pulled PNGs (`review/out/p1-deposits/keyframes/`) show the porphyry favourability on A's
+  Andean arc, coal and MVT in B's foreland, SEDEX and oil in C's rift, BIF on C's craton; headless
+  Chromium screenshots of `?site=` pages show the chains (placer ← exhumation ← erosion pulse,
+  formation ← flare-up ← subduction onset; reservoir ← generation, subsidence, inversion).
+- **Deviations from the plan.** (1) The acceptance run uses the synthetic preset file, not
+  `earthlike_quick_16k` (which P1-03 creates). (2) The lognormal is split at the median so all
+  three USGS percentiles are reproduced; its mean σ is the plan's (1.49 for porphyry). (3) Province
+  endowments (lognormal, σ 0 / 0.35 / 0.7 / 1.2) redistribute a type's ρ·A·F between tracts and
+  within them; they do not change the planet's expected count. (4) Iron is BIF only (no Fe skarn).
+  (5) The essentials list comes from the preset until P1-15's `deeptime:essentials` registry;
+  `guaranteed_occurrence` is emitted by the deposit stage (EVENTS.md updated). (6) Custom deposit
+  types from datapacks are parsed by the same code but not yet passed in (the content bundle is not
+  wired to the stage). (7) Causes are matched by point places (region masks arrive with P1-03).
+  (8) The last frame's favourability is drawn one year before its end so the closing keyframe
+  (sites) is a separate frame; a real pipeline that reaches the deposit stage at t = 0 needs a
+  different trigger.
+- **Field inputs the engine expects from P1-03…P1-07** (per L1 cell, per frame; frames oldest
+  first, each standing for Δt years, **replayable** — pass 2 rereads them; `FieldHistory` in
+  `deposits/fields.rs`, a `MemoryHistory` is there to record into):
+
+  | field | units | provider |
+  |---|---|---|
+  | `deeptime:arc_magma_flux`, `deeptime:magma_oxidation` | 0–1 | P1-03 |
+  | `deeptime:convergence_rate_km_myr`, `deeptime:obliquity_deg`, `deeptime:slab_age_myr` | km/Myr, °, Myr | P1-03 |
+  | `deeptime:crust_thickness_km`, `deeptime:fault_density` | km, 0–1 | P1-03 |
+  | `deeptime:orogenic_uplift_m_myr`, `deeptime:rift_subsidence_m_myr`, `deeptime:heat_flow_mw_m2` | m/Myr, m/Myr, mW/m² | P1-03 |
+  | `deeptime:dist_litho_step_km` | km | P1-03 |
+  | `deeptime:inherited_bif` | 0–1 | P1-03 (craton ages) + P1-07 |
+  | `deeptime:elevation_m`, `deeptime:erosion_rate_m_myr`, `deeptime:deposition_rate_m_myr` | m, m/Myr | P1-04 |
+  | `deeptime:topographic_gradient_m_km`, `deeptime:shelf` | m/km, 0–1 | P1-04 |
+  | `deeptime:carbonate_platform`, `deeptime:evaporite`, `deeptime:euxinic_basin`, `deeptime:coal_facies` | 0–1 facies | P1-04 (strata log) |
+  | `deeptime:source_rock_toc`, `deeptime:reservoir_quality`, `deeptime:seal` | wt%, 0–1 | P1-04 |
+  | `deeptime:burial_temp_c` | °C of the organic layer | P1-04 + P1-07 |
+  | `deeptime:trap_structure` | 0–1 closure | P1-07 |
+  | `deeptime:water_table_depth_m` | m | P1-04 + P1-05 |
+  | `deeptime:precip_mm`, `deeptime:t_mean_c` | mm/yr, °C | P1-05 |
+  | `deeptime:host/<rock class>` | 0–1 fraction in the ore window | P1-07 (optional; absent = no lithology opinion) |
+  | clocks `deeptime:clock/{oxygenated_oceans,land_plants,bif_acme}` | 0–1 per frame | the preset's `planet.atmosphere` (P1-03/P1-05) |
+  | present-day drainage receivers (L1 cell → downstream cell) | — | P1-04 |
+
+  Plus point-placed tectonic events for "Why here?" (`subduction_onset`, `collision`,
+  `orogeny_phase`, `terrane_accretion`, `rift_onset`, `basin_subsidence`, `marine_transgression`,
+  `erosion_pulse`) with t_start/t_end spanning the activity.
+- **Not done.** Real-field integration (record frames in P1-03…P1-07, then a preset pipeline that
+  ends with this stage); datapack content passed to the stage; Fe skarn; spawn ranking (§7.8);
+  the Java side of bodies and its parity test (P1-15); size multipliers tuned on in-world renders
+  (P1-15); merging placers that land on one drainage cell (the second is dropped by separation);
+  a spacesheep review page. Tuning note: time integration saturates F near 1 inside long-lived
+  systems (mean F 0.87–0.98), so counts follow ρ·A and favourability mostly shapes tracts.
+- **Next step.** P1-03…P1-07 publish their fields as frames (`FieldHistory`); then point the
+  real preset's pipeline at `DepositStage` and rerun the acceptance on `earthlike_quick_16k`.
 
 ### 2026-09-28 — P1-01 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Formats** (`crates/deeptime-format`, spec in `FORMAT.md` and the new `EVENTS.md`). Every new
