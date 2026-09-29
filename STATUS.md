@@ -57,8 +57,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
-| 2026-09-28 | P1-15 | **Q4 (plan §14): remove random rock-blob features in Deep Time worlds?** (vanilla granite/diorite/andesite/tuff blobs, Terralith's re-stoned and cliff-texturing blobs, Create's striated layers, Born in Chaos's argillite.) Recommendation: yes, on by default, switchable per pack. Implemented that way (`claim_rock_features: true` in `data/deeptime/neoforge/biome_modifier/claim_ores.json`; a pack's own modifier or an override of that file turns it off); in MIC it removes 24 placed features (list in the P1-15 build log). Not decided by the agent beyond the default. | not yet asked (sub-agent; for Ben) |
-| 2026-09-28 | P1-15 | **Q10 (plan §14): Excavated Variants in MIC?** Evidence so far: with EV 4.3.1 + DAG the deposits place EV's ore-in-rock variants for their host (copper in red sandstone / sandstone in the GameTest world), deterministically once EV's own `ore_replacer` is kept out of Deep Time levels (a compat mixin); EV knows vanilla's and Create's stones itself, Deep Time adds four vanilla stand-ins. The side-by-side BlueMap renders the question asks for were not made (the top-down ore render shows materials, not hosts). Recommendation unchanged: decide after those renders. | not yet asked (sub-agent; for Ben) |
+| 2026-09-28 | P1-15 | **Q10 (plan §14): Excavated Variants in MIC?** Ben (log 2026-09-28): decide after side-by-side BlueMap renders of the same deposits with and without EV in the MIC pack. Next: produce and publish those renders, then ask. | AskUserQuestion |
 
 ## Build log
 
