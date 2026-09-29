@@ -79,7 +79,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   whole 2.5 GB history, so that one reservation asked 2.65 GB on ~1.65 GB in use (the workbench entry's reading).
 - **What grows with length (measured).** Only the recorded history: 12.7 B per L1 cell per frame at 32k full (2,540.9 MiB
   for 100 frames of 2048 × 1024), 5.3 MiB per frame at 16k quick. The base in use at the end of the surface group,
-  without the history, is flat in length: 16k quick HISTORY_BASE_LINE. Events (7,391 at 32k × 1000 Myr), sites, the
+  without the history, is flat in length: 16k quick 761 MiB in use at 500 Myr, 931 MiB at 2000 Myr (+170 MiB for 4× the length, most likely the keyframe
+  ring filling to its 16 frames; not traced). Events (7,391 at 32k × 1000 Myr), sites, the
   pluton list, the keyframe ring (16 frames, the rest on disk) and the log ring are small or bounded; checkpoints are disk
   and are now streamed (below). Documented, not spilled.
 - **Design** (`deposits/{recorded, spill}.rs`, `session.rs`, `stage.rs`, `checkpoint.rs`).
@@ -148,7 +149,12 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
     MiB in use), 91 at the end; **disk: 2,325.6 MiB written to the spill file** (2.3 GiB for a 1000 Myr 32k full run;
     ~2.5 GiB is the bound, the history's size), gone when the run ended. Gauge peak 4,405.5 MiB (the young and amplify
     stages allocate without reserving; P1-06's own finding), max RSS 4.61 GB, macOS peak footprint 6.69 GB.
-  - LONG_RUN
+  - **The long run** (parked question), `pipeline_quick_16k`, supercontinent, **2000 Myr**, `--mem-cap 4294967296`, 6
+    threads: **finished**, 1,459 s (24 min on the loaded Mac; plates 343, climate 132, surface 911, structure 38, deposits
+    20, young 2.5, amplify 13.8 s), 21 sites, 5,961 events. History 1,356.3 MiB in 200 frames (13.0 B per cell per frame);
+    it all stayed in memory until the amplifier's whole-raster reservation, which sent 116 frames (762.5 MiB) to disk and
+    ran in memory. Gauge peak 3,805 MiB, max RSS 3.38 GB. Deposits on 2000 Myr of history at `count_mult` as calibrated:
+    porphyry 3, placer 10, coal 7, petroleum 1 (most drawn deposits eroded: 19 of 24 porphyries) — physics, not tuned here.
 - **Found, not mine.** `./gametest.sh` → 1 of the required tests fails, `DepositGameTests.siteApiAndProbes` ("no block
   with d < 0.3 in body 0"), twice, deterministic; the `deposits_world_4k` world data this branch writes is byte-identical
   to master's (22 files; `deeptime run` of both binaries), so it fails on master too. All other GameTests pass.
@@ -2954,7 +2960,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   recorded history no longer has to fit in memory: over the cap its oldest frames go to a spill file in the run's folder
   and the run gets slower instead of failing (build log 2026-09-29, "the recorded history spills to the SSD"). The 1000
   Myr `pipeline_full_32k` run that failed at 4 GiB now finishes under 4 GiB (40 min on a loaded Mac, 2.3 GiB of disk);
-  LONG_RUN_ISSUE A 4,600 Myr 32k full run needs its history on disk (~11 GiB, 12.7 B per L1 cell per frame) plus a base
+  `pipeline_quick_16k` 2000 Myr finishes under 4 GiB (24 min, 3.8 GiB gauge peak). A 4,600 Myr 32k full run needs its history on disk (~11 GiB, 12.7 B per L1 cell per frame) plus a base
   of ~4.2 GiB (the amplifier; ~3 GiB before it), so it fits an 8 GiB cap now; its time (~3 h) is untested. Still open:
   the physics is tested only over 500 Myr and starts from existing continents (no early-Earth phase); the young and
   amplify stages allocate ~0.3 GiB at 32k without reserving it.
