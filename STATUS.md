@@ -147,6 +147,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   ignored), `cargo clippy --workspace --all-targets --locked -- -D warnings` clean, `cargo fmt --all
   -- --check` clean, `cargo deny check licenses bans` ok, `cd neoforge && ./gradlew build test` →
   tests=118 failures=0 (the synthetic deposit world: 72 sites). GameTests not run (no Java change).
+- **Cost.** `stage deposits --in` seed 1 scattered (Mac, 6 threads, `--verbose` phase lines): pass 1
+  ≈ 0.1 s a frame (read + regional fields 0.07, fold 0.04), pass 2 over 14,522 tract cells 4.2 s,
+  survival + placement 0.02 s, 12 s wall with the 630 MB checkpoint load (the calibration quoted 4.1 s
+  for the old stage). The regional fields are computed only when an enabled type reads them, their
+  window normalisation is cached per grid and radius.
 - **Viewer bundle** review/out/p1-deposits-survivors (seed 1 scattered, deposit layers + inputs incl.
   the two regional fields, 3.8 MB, not published). Looked at: MVT favourability in belts on continental
   margins beside orogens (strongest along one southern margin), porphyry along arcs, the brine field as

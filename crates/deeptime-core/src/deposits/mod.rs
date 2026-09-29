@@ -541,9 +541,19 @@ impl DepositStage {
         )
     }
 
-    /// `frame` with the [`regional`] fields it can have.
+    /// `frame` with the [`regional`] fields that an enabled type reads.
     fn with_regional(&self, mut frame: FieldFrame) -> FieldFrame {
-        regional::add(&mut frame, &self.grid(), &self.regional());
+        let want: Vec<String> = self
+            .types
+            .iter()
+            .zip(&self.state.enabled)
+            .filter(|(_, ok)| **ok)
+            .flat_map(|(t, _)| t.fields())
+            .filter(|f| regional::DERIVED.contains(&f.as_str()))
+            .collect();
+        if !want.is_empty() {
+            regional::add(&mut frame, &self.grid(), &self.regional(), &want);
+        }
         frame
     }
 
@@ -728,7 +738,9 @@ impl DepositStage {
         let grid = self.grid();
         let burial = self.burial_field();
         let pet_rules = self.types.iter().find_map(|t| t.petroleum.clone());
+        let t0 = std::time::Instant::now();
         let frame = ctx.pool.install(|| self.read_frame(k, world))?;
+        let read_s = t0.elapsed().as_secs_f64();
         // The crust moves: carry what each cell has accumulated so far with it (a porphyry formed
         // on an arc travels with its plate), then fold this frame in at the new positions.
         let origin = if matches!(self.source, Source::Synthetic(_)) {
@@ -803,6 +815,13 @@ impl DepositStage {
             frame.t_years
         };
         world.t_years = world.t_years.max(t);
+        ctx.log.push(
+            crate::log::Level::Debug,
+            format!(
+                "deposits: frame {k} read in {read_s:.3} s, folded in {:.3} s",
+                t0.elapsed().as_secs_f64() - read_s
+            ),
+        );
         Ok(())
     }
 }
@@ -1464,7 +1483,17 @@ impl DepositStage {
         }
 
         // ---- pass 2: every tract cell's column through the history -------------------------
+        let t_pass = std::time::Instant::now();
         let cols = self.column_pass(&plans, hist, ctx)?;
+        ctx.log.push(
+            crate::log::Level::Debug,
+            format!(
+                "deposits: pass 2 over {} tract cells in {:.2} s",
+                cols.cells.len(),
+                t_pass.elapsed().as_secs_f64()
+            ),
+        );
+        let t_counts = std::time::Instant::now();
 
         // ---- counts (the survivor formula), sizes, positions --------------------------------
         let mut candidates: Vec<Candidate> = Vec::new();
@@ -1665,6 +1694,13 @@ impl DepositStage {
             }
         }
 
+        ctx.log.push(
+            crate::log::Level::Debug,
+            format!(
+                "deposits: survival and placement in {:.2} s",
+                t_counts.elapsed().as_secs_f64()
+            ),
+        );
         // ---- the chosen cells' columns (the ledger, the supergene windows) ---------------------
         let mut series: BTreeMap<u32, Vec<ColumnSample>> = BTreeMap::new();
         for cand in &candidates {
