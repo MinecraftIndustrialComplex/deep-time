@@ -514,8 +514,11 @@
     function showSite(id) {
       const s = S.find(x => x.id === id);
       if (!s) return;
+      // Grades are mass fractions: precious metals read better in g/t.
+      const grade = g => g < 1e-4 ? `${(g * 1e6).toPrecision(3)} g/t` : `${(g * 100).toPrecision(3)} %`;
       const products = s.products.map(p =>
-        `${esc(p.material)} (${esc(p.role)}): ${esc((p.grade * 100).toPrecision(3))} % · ${esc(Number(p.tonnage_t).toExponential(2))} t`).join('<br>') || '—';
+        `${esc(p.material)} (${esc(p.role)}): ${esc(grade(p.grade))} · ${esc(Number(p.tonnage_t).toExponential(2))} t`).join('<br>') ||
+        (s.kind === 'deposit' ? 'none left (eroded, or leached into its supergene blanket)' : '—');
       const chain = whyHere(s.forming_event, 6).map(([d, c]) => `${'&nbsp;'.repeat(2 * d)}↳ ${evLink(c)}`).join('<br>');
       const rows = [
         ['site', esc(s.id)],
@@ -562,7 +565,7 @@
       const clip = bodies.map(b => b.clip_top_y).find(v => v !== null && v !== undefined);
       if (clip !== undefined) yHi = Math.max(yHi, clip + 2);
       const half = W / 2 - pad;
-      const sp = (half - pad) / ext;                          // plan scale (left half)
+      const sp = Math.min(half - pad, H / 2 - pad) / ext;     // plan scale (left half; any yaw fits)
       const ss = Math.min((half - pad) / ext, (H - 2 * pad) / Math.max(1, yHi - yLo)); // section scale
       const colours = ['#c0392b', '#e67e22', '#f1c40f', '#27ae60', '#2980b9', '#8e44ad'];
       let svg = `<svg class="section" viewBox="0 0 ${W} ${H}" role="img" aria-label="plan and section of the site's bodies">`;
