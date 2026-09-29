@@ -15,7 +15,9 @@ use std::collections::BTreeMap;
 use deeptime_format::GridDesc;
 use serde::{Deserialize, Serialize};
 
-use super::fields::{FieldFrame, FieldHistory, HOST_PREFIX, spec};
+use super::fields::{
+    FieldFrame, FieldHistory, HOST_PREFIX, ORIGIN_FIELDS, origins_from_offsets, spec,
+};
 use crate::error::CoreError;
 
 /// One packed field of a frame.
@@ -236,6 +238,25 @@ impl FieldHistory for RecordedHistory {
 
     fn receivers(&self) -> Option<&[u32]> {
         self.receivers.as_deref()
+    }
+
+    fn origins(&self, k: usize) -> Result<Option<Vec<u32>>, CoreError> {
+        let Some(p) = self.frames.get(k) else {
+            return Err(CoreError::InvalidArgument(format!("no frame {k}")));
+        };
+        if k == 0 {
+            return Ok(None);
+        }
+        let find = |name: &str| p.fields.iter().find(|f| f.name == name);
+        let (Some(di), Some(dj)) = (find(ORIGIN_FIELDS[0]), find(ORIGIN_FIELDS[1])) else {
+            return Ok(None);
+        };
+        let cells = self.grid.cells();
+        Ok(Some(origins_from_offsets(
+            self.grid.w as usize,
+            &unpack(di, cells)?,
+            &unpack(dj, cells)?,
+        )))
     }
 }
 

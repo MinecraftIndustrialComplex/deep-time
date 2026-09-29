@@ -70,6 +70,7 @@ use std::sync::{Mutex, OnceLock};
 
 use deeptime_format::{Body, Event, EventId, Extraction, GridDesc, Place, Product, Site};
 use serde::{Deserialize, Serialize};
+use rayon::prelude::*;
 use serde_json::{Value, json};
 
 use crate::error::CoreError;
@@ -78,7 +79,7 @@ use crate::world::{Field, WorldState};
 
 use children::ColumnSample;
 use cluster::{Point, Spacing, TractSpace};
-use fields::{FieldFrame, FieldHistory};
+use fields::{FieldFrame, FieldHistory, NO_ORIGIN};
 use geometry::{Grades, Placement, Scales};
 use ledger::{Fate, Ledger};
 use petroleum::CellPet;
@@ -655,9 +656,27 @@ impl DepositStage {
         let burial = self.burial_field();
         let pet_rules = self.types.iter().find_map(|t| t.petroleum.clone());
         let frame = ctx.pool.install(|| self.read_frame(k, world))?;
+        // The crust moves: carry what each cell has accumulated so far with it (a porphyry formed
+        // on an arc travels with its plate), then fold this frame in at the new positions.
+        let origin = if matches!(self.source, Source::Synthetic(_)) {
+            None
+        } else {
+            ctx.pool
+                .install(|| DepositStage::recorded_of(world)?.origins(k))?
+        };
         let types = &self.types;
         let state = &mut self.state;
         ctx.pool.install(|| {
+            if let Some(o) = &origin {
+                for a in &mut state.acc {
+                    if !a.is_empty() {
+                        carry(a, o, CellAcc::fresh());
+                    }
+                }
+                if !state.pet.is_empty() {
+                    carry(&mut state.pet, o, CellPet::default());
+                }
+            }
             for (i, t) in types.iter().enumerate() {
                 if state.acc[i].is_empty() {
                     continue;
@@ -751,6 +770,9 @@ struct TypeCensus {
     too_deep: usize,
     children: usize,
     guaranteed: usize,
+    /// Sites whose centre is above sea level at the end of the history (a sanity check on where
+    /// the geology put them).
+    on_land: usize,
 }
 
 impl Stage for DepositStage {
@@ -818,6 +840,44 @@ struct Finish {
     census: Vec<TypeCensus>,
     /// Placed deposits per type (separation checks across tracts and children).
     placed: Vec<Vec<Point>>,
+    /// Where the crust now at a cell was at the end of every frame ([`trace`]), for the cells that
+    /// matter (kitchen centres, candidate sites): the place a deposit's forming events are
+    /// looked up at.
+    paths: BTreeMap<u32, Vec<u32>>,
+}
+
+/// Where the crust now at each of `cells` was at the end of every frame: `[i][k]`, [`NO_ORIGIN`]
+/// before it existed. A history whose crust does not move gives the cell itself every time.
+fn trace(
+    hist: &dyn FieldHistory,
+    frames: usize,
+    cells: &[u32],
+) -> Result<Vec<Vec<u32>>, CoreError> {
+    let mut out = vec![vec![NO_ORIGIN; frames]; cells.len()];
+    let mut cur: Vec<u32> = cells.to_vec();
+    for k in (0..frames).rev() {
+        for (o, c) in out.iter_mut().zip(&cur) {
+            o[k] = *c;
+        }
+        if let Some(map) = hist.origins(k)? {
+            for c in &mut cur {
+                if *c != NO_ORIGIN {
+                    *c = map[*c as usize];
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Carries per-cell accumulators with the crust into a frame: the cell `c` takes what was at
+/// `origin[c]` (or a fresh value for crust born in the frame).
+fn carry<T: Copy + Send + Sync>(v: &mut Vec<T>, origin: &[u32], fresh: T) {
+    let old = std::mem::take(v);
+    *v = origin
+        .par_iter()
+        .map(|&q| if q == NO_ORIGIN { fresh } else { old[q as usize] })
+        .collect();
 }
 
 /// The block y of the present surface at elevation `elev_m` (plan §8.8: y = 63 + h / 20; sea
@@ -1016,6 +1076,7 @@ impl DepositStage {
                 .collect(),
             placed: vec![Vec::new(); self.types.len()],
             present,
+            paths: BTreeMap::new(),
         };
 
         // ---- petroleum kitchens (their events come first so traps can cite them) -------------
@@ -1029,6 +1090,13 @@ impl DepositStage {
             let r = t.petroleum.as_ref().expect("petroleum type");
             let (kept, small) = petroleum::kitchens(&grid, &self.state.pet, r, sc.m_per_block_h);
             kitchens = kept;
+            let centres: Vec<u32> = kitchens.iter().map(|k| k.centre).collect();
+            for (cell, path) in centres
+                .iter()
+                .zip(ctx.pool.install(|| trace(hist, self.frames, &centres))?)
+            {
+                f.paths.insert(*cell, path);
+            }
             let mut areas: Vec<f64> = kitchens.iter().map(|k| k.tract.area_km2).collect();
             areas.sort_by(f64::total_cmp);
             let quantile = |q: f64| {
@@ -1049,14 +1117,15 @@ impl DepositStage {
             ctx.log.push(
                 crate::log::Level::Info,
                 format!(
-                    "deposits petroleum: {} kitchens of at least {} km² ({} smaller regions of mature source rock dropped)",
-                    kitchens.len(), r.min_kitchen_km2, small
+                    "deposits petroleum: {} kitchens of at least {} km² (area p50 {:.0}, p90 {:.0}, max {:.0} km²; {} smaller regions of mature source rock dropped)",
+                    kitchens.len(), r.min_kitchen_km2, quantile(0.5), quantile(0.9), quantile(1.0), small
                 ),
             );
             for (k, kit) in kitchens.iter().enumerate() {
                 let (x, z) = cluster::cell_xz(&grid, kit.centre);
                 let ll = lat_lon_of(c, x, z);
-                let causes = f.cause_ids(t, x, z, kit.t_onset, 1.0e7);
+                let (xf, zf) = self.xz_at(&f, kit.centre, (x, z), kit.t_onset);
+                let causes = f.cause_ids(t, xf, zf, kit.t_onset, 1.0e7);
                 let end = if kit.t_last_gen.is_finite() {
                     kit.t_last_gen.max(kit.t_onset)
                 } else {
@@ -1255,11 +1324,20 @@ impl DepositStage {
             .collect();
         let mut series: BTreeMap<u32, Vec<ColumnSample>> =
             cells.iter().map(|c| (*c, Vec::new())).collect();
+        // Each site's column is the crust's own: where it stood at every frame.
+        let paths = ctx.pool.install(|| trace(hist, self.frames, &cells))?;
         for k in 0..self.frames {
             let frame = ctx.pool.install(|| hist.frame(k))?;
-            for (cell, s) in cells.iter().zip(children::sample(&frame, &cells)) {
-                series.get_mut(cell).expect("listed").push(s);
+            let live: Vec<usize> = (0..cells.len())
+                .filter(|&i| paths[i][k] != NO_ORIGIN)
+                .collect();
+            let at: Vec<u32> = live.iter().map(|&i| paths[i][k]).collect();
+            for (&i, s) in live.iter().zip(children::sample(&frame, &at)) {
+                series.get_mut(&cells[i]).expect("listed").push(s);
             }
+        }
+        for (cell, path) in cells.iter().zip(paths) {
+            f.paths.insert(*cell, path);
         }
 
         // ---- materialise: ledger, sites, bodies, events, children -------------------------
@@ -1275,7 +1353,19 @@ impl DepositStage {
         }
 
         // ---- playability -------------------------------------------------------------------
-        self.guarantee(&mut f, world)?;
+        self.guarantee(&mut f, world, hist, ctx)?;
+        for s in &world.sites {
+            if let Some(ti) = self.types.iter().position(|t| t.id == s.deposit_type)
+                && bilinear_cells(
+                    &f.grid,
+                    &f.elev,
+                    f64::from(s.center[0]),
+                    f64::from(s.center[2]),
+                ) > 0.0
+            {
+                f.census[ti].on_land += 1;
+            }
+        }
 
         // ---- the sites layer and the census --------------------------------------------------
         let mut layer = vec![f32::NAN; n];
@@ -1352,6 +1442,40 @@ impl DepositStage {
 }
 
 impl DepositStage {
+    /// The frame whose interval contains year `t` (the first one ending at or after it).
+    fn frame_at(&self, t: f64) -> usize {
+        let times = &self.state.frame_times;
+        times
+            .iter()
+            .position(|(te, _)| t <= *te)
+            .unwrap_or(times.len().saturating_sub(1))
+    }
+
+    /// Where a deposit now at (`at`, in `cell`) was at year `t`: the point shifted by how far the
+    /// crust's cell has moved since (block metric; a history that does not move gives `at`). The
+    /// events that made a deposit are looked up here, not where its crust is today.
+    fn xz_at(&self, f: &Finish, cell: u32, at: (f64, f64), t: f64) -> (f64, f64) {
+        let Some(path) = f.paths.get(&cell) else {
+            return at;
+        };
+        let k = self.frame_at(t).min(path.len().saturating_sub(1));
+        let Some(&then) = path
+            .get(k..)
+            .and_then(|p| p.iter().find(|c| **c != NO_ORIGIN))
+        else {
+            return at;
+        };
+        let (fx, fz) = cluster::cell_xz(&f.grid, then);
+        let (px, pz) = cluster::cell_xz(&f.grid, cell);
+        let mut dx = fx - px;
+        if dx > f.c / 2.0 {
+            dx -= f.c;
+        } else if dx < -f.c / 2.0 {
+            dx += f.c;
+        }
+        (at.0 + dx, at.1 + (fz - pz))
+    }
+
     #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
     fn materialise(
         &self,
@@ -1384,7 +1508,8 @@ impl DepositStage {
                 .last()
                 .map_or(world.t_years, |(t, _)| *t),
         };
-        let mut causes = f.cause_ids(t, x, z, t_form, slack);
+        let (xf, zf) = self.xz_at(f, cell, (x, z), t_form);
+        let mut causes = f.cause_ids(t, xf, zf, t_form, slack);
         if t.formation_time == FormationTime::Cause
             && let Some(first) = causes
                 .iter()
@@ -1478,7 +1603,8 @@ impl DepositStage {
                     .param("fraction_left", 0.0)
                     .param("destroyed", 1i64)
                     .caused_by(formed);
-                for id in f.preservation_causes(t, x, z, t_gone) {
+                let (xg, zg) = self.xz_at(f, cell, (x, z), t_gone);
+                for id in f.preservation_causes(t, xg, zg, t_gone) {
                     ex = ex.caused_by(id);
                 }
                 let gone = f.emit(world, ex, x, z)?;
@@ -1601,7 +1727,8 @@ impl DepositStage {
                 .param("fraction_left", left)
                 .param("destroyed", 0i64)
                 .caused_by(forming);
-            for id in f.preservation_causes(t, x, z, t_exp) {
+            let (xe, ze) = self.xz_at(f, cell, (x, z), t_exp);
+            for id in f.preservation_causes(t, xe, ze, t_exp) {
                 ex = ex.caused_by(id);
             }
             exhumation = Some(f.emit(world, ex, x, z)?);
@@ -1716,7 +1843,8 @@ impl DepositStage {
             if let Some(ex) = exhumation {
                 ce = ce.caused_by(ex);
             }
-            for id in f.preservation_causes(ctype, x, z, t0) {
+            let (xs, zs) = self.xz_at(f, cell, (x, z), t0);
+            for id in f.preservation_causes(ctype, xs, zs, t0) {
                 ce = ce.caused_by(id);
             }
             let cev = f.emit(world, ce, x, z)?;
@@ -1885,7 +2013,13 @@ impl DepositStage {
             .param("tonnage_mt", size.tonnage_mt)
             .magnitude(size.tonnage_q as f32)
             .caused_by(gone_event);
-        for id in f.preservation_causes(child, x, z, t_gone) {
+        let (xp, zp) = self.xz_at(
+            f,
+            cand.point.cell,
+            (cand.point.x, cand.point.z),
+            t_gone,
+        );
+        for id in f.preservation_causes(child, xp, zp, t_gone) {
             e = e.caused_by(id);
         }
         let ev = f.emit(world, e, x, z)?;
@@ -1980,7 +2114,13 @@ impl DepositStage {
     }
 
     /// The playability pass (plan §7.8).
-    fn guarantee(&self, f: &mut Finish, world: &mut WorldState) -> Result<(), CoreError> {
+    fn guarantee(
+        &self,
+        f: &mut Finish,
+        world: &mut WorldState,
+        hist: &dyn FieldHistory,
+        ctx: &StageContext<'_>,
+    ) -> Result<(), CoreError> {
         let sc = f.sc;
         for ess in &self.params.essentials {
             let regions = Regions::new(world.circumference, ess.region_blocks);
@@ -2050,6 +2190,9 @@ impl DepositStage {
                         }
                     }
                     let Some((score, ti, cell)) = best else { break };
+                    let path = ctx.pool.install(|| trace(hist, self.frames, &[cell]))?;
+                    f.paths
+                        .insert(cell, path.into_iter().next().unwrap_or_default());
                     self.place_guaranteed(f, world, ti, cell, score, ess, region, &regions)?;
                     short -= 1;
                 }
@@ -2098,7 +2241,8 @@ impl DepositStage {
                 .map_or(world.t_years, |(t, _)| *t)
         };
         let slack = self.state.frame_times.first().map_or(1.0e7, |(_, dt)| *dt);
-        let causes = f.cause_ids(t, x, z, t_ev, slack);
+        let (xf, zf) = self.xz_at(f, cell, (x, z), t_ev);
+        let causes = f.cause_ids(t, xf, zf, t_ev, slack);
         let mut grades = Grades::new();
         for p in &t.products {
             match &p.grade_key {
