@@ -22,6 +22,15 @@ use rayon::prelude::*;
 use super::grid::Dims;
 use super::pflood::{BASE, LAND, SINK};
 
+pub mod forest;
+use forest::{Forest, SharedF64};
+
+#[cfg(test)]
+mod parity;
+
+/// Cells handed to one task in the parallel sums (`Forest::up`).
+const SUM_CHUNK: usize = 64;
+
 /// Receivers, donors and the stack of one routing.
 #[derive(Clone, Debug, Default)]
 pub struct Routing {
@@ -33,6 +42,8 @@ pub struct Routing {
     pub stack: Vec<u32>,
     /// Per basin: its root (a base-level cell or a sink) and its range in `stack`.
     pub basins: Vec<(u32, u32, u32)>,
+    /// The forest by position in `stack`, for the parallel passes (`forest.rs`).
+    pub forest: Forest,
 }
 
 /// D8 receivers of every cell on the filled surface `f`.
@@ -110,21 +121,42 @@ pub fn stack(d: &Dims, kind: &[u8], r: &mut Routing) {
         r.basins.push((root as u32, start, r.stack.len() as u32));
     }
     debug_assert!(kind.iter().all(|&k| k == BASE || k == LAND || k == SINK));
+    r.forest
+        .build(&r.rcv, &r.stack, kind, &count, &donors, &r.basins);
 }
 
 /// Drainage area of every cell, weighted by `weight` (runoff relative to the reference, so the
 /// result is the effective area of plan §8.2's runoff coupling), m². Base-level roots collect the
 /// area of their basins.
+///
+/// Parallel over the drainage forest (`Forest::up`); every cell adds its donors' areas to its own
+/// weight in ascending donor order, the order of the serial reverse-stack loop, so the sums are
+/// bit-identical to it.
 pub fn accumulate(d: &Dims, r: &Routing, weight: &[f32], area: &mut Vec<f64>) {
     let a = d.cell_area();
     area.clear();
-    area.extend(weight.iter().map(|&w| f64::from(w) * a));
-    for &c in r.stack.iter().rev() {
-        let c = c as usize;
-        let rc = r.rcv[c] as usize;
-        if rc != c {
-            area[rc] += area[c];
+    area.par_extend(weight.par_iter().map(|&w| f64::from(w) * a));
+    let f = &r.forest;
+    let acc = SharedF64::new(f.len(), 0.0);
+    {
+        let own: &[f64] = area;
+        f.up(SUM_CHUNK, |i| {
+            let mut s = own[r.stack[i] as usize];
+            for &dp in &f.dpos[f.dptr[i] as usize..f.dptr[i + 1] as usize] {
+                s += acc.get(dp as usize);
+            }
+            acc.set(i, s);
+        });
+    }
+    for (i, &c) in r.stack.iter().enumerate() {
+        area[c as usize] = acc.get(i);
+    }
+    for (k, &o) in f.outlets.iter().enumerate() {
+        let mut s = area[o as usize];
+        for &dp in &f.opos[f.optr[k] as usize..f.optr[k + 1] as usize] {
+            s += acc.get(dp as usize);
         }
+        area[o as usize] = s;
     }
 }
 
