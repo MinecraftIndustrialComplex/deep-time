@@ -303,6 +303,14 @@ pub struct TectonicParams {
     pub continental_speed_factor: f64,
     /// Initial continental elevation range, metres.
     pub continent_elevation_m: [f64; 2],
+    /// Share of the continental crust under the sea (shelves, slopes, epeiric seas): the initial
+    /// continental area is (1 − ocean_fraction)/(1 − this), its part nearest the ocean born as a
+    /// flooded shelf, so `planet.ocean_fraction` is the share of the surface under water rather
+    /// than of oceanic crust. Earth: 29 % land on 41 % continental crust (Cogley 1984, Rev.
+    /// Geophys. 22:101–122) → 0.29, the pipeline presets' value, whose surface stage floods the
+    /// continents' margins. 0 (the default) makes all continental crust dry at the start (P1-03;
+    /// the plate-only presets, whose continents never flood).
+    pub continental_shelf_share: f64,
     /// Continents of the `scattered` start.
     pub scattered_continents: u32,
     /// Coastline irregularity (noise warp of the distance, radians).
@@ -410,6 +418,7 @@ impl Default for TectonicParams {
             plate_speed_mm_yr: [20.0, 70.0],
             continental_speed_factor: 0.6,
             continent_elevation_m: [150.0, 900.0],
+            continental_shelf_share: 0.0,
             scattered_continents: 6,
             coast_warp_rad: 0.25,
             rift_lambda0: 0.012,
@@ -671,6 +680,11 @@ impl PlanetPreset {
         ] {
             check((0.0..=1.0).contains(&v), key, "must be in [0, 1]")?;
         }
+        check(
+            (0.0..0.9).contains(&k.continental_shelf_share),
+            "$.tectonics.continental_shelf_share",
+            "must be in [0, 0.9)",
+        )?;
         if let Some(s) = &self.structure {
             s.validate()?;
             check(
