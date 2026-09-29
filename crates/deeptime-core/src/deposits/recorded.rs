@@ -219,7 +219,8 @@ impl Slot {
 
 /// A record being read ahead.
 struct Prefetch {
-    k: usize,
+    /// The record being read (used only if frame `k` still is this record when it is asked for).
+    frame: Arc<DiskFrame>,
     job: JoinHandle<Result<Vec<u8>, CoreError>>,
 }
 
@@ -752,15 +753,20 @@ impl FieldHistory for RecordedHistory {
                 .ok_or_else(|| CoreError::InvalidArgument(format!("no frame {k}")))?;
             let scan = k == 0 || f.last_read.is_some_and(|l| l + 1 == k);
             f.last_read = Some(k);
-            // A read-ahead of another frame is left to finish on its own.
-            let ahead = f.prefetch.take().filter(|p| p.k == k);
+            // A read-ahead of another record (another frame, or this one since written anew) is
+            // left to finish on its own.
+            let ahead = f
+                .prefetch
+                .take()
+                .filter(|p| matches!(&slot, Slot::Disk(d) if Arc::ptr_eq(d, &p.frame)));
             if scan && let Some(Slot::Disk(next)) = f.slots.get(k + 1) {
                 let next = next.clone();
+                let read = next.clone();
                 f.prefetch = std::thread::Builder::new()
                     .name("deeptime-history-read".into())
-                    .spawn(move || next.file.read(next.offset, next.head.record_len()))
+                    .spawn(move || read.file.read(read.offset, read.head.record_len()))
                     .ok()
-                    .map(|job| Prefetch { k: k + 1, job });
+                    .map(|job| Prefetch { frame: next, job });
             }
             (slot, ahead)
         };

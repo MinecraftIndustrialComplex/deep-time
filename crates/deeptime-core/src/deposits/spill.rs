@@ -21,6 +21,7 @@ use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use deeptime_format::fsutil::{read_exact_at, write_all_at};
 
@@ -33,6 +34,10 @@ pub(crate) struct FrameFile {
     path: PathBuf,
     /// The append position of a spill file; `None` for a read-only source.
     end: Option<Mutex<u64>>,
+    /// Bytes read, and the time reads and writes took (ns): what the spill cost.
+    read_bytes: AtomicU64,
+    read_nanos: AtomicU64,
+    write_nanos: AtomicU64,
 }
 
 impl std::fmt::Debug for FrameFile {
@@ -69,6 +74,9 @@ impl FrameFile {
             file,
             path,
             end: Some(Mutex::new(0)),
+            read_bytes: AtomicU64::new(0),
+            read_nanos: AtomicU64::new(0),
+            write_nanos: AtomicU64::new(0),
         })
     }
 
@@ -85,6 +93,9 @@ impl FrameFile {
             file,
             path: path.to_owned(),
             end: None,
+            read_bytes: AtomicU64::new(0),
+            read_nanos: AtomicU64::new(0),
+            write_nanos: AtomicU64::new(0),
         }
     }
 
@@ -98,6 +109,7 @@ impl FrameFile {
             CoreError::InvalidState(format!("{} is read-only", self.path.display()))
         })?;
         let mut end = end.lock().map_err(|_| CoreError::Poisoned)?;
+        let started = Instant::now();
         let start = *end;
         let mut at = start;
         for p in parts {
@@ -105,15 +117,31 @@ impl FrameFile {
             at += p.len() as u64;
         }
         *end = at;
+        self.write_nanos
+            .fetch_add(started.elapsed().as_nanos() as u64, Ordering::Relaxed);
         Ok(start)
+    }
+
+    /// Bytes read so far, and the seconds reads and writes took (a read-ahead's seconds overlap
+    /// the reader's work).
+    pub fn io_stats(&self) -> (u64, f64, f64) {
+        (
+            self.read_bytes.load(Ordering::Relaxed),
+            self.read_nanos.load(Ordering::Relaxed) as f64 * 1e-9,
+            self.write_nanos.load(Ordering::Relaxed) as f64 * 1e-9,
+        )
     }
 
     /// `len` bytes at `offset`.
     pub fn read(&self, offset: u64, len: u64) -> Result<Vec<u8>, CoreError> {
         let len = usize::try_from(len)
             .map_err(|_| CoreError::InvalidState(format!("a {len}-byte read")))?;
+        let started = Instant::now();
         let mut b = vec![0u8; len];
         read_exact_at(&self.file, &mut b, offset).map_err(|e| CoreError::io(&self.path, e))?;
+        self.read_bytes.fetch_add(len as u64, Ordering::Relaxed);
+        self.read_nanos
+            .fetch_add(started.elapsed().as_nanos() as u64, Ordering::Relaxed);
         Ok(b)
     }
 }
@@ -169,6 +197,14 @@ impl SpillStore {
     /// Where the spill file is (or will be) created.
     pub fn dir(&self) -> &Path {
         &self.dir
+    }
+
+    /// The spill file's reads and writes: bytes read, seconds reading, seconds writing.
+    pub fn io_stats(&self) -> (u64, f64, f64) {
+        match self.file.lock() {
+            Ok(f) => f.as_ref().map_or((0, 0.0, 0.0), |f| f.io_stats()),
+            Err(_) => (0, 0.0, 0.0),
+        }
     }
 }
 
