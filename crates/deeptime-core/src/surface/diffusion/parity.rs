@@ -592,8 +592,11 @@ fn the_fused_solve_is_the_textbook_solve_when_there_is_nothing_to_solve_or_too_m
 }
 
 /// Times each phase of one diffusion step on an L1-sized terrain (`cargo test --release -p
-/// deeptime-core diffusion_timing -- --ignored --nocapture`): best of five per phase and thread
-/// count, the textbook solver beside the fused one, on the earthlike diffusivities.
+/// deeptime-core diffusion_timing -- --ignored --nocapture`, `DEEPTIME_TIMING_REPS` repetitions,
+/// 12 by default): the textbook solver beside the fused one on the earthlike diffusivities, at
+/// each thread count. The two are timed in interleaved pairs (old, new, old, new, …), so that a
+/// machine whose load moves affects both alike; minimum and median of each are printed, and the
+/// calibration loop shows what a perfectly parallel job gets from the machine at that moment.
 #[test]
 #[ignore = "a timing, not a check"]
 fn diffusion_timing() {
@@ -602,17 +605,29 @@ fn diffusion_timing() {
     let reps = std::env::var("DEEPTIME_TIMING_REPS")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(5);
-    let best = |f: &mut dyn FnMut()| {
-        (0..reps)
-            .map(|_| {
-                let t = std::time::Instant::now();
-                f();
-                t.elapsed().as_secs_f64() * 1e3
-            })
-            .fold(f64::INFINITY, f64::min)
+        .unwrap_or(12);
+    let ms = |f: &mut dyn FnMut()| {
+        let t = std::time::Instant::now();
+        f();
+        t.elapsed().as_secs_f64() * 1e3
     };
-    println!("{n} cells; ms per step, best of {reps} (old = textbook loop, new = fused passes)");
+    let best = |f: &mut dyn FnMut()| (0..reps).map(|_| ms(f)).fold(f64::INFINITY, f64::min);
+    // (min, median) of `reps` interleaved pairs.
+    let pairs = |a: &mut dyn FnMut(), b: &mut dyn FnMut()| {
+        let (mut ta, mut tb) = (Vec::new(), Vec::new());
+        for _ in 0..reps {
+            ta.push(ms(a));
+            tb.push(ms(b));
+        }
+        let stat = |mut v: Vec<f64>| {
+            v.sort_by(f64::total_cmp);
+            (v[0], v[v.len() / 2])
+        };
+        (stat(ta), stat(tb))
+    };
+    println!(
+        "{n} cells; ms per step, min/median of {reps} interleaved pairs (old = textbook loop, new = fused passes)"
+    );
     // What the stage itself does around the solve (surface/mod.rs, serial): the diffusivity fill.
     let mut kd = vec![0.0; n];
     let fill = best(&mut || {
@@ -636,38 +651,67 @@ fn diffusion_timing() {
             let b = c.h.clone();
             let mut x0 = c.h.clone();
             super::lod(&d, &mut x0, &c.kd, c.dt);
-            let lod = best(&mut || {
-                let mut x = c.h.clone();
-                super::lod(&d, &mut x, &c.kd, c.dt);
-                std::hint::black_box(&x);
-            });
-            let op_old = best(&mut || reference::time_operator(&d, &c.kd, c.dt));
-            let op_new = best(&mut || {
-                std::hint::black_box(super::Operator::new(&d, &c.kd, c.dt));
-            });
+            let (lod_old, lod_new) = pairs(
+                &mut || {
+                    let mut x = c.h.clone();
+                    reference::time_lod(&d, &mut x, &c.kd, c.dt);
+                    std::hint::black_box(&x);
+                },
+                &mut || {
+                    let mut x = c.h.clone();
+                    super::lod(&d, &mut x, &c.kd, c.dt);
+                    std::hint::black_box(&x);
+                },
+            );
+            let (op_old, op_new) = pairs(
+                &mut || reference::time_operator(&d, &c.kd, c.dt),
+                &mut || {
+                    std::hint::black_box(super::Operator::new(&d, &c.kd, c.dt));
+                },
+            );
             let mut its = (0, 0);
-            let cg_old = best(&mut || {
-                let mut x = x0.clone();
-                its.0 = reference::time_cg(&d, &b, &mut x, &c.kd, c.dt);
-            });
-            let cg_new = best(&mut || {
-                let mut x = x0.clone();
-                its.1 = super::cg(&d, &b, &mut x, &c.kd, c.dt);
-            });
-            let step_old = best(&mut || {
-                let mut h = c.h.clone();
-                reference::step(&d, &mut h, &c.kd, c.dt);
-            });
-            let step_new = best(&mut || {
-                let mut h = c.h.clone();
-                super::step(&d, &mut h, &c.kd, c.dt);
-            });
+            let (cg_old, cg_new) = pairs(
+                &mut || {
+                    let mut x = x0.clone();
+                    its.0 = reference::time_cg(&d, &b, &mut x, &c.kd, c.dt);
+                },
+                &mut || {
+                    let mut x = x0.clone();
+                    its.1 = super::cg(&d, &b, &mut x, &c.kd, c.dt);
+                },
+            );
+            let (step_old, step_new) = pairs(
+                &mut || {
+                    let mut h = c.h.clone();
+                    reference::step(&d, &mut h, &c.kd, c.dt);
+                },
+                &mut || {
+                    let mut h = c.h.clone();
+                    super::step(&d, &mut h, &c.kd, c.dt);
+                },
+            );
             println!(
-                "{threads:>2} threads (calibration {cal:.1} ms): lod {lod:.1} | operator old {op_old:.1} new {op_new:.1} | cg ({} / {} it) old {cg_old:.1} new {cg_new:.1} = {:.2} ms/it → {:.2} | step old {step_old:.1} new {step_new:.1}",
+                "{threads:>2} threads (calibration {cal:.1} ms): lod old {:.1}/{:.1} new {:.1}/{:.1} | operator old {:.1}/{:.1} new {:.1}/{:.1} | cg ({} / {} it) old {:.1}/{:.1} new {:.1}/{:.1} = {:.2} → {:.2} ms/it (min) | step old {:.1}/{:.1} new {:.1}/{:.1}",
+                lod_old.0,
+                lod_old.1,
+                lod_new.0,
+                lod_new.1,
+                op_old.0,
+                op_old.1,
+                op_new.0,
+                op_new.1,
                 its.0,
                 its.1,
-                cg_old / its.0 as f64,
-                cg_new / its.1 as f64,
+                cg_old.0,
+                cg_old.1,
+                cg_new.0,
+                cg_new.1,
+                cg_old.0 / its.0 as f64,
+                cg_new.0 / its.1 as f64,
+                step_old.0,
+                step_old.1,
+                step_new.0,
+                step_new.1,
             );
         });
     }
