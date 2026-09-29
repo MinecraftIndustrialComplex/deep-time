@@ -659,11 +659,11 @@ impl DepositStage {
         ctx: &StageContext<'_>,
     ) -> Result<(), CoreError> {
         let grid = self.grid();
-        // The frame unpacked, the crust's origins and the carried accumulators (P1-17: on a
-        // long run the recorded history's frames give way to them).
-        ctx.reserve(
-            self.frame_bytes() + grid.cells() as u64 * (12 + 28 * self.types.len() as u64),
-        )?;
+        // The frame unpacked, the crust's origins, one carried accumulator and the favourability
+        // layer being replaced (P1-17: on a long run the recorded history's frames give way to
+        // them).
+        let per_cell = 12 + 4 + std::mem::size_of::<CellAcc>() + std::mem::size_of::<CellPet>();
+        ctx.reserve(self.frame_bytes() + grid.cells() as u64 * per_cell as u64)?;
         let burial = self.burial_field();
         let pet_rules = self.types.iter().find_map(|t| t.petroleum.clone());
         let frame = ctx.pool.install(|| self.read_frame(k, world))?;

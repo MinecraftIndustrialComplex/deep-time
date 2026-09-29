@@ -33,7 +33,7 @@ pub struct Common {
 }
 
 /// The recorded history's line: its size, and what went to the spill file (P1-17).
-fn spill_line(s: &Session) -> CliResult<Option<String>> {
+pub(crate) fn spill_line(s: &Session) -> CliResult<Option<String>> {
     let spill = s.spill();
     let (read, read_s, write_s) = spill.io_stats();
     Ok(s.with_world(|w| {

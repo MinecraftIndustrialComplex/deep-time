@@ -739,30 +739,27 @@ impl Session {
         h.attach(&self.spill);
         let handle = h.handle();
         let mut out = Evicted::default();
-        let mut add = |e: Evicted| {
-            out.frames += e.frames;
-            out.bytes += e.bytes;
-        };
+        let mut why = "the memory cap";
         if let Some(budget) = self.history_budget {
             let resident = handle.resident_bytes();
             if resident > budget {
-                add(handle.evict(resident - budget)?);
+                out = handle.evict(resident - budget)?;
+                why = "the history budget (--history-mem)";
             }
         }
         let target = self.mem_cap - self.mem_cap / TRIM_HEADROOM;
         let in_use = self.gauge.in_use();
         if in_use > target {
-            add(handle.evict(in_use - target)?);
+            let e = handle.evict(in_use - target)?;
+            if e.frames > 0 {
+                why = "the memory cap";
+            }
+            out.frames += e.frames;
+            out.bytes += e.bytes;
         }
         if out.frames > 0 {
             out.created_file = !self.spill_logged.swap(true, Ordering::AcqRel);
-            log_evicted(
-                &self.log,
-                &out,
-                self.gauge.as_ref(),
-                self.mem_cap,
-                "the memory cap",
-            );
+            log_evicted(&self.log, &out, self.gauge.as_ref(), self.mem_cap, why);
         }
         Ok(())
     }
