@@ -18,7 +18,7 @@ use crate::run::CliResult;
 pub struct StructureView {
     pub strata: LoadedLayer,
     pub classes: Vec<String>,
-    /// `elevation` (block y) and `strata/outcrop` (class index), on L1.
+    /// `elevation` (block y), `strata/outcrop` and `strata/bedrock` (class index), on L1.
     pub layers: Vec<LoadedLayer>,
     pub sections: Vec<Section>,
     pub bodies: Vec<Body>,
@@ -28,7 +28,12 @@ pub struct StructureView {
     pub m_per_block: (f64, f64),
 }
 
-fn f32_layer(name: &str, units: &str, grid: &deeptime_format::GridDesc, v: &[f32]) -> CliResult<LoadedLayer> {
+fn f32_layer(
+    name: &str,
+    units: &str,
+    grid: &deeptime_format::GridDesc,
+    v: &[f32],
+) -> CliResult<LoadedLayer> {
     let mut d = LayerDesc::scalar(name, DType::F32, grid.clone(), Codec::Raw);
     d.units = units.to_owned();
     let bytes: Vec<u8> = v.iter().flat_map(|x| x.to_le_bytes()).collect();
@@ -55,29 +60,62 @@ pub fn build(world: &WorldState, preset_json: &str) -> CliResult<Option<Structur
     let n = grid.cells();
     let surface: Vec<f32> = (0..n).map(|c| src.surface_y(c, s) as f32).collect();
     let rock = world.fields[structure::field::ROCK].data.clone();
+    // Bedrock: the rock under the regolith (soil, saprolite, laterite, bauxite).
+    let regolith: Vec<usize> = ["soil", "saprolite", "laterite", "bauxite"]
+        .iter()
+        .filter_map(|r| EVERY_CLASS.iter().position(|c| c == r))
+        .collect();
+    let bedrock: Vec<f32> = (0..n)
+        .map(|c| {
+            if !regolith.contains(&(rock[c] as usize)) {
+                return rock[c];
+            }
+            let (_, classes) = h.cell(c);
+            classes
+                .iter()
+                .find(|&&k| !regolith.contains(&usize::from(k)))
+                .map_or(rock[c], |&k| f32::from(k))
+        })
+        .collect();
     let layers = vec![
         f32_layer("elevation", "block", &grid, &surface)?,
         f32_layer("strata/outcrop", "class index", &grid, &rock)?,
+        f32_layer("strata/bedrock", "class index", &grid, &bedrock)?,
     ];
     let log_m: Vec<f32> = (0..n)
-        .map(|c| world.surface.as_ref().map_or(0.0, |st| st.log.total(c) as f32))
+        .map(|c| {
+            world
+                .surface
+                .as_ref()
+                .map_or(0.0, |st| st.log.total(c) as f32)
+        })
         .collect();
 
     // Meridians: the column with the most land, and the one through the thickest strata log.
-    let land = |i: usize| (0..hgt).filter(|&j| surface[j * w + i] > s.sea_level_y as f32).count();
-    let i_a = (0..w).max_by_key(|&i| (land(i), std::cmp::Reverse(i))).unwrap_or(0);
+    let land = |i: usize| {
+        (0..hgt)
+            .filter(|&j| surface[j * w + i] > s.sea_level_y as f32)
+            .count()
+    };
+    let i_a = (0..w)
+        .max_by_key(|&i| (land(i), std::cmp::Reverse(i)))
+        .unwrap_or(0);
     let thickest = (0..n)
         .max_by(|&a, &b| log_m[a].total_cmp(&log_m[b]))
         .unwrap_or(0);
     let mut i_b = thickest % w;
-    if (i_b as i64 - i_a as i64).rem_euclid(w as i64).min((i_a as i64 - i_b as i64).rem_euclid(w as i64))
+    if (i_b as i64 - i_a as i64)
+        .rem_euclid(w as i64)
+        .min((i_a as i64 - i_b as i64).rem_euclid(w as i64))
         < (w / 16) as i64
     {
         i_b = (i_a + w / 2) % w;
     }
     let c = i64::from(s.circumference_blocks);
     let full = |i: usize, title: &str| {
-        let top = (0..hgt).map(|j| surface[j * w + i]).fold(f32::MIN, f32::max);
+        let top = (0..hgt)
+            .map(|j| surface[j * w + i])
+            .fold(f32::MIN, f32::max);
         let y1 = ((top + 20.0).ceil() as i32).clamp(s.sea_level_y + 20, s.max_y);
         Section {
             title: title.to_owned(),
@@ -88,11 +126,16 @@ pub fn build(world: &WorldState, preset_json: &str) -> CliResult<Option<Structur
             y1,
             w: (2 * hgt) as u32,
             h: (((y1 - s.min_y) as f64) / 1.5).round() as u32,
+            per_cell: false,
         }
     };
     let zoom = |x: i64, zc: i64, half: i64, title: &str| {
-        let i = grid.wrap_i(((x - grid.origin_block_x) as f64 / f64::from(grid.r)).round() as i64) as usize;
-        let rows = |z: i64| grid.clamp_j(((z - grid.origin_block_z) as f64 / f64::from(grid.r)).round() as i64) as usize;
+        let i = grid.wrap_i(((x - grid.origin_block_x) as f64 / f64::from(grid.r)).round() as i64)
+            as usize;
+        let rows = |z: i64| {
+            grid.clamp_j(((z - grid.origin_block_z) as f64 / f64::from(grid.r)).round() as i64)
+                as usize
+        };
         let (j0, j1) = (rows(zc - half), rows(zc + half));
         let (lo, hi) = (j0..=j1)
             .map(|j| surface[j * w + i])
@@ -108,6 +151,7 @@ pub fn build(world: &WorldState, preset_json: &str) -> CliResult<Option<Structur
             y1,
             w: 1000,
             h: ((y1 - y0) * 2).clamp(100, 900) as u32,
+            per_cell: false,
         }
     };
     let mut sections = vec![
@@ -116,11 +160,33 @@ pub fn build(world: &WorldState, preset_json: &str) -> CliResult<Option<Structur
     ];
     let x_a = grid.block_x(i_a as i64);
     let col_a: Vec<usize> = (0..hgt).map(|j| j * w + i_a).collect();
-    if let Some(&cb) = col_a.iter().max_by(|&&a, &&b| log_m[a].total_cmp(&log_m[b])) {
-        sections.push(zoom(x_a, grid.block_z((cb / w) as i64), 700, "The thickest basin on the first meridian (≈420 km)"));
+    if let Some(&cb) = col_a
+        .iter()
+        .max_by(|&&a, &&b| log_m[a].total_cmp(&log_m[b]))
+    {
+        let z = zoom(
+            x_a,
+            grid.block_z((cb / w) as i64),
+            700,
+            "The thickest basin on the first meridian (≈420 km)",
+        );
+        let mut cells = z.clone();
+        cells.title =
+            "The same basin, each strata cell's own stack (no interpolation between cells)".into();
+        cells.per_cell = true;
+        sections.push(z);
+        sections.push(cells);
     }
-    if let Some(&cm) = col_a.iter().max_by(|&&a, &&b| surface[a].total_cmp(&surface[b])) {
-        sections.push(zoom(x_a, grid.block_z((cm / w) as i64), 700, "The highest ground on the first meridian (≈420 km)"));
+    if let Some(&cm) = col_a
+        .iter()
+        .max_by(|&&a, &&b| surface[a].total_cmp(&surface[b]))
+    {
+        sections.push(zoom(
+            x_a,
+            grid.block_z((cm / w) as i64),
+            700,
+            "The highest ground on the first meridian (≈420 km)",
+        ));
     }
     // Through the pluton whose roof is nearest the surface.
     let bodies: Vec<Body> = world.bodies.clone();
@@ -128,15 +194,24 @@ pub fn build(world: &WorldState, preset_json: &str) -> CliResult<Option<Structur
         .iter()
         .filter(|b| b.role == "pluton")
         .map(|b| {
-            let ci = grid.wrap_i(((b.center[0] - grid.origin_block_x as f64) / f64::from(grid.r)).round() as i64) as usize;
-            let cj = grid.clamp_j(((b.center[2] - grid.origin_block_z as f64) / f64::from(grid.r)).round() as i64) as usize;
+            let ci = grid.wrap_i(
+                ((b.center[0] - grid.origin_block_x as f64) / f64::from(grid.r)).round() as i64,
+            ) as usize;
+            let cj = grid.clamp_j(
+                ((b.center[2] - grid.origin_block_z as f64) / f64::from(grid.r)).round() as i64,
+            ) as usize;
             let top = b.center[1] + f64::from(b.axes[1]);
             (b, top - f64::from(surface[cj * w + ci]))
         })
         .max_by(|a, b| a.1.total_cmp(&b.1));
     if let Some((b, _)) = exposed {
         let half = (f64::from(b.axes[0].max(b.axes[2])) * 4.0).max(250.0) as i64;
-        let mut z = zoom(b.center[0].round() as i64, b.center[2].round() as i64, half, "Through the most exhumed pluton");
+        let mut z = zoom(
+            b.center[0].round() as i64,
+            b.center[2].round() as i64,
+            half,
+            "Through the most exhumed pluton",
+        );
         let bottom = (b.center[1] - f64::from(b.axes[1]) - 30.0).floor() as i32;
         z.y0 = z.y0.min(bottom).max(s.min_y);
         z.h = ((z.y1 - z.y0) * 2).clamp(100, 900) as u32;
@@ -197,7 +272,11 @@ pub fn write(dir: &std::path::Path, v: &StructureView) -> CliResult<Value> {
         }
     }
     for b in &v.bodies {
-        for name in b.rock_class.iter().chain(b.zones.iter().filter_map(|z| z.rock_class.as_ref())) {
+        for name in b
+            .rock_class
+            .iter()
+            .chain(b.zones.iter().filter_map(|z| z.rock_class.as_ref()))
+        {
             if let Some(k) = v.classes.iter().position(|c| c == name) {
                 used[k] = true;
             }

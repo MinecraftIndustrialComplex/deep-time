@@ -141,7 +141,15 @@ mod tests {
         );
         assert!((rift - 0.6).abs() < 1e-6);
         // A 3-km delta wedge on oceanic crust.
-        let delta = closure(&[layer(3000.0, "shale")], 0.0, halite, false, regime::OCEAN_BASIN, 3000.0, &p);
+        let delta = closure(
+            &[layer(3000.0, "shale")],
+            0.0,
+            halite,
+            false,
+            regime::OCEAN_BASIN,
+            3000.0,
+            &p,
+        );
         assert!((delta - 0.8).abs() < 1e-6);
     }
 }

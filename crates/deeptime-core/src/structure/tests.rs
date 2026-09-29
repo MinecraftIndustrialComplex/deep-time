@@ -143,7 +143,10 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     for b in &world.bodies {
         assert_eq!(b.role, "pluton");
         let class = b.rock_class.as_deref().unwrap();
-        assert!(["granodiorite", "granite", "diorite"].contains(&class), "{class}");
+        assert!(
+            ["granodiorite", "granite", "diorite"].contains(&class),
+            "{class}"
+        );
         b.validate().unwrap();
     }
     assert_eq!(note["horizons"]["check"], "ok");
@@ -180,7 +183,10 @@ fn a_resumed_run_is_the_same_run() {
     .unwrap();
     finish(&s3);
     let got = s3.checkpoint().unwrap().world;
-    assert_eq!(got.surface.as_ref().unwrap().log, world.surface.as_ref().unwrap().log);
+    assert_eq!(
+        got.surface.as_ref().unwrap().log,
+        world.surface.as_ref().unwrap().log
+    );
     assert_eq!(got.bodies, world.bodies);
     assert_eq!(got.history, world.history);
     assert_eq!(got.fields[field::ROCK].data, world.fields[field::ROCK].data);

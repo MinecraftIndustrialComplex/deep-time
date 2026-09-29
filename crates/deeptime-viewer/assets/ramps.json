@@ -383,6 +383,7 @@
     "surface/regolith_m": "regolith",
     "structure/rock": "rock_class",
     "strata/outcrop": "rock_class",
+    "strata/bedrock": "rock_class",
     "structure/log_grade": "metamorphic_grade",
     "structure/trap_structure": "unit"
   },

@@ -16,7 +16,7 @@
 //! regime) and the fold trend take the nearest sample. Layers (world.fields): the keyframe layers
 //! `elevation` (block y), `plates` (a colour index of the plate id), `crust_age` (Myr, −1 on
 //! continental crust) and `regime`, and the outputs P1-04 and later stages read: `plates/*`
-//! (P1-07 added the nearest sample's rock pools, `plates/pool/*`, for the basement columns).
+//! (P1-07 added the rock pools, `plates/pool/*`, interpolated, for the basement columns).
 
 use glam::{DQuat, DVec3};
 use rayon::prelude::*;
@@ -212,15 +212,19 @@ pub fn sample(
             ]
         })
         .collect();
-    // The rock pools of the nearest sample (P1-07's basement columns, `structure::columns`); gap
-    // cells get the fresh ridge crust the next resampling makes.
+    // The rock pools, interpolated like the other thicknesses (P1-07's basement columns,
+    // `structure::columns`: the nearest sample's pools changed every other L1 cell and built
+    // columns of alternating crust); gap cells get the fresh ridge crust the next resampling makes.
+    let pool_values: Vec<Vec<f64>> = (0..POOL_FIELDS.len())
+        .map(|k| coupling.interpolate(mesh, |v| f64::from(samples[v as usize].pools[k])))
+        .collect();
     let pools: Vec<[f32; POOL_FIELDS.len()]> = (0..cells)
         .into_par_iter()
         .map(|c| {
             if info[c].mode == GAP {
                 super::pools::oceanic_column()
             } else {
-                samples[links[c].nearest as usize].pools
+                std::array::from_fn(|k| pool_values[k][c].max(0.0) as f32)
             }
         })
         .collect();
@@ -333,7 +337,7 @@ pub fn sample(
         .collect()
 }
 
-/// The L1 fields holding the nearest sample's rock pools, metres, in [`pool`] order
+/// The L1 fields holding the rock pools (interpolated), metres, in [`pool`] order
 /// (`plates/pool/<name>_m`; P1-07 builds the basement below the strata log from them).
 ///
 /// [`pool`]: super::state::pool

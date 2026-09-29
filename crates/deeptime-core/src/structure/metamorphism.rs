@@ -5,9 +5,12 @@
 //! allows. Classes only move forward, so a metamorphic rock keeps its grade when erosion brings it
 //! back up — which is how metamorphic belts reach the surface.
 //!
+//! **Where.** On continental crust (sediment on oceanic crust is subducted, or accreted and then
+//! continental, before it is buried deep enough).
+//!
 //! **Temperature.** A linear geotherm T(z) = T_s + (q / k)·z_eff, with q the plate model's heat
-//! flow proxy (`plates/heat_flow_mw_m2`), k = `conductivity_w_mk` and T_s the climate's mean
-//! temperature (or `surface_temp_c`). **Regime history** enters through z_eff: under an active
+//! flow proxy (`plates/heat_flow_mw_m2`, at most `max_heat_flow_mw_m2`), k = `conductivity_w_mk`
+//! and T_s the climate's mean temperature (or `surface_temp_c`). **Regime history** enters through z_eff: under an active
 //! collision (the `collision` regime, or a Himalayan orogeny younger than 30 Myr) the crust is being
 //! thickened and everything in it is buried with it, so depths scale by the thickening factor
 //! β = clamp(e / e₀, 1, `max_burial_factor`) (homogeneous pure shear; e the crust's thickness,
@@ -81,6 +84,11 @@ impl Paths {
                 .collect(),
             grades: t.iter().map(|c| grade(c.name)).collect(),
         }
+    }
+
+    /// `class`'s path as (class, formation temperature °C), as far as it has temperatures.
+    pub fn steps(&self, class: u16) -> &[(u16, f64)] {
+        &self.steps[usize::from(class)]
     }
 
     /// The class `class` becomes at temperature `temp_c` (itself when too cold).
@@ -195,7 +203,10 @@ mod tests {
         let col: Vec<u16> = log.column(0).iter().map(|l| l.class).collect();
         // Limestone at 1 km mid-depth: 10 + 25·2 = 60 °C, unchanged; shale at 5 km: 260 °C →
         // slate; sandstone at 10 km: 510 °C → quartzite.
-        assert_eq!(col, [index("quartzite"), index("slate"), index("limestone")]);
+        assert_eq!(
+            col,
+            [index("quartzite"), index("slate"), index("limestone")]
+        );
         log.check(0, crate::synth::EVERY_CLASS.len()).unwrap();
         // Cooled and exhumed: nothing goes back.
         let cold = Thermal {
@@ -203,7 +214,10 @@ mod tests {
             gradient_c_m: 0.0,
             ..hot
         };
-        assert_eq!(metamorphose(&mut log.column_mut(0), 0.0, &cold, &paths), 0.0);
+        assert_eq!(
+            metamorphose(&mut log.column_mut(0), 0.0, &cold, &paths),
+            0.0
+        );
         assert_eq!(log.column(0)[1].class, index("slate"));
         // Two layers reaching one class merge (older base age, summed thickness).
         let mut log = StrataLog::new(1, 8);

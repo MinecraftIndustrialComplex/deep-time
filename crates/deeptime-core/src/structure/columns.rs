@@ -23,7 +23,11 @@
 //!    oceanic crust), felsic volcanic → rhyolite (andesite in arcs), mafic volcanic → basalt,
 //!    metamorphic → gneiss (schist in a Himalayan orogen younger than 100 Myr), felsic plutonic →
 //!    granite (granodiorite under an Andean orogeny), mafic plutonic → gabbro. The first basement
-//!    unit takes the surface's regime overrides (arc → andesite, hotspot → basalt).
+//!    unit takes the surface's regime overrides (arc → andesite, hotspot → basalt). The pools have
+//!    no burial history, so on continental crust a pool unit steps along its class's metamorphic
+//!    path by the **present** geotherm (`metamorphism.rs`'s temperatures and geotherm, without the
+//!    collision factor): the unit is split at the depths of the isotherms of its path, so a thick
+//!    sedimentary pool is sandstone near the surface and quartzite below the 300 °C isotherm.
 //! 4. **The mantle** (peridotite) below the crust, down to the depth asked for.
 //!
 //! Neighbouring units of one class merge. Plutons are bodies, not units (`plutons.rs`).
@@ -34,6 +38,7 @@ use crate::surface::lithology::{self, Classes, index};
 use crate::surface::strata_log::Layer;
 use crate::surface::{basement_class, weathering};
 
+use super::metamorphism::Paths;
 use super::params::StructureParams;
 
 /// Depth of the carbonate compensation depth, m below sea level (4.5–5 km in today's oceans).
@@ -76,6 +81,7 @@ pub struct Tables {
     pub carbonate: Vec<bool>,
     /// Per class: crystalline (intrusive, special or regional-metamorphic above slate grade).
     pub crystalline: Vec<bool>,
+    pub paths: Paths,
 }
 
 impl Tables {
@@ -103,6 +109,7 @@ impl Tables {
                             && !matches!(c.name, "slate" | "phyllite" | "serpentinite"))
                 })
                 .collect(),
+            paths: Paths::get(),
         }
     }
 
@@ -152,6 +159,10 @@ pub struct Cell<'a> {
     pub orogeny_age: f32,
     /// Depth of the surface below sea level, m (negative on land).
     pub depth_below_sea_m: f64,
+    /// The present geotherm: surface temperature, °C, and gradient, °C/m (0 turns the basement's
+    /// metamorphism off).
+    pub surface_c: f64,
+    pub gradient_c_m: f64,
 }
 
 /// The class of pool `p` below the top of the basement.
@@ -234,7 +245,12 @@ pub fn build(
     let mut depth = 0.0f64;
     let reg = f64::from(cell.regolith_m.max(0.0));
     if reg > 0.0 {
-        push(out, t.regolith_class(cell.regolith_kind), reg, Source::Regolith);
+        push(
+            out,
+            t.regolith_class(cell.regolith_kind),
+            reg,
+            Source::Regolith,
+        );
         depth += reg;
     }
     let young_from = now_myr - p.loose_age_myr;
@@ -290,7 +306,23 @@ pub fn build(
             pool_class(t, cell, k)
         };
         first = false;
-        push(out, class, th, Source::Basement(k as u8));
+        // Split the pool at the isotherms of its class's path (continental crust only).
+        let mut top = depth;
+        let mut current = class;
+        if cell.crust_type != OCEANIC && cell.gradient_c_m > 0.0 {
+            for &(next, temp) in t.paths.steps(class) {
+                let z = (temp - cell.surface_c) / cell.gradient_c_m;
+                if z >= depth + th {
+                    break;
+                }
+                if z > top {
+                    push(out, current, z - top, Source::Basement(k as u8));
+                    top = z;
+                }
+                current = next;
+            }
+        }
+        push(out, current, depth + th - top, Source::Basement(k as u8));
         depth += th;
     }
     if depth < max_depth_m {
@@ -341,6 +373,8 @@ mod tests {
             orogeny: 0,
             orogeny_age: f32::NAN,
             depth_below_sea_m: -200.0,
+            surface_c: 10.0,
+            gradient_c_m: 0.0,
         }
     }
 
@@ -376,6 +410,18 @@ mod tests {
         let old = [layer(-100.0, 300.0, "sandstone")];
         build(&continental(&old), &t, &p, 0.0, 5000.0, &mut out);
         assert_eq!(out[0].class, index("sandstone"));
+        // A hot continent (40 °C/km): the metamorphic pool is gneiss already; the 2-km
+        // sedimentary pool stays sandstone above the 300 °C isotherm (7.25 km): nothing to split.
+        // A thick sedimentary pool is split at 7.25 km into quartzite.
+        let mut hot = continental(&[]);
+        hot.gradient_c_m = 0.04;
+        hot.pools[pool::SEDIMENTARY] = 10_000.0;
+        build(&hot, &t, &p, 0.0, 12_000.0, &mut out);
+        let classes: Vec<u16> = out.iter().map(|u| u.class).collect();
+        assert_eq!(&classes[..2], &[index("mudstone"), index("sandstone")]);
+        assert_eq!(classes[2], index("quartzite"));
+        let above: f64 = out[..2].iter().map(|u| f64::from(u.thickness_m)).sum();
+        assert!((above - 7250.0).abs() < 1e-2, "{above}");
     }
 
     #[test]
