@@ -4,7 +4,7 @@
 # Installs one of Deep Time's server sets into smoke/<profile>/server/ (plan §9.5).
 # Adapted from mic-climate's smoke/install.sh.
 #
-#   tools/smoke/install.sh <standalone|mic|terrablender|ev>
+#   tools/smoke/install.sh <standalone|mic|mic-ev|terrablender|ev|ev-client>
 #       [--size 16384|32768]      world circumference -> level-type deeptime:planet[_32k]
 #       [--synth <kind>]          write synthetic world data before the first start (P0-09+)
 #       [--strata <kind>]         the synthetic horizons: placeholder (default) or every-class (P1-12)
@@ -20,7 +20,17 @@
 #       [--memory-cap-gib <n>]    its memory_cap_gib (default 4)
 #       [--pack-worktree]         mic only: install the pack's working tree instead of its last
 #                                 commit (other sessions edit the working tree; HEAD is the default)
+#       [--seed <n>]              server.properties level-seed (default: none, a random seed). Two
+#                                 sets compared side by side (Q10: mic vs mic-ev) need the same seed,
+#                                 or vanilla's features, caves and scatter differ between them
 #       [--clean]                 throw the server away first
+#
+# DEEPTIME_PACK=<dir> installs mic/mic-ev from that pack checkout instead of ../../pack (a git
+# checkout with a .git directory: its HEAD, or its working tree with --pack-worktree).
+#
+# mic-ev is the mic set plus Excavated Variants and Dynamic Asset Generator (profiles/ev.txt's pins),
+# for the plan Q10 comparison; ev-client is the ev set plus Create, the smallest set a client needs to
+# generate EV's variant textures for every ore and stone the MIC pack has (tools/client/ev-assets.sh).
 #
 # Idempotent: downloads are cached under smoke/cache/ and packwiz-installer syncs, so a
 # re-run picks up exactly what the pack pins today. NOTHING under pack/ is written, and
@@ -32,7 +42,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-PACK="$(cd "$REPO/../../pack" && pwd)"
+# DEEPTIME_PACK: another pack checkout (e.g. a copy of the pack's deep-time branch); default ../../pack.
+PACK="$(cd "${DEEPTIME_PACK:-$REPO/../../pack}" && pwd)"
 PROFILES="$REPO/tools/smoke/profiles"
 CACHE="$REPO/smoke/cache"
 
@@ -45,7 +56,7 @@ GAME_PORT=25665
 RCON_PORT=25675
 
 PROFILE="${1:-}"; shift || true
-SIZE=16384; SYNTH=""; STRATA=placeholder; DATAPACK=""; TEST_TERRAIN=""; PRESET=""; CLEAN=0; PACK_WORKTREE=0
+SIZE=16384; SYNTH=""; STRATA=placeholder; DATAPACK=""; TEST_TERRAIN=""; PRESET=""; CLEAN=0; PACK_WORKTREE=0; SEED=""
 START=""; LENGTH_MYR=""; MEMORY_CAP_GIB=4
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -58,15 +69,19 @@ while [ $# -gt 0 ]; do
         --start) START="$2"; shift 2 ;;
         --length-myr) LENGTH_MYR="$2"; shift 2 ;;
         --memory-cap-gib) MEMORY_CAP_GIB="$2"; shift 2 ;;
+        --seed) SEED="$2"; shift 2 ;;
         --clean) CLEAN=1; shift ;;
         --pack-worktree) PACK_WORKTREE=1; shift ;;
         *) echo "install.sh: unknown argument '$1'" >&2; exit 2 ;;
     esac
 done
 case "$PROFILE" in
-    standalone|mic|terrablender|ev) ;;
-    *) echo "usage: install.sh <standalone|mic|terrablender|ev> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--clean]" >&2; exit 2 ;;
+    standalone|mic|mic-ev|terrablender|ev|ev-client) ;;
+    *) echo "usage: install.sh <standalone|mic|mic-ev|terrablender|ev|ev-client> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--seed N] [--clean]" >&2; exit 2 ;;
 esac
+# The sets installed from the MIC pack (packwiz-installer); the others are their pin files alone.
+case "$PROFILE" in mic|mic-ev) FROM_PACK=1 ;; *) FROM_PACK=0 ;; esac
+case "$SEED" in ''|-[0-9]*|[0-9]*) ;; *) echo "install.sh: --seed must be a number" >&2; exit 2 ;; esac
 case "$SIZE" in
     16384) LEVEL_TYPE='deeptime\:planet' ;;
     32768) LEVEL_TYPE='deeptime\:planet_32k' ;;
@@ -154,7 +169,8 @@ print(path)
 PY
 }
 
-# profile_lines <profile> -> "<slug> <id>" lines, following @include.
+# profile_lines <profile> -> "<slug> <id>" lines, following @include; profile_pins lists a pin that
+# two includes share once (mic-ev includes mic and ev, both of which pin Toroidal World).
 profile_lines() {
     local file="$PROFILES/$1.txt"
     while IFS= read -r line; do
@@ -164,11 +180,12 @@ profile_lines() {
         if [ "$1" = "@include" ]; then profile_lines "$2"; else echo "$1 $2"; fi
     done < "$file"
 }
+profile_pins() { profile_lines "$1" | awk '!seen[$0]++'; }
 
 # Deep Time and TW are always re-placed; nothing else of ours is left behind.
 find "$SERVER/mods" -maxdepth 1 \( -name 'deeptime-*.jar' -o -name 'toroidal_world*.jar' \) -delete
 
-if [ "$PROFILE" = mic ]; then
+if [ "$FROM_PACK" = 1 ]; then
     BOOTSTRAP="$CACHE/packwiz-installer-bootstrap.jar"
     if [ ! -f "$BOOTSTRAP" ]; then
         say "downloading packwiz-installer-bootstrap v0.0.3"
@@ -243,11 +260,11 @@ while read -r slug vid; do
     cp "$jar" "$SERVER/mods/"
     echo "   $slug $vid -> $(basename "$jar")"
     # Pins that follow the pack must stay equal to the pack's.
-    if [ "$PROFILE" != mic ] && [ -f "$PACK/mods/$slug.pw.toml" ]; then
+    if [ "$FROM_PACK" = 0 ] && [ -f "$PACK/mods/$slug.pw.toml" ]; then
         packvid="$(sed -n 's/^version *= *"\(.*\)"/\1/p' "$PACK/mods/$slug.pw.toml")"
         [ -n "$packvid" ] && [ "$packvid" != "$vid" ] && echo "   WARNING: the pack pins $slug at $packvid, profiles/$PROFILE.txt at $vid"
     fi
-done < <(profile_lines "$PROFILE")
+done < <(profile_pins "$PROFILE")
 
 # Always the current sources: an old jar left in build/libs once installed pre-P0-10 code.
 say "building the Deep Time jar"
@@ -294,6 +311,7 @@ enable-command-block=true
 sync-chunk-writes=false
 motd=Deep Time smoke test ($PROFILE)
 EOF
+[ -n "$SEED" ] && echo "level-seed=$SEED" >> "$SERVER/server.properties"
 {
     echo '-Xmx6G'
     echo '-XX:+UseG1GC'
@@ -334,7 +352,7 @@ fi
 cat > "$SMOKE/install.json" <<EOF
 {"profile": "$PROFILE", "size": $SIZE, "level_type": "$(echo "$LEVEL_TYPE" | tr -d '\\')", "synth": "$SYNTH", "strata": "$STRATA", "datapack": "$DATAPACK",
  "preset": "$PRESET", "timeline_start": "$START", "timeline_length_myr": "$LENGTH_MYR",
- "test_terrain": "$TEST_TERRAIN", "neoforge": "$NEO", "pack": "$PACK_DESC", "pack_dirty_hash": "$PACK_DIRTY_HASH",
+ "test_terrain": "$TEST_TERRAIN", "seed": "$SEED", "neoforge": "$NEO", "pack": "$PACK_DESC", "pack_dirty_hash": "$PACK_DIRTY_HASH",
  "pack_ref": "${PACK_REF:-}", "pack_stale_hashes": "${PACK_STALE:-}",
  "deeptime_jar": "$(basename "$JAR")", "game_port": $GAME_PORT, "rcon_port": $RCON_PORT}
 EOF

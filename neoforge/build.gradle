@@ -194,7 +194,10 @@ neoForge {
 // it put there before, then links the run's set, skipping any jar whose mod id is
 // already on the classpath and failing on a duplicate mod id.
 // ---------------------------------------------------------------------------
+// -PrunSet=<set> links smoke/<set>/server/mods into whichever run starts (tools/client/ev-assets.sh:
+// the ev-client set into the client, for Excavated Variants' generated textures).
 def serverSetFor = { String run ->
+    if (project.hasProperty('runSet')) return project.property('runSet').toString()
     if (project.hasProperty('withMic')) return 'mic'
     if (run == 'gameTestServer') {
         if (project.hasProperty('withTerraBlender')) return 'terrablender'
