@@ -72,7 +72,10 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     let json = pipeline_json(3000, 60.0, 7);
     let dir = temp_dir("bake");
     let s = session(&json, &dir, 2);
-    assert_eq!(s.stage_names(), ["plates", "surface", "structure"]);
+    assert_eq!(
+        s.stage_names(),
+        ["plates", "climate", "surface", "structure"]
+    );
     finish(&s);
     let world = s.checkpoint().unwrap().world;
     let preset = match &Preset::from_json(&json).unwrap().body {

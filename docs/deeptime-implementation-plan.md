@@ -2115,6 +2115,28 @@ Cost: LFPM-class precipitation costs about 2.4 stream-power steps per snapshot, 
 about one or two erosion steps (`surface_processes_climate.md` §5). Outputs feed erosion (runoff),
 deposits (paleolatitude, aridity), biomes (§7.2) and keyframes.
 
+*As built in P1-05* (`crates/deeptime-core/src/climate/`; STATUS.md has the details): the climate is
+a stage coupled to the plates like the surface, placed before it (`plates → climate → surface →
+structure`, one step each per plate step), so the surface's runoff, weathering and facies, the
+structure's metamorphism and the deposit frames read `climate/{t_mean_c, precip_mm}` of the ground
+they are about to change. Full snapshots every `snapshot_every_myr` (10) plus the first and last
+step; between them each cell's departure from its row's zonal reference moves with the plates
+(semi-Lagrangian, as the surface's offset) and takes the current lapse rate. (1) The EBM is climlab's
+equation with North, Cahalan & Coakley 1981's A, B, D and climlab's albedos, extended with a land
+and a sea surface per band (the sea a surface layer over a 50-m slab with latent sea ice and ocean
+heat diffusion), 72 implicit steps a year, a circular orbit; energy balanced to < 0.05 W/m². (2)
+Belts: three cells shifted per column and month by a thermal-equator ITCZ (monsoons) and a
+tilt-scaled shift of the highs; gyres from each ocean cell's position across its basin; drying
+under the highs' eastern flanks, summer onshore air on subtropical east coasts. (3) Moisture,
+maritime influence and rain shadows carried along each row with the wind (Earth-normalized decay
+lengths), smoothed over 300 Earth km. (4) Smith & Barstad via the MIT module, FFT per wind regime
+over the rows it reaches (x wraps; rows zero-padded). (5) Köppen from 12 months (Peel et al.
+2007). (6) ELA from summer temperature and precipitation (Ohmura et al. 1992); `glaciation`
+events. (7) Sea level stays the surface section's curve (P1-04). Monthly fields stay internal;
+the published fields are the annual mean, warmest and coldest month, precipitation, aridity,
+Köppen, ELA and glacier. `deeptime climate-dem` runs one snapshot on a given relief (Earth's
+1° relief: 19 of 24 reference cities in the right Köppen group).
+
 ### 8.4 Hydrology — `core::hydro` (Phase 2; Phase 0 only proves water holds)
 
 On L2: flow routing and priority-flood; river extraction as vectors with discharge above a drainage
@@ -3059,6 +3081,10 @@ a smoke benchmark and again at the end.
     cases (hand-built monthly series for Af, BWh, Cfb, Dfc, ET) classify correctly
   - `nix develop -c cargo run --release -p deeptime-cli -- stage climate --preset earthlike_quick_16k --viewer review/out/p1-climate`
 - **Ben reviews.** Köppen, temperature and precipitation maps and their change through time.
+- *As run (P1-05):* the acceptance command is `stage climate --preset pipeline_quick_16k --start
+  scattered_continents --length-myr 500` (the `earthlike_*` built-ins stay placeholders until P1-08,
+  as for P1-04); the climate is coupled into the plates group rather than a separate stage after it.
+  A synthetic ridge test, EBM balance and Köppen cases pass as specified.
 
 #### P1-06 Young landscape, amplification and the detail layer
 - **Goal.** L2 young landscape and L3 amplification (§8.2), plus `detail/amplitude` and the drama

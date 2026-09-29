@@ -509,14 +509,15 @@ mod tests {
         assert_eq!(hello_kind, "hello");
         assert_eq!(hello["frames"], json!([]));
         assert_eq!(hello["status"]["state"], "queued");
-        // The coupled group grows as stages land (plates, surface, structure, …): read it, don't pin it.
+        // The coupled group grows as stages land (plates, climate, surface, structure, …): read it, don't pin it.
         let stages: Vec<&str> = hello["meta"]["stages"]
             .as_array()
             .unwrap()
             .iter()
             .map(|s| s.as_str().unwrap())
             .collect();
-        assert_eq!(&stages[..2], ["plates", "surface"]);
+        assert_eq!(stages[0], "plates");
+        assert!(stages.contains(&"surface"), "{stages:?}");
         let group = stages.join("+");
         assert_eq!(hello["meta"]["label"], "small");
         let frames: Vec<&Value> = msgs
