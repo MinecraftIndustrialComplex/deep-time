@@ -7,9 +7,11 @@
 //! **Provinces** (decisions file: regional specialisation configurable, default strong): the
 //! planet is split into Voronoi provinces of about `province_km` across (seeds uniform on the
 //! sphere); each province gets, per deposit type, an endowment E = exp(σz − σ²/2) with z standard
-//! normal, so E has mean 1 and the planet's expected count stays the §8.6 formula's while some
-//! provinces are rich in a type and others poor. σ is 0 (off), 0.35 (weak), 0.7 (medium) or 1.2
-//! (strong) — design values, tuned by review.
+//! normal, so some provinces are rich in a type and others poor. The stage then rescales a type's
+//! tract expectations so their sum is exactly the §8.6 formula's: provinces redistribute a type's
+//! deposits between tracts (and, through the position weights, within a tract) without changing
+//! how many the planet expects. σ is 0 (off), 0.35 (weak), 0.7 (medium) or 1.2 (strong) — design
+//! values, tuned by review.
 
 use deeptime_format::GridDesc;
 use glam::DVec3;

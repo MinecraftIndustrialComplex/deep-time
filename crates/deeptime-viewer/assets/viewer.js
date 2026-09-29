@@ -603,5 +603,9 @@
     });
 
     show();
+    // Review links: index.html?site=<id> or ?event=<id> opens that item's details.
+    const q = new URLSearchParams(location.search);
+    if (q.has('site')) showSite(Number(q.get('site')));
+    else if (q.has('event')) showEvent(Number(q.get('event')));
   }
 })();

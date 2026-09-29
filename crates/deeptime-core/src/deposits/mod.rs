@@ -452,7 +452,14 @@ impl DepositStage {
                 );
             }
         }
-        world.t_years = world.t_years.max(frame.t_years);
+        // The last frame's favourability is drawn a year before its end, so the stage's closing
+        // keyframe (sites placed, at the frame's end) is a frame of its own.
+        let t = if k + 1 == self.frames {
+            frame.t_years - 1.0
+        } else {
+            frame.t_years
+        };
+        world.t_years = world.t_years.max(t);
         Ok(())
     }
 }
@@ -663,6 +670,9 @@ impl DepositStage {
         let c = grid.circumference() as f64;
         let sc = self.scales;
         let last = self.frames - 1;
+        if let Some((t_end, _)) = self.state.frame_times.last() {
+            world.t_years = world.t_years.max(*t_end);
+        }
         // Built in set-up, or again after a resume; from here on the history is only read.
         ctx.pool.install(|| self.history().map(|_| ()))?;
         let this: &DepositStage = self;
@@ -814,17 +824,31 @@ impl DepositStage {
                 per_camp,
             };
             f.census[ti].tracts = tracts.len();
+            // The §8.6 expectation per tract, then the province endowments redistribute it:
+            // λ_i = formula_i · E_i · Σ formula / Σ formula·E, so the planet's expected count stays
+            // the formula's while rich provinces take more of it.
+            let rho = t.sizing.density_per_1e5km2.p50;
+            let formulas: Vec<f64> = tracts
+                .iter()
+                .map(|tr| count::expected(rho, tr.area_km2, tr.mean_f, count_mult, 1.0))
+                .collect();
+            let e_tracts: Vec<f64> = tracts
+                .iter()
+                .map(|tr| {
+                    tr.cells
+                        .iter()
+                        .map(|c| endow[provinces.of_cell[*c as usize] as usize])
+                        .sum::<f64>()
+                        / tr.cells.len() as f64
+                })
+                .collect();
+            let raw: f64 = formulas.iter().zip(&e_tracts).map(|(a, e)| a * e).sum();
+            let total: f64 = formulas.iter().sum();
+            let norm = if raw > 0.0 { total / raw } else { 1.0 };
             let mut weighted_f = 0.0;
-            for tract in &tracts {
-                let e_tract = tract
-                    .cells
-                    .iter()
-                    .map(|c| endow[provinces.of_cell[*c as usize] as usize])
-                    .sum::<f64>()
-                    / tract.cells.len() as f64;
-                let rho = t.sizing.density_per_1e5km2.p50;
-                let formula = count::expected(rho, tract.area_km2, tract.mean_f, count_mult, 1.0);
-                let lambda = formula * e_tract;
+            for (i, tract) in tracts.iter().enumerate() {
+                let formula = formulas[i];
+                let lambda = formula * e_tracts[i] * norm;
                 let k = rng.poisson(lambda);
                 weighted_f += tract.mean_f * tract.area_km2;
                 {
@@ -1248,8 +1272,14 @@ impl DepositStage {
             let k =
                 rules.grade_mult[0] + rng.uniform() * (rules.grade_mult[1] - rules.grade_mult[0]);
             let metric = t.shape().metric();
+            let wt = col
+                .last()
+                .map_or(rules.min_water_table_m, |s| s.water_table_m);
+            // Leaching reaches down to the water table (at most the rules' leached column); the
+            // protore below it stays hypogene.
+            let leach_to = rules.leach_depth_m.min(wt.max(top_depth));
             let u_s = (centre_depth / half_m).clamp(-1.0, 1.0);
-            let u_l = ((centre_depth - rules.leach_depth_m) / half_m).clamp(-1.0, 1.0);
+            let u_l = ((centre_depth - leach_to) / half_m).clamp(-1.0, 1.0);
             let leached_frac =
                 ledger::fraction_below(metric, u_s) - ledger::fraction_below(metric, u_l);
             let (bt, bg, leached) = children::blanket(tonnage_t, cu, leached_frac, k);
@@ -1257,9 +1287,6 @@ impl DepositStage {
                 continue;
             }
             remaining_t = (remaining_t - leached).max(0.0);
-            let wt = col
-                .last()
-                .map_or(rules.min_water_table_m, |s| s.water_table_m);
             child_site = Some((ct, bt, bg, k, stable, t0, wt));
         }
         // Register the parent site.
@@ -1529,7 +1556,12 @@ impl DepositStage {
         Ok(())
     }
 
+    /// The site's products; none when no ore is left (a porphyry whose preserved roots were all
+    /// leached into its supergene blanket keeps its cap and gossan bodies but no hypogene ore).
     fn products(&self, t: &DepositType, size: &SizeDraw, tonnage_t: f64) -> Vec<Product> {
+        if tonnage_t < 1.0 {
+            return Vec::new();
+        }
         t.products
             .iter()
             .filter_map(|p| {
@@ -1548,14 +1580,16 @@ impl DepositStage {
     }
 
     fn extraction(&self, t: &DepositType, tonnage_t: f64) -> Extraction {
+        let some = tonnage_t >= 1.0;
         Extraction {
             finite: true,
-            amount_base: tonnage_t,
-            coe_vein: t.minecraft.coe_vein.clone(),
+            amount_base: tonnage_t.max(0.0),
+            coe_vein: t.minecraft.coe_vein.clone().filter(|_| some),
             cdg_charge_mb: t
                 .minecraft
                 .cdg_reservoir
-                .then(|| (tonnage_t / OIL_T_M3 * 1000.0).round() as u64),
+                .then(|| (tonnage_t.max(0.0) / OIL_T_M3 * 1000.0).round() as u64)
+                .filter(|_| some),
         }
     }
 

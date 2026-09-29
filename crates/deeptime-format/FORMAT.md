@@ -29,6 +29,7 @@ test on each side fails when they drift.
   events/<writer>-<n>.dtev      event segments (EVENTS.md); geology is writer 1
   sites/sites.dtsr              the site registry's records
   sites/index.dtsi              512-block grid → site ids
+  bodies/bodies.dtb             deposit bodies (P1-14): parametric primitives with zones
   keyframes/index.json          the timelapse frames
   keyframes/kf-<n>.dtk          one frame: RGBA8 per layer, LZ4
   checkpoints/<i>-<stage>.dtcp  optional stage checkpoints (dev and CLI only; never needed to play)
@@ -37,8 +38,8 @@ test on each side fails when they drift.
 Every file is written as `<name>.tmp`, fsynced, renamed and its directory fsynced. A writer
 deletes an existing `manifest.json` before it starts, so an interrupted write leaves a folder with
 no manifest, which readers treat as absent. A run (`deeptime run`, or the game through JNI) writes
-`preset.json`, `events/`, `sites/` and `keyframes/index.json` in every folder, empty when the preset
-produced nothing; keyframe files are written while the run goes, the rest by `finalizeWrite`, the
+`preset.json`, `events/`, `sites/`, `bodies/` and `keyframes/index.json` in every folder, empty when
+the preset produced nothing; keyframe files are written while the run goes, the rest by `finalizeWrite`, the
 manifest last. The synthetic worlds have none of these.
 
 ## `manifest.json`
@@ -176,6 +177,7 @@ tables are `u32 byte length + UTF-8 bytes`, back to back, with the count in the 
 | `DTEV` | `events/<w>-<n>.dtev` | 32 | 5 | `EVENTS.md` |
 | `DTSR` | `sites/sites.dtsr` | 16 | 3 | below |
 | `DTSI` | `sites/index.dtsi` | 32 | 2 | below |
+| `DTBD` | `bodies/bodies.dtb` | 16 | 3 | below |
 | `DTKF` | `keyframes/kf-<n>.dtk` | 24 | 1 + layers | below |
 | `DTCP` | `checkpoints/*.dtcp` | 8 | 2 | below (dev only) |
 
@@ -199,7 +201,7 @@ site record                               product entry
 5    1  u8 flags: bit 0 finite            16  4  u32 role (string index: primary, byproduct, …)
 6    2  reserved, 0                       20  4  reserved, 0
 8    4  u32 deposit type (string index)
-12   4  u32 body id (u32::MAX = none; bodies/ arrives with P1-14)
+12   4  u32 body id (u32::MAX = none; the site's first body in bodies/)
 16   12 i32 × 3 centre (block x, y, z; x in the canonical span)
 28   8  f32 × 2 latitude, longitude (degrees)
 36   24 i32 × 6 AABB min x, y, z, max x, y, z (inclusive; x may leave the canonical span)
@@ -223,6 +225,75 @@ and row `clamp(floor((z − origin_z)/512), 0, rows − 1)`.
 The viewer's `sites.json` holds one object per site: `id, kind, deposit_type, center, lat_lon, aabb,
 body, products [{material, grade, tonnage_t, role}], forming_event, parent, extraction {finite,
 amount_base, coe_vein, cdg_charge_mb}`.
+
+Deposit sites (P1-14):
+
+- `material` is `c:<name>` (`c:copper`, `c:crude_oil`), resolved through `#c:ores/<name>` (plan
+  §7.6). `tonnage_t` is the **ore** tonnage the grade applies to (the same for every product of a
+  site; contained metal = `tonnage_t · grade`), after truncation by erosion and leaching into a
+  supergene child. `grade` is a mass fraction (`_pct` / 100, `_gpt` · 10⁻⁶); a product that is the
+  whole ore (coal, crude oil) has grade 1. A site with no ore left (a porphyry whose preserved roots
+  were all leached into its blanket) has no products.
+- `body` is the site's first body; its bodies are the records of `bodies/bodies.dtb` whose `site`
+  is the site's id (the ore body first, then a lithocap or a gossan).
+- `amount_base` = `tonnage_t`; `coe_vein` is the deposit type's `minecraft.coe_vein`
+  (`createoreexcavation:ore_vein_type/copper`, …); `cdg_charge_mb` (reservoirs) is the oil tonnage
+  / 0.85 t/m³ · 1000 mB/m³ — P1-16 scales both to gameplay amounts.
+- `parent`: a supergene blanket's porphyry. A placer's parent was eroded away, so it has none; its
+  forming event (`placer_formation`) is caused by the parent's `deposit_exhumation`.
+
+## Bodies (`bodies/bodies.dtb`)
+
+Plan §5.7.4; code `crates/deeptime-format/src/bodies.rs`. `DTBD` fixed fields: `u32 N bodies,
+u32 S strings, u32 Z zones, u32 reserved`. Sections: 0 strings (roles, materials, rock classes,
+zone names), 1 N body records of 112 bytes sorted by id, 2 Z zone records of 40 bytes.
+
+```text
+body record                                      zone record
+0    4  u32 id (u32::MAX reserved)               0   4  u32 name (string index)
+4    4  u32 site (u32::MAX = none)               4   4  u32 material (string, u32::MAX = none)
+8    1  u8 shape (below)                         8   4  u32 rock class (string, u32::MAX = none)
+9    1  u8 flags: bit 0 clipped by erosion       12  8  f32 × 2 d range [d0, d1)
+10   2  reserved, 0                              20  8  f32 × 2 v range [v0, v1)
+12   4  u32 role (string: ore, lithocap, …)      28  4  f32 grade (mass fraction of material)
+16   24 f64 × 3 centre (block x, y, z)           32  4  f32 density (P(host block → ore), 0–1)
+40   12 f32 × 3 semi-axes a, b, c (blocks)       36  4  reserved, 0
+52   4  f32 yaw (radians about +y, +x → +z)
+56   4  f32 dip (radians about the local x axis)
+60   4  i32 clip_top_y (i32::MAX = none)
+64   24 i32 × 6 AABB min x, y, z, max x, y, z (inclusive; x may leave the canonical span)
+88   4  u32 first zone
+92   4  u32 zone count
+96   4  u32 rock class of the whole body (string, u32::MAX = none)
+100  4  reserved, 0
+104  8  reserved, 0 (voxel blobs, later)
+```
+
+Shapes: 0 ellipsoid, 1 stockwork_shell, 2 lens, 3 pod, 10 dome use the **ellipsoid metric**;
+4 sheet, 5 dyke, 6 pipe, 7 blanket, 8 seam, 9 channel use the **cylinder metric**. Evaluation of
+block (x, y, z) on a planet of circumference C — Java must do exactly this:
+
+1. The sample point is the block centre: `dx = x + 0.5 − cx` wrapped into [−C/2, C/2)
+   (`dx −= floor(dx/C + 0.5)·C`), `dy = y + 0.5 − cy`, `dz = z + 0.5 − cz`. Outside if
+   `y > clip_top_y`.
+2. Local coordinates, with `(sy, cy) = sin/cos yaw`, `(sd, cd) = sin/cos dip`:
+   `lx = cy·dx + sy·dz`, `ly = sd·sy·dx + cd·dy − sd·cy·dz`, `lz = −cd·sy·dx + sd·dy + cd·cy·dz`.
+3. `d = √((lx/a)² + (ly/b)² + (lz/c)²)` (ellipsoid) or `d = max(√((lx/a)² + (lz/c)²), |ly/b|)`
+   (cylinder); outside if `d > 1`. `v = clamp((b − ly)/(2b), 0, 1)` (0 at the local top).
+4. A zone applies when `d0 ≤ d < d1` and `v0 ≤ v < v1`, an upper bound ≥ 1 being inclusive. Zones
+   may overlap (several products in one place); a zone with no material only changes the rock
+   (`rock_class`), and a zone density of 0 places no ore (fluids, alteration halos).
+
+The AABB is conservative: the world extent along axis i is `Σ_j |R_ji|·h_j` around the centre
+(R the rotation above, h the semi-axes), clipped at `clip_top_y`. The viewer's `report.js` carries
+each body as JSON: `id, site, shape, metric, role, center, axes, yaw, dip, clip_top_y (null = none),
+aabb, rock_class, zones [{name, material, rock_class, d, v, grade, density}]`.
+
+`manifest.json` `notes.deposits` (runs with the deposit stage) is the stage's census: per type
+`id, sites, expected_formula (Σ ρ·A·F·count_mult over the tracts, plan §8.6), expected (after the
+province redistribution; the same total), drawn, tracts, permissive_km2, mean_f, buried,
+truncated, eroded, too_deep, children, guaranteed, dropped_separation`, plus `province`,
+`provinces`, `count_mult`, `sites`, `bodies`.
 
 ## Keyframes (`keyframes/index.json`, `keyframes/kf-<n>.dtk`)
 
