@@ -1716,9 +1716,15 @@ PackType.SERVER_DATA, Component.literal("Deep Time GameTest"), PackSource.BUILT_
 Pack.Position.TOP)`; NeoForge 21.1's helper resolves the path through the mod file's
 `findResource`, and `alwaysActive = true` makes the pack required. The GameTest server enables every
 available pack anyway (`GameTestServer.create` builds its `DataPackConfig` from
-`packRepository.getAvailableIds()`). `-Ddeeptime.extraDatapack=<folder>` (P1-12) adds one more pack
-the same way, from a folder outside the repository, and is honoured only together with
-`-Ddeeptime.gametest=true`.
+`packRepository.getAvailableIds()`). `-Ddeeptime.extraDatapack=<folder>` (P1-12) adds one more
+required pack at the top, from a folder outside the repository, and is honoured only together with
+`-Ddeeptime.gametest=true`. `addPackFinders` resolves paths inside the mod file only, so this pack
+goes through `event.addRepositorySource` with `Pack.readMetaAndCreate(new PackLocationInfo(
+"deeptime_extra", …), new PathPackResources.PathResourcesSupplier(folder), PackType.SERVER_DATA,
+new PackSelectionConfig(true, Pack.Position.TOP, false))` (review 2, gap 29; fixed in P1-12). Gradle
+sets the property from `-PextraDatapack=<folder>`; `-PwithMic` defaults it to the MIC rock-tag
+datapack next to the pack (`…/mic/Docs/datapacks/deeptime-mic-rock-tags`, which
+`tools/remote/mac.sh --pack` syncs to the Mac).
 
 **The editor.** `RegisterPresetEditorsEvent.register(ResourceKey<WorldPreset> deeptime:planet,
 PresetEditor)` on the client mod bus; `PresetEditor.createEditScreen(CreateWorldScreen,

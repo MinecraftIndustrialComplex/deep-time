@@ -33,7 +33,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-09 | Climate mapping and biomes | todo | | | |
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
 | P1-11 | Customize editor, timelapse and staging | todo | | | |
-| P1-12 | Strata pass with rock tags and `rock_states` | todo | | | |
+| P1-12 | Strata pass with rock tags and `rock_states` | done | 2026-09-28 | — | Mac: ./gametest.sh and -PwithMic (+ MIC rock tags via -Ddeeptime.extraDatapack) → All 21 required tests passed each; coal stone / black argillite; Create stones in their classes; loess = projectatmosphere:dust[layers=8]; everyClassInTheWorld 59/59 classes, 240 samples 0 wrong; MIC smoke probe palette 59/59 (member 24, fallback 35); JUnit 46/0; bodies deferred (P1-08/P1-14) |
 | P1-13 | Dedicated server: generate on first start | todo | | | |
 | P1-14 | Deposit engine: the four families | todo | | | |
 | P1-15 | Deposits in the world | todo | | | |
@@ -55,6 +55,96 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 — P1-12 strata pass with rock tags and `rock_states` (agent worktree agent-a9583db34fe66882c)
+- **Datapack registries** (`DeepTimeRegistries`, NeoForge `DataPackRegistryEvent.NewRegistry`, no
+  network codec: clients never need them): `deeptime:rock_class` (`rock/RockClass`, codec per §5.4.1
+  plus `sources` and `notes`; `vanilla_fallback` optional so third-party classes need none) and
+  `deeptime:rock_states` (`rock/RockStates`, the adopted format: `class`, `use` member|fallback,
+  `entries` of `block`, `state` (strings), `required` (default true)). `RockClassRegistry` /
+  `RockStatesRegistry` hold the keys and list entries sorted by id. `deposit_type`, `sim_field` and
+  `essentials` are not registered yet (P1-14, Phase 3, P1-15).
+- **The 59 classes** ship in `neoforge/src/main/resources/data/deeptime/deeptime/rock_class/`, generated
+  by `tools/dev/gen_rock_classes.py` (one table, validated: 59 classes, known names in paths, no
+  filler except coal's stone, vanilla-only fallbacks, no terracotta). Values are initial and marked
+  "tuned in P1-07": 1.0 = crystalline basement (granite, gneiss); erodibility 0.3 (chert, quartzite)
+  … 4.0 (halite) for bedrock, 4–10 for unconsolidated (Sklar & Dietrich 2001 strength scaling,
+  compressed by a square root; Stock & Montgomery 1999); diffusivity 0.5–5.0 (Roering et al. 1999 D
+  used as a linear multiplier, Heimsath et al. 1997); density 700 (pumice) – 3400 (BIF, eclogite)
+  kg/m³. `vanilla_fallback` = the README's vanilla member or last fallback entry. Judgment calls in
+  the table: loose sediments carry their lithified equivalent's `metamorphic_path` (the schema has
+  no lithification field; P1-07 needs its own rule), `facies_rule` names beyond the plan's example
+  are placeholders for P1-07, `karst`/`ore_host` tags added. Deep Time still ships **no fallback
+  tags** (Q15; `RockDataTest.noFallbackTagsShipped`).
+- **`RockPalette`** (plan §7.5): the rules live in plain Java (`rock/PaletteRules`, JUnit-tested):
+  members = `#deeptime:rock/<c>` in tag order, then `rock_states` member entries (absent
+  `required: false` blocks skipped); else the first of `#deeptime:rock_fallback/<c>` then
+  `rock_states` fallback entries; else `vanilla_fallback`; else unclassified crust. Air, stone and
+  deepslate are rejected everywhere except coal → stone (reported as problems). Several members: one
+  per horizon, `members[mix(key) mod n]` (SplitMix64 finaliser), primary = tag order's first. The
+  palette is an immutable snapshot rebuilt on `TagsUpdatedEvent` with cause `SERVER_DATA_LOAD`
+  (server start after tags bind, `/reload`); client tag syncs are ignored. `RockPalette.View`
+  also builds the "vanilla only" palette (only `minecraft:` members, no fallback tags, no
+  rock_states) the tests compare against. **Deviation:** a first version also rejected blocks that do
+  not block motion (worldgen heightmaps); vanilla snow and Project Atmosphere's dust are
+  `forceSolidOff`, so it rejected the adopted `rock_states` example; dropped (only air is rejected).
+- **`StrataPass` v1:** per column the horizon tops are bilinear between the four strata cells (the
+  nearest cell's top where a corner lacks the horizon), classes from the nearest; integer tops T_h,
+  horizon h fills T_{h+1} < y ≤ T_h (v0's boundary rule differed from `classAt` at integer tops;
+  both now share `StrataPass.column`). Runs are computed per column, then written section by section
+  straight into the section palettes, skipping sections without stone or deepslate. Horizon key =
+  `(h << 8) | classIndex` until world data carries unit ids (P1-08). **Bodies are not done:** the
+  `bodies/` format arrives with P1-08/P1-14; the pass has no body hook yet.
+- **`/deeptime probe palette`**: one `[deeptime-probe]` JSON line: `count`, `resolved`, `sources`
+  (per-source counts), `classes` (class → block states, primary first), `source`, `state`,
+  `unresolved`, `problems`. `deeptime-inspect rock --palette` now reads it (block states cut to
+  their id; a raw log line works). `tools/smoke/run.py` writes it to `smoke/<profile>/palette.json`.
+- **`-Ddeeptime.extraDatapack=<folder>`** (gap 29, plan §7.12 fixed): `GameTestSupport` adds the
+  folder through `addRepositorySource` + `PathPackResources.PathResourcesSupplier` as the required
+  top pack `deeptime_extra`, only with `-Ddeeptime.gametest=true`. Gradle sets it from
+  `-PextraDatapack=<folder>`; `-PwithMic` defaults it to `<repo>/../../Docs/datapacks/deeptime-mic-rock-tags`
+  (warns and goes without if absent). `tools/remote/mac.sh --pack` now also syncs that datapack to
+  `/Volumes/Graphide/ban/mic/Docs/datapacks/`. The MIC datapack and `pack/` were not modified.
+- **Synth:** `deeptime synth --strata every-class` (default `placeholder`): 8 horizons 10 blocks
+  apart, horizon h of L1 cell column i has class (6·i + h) mod 59, so any ten neighbouring cell
+  columns hold every class ≥ 20 blocks down; `gametest.sh` writes `deeptime-test` with it.
+  `install.sh` gains `--strata` and `--datapack <folder>` (copied into the world's `datapacks/`).
+- **Tests.** JUnit `PaletteRulesTest` (9) and `RockDataTest` (3); cargo `synth` +3
+  (`every_class_matches_the_rock_class_data` keeps Rust's list equal to the JSON files).
+  GameTests `StrataGameTests.{vanillaOnlyResolvesEveryClass, coalFallsBackToStone,
+  firstInstalledFallback, rockStatesMember, createStonesKeepTheirClasses, everyClassInTheWorld,
+  probePaletteListsEveryClass}`; `WorldDataGameTests.strataClassesResolve` now picks the member by
+  horizon key. The gametest pack adds three test classes (`deeptime_test:test_fallback`,
+  `test_state_fallback`, `test_states`), a fallback tag (absent optional block, stone, polished
+  andesite, andesite) and the README's `rock_states` example (`projectatmosphere:dust[layers=8]` as
+  loess, `required: false`).
+- **Measured (Mac).** `mac.sh -- 'cargo test --workspace'` (cli 13, core 41, format 27, inspect 19+7,
+  jni 7, viewer 4), `clippy --workspace --all-targets -D warnings`, `fmt --check`, `deny check licenses
+  bans` clean; `gradlew build test` → tests=46 failures=0. `mac.sh --pack --server -- './gametest.sh'`
+  → **All 21 required tests passed** (vanillaOnlyResolvesEveryClass sources member=16
+  vanilla_fallback=43; coal=minecraft:stone; everyClassInTheWorld 59 of 59 classes, 240 samples, 0
+  wrong; probe palette 62 classes, 62 resolved: member 17, fallback 2, vanilla_fallback 43).
+  `mac.sh --pack --server -- './gametest.sh -PwithMic'` (160 mods, MIC pack 303fd89 via
+  `install.sh mic`, the rock tags as `deeptime_extra`) → **All 21 required tests passed**: coal =
+  born_in_chaos_v1:black_argillite; limestone/dolostone/ironstone/BIF/serpentinite/scoria =
+  create:limestone/asurine/ochrum/crimsite/veridium/scoria; shale = black argillite, peridotite =
+  create:veridium (first installed fallbacks); loess = projectatmosphere:dust[layers=8];
+  everyClassInTheWorld 240 samples 0 wrong; probe palette 62 of 62 resolved: member 26, fallback 36,
+  vanilla_fallback 0.
+- **Smoke and rock render (Mac, production MIC server, pack 303fd89).** `install.sh mic --synth
+  wrap-test --strata every-class --datapack ../../Docs/datapacks/deeptime-mic-rock-tags` then
+  `mac.sh --server -- 'python3 tools/smoke/run.py --profile mic --fresh --chunky 96'` → PASS; the
+  probe palette (no gametest pack here) resolves **59 of 59: member 24, fallback 35** — exactly the
+  README's 24 classes with a real MIC block and 35 stand-in classes. `cargo run -p deeptime-inspect --
+  rock --world smoke/mic/server/planet --palette smoke/mic/palette.json --colors <colors table>` →
+  `review/out/p1-12/mic-rock/rock-0.png` (55,808 columns, 16-block bands of horizon-0 classes with
+  Create's veridium/asurine/ochrum/crimsite among them). A block → class map is ambiguous where
+  stand-ins share a block (calcite is marble, chalk, halite, …; the render names the alphabetically
+  first class).
+- **Not done / next.** Bodies in the strata pass (needs P1-08/P1-14's `bodies/`); the review
+  artefacts (BlueMap cliffs with Create stones) wait for Ben's review round; `deposit_type`,
+  `sim_field`, `essentials` registries come with their tasks. The MIC pack still has no copy of the
+  rock tags (Q16 answer: `pack/kubejs/data/deeptime/` on a pack branch, not done here).
 
 ### 2026-09-28 — P1-01 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Formats** (`crates/deeptime-format`, spec in `FORMAT.md` and the new `EVENTS.md`). Every new

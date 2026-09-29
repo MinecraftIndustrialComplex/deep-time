@@ -7,7 +7,9 @@
 #   tools/remote/mac.sh [--no-sync] [--pack] [--pull <path>]... -- <command>
 #
 #   --no-sync      skip the rsync of this checkout (the Mac copy is already current)
-#   --pack         also sync the MIC pack (…/mic/pack, with its .git) for tools/smoke/install.sh mic
+#   --pack         also sync the MIC pack (…/mic/pack, with its .git) for tools/smoke/install.sh mic,
+#                  and the MIC rock-tag datapack (…/mic/Docs/datapacks/deeptime-mic-rock-tags) that
+#                  ./gametest.sh -PwithMic adds
 #   --server       hold the Mac's Deep Time server lock while the command runs: use it for every
 #                  command that boots Minecraft (gametest.sh, gametest-planet.sh, smoke run.py,
 #                  BlueMap). Several agents build at once, but only one test server runs at a time
@@ -80,6 +82,13 @@ if [ "$PACK" = 1 ]; then
     PACKDIR=/home/greencheetah/Projects/mic/pack
     [ -f "$REPO/../../pack/pack.toml" ] && PACKDIR="$(cd "$REPO/../../pack" && pwd)"
     rsync -a --delete -e "ssh -o BatchMode=yes" "$PACKDIR/" "$HOST:$SSD/mic/pack/"
+    # The MIC rock-tag datapack (read-only here), which -PwithMic adds to the dev servers through
+    # -Ddeeptime.extraDatapack (neoforge/build.gradle, P1-12). It lives next to the pack in mic/Docs.
+    TAGSDIR="$(dirname "$PACKDIR")/Docs/datapacks/deeptime-mic-rock-tags"
+    if [ -f "$TAGSDIR/pack.mcmeta" ]; then
+        "${SSH[@]}" "mkdir -p '$SSD/mic/Docs/datapacks'"
+        rsync -a --delete -e "ssh -o BatchMode=yes" "$TAGSDIR/" "$HOST:$SSD/mic/Docs/datapacks/deeptime-mic-rock-tags/"
+    fi
 fi
 
 # The command runs inside the repo's dev shell, entered through a GC-rooted profile keyed on

@@ -36,6 +36,118 @@ pub const CLIMATE: [&str; 5] = [
 /// red_sandstone, granite).
 pub const STRATA_CLASSES: [&str; 3] = ["sandstone", "red_bed", "granite"];
 
+/// Every rock class of the vocabulary, in the order of the rock-tag README's Classes table
+/// (`/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md`). The
+/// definitions are Deep Time's `rock_class` data (`neoforge/src/main/resources/data/deeptime/
+/// deeptime/rock_class/`); a unit test keeps the two lists equal.
+pub const EVERY_CLASS: [&str; 59] = [
+    "granite",
+    "granodiorite",
+    "diorite",
+    "gabbro",
+    "anorthosite",
+    "peridotite",
+    "rhyolite",
+    "andesite",
+    "basalt",
+    "tuff",
+    "obsidian",
+    "scoria",
+    "pumice",
+    "conglomerate",
+    "sandstone",
+    "red_bed",
+    "mudstone",
+    "shale",
+    "black_shale",
+    "limestone",
+    "dolostone",
+    "chalk",
+    "chert",
+    "travertine",
+    "halite",
+    "gypsum",
+    "anhydrite",
+    "coal",
+    "ironstone",
+    "banded_iron_formation",
+    "phosphorite",
+    "slate",
+    "phyllite",
+    "schist",
+    "blueschist",
+    "greenstone",
+    "gneiss",
+    "quartzite",
+    "marble",
+    "amphibolite",
+    "eclogite",
+    "hornfels",
+    "skarn",
+    "serpentinite",
+    "kimberlite",
+    "carbonatite",
+    "pegmatite",
+    "greisen",
+    "soil",
+    "saprolite",
+    "laterite",
+    "bauxite",
+    "gravel",
+    "sand",
+    "clay",
+    "mud",
+    "till",
+    "loess",
+    "volcanic_ash",
+];
+
+/// Which horizon stacks a synthetic world carries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Strata {
+    /// Three horizons: sandstone from the surface, red beds from 6 blocks down, granite from 40
+    /// blocks down to the bottom of the world (P0-09).
+    Placeholder,
+    /// Every rock class (P1-12): eight horizons 10 blocks apart from the surface down; horizon
+    /// h of L1 cell column i has class (6·i + h) mod 59 of [`EVERY_CLASS`], so any ten
+    /// neighbouring cell columns hold every class at h ≥ 2 (20 blocks or more below the surface,
+    /// under whatever the surface rules paint). The last horizon reaches down to min_y.
+    EveryClass,
+}
+
+impl Strata {
+    pub fn name(self) -> &'static str {
+        match self {
+            Strata::Placeholder => "placeholder",
+            Strata::EveryClass => "every-class",
+        }
+    }
+
+    /// The class list written to `strata/classes.json`.
+    pub fn classes(self) -> &'static [&'static str] {
+        match self {
+            Strata::Placeholder => &STRATA_CLASSES,
+            Strata::EveryClass => &EVERY_CLASS,
+        }
+    }
+
+    /// Horizon tops below the surface, in blocks.
+    fn depths(self) -> &'static [i32] {
+        match self {
+            Strata::Placeholder => &[0, 6, 40],
+            Strata::EveryClass => &[0, 10, 20, 30, 40, 50, 60, 70],
+        }
+    }
+
+    /// The class index of horizon `h` in L1 cell column `i`.
+    pub fn class_index(self, i: u32, h: usize) -> u8 {
+        match self {
+            Strata::Placeholder => h as u8,
+            Strata::EveryClass => ((6 * u64::from(i) + h as u64) % EVERY_CLASS.len() as u64) as u8,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     WrapTest,
@@ -53,6 +165,7 @@ impl Kind {
 
 pub struct Options {
     pub kind: Kind,
+    pub strata: Strata,
     pub size: u32,
     pub out: PathBuf,
     pub viewer: Option<PathBuf>,
@@ -131,7 +244,7 @@ pub fn run(opts: &Options) -> Result<Summary, FormatError> {
         )?);
     }
 
-    let strata = strata_layer(&l1, &layers[0], opts.codec)?;
+    let strata = strata_layer(&l1, &layers[0], opts.strata, opts.codec)?;
 
     // Write the tile packs, then the side files, then the manifest.
     let mut manifest = Manifest::new(
@@ -164,7 +277,7 @@ pub fn run(opts: &Options) -> Result<Summary, FormatError> {
         });
     }
 
-    let classes = json!({ "classes": STRATA_CLASSES });
+    let classes = json!({ "classes": opts.strata.classes() });
     let spawn = spawn_candidates(&layers[0], &layers[1], manifest.scale.sea_level_y);
     for (rel, value) in [
         ("strata/classes.json", &classes),
@@ -190,7 +303,9 @@ pub fn run(opts: &Options) -> Result<Summary, FormatError> {
             "climate": "round(10000·p) of AnalyticTestTerrain.raster's formulas, with H from this kind's terrain"
         }),
     );
-    manifest.notes.insert("strata".into(), strata_notes());
+    manifest
+        .notes
+        .insert("strata".into(), strata_notes(opts.strata));
     if opts.kind == Kind::LakeTest {
         manifest.notes.insert("lake".into(), LakeTest::notes());
     }
@@ -219,7 +334,12 @@ pub fn run(opts: &Options) -> Result<Summary, FormatError> {
             &refs,
             Some(deeptime_viewer::Strata {
                 layer: &strata,
-                classes: STRATA_CLASSES.iter().map(|s| s.to_string()).collect(),
+                classes: opts
+                    .strata
+                    .classes()
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
             }),
         )
         .map_err(|e| io(dir, e))?;
@@ -293,18 +413,18 @@ fn layer_i16(
     LoadedLayer::new(d, ras.to_le_bytes())
 }
 
-/// The strata placeholder: per L1 cell three horizons below the surface sampled from the L3
-/// elevation at the same block — sandstone from the surface, red beds from 6 blocks down, granite
-/// from 40 blocks down to the bottom of the world.
+/// The horizon stacks: per L1 cell the horizons of `kind`, each top a fixed depth below the
+/// surface sampled from the L3 elevation at the same block.
 fn strata_layer(
     l1: &GridDesc,
     elevation: &LoadedLayer,
+    kind: Strata,
     codec: Codec,
 ) -> Result<LoadedLayer, FormatError> {
-    const K: usize = 3;
-    let depths = [0i32, 6 * 16, 40 * 16];
+    let depths = kind.depths();
+    let k = depths.len();
     let e = &elevation.desc.grid;
-    let mut bytes = Vec::with_capacity(l1.cells() * 3 * K);
+    let mut bytes = Vec::with_capacity(l1.cells() * 3 * k);
     for j in 0..l1.h {
         for i in 0..l1.w {
             // Same block, L3 index: (block − origin) / r.
@@ -314,29 +434,41 @@ fn strata_layer(
             let ej = (bz - e.origin_block_z) / i64::from(e.r);
             let surface = elevation.raw(ei, ej) as i32;
             for d in depths {
-                let top = (surface - d).max(i32::from(i16::MIN + 1)) as i16;
+                let top = (surface - d * 16).max(i32::from(i16::MIN + 1)) as i16;
                 bytes.extend_from_slice(&top.to_le_bytes());
             }
-            bytes.extend_from_slice(&[0u8, 1, 2]);
+            for h in 0..k {
+                bytes.push(kind.class_index(i, h));
+            }
         }
     }
     let mut d = LayerDesc::scalar("strata/horizons", DType::HorizonStack, l1.clone(), codec);
     d.units = "block/16 top, class index".into();
     d.scale = 1.0 / 16.0;
-    d.stack_depth = Some(K as u32);
+    d.stack_depth = Some(k as u32);
     LoadedLayer::new(d, bytes)
 }
 
-fn strata_notes() -> Value {
-    json!({
-        "placeholder": true,
-        "grid": "L1",
-        "horizons": [
-            {"class": STRATA_CLASSES[0], "top": "surface (the L3 elevation at the cell's block)"},
-            {"class": STRATA_CLASSES[1], "top": "surface − 6 blocks"},
-            {"class": STRATA_CLASSES[2], "top": "surface − 40 blocks, down to min_y"}
-        ]
-    })
+fn strata_notes(kind: Strata) -> Value {
+    match kind {
+        Strata::Placeholder => json!({
+            "placeholder": true,
+            "kind": kind.name(),
+            "grid": "L1",
+            "horizons": [
+                {"class": STRATA_CLASSES[0], "top": "surface (the L3 elevation at the cell's block)"},
+                {"class": STRATA_CLASSES[1], "top": "surface − 6 blocks"},
+                {"class": STRATA_CLASSES[2], "top": "surface − 40 blocks, down to min_y"}
+            ]
+        }),
+        Strata::EveryClass => json!({
+            "placeholder": true,
+            "kind": kind.name(),
+            "grid": "L1",
+            "horizons": "8 per cell; horizon h's top is the surface (the L3 elevation at the cell's block) − 10·h blocks; the last reaches down to min_y",
+            "class_rule": "horizon h of L1 cell column i has class index (6·i + h) mod 59, so any ten neighbouring cell columns hold every class at h ≥ 2"
+        }),
+    }
 }
 
 /// Land cells for spawn: dry, above sea level + 2, locally flat (≤ 1 block to each L3 neighbour),
@@ -530,6 +662,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("dt-synth-{}", std::process::id()));
         let opts = Options {
             kind: Kind::WrapTest,
+            strata: Strata::Placeholder,
             size: 1024,
             out: dir.join("w"),
             viewer: Some(dir.join("v")),
@@ -576,6 +709,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("dt-lake-{}", std::process::id()));
         let opts = Options {
             kind: Kind::LakeTest,
+            strata: Strata::Placeholder,
             size: 1024,
             out: dir.clone(),
             viewer: None,
@@ -608,6 +742,64 @@ mod tests {
         }
         let m = Manifest::read(&dir).unwrap();
         assert_eq!(m.notes["lake"]["water_level_y"], 120.0);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn every_class_matches_the_rock_class_data() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../neoforge/src/main/resources/data/deeptime/deeptime/rock_class");
+        let mut files: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .filter_map(|n| n.strip_suffix(".json").map(str::to_owned))
+            .collect();
+        files.sort();
+        let mut ours: Vec<String> = EVERY_CLASS.iter().map(|s| s.to_string()).collect();
+        ours.sort();
+        assert_eq!(files, ours);
+    }
+
+    #[test]
+    fn any_ten_columns_hold_every_class_below_the_soil() {
+        let k = Strata::EveryClass.depths().len();
+        for i0 in [0u32, 7, 58, 1000] {
+            let mut seen = [false; EVERY_CLASS.len()];
+            for i in i0..i0 + 10 {
+                for h in 2..k {
+                    seen[usize::from(Strata::EveryClass.class_index(i, h))] = true;
+                }
+            }
+            assert!(seen.iter().all(|&s| s), "columns {i0}..{}", i0 + 10);
+        }
+    }
+
+    #[test]
+    fn every_class_world_writes_its_classes() {
+        let dir = std::env::temp_dir().join(format!("dt-every-{}", std::process::id()));
+        let opts = Options {
+            kind: Kind::WrapTest,
+            strata: Strata::EveryClass,
+            size: 1024,
+            out: dir.clone(),
+            viewer: None,
+            dump_samples: None,
+            codec: Codec::Lz4Block,
+        };
+        run(&opts).unwrap();
+        let classes: Value =
+            serde_json::from_slice(&std::fs::read(dir.join("strata/classes.json")).unwrap())
+                .unwrap();
+        assert_eq!(classes["classes"].as_array().unwrap().len(), 59);
+        let s = TilePackReader::open(&dir.join("strata/horizons.dtr"))
+            .unwrap()
+            .load()
+            .unwrap();
+        assert_eq!(s.desc.stack_depth, Some(8));
+        let (top0, c0) = s.horizon(3, 10, 0);
+        let (top2, c2) = s.horizon(3, 10, 2);
+        assert_eq!(i32::from(top0) - i32::from(top2), 20 * 16);
+        assert_eq!((c0, c2), (18, 20));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
