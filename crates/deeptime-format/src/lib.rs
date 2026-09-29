@@ -5,6 +5,7 @@
 //! The byte layout is specified in `FORMAT.md` next to this crate's `Cargo.toml`; the Java
 //! reader (`com.minecraftindustrialcomplex.deeptime.worlddata`) implements the same document.
 
+pub mod bodies;
 pub mod container;
 pub mod error;
 pub mod events;
@@ -16,6 +17,7 @@ pub mod raster;
 pub mod sites;
 pub mod tilepack;
 
+pub use bodies::{Body, BodyId, Shape, Zone};
 pub use error::{FormatError, Result};
 pub use events::{
     Event, EventId, EventIndex, EventLog, EventWriter, GEOLOGY_WRITER, ParamValue, Params, Place,

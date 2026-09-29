@@ -338,6 +338,35 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// P1-14: `deeptime stage deposits --preset <synthetic> --viewer` writes the sites, the
+    /// census and the bodies into the viewer.
+    #[test]
+    fn stage_deposits_on_synthetic_fields() {
+        let dir = tmp("deposits");
+        let preset = std::path::PathBuf::from(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../deeptime-core/tests/presets/deposits_synthetic_4k.json"
+        ));
+        super::run::stage(&super::run::StageOptions {
+            name: "deposits".into(),
+            input: None,
+            preset: Some(preset),
+            out: Some(dir.join("deposits.dtcp")),
+            viewer: Some(dir.join("viewer")),
+            work: None,
+            common: quiet(),
+        })
+        .unwrap();
+        let sites: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(dir.join("viewer/sites.json")).unwrap())
+                .unwrap();
+        assert!(!sites.as_array().unwrap().is_empty());
+        let report = std::fs::read_to_string(dir.join("viewer/report.js")).unwrap();
+        assert!(report.contains("\"deposits\"") && report.contains("\"bodies\""));
+        assert!(dir.join("viewer/keyframes").is_dir());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     /// `stage` from a preset, then from the checkpoint it wrote, then bench.
     #[test]
     fn stage_chain_and_bench() {

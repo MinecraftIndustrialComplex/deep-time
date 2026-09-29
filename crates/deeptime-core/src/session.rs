@@ -105,11 +105,13 @@ impl MemoryGauge for NoGauge {
     }
 }
 
-/// A parsed preset. Until the real stages exist (P1-03 on) the only preset is the dummy one
-/// (`dummy.rs`); anything else is `PresetInvalid`.
+/// A parsed preset. Until the real stages exist (P1-03 on) the presets are the dummy one
+/// (`dummy.rs`) and P1-14's synthetic deposit run (`deposits::SyntheticPreset`, key
+/// `deposits_synthetic`); anything else is `PresetInvalid`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Preset {
     Dummy(DummyParams),
+    DepositsSynthetic(crate::deposits::SyntheticPreset),
 }
 
 impl Preset {
@@ -119,11 +121,22 @@ impl Preset {
         let obj = value
             .as_object()
             .ok_or_else(|| CoreError::preset("$", "expected a JSON object"))?;
-        if let Some(key) = obj.keys().find(|k| k.as_str() != "dummy") {
+        if let Some(key) = obj
+            .keys()
+            .find(|k| !["dummy", "deposits_synthetic"].contains(&k.as_str()))
+        {
             return Err(CoreError::preset(
                 format!("$.{key}"),
-                "unknown key (only the dummy preset exists before P1-03)",
+                "unknown key (only the dummy and deposits_synthetic presets exist before P1-03)",
             ));
+        }
+        if let Some(d) = obj.get("deposits_synthetic") {
+            if obj.len() > 1 {
+                return Err(CoreError::preset("$", "give one preset kind"));
+            }
+            let p = crate::deposits::SyntheticPreset::from_json(d)?;
+            p.stages()?;
+            return Ok(Preset::DepositsSynthetic(p));
         }
         let dummy = obj.get("dummy").ok_or_else(|| {
             CoreError::preset(
@@ -138,6 +151,9 @@ impl Preset {
     pub fn to_json(&self) -> Value {
         match self {
             Preset::Dummy(p) => p.to_json(),
+            Preset::DepositsSynthetic(p) => json!({
+                "deposits_synthetic": serde_json::to_value(p).expect("a preset serialises"),
+            }),
         }
     }
 
@@ -145,6 +161,7 @@ impl Preset {
     pub fn name(&self) -> &str {
         match self {
             Preset::Dummy(_) => "dummy",
+            Preset::DepositsSynthetic(_) => "deposits_synthetic",
         }
     }
 
@@ -152,6 +169,7 @@ impl Preset {
     pub fn stages(&self) -> Vec<Box<dyn Stage>> {
         match self {
             Preset::Dummy(p) => p.stages(),
+            Preset::DepositsSynthetic(p) => p.stages().expect("checked when the preset was parsed"),
         }
     }
 
@@ -159,6 +177,7 @@ impl Preset {
     pub fn initial_world(&self) -> WorldState {
         match self {
             Preset::Dummy(p) => p.initial_world(),
+            Preset::DepositsSynthetic(p) => p.initial_world(),
         }
     }
 
@@ -170,6 +189,10 @@ impl Preset {
                     size: w.keyframe_size,
                 },
                 None => KeyframePolicy::NONE,
+            },
+            Preset::DepositsSynthetic(p) => KeyframePolicy {
+                every_years: Some(p.keyframe_every_years),
+                size: (p.keyframe_size[0], p.keyframe_size[1]),
             },
         }
     }
@@ -841,6 +864,13 @@ impl Session {
         }
         files.push(FileEntry::of(dir, deeptime_format::events::INDEX_PATH)?);
 
+        let (bytes, crc32) = deeptime_format::bodies::write_bodies(dir, &world.bodies)?;
+        files.push(FileEntry {
+            path: deeptime_format::bodies::BODIES_PATH.into(),
+            bytes,
+            crc32,
+        });
+
         let w = write_sites(dir, world.circumference, &world.sites)?;
         files.push(FileEntry {
             path: SITES_PATH.into(),
@@ -887,9 +917,14 @@ impl Session {
                 "t_years": world.t_years,
                 "events": world.events.len(),
                 "sites": world.sites.len(),
+                "bodies": world.bodies.len(),
                 "keyframes": kf.frames.len(),
             }),
         );
+        for (stage, text) in &world.notes {
+            let v: Value = serde_json::from_str(text).unwrap_or_else(|_| json!(text));
+            m.notes.insert(stage.clone(), v);
+        }
         let bytes = m.to_json_bytes()?;
         write_atomic(&dir.join(MANIFEST), &bytes)?;
         self.state

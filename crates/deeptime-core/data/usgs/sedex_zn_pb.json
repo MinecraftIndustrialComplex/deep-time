@@ -1,0 +1,332 @@
+{
+  "id": "sedex_zn_pb",
+  "title": "Sedimentary exhalative (SEDEX, clastic-dominated) zinc-lead deposits",
+  "percentile_convention": "USGS: p90 is the value that 90% of deposits equal or exceed (the small end); p10 the large end",
+  "sources": [
+    {
+      "key": "ofr2009-1252",
+      "citation": "Singer, D.A., Berger, V.I., and Moring, B.C., 2009, Sediment-hosted zinc-lead deposits of the world--Database and grade and tonnage models: U.S. Geological Survey Open-File Report 2009-1252, v, 62 p. (text PDF of2009-1252_text.pdf, 67 PDF pages; printed page = PDF page - 5; database file SedZn-PbTX.txt)",
+      "url": "https://pubs.usgs.gov/of/2009/1252/",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "sir2010-5070n",
+      "citation": "Emsbo, Poul, Seal, R.R., Breit, G.N., Diehl, S.F., and Shah, A.K., 2016, Sedimentary exhalative (sedex) zinc-lead-silver deposit model, chap. N of Mineral deposit models for resource assessment: U.S. Geological Survey Scientific Investigations Report 2010-5070-N, 57 p. (printed page = PDF page - 12)",
+      "url": "https://pubs.usgs.gov/sir/2010/5070/n/sir20105070n.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "b1693-31a",
+      "citation": "Menzie, W.D., and Mosier, D.L., 1986, Grade and tonnage model of sedimentary exhalative Zn-Pb, in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 212-215 (Bulletin xiii, 379 p.; printed page = PDF page - 16 in report.pdf)",
+      "url": "https://pubs.usgs.gov/bul/1693/report.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "b1693-31a-desc",
+      "citation": "Briskey, J.A., 1986, Descriptive model of sedimentary exhalative Zn-Pb, in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 211-212",
+      "url": "https://pubs.usgs.gov/bul/1693/report.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "pp1640a",
+      "citation": "Singer, D.A., Menzie, W.D., Sutphin, D.M., Mosier, D.L., and Bliss, J.D., 2001, Mineral deposit density--An update, chap. A of Schulz, K.J., ed., Contributions to global mineral resource assessment research: U.S. Geological Survey Professional Paper 1640-A, p. A1-A13",
+      "url": "https://pubs.usgs.gov/pp/p1640a/p1640A.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    }
+  ],
+  "n_deposits": 25,
+  "tonnage_mt": {
+    "p90": 5.0,
+    "p50": 25.0,
+    "p10": 300.0,
+    "source": "ofr2009-1252",
+    "where": "Table 2 (SHam, 'Tons'), printed p. 10 (PDF p. 15); same intercepts on Figure 33, printed p. 46 (PDF p. 51)",
+    "method": "table",
+    "note": "SHam model (shale-hosted amagmatic Zn-Pb, 25 deposits), used as the SEDEX proxy (see extra.model_mapping). Million metric tons of ore = production + reserves + resources at the lowest available cutoff (p. 2). SHam tonnages are the main reason tonnage differs significantly among the nine types (ANOVA, 1% level; p. 10)."
+  },
+  "grades": {
+    "zn_pct": {
+      "unit": "percent",
+      "p90": 2.3,
+      "p50": 8.0,
+      "p10": 14.0,
+      "n_reported": 25,
+      "source": "ofr2009-1252",
+      "where": "Table 2 (SHam, 'Zn grade'), printed p. 10 (PDF p. 15); Figure 34, printed p. 47 (PDF p. 52)",
+      "method": "table",
+      "note": "All 25 deposits report Zn. Zn in SHam departs significantly from lognormal (Shapiro-Wilk, 1% level; p. 8), apparently because of a few low-grade deposits. n_reported counted by this compiler from SedZn-PbTX.txt."
+    },
+    "pb_pct": {
+      "unit": "percent",
+      "p90": 0.88,
+      "p50": 2.1,
+      "p10": 5.3,
+      "n_reported": 25,
+      "source": "ofr2009-1252",
+      "where": "Table 2 (SHam, 'Pb grade'), printed p. 10 (PDF p. 15); Figure 35, printed p. 48 (PDF p. 53)",
+      "method": "table",
+      "note": "All 25 deposits report Pb (counted from SedZn-PbTX.txt)."
+    },
+    "cu_pct": {
+      "unit": "percent",
+      "p90": 0.0,
+      "p50": 0.0,
+      "p10": 1.0,
+      "n_reported": 7,
+      "source": "ofr2009-1252",
+      "where": "Table 2 (SHam, 'Cu grade'), printed p. 10 (PDF p. 15); Figure 36, printed p. 49 (PDF p. 54)",
+      "method": "table",
+      "note": "Percentile includes deposits with zero (unreported) Cu; 7 of 25 report Cu (counted from SedZn-PbTX.txt)."
+    },
+    "ag_gpt": {
+      "unit": "grams per tonne",
+      "p90": 0.0,
+      "p50": 21.0,
+      "p10": 71.0,
+      "n_reported": 18,
+      "source": "ofr2009-1252",
+      "where": "Table 2 (SHam, 'Ag grade'), printed p. 10 (PDF p. 15); Figure 37, printed p. 50 (PDF p. 55)",
+      "method": "table",
+      "note": "Percentile includes deposits with zero (unreported) Ag; 18 of 25 report Ag (counted from SedZn-PbTX.txt)."
+    },
+    "au_gpt": {
+      "unit": "grams per tonne",
+      "p90": 0.0,
+      "p50": 0.0,
+      "p10": 0.18,
+      "n_reported": 4,
+      "source": "ofr2009-1252",
+      "where": "Table 2 (SHam, 'Au grade'), printed p. 10 (PDF p. 15); Figure 38, printed p. 51 (PDF p. 56); Table 3, printed p. 11 (PDF p. 16)",
+      "method": "table",
+      "note": "4 of 25 report Au (counted from SedZn-PbTX.txt). Table 3 counts 4 with Au grades among 31 SHam deposits in the full file."
+    }
+  },
+  "correlations": [
+    {
+      "a": "zn_pct",
+      "b": "pb_pct",
+      "r": 0.72,
+      "n": 25,
+      "significant": true,
+      "source": "ofr2009-1252",
+      "where": "Grade and Tonnage Models text, printed p. 8 (PDF p. 13)",
+      "method": "text",
+      "note": "Significant at the 1 percent level. This is the only SHam correlation printed. The report lists only significant correlations, so the other SHam pairs (including tonnage-grade) were presumably not significant, but no r is given for them."
+    }
+  ],
+  "ore_density_t_m3": {
+    "value": null,
+    "source": null,
+    "where": "OFR 2009-1252, SIR 2010-5070-N and Bulletin 1693 model 31a searched",
+    "method": "not found",
+    "note": "No ore density is stated or assumed in the USGS SEDEX sources opened. SIR 2010-5070-N uses 2.2 g/cm3 only as a typical SANDSTONE (red-bed source rock) bulk density, p. 30, PDF p. 42. It is not an ore density."
+  },
+  "deposits_per_1e5_km2": {
+    "p90": null,
+    "p50": null,
+    "p10": null,
+    "source": "pp1640a",
+    "where": "Table 1, p. A4-A5",
+    "method": "not found",
+    "note": "No USGS deposit-density model for SEDEX / sediment-hosted Zn-Pb was found. PP 1640-A Table 1 (13 deposit types) does not include it. SIR 2010-5070-N (p. 36) states only that 'All known sedex basins contain multiple deposits in multiple horizons'."
+  },
+  "min_separation_m": {
+    "value": 2000,
+    "source": "ofr2009-1252",
+    "where": "Spatial Rules Used, printed p. 2 (PDF p. 7)",
+    "method": "text",
+    "note": "All mineralized rock or alteration within 2 km was combined into one deposit."
+  },
+  "extra": {
+    "model_mapping": {
+      "value": null,
+      "unit": null,
+      "source": "ofr2009-1252",
+      "where": "Types of Sediment-Hosted Zinc-Lead Deposits, printed p. 3-5 (PDF p. 8-10); Table 2, printed p. 10 (PDF p. 15); counts from database file SedZn-PbTX.txt",
+      "method": "text",
+      "note": "OFR 2009-1252 has no model labelled 'SEDEX'. It classes deposits by map-observable host rock (carbonate CA, shale SH, mixed ML) and igneous association (am, ig, me). SHam (shale-hosted amagmatic) is used here as the SEDEX proxy: all 25 SHam deposits carry PreviousType 'SEDEX'. BUT only 25 of the 179 SEDEX-labelled deposits with tonnage fall in SHam. The rest are MLig 38, CAam 36, CAig 31, SHig 30, MLme 12 and CAme 7 (counted by this compiler from SedZn-PbTX.txt). The report states that 59 percent of SEDEX deposits are amagmatic (p. 4-5). For a model built on the traditional SEDEX list, see extra.alt_b1693_31a_* (Bulletin 1693 model 31a, 45 deposits, which includes Broken Hill-type and Irish deposits)."
+    },
+    "fraction_of_sedex_that_are_amagmatic": {
+      "value": 0.59,
+      "unit": "fraction",
+      "source": "ofr2009-1252",
+      "where": "printed p. 4-5 (PDF p. 9-10)",
+      "method": "text",
+      "note": "'This group contains 90 percent of MVT deposits and 59 percent of SEDEX deposits.'"
+    },
+    "shale_group_host_attributes": {
+      "value": null,
+      "unit": "fraction of SH-group deposits",
+      "source": "ofr2009-1252",
+      "where": "printed p. 4 (PDF p. 9)",
+      "method": "text",
+      "note": "For the whole shale-hosted (SH) group: 47 percent are hosted by dolomitic shale or shale with dolomite; carbonaceous (graphitic) shale characterises 62 percent; tuff or tuffaceous rocks are noted in 42 percent. For carbonate-hosted SEDEX the 'dolomite index' is 72 percent, and 17 percent have carbonaceous interlayers."
+    },
+    "sham_ore_area_km2_median": {
+      "value": 0.86,
+      "unit": "km2",
+      "source": "ofr2009-1252",
+      "where": "database field AreaOre_km2 in SedZn-PbTX.txt (field defined printed p. 5-6, PDF p. 10-11)",
+      "method": "table",
+      "note": "DERIVED, not printed by USGS: the median computed by this compiler over the 14 SHam deposits (with tonnage) that have a non-zero AreaOre_km2 (range 0.06-13.7). Same method: ore length median 2.55 km (n = 16, range 0.7-7), ore width median 0.55 km (n = 12), deposit thickness median 27.5 m (n = 12, range 12-135 m)."
+    },
+    "alt_b1693_31a_tonnage_mt": {
+      "value": 15,
+      "p90": 1.7,
+      "p50": 15,
+      "p10": 130,
+      "n": 45,
+      "unit": "million tonnes ore",
+      "source": "b1693-31a",
+      "where": "Figure 159, printed p. 213 (PDF p. 229 of report.pdf)",
+      "method": "figure intercept",
+      "note": "Classic USGS SEDEX model (45 deposits including Sullivan, Mount Isa, McArthur River, Red Dog, Howards Pass, Broken Hill (AUNT and SAFR), Navan, Silvermines, Tynagh; list p. 212). SIR 2010-5070-N (p. 39, PDF p. 51) paraphrases this model as 'between 1.4 and 120 Mt; the median deposit size is 15 Mt'. The printed intercepts are 1.7 and 130."
+    },
+    "alt_b1693_31a_zn_pct": {
+      "value": 5.6,
+      "p90": 2.4,
+      "p50": 5.6,
+      "p10": 13,
+      "n": 45,
+      "unit": "percent",
+      "source": "b1693-31a",
+      "where": "Figure 160, printed p. 214 (PDF p. 230)",
+      "method": "figure intercept",
+      "note": ""
+    },
+    "alt_b1693_31a_pb_pct": {
+      "value": 2.8,
+      "p90": 1.0,
+      "p50": 2.8,
+      "p10": 7.7,
+      "n": 45,
+      "unit": "percent",
+      "source": "b1693-31a",
+      "where": "Figure 161, printed p. 214 (PDF p. 230)",
+      "method": "figure intercept",
+      "note": ""
+    },
+    "alt_b1693_31a_ag_gpt": {
+      "value": 30,
+      "p90": null,
+      "p50": 30,
+      "p10": 160,
+      "n": 45,
+      "unit": "grams per tonne",
+      "source": "b1693-31a",
+      "where": "Figure 162, printed p. 215 (PDF p. 231)",
+      "method": "figure intercept",
+      "note": "No 90th-percentile intercept is printed. The plotted points start near a cumulative proportion of 0.8 (roughly four-fifths of deposits report Ag). The comments (p. 212) say the Ag distribution suggests two subtypes."
+    },
+    "alt_b1693_31a_cu_pct": {
+      "value": null,
+      "p90": null,
+      "p50": null,
+      "p10": 0.28,
+      "n": 45,
+      "unit": "percent",
+      "source": "b1693-31a",
+      "where": "Figure 163, printed p. 215 (PDF p. 231)",
+      "method": "figure intercept",
+      "note": "Only the 10th-percentile intercept is printed (about a fifth of deposits report Cu)."
+    },
+    "alt_b1693_31a_corr_pb_ag": {
+      "value": 0.77,
+      "unit": "r (n = 39)",
+      "source": "b1693-31a",
+      "where": "Comments, printed p. 212 (PDF p. 228)",
+      "method": "text",
+      "note": "'Lead grades are significantly correlated with silver grades (r = 0.77, n = 39).'"
+    },
+    "ore_body_thickness_m": {
+      "value": null,
+      "unit": "m",
+      "source": "b1693-31a-desc",
+      "where": "Description, printed p. 211 (PDF p. 227)",
+      "method": "text",
+      "note": "'sheet- or lens-like tabular ore bodies up to a few tens of meters thick, and may be distributed through a stratigraphic interval over 1,000 m'. No single number is given."
+    },
+    "geochemical_halo_radius_km": {
+      "value": 2,
+      "unit": "km",
+      "source": "b1693-31a-desc",
+      "where": "Geochemical Signature, printed p. 212 (PDF p. 228)",
+      "method": "text",
+      "note": "'Local (within 2 km) Zn, Pb, and Mn haloes.' Highest expected background in black shales: Pb 500 ppm, Zn 1,300 ppm, Cu 750 ppm, Ba 1,300 ppm. In carbonates: Pb 9, Zn 20, Cu 4, Ba 10 ppm."
+    },
+    "known_age_ranges_ma": {
+      "value": null,
+      "unit": "Ma",
+      "source": "b1693-31a-desc",
+      "where": "Age Range, printed p. 211 (PDF p. 227)",
+      "method": "text",
+      "note": "'Known deposits are Middle Proterozoic (1,700-1,400 m.y.); Cambrian to Carboniferous (530-300 m.y.).'"
+    },
+    "brine_temperature_c": {
+      "value": null,
+      "min": 100,
+      "max": 200,
+      "unit": "degC",
+      "source": "sir2010-5070n",
+      "where": "Brief Description, printed p. 2 (PDF p. 14); again p. 28 (PDF p. 40)",
+      "method": "text",
+      "note": "'warm, saline basin brines (approx. 100-200 degC and 17-30 percent total dissolved solids)'. p. 28: fluid-inclusion temperatures exceed 100 degC, and 100 degC is the minimum temperature for moving ore-forming quantities of Pb and Zn."
+    },
+    "brine_salinity_tds_pct": {
+      "value": null,
+      "min": 17,
+      "max": 30,
+      "unit": "wt% total dissolved solids",
+      "source": "sir2010-5070n",
+      "where": "printed p. 2 (PDF p. 14)",
+      "method": "text",
+      "note": "p. 28 gives 10-30 wt% TDS from fluid inclusions. Chlorinity of about 10^5 mg/L (17 wt% TDS) is a threshold below which Zn is < 1 ppm (p. 28)."
+    },
+    "metal_leaching_window_c": {
+      "value": null,
+      "min": 150,
+      "max": 250,
+      "unit": "degC",
+      "source": "sir2010-5070n",
+      "where": "printed p. 28 (PDF p. 40)",
+      "method": "text",
+      "note": "The 'thermal leaching window' of Southgate and others (2006), as cited: the burial interval through which metal source rocks are efficiently leached."
+    },
+    "basin_geothermal_gradient_c_per_km": {
+      "value": null,
+      "min": 20,
+      "max": 25,
+      "unit": "degC/km",
+      "source": "sir2010-5070n",
+      "where": "printed p. 28 (PDF p. 40)",
+      "method": "text",
+      "note": "'Temperature gradients of 20-25 degC/km are common in sedimentary basins, and 30 degC/km is commonly assumed as the upper limit.' With a 15 degC surface and 30 degC/km, 105 degC is reached at 3 km."
+    },
+    "min_basin_fill_thickness_km": {
+      "value": 3,
+      "unit": "km",
+      "source": "sir2010-5070n",
+      "where": "printed p. 28 (PDF p. 40)",
+      "method": "text",
+      "note": "'3 km is a conservative estimate for the total sediment thickness required to form a sedex deposit.' Ores in the six most important sedex basins overlie at least 5 km of sediment fill somewhere in the basin."
+    },
+    "rimming_platform_area_km2": {
+      "value": null,
+      "min": 100000,
+      "max": 1000000,
+      "unit": "km2",
+      "source": "sir2010-5070n",
+      "where": "printed p. 27 (PDF p. 39)",
+      "method": "text",
+      "note": "Sedex basins 'are rimmed by unusually large (10^5 and 10^6 km2) shallow-water epeiric carbonate platforms'."
+    },
+    "giant_deposit_contained_znpb_mt": {
+      "value": 10,
+      "unit": "Mt Zn+Pb metal (lower bound, 'typically greater than')",
+      "source": "sir2010-5070n",
+      "where": "printed p. 2 (PDF p. 14)",
+      "method": "text",
+      "note": "Very large Zn-Pb-Ag deposits (McArthur River, Century, Mount Isa, Sullivan, Howards Pass) typically hold > 10 Mt Zn+Pb. Intermediate Zn-Pb-Ag-Ba+/-Au deposits generally hold < 7 Mt Zn+Pb. The largest can contain > 20 Mt Zn metal (p. 29, PDF p. 41). Howards Pass holds an estimated 550 Mt of ore (p. 39)."
+    }
+  }
+}

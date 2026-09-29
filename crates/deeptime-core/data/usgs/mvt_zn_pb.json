@@ -1,0 +1,408 @@
+{
+  "id": "mvt_zn_pb",
+  "title": "Mississippi Valley-type zinc-lead deposits",
+  "percentile_convention": "USGS: p90 is the value that 90% of deposits equal or exceed (the small end); p10 the large end",
+  "sources": [
+    {
+      "key": "ofr2009-1252",
+      "citation": "Singer, D.A., Berger, V.I., and Moring, B.C., 2009, Sediment-hosted zinc-lead deposits of the world--Database and grade and tonnage models: U.S. Geological Survey Open-File Report 2009-1252, v, 62 p. (text PDF of2009-1252_text.pdf, 67 PDF pages; printed page = PDF page - 5; database file SedZn-PbTX.txt)",
+      "url": "https://pubs.usgs.gov/of/2009/1252/",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "sir2010-5070a",
+      "citation": "Leach, D.L., Taylor, R.D., Fey, D.L., Diehl, S.F., and Saltus, R.W., 2010, A deposit model for Mississippi Valley-Type lead-zinc ores, chap. A of Mineral deposit models for resource assessment: U.S. Geological Survey Scientific Investigations Report 2010-5070-A, viii, 43 p. (printed page = PDF page - 10)",
+      "url": "https://pubs.usgs.gov/sir/2010/5070/a/pdf/SIR10-5070A.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "b1693-32ab",
+      "citation": "Mosier, D.L., and Briskey, J.A., 1986, Grade and tonnage model of southeast Missouri Pb-Zn and Appalachian Zn deposits, in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 224-226 (Bulletin xiii, 379 p.; printed page = PDF page - 16 in report.pdf)",
+      "url": "https://pubs.usgs.gov/bul/1693/report.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "pp1640a",
+      "citation": "Singer, D.A., Menzie, W.D., Sutphin, D.M., Mosier, D.L., and Bliss, J.D., 2001, Mineral deposit density--An update, chap. A of Schulz, K.J., ed., Contributions to global mineral resource assessment research: U.S. Geological Survey Professional Paper 1640-A, p. A1-A13",
+      "url": "https://pubs.usgs.gov/pp/p1640a/p1640A.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    }
+  ],
+  "n_deposits": 132,
+  "tonnage_mt": {
+    "p90": 0.93,
+    "p50": 10.0,
+    "p10": 86.0,
+    "source": "ofr2009-1252",
+    "where": "Table 2 (CAam, 'Tons'), printed p. 9 (PDF p. 14); same intercepts on Figure 1, printed p. 14 (PDF p. 19)",
+    "method": "table",
+    "note": "Million metric tons of ore = total production + reserves + resources at the lowest available cutoff grade (p. 2). CAam model, used as MVT proxy (see extra.model_mapping)."
+  },
+  "grades": {
+    "zn_pct": {
+      "unit": "percent",
+      "p90": 1.7,
+      "p50": 5.1,
+      "p10": 12.0,
+      "n_reported": 128,
+      "source": "ofr2009-1252",
+      "where": "Table 2 (CAam, 'Zn grade'), printed p. 9 (PDF p. 14); Figure 2, printed p. 15 (PDF p. 20)",
+      "method": "table",
+      "note": "Percentiles are over all 132 deposits; unreported grades are treated as zero (p. 2-3). n_reported = deposits with non-zero Zn, counted by this compiler from SedZn-PbTX.txt; it matches the n = 128 printed for the tonnage-Zn correlation (p. 8). Zn in CAam departs significantly from lognormal (Shapiro-Wilk, 1% level) because of a few very low-grade deposits (p. 8-9)."
+    },
+    "pb_pct": {
+      "unit": "percent",
+      "p90": 0.19,
+      "p50": 1.5,
+      "p10": 5.0,
+      "n_reported": 121,
+      "source": "ofr2009-1252",
+      "where": "Table 2 (CAam, 'Pb grade'), printed p. 9 (PDF p. 14); Figure 3, printed p. 16 (PDF p. 21)",
+      "method": "table",
+      "note": "Percentiles over all 132 deposits, zeros included. n_reported counted by this compiler from SedZn-PbTX.txt (non-zero Pb)."
+    },
+    "cu_pct": {
+      "unit": "percent",
+      "p90": 0.0,
+      "p50": 0.0,
+      "p10": 0.0,
+      "n_reported": 9,
+      "source": "ofr2009-1252",
+      "where": "Table 2 (CAam, 'Cu grade'), printed p. 9 (PDF p. 14); Figure 4, printed p. 17 (PDF p. 22)",
+      "method": "table",
+      "note": "Only 9 of 132 deposits report Cu, so every percentile is zero. n_reported counted by this compiler from SedZn-PbTX.txt."
+    },
+    "ag_gpt": {
+      "unit": "grams per tonne",
+      "p90": 0.0,
+      "p50": 0.0,
+      "p10": 37.0,
+      "n_reported": 58,
+      "source": "ofr2009-1252",
+      "where": "Table 2 (CAam, 'Ag grade'), printed p. 9 (PDF p. 14); Figure 5, printed p. 18 (PDF p. 23)",
+      "method": "table",
+      "note": "Percentile includes deposits with zero (unreported) Ag: 74 of 132 have no Ag grade. n_reported counted by this compiler from SedZn-PbTX.txt."
+    },
+    "au_gpt": {
+      "unit": "grams per tonne",
+      "p90": 0.0,
+      "p50": 0.0,
+      "p10": 0.0,
+      "n_reported": 3,
+      "source": "ofr2009-1252",
+      "where": "Table 2 (CAam, 'Au grade'), printed p. 9 (PDF p. 14); Figure 6, printed p. 19 (PDF p. 24); Table 3, printed p. 11 (PDF p. 16)",
+      "method": "table",
+      "note": "Au reported for only 3 of 132 deposits (Table 3 says 3 of 148 CAam deposits in the full file). n_reported counted by this compiler from SedZn-PbTX.txt."
+    }
+  },
+  "correlations": [
+    {
+      "a": "tonnage_mt",
+      "b": "zn_pct",
+      "r": -0.3,
+      "n": 128,
+      "significant": true,
+      "source": "ofr2009-1252",
+      "where": "Grade and Tonnage Models text, printed p. 8 (PDF p. 13)",
+      "method": "text",
+      "note": "Significant at the 1 percent level, but NOT significant if two deposits with suspiciously low Zn grades are excluded (as stated in the report). Presumably computed on log-transformed values; the report does not say."
+    },
+    {
+      "a": "zn_pct",
+      "b": "pb_pct",
+      "r": 0.16,
+      "n": 117,
+      "significant": true,
+      "source": "ofr2009-1252",
+      "where": "printed p. 8 (PDF p. 13)",
+      "method": "text",
+      "note": "Significant at the 1 percent level."
+    },
+    {
+      "a": "pb_pct",
+      "b": "ag_gpt",
+      "r": 0.45,
+      "n": 56,
+      "significant": true,
+      "source": "ofr2009-1252",
+      "where": "printed p. 8 (PDF p. 13)",
+      "method": "text",
+      "note": "Significant at the 1 percent level. The report prints only significant correlations. Other CAam pairs (for example tonnage-Pb and tonnage-Ag) are presumably not significant, but no r is given for them."
+    }
+  ],
+  "ore_density_t_m3": {
+    "value": null,
+    "source": null,
+    "where": "OFR 2009-1252, SIR 2010-5070-A and Bulletin 1693 models 32a/32b searched",
+    "method": "not found",
+    "note": "None of the USGS MVT sources opened states or assumes an ore density. Tonnages are reported directly in metric tons."
+  },
+  "deposits_per_1e5_km2": {
+    "p90": null,
+    "p50": null,
+    "p10": null,
+    "source": "pp1640a",
+    "where": "Table 1, p. A4-A5 (13 deposit types listed)",
+    "method": "not found",
+    "note": "No USGS deposit-density model exists for MVT (or any sediment-hosted Zn-Pb) deposits in the sources opened. PP 1640-A Table 1 covers low-sulfide Au-quartz veins, placer Au, bedded barite, diamond pipes, Cyprus and kuroko massive sulfide, porphyry Cu, Climax Mo, podiform chromite, three volcanogenic Mn types and wolframite veins, but not Zn-Pb. District-scale counts from SIR 2010-5070-A are in extra.district_* (these are ore bodies within districts, NOT the 2-km-rule deposits of the grade-tonnage model)."
+  },
+  "min_separation_m": {
+    "value": 2000,
+    "source": "ofr2009-1252",
+    "where": "Spatial Rules Used, printed p. 2 (PDF p. 7)",
+    "method": "text",
+    "note": "All mineralized rock or alteration within 2 km was combined into one deposit. The rule was designed so that grade-tonnage and spatial-density models describe the same entities."
+  },
+  "extra": {
+    "model_mapping": {
+      "value": null,
+      "unit": null,
+      "source": "ofr2009-1252",
+      "where": "Types of Sediment-Hosted Zinc-Lead Deposits, printed p. 3-5 (PDF p. 8-10); Table 2, printed p. 9-10 (PDF p. 14-15); counts from database file SedZn-PbTX.txt",
+      "method": "text",
+      "note": "OFR 2009-1252 does NOT publish a model labelled 'MVT'. It re-classifies sediment-hosted Zn-Pb deposits by map-observable host rock and igneous association. The top-level numbers below are its CAam model (carbonate-hosted amagmatic Zn-Pb, 132 deposits), used here as the MVT proxy. In the report's own database, 93 of the 132 CAam deposits carry PreviousType 'MVT', 36 'SEDEX' and 3 mixed labels; 93 of the 105 deposits labelled MVT (with tonnage) fall in CAam and 12 in CAig (counted by this compiler from SedZn-PbTX.txt). The report states that the amagmatic group contains 90 percent of MVT deposits (p. 4-5). A strictly MVT-only USGS summary (SIR 2010-5070-A, Table 1, 113 deposits) is given in extra.alt_sir2010_5070a_*. District-scale USGS models (Bulletin 1693, models 32a/32b) are in extra.alt_b1693_32ab_*."
+    },
+    "fraction_of_mvt_that_are_amagmatic": {
+      "value": 0.9,
+      "unit": "fraction",
+      "source": "ofr2009-1252",
+      "where": "Types of Sediment-Hosted Zinc-Lead Deposits, printed p. 4-5 (PDF p. 9-10)",
+      "method": "text",
+      "note": "The amagmatic group 'contains 90 percent of MVT deposits and 59 percent of SEDEX deposits'."
+    },
+    "dolomite_host_fraction_mvt": {
+      "value": 0.62,
+      "unit": "fraction",
+      "source": "ofr2009-1252",
+      "where": "printed p. 4 (PDF p. 9)",
+      "method": "text",
+      "note": "Among carbonate-hosted (CA) deposits the 'dolomite index' is 50 percent overall, 72 percent for SEDEX and 62 percent for MVT. Carbonaceous interlayers occur in 8 percent of CA deposits."
+    },
+    "caam_ore_area_km2_median": {
+      "value": 3.28,
+      "unit": "km2",
+      "source": "ofr2009-1252",
+      "where": "database field AreaOre_km2 in SedZn-PbTX.txt (field defined p. 5-6, PDF p. 10-11)",
+      "method": "table",
+      "note": "DERIVED, not printed by USGS: the median computed by this compiler over the 50 CAam deposits (with tonnage) that have a non-zero AreaOre_km2. The range is 0.02-10000 km2, so the upper tail includes district-scale entries. Ore length: median 3.35 km (n = 48). Ore width: median 0.8 km (n = 47). Thickness: median 7 m (n = 10). Same method throughout."
+    },
+    "alt_sir2010_5070a_tonnage_mt": {
+      "value": 7.0,
+      "p90": 0.65,
+      "p50": 7.0,
+      "p10": 42.4,
+      "min": 0.06,
+      "max": 394,
+      "n": 113,
+      "unit": "million tonnes ore",
+      "source": "sir2010-5070a",
+      "where": "Table 1, printed p. 4 (PDF p. 14)",
+      "method": "table",
+      "note": "MVT-only summary statistics from the Taylor and others (2009, OFR 2009-1297) compilation. The table uses the ordinary statistical convention: its '10th' column (0.65) is mapped to p90 here and its '90th' column (42.4) to p10. 25th percentile 1.90 and 75th 18.1. The text (p. 3) gives median parameters of 7.0 Mt, 1.9% Pb, 6.0% Zn, 0.23% Cu and 32.5 g/t Ag."
+    },
+    "alt_sir2010_5070a_zn_pct": {
+      "value": 6.0,
+      "p90": 1.89,
+      "p50": 6.0,
+      "p10": 12.5,
+      "min": 0.11,
+      "max": 24.0,
+      "n": 107,
+      "unit": "percent",
+      "source": "sir2010-5070a",
+      "where": "Table 1, printed p. 4 (PDF p. 14)",
+      "method": "table",
+      "note": "Statistics over deposits WITH data only (zeros/unreported excluded), unlike OFR 2009-1252. Table columns remapped to the USGS convention. 25th 3.56, 75th 9.94."
+    },
+    "alt_sir2010_5070a_pb_pct": {
+      "value": 1.9,
+      "p90": 0.75,
+      "p50": 1.9,
+      "p10": 6.27,
+      "min": 0.18,
+      "max": 13.0,
+      "n": 101,
+      "unit": "percent",
+      "source": "sir2010-5070a",
+      "where": "Table 1, printed p. 4 (PDF p. 14)",
+      "method": "table",
+      "note": "Deposits with data only. 25th 1.10, 75th 3.60."
+    },
+    "alt_sir2010_5070a_cu_pct": {
+      "value": 0.23,
+      "p90": 0.14,
+      "p50": 0.23,
+      "p10": 0.44,
+      "min": 0.1,
+      "max": 0.52,
+      "n": 8,
+      "unit": "percent",
+      "source": "sir2010-5070a",
+      "where": "Table 1, printed p. 4 (PDF p. 14)",
+      "method": "table",
+      "note": "Only 8 of 113 deposits report Cu."
+    },
+    "alt_sir2010_5070a_ag_gpt": {
+      "value": 32.5,
+      "p90": 10.2,
+      "p50": 32.5,
+      "p10": 88.0,
+      "min": 3.4,
+      "max": 485,
+      "n": 34,
+      "unit": "grams per tonne",
+      "source": "sir2010-5070a",
+      "where": "Table 1, printed p. 4 (PDF p. 14); text p. 4",
+      "method": "table",
+      "note": "Silver is reported for 34 of 113 deposits (text, p. 4)."
+    },
+    "alt_sir2010_5070a_contained_zn_mt": {
+      "value": 0.33,
+      "p90": 0.03,
+      "p50": 0.33,
+      "p10": 2.44,
+      "min": null,
+      "max": 16.6,
+      "n": 108,
+      "unit": "million tonnes Zn metal",
+      "source": "sir2010-5070a",
+      "where": "Table 1, printed p. 4 (PDF p. 14)",
+      "method": "table",
+      "note": "Min printed as '<0.01'. Contained Pb metal: '10th' <0.01, median 0.11, '90th' 0.98, max 6.30 Mt (n = 108)."
+    },
+    "zn_to_pb_metal_ratio": {
+      "value": 10,
+      "unit": "mass ratio Zn:Pb",
+      "source": "sir2010-5070a",
+      "where": "Primary Commodities, printed p. 4 (PDF p. 14)",
+      "method": "text",
+      "note": "'On average, MVT deposits yield about a 10:1 mass ratio of Zn to Pb metal'. Some districts are Zn-only (East and Central Tennessee) and others Pb-dominant (Viburnum Trend, Old Lead Belt)."
+    },
+    "ore_fluid_temperature_c": {
+      "value": null,
+      "min": 75,
+      "max": 200,
+      "unit": "degC",
+      "source": "sir2010-5070a",
+      "where": "Temperature of the Ore Fluids, printed p. 19 (PDF p. 29); also Brief Description p. 3",
+      "method": "text",
+      "note": "Fluid-inclusion temperatures range from about 50 to 250 degC, but most lie between 75 and 200 degC. The highest (~180-250 degC) are in the Irish Midlands and at Gays River."
+    },
+    "ore_fluid_temperature_full_range_c": {
+      "value": null,
+      "min": 50,
+      "max": 250,
+      "unit": "degC",
+      "source": "sir2010-5070a",
+      "where": "printed p. 19 (PDF p. 29)",
+      "method": "text",
+      "note": "Full fluid-inclusion range."
+    },
+    "ore_fluid_salinity_wt_pct_nacl_eq": {
+      "value": null,
+      "min": 10,
+      "max": 30,
+      "unit": "wt% NaCl equivalent",
+      "source": "sir2010-5070a",
+      "where": "Salinity of the Ore Fluids, printed p. 19 (PDF p. 29); Brief Description p. 3",
+      "method": "text",
+      "note": "Basinal brines, typically 10-30 wt% salts."
+    },
+    "district_area_km2_examples": {
+      "value": null,
+      "unit": "km2",
+      "source": "sir2010-5070a",
+      "where": "Example Deposits, printed p. 5 (PDF p. 15); repeated p. 8 (PDF p. 18)",
+      "method": "text",
+      "note": "Large MVT districts: Southeast Missouri 3,000; Tri-State 1,800; Pine Point 1,600; Alpine 10,000; Upper Silesia 2,800; Irish Midlands 8,000; Upper Mississippi Valley 7,800 km2. MVT deposits are 'distributed over hundreds of square kilometers' that define districts (p. 5)."
+    },
+    "district_pine_point_orebodies": {
+      "value": 60,
+      "unit": "ore bodies in a 1,600 km2 district",
+      "source": "sir2010-5070a",
+      "where": "Dimensions in Plan View, printed p. 8 (PDF p. 18)",
+      "method": "text",
+      "note": "Collapse-breccia ore bodies tens to hundreds of meters across; 'these individual ore breccias total 60 deposits in a 1,600 km2 district'. p. 5 says Pine Point contains more than 80 deposits. Most Pine Point deposits hold 0.2-2 Mt ore and the largest nearly 18 Mt (p. 5). These are ore bodies, not 2-km-rule deposits."
+    },
+    "district_upper_mississippi_valley_orebodies": {
+      "value": 400,
+      "unit": "deposits (approximate, 'nearly 400') in a 7,800 km2 district",
+      "source": "sir2010-5070a",
+      "where": "printed p. 5 (PDF p. 15)",
+      "method": "text",
+      "note": "Average deposit size there was 0.1-0.5 Mt, with a few as large as 3 Mt (Heyl and others, 1959, as cited)."
+    },
+    "economic_vertical_extent_m": {
+      "value": null,
+      "unit": "m",
+      "source": "sir2010-5070a",
+      "where": "Vertical Extent, printed p. 8 (PDF p. 18)",
+      "method": "text",
+      "note": "Economic mineralization is 'usually on the order of a few to several tens of meters'. Stacked zones and trace mineralization can extend for several hundred meters. No single number is given."
+    },
+    "permissive_distance_from_orogen_km": {
+      "value": 600,
+      "unit": "km (approximate upper limit)",
+      "source": "sir2010-5070a",
+      "where": "Regional Scale Favorability, printed p. 27 (PDF p. 37)",
+      "method": "text",
+      "note": "Favourable: Neoproterozoic and Phanerozoic platform carbonate sequences 'less than approximately 600 km inboard of Phanerozoic orogenic belts'."
+    },
+    "alt_b1693_32ab_tonnage_mt": {
+      "value": 35,
+      "p90": 2.2,
+      "p50": 35,
+      "p10": 540,
+      "n": 20,
+      "unit": "million tonnes ore",
+      "source": "b1693-32ab",
+      "where": "Figure 168, printed p. 225 (PDF p. 241 of report.pdf)",
+      "method": "figure intercept",
+      "note": "DISTRICT-scale model (southeast Missouri Pb-Zn + Appalachian Zn, 20 districts). Estimates were made for districts only because individual deposits are hard to delimit, and districts smaller than about 1 Mt were excluded (comments, p. 224)."
+    },
+    "alt_b1693_32ab_zn_pct": {
+      "value": 4,
+      "p90": 1.4,
+      "p50": 4,
+      "p10": 12,
+      "n": 20,
+      "unit": "percent",
+      "source": "b1693-32ab",
+      "where": "Figure 169, printed p. 225 (PDF p. 241)",
+      "method": "figure intercept",
+      "note": "District-scale."
+    },
+    "alt_b1693_32ab_pb_pct": {
+      "value": 0.87,
+      "p90": null,
+      "p50": 0.87,
+      "p10": 3.6,
+      "n": 20,
+      "unit": "percent",
+      "source": "b1693-32ab",
+      "where": "Figure 170, printed p. 226 (PDF p. 242)",
+      "method": "figure intercept",
+      "note": "District-scale. No 90th-percentile intercept is printed because only about 80% of districts report Pb."
+    },
+    "alt_b1693_32ab_ag_gpt": {
+      "value": 0.48,
+      "p90": null,
+      "p50": 0.48,
+      "p10": 19,
+      "n": 20,
+      "unit": "grams per tonne",
+      "source": "b1693-32ab",
+      "where": "Figure 171, printed p. 226 (PDF p. 242)",
+      "method": "figure intercept",
+      "note": "District-scale. About half the districts report Ag."
+    },
+    "alt_b1693_32ab_corr_pb_ag": {
+      "value": 0.87,
+      "unit": "r (n = 10)",
+      "source": "b1693-32ab",
+      "where": "Comments, printed p. 224 (PDF p. 240)",
+      "method": "text",
+      "note": "'Lead grade is correlated with silver grade (r = 0.87, n = 10).'"
+    }
+  }
+}

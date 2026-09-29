@@ -45,6 +45,14 @@
   .row .t { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 7ch; text-align: right; }
   a.ref { color: var(--accent); cursor: pointer; text-decoration: underline; }
   .hint { color: var(--muted); font-size: 12px; }
+  #census { padding: 0 16px 16px; }
+  #censusbody { overflow-x: auto; }
+  table.census { border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+  table.census th, table.census td { padding: 2px 6px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  table.census th:first-child, table.census td:first-child { text-align: left; }
+  table.census th { color: var(--muted); font-weight: 600; }
+  svg.section { display: block; width: 100%; height: auto; margin-top: 6px; background: var(--bg); border: 1px solid var(--line); }
+  svg.section text { font: 10px system-ui, sans-serif; fill: var(--muted); }
 </style>
 </head>
 <body>
@@ -88,7 +96,11 @@
     <div class="panel"><h2>Details</h2><div id="details" class="hint">Click an event or a site.</div></div>
   </aside>
 </section>
+<section id="census" hidden>
+  <div class="panel"><h2>Deposit census</h2><div id="censusbody"></div></div>
+</section>
 <script src="bundle.js"></script>
+<script src="report.js"></script>
 <script src="viewer.js"></script>
 </body>
 </html>

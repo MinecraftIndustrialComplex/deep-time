@@ -1,0 +1,78 @@
+{
+  "id": "deeptime:petroleum_trap",
+  "family": "fuel",
+  "site_kind": "reservoir",
+  "description": "A petroleum system: a mature source-rock kitchen (Lopatin TTI) charging structural traps with seal and reservoir that formed before generation ended; the reservoirs feed Create: Diesel Generators.",
+  "products": [
+    {"material": "c:crude_oil", "grade_key": null, "role": "primary"}
+  ],
+  "components": {"combine": "product"},
+  "clock_gates": [],
+  "integration_myr": 10,
+  "formation_time": "peak",
+  "hosts": {"any_of": ["sandstone", "#deeptime:rock/carbonate"], "host_bias": {}},
+  "causes": {
+    "source": ["deeptime:basin_subsidence", "deeptime:rift_onset"],
+    "trap": ["deeptime:orogeny_phase", "deeptime:collision"],
+    "preservation": ["deeptime:erosion_pulse"]
+  },
+  "cause_radius_km": 600,
+  "sizing": {
+    "grade_tonnage": "petroleum",
+    "tonnage_mt": {"p90": 0.327, "p50": 1.637, "p10": 12.14},
+    "grades": {},
+    "correlations": [],
+    "ore_density_t_m3": 0.13,
+    "density_per_1e5km2": {"p90": 5, "p50": 20, "p10": 160},
+    "min_separation_m": 2000,
+    "tract_threshold": 0.05,
+    "clustering": {"model": "thomas", "camp_spacing_km": 20, "cluster_radius_km": 10}
+  },
+  "geometry": {
+    "shape": "dome",
+    "aspect": [1.0, 0.1, 2.0],
+    "dip_deg": [0, 0],
+    "zoning": [
+      {"zone": "gas_cap", "v": [0.0, 0.25], "density": 0.0},
+      {"zone": "oil_leg", "v": [0.25, 0.8], "material": "c:crude_oil", "grade_mult": 1.0, "density": 0.0},
+      {"zone": "water_leg", "v": [0.8, 1.0], "density": 0.0}
+    ],
+    "extra_bodies": [],
+    "children": []
+  },
+  "preservation": {
+    "formation_depth_m": 2000,
+    "vertical_extent_m": 50,
+    "erosion_behavior": "destroy",
+    "resistates": []
+  },
+  "petroleum": {
+    "tti_onset": 15,
+    "tti_peak": 75,
+    "tti_end": 160,
+    "migration_km": 50,
+    "source_field": "deeptime:source_rock_toc",
+    "temperature_field": "deeptime:burial_temp_c",
+    "trap_field": "deeptime:trap_structure",
+    "seal_field": "deeptime:seal",
+    "reservoir_field": "deeptime:reservoir_quality",
+    "trap_threshold": 0.3,
+    "seal_threshold": 0.3,
+    "reservoir_threshold": 0.3,
+    "min_source": 1.0
+  },
+  "minecraft": {
+    "coe_vein": null,
+    "cdg_reservoir": true,
+    "ore_block_policy": "none"
+  },
+  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 2.0, "richness_mult": 1.0},
+  "requires_fields": {},
+  "notes": [
+    "Lopatin TTI thresholds 15 (oil onset), 75 (peak), 160 (end of oil): Waples 1980, AAPG Bulletin 64:916 (abstract via OSTI; a journal fact, not USGS). USGS reports use close values: TTI 10 ≈ Ro 0.6 % for onset and TTI ≈ 160 ≈ Ro 1.3 % for thermogenic gas (PP 1698 p. 22), an oil window of TTI 10–180 (OFR 88-450-G). See crates/deeptime-core/data/usgs/petroleum.json.",
+    "Field size: the example of USGS World Petroleum Assessment 2000 (DDS-60), Niger Delta Agbada Reservoirs assessment unit 71920101, undiscovered oil fields: median 12 MMBO from the data form; p90 ≈ 2.4 and p10 ≈ 89 MMBO measured off the USGS histogram (the digitiser's log interpolation). Converted to tonnes at 0.1364 t per barrel (a design conversion for crude of 0.858 t/m³): 0.327 / 1.637 / 12.14 Mt. One province's distribution, not a global model.",
+    "PLACEHOLDERS (not found): density_per_1e5km2 5 / 20 / 160 fields per 100,000 km² of charged-trap area, min_separation_m 2000, formation_depth_m 2000; ore_density_t_m3 0.13 is oil tonnes per m³ of reservoir rock (20 % porosity × 75 % oil saturation × 0.85 t/m³, a design value), so the dome is the reservoir's volume.",
+    "Design values: migration_km 50, the trap/seal/reservoir thresholds, min_source 1 wt% TOC, the gas/oil/water legs; a layer generates only while hotter than 80 °C (petroleum.rs).",
+    "erosion_behavior destroy: erosion into a trap breaches it. Fluids place no blocks (ore_block_policy none); the charge goes to CDG (P1-16) as cdg_charge_mb = oil tonnes / 0.85 t/m³ × 1000."
+  ]
+}
