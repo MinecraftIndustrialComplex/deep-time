@@ -157,13 +157,15 @@ mod tests {
             lon: 10.0,
         };
         for (k, g) in [0.0, 1.0, 3.0, 8.0, 5.0, 1.5, 0.5, 0.0].iter().enumerate() {
-            tr.update(&mut w, k as f64 * 1e7, &ice(*g), 0.02, 0.01, false).unwrap();
+            tr.update(&mut w, k as f64 * 1e7, &ice(*g), 0.02, 0.01, false)
+                .unwrap();
         }
         assert_eq!(w.events.len(), 1);
         let e = &w.events[0];
         assert_eq!(e.kind, "deeptime:glaciation");
         assert_eq!((e.t_start, e.t_end), (2e7, 6e7));
-        tr.update(&mut w, 8e7, &ice(4.0), 0.02, 0.01, false).unwrap();
+        tr.update(&mut w, 8e7, &ice(4.0), 0.02, 0.01, false)
+            .unwrap();
         tr.update(&mut w, 9e7, &ice(4.0), 0.02, 0.01, true).unwrap();
         assert_eq!(w.events.len(), 2, "closed as ongoing at the end");
         assert_eq!(tr.count, 2);

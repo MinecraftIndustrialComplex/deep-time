@@ -209,8 +209,7 @@ pub fn itcz(
                     num += wt * lat_row[j];
                     den += wt;
                 }
-                *o = (num / den.max(1e-300))
-                    .clamp(-p.itcz_max_shift_deg, p.itcz_max_shift_deg);
+                *o = (num / den.max(1e-300)).clamp(-p.itcz_max_shift_deg, p.itcz_max_shift_deg);
             }
             out
         })
@@ -326,7 +325,13 @@ mod tests {
         assert!(belt_precip(50.0) > 3.0 * belt_precip(88.0));
         assert_eq!(belt_precip(-30.0), belt_precip(30.0));
         // Weights sum to one; trades in the tropics, westerlies at 45°, polar at 75°.
-        for &(phi, pb) in &[(10.0, 10.0), (45.0, 45.0), (75.0, 75.0), (5.0, -3.0), (-40.0, -36.0)] {
+        for &(phi, pb) in &[
+            (10.0, 10.0),
+            (45.0, 45.0),
+            (75.0, 75.0),
+            (5.0, -3.0),
+            (-40.0, -36.0),
+        ] {
             let w = regime_weights(phi, pb);
             assert!((w.iter().sum::<f64>() - 1.0).abs() < 1e-12, "{phi} {pb}");
         }
@@ -354,13 +359,27 @@ mod tests {
         let d = Dims::new(100, 1, 1.0, true);
         let land: Vec<bool> = (0..100).map(|i| i < 10).collect();
         let a = basin_position(&d, &land, &|_| 100.0, 0);
-        assert!(a[11] < -0.9, "west side of the basin (east coast): {}", a[11]);
-        assert!(a[98] > 0.9, "east side of the basin (west coast): {}", a[98]);
+        assert!(
+            a[11] < -0.9,
+            "west side of the basin (east coast): {}",
+            a[11]
+        );
+        assert!(
+            a[98] > 0.9,
+            "east side of the basin (west coast): {}",
+            a[98]
+        );
         assert!(a[55].abs() < 0.05);
         assert_eq!(a[5], 0.0);
         let p = ClimateParams::default();
-        assert!(sst_anomaly(&p, 1.0, 25.0) < -4.0, "cold upwelling off west coasts");
-        assert!(sst_anomaly(&p, 1.0, 55.0) > 5.0, "warm drift off west coasts");
+        assert!(
+            sst_anomaly(&p, 1.0, 25.0) < -4.0,
+            "cold upwelling off west coasts"
+        );
+        assert!(
+            sst_anomaly(&p, 1.0, 55.0) > 5.0,
+            "warm drift off west coasts"
+        );
         assert!(sst_anomaly(&p, -1.0, 55.0) < -4.0);
         assert!(subsidence_factor(&p, 1.0, 25.0) < 0.5);
         assert!(subsidence_factor(&p, -1.0, 25.0) > 1.3);

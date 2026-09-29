@@ -151,7 +151,11 @@ fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
         .filter(|&z| z > 0.0)
         .collect();
     lz.sort_by(f64::total_cmp);
-    let q = |f: f64| lz.get(((lz.len().max(1) - 1) as f64 * f).round() as usize).copied().unwrap_or(0.0);
+    let q = |f: f64| {
+        lz.get(((lz.len().max(1) - 1) as f64 * f).round() as usize)
+            .copied()
+            .unwrap_or(0.0)
+    };
     let (z50, z90) = (q(0.5), q(0.9));
     let hist = world.history.as_ref();
     Some(format!(
@@ -190,7 +194,8 @@ fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
 /// The climate's summary line (P1-05): `climate_final=<snapshots> t_surface_c=… koppen_land=A…/B…
 /// …`, from the last snapshot, when the run had a climate stage.
 fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
-    let note: Value = serde_json::from_str(world.notes.get(deeptime_core::climate::STAGE_NAME)?).ok()?;
+    let note: Value =
+        serde_json::from_str(world.notes.get(deeptime_core::climate::STAGE_NAME)?).ok()?;
     let last = &note["last"];
     let f = |v: &Value| v.as_f64().unwrap_or(f64::NAN);
     let shares = last["koppen_land_share"]

@@ -233,11 +233,10 @@ impl ClimateStage {
         // Where the crust went this plate step, and the ground the surface will erode.
         let started = Instant::now();
         let pid = need("plates/plate_id")?;
-        let src = self
-            .s
-            .omega
-            .as_ref()
-            .map(|prev| advect::sources(&grid, pid, &omega_for(prev, &parents), dt_myr * 1.0e6));
+        let src =
+            self.s.omega.as_ref().map(|prev| {
+                advect::sources(&grid, pid, &omega_for(prev, &parents), dt_myr * 1.0e6)
+            });
         let mut h: Vec<f64> = need("plates/elevation_m")?
             .iter()
             .map(|&z| f64::from(z))
@@ -344,8 +343,16 @@ impl ClimateStage {
             put(world, field::ARIDITY, s.aridity);
             put(world, field::ELA, ela);
             put(world, field::ELA_ALL, s.ela);
-            put(world, field::KOPPEN, s.koppen.iter().map(|&x| f32::from(x)).collect());
-            put(world, field::GLACIER, s.glacier.iter().map(|&x| f32::from(x)).collect());
+            put(
+                world,
+                field::KOPPEN,
+                s.koppen.iter().map(|&x| f32::from(x)).collect(),
+            );
+            put(
+                world,
+                field::GLACIER,
+                s.glacier.iter().map(|&x| f32::from(x)).collect(),
+            );
             put(world, field::D_MEAN, s.d_mean);
             put(world, field::D_WARM, s.d_warm);
             put(world, field::D_COLD, s.d_cold);
@@ -373,6 +380,7 @@ impl ClimateStage {
                 .map(|&[fi, fj]| old_k[advect::nearest(w, hgt, fi, fj)])
                 .collect();
             let refs = &self.s.refs;
+            #[allow(clippy::needless_range_loop)]
             let rows: Vec<[Vec<f32>; 7]> = (0..hgt)
                 .into_par_iter()
                 .map(|j| {
