@@ -469,14 +469,22 @@ impl Preset {
     }
 
     /// This preset with the game's content bundle applied (plan §5.4): the bundle's
-    /// `essentials` (the `deeptime:essentials` registry, P1-15) replace the preset's list. An empty
-    /// bundle, or one without `essentials`, changes nothing; the dummy pipeline has no essentials.
+    /// `essentials` (the `deeptime:essentials` registry, P1-15) replace the preset's list, and its
+    /// `climate_placement` (a datapack's copy of `data/deeptime/deeptime/climate_mapping/placement.json`,
+    /// P1-09) replaces the bake's default class placement table. An empty bundle, or one without
+    /// these keys, changes nothing; the dummy pipeline has neither.
     pub fn with_content(mut self, content_json: &str) -> Result<Preset, CoreError> {
         if content_json.trim().is_empty() {
             return Ok(self);
         }
         let v: Value = serde_json::from_str(content_json)
             .map_err(|e| CoreError::preset("content", format!("not valid JSON: {e}")))?;
+        if let Some(t) = v.get(crate::bake::placement::CONTENT_KEY) {
+            let table = crate::bake::placement::Placement::from_value(t)?;
+            if let PresetBody::Planet(p) = &mut self.body {
+                p.placement = Some(table);
+            }
+        }
         let Some(ess) = v.get("essentials") else {
             return Ok(self);
         };

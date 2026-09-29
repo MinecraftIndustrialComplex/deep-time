@@ -132,7 +132,74 @@ the `minecraft:overworld` router), the file `crates/deeptime-core/data/climate_m
 records `mapping: "p1-09"`, the preset's `params` (its `biomes` section, defaults filled in),
 `reference` (`bands`, and `reference` with `erosion`, `peaks_valleys`, `land_min_continents`), the
 mean band coordinates per Köppen class (`koppen_bands`) and the land share of each band
-(`land_shares`).
+(`land_shares`), and the class placement table the bake used (`placement`, below).
+
+**The preset's `biomes` section** (every key optional; the built-in presets carry them all):
+`temperature_shift`, `humidity_shift` (bands, ±2), `beach_blocks` (0–150), `terrain_window_blocks`
+(8–1,024), `variant_blocks` (64–16,384), `wetlands` (0–1), and, added with the placement table,
+the distances from the sea, in blocks, where the continentalness bands begin —
+`inland_mid_blocks` (mid-inland, default 200, 160–800), `inland_far_blocks` (far-inland, 1,000,
+900–3,000), `inland_interior_blocks` (the top of the scale, 5,000, 3,500–20,000) — and the
+wetland thresholds: `wetland_humidity` (the humidity band coordinate from which land counts as
+wet, 2.5, 1–4.5; full weight 1.5 bands above), `wetland_flat_share` (the share of land, flattest
+first, swamps may take, 0.35, 0.05–0.9) and `wetland_low_m` (the height above the sea at which
+lowland stops being low, 150 m, 20–600). The ranges keep the edges in order (the beach is below
+`inland_mid_blocks` below `inland_far_blocks` below `inland_interior_blocks`).
+
+**The class placement table** says where each Köppen class goes on the temperature and humidity
+bands. It is a datapack resource, `data/deeptime/deeptime/climate_mapping/placement.json`
+(source: `crates/deeptime-core/data/climate_mapping/placement.json`, beside `default.json`; the
+jar ships it and the core compiles the same file in as the default). Band coordinates: temperature
+0 … 5 over frozen | cold | temperate | warm | hot, humidity 0 … 5 over the five humidity bands.
+
+```text
+{
+  "schema": 1,
+  "_comment": "…",                       optional, ignored
+  "glacier_cap": 0.35,                   land above its equilibrium line (climate/glacier) is held at or below it
+  "temperature_ramps": {                 named ramps
+    "<name>": {
+      "base": 2.0, "span": 0.95,         b = base + span · Σ weightᵢ · clamp01((xᵢ − fromᵢ) / (toᵢ − fromᵢ))
+      "inputs": [                        base and base + span stay within [0, 5]; the weights add up to 1
+        { "of": "t_cold",                t_mean, t_warm (warmest month) or t_cold (coldest month), °C
+          "from": 0.0, "to": 18.0,       the temperatures for 0 and 1 (they differ; from may exceed to)
+          "weight": 1.0 }                optional, default 1
+      ]
+    }
+  },
+  "humidity_rules": {                    named rules; h starts as the aridity index P/PET's band coordinate
+    "<name>": {                          (0.03, 0.2, 0.5, 1, 2, 5 → 0 … 5 on a log scale), then, in this order:
+      "squeeze": [1.05, 2.55],           band 1 … 4 mapped linearly onto [lo, hi] (0 … 5)
+      "min": 2.05, "max": 3.0            raised to min, lowered to max; at least one of the three keys
+    }
+  },
+  "classes": {                           every land class Af … EF (31 of them; not "sea"), no others
+    "Af":  { "temperature": "tropical", "humidity": "rainforest" },
+    "BSk": { "temperature": { "when": { "of": "t_cold", "above": 0.0 },   the ramp "then" where the input is above
+                              "then": "temperate", "else": "boreal" },     the threshold, "else" elsewhere
+             "humidity": "steppe" }
+  }
+}
+```
+
+The default table reproduces what P1-09 first compiled in, operation for operation (a test holds
+the core's default to the old formulas bit for bit). A ramp is a `base`/`span` pair rather than two
+end points so that the coordinates the default writes are exactly the ones P1-09 computed.
+The sea's own temperature curve, the aridity → humidity anchors and the depth anchors of the sea
+stay in the core.
+
+*How a pack's table reaches the bake.* The bake is Rust and runs before the game (or the mod)
+can read a datapack, so the table travels in the **content bundle** (plan §5.4), the JSON the
+game passes with the preset: a dedicated server's first-start generation (`FirstStartGenerator`)
+reads the table from the server's resource manager (the highest-priority pack's copy; the jar's
+own when no pack overrides it) and adds it as the bundle's key `climate_placement`;
+`deeptime run --content <file>` takes the same key. `Preset::with_content` parses and checks it
+(an unusable table stops the run with the path of the problem, `$.climate_placement.classes.Af.temperature`)
+and the bake places the climate by it. Without the key the core's default is used, which is what
+the Create World editor's runs and the workbench do (they pass no bundle, as they pass no
+essentials). The table the bake used is recorded whole in the world data: `notes.bake.climate.placement`
+is `{"source": "default" | "content bundle", "table": {…}}`. The game does not read the table
+again: the world's biome inputs are already baked with it.
 
 At the world's first start the game builds `climate_mapping.json` next to the manifest and reads
 it on every later start (so a pack update never moves biomes in unexplored chunks): `schema` 1,

@@ -144,7 +144,7 @@ class AdvancedSettingsTest {
     void theCatalogueGroupsTheAdvancedSectionsLast() {
         List<EditorFields.Section> adv = EditorFields.advancedSections();
         assertEquals(List.of(EditorFields.Section.ADV_PLATES, EditorFields.Section.ADV_SURFACE, EditorFields.Section.ADV_CLIMATE,
-                EditorFields.Section.ADV_ROCKS, EditorFields.Section.ADV_DEPOSITS), adv);
+                EditorFields.Section.ADV_ROCKS, EditorFields.Section.ADV_DEPOSITS, EditorFields.Section.ADV_BIOMES), adv);
         assertEquals(Set.copyOf(adv), EditorFields.ADVANCED);
         boolean seen = false;
         for (EditorFields.Field f : EditorFields.ALL) {
@@ -310,6 +310,14 @@ class AdvancedSettingsTest {
             assertEquals("2", m.fieldText(EditorFields.byId("feature_deposits")));
             assertEquals("0.5", m.fieldText(EditorFields.byId("feature_strata")));
             assertEquals(java.util.Optional.of("medium"), m.choice(EditorFields.byId("province_strength")));
+            // The biome placement settings.
+            assertEquals("40", m.fieldText(EditorFields.byId("beach_width")));
+            assertEquals("300", m.fieldText(EditorFields.byId("inland_mid")));
+            assertEquals("1500", m.fieldText(EditorFields.byId("inland_far")));
+            assertEquals("8000", m.fieldText(EditorFields.byId("inland_interior")));
+            assertEquals("3", m.fieldText(EditorFields.byId("wetland_humidity")));
+            assertEquals("0.5", m.fieldText(EditorFields.byId("wetland_flat_share")));
+            assertEquals("250", m.fieldText(EditorFields.byId("wetland_lowland")));
             assertEquals(json, m.effectivePresetJson(), "nothing is added, dropped or rounded");
             assertEquals(json, ShareCode.decode(m.exportShareCode()));
         }
