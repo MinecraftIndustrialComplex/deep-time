@@ -27,6 +27,33 @@ pub struct Common {
     pub verbose: bool,
     /// `--set path=value` overrides of the preset (`apply_overrides`).
     pub set: Vec<String>,
+    /// `--history-mem`: the recorded history's frames held in memory at most, bytes
+    /// (`Session::set_history_budget`).
+    pub history_mem: Option<u64>,
+}
+
+/// The recorded history's line: its size, and what went to the spill file (P1-17).
+pub(crate) fn spill_line(s: &Session) -> CliResult<Option<String>> {
+    let spill = s.spill();
+    let (read, read_s, write_s) = spill.io_stats();
+    Ok(s.with_world(|w| {
+        w.history.as_ref().map(|h| {
+            format!(
+                "history frames={} history_mib={:.1} in_memory_mib={:.1} frames_on_disk={} spilled_mib={:.1} spilled_frames={} spill_read_mib={:.1} spill_read_s={:.2} spill_write_s={:.2} reserved_peak_mib={:.1} reserved_base_peak_mib={:.1}",
+                h.frame_count(),
+                h.bytes() as f64 / 1048576.0,
+                h.resident_bytes() as f64 / 1048576.0,
+                h.frames_on_disk(),
+                spill.written_bytes() as f64 / 1048576.0,
+                spill.written_frames(),
+                read as f64 / 1048576.0,
+                read_s,
+                write_s,
+                s.needed_peak() as f64 / 1048576.0,
+                s.needed_base_peak() as f64 / 1048576.0,
+            )
+        })
+    })?)
 }
 
 /// Applies `--set a.b.c=value` overrides to preset JSON (the value is JSON, else a string; missing
@@ -101,10 +128,12 @@ fn drive(
 /// Prints the deposit stage's census: sites per type next to the plan §8.6 expectation.
 pub fn print_census(census: &Value) {
     println!(
-        "deposits: province={} ({} provinces) count_mult={} — expected(§8.6) = Σ_tracts ρ_p50/1e5 · A_km2 · mean_F · count_mult",
+        "deposits: province={} ({} provinces) count_mult={} max_formed_per_survivor={} brine_flow_km={} — target(§8.6) = count_mult · ρ_p50/1e5 · Σ_tracts A_km2 survivors; formed = target / preservation",
         census["province"].as_str().unwrap_or("?"),
         census["provinces"],
         census["count_mult"],
+        census["max_formed_per_survivor"],
+        census["brine_flow_km"],
     );
     if let Some(h) = census["history"].as_object() {
         println!(
@@ -127,12 +156,16 @@ pub fn print_census(census: &Value) {
     for t in census["types"].as_array().into_iter().flatten() {
         let f = |k: &str| t[k].as_f64().unwrap_or(0.0);
         println!(
-            "deposits {:<30} sites={:>3} expected={:>7.2} with_provinces={:>7.2} drawn={:>3} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={}",
+            "deposits {:<30} sites={:>3} target={:>7.2} expected={:>7.2} at_positions={:>7.2} preservation={:.3} formed_expected={:>7.2} drawn={:>3} capped={} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={}",
             t["id"].as_str().unwrap_or("?"),
             f("sites"),
-            f("expected_formula"),
+            f("target"),
             f("expected"),
+            f("expected_at_positions"),
+            f("preservation"),
+            f("expected_formed"),
             f("drawn"),
+            t["capped"].as_bool().unwrap_or(false),
             f("tracts"),
             f("permissive_km2"),
             f("mean_f"),
@@ -253,7 +286,7 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         st.events.counts[0],
         st.events.counts[1],
         st.events.counts[2],
-        hist.map_or(0, |h| h.frames.len()),
+        hist.map_or(0, |h| h.frame_count()),
         hist.map_or(0.0, |h| h.bytes() as f64 / 1048576.0),
         z50,
         z90,
@@ -575,6 +608,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     if o.checkpoints {
         s.set_checkpoint_dir(Some(o.out.join("checkpoints")));
     }
+    s.set_history_budget(o.common.history_mem);
     drive(&s, o.common.verbose, |_, st| st == AdvanceStatus::Done)?;
     s.finalize_write()?;
     forward_log(&s, o.common.verbose);
@@ -593,32 +627,32 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         alloc::peak() as f64 / 1048576.0,
         started.elapsed().as_secs_f64()
     );
-    let world = s.checkpoint()?.world;
-    if let Some(line) = plates_line(&world) {
+    // The world as it stands, not a copy of it (a 32k full world is gigabytes).
+    let timings = s.stage_timings()?;
+    let lines = s.with_world(|world| {
+        let mut lines: Vec<String> = [
+            plates_line(world),
+            surface_line(world),
+            climate_line(world),
+            structure_line(world),
+            young_line(world),
+            amplify_line(world),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        lines.push(format!("timings {}", timings_line(&timings, world)));
+        lines
+    })?;
+    for line in lines {
         println!("deeptime run: {line}");
     }
-    if let Some(line) = surface_line(&world) {
-        println!("deeptime run: {line}");
-    }
-    if let Some(line) = climate_line(&world) {
-        println!("deeptime run: {line}");
-    }
-    if let Some(line) = structure_line(&world) {
-        println!("deeptime run: {line}");
-    }
-    if let Some(line) = young_line(&world) {
-        println!("deeptime run: {line}");
-    }
-    if let Some(line) = amplify_line(&world) {
+    if let Some(line) = spill_line(&s)? {
         println!("deeptime run: {line}");
     }
     if let Some(b) = manifest.notes.get(deeptime_core::bake::NOTES_KEY) {
         println!("deeptime run: {}", deeptime_core::bake::summary_line(b));
     }
-    println!(
-        "deeptime run: timings {}",
-        timings_line(&s.stage_timings()?, &world)
-    );
     if let Some(dir) = &o.viewer {
         let title = format!("Deep Time — run {} ({})", s.preset().name(), o.preset);
         deeptime_viewer::write_world_bundle(dir, &o.out, &title)?;
@@ -695,12 +729,15 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
                     .into());
                 }
             }
-            Session::resume(ck, opts, Arc::new(AllocGauge))?
+            let mut s = Session::resume(ck, opts, Arc::new(AllocGauge))?;
+            s.set_history_budget(o.common.history_mem);
+            s
         }
         (None, Some(preset)) => {
             let json = load_preset_with(preset, o.start.as_deref(), o.length_myr)?;
             let json = apply_overrides(&json, &o.common.set)?;
-            let s = Session::create(&json, "", opts, Arc::new(AllocGauge))?;
+            let mut s = Session::create(&json, "", opts, Arc::new(AllocGauge))?;
+            s.set_history_budget(o.common.history_mem);
             let stages = s.preset().stages();
             let target = group_of(&stages, &o.name).map(|g| g.start).ok_or_else(|| {
                 format!(
@@ -789,6 +826,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     }
     if let Some(line) = history_line(&ck.world) {
         println!("deeptime stage {}: history {line}", o.name);
+    }
+    if let Some(line) = spill_line(&s)? {
+        println!("deeptime stage {}: {line}", o.name);
     }
     println!(
         "deeptime stage {}: timings {}",

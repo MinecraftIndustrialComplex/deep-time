@@ -526,8 +526,11 @@ public final class EditorModel {
             else if (est.isEmpty())
                 out.add(Problem.of("editor.problem.estimating"));
             else if (capValid() && est.get().exceeds(capBytes()))
-                out.add(Problem.of("editor.problem.over_cap", Formats.bytes(est.get().peakBytes()), Formats.gib(capBytes())));
-            if (est.isPresent() && deps.machine().freeBytes() >= 0 && est.get().peakBytes() > deps.machine().freeBytes())
+                out.add(Problem.of("editor.problem.over_cap", Formats.bytes(est.get().baseBytes()), Formats.gib(capBytes())));
+            else if (capValid() && est.get().spillUnder(capBytes()) > 0)
+                out.add(Problem.warning("editor.warning.spill", Formats.bytes(est.get().spillUnder(capBytes()))));
+            if (est.isPresent() && deps.machine().freeBytes() >= 0
+                    && est.get().peakUnder(capBytes()) > deps.machine().freeBytes())
                 out.add(Problem.warning("editor.warning.low_memory", Formats.bytes(deps.machine().freeBytes())));
         }
         if (launchError != null)

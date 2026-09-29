@@ -88,6 +88,7 @@
   "deeptime.editor.problem.estimating": "Estimating memory and time…",
   "deeptime.editor.problem.over_cap": "Needs about %s, above the %s GiB cap: raise the cap or choose a smaller preset.",
   "deeptime.editor.warning.low_memory": "Only %s of memory is free now; the run may be slow or fail.",
+  "deeptime.editor.warning.spill": "Over the cap: about %s of the recorded history goes to disk in the world's folder while it runs. Slower, same planet.",
   "deeptime.editor.warning.launch_failed": "The run could not start: %s",
   "deeptime.editor.warning.placeholder": "Placeholder preset: not a simulated planet yet (the simulation stages are in progress).",
   "deeptime.editor.warning.cap_above_ram": "The cap is above this machine's %s GiB of memory.",

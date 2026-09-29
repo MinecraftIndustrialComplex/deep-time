@@ -357,12 +357,13 @@
     const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
     const f = (v, d) => (typeof v === 'number') ? v.toFixed(d) : esc(v ?? '—');
     const cols = [['id', 'type', v => esc(String(v).replace(/^deeptime:/, ''))], ['sites', 'sites', v => f(v, 0)],
-      ['expected_formula', 'ρ·A·F (§8.6)', v => f(v, 2)], ['expected', 'with provinces', v => f(v, 2)], ['drawn', 'drawn', v => f(v, 0)],
+      ['target', 'target ρ·A (§8.6)', v => f(v, 2)], ['expected', 'expected survivors', v => f(v, 2)],
+      ['preservation', 'preserved share', v => f(v, 3)], ['expected_formed', 'expected formed', v => f(v, 1)], ['drawn', 'formed', v => f(v, 0)],
       ['tracts', 'tracts', v => f(v, 0)], ['permissive_km2', 'permissive km²', v => f(v, 0)], ['mean_f', 'mean F', v => f(v, 2)],
       ['buried', 'buried', v => f(v, 0)], ['truncated', 'truncated', v => f(v, 0)], ['eroded', 'eroded', v => f(v, 0)],
       ['too_deep', 'too deep', v => f(v, 0)], ['children', 'children', v => f(v, 0)], ['guaranteed', 'guaranteed', v => f(v, 0)],
       ['dropped_separation', 'dropped', v => f(v, 0)]];
-    let h = `<p class="hint">Regional specialisation ${esc(c.province)} (${esc(c.provinces)} provinces of ≈${esc(c.province_km)} km) · count_mult ${esc(c.count_mult)} · ${esc(c.sites)} sites, ${esc(c.bodies)} bodies. ${esc(c.formula || '')}</p>`;
+    let h = `<p class="hint">Regional specialisation ${esc(c.province)} (${esc(c.provinces)} provinces of ≈${esc(c.province_km)} km) · count_mult ${esc(c.count_mult)} · at most ${esc(c.max_formed_per_survivor ?? '—')} formed per survivor · brine flow ${esc(c.brine_flow_km ?? '—')} km · ${esc(c.sites)} sites, ${esc(c.bodies)} bodies. ${esc(c.formula || '')}</p>`;
     h += '<table class="census"><tr>' + cols.map(x => `<th>${esc(x[1])}</th>`).join('') + '</tr>';
     for (const t of c.types || []) h += '<tr>' + cols.map(x => `<td>${x[2](t[x[0]])}</td>`).join('') + '</tr>';
     box.innerHTML = h + '</table>';

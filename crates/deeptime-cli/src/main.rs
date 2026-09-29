@@ -284,6 +284,10 @@ enum Command {
         /// Only what `parity/columns.json` holds per column.
         #[arg(long)]
         parity: bool,
+        /// Add each site's "why here" (its forming event and the events that caused it, read from
+        /// the world data's event log) to the answer; the workbench's click-to-inspect asks for it.
+        #[arg(long, conflicts_with = "parity")]
+        why: bool,
     },
     /// Write the Java↔Rust column parity fixture (plan §9.2): columns of a world-data folder as the
     /// column evaluator answers them, for `ColumnParityTest` and the real-planet GameTest.
@@ -341,6 +345,11 @@ struct CommonArgs {
     /// stage's parameters can be swept without re-running the earlier ones.
     #[arg(long = "set", value_name = "PATH=VALUE")]
     set: Vec<String>,
+    /// Holds at most this many bytes of the recorded history's frames in memory, whatever the
+    /// cap; the rest goes to a spill file in the run's folder (0 = every frame; default: the
+    /// memory cap decides). Results are the same either way; for measuring the spill.
+    #[arg(long)]
+    history_mem: Option<u64>,
 }
 
 impl CommonArgs {
@@ -350,6 +359,7 @@ impl CommonArgs {
             mem_cap: self.mem_cap,
             verbose: self.verbose,
             set: self.set.clone(),
+            history_mem: self.history_mem,
         }
     }
 }
@@ -445,7 +455,12 @@ fn main() -> ExitCode {
                 keep,
                 every_myr,
                 exit_when_done,
-                preview: preview.map(|script| watch::stage2::Preview { python, script }),
+                preview: preview.map(|script| watch::stage2::Preview {
+                    python,
+                    script,
+                    runs: None,
+                    deeptime: None,
+                }),
                 common: common.common(),
             }),
         ),
@@ -558,13 +573,18 @@ fn main() -> ExitCode {
             x,
             z,
             parity,
+            why,
         }) => match deeptime_format::ColumnWorld::open(&world_data) {
             Ok(w) => {
-                let v = if parity {
+                let mut v = if parity {
                     w.sample(x, z).to_json()
                 } else {
                     w.inspect(x, z)
                 };
+                if why && let Err(e) = attach_why(&mut v, &world_data) {
+                    eprintln!("deeptime inspect-column: {e}");
+                    return ExitCode::FAILURE;
+                }
                 println!(
                     "{}",
                     serde_json::to_string_pretty(&v).expect("a column serialises")
@@ -734,6 +754,29 @@ fn preset_command(action: PresetAction) -> run::CliResult<()> {
     Ok(())
 }
 
+/// `inspect-column --why`: puts `why` on each of the answer's sites: the forming event and its
+/// cause chain (four links deep, as the 3D export's site cards do) from the world data's event log.
+fn attach_why(v: &mut serde_json::Value, world_data: &std::path::Path) -> Result<(), String> {
+    use deeptime_format::events::{EventId, EventLog};
+    let Some(sites) = v["sites"].as_array_mut().filter(|s| !s.is_empty()) else {
+        return Ok(());
+    };
+    let log = EventLog::load(world_data).map_err(|e| e.to_string())?;
+    for site in sites {
+        let formed = site["forming_event"]
+            .as_u64()
+            .and_then(|f| log.get(EventId(f)));
+        site["why"] = match formed {
+            Some(e) => serde_json::json!({
+                "forming_event": e.to_json(),
+                "chain": log.cause_chain(e.id, 4).iter().map(|c| c.to_json()).collect::<Vec<_>>(),
+            }),
+            None => serde_json::json!({ "error": "the forming event is not in the event log" }),
+        };
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use clap::CommandFactory;
@@ -768,6 +811,7 @@ mod tests {
             mem_cap: 0,
             verbose: false,
             set: Vec::new(),
+            history_mem: None,
         }
     }
 
@@ -1091,7 +1135,7 @@ mod tests {
             end.world
                 .history
                 .as_ref()
-                .is_some_and(|h| h.frames.len() == 2)
+                .is_some_and(|h| h.frame_count() == 2)
         );
         assert!(
             dir.join("viewer/keyframes/kf-0-surface_drainage.png")
@@ -1285,6 +1329,20 @@ mod tests {
         assert_eq!(v["wx"], -2047);
         assert!(v["layers"]["climate/temperature"]["bilinear"].is_number());
         assert!(v["strata"].as_array().is_some_and(|a| !a.is_empty()));
+        // `--why`: a column inside a site's box gets the site's forming event and chain.
+        if let Some((sites, _)) = deeptime_format::sites::read_sites(&dir.join("world")).unwrap()
+            && let Some(site) = sites.first()
+        {
+            let [cx, _, cz] = site.center;
+            let mut v = w.inspect(i64::from(cx), i64::from(cz));
+            super::attach_why(&mut v, &dir.join("world")).unwrap();
+            let held = v["sites"].as_array().unwrap();
+            assert!(
+                held.iter().any(|s| s["id"] == site.id),
+                "the site holds its centre"
+            );
+            assert!(held.iter().all(|s| s["why"].is_object()), "{v}");
+        }
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

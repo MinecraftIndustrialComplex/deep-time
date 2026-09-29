@@ -2,8 +2,9 @@
 //! The shared state every stage reads and writes (plan §8 `WorldState`): the simulated clock, the
 //! named fields stages exchange and keyframes are drawn from, the event log written as geology
 //! (writer 1, plan §5.5) and the site registry (§5.6). It is what a checkpoint stores, so every
-//! field serialises with postcard; stages add their own state here as they arrive (plates in
-//! P1-03, the L1 surface in P1-04, …).
+//! field serialises with postcard (the recorded history travels beside the body, see
+//! `checkpoint.rs`); stages add their own state here as they arrive (plates in P1-03, the L1
+//! surface in P1-04, …).
 
 use std::collections::BTreeMap;
 
@@ -65,7 +66,10 @@ pub struct WorldState {
     /// The deep-time surface on L1 (plan §8.2: offset, regolith, strata log), once the surface
     /// stage has started (P1-04).
     pub surface: Option<crate::surface::SurfaceState>,
-    /// The deposit engine's field history recorded by the history stages (P1-04 on).
+    /// The deposit engine's field history recorded by the history stages (P1-04 on). Not in the
+    /// postcard body: a checkpoint carries its head in the body and its frames in sections of
+    /// their own, streamed (`checkpoint.rs`), since frames may be on disk (P1-17).
+    #[serde(skip)]
     pub history: Option<crate::deposits::recorded::RecordedHistory>,
     next_event_seq: u64,
     next_site_id: SiteId,
