@@ -322,10 +322,11 @@
       return frames.get(key);
     }
 
-    // Pixel (px, py) of a keyframe is centred on lon −180° + 360°·px/w, lat 90° − 180°·py/h.
+    // Pixel (px, py) of a keyframe is centred on lon 360°·px/w (plan §5.2: the seam is 0°) and
+    // lat 90° − 180°·py/h.
     function toCanvas(lat, lon, f) {
       const s = canvas.width / f.w;
-      const px = ((((lon + 180) % 360) + 360) % 360) / 360 * f.w;
+      const px = ((lon % 360) + 360) % 360 / 360 * f.w;
       const py = (90 - lat) / 180 * f.h;
       return [(px + 0.5) * s, (py + 0.5) * s];
     }
@@ -437,7 +438,7 @@
       return '<table class="kv">' + rows.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${b}</td></tr>`).join('') + '</table>';
     }
     function placeText(p) {
-      if (p.type === 'point') return `${Math.abs(p.lat).toFixed(2)}° ${p.lat >= 0 ? 'N' : 'S'}, ${Math.abs(p.lon).toFixed(2)}° ${p.lon >= 0 ? 'E' : 'W'}`;
+      if (p.type === 'point') return `${Math.abs(p.lat).toFixed(2)}° ${p.lat >= 0 ? 'N' : 'S'}, longitude ${p.lon.toFixed(2)}°`;
       if (p.type === 'site') return `<a class="ref" data-site="${p.site}">site ${p.site}</a>`;
       if (p.type === 'global') return 'global';
       return esc(`${p.type} ${p[p.type === 'region' ? 'mask' : p.type]}`);
@@ -490,7 +491,7 @@
         ['kind', esc(s.kind)],
         ['type', esc(s.deposit_type)],
         ['centre', esc(`x ${s.center[0]}, y ${s.center[1]}, z ${s.center[2]}`)],
-        ['lat, lon', esc(`${s.lat_lon[0].toFixed(2)}, ${s.lat_lon[1].toFixed(2)}`)],
+        ['lat, lon', esc(`${s.lat_lon[0].toFixed(2)}°, ${s.lat_lon[1].toFixed(2)}° (the seam is 0°)`)],
         ['bounds', esc(`${s.aabb[0].join(', ')} … ${s.aabb[1].join(', ')}`)],
         ['products', products],
         ['parent', s.parent === null ? '—' : `<a class="ref" data-site="${s.parent}">site ${s.parent}</a>`],

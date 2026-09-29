@@ -237,8 +237,8 @@ Timelapse frames (plan §6.1), written while a run goes; frame `n` counts from 0
 `DTKF` fixed fields: `u32 n, u32 w, u32 h, u32 L layers, f64 t (years)`. Section 0 is a string
 table of `1 + L` strings: the stage, then the layer names in section order. Sections `1 … L` are
 one LZ4 raw block each (as tile packs), decoding to `w·h·4` bytes of RGBA8, row-major, row 0 north.
-Pixel (px, py) is centred on longitude −180° + 360°·px/w and latitude 90° − 180°·py/h, the nearest
-cell of the field it was drawn from, coloured with `crates/deeptime-viewer/assets/ramps.json`
+Pixel (px, py) is centred on longitude 360°·px/w (the seam is 0°, plan §5.2) and latitude
+90° − 180°·py/h, the nearest cell of the field it was drawn from, coloured with `crates/deeptime-viewer/assets/ramps.json`
 (the same ramps the viewer and the game use); alpha 0 is nodata. Frames are taken when the clock
 passes the next multiple of the preset's keyframe interval (counted from the run's start) and at
 the end of each stage.

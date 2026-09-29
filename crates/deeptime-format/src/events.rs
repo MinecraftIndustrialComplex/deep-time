@@ -76,7 +76,8 @@ impl fmt::Display for EventId {
 pub enum Place {
     /// The whole planet (a glaciation, an atmosphere switch).
     Global,
-    /// Degrees; north positive, east positive (block z = −lat/90 · C/4, x = lon/360 · C).
+    /// Degrees: latitude north positive; longitude in [0°, 360°) east of the seam, as plan §5.2
+    /// (block x = lon/360 · C − C/2, z = −lat/90 · C/4).
     Point {
         lat: f32,
         lon: f32,
@@ -990,10 +991,11 @@ impl EventLog {
     }
 }
 
-/// The grid cell (nearest point sample) at a latitude and longitude, x wrapped, z clamped.
+/// The grid cell (nearest point sample) at a latitude and longitude (plan §5.2: longitude
+/// 360°·(x + C/2)/C, so the seam is 0°), x wrapped, z clamped.
 pub fn cell_of(grid: &GridDesc, lat: f32, lon: f32) -> (u32, u32) {
     let c = grid.circumference() as f64;
-    let x = f64::from(lon) / 360.0 * c;
+    let x = f64::from(lon) / 360.0 * c - c / 2.0;
     let z = -f64::from(lat) / 90.0 * c / 4.0;
     let r = f64::from(grid.r);
     let i = ((x - grid.origin_block_x as f64) / r).round() as i64;
@@ -1217,19 +1219,22 @@ mod tests {
         let grid = GridDesc::for_planet("L1", 1024, 16).unwrap(); // 64 × 32
         let log = EventLog::from_events(vec![
             Event::new(EventId::new(1, 0), 0.0, "deeptime:a", "deeptime:s")
-                .at(Place::Point { lat: 0.0, lon: 0.0 }),
+                .at(Place::Point {
+                    lat: 0.0,
+                    lon: 180.0,
+                }),
             Event::new(EventId::new(1, 1), 1.0, "deeptime:a", "deeptime:s")
                 .at(Place::Site { site: 3 }),
             Event::new(EventId::new(1, 2), 2.0, "deeptime:a", "deeptime:s"),
         ])
         .unwrap();
-        let idx = log.cell_index(&grid, |s| (s == 3).then_some([0.0, 0.0]));
-        // lat 0, lon 0 is block (0, 0): cell (32, 16).
-        assert_eq!(cell_of(&grid, 0.0, 0.0), (32, 16));
+        let idx = log.cell_index(&grid, |s| (s == 3).then_some([0.0, 180.0]));
+        // lat 0, lon 180° is block (0, 0): cell (32, 16).
+        assert_eq!(cell_of(&grid, 0.0, 180.0), (32, 16));
         assert_eq!(idx.at(32, 16), &[EventId::new(1, 0), EventId::new(1, 1)]);
-        // The seam: lon ±180 is column 0; the poles clamp.
-        assert_eq!(cell_of(&grid, 90.0, -180.0), (0, 0));
-        assert_eq!(cell_of(&grid, -90.0, 180.0), (0, 31));
+        // The seam is 0° (and 360°): column 0; the poles clamp.
+        assert_eq!(cell_of(&grid, 90.0, 0.0), (0, 0));
+        assert_eq!(cell_of(&grid, -90.0, 360.0), (0, 31));
     }
 
     #[test]

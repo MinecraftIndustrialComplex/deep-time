@@ -27,7 +27,7 @@ pub fn keyframe_path(n: u32) -> String {
 }
 
 /// One timelapse frame: every layer as RGBA8, `w × h × 4` bytes, row-major, row 0 = north edge,
-/// column 0 = the seam (longitude −180°).
+/// column 0 = the seam (longitude 0°, plan §5.2).
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeyframeImage {
     /// Frame number within the run, from 0.

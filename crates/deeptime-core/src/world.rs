@@ -116,10 +116,12 @@ impl WorldState {
         Ok(id)
     }
 
-    /// Block (x, z) of a latitude and longitude on this planet (x = lon/360·C, z = −lat/90·C/4).
+    /// Block (x, z) of a latitude and longitude on this planet: plan §5.2's longitude
+    /// 360°·(x + C/2)/C (the seam is 0°), so x = lon/360·C − C/2 (wrapped into [−C/2, C/2)) and
+    /// z = −lat/90·C/4.
     pub fn block_of(&self, lat: f64, lon: f64) -> (i32, i32) {
         let c = f64::from(self.circumference);
-        let x = (lon / 360.0 * c).round() as i64;
+        let x = (lon / 360.0 * c - c / 2.0).round() as i64;
         let half = i64::from(self.circumference / 2);
         let x = (x + half).rem_euclid(i64::from(self.circumference)) - half;
         let z = (-lat / 90.0 * c / 4.0).round() as i64;
@@ -149,8 +151,10 @@ mod tests {
         assert!(w.emit(forged).is_err());
         let not_finite = w.event(f64::NAN, "deeptime:x", "deeptime:y");
         assert!(w.emit(not_finite).is_err());
-        assert_eq!(w.block_of(0.0, 180.0), (-2048, 0));
-        assert_eq!(w.block_of(90.0, -90.0), (-1024, -1024));
+        assert_eq!(w.block_of(0.0, 180.0), (0, 0));
+        assert_eq!(w.block_of(0.0, 0.0), (-2048, 0), "the seam");
+        assert_eq!(w.block_of(0.0, 360.0), (-2048, 0));
+        assert_eq!(w.block_of(90.0, 90.0), (-1024, -1024));
         assert_eq!(w.next_site_id(), 0);
     }
 }

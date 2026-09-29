@@ -45,9 +45,9 @@ impl KeyframePolicy {
 }
 
 /// Renders `layers` of `world.fields` (those present) at `size`. Pixel (px, py) is centred on
-/// longitude −180° + 360°·px/w and latitude 90° − 180°·py/h (as a tile pack's cell is a point
-/// sample, `FORMAT.md`) and takes the nearest grid cell, coloured with the layer's ramp; NaN is
-/// transparent. `None` when none of the layers exists yet.
+/// longitude 360°·px/w (the seam is 0°, plan §5.2) and latitude 90° − 180°·py/h (as a tile
+/// pack's cell is a point sample, `FORMAT.md`) and takes the nearest grid cell, coloured with the
+/// layer's ramp; NaN is transparent. `None` when none of the layers exists yet.
 pub fn render(
     world: &WorldState,
     ramps: &Ramps,
