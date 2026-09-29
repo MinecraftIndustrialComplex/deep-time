@@ -136,13 +136,19 @@ impl Run {
     fn list_json(&self, queue_position: Option<usize>) -> Value {
         let (frames, events, progress, status) = self.live.summary();
         let meta = self.live.meta();
+        // The planet seed, for the run card (the preset's top-level `seed`, where it has one).
+        let seed = serde_json::from_str::<Value>(&self.preset_json)
+            .ok()
+            .and_then(|v| v.get("seed").cloned())
+            .unwrap_or(Value::Null);
         json!({
             "id": self.id, "label": self.label, "created_utc": self.created_utc,
             "preset": meta["preset"], "start": meta["start"], "length_myr": meta["length_myr"],
-            "stages": meta["stages"], "circumference": meta["circumference"],
+            "stages": meta["stages"], "circumference": meta["circumference"], "seed": seed,
             "share_code": self.share_code, "state": status["state"], "message": status["message"],
             "seconds": status["seconds"], "frames": frames, "events": events,
             "total_permille": progress["total_permille"], "t_years": progress["t_years"],
+            "elapsed_ms": progress["elapsed_ms"], "eta_ms": progress["eta_ms"],
             "queue_position": queue_position,
         })
     }
