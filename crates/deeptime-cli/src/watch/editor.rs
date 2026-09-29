@@ -644,7 +644,8 @@ mod tests {
         assert_eq!(r["can_run"], false, "{r:#}");
         assert_eq!(r["cap_bytes"], DEFAULT_MEM_CAP);
         let reason = r["problems"][0].as_str().unwrap();
-        assert!(reason.starts_with("needs about 5."), "{reason}");
+        assert!(reason.starts_with("needs about "), "{reason}");
+        assert!(reason.contains("for the server itself"), "{reason}");
         assert!(reason.contains("the memory cap is 4 GiB"), "{reason}");
         assert!(reason.contains("raise the cap in Memory"), "{reason}");
         assert_eq!(r["problems"].as_array().unwrap().len(), 1);
