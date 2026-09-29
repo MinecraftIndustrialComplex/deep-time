@@ -963,4 +963,94 @@ mod tests {
         .unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
     }
+    /// P1-14: `stage deposits --preset pipeline_quick_16k` runs plates, surface and structure and
+    /// then the deposit stage on the history they recorded; the census names the recorded history,
+    /// the viewer bundle carries the deposit layers and the sites, and a checkpoint taken before
+    /// the deposit stage continues with `stage deposits --in`.
+    #[test]
+    fn deposit_stage_reads_the_recorded_history() {
+        let dir = tmp("deposits-real");
+        std::fs::create_dir_all(&dir).unwrap();
+        let json = super::run::load_preset_with(
+            "pipeline_quick_16k",
+            Some("scattered_continents"),
+            Some(20.0),
+        )
+        .unwrap();
+        let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        v["resolution"]["l0_samples"] = serde_json::json!(3000);
+        v["resolution"]["l1_r"] = serde_json::json!(64);
+        v["keyframes"]["size"] = serde_json::json!([64, 32]);
+        v["keyframes"]["every_myr"] = serde_json::json!(10.0);
+        v["deposits"]["count_mult"] = serde_json::json!(200.0);
+        let preset = dir.join("small.json");
+        std::fs::write(&preset, v.to_string()).unwrap();
+        let stage = |name: &str,
+                     input: Option<std::path::PathBuf>,
+                     preset: Option<String>,
+                     out: Option<std::path::PathBuf>,
+                     viewer: Option<std::path::PathBuf>| {
+            super::run::stage(&super::run::StageOptions {
+                name: name.into(),
+                input,
+                preset,
+                start: None,
+                length_myr: None,
+                max_steps: None,
+                out,
+                viewer,
+                work: None,
+                common: quiet(),
+            })
+        };
+        // From the preset: the stages before it run first.
+        stage(
+            "deposits",
+            None,
+            Some(preset.to_string_lossy().into_owned()),
+            Some(dir.join("end.dtcp")),
+            Some(dir.join("viewer")),
+        )
+        .unwrap();
+        let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
+        assert_eq!(
+            end.stage_names,
+            ["plates", "surface", "structure", "deposits"]
+        );
+        assert_eq!(end.next_stage_name(), None, "the run is complete");
+        assert!(
+            end.world.history.is_some(),
+            "the history stays in the world"
+        );
+        let census: serde_json::Value =
+            serde_json::from_str(&end.world.notes[deeptime_core::deposits::STAGE_NAME]).unwrap();
+        assert_eq!(census["history"]["source"], "recorded");
+        assert_eq!(census["skipped"], serde_json::json!([]));
+        assert!(
+            std::fs::read_dir(dir.join("viewer/keyframes"))
+                .unwrap()
+                .any(|e| e
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .contains("deposits_sites"))
+        );
+        assert!(dir.join("viewer/sites.json").is_file());
+        assert!(dir.join("viewer/report.js").is_file());
+        // The strata inspector stays with the structure bundle (its layers are ~20 MB).
+        assert!(!dir.join("viewer/layers/strata.js").exists());
+        // From a checkpoint taken before the stage: the group's end, next stage deposits.
+        stage(
+            "structure",
+            None,
+            Some(preset.to_string_lossy().into_owned()),
+            Some(dir.join("group.dtcp")),
+            None,
+        )
+        .unwrap();
+        let group = deeptime_core::checkpoint::Checkpoint::read(&dir.join("group.dtcp")).unwrap();
+        assert_eq!(group.next_stage_name(), Some("deposits"));
+        stage("deposits", Some(dir.join("group.dtcp")), None, None, None).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }
