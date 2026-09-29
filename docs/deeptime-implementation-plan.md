@@ -1079,6 +1079,18 @@ counter's peak is reported in `bench.json` and the progress block. The native he
 the JVM heap, so a player needs RAM for both; the editor shows the machine's free memory beside the
 estimate.
 
+*As built in P1-17 (history spill; decisions log 2026-09-29, "Spill history to the SSD"):* the one
+state that grows with a run's length is the deposit engine's recorded history (P1-04: a packed frame
+every `surface.frame_every_myr`, ~13 B per L1 cell per frame). It is held in memory while the cap
+allows; when a stage's reservation would not fit, or the gauge is within `cap/16` of the cap after a
+step, the oldest frames go to an anonymous spill file in the run's folder (the staging folder in the
+game) and are read back on demand, the next one read ahead. A run over its cap therefore gets slower
+instead of failing; only a base (everything but the history) that does not fit still fails cleanly.
+`estimate` reports `base_bytes`, `history_bytes` and, under a cap (`session::estimate_for`),
+`peak_bytes` = base + the history that fits and `spill_bytes` = the rest; the editor blocks a run only
+when its base is over the cap. Checkpoints (schema 6) carry the frames in sections of their own,
+streamed. Results are bit-identical whatever the cap (STATUS.md, build log 2026-09-29).
+
 **Disk** (raw, before LZ4). 16k quick: `elevation` and `water_level` at L3 are 33.6 M × 2 B =
 64 MiB each; the five biome-parameter layers at L2 (2048 × 1024 × 2 B) are 4 MiB each; horizon stacks
 (K = 32, 3 B per horizon) at L1 (1024 × 512 × 96 B) are 48 MiB. 32k full: `elevation` and

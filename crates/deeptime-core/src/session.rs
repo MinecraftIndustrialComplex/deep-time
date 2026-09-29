@@ -777,6 +777,9 @@ impl Session {
             "frames_on_disk": h.frames_on_disk(),
             "spilled_bytes": self.spill.written_bytes(),
             "spilled_frames": self.spill.written_frames(),
+            "spill_read_bytes": self.spill.io_stats().0,
+            "spill_read_seconds": self.spill.io_stats().1,
+            "spill_write_seconds": self.spill.io_stats().2,
             "reserved_peak_bytes": self.needed_peak(),
             "reserved_base_peak_bytes": self.needed_base_peak(),
         }))

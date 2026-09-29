@@ -30,6 +30,8 @@ class EditorModelTest {
 
     /** A fake estimate: the JSON's length as peak bytes unless set. */
     long peak = 100_000_000L;
+    /** The fake estimate's recorded history (spillable, P1-17); -1 leaves the fields out. */
+    long history = -1;
     boolean natives = true;
     final List<String> estimated = new ArrayList<>();
     final List<FakeRunHandle> launched = new ArrayList<>();
@@ -43,7 +45,9 @@ class EditorModelTest {
             estimated.add(json);
             if (json.contains("\"poison\""))
                 throw new IllegalArgumentException("$.poison: unknown key");
-            return "{\"peak_bytes\":" + peak + ",\"stages\":[{\"bytes\":1,\"name\":\"dummy_drift\",\"seconds\":5.0},"
+            String spill = history < 0 ? ""
+                    : ",\"base_bytes\":" + (peak - history) + ",\"history_bytes\":" + history;
+            return "{\"peak_bytes\":" + peak + spill + ",\"stages\":[{\"bytes\":1,\"name\":\"dummy_drift\",\"seconds\":5.0},"
                     + "{\"bytes\":2,\"name\":\"dummy_erode\",\"seconds\":5.0}]}";
         }, (json, out, threads, cap) -> {
             FakeRunHandle h = new FakeRunHandle(out);
@@ -150,6 +154,43 @@ class EditorModelTest {
         assertFalse(m.canRun());
         m.setCapText("5,5");
         assertTrue(m.capValid(), "a comma works as the decimal point");
+    }
+
+    /**
+     * The recorded history spills to disk over the cap (P1-17): only the base must fit, a run
+     * whose history does not is allowed with a warning, and one whose base does not is blocked
+     * naming the base.
+     */
+    @Test
+    void onlyTheBaseMustFitTheCap() {
+        peak = 7 * GIB;
+        history = 3 * GIB;
+        EditorModel m = model();
+        m.setStart("supercontinent");
+        m.setLengthText("1000");
+        m.refreshEstimate();
+        Estimate e = m.estimate().orElseThrow();
+        assertEquals(4 * GIB, e.baseBytes());
+        assertEquals(4 * GIB, m.capBytes());
+        assertTrue(m.canRun(), () -> m.problems().toString());
+        assertTrue(has(m.problems(), "editor.warning.spill"));
+        assertEquals(4 * GIB, e.peakUnder(m.capBytes()));
+        assertEquals(3 * GIB, e.spillUnder(m.capBytes()));
+        m.setCapText("5.5");
+        assertEquals(5.5 * GIB, e.peakUnder(m.capBytes()), 1.0);
+        assertEquals(1.5 * GIB, e.spillUnder(m.capBytes()), 1.0);
+        m.setCapText("16");
+        assertFalse(has(m.problems(), "editor.warning.spill"), "it all fits");
+        assertEquals(7 * GIB, e.peakUnder(m.capBytes()));
+        assertEquals(0, e.spillUnder(m.capBytes()));
+        m.setCapText("3");
+        assertFalse(m.canRun());
+        assertTrue(has(m.problems(), "editor.problem.over_cap"));
+        // An estimate without the fields (a library from before the spill): the peak is all base.
+        Estimate old = Estimate.parse("{\"peak_bytes\":5,\"stages\":[]}");
+        assertEquals(5, old.baseBytes());
+        assertEquals(0, old.historyBytes());
+        assertTrue(old.exceeds(4));
     }
 
     @Test

@@ -225,7 +225,7 @@ final class SetupPage implements PlanetEditorScreen.Page {
         // The estimate and the machine.
         Optional<Estimate> est = model.estimate();
         MachineInfo m = model.deps().machine();
-        Component estimate = est.map(e -> (Component) Lang.tr("editor.estimate", Formats.bytes(e.peakBytes()),
+        Component estimate = est.map(e -> (Component) Lang.tr("editor.estimate", Formats.bytes(e.peakUnder(model.capBytes())),
                         Formats.gib(model.capBytes()), Formats.seconds(e.seconds()), e.stages().size()))
                 .orElse(model.estimateError().map(err -> (Component) Lang.tr("editor.estimate.error"))
                         .orElse(Lang.tr("editor.estimate.pending")));

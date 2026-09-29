@@ -35,16 +35,22 @@ pub struct Common {
 /// The recorded history's line: its size, and what went to the spill file (P1-17).
 fn spill_line(s: &Session) -> CliResult<Option<String>> {
     let spill = s.spill();
+    let (read, read_s, write_s) = spill.io_stats();
     Ok(s.with_world(|w| {
         w.history.as_ref().map(|h| {
             format!(
-                "history frames={} history_mib={:.1} in_memory_mib={:.1} frames_on_disk={} spilled_mib={:.1} spilled_frames={}",
+                "history frames={} history_mib={:.1} in_memory_mib={:.1} frames_on_disk={} spilled_mib={:.1} spilled_frames={} spill_read_mib={:.1} spill_read_s={:.2} spill_write_s={:.2} reserved_peak_mib={:.1} reserved_base_peak_mib={:.1}",
                 h.frame_count(),
                 h.bytes() as f64 / 1048576.0,
                 h.resident_bytes() as f64 / 1048576.0,
                 h.frames_on_disk(),
                 spill.written_bytes() as f64 / 1048576.0,
                 spill.written_frames(),
+                read as f64 / 1048576.0,
+                read_s,
+                write_s,
+                s.needed_peak() as f64 / 1048576.0,
+                s.needed_base_peak() as f64 / 1048576.0,
             )
         })
     })?)
