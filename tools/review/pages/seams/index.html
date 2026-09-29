@@ -8,7 +8,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Deep Time — How the seams work</title>
-<meta name="description" content="An interactive explainer of Deep Time's planet mapping: the east–west seam closed by Toroidal World, the soft polar caps, the Nether and End, and what has been verified.">
+<meta name="description" content="Where Deep Time's east–west seam is and what happens when you, a mob or a ship crosses it: your screen, your F3 coordinates, the server and the chunks. Plus the polar caps, the Nether and End, and what has been verified.">
 <style>
 :root{
   color-scheme: light;
@@ -23,6 +23,7 @@
   --pend:#7A5300; --pend-bg:#F4E5C2;
   --unv:#56468A; --unv-bg:#E5E0F3;
   --later:#43545D; --later-bg:#E1E7E6;
+  --code:#1D5A94; --code-bg:#DCE8F5;
   --btn:#13222A; --btn-ink:#F8FAF9;
   --f-display:"Archivo","Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif;
   --f-body:"Source Serif 4","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
@@ -42,6 +43,7 @@
     --pend:#F3C467; --pend-bg:#3A2F12;
     --unv:#BDAAF2; --unv-bg:#2A2444;
     --later:#A8B7BD; --later-bg:#22313A;
+    --code:#8EC5F7; --code-bg:#172B3E;
     --btn:#E2EAEC; --btn-ink:#0E161A;
   }
 }
@@ -58,6 +60,7 @@
   --pend:#F3C467; --pend-bg:#3A2F12;
   --unv:#BDAAF2; --unv-bg:#2A2444;
   --later:#A8B7BD; --later-bg:#22313A;
+  --code:#8EC5F7; --code-bg:#172B3E;
   --btn:#E2EAEC; --btn-ink:#0E161A;
 }
 *,*::before,*::after{box-sizing:border-box}
@@ -153,6 +156,7 @@ canvas:focus-visible{outline:2px solid var(--seam);outline-offset:3px}
 .pill.unv{background:var(--unv-bg);color:var(--unv)}
 .pill.later{background:var(--later-bg);color:var(--later)}
 .pill.pole{background:var(--ice);color:var(--ink-2)}
+.pill.code{background:var(--code-bg);color:var(--code)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-family:var(--f-display);font-size:.8rem;color:var(--ink-2);margin:0;padding:0;list-style:none}
 .legend li{display:inline-flex;align-items:center;gap:7px}
 .key{width:16px;height:10px;border-radius:2px;display:inline-block;flex:none}
@@ -200,6 +204,24 @@ svg text{font-family:var(--f-mono)}
 footer{border-top:1px solid var(--rule);padding-block:34px 60px;color:var(--ink-3);font-size:.9rem}
 footer ul{margin:8px 0 0;padding-left:1.1em}
 footer li{margin:2px 0}
+/* the wrap explainer */
+.linkcard{display:grid;gap:4px;padding:14px 18px;border:1px solid var(--rule);border-left:4px solid var(--seam);border-radius:8px;background:var(--panel);text-decoration:none;max-width:680px;color:var(--ink)}
+.linkcard:hover{border-color:var(--ink-3);border-left-color:var(--seam)}
+.linkcard strong{font-family:var(--f-display);font-size:1.12rem;font-weight:700}
+figure{margin:0}
+.where-figs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+@media (max-width:760px){.where-figs{grid-template-columns:minmax(0,1fr)}}
+.where-figs svg{display:block;width:100%;max-width:560px;height:auto;margin-inline:auto}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:12px;counter-reset:step}
+.steps>li{counter-increment:step;display:grid;grid-template-columns:2em minmax(0,1fr);gap:6px 12px;background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:12px 16px;min-width:0}
+.steps>li::before{content:counter(step);grid-row:1 / span 2;font-family:var(--f-display);font-weight:760;font-size:1.35rem;color:var(--seam);line-height:1.15}
+.steps h3{font-size:1.02rem;align-self:center}
+.said{display:grid;grid-template-columns:7em minmax(0,1fr);gap:5px 14px;margin:0}
+.said dt{font-family:var(--f-display);font-size:.8rem;font-weight:650;color:var(--ink-3);padding-top:3px}
+.said dd{margin:0;font-size:.95rem;color:var(--ink-2);min-width:0;overflow-wrap:anywhere}
+@media (max-width:560px){.steps>li{grid-template-columns:minmax(0,1fr);padding:12px 14px}.steps>li::before{grid-row:auto}.said{grid-template-columns:minmax(0,1fr);gap:0}.said dd{margin-bottom:8px}}
+.subhead{font-size:1.25rem;margin:44px 0 12px}
+.f-cap{fill:var(--cap)}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 </style>
 </head>
@@ -209,7 +231,7 @@ footer li{margin:2px 0}
   <div class="wrap bar-in">
     <a class="brand" href="#top">Deep Time <span>seams</span></a>
     <nav class="nav" aria-label="Sections">
-      <a href="#map">Map</a><a href="#seam">The seam</a><a href="#round">Why round</a><a href="#poles">Poles</a><a href="#dims">Nether &amp; End</a><a href="#status">Status</a>
+      <a href="#where">Where</a><a href="#cross">Crossing</a><a href="#lap">All the way round</a><a href="#numbers">Numbers</a><a href="#map">Map</a><a href="#poles">Poles</a><a href="#dims">Nether &amp; End</a><a href="#status">Status</a>
     </nav>
     <div class="seg" role="group" aria-label="Planet size">
       <button type="button" id="c16" data-c="16384" aria-pressed="true">16,384 <small>singleplayer</small></button>
@@ -221,22 +243,237 @@ footer li{margin:2px 0}
 <header class="wrap hero" id="top" data-ss-section="top">
   <p class="eyebrow" data-ss-id="top-p-1">Deep Time · review page · 2026-09-28 · P0-06</p>
   <h1 data-ss-id="top-h1-1">How Deep Time's seams work</h1>
-  <p class="lede" data-ss-id="top-p-2">Deep Time plays a whole planet on Minecraft's flat block grid. East–west it loops: walk <span data-v="C">16,384</span> blocks east and you are back where you started, with no edge anywhere. North–south it cannot loop, so the poles get a soft cap. Every figure below is interactive, and every number follows the planet size picked in the bar above.</p>
+  <p class="lede" data-ss-id="top-p-2">The overworld loops east–west. The loop is closed in one place: a straight north–south line at x = <span data-v="halfC">8,192</span>, which is the same line as x = <span data-v="negHalfC">−8,192</span>. You can walk up to it. Keep walking and you are on the other side: no wall, no loading screen, no teleport. The land carries straight on. The only thing that jumps is the position F3 shows (its XYZ, Block and Chunk lines). The loop is made by the Toroidal World mod (TW).</p>
+  <a class="linkcard" href="https://spacesheep.dev/@benmac/deeptime-wrap" data-ss-id="top-link-1">
+    <span class="eyebrow">Companion page</span>
+    <strong>How the wrap works, in pictures →</strong>
+    <span class="small">spacesheep.dev/@benmac/deeptime-wrap: the same mechanics as a graphics-first walkthrough.</span>
+  </a>
   <dl class="gist">
-    <div data-ss-id="top-item-1"><dt><span class="sw" style="background:var(--seam)"></span>East–west: a seamless loop</dt><dd>The overworld is a cylinder in x, closed by the Toroidal World mod. Mountains, rivers and biomes run straight through the seam; mobs, items and ships cross it.</dd></div>
-    <div data-ss-id="top-item-2"><dt><span class="sw" style="background:var(--cap)"></span>North–south: a soft cap</dt><dd>From 75° latitude a pushback toward the equator grows, with a warning and a storm. At 80° it becomes a hard stop.</dd></div>
-    <div data-ss-id="top-item-3"><dt><span class="sw" style="background:var(--ink-3)"></span>Later: pole transit</dt><dd>Crossing a pole may one day teleport you to the opposite longitude, heading south. Not built yet.</dd></div>
+    <div data-ss-id="top-item-1"><dt><span class="sw" style="background:var(--seam)"></span>Where the wrap is</dt><dd>One line, x = ±<span data-v="halfC">8,192</span>, from pole to pole. The server stores x from <span data-v="negHalfC">−8,192</span> to <span data-v="halfCm1">8,191</span> and nothing else. Away from that line the world is ordinary Minecraft.</dd></div>
+    <div data-ss-id="top-item-2"><dt><span class="sw" style="background:var(--ink)"></span>What happens when you cross</dt><dd>Your game keeps counting: <span data-v="halfCm1">8,191</span>, <span data-v="halfC">8,192</span>, <span data-v="halfCp1">8,193</span> … The server quietly files you under <span data-v="negHalfC">−8,192</span>, <span data-v="negHalfCp1">−8,191</span> … and tells your game nothing. F3's XYZ line shows the server's number; an extra "Unwrapped XYZ" line shows your game's.</dd></div>
+    <div data-ss-id="top-item-3"><dt><span class="sw" style="background:var(--cap)"></span>North–south: no wrap</dt><dd>From 75° latitude a pushback, a warning and a storm grow; 80° is a hard stop. Crossing a pole may one day become a teleport. Not built yet.</dd></div>
   </dl>
-  <div class="numbers">
-    <div class="numbers-head">
-      <h3 data-ss-id="top-h3-1">The numbers (plan §5.1)</h3>
-      <p class="hint" data-ss-id="top-p-3">The highlighted column is the planet size selected above.</p>
+  <p class="small" data-ss-id="top-p-3">Everything here comes from reading Toroidal World 0.19.3's code and from server-side tests. Nobody has watched a crossing through a game client yet (Ben cannot launch the game); the page says so wherever it matters. Every number follows the planet size picked in the bar above.</p>
+</header>
+
+<!-- ============================================================ WHERE -->
+<section class="plate" id="where" aria-labelledby="where-h" data-ss-section="where">
+  <div class="wrap">
+    <div class="plate-head">
+      <p class="eyebrow" data-ss-id="where-p-1">wrap/PlanetShape.java · TW WorldLoopBounds · wrapped_planet_worlds.md §7.1</p>
+      <h2 id="where-h" data-ss-id="where-h">Where the wrap is</h2>
+      <p data-ss-id="where-p-2">The server stores the overworld as one strip of land, <span data-v="C">16,384</span> blocks wide: x from <span data-v="negHalfC">−8,192</span> to <span data-v="halfCm1">8,191</span>. North–south it runs from pole to pole. Its east edge is glued to its west edge. Stand on x = <span data-v="halfCm1">8,191</span>, step east, and you are standing on x = <span data-v="negHalfC">−8,192</span>.</p>
+      <p data-ss-id="where-p-3">That glue line is the <strong>seam</strong>. It is a real place: a straight line on the ground that you can walk to, running from the north cap to the south cap. Nothing marks it. There is no world border there and no wall, and the terrain does not change: Deep Time generates the land so that column <span data-v="halfCm1">8,191</span> runs straight into column <span data-v="negHalfC">−8,192</span>. On the planet it is the 0° meridian, where Deep Time starts counting longitude.</p>
+      <p data-ss-id="where-p-4">Point 0, 0 is half a lap from the seam: <span data-v="halfC">8,192</span> blocks east or west. Spawn is not kept away from it, though. Deep Time puts spawn on the best land the simulation found, which can be anywhere, seam included. Away from the seam nothing about the world is unusual.</p>
+    </div>
+    <div class="where-figs">
+      <figure class="stage" data-ss-id="where-figure-1">
+        <svg viewBox="0 0 360 262" role="img" aria-labelledby="whereA-t">
+          <title id="whereA-t">The stored overworld seen from above: a rectangle from x = −C/2 on the left to x = C/2 on the right, north pole at the top, south pole at the bottom. Both side edges are the seam, and they are the same line. Point 0, 0 is in the middle, half a lap from the seam either way.</title>
+          <rect x="40" y="28" width="280" height="180" class="f-bg2 s-rule" stroke-width="1"/>
+          <rect x="40" y="28" width="280" height="10" class="f-stop" opacity=".22"/>
+          <rect x="40" y="38" width="280" height="5" class="f-cap" opacity=".45"/>
+          <rect x="40" y="193" width="280" height="5" class="f-cap" opacity=".45"/>
+          <rect x="40" y="198" width="280" height="10" class="f-stop" opacity=".22"/>
+          <line x1="40" y1="118" x2="320" y2="118" class="s-rule" stroke-width="1" stroke-dasharray="3 4"/>
+          <g class="f-ink3" opacity=".22">
+            <path d="M40 70 C70 62 96 80 120 74 C140 69 150 90 138 104 C126 118 90 112 70 122 C58 128 46 124 40 120 Z"/>
+            <path d="M320 70 C300 76 286 96 292 110 C298 124 312 122 320 120 Z"/>
+            <path d="M176 136 C196 128 226 134 238 150 C248 164 232 180 210 178 C190 176 168 160 176 136 Z"/>
+            <path d="M226 60 C246 54 272 62 270 78 C268 92 240 94 228 84 C220 78 218 64 226 60 Z"/>
+          </g>
+          <line x1="40" y1="28" x2="40" y2="208" class="s-seam" stroke-width="3"/>
+          <line x1="320" y1="28" x2="320" y2="208" class="s-seam" stroke-width="3"/>
+          <text x="40" y="20" font-size="11" text-anchor="middle" class="f-seam">x = <tspan data-v="negHalfC">−8,192</tspan></text>
+          <text x="320" y="20" font-size="11" text-anchor="middle" class="f-seam">x = <tspan data-v="halfC">8,192</tspan></text>
+          <text x="180" y="20" font-size="10.5" text-anchor="middle" class="f-ink3">north pole</text>
+          <text x="180" y="222" font-size="10.5" text-anchor="middle" class="f-ink3">south pole</text>
+          <text transform="translate(31 118) rotate(-90)" font-size="11" text-anchor="middle" class="f-seam">seam</text>
+          <text transform="translate(333 118) rotate(90)" font-size="11" text-anchor="middle" class="f-seam">seam</text>
+          <g class="s-ink" stroke-width="1" fill="none">
+            <path d="M44 150 H176 M44 146 V154 M176 146 V154"/>
+            <path d="M184 150 H316 M184 146 V154 M316 146 V154"/>
+          </g>
+          <text x="110" y="144" font-size="10.5" text-anchor="middle" class="f-ink2"><tspan data-v="halfC">8,192</tspan> blocks</text>
+          <text x="250" y="144" font-size="10.5" text-anchor="middle" class="f-ink2"><tspan data-v="halfC">8,192</tspan> blocks</text>
+          <circle cx="180" cy="118" r="3.6" class="f-ink"/>
+          <text x="186" y="113" font-size="11" class="f-ink">0, 0</text>
+          <path d="M320 212 V232 Q320 242 310 242 H50 Q40 242 40 232 V218" fill="none" class="s-seam" stroke-width="1.6" stroke-dasharray="4 3"/>
+          <path d="M35 222 L40 212 L45 222 Z" class="f-seam"/>
+          <text x="180" y="257" font-size="11" text-anchor="middle" class="f-seam">off the east edge = in at the west edge</text>
+        </svg>
+        <figcaption class="small" data-ss-id="where-p-5"><strong>What the server stores, from above.</strong> Both side edges are the seam; they are one and the same line. The shaded bands top and bottom are the polar caps (75° soft, 80° hard stop).</figcaption>
+      </figure>
+      <figure class="stage" data-ss-id="where-figure-2">
+        <svg viewBox="0 0 360 262" role="img" aria-labelledby="whereB-t">
+          <title id="whereB-t">The same land redrawn with the seam in the middle: a single dashed line on the ground. A river and hills run straight across it. Below it, the server's x numbers jump from C/2 − 1 to −C/2 at the line, while your game's numbers keep counting.</title>
+          <rect x="20" y="28" width="320" height="170" class="f-bg2 s-rule" stroke-width="1"/>
+          <g class="f-ink3" opacity=".2">
+            <path d="M120 40 C150 34 200 38 226 52 C246 64 236 84 208 86 C180 88 150 80 130 70 C112 60 104 44 120 40 Z"/>
+            <path d="M40 160 C60 150 90 156 96 170 C100 184 76 192 56 188 C40 184 30 168 40 160 Z"/>
+            <path d="M262 150 C286 142 318 150 322 166 C326 182 300 190 280 186 C262 182 248 160 262 150 Z"/>
+          </g>
+          <path d="M20 132 C70 104 120 150 160 128 C176 119 188 118 200 126 C240 150 290 104 340 124" fill="none" stroke="#3A70AA" stroke-width="5" stroke-linecap="round"/>
+          <line x1="180" y1="28" x2="180" y2="198" class="s-seam" stroke-width="2.5" stroke-dasharray="6 4"/>
+          <text x="180" y="20" font-size="11" text-anchor="middle" class="f-seam">the seam</text>
+          <text x="100" y="20" font-size="10.5" text-anchor="middle" class="f-ink3">west of it</text>
+          <text x="260" y="20" font-size="10.5" text-anchor="middle" class="f-ink3">east of it</text>
+          <circle cx="112" cy="100" r="5" fill="#fff" stroke="#13222A" stroke-width="2"/>
+          <text x="112" y="88" font-size="11" text-anchor="middle" class="f-ink">you</text>
+          <path d="M122 100 H236" class="s-ink" stroke-width="1.6" fill="none"/>
+          <path d="M236 95 L246 100 L236 105 Z" class="f-ink3"/>
+          <text x="184" y="95" font-size="10.5" class="f-ink2">walking east</text>
+          <text x="20" y="218" font-size="10.5" class="f-ink3">server x</text>
+          <text x="174" y="218" font-size="11" text-anchor="end" class="f-ink2"><tspan data-v="halfCm2">8,190</tspan> · <tspan data-v="halfCm1">8,191</tspan></text>
+          <text x="186" y="218" font-size="11" class="f-seam"><tspan data-v="negHalfC">−8,192</tspan> · <tspan data-v="negHalfCp1">−8,191</tspan></text>
+          <text x="20" y="240" font-size="10.5" class="f-ink3">game x</text>
+          <text x="174" y="240" font-size="11" text-anchor="end" class="f-ink2"><tspan data-v="halfCm2">8,190</tspan> · <tspan data-v="halfCm1">8,191</tspan></text>
+          <text x="186" y="240" font-size="11" class="f-ink"><tspan data-v="halfC">8,192</tspan> · <tspan data-v="halfCp1">8,193</tspan> …</text>
+          <text x="180" y="257" font-size="10.5" text-anchor="middle" class="f-ink3">(after walking there from spawn)</text>
+        </svg>
+        <figcaption class="small" data-ss-id="where-p-6"><strong>What you walk through.</strong> Centred on the seam, it is just a line on the ground. The river and the hills carry straight on. The server's x jumps at the line; your game's x keeps counting.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ CROSS -->
+<section class="plate" id="cross" aria-labelledby="cross-h" data-ss-section="cross">
+  <span id="seam"></span>
+  <div class="wrap">
+    <div class="plate-head">
+      <p class="eyebrow" data-ss-id="cross-p-1">TW 0.19.3, read from the code · wrapped_planet_worlds.md §7.2–7.5</p>
+      <h2 id="cross-h" data-ss-id="cross-h">What happens when you cross</h2>
+      <p data-ss-id="cross-p-2">Two different x numbers are in play. The <strong>server's x</strong> always stays inside the stored strip, <span data-v="negHalfC">−8,192</span> to <span data-v="halfCm1">8,191</span>. <strong>Your game's x</strong> (the client's) never wraps while you walk: it just keeps counting. TW translates between the two in every message the server sends you. To <em>fold</em> a number means to add or subtract <span data-v="C">16,384</span> until it lands inside the strip: <span data-v="foldEgIn">8,195</span> folds to <span data-v="foldEgOut">−8,189</span>.</p>
+      <p class="flag" data-ss-id="cross-p-3"><span class="pill code">From code</span><span>This is what TW 0.19.3's code does, traced class by class. It has not been watched through a game client. The example player logged in near the seam and uses a render distance of 12 chunks.</span></p>
+    </div>
+
+    <ol class="steps" data-ss-id="cross-list-1">
+      <li data-ss-id="cross-step-1"><h3>You stand at x = <span data-v="start">8,180</span>, facing east.</h3>
+        <dl class="said">
+          <dt>Your screen</dt><dd>Land to the horizon, as anywhere. The chunks past the seam are already loaded and drawn.</dd>
+          <dt>F3</dt><dd><span class="mono">XYZ: <span data-v="start">8,180</span></span> and <span class="mono">Unwrapped XYZ: <span data-v="start">8,180</span></span>. Since you logged in the two agree.</dd>
+          <dt>The server</dt><dd>Has you at <span data-v="start">8,180</span>, in chunk <span data-v="startCh">511</span>, the last stored chunk. Your view reaches chunks <span data-v="vFrom">499</span> to <span data-v="vTo">523</span>. Chunks <span data-v="posChunk">512</span> to <span data-v="sentTo">523</span> do not exist on disk. The server sends you its chunks <span data-v="negChunk">−512</span> to <span data-v="storedTo">−501</span> and labels them <span data-v="posChunk">512</span> to <span data-v="sentTo">523</span>, so your game puts them right next to <span data-v="startCh">511</span>.</dd>
+        </dl></li>
+      <li data-ss-id="cross-step-2"><h3>You walk up to x = <span data-v="pre">8,191.9</span>, the last stored block.</h3>
+        <dl class="said">
+          <dt>Your screen</dt><dd>Nothing special. The seam is under your feet and you cannot see it.</dd>
+          <dt>F3</dt><dd><span class="mono">XYZ: <span data-v="pre">8,191.9</span></span>, <span class="mono">Unwrapped XYZ: <span data-v="pre">8,191.9</span></span>.</dd>
+          <dt>The server</dt><dd>Same number.</dd>
+        </dl></li>
+      <li data-ss-id="cross-step-3"><h3>One more step. Your game moves you to <span data-v="post">8,192.1</span>.</h3>
+        <dl class="said">
+          <dt>Your game</dt><dd>Moves you as it always does and reports <span data-v="post">8,192.1</span> to the server.</dd>
+          <dt>The server</dt><dd>Checks the move as an ordinary 0.2-block step. Then, because <span data-v="post">8,192.1</span> is past the edge, it files you under <span data-v="post">8,192.1</span> − <span data-v="C">16,384</span> = <span data-v="postStored">−8,191.9</span>. It sends your game nothing: no teleport and no chunk reload.</dd>
+          <dt>Your screen</dt><dd>Nothing happens: no loading screen, no flash, no jump. (That is what the code implies; nobody has watched it yet.)</dd>
+          <dt>F3</dt><dd><span class="mono">XYZ</span> jumps to <span data-v="postStored">−8,191.9</span>. <span class="mono">Unwrapped XYZ</span> says <span data-v="post">8,192.1</span>. The Chunk line says <span data-v="negChunk">−512</span> in <span class="mono">r.<span data-v="negRegion">−16</span>.0.mca</span>, the region file that block is saved in.</dd>
+        </dl></li>
+      <li data-ss-id="cross-step-4"><h3>You keep walking, to x = <span data-v="after">8,300</span> by your game's count.</h3>
+        <dl class="said">
+          <dt>The server</dt><dd>Has you at <span data-v="afterStored">−8,084</span>. As you move it loads chunks at the far edge of your view and drops them behind you, one column at a time, as anywhere else. The newest one is its chunk <span data-v="afterEdgeStored">−494</span>, sent to you as chunk <span data-v="afterEdge">530</span>.</dd>
+          <dt>F3</dt><dd><span class="mono">XYZ: <span data-v="afterStored">−8,084</span></span>, <span class="mono">Unwrapped XYZ: <span data-v="after">8,300</span></span>.</dd>
+        </dl></li>
+      <li data-ss-id="cross-step-5"><h3>You turn round and walk back west.</h3>
+        <dl class="said">
+          <dt>Everything</dt><dd>Runs in reverse. When your game says <span data-v="pre">8,191.9</span>, the server files you under <span data-v="pre">8,191.9</span> again, and F3's two lines agree once more.</dd>
+        </dl></li>
+      <li data-ss-id="cross-step-6"><h3>You type a teleport.</h3>
+        <dl class="said">
+          <dt>Commands</dt><dd>Use the server's numbers, the ones on F3's XYZ line. <span class="mono">/tp 0 100 0</span> works from anywhere. <span class="mono">/tp <span data-v="plainTyped">8300</span> 100 0</span> is refused with "<span data-v="plainTyped">8300</span> is outside this world — it must be between <span data-v="plainMin">-8192</span> and <span data-v="plainMax">8191</span>". Relative <span class="mono">~</span> coordinates may go past the edge; they are folded.</dd>
+          <dt>Where you land</dt><dd>On the copy of the target nearest to where your game thinks you are. From step 4, <span class="mono">/tp 0 100 0</span> puts your game at x = <span data-v="C">16,384</span>, while F3's XYZ line says 0.</dd>
+        </dl></li>
+    </ol>
+
+    <h3 class="subhead" id="both" data-ss-id="cross-h3-1">See both numbers move</h3>
+    <p class="small" style="margin-bottom:14px" data-ss-id="cross-p-4">Top: the server's strip, the whole world to scale. Bottom: the same land as your game holds it, a line that never ends. Walk across the seam and watch the two x values part company. The friend is another player standing <span data-v="friendOff">92</span> blocks past the seam.</p>
+    <div class="fig">
+      <div class="stage" data-ss-id="cross-figure-1">
+        <div class="tools">
+          <button type="button" class="btn" id="dw-w" aria-pressed="false">◂ Walk west</button>
+          <button type="button" class="btn" id="dw-e" aria-pressed="false">Walk east ▸</button>
+          <button type="button" class="btn" id="dw-sw" aria-label="Step one block west">◂ 1</button>
+          <button type="button" class="btn" id="dw-se" aria-label="Step one block east">1 ▸</button>
+          <span class="sep"></span>
+          <button type="button" class="btn" id="dw-lap">Go all the way round</button>
+          <button type="button" class="btn" id="dw-relog">Log out and back in</button>
+          <button type="button" class="btn" id="dw-reset">Reset</button>
+        </div>
+        <canvas id="dualc" tabindex="0" role="img" aria-label="Two coordinate systems. Top: the server's stored strip with your position and a friend's. Bottom: the land around you as your game holds it, with your game's x and the server's x for each spot." style="touch-action:pan-y"></canvas>
+        <p class="hint" data-ss-id="cross-p-5">Under the land: your game's x (top row) and the server's x for the same spot (bottom row, <span style="color:var(--seam)">magenta</span> where they differ). Above it: chunk numbers, "= s" giving the stored chunk. Drag the land sideways to walk; ← → step (Shift: a chunk). Walking runs at sprint speed.</p>
+        <p class="caption" id="dual-caption" aria-live="polite" data-ss-id="cross-p-6"></p>
+      </div>
+      <div style="display:grid;gap:14px;min-width:0">
+        <aside class="readout" id="dual-read" aria-live="polite" data-ss-id="cross-panel-1"></aside>
+        <div class="card" data-ss-id="cross-card-log"><h3>What the server did</h3><ol class="log" id="dual-log"></ol></div>
+      </div>
+    </div>
+
+    <h3 class="subhead" data-ss-id="cross-h3-2">Other things that cross</h3>
+    <div class="cards">
+      <div class="card" data-ss-id="cross-card-1"><h3>A mob, an item, an arrow</h3><p class="small">If it ends its own server tick past the edge, the server moves it by <span data-v="C">16,384</span> in that tick. Its speed, its riders and a mob's path target move with it, so a zombie chasing you keeps chasing. Your game gets one position update, which TW rewrites to the copy nearest you, so it lands where it was heading.</p><p class="flag"><span class="pill ok">Tested</span><span>A snowball thrown east from x = 8,188.5 came out at −8,191.79 (C = 16,384).</span></p></div>
+      <div class="card" data-ss-id="cross-card-2"><h3>A boat, a horse, a minecart</h3><p class="small">The vehicle and everyone on it move together. If you steer it, it is filed on the other side when your steering update crosses, just like walking. A minecart is moved in its own tick. Either way your game's x just keeps counting.</p><p class="flag"><span class="pill code">From code</span><span>Not tested on a server yet.</span></p></div>
+      <div class="card" data-ss-id="cross-card-3"><h3>A Sable ship</h3><p class="small">The whole ship, and anything tied to it, is moved when its centre crosses, keeping its speed. While it straddles the seam it is stored on the side its centre is on.</p><p class="flag"><span class="pill ok">Tested</span><span>A jet crossed 20 times out of 20; a ship saved astride the seam reloaded whole. How the hull looks as it crosses needs a client.</span></p></div>
+      <div class="card" data-ss-id="cross-card-4"><h3>Two players either side</h3><p class="small">You at <span data-v="friendE">8,100</span>, a friend at <span data-v="friend">−8,100</span>: <span data-v="friendGap">184</span> blocks apart through the seam. Your game is sent your friend at <span data-v="friendSent">8,284</span>, <span data-v="friendGap">184</span> blocks east of you. Their game is sent you at <span data-v="friendSentNeg">−8,284</span>, <span data-v="friendGap">184</span> blocks west. Each of you sees the other at the right distance, under different numbers. Sounds, mob AI and who-can-see-whom all measure through the seam.</p><p class="flag"><span class="pill unv">Needs a client</span><span>Not tried with two real players yet.</span></p></div>
+      <div class="card" data-ss-id="cross-card-5"><h3>Compasses, maps, beds</h3><p class="small">A compass or lodestone compass points the short way, across the seam if that is shorter. Map markers are placed through the seam, and a map held near it should draw both sides (inferred from the code). Beds, respawn anchors and world spawn are saved inside the strip.</p><p class="flag"><span class="pill code">From code</span><span>Not tested.</span></p></div>
+      <div class="card" data-ss-id="cross-card-6"><h3>Building commands</h3><p class="small"><span class="mono">/fill</span>, <span class="mono">/fillbiome</span> and <span class="mono">/clone</span> refuse a box that crosses the seam: "That area crosses the world seam and could mean either side of it — run the command once per side". <span class="mono">/locate</span> measures its distance through the seam.</p><p class="flag"><span class="pill code">From code</span><span>Not tested.</span></p></div>
+    </div>
+
+    <dl class="rules">
+      <div data-ss-id="seam-item-3"><dt>Terrain continuity is Deep Time's job</dt><dd>Every simulation raster wraps in x (cell index modulo width) and the sub-cell detail noise has period C, so column −C/2 continues column C/2 − 1 exactly. TW only glues the edges; it does not blend terrain.</dd></div>
+      <div data-ss-id="seam-item-5"><dt>How Deep Time shapes its world</dt><dd>TW's own shape picker runs only from its Create World button, never on a dedicated server, so a mixin on <code>WorldDimensions.bake</code> calls TW's public <code>ShapeDimensions.withSpans</code>. Deep Time's generator subclasses <code>NoiseBasedChunkGenerator</code>, so TW <em>stamps</em> it (same object, shape attached) and wraps its noise-fill and biome passes.</dd></div>
+      <div data-ss-id="seam-item-4"><dt>Chunk keys</dt><dd>Any server-side lookup past the edge (a block, a chunk, an entity) is folded to the stored one by TW. Deep Time code folds a position with TW's <code>ToroidalShape.fold</code> before using it as a key.</dd></div>
+      <div data-ss-id="seam-item-9"><dt>How far you can see</dt><dd>TW caps view and simulation distance at <span data-v="viewMax">509</span> chunks, half the loop minus 3. Minecraft's own maximum is 32, so the cap never matters, and you are only ever sent one copy of a chunk: you cannot see the same place twice.</dd></div>
+      <div data-ss-id="seam-item-6"><dt>No border at the seam</dt><dd>Deep Time sets no world border, so vanilla's applies: centred on 0, 0 and 60 million blocks wide. TW measures it through the seam, so along x it never gets in the way. Along z the pole cap stops you long before it.</dd></div>
+      <div data-ss-id="seam-item-7"><dt>One subtlety from the tests</dt><dd>TW moves any non-player entity that ends its own tick past the edge, however it got there. A test that sets a position past the edge and reads it back before the entity ticks sees it unfolded, so the seam tests move entities under their own motion.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- ============================================================ LAP -->
+<section class="plate" id="lap" aria-labelledby="lap-h" data-ss-section="lap">
+  <div class="wrap">
+    <div class="plate-head">
+      <p class="eyebrow" data-ss-id="lap-p-1">TW SeamTravel, ClientPosition · wrapped_planet_worlds.md §7.2, §7.5</p>
+      <h2 id="lap-h" data-ss-id="lap-h">Going all the way round</h2>
+      <p data-ss-id="lap-p-2">Walk <span data-v="C">16,384</span> blocks east and you are back where you started: the same blocks, the same stored x. Nothing marks the moment on screen. TW grants an advancement, <strong>Back Where You Started</strong> ("Travel a full lap around the world"). It counts net travel, so <span data-v="halfCnet">8,000</span> blocks east and <span data-v="halfCnet">8,000</span> back is not a lap.</p>
+      <p data-ss-id="lap-p-3">Your game's x does not come back. It is now <span data-v="C">16,384</span> larger than when you set out, and F3's Unwrapped line shows it. Each further lap adds another <span data-v="C">16,384</span>. It is reset to the stored x at only three moments: when you log in, when you respawn, and when you change dimension. Each of those already reloads the world around you.</p>
+    </div>
+    <div class="two">
+      <div class="tablewrap">
+        <table data-ss-id="lap-table-1">
+          <thead><tr><th scope="col">Starting at x = 1,000</th><th scope="col">F3 XYZ (server)</th><th scope="col">F3 Unwrapped XYZ (your game)</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Setting out</th><td class="v">1,000</td><td class="v">1,000</td></tr>
+            <tr><th scope="row">After one lap east</th><td class="v">1,000</td><td class="v" data-v="lap1">17,384</td></tr>
+            <tr><th scope="row">After two laps east</th><td class="v">1,000</td><td class="v" data-v="lap2">33,768</td></tr>
+            <tr><th scope="row">Then log out and in</th><td class="v">1,000</td><td class="v">1,000</td></tr>
+            <tr><th scope="row">One lap west instead</th><td class="v">1,000</td><td class="v" data-v="lapW">−15,384</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="readout" data-ss-id="lap-panel-1">
+        <h3>Is there a limit?</h3>
+        <p class="small">Not a practical one. The server clamps any reported position to ±30,000,000, which is about <span data-v="lapsMax">1,831</span> laps without logging out, dying or using a portal. Try it with <em>Go all the way round</em> in the figure above.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ NUMBERS -->
+<section class="plate" id="numbers" aria-labelledby="numbers-h" data-ss-section="numbers">
+  <div class="wrap">
+    <div class="plate-head">
+      <p class="eyebrow" data-ss-id="numbers-p-1">Plan §5.1</p>
+      <h2 id="numbers-h" data-ss-id="numbers-h">The numbers</h2>
+      <p class="hint" data-ss-id="top-p-3b">The highlighted column is the planet size selected above.</p>
     </div>
     <div class="tablewrap">
       <table id="numtable" data-ss-id="top-table-1">
         <thead><tr><th scope="col">Quantity</th><th scope="col" data-col="16384">Singleplayer</th><th scope="col" data-col="32768">Server</th><th scope="col">From</th></tr></thead>
         <tbody>
           <tr><th scope="row">Circumference C</th><td class="v" data-col="16384">16,384 blocks</td><td class="v" data-col="32768">32,768 blocks</td><td class="how">chosen per world</td></tr>
+          <tr><th scope="row">The seam</th><td class="v" data-col="16384">x = −8,192 ≡ 8,192</td><td class="v" data-col="32768">x = −16,384 ≡ 16,384</td><td class="how">x = ±C/2, pole to pole</td></tr>
           <tr><th scope="row">Loop width</th><td class="v" data-col="16384">1,024 chunks</td><td class="v" data-col="32768">2,048 chunks</td><td class="how">C / 16</td></tr>
           <tr><th scope="row">Stored x span</th><td class="v" data-col="16384">−8,192 … 8,191</td><td class="v" data-col="32768">−16,384 … 16,383</td><td class="how">[−C/2, C/2)</td></tr>
           <tr><th scope="row">Stored chunks</th><td class="v" data-col="16384">−512 … 511</td><td class="v" data-col="32768">−1,024 … 1,023</td><td class="how">[−C/32, C/32)</td></tr>
@@ -246,12 +483,13 @@ footer li{margin:2px 0}
           <tr><th scope="row">Soft cap starts, ±75°</th><td class="v" data-col="16384">z = ±3,413</td><td class="v" data-col="32768">z = ±6,827</td><td class="how">(75/90) · C/4</td></tr>
           <tr><th scope="row">Hard stop, ±80°</th><td class="v" data-col="16384">z = ±3,641</td><td class="v" data-col="32768">z = ±7,282</td><td class="how">(80/90) · C/4</td></tr>
           <tr><th scope="row">Radius, at 300 m per block</th><td class="v" data-col="16384">782 km</td><td class="v" data-col="32768">1,565 km</td><td class="how">C · 300 m / 2π</td></tr>
+          <tr><th scope="row">TW's view-distance cap</th><td class="v" data-col="16384">509 chunks</td><td class="v" data-col="32768">1,021 chunks</td><td class="how">C/32 − 3; vanilla max is 32</td></tr>
           <tr><th scope="row">Nether loop</th><td class="v" data-col="16384">128 chunks</td><td class="v" data-col="32768">256 chunks</td><td class="how">C / 16 / 8</td></tr>
         </tbody>
       </table>
     </div>
   </div>
-</header>
+</section>
 
 <!-- ============================================================ MAP -->
 <section class="plate" id="map" aria-labelledby="map-h" data-ss-section="map">
@@ -285,56 +523,6 @@ latitude  = −z · 360° / C               north is −z; the pole edges are z 
       <aside class="readout" id="map-read" aria-live="polite" data-ss-id="map-panel-1"></aside>
     </div>
     <p class="small" style="margin-top:16px" id="stretch-note" data-ss-id="map-p-4"><strong>Why the far north looks smeared.</strong> Planet-scale features (continents, mountain belts) are sampled at their true latitude and longitude, so on this map they are stretched east–west by sec φ: 1.0 at the equator, 2.0 at 60°, 3.9 at 75°. Erosion, rivers and valleys are computed in block space, so they keep their shape wherever they are. The stretch near the poles is one more reason for the caps. Tick <em>Stretch</em> to see circles that are 10° across on the planet.</p>
-  </div>
-</section>
-
-<!-- ============================================================ SEAM -->
-<section class="plate" id="seam" aria-labelledby="seam-h" data-ss-section="seam">
-  <div class="wrap">
-    <div class="plate-head">
-      <p class="eyebrow" data-ss-id="seam-p-1">Plan §7.10 · Toroidal World 0.19.3</p>
-      <h2 id="seam-h" data-ss-id="seam-h">The seam, up close</h2>
-      <p data-ss-id="seam-p-2">The server stores exactly one copy of the planet: x from <span data-v="negHalfC">−8,192</span> to <span data-v="halfCm1">8,191</span>. Nothing past it exists on disk. The Toroidal World mod (TW) makes that edge disappear in two ways: anything that crosses it is moved back into the span in the same tick, and each player is sent the copy of the world nearest to them.</p>
-      <p data-ss-id="seam-p-3">Below is a top-down strip of the two ends of the span, one pixel square per block. Launch something east across the seam, then flip between what the server stores and what a player standing next to the seam is sent.</p>
-    </div>
-    <div class="stage" data-ss-id="seam-figure-1">
-      <div class="tools">
-        <div class="seg" role="group" aria-label="View">
-          <button type="button" id="view-server" aria-pressed="true">What the server stores</button>
-          <button type="button" id="view-player" aria-pressed="false">What a player sees</button>
-        </div>
-        <span class="sep"></span>
-        <label class="check"><input type="checkbox" id="strip-slow" checked> Slow motion ×¼</label>
-      </div>
-      <canvas id="stripc" tabindex="0" aria-label="Top-down strip of blocks at both ends of the stored span, with entities crossing the seam." style="touch-action:pan-y"></canvas>
-      <div class="tools">
-        <button type="button" class="btn primary" data-spawn="snowball">Throw a snowball</button>
-        <button type="button" class="btn" data-spawn="minecart">Send a minecart</button>
-        <button type="button" class="btn" data-spawn="zombie">Spawn a zombie</button>
-        <button type="button" class="btn" data-spawn="ship">Launch a Sable ship</button>
-        <span class="sep"></span>
-        <button type="button" class="btn" id="step-w" aria-label="Step one block west">◂ Step west</button>
-        <button type="button" class="btn" id="step-e" aria-label="Step one block east">Step east ▸</button>
-        <button type="button" class="btn" id="strip-clear">Clear</button>
-      </div>
-      <p class="hint" data-ss-id="seam-p-4">Numbers above the strip are chunk x, below it block x; a <span style="color:var(--seam)">magenta</span> number with * is a chunk sent to you at a shifted position. Drag in the strip to walk (across the seam only in the player's view); ← → keys step one block.</p>
-      <p class="caption" id="strip-caption" data-ss-id="seam-p-5"></p>
-    </div>
-    <div class="cards" style="margin-top:14px">
-      <div class="card" id="strip-ent" aria-live="polite" data-ss-id="seam-card-1"></div>
-      <div class="card" id="strip-you" data-ss-id="seam-card-2"></div>
-      <div class="card" data-ss-id="seam-card-3"><h3 data-ss-id="seam-h3-1">Server log</h3><ol class="log" id="strip-log"></ol></div>
-    </div>
-    <dl class="rules">
-      <div data-ss-id="seam-item-1"><dt>Crossing, on the server</dt><dd>A mob, item, projectile, minecart or ship entity that ends its tick at x ≥ C/2 is moved to x − C in the same tick (x &lt; −C/2 → x + C), with its passengers, velocity and pathfinding target. Players are moved when their movement packet crosses. Coordinates therefore stay inside the stored span.</dd></div>
-      <div data-ss-id="seam-item-2"><dt>What players are sent</dt><dd>Chunks, entity positions and block updates are rewritten to the copy nearest each player, so there is no visible edge. Distances for mob AI, sounds, projectiles, explosions and compasses are also measured to the nearest copy: the world behaves round, not just looks round.</dd></div>
-      <div data-ss-id="seam-item-3"><dt>Terrain continuity is Deep Time's job</dt><dd>Every simulation raster wraps in x (cell index modulo width) and the sub-cell detail noise has period C, so column −C/2 continues column C/2 − 1 exactly. The river and the rail in the strip run straight through.</dd></div>
-      <div data-ss-id="seam-item-4"><dt>Chunk keys</dt><dd>A chunk request past the edge is folded to the stored chunk by TW. Deep Time code folds a position with TW's <code>ToroidalShape.fold</code> before using it as a key.</dd></div>
-      <div data-ss-id="seam-item-5"><dt>How Deep Time shapes its world</dt><dd>TW's own shape picker runs only from its Create World button, never on a dedicated server, so a mixin on <code>WorldDimensions.bake</code> calls TW's public <code>ShapeDimensions.withSpans</code>. Deep Time's generator subclasses <code>NoiseBasedChunkGenerator</code>, so TW <em>stamps</em> it (same object, shape attached) and wraps its noise-fill and biome passes.</dd></div>
-      <div data-ss-id="seam-item-6"><dt>World border, structures, fallback</dt><dd>Along x the border never gets in the way once it covers the loop; along z it is vanilla, but the pole cap limits z first. TW moves structure starts across the seam (test pending). Had TW failed, Deep Time would teleport entities at the seam itself; not needed so far.</dd></div>
-      <div data-ss-id="seam-item-7"><dt>One subtlety from the tests</dt><dd>TW folds <em>movement</em>: an entity that steps over the border is moved. A position set directly past the edge (a teleport) is not folded by that rule, so the seam tests move entities under their own motion (STATUS.md, P0-06 notes).</dd></div>
-      <div data-ss-id="seam-item-8"><dt>Not checkable without a client</dt><dd>How crossing looks and feels (a hitch, pop-in, a ship's hull staying whole on screen), entity tracking across the seam in multiplayer, and how contraptions render at the seam. The player's view above is TW's documented behaviour, not something anyone has watched yet.</dd></div>
-    </dl>
   </div>
 </section>
 
@@ -494,13 +682,14 @@ return ShapeDimensions.withSpans(dims, spans, spans.scaledDown(NETHER_SCALE),   
     <div class="plate-head">
       <p class="eyebrow" data-ss-id="status-p-1">STATUS.md · plan P0-06, P1-18, §10.6</p>
       <h2 id="status-h" data-ss-id="status-h">What is verified, and what is not</h2>
-      <p data-ss-id="status-p-2">Verified on 2026-09-28 on a dedicated planet server running the analytic test terrain at C = 16,384. Nothing here has been looked at through a game client: Ben cannot launch the game, so everything is checked by server-side tests and probes.</p>
+      <p data-ss-id="status-p-2">"Verified" means checked on 2026-09-28 on a dedicated planet server (analytic test terrain, C = 16,384; region files also at 32,768). "From code" means read in Toroidal World 0.19.3's decompiled code but not exercised by a test. Nothing here has been looked at through a game client: Ben cannot launch the game.</p>
     </div>
     <div class="tools" style="margin-bottom:12px">
       <div class="filters" role="group" aria-label="Filter rows">
         <button type="button" class="btn" data-filter="all" aria-pressed="true">All</button>
         <button type="button" class="btn" data-filter="ok" aria-pressed="false">Verified</button>
         <button type="button" class="btn" data-filter="pend" aria-pressed="false">Pending</button>
+        <button type="button" class="btn" data-filter="code" aria-pressed="false">From code</button>
         <button type="button" class="btn" data-filter="unv" aria-pressed="false">Needs a client</button>
       </div>
       <span class="sep"></span>
@@ -514,16 +703,21 @@ return ShapeDimensions.withSpans(dims, spans, spans.scaledDown(NETHER_SCALE),   
           <tr data-s="ok" data-ss-id="status-row-2"><td>Terrain is continuous across the seam</td><td><span class="pill ok">Verified</span></td><td class="ev">GameTest columnscontinuous: 16 rows at the seam, 0 bad folds, 0 height jumps</td></tr>
           <tr data-s="ok" data-ss-id="status-row-3"><td>An entity crossing the seam is folded back into the span</td><td><span class="pill ok">Verified</span></td><td class="ev">GameTest entitycrossesseam: a snowball flying east from x = 8,188.5 came out at x = −8,191.79</td></tr>
           <tr data-s="ok" data-ss-id="status-row-4"><td>Generated heights equal the terrain function; the terrain is periodic across the seam</td><td><span class="pill ok">Verified</span></td><td class="ev">GameTests (P0-05): heightMatchesReference max difference 0 on all 128 sampled columns; periodicAcrossSeam 0 mismatches</td></tr>
-          <tr data-s="pend" data-ss-id="status-row-5"><td>Sable ships cross the seam</td><td><span class="pill pend">Pending</span></td><td class="ev">SableSeamGameTests.jetCrossesSeam must pass 20 of 20 (P0-06)</td></tr>
-          <tr data-s="pend" data-ss-id="status-row-6"><td>A ship saved straddling the seam reloads intact</td><td><span class="pill pend">Pending</span></td><td class="ev">scenario sable_straddle: same sub-level id and block count after save-all flush, stop, start (P0-06)</td></tr>
-          <tr data-s="pend" data-ss-id="status-row-7"><td>Structures straddling the seam are moved across it</td><td><span class="pill pend">Pending</span></td><td class="ev">structureStraddlesSeam (P0-06)</td></tr>
-          <tr data-s="pend" data-ss-id="status-row-8"><td>Create kinetic networks and trains across the seam</td><td><span class="pill pend">Pending</span></td><td class="ev">informational: shaftLineAcrossSeam logs whether a kinetic network works across the seam (P0-06)</td></tr>
-          <tr data-s="pend" data-ss-id="status-row-9"><td>Region files stay inside the span, at 16k and at 32k</td><td><span class="pill pend">Pending</span></td><td class="ev">smoke mic with Chunky over a rectangle straddling the seam: regions outside span 0; tw.widthChunks=1024 and 2048 (P0-06)</td></tr>
+          <tr data-s="ok" data-ss-id="status-row-5"><td>Sable ships cross the seam</td><td><span class="pill ok">Verified</span></td><td class="ev">P0-06 jetCrossesSeam 20/20: a 10-block hull at 40 blocks/s crosses at tick 6, x = −8,187.76 after, 10/10 blocks, vx 38.6 kept</td></tr>
+          <tr data-s="ok" data-ss-id="status-row-6"><td>A ship saved straddling the seam reloads intact</td><td><span class="pill ok">Verified</span></td><td class="ev">P0-06 scenario sable_straddle: OK, same sub-level id, 19 blocks, x 8,191.97 before and after save, stop, start</td></tr>
+          <tr data-s="ok" data-ss-id="status-row-7"><td>Structures and trees straddling the seam are generated whole</td><td><span class="pill ok">Verified</span></td><td class="ev">P0-06 structureStraddlesSeam: plains_small_house_1 over x 8,188 … 8,194, 0 blocks wrong; treeStraddlesSeam: 0 decaying leaves</td></tr>
+          <tr data-s="ok" data-ss-id="status-row-8"><td>A Create shaft line turns across the seam</td><td><span class="pill ok">Verified</span></td><td class="ev">P0-06 shaftLineAcrossSeam (informational): 16 RPM on all 7 shafts, 4 of them west of the seam</td></tr>
+          <tr data-s="pend" data-ss-id="status-row-8b"><td>Create trains, belts and moving contraptions across the seam</td><td><span class="pill pend">Pending</span></td><td class="ev">not tested yet (STATUS.md P0-06 follow-ups)</td></tr>
+          <tr data-s="ok" data-ss-id="status-row-9"><td>Region files stay inside the span, at 16k and at 32k</td><td><span class="pill ok">Verified</span></td><td class="ev">P0-06 smoke mic + Chunky over 1,089 chunks centred on the seam: regions outside span 0 at both sizes; tw.widthChunks 1024 and 2048</td></tr>
           <tr data-s="pend" data-ss-id="status-row-10"><td>Nether loops at 1:8; the End does not loop</td><td><span class="pill pend">Pending</span></td><td class="ev">set in PlanetShape (spans.scaledDown(8), LoopSpans.NONE); the probe so far covers the overworld only</td></tr>
+          <tr data-s="code" data-ss-id="status-row-c1"><td>A walking player is filed on the other side by the server with no teleport packet; the client's own x keeps counting</td><td><span class="pill code">From code</span></td><td class="ev">TW 0.19.3 ServerGamePacketListenerImplMixin (continuousX, wrapIntoBounds), ClientPosition; research note §7.3</td></tr>
+          <tr data-s="code" data-ss-id="status-row-c2"><td>F3 shows the stored XYZ, Block and Chunk, plus "Unwrapped" lines with the client's own numbers</td><td><span class="pill code">From code</span></td><td class="ev">TW 0.19.3 DebugEntryPositionMixin on DebugScreenOverlay.getGameInformation; research note §7.2</td></tr>
+          <tr data-s="code" data-ss-id="status-row-c3"><td>The client's x is reset to the stored x only on login, respawn and dimension change</td><td><span class="pill code">From code</span></td><td class="ev">TW 0.19.3 ClientPosition.rebase callers: listener constructor, PlayerList.respawn, PacketTranslator.playerPosition; research note §7.2</td></tr>
+          <tr data-s="code" data-ss-id="status-row-c4"><td>Commands refuse an absolute x outside the stored span; boxes across the seam are refused</td><td><span class="pill code">From code</span></td><td class="ev">TW 0.19.3 CommandCoordinatesMixin, SeamCommandErrors, Fill/FillBiome/Clone mixins; research note §7.5</td></tr>
           <tr data-s="ok" data-ss-id="status-row-11"><td>Pole pushback, warning, ship wind, hard stop at 80°</td><td><span class="pill ok">Verified</span></td><td class="ev">P1-18 on the planet server: PoleCapGameTests.entityPushedBack, hardStopAt80, sableHullPushedBack; clients without Deep Time refused (NetworkGameTests.worldInfoChannelRequired, refuse_client)</td></tr>
           <tr data-s="later" data-ss-id="status-row-12"><td>Pole transit to longitude +180°</td><td><span class="pill later">Later</span></td><td class="ev">plan §10.6; not designed in detail</td></tr>
-          <tr data-s="unv" data-ss-id="status-row-13"><td>How crossing the seam looks and feels: a hitch, pop-in, a ship's hull staying whole on screen</td><td><span class="pill unv">Needs a client</span></td><td class="ev">no server-side test can show it</td></tr>
-          <tr data-s="unv" data-ss-id="status-row-14"><td>Entity tracking across the seam in multiplayer</td><td><span class="pill unv">Needs a client</span></td><td class="ev">needs connected clients on both sides of the seam</td></tr>
+          <tr data-s="unv" data-ss-id="status-row-13"><td>How crossing the seam looks and feels: no hitch, no pop-in, a ship's hull staying whole on screen</td><td><span class="pill unv">Needs a client</span></td><td class="ev">the code sends nothing at a walking crossing; only a client can show it is seamless</td></tr>
+          <tr data-s="unv" data-ss-id="status-row-14"><td>Two players either side of the seam see each other at the right place</td><td><span class="pill unv">Needs a client</span></td><td class="ev">needs connected clients on both sides of the seam</td></tr>
           <tr data-s="unv" data-ss-id="status-row-15"><td>Rendering of contraptions at the seam</td><td><span class="pill unv">Needs a client</span></td><td class="ev">client rendering</td></tr>
           <tr data-s="unv" data-ss-id="status-row-16"><td>The polar storm and the action-bar warning</td><td><span class="pill unv">Needs a client</span></td><td class="ev">client-side only; P1-18 has nothing visual to review</td></tr>
         </tbody>
@@ -534,7 +728,7 @@ return ShapeDimensions.withSpans(dims, spans, spans.scaledDown(NETHER_SCALE),   
 
 <footer data-ss-section="footer">
   <div class="wrap">
-    <p data-ss-id="footer-p-1">Sources, all in the Deep Time repository: <code>docs/deeptime-implementation-plan.md</code> §5.1, §5.2, §7.10, §7.11, §10.6 and P0-06; <code>docs/research/notes/wrapped_planet_worlds.md</code> §5.1, §5.3; <code>STATUS.md</code> (build log, 2026-09-28); <code>neoforge/…/wrap/PlanetShape.java</code>. Page source: <code>tools/review/pages/seams/</code>.</p>
+    <p data-ss-id="footer-p-1">Sources, all in the Deep Time repository: <code>docs/research/notes/wrapped_planet_worlds.md</code> §7 (the crossing mechanics, read from Toroidal World 0.19.3's decompiled jar, with class names), §5.1 and §5.3; <code>docs/deeptime-implementation-plan.md</code> §5.1, §5.2, §7.10, §7.11, §10.6 and P0-06; <code>STATUS.md</code> (build log, 2026-09-28); <code>neoforge/…/wrap/PlanetShape.java</code>, <code>server/SpawnHandler.java</code>. Companion page: <a href="https://spacesheep.dev/@benmac/deeptime-wrap">deeptime-wrap</a>. Page source: <code>tools/review/pages/seams/</code>.</p>
     <p style="margin-top:8px" data-ss-id="footer-p-2">The planet on this page is procedural decoration. The coordinates, bands, spans and folds are computed with the formulas above.</p>
   </div>
 </footer>
@@ -586,11 +780,26 @@ const ZONES = {
 };
 function derived(C) {
   const s80 = Math.round(80 / 90 * C / 4);
+  // the crossing walkthrough (wrapped_planet_worlds.md §7.3): log in 12 blocks west of the seam,
+  // render distance 12 chunks, then walk to 108 blocks past it by your game's count
+  const VD = 12, st = C / 2 - 12, stCh = Math.floor(st / 16), aft = C / 2 + 108, aftCh = Math.floor(aft / 16);
+  const FO = 92;   // the friend's distance past the seam (FRIEND_OFF)
   return {
     C: num(C), halfC: num(C / 2), halfCm1: num(C / 2 - 1), negHalfC: num(-C / 2),
+    halfCm2: num(C / 2 - 2), halfCp1: num(C / 2 + 1), negHalfCp1: num(-C / 2 + 1),
     chunks: num(C / 16), nether: num(C / 128), latPer: (360 / C).toFixed(5) + '°',
     cap75: num(Math.round(75 / 90 * C / 4)), stop80: num(s80), qC: num(C / 4),
     gap: num(C / 4 - s80), gapChunks: num(Math.floor((C / 4 - s80) / 16)),
+    foldEgIn: num(C / 2 + 3), foldEgOut: num(-C / 2 + 3),
+    start: num(st), startCh: num(stCh), vFrom: num(stCh - VD), vTo: num(stCh + VD),
+    posChunk: num(C / 32), negChunk: num(-C / 32), sentTo: num(stCh + VD), storedTo: num(stCh + VD - C / 16),
+    pre: num(C / 2 - 0.1, 1), post: num(C / 2 + 0.1, 1), postStored: num(-C / 2 + 0.1, 1), negRegion: num(-C / 1024),
+    after: num(aft), afterStored: num(aft - C), afterEdge: num(aftCh + VD), afterEdgeStored: num(aftCh + VD - C / 16),
+    plainMin: String(-C / 2), plainMax: String(C / 2 - 1), plainTyped: String(aft),
+    friendOff: num(FO), friend: num(-(C / 2 - FO)), friendE: num(C / 2 - FO), friendGap: num(2 * FO),
+    friendSent: num(C / 2 + FO), friendSentNeg: num(-(C / 2 + FO)),
+    halfCnet: num(Math.floor(C / 2000) * 1000), lap1: num(1000 + C), lap2: num(1000 + 2 * C), lapW: num(1000 - C),
+    lapsMax: num(Math.floor(3e7 / C)), viewMax: num(C / 32 - 3),
   };
 }
 function applyDerived() {
@@ -928,17 +1137,16 @@ function initMap() {
   M.pin = { lon: 330, lat: 45 };
 }
 
-/* ================================================================ 2. SEAM STRIP */
-const RAIL_Z = 5;
-const S = { P: 32, G: 10, R: 18, zTop: -9, view: 0, anim: 0, slow: true, player: null, ents: [], tick: 0, acc: 0,
-            raf: 0, last: 0, flashes: [], log: [], tracked: null, tex: null, texKey: '', geo: null, drag: false, seq: 0 };
-const KIND = {
-  snowball: { name: 'Snowball', note: () => `Replays the GameTest entitycrossesseam: spawned at x = ${num(P.C / 2 - 3.5, 1)} flying east. At C = 16,384 the test found it at x = −8,191.79; the speed here is picked so the replay lands on that number.` },
-  minecart: { name: 'Minecart', note: () => 'On a rail line that runs straight through the seam. Passengers and velocity move with it.' },
-  zombie: { name: 'Zombie, chasing you', note: () => 'Its pathfinding target and every distance it measures are folded, so it walks to you through the seam, not the long way round the planet.' },
-  ship: { name: 'Sable ship', note: () => 'Crossing goes through TW\'s Sable compat and is untested: P0-06 needs 20 of 20 jets across the seam, and a hull saved straddling the seam must reload intact. How a straddling hull looks on screen needs a client.' },
-};
-function tileColor(x, z) {
+/* ================================================================ 2. TWO COORDINATE SYSTEMS */
+// What TW 0.19.3 does (wrapped_planet_worlds.md §7.2–7.5): the server keeps every x folded into
+// [−C/2, C/2); each client keeps its own unfolded x (TW's per-connection "mirror"), which TW resets
+// to the stored x only on login, respawn and dimension change. A walking crossing sends nothing.
+const FRIEND_OFF = 92;                       // the friend stands 92 blocks east of the seam
+const SPRINT = 5.612;                        // vanilla sprint, blocks per second
+const DW = { cx: 0, sx: 0, travel: 0, laps: 0, walk: 0, lap: null, raf: 0, last: 0, log: [], flash: null,
+             drag: null, geo: null, seq: 0 };
+const friendSx = (C = P.C) => -(C / 2 - FRIEND_OFF);
+function tileColor(x, z) {                   // a periodic example landscape with a river; x is stored x
   const C = P.C, xm = mod(x, C);
   const h = 0.62 * pnoise2(xm / 8, z / 8, C / 8, 91) + 0.38 * pnoise2(xm / 4, z / 4, C / 4, 92);
   const zr = -3 + 2.4 * Math.sin(2 * Math.PI * xm / 64) + 1.1 * Math.sin(2 * Math.PI * xm / 32 + 1.3);
@@ -950,361 +1158,205 @@ function tileColor(x, z) {
   const t = clamp((h - 0.25) / 0.45, 0, 1);
   return [Math.round(lerp(124, 84, t)), Math.round(lerp(178, 138, t)), Math.round(lerp(88, 64, t))];
 }
-function stripTex() {
-  const key = P.C + ':' + S.P;
-  if (S.texKey === key) return S.tex;
-  const mk = (start) => {
-    const c = document.createElement('canvas'); c.width = S.P; c.height = S.R;
-    const g = c.getContext('2d'), im = g.createImageData(S.P, S.R);
-    for (let j = 0; j < S.R; j++) for (let i = 0; i < S.P; i++) {
-      const col = tileColor(start + i, S.zTop + j), k = (j * S.P + i) * 4;
-      im.data[k] = col[0]; im.data[k + 1] = col[1]; im.data[k + 2] = col[2]; im.data[k + 3] = 255;
-    }
-    g.putImageData(im, 0, 0); return c;
-  };
-  S.tex = { W: mk(-P.C / 2), E: mk(P.C / 2 - S.P) }; S.texKey = key;
-  return S.tex;
+function dualLog(s, f) {
+  DW.log.unshift({ n: ++DW.seq, s, f: !!f }); DW.log.length = Math.min(DW.log.length, 6);
+  $('#dual-log').innerHTML = DW.log.map((l) => `<li><span class="tk">#${l.n}</span><span class="${l.f ? 'f' : ''}">${l.s}</span></li>`).join('');
 }
-const inStrip = (x, C = P.C) => (x >= -C / 2 && x < -C / 2 + S.P) || (x >= C / 2 - S.P && x < C / 2);
-function logEvent(s, f) { S.log.unshift({ tick: S.tick, s, f: !!f }); S.log.length = Math.min(S.log.length, 7); renderLog(); }
-function renderLog() {
-  $('#strip-log').innerHTML = S.log.map((l) => `<li><span class="tk">t${l.tick}</span><span class="${l.f ? 'f' : ''}">${l.s}</span></li>`).join('');
-}
-function resetStrip() {
+function dualReset() {
   const C = P.C;
-  S.player = { x: C / 2 - 9.5, z: 0.5 };
-  S.ents = []; S.tick = 0; S.acc = 0; S.log = []; S.tracked = null; S.flashes = [];
-  logEvent(`You stand at x = ${num(S.player.x, 1)}, ${num(C / 2 - S.player.x, 1)} blocks west of the seam.`);
-  stripReadout();
+  DW.cx = DW.sx = C / 2 - 12; DW.travel = 0; DW.laps = 0; DW.walk = 0; DW.lap = null; DW.flash = null; DW.log = []; DW.seq = 0;
+  dualLog(`You log in at x = ${num(DW.cx)}. Your game's x and the server's x are the same number.`);
+  dualButtons();
 }
-function spawn(kind) {
-  const C = P.C, pl = S.player;
-  let e;
-  if (kind === 'snowball') e = { x: C / 2 - 3.5, z: pl.z, vx: 1.86432 };
-  else if (kind === 'minecart') e = { x: C / 2 - 12.5, z: RAIL_Z + 0.5, vx: 0.4 };
-  else if (kind === 'zombie') e = { x: pl.x >= 0 ? -C / 2 + 4.5 : C / 2 - 4.5, z: clamp(pl.z + 3, S.zTop + 1, S.zTop + S.R - 1), speed: 0.3 };
-  else e = { x: C / 2 - 14, z: -3.5, vx: 0.5, len: 6, wid: 3 };
-  Object.assign(e, { kind, raw: e.x, prevX: e.x, prevZ: e.z, age: 0, folds: [], id: ++S.seq });
-  S.ents.push(e); if (S.ents.length > 6) S.ents.shift();
-  S.tracked = e;
-  logEvent(`${KIND[kind].name.split(',')[0]} #${e.id} at x = ${num(e.x, 2)}.`);
-  stripReadout(); kickStrip();
-}
-function tickOnce() {
-  S.tick++;
-  const C = P.C, pl = S.player;
-  for (const e of S.ents) {
-    e.prevX = e.x; e.prevZ = e.z;
-    let dx = 0, dz = 0;
-    if (e.kind === 'snowball') { dx = e.vx; e.vx *= 0.99; }
-    else if (e.kind === 'zombie') {
-      const tx = fold(pl.x - e.x), tz = pl.z - e.z, d = Math.hypot(tx, tz);
-      if (d > 1.4) { dx = tx / d * e.speed; dz = tz / d * e.speed; }
-    } else dx = e.vx;
-    e.x += dx; e.z += dz; e.raw += dx; e.age++;
-    // End of the entity's tick: TW moves it back into the span, same tick.
-    if (e.x >= C / 2 || e.x < -C / 2) {
-      const before = e.x; e.x = fold(e.x);
-      const east = before >= C / 2;
-      e.folds.push({ tick: S.tick, before, after: e.x });
-      logEvent(`#${e.id} ended the tick at ${num(before, 2)} ${east ? '≥' : '<'} ${num(east ? C / 2 : -C / 2)} → moved to ${num(e.x, 2)}`, true);
-      S.flashes.push({ t0: performance.now(), dir: east ? 1 : -1, z: e.z });
+// Your game moves you by d blocks. The server sees the same step (TW hands vanilla the copy nearest
+// your old stored x), then folds you if you ended past the edge, and sends your game nothing.
+function dualMove(d) {
+  const C = P.C;
+  while (Math.abs(d) > 1e-9) {
+    const step = clamp(d, -16, 16); d -= step;            // at most a chunk per step, so a fold is logged near the seam
+    DW.cx += step;
+    let s = DW.sx + step;
+    if (s >= C / 2 || s < -C / 2) {
+      const east = s >= C / 2, before = s;
+      s = fold(s);
+      DW.flash = { t0: performance.now(), dir: east ? 1 : -1 };
+      dualLog(`Your game reported x = ${num(DW.cx, 1)}. The server filed you under ${num(before, 1)} ${east ? '−' : '+'} ${num(C)} = ${num(s, 1)} and sent your game nothing.`, true);
+    }
+    DW.sx = s;
+    DW.travel += step;
+    if (Math.abs(DW.travel) >= C - 1e-6) {
+      const east = DW.travel > 0;
+      DW.travel -= Math.sign(DW.travel) * C; DW.laps += east ? 1 : -1;
+      dualLog(`${num(C)} blocks net ${east ? 'east' : 'west'}: advancement "Back Where You Started". Stored x is back where it began; your game's x is ${num(C)} ${east ? 'more' : 'less'}.`, true);
     }
   }
-  const gone = S.ents.filter((e) => !inStrip(e.x) || (e.kind === 'snowball' && e.age > 90));
-  for (const e of gone) logEvent(`#${e.id} left the strip at x = ${num(e.x, 1)}.`);
-  if (gone.length) S.ents = S.ents.filter((e) => !gone.includes(e));
 }
-function clampPlayer() {
-  const C = P.C, pl = S.player;
-  if (!inStrip(pl.x)) pl.x = pl.x >= 0 ? C / 2 - S.P + 0.5 : -C / 2 + S.P - 0.5;
-  pl.z = clamp(pl.z, S.zTop + 0.5, S.zTop + S.R - 0.5);
+function dualRelog() {
+  const old = DW.cx;
+  DW.walk = 0; DW.lap = null;
+  DW.cx = DW.sx;
+  dualLog(Math.abs(old - DW.sx) < 1 ? 'You logged out and back in. Your game\'s x already matched the server\'s.'
+    : `You logged out and back in. Your game's x was reset from ${num(old, 1)} to the stored ${num(DW.sx, 1)}. Respawning and changing dimension do the same.`, true);
+  dualButtons(); dualReadout(); kickDual();
 }
-function movePlayerTo(nx) {
-  const C = P.C, pl = S.player;
-  let x = nx, crossed = 0;
-  if (x >= C / 2) { x -= C; crossed = 1; } else if (x < -C / 2) { x += C; crossed = -1; }
-  pl.x = x;
-  if (crossed) logEvent(`Your movement crossed x = ${num(crossed > 0 ? C / 2 : -C / 2)}: moved to x ${crossed > 0 ? '−' : '+'} ${num(C)} = ${num(x, 2)}`, true);
-  clampPlayer();
+function dualButtons() {
+  $('#dw-w').setAttribute('aria-pressed', String(DW.walk < 0));
+  $('#dw-e').setAttribute('aria-pressed', String(DW.walk > 0));
+  $('#dw-lap').setAttribute('aria-pressed', String(!!DW.lap));
 }
-function stepPlayer(d) {
-  const C = P.C, pl = S.player;
-  let nx = pl.x + d;
-  // stay inside the strip: walking away from the seam stops at the strip's inner edge
-  if (pl.x >= 0 && nx < C / 2 - S.P) nx = C / 2 - S.P + 0.5;
-  if (pl.x < 0 && nx >= -C / 2 + S.P) nx = -C / 2 + S.P - 0.5;
-  movePlayerTo(nx);
-  stripReadout(); kickStrip();
-}
-function drawStrip() {
-  const cv = $('#stripc'); const w = cv.clientWidth; if (!w) return;
-  const nP = w < 560 ? 20 : 32;
-  if (nP !== S.P) { S.P = nP; S.texKey = ''; S.ents = S.ents.filter((e) => inStrip(e.x)); clampPlayer(); }
-  S.G = w < 560 ? 8 : 10;
-  const tex = stripTex();
-  const u = w / (2 * S.P + S.G);
-  const top = 36, bot = 30, sh = S.R * u, h = Math.round(top + sh + bot);
+function drawDual() {
+  const cv = $('#dualc'); const w = cv.clientWidth; if (!w) return;
+  const C = P.C, narrow = w < 520, now = performance.now();
+  const N = narrow ? 24 : 40, u = w / (2 * N), rows = 10, z0 = -8;
+  const pad = 10, aY = 34, aH = 22, bT = 130, bH = rows * u, h = Math.round(bT + bH + 44);
   const { ctx } = prep(cv, h);
-  const C = P.C, t = smooth(S.anim), now = performance.now();
-  const pw = { start: -C / 2, off: lerp(0, S.G / 2 + S.P, t), tex: tex.W, key: 'W' };
-  const pe = { start: C / 2 - S.P, off: lerp(S.P + S.G, S.G / 2, t), tex: tex.E, key: 'E' };
-  S.geo = { w, u, top, sh, h, pw, pe };
   ctx.clearRect(0, 0, w, h);
-  // the gap between the two ends: the rest of the stored planet
-  const gapA = clamp(1 - t * 2.4, 0, 1);
-  if (gapA > 0) {
-    ctx.globalAlpha = gapA;
-    const gx = S.P * u, gw = S.G * u;
-    ctx.fillStyle = hatch(ctx, rgba(T.ink3, 0.28), T.bg2); ctx.fillRect(gx, top, gw, sh);
-    const mid = gx + gw / 2;
-    if (gw >= 64) {
-      text(ctx, num(C - 2 * S.P), mid, top + sh / 2 - 13, { font: `650 12px ${FD}`, align: 'center', color: T.ink, halo: T.bg2 });
-      text(ctx, 'blocks of', mid, top + sh / 2 + 2, { font: `500 10.5px ${FD}`, align: 'center', color: T.ink2, halo: T.bg2 });
-      text(ctx, 'planet', mid, top + sh / 2 + 15, { font: `500 10.5px ${FD}`, align: 'center', color: T.ink2, halo: T.bg2 });
-    } else {
-      text(ctx, num(C - 2 * S.P), mid, top + sh / 2, { font: `650 9px ${FD}`, align: 'center', color: T.ink, halo: T.bg2 });
-    }
-    ctx.globalAlpha = 1;
-  }
-  // the two ends of the span
-  ctx.imageSmoothingEnabled = false;
-  const panel = (p, alpha) => {
-    const x0 = p.off * u;
-    ctx.save(); ctx.globalAlpha = alpha;
-    ctx.drawImage(p.tex, x0, top, S.P * u, sh);
-    const ry = top + (RAIL_Z - S.zTop) * u;
-    ctx.fillStyle = 'rgba(96,66,40,.95)';
-    for (let i = 0; i < S.P; i++) ctx.fillRect(x0 + (i + 0.35) * u, ry + 0.08 * u, 0.3 * u, 0.84 * u);
-    ctx.fillStyle = '#A7A7A2';
-    ctx.fillRect(x0, ry + 0.24 * u, S.P * u, Math.max(1, 0.12 * u)); ctx.fillRect(x0, ry + 0.64 * u, S.P * u, Math.max(1, 0.12 * u));
-    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    for (let x = Math.ceil(p.start / 16) * 16; x < p.start + S.P; x += 16) {
-      if (x === p.start) continue;
-      const sx = Math.round(x0 + (x - p.start) * u) + 0.5; ctx.moveTo(sx, top); ctx.lineTo(sx, top + sh);
-    }
-    ctx.stroke(); ctx.setLineDash([]);
-    ctx.restore();
+  DW.geo = { u };
+  // ---- lane A: the server's strip, the whole world to scale
+  text(ctx, narrow ? 'Server: one strip, the whole world' : `Server: one stored strip, x from ${num(-C / 2)} to ${num(C / 2 - 1)}, the whole world to scale`,
+    pad, 12, { font: `650 11.5px ${FD}`, color: T.ink });
+  const ax0 = pad + 4, ax1 = w - pad - 4, aw = ax1 - ax0;
+  const ax = (x) => ax0 + (x + C / 2) / C * aw;
+  ctx.fillStyle = T.bg2; ctx.fillRect(ax0, aY, aw, aH);
+  ctx.strokeStyle = T.rule; ctx.lineWidth = 1; ctx.strokeRect(ax0 + 0.5, aY + 0.5, aw - 1, aH - 1);
+  ctx.fillStyle = T.seam; ctx.fillRect(ax0 - 1.5, aY - 3, 3, aH + 6); ctx.fillRect(ax1 - 1.5, aY - 3, 3, aH + 6);
+  ctx.strokeStyle = T.rule; ctx.beginPath(); ctx.moveTo(ax(0) + 0.5, aY); ctx.lineTo(ax(0) + 0.5, aY + aH); ctx.stroke();
+  text(ctx, num(-C / 2), ax0, aY + aH + 22, { font: `600 10.5px ${FM}`, color: T.seam });
+  text(ctx, '0', ax(0), aY + aH + 22, { font: `500 10.5px ${FM}`, align: 'center', color: T.ink3 });
+  text(ctx, num(C / 2 - 1), ax1, aY + aH + 22, { font: `600 10.5px ${FM}`, align: 'right', color: T.seam });
+  const dot = (x, y, fill, label, above) => {
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#13222A'; ctx.stroke();
+    if (label) text(ctx, label, clamp(x, 26, w - 26), above ? y - 13 : y + 14, { font: `650 10.5px ${FD}`, align: 'center', color: T.ink, halo: T.panel });
   };
-  panel(pe, 1);
-  panel(pw, 1 - 0.55 * Math.sin(Math.PI * t));
-  // seam lines
-  const xe = (pe.off + S.P) * u, xw = pw.off * u;
-  ctx.fillStyle = T.seam;
-  if (t < 0.98) { ctx.fillRect(Math.min(xe, w) - 2, top - 4, 2.5, sh + 8); ctx.fillRect(Math.max(xw, 0) - 0.5, top - 4, 2.5, sh + 8); }
-  else {
-    ctx.save(); ctx.strokeStyle = T.seam; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
-    ctx.beginPath(); ctx.moveTo(xe, top - 4); ctx.lineTo(xe, top + sh + 4); ctx.stroke(); ctx.restore();
-  }
-  // labels: chunk x above, block x below
-  const east = S.player.x >= 0;
-  const shift = (p) => (t < 0.5 ? 0 : (east && p.key === 'W' ? C : (!east && p.key === 'E' ? -C : 0)));
-  for (const p of [pw, pe]) {
-    const sft = shift(p);
-    for (let cx = Math.floor(p.start / 16); cx * 16 < p.start + S.P; cx++) {
-      const a = Math.max(cx * 16, p.start), b = Math.min(cx * 16 + 16, p.start + S.P);
-      if ((b - a) * u < 34) continue;
-      const mx = (p.off + (a + b) / 2 - p.start) * u;
-      text(ctx, num(cx + sft / 16) + (sft ? '*' : ''), mx, top - 11, { font: `${sft ? 600 : 500} 10.5px ${FM}`, align: 'center', color: sft ? T.seam : T.ink2 });
-    }
-    let lastLab = -1e9;
-    for (let x = Math.ceil(p.start / 16) * 16; x <= p.start + S.P; x += 16) {
-      const sx = (p.off + x - p.start) * u;
-      if (sx < 18 || sx > w - 18 || Math.abs(sx - lastLab) < 44) continue;
-      if (t >= 0.5 && p.key === (east ? 'W' : 'E') && Math.abs(sx - xe) < 4) continue;
-      lastLab = sx;
-      const isSeam = x === -C / 2 || x === C / 2;
-      text(ctx, num(x + sft), sx, top + sh + 15, { font: `${isSeam ? 600 : 500} 10.5px ${FM}`, align: 'center', color: isSeam || sft ? T.seam : T.ink3 });
-    }
-  }
-  if (t < 0.5) {
-    text(ctx, num(-C / 2), Math.max(xw, 0) + 3, top + sh + 15, { font: `600 10.5px ${FM}`, color: T.seam });
-    text(ctx, num(C / 2) + ' →', Math.min(xe, w) - 3, top + sh + 15, { font: `600 10.5px ${FM}`, align: 'right', color: T.seam });
-  }
-  // entities
-  const fr = S.anim >= 0.999 ? clamp(S.acc, 0, 1) : 1;
-  const xsOf = (x) => (x >= 0 ? x : x + C);
-  const screenX = (x, xPrev) => {
-    if (t >= 0.5) {
-      const xs = lerp(xsOf(xPrev), xsOf(x), fr);
-      return xs < C / 2 ? (pe.off + xs - pe.start) * u : (pw.off + xs - C - pw.start) * u;
-    }
-    return x >= 0 ? (pe.off + x - pe.start) * u : (pw.off + x - pw.start) * u;
-  };
-  const clipTo = (x) => {
-    ctx.save(); ctx.beginPath();
-    if (t >= 0.5) ctx.rect(Math.min(pe.off, pw.off) * u, top, 2 * S.P * u, sh);
-    else { const p = x >= 0 ? pe : pw; ctx.rect(p.off * u, top, S.P * u, sh); }
-    ctx.clip();
-  };
-  for (const e of S.ents) {
-    const sx = screenX(e.x, e.prevX), sy = top + (lerp(e.prevZ, e.z, fr) - S.zTop) * u;
-    clipTo(e.x);
-    drawEntity(ctx, e, sx, sy, u);
-    ctx.restore();
-    if (e.kind === 'ship' && t < 0.5) {   // the part of a hull that overhangs the stored end
-      const p = e.x >= 0 ? pe : pw, L = e.len * u, x0 = p.off * u, x1 = (p.off + S.P) * u;
-      if (sx + L / 2 > x1 || sx - L / 2 < x0) {
-        ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = T.ink2; ctx.lineWidth = 1.2;
-        ctx.strokeRect(sx - L / 2, sy - e.wid * u / 2, L, e.wid * u); ctx.restore();
-      }
-    }
-    if (e === S.tracked) {
-      ctx.save(); clipTo(e.x);
-      ctx.beginPath(); ctx.arc(sx, sy, Math.max(9, (e.kind === 'ship' ? 3.8 : 1.1) * u), 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]); ctx.stroke();
-      ctx.restore(); ctx.restore();
-    }
-  }
-  // you
-  const pl = S.player;
-  const px = screenX(pl.x, pl.x), py = top + (pl.z - S.zTop) * u;
-  ctx.beginPath(); ctx.arc(px, py, Math.max(5, 0.5 * u), 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#13222A'; ctx.stroke();
-  text(ctx, 'you', px, py - Math.max(5, 0.5 * u) - 8, { font: `650 11px ${FD}`, align: 'center', color: '#fff', halo: 'rgba(0,0,0,.65)' });
-  // folds
-  for (const f of S.flashes) {
-    const a = clamp(1 - (now - f.t0) / 1500, 0, 1);
-    if (t < 0.5) {
-      const x1 = f.dir > 0 ? Math.min(xe, w - 2) : Math.max(xw, 2), x2 = f.dir > 0 ? Math.max(xw, 2) : Math.min(xe, w - 2);
-      ctx.strokeStyle = rgba(T.seam, a); ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(x1, top - 2); ctx.quadraticCurveTo((x1 + x2) / 2, -top * 0.75, x2, top - 2); ctx.stroke();
-      ctx.fillStyle = rgba(T.seam, a);
-      ctx.beginPath(); ctx.moveTo(x2, top); ctx.lineTo(x2 - 5, top - 9); ctx.lineTo(x2 + 5, top - 9); ctx.closePath(); ctx.fill();
+  const FRIEND = '#3F7FD0';
+  const fsx = friendSx(C);
+  if (DW.flash) {
+    const a = clamp(1 - (now - DW.flash.t0) / 1800, 0, 1);
+    if (a > 0) {
       ctx.globalAlpha = a;
-      tag(ctx, f.dir > 0 ? `moved to x − ${num(C)}` : `moved to x + ${num(C)}`, (x1 + x2) / 2, 11, T.seam, '#fff', `600 10.5px ${FM}`);
+      ctx.fillStyle = rgba(T.seam, 0.35); ctx.fillRect(ax0, aY, 14, aH); ctx.fillRect(ax1 - 14, aY, 14, aH);
+      tag(ctx, DW.flash.dir > 0 ? `east end → west end: x − ${num(C)}` : `west end → east end: x + ${num(C)}`, ax(0), aY + aH / 2, T.seam, '#fff', `600 10.5px ${FM}`);
       ctx.globalAlpha = 1;
-    } else {
-      const r = (1 - a) * 2.5 * u + 4;
-      ctx.beginPath(); ctx.arc(xe, top + (f.z - S.zTop) * u, r, 0, Math.PI * 2);
-      ctx.strokeStyle = rgba(T.seam, a); ctx.lineWidth = 2; ctx.stroke();
     }
   }
-  if (t >= 0.98 && !S.flashes.length) {
-    ctx.globalAlpha = 0.95;
-    tag(ctx, 'seam: no edge in game', xe, 10, T.seam, '#fff', `600 10.5px ${FD}`);
-    ctx.globalAlpha = 1;
+  const fx = ax(fsx), px = ax(DW.sx);
+  dot(fx, aY + aH * 0.68, FRIEND, 'friend', false);   // offset rows so the two stay visible when close
+  dot(px, aY + aH * 0.32, '#ffffff', 'you', true);
+  // ---- lane B: the same land as your game holds it
+  text(ctx, narrow ? `Your game: a line that never ends (±${N} blocks)` : `Your game: the same land as a line that never ends (±${N} blocks around you)`,
+    pad, bT - 34, { font: `650 11.5px ${FD}`, color: T.ink });
+  const sxOf = (X) => w / 2 + (X - DW.cx) * u;
+  const X0 = Math.floor(DW.cx - N) - 1, X1 = Math.ceil(DW.cx + N) + 1;
+  for (let X = X0; X <= X1; X++) {
+    const x0 = Math.floor(sxOf(X)), x1 = Math.ceil(sxOf(X + 1));
+    for (let j = 0; j < rows; j++) {
+      const c = tileColor(fold(X), z0 + j);
+      ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      ctx.fillRect(x0, Math.floor(bT + j * u), x1 - x0, Math.ceil(u) + 1);
+    }
   }
-}
-function drawEntity(ctx, e, x, y, u) {
-  if (e.kind === 'snowball') {
-    ctx.beginPath(); ctx.arc(x, y, Math.max(3.2, 0.34 * u), 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.lineWidth = 1.4; ctx.strokeStyle = '#38505C'; ctx.stroke();
-  } else if (e.kind === 'minecart') {
-    const w = 1.1 * u, h = 0.8 * u;
-    ctx.fillStyle = '#5B5E63'; ctx.fillRect(x - w / 2, y - h / 2, w, h);
-    ctx.strokeStyle = '#23262A'; ctx.lineWidth = 1.2; ctx.strokeRect(x - w / 2, y - h / 2, w, h);
-    ctx.fillStyle = '#34373B'; ctx.fillRect(x - w / 2 + 0.18 * u, y - h / 2 + 0.16 * u, w - 0.36 * u, h - 0.32 * u);
-  } else if (e.kind === 'zombie') {
-    const s = Math.max(6, 0.8 * u);
-    ctx.fillStyle = '#4F8A3C'; ctx.fillRect(x - s / 2, y - s / 2, s, s);
-    ctx.strokeStyle = '#1F3A18'; ctx.lineWidth = 1.2; ctx.strokeRect(x - s / 2, y - s / 2, s, s);
-    ctx.fillStyle = '#10200C'; ctx.fillRect(x - s * 0.3, y - s * 0.12, s * 0.2, s * 0.18); ctx.fillRect(x + s * 0.1, y - s * 0.12, s * 0.2, s * 0.18);
-  } else {
-    const L = e.len * u, W = e.wid * u;
-    ctx.save(); ctx.translate(x, y);
-    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(-L / 2 + 0.3 * u, -W / 2 + 0.4 * u, L, W);
-    ctx.beginPath();
-    ctx.moveTo(L / 2, 0); ctx.lineTo(L / 2 - W * 0.55, -W / 2); ctx.lineTo(-L / 2, -W / 2); ctx.lineTo(-L / 2, W / 2); ctx.lineTo(L / 2 - W * 0.55, W / 2); ctx.closePath();
-    ctx.fillStyle = '#8A5A32'; ctx.fill(); ctx.strokeStyle = '#3B2412'; ctx.lineWidth = 1.4; ctx.stroke();
-    ctx.fillStyle = '#C79A64'; ctx.fillRect(-L / 2 + 0.5 * u, -W / 2 + 0.5 * u, L - 1.9 * u, W - u);
-    ctx.fillStyle = '#E9DCC3'; ctx.fillRect(-L / 2 + 0.7 * u, -W / 2 + 0.7 * u, 1.3 * u, 1.1 * u);
-    ctx.fillStyle = '#3B2412'; ctx.beginPath(); ctx.arc(0.3 * u, 0, Math.max(1.5, 0.22 * u), 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+  // chunk lines and labels
+  ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath();
+  for (let X = Math.ceil(X0 / 16) * 16; X <= X1; X += 16) { const x = Math.round(sxOf(X)) + 0.5; ctx.moveTo(x, bT); ctx.lineTo(x, bT + bH); }
+  ctx.stroke(); ctx.restore();
+  for (let k = Math.floor(X0 / 16); k * 16 <= X1; k++) {
+    const a = Math.max(sxOf(k * 16), 0), b = Math.min(sxOf(k * 16 + 16), w);
+    if (b - a < 30) continue;
+    const ks = Math.floor(fold(k * 16) / 16), mid = (a + b) / 2;
+    const long = ks !== k ? `chunk ${num(k)} = s ${num(ks)}` : `chunk ${num(k)}`;
+    ctx.font = `600 10px ${FM}`;
+    const s = ctx.measureText(long).width + 6 < b - a ? long : (ks !== k ? `${num(k)}=s${num(ks)}` : num(k));
+    text(ctx, s, mid, bT - 9, { font: `${ks !== k ? 600 : 500} 10px ${FM}`, align: 'center', color: ks !== k ? T.seam : T.ink3 });
   }
+  // the seam(s) in your game's space: every x ≡ C/2 (mod C)
+  for (let X = X0; X <= X1; X++) {
+    if (mod(X - C / 2, C) !== 0) continue;
+    const x = sxOf(X);
+    ctx.save(); ctx.strokeStyle = T.seam; ctx.lineWidth = 2.5; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(x, bT - 2); ctx.lineTo(x, bT + bH + 2); ctx.stroke(); ctx.restore();
+    tag(ctx, 'seam', x, bT + bH - 10, T.seam, '#fff', `650 10px ${FD}`);
+  }
+  // tick labels: your game's x, then the server's x for the same spot
+  const step = 8, rowG = bT + bH + 14, rowS = bT + bH + 31;
+  ctx.fillStyle = T.panel; ctx.fillRect(0, bT + bH + 3, 50, 38);
+  for (let X = Math.ceil(X0 / step) * step; X <= X1; X += step) {
+    const x = sxOf(X); if (x < 58 || x > w - 20) continue;
+    const s = fold(X);
+    text(ctx, num(X), x, rowG, { font: `500 10.5px ${FM}`, align: 'center', color: T.ink2 });
+    text(ctx, num(s), x, rowS, { font: `${s !== X ? 600 : 500} 10.5px ${FM}`, align: 'center', color: s !== X ? T.seam : T.ink3 });
+  }
+  text(ctx, 'game x', 4, rowG, { font: `600 10px ${FD}`, color: T.ink2 });
+  text(ctx, 'server x', 4, rowS, { font: `600 10px ${FD}`, color: T.ink3 });
+  // the friend, sent to you at the copy nearest your game's x
+  const fc = DW.cx + fold(fsx - DW.cx), fX = sxOf(fc);
+  const yRow = bT + (6.5) * u;
+  if (fX > -8 && fX < w + 8) dot(fX, bT + 2.5 * u, FRIEND, 'friend', false);
+  dot(w / 2, yRow, '#ffffff', 'you', true);
 }
-function stripReadout() {
-  const C = P.C, pl = S.player, e = S.tracked;
-  const east = pl.x >= 0;
-  $('#strip-you').innerHTML = `<h3>You</h3><dl class="kv">
-    <dt>Stored x, z</dt><dd>${num(pl.x, 2)}, ${num(pl.z, 2)}</dd>
-    <dt>Chunk</dt><dd>${num(chunkOf(pl.x))}, ${num(chunkOf(pl.z))}</dd>
-    <dt>Region file</dt><dd>r.${regionOf(pl.x)}.${regionOf(pl.z)}.mca</dd>
-    <dt>Far side</dt><dd>${east ? `x = ${num(-C / 2)} … is sent to you as ${num(C / 2)} …` : `x = ${num(C / 2 - 1)} … is sent to you as ${num(-C / 2 - 1)} …`}</dd>
+function dualReadout() {
+  const C = P.C, cx = DW.cx, sx = DW.sx, fsx = friendSx(C);
+  const toSeam = fold(cx - C / 2);                      // signed offset from the nearest seam
+  const fc = cx + fold(fsx - cx), fd = fc - cx;
+  const lapsText = DW.laps === 0 ? 'none yet' : `${num(Math.abs(DW.laps))} ${DW.laps > 0 ? 'east' : 'west'}`;
+  $('#dual-read').innerHTML = `<h3>Right now</h3><dl class="kv">
+    <dt>Your game's x</dt><dd>${num(cx, 1)}<br><span class="dim">F3 "Unwrapped XYZ"</span></dd>
+    <dt>Server's x</dt><dd>${num(sx, 1)}<br><span class="dim">F3 "XYZ"</span></dd>
+    <dt>Difference</dt><dd>${num(cx - sx)}${Math.round((cx - sx) / C) === 0 ? '' : ` <span class="dim">= ${num(Math.round((cx - sx) / C))} × ${num(C)}</span>`}</dd>
+    <dt>Chunk</dt><dd>stored ${num(chunkOf(sx))}, in r.${num(regionOf(sx))}.0.mca<br>your game: ${num(chunkOf(cx))}</dd>
+    <dt>Seam</dt><dd>${Math.abs(toSeam) < 0.05 ? 'under your feet' : `${num(Math.abs(toSeam), 1)} blocks ${toSeam < 0 ? 'east' : 'west'} of you`}</dd>
+    <dt>Friend</dt><dd>stored at ${num(fsx)}<br>sent to you at ${num(fc)}: ${num(Math.abs(fd))} blocks ${fd >= 0 ? 'east' : 'west'}</dd>
+    <dt>This lap</dt><dd>${num(Math.abs(DW.travel))} of ${num(C)} blocks ${DW.travel >= 0 ? 'east' : 'west'}<br>laps done: ${lapsText}</dd>
   </dl>`;
-  if (!e) {
-    $('#strip-ent').innerHTML = '<h3>Tracked entity</h3><p class="small">Launch something: the snowball replays the GameTest that crossed the seam on the planet server.</p>';
-    return;
-  }
-  const sent = pl.x + fold(e.x - pl.x);
-  const dNear = Math.hypot(fold(e.x - pl.x), e.z - pl.z);
-  const f = e.folds[e.folds.length - 1];
-  const alive = S.ents.includes(e);
-  $('#strip-ent').innerHTML = `<h3>${KIND[e.kind].name} #${e.id}${alive ? '' : ' <span class="dim">(gone)</span>'}</h3><dl class="kv">
-    <dt>Stored x</dt><dd>${num(e.x, 2)}</dd>
-    <dt>Raw x</dt><dd>${num(e.raw, 2)} <span class="dim">if nothing folded</span></dd>
-    <dt>Sent to you at</dt><dd>${num(sent, 2)}</dd>
-    <dt>Stored chunk</dt><dd>${num(chunkOf(e.x))} · r.${regionOf(e.x)}</dd>
-    <dt>Distance</dt><dd>${num(dNear, 1)} to your nearest copy<br><span class="dim">naive |Δx| would be ${num(Math.abs(e.x - pl.x), 1)}</span></dd>
-    <dt>Fold</dt><dd>${f ? `tick ${f.tick}: ${num(f.before, 2)} → ${num(f.after, 2)}` : 'not yet'}</dd>
-  </dl><p class="small">${KIND[e.kind].note()}</p>`;
+  const k = Math.round((cx - sx) / C);
+  $('#dual-caption').innerHTML = k === 0
+    ? `<strong>Both numbers agree.</strong> They do from login until your first crossing. The friend stands ${num(FRIEND_OFF)} blocks past the seam, at stored x = ${num(fsx)}; the server sends them to you at x = ${num(fc)}, so they appear ${num(Math.abs(fd))} blocks ${fd >= 0 ? 'east' : 'west'} of you, where they really are.`
+    : `<strong>Your game's x is ${num(Math.abs(k))} lap${Math.abs(k) === 1 ? '' : 's'} (${num(Math.abs(cx - sx))} blocks) ${k > 0 ? 'ahead of' : 'behind'} the server's.</strong> TW adds that difference to everything it sends you: chunks, mobs, other players. So the land and the people around you sit exactly where your game expects them. Log out and back in to see it reset.`;
 }
-function stripCaption() {
-  const C = P.C;
-  $('#strip-caption').innerHTML = S.view === 0
-    ? `<strong>What the server stores: one copy.</strong> The west end of the span (x from ${num(-C / 2)}) and the east end (x up to ${num(C / 2 - 1)}) are ${num(C - 2 * S.P)} blocks apart on disk. Anything that ends a tick past the east end is moved to the west end in that same tick; nothing is ever stored past x = ${num(C / 2)}.`
-    : `<strong>What a player next to the seam is sent: the nearest copy of everything.</strong> Standing east of the seam, you are sent the chunks of x = ${num(-C / 2)} … as if they were at ${num(C / 2)} …, so the river and the rail simply continue. Walk across and the numbers change, the picture does not. This is TW's documented behaviour; nobody has watched it through a client yet.`;
+function dualFrame(now) {
+  DW.raf = 0;
+  const dt = DW.last ? Math.min(0.1, (now - DW.last) / 1000) : 0; DW.last = now;
+  if (DW.lap) {
+    const L = DW.lap, t = clamp((now - L.t0) / L.dur, 0, 1);
+    const want = L.from + L.dir * P.C * smooth(t);
+    dualMove(want - DW.cx);
+    if (t >= 1) { DW.lap = null; dualButtons(); }
+  } else if (DW.walk) dualMove(DW.walk * SPRINT * dt);
+  drawDual(); dualReadout();
+  const flashing = DW.flash && now - DW.flash.t0 < 1800;
+  if (DW.walk || DW.lap || flashing) DW.raf = requestAnimationFrame(dualFrame);
+  else DW.last = 0;
 }
-let lastReadTick = -1;
-function stripLoop(now) {
-  S.raf = 0;
-  const dt = S.last ? Math.min(0.1, (now - S.last) / 1000) : 0; S.last = now;
-  if (S.anim !== S.view) S.anim = reduceMotion ? S.view : clamp(S.anim + (S.view ? 1 : -1) * dt / 0.75, 0, 1);
-  if (S.ents.length) {
-    S.acc += dt * 20 * (S.slow ? 0.25 : 1);
-    while (S.acc >= 1) { S.acc -= 1; tickOnce(); }
-  } else S.acc = 0;
-  S.flashes = S.flashes.filter((f) => now - f.t0 < 1500);
-  drawStrip();
-  if (S.tick !== lastReadTick) { lastReadTick = S.tick; stripReadout(); }
-  if (S.ents.length || S.anim !== S.view || S.flashes.length) S.raf = requestAnimationFrame(stripLoop);
-  else S.last = 0;
-}
-function kickStrip() { if (!S.raf) { S.last = 0; S.raf = requestAnimationFrame(stripLoop); } }
-function replaySnowball() {
-  spawn('snowball');
-  for (let i = 0; i < 4; i++) tickOnce();   // tick 2 is the fold: 8,192.21 → −8,191.79 at 16k
-  stripReadout();
-}
-function initStrip() {
-  resetStrip(); stripCaption(); replaySnowball();
-  $$('[data-spawn]').forEach((b) => b.addEventListener('click', () => spawn(b.dataset.spawn)));
-  $('#strip-clear').addEventListener('click', () => { resetStrip(); drawStrip(); });
-  $('#step-w').addEventListener('click', () => stepPlayer(-1));
-  $('#step-e').addEventListener('click', () => stepPlayer(1));
-  $('#strip-slow').addEventListener('change', (e) => { S.slow = e.target.checked; });
-  const setView = (v) => {
-    S.view = v;
-    $('#view-server').setAttribute('aria-pressed', String(v === 0));
-    $('#view-player').setAttribute('aria-pressed', String(v === 1));
-    stripCaption(); kickStrip();
-  };
-  $('#view-server').addEventListener('click', () => setView(0));
-  $('#view-player').addEventListener('click', () => setView(1));
-  const cv = $('#stripc');
-  cv.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); stepPlayer((e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 4 : 1)); }
+function kickDual() { if (!DW.raf) { DW.last = 0; DW.raf = requestAnimationFrame(dualFrame); } }
+function dualStep(d) { DW.walk = 0; DW.lap = null; dualButtons(); dualMove(d); dualReadout(); kickDual(); }
+function initDual() {
+  dualReset();
+  const walk = (dir) => { DW.lap = null; DW.walk = DW.walk === dir ? 0 : dir; dualButtons(); kickDual(); };
+  $('#dw-w').addEventListener('click', () => walk(-1));
+  $('#dw-e').addEventListener('click', () => walk(1));
+  $('#dw-sw').addEventListener('click', () => dualStep(-1));
+  $('#dw-se').addEventListener('click', () => dualStep(1));
+  $('#dw-lap').addEventListener('click', () => {
+    DW.walk = 0;
+    if (reduceMotion) { dualMove(P.C); dualButtons(); dualReadout(); kickDual(); return; }
+    DW.lap = { t0: performance.now(), dur: 5200, from: DW.cx, dir: 1 };
+    dualLog(`Setting off east for a full lap: ${num(P.C)} blocks (shown fast).`);
+    dualButtons(); kickDual();
   });
-  const dragTo = (e) => {
-    const g = S.geo; if (!g) return;
-    const r = cv.getBoundingClientRect();
-    const bx = (e.clientX - r.left) / g.u, bz = S.zTop + (e.clientY - r.top - g.top) / g.u;
-    const C = P.C, pl = S.player;
-    pl.z = clamp(bz, S.zTop + 0.5, S.zTop + S.R - 0.5);
-    if (S.anim >= 0.5) {
-      const xs = clamp(C / 2 - S.P + (bx - g.pe.off), C / 2 - S.P + 0.5, C / 2 + S.P - 0.5);
-      movePlayerTo(pl.x < 0 ? xs - C : xs);   // strip coordinate → stored x; crossing the seam folds
-    } else {
-      const p = pl.x >= 0 ? g.pe : g.pw;
-      pl.x = clamp(p.start + (bx - p.off), p.start + 0.5, p.start + S.P - 0.5);
-    }
-    stripReadout(); kickStrip();
-  };
-  cv.addEventListener('pointerdown', (e) => { S.drag = true; try { cv.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } dragTo(e); });
-  cv.addEventListener('pointermove', (e) => { if (S.drag) dragTo(e); });
-  cv.addEventListener('pointerup', () => { S.drag = false; });
-  cv.addEventListener('pointercancel', () => { S.drag = false; });
+  $('#dw-relog').addEventListener('click', dualRelog);
+  $('#dw-reset').addEventListener('click', () => { dualReset(); dualReadout(); kickDual(); });
+  const cv = $('#dualc');
+  cv.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); dualStep((e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 16 : 1)); }
+  });
+  cv.addEventListener('pointerdown', (e) => { DW.drag = e.clientX; DW.walk = 0; DW.lap = null; dualButtons(); try { cv.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } });
+  cv.addEventListener('pointermove', (e) => {
+    if (DW.drag === null || !DW.geo) return;
+    const d = (e.clientX - DW.drag) / DW.geo.u; DW.drag = e.clientX;
+    dualMove(-d); dualReadout(); kickDual();
+  });
+  const end = () => { DW.drag = null; };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
 }
 
 /* ================================================================ 3. ROLL (flat → cylinder → sphere) */
@@ -1803,7 +1855,7 @@ function initNether() {
 function initStatus() {
   const rows = $$('.status tbody tr');
   const count = (s) => rows.filter((r) => r.dataset.s === s).length;
-  $('#tally').textContent = `${count('ok')} verified · ${count('pend')} pending · ${count('later')} later · ${count('unv')} need a client`;
+  $('#tally').textContent = `${count('ok')} verified · ${count('code')} from code · ${count('pend')} pending · ${count('later')} later · ${count('unv')} need a client`;
   $$('[data-filter]').forEach((b) => b.addEventListener('click', () => {
     const f = b.dataset.filter;
     $$('[data-filter]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
@@ -1815,7 +1867,7 @@ function initStatus() {
 function drawAll() {
   readTheme();
   drawMap(); mapReadout();
-  drawStrip();
+  drawDual(); dualReadout();
   drawRoll(); rollCaption();
   drawMirror();
   drawPoleChart(); drawScene(); poleReadout();
@@ -1825,10 +1877,10 @@ function init() {
   readTheme();
   buildMap();
   applyDerived();
-  initMap(); initStrip(); initRoll(); initMirror(); initPoles(); initNether(); initStatus();
+  initMap(); initDual(); initRoll(); initMirror(); initPoles(); initNether(); initStatus();
   subs.push(() => {
     M.pin = M.pin || { lon: 330, lat: 45 };
-    S.texKey = ''; resetStrip(); stripCaption(); replaySnowball();
+    dualReset(); dualReadout();
     NE.x = netherW() / 2 - 5;
     drawAll();
   });
