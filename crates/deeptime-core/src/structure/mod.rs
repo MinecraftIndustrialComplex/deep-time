@@ -244,6 +244,7 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     StageEstimate {
         bytes: cells * (hosts * 4 + 3 * 4 + 64),
         seconds: cells as f64 * p.plate_steps() as f64 * 0.05e-6,
+        history_bytes: 0,
     }
 }
 
@@ -439,7 +440,7 @@ impl StructureStage {
 
         // 3. The deposit engine's fields for frames the surface closed this step.
         let started = Instant::now();
-        let frames = history.as_ref().map_or(0, |h| h.frames.len() as u64);
+        let frames = history.as_ref().map_or(0, |h| h.frame_count() as u64);
         let mut trap: Option<Vec<f32>> = None;
         if frames > self.st.frames_seen {
             ctx.reserve((n * (self.host_classes.len() + 2) * 4) as u64)?;
