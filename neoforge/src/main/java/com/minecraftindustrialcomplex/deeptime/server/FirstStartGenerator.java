@@ -198,7 +198,7 @@ public final class FirstStartGenerator {
                     "The level-type in server.properties (" + levelTypeFor(c) + ") fixes the world's size before the first start.\n"
                             + "Either choose a preset for C = " + c + " (" + presetsFor(c) + "),\n"
                             + "or set level-type=" + levelTypeFor(presetC).replace(":", "\\:") + " in server.properties and delete the world folder "
-                            + world.getFileName() + " (it holds no world yet).");
+                            + world.getFileName() + "\n(it holds no world yet, but its level.dat already records the old level-type).");
 
         // 3. The natives (plan §6.6).
         String cli = "deeptime run --preset " + quote(config.preset()) + " --start " + timeline.start()
@@ -247,9 +247,10 @@ public final class FirstStartGenerator {
             throw new Stop("cannot prepare " + work + ": " + e, "Check that the world folder is writable.");
         }
         int threads = config.threads() > 0 ? config.threads() : Runtime.getRuntime().availableProcessors();
-        DeepTime.LOGGER.info("[deeptime] generating the world's history on first start: preset {} ({}), C = {}, timeline {}, "
+        DeepTime.LOGGER.info("[deeptime] generating the world's history on first start: preset {}, C = {}, timeline {}, "
                         + "{} threads, native cap {} GiB, estimate {} GiB, {} stages -> {}",
-                name, resolved.label(), c, timeline, threads, gib(cap), gib(peak), stageNames.size(), dir);
+                name.equals(resolved.label()) ? name : name + " (" + resolved.label() + ")", c, timeline, threads,
+                gib(cap), gib(peak), stageNames.size(), dir);
         long started = System.nanoTime();
         String manifestJson = run(server, presetJson, work, threads, cap, stageNames, started);
 

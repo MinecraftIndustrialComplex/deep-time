@@ -310,7 +310,7 @@ def check_generation(steps, server, install, label=""):
 
 
 # A scenario boots a world without data and expects Deep Time to stop the server before
-# loadLevel() (plan §6.6, §7.13): exit status 1, no Done, no level.dat, no region files, no world
+# loadLevel() (plan §6.6, §7.13): exit status 1, no Done, no region files, no world
 # data, no crash report. Each prepares the server and restores it afterwards.
 SCENARIOS = {
     "first_start_no_config": "config/deeptime/server.json missing -> template written, clean stop",
@@ -379,8 +379,18 @@ def run_scenario(name, a, smoke, server_dir, world, install, tools):
                 next((l for l in server.lines if STOPPING.search(l)), "absent").strip()[:200], bool(STOPPING.search(text)))
     steps.check("stopped before loadLevel()", "no 'Preparing level'", "present" if "Preparing level" in text else "absent",
                 "Preparing level" not in text)
-    half = [p for p in ("level.dat", "region", "deeptime", "deeptime.generating") if os.path.exists(os.path.join(world, p))]
-    steps.check("no half-made world saved", "no level.dat, region/, deeptime/", ", ".join(half) or "none", not half)
+    half = [p for p in ("region", "entities", "poi", "data", "dimensions", "DIM-1", "DIM1", "deeptime", "deeptime.generating")
+            if os.path.exists(os.path.join(world, p))]
+    steps.check("no half-made world saved", "no region/, entities/, data/, dimensions/, deeptime/", ", ".join(half) or "none",
+                not half)
+    # Vanilla's Main writes level.dat (the world's settings) before the server thread starts, so it
+    # exists before any mod event; nothing may write it again at the stop.
+    level_dat = os.path.join(world, "level.dat")
+    stop_at = next((t for t, l in server.timed if STOPPING.search(l)), None)
+    mtime = os.path.getmtime(level_dat) if os.path.exists(level_dat) else None
+    steps.check("level.dat is only vanilla Main's (not rewritten at the stop)", "written before the stop line",
+                "absent" if mtime is None else (f"{stop_at - mtime:.1f} s before the stop line" if stop_at else "no stop line"),
+                mtime is None or (stop_at is not None and mtime < stop_at))
     noise = [l.strip()[:160] for l in server.lines if re.search(
         r"Encountered an unexpected exception|Exception stopping the server|This crash report has been saved|"
         r"Failed to start the minecraft server", l)]

@@ -17,11 +17,16 @@ import net.minecraft.server.MinecraftServer;
  *   <li>{@code MinecraftServerFirstStartMixin}: {@code runServer} skips
  *       {@code ServerStartedEvent} and {@code ServerStoppingEvent} (no mod expects them without a
  *       level), and {@code saveAllChunks} saves nothing (vanilla would throw on the missing
- *       overworld and write {@code level.dat}). {@code stopServer} still closes the network
+ *       overworld, an "Exception stopping the server"). {@code stopServer} still closes the network
  *       listener and releases {@code session.lock}; {@code ServerStoppedEvent} still fires.</li>
  * </ol>
  *
- * The server is halted, so the tick loop never runs. No crash report is written. When the stop is
+ * What the world folder holds afterwards is what vanilla wrote before any mod event:
+ * {@code level.dat} (the world's settings, written by {@code net.minecraft.server.Main} before the
+ * server thread starts, so it already records the level-type), {@code session.lock} and NeoForge's
+ * {@code serverconfig/}. No region, entity, POI or {@code data/} file, and no world data.
+ *
+ * <p>The server is halted, so the tick loop never runs. No crash report is written. When the stop is
  * a failure (not a Ctrl-C during generation), a {@code deeptime-stop} thread waits for the server
  * thread to finish and exits the JVM with status 1, so service managers see that the server did
  * not start.
