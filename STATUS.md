@@ -46,6 +46,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 ## Review pages
 | Name | URL | Version label | Date |
 |---|---|---|---|
+| hub (every review page in one place; update it when a page is added) | https://spacesheep.dev/@benmac/deeptime-hub | hub 2026-09-28 | 2026-09-28 |
 | seams (where the wrap is, what crossing does, checked against TW 0.19.3 code; links the wrap graphics page) | https://spacesheep.dev/@benmac/deeptime-seams | wrap explainer 2026-09-28 | 2026-09-28 |
 | wrap (how the east–west wrap works: 3D planet, server vs client views of a crossing, two players, a lap, Nether 1:8) | https://spacesheep.dev/@benmac/deeptime-wrap | how the wrap works 2026-09-28 | 2026-09-28 |
 | phase0 (Phase 0 exit: every check, evidence, links) | https://spacesheep.dev/@benmac/deeptime-phase0 | Phase 0 exit 2026-09-28 | 2026-09-28 |
