@@ -12,7 +12,12 @@
 #                                 rock tags, …/mic/Docs/datapacks/deeptime-mic-rock-tags, until the
 #                                 pack ships them; P1-12)
 #       [--test-terrain <kind>]   -Ddeeptime.testTerrain=<kind> (the analytic terrain, P0-05+)
-#       [--preset <p>]            config/deeptime/server.json preset (P1-13+)
+#       [--preset <p>]            config/deeptime/server.json preset (P1-13+): a built-in name, a
+#                                 file or a share code; the server generates on its first start
+#       [--start <s>]             its timeline.start (supercontinent | scattered_continents | random)
+#       [--length-myr <n>]        its timeline.length_myr. The mod has no default story; this
+#                                 harness names supercontinent / 1000 when --preset comes alone
+#       [--memory-cap-gib <n>]    its memory_cap_gib (default 4)
 #       [--pack-worktree]         mic only: install the pack's working tree instead of its last
 #                                 commit (other sessions edit the working tree; HEAD is the default)
 #       [--clean]                 throw the server away first
@@ -41,6 +46,7 @@ RCON_PORT=25675
 
 PROFILE="${1:-}"; shift || true
 SIZE=16384; SYNTH=""; STRATA=placeholder; DATAPACK=""; TEST_TERRAIN=""; PRESET=""; CLEAN=0; PACK_WORKTREE=0
+START=""; LENGTH_MYR=""; MEMORY_CAP_GIB=4
 while [ $# -gt 0 ]; do
     case "$1" in
         --size) SIZE="$2"; shift 2 ;;
@@ -49,6 +55,9 @@ while [ $# -gt 0 ]; do
         --datapack) DATAPACK="$2"; shift 2 ;;
         --test-terrain) TEST_TERRAIN="$2"; shift 2 ;;
         --preset) PRESET="$2"; shift 2 ;;
+        --start) START="$2"; shift 2 ;;
+        --length-myr) LENGTH_MYR="$2"; shift 2 ;;
+        --memory-cap-gib) MEMORY_CAP_GIB="$2"; shift 2 ;;
         --clean) CLEAN=1; shift ;;
         --pack-worktree) PACK_WORKTREE=1; shift ;;
         *) echo "install.sh: unknown argument '$1'" >&2; exit 2 ;;
@@ -56,7 +65,7 @@ while [ $# -gt 0 ]; do
 done
 case "$PROFILE" in
     standalone|mic|terrablender|ev) ;;
-    *) echo "usage: install.sh <standalone|mic|terrablender|ev> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P] [--clean]" >&2; exit 2 ;;
+    *) echo "usage: install.sh <standalone|mic|terrablender|ev> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--clean]" >&2; exit 2 ;;
 esac
 case "$SIZE" in
     16384) LEVEL_TYPE='deeptime\:planet' ;;
@@ -290,9 +299,23 @@ EOF
     echo '-XX:+UseG1GC'
     [ -n "$TEST_TERRAIN" ] && echo "-Ddeeptime.testTerrain=$TEST_TERRAIN"
 } > "$SERVER/user_jvm_args.txt"
+# config/deeptime/server.json (plan §7.13, P1-13): exactly what this install asked for, so a stale
+# file from an earlier install never decides a first start.
+rm -f "$SERVER/config/deeptime/server.json"
 if [ -n "$PRESET" ]; then
+    [ -n "$START" ] || START=supercontinent
+    [ -n "$LENGTH_MYR" ] || LENGTH_MYR=1000
     mkdir -p "$SERVER/config/deeptime"
-    printf '{"preset": "%s", "memory_cap_gib": 4, "threads": 0}\n' "$PRESET" > "$SERVER/config/deeptime/server.json"
+    python3 - "$SERVER/config/deeptime/server.json" "$PRESET" "$START" "$LENGTH_MYR" "$MEMORY_CAP_GIB" <<'PY'
+import json, sys
+path, preset, start, length, cap = sys.argv[1:]
+cfg = {"_about": "Written by deep-time/tools/smoke/install.sh (P1-13 smoke).",
+       "preset": preset,
+       "timeline": {"start": start, "length_myr": float(length)},
+       "memory_cap_gib": float(cap), "threads": 0}
+open(path, "w").write(json.dumps(cfg, indent=2) + "\n")
+PY
+    echo "   config/deeptime/server.json: preset $PRESET, timeline $START / $LENGTH_MYR Myr"
 fi
 
 if [ -n "$SYNTH" ]; then
@@ -310,6 +333,7 @@ fi
 
 cat > "$SMOKE/install.json" <<EOF
 {"profile": "$PROFILE", "size": $SIZE, "level_type": "$(echo "$LEVEL_TYPE" | tr -d '\\')", "synth": "$SYNTH", "strata": "$STRATA", "datapack": "$DATAPACK",
+ "preset": "$PRESET", "timeline_start": "$START", "timeline_length_myr": "$LENGTH_MYR",
  "test_terrain": "$TEST_TERRAIN", "neoforge": "$NEO", "pack": "$PACK_DESC", "pack_dirty_hash": "$PACK_DIRTY_HASH",
  "pack_ref": "${PACK_REF:-}", "pack_stale_hashes": "${PACK_STALE:-}",
  "deeptime_jar": "$(basename "$JAR")", "game_port": $GAME_PORT, "rcon_port": $RCON_PORT}

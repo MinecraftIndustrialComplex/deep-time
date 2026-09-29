@@ -66,8 +66,18 @@ fn drive(
     }
 }
 
+/// A preset argument: a built-in name, a file or a share code (`deeptime_core::preset::resolve`).
+fn load_preset(arg: &str) -> CliResult<String> {
+    Ok(deeptime_core::preset::resolve(arg)?)
+}
+
 pub struct RunOptions {
-    pub preset: PathBuf,
+    /// A built-in name, a file or a share code.
+    pub preset: String,
+    /// `timeline.start`, as `config/deeptime/server.json` sets it on a server.
+    pub start: Option<String>,
+    /// `timeline.length_myr`.
+    pub length_myr: Option<f64>,
     pub content: Option<PathBuf>,
     pub out: PathBuf,
     pub viewer: Option<PathBuf>,
@@ -78,7 +88,11 @@ pub struct RunOptions {
 /// `deeptime run`: a whole planet into `--out`.
 pub fn run(o: &RunOptions) -> CliResult<()> {
     let started = Instant::now();
-    let preset = read_text(&o.preset, "preset")?;
+    let preset = deeptime_core::preset::with_timeline(
+        &load_preset(&o.preset)?,
+        o.start.as_deref(),
+        o.length_myr,
+    )?;
     let content = match &o.content {
         Some(p) => read_text(p, "content bundle")?,
         None => String::new(),
@@ -107,11 +121,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         started.elapsed().as_secs_f64()
     );
     if let Some(dir) = &o.viewer {
-        let title = format!(
-            "Deep Time — run {} ({})",
-            s.preset().name(),
-            o.preset.display()
-        );
+        let title = format!("Deep Time — run {} ({})", s.preset().name(), o.preset);
         deeptime_viewer::write_world_bundle(dir, &o.out, &title)?;
         println!(
             "deeptime run: viewer -> {}",
@@ -124,7 +134,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
 pub struct StageOptions {
     pub name: String,
     pub input: Option<PathBuf>,
-    pub preset: Option<PathBuf>,
+    pub preset: Option<String>,
     pub out: Option<PathBuf>,
     pub viewer: Option<PathBuf>,
     pub work: Option<PathBuf>,
@@ -171,12 +181,7 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             Session::resume(ck, opts, Arc::new(AllocGauge))?
         }
         (None, Some(preset)) => {
-            let s = Session::create(
-                &read_text(preset, "preset")?,
-                "",
-                opts,
-                Arc::new(AllocGauge),
-            )?;
+            let s = Session::create(&load_preset(preset)?, "", opts, Arc::new(AllocGauge))?;
             let target = s
                 .stage_names()
                 .iter()
@@ -195,7 +200,7 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             }
             s
         }
-        _ => return Err("give exactly one of --in <checkpoint> and --preset <file>".into()),
+        _ => return Err("give exactly one of --in <checkpoint> and --preset <preset>".into()),
     };
     let events_before = s.progress().events_total;
     let stepping = Instant::now();
@@ -269,7 +274,7 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
 }
 
 pub struct BenchOptions {
-    pub preset: PathBuf,
+    pub preset: String,
     pub threads: Vec<usize>,
     pub out: PathBuf,
     pub viewer: Option<PathBuf>,
@@ -281,7 +286,7 @@ pub struct BenchOptions {
 /// `deeptime bench`: the preset once per thread count, with per-stage wall time and peak native
 /// memory, into `bench.json` and a timing page (the Phase 1 budget gate's skeleton, P1-17).
 pub fn bench(o: &BenchOptions) -> CliResult<()> {
-    let preset = read_text(&o.preset, "preset")?;
+    let preset = load_preset(&o.preset)?;
     let temp = o.work.is_none();
     let work = o.work.clone().unwrap_or_else(|| {
         std::env::temp_dir().join(format!("deeptime-bench-{}", std::process::id()))
@@ -338,7 +343,7 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
     }
     let bench = json!({
         "preset": name,
-        "preset_file": o.preset.display().to_string(),
+        "preset_file": o.preset,
         "version": deeptime_core::VERSION,
         "host": format!(
             "{}-{} ({} processors)",

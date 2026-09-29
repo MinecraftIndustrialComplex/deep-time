@@ -1,0 +1,23 @@
+{
+  "_about": "Share codes (plan §5.1) written by each side from the same canonical JSON. Rust's share_code tests check encode(json) == rust and decode both; the mod's ShareCodeTest decodes both too. Fill both with tools/dev/share_code_fixture.py after ./gradlew test (ShareCodeTest writes neoforge/build/share-codes-java.json).",
+  "cases": [
+    {
+      "name": "dummy_world",
+      "json": "{\"dummy\":{\"sleep_ms\":0,\"stages\":[\"dummy_drift\",\"dummy_erode\"],\"steps\":20,\"world\":{\"circumference\":4096,\"event_every_steps\":4,\"grid_r\":16,\"keyframe_every_years\":50000000.0,\"keyframe_size\":[256,128],\"seed\":7,\"sites\":3,\"t_end_years\":0.0,\"t_start_years\":-400000000.0}}}",
+      "rust": "DT1.TY5dDoIwEITvss_VVARUrkJMQ-hCGimQbdFUwt3dChj70OzPNzM7g56sDVDM4DrEUVkHhRTgfNUil-W6V5pM40FsHdKgEe4Rw5GphBWvgTodfWpD9WQbJOxrhCKVt1wAPrH3in8KahOlAloyWhEUJyYeGBqqLG5QwIoYyuT6jvKPcObNxmWS5eKUXOMZiBx94cL4ePVZAIf1enf5yj0HV-T32SGVP-9lWT4",
+      "java": "DT1.TY7RDoIwDEX_pc_TDATU_QoxC2GFLDIw3dBMwr9bBIx9WNr13Hs7gRmdi6Am8B3iQzsPSgrwoWqR23Lda0O2CSC2CWkwCLcFwwdTKSteA3Vm8akt1aNrkLCvEVQmr4UAfGIfNL8U9SbKBLRkjSZQCRN3jA1VDjcoYkUM5XKto_wjvH2zcZnmhUjSy3IGIkefubFhufokgMN6s7t85YGDKwr73yGTP-95nj8"
+    },
+    {
+      "name": "earthlike_quick_16k_with_timeline",
+      "json": "{\"description\":\"PLACEHOLDER - Phase 1 in progress. Not a simulated planet: the dummy pipeline (a drifting toy continent, a causal event chain, three deposit sites and keyframes; 25 steps per stage at 200 ms) plus P0-09's synthetic wrap-test terrain baked at C = 16384. The real earthlike_quick_16k replaces this file when the stages of P1-03 to P1-08 land (tuned in P1-17). It names no timeline: the editor or config/deeptime/server.json does.\",\"dummy\":{\"sleep_ms\":200,\"stages\":[\"dummy_drift\",\"dummy_erode\"],\"steps\":25,\"synth\":\"wrap-test\",\"world\":{\"circumference\":16384,\"event_every_steps\":5,\"grid_r\":16,\"keyframe_every_years\":125000000.0,\"keyframe_size\":[256,128],\"seed\":1,\"sites\":3,\"t_end_years\":0.0,\"t_start_years\":-1000000000.0}},\"name\":\"earthlike_quick_16k\",\"placeholder\":true,\"scale\":{\"circumference_blocks\":16384},\"schema\":0,\"timeline\":{\"length_myr\":1000,\"start\":\"supercontinent\"}}",
+      "rust": "DT1.bVJta9swEP4rh76sBce1kyXLPPZhdIUNyhbGvpVhVOsSa5ElT3du8Er--05OUgabCeHiPHruedGzMkhNtD3b4FWlNvcfbu8-fb3_ePcNZrBpNSGUYD30MewiEuXwJTBoINsNTjMa6J32yBVwi2CGrhuhtz066xGuNJhot2z9DjiM0AQvM3rOhKHRA2kH-CS_oWm19ZlwRBQW7ANZlh2MBNob2OO4jbpDegfzJRBjT9BjlEnvEDTDvCigo2sRMxBsilnx9hUBjV5EsW3gEHU_EzIGxhhlFTzqvWiXk7fwHsrVYv06h-_iIGLSpCO3zu6x_jXYZl-Xq738IUYb0cOtJdhah3Bo0U-2JxkEYQubclYsxOs0rMEl8Vc8eNklS-Vl-eY6h88MPrkBH4BtN4V1ChCN5RBBPpLV1u5uDGKfIDeE8Qlj_pOCBxOQcpWpKW5VPStyAqs7UpUEkamTHlU9nBD1VMIFX2MMBtWPBJMc5chSxhSV9P8SlKAPITqT2Bsbm6HbYkTfoKqmtDI1FVfLdxzrM5MQ7aI1dUygTF1aO4NGiVVA5XxZTE9e_AUh-1uoH-bLVVbO10kcoiwvZUi3QFWLTMk2by4003GWzdLV5d2sLC5PXhyPmUopi6v_9Cn-pj7b4AyKXo4Dyq5GO_zHcv3oQrOns_NjgrXYadEgCs71pUMO_Y7buhuT_-JcRGQRQIPc1pfbr47HPw",
+      "java": "DT1.bVJta9swEP4rh76sBce1kyXLPPZhdIUNyhbGvpVhVOsSa5ElT3du8Er--05OUgabCeHiPHruedGzMkhNtD3b4FWlNvcfbu8-fb3_ePcNZrBpNSGUYD30MewiEuXwJTBoINsNTjMa6J32yBVwi2CGrhuhtz066xGuNJhot2z9DjiM0AQvM3rOhKHRA2kH-CS_oWm19ZlwRBQW7ANZlh2MBNob2OO4jbpDegfzJRBjT9BjlEnvEDTDvCigo2sRMxBsilnx9hUBjV5EsW3gEHU_EzIGxhhlFTzqvWiXk7fwHsrVYv06h-_iIGLSpCO3zu6x_jXYZl-Xq738IUYb0cOtJdhah3Bo0U-2JxkEYQubclYsxOs0rMEl8Vc8eNklS-Vl-eY6h88MPrkBH4BtN4V1ChCN5RBBPpLV1u5uDGKfIDeE8Qlj_pOCBxOQcpWpKW5VPStyAqs7UpUEkamTHlU9nBD1VMIFX2MMBtWPBJMc5chSxhSV9P8SlKAPITqT2Bsbm6HbYkTfoKqmtDI1FVfLdxzrM5MQ7aI1dUygTF1aO4NGiVVA5XxZTE9e_AUh-1uoH-bLVVbO10kcoiwvZUi3QFWLTMk2by4003GWzdLV5d2sLC5PXhyPmUopi6v_9Cn-pj7b4AyKXo4Dyq5GO_zHcv3oQrOns_NjgrXYadEgCs71pUMO_Y7buhuT_-JcRGQRQIPc1pfbr47HPw"
+    },
+    {
+      "name": "escapes_and_numbers",
+      "json": "{\"a\":[1,2.5,-0.125,18446744073709551615],\"n\":{\"b\":true,\"z\":null},\"s\":\"Ünïcödé — \\\"quoted\\\" \\\\ tab\\t newline\\n ctrl\\u0001 end\"}",
+      "rust": "DT1.BUDBCcIwFF3l886xJDVpNav4PbRNDkL4Yk0QLAWH8OgCnry5QDZxElkwwB-MahunNroxrVNmZ23XW6v7ba_3zpnOuKOCwC8Y4fNcosIdXkpKq8IVHvUl9TPVb6hv-j2exLiUc46BQcyUh5EzSbylk0QWmvKcuGitDUUJWP8",
+      "java": "DT1.BcGxDcIwEAXQVU6_NpEd7AS8CkeRxC6QrEMEW0hEkRiCkgWo6FjAmzAJ7y0Y4A9GtY1TG92Y1imzs7brrdX9ttd750xn3FFB4BeM8HkuUeEOLyWlVeEKj_qS-pnqN9Q3_R5PYlzKOcfAIGbKw8iZJN7SSSILTXlOXLTWhqIErH8"
+    }
+  ]
+}
