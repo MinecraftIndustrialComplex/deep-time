@@ -297,6 +297,59 @@
     box.innerHTML = h;
   }
 
+  // ---- amplification (P1-06): before/after views of L3, a slider across each -------------------
+  function amplify(am) {
+    const box = document.getElementById('amplifybody');
+    document.getElementById('amplify').hidden = false;
+    const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const deg = (v, pos, neg) => `${Math.abs(v).toFixed(1)}°${v >= 0 ? pos : neg}`;
+    let h = `<p class="hint">${esc(am.summary || '')}</p>`;
+    h += '<table class="kv">' + (am.stats || []).map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join('') + '</table>';
+    h += `<p class="hint">Each view is ${am.regions.length ? am.regions[0].w : 0} × ${am.regions.length ? am.regions[0].h : 0} cells of ${am.cell_km.toFixed(1)} km, hill-shaded ` +
+      `(vertical exaggeration ×${am.ve}; the game's own is ×15). <b>Before</b>: the young landscape's L2 terrain interpolated to L3 with no erosion pass; ` +
+      `<b>after</b>: what the amplifier wrote. Drag across a picture to slide between them. The change picture is blue where the amplifier cut ` +
+      `and red where it raised the ground (saturating at ±${am.diff_m} m).</p>`;
+    h += `<p><label><input type="checkbox" id="amprivers"> rivers (D8 drainage of that very terrain, areas of at least ${am.river_km2} km²)</label></p>`;
+    for (const r of am.regions) {
+      h += `<div class="cmpwrap" data-id="${esc(r.id)}"><div><h3>${esc(r.title)}</h3>` +
+        `<div class="cmp"><img class="bot" alt="before"><img class="top" alt="after"><div class="bar"></div>` +
+        `<span class="tag l">before</span><span class="tag r">after</span></div>` +
+        `<p class="hint">${deg(r.lat, 'N', 'S')}, ${r.lon.toFixed(1)}°E · ${r.km.toFixed(0)} km across · ${esc(r.note)} · rivers ${r.river_cells[0]} → ${r.river_cells[1]} cells · ` +
+        `mean height change ${r.mean_abs_change_m.toFixed(1)} m</p></div>` +
+        `<div class="side"><img alt="change" src="${esc(r.files.diff)}"><p class="hint">change (after − before)</p></div></div>`;
+    }
+    // Extra figures a review adds (a row of labelled pictures: the drama slider at 0.25, 1, 2).
+    for (const x of am.extras || []) {
+      h += `<h3>${esc(x.title)}</h3><p class="hint">${esc(x.note || '')}</p><div style="display:flex;flex-wrap:wrap;gap:8px">` +
+        x.images.map(i => `<figure class="xsec" style="flex:1 1 300px;max-width:512px"><img src="${esc(i.file)}" alt="${esc(i.label)}" style="width:100%;height:auto">` +
+          `<figcaption>${esc(i.label)}</figcaption></figure>`).join('') + '</div>';
+    }
+    box.innerHTML = h;
+    const rivers = document.getElementById('amprivers');
+    const wraps = [...box.querySelectorAll('.cmpwrap')];
+    const byId = new Map(am.regions.map(r => [r.id, r]));
+    const setSrc = () => {
+      for (const w of wraps) {
+        const f = byId.get(w.dataset.id).files;
+        w.querySelector('.bot').src = rivers.checked ? f.before_rivers : f.before;
+        w.querySelector('.top').src = rivers.checked ? f.after_rivers : f.after;
+      }
+    };
+    rivers.addEventListener('change', setSrc);
+    setSrc();
+    for (const w of wraps) {
+      const cmp = w.querySelector('.cmp'), top = w.querySelector('.top'), bar = w.querySelector('.bar');
+      const move = e => {
+        const r = cmp.getBoundingClientRect();
+        const p = Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100));
+        top.style.clipPath = `inset(0 0 0 ${p}%)`;
+        bar.style.left = p + '%';
+      };
+      cmp.addEventListener('pointerdown', e => { cmp.setPointerCapture(e.pointerId); move(e); cmp.onpointermove = move; });
+      cmp.addEventListener('pointerup', () => { cmp.onpointermove = null; });
+    }
+  }
+
   // ---- the deposit census (P1-14): counts per type next to the §8.6 expectation --------------
   function census(c) {
     const box = document.getElementById('censusbody');
@@ -327,6 +380,7 @@
     }
     if (R && R.deposits) census(R.deposits);
     if (R && R.structure) structure(R.structure);
+    if (R && R.amplify) amplify(R.amplify);
     if (!K.length && !E.length && !S.length) return;
     document.getElementById('timelapse').hidden = false;
     const byId = new Map(E.map(e => [e.id, e]));

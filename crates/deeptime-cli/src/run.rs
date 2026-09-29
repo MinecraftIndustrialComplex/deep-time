@@ -25,6 +25,37 @@ pub struct Common {
     pub threads: usize,
     pub mem_cap: u64,
     pub verbose: bool,
+    /// `--set path=value` overrides of the preset (`apply_overrides`).
+    pub set: Vec<String>,
+}
+
+/// Applies `--set a.b.c=value` overrides to preset JSON (the value is JSON, else a string; missing
+/// objects on the way are made). The result goes through the preset parser like any preset, so
+/// an unknown key or an out-of-range value is refused naming its path.
+pub(crate) fn apply_overrides(json: &str, set: &[String]) -> CliResult<String> {
+    if set.is_empty() {
+        return Ok(json.to_owned());
+    }
+    let mut v: Value = serde_json::from_str(json)?;
+    for item in set {
+        let (path, value) = item
+            .split_once('=')
+            .ok_or_else(|| format!("--set {item}: expected PATH=VALUE"))?;
+        let value: Value = serde_json::from_str(value).unwrap_or_else(|_| json!(value));
+        let mut at = &mut v;
+        let keys: Vec<&str> = path.split('.').collect();
+        for (n, key) in keys.iter().enumerate() {
+            let obj = at
+                .as_object_mut()
+                .ok_or_else(|| format!("--set {item}: {} is not an object", keys[..n].join(".")))?;
+            if n + 1 == keys.len() {
+                obj.insert((*key).to_owned(), value);
+                break;
+            }
+            at = obj.entry((*key).to_owned()).or_insert_with(|| json!({}));
+        }
+    }
+    Ok(v.to_string())
 }
 
 pub(crate) fn read_text(path: &Path, what: &str) -> CliResult<String> {
@@ -430,6 +461,25 @@ fn structure_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     Some(deeptime_core::structure::summary_line(&v))
 }
 
+/// The young landscape's summary line (P1-06): `young_final=… land_z_p50_m=a->b …`, when the
+/// pipeline ran it.
+fn young_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note = world.notes.get(deeptime_core::surface::young::STAGE_NAME)?;
+    let v: Value = serde_json::from_str(note).ok()?;
+    v.get("after")?;
+    Some(deeptime_core::surface::young::summary_line(&v))
+}
+
+/// The amplifier's summary line (P1-06): `amplify_final=8192x4096 mode=… sinks=0 passes[…]`, when
+/// the pipeline ran it.
+fn amplify_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note = world
+        .notes
+        .get(deeptime_core::surface::amplify::STAGE_NAME)?;
+    let v: Value = serde_json::from_str(note).ok()?;
+    Some(deeptime_core::surface::amplify::summary_line(&v))
+}
+
 /// The deposit engine's recorded history (P1-04): per field of the last frame, the share of cells
 /// where it is non-zero and its mean there.
 fn history_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -469,6 +519,7 @@ pub(crate) fn timings_line(
         deeptime_core::surface::STAGE_NAME,
         deeptime_core::climate::STAGE_NAME,
         deeptime_core::structure::STAGE_NAME,
+        deeptime_core::surface::young::STAGE_NAME,
     ] {
         if let Some(note) = world
             .notes
@@ -510,6 +561,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         o.start.as_deref(),
         o.length_myr,
     )?;
+    let preset = apply_overrides(&preset, &o.common.set)?;
     let content = match &o.content {
         Some(p) => read_text(p, "content bundle")?,
         None => String::new(),
@@ -554,6 +606,12 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         println!("deeptime run: {line}");
     }
     if let Some(line) = structure_line(&world) {
+        println!("deeptime run: {line}");
+    }
+    if let Some(line) = young_line(&world) {
+        println!("deeptime run: {line}");
+    }
+    if let Some(line) = amplify_line(&world) {
         println!("deeptime run: {line}");
     }
     println!(
@@ -603,7 +661,8 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     let opts = session_options(&work, &o.common);
     let s = match (&o.input, &o.preset) {
         (Some(input), None) => {
-            let ck = Checkpoint::read(input)?;
+            let mut ck = Checkpoint::read(input)?;
+            ck.preset_json = apply_overrides(&ck.preset_json, &o.common.set)?;
             // A stage coupled to others (plates + surface) runs with its group, which starts at
             // the group's lead: a checkpoint whose next stage is the lead serves any member.
             let group = deeptime_core::preset::Preset::from_json(&ck.preset_json)
@@ -639,6 +698,7 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         }
         (None, Some(preset)) => {
             let json = load_preset_with(preset, o.start.as_deref(), o.length_myr)?;
+            let json = apply_overrides(&json, &o.common.set)?;
             let s = Session::create(&json, "", opts, Arc::new(AllocGauge))?;
             let stages = s.preset().stages();
             let target = group_of(&stages, &o.name).map(|g| g.start).ok_or_else(|| {
@@ -720,6 +780,12 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     if let Some(line) = structure_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
+    if let Some(line) = young_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = amplify_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
     if let Some(line) = history_line(&ck.world) {
         println!("deeptime stage {}: history {line}", o.name);
     }
@@ -748,6 +814,12 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             for k in &mut keyframes {
                 k.layers.retain(|(name, _)| o.viewer_layers.contains(name));
             }
+        } else if o.name == deeptime_core::surface::young::STAGE_NAME
+            || o.name == deeptime_core::surface::amplify::STAGE_NAME
+        {
+            // P1-06: the young landscape's and the amplifier's own frames (the deep-time frames
+            // belong to the surface bundle); the before/after views come from the L3 layer.
+            keyframes.retain(|k| k.stage.starts_with("young") || k.stage.starts_with("amplify"));
         } else if o.name == deeptime_core::deposits::STAGE_NAME {
             // The deposit bundle keeps the map context (elevation, plates, crust age, regime,
             // drainage, the rock and the trap structure) and the deposit layers; the surface's
@@ -779,12 +851,22 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         // the deposit stage's bundle leaves the strata inspector to the structure stage's own (its
         // layers alone are ~20 MB, and the deposit bundles stay under the review cap).
         let structure = if o.name == deeptime_core::deposits::STAGE_NAME
+            || o.name == deeptime_core::surface::young::STAGE_NAME
+            || o.name == deeptime_core::surface::amplify::STAGE_NAME
             || !(o.viewer_layers.is_empty()
                 || o.viewer_layers.iter().any(|l| l.starts_with("structure")))
         {
             None
         } else {
             crate::structure_view::build(&ck.world, &ck.preset_json)?
+        };
+        // P1-06: the hill-shaded before/after views of the amplifier.
+        let amplified = if o.name == deeptime_core::surface::young::STAGE_NAME
+            || o.name == deeptime_core::surface::amplify::STAGE_NAME
+        {
+            crate::amplify_view::build(&ck.world, &ck.preset_json, &work)?
+        } else {
+            None
         };
         let layers: Vec<&deeptime_format::LoadedLayer> =
             structure.iter().flat_map(|v| v.layers.iter()).collect();
@@ -815,6 +897,20 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
                 o.name,
                 v.sections.len(),
                 dir.join("sections").display()
+            );
+        }
+        if let Some(v) = &amplified {
+            let am = crate::amplify_view::write(dir, v)?;
+            report
+                .get_or_insert_with(|| json!({}))
+                .as_object_mut()
+                .expect("an object")
+                .insert("amplify".into(), am);
+            println!(
+                "deeptime stage {}: {} before/after views -> {}",
+                o.name,
+                v.regions.len(),
+                dir.join("amplify").display()
             );
         }
         if let Some(report) = report {
@@ -891,6 +987,12 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             println!("deeptime bench: threads={threads} {line}");
         }
         if let Some(line) = climate_line(&world) {
+            println!("deeptime bench: threads={threads} {line}");
+        }
+        if let Some(line) = young_line(&world) {
+            println!("deeptime bench: threads={threads} {line}");
+        }
+        if let Some(line) = amplify_line(&world) {
             println!("deeptime bench: threads={threads} {line}");
         }
         println!(

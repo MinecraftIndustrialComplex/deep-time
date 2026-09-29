@@ -37,6 +37,9 @@ pub struct StageContext<'a> {
     pub pool: &'a rayon::ThreadPool,
     /// The session's log ring.
     pub log: &'a LogRing,
+    /// The world-data folder the session writes (`SessionOptions::out_dir`): where a stage that
+    /// spills tiles to disk puts them (the L3 amplifier, plan §5.7.5).
+    pub out_dir: &'a std::path::Path,
     /// Return from `step` by about this instant (a stage doing one short step per call may ignore
     /// it: the session checks the budget between calls).
     pub until: Instant,

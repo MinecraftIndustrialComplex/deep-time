@@ -235,6 +235,7 @@ mod tests {
             threads: 2,
             mem_cap: 0,
             verbose: false,
+            set: Vec::new(),
         }
     }
 
@@ -273,6 +274,8 @@ mod tests {
         // The streaming tests read the coupled group (plates, surface, structure) as the whole
         // pipeline; the deposit stage after it (P1-14) has its own tests.
         v.as_object_mut().unwrap().remove("deposits");
+        v.as_object_mut().unwrap().remove("young");
+        v.as_object_mut().unwrap().remove("amplify");
         v.to_string()
     }
 
