@@ -45,7 +45,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 ## Review pages
 | Name | URL | Version label | Date |
 |---|---|---|---|
-| seams (how the seams work, interactive) | https://spacesheep.dev/@benmac/deeptime-seams | seams v2 2026-09-28 | 2026-09-28 |
+| seams (where the wrap is, what crossing does, checked against TW 0.19.3 code; links the wrap graphics page) | https://spacesheep.dev/@benmac/deeptime-seams | wrap explainer 2026-09-28 | 2026-09-28 |
 | phase0 (Phase 0 exit: every check, evidence, links) | https://spacesheep.dev/@benmac/deeptime-phase0 | Phase 0 exit 2026-09-28 | 2026-09-28 |
 | p1-editor (real-client screenshots of the Create World editor, timelapse, review, world) | https://spacesheep.dev/@benmac/deeptime-p1-editor | P1-11 client screenshots 2026-09-28 | 2026-09-28 |
 | p1-plates (500 Myr of plates, 100k samples, keyframes + events) | https://spacesheep.dev/@benmac/deeptime-p1-plates | P1-03 plates 100k 500 Myr 2026-09-28 | 2026-09-28 |
@@ -63,6 +63,19 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+
+### 2026-09-28 — Seams page rewritten from TW's code; correction to the P0-06 teleport note (agent worktree agent-aa125dc28bc6eb2a3)
+- **What.** tools/review/pages/seams/ now opens with where the seam is (x = −C/2 ≡ C/2, pole to pole) and a
+  step-by-step of a crossing; docs/research/notes/wrapped_planet_worlds.md §7 records the mechanics read from
+  TW 0.19.3's decompiled code: the client keeps its own unfolded x (reset only on login, respawn, dimension
+  change); a walking crossing sends no position packet; F3's XYZ/Block/Chunk show the folded x and TW adds
+  "Unwrapped" lines; commands refuse absolute x outside [−C/2, C/2) and fold `~`; `/fill`, `/fillbiome`,
+  `/clone` refuse boxes across the seam; spawn may land on the seam (spawn.rs uses wrapped distances).
+- **Correction.** The P0-06 note that "`setPos` is a teleport and stays unfolded" is too strong: a non-player
+  entity past the edge is folded at the end of its next tick, and one added past the edge is folded on
+  `addEntity`. The seam tests' use of self-motion is still right, since it exercises the crossing itself.
+- **Next.** F3 screenshots on each side of the seam with tools/client/mac-screenshots.sh would settle the
+  "Needs a client" rows.
 
 ### 2026-09-28 — P1-16 COE and CDG hooks (agent worktree agent-a8ca83a89f23c10ef, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Signatures** (javap + cfr on the Mac MIC set's jars, `createoreexcavation-1.21-1.6.8.jar` sha512
