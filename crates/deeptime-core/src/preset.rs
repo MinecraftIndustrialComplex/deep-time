@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! Presets (plan §5.1): parsing, the built-in presets, and how a preset argument is resolved.
 //!
-//! Until the real stages exist (P1-03 on) the only pipeline is the dummy one (`dummy.rs`). A
-//! preset is `{"dummy": {…}}` plus optional header keys that every preset will carry:
+//! Until the real stages exist (P1-03 on) the pipelines are the dummy one (`dummy.rs`) and P1-14's
+//! deposit stage on a synthetic history (`{"deposits_synthetic": {…}}`,
+//! `deposits::SyntheticPreset`). A preset is `{"dummy": {…}}` (or `{"deposits_synthetic": {…}}`)
+//! plus optional header keys that every preset will carry:
 //!
 //! ```json
 //! {"schema": 0, "name": "earthlike_quick_16k", "description": "…", "placeholder": true,
