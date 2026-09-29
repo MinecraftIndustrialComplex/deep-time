@@ -123,6 +123,170 @@ pub fn write_tile_pack(path: &Path, desc: &LayerDesc, cells: &[u8]) -> Result<Wr
     })
 }
 
+/// Writes a tile pack one tile at a time (P1-06, plan §5.7.5): the L3 amplifier's finished tiles
+/// spill to disk as they are done instead of the whole raster waiting in memory. The file is the
+/// one [`write_tile_pack`] writes (same header, index and tile encoding); tiles may arrive in any
+/// order, because the index is reserved up front and patched by [`TilePackWriter::finish`], which
+/// also fsyncs and renames `<path>.tmp` over `path`.
+pub struct TilePackWriter {
+    path: PathBuf,
+    tmp: PathBuf,
+    file: File,
+    desc: LayerDesc,
+    index: Vec<Option<TileEntry>>,
+    index_at: u64,
+    pos: u64,
+}
+
+impl TilePackWriter {
+    /// Starts `path` (as `<path>.tmp`) for the layer `desc`.
+    pub fn create(path: &Path, desc: &LayerDesc) -> Result<TilePackWriter> {
+        use std::io::Write;
+        desc.validate()?;
+        let json = serde_json::to_vec(desc).map_err(|source| FormatError::Json {
+            what: format!("layer {}", desc.name),
+            source,
+        })?;
+        let header_len = HEADER_BYTES + json.len();
+        let header_len_u32 = u32::try_from(header_len)
+            .map_err(|_| FormatError::Invalid("layer descriptor too large".into()))?;
+        let mut head = Vec::with_capacity(align8(header_len));
+        head.extend_from_slice(&MAGIC);
+        head.extend_from_slice(&header_len_u32.to_le_bytes());
+        head.extend_from_slice(&FORMAT_MINOR.to_le_bytes());
+        head.extend_from_slice(&0u16.to_le_bytes());
+        let mut h = crc32fast::Hasher::new();
+        h.update(&head[..12]);
+        h.update(&json);
+        head.extend_from_slice(&h.finalize().to_le_bytes());
+        head.extend_from_slice(&json);
+        head.resize(align8(head.len()), 0);
+        let n = desc.tile_count();
+        let index_at = head.len();
+        head.resize(align8(index_at + n * INDEX_ENTRY_BYTES), 0);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| FormatError::io(parent, e))?;
+        }
+        let mut name = path.file_name().unwrap_or_default().to_os_string();
+        name.push(".tmp");
+        let tmp = path.with_file_name(name);
+        let mut file = File::create(&tmp).map_err(|e| FormatError::io(&tmp, e))?;
+        file.write_all(&head)
+            .map_err(|e| FormatError::io(&tmp, e))?;
+        Ok(TilePackWriter {
+            path: path.to_owned(),
+            tmp,
+            file,
+            desc: desc.clone(),
+            index: vec![None; n],
+            index_at: index_at as u64,
+            pos: head.len() as u64,
+        })
+    }
+
+    /// The layer being written.
+    pub fn desc(&self) -> &LayerDesc {
+        &self.desc
+    }
+
+    /// Adds tile `t` (row-major, `LayerDesc::tile_rect`) from its cells, row-major and
+    /// little-endian; a tile put twice is replaced by the later one (the earlier bytes stay in
+    /// the file, unreferenced).
+    pub fn put_tile(&mut self, t: usize, cells: &[u8]) -> Result<()> {
+        use std::io::Write;
+        if t >= self.index.len() {
+            return Err(FormatError::Invalid(format!(
+                "layer {}: tile {t} of {}",
+                self.desc.name,
+                self.index.len()
+            )));
+        }
+        let (_, _, tw, th) = self.desc.tile_rect(t);
+        let want = tw as usize * th as usize * self.desc.cell_bytes();
+        if cells.len() != want {
+            return Err(FormatError::Invalid(format!(
+                "layer {}: tile {t} has {} bytes, expected {want}",
+                self.desc.name,
+                cells.len()
+            )));
+        }
+        let stored: Vec<u8>;
+        let data: &[u8] = match self.desc.codec {
+            Codec::Raw => cells,
+            Codec::Lz4Block => {
+                stored = lz4_flex::block::compress(cells);
+                &stored
+            }
+        };
+        let length = u32::try_from(data.len())
+            .map_err(|_| FormatError::Invalid("tile larger than 4 GiB".into()))?;
+        self.file
+            .write_all(data)
+            .map_err(|e| FormatError::io(&self.tmp, e))?;
+        let pad = align8(data.len()) - data.len();
+        if pad > 0 {
+            self.file
+                .write_all(&[0u8; 8][..pad])
+                .map_err(|e| FormatError::io(&self.tmp, e))?;
+        }
+        self.index[t] = Some(TileEntry {
+            offset: self.pos,
+            length,
+            crc32: crc32fast::hash(data),
+        });
+        self.pos += align8(data.len()) as u64;
+        Ok(())
+    }
+
+    /// Patches the index, fsyncs and renames the file into place; every tile must have been put.
+    pub fn finish(mut self) -> Result<Written> {
+        use std::io::{Read, Seek, SeekFrom, Write};
+        if let Some(t) = self.index.iter().position(Option::is_none) {
+            return Err(FormatError::Invalid(format!(
+                "layer {}: tile {t} was never written",
+                self.desc.name
+            )));
+        }
+        let mut table = Vec::with_capacity(self.index.len() * INDEX_ENTRY_BYTES);
+        for e in self.index.iter().flatten() {
+            table.extend_from_slice(&e.offset.to_le_bytes());
+            table.extend_from_slice(&e.length.to_le_bytes());
+            table.extend_from_slice(&e.crc32.to_le_bytes());
+        }
+        self.file
+            .seek(SeekFrom::Start(self.index_at))
+            .and_then(|_| self.file.write_all(&table))
+            .and_then(|_| self.file.sync_all())
+            .map_err(|e| FormatError::io(&self.tmp, e))?;
+        // The whole-file CRC32 the manifest records, read back in 1 MiB pieces.
+        let mut hasher = crc32fast::Hasher::new();
+        let mut f = File::open(&self.tmp).map_err(|e| FormatError::io(&self.tmp, e))?;
+        let mut buf = vec![0u8; 1 << 20];
+        loop {
+            let n = f
+                .read(&mut buf)
+                .map_err(|e| FormatError::io(&self.tmp, e))?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buf[..n]);
+        }
+        let bytes = std::fs::metadata(&self.tmp)
+            .map_err(|e| FormatError::io(&self.tmp, e))?
+            .len();
+        std::fs::rename(&self.tmp, &self.path).map_err(|e| FormatError::io(&self.path, e))?;
+        if let Some(parent) = self.path.parent()
+            && let Ok(d) = File::open(parent)
+        {
+            let _ = d.sync_all();
+        }
+        Ok(Written {
+            bytes,
+            crc32: hasher.finalize(),
+        })
+    }
+}
+
 /// A memory-mapped tile pack.
 pub struct TilePackReader {
     path: PathBuf,
@@ -423,6 +587,51 @@ mod tests {
             TilePackReader::open(&p),
             Err(FormatError::Corrupt { .. })
         ));
+        std::fs::remove_file(&p).unwrap();
+    }
+
+    #[test]
+    fn a_writer_in_any_tile_order_writes_the_same_pack() {
+        let grid = GridDesc::for_planet("L3", 1024, 2).unwrap();
+        let ras = Raster::<i16>::from_fn(grid.clone(), |i, j| {
+            (i as i32 * 13 - j as i32 * 7 + (i * j) as i32 % 91) as i16
+        });
+        let mut desc = LayerDesc::scalar("elevation", DType::I16, grid, Codec::Lz4Block);
+        desc.tile = 100; // edge tiles are cropped
+        let cells = ras.to_le_bytes();
+        let want = encode_tile_pack(&desc, &cells).unwrap();
+        let p = tmp("writer.dtr");
+        let mut w = TilePackWriter::create(&p, &desc).unwrap();
+        assert!(w.put_tile(999, &[]).is_err());
+        let cb = desc.cell_bytes();
+        let row = desc.grid.w as usize * cb;
+        // Even tiles first, then odd ones: the reader must not care about the file order.
+        let order: Vec<usize> = (0..desc.tile_count())
+            .filter(|t| t % 2 == 0)
+            .chain((0..desc.tile_count()).filter(|t| t % 2 == 1))
+            .collect();
+        assert!(w.put_tile(order[0], &[1, 2, 3]).is_err(), "wrong size");
+        for &t in &order {
+            let (x0, z0, tw, th) = desc.tile_rect(t);
+            let mut tile = Vec::new();
+            for z in z0..z0 + th {
+                let s = z as usize * row + x0 as usize * cb;
+                tile.extend_from_slice(&cells[s..s + tw as usize * cb]);
+            }
+            w.put_tile(t, &tile).unwrap();
+        }
+        let done = w.finish().unwrap();
+        assert_eq!(done.bytes, std::fs::metadata(&p).unwrap().len());
+        assert_eq!(done.crc32, crc32fast::hash(&std::fs::read(&p).unwrap()));
+        let r = TilePackReader::open(&p).unwrap();
+        assert_eq!(r.load().unwrap().bytes, cells);
+        assert_eq!(want.len(), std::fs::read(&p).unwrap().len(), "same size");
+        // A pack with a missing tile is refused, and leaves no final file.
+        let q = tmp("writer-missing.dtr");
+        let mut w = TilePackWriter::create(&q, &desc).unwrap();
+        w.put_tile(0, &vec![0u8; 100 * 100 * cb]).unwrap();
+        assert!(w.finish().is_err());
+        assert!(!q.exists());
         std::fs::remove_file(&p).unwrap();
     }
 

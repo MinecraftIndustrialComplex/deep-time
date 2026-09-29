@@ -350,6 +350,10 @@ fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
     // These tests are about the plates and the surface; the deposit stage has its own
     // (`deposits::tests`).
     v.as_object_mut().unwrap().remove("deposits");
+    // The young landscape and L3 amplification (P1-06) have their own tests
+    // (`amplify::tests`).
+    v.as_object_mut().unwrap().remove("young");
+    v.as_object_mut().unwrap().remove("amplify");
     v.to_string()
 }
 

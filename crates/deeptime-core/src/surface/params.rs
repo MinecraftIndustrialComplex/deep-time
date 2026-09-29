@@ -148,6 +148,10 @@ pub struct SurfaceParams {
     pub transgression_frac: f64,
     /// Iterations of Yuan et al.'s erosion–deposition solve (at most).
     pub spl_max_iter: u32,
+    /// The drama slider (plan §8.2, P1-06; the editor's `surface.drama`): 0..=2, default 1. It
+    /// scales the amplifier's thermal critical slope (`thermal::critical_slope`) and the
+    /// amplitude of the sub-cell detail term (`detail.rs`).
+    pub drama: f64,
 }
 
 impl Default for SurfaceParams {
@@ -185,6 +189,7 @@ impl Default for SurfaceParams {
             event_min_area_km2: 3000.0,
             transgression_frac: 0.04,
             spl_max_iter: 6,
+            drama: 1.0,
         }
     }
 }
@@ -261,6 +266,11 @@ impl SurfaceParams {
             (1..=50).contains(&self.spl_max_iter),
             "spl_max_iter",
             "must be in [1, 50]",
+        )?;
+        check(
+            self.drama.is_finite() && (0.0..=2.0).contains(&self.drama),
+            "drama",
+            "must be in [0, 2]",
         )?;
         for c in &self.sea_level.cycles {
             check(

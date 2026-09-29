@@ -96,7 +96,7 @@ pub fn planet_builtin(name: &str) -> Option<&'static str> {
 }
 
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 9] = [
+pub const PLANET_KEYS: [&str; 11] = [
     "seed",
     "planet",
     "keyframes",
@@ -106,6 +106,8 @@ pub const PLANET_KEYS: [&str; 9] = [
     "climate",
     "structure",
     "deposits",
+    "young",
+    "amplify",
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
@@ -481,6 +483,12 @@ pub struct PlanetPreset {
     /// The deposit engine (P1-14) on the history the surface stage records; `None` stops after
     /// the surface. It needs a `surface` section.
     pub deposits: Option<crate::deposits::DepositParams>,
+    /// The young landscape on L2 (P1-06); `None` leaves the surface on L1. It needs a `surface`
+    /// section.
+    pub young: Option<crate::surface::young::YoungParams>,
+    /// Amplification to L3 (P1-06) and the detail layer; `None` writes no L3. It needs a
+    /// `young` section.
+    pub amplify: Option<crate::surface::amplify::AmplifyParams>,
 }
 
 type Obj = Map<String, Value>;
@@ -520,6 +528,8 @@ impl PlanetPreset {
         let climate: Option<crate::climate::ClimateParams> = section(obj, "climate")?;
         let structure: Option<crate::structure::StructureParams> = section(obj, "structure")?;
         let deposits: Option<crate::deposits::DepositParams> = section(obj, "deposits")?;
+        let young: Option<crate::surface::young::YoungParams> = section(obj, "young")?;
+        let amplify: Option<crate::surface::amplify::AmplifyParams> = section(obj, "amplify")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
         let seed = match obj.get("seed") {
             None => 1,
@@ -540,6 +550,8 @@ impl PlanetPreset {
             climate,
             structure,
             deposits,
+            young,
+            amplify,
         };
         preset.validate()?;
         Ok(preset)
@@ -720,6 +732,42 @@ impl PlanetPreset {
                  stage records",
             )?;
         }
+        if let Some(y) = &self.young {
+            y.validate()?;
+            check(
+                self.surface.is_some(),
+                "$.young",
+                "needs a surface section: the young landscape starts from the deep-time surface",
+            )?;
+            check(
+                crate::surface::amplify::doublings(r.l1_r, r.l2_r).is_some(),
+                "$.resolution.l2_r",
+                "l1_r must be a power of two times l2_r (L2 is L1 doubled once or more)",
+            )?;
+            check(
+                s.circumference_blocks.is_multiple_of(2 * r.l2_r),
+                "$.resolution.l2_r",
+                "C must be a multiple of 2·l2_r",
+            )?;
+        }
+        if let Some(a) = &self.amplify {
+            a.validate()?;
+            check(
+                self.young.is_some(),
+                "$.amplify",
+                "needs a young section: the amplifier starts from the young landscape",
+            )?;
+            check(
+                crate::surface::amplify::doublings(r.l2_r, r.l3_r).is_some_and(|n| n >= 1),
+                "$.resolution.l3_r",
+                "l2_r must be a power of two times l3_r, and larger (L3 is L2 doubled once or more)",
+            )?;
+            check(
+                s.circumference_blocks.is_multiple_of(2 * r.l3_r),
+                "$.resolution.l3_r",
+                "C must be a multiple of 2·l3_r",
+            )?;
+        }
         Ok(())
     }
 
@@ -745,6 +793,12 @@ impl PlanetPreset {
         }
         if let Some(d) = &self.deposits {
             v["deposits"] = json!(d);
+        }
+        if let Some(y) = &self.young {
+            v["young"] = json!(y);
+        }
+        if let Some(a) = &self.amplify {
+            v["amplify"] = json!(a);
         }
         v
     }
