@@ -63,8 +63,11 @@ generation 3.3 s, Chunky 361 chunks 9.1 s, probes 0.1 s, stop 2.9 s, export 0.5 
 (`crates/deeptime-cli/src/watch/stage2.rs`) forwards `POST /api/preview`, `GET /api/preview/…`,
 `GET /api/inspect` and `GET /area3d/…` to `preview.py http <METHOD> <path?query>` (body on stdin;
 stdout: one JSON line `{"status", "content_type", "length"}`, then the body). The page's `Stage2`
-object (`workbench.js`) does the rest: a box drawn with ▭ posts `{run, frame, t_years, box, lat_lon}`,
-the answer's `status_url` is polled, and `url` (the viewer on the export) opens in the panel.
+object (`workbench.js`) does the rest: a box drawn with the Area 3D tool (or a click, for 256 × 256)
+posts `{run, frame, t_years, box, lat_lon}` and the Inspect tool asks `/api/inspect`; each answer
+becomes a job card in the inspector's 3D tab, its `status_url` is polled (the card shows the step:
+waiting for the lock, booting, generating, exporting), and `url` (the viewer on the export, with
+`&embed=1` in the card) opens in the card and full size over the page.
 
 **Which world a preview shows.** A workbench run is a raster history on the simulation grid, not a
 Minecraft world, and no run can be baked into one until P1-08. So a preview is **the synthetic

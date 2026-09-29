@@ -6,76 +6,124 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Deep Time Area Preview</title>
 <meta name="description" content="A box of a generated Deep Time world in 3D: strata, ore bodies and why they are there, from the real generator run headless.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
+/* The workbench's visual language (crates/deeptime-viewer/assets/workbench.html): dark by default,
+   the same tokens, panels and controls; a light theme stays one click away. */
 :root {
-  --bg: #f4f3ef; --panel: #ffffffee; --ink: #1d1d1b; --muted: #6b6a64; --line: #d8d6ce;
-  --accent: #1f6feb; --accent-ink: #fff; --scene: #dfe6ec; --warn: #b45309; --ok: #15803d; --chip: #eceae3;
+  color-scheme: dark;
+  --bg: #07090d; --panel: rgba(18, 23, 32, .9); --panel-solid: #121720; --ink: #e8ecf3; --ink-2: #b0b8c7; --muted: #7f8a9d; --dim: #5a6477;
+  --line: rgba(160, 175, 200, .16); --line-1: rgba(160, 175, 200, .09); --input: #07090d; --chip: #19202b; --chip-2: #222a37;
+  --accent: #7d8cff; --accent-hi: #a1abff; --accent-ink: #0a0e28; --accent-soft: rgba(125, 140, 255, .15); --accent-line: rgba(125, 140, 255, .5);
+  --scene-a: #111827; --scene-b: #05070a; --warn: #f4b740; --ok: #3fcf8e; --bad: #ff7b6b;
+  --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --ease: cubic-bezier(.2, .7, .2, 1);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #15171a; --panel: #1d2024ee; --ink: #e8e6e1; --muted: #9a988f; --line: #33373d;
-    --accent: #58a6ff; --accent-ink: #0b0d10; --scene: #0f1216; --warn: #f0a24b; --ok: #4ade80; --chip: #2a2e34;
-  }
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef0f4; --panel: rgba(255, 255, 255, .92); --panel-solid: #fff; --ink: #151a23; --ink-2: #3a4252; --muted: #677084; --dim: #8b93a3;
+  --line: rgba(20, 30, 50, .14); --line-1: rgba(20, 30, 50, .08); --input: #fff; --chip: #eef0f5; --chip-2: #e2e6ee;
+  --accent: #4f5fe8; --accent-hi: #3d4ad0; --accent-ink: #fff; --accent-soft: rgba(79, 95, 232, .12); --accent-line: rgba(79, 95, 232, .45);
+  --scene-a: #e4e9f0; --scene-b: #cfd6e0; --warn: #b45309; --ok: #15803d; --bad: #c2410c;
 }
-:root[data-theme="dark"] {
-  --bg: #15171a; --panel: #1d2024ee; --ink: #e8e6e1; --muted: #9a988f; --line: #33373d;
-  --accent: #58a6ff; --accent-ink: #0b0d10; --scene: #0f1216; --warn: #f0a24b; --ok: #4ade80; --chip: #2a2e34;
-}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .001ms !important; animation-duration: .001ms !important; } }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
-  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
-header { position: fixed; top: 0; left: 0; right: 0; height: 48px; display: flex; align-items: center; gap: 8px;
-  padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); z-index: 5; }
-header h1 { font-size: 15px; margin: 0; white-space: nowrap; }
-header .sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.45 var(--font); overflow: hidden; -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+header { position: fixed; top: 0; left: 0; right: 0; height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  background: linear-gradient(180deg, #0e131b, #0b0f15); border-bottom: 1px solid var(--line-1); z-index: 5; }
+:root[data-theme="light"] header { background: #fff; }
+.brand { display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+.brand svg { width: 24px; height: 24px; }
+header h1 { font-size: 14px; margin: 0; white-space: nowrap; font-weight: 700; letter-spacing: -.01em; }
+header h1 span { color: var(--muted); font-weight: 500; margin-left: 4px; }
+header .sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
+.vsep { width: 1px; height: 20px; background: var(--line); }
 button, select, .file { font: inherit; color: var(--ink); background: var(--chip); border: 1px solid var(--line);
-  border-radius: 6px; padding: 4px 8px; cursor: pointer; }
-button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  border-radius: 8px; padding: 0 11px; height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  transition: background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease); }
+button:hover, .file:hover, select:hover { border-color: rgba(160, 175, 200, .3); background: var(--chip-2); }
+select { appearance: none; -webkit-appearance: none; padding-right: 28px; background-color: var(--input);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237f8a9d' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 9px center; }
+select option { background: var(--panel-solid); color: var(--ink); }
+button.on { background: var(--accent-soft); color: var(--ink); border-color: var(--accent-line); }
 .file input { display: none; }
-#scene { position: fixed; top: 48px; left: 0; right: 0; bottom: 0; }
+#scene { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; background: radial-gradient(1200px 700px at 50% 40%, var(--scene-a), var(--scene-b) 75%); }
 #scene canvas { display: block; }
-.panel { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-  z-index: 4; overflow: auto; backdrop-filter: blur(6px); }
-#controls { top: 60px; left: 12px; width: 272px; max-height: calc(100% - 72px); padding: 10px 12px; }
-#inspect { top: 60px; right: 12px; width: 340px; max-height: calc(100% - 72px); padding: 10px 12px; display: none; }
+.panel { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  z-index: 4; overflow: auto; backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+#controls { top: 64px; left: 12px; width: 288px; max-height: calc(100% - 76px); padding: 12px 14px; }
+#inspect { top: 64px; right: 12px; width: 348px; max-height: calc(100% - 76px); padding: 12px 14px; display: none; }
 #inspect.show { display: block; }
-h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 12px 0 6px; }
-h2:first-child { margin-top: 0; }
-label { display: flex; align-items: center; gap: 6px; }
-.cats label { justify-content: space-between; }
-.cats label span.n { color: var(--muted); font-size: 12px; }
-.row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 4px 0; }
-input[type=range] { width: 100%; accent-color: var(--accent); }
-.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid #0003; vertical-align: -2px; }
+h2 { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; color: var(--dim); margin: 16px 0 8px; }
+h2:first-child { margin-top: 2px; }
+label { display: flex; align-items: center; gap: 8px; }
+input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+.cats { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.cats label { justify-content: space-between; padding: 5px 6px; border-radius: 7px; font-size: 12.5px; }
+.cats label:hover { background: var(--chip); }
+.cats label > span:first-child { display: flex; align-items: center; gap: 8px; }
+.cats label span.n { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.seg { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--input); border: 1px solid var(--line-1); }
+.seg button { flex: 1 1 auto; justify-content: center; height: 26px; border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 500; padding: 0 8px; border-radius: 7px; }
+.seg button:hover { color: var(--ink); background: transparent; }
+.seg button.on { background: var(--chip-2); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .35), inset 0 0 0 1px var(--line); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+.row.full select { flex: 1; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; background: transparent; margin: 2px 0; cursor: pointer; }
+input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: var(--chip-2); }
+input[type=range]::-moz-range-track { height: 4px; border-radius: 4px; background: var(--chip-2); }
+input[type=range]::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--accent); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #f3f5fa; box-shadow: 0 0 0 3px rgba(125, 140, 255, .3), 0 1px 3px rgba(0, 0, 0, .6); }
+input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #f3f5fa; box-shadow: 0 0 0 3px rgba(125, 140, 255, .3); }
+input[type=range]:disabled { opacity: .35; cursor: not-allowed; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .2); vertical-align: -2px; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
-.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
-.kv b { font-weight: 600; color: var(--muted); }
-.chain { margin: 4px 0 0; padding-left: 16px; font-size: 13px; }
-.chain li { margin: 2px 0; }
-.site { border-top: 1px solid var(--line); padding-top: 6px; margin-top: 6px; }
-ul.sites { list-style: none; padding: 0; margin: 0; }
-ul.sites li { padding: 3px 0; cursor: pointer; font-size: 13px; }
-ul.sites li:hover { color: var(--accent); }
-.col { font-size: 12px; border-collapse: collapse; width: 100%; }
-.col td { padding: 1px 4px; border-bottom: 1px solid var(--line); }
-.col tr.here td { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-#status { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: var(--panel);
-  border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 12px; z-index: 4; white-space: nowrap;
-  max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; }
-a { color: var(--accent); }
-#drop { position: fixed; inset: 48px 0 0 0; display: none; align-items: center; justify-content: center; z-index: 3;
-  color: var(--muted); font-size: 16px; text-align: center; padding: 24px; }
+.val { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.val b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 12.5px; }
+.kv b { font-weight: 500; color: var(--muted); }
+.kv span { font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
+.chain { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; }
+.chain li { margin: 3px 0; }
+.site { border-top: 1px solid var(--line-1); padding-top: 8px; margin-top: 8px; }
+ul.sites { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 3px; }
+ul.sites li { padding: 7px 9px; cursor: pointer; font-size: 12.5px; border-radius: 8px; background: var(--chip); border: 1px solid var(--line-1); }
+ul.sites li:hover { border-color: var(--accent-line); }
+ul.sites li b { color: var(--accent-hi); margin-right: 4px; }
+.col { font-size: 12px; border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.col td { padding: 3px 6px; border-bottom: 1px solid var(--line-1); }
+.col tr.here td { background: var(--accent-soft); color: var(--ink); }
+#status { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); background: var(--panel); backdrop-filter: blur(10px);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 12px; z-index: 4; white-space: nowrap; color: var(--ink-2);
+  max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; box-shadow: 0 6px 20px rgba(0, 0, 0, .35); font-variant-numeric: tabular-nums; }
+a { color: var(--accent-hi); }
+#drop { position: fixed; inset: 52px 0 0 0; display: none; align-items: center; justify-content: center; z-index: 3;
+  color: var(--muted); font-size: 14px; text-align: center; padding: 24px; line-height: 1.7; }
 #drop.show { display: flex; }
+#drop code { font-family: var(--mono); font-size: 12px; background: var(--chip); padding: 1px 5px; border-radius: 4px; color: var(--ink-2); }
 #toggle-controls { display: none; }
 .ok { color: var(--ok); } .warn { color: var(--warn); }
+.note { display: flex; gap: 9px; padding: 10px 11px; border-radius: 10px; background: rgba(244, 183, 64, .12); border: 1px solid rgba(244, 183, 64, .3); color: var(--ink-2); font-size: 12px; line-height: 1.5; margin-bottom: 10px; }
+.note::before { content: "i"; flex: 0 0 auto; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--warn); color: #1a1204; font-weight: 700; font-size: 11px; margin-top: 1px; }
+.closebtn { width: 28px; height: 28px; padding: 0; justify-content: center; border-radius: 7px; }
+code { font-family: var(--mono); font-size: .92em; }
+/* Inside the workbench's job card (?embed=1): just the scene. */
+:root.embed header, :root.embed #controls, :root.embed #inspect, :root.embed #drop { display: none !important; }
+:root.embed #scene { top: 0; }
+:root.embed #status { top: auto; bottom: 8px; font-size: 11px; padding: 3px 10px; max-width: calc(100% - 16px); }
 @media (max-width: 720px) {
-  header .sub { display: none; }
-  #toggle-controls { display: inline-block; }
-  #controls { left: 8px; right: 8px; width: auto; top: 56px; max-height: 55%; display: none; }
+  header .sub, .vsep { display: none; }
+  #toggle-controls { display: inline-flex; }
+  #controls { left: 8px; right: 8px; width: auto; top: 60px; max-height: 55%; display: none; }
   #controls.open { display: block; }
   #inspect { left: 8px; right: 8px; width: auto; top: auto; bottom: 8px; max-height: 50%; }
-  #status { bottom: auto; top: 56px; }
+  #status { bottom: auto; top: 60px; }
 }
 </style>
 <script type="importmap">
@@ -87,47 +135,49 @@ a { color: var(--accent); }
 </head>
 <body>
 <header>
-  <h1>Area preview</h1>
-  <span class="sub" id="subtitle">Deep Time · a box of a generated world</span>
+  <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a7b2ff"/><stop offset=".55" stop-color="#6a7cff"/><stop offset="1" stop-color="#2f3aa8"/></linearGradient><clipPath id="c"><circle cx="16" cy="16" r="12"/></clipPath></defs><circle cx="16" cy="16" r="15" fill="none" stroke="#7d8cff" stroke-opacity=".35" stroke-width="1.2"/><circle cx="16" cy="16" r="12" fill="url(#g)"/><g clip-path="url(#c)" fill="none" stroke-linecap="round"><path d="M2 14.5c4-2.4 8 1.6 12-.4s8-2.6 16 .4" stroke="#0a0e28" stroke-opacity=".55" stroke-width="1.8"/><path d="M2 19.5c4-2 9 1.8 13 .1s8-2.2 15 .2" stroke="#0a0e28" stroke-opacity=".38" stroke-width="1.6"/></g></svg>
+  <h1>Deep Time<span>Area preview</span></h1></div>
+  <span class="vsep"></span>
+  <span class="sub" id="subtitle">A box of a generated world</span>
   <select id="exports" hidden aria-label="Export"></select>
   <label class="file" title="Open a .dtva or .dtva.gz export">Open…<input type="file" id="file" accept=".gz,.dtva"></label>
   <button id="toggle-controls" aria-label="Controls">☰</button>
-  <button id="theme" title="Theme: auto, light, dark" aria-label="Theme">◐</button>
+  <button id="theme" class="closebtn" title="Theme: dark or light" aria-label="Theme">☾</button>
 </header>
 <div id="scene"></div>
 <div id="drop">Drop a <code>.dtva.gz</code> export here, or open one with <b>Open…</b><br>
   (<code>tools/workbench/preview-area.sh</code> makes them; <code>?src=&lt;url&gt;</code> loads one directly).</div>
 
 <aside class="panel" id="controls">
-  <div id="note" class="small warn" hidden style="margin-bottom:8px"></div>
+  <div id="note" class="note" hidden></div>
   <h2>Show</h2>
-  <div class="row">
-    <button data-preset="all" class="on">Everything</button>
-    <button data-preset="nostone">Hide stone</button>
-    <button data-preset="ores">Ores &amp; deposits</button>
+  <div class="seg">
+    <button data-preset="all" class="on" title="Every block">Everything</button>
+    <button data-preset="nostone" title="Hide rock, crust, soil, plants and water">No stone</button>
+    <button data-preset="ores" title="Ores, with the deposit bodies see-through">Ores</button>
   </div>
   <div class="cats" id="cats"></div>
-  <label><input type="checkbox" id="bodies"> Deposit bodies (see-through)</label>
+  <div class="cats"><label><span><input type="checkbox" id="bodies"> Deposit bodies (see-through)</span></label></div>
   <h2>Colour by</h2>
-  <div class="row">
+  <div class="row full">
     <select id="colour" aria-label="Colour by">
       <option value="block">Block</option>
       <option value="strata">Rock horizon (strata stack)</option>
       <option value="body">Deposit body</option>
     </select>
   </div>
-  <label><input type="checkbox" id="vivid" checked> Vivid ores (colour by material)</label>
+  <div class="cats"><label><span><input type="checkbox" id="vivid" checked> Vivid ores (colour by material)</span></label></div>
   <h2>Cutaway</h2>
-  <div class="small">Top at y <b id="cuty-v"></b></div>
   <input type="range" id="cuty" aria-label="Top cut">
-  <div class="row small">
-    <label>Section <select id="secaxis" aria-label="Cross-section axis">
+  <div class="val"><span>Top at</span><span>y <b id="cuty-v"></b></span></div>
+  <div class="row" style="margin-top:12px">
+    <label class="small">Section <select id="secaxis" aria-label="Cross-section axis">
       <option value="none">off</option><option value="x">along x (keep west)</option><option value="z">along z (keep north)</option>
     </select></label>
-    <label><input type="checkbox" id="secflip"> flip</label>
+    <label class="small"><input type="checkbox" id="secflip"> flip</label>
   </div>
-  <div class="small" id="sec-v"></div>
   <input type="range" id="secpos" aria-label="Cross-section position" disabled>
+  <div class="val"><span></span><span id="sec-v"></span></div>
   <h2>Sites in the box</h2>
   <ul class="sites" id="sites"><li class="muted">none</li></ul>
   <h2>About this box</h2>
