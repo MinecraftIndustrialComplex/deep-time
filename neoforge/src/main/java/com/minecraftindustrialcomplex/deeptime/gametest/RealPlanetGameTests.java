@@ -69,7 +69,7 @@ public final class RealPlanetGameTests {
         WorldData wd = t.data();
         helper.assertTrue(wd.detailNoise() != null, "the real planet has a detail term");
         int c = t.circumference();
-        int corners = 0, cornerMax = 0, maxDiff = 0, detailed = 0;
+        int corners = 0, cornerMax = 0, maxDiff = 0, detailed = 0, checked = 0;
         String worst = "";
         for (int i = 0; i < 96; i++) {
             boolean corner = i % 2 == 0;
@@ -82,9 +82,12 @@ public final class RealPlanetGameTests {
             if (wd.detail(t.wrapX(x), z) != 0.0)
                 detailed++;
             int expected = (int) Math.ceil(t.height(x, z)) - 1;
+            if (expected < level.getMinBuildHeight() + 32)
+                continue;   // the floor band: the router's bottom slide, not the bake
             int actual = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.NOISE, true)
                     .getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z);
             int diff = Math.abs(actual - expected);
+            checked++;
             if (corner) {
                 corners++;
                 cornerMax = Math.max(cornerMax, diff);
@@ -94,8 +97,9 @@ public final class RealPlanetGameTests {
                 worst = "(" + x + ", " + z + ") expected " + expected + " got " + actual + " H=" + t.height(x, z);
             }
         }
-        DeepTime.LOGGER.info("[gametest] realPlanetHeightMatchesTheBake columns=96 cornerColumns={} cornerMaxAbsDiff={} "
-                + "maxAbsDiff={} withDetail={} worst={}", corners, cornerMax, maxDiff, detailed, worst);
+        DeepTime.LOGGER.info("[gametest] realPlanetHeightMatchesTheBake columns={} cornerColumns={} cornerMaxAbsDiff={} "
+                + "maxAbsDiff={} withDetail={} worst={}", checked, corners, cornerMax, maxDiff, detailed, worst);
+        helper.assertTrue(corners >= 24, "only " + corners + " corner columns above the floor band");
         helper.assertTrue(cornerMax == 0, "corner columns differ by up to " + cornerMax + ": " + worst);
         helper.assertTrue(maxDiff <= 12, "columns differ by up to " + maxDiff + ": " + worst);
         helper.succeed();

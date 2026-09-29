@@ -411,13 +411,19 @@ public final class DepositGameTests {
         Target t = target(helper, level, wd);
         int c = wd.circumference();
         Body b = t.body();
+        // The body's most central block (a clipped or thin body may have none with d < 0.3).
         BlockPos inside = null;
-        for (int y = b.max()[1]; y >= b.min()[1] && inside == null; y--)
-            for (int x = b.min()[0]; x <= b.max()[0] && inside == null; x++)
-                for (int z = b.min()[2]; z <= b.max()[2] && inside == null; z++)
-                    if (b.locate(c, x, y, z) != null && b.locate(c, x, y, z).d() < 0.3)
+        double best = Double.MAX_VALUE;
+        for (int y = b.max()[1]; y >= b.min()[1]; y--)
+            for (int x = b.min()[0]; x <= b.max()[0]; x++)
+                for (int z = b.min()[2]; z <= b.max()[2]; z++) {
+                    var loc = b.locate(c, x, y, z);
+                    if (loc != null && loc.d() < best) {
+                        best = loc.d();
                         inside = new BlockPos(canonical(c, x), y, z);
-        helper.assertTrue(inside != null, "no block with d < 0.3 in body " + b.id());
+                    }
+                }
+        helper.assertTrue(inside != null, "no block inside body " + b.id());
         var at = sites.at(inside);
         helper.assertTrue(at.isPresent() && at.get().id() == t.site().id(), "at(" + inside.toShortString() + ") = " + at);
         helper.assertTrue(sites.inChunk(new ChunkPos(inside)).stream().anyMatch(s -> s.id() == t.site().id()), "inChunk misses the site");
