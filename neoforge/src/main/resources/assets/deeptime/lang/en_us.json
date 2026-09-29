@@ -93,6 +93,7 @@
   "deeptime.editor.field.pluton_rate": "Granite frequency",
   "deeptime.editor.field.pluton_size": "Granite body size",
   "deeptime.editor.field.province_size": "Ore province size",
+  "deeptime.editor.field.brine_reach": "Brine flow reach",
   "deeptime.editor.option.province_strength.off": "Off",
   "deeptime.editor.option.province_strength.weak": "Weak",
   "deeptime.editor.option.province_strength.medium": "Medium",

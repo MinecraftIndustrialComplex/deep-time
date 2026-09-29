@@ -2,7 +2,7 @@
   "id": "deeptime:mvt_zn_pb",
   "family": "basin_brine",
   "site_kind": "deposit",
-  "description": "Mississippi Valley-type zinc-lead: replacement and open-space ore in platform dolostone, deposited by basin brines that orogenic uplift drove through the carbonate aquifer.",
+  "description": "Mississippi Valley-type zinc-lead: replacement and open-space ore in platform carbonates, deposited by hot basinal brines that topography-driven flow from a rising orogen swept across a foreland basin into the carbonate platform at its margin.",
   "products": [
     {"material": "c:zinc", "grade_key": "zn_pct", "role": "primary"},
     {"material": "c:lead", "grade_key": "pb_pct", "role": "coproduct"},
@@ -11,16 +11,17 @@
   "components": {
     "combine": "product",
     "source": [
-      {"field": "deeptime:evaporite", "curve": [[0, 0.15], [0.3, 1]], "note": "evaporite-derived oxidised brines (Leach et al. 2010); the floor lets seawater-evaporation brines count a little (design)"}
+      {"field": "deeptime:basin_brine", "curve": [[0, 0], [0.035, 1]], "note": "hot basinal brines (75–200 °C, 10–30 wt% NaCl; Leach et al. 2005; Garven 1985) from a subsiding sedimentary basin anywhere within the flow reach, not at the site; the field is the share of hot basin within brine_flow_km (regional.rs); full at 0.035, about 40,000 km² of hot basin spread within a 600 km reach (design)"}
     ],
     "driver": [
-      {"field": "deeptime:topographic_gradient_m_km", "curve": [[0, 0], [1, 0.5], [4, 1]], "note": "uplift-driven topographic flow (Garven 1985; Bethke 1986): the basin-scale gradient from an orogen across its foreland, of the order of 1 km over a few hundred km (P1-17: the first thresholds, 5 and 15 m/km, picked mountain fronts, where the deposits eroded away); thresholds are design"}
+      {"field": "deeptime:regional_head_drop_m_km", "curve": [[0, 0], [1, 0.5], [3.3, 1]], "note": "topography-driven flow from a rising orogen across the basin (Garven & Freeze 1984; Garven 1985; Bethke & Marshak 1990: 'topographic relief of the tectonic belt provided the dominant driving force'), during contraction (Leach et al. 2001); the field counts only ground rising now (regional.rs); full drive at 3.3 m/km, Garven & Freeze 1984's base case (a 1 km water-table drop over a 300 km basin)"}
     ],
     "pathway": [
-      {"field": "deeptime:fault_density", "curve": [[0, 0.5], [0.4, 1]], "note": "faults and basement highs focus flow (design)"}
+      {"field": "deeptime:fault_density", "curve": [[0, 0.5], [0.4, 1]], "note": "faults, arches and basement highs focus the discharge (Bradley & Leach 2003: flexure-induced faults; design thresholds)"},
+      {"field": "deeptime:crust_thickness_km", "curve": [[20, 0], [30, 1]], "note": "a platform on continental crust (Leach et al. 2010: platform carbonate sequences); design thresholds"}
     ],
     "trap": [
-      {"field": "deeptime:carbonate_platform", "curve": [[0.1, 0], [0.5, 1]], "note": "platform carbonates as host and aquifer (Leach et al. 2010)"}
+      {"field": "deeptime:carbonate_platform", "curve": [[0.02, 0], [0.2, 1]], "note": "platform carbonates as aquifer and reactive host (Leach et al. 2010); a fifth of the column's top kilometre counts fully (design)"}
     ]
   },
   "clock_gates": ["deeptime:clock/oxygenated_oceans"],
@@ -28,11 +29,12 @@
   "formation_time": "peak",
   "hosts": {
     "any_of": ["#deeptime:rock/carbonate"],
-    "host_bias": {"dolostone": 1.5}
+    "host_bias": {"dolostone": 1.5},
+    "full_at": 0.05
   },
   "causes": {
-    "source": ["deeptime:marine_transgression"],
-    "driver": ["deeptime:orogeny_phase", "deeptime:collision"],
+    "source": ["deeptime:basin_subsidence", "deeptime:marine_transgression"],
+    "driver": ["deeptime:orogeny_phase", "deeptime:collision", "deeptime:subduction_onset"],
     "trap": ["deeptime:marine_transgression"],
     "preservation": ["deeptime:erosion_pulse"]
   },
@@ -81,13 +83,13 @@
     "cdg_reservoir": false,
     "ore_block_policy": "ev_then_vanilla"
   },
-  "balance": {"count_mult": 20.0, "size_mult_h": 12.0, "size_mult_v": 3.0, "richness_mult": 1.0},
+  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 3.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
     "Sizing: USGS OFR 2009-1252 (Singer, Berger & Moring 2009), model CAam (carbonate-hosted, amagmatic), n = 132, Table 2 p. 9: tonnage 0.93 / 10 / 86 Mt, Zn 1.7 / 5.1 / 12 %, Pb 0.19 / 1.5 / 5.0 %, Ag 0 / 0 / 37 g/t (unreported grades counted as zero); correlations from the text p. 8; the 2 km same-deposit rule p. 2. The report has no MVT model as such: 93 of its 132 CAam deposits are labelled MVT and 93 of the 105 MVT-labelled deposits fall in CAam. presence = n_reported / 132 counted in the report's database SedZn-PbTX.txt. The MVT-only table of SIR 2010-5070-A (Table 1) is in data/usgs/mvt_zn_pb.json extra. Cu and Au (9 and 3 of 132) are left out.",
     "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 2.9 (dolostone with sulfides), density_per_1e5km2 1 / 5 / 20 (no USGS MVT deposit density exists; SIR 2010-5070-A gives district areas of 1,600–10,000 km² and Pine Point's 60 ore bodies in 1,600 km², which local densities far exceed), formation_depth_m 1000.",
     "Design values: the curves' thresholds, integration_myr 5 (brine flushes are short: 0.5–5 Myr at Pine Point, Garven 1985), clustering, zoning, aspect, size multipliers.",
     "Create stones (decisions file): dolostone (asurine → zinc) is the preferred host at 1.5, and the ore body turns its host to dolostone (hydrothermal dolomite).",
-    "Balance (P1-17 calibration, 2026-09-29): count_mult 20. With the placeholder density the permissive platforms of a 16k planet (1,000–25,000 km²) expect well under one deposit, so the family would be absent from most planets; 20 × gives a few per 500-Myr pipeline_quick_16k run, many of which the ledger then erodes (the playability pass guarantees essentials). Carbonate hosts stay scarce on the recorded history (STATUS.md, P1-17 partial: calibration)."
+    "Counts (survivor formula, decisions log 2026-09-29, plan §8.6 as built): the density counts deposits that survive to the present, as USGS does; the engine forms more (deposits/survival.rs) so that the expected survivors are ρ_p50 · permissive area · count_mult. balance.count_mult stays 1: a pack lever, not a calibration. Driver reworked 2026-09-29 (Ben: 'Rework its driver'): basin-scale flow — a hot basin and a rising orogen within brine_flow_km (600 km, the USGS MVT tract criterion) feed brine to carbonate the site holds (deposits/regional.rs); hosts.full_at 0.05 lets a ~100 m carbonate unit in the 2 km host window count fully."
   ]
 }
