@@ -814,7 +814,7 @@ def preview_world_note(run):
     return (f"Not run {run}'s terrain. Workbench runs are rasters on the simulation grid and become a "
             f"Minecraft world only through P1-08's bake, which does not exist yet. This preview is Deep Time's "
             f"synthetic deposit world (deposits_world_16k, {PREVIEW_LENGTH_MYR} Myr, C = {PREVIEW_C:,}) generated "
-            f"by the real mod on the Mac's headless {os.environ.get('DEEPTIME_WORKBENCH_PROFILE', 'standalone')} "
+            f"by the real mod on the Mac's headless {os.environ.get('DEEPTIME_WORKBENCH_PROFILE', 'mic')} "
             f"server, at the latitude and longitude you picked. Its sites cluster near x -5,600, z -1,000.")
 
 
@@ -873,7 +873,7 @@ def for_page(st):
 def workbench_preview(req):
     run = req.get("run", "?")
     box, shrink = box_on_preview_world(req)
-    spec = {"profile": os.environ.get("DEEPTIME_WORKBENCH_PROFILE", "standalone"), "size": PREVIEW_C,
+    spec = {"profile": os.environ.get("DEEPTIME_WORKBENCH_PROFILE", "mic"), "size": PREVIEW_C,
             "boxes": [box],
             "world": {"preset": PREVIEW_PRESET, "start": "supercontinent", "length_myr": PREVIEW_LENGTH_MYR},
             "note": shrink + preview_world_note(run),
@@ -911,7 +911,7 @@ def workbench_inspect(q):
         out["note"] = out.get("note") or preview_world_note(run)
         return 200, out
     h = INSPECT_SIDE // 2
-    spec = {"profile": os.environ.get("DEEPTIME_WORKBENCH_PROFILE", "standalone"), "size": PREVIEW_C,
+    spec = {"profile": os.environ.get("DEEPTIME_WORKBENCH_PROFILE", "mic"), "size": PREVIEW_C,
             "boxes": [[x - h, z - h, x + h, z + h]], "pick": [x, z],
             "world": {"preset": PREVIEW_PRESET, "start": "supercontinent", "length_myr": PREVIEW_LENGTH_MYR},
             "note": ("There is no fast column answer until P1-08; this generates the 32 × 32 blocks around the "

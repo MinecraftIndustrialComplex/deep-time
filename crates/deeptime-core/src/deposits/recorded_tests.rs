@@ -73,7 +73,7 @@ fn run(json: &str, threads: usize, name: &str) -> (WorldState, Value) {
     let s = Session::create(json, "", options(&dir, threads), Arc::new(NoGauge)).unwrap();
     assert_eq!(
         s.stage_names(),
-        ["plates", "surface", "structure", "deposits"]
+        ["plates", "climate", "surface", "structure", "deposits"]
     );
     finish(&s);
     let world = s.checkpoint().unwrap().world;
@@ -138,20 +138,19 @@ fn coupled_pipeline_reads_its_own_history_and_is_deterministic_across_threads() 
             "{wanted} not in the history"
         );
     }
-    // A 100 Myr run on 3,000 samples is young: the petroleum system, which needs source, seal,
-    // reservoir and structure in one basin, is the family that develops (the synthetic-history
-    // test below has every family; the 500 Myr acceptance run is in STATUS.md). Its sites are
-    // real, with kitchens in the log.
+    // A 100 Myr run on 3,000 samples is young: only the families whose setting forms fast develop.
+    // Which ones depends on the climate (with P1-04's stand-in it was the petroleum system; with
+    // P1-05's real climate it is coal on the humid coastal plains). The synthetic-history test below
+    // has every family; the 500 Myr acceptance run is in STATUS.md. Here: some sites, all real.
     let by = sites_by_type(&a);
-    assert!(
-        by.get("deeptime:petroleum_trap").copied().unwrap_or(0) > 0,
-        "{by:?}"
-    );
-    assert!(
-        a.events
-            .iter()
-            .any(|e| e.kind == "deeptime:petroleum_generation" && e.source == SOURCE)
-    );
+    assert!(by.values().sum::<usize>() > 0, "{by:?}");
+    if by.contains_key("deeptime:petroleum_trap") {
+        assert!(
+            a.events
+                .iter()
+                .any(|e| e.kind == "deeptime:petroleum_generation" && e.source == SOURCE)
+        );
+    }
     // Every site has its forming event with causes in the log (the real events of the plates and
     // the surface, not the synthetic ones).
     for s in &a.sites {
