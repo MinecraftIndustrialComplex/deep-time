@@ -2,7 +2,6 @@
 package com.minecraftindustrialcomplex.deeptime.server;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.CancelledException;
@@ -11,6 +10,7 @@ import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeStatus;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.SimSession;
 import com.minecraftindustrialcomplex.deeptime.preset.PresetException;
 import com.minecraftindustrialcomplex.deeptime.preset.Presets;
+import com.minecraftindustrialcomplex.deeptime.screen.model.Estimate;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Manifest;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataRef;
@@ -217,24 +217,28 @@ public final class FirstStartGenerator {
         // 4. Estimate, then run.
         long cap = config.memoryCapBytes();
         List<String> stageNames = new ArrayList<>();
-        long peak;
+        Estimate estimate;
         // The content bundle (plan §5.4): today the deeptime:essentials registry, which replaces the
         // preset's essentials in the core's playability pass (P1-15).
         String contentJson = com.minecraftindustrialcomplex.deeptime.ore.OreData.contentJson(server);
         try {
-            JsonObject est = Presets.parseObject(SimSession.estimate(presetJson, contentJson));
-            peak = est.get("peak_bytes").getAsLong();
-            for (JsonElement st : est.getAsJsonArray("stages"))
-                stageNames.add(st.getAsJsonObject().get("name").getAsString());
+            estimate = Estimate.parse(SimSession.estimate(presetJson, contentJson));
+            for (Estimate.Stage st : estimate.stages())
+                stageNames.add(st.name());
         } catch (RuntimeException e) {
             throw new Stop("the preset " + name + " is not valid: " + e.getMessage(),
                     "Fix the preset (or choose a built-in one) in " + configFile + ".");
         }
-        if (peak > cap)
+        // Only the base must fit: the recorded history spills to the work folder over the cap (P1-17).
+        long peak = estimate.peakUnder(cap);
+        if (estimate.exceeds(cap))
             throw new Stop(String.format(Locale.ROOT, "the preset %s needs about %.1f GiB of native memory, above memory_cap_gib %.1f",
-                            name, peak / GIB, cap / GIB),
+                            name, estimate.baseBytes() / GIB, cap / GIB),
                     "Raise \"memory_cap_gib\" in " + configFile + " (the machine needs that much RAM besides the server's -Xmx),\n"
                             + "or choose a smaller preset.");
+        if (estimate.spillUnder(cap) > 0)
+            DeepTime.LOGGER.info("[deeptime] about {} GiB of the recorded history will not fit memory_cap_gib {}: it goes to "
+                    + "the work folder while the simulation runs (slower, same planet)", gib(estimate.spillUnder(cap)), gib(cap));
         if (info.placeholder())
             DeepTime.LOGGER.warn("[deeptime] {} is a Phase 1 placeholder, not a simulated planet: {}", name,
                     info.description().orElse("the dummy pipeline plus a synthetic terrain"));

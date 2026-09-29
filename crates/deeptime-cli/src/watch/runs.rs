@@ -33,7 +33,9 @@ use super::editor::Catalog;
 use super::live::{FrameSize, Live};
 use super::{live_cadence, progress_json};
 use crate::alloc::{self, AllocGauge};
-use crate::run::{CliResult, Common, forward_log, plates_line, surface_line, timings_line};
+use crate::run::{
+    CliResult, Common, forward_log, plates_line, spill_line, surface_line, timings_line,
+};
 
 /// Runs that may wait behind the running one.
 pub const QUEUE_MAX: usize = 3;
@@ -580,17 +582,18 @@ impl Workbench {
             alloc::peak() as f64 / 1048576.0,
             started.elapsed().as_secs_f64()
         )];
-        let world = s.checkpoint()?.world;
-        lines.extend(plates_line(&world));
-        lines.extend(surface_line(&world));
-        lines.push(format!(
-            "timings {}",
-            timings_line(&s.stage_timings()?, &world)
-        ));
-        #[cfg(test)]
-        {
-            *lock(&run.final_world) = Some(world);
-        }
+        // The world as it stands, not a copy (a 32k full world is gigabytes; P1-17).
+        let timings = s.stage_timings()?;
+        s.with_world(|world| {
+            lines.extend(plates_line(world));
+            lines.extend(surface_line(world));
+            lines.push(format!("timings {}", timings_line(&timings, world)));
+            #[cfg(test)]
+            {
+                *lock(&run.final_world) = Some(world.clone());
+            }
+        })?;
+        lines.extend(spill_line(&s)?);
         run.live
             .publish(Vec::new(), Vec::new(), Some(progress_json(&s)));
         Ok(lines)
