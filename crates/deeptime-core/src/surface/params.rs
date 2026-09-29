@@ -91,9 +91,9 @@ pub struct SurfaceParams {
     /// Hillslope diffusivity κ for crystalline basement, m²/yr.
     pub kd_land_m2_yr: f64,
     /// Shallow-water marine diffusivity D₀ (Landlab `SimpleSubmarineDiffuser`), m²/yr: Landlab's
-    /// default 100 (P1-17; P1-04 had 300). Faces take the mean of their cells' diffusivities, so the
-    /// sea erodes a coastal land cell at about D₀/2: at 300 the shores retreated ~250 km in 500 Myr
-    /// and drowned a third of the continental crust once the continents were Earth-low.
+    /// default 100 (P1-17; P1-04 had 300). Faces take the mean of their cells' diffusivities, so
+    /// the sea erodes a coastal land cell at about D₀/2: at 300 the shores retreated ~250 km in
+    /// 500 Myr and drowned a third of the continental crust once the continents were Earth-low.
     pub kd_marine_m2_yr: f64,
     /// Wave base of the marine diffusivity, m (Landlab's default 60; P1-04 had 100).
     pub wave_base_m: f64,
