@@ -8,8 +8,9 @@
 //! type's most favourable land cell in the region, and records it as
 //! `deeptime:guaranteed_occurrence` so "Why here?" stays honest.
 //!
-//! The essentials list is a pack's to define (`deeptime:essentials` registry, P1-15); until then
-//! the preset carries it.
+//! The essentials list is a pack's to define: the game passes its `deeptime:essentials` registry
+//! (P1-15) in the content bundle (`{"essentials": [...]}`), which replaces the preset's list
+//! (`crate::preset::Preset::with_content`); runs without a bundle (the CLI) use the preset's.
 
 use serde::{Deserialize, Serialize};
 
@@ -26,6 +27,10 @@ pub struct Essential {
     pub region_blocks: u32,
     #[serde(default)]
     pub exposed: bool,
+    /// The spawn must lie within this many blocks of a site of the material (plan §7.8); the
+    /// spawn ranking ([`super::spawn`]) scores candidates by it. `None`: no spawn requirement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_blocks_from_spawn: Option<u32>,
 }
 
 /// The region grid of an essential.

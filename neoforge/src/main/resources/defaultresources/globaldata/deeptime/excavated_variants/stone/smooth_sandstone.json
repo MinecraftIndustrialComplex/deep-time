@@ -1,0 +1,10 @@
+{
+  "types": [
+    "excavated_variants:overworld"
+  ],
+  "translations": {
+    "en_us": "Smooth Sandstone"
+  },
+  "block": "minecraft:smooth_sandstone",
+  "ore_tags": []
+}

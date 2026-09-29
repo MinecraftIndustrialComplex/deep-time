@@ -1,0 +1,10 @@
+{
+  "types": [
+    "excavated_variants:overworld"
+  ],
+  "translations": {
+    "en_us": "Packed Mud"
+  },
+  "block": "minecraft:packed_mud",
+  "ore_tags": []
+}

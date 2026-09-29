@@ -1,0 +1,10 @@
+{
+  "types": [
+    "excavated_variants:overworld"
+  ],
+  "translations": {
+    "en_us": "Polished Tuff"
+  },
+  "block": "minecraft:polished_tuff",
+  "ore_tags": []
+}

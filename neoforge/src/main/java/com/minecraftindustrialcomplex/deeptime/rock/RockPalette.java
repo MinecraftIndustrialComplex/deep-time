@@ -41,17 +41,72 @@ public final class RockPalette {
     public static final String TAG_MEMBERS = "rock/";
     public static final String TAG_FALLBACK = "rock_fallback/";
 
-    private static final RockPalette EMPTY = new RockPalette(Map.of(), Map.of());
+    private static final RockPalette EMPTY = new RockPalette(Map.of(), Map.of(), Map.of());
     private static volatile RockPalette current = EMPTY;
+
+    /** What a block is to the deposit feature and background scatter (P1-15). */
+    public enum Host {
+        /** Not rock: air, fluids, ore, plants, anything no rock class resolves to. */
+        NONE,
+        /** Unconsolidated rock (the {@code unconsolidated} family: soil, sand, gravel, clay, …). */
+        LOOSE,
+        /** Bedrock: the unclassified crust (stone, deepslate) or any other class's block. */
+        ROCK
+    }
 
     /** Class name → resolution, ordered by class name. */
     private final Map<String, PaletteRules.Result<BlockState>> byClass;
     /** Problems found while building (unknown classes in rock_states, bad states, missing blocks). */
     private final Map<String, List<String>> problems;
+    /** Block → the classes whose resolution contains it (sorted), for host checks and scatter bias. */
+    private final Map<Block, List<String>> classesOfBlock;
+    /** Block → host kind (ROCK wins where a block serves several classes). */
+    private final Map<Block, Host> hostOfBlock;
+    /** Class → family ({@link RockClass#family()}). */
+    private final Map<String, String> families;
 
-    private RockPalette(Map<String, PaletteRules.Result<BlockState>> byClass, Map<String, List<String>> problems) {
+    private RockPalette(Map<String, PaletteRules.Result<BlockState>> byClass, Map<String, List<String>> problems,
+                        Map<String, String> families) {
         this.byClass = byClass;
         this.problems = problems;
+        this.families = Map.copyOf(families);
+        Map<Block, List<String>> classes = new java.util.HashMap<>();
+        Map<Block, Host> hosts = new java.util.HashMap<>();
+        byClass.forEach((name, r) -> {
+            Host kind = "unconsolidated".equals(families.get(name)) ? Host.LOOSE : Host.ROCK;
+            for (BlockState b : r.blocks()) {
+                classes.computeIfAbsent(b.getBlock(), k -> new ArrayList<>()).add(name);
+                hosts.merge(b.getBlock(), kind, (a, c) -> a == Host.ROCK || c == Host.ROCK ? Host.ROCK : Host.LOOSE);
+            }
+        });
+        classes.replaceAll((k, v) -> List.copyOf(v));
+        this.classesOfBlock = Map.copyOf(classes);
+        this.hostOfBlock = Map.copyOf(hosts);
+    }
+
+    /** True for a class of the {@code unconsolidated} family (sand, gravel, soil, …). */
+    public boolean isLoose(String rockClass) {
+        return "unconsolidated".equals(families.get(rockClass));
+    }
+
+    /**
+     * What {@code s} is as a host for ore: the unclassified crust (stone, deepslate) and every
+     * class's blocks are rock, the unconsolidated classes' blocks loose rock, anything else none.
+     */
+    public Host host(BlockState s) {
+        if (s.is(Blocks.STONE) || s.is(Blocks.DEEPSLATE))
+            return Host.ROCK;
+        return hostOfBlock.getOrDefault(s.getBlock(), Host.NONE);
+    }
+
+    /**
+     * The rock classes {@code s} is a block of (several where classes share a stand-in), sorted;
+     * {@code unclassified_crust} for stone and deepslate; empty for non-rock.
+     */
+    public List<String> classesOf(BlockState s) {
+        if (s.is(Blocks.STONE) || s.is(Blocks.DEEPSLATE))
+            return List.of("unclassified_crust");
+        return classesOfBlock.getOrDefault(s.getBlock(), List.of());
     }
 
     public static void init() {
@@ -134,7 +189,10 @@ public final class RockPalette {
             out.put(name, result);
         });
         problems.values().removeIf(List::isEmpty);
-        return new RockPalette(java.util.Collections.unmodifiableMap(out), java.util.Collections.unmodifiableMap(problems));
+        Map<String, String> families = new TreeMap<>();
+        classes.forEach((name, rc) -> families.put(name, rc.family()));
+        return new RockPalette(java.util.Collections.unmodifiableMap(out), java.util.Collections.unmodifiableMap(problems),
+                families);
     }
 
     /** A tag's blocks in list order (absent optional entries were dropped when the tag loaded). */

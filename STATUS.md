@@ -36,7 +36,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-12 | Strata pass with rock tags and `rock_states` | done | 2026-09-28 | — | Mac: ./gametest.sh and -PwithMic (+ MIC rock tags via -Ddeeptime.extraDatapack) → All 21 required tests passed each; coal stone / black argillite; Create stones in their classes; loess = projectatmosphere:dust[layers=8]; everyClassInTheWorld 59/59 classes, 240 samples 0 wrong; MIC smoke probe palette 59/59 (member 24, fallback 35); JUnit 46/0; bodies deferred (P1-08/P1-14) |
 | P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 743b69d | Mechanism verified on placeholder presets (dummy pipeline + wrap-test bake): standalone and MIC first starts generate in ~12 s with progress lines ≤ 5 s apart, restart does not regenerate; no-config / circumference-mismatch / native-failure all stop cleanly before loadLevel. Rerun with the real presets after P1-08 |
 | P1-14 | Deposit engine: the four families | doing | 2026-09-28 | 7f4858c | Engine on a synthetic field history (real fields wait for P1-03…P1-07). Mac: cargo test --workspace ok (core 82 incl. 41 deposits::, format 31, cli 11); porphyry σ 1.4892; Poisson means within 4 SE over 10,000 draws; tonnage P90/P50/P10 within 4 SE; min separation holds (200 seeds + the run); every site has a forming event with causes; `stage deposits --preset …/deposits_synthetic_16k.json --viewer review/out/p1-deposits` → 32 sites of all 8 types, counts next to ρ·A·F (porphyry 9 drawn / 9.41), 0.83 GB peak; fmt, clippy -D warnings, deny clean |
-| P1-15 | Deposits in the world | todo | | | |
+| P1-15 | Deposits in the world | doing | 2026-09-28 | — | On the synthetic deposit world (real fields wait for P1-03…P1-08). Mac: ./gametest.sh, -PwithEv, -PwithMic → All 30 required tests passed each (DepositGameTests body 1222/1222 ore exact, 0 missed, 0 unexplained, regeneration 0 of 44,880 differ; ClaimGameTests; SpawnGameTests); ./gametest-planet.sh claimoninplanetworld PASS standalone (19 removed) and -PwithMic (38 removed); JUnit 62/0 incl. DepositDataParityTest (19,649 body samples, worst Δ 3.3e-16); smoke standalone first-start deposit world PASS + `deeptime-inspect ore` render |
 | P1-16 | COE and CDG hooks | todo | | | |
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
@@ -57,6 +57,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-09-28 | P1-15 | **Q4 (plan §14): remove random rock-blob features in Deep Time worlds?** (vanilla granite/diorite/andesite/tuff blobs, Terralith's re-stoned and cliff-texturing blobs, Create's striated layers, Born in Chaos's argillite.) Recommendation: yes, on by default, switchable per pack. Implemented that way (`claim_rock_features: true` in `data/deeptime/neoforge/biome_modifier/claim_ores.json`; a pack's own modifier or an override of that file turns it off); in MIC it removes 24 placed features (list in the P1-15 build log). Not decided by the agent beyond the default. | not yet asked (sub-agent; for Ben) |
+| 2026-09-28 | P1-15 | **Q10 (plan §14): Excavated Variants in MIC?** Evidence so far: with EV 4.3.1 + DAG the deposits place EV's ore-in-rock variants for their host (copper in red sandstone / sandstone in the GameTest world), deterministically once EV's own `ore_replacer` is kept out of Deep Time levels (a compat mixin); EV knows vanilla's and Create's stones itself, Deep Time adds four vanilla stand-ins. The side-by-side BlueMap renders the question asks for were not made (the top-down ore render shows materials, not hosts). Recommendation unchanged: decide after those renders. | not yet asked (sub-agent; for Ben) |
 
 ## Build log
 
@@ -295,6 +297,157 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   publishing them as frames is not done here (P1-14 landed while this task ran).
 - **Next.** P1-04 (surface processes on L1) reads `plates/uplift_mm_yr` and the other `plates/*`
   fields; its pipeline should set `tectonics.l1_every_steps` = 1. Then the frames P1-14 reads.
+
+### 2026-09-28 — P1-15 deposits in the world, on the synthetic deposit world (agent worktree agent-a76188b70a388c5da, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Scope.** Everything of P1-15 that does not need P1-03…P1-08, driven by P1-14's synthetic run.
+  The row stays `doing` until the real presets feed it (rerun the acceptance below unchanged).
+- **A world with terrain and deposits (Rust).** A `deposits_synthetic` preset may carry
+  `"terrain": {"strata": "placeholder" | "every-class"}`: `finalize_write` then bakes, next to the
+  sites, bodies and events, a terrain whose elevation is the synthetic history's present elevation
+  (`deposits::synthetic::HistoryTerrain`, `synth::build_with`, kind `deposit-history`), so every body
+  sits in the ground it was placed against. For that the deposit stage now samples the present
+  surface **bilinearly on L1 at the site's point** (`Finish::surface_at`, `bilinear_cells`) instead
+  of the nearest cell; P1-14's tests and its 16k census (32 sites) are unchanged. Presets
+  `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json` (GameTests, smoke). Truncated ore
+  bodies' clips lie within 3 blocks of the baked ground (`world_preset_bakes_terrain_under_the_bodies`).
+- **Spawn and essentials (Rust + Java).** `Essential` gains `max_blocks_from_spawn`. New
+  `deposits::spawn`: with such essentials the bake ranks spawn candidates (dry, flat, 16-block
+  lattice; fewest essentials out of reach, then Σ min(d/max, 4), then distance from 0,0; top 10,
+  64 blocks apart) and writes `ranked_by`, `unmet`, `score`, `essentials` into
+  `spawn/candidates.json` (FORMAT.md). `SpawnHandler` takes the dry candidate with the fewest
+  `unmet`. Java registries `deeptime:essentials`, `deeptime:scatter` and `deeptime:deposit_type`
+  (lenient codec: products and the ore-block policy only) in `ore/OreData`; Deep Time ships vanilla
+  essentials (iron, coal 1 per 4,096-block region, exposed, spawn ≤ 2,048; copper 1 per 8,192,
+  spawn ≤ 3,072; gold 1 per 8,192) and scatter rules (coal, iron, copper, gold, zinc; values
+  judged, marked initial). **Content bundle:** `FirstStartGenerator` passes
+  `{"essentials": [...]}` from the registry to the native run; `Preset::with_content` replaces the
+  preset's essentials with it (the recorded preset.json carries the list used).
+- **Java world data.** `worlddata/{Sectioned, SiteData, BodyData, Body, EventData, Deposits}`: readers
+  of `DTSR`/`DTSI`/`DTBD`/`DTEV` (CRCs, versions, bounds checked as in Rust), `Body.locate` = Rust's
+  `Body::locate` operation for operation, `WorldData.deposits()` lazily. **Parity:**
+  `DepositDataParityTest` over `deeptime run deposits_world_4k.json` + new `deeptime dump-deposits`
+  (Gradle `testWorldDeposits4k`): every site field, 532 index lookups, 49 bodies × 401 samples
+  (a quarter across the seam) — 19,649 samples, 1,388 inside, worst |Δd|,|Δv| 3.3e-16, 0
+  inside/outside disagreements — and every forming event's cause chain.
+- **API** `api/{DeepTimeSites, Site, SiteKind, Product, Extraction, GeoEvent}` (plan §5.6) via
+  `worldgen/LevelSites`: `of(ServerLevel)` (empty outside Deep Time levels), `all`, `at` (body SDF),
+  `inChunk`, `within`, `byId`, `formingEvent`, `causeChain`, `event`.
+- **Strata pass:** bodies now paint their `rock_class` (a zone's winning, last zone last) over the
+  crust or horizon rock inside their SDF, one member per body (`StrataPass.bodyKey`);
+  `StrataPass.predictedRock` for tests. `RockPalette` gains `host(state)` (ROCK = crust or any
+  consolidated class's block, LOOSE = the `unconsolidated` family, NONE), `classesOf`, `isLoose`.
+- **Deposit feature** (`worldgen/DepositFeature`, `deeptime:deposits`) and **background scatter**
+  (`worldgen/BackgroundScatterFeature`), both at `underground_ores` through one
+  `neoforge:add_features` modifier (`biome_modifier/deposits.json`, deposits first). Per block one
+  draw, a SplitMix hash of the canonical position and the body id, against the running sum of the
+  densities of the zones with a material that apply there (zone order; FORMAT.md "Bodies"); host =
+  ROCK, or LOOSE only in a body whose own class is loose (placers in gravel). Scatter: ⌊n⌋ + chance
+  clusters per chunk, start depth from `y_window` as a fraction of the column from the world data's
+  surface to min_y (the plan's "fraction of crust thickness"), a `size`-step random walk inside the
+  chunk, ROCK hosts only, `host_bias` per class. Both write only their own chunk; both no-ops
+  outside Deep Time generators.
+- **OreBlockResolver** (`ore/`): EV variant for the host, else `#c:ores/<m>` ∩
+  `#c:ores_in_ground/{deepslate below 0, stone}`, else the first `#c:ores/<m>` block; cached per
+  (material, host block, below 0), rebuilt on tag reload. **EV** (`compat/ev/EvBridge` +
+  `EvBridgeImpl`, compileOnly `maven.modrinth:excavated_variants:krUiU6UD` — the slug has an
+  underscore): EV 4.3.1 registers its `ore`/`stone` registries in `BuiltInRegistries.REGISTRY`, and
+  after registration `Ore.getStones()` maps each stone to the ore's block in it (originals and
+  generated variants), so no id arithmetic. EV already ships stone configs for vanilla's and
+  Create's stones; Deep Time ships only the four vanilla stand-ins EV lacks (polished tuff, packed
+  mud, smooth sandstone, cobblestone) through DefaultResources (`defaultresources.meta.json` +
+  `defaultresources/globaldata/deeptime/excavated_variants/stone/`; verified loaded under -PwithEv).
+  **Finding: EV's own `ore_replacer` must not run in Deep Time levels** — added to every biome's
+  `TOP_LAYER_MODIFICATION` in `AFTER_EVERYTHING`, it re-picks ore stones from neighbours with
+  chunk-edge bookkeeping, and a regenerated deposit differed in 200 of 1,406 ore blocks. Compat mixin
+  `mixin/compat/excavated_variants/OreReplacerMixin` (@Pseudo, applied only with EV) skips it in
+  Deep Time levels; other levels and EV's config are untouched. Consequence: unknown ores in Deep
+  Time levels stay their stone/deepslate blocks in granite/diorite/andesite/tuff hosts (follow-up:
+  a deterministic EV conversion for unknown ores against `predictedRock`).
+- **Ore claiming** (`ore/ClaimOresBiomeModifier`, `ClaimRules`; `biome_modifier/claim_ores.json`,
+  `#minecraft:is_overworld`): REMOVE phase, every decoration step, only when
+  `ServerLifecycleHooks.getCurrentServer()`'s overworld stem is a `GeologicChunkGenerator`. Claimed
+  materials = deposit-type products + scatter materials (+ `materials`): c:coal, copper, crude_oil,
+  gold, iron, lead, molybdenum, silver, zinc. Only **ore-shaped** feature types are judged
+  (`minecraft:ore`, `scattered_ore`, `replace_single_block`, `create:layered_ore`,
+  `lithostitched:ore`, + `ore_feature_types`); selectors are followed; the blocks placed are read by
+  encoding the configured feature with its codec and collecting `{"Name": …}` states outside
+  rule-test keys (works for Create's layered ore without Create on the classpath). ORE = places a
+  `#c:ores/<claimed>` block; ROCK (with `claim_rock_features`, default on, **Q4 pending**) = every
+  placed block is ROCK and nothing else is in the feature (+ `rock_features` list, which names
+  `create:striated_ores_overworld`); loose pockets (dirt, gravel, clay) stay; `keep` list. A first
+  version judged every feature and removed Terralith's floating islands, boulders, pillars, ponds
+  and lava removers — hence the ore-shaped rule. `/deeptime probe claims` prints the dry run and
+  what was removed.
+- **Probes** (`server/SiteCommands`): `probe site <x> <y> <z>` (site, bodies, zones, d, v, the draw's
+  material, the block), `sites near <x> <z> <radius>`, `why <siteId>` (site, forming event, 4-link
+  chain; readable lines too), `probe claims`. `tools/smoke/run.py --rcon <cmd>` records probe lines
+  in the report and `rcon.jsonl`; its generation check accepts a generation shorter than the
+  progress gap, and its mixin check skips compat mixins the plugin skipped.
+- **GameTests** (new level `deeptime:test_deposits` + `test_deposits_twin` over
+  `run-gametest/world/deeptime-deposits`, C = 4,096, fixed biome `deeptime:test_ores` whose only
+  features are the two above; gametest.sh writes it with `deeptime run`): `DepositGameTests.
+  {bodyHasOre, vanillaOreBlock, evVariantWhenInstalled, depositsDeterministic, siteApiAndProbes,
+  backgroundScatterPlaces}`, `ClaimGameTests.{claimOffWhenOverworldNotGeologic,
+  claimRulesSortFeatures}` (the GameTest overworld is not Deep Time's, so claiming is off there and
+  the rules are checked as a dry run), `SpawnGameTests.essentialsWithinReach`, and on the planet
+  server `PlanetClaimGameTests.claimOnInPlanetWorld`. The site is picked from the registry (first
+  deposit with products whose ore body is ≤ 96 blocks across and due ≥ 200 ore blocks, porphyry
+  first): site 2, porphyry Cu-Mo-Au, stockwork-shell body 3, AABB (−1330, 117, 175)..(−1298, 156, 208).
+- **Measured (Mac).** `cargo test --workspace` ok (core 102, format 31, cli 9, inspect 19 + 7, jni 7,
+  viewer 4), clippy `-D warnings`, fmt, `deny check licenses bans` clean; `gradlew build test` →
+  tests=62 failures=0. `mac.sh --server -- ./gametest.sh` → **All 30 required tests passed**:
+  body 3 due 1,704, placed 1,222 = exact 1,222 (`minecraft:copper_ore`), missed 0, not host 482
+  (air 365, dirt 84, grass 33: the clipped top and the soil), 184 other ores in the box all explained
+  (178 another body's, 6 scatter), unexplained 0, 12 chunks; regeneration 44,880 blocks,
+  1,406 ore, 0 differ; scatter 16 chunks, 539 planned, 404 placed, 0 wrong; spawn (−1184, 76, −462),
+  iron 52 / coal 52 / copper 44 blocks (reach 1,024/1,536/1,024); why: deposit_formation ←
+  subduction_onset, orogeny_phase. Claim dry run: 12 ORE (vanilla, incl. nether gold) and 7 ROCK of
+  235 placed features; plains untouched (0 removed). `./gametest.sh -PwithEv` (TW + EV 4.3.1 + DAG
+  6.1.2) → **All 30 passed**: the same 1,222 blocks as EV variants (1,115 copper-in-red-sandstone,
+  107 copper-in-sandstone), 171 EV ores / 111 stones / 110 variants, Deep Time's four stones load.
+  `./gametest.sh -PwithMic` (pack 303fd89 via `install.sh mic`, the rock tags as `deeptime_extra`)
+  → **All 30 passed**: body 3 adds 110 `iceandfire:silver_ore`; claim dry run over 932 placed
+  features: 16 ORE (vanilla, `create:zinc_ore`, `createnuclear:lead_ore`, `iceandfire:silver_ore`,
+  `terralith:cave/fungal/ore_coal_extra`), 24 ROCK (vanilla blobs, `create:striated_ores_overworld`,
+  `born_in_chaos_v1:black_argillite`, 16 Terralith rock/cliff features incl. `ds_reducer`,
+  `noise_reducer`, `granitifier`, `calcitifier`, `desert/sandstone`), kept: uranium, platinum,
+  nickel, fluorite, wolframite, sapphire, Cobblemon, `createnuclear:striated_ores_overworld`
+  (rock + uranium), Terralith's floating islands, boulders and pillars. `./gametest-planet.sh --run
+  claimoninplanetworld@0,100,0` → PASS (standalone set: 19 removed, plains 48 → 33 features) and with
+  `-- -PwithMic` → PASS (38 removed; uranium, diamond, lapis, redstone, dirt kept).
+- **Smoke and ore render.** `install.sh standalone --preset $PWD/crates/deeptime-core/tests/presets/
+  deposits_world_16k.json --length-myr 500`, then `mac.sh --server -- 'python3 tools/smoke/run.py
+  --profile standalone --fresh --chunky 112 --chunky-center -5570,-1030 --rcon "deeptime sites near
+  -5570 -1030 600" --rcon "deeptime why 2" --rcon "deeptime probe site -5563 130 -1002" --rcon
+  "deeptime probe claims"'` → **PASS**: first start ran the deposit engine through JNI with the
+  registry's essentials (content bundle logged) in 2.2 s — 42 sites (32 with the preset's own
+  essentials in the CLI run; the natural sites are identical), spawn (−16, 69, −2142) with coal and
+  iron 2 blocks and copper 669 blocks away; claim removed 19 features; all four probes answered.
+  `cargo run -p deeptime-inspect -- ore --world smoke/standalone/server/planet
+  --area=-5682,-1142,-5458,-918 --scale 3` → `review/out/p1-15/ore-standalone/ore.png` (the ore
+  render now outlines site footprints and counts ore columns inside/outside them; it also knows
+  EV's variant names). What it shows: the placer's gold streak inside its box, the supergene
+  blanket's copper cluster inside the porphyry's box, and outside the boxes only small scatter
+  clusters (copper 625 columns outside vs 329 inside the footprints, iron 873/197, coal 680/165,
+  zinc 134/42, gold 82/139) and the unclaimed vanilla ores (diamond, lapis, redstone ~8,100 blocks,
+  kept by design). Porphyry site 10's box is empty: the every-class strata put soil, till and
+  laterite (loose) at y 102–141 there, and loose rock hosts ore only in loose bodies.
+- **Deviations and findings.** (1) Driven by the synthetic run, not `earthlike_quick_16k`. (2) The
+  GameTest server cannot turn claiming on (its overworld is not Deep Time's), so claiming is a dry
+  run there plus the planet-server test (the plan already put `claimOnInPlanetWorld` there).
+  (3) Deposit tests use a fixed test biome so vanilla features cannot interfere. (4) EV's ore
+  replacer is disabled in Deep Time levels (above); plan §7.6 updated. (5) P1-14 engine quirks seen
+  in the renders, for its follow-up: the guarantee pass stacks guaranteed deposits of different
+  materials on one cell (coal and BIF both at (−16, −2144), 2 blocks from the chosen spawn); several
+  porphyries have no products left (leached into their blankets) and are still bodies; a porphyry
+  ore body has no rock class of its own, so in loose horizons it places nothing (P1-07 could give
+  intrusive types their intrusion class). (6) Not done: the BlueMap cut through a porphyry and the
+  side-by-side EV renders for Ben (Q10); a spacesheep page; size-multiplier tuning on renders (the
+  bodies look plausible at 20–60 blocks; left at P1-14's values); unknown-ore EV conversion; MIC's
+  own essentials and scatter lists (pack branch).
+- **Next step.** P1-16 (COE/CDG) can use `DeepTimeSites` directly. After P1-08, rerun: `./gametest.sh`,
+  `-PwithEv`, `-PwithMic`, `./gametest-planet.sh --run claimoninplanetworld@0,100,0 [-- -PwithMic]`
+  and the smoke/ore render on the real preset; answer Q4 and Q10.
 
 ### 2026-09-28 — P1-12 strata pass with rock tags and `rock_states` (agent worktree agent-a9583db34fe66882c)
 - **Datapack registries** (`DeepTimeRegistries`, NeoForge `DataPackRegistryEvent.NewRegistry`, no

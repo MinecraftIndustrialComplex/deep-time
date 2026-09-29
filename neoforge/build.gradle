@@ -86,6 +86,10 @@ dependencies {
     compileOnly files(twInnerDir.map { it.file(tw_inner_jar) }).builtBy(extractToroidalWorld)
     compileOnly("maven.modrinth:sable:${sable_version}") { transitive = false }
     compileOnly files(sableCompanionDir.map { it.file(sable_companion_jar) }).builtBy(extractSableCompanion)
+    // Excavated Variants 4.3.1 (LGPL-3.0-or-later; P1-15): compileOnly for compat/ev/EvBridgeImpl, the
+    // only class naming its API, loaded when EV is installed. -PwithEv runs load it from the ev
+    // server set (tools/smoke/profiles/ev.txt). The Modrinth slug is excavated_variants.
+    compileOnly("maven.modrinth:excavated_variants:${ev_version}") { transitive = false }
 
     testImplementation platform("org.junit:junit-bom:${junit_version}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -552,9 +556,35 @@ def testWorldTasks = [wrap1024: 'wrap-test', lake1024: 'lake-test'].collect { na
                 '--dump-samples', samples.get().asFile.absolutePath
     }
 }
+// P1-15: a synthetic deposit world (sites, bodies, events and a terrain) and Rust's own reading of
+// it (`deeptime dump-deposits`), for DepositDataParityTest.
+def depositWorldRun = tasks.register('testWorldDeposits4kRun', Exec) {
+    description = 'Writes the synthetic deposit world fixture (C = 4096) with deeptime run.'
+    inputs.files(fileTree(new File(repoRoot, 'crates')) { exclude '**/target/**' })
+    inputs.files(new File(repoRoot, 'Cargo.toml'), new File(repoRoot, 'Cargo.lock'))
+    def out = testWorldsDir.map { it.dir('deposits4k') }
+    outputs.dir out
+    workingDir repoRoot
+    doFirst { delete out }
+    commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
+            'run', '--preset', new File(repoRoot, 'crates/deeptime-core/tests/presets/deposits_world_4k.json').absolutePath,
+            '--out', out.get().asFile.absolutePath
+}
+def depositWorldDump = tasks.register('testWorldDeposits4k', Exec) {
+    description = "Dumps Rust's reading of the deposit world fixture (sites, index, bodies, events)."
+    dependsOn depositWorldRun
+    def world = testWorldsDir.map { it.dir('deposits4k') }
+    def dump = testWorldsDir.map { it.file('deposits4k-samples.json') }
+    inputs.dir world
+    outputs.file dump
+    workingDir repoRoot
+    commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
+            'dump-deposits', '--world', world.get().asFile.absolutePath, '--out', dump.get().asFile.absolutePath
+}
 def testWorlds = tasks.register('testWorlds') {
     description = 'Writes every synthetic world-data fixture the JUnit tests read.'
     dependsOn testWorldTasks
+    dependsOn depositWorldDump
 }
 tasks.named('test', Test) {
     dependsOn testWorlds

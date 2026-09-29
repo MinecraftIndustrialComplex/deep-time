@@ -27,6 +27,8 @@ public final class WorldData {
     private final Manifest manifest;
     private final TileCache cache;
     private final Map<String, RasterSampler> layers;
+    /** Sites, bodies and events, read on first use (P1-15). */
+    private volatile Deposits deposits;
 
     private WorldData(Path folder, Manifest manifest, TileCache cache, Map<String, RasterSampler> layers) {
         this.folder = folder;
@@ -74,6 +76,22 @@ public final class WorldData {
     /** C, the east-west period in blocks. */
     public int circumference() {
         return manifest.circumference();
+    }
+
+    /**
+     * The world's sites, bodies and events ({@code sites/}, {@code bodies/}, {@code events/}), read
+     * and checked on first use; empty for a folder without them (the synthetic terrains).
+     */
+    public Deposits deposits() {
+        Deposits d = deposits;
+        if (d == null) {
+            synchronized (this) {
+                if (deposits == null)
+                    deposits = Deposits.read(folder, circumference());
+                d = deposits;
+            }
+        }
+        return d;
     }
 
     public boolean has(String layer) {
