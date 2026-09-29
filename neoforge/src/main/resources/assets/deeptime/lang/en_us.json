@@ -38,6 +38,7 @@
   "deeptime.editor.share.no_size": "Cannot import: the preset names no circumference.",
   "deeptime.editor.cap": "Native memory cap (GiB)",
   "deeptime.editor.cap.tooltip": "The simulation's own memory, outside the game's. Default 4 GiB; raise it freely if this machine has the RAM.",
+  "deeptime.editor.field.seed": "Planet seed",
   "deeptime.editor.field.gravity": "Gravity",
   "deeptime.editor.field.day_length": "Day length",
   "deeptime.editor.field.axial_tilt": "Axial tilt",
