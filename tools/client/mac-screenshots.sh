@@ -45,29 +45,17 @@ while [ $# -gt 0 ]; do
 done
 [[ "$NAME" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "mac-screenshots: --name must be one plain word" >&2; exit 2; }
 
-# The same host and layout as tools/remote/mac.sh.
-HOST="${DEEPTIME_MAC:-ban@m6-mac-mini}"
-SSD=/Volumes/Graphide/ban
-REMOTE="$SSD/mic/mods/$(basename "$REPO")"
-CACHE="$SSD/deeptime-cache"
-SSH=(ssh -o BatchMode=yes -o ConnectTimeout=15)
-
-# graphide's lock script is the protocol's one source; it is copied fresh on every run.
-M6LOCK_SH="${M6LOCK_SH:-/home/greencheetah/Projects/graphide/graphide/utilities/scripts/mactest/m6lock.sh}"
-[ -f "$M6LOCK_SH" ] || { echo "mac-screenshots: no m6lock.sh at $M6LOCK_SH (graphide's utilities/scripts/mactest/; set M6LOCK_SH)" >&2; exit 2; }
+# The host, the Mac's layout, graphide's lock script and the interrupt handling are shared with
+# tools/client/ev-assets.sh.
+TOOL=mac-screenshots
+source tools/client/mac-client-laptop-lib.sh
+mcl_check_m6lock
 
 if [ "$BUILD" = 1 ]; then
     tools/remote/mac.sh -- 'cd neoforge && ./gradlew --console=plain -q classes gametestClasses createClientLaunchScript linkRunModsClient'
 fi
-"${SSH[@]}" "$HOST" "mkdir -p '$CACHE' && cat > '$CACHE/m6lock.sh'" < "$M6LOCK_SH"
-
-stop_mac_side() {
-    trap - INT TERM
-    echo "mac-screenshots: interrupted; stopping the Mac side" >&2
-    "${SSH[@]}" -n "$HOST" "p=\$(cat '$REMOTE/neoforge/build/mac-client/runner.pid' 2>/dev/null) && kill -TERM \$p" || true
-    exit 130
-}
-trap stop_mac_side INT TERM
+mcl_push_m6lock
+mcl_stop_on_interrupt
 
 rm -rf "review/out/$NAME"
 set +e
