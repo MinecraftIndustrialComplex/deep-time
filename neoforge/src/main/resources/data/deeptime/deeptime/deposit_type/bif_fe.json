@@ -1,0 +1,82 @@
+{
+  "id": "deeptime:bif_fe",
+  "family": "sedimentary_chemical",
+  "site_kind": "deposit",
+  "description": "Banded iron formation (Superior and Algoma types): chert–iron-oxide sheets of the 2.65–1.85 Ga acme, inherited in cratonic basement when the timeline starts after it.",
+  "products": [
+    {"material": "c:iron", "grade_key": "fe_pct", "role": "primary"}
+  ],
+  "components": {
+    "combine": "product",
+    "source": [
+      {"any_of": [
+        {"field": "deeptime:inherited_bif", "curve": [[0.1, 0], [0.5, 1]], "note": "inherited Paleoproterozoic BIF in the basement (plan §8.6)"},
+        {"field": "deeptime:clock/bif_acme", "curve": [[0, 0], [1, 1]], "note": "the 2.65–1.85 Ga acme (Bekker et al. 2010)"}
+      ]}
+    ],
+    "trap": [
+      {"any_of": [
+        {"field": "deeptime:inherited_bif", "curve": [[0.1, 0], [0.5, 1]]},
+        {"field": "deeptime:shelf", "curve": [[0.1, 0], [0.5, 1]], "note": "Superior-type BIF on passive-margin shelves (Bekker et al. 2010)"}
+      ]}
+    ]
+  },
+  "clock_gates": [],
+  "integration_myr": 10,
+  "formation_time": "cause",
+  "hosts": {
+    "any_of": ["banded_iron_formation", "ironstone"],
+    "host_bias": {"banded_iron_formation": 2.0}
+  },
+  "causes": {
+    "source": ["deeptime:marine_transgression"],
+    "trap": ["deeptime:marine_transgression"],
+    "preservation": ["deeptime:erosion_pulse"]
+  },
+  "cause_radius_km": 600,
+  "sizing": {
+    "grade_tonnage": "bif_fe",
+    "tonnage_mt": {"p90": 11, "p50": 170, "p10": 2400},
+    "grades": {
+      "fe_pct": {"p90": 30, "p50": 53, "p10": 66, "presence": 1.0}
+    },
+    "correlations": [],
+    "ore_density_t_m3": 3.6,
+    "density_per_1e5km2": {"p90": 1, "p50": 4, "p10": 12},
+    "min_separation_m": 5000,
+    "tract_threshold": 0.25,
+    "clustering": {"model": "thomas", "camp_spacing_km": 60, "cluster_radius_km": 20}
+  },
+  "geometry": {
+    "shape": "sheet",
+    "aspect": [1.0, 0.05, 2.5],
+    "dip_deg": [5, 40],
+    "rock_class": "banded_iron_formation",
+    "zoning": [
+      {"zone": "ore", "d": [0.0, 0.8], "material": "c:iron", "grade_mult": 1.0, "density": 0.35},
+      {"zone": "margin", "d": [0.8, 1.0], "material": "c:iron", "grade_mult": 0.8, "density": 0.15}
+    ],
+    "extra_bodies": [],
+    "children": []
+  },
+  "preservation": {
+    "formation_depth_m": 1200,
+    "vertical_extent_m": 50,
+    "erosion_behavior": "truncate",
+    "resistates": []
+  },
+  "minecraft": {
+    "coe_vein": "createoreexcavation:ore_vein_type/iron",
+    "cdg_reservoir": false,
+    "ore_block_policy": "ev_then_vanilla"
+  },
+  "balance": {"count_mult": 1.0, "size_mult_h": 6.0, "size_mult_v": 4.0, "richness_mult": 1.0},
+  "requires_fields": {},
+  "notes": [
+    "Sizing: USGS Bulletin 1693 (Cox & Singer eds. 1986) model 34a, Superior Fe, n = 66: tonnage 11 / 170 / 2400 Mt (Fig. 172, p. 229) and Fe 30 / 53 / 66 % (Fig. 173, p. 230), figure intercepts. The model covers Algoma-type too (model 28b, p. 198: its grade–tonnage model 'is included under Superior Fe'). The 53 % Fe median is well above primary iron formation (typically 30–35 % Fe, OFR 95-831), so the model probably includes enriched ores. See crates/deeptime-core/data/usgs/bif_fe.json.",
+    "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 3.6 (hematite–magnetite–quartz rock), density_per_1e5km2 1 / 4 / 12, min_separation_m 5000, formation_depth_m 1200 (for an inherited sheet: its depth at the timeline's start, which slow cratonic erosion then brings towards the surface).",
+    "formation_time cause: an inherited deposit takes the time of its causing event (the BIF shelf sea), not a frame of the timeline.",
+    "Design values: the curves, clustering, zoning, aspect and dip (folded iron formation), size multipliers.",
+    "Create stones (decisions file): banded_iron_formation (crimsite → iron) is the preferred host at 2.0 and the sheet's own rock class."
+  ]
+}

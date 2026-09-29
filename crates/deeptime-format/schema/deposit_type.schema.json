@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MinecraftIndustrialComplex/deep-time/crates/deeptime-format/schema/deposit_type.schema.json",
+  "title": "Deep Time deposit type",
+  "description": "A mineral-system definition: data/<ns>/deeptime/deposit_type/<name>.json (plan §5.4.3; ore_genesis_modeling.md Q7). SPDX-License-Identifier: LGPL-3.0-or-later. The Rust parser (crates/deeptime-core/src/deposits/types.rs) refuses unknown keys; a test checks that this schema's top-level properties are the parser's.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "family", "site_kind", "products", "sizing", "geometry", "preservation", "minecraft"],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$"},
+    "unit": {"type": "number", "minimum": 0, "maximum": 1},
+    "range": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+    "percentiles": {
+      "description": "USGS convention: p90 is the value 90 % of deposits equal or exceed (the small end), p10 the large end.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p90", "p50", "p10"],
+      "properties": {
+        "p90": {"type": "number", "exclusiveMinimum": 0},
+        "p50": {"type": "number", "exclusiveMinimum": 0},
+        "p10": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "grade": {
+      "description": "USGS percentiles over all deposits, unreported grades counted as zero; presence = the fraction of deposits that report the metal.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p50", "p10"],
+      "properties": {
+        "p90": {"type": ["number", "null"], "minimum": 0},
+        "p50": {"type": "number", "minimum": 0},
+        "p10": {"type": "number", "exclusiveMinimum": 0},
+        "presence": {"$ref": "#/$defs/unit", "default": 1}
+      }
+    },
+    "term": {
+      "description": "curve(field)^weight, or the maximum of any_of (fuzzy OR). Curves are piecewise-linear [x, membership] points, x increasing, clamped at the ends.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "field": {"$ref": "#/$defs/id"},
+        "curve": {"type": "array", "minItems": 2, "items": {"type": "array", "prefixItems": [{"type": "number"}, {"$ref": "#/$defs/unit"}], "minItems": 2, "maxItems": 2}},
+        "weight": {"type": "number", "exclusiveMinimum": 0, "default": 1},
+        "any_of": {"type": "array", "items": {"$ref": "#/$defs/term"}},
+        "note": {"type": ["string", "null"]}
+      },
+      "oneOf": [{"required": ["field", "curve"]}, {"required": ["any_of"]}]
+    },
+    "terms": {"type": "array", "items": {"$ref": "#/$defs/term"}},
+    "kinds": {"type": "array", "items": {"$ref": "#/$defs/id"}},
+    "zone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zone"],
+      "properties": {
+        "zone": {"type": "string"},
+        "d": {"$ref": "#/$defs/range", "description": "normalised-distance range [d0, d1)", "default": [0, 1]},
+        "v": {"$ref": "#/$defs/range", "description": "vertical position range [v0, v1), 0 = the body's top", "default": [0, 1]},
+        "material": {"type": ["string", "null"], "description": "a product's material"},
+        "rock_class": {"type": ["string", "null"], "description": "the rock class the zone's host becomes"},
+        "grade_mult": {"type": "number", "minimum": 0, "default": 1},
+        "density": {"$ref": "#/$defs/unit", "default": 0}
+      }
+    },
+    "shape": {"enum": ["ellipsoid", "stockwork_shell", "lens", "pod", "sheet", "dyke", "pipe", "blanket", "seam", "channel", "dome"]}
+  },
+  "properties": {
+    "id": {"$ref": "#/$defs/id"},
+    "family": {"type": "string", "description": "magmatic_hydrothermal, orthomagmatic, seafloor, basin_brine, metamorphic, sedimentary_chemical, residual, placer, fuel, fantasy"},
+    "site_kind": {"enum": ["deposit", "reservoir", "placer", "supergene", "fantasy"]},
+    "child_only": {"type": "boolean", "default": false, "description": "sites exist only when a parent spawns them"},
+    "description": {"type": "string"},
+    "products": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["material", "role"],
+        "properties": {
+          "material": {"$ref": "#/$defs/id", "description": "c:<material>, resolved through #c:ores/<material>"},
+          "grade_key": {"type": ["string", "null"], "description": "a key of sizing.grades; null for a product that is the whole ore (coal, oil)"},
+          "role": {"enum": ["primary", "coproduct", "byproduct"]}
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "combine": {"enum": ["product", "min", "geometric_mean"], "default": "product"},
+        "source": {"$ref": "#/$defs/terms"},
+        "driver": {"$ref": "#/$defs/terms"},
+        "pathway": {"$ref": "#/$defs/terms"},
+        "trap": {"$ref": "#/$defs/terms"}
+      }
+    },
+    "clock_gates": {"$ref": "#/$defs/kinds", "description": "clocks (deeptime:clock/...) the whole type is multiplied by"},
+    "integration_myr": {"type": "number", "exclusiveMinimum": 0, "default": 10, "description": "F = 1 − Π(1 − F_t)^(Δt/τ)"},
+    "formation_time": {"enum": ["peak", "cause"], "default": "peak"},
+    "hosts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "any_of": {"type": "array", "items": {"type": "string"}, "description": "rock classes and #deeptime:rock/<group> groups"},
+        "host_bias": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}, "description": "class → weight; the Create stones as preferred hosts"}
+      }
+    },
+    "causes": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "event kinds that count as causes of each component ('Why here?')",
+      "properties": {
+        "source": {"$ref": "#/$defs/kinds"},
+        "driver": {"$ref": "#/$defs/kinds"},
+        "pathway": {"$ref": "#/$defs/kinds"},
+        "trap": {"$ref": "#/$defs/kinds"},
+        "preservation": {"$ref": "#/$defs/kinds"}
+      }
+    },
+    "cause_radius_km": {"type": "number", "exclusiveMinimum": 0, "default": 600},
+    "sizing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["grade_tonnage", "tonnage_mt", "ore_density_t_m3", "density_per_1e5km2", "min_separation_m", "tract_threshold", "clustering"],
+      "properties": {
+        "grade_tonnage": {"type": "string", "description": "the USGS table id (crates/deeptime-core/data/usgs/<id>.json)"},
+        "tonnage_mt": {"$ref": "#/$defs/percentiles"},
+        "grades": {"type": "object", "additionalProperties": {"$ref": "#/$defs/grade"}},
+        "correlations": {"type": "array", "items": {"type": "array", "prefixItems": [{"type": "string"}, {"type": "string"}, {"type": "number", "exclusiveMinimum": -1, "exclusiveMaximum": 1}], "minItems": 3, "maxItems": 3}},
+        "ore_density_t_m3": {"type": "number", "exclusiveMinimum": 0},
+        "density_per_1e5km2": {"$ref": "#/$defs/percentiles"},
+        "min_separation_m": {"type": "number", "minimum": 0},
+        "tract_threshold": {"type": "number", "minimum": 0, "exclusiveMaximum": 1},
+        "clustering": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model", "camp_spacing_km", "cluster_radius_km"],
+          "properties": {
+            "model": {"const": "thomas"},
+            "camp_spacing_km": {"type": "number", "minimum": 0},
+            "cluster_radius_km": {"type": "number", "exclusiveMinimum": 0}
+          }
+        }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape", "aspect"],
+      "properties": {
+        "shape": {"$ref": "#/$defs/shape"},
+        "aspect": {"type": "array", "items": {"type": "number", "exclusiveMinimum": 0}, "minItems": 3, "maxItems": 3, "description": "relative semi-axes (x, vertical, z)"},
+        "dip_deg": {"$ref": "#/$defs/range", "default": [0, 0]},
+        "rock_class": {"type": ["string", "null"]},
+        "zoning": {"type": "array", "items": {"$ref": "#/$defs/zone"}},
+        "extra_bodies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["role", "shape", "when", "scale_h", "thickness_m"],
+            "properties": {
+              "role": {"type": "string"},
+              "shape": {"$ref": "#/$defs/shape"},
+              "when": {"enum": ["preserved", "exposed"]},
+              "scale_h": {"type": "number", "exclusiveMinimum": 0},
+              "thickness_m": {"type": "number", "exclusiveMinimum": 0},
+              "rock_class": {"type": ["string", "null"]},
+              "zones": {"type": "array", "items": {"$ref": "#/$defs/zone"}}
+            }
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type_id", "relation"],
+            "properties": {
+              "type_id": {"$ref": "#/$defs/id"},
+              "relation": {"enum": ["above_watertable", "downstream"]}
+            }
+          }
+        }
+      }
+    },
+    "preservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["formation_depth_m", "vertical_extent_m", "erosion_behavior"],
+      "properties": {
+        "formation_depth_m": {"type": "number", "minimum": 0},
+        "vertical_extent_m": {"type": "number", "minimum": 0},
+        "erosion_behavior": {"enum": ["truncate", "spawn_placer", "destroy"]},
+        "resistates": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "weathering": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["max_top_depth_m", "min_water_table_m", "precip_mm", "min_stable_myr", "max_erosion_m_myr", "grade_mult", "leach_depth_m"],
+      "properties": {
+        "max_top_depth_m": {"type": "number"},
+        "min_water_table_m": {"type": "number"},
+        "precip_mm": {"$ref": "#/$defs/range"},
+        "min_stable_myr": {"type": "number"},
+        "max_erosion_m_myr": {"type": "number"},
+        "grade_mult": {"$ref": "#/$defs/range"},
+        "leach_depth_m": {"type": "number"}
+      }
+    },
+    "placer": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["transport_km", "capture_fraction", "flatten_gradient_m_km"],
+      "properties": {
+        "transport_km": {"type": "number", "minimum": 0},
+        "capture_fraction": {"$ref": "#/$defs/unit"},
+        "flatten_gradient_m_km": {"type": "number", "minimum": 0}
+      }
+    },
+    "petroleum": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["tti_onset", "tti_peak", "tti_end", "migration_km", "source_field", "temperature_field", "trap_field", "seal_field", "reservoir_field", "trap_threshold", "seal_threshold", "reservoir_threshold", "min_source"],
+      "properties": {
+        "tti_onset": {"type": "number"},
+        "tti_peak": {"type": "number"},
+        "tti_end": {"type": "number"},
+        "migration_km": {"type": "number", "minimum": 0},
+        "source_field": {"$ref": "#/$defs/id"},
+        "temperature_field": {"$ref": "#/$defs/id"},
+        "trap_field": {"$ref": "#/$defs/id"},
+        "seal_field": {"$ref": "#/$defs/id"},
+        "reservoir_field": {"$ref": "#/$defs/id"},
+        "trap_threshold": {"type": "number"},
+        "seal_threshold": {"type": "number"},
+        "reservoir_threshold": {"type": "number"},
+        "min_source": {"type": "number"}
+      }
+    },
+    "coal": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["temperature_field", "rank_tti"],
+      "properties": {
+        "temperature_field": {"$ref": "#/$defs/id"},
+        "rank_tti": {"type": "array", "items": {"type": "array", "prefixItems": [{"type": "string"}, {"type": "number"}], "minItems": 2, "maxItems": 2}}
+      }
+    },
+    "minecraft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ore_block_policy"],
+      "properties": {
+        "coe_vein": {"type": ["string", "null"], "description": "a Create Ore Excavation vein recipe id (createoreexcavation:ore_vein_type/copper) or null"},
+        "cdg_reservoir": {"type": "boolean", "default": false, "description": "sites feed Create: Diesel Generators oil (plan §7.14)"},
+        "ore_block_policy": {"enum": ["ev_then_vanilla", "none"], "description": "Excavated Variants when installed, else stone/deepslate ores (decisions file); none for fluids"}
+      }
+    },
+    "balance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "count_mult": {"type": "number", "minimum": 0, "default": 1},
+        "size_mult_h": {"type": "number", "minimum": 0, "default": 1},
+        "size_mult_v": {"type": "number", "minimum": 0, "default": 1},
+        "richness_mult": {"type": "number", "minimum": 0, "default": 1},
+        "province": {"enum": ["off", "weak", "medium", "strong", null], "description": "overrides the preset's regional specialisation (default strong)"}
+      }
+    },
+    "requires_fields": {
+      "type": "object",
+      "description": "fantasy fields with a fallback (Phase 3)",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider"],
+        "properties": {"provider": {"type": "string"}, "fallback": {}}
+      }
+    },
+    "notes": {"type": "array", "items": {"type": "string"}, "description": "sources, placeholders and design values"}
+  }
+}

@@ -5,6 +5,10 @@
 // The stage runner and its persistence (P1-01).
 pub mod checkpoint;
 pub mod dummy;
+
+// Deposits (P1-14).
+pub mod deposits;
+
 pub mod keyframes;
 pub mod stage;
 pub mod world;

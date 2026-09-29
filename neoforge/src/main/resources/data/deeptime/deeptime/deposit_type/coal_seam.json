@@ -1,0 +1,83 @@
+{
+  "id": "deeptime:coal_seam",
+  "family": "fuel",
+  "site_kind": "deposit",
+  "description": "Coal seams: peat mires preserved where accommodation kept pace with peat production, after land plants; rank from burial heating.",
+  "products": [
+    {"material": "c:coal", "grade_key": null, "role": "primary"}
+  ],
+  "components": {
+    "combine": "product",
+    "source": [
+      {"field": "deeptime:coal_facies", "curve": [[0.05, 0], [0.4, 1]], "note": "peat-mire facies from the strata log (Bohacs & Suter 1997)"}
+    ],
+    "driver": [
+      {"field": "deeptime:deposition_rate_m_myr", "curve": [[5, 0], [40, 1], [300, 0.4]], "note": "accommodation roughly matching peat production; excess drowns mires (Bohacs & Suter 1997); numbers are design"}
+    ]
+  },
+  "clock_gates": ["deeptime:clock/land_plants"],
+  "integration_myr": 10,
+  "formation_time": "peak",
+  "hosts": {
+    "any_of": ["coal", "sandstone", "mudstone", "shale"],
+    "host_bias": {}
+  },
+  "causes": {
+    "source": ["deeptime:basin_subsidence"],
+    "driver": ["deeptime:basin_subsidence", "deeptime:orogeny_phase"],
+    "preservation": ["deeptime:erosion_pulse"]
+  },
+  "cause_radius_km": 600,
+  "sizing": {
+    "grade_tonnage": "coal",
+    "tonnage_mt": {"p90": 4.2, "p50": 13, "p10": 25},
+    "grades": {},
+    "correlations": [],
+    "ore_density_t_m3": 1.32,
+    "density_per_1e5km2": {"p90": 10, "p50": 30, "p10": 80},
+    "min_separation_m": 2400,
+    "tract_threshold": 0.2,
+    "clustering": {"model": "thomas", "camp_spacing_km": 20, "cluster_radius_km": 8}
+  },
+  "geometry": {
+    "shape": "seam",
+    "aspect": [1.0, 0.001, 1.5],
+    "dip_deg": [0, 8],
+    "rock_class": "coal",
+    "zoning": [
+      {"zone": "seam", "d": [0.0, 1.0], "material": "c:coal", "grade_mult": 1.0, "density": 0.6}
+    ],
+    "extra_bodies": [],
+    "children": []
+  },
+  "preservation": {
+    "formation_depth_m": 800,
+    "vertical_extent_m": 2,
+    "erosion_behavior": "truncate",
+    "resistates": []
+  },
+  "coal": {
+    "temperature_field": "deeptime:burial_temp_c",
+    "rank_tti": [
+      ["lignite", 3],
+      ["subbituminous", 10],
+      ["high_volatile_bituminous", 75],
+      ["low_volatile_bituminous", 500],
+      ["anthracite", 1000000000]
+    ]
+  },
+  "minecraft": {
+    "coe_vein": "createoreexcavation:ore_vein_type/coal",
+    "cdg_reservoir": false,
+    "ore_block_policy": "ev_then_vanilla"
+  },
+  "balance": {"count_mult": 1.0, "size_mult_h": 6.0, "size_mult_v": 20.0, "richness_mult": 1.0},
+  "requires_fields": {},
+  "notes": [
+    "No USGS grade–tonnage model exists for coal. Density 1.32 t/m³ for bituminous coal: USGS Circular 891 (Wood et al. 1983), Table 2 p. 22 (1,800 short tons per acre-foot; anthracite 1.47, subbituminous 1.30, lignite 1.29 in data/usgs/coal.json).",
+    "PLACEHOLDER tonnage 4.2 / 13 / 25 Mt: one mine-sized block of 1.2 km radius (Circular 891's indicated-reliability radius) × seams of 28, 84 and 168 in (Circular 891 thickness class limits) × 1.32 t/m³ — not a USGS distribution. The aspect follows (a 2 m seam over a 1–1.5 km block).",
+    "PLACEHOLDERS: density_per_1e5km2 10 / 30 / 80 (no USGS density), min_separation_m 2400 (two block radii), formation_depth_m 800.",
+    "Rank from Lopatin TTI of the coal layer: TTI 75 ↔ Ro ≈ 1.1 % (Waples' correspondence as tabulated by the Kansas Geological Survey, non-USGS; the high-volatile bituminous limit). The lignite, subbituminous and low-volatile bounds are PLACEHOLDERS (no USGS table of reflectance by rank was found).",
+    "Design values: the curves, clustering, dip, size_mult_v 20 (a 2 m seam is a tenth of a block at 20 m per block)."
+  ]
+}

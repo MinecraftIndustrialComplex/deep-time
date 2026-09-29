@@ -1,0 +1,109 @@
+{
+  "id": "deeptime:porphyry_cu_mo_au",
+  "family": "magmatic_hydrothermal",
+  "site_kind": "deposit",
+  "description": "Porphyry copper-molybdenum-gold: stockwork and disseminated ore in zoned alteration shells around oxidised arc porphyry stocks at convergent margins.",
+  "products": [
+    {"material": "c:copper", "grade_key": "cu_pct", "role": "primary"},
+    {"material": "c:molybdenum", "grade_key": "mo_pct", "role": "byproduct"},
+    {"material": "c:gold", "grade_key": "au_gpt", "role": "byproduct"},
+    {"material": "c:silver", "grade_key": "ag_gpt", "role": "byproduct"}
+  ],
+  "components": {
+    "combine": "product",
+    "source": [
+      {"field": "deeptime:arc_magma_flux", "curve": [[0, 0], [0.3, 0.5], [1, 1]], "note": "ore_genesis_modeling.md Q7 example (illustrative shape): arc magma pulses"},
+      {"field": "deeptime:magma_oxidation", "curve": [[0.4, 0], [0.6, 1]], "note": "Q7 example; hot, hydrous, oxidised magmas (Richards 2003)"}
+    ],
+    "driver": [
+      {"field": "deeptime:convergence_rate_km_myr", "curve": [[30, 0.3], [100, 1], [160, 0.6]], "note": "peak near 100 km/Myr (Butterworth et al. 2016)"},
+      {"field": "deeptime:obliquity_deg", "curve": [[0, 0.6], [15, 1], [40, 0.5], [70, 0.2]], "note": "peak near 15° (Butterworth et al. 2016); tails are design"},
+      {"field": "deeptime:slab_age_myr", "curve": [[0, 0.2], [25, 1], [70, 1], [120, 0.3]], "note": "25–70 Myr slab age (Butterworth et al. 2016); tails are design"}
+    ],
+    "pathway": [
+      {"field": "deeptime:fault_density", "curve": [[0, 0.2], [0.5, 1]], "note": "Q7 example; crustal stress controls ascent (Richards 2003)"}
+    ],
+    "trap": [
+      {"field": "deeptime:crust_thickness_km", "curve": [[25, 0.3], [45, 1], [70, 1]], "note": "Q7 example; thickened compressive arcs (Cooke et al. 2005)"}
+    ]
+  },
+  "clock_gates": [],
+  "integration_myr": 10,
+  "formation_time": "peak",
+  "hosts": {
+    "any_of": ["granodiorite", "granite", "#deeptime:rock/volcanic", "#deeptime:rock/carbonate"],
+    "host_bias": {"serpentinite": 1.5}
+  },
+  "causes": {
+    "source": ["deeptime:subduction_onset"],
+    "driver": ["deeptime:orogeny_phase", "deeptime:collision"],
+    "trap": ["deeptime:terrane_accretion", "deeptime:orogeny_phase"],
+    "preservation": ["deeptime:erosion_pulse", "deeptime:orogeny_phase"]
+  },
+  "cause_radius_km": 600,
+  "sizing": {
+    "grade_tonnage": "porphyry_cu",
+    "tonnage_mt": {"p90": 33, "p50": 240, "p10": 1500},
+    "grades": {
+      "cu_pct": {"p90": 0.24, "p50": 0.44, "p10": 0.75, "presence": 1.0},
+      "mo_pct": {"p90": 0.0, "p50": 0.002, "p10": 0.03, "presence": 0.5403},
+      "au_gpt": {"p90": 0.0, "p50": 0.05, "p10": 0.5, "presence": 0.6066},
+      "ag_gpt": {"p90": 0.0, "p50": 0.0, "p10": 3.8, "presence": 0.4076}
+    },
+    "correlations": [
+      ["tonnage_mt", "cu_pct", 0.1],
+      ["tonnage_mt", "au_gpt", -0.28],
+      ["mo_pct", "au_gpt", -0.16],
+      ["au_gpt", "ag_gpt", 0.26]
+    ],
+    "ore_density_t_m3": 2.7,
+    "density_per_1e5km2": {"p90": 4, "p50": 15, "p10": 35},
+    "min_separation_m": 2000,
+    "tract_threshold": 0.2,
+    "clustering": {"model": "thomas", "camp_spacing_km": 40, "cluster_radius_km": 15}
+  },
+  "geometry": {
+    "shape": "stockwork_shell",
+    "aspect": [1.0, 1.43, 1.0],
+    "dip_deg": [0, 0],
+    "zoning": [
+      {"zone": "potassic_core", "d": [0.0, 0.45], "material": "c:copper", "grade_mult": 1.3, "density": 0.35},
+      {"zone": "potassic_core_mo", "d": [0.0, 0.3], "material": "c:molybdenum", "grade_mult": 1.5, "density": 0.06},
+      {"zone": "potassic_core_au", "d": [0.0, 0.45], "material": "c:gold", "grade_mult": 1.2, "density": 0.04},
+      {"zone": "phyllic", "d": [0.45, 0.75], "material": "c:copper", "grade_mult": 0.8, "density": 0.2},
+      {"zone": "phyllic_ag", "d": [0.45, 0.75], "material": "c:silver", "grade_mult": 1.0, "density": 0.03},
+      {"zone": "propylitic_halo", "d": [0.75, 1.0], "rock_class": "greenstone", "density": 0.0}
+    ],
+    "extra_bodies": [
+      {"role": "lithocap", "shape": "lens", "when": "preserved", "scale_h": 1.5, "thickness_m": 500, "rock_class": "quartzite",
+       "zones": [{"zone": "advanced_argillic", "d": [0.0, 1.0], "density": 0.0}]},
+      {"role": "gossan", "shape": "blanket", "when": "exposed", "scale_h": 1.1, "thickness_m": 40, "rock_class": "ironstone",
+       "zones": [{"zone": "gossan_gold", "d": [0.0, 1.0], "material": "c:gold", "grade_mult": 1.0, "density": 0.02}]}
+    ],
+    "children": [
+      {"type_id": "deeptime:supergene_cu_blanket", "relation": "above_watertable"},
+      {"type_id": "deeptime:placer_au", "relation": "downstream"}
+    ]
+  },
+  "preservation": {
+    "formation_depth_m": 1500,
+    "vertical_extent_m": 1250,
+    "erosion_behavior": "spawn_placer",
+    "resistates": ["c:gold"]
+  },
+  "minecraft": {
+    "coe_vein": "createoreexcavation:ore_vein_type/copper",
+    "cdg_reservoir": false,
+    "ore_block_policy": "ev_then_vanilla"
+  },
+  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 1.0, "richness_mult": 1.0},
+  "requires_fields": {},
+  "notes": [
+    "Sizing: USGS OFR 2008-1155 (Singer, Berger & Moring 2008), Table 1 (PDF p. 9): all porphyry Cu deposits, n = 422; by-product percentiles count unreported grades as zero; presence = n_reported / 422 from the report's data file PorCuTX2008.txt; correlations (Pearson r of log10) from the text, PDF p. 8. See crates/deeptime-core/data/usgs/porphyry_cu.json.",
+    "Deposit density 4 / 15 / 35 per 100,000 km² and the 2 km same-deposit rule: Singer, Berger & Menzie 2005 (USGS authors; Pubs Warehouse record 70197200) and OFR 2008-1155 PDF p. 4.",
+    "PLACEHOLDER: ore_density_t_m3 2.7 (no USGS value found; generic intermediate-felsic intrusive rock).",
+    "Geometry: aspect from SIR 2010-5070-B (median ore area 0.6 km², Table E1 p. 28; hypogene ore generally 1–1.5 km tall, p. 25); formation depth 1.5 km = median emplacement depth of the Cu subtype (OFR 2008-1155 Fig. 24, digitised).",
+    "Design values: curves' tails, tract_threshold, clustering radii, zoning fractions and densities, lithocap and gossan sizes, size_mult_h 12 (a median porphyry ≈ 20 blocks across).",
+    "Create stones (decisions file): serpentinite (veridium) is a preferred copper host at weight 1.5; the gossan is ironstone (ochrum → gold) and carries gold."
+  ]
+}
