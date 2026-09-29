@@ -22,7 +22,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-13 | Water above sea level holds | done | 2026-09-28 | — | Mac ./gametest.sh → All 14 required tests passed: lakeHolds before=65304 after=65304 expected=65304 outside=0 (every source woken by a fluid tick, 400 ticks forceloaded), water_top_y=120 at the lake centre, generatedFluidTicks=0. The inspect section PNG (review picture) comes with P0-11; -PwithMic (Mac): All 14 required tests passed, lakeHolds identical (outside=0) |
 | P0-14 | BlueMap renders on MIC blocks | doing | 2026-09-28 | — | Mac: tools/review/render-bluemap.sh renders the MIC smoke world (surface map + a below-y-0 strata map) in ~30 s; web app 645 MB uncompressed (962 hires tiles × ~0.65 MB, 992-block height). Hosting on spacesheep undecided: gzip tiles + a decompressing service worker, or a smaller render mask |
 | P0-15 | Phase 0 exit | todo | | | |
-| P1-01 | Session, checkpoints, keyframes, event log and site formats | done | 2026-09-28 | — | Mac: cargo test -p deeptime-format 27 ok (segments + sites round-trip, two writers merge with no id collision); run --preset dummy.json → manifest.json, events/1-0.dtev, keyframes/index.json (13 events, 9 keyframes, 3 sites); test --workspace, fmt, clippy -D warnings, deny licenses bans clean; gradlew build test tests=31 failures=0; ./gametest.sh all 10 pass |
+| P1-01 | Session, checkpoints, keyframes, event log and site formats | done | 2026-09-28 | — | Mac: cargo test -p deeptime-format 27 ok (segments + sites round-trip, two writers merge with no id collision); run --preset dummy.json → manifest.json, events/1-0.dtev, keyframes/index.json (13 events, 9 keyframes, 3 sites); test --workspace, fmt, clippy -D warnings, deny licenses bans clean; gradlew build test tests=34 failures=0 and ./gametest.sh all 14 pass (after merging master 2f81ae5) |
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
 | P1-03 | Plates and crust | todo | | | |
 | P1-04 | Deep-time surface processes on L1 | todo | | | |
@@ -90,10 +90,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Measured (Mac, `tools/remote/mac.sh`).** `cargo test -p deeptime-format` 27 passed;
   `cargo run -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/dummy.json --out
   $TMPDIR/p1-01/dummy --viewer review/out/p1-dummy` → 2 stages, 13 events, 9 keyframes, 3 sites,
-  peak 1.5 MiB, 0.19 s; `cargo test --workspace` (core 18, format 27, cli 10, jni 7, viewer 4),
+  peak 1.5 MiB, 0.19 s; `cargo test --workspace` (core 41 incl. P1-02's 23, format 27, cli 10, jni 7, viewer 4),
   `fmt --check`, `clippy -D warnings`, `deny check licenses bans` clean; `gradlew build test`
-  tests=31 failures=0 (NativeLinkTest gains `keyframesAndEventsCrossTheBoundary`);
-  `mac.sh --server -- ./gametest.sh` → All 10 required tests passed (NativeGameTests
+  tests=34 failures=0 on master 2f81ae5 + this branch (NativeLinkTest gains
+  `keyframesAndEventsCrossTheBoundary`);
+  `mac.sh --server -- ./gametest.sh` → All 14 required tests passed (NativeGameTests
   `dummySessionRunsAndCancels`: steps=5 manifest ok, cancelled run wrote no manifest). Bench of the
   dummy (debug build): stages 36.7 ms at 1 thread → 7.7 ms at 8.
 - **Contract changes to note.** The session's `manifest.json` is now the standard `Manifest`
