@@ -2250,6 +2250,8 @@
   };
   // Families as people know them; the raw preset names stay as secondary text.
   const FAMILY = {
+    earthlike_quick: ['Earth-like · quick', 'The whole simulation: plates, climate, surface, structure and deposits, at the quick resolution.'],
+    earthlike_full: ['Earth-like · full', 'The whole simulation at the full resolution: slower, finer.'],
     pipeline_quick: ['Earth-like · quick', 'The whole simulation: plates, climate, surface, structure and deposits, at the quick resolution.'],
     pipeline_full: ['Earth-like · full', 'The whole simulation at the full resolution: slower, finer.'],
     plates_quick: ['Plates only · quick', 'Plate tectonics alone, at the quick resolution: the fastest look at continents moving.'],
@@ -2258,8 +2260,10 @@
   const sizeShort = c => `${Math.round(c / 1024)}k`;
   function familyName(fam) {
     if (FAMILY[fam]) return FAMILY[fam][0];
-    const l = L(`preset.${fam}`);
-    return `Placeholder · ${l || fam.replace(/_/g, ' ')}`;
+    const l = L(`preset.${fam}`) || fam.replace(/_/g, ' ');
+    // Only a family whose presets are all placeholders is called one (the earthlike_* ones are real since P1-08).
+    const ps = catalog ? catalog.presets.filter(p => p.family === fam) : [];
+    return ps.length && ps.every(p => p.placeholder) ? `Placeholder · ${l}` : l;
   }
   function presetName(name) {
     if (!name) return '';
