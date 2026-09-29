@@ -137,7 +137,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
     sites, bodies, keyframes, the L3 tile packs) and every manifest note equal but for its timings (56 sites, same census);
     50 frames, 266.9 MiB of history, 478.8 MiB written (each frame twice: once by the surface, again after the structure
     stage added its fields), 787.8 MiB read back.
-  - COMPARE_32K
+  - 32k full 1000 Myr in memory (8 GiB cap) for a byte comparison with the 4 GiB run: started on the Mac
+    (`review/out/spill/run32k-8g`), not finished when this entry was written; compare with `review/out/spill/cmp.py`.
 - **Timings and memory.**
   - 16k quick 500 Myr side by side on the loaded Mac: 798 s in memory vs 795 s all on disk (noise); deposits 7.4 vs
     6.2 s; spill I/O 0.74 s writing, 0.24 s reading. Gauge peak 3,373 vs 3,106 MiB (the young/amplify stages dominate the
