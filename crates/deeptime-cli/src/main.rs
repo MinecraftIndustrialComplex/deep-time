@@ -55,40 +55,39 @@ enum Command {
         #[command(flatten)]
         common: CommonArgs,
     },
-    /// Run a planet like `run` and serve a live page of it while it runs (map, globe, layers and
-    /// events every step; pause, step, rewind, speed, follow live). Serves loopback or a Tailscale
-    /// address only, never the LAN; tools/viewer/mac-watch.sh runs it on the Mac and puts it on
-    /// the tailnet.
+    /// The browser workbench (P1-20): serve the editor, the runs and a live view of each run (map,
+    /// globe, layers and events every step; pause, step, rewind, speed, follow live, compare two
+    /// runs). Runs go one at a time; finished ones are kept under --runs. Serves loopback or a
+    /// Tailscale address only, never the LAN; tools/viewer/mac-watch.sh runs it on the Mac and
+    /// puts it on the tailnet.
     Watch {
-        /// A built-in preset name, a preset JSON file or a share code (DT1.…).
+        /// A run to start right away (a built-in preset name, a preset JSON file or a share code);
+        /// the page starts others.
         #[arg(long)]
-        preset: String,
-        /// Timeline start configuration (supercontinent, scattered_continents, random).
+        preset: Option<String>,
+        /// Timeline start configuration for --preset (supercontinent, scattered_continents,
+        /// random).
         #[arg(long)]
         start: Option<String>,
-        /// Timeline length in millions of years.
+        /// Timeline length for --preset, in millions of years.
         #[arg(long)]
         length_myr: Option<f64>,
-        /// Content bundle JSON (rock classes, deposit types; plan §5.4).
-        #[arg(long)]
-        content: Option<PathBuf>,
         /// Address to serve on: loopback (default) or the machine's Tailscale address.
         #[arg(long, default_value = "127.0.0.1")]
         bind: IpAddr,
         /// Port to serve on.
         #[arg(long, default_value_t = watch::DEFAULT_PORT)]
         port: u16,
-        /// Folder for the world data (<work>/world) and the frame images (<work>/frames); default
-        /// a temporary folder.
+        /// Folder the runs are kept in (a folder per run; default: a temporary folder).
         #[arg(long)]
-        work: Option<PathBuf>,
+        runs: Option<PathBuf>,
+        /// Finished runs kept; the oldest beyond this are deleted.
+        #[arg(long, default_value_t = watch::DEFAULT_KEEP)]
+        keep: usize,
         /// A frame every this many Myr (default: after every step).
         #[arg(long)]
         every_myr: Option<f64>,
-        /// Also write the static viewer bundle here when the run is done.
-        #[arg(long)]
-        viewer: Option<PathBuf>,
-        /// Stop serving when the run is done (default: serve until stopped).
+        /// Stop once nothing runs or waits (after --preset's run; default: serve until stopped).
         #[arg(long)]
         exit_when_done: bool,
         #[command(flatten)]
@@ -348,12 +347,11 @@ fn main() -> ExitCode {
             preset,
             start,
             length_myr,
-            content,
             bind,
             port,
-            work,
+            runs,
+            keep,
             every_myr,
-            viewer,
             exit_when_done,
             common,
         }) => finish(
@@ -362,12 +360,11 @@ fn main() -> ExitCode {
                 preset,
                 start,
                 length_myr,
-                content,
                 bind,
                 port,
-                work,
+                runs: runs.unwrap_or_else(|| std::env::temp_dir().join("deeptime-watch-runs")),
+                keep,
                 every_myr,
-                viewer,
                 exit_when_done,
                 common: common.common(),
             }),

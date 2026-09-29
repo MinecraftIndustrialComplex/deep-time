@@ -1,42 +1,55 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! The watch server: a small HTTP/1.1 server on std's `TcpListener` (GET and HEAD, keep-alive, a
-//! thread per connection, at most [`MAX_CONNECTIONS`]) for the live page, its stream
-//! (server-sent events) and the frame images. It only reads the session (`copy_keyframe`, which
-//! never blocks on a step); nothing a page sends reaches the simulation.
+//! The workbench server: a small HTTP/1.1 server on std's `TcpListener` (GET, HEAD and JSON
+//! POSTs, keep-alive, a thread per connection, at most [`MAX_CONNECTIONS`]) for the page, its
+//! API, each run's stream (server-sent events) and frame images. Requests only choose inputs
+//! (a new run's preset) or cancel a run; nothing a page sends changes a running simulation.
 //!
 //! Who may connect: loopback and Tailscale addresses only ([`tailnet_or_loopback`]), for the
 //! address it binds and for every peer. On the Mac it binds 127.0.0.1 and `tailscale serve --tcp`
 //! forwards the tailnet to it (tools/viewer/mac-watch.sh): tailscaled is already allowed through
-//! macOS's application firewall, a freshly built binary is not (binding 100.x directly would
-//! raise the firewall's "accept incoming connections?" dialog on the Mac's screen).
+//! macOS's application firewall, a freshly built binary is not (binding 100.x directly raises the
+//! firewall's "accept incoming connections?" dialog on the Mac's screen and blocks until someone
+//! answers). A POST must be `application/json` (a cross-site form cannot send that without a CORS
+//! preflight, which this server never grants), same-origin when the browser says where it came
+//! from, and addressed to a tailnet or local name (no DNS rebinding).
 //!
-//! Routes: `/` the page, `/live.js`, `/ramps.json`, `/state.json` (everything so far, the
-//! stream's `hello`), `/stream` (SSE: `hello`, then `events`, `frame`, `progress`, `status`,
-//! `bye`; a comment line every 15 s), `/frames/<run>/<n>/<layer index>.png` (the frame's layer,
-//! encoded on first request and cached in the work folder's `frames/`).
+//! Routes:
+//! - `/` the page, `/workbench.js`, `/ramps.json`
+//! - `GET /api/catalog` the editor's definitions; `POST /api/preset` a form state's effective
+//!   preset, share code, problems and estimate; `POST /api/decode` a share code as a form state
+//! - `GET /api/runs` the runs and the queue; `POST /api/runs` queue a run (`{"json", "label",
+//!   "cap_gib"}`); `POST /api/runs/<id>/cancel`
+//! - `GET /api/runs/<id>/stream` (SSE: `hello`, then `events`, `frame`, `progress`, `status`,
+//!   `bye`; a comment line every 15 s), `/api/runs/<id>/state.json` (the `hello`),
+//!   `/api/runs/<id>/frames/<n>/<layer index>.png` (encoded on first request, cached in the run's
+//!   `frames/`)
+//! - stage 2 (P1-20, a sibling worktree builds it): `POST /api/preview` (a box of a run's world →
+//!   a 3D block preview job) and `GET /api/inspect?run=&x=&z=` (a column's rock layers, ore bodies
+//!   and "why here"); both answer 501 with `{"available": false, "message"}` until it lands.
 
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use deeptime_core::session::Session;
+use serde_json::{Value, json};
 
 use super::live::Live;
+use super::runs::Workbench;
 
 /// Connections served at once; more are answered 503.
 pub const MAX_CONNECTIONS: usize = 64;
 const MAX_HEADER_BYTES: u64 = 16 * 1024;
+const MAX_BODY_BYTES: u64 = 1 << 20;
 /// A keep-alive connection with no request for this long is closed.
 const IDLE: Duration = Duration::from_secs(60);
 /// A stream with nothing to say sends a comment this often (and so notices a closed page).
 const PING: Duration = Duration::from_secs(15);
 
 const NO_CACHE: &str = "no-cache";
-/// A frame's image never changes within a run, and its URL names the run.
+/// A frame's image never changes, and its URL names the run.
 const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 
 /// Loopback, or Tailscale's ranges: 100.64.0.0/10 (the CGNAT block its IPv4 addresses come
@@ -53,13 +66,28 @@ pub fn tailnet_or_loopback(ip: IpAddr) -> bool {
     }
 }
 
+/// A `Host` a tailnet page may use: an IP literal, `localhost`, a bare machine name (MagicDNS)
+/// or a `*.ts.net` name. Anything else would be a foreign site's name pointed at this address.
+pub fn tailnet_host(host: &str) -> bool {
+    let name = if let Some(rest) = host.strip_prefix('[') {
+        rest.split(']').next().unwrap_or("")
+    } else {
+        host.rsplit_once(':')
+            .filter(|(_, port)| port.bytes().all(|b| b.is_ascii_digit()))
+            .map_or(host, |(h, _)| h)
+    };
+    let name = name.to_ascii_lowercase();
+    !name.is_empty()
+        && (name.parse::<IpAddr>().is_ok()
+            || name == "localhost"
+            || !name.contains('.')
+            || name.ends_with(".ts.net"))
+}
+
 /// What the routes read.
 pub struct App {
-    pub live: Arc<Live>,
-    pub session: Arc<Session>,
-    /// The PNG cache (`<work>/frames`).
-    pub frames_dir: PathBuf,
-    /// `live.html` with the title.
+    pub wb: Arc<Workbench>,
+    /// The page with its title.
     pub page: String,
 }
 
@@ -148,7 +176,12 @@ fn accept_loop(listener: TcpListener, app: Arc<App>, stop: Arc<AtomicBool>) {
 struct Request {
     method: String,
     path: String,
+    query: String,
     keep_alive: bool,
+    host: String,
+    origin: Option<String>,
+    content_type: String,
+    body: Vec<u8>,
 }
 
 struct Response {
@@ -176,16 +209,34 @@ impl Response {
             body: body.into().into_bytes(),
         }
     }
+
+    fn json(status: u16, v: &Value) -> Response {
+        Response {
+            status,
+            content_type: "application/json",
+            cache: "no-store",
+            body: v.to_string().into_bytes(),
+        }
+    }
+
+    fn error(status: u16, message: impl Into<String>) -> Response {
+        Response::json(status, &json!({ "error": message.into() }))
+    }
 }
 
 fn reason(status: u16) -> &'static str {
     match status {
         200 => "OK",
+        201 => "Created",
         204 => "No Content",
         400 => "Bad Request",
         403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        409 => "Conflict",
+        413 => "Payload Too Large",
+        415 => "Unsupported Media Type",
+        501 => "Not Implemented",
         503 => "Service Unavailable",
         _ => "Internal Server Error",
     }
@@ -210,8 +261,8 @@ fn respond(out: &mut TcpStream, r: &Response, head: bool, keep_alive: bool) -> i
     out.flush()
 }
 
-/// One request's line and headers (a body, which GET does not have, is skipped). `None` at a
-/// clean end of the connection.
+/// One request (its body read when it has one of at most 1 MiB). `None` at a clean end of the
+/// connection.
 fn read_request(r: &mut BufReader<TcpStream>) -> io::Result<Option<Request>> {
     let mut limited = (&mut *r).take(MAX_HEADER_BYTES);
     let mut line = String::new();
@@ -234,7 +285,8 @@ fn read_request(r: &mut BufReader<TcpStream>) -> io::Result<Option<Request>> {
     };
     let (method, target) = (method.to_owned(), target.to_owned());
     let mut keep_alive = version == "HTTP/1.1";
-    let mut content_length = 0u64;
+    let (mut content_length, mut host, mut origin, mut content_type) =
+        (0u64, String::new(), None, String::new());
     loop {
         line.clear();
         if limited.read_line(&mut line)? == 0 {
@@ -248,27 +300,45 @@ fn read_request(r: &mut BufReader<TcpStream>) -> io::Result<Option<Request>> {
             break;
         }
         if let Some((k, v)) = l.split_once(':') {
-            let v = v.trim().to_ascii_lowercase();
+            let v = v.trim();
+            let lower = v.to_ascii_lowercase();
             match k.trim().to_ascii_lowercase().as_str() {
-                "connection" if v.contains("close") => keep_alive = false,
-                "connection" if v.contains("keep-alive") => keep_alive = true,
+                "connection" if lower.contains("close") => keep_alive = false,
+                "connection" if lower.contains("keep-alive") => keep_alive = true,
                 "content-length" => content_length = v.parse().unwrap_or(u64::MAX),
+                "host" => host = v.to_owned(),
+                "origin" => origin = Some(v.to_owned()),
+                "content-type" => content_type = lower,
                 _ => {}
             }
         }
     }
-    if content_length > 0 {
-        if content_length > 1 << 20 {
-            keep_alive = false;
-        } else {
-            io::copy(&mut (&mut *r).take(content_length), &mut io::sink())?;
-        }
+    if content_length > MAX_BODY_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "the request body is over 1 MiB",
+        ));
     }
-    let path = target.split(['?', '#']).next().unwrap_or("/").to_owned();
+    let mut body = Vec::new();
+    if content_length > 0 {
+        (&mut *r).take(content_length).read_to_end(&mut body)?;
+    }
+    let (path, query) = match target.split('#').next().unwrap_or("/").split_once('?') {
+        Some((p, q)) => (p.to_owned(), q.to_owned()),
+        None => (
+            target.split('#').next().unwrap_or("/").to_owned(),
+            String::new(),
+        ),
+    };
     Ok(Some(Request {
         method,
         path,
+        query,
         keep_alive,
+        host,
+        origin,
+        content_type,
+        body,
     }))
 }
 
@@ -282,7 +352,7 @@ fn handle(stream: TcpStream, app: &App, stop: &AtomicBool) -> io::Result<()> {
             &mut out,
             &Response::text(
                 403,
-                "Forbidden: the Deep Time watch page serves the tailnet only\n",
+                "Forbidden: the Deep Time workbench serves the tailnet only\n",
             ),
             false,
             false,
@@ -308,45 +378,61 @@ fn handle(stream: TcpStream, app: &App, stop: &AtomicBool) -> io::Result<()> {
             Err(e) => return Err(e),
         };
         let head = req.method == "HEAD";
-        if req.method != "GET" && !head {
-            return respond(
-                &mut out,
-                &Response::text(405, "GET only: the page only reads the run\n"),
-                false,
-                false,
-            );
-        }
-        if req.path == "/stream" && !head {
-            return stream_events(out, app);
-        }
-        respond(&mut out, &route(app, &req.path), head, req.keep_alive)?;
+        let resp = match req.method.as_str() {
+            "GET" | "HEAD" => {
+                if !head
+                    && let Some(id) = req
+                        .path
+                        .strip_prefix("/api/runs/")
+                        .and_then(|r| r.strip_suffix("/stream"))
+                {
+                    return match app.wb.run(id) {
+                        Some(run) => stream_events(out, &run.live),
+                        None => respond(
+                            &mut out,
+                            &Response::error(404, format!("no run {id}")),
+                            false,
+                            false,
+                        ),
+                    };
+                }
+                get(app, &req)
+            }
+            "POST" => post(app, &req),
+            _ => Response::error(405, "GET, HEAD or POST"),
+        };
+        respond(&mut out, &resp, head, req.keep_alive)?;
         if !req.keep_alive {
             return Ok(());
         }
     }
 }
 
-fn route(app: &App, path: &str) -> Response {
+fn query_param<'a>(query: &'a str, key: &str) -> Option<&'a str> {
+    query
+        .split('&')
+        .filter_map(|kv| kv.split_once('='))
+        .find(|(k, _)| *k == key)
+        .map(|(_, v)| v)
+}
+
+fn get(app: &App, req: &Request) -> Response {
+    let path = req.path.as_str();
     match path {
         "/" | "/index.html" => Response::ok(
             "text/html; charset=utf-8",
             NO_CACHE,
             app.page.as_bytes().to_vec(),
         ),
-        "/live.js" => Response::ok(
+        "/workbench.js" => Response::ok(
             "text/javascript; charset=utf-8",
             NO_CACHE,
-            deeptime_viewer::LIVE_JS.as_bytes().to_vec(),
+            deeptime_viewer::WORKBENCH_JS.as_bytes().to_vec(),
         ),
         "/ramps.json" => Response::ok(
             "application/json",
             NO_CACHE,
             deeptime_viewer::RAMPS_JSON.as_bytes().to_vec(),
-        ),
-        "/state.json" => Response::ok(
-            "application/json",
-            "no-store",
-            app.live.snapshot().0.into_bytes(),
         ),
         "/favicon.ico" => Response {
             status: 204,
@@ -354,20 +440,122 @@ fn route(app: &App, path: &str) -> Response {
             cache: IMMUTABLE,
             body: Vec::new(),
         },
-        _ => match path.strip_prefix("/frames/") {
-            Some(rest) => frame_png(app, rest),
-            None => Response::text(404, "not found\n"),
+        "/api/catalog" => Response::json(200, &app.wb.catalog.to_json()),
+        "/api/runs" => Response::json(200, &app.wb.list_json()),
+        "/api/inspect" => Response::json(
+            501,
+            &json!({
+                "available": false,
+                "run": query_param(&req.query, "run"),
+                "message": "Click-to-inspect (a column's rock layers, ore bodies and \"why here\", \
+                            through the same column evaluator as deeptime inspect-column) is the \
+                            workbench's stage 2; it is not available yet.",
+            }),
+        ),
+        _ => {
+            let Some(rest) = path.strip_prefix("/api/runs/") else {
+                return Response::text(404, "not found\n");
+            };
+            let (id, tail) = rest.split_once('/').unwrap_or((rest, ""));
+            let Some(run) = app.wb.run(id) else {
+                return Response::error(404, format!("no run {id} (it may have been pruned)"));
+            };
+            if tail == "state.json" {
+                return Response::ok(
+                    "application/json",
+                    "no-store",
+                    run.live.snapshot().0.into_bytes(),
+                );
+            }
+            match tail.strip_prefix("frames/") {
+                Some(f) => frame_png(&run, f),
+                None => Response::text(404, "not found\n"),
+            }
+        }
+    }
+}
+
+/// The POST guard: JSON only, same origin, a tailnet or local name.
+fn post_refusal(req: &Request) -> Option<Response> {
+    if !req.content_type.starts_with("application/json") {
+        return Some(Response::error(415, "POST application/json"));
+    }
+    if !tailnet_host(&req.host) {
+        return Some(Response::error(
+            403,
+            format!("not a tailnet address: {}", req.host),
+        ));
+    }
+    if let Some(o) = &req.origin {
+        let from = o.split_once("://").map_or(o.as_str(), |(_, rest)| rest);
+        if from != req.host {
+            return Some(Response::error(
+                403,
+                format!("cross-origin request from {o}"),
+            ));
+        }
+    }
+    None
+}
+
+fn post(app: &App, req: &Request) -> Response {
+    if let Some(refused) = post_refusal(req) {
+        return refused;
+    }
+    let body: Value = match serde_json::from_slice(&req.body) {
+        Ok(v) => v,
+        Err(e) => return Response::error(400, format!("not JSON: {e}")),
+    };
+    let path = req.path.as_str();
+    match path {
+        "/api/preset" => {
+            let r = app.wb.catalog.effective(&body);
+            Response::json(if r.get("error").is_some() { 400 } else { 200 }, &r)
+        }
+        "/api/decode" => {
+            let r = app.wb.catalog.decode(body["code"].as_str().unwrap_or(""));
+            Response::json(if r.get("error").is_some() { 400 } else { 200 }, &r)
+        }
+        "/api/runs" => {
+            let Some(json) = body["json"].as_str() else {
+                return Response::error(400, "give the preset as \"json\"");
+            };
+            let cap = body["cap_gib"]
+                .as_f64()
+                .filter(|g| g.is_finite() && *g >= 0.25)
+                .map_or(0, |g| (g * (1u64 << 30) as f64) as u64);
+            match app.wb.submit(json, body["label"].as_str(), cap) {
+                Ok(run) => Response::json(201, &json!({ "id": run.id })),
+                Err((status, msg)) => Response::error(status, msg),
+            }
+        }
+        "/api/preview" => Response::json(
+            501,
+            &json!({
+                "available": false,
+                "request": body,
+                "message": "The 3D block preview of an area is the workbench's stage 2, built \
+                            beside this page; it is not available yet.",
+            }),
+        ),
+        _ => match path
+            .strip_prefix("/api/runs/")
+            .and_then(|r| r.strip_suffix("/cancel"))
+        {
+            Some(id) => match app.wb.cancel(id) {
+                Ok(()) => Response::json(200, &json!({ "ok": true })),
+                Err((status, msg)) => Response::error(status, msg),
+            },
+            None => Response::error(404, "not found"),
         },
     }
 }
 
 static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
 
-/// `<run>/<n>/<layer index>.png`: from the cache, or copied out of the session and encoded.
-fn frame_png(app: &App, rest: &str) -> Response {
-    let mut it = rest.split('/');
-    let (Some(run), Some(n), Some(file), None) = (it.next(), it.next(), it.next(), it.next())
-    else {
+/// `<n>/<layer index>.png` of a run: from its cache, or drawn from the frame and encoded.
+fn frame_png(run: &super::runs::Run, rest: &str) -> Response {
+    let (Some((n, file)), true) = (rest.split_once('/'), !rest.contains("..")) else {
         return Response::text(404, "not found\n");
     };
     let (Ok(n), Some(Ok(layer))) = (
@@ -376,26 +564,25 @@ fn frame_png(app: &App, rest: &str) -> Response {
     ) else {
         return Response::text(404, "not found\n");
     };
-    if run != app.live.run() {
-        return Response::text(404, "that run is over: reload the page\n");
-    }
-    let Some(size) = app.live.frame_size(n as usize) else {
+    let Some(size) = run.live.frame_size(n as usize) else {
         return Response::text(404, "no such frame yet\n");
     };
     if layer as usize >= size.layers {
         return Response::text(404, "no such layer\n");
     }
-    let path = app.frames_dir.join(format!("kf-{n}-{layer}.png"));
+    let dir = run.frames_dir();
+    let path = dir.join(format!("kf-{n}-{layer}.png"));
     if let Ok(bytes) = std::fs::read(&path) {
         return Response::ok("image/png", IMMUTABLE, bytes);
     }
-    let mut rgba = vec![0u8; size.w as usize * size.h as usize * 4];
-    if let Err(e) = app.session.copy_keyframe(n, layer, &mut rgba) {
-        return Response::text(500, format!("frame {n} layer {layer}: {e}\n"));
-    }
+    let rgba = match run.frame_rgba(n, layer, size) {
+        Ok(rgba) => rgba,
+        Err(e) => return Response::text(500, format!("frame {n} layer {layer}: {e}\n")),
+    };
     match deeptime_viewer::encode_png(size.w, size.h, &rgba) {
         Ok(png) => {
             // Two requests for one image may both encode it; each renames its own file in.
+            let _ = std::fs::create_dir_all(&dir);
             let tmp = path.with_extension(format!(
                 "png.{}.tmp",
                 TMP_SEQ.fetch_add(1, Ordering::Relaxed)
@@ -415,16 +602,16 @@ fn send(out: &mut TcpStream, event: &str, data: &str) -> io::Result<()> {
 
 /// Server-sent events until the page goes away or the server closes (the body ends with the
 /// connection).
-fn stream_events(mut out: TcpStream, app: &App) -> io::Result<()> {
+fn stream_events(mut out: TcpStream, live: &Live) -> io::Result<()> {
     out.write_all(
         b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-store\r\n\
           X-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\nretry: 2000\n\n",
     )?;
-    let (hello, mut cur) = app.live.snapshot();
+    let (hello, mut cur) = live.snapshot();
     send(&mut out, "hello", &hello)?;
     out.flush()?;
     loop {
-        match app.live.next(&mut cur, PING) {
+        match live.next(&mut cur, PING) {
             None => {
                 send(&mut out, "bye", "{}")?;
                 return out.flush();
@@ -473,6 +660,24 @@ mod tests {
             "::ffff:10.0.0.1",
         ] {
             assert!(!tailnet_or_loopback(no.parse().unwrap()), "{no}");
+        }
+        for ok in [
+            "m6-mac-mini:8642",
+            "m6-mac-mini.tail028f45.ts.net:8642",
+            "100.100.232.45:8642",
+            "127.0.0.1:8642",
+            "localhost",
+            "[fd7a:115c:a1e0::1]:8642",
+        ] {
+            assert!(tailnet_host(ok), "{ok}");
+        }
+        for no in [
+            "evil.example.com",
+            "evil.example.com:8642",
+            "",
+            "m6.local.example:1",
+        ] {
+            assert!(!tailnet_host(no), "{no}");
         }
     }
 }

@@ -85,8 +85,42 @@ impl Live {
         }
     }
 
-    pub fn run(&self) -> &str {
-        &self.run
+    /// A finished run read back from its folder: everything at once, nothing more to come.
+    pub fn restored(
+        run: String,
+        meta: Value,
+        frames: Vec<(Value, FrameSize)>,
+        events: Vec<String>,
+        progress: Value,
+        status: Value,
+    ) -> Live {
+        let live = Live::new(run, meta);
+        {
+            let mut g = live.lock();
+            for (f, size) in frames {
+                g.frames.push(f);
+                g.sizes.push(size);
+            }
+            g.events = events;
+            g.progress = progress;
+            g.status = status;
+        }
+        live
+    }
+
+    pub fn meta(&self) -> &Value {
+        &self.meta
+    }
+
+    /// (frames, events, progress, status): the runs list's line.
+    pub fn summary(&self) -> (usize, usize, Value, Value) {
+        let g = self.lock();
+        (
+            g.frames.len(),
+            g.events.len(),
+            g.progress.clone(),
+            g.status.clone(),
+        )
     }
 
     fn lock(&self) -> MutexGuard<'_, Inner> {
