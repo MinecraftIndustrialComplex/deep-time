@@ -62,6 +62,66 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 ## Build log
 
+### 2026-09-28 — Real-client screenshots on the Mac's desktop session (agent worktree agent-ab0d4cbba4384f9e5)
+- **Why.** Ben (2026-09-28, CLAUDE.md "Real-client runs"): clients boot in the M6 Mac mini's
+  logged-in desktop session, never under the laptop's Xvfb. P1-11's `tools/client/screenshots.sh`
+  (HeadlessMC + Xvfb, laptop) now refuses to run unless `DEEPTIME_XVFB_CLIENT=1`.
+- **Shape.** `tools/client/mac-screenshots.sh [--name N] [--no-build] [--no-guidance] [--no-create]
+  [--size WxH] [--timeout S] [--lease-wait S]` on the laptop: (1) `tools/remote/mac.sh` syncs
+  and runs `./gradlew classes gametestClasses createClientLaunchScript linkRunModsClient`;
+  (2) copies graphide's `utilities/scripts/mactest/m6lock.sh` (read-only source; `M6LOCK_SH`
+  overrides the path) to `/Volumes/Graphide/ban/deeptime-cache/m6lock.sh`; (3) `mac.sh --no-sync
+  --server --pull review/out/<name>` runs `tools/client/mac-client.sh` on the Mac, so Deep Time's
+  server lock is held for the whole client run (the client starts an integrated server); (4) prints
+  the driver's lines and the PNG list. Ctrl-C/TERM on the laptop TERMs the Mac runner through its
+  pid file (`neoforge/build/mac-client/runner.pid`).
+- **Launch.** Not HeadlessMC: offline it stubs LWJGL unless it sees Xvfb, and its dummy assets are
+  what made P1-11's backgrounds dark red. Instead ModDevGradle's own dev launch:
+  `createClientLaunchScript` writes `neoforge/build/moddev/runClient.sh` (one line, `(cd run; exec
+  java @clientRunClasspath.txt @clientRunVmArgs.txt -Dfml.modFolders=… net.neoforged.devlaunch.Main
+  @clientRunProgramArgs.txt)`, `-XstartOnFirstThread` already in the VM args on macOS; real assets
+  from the Gradle cache). The runner reads its words back, adds `-Ddeeptime.client.run=<id>` (the
+  kill marker), `-Xmx3G`, `-Ddeeptime.dev.screenshots=true` and the pass's properties, and starts it
+  with `sudo -n launchctl asuser 501 sudo -n -u ban -H env -i … /bin/bash launch-<pass>.sh`
+  (graphide's mactest pattern: from sshd a process is in the `Background` launchd manager and gets
+  no WindowServer; this puts it in `Aqua`, checked with `launchctl managername`). Deep Time loads
+  from the build output (natives `aarch64-apple-darwin` from build/resources), Toroidal World
+  0.19.3's bundle from run/mods (linkRunModsClient); the log shows both and TW's 1,024-chunk
+  cylinder. `options.txt` as P1-11's plus master/music volume 0 (Ben's speakers) and no pause on
+  lost focus; NeoForge's early window off; `caffeinate -d -w <pid>` keeps the display awake. PNGs
+  come from the GL framebuffer (ScreenshotDriver), so no macOS Screen Recording permission is
+  involved (`screencapture` would need one; graphide notes nothing grants it).
+- **Lease.** graphide's M6 lock, kind `drive` (excludes other desktop walks and the perf lane;
+  graphide's `tests` runs may continue beside it), holder `deeptime-client:<checkout name>`, TTL
+  300 s, renewed every 60 s while the client runs (`acquire` again; if that fails — the lease lapsed
+  and someone else took the desktop — the client is stopped), released on every exit path. Waits up
+  to `--lease-wait` (600 s) for a busy desktop and never breaks another holder's lease. Order:
+  Deep Time's server lock first (mac.sh), then the lease. Every failure, timeout, lost lease or
+  signal kills only this run's JVM: its pid from the launch script, checked against the marker.
+- **Measured (Mac, `tools/client/mac-screenshots.sh --name p1-11-mac`, about 1 min 15 s end to end
+  with an up-to-date build; three full runs, the same every time):** main pass 46–47 s (~680 ticks:
+  Create World with "Deep Time Planet" and Create blocked `NOT_SIMULATED` → setup → timeline → run
+  live, map then globe → done, 9 keyframes, 13 events → scrubbed 5/9 → review, spawn −8.3° N
+  204.4° E, 6 province cells → Accept → `Moved staged … (rename)`, `Bound … C = 16384` → in world,
+  last run at (1110, 65, 373)); guidance pass 14–17 s (Create blocked `NATIVES`).
+  Twelve 854×480 PNGs in `review/out/p1-11-mac/` (gitignored), the same twelve as P1-11's laptop
+  set, same content; differences: the real title panorama (blurred) behind every screen instead of
+  the dark fallback, Steve's arm, and the in-world view (random seed: other vegetation, a coast in
+  view). Failure paths tried: `--timeout 15` → client stopped at 15 s, lease released, 5 PNGs, exit 1;
+  SIGTERM to the laptop's process group during a client run → runner stopped the client, released
+  the lease, server lock gone, no process of this checkout left; the same while waiting for the
+  server lock (another agent's `q10-ev.sh` held it) → nothing left behind. The drive lease and the
+  server lock were free after every run.
+- **Found:** the setup page reads "This machine: 1.0 GiB free of 16.0 GiB" on the Mac:
+  `MachineInfo` falls back to `OperatingSystemMXBean.getFreeMemorySize()`, which on macOS counts only
+  free pages (inactive and purgeable memory, which the system hands out on demand, are left out) —
+  the macOS twin of the Linux `MemFree` bug P1-11 fixed. The memory warnings will misfire on Macs.
+  Next step for P1-11: a macOS reading (vm_stat free + inactive + speculative pages, as graphide's
+  m6lock `avail_gb` does, or `host_statistics64` through the JNI side).
+- **Needs from Ben:** nothing while `ban` stays logged in at the Mac (auto-login or a Screen Sharing
+  login); with nobody logged in the runner stops with `BLOCKED: … no GUI session` (exit 4). A
+  locked screen is only warned about (untested: every run here had `ban` unlocked at the console).
+
 ### 2026-09-28 — P1-11 Customize editor, timelapse and staging, on the placeholder presets (agent worktree agent-a61f0e6a8e0a67dfa)
 - **Shape.** Client-only screens in `screen/` (reached only through `screen/ClientSetup`, a
   `@Mod(dist = CLIENT)` class: preset editor for `deeptime:planet` and `planet_32k`, the Create
