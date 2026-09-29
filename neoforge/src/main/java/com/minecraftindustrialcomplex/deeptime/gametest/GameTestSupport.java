@@ -63,6 +63,18 @@ public final class GameTestSupport {
     public static final ResourceKey<Level> TEST_LAKE =
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_lake"));
 
+    /**
+     * The synthetic deposit world (P1-15; C = 4,096, folder {@code deeptime-deposits}; gametest.sh
+     * writes it with {@code deeptime run --preset deposits_world_4k.json}): a fixed biome,
+     * {@code deeptime:test_ores}, whose only features are the deposits and the background scatter.
+     */
+    public static final ResourceKey<Level> TEST_DEPOSITS =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_deposits"));
+
+    /** A second level over the same deposit world data, for the regeneration check. */
+    public static final ResourceKey<Level> TEST_DEPOSITS_TWIN =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_deposits_twin"));
+
     private GameTestSupport() {}
 
     /** True in the two dev GameTest runtimes (both set {@code -Ddeeptime.gametest=true}). */

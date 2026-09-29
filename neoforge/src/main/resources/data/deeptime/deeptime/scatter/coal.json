@@ -1,0 +1,20 @@
+{
+  "material": "c:coal",
+  "clusters_per_chunk": 2.0,
+  "size": 8,
+  "y_window": [
+    0.0,
+    0.4
+  ],
+  "host_bias": {
+    "coal": 1.0,
+    "shale": 1.0,
+    "black_shale": 1.0,
+    "mudstone": 1.0,
+    "sandstone": 0.8,
+    "red_bed": 0.6,
+    "unclassified_crust": 0.6,
+    "*": 0.3
+  },
+  "_comment": "Coal stringers, mostly in sedimentary rock near the surface. Background scatter (plan §7.8): values are initial, judged against the deposit renders; packs override or add files under data/<ns>/deeptime/scatter/."
+}

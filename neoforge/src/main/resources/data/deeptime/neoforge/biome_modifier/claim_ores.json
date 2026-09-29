@@ -1,0 +1,8 @@
+{
+  "type": "deeptime:claim_ores",
+  "biomes": "#minecraft:is_overworld",
+  "claim_rock_features": true,
+  "materials": [],
+  "rock_features": ["create:striated_ores_overworld"],
+  "keep": []
+}

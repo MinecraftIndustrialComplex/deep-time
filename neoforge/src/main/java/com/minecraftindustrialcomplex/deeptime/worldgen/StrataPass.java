@@ -36,8 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * block type. A class that resolves to nothing leaves the crust as it is.
  *
  * <p><b>Writes.</b> Whole runs go straight into the section palettes (sections holding no stone or
- * deepslate are skipped). Bodies (intrusions, alteration halos, gossans) override horizons once
- * world data carries them (the {@code bodies/} files, P1-08 and P1-14).
+ * deepslate are skipped). Bodies (intrusions, alteration halos, gossans; {@code bodies/}, P1-14)
+ * then override horizons inside their SDF where they name a rock class ({@link #paintBodies},
+ * P1-15).
  */
 public final class StrataPass {
 
@@ -144,9 +145,13 @@ public final class StrataPass {
                 runs[ci] = n;
             }
         }
-        if (highest == Integer.MIN_VALUE)
-            return;
+        if (highest != Integer.MIN_VALUE)
+            writeRuns(chunk, highest, k, runTop, runBottom, runBlock, runs);
+        paintBodies(chunk, wd, k, runTop, runBottom, runBlock, runs);
+    }
 
+    private static void writeRuns(ChunkAccess chunk, int highest, int k, int[] runTop, int[] runBottom,
+                                  BlockState[] runBlock, int[] runs) {
         for (int si = chunk.getSectionIndex(highest); si >= 0; si--) {
             LevelChunkSection section = chunk.getSection(si);
             if (section.hasOnlyAir() || !section.maybeHas(StrataPass::isCrust))
@@ -165,6 +170,105 @@ public final class StrataPass {
                 }
             }
         }
+    }
+
+    /** A body's key for the member choice: distinct from every horizon key. */
+    public static long bodyKey(int bodyId) {
+        return (1L << 48) | Integer.toUnsignedLong(bodyId);
+    }
+
+    /**
+     * Bodies override horizons inside their SDF (plan §7.5): where a body (or one of its zones) names
+     * a rock class, the crust or horizon rock at that block becomes the class's block (one member
+     * per body, {@link #bodyKey}). A zone's class wins over the body's; of several zones the last
+     * that applies. Soil, sand, water and anything the surface rules placed stay, as for horizons.
+     */
+    static void paintBodies(ChunkAccess chunk, WorldData wd, int k, int[] runTop, int[] runBottom,
+                            BlockState[] runBlock, int[] runs) {
+        int minY = chunk.getMinBuildHeight(), maxY = chunk.getMaxBuildHeight() - 1;
+        int cx = chunk.getPos().x, cz = chunk.getPos().z, x0 = cx << 4, z0 = cz << 4;
+        var bodies = wd.deposits().bodiesInChunk(cx, cz, minY, maxY);
+        if (bodies.isEmpty())
+            return;
+        int c = wd.circumference();
+        RockPalette palette = RockPalette.get();
+        for (var b : bodies) {
+            boolean anyClass = b.rockClass() != null;
+            for (var z : b.zones())
+                anyClass |= z.rockClass() != null;
+            if (!anyClass)
+                continue;
+            long key = bodyKey(b.id());
+            int yLo = Math.max(minY, b.min()[1]), yHi = Math.min(maxY, b.max()[1]);
+            for (int lx = 0; lx < 16; lx++) {
+                for (int lz = 0; lz < 16; lz++) {
+                    int x = x0 + lx, z = z0 + lz;
+                    if (!b.aabbContains(c, x, yLo, z) && !b.aabbContains(c, x, yHi, z))
+                        continue;
+                    int ci = lx * 16 + lz;
+                    for (int y = yLo; y <= yHi; y++) {
+                        var at = b.locate(c, x, y, z);
+                        if (at == null)
+                            continue;
+                        String cls = b.rockClass();
+                        for (var zone : b.zones())
+                            if (zone.rockClass() != null && zone.contains(at.d(), at.v()))
+                                cls = zone.rockClass();
+                        if (cls == null)
+                            continue;
+                        BlockState rock = palette.block(cls, key);
+                        if (rock == null)
+                            continue;
+                        LevelChunkSection section = chunk.getSection(chunk.getSectionIndex(y));
+                        BlockState here = section.getBlockState(lx, y & 15, lz);
+                        if (here == rock)
+                            continue;
+                        if (isCrust(here) || here == horizonBlock(ci, y, k, runTop, runBottom, runBlock, runs))
+                            section.setBlockState(lx, y & 15, lz, rock, false);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * The rock the strata pass paints at (x, y, z) where the crust is: the horizon's block, or a
+     * body's where one names a class there (as {@link #paintBodies} decides). Null above the
+     * horizons or where nothing resolves (the crust stays). For tests and probes.
+     */
+    public static BlockState predictedRock(WorldData wd, int x, int y, int z) {
+        RockPalette palette = RockPalette.get();
+        BlockState rock = null;
+        if (wd.has(LAYER)) {
+            var h = horizonAt(wd, x, y, z);
+            if (h.isPresent())
+                rock = palette.block(h.get().rockClass(), h.get().key());
+        }
+        int c = wd.circumference();
+        for (var b : wd.deposits().bodiesIn(x, y, z, x, y, z)) {
+            var at = b.locate(c, x, y, z);
+            if (at == null)
+                continue;
+            String cls = b.rockClass();
+            for (var zone : b.zones())
+                if (zone.rockClass() != null && zone.contains(at.d(), at.v()))
+                    cls = zone.rockClass();
+            if (cls == null)
+                continue;
+            BlockState r = palette.block(cls, bodyKey(b.id()));
+            if (r != null)
+                rock = r;
+        }
+        return rock;
+    }
+
+    /** The block the horizon runs put at (column ci, y), or null. */
+    private static BlockState horizonBlock(int ci, int y, int k, int[] runTop, int[] runBottom, BlockState[] runBlock,
+                                           int[] runs) {
+        for (int r = 0; r < runs[ci]; r++)
+            if (y <= runTop[ci * k + r] && y >= runBottom[ci * k + r])
+                return runBlock[ci * k + r];
+        return null;
     }
 
     /** The unclassified crust the router and surface rules leave behind. */

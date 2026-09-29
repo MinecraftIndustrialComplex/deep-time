@@ -1596,6 +1596,20 @@ happens before tags load), so Deep Time ships EV stone configs for the vanilla a
 the rock vocabulary under `globaldata/deeptime/excavated_variants/`; packs add their own for
 bring-your-own stones. P1-15 verifies EV's config schema and whether EV's own
 `attempt_worldgen_replacement` must be off in Deep Time worlds to avoid double replacement.
+(P1-15, verified on EV 4.3.1 by javap: EV registers `excavated_variants:ore`/`:stone` in
+`BuiltInRegistries.REGISTRY`; after registration `Ore.getStones()` maps each stone to the ore's
+block in it, originals and generated variants alike, so no id arithmetic is needed. EV already ships
+stone configs for vanilla's stone, deepslate, granite, diorite, andesite, tuff, calcite, sandstone,
+red sandstone, basalt, smooth basalt and dripstone and for Create's seven stones, so Deep Time ships
+only the vanilla stand-ins EV lacks (polished tuff, packed mud, smooth sandstone, cobblestone) through
+DefaultResources' `defaultresources.meta.json` + `defaultresources/globaldata/deeptime/excavated_variants/stone/`.
+EV's own replacement (`excavated_variants:ore_replacer`, added to every biome's
+`TOP_LAYER_MODIFICATION` in the `AFTER_EVERYTHING` phase, gated by `attempt_worldgen_replacement` in
+`config/excavated_variants.json`, default true) must be off in Deep Time levels: it re-picks an ore's
+stone from its neighbours with chunk-edge bookkeeping, so a regenerated deposit differed in 200 of
+1,406 ore blocks. Deep Time turns it off per level with a compat mixin
+(`mixin/compat/excavated_variants/OreReplacerMixin`), so other levels of the pack keep it; the
+config stays untouched.)
 
 ### 7.7 Ore claiming
 
@@ -1618,6 +1632,14 @@ bring-your-own stones. P1-15 verifies EV's config schema and whether EV's own
   restored blobs and Create's `striated_ores_overworld` place rock-class blocks at random, which
   contradicts simulated lithology. The same modifier removes them when `claim_rock_features` is on
   (default on); this is Q4 in §14.
+- (P1-15 as built: only ore-shaped features are judged — `minecraft:ore`, `scattered_ore`,
+  `replace_single_block`, `create:layered_ore`, `lithostitched:ore`, plus the modifier's
+  `ore_feature_types`; selectors are followed — and the blocks they place are read by encoding the
+  configured feature with its codec, so Create's layered ore needs no Create API. A rock blob is an
+  ore-shaped feature placing only bedrock-class blocks; loose pockets (dirt, gravel, clay) and
+  terrain features that merely contain rock or ore (Terralith's floating islands, boulders,
+  pillars) stay. The GameTest server's overworld is not Deep Time's, so its tests check the rules as
+  a dry run and the planet server checks the removal.)
 
 ### 7.8 Background scatter, playability minimums, spawn
 
@@ -1625,7 +1647,9 @@ bring-your-own stones. P1-15 verifies EV's config schema and whether EV's own
   of common materials anywhere, host-rock-gated, from data files
   `data/<ns>/deeptime/scatter/<material>.json` (`clusters_per_chunk`, `size`, `y_window` as a
   fraction of crust thickness, `host_bias` by rock class). It exists so nobody "searched for hours
-  and found nothing" (IE #2229, COE #85).
+  and found nothing" (IE #2229, COE #85). (P1-15 as built: `y_window` is [f0, f1] of the column from
+  the world data's surface (0) to the bottom of the world (1) — the playable crust — and the rules
+  are the `deeptime:scatter` registry.)
 - **Playability minimums.** The `deeptime:essentials` registry lists materials with
   `min_sites_per_region`, `region_blocks`, `max_blocks_from_spawn` and `exposed`. The core's deposit
   stage adds, after natural placement, the smallest plausible deposit at the most favourable cell of
