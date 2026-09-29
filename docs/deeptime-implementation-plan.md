@@ -1596,6 +1596,20 @@ happens before tags load), so Deep Time ships EV stone configs for the vanilla a
 the rock vocabulary under `globaldata/deeptime/excavated_variants/`; packs add their own for
 bring-your-own stones. P1-15 verifies EV's config schema and whether EV's own
 `attempt_worldgen_replacement` must be off in Deep Time worlds to avoid double replacement.
+(P1-15, verified on EV 4.3.1 by javap: EV registers `excavated_variants:ore`/`:stone` in
+`BuiltInRegistries.REGISTRY`; after registration `Ore.getStones()` maps each stone to the ore's
+block in it, originals and generated variants alike, so no id arithmetic is needed. EV already ships
+stone configs for vanilla's stone, deepslate, granite, diorite, andesite, tuff, calcite, sandstone,
+red sandstone, basalt, smooth basalt and dripstone and for Create's seven stones, so Deep Time ships
+only the vanilla stand-ins EV lacks (polished tuff, packed mud, smooth sandstone, cobblestone) through
+DefaultResources' `defaultresources.meta.json` + `defaultresources/globaldata/deeptime/excavated_variants/stone/`.
+EV's own replacement (`excavated_variants:ore_replacer`, added to every biome's
+`TOP_LAYER_MODIFICATION` in the `AFTER_EVERYTHING` phase, gated by `attempt_worldgen_replacement` in
+`config/excavated_variants.json`, default true) must be off in Deep Time levels: it re-picks an ore's
+stone from its neighbours with chunk-edge bookkeeping, so a regenerated deposit differed in 200 of
+1,406 ore blocks. Deep Time turns it off per level with a compat mixin
+(`mixin/compat/excavated_variants/OreReplacerMixin`), so other levels of the pack keep it; the
+config stays untouched.)
 
 ### 7.7 Ore claiming
 
@@ -1618,6 +1632,14 @@ bring-your-own stones. P1-15 verifies EV's config schema and whether EV's own
   restored blobs and Create's `striated_ores_overworld` place rock-class blocks at random, which
   contradicts simulated lithology. The same modifier removes them when `claim_rock_features` is on
   (default on); this is Q4 in §14.
+- (P1-15 as built: only ore-shaped features are judged — `minecraft:ore`, `scattered_ore`,
+  `replace_single_block`, `create:layered_ore`, `lithostitched:ore`, plus the modifier's
+  `ore_feature_types`; selectors are followed — and the blocks they place are read by encoding the
+  configured feature with its codec, so Create's layered ore needs no Create API. A rock blob is an
+  ore-shaped feature placing only bedrock-class blocks; loose pockets (dirt, gravel, clay) and
+  terrain features that merely contain rock or ore (Terralith's floating islands, boulders,
+  pillars) stay. The GameTest server's overworld is not Deep Time's, so its tests check the rules as
+  a dry run and the planet server checks the removal.)
 
 ### 7.8 Background scatter, playability minimums, spawn
 
@@ -1625,7 +1647,9 @@ bring-your-own stones. P1-15 verifies EV's config schema and whether EV's own
   of common materials anywhere, host-rock-gated, from data files
   `data/<ns>/deeptime/scatter/<material>.json` (`clusters_per_chunk`, `size`, `y_window` as a
   fraction of crust thickness, `host_bias` by rock class). It exists so nobody "searched for hours
-  and found nothing" (IE #2229, COE #85).
+  and found nothing" (IE #2229, COE #85). (P1-15 as built: `y_window` is [f0, f1] of the column from
+  the world data's surface (0) to the bottom of the world (1) — the playable crust — and the rules
+  are the `deeptime:scatter` registry.)
 - **Playability minimums.** The `deeptime:essentials` registry lists materials with
   `min_sites_per_region`, `region_blocks`, `max_blocks_from_spawn` and `exposed`. The core's deposit
   stage adds, after natural placement, the smallest plausible deposit at the most favourable cell of
@@ -1705,6 +1729,17 @@ becomes a hard stop. The level's sub-levels come from Sable's public
 (`List<ServerSubLevel>`; `javap` on Sable 2.0.5). Terrain exists all the way to the poles;
 beyond the pole edge (|z| ≥ C/4) `deeptime:beyond_pole` makes an ice-sheet ocean.
 
+*As built in P1-18:* the lines are the generator's `world_data.pole_cap_deg` / `pole_stop_deg`
+(defaults 75 / 80; `wrap/PoleCapCurve` holds the geometry and curves). With s the depth into the
+band: pushback 0.10·s^1.5 blocks/tick² toward the equator, storm s^0.7, Sable wind 1.0·s^1.5
+blocks/s per tick. A player's own movement belongs to its client, so the server sends the wind in
+`PoleStormPayload` and Deep Time's client adds it (to the player or the vehicle it steers); the
+server pushes the vehicles it simulates itself (a player's root vehicle, e.g. a minecart) and
+enforces the hard stop (absolute teleport onto the line; vehicles moved with their riders; riders
+of contraptions dismounted). Creative: storm, warning and stop, no wind; spectator: storm only.
+Sable: wind at the pose, stop by the hull's poleward edge (poleward velocity cancelled, never a
+teleport). Details in STATUS.md's P1-18 entry.
+
 ### 7.12 World preset, dimension type and the Customize editor
 
 Resources in `neoforge/src/main/resources/data/`:
@@ -1762,6 +1797,42 @@ event fires between Create and the integrated server's `initServer`; the first h
 `ServerAboutToStartEvent`, which runs before `loadLevel()`. There `server/StagingMover` moves the
 staging folder into `<world>/deeptime/` (an atomic rename on the same filesystem, else copy, verify
 CRCs, delete) and binds `ActiveWorldData`.
+
+*As built in P1-11 (before the real stages):* the screens are client-only classes in `screen/`,
+reached only through `screen/ClientSetup`, a `@Mod(dist = CLIENT)` entry point (registers the
+editor for `deeptime:planet` and `planet_32k`); every rule lives in the plain-Java
+`screen/model/` (`EditorModel`, `EditorFields`, `TimelapseModel`, `ReviewModel`, `RunHandle` /
+`SessionRunHandle`, `Ramps`, `GlobeProjection`, `ProvinceHints`, `GuidanceModel`, `Formats`), which
+JUnit and the GameTests drive. **Parameters**: `EditorFields` names each field's preset JSON path
+(`planet.gravity_m_s2`, `scale.m_per_block_h`, `deposits.count_multiplier`,
+`scale.feature_scale.rivers`, `surface.drama`, `playability.essentials`, `fantasy.*`, …); a field
+is editable only when the selected preset carries its path, so the placeholder presets (which the
+core rejects any unknown key for) show them unavailable and the real presets light them up with no
+screen change (if P1-03…P1-17 name a path differently, only that catalogue line changes; fantasy
+toggles stay disabled until Phase 3). **Size** selects the built-in of the chosen family
+(`earthlike_quick` / `earthlike_full` × 16k / 32k); an imported code's size is fixed. **Run** is
+disabled until a start configuration and a length are chosen, the estimate is in and under the cap
+(default 4 GiB, any higher value accepted; the machine's free and total memory are shown beside it).
+`SimSession.launch` creates the session on the `deeptime-sim` worker (plan §6.2), which also
+collects keyframe infos and events after every step and before it destroys the session; keyframe
+pixels come through `copyKeyframe` while the session lives and from `keyframes/kf-<n>.dtk`
+(pure-Java `worlddata/KeyframeFiles`) afterwards, decoded on a loader thread into a 64 MiB ring. The
+globe is an orthographic projection drawn on the CPU into a 256² texture. The review page's map is
+the staged world data's `elevation` raster coloured with `ramps.json` (copied into the jar as
+`deeptime/ramps.json`); the spawn marker is the first `spawn/candidates.json` entry above sea
+level; ore-province hints are the dominant deposit type of 30° cells, sites blurred over their
+neighbours (`worlddata/SiteRecords` reads `sites/sites.dtsr`). The pack's biome names and the
+staged §7.2 mapping wait for P1-09. **Accept** is `PlanetGenerators.withStaging` (the current
+overworld's biome source and settings, `WorldDataRef` with the staging id and the preset's C;
+`PlanetShape` then shapes TW from that C at bake). `WorldDataBinder`'s HIGHEST listener runs
+`StagingMover` first, then `FirstStartGenerator.prepare`, then binds; a failed move stops a
+dedicated server (`ServerStop`) and throws on an integrated one. The copy route verifies every
+file's CRC32 against the source and every manifest entry, with plain reads (a memory-mapped tile
+pack would block the rename on Windows). **Create is disabled** for a Deep Time world until staged
+data exists (`PlanetGenerators.createBlock`: no run accepted, natives missing, or the staging
+folder gone); Enter is held back too (`screen/CreateWorldGuard`). Abandoned staging folders
+(untouched for 24 h and held by no open editor) are deleted at client setup and at every server
+start. A running simulation keeps going when the editor is closed; reopening Customize shows it.
 
 Tectonic 3.0.28 ships a client mixin, `WorldCreationUiStateMixin.tectonic$removeUnusablePresets`
 (injected at the return of `WorldCreationUiState.getNonEmptyList`). Decompiled, it only removes
@@ -1850,6 +1921,17 @@ login) carries the format version, circumference, scales, cap latitude and plane
 client uses for the pole storm, an F3 latitude/longitude line and, later, maps. `neoforge.mods.toml`
 declares `minecraft`, `neoforge` and `toroidal_world` as required with `side = "BOTH"`; COE, CDG,
 TerraBlender, Excavated Variants, Sable and Distant Horizons as optional.
+
+*As built in P1-18:* `net/DeepTimeNetwork` registers two required play-to-client channels,
+version "1": `deeptime:world_info` (`WorldInfoPayload`: planet flag, dimension, format version,
+C, m per block h/v, cap and stop latitudes, planet name; sent on login, dimension change and
+respawn) and `deeptime:pole_storm` (`PoleStormPayload`: storm 0…1 and the client's wind). NeoForge
+has no public view of its registrations, so `DeepTimeNetwork.registrations()` reads
+`NetworkRegistry.PAYLOAD_REGISTRATIONS` by reflection (`/deeptime probe network`);
+`NetworkGameTests.worldInfoChannelRequired` feeds it to `NetworkComponentNegotiator`, and the
+planet harness's `--scenario refuse_client` logs in over TCP as a NeoForge client without Deep
+Time (refused, naming exactly the two channels), with every channel (accepted) and as a vanilla
+client (refused). The F3 line: `Deep Time: 76.904° N 90.000° E · <planet> (C 16384, 300 m/block)`.
 
 ### 7.16 Commands for tests and debugging
 
@@ -3004,6 +3086,18 @@ a smoke benchmark and again at the end.
   - `cd neoforge && nix develop -c ./gradlew test --tests '*ShareCodeTest'`, then `junit-summary.py` → `failures=0 errors=0`
   - best effort, not a gate: mic-climate-style `gametest-client.sh` opens the Create World screen with
     the Deep Time preset without a client crash; result recorded
+- **As built (before P1-08, on the placeholder presets).** Class names differ from the list above:
+  the common models are `screen/model/{EditorModel, EditorFields, TimelapseModel, ReviewModel,
+  RunHandle, SessionRunHandle, …}` (share codes stay in P1-13's `preset/ShareCode`, whose
+  `ShareCodeTest` already decodes the Rust-made codes); staging is `server/{Staging, StagingMover}`
+  plus `worldgen/PlanetGenerators` (Accept's generator and the Create guard) instead of
+  `GeologicChunkGenerator.forStaging`. GameTests: `EditorModelGameTests.{acceptBuildsGenerator,
+  stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel}`; JUnit:
+  `EditorModelTest`, `TimelapseModelTest`, `ModelHelpersTest`, `StagingMoverTest`,
+  `TimelineAcrossJniTest`, `ScreenSourcesTest` (dist separation and language keys). The client
+  check is `tools/client/screenshots.sh` (HeadlessMC under Xvfb, `-Ddeeptime.dev.screenshots=true`
+  drives the editor and takes screenshots). Rerun with the real presets after P1-08, and add the
+  review page's biome names with P1-09.
 - **Ben reviews.** The same keyframes in the viewer (the screen itself is unverifiable, §9.8).
 
 #### P1-12 Strata pass with rock tags and `rock_states`
@@ -3405,11 +3499,11 @@ Still open. Each has a recommendation; ask when the task in the last column star
 | # | Question | Recommendation | Needed by |
 |---|---|---|---|
 | Q3 | **Windows DLL signing** against antivirus false positives (Sable #691). | No signing while private. At public release apply to SignPath Foundation (free for OSI-licensed open source, which LGPL-3.0-or-later is; needs a released, maintained project, CI-only signing and 2FA). Azure Artifact Signing is the paid fallback (individual accounts US/Canada only). Until then, the guidance text and `-Ddeeptime.natives.path`. | release |
-| Q4 | **Remove random rock-blob features in Deep Time worlds** (vanilla granite/diorite/andesite/tuff blobs, Terralith ReStoned's restored ones, Create's striated layers), since the simulation owns lithology? | Yes, on by default (`claim_rock_features`), switchable per pack. | P1-15 |
+| Q4 | **Remove random rock-blob features in Deep Time worlds** (vanilla granite/diorite/andesite/tuff blobs, Terralith ReStoned's restored ones, Create's striated layers), since the simulation owns lithology? | **Answered** (decisions file, log 2026-09-28): remove, on by default, switchable per pack. | P1-15 |
 | Q5 | **Build range per world.** The dimension type is data, fixed at −352..639; a per-world range would need a per-world datapack. | **Answered** (decisions file, log 2026-09-28): fixed at −352..639 until 1.0. | P0-05 |
 | Q6 | **When to abandon Toroidal World** for Deep Time's own seam teleport. | Only if one of P0-06 step 6's triggers holds (no way to shape a world created from Deep Time's preset; Sable crossing fails on TW ≥ 0.19.3; the MIC pack will not boot with TW and configuration cannot fix it), and only after asking. | P0-06 |
 | Q8 | **Metamorphic facies table:** hand-built from textbook facies boundaries, or generated offline with MAGEMin (GPL-3.0) or Perple_X (no formal licence), whose output-data status is unclear. | Hand-built, with each boundary cited. | P2-02 |
-| Q10 | **Excavated Variants in MIC.** It is not in the pack (and needs Dynamic Asset Generator); without it, ore in non-stone hosts falls back to stone/deepslate ores. | Decide after P1-15's side-by-side renders with and without EV. | P1-15 |
+| Q10 | **Excavated Variants in MIC.** It is not in the pack (and needs Dynamic Asset Generator); without it, ore in non-stone hosts falls back to stone/deepslate ores. | **Process decided** (decisions file, log 2026-09-28): decide after side-by-side BlueMap renders with and without EV in MIC. | P1-15 |
 | Q11 | **Pinning Toroidal World in MIC.** TW is pre-1.0 with no world-compatibility promise between versions, and mixes into mods MIC updates (C2ME, DH, Sable, Create). | Pin TW's Modrinth version id in the pack, record the C2ME/DH/Sable versions it was built against, and upgrade TW only after a Deep Time smoke passes. | P0-06 |
 | Q13 | **"Why here?" in v1.** The decisions file puts the timelapse only on the Create World screen, and prospecting is planned separately. | **Answered** (decisions file, log 2026-09-28): site API + `/deeptime why <site>` + the HTML viewer; an in-game screen waits for the prospecting plan. | P1-14 |
 | Q14 | **Paint-and-pin constraints** have no phase in the decisions file. | **Answered** (decisions file, log 2026-09-28): after the fantasy features ("later", §10.6). | — |

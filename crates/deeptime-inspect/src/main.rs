@@ -309,8 +309,28 @@ fn run(cli: Cli) -> Result<()> {
             )?;
         }
         Cmd::Ore { common, area } => {
-            let v = render::ore(&common.world, area, &out_of(&common))?;
-            print_json(&serde_json::json!({"images": v["images"], "materials": v["materials"]}))?;
+            // Site footprints from the world's own world data, when it has sites (P1-15).
+            let sites: Vec<render::SiteBox> =
+                match deeptime_format::sites::read_sites(&common.world.join("deeptime")) {
+                    Ok(Some((sites, _))) => sites
+                        .iter()
+                        .map(|s| render::SiteBox {
+                            id: s.id,
+                            deposit_type: s.deposit_type.clone(),
+                            x0: s.aabb[0][0],
+                            z0: s.aabb[0][2],
+                            x1: s.aabb[1][0],
+                            z1: s.aabb[1][2],
+                        })
+                        .collect(),
+                    _ => Vec::new(),
+                };
+            let v = render::ore_with_sites(&common.world, area, &sites, &out_of(&common))?;
+            print_json(
+                &serde_json::json!({"images": v["images"], "materials": v["materials"],
+                "sites": v["sites"], "ore_columns_in_site_footprints": v["ore_columns_in_site_footprints"],
+                "ore_columns_outside_sites": v["ore_columns_outside_sites"]}),
+            )?;
         }
         Cmd::Section {
             common,

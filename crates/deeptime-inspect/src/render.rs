@@ -314,7 +314,36 @@ fn ore_color(material: &str) -> Rgba {
     }
 }
 
+/// A site's footprint for the ore render's overlay (P1-15): id, deposit type, and the inclusive
+/// block AABB x and z bounds.
+#[derive(Clone, Debug)]
+pub struct SiteBox {
+    pub id: u32,
+    pub deposit_type: String,
+    pub x0: i32,
+    pub z0: i32,
+    pub x1: i32,
+    pub z1: i32,
+}
+
+impl SiteBox {
+    fn contains(&self, x: i32, z: i32) -> bool {
+        x >= self.x0 && x <= self.x1 && z >= self.z0 && z <= self.z1
+    }
+}
+
 pub fn ore(world_dir: &Path, area: Option<Area>, out: &Out) -> Result<Value> {
+    ore_with_sites(world_dir, area, &[], out)
+}
+
+/// The ore render with site footprints outlined (white) and counted: how many ore columns lie
+/// inside a site's footprint and how many outside (background scatter and unclaimed ores).
+pub fn ore_with_sites(
+    world_dir: &Path,
+    area: Option<Area>,
+    sites: &[SiteBox],
+    out: &Out,
+) -> Result<Value> {
     let world = World::load_area(world_dir, area)?;
     let list = areas(&world, area)?;
     struct Stat {
@@ -326,6 +355,9 @@ pub fn ore(world_dir: &Path, area: Option<Area>, out: &Out) -> Result<Value> {
     let mut by_block: BTreeMap<String, Stat> = BTreeMap::new();
     let mut by_material: BTreeMap<String, Stat> = BTreeMap::new();
     let mut files = Vec::new();
+    let mut in_sites: BTreeMap<String, usize> = BTreeMap::new();
+    let mut outside: BTreeMap<String, usize> = BTreeMap::new();
+    let mut shown: Vec<Value> = Vec::new();
     for (i, a) in list.iter().enumerate() {
         // Highest ore per column: (y, material).
         let mut best: HashMap<(i32, i32), (i32, String)> = HashMap::new();
@@ -389,8 +421,32 @@ pub fn ore(world_dir: &Path, area: Option<Area>, out: &Out) -> Result<Value> {
                         let depth = world.terrain_top(x, z).map_or(0, |t| (t - y).max(0));
                         let f = 1.0 - (f64::from(depth) / 400.0).min(0.7);
                         img.set(px, pz, shade(ore_color(mat), f));
+                        let bucket = if sites.iter().any(|s| s.contains(x, z)) {
+                            &mut in_sites
+                        } else {
+                            &mut outside
+                        };
+                        *bucket.entry(mat.clone()).or_insert(0) += 1;
                     }
                     None => img.set(px, pz, [0x1a, 0x1a, 0x19, 255]),
+                }
+            }
+        }
+        // Site footprints: a white outline, drawn over the ore.
+        for sb in sites {
+            if sb.x1 < a.x0 || sb.x0 >= a.x1 || sb.z1 < a.z0 || sb.z0 >= a.z1 {
+                continue;
+            }
+            shown.push(json!({"id": sb.id, "type": sb.deposit_type, "x": [sb.x0, sb.x1], "z": [sb.z0, sb.z1]}));
+            for z in sb.z0.max(a.z0)..=sb.z1.min(a.z1 - 1) {
+                for x in sb.x0.max(a.x0)..=sb.x1.min(a.x1 - 1) {
+                    if x == sb.x0 || x == sb.x1 || z == sb.z0 || z == sb.z1 {
+                        img.set(
+                            (x - a.x0) as usize,
+                            (z - a.z0) as usize,
+                            [0xff, 0xff, 0xff, 255],
+                        );
+                    }
                 }
             }
         }
@@ -415,12 +471,15 @@ pub fn ore(world_dir: &Path, area: Option<Area>, out: &Out) -> Result<Value> {
         .collect();
     let v = json!({
         "command": "ore",
-        "definition": "ore blocks (*_ore, ancient_debris, raw_*_block) by material (deepslate_/nether_ prefixes dropped); each pixel is the column's highest ore, darker the deeper below the terrain surface (full dark at 280 blocks); columns with no ore are near-black",
+        "definition": "ore blocks (*_ore, Excavated Variants variants, ancient_debris, raw_*_block) by material (deepslate_/nether_ prefixes dropped); each pixel is the column's highest ore, darker the deeper below the terrain surface (full dark at 280 blocks); columns with no ore are near-black",
         "world": world_summary(&world),
         "images": files,
         "legend": legend,
         "materials": stat(&by_material),
         "blocks": stat(&by_block),
+        "sites": shown,
+        "ore_columns_in_site_footprints": in_sites,
+        "ore_columns_outside_sites": outside,
     });
     out.json(&v, "ore.json")?;
     Ok(v)

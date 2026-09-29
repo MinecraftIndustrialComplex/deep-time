@@ -3,14 +3,18 @@ package com.minecraftindustrialcomplex.deeptime;
 
 import com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLoader;
+import com.minecraftindustrialcomplex.deeptime.net.DeepTimeNetwork;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLogSink;
+import com.minecraftindustrialcomplex.deeptime.ore.OreBlockResolver;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.server.DeepTimeCommands;
 import com.minecraftindustrialcomplex.deeptime.server.SpawnHandler;
 import com.minecraftindustrialcomplex.deeptime.server.WorldDataBinder;
-import com.minecraftindustrialcomplex.deeptime.wrap.PoleCapPrototype;
+import com.minecraftindustrialcomplex.deeptime.wrap.PoleCap;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -19,7 +23,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Deep Time's entry point. The mod registers no blocks or items (decisions file,
- * "Rock blocks"): everything it adds is worldgen, data, screens and hooks.
+ * "Rock blocks"): everything it adds is worldgen, data, screens, hooks and two required network
+ * channels (plan §7.15), which is what makes it required on the client too.
  */
 @Mod(DeepTime.MODID)
 public final class DeepTime {
@@ -37,8 +42,13 @@ public final class DeepTime {
         WorldDataBinder.init();
         SpawnHandler.init();
         RockPalette.init();
+        OreBlockResolver.init();
         GameTestSupport.init(modBus);
-        PoleCapPrototype.init();
+        DeepTimeNetwork.init(modBus);
+        PoleCap.init();
+        // The F3 line and the polar storm; never loaded on a dedicated server.
+        if (FMLEnvironment.dist == Dist.CLIENT)
+            com.minecraftindustrialcomplex.deeptime.client.DeepTimeClient.init(modBus);
         loadNatives();
     }
 

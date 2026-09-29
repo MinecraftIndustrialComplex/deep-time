@@ -330,9 +330,11 @@ def check_generation(steps, server, install, label=""):
     marks = [t for t, l in server.timed if t0 <= t <= t1 and (GEN_START.search(l) or GEN_PROGRESS.search(l) or GEN_DONE.search(l))]
     gaps = [b - a for a, b in zip(marks, marks[1:])]
     progress = [l for t, l in server.timed if t0 <= t <= t1 and GEN_PROGRESS.search(l)]
+    # A generation shorter than the gap needs no progress line (P1-15's synthetic deposit world
+    # generates in about 2 s): the start and done lines are then the only marks.
     steps.check(f"{label}[deeptime] progress lines at most 5 s apart", f"max gap <= {MAX_PROGRESS_GAP_S} s",
                 f"{len(progress)} progress lines, max gap {max(gaps, default=0):.2f} s",
-                bool(progress) and max(gaps, default=0) <= MAX_PROGRESS_GAP_S)
+                (bool(progress) or t1 - t0 <= MAX_PROGRESS_GAP_S) and max(gaps, default=0) <= MAX_PROGRESS_GAP_S)
     steps.check(f"{label}generation finished before Done (", "before", "before" if server.done_at and t1 <= server.done_at else "after",
                 bool(server.done_at) and t1 <= server.done_at)
     steps.record(f"{label}generation time (s)", f"{t1 - t0:.1f}")
@@ -482,6 +484,10 @@ def main():
     ap.add_argument("--restart", action="store_true")
     ap.add_argument("--scenario", choices=sorted(SCENARIOS))
     ap.add_argument("--timeout", type=int, default=1500)
+    ap.add_argument("--rcon", action="append", default=[], metavar="COMMAND",
+                    help="an RCON command run after the chunky tasks (repeatable, e.g. 'deeptime sites near 0 0 9000'); "
+                         "its [deeptime-probe] line (from the server log when RCON cuts it) is recorded in the report "
+                         "and appended to smoke/<profile>/rcon.jsonl (P1-15)")
     a = ap.parse_args()
 
     smoke = os.path.join(REPO, "smoke", a.profile)
@@ -540,8 +546,13 @@ def main():
     try:
         if ok:
             mods_dir = os.path.join(server_dir, "mods")
+            # Deep Time's compat mixins (mixin.compat.<modid>) are skipped, with a log line, when
+            # their mod is absent (DeepTimeMixinPlugin); they are not required then.
+            skipped = {m.group(1).split(".mixin.", 1)[-1] for l in server.lines
+                       if (m := re.search(r"Skipping mixin (\S+): \S+ is not installed", l))}
             for config in REQUIRED_CONFIGS:
                 jar, declared = declared_mixins(mods_dir, config)
+                declared = [d for d in declared if d not in skipped]
                 applied = server.applied(config)
                 short = {k.rsplit(".", 1)[-1] for k in applied} | set(applied)
                 missing = [m for m in declared if m not in short and m.rsplit(".", 1)[-1] not in short]
@@ -620,6 +631,22 @@ def main():
                 lines = server.grep(finished.pattern, 10**9)
                 done = len(lines) > before
                 steps.check(name, "finished", lines[-1][-160:] if done else "timeout", done)
+
+            if a.rcon:
+                open(os.path.join(smoke, "rcon.jsonl"), "w").close()
+            for cmd in a.rcon:
+                before = len(server.lines)
+                out = rcon(cmd, check=False)
+                time.sleep(1)   # RCON may cut a long reply; the server log has the whole probe line
+                line = next((m.group(1) for l in reversed(server.lines[before:]) if (m := PROBE.search(l))), None)
+                if line is None:
+                    m = PROBE.search(out)
+                    line = m.group(1) if m else None
+                steps.check(f"rcon: {cmd}", "[deeptime-probe] JSON" if cmd.startswith("deeptime") else "answers",
+                            (line or out)[:300], line is not None or not cmd.startswith("deeptime"))
+                with open(os.path.join(smoke, "rcon.jsonl"), "a") as f:
+                    f.write(json.dumps({"command": cmd, "probe": json.loads(line) if line else None, "reply": out}) + "\n")
+                print(f"   rcon {cmd}: {(line or out)[:200]}", flush=True)
 
             rcon("save-all flush")
             time.sleep(3)

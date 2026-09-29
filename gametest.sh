@@ -32,6 +32,10 @@ rm -rf run-gametest/world
 # with every rock class in its horizons (P1-12's StrataGameTests.everyClassInTheWorld).
 dev cargo run --release -q -p deeptime-cli -- synth --kind wrap-test --strata every-class --size 1024 --out run-gametest/world/deeptime-test \
     || { echo "FAILED: deeptime synth"; exit 1; }
+# World data for the test_deposits levels (P1-15): the deposit engine's synthetic run (sites, bodies,
+# events) with a terrain baked from the synthetic history's present elevation, C = 4096.
+dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/deposits_world_4k.json --out run-gametest/world/deeptime-deposits \
+    || { echo "FAILED: deeptime run deposits_world_4k"; exit 1; }
 # World data for the test_lake level (P0-13): a basin and a closed channel holding water at y 120.
 dev cargo run --release -q -p deeptime-cli -- synth --kind lake-test --size 1024 --out run-gametest/world/deeptime-lake \
     || { echo "FAILED: deeptime synth lake-test"; exit 1; }

@@ -235,6 +235,7 @@ version = "0.0.1"
 dependencies = [
  "crc32fast",
  "deeptime-format",
+ "flate2",
  "glam",
  "kiddo",
  "postcard",

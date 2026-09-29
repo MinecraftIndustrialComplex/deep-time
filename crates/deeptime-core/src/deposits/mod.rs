@@ -43,6 +43,7 @@ pub mod recorded;
 pub mod rules;
 pub mod sites;
 pub mod sizing;
+pub mod spawn;
 pub mod synthetic;
 pub mod tracts;
 pub mod types;
@@ -139,6 +140,32 @@ pub struct SyntheticPreset {
     pub keyframe_size: [u32; 2],
     #[serde(default)]
     pub deposits: DepositParams,
+    /// P1-15: bake a playable terrain into the run's world data at `finalize_write`: the
+    /// history's present elevation as the ground (the surface the bodies were placed against,
+    /// [`synthetic::HistoryTerrain`]), the synthetic climate and horizons, and spawn candidates
+    /// ranked by the essentials ([`spawn`]). Without it the world data holds sites, bodies and
+    /// events only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terrain: Option<TerrainBake>,
+}
+
+/// The `deposits_synthetic.terrain` section.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TerrainBake {
+    /// The horizon stacks: `placeholder` (default) or `every-class` (`crate::synth::Strata`).
+    #[serde(default = "placeholder_strata")]
+    pub strata: String,
+}
+
+fn placeholder_strata() -> String {
+    crate::synth::Strata::Placeholder.name().to_owned()
+}
+
+impl TerrainBake {
+    pub fn strata(&self) -> crate::synth::Strata {
+        crate::synth::Strata::from_name(&self.strata).expect("checked when the preset was parsed")
+    }
 }
 
 impl SyntheticPreset {
@@ -171,6 +198,16 @@ impl SyntheticPreset {
                 "$.deposits_synthetic.keyframe_size",
                 "must be positive",
             ));
+        }
+        if let Some(t) = &p.terrain {
+            if crate::synth::Strata::from_name(&t.strata).is_none() {
+                return Err(CoreError::preset(
+                    "$.deposits_synthetic.terrain.strata",
+                    format!("{:?} is not placeholder or every-class", t.strata),
+                ));
+            }
+            crate::synth::check_circumference(p.circumference)
+                .map_err(|e| CoreError::preset("$.deposits_synthetic.terrain", e))?;
         }
         Ok(p)
     }
@@ -566,8 +603,9 @@ struct Finish {
     placed: Vec<Vec<Point>>,
 }
 
-fn surface_y(elev_m: f32, sc: &Scales) -> f64 {
-    // Plan §8.8: y = 63 + h / 20, sea floors stay where they are (deposits there are rare).
+/// The block y of the present surface at elevation `elev_m` (plan §8.8: y = 63 + h / 20; sea
+/// floors stay where they are, deposits there are rare).
+pub fn surface_y(elev_m: f32, sc: &Scales) -> f64 {
     (63.0 + f64::from(elev_m) / sc.m_per_block_v)
         .clamp(f64::from(sc.min_y + 8), f64::from(sc.max_y))
 }
@@ -576,7 +614,36 @@ fn favourability_of(acc: &[CellAcc]) -> Vec<f64> {
     acc.iter().map(CellAcc::favourability).collect()
 }
 
+/// Bilinear sample of per-cell `values` on `grid` at block (x, z), with FORMAT.md's convention
+/// ("Grids": point samples, x wraps, z clamps).
+pub fn bilinear_cells(grid: &GridDesc, values: &[f32], x: f64, z: f64) -> f64 {
+    let (w, h) = (i64::from(grid.w), i64::from(grid.h));
+    let r = f64::from(grid.r);
+    let u = (x - grid.origin_block_x as f64) / r;
+    let v = (z - grid.origin_block_z as f64) / r;
+    let (i0, j0) = (u.floor() as i64, v.floor() as i64);
+    let (fu, fv) = (u - i0 as f64, v - j0 as f64);
+    let at = |i: i64, j: i64| {
+        let i = i.rem_euclid(w);
+        let j = j.clamp(0, h - 1);
+        f64::from(values[(j * w + i) as usize])
+    };
+    let a = at(i0, j0) + (at(i0 + 1, j0) - at(i0, j0)) * fu;
+    let b = at(i0, j0 + 1) + (at(i0 + 1, j0 + 1) - at(i0, j0 + 1)) * fu;
+    a + (b - a) * fv
+}
+
 impl Finish {
+    /// The present surface (block y) at block (x, z): the L1 elevation sampled bilinearly, the
+    /// same surface a synthetic deposit world's baked terrain follows
+    /// ([`synthetic::HistoryTerrain`]), so a body's clip and depth match the ground it is in.
+    fn surface_at(&self, x: f64, z: f64) -> f64 {
+        surface_y(
+            bilinear_cells(&self.grid, &self.elev, x, z) as f32,
+            &self.sc,
+        )
+    }
+
     fn radius_blocks(&self, t: &DepositType) -> f64 {
         t.cause_radius_km * 1000.0 / self.sc.m_per_block_h
     }
@@ -1060,7 +1127,7 @@ impl DepositStage {
             buried_m,
         };
         let fate = ledger.apply(t.preservation.erosion_behavior, t.shape().metric());
-        let surf = surface_y(f.elev[cell as usize], &sc);
+        let surf = f.surface_at(x, z);
         let ll = lat_lon_of(c, x, z);
         let scores = acc.map(|a| a.scores.map(rules::dq8)).unwrap_or([1.0; 6]);
         let limiting = acc.map_or("none", |a| COMPONENTS[a.limiting()]);
@@ -1485,7 +1552,7 @@ impl DepositStage {
             return Ok(());
         }
         f.placed[ct].push(Point { x, z, cell, radius });
-        let surf = surface_y(f.elev[cell as usize], &sc);
+        let surf = f.surface_at(x, z);
         let half_m = geometry::half_height_m(child, tonnage_t);
         // Follow the drainage direction.
         let next = receivers.map_or(cell, |rec| rec[cell as usize]);
@@ -1641,9 +1708,7 @@ impl DepositStage {
                     continue;
                 }
                 if ess.exposed {
-                    let cell =
-                        cluster::cell_of(&f.grid, f64::from(s.center[0]), f64::from(s.center[2]));
-                    let surf = surface_y(f.elev[cell as usize], &sc);
+                    let surf = f.surface_at(f64::from(s.center[0]), f64::from(s.center[2]));
                     if f64::from(s.aabb[1][1]) < surf - EXPOSED_BLOCKS {
                         continue;
                     }
@@ -1731,7 +1796,7 @@ impl DepositStage {
         let radius = geometry::radius_blocks(t, tonnage_t, &sc);
         f.placed[ti].push(Point { x, z, cell, radius });
         let half_m = geometry::half_height_m(t, tonnage_t);
-        let surf = surface_y(f.elev[cell as usize], &sc);
+        let surf = f.surface_at(x, z);
         let depth = if ess.exposed {
             // Top at the surface: the body's vertical half-height in blocks is scaled by
             // size_mult_v about its centre.
@@ -1992,6 +2057,79 @@ mod tests {
         assert_eq!(resumed.bodies, full.bodies);
         assert_eq!(resumed.events.len(), full.events.len());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// P1-15: a `terrain` preset bakes a playable world whose ground is the surface the bodies
+    /// were placed against, with spawn candidates ranked by the essentials; the content bundle's
+    /// essentials replace the preset's.
+    #[test]
+    fn world_preset_bakes_terrain_under_the_bodies() {
+        use deeptime_format::{Manifest, RasterRead, TilePackReader};
+        const WORLD_4K: &str = include_str!("../../tests/presets/deposits_world_4k.json");
+        let (w, dir) = run(WORLD_4K, "world");
+        let m = Manifest::read(&dir).unwrap();
+        m.verify(&dir).unwrap();
+        assert_eq!(m.notes["synthetic"]["kind"], "deposit-history");
+        let names: Vec<&str> = m.layers.iter().map(|l| l.name.as_str()).collect();
+        for l in [
+            "elevation",
+            "water_level",
+            "climate/temperature",
+            "strata/horizons",
+        ] {
+            assert!(names.contains(&l), "{l} missing from {names:?}");
+        }
+        for f in ["sites/sites.dtsr", "bodies/bodies.dtb", "events/index.json"] {
+            assert!(dir.join(f).is_file(), "{f}");
+        }
+        let elev = TilePackReader::open(&dir.join("rasters/elevation.dtr"))
+            .unwrap()
+            .load()
+            .unwrap();
+        // A truncated body is clipped at the ground it sits in: its clip is the history's surface
+        // at the body's centre, and the baked terrain (L3, quantised to 1/16) follows it closely.
+        let mut clipped = 0;
+        for b in w.bodies.iter().filter(|b| b.role == "ore") {
+            if b.clip_top_y == deeptime_format::bodies::NO_CLIP {
+                continue;
+            }
+            clipped += 1;
+            let ground = elev.bilinear(b.center[0], b.center[2]);
+            assert!(
+                (f64::from(b.clip_top_y) - ground).abs() <= 3.0,
+                "body {} clip {} vs ground {ground:.2}",
+                b.id,
+                b.clip_top_y
+            );
+        }
+        assert!(clipped > 0, "no truncated ore body in the 4k world");
+        let spawn: Value = serde_json::from_str(
+            &std::fs::read_to_string(dir.join("spawn/candidates.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(spawn["ranked_by"].as_array().unwrap().len(), 3);
+        let first = &spawn["candidates"][0];
+        assert_eq!(first["unmet"], 0, "{first}");
+        let _ = std::fs::remove_dir_all(&dir);
+
+        // The content bundle's essentials win over the preset's.
+        let p = crate::session::Preset::from_json(WORLD_4K)
+            .unwrap()
+            .with_content(r#"{"essentials": [{"material": "c:gold", "min_sites_per_region": 1, "region_blocks": 4096}]}"#)
+            .unwrap();
+        match p.bake().unwrap() {
+            crate::preset::Bake::DepositHistory { essentials, .. } => {
+                assert_eq!(essentials.len(), 1);
+                assert_eq!(essentials[0].material, "c:gold");
+            }
+            other => panic!("{other:?}"),
+        }
+        assert!(
+            crate::session::Preset::from_json(WORLD_4K)
+                .unwrap()
+                .with_content(r#"{"essentials": [{"material": "c:gold"}]}"#)
+                .is_err()
+        );
     }
 
     #[test]

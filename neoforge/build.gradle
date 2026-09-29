@@ -55,8 +55,9 @@ def extractToroidalWorld = tasks.register('extractToroidalWorld', Copy) {
 }
 
 // ---------------------------------------------------------------------------
-// Sable (PolyForm Shield): compileOnly, for the planet-server tests' helper
-// compat/sable/SableTestOps only. Never on a run's classpath (the planet server loads Sable
+// Sable (PolyForm Shield): compileOnly, for compat/sable/ only (SableTestOps, the planet-server
+// tests' helper; SablePoleCap, the pole cap's ship wind, called only when Sable is loaded). Never
+// on a run's classpath (the planet server loads Sable
 // from the standalone set's mods/ folder) and never in the jar. Its companion jar (math
 // types used in the API's signatures) is nested, so it is extracted for javac.
 // ---------------------------------------------------------------------------
@@ -85,6 +86,10 @@ dependencies {
     compileOnly files(twInnerDir.map { it.file(tw_inner_jar) }).builtBy(extractToroidalWorld)
     compileOnly("maven.modrinth:sable:${sable_version}") { transitive = false }
     compileOnly files(sableCompanionDir.map { it.file(sable_companion_jar) }).builtBy(extractSableCompanion)
+    // Excavated Variants 4.3.1 (LGPL-3.0-or-later; P1-15): compileOnly for compat/ev/EvBridgeImpl, the
+    // only class naming its API, loaded when EV is installed. -PwithEv runs load it from the ev
+    // server set (tools/smoke/profiles/ev.txt). The Modrinth slug is excavated_variants.
+    compileOnly("maven.modrinth:excavated_variants:${ev_version}") { transitive = false }
 
     testImplementation platform("org.junit:junit-bom:${junit_version}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -153,12 +158,13 @@ neoForge {
             gameDirectory = file('../run-gametest')
         }
         // ./gametest-planet.sh -- a dev dedicated server with a real Deep Time + TW
-        // overworld; namespace `deeptime_planet` (plan §9.4).
+        // overworld; namespace `deeptime_planet` (plan §9.4), plus `deeptime` so the harness can
+        // also run a GameTest-server test there by name (P1-18: worldinfochannelrequired).
         planetServer {
             server()
             programArgument '--nogui'
             systemProperty 'neoforge.enableGameTest', 'true'
-            systemProperty 'neoforge.enabledGameTestNamespaces', 'deeptime_planet'
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'deeptime_planet,deeptime'
             systemProperty 'deeptime.gametest', 'true'
             // Set by tools/planet/run_planet.py (--test-terrain); blank means world data.
             systemProperty 'deeptime.testTerrain', System.getenv('DEEPTIME_TEST_TERRAIN') ?: ''
@@ -507,6 +513,12 @@ tasks.named('processResources', ProcessResources) {
         include '*.json'
         into 'deeptime/presets'
     }
+    // The colour ramps the core's keyframes, the viewer and the game share (plan §3.3, P1-11):
+    // one file, read by screen/model/Ramps as deeptime/ramps.json.
+    from(new File(repoRoot, 'crates/deeptime-viewer/assets')) {
+        include 'ramps.json'
+        into 'deeptime'
+    }
     if (project.hasProperty('release')) {
         dependsOn checkReleaseNatives
         from(nativesDistDir) { into 'natives/deeptime' }
@@ -550,9 +562,35 @@ def testWorldTasks = [wrap1024: 'wrap-test', lake1024: 'lake-test'].collect { na
                 '--dump-samples', samples.get().asFile.absolutePath
     }
 }
+// P1-15: a synthetic deposit world (sites, bodies, events and a terrain) and Rust's own reading of
+// it (`deeptime dump-deposits`), for DepositDataParityTest.
+def depositWorldRun = tasks.register('testWorldDeposits4kRun', Exec) {
+    description = 'Writes the synthetic deposit world fixture (C = 4096) with deeptime run.'
+    inputs.files(fileTree(new File(repoRoot, 'crates')) { exclude '**/target/**' })
+    inputs.files(new File(repoRoot, 'Cargo.toml'), new File(repoRoot, 'Cargo.lock'))
+    def out = testWorldsDir.map { it.dir('deposits4k') }
+    outputs.dir out
+    workingDir repoRoot
+    doFirst { delete out }
+    commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
+            'run', '--preset', new File(repoRoot, 'crates/deeptime-core/tests/presets/deposits_world_4k.json').absolutePath,
+            '--out', out.get().asFile.absolutePath
+}
+def depositWorldDump = tasks.register('testWorldDeposits4k', Exec) {
+    description = "Dumps Rust's reading of the deposit world fixture (sites, index, bodies, events)."
+    dependsOn depositWorldRun
+    def world = testWorldsDir.map { it.dir('deposits4k') }
+    def dump = testWorldsDir.map { it.file('deposits4k-samples.json') }
+    inputs.dir world
+    outputs.file dump
+    workingDir repoRoot
+    commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
+            'dump-deposits', '--world', world.get().asFile.absolutePath, '--out', dump.get().asFile.absolutePath
+}
 def testWorlds = tasks.register('testWorlds') {
     description = 'Writes every synthetic world-data fixture the JUnit tests read.'
     dependsOn testWorldTasks
+    dependsOn depositWorldDump
 }
 tasks.named('test', Test) {
     dependsOn testWorlds

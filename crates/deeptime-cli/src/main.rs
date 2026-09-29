@@ -2,6 +2,7 @@
 //! `deeptime`: the standalone driver for every simulation stage (plan §9.3).
 
 mod alloc;
+mod dump;
 mod run;
 mod synth;
 
@@ -188,6 +189,16 @@ enum Command {
         /// Tile encoding.
         #[arg(long, value_enum, default_value_t = CodecArg::Lz4)]
         codec: CodecArg,
+    },
+    /// Dump a world's sites, index lookups, body evaluations and cause chains as JSON (the Java
+    /// parity-test fixture, P1-15).
+    DumpDeposits {
+        /// World-data folder holding sites/, bodies/ and events/.
+        #[arg(long)]
+        world: PathBuf,
+        /// JSON file to write.
+        #[arg(long)]
+        out: PathBuf,
     },
 }
 
@@ -377,6 +388,19 @@ fn main() -> ExitCode {
                 &out,
             ),
         ),
+        Some(Command::DumpDeposits { world, out }) => match dump::run(&world, &out) {
+            Ok((sites, bodies, inside)) => {
+                println!(
+                    "deeptime dump-deposits: {sites} sites, {bodies} bodies ({inside} samples inside) -> {}",
+                    out.display()
+                );
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("deeptime dump-deposits: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some(Command::Synth {
             kind,
             strata,
@@ -595,6 +619,36 @@ mod tests {
         let report = std::fs::read_to_string(dir.join("viewer/report.js")).unwrap();
         assert!(report.contains("\"deposits\"") && report.contains("\"bodies\""));
         assert!(dir.join("viewer/keyframes").is_dir());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// P1-15: `run` of the deposit world preset, then `dump-deposits` over it.
+    #[test]
+    fn deposit_world_dumps() {
+        let dir = tmp("dump");
+        let preset = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../deeptime-core/tests/presets/deposits_world_4k.json"
+        )
+        .to_owned();
+        super::run::run(&super::run::RunOptions {
+            preset,
+            start: None,
+            length_myr: None,
+            content: None,
+            out: dir.join("w"),
+            viewer: None,
+            checkpoints: false,
+            common: quiet(),
+        })
+        .unwrap();
+        let (sites, bodies, inside) =
+            super::dump::run(&dir.join("w"), &dir.join("dump.json")).unwrap();
+        assert!(sites > 0 && bodies >= sites / 2 && inside > 0);
+        let v: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(dir.join("dump.json")).unwrap()).unwrap();
+        assert_eq!(v["circumference"], 4096);
+        assert_eq!(v["sites"].as_array().unwrap().len(), sites);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

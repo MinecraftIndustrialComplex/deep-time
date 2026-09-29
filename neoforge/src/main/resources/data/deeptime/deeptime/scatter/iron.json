@@ -1,0 +1,13 @@
+{
+  "material": "c:iron",
+  "clusters_per_chunk": 2.0,
+  "size": 6,
+  "y_window": [
+    0.05,
+    0.8
+  ],
+  "host_bias": {
+    "*": 1.0
+  },
+  "_comment": "Small iron pods anywhere. Background scatter (plan §7.8): values are initial, judged against the deposit renders; packs override or add files under data/<ns>/deeptime/scatter/."
+}

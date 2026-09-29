@@ -7,8 +7,11 @@ import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.compat.sable.SableTestOps;
 import com.minecraftindustrialcomplex.deeptime.gametest.DeepTimeTestReporter;
 import com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport;
+import com.minecraftindustrialcomplex.deeptime.net.DeepTimeNetwork;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.wrap.PoleCap;
+import com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -43,7 +46,20 @@ public final class DeepTimeCommands {
                                 .then(Commands.argument("z", IntegerArgumentType.integer())
                                         .executes(DeepTimeCommands::probeColumn))))
                 .then(Commands.literal("tw").executes(DeepTimeCommands::probeTw))
-                .then(Commands.literal("palette").executes(c -> probePalette(c.getSource())));
+                .then(Commands.literal("pole")
+                        .executes(c -> probePole(c.getSource(), c.getSource().getPosition().z))
+                        .then(Commands.argument("z", IntegerArgumentType.integer())
+                                .executes(c -> probePole(c.getSource(), IntegerArgumentType.getInteger(c, "z")))))
+                .then(Commands.literal("network").executes(c -> probeNetwork(c.getSource())))
+                .then(Commands.literal("palette").executes(c -> probePalette(c.getSource())))
+                .then(Commands.literal("site")
+                        .then(Commands.argument("x", IntegerArgumentType.integer())
+                                .then(Commands.argument("y", IntegerArgumentType.integer())
+                                        .then(Commands.argument("z", IntegerArgumentType.integer())
+                                                .executes(c -> SiteCommands.probeSite(c.getSource(),
+                                                        IntegerArgumentType.getInteger(c, "x"), IntegerArgumentType.getInteger(c, "y"),
+                                                        IntegerArgumentType.getInteger(c, "z")))))))
+                .then(Commands.literal("claims").executes(c -> SiteCommands.probeClaims(c.getSource())));
         var gametest = Commands.literal("gametest").requires(s -> GameTestSupport.enabled());
         // Sable is optional: its probe and test commands exist only when it is loaded, and every
         // Sable call goes through SableTestOps (loaded on first use).
@@ -54,8 +70,21 @@ public final class DeepTimeCommands {
                             .then(Commands.argument("z", IntegerArgumentType.integer())
                                     .executes(DeepTimeCommands::sableStraddle))));
         }
+        var sites = Commands.literal("sites")
+                .then(Commands.literal("near")
+                        .then(Commands.argument("x", IntegerArgumentType.integer())
+                                .then(Commands.argument("z", IntegerArgumentType.integer())
+                                        .then(Commands.argument("radius", IntegerArgumentType.integer(1, 1 << 20))
+                                                .executes(c -> SiteCommands.sitesNear(c.getSource(),
+                                                        IntegerArgumentType.getInteger(c, "x"), IntegerArgumentType.getInteger(c, "z"),
+                                                        IntegerArgumentType.getInteger(c, "radius")))))));
+        var why = Commands.literal("why")
+                .then(Commands.argument("siteId", IntegerArgumentType.integer(0))
+                        .executes(c -> SiteCommands.why(c.getSource(), IntegerArgumentType.getInteger(c, "siteId"))));
         dispatcher.register(Commands.literal("deeptime").requires(s -> s.hasPermission(2))
                 .then(probe)
+                .then(sites)
+                .then(why)
                 .then(gametest
                         .then(Commands.literal("reset").executes(c -> {
                             DeepTimeTestReporter.INSTANCE.reset();
@@ -218,7 +247,57 @@ public final class DeepTimeCommands {
         return emit(ctx.getSource(), o);
     }
 
-    static int emit(CommandSourceStack source, JsonObject o) {
+    /**
+     * The pole cap (plan §7.11) of the source's level at block z (default: the source's own z):
+     * the lines, the latitude and what the cap does there.
+     */
+    private static int probePole(CommandSourceStack source, double z) {
+        ServerLevel level = source.getLevel();
+        JsonObject o = new JsonObject();
+        o.addProperty("probe", "pole");
+        o.addProperty("level", level.dimension().location().toString());
+        PoleCapCurve cap = PoleCap.capOf(level);
+        o.addProperty("planet", cap != null);
+        if (cap != null) {
+            o.addProperty("circumference", cap.circumference());
+            o.addProperty("capDeg", cap.capDeg());
+            o.addProperty("stopDeg", cap.stopDeg());
+            o.addProperty("capZ", cap.capZ());
+            o.addProperty("stopZ", cap.stopZ());
+            o.addProperty("z", z);
+            o.addProperty("latitude", cap.latitudeDeg(z));
+            o.addProperty("zone", cap.zone(z).name());
+            o.addProperty("depth", cap.depth(z));
+            o.addProperty("storm", cap.storm(z));
+            o.addProperty("push", cap.push(z));
+            o.addProperty("wind", cap.wind(z));
+        }
+        return emit(source, o);
+    }
+
+    /**
+     * Every payload channel NeoForge has registered (plan §7.15): protocol, id, version, flow and
+     * whether it is optional. gametest-planet.sh's {@code refuse_client} scenario builds its fake
+     * clients' channel lists from this.
+     */
+    private static int probeNetwork(CommandSourceStack source) {
+        JsonObject o = new JsonObject();
+        o.addProperty("probe", "network");
+        JsonArray channels = new JsonArray();
+        for (DeepTimeNetwork.Channel c : DeepTimeNetwork.registrations()) {
+            JsonObject j = new JsonObject();
+            j.addProperty("protocol", c.protocol().name());
+            j.addProperty("id", c.id().toString());
+            j.addProperty("version", c.version());
+            j.addProperty("flow", c.flow().map(Enum::name).orElse(null));
+            j.addProperty("optional", c.optional());
+            channels.add(j);
+        }
+        o.add("channels", channels);
+        return emit(source, o);
+    }
+
+    public static int emit(CommandSourceStack source, JsonObject o) {
         String line = PROBE_PREFIX + o;
         DeepTime.LOGGER.info(line);
         source.sendSuccess(() -> Component.literal(line), false);

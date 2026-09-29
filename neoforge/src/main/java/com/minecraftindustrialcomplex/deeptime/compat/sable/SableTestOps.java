@@ -25,10 +25,11 @@ import java.util.UUID;
  *
  * <p>Sable (2.0.5, PolyForm Shield) is compileOnly and absent from the GameTest server, so its
  * types must never appear in a GameTest holder's method signatures: NeoForge's registration
- * loads every declared method of an enabled holder (cold-read review 2, gap 2). This class is
- * the only place that names Sable types, and its public methods take and return vanilla and JDK
- * types only. Callers check {@code ModList.get().isLoaded("sable")} before the first call, which
- * is when this class (and Sable's) would load.
+ * loads every declared method of an enabled holder (cold-read review 2, gap 2). This class and
+ * {@link SablePoleCap} (P1-18, the pole cap's wind) are the only places that name Sable types,
+ * and their public methods take and return vanilla, JDK and Deep Time types only. Callers check
+ * {@code ModList.get().isLoaded("sable")} before the first call, which is when this class (and
+ * Sable's) would load.
  */
 public final class SableTestOps {
 
@@ -84,6 +85,12 @@ public final class SableTestOps {
             return null;
         Vector3dc p = s.logicalPose().position();
         return new Vec3(p.x(), p.y(), p.z());
+    }
+
+    /** The sub-level's global bounds (world space), or null when it is gone (P1-18's pole tests). */
+    public static net.minecraft.world.phys.AABB bounds(ServerLevel level, UUID id) {
+        ServerSubLevel s = find(level, id);
+        return s == null ? null : s.boundingBox().toMojang();
     }
 
     /** Non-air blocks in the sub-level's plot, or -1 when it is gone. */
