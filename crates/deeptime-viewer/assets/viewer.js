@@ -287,7 +287,7 @@
     for (const s of st.sections || []) {
       h += `<figure class="xsec"><img src="${esc(s.file)}" width="${s.w}" height="${s.h}" alt="${esc(s.title)}">` +
         `<figcaption>${esc(s.title)} — lon ${s.lon.toFixed(1)}°, ${deg(s.lat0, 'N', 'S')} (left) to ${deg(s.lat1, 'N', 'S')} (right), ` +
-        `${s.km.toFixed(0)} km; y ${s.y0}…${s.y1}; vertical exaggeration ×${s.vertical_exaggeration.toFixed(1)} (the world itself is ×15)` +
+        `${s.km.toFixed(0)} km; y ${s.y0}…${s.y1}; vertical exaggeration of the picture ×${s.vertical_exaggeration.toFixed(0)} in real metres (the Minecraft world itself is ×15)` +
         `${s.per_cell ? '; each strata cell drawn as its own stack' : '; columns as the game reads them'}</figcaption></figure>`;
     }
     if (st.legend && st.legend.length) {
