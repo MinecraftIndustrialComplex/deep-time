@@ -39,6 +39,7 @@ pub mod ledger;
 pub mod petroleum;
 pub mod playability;
 pub mod random;
+pub mod recorded;
 pub mod rules;
 pub mod sites;
 pub mod sizing;

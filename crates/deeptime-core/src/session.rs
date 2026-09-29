@@ -12,6 +12,7 @@
 //! writes `preset.json`, `events/`, `sites/`, `keyframes/index.json` and `manifest.json` last
 //! (tmp, fsync, rename; plan §6.3), so a folder with a manifest is complete.
 
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, AtomicU8, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -196,6 +197,8 @@ pub struct StageTiming {
 
 struct Stepper {
     stages: Vec<Box<dyn Stage>>,
+    /// [`stage_groups`] of `stages`; `current` is always a group's lead.
+    groups: Vec<Range<usize>>,
     current: usize,
     world: WorldState,
     /// Keyframe times are `kf_origin + k · every_years`.
@@ -203,6 +206,22 @@ struct Stepper {
     next_kf: f64,
     last_kf_t: Option<f64>,
     timings: Vec<StageTiming>,
+}
+
+impl Stepper {
+    /// The group whose lead is `current` (empty past the last stage).
+    fn group(&self) -> Range<usize> {
+        self.groups
+            .iter()
+            .find(|g| g.start == self.current)
+            .cloned()
+            .unwrap_or(self.current..self.current)
+    }
+}
+
+/// Saved states of a group's members (a checkpoint taken inside a group of more than one stage).
+fn encode_group_state(states: &[Vec<u8>]) -> Result<Vec<u8>, CoreError> {
+    crate::stage::to_state(&states.to_vec())
 }
 
 const NOT_FINISHED: u64 = u64::MAX;
@@ -317,10 +336,36 @@ impl Session {
             options.mem_cap
         };
         let mut stages = preset.stages();
-        if !stage_state.is_empty()
-            && let Some(stage) = stages.get_mut(next_stage)
-        {
-            stage.load_state(stage_state)?;
+        let groups = stage_groups(&stages)?;
+        if next_stage < stages.len() && !groups.iter().any(|g| g.start == next_stage) {
+            return Err(CoreError::InvalidState(format!(
+                "the checkpoint stops inside a group of coupled stages (at {})",
+                stages[next_stage].name()
+            )));
+        }
+        let group = groups
+            .iter()
+            .find(|g| g.start == next_stage)
+            .cloned()
+            .unwrap_or(next_stage..next_stage);
+        if !stage_state.is_empty() {
+            if group.len() > 1 {
+                let states: Vec<Vec<u8>> = crate::stage::from_state(stage_state)?;
+                if states.len() != group.len() {
+                    return Err(CoreError::InvalidState(format!(
+                        "the checkpoint holds {} states for a group of {} stages",
+                        states.len(),
+                        group.len()
+                    )));
+                }
+                for (k, st) in group.clone().zip(states) {
+                    if !st.is_empty() {
+                        stages[k].load_state(&st)?;
+                    }
+                }
+            } else if let Some(stage) = stages.get_mut(next_stage) {
+                stage.load_state(stage_state)?;
+            }
         }
         let stage_names: Vec<String> = stages.iter().map(|s| s.name().to_owned()).collect();
         let timings = stage_names
@@ -371,6 +416,7 @@ impl Session {
             events_total: AtomicU64::new(events_total),
             stepper: Mutex::new(Stepper {
                 stages,
+                groups,
                 current: next_stage,
                 world,
                 kf_origin,
@@ -479,8 +525,9 @@ impl Session {
             if index >= s.stages.len() {
                 return Ok(self.complete());
             }
-            if s.stages[index].is_done() {
-                let name = s.stages[index].name().to_owned();
+            let group = s.group();
+            if s.stages[group.clone()].iter().all(|st| st.is_done()) {
+                let name = group_label(&s.stages, &group);
                 self.finish_stage(s)
                     .map_err(|e| self.fail(&format!("finishing stage {name}"), e))?;
                 self.stage_permille.store(0, Ordering::Release);
@@ -490,33 +537,45 @@ impl Session {
                 self.stage_index.store(s.current as u32, Ordering::Release);
                 return Ok(AdvanceStatus::StageDone);
             }
-            let stage = &mut s.stages[index];
-            if stage.steps_done() == 0 {
-                self.log
-                    .push(Level::Info, format!("stage {} started", stage.name()));
+            // One step of the lead, then one of every follower (a group of one: just the stage).
+            let mut last = index;
+            for k in group.clone() {
+                let stage = &mut s.stages[k];
+                if stage.is_done() {
+                    continue;
+                }
+                if stage.steps_done() == 0 {
+                    self.log
+                        .push(Level::Info, format!("stage {} started", stage.name()));
+                }
+                let ctx = StageContext {
+                    pool: &self.pool,
+                    log: &self.log,
+                    until,
+                    gauge: self.gauge.as_ref(),
+                    mem_cap: self.mem_cap,
+                    state: &self.state,
+                };
+                let stepped = Instant::now();
+                if let Err(e) = stage.step(&mut s.world, &ctx) {
+                    let what = format!("stage {}", stage.name());
+                    return Err(self.fail(&what, e));
+                }
+                s.timings[k].steps = stage.steps_done();
+                s.timings[k].millis += stepped.elapsed().as_secs_f64() * 1000.0;
+                last = k;
             }
-            let ctx = StageContext {
-                pool: &self.pool,
-                log: &self.log,
-                until,
-                gauge: self.gauge.as_ref(),
-                mem_cap: self.mem_cap,
-                state: &self.state,
-            };
-            let stepped = Instant::now();
-            if let Err(e) = stage.step(&mut s.world, &ctx) {
-                let what = format!("stage {}", stage.name());
-                return Err(self.fail(&what, e));
-            }
-            s.timings[index].steps = stage.steps_done();
+            let lead = &s.stages[index];
             self.stage_permille.store(
-                permille(stage.steps_done(), stage.total_steps()),
+                permille(lead.steps_done(), lead.total_steps()),
                 Ordering::Release,
             );
+            let stepped = Instant::now();
             self.after_step(s)
                 .map_err(|e| self.fail("keyframe or event publishing", e))?;
-            // A stage's time includes publishing its events and drawing its keyframes.
-            s.timings[index].millis += stepped.elapsed().as_secs_f64() * 1000.0;
+            // A stage's time includes publishing its events and drawing its keyframes (a group's
+            // go to its last member that stepped).
+            s.timings[last].millis += stepped.elapsed().as_secs_f64() * 1000.0;
             if start.elapsed() >= budget {
                 return Ok(AdvanceStatus::Running);
             }
@@ -529,9 +588,10 @@ impl Session {
         if let Some(every) = self.policy.every_years
             && s.world.t_years >= s.next_kf
         {
-            let layers = s.stages[s.current].keyframe_layers().to_vec();
+            let group = s.group();
+            let layers = group_layers(&s.stages, &group);
             if !layers.is_empty() {
-                let name = s.stages[s.current].name().to_owned();
+                let name = group_label(&s.stages, &group);
                 self.take_keyframe(s, &name, &layers)?;
                 let k = ((s.world.t_years - s.kf_origin) / every).floor() + 1.0;
                 s.next_kf = s.kf_origin + k * every;
@@ -578,18 +638,20 @@ impl Session {
     /// The current stage just finished: a closing keyframe, a checkpoint if asked for, next stage.
     fn finish_stage(&self, s: &mut Stepper) -> Result<(), CoreError> {
         let index = s.current;
-        let name = s.stages[index].name().to_owned();
+        let group = s.group();
+        let name = group_label(&s.stages, &group);
         self.log.push(Level::Info, format!("stage {name} finished"));
         let started = Instant::now();
         self.publish(&s.world);
         if self.policy.every_years.is_some() {
-            let layers = s.stages[index].keyframe_layers().to_vec();
+            let layers = group_layers(&s.stages, &group);
             if !layers.is_empty() {
                 self.take_keyframe(s, &name, &layers)?;
             }
         }
-        s.timings[index].millis += started.elapsed().as_secs_f64() * 1000.0;
-        s.current += 1;
+        let last = group.end.max(index + 1) - 1;
+        s.timings[last].millis += started.elapsed().as_secs_f64() * 1000.0;
+        s.current = group.end.max(index + 1);
         if let Some(dir) = &self.checkpoint_dir {
             let path = dir.join(format!("{index}-{name}.dtcp"));
             self.checkpoint_of(s)?.write(&path)?;
@@ -705,9 +767,26 @@ impl Session {
     fn checkpoint_of(&self, s: &Stepper) -> Result<Checkpoint, CoreError> {
         // A stage that has stepped keeps its state, even after its last step (the session moves
         // on to the next stage only on the following `advance`): a resume must not rerun it.
-        let stage_state = match s.stages.get(s.current) {
-            Some(stage) if stage.steps_done() > 0 => stage.save_state()?,
-            _ => Vec::new(),
+        let group = s.group();
+        let stage_state = if group.len() > 1 {
+            let mut states = Vec::with_capacity(group.len());
+            for st in &s.stages[group.clone()] {
+                states.push(if st.steps_done() > 0 {
+                    st.save_state()?
+                } else {
+                    Vec::new()
+                });
+            }
+            if states.iter().all(Vec::is_empty) {
+                Vec::new()
+            } else {
+                encode_group_state(&states)?
+            }
+        } else {
+            match s.stages.get(s.current) {
+                Some(stage) if stage.steps_done() > 0 => stage.save_state()?,
+                _ => Vec::new(),
+            }
         };
         Ok(Checkpoint {
             preset_json: self.preset_json.clone(),
@@ -872,6 +951,62 @@ impl Session {
         String::from_utf8(bytes)
             .map_err(|e| CoreError::InvalidState(format!("manifest is not UTF-8: {e}")))
     }
+}
+
+/// The pipeline's groups of coupled stages (`Stage::coupled_to`), in order: each range is a lead
+/// and the followers interleaved with it; an uncoupled stage is a group of one. Fails when a
+/// coupled stage does not follow a stage of the group it names.
+pub fn stage_groups(stages: &[Box<dyn Stage>]) -> Result<Vec<Range<usize>>, CoreError> {
+    let mut groups = Vec::new();
+    let mut i = 0;
+    while i < stages.len() {
+        if let Some(to) = stages[i].coupled_to() {
+            return Err(CoreError::InvalidState(format!(
+                "stage {} is coupled to {to}, which does not come just before it",
+                stages[i].name()
+            )));
+        }
+        let mut j = i + 1;
+        while j < stages.len()
+            && stages[j]
+                .coupled_to()
+                .is_some_and(|to| stages[i..j].iter().any(|s| s.name() == to))
+        {
+            j += 1;
+        }
+        groups.push(i..j);
+        i = j;
+    }
+    Ok(groups)
+}
+
+/// The group (range of stage indices) holding the stage called `name`.
+pub fn group_of(stages: &[Box<dyn Stage>], name: &str) -> Option<Range<usize>> {
+    let groups = stage_groups(stages).ok()?;
+    let k = stages.iter().position(|s| s.name() == name)?;
+    groups.into_iter().find(|g| g.contains(&k))
+}
+
+/// A group's label: its members' names joined with `+` (`plates+surface`).
+fn group_label(stages: &[Box<dyn Stage>], g: &Range<usize>) -> String {
+    stages[g.clone()]
+        .iter()
+        .map(|s| s.name())
+        .collect::<Vec<_>>()
+        .join("+")
+}
+
+/// The union of a group's keyframe layers, in member order.
+fn group_layers(stages: &[Box<dyn Stage>], g: &Range<usize>) -> Vec<&'static str> {
+    let mut out: Vec<&'static str> = Vec::new();
+    for s in &stages[g.clone()] {
+        for &l in s.keyframe_layers() {
+            if !out.contains(&l) {
+                out.push(l);
+            }
+        }
+    }
+    out
 }
 
 fn permille(done: u64, total: u64) -> u32 {

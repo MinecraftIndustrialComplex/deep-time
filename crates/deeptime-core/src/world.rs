@@ -62,6 +62,11 @@ pub struct WorldState {
     pub notes: BTreeMap<String, String>,
     /// The plate model's L0 crust (plan §8.1), once the plates stage has started.
     pub plates: Option<crate::plates::PlateState>,
+    /// The deep-time surface on L1 (plan §8.2: offset, regolith, strata log), once the surface
+    /// stage has started (P1-04).
+    pub surface: Option<crate::surface::SurfaceState>,
+    /// The deposit engine's field history recorded by the history stages (P1-04 on).
+    pub history: Option<crate::deposits::recorded::RecordedHistory>,
     next_event_seq: u64,
     next_site_id: SiteId,
     next_body_id: BodyId,
@@ -79,6 +84,8 @@ impl WorldState {
             bodies: Vec::new(),
             notes: BTreeMap::new(),
             plates: None,
+            surface: None,
+            history: None,
             next_event_seq: 0,
             next_site_id: 0,
             next_body_id: 0,

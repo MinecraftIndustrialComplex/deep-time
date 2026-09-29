@@ -63,8 +63,47 @@ pub fn plates_builtin(name: &str) -> Option<&'static str> {
         .map(|(_, j)| *j)
 }
 
+/// The planet pipeline's presets so far (`crates/deeptime-core/presets/pipeline/`): plates and the
+/// deep-time surface interleaved (P1-04); later stages add their sections, and the `earthlike_*`
+/// built-ins take them over when P1-08 lands.
+pub const PIPELINE_BUILTIN: [(&str, &str); 4] = [
+    (
+        "pipeline_quick_16k",
+        include_str!("../presets/pipeline/pipeline_quick_16k.json"),
+    ),
+    (
+        "pipeline_full_16k",
+        include_str!("../presets/pipeline/pipeline_full_16k.json"),
+    ),
+    (
+        "pipeline_quick_32k",
+        include_str!("../presets/pipeline/pipeline_quick_32k.json"),
+    ),
+    (
+        "pipeline_full_32k",
+        include_str!("../presets/pipeline/pipeline_full_32k.json"),
+    ),
+];
+
+/// The JSON of a plate or pipeline preset.
+pub fn planet_builtin(name: &str) -> Option<&'static str> {
+    plates_builtin(name).or_else(|| {
+        PIPELINE_BUILTIN
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, j)| *j)
+    })
+}
+
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 5] = ["seed", "planet", "keyframes", "resolution", "tectonics"];
+pub const PLANET_KEYS: [&str; 6] = [
+    "seed",
+    "planet",
+    "keyframes",
+    "resolution",
+    "tectonics",
+    "surface",
+];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
 pub const SCALE_KEYS: [&str; 7] = [
@@ -420,6 +459,8 @@ pub struct PlanetPreset {
     pub keyframes: KeyframeParams,
     pub resolution: ResolutionParams,
     pub tectonics: TectonicParams,
+    /// The deep-time surface (P1-04); `None` runs the plates alone.
+    pub surface: Option<crate::surface::SurfaceParams>,
 }
 
 type Obj = Map<String, Value>;
@@ -455,6 +496,7 @@ impl PlanetPreset {
         let resolution: Option<ResolutionParams> = section(obj, "resolution")?;
         let tectonics: Option<TectonicParams> = section(obj, "tectonics")?;
         let keyframes: Option<KeyframeParams> = section(obj, "keyframes")?;
+        let surface: Option<crate::surface::SurfaceParams> = section(obj, "surface")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
         let seed = match obj.get("seed") {
             None => 1,
@@ -471,6 +513,7 @@ impl PlanetPreset {
             keyframes: keyframes.unwrap_or_default(),
             resolution: resolution.ok_or_else(|| missing("resolution"))?,
             tectonics: tectonics.unwrap_or_default(),
+            surface,
         };
         preset.validate()?;
         Ok(preset)
@@ -611,20 +654,33 @@ impl PlanetPreset {
         ] {
             check((0.0..=1.0).contains(&v), key, "must be in [0, 1]")?;
         }
+        if let Some(s) = &self.surface {
+            s.validate()?;
+            check(
+                k.l1_every_steps == 1,
+                "$.tectonics.l1_every_steps",
+                "must be 1 with a surface section (the surface stage reads the plates' L1 fields \
+                 after every plate step)",
+            )?;
+        }
         Ok(())
     }
 
     /// The body's canonical JSON; `Preset::to_json` adds the header (schema, name, description,
     /// placeholder, timeline).
     pub fn to_json(&self) -> Value {
-        json!({
+        let mut v = json!({
             "seed": self.seed,
             "planet": self.planet,
             "scale": self.scale,
             "keyframes": self.keyframes,
             "resolution": self.resolution,
             "tectonics": self.tectonics,
-        })
+        });
+        if let Some(s) = &self.surface {
+            v["surface"] = json!(s);
+        }
+        v
     }
 
     /// The chosen start, or the error a run reports when the player has not chosen one.
