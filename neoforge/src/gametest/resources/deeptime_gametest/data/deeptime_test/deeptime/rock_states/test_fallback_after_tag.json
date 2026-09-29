@@ -1,0 +1,7 @@
+{
+  "class": "test_fallback",
+  "use": "fallback",
+  "entries": [
+    {"block": "minecraft:polished_granite"}
+  ]
+}

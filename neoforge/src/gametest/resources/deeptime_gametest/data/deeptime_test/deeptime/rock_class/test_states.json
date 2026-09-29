@@ -1,0 +1,9 @@
+{
+  "class": "test_states",
+  "family": "unconsolidated",
+  "density_kg_m3": 1500,
+  "erodibility": 5.0,
+  "diffusivity": 3.0,
+  "vanilla_fallback": "minecraft:sand",
+  "notes": "GameTest class (StrataGameTests.rockStatesMember): its only members are rock_states entries, an absent optional block and snow at layers=8 (the shape of the rock-tag README's Project Atmosphere dust example)."
+}

@@ -108,6 +108,18 @@ sourceSets {
     }
 }
 
+// -Ddeeptime.extraDatapack=<folder> (P1-12, cold-read review 2 gap 29): -PextraDatapack=<folder>, or
+// with -PwithMic the MIC rock-tag datapack next to the pack (…/mic/Docs/datapacks/deeptime-mic-rock-tags;
+// tools/remote/mac.sh --pack syncs the Mac's copy). The mod honours it only with -Ddeeptime.gametest=true.
+def micRockTags = [new File(repoRoot, '../../Docs/datapacks/deeptime-mic-rock-tags'),
+                   new File('/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags')]
+        .find { new File(it, 'pack.mcmeta').isFile() }
+def extraDatapack = project.findProperty('extraDatapack')
+        ?: (project.hasProperty('withMic') ? micRockTags?.canonicalPath : null)
+if (project.hasProperty('withMic') && !project.hasProperty('extraDatapack') && micRockTags == null)
+    logger.warn("-PwithMic: no MIC rock-tag datapack at ${new File(repoRoot, '../../Docs/datapacks/deeptime-mic-rock-tags')} " +
+            "(tools/remote/mac.sh --pack syncs it); the runs go without the rock tags")
+
 neoForge {
     version = project.neo_version
 
@@ -133,6 +145,7 @@ neoForge {
             type = 'gameTestServer'
             systemProperty 'neoforge.enabledGameTestNamespaces', 'deeptime'
             systemProperty 'deeptime.gametest', 'true'
+            if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
             jvmArgument '-Xmx6G'
             if (project.hasProperty('gametestDebugLog')) logLevel = org.slf4j.event.Level.DEBUG
             gameDirectory = file('../run-gametest')
@@ -147,6 +160,7 @@ neoForge {
             systemProperty 'deeptime.gametest', 'true'
             // Set by tools/planet/run_planet.py (--test-terrain); blank means world data.
             systemProperty 'deeptime.testTerrain', System.getenv('DEEPTIME_TEST_TERRAIN') ?: ''
+            if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
             jvmArgument '-Xmx6G'
             gameDirectory = file('../run-planet')
         }

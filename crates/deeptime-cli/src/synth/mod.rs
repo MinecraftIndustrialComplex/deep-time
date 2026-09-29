@@ -6,17 +6,18 @@
 
 use std::path::{Path, PathBuf};
 
-use deeptime_core::synth::{self as core_synth, STRATA_CLASSES, SplitMix};
+use deeptime_core::synth::{self as core_synth, SplitMix};
 use deeptime_format::{
     Codec, FormatError, LoadedLayer, Manifest, RasterRead, Writer, fsutil::write_atomic,
     manifest::MANIFEST,
 };
 use serde_json::{Value, json};
 
-pub use deeptime_core::synth::Kind;
+pub use deeptime_core::synth::{Kind, Strata};
 
 pub struct Options {
     pub kind: Kind,
+    pub strata: Strata,
     pub size: u32,
     pub out: PathBuf,
     pub viewer: Option<PathBuf>,
@@ -33,7 +34,7 @@ pub struct Summary {
 /// Writes a synthetic world.
 pub fn run(opts: &Options) -> Result<Summary, FormatError> {
     let c = opts.size;
-    let world = core_synth::build(opts.kind, c, opts.codec)?;
+    let world = core_synth::build(opts.kind, opts.strata, c, opts.codec)?;
 
     // A folder with a manifest is complete: drop any old one before writing anything.
     let manifest_path = opts.out.join(MANIFEST);
@@ -73,7 +74,12 @@ pub fn run(opts: &Options) -> Result<Summary, FormatError> {
             &refs,
             Some(deeptime_viewer::Strata {
                 layer: &world.strata,
-                classes: STRATA_CLASSES.iter().map(|s| s.to_string()).collect(),
+                classes: opts
+                    .strata
+                    .classes()
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
             }),
         )
         .map_err(|e| io(dir, e))?;
@@ -210,6 +216,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("dt-synth-{}", std::process::id()));
         let opts = Options {
             kind: Kind::WrapTest,
+            strata: Strata::Placeholder,
             size: 1024,
             out: dir.join("w"),
             viewer: Some(dir.join("v")),
@@ -256,6 +263,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("dt-lake-{}", std::process::id()));
         let opts = Options {
             kind: Kind::LakeTest,
+            strata: Strata::Placeholder,
             size: 1024,
             out: dir.clone(),
             viewer: None,
@@ -288,6 +296,33 @@ mod tests {
         }
         let m = Manifest::read(&dir).unwrap();
         assert_eq!(m.notes["lake"]["water_level_y"], 120.0);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn every_class_world_writes_its_classes() {
+        let dir = std::env::temp_dir().join(format!("dt-every-{}", std::process::id()));
+        let opts = Options {
+            kind: Kind::WrapTest,
+            strata: Strata::EveryClass,
+            size: 1024,
+            out: dir.clone(),
+            viewer: None,
+            dump_samples: None,
+            codec: Codec::Lz4Block,
+        };
+        run(&opts).unwrap();
+        let classes: Value =
+            serde_json::from_slice(&std::fs::read(dir.join("strata/classes.json")).unwrap())
+                .unwrap();
+        assert_eq!(classes["classes"].as_array().unwrap().len(), 59);
+        let m = Manifest::read(&dir).unwrap();
+        assert_eq!(m.notes["strata"]["kind"], "every-class");
+        let s = TilePackReader::open(&dir.join("strata/horizons.dtr"))
+            .unwrap()
+            .load()
+            .unwrap();
+        assert_eq!(s.desc.stack_depth, Some(8));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
