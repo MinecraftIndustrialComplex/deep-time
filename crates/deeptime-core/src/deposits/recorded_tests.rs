@@ -70,7 +70,7 @@ fn finish(s: &Session) {
 fn run(json: &str, threads: usize, name: &str) -> (WorldState, Value) {
     let dir = temp_dir(name);
     let s = Session::create(json, "", options(&dir, threads), Arc::new(NoGauge)).unwrap();
-    assert_eq!(s.stage_names(), ["plates", "surface", "deposits"]);
+    assert_eq!(s.stage_names(), ["plates", "surface", "structure", "deposits"]);
     finish(&s);
     let world = s.checkpoint().unwrap().world;
     let census: Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
@@ -100,10 +100,10 @@ fn coupled_pipeline_places_every_family_and_is_deterministic_across_threads() {
     assert_eq!(a.bodies, b.bodies, "bodies differ");
     assert_eq!(a.events, b.events, "events differ");
     assert_eq!(census, census_b, "census differs");
-    assert_eq!(
-        a.fields["deposits/sites"].data, b.fields["deposits/sites"].data,
-        "sites layer differs"
-    );
+    let bits = |w: &WorldState| -> Vec<u32> {
+        w.fields["deposits/sites"].data.iter().map(|v| v.to_bits()).collect()
+    };
+    assert_eq!(bits(&a), bits(&b), "sites layer differs");
     // The history is still in the world after the stage (a checkpoint carries it).
     assert!(a.history.as_ref().is_some_and(|h| h.frame_count() == 10));
     // The census names its history.

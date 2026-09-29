@@ -457,6 +457,10 @@ pub struct PetroleumRules {
     pub reservoir_threshold: f64,
     /// Minimum source-rock value (TOC wt%) for a kitchen.
     pub min_source: f64,
+    /// Smallest connected region of mature source rock that counts as a kitchen (km²; 0 = every
+    /// region). Single cells of locally hot rock are noise, not generative basins.
+    #[serde(default)]
+    pub min_kitchen_km2: f64,
 }
 
 /// Coal rules: rank from the maximum TTI the seam reached.
