@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletionException;
@@ -50,7 +51,9 @@ class NativeLinkTest {
     @Test
     void phaseZeroEntryPoints() {
         String dummy = "{\"dummy\":{\"steps\":1,\"sleep_ms\":0}}";
-        assertEquals("{\"peak_bytes\":0,\"stages\":[]}", DeepTimeNative.estimate(dummy, ""));
+        // P1-01: the estimate lists every stage (plan §6.1 "per-stage bytes and seconds").
+        assertEquals("{\"peak_bytes\":0,\"stages\":[{\"bytes\":0,\"name\":\"dummy\",\"seconds\":0.0}]}",
+                DeepTimeNative.estimate(dummy, ""));
         long id = DeepTimeNative.create(dummy, "", gameDir.resolve("entry").toString(), 1, 0);
         try {
             assertEquals(0, DeepTimeNative.keyframeCount(id));
@@ -75,6 +78,49 @@ class NativeLinkTest {
         assertThrows(IllegalStateException.class, () -> DeepTimeNative.advance(id, 1));
         assertThrows(IllegalStateException.class, () -> DeepTimeNative.destroy(id));
         assertThrows(IllegalStateException.class, () -> DeepTimeNative.cancel(0xdead_beefL));
+    }
+
+    /**
+     * P1-01: a dummy preset with a toy world produces keyframes (RGBA8 through a direct buffer) and
+     * events across JNI, and its world data holds the event segment and the keyframe index.
+     */
+    @Test
+    void keyframesAndEventsCrossTheBoundary() {
+        String world = "{\"dummy\":{\"steps\":8,\"sleep_ms\":0,\"stages\":[\"a\",\"b\"],\"world\":{"
+                + "\"circumference\":1024,\"grid_r\":16,\"t_start_years\":-1.0e8,\"t_end_years\":0.0,"
+                + "\"keyframe_every_years\":2.5e7,\"keyframe_size\":[64,32],\"event_every_steps\":2,\"sites\":2}}}";
+        Path out = gameDir.resolve("world");
+        long id = DeepTimeNative.create(world, "", out.toString(), 2, 0);
+        try {
+            assertThrows(IllegalArgumentException.class, () -> DeepTimeNative.keyframeInfo(id, 0),
+                    "no keyframe produced yet");
+            assertEquals(DeepTimeNative.DONE, advanceUntilSettled(id));
+            int count = DeepTimeNative.keyframeCount(id);
+            assertTrue(count > 0, "keyframes produced");
+            String info = DeepTimeNative.keyframeInfo(id, count - 1);
+            assertTrue(info.contains("\"w\":64") && info.contains("\"layers\":[\"elevation\"]"), info);
+            ByteBuffer rgba = ByteBuffer.allocateDirect(64 * 32 * 4);
+            DeepTimeNative.copyKeyframe(id, 0, 0, rgba);
+            assertEquals((byte) 255, rgba.get(3), "opaque first pixel");
+            assertThrows(IllegalArgumentException.class,
+                    () -> DeepTimeNative.copyKeyframe(id, 0, 0, ByteBuffer.allocateDirect(16)), "short buffer");
+            assertThrows(IllegalArgumentException.class,
+                    () -> DeepTimeNative.copyKeyframe(id, 0, 0, ByteBuffer.allocate(64 * 32 * 4)), "heap buffer");
+            assertThrows(IllegalArgumentException.class, () -> DeepTimeNative.keyframeInfo(id, count));
+            String events = DeepTimeNative.eventsSince(id, 0, 1000);
+            assertTrue(events.contains("\"kind\":\"deeptime:deposit_formation\""), events);
+            assertEquals("[]", DeepTimeNative.eventsSince(id, 1000, 10));
+            long[] p = new long[DeepTimeNative.PROGRESS_FIELDS];
+            DeepTimeNative.progress(id, p);
+            assertEquals(count, p[10], "keyframes ready");
+            assertEquals(10, p[11], "events total: 8 in the chain + 2 deposit formations");
+            DeepTimeNative.finalizeWrite(id);
+            assertTrue(Files.isRegularFile(out.resolve("events/1-0.dtev")));
+            assertTrue(Files.isRegularFile(out.resolve("keyframes/index.json")));
+            assertTrue(Files.isRegularFile(out.resolve("sites/sites.dtsr")));
+        } finally {
+            DeepTimeNative.destroy(id);
+        }
     }
 
     private static int advanceUntilSettled(long id) {

@@ -1,0 +1,18 @@
+{
+  "dummy": {
+    "steps": 20,
+    "sleep_ms": 0,
+    "stages": ["dummy_drift", "dummy_erode"],
+    "world": {
+      "circumference": 4096,
+      "grid_r": 16,
+      "t_start_years": -400000000.0,
+      "t_end_years": 0.0,
+      "keyframe_every_years": 50000000.0,
+      "keyframe_size": [256, 128],
+      "event_every_steps": 4,
+      "sites": 3,
+      "seed": 7
+    }
+  }
+}

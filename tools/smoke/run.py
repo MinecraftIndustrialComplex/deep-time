@@ -9,7 +9,10 @@
         [--chunky <radius>]       pregenerate a square of this radius (Chunky)
         [--chunky-center <x,z>|seam]  its centre (default 0,0); `seam` is x = C/2, z = 0, so the
                                   square straddles the seam and the region check below proves
-                                  nothing was written outside the canonical span
+                                  nothing was written outside the canonical span (P0-06)
+        [--chunky-seam]           also pregenerate at least 128 columns either side of the
+                                  seam (x = C/2), z in [-64, 80), inside the canonical span
+                                  (deeptime-inspect seam, plan §9.7)
         [--restart]               stop, start again and confirm the world data was not regenerated
         [--timeout <s>]           how long to wait for "Done (" (default 1500)
 
@@ -291,6 +294,7 @@ def main():
     ap.add_argument("--chunky", type=int, default=0)
     ap.add_argument("--chunky-center", default="0,0", metavar="X,Z|seam",
                     help="centre of the Chunky square; `seam` is x = C/2, z = 0 (P0-06)")
+    ap.add_argument("--chunky-seam", action="store_true")
     ap.add_argument("--restart", action="store_true")
     ap.add_argument("--timeout", type=int, default=1500)
     a = ap.parse_args()
@@ -381,18 +385,32 @@ def main():
                 errs = server.grep(r"(?i)\[(c2me|distanthorizons|DistantHorizons)[^\]]*\].*(ERROR|Exception)|/ERROR\].*(c2me|distanthorizons)", 5)
                 steps.check("no C2ME or Distant Horizons errors in the boot log", "none", "; ".join(errs)[:300] or "none", not errs)
 
+            tasks = []
             if a.chunky:
                 cx, cz = chunky_center(a.chunky_center, install["size"])
                 steps.record("chunky square", f"centre {cx},{cz} radius {a.chunky} (x {cx - a.chunky}..{cx + a.chunky})")
-                for cmd in (f"chunky center {cx} {cz}", "chunky shape square", f"chunky radius {a.chunky}", "chunky start"):
+                tasks.append(("chunky pregeneration finished", cx, cz, a.chunky))
+            if a.chunky_seam and is_planet:
+                # Chunky's square is the chunks (int) centre >> 4 ± ceil(radius / 16): with
+                # centre ±(C/2 - 72) and radius 64 that is x in [C/2 - 144, C/2) and
+                # [-C/2, -C/2 + 144), z in [-64, 80): no chunk outside the canonical span
+                # (the region check below).
+                half = install["size"] // 2
+                tasks.append(("chunky seam east finished", half - 72, 0, 64))
+                tasks.append(("chunky seam west finished", -(half - 72), 0, 64))
+            finished = re.compile(r"Task finished for|Task complete")
+            for name, cx, cz, radius in tasks:
+                before = len(server.grep(finished.pattern, 10**9))
+                for cmd in (f"chunky center {cx} {cz}", "chunky shape square", f"chunky radius {radius}", "chunky start"):
                     print(f"   {cmd}: {rcon(cmd, check=False)[:160]}", flush=True)
                 deadline = time.time() + 1800
                 while time.time() < deadline:
                     time.sleep(10)
-                    if server.grep(r"Task finished for|Task complete", 1):
+                    if len(server.grep(finished.pattern, 10**9)) > before:
                         break
-                done = server.grep(r"Task finished|Task complete", 1)
-                steps.check("chunky pregeneration finished", "finished", done[0][-160:] if done else "timeout", bool(done))
+                lines = server.grep(finished.pattern, 10**9)
+                done = len(lines) > before
+                steps.check(name, "finished", lines[-1][-160:] if done else "timeout", done)
 
             rcon("save-all flush")
             time.sleep(3)
@@ -406,7 +424,7 @@ def main():
                             note=f"-C/1024 <= rx < C/1024, C = {install['size']}")
                 steps.record("empty region files outside the span (0 chunks, opened by lookups)",
                              f"{len(empty)}" + (f": {', '.join(sorted(empty)[:8])}" if empty else ""))
-                if a.chunky:
+                if a.chunky_seam or (a.chunky and a.chunky_center == "seam"):
                     # Both sides of the seam hold chunks: the last region column (rx = C/1024 - 1)
                     # and the first (rx = -C/1024).
                     half = install["size"] // 1024

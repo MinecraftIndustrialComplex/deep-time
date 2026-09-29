@@ -1,0 +1,77 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
+<!-- deeptime bench (plan §3.3, §9.3): wall time per stage for each thread count, peak native
+     memory, and the numbers as a table. bench.js sets window.DT_BENCH (the same object as bench.json). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep Time bench</title>
+<style>
+  :root { color-scheme: light; --surface: #fcfcfb; --panel: #ffffff; --text: #0b0b0b; --text-2: #52514e;
+          --line: #e2e1dc; --bar: #2a78d6; }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) { color-scheme: dark; --surface: #1a1a19; --panel: #222221;
+          --text: #ffffff; --text-2: #c3c2b7; --line: #3a3a37; --bar: #3987e5; }
+  }
+  :root[data-theme="dark"] { color-scheme: dark; --surface: #1a1a19; --panel: #222221; --text: #ffffff;
+          --text-2: #c3c2b7; --line: #3a3a37; --bar: #3987e5; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 12px 16px; background: var(--surface); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 16px; margin: 0 0 2px; }
+  .meta { color: var(--text-2); font-size: 12px; margin-bottom: 12px; }
+  .runs { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .run { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
+  .run h2 { font-size: 13px; margin: 0 0 2px; }
+  .run .stat { color: var(--text-2); font-size: 12px; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+  .bar { display: grid; grid-template-columns: 9em 1fr 6em; gap: 6px; align-items: center; font-size: 12px; }
+  .bar .name { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar .track { height: 14px; }
+  .bar .fill { height: 100%; background: var(--bar); border-radius: 0 4px 4px 0; min-width: 1px; }
+  .bar .v { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar + .bar { margin-top: 2px; }
+  table { border-collapse: collapse; margin-top: 16px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 2px 8px; border-bottom: 1px solid var(--line); text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-2); font-weight: 600; }
+</style>
+</head>
+<body>
+<h1>Deep Time bench</h1>
+<div class="meta" id="meta"></div>
+<div class="runs" id="runs"></div>
+<table id="table"><thead></thead><tbody></tbody></table>
+<script src="bench.js"></script>
+<script>
+'use strict';
+(function () {
+  const B = window.DT_BENCH;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const ms = v => v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${v.toFixed(1)} ms`;
+  const mib = b => `${(b / 1048576).toFixed(1)} MiB`;
+  document.getElementById('meta').textContent =
+    `preset ${B.preset} · deeptime ${B.version} · ${B.host} · ${B.runs.length} run(s) · written ${B.created_utc}`;
+  // One scale for every panel, so bars compare across thread counts.
+  const max = Math.max(1e-9, ...B.runs.flatMap(r => r.stages.map(s => s.millis)));
+  const runs = document.getElementById('runs');
+  for (const r of B.runs) {
+    const div = document.createElement('div');
+    div.className = 'run';
+    div.innerHTML = `<h2>${esc(r.threads)} thread${r.threads === 1 ? '' : 's'}</h2>` +
+      `<div class="stat">total ${ms(r.total_millis)} · peak native memory ${mib(r.peak_bytes)}</div>` +
+      r.stages.map(s => `<div class="bar" title="${esc(s.name)}: ${ms(s.millis)}, ${esc(s.steps)} steps">` +
+        `<span class="name">${esc(s.name)}</span>` +
+        `<span class="track"><span class="fill" style="display:block;width:${(100 * s.millis / max).toFixed(2)}%"></span></span>` +
+        `<span class="v">${ms(s.millis)}</span></div>`).join('');
+    runs.appendChild(div);
+  }
+  const names = B.runs.length ? B.runs[0].stages.map(s => s.name) : [];
+  document.querySelector('#table thead').innerHTML =
+    '<tr><th>threads</th>' + names.map(n => `<th>${esc(n)} (ms)</th>`).join('') + '<th>total (ms)</th><th>peak (MiB)</th></tr>';
+  document.querySelector('#table tbody').innerHTML = B.runs.map(r =>
+    `<tr><td>${esc(r.threads)}</td>` + r.stages.map(s => `<td>${s.millis.toFixed(1)}</td>`).join('') +
+    `<td>${r.total_millis.toFixed(1)}</td><td>${(r.peak_bytes / 1048576).toFixed(1)}</td></tr>`).join('');
+})();
+</script>
+</body>
+</html>

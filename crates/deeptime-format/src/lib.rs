@@ -5,15 +5,26 @@
 //! The byte layout is specified in `FORMAT.md` next to this crate's `Cargo.toml`; the Java
 //! reader (`com.minecraftindustrialcomplex.deeptime.worlddata`) implements the same document.
 
+pub mod container;
 pub mod error;
+pub mod events;
 pub mod fsutil;
+pub mod keyframes;
 pub mod manifest;
+pub mod ramps;
 pub mod raster;
+pub mod sites;
 pub mod tilepack;
 
 pub use error::{FormatError, Result};
+pub use events::{
+    Event, EventId, EventIndex, EventLog, EventWriter, GEOLOGY_WRITER, ParamValue, Params, Place,
+};
+pub use keyframes::{KeyframeEntry, KeyframeImage, KeyframeIndex};
 pub use manifest::{FileEntry, LayerEntry, Manifest, Scale, Writer};
+pub use ramps::{Ramp, Ramps};
 pub use raster::{Cell, Codec, DType, GridDesc, LayerDesc, LoadedLayer, Raster, RasterRead, TILE};
+pub use sites::{Extraction, Product, Site, SiteId, SiteIndex, SiteKind};
 pub use tilepack::{TilePackReader, Written, encode_tile_pack, write_tile_pack};
 
 /// The world-data format version this crate reads and writes (plan §5.7.2). Its one source is the
