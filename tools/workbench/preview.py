@@ -784,7 +784,8 @@ def submit(spec, job=None):
     write_json(os.path.join(j.dir, "spec.json"), spec)
     log = open(os.path.join(j.dir, "runner.out"), "a")
     child = subprocess.Popen([sys.executable, os.path.abspath(__file__), "run", "--job", job, "--from-spec"],
-                             cwd=REPO, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+                             cwd=REPO, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                             start_new_session=True)
     j.set(pid=child.pid)   # the runner's, until it writes its own status
     return j.st
 

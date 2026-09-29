@@ -27,6 +27,7 @@ mod editor;
 mod http;
 mod live;
 mod runs;
+pub mod stage2;
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
@@ -65,6 +66,8 @@ pub struct WatchOptions {
     pub every_myr: Option<f64>,
     /// Stop once nothing runs or waits (after `preset`'s run): scripts and tests.
     pub exit_when_done: bool,
+    /// Stage 2's preview runner (`--preview`); without it the preview and inspect routes answer 501.
+    pub preview: Option<stage2::Preview>,
     pub common: Common,
 }
 
@@ -162,6 +165,7 @@ pub fn serve(o: &WatchOptions) -> CliResult<Served> {
     let app = Arc::new(http::App {
         wb: Arc::clone(&wb),
         page: deeptime_viewer::workbench_page("Deep Time workbench"),
+        preview: o.preview.clone(),
     });
     let server = http::Server::start(SocketAddr::new(o.bind, o.port), app).map_err(|e| {
         wb.close();
@@ -245,6 +249,7 @@ mod tests {
             keep,
             every_myr: None,
             exit_when_done: true,
+            preview: None,
             common: quiet(),
         }
     }

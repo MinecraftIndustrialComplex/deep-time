@@ -91,6 +91,13 @@ enum Command {
         /// Stop once nothing runs or waits (after --preset's run; default: serve until stopped).
         #[arg(long)]
         exit_when_done: bool,
+        /// Stage 2 (P1-20): tools/workbench/preview.py of a checkout with smoke server sets, which
+        /// then answers the 3D preview, click-to-inspect and /area3d/ routes (default: 501).
+        #[arg(long)]
+        preview: Option<PathBuf>,
+        /// The Python that runs --preview (stdlib-only; /usr/bin/python3 on the Mac).
+        #[arg(long, default_value = "python3")]
+        python: PathBuf,
         #[command(flatten)]
         common: CommonArgs,
     },
@@ -354,6 +361,8 @@ fn main() -> ExitCode {
             keep,
             every_myr,
             exit_when_done,
+            preview,
+            python,
             common,
         }) => finish(
             "watch",
@@ -367,6 +376,7 @@ fn main() -> ExitCode {
                 keep,
                 every_myr,
                 exit_when_done,
+                preview: preview.map(|script| watch::stage2::Preview { python, script }),
                 common: common.common(),
             }),
         ),
