@@ -450,12 +450,14 @@ public final class EditorModel {
         return Optional.of(json);
     }
 
-    /** Stores the estimator's answer for {@code forJson}: its JSON, or {@code error}. Stale answers are dropped. */
+    /**
+     * Stores the estimator's answer for {@code forJson}: its JSON, or {@code error}. Safe from the
+     * estimator's thread: it touches only the estimate fields; an answer for a preset that is no
+     * longer the current one is never shown ({@link #estimate()} compares) and is asked again.
+     */
     public synchronized void acceptEstimate(String forJson, String resultJson, String error) {
         if (forJson.equals(estimateInFlight))
             estimateInFlight = null;
-        if (!forJson.equals(effectivePresetJson()))
-            return;
         estimatedFor = forJson;
         if (error != null) {
             estimate = null;
