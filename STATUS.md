@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Next: P1-03, P1-12, P1-13, P1-14 (agents), then P1-04 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Next: P1-04 (agent, critical path), P1-11, P1-15, P1-18 (agents), then P1-05/P1-07 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -32,14 +32,14 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-08 | Bake, world data v1 and parity | todo | | | |
 | P1-09 | Climate mapping and biomes | todo | | | |
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
-| P1-11 | Customize editor, timelapse and staging | todo | | | |
+| P1-11 | Customize editor, timelapse and staging | doing | 2026-09-28 | d42375e | Screens, models and staging built on the placeholder presets (real stages pending). Mac, merged with master f14d258 (P1-03, P1-18): JUnit tests=101 failures=0 (new: EditorModelTest, TimelapseModelTest, ModelHelpersTest, StagingMoverTest, TimelineAcrossJniTest, ScreenSourcesTest); ./gametest.sh → All 31 required tests passed (EditorModelGameTests acceptBuildsGenerator, stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel, realPresetFieldsLightUp); cargo fmt/clippy -D warnings/test --locked (193 passed)/deny clean; gradlew build clean. Client (laptop, HeadlessMC + Xvfb): whole walk Create World → editor → run → review → Accept → world created from the moved staging, no crash; guidance panel with natives forced off; screenshots in review/out/p1-11-client. Rerun with the real presets after P1-08; biome names on the review page with P1-09 |
 | P1-12 | Strata pass with rock tags and `rock_states` | done | 2026-09-28 | — | Mac: ./gametest.sh and -PwithMic (+ MIC rock tags via -Ddeeptime.extraDatapack) → All 21 required tests passed each; coal stone / black argillite; Create stones in their classes; loess = projectatmosphere:dust[layers=8]; everyClassInTheWorld 59/59 classes, 240 samples 0 wrong; MIC smoke probe palette 59/59 (member 24, fallback 35); JUnit 46/0; bodies deferred (P1-08/P1-14) |
 | P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 743b69d | Mechanism verified on placeholder presets (dummy pipeline + wrap-test bake): standalone and MIC first starts generate in ~12 s with progress lines ≤ 5 s apart, restart does not regenerate; no-config / circumference-mismatch / native-failure all stop cleanly before loadLevel. Rerun with the real presets after P1-08 |
 | P1-14 | Deposit engine: the four families | doing | 2026-09-28 | 7f4858c | Engine on a synthetic field history (real fields wait for P1-03…P1-07). Mac: cargo test --workspace ok (core 82 incl. 41 deposits::, format 31, cli 11); porphyry σ 1.4892; Poisson means within 4 SE over 10,000 draws; tonnage P90/P50/P10 within 4 SE; min separation holds (200 seeds + the run); every site has a forming event with causes; `stage deposits --preset …/deposits_synthetic_16k.json --viewer review/out/p1-deposits` → 32 sites of all 8 types, counts next to ρ·A·F (porphyry 9 drawn / 9.41), 0.83 GB peak; fmt, clippy -D warnings, deny clean |
-| P1-15 | Deposits in the world | todo | | | |
+| P1-15 | Deposits in the world | doing | 2026-09-28 | — | On the synthetic deposit world (real fields wait for P1-03…P1-08). Mac: ./gametest.sh, -PwithEv, -PwithMic → All 30 required tests passed each (DepositGameTests body 1222/1222 ore exact, 0 missed, 0 unexplained, regeneration 0 of 44,880 differ; ClaimGameTests; SpawnGameTests); ./gametest-planet.sh claimoninplanetworld PASS standalone (19 removed) and -PwithMic (38 removed); JUnit 62/0 incl. DepositDataParityTest (19,649 body samples, worst Δ 3.3e-16); smoke standalone first-start deposit world PASS + `deeptime-inspect ore` render |
 | P1-16 | COE and CDG hooks | todo | | | |
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
-| P1-18 | Pole cap and client info | todo | | | |
+| P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
 
 ## Review pages
@@ -47,6 +47,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 |---|---|---|---|
 | seams (how the seams work, interactive) | https://spacesheep.dev/@benmac/deeptime-seams | seams v2 2026-09-28 | 2026-09-28 |
 | phase0 (Phase 0 exit: every check, evidence, links) | https://spacesheep.dev/@benmac/deeptime-phase0 | Phase 0 exit 2026-09-28 | 2026-09-28 |
+| p1-plates (500 Myr of plates, 100k samples, keyframes + events) | https://spacesheep.dev/@benmac/deeptime-p1-plates | P1-03 plates 100k 500 Myr 2026-09-28 | 2026-09-28 |
 | p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
 | p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
 
@@ -56,8 +57,213 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-09-28 | P1-15 | **Q10 (plan §14): Excavated Variants in MIC?** Ben (log 2026-09-28): decide after side-by-side BlueMap renders of the same deposits with and without EV in the MIC pack. Next: produce and publish those renders, then ask. | AskUserQuestion |
 
 ## Build log
+
+### 2026-09-28 — P1-11 Customize editor, timelapse and staging, on the placeholder presets (agent worktree agent-a61f0e6a8e0a67dfa)
+- **Shape.** Client-only screens in `screen/` (reached only through `screen/ClientSetup`, a
+  `@Mod(dist = CLIENT)` class: preset editor for `deeptime:planet` and `planet_32k`, the Create
+  guard, the staging cleanup, the dev screenshot driver); all rules in plain-Java `screen/model/`
+  (no Minecraft imports; `ScreenSourcesTest` enforces both). Plan §7.12 has an "As built in P1-11"
+  paragraph; §10.3 P1-11 lists the class names that differ from the plan's (`EditorModel`,
+  `TimelapseModel`, `ReviewModel` instead of `PlanetEditorModel`/`RunModel`; share codes stay in
+  P1-13's `preset/ShareCode`; `worldgen/PlanetGenerators.withStaging` instead of
+  `GeologicChunkGenerator.forStaging`).
+- **Setup page** (`EditorModel`, `EditorFields`): preset = built-in family (`earthlike_quick`,
+  `earthlike_full`) × size (16k/32k picks the built-in), or an imported code (size fixed); timeline
+  start and length with no default, Run disabled until both are chosen (plus: estimate in, peak ≤
+  cap, numbers in range, natives linked); the §5.1 parameter catalogue (planet, scale, multipliers,
+  essentials, fantasy toggles as Phase 3 placeholders) where **a field is editable only when the
+  preset carries its JSON path** — the placeholders carry none and the core rejects unknown keys, so
+  they show unavailable, and the real presets light them up without a screen change (the paths are
+  my proposal for §5.1's structs: `planet.gravity_m_s2`, `scale.m_per_block_h`,
+  `deposits.count_multiplier`, `scale.feature_scale.rivers`, `surface.drama`,
+  `playability.essentials`, …; P1-03…P1-17 must use them or change the catalogue line). Memory cap
+  default 4 GiB, any value ≥ 0.25 accepted, warnings when above the machine's RAM or free memory;
+  the estimate runs off the render thread, stale answers dropped. Share codes: export = the
+  effective preset (timeline included); import selects the built-in when the code is one, else a
+  custom preset.
+- **Run page** (`TimelapseModel`, `SessionRunHandle`): `SimSession.launch` (new) creates the session
+  on the `deeptime-sim` worker (plan §6.2; `start` keeps creating on the caller for the server) and,
+  with `collectTimeline`, gathers keyframe infos and events after each step and before destroy, so
+  the last step's output is never lost; `SimSession.copyKeyframe` while alive, `worlddata/KeyframeFiles`
+  (pure-Java `DTKF` reader over the new `worlddata/Container`) after. Frames decode on a loader
+  thread into a 64 MiB LRU ring; the view follows the newest frame until scrubbed back; events show
+  up to the frame's time, fresh ones (after the previous frame) highlighted and drawn larger; layer
+  buttons are data-driven (every layer a frame names); playback 400 ms/frame; the globe is an
+  orthographic projection on the CPU (`GlobeProjection`, 256² texture). Closing the editor leaves a
+  run going; reopening Customize (one model per Create World screen) shows it. Cancelled and failed
+  runs delete their staging folder from the completion future (no polling needed).
+- **Review page** (`ReviewModel`): the staged world data's `elevation` sampled 512×256 and coloured
+  with `Ramps` (Java port of `deeptime_format::Ramps`; `ramps.json` now copied into the jar as
+  `deeptime/ramps.json`; `ModelHelpersTest` checks the Rust test's colours plus a half-way
+  rounding case), fallback the last keyframe; spawn marker = first `spawn/candidates.json` entry
+  above sea level; ore-province hints (`ProvinceHints`: dominant deposit type per 30° cell, each site
+  weighing 1 in its cell and 0.5 in the eight around, shown at ≥ 1; `worlddata/SiteRecords` reads
+  `sites.dtsr`). Biome names and the staged §7.2 mapping: P1-09.
+- **Guidance panel** (`GuidanceModel`) when the natives did not load and nothing finished to review.
+- **Staging**: `server/Staging` (`<gamedir>/deeptime/staging/<uuid>/`, ids validated as lower-case
+  UUIDs, `cleanupAbandoned`: untouched 24 h and held by no open editor), `server/StagingMover`
+  (target already has a manifest → nothing; rename with `ATOMIC_MOVE`; else copy to
+  `<target>.staging-copy` comparing each file's CRC32 with the source, check every manifest entry
+  with plain reads — a memory-mapped tile pack would block the rename on Windows —, rename into
+  place, then delete the staging folder; any failure removes the partial copy and leaves staging
+  untouched). `WorldDataBinder`'s HIGHEST listener now runs `moveStaged` → `FirstStartGenerator.prepare`
+  → bind (a failed move stops a dedicated server through `ServerStop`, throws on an integrated one);
+  cleanup runs in the background at every server start and at client setup. Accept =
+  `PlanetGenerators.withStaging` (current overworld's biome source and settings; `WorldDataRef`
+  with the staging id and the preset's C; TW's shape follows at bake). **Create is disabled** for a
+  Deep Time world until staged data exists (`PlanetGenerators.createBlock`: no accepted run, natives
+  missing, staging folder gone), Enter held back too (`screen/CreateWorldGuard`); a world type
+  switched away and back gets the accepted binding back when Customize reopens.
+- **Found on master:** `Cargo.lock` lacked `flate2` under `deeptime-core` (a merge slip after
+  P1-13), so every `--locked` build refused to run (`build-natives.sh`, `cargo tree --locked`);
+  unlocked builds rewrote the lock silently. Fixed in commit 6c6298d.
+- **Tests.** JUnit (Mac, `cd neoforge && ./gradlew build`): tests=93 failures=0 — `EditorModelTest`
+  (9: families and sizes, Run disabled without a timeline, stale estimates, cap, natives missing,
+  fields follow the preset, share-code round trip, staging folders across run/accept/discard/cancel,
+  launch failure), `TimelapseModelTest` (8: live following, event cursor and freshness, layers,
+  off-thread ring, bounded ring, playback, cleanup, progress line), `ModelHelpersTest` (7: ramps
+  parity, globe, formats, province hints, real presets carry every field — vacuous until P1-08 —,
+  MemAvailable, guidance),
+  `StagingMoverTest` (7: rename, copy+verify, corrupted manifest keeps staging, incomplete refused,
+  partial target replaced, cleanup by age/held), `TimelineAcrossJniTest` (2: JNI pixels = disk
+  pixels for every frame, a launched session feeds the timelapse, create errors and early cancel
+  fail the completion), `ScreenSourcesTest` (2). GameTests (Mac, `./gametest.sh`): All 25 required
+  tests passed — `acceptBuildsGenerator` (codec keeps `staging_id`, C 32,768 → TW 2,048 chunks,
+  Create blocked/unblocked/blocked again), `stagingMovedOnStart` (copy route, restart moves nothing,
+  bound terrain within 0.031 blocks of the analytic terrain), `editorRunsAcceptsAndBinds` (share code
+  → timeline → real estimate → run of a fast placeholder at C 1,024 → 9 frames, 8 events → review map
+  from world data, spawn marker, 1 province → Accept → rename into the world → bound, max error
+  0.031), `shareCodeThroughModel` (the core refuses a preset with a `planet` section: "$.planet:
+  unknown key"). cargo fmt, clippy -D warnings, test --workspace, deny: clean.
+- **Client check (best effort, laptop, real GL).** `tools/client/screenshots.sh <jar> <linux .so>`
+  (jar built on the Mac with `./gradlew jar`, the Linux library with `tools/natives/build-natives.sh
+  --only linux-x86_64-gnu`, both pulled; HeadlessMC 2.10.0 under Xvfb + Mesa, Deep Time + TW only,
+  `ScreenshotDriver` walks the screens): Create World with "Deep Time Planet" and Create disabled
+  (`NOT_SIMULATED`) → setup page (Run disabled: "Choose how the continents start", estimate 2.0 MiB /
+  ~10 s / 2 stages) → timeline set, Run → timelapse live (map, then globe) → done (9 keyframes, 13
+  events), scrubbed to 5/9 → review (final map from world data, spawn −8.3° N 204.4° E, 6 province
+  cells) → Accept → Create enabled → the world is created: `Moved staged Deep Time world data …
+  (rename)`, `Bound … staged as <id>`, player in the world at (1114, 66, 377) — the review's spawn
+  marker. With `GUIDANCE=1` (`-Ddeeptime.natives.forceFail=unsupported`): the guidance panel, and
+  Create blocked (`NATIVES`). Twelve screenshots in `review/out/p1-11-client/` (gitignored), no
+  client crash. Three things it took: HeadlessMC's `--jvm` passes only its first token (the -D
+  properties go through `JAVA_TOOL_OPTIONS`); offline it stubs LWJGL (black screenshots) unless
+  `hmc.check.xvfb=true` lets it see Xvfb; the game's STB PNG writer fails there, so the driver
+  writes PNGs with ImageIO. It fixed two screen bugs: the scrubber label lagged while following
+  live, and Linux "free memory" was `MemFree` (0.7 GiB of 15.4) — now `MemAvailable`. Layout and
+  feel remain unreviewed by a person (plan §9.8).
+- **Merged master f14d258 (P1-03 plates, P1-18 pole cap) into this branch.** Conflicts: STATUS.md
+  (both build-log entries kept) and `en_us.json` (P1-18 added one too; keys unioned). Adapted:
+  P1-18's six-field `WorldDataRef` (Accept keeps the world preset's pole-cap lines), and
+  `ScreenSourcesTest` treats P1-18's `client/` package as client-only too. P1-03's planet pipeline
+  (`params.rs`) uses exactly the catalogue's `planet.*` and `scale.m_per_block_*` paths; the
+  catalogue's ranges now match its validation (tilt 0–180°, ocean fraction 0.05–0.95), and the new
+  GameTest `realPresetFieldsLightUp` imports a P1-03 planet preset: those seven fields become
+  editable, an edit lands at the path the core reads, and the core's estimate accepts it (174 MiB,
+  1 stage). After the merge: JUnit tests=101 failures=0; ./gametest.sh All 31 required tests
+  passed; cargo fmt, clippy -D warnings, test --locked (193 passed), deny clean.
+- **Next.** When P1-08's real presets land: rerun `./gametest.sh` and the client check with them,
+  make the `EditorFields` paths match the real schema (`ModelHelpersTest.realPresetsCarryEveryField`
+  fails for a real built-in that lacks one), add P1-09's biome names and staged climate mapping at Accept.
+
+### 2026-09-28 — P1-18 pole cap and client info (agent worktree agent-a4399e9f8080242f4)
+- **The cap** (`wrap/PoleCap`, `wrap/PoleCapCurve`; replaces P0-06's `PoleCapPrototype` and its
+  `prototypepushback` test). Runs after every tick of a Deep Time level (`LevelTickEvent.Post`).
+  Lines per level from the generator's `world_data`: new optional codec fields `pole_cap_deg`
+  (default 75) and `pole_stop_deg` (default 80), validated cap < stop ≤ 90 and written out in
+  both world presets (and `tools/dev/gen_worldgen.py`); `WorldDataRef.poleCap()`. The Rust
+  preset's `scale.pole_cap_deg` (plan §5.1) reaches the generator when P1-11 writes world presets
+  from a preset; the placeholder presets name neither.
+- **The curves** (the seam page's were illustrations; now the real ones, documented in
+  `PoleCapCurve`, pinned by `PoleCapCurveTest`): s = depth into the 75°–80° band. Pushback
+  0.10·s^1.5 blocks/tick² toward the equator (76° 0.0089, 77.5° 0.0354, 79° 0.0716, 80° 0.10;
+  ground friction makes a per-tick push p a drift of 2.2p, the same factor as the walking input
+  0.1, so at 80° walking is cancelled exactly, sprinting creeps, and anything airborne (factor 11)
+  or gliding is thrown back hard). Storm s^0.7 (0.20 at 75.5°, 0.62 at 77.5°). Sable wind
+  1.0·s^1.5 blocks/s added per tick (20 blocks/s² at the stop; a 40 blocks/s jet entering at 75°
+  turns at 78.6° at 16k).
+- **Player policy** (decided here): survival/adventure get wind, warning and stop; **creative**
+  gets the storm, the warning and the hard stop but no wind (the vanilla border stops creative
+  players too; builders at 76° should not be blown about); **spectators** only see the storm (no
+  wind, no stop, no warning, as they pass the vanilla border); fake players are ignored.
+  **Vehicles**: a player's root vehicle, under the strongest policy of its riders; empty vehicles and
+  mob-only stacks are not capped (nothing gained).
+- **Who moves whom.** A player's own movement (and a vehicle it steers: boat, horse) is its
+  client's; a server motion packet would *replace* the client's velocity every tick (no momentum,
+  broken jumps), so the server sends the wind in `PoleStormPayload.push` and Deep Time's client adds
+  it before the player moves (`client/PolarStorm`). Vehicles the server simulates (minecarts, any
+  ridden-but-not-steered root) are pushed server-side. The hard stop is always the server's: a
+  player past the line is teleported onto it, 0.05 blocks inside (absolute teleport, which zeroes
+  the client's velocity; y lifted out of terrain if the line cuts rising ground), a vehicle is moved
+  with its riders (plus `ClientboundMoveVehiclePacket` when a client steers it), riders of anything
+  else (Create contraptions, modded seats) are dismounted and stopped alone. Action bar: gold storm
+  line on entry and every 40 ticks, red stop line at once (`assets/deeptime/lang/en_us.json`).
+- **Sable** (`compat/sable/SablePoleCap`, loaded only with Sable; with `SableTestOps` the only
+  classes naming Sable types): every sub-level of the level from
+  `SubLevelContainer.getContainer(level).getAllSubLevels()`; wind at the pose through
+  `RigidBodyHandle.addLinearAndAngularVelocity`; stop when the hull's poleward edge (global bounds)
+  is past the line: poleward velocity cancelled plus the full wind, never a teleport (a teleport
+  would leave the deck's players behind). Sable declared `optional` `[2.0.5,)` in mods.toml.
+- **Networking** (`net/`): `DeepTimeNetwork` registers `deeptime:world_info` (`WorldInfoPayload`:
+  planet flag, dimension, world-data format version, C, m/block h and v (manifest, new optional
+  fields), cap and stop, planet name = the manifest source's preset/kind; sent on login, dimension
+  change, respawn) and `deeptime:pole_storm` (`PoleStormPayload`: storm, push; sent on a change of
+  0.02 storm or 0.002 push, and on every change to or from zero; clamped on arrival), both
+  play-to-client, version "1", **required**. `ClientHandlers` only stores into `ClientPlanetState`
+  (no client classes, safe on a dedicated server). NeoForge has no public view of its
+  registrations: `DeepTimeNetwork.registrations()` reads `NetworkRegistry.PAYLOAD_REGISTRATIONS` by
+  reflection. New probes: `/deeptime probe pole [z]`, `/deeptime probe network`.
+- **Client** (`client/DeepTimeClient`, `client/PolarStorm`; loaded only when
+  `FMLEnvironment.dist == CLIENT`): the F3 line (`net/PlanetDebugLine`, left column:
+  `Deep Time: 76.904° N 90.000° E · wrap-test (C 16384, 300 m/block) · polar storm 62%`), the wind,
+  fog (far plane from the render distance down to 20 blocks at full storm, near plane to 0,
+  colour toward pale grey; camera in air only) and up to 16 snowflakes a tick blown equatorward;
+  the drawn storm eases 0.02/tick. **Compiled only**: no client was booted. mic-climate's
+  HeadlessMC route is not cheap here: its `-lwjgl` mode never got past "Waiting for player to
+  load", its Xvfb mode is Linux-only (the Mac has no X server; the laptop must not run heavy
+  jobs), and reaching the storm would also need a Deep Time world with the player at 75°+.
+- **Tests.** Players are `gametest/MockPlayers`: real `ServerPlayer`s placed through
+  `PlayerList.placeNewPlayer` on an `EmbeddedChannel` connection NeoForge treats as a full NeoForge
+  client (`NetworkRegistry.configureMockConnection`), so tests read the packets the server sends
+  (storm payloads, action bar = system chat with overlay) and see its teleports; nothing moves
+  them. Planet namespace (`PoleCapGameTests`; each test forces its own polar chunk strips at
+  y = max − 20.5, so the harness only needs a loaded spot): `entityPushedBack`, `hardStopAt80`,
+  `sableHullPushedBack`. GameTest namespace (`NetworkGameTests`): `worldInfoRoundTrip`,
+  `poleStormRoundTrip`, `worldInfoChannelRequired` (registration + NeoForge's own negotiator),
+  `planetDebugLine`, `worldInfoFollowsThePlayer` (own batch). The planet server now also enables
+  the `deeptime` namespace so `worldinfochannelrequired` runs there too. Headless connection test:
+  `gametest-planet.sh --scenario refuse_client` (new `tools/planet/mcclient.py`, stdlib, protocol
+  767 with compression) logs in over TCP three times with the channel list from
+  `/deeptime probe network` (read from the server log: RCON returns only 4 kB of the 20 kB line).
+  `--scenario` is repeatable now. `tools/review/phase0.py` runs the new pole tests instead of the
+  prototype; the seam page shows the real curves, texts and "Verified".
+- **Measured** (Mac; numbers from the planet run of the final commit):
+  `tools/remote/mac.sh --server -- '(cd neoforge && ./gradlew build test) ; ./gametest.sh ;
+  tools/smoke/install.sh standalone ; ./gametest-planet.sh --run columnscontinuous,entitycrossesseam,structurestraddlesseam,treestraddlesseam,shaftlineacrossseam@8185,250,0 --run jetcrossesseam@8185,250,64 --run entitypushedback,hardstopat80,sablehullpushedback,worldinfochannelrequired@0,300,64 --scenario sable_straddle --scenario refuse_client'`
+  → JUnit `tests=65 failures=0 errors=0` (PoleCapCurveTest 8 new); GameTest server `All 26 required
+  tests passed`; planet server `PASS`: the five seam tests, jetcrossesseam 20/20, sable_straddle OK,
+  and the four P1-18 tests. entityPushedBack (C = 16,384, 40 ticks): players N and S identical —
+  74.5° storm 0 / push 0 / no bar; 76° 0.3241 / 0.0089; 77.5° 0.6156 / 0.0354; 79° 0.8554 / 0.0716,
+  bar each; creative 77.5° storm 0.616 push 0 + no-wind bar; spectator storm 0.616 push 0, no bar;
+  minecarts with riders dz 0 / −3.91 / −12.95 / −14.58 at 74.5 / 76 / 77.5 / 79° S (the 0.4
+  blocks/tick off-rail limit flattens the top) and +12.85 at 77.5° N, riders sent push 0.
+  hardStopAt80: survival 80.5° N and 82° S and creative 80.5° S put at |z| 3640.84 (79.9989°, line
+  3640.89); spectator at 81° N untouched; carts (one placed at 80.5° N, one running poleward at 0.4
+  from 79.995° S) never observed past 79.9989°, riders still aboard. sableHullPushedBack (40 ticks):
+  dz 0 at 74.5° S, −5.90 at 76.5° S, −20.81 at 78.5° S, +12.70 at 77.5° N; the 60 blocks/s hull
+  from 79.3° N: poleward edge max 80.051° (allowed 80.088°, one tick of travel + a block), ends at
+  79.60° moving back at 26.2 blocks/s. worldInfoChannelRequired: 199 channels (188 play); without
+  Deep Time's two → refused naming exactly them. refuse_client over TCP: NeoForge client without
+  Deep Time refused (`neoforge:modded_network_setup_failed` names deeptime:pole_storm and
+  deeptime:world_info, then `multiplayer.disconnect.incompatible`), with every channel accepted
+  (`neoforge:network`), vanilla refused (NeoForge's "you are not running NeoForge"). Logs:
+  gitignored `review/out/p1-18/{junit,gametest,planet}.txt` and `run-planet/planet.log` in this worktree.
+- **Next.** Merge; P1-19 lists the four planet tests and `refuse_client` in the Phase 1 exit. A
+  real client boot (the storm visuals, the F3 line, the client-side wind) stays unverified (plan
+  §9.8).
 
 ### 2026-09-28 — P1-03 plates and crust (agent worktree agent-a634f0216bff6a4a4, branch worktree-agent-a634f0216bff6a4a4)
 - **What.** `crates/deeptime-core/src/plates/` (mod, state, kinematics, geometry, init, subduction,
@@ -198,6 +404,157 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   publishing them as frames is not done here (P1-14 landed while this task ran).
 - **Next.** P1-04 (surface processes on L1) reads `plates/uplift_mm_yr` and the other `plates/*`
   fields; its pipeline should set `tectonics.l1_every_steps` = 1. Then the frames P1-14 reads.
+
+### 2026-09-28 — P1-15 deposits in the world, on the synthetic deposit world (agent worktree agent-a76188b70a388c5da, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Scope.** Everything of P1-15 that does not need P1-03…P1-08, driven by P1-14's synthetic run.
+  The row stays `doing` until the real presets feed it (rerun the acceptance below unchanged).
+- **A world with terrain and deposits (Rust).** A `deposits_synthetic` preset may carry
+  `"terrain": {"strata": "placeholder" | "every-class"}`: `finalize_write` then bakes, next to the
+  sites, bodies and events, a terrain whose elevation is the synthetic history's present elevation
+  (`deposits::synthetic::HistoryTerrain`, `synth::build_with`, kind `deposit-history`), so every body
+  sits in the ground it was placed against. For that the deposit stage now samples the present
+  surface **bilinearly on L1 at the site's point** (`Finish::surface_at`, `bilinear_cells`) instead
+  of the nearest cell; P1-14's tests and its 16k census (32 sites) are unchanged. Presets
+  `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json` (GameTests, smoke). Truncated ore
+  bodies' clips lie within 3 blocks of the baked ground (`world_preset_bakes_terrain_under_the_bodies`).
+- **Spawn and essentials (Rust + Java).** `Essential` gains `max_blocks_from_spawn`. New
+  `deposits::spawn`: with such essentials the bake ranks spawn candidates (dry, flat, 16-block
+  lattice; fewest essentials out of reach, then Σ min(d/max, 4), then distance from 0,0; top 10,
+  64 blocks apart) and writes `ranked_by`, `unmet`, `score`, `essentials` into
+  `spawn/candidates.json` (FORMAT.md). `SpawnHandler` takes the dry candidate with the fewest
+  `unmet`. Java registries `deeptime:essentials`, `deeptime:scatter` and `deeptime:deposit_type`
+  (lenient codec: products and the ore-block policy only) in `ore/OreData`; Deep Time ships vanilla
+  essentials (iron, coal 1 per 4,096-block region, exposed, spawn ≤ 2,048; copper 1 per 8,192,
+  spawn ≤ 3,072; gold 1 per 8,192) and scatter rules (coal, iron, copper, gold, zinc; values
+  judged, marked initial). **Content bundle:** `FirstStartGenerator` passes
+  `{"essentials": [...]}` from the registry to the native run; `Preset::with_content` replaces the
+  preset's essentials with it (the recorded preset.json carries the list used).
+- **Java world data.** `worlddata/{Sectioned, SiteData, BodyData, Body, EventData, Deposits}`: readers
+  of `DTSR`/`DTSI`/`DTBD`/`DTEV` (CRCs, versions, bounds checked as in Rust), `Body.locate` = Rust's
+  `Body::locate` operation for operation, `WorldData.deposits()` lazily. **Parity:**
+  `DepositDataParityTest` over `deeptime run deposits_world_4k.json` + new `deeptime dump-deposits`
+  (Gradle `testWorldDeposits4k`): every site field, 532 index lookups, 49 bodies × 401 samples
+  (a quarter across the seam) — 19,649 samples, 1,388 inside, worst |Δd|,|Δv| 3.3e-16, 0
+  inside/outside disagreements — and every forming event's cause chain.
+- **API** `api/{DeepTimeSites, Site, SiteKind, Product, Extraction, GeoEvent}` (plan §5.6) via
+  `worldgen/LevelSites`: `of(ServerLevel)` (empty outside Deep Time levels), `all`, `at` (body SDF),
+  `inChunk`, `within`, `byId`, `formingEvent`, `causeChain`, `event`.
+- **Strata pass:** bodies now paint their `rock_class` (a zone's winning, last zone last) over the
+  crust or horizon rock inside their SDF, one member per body (`StrataPass.bodyKey`);
+  `StrataPass.predictedRock` for tests. `RockPalette` gains `host(state)` (ROCK = crust or any
+  consolidated class's block, LOOSE = the `unconsolidated` family, NONE), `classesOf`, `isLoose`.
+- **Deposit feature** (`worldgen/DepositFeature`, `deeptime:deposits`) and **background scatter**
+  (`worldgen/BackgroundScatterFeature`), both at `underground_ores` through one
+  `neoforge:add_features` modifier (`biome_modifier/deposits.json`, deposits first). Per block one
+  draw, a SplitMix hash of the canonical position and the body id, against the running sum of the
+  densities of the zones with a material that apply there (zone order; FORMAT.md "Bodies"); host =
+  ROCK, or LOOSE only in a body whose own class is loose (placers in gravel). Scatter: ⌊n⌋ + chance
+  clusters per chunk, start depth from `y_window` as a fraction of the column from the world data's
+  surface to min_y (the plan's "fraction of crust thickness"), a `size`-step random walk inside the
+  chunk, ROCK hosts only, `host_bias` per class. Both write only their own chunk; both no-ops
+  outside Deep Time generators.
+- **OreBlockResolver** (`ore/`): EV variant for the host, else `#c:ores/<m>` ∩
+  `#c:ores_in_ground/{deepslate below 0, stone}`, else the first `#c:ores/<m>` block; cached per
+  (material, host block, below 0), rebuilt on tag reload. **EV** (`compat/ev/EvBridge` +
+  `EvBridgeImpl`, compileOnly `maven.modrinth:excavated_variants:krUiU6UD` — the slug has an
+  underscore): EV 4.3.1 registers its `ore`/`stone` registries in `BuiltInRegistries.REGISTRY`, and
+  after registration `Ore.getStones()` maps each stone to the ore's block in it (originals and
+  generated variants), so no id arithmetic. EV already ships stone configs for vanilla's and
+  Create's stones; Deep Time ships only the four vanilla stand-ins EV lacks (polished tuff, packed
+  mud, smooth sandstone, cobblestone) through DefaultResources (`defaultresources.meta.json` +
+  `defaultresources/globaldata/deeptime/excavated_variants/stone/`; verified loaded under -PwithEv).
+  **Finding: EV's own `ore_replacer` must not run in Deep Time levels** — added to every biome's
+  `TOP_LAYER_MODIFICATION` in `AFTER_EVERYTHING`, it re-picks ore stones from neighbours with
+  chunk-edge bookkeeping, and a regenerated deposit differed in 200 of 1,406 ore blocks. Compat mixin
+  `mixin/compat/excavated_variants/OreReplacerMixin` (@Pseudo, applied only with EV) skips it in
+  Deep Time levels; other levels and EV's config are untouched. Consequence: unknown ores in Deep
+  Time levels stay their stone/deepslate blocks in granite/diorite/andesite/tuff hosts (follow-up:
+  a deterministic EV conversion for unknown ores against `predictedRock`).
+- **Ore claiming** (`ore/ClaimOresBiomeModifier`, `ClaimRules`; `biome_modifier/claim_ores.json`,
+  `#minecraft:is_overworld`): REMOVE phase, every decoration step, only when
+  `ServerLifecycleHooks.getCurrentServer()`'s overworld stem is a `GeologicChunkGenerator`. Claimed
+  materials = deposit-type products + scatter materials (+ `materials`): c:coal, copper, crude_oil,
+  gold, iron, lead, molybdenum, silver, zinc. Only **ore-shaped** feature types are judged
+  (`minecraft:ore`, `scattered_ore`, `replace_single_block`, `create:layered_ore`,
+  `lithostitched:ore`, + `ore_feature_types`); selectors are followed; the blocks placed are read by
+  encoding the configured feature with its codec and collecting `{"Name": …}` states outside
+  rule-test keys (works for Create's layered ore without Create on the classpath). ORE = places a
+  `#c:ores/<claimed>` block; ROCK (with `claim_rock_features`, default on, **Q4 pending**) = every
+  placed block is ROCK and nothing else is in the feature (+ `rock_features` list, which names
+  `create:striated_ores_overworld`); loose pockets (dirt, gravel, clay) stay; `keep` list. A first
+  version judged every feature and removed Terralith's floating islands, boulders, pillars, ponds
+  and lava removers — hence the ore-shaped rule. `/deeptime probe claims` prints the dry run and
+  what was removed.
+- **Probes** (`server/SiteCommands`): `probe site <x> <y> <z>` (site, bodies, zones, d, v, the draw's
+  material, the block), `sites near <x> <z> <radius>`, `why <siteId>` (site, forming event, 4-link
+  chain; readable lines too), `probe claims`. `tools/smoke/run.py --rcon <cmd>` records probe lines
+  in the report and `rcon.jsonl`; its generation check accepts a generation shorter than the
+  progress gap, and its mixin check skips compat mixins the plugin skipped.
+- **GameTests** (new level `deeptime:test_deposits` + `test_deposits_twin` over
+  `run-gametest/world/deeptime-deposits`, C = 4,096, fixed biome `deeptime:test_ores` whose only
+  features are the two above; gametest.sh writes it with `deeptime run`): `DepositGameTests.
+  {bodyHasOre, vanillaOreBlock, evVariantWhenInstalled, depositsDeterministic, siteApiAndProbes,
+  backgroundScatterPlaces}`, `ClaimGameTests.{claimOffWhenOverworldNotGeologic,
+  claimRulesSortFeatures}` (the GameTest overworld is not Deep Time's, so claiming is off there and
+  the rules are checked as a dry run), `SpawnGameTests.essentialsWithinReach`, and on the planet
+  server `PlanetClaimGameTests.claimOnInPlanetWorld`. The site is picked from the registry (first
+  deposit with products whose ore body is ≤ 96 blocks across and due ≥ 200 ore blocks, porphyry
+  first): site 2, porphyry Cu-Mo-Au, stockwork-shell body 3, AABB (−1330, 117, 175)..(−1298, 156, 208).
+- **Measured (Mac).** `cargo test --workspace` ok (core 102, format 31, cli 9, inspect 19 + 7, jni 7,
+  viewer 4), clippy `-D warnings`, fmt, `deny check licenses bans` clean; `gradlew build test` →
+  tests=62 failures=0. `mac.sh --server -- ./gametest.sh` → **All 30 required tests passed**:
+  body 3 due 1,704, placed 1,222 = exact 1,222 (`minecraft:copper_ore`), missed 0, not host 482
+  (air 365, dirt 84, grass 33: the clipped top and the soil), 184 other ores in the box all explained
+  (178 another body's, 6 scatter), unexplained 0, 12 chunks; regeneration 44,880 blocks,
+  1,406 ore, 0 differ; scatter 16 chunks, 539 planned, 404 placed, 0 wrong; spawn (−1184, 76, −462),
+  iron 52 / coal 52 / copper 44 blocks (reach 1,024/1,536/1,024); why: deposit_formation ←
+  subduction_onset, orogeny_phase. Claim dry run: 12 ORE (vanilla, incl. nether gold) and 7 ROCK of
+  235 placed features; plains untouched (0 removed). `./gametest.sh -PwithEv` (TW + EV 4.3.1 + DAG
+  6.1.2) → **All 30 passed**: the same 1,222 blocks as EV variants (1,115 copper-in-red-sandstone,
+  107 copper-in-sandstone), 171 EV ores / 111 stones / 110 variants, Deep Time's four stones load.
+  `./gametest.sh -PwithMic` (pack 303fd89 via `install.sh mic`, the rock tags as `deeptime_extra`)
+  → **All 30 passed**: body 3 adds 110 `iceandfire:silver_ore`; claim dry run over 932 placed
+  features: 16 ORE (vanilla, `create:zinc_ore`, `createnuclear:lead_ore`, `iceandfire:silver_ore`,
+  `terralith:cave/fungal/ore_coal_extra`), 24 ROCK (vanilla blobs, `create:striated_ores_overworld`,
+  `born_in_chaos_v1:black_argillite`, 16 Terralith rock/cliff features incl. `ds_reducer`,
+  `noise_reducer`, `granitifier`, `calcitifier`, `desert/sandstone`), kept: uranium, platinum,
+  nickel, fluorite, wolframite, sapphire, Cobblemon, `createnuclear:striated_ores_overworld`
+  (rock + uranium), Terralith's floating islands, boulders and pillars. `./gametest-planet.sh --run
+  claimoninplanetworld@0,100,0` → PASS (standalone set: 19 removed, plains 48 → 33 features) and with
+  `-- -PwithMic` → PASS (38 removed; uranium, diamond, lapis, redstone, dirt kept).
+- **Smoke and ore render.** `install.sh standalone --preset $PWD/crates/deeptime-core/tests/presets/
+  deposits_world_16k.json --length-myr 500`, then `mac.sh --server -- 'python3 tools/smoke/run.py
+  --profile standalone --fresh --chunky 112 --chunky-center -5570,-1030 --rcon "deeptime sites near
+  -5570 -1030 600" --rcon "deeptime why 2" --rcon "deeptime probe site -5563 130 -1002" --rcon
+  "deeptime probe claims"'` → **PASS**: first start ran the deposit engine through JNI with the
+  registry's essentials (content bundle logged) in 2.2 s — 42 sites (32 with the preset's own
+  essentials in the CLI run; the natural sites are identical), spawn (−16, 69, −2142) with coal and
+  iron 2 blocks and copper 669 blocks away; claim removed 19 features; all four probes answered.
+  `cargo run -p deeptime-inspect -- ore --world smoke/standalone/server/planet
+  --area=-5682,-1142,-5458,-918 --scale 3` → `review/out/p1-15/ore-standalone/ore.png` (the ore
+  render now outlines site footprints and counts ore columns inside/outside them; it also knows
+  EV's variant names). What it shows: the placer's gold streak inside its box, the supergene
+  blanket's copper cluster inside the porphyry's box, and outside the boxes only small scatter
+  clusters (copper 625 columns outside vs 329 inside the footprints, iron 873/197, coal 680/165,
+  zinc 134/42, gold 82/139) and the unclaimed vanilla ores (diamond, lapis, redstone ~8,100 blocks,
+  kept by design). Porphyry site 10's box is empty: the every-class strata put soil, till and
+  laterite (loose) at y 102–141 there, and loose rock hosts ore only in loose bodies.
+- **Deviations and findings.** (1) Driven by the synthetic run, not `earthlike_quick_16k`. (2) The
+  GameTest server cannot turn claiming on (its overworld is not Deep Time's), so claiming is a dry
+  run there plus the planet-server test (the plan already put `claimOnInPlanetWorld` there).
+  (3) Deposit tests use a fixed test biome so vanilla features cannot interfere. (4) EV's ore
+  replacer is disabled in Deep Time levels (above); plan §7.6 updated. (5) P1-14 engine quirks seen
+  in the renders, for its follow-up: the guarantee pass stacks guaranteed deposits of different
+  materials on one cell (coal and BIF both at (−16, −2144), 2 blocks from the chosen spawn); several
+  porphyries have no products left (leached into their blankets) and are still bodies; a porphyry
+  ore body has no rock class of its own, so in loose horizons it places nothing (P1-07 could give
+  intrusive types their intrusion class). (6) Not done: the BlueMap cut through a porphyry and the
+  side-by-side EV renders for Ben (Q10); a spacesheep page; size-multiplier tuning on renders (the
+  bodies look plausible at 20–60 blocks; left at P1-14's values); unknown-ore EV conversion; MIC's
+  own essentials and scatter lists (pack branch).
+- **Next step.** P1-16 (COE/CDG) can use `DeepTimeSites` directly. After P1-08, rerun: `./gametest.sh`,
+  `-PwithEv`, `-PwithMic`, `./gametest-planet.sh --run claimoninplanetworld@0,100,0 [-- -PwithMic]`
+  and the smoke/ore render on the real preset; answer Q4 and Q10.
 
 ### 2026-09-28 — P1-12 strata pass with rock tags and `rock_states` (agent worktree agent-a9583db34fe66882c)
 - **Datapack registries** (`DeepTimeRegistries`, NeoForge `DataPackRegistryEvent.NewRegistry`, no
