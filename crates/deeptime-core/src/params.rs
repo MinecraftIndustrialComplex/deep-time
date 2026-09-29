@@ -114,7 +114,7 @@ pub const PLANET_KEYS: [&str; 12] = [
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
-pub const SCALE_KEYS: [&str; 7] = [
+pub const SCALE_KEYS: [&str; 8] = [
     "circumference_blocks",
     "m_per_block_h",
     "m_per_block_v",
@@ -122,7 +122,13 @@ pub const SCALE_KEYS: [&str; 7] = [
     "max_y",
     "sea_level_y",
     "pole_cap_deg",
+    "feature_scale",
 ];
+
+/// The most of the planet the initial continental crust, (1 − ocean_fraction)/(1 − shelf share),
+/// may cover: the rest is ocean floor. All continental crust (no ocean floor to subduct, no ridges)
+/// gives NaN elevations from the surface stage; 0.986 was run and works.
+pub const MAX_CONTINENTAL_SHARE: f64 = 0.98;
 
 /// The tectonic regime (plan §5.1). v1 simulates only a mobile lid.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -182,6 +188,33 @@ pub struct ScaleParams {
     pub sea_level_y: i32,
     #[serde(default = "d_pole_cap_deg")]
     pub pole_cap_deg: f64,
+    /// How big the world's features are drawn in blocks, relative to their real size at the
+    /// block scale (the editor's "feature scale" settings); 1 everywhere is the calibrated world.
+    #[serde(default)]
+    pub feature_scale: FeatureScale,
+}
+
+/// Multipliers of feature sizes in blocks (plan §5.1 `feature_scale`; the editor's Multipliers
+/// section). Only features the model has today are here: rivers and canyons arrive with Phase 2's
+/// river and cave stages, and get their keys then.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct FeatureScale {
+    /// Ore bodies: their length, width and height in blocks (the tonnage, grade and site
+    /// records stay as they are; `deposits.size_mult` is the amount of ore).
+    pub deposits: f64,
+    /// Rock layers: the thickness in blocks of every stratum of the baked columns (the history
+    /// and the ore stay as they are; `scale.m_per_block_v` moves everything).
+    pub strata: f64,
+}
+
+impl Default for FeatureScale {
+    fn default() -> Self {
+        FeatureScale {
+            deposits: 1.0,
+            strata: 1.0,
+        }
+    }
 }
 
 impl ScaleParams {
@@ -605,6 +638,16 @@ impl PlanetPreset {
             "$.scale.sea_level_y",
             "must lie between min_y and max_y",
         )?;
+        for (v, key) in [
+            (s.feature_scale.deposits, "$.scale.feature_scale.deposits"),
+            (s.feature_scale.strata, "$.scale.feature_scale.strata"),
+        ] {
+            check(
+                v.is_finite() && (0.1..=10.0).contains(&v),
+                key,
+                "must be in [0.1, 10]",
+            )?;
+        }
         let kf = &self.keyframes;
         check(kf.every_myr > 0.0, "$.keyframes.every_myr", "must be > 0")?;
         check(
@@ -705,6 +748,21 @@ impl PlanetPreset {
             "$.tectonics.continental_shelf_share",
             "must be in [0, 0.9)",
         )?;
+        // A planet without ocean floor has no ocean crust for the plate model and the surface to
+        // work with: the surface stage's elevations come out NaN everywhere (found by the settings
+        // audit's extremes: ocean_fraction 0.25 with the pipeline presets' shelf share 0.29).
+        let continental = (1.0 - p.ocean_fraction) / (1.0 - k.continental_shelf_share);
+        if continental > MAX_CONTINENTAL_SHARE {
+            return Err(CoreError::preset(
+                "$.tectonics.continental_shelf_share",
+                format!(
+                    "the continental crust, (1 − ocean_fraction)/(1 − continental_shelf_share) = \
+                     {continental:.3} of the planet, must leave at least {:.0} % ocean floor: raise \
+                     planet.ocean_fraction or lower the shelf share",
+                    100.0 * (1.0 - MAX_CONTINENTAL_SHARE)
+                ),
+            ));
+        }
         if let Some(s) = &self.structure {
             s.validate()?;
             check(
@@ -894,6 +952,30 @@ mod tests {
         assert_eq!(full.resolution.l0_samples, 250_000);
     }
 
+    /// The settings audit (decisions log 2026-09-29: tuning knobs that shape the world are settings): the
+    /// editors change only keys the preset carries, so the pipeline presets write out the sections
+    /// that used to be absent or empty (`structure`, `amplify`) at the values those sections take
+    /// when the keys are missing, so a default run is unchanged (STATUS.md's settings audit entry compares
+    /// the world files of a 100 Myr run byte for byte).
+    #[test]
+    fn the_pipeline_presets_write_out_the_tuning_knobs_at_their_defaults() {
+        for (name, json) in PIPELINE_BUILTIN {
+            let p = planet(json);
+            assert_eq!(
+                p.amplify,
+                Some(crate::surface::amplify::AmplifyParams::default()),
+                "{name}: the terrain carving is medium (Ben, 2026-09-29)"
+            );
+            assert_eq!(
+                p.structure,
+                Some(crate::structure::StructureParams::default()),
+                "{name}: pluton rate and size"
+            );
+            assert_eq!(p.amplify.as_ref().unwrap().incision_cap, 3.0);
+            assert_eq!(p.surface.as_ref().unwrap().drama, 1.0);
+        }
+    }
+
     #[test]
     fn timeline_choices_apply() {
         let json = with_timeline(
@@ -924,6 +1006,14 @@ mod tests {
             path_of(&v.to_string())
         };
         assert_eq!(edit(&|v| v["tectonics"]["nope"] = json!(1)), "$.tectonics");
+        // No ocean floor at all: 60 % land on 100 % continental crust (0.6/0.4 of the planet).
+        assert_eq!(
+            edit(&|v| {
+                v["planet"]["ocean_fraction"] = json!(0.4);
+                v["tectonics"]["continental_shelf_share"] = json!(0.6);
+            }),
+            "$.tectonics.continental_shelf_share"
+        );
         assert_eq!(
             edit(&|v| v["planet"]["ocean_fraction"] = json!(1.5)),
             "$.planet.ocean_fraction"

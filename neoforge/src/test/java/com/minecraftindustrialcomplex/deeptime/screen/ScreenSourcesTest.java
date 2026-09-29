@@ -94,8 +94,11 @@ class ScreenSourcesTest {
         }
         assertTrue(used.size() > 60, "found only " + used.size() + " keys: the patterns no longer match the sources");
         // Keys built at run time.
-        for (EditorFields.Field f : EditorFields.ALL)
+        for (EditorFields.Field f : EditorFields.ALL) {
             used.add("deeptime." + f.labelKey());
+            for (String option : f.options())
+                used.add("deeptime." + f.optionKey(option));
+        }
         for (EditorFields.Section s : EditorFields.Section.values())
             used.add("deeptime.editor.section." + s.name().toLowerCase(java.util.Locale.ROOT));
         for (String s : Presets.START_CONFIGS)

@@ -731,6 +731,27 @@ fn the_amplify_section_is_validated_and_needs_the_young_one() {
         edit(&|v| v["amplify"]["nope"] = serde_json::json!(1)),
         "$.amplify"
     );
+    // The editor's "Terrain carving" (settings audit): the default is medium (3); the whole editor range
+    // 0.25..=10 and the core's (0, 100] are accepted, nothing beyond.
+    assert_eq!(AmplifyParams::default().incision_cap, 3.0);
+    for ok in [0.25, 0.5, 3.0, 10.0, 100.0] {
+        let p = AmplifyParams {
+            incision_cap: ok,
+            ..AmplifyParams::default()
+        };
+        p.validate().unwrap();
+    }
+    for bad in [0.0, -1.0, 100.5, f64::NAN] {
+        let p = AmplifyParams {
+            incision_cap: bad,
+            ..AmplifyParams::default()
+        };
+        assert!(p.validate().is_err(), "{bad}");
+    }
+    assert_eq!(
+        edit(&|v| v["amplify"]["incision_cap"] = serde_json::json!(101.0)),
+        "$.amplify.incision_cap"
+    );
     assert_eq!(
         edit(&|v| v["amplify"]["tile_cells"] = serde_json::json!(300)),
         "$.amplify.tile_cells"

@@ -107,6 +107,13 @@ class ModelHelpersTest {
         assertEquals("9.81", Formats.number(9.81));
         assertEquals("300", Formats.number(300.0));
         assertEquals("0.001", Formats.number(0.001));
+        assertEquals("0.0001", Formats.number(0.0001));
+        // Under 1e-4 six decimals would round the value away (the erosion constant, 2e-9): scientific form.
+        assertEquals("2e-9", Formats.number(2.0e-9));
+        assertEquals("1.5e-7", Formats.number(1.5e-7));
+        assertEquals("-5e-5", Formats.number(-5.0e-5));
+        assertEquals(2.0e-9, Formats.parse(Formats.number(2.0e-9)));
+        assertEquals(1.5e-7, Formats.parse("1,5e-7"));
         assertEquals(5.5, Formats.parse(" 5,5 "));
         assertTrue(Double.isNaN(Formats.parse("x")));
         assertTrue(Double.isNaN(Formats.parse("Infinity")));

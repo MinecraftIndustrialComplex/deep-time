@@ -42,6 +42,18 @@ final class SetupPage implements PlanetEditorScreen.Page {
     private EditBox shareBox;
     private Component shareStatus = Component.empty();
     private static double scrollMemory;
+    /** Set by {@link #showAdvanced}: the next drawing scrolls the Advanced header to the top. */
+    private static boolean scrollToAdvanced;
+
+    /** Development (ScreenshotDriver): the next drawing of the page scrolls the Advanced header to the top. */
+    static void showAdvanced() {
+        scrollToAdvanced = true;
+    }
+
+    /** Development (ScreenshotDriver): scrolls the page by {@code rows} rows on its next drawing. */
+    static void scrollRows(int rows) {
+        scrollMemory += (double) rows * ROW;
+    }
 
     @Override
     public void init(PlanetEditorScreen s) {
@@ -126,12 +138,15 @@ final class SetupPage implements PlanetEditorScreen.Page {
 
         EditorFields.Section section = null;
         for (EditorFields.Field f : EditorFields.ALL) {
+            if (f.advanced())
+                continue; // behind the Advanced header below
             if (f.section() != section) {
                 section = f.section();
                 list.header(Lang.tr("editor.section." + sectionKey(section)));
             }
             list.row(fieldLabel(f), fieldWidget(f, font), tooltipOf(f));
         }
+        advanced(s, font);
         list.setScrollAmount(scrollMemory);
 
         int by = s.height - 24;
@@ -150,15 +165,47 @@ final class SetupPage implements PlanetEditorScreen.Page {
         tick();
     }
 
+    /**
+     * The Advanced settings (settings audit): one header button that folds every {@code adv_*} section of
+     * the catalogue in and out, closed by default; open, each section is a sub-header over its
+     * fields, in the list's own scrolling. The state is the model's, so it survives a redraw.
+     */
+    private void advanced(PlanetEditorScreen s, Font font) {
+        List<EditorFields.Field> adv = EditorFields.advancedFields();
+        if (adv.isEmpty())
+            return;
+        int avail = model.advancedAvailable();
+        String count = avail == adv.size() ? String.valueOf(adv.size()) : avail + " of " + adv.size();
+        boolean open = model.advancedOpen();
+        Component label = open ? Lang.tr("editor.advanced.open", count) : Lang.tr("editor.advanced.closed", count);
+        int edited = model.advancedEdited();
+        if (edited > 0) // a closed header still says the world differs from the preset's
+            label = Lang.tr("editor.advanced.edited", label, edited);
+        int at = list.children().size();
+        if (scrollToAdvanced) {
+            scrollToAdvanced = false;
+            scrollMemory = (double) at * ROW;
+        }
+        list.toggle(label, Lang.tr("editor.advanced.tooltip").getString(), () -> {
+            model.setAdvancedOpen(!open);
+            if (!open)
+                scrollMemory = (double) at * ROW; // the header to the top, its sections below it
+            s.refresh();
+        });
+        if (!open)
+            return;
+        EditorFields.Section section = null;
+        for (EditorFields.Field f : adv) {
+            if (f.section() != section) {
+                section = f.section();
+                list.header(Lang.tr("editor.section." + sectionKey(section)));
+            }
+            list.row(fieldLabel(f), fieldWidget(f, font), tooltipOf(f));
+        }
+    }
+
     private static String sectionKey(EditorFields.Section s) {
-        return switch (s) {
-            case PLANET -> "planet";
-            case SCALE -> "scale";
-            case MULTIPLIERS -> "multipliers";
-            case BIOMES -> "biomes";
-            case FANTASY -> "fantasy";
-            case PLAYABILITY -> "playability";
-        };
+        return s.name().toLowerCase(java.util.Locale.ROOT);
     }
 
     private static Component fieldLabel(EditorFields.Field f) {
@@ -166,13 +213,20 @@ final class SetupPage implements PlanetEditorScreen.Page {
         return f.unit().isEmpty() ? label : label.copy().append(" (" + f.unit() + ")");
     }
 
+    /** A choice's option as the player reads it (a fixed option has a lang key, others show as they are). */
+    private static Component optionLabel(EditorFields.Field f, String value) {
+        return f.options().contains(value) ? Component.translatable("deeptime." + f.optionKey(value)) : Component.literal(value);
+    }
+
+    /** What the field does (the catalogue's hint), then its range or why it is not editable. */
     private String tooltipOf(EditorFields.Field f) {
         if (f.phase3())
             return Lang.tr("editor.field.phase3").getString();
+        String hint = f.hint().isEmpty() ? "" : f.hint() + "\n";
         if (!model.available(f))
-            return Lang.tr("editor.field.unavailable", f.path()).getString();
-        return f.kind() == EditorFields.Kind.NUMBER
-                ? Lang.tr("editor.field.range", Formats.number(f.min()), Formats.number(f.max()), f.path()).getString() : f.path();
+            return hint + Lang.tr("editor.field.unavailable", f.path()).getString();
+        return hint + (f.kind() == EditorFields.Kind.NUMBER
+                ? Lang.tr("editor.field.range", Formats.number(f.min()), Formats.number(f.max()), f.path()).getString() : f.path());
     }
 
     private AbstractWidget fieldWidget(EditorFields.Field f, Font font) {
@@ -197,7 +251,8 @@ final class SetupPage implements PlanetEditorScreen.Page {
                     w = Button.builder(Lang.tr("editor.field.none"), b -> {}).width(WIDGET_W).build();
                     on = false;
                 } else {
-                    w = CycleButton.<String>builder(Component::literal).withValues(choices).withInitialValue(choices.get(0))
+                    String current = model.choice(f).filter(choices::contains).orElse(choices.get(0));
+                    w = CycleButton.<String>builder(v -> optionLabel(f, v)).withValues(choices).withInitialValue(current)
                             .displayOnlyValue().create(0, 0, WIDGET_W, 20, fieldLabel(f), (b, v) -> model.setChoice(f, v));
                 }
             }
@@ -281,7 +336,42 @@ final class SetupPage implements PlanetEditorScreen.Page {
             addEntry(new Row(label, List.of(a, b)));
         }
 
+        /** A full-width button (the Advanced header). */
+        void toggle(Component label, String tooltip, Runnable onPress) {
+            Button b = Button.builder(label, x -> onPress.run()).width(WIDGET_W).build();
+            if (tooltip != null && !tooltip.isEmpty())
+                b.setTooltip(Tooltip.create(Component.literal(tooltip)));
+            addEntry(new Wide(b));
+        }
+
         abstract static class Entry extends ContainerObjectSelectionList.Entry<Entry> {}
+
+        static final class Wide extends Entry {
+            private final Button button;
+
+            Wide(Button button) {
+                this.button = button;
+            }
+
+            @Override
+            public void render(GuiGraphics g, int index, int top, int left, int width, int height, int mouseX, int mouseY,
+                    boolean hovering, float partialTick) {
+                button.setX(left);
+                button.setY(top);
+                button.setWidth(width);
+                button.render(g, mouseX, mouseY, partialTick);
+            }
+
+            @Override
+            public List<? extends GuiEventListener> children() {
+                return List.of(button);
+            }
+
+            @Override
+            public List<? extends NarratableEntry> narratables() {
+                return List.of(button);
+            }
+        }
 
         static final class Header extends Entry {
             private final Component label;

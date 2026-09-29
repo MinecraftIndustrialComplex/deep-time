@@ -22,7 +22,7 @@
 # tools/client/ev-assets-mac.sh shares; read its header. --lease-wait is how long to wait for a busy
 # desktop (default 600 s).
 #
-# Passes: `main` (create=true unless --no-create: 01..10) and, unless --no-guidance, `guidance`
+# Passes: `main` (create=true unless --no-create: 01..10, plus 02b and 02c, the Advanced settings) and, unless --no-guidance, `guidance`
 # (-Ddeeptime.natives.forceFail=unsupported: its two shots land as 11-guidance-panel and
 # 12-create-world-natives-missing). Output: review/out/<name>/ (PNGs, client-<pass>.log,
 # shots.txt, runner.log, crash reports); tools/remote/mac.sh --pull brings it to the laptop.
@@ -66,7 +66,7 @@ if [ "$GUIDANCE" = 1 ]; then
     cp "$GAMEDIR/screenshots/03-create-world-natives-missing.png" "$OUT/12-create-world-natives-missing.png" 2>/dev/null || true
 fi
 
-expected=(01-create-world-deeptime 02-setup-no-timeline 03-setup-ready 04-run-map-live 05-run-globe-live
+expected=(01-create-world-deeptime 02-setup-no-timeline 02b-setup-advanced 02c-setup-advanced-scrolled 03-setup-ready 04-run-map-live 05-run-globe-live
           06-run-done 07-run-scrubbed 08-review 09-create-world-accepted)
 [ "$CREATE" = true ] && expected+=(10-in-world)
 [ "$GUIDANCE" = 1 ] && expected+=(11-guidance-panel 12-create-world-natives-missing)
