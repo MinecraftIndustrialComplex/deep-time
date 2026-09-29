@@ -44,8 +44,10 @@
 //! reports Σ(Δh)·a − (carbonate + evaporite) for the whole run.
 
 pub mod advect;
+pub mod amplify;
 pub mod carbonate;
 pub mod climate;
+pub mod detail;
 pub mod diffusion;
 pub mod events;
 pub mod facies;
@@ -59,7 +61,9 @@ pub mod pflood;
 pub mod routing;
 pub mod spl;
 pub mod strata_log;
+pub mod thermal;
 pub mod weathering;
+pub mod young;
 
 #[cfg(test)]
 mod tests;

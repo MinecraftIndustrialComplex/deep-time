@@ -27,7 +27,7 @@ pub use manifest::{FileEntry, LayerEntry, Manifest, Scale, Writer};
 pub use ramps::{Ramp, Ramps};
 pub use raster::{Cell, Codec, DType, GridDesc, LayerDesc, LoadedLayer, Raster, RasterRead, TILE};
 pub use sites::{Extraction, Product, Site, SiteId, SiteIndex, SiteKind};
-pub use tilepack::{TilePackReader, Written, encode_tile_pack, write_tile_pack};
+pub use tilepack::{TilePackReader, TilePackWriter, Written, encode_tile_pack, write_tile_pack};
 
 /// The world-data format version this crate reads and writes (plan §5.7.2). Its one source is the
 /// workspace `Cargo.toml` (`[workspace.metadata.deeptime] format_version`), read by `build.rs`;

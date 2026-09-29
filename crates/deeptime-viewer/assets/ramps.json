@@ -465,6 +465,10 @@
         [3.999, "#d0a040"],
         [4, "#e04030"]
       ]
+    },
+    "detail": {
+      "_comment": "The sub-cell detail amplitude in blocks (surface/detail.rs, P1-06): 0 on plains and along rivers, up to 6 blocks (12 at drama 2) on rough mountains.",
+      "stops": [[0, "#141414"], [1, "#4a3f7a"], [3, "#c26a4a"], [6, "#ffe08a"]]
     }
   },
   "layers": {
@@ -501,7 +505,12 @@
     "strata/outcrop": "rock_class",
     "strata/bedrock": "rock_class",
     "structure/log_grade": "metamorphic_grade",
-    "structure/trap_structure": "unit"
+    "structure/trap_structure": "unit",
+    "young/elevation": "elevation",
+    "young/drainage": "drainage",
+    "amplify/elevation": "elevation",
+    "amplify/detail": "detail",
+    "amplify/drainage": "drainage"
   },
   "default": "grey"
 }

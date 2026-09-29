@@ -126,6 +126,10 @@ fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
     v["keyframes"]["size"] = serde_json::json!([128, 64]);
     v["keyframes"]["every_myr"] = serde_json::json!(20.0);
     v["seed"] = serde_json::json!(seed);
+    // The young landscape and L3 amplification (P1-06) have their own tests
+    // (`surface::amplify::tests`); their L2 and L3 are far finer than this L1.
+    v.as_object_mut().unwrap().remove("young");
+    v.as_object_mut().unwrap().remove("amplify");
     v.to_string()
 }
 

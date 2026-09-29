@@ -5,7 +5,7 @@
 //! meaning on a 4.8 km (16k quick) or 2.4 km (16k full) cell.
 //!
 //! ```json
-//! "surface": {"k_spl": 3e-10, "m_spl": 1.0, "n_spl": 2.0, "g_deposition": 1.0,
+//! "surface": {"k_spl": 2e-9, "m_spl": 1.0, "n_spl": 2.0, "g_deposition": 1.0,
 //!             "sea_level": {"base_m": 0, "cycles": [{"amplitude_m": 80, "period_myr": 250}]}}
 //! ```
 
@@ -73,7 +73,10 @@ pub struct SurfaceParams {
     /// favour n > 1, Harel, Mudd & Attal 2016): with n = 1, m = 0.5 and any K that keeps orogens
     /// mountainous, continental rivers on gentle slopes planed whole continents to sea level
     /// within ~20 Myr in the 100–500-Myr tuning runs (STATUS.md, P1-04); with n = 2 steep orogens
-    /// erode fast and low cratons slowly. K = 3·10⁻¹⁰ (m·yr)⁻¹.
+    /// erode fast and low cratons slowly. K = 2·10⁻⁹ (m·yr)⁻¹ (P1-17 calibration with the real
+    /// climate, Airy isostasy and the narrower Andean uplift of the pipeline presets: the land's
+    /// median ends 0.6 km high and its 90th percentile ~2 km, Earth's 0.43 and 2.0 km; P1-04's
+    /// 3·10⁻¹⁰ was set on the stand-in climate's wetter interiors and left 2.5-km plateaus).
     pub k_spl: f64,
     /// Area exponent m.
     pub m_spl: f64,
@@ -87,9 +90,12 @@ pub struct SurfaceParams {
     pub threshold_slope: f64,
     /// Hillslope diffusivity κ for crystalline basement, m²/yr.
     pub kd_land_m2_yr: f64,
-    /// Shallow-water marine diffusivity D₀ (Landlab `SimpleSubmarineDiffuser`), m²/yr.
+    /// Shallow-water marine diffusivity D₀ (Landlab `SimpleSubmarineDiffuser`), m²/yr: Landlab's
+    /// default 100 (P1-17; P1-04 had 300). Faces take the mean of their cells' diffusivities, so
+    /// the sea erodes a coastal land cell at about D₀/2: at 300 the shores retreated ~250 km in
+    /// 500 Myr and drowned a third of the continental crust once the continents were Earth-low.
     pub kd_marine_m2_yr: f64,
-    /// Wave base of the marine diffusivity, m.
+    /// Wave base of the marine diffusivity, m (Landlab's default 60; P1-04 had 100).
     pub wave_base_m: f64,
     /// Tidal range (smooths the shoreline for diffusion and carbonates), m.
     pub tidal_range_m: f64,
@@ -116,10 +122,11 @@ pub struct SurfaceParams {
     /// Soil production decay depth H*, m.
     pub weathering_decay_depth_m: f64,
     /// Fraction of a load change compensated isostatically (the sea's water-loaded share is 0.7
-    /// of it). Airy isostasy would give ρ_crust / ρ_mantle ≈ 0.8; the default 0.6 is lower because
-    /// the plate model's uplift is already surface uplift over broad bands inboard of trenches, and
-    /// at steady state erosion = uplift / (1 − isostasy) (5× at 0.8 kept whole continents eroding
-    /// at 50–150 m/Myr in the first 100-Myr runs; 2.5× at 0.6).
+    /// of it): Airy's ρ_crust / ρ_mantle ≈ 2.7 / 3.3 ≈ 0.8 (P1-17). P1-04 chose 0.6 because the
+    /// plate model then uplifted whole continents (1,800-km Andean bands) and at steady state
+    /// erosion = uplift / (1 − isostasy); with the pipeline presets' 800-km bands the uplift is
+    /// confined to orogens, and 0.6 let erosion lower the cratons below the sea (a removed
+    /// kilometre of crust lowers the ground 400 m at 0.6, 200 m at Airy's 0.8).
     pub isostasy: f64,
     /// Radius over which loads are spread before compensation (a flexural wavelength), km.
     pub isostasy_radius_km: f64,
@@ -141,20 +148,24 @@ pub struct SurfaceParams {
     pub transgression_frac: f64,
     /// Iterations of Yuan et al.'s erosion–deposition solve (at most).
     pub spl_max_iter: u32,
+    /// The drama slider (plan §8.2, P1-06; the editor's `surface.drama`): 0..=2, default 1. It
+    /// scales the amplifier's thermal critical slope (`thermal::critical_slope`) and the
+    /// amplitude of the sub-cell detail term (`detail.rs`).
+    pub drama: f64,
 }
 
 impl Default for SurfaceParams {
     fn default() -> Self {
         SurfaceParams {
-            k_spl: 3.0e-10,
+            k_spl: 2.0e-9,
             m_spl: 1.0,
             n_spl: 2.0,
             g_deposition: 1.0,
             runoff_ref_m_yr: 0.5,
             threshold_slope: 0.35,
             kd_land_m2_yr: 2.0,
-            kd_marine_m2_yr: 300.0,
-            wave_base_m: 100.0,
+            kd_marine_m2_yr: 100.0,
+            wave_base_m: 60.0,
             tidal_range_m: 2.0,
             marine_fill_depth_m: 0.0,
             shelf_slope: 0.0005,
@@ -167,7 +178,7 @@ impl Default for SurfaceParams {
             evaporite_m_myr: 100.0,
             weathering_max_m_myr: 50.0,
             weathering_decay_depth_m: 5.0,
-            isostasy: 0.6,
+            isostasy: 0.8,
             isostasy_radius_km: 50.0,
             sea_level: SeaLevel::default(),
             log_layers: 32,
@@ -178,6 +189,7 @@ impl Default for SurfaceParams {
             event_min_area_km2: 3000.0,
             transgression_frac: 0.04,
             spl_max_iter: 6,
+            drama: 1.0,
         }
     }
 }
@@ -254,6 +266,11 @@ impl SurfaceParams {
             (1..=50).contains(&self.spl_max_iter),
             "spl_max_iter",
             "must be in [1, 50]",
+        )?;
+        check(
+            self.drama.is_finite() && (0.0..=2.0).contains(&self.drama),
+            "drama",
+            "must be in [0, 2]",
         )?;
         for c in &self.sea_level.cycles {
             check(

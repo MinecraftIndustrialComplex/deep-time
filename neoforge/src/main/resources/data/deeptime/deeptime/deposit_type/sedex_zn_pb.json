@@ -81,12 +81,13 @@
     "cdg_reservoir": false,
     "ore_block_policy": "ev_then_vanilla"
   },
-  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 4.0, "richness_mult": 1.0},
+  "balance": {"count_mult": 20.0, "size_mult_h": 12.0, "size_mult_v": 4.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
     "Sizing: USGS OFR 2009-1252 (Singer, Berger & Moring 2009), model SHam (shale-hosted, amagmatic), n = 25, Table 2 p. 10: tonnage 5 / 25 / 300 Mt, Zn 2.3 / 8 / 14 %, Pb 0.88 / 2.1 / 5.3 %, Ag 0 / 21 / 71 g/t, Cu 0 / 0 / 1.0 % (unreported grades counted as zero); Zn–Pb r = 0.72 (text); 2 km same-deposit rule (p. 2). All 25 SHam deposits are labelled SEDEX (they are 25 of the report's 179 SEDEX-labelled deposits). presence = n_reported / 25 from the report's database. Bulletin 1693 model 31a (n = 45) is in data/usgs/sedex_zn_pb.json extra. Au (4 of 25) is left out.",
     "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 3.2 (sulfide-rich shale), density_per_1e5km2 0.5 / 2 / 8 (no USGS SEDEX deposit density exists), formation_depth_m 100 (syn-sedimentary to early diagenetic).",
     "Geometry: stratiform sheet; aspect 0.03 from the database's median ore area 0.86 km² and ore bodies up to a few tens of metres thick (B1693 m31a); the Cu → Pb → Zn lateral zoning away from the feeder (Leach et al. 2010).",
-    "Create stones (decisions file): dolostone (asurine → zinc) is a preferred host at 1.5; the sheet turns its host to black shale."
+    "Create stones (decisions file): dolostone (asurine → zinc) is a preferred host at 1.5; the sheet turns its host to black shale.",
+    "Balance (P1-17 calibration, 2026-09-29): count_mult 20. The placeholder density gives 0.1–0.3 deposits on a 16k planet's 7,000–30,000 km² of permissive euxinic rift basins; 20 × gives a few per 500-Myr pipeline_quick_16k run (STATUS.md, P1-17 partial: calibration)."
   ]
 }

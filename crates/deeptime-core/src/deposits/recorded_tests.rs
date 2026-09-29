@@ -36,6 +36,9 @@ fn pipeline_json(n: u32, myr: f64, seed: u64, count_mult: f64) -> String {
     v["keyframes"]["every_myr"] = serde_json::json!(20.0);
     v["seed"] = serde_json::json!(seed);
     v["deposits"]["count_mult"] = serde_json::json!(count_mult);
+    // The young landscape and L3 amplification (P1-06) have their own tests.
+    v.as_object_mut().unwrap().remove("young");
+    v.as_object_mut().unwrap().remove("amplify");
     v.to_string()
 }
 
@@ -280,6 +283,7 @@ fn drive(stage: &mut DepositStage, world: &mut WorldState) -> Vec<String> {
         let ctx = StageContext {
             pool: &pool,
             log: &log,
+            out_dir: std::path::Path::new("."),
             until: std::time::Instant::now(),
             gauge: &gauge,
             mem_cap: u64::MAX,
@@ -499,6 +503,7 @@ fn a_world_without_history_is_a_clear_error() {
     let ctx = StageContext {
         pool: &pool,
         log: &log,
+        out_dir: std::path::Path::new("."),
         until: std::time::Instant::now(),
         gauge: &NoGauge,
         mem_cap: u64::MAX,

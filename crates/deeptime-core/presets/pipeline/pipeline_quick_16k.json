@@ -1,7 +1,7 @@
 {
   "schema": 0,
   "name": "pipeline_quick_16k",
-  "description": "The planet pipeline so far (P1-03 plates + P1-05 climate + P1-04 deep-time surface, interleaved per plate step) on an Earth-like planet: L0 100000 samples, L1 1024x512. The plate model reads L1 every step and leaves erosion to the surface stage. No timeline: choose the start and length (--start, --length-myr).",
+  "description": "The planet pipeline so far (P1-03 plates + P1-05 climate + P1-04 deep-time surface, interleaved per plate step, then P1-06's young landscape and L3 amplification) on an Earth-like planet: L0 100000 samples, L1 1024x512. The plate model reads L1 every step and leaves erosion to the surface stage. No timeline: choose the start and length (--start, --length-myr).",
   "seed": 1,
   "planet": {
     "gravity_m_s2": 9.81,
@@ -27,6 +27,8 @@
       512
     ]
   },
+  "young": {},
+  "amplify": {},
   "resolution": {
     "l0_samples": 100000,
     "l1_r": 16,
@@ -43,15 +45,15 @@
   "tectonics": {
     "time_step_myr": 2.0,
     "model_radius_km": 6370.0,
-    "ridge_elevation_m": -1000.0,
+    "ridge_elevation_m": -2500.0,
     "abyssal_elevation_m": -6000.0,
     "trench_elevation_m": -10000.0,
     "max_elevation_m": 10000.0,
-    "subduction_distance_km": 1800.0,
-    "collision_distance_km": 4200.0,
+    "subduction_distance_km": 800.0,
+    "collision_distance_km": 2000.0,
     "collision_coefficient_per_km": 1.3e-05,
     "max_plate_speed_mm_yr": 100.0,
-    "oceanic_damping_mm_yr": 0.04,
+    "oceanic_damping_mm_yr": 0.05,
     "continental_erosion_mm_yr": 0.0,
     "sediment_accretion_mm_yr": 0.3,
     "subduction_uplift_mm_yr": 0.6,
@@ -74,6 +76,7 @@
       150.0,
       900.0
     ],
+    "continental_shelf_share": 0.29,
     "scattered_continents": 6,
     "coast_warp_rad": 0.25,
     "rift_lambda0": 0.012,
@@ -94,7 +97,7 @@
     "resample_drift_km": 1500.0,
     "arc_distance_km": 200.0,
     "arc_width_km": 60.0,
-    "arc_uplift_mm_yr": 0.1,
+    "arc_uplift_mm_yr": 0.3,
     "arc_magma_m_per_myr": 20.0,
     "trench_relax": 0.5,
     "pelagic_m_per_myr": 5.0,
@@ -124,15 +127,15 @@
     "l1_every_steps": 1
   },
   "surface": {
-    "k_spl": 3e-10,
+    "k_spl": 2e-09,
     "m_spl": 1.0,
     "n_spl": 2.0,
     "g_deposition": 1.0,
     "runoff_ref_m_yr": 0.5,
     "threshold_slope": 0.35,
     "kd_land_m2_yr": 2.0,
-    "kd_marine_m2_yr": 300.0,
-    "wave_base_m": 100.0,
+    "kd_marine_m2_yr": 100.0,
+    "wave_base_m": 60.0,
     "tidal_range_m": 2.0,
     "marine_fill_depth_m": 0.0,
     "shelf_slope": 0.0005,
@@ -145,7 +148,7 @@
     "evaporite_m_myr": 100.0,
     "weathering_max_m_myr": 50.0,
     "weathering_decay_depth_m": 5.0,
-    "isostasy": 0.6,
+    "isostasy": 0.8,
     "isostasy_radius_km": 50.0,
     "sea_level": {
       "base_m": 0.0,
@@ -164,6 +167,7 @@
       "curve": []
     },
     "log_layers": 32,
+    "drama": 1.0,
     "substeps": 1,
     "frame_every_myr": 10.0,
     "erosion_pulse_m_myr": 200.0,
@@ -186,7 +190,7 @@
     "land_depth_m": 3.0,
     "land_ocean_exchange_w_m2_k": 10.0,
     "ocean_diffusivity_w_m2_k": 0.3,
-    "ice_sheet_feedback": 0.0,
+    "ice_sheet_feedback": 1.0,
     "ebm_bands": 90,
     "ebm_steps_per_year": 72,
     "ebm_spinup_years": 40,
