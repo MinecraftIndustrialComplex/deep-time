@@ -407,12 +407,58 @@ def hostNatives = tasks.register('hostNatives') {
     }
 }
 
+// Release jars (-Prelease) pack ../target/natives-dist/ instead: all eight libraries and their
+// natives.json, from `nix run .#natives` (tools/natives/build-natives.sh) or the natives-dist
+// artifact of .github/workflows/natives.yml (plan §4.5, §6.5, P0-08).
+def nativesDistDir = new File(repoRoot, 'target/natives-dist')
+def checkReleaseNatives = tasks.register('checkReleaseNatives') {
+    description = 'Fails unless ../target/natives-dist holds all eight natives and a matching natives.json.'
+    inputs.files(fileTree(nativesDistDir))
+    inputs.property 'version', cargoVersion
+    inputs.property 'formatVersion', formatVersion
+    doLast {
+        def hint = 'build them with `nix run .#natives` (tools/natives/build-natives.sh) or download the ' +
+                'natives-dist artifact of the natives.yml workflow into target/natives-dist/'
+        def manifestFile = new File(nativesDistDir, 'natives.json')
+        if (!manifestFile.isFile())
+            throw new GradleException("-Prelease: ${manifestFile} is missing; ${hint}")
+        def m = new groovy.json.JsonSlurper().parse(manifestFile, 'UTF-8')
+        def problems = []
+        if (m.schema != 1) problems << "schema is ${m.schema}, not 1"
+        if (m.version != cargoVersion) problems << "version is ${m.version}, the Cargo workspace says ${cargoVersion}"
+        if (m.format_version != formatVersion) problems << "format_version is ${m.format_version}, Cargo.toml says ${formatVersion}"
+        def libs = (m.libraries ?: []) as List
+        def listed = libs.collect { it.platform } as Set
+        def expected = platformKeys.values() as Set
+        if (libs.size() != expected.size() || listed != expected)
+            problems << "it lists ${libs.size()} libraries (${listed.sort().join(', ')}); a release needs exactly these ${expected.size()}: ${expected.sort().join(', ')}"
+        def packed = ['natives.json'] as Set
+        libs.each { lib ->
+            def f = new File(nativesDistDir, "${lib.platform}/${lib.file}")
+            packed << "${lib.platform}/${lib.file}".toString()
+            if (platformKeys[lib.rust_target] != lib.platform)
+                problems << "${lib.platform}: rust_target ${lib.rust_target} does not belong to it"
+            if (!f.isFile()) { problems << "${lib.platform}: ${f} is missing"; return }
+            if (f.length() != lib.size) problems << "${lib.platform}: size ${f.length()}, natives.json says ${lib.size}"
+            def md = java.security.MessageDigest.getInstance('SHA-256')
+            f.withInputStream { s -> byte[] buf = new byte[65536]; int n; while ((n = s.read(buf)) > 0) md.update(buf, 0, n) }
+            def sha = md.digest().encodeHex().toString()
+            if (sha != lib.sha256) problems << "${lib.platform}: sha256 ${sha}, natives.json says ${lib.sha256}"
+        }
+        def extra = fileTree(nativesDistDir).files.collect { nativesDistDir.toPath().relativize(it.toPath()).toString().replace('\\', '/') }
+                .findAll { !(it in packed) }
+        if (extra) problems << "unlisted files: ${extra.sort().join(', ')}"
+        if (problems)
+            throw new GradleException("-Prelease: ${nativesDistDir} is not a complete release set:\n  - " +
+                    problems.join('\n  - ') + "\n${hint}")
+        logger.lifecycle("checkReleaseNatives: ${libs.size()} libraries, version ${m.version}, format ${m.format_version}")
+    }
+}
+
 tasks.named('processResources', ProcessResources) {
     if (project.hasProperty('release')) {
-        // TODO(P0-08): release jars pack ../target/natives-dist/ (all eight libraries and its
-        // natives.json, from `nix run .#natives` or the natives.yml artifacts) and check that
-        // natives.json lists 8 libraries. Until then -Prelease fails rather than ship a dev jar.
-        doFirst { throw new GradleException('-Prelease (natives-dist packing) arrives with P0-08') }
+        dependsOn checkReleaseNatives
+        from(nativesDistDir) { into 'natives/deeptime' }
     } else {
         dependsOn hostNatives
         from(nativesHostDir) { into 'natives/deeptime' }

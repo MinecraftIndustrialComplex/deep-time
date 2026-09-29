@@ -98,6 +98,21 @@
           };
         };
 
+        # `nix run .#natives`: the eight natives into target/natives-dist/ with natives.json (plan
+        # §4.4, P0-08), from the checkout the command runs in. It re-enters this flake's dev shell
+        # rather than listing the tools again: the build scripts of the workspace need a host C
+        # linker, which on macOS only the shell's stdenv sets up.
+        apps.natives = {
+          type = "app";
+          program = lib.getExe (pkgs.writeShellApplication {
+            name = "deeptime-natives";
+            text = ''
+              exec nix develop '${inputs.self}#default' -c bash ${./tools/natives/build-natives.sh} "$@"
+            '';
+          });
+          meta.description = "Cross-build the eight Deep Time natives into target/natives-dist";
+        };
+
         checks.toolchain-channel = let
           toml = builtins.fromTOML (builtins.readFile ./rust-toolchain.toml);
         in

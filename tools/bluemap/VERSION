@@ -1,0 +1,4 @@
+# BlueMap CLI (MIT), pinned by sha256 (plan §9.6). Runs on Java 25: nix shell nixpkgs#jdk25.
+version=5.28
+url=https://github.com/BlueMap-Minecraft/BlueMap/releases/download/v5.28/bluemap-5.28-cli.jar
+sha256=c6868465f8f972a64a3f2acc32112cab8560339045747f81359bdea6959f7ac2
