@@ -24,7 +24,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-15 | Phase 0 exit | todo | | | |
 | P1-01 | Session, checkpoints, keyframes, event log and site formats | done | 2026-09-28 | — | Mac: cargo test -p deeptime-format 27 ok (segments + sites round-trip, two writers merge with no id collision); run --preset dummy.json → manifest.json, events/1-0.dtev, keyframes/index.json (13 events, 9 keyframes, 3 sites); test --workspace, fmt, clippy -D warnings, deny licenses bans clean; gradlew build test tests=34 failures=0 and ./gametest.sh all 14 pass (after merging master 2f81ae5) |
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
-| P1-03 | Plates and crust | todo | | | |
+| P1-03 | Plates and crust | done | 2026-09-28 | 0867a61 | Mac: cargo test --workspace ok (plates:: 13 + 1 ignored, params:: 3: rift area conserved exactly, partition, ages ≥ 0, hull invariants after every resampling, byte-identical resume); 500 Myr 20k: p90 ocean age 167/169/245 Myr, 98/97/90.5 % < 250 Myr; `stage plates --preset earthlike_quick_16k --start scattered --timeline-myr 500` → plates_final=13 ocean_age_p90_myr=202.3 steps=250 seconds=11.6; 100k 9.3 s (12 thr) / 29.8 s (1 thr), 250k 33 s vs Cortial 76–106 / 330–437 s; clippy, fmt, deny clean |
 | P1-04 | Deep-time surface processes on L1 | todo | | | |
 | P1-05 | Climate | todo | | | |
 | P1-06 | Young landscape, amplification and the detail layer | todo | | | |
@@ -55,6 +55,128 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 — P1-03 plates and crust (agent worktree agent-a634f0216bff6a4a4, branch worktree-agent-a634f0216bff6a4a4)
+- **What.** `crates/deeptime-core/src/plates/` (mod, state, kinematics, geometry, init, subduction,
+  collision, rifting, ridges, hotspots, pools, events, normalise, noise, l1, stats, tests) — the
+  plates stage of §8.1 implemented from Cortial, Peytavie, Galin & Guérin 2019 (the paper only;
+  the community ports were not opened), rock pools ported from tectonics.js `RockColumn.js`/
+  `Crust.js` (CC BY 4.0, commit ce371fa; NOTICE.md and the header of `pools.rs`).
+  `params.rs` + `presets/earthlike_{quick,full}_{16k,32k}.json` (planet, scale, timeline,
+  resolution and a full `tectonics` section = Cortial's Appendix A + the design constants below).
+  `WorldState.plates` holds the L0 crust (checkpoint schema 1 → 2); `Preset::Planet` runs the
+  plates stage; `Coupling::relink` (P1-02) lets moving crust be sampled through the coupling.
+  CLI: `--preset` takes a file or a built-in name, `--start`/`--timeline-myr` choose the timeline,
+  `stage --max-steps N` writes a mid-stage checkpoint, `run`/`stage`/`bench` print the plates
+  summary line. `tools/dev/plates_sweep.py` runs tectonics overrides on the Mac for tuning.
+  New ramps `plates`, `crust_age`, `regime` in `ramps.json`; `EVENTS.md` documents every plate
+  event's params, magnitudes and causes. No new dependencies.
+- **Model, per 2-Myr step.** Rigid rotation of each plate's groups about its Euler pole; overlap
+  detection (8 nearest samples; a sample inside another plate's lattice triangle, located in that
+  group's frame); contacts with a polarity (oceanic under continental, older under younger, the
+  smaller plate forced under in continent–continent) and hidden subducted crust; Cortial's uplift
+  ũ = u₀·f(d)·g(v)·h(z̃) within r_s = 1,800 km of the overriding plate's front (multi-source
+  Dijkstra inside rigid groups), fold directions, Andean orogeny; arc magma, oxidation proxy,
+  convergence/obliquity/slab age at the nearest trench and a heat-flow proxy per sample (the
+  deposit accumulators); continental collision at 300 km of continental interpenetration with
+  terrane transfer and Δz = Δc·A·(1−(d/r)²)², r = r_c√(v/v₀·A/A₀); hotspots and LIPs;
+  continental erosion, oceanic dampening, trench accretion; rock pools (erosion one hop downhill,
+  lithification 2.2 MPa, metamorphism 300 MPa, `Crust.overlap` accretion at resampling); Poisson
+  rifting into 2–4 plates; global resampling every 10–60 steps (1,500 km of drift) onto a freshly
+  rotated Fibonacci lattice with the hull rebuilt, Cortial's α-blend ridge crust in the gaps.
+- **Design choices and deviations (all in module docs; tunable in `tectonics`).**
+  1. Samples live in rigid *groups* (lattice position + the group's accumulated rotation), so rift
+     fragments and transferred terranes need no remeshing between resamplings; a lattice triangle
+     belongs to a plate only while its three corners share a group. Cortial reuses one mesh; here
+     each resampling uses a new random rotation of the Fibonacci set and rebuilds the hull.
+  2. The front is the overriding plate's own lattice boundary (fixed in its frame; no trench
+     roll-back). f(d) is a piecewise cubic peaking at `subduction_peak_km` = 300 km; h(z̃) = z̃² as
+     in the paper, which leaves abyssal overriding crust sinking, so an **arc band** (Gaussian at
+     200 ± 60 km) adds `arc_uplift_mm_yr` = 0.1 to submarine overriding crust and arc crust that
+     emerges becomes continental (island arcs, the continental crust factory).
+  3. **Isostatic ceiling**: uplift of crust above sea level is scaled by (1 − z/z_c); without it
+     repeated collisions saturated whole continents at z_c = 10 km (first run).
+  4. **Collision**: d is measured from the contact (forced-subducted continental crust), not the
+     whole terrane; Δc·A is capped at 4 km (Δc·A of a continent is tens of km); the receiving
+     plate takes the area-weighted mean angular velocity. Events by terrane size: < 0.5 % of A₀
+     silent, < 10 % terrane_accretion only, ≥ 10 % collision + terrane_accretion + orogeny_phase.
+  5. **Polarity reversal** (continental crust on the subducting side of an oceanic overriding
+     plate reverses the contact; Cortial's "an oceanic plate always plunges beneath a continental
+     plate" applied continuously) and **locked sutures** (continental crust with a Himalayan
+     orogeny < 30 Myr old is never forced under again). Without them a continent at a junction of
+     three trenches was handed round the three plates every 2–8 Myr (309 "collisions" in the
+     first 500-Myr run).
+  6. **Subduction initiation** at ocean floor older than 150 Myr on plates that subduct nowhere
+     (Poisson, rate 0.1 per A₀ of old crust per step): the old part splits off and converges on the
+     rest. **Slab pull on speed**: a plate with ≥ 3,000 km of front relaxes (20 Myr) to 80 mm/yr at
+     its centroid, others to the middle of `plate_speed_mm_yr`; plus Cortial's axis pull and a small
+     Euler-pole random walk. Without these the oceans never recycled (p90 age 327 Myr).
+  7. Rifting: f(x_P) = 0.08 + 0.92·x_P²; fragments diverge from the other fragments' centroid at
+     20–50 mm/yr on top of the parent's motion; a LIP ×4 boosts the plate under it for 20 Myr.
+  8. Resampling: a new point within 0.75 spacings of an old visible sample but in no whole
+     triangle (a plate's boundary strip) copies that sample; only farther points are gaps that get
+     new crust (at first every boundary strip became ridge crust and continents frayed).
+  9. Events: subduction_onset only once a contact lasts 3 steps, converging ≥ 10 mm/yr over
+     ≥ max(3, n/10,000) samples (dated to its start); ridge_birth once per plate pair when
+     ≥ max(3, n/2,000) samples of new crust lie between them; Andean orogeny_phase only after
+     ≥ 10 Myr. All places are points (region masks and paths are not stored yet).
+  10. Initial planet: noise-warped weighted Voronoi plates; every continent rides whole on its
+      majority plate; oceanic ages from the boundaries that diverge; ocean fraction exact to one
+      sample; supercontinent/scattered/random as §5.1. A final resampling at the last step leaves
+      no gaps or hidden slabs in the world P1-04 receives.
+  11. L1: every cell is relinked from a k-d-tree query at each sampling (not only cells whose
+      triangle left its plate), so sampling is history-free and a resumed run is bit-identical.
+      L1 is sampled at the keyframe times and the end (`l1_every_steps` = 0); P1-04 sets 1.
+  12. Keyframe layers `elevation` (block y), `plates` (colour index id·7 mod 20), `crust_age`
+      (−1 on continents), `regime`; outputs `plates/{elevation_m, uplift_mm_yr, crust_type,
+      orogeny_type, orogeny_age_myr, fold_trend_deg, plate_id}` on L1.
+- **Measured** (`tools/remote/mac.sh`, M6 Mac mini, 12 threads, shared with other agents' builds,
+  load average 9–14): `cargo test --workspace` → core 57 passed + 1 ignored (plates:: 13 + the ignored statistics test, params:: 3; incl.
+  `rifting_conserves_area_exactly` (integer sample counts: relative error 0), `runs_keep_their_
+  invariants` (partition, ages ≥ 0, finite fields, hull V − E + F = 2 + mutual neighbours + CCW
+  after every resampling, all three starts, 80 steps), `resumed_run_is_identical` (byte-equal
+  worlds), `a_preset_without_a_timeline_is_refused`), cli 11, format 27, inspect 19, jni 7,
+  viewer 4; `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --check`,
+  `cargo deny check licenses bans` clean. `cargo test --release -p deeptime-core
+  plates::tests::statistics -- --ignored` (20k samples, 500 Myr) → supercontinent p90 167 Myr,
+  98 % < 250 Myr, 15 plates (8 ≥ 5 %); scattered 169 Myr, 97 %, 21 plates (7 ≥ 5 %); random
+  245 Myr, 90.5 %, 8 plates (4 ≥ 5 %).
+  `deeptime stage plates --preset earthlike_quick_16k --start scattered --timeline-myr 500` (100k)
+  → `plates_final=13 ocean_age_p90_myr=202.3 ocean_age_p50_myr=69.7 ocean_younger_250=0.925
+  ocean_frac=0.740 largest_plate_frac=0.179 plates_over_5pct=8 plates_under_1pct=0 … steps=250
+  seconds=11.607`; 610 events (orogeny_phase 149, subduction_onset 142, ridge_birth 134,
+  terrane_accretion 96, collision 26, hotspot_track 21, plate_death 15, plate_birth 14, LIP 7,
+  rift_onset 6), 11 keyframes, peak 208 MiB. `earthlike_full_16k` (250k) → `plates_final=16
+  ocean_age_p90_myr=122.0 ocean_younger_250=0.999 ocean_frac=0.692 … seconds=32.965`, 1,218 events.
+  `deeptime bench --preset earthlike_quick_16k --start scattered --timeline-myr 500 --threads
+  1,4,12` → 29.8 / 15.7 / 9.3 s, identical results on every thread count. **Against Cortial's
+  Table 2 estimate (§8.1): 100k 76–106 s → 9.3 s (29.8 s single-threaded); 250k 330–437 s →
+  33 s.** Checkpoint chain: `stage plates … --max-steps 100 --out mid.dtcp` (33.6 MB) then
+  `stage plates --in mid.dtcp --out end.dtcp --viewer review/out/p1-plates-resumed` → the same
+  final summary as the straight run; running it again from `end.dtcp` is refused ("already ran").
+  Sweep (`tools/dev/plates_sweep.py`, 100k, 3 starts × 2 seeds): p90 141–228 Myr, 92.5–99.4 %
+  younger than 250 Myr, ocean fraction 0.73–0.76, 10–22 plates.
+  `deeptime run --preset earthlike_quick_16k --start scattered --timeline-myr 500 --out … --viewer
+  review/out/p1-plates` → manifest, events/, keyframes/ (11 frames × 4 layers), viewer bundle.
+- **What the keyframes show** (review/out/p1-plates, pulled back and looked at): at −498 Myr six
+  low green continents in a deep ocean with trench lines along plate boundaries in the oceans;
+  by −348 Myr the continents have drifted and one has swung over the north pole, their margins
+  raised to 1–2 km (Andean belts) and green island arcs trail across the eastern ocean; by
+  −148 Myr a continent is splitting along a narrow new ocean (a rift opening like the Red Sea),
+  arcs and accreted terranes fringe the others; at 0 Myr the continents are rearranged and
+  scattered south and east with raised margins, trenches along active margins, and the crust-age
+  map shows spreading ridges with symmetric red→blue age bands and a few old (blue) basins —
+  plausible drifting, colliding and rifting. The plates map shows 13 plates with clean, slightly
+  irregular boundaries (plates whose ids differ by 20 share a colour).
+- **Not done / later.** Region masks and paths for events (points only). The review page
+  "Deep Time — P1 plates" is not published (the main session publishes review/out/p1-plates).
+  Continental area is resolution-dependent (ocean fraction 0.74 at 100k, 0.69 at 250k, 0.82–0.85
+  at 20k: arc emergence and forced-subduction consumption scale with sample spacing) and the
+  event count grows with resolution (610 → 1,218 events from 100k to 250k); both for P1-17's
+  tuning. No Java change: JUnit/GameTests not rerun (`{"planet":{}}` still fails at `$.planet`,
+  as NativeLinkTest expects).
+- **Next.** P1-04 (surface processes on L1) reads `plates/uplift_mm_yr` and the other `plates/*`
+  fields; its pipeline should set `tectonics.l1_every_steps` = 1.
 
 ### 2026-09-28 — P1-01 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Formats** (`crates/deeptime-format`, spec in `FORMAT.md` and the new `EVENTS.md`). Every new
