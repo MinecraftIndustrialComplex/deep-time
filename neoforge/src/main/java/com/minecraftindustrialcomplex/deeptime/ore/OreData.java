@@ -44,22 +44,83 @@ public final class OreData {
         ).apply(i, ProductDef::new));
     }
 
-    /** The {@code minecraft} section: how the type's ore reaches the world. */
-    public record MinecraftDef(String oreBlockPolicy, Optional<String> coeVein, boolean cdgReservoir) {
-        static final MinecraftDef DEFAULT = new MinecraftDef("ev_then_vanilla", Optional.empty(), false);
+    /**
+     * The {@code minecraft} section: how the type's ore reaches the world. {@code coeVein} and
+     * {@code cdgScale} are read at run time by the COE and CDG hooks (P1-16, plan §7.14), so a pack
+     * that overrides the type's file in a datapack remaps the vein or rescales the oil of worlds
+     * that already exist.
+     */
+    public record MinecraftDef(String oreBlockPolicy, Optional<String> coeVein, boolean cdgReservoir, double cdgScale) {
+        static final MinecraftDef DEFAULT = new MinecraftDef("ev_then_vanilla", Optional.empty(), false, 1.0);
         static final Codec<MinecraftDef> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.STRING.optionalFieldOf("ore_block_policy", "ev_then_vanilla").forGetter(MinecraftDef::oreBlockPolicy),
                 Codec.STRING.lenientOptionalFieldOf("coe_vein").forGetter(MinecraftDef::coeVein),
-                Codec.BOOL.optionalFieldOf("cdg_reservoir", false).forGetter(MinecraftDef::cdgReservoir)
+                Codec.BOOL.optionalFieldOf("cdg_reservoir", false).forGetter(MinecraftDef::cdgReservoir),
+                Codec.doubleRange(0, Double.MAX_VALUE).optionalFieldOf("cdg_scale", 1.0).forGetter(MinecraftDef::cdgScale)
         ).apply(i, MinecraftDef::new));
     }
 
+    /**
+     * A USGS-style percentile triple (P90 = the value 90 % of deposits exceed, so P90 ≤ P50 ≤ P10).
+     * The core fits a lognormal split at the median to it ({@code deposits::sizing::Lognormal}).
+     */
+    public record Percentiles(double p90, double p50, double p10) {
+        static final Codec<Percentiles> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.fieldOf("p90").forGetter(Percentiles::p90),
+                Codec.DOUBLE.fieldOf("p50").forGetter(Percentiles::p50),
+                Codec.DOUBLE.fieldOf("p10").forGetter(Percentiles::p10)
+        ).apply(i, Percentiles::new));
+
+        /** Φ⁻¹(0.9), the core's {@code Z90}. */
+        static final double Z90 = 1.2815515655446005;
+
+        /**
+         * The fraction of deposits below {@code x} under the core's split lognormal: σ below the
+         * median is (ln P50 − ln P90)/Φ⁻¹(0.9), above it (ln P10 − ln P50)/Φ⁻¹(0.9) (Rust
+         * {@code Lognormal::cdf}).
+         */
+        public double cdf(double x) {
+            if (!(x > 0) || !(p50 > 0))
+                return 0;
+            double d = Math.log(x) - Math.log(p50);
+            double s = d < 0 ? (Math.log(p50) - Math.log(Math.max(p90, 1e-300))) / Z90
+                    : (Math.log(Math.max(p10, 1e-300)) - Math.log(p50)) / Z90;
+            if (!(s > 0))
+                return d < 0 ? 0 : 1;
+            return normalCdf(d / s);
+        }
+
+        /** Φ(x) with the core's erf (Abramowitz–Stegun 7.1.26, |error| < 1.5e-7; Rust {@code random::normal_cdf}). */
+        static double normalCdf(double x) {
+            double z = x / Math.sqrt(2);
+            double sgn = Math.signum(z), a = Math.abs(z);
+            double t = 1.0 / (1.0 + 0.3275911 * a);
+            double y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t
+                    + 0.254829592) * t * Math.exp(-a * a);
+            return 0.5 * (1.0 + sgn * y);
+        }
+    }
+
+    /** The {@code sizing} section, as far as Java reads it: the tonnage percentiles in Mt. */
+    public record SizingDef(Optional<Percentiles> tonnageMt) {
+        static final SizingDef NONE = new SizingDef(Optional.empty());
+        static final Codec<SizingDef> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Percentiles.CODEC.lenientOptionalFieldOf("tonnage_mt").forGetter(SizingDef::tonnageMt)
+        ).apply(i, SizingDef::new));
+    }
+
     /** What Java reads of a deposit type (the core parses the whole schema). */
-    public record DepositTypeInfo(List<ProductDef> products, MinecraftDef minecraft) {
+    public record DepositTypeInfo(List<ProductDef> products, MinecraftDef minecraft, SizingDef sizing) {
         public static final Codec<DepositTypeInfo> CODEC = RecordCodecBuilder.create(i -> i.group(
                 ProductDef.CODEC.listOf().optionalFieldOf("products", List.of()).forGetter(DepositTypeInfo::products),
-                MinecraftDef.CODEC.optionalFieldOf("minecraft", MinecraftDef.DEFAULT).forGetter(DepositTypeInfo::minecraft)
+                MinecraftDef.CODEC.optionalFieldOf("minecraft", MinecraftDef.DEFAULT).forGetter(DepositTypeInfo::minecraft),
+                SizingDef.CODEC.lenientOptionalFieldOf("sizing", SizingDef.NONE).forGetter(DepositTypeInfo::sizing)
         ).apply(i, DepositTypeInfo::new));
+    }
+
+    /** The loaded deposit type {@code id}, if the registry has it. */
+    public static Optional<DepositTypeInfo> depositType(RegistryAccess access, ResourceLocation id) {
+        return access.registry(DEPOSIT_TYPE).flatMap(r -> r.getOptional(id));
     }
 
     public static final ResourceKey<Registry<DepositTypeInfo>> DEPOSIT_TYPE =

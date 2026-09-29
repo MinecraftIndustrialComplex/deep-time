@@ -247,7 +247,10 @@ Deposit sites (P1-14):
   is the site's id (the ore body first, then a lithocap or a gossan).
 - `amount_base` = `tonnage_t`; `coe_vein` is the deposit type's `minecraft.coe_vein`
   (`createoreexcavation:ore_vein_type/copper`, …); `cdg_charge_mb` (reservoirs) is the oil tonnage
-  / 0.85 t/m³ · 1000 mB/m³ — P1-16 scales both to gameplay amounts.
+  / 0.85 t/m³ · 1000 mB/m³. The records keep these physical values; the game scales them at run time
+  (P1-16, plan §7.14): COE's vein size follows the site's tonnage quantile in its type's lognormal,
+  and CDG sees `cdg_charge_mb` × the type's `minecraft.cdg_scale`, split over the chunks of the ore
+  body by volume.
 - `parent`: a supergene blanket's porphyry. A placer's parent was eroded away, so it has none; its
   forming event (`placer_formation`) is caused by the parent's `deposit_exhumation`.
 
