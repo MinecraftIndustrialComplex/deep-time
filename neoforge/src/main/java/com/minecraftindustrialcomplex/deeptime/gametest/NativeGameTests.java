@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.gametest;
 
+import com.minecraftindustrialcomplex.deeptime.worlddata.FormatVersion;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.CancelledException;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLoader;
@@ -76,7 +77,8 @@ public final class NativeGameTests {
             } catch (CompletionException e) {
                 throw new IllegalStateException("the dummy run failed: " + e.getCause(), e);
             }
-            helper.assertTrue(manifest.contains("\"format_version\": \"0.0\""), "manifest lacks format_version 0.0: " + manifest);
+            helper.assertTrue(manifest.contains("\"format_version\": \"" + FormatVersion.CURRENT + "\""),
+                    "manifest lacks format_version " + FormatVersion.CURRENT + ": " + manifest);
             helper.assertTrue(Files.isRegularFile(doneDir.resolve("manifest.json")), "no manifest.json in " + doneDir);
             helper.assertTrue(done.progress().state() == SimSession.Progress.FINALIZED,
                     "finished session state " + done.progress().state());

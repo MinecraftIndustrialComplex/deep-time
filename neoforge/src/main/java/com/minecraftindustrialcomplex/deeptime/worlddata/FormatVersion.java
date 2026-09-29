@@ -9,10 +9,10 @@ package com.minecraftindustrialcomplex.deeptime.worlddata;
 public final class FormatVersion {
 
     /** The version string written in {@code manifest.json}. */
-    public static final String CURRENT = "0.0";
+    public static final String CURRENT = "0.1";
 
     /** The minor part of {@link #CURRENT}, written into every file header. */
-    public static final int MINOR = 0;
+    public static final int MINOR = 1;
 
     private FormatVersion() {}
 
@@ -26,7 +26,7 @@ public final class FormatVersion {
             throw new WorldDataException(refusal(found));
     }
 
-    /** The refusal message: "world data 0.3, this Deep Time reads 0.0; before 1.0 worlds are not migrated". */
+    /** The refusal message: "world data 0.3, this Deep Time reads 0.1; before 1.0 worlds are not migrated". */
     public static String refusal(String found) {
         return "world data " + found + ", this Deep Time reads " + CURRENT + "; before 1.0 worlds are not migrated";
     }

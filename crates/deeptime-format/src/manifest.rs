@@ -282,13 +282,18 @@ mod tests {
         let text = std::fs::read_to_string(dir.join(MANIFEST)).unwrap();
         std::fs::write(
             dir.join(MANIFEST),
-            text.replace("\"format_version\": \"0.0\"", "\"format_version\": \"0.3\""),
+            text.replace(
+                &format!("\"format_version\": \"{FORMAT_VERSION}\""),
+                "\"format_version\": \"0.9\"",
+            ),
         )
         .unwrap();
         let err = Manifest::read(&dir).unwrap_err().to_string();
         assert_eq!(
             err,
-            "world data 0.3, this Deep Time reads 0.0; before 1.0 worlds are not migrated"
+            format!(
+                "world data 0.9, this Deep Time reads {FORMAT_VERSION}; before 1.0 worlds are not migrated"
+            )
         );
 
         std::fs::write(dir.join("side.json"), b"{ }").unwrap();

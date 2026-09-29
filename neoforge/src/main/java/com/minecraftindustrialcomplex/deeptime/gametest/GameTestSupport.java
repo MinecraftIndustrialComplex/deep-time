@@ -71,6 +71,15 @@ public final class GameTestSupport {
     public static final ResourceKey<Level> TEST_DEPOSITS =
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_deposits"));
 
+    /**
+     * A real baked planet (P1-08; C = 4,096, folder {@code deeptime-real}; gametest.sh writes it
+     * with {@code deeptime run --preset tests/presets/planet_world_4k.json} and its parity fixture
+     * with {@code deeptime parity}): every stage of the pipeline, the pack's biomes and surface
+     * rules, no caves ({@code deeptime:planet_nocaves}).
+     */
+    public static final ResourceKey<Level> TEST_PLANET_REAL =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_planet_real"));
+
     /** A second level over the same deposit world data, for the regeneration check. */
     public static final ResourceKey<Level> TEST_DEPOSITS_TWIN =
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_deposits_twin"));

@@ -52,10 +52,7 @@ mc_start
 
 failed=0
 set +e
-# The built-in presets are still P1-13's placeholders, which carry none of the Advanced settings
-# (settings audit): the driver imports the pipeline preset to show them (02b, 02c), then goes back.
-mc_run_pass main -Ddeeptime.dev.screenshots=true "-Ddeeptime.dev.screenshots.create=$CREATE" \
-    "-Ddeeptime.dev.screenshots.preset=$REPO/crates/deeptime-core/presets/pipeline/pipeline_quick_16k.json"; st=$?
+mc_run_pass main -Ddeeptime.dev.screenshots=true "-Ddeeptime.dev.screenshots.create=$CREATE"; st=$?
 set -e
 [ "$st" = 0 ] || failed=1
 cp "$GAMEDIR"/screenshots/*.png "$OUT/" 2>/dev/null || true

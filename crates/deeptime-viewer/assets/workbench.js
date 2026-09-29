@@ -2192,6 +2192,8 @@
   };
   // Families as people know them; the raw preset names stay as secondary text.
   const FAMILY = {
+    earthlike_quick: ['Earth-like · quick', 'The whole simulation: plates, climate, surface, structure and deposits, at the quick resolution.'],
+    earthlike_full: ['Earth-like · full', 'The whole simulation at the full resolution: slower, finer.'],
     pipeline_quick: ['Earth-like · quick', 'The whole simulation: plates, climate, surface, structure and deposits, at the quick resolution.'],
     pipeline_full: ['Earth-like · full', 'The whole simulation at the full resolution: slower, finer.'],
     plates_quick: ['Plates only · quick', 'Plate tectonics alone, at the quick resolution: the fastest look at continents moving.'],
@@ -2206,7 +2208,10 @@
   function presetName(name) {
     if (!name) return '';
     const p = catalog && catalog.presets.find(x => x.name === name);
-    if (!p) return String(name).replace(/_/g, ' ');
+    if (!p) {   // a preset the page no longer lists (the pipeline and plates presets): its family, still
+      const m = /^(.*)_(\d+)k$/.exec(String(name));
+      return m && FAMILY[m[1]] ? `${FAMILY[m[1]][0]} · ${m[2]}k` : String(name).replace(/_/g, ' ');
+    }
     return `${familyName(p.family)} · ${sizeShort(p.circumference)}`;
   }
   const sizeLabel = c => L(`size.${c / 1024}k`) || L('size.other', c.toLocaleString('en')) || `${c} blocks`;
@@ -2579,7 +2584,7 @@
     catalog = res.body;
     form.cap = defaultCapGiB();
     buildForm();
-    const def = catalog.presets.find(p => p.name === 'pipeline_quick_16k') || catalog.presets.find(p => !p.placeholder) || catalog.presets[0];
+    const def = catalog.presets.find(p => p.name === 'earthlike_quick_16k') || catalog.presets.find(p => !p.placeholder) || catalog.presets[0];
     form.preset = def.name;
     startButtons(); lengthUI();
     presetChanged();

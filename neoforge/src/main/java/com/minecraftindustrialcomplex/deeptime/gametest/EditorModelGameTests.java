@@ -301,7 +301,7 @@ public final class EditorModelGameTests {
         EditorModel a = model();
         a.selectSize(32_768);
         a.setStart("scattered_continents");
-        a.setLengthText("2500");
+        a.setLengthText("500");   // a real planet since P1-08: a length whose estimate fits the default cap
         a.refreshEstimate();
         helper.assertTrue(a.canRun(), "A can run: " + a.problems());
         String code = a.exportShareCode();
@@ -316,7 +316,7 @@ public final class EditorModelGameTests {
 
         // The Java and Rust codes agree: the core runs what the model encodes (estimate validates).
         var info = Presets.info(Presets.parseObject(ShareCode.decode(code)));
-        helper.assertTrue(info.timeline().orElseThrow().equals(new Presets.Timeline("scattered_continents", 2500.0)), "timeline kept");
+        helper.assertTrue(info.timeline().orElseThrow().equals(new Presets.Timeline("scattered_continents", 500.0)), "timeline kept");
 
         // A preset with a section the core does not know is refused by the core (Run stays off), not hidden.
         JsonObject custom = Presets.parseObject(ShareCode.decode(code));

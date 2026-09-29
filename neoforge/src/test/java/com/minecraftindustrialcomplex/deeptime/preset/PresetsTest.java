@@ -32,7 +32,7 @@ class PresetsTest {
             assertEquals(Files.readString(src.resolve(name + ".json")), json, name + " is the core's file");
             Presets.Info info = Presets.info(Presets.parseObject(json));
             assertEquals(name, info.name().orElseThrow());
-            assertTrue(info.placeholder(), name + " is a Phase 1 placeholder");
+            assertFalse(info.placeholder(), name + " is a simulated planet since P1-08");
             assertTrue(info.timeline().isEmpty(), name + " names no timeline (no default story)");
             assertEquals(name.endsWith("_32k") ? 32_768 : 16_384, info.circumference().getAsInt(), name);
         }
