@@ -20,6 +20,7 @@ pub struct WorldData {
     water: Option<LoadedLayer>,
     strata: Option<LoadedLayer>,
     pub classes: Vec<String>,
+    koppen: std::sync::OnceLock<Option<LoadedLayer>>,
 }
 
 fn load_layer(dir: &Path, m: &Manifest, name: &str) -> Result<Option<LoadedLayer>> {
@@ -67,6 +68,7 @@ impl WorldData {
             water,
             strata,
             classes,
+            koppen: std::sync::OnceLock::new(),
         })
     }
 
@@ -99,6 +101,21 @@ impl WorldData {
         let w = self.water.as_ref()?;
         let v = w.nearest(self.wrap_x(i64::from(x)) as f64, f64::from(z));
         v.is_finite().then_some(v)
+    }
+
+    /// The Köppen class index at (x, z) (the baked `climate/koppen`, nearest cell; 31 = sea), if
+    /// the world data has the layer. The layer is read on first use of any column.
+    pub fn koppen(&self, x: i32, z: i32) -> Option<u8> {
+        let k = self
+            .koppen
+            .get_or_init(|| {
+                load_layer(&self.dir, &self.manifest, "climate/koppen")
+                    .ok()
+                    .flatten()
+            })
+            .as_ref()?;
+        let v = k.nearest(self.wrap_x(i64::from(x)) as f64, f64::from(z));
+        v.is_finite().then(|| v.round().clamp(0.0, 31.0) as u8)
     }
 
     /// Horizons per column in the strata layer (its `stack_depth`), 0 without one.

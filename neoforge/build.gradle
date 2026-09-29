@@ -531,6 +531,12 @@ tasks.named('processResources', ProcessResources) {
         include 'editor_fields.json'
         into 'deeptime'
     }
+    // The climate mapping's reference (plan §7.2, P1-09): the bake compiles it in with include_str!,
+    // the game reads it as the default of a datapack resource a pack may override.
+    from(new File(repoRoot, 'crates/deeptime-core/data/climate_mapping')) {
+        include 'default.json'
+        into 'data/deeptime/deeptime/climate_mapping'
+    }
     if (project.hasProperty('release')) {
         dependsOn checkReleaseNatives
         from(nativesDistDir) { into 'natives/deeptime' }

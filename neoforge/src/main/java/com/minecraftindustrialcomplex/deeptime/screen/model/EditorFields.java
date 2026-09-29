@@ -37,7 +37,7 @@ public final class EditorFields {
 
     private EditorFields() {}
 
-    public enum Section { PLANET, SCALE, MULTIPLIERS, FANTASY, PLAYABILITY }
+    public enum Section { PLANET, SCALE, MULTIPLIERS, BIOMES, FANTASY, PLAYABILITY }
 
     public enum Kind { NUMBER, TOGGLE, CHOICE }
 

@@ -155,6 +155,7 @@ final class SetupPage implements PlanetEditorScreen.Page {
             case PLANET -> "planet";
             case SCALE -> "scale";
             case MULTIPLIERS -> "multipliers";
+            case BIOMES -> "biomes";
             case FANTASY -> "fantasy";
             case PLAYABILITY -> "playability";
         };
