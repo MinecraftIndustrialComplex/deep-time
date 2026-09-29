@@ -349,11 +349,14 @@ public final class CompatGameTests {
             int trapPositive = 0, trapInfinite = 0;
             long max = 0;
             boolean exact = SiteChunks.footprint(sites, t).stride() == 1;
+            long elsewhere = 0;   // blocks in chunks another trap fills more: their share is not this trap's to add up
             for (var e : counts.entrySet()) {
                 ChunkPos p = new ChunkPos(e.getKey());
                 var covering = CdgBridge.charge(level, p.x, p.z);
-                if (covering.isEmpty() || covering.get().site().id() != t.id())
+                if (covering.isEmpty() || covering.get().site().id() != t.id()) {
+                    elsewhere += e.getValue();
                     continue;   // another trap fills this chunk more
+                }
                 chunks++;
                 long mb = Math.round((double) charge * scale * e.getValue() / total);
                 int expected = mb > threshold ? Integer.MAX_VALUE : (int) mb;
@@ -382,8 +385,10 @@ public final class CompatGameTests {
                 problems.add("trap " + t.id() + " has no chunk with oil");
             lines.add("trap " + t.id() + " charge " + charge + " mB × " + scale + " over " + counts.size() + " chunks ("
                     + total + " blocks), max chunk " + max + " mB, finite sum " + Math.round(sum));
-            if (trapInfinite == 0 && Math.abs(sum - charge * scale) > counts.size())
-                problems.add("trap " + t.id() + ": the chunks add up to " + sum + ", the scaled charge is " + charge * scale);
+            double own = charge * scale * (total - elsewhere) / (double) total;
+            if (trapInfinite == 0 && Math.abs(sum - own) > counts.size())
+                problems.add("trap " + t.id() + ": the chunks add up to " + sum + ", the scaled charge of its own chunks is " + own
+                        + " (" + elsewhere + " of " + total + " blocks lie in chunks another trap fills)");
         }
         DeepTime.LOGGER.info("[gametest] cdgOilFromTrap: {} traps {}; chunks {}, with oil {}, infinite {} (threshold {}); CDG {}; problems {}",
                 traps.size(), lines, chunks, positive, infinite, threshold, cdg.map(CdgAccess::config).orElse("not installed"), problems);
