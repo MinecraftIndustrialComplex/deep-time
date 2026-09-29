@@ -20,7 +20,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-11 | `deeptime-inspect` | done | 2026-09-28 | 86140f2 | Mac: cargo test -p deeptime-inspect ok (19 unit + 7 fixture); `cargo run -p deeptime-inspect -- compare --world smoke/standalone/server/planet --world-data …/deeptime` → p99_abs_diff_blocks 1 (p50 0, max 5, 99.6 % within 1 block; 109,184 of 128,000 columns compared); seam 144 rows, 0 mismatches; clippy, fmt, deny ok |
 | P0-12 | Terralith, TerraBlender and Biomes O' Plenty checks | done | 2026-09-28 | 00db177 | Mac: ./gametest.sh default/-PwithMic/-PwithTerraBlender → All 13 passed; terralith=3008 of 4096 land samples (MIC), biomesoplenty=1325 of 4096 (TB), surface painted 24/24; smoke mic --synth wrap-test (production server) PASS: probe tw stamped/loopsX/!loopsZ/1024, locate village found, no C2ME/DH errors, chunky done, regions outside span 0 |
 | P0-13 | Water above sea level holds | done | 2026-09-28 | — | Mac ./gametest.sh → All 14 required tests passed: lakeHolds before=65304 after=65304 expected=65304 outside=0 (every source woken by a fluid tick, 400 ticks forceloaded), water_top_y=120 at the lake centre, generatedFluidTicks=0. The inspect section PNG (review picture) comes with P0-11; -PwithMic (Mac): All 14 required tests passed, lakeHolds identical (outside=0) |
-| P0-14 | BlueMap renders on MIC blocks | doing | 2026-09-28 | — | Mac: tools/review/render-bluemap.sh renders the MIC smoke world (surface map + a below-y-0 strata map) in ~30 s; web app 645 MB uncompressed (962 hires tiles × ~0.65 MB, 992-block height). Hosting on spacesheep undecided: gzip tiles + a decompressing service worker, or a smaller render mask |
+| P0-14 | BlueMap renders on MIC blocks | done | 2026-09-28 | — | https://spacesheep.dev/@benmac/deeptime-p0-bluemap (private): MIC smoke world with synthetic world data, box 1952..2143 × 416..607 around the test mountain, surface + below-y-0 maps; gzip tiles unzipped in the browser (BlueMap clientDecompression), 29 MB/174 files; loads in headless Chromium over plain HTTP; the hosted page itself is private, so its first real load is Ben's. No service worker needed |
 | P0-15 | Phase 0 exit | todo | | | |
 | P1-01 | Session, checkpoints, keyframes, event log and site formats | done | 2026-09-28 | — | Mac: cargo test -p deeptime-format 27 ok (segments + sites round-trip, two writers merge with no id collision); run --preset dummy.json → manifest.json, events/1-0.dtev, keyframes/index.json (13 events, 9 keyframes, 3 sites); test --workspace, fmt, clippy -D warnings, deny licenses bans clean; gradlew build test tests=34 failures=0 and ./gametest.sh all 14 pass (after merging master 2f81ae5) |
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
@@ -46,6 +46,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | Name | URL | Version label | Date |
 |---|---|---|---|
 | seams (how the seams work, interactive) | https://spacesheep.dev/@benmac/deeptime-seams | seams v2 2026-09-28 | 2026-09-28 |
+| p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
 
 ## Pending questions
 Questions asked of Ben and not yet answered. Answers go into the decisions file's log
@@ -371,6 +372,16 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   seam chunk from a test can wait indefinitely in TW's seam-generation queue, so seam tests read only
   forceloaded chunks (`getChunkNow`). Two `/test run` at one position cancel each other: the harness
   spaces tests 8 blocks apart.
+- **P0-14 / BlueMap on spacesheep.** spacesheep's Free plan caps a space at 200 files and a file at
+  10 MB; BlueMap tiles of a 992-block world are several MB each before gzip, and a map's
+  textures.json with all ~160 MIC jars is 10.4 MB gzipped. The page works by (1) gzip storage plus
+  BlueMap's own `clientDecompression` switch (the web app inflates `.prbm.gz` with DecompressionStream,
+  so no Content-Encoding header is needed), (2) a bounded render box (`BLUEMAP_BOX`), (3) only the jars
+  whose blocks occur in the box (`BLUEMAP_ONLY_PRESENT=1`, via the new `deeptime-inspect blocks`), and
+  (4) dropping the source map, PHP backend and non-English translations. `deeptime-inspect blocks` on
+  the MIC world also shows what P1-15 must claim: Create's stone blobs (crimsite, ochrum, veridium,
+  limestone) and ores from Create Nuclear, Destroy, Create Propulsion, Ice and Fire and Cobblemon
+  scatter through Deep Time terrain today.
 - **TW semantics for tests:** TW moves an entity that *steps* over the border (its movement path);
   `setPos` is a teleport and stays unfolded.
 - **P0-07 (agent, merged):** see the P0-07 entry below. **P0-09 (agent, merged):** on-disk layout in
