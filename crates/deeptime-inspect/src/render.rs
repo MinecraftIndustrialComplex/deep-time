@@ -619,7 +619,10 @@ pub fn section(
         water.values().sum::<usize>()
     ));
     for (y, n) in &water {
-        stdout.push(format!("water_top_y={y} surface_y={} columns={n}", y + 1));
+        stdout.push(format!(
+            "water_top_y={} water_block_y={y} columns={n}",
+            y + 1
+        ));
     }
     let along = match args.axis {
         Axis::X => "z",
@@ -630,15 +633,15 @@ pub fn section(
         "plane": format!("{axis_name} = {}", args.at),
         "along": along,
         "from": lo, "to": hi, "y_from": y0, "y_to": y1,
-        "definition": "one pixel per block (then scaled): blocks by colour, sky light blue, air under the column's top block near-black; overlays: magenta = the first block above the world data's expected top (ceil(H)), green = the world data's water_level, yellow/violet/green/orange = the tops of strata horizons 1.. (horizon 0 starts at the surface). water_top_y = the y of the highest block holding water above the terrain surface; surface_y = water_top_y + 1, the height of the water surface (sea level 63 gives water_top_y 62).",
+        "definition": "one pixel per block (then scaled): blocks by colour, sky light blue, air under the column's top block near-black; overlays: magenta = the first block above the world data's expected top (ceil(H)), green = the world data's water_level, yellow/violet/green/orange = the tops of strata horizons 1.. (horizon 0 starts at the surface). water_top_y = the top face of the highest block holding water above the terrain surface (water_block_y + 1; P0-13's lakeHolds uses the same; sea level 63 gives water_top_y 63, water_block_y 62).",
         "legend": {"expected_surface": hex(OVERLAY_EXPECTED), "water_level": hex(OVERLAY_WATER),
                    "horizons": OVERLAY_HORIZONS.iter().map(|c| hex(*c)).collect::<Vec<_>>()},
         "bodies": "none: world-data format 0.0 has no site bodies",
         "world_data": wd.map(|w| w.dir.display().to_string()),
         "png": p.display().to_string(),
-        "water_tops": water.iter().map(|(y, n)| json!({"y": y, "columns": n})).collect::<Vec<_>>(),
+        "water_tops": water.iter().map(|(y, n)| json!({"water_top_y": y + 1, "water_block_y": y, "columns": n})).collect::<Vec<_>>(),
         "columns": cols.iter().map(|c| json!({
-            along: c.t, "top": c.top, "terrain": c.terrain, "water_top": c.water,
+            along: c.t, "top": c.top, "terrain": c.terrain, "water_block_y": c.water,
             "expected": c.expected,
             "horizons": c.horizons.iter().map(|(t, n)| json!([t, n])).collect::<Vec<_>>(),
             "water_level": c.level,

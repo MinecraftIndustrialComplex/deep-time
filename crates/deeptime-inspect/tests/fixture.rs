@@ -247,7 +247,7 @@ fn section_prints_the_water_surface() {
     )
     .unwrap();
     assert!(
-        lines.contains(&"water_top_y=62 surface_y=63 columns=64".to_owned()),
+        lines.contains(&"water_top_y=63 water_block_y=62 columns=64".to_owned()),
         "{lines:?}"
     );
     assert!(Path::new(v["png"].as_str().unwrap()).is_file());

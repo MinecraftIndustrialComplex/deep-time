@@ -124,7 +124,8 @@ enum Cmd {
         #[arg(long, value_parser = Area::parse, allow_hyphen_values = true)]
         area: Option<Area>,
     },
-    /// A vertical cross-section; prints water_top_y=<y> for the water surfaces it crosses.
+    /// A vertical cross-section; prints water_top_y=<y> (the top face of the highest water
+    /// block) for every water surface it crosses.
     Section {
         #[command(flatten)]
         common: Common,

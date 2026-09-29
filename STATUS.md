@@ -72,8 +72,10 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   (2 columns around a pit ≥ 2 blocks below close₃₂(open₄(measured)); reads only the measured
   surface). A first rule (air/fluid under neighbours' surfaces) missed vertical ravines and smooth
   dry cave-entrance hollows on beaches (17 blocks deep, no overhang), hence the morphological
-  test. `section` prints `water_top_y=<y> surface_y=<y+1> columns=<n>`: sea level 63 gives
-  `water_top_y=62`, so P0-13 must say whether its lake at `water_level` 120 means 119 or 120.
+  test. `section` prints `water_top_y=<y> water_block_y=<y−1> columns=<n>`, `water_top_y` being
+  the top face of the highest water block as P0-13's `lakeHolds` defines it. On P0-13's GameTest
+  world (main checkout's Mac copy) `section --world run-gametest/world/dimensions/deeptime/test_lake
+  --axis z --at 0 --from -88 --to 212` → `water_top_y=120 water_block_y=119 columns=209`.
 - **Measured** (Mac; `install.sh standalone --synth wrap-test --size 16384 && run.py --profile
   standalone --fresh --chunky 128 --chunky-seam` → PASS): compare p99 1, p50 0, max 5,
   histogram −3:9 −2:145 −1:2478 0:105190 +1:1106 +2:124 +3:85 +4:35 +5:12; excluded carved
