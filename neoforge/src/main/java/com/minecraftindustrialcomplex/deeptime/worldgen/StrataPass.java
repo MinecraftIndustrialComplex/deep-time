@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
-import com.google.gson.JsonParser;
 import com.minecraftindustrialcomplex.deeptime.rock.PaletteRules;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
+import com.minecraftindustrialcomplex.deeptime.worlddata.Columns;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import net.minecraft.core.SectionPos;
@@ -12,13 +12,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Paints rock strata into the unclassified crust (plan §7.5), v1. Runs after the pack's surface
@@ -43,7 +38,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class StrataPass {
 
     public static final String LAYER = "strata/horizons";
-    private static final Map<WorldData, List<String>> CLASSES = new ConcurrentHashMap<>();
 
     private StrataPass() {}
 
@@ -55,57 +49,19 @@ public final class StrataPass {
         return ((long) h << 8) | classIndex;
     }
 
-    /** One column's horizons, top-down: integer tops and class indexes. */
-    public static final class Column {
-        public final int[] tops;
-        public final int[] classes;
-        public int count;
-
+    /** One column's horizons, top-down: integer tops and class indexes ({@link Columns.Stack}). */
+    public static final class Column extends Columns.Stack {
         public Column(int k) {
-            tops = new int[k];
-            classes = new int[k];
-        }
-
-        /** The index of the horizon holding block y, or −1 above the first horizon's top. */
-        public int horizonAt(int y) {
-            if (count == 0 || y > tops[0])
-                return -1;
-            int h = 0;
-            while (h + 1 < count && y <= tops[h + 1])
-                h++;
-            return h;
+            super(k);
         }
     }
 
-    /** Fills {@code out} with the stack at block (x, z). */
+    /**
+     * Fills {@code out} with the stack at block (x, z): the column rule of the world-data contract
+     * ({@link Columns#stack}, which Rust's {@code stack_at} mirrors).
+     */
     public static void column(WorldData wd, RasterSampler strata, int x, int z, Column out) {
-        var grid = strata.desc().grid();
-        int c = wd.circumference();
-        int k = Math.min(strata.stackDepth(), out.tops.length);
-        double wx = Math.floorMod(x + c / 2, c) - c / 2;
-        double u = (wx - grid.originBlockX()) / grid.r();
-        double v = (z - grid.originBlockZ()) / (double) grid.r();
-        long in = (long) Math.floor(u + 0.5), jn = (long) Math.floor(v + 0.5);
-        long i0 = (long) Math.floor(u), j0 = (long) Math.floor(v);
-        double fu = u - i0, fv = v - j0;
-        int used = 0;
-        int prev = Integer.MAX_VALUE;
-        for (int h = 0; h < k; h++) {
-            int cls = strata.horizonClass(in, jn, h);
-            double nearest = strata.horizonTop(in, jn, h);
-            if (cls == 255 || Double.isNaN(nearest))
-                break;
-            double t00 = strata.horizonTop(i0, j0, h), t10 = strata.horizonTop(i0 + 1, j0, h);
-            double t01 = strata.horizonTop(i0, j0 + 1, h), t11 = strata.horizonTop(i0 + 1, j0 + 1, h);
-            double top = Double.isNaN(t00) || Double.isNaN(t10) || Double.isNaN(t01) || Double.isNaN(t11) ? nearest
-                    : (t00 + (t10 - t00) * fu) * (1 - fv) + (t01 + (t11 - t01) * fu) * fv;
-            int t = Math.min((int) Math.floor(top), prev);   // tops never rise with depth
-            out.tops[used] = t;
-            out.classes[used] = cls;
-            prev = t;
-            used++;
-        }
-        out.count = used;
+        Columns.stack(wd, strata, x, z, out);
     }
 
     public static void apply(ChunkAccess chunk, WorldData wd) {
@@ -276,19 +232,9 @@ public final class StrataPass {
         return s.is(Blocks.STONE) || s.is(Blocks.DEEPSLATE);
     }
 
-    /** Class index → rock class id, from {@code strata/classes.json}. */
+    /** Class index → rock class id, from {@code strata/classes.json} ({@link WorldData#classes}). */
     public static List<String> classes(WorldData wd) {
-        return CLASSES.computeIfAbsent(wd, d -> {
-            try {
-                var arr = JsonParser.parseString(Files.readString(d.folder().resolve("strata/classes.json")))
-                        .getAsJsonObject().getAsJsonArray("classes");
-                List<String> out = new ArrayList<>();
-                arr.forEach(e -> out.add(e.getAsString()));
-                return List.copyOf(out);
-            } catch (IOException | RuntimeException e) {
-                throw new IllegalStateException("cannot read strata/classes.json in " + d.folder(), e);
-            }
-        });
+        return wd.classes();
     }
 
     /** A horizon at a block, for tests and probes. */

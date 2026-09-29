@@ -599,10 +599,36 @@ def depositWorldDump = tasks.register('testWorldDeposits4k', Exec) {
     commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
             'dump-deposits', '--world', world.get().asFile.absolutePath, '--out', dump.get().asFile.absolutePath
 }
+// P1-08: a small real planet (every stage, baked: format 0.1) and Rust's column evaluator on 500 of
+// its columns (`deeptime parity` -> planet4k/parity/columns.json), for ColumnParityTest and
+// NativeLinkTest.sampleColumnIsTheParityFixture.
+def planetWorldRun = tasks.register('testWorldPlanet4kRun', Exec) {
+    description = 'Writes the real test planet (C = 4096, tests/presets/planet_world_4k.json) with deeptime run.'
+    inputs.files(fileTree(new File(repoRoot, 'crates')) { exclude '**/target/**' })
+    inputs.files(new File(repoRoot, 'Cargo.toml'), new File(repoRoot, 'Cargo.lock'))
+    def out = testWorldsDir.map { it.dir('planet4k') }
+    outputs.dir out
+    workingDir repoRoot
+    doFirst { delete out }
+    commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
+            'run', '--preset', new File(repoRoot, 'crates/deeptime-core/tests/presets/planet_world_4k.json').absolutePath,
+            '--out', out.get().asFile.absolutePath
+}
+def planetWorldParity = tasks.register('testWorldPlanet4k', Exec) {
+    description = "Writes Rust's column evaluator on 500 columns of the real test planet (parity/columns.json)."
+    dependsOn planetWorldRun
+    def world = testWorldsDir.map { it.dir('planet4k') }
+    def fixture = testWorldsDir.map { it.file('planet4k/parity/columns.json') }
+    outputs.file fixture
+    workingDir repoRoot
+    commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
+            'parity', '--world-data', world.get().asFile.absolutePath, '--columns', '500'
+}
 def testWorlds = tasks.register('testWorlds') {
-    description = 'Writes every synthetic world-data fixture the JUnit tests read.'
+    description = 'Writes every world-data fixture the JUnit tests read.'
     dependsOn testWorldTasks
     dependsOn depositWorldDump
+    dependsOn planetWorldParity
 }
 tasks.named('test', Test) {
     dependsOn testWorlds

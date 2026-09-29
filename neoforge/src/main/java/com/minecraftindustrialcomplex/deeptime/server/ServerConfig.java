@@ -140,7 +140,6 @@ public record ServerConfig(String preset, Optional<Presets.Timeline> timeline, d
         return """
                 {
                   "_about": "Deep Time generates this world's geologic history once, on the server's first start, before the world is created. Fill in preset and timeline, then start the server again. Keys that start with _ are explanations and are ignored.",
-                  "_phase_1": "The built-in presets are placeholders while Phase 1 is in progress: a dummy pipeline plus a synthetic terrain, not a simulated planet.",
                   "preset": "",
                   "_preset": "A built-in preset: earthlike_quick_16k or earthlike_full_16k for level-type=deeptime:planet (C = 16384 blocks), earthlike_quick_32k or earthlike_full_32k for level-type=deeptime:planet_32k (C = 32768). Or a preset file (a path relative to this folder or to the server folder), or a share code from the Create World screen (DT1.…). The preset's circumference must match the level-type in server.properties.",
                   "timeline": {
