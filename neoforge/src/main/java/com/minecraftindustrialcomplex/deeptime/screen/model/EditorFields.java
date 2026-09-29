@@ -3,8 +3,17 @@ package com.minecraftindustrialcomplex.deeptime.screen.model;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -18,6 +27,11 @@ import java.util.Optional;
  *
  * <p>The size (circumference) and the timeline are not in this list: every preset carries them
  * (the size picks the built-in preset; the timeline has no default, plan §5.1).
+ *
+ * <p>The list itself is {@code crates/deeptime-viewer/assets/editor_fields.json}, shipped in the jar
+ * as {@code deeptime/editor_fields.json} (Gradle {@code processResources}, like {@code ramps.json}):
+ * the browser workbench ({@code deeptime watch}, P1-20) builds its form from the same file, so the
+ * two editors cannot drift apart.
  */
 public final class EditorFields {
 
@@ -34,8 +48,10 @@ public final class EditorFields {
      * @param path    dotted JSON path inside the preset ({@code planet.gravity_m_s2})
      * @param unit    shown after the value ({@code m/s²}); empty for none
      * @param phase3  a fantasy toggle: shown, always disabled until Phase 3 (decisions file, "Fantasy terrain")
+     * @param integer a whole number, written as a JSON integer (the seed is a u64 in the core)
      */
-    public record Field(String id, Section section, Kind kind, String path, double min, double max, String unit, boolean phase3) {
+    public record Field(String id, Section section, Kind kind, String path, double min, double max, String unit, boolean phase3,
+                        boolean integer) {
 
         public String labelKey() {
             return "editor.field." + id;
@@ -57,43 +73,61 @@ public final class EditorFields {
             return !phase3 && get(preset).isPresent();
         }
 
-        /** Checks a number against the range. */
+        /** Checks a number against the range (and, for an integer field, that it is whole). */
         public boolean inRange(double v) {
-            return !Double.isNaN(v) && v >= min && v <= max;
+            return !Double.isNaN(v) && v >= min && v <= max && (!integer || v == Math.rint(v));
+        }
+
+        /** The JSON a valid number becomes: an integer field's as a long, the others' as a double. */
+        public JsonPrimitive number(double v) {
+            return integer ? new JsonPrimitive((long) v) : new JsonPrimitive(v);
         }
     }
 
-    private static Field number(String id, Section s, String path, double min, double max, String unit) {
-        return new Field(id, s, Kind.NUMBER, path, min, max, unit, false);
-    }
+    /** Where the catalogue sits in the jar. */
+    public static final String RESOURCE = "/deeptime/editor_fields.json";
 
     /**
-     * Every field, in the setup page's order. The planet and scale paths and ranges are P1-03's
-     * {@code params.rs} ({@code PlanetParams}, {@code ScaleParams}, {@code PlanetPreset::validate});
-     * the others are proposals for the stages that have not landed (their ranges are the editor's
-     * sanity bounds; the core validates in the end).
+     * Every field, in the setup page's order, from {@link #RESOURCE}. The planet, scale and seed
+     * paths and ranges are P1-03's {@code params.rs} ({@code PlanetParams}, {@code ScaleParams},
+     * {@code PlanetPreset::validate}); the others are proposals for the stages that have not landed
+     * (their ranges are the editor's sanity bounds; the core validates in the end).
      */
-    public static final List<Field> ALL = List.of(
-            number("gravity", Section.PLANET, "planet.gravity_m_s2", 0.1, 99.9, "m/s²"),
-            number("day_length", Section.PLANET, "planet.day_length_h", 1, 10_000, "h"),
-            number("axial_tilt", Section.PLANET, "planet.axial_tilt_deg", 0, 180, "°"),
-            number("star_flux", Section.PLANET, "planet.star_flux_rel", 0.1, 10, "×"),
-            number("ocean_fraction", Section.PLANET, "planet.ocean_fraction", 0.05, 0.95, ""),
-            number("m_per_block_h", Section.SCALE, "scale.m_per_block_h", 10, 10_000, "m"),
-            number("m_per_block_v", Section.SCALE, "scale.m_per_block_v", 1, 200, "m"),
-            number("deposit_count", Section.MULTIPLIERS, "deposits.count_multiplier", 0, 10, "×"),
-            number("deposit_size", Section.MULTIPLIERS, "deposits.size_multiplier", 0.1, 10, "×"),
-            number("deposit_richness", Section.MULTIPLIERS, "deposits.richness_multiplier", 0.1, 10, "×"),
-            number("province_strength", Section.MULTIPLIERS, "deposits.province_strength", 0, 1, ""),
-            number("feature_deposits", Section.MULTIPLIERS, "scale.feature_scale.deposits", 0.1, 10, "×"),
-            number("feature_rivers", Section.MULTIPLIERS, "scale.feature_scale.rivers", 0.1, 10, "×"),
-            number("feature_canyons", Section.MULTIPLIERS, "scale.feature_scale.canyons", 0.1, 10, "×"),
-            number("feature_strata", Section.MULTIPLIERS, "scale.feature_scale.strata", 0.1, 10, "×"),
-            number("drama", Section.MULTIPLIERS, "surface.drama", 0, 2, ""),
-            new Field("fantasy_fields", Section.FANTASY, Kind.TOGGLE, "fantasy.fields", 0, 1, "", true),
-            new Field("sky_islands", Section.FANTASY, Kind.TOGGLE, "fantasy.sky_islands", 0, 1, "", true),
-            new Field("exotic_landforms", Section.FANTASY, Kind.TOGGLE, "fantasy.exotic_landforms", 0, 1, "", true),
-            new Field("essentials", Section.PLAYABILITY, Kind.CHOICE, "playability.essentials", 0, 0, "", false));
+    public static final List<Field> ALL = load();
+
+    /** Reads the catalogue; a jar without it is broken, so this throws. */
+    static List<Field> load() {
+        try (InputStream in = EditorFields.class.getResourceAsStream(RESOURCE)) {
+            if (in == null)
+                throw new IllegalStateException("the editor catalogue " + RESOURCE + " is missing from the jar; reinstall Deep Time");
+            return parse(JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** The fields of a catalogue ({@code {"fields": [...]}}); throws on a malformed entry. */
+    static List<Field> parse(JsonObject catalogue) {
+        List<Field> out = new ArrayList<>();
+        for (JsonElement e : catalogue.getAsJsonArray("fields")) {
+            JsonObject o = e.getAsJsonObject();
+            String id = o.get("id").getAsString();
+            try {
+                out.add(new Field(id,
+                        Section.valueOf(o.get("section").getAsString().toUpperCase(Locale.ROOT)),
+                        Kind.valueOf(o.get("kind").getAsString().toUpperCase(Locale.ROOT)),
+                        o.get("path").getAsString(),
+                        o.get("min").getAsDouble(),
+                        o.get("max").getAsDouble(),
+                        o.has("unit") ? o.get("unit").getAsString() : "",
+                        o.has("phase3") && o.get("phase3").getAsBoolean(),
+                        o.has("integer") && o.get("integer").getAsBoolean()));
+            } catch (RuntimeException ex) {
+                throw new IllegalStateException("editor field '" + id + "' in " + RESOURCE + ": " + ex.getMessage(), ex);
+            }
+        }
+        return List.copyOf(out);
+    }
 
     /** The field with this id. */
     public static Field byId(String id) {
