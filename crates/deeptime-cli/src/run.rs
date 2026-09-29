@@ -106,6 +106,28 @@ fn load_preset(arg: &str) -> CliResult<String> {
     Ok(deeptime_core::preset::resolve(arg)?)
 }
 
+/// A preset argument with the timeline choices applied (`--start`, `--length-myr`).
+pub fn load_preset_with(
+    arg: &str,
+    start: Option<&str>,
+    length_myr: Option<f64>,
+) -> CliResult<String> {
+    Ok(deeptime_core::preset::with_timeline(
+        &load_preset(arg)?,
+        start,
+        length_myr,
+    )?)
+}
+
+/// The plate model's summary line (plan P1-03: `plates_final=<n> ocean_age_p90_myr=<a> …`), when
+/// the world has plates.
+fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    world
+        .plates
+        .as_ref()
+        .map(|st| deeptime_core::plates::stats::summary(st).line())
+}
+
 pub struct RunOptions {
     /// A built-in name, a file or a share code.
     pub preset: String,
@@ -161,6 +183,9 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         alloc::peak() as f64 / 1048576.0,
         started.elapsed().as_secs_f64()
     );
+    if let Some(line) = plates_line(&s.checkpoint()?.world) {
+        println!("deeptime run: {line}");
+    }
     if let Some(dir) = &o.viewer {
         let title = format!("Deep Time — run {} ({})", s.preset().name(), o.preset);
         deeptime_viewer::write_world_bundle(dir, &o.out, &title)?;
@@ -176,6 +201,12 @@ pub struct StageOptions {
     pub name: String,
     pub input: Option<PathBuf>,
     pub preset: Option<String>,
+    /// `timeline.start` for `--preset`.
+    pub start: Option<String>,
+    /// `timeline.length_myr` for `--preset`.
+    pub length_myr: Option<f64>,
+    /// Stop after this many steps of the stage (a mid-stage checkpoint).
+    pub max_steps: Option<u64>,
     pub out: Option<PathBuf>,
     pub viewer: Option<PathBuf>,
     pub work: Option<PathBuf>,
@@ -222,7 +253,8 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             Session::resume(ck, opts, Arc::new(AllocGauge))?
         }
         (None, Some(preset)) => {
-            let s = Session::create(&load_preset(preset)?, "", opts, Arc::new(AllocGauge))?;
+            let json = load_preset_with(preset, o.start.as_deref(), o.length_myr)?;
+            let s = Session::create(&json, "", opts, Arc::new(AllocGauge))?;
             let target = s
                 .stage_names()
                 .iter()
@@ -245,9 +277,23 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     };
     let events_before = s.progress().events_total;
     let stepping = Instant::now();
-    drive(&s, o.common.verbose, |_, st| {
-        matches!(st, AdvanceStatus::StageDone | AdvanceStatus::Done)
-    })?;
+    match o.max_steps {
+        None => {
+            drive(&s, o.common.verbose, |_, st| {
+                matches!(st, AdvanceStatus::StageDone | AdvanceStatus::Done)
+            })?;
+        }
+        Some(max) => {
+            // One step per call: advance with a zero budget runs exactly one.
+            for _ in 0..max {
+                let status = s.advance(Duration::ZERO);
+                forward_log(&s, o.common.verbose);
+                if status? != AdvanceStatus::Running {
+                    break;
+                }
+            }
+        }
+    }
     let seconds = stepping.elapsed().as_secs_f64();
     let ck = s.checkpoint()?;
     let timing = s
@@ -270,6 +316,12 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     let census = census_of(&ck.world.notes);
     if let Some(c) = &census {
         print_census(c);
+    }
+    if let Some(line) = plates_line(&ck.world) {
+        println!(
+            "deeptime stage {}: {line} steps={timing} seconds={seconds:.3}",
+            o.name
+        );
     }
     if let Some(out) = &o.out {
         ck.write(out)?;
@@ -323,6 +375,8 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
 
 pub struct BenchOptions {
     pub preset: String,
+    pub start: Option<String>,
+    pub length_myr: Option<f64>,
     pub threads: Vec<usize>,
     pub out: PathBuf,
     pub viewer: Option<PathBuf>,
@@ -334,7 +388,7 @@ pub struct BenchOptions {
 /// `deeptime bench`: the preset once per thread count, with per-stage wall time and peak native
 /// memory, into `bench.json` and a timing page (the Phase 1 budget gate's skeleton, P1-17).
 pub fn bench(o: &BenchOptions) -> CliResult<()> {
-    let preset = load_preset(&o.preset)?;
+    let preset = load_preset_with(&o.preset, o.start.as_deref(), o.length_myr)?;
     let temp = o.work.is_none();
     let work = o.work.clone().unwrap_or_else(|| {
         std::env::temp_dir().join(format!("deeptime-bench-{}", std::process::id()))
@@ -370,6 +424,9 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             .map(|t| json!({ "name": t.name, "steps": t.steps, "millis": t.millis }))
             .collect();
         stages.push(json!({ "name": "finalize", "steps": 1, "millis": finalize_ms }));
+        if let Some(line) = plates_line(&s.checkpoint()?.world) {
+            println!("deeptime bench: threads={threads} {line}");
+        }
         println!(
             "deeptime bench: threads={threads} total_ms={total_ms:.1} peak_bytes={peak} stages={}",
             stages
