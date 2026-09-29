@@ -2190,6 +2190,12 @@ depends on (`mixinextras-neoforge` 0.5.3 in its POM); `WorldLoader.DataLoadConte
    live, because they need a real TW-shaped Deep Time overworld. Flags: `--boot-only` (start, wait for
    `Done (`, run `/deeptime probe column 0 0`, stop), `--size 16384|32768`, `--scenario <name>` (one
    scripted scenario, such as P0-06's `sable_straddle`), `-PwithMic`.
+   *As built (P0-06):* tests run by name (`--run name,…@x,y,z[~dx,dz]`), **one at a time**, because
+   1.21.1's `/test run` begins with `TestCommand.stopTests()` and cancels any test still running;
+   `/test run` ignores y and puts the test on the WORLD_SURFACE heightmap at (x, z + 3), which reads
+   the world's floor until that chunk is loaded, so the harness forceloads first and waits for every
+   test spot (`execute if loaded`); TW's `/forceload` accepts canonical coordinates only, so a box
+   across the seam is split into two. Results come from `DeepTimeTestReporter` (§9.4 gap 1).
 
 GameTest classes by task: `BootGameTests` (P0-03, P0-05), `GeneratorGameTests` (P0-05, P0-10),
 `SeamGameTests`, `SableSeamGameTests`, `PoleCapGameTests` (P0-06, P1-18), `NativeGameTests` (P0-07),
@@ -2239,7 +2245,10 @@ once from nixpkgs). Every byte they produce lands under Deep Time's own gitignor
   and compare them with the world data; `locate structure #minecraft:village`; pregenerate with
   Chunky (`chunky center <x> <z>`, `chunky radius 256`, `chunky start`, poll `chunky progress`);
   check that every `region/r.<rx>.<rz>.mca` file name has −C/1024 ≤ rx < C/1024 (a 512-block region
-  file; nothing written outside the canonical span); `save-all flush`; stop; start again and confirm
+  file; nothing written outside the canonical span) — as built (P0-06), every region, entities and
+  poi file *that stores a chunk*: vanilla creates an empty `.mca` whenever it opens a region file for
+  a read, and on a TW world some reads use raw coordinates past the edge (0-byte files at
+  rx = C/1024 and −C/1024 − 1), which are recorded, not failed; `save-all flush`; stop; start again and confirm
   the world data was not regenerated; write `smoke/<profile>/report.md` (pass/fail table, boot time,
   generation time, peak RSS, mixins, probes, exclusions, the pack commit).
 - The resulting world folder feeds BlueMap (§9.6) and `deeptime-inspect` (§9.7).

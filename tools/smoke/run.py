@@ -6,7 +6,10 @@
         [--fresh]                 delete the world first
         [--level-type <preset>]   override server.properties' level-type (boot-only runs,
                                   e.g. minecraft:normal before Deep Time's preset exists)
-        [--chunky <radius>]       pregenerate a square of this radius around 0,0
+        [--chunky <radius>]       pregenerate a square of this radius (Chunky)
+        [--chunky-center <x,z>|seam]  its centre (default 0,0); `seam` is x = C/2, z = 0, so the
+                                  square straddles the seam and the region check below proves
+                                  nothing was written outside the canonical span (P0-06)
         [--chunky-seam]           also pregenerate at least 128 columns either side of the
                                   seam (x = C/2), z in [-64, 80), inside the canonical span
                                   (deeptime-inspect seam, plan §9.7)
@@ -235,23 +238,52 @@ def port_free(port):
         return s.connect_ex(("127.0.0.1", port)) != 0
 
 
-def region_span_check(world, circumference):
-    """Every region file of the overworld must satisfy -C/1024 <= rx < C/1024 (plan §9.5).
+def region_chunks(path):
+    """Chunks stored in a region file: non-zero entries of its 4 KiB location table."""
+    if os.path.getsize(path) < 4096:
+        return 0
+    import struct
+    header = open(path, "rb").read(4096)
+    return sum(1 for i in range(1024) if struct.unpack_from(">I", header, 4 * i)[0] != 0)
 
-    Returns (total, outside, outside_empty). A 0-byte file holds no chunk: the game creates the
-    file when it merely looks a chunk up (Toroidal World folds the lookup, and nothing is
-    written), so those are listed apart and do not fail the check."""
-    region_dir = os.path.join(world, "region")
+
+def region_span_check(world, circumference):
+    """Every region file that stores a chunk must satisfy -C/1024 <= rx < C/1024 (plan §9.5).
+
+    Checked in region/, entities/ and poi/. Vanilla creates an empty .mca whenever it opens a
+    region file for a read (structure checks, "is this chunk generated" lookups), and on a wrapped
+    world some of those reads use raw coordinates past the edge (P0-06: eight 0-byte files at
+    rx = 32 and -33 after a Chunky square across the 32k seam). Such a file stores nothing, so it
+    is recorded, not counted. Returns (files with chunks, of them outside the span, empty files
+    outside the span).
+    """
     half = circumference // 1024
-    outside, empty, total = [], [], 0
-    if os.path.isdir(region_dir):
-        for f in os.listdir(region_dir):
+    outside, empty_outside, total = [], [], 0
+    for sub in ("region", "entities", "poi"):
+        d = os.path.join(world, sub)
+        if not os.path.isdir(d):
+            continue
+        for f in os.listdir(d):
             m = re.match(r"r\.(-?\d+)\.(-?\d+)\.mca$", f)
-            if m:
-                total += 1
-                if not (-half <= int(m.group(1)) < half):
-                    (empty if os.path.getsize(os.path.join(region_dir, f)) == 0 else outside).append(f)
-    return total, outside, empty
+            if not m:
+                continue
+            inside = -half <= int(m.group(1)) < half
+            if region_chunks(os.path.join(d, f)) == 0:
+                if not inside:
+                    empty_outside.append(f"{sub}/{f}")
+                continue
+            total += 1
+            if not inside:
+                outside.append(f"{sub}/{f}")
+    return total, outside, empty_outside
+
+
+def chunky_center(spec, circumference):
+    """`x,z`, or `seam` for the seam at x = C/2 (the square then straddles it)."""
+    if spec == "seam":
+        return circumference // 2, 0
+    x, z = spec.split(",")
+    return int(x), int(z)
 
 
 def main():
@@ -260,6 +292,8 @@ def main():
     ap.add_argument("--fresh", action="store_true")
     ap.add_argument("--level-type")
     ap.add_argument("--chunky", type=int, default=0)
+    ap.add_argument("--chunky-center", default="0,0", metavar="X,Z|seam",
+                    help="centre of the Chunky square; `seam` is x = C/2, z = 0 (P0-06)")
     ap.add_argument("--chunky-seam", action="store_true")
     ap.add_argument("--restart", action="store_true")
     ap.add_argument("--timeout", type=int, default=1500)
@@ -293,7 +327,10 @@ def main():
 
     for port in (install["game_port"], install["rcon_port"]):
         if not port_free(port):
-            owners = subprocess.run(["ss", "-ltnp", f"sport = :{port}"], capture_output=True, text=True).stdout
+            try:
+                owners = subprocess.run(["ss", "-ltnp", f"sport = :{port}"], capture_output=True, text=True).stdout
+            except FileNotFoundError:   # macOS
+                owners = subprocess.run(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN"], capture_output=True, text=True).stdout
             sys.exit(f"run.py: port {port} is in use -- another server (a peer session?) holds it:\n{owners}")
 
     os.makedirs(os.path.join(smoke, "logs"), exist_ok=True)
@@ -333,7 +370,9 @@ def main():
                 if m:
                     tw = json.loads(m.group(1))
                     for k in ("stamped", "loopsX", "loopsZ", "widthChunks", "climateCompression"):
-                        steps.record(f"tw.{k}", tw.get(k))
+                        steps.record(f"tw.{k}", json.dumps(tw.get(k)).strip('"'))
+                    print("   probe tw: " + " ".join(f"{k}={json.dumps(tw.get(k)).strip(chr(34))}" for k in
+                                                     ("stamped", "loopsX", "loopsZ", "widthChunks", "climateCompression")), flush=True)
                 out = rcon("deeptime probe column 0 0", check=False)
                 m = PROBE.search(out)
                 steps.check("/deeptime probe column 0 0 answers", "[deeptime-probe] JSON", out[:200], m is not None)
@@ -348,7 +387,9 @@ def main():
 
             tasks = []
             if a.chunky:
-                tasks.append(("chunky pregeneration finished", 0, 0, a.chunky))
+                cx, cz = chunky_center(a.chunky_center, install["size"])
+                steps.record("chunky square", f"centre {cx},{cz} radius {a.chunky} (x {cx - a.chunky}..{cx + a.chunky})")
+                tasks.append(("chunky pregeneration finished", cx, cz, a.chunky))
             if a.chunky_seam and is_planet:
                 # Chunky's square is the chunks (int) centre >> 4 ± ceil(radius / 16): with
                 # centre ±(C/2 - 72) and radius 64 that is x in [C/2 - 144, C/2) and
@@ -360,24 +401,39 @@ def main():
             finished = re.compile(r"Task finished for|Task complete")
             for name, cx, cz, radius in tasks:
                 before = len(server.grep(finished.pattern, 10**9))
-                rcon(f"chunky center {cx} {cz}")
-                rcon(f"chunky radius {radius}")
-                rcon("chunky start")
+                for cmd in (f"chunky center {cx} {cz}", "chunky shape square", f"chunky radius {radius}", "chunky start"):
+                    print(f"   {cmd}: {rcon(cmd, check=False)[:160]}", flush=True)
                 deadline = time.time() + 1800
                 while time.time() < deadline:
                     time.sleep(10)
                     if len(server.grep(finished.pattern, 10**9)) > before:
                         break
-                done = len(server.grep(finished.pattern, 10**9)) > before
-                steps.check(name, "finished", "finished" if done else "timeout", done)
+                lines = server.grep(finished.pattern, 10**9)
+                done = len(lines) > before
+                steps.check(name, "finished", lines[-1][-160:] if done else "timeout", done)
 
             rcon("save-all flush")
             time.sleep(3)
             if is_planet:
                 total, outside, empty = region_span_check(world, install["size"])
-                steps.check("region files inside the canonical span", "outside=0", f"outside={len(outside)} of {total}", not outside,
-                            note=", ".join(sorted(outside)))
-                steps.record("empty (0-byte) region files outside the span", f"{len(empty)}: {', '.join(sorted(empty)) or 'none'}")
+                print(f"   regions outside span: {len(outside)} (of {total} region files holding chunks; span "
+                      f"{-install['size'] // 1024} <= rx < {install['size'] // 1024}; {len(empty)} empty files outside)",
+                      flush=True)
+                steps.check("regions outside span", "0", f"{len(outside)} (of {total} region/entities/poi files holding chunks"
+                            + (f": {', '.join(sorted(outside)[:8])}" if outside else "") + ")", not outside,
+                            note=f"-C/1024 <= rx < C/1024, C = {install['size']}")
+                steps.record("empty region files outside the span (0 chunks, opened by lookups)",
+                             f"{len(empty)}" + (f": {', '.join(sorted(empty)[:8])}" if empty else ""))
+                if a.chunky_seam or (a.chunky and a.chunky_center == "seam"):
+                    # Both sides of the seam hold chunks: the last region column (rx = C/1024 - 1)
+                    # and the first (rx = -C/1024).
+                    half = install["size"] // 1024
+                    rdir = os.path.join(world, "region")
+                    side = lambda rx: sum(region_chunks(os.path.join(rdir, f)) for f in os.listdir(rdir)
+                                          if re.match(rf"r\.{rx}\.-?\d+\.mca$", f))
+                    east, west = side(half - 1), side(-half)
+                    steps.check("chunks stored on both sides of the seam", "east > 0 and west > 0",
+                                f"east (rx={half - 1}) {east}, west (rx={-half}) {west}", east > 0 and west > 0)
 
             steps.record("peak RSS (MB)", (server.peak_rss_kb() or 0) // 1024)
             server.stop(rcon)
@@ -396,7 +452,11 @@ def main():
 
     passed = not steps.failed
     write_report(smoke, a, install, steps, level_type, boot_s, started, passed, server)
-    print(f"\n{'PASS' if passed else 'FAIL'} -- report: {os.path.join(smoke, 'report.md')}", flush=True)
+    # Keep one report per circumference too (P0-06 compares 16k and 32k side by side).
+    import shutil
+    shutil.copyfile(os.path.join(smoke, "report.md"), os.path.join(smoke, f"report-C{install['size']}.md"))
+    print(f"\n{'PASS' if passed else 'FAIL'} -- report: {os.path.join(smoke, 'report.md')} "
+          f"(also report-C{install['size']}.md)", flush=True)
     sys.exit(0 if passed else 1)
 
 
