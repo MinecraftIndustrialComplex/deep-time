@@ -1,100 +1,72 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
-# The Mac side of tools/client/ev-assets.sh (read that first); runs inside the repo's dev shell on
-# the Mac, under the Deep Time server lock, while the laptop holds the desktop's drive lease.
+# The Mac side of tools/client/ev-assets.sh (read that first); runs ON the Mac from the repo root,
+# inside `tools/remote/mac.sh --no-sync --server` (Deep Time's server lock) and the repo's dev shell.
 #
-# 1. installs the ev-client set (tools/smoke/install.sh ev-client) if it is missing;
+#   tools/client/ev-assets-mac.sh --m6lock <path to graphide's m6lock.sh> [--timeout S] [--lease-wait S]
+#
+# 1. checks the ev-client set is linked into the client's run/mods (the laptop side ran
+#    `./gradlew -PrunSet=ev-client linkRunModsClient` after `tools/smoke/install.sh ev-client`);
 # 2. writes run/config/dynamic_asset_generator.json: full_cache (DAG writes every resource it makes
 #    under run/.cache/dynamic_asset_generator/) and time_resources (times.log); other keys at their
 #    defaults (DAG 6.1.2's ModConfig.getDefault);
-# 3. starts `./gradlew runClient -PrunSet=ev-client` in ban's desktop session: `sudo launchctl asuser`
-#    (macOS gives a GUI app spawned from sshd no window server) with this dev shell's environment;
-# 4. waits for the block atlas ("Created: … minecraft:textures/atlas/blocks.png-atlas"), by which
-#    time every block model and texture has been asked for, gives DAG 20 s more, stops the client;
-# 5. writes summary.json, then turns the cache into a resource pack (tools/client/ev-assets-pack.py).
+# 3. boots the client through tools/client/mac-client-lib.sh, the launch every real-client run
+#    shares (the drive lease on graphide's M6 lock, renewed while it runs; ModDevGradle's dev launch
+#    in ban's desktop session through `sudo launchctl asuser`; only this run's JVM is ever
+#    stopped), without ScreenshotDriver: the client just loads. The pass ends 20 s after the block
+#    atlas is created ("Created: … minecraft:textures/atlas/blocks.png-atlas"), by which time every
+#    block model and texture has been asked for, and the client is stopped;
+# 4. writes summary.json, then turns the cache into a resource pack (tools/client/ev-assets-pack.py).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 REPO="$PWD"
-OUT="$REPO/review/out/q10/ev-assets"
-RUN="$REPO/run"
-LOG="$OUT/client.log"
-TIMEOUT="${EV_ASSETS_TIMEOUT:-1500}"
+source tools/client/mac-client-lib.sh
 
-rm -rf "$OUT" && mkdir -p "$OUT"
-if [ ! -f smoke/ev-client/install.json ]; then
-    tools/smoke/install.sh ev-client 2>&1 | tail -3
-fi
-
-mkdir -p "$RUN/config"
-rm -rf "$RUN/.cache/dynamic_asset_generator" "$RUN/logs" "$RUN/crash-reports"
-printf '%s\n' '{"full_cache": true, "palette_extraction_force_clustering_cutoff": 1000000, "time_resources": true, "keyed_cache": true}' \
-    > "$RUN/config/dynamic_asset_generator.json"
-cat > "$RUN/options.txt" <<'EOF'
-onboardAccessibility:false
-pauseOnLostFocus:false
-narrator:0
-tutorialStep:none
-joinedFirstServer:true
-soundCategory_master:0.0
-EOF
-
-# The launcher: this shell's environment (the dev shell: java, GRADLE_USER_HOME, …), then Gradle.
-LAUNCH="$OUT/launch.sh"
-{
-    echo '#!/bin/bash'
-    export -p | grep -v -E '^declare -[a-zA-Z-]* (BASHOPTS|SHELLOPTS|BASH_VERSINFO|EUID|PPID|UID|SHLVL|OLDPWD|PWD|_)='
-    echo "cd '$REPO/neoforge'"
-    echo "exec ./gradlew runClient --no-daemon --console=plain -PrunSet=ev-client"
-} > "$LAUNCH"
-chmod +x "$LAUNCH"
-
-UID_NUM="$(id -u)"; USER_NAME="$(id -un)"
-echo "ev-assets: starting the client in gui/$UID_NUM (log $LOG)"
-T0=$(date +%s)
-sudo -n launchctl asuser "$UID_NUM" sudo -n -u "$USER_NAME" -H /bin/bash "$LAUNCH" > "$LOG" 2>&1 &
-LAUNCHER_PID=$!
-
-# The client JVM and this run's Gradle wrapper: java processes whose command line names this
-# checkout (other agents' worktrees have other paths; Gradle daemons name only the cache).
-client_pids() {
-    ps -axo pid=,command= | grep -F "$REPO/" | grep -E 'java' | grep -v -E 'GradleWrapperMain|GradleDaemon|grep' \
-        | awk '{print $1}' || true
-}
-wrapper_pids() { ps -axo pid=,command= | grep -F "$REPO/neoforge/gradle/wrapper" | grep -v grep | awk '{print $1}' || true; }
-stop_client() {
-    local pids; pids="$(client_pids)"
-    [ -n "$pids" ] && kill $pids 2>/dev/null || true
-    sleep 5
-    pids="$(client_pids) $(wrapper_pids)"; [ -n "${pids// /}" ] && kill -9 $pids 2>/dev/null || true
-    wait "$LAUNCHER_PID" 2>/dev/null || true
-}
-trap stop_client EXIT
-
-ATLAS=""; STATUS=timeout
-while [ $(( $(date +%s) - T0 )) -lt "$TIMEOUT" ]; do
-    if grep -q -E 'Created: .*minecraft:textures/atlas/blocks\.png-atlas' "$LOG" 2>/dev/null; then
-        ATLAS=$(( $(date +%s) - T0 )); STATUS=atlas; break
-    fi
-    if grep -q -E 'Preparing crash report|BUILD FAILED|Crash report saved' "$LOG" 2>/dev/null; then STATUS=crash; break; fi
-    if ! kill -0 "$LAUNCHER_PID" 2>/dev/null; then STATUS=exited; break; fi
-    sleep 5
+NAME=q10-ev-assets; M6LOCK=""; TIMEOUT="${EV_ASSETS_TIMEOUT:-1500}"; LEASE_WAIT=600
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --m6lock) M6LOCK="$2"; shift 2 ;;
+        --timeout) TIMEOUT="$2"; shift 2 ;;
+        --lease-wait) LEASE_WAIT="$2"; shift 2 ;;
+        *) echo "ev-assets-mac: unknown argument $1" >&2; exit 2 ;;
+    esac
 done
-echo "ev-assets: $STATUS after $(( $(date +%s) - T0 )) s"
-[ "$STATUS" = atlas ] && sleep 20
-# RSS of the client JVM at the atlas, for the page's cost table.
-RSS_KB="$(for p in $(client_pids); do ps -o rss= -p "$p"; done | sort -n | tail -1 | tr -d ' ')"
-stop_client
-trap - EXIT
 
-cp "$RUN/logs/latest.log" "$OUT/latest.log" 2>/dev/null || true
-cp -R "$RUN/crash-reports" "$OUT/" 2>/dev/null || true
-CACHE="$RUN/.cache/dynamic_asset_generator"
+OUT="$REPO/review/out/q10/ev-assets"
+PURPOSE="Deep Time Q10: a Minecraft client makes Excavated Variants textures"
+XMX=4G   # what the run configuration gave the client before (a quarter of the 16 GB)
+mc_start
+
+# A screenshot run's `linkRunModsClient` (no -PrunSet) empties what an ev-client one linked.
+compgen -G "$GAMEDIR/mods/*xcavated*" >/dev/null \
+    || { mc_log "the ev-client set is not linked into $GAMEDIR/mods (tools/client/ev-assets.sh runs tools/smoke/install.sh ev-client and ./gradlew -PrunSet=ev-client linkRunModsClient)"; exit 1; }
+
+mkdir -p "$GAMEDIR/config"
+rm -rf "$GAMEDIR/.cache/dynamic_asset_generator" "$GAMEDIR/logs" "$GAMEDIR/crash-reports"
+printf '%s\n' '{"full_cache": true, "palette_extraction_force_clustering_cutoff": 1000000, "time_resources": true, "keyed_cache": true}' \
+    > "$GAMEDIR/config/dynamic_asset_generator.json"
+
+MC_READY_REGEX='Created: .*minecraft:textures/atlas/blocks\.png-atlas'
+MC_READY_GRACE=20
+MC_FAIL_REGEX='Preparing crash report|Crash report saved'
+set +e
+mc_run_pass ev
+st=$?
+set -e
+mc_release
+case "$st" in 0) STATUS=atlas ;; 124) STATUS=timeout ;; *) STATUS=crash ;; esac
+echo "ev-assets: $STATUS after ${MC_READY_AT:-?} s to the block atlas"
+mv "$OUT/client-ev.log" "$OUT/client.log" 2>/dev/null || true
+[ -s "$OUT/shots.txt" ] || rm -f "$OUT/shots.txt"   # the screenshot driver is off: nothing to list
+
+cp "$GAMEDIR/logs/latest.log" "$OUT/latest.log" 2>/dev/null || true
+cp -R "$GAMEDIR/crash-reports" "$OUT/" 2>/dev/null || true
+CACHE="$GAMEDIR/.cache/dynamic_asset_generator"
 [ -d "$CACHE" ] && cp -R "$CACHE" "$OUT/cache"
 [ -f "$CACHE/times.log" ] && cp "$CACHE/times.log" "$OUT/times.log"
 
-
-python3 - "$OUT" "$STATUS" "${ATLAS:-}" "${RSS_KB:-}" <<'PY'
+python3 - "$OUT" "$STATUS" "${MC_READY_AT:-}" "${MC_STOP_RSS_KB:-}" <<'PY'
 import json, os, re, sys
 out, status, atlas, rss = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 path = os.path.join(out, "client.log")
@@ -116,3 +88,4 @@ summary = {"status": status, "seconds_launch_to_block_atlas": int(atlas) if atla
 json.dump(summary, open(os.path.join(out, "summary.json"), "w"), indent=1)
 PY
 python3 tools/client/ev-assets-pack.py "$OUT"
+[ "$STATUS" = atlas ]
