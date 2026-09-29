@@ -6,8 +6,9 @@
 //! - A **term** is `curve(field)^weight`, or the maximum of its `any_of` alternatives (fuzzy OR).
 //! - A **component** (source, driver, pathway, trap) is the product of its terms; an empty
 //!   component scores 1.
-//! - The **host** score is `min(1, Σ w_c · frac_c)` over the `deeptime:host/<class>` fractions with
-//!   the type's host weights (1 when the history has no host fields: no lithology opinion).
+//! - The **host** score is `min(1, Σ w_c · frac_c / full_at)` over the `deeptime:host/<class>`
+//!   fractions with the type's host weights and `hosts.full_at` (default 1; 1 when the history has
+//!   no host fields: no lithology opinion).
 //! - The **clock** score is the product of the type's clock gates.
 //! - `F_t = combine(source, driver, pathway, trap) · host · clock`, with `combine` the product,
 //!   the minimum or the geometric mean.
@@ -85,6 +86,8 @@ pub struct Compiled {
     /// (field name, weight) per host class, and the class names in the same order.
     pub hosts: Vec<(String, f64)>,
     pub host_classes: Vec<String>,
+    /// The weighted host share at which the host score is 1 (`hosts.full_at`).
+    pub host_full_at: f64,
     pub tau_myr: f64,
 }
 
@@ -106,6 +109,7 @@ impl Compiled {
             gates: t.clock_gates.clone(),
             host_classes: weights.keys().cloned().collect(),
             hosts,
+            host_full_at: t.hosts.full_at,
             tau_myr: t.integration_myr,
         }
     }
@@ -215,7 +219,7 @@ impl<'a> FrameEval<'a> {
                     host = k as u8;
                 }
             }
-            parts[4] = sum.min(1.0);
+            parts[4] = (sum / self.rules.host_full_at).min(1.0);
         }
         parts[5] = self.clock;
         let core = match self.rules.combine {
