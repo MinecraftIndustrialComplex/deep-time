@@ -101,10 +101,12 @@ fn drive(
 /// Prints the deposit stage's census: sites per type next to the plan §8.6 expectation.
 pub fn print_census(census: &Value) {
     println!(
-        "deposits: province={} ({} provinces) count_mult={} — expected(§8.6) = Σ_tracts ρ_p50/1e5 · A_km2 · mean_F · count_mult",
+        "deposits: province={} ({} provinces) count_mult={} max_formed_per_survivor={} brine_flow_km={} — target(§8.6) = count_mult · ρ_p50/1e5 · Σ_tracts A_km2 survivors; formed = target / preservation",
         census["province"].as_str().unwrap_or("?"),
         census["provinces"],
         census["count_mult"],
+        census["max_formed_per_survivor"],
+        census["brine_flow_km"],
     );
     if let Some(h) = census["history"].as_object() {
         println!(
@@ -127,12 +129,16 @@ pub fn print_census(census: &Value) {
     for t in census["types"].as_array().into_iter().flatten() {
         let f = |k: &str| t[k].as_f64().unwrap_or(0.0);
         println!(
-            "deposits {:<30} sites={:>3} expected={:>7.2} with_provinces={:>7.2} drawn={:>3} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={}",
+            "deposits {:<30} sites={:>3} target={:>7.2} expected={:>7.2} at_positions={:>7.2} preservation={:.3} formed_expected={:>7.2} drawn={:>3} capped={} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={}",
             t["id"].as_str().unwrap_or("?"),
             f("sites"),
-            f("expected_formula"),
+            f("target"),
             f("expected"),
+            f("expected_at_positions"),
+            f("preservation"),
+            f("expected_formed"),
             f("drawn"),
+            t["capped"].as_bool().unwrap_or(false),
             f("tracts"),
             f("permissive_km2"),
             f("mean_f"),

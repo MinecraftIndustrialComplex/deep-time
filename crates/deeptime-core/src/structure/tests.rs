@@ -117,7 +117,9 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
 
     // The deposit engine's history: every built-in type finds every field it reads.
     let hist = world.history.as_ref().expect("frames");
-    let names = hist.names();
+    let mut names = hist.names();
+    // The regional fields the deposit engine derives on reading (`deposits::regional`).
+    names.extend(crate::deposits::regional::derivable(&names));
     for t in crate::deposits::types::builtin().unwrap() {
         let missing: Vec<String> = t
             .fields()
