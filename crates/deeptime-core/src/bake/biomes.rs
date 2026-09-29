@@ -648,10 +648,8 @@ fn coords(c: &Climate<'_>, l1: &GridDesc) -> Coords {
     let (w, h) = (l1.w as usize, l1.h as usize);
     let n = w * h;
     // A missing field or a NaN cell falls back to the defaults below (never to "driest").
-    let at = |f: Option<&Field>, k: usize| {
-        f.map(|f| f64::from(f.data[k]))
-            .filter(|v| v.is_finite())
-    };
+    let at =
+        |f: Option<&Field>, k: usize| f.map(|f| f64::from(f.data[k])).filter(|v| v.is_finite());
     let mut t_land = vec![f32::NAN; n];
     let mut h_land = vec![f32::NAN; n];
     let mut t_sea = vec![f32::NAN; n];
