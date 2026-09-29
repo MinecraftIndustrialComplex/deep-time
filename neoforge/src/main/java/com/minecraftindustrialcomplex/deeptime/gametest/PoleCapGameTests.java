@@ -43,7 +43,9 @@ public final class PoleCapGameTests {
         ServerLevel level = helper.getLevel();
         int c = SeamGameTests.circumference(helper);
         BlockPos spot = SeamGameTests.surfaceSpot(helper);
-        double y = spot.getY() + 10.5;
+        // Clear air near the top of the world: a probe drifting equatorward at surface height can hit
+        // rising ground and stop, which reads as "no pushback" (seen in the Phase 0 exit run).
+        double y = level.getMaxBuildHeight() - 20.5;
         List<BlockPos> starts = new ArrayList<>();
         for (double lat : LATITUDES)
             starts.add(BlockPos.containing(spot.getX() + 0.5, y, -PoleCapPrototype.zOfLatitude(c, lat) + 0.5));
