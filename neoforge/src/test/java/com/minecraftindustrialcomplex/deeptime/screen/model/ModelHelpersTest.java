@@ -168,6 +168,18 @@ class ModelHelpersTest {
     }
 
     @Test
+    void memAvailableFromMeminfo(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
+        Path f = dir.resolve("meminfo");
+        java.nio.file.Files.writeString(f, "MemTotal:       16163264 kB\nMemFree:          734812 kB\nMemAvailable:    7340032 kB\n");
+        assertEquals(7340032L * 1024, MachineInfo.memAvailable(f).orElseThrow());
+        assertTrue(MachineInfo.memAvailable(dir.resolve("absent")).isEmpty());
+        java.nio.file.Files.writeString(f, "MemTotal: 1 kB\n");
+        assertTrue(MachineInfo.memAvailable(f).isEmpty());
+        MachineInfo m = MachineInfo.current();
+        assertTrue(m.processors() >= 1 && m.clientThreads() >= 1 && m.jvmMaxBytes() > 0);
+    }
+
+    @Test
     void guidanceText() {
         NativeStatus s = NativeStatus.failure(FailureClass.UNSUPPORTED_PLATFORM, "linux-riscv64-gnu", Path.of("/x/lib.so"), null,
                 FailureClass.UNSUPPORTED_PLATFORM.guidance("linux-riscv64-gnu", null, null));
