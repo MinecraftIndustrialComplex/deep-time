@@ -27,12 +27,15 @@ import java.util.Optional;
  * @param groups          the group tags that contain the class ({@code deeptime:rock/clastic}, …)
  * @param metamorphicPath the prograde sequence of class names
  * @param weathersTo      the class weathering produces
- * @param faciesRule      the name of the setting that forms the class (defined by P1-07)
+ * @param lithifiesTo     what a loose class becomes once buried (P1-07's structure stage)
+ * @param looseEquivalent how the young, shallow part of a deposit of this class is shown (P1-07)
+ * @param faciesRule      the name of the setting that forms the class (the settings the core forms
+ *                        are listed in {@code tools/dev/gen_rock_classes.py})
  * @param tags            flags the deposit and structure stages key on
  */
 public record RockClass(String name, String family, List<String> groups, double densityKgM3, double erodibility,
                         double diffusivity, List<String> metamorphicPath, Optional<String> weathersTo,
-                        Optional<String> faciesRule, List<String> tags, Optional<ResourceLocation> vanillaFallback,
+                        Optional<String> lithifiesTo, Optional<String> looseEquivalent, Optional<String> faciesRule, List<String> tags, Optional<ResourceLocation> vanillaFallback,
                         Map<String, String> sources, Optional<String> notes) {
 
     /** Class names are block-tag path segments. */
@@ -48,6 +51,8 @@ public record RockClass(String name, String family, List<String> groups, double 
             Codec.doubleRange(1e-6, 1e6).fieldOf("diffusivity").forGetter(RockClass::diffusivity),
             NAME.listOf().optionalFieldOf("metamorphic_path", List.of()).forGetter(RockClass::metamorphicPath),
             NAME.optionalFieldOf("weathers_to").forGetter(RockClass::weathersTo),
+            NAME.optionalFieldOf("lithifies_to").forGetter(RockClass::lithifiesTo),
+            NAME.optionalFieldOf("loose_equivalent").forGetter(RockClass::looseEquivalent),
             Codec.STRING.optionalFieldOf("facies_rule").forGetter(RockClass::faciesRule),
             Codec.STRING.listOf().optionalFieldOf("tags", List.of()).forGetter(RockClass::tags),
             ResourceLocation.CODEC.optionalFieldOf("vanilla_fallback").forGetter(RockClass::vanillaFallback),

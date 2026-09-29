@@ -175,6 +175,14 @@ fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     ))
 }
 
+/// The structure stage's summary line (P1-07): `structure_final=<steps> plutons_emplaced=… …`,
+/// when the pipeline ran it.
+fn structure_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note = world.notes.get(deeptime_core::structure::STAGE_NAME)?;
+    let v: Value = serde_json::from_str(note).ok()?;
+    Some(deeptime_core::structure::summary_line(&v))
+}
+
 /// The deposit engine's recorded history (P1-04): per field of the last frame, the share of cells
 /// where it is non-zero and its mean there.
 fn history_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -209,19 +217,24 @@ fn timings_line(
         .iter()
         .map(|t| format!("{}={:.1}s/{}steps", t.name, t.millis / 1000.0, t.steps))
         .collect();
-    if let Some(note) = world
-        .notes
-        .get(deeptime_core::surface::STAGE_NAME)
-        .and_then(|n| serde_json::from_str::<Value>(n).ok())
-        && let Some(ms) = note["millis"].as_object()
-    {
-        parts.push(format!(
-            "surface[{}]",
-            ms.iter()
-                .map(|(k, v)| format!("{k}={:.1}s", v.as_f64().unwrap_or(0.0) / 1000.0))
-                .collect::<Vec<_>>()
-                .join(",")
-        ));
+    for stage in [
+        deeptime_core::surface::STAGE_NAME,
+        deeptime_core::structure::STAGE_NAME,
+    ] {
+        if let Some(note) = world
+            .notes
+            .get(stage)
+            .and_then(|n| serde_json::from_str::<Value>(n).ok())
+            && let Some(ms) = note["millis"].as_object()
+        {
+            parts.push(format!(
+                "{stage}[{}]",
+                ms.iter()
+                    .map(|(k, v)| format!("{k}={:.1}s", v.as_f64().unwrap_or(0.0) / 1000.0))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ));
+        }
     }
     parts.join(" ")
 }
@@ -286,6 +299,9 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         println!("deeptime run: {line}");
     }
     if let Some(line) = surface_line(&world) {
+        println!("deeptime run: {line}");
+    }
+    if let Some(line) = structure_line(&world) {
         println!("deeptime run: {line}");
     }
     println!(
@@ -438,6 +454,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     if let Some(line) = surface_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
+    if let Some(line) = structure_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
     if let Some(line) = history_line(&ck.world) {
         println!("deeptime stage {}: history {line}", o.name);
     }
@@ -470,18 +489,41 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             format_version: deeptime_format::FORMAT_VERSION.to_owned(),
             created_utc: rfc3339_utc(SystemTime::now()),
         };
+        // P1-07: the baked horizon stacks (the inspector), the elevation and the rock at the
+        // surface as map layers, and meridian cross-sections.
+        let structure = crate::structure_view::build(&ck.world, &ck.preset_json)?;
+        let layers: Vec<&deeptime_format::LoadedLayer> =
+            structure.iter().flat_map(|v| v.layers.iter()).collect();
         deeptime_viewer::write_bundle_with(
             dir,
             &info,
-            &[],
-            None,
+            &layers,
+            structure.as_ref().map(|v| deeptime_viewer::Strata {
+                layer: &v.strata,
+                classes: v.classes.clone(),
+            }),
             &deeptime_viewer::Timeline {
                 keyframes,
                 events: ck.world.events.clone(),
                 sites: ck.world.sites.clone(),
             },
         )?;
-        if let Some(report) = deeptime_viewer::deposit_report(census.as_ref(), &ck.world.bodies) {
+        let mut report = deeptime_viewer::deposit_report(census.as_ref(), &ck.world.bodies);
+        if let Some(v) = &structure {
+            let st = crate::structure_view::write(dir, v)?;
+            report
+                .get_or_insert_with(|| json!({}))
+                .as_object_mut()
+                .expect("an object")
+                .insert("structure".into(), st);
+            println!(
+                "deeptime stage {}: {} cross-sections -> {}",
+                o.name,
+                v.sections.len(),
+                dir.join("sections").display()
+            );
+        }
+        if let Some(report) = report {
             deeptime_viewer::write_report(dir, &report)?;
         }
         println!(

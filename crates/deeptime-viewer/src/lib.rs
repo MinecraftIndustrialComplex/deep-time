@@ -11,6 +11,8 @@
 //! strip with a time scrubber, an event ticker and a site list with the "Why here?" cause chain.
 //! [`write_bench_page`] writes `deeptime bench`'s timing page.
 
+pub mod section;
+
 use std::fs;
 use std::io;
 use std::path::Path;

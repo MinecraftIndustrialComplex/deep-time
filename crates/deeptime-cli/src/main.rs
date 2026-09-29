@@ -4,6 +4,7 @@
 mod alloc;
 mod dump;
 mod run;
+mod structure_view;
 mod synth;
 
 use std::path::PathBuf;
