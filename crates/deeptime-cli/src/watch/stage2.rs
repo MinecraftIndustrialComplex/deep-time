@@ -23,6 +23,12 @@ pub struct Preview {
     pub python: PathBuf,
     /// `tools/workbench/preview.py` of the checkout whose smoke server sets it uses.
     pub script: PathBuf,
+    /// The workbench's runs folder (`--runs`): the runner finds a run's bake at
+    /// `<runs>/<id>/world` (`DEEPTIME_WORKBENCH_RUNS`). `watch::serve` fills it in.
+    pub runs: Option<PathBuf>,
+    /// The `deeptime` binary the runner asks for `inspect-column` (`DEEPTIME_WORKBENCH_DEEPTIME`):
+    /// this very executable. `watch::serve` fills it in.
+    pub deeptime: Option<PathBuf>,
 }
 
 /// One forwarded answer.
@@ -60,9 +66,15 @@ fn static_type(t: &str) -> &'static str {
 impl Preview {
     /// Forwards one request. `target` is the path with its query (`/api/inspect?run=…`).
     pub fn call(&self, method: &str, target: &str, body: &[u8]) -> io::Result<Answer> {
-        let mut child = Command::new(&self.python)
-            .arg(&self.script)
-            .args(["http", method, target])
+        let mut cmd = Command::new(&self.python);
+        cmd.arg(&self.script).args(["http", method, target]);
+        if let Some(runs) = &self.runs {
+            cmd.env("DEEPTIME_WORKBENCH_RUNS", runs);
+        }
+        if let Some(bin) = &self.deeptime {
+            cmd.env("DEEPTIME_WORKBENCH_DEEPTIME", bin);
+        }
+        let mut child = cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -159,6 +171,8 @@ mod tests {
         let p = Preview {
             python: "sh".into(),
             script: script.clone(),
+            runs: None,
+            deeptime: None,
         };
         let a = p.call("POST", "/api/preview?x=1", b"{}").unwrap();
         assert_eq!(a.status, 202);
@@ -167,6 +181,19 @@ mod tests {
             String::from_utf8(a.body).unwrap(),
             "POST /api/preview?x=1 {}"
         );
+        // The runner is told where the runs and the deeptime binary are.
+        std::fs::write(
+            &script,
+            "m=\"$DEEPTIME_WORKBENCH_RUNS $DEEPTIME_WORKBENCH_DEEPTIME\"; printf '{\"status\": 200, \"content_type\": \"text/plain\", \"length\": %d}\\n%s' ${#m} \"$m\"\n",
+        )
+        .unwrap();
+        let p2 = Preview {
+            runs: Some("/runs".into()),
+            deeptime: Some("/bin/deeptime".into()),
+            ..p.clone()
+        };
+        let a = p2.call("GET", "/api/inspect", b"").unwrap();
+        assert_eq!(String::from_utf8(a.body).unwrap(), "/runs /bin/deeptime");
         std::fs::write(&script, "echo nothing-useful >&2; exit 3\n").unwrap();
         let e = p.call("GET", "/api/inspect", b"").err().unwrap();
         assert!(e.to_string().contains("nothing-useful"), "{e}");
