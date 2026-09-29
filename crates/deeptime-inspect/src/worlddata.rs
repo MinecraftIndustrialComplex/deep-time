@@ -84,6 +84,24 @@ impl WorldData {
         v.is_finite().then_some(v)
     }
 
+    /// Horizons per column in the strata layer (its `stack_depth`), 0 without one.
+    pub fn stack_depth(&self) -> usize {
+        self.strata
+            .as_ref()
+            .map_or(0, |s| s.desc.stack_depth.unwrap_or(0) as usize)
+    }
+
+    /// One column's horizons as the strata pass builds them (`StrataPass.column`, through
+    /// `LoadedLayer::stack_at`): top-down (top block y, class index); horizon h fills
+    /// tops[h+1] < y ≤ tops[h], the last one to the bottom of the world. Empty without strata.
+    pub fn strata_column(&self, x: i32, z: i32) -> Vec<(i32, u8)> {
+        let mut out = Vec::new();
+        if let Some(s) = &self.strata {
+            s.stack_at(i64::from(x), i64::from(z), &mut out);
+        }
+        out
+    }
+
     /// The horizon stack at (x, z) as `StrataPass` reads it: the nearest L1 cell, horizons
     /// top-down as (top in blocks, class name), stopping at the first unused one.
     pub fn horizons(&self, x: i32, z: i32) -> Vec<(f64, String)> {
