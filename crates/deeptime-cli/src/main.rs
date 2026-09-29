@@ -6,7 +6,9 @@ mod dump;
 mod run;
 mod structure_view;
 mod synth;
+mod watch;
 
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -51,6 +53,44 @@ enum Command {
         /// Also write a checkpoint after every stage into <out>/checkpoints/.
         #[arg(long)]
         checkpoints: bool,
+        #[command(flatten)]
+        common: CommonArgs,
+    },
+    /// The browser workbench (P1-20): serve the editor, the runs and a live view of each run (map,
+    /// globe, layers and events every step; pause, step, rewind, speed, follow live, compare two
+    /// runs). Runs go one at a time; finished ones are kept under --runs. Serves loopback or a
+    /// Tailscale address only, never the LAN; tools/viewer/mac-watch.sh runs it on the Mac and
+    /// puts it on the tailnet.
+    Watch {
+        /// A run to start right away (a built-in preset name, a preset JSON file or a share code);
+        /// the page starts others.
+        #[arg(long)]
+        preset: Option<String>,
+        /// Timeline start configuration for --preset (supercontinent, scattered_continents,
+        /// random).
+        #[arg(long)]
+        start: Option<String>,
+        /// Timeline length for --preset, in millions of years.
+        #[arg(long)]
+        length_myr: Option<f64>,
+        /// Address to serve on: loopback (default) or the machine's Tailscale address.
+        #[arg(long, default_value = "127.0.0.1")]
+        bind: IpAddr,
+        /// Port to serve on.
+        #[arg(long, default_value_t = watch::DEFAULT_PORT)]
+        port: u16,
+        /// Folder the runs are kept in (a folder per run; default: a temporary folder).
+        #[arg(long)]
+        runs: Option<PathBuf>,
+        /// Finished runs kept; the oldest beyond this are deleted.
+        #[arg(long, default_value_t = watch::DEFAULT_KEEP)]
+        keep: usize,
+        /// A frame every this many Myr (default: after every step).
+        #[arg(long)]
+        every_myr: Option<f64>,
+        /// Stop once nothing runs or waits (after --preset's run; default: serve until stopped).
+        #[arg(long)]
+        exit_when_done: bool,
         #[command(flatten)]
         common: CommonArgs,
     },
@@ -301,6 +341,32 @@ fn main() -> ExitCode {
                 out,
                 viewer,
                 checkpoints,
+                common: common.common(),
+            }),
+        ),
+        Some(Command::Watch {
+            preset,
+            start,
+            length_myr,
+            bind,
+            port,
+            runs,
+            keep,
+            every_myr,
+            exit_when_done,
+            common,
+        }) => finish(
+            "watch",
+            watch::watch(&watch::WatchOptions {
+                preset,
+                start,
+                length_myr,
+                bind,
+                port,
+                runs: runs.unwrap_or_else(|| std::env::temp_dir().join("deeptime-watch-runs")),
+                keep,
+                every_myr,
+                exit_when_done,
                 common: common.common(),
             }),
         ),

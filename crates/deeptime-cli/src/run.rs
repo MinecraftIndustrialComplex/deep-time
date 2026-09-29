@@ -20,17 +20,18 @@ pub type CliResult<T> = Result<T, Box<dyn std::error::Error>>;
 const ADVANCE_BUDGET: Duration = Duration::from_millis(250);
 
 /// Options shared by the subcommands that run a session.
+#[derive(Clone)]
 pub struct Common {
     pub threads: usize,
     pub mem_cap: u64,
     pub verbose: bool,
 }
 
-fn read_text(path: &Path, what: &str) -> CliResult<String> {
+pub(crate) fn read_text(path: &Path, what: &str) -> CliResult<String> {
     std::fs::read_to_string(path).map_err(|e| format!("{what} {}: {e}", path.display()).into())
 }
 
-fn session_options(out: &Path, c: &Common) -> SessionOptions {
+pub(crate) fn session_options(out: &Path, c: &Common) -> SessionOptions {
     SessionOptions {
         out_dir: out.to_path_buf(),
         threads: c.threads,
@@ -39,7 +40,7 @@ fn session_options(out: &Path, c: &Common) -> SessionOptions {
 }
 
 /// Prints the session's log lines to stderr (DEBUG only when verbose).
-fn forward_log(s: &Session, verbose: bool) {
+pub(crate) fn forward_log(s: &Session, verbose: bool) {
     for line in s.log().drain() {
         if verbose || !line.starts_with("DEBUG") {
             eprintln!("  {}", line.replacen('\t', " ", 1));
@@ -139,7 +140,7 @@ pub fn load_preset_with(
 
 /// The plate model's summary line (plan P1-03: `plates_final=<n> ocean_age_p90_myr=<a> …`), when
 /// the world has plates.
-fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     world
         .plates
         .as_ref()
@@ -148,7 +149,7 @@ fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
 
 /// The surface's summary line (P1-04): `surface_final=<steps> land_frac=… sediment_km3=… …`,
 /// when the world has a surface.
-fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     let st = world.surface.as_ref()?;
     let t = &st.totals;
     let n = st.log.cells().max(1) as f64;
@@ -227,7 +228,7 @@ fn history_line(world: &deeptime_core::world::WorldState) -> Option<String> {
 }
 
 /// Per-stage wall time, and the surface's per-process split when it ran to the end.
-fn timings_line(
+pub(crate) fn timings_line(
     timings: &[deeptime_core::session::StageTiming],
     world: &deeptime_core::world::WorldState,
 ) -> String {

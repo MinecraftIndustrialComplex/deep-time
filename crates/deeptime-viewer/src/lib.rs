@@ -10,6 +10,13 @@
 //! frames), `events.json` and `sites.json` (also embedded in `bundle.js`), shown as a keyframe
 //! strip with a time scrubber, an event ticker and a site list with the "Why here?" cause chain.
 //! [`write_bench_page`] writes `deeptime bench`'s timing page.
+//!
+//! The workbench page (`deeptime watch`, decisions log 2026-09-28, P1-20): [`workbench_page`] and
+//! [`WORKBENCH_JS`] are served by the CLI's watch server with `ramps.json`; frames travel as PNGs
+//! from [`encode_png`]. Its live view draws the same keyframes with the same ramps and look as the
+//! bundle's timelapse, fed by a stream instead of `bundle.js`; its editor is built from
+//! [`EDITOR_FIELDS_JSON`], the catalogue the game's editor reads, labelled from the game's
+//! [`LANG_EN_US_JSON`].
 
 pub mod section;
 
@@ -30,6 +37,17 @@ pub use deeptime_format::ramps::RAMPS_JSON;
 const INDEX_HTML: &str = include_str!("../assets/index.html");
 const VIEWER_JS: &str = include_str!("../assets/viewer.js");
 const BENCH_HTML: &str = include_str!("../assets/bench.html");
+const WORKBENCH_HTML: &str = include_str!("../assets/workbench.html");
+/// The workbench page's script (`deeptime watch` serves it as `workbench.js`).
+pub const WORKBENCH_JS: &str = include_str!("../assets/workbench.js");
+/// The planet editor's field catalogue, shared with the game (Gradle ships it in the jar as
+/// `deeptime/editor_fields.json` for `screen/model/EditorFields`); the workbench's form is built
+/// from it.
+pub const EDITOR_FIELDS_JSON: &str = include_str!("../assets/editor_fields.json");
+/// The game's English strings: the workbench labels its form with the editor's own keys
+/// (`deeptime.editor.*`).
+pub const LANG_EN_US_JSON: &str =
+    include_str!("../../../neoforge/src/main/resources/assets/deeptime/lang/en_us.json");
 
 /// Widest PNG written per layer.
 pub const MAX_IMAGE_W: u32 = 2048;
@@ -322,6 +340,31 @@ pub fn write_bench_page(dir: &Path, bench: &Value) -> io::Result<()> {
     Ok(())
 }
 
+/// The workbench page's `index.html` with `title` (`deeptime watch`).
+pub fn workbench_page(title: &str) -> String {
+    WORKBENCH_HTML.replace("{{TITLE}}", &html_escape(title))
+}
+
+/// RGBA8 (`w·h·4` bytes) as PNG bytes, with png's fast deflate: the live page asks for a frame's
+/// layer once, while the run goes on.
+pub fn encode_png(w: u32, h: u32, rgba: &[u8]) -> io::Result<Vec<u8>> {
+    if rgba.len() as u64 != u64::from(w) * u64::from(h) * 4 {
+        return Err(io::Error::other(format!(
+            "{} bytes are not a {w}×{h} RGBA image",
+            rgba.len()
+        )));
+    }
+    let mut out = Vec::with_capacity(rgba.len() / 4);
+    let mut enc = png::Encoder::new(&mut out, w, h);
+    enc.set_color(png::ColorType::Rgba);
+    enc.set_depth(png::BitDepth::Eight);
+    enc.set_compression(png::Compression::Fast);
+    let mut writer = enc.write_header().map_err(io::Error::other)?;
+    writer.write_image_data(rgba).map_err(io::Error::other)?;
+    writer.finish().map_err(io::Error::other)?;
+    Ok(out)
+}
+
 fn write_rgba_png(path: &Path, w: u32, h: u32, rgba: &[u8]) -> io::Result<()> {
     let file = io::BufWriter::new(fs::File::create(path)?);
     let mut enc = png::Encoder::new(file, w, h);
@@ -429,6 +472,27 @@ mod tests {
     #[test]
     fn slugs() {
         assert_eq!(slug("climate/temperature"), "climate_temperature");
+    }
+
+    #[test]
+    fn workbench_page_and_png() {
+        let page = workbench_page("live <run>");
+        assert!(page.contains("<title>live &lt;run&gt;</title>"));
+        assert!(page.contains("workbench.js") && !page.contains("{{TITLE}}"));
+        assert!(WORKBENCH_JS.contains("EventSource"));
+        let fields: Value = serde_json::from_str(EDITOR_FIELDS_JSON).unwrap();
+        assert!(fields["fields"].as_array().unwrap().len() > 10);
+        let lang: Value = serde_json::from_str(LANG_EN_US_JSON).unwrap();
+        assert!(lang["deeptime.editor.field.seed"].is_string());
+        let rgba: Vec<u8> = (0..4 * 3 * 4).map(|i| (i * 7) as u8).collect();
+        let png = encode_png(4, 3, &rgba).unwrap();
+        assert_eq!(&png[1..4], b"PNG");
+        let dec = png::Decoder::new(std::io::Cursor::new(&png));
+        let mut reader = dec.read_info().unwrap();
+        let mut buf = vec![0; reader.output_buffer_size().unwrap()];
+        reader.next_frame(&mut buf).unwrap();
+        assert_eq!(buf, rgba, "lossless");
+        assert!(encode_png(4, 4, &rgba).is_err());
     }
 
     #[test]

@@ -41,7 +41,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
-| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. |
+| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log) |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -69,6 +69,81 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — macOS free memory in MachineInfo; the Q10 client launcher folded into mac-client's launch path (agent worktree agent-aab6da56089b714ed, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **1. macOS free memory (the twin of P1-11's Linux `MemFree` fix).** The JDK is not right on the Mac:
+  `OperatingSystemMXBean.getFreeMemorySize()` was 1,068,990,464 B (0.996 GiB) on the 16 GB M6 with 6+ GiB
+  available. It is the kernel's free-page count alone (65,246 pages of 16 KiB at that moment, matching `vm_stat`'s
+  "Pages free"; not a 4 KiB page-size slip), so `MachineInfo` now reads `vm_stat`. New `MacMemory` (package-private,
+  `screen.model`): parses **free + speculative + inactive + purgeable** pages × the header's page size (vm_stat's
+  "Pages free" already excludes the speculative pages, so nothing is counted twice; a purgeable page that also sits
+  in the inactive queue is counted twice, tens of MiB). `/usr/bin/vm_stat` costs about 12 ms of process spawn from
+  Java, so nothing waits for it: `availableBytes()` returns the last reading and starts the next one on a daemon
+  thread when it is older than 5 s; `MachineInfo.prime()` starts one at client setup (`ClientSetup`, off the render
+  thread: loads the classes too) and whenever a Create World screen inits (`CreateWorldGuard`, rate-limited by the
+  TTL). `current()` on macOS uses the cache; with no reading yet, or no working `vm_stat`, the figure is **unknown
+  (−1, "?" and no low-memory warning), never the bean's wrong one**, and is capped at the total. The figure is a
+  snapshot of the moment the editor model is created, as on Linux (a follow-up would be re-reading it per frame).
+- **Compared on the Mac** (`ssh`, the same `vm_stat` for every figure, awk; three samples 2 s apart while other agents
+  were building, then one on the idle machine after the client run). JDK bean's free-only figure 0.15–0.29 GiB
+  (idle: 3.67); **this formula 5.58–5.84 GiB (idle: 8.10)**; Activity Monitor's arithmetic, physical memory minus
+  (App Memory + Wired + Compressed) 3.40–3.64 GiB (idle: 7.55); `memory_pressure` "free percentage" 70–73 %
+  = 11.2–11.7 GiB (idle 76 %), which counts active pages as available (a pressure metric, not headroom). So the
+  figure is between Activity Monitor's and `memory_pressure`'s and within 0.55 GiB (7 %) of Activity Monitor's on an
+  idle machine; under load Activity Monitor is 2 GiB lower because it counts idle anonymous (inactive) memory as
+  used, while macOS compresses or drops it when a new process needs the room. It is the sum graphide's `m6lock.sh
+  avail_gb` uses on this Mac (plus purgeable) and psutil/Zabbix's `free + inactive`. Chosen on that basis and Ben's
+  brief; if it proves too generous under load, the conservative alternative is free + speculative + file-backed +
+  purgeable (2.85–3.09 GiB loaded, 7.19 idle), also from vm_stat.
+- **Tests.** `MacMemoryTest` (11): the parser on the real M6 capture (expected 8,443,494,400 B = 7.86 GiB; the tag,
+  File-backed and Anonymous lines are not mistaken for the four that count), an Intel-layout 4 KiB capture (written
+  from the format), optional lines, CRLF, missing page size / free / inactive → empty, a counter too large for a long;
+  the cache with an injected source, queue executor and clock (the first call returns −1 without running the
+  source on the caller's thread; one reading in flight at a time; a stale figure is served while the next runs; a
+  failing or garbled vm_stat keeps the last good figure and is not retried inside the TTL; a rejecting executor
+  does not wedge it); and, `@EnabledOnOs(MAC)`, the real thing: `prime()` took 7.7 ms on the calling thread in a cold
+  JUnit JVM (class init; the reading itself is on the daemon thread), `MachineInfo.freeBytes` = 6.10 GiB of 16.00 vs the bean's
+  1.02 GiB a moment before. **Real client** (`tools/client/mac-screenshots.sh --name macmem --no-guidance
+  --no-create --timeout 240`, exit 0, 32 s): the setup page reads "This machine: **6.6 GiB free of 16.0 GiB**, game
+  heap 3.0 GiB, 11 simulation threads" (`review/out/macmem/03-setup-ready.png`, gitignored); it read 1.0 GiB before.
+- **2. `ev-assets.sh` on `mac-client.sh`'s launch path.** The lease, the desktop-session checks, the pid-marker kill,
+  the `launchctl asuser` launch and the pass loop (timeout, lease renewal every 60 s, notes) moved out of
+  `mac-client.sh` into **`tools/client/mac-client-lib.sh`** (Mac side, sourced), which `mac-client.sh` and
+  `ev-assets-mac.sh` both use; the laptop side (host and layout, graphide's `m6lock.sh`, copy to the Mac, the
+  Ctrl-C handler) is **`tools/client/mac-client-laptop-lib.sh`**, sourced by `mac-screenshots.sh` and `ev-assets.sh`.
+  `mac-client.sh`'s command line and output are unchanged (the two `-Ddeeptime.dev.screenshots=true` moved to its
+  passes; the library knows nothing of screenshots). `ev-assets-mac.sh` keeps only what is EV's: the DAG config, the
+  "ready" condition (the library's `MC_READY_REGEX` = the block atlas line, `MC_READY_GRACE` 20 s, `MC_FAIL_REGEX` =
+  a crash report), summary.json and the pack. Gone from it: its own `sudo launchctl asuser` of `gradlew runClient`,
+  the `ps | grep` client/wrapper pid patterns, its own trap; gone from `ev-assets.sh`: the lease streamed from the
+  laptop over ssh (TTL 2400 s, no renewal).
+- **What changed for `ev-assets.sh` (behaviour kept: same outputs in `review/out/q10/ev-assets/`).** The client is
+  ModDevGradle's dev launch (`createClientLaunchScript`, direct `java`) with `-Xmx4G` instead of `gradlew runClient`;
+  `tools/smoke/install.sh ev-client` and `./gradlew -PrunSet=ev-client … linkRunModsClient` run in the laptop-side
+  build step (no `--server` lock needed) and the run checks the set is linked; the lease is taken and renewed on the
+  Mac; options.txt is the shared one (guiScale 2, no early window); `--no-build`, `--timeout` (EV_ASSETS_TIMEOUT
+  default), `--lease-wait` flags; exit status is nonzero when the client crashes or times out (it used to be 0 with
+  `status` in summary.json); `runner.log` replaces `launch.sh`. The local output folder is still not emptied before
+  the pull.
+- **Verified.** `tools/client/ev-assets.sh` one run on the free, unlocked desktop: exit 0, block atlas 14 s after
+  launch, client stopped 20 s later, 35 s in all; DAG wrote 338 textures / 488 models / 190 blockstates (the Q10
+  entry's counts), `pack/` 1,018 files vs the earlier agent's 1,019 (the only file missing is
+  `assets/minecraft/atlases/blocks.json`, the atlas definition `ev-assets-pack.py` documents leaving out; the lang
+  file has the same 190 entries in another order), client RSS 1,527 MB at the stop (2,188 MB in the Q10 entry under
+  `runClient`, another heap and moment). `m6lock status` was `free` after every run including the failed ones.
+- **Found while folding, fixed:** (a) Nix's stdenv exports `SIZE=size`, which the shared `SIZE` variable picked
+  up (`--size is WxH (got 'size')`): renamed `WINDOW_SIZE`. (b) The dev shell's bash is Nix's non-interactive one:
+  no `compgen`. (c) The library's "screen is locked" warning tested `/dev/console`'s owner, which is `root` here
+  with `ban` logged in and unlocked, so it fired on every run; it now reads ioreg's `IOConsoleLocked` and a locked
+  screen stops the run with exit 4 before anything is leased or started (`IOConsoleLocked = No` for every run
+  here; the locked case is not exercised, and nothing types a password). (d) An early `exit 4` left a stale
+  `runner.pid`, which the laptop's Ctrl-C handler would then TERM; every exit now removes it.
+- **Gates** (master 9e34b45 merged into the branch; the same two gates also passed on the branch merged with
+  master 2fd6f15, tests=117): `tools/remote/mac.sh -- 'cd neoforge && ./gradlew build test && python3
+  ../tools/ci/junit-summary.py build/test-results/test'` → BUILD SUCCESSFUL, tests=118 failures=0 errors=0
+  skipped=0; `tools/remote/mac.sh --server -- './gametest.sh'` → **All 45 required tests passed**.
+- **Next.** Nothing blocks. The setup page's memory line stays a snapshot from when the editor model is created
+  (Create World open); to show the machine live, `SetupPage` could read `MachineInfo.current()` each frame (it
+  is one volatile read now). Not merged into master and not pushed, as asked.
 
 ### 2026-09-29 — P1-07 rock classes, column strata and metamorphism (agent worktree agent-a660cc7be45a80cf6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** New stage `structure` (`crates/deeptime-core/src/structure/{mod, params, columns,
@@ -163,6 +238,98 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Next.** P1-08 bakes `strata/horizons` from `bake_horizons` and the pluton bodies; P1-14 wires
   `RecordedHistory` (now complete for every built-in type) into `DepositStage`; P1-17 tunes pluton
   rate/size and the metamorphic heat-flow cap.
+
+### 2026-09-29 — P1-20 stage 1: the browser workbench (`deeptime watch`) (agent worktree agent-a3abc4a868f0c3b81, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** `deeptime watch` (crates/deeptime-cli/src/watch/: `mod.rs` command and live cadence,
+  `editor.rs` the setup page's rules, `runs.rs` queue and kept runs, `live.rs` per-run stream state,
+  `http.rs` the server) serves one page (crates/deeptime-viewer/assets/workbench.{html,js}) with the
+  Create World editor's controls, the runs, and a live view of each run: map, globe, legend, layer
+  buttons, events (fresh ones ringed, older ones fading over 24 Myr, click for the cause chain), with
+  play/pause, step, rewind, speed (0.5–100 Myr/s), a scrubber over every finished step and "follow
+  live"; **compare** shows two runs side by side at the same time and layer (the focused pane drives
+  the clock, the other shows its frame at or before that time). `?tv` = dark, large, spinning globe,
+  no editor, follows the newest run. Commits 6eaf013 (live page), d12bc06 (shared catalogue), 97f06a2
+  (server), then the page and the wrapper; merged master 4070f62 cleanly.
+- **The editor is driven from the game's own definitions** (Ben: no hand-copied list). The field
+  catalogue moved out of `EditorFields.ALL` into `crates/deeptime-viewer/assets/editor_fields.json`,
+  which Gradle ships as `deeptime/editor_fields.json` (like ramps.json) and `EditorFields` now reads;
+  the workbench reads the same file (`include_str!`). It gained the **planet seed** (an integer field:
+  written as a JSON integer, the core's u64; `EditorFields.Field.integer`, `number()`), editable where a
+  preset carries a top-level `seed` (the planet pipelines; not the placeholders). Labels come from the
+  game's lang file (`deeptime.editor.*`, one new key `field.seed`). Presets: `preset::BUILTIN` (the
+  game's four, placeholders) plus `params::PIPELINE_BUILTIN` and `PLATES_BUILTIN` (the real simulation
+  until P1-08), grouped into families by `_<n>k` as `EditorModel.familyOf` does; the page defaults to
+  `pipeline_quick_16k`. Start configurations and the length range are the core's `StartConfig::ALL`,
+  `LENGTH_MYR_RANGE`. The server computes the effective preset with the game's rules (a field is
+  editable only when the preset carries its path; out-of-range or non-integer values are refused and
+  named; the timeline by `preset::with_timeline`; numbers written as the game writes them), and its
+  canonical JSON, share code (`share_code`, the Java twin's partner) and the core's `session::estimate`;
+  a pasted code selects the built-in it equals, else becomes an imported preset (`EditorModel.
+  importShareCode`). A run's own code is kept, so "Load its settings" refills the form. Tests:
+  `edits_land_where_the_core_reads_them` (every available field edited → the core accepts the preset;
+  the code round-trips to the same JSON), `a_built_in_code_selects_the_built_in…`, JUnit
+  `catalogueIsTheSharedFileAndTheSeedIsAnInteger`.
+- **Runs.** One at a time (the Mac is shared); up to 3 wait, a 4th is refused with a message (409);
+  cancelling a queued run removes it, cancelling the running one stops it after its current step and
+  keeps its frames. Each run is a folder under `--runs` (on the Mac `deeptime-cache/workbench/runs/`):
+  `run.json` (request, share code, meta, final status), `events.jsonl` (each event's JSON exactly as
+  the session wrote it: re-serialising moved float digits, caught by the stream test), `world/` (the
+  session's output: a keyframe per step + the world data) and `frames/` (PNG cache). A restart reads
+  every run back (an unfinished one as "interrupted"); the newest `--keep` (default 8) finished runs
+  stay, older folders are deleted. **Size: ~1 GB per 500-Myr pipeline_quick_16k run** (250 frames × 10
+  layers × 1024×512 RGBA `.dtk` ≈ 930 MB; PNGs ~0.7 MB per viewed layer), so 8 kept ≈ 8 GB of the SSD's
+  213 GB free.
+- **Watching changes nothing.** The run's preset gets `keyframes.every_myr = 1e-6` (a frame after every
+  step; `--every-myr` for fewer); keyframes are drawn from the world between steps and do not feed back
+  (plates' L1 sampling already runs every step in the pipeline presets). The runner advances with a zero
+  budget (exactly one step) and publishes frames (`keyframe_info`), events (`events_since`) and progress;
+  images come from `copy_keyframe` while it runs, from the `.dtk` files after. Test
+  `workbench_streams_every_step_and_matches_the_batch_run` (plates+surface, 3,000 samples, 20 Myr):
+  10 frames, one per step, times increasing to 0; every event in emission order; the last frame's 10
+  layers byte-equal (as PNG) the batch run's final keyframe; the watched world equals the batch
+  world (postcard bytes, wall-clock `millis` removed). At full size the watched scattered-continents
+  run printed exactly P1-04's batch summary (`land_frac=0.215 sediment_km3=9.571e6`, 1,238 events).
+- **Serving: tailnet only.** The server binds 127.0.0.1 on the Mac and `tailscale serve --bg --tcp 8642
+  tcp://127.0.0.1:8642` forwards the tailnet to it. Measured before choosing: the Mac's application
+  firewall is on and lists only known apps (tailscaled among them); a new binary bound to the 100.x
+  address would raise the "accept incoming connections?" dialog on the shared screen. The server also
+  refuses peers outside 127/8, ::1, 100.64/10, fd7a:115c:a1e0::/48 and any `--bind` outside them;
+  POSTs must be `application/json`, same-origin when the browser sends Origin, and addressed to a
+  tailnet/local Host (no DNS rebinding). From the laptop: page and SSE over `m6-mac-mini:8642` 200,
+  `10.0.0.217:8642` (LAN) connection refused, a cross-origin POST 403. The tailscale CLI matching the
+  Mac's tailscaled 1.102.4 is GC-rooted at `deeptime-cache/tailscale` (the daemon ships none).
+- **`tools/viewer/mac-watch.sh`** `[--preset P --start S --length-myr L] [--port N] [--keep N]
+  [--threads N] [--tv]`, `stop`, `status`, `tv`: release build via mac.sh (no `--server` lock: no
+  Minecraft), the binary copied to `deeptime-cache/workbench/bin/`, started with nohup, pid and log in
+  `deeptime-cache/workbench/watch-<port>.{pid,log}`; `stop` kills only a `deeptime watch` pid, removes
+  the tailnet forward and the TV's caffeinate. `--tv`/`tv`: `vncdrive.sh status` (waits up to 15 min
+  while "locked", never types), `open -a Safari http://localhost:<port>/?tv`, `vncdrive.sh key
+  ctrl-super-f` (a moment of graphide's drive lease; reports if the M6 is busy), `vncdrive.sh close`,
+  and `caffeinate -d -w <server pid>`. Not run on the screen (Ben was using it); the lock parse was
+  checked read-only (`status` → "locked").
+- **Stage 2 hook (the sibling worktree's 3D preview and inspector).** Server: `POST /api/preview`
+  `{run, frame, t_years, box: {x0, z0, x1, z1} (blocks), lat_lon: {north, south, west, east}}` and
+  `GET /api/inspect?run=&frame=&x=&z=` answer 501 `{"available": false, "message"}`. Page: the one
+  `Stage2` object in workbench.js (a map click inspects the column there; the ▭ area tool drags a box
+  and asks for a preview) draws into the "Inspect & 3D preview" panel; its `render` already follows
+  a `status_url` and embeds a `url`, so the job contract (box → job id → status → export URL) needs
+  the server routes plus at most that object. Block coordinates from the map follow plan §5.2
+  (x = 360°-longitude scaled to C from the seam at −C/2, north −z).
+- **Measured** (Mac, `tools/remote/mac.sh`): `cargo test --workspace` (cli 20 incl. 3 editor, 2 watch
+  server, live, http; viewer 5; core 139; format 31; inspect 21; jni 7+7), `cargo clippy --workspace
+  --all-targets -D warnings`, `cargo fmt --check`, `cargo deny check licenses bans` clean; `cd neoforge
+  && ./gradlew build test` → tests=107 failures=0. End to end: `tools/viewer/mac-watch.sh --preset
+  pipeline_quick_16k --start scattered_continents --length-myr 500` → 250 frames live, 133 s; a second
+  run started through `/api/preset` + `/api/runs` from the laptop (supercontinent, seed 7, ocean 0.6)
+  → 250 frames, 2,510 events, 345 s (the Mac was loaded). Screenshots (headless Chromium over
+  DevTools, `tools/viewer/shot.py`: Chromium's `--screenshot` fires before a streamed page draws)
+  mid-run (LIVE at 380 Myr ago, globe, legend, events), compare at 298 and 98 Myr ago on elevation and
+  plates, the editor filled (Random, 800 Myr, gravity 3.71 → estimate peak 1.24 GiB, ~5:50, Run on).
+- **Next.** Stage 2 plugs into `/api/preview`, `/api/inspect` and `Stage2`. P1-05/P1-07's new
+  layers appear as buttons with no change here (checked by construction: layers are whatever the
+  frames name). Open for Ben: see the report's decisions (default keep 8 runs ≈ 8 GB; the TV path
+  untested on the screen).
+
 ### 2026-09-29 — MIC pack branch `deep-time`: Excavated Variants and its gaps (Q10), rock tags (Q16) (agent, pack worktree ../../pack-deeptime)
 - **What.** Pack branch `deep-time` pushed at 16dfd80 (on pack master 303fd89; master untouched): EV 4.3.1 + DAG 6.1.2
   (packwiz, Modrinth); EV configs under `globalresources/mic/globaldata/excavated_variants/excavated_variants/` for
