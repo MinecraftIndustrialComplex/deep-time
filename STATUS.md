@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · In flight (agent worktrees under .claude/worktrees/, not yet merged): P1-05 climate, P1-07 rock classes/strata (done on its branch), P1-20 workbench stage 1 (live runs + editor controls) and stage 2 (3D area preview), MIC pack branch `deep-time` (EV + gap configs + rock tags; pack worktree ../../pack-deeptime) · Next after those land: P1-14 wires the recorded history, then P1-06, P1-08 · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · In flight (agent worktrees under .claude/worktrees/, not yet merged): P1-05 climate, P1-07 rock classes/strata (done on its branch), P1-14 deposits in the pipeline, P1-17 early (parallel pflood/SPL), P1-20 workbench stage 1 (live runs + editor controls) and stage 2 (3D area preview), macOS free-memory fix + Q10 client launcher fold, MIC pack branch `deep-time` (EV + gap configs + rock tags; pack worktree ../../pack-deeptime) · Next after those land: P1-06, then P1-08 · Sub-agents on Sonnet 5.5 from 2026-09-29 (Ben) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -162,6 +162,24 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Next.** P1-08 bakes `strata/horizons` from `bake_horizons` and the pluton bodies; P1-14 wires
   `RecordedHistory` (now complete for every built-in type) into `DepositStage`; P1-17 tunes pluton
   rate/size and the metamorphic heat-flow cap.
+### 2026-09-29 — MIC pack branch `deep-time`: Excavated Variants and its gaps (Q10), rock tags (Q16) (agent, pack worktree ../../pack-deeptime)
+- **What.** Pack branch `deep-time` pushed at 16dfd80 (on pack master 303fd89; master untouched): EV 4.3.1 + DAG 6.1.2
+  (packwiz, Modrinth); EV configs under `globalresources/mic/globaldata/excavated_variants/excavated_variants/` for
+  Born in Chaos black and fired black argillite, Create Nuclear lead ore (with `createnuclear:lead_ores`), Ice and Fire
+  silver ore; the rock-tag datapack as `kubejs/data/deeptime/` (120 files, byte-identical); an Almost Unified
+  `unification/materials.json`; the branch report `modDocs/deeptime-branch.md` (force-added, packwiz-ignored).
+  index.toml edited by hand (additions only, no `packwiz refresh`).
+- **Measured** (Q10 recipe on the Mac, `deposits_world_16k`, seed 7, Deep Time 84759b0; install via the new
+  `DEEPTIME_PACK=<dir> tools/smoke/install.sh mic|mic-ev`): EV variants 252 (Q10 190). Q10 boxes: 2,291 of 2,507
+  Deep Time ore blocks are EV variants (Q10 1,350); black argillite 549/549, fired 395/395. Zn–Pb boxes (MVT sites
+  23/24, SEDEX 25): lead 262/262, silver 46/46, zinc 3,176/3,176 variants. No EV/DAG/DefaultResources errors; both
+  worlds pass every smoke check incl. restart. Still plain: ore in stone (its variant is the original), dirt, obsidian.
+- **Found.** MIC's Almost Unified config is never read, on master too: AU 1.4.2 reads only
+  `config/almostunified/unification/*.json`; the pack's `unify.json` is the 0.x layout, so its priorities
+  (e.g. `c:ingots/lead → destroy`) do not apply. Asked Ben (pack-wide).
+- **Not checked.** DAG's generated textures for the new variants in a client.
+- **Leftovers on the Mac** (safe to delete later): /Volumes/Graphide/ban/mic/evpack-verify/,
+  /Volumes/Graphide/ban/mic/mods/pack-deeptime-verify/.
 
 ### 2026-09-28 — wrap page merged; snowball figure settled (main session f981c0d3)
 - **Snowball.** entityCrossesSeam starts the gravity-free snowball at x = 8,188.5 with 0.25 blocks/tick and
