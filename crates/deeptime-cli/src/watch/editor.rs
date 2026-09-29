@@ -238,10 +238,12 @@ impl Catalog {
     /// `{"preset": <built-in name>} | {"imported": <preset object>}`, `"start"`, `"length_myr"`,
     /// `"fields": {id: value}`, `"cap_gib"` (the memory cap field; 0 or absent = the default) →
     /// the canonical JSON, its share code, each field's availability and value, the problems, the
-    /// core's estimate once the preset is complete, what the run needs of the cap (`needed_bytes`:
-    /// the estimate's peak plus [`SERVER_OVERHEAD_BYTES`]) and the cap it was held to
-    /// (`cap_bytes`). A run that needs more than its cap is `can_run: false`, with the reason
-    /// among the problems.
+    /// core's estimate under the cap once the preset is complete (`session::estimate_for` with the
+    /// cap less [`SERVER_OVERHEAD_BYTES`]: its `spill_bytes` is the recorded history that goes to
+    /// the run folder's spill file, P1-17), what the run needs of the cap (`needed_bytes`: the
+    /// estimate's peak plus [`SERVER_OVERHEAD_BYTES`]) and the cap it was held to (`cap_bytes`). A
+    /// run that needs more than its cap — only a run whose base does not fit, since the history
+    /// spills — is `can_run: false`, with the reason among the problems.
     pub fn effective(&self, req: &Value) -> Value {
         let mut problems: Vec<String> = Vec::new();
         let cap = self.cap_bytes(&req["cap_gib"]).unwrap_or_else(|e| {
@@ -308,7 +310,7 @@ impl Catalog {
         let mut needed = None;
         if problems.is_empty() {
             match Preset::from_json(&json).and_then(|p| p.check_runnable()) {
-                Ok(()) => match session::estimate(&json, "") {
+                Ok(()) => match stage_estimate(&json, cap) {
                     Ok(e) => {
                         estimate = serde_json::from_str(&e).unwrap_or(Value::Null);
                         needed = needed_bytes(&estimate);
@@ -411,10 +413,17 @@ impl Catalog {
     /// of [`Catalog::effective`] applied again where the run is created, so a page that predates
     /// it, or never asked, cannot start a run that would only fail on the cap later.
     pub fn within_cap(&self, json: &str, cap: u64) -> Result<(), String> {
-        let estimate = session::estimate(json, "").map_err(|e| e.to_string())?;
+        let estimate = stage_estimate(json, cap).map_err(|e| e.to_string())?;
         let estimate: Value = serde_json::from_str(&estimate).map_err(|e| e.to_string())?;
         over_cap(&estimate, cap).map_or(Ok(()), Err)
     }
+}
+
+/// The core's estimate for a run under a cap of `cap` bytes: the stages get what the server leaves
+/// of it, and the recorded history they cannot hold under that spills to disk (P1-17), so the
+/// estimate's peak is over what they get only when the rest of the run (its base) is.
+fn stage_estimate(json: &str, cap: u64) -> Result<String, deeptime_core::CoreError> {
+    session::estimate_for(json, "", cap.saturating_sub(SERVER_OVERHEAD_BYTES).max(1))
 }
 
 /// What a run needs of the memory cap: the estimate's peak plus [`SERVER_OVERHEAD_BYTES`] (0 for
@@ -432,10 +441,15 @@ fn needed_bytes(estimate: &Value) -> Option<u64> {
 /// against the cap the run gets.
 fn over_cap(estimate: &Value, cap: u64) -> Option<String> {
     let needed = needed_bytes(estimate)?;
+    let what = if estimate["history_bytes"].as_u64().unwrap_or(0) > 0 {
+        "the estimate with its recorded history on disk"
+    } else {
+        "the estimate"
+    };
     (needed > cap).then(|| {
         format!(
-            "needs about {} (the estimate, {}, and {} for the server itself); the memory cap is \
-             {}: raise the cap in Memory, or shorten the run or pick a smaller preset",
+            "needs about {} ({what}, {}, and {} for the server itself); the memory cap is \
+             {}: raise the cap in Memory, or pick a smaller preset",
             gib_up(needed),
             gib_up(needed - SERVER_OVERHEAD_BYTES),
             gib_up(SERVER_OVERHEAD_BYTES),
@@ -627,6 +641,32 @@ mod tests {
         assert!(c.runnable(no_timeline["json"].as_str().unwrap()).is_err());
     }
 
+    /// P1-17: the recorded history goes to disk over the cap, so a run whose history does not fit
+    /// is allowed (its estimate says how much spills) and only its base decides; 2000 Myr of
+    /// `pipeline_full_32k` under the workbench's 8 GiB, refused before the spill (≈ 9 GiB).
+    #[test]
+    fn a_run_whose_history_spills_is_allowed() {
+        let c = Catalog::load().unwrap().with_default_cap(8 << 30);
+        let r = c.effective(&json!({
+            "preset": "pipeline_full_32k", "start": "supercontinent", "length_myr": 2000,
+        }));
+        assert_eq!(r["can_run"], true, "{r:#}");
+        let e = &r["estimate"];
+        let (base, history, spill, peak) = (
+            e["base_bytes"].as_u64().unwrap(),
+            e["history_bytes"].as_u64().unwrap(),
+            e["spill_bytes"].as_u64().unwrap(),
+            e["peak_bytes"].as_u64().unwrap(),
+        );
+        assert!(
+            base + history + SERVER_OVERHEAD_BYTES > 8 << 30,
+            "all in memory it would not fit: {e}"
+        );
+        assert!(spill > 0 && peak + SERVER_OVERHEAD_BYTES <= 8 << 30, "{e}");
+        assert_eq!(peak + spill, base + history);
+        assert!(c.within_cap(r["json"].as_str().unwrap(), 8 << 30).is_ok());
+    }
+
     /// The bug: `pipeline_full_32k`, supercontinent, 1000 Myr estimates about 5.5 GB, and the
     /// workbench answered `can_run: true` against a 4 GiB cap; the run failed 15 minutes in
     /// ("needed 4300143147 bytes, cap 4294967296 bytes"). The estimate is held to the run's cap now:
@@ -657,14 +697,16 @@ mod tests {
                 .is_err()
         );
 
-        // The editor's field raises the cap for this run; the estimate is unchanged.
+        // The editor's field raises the cap for this run; the base is the same, and more of the
+        // recorded history stays in memory (P1-17).
         let mut raised = req.clone();
         raised["cap_gib"] = json!(8);
         let r8 = c.effective(&raised);
         assert_eq!(r8["problems"], json!([]), "{r8:#}");
         assert_eq!(r8["can_run"], true);
         assert_eq!(r8["cap_bytes"], 8u64 << 30);
-        assert_eq!(r8["estimate"]["peak_bytes"], r["estimate"]["peak_bytes"]);
+        assert_eq!(r8["estimate"]["base_bytes"], r["estimate"]["base_bytes"]);
+        assert!(r8["estimate"]["peak_bytes"].as_u64().unwrap() > peak);
         assert!(c.within_cap(r8["json"].as_str().unwrap(), 8 << 30).is_ok());
 
         // What the run needs is the estimate plus the server's own memory (the estimate alone ran

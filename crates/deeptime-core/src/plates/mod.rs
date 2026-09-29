@@ -555,7 +555,11 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let bytes = n * (3 * sample + 400)
         + cells * (20 + 4 * 11)
         + 16 * KEYFRAME_LAYERS.len() as u64 * u64::from(kw) * u64::from(kh) * 4;
-    StageEstimate { bytes, seconds }
+    StageEstimate {
+        bytes,
+        seconds,
+        history_bytes: 0,
+    }
 }
 
 impl Stage for PlatesStage {

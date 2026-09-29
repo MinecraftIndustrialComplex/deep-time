@@ -130,9 +130,11 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let c = u64::from(p.scale.circumference_blocks);
     let r = u64::from(p.resolution.l2_r);
     let cells = (c / r) * (c / r / 2);
+    let surface = super::estimate(p);
     StageEstimate {
-        bytes: super::estimate(p).bytes + cells * (14 * 8 + 12 * 4),
+        bytes: surface.bytes + cells * (14 * 8 + 12 * 4),
         seconds: cells as f64 * f64::from(y.steps) * 1.0e-6,
+        history_bytes: surface.history_bytes,
     }
 }
 
