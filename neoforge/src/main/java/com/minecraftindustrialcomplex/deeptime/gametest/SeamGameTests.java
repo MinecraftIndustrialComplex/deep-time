@@ -103,6 +103,23 @@ public final class SeamGameTests {
     }
 
     /**
+     * The top terrain block of a column (stone, dirt, sand, gravel, clay): the generator's surface
+     * without the features on it. The heightmaps count trees and boulders, which the world's
+     * random seed puts on one side of the seam and not the other (a 3-block "jump" in one P0-06 run).
+     */
+    static int terrainHeight(LevelChunk chunk, int x, int z) {
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos(x, chunk.getHeight(Heightmap.Types.WORLD_SURFACE, x & 15, z & 15), z);
+        for (; p.getY() > chunk.getMinBuildHeight(); p.move(Direction.DOWN)) {
+            BlockState s = chunk.getBlockState(p);
+            if (s.is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD) || s.is(net.minecraft.tags.BlockTags.DIRT)
+                    || s.is(net.minecraft.tags.BlockTags.SAND) || s.is(Blocks.GRAVEL) || s.is(Blocks.CLAY)
+                    || s.is(Blocks.SANDSTONE) || s.is(Blocks.STONE) || s.is(Blocks.DEEPSLATE))
+                return p.getY();
+        }
+        return chunk.getMinBuildHeight();
+    }
+
+    /**
      * Across the seam the world continues. Positions past the edge are folded through TW's API
      * first (TW's rule: fold a position before using it; a raw read at chunk C/32 can stall in TW's
      * seam-generation queue): x = C/2 + k folds to −C/2 + k, and the step from the last canonical
@@ -138,10 +155,10 @@ public final class SeamGameTests {
                 continue;
             }
             rows++;
-            int a = east.getHeight(Heightmap.Types.OCEAN_FLOOR, c / 2 - 2, z);
-            int b = east.getHeight(Heightmap.Types.OCEAN_FLOOR, c / 2 - 1, z);
-            int across = west.getHeight(Heightmap.Types.OCEAN_FLOOR, -c / 2, z);
-            int after = west.getHeight(Heightmap.Types.OCEAN_FLOOR, -c / 2 + 1, z);
+            int a = terrainHeight(east, c / 2 - 2, z);
+            int b = terrainHeight(east, c / 2 - 1, z);
+            int across = terrainHeight(west, -c / 2, z);
+            int after = terrainHeight(west, -c / 2 + 1, z);
             if (i == 8)
                 detail.append(" sample(z=").append(z).append("):").append(a).append(',').append(b).append("|")
                         .append(across).append(',').append(after);
