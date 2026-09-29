@@ -65,7 +65,10 @@ tools/review/publish.sh <name> <folder>                 # private spacesheep pag
   agents: take a "drive" lease with graphide's `utilities/scripts/mactest/m6lock.sh` first.
   `tools/client/mac-screenshots.sh` does all of it from the laptop (sync and build, Deep Time's server
   lock, the drive lease, the launch in the desktop session, the PNGs back in review/out/<name>/);
-  the ScreenshotDriver's walk is the model for any other client check. The old laptop route
+  the ScreenshotDriver's walk is the model for any other client check. Any other real-client tool
+  (`tools/client/ev-assets.sh`) launches through the same Mac-side library, `tools/client/mac-client-lib.sh`
+  (lease, desktop session, cleanup), and stops with exit 4 when nobody is logged in or the screen is
+  locked; never type a password. The old laptop route
   (`tools/client/screenshots.sh`, HeadlessMC + Xvfb) refuses to run without DEEPTIME_XVFB_CLIENT=1;
   never set it on the laptop.
 - Ben cannot launch the game. Every check must be runnable here and reviewable in a browser.
