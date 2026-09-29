@@ -227,7 +227,7 @@
       h += `<div class="cats">${info.classes.map(k => `<div title="${esc(k.v)}"><i style="background:${k.c}"></i><span>${esc(k.label ?? k.v)}</span></div>`).join('')}</div>`;
     } else if (info.cat) {
       h += `<div class="strip">${info.classes.map(k => `<i style="background:${k.c}"></i>`).join('')}</div>`;
-      h += `<div class="ticks"><span style="left:0">${info.classes.length} classes</span></div>`;
+      h += `<div class="note" style="-webkit-line-clamp:1">${info.classes.length} classes, unlabelled</div>`;
     } else {
       h += `<canvas class="bar" data-ramp="${esc(info.name)}" data-target="${target}"></canvas><div class="ticks">`;
       const span = info.hi - info.lo || 1;
@@ -677,11 +677,12 @@
             : [`No frames (${st || 'unknown'})`, (r.status && r.status.message) || 'This run made no frames.', false];
       p.waiting.innerHTML = `${spin ? '<div class="spinner l"></div>' : ic(st === 'queued' ? 'clock' : 'alert', 'ic-l')}<div>${esc(title)}</div><div class="sub">${esc(sub)}</div>`;
     }
-    if (!has || p.cur < 0 || !r.frames[p.cur]) { p.clock.innerHTML = ''; badge(p); drawGrid(p); return; }
+    if (!has || p.cur < 0 || !r.frames[p.cur]) { p.clock.innerHTML = ''; badge(p); drawGrid(p); p.frame.classList.remove('loading'); return; }
     const f = r.frames[p.cur];
     const dn = displayIndex(r, p.cur), fd = r.frames[dn];
     const img = r.image(dn);
     if (ready(img)) p.drawn = img;
+    p.frame.classList.toggle('loading', !ready(img));
     // Continuous layers upscale smoothly; categorical ones (plates, Köppen, rock) keep hard edges.
     const dli = r.layerIndex(fd), dinfo = rampInfo(fd.ramps && fd.ramps[dli]);
     ctx.imageSmoothingEnabled = !!dinfo && !dinfo.cat && c.width > fd.w * 1.2;
@@ -999,24 +1000,27 @@
       box.replaceChildren(...this.jobs.map(j => j.el));
       $('s2intro').classList.toggle('compact', this.jobs.length > 0);
       for (const j of this.jobs) this.render(j);
-      const active = this.jobs.filter(j => !['done', 'failed', 'unavailable'].includes(j.st.state) && !j.st.url).length;
+      const active = this.jobs.filter(j => !!j.st.status_url && !j.st.url && !['done', 'failed'].includes(j.st.state) || j.st.state === 'sending').length;
       $('jobcount').hidden = !active; $('jobcount').textContent = active;
     },
     render(job) {
       if (!job.el) { this.renderAll(); return; }
-      const st = job.st, state = st.url ? 'done' : st.state || 'queued';
+      const st = job.st;
+      // An answer that is neither a job nor a viewer (a direct column answer, after P1-08): shown as it is.
+      const plain = !st.url && !st.status_url && !st.state && !st.error;
+      const state = st.url ? 'done' : plain ? 'answer' : st.state || 'queued';
       const key = [state, st.message, st.error, st.url, st.note, job.embed].join('|');
-      const active = !['done', 'failed', 'unavailable'].includes(state);
+      const active = !['done', 'failed', 'unavailable', 'answer'].includes(state);
       job.el.classList.toggle('active', active);
-      const act = this.jobs.filter(j => !['done', 'failed', 'unavailable'].includes(j.st.state) && !j.st.url).length;
+      const act = this.jobs.filter(j => !!j.st.status_url && !j.st.url && !['done', 'failed'].includes(j.st.state) || j.st.state === 'sending').length;
       $('jobcount').hidden = !act; $('jobcount').textContent = act;
       if (key === job.key) { this.tickOne(job); return; }
       job.key = key;
       const idx = S2_STEPS.findIndex(s => s[0] === state);
       const stepName = state === 'sending' ? 'Asking the Mac…' : idx >= 0 ? S2_STEPS[idx][1] : cap1(state);
-      const badgeCls = state === 'done' ? 's-done' : state === 'failed' ? 's-failed' : state === 'unavailable' ? 's-idle' : state === 'queued' || state === 'waiting' ? 's-queued' : 's-finalizing';
+      const badgeCls = state === 'done' || state === 'answer' ? 's-done' : state === 'failed' ? 's-failed' : state === 'unavailable' ? 's-idle' : state === 'queued' || state === 'waiting' ? 's-queued' : 's-finalizing';
       let h = `<div class="jh"><div class="jic">${ic(job.kind === 'area' ? 'cube' : 'crosshair')}</div><div class="jt"><div class="a">${esc(job.title)}</div><div class="b">${esc(job.sub)}</div></div>` +
-        `<span class="badge ${badgeCls}">${esc(state === 'done' ? 'Ready' : state === 'unavailable' ? 'Off' : state === 'failed' ? 'Failed' : state === 'sending' ? 'Sending' : 'Working')}</span></div>`;
+        `<span class="badge ${badgeCls}">${esc(state === 'done' || state === 'answer' ? 'Ready' : state === 'unavailable' ? 'Off' : state === 'failed' ? 'Failed' : state === 'sending' ? 'Sending' : 'Working')}</span></div>`;
       if (active) {
         h += `<div class="steps">${S2_STEPS.slice(0, -1).map((s, i) => `<i class="${i < idx ? 'done' : i === idx || (idx < 0 && i === 0) ? 'cur' : ''}" title="${esc(s[1])}"></i>`).join('')}</div>`;
         h += `<div class="jrow"><b>${esc(stepName)}</b><span class="elapsed"></span></div>`;
@@ -1026,6 +1030,8 @@
         h += `<div class="jacts"><button class="btn btn-sm" data-jact="retry">${ic('refresh', 'ic-s')}Try again</button></div>`;
       } else if (state === 'unavailable') {
         h += `<div class="callout warn" style="margin-top:10px">${ic('info')}<div><b>3D preview is off on this workbench.</b> ${esc(st.message || '')}</div></div>`;
+      } else if (state === 'answer') {
+        h += `<pre class="lines" style="margin-top:10px;max-height:260px;overflow:auto">${esc(JSON.stringify(Object.assign({}, st, { note: undefined }), null, 1))}</pre>`;
       } else {
         h += `<div class="jrow" style="margin-top:8px"><span style="display:flex;gap:5px;align-items:center;white-space:nowrap">${ic('check', 'ic-s')}Real generator</span><span class="elapsed" style="text-align:right"></span></div>`;
         if (job.embed) h += `<div class="embed"><iframe src="${esc(embedURL(st.url))}" title="3D preview" loading="lazy"></iframe></div>`;
@@ -1638,8 +1644,9 @@
     h += `<div class="chips" style="margin-bottom:12px">${runChips({ preset: m.preset, start: m.start, length_myr: m.length_myr, circumference: m.circumference, stages: m.stages, seed: runSeed(r.id) })}</div>`;
     if (r.placeholder()) h += `<div class="callout warn" style="margin-bottom:12px">${ic('alert')}<div><b>Placeholder: not the real simulation.</b> This run used the dummy pipeline (${esc((m.stages || []).join(', '))}), which exists only until the real presets replace the placeholders.</div></div>`;
     if (!r.finished() && pr.total_permille !== undefined) {
-      h += `<div class="runcard" style="cursor:default;animation:none"><div class="prog" style="margin-top:0"><div class="bar"><span style="width:${(pr.total_permille || 0) / 10}%"></span></div>` +
-        `<div class="row"><span><b>${((pr.total_permille || 0) / 10).toFixed(1)}%</b> · ${esc(pr.stage || '')}</span><span>${pr.eta_ms ? `ETA ${fmtDur(pr.eta_ms)}` : ''}</span></div></div></div>`;
+      const pg = progressOf(r.id, Object.assign({ length_myr: m.length_myr }, pr));
+      h += `<div class="runcard" style="cursor:default;animation:none"><div class="prog" style="margin-top:0"><div class="bar"><span style="width:${100 * (pg.p || 0)}%"></span></div>` +
+        `<div class="row"><span><b>${(100 * (pg.p || 0)).toFixed(1)}%</b> · ${esc(pr.stage || '')}</span><span>${esc(etaText(pg))}</span></div></div></div>`;
     }
     const rows = [
       ['Preset', `${esc(presetName(m.preset))} <span class="dim mono">${esc(m.preset)}</span>`], ['Start', esc(startName(m.start) || '—')],
@@ -1718,7 +1725,8 @@
     const b = badgeState(p);
     $('tv-badge').innerHTML = b ? `<span class="badge ${b[0]}">${b[0] === 's-live' ? '<span class="sdot s-live"></span>' : ''}${esc(b[1])}</span>` : '';
     const pr = r.progress || {};
-    $('tv-sub').textContent = !r.finished() && pr.total_permille !== undefined ? `${(pr.total_permille / 10).toFixed(0)}% computed${pr.eta_ms ? ` · ${fmtDur(pr.eta_ms)} to go` : ''}` : '';
+    const pg = progressOf(r.id, Object.assign({ length_myr: r.meta && r.meta.length_myr }, pr));
+    $('tv-sub').textContent = !r.finished() && pg.p !== null ? `${(100 * pg.p).toFixed(0)}% simulated · ${etaText(pg)}` : '';
   }
   function tvEvents() {
     if (!TV) return;
@@ -2010,7 +2018,7 @@
     tag.hidden = !(inA || inB); tag.textContent = inA ? 'A' : 'B';
     el.querySelector('.sdot').className = `sdot s-${r.state}`;
     el.querySelector('.lbl').textContent = r.label;
-    const pct = r.total_permille !== null && r.total_permille !== undefined ? r.total_permille / 10 : null;
+    const pg = progressOf(r.id, r);
     const bd = el.querySelector('.badge');
     bd.className = `badge s-${r.state}`;
     bd.textContent = r.state === 'queued' ? `Queued #${r.queue_position}` : r.state === 'running' ? 'Running' : r.state;
@@ -2020,10 +2028,9 @@
     const prog = el.querySelector('.prog');
     prog.hidden = r.state !== 'running';
     if (r.state === 'running') {
-      prog.querySelector('.bar span').style.width = `${pct || 0}%`;
-      prog.querySelector('.l').innerHTML = `<b>${(pct || 0).toFixed(0)}%</b>${r.t_years !== null && r.t_years !== undefined ? ` · at ${esc(fmtT(-Math.abs(r.t_years)))}` : ''}`;
-      const eta = etaOf(r);
-      prog.querySelector('.r').textContent = eta !== null ? `ETA ${fmtDur(eta)}` : 'estimating…';
+      prog.querySelector('.bar span').style.width = `${100 * (pg.p || 0)}%`;
+      prog.querySelector('.l').innerHTML = `<b>${(100 * (pg.p || 0)).toFixed(0)}%</b>${r.t_years !== null && r.t_years !== undefined ? ` · at ${esc(fmtT(-Math.abs(r.t_years)))}` : ''}`;
+      prog.querySelector('.r').textContent = etaText(pg);
     }
     const when = relTime(r.created_utc);
     const meta = r.state === 'queued' ? ['waiting for the Mac', when ? `queued ${when}` : '']
@@ -2044,16 +2051,25 @@
     }
     return el;
   }
-  // Progress over time, for runs the server gives no ETA for.
+  // How far a run is: the share of its history simulated so far (the core's permille weighs the
+  // later stages heavily and reads low for most of a run), and the time left at the pace so far.
   const seen = new Map();
-  function etaOf(r) {
-    if (r.eta_ms) return r.eta_ms;
-    if (r.elapsed_ms && r.total_permille > 5) return r.elapsed_ms * (1000 - r.total_permille) / r.total_permille;
-    const s = seen.get(r.id), now = Date.now();
-    if (!s) { seen.set(r.id, { t: now, p: r.total_permille || 0 }); return null; }
-    const rate = ((r.total_permille || 0) - s.p) / (now - s.t);
-    return rate > 0 ? (1000 - (r.total_permille || 0)) / rate : null;
+  function progressOf(id, x) {
+    let p = null;
+    if (x.length_myr && x.t_years !== null && x.t_years !== undefined && isFinite(x.t_years)) p = clamp(1 - Math.abs(x.t_years) / (x.length_myr * 1e6), 0, 1);
+    else if (x.total_permille !== null && x.total_permille !== undefined) p = x.total_permille / 1000;
+    let eta = null;
+    if (p !== null && p >= 0.03 && p < 1) {
+      if (x.elapsed_ms) eta = x.elapsed_ms * (1 - p) / p;
+      else {
+        const s = seen.get(id), now = Date.now();
+        if (!s) seen.set(id, { t: now, p });
+        else if (p > s.p) eta = (now - s.t) * (1 - p) / (p - s.p);
+      }
+    }
+    return { p, eta };
   }
+  const etaText = pg => pg.p >= 1 ? 'finishing…' : pg.eta !== null ? `${fmtDur(pg.eta)} left` : 'estimating…';
   $('runlist').addEventListener('click', async ev => {
     const card = ev.target.closest('.runcard');
     if (!card) { const g = ev.target.closest('[data-go]'); if (g) { sideTab(g.dataset.go); if (narrow.matches) setMTab(g.dataset.go); } return; }
@@ -2100,11 +2116,11 @@
     for (const r of j.runs) if (r.seed !== undefined && r.seed !== null) seeds.set(r.id, r.seed);
     const running = j.runs.find(r => r.state === 'running');
     // Top bar: the Mac's one run slot.
-    $('macbar').style.width = running ? `${(running.total_permille || 0) / 10}%` : '0%';
+    const rpg = running ? progressOf(running.id, running) : null;
+    $('macbar').style.width = running ? `${100 * (rpg.p || 0)}%` : '0%';
     $('macdot').className = `sdot ${running ? 's-running' : 's-idle'}`;
     if (running) {
-      const eta = etaOf(running);
-      $('mactext').innerHTML = `<b>${esc(running.label)}</b> · ${((running.total_permille || 0) / 10).toFixed(0)}%${eta !== null ? ` · ${fmtDur(eta)} left` : ''}${j.queue.length ? ` · ${j.queue.length} waiting` : ''}`;
+      $('mactext').innerHTML = `<b>${esc(running.label)}</b> · ${(100 * (rpg.p || 0)).toFixed(0)}% · ${esc(etaText(rpg))}${j.queue.length ? ` · ${j.queue.length} waiting` : ''}`;
     } else $('mactext').innerHTML = `Mac idle · ${j.runs.length} run${j.runs.length === 1 ? '' : 's'} kept`;
     $('runscount').textContent = j.runs.length;
     const list = $('runlist');

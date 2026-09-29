@@ -41,7 +41,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-17 | Benchmark gate and preset tuning | doing | 2026-09-29 | | Partial (surface parallelism, branch worktree-agent-a9bc0ab99e68b4a07): stream-power solve 34.0 → 6.5 s at 12 threads, bit-identical; flood left serial on purpose; diffusion is now the largest surface cost; see the build log entry "P1-17 partial" |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
-| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log) |
+| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log). **UI overhaul** (branch worktree-agent-a95571be05fdd89d6, Ben: "should be dark themed"): dark map-first layout, run cards, sectioned editor with the estimate by Run, split/side-by-side compare, timeline dock, stage-2 job cards, `?tv` HUD, 390 px; placeholders hidden; Mac gates clean, JUnit 118/0; before/after in review/out/workbench-ui/ (see build log) |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -70,6 +70,81 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — P1-20: the workbench UI overhaul, dark (agent worktree agent-a95571be05fdd89d6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben opened the workbench: "Sorry, that looks shit. … a complete UI overhaul to look WAYY better.
+  (Also, should be dark themed.)" Then, from real use: he ran `earthlike_full_32k` for 4,600 Myr and got
+  one green blob, because the placeholder presets sat next to the real ones.
+- **What changed (front end; the HTTP/SSE contract, the POST guard and the stage-2 contract are as they
+  were).** `crates/deeptime-viewer/assets/workbench.{html,js}` rewritten (still plain HTML/CSS/JS, embedded
+  with `include_str!`; Inter and JetBrains Mono from Google Fonts with a system fallback; icons inline SVG).
+  One dark palette as CSS custom properties (elevation layers, one indigo accent, live/queued/done/failed
+  colours), the map on near-black so ramps.json's colours read as in the game (ramps untouched).
+  Layout: top bar (run title and chips, the Mac's slot with progress and time left, connection); left
+  sidebar, collapsible (`E`; a drawer below 1180 px): run cards (status, progress bar, simulated share and
+  time left, preset/start/length/seed chips, Open / Compare / Settings / Cancel with an inline confirm),
+  grouped "On the Mac" and "Finished"; the editor: preset cards (friendly names such as "Earth-like ·
+  quick", the raw family as secondary text, the stages as chips), size as a segmented control, start as
+  three picture cards, length as a log slider with quick picks, the memory cap, every catalogue section
+  with its description and every field with its hint (a section this preset lacks folds away and says
+  why), share code copy/paste-to-import, and a sticky footer with the estimate as two tiles (peak memory
+  with a bar against the cap; time on the Mac) above the reasons Run is off (click one to jump to its
+  field) and warnings for near-cap and long runs; Run says "Queue run" when the Mac is busy. The stage:
+  the map as the hero with a graticule, lat/lon axes and the seam marked, a crosshair and a readout
+  (lat, lon, block x/z, the layer's value read back from the colour), event markers with glowing fresh
+  ones, tools Select / Inspect / Area 3D with a hint pill, Events and Grid toggles, and compare as Single /
+  Split (one map, a draggable divider; arrow keys on it) / Side by side (stacked when that gives larger
+  maps) with a run-B picker and swap. Right panel: the globe (lit sphere, atmosphere rim, graticule, the
+  seam dashed, lat/lon on hover, spin), the layer picker (grouped popover with swatches; ↑/↓ and 1–9) and
+  its legend (ticks, units, Köppen and other labelled classes by name), the inspector (Events with a
+  kind filter; Details: an event's fields, its causes and effects as clickable chips, "go to this step",
+  or a clicked point's values with "inspect this column" / "preview 256 × 256 here"; 3D: stage-2 job
+  cards; Run: the summary lines as stat tiles, share code, load settings). The dock: transport, a large
+  time readout, speed −/+ (`[` `]`), Live / Jump to end, and a timeline over the run's whole planned span
+  (computed part, live edge, playhead, Myr-ago ticks, an event histogram by kind); drag or click to seek.
+  Tooltips with shortcuts, toasts, a shortcuts sheet (`?`), focus rings, `prefers-reduced-motion`
+  honoured. `?tv`: no chrome; title, the time in 3.6 rem type, a LIVE badge with the share simulated and
+  time left, the newest events, the legend and a globe float over a full-screen map; follows new runs and
+  replays the last one after 25 s idle. Phones (390 px): one column, map, dock, then a tab bar (Layers,
+  Inspect, Globe, Runs, New run); no horizontal scroll. Empty, loading and not-answering states drawn.
+- **Placeholders (the coordinator's addition).** Placeholder presets are hidden behind "Show placeholder
+  presets (dev)"; the real `pipeline_*` / `plates_*` families come first under friendly names. A
+  placeholder run carries a "placeholder" chip on its card and in the top bar, a map badge
+  "PLACEHOLDER · NOT THE REAL SIMULATION" and a warning in its Run tab.
+- **Stage 2 in the page.** Inspect and Area 3D make job cards: steps (queued → waiting for the lock →
+  booting → generating → exporting), elapsed "usually 1–2 min", the runner's message, the note's lead
+  ("A test world at this latitude and longitude, until P1-08.") with More; when done the 3D view runs in
+  the card (`area3d/?…&embed=1`) and opens full size over the page. A failure shows the error and Try
+  again; a 501 says preview is off. `tools/review/pages/area3d/` takes the same look (dark by default,
+  light one click away, `?embed=1` shows the scene alone). A direct, non-job answer (P1-08's column
+  route) is shown as it is.
+- **Server and catalogue (minimal).** `GET /api/catalog` also sends the catalogue's new `sections`
+  (a description per section); every field gained a one-line `hint` (`editor_fields.json`; Java's
+  `EditorFields` ignores both, JUnit 118/0). `GET /api/runs` rows gained `seed`, `elapsed_ms`, `eta_ms`.
+  Progress in the page is the share of the history simulated (`t_years` over `length_myr`) with the
+  time left at the pace so far: the core's `total_permille` read 3 % at 20 % of a run.
+- **Measured.** Private `deeptime watch --preview` on the Mac, port 8653 (`deeptime-cache/workbench-ui/`,
+  standalone profile, runs copied from the live folder plus new ones), reached over an ssh tunnel; shots
+  by a batch DevTools driver (headless Chromium, SwiftShader WebGL). End to end through the new UI: a run
+  started from the editor (random, 200 Myr: 101 frames, 491 events, 2:24), a running run cancelled from
+  its card (kept 210 frames), compare split and side by side, an inspect and an area preview (standalone,
+  77 s job, the 3D view in the card and the modal). Playback at 20 Myr/s on a 251-frame run, same
+  machine and data: new page 57.6 fps with 1 long task in 8 s, old page 43.8 fps with 37.
+  Screenshots: `review/out/workbench-ui/{before,after}/` and `index.html` (9 before/after pairs + 20 new
+  states: 1600 × 900, 1920 × 1080, 1280, 1024, 390 px, `?tv` at 1080p and 4K).
+- **Gates** (Mac, after merging master c79b38f): cargo fmt --check, clippy --workspace --all-targets
+  -D warnings, test --workspace --locked (cli 23, core 173 + 2 ignored, format 32, inspect 28 + 2 + 7,
+  jni 7, viewer 5), deny licenses bans clean; `cd neoforge && ./gradlew build test` → tests=118
+  failures=0 (the catalogue change).
+- **Found, not fixed here.** Every preview on the live 8642 server failed ("the preset …
+  deposits_world_16k.json is not valid: $.deposits_synthetic: unknown key"): the main checkout's
+  `smoke/mic` on the Mac holds a Deep Time jar from 2026-09-28 19:33, older than P1-15's synthetic deposit
+  preset, and `preview.py` installs a profile only when `install.json` is missing. Fix: re-run
+  `tools/smoke/install.sh mic` for that checkout (mac.sh --pack); later, have `preview.py` reinstall when
+  the checkout's jar is newer.
+- **Next.** The parent merges, restarts 8642 with `mac-watch.sh` and puts `?tv` on the TV. Open for Ben:
+  the accent colour, whether the TV should replay when idle, whether the placeholder toggle should go.
+
+===
 ### 2026-09-29 — P1-17 partial: the surface stage's serial solves run in parallel (agent worktree agent-a9bc0ab99e68b4a07, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** `surface/routing/forest.rs` (new): the drainage forest in stack order (cells by position, receivers,
   donors as CSR in ascending cell index, subtree sizes, tops, leaves, river mouths) and two schedulers,
@@ -2357,7 +2432,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   existing continents (no early-Earth phase). Options offered: history on disk (flat memory), an early-Earth
   phase, or a 1 Gyr cap. Revisit in P1-17 or when Ben raises it.
 - The workbench offered the placeholder `earthlike_*` presets (dummy pipeline) next to the real `pipeline_*`
-  ones; Ben ran one and got a single blob. The UI redesign hides placeholders (P1-20).
+  ones; Ben ran one and got a single blob. The UI overhaul hides them behind a dev toggle and marks a
+  placeholder run (build log 2026-09-29, UI overhaul).
+- Workbench previews on the live server fail until the main checkout's `smoke/mic` on the Mac is
+  reinstalled (its Deep Time jar predates P1-15's synthetic deposit preset; build log 2026-09-29, UI
+  overhaul).
 - The plan is at revision 2 plus a partial revision 3 (the decisions-log rule in §1.2). The 29 gaps of
   docs/plan-reviews/2026-09-28-cold-read-review-2.md are fixed in the plan by the task that hits each
   one; the build log names each fix as it lands.
