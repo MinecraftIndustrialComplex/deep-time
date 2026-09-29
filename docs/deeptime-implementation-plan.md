@@ -1888,6 +1888,8 @@ community ports) are not opened for code.
   rifting every 20–120 Myr. For a 500 Myr timeline (250 steps): 100k → 70 s + 4–25 events × 1.43 s
   = 76–106 s; 250k → 310 s + 4–25 × 5.08 s = 330–437 s. Deep Time's timelines are chosen by the
   player, so the estimate is computed per preset, and P1-17 replaces these figures with measurements.
+  **Measured (P1-03, M6 Mac mini, release, 500 Myr, shared with other builds):** 100k → 9.3 s on
+  12 threads (15.7 s on 4, 29.8 s on 1); 250k → 33 s on 12 threads (STATUS.md, P1-03).
 - **Outputs.** Per-step uplift/subsidence rate, crust type, orogeny type/age, fold trend and regime
   sampled to L1 (§5.2); plate/rift/collision/arc/hotspot events; keyframes of elevation, plates and
   crust age.
@@ -2832,8 +2834,10 @@ a smoke benchmark and again at the end.
 - **Acceptance.**
   - `nix develop -c cargo test -p deeptime-core plates::` → area conserved across rifting (relative
     error < 1e-9); no sample in two plates; ages non-negative
-  - `nix develop -c cargo run --release -p deeptime-cli -- stage plates --preset earthlike_quick_16k --timeline-myr 500 --viewer review/out/p1-plates`
-    → prints `plates_final=<n> ocean_age_p90_myr=<a> steps=250 seconds=<s>` and writes the viewer
+  - `nix develop -c cargo run --release -p deeptime-cli -- stage plates --preset earthlike_quick_16k --start scattered --timeline-myr 500 --viewer review/out/p1-plates`
+    → prints `plates_final=<n> ocean_age_p90_myr=<a> … steps=250 seconds=<s>` and writes the viewer
+    (`--start` is required: the built-in presets leave the start configuration to the player,
+    decisions file "Timeline")
 - **Ben reviews.** "Deep Time — P1 plates": the timelapse of plates, crust age and elevation, with
   the rift/collision ticker.
 

@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "name": "earthlike_full_32k",
+  "seed": 1,
+  "planet": {
+    "gravity_m_s2": 9.81,
+    "day_length_h": 24.0,
+    "axial_tilt_deg": 23.4,
+    "star_flux_rel": 1.0,
+    "ocean_fraction": 0.7,
+    "regime": "mobile_lid"
+  },
+  "scale": {
+    "circumference_blocks": 32768,
+    "m_per_block_h": 300.0,
+    "m_per_block_v": 20.0,
+    "min_y": -352,
+    "max_y": 639,
+    "sea_level_y": 63,
+    "pole_cap_deg": 75.0
+  },
+  "timeline": {
+    "start": null,
+    "length_myr": null,
+    "keyframe_every_myr": 50.0,
+    "keyframe_size": [
+      1024,
+      512
+    ]
+  },
+  "resolution": {
+    "l0_samples": 250000,
+    "l1_r": 16,
+    "l2_r": 8,
+    "l3_r": 2
+  },
+  "tectonics": {
+    "time_step_myr": 2.0,
+    "model_radius_km": 6370.0,
+    "ridge_elevation_m": -1000.0,
+    "abyssal_elevation_m": -6000.0,
+    "trench_elevation_m": -10000.0,
+    "max_elevation_m": 10000.0,
+    "subduction_distance_km": 1800.0,
+    "collision_distance_km": 4200.0,
+    "collision_coefficient_per_km": 1.3e-05,
+    "max_plate_speed_mm_yr": 100.0,
+    "oceanic_damping_mm_yr": 0.04,
+    "continental_erosion_mm_yr": 0.03,
+    "sediment_accretion_mm_yr": 0.3,
+    "subduction_uplift_mm_yr": 0.6,
+    "collision_threshold_km": 300.0,
+    "subduction_peak_km": 300.0,
+    "collision_uplift_max_m": 4000.0,
+    "slab_pull_rad_per_1000km_myr": 0.002,
+    "slab_pull_speed_mm_yr": 80.0,
+    "slab_pull_front_km": 3000.0,
+    "slab_pull_relax_myr": 20.0,
+    "motion_jitter_per_sqrt_myr": 0.02,
+    "initial_plates": 14,
+    "plate_size_variety_rad": 0.35,
+    "plate_speed_mm_yr": [
+      20.0,
+      70.0
+    ],
+    "continental_speed_factor": 0.6,
+    "continent_elevation_m": [
+      150.0,
+      900.0
+    ],
+    "scattered_continents": 6,
+    "coast_warp_rad": 0.25,
+    "rift_lambda0": 0.012,
+    "rift_ocean_weight": 0.08,
+    "rift_fragments": [
+      2,
+      4
+    ],
+    "rift_speed_mm_yr": [
+      20.0,
+      50.0
+    ],
+    "rift_warp_rad": 0.2,
+    "min_plate_area_frac": 0.003,
+    "max_plates": 40,
+    "resample_min_steps": 10,
+    "resample_max_steps": 60,
+    "resample_drift_km": 1500.0,
+    "arc_distance_km": 200.0,
+    "arc_width_km": 60.0,
+    "arc_uplift_mm_yr": 0.1,
+    "arc_magma_m_per_myr": 20.0,
+    "trench_relax": 0.5,
+    "pelagic_m_per_myr": 5.0,
+    "hotspots_initial": 8,
+    "hotspot_births_per_100myr": 3.0,
+    "hotspot_lifetime_myr": [
+      40.0,
+      150.0
+    ],
+    "hotspot_radius_km": 150.0,
+    "hotspot_uplift_mm_yr": 0.3,
+    "lip_probability": 0.5,
+    "lip_radius_km": 900.0,
+    "lip_thickness_m": 1500.0,
+    "lip_rift_boost": 4.0,
+    "lip_rift_boost_myr": 20.0,
+    "terrane_event_min_frac": 0.005,
+    "collision_min_frac": 0.1,
+    "subduction_initiation_age_myr": 150.0,
+    "subduction_initiation_rate": 0.1,
+    "subduction_initiation_speed_mm_yr": [
+      30.0,
+      60.0
+    ],
+    "contact_timeout_steps": 12,
+    "collision_orogeny_myr": 30.0,
+    "l1_every_steps": 0
+  }
+}

@@ -27,9 +27,11 @@ enum Command {
     Version,
     /// Run a whole planet from a preset and write its world-data folder (what the game writes).
     Run {
-        /// Preset JSON file (tests/presets/dummy.json until the real stages exist).
+        /// Preset JSON file, or a built-in preset's name (earthlike_quick_16k, …).
         #[arg(long)]
         preset: PathBuf,
+        #[command(flatten)]
+        timeline: TimelineArgs,
         /// Content bundle JSON (rock classes, deposit types; plan §5.4). Optional for now.
         #[arg(long)]
         content: Option<PathBuf>,
@@ -53,9 +55,14 @@ enum Command {
         /// Checkpoint to start from; its next stage must be <name>.
         #[arg(long = "in")]
         input: Option<PathBuf>,
-        /// Preset to start from instead of a checkpoint.
+        /// Preset to start from instead of a checkpoint (a file or a built-in name).
         #[arg(long)]
         preset: Option<PathBuf>,
+        #[command(flatten)]
+        timeline: TimelineArgs,
+        /// Stop after this many steps of the stage and write a mid-stage checkpoint.
+        #[arg(long)]
+        max_steps: Option<u64>,
         /// Checkpoint to write after the stage.
         #[arg(long)]
         out: Option<PathBuf>,
@@ -70,8 +77,11 @@ enum Command {
     },
     /// Run a preset once per thread count with per-stage timings and peak native memory.
     Bench {
+        /// Preset JSON file, or a built-in preset's name.
         #[arg(long)]
         preset: PathBuf,
+        #[command(flatten)]
+        timeline: TimelineArgs,
         /// Thread counts, comma-separated.
         #[arg(long, value_delimiter = ',', default_value = "1,2,4,8")]
         threads: Vec<usize>,
@@ -112,6 +122,26 @@ enum Command {
         #[arg(long, value_enum, default_value_t = CodecArg::Lz4)]
         codec: CodecArg,
     },
+}
+
+/// The timeline a planet preset leaves to the player (there is no default story).
+#[derive(clap::Args)]
+struct TimelineArgs {
+    /// Start configuration: supercontinent, scattered or random.
+    #[arg(long, value_parser = ["supercontinent", "scattered", "random"])]
+    start: Option<String>,
+    /// Length of the history in Myr.
+    #[arg(long = "timeline-myr")]
+    timeline_myr: Option<f64>,
+}
+
+impl TimelineArgs {
+    fn timeline(&self) -> run::Timeline {
+        run::Timeline {
+            start: self.start.clone(),
+            length_myr: self.timeline_myr,
+        }
+    }
 }
 
 #[derive(clap::Args)]
@@ -174,6 +204,7 @@ fn main() -> ExitCode {
         }
         Some(Command::Run {
             preset,
+            timeline,
             content,
             out,
             viewer,
@@ -183,6 +214,7 @@ fn main() -> ExitCode {
             "run",
             run::run(&run::RunOptions {
                 preset,
+                timeline: timeline.timeline(),
                 content,
                 out,
                 viewer,
@@ -194,6 +226,8 @@ fn main() -> ExitCode {
             name,
             input,
             preset,
+            timeline,
+            max_steps,
             out,
             viewer,
             work,
@@ -204,6 +238,8 @@ fn main() -> ExitCode {
                 name,
                 input,
                 preset,
+                timeline: timeline.timeline(),
+                max_steps,
                 out,
                 viewer,
                 work,
@@ -212,6 +248,7 @@ fn main() -> ExitCode {
         ),
         Some(Command::Bench {
             preset,
+            timeline,
             threads,
             out,
             viewer,
@@ -222,6 +259,7 @@ fn main() -> ExitCode {
             "bench",
             run::bench(&run::BenchOptions {
                 preset,
+                timeline: timeline.timeline(),
                 threads,
                 out,
                 viewer,
@@ -316,6 +354,7 @@ mod tests {
         let dir = tmp("run");
         super::run::run(&super::run::RunOptions {
             preset: dummy_preset(),
+            timeline: Default::default(),
             content: None,
             out: dir.join("dummy"),
             viewer: Some(dir.join("viewer")),
@@ -346,6 +385,8 @@ mod tests {
             name: "dummy_drift".into(),
             input: None,
             preset: Some(dummy_preset()),
+            timeline: Default::default(),
+            max_steps: None,
             out: Some(dir.join("a.dtcp")),
             viewer: None,
             work: None,
@@ -356,6 +397,8 @@ mod tests {
             name: "dummy_erode".into(),
             input: Some(dir.join("a.dtcp")),
             preset: None,
+            timeline: Default::default(),
+            max_steps: None,
             out: Some(dir.join("b.dtcp")),
             viewer: Some(dir.join("viewer")),
             work: None,
@@ -378,6 +421,7 @@ mod tests {
 
         super::run::bench(&super::run::BenchOptions {
             preset: dummy_preset(),
+            timeline: Default::default(),
             threads: vec![1, 2],
             out: dir.join("bench.json"),
             viewer: Some(dir.join("bench")),
@@ -392,6 +436,84 @@ mod tests {
         assert_eq!(bench["runs"].as_array().unwrap().len(), 2);
         assert_eq!(bench["runs"][1]["threads"], 2);
         assert!(bench["runs"][0]["peak_bytes"].as_u64().unwrap() > 0);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The P1-03 CLI path in miniature: a planet preset by built-in name with the timeline
+    /// chosen on the command line, stopped mid-stage, then finished from the checkpoint.
+    #[test]
+    fn plates_stage_runs_from_a_checkpoint() {
+        let dir = tmp("plates");
+        std::fs::create_dir_all(&dir).unwrap();
+        let json = super::run::load_preset(
+            std::path::Path::new("earthlike_quick_16k"),
+            &super::run::Timeline {
+                start: Some("scattered".into()),
+                length_myr: Some(20.0),
+            },
+        )
+        .unwrap();
+        let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        v["resolution"]["l0_samples"] = serde_json::json!(3000);
+        v["resolution"]["l1_r"] = serde_json::json!(64);
+        v["timeline"]["keyframe_size"] = serde_json::json!([64, 32]);
+        v["timeline"]["keyframe_every_myr"] = serde_json::json!(10.0);
+        let preset = dir.join("small.json");
+        std::fs::write(&preset, v.to_string()).unwrap();
+        // No start chosen: refused (no default story).
+        assert!(
+            super::run::load_preset(
+                std::path::Path::new("earthlike_quick_16k"),
+                &Default::default()
+            )
+            .is_ok()
+        );
+        let refused = super::run::stage(&super::run::StageOptions {
+            name: "plates".into(),
+            input: None,
+            preset: Some("earthlike_quick_16k".into()),
+            timeline: Default::default(),
+            max_steps: Some(1),
+            out: None,
+            viewer: None,
+            work: Some(dir.join("refused")),
+            common: quiet(),
+        });
+        assert!(refused.unwrap_err().to_string().contains("timeline.start"));
+        super::run::stage(&super::run::StageOptions {
+            name: "plates".into(),
+            input: None,
+            preset: Some(preset.clone()),
+            timeline: Default::default(),
+            max_steps: Some(4),
+            out: Some(dir.join("mid.dtcp")),
+            viewer: None,
+            work: None,
+            common: quiet(),
+        })
+        .unwrap();
+        let mid = deeptime_core::checkpoint::Checkpoint::read(&dir.join("mid.dtcp")).unwrap();
+        assert_eq!(mid.next_stage_name(), Some("plates"));
+        assert!(!mid.stage_state.is_empty());
+        assert_eq!(mid.world.t_years, -1.2e7);
+        super::run::stage(&super::run::StageOptions {
+            name: "plates".into(),
+            input: Some(dir.join("mid.dtcp")),
+            preset: None,
+            timeline: Default::default(),
+            max_steps: None,
+            out: Some(dir.join("end.dtcp")),
+            viewer: Some(dir.join("viewer")),
+            work: None,
+            common: quiet(),
+        })
+        .unwrap();
+        let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
+        assert_eq!(end.next_stage, 1);
+        assert_eq!(end.world.t_years, 0.0);
+        assert!(end.world.plates.is_some());
+        assert!(dir.join("viewer/keyframes/kf-0-elevation.png").is_file());
+        assert!(dir.join("viewer/keyframes/kf-0-crust_age.png").is_file());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

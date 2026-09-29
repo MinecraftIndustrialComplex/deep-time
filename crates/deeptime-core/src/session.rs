@@ -29,6 +29,8 @@ use crate::checkpoint::Checkpoint;
 use crate::error::CoreError;
 use crate::keyframes::{self, KeyframePolicy, KeyframeStore, RING_CAPACITY};
 use crate::log::{Level, LogRing};
+use crate::params::PlanetPreset;
+use crate::plates::PlatesStage;
 use crate::world::WorldState;
 
 pub use crate::dummy::{DummyParams, DummyStage};
@@ -105,11 +107,12 @@ impl MemoryGauge for NoGauge {
     }
 }
 
-/// A parsed preset. Until the real stages exist (P1-03 on) the only preset is the dummy one
-/// (`dummy.rs`); anything else is `PresetInvalid`.
+/// A parsed preset: the dummy preset of P0-07/P1-01 (`dummy.rs`, `{"dummy": {…}}`) or a planet
+/// preset (`params.rs`, plan §5.1), whose pipeline starts with the plates stage (P1-03).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Preset {
     Dummy(DummyParams),
+    Planet(Box<PlanetPreset>),
 }
 
 impl Preset {
@@ -119,25 +122,25 @@ impl Preset {
         let obj = value
             .as_object()
             .ok_or_else(|| CoreError::preset("$", "expected a JSON object"))?;
-        if let Some(key) = obj.keys().find(|k| k.as_str() != "dummy") {
-            return Err(CoreError::preset(
-                format!("$.{key}"),
-                "unknown key (only the dummy preset exists before P1-03)",
-            ));
+        if let Some(dummy) = obj.get("dummy") {
+            if let Some(key) = obj.keys().find(|k| k.as_str() != "dummy") {
+                return Err(CoreError::preset(
+                    format!("$.{key}"),
+                    "unknown key beside the dummy preset",
+                ));
+            }
+            return Ok(Preset::Dummy(DummyParams::from_json(dummy)?));
         }
-        let dummy = obj.get("dummy").ok_or_else(|| {
-            CoreError::preset(
-                "$",
-                r#"only the dummy preset {"dummy":{"steps":N,"sleep_ms":M}} exists before P1-03"#,
-            )
-        })?;
-        Ok(Preset::Dummy(DummyParams::from_json(dummy)?))
+        let planet = PlanetPreset::from_obj(obj)?;
+        planet.check_runnable()?;
+        Ok(Preset::Planet(Box::new(planet)))
     }
 
     /// The canonical preset (what `preset.json` and checkpoints store).
     pub fn to_json(&self) -> Value {
         match self {
             Preset::Dummy(p) => p.to_json(),
+            Preset::Planet(p) => p.to_json(),
         }
     }
 
@@ -145,6 +148,7 @@ impl Preset {
     pub fn name(&self) -> &str {
         match self {
             Preset::Dummy(_) => "dummy",
+            Preset::Planet(p) => &p.name,
         }
     }
 
@@ -152,6 +156,7 @@ impl Preset {
     pub fn stages(&self) -> Vec<Box<dyn Stage>> {
         match self {
             Preset::Dummy(p) => p.stages(),
+            Preset::Planet(p) => vec![Box::new(PlatesStage::new((**p).clone()))],
         }
     }
 
@@ -159,6 +164,9 @@ impl Preset {
     pub fn initial_world(&self) -> WorldState {
         match self {
             Preset::Dummy(p) => p.initial_world(),
+            Preset::Planet(p) => {
+                WorldState::new(p.seed, p.scale.circumference_blocks, p.t_start_years())
+            }
         }
     }
 
@@ -170,6 +178,10 @@ impl Preset {
                     size: w.keyframe_size,
                 },
                 None => KeyframePolicy::NONE,
+            },
+            Preset::Planet(p) => KeyframePolicy {
+                every_years: Some(p.timeline.keyframe_every_myr * 1.0e6),
+                size: (p.timeline.keyframe_size[0], p.timeline.keyframe_size[1]),
             },
         }
     }

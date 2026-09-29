@@ -11,6 +11,8 @@ pub mod world;
 
 pub mod error;
 pub mod log;
+pub mod params;
+pub mod plates;
 pub mod session;
 pub mod sphere;
 

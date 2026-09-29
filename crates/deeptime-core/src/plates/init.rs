@@ -1,0 +1,360 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+//! The initial planet (Cortial §3, "Workflow"): plates as noise-warped spherical Voronoi cells of
+//! random centroids, continents shaped by the start configuration the player chose, random plate
+//! motions, oceanic crust aged from the boundaries that diverge, and the first hotspots.
+//!
+//! Start configurations (plan §5.1, decisions file "Timeline"):
+//! - **supercontinent**: one continent of the whole continental area, centred on the largest
+//!   plate, with a noise-warped outline;
+//! - **scattered**: `scattered_continents` continents of mixed sizes at spread-out centres;
+//! - **random**: the lowest values of a fractal noise, so continents and islands of every size.
+//!
+//! In every case the continental area is (1 − ocean_fraction) of the planet, to one sample, and
+//! every continent starts whole on the plate most of it lies on.
+
+use glam::{DQuat, DVec3};
+use rayon::prelude::*;
+
+use super::Env;
+use super::geometry::{Geo, connect_plates, dijkstra};
+use super::kinematics::{arr, cap_speed, random_motion};
+use super::noise::fbm;
+use super::pools::{continental_column, ocean_elevation, ocean_heat_flow, oceanic_column};
+use super::state::{
+    CONTINENTAL, Counters, Group, Hotspot, OCEANIC, Plate, PlateState, Sample, pool, regime,
+};
+use crate::error::CoreError;
+use crate::params::{PlanetPreset, StartConfig};
+use crate::sphere::SplitMix64;
+
+/// A uniformly random rotation (Shoemake 1992, "Uniform random rotations").
+pub fn random_rotation(rng: &mut SplitMix64) -> DQuat {
+    let (u1, u2, u3) = (rng.next_f64(), rng.next_f64(), rng.next_f64());
+    let (a, b) = ((1.0 - u1).sqrt(), u1.sqrt());
+    let (t2, t3) = (std::f64::consts::TAU * u2, std::f64::consts::TAU * u3);
+    DQuat::from_xyzw(a * t2.sin(), a * t2.cos(), b * t3.sin(), b * t3.cos()).normalize()
+}
+
+/// Indices of the `count` smallest scores (ties by index).
+fn lowest(score: &[f64], count: usize) -> Vec<u32> {
+    let mut idx: Vec<u32> = (0..score.len() as u32).collect();
+    idx.par_sort_unstable_by(|&a, &b| {
+        score[a as usize]
+            .total_cmp(&score[b as usize])
+            .then(a.cmp(&b))
+    });
+    idx.truncate(count);
+    idx
+}
+
+/// Builds the initial plate state and its lattice geometry.
+pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Geo), CoreError> {
+    let k = env.k;
+    let start = preset.start()?;
+    let t0 = preset.t_start_years() / 1.0e6;
+    let n = preset.resolution.l0_samples as usize;
+    let mut rng = SplitMix64::new(preset.seed ^ 0xDEE9_7143_0000_0001);
+    let lattice = arr(random_rotation(&mut rng));
+    let geo = Geo::build(n, lattice)?;
+    let pts: Vec<DVec3> = geo.points().to_vec();
+    let norm = env.norm;
+    let seed = rng.next_u64();
+
+    // Plates: noise-warped, additively weighted Voronoi cells (a few large, some small).
+    let np = k.initial_plates as usize;
+    let min_sep = 0.35 * (4.0 * std::f64::consts::PI / np as f64).sqrt();
+    let mut centres: Vec<DVec3> = Vec::with_capacity(np);
+    while centres.len() < np {
+        let c = rng.unit_vector();
+        if centres.iter().all(|d| d.angle_between(c) > min_sep) || rng.next_f64() < 0.02 {
+            centres.push(c);
+        }
+    }
+    let weights: Vec<f64> = (0..np)
+        .map(|_| k.plate_size_variety_rad * rng.next_f64().powi(2))
+        .collect();
+    let mut plate: Vec<u32> = pts
+        .par_iter()
+        .map(|&p| {
+            let warp = 0.2 * fbm(p, 2.5, 3, seed);
+            (0..np)
+                .map(|c| (c, p.angle_between(centres[c]) - weights[c] + warp))
+                .fold((0, f64::INFINITY), |a, b| if b.1 < a.1 { b } else { a })
+                .0 as u32
+        })
+        .collect();
+    connect_plates(&geo, &mut plate, |_| true);
+
+    // Continents.
+    let target = ((1.0 - preset.planet.ocean_fraction) * n as f64).round() as usize;
+    let warp = k.coast_warp_rad;
+    let mut continental = vec![false; n];
+    match start {
+        StartConfig::Supercontinent => {
+            let mut counts = vec![0usize; np];
+            for &p in &plate {
+                counts[p as usize] += 1;
+            }
+            let big = (0..np)
+                .max_by_key(|&c| (counts[c], std::cmp::Reverse(c)))
+                .unwrap_or(0);
+            let c = plate
+                .iter()
+                .zip(&pts)
+                .filter(|(p, _)| **p as usize == big)
+                .map(|(_, q)| *q)
+                .sum::<DVec3>()
+                .normalize_or(centres[big]);
+            let s2 = seed.wrapping_add(11);
+            let score: Vec<f64> = pts
+                .par_iter()
+                .map(|&p| p.angle_between(c) + warp * fbm(p, 3.0, 4, s2))
+                .collect();
+            for i in lowest(&score, target) {
+                continental[i as usize] = true;
+            }
+        }
+        StartConfig::Scattered => {
+            let m = k.scattered_continents.max(1) as usize;
+            let mut sizes: Vec<f64> = (0..m).map(|_| rng.range(0.35, 1.6).powi(2)).collect();
+            let total: f64 = sizes.iter().sum();
+            for s in &mut sizes {
+                *s = (*s / total * target as f64).round();
+            }
+            sizes.sort_by(|a, b| b.total_cmp(a));
+            let sep = 0.9 * (4.0 * std::f64::consts::PI / m as f64).sqrt();
+            let mut cs: Vec<DVec3> = Vec::new();
+            let mut tries = 0;
+            while cs.len() < m {
+                let c = rng.unit_vector();
+                tries += 1;
+                if cs.iter().all(|d| d.angle_between(c) > sep) || tries > 2000 {
+                    cs.push(c);
+                }
+            }
+            let mut taken = 0usize;
+            for (j, c) in cs.iter().enumerate() {
+                let want = if j + 1 == m {
+                    target.saturating_sub(taken)
+                } else {
+                    sizes[j] as usize
+                };
+                let sj = seed.wrapping_add(100 + j as u64);
+                let score: Vec<f64> = pts
+                    .par_iter()
+                    .enumerate()
+                    .map(|(i, &p)| {
+                        if continental[i] {
+                            f64::INFINITY
+                        } else {
+                            p.angle_between(*c) + warp * fbm(p, 3.5, 4, sj)
+                        }
+                    })
+                    .collect();
+                for i in lowest(&score, want) {
+                    if !continental[i as usize] {
+                        continental[i as usize] = true;
+                        taken += 1;
+                    }
+                }
+            }
+        }
+        StartConfig::Random => {
+            let s3 = seed.wrapping_add(7);
+            let score: Vec<f64> = pts.par_iter().map(|&p| -fbm(p, 1.6, 6, s3)).collect();
+            for i in lowest(&score, target) {
+                continental[i as usize] = true;
+            }
+        }
+    }
+
+    // Each continent rides whole on the plate most of it lies on, so plate boundaries start in
+    // the oceans (a continent straddling a boundary would be torn or forced under at once).
+    let mut blob = vec![u32::MAX; n];
+    let mut stack = Vec::new();
+    for s in 0..n {
+        if !continental[s] || blob[s] != u32::MAX {
+            continue;
+        }
+        let mut members = Vec::new();
+        blob[s] = s as u32;
+        stack.push(s as u32);
+        while let Some(v) = stack.pop() {
+            members.push(v);
+            for (u, _) in geo.edges(v) {
+                if continental[u as usize] && blob[u as usize] == u32::MAX {
+                    blob[u as usize] = s as u32;
+                    stack.push(u);
+                }
+            }
+        }
+        let mut votes = vec![0usize; np];
+        for &v in &members {
+            votes[plate[v as usize] as usize] += 1;
+        }
+        let major = (0..np)
+            .max_by_key(|&c| (votes[c], std::cmp::Reverse(c)))
+            .unwrap_or(0) as u32;
+        for &v in &members {
+            plate[v as usize] = major;
+        }
+    }
+    connect_plates(&geo, &mut plate, |_| true);
+
+    // Motions: slower for continental plates.
+    let mut plates: Vec<Plate> = Vec::with_capacity(np);
+    for (c, &centre) in centres.iter().enumerate() {
+        let members: Vec<usize> = (0..n).filter(|&i| plate[i] as usize == c).collect();
+        let centroid = members
+            .iter()
+            .map(|&i| pts[i])
+            .sum::<DVec3>()
+            .normalize_or(centre);
+        let cont = if members.is_empty() {
+            0.0
+        } else {
+            members.iter().filter(|&&i| continental[i]).count() as f64 / members.len() as f64
+        };
+        let v = rng.range(k.plate_speed_mm_yr[0], k.plate_speed_mm_yr[1])
+            * (1.0 - (1.0 - k.continental_speed_factor) * cont);
+        let omega = cap_speed(
+            random_motion(&mut rng, centroid, v, &norm),
+            &norm,
+            k.max_plate_speed_mm_yr,
+        );
+        plates.push(Plate {
+            id: c as u32,
+            alive: !members.is_empty(),
+            omega: omega.to_array(),
+            born_myr: t0,
+            died_myr: None,
+            birth_event: None,
+            parent: None,
+            lip_until_myr: f64::NEG_INFINITY,
+            lip_event: None,
+            samples: members.len() as u32,
+            centroid: centroid.to_array(),
+            continental_frac: cont,
+        });
+    }
+
+    // Oceanic ages: distance from the boundaries that diverge, at each plate's own speed.
+    let omega: Vec<DVec3> = plates.iter().map(|p| DVec3::from_array(p.omega)).collect();
+    let mut sources = Vec::new();
+    let mut any_div = vec![false; np];
+    for v in 0..n as u32 {
+        let pv = plate[v as usize];
+        for (u, _) in geo.edges(v) {
+            let pu = plate[u as usize];
+            if pu != pv {
+                let x = pts[v as usize];
+                let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
+                if rel.dot(pts[u as usize] - x) > 0.0 {
+                    sources.push((v, 0.0, pv));
+                    any_div[pv as usize] = true;
+                    break;
+                }
+            }
+        }
+    }
+    for v in 0..n as u32 {
+        let pv = plate[v as usize];
+        if !any_div[pv as usize] && geo.edges(v).any(|(u, _)| plate[u as usize] != pv) {
+            sources.push((v, 0.0, pv));
+        }
+    }
+    let (dist, _) = dijkstra(
+        &geo,
+        &sources,
+        |a, b| plate[a as usize] == plate[b as usize],
+        std::f64::consts::PI,
+    );
+
+    let (zr, zt) = (k.ridge_elevation_m, k.trench_elevation_m);
+    let s4 = seed.wrapping_add(23);
+    let samples: Vec<Sample> = (0..n)
+        .into_par_iter()
+        .map(|i| {
+            let p = pts[i];
+            let pl = plate[i] as usize;
+            let mut s = Sample::blank(plate[i]);
+            if continental[i] {
+                let f = 0.5 + 0.5 * fbm(p, 4.0, 4, s4);
+                s.kind = CONTINENTAL;
+                s.elevation_m = (k.continent_elevation_m[0]
+                    + f * (k.continent_elevation_m[1] - k.continent_elevation_m[0]))
+                    as f32;
+                s.pools = continental_column();
+                s.regime = regime::CRATON;
+                s.heat_flow_mw_m2 = 60.0;
+            } else {
+                let v = norm
+                    .speed_mm_yr(omega[pl], DVec3::from_array(plates[pl].centroid))
+                    .max(10.0);
+                let d_km = if dist[i].is_finite() {
+                    norm.km(dist[i])
+                } else {
+                    0.0
+                };
+                let age = (d_km / v).min(180.0);
+                s.kind = OCEANIC;
+                s.formed_myr = (t0 - age) as f32;
+                s.elevation_m = ocean_elevation(age, zr, zt, k.oceanic_damping_mm_yr) as f32;
+                s.pools = oceanic_column();
+                s.pools[pool::SEDIMENT] = (k.pelagic_m_per_myr * age) as f32;
+                s.heat_flow_mw_m2 = ocean_heat_flow(age) as f32;
+            }
+            s.thickness_m = s.pools.iter().sum();
+            s
+        })
+        .collect();
+
+    let hotspots: Vec<Hotspot> = (0..k.hotspots_initial)
+        .map(|id| {
+            let born = t0 - rng.range(0.0, 50.0);
+            let life = rng.range(k.hotspot_lifetime_myr[0], k.hotspot_lifetime_myr[1]);
+            Hotspot {
+                id,
+                pos: rng.unit_vector().to_array(),
+                born_myr: born,
+                dies_myr: (born + life).max(t0 + 10.0),
+                uplift_mm_yr: k.hotspot_uplift_mm_yr * rng.range(0.6, 1.4),
+                lip_event: None,
+                plates: Vec::new(),
+                track_km: 0.0,
+                closed: false,
+            }
+        })
+        .collect();
+
+    let groups: Vec<Group> = (0..np as u32)
+        .map(|p| Group {
+            plate: p,
+            rot: [0.0, 0.0, 0.0, 1.0],
+        })
+        .collect();
+    let model_area = 4.0 * std::f64::consts::PI * norm.model_km * norm.model_km;
+    let state = PlateState {
+        n: n as u32,
+        lattice,
+        samples,
+        groups,
+        plates,
+        contacts: Vec::new(),
+        hotspots,
+        ridges: Vec::new(),
+        rift_links: Vec::new(),
+        rng,
+        step: 0,
+        t_myr: t0,
+        start_myr: t0,
+        resample_step: 0,
+        resample_myr: t0,
+        a0_km2: model_area / np as f64,
+        counters: Counters {
+            hotspots: k.hotspots_initial,
+            ..Counters::default()
+        },
+    };
+    Ok((state, geo))
+}

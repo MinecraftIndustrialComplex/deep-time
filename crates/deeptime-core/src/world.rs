@@ -2,8 +2,8 @@
 //! The shared state every stage reads and writes (plan §8 `WorldState`): the simulated clock, the
 //! named fields stages exchange and keyframes are drawn from, the event log written as geology
 //! (writer 1, plan §5.5) and the site registry (§5.6). It is what a checkpoint stores, so every
-//! field serialises with postcard; stages add their own state here as they arrive (plates in
-//! P1-03, the L1 surface in P1-04, …).
+//! field serialises with postcard; stages add their own state here as they arrive (the L0 crust
+//! of the plates stage since P1-03, the L1 surface in P1-04, …).
 
 use std::collections::BTreeMap;
 
@@ -55,6 +55,8 @@ pub struct WorldState {
     /// Events emitted so far, in emission order (the order `eventsSince` cursors count).
     pub events: Vec<Event>,
     pub sites: Vec<Site>,
+    /// The plate model's L0 crust (plan §8.1), once the plates stage has started.
+    pub plates: Option<crate::plates::PlateState>,
     next_event_seq: u64,
     next_site_id: SiteId,
 }
@@ -68,6 +70,7 @@ impl WorldState {
             fields: BTreeMap::new(),
             events: Vec::new(),
             sites: Vec::new(),
+            plates: None,
             next_event_seq: 0,
             next_site_id: 0,
         }

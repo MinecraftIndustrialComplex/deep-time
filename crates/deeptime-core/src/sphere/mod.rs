@@ -28,8 +28,9 @@ use glam::DVec3;
 
 /// SplitMix64 (Steele, Lea & Flood 2014, "Fast splittable pseudorandom number generators"): the
 /// small deterministic generator behind the hull's insertion order and the tests' random points.
-/// Not for anything statistical beyond that.
-#[derive(Clone, Debug)]
+/// Not for anything statistical beyond that (the plate model's Poisson draws and initial
+/// shapes, P1-03, use it too; its state serialises into checkpoints).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SplitMix64(u64);
 
 impl SplitMix64 {
@@ -55,6 +56,18 @@ impl SplitMix64 {
     /// Uniform in [0, n) for n > 0 (Lemire's multiply-shift; the bias is below 2⁻³² for n < 2³²).
     pub fn below(&mut self, n: u64) -> u64 {
         ((u128::from(self.next_u64()) * u128::from(n)) >> 64) as u64
+    }
+
+    /// Uniform in [lo, hi).
+    pub fn range(&mut self, lo: f64, hi: f64) -> f64 {
+        lo + (hi - lo) * self.next_f64()
+    }
+
+    /// A standard normal deviate (Box–Muller).
+    pub fn normal(&mut self) -> f64 {
+        let u = self.next_f64().max(f64::MIN_POSITIVE);
+        let v = self.next_f64();
+        (-2.0 * u.ln()).sqrt() * (std::f64::consts::TAU * v).cos()
     }
 
     /// A uniformly distributed unit vector (Marsaglia 1972).
