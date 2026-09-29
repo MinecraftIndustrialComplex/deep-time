@@ -14,7 +14,7 @@
       {"field": "deeptime:evaporite", "curve": [[0, 0.15], [0.3, 1]], "note": "evaporite-derived oxidised brines (Leach et al. 2010); the floor lets seawater-evaporation brines count a little (design)"}
     ],
     "driver": [
-      {"field": "deeptime:topographic_gradient_m_km", "curve": [[0, 0], [5, 0.5], [15, 1]], "note": "uplift-driven topographic flow (Garven 1985; Bethke 1986); thresholds are design"}
+      {"field": "deeptime:topographic_gradient_m_km", "curve": [[0, 0], [1, 0.5], [4, 1]], "note": "uplift-driven topographic flow (Garven 1985; Bethke 1986): the basin-scale gradient from an orogen across its foreland, of the order of 1 km over a few hundred km (P1-17: the first thresholds, 5 and 15 m/km, picked mountain fronts, where the deposits eroded away); thresholds are design"}
     ],
     "pathway": [
       {"field": "deeptime:fault_density", "curve": [[0, 0.5], [0.4, 1]], "note": "faults and basement highs focus flow (design)"}
@@ -81,7 +81,7 @@
     "cdg_reservoir": false,
     "ore_block_policy": "ev_then_vanilla"
   },
-  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 3.0, "richness_mult": 1.0},
+  "balance": {"count_mult": 20.0, "size_mult_h": 12.0, "size_mult_v": 3.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
     "Sizing: USGS OFR 2009-1252 (Singer, Berger & Moring 2009), model CAam (carbonate-hosted, amagmatic), n = 132, Table 2 p. 9: tonnage 0.93 / 10 / 86 Mt, Zn 1.7 / 5.1 / 12 %, Pb 0.19 / 1.5 / 5.0 %, Ag 0 / 0 / 37 g/t (unreported grades counted as zero); correlations from the text p. 8; the 2 km same-deposit rule p. 2. The report has no MVT model as such: 93 of its 132 CAam deposits are labelled MVT and 93 of the 105 MVT-labelled deposits fall in CAam. presence = n_reported / 132 counted in the report's database SedZn-PbTX.txt. The MVT-only table of SIR 2010-5070-A (Table 1) is in data/usgs/mvt_zn_pb.json extra. Cu and Au (9 and 3 of 132) are left out.",

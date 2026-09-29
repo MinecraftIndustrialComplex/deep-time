@@ -29,6 +29,9 @@ pub struct Options {
     pub viewer: Option<PathBuf>,
 }
 
+/// Snapshots repeated on the relief when the preset turns the ice-sheet feedback on.
+const FEEDBACK_SNAPSHOTS: usize = 5;
+
 /// Places whose Köppen class is well known (Peel et al. 2007's map), for the printed check.
 const PLACES: [(&str, f64, f64, &str); 24] = [
     ("London", 51.5, -0.1, "Cfb"),
@@ -113,7 +116,21 @@ pub fn run(o: &Options) -> CliResult<()> {
         planet,
     };
     let mut ebm = EbmState::default();
-    let s = snapshot::compute(&inp, &mut ebm, &[]);
+    let mut s = snapshot::compute(&inp, &mut ebm, &[]);
+    // With the ice-sheet feedback on (P1-17), the stage feeds each snapshot's ice sheets to the
+    // next one's EBM; repeat the snapshot on the same relief until the ice settles, as the stage
+    // would over this many 10-Myr snapshots.
+    if p.ice_sheet_feedback > 0.0 {
+        for k in 1..=FEEDBACK_SNAPSHOTS {
+            println!(
+                "deeptime climate-dem: ice-sheet feedback {:.2}, snapshot {k}: glaciated land {:.3}",
+                p.ice_sheet_feedback,
+                s.ice.frac()
+            );
+            let sheet = s.band_sheet.clone();
+            s = snapshot::compute(&inp, &mut ebm, &sheet);
+        }
+    }
     println!(
         "deeptime climate-dem: {}x{} cells of {:.1} km, EBM {:.2} °C global, net TOA {:.3} W/m² \
          after {} years, ITCZ {:.1}..{:.1}°, glaciated land {:.3}, {:.2}s",
