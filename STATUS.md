@@ -137,8 +137,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
     sites, bodies, keyframes, the L3 tile packs) and every manifest note equal but for its timings (56 sites, same census);
     50 frames, 266.9 MiB of history, 478.8 MiB written (each frame twice: once by the surface, again after the structure
     stage added its fields), 787.8 MiB read back.
-  - 32k full 1000 Myr in memory (8 GiB cap) for a byte comparison with the 4 GiB run: started on the Mac
-    (`review/out/spill/run32k-8g`), not finished when this entry was written; compare with `review/out/spill/cmp.py`.
+  - **At scale, 32k:** the failing run under 4 GiB (91 of 100 frames on disk) vs the same run under 8 GiB (5 frames
+    spilled, by the amplifier's whole-raster reservation; its middle level then ran whole, 1 tile instead of 8): all 33
+    world-data files identical (368.7 MiB, the L3 tile packs included), the deposit census and every note equal but for
+    timings (118 sites, 7,391 events). Wall time 2,421 s (4 GiB) vs 2,534 s (8 GiB), both on the shared Mac under other
+    agents' load: no slowdown to measure; 8 GiB run: max RSS 4.76 GB, peak footprint 9.17 GB, gauge peak 8,182 MiB.
 - **Timings and memory.**
   - 16k quick 500 Myr side by side on the loaded Mac: 798 s in memory vs 795 s all on disk (noise); deposits 7.4 vs
     6.2 s; spill I/O 0.74 s writing, 0.24 s reading. Gauge peak 3,373 vs 3,106 MiB (the young/amplify stages dominate the
@@ -156,13 +159,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
     it all stayed in memory until the amplifier's whole-raster reservation, which sent 116 frames (762.5 MiB) to disk and
     ran in memory. Gauge peak 3,805 MiB, max RSS 3.38 GB. Deposits on 2000 Myr of history at `count_mult` as calibrated:
     porphyry 3, placer 10, coal 7, petroleum 1 (most drawn deposits eroded: 19 of 24 porphyries) — physics, not tuned here.
-- **Found, not mine.** `./gametest.sh` → 1 of the required tests fails, `DepositGameTests.siteApiAndProbes` ("no block
-  with d < 0.3 in body 0"), twice, deterministic; the `deposits_world_4k` world data this branch writes is byte-identical
-  to master's (22 files; `deeptime run` of both binaries), so it fails on master too. All other GameTests pass.
-- **Gates** (Mac, after merging master 455b57f): `cargo fmt --all -- --check` clean; `cargo clippy --workspace
-  --all-targets -- -D warnings` clean; `cargo test --workspace --no-fail-fast` all ok (core 211 + 2 ignored, history_cap
-  1, cli 26, format 34, …); `cargo deny check licenses bans` ok; `cargo check --target x86_64-pc-windows-msvc -p
-  deeptime-core` ok (the Windows spill-file code); `cd neoforge && ./gradlew build test` → JUnit 119/0.
+- **Gates** (Mac, after merging master 64752e6, P1-08 included): `cargo fmt --all -- --check` clean; `cargo clippy
+  --workspace --all-targets -- -D warnings` clean; `cargo test --workspace --no-fail-fast` all ok (core 215 + 2 ignored,
+  history_cap 1, cli 27, format 40, …); `./gametest.sh --server` All 48 required tests passed (before the merge
+  `siteApiAndProbes` failed on master's deposit world too; P1-08 fixed it); `cargo deny check licenses bans` ok; `cargo check --target x86_64-pc-windows-msvc -p
+  deeptime-core` ok (the Windows spill-file code); `cd neoforge && ./gradlew build test` → JUnit 125/0.
 - **Next.** P1-17 proper: re-measure the workbench's 512 MiB overhead with the flat history (the method in the
   workbench entry); make young and amplify reserve what they allocate (the 32k run passed its 4 GiB gauge cap by
   ~0.3 GiB there, unreserved); the 12 B/cell/frame history constant in `surface::estimate` holds (12.7 measured at 32k).
