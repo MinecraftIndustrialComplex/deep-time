@@ -68,7 +68,7 @@
     "cdg_scale": 0.02,
     "ore_block_policy": "none"
   },
-  "balance": {"count_mult": 3.0, "size_mult_h": 12.0, "size_mult_v": 2.0, "richness_mult": 1.0},
+  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 2.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
     "Lopatin TTI thresholds 15 (oil onset), 75 (peak), 160 (end of oil): Waples 1980, AAPG Bulletin 64:916 (abstract via OSTI; a journal fact, not USGS). USGS reports use close values: TTI 10 ≈ Ro 0.6 % for onset and TTI ≈ 160 ≈ Ro 1.3 % for thermogenic gas (PP 1698 p. 22), an oil window of TTI 10–180 (OFR 88-450-G). See crates/deeptime-core/data/usgs/petroleum.json.",

@@ -103,7 +103,8 @@
       "additionalProperties": false,
       "properties": {
         "any_of": {"type": "array", "items": {"type": "string"}, "description": "rock classes and #deeptime:rock/<group> groups"},
-        "host_bias": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}, "description": "class → weight; the Create stones as preferred hosts"}
+        "host_bias": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}, "description": "class → weight; the Create stones as preferred hosts"},
+        "full_at": {"type": "number", "exclusiveMinimum": 0, "maximum": 1, "default": 1, "description": "weighted host share of the ore window at which the host score is 1 (score = min(1, Σ w·frac / full_at)); 1 = a window of host rock, less for a stratabound host unit"}
       }
     },
     "causes": {

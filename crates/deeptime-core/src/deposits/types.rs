@@ -188,7 +188,7 @@ impl Components {
 }
 
 /// Host lithology.
-#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Hosts {
     /// Rock classes (`granodiorite`) and groups (`#deeptime:rock/carbonate`).
@@ -199,6 +199,27 @@ pub struct Hosts {
     /// asurine/dolostone → zinc); a class listed only here becomes a host with that weight.
     #[serde(default)]
     pub host_bias: BTreeMap<String, f64>,
+    /// The weighted host share of the ore window (`deeptime:host/<class>`, the top
+    /// `structure.host_window_m` of the column) at which the host scores fully: the score is
+    /// min(1, Σ w_c · frac_c / `full_at`). 1 (the default) asks for a window of host rock; a
+    /// stratabound type whose host is one unit asks for that unit's thickness (MVT: 0.05, about
+    /// 100 m of carbonate in a 2 km window).
+    #[serde(default = "one", skip_serializing_if = "is_one")]
+    pub full_at: f64,
+}
+
+fn is_one(x: &f64) -> bool {
+    *x == 1.0
+}
+
+impl Default for Hosts {
+    fn default() -> Self {
+        Hosts {
+            any_of: Vec::new(),
+            host_bias: BTreeMap::new(),
+            full_at: 1.0,
+        }
+    }
 }
 
 /// Event kinds that count as causes of each component ("Why here?").
@@ -867,6 +888,9 @@ impl DepositType {
             return Err("integration_myr must be > 0".into());
         }
         self.hosts.weights()?;
+        if !(self.hosts.full_at > 0.0 && self.hosts.full_at <= 1.0) {
+            return Err("hosts.full_at must be in (0, 1]".into());
+        }
         let s = &self.sizing;
         let ordered = |p: &Percentiles| p.p90 > 0.0 && p.p90 <= p.p50 && p.p50 <= p.p10;
         if !ordered(&s.tonnage_mt) {
@@ -1054,6 +1078,7 @@ mod tests {
             ]
             .into_iter()
             .collect(),
+            full_at: 1.0,
         };
         let w = h.weights().unwrap();
         assert_eq!(w["limestone"], 1.0);
@@ -1063,7 +1088,7 @@ mod tests {
         assert!(
             Hosts {
                 any_of: vec!["#deeptime:rock/nope".into()],
-                host_bias: BTreeMap::new()
+                ..Hosts::default()
             }
             .weights()
             .is_err()

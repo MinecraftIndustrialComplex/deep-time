@@ -14,6 +14,8 @@
 //! | favourability, limiting component, time integration | [`rules`] |
 //! | permissive tracts | [`tracts`] |
 //! | Poisson counts, metallogenic provinces | [`count`] |
+//! | the survivor formula: formation from the density of survivors | [`survival`] |
+//! | regional fields (basin brines, regional head) derived from each frame | [`regional`] |
 //! | Thomas-cluster positions, minimum separation | [`cluster`] |
 //! | lognormal tonnage, Gaussian-copula grades | [`sizing`] |
 //! | zoned bodies | [`geometry`] |
@@ -26,8 +28,12 @@
 //!
 //! The stage reads a [`fields::FieldHistory`] in two passes: pass 1 steps through every frame
 //! (one frame per `step`) folding favourability and maturity into per-cell accumulators; the last
-//! step places deposits, replays the frames at the chosen cells only (pass 2: the ledger and the
-//! supergene windows), builds bodies and sites and emits the events.
+//! step finds the permissive tracts, replays the frames at every tract cell (pass 2: each cell's
+//! favourability hazard frame by frame and its burial and erosion, from which [`survival`] gives
+//! the chance that a deposit formed there survives to the present), sets how many deposits form
+//! so that the survivors match the USGS density, places them, runs the ledger and the supergene
+//! windows at their cells, builds bodies and sites and emits the events. Every frame read gets the
+//! [`regional`] fields first.
 //!
 //! **Where the history comes from.** Two sources feed the same engine. The `deposits_synthetic`
 //! preset builds a synthetic history from a seed ([`synthetic`]; the engine's own tests and the
@@ -56,10 +62,12 @@ pub mod petroleum;
 pub mod playability;
 pub mod random;
 pub mod recorded;
+pub mod regional;
 pub mod rules;
 pub mod sites;
 pub mod sizing;
 pub mod spawn;
+pub mod survival;
 pub mod synthetic;
 pub mod tracts;
 pub mod types;
@@ -109,13 +117,32 @@ fn province_km() -> f64 {
     800.0
 }
 
+/// USGS SIR 2010-5070-A (the MVT deposit model): MVT-permissive tracts are platform carbonates
+/// "less than ~600 km inboard of Phanerozoic orogenic belts".
+fn brine_flow_km() -> f64 {
+    600.0
+}
+
+fn max_formed_per_survivor() -> f64 {
+    20.0
+}
+
 /// The preset's `deposits` section (plan §5.1 `DepositParams`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DepositParams {
-    /// Global count multiplier (§8.6 step 2; 1 = real densities).
+    /// Global count multiplier (§8.6 step 2; 1 = real densities of surviving deposits).
     #[serde(default = "one")]
     pub count_mult: f64,
+    /// At most this many deposits form per expected survivor (the survivor formula's cap,
+    /// [`survival`]): a type the planet barely preserves forms this multiple of its target and
+    /// falls short, rather than forming without bound.
+    #[serde(default = "max_formed_per_survivor")]
+    pub max_formed_per_survivor: f64,
+    /// Reach of a basin-scale groundwater flow system (km): how far basinal brines and an
+    /// orogen's head act ([`regional`]; MVT's driver).
+    #[serde(default = "brine_flow_km")]
+    pub brine_flow_km: f64,
     /// Regional specialisation (decisions file: default strong).
     #[serde(default)]
     pub province: Province,
@@ -134,6 +161,8 @@ impl Default for DepositParams {
     fn default() -> Self {
         DepositParams {
             count_mult: 1.0,
+            max_formed_per_survivor: max_formed_per_survivor(),
+            brine_flow_km: brine_flow_km(),
             province: Province::Strong,
             province_km: province_km(),
             types: Vec::new(),
@@ -204,12 +233,7 @@ impl SyntheticPreset {
                 "more than 10,000 frames",
             ));
         }
-        if !(p.deposits.count_mult >= 0.0 && p.deposits.province_km > 0.0) {
-            return Err(CoreError::preset(
-                "$.deposits_synthetic.deposits",
-                "count_mult ≥ 0 and province_km > 0 are required",
-            ));
-        }
+        p.deposits.check("$.deposits_synthetic.deposits")?;
         if p.keyframe_size[0] == 0 || p.keyframe_size[1] == 0 {
             return Err(CoreError::preset(
                 "$.deposits_synthetic.keyframe_size",
@@ -274,6 +298,8 @@ const INPUT_LAYERS: &[(&str, &str)] = &[
     ("deeptime:euxinic_basin", "input/euxinic_basin"),
     ("deeptime:coal_facies", "input/coal_facies"),
     ("deeptime:erosion_rate_m_myr", "input/erosion_rate_m_myr"),
+    (regional::BASIN_BRINE, "input/basin_brine"),
+    (regional::HEAD_DROP, "input/regional_head_drop_m_km"),
 ];
 
 /// What a checkpoint keeps of the stage.
@@ -348,13 +374,23 @@ impl DepositParams {
     /// Range checks and the type list, each naming its key under `path` (`$.deposits` in a planet
     /// preset).
     pub fn validate(&self, path: &str) -> Result<(), CoreError> {
-        if !(self.count_mult >= 0.0 && self.province_km > 0.0) {
+        self.check(path)?;
+        select_types(self).map(|_| ())
+    }
+
+    fn check(&self, path: &str) -> Result<(), CoreError> {
+        if !(self.count_mult >= 0.0
+            && self.province_km > 0.0
+            && self.max_formed_per_survivor >= 1.0
+            && self.brine_flow_km > 0.0)
+        {
             return Err(CoreError::preset(
                 path,
-                "count_mult ≥ 0 and province_km > 0 are required",
+                "count_mult ≥ 0, province_km > 0, max_formed_per_survivor ≥ 1 and brine_flow_km > 0 \
+                 are required",
             ));
         }
-        select_types(self).map(|_| ())
+        Ok(())
     }
 }
 
@@ -404,6 +440,19 @@ impl DepositStage {
             types,
             frames,
         ))
+    }
+
+    /// The same stage running `types` instead (tests: a type written for the test).
+    #[cfg(test)]
+    fn with_types(self, types: Vec<DepositType>) -> DepositStage {
+        DepositStage::build(
+            self.seed,
+            self.params,
+            self.scales,
+            self.source,
+            types,
+            self.frames,
+        )
     }
 
     fn build(
@@ -473,13 +522,34 @@ impl DepositStage {
         })
     }
 
-    /// Frame `k` of whichever history this stage reads.
+    /// Frame `k` of whichever history this stage reads, with the regional fields.
     fn read_frame(&mut self, k: usize, world: &WorldState) -> Result<FieldFrame, CoreError> {
-        if matches!(self.source, Source::Synthetic(_)) {
-            self.history()?.frame(k)
+        let frame = if matches!(self.source, Source::Synthetic(_)) {
+            self.history()?.frame(k)?
         } else {
-            DepositStage::recorded_of(world)?.frame(k)
-        }
+            DepositStage::recorded_of(world)?.frame(k)?
+        };
+        Ok(self.with_regional(frame))
+    }
+
+    /// The regional fields' parameters on this stage's grid.
+    fn regional(&self) -> regional::Regional {
+        regional::Regional::new(
+            &self.grid(),
+            self.scales.m_per_block_h,
+            self.params.brine_flow_km,
+        )
+    }
+
+    /// `frame` with the [`regional`] fields it can have.
+    fn with_regional(&self, mut frame: FieldFrame) -> FieldFrame {
+        regional::add(&mut frame, &self.grid(), &self.regional());
+        frame
+    }
+
+    /// Frame `k` of `hist` with the regional fields (the placement step's reads).
+    fn frame_of(&self, hist: &dyn FieldHistory, k: usize) -> Result<FieldFrame, CoreError> {
+        Ok(self.with_regional(hist.frame(k)?))
     }
 
     /// Index of the petroleum type, if loaded and enabled.
@@ -527,6 +597,9 @@ impl DepositStage {
                 let times = h.frames.iter().map(|f| (f.t_years, f.dt_years)).collect();
                 (h.names(), times)
             };
+        // The regional fields every frame gets on reading.
+        let mut names = names;
+        names.extend(regional::derivable(&names));
         self.frames = frame_times.len();
         self.state.frames = self.frames;
         let bytes = (self.types.len() as u64 * n as u64 * std::mem::size_of::<CellAcc>() as u64)
@@ -745,6 +818,96 @@ struct Candidate {
     fav: f64,
     /// Petroleum: (kitchen, charge time, migration km).
     charge: Option<(usize, f64, f64)>,
+    /// The favourability hazard of its cell, frame by frame (types that form at a frame of the
+    /// history): its formation frame is drawn ∝ this ([`survival`]).
+    hazard: Option<Vec<f32>>,
+    /// p(c) of its cell: the chance the survivor formula gave it.
+    p_survive: f64,
+}
+
+/// When a type's deposits form (what [`survival::preservation`] integrates over).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FormationKind {
+    /// At a frame drawn ∝ the cell's favourability hazard (`formation_time: peak`).
+    Hazard,
+    /// Before the history (`formation_time: cause`, inherited deposits).
+    Start,
+    /// At the trap's charge (petroleum).
+    Charge,
+}
+
+/// One type's permissive tracts, before the counts.
+struct TypeTracts {
+    ti: usize,
+    fv: Vec<f64>,
+    tracts: Vec<tracts::Tract>,
+    endow: Vec<f64>,
+    strength: Province,
+    /// Every cell of its tracts, ascending.
+    cells: Vec<u32>,
+    formation: FormationKind,
+}
+
+/// Pass 2: every tract cell's column through the history, `[i · frames + k]` for cell `cells[i]`.
+struct Columns {
+    cells: Vec<u32>,
+    frames: usize,
+    /// Whether the crust now at the cell existed in frame k.
+    alive: Vec<bool>,
+    erosion: Vec<f32>,
+    deposition: Vec<f32>,
+    water_table: Vec<f32>,
+    precip: Vec<f32>,
+    /// Where the crust now at `cells[i]` was at the end of every frame.
+    paths: Vec<Vec<u32>>,
+    /// Per [`TypeTracts`] (same order), for `FormationKind::Hazard` types: the hazard
+    /// −(Δt/τ)·ln(1 − F_t) of each of its cells, `[j · frames + k]` for its `cells[j]`.
+    hazard: Vec<Vec<f32>>,
+}
+
+impl Columns {
+    fn index(&self, cell: u32) -> Option<usize> {
+        self.cells.binary_search(&cell).ok()
+    }
+
+    fn hazard_of(&self, plan: usize, j: usize) -> &[f32] {
+        &self.hazard[plan][j * self.frames..(j + 1) * self.frames]
+    }
+
+    /// The column's net burial per frame (m).
+    fn net(&self, i: usize, times: &[(f64, f64)]) -> survival::ColumnNet {
+        let at = i * self.frames;
+        survival::ColumnNet::new(
+            (0..self.frames)
+                .map(|k| {
+                    if self.alive[at + k] {
+                        (f64::from(self.deposition[at + k]) - f64::from(self.erosion[at + k]))
+                            * times[k].1
+                            / 1.0e6
+                    } else {
+                        0.0
+                    }
+                })
+                .collect(),
+        )
+    }
+
+    /// The column's samples, the frames its crust existed in (what the ledger and the supergene
+    /// windows read).
+    fn series(&self, i: usize, times: &[(f64, f64)]) -> Vec<ColumnSample> {
+        let at = i * self.frames;
+        (0..self.frames)
+            .filter(|k| self.alive[at + k])
+            .map(|k| ColumnSample {
+                t_years: times[k].0,
+                dt_years: times[k].1,
+                erosion_m_myr: f64::from(self.erosion[at + k]),
+                deposition_m_myr: f64::from(self.deposition[at + k]),
+                water_table_m: f64::from(self.water_table[at + k]),
+                precip_mm: f64::from(self.precip[at + k]),
+            })
+            .collect()
+    }
 }
 
 /// Per-type census numbers.
@@ -756,11 +919,24 @@ struct TypeCensus {
     tracts: usize,
     permissive_km2: f64,
     mean_f: f64,
-    /// Σ ρ·A·F·count_mult over the tracts (plan §8.6's formula).
-    expected_formula: f64,
-    /// … times each tract's province endowment (what was drawn from).
+    /// N* = count_mult · ρ/10⁵ · Σ A: the survivors the USGS density asks for (plan §8.6 as
+    /// built 2026-09-29, [`survival`]).
+    target: f64,
+    /// P̄: the share of what forms that the planet preserves (formation-weighted).
+    preservation: f64,
+    /// Deposits formed per expected survivor, 1 / max(P̄, 1 / cap).
+    formation_mult: f64,
+    /// The cap stopped formation short of the target.
+    capped: bool,
+    /// Σ λ: the deposits expected to form.
+    expected_formed: f64,
+    /// Σ λ·p̄: the survivors expected (= `target` unless capped).
     expected: f64,
+    /// Deposits formed (drawn).
     drawn: u64,
+    /// Σ p(c) over the deposits formed, at the cells they were placed in: the survivors the
+    /// model expects given where they landed (a check on the placement against the weights).
+    expected_at_positions: f64,
     placed: usize,
     dropped_separation: usize,
     sites: usize,
@@ -987,6 +1163,28 @@ impl Finish {
     }
 }
 
+/// The frame drawn ∝ `hazard` by a uniform `u` ∈ [0, 1) (`None` when the hazard is zero).
+fn draw_frame(hazard: &[f32], u: f64) -> Option<usize> {
+    let total: f64 = hazard.iter().map(|h| f64::from(*h)).sum();
+    if !(total > 0.0) {
+        return None;
+    }
+    let mut left = u * total;
+    let mut last = None;
+    for (k, h) in hazard.iter().enumerate() {
+        let h = f64::from(*h);
+        if h <= 0.0 {
+            continue;
+        }
+        if left < h {
+            return Some(k);
+        }
+        left -= h;
+        last = Some(k);
+    }
+    last
+}
+
 /// Erosion and burial at a column after `t_form` (partial overlap of the formation frame).
 fn since(series: &[ColumnSample], t_form: f64) -> (f64, f64) {
     let mut e = 0.0;
@@ -1203,8 +1401,8 @@ impl DepositStage {
             );
         }
 
-        // ---- tracts, counts, sizes, positions -----------------------------------------------
-        let mut candidates: Vec<Candidate> = Vec::new();
+        // ---- tracts ---------------------------------------------------------------------------
+        let mut plans: Vec<TypeTracts> = Vec::new();
         for (ti, t) in self.types.iter().enumerate() {
             if !self.state.enabled[ti] || t.child_only {
                 continue;
@@ -1221,21 +1419,6 @@ impl DepositStage {
             let endow = provinces.endowment(&t.id, strength);
             let tracts =
                 tracts::find_tracts(&grid, &fv, t.sizing.tract_threshold, sc.m_per_block_h);
-            let model = SizeModel::new(&t.sizing);
-            let mut rng = Rng::stream(self.seed, &format!("deposits/{}", t.id));
-            let count_mult = self.params.count_mult * t.balance.count_mult;
-            let per_camp = match strength {
-                Province::Off => 1.0,
-                Province::Weak => 2.0,
-                Province::Medium => 3.0,
-                Province::Strong => 4.0,
-            };
-            let spacing = Spacing {
-                camp_spacing: t.sizing.clustering.camp_spacing_km * 1000.0 / sc.m_per_block_h,
-                sigma: t.sizing.clustering.cluster_radius_km * 1000.0 / sc.m_per_block_h,
-                min_sep: t.sizing.min_separation_m / sc.m_per_block_h,
-                per_camp,
-            };
             f.census[ti].tracts = tracts.len();
             if let Some((cell, &fmax)) = fv
                 .iter()
@@ -1257,44 +1440,178 @@ impl DepositStage {
                         .collect::<BTreeMap<_, _>>(),
                 }));
             }
-            // The §8.6 expectation per tract, then the province endowments redistribute it:
-            // λ_i = formula_i · E_i · Σ formula / Σ formula·E, so the planet's expected count stays
-            // the formula's while rich provinces take more of it.
-            let rho = t.sizing.density_per_1e5km2.p50;
-            let formulas: Vec<f64> = tracts
-                .iter()
-                .map(|tr| count::expected(rho, tr.area_km2, tr.mean_f, count_mult, 1.0))
-                .collect();
-            let e_tracts: Vec<f64> = tracts
-                .iter()
-                .map(|tr| {
-                    tr.cells
-                        .iter()
-                        .map(|c| endow[provinces.of_cell[*c as usize] as usize])
-                        .sum::<f64>()
-                        / tr.cells.len() as f64
-                })
-                .collect();
-            let raw: f64 = formulas.iter().zip(&e_tracts).map(|(a, e)| a * e).sum();
-            let total: f64 = formulas.iter().sum();
-            let norm = if raw > 0.0 { total / raw } else { 1.0 };
-            let mut weighted_f = 0.0;
-            for (i, tract) in tracts.iter().enumerate() {
-                let formula = formulas[i];
-                let lambda = formula * e_tracts[i] * norm;
-                let k = rng.poisson(lambda);
-                weighted_f += tract.mean_f * tract.area_km2;
-                {
-                    let cen = &mut f.census[ti];
-                    cen.permissive_km2 += tract.area_km2;
-                    cen.expected_formula += formula;
-                    cen.expected += lambda;
-                    cen.drawn += k;
+            let mut cells: Vec<u32> = tracts.iter().flat_map(|tr| tr.cells.iter().copied()).collect();
+            cells.sort_unstable();
+            let formation = if Some(ti) == pet_ty {
+                FormationKind::Charge
+            } else if t.formation_time == FormationTime::Cause {
+                FormationKind::Start
+            } else {
+                FormationKind::Hazard
+            };
+            plans.push(TypeTracts {
+                ti,
+                fv,
+                tracts,
+                endow,
+                strength,
+                cells,
+                formation,
+            });
+        }
+
+        // ---- pass 2: every tract cell's column through the history -------------------------
+        let cols = self.column_pass(&plans, hist, ctx)?;
+
+        // ---- counts (the survivor formula), sizes, positions --------------------------------
+        let mut candidates: Vec<Candidate> = Vec::new();
+        for (pi, plan) in plans.iter().enumerate() {
+            let ti = plan.ti;
+            let t = &self.types[ti];
+            let (fv, endow, tracts) = (&plan.fv, &plan.endow, &plan.tracts);
+            // p(c): the chance a deposit formed in each tract cell survives to the present.
+            let model = survival::FateModel::new(t);
+            let pet_rules = t.petroleum.as_ref();
+            let p_cell: Vec<f64> = ctx.pool.install(|| {
+                plan.cells
+                    .par_iter()
+                    .enumerate()
+                    .map(|(j, &cell)| {
+                        let Some(i) = cols.index(cell) else {
+                            return 0.0;
+                        };
+                        let net = cols.net(i, &self.state.frame_times);
+                        let limit = survival::too_deep_limit_m(
+                            surface_y(f.elev[cell as usize], &sc),
+                            sc.min_y,
+                            sc.m_per_block_v,
+                        );
+                        let when = match plan.formation {
+                            FormationKind::Hazard => {
+                                survival::Formation::Hazard(cols.hazard_of(pi, j))
+                            }
+                            FormationKind::Start => survival::Formation::Start,
+                            FormationKind::Charge => {
+                                let Some(r) = pet_rules else { return 0.0 };
+                                let t_trap = f64::from(self.state.pet[cell as usize].t_trap);
+                                let Some(ch) = petroleum::charge(
+                                    &grid,
+                                    &kitchens,
+                                    cell,
+                                    t_trap,
+                                    r,
+                                    sc.m_per_block_h,
+                                ) else {
+                                    return 0.0;
+                                };
+                                let k = self.frame_at(ch.t_charge);
+                                let (te, dt) = self.state.frame_times[k];
+                                survival::Formation::At {
+                                    k,
+                                    u: if dt > 0.0 { (te - ch.t_charge) / dt } else { 0.0 },
+                                }
+                            }
+                        };
+                        survival::preservation(&model, &net, when, limit)
+                    })
+                    .collect()
+            });
+            let p_of = |cell: u32| {
+                plan.cells
+                    .binary_search(&cell)
+                    .map_or(0.0, |j| p_cell[j])
+            };
+            // Per tract: its endowment E_i, its formation weight φ_i = A·F̄·E and its preservation
+            // p̄_i (p averaged with the position weights F·E).
+            let mut areas = Vec::with_capacity(tracts.len());
+            let mut phis = Vec::with_capacity(tracts.len());
+            let mut pbars = Vec::with_capacity(tracts.len());
+            for tr in tracts {
+                let e = tr
+                    .cells
+                    .iter()
+                    .map(|c| endow[provinces.of_cell[*c as usize] as usize])
+                    .sum::<f64>()
+                    / tr.cells.len() as f64;
+                let (mut num, mut den, mut plain) = (0.0, 0.0, 0.0);
+                for &c in &tr.cells {
+                    let w = fv[c as usize] * endow[provinces.of_cell[c as usize] as usize];
+                    let p = p_of(c);
+                    num += w * p;
+                    den += w;
+                    plain += p;
                 }
+                pbars.push(if den > 0.0 {
+                    num / den
+                } else {
+                    plain / tr.cells.len() as f64
+                });
+                areas.push(tr.area_km2);
+                phis.push(tr.area_km2 * tr.mean_f * e);
+            }
+            let count_mult = self.params.count_mult * t.balance.count_mult;
+            let fp = survival::plan(
+                t.sizing.density_per_1e5km2.p50,
+                count_mult,
+                &areas,
+                &phis,
+                &pbars,
+                self.params.max_formed_per_survivor,
+            );
+            {
+                let cen = &mut f.census[ti];
+                cen.permissive_km2 = areas.iter().sum();
+                cen.mean_f = if cen.permissive_km2 > 0.0 {
+                    tracts.iter().map(|tr| tr.mean_f * tr.area_km2).sum::<f64>()
+                        / cen.permissive_km2
+                } else {
+                    0.0
+                };
+                cen.target = fp.target;
+                cen.preservation = fp.preservation;
+                cen.formation_mult = fp.formation_mult;
+                cen.capped = fp.capped;
+                // (+ 0.0: an empty sum is −0.0.)
+                cen.expected_formed = fp.formed.iter().sum::<f64>() + 0.0;
+                cen.expected = fp.expected_survivors;
+            }
+            if fp.capped {
+                ctx.log.push(
+                    crate::log::Level::Warn,
+                    format!(
+                        "deposits {}: the planet preserves {:.1} % of what forms; formation stops \
+                         at {:.0} per survivor, so about {:.2} of the {:.2} survivors the density \
+                         asks for are expected",
+                        t.id,
+                        100.0 * fp.preservation,
+                        fp.formation_mult,
+                        fp.expected_survivors,
+                        fp.target
+                    ),
+                );
+            }
+            let model_size = SizeModel::new(&t.sizing);
+            let mut rng = Rng::stream(self.seed, &format!("deposits/{}", t.id));
+            let per_camp = match plan.strength {
+                Province::Off => 1.0,
+                Province::Weak => 2.0,
+                Province::Medium => 3.0,
+                Province::Strong => 4.0,
+            };
+            let spacing = Spacing {
+                camp_spacing: t.sizing.clustering.camp_spacing_km * 1000.0 / sc.m_per_block_h,
+                sigma: t.sizing.clustering.cluster_radius_km * 1000.0 / sc.m_per_block_h,
+                min_sep: t.sizing.min_separation_m / sc.m_per_block_h,
+                per_camp,
+            };
+            for (i, tract) in tracts.iter().enumerate() {
+                let lambda = fp.formed[i];
+                let k = rng.poisson(lambda);
+                f.census[ti].drawn += k;
                 if k == 0 {
                     continue;
                 }
-                let sizes: Vec<SizeDraw> = (0..k).map(|_| model.draw(&mut rng)).collect();
+                let sizes: Vec<SizeDraw> = (0..k).map(|_| model_size.draw(&mut rng)).collect();
                 let radii: Vec<f64> = sizes
                     .iter()
                     .map(|s| geometry::radius_blocks(t, s.tonnage_mt * 1.0e6, &sc))
@@ -1326,6 +1643,11 @@ impl DepositStage {
                     } else {
                         None
                     };
+                    let hazard = match (plan.formation, plan.cells.binary_search(&p.cell)) {
+                        (FormationKind::Hazard, Ok(j)) => Some(cols.hazard_of(pi, j).to_vec()),
+                        _ => None,
+                    };
+                    f.census[ti].expected_at_positions += p_of(p.cell);
                     candidates.push(Candidate {
                         ty: ti,
                         point: *p,
@@ -1333,43 +1655,25 @@ impl DepositStage {
                         endowment: endow[provinces.of_cell[p.cell as usize] as usize],
                         fav: fv[p.cell as usize],
                         charge,
+                        hazard,
+                        p_survive: p_of(p.cell),
                     });
                 }
             }
-            let cen = &mut f.census[ti];
-            cen.mean_f = if cen.permissive_km2 > 0.0 {
-                weighted_f / cen.permissive_km2
-            } else {
-                0.0
-            };
         }
 
-        // ---- pass 2: the columns of the chosen cells ---------------------------------------
-        let cells: Vec<u32> = candidates
-            .iter()
-            .map(|c| c.point.cell)
-            .collect::<BTreeSet<_>>()
-            .into_iter()
-            .collect();
-        let mut series: BTreeMap<u32, Vec<ColumnSample>> =
-            cells.iter().map(|c| (*c, Vec::new())).collect();
-        // Each site's column is the crust's own: where it stood at every frame.
-        let paths = ctx.pool.install(|| trace(hist, self.frames, &cells))?;
-        for k in 0..self.frames {
-            let frame = ctx.pool.install(|| hist.frame(k))?;
-            let live: Vec<usize> = paths
-                .iter()
-                .enumerate()
-                .filter(|(_, p)| p[k] != NO_ORIGIN)
-                .map(|(i, _)| i)
-                .collect();
-            let at: Vec<u32> = live.iter().map(|&i| paths[i][k]).collect();
-            for (&i, s) in live.iter().zip(children::sample(&frame, &at)) {
-                series.get_mut(&cells[i]).expect("listed").push(s);
+        // ---- the chosen cells' columns (the ledger, the supergene windows) ---------------------
+        let mut series: BTreeMap<u32, Vec<ColumnSample>> = BTreeMap::new();
+        for cand in &candidates {
+            let cell = cand.point.cell;
+            if series.contains_key(&cell) {
+                continue;
             }
-        }
-        for (cell, path) in cells.iter().zip(paths) {
-            f.paths.insert(*cell, path);
+            let i = cols
+                .index(cell)
+                .expect("a candidate lies in a tract, whose cells were all replayed");
+            series.insert(cell, cols.series(i, &self.state.frame_times));
+            f.paths.insert(cell, cols.paths[i].clone());
         }
 
         // ---- materialise: ledger, sites, bodies, events, children -------------------------
@@ -1454,7 +1758,9 @@ impl DepositStage {
             "types": f.census,
             "sites": world.sites.len(),
             "bodies": world.bodies.len(),
-            "formula": "expected_formula = Σ_tracts ρ_p50/1e5 · A_km2 · mean_F · count_mult (plan §8.6); expected multiplies each tract by its province endowment",
+            "max_formed_per_survivor": self.params.max_formed_per_survivor,
+            "brine_flow_km": self.params.brine_flow_km,
+            "formula": "survivors: target = count_mult · ρ_p50/1e5 · Σ_tracts A_km2 (plan §8.6 as built 2026-09-29: USGS densities count survivors); formed λ_i = target · φ_i / Σ φ_j p̄_j with φ = A · mean_F · endowment and p̄ the tract's modelled preservation, capped at max_formed_per_survivor; expected = Σ λ_i p̄_i",
         });
         world
             .notes
@@ -1463,9 +1769,10 @@ impl DepositStage {
             ctx.log.push(
                 crate::log::Level::Info,
                 format!(
-                    "deposits {}: sites={} expected_formula={:.2} expected={:.2} drawn={} tracts={} permissive_km2={:.0} mean_F={:.3} eroded={} truncated={} too_deep={} children={} guaranteed={}",
-                    tc.id, tc.sites, tc.expected_formula, tc.expected, tc.drawn, tc.tracts, tc.permissive_km2,
-                    tc.mean_f, tc.eroded, tc.truncated, tc.too_deep, tc.children, tc.guaranteed
+                    "deposits {}: sites={} target={:.2} expected={:.2} at_positions={:.2} preservation={:.3} formed_expected={:.2} drawn={} tracts={} permissive_km2={:.0} mean_F={:.3} eroded={} truncated={} too_deep={} children={} guaranteed={}{}",
+                    tc.id, tc.sites, tc.target, tc.expected, tc.expected_at_positions, tc.preservation, tc.expected_formed, tc.drawn, tc.tracts, tc.permissive_km2,
+                    tc.mean_f, tc.eroded, tc.truncated, tc.too_deep, tc.children, tc.guaranteed,
+                    if tc.capped { " CAPPED" } else { "" }
                 ),
             );
         }
@@ -1474,6 +1781,109 @@ impl DepositStage {
 }
 
 impl DepositStage {
+    /// Pass 2 (see the module doc): replays every frame at every tract cell, where its crust was
+    /// then, recording the column's erosion, deposition, water table and precipitation and each
+    /// hazard type's favourability hazard.
+    fn column_pass(
+        &self,
+        plans: &[TypeTracts],
+        hist: &dyn FieldHistory,
+        ctx: &StageContext<'_>,
+    ) -> Result<Columns, CoreError> {
+        let cells: Vec<u32> = plans
+            .iter()
+            .flat_map(|p| p.cells.iter().copied())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let nf = self.frames;
+        let hazard_cells: usize = plans
+            .iter()
+            .filter(|p| p.formation == FormationKind::Hazard)
+            .map(|p| p.cells.len())
+            .sum();
+        ctx.reserve(((cells.len() * (4 * 4 + 1 + 4) + hazard_cells * 4) * nf) as u64)?;
+        let paths = ctx.pool.install(|| trace(hist, nf, &cells))?;
+        let n = cells.len() * nf;
+        let mut cols = Columns {
+            frames: nf,
+            alive: vec![false; n],
+            erosion: vec![0.0; n],
+            deposition: vec![0.0; n],
+            water_table: vec![0.0; n],
+            precip: vec![0.0; n],
+            hazard: plans
+                .iter()
+                .map(|p| {
+                    if p.formation == FormationKind::Hazard {
+                        vec![0.0; p.cells.len() * nf]
+                    } else {
+                        Vec::new()
+                    }
+                })
+                .collect(),
+            paths: Vec::new(),
+            cells,
+        };
+        // Each type's cells as positions in the union.
+        let pos: Vec<Vec<usize>> = plans
+            .iter()
+            .map(|p| {
+                p.cells
+                    .iter()
+                    .map(|c| cols.index(*c).expect("in the union"))
+                    .collect()
+            })
+            .collect();
+        let rules: Vec<Option<Compiled>> = plans
+            .iter()
+            .map(|p| {
+                (p.formation == FormationKind::Hazard).then(|| Compiled::new(&self.types[p.ti]))
+            })
+            .collect();
+        for k in 0..nf {
+            let frame = ctx.pool.install(|| self.frame_of(hist, k))?;
+            let live: Vec<usize> = (0..cols.cells.len())
+                .filter(|&i| paths[i][k] != NO_ORIGIN)
+                .collect();
+            let at: Vec<u32> = live.iter().map(|&i| paths[i][k]).collect();
+            for (&i, smp) in live.iter().zip(children::sample(&frame, &at)) {
+                let o = i * nf + k;
+                cols.alive[o] = true;
+                cols.erosion[o] = smp.erosion_m_myr as f32;
+                cols.deposition[o] = smp.deposition_m_myr as f32;
+                cols.water_table[o] = smp.water_table_m as f32;
+                cols.precip[o] = smp.precip_mm as f32;
+            }
+            for (pi, r) in rules.iter().enumerate() {
+                let Some(r) = r else { continue };
+                let Some(eval) = FrameEval::new(r, &frame) else {
+                    continue;
+                };
+                let scale = frame.dt_myr() / r.tau_myr;
+                let h: Vec<f32> = ctx.pool.install(|| {
+                    pos[pi]
+                        .par_iter()
+                        .map(|&i| {
+                            let q = paths[i][k];
+                            if q == NO_ORIGIN {
+                                return 0.0;
+                            }
+                            // The same hazard pass 1 folds into the favourability.
+                            let f = eval.at(q as usize).f.min(0.999);
+                            (-(scale * (1.0 - f).ln())) as f32
+                        })
+                        .collect()
+                });
+                for (j, v) in h.into_iter().enumerate() {
+                    cols.hazard[pi][j * nf + k] = v;
+                }
+            }
+        }
+        cols.paths = paths;
+        Ok(cols)
+    }
+
     /// The frame whose interval contains year `t` (the first one ending at or after it).
     fn frame_at(&self, t: f64) -> usize {
         let times = &self.state.frame_times;
@@ -1527,10 +1937,20 @@ impl DepositStage {
         let mut rng = Rng::stream(self.seed, &format!("materialise/{}/{cell}/{x:.3}", t.id));
         let acc = self.state.acc[cand.ty].get(cell as usize).copied();
         let slack = self.state.frame_times.first().map_or(1.0e7, |(_, dt)| *dt);
-        // Formation time.
-        let mut t_form = match (cand.charge, acc) {
-            (Some((_, tc, _)), _) => tc,
-            (None, Some(a)) if a.k_best != u16::MAX => {
+        // Formation time: a charged trap at its charge; a type that forms during the history at
+        // a frame drawn ∝ its cell's favourability hazard, uniform within the frame (the
+        // distribution the survivor formula integrated over, [`survival`]).
+        let hazard_frame = cand
+            .hazard
+            .as_deref()
+            .and_then(|h| draw_frame(h, rng.uniform()));
+        let mut t_form = match (cand.charge, hazard_frame, acc) {
+            (Some((_, tc, _)), _, _) => tc,
+            (None, Some(k), _) => {
+                let (te, dt) = self.state.frame_times[k];
+                te - dt * rng.uniform()
+            }
+            (None, None, Some(a)) if a.k_best != u16::MAX => {
                 let (te, dt) = self.state.frame_times[a.k_best as usize];
                 te - dt * rng.uniform()
             }
@@ -1600,6 +2020,7 @@ impl DepositStage {
             let mut e = e
                 .param("tonnage_mt", cand.size.tonnage_mt)
                 .param("tonnage_quantile", cand.size.tonnage_q)
+                .param("p_survive", cand.p_survive)
                 .param("formation_depth_m", t.preservation.formation_depth_m)
                 .param("province_endowment", cand.endowment)
                 .magnitude(cand.size.tonnage_q as f32);
