@@ -117,13 +117,13 @@
     "l1_every_steps": 1
   },
   "surface": {
-    "k_spl": 2e-06,
+    "k_spl": 5e-07,
     "m_spl": 0.5,
     "n_spl": 1.0,
     "g_deposition": 1.0,
     "runoff_ref_m_yr": 0.5,
     "threshold_slope": 0.35,
-    "kd_land_m2_yr": 5.0,
+    "kd_land_m2_yr": 2.0,
     "kd_marine_m2_yr": 300.0,
     "wave_base_m": 100.0,
     "tidal_range_m": 2.0,
@@ -138,7 +138,7 @@
     "evaporite_m_myr": 100.0,
     "weathering_max_m_myr": 50.0,
     "weathering_decay_depth_m": 5.0,
-    "isostasy": 0.8,
+    "isostasy": 0.6,
     "isostasy_radius_km": 50.0,
     "sea_level": {
       "base_m": 0.0,
@@ -159,9 +159,9 @@
     "log_layers": 32,
     "substeps": 1,
     "frame_every_myr": 10.0,
-    "erosion_pulse_m_myr": 150.0,
-    "basin_m_myr": 40.0,
-    "event_min_area_km2": 1000.0,
+    "erosion_pulse_m_myr": 200.0,
+    "basin_m_myr": 80.0,
+    "event_min_area_km2": 3000.0,
     "transgression_frac": 0.04,
     "spl_max_iter": 6
   }

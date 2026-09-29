@@ -5,7 +5,7 @@
 //! meaning on a 4.8 km (16k quick) or 2.4 km (16k full) cell.
 //!
 //! ```json
-//! "surface": {"k_spl": 2e-6, "m_spl": 0.5, "n_spl": 1.0, "g_deposition": 1.0,
+//! "surface": {"k_spl": 5e-7, "m_spl": 0.5, "n_spl": 1.0, "g_deposition": 1.0,
 //!             "sea_level": {"base_m": 0, "cycles": [{"amplitude_m": 80, "period_myr": 250}]}}
 //! ```
 
@@ -110,8 +110,11 @@ pub struct SurfaceParams {
     pub weathering_max_m_myr: f64,
     /// Soil production decay depth H*, m.
     pub weathering_decay_depth_m: f64,
-    /// Fraction of a load change compensated isostatically (Airy, ρ_crust / ρ_mantle ≈ 0.8 on
-    /// land; the sea's water-loaded share is 0.7 of it).
+    /// Fraction of a load change compensated isostatically (the sea's water-loaded share is 0.7
+    /// of it). Airy isostasy would give ρ_crust / ρ_mantle ≈ 0.8; the default 0.6 is lower because
+    /// the plate model's uplift is already surface uplift over broad bands inboard of trenches, and
+    /// at steady state erosion = uplift / (1 − isostasy) (5× at 0.8 kept whole continents eroding
+    /// at 50–150 m/Myr in the first 100-Myr runs; 2.5× at 0.6).
     pub isostasy: f64,
     /// Radius over which loads are spread before compensation (a flexural wavelength), km.
     pub isostasy_radius_km: f64,
@@ -138,13 +141,13 @@ pub struct SurfaceParams {
 impl Default for SurfaceParams {
     fn default() -> Self {
         SurfaceParams {
-            k_spl: 2.0e-6,
+            k_spl: 5.0e-7,
             m_spl: 0.5,
             n_spl: 1.0,
             g_deposition: 1.0,
             runoff_ref_m_yr: 0.5,
             threshold_slope: 0.35,
-            kd_land_m2_yr: 5.0,
+            kd_land_m2_yr: 2.0,
             kd_marine_m2_yr: 300.0,
             wave_base_m: 100.0,
             tidal_range_m: 2.0,
@@ -159,15 +162,15 @@ impl Default for SurfaceParams {
             evaporite_m_myr: 100.0,
             weathering_max_m_myr: 50.0,
             weathering_decay_depth_m: 5.0,
-            isostasy: 0.8,
+            isostasy: 0.6,
             isostasy_radius_km: 50.0,
             sea_level: SeaLevel::default(),
             log_layers: 32,
             substeps: 1,
             frame_every_myr: 10.0,
-            erosion_pulse_m_myr: 150.0,
-            basin_m_myr: 40.0,
-            event_min_area_km2: 1000.0,
+            erosion_pulse_m_myr: 200.0,
+            basin_m_myr: 80.0,
+            event_min_area_km2: 3000.0,
             transgression_frac: 0.04,
             spl_max_iter: 6,
         }
