@@ -16,8 +16,8 @@
 //! mouth first **fills accommodation** outwards: a priority queue over sea cells from the mouth,
 //! shallowest first, raises each cell to a clinoform fill level — `fill_depth_m` below sea level
 //! at the mouth, deepening by `shelf_slope` with distance — until the load is spent. Deltas and
-//! shelves prograde from the mouths this way; the diffusion then smooths them. Mass is exact: the
-//! last cell a mouth reaches takes whatever is left.
+//! shelves prograde from the mouths this way; the diffusion then smooths them. Mass is exact: a
+//! load that finds no more room (a full closed sea) spreads evenly over the cells it reached.
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -72,6 +72,7 @@ pub struct FillScratch {
     heap: BinaryHeap<Item>,
     /// The cells the last [`fill`] raised.
     pub touched: Vec<u32>,
+    visited: Vec<u32>,
 }
 
 /// Parameters of the mouth fill.
@@ -110,6 +111,7 @@ pub fn fill(
     let stamp_id = s.generation;
     s.heap.clear();
     s.touched.clear();
+    s.visited.clear();
     s.heap.push(Item {
         z: h[mouth],
         c: mouth as u32,
@@ -119,12 +121,11 @@ pub fn fill(
     let mut left = volume;
     let mut touched = 0;
     let mut visited = 0;
-    let mut last = mouth;
     while left > 0.0 {
         let Some(it) = s.heap.pop() else { break };
         let c = it.c as usize;
-        last = c;
         visited += 1;
+        s.visited.push(c as u32);
         let level = p.sea_level - p.fill_depth_m - p.shelf_slope * f64::from(it.dist);
         if h[c] < level {
             let take = ((level - h[c]) * a).min(left);
@@ -150,11 +151,18 @@ pub fn fill(
         }
     }
     if left > 0.0 {
-        let dz = left / a;
-        h[last] += dz;
-        dep[last] += dz as f32;
-        touched += 1;
-        s.touched.push(last as u32);
+        // A closed sea is full (or the mouth ran out of cells): the rest spreads evenly over
+        // what it reached, so a load never makes a tower.
+        let cells = s.visited.len().max(1) as f64;
+        let dz = left / (cells * a);
+        for &c in &s.visited {
+            let c = c as usize;
+            h[c] += dz;
+            dep[c] += dz as f32;
+        }
+        // (A cell may now appear twice in `touched`; its users are idempotent.)
+        touched += s.visited.len();
+        s.touched.extend_from_slice(&s.visited);
     }
     touched
 }

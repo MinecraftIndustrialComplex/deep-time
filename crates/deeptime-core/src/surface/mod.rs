@@ -139,6 +139,8 @@ pub struct Totals {
     pub mass_residual_km3: f64,
     pub steps: u64,
     pub spl_iterations: u64,
+    /// Conjugate-gradient iterations of the diffusion solves.
+    pub diffusion_iterations: u64,
     pub sinks: u64,
     pub frames: u64,
 }
@@ -371,6 +373,10 @@ fn dominant(mix: &[f64; spl::FAMILIES]) -> Option<u16> {
     Some(strata_log::provenance(k, v / tot))
 }
 
+/// Regolith at least this thick is the surface rock (for erodibility, diffusivity and the
+/// `surface/class` layer), m.
+pub const REGOLITH_SHOWS_M: f32 = 10.0;
+
 fn regolith_class(cls: &Classes, kind: u8) -> u16 {
     match kind {
         weathering::SAPROLITE => cls.saprolite,
@@ -589,8 +595,11 @@ impl SurfaceStage {
                 )
             })
             .collect();
+        // The rock a cell shows and erodes: regolith only where it is thick (a few metres of soil
+        // are gone in the first thousand years of a 2-Myr step), else the log's top, else the
+        // basement.
         let surface_class = |st: &SurfaceState, c: usize| -> u16 {
-            if st.regolith_m[c] >= 1.0 {
+            if st.regolith_m[c] >= REGOLITH_SHOWS_M {
                 regolith_class(&cls, st.regolith_kind[c])
             } else if st.log.total(c) >= 0.5 {
                 st.log.top(c).map_or(basement[c], |l| l.class)
@@ -641,13 +650,11 @@ impl SurfaceStage {
         };
         let mut to_sea = 0.0;
         let mut iterations = 0u64;
+        let mut cg_iterations = 0u64;
         let mut sinks = 0u64;
         for sub in 0..subs {
             let started = Instant::now();
-            sc.kind
-                .par_iter_mut()
-                .zip(sc.h.par_iter())
-                .for_each(|(k, &z)| *k = if z <= sea { BASE } else { LAND });
+            pflood::open_sea(&d, &sc.h, sea, (n / 500).max(1), &mut sc.kind);
             sc.base_z.iter_mut().for_each(|b| *b = sea);
             sinks += pflood::flood(&d, &sc.h, &sc.base_z, &mut sc.kind, &mut sc.filled) as u64;
             self.time("pflood", started);
@@ -770,13 +777,13 @@ impl SurfaceStage {
                 );
             }
             let before = sc.h.clone();
-            diffusion::step(&d, &mut sc.h, &sc.kd, dts);
+            cg_iterations += diffusion::step(&d, &mut sc.h, &sc.kd, dts) as u64;
             #[allow(clippy::needless_range_loop)]
             for c in 0..n {
                 let dd = (sc.h[c] - before[c]) as f32;
                 if dd < 0.0 {
                     parts.eroded[c] -= dd;
-                } else if before[c] <= sea {
+                } else if sc.kind[c] == BASE {
                     parts.marine[c] += dd;
                 } else {
                     parts.fluvial[c] += dd;
@@ -818,7 +825,7 @@ impl SurfaceStage {
                     let mut kind_c = fields::KIND_NONE;
                     let mut coal_c = false;
                     let z_end = sc.h[c];
-                    let marine = z_end <= sea;
+                    let marine = sc.kind[c] == BASE && z_end <= sea;
                     let dm = net[c];
                     let setting = Setting {
                         marine,
@@ -939,6 +946,7 @@ impl SurfaceStage {
         t.mass_residual_km3 += (sum_net - carb - evap) * km3;
         t.steps += 1;
         t.spl_iterations += iterations;
+        t.diffusion_iterations += cg_iterations;
         t.sinks += sinks;
 
         let m_per_block_v = self.preset.scale.m_per_block_v;
