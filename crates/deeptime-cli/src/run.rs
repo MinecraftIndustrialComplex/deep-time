@@ -20,6 +20,7 @@ pub type CliResult<T> = Result<T, Box<dyn std::error::Error>>;
 const ADVANCE_BUDGET: Duration = Duration::from_millis(250);
 
 /// Options shared by the subcommands that run a session.
+#[derive(Clone)]
 pub struct Common {
     pub threads: usize,
     pub mem_cap: u64,

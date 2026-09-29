@@ -1,71 +1,69 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! `deeptime watch` (decisions log 2026-09-28, "How should Ben watch a simulation while it
-//! runs?"): runs a session like `deeptime run` and serves a live page of it while it runs — map,
-//! globe, layers and events as each step lands, with pause, step, rewind, speed and "follow
-//! live". Runs are started by this command, never from the browser.
+//! `deeptime watch`: the browser workbench (decisions log 2026-09-28, "How should Ben watch a
+//! simulation while it runs?" and "Should Deep Time get a browser workbench on the Mac…"; STATUS
+//! P1-20, stage 1). One process serves a page on the tailnet with
 //!
-//! How it works: the preset's keyframe cadence is set to one frame per step (`--every-myr`
-//! chooses another), so the session renders every step through the same keyframe path the
-//! in-game timelapse uses; the driving thread advances one step at a time and publishes new
-//! frames (`keyframe_info`), events (`events_since`) and progress into [`live::Live`]; the server
-//! ([`http`]) streams them to every page and encodes a frame's layer as PNG when a page first asks
-//! for it (`copy_keyframe`: the ring, else the frame's file on disk, so every step stays
-//! reachable while the run goes on). The layers are whatever the frames name, so a new stage's
-//! layers appear without a change here.
+//! - the Create World editor's controls ([`editor`]: the game's presets, field catalogue, timeline
+//!   choices and share codes) and a Run button;
+//! - the runs ([`runs`]): a queue served one at a time, each kept on disk after it ends (the
+//!   newest `--keep`) so it can be reopened, rewound and compared side by side;
+//! - a live view of each run: map, globe, layers and events as each step lands, with pause, step,
+//!   rewind, speed and "follow live".
 //!
-//! Watching changes nothing in the run: keyframes are drawn from the world between steps. The
-//! test `watch_streams_every_step_and_matches_the_batch_run` holds it to that (the watched world
+//! How a run is watched: its preset's keyframe cadence is set to one frame per step
+//! ([`live_cadence`]; `--every-myr` chooses another), so the session renders every step through the
+//! same keyframe path the in-game timelapse uses; the runner advances one step at a time and
+//! publishes new frames (`keyframe_info`), events (`events_since`) and progress into the run's
+//! [`live::Live`]; the server ([`http`]) streams them and encodes a frame's layer as PNG when a page
+//! first asks. The layers are whatever the frames name, so a new stage's layers appear without a
+//! change here.
+//!
+//! Watching changes nothing in a run: keyframes are drawn from the world between steps, and the
+//! page only chooses a new run's inputs or cancels one. The test
+//! `workbench_streams_every_step_and_matches_the_batch_run` holds it to that (the watched world
 //! equals the batch run's, and its last frame is the batch run's last keyframe pixel for pixel).
 
+mod editor;
 mod http;
 mod live;
+mod runs;
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use deeptime_core::session::{AdvanceStatus, Session, SessionState};
-use deeptime_format::Ramps;
-use deeptime_format::manifest::rfc3339_utc;
+use deeptime_core::session::{Session, SessionState};
 use serde_json::{Value, json};
 
-use crate::alloc::{self, AllocGauge};
-use crate::run::{
-    CliResult, Common, forward_log, load_preset_with, plates_line, read_text, session_options,
-    surface_line, timings_line,
-};
+use crate::run::{CliResult, Common, load_preset_with};
 
 pub use http::tailnet_or_loopback;
-use live::{FrameSize, Live};
 
-/// The watch server's default port (tools/viewer/mac-watch.sh uses it too).
+/// The workbench's default port (tools/viewer/mac-watch.sh uses it too).
 pub const DEFAULT_PORT: u16 = 8642;
+
+/// Finished runs kept by default (about 1 GB each for a 500-Myr pipeline_quick_16k run).
+pub const DEFAULT_KEEP: usize = 8;
 
 /// "A frame after every step": a keyframe cadence of one year, shorter than any step.
 const EVERY_STEP_MYR: f64 = 1.0e-6;
 
-/// Progress is published at least this often while nothing else changes.
-const PROGRESS_EVERY: Duration = Duration::from_millis(250);
-
 pub struct WatchOptions {
-    /// A built-in name, a file or a share code.
-    pub preset: String,
+    /// A run to queue at start (a built-in name, a file or a share code); the page starts others.
+    pub preset: Option<String>,
     pub start: Option<String>,
     pub length_myr: Option<f64>,
-    pub content: Option<PathBuf>,
     /// Loopback or a Tailscale address (`tailnet_or_loopback`).
     pub bind: IpAddr,
-    /// 0 = any free port (tests).
+    /// 0 = any free port.
     pub port: u16,
-    /// World data in `<work>/world`, frame images in `<work>/frames` (default: a temporary
-    /// folder).
-    pub work: Option<PathBuf>,
+    /// Where runs are kept (a folder per run).
+    pub runs: PathBuf,
+    /// Finished runs kept; older ones are deleted.
+    pub keep: usize,
     /// A frame every this many Myr instead of every step.
     pub every_myr: Option<f64>,
-    /// Also write the static viewer bundle here when the run is done.
-    pub viewer: Option<PathBuf>,
-    /// Stop serving once the run is done (default: serve until killed).
+    /// Stop once nothing runs or waits (after `preset`'s run): scripts and tests.
     pub exit_when_done: bool,
     pub common: Common,
 }
@@ -127,284 +125,85 @@ fn progress_json(s: &Session) -> Value {
     })
 }
 
-/// Cursors of what the driving thread has published.
-#[derive(Default)]
-struct Published {
-    frames: u32,
-    events: u64,
-    progress_at: Option<Instant>,
-}
-
-/// A running watch: the session, what the page sees of it, and the server.
-pub struct Watch {
-    session: Arc<Session>,
-    live: Arc<Live>,
+/// A running workbench: its runs and its server.
+pub struct Served {
+    pub wb: Arc<runs::Workbench>,
     server: http::Server,
-    ramps: Ramps,
-    work: PathBuf,
-    viewer: Option<PathBuf>,
-    title: String,
-    verbose: bool,
 }
 
-impl Watch {
-    /// Creates the session and starts serving (the run starts with [`Watch::run`]).
-    pub fn start(o: &WatchOptions) -> CliResult<Watch> {
-        if !tailnet_or_loopback(o.bind) {
-            return Err(format!(
-                "--bind {}: only loopback or a Tailscale address (100.64.0.0/10, \
-                 fd7a:115c:a1e0::/48); the page is never served on the LAN",
-                o.bind
-            )
-            .into());
-        }
-        if let Some(m) = o.every_myr
-            && !(m.is_finite() && m > 0.0)
-        {
-            return Err(format!("--every-myr {m}: must be > 0").into());
-        }
-        let preset = live_cadence(
-            &load_preset_with(&o.preset, o.start.as_deref(), o.length_myr)?,
-            o.every_myr,
-        )?;
-        let content = match &o.content {
-            Some(p) => read_text(p, "content bundle")?,
-            None => String::new(),
-        };
-        let work = o.work.clone().unwrap_or_else(|| {
-            std::env::temp_dir().join(format!("deeptime-watch-{}", std::process::id()))
-        });
-        let world = work.join("world");
-        let frames = work.join("frames");
-        // A new run: no image of an earlier run in this folder may be served for this one.
-        if let Err(e) = std::fs::remove_dir_all(&frames)
-            && e.kind() != std::io::ErrorKind::NotFound
-        {
-            return Err(e.into());
-        }
-        std::fs::create_dir_all(&frames)?;
-        let session = Arc::new(Session::create(
-            &preset,
-            &content,
-            session_options(&world, &o.common),
-            Arc::new(AllocGauge),
-        )?);
-        let p = session.preset();
-        let mut title = format!("Deep Time — live: {}", p.name());
-        if let Some(s) = &o.start {
-            title.push_str(&format!(", {s}"));
-        }
-        if let Some(l) = o.length_myr {
-            title.push_str(&format!(", {l} Myr"));
-        }
-        let run = format!(
-            "{:x}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map_or(0, |d| d.as_millis())
-        );
-        let meta = json!({
-            "title": title,
-            "preset": p.name(),
-            "preset_arg": o.preset,
-            "start": o.start,
-            "length_myr": o.length_myr,
-            "frame_every_myr": o.every_myr,
-            "stages": session.stage_names(),
-            "circumference": p.circumference(),
-            "t_start_years": p.initial_world().t_years,
-            "threads": session.threads(),
-            "version": deeptime_core::VERSION,
-            "started_utc": rfc3339_utc(SystemTime::now()),
-        });
-        let live = Arc::new(Live::new(run, meta));
-        let app = Arc::new(http::App {
-            live: Arc::clone(&live),
-            session: Arc::clone(&session),
-            frames_dir: frames,
-            page: deeptime_viewer::live_page(&title),
-        });
-        let server = http::Server::start(SocketAddr::new(o.bind, o.port), app)
-            .map_err(|e| format!("cannot serve on {}:{}: {e}", o.bind, o.port))?;
-        Ok(Watch {
-            session,
-            live,
-            server,
-            ramps: Ramps::builtin(),
-            work,
-            viewer: o.viewer.clone(),
-            title,
-            verbose: o.common.verbose,
-        })
-    }
-
+impl Served {
     pub fn addr(&self) -> SocketAddr {
         self.server.addr()
     }
 
-    /// Runs the session to the end, publishing after every step, then writes the world data (and
-    /// the static viewer if asked). A failure is shown on the page too.
-    pub fn run(&self) -> CliResult<()> {
-        let r = self.drive();
-        if let Err(e) = &r {
-            self.live
-                .set_status(json!({ "state": "failed", "message": e.to_string() }));
-        }
-        r
-    }
-
-    fn drive(&self) -> CliResult<()> {
-        let s = &*self.session;
-        let started = Instant::now();
-        let mut published = Published::default();
-        loop {
-            // A zero budget runs exactly one step.
-            let status = s.advance(Duration::ZERO);
-            forward_log(s, self.verbose);
-            self.publish(&mut published, false)?;
-            match status? {
-                AdvanceStatus::Done => break,
-                AdvanceStatus::Cancelled => return Err("the session was cancelled".into()),
-                AdvanceStatus::Running | AdvanceStatus::StageDone => {}
-            }
-        }
-        self.publish(&mut published, true)?;
-        self.live.set_status(json!({ "state": "finalizing" }));
-        let world_dir = s.out_dir().to_path_buf();
-        s.finalize_write()?;
-        forward_log(s, self.verbose);
-        let p = s.progress();
-        let mut lines = vec![format!(
-            "{} ({} stages, {} events, {} frames, peak {:.1} MiB) in {:.2}s",
-            s.preset().name(),
-            p.stage_count,
-            p.events_total,
-            p.keyframes_ready,
-            alloc::peak() as f64 / 1048576.0,
-            started.elapsed().as_secs_f64()
-        )];
-        let world = s.checkpoint()?.world;
-        lines.extend(plates_line(&world));
-        lines.extend(surface_line(&world));
-        lines.push(format!(
-            "timings {}",
-            timings_line(&s.stage_timings()?, &world)
-        ));
-        drop(world);
-        if let Some(dir) = &self.viewer {
-            deeptime_viewer::write_world_bundle(dir, &world_dir, &self.title)?;
-            lines.push(format!("viewer -> {}", dir.join("index.html").display()));
-        }
-        for l in &lines {
-            println!("deeptime watch: {l}");
-        }
-        self.live
-            .publish(Vec::new(), Vec::new(), Some(progress_json(s)));
-        self.live.set_status(json!({
-            "state": "done",
-            "lines": lines,
-            "world": world_dir.display().to_string(),
-            "seconds": started.elapsed().as_secs_f64(),
-        }));
-        Ok(())
-    }
-
-    /// New frames and events since the last call, and the progress (at most every
-    /// [`PROGRESS_EVERY`] unless something else changed or `force`).
-    fn publish(&self, p: &mut Published, force: bool) -> CliResult<()> {
-        let s = &*self.session;
-        let mut frames = Vec::new();
-        let count = s.keyframe_count();
-        while p.frames < count {
-            let mut info: Value = serde_json::from_str(&s.keyframe_info(p.frames)?)?;
-            let names: Vec<String> = info["layers"]
-                .as_array()
-                .map(|a| {
-                    a.iter()
-                        .map(|v| v.as_str().unwrap_or("").to_owned())
-                        .collect()
-                })
-                .unwrap_or_default();
-            let size = FrameSize {
-                w: info["w"].as_u64().unwrap_or(0) as u32,
-                h: info["h"].as_u64().unwrap_or(0) as u32,
-                layers: names.len(),
-            };
-            info["ramps"] = json!(
-                names
-                    .iter()
-                    .map(|n| self.ramps.for_layer(n).0)
-                    .collect::<Vec<_>>()
-            );
-            frames.push((info, size));
-            p.frames += 1;
-        }
-        // One event per call keeps each event's JSON text exactly as the session wrote it.
-        let mut events = Vec::new();
-        loop {
-            let one = s.events_since(p.events, 1);
-            let text = one
-                .strip_prefix('[')
-                .and_then(|t| t.strip_suffix(']'))
-                .ok_or_else(|| format!("events_since returned {one}"))?;
-            if text.is_empty() {
-                break;
-            }
-            events.push(text.to_owned());
-            p.events += 1;
-        }
-        let due = force
-            || !frames.is_empty()
-            || !events.is_empty()
-            || p.progress_at.is_none_or(|t| t.elapsed() >= PROGRESS_EVERY);
-        let progress = due.then(|| {
-            p.progress_at = Some(Instant::now());
-            progress_json(s)
-        });
-        self.live.publish(frames, events, progress);
-        Ok(())
-    }
-
-    /// Ends the streams and stops serving.
+    /// Stops the runner (cancelling a running run) and the server.
     pub fn stop(mut self) {
-        self.live.close();
+        self.wb.close();
         self.server.stop();
     }
+}
 
-    /// Serves until the process is killed.
-    pub fn serve(self) {
-        self.server.join();
+/// Opens the runs folder and starts serving.
+pub fn serve(o: &WatchOptions) -> CliResult<Served> {
+    if !tailnet_or_loopback(o.bind) {
+        return Err(format!(
+            "--bind {}: only loopback or a Tailscale address (100.64.0.0/10, fd7a:115c:a1e0::/48); \
+             the page is never served on the LAN",
+            o.bind
+        )
+        .into());
     }
+    if let Some(m) = o.every_myr
+        && !(m.is_finite() && m > 0.0)
+    {
+        return Err(format!("--every-myr {m}: must be > 0").into());
+    }
+    let wb = runs::Workbench::open(&o.runs, o.keep, o.common.clone(), o.every_myr)?;
+    let app = Arc::new(http::App {
+        wb: Arc::clone(&wb),
+        page: deeptime_viewer::workbench_page("Deep Time workbench"),
+    });
+    let server = http::Server::start(SocketAddr::new(o.bind, o.port), app).map_err(|e| {
+        wb.close();
+        format!("cannot serve on {}:{}: {e}", o.bind, o.port)
+    })?;
+    Ok(Served { wb, server })
 }
 
 /// `deeptime watch`.
 pub fn watch(o: &WatchOptions) -> CliResult<()> {
-    let w = Watch::start(o)?;
+    let served = serve(o)?;
     println!(
-        "deeptime watch: serving http://{}/ (run {}; world data and frame images in {})",
-        w.addr(),
-        w.live.run(),
-        w.work.display()
+        "deeptime watch: serving http://{}/ (runs in {}, the newest {} finished kept; pid {})",
+        served.addr(),
+        o.runs.display(),
+        o.keep,
+        std::process::id()
     );
-    let r = w.run();
-    match &r {
-        Ok(()) => println!(
-            "deeptime watch: run finished; {} (pid {})",
-            if o.exit_when_done {
-                "stopping".to_owned()
-            } else {
-                "still serving until stopped".to_owned()
-            },
-            std::process::id()
-        ),
-        Err(e) => eprintln!("deeptime watch: the run failed: {e}; the page keeps what it made"),
+    let mut first = None;
+    if let Some(p) = &o.preset {
+        let json = load_preset_with(p, o.start.as_deref(), o.length_myr)?;
+        let run = served
+            .wb
+            .submit(&json, None, o.common.mem_cap)
+            .map_err(|(_, m)| m)?;
+        println!("deeptime watch: queued run {}", run.id);
+        first = Some(run);
     }
-    if o.exit_when_done {
-        w.stop();
-    } else {
-        w.serve();
+    if !o.exit_when_done {
+        served.server.join();
+        return Ok(());
     }
-    r
+    served.wb.wait_idle();
+    let state = first
+        .as_ref()
+        .map(|r| r.live.summary().3)
+        .unwrap_or(Value::Null);
+    served.stop();
+    match state["state"].as_str() {
+        None | Some("done") => Ok(()),
+        Some(s) => Err(format!("the run ended {s}: {}", state["message"]).into()),
+    }
 }
 
 #[cfg(test)]
@@ -413,9 +212,10 @@ mod tests {
     use std::io::{BufRead, BufReader, Read, Write};
     use std::net::{Ipv4Addr, TcpStream};
     use std::path::Path;
+    use std::time::{Duration, Instant};
 
     use deeptime_core::checkpoint::Checkpoint;
-    use deeptime_core::session::{NoGauge, SessionOptions};
+    use deeptime_core::session::{AdvanceStatus, NoGauge, SessionOptions};
     use deeptime_core::world::WorldState;
     use deeptime_format::keyframes::{KeyframeIndex, read_keyframe};
 
@@ -434,25 +234,26 @@ mod tests {
         }
     }
 
-    fn options(preset: &Path, work: &Path, bind: IpAddr) -> WatchOptions {
+    fn options(runs: &Path, keep: usize, bind: IpAddr) -> WatchOptions {
         WatchOptions {
-            preset: preset.to_string_lossy().into_owned(),
+            preset: None,
             start: None,
             length_myr: None,
-            content: None,
             bind,
             port: 0,
-            work: Some(work.to_path_buf()),
+            runs: runs.to_path_buf(),
+            keep,
             every_myr: None,
-            viewer: None,
             exit_when_done: true,
             common: quiet(),
         }
     }
 
+    const LOCAL: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
+
     /// The coupled plates + surface pipeline at test size: 20 Myr, 10 steps, keyframes every
     /// 10 Myr (the batch run's cadence).
-    fn small_pipeline(dir: &Path) -> PathBuf {
+    fn small_pipeline() -> String {
         let json = load_preset_with(
             "pipeline_quick_16k",
             Some("scattered_continents"),
@@ -464,17 +265,34 @@ mod tests {
         v["resolution"]["l1_r"] = json!(64);
         v["keyframes"]["size"] = json!([64, 32]);
         v["keyframes"]["every_myr"] = json!(10.0);
-        let path = dir.join("small.json");
-        std::fs::write(&path, v.to_string()).unwrap();
-        path
+        v.to_string()
     }
 
-    /// One GET on a fresh connection: (status, body).
-    fn get(addr: SocketAddr, path: &str) -> (u16, Vec<u8>) {
+    fn dummy(steps: u32, sleep_ms: u32) -> String {
+        let text = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../deeptime-core/tests/presets/dummy.json"
+        ))
+        .unwrap();
+        let mut v: Value = serde_json::from_str(&text).unwrap();
+        v["dummy"]["steps"] = json!(steps);
+        v["dummy"]["sleep_ms"] = json!(sleep_ms);
+        v.to_string()
+    }
+
+    /// One request on a fresh connection: (status, body).
+    fn request(
+        addr: SocketAddr,
+        method: &str,
+        path: &str,
+        headers: &str,
+        body: &str,
+    ) -> (u16, Vec<u8>) {
         let mut s = TcpStream::connect(addr).unwrap();
         write!(
             s,
-            "GET {path} HTTP/1.1\r\nHost: t\r\nConnection: close\r\n\r\n"
+            "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n{headers}Content-Length: {}\r\n\r\n{body}",
+            body.len()
         )
         .unwrap();
         let mut all = Vec::new();
@@ -490,6 +308,88 @@ mod tests {
             assert_eq!(l.parse::<usize>().unwrap(), body.len());
         }
         (status, body)
+    }
+
+    fn get(addr: SocketAddr, path: &str) -> (u16, Vec<u8>) {
+        request(addr, "GET", path, "", "")
+    }
+
+    fn post(addr: SocketAddr, path: &str, body: &Value) -> (u16, Value) {
+        let (status, b) = request(
+            addr,
+            "POST",
+            path,
+            "Content-Type: application/json\r\n",
+            &body.to_string(),
+        );
+        (status, serde_json::from_slice(&b).unwrap_or(Value::Null))
+    }
+
+    fn get_json(addr: SocketAddr, path: &str) -> Value {
+        let (status, b) = get(addr, path);
+        assert_eq!(status, 200, "{path}");
+        serde_json::from_slice(&b).unwrap()
+    }
+
+    fn run_state(addr: SocketAddr, id: &str) -> Value {
+        get_json(addr, "/api/runs")["runs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == id)
+            .cloned()
+            .unwrap_or(Value::Null)
+    }
+
+    /// Reads a run's stream until its status is final; signals once `hello` arrived.
+    fn read_stream(
+        addr: SocketAddr,
+        id: String,
+        tx: std::sync::mpsc::Sender<()>,
+    ) -> Vec<(String, Value)> {
+        let mut s = TcpStream::connect(addr).unwrap();
+        write!(
+            s,
+            "GET /api/runs/{id}/stream HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"
+        )
+        .unwrap();
+        let mut r = BufReader::new(s);
+        let mut line = String::new();
+        r.read_line(&mut line).unwrap();
+        assert!(line.starts_with("HTTP/1.1 200"), "{line}");
+        let mut headers = String::new();
+        loop {
+            line.clear();
+            r.read_line(&mut line).unwrap();
+            if line == "\r\n" {
+                break;
+            }
+            headers.push_str(&line);
+        }
+        assert!(headers.contains("Content-Type: text/event-stream"));
+        let (mut msgs, mut event) = (Vec::new(), String::new());
+        loop {
+            line.clear();
+            if r.read_line(&mut line).unwrap() == 0 {
+                break;
+            }
+            let l = line.trim_end();
+            if let Some(e) = l.strip_prefix("event: ") {
+                event = e.to_owned();
+            } else if let Some(d) = l.strip_prefix("data: ") {
+                let v: Value = serde_json::from_str(d).unwrap();
+                if event == "hello" {
+                    tx.send(()).unwrap();
+                }
+                let done = event == "status"
+                    && ["done", "failed", "cancelled"].contains(&v["state"].as_str().unwrap_or(""));
+                msgs.push((event.clone(), v));
+                if done {
+                    break;
+                }
+            }
+        }
+        msgs
     }
 
     /// The world without its wall-clock timings (the surface's note keeps `millis`).
@@ -510,6 +410,14 @@ mod tests {
         }
         .to_bytes()
         .unwrap()
+    }
+
+    fn wait_for(what: &str, mut f: impl FnMut() -> bool) {
+        let until = Instant::now() + Duration::from_secs(60);
+        while !f() {
+            assert!(Instant::now() < until, "timed out waiting for {what}");
+            std::thread::sleep(Duration::from_millis(20));
+        }
     }
 
     #[test]
@@ -537,9 +445,8 @@ mod tests {
     #[test]
     fn never_binds_the_lan() {
         let dir = tmp("bind");
-        let preset = small_pipeline(&dir);
         for addr in ["0.0.0.0", "10.0.0.217", "::"] {
-            let err = Watch::start(&options(&preset, &dir.join("w"), addr.parse().unwrap()))
+            let err = serve(&options(&dir, 2, addr.parse().unwrap()))
                 .err()
                 .unwrap()
                 .to_string();
@@ -548,18 +455,18 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// The live stream in miniature: every step arrives as a frame while the run goes on, every
-    /// event arrives, the last frame is the batch run's last keyframe pixel for pixel, and the
-    /// watched world equals the batch world (watching changes nothing).
+    /// A run started through the API streams every step as a frame while it runs and every event;
+    /// its last frame (now read back from disk) is the batch run's last keyframe pixel for pixel,
+    /// and its world equals the batch world (watching changes nothing).
     #[test]
-    fn watch_streams_every_step_and_matches_the_batch_run() {
+    fn workbench_streams_every_step_and_matches_the_batch_run() {
         let dir = tmp("stream");
-        let preset = small_pipeline(&dir);
+        let preset = small_pipeline();
 
         // The batch run, as `deeptime run` drives it (the preset's own 10-Myr keyframes).
         let batch_dir = dir.join("batch");
         let batch = Session::create(
-            &std::fs::read_to_string(&preset).unwrap(),
+            &preset,
             "",
             SessionOptions {
                 out_dir: batch_dir.clone(),
@@ -579,65 +486,31 @@ mod tests {
         );
         let batch_last = read_keyframe(&batch_dir, index.frames.last().unwrap()).unwrap();
 
-        let w = Watch::start(&options(
-            &preset,
-            &dir.join("watch"),
-            IpAddr::V4(Ipv4Addr::LOCALHOST),
-        ))
-        .unwrap();
-        let addr = w.addr();
+        let served = serve(&options(&dir.join("runs"), 8, LOCAL)).unwrap();
+        let addr = served.addr();
+        served.wb.hold(true);
+        let (status, created) = post(
+            addr,
+            "/api/runs",
+            &json!({ "json": preset, "label": "small" }),
+        );
+        assert_eq!(status, 201, "{created}");
+        let id = created["id"].as_str().unwrap().to_owned();
         let (tx, rx) = std::sync::mpsc::channel();
-        let reader = std::thread::spawn(move || {
-            let mut s = TcpStream::connect(addr).unwrap();
-            s.write_all(b"GET /stream HTTP/1.1\r\nHost: t\r\n\r\n")
-                .unwrap();
-            let mut r = BufReader::new(s);
-            let mut line = String::new();
-            r.read_line(&mut line).unwrap();
-            assert!(line.starts_with("HTTP/1.1 200"), "{line}");
-            let mut headers = String::new();
-            loop {
-                line.clear();
-                r.read_line(&mut line).unwrap();
-                if line == "\r\n" {
-                    break;
-                }
-                headers.push_str(&line);
-            }
-            assert!(headers.contains("Content-Type: text/event-stream"));
-            let (mut msgs, mut event) = (Vec::new(), String::new());
-            loop {
-                line.clear();
-                if r.read_line(&mut line).unwrap() == 0 {
-                    break;
-                }
-                let l = line.trim_end();
-                if let Some(e) = l.strip_prefix("event: ") {
-                    event = e.to_owned();
-                } else if let Some(d) = l.strip_prefix("data: ") {
-                    let v: Value = serde_json::from_str(d).unwrap();
-                    if event == "hello" {
-                        tx.send(()).unwrap();
-                    }
-                    let done = event == "status" && v["state"] == "done";
-                    msgs.push((event.clone(), v));
-                    if done {
-                        break;
-                    }
-                }
-            }
-            msgs
-        });
+        let sid = id.clone();
+        let reader = std::thread::spawn(move || read_stream(addr, sid, tx));
         // The page is connected before the first step.
         rx.recv_timeout(Duration::from_secs(30)).unwrap();
-        w.run().unwrap();
+        served.wb.hold(false);
         let msgs = reader.join().unwrap();
+        served.wb.wait_idle();
 
         let (hello_kind, hello) = &msgs[0];
         assert_eq!(hello_kind, "hello");
         assert_eq!(hello["frames"], json!([]));
+        assert_eq!(hello["status"]["state"], "queued");
         assert_eq!(hello["meta"]["stages"], json!(["plates", "surface"]));
-        let run = hello["run"].as_str().unwrap().to_owned();
+        assert_eq!(hello["meta"]["label"], "small");
         let frames: Vec<&Value> = msgs
             .iter()
             .filter(|(k, _)| k == "frame")
@@ -678,7 +551,7 @@ mod tests {
         assert_eq!(msgs.last().unwrap().1["state"], "done");
         assert!(msgs.iter().any(|(k, _)| k == "progress"));
 
-        // The last frame, layer by layer, is the batch run's final keyframe.
+        // The last frame, layer by layer, is the batch run's final keyframe (from disk now).
         let last = frames.last().unwrap();
         assert_eq!(last["t"].as_f64().unwrap(), batch_last.t);
         let names: Vec<&str> = last["layers"]
@@ -689,7 +562,7 @@ mod tests {
             .collect();
         assert_eq!(names, batch_last.layer_names());
         for (i, (_, rgba)) in batch_last.layers.iter().enumerate() {
-            let (status, png) = get(addr, &format!("/frames/{run}/9/{i}.png"));
+            let (status, png) = get(addr, &format!("/api/runs/{id}/frames/9/{i}.png"));
             assert_eq!(status, 200);
             assert_eq!(
                 png,
@@ -698,38 +571,211 @@ mod tests {
                 names[i]
             );
         }
-        // Rewinding: the first step's frame is still there, and now cached.
-        assert_eq!(get(addr, &format!("/frames/{run}/0/0.png")).0, 200);
-        assert!(dir.join("watch/frames/kf-0-0.png").is_file());
-        assert_eq!(get(addr, &format!("/frames/{run}/10/0.png")).0, 404);
-        assert_eq!(get(addr, "/frames/other/0/0.png").0, 404);
-        let (status, page) = get(addr, "/");
-        assert_eq!(status, 200);
-        assert!(String::from_utf8(page).unwrap().contains("live.js"));
-        assert_eq!(get(addr, "/live.js").0, 200);
-        assert_eq!(get(addr, "/ramps.json").0, 200);
-        assert_eq!(get(addr, "/nothing").0, 404);
-        let (status, state) = get(addr, "/state.json");
-        assert_eq!(status, 200);
-        let state: Value = serde_json::from_slice(&state).unwrap();
+        assert_eq!(get(addr, &format!("/api/runs/{id}/frames/0/0.png")).0, 200);
+        assert!(dir.join(format!("runs/{id}/frames/kf-0-0.png")).is_file());
+        assert_eq!(get(addr, &format!("/api/runs/{id}/frames/10/0.png")).0, 404);
+        assert_eq!(get(addr, "/api/runs/nope/frames/0/0.png").0, 404);
+        let state: Value =
+            serde_json::from_slice(&get(addr, &format!("/api/runs/{id}/state.json")).1).unwrap();
         assert_eq!(state["frames"].as_array().unwrap().len(), 10);
         assert_eq!(state["status"]["state"], "done");
-        // Keep-alive: two requests on one connection.
-        let mut s = TcpStream::connect(addr).unwrap();
-        s.write_all(b"GET /ramps.json HTTP/1.1\r\nHost: t\r\n\r\nHEAD / HTTP/1.1\r\nHost: t\r\nConnection: close\r\n\r\n")
-            .unwrap();
-        let mut both = String::new();
-        s.read_to_string(&mut both).unwrap();
-        assert_eq!(both.matches("HTTP/1.1 200 OK").count(), 2);
+        let listed = run_state(addr, &id);
+        assert_eq!(listed["state"], "done");
+        assert_eq!(listed["frames"], 10);
+        assert_eq!(listed["label"], "small");
+        assert!(listed["share_code"].as_str().unwrap().starts_with("DT1."));
 
         // Watching changed nothing: the same world as the batch run.
-        let watched = w.session.checkpoint().unwrap().world;
+        let watched = served
+            .wb
+            .run(&id)
+            .unwrap()
+            .final_world
+            .lock()
+            .unwrap()
+            .take()
+            .unwrap();
         assert!(
             world_bytes(watched) == world_bytes(batch_world),
             "the watched run's world differs from the batch run's"
         );
-        assert!(dir.join("watch/world/manifest.json").is_file());
-        w.stop();
+        assert!(dir.join(format!("runs/{id}/world/manifest.json")).is_file());
+        served.stop();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The page, the editor API, the queue (one run at a time, a bounded wait, cancelling), the
+    /// POST guard, the stage-2 stubs, and runs kept across a restart and pruned.
+    #[test]
+    fn workbench_queue_editor_and_kept_runs() {
+        let dir = tmp("queue");
+        let runs = dir.join("runs");
+        let served = serve(&options(&runs, 8, LOCAL)).unwrap();
+        let addr = served.addr();
+
+        let (status, page) = get(addr, "/");
+        assert_eq!(status, 200);
+        assert!(String::from_utf8(page).unwrap().contains("workbench.js"));
+        assert_eq!(get(addr, "/workbench.js").0, 200);
+        assert_eq!(get(addr, "/ramps.json").0, 200);
+        assert_eq!(get(addr, "/nothing").0, 404);
+        let catalog = get_json(addr, "/api/catalog");
+        assert_eq!(catalog["fields"][0]["id"], "seed");
+        let (status, eff) = post(
+            addr,
+            "/api/preset",
+            &json!({ "preset": "pipeline_quick_16k", "start": "random", "length_myr": 100, "fields": { "seed": 7 } }),
+        );
+        assert_eq!(status, 200);
+        assert_eq!(eff["can_run"], true, "{eff}");
+        let (status, dec) = post(addr, "/api/decode", &json!({ "code": eff["share_code"] }));
+        assert_eq!(status, 200);
+        assert_eq!(dec["imported"]["seed"], 7);
+        assert_eq!(
+            post(addr, "/api/decode", &json!({ "code": "DT1.x" })).0,
+            400
+        );
+
+        // The POST guard.
+        let body = json!({ "json": dummy(2, 0) }).to_string();
+        assert_eq!(
+            request(
+                addr,
+                "POST",
+                "/api/runs",
+                "Content-Type: text/plain\r\n",
+                &body
+            )
+            .0,
+            415
+        );
+        assert_eq!(
+            request(
+                addr,
+                "POST",
+                "/api/runs",
+                "Content-Type: application/json\r\nOrigin: http://evil.example.com\r\n",
+                &body
+            )
+            .0,
+            403
+        );
+        let mut s = TcpStream::connect(addr).unwrap();
+        write!(
+            s,
+            "POST /api/runs HTTP/1.1\r\nHost: evil.example.com:8642\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        )
+        .unwrap();
+        let mut resp = String::new();
+        s.read_to_string(&mut resp).unwrap();
+        assert!(resp.starts_with("HTTP/1.1 403"), "{resp}");
+        assert_eq!(post(addr, "/api/runs", &json!({ "json": "{}" })).0, 400);
+        assert_eq!(
+            post(
+                addr,
+                "/api/preview",
+                &json!({ "run": "x", "box": [0, 0, 16, 16] })
+            )
+            .0,
+            501
+        );
+        assert_eq!(get(addr, "/api/inspect?run=x&x=0&z=0").0, 501);
+
+        // One at a time: with the queue held, three wait and a fourth is refused; one is
+        // cancelled before it starts.
+        served.wb.hold(true);
+        let ids: Vec<String> = (0..3)
+            .map(|k| {
+                let (status, v) = post(
+                    addr,
+                    "/api/runs",
+                    &json!({ "json": dummy(2 + k, 0), "label": format!("d{k}") }),
+                );
+                assert_eq!(status, 201, "{v}");
+                v["id"].as_str().unwrap().to_owned()
+            })
+            .collect();
+        let (status, refused) = post(addr, "/api/runs", &json!({ "json": dummy(2, 0) }));
+        assert_eq!(status, 409);
+        assert!(
+            refused["error"].as_str().unwrap().contains("one at a time"),
+            "{refused}"
+        );
+        let list = get_json(addr, "/api/runs");
+        assert_eq!(list["queue"].as_array().unwrap().len(), 3);
+        assert_eq!(run_state(addr, &ids[2])["queue_position"], 3);
+        assert_eq!(
+            post(addr, &format!("/api/runs/{}/cancel", ids[1]), &json!({})).0,
+            200
+        );
+        assert_eq!(run_state(addr, &ids[1])["state"], "cancelled");
+        served.wb.hold(false);
+        served.wb.wait_idle();
+        assert_eq!(run_state(addr, &ids[0])["state"], "done");
+        assert_eq!(run_state(addr, &ids[2])["state"], "done");
+        assert_eq!(
+            post(addr, &format!("/api/runs/{}/cancel", ids[0]), &json!({})).0,
+            409
+        );
+
+        // Cancelling the running run keeps what it made.
+        let (_, slow) = post(
+            addr,
+            "/api/runs",
+            &json!({ "json": dummy(40, 40), "label": "slow" }),
+        );
+        let slow = slow["id"].as_str().unwrap().to_owned();
+        wait_for("the slow run's first frames", || {
+            let r = run_state(addr, &slow);
+            r["state"] == "running" && r["frames"].as_u64().unwrap_or(0) >= 2
+        });
+        assert_eq!(
+            post(addr, &format!("/api/runs/{slow}/cancel"), &json!({})).0,
+            200
+        );
+        served.wb.wait_idle();
+        let r = run_state(addr, &slow);
+        assert_eq!(r["state"], "cancelled");
+        let kept_frames = r["frames"].as_u64().unwrap();
+        assert!(kept_frames >= 2 && kept_frames < 80, "{r}");
+        assert_eq!(
+            get(addr, &format!("/api/runs/{slow}/frames/1/0.png")).0,
+            200
+        );
+        served.stop();
+
+        // A restart reads every run back, with its frames and events; images come from disk.
+        let served = serve(&options(&runs, 8, LOCAL)).unwrap();
+        let addr = served.addr();
+        let list = get_json(addr, "/api/runs");
+        assert_eq!(list["runs"].as_array().unwrap().len(), 4);
+        assert_eq!(list["runs"][0]["id"], slow, "newest first");
+        let r = run_state(addr, &slow);
+        assert_eq!(
+            (r["state"].clone(), r["frames"].as_u64().unwrap()),
+            (json!("cancelled"), kept_frames)
+        );
+        let d0 = run_state(addr, &ids[0]);
+        assert_eq!(d0["state"], "done");
+        assert!(d0["events"].as_u64().unwrap() > 0);
+        assert_eq!(
+            get(addr, &format!("/api/runs/{}/frames/0/0.png", ids[2])).0,
+            200
+        );
+        served.stop();
+        // Keeping 2: the two oldest finished runs (and their folders) go.
+        let served = serve(&options(&runs, 2, LOCAL)).unwrap();
+        let list = get_json(served.addr(), "/api/runs");
+        let left: Vec<&str> = list["runs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(left, [slow.as_str(), ids[2].as_str()]);
+        assert!(!runs.join(&ids[0]).exists() && !runs.join(&ids[1]).exists());
+        served.stop();
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

@@ -1,0 +1,196 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
+<!-- Deep Time workbench (`deeptime watch`, P1-20): served by the watch server with workbench.js and ramps.json. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+  :root { --bg: #f7f7f5; --fg: #1d1d1b; --muted: #6b6b66; --panel: #ffffff; --line: #d9d9d4; --accent: #c0392b; --hl: #fff3c4; --ok: #2e8b57; --warn: #b8860b; --bad: #c0392b; --run: #1f78b4; --input: #ffffff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16171a; --fg: #e8e8e3; --muted: #9a9a94; --panel: #1f2024; --line: #33343a; --accent: #ff6b5b; --hl: #3a3420; --ok: #5fd08a; --warn: #f0c050; --bad: #ff6b5b; --run: #6cb4ee; --input: #26272c; }
+  }
+  /* The TV (?tv): always dark, larger type, no editor. */
+  :root.tv { --bg: #0e0f11; --fg: #ecece6; --muted: #9a9a94; --panel: #17181b; --line: #2c2d33; --accent: #ff6b5b; --hl: #3a3420; --ok: #5fd08a; --warn: #f0c050; --bad: #ff6b5b; --run: #6cb4ee; --input: #202125; font-size: 17px; }
+  :root.tv.idle, :root.tv.idle * { cursor: none !important; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 1em/1.4 system-ui, sans-serif; display: flex; flex-direction: column; }
+  button, select, input, textarea { font: inherit; color: inherit; }
+  input, select, textarea { background: var(--input); border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px; }
+  button { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 2px 10px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.on { outline: 2px solid var(--accent); }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 1.1em; margin: 0; }
+  #macstatus { flex: 1 1 340px; display: flex; align-items: center; gap: 10px; min-width: 240px; font-size: .85em; color: var(--muted); }
+  #bar { flex: 0 1 220px; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; min-width: 60px; }
+  #bar > div { height: 100%; width: 0; background: var(--run); transition: width .3s; }
+  #conn { font-size: .8em; white-space: nowrap; }
+  #conn::before { content: '● '; color: var(--warn); }
+  #conn.ok::before { color: var(--ok); }
+  #app { flex: 1 1 auto; display: grid; grid-template-columns: 340px minmax(0, 1fr) minmax(280px, 26%); gap: 12px; padding: 12px 16px; min-height: 0; }
+  #app.nosidebar { grid-template-columns: minmax(0, 1fr) minmax(280px, 28%); }
+  #app.nosidebar #sidebar { display: none; }
+  @media (max-width: 1100px) { #app, #app.nosidebar { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
+  .panel h2, details.panel > summary { font-size: .8em; margin: 0 0 6px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+  details.panel > summary { cursor: pointer; list-style: none; }
+  details.panel > summary::before { content: '▸ '; }
+  details.panel[open] > summary::before { content: '▾ '; }
+  .hint { color: var(--muted); font-size: .8em; }
+  .bad { color: var(--bad); }
+  /* the editor and the runs */
+  #sidebar { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; max-height: calc(100vh - 70px); }
+  .frow { display: grid; grid-template-columns: 42% 1fr; gap: 4px 8px; align-items: center; margin: 3px 0; font-size: .9em; }
+  .frow > label { color: var(--muted); overflow-wrap: anywhere; }
+  .frow .ctl { display: flex; gap: 6px; align-items: center; min-width: 0; }
+  .frow .ctl input[type=range] { flex: 1 1 auto; min-width: 40px; }
+  .frow .ctl input[type=number] { width: 7.5em; }
+  .frow.off { opacity: .55; }
+  .frow.invalid input { border-color: var(--bad); color: var(--bad); }
+  .fsec { font-size: .75em; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 10px 0 2px; border-bottom: 1px solid var(--line); }
+  #problems { margin: 6px 0; padding-left: 18px; font-size: .85em; color: var(--bad); }
+  #problems:empty { display: none; }
+  #estimate { font-size: .85em; color: var(--muted); }
+  #sharecode { width: 100%; font-family: ui-monospace, monospace; font-size: .75em; height: 3.6em; resize: vertical; }
+  .brow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+  #runlist { font-size: .85em; }
+  .run { border-bottom: 1px solid var(--line); padding: 5px 2px; }
+  .run.a { background: var(--hl); }
+  .run .top { display: flex; gap: 6px; align-items: baseline; }
+  .run .lbl { flex: 1 1 auto; font-weight: 600; overflow-wrap: anywhere; }
+  .run .st { font-size: .8em; white-space: nowrap; }
+  .run .sub { color: var(--muted); font-size: .8em; }
+  .run .acts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+  .run .acts button { font-size: .75em; padding: 0 6px; }
+  .sdot { width: .6em; height: .6em; border-radius: 50%; display: inline-block; margin-right: 4px; background: var(--muted); }
+  .sdot.running { background: var(--ok); animation: pulse 1.2s infinite; }
+  .sdot.done { background: var(--run); }
+  .sdot.failed { background: var(--bad); }
+  .sdot.cancelled, .sdot.interrupted { background: var(--warn); }
+  @keyframes pulse { 50% { opacity: .3; } }
+  /* the viewer */
+  #viewer { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  #panes { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  #panes.compare { grid-template-columns: 1fr 1fr; }
+  .pane { min-width: 0; }
+  .pane .head { display: flex; gap: 8px; align-items: baseline; font-size: .85em; margin-bottom: 3px; }
+  .pane .head .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pane .head .tag { color: var(--muted); }
+  .pane.focus .head .name { color: var(--accent); }
+  .mapbox { position: relative; width: 100%; max-width: calc((100vh - 200px) * 2); }
+  #panes.compare .mapbox { max-width: none; }
+  .map { width: 100%; aspect-ratio: 2 / 1; display: block; background: #000; border: 1px solid var(--line); cursor: crosshair; touch-action: none; }
+  .pane.focus .map { border-color: var(--accent); }
+  .clock { position: absolute; left: 10px; top: 6px; color: #fff; font-size: 1.5em; font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px #000, 0 0 8px #000; pointer-events: none; }
+  #panes.compare .clock { font-size: 1.1em; }
+  .clock small { display: block; font-size: .55em; font-weight: 400; opacity: .85; }
+  .badge { position: absolute; right: 10px; top: 8px; color: #fff; background: #555; padding: 1px 9px; border-radius: 3px; font-weight: 600; font-size: .75em; letter-spacing: .06em; pointer-events: none; }
+  .badge.live { background: #d7301f; }
+  .waiting { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #ccc; font-size: 1em; pointer-events: none; text-align: center; padding: 0 20px; }
+  #controls { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  #controls button { min-width: 2.4em; }
+  #scrub { flex: 1 1 200px; }
+  #tlabel { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .9em; }
+  #layers { display: flex; flex-wrap: wrap; gap: 4px; }
+  #layers button { font-size: .8em; padding: 2px 8px; }
+  #layers button.on { border-color: var(--accent); background: var(--hl); outline: none; }
+  #layers button kbd { color: var(--muted); font: inherit; margin-right: 4px; }
+  aside { min-width: 0; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  #globe { width: 100%; max-width: calc(100vh - 430px); min-width: 180px; aspect-ratio: 1; display: block; margin: 0 auto; cursor: grab; touch-action: none; }
+  #legendbar { width: 100%; height: 14px; display: block; border: 1px solid var(--line); }
+  #legend .ends { display: flex; justify-content: space-between; font-size: .8em; color: var(--muted); }
+  #legendnote { font-size: .75em; color: var(--muted); margin-top: 3px; }
+  #evpanel { flex: 1 1 auto; min-height: 140px; display: flex; flex-direction: column; }
+  #ticker { flex: 1 1 auto; overflow-y: auto; font-size: .85em; min-height: 0; max-height: 40vh; }
+  .row { padding: 2px 4px; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+  .row:hover { background: var(--hl); }
+  .row.new { font-weight: 600; background: var(--hl); }
+  .row .t { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 8ch; text-align: right; }
+  .dot { width: .6em; height: .6em; border-radius: 50%; display: inline-block; flex: 0 0 auto; border: 1px solid #0006; }
+  #details { max-height: 32vh; overflow-y: auto; }
+  table.kv { border-collapse: collapse; width: 100%; font-size: .85em; table-layout: fixed; }
+  table.kv td { padding: 1px 4px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+  table.kv td:first-child { color: var(--muted); width: 36%; }
+  a.ref { color: var(--accent); cursor: pointer; text-decoration: underline; }
+  pre.lines { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .75em; margin: 4px 0 0; }
+  button.x { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 2px; }
+  #stage2 .body { font-size: .85em; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Deep Time workbench</h1>
+  <div id="macstatus"><div id="bar"><div></div></div><span id="mactext">connecting…</span></div>
+  <span id="conn">connecting</span>
+  <button id="togglesidebar" title="show or hide the editor and the runs (e)">☰ editor &amp; runs</button>
+</header>
+<div id="app">
+  <nav id="sidebar">
+    <details class="panel" id="newrun" open>
+      <summary><span>New run</span><span class="hint" id="presetnote"></span></summary>
+      <div id="form"><div class="hint">Loading the editor…</div></div>
+      <ul id="problems"></ul>
+      <div id="estimate"></div>
+      <div class="brow">
+        <button class="primary" id="runbtn" disabled>Run</button>
+        <input id="label" placeholder="label (optional)" style="flex:1 1 8em; min-width: 6em">
+      </div>
+      <div class="fsec">Share code</div>
+      <textarea id="sharecode" readonly spellcheck="false" aria-label="share code of this preset"></textarea>
+      <div class="brow">
+        <button id="copycode">Copy</button>
+        <input id="importcode" placeholder="paste a code (DT1.…)" style="flex:1 1 8em; min-width: 6em" spellcheck="false">
+        <button id="importbtn">Import</button>
+      </div>
+      <div class="hint" id="importmsg"></div>
+    </details>
+    <div class="panel" id="runsbox"><h2><span>Runs</span><span class="hint" id="runscount"></span></h2><div id="runlist" class="hint">No runs yet.</div></div>
+  </nav>
+  <main id="viewer">
+    <div id="panes">
+      <div class="pane focus" id="paneA" data-pane="0">
+        <div class="head"><span class="name">A</span><span class="tag"></span></div>
+        <div class="mapbox"><canvas class="map"></canvas><div class="clock"></div><div class="badge" hidden></div><div class="waiting">No run yet: start one from the editor.</div></div>
+      </div>
+      <div class="pane" id="paneB" data-pane="1" hidden>
+        <div class="head"><span class="name">B</span><span class="tag"></span></div>
+        <div class="mapbox"><canvas class="map"></canvas><div class="clock"></div><div class="badge" hidden></div><div class="waiting">Choose a run to compare (Compare in the runs list).</div></div>
+      </div>
+    </div>
+    <div id="controls">
+      <button id="rewind" title="back to the start (Home)">⏮</button>
+      <button id="back" title="one step back (←)">◀︎</button>
+      <button id="play" title="play / pause (space)">▶︎</button>
+      <button id="fwd" title="one step forward (→)">▶︎|</button>
+      <button id="live" title="follow the run live (End)">● live</button>
+      <label class="hint">speed <select id="rate" aria-label="playback speed">
+        <option value="0.5">0.5 Myr/s</option><option value="1">1 Myr/s</option><option value="2">2 Myr/s</option>
+        <option value="5">5 Myr/s</option><option value="10" selected>10 Myr/s</option><option value="20">20 Myr/s</option>
+        <option value="50">50 Myr/s</option><option value="100">100 Myr/s</option>
+      </select></label>
+      <input type="range" id="scrub" min="0" max="0" value="0" aria-label="step">
+      <span id="tlabel"></span>
+      <button id="compare" title="two runs side by side, same layer and time (c)">⇆ compare</button>
+      <button id="boxtool" title="drag a box on a map to preview that area in 3D (stage 2)">▭ area</button>
+      <label class="hint"><input type="checkbox" id="markers" checked> events</label>
+    </div>
+    <div id="layers"></div>
+  </main>
+  <aside>
+    <div class="panel"><h2><span>Globe</span><span class="hint">drag to turn · double-click to spin</span></h2><canvas id="globe" width="480" height="480"></canvas></div>
+    <div class="panel" id="legend"><h2><span>Legend</span><span id="lname"></span></h2><canvas id="legendbar" width="256" height="14"></canvas><div class="ends"><span id="lmin"></span><span id="lunits"></span><span id="lmax"></span></div><div id="legendnote"></div></div>
+    <div class="panel" id="evpanel"><h2><span>Events up to this step</span><span id="evcount"></span></h2><div id="ticker" class="hint">No events yet.</div></div>
+    <div class="panel" id="detailpanel" hidden><h2><span>Details</span><button class="x" id="closedetails" title="close">✕</button></h2><div id="details"></div></div>
+    <div class="panel" id="stage2"><h2><span>Inspect &amp; 3D preview</span><span class="hint">stage 2</span></h2><div class="body" id="stage2body"><span class="hint">Click a map to inspect a column, or drag a box with ▭ area to preview it in 3D. Both arrive with the workbench's stage 2.</span></div></div>
+    <details class="panel" id="runinfo"><summary>Run</summary><div id="runinfobody"></div></details>
+  </aside>
+</div>
+<script src="workbench.js"></script>
+</body>
+</html>
