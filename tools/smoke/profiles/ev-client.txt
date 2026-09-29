@@ -1,0 +1,5 @@
+# The ev set plus Create: the smallest set whose client generates Excavated Variants' textures for
+# every ore and stone EV knows in the MIC pack (vanilla's and Create's, plus Deep Time's four
+# stand-ins; no other MIC mod has an EV ore or stone config). tools/client/ev-assets.sh runs it.
+@include ev
+create              UjX6dr61   # 6.0.10+mc1.21.1 (pack pin)

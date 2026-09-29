@@ -176,8 +176,26 @@ enum Cmd {
         #[arg(long)]
         world: PathBuf,
         /// x0,z0,x1,z1 (x1, z1 exclusive).
-        #[arg(long, value_parser = Area::parse)]
+        #[arg(long, value_parser = Area::parse, allow_hyphen_values = true)]
         area: Area,
+    },
+    /// Ore blocks by the rock they sit in (plan Q10): for every ore block in the area, the most
+    /// common rock beside it (hosts.rs has the rule). Prints JSON (counts and counts per host).
+    OreHosts {
+        /// The world or dimension folder (the one holding region/).
+        #[arg(long)]
+        world: PathBuf,
+        /// A second world generated from the same data (Q10: with Excavated Variants): every ore
+        /// position is counted with the block the other world has there.
+        #[arg(long)]
+        other: Option<PathBuf>,
+        /// x0,z0,x1,z1 (x1, z1 exclusive).
+        #[arg(long, value_parser = Area::parse, allow_hyphen_values = true)]
+        area: Area,
+        #[arg(long, allow_hyphen_values = true)]
+        y_from: Option<i32>,
+        #[arg(long, allow_hyphen_values = true)]
+        y_to: Option<i32>,
     },
     /// Lists region files; prints outside=<n> for files outside -C/1024 <= rx < C/1024.
     Regions {
@@ -434,6 +452,33 @@ fn run(cli: Cli) -> Result<()> {
             print_json(
                 &serde_json::json!({"area": area.to_json(), "namespaces": by_ns, "blocks": by_id}),
             )?;
+        }
+        Cmd::OreHosts {
+            world,
+            other,
+            area,
+            y_from,
+            y_to,
+        } => {
+            // One block of margin: the host rings look past the area's edge.
+            let wide = deeptime_inspect::world::Area {
+                x0: area.x0 - 2,
+                z0: area.z0 - 2,
+                x1: area.x1 + 2,
+                z1: area.z1 + 2,
+            };
+            let w = World::load_area(&world, Some(wide))?;
+            let o = other
+                .as_deref()
+                .map(|p| World::load_area(p, Some(wide)))
+                .transpose()?;
+            let y = match (y_from, y_to) {
+                (Some(a), Some(b)) => Some((a.min(b), a.max(b))),
+                (None, None) => None,
+                _ => return Err(Error::new("give both --y-from and --y-to, or neither")),
+            };
+            let pairs = deeptime_inspect::hosts::ore_hosts(&w, o.as_ref(), area, y);
+            print_json(&deeptime_inspect::hosts::to_json(area, &pairs))?;
         }
         Cmd::Regions { world, span, json } => {
             let wd = default_world_data(&world, None)?;
