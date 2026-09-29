@@ -767,12 +767,8 @@ impl Session {
         // until the bake of P1-08 exists.
         if let Some(kind) = self.preset.synth() {
             let started = Instant::now();
-            let baked = crate::synth::build(
-                kind,
-                crate::synth::Strata::Placeholder,
-                c,
-                Codec::Lz4Block,
-            )?;
+            let baked =
+                crate::synth::build(kind, crate::synth::Strata::Placeholder, c, Codec::Lz4Block)?;
             let bytes = baked.write_into(dir, &mut m)?;
             self.log.push(
                 Level::Info,
