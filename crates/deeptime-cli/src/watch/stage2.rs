@@ -71,11 +71,17 @@ impl Preview {
             let mut stdin = child.stdin.take().expect("piped");
             stdin.write_all(body)?;
         }
+        // stderr is drained on its own thread, so a runner that logs a lot never blocks on it.
+        let mut stderr = child.stderr.take().expect("piped");
+        let err_reader = std::thread::spawn(move || {
+            let mut err = String::new();
+            let _ = stderr.read_to_string(&mut err);
+            err
+        });
         let mut out = Vec::new();
         child.stdout.take().expect("piped").read_to_end(&mut out)?;
-        let mut err = String::new();
-        let _ = child.stderr.take().expect("piped").read_to_string(&mut err);
         let status = child.wait()?;
+        let err = err_reader.join().unwrap_or_default();
         let bad = |why: String| io::Error::other(format!("{}: {why}", self.script.display()));
         let nl = out.iter().position(|&b| b == b'\n').ok_or_else(|| {
             bad(format!(
