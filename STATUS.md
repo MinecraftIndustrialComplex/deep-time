@@ -417,7 +417,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **The test is stricter than the plan's:** after the first count it schedules a fluid tick on every
   water source it counted (as a changed neighbour would), so "after" proves the basin is watertight,
   not only that nothing ticked. `expected` is every open block (air or water) between each footprint
-  column's ground and its surface; `outside` is any water in a box 48 blocks past the footprint,
+  column's ground and its surface; `outside` is any water in a box 16 blocks past the footprint (48 until P1-12),
   y 84…141, that is not in those blocks. `floorCornerMaxDiff=0` ties the basin to the raster at
   noise-cell corners; `analytic` is the same count from the raster's H (informational: bilinear
   interpolation over 4-block noise cells moves the shore by a block or two).
