@@ -18,7 +18,9 @@
 //! - `GET /api/catalog` the editor's definitions; `POST /api/preset` a form state's effective
 //!   preset, share code, problems and estimate; `POST /api/decode` a share code as a form state
 //! - `GET /api/runs` the runs and the queue; `POST /api/runs` queue a run (`{"json", "label",
-//!   "cap_gib"}`); `POST /api/runs/<id>/cancel`
+//!   "cap_gib"}`: the memory cap, 0 or absent = the workbench's `--mem-cap`; a run whose estimate
+//!   is over its cap answers 400 with the reason, as `POST /api/preset` does with `can_run:
+//!   false`); `POST /api/runs/<id>/cancel`
 //! - `GET /api/runs/<id>/stream` (SSE: `hello`, then `events`, `frame`, `progress`, `status`,
 //!   `bye`; a comment line every 15 s), `/api/runs/<id>/state.json` (the `hello`),
 //!   `/api/runs/<id>/frames/<n>/<layer index>.png` (encoded on first request, cached in the run's
@@ -555,10 +557,12 @@ fn post(app: &App, req: &Request) -> Response {
             let Some(json) = body["json"].as_str() else {
                 return Response::error(400, "give the preset as \"json\"");
             };
-            let cap = body["cap_gib"]
-                .as_f64()
-                .filter(|g| g.is_finite() && *g >= 0.25)
-                .map_or(0, |g| (g * (1u64 << 30) as f64) as u64);
+            // The editor's memory cap (0 or absent = the workbench's default); a run over its cap
+            // is refused inside `submit`, the same rule as the form's answer.
+            let cap = match app.wb.catalog.cap_bytes(&body["cap_gib"]) {
+                Ok(cap) => cap,
+                Err(msg) => return Response::error(400, msg),
+            };
             match app.wb.submit(json, body["label"].as_str(), cap) {
                 Ok(run) => Response::json(201, &json!({ "id": run.id })),
                 Err((status, msg)) => Response::error(status, msg),
