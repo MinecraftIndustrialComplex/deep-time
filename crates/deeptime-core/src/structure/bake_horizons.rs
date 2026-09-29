@@ -257,6 +257,9 @@ pub fn bake_with(
     t: &Tables,
 ) -> Horizons {
     let s = &preset.scale;
+    // `scale.feature_scale.strata` thickens (or thins) every layer in blocks: the metres a block
+    // stands for, vertically, are divided by it for the strata alone (1 leaves them as they are).
+    let mv = s.m_per_block_v / s.feature_scale.strata;
     let k = p.horizons as usize;
     let n = src.grid.cells();
     let mut tops = vec![NO_TOP; n * k];
@@ -266,9 +269,9 @@ pub fn bake_with(
         .enumerate()
         .for_each_init(Vec::new, |units, (c, (tc, cc))| {
             let surface_y = src.surface_y(c, s);
-            let depth = (surface_y - f64::from(s.min_y)).max(1.0) * s.m_per_block_v + 100.0;
+            let depth = (surface_y - f64::from(s.min_y)).max(1.0) * mv + 100.0;
             columns::build(&src.cell(c), t, p, src.now_myr, depth, units);
-            bake_cell(units, surface_y, s.min_y, s.max_y, s.m_per_block_v, tc, cc);
+            bake_cell(units, surface_y, s.min_y, s.max_y, mv, tc, cc);
         });
     Horizons {
         grid: src.grid.clone(),
@@ -291,6 +294,33 @@ mod tests {
             thickness_m: th,
             source: Source::Log,
         }
+    }
+
+    /// `scale.feature_scale.strata` (the settings audit): the bake gets the metres per block
+    /// divided by it, so every layer is that many times thicker in blocks and the stack's tops
+    /// move down by the same factor; 1 is the calibrated bake.
+    #[test]
+    fn the_strata_feature_scale_thickens_every_layer() {
+        let units = [
+            unit("sandstone", 400.0),
+            unit("shale", 600.0),
+            unit("limestone", 3000.0),
+            unit("granite", 20_000.0),
+        ];
+        let bake = |mv: f64| {
+            let mut tops = vec![0i16; 4];
+            let mut classes = vec![0u8; 4];
+            bake_cell(&units, 100.0, -352, 639, mv, &mut tops, &mut classes);
+            tops
+        };
+        let base = bake(20.0);
+        // Depth below the surface (1/16 blocks) of the second top: 400 m at 20 m/block = 20 blocks.
+        assert_eq!(i32::from(base[0]) - i32::from(base[1]), 20 * 16);
+        assert_eq!(bake(20.0 / 1.0), base, "a scale of 1 changes nothing");
+        let thick = bake(20.0 / 2.0);
+        assert_eq!(i32::from(thick[0]) - i32::from(thick[1]), 40 * 16);
+        let thin = bake(20.0 / 0.5);
+        assert_eq!(i32::from(thin[0]) - i32::from(thin[1]), 10 * 16);
     }
 
     #[test]

@@ -18,7 +18,11 @@
     "min_y": -352,
     "max_y": 639,
     "sea_level_y": 63,
-    "pole_cap_deg": 75.0
+    "pole_cap_deg": 75.0,
+    "feature_scale": {
+      "deposits": 1.0,
+      "strata": 1.0
+    }
   },
   "keyframes": {
     "every_myr": 50.0,
@@ -28,7 +32,9 @@
     ]
   },
   "young": {},
-  "amplify": {},
+  "amplify": {
+    "incision_cap": 3.0
+  },
   "resolution": {
     "l0_samples": 100000,
     "l1_r": 16,
@@ -37,8 +43,11 @@
   },
   "deposits": {
     "count_mult": 1.0,
+    "size_mult": 1.0,
+    "richness_mult": 1.0,
     "province": "strong",
     "province_km": 800.0,
+    "brine_flow_km": 600.0,
     "types": [],
     "essentials": []
   },
@@ -231,5 +240,13 @@
     "ela_offset_c": 0.0,
     "glaciation_on_frac": 0.02,
     "glaciation_off_frac": 0.01
+  },
+  "structure": {
+    "pluton_rate_km2_myr": 1e-05,
+    "pluton_length_km": [
+      25.0,
+      8.0,
+      80.0
+    ]
   }
 }
