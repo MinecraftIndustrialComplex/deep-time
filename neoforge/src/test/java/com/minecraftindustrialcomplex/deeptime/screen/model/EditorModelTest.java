@@ -196,6 +196,33 @@ class EditorModelTest {
         assertTrue(m.fieldValid(g));
     }
 
+    /**
+     * The catalogue is the shared deeptime/editor_fields.json (the browser workbench reads the same
+     * file, P1-20); the seed is a whole number and lands in the preset as a JSON integer (a u64 in
+     * the core), the other numbers as doubles.
+     */
+    @Test
+    void catalogueIsTheSharedFileAndTheSeedIsAnInteger() {
+        assertEquals("seed", EditorFields.ALL.get(0).id());
+        assertTrue(EditorFields.byId("seed").integer());
+        assertFalse(EditorFields.byId("gravity").integer());
+        assertEquals(EditorFields.Section.PLANET, EditorFields.byId("seed").section());
+        assertTrue(EditorFields.byId("fantasy_fields").phase3());
+        EditorModel m = model();
+        JsonObject p = Presets.parseObject(Presets.builtin("earthlike_quick_16k").orElseThrow());
+        p.addProperty("seed", 1);
+        p.addProperty("name", "seeded");
+        assertTrue(m.importShareCode(ShareCode.encode(p.toString())).isEmpty());
+        EditorFields.Field seed = EditorFields.byId("seed");
+        assertTrue(m.available(seed));
+        assertEquals("1", m.fieldText(seed));
+        m.setFieldText(seed, "42");
+        assertTrue(m.effectivePresetJson().matches(".*\"seed\":42[,}].*"), m.effectivePresetJson());
+        m.setFieldText(seed, "4.5");
+        assertFalse(m.fieldValid(seed), "a seed is whole");
+        assertTrue(m.effectivePresetJson().matches(".*\"seed\":1[,}].*"), "an invalid seed is not used");
+    }
+
     @Test
     void shareCodeRoundTrip() {
         EditorModel a = ready();
