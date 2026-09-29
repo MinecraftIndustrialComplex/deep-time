@@ -340,7 +340,10 @@ the end of each stage.
 `schema`, `stage_names`, `next_stage`, `next_stage_name`, `mid_stage`, `t_years`, `events`, `sites`,
 `fields`); section 1 is the postcard encoding of `deeptime_core::checkpoint::Checkpoint` (the
 canonical preset, the content bundle, the pipeline, the next stage, that stage's saved state when
-taken mid-stage, and the whole `WorldState`). Postcard is not self-describing: a checkpoint is read
+taken mid-stage, and the whole `WorldState`). The next stage is always a group's lead: inside a
+group of coupled stages (plates + surface, P1-04) the saved state is the postcard `Vec<Vec<u8>>` of
+every member's state, in pipeline order. Schema 4 (P1-04) adds the surface state and the deposit
+engine's recorded field history to `WorldState`. Postcard is not self-describing: a checkpoint is read
 only by a build with the same schema number and core version, and is never part of a world's
 contract with Java.
 

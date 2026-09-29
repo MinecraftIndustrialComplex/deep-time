@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Next: P1-04 (agent, critical path), P1-11, P1-15, P1-18 (agents), then P1-05/P1-07 · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Next: P1-05 and P1-07 (critical path; P1-04 done, P1-14 wires its recorded history), P1-11, P1-15, P1-18 (agents) · Updated: 2026-09-28 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -25,7 +25,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-01 | Session, checkpoints, keyframes, event log and site formats | done | 2026-09-28 | — | Mac: cargo test -p deeptime-format 27 ok (segments + sites round-trip, two writers merge with no id collision); run --preset dummy.json → manifest.json, events/1-0.dtev, keyframes/index.json (13 events, 9 keyframes, 3 sites); test --workspace, fmt, clippy -D warnings, deny licenses bans clean; gradlew build test tests=34 failures=0 and ./gametest.sh all 14 pass (after merging master 2f81ae5) |
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
 | P1-03 | Plates and crust | done | 2026-09-28 | 0867a61 | Mac: cargo test --workspace ok (plates::/params::/preset:: 20 + 1 ignored: rift area conserved exactly, partition, ages ≥ 0, hull invariants after every resampling, byte-identical resume); 500 Myr 20k: p90 ocean age 167/169/245 Myr, 98/97/90.5 % < 250 Myr; `stage plates --preset plates_quick_16k --start scattered_continents --length-myr 500` → plates_final=13 ocean_age_p90_myr=202.3 steps=250 seconds=8.3; 100k 8.3 s (12 thr) / 23 s (1 thr), 250k 25–31 s / 72 s vs Cortial 76–106 / 330–437 s; clippy, fmt, deny clean |
-| P1-04 | Deep-time surface processes on L1 | todo | | | |
+| P1-04 | Deep-time surface processes on L1 | done | 2026-09-28 | 50dd95f | Mac: cargo test --workspace ok (core 139 incl. surface:: 20: receivers acyclic, depressions resolved, diffusion Σh conserved, SPL ramp = analytic within 1e-6 (n 1) / 1e-3 (n 2), strata-log invariants, coupled pipeline resume identical; cli 11); `stage surface --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-surface` → 250 steps 96 s (plates 22 s, surface 74 s), land_frac 0.215, mass residual −6e-4 km³ of 1.2e8 eroded, 50 frames, 70 erosion pulses / 265 basins / 3 sea events; bench 1 thread surface 137 s = 1.05 µs/cell/step vs the 131 s cost model; fastscapelib oracle hypsometry_ks=0.0209 chi_slope_ratio=1.0000 PASS; fmt, clippy -D warnings, deny clean; gradlew build test 106/0 |
 | P1-05 | Climate | todo | | | |
 | P1-06 | Young landscape, amplification and the detail layer | todo | | | |
 | P1-07 | Rock classes, column strata and metamorphism | todo | | | |
@@ -162,6 +162,154 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Next step.** After P1-08, rerun `./gametest.sh -PwithMic` and the two-phase MIC smoke above on
   the real preset (pick probe chunks from `sites near`'s `ore_chunk`); P1-17 retunes `cdg_scale`;
   Ben decides (1).
+
+### 2026-09-28 — P1-04 deep-time surface processes on L1 (agent worktree agent-a7fbbf1cc57a46cda, branch worktree-agent-a7fbbf1cc57a46cda)
+- **What.** `crates/deeptime-core/src/surface/` (mod, params, grid, advect, pflood, routing, spl,
+  diffusion, marine, carbonate, weathering, strata_log, facies, lithology, climate, fields, events,
+  oracle, tests) — the surface stage of plan §8.2's deep-time half — plus `deposits/recorded.rs`
+  (the deposit engine's recorded field history). From papers: Braun & Willett 2013 (implicit stream
+  power, stack), Yuan et al. 2019 (erosion–deposition G, iterated), Barnes et al. 2014
+  (Priority-Flood+ε with the pit queue; RichDEM not opened), Bosscher & Schlager 1992, Fu 1981
+  (Budyko). Ported from Landlab (MIT; NOTICE.md and file headers): `ExponentialWeatherer(Integrated)`,
+  `Lithology`/`LithoLayers` (the log's layer model), `ThresholdEroder` (critical slope),
+  `SimpleSubmarineDiffuser` (D(z)), `CarbonateProducer` (equations and defaults). fastscapelib
+  only as the oracle (`tools/validation/fastscape_compare.py`, venv, never vendored). New dependency:
+  `lz4_flex` in the core (already in the tree via the format crate, MIT). Checkpoint schema 3 → 4.
+- **Coupling (the design).** `Stage::coupled_to` + session *groups*: a planet preset with a
+  `surface` section builds `[plates, surface]`, and the session steps plates once, then surface once,
+  per plate step (keyframes draw the union of the group's layers; a checkpoint inside the group
+  stores every member's state; `stage_groups`/`group_of` in `session.rs`). The surface keeps
+  `h = plates/elevation_m + offset`; the offset, regolith and strata log are advected
+  semi-Lagrangianly with each cell's plate (R(−Ω·Δt), Ω stored at the end of the previous step,
+  parents' Ω for plates born in the step); crust born this step starts bare. The surface's net
+  change (`surface/feedback_m`, material `surface/material_m`) is splatted onto L0 samples with the
+  last coupling's barycentric weights at the start of the next plate step (elevation and rock pools),
+  which writes back what it applied (`surface/feedback_applied_m`) and the surface takes that off
+  its offset — so L0 and L1 never drift apart and uplift is exactly the plate model's. Pipeline
+  presets `presets/pipeline/pipeline_{quick,full}_{16k,32k}.json` = the plate presets +
+  `l1_every_steps: 1`, `continental_erosion_mm_yr: 0` (the surface erodes) + a full `surface`
+  section; a planet preset with `surface` and `l1_every_steps ≠ 1` is refused. `plates/l1.rs`
+  publishes 8 more L1 fields per step (`plates/{flags, top_pool, oxidation, convergence_mm_yr,
+  obliquity_deg, slab_age_myr, heat_flow_mw_m2, thickness_m}`).
+- **One step (2 Myr, `substeps` = 1).** Open sea = below-sea cells in a connected body ≥ W·H/500
+  cells (smaller closed basins are lakes); Priority-Flood+ε from the sea; D8 on the filled surface
+  (MFD rejected: the O(n) implicit solve needs one receiver; P1-06 draws channels at block scale);
+  runoff-weighted areas; Braun–Willett + Yuan G = 1 with Newton for n ≠ 1, lakes trap sediment to
+  their level, deposition capped by supply, critical slope 0.35 with the cut rock routed as sediment;
+  river loads fill the sea from each mouth outwards (priority by depth, to sea level − 0 m deepening
+  0.5 m/km; a full closed sea spreads the rest over the cells it reached — the first version dumped
+  it on one cell and made 160-km towers); Bosscher–Schlager carbonates (× water temperature, ×
+  e^(−clastic/20 m), capped at sea level); evaporites 100 m/Myr in restricted (ocean fraction within
+  ~150 km < 0.4) arid shallow seas and arid lakes; **2D implicit diffusion by Jacobi-PCG** (land κ
+  = 2 m²/yr × rock diffusivity, sea Landlab D(z) with D₀ 300, wave base 100 m) — the first version's
+  LOD splitting left N–S streaks on the shelves (D·Δt/Δx² ≈ 26), so LOD is now only the initial
+  guess; the residual's sum is returned so Σh is exact; then the strata log (facies rules in
+  `facies.rs`: the research's proposal + red beds, dolostone, black shale in restricted deep warm
+  water, halite/gypsum by aridity, coal in humid flat aggrading mires), regolith (Landlab integrated
+  exponential weathering, w₀ 50 m/Myr × climate; laterite/bauxite rule; buried regolith becomes a
+  palaeosol layer), local isostasy (net load × 0.6 (× 0.7 at sea), box-blurred over 50 km).
+  Erodibility/diffusivity from the surface rock (regolith only when ≥ 10 m, else the log's top, else
+  the basement from the plates' crust type/regime/orogeny/top pool), the 59-class table compiled in
+  from the P1-12 JSON (`include_str!`). Runoff: `climate/{t_mean_c,precip_mm}` if a climate stage
+  wrote them (P1-05), else a documented zonal stand-in (T = 28 − 42 sin²φ − 6.5 °C/km; belts of P;
+  orographic and continentality factors; Fu's Budyko curve). Strata log K = 32, 12 B/layer, merge of
+  same-class neighbours, cap by merging the thinnest adjacent pair; base ages, provenance = dominant
+  source family and its share (`strata_log::provenance`).
+- **Calibration (tuning runs, 100–500 Myr on 16k quick; `build/tune/*.json` variants, not
+  committed).** n = 1, m = 0.5: at K 2e-6 whole continents eroded at 50–150 m/Myr and flattened in
+  ~20 Myr; lower K only raised relief (erosion at steady state = uplift / (1 − isostasy)). Defaults
+  now **n = 2, m = 1, K = 3e-10**, isostasy 0.6, κ 2, deltas fill to sea level: land fraction 0.30 →
+  0.26 → 0.215 over 300–500 Myr instead of 0.15; orogens erode fast, cratons slowly. Continents
+  still end up domed (interior highlands up to ~3–4 km with erosion rims) — the plate model's broad
+  uplift inboard of trenches; P1-17 tunes.
+- **Deposit engine frames (P1-14's interface).** Every step adds its fields to an accumulator;
+  every 10 Myr a time-averaged frame is packed (16-bit elevation, erosion and deposition rates,
+  8-bit the rest, LZ4) into `WorldState::history` (`RecordedHistory: FieldHistory`); receivers of
+  the last routing at the end. **Published:** P1-03's `arc_magma_flux`, `magma_oxidation`,
+  `convergence_rate_km_myr`, `obliquity_deg`, `slab_age_myr`, `crust_thickness_km`,
+  `fault_density` (regime proxy), `orogenic_uplift_m_myr`, `rift_subsidence_m_myr`,
+  `heat_flow_mw_m2`, `dist_litho_step_km` (chamfer distance to craton edges), `inherited_bif` (0:
+  no pre-run crust ages); P1-04's `elevation_m`, `erosion_rate_m_myr`, `deposition_rate_m_myr`,
+  `topographic_gradient_m_km`, `shelf`, `carbonate_platform`, `evaporite`, `euxinic_basin`,
+  `coal_facies`, `source_rock_toc`, `burial_temp_c`, `reservoir_quality`, `seal`,
+  `water_table_depth_m`; stand-ins until P1-05: `precip_mm`, `t_mean_c`; clocks `oxygenated_oceans`
+  1, `land_plants` 1, `bif_acme` 0 (a Phanerozoic Earth until the preset has `planet.atmosphere`).
+  Definitions in `surface/fields.rs`. **Missing:** `trap_structure` (P1-07), `host/<class>` (P1-07).
+  The coupled test checks every built-in deposit type finds all its fields except the petroleum
+  trap's `trap_structure`. `DepositStage` still only builds a synthetic history (wiring
+  `RecordedHistory` in is P1-14's next step).
+- **Events** (`EVENTS.md`, "The surface's events"): `erosion_pulse` (≥ 200 m/Myr, ≥ 3,000 km²),
+  `basin_subsidence` (≥ 80 m/Myr, with the regime as `setting`), `marine_transgression`/`regression`
+  (zigzag of the flooded share of continental crust, ≥ 0.04), tracked across frames, written when
+  they end (`ongoing` at the end of the run), with causes (nearest orogeny/collision/subduction,
+  rift/ridge…).
+- **Measured (Mac, `tools/remote/mac.sh`, M6 Mac mini, 12 threads, shared).** `cargo test
+  --workspace` → core 139 + 1 ignored (surface:: 20: receivers acyclic and every land cell drains to
+  the sea on 5 noisy DEMs; depressions resolved (strictly lower neighbour on the filled surface);
+  land without a sea drains to one sink; diffusion Σh conserved to 1e-9 on wrapping/closed/2-wide/
+  1-wide grids with D from 0 to 1e5; **stream-power steady state on a 4 × 40 ramp equals the
+  analytic profile S_j = (U/(K A_j^m))^(1/n)** within 1e-6 (n = 1) and 1e-3 (n = 2) relative;
+  erosion–deposition + mouth fill + diffusion conserve mass to 1e-9; strata log invariants over
+  4,000 random deposits/erosions with K = 6; the coupled plates + surface pipeline (3,000 samples,
+  60 Myr): log invariants on every cell, mass residual < 1e-6 of the eroded volume, 6 frames with
+  every field, acyclic present-day receivers, a checkpoint taken inside the group and resumed on
+  another thread count gives the identical surface, log, events and history), cli 11 (new: `stage
+  plates --max-steps 3 --out plates.dtcp` then `stage surface --in plates.dtcp` finishes the group;
+  `stage surface --preset` runs it from the start), format 31, inspect 19, jni 7+7, viewer 4;
+  `cargo fmt`, `cargo clippy --workspace --all-targets -D warnings`, `cargo deny check licenses bans`
+  clean; `cd neoforge && ./gradlew build test` → BUILD SUCCESSFUL, tests=106 failures=0.
+  **Acceptance run:** `deeptime stage surface --preset pipeline_quick_16k --start scattered_continents
+  --length-myr 500 --viewer review/out/p1-surface` (L0 100k, L1 1024 × 512) → 250 steps in 96 s
+  (plates 22.3 s, surface 74.0 s: spl 29.9, diffusion 21.1 (112 CG iterations/step), fields+events
+  7.0, pflood 3.2, setup 3.1, advect 2.9, isostasy 1.7, outputs 1.3, strata 1.0, routing 0.9,
+  carbonate 0.6, marine fill 0.5), peak footprint 1.63 GB (counting allocator 1.11 GB);
+  `surface_final=250 land_frac=0.215 max_elevation_m=10048 sediment_km3=9.6e6 eroded_km3=1.20e8
+  marine_km3=1.06e8 fluvial_km3=1.1e7 lake_km3=3.1e6 carbonate_km3=6.9e5 evaporite_km3=1.4e5
+  mass_residual_km3=-6.2e-4 mean_log_layers=1.71 erosion_pulses=70 basins=265 sea_events=3
+  frames=50 history_mib=220`; 1,238 events (338 from the surface, 320 with causes). **Bench**
+  (`deeptime bench --preset pipeline_quick_16k --start scattered_continents --length-myr 500
+  --threads 12,4,1`, identical results on every thread count): total 86.6 / 111.8 / 235.1 s; plates
+  20.7 / 32.7 / 98.0 s; surface 65.9 / 79.0 / 137.0 s. **Against §8.2's cost model** (L1 0.52 M
+  cells × 250 steps × 1 µs = 131 s single-threaded, 33–44 s parallel): **137 s single-threaded
+  (1.05 µs/cell/step)**, 66 s on 12 threads (2.1×: priority-flood and the stream-power solve are
+  serial, 33 s of the 66). The plates stage costs 2.5× its P1-03 time in the pipeline (8.3 → 20.7 s)
+  because it now samples L1 every step (relink + 19 fields).
+- **Oracle** (`tools/remote/mac.sh -- 'nix shell nixpkgs#python312 -c python3
+  tools/validation/fastscape_compare.py --grid 256'`, fastscapelib 0.3.0 in a venv under
+  review/out/validation/; 256², dx 4.8 km, K 2e-6, m 0.5, n 1, U 1 mm/yr, 500 × 0.1 Myr, same
+  initial noise) → `hypsometry_ks=0.0209 chi_slope_ratio=1.0000 chi_fit_ratio=0.9997
+  area_log10_ks=0.0038`, PASS (tolerances in the script: KS ≤ 0.06 from seeds 1–5 (0.010–0.040),
+  χ ratio 0.98–1.02 (1.0000 on every seed; k_s = U/K = 500 both), area KS ≤ 0.02). From the same
+  mature surface one step agrees cell for cell (99.98–100 % identical areas, mean |Δz| 2 mm); the
+  networks diverge from the initial noise because Deep Time fills lakes with sediment at G = 0 and
+  fastscapelib does not (intended here) and the floods break ties differently. Deep Time 2.5 s vs
+  fastscapelib 3.6 s per run.
+- **What the keyframes show** (review/out/p1-surface, 11 frames × 10 layers, pulled back and looked
+  at): at −498 Myr six low green continents; by −348 Myr they carry interior highlands (tan to brown,
+  2–4 km) with erosion concentrated on escarpments and active margins, dendritic river networks
+  (drainage layer) running to every coast, and light-blue shelves prograding from the river mouths;
+  at −248 Myr a northern supercontinent with deposition strung along its margins (shelf wedges,
+  deltas, a restricted interior sea) while the regime layer shows back-arc belts inboard of trenches
+  and cratonic interiors; at 0 Myr scattered continents with snow-white peaks (≥ 4.7 km) in collision
+  and arc belts, erosion rims around domed interiors, thick sediment (≥ 2 km) on passive margins and
+  in basins beside orogens, laterite/saprolite over the tropical lowlands, andesite on arc margins,
+  shale veneers on shelves and basalt on bare ocean floor. Mass balance: 88 % of eroded rock reaches
+  the sea; the log keeps 9.6e6 km³ (the rest was subducted with its crust or cleared by new crust).
+- **Deviations from the plan.** (1) The acceptance command is `stage surface --preset
+  pipeline_quick_16k`, not `stage erosion --preset earthlike_quick_16k` (the built-ins stay P1-13's
+  placeholders until P1-08; the stage is named `surface`). (2) Interleaving is a session feature
+  (coupled groups), so `stage surface --in` takes a checkpoint whose next stage is the plates lead.
+  (3) Priority-flood and the stream-power solve are serial (plan: tiled flood, per-basin parallel
+  solve) — they are 33 s of 66 s on 12 threads; the obvious speed-up for P1-17. (4) Diffusion is 2D
+  PCG, not ADI (ADI/LOD streaks at deep-time steps). (5) Default stream power n = 2, m = 1 (not the
+  plan's implied n = 1). (6) Isostasy (not in the plan) is needed for sediment basins and orogen
+  persistence.
+- **Not done / next.** Wire `RecordedHistory` into `DepositStage` and put `deposits` after the group
+  in the pipeline presets (P1-14); `trap_structure` and host fractions (P1-07); P1-05 replaces the
+  climate stand-in by writing `climate/{t_mean_c,precip_mm}`; tuning (domed continents, event counts
+  — 265 basins in 500 Myr is many; history is 4.4 MiB per frame at 16k quick, 220 MiB per 500 Myr,
+  ~4× that at 16k full) and parallel flood/solve in P1-17. A spacesheep review page "Deep Time — P1
+  erosion" is not published (the bundle is review/out/p1-surface on the Mac and laptop).
 
 ### 2026-09-28 — P1-11 Customize editor, timelapse and staging, on the placeholder presets (agent worktree agent-a61f0e6a8e0a67dfa)
 - **Shape.** Client-only screens in `screen/` (reached only through `screen/ClientSetup`, a
