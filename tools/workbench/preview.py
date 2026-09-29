@@ -20,6 +20,8 @@ A job generates one or more boxes of a world on a headless server and exports ea
 
 Commands:
     preview.py run    [spec options] [--job ID] [--lock-held] [--install] [--keep-world]
+    preview.py refresh-jar --profile P        build the Deep Time jar and replace the profile's copy if it
+                                              differs (what every `run` does first); no server, no job
     preview.py submit [spec options]          start `run` detached; prints {"job", "dir", ...}
     preview.py status <job>                   the job's status.json
     preview.py list                           every job, newest first
@@ -50,6 +52,7 @@ import socket
 import string
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 
@@ -572,11 +575,11 @@ def refresh_deeptime_jar(job, smoke, build=build_deeptime_jar):
         msg = f"refreshed the Deep Time jar in smoke/{os.path.basename(smoke)}: {was} -> {res['name']} {res['sha256'][:12]} ({src})"
     else:
         msg = f"the Deep Time jar is current: {res['name']} {res['sha256'][:12]} ({src})"
-    job.set(message=msg)
     job.st["jar"] = {"refreshed": res["changed"], "sha256": res["sha256"], "src_rev": fields["deeptime_src_rev"],
                      "src_hash": fields["deeptime_src_hash"], "was": [w["sha256"] for w in res["was"]],
                      "seconds": seconds}
-    job.timing("jar_s", seconds)
+    job.st["timings"]["jar_s"] = seconds
+    job.set(message=msg)
     return res
 
 
@@ -1134,6 +1137,8 @@ def main():
     st = sub.add_parser("status")
     st.add_argument("job")
     sub.add_parser("list")
+    rj = sub.add_parser("refresh-jar", help="bring a profile's Deep Time jar up to date (no server, no job)")
+    rj.add_argument("--profile", default="mic", choices=PROFILES)
     sv = sub.add_parser("serve")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8765)
@@ -1148,6 +1153,18 @@ def main():
         print(json.dumps(status(a.job), indent=1))
     elif a.cmd == "list":
         print(json.dumps(list_jobs(), indent=1))
+    elif a.cmd == "refresh-jar":
+        smoke = os.path.join(REPO, "smoke", a.profile)
+        if not os.path.exists(os.path.join(smoke, "install.json")):
+            sys.exit(f"preview.py: no {smoke}/install.json: run tools/smoke/install.sh {a.profile}")
+        # Not a job: its folder is a throwaway, so the workbench's job list never shows it.
+        os.environ["DEEPTIME_WORKBENCH_JOBS"] = tempfile.mkdtemp(prefix="deeptime-refresh-jar-")
+        j = Job("refresh-jar", {})
+        try:
+            refresh_deeptime_jar(j, smoke)
+        except RuntimeError as e:
+            sys.exit(f"preview.py: {e}")
+        print(json.dumps(j.st["jar"], indent=1))
     elif a.cmd == "serve":
         serve(a.host, a.port)
     elif a.cmd == "submit":
