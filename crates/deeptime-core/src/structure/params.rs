@@ -21,6 +21,10 @@ pub struct StructureParams {
     /// Thermal conductivity of the linear geotherm T(z) = T_s + q·z/k, W/(m·K) (the surface's
     /// burial temperature uses the same 2.5, a typical upper-crust value).
     pub conductivity_w_mk: f64,
+    /// Heat flow above this is not used for the geotherm, mW/m² (the plate model's proxy reaches
+    /// 300 near ridges and arcs, where advection, not conduction, carries the heat; continental
+    /// surface heat flow rarely exceeds ~120 outside active volcanic centres).
+    pub max_heat_flow_mw_m2: f64,
     /// Thickness of normal continental crust, m: the plate model's initial column (35 km,
     /// `plates::pools::continental_column`), the reference of the collision burial factor.
     pub reference_crust_m: f64,
@@ -77,6 +81,7 @@ impl Default for StructureParams {
             horizons: 32,
             surface_temp_c: 10.0,
             conductivity_w_mk: 2.5,
+            max_heat_flow_mw_m2: 120.0,
             reference_crust_m: 35_000.0,
             max_burial_factor: 2.0,
             loose_depth_m: 150.0,
@@ -119,6 +124,11 @@ impl StructureParams {
             "must be > 0",
         )?;
         check(
+            self.max_heat_flow_mw_m2 > 0.0,
+            "max_heat_flow_mw_m2",
+            "must be > 0",
+        )?;
+        check(
             self.reference_crust_m > 0.0,
             "reference_crust_m",
             "must be > 0",
@@ -142,11 +152,7 @@ impl StructureParams {
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
         }
-        check(
-            self.host_window_m > 0.0,
-            "host_window_m",
-            "must be > 0",
-        )?;
+        check(self.host_window_m > 0.0, "host_window_m", "must be > 0")?;
         let [m, lo, hi] = self.pluton_length_km;
         check(
             lo > 0.0 && lo <= m && m <= hi,

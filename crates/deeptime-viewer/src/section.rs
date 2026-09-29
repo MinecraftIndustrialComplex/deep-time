@@ -28,6 +28,27 @@ pub struct Section {
     /// Pixels.
     pub w: u32,
     pub h: u32,
+    /// Draw each strata cell's own stack (no interpolation between cells) instead of the Java
+    /// strata pass's column.
+    pub per_cell: bool,
+}
+
+/// The stack of the strata cell nearest block (x, z), without interpolation: (top block, class).
+fn cell_stack(strata: &LoadedLayer, x: i64, z: i64, out: &mut Vec<(i32, u8)>) {
+    out.clear();
+    let d = &strata.desc;
+    let g = &d.grid;
+    let c = i64::from(g.w) * i64::from(g.r);
+    let wx = (x + c / 2).rem_euclid(c) - c / 2;
+    let i = ((wx - g.origin_block_x) as f64 / f64::from(g.r) + 0.5).floor() as i64;
+    let j = ((z - g.origin_block_z) as f64 / f64::from(g.r) + 0.5).floor() as i64;
+    for h in 0..d.stack_depth.unwrap_or(0) {
+        let (t, class) = strata.horizon(g.wrap_i(i), g.clamp_j(j), h);
+        if class == 255 || t == i16::MIN {
+            break;
+        }
+        out.push(((f64::from(t) * d.scale + d.offset).floor() as i32, class));
+    }
 }
 
 const AIR: [u8; 4] = [18, 20, 26, 255];
@@ -81,13 +102,18 @@ pub fn render(
     for px in 0..s.w {
         let z = s.z0 as f64 + (s.z1 - s.z0) as f64 * (f64::from(px) + 0.5) / f64::from(s.w);
         let z = z.floor() as i64;
-        strata.stack_at(s.x, z, &mut stack);
+        if s.per_cell {
+            cell_stack(strata, s.x, z, &mut stack);
+        } else {
+            strata.stack_at(s.x, z, &mut stack);
+        }
         let near: Vec<&&Body> = on_plane
             .iter()
             .filter(|b| i64::from(b.aabb[0][2]) <= z && z <= i64::from(b.aabb[1][2]))
             .collect();
         for py in 0..s.h {
-            let yf = f64::from(s.y1) - f64::from(s.y1 - s.y0) * (f64::from(py) + 0.5) / f64::from(s.h);
+            let yf =
+                f64::from(s.y1) - f64::from(s.y1 - s.y0) * (f64::from(py) + 0.5) / f64::from(s.h);
             let y = yf.floor() as i32;
             let top = stack.first().map_or(i32::MIN, |t| t.0);
             let colour = if y > top {
@@ -147,7 +173,7 @@ pub fn write_sections(
         let m_per_px_h = (s.z1 - s.z0).abs() as f64 * m_per_block.0 / f64::from(s.w);
         let m_per_px_v = f64::from(s.y1 - s.y0) * m_per_block.1 / f64::from(s.h);
         out.push(json!({
-            "title": s.title, "file": file, "w": s.w, "h": s.h,
+            "title": s.title, "file": file, "w": s.w, "h": s.h, "per_cell": s.per_cell,
             "x": s.x, "z0": s.z0, "z1": s.z1, "y0": s.y0, "y1": s.y1,
             "lon": lon, "lat0": lat(s.z0), "lat1": lat(s.z1),
             "km": (s.z1 - s.z0).abs() as f64 * m_per_block.0 / 1000.0,

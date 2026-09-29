@@ -75,7 +75,10 @@ pub fn bake_cell(
         y -= f64::from(u.thickness_m) / m_per_block_v;
     }
     if hz.is_empty() {
-        hz.push(((top0 * 16.0).round() as i32, units.last().map_or(0, |u| u.class)));
+        hz.push((
+            (top0 * 16.0).round() as i32,
+            units.last().map_or(0, |u| u.class),
+        ));
     }
     let thick = |hz: &[(i32, u16)], i: usize| -> i32 {
         let below = if i + 1 < hz.len() { hz[i + 1].0 } else { floor };
@@ -154,7 +157,10 @@ impl Horizons {
             .iter()
             .position(|&x| x == NO_CLASS)
             .unwrap_or(k);
-        (&self.tops[c * k..c * k + n], &self.classes[c * k..c * k + n])
+        (
+            &self.tops[c * k..c * k + n],
+            &self.classes[c * k..c * k + n],
+        )
     }
 
     /// The plan's acceptance (P1-07): every stack ordered top-down, every horizon at least one
@@ -203,7 +209,12 @@ impl Horizons {
             }
             bytes.extend_from_slice(&self.classes[c * k..(c + 1) * k]);
         }
-        let mut d = LayerDesc::scalar("strata/horizons", DType::HorizonStack, self.grid.clone(), codec);
+        let mut d = LayerDesc::scalar(
+            "strata/horizons",
+            DType::HorizonStack,
+            self.grid.clone(),
+            codec,
+        );
         d.units = "block/16 top, class index".into();
         d.scale = 1.0 / 16.0;
         d.stack_depth = Some(self.k);
@@ -320,7 +331,12 @@ mod tests {
         assert_eq!(tops[0], 1600, "the surface");
         // More horizons than K: the thinnest pairs merge.
         let many: Vec<Unit> = (0..20)
-            .map(|i| unit(if i % 2 == 0 { "sandstone" } else { "shale" }, 100.0 + i as f32))
+            .map(|i| {
+                unit(
+                    if i % 2 == 0 { "sandstone" } else { "shale" },
+                    100.0 + i as f32,
+                )
+            })
             .collect();
         let n = bake_cell(&many, 300.0, -352, 639, 20.0, &mut tops, &mut classes);
         assert!((1..=k).contains(&n), "{n}");

@@ -282,7 +282,10 @@ mod tests {
         let shale = &t[usize::from(index("shale"))];
         assert_eq!(shale.metamorphic_path.first(), Some(&index("slate")));
         assert_eq!(shale.loose_equivalent, Some(index("mud")));
-        assert_eq!(t[usize::from(index("sand"))].lithifies_to, Some(index("sandstone")));
+        assert_eq!(
+            t[usize::from(index("sand"))].lithifies_to,
+            Some(index("sandstone"))
+        );
         let _ = Classes::get();
         let _ = t[0].density_kg_m3;
     }

@@ -90,6 +90,9 @@ pub struct CellSource<'a> {
     regime: &'a [f32],
     orogeny: &'a [f32],
     orogeny_age: &'a [f32],
+    heat: &'a [f32],
+    t_mean: Option<&'a [f32]>,
+    p: StructureParams,
 }
 
 fn field_of<'a>(
@@ -137,6 +140,12 @@ impl<'a> CellSource<'a> {
             regime: field_of(fields, "regime", n)?,
             orogeny: field_of(fields, "plates/orogeny_type", n)?,
             orogeny_age: field_of(fields, "plates/orogeny_age_myr", n)?,
+            heat: field_of(fields, "plates/heat_flow_mw_m2", n)?,
+            t_mean: fields
+                .get("climate/t_mean_c")
+                .filter(|f| f.data.len() == n)
+                .map(|f| f.data.as_slice()),
+            p: preset.structure.clone().unwrap_or_default(),
         })
     }
 
@@ -153,7 +162,23 @@ impl<'a> CellSource<'a> {
             orogeny: self.orogeny[c] as u8,
             orogeny_age: self.orogeny_age[c],
             depth_below_sea_m: self.sea_level_m - f64::from(s.elevation_m[c]),
+            surface_c: self.surface_c(c),
+            gradient_c_m: self.gradient_c_m(c),
         }
+    }
+
+    /// The surface temperature of the geotherm at cell `c`, °C.
+    pub fn surface_c(&self, c: usize) -> f64 {
+        self.t_mean
+            .map_or(self.p.surface_temp_c, |t| f64::from(t[c]))
+            .max(0.0)
+    }
+
+    /// The present geotherm at cell `c`, °C/m (`metamorphism.rs`).
+    pub fn gradient_c_m(&self, c: usize) -> f64 {
+        f64::from(self.heat[c].clamp(0.0, self.p.max_heat_flow_mw_m2 as f32))
+            / 1000.0
+            / self.p.conductivity_w_mk
     }
 
     /// The surface of cell `c` in blocks.
@@ -291,6 +316,7 @@ impl StructureStage {
         let thick = field_of(fields, "plates/thickness_m", n)?;
         let orogeny = field_of(fields, "plates/orogeny_type", n)?;
         let orogeny_age = field_of(fields, "plates/orogeny_age_myr", n)?;
+        let crust_m = field_of(fields, "plates/crust_type", n)?;
         let t_mean = fields
             .get("climate/t_mean_c")
             .filter(|f| f.data.len() == n)
@@ -306,7 +332,10 @@ impl StructureStage {
                 .zip(log.count.par_iter_mut())
                 .enumerate()
                 .map(|(c, (layers, count))| {
-                    if *count == 0 {
+                    // Regional metamorphism is a continental process here: sediment on oceanic
+                    // crust is subducted or accreted (and then continental) before it is buried
+                    // deep enough.
+                    if *count == 0 || crust_m[c] as u8 != CONTINENTAL {
                         return 0.0;
                     }
                     let collision = reg[c] as u8 == regime::COLLISION
@@ -319,8 +348,12 @@ impl StructureStage {
                         1.0
                     };
                     let th = Thermal {
-                        surface_c: t_mean.map_or(p.surface_temp_c, |t| f64::from(t[c])).max(0.0),
-                        gradient_c_m: f64::from(heat[c].max(0.0)) / 1000.0 / p.conductivity_w_mk,
+                        surface_c: t_mean
+                            .map_or(p.surface_temp_c, |t| f64::from(t[c]))
+                            .max(0.0),
+                        gradient_c_m: f64::from(heat[c].clamp(0.0, p.max_heat_flow_mw_m2 as f32))
+                            / 1000.0
+                            / p.conductivity_w_mk,
                         burial,
                     };
                     let mut col = crate::surface::strata_log::ColumnMut { layers, count };
@@ -371,11 +404,21 @@ impl StructureStage {
             regime: reg,
             plate_id,
         };
-        let mut rng = Rng::stream(step_seed(self.preset.seed, self.st.done), "structure/plutons");
+        let mut rng = Rng::stream(
+            step_seed(self.preset.seed, self.st.done),
+            "structure/plutons",
+        );
         let tables = &self.tables;
         let host_at = |c: usize, depth: f64| {
             let mut units = Vec::new();
-            columns::build(&src.cell(c), tables, p, src.now_myr, depth + 1.0, &mut units);
+            columns::build(
+                &src.cell(c),
+                tables,
+                p,
+                src.now_myr,
+                depth + 1.0,
+                &mut units,
+            );
             plutons::host_class(&units, depth)
         };
         let born = plutons::emplace(
@@ -595,12 +638,26 @@ impl StructureStage {
         let mut rock: Vec<f32> = (0..n)
             .into_par_iter()
             .map_init(
-                || (Vec::new(), vec![0i16; p.horizons as usize], vec![0u8; p.horizons as usize]),
+                || {
+                    (
+                        Vec::new(),
+                        vec![0i16; p.horizons as usize],
+                        vec![0u8; p.horizons as usize],
+                    )
+                },
                 |(units, tops, classes), c| {
                     let surface_y = src.surface_y(c, s);
                     // Enough of the column that the first horizon is settled.
                     columns::build(&src.cell(c), t, p, src.now_myr, 2000.0, units);
-                    bake_horizons::bake_cell(units, surface_y, s.min_y, s.max_y, s.m_per_block_v, tops, classes);
+                    bake_horizons::bake_cell(
+                        units,
+                        surface_y,
+                        s.min_y,
+                        s.max_y,
+                        s.m_per_block_v,
+                        tops,
+                        classes,
+                    );
                     f32::from(classes[0])
                 },
             )

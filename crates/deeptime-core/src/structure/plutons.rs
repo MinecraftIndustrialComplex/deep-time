@@ -141,7 +141,8 @@ pub fn emplace(
     }
     let lambda = total * p.pluton_rate_km2_myr * dt_myr;
     let count = rng.poisson(lambda);
-    let (granodiorite, granite, diorite) = (index("granodiorite"), index("granite"), index("diorite"));
+    let (granodiorite, granite, diorite) =
+        (index("granodiorite"), index("granite"), index("diorite"));
     let r = f64::from(grid.r);
     let mut out = Vec::with_capacity(count as usize);
     for _ in 0..count {
@@ -171,7 +172,8 @@ pub fn emplace(
         let a_m = 500.0 * length_km;
         let c_m = a_m * (0.5 + 0.5 * rng.uniform());
         let b_m = 500.0 * thick_km;
-        let roof_km = p.pluton_roof_km[0] + rng.uniform() * (p.pluton_roof_km[1] - p.pluton_roof_km[0]);
+        let roof_km =
+            p.pluton_roof_km[0] + rng.uniform() * (p.pluton_roof_km[1] - p.pluton_roof_km[0]);
         let yaw = rng.uniform() * std::f64::consts::PI;
         let host = host_at(c, roof_km * 1000.0);
         let aureole = match host {
@@ -247,7 +249,12 @@ pub fn advance(
 
 /// Calls `f(cell, r2, depth_to_centre_m)` for every L1 cell whose centre lies inside the
 /// pluton's horizontal ellipse, with r2 = (u/a)² + (w/c)² in its own axes.
-pub fn for_each_cell(pl: &Pluton, grid: &GridDesc, m_per_block_h: f64, mut f: impl FnMut(usize, f64)) {
+pub fn for_each_cell(
+    pl: &Pluton,
+    grid: &GridDesc,
+    m_per_block_h: f64,
+    mut f: impl FnMut(usize, f64),
+) {
     let r = f64::from(grid.r);
     let ext_blocks = f64::from(pl.a_m.max(pl.c_m)) / m_per_block_h;
     let cells = (ext_blocks / r).ceil() as i64 + 1;
@@ -392,7 +399,16 @@ mod tests {
         let c0 = cell_of(&grid, 0.0, 0.0);
         material[c0 + 1] = -500.0;
         material[c0] = -500.0;
-        advance(&mut pls, &grid, &omega, 1.0e6, &plate, &crust, Some(&material), &mut counts);
+        advance(
+            &mut pls,
+            &grid,
+            &omega,
+            1.0e6,
+            &plate,
+            &crust,
+            Some(&material),
+            &mut counts,
+        );
         assert_eq!(pls.len(), 1);
         // Moved one cell in longitude (16 blocks east or west, whichever the frame calls +Ω),
         // and the erosion there took 500 m off its roof.
@@ -402,7 +418,16 @@ mod tests {
         // Eroded through its whole height: gone.
         let mut deep = vec![-10_000.0f32; n];
         deep[0] = 0.0;
-        advance(&mut pls, &grid, &omega, 0.0, &plate, &crust, Some(&deep), &mut counts);
+        advance(
+            &mut pls,
+            &grid,
+            &omega,
+            0.0,
+            &plate,
+            &crust,
+            Some(&deep),
+            &mut counts,
+        );
         assert!(pls.is_empty());
         assert_eq!(counts.eroded, 1);
         // Oceanic crust carried under another plate: subducted.
@@ -411,7 +436,16 @@ mod tests {
         let mut pls = vec![isl];
         let other = vec![3.0f32; n];
         let ocean = vec![0.0f32; n];
-        advance(&mut pls, &grid, &omega, 0.0, &other, &ocean, None, &mut counts);
+        advance(
+            &mut pls,
+            &grid,
+            &omega,
+            0.0,
+            &other,
+            &ocean,
+            None,
+            &mut counts,
+        );
         assert!(pls.is_empty() && counts.subducted == 1);
     }
 
