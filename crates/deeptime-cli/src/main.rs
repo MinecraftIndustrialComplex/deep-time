@@ -63,7 +63,9 @@ enum Command {
     /// globe, layers and events every step; pause, step, rewind, speed, follow live, compare two
     /// runs). Runs go one at a time; finished ones are kept under --runs. Serves loopback or a
     /// Tailscale address only, never the LAN; tools/viewer/mac-watch.sh runs it on the Mac and
-    /// puts it on the tailnet.
+    /// puts it on the tailnet. --mem-cap is the default memory cap of its runs (the page's Memory
+    /// field sets another for one run); a run whose estimate is over its cap is refused before
+    /// it starts.
     Watch {
         /// A run to start right away (a built-in preset name, a preset JSON file or a share code);
         /// the page starts others.
