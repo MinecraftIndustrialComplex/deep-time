@@ -1022,11 +1022,37 @@ impl DepositStage {
         let pet_ty = self.petroleum_type();
         let mut kitchen_events: Vec<EventId> = Vec::new();
         let mut kitchens = Vec::new();
+        let mut petroleum_note: Option<Value> = None;
         let mut pet_f: Vec<f64> = Vec::new();
         if let Some(pi) = pet_ty {
             let t = &self.types[pi];
             let r = t.petroleum.as_ref().expect("petroleum type");
-            kitchens = petroleum::kitchens(&grid, &self.state.pet, r, sc.m_per_block_h);
+            let (kept, small) = petroleum::kitchens(&grid, &self.state.pet, r, sc.m_per_block_h);
+            kitchens = kept;
+            let mut areas: Vec<f64> = kitchens.iter().map(|k| k.tract.area_km2).collect();
+            areas.sort_by(f64::total_cmp);
+            let quantile = |q: f64| {
+                areas
+                    .get(((areas.len() as f64 - 1.0) * q).round() as usize)
+                    .copied()
+                    .unwrap_or(0.0)
+            };
+            petroleum_note = Some(json!({
+                "kitchen_km2_p50": quantile(0.5),
+                "kitchen_km2_p90": quantile(0.9),
+                "kitchen_km2_max": quantile(1.0),
+                "kitchens": kitchens.len(),
+                "dropped_small": small,
+                "min_kitchen_km2": r.min_kitchen_km2,
+                "kitchen_km2_total": kitchens.iter().map(|k| k.tract.area_km2).sum::<f64>(),
+            }));
+            ctx.log.push(
+                crate::log::Level::Info,
+                format!(
+                    "deposits petroleum: {} kitchens of at least {} km² ({} smaller regions of mature source rock dropped)",
+                    kitchens.len(), r.min_kitchen_km2, small
+                ),
+            );
             for (k, kit) in kitchens.iter().enumerate() {
                 let (x, z) = cluster::cell_xz(&grid, kit.centre);
                 let ll = lat_lon_of(c, x, z);
@@ -1298,6 +1324,7 @@ impl DepositStage {
             },
             "skipped": skipped,
             "fallbacks": self.state.fallbacks,
+            "petroleum": petroleum_note,
             "count_mult": self.params.count_mult,
             "province": self.params.province.name(),
             "province_km": self.params.province_km,

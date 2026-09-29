@@ -116,7 +116,26 @@ pub struct Kitchen {
     pub centre: u32,
 }
 
+/// The kitchens of a run, largest first among equals in scan order, and how many connected
+/// regions of mature source rock were too small to count (`PetroleumRules::min_kitchen_km2`): on a
+/// real history most of them are a cell or two of locally hot rock, which cannot charge a trap.
 pub fn kitchens(
+    grid: &GridDesc,
+    acc: &[CellPet],
+    r: &PetroleumRules,
+    m_per_block_h: f64,
+) -> (Vec<Kitchen>, usize) {
+    let all = mature_regions(grid, acc, r, m_per_block_h);
+    let found = all.len();
+    let kept: Vec<Kitchen> = all
+        .into_iter()
+        .filter(|k| k.tract.area_km2 >= r.min_kitchen_km2)
+        .collect();
+    let dropped = found - kept.len();
+    (kept, dropped)
+}
+
+fn mature_regions(
     grid: &GridDesc,
     acc: &[CellPet],
     r: &PetroleumRules,
@@ -248,6 +267,7 @@ mod tests {
             seal_threshold: 0.3,
             reservoir_threshold: 0.3,
             min_source: 1.0,
+            min_kitchen_km2: 0.0,
         }
     }
 
@@ -310,8 +330,15 @@ mod tests {
         assert_eq!(a.t_onset, -90.0e6);
         assert!(a.t_peak.is_nan());
         assert_eq!(a.t_last_gen, -80.0e6);
-        let ks = kitchens(&grid, &acc, &r, 300.0);
-        assert_eq!(ks.len(), 1);
+        let (ks, dropped) = kitchens(&grid, &acc, &r, 300.0);
+        assert_eq!((ks.len(), dropped), (1, 0));
+        // A minimum area drops the kitchen (two cells of ≈ 2 km²… at 300 m blocks: 2 · 23 km²).
+        let small = PetroleumRules {
+            min_kitchen_km2: 1.0e6,
+            ..r.clone()
+        };
+        let (none, dropped) = kitchens(&grid, &acc, &small, 300.0);
+        assert_eq!((none.len(), dropped), (0, 1));
         assert_eq!(ks[0].t_onset, -90.0e6);
         let early = charge(
             &grid,
