@@ -560,7 +560,14 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         };
         // P1-07: the baked horizon stacks (the inspector), the elevation and the rock at the
         // surface as map layers, and meridian cross-sections.
-        let structure = crate::structure_view::build(&ck.world, &ck.preset_json)?;
+        // `--viewer-layers` without `structure` leaves them out (a climate-only page stays small).
+        let structure = if o.viewer_layers.is_empty()
+            || o.viewer_layers.iter().any(|l| l.starts_with("structure"))
+        {
+            crate::structure_view::build(&ck.world, &ck.preset_json)?
+        } else {
+            None
+        };
         let layers: Vec<&deeptime_format::LoadedLayer> =
             structure.iter().flat_map(|v| v.layers.iter()).collect();
         deeptime_viewer::write_bundle_with(

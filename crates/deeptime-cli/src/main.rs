@@ -123,7 +123,8 @@ enum Command {
         #[arg(long)]
         viewer: Option<PathBuf>,
         /// Only these keyframe layers go into the viewer bundle (comma-separated field names,
-        /// e.g. `elevation,climate/koppen`; default all), to keep a review page small.
+        /// e.g. `elevation,climate/koppen`; default all), to keep a review page small. The
+        /// structure stage's map layers and sections come only when a `structure…` name is given.
         #[arg(long, value_delimiter = ',')]
         viewer_layers: Vec<String>,
         /// Folder for the stage's keyframes (default <out>.work, or a temporary folder).
