@@ -1,8 +1,8 @@
 # The Deep Time overworld as a player sees it.
 world: "@WORLD@"
 dimension: "minecraft:overworld"
-name: "Deep Time planet — surface"
-sorting: 0
+name: "@LABEL@ — surface"
+sorting: @SORT0@
 start-pos: { x: @CX@, z: @CZ@ }
 sky-color: "#7dabff"
 void-color: "#000000"
@@ -13,7 +13,7 @@ remove-caves-below-y: 55
 cave-detection-ocean-floor: -5
 cave-detection-uses-block-light: false
 min-inhabited-time: 0
-render-mask: [ { min-x: @MINX@, max-x: @MAXX@, min-z: @MINZ@, max-z: @MAXZ@ } ]
+render-mask: [ @MASK@ ]
 render-edges: true
 edge-light-strength: 8
 enable-perspective-view: true

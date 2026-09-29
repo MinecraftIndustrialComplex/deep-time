@@ -1,19 +1,19 @@
-# Only blocks below y 0: the rock strata seen from above, and the check that BlueMap handles the
-# -352..639 build range (plan §9.6, P0-14).
+# Only blocks below y 0 (or, with BLUEMAP_BOXES, below each box's cut height): the rock strata seen
+# from above, and the check that BlueMap handles the -352..639 build range (plan §9.6, P0-14).
 world: "@WORLD@"
 dimension: "minecraft:overworld"
-name: "Deep Time planet — below y 0 (strata)"
-sorting: 1
+name: "@LABEL@ — @CUTNAME@"
+sorting: @SORT1@
 start-pos: { x: @CX@, z: @CZ@ }
 sky-color: "#7dabff"
 void-color: "#000000"
 sky-light: 1
-ambient-light: 0.6
+ambient-light: @CUTLIGHT@   # 0.6 for the below-y-0 map; 1.0 for Q10 cuts, so rock and ore read in the flat view
 remove-caves-below-y: -10000
 cave-detection-ocean-floor: -5
 cave-detection-uses-block-light: false
 min-inhabited-time: 0
-render-mask: [ { min-x: @MINX@, max-x: @MAXX@, min-z: @MINZ@, max-z: @MAXZ@, max-y: 0 } ]
+render-mask: [ @CUTMASK@ ]
 render-edges: true
 edge-light-strength: 8
 enable-perspective-view: true
