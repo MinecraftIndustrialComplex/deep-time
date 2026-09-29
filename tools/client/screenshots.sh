@@ -50,7 +50,11 @@ hmc.rethrow.launch.exceptions=true
 hmc.exit.on.failed.command=true
 hmc.assets.dummy=true
 hmc.jline.enabled=false
+hmc.check.xvfb=true
 EOF
+# hmc.check.xvfb: offline, HeadlessMC 2.10.0 stubs LWJGL ("game will start in headless mode": every
+# GL call returns defaults, so screenshots are black) unless it finds xvfb in `ps aux`, which it
+# only looks for with this property set.
 
 LAUNCHER="$WORK/headlessmc-launcher-$HMC_VERSION.jar"
 if [ ! -f "$LAUNCHER" ]; then
