@@ -117,9 +117,9 @@
     "l1_every_steps": 1
   },
   "surface": {
-    "k_spl": 5e-07,
-    "m_spl": 0.5,
-    "n_spl": 1.0,
+    "k_spl": 3e-10,
+    "m_spl": 1.0,
+    "n_spl": 2.0,
     "g_deposition": 1.0,
     "runoff_ref_m_yr": 0.5,
     "threshold_slope": 0.35,
@@ -127,7 +127,7 @@
     "kd_marine_m2_yr": 300.0,
     "wave_base_m": 100.0,
     "tidal_range_m": 2.0,
-    "marine_fill_depth_m": 20.0,
+    "marine_fill_depth_m": 0.0,
     "shelf_slope": 0.0005,
     "carbonate_max_mm_yr": 10.0,
     "carbonate_extinction_per_m": 0.1,
