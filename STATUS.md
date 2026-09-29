@@ -72,6 +72,79 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — Workbench: a run over its memory cap is refused before it starts; the default cap is 8 GiB (agent worktree agent-afd5b3eb4fa7751da, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **The bug.** Ben's `pipeline_full_32k`, supercontinent, 1000 Myr: `POST /api/preset` estimated `peak_bytes`
+  5,532,931,904 against the 4 GiB default cap and still answered `can_run: true`; the run started and failed 15
+  minutes in ("needed 4300143147 bytes, cap 4294967296 bytes"). Reproduced on a private release workbench (Mac,
+  port 8653, before the fix): the same 5,532,931,904 and `can_run: true`. Why 4.30 GB and not 5.53 GB: the cap is
+  only checked at `ctx.reserve(..)` calls (in-use bytes + the request), the estimate is the *peak*; the death is
+  consistent with the surface stage's first `reserve(estimate / 2)` (2.65 GB) on ~1.65 GB in use (inferred from
+  the code, not from a trace). (The client-side
+  `overCap()` of the UI overhaul landed after Ben's run, at 03:29; the server never checked.)
+- **The rule.** `editor.rs`: `Catalog::effective` holds the estimate to the run's cap (`cap_gib`, the editor's
+  Memory field; absent, null or 0 = the workbench's default; a number below 0.25 GiB is a problem of its own, the
+  game's minimum) and answers `can_run: false` with the reason among `problems`, plus `needed_bytes` and
+  `cap_bytes`. Wording: "needs about 5.7 GiB (the estimate, 5.2 GiB, and 512 MiB for the server itself); the
+  memory cap is 4 GiB: raise the cap in Memory, or shorten the run or pick a smaller preset".
+  **The margin is measured, not guessed.** What a run needs of the cap is the estimate's peak plus
+  `SERVER_OVERHEAD_BYTES` = 512 MiB (a preset that estimates 0 needs 0). The estimate runs low by an almost
+  constant amount, not a factor (the cap's gauge counts the whole process): private release workbench, a
+  finished run's `peak N MiB` summary line minus its `session::estimate` peak, all `supercontinent`:
+
+  | preset | Myr | estimate | measured peak | difference |
+  |---|---|---|---|---|
+  | pipeline_quick_16k | 100 | 0.945 GB | 1.347 GB (1284.8 MiB) | +0.40 GB |
+  | pipeline_quick_16k | 250 | 1.039 GB | 1.442 GB (1375.0 MiB) | +0.40 GB |
+  | pipeline_quick_16k | 500 | 1.196 GB | 1.604 GB (1529.5 MiB) | +0.41 GB |
+  | pipeline_full_32k | 30 | 3.092 GB | 3.578 GB (3412.7 MiB) | +0.49 GB |
+  | pipeline_full_32k | 250 | 3.645 GB | 4.088 GB (3898.7 MiB) | +0.44 GB |
+
+  (Before the fix it was also plain that the estimate was not the failing number: 5.53 GB estimated against a
+  4.30 GB death. The margin only matters within ~0.5 GB of a cap.) The end-of-run `bytes_peak` in the progress
+  is higher still (the final checkpoint clones the world: +0.16 to +0.97 GB over the summary peaks above); it is
+  not cap-checked and not counted.
+- **The request.** `runs.rs` `Workbench::submit` (the `POST /api/runs` path, and `deeptime watch --preset`)
+  resolves the cap (0 = the workbench default), calls `Catalog::within_cap` and refuses with the same words
+  (HTTP 400) before anything is created (no run, no folder); the run keeps the resolved cap in `run.json`
+  (`mem_cap`; runs from before, which stored 0, read back as the core's 4 GiB). An invalid `cap_gib` is a 400
+  too (it used to fall back to the default silently). Run cards carry `mem_cap`; `/api/catalog` carries
+  `mem_cap_bytes`, `min_cap_gib` and `server_overhead_bytes`.
+- **The default cap (Ben, 2026-09-29, "8 GiB (Recommended)", in the decisions log).** `deeptime watch --mem-cap N`
+  (bytes; 0 = the core's 4 GiB, unchanged, as is the in-game editor) is the workbench's default:
+  `Catalog::with_default_cap`, used by the estimate check, the request check and `create`. `tools/viewer/mac-watch.sh`
+  passes 8 GiB (8589934592) and takes `--mem-cap SIZE` (bytes, `8G`, `12GiB`, `6.5G`): checked with a stub `ssh`
+  (default 8589934592; 12GiB -> 12884901888; 6.5G -> 6979321856; `lots` -> exit 2), the live 8642 workbench not touched.
+- **The page.** `workbench.js`: the Memory field starts at the server's default and says so ("8 GiB · the default", "4 GiB
+  for this run · default 8 GiB"); the game's tooltip ("Default 4 GiB") is replaced by the workbench's own text; a new cap
+  asks the server again (it decides); the reason is a red problem in the list whose click unfolds and focuses the
+  Memory field; the estimate tile shows the needed memory (estimate + server, tooltip says so), the bar against the
+  cap and "cap 8 GiB · default"; a run's panel shows its memory cap. Headless shots (`tools/viewer/shot.py` against a
+  private debug workbench on the Mac, `--mem-cap 8589934592`, port 8654 through an ssh forward, 8642 untouched;
+  in `review/out/workbench-memory-cap/`, not committed): `1-default-8gib-runs.png` (pipeline_full 32k, supercontinent,
+  1000 Myr: 7.03 GiB needed after merging master, cap 8 GiB · default, Run on, "Near the memory cap"),
+  `2-cap-4gib-refused.png` (cap 4: the red reason, Run off), `3-reason-clicked-memory-field.png` (Memory folded, the
+  reason clicked: it unfolds, scrolls to and focuses `f_cap`; asserted in the page), `4-run-panel-memory-cap.png`.
+- **Tests.** `editor::tests::a_run_over_its_memory_cap_is_refused_and_a_raised_cap_allows_it` (refuses at the 4 GiB
+  default with the words above; `cap_gib` 8 allows it; the edge either side of the needed bytes; `--mem-cap` 8 GiB
+  allows it by default, `cap_gib` 0 = default, `cap_gib` 4 refuses again; 0.1, -3 and "lots" are refused) and
+  `watch::tests::the_run_request_refuses_a_run_over_its_memory_cap` (POST /api/runs: 400 with the form's words, for no
+  cap, 4 and 0; 0.1 refused; nothing created, no run folder; `cap_gib` 8 queues it (queue held), run keeps 8 GiB;
+  `--mem-cap` 8 GiB queues it with no field or 0, and `cap_gib` 4 refuses).
+- **Gates** (Mac, after merging master 05c772e): `cargo fmt --all -- --check` clean; `cargo clippy --workspace
+  --all-targets -- -D warnings` clean; `cargo test --workspace --no-fail-fast` all ok (25 in the cli binary, 205 + 2 ignored in core, …);
+  `cargo deny check licenses bans` ok.
+- **End to end, the run that failed.** On the private release workbench (before the fix, cap 8 GiB in the request),
+  `pipeline_full_32k`, supercontinent, 1000 Myr ran past the 8.8 % where Ben's run died: 11.2 % when cancelled, peak
+  4.65 GB, 3.44 GB in use (the 4 GiB run had died at 4.30 GB). It was cancelled there (well over an hour to finish on a shared
+  Mac); the finished peak is unmeasured. **Master's new stages raised that preset's estimate** (young, amplify): 5.53 GB
+  became 6.6 GiB (+0.5 GiB server = 7.1 GiB needed), which still fits 8 GiB but is "near the cap"; 4600 Myr full 32k
+  (14.6 GB before the merge) is refused at 8 GiB.
+- **Not done / next.** The live 8642 workbench runs the old binary: restart it from the main checkout after merging
+  (`tools/viewer/mac-watch.sh`, which now passes `--mem-cap 8G`). Ben's later decision (log 2026-09-29, spill the
+  recorded history to the SSD instead of failing at the cap) makes the deposit estimate flat in length: when it
+  lands, `over_cap`'s estimate and the 512 MiB constant should be re-measured the same way (the table above is the
+  method: run, read the `peak` line, subtract the estimate).
+
 ### 2026-09-29 — P1-17 partial: calibration with the real climate (agent worktree agent-ae48007457b607716, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Ben, 2026-09-29, "Now, beside P1-06 (Recommended)": recalibrate erosion and uplift with the climate on,
   turn the ice-sheet feedback on once elevations look Earth-like, retune deposit counts; P1-17 proper does the final
@@ -2794,7 +2867,9 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   (pipeline_full_32k, too big for the 16 GB Mac): the deposit engine's recorded history (a frame every
   10 Myr) is held in memory and grows with length. The physics is tested only over 500 Myr and starts from
   existing continents (no early-Earth phase). Options offered: history on disk (flat memory), an early-Earth
-  phase, or a 1 Gyr cap. Revisit in P1-17 or when Ben raises it.
+  phase, or a 1 Gyr cap. Revisit in P1-17 or when Ben raises it. Since the memory-cap fix (build log,
+  2026-09-29) the workbench refuses a run whose estimate plus 512 MiB is over its cap (default 8 GiB) instead
+  of failing partway, so a run like this now says why before it starts.
 - The workbench offered the placeholder `earthlike_*` presets (dummy pipeline) next to the real `pipeline_*`
   ones; Ben ran one and got a single blob. The UI overhaul hides them behind a dev toggle and marks a
   placeholder run (build log 2026-09-29, UI overhaul).
