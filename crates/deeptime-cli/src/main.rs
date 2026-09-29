@@ -450,11 +450,11 @@ fn main() -> ExitCode {
                 every_myr,
                 exit_when_done,
                 preview: preview.map(|script| watch::stage2::Preview {
-                        python,
-                        script,
-                        runs: None,
-                        deeptime: None,
-                    }),
+                    python,
+                    script,
+                    runs: None,
+                    deeptime: None,
+                }),
                 common: common.common(),
             }),
         ),
@@ -1328,9 +1328,12 @@ mod tests {
         {
             let [cx, _, cz] = site.center;
             let mut v = w.inspect(i64::from(cx), i64::from(cz));
-            attach_why(&mut v, &dir.join("world")).unwrap();
+            super::attach_why(&mut v, &dir.join("world")).unwrap();
             let held = v["sites"].as_array().unwrap();
-            assert!(held.iter().any(|s| s["id"] == site.id), "the site holds its centre");
+            assert!(
+                held.iter().any(|s| s["id"] == site.id),
+                "the site holds its centre"
+            );
             assert!(held.iter().all(|s| s["why"].is_object()), "{v}");
         }
         std::fs::remove_dir_all(&dir).unwrap();

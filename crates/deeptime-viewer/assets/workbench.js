@@ -1630,7 +1630,7 @@
         `${(why.chain || []).map(ev).join('')}</div>`;
     }
     for (const b of bodies) if (b.site != null && !site(b.site)) { h += `<div class="desc" style="margin-top:8px">Site ${b.site} owns body ${b.id}; its box is not over this column.</div>`; break; }
-    h += `<div class="callout" style="margin-top:12px">${ic('info')}<div>${esc(st.note || '')}</div></div>` +
+    h += `<div class="callout" style="margin-top:12px">${ic('info')}<div><b>This run's own terrain.</b> What Deep Time decides for the column, read from the run's bake: it does not include what other mods' features add. The 3D preview shows the placed blocks.</div></div>` +
       `<div class="acts"><button class="btn btn-sm" data-dact="area">${ic('cube', 'ic-s')}Preview 256 × 256 here</button></div>`;
     $('details').innerHTML = h;
     $('details').dataset.curEv = '';
