@@ -282,7 +282,7 @@ nix shell nixpkgs#nodejs_22 -c npx -y spacesheep@1.17.0 deploy . \
   `--visibility`, `--org`, `-m` and `--json`; 1.13.0 (whose `--help` this plan first used) had the same
   options without `--new`. Re-check the README before bumping the pin.
 - **Space ids are recorded in the repo.** A first deploy creates a space and writes `.spacesheep.json`
-  (`{"space": "<uuid>", "url": "https://spacesheep.dev/@ben-6b8e/<slug>"}`) into the deployed folder,
+  (`{"space": "<uuid>", "url": "https://spacesheep.dev/@benmac/<slug>"}`) into the deployed folder,
   and later deploys from that folder publish a **new version of the same space**. Review folders live
   under the gitignored `review/out/`, so `publish.sh` also copies each page's space id into
   `tools/review/spaces.json` (committed) and passes `--space` on every later deploy. That keeps Ben's
@@ -1634,7 +1634,12 @@ the terrain surface, it fills the air between them with water source blocks (ice
 the climate layer says frozen), without scheduling fluid ticks, so a basin stays still until a
 neighbour changes. The bake guarantees `water_level` never exceeds the lowest rim of its basin
 (Fill–Spill–Merge levels, Phase 2); Phase 0 proves the mechanism with a hand-made basin and channel
-(P0-13). Carvers run after this pass and can open caves under a lake; that drains into caves the way
+(P0-13). The generated ground is the density interpolated over 4-block noise cells, so on a steep
+shore it lies a block or two below the elevation raster: a column whose own `water_level` cell is dry
+takes the level of the nearest wet cell within one noise cell (P0-13's first run left two shore
+pockets that the woken lake filled), and the bake must therefore keep each rim above its level for at
+least one noise cell beyond the last wet cell. (P0-13: the ice comes from vanilla's
+`freeze_top_layer` feature, which every overworld biome runs after this pass.) Carvers run after this pass and can open caves under a lake; that drains into caves the way
 vanilla lakes do and is accepted.
 
 ### 7.10 Toroidal World: the cylinder shape
@@ -2295,16 +2300,32 @@ writes PNGs plus a JSON summary:
   `deeptime-inspect colors --jars <mods dir> --vanilla <client-extra jar>` builds from the jars' own
   top textures (average colour per block).
 - `rock` — the rock class of the first solid non-surface block per column (block → class from
-  `/deeptime probe palette`'s dump).
+  `/deeptime probe palette`'s dump; until that probe exists, from the `#deeptime:rock/<class>` tags
+  in the world's jars and datapacks).
 - `ore` — ore blocks by material, projected from above with depth shading.
 - `section --axis x|z --at <n> --from <a> --to <b>` — a vertical cross-section, blocks by colour,
-  with site bodies and horizon lines overlaid from the world data.
+  with site bodies and horizon lines overlaid from the world data. `--axis z --at <n>` is the plane
+  z = n, running along x. It prints `water_top_y=<y> water_block_y=<y−1> columns=<n>` for every
+  water surface it crosses: `water_top_y` is the top face of the highest block holding water above
+  the terrain surface, as P0-13's `lakeHolds` logs it (sea level 63 gives 63), `water_block_y` that
+  block's y (cold-read review 2, gap 18).
 - `seam` — the 128 columns on either side of x = C/2 as one strip, and the per-column height
   difference between the region files and the world data.
-- `compare --world-data <dir>` — generated surface height vs `elevation`, as a histogram and a map.
+- `compare --world <dir> --world-data <dir>` — generated surface height vs `elevation`, as a
+  histogram and a map (cold-read review 2, gap 18). **Measured** is the y of the highest block that
+  is not air, fluid or a feature (vegetation, logs, wood, leaves, roots, huge mushrooms, coral,
+  sea pickles, snow layers, sheet ice, …): `OCEAN_FLOOR` minus logs, leaves and features.
+  **Expected** is `⌈H⌉ − 1`, H the bilinear `elevation` (the GameTests' expected top). Only `full`
+  chunks count, and two kinds of column are left out and counted: `structure` (within 12 blocks of
+  a structure piece that reaches the surface) and `carved` (within 2 columns of a pit: at least 2
+  blocks below the morphological closing, half-width up to 32, of the measured surface after an
+  opening of half-width 4 that removes narrow bumps; the test reads only the measured surface,
+  never the world data). The JSON reports `p99_abs_diff_blocks` (nearest rank over |measured −
+  expected|), the histogram and the exclusion counts.
 - `regions --world <dir> --span <C>` — lists region files and counts any outside the canonical span
   (−C/1024 ≤ rx < C/1024), printing `outside=<n>`; the same check `run.py` does by file name, kept
-  here for worlds that did not come from a smoke run.
+  here for worlds that did not come from a smoke run. A 0-byte file holds no chunk (the game
+  creates it when it merely looks a chunk up) and is counted apart as `outside_empty`.
 
 ### 9.8 Publishing and what stays unverifiable
 
@@ -2680,11 +2701,12 @@ of Phase 0 is built on it.
 - **Creates.** `crates/deeptime-inspect` with `colors`, `topdown`, `rock`, `ore`, `section`, `seam`,
   `regions`, `compare`; a small region fixture copied from the standalone smoke world for its tests.
 - **Depends on.** P0-04, P0-09, P0-10 (a standalone smoke world with world data:
-  `tools/smoke/install.sh standalone --synth wrap-test --size 16384 && python3 tools/smoke/run.py --profile standalone`).
+  `tools/smoke/install.sh standalone --synth wrap-test --size 16384 && python3 tools/smoke/run.py --profile standalone --fresh --chunky 128 --chunky-seam`;
+  `--chunky-seam` pregenerates the columns either side of the seam for `seam`).
 - **Acceptance.**
   - `nix develop -c cargo test -p deeptime-inspect` → ok
   - `nix develop -c cargo run -p deeptime-inspect -- compare --world smoke/standalone/server/planet --world-data smoke/standalone/server/planet/deeptime`
-    → JSON with `"p99_abs_diff_blocks"` ≤ 1
+    → JSON with `"p99_abs_diff_blocks"` ≤ 1 (measured and expected as §9.7 defines them)
 - **Ben reviews.** Top-down, section and seam PNGs on the Phase 0 page.
 
 #### P0-12 Terralith, TerraBlender and Biomes O' Plenty checks
@@ -2716,8 +2738,11 @@ of Phase 0 is built on it.
 - **Depends on.** P0-10, P0-11.
 - **Acceptance.**
   - `./gametest.sh` → `lakeHolds` passes; log `[gametest] lakeHolds before=<N> after=<N> expected=<N> outside=0`
-  - `nix develop -c cargo run -p deeptime-inspect -- section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at <lake z> --from <a> --to <b>`
-    → a PNG with the water surface at y 120
+    with before = after = expected, and `[gametest] lakeHolds water_top_y=120` (the top face of the
+    highest water block at the lake centre, `notes.lake.centre_block`; cold-read review 2, gap 18)
+  - `nix develop -c cargo run -p deeptime-inspect -- section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at 0 --from -88 --to 212`
+    → a PNG with the water surface at y 120 and the printed line `water_top_y=120` (the lake centre
+    is z 0 and the channel runs along it to x 160; −88…212 is `lakeHolds`' scanned box; P0-11)
 - **Ben reviews.** The cross-section and the BlueMap view of the lake.
 
 #### P0-14 BlueMap renders on MIC blocks

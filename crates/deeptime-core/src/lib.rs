@@ -2,9 +2,17 @@
 //! The Deep Time simulation core (plan §8). Depends on the format crate only; no Minecraft and
 //! no JNI types, so the civ module and future planets can reuse it as a plain library.
 
+// The stage runner and its persistence (P1-01).
+pub mod checkpoint;
+pub mod dummy;
+pub mod keyframes;
+pub mod stage;
+pub mod world;
+
 pub mod error;
 pub mod log;
 pub mod session;
+pub mod sphere;
 
 pub use deeptime_format::FORMAT_VERSION;
 pub use error::CoreError;

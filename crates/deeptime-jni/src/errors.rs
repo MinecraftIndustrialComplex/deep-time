@@ -81,7 +81,9 @@ impl BridgeError {
         match self {
             BridgeError::Core(CoreError::PresetInvalid { .. }) => own("PresetInvalidException"),
             BridgeError::Core(CoreError::MemoryCap { .. }) => own("MemoryCapException"),
-            BridgeError::Core(CoreError::Io { .. }) => own("DeepTimeIoException"),
+            BridgeError::Core(CoreError::Io { .. } | CoreError::Format(_)) => {
+                own("DeepTimeIoException")
+            }
             BridgeError::Core(CoreError::Cancelled) => own("CancelledException"),
             BridgeError::Core(CoreError::Poisoned) | BridgeError::Poisoned(_) => {
                 own("SessionPoisonedException")
@@ -93,7 +95,9 @@ impl BridgeError {
                 "java/lang/UnsupportedOperationException".into()
             }
             BridgeError::Panic(_) => own("NativePanicException"),
-            BridgeError::IllegalArgument(_) => "java/lang/IllegalArgumentException".into(),
+            BridgeError::IllegalArgument(_) | BridgeError::Core(CoreError::InvalidArgument(_)) => {
+                "java/lang/IllegalArgumentException".into()
+            }
             BridgeError::Jni(_) => "java/lang/RuntimeException".into(),
         }
     }
@@ -226,6 +230,20 @@ mod tests {
             (
                 CoreError::Unsupported("sampleColumn").into(),
                 "java/lang/UnsupportedOperationException".into(),
+            ),
+            (
+                CoreError::InvalidArgument("keyframe 3 of 2".into()).into(),
+                "java/lang/IllegalArgumentException".into(),
+            ),
+            (
+                // A world-data or checkpoint format error (here: a file too short for its header).
+                deeptime_core::checkpoint::Checkpoint::from_bytes(
+                    std::path::Path::new("x.dtcp"),
+                    b"junk",
+                )
+                .unwrap_err()
+                .into(),
+                pkg("DeepTimeIoException"),
             ),
         ];
         for (err, class) in cases {
