@@ -113,6 +113,8 @@ def fold(x, c):
 
 def allowed_roots():
     roots = [REPO, jobs_root(), os.path.dirname(os.path.dirname(REPO))]   # …/mic (pack, Docs)
+    if runs_root():
+        roots.append(runs_root())   # a run's bake is a world_data source
     extra = os.environ.get("DEEPTIME_WORKBENCH_ROOTS", "")
     roots += [r for r in extra.split(os.pathsep) if r]
     return [os.path.realpath(r) for r in roots]
@@ -260,6 +262,8 @@ class Job:
                    "timings": {}, "exports": [], "message": "", "pid": os.getpid()}
         if spec.get("note"):
             self.st["note"] = spec["note"]
+        if spec.get("note_kind"):
+            self.st["note_kind"] = spec["note_kind"]
         self.log = open(os.path.join(self.dir, "runner.log"), "a", buffering=1)
 
     def set(self, state=None, message=None, **kw):
@@ -650,7 +654,9 @@ def prepare_world(job, spec, smoke, prep):
                 log_name="build.log")
     elif w.get("world_data"):
         job.set("preparing", f"copying world data from {w['world_data']}")
-        shutil.copytree(w["world_data"], os.path.join(world, "deeptime"), dirs_exist_ok=True)
+        # The keyframes (a run's timelapse, tens of MB) are not part of what a world reads.
+        shutil.copytree(w["world_data"], os.path.join(world, "deeptime"), dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("keyframes"))
     elif w.get("test_terrain"):
         jvm.append(f"-Ddeeptime.testTerrain={w['test_terrain']}")
     # config/deeptime/server.json decides a first start (P1-13); only a preset job has one.
@@ -870,24 +876,74 @@ class Busy(Exception):
 
 
 # ---------------------------------------------------------------------------------------------
-# The workbench's stage-2 routes (crates/deeptime-cli/src/watch/http.rs proxies them here).
-# A workbench run is a raster history on the simulation grid, not a Minecraft world: until P1-08
-# bakes a run into world data, a preview generates the synthetic deposit world at the same block
-# coordinates, and every answer says so.
+# The workbench's stage-2 routes (crates/deeptime-cli/src/watch/stage2.rs forwards them here).
+# A run that finished with P1-08's bake (world data 0.1 in <runs>/<id>/world) is previewed and
+# inspected as its own terrain: /api/inspect answers from `deeptime inspect-column` on the bake and
+# a preview boots the real mod on a world that uses the bake. A run without one (a placeholder, a
+# run older than format 0.1, one still running) keeps the old behaviour: the synthetic deposit
+# world at the same latitude and longitude, and every answer says so.
 # ---------------------------------------------------------------------------------------------
 
+RUNS_ENV = "DEEPTIME_WORKBENCH_RUNS"          # the workbench's runs folder (set by `deeptime watch`)
+DEEPTIME_ENV = "DEEPTIME_WORKBENCH_DEEPTIME"  # the deeptime binary for inspect-column (idem)
+RUN_ID = re.compile(r"[A-Za-z0-9._-]+")
 PREVIEW_C = 16384
 PREVIEW_PRESET = os.path.join(REPO, "crates", "deeptime-core", "tests", "presets", "deposits_world_16k.json")
 PREVIEW_LENGTH_MYR = 500
 INSPECT_SIDE = 32
 
 
-def preview_world_note(run):
-    return (f"Not run {run}'s terrain. Workbench runs are rasters on the simulation grid and become a "
-            f"Minecraft world only through P1-08's bake, which does not exist yet. This preview is Deep Time's "
-            f"synthetic deposit world (deposits_world_16k, {PREVIEW_LENGTH_MYR} Myr, C = {PREVIEW_C:,}) generated "
-            f"by the real mod on the Mac's headless {os.environ.get('DEEPTIME_WORKBENCH_PROFILE', 'mic')} "
-            f"server, at the latitude and longitude you picked. Its sites cluster near x -5,600, z -1,000.")
+def runs_root():
+    r = os.environ.get(RUNS_ENV)
+    return os.path.realpath(r) if r else None
+
+
+def run_bake(run):
+    """(bake, why_not): the run's P1-08 bake, or None and the reason there is none. The bake is a
+    dict: dir (its world-data folder), c (circumference), manifest."""
+    root = runs_root()
+    if not root:
+        return None, "this workbench does not tell the preview runner where its runs are"
+    if not RUN_ID.fullmatch(run or ""):
+        return None, f"{run!r} is not a run of this workbench"
+    d = os.path.join(root, run, "world")
+    try:
+        with open(os.path.join(d, "manifest.json")) as f:
+            m = json.load(f)
+    except (OSError, ValueError):
+        return None, "the run has not finished writing its world data (or is older than the bake)"
+    try:
+        major, minor = (int(v) for v in str(m.get("format_version", "0.0")).split(".")[:2])
+    except ValueError:
+        major, minor = 0, 0
+    notes = m.get("notes") or {}
+    layers = {l.get("name") for l in m.get("layers", [])}
+    c = (m.get("scale") or {}).get("circumference_blocks")
+    if (major, minor) < (0, 1) or not isinstance(notes.get("bake"), dict) or notes["bake"].get("baked") is False:
+        return None, f"the run's world data is format {m.get('format_version')} with no bake"
+    if (notes.get("run") or {}).get("placeholder"):
+        return None, "the run is a placeholder preset: its terrain is a synthetic stand-in"
+    if not {"elevation", "strata/horizons"} <= layers:
+        return None, "the run's world data has no terrain or strata layer"
+    if c not in LEVEL_TYPES:
+        return None, f"the run's circumference {c} has no Deep Time level type"
+    return {"dir": d, "c": c, "manifest": m}, ""
+
+
+def run_terrain_note(run, bake):
+    m = bake["manifest"]
+    return (f"This is run {run}'s own terrain. It is the run's finished bake (world data {m.get('format_version')}, "
+            f"{m.get('source', '')}, C = {bake['c']:,}), the very data a world made from this run gets, and the preview "
+            f"is generated by the real mod on the Mac's headless {os.environ.get('DEEPTIME_WORKBENCH_PROFILE', 'mic')} "
+            f"server. A bake is the planet at the end of the run, so it does not change with the frame you were looking at.")
+
+
+def preview_world_note(run, why=""):
+    return (f"Not run {run}'s terrain: {why or 'it has no bake'}. Only a run that finished with the P1-08 bake "
+            f"(world data 0.1) is previewed as itself. This preview is Deep Time's synthetic deposit world "
+            f"(deposits_world_16k, {PREVIEW_LENGTH_MYR} Myr, C = {PREVIEW_C:,}) generated by the real mod on the "
+            f"Mac's headless {os.environ.get('DEEPTIME_WORKBENCH_PROFILE', 'mic')} server, at the latitude and "
+            f"longitude you picked. Its sites cluster near x -5,600, z -1,000.")
 
 
 def latlon_to_block(lat, lon, c=PREVIEW_C):
@@ -895,13 +951,13 @@ def latlon_to_block(lat, lon, c=PREVIEW_C):
     return round(lon / 360 * c - c / 2), round(-lat / 360 * c)
 
 
-def box_on_preview_world(req):
-    """The request's box on the C = 16,384 preview planet (from lat_lon when given), at most
+def box_on_world(req, c=PREVIEW_C):
+    """The request's box on the planet of circumference c (from lat_lon when given), at most
     256 × 256 around its centre; returns (box, a note about any shrinking)."""
     ll = req.get("lat_lon") or {}
     if all(isinstance(ll.get(k), (int, float)) for k in ("north", "south", "west", "east")):
-        x0, z0 = latlon_to_block(ll["north"], ll["west"])
-        x1, z1 = latlon_to_block(ll["south"], ll["east"])
+        x0, z0 = latlon_to_block(ll["north"], ll["west"], c)
+        x1, z1 = latlon_to_block(ll["south"], ll["east"], c)
     else:
         b = req.get("box") or {}
         try:
@@ -915,8 +971,11 @@ def box_on_preview_world(req):
         note = f"The box you drew ({x1 - x0} × {z1 - z0} blocks) was cut to its central {min(w, MAX_SIDE)} × {min(d, MAX_SIDE)}. "
     cx, cz = (x0 + x1) // 2, (z0 + z1) // 2
     w, d = min(w, MAX_SIDE), min(d, MAX_SIDE)
-    x0, z0 = cx - w // 2, max(-PREVIEW_C // 4, min(PREVIEW_C // 4 - d, cz - d // 2))
-    return [fold(x0, PREVIEW_C), z0, fold(x0, PREVIEW_C) + w, z0 + d], note
+    x0, z0 = cx - w // 2, max(-c // 4, min(c // 4 - d, cz - d // 2))
+    return [fold(x0, c), z0, fold(x0, c) + w, z0 + d], note
+
+
+box_on_preview_world = box_on_world   # the name P1-20 stage 2 used
 
 
 def viewer_url(job, st, pick=None):
@@ -944,33 +1003,77 @@ def for_page(st):
 
 def workbench_preview(req):
     run = req.get("run", "?")
-    box, shrink = box_on_preview_world(req)
-    spec = {"profile": os.environ.get("DEEPTIME_WORKBENCH_PROFILE", "mic"), "size": PREVIEW_C,
-            "boxes": [box],
-            "world": {"preset": PREVIEW_PRESET, "start": "supercontinent", "length_myr": PREVIEW_LENGTH_MYR},
-            "note": shrink + preview_world_note(run),
-            "request": {k: req.get(k) for k in ("run", "frame", "t_years", "box", "lat_lon")}}
+    request = {k: req.get(k) for k in ("run", "frame", "t_years", "box", "lat_lon")}
+    bake, why = run_bake(run)
+    profile = os.environ.get("DEEPTIME_WORKBENCH_PROFILE", "mic")
+    if bake:
+        box, shrink = box_on_world(req, bake["c"])
+        spec = {"profile": profile, "size": bake["c"], "boxes": [box],
+                "world": {"world_data": bake["dir"]},
+                "note": shrink + run_terrain_note(run, bake), "note_kind": "run", "request": request}
+    else:
+        box, shrink = box_on_world(req)
+        spec = {"profile": profile, "size": PREVIEW_C, "boxes": [box],
+                "world": {"preset": PREVIEW_PRESET, "start": "supercontinent", "length_myr": PREVIEW_LENGTH_MYR},
+                "note": shrink + preview_world_note(run, why), "note_kind": "test-world", "request": request}
     return 202, for_page(submit(spec))
 
 
+def deeptime_bin():
+    p = os.environ.get(DEEPTIME_ENV)
+    if p and os.path.isfile(p):
+        return p
+    for rel in ("release", "debug"):
+        p = os.path.join(REPO, "target", rel, "deeptime")
+        if os.path.isfile(p):
+            return p
+    return shutil.which("deeptime")
+
+
+def inspect_bake(run, bake, x, z):
+    """One column of a run's bake through `deeptime inspect-column --why`: the evaluator behind the
+    game's terrain and strata (parity-tested against the Java reader), in milliseconds."""
+    exe = deeptime_bin()
+    if not exe:
+        raise ValueError("no deeptime binary to ask (set " + DEEPTIME_ENV + ")")
+    t = time.time()
+    p = subprocess.run([exe, "inspect-column", "--world-data", bake["dir"], "--why", str(x), str(z)],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+    if p.returncode != 0:
+        raise ValueError("deeptime inspect-column: " + p.stderr.decode(errors="replace").strip()[-400:])
+    col = json.loads(p.stdout)
+    return {"source": "bake", "run": run, "column": {"x": x, "z": z}, "note_kind": "run",
+            "note": run_terrain_note(run, bake) + " This answer is what Deep Time decides for the column, not what "
+                    "other mods' features add to it; the 3D preview shows the placed blocks.",
+            "terrain_height": round(col["surface"], 1), "top_y": col["top_y"], "circumference": bake["c"],
+            "seconds": round(time.time() - t, 3), "inspect": col}
+
+
 def workbench_inspect(q):
-    """One column: from a finished preview that holds it (the viewer opens with the column's top
-    block selected), else the preview being made of it, else a new 32 × 32 preview around it.
-    There is no fast column path until P1-08 (README.md, "Later")."""
+    """One column of a run. A run with a bake answers at once from it (inspect_bake). Otherwise,
+    as before P1-08: from a finished test-world preview that holds the column (the viewer opens with
+    the column's top block selected), else the preview being made of it, else a new 32 × 32
+    preview around it."""
     run = q.get("run", "?")
+    bake, why = run_bake(run)
+    c = bake["c"] if bake else PREVIEW_C
     try:
-        if q.get("lat") not in (None, "") and q.get("lon") not in (None, ""):
-            x, z = latlon_to_block(float(q["lat"]), float(q["lon"]))
+        if bake and q.get("x") not in (None, "") and q.get("z") not in (None, ""):
+            x, z = int(float(q["x"])), int(float(q["z"]))
+        elif q.get("lat") not in (None, "") and q.get("lon") not in (None, ""):
+            x, z = latlon_to_block(float(q["lat"]), float(q["lon"]), c)
         else:
             x, z = int(q["x"]), int(q["z"])
     except (KeyError, ValueError):
         raise ValueError("give x and z (or lat and lon)")
-    x = fold(x, PREVIEW_C)
+    x = fold(x, c)
+    if bake:
+        return 200, inspect_bake(run, bake, x, z)
     if abs(z) > PREVIEW_C // 4 - INSPECT_SIDE:
         raise ValueError(f"z {z} is past the preview planet's pole cap")
     for st in list_jobs():
         spec = st.get("spec") or {}
-        if spec.get("size") != PREVIEW_C or not spec.get("boxes"):
+        if spec.get("size") != PREVIEW_C or not spec.get("boxes") or (spec.get("world") or {}).get("preset") != PREVIEW_PRESET:
             continue
         bx0, bz0, bx1, bz1 = spec["boxes"][0]
         inside = (x - bx0) % PREVIEW_C < bx1 - bx0 and bz0 <= z < bz1
@@ -980,15 +1083,17 @@ def workbench_inspect(q):
         if st.get("state") == "done":
             out["url"] = viewer_url(st["job"], st, (x, z))
         out["column"] = {"x": x, "z": z}
-        out["note"] = out.get("note") or preview_world_note(run)
+        out["note"] = out.get("note") or preview_world_note(run, why)
+        out["note_kind"] = "test-world"
         return 200, out
     h = INSPECT_SIDE // 2
     spec = {"profile": os.environ.get("DEEPTIME_WORKBENCH_PROFILE", "mic"), "size": PREVIEW_C,
             "boxes": [[x - h, z - h, x + h, z + h]], "pick": [x, z],
             "world": {"preset": PREVIEW_PRESET, "start": "supercontinent", "length_myr": PREVIEW_LENGTH_MYR},
-            "note": ("There is no fast column answer until P1-08; this generates the 32 × 32 blocks around the "
-                     "column (about a minute) and opens it with the column's top block selected. ")
-            + preview_world_note(run),
+            "note": ("There is no fast column answer for this run; this generates the 32 × 32 blocks around the "
+                     "column of a test world (about a minute) and opens it with the column's top block selected. ")
+            + preview_world_note(run, why),
+            "note_kind": "test-world",
             "request": {"run": run, "frame": q.get("frame"), "x": q.get("x"), "z": q.get("z")}}
     out = for_page(submit(spec))
     out["column"] = {"x": x, "z": z}
