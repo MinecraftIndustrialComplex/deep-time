@@ -34,7 +34,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
 | P1-11 | Customize editor, timelapse and staging | todo | | | |
 | P1-12 | Strata pass with rock tags and `rock_states` | todo | | | |
-| P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 147910a | Mechanism done on placeholder presets (Mac): smoke standalone `--preset earthlike_quick_16k --fresh --restart` PASS (generation 11.9 s, progress lines ≤ 5 s apart, restart `world data present`); `--scenario` first_start_no_config / _circumference_mismatch / _native_failure: OK (exit 1, no crash report, nothing but vanilla's level.dat); JUnit 45/45 incl. ShareCodeTest cross-fixture; GameTests 14/14. Left: rerun with the real presets after P1-08 |
+| P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 743b69d | Mechanism verified on placeholder presets (dummy pipeline + wrap-test bake): standalone and MIC first starts generate in ~12 s with progress lines ≤ 5 s apart, restart does not regenerate; no-config / circumference-mismatch / native-failure all stop cleanly before loadLevel. Rerun with the real presets after P1-08 |
 | P1-14 | Deposit engine: the four families | todo | | | |
 | P1-15 | Deposits in the world | todo | | | |
 | P1-16 | COE and CDG hooks | todo | | | |
