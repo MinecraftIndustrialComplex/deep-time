@@ -35,24 +35,24 @@ const fmt = (n) => Number(n).toLocaleString('en-US');
 const short = (id) => String(id ?? '').replace(/^[a-z0-9_.-]+:/, '');
 
 // ---------------------------------------------------------------------------------------------
-// Theme.
+// Theme: dark by default, as the workbench; light one click away. `?embed=1` (the workbench's job
+// card) shows the scene alone.
 // ---------------------------------------------------------------------------------------------
-const THEMES = ['auto', 'light', 'dark'];
-let theme = 'auto';
-try { theme = localStorage.getItem('area3d-theme') || 'auto'; } catch { /* storage blocked */ }
+const THEMES = ['dark', 'light'];
+let theme = 'dark';
+try { theme = localStorage.getItem('area3d-theme') || 'dark'; } catch { /* storage blocked */ }
 if (params.get('theme')) theme = params.get('theme');
+if (!THEMES.includes(theme)) theme = 'dark';
+if (params.has('embed')) document.documentElement.classList.add('embed');
 function applyTheme() {
-  if (theme === 'auto') delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = theme;
-  $('theme').textContent = { auto: '◐', light: '☀', dark: '☾' }[theme];
-  if (renderer) scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--scene').trim());
+  document.documentElement.dataset.theme = theme;
+  $('theme').textContent = { light: '☀', dark: '☾' }[theme];
 }
 $('theme').onclick = () => {
-  theme = THEMES[(THEMES.indexOf(theme) + 1) % 3];
+  theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
   try { localStorage.setItem('area3d-theme', theme); } catch { /* ignore */ }
   applyTheme();
 };
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 
 // ---------------------------------------------------------------------------------------------
 // Decoding.
@@ -130,7 +130,8 @@ const transMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: 
 
 function initScene() {
   const host = $('scene');
-  renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setClearColor(0x000000, 0);   // the page's gradient shows through
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   host.appendChild(renderer.domElement);
   scene = new THREE.Scene();
@@ -141,7 +142,7 @@ function initScene() {
   group = new THREE.Group();
   scene.add(group);
   const hg = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.06, 1.06, 1.06));
-  highlight = new THREE.LineSegments(hg, new THREE.LineBasicMaterial({ color: 0xff2d55, depthTest: false }));
+  highlight = new THREE.LineSegments(hg, new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false }));
   highlight.renderOrder = 10;
   highlight.visible = false;
   group.add(highlight);
@@ -515,7 +516,7 @@ function describe(i, yy, zk) {
     }
     stack = `<h2>Strata stack of this column</h2><table class="col">${rows.join('')}</table>`;
   }
-  return `<div class="row" style="justify-content:space-between"><h2 style="margin:0">Block</h2><button data-close aria-label="Close">✕</button></div>
+  return `<div class="row" style="justify-content:space-between;margin-top:0"><h2 style="margin:0">Block</h2><button class="closebtn" data-close aria-label="Close">✕</button></div>
     <div style="margin:6px 0"><span class="sw" style="background:${swatch(A.entBlock[e])}"></span> <b>${esc(b.id)}</b> <span class="muted">${esc(b.cat)}${b.ore ? `, ${esc(b.ore)} ore` : ''}</span></div>
     <div class="kv"><b>x</b><span>${w.x}${seam}</span><b>y</b><span>${w.y}</span><b>z</b><span>${w.z}</span>
     <b>chunk</b><span>${w.x >> 4}, ${w.z >> 4}</span>${classes}
@@ -568,7 +569,7 @@ function buildControls() {
   document.querySelectorAll('[data-preset]').forEach((el) => { el.onclick = () => applyPreset(el.dataset.preset); });
   const sites = A.h.sites || [];
   $('sites').innerHTML = sites.length ? sites.map((s) =>
-    `<li data-site="${s.id}"><b>${s.id}</b> ${esc(short(s.type))} <span class="muted">${esc(s.kind)} · ${(s.products || []).map((p) => short(p.material)).join(', ') || 'no products'}</span></li>`).join('')
+    `<li data-site="${s.id}" title="Cut through this site"><b>${s.id}</b> ${esc(short(s.type).replace(/_/g, ' '))}<br><span class="muted small">${esc(s.kind)} · ${(s.products || []).map((p) => short(p.material)).join(', ') || 'no products'}</span></li>`).join('')
     : '<li class="muted">none</li>';
   $('sites').querySelectorAll('[data-site]').forEach((el) => { el.onclick = () => cutThroughSite(+el.dataset.site); });
   const st = A.h.stats, meta = A.h.meta || {};
