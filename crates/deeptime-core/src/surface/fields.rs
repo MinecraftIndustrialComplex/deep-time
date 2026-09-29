@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 use super::grid::{Dims, box_blur};
 use super::lithology::{Classes, has_tag};
 use super::strata_log::StrataLog;
-use crate::deposits::fields::{FieldFrame, lat_of_row};
+use crate::deposits::fields::{FieldFrame, NO_ORIGIN, ORIGIN_FIELDS, lat_of_row};
 use crate::plates::state::{ARC, CONTINENTAL, SUBDUCTION_ZONE, regime};
 
 /// Prefix of every field name.
@@ -97,6 +97,9 @@ pub struct FrameAcc {
     pub t_start_years: f64,
     pub span_years: f64,
     pub sums: BTreeMap<String, Vec<f32>>,
+    /// Where each cell's crust was at the start of the frame (composed over the frame's steps by
+    /// [`FrameAcc::compose_back`]); empty while no step has moved anything (the identity).
+    pub back: Vec<u32>,
 }
 
 impl FrameAcc {
@@ -115,6 +118,23 @@ impl FrameAcc {
 
     pub fn is_empty(&self) -> bool {
         self.span_years <= 0.0
+    }
+
+    /// Adds one step's crust motion: `nearest[c]` is the cell the material now at `c` came from
+    /// (the same nearest-cell map that carries the strata log), `newborn[c]` marks crust made in
+    /// this step. Composes it with the motion so far, so `back[c]` names the cell that held this
+    /// crust when the frame began.
+    pub fn compose_back(&mut self, nearest: &[usize], newborn: &[bool]) {
+        let n = nearest.len();
+        if self.back.len() != n {
+            self.back = (0..n as u32).collect();
+        }
+        let prev = std::mem::take(&mut self.back);
+        self.back = nearest
+            .par_iter()
+            .zip(newborn.par_iter())
+            .map(|(&q, &born)| if born { NO_ORIGIN } else { prev[q] })
+            .collect();
     }
 
     /// Bytes held.
@@ -426,6 +446,35 @@ pub fn flush(acc: &mut FrameAcc, d: &Dims, t_end_years: f64) -> FieldFrame {
         let g = regional_gradient(d, e);
         fields.insert(FRAME_FIELDS[2].into(), g);
     }
+    // The crust's motion over the frame, as offsets (small integers: exact in the 16-bit packing).
+    if acc.back.len() == n {
+        let w = d.w as i64;
+        let (di, dj): (Vec<f32>, Vec<f32>) = acc
+            .back
+            .par_iter()
+            .enumerate()
+            .map(|(c, &b)| {
+                if b == NO_ORIGIN {
+                    return (f32::NAN, f32::NAN);
+                }
+                let (bi, bj) = (i64::from(b) % w, i64::from(b) / w);
+                let (ci, cj) = (c as i64 % w, c as i64 / w);
+                let mut di = bi - ci;
+                if di >= w / 2 {
+                    di -= w;
+                } else if di < -w / 2 {
+                    di += w;
+                }
+                (di as f32, (bj - cj) as f32)
+            })
+            .unzip();
+        fields.insert(ORIGIN_FIELDS[0].into(), di);
+        fields.insert(ORIGIN_FIELDS[1].into(), dj);
+    } else {
+        fields.insert(ORIGIN_FIELDS[0].into(), vec![0.0; n]);
+        fields.insert(ORIGIN_FIELDS[1].into(), vec![0.0; n]);
+    }
+    acc.back.clear();
     let frame = FieldFrame {
         t_years: t_end_years,
         dt_years: acc.span_years,

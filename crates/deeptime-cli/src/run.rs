@@ -75,10 +75,28 @@ pub fn print_census(census: &Value) {
         census["provinces"],
         census["count_mult"],
     );
+    if let Some(h) = census["history"].as_object() {
+        println!(
+            "deposits: history {} · {} frames · {} names",
+            h["source"].as_str().unwrap_or("?"),
+            h["frames"],
+            h["names"].as_array().map_or(0, Vec::len),
+        );
+    }
+    for s in census["skipped"].as_array().into_iter().flatten() {
+        println!(
+            "deposits SKIPPED {}: the history lacks {}",
+            s["type"].as_str().unwrap_or("?"),
+            s["missing"]
+        );
+    }
+    for note in census["fallbacks"].as_array().into_iter().flatten() {
+        println!("deposits FALLBACK: {}", note.as_str().unwrap_or("?"));
+    }
     for t in census["types"].as_array().into_iter().flatten() {
         let f = |k: &str| t[k].as_f64().unwrap_or(0.0);
         println!(
-            "deposits {:<30} sites={:>3} expected={:>7.2} with_provinces={:>7.2} drawn={:>3} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={}",
+            "deposits {:<30} sites={:>3} expected={:>7.2} with_provinces={:>7.2} drawn={:>3} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={}",
             t["id"].as_str().unwrap_or("?"),
             f("sites"),
             f("expected_formula"),
@@ -94,7 +112,26 @@ pub fn print_census(census: &Value) {
             f("children"),
             f("guaranteed"),
             f("dropped_separation"),
+            f("on_land"),
         );
+        if let Some(b) = t["best_cell"].as_object() {
+            let g = |k: &str| b[k].as_f64().unwrap_or(0.0);
+            println!(
+                "  best cell F={:.2} at lat {:.1} lon {:.1}, limited by {} (scores {})",
+                g("favourability"),
+                g("lat"),
+                g("lon"),
+                b["limiting"].as_str().unwrap_or("?"),
+                b["scores"]
+                    .as_object()
+                    .map(|m| m
+                        .iter()
+                        .map(|(k, v)| format!("{k} {:.2}", v.as_f64().unwrap_or(0.0)))
+                        .collect::<Vec<_>>()
+                        .join(", "))
+                    .unwrap_or_default()
+            );
+        }
     }
 }
 
@@ -549,6 +586,22 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             for k in &mut keyframes {
                 k.layers.retain(|(name, _)| o.viewer_layers.contains(name));
             }
+        } else if o.name == deeptime_core::deposits::STAGE_NAME {
+            // The deposit bundle keeps the map context (elevation, plates, crust age, regime,
+            // drainage, the rock and the trap structure) and the deposit layers; the surface's
+            // bulk layers stay in the surface bundle. Keeps a 500 Myr bundle under the review cap.
+            const LEFT_TO_THE_SURFACE_BUNDLE: [&str; 6] = [
+                "surface/erosion_m_myr",
+                "surface/deposition_m_myr",
+                "surface/sediment_m",
+                "surface/regolith_m",
+                "surface/class",
+                "structure/log_grade",
+            ];
+            for k in &mut keyframes {
+                k.layers
+                    .retain(|(name, _)| !LEFT_TO_THE_SURFACE_BUNDLE.contains(&name.as_str()));
+            }
         }
         let info = deeptime_viewer::BundleInfo {
             title: format!("Deep Time — stage {}", o.name),
@@ -560,13 +613,16 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         };
         // P1-07: the baked horizon stacks (the inspector), the elevation and the rock at the
         // surface as map layers, and meridian cross-sections.
-        // `--viewer-layers` without `structure` leaves them out (a climate-only page stays small).
-        let structure = if o.viewer_layers.is_empty()
-            || o.viewer_layers.iter().any(|l| l.starts_with("structure"))
+        // `--viewer-layers` without `structure` leaves them out (a climate-only page stays small);
+        // the deposit stage's bundle leaves the strata inspector to the structure stage's own (its
+        // layers alone are ~20 MB, and the deposit bundles stay under the review cap).
+        let structure = if o.name == deeptime_core::deposits::STAGE_NAME
+            || !(o.viewer_layers.is_empty()
+                || o.viewer_layers.iter().any(|l| l.starts_with("structure")))
         {
-            crate::structure_view::build(&ck.world, &ck.preset_json)?
-        } else {
             None
+        } else {
+            crate::structure_view::build(&ck.world, &ck.preset_json)?
         };
         let layers: Vec<&deeptime_format::LoadedLayer> =
             structure.iter().flat_map(|v| v.layers.iter()).collect();

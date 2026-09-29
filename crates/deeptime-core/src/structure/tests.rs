@@ -30,6 +30,9 @@ fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
     v["seed"] = serde_json::json!(seed);
     // Plenty of plutons on the small test planet.
     v["structure"] = serde_json::json!({"pluton_rate_km2_myr": 2e-3});
+    // These tests are about the structure stage; the deposit stage after it has its own
+    // (`deposits::recorded_tests`).
+    v.as_object_mut().unwrap().remove("deposits");
     v.to_string()
 }
 
