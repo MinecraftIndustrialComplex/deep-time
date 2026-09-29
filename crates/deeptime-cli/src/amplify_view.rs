@@ -276,6 +276,7 @@ fn pick_regions(
     sea: f64,
     cfg: &Cfg,
     repair_at: Option<(i64, i64, f64)>,
+    tile: Option<usize>,
 ) -> Vec<Region> {
     let (bw, bh) = (gw / SIDE, gh / SIDE);
     // Per block: land share, mean gradient over land (blocks per 4 cells), shoreline cells.
@@ -451,6 +452,43 @@ fn pick_regions(
             ));
         }
     }
+    // Where four tiles of a streamed run meet: the interior tile corner with the most land round it.
+    if let Some(t) = tile.filter(|&t| t > 0 && t * 2 <= gw.min(gh * 2) && t < gh) {
+        let mut best = (0usize, 0i64, 0i64);
+        for m in 1..gh.div_ceil(t) {
+            for k in 1..gw.div_ceil(t) {
+                let (cx, cy) = ((k * t) as i64, (m * t) as i64);
+                let mut land = 0usize;
+                for j in (0..SIDE).step_by(8) {
+                    for i in (0..SIDE).step_by(8) {
+                        let (gi, gj) = (
+                            cx + i as i64 - SIDE as i64 / 2,
+                            cy + j as i64 - SIDE as i64 / 2,
+                        );
+                        if f64::from(l3.y(gi, gj)) > cfg.sea_y {
+                            land += 1;
+                        }
+                    }
+                }
+                if land > best.0 {
+                    best = (land, cx, cy);
+                }
+            }
+        }
+        if best.0 > 0 {
+            let (x0, y0) = (best.1 - SIDE as i64 / 2, best.2 - SIDE as i64 / 2);
+            regions.push(place(
+                "tiles",
+                "Where four tiles of the streamed run meet",
+                format!(
+                    "the corner at cell ({}, {}); each tile is computed in its own window",
+                    best.1, best.2
+                ),
+                x0,
+                y0,
+            ));
+        }
+    }
     // The seam: the window centred on x = ±C/2 with the most land.
     let mut best = (0usize, 0i64);
     for j0 in (0..=gh - SIDE).step_by(32) {
@@ -535,7 +573,13 @@ pub fn build(world: &WorldState, preset_json: &str, work: &Path) -> CliResult<Op
             note["flood_max_raise_m"].as_f64()?,
         ))
     });
-    let regions = pick_regions(&l3, gw, gh, z2, lake2, area2, w2, sea, &cfg, repair_at);
+    let tile = (note["mode"] == "streamed")
+        .then(|| note["tile_cells"].as_u64())
+        .flatten()
+        .map(|t| t as usize);
+    let regions = pick_regions(
+        &l3, gw, gh, z2, lake2, area2, w2, sea, &cfg, repair_at, tile,
+    );
     let ramps = Ramps::builtin();
     let (_, ramp) = ramps.for_layer("elevation");
     let mut rendered = Vec::new();

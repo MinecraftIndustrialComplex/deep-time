@@ -49,16 +49,15 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 
 use deeptime_format::{Codec, DType, GridDesc, LayerEntry, Manifest};
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use self::kernels::{Buf, Counts, FloodStats, NoiseCfg, Physics, Times, run_passes};
+use self::kernels::{Counts, NoiseCfg, Physics, Times};
 use self::resample::Level;
 use self::tiles::{
-    LastCfg, LastStats, PackSink, Preview, TilePlan, TileSink, halo as plan_halo, run_last,
+    LEVEL_BYTES_PER_CELL, LastStats, LevelSink, PackSink, Preview, TILE_BYTES_PER_CELL, TileCfg,
+    TilePlan, TileSink, halo as plan_halo, run_tiles,
 };
-use self::window::Win;
 use super::detail::{DetailParams, Noise};
 use super::thermal;
 use super::young;
@@ -120,8 +119,11 @@ pub struct AmplifyParams {
     pub slope_ref: f64,
     /// The slope term stops growing here.
     pub slope_cap: f64,
-    /// A cell lowers by at most this fraction of its drop to its receiver per iteration.
+    /// A cell lowers by at most this fraction of its drop to its receiver per iteration …
     pub max_incision_frac: f64,
+    /// … and by at most this fraction of its initial drop to its lowest neighbour in all: the
+    /// erosion is scaled by the cell size, a stream cuts a valley of a few cells' relief.
+    pub incision_cap: f64,
     /// A cell stays at least this gradient above its receiver.
     pub min_gradient: f64,
     /// Critical slope at drama 1 (Schott: tan 30° ≈ 0.57), and the share of an excess a pair of
@@ -163,6 +165,7 @@ impl Default for AmplifyParams {
             slope_ref: 0.1,
             slope_cap: 0.5,
             max_incision_frac: 0.3,
+            incision_cap: 3.0,
             min_gradient: 1.0e-4,
             thermal_slope: 0.6,
             thermal_rate: 0.05,
@@ -221,6 +224,9 @@ impl AmplifyParams {
         pos(self.slope_cap, "slope_cap")?;
         if !(self.max_incision_frac > 0.0 && self.max_incision_frac <= 1.0) {
             return Err(bad("max_incision_frac", "must be in (0, 1]"));
+        }
+        if !(self.incision_cap > 0.0 && self.incision_cap <= 5.0) {
+            return Err(bad("incision_cap", "must be in (0, 5]"));
         }
         if !(0.0..0.1).contains(&self.min_gradient) {
             return Err(bad("min_gradient", "must be in [0, 0.1)"));
@@ -310,6 +316,7 @@ impl Config {
             slope_ref: p.slope_ref as f32,
             slope_cap: p.slope_cap as f32,
             max_frac: p.max_incision_frac as f32,
+            cap_frac: p.incision_cap as f32,
             min_gradient: p.min_gradient as f32,
             thermal_slope: thermal::critical_slope(p.thermal_slope, self.drama) as f32,
             thermal_rate: p.thermal_rate as f32,
@@ -358,9 +365,9 @@ impl Config {
 pub struct LevelReport {
     pub w: usize,
     pub h: usize,
-    pub times: Times,
-    pub pre_flood: FloodStats,
-    pub flood: FloodStats,
+    /// One tile: the whole raster.
+    pub tiles: usize,
+    pub stats: LastStats,
     pub millis: f64,
 }
 
@@ -373,7 +380,9 @@ pub struct Outcome {
 }
 
 /// Amplifies `l2` by `doublings` (≥ 1) levels; the last one goes tile by tile through `sink`.
-/// `reserve(bytes)` is asked before each allocation of buffers that size.
+/// The levels before it run on the whole raster, or in tiles of `p.tile_cells` when `p.stream` says
+/// so (or, for `auto`, when `reserve(bytes)`, which is asked before every allocation of buffers of
+/// that size, refuses the whole raster's).
 pub fn run(
     l2: Level,
     doublings: u32,
@@ -396,45 +405,52 @@ pub fn run(
         }
         let started = Instant::now();
         let (gw, gh) = (2 * level.w, 2 * level.h);
-        let win = Win::full(gw, gh);
-        reserve(win.cells() as u64 * Buf::BYTES_PER_CELL)?;
         let dxf = level.fine_dx();
-        let fine = level.sample(&win);
-        let mut buf = Buf::new(win, fine);
-        let ph = cfg.physics(dxf);
-        let mut times = Times::default();
-        let pass = run_passes(
-            &mut buf,
-            &ph,
-            &cfg.counts(true),
-            &cfg.noise_cfg(gw),
-            &mut times,
-        );
-        let a_fine = (dxf * dxf) as f32;
-        let wgt: Vec<f32> = buf.own.par_iter().map(|&o| o / a_fine).collect();
-        level = Level {
-            w: gw,
-            h: gh,
-            dx: dxf,
-            z: std::mem::take(&mut buf.z),
-            area: std::mem::take(&mut buf.a),
-            wgt,
-            kfac: std::mem::take(&mut buf.kfac),
-            lake: std::mem::take(&mut buf.lake),
+        let counts = cfg.counts(true);
+        // The whole raster's buffers, and the next level's arrays which are kept either way.
+        let whole_bytes = (gw * gh) as u64 * (TILE_BYTES_PER_CELL + LEVEL_BYTES_PER_CELL);
+        let tiled = match cfg.p.stream {
+            StreamMode::Always => true,
+            StreamMode::Never => false,
+            StreamMode::Auto => reserve(whole_bytes).is_err(),
+        } && (cfg.p.tile_cells as usize) < gw.max(gh);
+        let level_plan = if tiled {
+            TilePlan {
+                gw,
+                gh,
+                tile: cfg.p.tile_cells as usize,
+                halo: plan_halo(&counts, cfg.p.repair_margin_cells as usize),
+            }
+        } else {
+            TilePlan::whole(gw, gh)
         };
+        let tcfg = TileCfg {
+            ph: cfg.physics(dxf),
+            counts,
+            noise: cfg.noise_cfg(gw),
+            detail: &cfg.p.detail,
+            drama: cfg.drama,
+            mv: cfg.mv,
+            plan: level_plan,
+            preview_stride: 1,
+            last: false,
+        };
+        reserve((gw * gh) as u64 * LEVEL_BYTES_PER_CELL)?;
+        let mut next = LevelSink::new(gw, gh, dxf);
+        let (_, stats) = run_tiles(&level, &tcfg, &mut next, cancelled, reserve)?;
+        level = next.level;
         reports.push(LevelReport {
             w: gw,
             h: gh,
-            times,
-            pre_flood: pass.pre_flood,
-            flood: pass.flood,
+            tiles: stats.tiles,
+            stats,
             millis: started.elapsed().as_secs_f64() * 1000.0,
         });
     }
     let (gw, gh) = (2 * level.w, 2 * level.h);
     debug_assert_eq!((plan.gw, plan.gh), (gw, gh));
     let dxf = level.fine_dx();
-    let last = LastCfg {
+    let last = TileCfg {
         ph: cfg.physics(dxf),
         counts: cfg.counts(false),
         noise: cfg.noise_cfg(gw),
@@ -443,8 +459,9 @@ pub fn run(
         mv: cfg.mv,
         plan,
         preview_stride: preview_stride(gw, cfg.p.preview_width as usize),
+        last: true,
     };
-    let (preview, stats) = run_last(&level, &last, sink, cancelled, reserve)?;
+    let (preview, stats) = run_tiles(&level, &last, sink, cancelled, reserve)?;
     Ok(Outcome {
         preview,
         last: stats,
@@ -547,34 +564,42 @@ pub fn level_from_world(world: &WorldState, p: &PlanetPreset) -> Result<Level, C
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let a = p.amplify.clone().unwrap_or_default();
     let c = u64::from(p.scale.circumference_blocks);
-    let cells = |r: u32| (c / u64::from(r)) * (c / u64::from(r) / 2);
+    let width = |r: u32| c / u64::from(r);
+    let cells = |r: u32| width(r) * (width(r) / 2);
     let l3 = cells(p.resolution.l3_r);
     let l2 = cells(p.resolution.l2_r);
     let levels = doublings(p.resolution.l2_r, p.resolution.l3_r).unwrap_or(1);
-    let world = super::estimate(p).bytes;
-    // The last level streams when its buffers would not fit next to the rest of the world under
-    // the default cap (plan §5.7.5: "any preset whose estimate exceeds its cap streams L3
+    let world = super::estimate(p).bytes + l2 * LEVEL_BYTES_PER_CELL;
+    let cap = crate::session::DEFAULT_MEM_CAP;
+    // A level streams when its buffers would not fit next to the rest of the world under the
+    // default cap (plan §5.7.5: "any preset whose estimate exceeds its cap streams L3
     // automatically"); a tile's window is the tile and a halo of about 200 cells on each side.
-    let window = (u64::from(a.tile_cells) + 2 * 200).min(c);
-    let streamed = window * window.min(c / 2) * Buf::BYTES_PER_CELL;
-    let whole = l3 * Buf::BYTES_PER_CELL;
-    let last_bytes = match a.stream {
+    let window = |r: u32| {
+        let w = (u64::from(a.tile_cells) + 2 * 200).min(width(r));
+        w * w.min(width(r) / 2) * TILE_BYTES_PER_CELL
+    };
+    let pick = |whole: u64, streamed: u64| match a.stream {
         StreamMode::Always => streamed,
         StreamMode::Never => whole,
-        StreamMode::Auto if world + l2 * 17 + whole > crate::session::DEFAULT_MEM_CAP => streamed,
+        StreamMode::Auto if world + whole > cap => streamed,
         StreamMode::Auto => whole,
     };
-    // The levels before the last hold their buffers whole.
-    let mid = if levels > 1 {
-        cells(p.resolution.l3_r << 1) * Buf::BYTES_PER_CELL
-    } else {
-        0
-    };
-    let mid_cells: u64 = (1..levels)
-        .map(|k| cells(p.resolution.l3_r << (levels - k)))
-        .sum();
+    let last = pick(l3 * TILE_BYTES_PER_CELL, window(p.resolution.l3_r));
+    // The levels before the last also keep the next level's arrays.
+    let mut peak = last;
+    let mut mid_cells = 0u64;
+    for k in 1..levels {
+        let r = p.resolution.l3_r << (levels - k);
+        mid_cells += cells(r);
+        let kept = cells(r) * LEVEL_BYTES_PER_CELL;
+        peak = peak.max(
+            pick(cells(r) * TILE_BYTES_PER_CELL, window(r))
+                + kept
+                + cells(r) * LEVEL_BYTES_PER_CELL,
+        );
+    }
     StageEstimate {
-        bytes: world + l2 * 17 + last_bytes.max(mid),
+        bytes: world + peak,
         seconds: l3 as f64 * 1.2e-6 + mid_cells as f64 * 3.0e-6,
     }
 }
@@ -647,13 +672,23 @@ impl AmplifyStage {
 
         // Whole raster in memory, or tile by tile (plan §5.7.5: streams automatically when the
         // buffers would not fit under the memory cap).
-        let whole_bytes = (gw * gh) as u64 * Buf::BYTES_PER_CELL;
+        let whole_bytes = (gw * gh) as u64 * TILE_BYTES_PER_CELL;
         let streamed = match self.p.stream {
             StreamMode::Always => true,
             StreamMode::Never => false,
             StreamMode::Auto => ctx.reserve(whole_bytes).is_err(),
         };
         let plan = cfg.plan(gw, gh, streamed && self.p.tile_cells < (gw.max(gh)) as u32);
+        ctx.log.push(
+            crate::log::Level::Info,
+            format!(
+                "amplify: {} MiB in use of the {} MiB cap; the last level of {gw} x {gh} cells needs {} MiB whole and runs {}",
+                ctx.gauge.in_use() >> 20,
+                ctx.mem_cap >> 20,
+                whole_bytes >> 20,
+                if plan.tile >= gw.max(gh) { "in memory" } else { "in tiles" }
+            ),
+        );
         let reserve = |bytes: u64| ctx.reserve(bytes);
         let mut sink = PackSink::create(ctx.out_dir, &l3, 256, sea, cfg.sea_y, cfg.mv)?;
         let setup_ms = started.elapsed().as_secs_f64() * 1000.0;
@@ -717,11 +752,12 @@ impl AmplifyStage {
             .iter()
             .map(|l| {
                 json!({
-                    "w": l.w, "h": l.h, "millis": l.millis,
-                    "passes": timing_json(&l.times),
-                    "pre_flood_raised_cells": l.pre_flood.raised_cells,
-                    "flood_raised_cells": l.flood.raised_cells,
-                    "flood_max_raise_m": l.flood.max_raise_m,
+                    "w": l.w, "h": l.h, "millis": l.millis, "tiles": l.tiles,
+                    "passes": timing_json(&l.stats.times),
+                    "pre_flood_raised_cells": l.stats.pre_flood_raised_cells,
+                    "flood_raised_cells": l.stats.flood_raised_cells,
+                    "flood_max_raise_m": l.stats.flood_max_raise_m,
+                    "sinks": l.stats.sinks,
                 })
             })
             .collect();
@@ -748,6 +784,7 @@ impl AmplifyStage {
             "flood_max_raise_at": [t.flood_max_raise_at.0, t.flood_max_raise_at.1],
             "flood_unreached": t.flood_unreached,
             "mean_abs_change_m": t.change_m_cells / (t.land_cells.max(1) as f64),
+            "mean_detail_blocks": t.detail_blocks_cells / (t.land_cells.max(1) as f64),
             "eroded_km3": t.eroded_m_cells * km3,
             "lost_in_transit_km3": t.transit_m_cells * km3,
             "levels": levels,
@@ -791,9 +828,16 @@ pub fn summary_line(v: &Value) -> String {
         .map(|(k, ms)| format!("{k}={:.1}s", ms / 1000.0))
         .collect::<Vec<_>>()
         .join(",");
+    let level_tiles = v["levels"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|l| format!("{}x{}:{}", l["w"], l["h"], l["tiles"]))
+        .collect::<Vec<_>>()
+        .join(",");
     format!(
-        "amplify_final={}x{} mode={} tiles={} halo={} sinks={} pre_flood_raised_cells={} flood_raised_cells={} \
-         flood_max_raise_m={:.2}@{} mean_abs_change_m={:.1} eroded_km3={:.3e} lost_in_transit_km3={:.3e} drama={} \
+        "amplify_final={}x{} mode={} tiles={} halo={} mid_tiles=[{level_tiles}] sinks={} pre_flood_raised_cells={} flood_raised_cells={} \
+         flood_max_raise_m={:.2}@{} mean_abs_change_m={:.1} mean_detail_blocks={:.2} eroded_km3={:.3e} lost_in_transit_km3={:.3e} drama={} \
          passes[{}] sample={:.1}s detail={:.1}s sink={:.1}s total={:.1}s",
         v["grid"]["w"],
         v["grid"]["h"],
@@ -806,6 +850,7 @@ pub fn summary_line(v: &Value) -> String {
         f("flood_max_raise_m"),
         v["flood_max_raise_at"],
         f("mean_abs_change_m"),
+        f("mean_detail_blocks"),
         f("eroded_km3"),
         f("lost_in_transit_km3"),
         v["drama"],

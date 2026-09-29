@@ -17,6 +17,12 @@ use super::window::Win;
 use crate::error::CoreError;
 use crate::surface::detail::DetailParams;
 
+/// Bytes per cell of a window while a tile runs: the passes' arrays ([`Buf`]), the copy of the
+/// terrain the change is measured against, and the core's arrays handed to the sink.
+pub const TILE_BYTES_PER_CELL: u64 = Buf::BYTES_PER_CELL + 4 + 17;
+/// Bytes per cell of a [`Level`] (terrain, area, weight, erodibility, lake).
+pub const LEVEL_BYTES_PER_CELL: u64 = 17;
+
 /// A rectangle of the fine grid: first column, first row, width, height.
 pub type Rect = (usize, usize, usize, usize);
 
@@ -84,11 +90,65 @@ impl TilePlan {
     }
 }
 
-/// A finished tile: its core's terrain (m) and detail amplitude (blocks), row-major.
+/// A finished tile: its core's terrain (m) and detail amplitude (blocks), row-major, and for a
+/// level before the last the arrays of the next level.
 pub struct TileOut<'a> {
     pub rect: Rect,
     pub z_m: &'a [f32],
     pub amp_blocks: &'a [f32],
+    pub level: Option<LevelTile<'a>>,
+}
+
+/// The arrays of a level a tile's core hands on ([`Level`]).
+pub struct LevelTile<'a> {
+    pub area: &'a [f32],
+    pub wgt: &'a [f32],
+    pub kfac: &'a [f32],
+    pub lake: &'a [u8],
+}
+
+/// Collects the cores of a level before the last into the arrays of the next.
+pub struct LevelSink {
+    pub level: Level,
+}
+
+impl LevelSink {
+    pub fn new(w: usize, h: usize, dx: f64) -> LevelSink {
+        let n = w * h;
+        LevelSink {
+            level: Level {
+                w,
+                h,
+                dx,
+                z: vec![0.0; n],
+                area: vec![0.0; n],
+                wgt: vec![0.0; n],
+                kfac: vec![0.0; n],
+                lake: vec![0; n],
+            },
+        }
+    }
+}
+
+impl TileSink for LevelSink {
+    fn put(&mut self, t: &TileOut<'_>) -> Result<(), CoreError> {
+        let Some(l) = &t.level else {
+            return Err(CoreError::InvalidState(
+                "a level sink was given the last level's tile".into(),
+            ));
+        };
+        let (x0, y0, w, h) = t.rect;
+        for j in 0..h {
+            let dst = (y0 + j) * self.level.w + x0;
+            let src = j * w..(j + 1) * w;
+            self.level.z[dst..dst + w].copy_from_slice(&t.z_m[src.clone()]);
+            self.level.area[dst..dst + w].copy_from_slice(&l.area[src.clone()]);
+            self.level.wgt[dst..dst + w].copy_from_slice(&l.wgt[src.clone()]);
+            self.level.kfac[dst..dst + w].copy_from_slice(&l.kfac[src.clone()]);
+            self.level.lake[dst..dst + w].copy_from_slice(&l.lake[src]);
+        }
+        Ok(())
+    }
 }
 
 /// Where finished tiles go.
@@ -270,6 +330,8 @@ pub struct LastStats {
     /// Σ |z after − z before| over the land cells of the cores (m · cells) and their number.
     pub change_m_cells: f64,
     pub land_cells: u64,
+    /// Σ detail amplitude over the same land cells, blocks · cells.
+    pub detail_blocks_cells: f64,
     pub cells: u64,
     pub times: Times,
     pub sample_ms: f64,
@@ -277,8 +339,8 @@ pub struct LastStats {
     pub sink_ms: f64,
 }
 
-/// What [`run_last`] needs besides the level.
-pub struct LastCfg<'a> {
+/// What [`run_tiles`] needs besides the level.
+pub struct TileCfg<'a> {
     pub ph: Physics,
     pub counts: Counts,
     pub noise: NoiseCfg,
@@ -288,12 +350,16 @@ pub struct LastCfg<'a> {
     pub mv: f64,
     pub plan: TilePlan,
     pub preview_stride: usize,
+    /// The last level: the detail amplitude and the preview are made. An earlier level hands the
+    /// sink the arrays of the next one instead ([`LevelTile`]).
+    pub last: bool,
 }
 
-/// Runs the last ×2 level tile by tile from `level` into `sink`.
-pub fn run_last(
+/// Runs one ×2 level tile by tile from `level` into `sink`: the last level into the L3 layers,
+/// an earlier one into the arrays of the next ([`LevelSink`]).
+pub fn run_tiles(
     level: &Level,
-    cfg: &LastCfg<'_>,
+    cfg: &TileCfg<'_>,
     sink: &mut dyn TileSink,
     cancelled: &dyn Fn() -> bool,
     reserve: &dyn Fn(u64) -> Result<(), CoreError>,
@@ -301,23 +367,27 @@ pub fn run_last(
     let plan = cfg.plan;
     let (gw, gh) = (plan.gw, plan.gh);
     let s = cfg.preview_stride.max(1);
-    let mut preview = Preview {
-        stride: s,
-        w: gw.div_ceil(s),
-        h: gh.div_ceil(s),
-        ..Preview::default()
-    };
-    preview.z_m = vec![f32::NAN; preview.w * preview.h];
-    preview.amp_blocks = vec![f32::NAN; preview.w * preview.h];
-    preview.drainage = vec![f32::NAN; preview.w * preview.h];
+    let mut preview = Preview::default();
+    if cfg.last {
+        preview = Preview {
+            stride: s,
+            w: gw.div_ceil(s),
+            h: gh.div_ceil(s),
+            ..Preview::default()
+        };
+        preview.z_m = vec![f32::NAN; preview.w * preview.h];
+        preview.amp_blocks = vec![f32::NAN; preview.w * preview.h];
+        preview.drainage = vec![f32::NAN; preview.w * preview.h];
+    }
     let mut stats = LastStats::default();
     let sea = cfg.ph.sea;
+    let a_fine = (cfg.ph.dx * cfg.ph.dx).max(f32::MIN_POSITIVE);
     for core in plan.cores() {
         if cancelled() {
             return Err(CoreError::Cancelled);
         }
         let (win, cx, cy) = plan.window(core);
-        reserve(win.cells() as u64 * Buf::BYTES_PER_CELL)?;
+        reserve(win.cells() as u64 * TILE_BYTES_PER_CELL)?;
         stats.tiles += 1;
         stats.window_cells_max = stats.window_cells_max.max(win.cells());
         let started = Instant::now();
@@ -342,15 +412,25 @@ pub fn run_last(
             );
         }
         stats.flood_unreached += pass.flood.unreached;
-        // Local relief, then the detail amplitude of every core cell.
-        relief5(&win, &buf.z, &mut buf.z2);
+        if cfg.last {
+            // Local relief, then the detail amplitude of every core cell.
+            relief5(&win, &buf.z, &mut buf.z2);
+        }
         let mut z_core = Vec::with_capacity(cw * ch);
-        let mut amp_core = Vec::with_capacity(cw * ch);
+        let mut amp_core = Vec::with_capacity(if cfg.last { cw * ch } else { 0 });
+        let (mut area_core, mut wgt_core, mut kfac_core, mut lake_core) =
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        if !cfg.last {
+            area_core.reserve(cw * ch);
+            wgt_core.reserve(cw * ch);
+            kfac_core.reserve(cw * ch);
+            lake_core.reserve(cw * ch);
+        }
         for j in 0..ch {
             let row = (cy + j) * win.w + cx;
             let mut eroded = 0.0f64;
             let mut transit = 0.0f64;
-            let (mut change, mut land) = (0.0f64, 0u64);
+            let (mut change, mut land, mut detail) = (0.0f64, 0u64, 0.0f64);
             for i in 0..cw {
                 let c = row + i;
                 z_core.push(buf.z[c]);
@@ -358,11 +438,21 @@ pub fn run_last(
                     change += f64::from((buf.z[c] - before[c]).abs());
                     land += 1;
                 }
-                let relief_blocks = f64::from(buf.z2[c]) / cfg.mv;
-                let a = cfg
-                    .detail
-                    .amplitude_blocks(relief_blocks, f64::from(buf.a[c]), cfg.drama);
-                amp_core.push(a as f32);
+                if cfg.last {
+                    let relief_blocks = f64::from(buf.z2[c]) / cfg.mv;
+                    let a =
+                        cfg.detail
+                            .amplitude_blocks(relief_blocks, f64::from(buf.a[c]), cfg.drama);
+                    amp_core.push(a as f32);
+                    if before[c] > sea {
+                        detail += a;
+                    }
+                } else {
+                    area_core.push(buf.a[c]);
+                    wgt_core.push(buf.own[c] / a_fine);
+                    kfac_core.push(buf.kfac[c]);
+                    lake_core.push(buf.lake[c]);
+                }
                 eroded += f64::from(buf.eroded[c]);
                 transit += f64::from(buf.sed[c]);
             }
@@ -370,18 +460,21 @@ pub fn run_last(
             stats.transit_m_cells += transit;
             stats.change_m_cells += change;
             stats.land_cells += land;
+            stats.detail_blocks_cells += detail;
         }
         stats.cells += (cw * ch) as u64;
-        // The preview: the cells of the thinned grid this core holds.
-        let (x0, y0, _, _) = core;
-        for pj in y0.div_ceil(s)..(y0 + ch).div_ceil(s) {
-            for pi in x0.div_ceil(s)..(x0 + cw).div_ceil(s) {
-                let (gi, gj) = (pi * s, pj * s);
-                let c = (cy + gj - y0) * win.w + cx + gi - x0;
-                let p = pj * preview.w + pi;
-                preview.z_m[p] = buf.z[c];
-                preview.amp_blocks[p] = amp_core[(gj - y0) * cw + gi - x0];
-                preview.drainage[p] = (f64::from(buf.a[c]).max(1.0) / 1.0e6).log10() as f32;
+        if cfg.last {
+            // The preview: the cells of the thinned grid this core holds.
+            let (x0, y0, _, _) = core;
+            for pj in y0.div_ceil(s)..(y0 + ch).div_ceil(s) {
+                for pi in x0.div_ceil(s)..(x0 + cw).div_ceil(s) {
+                    let (gi, gj) = (pi * s, pj * s);
+                    let c = (cy + gj - y0) * win.w + cx + gi - x0;
+                    let p = pj * preview.w + pi;
+                    preview.z_m[p] = buf.z[c];
+                    preview.amp_blocks[p] = amp_core[(gj - y0) * cw + gi - x0];
+                    preview.drainage[p] = (f64::from(buf.a[c]).max(1.0) / 1.0e6).log10() as f32;
+                }
             }
         }
         stats.detail_ms += started.elapsed().as_secs_f64() * 1000.0;
@@ -390,6 +483,12 @@ pub fn run_last(
             rect: core,
             z_m: &z_core,
             amp_blocks: &amp_core,
+            level: (!cfg.last).then_some(LevelTile {
+                area: &area_core,
+                wgt: &wgt_core,
+                kfac: &kfac_core,
+                lake: &lake_core,
+            }),
         })?;
         stats.sink_ms += started.elapsed().as_secs_f64() * 1000.0;
     }

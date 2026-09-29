@@ -83,6 +83,9 @@ pub struct Physics {
     pub slope_ref: f32,
     pub slope_cap: f32,
     pub max_frac: f32,
+    /// A cell loses at most this fraction of its initial drop to its lowest neighbour in all
+    /// (the erosion is scaled by the cell size: a stream cuts a valley of some cells' relief).
+    pub cap_frac: f32,
     /// A cell stays this gradient above its receiver.
     pub min_gradient: f32,
     /// The drama-scaled critical slope.
@@ -144,6 +147,8 @@ pub struct Buf {
     /// 1 where the flood after the seeding raised the cell: a filled depression, not a channel,
     /// which the erosion leaves alone (it would cut a gorge out of nothing).
     pub frozen: Vec<u8>,
+    /// The most each cell may lose to erosion in all, m.
+    pub cap: Vec<f32>,
     pub tmult: Vec<f32>,
     /// The part of the window whose statistics count (`x0, y0, w, h`): the tile's core.
     pub core: (usize, usize, usize, usize),
@@ -151,7 +156,7 @@ pub struct Buf {
 
 impl Buf {
     /// Bytes per cell of a buffer (the memory estimate).
-    pub const BYTES_PER_CELL: u64 = 11 * 4 + 2;
+    pub const BYTES_PER_CELL: u64 = 12 * 4 + 2;
 
     pub fn new(win: Win, fine: Fine) -> Buf {
         let n = win.cells();
@@ -169,6 +174,7 @@ impl Buf {
             kfac: fine.kfac,
             lake: fine.lake,
             frozen: vec![0; n],
+            cap: vec![0.0; n],
             tmult: vec![1.0; n],
             core: (0, 0, win.w, win.h),
         }
@@ -263,6 +269,7 @@ pub fn erode_step(
     kfac: &[f32],
     lake: &[u8],
     frozen: &[u8],
+    cap: &[f32],
     ph: &Physics,
     out: &mut [f32],
     eroded: &mut [f32],
@@ -302,7 +309,8 @@ pub fn erode_step(
             * kfac[c]
             * pw(a[c].min(ph.area_cap_m2) / ph.area_ref_m2, ph.area_exp)
             * pw(smax.min(ph.slope_cap) / ph.slope_ref, ph.slope_exp);
-        let delta = spl.min(room * ph.max_frac);
+        let left = cap[c] - *e;
+        let delta = spl.min(room * ph.max_frac).min(left);
         if delta > 0.0 {
             *o = zc - delta;
             *e += delta;
@@ -397,6 +405,28 @@ pub fn seed_step(win: &Win, z: &[f32], ph: &Physics, cfg: &NoiseCfg, out: &mut [
             + 0.35 * cfg.noise.value(x, zb, 7.0 * cell, 102);
         let v = zc + cfg.seed_relief * smax * ph.dx * n as f32;
         *o = v.max(ph.sea + 0.05);
+    });
+}
+
+/// How much each land cell may lose to erosion in all: `cap_frac` of its drop to its lowest
+/// neighbour (0 on flats and pits).
+pub fn incision_cap(win: &Win, z: &[f32], ph: &Physics, out: &mut [f32]) {
+    map_cells(win, out, |i, j, o| {
+        let c = j * win.w + i;
+        let zc = z[c];
+        *o = 0.0;
+        if zc <= ph.sea {
+            return;
+        }
+        let mut nb = [NONE; 8];
+        win.nbrs(i, j, &mut nb);
+        let mut low = zc;
+        for &n in nb.iter() {
+            if n != NONE {
+                low = low.min(z[n as usize]);
+            }
+        }
+        *o = ph.cap_frac * (zc - low.max(ph.sea));
     });
 }
 
@@ -667,6 +697,7 @@ pub fn run_passes(
 
     let started = Instant::now();
     buf.eroded.iter_mut().for_each(|e| *e = 0.0);
+    incision_cap(&win, &buf.z, ph, &mut buf.cap);
     for _ in 0..counts.erode {
         norms(&win, &buf.z, ph, &mut buf.norm);
         area_step(&win, &buf.z, &buf.norm, &buf.a, &buf.own, ph, &mut buf.a2);
@@ -678,6 +709,7 @@ pub fn run_passes(
             &buf.kfac,
             &buf.lake,
             &buf.frozen,
+            &buf.cap,
             ph,
             &mut buf.z2,
             &mut buf.eroded,
@@ -753,6 +785,7 @@ mod tests {
             slope_ref: 0.1,
             slope_cap: 1.0,
             max_frac: 0.5,
+            cap_frac: 0.5,
             min_gradient: 1.0e-4,
             thermal_slope: 0.6,
             thermal_rate: 0.05,
@@ -896,6 +929,7 @@ mod tests {
             "the sea has no flow"
         );
         let frozen = vec![0u8; n];
+        let cap = vec![1.0e9f32; n];
         erode_step(
             &win,
             &z,
@@ -903,6 +937,7 @@ mod tests {
             &kfac,
             &lake,
             &frozen,
+            &cap,
             &ph,
             &mut out,
             &mut eroded,
