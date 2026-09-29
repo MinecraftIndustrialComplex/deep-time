@@ -23,6 +23,9 @@ pub mod sphere;
 // Deep-time surface processes on L1 (P1-04).
 pub mod surface;
 
+// The parametric climate on L1 (P1-05).
+pub mod climate;
+
 // Column strata, metamorphism, plutons and the horizon bake (P1-07).
 pub mod structure;
 

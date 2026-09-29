@@ -194,7 +194,7 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 | `deeptime:basin_subsidence` | a sedimentary basin subsides | surface (P1-04) | see "The surface's events" |
 | `deeptime:marine_transgression` | the sea advances over land | surface (P1-04) | see "The surface's events" |
 | `deeptime:marine_regression` | the sea retreats | surface (P1-04) | see "The surface's events" |
-| `deeptime:glaciation` | an ice age | climate (P1-05) | set by P1-05 |
+| `deeptime:glaciation` | an ice age | climate (P1-05) | see "The climate's events" |
 | `deeptime:erosion_pulse` | a burst of erosion | surface (P1-04); dummy | see "The surface's events"; dummy: see below |
 | `deeptime:deposit_formation` | a deposit forms (place: its site) | deposits (P1-14); dummy | below |
 | `deeptime:deposit_exhumation` | erosion exposes (or destroys) a deposit | deposits (P1-14) | below |
@@ -255,6 +255,20 @@ Places are points: the region's centroid in its strongest frame. Areas and volum
 
 Place of a transgression or regression: the centroid of the continental cells flooded at its end and
 not at its start (regression: the reverse); global when there are none.
+
+### The climate's events (source `deeptime:climate`, P1-05)
+
+Written by `crates/deeptime-core/src/climate/glaciers.rs` (plan §8.3 item 6), decided at each
+climate snapshot (every `climate.snapshot_every_myr`, 10 Myr, plus the first and last step). A cell is
+glaciated when its land lies above its equilibrium line (ELA from the summer temperature and
+Ohmura et al. 1992's precipitation relation). A glaciation starts at the first snapshot where
+glaciers cover at least `glaciation_on_frac` (0.02) of the land (true area) and ends at the first
+where they cover less than `glaciation_off_frac` (0.01); still open at the end of the run it is
+written with `ongoing` = 1. Place: the ice's area-weighted centroid at its largest.
+
+| Kind | Params | Magnitude | Causes |
+|---|---|---|---|
+| `glaciation` | `peak_land_frac` (glaciated share of the land at its largest), `peak_area_km2`, `peak_t_years`, `ongoing` | peak share / 0.2, ≤ 1 | — |
 
 ### The dummy preset's events (source `deeptime:dummy`, until P1-03)
 

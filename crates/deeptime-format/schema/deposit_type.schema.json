@@ -237,7 +237,8 @@
         "trap_threshold": {"type": "number"},
         "seal_threshold": {"type": "number"},
         "reservoir_threshold": {"type": "number"},
-        "min_source": {"type": "number"}
+        "min_source": {"type": "number"},
+        "min_kitchen_km2": {"type": "number", "minimum": 0}
       }
     },
     "coal": {

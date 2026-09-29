@@ -27,6 +27,7 @@ mod editor;
 mod http;
 mod live;
 mod runs;
+pub mod stage2;
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
@@ -65,6 +66,8 @@ pub struct WatchOptions {
     pub every_myr: Option<f64>,
     /// Stop once nothing runs or waits (after `preset`'s run): scripts and tests.
     pub exit_when_done: bool,
+    /// Stage 2's preview runner (`--preview`); without it the preview and inspect routes answer 501.
+    pub preview: Option<stage2::Preview>,
     pub common: Common,
 }
 
@@ -162,6 +165,7 @@ pub fn serve(o: &WatchOptions) -> CliResult<Served> {
     let app = Arc::new(http::App {
         wb: Arc::clone(&wb),
         page: deeptime_viewer::workbench_page("Deep Time workbench"),
+        preview: o.preview.clone(),
     });
     let server = http::Server::start(SocketAddr::new(o.bind, o.port), app).map_err(|e| {
         wb.close();
@@ -245,6 +249,7 @@ mod tests {
             keep,
             every_myr: None,
             exit_when_done: true,
+            preview: None,
             common: quiet(),
         }
     }
@@ -265,6 +270,9 @@ mod tests {
         v["resolution"]["l1_r"] = json!(64);
         v["keyframes"]["size"] = json!([64, 32]);
         v["keyframes"]["every_myr"] = json!(10.0);
+        // The streaming tests read the coupled group (plates, surface, structure) as the whole
+        // pipeline; the deposit stage after it (P1-14) has its own tests.
+        v.as_object_mut().unwrap().remove("deposits");
         v.to_string()
     }
 
@@ -509,14 +517,15 @@ mod tests {
         assert_eq!(hello_kind, "hello");
         assert_eq!(hello["frames"], json!([]));
         assert_eq!(hello["status"]["state"], "queued");
-        // The coupled group grows as stages land (plates, surface, structure, …): read it, don't pin it.
+        // The coupled group grows as stages land (plates, climate, surface, structure, …): read it, don't pin it.
         let stages: Vec<&str> = hello["meta"]["stages"]
             .as_array()
             .unwrap()
             .iter()
             .map(|s| s.as_str().unwrap())
             .collect();
-        assert_eq!(&stages[..2], ["plates", "surface"]);
+        assert_eq!(stages[0], "plates");
+        assert!(stages.contains(&"surface"), "{stages:?}");
         let group = stages.join("+");
         assert_eq!(hello["meta"]["label"], "small");
         let frames: Vec<&Value> = msgs

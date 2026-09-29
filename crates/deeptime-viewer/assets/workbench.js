@@ -461,7 +461,7 @@
     body: $('stage2body'),
     async inspect(run, frame, x, z, lat, lon) {
       this.body.innerHTML = `<span class="hint">Inspecting x ${x}, z ${z} (${lat.toFixed(2)}°, ${lon.toFixed(2)}°) of ${esc(run.meta ? run.meta.label : run.id)} at ${esc(fmtT(frame.t))}…</span>`;
-      const q = new URLSearchParams({ run: run.id, frame: frame.n, x, z });
+      const q = new URLSearchParams({ run: run.id, frame: frame.n, x, z, lat, lon });
       this.render((await api(`api/inspect?${q}`)).body, `column x ${x}, z ${z}`);
     },
     async preview(run, frame, box, latLon) {
@@ -475,13 +475,15 @@
         this.body.innerHTML = `<div><b>${esc(what)}</b></div><div class="hint">${esc(j.message || j.error)}</div>`;
         return;
       }
+      // Which world the preview is (stage 2 says so: not the run's own terrain until P1-08).
+      const note = j.note ? `<div class="hint">${esc(j.note)}</div>` : '';
       if (j.url) {
         this.body.innerHTML = `<div><b>${esc(what)}</b> · <a class="ref" href="${esc(j.url)}" target="_blank" rel="noopener">open</a></div>` +
-          `<iframe src="${esc(j.url)}" style="width:100%;height:320px;border:1px solid var(--line)"></iframe>`;
+          note + `<iframe src="${esc(j.url)}" style="width:100%;height:320px;border:1px solid var(--line)"></iframe>`;
         return;
       }
       if (j.status_url) {
-        this.body.innerHTML = `<div><b>${esc(what)}</b></div><div class="hint">${esc(j.state || 'queued')}…</div>`;
+        this.body.innerHTML = `<div><b>${esc(what)}</b></div><div class="hint">${esc(j.state || 'queued')}… ${esc(j.message || '')}</div>` + note;
         setTimeout(async () => this.render((await api(j.status_url)).body, what), 1000);
         return;
       }

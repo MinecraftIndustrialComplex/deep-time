@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · In flight (agent worktrees under .claude/worktrees/, not yet merged): P1-05 climate, P1-07 rock classes/strata (done on its branch), P1-14 deposits in the pipeline, P1-17 early (parallel pflood/SPL), P1-20 workbench stage 1 (live runs + editor controls) and stage 2 (3D area preview), macOS free-memory fix + Q10 client launcher fold, MIC pack branch `deep-time` (EV + gap configs + rock tags; pack worktree ../../pack-deeptime) · Next after those land: P1-06, then P1-08 · Sub-agents on Sonnet 5.5 from 2026-09-29 (Ben) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-07 rock classes/strata, P1-14 deposits on the recorded history, P1-20 stage 1 workbench · In flight (agent worktrees under .claude/worktrees/): P1-17 early (parallel pflood/SPL), P1-20 stage 2 (3D area preview; done on its branch), MIC pack AU port (au-port-steel-guard) · Next: P1-06, then P1-08 · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -26,7 +26,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-02 | Fibonacci sphere, triangulation and raster coupling | done | 2026-09-28 | 0ea8a1b | Mac: cargo test -p deeptime-core sphere:: → 23 passed (V−E+F=2; every 16k-quick L1 cell: weights sum 1 ±1e-6, ≥ −1e-9, containing triangle; k-d nearest = brute force on 10,000 points); sphere_bench 250k: hull 255 ms (12 threads; 280 ms on 1), k-d tree 8 ms, L1 2048×1024 coupling 41 ms, 0 bad cells on all four L1 grids |
 | P1-03 | Plates and crust | done | 2026-09-28 | 0867a61 | Mac: cargo test --workspace ok (plates::/params::/preset:: 20 + 1 ignored: rift area conserved exactly, partition, ages ≥ 0, hull invariants after every resampling, byte-identical resume); 500 Myr 20k: p90 ocean age 167/169/245 Myr, 98/97/90.5 % < 250 Myr; `stage plates --preset plates_quick_16k --start scattered_continents --length-myr 500` → plates_final=13 ocean_age_p90_myr=202.3 steps=250 seconds=8.3; 100k 8.3 s (12 thr) / 23 s (1 thr), 250k 25–31 s / 72 s vs Cortial 76–106 / 330–437 s; clippy, fmt, deny clean |
 | P1-04 | Deep-time surface processes on L1 | done | 2026-09-28 | 50dd95f | Mac: cargo test --workspace ok (core 139 incl. surface:: 20: receivers acyclic, depressions resolved, diffusion Σh conserved, SPL ramp = analytic within 1e-6 (n 1) / 1e-3 (n 2), strata-log invariants, coupled pipeline resume identical; cli 11); `stage surface --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-surface` → 250 steps 96 s (plates 22 s, surface 74 s), land_frac 0.215, mass residual −6e-4 km³ of 1.2e8 eroded, 50 frames, 70 erosion pulses / 265 basins / 3 sea events; bench 1 thread surface 137 s = 1.05 µs/cell/step vs the 131 s cost model; fastscapelib oracle hypsometry_ks=0.0209 chi_slope_ratio=1.0000 PASS; fmt, clippy -D warnings, deny clean; gradlew build test 106/0 |
-| P1-05 | Climate | todo | | | |
+| P1-05 | Climate | done | 2026-09-29 | — | Mac: cargo test --workspace ok (core 162 + 1 ignored incl. climate:: 14: EBM balance |ASR−OLR| < 0.2 W/m², energy conserved by diffusion/ice to 1e-9, ridge windward > 3× lee with a rain shadow, Köppen Af/BWh/Cfb/Dfc/ET/EF/Aw/Csa/Dwd hand-built cases, idealised planet has all five groups, coupled pipeline resumes identically on 1 vs 3 threads); `stage climate --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-climate` → 51 snapshots, climate 11.7 s of 191 s, t_surface 11.3 °C, EBM 15.6 °C, net TOA 0.006 W/m², land Köppen A 0.10/B 0.12/C 0.21/D 0.04/E 0.53; bench 12 vs 1 thread identical; Earth relief (`climate-dem`): 19/24 cities in the right Köppen group; clippy, fmt, deny clean; gradlew build test 118/0 (after merging master 6d8171f) |
 | P1-06 | Young landscape, amplification and the detail layer | todo | | | |
 | P1-07 | Rock classes, column strata and metamorphism | done | 2026-09-29 | — | On the coupled pipeline preset (built-ins stay placeholders until P1-08). Mac: cargo test --workspace ok (core 149 + 1 ignored incl. structure:: 11: stacks ordered top-down, ≥ 1 block thick, classes valid, ≤ K; resume identical; every built-in deposit type finds all its fields incl. trap_structure and host/*), fmt, clippy -D warnings, deny clean; gradlew build test 106/0; ./gametest.sh All 45 passed (everyClassInTheWorld 59/59, 240 samples 0 wrong); `stage structure --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-structure` → horizon_check=ok, 3.88 horizons/cell, 22,000 plutons (8,138 bodies), 50 frames published; structure 4.8 s of 122 s |
 | P1-08 | Bake, world data v1 and parity | todo | | | |
@@ -35,13 +35,13 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-11 | Customize editor, timelapse and staging | doing | 2026-09-28 | d42375e | Screens, models and staging built on the placeholder presets (real stages pending). Mac, merged with master f14d258 (P1-03, P1-18): JUnit tests=101 failures=0 (new: EditorModelTest, TimelapseModelTest, ModelHelpersTest, StagingMoverTest, TimelineAcrossJniTest, ScreenSourcesTest); ./gametest.sh → All 31 required tests passed (EditorModelGameTests acceptBuildsGenerator, stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel, realPresetFieldsLightUp); cargo fmt/clippy -D warnings/test --locked (193 passed)/deny clean; gradlew build clean. Client (laptop, HeadlessMC + Xvfb): whole walk Create World → editor → run → review → Accept → world created from the moved staging, no crash; guidance panel with natives forced off; screenshots in review/out/p1-11-client. Rerun with the real presets after P1-08; biome names on the review page with P1-09 |
 | P1-12 | Strata pass with rock tags and `rock_states` | done | 2026-09-28 | — | Mac: ./gametest.sh and -PwithMic (+ MIC rock tags via -Ddeeptime.extraDatapack) → All 21 required tests passed each; coal stone / black argillite; Create stones in their classes; loess = projectatmosphere:dust[layers=8]; everyClassInTheWorld 59/59 classes, 240 samples 0 wrong; MIC smoke probe palette 59/59 (member 24, fallback 35); JUnit 46/0; bodies deferred (P1-08/P1-14) |
 | P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 743b69d | Mechanism verified on placeholder presets (dummy pipeline + wrap-test bake): standalone and MIC first starts generate in ~12 s with progress lines ≤ 5 s apart, restart does not regenerate; no-config / circumference-mismatch / native-failure all stop cleanly before loadLevel. Rerun with the real presets after P1-08 |
-| P1-14 | Deposit engine: the four families | doing | 2026-09-28 | 7f4858c | Engine on a synthetic field history (real fields wait for P1-03…P1-07). Mac: cargo test --workspace ok (core 82 incl. 41 deposits::, format 31, cli 11); porphyry σ 1.4892; Poisson means within 4 SE over 10,000 draws; tonnage P90/P50/P10 within 4 SE; min separation holds (200 seeds + the run); every site has a forming event with causes; `stage deposits --preset …/deposits_synthetic_16k.json --viewer review/out/p1-deposits` → 32 sites of all 8 types, counts next to ρ·A·F (porphyry 9 drawn / 9.41), 0.83 GB peak; fmt, clippy -D warnings, deny clean |
+| P1-14 | Deposit engine: the four families | done | 2026-09-29 | — | On the real recorded history (plates → surface → structure → deposits, `pipeline_{quick,full}_{16k,32k}` have a `deposits` section). Mac: cargo test --workspace ok (core 155 + 1 ignored incl. deposits::recorded_tests 6: 1 vs 3 threads give identical sites/bodies/events/census, a checkpoint inside the deposit stage resumes on another thread count to the same sites, favourability of a rigidly drifting crust = the fixed-crust map moved cell for cell, missing fields skip exactly the types that read them and change nothing else, every family on recorded frames; cli 21 incl. `stage deposits` on the real history; format 32, inspect 28, jni 7, viewer 5); clippy -D warnings, deny licenses bans clean; gradlew build test 118/0; fmt clean for every file this task touches (watch/editor.rs on master is not); `stage deposits --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-deposits-real` → 154 s (plates 30.0, surface 111.6, structure 5.0, deposits 4.4), 5 sites at count_mult 1 (porphyry 1, coal 4; MVT, SEDEX, petroleum expected 0.00 / 0.00 / 0.11), 42 at count_mult 10; 17 MB bundle. Ben reviews: ore provinces, site list, three chains; see the build log for what is empty and why |
 | P1-15 | Deposits in the world | doing | 2026-09-28 | — | On the synthetic deposit world (real fields wait for P1-03…P1-08). Mac: ./gametest.sh, -PwithEv, -PwithMic → All 30 required tests passed each (DepositGameTests body 1222/1222 ore exact, 0 missed, 0 unexplained, regeneration 0 of 44,880 differ; ClaimGameTests; SpawnGameTests); ./gametest-planet.sh claimoninplanetworld PASS standalone (19 removed) and -PwithMic (38 removed); JUnit 62/0 incl. DepositDataParityTest (19,649 body samples, worst Δ 3.3e-16); smoke standalone first-start deposit world PASS + `deeptime-inspect ore` render |
 | P1-16 | COE and CDG hooks | done | 2026-09-28 | — | Mac: `./gametest.sh` and `-PwithMic` → All 45 required tests passed each; CompatGameTests with COE 1.6.8 + CDG 1.3.15: 7 of 7 site chunks = the site's vein in COE, 30 of 30 claimed noise veins dropped (COE picks them in the overworld), 34 unclaimed kept, 33 stored randomMul = the site's quantile (24 = Rust's drawn quantile, worst Δ 2.8e-8), 16 trap chunks = charge × cdg_scale × share, 111 chunks outside traps 0. MIC smoke (16k deposit world) PASS: `probe coe` at 9 site chunks = the site's vein (agrees), `probe cdg` over trap 27 > 0 (infinite / 553,979 mB), 0 elsewhere; `/coe locate` copper not found, redstone found. JUnit 106/0; cargo fmt/clippy/test/deny clean. Driven by the synthetic deposit world (see build log) |
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
-| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log) |
+| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log) |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -55,6 +55,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | p1-surface (500 Myr of plates + erosion, deposition, strata; 16k quick pipeline; PNGs losslessly recompressed to fit the 25 MB Free-plan deploy cap) | https://spacesheep.dev/@benmac/deeptime-p1-surface | P1-04 surface processes, 500 Myr 2026-09-28 | 2026-09-28 |
 | p1-structure (P1-07: surface rock, bedrock, metamorphic grade, trap structure, plutons, six pole-to-pole cross-sections; trimmed to 23 MB) | https://spacesheep.dev/@benmac/deeptime-p1-structure | P1-07 rock classes and strata, 500 Myr 2026-09-29 | 2026-09-29 |
 | p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
+| p1-deposits-real (P1-14: deposits on the real 500 Myr history; not published, review/out/p1-deposits-real on the laptop and the Mac, 17 MB) | — | P1-14 real history 2026-09-29 | 2026-09-29 |
 | p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
 | q10-ev (Q10 evidence: the same deposits in MIC without and with Excavated Variants; cut screenshots, per-host ore table, costs, trade-offs) | https://spacesheep.dev/@benmac/deeptime-q10-ev | Q10 evidence 2026-09-28 | 2026-09-28 |
 | q10-map-plain (BlueMap, MIC without EV: 3 sites, surface + cut maps; linked from q10-ev) | https://spacesheep.dev/@benmac/deeptime-q10-map-plain | Q10 map without EV 2026-09-28 | 2026-09-28 |
@@ -69,6 +70,171 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — P1-14: the deposit engine on the real recorded history (agent worktree agent-a1861e86fd3f0f213, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** `DepositStage::recorded(&PlanetPreset)` reads `WorldState::history` (P1-04's frames plus P1-07's `trap_structure`
+  and `host/<class>`), the synthetic path is unchanged (`Source::{Synthetic, Recorded}`). A planet preset with a `deposits`
+  section (`DepositParams`: count_mult, province, province_km, types, essentials; validated, needs `surface`) adds the stage
+  after the coupled group; the four `presets/pipeline/pipeline_*.json` got `"deposits": {count_mult 1, strong, 800 km, all
+  types, no essentials}` inserted between `resolution` and `tectonics` (a different place from where P1-05 appends, so the
+  merge is textual-conflict free). The stage takes the history out of the world for the placement step and puts it back
+  (checkpoints carry it); frame count and frame times come from the history, not the preset (`state.frames`, restored on
+  resume); scales, grid and seed from the preset. `with_content` now also sets a planet preset's essentials. Field names are
+  read from the history's own `names()`, nothing is listed in the stage.
+- **Missing fields degrade deterministically.** A type whose rules read a name the history lacks is skipped: no accumulator,
+  no sites, a WARN per type (`deposit type X skipped: the history lacks [...]`), an INFO summary (`8 of 8 types run on 50
+  frames (55 fields, 3 clocks)`), and the census (`skipped: [{type, missing}]`, printed by the CLI as `deposits SKIPPED`).
+  Absent `host/*` fields are a documented fallback, not a skip (host score 1, "no lithology opinion"): logged and in
+  `fallbacks`. With P1-07 merged **no type is skipped and no fallback fires** on the real history; the tests exercise both
+  by dropping `trap_structure`/`carbonate_platform`/the host fields from a recorded synthetic history (the types that kept
+  their fields give bit-identical favourability). Types that are *enabled but empty* are visible instead through the census'
+  `best_cell` (where the most favourable cell is, its six component scores, the limiting component; the CLI prints it) and
+  `tracts`/`expected`.
+- **Found while looking at the first real map: the accumulators did not move with the plates.** The engine folds favourability
+  per L1 cell over frames; on the real history a cell's crust changes every 10 Myr (100+ cells), so an arc's history smeared
+  along its track and sites landed on old arc positions in the ocean (2 of 5 porphyries and 1 of 11 coal on land, arcs as
+  random streaks). Fix, additive to P1-04: the surface stage composes its per-step nearest-cell advection maps into a
+  per-frame *origin map* (`FrameAcc::compose_back`, crust born in the step marked new) and records it in every frame as two
+  exact-integer fields `deeptime:origin_di/dj` (cell offsets, NaN = new crust; 16-bit packing is exact for them, so
+  `RecordedHistory` is unchanged). The deposit engine carries every type's `CellAcc` and the petroleum `CellPet` with the crust
+  into each frame (`carry`, a parallel gather) before folding the frame in, so favourability is per crust parcel; pass 2 traces
+  each site's cell back through the frames (`trace`) so the ledger's erosion/burial series and the supergene window are the
+  column's own, and every forming/exhumation/placer event is looked up at where the deposit *was* at that time (`xz_at`), not
+  where its crust is now. Placers stay on the present drainage. A rigid-drift test proves the carry exact. **Checkpoint schema
+  4 → 5** (surface `FrameAcc` and the deposit state changed shape); the history grows by two mostly-constant fields per frame.
+- **Also fixed.** (1) Petroleum kitchens: the real history has 3,348 connected regions of mature source rock (p50 one cell,
+  22 km²; 3,271 of them under 500 km²), which made 3,348 `petroleum_generation` events that buried the viewer and the ticker.
+  `PetroleumRules.min_kitchen_km2` (schema + type JSON: 500, about 22 L1 cells; default 0 for datapacks) keeps 77. (2) The
+  keyframe dedupe in the session was per instant; a recorded run reaches the deposit stage at t = 0 where the group has just
+  drawn its closing keyframe, so the deposit stage's own was skipped. It is now per group (`last_kf_t: (t, group lead)`),
+  three lines in `session.rs`. (3) The deposit bundle leaves the strata inspector to the structure bundle (its layers were
+  ~20 MB) and drops six bulk surface/structure layers from its keyframes (`surface/{erosion,deposition,sediment,regolith,
+  class}`, `structure/log_grade`), so a 500 Myr bundle is 23 MB before oxipng and 17 MB after.
+- **Tests that pinned the pipeline.** `surface/tests.rs::pipeline_json`, `structure/tests.rs::pipeline_json`, the CLI's
+  surface test and the workbench's `small_pipeline` now remove the `deposits` section (they are about the group); new tests
+  cover the stage. `deposits::recorded_tests`: `coupled_pipeline_reads_its_own_history_and_is_deterministic_across_threads`
+  (3,000 samples, 100 Myr, 1 vs 3 threads: sites, bodies, events, census and the sites layer bit-identical; no skipped type, no
+  fallback; petroleum sites with kitchens in the log; every site's causes are real plates/surface events),
+  `a_checkpoint_inside_the_deposit_stage_resumes_to_the_same_sites`, `deposits_ride_a_rigidly_drifting_crust`,
+  `missing_fields_skip_the_types_that_need_them_and_nothing_else`, `the_recorded_stage_places_every_family` (recorded frames
+  made from the synthetic history: all eight types have sites), `a_world_without_history_is_a_clear_error`; CLI
+  `deposit_stage_reads_the_recorded_history` (`stage deposits --preset` and `--in` after `stage structure --out`).
+  **A 100 Myr run on 3,000 samples is too young for most families** (only petroleum gets tracts, coal one that erodes), so the
+  "every family" assertion is made on the recorded synthetic history and on the 500 Myr acceptance run below, not on the
+  small coupled run; longer coupled tests would cost minutes in debug.
+- **Measured (Mac, `tools/remote/mac.sh`, M6, 12 threads, shared).** `stage deposits --preset pipeline_quick_16k --start
+  scattered_continents --length-myr 500 --viewer review/out/p1-deposits-real --out …` → 154 s wall on a quiet Mac (plates
+  30.0 s, surface 111.6, structure 5.0, deposits 4.4 for 52 steps; 224 s when the Mac was busy); `stage deposits --in` a saved
+  group checkpoint: 4.1 s wall. 55 fields + 3 clocks in the history. The deposit stage adds the accumulators (8 types × 24 B ×
+  524k cells ≈ 100 MB) to the world; history 327 MiB at 500 Myr 16k quick (312.8 MiB before the origin fields).
+- **What the 500 Myr map showed (count_mult 1 and, for the placement check, 10; both with strong provinces).**
+
+  | type | ρ·A·F expected | drawn | sites | tracts (km²) | best cell |
+  |---|---|---|---|---|---|
+  | porphyry_cu_mo_au | 1.88 | 2 | 1 (+0 children) | 641 (37,641) | F 0.91, limited by driver (convergence/obliquity/slab age) |
+  | coal_seam | 15.24 | 17 | 4 (9 eroded, 4 too deep) | 1,298 (105,784) | F 1.00 |
+  | mvt_zn_pb | 0.00 | 0 | 0 | 2 (45) | F 0.21, limited by host and source (evaporite) |
+  | sedex_zn_pb | 0.00 | 0 | 0 | 4 (112) | F 0.80, limited by pathway; 112 km² |
+  | petroleum_trap | 0.11 | 0 | 0 | 84 (2,797) | 77 kitchens ≥ 500 km² |
+  | bif_fe, placer_au, supergene | 0 | 0 | 0 | 0 | bif: `bif_acme` clock 0 and `inherited_bif` 0 (P1-05/P1-07 stand-ins) |
+
+  At count_mult 10: 42 sites (porphyry 3 with 9 placers, coal 30, petroleum 0 after its one draw was too deep).
+  Where they sit: the favourability maps now follow the margins the arcs and mires were on (the arc-flux input shows thin
+  lines along every active margin; the porphyry map shows the same lines where the crust ended up); porphyries are on
+  continental-margin arcs with placers within a few cells of them downstream (4 of 9 on land, the rest at the river mouths
+  the walk ends in); coal is on shelves and coastal plains and in the drowned mires of the polar shelf (19 of 30 above sea
+  level); nothing lands in the deep ocean. Site chains checked in the viewer: porphyry #4 (46.2°N, 235.3°E, andesite host,
+  buried, weakest component driver, barren nearby for lack of source) ← subduction_onset 1:98, orogeny_phase 1:290,
+  terrane_accretion 1:82 ← subduction_onset 1:65, collision 1:81 ← subduction_onset 1:16 — real plates events, not synthetic.
+  **The counts are low and MVT/SEDEX/oil are empty because the surface's facies are scarce**, not because of the engine:
+  at the last frame the carbonate platform covers 0.5 % of cells, evaporite 0.8 %, euxinic basin 0.4 %, coal facies 0.1 %, and
+  the mean temperature is −1.8 °C (P1-05's climate replaces this stand-in; carbonate needs water ≥ 18 °C). Porphyry is 1.9
+  against the plan's rough "about 11 at 16k" (1 % arcs at F 1): the arcs cover 0.5 % of the planet at mean F 0.33.
+- **Deviations.** (1) The acceptance run is `pipeline_quick_16k` (P1-13's `earthlike_*` stay placeholders until P1-08).
+  (2) Scales come from the preset but the surface elevation → block y still uses sea level y = 63. (3) The deposit stage runs
+  at t = 0 after the group, so the sites and census come out with a second keyframe at t = 0 labelled `deposits`.
+  (4) The essentials list is empty in the pipeline presets (the game passes `deeptime:essentials` in the content bundle;
+  `with_content` applies it), so this run has no `guaranteed_occurrence` sites.
+- **Not done / next.** P1-05's climate (warm shallow seas → carbonate, evaporite, coal) is what fills MVT/SEDEX/coal; then
+  count_mult and the facies rules are tuning (P1-17), and BIF needs P1-07's basement ages to reach `inherited_bif` for a
+  timeline that starts after the acme. P1-15/P1-16 rerun on a real deposit world after P1-08. Decisions for Ben: none
+  blocking; the count question (`count_mult` default 1 gives 1 porphyry on a 16k planet) waits for P1-05.
+
+### 2026-09-29 — P1-20 stage 2: 3D area preview and click-to-inspect from the real generator (agent worktree agent-a63e3a8af506069de, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Approach.** The Rust column evaluator is a stub until P1-08, so stage 2 runs the real mod headless
+  on the Mac and exports what it placed: Deep Time's density, strata pass and deposits and the
+  pack's surface rules and ores, as a player's world gets them.
+- **`deeptime-inspect export-area`** (`crates/deeptime-inspect/src/area.rs`, format in its docs):
+  a box of at most 256 × 256 (`--max-side`), y −352..639 or `--y`, written as `.dtva(.gz)`: a JSON
+  header, then u16 run counts per column, u16 run values and lengths (bottom-up), and the strata stack
+  per column (K × i16 tops, K × u8 classes, read through P1-07's `LoadedLayer::stack_at`, the same
+  column the Java strata pass builds). A run value is a (block, tag) entry; a tag lists the deposit
+  bodies and zones whose SDF holds the block centre. x0 is folded into [−C/2, C/2) and the box runs
+  east, so a box may straddle the seam (column i = world x fold(x0 + i), unwrapped x0 + i). The header
+  carries blocks (colour from `colors`, category, ore material, the rock classes a block belongs to),
+  the bodies and sites in the box with their "why here" chains (from `/deeptime why` when the runner
+  recorded it, else the world data's event log), the palette and claims probes, and stats: categories,
+  ore in bodies / claimed scatter / unclaimed, how much rock is its horizon's (or body's) class, and
+  whether the `probe site` answers match the export's blocks and body tags. `--verify` decodes the file
+  and compares it with the region files block by block. Tests: 7 unit (round trip, RLE runs maximal
+  and summing to the height, runs past the stored sections, a box across the seam at C = 128 given in
+  three frames, a body across the seam, probes parsing, categories) + 2 on the real fixture region
+  (80 × 64 × 384 blocks equal the world's; the same columns one lap away; proto and missing chunks
+  reported).
+- **Job runner** `tools/workbench/preview.py` (stdlib; `/usr/bin/python3` 3.9 on the Mac runs it):
+  installs the profile's server set if missing, prepares the job's own world
+  (`smoke/workbench/jobs/<job>/world`, booted with `--universe <job> --world world`, so smoke worlds
+  are untouched; synthetic data, a world-data folder, a first-start preset or a test terrain), takes
+  the Mac's server lock (the one `mac.sh --server` holds; waits, never breaks it), Chunky per box (a
+  seam box in its two canonical pieces), the probes, stop, `export-area --verify`, deletes the world.
+  From the laptop: `tools/workbench/preview-area.sh`. Contract in `tools/workbench/README.md`.
+- **Viewer** `tools/review/pages/area3d/` (three.js 0.169 from jsDelivr): greedy-meshed 32³ sections,
+  a section re-meshed only when a cut, toggle or colour mode changes what it shows; top cut, x/z
+  cross-section, category toggles and presets (everything / hide stone / ores and deposits with bodies
+  see-through), colour by block, rock horizon or body, vivid ores (ore textures average to their stone,
+  so ores are painted by material by default); the seam drawn in red; click a block for id, folded and
+  unwrapped position, chunk, horizon and whether the strata pass painted it, the body and zones, the
+  site with products and why-here chain, and the column's strata stack; "cut here" makes a notch through
+  a site's ore body. Light and dark, 390 px. URL state (`site`, `pick`, `pickcol`, `cuty`, `sec`, …).
+- **Wired into the workbench** (stage 1 at 9e34b45): `deeptime watch --preview <preview.py>` forwards
+  `POST /api/preview`, `GET /api/preview/…`, `GET /api/inspect`, `GET /area3d/…` to `preview.py http`
+  (new `crates/deeptime-cli/src/watch/stage2.rs`; `http.rs` asks it first, 501 without `--preview`);
+  `mac-watch.sh` passes the checkout's preview.py (`--no-preview` to leave it off); `workbench.js`
+  `Stage2` passes lat/lon to inspect and shows the answer's `note`. **What a preview is:** runs are
+  rasters, not worlds, so until P1-08 a preview is the synthetic deposit world (deposits_world_16k,
+  500 Myr, C = 16,384) at the box's latitude and longitude; every answer, the panel and the viewer say
+  so. Inspect answers from a finished preview holding the column (the viewer opens on the column's top
+  block), else starts a 32 × 32 preview. The P1-08 plug-in points are in the README ("Later").
+- **Measured (Mac)**, `tools/workbench/preview-area.sh`, all `verify` 0 wrong:
+  | Box | Profile, world | Boot | First start | Chunky | Total | File |
+  |---|---|---|---|---|---|---|
+  | 256 × 256 × 992 at −5698,−1158 | standalone, deposits_world_16k | 12.7 s | 3.3 s | 361 chunks 9.1 s | 43.8 s | 0.94 MB, 31.3 M blocks, 1.26 M runs |
+  | same, after merging P1-07 | standalone | 17.0 s | 4.5 s | 361 chunks 11.1 s | 63.1 s (with the jar rebuild) | 1.02 MB |
+  | same | MIC, 168 mods, pack 303fd89 | 50.3 s | 5.8 s | 361 chunks 25.3 s | 89.9 s | 1.09 MB, 173 block types |
+  | 128 × 128 across the seam (8128..8256) | standalone, wrap-test every-class | 21.4 s | — | 2 × 55 chunks 9.4 s | 54.5 s | 0.19 MB |
+  | 63 × 27 through the workbench | standalone, deposits_world_16k | — | — | 35 chunks | 27.2 s | 34 kB |
+  Export itself 0.5 s for the largest box. 6 of 6 `probe site` answers agree with the export's blocks
+  and body tags (standalone after the merge, and MIC). Strata: 99.2 % (standalone) and 98.5 % (MIC) of
+  rock below the first horizon top is its horizon's or body's class; crust 2,091 / 134,146 blocks
+  (MIC: stone that features put back). Seam box: terrain top continuous (largest step between the two
+  seam columns 4, mean 0.62; a neighbouring pair: 4, 0.10; the seam's carvers, as P0-15 saw).
+  `tools/workbench/check-watch.sh` (a private `deeptime watch --preview` on port 8653): POST with the
+  page's body → 202 + note → polled → done in 115 s (90 s of it waiting for another session's server
+  lock) → export 34 kB, `/area3d/` 200, inspect of a column inside a finished box → the viewer URL with
+  `pickcol`. Screenshots (headless Chromium, SwiftShader; about 15 s to load and mesh 256 × 256 × 992):
+  `review/out/area3d-shots/` (overview, notch cutaway through the supergene blanket with a copper ore
+  selected, ores-and-deposits, seam, MIC overview and cutaway, 390 px dark, the workbench-made preview).
+  Review bundle (not published): `review/out/area3d/` (viewer + 4 exports, 2.3 MB, 7 files).
+- **Gates** after merging master 6d8171f: `cargo fmt --check`, `clippy --workspace --all-targets -D
+  warnings`, `test --workspace --locked` (cli 22 incl. 2 stage2, core 149, format 32, inspect 28 + 2 +
+  7, jni 7, viewer 5), `deny check licenses bans` clean. `fmt` also needed master's b150ea0 watch test
+  reformatted (done here). No Java changed, so no JUnit/GameTest rerun.
+- **Findings.** In the MIC box the unclaimed ores are many (uranium 5,420, nickel 3,682, fluorite
+  2,262, platinum 1,840 blocks in 256 × 256): kept by design, since claiming covers Deep Time's
+  materials only. The same blanket holds 337 ore blocks in the standalone world and 367 in MIC (MIC's
+  Create stones are hosts where vanilla's stand-ins are not).
+- **Next.** Publish `review/out/area3d/` (parent session). After P1-08: point `workbench_preview` at
+  the run's bake and answer `/api/inspect` from `deeptime inspect-column` (README "Later").
+
 ### 2026-09-29 — macOS free memory in MachineInfo; the Q10 client launcher folded into mac-client's launch path (agent worktree agent-aab6da56089b714ed, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **1. macOS free memory (the twin of P1-11's Linux `MemFree` fix).** The JDK is not right on the Mac:
   `OperatingSystemMXBean.getFreeMemorySize()` was 1,068,990,464 B (0.996 GiB) on the 16 GB M6 with 6+ GiB
@@ -144,6 +310,127 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Next.** Nothing blocks. The setup page's memory line stays a snapshot from when the editor model is created
   (Create World open); to show the machine live, `SetupPage` could read `MachineInfo.current()` each frame (it
   is one volatile read now). Not merged into master and not pushed, as asked.
+
+### 2026-09-29 — P1-05 climate (agent worktree agent-ac0e58a6cc29f08bf, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** `crates/deeptime-core/src/climate/` (mod, params, insolation, ebm, belts, lapse,
+  orographic, koppen, glaciers, snapshot, tests) — plan §8.3. Ported (NOTICE.md, file headers):
+  fastscape-lem/orographic-precipitation (MIT, commit baf8a0c: Smith & Barstad's Fourier transfer
+  function and defaults) and climlab's EBM equations (MIT, commit fcbde37: `EBM_seasonal`,
+  `StepFunctionAlbedo`, `AplusBT`, `MeridionalHeatDiffusion`, daily insolation — equations, not
+  code). New dependency: `rustfft` 6.4.1 (MIT OR Apache-2.0; `cargo deny` clean). Also: preset
+  section `climate` (every key optional, `deny_unknown_fields`, range checks naming the key; all
+  four `presets/pipeline/*.json` carry it), `PlanetPreset.climate`, the `climate_final` CLI line,
+  climate per-process timings, EVENTS.md "The climate's events" (`glaciation`), ramps
+  `climate_t`, `precip`, `aridity`, `koppen` (categorical, with `labels`) in ramps.json, a keyframe
+  legend in the viewer (swatches for Köppen), `deeptime stage --viewer-layers a,b,…` (keeps a review
+  page small; without a `structure…` name it also leaves P1-07's structure view out), and a dev
+  subcommand `deeptime climate-dem --dem <f32> --width W [--preset P] [--viewer D]` (one snapshot on
+  a given relief). Plan §8.3 and §10.3 P1-05 have "As built"/"As run" notes.
+- **Wiring.** The climate is a stage coupled to the plates, placed *before* the surface: the group is
+  now `plates → climate → surface → structure` (preset.rs pushes climate when the preset has a
+  `climate` section). Each plate step it computes the ground the surface is about to erode (the
+  plate model's L1 elevation + the surface's offset advected with the plates exactly as the surface
+  will) and writes `climate/{t_mean_c, precip_mm}` (read by `surface/climate.rs` for runoff,
+  weathering, facies, carbonate water temperature — now the stage's temperature, not the zonal
+  stand-in — and by P1-07's metamorphism via `climate/t_mean_c`) plus `climate/{koppen, t_warm_c,
+  t_cold_c, aridity, glacier, ela_m}` and the carried anomalies `climate/anomaly/*`. The deposit
+  frames' `precip_mm` and `t_mean_c` therefore are the real climate (checked in the coupled test:
+  the last frame's mean precipitation within 20 % of the field's). Without a `climate` section the
+  surface keeps its stand-in. Checkpoint schema unchanged (the stage keeps its state in its own
+  postcard blob: EBM state, ice sheets, row references, glaciation tracker).
+- **Snapshots.** Full snapshot at the first step, every 10 Myr and the last step (51 in 500 Myr);
+  between them each cell's sea-level departure from its row's reference (EBM ocean temperature;
+  ln of the belts' precipitation), ELA, aridity and Köppen move with the plates (semi-Lagrangian,
+  `surface::advect`) and the lapse rate is re-applied on the current ground; land risen from the sea
+  gets a Köppen from a sinusoidal year. The EBM warm-starts from the previous snapshot (6 years;
+  40 at spin-up; early stop at 0.005 K).
+- **Model decisions (implementation details, recorded here).** EBM: climlab's equation with North,
+  Cahalan & Coakley 1981's A 203.3 W/m², B 2.09, D 0.649 (climlab's 210/2/0.555 ran this model's
+  Earth 3 °C cold) and climlab's `EBM_seasonal` albedos (a₀ 0.33, a₂ 0.25, a_i 0.62, T_f −10 °C);
+  per band a land surface (3 m of water) and a sea surface layer over a 50-m slab (coupled 30 W/m²/K,
+  k/h through sea ice), latent sea ice at −1.8 °C, slab heat diffusion 0.3 W/m²/K, land–sea
+  exchange 10 W/m²/K, 72 backward-Euler steps a year, circular orbit. Belts: trades/westerlies/polar
+  easterlies by belt latitude, the ITCZ per column and month as the thermal equator (soft max of
+  the land/sea-mixed EBM temperature over ±35°, smoothed 1,500 Earth km, ≤ 22°), monsoon westerlies
+  where trades cross the equator, the highs shifted ±6° × sin(tilt)/sin 23.4°; gyre SST anomalies
+  and drying under the highs' eastern flanks from each ocean cell's basin position; summer onshore
+  air on east coasts 15–45° (`onshore` 1.0). Moisture decays inland over 3,500 Earth km (× (1 + 1.5 ×
+  belt wetness) for recycling) to a floor of 0.3; rain shadow e^(−Δz/2,500 m) behind barriers;
+  plateau drying above 1.5 km. Orographic: one FFT per wind regime over the rows it can reach,
+  0.5 rain-hours/day, lee drying proportional with a 0.3 floor. Köppen: Peel et al. 2007 + As/Aw.
+  Glaciers: ELA from Ohmura et al. 1992. `ice_sheet_feedback` = 0 by default (see findings).
+- **Measured (Mac, M6 mini, 12 threads, shared — other agents' builds and a Gradle daemon were
+  running; load 5–10).** `cargo test --workspace --locked` → cli 20, core 162 + 1 ignored (climate::
+  14: insolation limits (S₀/π at the equator on an equinox, S₀ sin ε at the pole on the solstice,
+  global mean S₀/4 within 0.2 %); EBM converges with |ASR − OLR| < 0.2 W/m², global 5–20 °C, land
+  seasons > 2 × sea at 55°N; diffusion + ice conserve Σ C·T − latent to 1e-9, +5 % star warms > 3 K;
+  Smith–Barstad ridge across a westerly: windward mean > 0.5 mm/h, lee < a third of it, negative in
+  the shadow, easterly mirror-symmetric to 1e-6; Köppen Af, BWh, Cfb, Dfc, ET, Csa (southern), EF,
+  Aw, Dwd; belts and basins; the air's march; ELA; one glaciation event; an idealised planet has
+  all five groups, a rain shadow (windward > 1.5 × lee), glaciated polar land; the coupled
+  pipeline (3,000 samples, 60 Myr, 256 × 128) writes every field, the surface reads it
+  (`from_stage`), 7 snapshots, and a checkpoint resumed on 3 threads (from 1) gives identical
+  climate fields, surface, history and events), format 32, inspect 21 + 7, jni 7 + 7, viewer 4;
+  `cargo clippy --workspace --all-targets -D warnings`, `cargo fmt --check`, `cargo deny check
+  licenses bans` clean; `cd neoforge && ./gradlew build test` → tests=118 failures=0 on the tree merged with master 6d8171f (ramps.json in
+  the jar still parses).
+  **Acceptance:** `deeptime stage climate --preset pipeline_quick_16k --start scattered_continents
+  --length-myr 500 --viewer review/out/p1-climate --viewer-layers elevation,climate/koppen,
+  climate/t_mean_c,climate/precip_mm,surface/class,surface/drainage` (after merging P1-07) →
+  250 steps, 191 s (plates 37.1, climate 11.7, surface 135.8, structure 6.5; climate: snapshot 7.7
+  (cells 4.5, belts 1.7, orographic 0.9, EBM 0.1), topography 2.3, advect 1.7), peak footprint
+  2.5 GB; `climate_final=51 t_surface_c=11.3 t_land_c=-0.1 precip_land_mm=536
+  koppen_land=A0.10/B0.12/C0.21/D0.04/E0.53 glaciated_land_frac=0.307 glaciations=1
+  ebm_t_global_c=15.6 ebm_net_toa_w_m2=0.006 itcz_deg=-8.0..9.0 land_z_p50_m=2496
+  land_z_p90_m=5407 land_above_2km=0.598`. **Bench** (before the P1-07 merge; `deeptime bench
+  --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --threads 12,1`):
+  12 threads 192 s (plates 36.7, climate 13.3, surface 142.2), 1 thread 373 s (143.0 / 37.1 /
+  193.1), peak 1.20 GB, **identical summaries on both thread counts**. The climate costs ~5–7 % of
+  the run (§8.3's "one or two erosion steps per snapshot" holds: 51 snapshots ≈ 8 s). The surface's
+  diffusion took 65–73 s here against 21 s in P1-04's run — the Mac was loaded, not a regression
+  (the same code; P1-17 should bench on a quiet machine).
+  **Earth check:** `deeptime climate-dem --dem build/earth/earth_720.f32 --width 720 --preset
+  pipeline_quick_16k --viewer review/out/p1-climate/earth` on GMT's `earth_relief_01d_p`
+  (SRTM15+, 1°, doubled to 720 × 360; a local file, not committed) → EBM 15.6 °C, net TOA 0.013,
+  land 8.1 °C / 562 mm/yr (Earth ≈ 8.5 °C / 715 mm), groups A 0.17 / B 0.26 / C 0.10 / D 0.25 /
+  E 0.23, 19 of 24 reference cities in the right main group (5 exact: London Cfb, Manaus Af,
+  Kinshasa Aw, Chicago Dfa, Vostok EF). The map is recognisably Earth's: Sahara–Arabia–Australia
+  deserts, Amazon/Congo/Indonesia A, Siberia/Canada D, Mediterranean C, Andes and Tibet cold.
+  Misses: Mumbai (the ITCZ reaches only ~12°N, no Indian monsoon), Beijing/Buenos Aires/Sydney too
+  dry (east-coast humid subtropics are weak), Denver/Lhasa/Anchorage too cold, land 20 % dry overall.
+- **What the maps show** (review/out/p1-climate, pulled back and looked at; 16 MB after oxipng,
+  6 keyframe layers × 11 frames plus `earth/`): temperature has clean zonal bands with continents
+  hot in the tropics and cold on their highlands (the lapse rate over the domed interiors is the
+  dominant land signal), polar continents deep blue; precipitation has the ITCZ wet belt, the
+  subtropical dry belts, the westerlies' wet belt, sharp windward/leeward contrasts on every range
+  (orographic stripes on the ridges, dry lees) and drier continental interiors; faint east–west
+  streaks off some coasts from the row-wise march survive the 300-km smoothing. Köppen: coastal
+  rims of A (tropics), B (subtropical west coasts and lees), C and D, with E (ET/EF) over high
+  interiors and polar land; at −450 Myr, when the continents were still low, the Köppen map looks
+  Earth-like (large BWh/BSh interiors, Af/Am/Aw equatorial belts, C/D mid-latitudes).
+- **Findings for Ben / P1-17.** (1) **Land is too high and therefore too cold.** With the real
+  climate the continents end 2.5–3.1 km high at the median (land above 2 km: 60–68 %) against
+  1.35 km with the stand-in: dry interiors and rain shadows cut runoff, so the stream-power erosion
+  calibrated in P1-04 on the stand-in's wetter interiors no longer holds P1-04's domed continents
+  down. Half the land ends in Köppen E. The climate is doing what it should with that relief (the
+  Earth check shows it); the fix belongs to the surface's calibration with the climate on (K,
+  `runoff_ref_m_yr`, the domed uplift inboard of trenches) — P1-17's tuning, or a decision to
+  recalibrate now. (2) The ice-sheet albedo feedback is implemented but off
+  (`ice_sheet_feedback` 0): at 1 it froze most of that high land (46 % glaciated). Turn it on once
+  the hypsometry is Earth-like. (3) No glacial erosion exists (glaciers are only diagnosed).
+- **Deviations from the plan.** (1) Acceptance on `pipeline_quick_16k` (placeholders until P1-08),
+  as P1-04. (2) The climate is a coupled member of the plates group, not a stage after it (the plan's
+  §8 order says "then climate snapshots"; the surface needs runoff every step). (3) The fixed
+  §8.3 files exist except `sealevel.rs` (sea level stays in `surface::params::SeaLevel`); `lapse.rs`
+  holds the continentality march; `snapshot.rs` assembles. (4) Smith–Barstad FFT per wind regime
+  over the whole width (not per band's latitude strip only; a regime is solved over the rows its
+  weights reach). (5) Monthly fields are not stored (annual mean, warmest/coldest month); §5.3's
+  `climate/p_mm` is named `climate/precip_mm` (P1-04's interface).
+- **Next.** P1-17: recalibrate the surface with the climate on (see finding 1), then
+  `ice_sheet_feedback`; P1-09 reads `climate/{koppen, t_mean_c, t_warm_c, t_cold_c, precip_mm,
+  aridity}`. The review page is review/out/p1-climate (not published; `earth/index.html` inside
+  is the Earth check).
+
 
 ### 2026-09-29 — P1-07 rock classes, column strata and metamorphism (agent worktree agent-a660cc7be45a80cf6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** New stage `structure` (`crates/deeptime-core/src/structure/{mod, params, columns,
@@ -1968,6 +2255,14 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
+- **Long runs (parked by Ben, 2026-09-29: "DW about it for now").** A real 4,600 Myr run (timeline max, plan
+  §5.1) is estimated by the workbench at ~45 min / 3.8 GB (pipeline_quick_16k) and ~3 h / 14.6 GB
+  (pipeline_full_32k, too big for the 16 GB Mac): the deposit engine's recorded history (a frame every
+  10 Myr) is held in memory and grows with length. The physics is tested only over 500 Myr and starts from
+  existing continents (no early-Earth phase). Options offered: history on disk (flat memory), an early-Earth
+  phase, or a 1 Gyr cap. Revisit in P1-17 or when Ben raises it.
+- The workbench offered the placeholder `earthlike_*` presets (dummy pipeline) next to the real `pipeline_*`
+  ones; Ben ran one and got a single blob. The UI redesign hides placeholders (P1-20).
 - The plan is at revision 2 plus a partial revision 3 (the decisions-log rule in §1.2). The 29 gaps of
   docs/plan-reviews/2026-09-28-cold-read-review-2.md are fixed in the plan by the task that hits each
   one; the build log names each fix as it lands.

@@ -8,6 +8,7 @@
 //! ([`render`]). The surface a height check measures is defined in [`world`]; the columns it
 //! leaves out in [`surface`].
 
+pub mod area;
 pub mod blocks;
 pub mod chunk;
 pub mod colors;
