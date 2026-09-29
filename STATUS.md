@@ -28,7 +28,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-04 | Deep-time surface processes on L1 | done | 2026-09-28 | 50dd95f | Mac: cargo test --workspace ok (core 139 incl. surface:: 20: receivers acyclic, depressions resolved, diffusion Σh conserved, SPL ramp = analytic within 1e-6 (n 1) / 1e-3 (n 2), strata-log invariants, coupled pipeline resume identical; cli 11); `stage surface --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-surface` → 250 steps 96 s (plates 22 s, surface 74 s), land_frac 0.215, mass residual −6e-4 km³ of 1.2e8 eroded, 50 frames, 70 erosion pulses / 265 basins / 3 sea events; bench 1 thread surface 137 s = 1.05 µs/cell/step vs the 131 s cost model; fastscapelib oracle hypsometry_ks=0.0209 chi_slope_ratio=1.0000 PASS; fmt, clippy -D warnings, deny clean; gradlew build test 106/0 |
 | P1-05 | Climate | todo | | | |
 | P1-06 | Young landscape, amplification and the detail layer | todo | | | |
-| P1-07 | Rock classes, column strata and metamorphism | todo | | | |
+| P1-07 | Rock classes, column strata and metamorphism | doing | 2026-09-28 | | agent worktree agent-a660cc7be45a80cf6 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c) |
 | P1-08 | Bake, world data v1 and parity | todo | | | |
 | P1-09 | Climate mapping and biomes | todo | | | |
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
