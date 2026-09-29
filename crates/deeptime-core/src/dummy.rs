@@ -558,6 +558,7 @@ impl Stage for DummyStage {
         StageEstimate {
             bytes: field + self.params.reserve_bytes,
             seconds: self.params.steps as f64 * self.params.sleep_ms as f64 / 1000.0,
+            history_bytes: 0,
         }
     }
 

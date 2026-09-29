@@ -52,7 +52,9 @@ class NativeLinkTest {
     void phaseZeroEntryPoints() {
         String dummy = "{\"dummy\":{\"steps\":1,\"sleep_ms\":0}}";
         // P1-01: the estimate lists every stage (plan §6.1 "per-stage bytes and seconds").
-        assertEquals("{\"peak_bytes\":0,\"stages\":[{\"bytes\":0,\"name\":\"dummy\",\"seconds\":0.0}]}",
+        // P1-17: plus the base, the recorded history, its spill under the default cap and that cap.
+        assertEquals("{\"base_bytes\":0,\"history_bytes\":0,\"mem_cap\":4294967296,\"peak_bytes\":0,\"spill_bytes\":0,"
+                + "\"stages\":[{\"base_bytes\":0,\"bytes\":0,\"history_bytes\":0,\"name\":\"dummy\",\"seconds\":0.0,\"spill_bytes\":0}]}",
                 DeepTimeNative.estimate(dummy, ""));
         long id = DeepTimeNative.create(dummy, "", gameDir.resolve("entry").toString(), 1, 0);
         try {

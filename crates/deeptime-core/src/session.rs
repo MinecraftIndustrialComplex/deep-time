@@ -14,7 +14,7 @@
 
 use std::ops::Range;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicI64, AtomicU8, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU8, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -26,7 +26,9 @@ use deeptime_format::{
 };
 use serde_json::{Value, json};
 
-use crate::checkpoint::Checkpoint;
+use crate::checkpoint::{Checkpoint, CheckpointRef};
+use crate::deposits::recorded::Evicted;
+use crate::deposits::spill::SpillStore;
 use crate::error::CoreError;
 use crate::keyframes::{self, KeyframePolicy, KeyframeStore, RING_CAPACITY};
 use crate::log::{Level, LogRing};
@@ -118,25 +120,69 @@ pub fn check_content(json: &str) -> Result<(), CoreError> {
         .map_err(|e| CoreError::preset("content", format!("not valid JSON: {e}")))
 }
 
-/// The memory and time estimate for a preset, as JSON (plan §5.7.5):
-/// `{"peak_bytes": P, "stages": [{"bytes", "name", "seconds"}, …]}`. Each stage's bytes are its
-/// peak working set, shared world state included, so the run's peak is their maximum.
+/// The memory and time estimate for a preset under the default memory cap, as JSON (plan
+/// §5.7.5); [`estimate_for`] with a cap of 0.
 pub fn estimate(preset_json: &str, content_json: &str) -> Result<String, CoreError> {
+    estimate_for(preset_json, content_json, 0)
+}
+
+/// Seconds to write and read back a byte of spilled history: written once, read by the deposit
+/// engine's two passes (an SSD at ~1 GB/s; P1-17 measures it).
+const SPILL_SECONDS_PER_BYTE: f64 = 3.0e-9;
+
+/// The memory and time estimate for a preset run under a memory cap of `mem_cap` bytes (0: the
+/// default), as JSON (plan §5.7.5; P1-17's history spill):
+///
+/// `{"peak_bytes", "base_bytes", "history_bytes", "spill_bytes", "mem_cap",
+///   "stages": [{"name", "bytes", "seconds", "base_bytes", "history_bytes", "spill_bytes"}, …]}`
+///
+/// A stage's `base_bytes` is its working set without the recorded history (what must fit under
+/// the cap, or the run fails cleanly), `history_bytes` the history at the end of the stage (it
+/// stays in memory while the cap allows and spills to the run's folder after that), `bytes`
+/// = base + the history held in memory under this cap (its peak) and `spill_bytes` the rest (the
+/// disk it uses). The run's figures are the stages' maxima: `peak_bytes` ≈ base + what of the
+/// history fits, so a run whose `peak_bytes` is over its cap is one whose base does not fit.
+/// Seconds include the spill's disk time.
+pub fn estimate_for(
+    preset_json: &str,
+    content_json: &str,
+    mem_cap: u64,
+) -> Result<String, CoreError> {
     let preset = Preset::from_json(preset_json)?;
     preset.check_runnable()?;
     check_content(content_json)?;
     let preset = preset.with_content(content_json)?;
-    let mut peak = 0u64;
+    let cap = if mem_cap == 0 {
+        DEFAULT_MEM_CAP
+    } else {
+        mem_cap
+    };
+    let (mut peak, mut base, mut history, mut spill) = (0u64, 0u64, 0u64, 0u64);
     let stages: Vec<Value> = preset
         .stages()
         .iter()
         .map(|s| {
             let e = s.estimate();
-            peak = peak.max(e.bytes);
-            json!({ "name": s.name(), "bytes": e.bytes, "seconds": e.seconds })
+            let hist = e.history_bytes.min(e.bytes);
+            let b = e.bytes - hist;
+            let held = hist.min(cap.saturating_sub(b));
+            let spilled = hist - held;
+            peak = peak.max(b + held);
+            base = base.max(b);
+            history = history.max(hist);
+            spill = spill.max(spilled);
+            json!({
+                "name": s.name(), "bytes": b + held,
+                "seconds": e.seconds + spilled as f64 * SPILL_SECONDS_PER_BYTE,
+                "base_bytes": b, "history_bytes": hist, "spill_bytes": spilled,
+            })
         })
         .collect();
-    Ok(json!({ "peak_bytes": peak, "stages": stages }).to_string())
+    Ok(json!({
+        "peak_bytes": peak, "base_bytes": base, "history_bytes": history,
+        "spill_bytes": spill, "mem_cap": cap, "stages": stages,
+    })
+    .to_string())
 }
 
 /// How a session is created.
@@ -259,6 +305,53 @@ pub struct Session {
     has_keyframes: bool,
     ramps: Ramps,
     checkpoint_dir: Option<PathBuf>,
+    /// Where the recorded history's evicted frames go (P1-17): a spill file in `out_dir`.
+    spill: Arc<SpillStore>,
+    /// A fixed budget for the history's frames in memory, on top of the memory cap (tests and
+    /// `--history-mem`); `None`: the cap alone decides.
+    history_budget: Option<u64>,
+    /// The first eviction was logged.
+    spill_logged: AtomicBool,
+    /// The most any stage's reservation asked for: bytes in use plus bytes reserved, with and
+    /// without the history's frames then in memory.
+    needed_peak: [AtomicU64; 2],
+}
+
+/// The share of the memory cap kept free after a step: the history is trimmed to
+/// `cap - cap / TRIM_HEADROOM` so a stage's next allocations (reserved or not) have room.
+const TRIM_HEADROOM: u64 = 16;
+
+/// Logs an eviction of the recorded history's frames (`why`: what asked for the memory).
+pub(crate) fn log_evicted(
+    log: &LogRing,
+    e: &Evicted,
+    gauge: &dyn MemoryGauge,
+    cap: u64,
+    why: &str,
+) {
+    if e.frames == 0 {
+        return;
+    }
+    let level = if e.created_file {
+        Level::Info
+    } else {
+        Level::Debug
+    };
+    log.push(
+        level,
+        format!(
+            "history: {} frame(s), {:.1} MiB, spilled to disk for {why} ({:.0} of {:.0} MiB in use){}",
+            e.frames,
+            e.bytes as f64 / 1_048_576.0,
+            gauge.in_use() as f64 / 1_048_576.0,
+            cap as f64 / 1_048_576.0,
+            if e.created_file {
+                "; the run continues from the spill file in its folder, slower but within the cap"
+            } else {
+                ""
+            }
+        ),
+    );
 }
 
 impl Session {
@@ -401,6 +494,7 @@ impl Session {
             }
             _ => kf_origin,
         };
+        let spill = Arc::new(SpillStore::new(&options.out_dir));
         let session = Session {
             stage_count: stages.len() as u32,
             stage_names,
@@ -436,6 +530,10 @@ impl Session {
             has_keyframes,
             ramps: Ramps::builtin(),
             checkpoint_dir: None,
+            spill,
+            history_budget: None,
+            spill_logged: AtomicBool::new(false),
+            needed_peak: [AtomicU64::new(0), AtomicU64::new(0)],
         };
         session.log.push(
             Level::Info,
@@ -455,6 +553,36 @@ impl Session {
     /// plan §5.7.1 `checkpoints/`).
     pub fn set_checkpoint_dir(&mut self, dir: Option<PathBuf>) {
         self.checkpoint_dir = dir;
+    }
+
+    /// Holds at most `bytes` of the recorded history's packed frames in memory, whatever the
+    /// cap (`Some(0)`: every frame goes to disk as soon as its step is done); `None` leaves it to
+    /// the cap. Results do not depend on it; tests and `--history-mem` use it.
+    pub fn set_history_budget(&mut self, bytes: Option<u64>) {
+        self.history_budget = bytes;
+    }
+
+    /// The spill store: the disk the recorded history used (bytes and frames written).
+    pub fn spill(&self) -> &SpillStore {
+        &self.spill
+    }
+
+    /// The most any stage's reservation asked for so far: bytes in use plus bytes reserved.
+    pub fn needed_peak(&self) -> u64 {
+        self.needed_peak[0].load(Ordering::Relaxed)
+    }
+
+    /// [`Session::needed_peak`] without the recorded history's frames then in memory: the smallest
+    /// cap the run's reservations fit (the history spilling to make room), give or take the
+    /// memory other threads hold at that moment.
+    pub fn needed_base_peak(&self) -> u64 {
+        self.needed_peak[1].load(Ordering::Relaxed)
+    }
+
+    /// Runs `f` on the world as it stands (between `advance` calls), without copying it.
+    pub fn with_world<R>(&self, f: impl FnOnce(&WorldState) -> R) -> Result<R, CoreError> {
+        let s = self.lock_stepper()?;
+        Ok(f(&s.world))
     }
 
     pub fn threads(&self) -> usize {
@@ -556,6 +684,11 @@ impl Session {
                     self.log
                         .push(Level::Info, format!("stage {} started", stage.name()));
                 }
+                // The history's frames give way to a stage's reservations (P1-17).
+                let history = s.world.history.as_ref().map(|h| {
+                    h.attach(&self.spill);
+                    h.handle()
+                });
                 let ctx = StageContext {
                     pool: &self.pool,
                     log: &self.log,
@@ -564,11 +697,16 @@ impl Session {
                     gauge: self.gauge.as_ref(),
                     mem_cap: self.mem_cap,
                     state: &self.state,
+                    history: history.as_ref(),
+                    needed_peak: Some(&self.needed_peak),
                 };
                 let stepped = Instant::now();
                 if let Err(e) = stage.step(&mut s.world, &ctx) {
                     let what = format!("stage {}", stage.name());
                     return Err(self.fail(&what, e));
+                }
+                if let Err(e) = self.trim_history(&s.world) {
+                    return Err(self.fail("spilling the recorded history", e));
                 }
                 s.timings[k].steps = stage.steps_done();
                 s.timings[k].millis += stepped.elapsed().as_secs_f64() * 1000.0;
@@ -589,6 +727,59 @@ impl Session {
                 return Ok(AdvanceStatus::Running);
             }
         }
+    }
+
+    /// After a step: the history's oldest frames go to disk while the gauge is over
+    /// `cap - cap / TRIM_HEADROOM` (or the history over its fixed budget), so memory stays flat
+    /// however long the run.
+    fn trim_history(&self, world: &WorldState) -> Result<(), CoreError> {
+        let Some(h) = &world.history else {
+            return Ok(());
+        };
+        h.attach(&self.spill);
+        let handle = h.handle();
+        let mut out = Evicted::default();
+        let mut why = "the memory cap";
+        if let Some(budget) = self.history_budget {
+            let resident = handle.resident_bytes();
+            if resident > budget {
+                out = handle.evict(resident - budget)?;
+                why = "the history budget (--history-mem)";
+            }
+        }
+        let target = self.mem_cap - self.mem_cap / TRIM_HEADROOM;
+        let in_use = self.gauge.in_use();
+        if in_use > target {
+            let e = handle.evict(in_use - target)?;
+            if e.frames > 0 {
+                why = "the memory cap";
+            }
+            out.frames += e.frames;
+            out.bytes += e.bytes;
+        }
+        if out.frames > 0 {
+            out.created_file = !self.spill_logged.swap(true, Ordering::AcqRel);
+            log_evicted(&self.log, &out, self.gauge.as_ref(), self.mem_cap, why);
+        }
+        Ok(())
+    }
+
+    /// The history's state for the log and the manifest.
+    fn history_note(&self, world: &WorldState) -> Option<Value> {
+        let h = world.history.as_ref()?;
+        Some(json!({
+            "frames": h.frame_count(),
+            "bytes": h.bytes(),
+            "resident_bytes": h.resident_bytes(),
+            "frames_on_disk": h.frames_on_disk(),
+            "spilled_bytes": self.spill.written_bytes(),
+            "spilled_frames": self.spill.written_frames(),
+            "spill_read_bytes": self.spill.io_stats().0,
+            "spill_read_seconds": self.spill.io_stats().1,
+            "spill_write_seconds": self.spill.io_stats().2,
+            "reserved_peak_bytes": self.needed_peak(),
+            "reserved_base_peak_bytes": self.needed_base_peak(),
+        }))
     }
 
     /// Publishes new events and the clock; takes a keyframe when the clock passed the next one.
@@ -661,9 +852,25 @@ impl Session {
         let last = group.end.max(index + 1) - 1;
         s.timings[last].millis += started.elapsed().as_secs_f64() * 1000.0;
         s.current = group.end.max(index + 1);
+        if let Some(note) = self.history_note(&s.world) {
+            let mib = |k: &str| note[k].as_f64().unwrap_or(0.0) / 1_048_576.0;
+            self.log.push(
+                Level::Info,
+                format!(
+                    "history after {name}: {} frames, {:.1} MiB ({:.1} MiB in memory, {} frames on disk; {:.1} MiB written to the spill file); {:.0} MiB in use of the {:.0} MiB cap",
+                    note["frames"],
+                    mib("bytes"),
+                    mib("resident_bytes"),
+                    note["frames_on_disk"],
+                    mib("spilled_bytes"),
+                    self.gauge.in_use() as f64 / 1_048_576.0,
+                    self.mem_cap as f64 / 1_048_576.0,
+                ),
+            );
+        }
         if let Some(dir) = &self.checkpoint_dir {
             let path = dir.join(format!("{index}-{name}.dtcp"));
-            self.checkpoint_of(s)?.write(&path)?;
+            self.write_checkpoint_of(s, &path)?;
             self.log.push(
                 Level::Info,
                 format!("checkpoint written to {}", path.display()),
@@ -774,6 +981,38 @@ impl Session {
     }
 
     fn checkpoint_of(&self, s: &Stepper) -> Result<Checkpoint, CoreError> {
+        Ok(Checkpoint {
+            preset_json: self.preset_json.clone(),
+            content_json: self.content_json.clone(),
+            stage_names: self.stage_names.clone(),
+            next_stage: s.current as u32,
+            stage_state: self.stage_state_of(s)?,
+            world: s.world.clone(),
+        })
+    }
+
+    /// Writes the run as it stands to `path`, streamed from the world (no copy of it is made).
+    fn write_checkpoint_of(&self, s: &Stepper, path: &Path) -> Result<(), CoreError> {
+        let stage_state = self.stage_state_of(s)?;
+        CheckpointRef {
+            preset_json: &self.preset_json,
+            content_json: &self.content_json,
+            stage_names: &self.stage_names,
+            next_stage: s.current as u32,
+            stage_state: &stage_state,
+            world: &s.world,
+        }
+        .write(path)
+    }
+
+    /// The run as it stands, written to `path` (between `advance` calls; what
+    /// [`Session::checkpoint`] returns, without copying the world).
+    pub fn write_checkpoint(&self, path: &Path) -> Result<(), CoreError> {
+        let s = self.lock_stepper()?;
+        self.write_checkpoint_of(&s, path)
+    }
+
+    fn stage_state_of(&self, s: &Stepper) -> Result<Vec<u8>, CoreError> {
         // A stage that has stepped keeps its state, even after its last step (the session moves
         // on to the next stage only on the following `advance`): a resume must not rerun it.
         let group = s.group();
@@ -797,14 +1036,7 @@ impl Session {
                 _ => Vec::new(),
             }
         };
-        Ok(Checkpoint {
-            preset_json: self.preset_json.clone(),
-            content_json: self.content_json.clone(),
-            stage_names: self.stage_names.clone(),
-            next_stage: s.current as u32,
-            stage_state,
-            world: s.world.clone(),
-        })
+        Ok(stage_state)
     }
 
     /// The run as it stands, for `deeptime stage` (between `advance` calls).
@@ -984,6 +1216,9 @@ impl Session {
         }
         if header.placeholder {
             run["placeholder"] = json!(true);
+        }
+        if let Some(h) = self.history_note(world) {
+            run["history"] = h;
         }
         m.notes.insert("run".into(), run);
         // Stage summaries (the deposit census of P1-14).
@@ -1386,11 +1621,74 @@ mod tests {
         ));
         assert_eq!(
             estimate(r#"{"dummy":{"steps":1,"sleep_ms":0}}"#, "").unwrap(),
-            r#"{"peak_bytes":0,"stages":[{"bytes":0,"name":"dummy","seconds":0.0}]}"#
+            r#"{"base_bytes":0,"history_bytes":0,"mem_cap":4294967296,"peak_bytes":0,"spill_bytes":0,"stages":[{"base_bytes":0,"bytes":0,"history_bytes":0,"name":"dummy","seconds":0.0,"spill_bytes":0}]}"#
         );
         let world: Value = serde_json::from_str(&estimate(DUMMY_WORLD, "").unwrap()).unwrap();
         assert_eq!(world["peak_bytes"], 256 * 128 * 4);
         assert_eq!(world["stages"][1]["name"], "dummy_erode");
+    }
+
+    /// The estimate under a cap (P1-17): the recorded history is held while the cap allows and
+    /// the rest is disk, so the peak is the base plus what fits, never over the cap unless the
+    /// base itself is; a larger cap holds more and spills less; seconds grow with the spill.
+    #[test]
+    fn the_estimate_spills_the_history_over_the_cap() {
+        // The run that failed at 4 GiB (1000 Myr of 32k full) up to its deposits: P1-06's young
+        // landscape and amplifier come after and bring working sets of their own.
+        let json = crate::preset::with_timeline(
+            crate::params::planet_builtin("pipeline_full_32k").unwrap(),
+            Some("supercontinent"),
+            Some(1000.0),
+        )
+        .unwrap();
+        let mut v: Value = serde_json::from_str(&json).unwrap();
+        v.as_object_mut().unwrap().remove("young");
+        v.as_object_mut().unwrap().remove("amplify");
+        let json = v.to_string();
+        let at = |cap: u64| -> Value {
+            serde_json::from_str(&estimate_for(&json, "", cap).unwrap()).unwrap()
+        };
+        let big = at(64 << 30);
+        let (base, history) = (
+            big["base_bytes"].as_u64().unwrap(),
+            big["history_bytes"].as_u64().unwrap(),
+        );
+        assert!(history > 2 << 30, "1000 Myr of 32k frames: {history} bytes");
+        assert_eq!(big["spill_bytes"], 0);
+        assert_eq!(big["peak_bytes"].as_u64().unwrap(), base + history);
+        assert_eq!(big["mem_cap"], 64u64 << 30);
+        let four = at(4 << 30);
+        assert_eq!(four, at(0), "0 is the default cap, 4 GiB");
+        let peak = four["peak_bytes"].as_u64().unwrap();
+        let spill = four["spill_bytes"].as_u64().unwrap();
+        assert!(base < 4 << 30, "the base fits 4 GiB: {base}");
+        assert!(peak <= 4 << 30 && spill > 0, "{four}");
+        assert_eq!(four["base_bytes"], big["base_bytes"]);
+        let secs = |v: &Value| -> f64 {
+            v["stages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|s| s["seconds"].as_f64().unwrap())
+                .sum()
+        };
+        assert!(secs(&four) > secs(&big));
+        // Every stage's own figures add up.
+        for s in four["stages"].as_array().unwrap() {
+            let (b, h, sp, bytes) = (
+                s["base_bytes"].as_u64().unwrap(),
+                s["history_bytes"].as_u64().unwrap(),
+                s["spill_bytes"].as_u64().unwrap(),
+                s["bytes"].as_u64().unwrap(),
+            );
+            assert_eq!(bytes + sp, b + h, "{s}");
+        }
+        // A cap under the base: the peak is the base, over the cap (the run would fail cleanly),
+        // and the whole history would be disk.
+        let tiny = at(1 << 30);
+        assert_eq!(tiny["peak_bytes"], tiny["base_bytes"]);
+        assert!(tiny["peak_bytes"].as_u64().unwrap() > 1 << 30);
+        assert_eq!(tiny["spill_bytes"], tiny["history_bytes"]);
     }
 
     struct FixedGauge(u64);

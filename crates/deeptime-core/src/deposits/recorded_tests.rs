@@ -22,7 +22,7 @@ use crate::session::{AdvanceStatus, NoGauge, Session, SessionOptions};
 
 /// A small coupled planet: `n` L0 samples, L1 r = 64 at 16k (256 × 128), `myr` of history, the
 /// deposit stage last, with `count_mult` (the small planet has little area, so tests raise it).
-fn pipeline_json(n: u32, myr: f64, seed: u64, count_mult: f64) -> String {
+pub(super) fn pipeline_json(n: u32, myr: f64, seed: u64, count_mult: f64) -> String {
     let json = with_timeline(
         planet_builtin("pipeline_quick_16k").unwrap(),
         Some("scattered_continents"),
@@ -42,7 +42,7 @@ fn pipeline_json(n: u32, myr: f64, seed: u64, count_mult: f64) -> String {
     v.to_string()
 }
 
-fn temp_dir(name: &str) -> PathBuf {
+pub(super) fn temp_dir(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "deeptime-deposits-real-{name}-{}-{:?}",
         std::process::id(),
@@ -60,7 +60,7 @@ fn options(dir: &Path, threads: usize) -> SessionOptions {
     }
 }
 
-fn finish(s: &Session) {
+pub(super) fn finish(s: &Session) {
     loop {
         match s.advance(Duration::from_secs(60)).unwrap() {
             AdvanceStatus::Done => break,
@@ -288,6 +288,8 @@ fn drive(stage: &mut DepositStage, world: &mut WorldState) -> Vec<String> {
             gauge: &gauge,
             mem_cap: u64::MAX,
             state: &state,
+            history: None,
+            needed_peak: None,
         };
         stage.step(world, &ctx).unwrap();
     }
@@ -508,6 +510,8 @@ fn a_world_without_history_is_a_clear_error() {
         gauge: &NoGauge,
         mem_cap: u64::MAX,
         state: &state,
+        history: None,
+        needed_peak: None,
     };
     let e = stage.step(&mut world, &ctx).unwrap_err().to_string();
     assert!(e.contains("field history") && e.contains("surface"), "{e}");
