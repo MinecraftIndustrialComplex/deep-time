@@ -34,8 +34,9 @@ import java.util.List;
  * timelapse (map and globe) while running and when done, the review page, and the Create World
  * screen after Accept — then, with {@code -Ddeeptime.dev.screenshots.create=true}, creates the
  * world (the staging move at server start) and shoots it in-world, and quits. Every step logs a
- * {@code [deeptime-shot]} line. Used by {@code tools/client/screenshots.sh} (P1-11's best-effort
- * client check, plan §9.8); never active in a normal game.
+ * {@code [deeptime-shot]} line. Used by {@code tools/client/mac-screenshots.sh} (the client on the
+ * Mac's desktop session; P1-11's laptop route was {@code tools/client/screenshots.sh}), P1-11's
+ * best-effort client check, plan §9.8; never active in a normal game.
  */
 final class ScreenshotDriver {
 
