@@ -148,11 +148,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   writes back the same JSON, top of every range and last option survive export → import) and `editor.rs`
   `a_tuned_code_from_the_game_loads_unchanged` (the workbench decodes both codes, `effective` returns the very same JSON and each
   field's value). Game to workbench and back is the same two tests on one file.
-- **Measured gates** (Mac, branch merged with master 16e4c90 and its P1-08): `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`,
-  `deny check licenses bans` clean; `cargo test --workspace --locked`: cli 29, core 221 (+2 ignored), format 39, others as before, 0 failed
+- **Measured gates** (Mac, branch merged with master b8788a7): `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`,
+  `deny check licenses bans` clean; `cargo test --workspace --locked`: cli 30, core 233 (+3 ignored), format 40, history_cap 1, others as before, 0 failed
   (new: `deposits::tests::the_global_multipliers_fold_into_the_types`, `bake_horizons::tests::the_strata_feature_scale_thickens_every_layer`,
   `params::tests::the_pipeline_presets_write_out_the_tuning_knobs_at_their_defaults`, incision-cap range, the ocean-floor refusal, several
-  editor tests); `cd neoforge && ./gradlew build test`: tests=133 failures=0 (new `AdvancedSettingsTest` 9, `Formats`, lang keys).
+  editor tests); `cd neoforge && ./gradlew build test`: tests=134 failures=0 (new `AdvancedSettingsTest` 9, `Formats`, lang keys).
   GameTests not re-run.
 - **Screenshots** (gitignored, `review/out/settings/` on the laptop and the Mac): real client
   (`tools/client/mac-screenshots.sh --name settings --no-guidance --no-create`, the Mac's desktop, exit 0): `02b-setup-advanced.png`,
