@@ -8,6 +8,7 @@ import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.server.DeepTimeCommands;
 import com.minecraftindustrialcomplex.deeptime.server.SpawnHandler;
 import com.minecraftindustrialcomplex.deeptime.server.WorldDataBinder;
+import com.minecraftindustrialcomplex.deeptime.wrap.PoleCapPrototype;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
@@ -37,6 +38,7 @@ public final class DeepTime {
         SpawnHandler.init();
         RockPalette.init();
         GameTestSupport.init(modBus);
+        PoleCapPrototype.init();
         loadNatives();
     }
 
