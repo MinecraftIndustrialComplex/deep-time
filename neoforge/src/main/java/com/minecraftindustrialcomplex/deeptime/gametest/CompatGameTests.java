@@ -389,7 +389,7 @@ public final class CompatGameTests {
             double own = charge * scale;   // every chunk the trap reaches adds its share, supplied or not
             if (trapInfinite == 0 && Math.abs(sum - own) > counts.size())
                 problems.add("trap " + t.id() + ": the chunks add up to " + sum + ", the scaled charge of its own chunks is " + own
-                        + " (" + elsewhere + " of " + total + " blocks lie in chunks another trap fills)");
+                        + " over " + counts.size() + " chunks");
         }
         DeepTime.LOGGER.info("[gametest] cdgOilFromTrap: {} traps {}; chunks {}, with oil {}, infinite {} (threshold {}); CDG {}; problems {}",
                 traps.size(), lines, chunks, positive, infinite, threshold, cdg.map(CdgAccess::config).orElse("not installed"), problems);
