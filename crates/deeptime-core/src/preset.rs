@@ -376,6 +376,10 @@ impl Preset {
             PresetBody::Planet(p) => {
                 let mut stages: Vec<Box<dyn Stage>> =
                     vec![Box::new(PlatesStage::new((**p).clone()))];
+                if p.climate.is_some() {
+                    // Coupled to the plates, before the surface, which reads its fields (P1-05).
+                    stages.push(Box::new(crate::climate::ClimateStage::new((**p).clone())));
+                }
                 if p.surface.is_some() {
                     // Coupled to the plates: one surface step after every plate step (plan §8).
                     stages.push(Box::new(crate::surface::SurfaceStage::new((**p).clone())));

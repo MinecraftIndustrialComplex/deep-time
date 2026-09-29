@@ -24,8 +24,8 @@
 //! | `source_rock_toc` | surface | the richest layer of the log: black shale 5, coal 3, shale 1, mudstone 0.8 wt% TOC, × min(1, thickness / 20 m) |
 //! | `burial_temp_c` | surface | that layer's mid-depth × the geotherm (heat flow / 2.5 W/m/K) + the surface temperature; the surface temperature where there is none |
 //! | `reservoir_quality`, `seal` | surface | reservoir-tagged rock above the source layer (/ 50 m, capped at 1); seal-tagged rock above the topmost reservoir (/ 20 m) |
-//! | `water_table_depth_m` | surface + climate stand-in | land: 5 m + 150 m·(1 − min(1, P/PET)) + 5 % of the local relief; sea: 0 |
-//! | `precip_mm`, `t_mean_c` | climate stand-in (`climate.rs`) until P1-05 | |
+//! | `water_table_depth_m` | surface + climate | land: 5 m + 150 m·(1 − min(1, P/PET)) + 5 % of the local relief; sea: 0 |
+//! | `precip_mm`, `t_mean_c` | climate (P1-05, `crate::climate`), read through `climate.rs`; the zonal stand-in without a `climate` section | the climate the surface step ran with |
 //! | clocks `oxygenated_oceans`, `land_plants`, `bif_acme` | stand-in | 1, 1, 0 (a Phanerozoic Earth) until the preset carries `planet.atmosphere` |
 //!
 //! `trap_structure` (P1-07) and the `host/<class>` fractions are not published yet.

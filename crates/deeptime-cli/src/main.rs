@@ -2,6 +2,7 @@
 //! `deeptime`: the standalone driver for every simulation stage (plan §9.3).
 
 mod alloc;
+mod climate_dem;
 mod dump;
 mod run;
 mod synth;
@@ -80,6 +81,10 @@ enum Command {
         /// Also write an HTML viewer bundle (the stage's keyframes, all events and sites) here.
         #[arg(long)]
         viewer: Option<PathBuf>,
+        /// Only these keyframe layers go into the viewer bundle (comma-separated field names,
+        /// e.g. `elevation,climate/koppen`; default all), to keep a review page small.
+        #[arg(long, value_delimiter = ',')]
+        viewer_layers: Vec<String>,
         /// Folder for the stage's keyframes (default <out>.work, or a temporary folder).
         #[arg(long)]
         work: Option<PathBuf>,
@@ -115,6 +120,26 @@ enum Command {
         /// Print DEBUG log lines too.
         #[arg(long)]
         verbose: bool,
+    },
+    /// One climate snapshot (P1-05) on a given relief — e.g. Earth's — to check the climate
+    /// against a planet whose Köppen map is known. The raster is raw little-endian f32 metres,
+    /// W × W/2 cells, row 0 at the north pole, column i at longitude 360°·i/W.
+    ClimateDem {
+        /// The relief raster.
+        #[arg(long)]
+        dem: PathBuf,
+        /// Cells around (W); the raster has W/2 rows.
+        #[arg(long)]
+        width: u32,
+        /// A preset whose `climate` and `planet` sections apply (default: the defaults).
+        #[arg(long)]
+        preset: Option<String>,
+        /// The planet's circumference in km (Earth: 40,030).
+        #[arg(long, default_value_t = 40030.0)]
+        circumference_km: f64,
+        /// Also write an HTML viewer bundle (Köppen, temperature, precipitation) here.
+        #[arg(long)]
+        viewer: Option<PathBuf>,
     },
     /// The surface kernels (P1-04) on a plain raster, for the fastscapelib oracle
     /// (tools/validation/fastscape_compare.py): periodic in x, the first and last rows fixed at
@@ -312,6 +337,7 @@ fn main() -> ExitCode {
             max_steps,
             out,
             viewer,
+            viewer_layers,
             work,
             common,
         }) => finish(
@@ -325,6 +351,7 @@ fn main() -> ExitCode {
                 max_steps,
                 out,
                 viewer,
+                viewer_layers,
                 work,
                 common: common.common(),
             }),
@@ -354,6 +381,23 @@ fn main() -> ExitCode {
             }),
         ),
         Some(Command::Preset { action }) => finish("preset", preset_command(action)),
+        Some(Command::ClimateDem {
+            dem,
+            width,
+            preset,
+            circumference_km,
+            viewer,
+        }) => finish(
+            "climate-dem",
+            climate_dem::run(&climate_dem::Options {
+                dem,
+                w: width,
+                h: width / 2,
+                preset,
+                circumference_km,
+                viewer,
+            }),
+        ),
         Some(Command::Lem {
             grid,
             height,
@@ -830,6 +874,7 @@ mod tests {
                 max_steps,
                 out,
                 viewer,
+                viewer_layers: Vec::new(),
                 work: None,
                 common: quiet(),
             })
@@ -845,8 +890,9 @@ mod tests {
         .unwrap();
         let mid = deeptime_core::checkpoint::Checkpoint::read(&dir.join("plates.dtcp")).unwrap();
         assert_eq!(mid.next_stage_name(), Some("plates"));
-        assert_eq!(mid.stage_names, ["plates", "surface"]);
-        assert!(mid.world.surface.is_some(), "the group steps both stages");
+        assert_eq!(mid.stage_names, ["plates", "climate", "surface"]);
+        assert!(mid.world.surface.is_some(), "the group steps every member");
+        assert!(mid.world.fields.contains_key("climate/koppen"));
         stage(
             "surface",
             Some(dir.join("plates.dtcp")),
@@ -857,7 +903,7 @@ mod tests {
         )
         .unwrap();
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
-        assert_eq!(end.next_stage, 2);
+        assert_eq!(end.next_stage, 3);
         assert_eq!(end.world.t_years, 0.0);
         let st = end.world.surface.as_ref().unwrap();
         assert_eq!(st.totals.steps, 10);
@@ -875,7 +921,20 @@ mod tests {
             dir.join("viewer/keyframes/kf-0-surface_class.png")
                 .is_file()
         );
-        // `stage surface --preset` runs the group from the start.
+        assert!(
+            dir.join("viewer/keyframes/kf-0-climate_koppen.png")
+                .is_file()
+        );
+        // `stage surface --preset` runs the group from the start, and so does `stage climate`.
+        stage(
+            "climate",
+            None,
+            Some(preset.to_string_lossy().into_owned()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
         stage(
             "surface",
             None,

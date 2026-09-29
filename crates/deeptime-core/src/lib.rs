@@ -23,6 +23,9 @@ pub mod sphere;
 // Deep-time surface processes on L1 (P1-04).
 pub mod surface;
 
+// The parametric climate on L1 (P1-05).
+pub mod climate;
+
 // Presets, share codes and the synthetic terrains of the placeholder presets (P1-13).
 pub mod preset;
 pub mod share_code;

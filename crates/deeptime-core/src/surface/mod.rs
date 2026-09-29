@@ -23,7 +23,8 @@
 //! # One step (Δt = the plate step, `substeps` LEM steps inside it)
 //! 1. Advect the offset, regolith and strata log; clear them on crust born this step.
 //! 2. h = plate elevation + offset; sea level from the preset (`params::SeaLevel`); climate
-//!    (`climate.rs`: P1-05's fields when present, else the stand-in).
+//!    (`climate.rs`: the climate stage's fields, which it wrote just before this step on the same
+//!    ground, when the preset has a `climate` section (P1-05), else the stand-in).
 //! 3. Per LEM step: the sea is the base level; priority-flood (`pflood.rs`), D8 routing and the
 //!    stack (`routing.rs`); implicit stream power with erosion–deposition and a critical slope
 //!    (`spl.rs`), runoff-weighted areas, K from the surface rock; river loads fill the sea from
