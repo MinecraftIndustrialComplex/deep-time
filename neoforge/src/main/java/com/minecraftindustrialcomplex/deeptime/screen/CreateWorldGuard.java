@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.screen;
 
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLoader;
+import com.minecraftindustrialcomplex.deeptime.screen.model.MachineInfo;
 import com.minecraftindustrialcomplex.deeptime.worldgen.PlanetGenerators;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
@@ -20,7 +21,8 @@ import org.lwjgl.glfw.GLFW;
  * is no default story (decisions file, "Timeline"), so a Deep Time world cannot be created without
  * a run; with the natives missing, Create stays disabled for Deep Time only. Enter, which also
  * creates the world, is held back the same way. The rule itself is
- * {@link PlanetGenerators#createBlock}, which the GameTests check.
+ * {@link PlanetGenerators#createBlock}, which the GameTests check. Also starts the background
+ * memory reading for the editor's setup page ({@link MachineInfo#prime()}).
  */
 final class CreateWorldGuard {
 
@@ -38,6 +40,9 @@ final class CreateWorldGuard {
     private static void onInit(ScreenEvent.Init.Post event) {
         if (!(event.getScreen() instanceof CreateWorldScreen screen))
             return;
+        // The setup page's "free memory" is read in the background (macOS: a vm_stat process); starting
+        // it here has the figure ready by the time the editor opens. Rate-limited, returns at once.
+        MachineInfo.prime();
         for (GuiEventListener l : event.getListenersList()) {
             if (l instanceof Button b && b.getMessage().getContents() instanceof TranslatableContents t
                     && "selectWorld.create".equals(t.getKey())) {

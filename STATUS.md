@@ -69,6 +69,81 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — macOS free memory in MachineInfo; the Q10 client launcher folded into mac-client's launch path (agent worktree agent-aab6da56089b714ed, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **1. macOS free memory (the twin of P1-11's Linux `MemFree` fix).** The JDK is not right on the Mac:
+  `OperatingSystemMXBean.getFreeMemorySize()` was 1,068,990,464 B (0.996 GiB) on the 16 GB M6 with 6+ GiB
+  available. It is the kernel's free-page count alone (65,246 pages of 16 KiB at that moment, matching `vm_stat`'s
+  "Pages free"; not a 4 KiB page-size slip), so `MachineInfo` now reads `vm_stat`. New `MacMemory` (package-private,
+  `screen.model`): parses **free + speculative + inactive + purgeable** pages × the header's page size (vm_stat's
+  "Pages free" already excludes the speculative pages, so nothing is counted twice; a purgeable page that also sits
+  in the inactive queue is counted twice, tens of MiB). `/usr/bin/vm_stat` costs about 12 ms of process spawn from
+  Java, so nothing waits for it: `availableBytes()` returns the last reading and starts the next one on a daemon
+  thread when it is older than 5 s; `MachineInfo.prime()` starts one at client setup (`ClientSetup`, off the render
+  thread: loads the classes too) and whenever a Create World screen inits (`CreateWorldGuard`, rate-limited by the
+  TTL). `current()` on macOS uses the cache; with no reading yet, or no working `vm_stat`, the figure is **unknown
+  (−1, "?" and no low-memory warning), never the bean's wrong one**, and is capped at the total. The figure is a
+  snapshot of the moment the editor model is created, as on Linux (a follow-up would be re-reading it per frame).
+- **Compared on the Mac** (`ssh`, the same `vm_stat` for every figure, awk; three samples 2 s apart while other agents
+  were building, then one on the idle machine after the client run). JDK bean's free-only figure 0.15–0.29 GiB
+  (idle: 3.67); **this formula 5.58–5.84 GiB (idle: 8.10)**; Activity Monitor's arithmetic, physical memory minus
+  (App Memory + Wired + Compressed) 3.40–3.64 GiB (idle: 7.55); `memory_pressure` "free percentage" 70–73 %
+  = 11.2–11.7 GiB (idle 76 %), which counts active pages as available (a pressure metric, not headroom). So the
+  figure is between Activity Monitor's and `memory_pressure`'s and within 0.55 GiB (7 %) of Activity Monitor's on an
+  idle machine; under load Activity Monitor is 2 GiB lower because it counts idle anonymous (inactive) memory as
+  used, while macOS compresses or drops it when a new process needs the room. It is the sum graphide's `m6lock.sh
+  avail_gb` uses on this Mac (plus purgeable) and psutil/Zabbix's `free + inactive`. Chosen on that basis and Ben's
+  brief; if it proves too generous under load, the conservative alternative is free + speculative + file-backed +
+  purgeable (2.85–3.09 GiB loaded, 7.19 idle), also from vm_stat.
+- **Tests.** `MacMemoryTest` (11): the parser on the real M6 capture (expected 8,443,494,400 B = 7.86 GiB; the tag,
+  File-backed and Anonymous lines are not mistaken for the four that count), an Intel-layout 4 KiB capture (written
+  from the format), optional lines, CRLF, missing page size / free / inactive → empty, a counter too large for a long;
+  the cache with an injected source, queue executor and clock (the first call returns −1 without running the
+  source on the caller's thread; one reading in flight at a time; a stale figure is served while the next runs; a
+  failing or garbled vm_stat keeps the last good figure and is not retried inside the TTL; a rejecting executor
+  does not wedge it); and, `@EnabledOnOs(MAC)`, the real thing: `prime()` took 7.7 ms on the calling thread in a cold
+  JUnit JVM (class init; the reading itself is on the daemon thread), `MachineInfo.freeBytes` = 6.10 GiB of 16.00 vs the bean's
+  1.02 GiB a moment before. **Real client** (`tools/client/mac-screenshots.sh --name macmem --no-guidance
+  --no-create --timeout 240`, exit 0, 32 s): the setup page reads "This machine: **6.6 GiB free of 16.0 GiB**, game
+  heap 3.0 GiB, 11 simulation threads" (`review/out/macmem/03-setup-ready.png`, gitignored); it read 1.0 GiB before.
+- **2. `ev-assets.sh` on `mac-client.sh`'s launch path.** The lease, the desktop-session checks, the pid-marker kill,
+  the `launchctl asuser` launch and the pass loop (timeout, lease renewal every 60 s, notes) moved out of
+  `mac-client.sh` into **`tools/client/mac-client-lib.sh`** (Mac side, sourced), which `mac-client.sh` and
+  `ev-assets-mac.sh` both use; the laptop side (host and layout, graphide's `m6lock.sh`, copy to the Mac, the
+  Ctrl-C handler) is **`tools/client/mac-client-laptop-lib.sh`**, sourced by `mac-screenshots.sh` and `ev-assets.sh`.
+  `mac-client.sh`'s command line and output are unchanged (the two `-Ddeeptime.dev.screenshots=true` moved to its
+  passes; the library knows nothing of screenshots). `ev-assets-mac.sh` keeps only what is EV's: the DAG config, the
+  "ready" condition (the library's `MC_READY_REGEX` = the block atlas line, `MC_READY_GRACE` 20 s, `MC_FAIL_REGEX` =
+  a crash report), summary.json and the pack. Gone from it: its own `sudo launchctl asuser` of `gradlew runClient`,
+  the `ps | grep` client/wrapper pid patterns, its own trap; gone from `ev-assets.sh`: the lease streamed from the
+  laptop over ssh (TTL 2400 s, no renewal).
+- **What changed for `ev-assets.sh` (behaviour kept: same outputs in `review/out/q10/ev-assets/`).** The client is
+  ModDevGradle's dev launch (`createClientLaunchScript`, direct `java`) with `-Xmx4G` instead of `gradlew runClient`;
+  `tools/smoke/install.sh ev-client` and `./gradlew -PrunSet=ev-client … linkRunModsClient` run in the laptop-side
+  build step (no `--server` lock needed) and the run checks the set is linked; the lease is taken and renewed on the
+  Mac; options.txt is the shared one (guiScale 2, no early window); `--no-build`, `--timeout` (EV_ASSETS_TIMEOUT
+  default), `--lease-wait` flags; exit status is nonzero when the client crashes or times out (it used to be 0 with
+  `status` in summary.json); `runner.log` replaces `launch.sh`. The local output folder is still not emptied before
+  the pull.
+- **Verified.** `tools/client/ev-assets.sh` one run on the free, unlocked desktop: exit 0, block atlas 14 s after
+  launch, client stopped 20 s later, 35 s in all; DAG wrote 338 textures / 488 models / 190 blockstates (the Q10
+  entry's counts), `pack/` 1,018 files vs the earlier agent's 1,019 (the only file missing is
+  `assets/minecraft/atlases/blocks.json`, the atlas definition `ev-assets-pack.py` documents leaving out; the lang
+  file has the same 190 entries in another order), client RSS 1,527 MB at the stop (2,188 MB in the Q10 entry under
+  `runClient`, another heap and moment). `m6lock status` was `free` after every run including the failed ones.
+- **Found while folding, fixed:** (a) Nix's stdenv exports `SIZE=size`, which the shared `SIZE` variable picked
+  up (`--size is WxH (got 'size')`): renamed `WINDOW_SIZE`. (b) The dev shell's bash is Nix's non-interactive one:
+  no `compgen`. (c) The library's "screen is locked" warning tested `/dev/console`'s owner, which is `root` here
+  with `ban` logged in and unlocked, so it fired on every run; it now reads ioreg's `IOConsoleLocked` and a locked
+  screen stops the run with exit 4 before anything is leased or started (`IOConsoleLocked = No` for every run
+  here; the locked case is not exercised, and nothing types a password). (d) An early `exit 4` left a stale
+  `runner.pid`, which the laptop's Ctrl-C handler would then TERM; every exit now removes it.
+- **Gates** (master 9e34b45 merged into the branch; the same two gates also passed on the branch merged with
+  master 2fd6f15, tests=117): `tools/remote/mac.sh -- 'cd neoforge && ./gradlew build test && python3
+  ../tools/ci/junit-summary.py build/test-results/test'` → BUILD SUCCESSFUL, tests=118 failures=0 errors=0
+  skipped=0; `tools/remote/mac.sh --server -- './gametest.sh'` → **All 45 required tests passed**.
+- **Next.** Nothing blocks. The setup page's memory line stays a snapshot from when the editor model is created
+  (Create World open); to show the machine live, `SetupPage` could read `MachineInfo.current()` each frame (it
+  is one volatile read now). Not merged into master and not pushed, as asked.
 
 ### 2026-09-29 — P1-07 rock classes, column strata and metamorphism (agent worktree agent-a660cc7be45a80cf6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** New stage `structure` (`crates/deeptime-core/src/structure/{mod, params, columns,
