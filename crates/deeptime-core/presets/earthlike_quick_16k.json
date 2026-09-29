@@ -231,5 +231,13 @@
     "ela_offset_c": 0.0,
     "glaciation_on_frac": 0.02,
     "glaciation_off_frac": 0.01
+  },
+  "biomes": {
+    "temperature_shift": 0.0,
+    "humidity_shift": 0.0,
+    "beach_blocks": 16.0,
+    "terrain_window_blocks": 64.0,
+    "variant_blocks": 1024.0,
+    "wetlands": 1.0
   }
 }

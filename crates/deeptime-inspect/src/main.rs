@@ -117,6 +117,20 @@ enum Cmd {
         #[arg(long)]
         tags: Vec<PathBuf>,
     },
+    /// Surface biomes (the biome stored at each column's terrain top) beside the world data's
+    /// Köppen map of the same area (P1-09), and per Köppen class the biomes found there.
+    Biomes {
+        #[command(flatten)]
+        common: Common,
+        #[arg(long, value_parser = Area::parse, allow_hyphen_values = true)]
+        area: Option<Area>,
+        /// Default: <world>/deeptime if present.
+        #[arg(long)]
+        world_data: Option<PathBuf>,
+        /// Base name of the files (<name>.png, <name>-koppen.png, <name>.json).
+        #[arg(long, default_value = "biomes")]
+        name: String,
+    },
     /// Ore blocks by material, projected from above, shaded by depth.
     Ore {
         #[command(flatten)]
@@ -364,6 +378,16 @@ fn run(cli: Cli) -> Result<()> {
             print_json(
                 &serde_json::json!({"images": v["images"], "classes": v["classes"], "unmapped_blocks": v["unmapped_blocks"]}),
             )?;
+        }
+        Cmd::Biomes {
+            common,
+            area,
+            world_data,
+            name,
+        } => {
+            let wd = default_world_data(&common.world, world_data.as_ref())?;
+            let v = render::biomes(&common.world, area, wd.as_ref(), &name, &out_of(&common))?;
+            print_json(&v["images"])?;
         }
         Cmd::Ore { common, area } => {
             // Site footprints from the world's own world data, when it has sites (P1-15).

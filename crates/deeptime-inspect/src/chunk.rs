@@ -39,6 +39,22 @@ impl Section {
     }
 }
 
+/// One section's biomes: 4 × 4 × 4 cells of 4³ blocks (index `y·16 + z·4 + x`), a palette of
+/// biome ids and `⌈log₂ palette⌉`-bit indices (no minimum width; a one-entry palette has no data).
+pub struct BiomeSection {
+    pub palette: Vec<String>,
+    idx: Vec<u8>,
+}
+
+impl BiomeSection {
+    /// The biome id at local block (x, y, z) of the section.
+    pub fn get(&self, x: usize, y: usize, z: usize) -> &str {
+        let i = ((y >> 2) << 4) | ((z >> 2) << 2) | (x >> 2);
+        let k = self.idx.get(i).copied().unwrap_or(0) as usize;
+        self.palette.get(k).map_or("?", String::as_str)
+    }
+}
+
 /// One structure piece's bounding box (inclusive block coordinates) and its structure's id.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Piece {
@@ -61,6 +77,8 @@ pub struct Chunk {
     pub heightmaps: Vec<(String, Vec<u16>)>,
     /// Pieces of the structures that start in this chunk.
     pub pieces: Vec<Piece>,
+    /// Biomes by section Y.
+    pub biomes: Vec<(i32, BiomeSection)>,
 }
 
 /// ⌈log₂ n⌉ for n ≥ 1.
@@ -114,10 +132,32 @@ impl Chunk {
             .to_owned();
         let sections_tag = root.get("sections").and_then(Tag::as_list).unwrap_or(&[]);
         let mut parsed: Vec<(i32, Section)> = Vec::new();
+        let mut biomes: Vec<(i32, BiomeSection)> = Vec::new();
         for s in sections_tag {
             let Some(y) = s.get("Y").and_then(Tag::as_i64) else {
                 continue;
             };
+            if let Some(b) = s.get("biomes") {
+                let palette: Vec<String> = b
+                    .get("palette")
+                    .and_then(Tag::as_list)
+                    .unwrap_or(&[])
+                    .iter()
+                    .map(|t| t.as_str().unwrap_or("?").to_owned())
+                    .collect();
+                if !palette.is_empty() {
+                    let idx = if palette.len() == 1 {
+                        vec![0u8; 64]
+                    } else {
+                        let bits = ceil_log2(palette.len());
+                        let data = b.get("data").and_then(Tag::as_long_array).unwrap_or(&[]);
+                        unpack(data, bits, 64)
+                            .map(|v| v.into_iter().map(|k| k as u8).collect())
+                            .unwrap_or_else(|| vec![0u8; 64])
+                    };
+                    biomes.push((y as i32, BiomeSection { palette, idx }));
+                }
+            }
             let Some(bs) = s.get("block_states") else {
                 continue;
             };
@@ -235,7 +275,17 @@ impl Chunk {
             sections,
             heightmaps,
             pieces,
+            biomes,
         })
+    }
+
+    /// The biome id at local (x, z) and world y (clamped into the stored sections).
+    pub fn biome(&self, x: usize, y: i32, z: usize) -> Option<&str> {
+        let lo = self.biomes.iter().map(|(y0, _)| *y0).min()?;
+        let hi = self.biomes.iter().map(|(y0, _)| *y0).max()?;
+        let y = y.clamp(lo * 16, hi * 16 + 15);
+        let (_, s) = self.biomes.iter().find(|(y0, _)| *y0 == y >> 4)?;
+        Some(s.get(x, (y & 15) as usize, z))
     }
 
     pub fn is_full(&self) -> bool {
@@ -357,6 +407,48 @@ mod tests {
             ("Y".into(), Tag::Byte(y)),
             ("block_states".into(), Tag::Compound(bs)),
         ])
+    }
+
+    #[test]
+    fn biomes_by_quart_cell() {
+        // Section 0: three biomes (2 bits), cell index y·16 + z·4 + x → palette index % 3;
+        // section 1: one biome, no data.
+        let pal = ["minecraft:desert", "minecraft:plains", "terralith:steppe"];
+        let idx: Vec<u32> = (0..64).map(|i| (i % 3) as u32).collect();
+        let biomes = |y: i8, p: &[&str], data: Option<Vec<i64>>| {
+            let mut b = vec![(
+                "palette".to_owned(),
+                Tag::List(p.iter().map(|n| Tag::String((*n).into())).collect()),
+            )];
+            if let Some(d) = data {
+                b.push(("data".into(), Tag::LongArray(d)));
+            }
+            Tag::Compound(vec![
+                ("Y".into(), Tag::Byte(y)),
+                ("biomes".into(), Tag::Compound(b)),
+            ])
+        };
+        let root = Tag::Compound(vec![
+            ("xPos".into(), Tag::Int(0)),
+            ("zPos".into(), Tag::Int(0)),
+            ("yPos".into(), Tag::Int(0)),
+            (
+                "sections".into(),
+                Tag::List(vec![
+                    biomes(0, &pal, Some(pack(&idx, 2))),
+                    biomes(1, &["minecraft:ocean"], None),
+                ]),
+            ),
+        ]);
+        let c = Chunk::parse(&root, &mut Registry::new()).unwrap();
+        // Block (5, 9, 13): cell x 1, y 2, z 3 → 2·16 + 3·4 + 1 = 45 → 45 % 3 = 0.
+        assert_eq!(c.biome(5, 9, 13), Some("minecraft:desert"));
+        // Cell 46 → 1.
+        assert_eq!(c.biome(9, 9, 13), Some("minecraft:plains"));
+        assert_eq!(c.biome(0, 20, 0), Some("minecraft:ocean"));
+        // Clamped into the stored sections.
+        assert_eq!(c.biome(0, 400, 0), Some("minecraft:ocean"));
+        assert_eq!(c.biome(0, -50, 0), Some("minecraft:desert"));
     }
 
     #[test]

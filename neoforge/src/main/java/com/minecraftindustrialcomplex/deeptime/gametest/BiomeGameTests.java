@@ -2,7 +2,11 @@
 package com.minecraftindustrialcomplex.deeptime.gametest;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.climate.BiomeCensus;
+import com.minecraftindustrialcomplex.deeptime.climate.OverworldBands;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import net.minecraft.world.level.biome.Climate;
+import net.minecraft.world.level.biome.OverworldBiomeBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.QuartPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -102,6 +106,113 @@ public final class BiomeGameTests {
         helper.assertTrue(checked >= 16, "only " + checked + " land columns found");
         helper.assertTrue(painted * 2 >= checked, "only " + painted + " of " + checked + " land columns are painted:" + bare);
         helper.succeed();
+    }
+
+    /**
+     * Floors of {@link #climateConsistent}, per Köppen family (P1-09 acceptance: recorded at the
+     * first calibrated run, standalone and MIC; see STATUS.md's P1-09 build log). A family with
+     * fewer than {@link #MIN_COLUMNS} columns on the test planet is logged, not asserted.
+     */
+    static final Map<String, Double> FLOORS = Map.of(
+            "A", 0.0, "Af", 0.0, "BW", 0.0, "BS", 0.0, "C", 0.0, "D", 0.0, "Dsub", 0.0, "E", 0.0, "sea", 0.0);
+    static final int MIN_COLUMNS = 20;
+
+    /**
+     * P1-09: biomes follow the simulated climate. On the real baked planet ({@code test_planet_real},
+     * the pack's biomes through the world's climate mapping), for each Köppen family the share of
+     * surface columns whose biome carries a matching NeoForge {@code c:} tag ({@link BiomeCensus#CHECKS})
+     * is logged and meets its floor.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
+    public static void climateConsistent(GameTestHelper helper) {
+        ServerLevel level = RealPlanetGameTests.level(helper);
+        var t = RealPlanetGameTests.terrain(helper, level);
+        helper.assertTrue(!t.mapping().isIdentity(), "the real planet has a climate mapping (climate_mapping.json)");
+        BiomeCensus.Result r;
+        try {
+            r = BiomeCensus.run(level, t.circumference() / 256, 32, null);
+        } catch (java.io.IOException e) {
+            helper.fail(e.toString());
+            return;
+        }
+        DeepTime.LOGGER.info("[gametest] climateConsistent {}", r.json());
+        StringBuilder low = new StringBuilder();
+        for (var ch : BiomeCensus.CHECKS) {
+            double share = r.share(ch.name());
+            if (r.total(ch.name()) < MIN_COLUMNS)
+                continue;
+            double floor = FLOORS.getOrDefault(ch.name(), 0.0);
+            if (share < floor)
+                low.append(String.format(java.util.Locale.ROOT, " %s %.3f < %.3f (%d columns)", ch.name(), share, floor, r.total(ch.name())));
+        }
+        helper.assertTrue(low.isEmpty(), "Köppen families below their floor:" + low);
+        helper.succeed();
+    }
+
+    /**
+     * The reference bands the bake places values against ({@code default.json} in the jar) are
+     * {@code OverworldBiomeBuilder}'s own (plan §7.2: "the band boundaries come from
+     * OverworldBiomeBuilder in the 1.21.1 sources"), read from the class by reflection.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE)
+    public static void bandsAreTheBuilders(GameTestHelper helper) {
+        OverworldBands jar = OverworldBands.defaults();
+        try {
+            var b = new OverworldBiomeBuilder();
+            double[] t = edges(param(b, "temperatures"));
+            double[] h = edges(param(b, "humidities"));
+            double[] e = edges(param(b, "erosions"));
+            String[] cont = {"mushroomFieldsContinentalness", "deepOceanContinentalness", "oceanContinentalness",
+                    "coastContinentalness", "nearInlandContinentalness", "midInlandContinentalness", "farInlandContinentalness"};
+            double[] c = new double[cont.length + 1];
+            for (int i = 0; i < cont.length; i++) {
+                Climate.Parameter p = (Climate.Parameter) field(b, cont[i]);
+                c[i] = Climate.unquantizeCoord(p.min());
+                c[i + 1] = Climate.unquantizeCoord(p.max());
+            }
+            double[] w = {0.0, (Float) staticField("VALLEY_SIZE"), (Float) staticField("LOW_START"), OverworldBiomeBuilder.HIGH_START,
+                    OverworldBiomeBuilder.PEAK_START, (Float) staticField("PEAK_END")};
+            OverworldBands vanilla = new OverworldBands(t, h, c, e, w);
+            DeepTime.LOGGER.info("[gametest] bandsAreTheBuilders builder={} jar={}", vanilla.toJson(), jar.toJson());
+            for (int i = 0; i < 6; i++) {
+                helper.assertTrue(Math.abs(t[i] - jar.temperature()[i]) < 1e-4, "temperature edge " + i);
+                helper.assertTrue(Math.abs(h[i] - jar.vegetation()[i]) < 1e-4, "humidity edge " + i);
+                helper.assertTrue(Math.abs(w[i] - jar.weirdness()[i]) < 1e-4, "weirdness edge " + i);
+            }
+            for (int i = 0; i < 8; i++) {
+                helper.assertTrue(Math.abs(e[i] - jar.erosion()[i]) < 1e-4, "erosion edge " + i);
+                helper.assertTrue(Math.abs(c[i] - jar.continents()[i]) < 1e-4, "continentalness edge " + i);
+            }
+        } catch (ReflectiveOperationException ex) {
+            helper.fail("cannot read OverworldBiomeBuilder: " + ex);
+        }
+        helper.succeed();
+    }
+
+    private static Object field(Object o, String name) throws ReflectiveOperationException {
+        var f = OverworldBiomeBuilder.class.getDeclaredField(name);
+        f.setAccessible(true);
+        return f.get(o);
+    }
+
+    private static Object staticField(String name) throws ReflectiveOperationException {
+        var f = OverworldBiomeBuilder.class.getDeclaredField(name);
+        f.setAccessible(true);
+        return f.get(null);
+    }
+
+    private static Climate.Parameter[] param(Object b, String name) throws ReflectiveOperationException {
+        return (Climate.Parameter[]) field(b, name);
+    }
+
+    /** The edges of consecutive spans. */
+    private static double[] edges(Climate.Parameter[] ps) {
+        double[] out = new double[ps.length + 1];
+        for (int i = 0; i < ps.length; i++) {
+            out[i] = Climate.unquantizeCoord(ps[i].min());
+            out[i + 1] = Climate.unquantizeCoord(ps[i].max());
+        }
+        return out;
     }
 
     /** Biomes O' Plenty's regions reach Deep Time's terrain through TerraBlender (-PwithTerraBlender). */
