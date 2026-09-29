@@ -1,0 +1,167 @@
+{
+  "id": "bif_fe",
+  "title": "Banded iron formation (Superior-type, with Algoma-type) iron deposits",
+  "percentile_convention": "USGS: p90 is the value that 90% of deposits equal or exceed (the small end); p10 the large end",
+  "sources": [
+    {
+      "key": "b1693-34a",
+      "citation": "Mosier, D.L., and Singer, D.A., 1986, Grade and tonnage model of Superior Fe and Algoma Fe deposits, in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 228-230 (Bulletin xiii, 379 p.; printed page = PDF page - 16 in report.pdf)",
+      "url": "https://pubs.usgs.gov/bul/1693/report.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "b1693-34a-desc",
+      "citation": "Cannon, W.F., 1986, Descriptive model of Superior Fe, in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 228",
+      "url": "https://pubs.usgs.gov/bul/1693/report.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "b1693-28b-desc",
+      "citation": "Cannon, W.F., 1986, Descriptive model of Algoma Fe, in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 198",
+      "url": "https://pubs.usgs.gov/bul/1693/report.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "ofr95-831",
+      "citation": "Cannon, W.F., Hadley, D.G., and Horton, R.J., 1995, Superior Fe deposits (Model 34a; Cannon, 1986), p. 252-255, and Algoma Fe deposits (Model 28b; Cannon, 1986), p. 209-212, in du Bray, E.A., ed., Preliminary compilation of descriptive geoenvironmental mineral deposit models: U.S. Geological Survey Open-File Report 95-831, ii, 272 p. (chapter PDFs CHAP32.pdf and CHAP27.pdf)",
+      "url": "https://pubs.usgs.gov/of/1995/ofr-95-0831/",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "pp1640a",
+      "citation": "Singer, D.A., Menzie, W.D., Sutphin, D.M., Mosier, D.L., and Bliss, J.D., 2001, Mineral deposit density--An update, chap. A of Schulz, K.J., ed., Contributions to global mineral resource assessment research: U.S. Geological Survey Professional Paper 1640-A, p. A1-A13",
+      "url": "https://pubs.usgs.gov/pp/p1640a/p1640A.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    }
+  ],
+  "n_deposits": 66,
+  "tonnage_mt": {
+    "p90": 11,
+    "p50": 170,
+    "p10": 2400,
+    "source": "b1693-34a",
+    "where": "Figure 172 ('Tonnages of Algoma Fe and Superior Fe deposits'), printed p. 229 (PDF p. 245 of report.pdf)",
+    "method": "figure intercept",
+    "note": "ONE combined model for Superior and Algoma types (n = 66): 'Archean and Proterozoic deposits (Algoma and Superior types) are both included because they are not significantly different in tonnage or grades' (comments, p. 228, PDF p. 244). Bulletin 1693 has NO separate grade-tonnage model under 28b: the Algoma descriptive model (p. 198) says 'The grade-tonnage model for Algoma Fe is included under Superior Fe'. Intercepts were read from the printed arrows at 300 dpi. OFR 95-831 (p. 253) restates the median as 170 million tonnes."
+  },
+  "grades": {
+    "fe_pct": {
+      "unit": "percent",
+      "p90": 30,
+      "p50": 53,
+      "p10": 66,
+      "n_reported": 66,
+      "source": "b1693-34a",
+      "where": "Figure 173 ('Iron grades of Algoma Fe and Superior Fe deposits'), printed p. 230 (PDF p. 246)",
+      "method": "figure intercept",
+      "note": "All 66 deposits are plotted (curve starts at proportion 1.0). The 53% Fe median is far above the 30-35% typical of primary iron formation (OFR 95-831). This compiler infers that many of the 66 entries are enriched (supergene / direct-shipping) ores; Bulletin 1693 does not say so. The primary iron-formation grade is 'typically about 30 to 35 weight percent iron ... but may vary from 15 to 45' (OFR 95-831, p. 254 and p. 210; see extra)."
+    },
+    "p_pct": {
+      "unit": "percent",
+      "p90": null,
+      "p50": 0.031,
+      "p10": 0.17,
+      "n_reported": null,
+      "source": "b1693-34a",
+      "where": "Figure 174 ('Phosphorus grades of Algoma Fe and Superior Fe deposits'), printed p. 230 (PDF p. 246)",
+      "method": "figure intercept",
+      "note": "No 90th-percentile intercept is printed because only about two-thirds of the 66 deposits report P: the plotted points start at a cumulative proportion of about 0.65, i.e. roughly 43 deposits. The exact count is not printed, so n_reported is left null. The model treats unreported P as zero, the usual USGS convention."
+    }
+  },
+  "correlations": [],
+  "ore_density_t_m3": {
+    "value": null,
+    "source": null,
+    "where": "Bulletin 1693 models 34a/28b and OFR 95-831 chapters on Superior Fe and Algoma Fe searched",
+    "method": "not found",
+    "note": "None of the USGS iron-formation sources opened gives an ore density or specific gravity. OFR 95-831 says only that iron-formation causes 'positive, high-amplitude gravity anomalies because it contains elevated abundances of high-density iron minerals, including magnetite and hematite' (p. 252 / p. 209). Mineral specific gravities (hematite ~5.3, magnetite ~5.2) are textbook facts, not taken from a USGS document here."
+  },
+  "deposits_per_1e5_km2": {
+    "p90": null,
+    "p50": null,
+    "p10": null,
+    "source": "pp1640a",
+    "where": "Table 1, p. A4-A5",
+    "method": "not found",
+    "note": "No USGS deposit-density model for Superior or Algoma iron formation was found. PP 1640-A Table 1 (13 deposit types) does not include iron formation."
+  },
+  "min_separation_m": {
+    "value": null,
+    "source": "b1693-34a",
+    "where": "comments, printed p. 228 (PDF p. 244)",
+    "method": "not found",
+    "note": "Bulletin 1693 model 34a states no deposit-aggregation (proximity) rule. Its 'deposits' are named ranges and districts (e.g. Mesabi, Krivoi-Rog, Labrador Quebec, 'Serria do Carajas' as printed; list p. 228-229). OFR 95-831 notes that individual mining blocks 'commonly exceed a billion tons of reserves and seldom are less than 100 million tons' (p. 253)."
+  },
+  "extra": {
+    "primary_ore_fe_pct_typical": {
+      "value": null,
+      "min": 30,
+      "max": 35,
+      "unit": "weight percent Fe",
+      "source": "ofr95-831",
+      "where": "Superior Fe, 'Nature of ore', printed p. 253-254 (CHAP32.pdf PDF p. 2-3); Algoma Fe, printed p. 210 (CHAP27.pdf PDF p. 2)",
+      "method": "text",
+      "note": "'Grade is relatively uniform, typically about 30 to 35 weight percent iron for all facies, but may vary from 15 to 45 weight percent.' The same wording appears for Algoma type. Use this for unenriched banded iron formation (taconite). The 30/53/66 model includes enriched ores."
+    },
+    "primary_ore_fe_pct_range": {
+      "value": null,
+      "min": 15,
+      "max": 45,
+      "unit": "weight percent Fe",
+      "source": "ofr95-831",
+      "where": "printed p. 254 (Superior) and p. 210 (Algoma)",
+      "method": "text",
+      "note": ""
+    },
+    "superior_mining_block_mt": {
+      "value": null,
+      "min": 100,
+      "max": 1000,
+      "unit": "million tons (mining blocks)",
+      "source": "ofr95-831",
+      "where": "Superior Fe, 'Deposit size', printed p. 253 (CHAP32.pdf PDF p. 2)",
+      "method": "text",
+      "note": "'Individual mining blocks ... commonly exceed a billion tons of reserves and seldom are less than 100 million tons.' Whole iron formations can contain 'tens of trillions of tons of material averaging about 30 percent iron'. The units are 'tons' as printed, not stated as metric."
+    },
+    "algoma_deposit_size": {
+      "value": 170,
+      "unit": "million tonnes (median)",
+      "source": "ofr95-831",
+      "where": "Algoma Fe, 'Deposit size', printed p. 210 (CHAP27.pdf PDF p. 2)",
+      "method": "text",
+      "note": "'Deposits are small (a few million tonnes) to very large (billions of tonnes); median deposit size is 170 million tonnes (Mosier and Singer, 1986).' This is the same combined model, not an Algoma-only one."
+    },
+    "superior_age_ga": {
+      "value": 2.0,
+      "unit": "Ga (+/- 0.2)",
+      "source": "b1693-34a-desc",
+      "where": "Age Range, printed p. 228 (PDF p. 244)",
+      "method": "text",
+      "note": "'Mostly Early Proterozoic (2.0 +/- 0.2 b.y.). Less commonly Middle and Late Proterozoic.' Setting: stable shallow-water marine shelf or intracratonic basin; interlayered with quartzite, shale and dolomite."
+    },
+    "algoma_age": {
+      "value": null,
+      "unit": null,
+      "source": "b1693-28b-desc",
+      "where": "Age Range, printed p. 198 (PDF p. 214)",
+      "method": "text",
+      "note": "'Mostly Archean.' Setting: volcano-sedimentary basins (greenstone belts), tectonically active submarine volcanic belts. Associated with kuroko massive sulfide and Homestake Au deposits. No number given."
+    },
+    "banding_scale": {
+      "value": null,
+      "unit": "cm",
+      "source": "b1693-34a-desc",
+      "where": "Description and Texture/Structure, printed p. 228 (PDF p. 244)",
+      "method": "text",
+      "note": "'typically layered on centimeter scale with siliceous (chert) beds interlayered with iron-rich beds'. OFR 95-831 (p. 253) gives 'less than a millimeter to a few centimeters' for Superior type and 'one to a few centimeters' for Algoma type (p. 210)."
+    },
+    "newer_usgs_grade_tonnage_model": {
+      "value": null,
+      "unit": null,
+      "source": null,
+      "where": "USGS Publications Warehouse searched (queries 'iron formation grade tonnage', 'banded iron formation deposits database', 'iron ore deposits grade and tonnage model')",
+      "method": "not found",
+      "note": "No USGS iron-formation grade-tonnage model newer than Bulletin 1693 (1986) was found."
+    }
+  }
+}

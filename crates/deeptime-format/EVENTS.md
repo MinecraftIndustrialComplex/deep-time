@@ -196,13 +196,13 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 | `deeptime:marine_regression` | the sea retreats | surface (P1-04) | set by P1-04 |
 | `deeptime:glaciation` | an ice age | climate (P1-05) | set by P1-05 |
 | `deeptime:erosion_pulse` | a burst of erosion | surface (P1-04); dummy | dummy: see below |
-| `deeptime:deposit_formation` | a deposit forms (place: its site) | deposits (P1-14); dummy | `deposit_type` str, `site` i64; P1-14 adds the limiting mineral-system component |
-| `deeptime:deposit_exhumation` | erosion exposes a deposit | deposits (P1-14) | set by P1-14 |
-| `deeptime:placer_formation` | a placer forms from an eroded source | deposits (P1-14) | set by P1-14 |
-| `deeptime:supergene_enrichment` | a supergene blanket forms | deposits (P1-14) | set by P1-14 |
-| `deeptime:petroleum_generation` | a source rock enters the oil window | deposits (P1-14) | set by P1-14 |
-| `deeptime:trap_charge` | a trap fills with petroleum | deposits (P1-14) | set by P1-14 |
-| `deeptime:guaranteed_occurrence` | a deposit added by the playability pass (plan §7.8) | bake (P1-15) | set by P1-15 |
+| `deeptime:deposit_formation` | a deposit forms (place: its site) | deposits (P1-14); dummy | below |
+| `deeptime:deposit_exhumation` | erosion exposes (or destroys) a deposit | deposits (P1-14) | below |
+| `deeptime:placer_formation` | a placer forms from an eroded source | deposits (P1-14) | below |
+| `deeptime:supergene_enrichment` | a supergene blanket forms | deposits (P1-14) | below |
+| `deeptime:petroleum_generation` | a source rock enters the oil window | deposits (P1-14) | below |
+| `deeptime:trap_charge` | a trap fills with petroleum | deposits (P1-14) | below |
+| `deeptime:guaranteed_occurrence` | a deposit added by the playability pass (plan §7.8) | deposits (P1-14) | below |
 
 ### The dummy preset's events (source `deeptime:dummy`, until P1-03)
 
@@ -212,3 +212,31 @@ at the drifting continent's centre (a point place), each caused by the one befor
 the continent's peak height / 8,000 m. Params: `stage` (str, the stage name), `step` (i64, the run's
 step index), `peak_y` (f64, the peak's block y). At the end of the last stage one
 `deposit_formation` per site, caused by the last chain event, with a site place.
+
+### Deposit events (source `deeptime:deposits`, P1-14)
+
+The deposit stage (`crates/deeptime-core/src/deposits/`) writes one forming event per site, whose
+`causes` are the "Why here?" chain: per mineral-system component the event of the kinds the deposit
+type lists (`causes.source`, `.driver`, `.pathway`, `.trap`) nearest the site in space (within the
+type's `cause_radius_km`) and time (active at the formation or ended at most 100 Myr before; any
+time for a type dated by its cause); a deposit whose components find nothing cites the nearest
+earlier geology event. Scores are 0–1. Every forming event's place is its site, except for deposits
+that erosion destroyed (point place, `site` −1).
+
+| Kind | t_start (t_end) | Magnitude | Causes | Params |
+|---|---|---|---|---|
+| `deposit_formation` | the formation time: the cell's most favourable frame (jittered inside it), or the earliest cause for types dated by their cause (inherited BIF) | the tonnage's quantile in its distribution | component events | `deposit_type` str, `site` i64 (−1 = destroyed), `favourability` f64 (the cell's integrated F; for petroleum the charged trap × seal × reservoir); rule-based types add `score_source`, `score_driver`, `score_pathway`, `score_trap`, `score_host`, `score_clock` f64 (at the best frame), `limiting` str (the site's weakest component), `neighbours_limited_by` str (the component that most often limits the barren cells within 3 L1 cells), `host_class` str (the host class that scored best; empty without host fields); `tonnage_mt` f64 (as drawn), `tonnage_quantile` f64, `formation_depth_m` f64, `province_endowment` f64, `fate` str (`buried`, `truncated`, `eroded`), `fraction_left` f64; coal adds `rank` str and `tti` f64 |
+| `deposit_exhumation` | when erosion reached the body's top (truncated) or its base (destroyed) | 0 | the deposit's formation event, the nearest `causes.preservation` event (an erosion pulse) | `deposit_type` str, `site` i64 (−1 = destroyed), `eroded_m` f64 (since formation), `fraction_left` f64, `destroyed` i64 (0/1) |
+| `placer_formation` | the parent's destruction | the placer's tonnage quantile | the parent's `deposit_exhumation` (+ preservation events) | `deposit_type`, `site`, `parent_type` str, `transport_km` f64, `resistate_lost_t` f64 (resistate metal the parent lost), `tonnage_mt` f64 |
+| `supergene_enrichment` | start of the stable window (to the present) | k / 3 | the parent's formation and exhumation events (+ preservation events) | `deposit_type`, `site`, `parent` i64 (site), `grade_mult` f64 (k), `stable_myr` f64, `water_table_m` f64, `leached_t` f64 (parent ore leached into the blanket) |
+| `petroleum_generation` (point place, a kitchen's centre) | the kitchen's earliest oil-window onset (to its last generating frame) | min(TTI_max / TTI_peak, 4) / 4 | the kitchen's `causes.source` events (subsidence, rifting) | `deposit_type` str, `kitchen` i64, `tti_max` f64, `area_km2` f64, `toc_mean` f64 |
+| `trap_charge` (a reservoir's forming event) | the charge time: max(trap formation, kitchen onset) | tonnage quantile | the kitchen's `petroleum_generation` + component events | as `deposit_formation`, plus `kitchen` i64, `migration_km` f64, `trap_formed_years` f64 |
+| `guaranteed_occurrence` | the cell's most favourable frame | 0 | component events as for a natural deposit | `deposit_type`, `site`, `material` str, `region` str (`col,row` of the essentials grid), `favourability` f64, `limiting` str, `score` f64, `reason` str |
+
+### The synthetic history's events (source `deeptime:synthetic`, P1-14)
+
+`deposits_synthetic` presets stand in for P1-03…P1-07 with an invented planet
+(`crates/deeptime-core/src/deposits/synthetic.rs`); it emits the tectonic events a real history
+would, at point places along its features: `subduction_onset`, `terrane_accretion`,
+`orogeny_phase`, `erosion_pulse`, `collision`, `marine_transgression`, `basin_subsidence` and
+`rift_onset`, each with the param `feature` (str, e.g. `A margin`, `C rift`).

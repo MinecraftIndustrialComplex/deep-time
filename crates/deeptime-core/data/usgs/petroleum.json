@@ -1,0 +1,394 @@
+{
+  "id": "petroleum",
+  "title": "Conventional oil and gas fields: maturation thresholds and field sizes",
+  "percentile_convention": "USGS: p90 is the value that 90% of deposits equal or exceed (the small end); p10 the large end",
+  "sources": [
+    {
+      "key": "waples1980",
+      "citation": "Waples, D.W., 1980, Time and temperature in petroleum formation: Application of Lopatin's method to petroleum exploration: American Association of Petroleum Geologists Bulletin, v. 64, no. 6, p. 916-926 (values taken from the abstract as indexed by the U.S. DOE OSTI record 6845191)",
+      "url": "https://www.osti.gov/biblio/6845191",
+      "licence": "fact cited from a journal article (not redistributed)"
+    },
+    {
+      "key": "kgs-b240",
+      "citation": "Newell (initials not shown on the web page), ca. 1997, [article on TTI modelling in central Kansas], section 'TTI Modeling for Localities in Central Kansas', in Current Research in Earth Sciences: Kansas Geological Survey Bulletin 240, part 2 (web version dated 1998-03-16), Table 1 (TTI to Ro after Waples, 1981)",
+      "url": "https://www.kgs.ku.edu/Current/1997/newell/newell3.html",
+      "licence": "fact cited from a state geological survey publication (not redistributed; not USGS)"
+    },
+    {
+      "key": "pp1698-b",
+      "citation": "Higley, D.K., and Cox, D.O., 2005, Oil and gas exploration and development along the Front Range in the Denver Basin of Colorado, Nebraska, and Wyoming, chap. B of Energy resource studies, northern Front Range, Colorado: U.S. Geological Survey Professional Paper 1698 (P1698.pdf, 162 p.)",
+      "url": "https://pubs.usgs.gov/pp/2005/1698/pdf/P1698.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "ofr88-450g",
+      "citation": "Spencer, C.W., and Wilson, R.J., 1988, Petroleum geology and principal exploration plays in the Uinta-Piceance-Eagle Basins Province, Utah and Colorado: U.S. Geological Survey Open-File Report 88-450-G",
+      "url": "https://pubs.usgs.gov/of/1988/0450g/report.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "ofr94-220",
+      "citation": "Nuccio, V.F., 1994, Vitrinite reflectance data for the Paleocene Fort Union and Eocene Wind River Formations, and burial history of a drill hole located in central Wind River Basin, Wyoming: U.S. Geological Survey Open-File Report 94-220, 43 p.",
+      "url": "https://pubs.usgs.gov/of/1994/0220/report.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "dds69b-ch4",
+      "citation": "Nuccio, V.F., and Roberts, L.N.R., 2003, Thermal maturity and oil and gas generation history of petroleum systems in the Uinta-Piceance Province, Utah and Colorado, chap. 4 of USGS Uinta-Piceance Assessment Team, Petroleum systems and geologic assessment of oil and gas in the Uinta-Piceance Province, Utah and Colorado: U.S. Geological Survey Digital Data Series DDS-69-B",
+      "url": "https://pubs.usgs.gov/dds/dds-069/dds-069-b/REPORTS/Chapter_4.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "ofr2003-253",
+      "citation": "Moore, T.E., and Potter, C.J., 2003, Structural plays in Ellesmerian sequence and correlative strata of the National Petroleum Reserve, Alaska: U.S. Geological Survey Open-File Report 2003-253, 40 p.",
+      "url": "https://pubs.usgs.gov/of/2003/0253/pdf/of03-253.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "sir2010-5070n",
+      "citation": "Emsbo, Poul, Seal, R.R., Breit, G.N., Diehl, S.F., and Shah, A.K., 2016, Sedimentary exhalative (sedex) zinc-lead-silver deposit model: U.S. Geological Survey Scientific Investigations Report 2010-5070-N, 57 p. (printed page = PDF page - 12)",
+      "url": "https://pubs.usgs.gov/sir/2010/5070/n/sir20105070n.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "dds60-au71920101",
+      "citation": "Tuttle, M.L., Brownfield, M.E., and Charpentier, R.R. (assessment geologists), 2000, Agbada Reservoirs, Assessment Unit 71920101 (Niger Delta Province 7192), assessment-unit summary and data form, in U.S. Geological Survey World Energy Assessment Team, U.S. Geological Survey World Petroleum Assessment 2000--Description and results: U.S. Geological Survey Digital Data Series DDS-60 (file reg7/P7/tps/AU/au719211.pdf inside regions/reg7.zip; 8 PDF pages)",
+      "url": "https://pubs.usgs.gov/dds/dds-060/regions/reg7.zip",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "dds60-ar",
+      "citation": "Ahlbrandt, T.S., Charpentier, R.R., Klett, T.R., Schmoker, J.W., and Schenk, C.J., 2000, Analysis of assessment results, chap. AR of U.S. Geological Survey World Petroleum Assessment 2000--Description and results: U.S. Geological Survey Digital Data Series DDS-60",
+      "url": "https://pubs.usgs.gov/dds/dds-060/chaps/AR.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "dds60-mc",
+      "citation": "Charpentier, R.R., and Klett, T.R., 2000, Monte Carlo simulation method, chap. MC of U.S. Geological Survey World Petroleum Assessment 2000--Description and results: U.S. Geological Survey Digital Data Series DDS-60",
+      "url": "https://pubs.usgs.gov/dds/dds-060/chaps/MC.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "dds60-am",
+      "citation": "Schmoker, J.W., and Klett, T.R., 2000, U.S. Geological Survey assessment model for undiscovered conventional oil, gas, and NGL resources--The Seventh Approximation, chap. AM of U.S. Geological Survey World Petroleum Assessment 2000--Description and results: U.S. Geological Survey Digital Data Series DDS-60 (also USGS Bulletin 2165)",
+      "url": "https://pubs.usgs.gov/dds/dds-060/chaps/AM.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "dds60-gl",
+      "citation": "Klett, T.R., Schmoker, J.W., Charpentier, R.R., Ahlbrandt, T.S., and Ulmishek, G.F., 2000, Glossary, chap. GL of U.S. Geological Survey World Petroleum Assessment 2000--Description and results: U.S. Geological Survey Digital Data Series DDS-60",
+      "url": "https://pubs.usgs.gov/dds/dds-060/chaps/GL.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    },
+    {
+      "key": "dds69b-ch5",
+      "citation": "Dubiel, R.F., 2003, Geology, depositional models, and oil and gas assessment of the Green River Total Petroleum System, Uinta-Piceance Province, eastern Utah and western Colorado, chap. 5 of U.S. Geological Survey Digital Data Series DDS-69-B",
+      "url": "https://pubs.usgs.gov/dds/dds-069/dds-069-b/REPORTS/Chapter_5.pdf",
+      "licence": "US public domain (U.S. Geological Survey)"
+    }
+  ],
+  "n_deposits": null,
+  "tonnage_mt": {
+    "p90": null,
+    "p50": null,
+    "p10": null,
+    "source": null,
+    "where": null,
+    "method": "not applicable",
+    "note": "Petroleum fields are sized by volume (millions of barrels of oil or oil equivalent), not ore tonnage. See extra.field_size_mmboe."
+  },
+  "grades": {},
+  "correlations": [],
+  "ore_density_t_m3": {
+    "value": null,
+    "source": null,
+    "where": null,
+    "method": "not applicable",
+    "note": "Not applicable to fluid accumulations."
+  },
+  "deposits_per_1e5_km2": {
+    "p90": null,
+    "p50": null,
+    "p10": null,
+    "source": null,
+    "where": "DDS-60 chapters AM, AR, MC, GL and AU 71920101 searched",
+    "method": "not found",
+    "note": "No USGS density of oil or gas fields per area was found. The World Petroleum Assessment estimates NUMBERS of undiscovered fields per assessment unit (for example 200 / 580 / 1000 oil fields, min / median / max, for AU 71920101, extra.niger_delta_undiscovered_oil_field_count). The AU data form gives the AU's areal split by country as percentages, not its area."
+  },
+  "min_separation_m": {
+    "value": null,
+    "source": "dds60-gl",
+    "where": "Glossary, 'Field', PDF p. 4",
+    "method": "not found",
+    "note": "No distance rule. A field is 'a production unit consisting of a collection of oil and gas pools that when projected to the surface form an approximately contiguous area that can be circumscribed'. An oil field has GOR < 20,000 cfg/bbl; a gas field has GOR >= 20,000."
+  },
+  "extra": {
+    "field_size_mmboe": {
+      "value": 12,
+      "p90": 2.4,
+      "p50": 12,
+      "p10": 89,
+      "source": "dds60-au71920101",
+      "where": "p50: data form 'Size of Undiscovered Fields', median size, PDF p. 4; p90 and p10: 'Agbada Reservoirs, AU 71920101, Undiscovered Field-Size Distribution' bar chart (oil fields), PDF p. 7",
+      "method": "digitised from figure",
+      "note": "EXAMPLE ONLY: Niger Delta Province (7192), Tertiary Niger Delta (Agbada/Akata) TPS, Agbada Reservoirs assessment unit 71920101, USGS World Petroleum Assessment 2000. These are the USGS-assessed sizes (grown) of UNDISCOVERED OIL fields, in MMBO of oil only (the minimum-size cutoff is 1 MMBOE). p50 = 12 MMBO is printed in the data form. p90 and p10 were derived by this compiler: the eleven log2 size-class bars were measured at 250 dpi (heights 38.9, 83.1, 106.6, 111.3, 97.2, 71.3, 43.8, 22.5, 9.7, 3.6, 0.9 fields for 1-<2 ... 1024-<2048 MMBO; sum 589 vs the printed mean of 586.3), and the cumulative 10% and 90% points were interpolated log-linearly within a class. The same procedure gives p50 = 12.0, matching the data form. p10 reads 88-90 depending on outline handling. The input distribution is a shifted truncated lognormal (DDS-60 chap. MC) with min 1, median 12 and max 1500 MMBO (extra.niger_delta_*). For a small-field province see extra.uinta_*."
+    },
+    "field_size_distribution_type": {
+      "value": null,
+      "unit": null,
+      "source": "dds60-mc",
+      "where": "chap. MC, p. MC-3 (PDF p. 5)",
+      "method": "text",
+      "note": "The Emc2 program used for the World Petroleum Assessment 2000 uses 'shifted truncated lognormal distributions for the field-size and triangular distributions for numbers of undiscovered fields and for coproduct ratios'. Inputs are given as minimum (F100), median (F50) and maximum (F0) fractiles (chap. AM, p. AM-6)."
+    },
+    "niger_delta_min_field_size_mmboe": {
+      "value": 1,
+      "unit": "MMBOE (grown)",
+      "source": "dds60-au71920101",
+      "where": "data form, 'What is the minimum field size?', PDF p. 4",
+      "method": "table",
+      "note": "AU 71920101 (Agbada Reservoirs, Niger Delta)."
+    },
+    "niger_delta_undiscovered_oil_field_size_mmbo": {
+      "value": 12,
+      "min": 1,
+      "max": 1500,
+      "unit": "MMBO (grown), min / median / max",
+      "source": "dds60-au71920101",
+      "where": "data form, 'Size of Undiscovered Fields', PDF p. 4",
+      "method": "table",
+      "note": "Undiscovered gas fields: min 6, median 60, max 7000 BCFG (6,000 cfg = 1 BOE in the USGS form, so about 1 / 10 / 1167 MMBOE, converted by this compiler)."
+    },
+    "niger_delta_undiscovered_oil_field_count": {
+      "value": 580,
+      "min": 200,
+      "max": 1000,
+      "unit": "number of undiscovered oil fields >= minimum size (min / median / max)",
+      "source": "dds60-au71920101",
+      "where": "data form, 'Number of Undiscovered Fields', PDF p. 4",
+      "method": "table",
+      "note": "Undiscovered gas fields: 100 / 250 / 400. Mean number of undiscovered oil fields in the simulation: 586.3 (bar chart, PDF p. 7)."
+    },
+    "niger_delta_discovered_fields": {
+      "value": 481,
+      "unit": "discovered oil fields >= minimum size",
+      "source": "dds60-au71920101",
+      "where": "data form, 'Number of discovered fields exceeding minimum size', PDF p. 4",
+      "method": "table",
+      "note": "Plus 93 discovered gas fields. Established AU (> 13 fields)."
+    },
+    "niger_delta_discovered_oil_field_median_mmboe": {
+      "value": 22.6,
+      "unit": "MMBOE (grown), median of the last third of discoveries",
+      "source": "dds60-au71920101",
+      "where": "data form, 'Median size (grown) of discovered oil fields', PDF p. 4",
+      "method": "table",
+      "note": "By discovery thirds: 1st 60, 2nd 21.6, 3rd 22.6 MMBOE. Discovered gas fields: 116 / 58 / 199 BCFG."
+    },
+    "uinta_min_field_size_mmboe": {
+      "value": 0.5,
+      "unit": "MMBOE (grown)",
+      "source": "dds69b-ch5",
+      "where": "Appendix B data form for AU 50200501, printed p. 36 (PDF p. 40)",
+      "method": "table",
+      "note": "Second example, a small-field province: Uinta Green River Conventional Oil and Gas AU (50200501), USGS National Oil and Gas Assessment 2002. 15 discovered oil fields >= 0.5 MMBO."
+    },
+    "uinta_undiscovered_oil_field_size_mmbo": {
+      "value": 1,
+      "min": 0.5,
+      "max": 25,
+      "unit": "MMBO (grown), min / median / max",
+      "source": "dds69b-ch5",
+      "where": "Appendix B data form, printed p. 36 (PDF p. 40)",
+      "method": "table",
+      "note": "Number of undiscovered oil fields 1 / 6 / 12. Median size of discovered oil fields by thirds 2.15 / 2.19 / 1.2 MMBOE (also stated in the text, p. 27, PDF p. 31)."
+    },
+    "world_min_field_size_mmboe": {
+      "value": 20,
+      "unit": "MMBOE (largest minimum field size used by any AU)",
+      "source": "dds60-ar",
+      "where": "chap. AR, 'Minimum Field Size', p. AR-32 (PDF p. 49); fig. AR-98",
+      "method": "text",
+      "note": "'No minimum field size exceeded 20 MMBOE. Seventy percent of minimum field sizes were in the range of 1 through 5 MMBOE.'"
+    },
+    "world_median_undiscovered_oil_field_size_note": {
+      "value": null,
+      "unit": "MMBO",
+      "source": "dds60-ar",
+      "where": "chap. AR, 'Size of Undiscovered Fields', p. AR-33 (PDF p. 50); fig. AR-100",
+      "method": "text",
+      "note": "Across the AUs of the assessment (the chapter speaks of 270 defined assessment units): about 45 percent were judged to contain undiscovered oil fields with a median size of 1-10 MMBO, and just under 20 percent a median size exceeding 30 MMBO. Similar for gas. Roughly half the AUs were judged to hold 1-25 undiscovered oil fields and about a quarter more than 50 (p. AR-33)."
+    },
+    "boe_conversion_cfg_per_bo": {
+      "value": 6000,
+      "unit": "cubic feet of gas per barrel of oil equivalent",
+      "source": "dds60-am",
+      "where": "chap. AM, fig. AM-3a data form (PDF p. 17)",
+      "method": "table",
+      "note": "'mmboe grown (6000 cfg = 1 bo)'."
+    },
+    "tti_onset_oil_generation": {
+      "value": 15,
+      "unit": "Lopatin TTI",
+      "source": "waples1980",
+      "where": "abstract, AAPG Bull. 64(6) p. 916 (via OSTI record 6845191)",
+      "method": "text",
+      "note": "Waples (1980) thresholds: 15 onset of oil generation; 75 peak; 160 end of oil generation; ~500 40-degree (API) oil preservation deadline; ~1000 50-degree oil deadline; ~1500 wet-gas preservation deadline; > 65,000 dry-gas preservation deadline. NOT found restated as 15/75/160 in a USGS document. USGS reports that use the method pick their own thresholds: PP 1698 uses TTI 10 for the onset of oil and ~160 for thermogenic gas, and draws TTI = 15, 60 and 160 lines on its burial plot; OFR 88-450-G uses 10 and 180 (extra.tti_usgs_*)."
+    },
+    "tti_peak_oil_generation": {
+      "value": 75,
+      "unit": "Lopatin TTI",
+      "source": "waples1980",
+      "where": "abstract, AAPG Bull. 64(6) p. 916 (via OSTI record 6845191)",
+      "method": "text",
+      "note": ""
+    },
+    "tti_end_oil_generation": {
+      "value": 160,
+      "unit": "Lopatin TTI",
+      "source": "waples1980",
+      "where": "abstract, AAPG Bull. 64(6) p. 916 (via OSTI record 6845191)",
+      "method": "text",
+      "note": ""
+    },
+    "tti_oil_40api_preservation_deadline": {
+      "value": 500,
+      "unit": "Lopatin TTI (approximate)",
+      "source": "waples1980",
+      "where": "abstract (via OSTI record 6845191)",
+      "method": "text",
+      "note": "Printed as 'approx. 500'. The OSTI rendering says '40 deg'; this is presumably API gravity."
+    },
+    "tti_oil_50api_preservation_deadline": {
+      "value": 1000,
+      "unit": "Lopatin TTI (approximate)",
+      "source": "waples1980",
+      "where": "abstract (via OSTI record 6845191)",
+      "method": "text",
+      "note": "Printed as 'approx. 1000'."
+    },
+    "tti_wet_gas_preservation_deadline": {
+      "value": 1500,
+      "unit": "Lopatin TTI (approximate)",
+      "source": "waples1980",
+      "where": "abstract (via OSTI record 6845191)",
+      "method": "text",
+      "note": "Printed as 'approx. 1500'."
+    },
+    "tti_dry_gas_preservation_deadline": {
+      "value": 65000,
+      "unit": "Lopatin TTI (lower bound, '> 65,000')",
+      "source": "waples1980",
+      "where": "abstract (via OSTI record 6845191)",
+      "method": "text",
+      "note": "Dry gas survives up to at least TTI 65,000."
+    },
+    "tti_rate_doubling_interval_c": {
+      "value": 10,
+      "unit": "degC per doubling of maturation rate",
+      "source": "waples1980",
+      "where": "abstract (via OSTI record 6845191)",
+      "method": "text",
+      "note": "'The rate of the chemical reactions involved in thermal maturation ... appears to double with every 10 degC (18 degF) rise in temperature' (the basis of Lopatin's TTI)."
+    },
+    "tti_ro_correspondence_waples1981": {
+      "value": null,
+      "unit": "TTI -> Ro (%)",
+      "source": "kgs-b240",
+      "where": "Table 1 (web page newell3.html)",
+      "method": "table",
+      "note": "NOT USGS. Kansas Geological Survey table, credited to Waples (1981): TTI 15 -> Ro 0.6 (onset of oil); TTI 75 -> Ro 1.1 (peak oil); TTI 160 -> Ro 1.3 (end of oil); TTI 1,500 -> Ro ~3.8 (upper TTI limit for wet gas). Waples' 1980 TTI-Ro table itself was not opened."
+    },
+    "tti_usgs_pp1698_onset_oil": {
+      "value": 10,
+      "unit": "Lopatin TTI (= Ro 0.6%)",
+      "source": "pp1698-b",
+      "where": "chap. B, printed p. 22 (PDF p. 29); Figure 11, printed p. 26 (PDF p. 33)",
+      "method": "text",
+      "note": "Wattenberg field, Denver Basin: 'Estimated onset of oil generation is at a TTI of 10 (vitrinite reflectance Ro 0.6 percent); generation of thermogenic gas occurs at a TTI of about 160 (Ro 1.3 percent)'. A calculated maximum TTI of 350 corresponds to Ro 1.6%. Figure 11 draws TTI = 15, 60 and 160 lines. p. 26 cites Waples (1980) for 'Ro 1.35 percent' as the minimum for thermogenic gas from oil breakdown."
+    },
+    "tti_usgs_pp1698_thermogenic_gas": {
+      "value": 160,
+      "unit": "Lopatin TTI (= Ro 1.3%)",
+      "source": "pp1698-b",
+      "where": "chap. B, printed p. 22 (PDF p. 29)",
+      "method": "text",
+      "note": "See tti_usgs_pp1698_onset_oil."
+    },
+    "tti_usgs_ofr88450g_oil_window": {
+      "value": null,
+      "min": 10,
+      "max": 180,
+      "unit": "Lopatin TTI (top and base of the oil window)",
+      "source": "ofr88-450g",
+      "where": "'Thermal maturation and burial history', PDF p. 10 (printed page number not legible); Piceance example PDF p. 13 (printed p. 10)",
+      "method": "text",
+      "note": "'The assumed top of the oil window is at a TTI of 10, and the base was assumed to be TTI 180', with a geothermal gradient of 1.5 degF per 100 ft assumed (Uinta Basin). At the MWX site the base (TTI 180) matches Ro > 1.35%."
+    },
+    "ro_onset_oil_type_ii_pct": {
+      "value": 0.6,
+      "unit": "percent Ro",
+      "source": "ofr94-220",
+      "where": "Methods, PDF p. 2",
+      "method": "text",
+      "note": "Citing Waples (1985): onset of oil generation from about 0.45-0.50% Ro for high-sulfur kerogen, 0.60% for type II and 0.65% for type III. The end of oil generation is 'commonly accepted' at 1.35% Ro. Type I (Dow, 1977) generates oil between 0.50 and 1.35%. Wet gas forms between 0.80 and 2.0% Ro, dry (thermogenic) gas between about 1.0 and 3.0%, and biogenic gas as low as 0.20% (peat). Figure 2 (PDF p. 5) marks 0.60, 0.75, 1.0 and 1.35% Ro."
+    },
+    "ro_end_oil_pct": {
+      "value": 1.35,
+      "unit": "percent Ro",
+      "source": "ofr94-220",
+      "where": "Methods, PDF p. 2",
+      "method": "text",
+      "note": "See ro_onset_oil_type_ii_pct."
+    },
+    "ro_type_iii_gas_thresholds_pct": {
+      "value": null,
+      "min": 0.75,
+      "max": 1.1,
+      "unit": "percent Ro (onset of significant gas, maximum gas generation)",
+      "source": "dds69b-ch4",
+      "where": "chap. 4, printed p. 6 (PDF p. 10)",
+      "method": "text",
+      "note": "Type III kerogen: Ro ~0.75% is the onset of significant gas generation and 1.10% the level of maximum generation and expulsion (Meissner, 1984, as cited). The upper limit for gas preservation may be as high as 3.5% (Dow, 1977) or 4.0% Ro (Waples, 1980, as cited). Wet gas forms at 0.80-2.0% Ro and dry gas at ~1.0-3.0% Ro."
+    },
+    "oil_window_temperature_c": {
+      "value": null,
+      "min": 80,
+      "max": 120,
+      "unit": "degC",
+      "source": "ofr2003-253",
+      "where": "printed p. 8 (PDF p. 8)",
+      "method": "text",
+      "note": "'Assuming a geothermal gradient typical for a long-standing passive margin (~30 degC/km), the depth to the oil window (80 degC to 120 degC) ...' The ~50-150 degC catagenesis window was NOT found stated in a USGS document opened."
+    },
+    "geothermal_gradient_passive_margin_c_per_km": {
+      "value": 30,
+      "unit": "degC/km",
+      "source": "ofr2003-253",
+      "where": "printed p. 8 (PDF p. 8)",
+      "method": "text",
+      "note": "'typical for a long-standing passive margin (~30 degC/km)'."
+    },
+    "geothermal_gradient_sedimentary_basins_c_per_km": {
+      "value": null,
+      "min": 20,
+      "max": 25,
+      "unit": "degC/km",
+      "source": "sir2010-5070n",
+      "where": "printed p. 28 (PDF p. 40)",
+      "method": "text",
+      "note": "'Temperature gradients of 20-25 degC/km are common in sedimentary basins, and 30 degC/km is commonly assumed as the upper limit in models.' The report also uses a mean annual surface temperature of 15 degC."
+    },
+    "geothermal_gradient_examples_f_per_100ft": {
+      "value": null,
+      "min": 1.5,
+      "max": 2.55,
+      "unit": "degF per 100 ft",
+      "source": "pp1698-b + ofr88-450g",
+      "where": "PP 1698 chap. B printed p. 22 (PDF p. 29); OFR 88-450-G PDF p. 10",
+      "method": "text",
+      "note": "Wattenberg field (Denver Basin) about 2.55 degF/100 ft, and about 2.0 degF/100 ft outside the field (PP 1698). Uinta Basin model assumption 1.5 degF/100 ft (OFR 88-450-G). Converted by this compiler: 1.5, 2.0 and 2.55 degF/100 ft = 27, 36 and 46 degC/km."
+    }
+  }
+}

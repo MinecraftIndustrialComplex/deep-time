@@ -8,6 +8,18 @@ and contribute no code.
 | Source | Licence | Used for | Deep Time files |
 |---|---|---|---|
 
+## Data
+
+- **U.S. Geological Survey grade–tonnage models and reports** (public domain, works of the U.S.
+  Government; attribution kept as good practice): OFR 2008-1155 (porphyry copper), OFR 2009-1252
+  (sediment-hosted Zn–Pb), Bulletin 1693 models 31a, 32a/b, 34a and 39a, SIR 2010-5070-A, -B and -N,
+  Circular 891 (coal), OFR 95-831, PP 1625-A, PP 1698, OFR 88-450-G, OFR 94-220, OFR 2003-253,
+  DDS-60 and DDS-69-B. Digitised in P1-14, with the table or figure and page of every number, into
+  `crates/deeptime-core/data/usgs/*.json`; the deposit types in
+  `neoforge/src/main/resources/data/deeptime/deeptime/deposit_type/` copy them. Facts cited from
+  journal articles (Waples 1980, Butterworth et al. 2016, Hoggard et al. 2020, Sillitoe 2005, …)
+  are numbers, not redistributed text.
+
 ## Build-time terms
 
 - cargo-xwin downloads the Microsoft C runtime and Windows SDK to link the Windows natives. Using it

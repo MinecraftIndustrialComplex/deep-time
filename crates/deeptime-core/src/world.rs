@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 
-use deeptime_format::{Event, EventId, GEOLOGY_WRITER, GridDesc, Site, SiteId};
+use deeptime_format::{Body, BodyId, Event, EventId, GEOLOGY_WRITER, GridDesc, Site, SiteId};
 use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
@@ -55,8 +55,14 @@ pub struct WorldState {
     /// Events emitted so far, in emission order (the order `eventsSince` cursors count).
     pub events: Vec<Event>,
     pub sites: Vec<Site>,
+    /// Deposit bodies and other geometry (plan §5.7.4; P1-14).
+    pub bodies: Vec<Body>,
+    /// Per-stage summaries as JSON text (the deposit census of P1-14, …), copied into
+    /// `manifest.json` `notes` by `finalize_write`.
+    pub notes: BTreeMap<String, String>,
     next_event_seq: u64,
     next_site_id: SiteId,
+    next_body_id: BodyId,
 }
 
 impl WorldState {
@@ -68,8 +74,11 @@ impl WorldState {
             fields: BTreeMap::new(),
             events: Vec::new(),
             sites: Vec::new(),
+            bodies: Vec::new(),
+            notes: BTreeMap::new(),
             next_event_seq: 0,
             next_site_id: 0,
+            next_body_id: 0,
         }
     }
 
@@ -113,6 +122,27 @@ impl WorldState {
         }
         let id = site.id;
         self.sites.push(site);
+        Ok(id)
+    }
+
+    /// The next body id.
+    pub fn next_body_id(&mut self) -> BodyId {
+        let id = self.next_body_id;
+        self.next_body_id += 1;
+        id
+    }
+
+    /// Registers `body` (its id from [`WorldState::next_body_id`]).
+    pub fn add_body(&mut self, body: Body) -> Result<BodyId, CoreError> {
+        body.validate()?;
+        if body.id >= self.next_body_id || self.bodies.iter().any(|b| b.id == body.id) {
+            return Err(CoreError::InvalidArgument(format!(
+                "body {} was not allocated by this world, or is registered twice",
+                body.id
+            )));
+        }
+        let id = body.id;
+        self.bodies.push(body);
         Ok(id)
     }
 

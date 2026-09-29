@@ -805,6 +805,13 @@ impl Session {
         }
         files.push(FileEntry::of(dir, deeptime_format::events::INDEX_PATH)?);
 
+        let (bytes, crc32) = deeptime_format::bodies::write_bodies(dir, &world.bodies)?;
+        files.push(FileEntry {
+            path: deeptime_format::bodies::BODIES_PATH.into(),
+            bytes,
+            crc32,
+        });
+
         let w = write_sites(dir, world.circumference, &world.sites)?;
         files.push(FileEntry {
             path: SITES_PATH.into(),
@@ -835,6 +842,7 @@ impl Session {
             "t_years": world.t_years,
             "events": world.events.len(),
             "sites": world.sites.len(),
+            "bodies": world.bodies.len(),
             "keyframes": kf.frames.len(),
         });
         let header = &self.preset.header;
@@ -845,6 +853,11 @@ impl Session {
             run["placeholder"] = json!(true);
         }
         m.notes.insert("run".into(), run);
+        // Stage summaries (the deposit census of P1-14).
+        for (stage, text) in &world.notes {
+            let v: Value = serde_json::from_str(text).unwrap_or_else(|_| json!(text));
+            m.notes.insert(stage.clone(), v);
+        }
         let bytes = m.to_json_bytes()?;
         write_atomic(&dir.join(MANIFEST), &bytes)?;
         self.state

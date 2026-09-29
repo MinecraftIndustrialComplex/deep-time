@@ -51,6 +51,54 @@
         [-1, "#111111"],
         [1, "#f0f0f0"]
       ]
+    },
+    "favourability": {
+      "stops": [
+        [0, "#0b0b1a"],
+        [0.05, "#1d2a5c"],
+        [0.25, "#2a7fb8"],
+        [0.5, "#41b6a4"],
+        [0.75, "#c5e36b"],
+        [1, "#fff5a0"]
+      ]
+    },
+    "relief": {
+      "stops": [
+        [-6000, "#08142e"],
+        [-2000, "#1f4e8c"],
+        [-1, "#6fa8dc"],
+        [0, "#3f7f3a"],
+        [800, "#9bbf5a"],
+        [2000, "#b08d57"],
+        [4000, "#f2f2f2"]
+      ]
+    },
+    "unit": {
+      "stops": [
+        [0, "#141414"],
+        [0.5, "#8c6bb1"],
+        [1, "#f7e1a0"]
+      ]
+    },
+    "erosion": {
+      "stops": [
+        [0, "#141414"],
+        [50, "#7a3b2e"],
+        [200, "#d9772b"],
+        [500, "#ffe08a"]
+      ]
+    },
+    "sites": {
+      "stops": [
+        [1, "#d7301f"],
+        [2, "#fdae61"],
+        [3, "#ffd700"],
+        [4, "#a6611a"],
+        [5, "#9e9e9e"],
+        [6, "#1a9850"],
+        [7, "#66c2a5"],
+        [8, "#8073ac"]
+      ]
     }
   },
   "layers": {
@@ -60,7 +108,12 @@
     "climate/vegetation": "vegetation",
     "climate/continents": "diverging",
     "climate/erosion": "grey",
-    "climate/ridges": "grey"
+    "climate/ridges": "grey",
+    "deposits/favourability/*": "favourability",
+    "deposits/sites": "sites",
+    "input/elevation_m": "relief",
+    "input/erosion_rate_m_myr": "erosion",
+    "input/*": "unit"
   },
   "default": "grey"
 }

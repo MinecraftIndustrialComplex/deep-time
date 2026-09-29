@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! Presets (plan §5.1): parsing, the built-in presets, and how a preset argument is resolved.
 //!
-//! Until the real stages exist (P1-03 on) the only pipeline is the dummy one (`dummy.rs`). A
-//! preset is `{"dummy": {…}}` plus optional header keys that every preset will carry:
+//! Until the real stages exist (P1-03 on) the pipelines are the dummy one (`dummy.rs`) and P1-14's
+//! deposit stage on a synthetic history (`{"deposits_synthetic": {…}}`,
+//! `deposits::SyntheticPreset`). A preset is `{"dummy": {…}}` (or `{"deposits_synthetic": {…}}`)
+//! plus optional header keys that every preset will carry:
 //!
 //! ```json
 //! {"schema": 0, "name": "earthlike_quick_16k", "description": "…", "placeholder": true,
@@ -174,6 +176,9 @@ pub struct PresetHeader {
 #[derive(Debug, Clone, PartialEq)]
 pub enum PresetBody {
     Dummy(DummyParams),
+    /// P1-14: the deposit stage on a synthetic field history (`{"deposits_synthetic": {…}}`,
+    /// `crate::deposits::SyntheticPreset`), until P1-03…P1-07 publish real fields.
+    DepositsSynthetic(crate::deposits::SyntheticPreset),
 }
 
 /// A parsed preset.
@@ -199,16 +204,45 @@ impl Preset {
         let obj = value
             .as_object()
             .ok_or_else(|| CoreError::preset("$", "expected a JSON object"))?;
-        if let Some(key) = obj
-            .keys()
-            .find(|k| k.as_str() != "dummy" && !HEADER_KEYS.contains(&k.as_str()))
-        {
+        if let Some(key) = obj.keys().find(|k| {
+            !["dummy", "deposits_synthetic"].contains(&k.as_str())
+                && !HEADER_KEYS.contains(&k.as_str())
+        }) {
             return Err(CoreError::preset(
                 format!("$.{key}"),
-                "unknown key (only the dummy preset exists before P1-03)",
+                "unknown key (only the dummy and deposits_synthetic presets exist before P1-03)",
             ));
         }
         let header = parse_header(obj)?;
+        if let Some(d) = obj.get("deposits_synthetic") {
+            if obj.contains_key("dummy") {
+                return Err(CoreError::preset(
+                    "$",
+                    "give one pipeline: dummy or deposits_synthetic",
+                ));
+            }
+            let mut p = crate::deposits::SyntheticPreset::from_json(d)?;
+            if let Some(c) = header.circumference
+                && c != p.circumference
+            {
+                return Err(CoreError::preset(
+                    "$.scale.circumference_blocks",
+                    format!(
+                        "{c} differs from deposits_synthetic's circumference {}",
+                        p.circumference
+                    ),
+                ));
+            }
+            if let Some(t) = header.timeline {
+                p.t_start_years = -t.length_myr * 1e6;
+                p.t_end_years = 0.0;
+            }
+            p.stages()?;
+            return Ok(Preset {
+                header,
+                body: PresetBody::DepositsSynthetic(p),
+            });
+        }
         let dummy = obj.get("dummy").ok_or_else(|| {
             CoreError::preset(
                 "$",
@@ -243,6 +277,9 @@ impl Preset {
     pub fn to_json(&self) -> Value {
         let mut v = match &self.body {
             PresetBody::Dummy(p) => p.to_json(),
+            PresetBody::DepositsSynthetic(p) => json!({
+                "deposits_synthetic": serde_json::to_value(p).expect("a preset serialises"),
+            }),
         };
         let h = &self.header;
         let obj = v.as_object_mut().expect("a preset is an object");
@@ -275,6 +312,7 @@ impl Preset {
         match (&self.header.name, &self.body) {
             (Some(n), _) => n,
             (None, PresetBody::Dummy(_)) => "dummy",
+            (None, PresetBody::DepositsSynthetic(_)) => "deposits_synthetic",
         }
     }
 
@@ -285,6 +323,7 @@ impl Preset {
                 .world
                 .as_ref()
                 .map_or(DEFAULT_DUMMY_CIRCUMFERENCE, |w| w.circumference),
+            PresetBody::DepositsSynthetic(p) => p.circumference,
         })
     }
 
@@ -292,6 +331,9 @@ impl Preset {
     pub fn stages(&self) -> Vec<Box<dyn Stage>> {
         match &self.body {
             PresetBody::Dummy(p) => p.stages(),
+            PresetBody::DepositsSynthetic(p) => {
+                p.stages().expect("checked when the preset was parsed")
+            }
         }
     }
 
@@ -299,6 +341,7 @@ impl Preset {
     pub fn initial_world(&self) -> WorldState {
         match &self.body {
             PresetBody::Dummy(p) => p.initial_world(),
+            PresetBody::DepositsSynthetic(p) => p.initial_world(),
         }
     }
 
@@ -311,6 +354,10 @@ impl Preset {
                 },
                 None => KeyframePolicy::NONE,
             },
+            PresetBody::DepositsSynthetic(p) => KeyframePolicy {
+                every_years: Some(p.keyframe_every_years),
+                size: (p.keyframe_size[0], p.keyframe_size[1]),
+            },
         }
     }
 
@@ -318,6 +365,7 @@ impl Preset {
     pub fn synth(&self) -> Option<synth::Kind> {
         match &self.body {
             PresetBody::Dummy(p) => p.synth,
+            PresetBody::DepositsSynthetic(_) => None,
         }
     }
 }
@@ -486,7 +534,9 @@ mod tests {
                 length_myr: 800.0
             })
         );
-        let PresetBody::Dummy(d) = &p.body;
+        let PresetBody::Dummy(d) = &p.body else {
+            panic!("a dummy preset");
+        };
         let w = d.world.as_ref().unwrap();
         assert_eq!((w.t_start_years, w.t_end_years), (-8.0e8, 0.0));
         assert_eq!(w.keyframe_every_years, 1.0e8);

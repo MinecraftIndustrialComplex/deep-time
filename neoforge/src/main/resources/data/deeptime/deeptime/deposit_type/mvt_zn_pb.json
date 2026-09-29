@@ -1,0 +1,92 @@
+{
+  "id": "deeptime:mvt_zn_pb",
+  "family": "basin_brine",
+  "site_kind": "deposit",
+  "description": "Mississippi Valley-type zinc-lead: replacement and open-space ore in platform dolostone, deposited by basin brines that orogenic uplift drove through the carbonate aquifer.",
+  "products": [
+    {"material": "c:zinc", "grade_key": "zn_pct", "role": "primary"},
+    {"material": "c:lead", "grade_key": "pb_pct", "role": "coproduct"},
+    {"material": "c:silver", "grade_key": "ag_gpt", "role": "byproduct"}
+  ],
+  "components": {
+    "combine": "product",
+    "source": [
+      {"field": "deeptime:evaporite", "curve": [[0, 0.15], [0.3, 1]], "note": "evaporite-derived oxidised brines (Leach et al. 2010); the floor lets seawater-evaporation brines count a little (design)"}
+    ],
+    "driver": [
+      {"field": "deeptime:topographic_gradient_m_km", "curve": [[0, 0], [5, 0.5], [15, 1]], "note": "uplift-driven topographic flow (Garven 1985; Bethke 1986); thresholds are design"}
+    ],
+    "pathway": [
+      {"field": "deeptime:fault_density", "curve": [[0, 0.5], [0.4, 1]], "note": "faults and basement highs focus flow (design)"}
+    ],
+    "trap": [
+      {"field": "deeptime:carbonate_platform", "curve": [[0.1, 0], [0.5, 1]], "note": "platform carbonates as host and aquifer (Leach et al. 2010)"}
+    ]
+  },
+  "clock_gates": ["deeptime:clock/oxygenated_oceans"],
+  "integration_myr": 5,
+  "formation_time": "peak",
+  "hosts": {
+    "any_of": ["#deeptime:rock/carbonate"],
+    "host_bias": {"dolostone": 1.5}
+  },
+  "causes": {
+    "source": ["deeptime:marine_transgression"],
+    "driver": ["deeptime:orogeny_phase", "deeptime:collision"],
+    "trap": ["deeptime:marine_transgression"],
+    "preservation": ["deeptime:erosion_pulse"]
+  },
+  "cause_radius_km": 600,
+  "sizing": {
+    "grade_tonnage": "mvt_zn_pb",
+    "tonnage_mt": {"p90": 0.93, "p50": 10.0, "p10": 86.0},
+    "grades": {
+      "zn_pct": {"p90": 1.7, "p50": 5.1, "p10": 12.0, "presence": 0.9697},
+      "pb_pct": {"p90": 0.19, "p50": 1.5, "p10": 5.0, "presence": 0.9167},
+      "ag_gpt": {"p90": 0.0, "p50": 0.0, "p10": 37.0, "presence": 0.4394}
+    },
+    "correlations": [
+      ["tonnage_mt", "zn_pct", -0.3],
+      ["zn_pct", "pb_pct", 0.16],
+      ["pb_pct", "ag_gpt", 0.45]
+    ],
+    "ore_density_t_m3": 2.9,
+    "density_per_1e5km2": {"p90": 1, "p50": 5, "p10": 20},
+    "min_separation_m": 2000,
+    "tract_threshold": 0.2,
+    "clustering": {"model": "thomas", "camp_spacing_km": 30, "cluster_radius_km": 10}
+  },
+  "geometry": {
+    "shape": "lens",
+    "aspect": [1.0, 0.1, 1.0],
+    "dip_deg": [0, 5],
+    "rock_class": "dolostone",
+    "zoning": [
+      {"zone": "core_zn", "d": [0.0, 0.55], "material": "c:zinc", "grade_mult": 1.2, "density": 0.35},
+      {"zone": "core_pb", "d": [0.0, 0.55], "material": "c:lead", "grade_mult": 1.0, "density": 0.1},
+      {"zone": "core_ag", "d": [0.0, 0.55], "material": "c:silver", "grade_mult": 1.0, "density": 0.02},
+      {"zone": "fringe_zn", "d": [0.55, 1.0], "material": "c:zinc", "grade_mult": 0.7, "density": 0.15}
+    ],
+    "extra_bodies": [],
+    "children": []
+  },
+  "preservation": {
+    "formation_depth_m": 1000,
+    "vertical_extent_m": 100,
+    "erosion_behavior": "truncate",
+    "resistates": []
+  },
+  "minecraft": {
+    "coe_vein": "createoreexcavation:ore_vein_type/zinc",
+    "cdg_reservoir": false,
+    "ore_block_policy": "ev_then_vanilla"
+  },
+  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 3.0, "richness_mult": 1.0},
+  "requires_fields": {},
+  "notes": [
+    "Sizing: USGS OFR 2009-1252 (Singer, Berger & Moring 2009), model CAam (carbonate-hosted, amagmatic), n = 132, Table 2 p. 9: tonnage 0.93 / 10 / 86 Mt, Zn 1.7 / 5.1 / 12 %, Pb 0.19 / 1.5 / 5.0 %, Ag 0 / 0 / 37 g/t (unreported grades counted as zero); correlations from the text p. 8; the 2 km same-deposit rule p. 2. The report has no MVT model as such: 93 of its 132 CAam deposits are labelled MVT and 93 of the 105 MVT-labelled deposits fall in CAam. presence = n_reported / 132 counted in the report's database SedZn-PbTX.txt. The MVT-only table of SIR 2010-5070-A (Table 1) is in data/usgs/mvt_zn_pb.json extra. Cu and Au (9 and 3 of 132) are left out.",
+    "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 2.9 (dolostone with sulfides), density_per_1e5km2 1 / 5 / 20 (no USGS MVT deposit density exists; SIR 2010-5070-A gives district areas of 1,600–10,000 km² and Pine Point's 60 ore bodies in 1,600 km², which local densities far exceed), formation_depth_m 1000.",
+    "Design values: the curves' thresholds, integration_myr 5 (brine flushes are short: 0.5–5 Myr at Pine Point, Garven 1985), clustering, zoning, aspect, size multipliers.",
+    "Create stones (decisions file): dolostone (asurine → zinc) is the preferred host at 1.5, and the ore body turns its host to dolostone (hydrothermal dolomite)."
+  ]
+}

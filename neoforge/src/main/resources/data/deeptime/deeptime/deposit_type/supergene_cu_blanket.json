@@ -1,0 +1,72 @@
+{
+  "id": "deeptime:supergene_cu_blanket",
+  "family": "residual",
+  "site_kind": "supergene",
+  "child_only": true,
+  "description": "Supergene chalcocite enrichment blanket at the (paleo)water table above an exposed porphyry, under a leached, hematitic cap.",
+  "products": [
+    {"material": "c:copper", "grade_key": "cu_pct", "role": "primary"}
+  ],
+  "components": {"combine": "product"},
+  "clock_gates": [],
+  "integration_myr": 10,
+  "formation_time": "peak",
+  "hosts": {"any_of": [], "host_bias": {}},
+  "causes": {
+    "preservation": ["deeptime:erosion_pulse", "deeptime:orogeny_phase"]
+  },
+  "cause_radius_km": 600,
+  "sizing": {
+    "grade_tonnage": "supergene_cu",
+    "tonnage_mt": {"p90": 10, "p50": 100, "p10": 1500},
+    "grades": {
+      "cu_pct": {"p90": 0.4, "p50": 0.8, "p10": 1.7, "presence": 1.0}
+    },
+    "correlations": [],
+    "ore_density_t_m3": 2.7,
+    "density_per_1e5km2": {"p90": 1, "p50": 1, "p10": 1},
+    "min_separation_m": 0,
+    "tract_threshold": 0.5,
+    "clustering": {"model": "thomas", "camp_spacing_km": 0, "cluster_radius_km": 1}
+  },
+  "geometry": {
+    "shape": "blanket",
+    "aspect": [1.0, 0.12, 1.0],
+    "dip_deg": [0, 0],
+    "zoning": [
+      {"zone": "oxide_zone", "v": [0.0, 0.3], "material": "c:copper", "grade_mult": 0.5, "density": 0.15},
+      {"zone": "enrichment_blanket", "v": [0.3, 1.0], "material": "c:copper", "grade_mult": 1.0, "density": 0.45}
+    ],
+    "extra_bodies": [],
+    "children": []
+  },
+  "preservation": {
+    "formation_depth_m": 150,
+    "vertical_extent_m": 100,
+    "erosion_behavior": "truncate",
+    "resistates": []
+  },
+  "weathering": {
+    "max_top_depth_m": 300,
+    "min_water_table_m": 50,
+    "precip_mm": [100, 1500],
+    "min_stable_myr": 0.5,
+    "max_erosion_m_myr": 50,
+    "grade_mult": [2.0, 3.0],
+    "leach_depth_m": 300
+  },
+  "minecraft": {
+    "coe_vein": "createoreexcavation:ore_vein_type/copper",
+    "cdg_reservoir": false,
+    "ore_block_policy": "ev_then_vanilla"
+  },
+  "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 1.0, "richness_mult": 1.0},
+  "requires_fields": {},
+  "notes": [
+    "A child of deeptime:porphyry_cu_mo_au: its tonnage and grade come from the parent (copper conserved: the leached column's copper, concentrated k-fold at k × the hypogene grade), not from sizing, which only documents the ranges.",
+    "USGS SIR 2010-5070-B (John et al. 2010): enrichment up to 3× in the Andes (p. 66, restating Sillitoe 2005), up to ~8× in the south-western US; enriched sulfide ore 0.4–1.7 % Cu (pp. 4, 65); enriched zone seldom thicker than 200 m (p. 25); blankets form at the top of the water table (p. 120); rainfall of 10 cm/yr or more (p. 68, the precip lower bound). Supergene activity lasted at least 0.4–6.2 Myr per deposit (Sillitoe & McKee 1996, USGS record 70018070); the plan's 0.5 Myr minimum (Sillitoe 2005) is used. See crates/deeptime-core/data/usgs/supergene_cu.json.",
+    "Enrichment applies to copper only: Mo, Au and Ag enrichment is not documented (SIR 2010-5070-B).",
+    "PLACEHOLDERS (no USGS grade–tonnage model exists for blankets): tonnage_mt 10 / 100 / 1500 (the text gives 'tens of Mt' to more than 1.5 Gt), cu_pct p50 0.8 inside the 0.4–1.7 % range, ore_density_t_m3 2.7, density_per_1e5km2 and clustering (unused by a child), leach_depth_m and max_top_depth_m 300 ('several hundred m' of leached cap).",
+    "Design values: min_water_table_m 50, precip upper bound 1500 mm (hot semi-arid to pluvial, not quantified), max_erosion_m_myr 50 (erosion must not outpace enrichment), zoning split and densities, the blanket's aspect."
+  ]
+}

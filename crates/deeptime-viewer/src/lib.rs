@@ -17,8 +17,8 @@ use std::path::Path;
 
 use deeptime_format::keyframes::{KeyframeIndex, read_keyframe};
 use deeptime_format::{
-    DType, Event, EventLog, KeyframeImage, LoadedLayer, Manifest, Ramp, Ramps, RasterRead, Site,
-    TilePackReader,
+    Body, DType, Event, EventLog, KeyframeImage, LoadedLayer, Manifest, Ramp, Ramps, RasterRead,
+    Site, TilePackReader,
 };
 use serde_json::{Value, json};
 
@@ -155,6 +155,9 @@ pub fn write_bundle_with(
 
     let (keyframes, events, sites) = write_timeline(dir, timeline)?;
 
+    // An empty report; `write_report` replaces it (P1-14: the deposit census and bodies).
+    fs::write(dir.join("report.js"), "window.DT_REPORT = null;\n")?;
+
     let ramps_value: Value = serde_json::from_str(RAMPS_JSON).map_err(io::Error::other)?;
     let bundle = json!({
         "title": info.title, "source": info.source, "circumference": info.circumference,
@@ -258,7 +261,36 @@ pub fn write_world_bundle(dir: &Path, world: &Path, title: &str) -> io::Result<(
             events: events.events().to_vec(),
             sites,
         },
+    )?;
+    let bodies = deeptime_format::bodies::read_bodies(world)
+        .map_err(io::Error::other)?
+        .unwrap_or_default();
+    if let Some(report) = deposit_report(m.notes.get("deposits"), &bodies) {
+        write_report(dir, &report)?;
+    }
+    Ok(())
+}
+
+/// Writes `report.js` (`window.DT_REPORT = …`) next to a bundle's `index.html`: stage reports
+/// the page shows beside the timeline. P1-14 puts `{"deposits": <census>, "bodies": [...]}` there
+/// (`FORMAT.md`, "Bodies"); the page draws the census table and each site's body section.
+pub fn write_report(dir: &Path, report: &Value) -> io::Result<()> {
+    fs::write(
+        dir.join("report.js"),
+        format!("window.DT_REPORT = {report};\n"),
     )
+}
+
+/// The report of a world's deposit stage: its census (from `manifest.json` notes or the world's
+/// notes) and every body.
+pub fn deposit_report(census: Option<&Value>, bodies: &[Body]) -> Option<Value> {
+    if census.is_none() && bodies.is_empty() {
+        return None;
+    }
+    Some(json!({
+        "deposits": census.cloned().unwrap_or(Value::Null),
+        "bodies": bodies.iter().map(Body::to_json).collect::<Vec<_>>(),
+    }))
 }
 
 /// Writes `deeptime bench`'s page: `index.html` plus `bench.js` (`window.DT_BENCH = …`), the
