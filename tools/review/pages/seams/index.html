@@ -381,10 +381,10 @@ latitude  = −z · 360° / C               north is −z; the pole edges are z 
 <section class="plate" id="poles" aria-labelledby="poles-h" data-ss-section="poles">
   <div class="wrap">
     <div class="plate-head">
-      <p class="eyebrow" data-ss-id="poles-p-1">Plan §7.11 · P1-18 · prototype in P0-06</p>
+      <p class="eyebrow" data-ss-id="poles-p-1">Plan §7.11 · built in P1-18 (prototype in P0-06)</p>
       <h2 id="poles-h" data-ss-id="poles-h">The poles: a soft cap, then a wall</h2>
       <p data-ss-id="poles-p-2">From 75° a pushback toward the equator grows with latitude, an action-bar warning appears, and a storm (fog and particles, drawn by the client) thickens. Sable ships get wind: their velocity is pushed toward the equator. At 80° the pushback becomes a hard stop. Terrain exists all the way to the pole edge; past it (|z| ≥ C/4), chunks that load at view distance are an ice-sheet ocean.</p>
-      <p class="flag" data-ss-id="poles-p-3"><span class="pill pend">Not built</span><span>Planned in P1-18. The plan fixes where the cap starts and where the stop is, not the shape of the curves: the curves, the storm and the warning text below are illustrations.</span></p>
+      <p class="flag" data-ss-id="poles-p-3"><span class="pill ok">Built</span><span>P1-18. The curves are the real ones, with s the depth into the 75°–80° band: pushback 0.10·s<sup>1.5</sup> blocks/tick² (at 80° it cancels walking), storm s<sup>0.7</sup>, Sable wind up to 20 blocks/s². Creative players get the storm and the stop but no wind; spectators only the storm. The warning texts are the real ones; the scene itself is an illustration of what the client draws.</span></p>
     </div>
     <div class="fig">
       <div class="stage" data-ss-id="poles-figure-1">
@@ -395,8 +395,8 @@ latitude  = −z · 360° / C               north is −z; the pole edges are z 
         </div>
         <canvas id="scenec" aria-label="Illustration of the view north at the chosen latitude: storm, fog and the action-bar warning."></canvas>
         <ul class="legend">
-          <li><span class="key" style="background:var(--ink)"></span>Pushback (illustrative)</li>
-          <li><span class="key" style="background:repeating-linear-gradient(90deg,var(--ink-3) 0 4px,transparent 4px 7px)"></span>Storm (illustrative)</li>
+          <li><span class="key" style="background:var(--ink)"></span>Pushback (share of 0.10 blocks/tick²)</li>
+          <li><span class="key" style="background:repeating-linear-gradient(90deg,var(--ink-3) 0 4px,transparent 4px 7px)"></span>Storm intensity</li>
           <li><span class="key" style="background:var(--stop)"></span>Hard stop, 80°</li>
         </ul>
         <canvas id="polec" aria-label="Chart of pushback and storm strength against latitude from 60 to 90 degrees."></canvas>
@@ -520,7 +520,7 @@ return ShapeDimensions.withSpans(dims, spans, spans.scaledDown(NETHER_SCALE),   
           <tr data-s="pend" data-ss-id="status-row-8"><td>Create kinetic networks and trains across the seam</td><td><span class="pill pend">Pending</span></td><td class="ev">informational: shaftLineAcrossSeam logs whether a kinetic network works across the seam (P0-06)</td></tr>
           <tr data-s="pend" data-ss-id="status-row-9"><td>Region files stay inside the span, at 16k and at 32k</td><td><span class="pill pend">Pending</span></td><td class="ev">smoke mic with Chunky over a rectangle straddling the seam: regions outside span 0; tw.widthChunks=1024 and 2048 (P0-06)</td></tr>
           <tr data-s="pend" data-ss-id="status-row-10"><td>Nether loops at 1:8; the End does not loop</td><td><span class="pill pend">Pending</span></td><td class="ev">set in PlanetShape (spans.scaledDown(8), LoopSpans.NONE); the probe so far covers the overworld only</td></tr>
-          <tr data-s="pend" data-ss-id="status-row-11"><td>Pole pushback, warning, ship wind, hard stop at 80°</td><td><span class="pill pend">Pending</span></td><td class="ev">PoleCapGameTests.prototypePushback (P0-06); then entityPushedBack, sableHullPushedBack, hardStopAt80 (P1-18)</td></tr>
+          <tr data-s="ok" data-ss-id="status-row-11"><td>Pole pushback, warning, ship wind, hard stop at 80°</td><td><span class="pill ok">Verified</span></td><td class="ev">P1-18 on the planet server: PoleCapGameTests.entityPushedBack, hardStopAt80, sableHullPushedBack; clients without Deep Time refused (NetworkGameTests.worldInfoChannelRequired, refuse_client)</td></tr>
           <tr data-s="later" data-ss-id="status-row-12"><td>Pole transit to longitude +180°</td><td><span class="pill later">Later</span></td><td class="ev">plan §10.6; not designed in detail</td></tr>
           <tr data-s="unv" data-ss-id="status-row-13"><td>How crossing the seam looks and feels: a hitch, pop-in, a ship's hull staying whole on screen</td><td><span class="pill unv">Needs a client</span></td><td class="ev">no server-side test can show it</td></tr>
           <tr data-s="unv" data-ss-id="status-row-14"><td>Entity tracking across the seam in multiplayer</td><td><span class="pill unv">Needs a client</span></td><td class="ev">needs connected clients on both sides of the seam</td></tr>
@@ -1595,8 +1595,8 @@ function initMirror() {
 
 /* ================================================================ 4. POLES */
 const PL = { lat: 77, walk: false, raf: 0, last: 0, parts: [], sceneRaf: 0, visible: false };
-const push = (lat) => (lat < 75 ? 0 : lat >= 80 ? 1 : Math.pow((lat - 75) / 5, 1.6));
-const storm = (lat) => (lat < 75 ? 0 : Math.pow(clamp((lat - 75) / 5, 0, 1), 0.8));
+const push = (lat) => (lat < 75 ? 0 : lat >= 80 ? 1 : Math.pow((lat - 75) / 5, 1.5));   // PoleCapCurve (P1-18)
+const storm = (lat) => (lat < 75 ? 0 : Math.pow(clamp((lat - 75) / 5, 0, 1), 0.7));
 function drawPoleChart() {
   const cv = $('#polec'); const w = cv.clientWidth; if (!w) return;
   const h = Math.round(clamp(w * 0.36, 190, 250));
@@ -1669,13 +1669,13 @@ function drawScene() {
   ctx.stroke();
   // the action bar
   if (lat >= 75) {
-    const msg = lat >= 80 ? 'You cannot go any further north' : 'Polar storm: the wind is pushing you back';
+    const msg = lat >= 80 ? 'You cannot go any further: 80.0° N is the edge of the world' : `Polar storm (${lat.toFixed(1)}° N): the wind is pushing you back toward the equator`;
     ctx.font = `600 ${w < 420 ? 11.5 : 13}px ${FD}`;
     const tw = ctx.measureText(msg).width + 22, bx = w / 2 - tw / 2, by = h - 40;
     ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(bx, by, tw, 24);
     ctx.fillStyle = lat >= 80 ? '#FF9C92' : '#FFD27A'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(msg, w / 2, by + 12.5);
   }
-  text(ctx, 'illustration · client-side, not built', w - 8, 12, { font: `500 10px ${FD}`, align: 'right', color: '#23404F', halo: 'rgba(255,255,255,.7)' });
+  text(ctx, 'illustration of the client-side storm', w - 8, 12, { font: `500 10px ${FD}`, align: 'right', color: '#23404F', halo: 'rgba(255,255,255,.7)' });
   text(ctx, `facing north at ${lat.toFixed(1)}°`, 8, 12, { font: `600 10.5px ${FM}`, color: '#23404F', halo: 'rgba(255,255,255,.7)' });
 }
 function sceneFrame(now) {
