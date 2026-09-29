@@ -15,6 +15,7 @@ use deeptime_format::DType;
 use serde_json::{Value, json};
 
 use super::biomes::{self, BiomeParams, Climate, Ground};
+use super::placement;
 use super::{Out, desc, field, grids, resample};
 use crate::climate;
 use crate::error::CoreError;
@@ -140,6 +141,7 @@ pub fn bake(
             circumference: p.scale.circumference_blocks,
         },
         &params,
+        p.placement.as_ref().unwrap_or_else(|| placement::builtin()),
     );
     for (name, data) in BIOME_INPUTS.iter().zip(&mapped.layers) {
         let raw: Vec<i16> = data.iter().map(|&v| to_raw(v)).collect();
