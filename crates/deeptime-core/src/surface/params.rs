@@ -5,7 +5,7 @@
 //! meaning on a 4.8 km (16k quick) or 2.4 km (16k full) cell.
 //!
 //! ```json
-//! "surface": {"k_spl": 5e-7, "m_spl": 0.5, "n_spl": 1.0, "g_deposition": 1.0,
+//! "surface": {"k_spl": 3e-10, "m_spl": 1.0, "n_spl": 2.0, "g_deposition": 1.0,
 //!             "sea_level": {"base_m": 0, "cycles": [{"amplitude_m": 80, "period_myr": 250}]}}
 //! ```
 
@@ -69,10 +69,15 @@ impl SeaLevel {
 #[serde(deny_unknown_fields, default)]
 pub struct SurfaceParams {
     /// Stream-power K for crystalline basement (erodibility 1), m^(1−2m)/yr (Braun & Willett).
+    /// The defaults are the nonlinear law n = 2, m = 1 (m/n = 0.5; worldwide ¹⁰Be denudation rates
+    /// favour n > 1, Harel, Mudd & Attal 2016): with n = 1, m = 0.5 and any K that keeps orogens
+    /// mountainous, continental rivers on gentle slopes planed whole continents to sea level
+    /// within ~20 Myr in the 100–500-Myr tuning runs (STATUS.md, P1-04); with n = 2 steep orogens
+    /// erode fast and low cratons slowly. K = 3·10⁻¹⁰ (m·yr)⁻¹.
     pub k_spl: f64,
     /// Area exponent m.
     pub m_spl: f64,
-    /// Slope exponent n.
+    /// Slope exponent n (Newton's method in the implicit solve when ≠ 1).
     pub n_spl: f64,
     /// Yuan et al. 2019 deposition coefficient G (0 = detachment-limited).
     pub g_deposition: f64,
@@ -141,9 +146,9 @@ pub struct SurfaceParams {
 impl Default for SurfaceParams {
     fn default() -> Self {
         SurfaceParams {
-            k_spl: 5.0e-7,
-            m_spl: 0.5,
-            n_spl: 1.0,
+            k_spl: 3.0e-10,
+            m_spl: 1.0,
+            n_spl: 2.0,
             g_deposition: 1.0,
             runoff_ref_m_yr: 0.5,
             threshold_slope: 0.35,
@@ -151,7 +156,7 @@ impl Default for SurfaceParams {
             kd_marine_m2_yr: 300.0,
             wave_base_m: 100.0,
             tidal_range_m: 2.0,
-            marine_fill_depth_m: 20.0,
+            marine_fill_depth_m: 0.0,
             shelf_slope: 0.0005,
             carbonate_max_mm_yr: 10.0,
             carbonate_extinction_per_m: 0.1,
