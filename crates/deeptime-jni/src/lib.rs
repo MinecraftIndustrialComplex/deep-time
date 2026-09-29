@@ -21,6 +21,7 @@ use std::time::Duration;
 use deeptime_core::log::Level;
 use deeptime_core::session::{PROGRESS_FIELDS, Session, SessionOptions};
 use deeptime_core::{CoreError, FORMAT_VERSION};
+use deeptime_format::ColumnWorld;
 use jni::objects::{JByteBuffer, JClass, JLongArray, JString};
 use jni::sys::{jint, jlong};
 use jni::{Env, EnvUnowned};
@@ -361,18 +362,48 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
     })
 }
 
+/// The last world-data folder `sampleColumn` opened, with its manifest's modification time: a
+/// parity test samples hundreds of columns of one folder, and a folder written again is reopened.
+static COLUMN_WORLD: std::sync::Mutex<Option<OpenWorld>> = std::sync::Mutex::new(None);
+
+/// A folder, its manifest's modification time and the evaluator opened on it.
+type OpenWorld = (PathBuf, Option<std::time::SystemTime>, Arc<ColumnWorld>);
+
+/// The column evaluator on `dir` (cached, see [`COLUMN_WORLD`]).
+pub fn column_world(dir: &std::path::Path) -> Result<Arc<ColumnWorld>, CoreError> {
+    let stamp = std::fs::metadata(dir.join(deeptime_format::manifest::MANIFEST))
+        .and_then(|m| m.modified())
+        .ok();
+    let mut cache = COLUMN_WORLD.lock().unwrap_or_else(|p| p.into_inner());
+    if let Some((path, at, w)) = cache.as_ref()
+        && path == dir
+        && *at == stamp
+    {
+        return Ok(Arc::clone(w));
+    }
+    let w = Arc::new(ColumnWorld::open(dir)?);
+    *cache = Some((dir.to_owned(), stamp, Arc::clone(&w)));
+    Ok(w)
+}
+
+/// The parity oracle (plan §6.1, §9.2): column (x, z) of a world-data folder as the Rust column
+/// evaluator answers it (`deeptime_format::column`), as the JSON `parity/columns.json` holds per
+/// column. Not a chunk-generation path: the game reads world data in Java.
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge_DeepTimeNative_sampleColumn<
     'l,
 >(
     mut env: EnvUnowned<'l>,
     _class: JClass<'l>,
-    _world_data_dir: JString<'l>,
-    _x: jint,
-    _z: jint,
+    world_data_dir: JString<'l>,
+    x: jint,
+    z: jint,
 ) -> JString<'l> {
-    guard(&mut env, |_env| {
-        Err(CoreError::Unsupported("sampleColumn (until P1-08)").into())
+    guard(&mut env, |env| {
+        let dir = PathBuf::from(string_arg(env, &world_data_dir, "worldDataDir")?);
+        let w = column_world(&dir)?;
+        let json = w.sample(i64::from(x), i64::from(z)).to_json().to_string();
+        Ok(env.new_string(json)?)
     })
 }
 
@@ -385,7 +416,7 @@ mod tests {
         let v = version_string();
         let (semver_sha, rest) = v.split_once(';').unwrap();
         assert!(semver_sha.starts_with("0.0.1+"), "{v}");
-        assert!(rest.starts_with("format=0.0;target="), "{v}");
+        assert!(rest.starts_with("format=0.1;target="), "{v}");
         assert!(rest.ends_with(TARGET), "{v}");
     }
 

@@ -730,6 +730,14 @@ placeholders (`"placeholder": true`: the dummy pipeline plus the `wrap-test` syn
 baked at their C); they name no timeline. Their one source is `crates/deeptime-core/presets/`
 (compiled into the core, copied into the jar as `deeptime/presets/<name>.json`).
 
+*As built in P1-08:* the four built-ins are the planet pipeline presets under their game names
+(`earthlike_quick_16k` = `pipeline_quick_16k`, `earthlike_full_16k` = `pipeline_full_16k`,
+`earthlike_quick_32k` = `pipeline_quick_32k`, `earthlike_full_32k` = `pipeline_full_32k`; only `name`
+and `description` differ). Calibration keeps editing `presets/pipeline/`; `tools/dev/sync_builtin_presets.py`
+copies them, and `preset::tests::builtins_are_the_pipeline_presets` fails while they drift. A
+`placeholder` preset still runs (the core, the server's warning, the workbench's dev toggle); none is
+built in any more.
+
 ### 5.2 The grids
 
 **Choice.** Two geometries, joined by resampling:
@@ -2303,6 +2311,16 @@ levels, climate layers, detail amplitude, province ids and spawn candidates; the
 strata, bodies, sites, events and the manifest last (§6.3). `sampleColumn` (§6.1) and the CLI's
 `deeptime inspect-column` call the same column evaluator Java mirrors.
 
+*As built (P1-08):* `deeptime-core/src/bake/{mod, terrain, strata, climate, surface, meta}.rs`,
+called by `Session::finalize_write` for every planet preset; the layer table, `notes.bake` and the
+contract changes are FORMAT.md's ("The bake", "The terrain height", "Columns"; format 0.1). The L3
+`elevation` and `detail/amplitude` are the amplify stage's own streamed packs (P1-06); `water_level`
+is written all nodata (lakes are Phase 2); the first horizon of every stack is raised over the
+amplified terrain (FORMAT.md, "The P1-08 bake"); the five biome inputs use a provisional mapping
+until P1-09 computes the per-world one. The column evaluator lives in the format crate
+(`deeptime_format::column`, the contract with Java), with the detail noise (`deeptime_format::detail`);
+Java's twin is `worlddata/Columns` and `worlddata/DetailNoise`.
+
 ---
 
 ## 9. Review and test pipeline
@@ -3185,6 +3203,13 @@ a smoke benchmark and again at the end.
   - `cd neoforge && nix develop -c ./gradlew test --tests '*ColumnParityTest'`, then `junit-summary.py`
     → `failures=0 errors=0` (the test asserts that all 500 columns of `parity/columns.json` are equal)
 - **Ben reviews.** The full-run viewer.
+- *As run (P1-08):* a real preset names no timeline (decisions file, "Timeline"), so the first
+  acceptance command needs one: `run --preset earthlike_quick_16k --start scattered_continents
+  --length-myr 500 --out … --viewer review/out/p1-q16`. The parity world is a small real planet
+  (`crates/deeptime-core/tests/presets/planet_world_4k.json`, C = 4096, every stage) that Gradle's
+  `testWorldPlanet4k` bakes and `deeptime parity` samples; `ColumnParityTest` also checks every
+  column's JSON from the JNI `sampleColumn` (in `NativeLinkTest`). The GameTest level
+  `deeptime:test_planet_real` carries the same planet with the pack's biomes (`RealPlanetGameTests`).
 
 #### P1-09 Climate mapping and biomes
 - **Goal.** §7.2: physical climate → the five vanilla parameters, stored per world.

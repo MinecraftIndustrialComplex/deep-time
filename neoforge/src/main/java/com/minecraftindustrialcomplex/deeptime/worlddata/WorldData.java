@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worlddata;
 
+import com.google.gson.JsonParser;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.CRC32;
 
@@ -27,14 +31,30 @@ public final class WorldData {
     private final Manifest manifest;
     private final TileCache cache;
     private final Map<String, RasterSampler> layers;
+    /** The sub-cell detail term's noise and amplitude layer (format 0.1), or null. */
+    private final DetailNoise detail;
+    private final RasterSampler amplitude;
     /** Sites, bodies and events, read on first use (P1-15). */
     private volatile Deposits deposits;
+    /** {@code strata/classes.json}, read on first use. */
+    private volatile List<String> classes;
 
     private WorldData(Path folder, Manifest manifest, TileCache cache, Map<String, RasterSampler> layers) {
         this.folder = folder;
         this.manifest = manifest;
         this.cache = cache;
         this.layers = layers;
+        DetailNoise d = DetailNoise.of(manifest);
+        if (d != null) {
+            String name = DetailNoise.layerOf(manifest);
+            this.amplitude = layers.get(name);
+            if (amplitude == null)
+                throw new WorldDataException(folder + ": notes.bake.detail names the layer " + name
+                        + ", which the manifest lacks");
+        } else {
+            this.amplitude = null;
+        }
+        this.detail = d;
     }
 
     /** Opens {@code folder} with its own default-sized tile cache. */
@@ -94,6 +114,28 @@ public final class WorldData {
         return d;
     }
 
+    /** {@code strata/classes.json}: class index → rock class id (read once). */
+    public List<String> classes() {
+        List<String> c = classes;
+        if (c == null) {
+            synchronized (this) {
+                if (classes == null) {
+                    Path p = folder.resolve("strata/classes.json");
+                    try {
+                        var arr = JsonParser.parseString(Files.readString(p)).getAsJsonObject().getAsJsonArray("classes");
+                        List<String> out = new ArrayList<>();
+                        arr.forEach(e -> out.add(e.getAsString()));
+                        classes = List.copyOf(out);
+                    } catch (IOException | RuntimeException e) {
+                        throw new WorldDataException("cannot read " + p + ": " + e.getMessage(), e);
+                    }
+                }
+                c = classes;
+            }
+        }
+        return c;
+    }
+
     public boolean has(String layer) {
         return layers.containsKey(layer);
     }
@@ -106,9 +148,31 @@ public final class WorldData {
         return s;
     }
 
-    /** Terrain surface height at block (x, z): bilinear on the L3 {@code elevation} layer. */
+    /**
+     * The terrain height H at block (x, z) (FORMAT.md, "The terrain height"): the L3
+     * {@code elevation} layer bilinear, plus, where the world has one (format 0.1 bakes), the
+     * detail term A·N — the {@code detail/amplitude} layer bilinear times {@link DetailNoise}.
+     * {@code x} is expected folded into [−C/2, C/2) ({@code TerrainSource.wrapX}); the noise is
+     * evaluated at the x given, as Rust's column evaluator does.
+     */
     public double height(double x, double z) {
+        double e = layer(ELEVATION).bilinear(x, z);
+        return detail == null ? e : e + amplitude.bilinear(x, z) * detail.at(x, z);
+    }
+
+    /** The {@code elevation} layer alone at block (x, z) (E of H = E + A·N). */
+    public double elevation(double x, double z) {
         return layer(ELEVATION).bilinear(x, z);
+    }
+
+    /** The detail term A·N at block (x, z); 0 in a world without one. */
+    public double detail(double x, double z) {
+        return detail == null ? 0.0 : amplitude.bilinear(x, z) * detail.at(x, z);
+    }
+
+    /** The world's detail noise, or null. */
+    public DetailNoise detailNoise() {
+        return detail;
     }
 
     /**

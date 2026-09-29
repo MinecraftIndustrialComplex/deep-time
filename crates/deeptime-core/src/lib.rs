@@ -29,6 +29,9 @@ pub mod climate;
 // Column strata, metamorphism, plutons and the horizon bake (P1-07).
 pub mod structure;
 
+// The bake: a finished planet run as the chunk-time layers the game reads (P1-08).
+pub mod bake;
+
 // Presets, share codes and the synthetic terrains of the placeholder presets (P1-13).
 pub mod preset;
 pub mod share_code;

@@ -19,10 +19,11 @@
 //! the plate presets leave `timeline` out and a run refuses to start until it is set (the editor,
 //! `config/deeptime/server.json` or the CLI's `--start`/`--length-myr`).
 //!
-//! The built-in `earthlike_*` presets are still P1-13's placeholders (the game bakes their
-//! synthetic terrain until P1-08 exists); the plate pipeline's presets are `plates_*`
-//! (`presets/plates/`, [`PLATES_BUILTIN`]), resolved by name like the built-ins. When the stages up
-//! to P1-08 land, their sections move into the `earthlike_*` files.
+//! The built-in `earthlike_*` presets (`preset::BUILTIN`) are the planet pipeline's presets under
+//! their game names since P1-08 (`tools/dev/sync_builtin_presets.py`); the plate pipeline's
+//! presets are `plates_*` (`presets/plates/`, [`PLATES_BUILTIN`]) and the full pipeline's
+//! `pipeline_*` ([`PIPELINE_BUILTIN`], the files calibration edits), resolved by name like the
+//! built-ins.
 //!
 //! Sections are parsed with serde, one at a time, so an error names the section
 //! (`$.planet: missing field gravity_m_s2`); range checks name the exact key. Every section
@@ -63,9 +64,10 @@ pub fn plates_builtin(name: &str) -> Option<&'static str> {
         .map(|(_, j)| *j)
 }
 
-/// The planet pipeline's presets so far (`crates/deeptime-core/presets/pipeline/`): plates and the
-/// deep-time surface interleaved (P1-04); later stages add their sections, and the `earthlike_*`
-/// built-ins take them over when P1-08 lands.
+/// The planet pipeline's presets (`crates/deeptime-core/presets/pipeline/`): every stage from the
+/// plates to the amplifier. The game's `earthlike_*` built-ins are these under other names (P1-08;
+/// `tools/dev/sync_builtin_presets.py` copies them, `preset::tests::builtins_are_the_pipeline_presets`
+/// checks it).
 pub const PIPELINE_BUILTIN: [(&str, &str); 4] = [
     (
         "pipeline_quick_16k",
