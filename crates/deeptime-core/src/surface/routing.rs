@@ -16,6 +16,14 @@
 //! Because the filled surface strictly decreases along every receiver path (`pflood.rs`), the
 //! receiver graph is a forest whose roots are the base-level cells and sinks: acyclic by
 //! construction, which `check_acyclic` verifies in the tests.
+//!
+//! **Parallel passes (P1-17).** `stack` also builds the [`forest::Forest`] (the stack's cells by
+//! position, their receivers, donors and subtree sizes); `accumulate`, `spl::solve` and
+//! `spl::families` walk it with a work-stealing top-down scheduler and a bottom-up one in which the
+//! last donor to finish carries on to the receiver. Their sums are gathers over the donors in
+//! ascending cell index, the order of the serial reverse-stack loops, so every result equals the
+//! serial one to the last bit on any thread count (`parity.rs` compares bit patterns against the
+//! P1-04 loops on random wrapping grids).
 
 use rayon::prelude::*;
 

@@ -384,3 +384,189 @@ fn one_thread_and_twelve_walk_the_same_forest() {
         one.report
     );
 }
+
+/// The least fixed point of the ε relaxation, w[m] = min over neighbours c of max(h[m],
+/// next_up(w[c])) with the sea at its base level: what any flood that is independent of its own
+/// processing order (tiled, parallel, Dijkstra with exact ties) computes. Brute force.
+fn least_fixed_point(d: &Dims, h: &[f64], base_z: &[f64], kind: &[u8]) -> Vec<f64> {
+    let n = d.cells();
+    let mut w: Vec<f64> = (0..n)
+        .map(|c| if kind[c] == BASE { base_z[c] } else { f64::INFINITY })
+        .collect();
+    loop {
+        let mut changed = false;
+        for c in 0..n {
+            if kind[c] == BASE {
+                continue;
+            }
+            for (m, _) in d.neighbours(c) {
+                let v = h[c].max(w[m].next_up());
+                if v < w[c] {
+                    w[c] = v;
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            return w;
+        }
+    }
+}
+
+#[test]
+fn the_serial_flood_is_the_least_fixed_point_except_on_exact_ties() {
+    // Why the flood is not tiled: on generic (untied) heights the serial FIFO flood and the
+    // order-independent least fixed point are the same surface, bit for bit; where heights are
+    // exactly equal (flats fed from two sides) the serial order shows in the ulps.
+    let differing = |coarse: bool, seed: u64| -> usize {
+        let c = case(40, 30, seed, true, true, coarse);
+        let n = c.d.cells();
+        // The sea as the pipeline finds it: every connected cell at or below sea level.
+        let mut kind = vec![LAND; n];
+        pflood::open_sea(&c.d, &c.h, 0.0, 1, &mut kind);
+        let mut filled = vec![0.0; n];
+        pflood::flood(&c.d, &c.h, &c.base_z, &mut kind, &mut filled);
+        let lfp = least_fixed_point(&c.d, &c.h, &c.base_z, &kind);
+        (0..n)
+            .filter(|&i| filled[i].to_bits() != lfp[i].to_bits())
+            .count()
+    };
+    for seed in 1..8 {
+        assert_eq!(differing(false, seed), 0, "untied heights, seed {seed}");
+    }
+    let tied: usize = (1..8).map(|seed| differing(true, seed)).sum();
+    assert!(tied > 0, "tied heights: the serial order matters in the ulps");
+}
+
+/// A fractal terrain like the L1 elevations: value noise of eight octaves on a wrapping raster.
+fn fractal(w: usize, hgt: usize, seed: u64) -> Vec<f64> {
+    let mut rng = SplitMix64::new(seed);
+    let mut z = vec![0.0; w * hgt];
+    for oct in 0..8 {
+        let (gw, gh) = (4usize << oct, 2usize << oct);
+        let g: Vec<f64> = (0..gw * gh).map(|_| rng.next_f64() - 0.5).collect();
+        let amp = 4000.0 / f64::from(1 << oct).powf(0.9);
+        for j in 0..hgt {
+            let fy = j as f64 / hgt as f64 * gh as f64;
+            let (j0, ty) = (fy.floor() as usize, fy.fract());
+            for i in 0..w {
+                let fx = i as f64 / w as f64 * gw as f64;
+                let (i0, tx) = (fx.floor() as usize, fx.fract());
+                let at = |a: usize, b: usize| g[b.min(gh - 1) * gw + a % gw];
+                let top = at(i0, j0) * (1.0 - tx) + at(i0 + 1, j0) * tx;
+                let bot = at(i0, j0 + 1) * (1.0 - tx) + at(i0 + 1, j0 + 1) * tx;
+                z[j * w + i] += amp * (top * (1.0 - ty) + bot * ty);
+            }
+        }
+    }
+    z
+}
+
+/// Times each phase of one LEM step on an L1-sized terrain (`cargo test --release -p
+/// deeptime-core surface_timing -- --ignored --nocapture`): best of ten per phase and thread
+/// count, the P1-04 serial loops beside the parallel passes. A clean measurement of what the
+/// forest passes buy on a machine whose load makes the end-to-end bench noisy.
+#[test]
+#[ignore = "a timing, not a check"]
+fn surface_timing() {
+    let (w, hgt) = (1024, 512);
+    let d = Dims::new(w, hgt, 4800.0, true);
+    let n = d.cells();
+    let h = fractal(w, hgt, 7);
+    let mut sorted = h.clone();
+    sorted.sort_by(f64::total_cmp);
+    let sea = sorted[n * 78 / 100];
+    let mut kind = vec![LAND; n];
+    pflood::open_sea(&d, &h, sea, n / 500, &mut kind);
+    let base_z = vec![sea; n];
+    let mut filled = vec![0.0; n];
+    pflood::flood(&d, &h, &base_z, &mut kind, &mut filled);
+    let weight = vec![1.0f32; n];
+    let kf = vec![3e-10; n];
+    let fam = vec![1u8; n];
+    let sp = SplParams {
+        m: 1.0,
+        n: 2.0,
+        g: 1.0,
+        dt: 2.0e6,
+        sc: 0.35,
+        max_iter: 6,
+        tol_m: 0.01,
+    };
+    let best = |f: &mut dyn FnMut()| {
+        (0..10)
+            .map(|_| {
+                let t = std::time::Instant::now();
+                f();
+                t.elapsed().as_secs_f64() * 1e3
+            })
+            .fold(f64::INFINITY, f64::min)
+    };
+    let mut r = Routing::default();
+    let mut area = Vec::new();
+    let mut hn = vec![0.0; n];
+    let mut qin = vec![0.0; n];
+    let mut mix = Vec::new();
+    let land = kind.iter().filter(|&&k| k == LAND).count();
+    println!("{land} land cells of {n}; ms per step, best of 10");
+    let sea_ms = best(&mut || {
+        let mut k = vec![LAND; n];
+        pflood::open_sea(&d, &h, sea, n / 500, &mut k);
+    });
+    let flood_ms = best(&mut || {
+        let mut k = kind.clone();
+        pflood::flood(&d, &h, &base_z, &mut k, &mut filled);
+    });
+    println!("serial: open_sea {sea_ms:.2}, flood {flood_ms:.2}");
+    receivers(&d, &filled, &kind, &mut r);
+    stack(&d, &kind, &mut r);
+    let acc0 = best(&mut || accumulate_serial(&d, &r, &weight, &mut area));
+    let input = SplInput {
+        kind: &kind,
+        h0: &h,
+        filled: &filled,
+        base_z: &base_z,
+        area: &area,
+        kf: &kf,
+    };
+    let sol0 = best(&mut || {
+        solve_serial(&d, &r, &input, &sp, &mut hn, &mut qin);
+    });
+    let fam0 = best(&mut || families_serial(&d, &r, &input, &fam, sp.dt, &hn, &mut mix));
+    println!(
+        "P1-04 serial loops: accumulate {acc0:.2}, solve {sol0:.2}, families {fam0:.2}, sum {:.2}",
+        acc0 + sol0 + fam0
+    );
+    for threads in [1, 2, 4, 8, 12] {
+        in_pool(threads, || {
+            // What a perfectly parallel loop gets from this machine right now (other jobs share it).
+            let cal = best(&mut || {
+                use rayon::prelude::*;
+                let s: f64 = (0..4_000_000u32)
+                    .into_par_iter()
+                    .map(|i| f64::from(i).sqrt().sin())
+                    .sum();
+                std::hint::black_box(s);
+            });
+            print!("{threads:>2} threads (calibration loop {cal:.1} ms): ");
+            let rcv = best(&mut || receivers(&d, &filled, &kind, &mut r));
+            let stk = best(&mut || stack(&d, &kind, &mut r));
+            let acc = best(&mut || accumulate(&d, &r, &weight, &mut area));
+            let input = SplInput {
+                kind: &kind,
+                h0: &h,
+                filled: &filled,
+                base_z: &base_z,
+                area: &area,
+                kf: &kf,
+            };
+            let sol = best(&mut || {
+                spl::solve(&d, &r, &input, &sp, &mut hn, &mut qin);
+            });
+            let fm = best(&mut || spl::families(&d, &r, &input, &fam, sp.dt, &hn, &mut mix));
+            println!(
+                "receivers {rcv:.2}, stack {stk:.2}, accumulate {acc:.2}, solve {sol:.2}, families {fm:.2}"
+            );
+        });
+    }
+}
