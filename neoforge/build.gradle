@@ -520,9 +520,12 @@ tasks.named('processResources', ProcessResources) {
         into 'deeptime/presets'
     }
     // The colour ramps the core's keyframes, the viewer and the game share (plan §3.3, P1-11):
-    // one file, read by screen/model/Ramps as deeptime/ramps.json.
+    // one file, read by screen/model/Ramps as deeptime/ramps.json. The editor's field catalogue
+    // likewise (P1-20): screen/model/EditorFields reads deeptime/editor_fields.json, the browser
+    // workbench (deeptime watch) the same file.
     from(new File(repoRoot, 'crates/deeptime-viewer/assets')) {
         include 'ramps.json'
+        include 'editor_fields.json'
         into 'deeptime'
     }
     if (project.hasProperty('release')) {
