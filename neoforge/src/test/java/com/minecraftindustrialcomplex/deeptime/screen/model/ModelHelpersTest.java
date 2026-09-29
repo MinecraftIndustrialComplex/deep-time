@@ -143,6 +143,30 @@ class ModelHelpersTest {
         assertEquals(0xffb000, ProvinceHints.colour("deeptime:dummy"));
     }
 
+    /**
+     * Every real (non-placeholder) built-in preset carries every parameter path the editor edits,
+     * so no field of a real preset is shown unavailable. Vacuous while the built-ins are P1-13's
+     * placeholders; it bites when P1-08/P1-17 replace them.
+     */
+    @Test
+    void realPresetsCarryEveryField() {
+        int real = 0;
+        for (String name : com.minecraftindustrialcomplex.deeptime.preset.Presets.BUILTIN) {
+            var o = com.minecraftindustrialcomplex.deeptime.preset.Presets.parseObject(
+                    com.minecraftindustrialcomplex.deeptime.preset.Presets.builtin(name).orElseThrow());
+            if (com.minecraftindustrialcomplex.deeptime.preset.Presets.info(o).placeholder())
+                continue;
+            real++;
+            for (EditorFields.Field f : EditorFields.ALL)
+                if (!f.phase3())
+                    assertTrue(f.availableIn(o), name + " has no " + f.path() + " (EditorFields." + f.id() + ")");
+        }
+        System.out.println("[junit] realPresetsCarryEveryField: " + real + " real built-in presets checked");
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (EditorFields.Field f : EditorFields.ALL)
+            assertTrue(ids.add(f.id()), "duplicate field id " + f.id());
+    }
+
     @Test
     void guidanceText() {
         NativeStatus s = NativeStatus.failure(FailureClass.UNSUPPORTED_PLATFORM, "linux-riscv64-gnu", Path.of("/x/lib.so"), null,

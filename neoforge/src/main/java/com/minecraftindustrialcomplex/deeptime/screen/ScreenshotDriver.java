@@ -19,6 +19,8 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
+import java.util.List;
+
 /**
  * Development only: with {@code -Ddeeptime.dev.screenshots=true} the client walks the planet
  * editor on its own and takes screenshots into {@code <gamedir>/screenshots/} — the Create World
@@ -205,7 +207,7 @@ final class ScreenshotDriver {
                 case CREATING -> {
                     if (screen instanceof ConfirmScreen confirm && stepTicks % 20 == 0) {
                         // an experimental-settings confirmation: proceed
-                        for (GuiEventListener l : confirm.children())
+                        for (GuiEventListener l : List.copyOf(confirm.children()))
                             if (l instanceof Button b) {
                                 b.onPress();
                                 break;
@@ -235,13 +237,16 @@ final class ScreenshotDriver {
     }
 
     private static void worldTab(CreateWorldScreen cws) {
-        for (GuiEventListener l : cws.children())
-            if (l instanceof TabNavigationBar bar)
+        // A tab switch replaces the screen's widgets: iterate a copy.
+        for (GuiEventListener l : List.copyOf(cws.children()))
+            if (l instanceof TabNavigationBar bar) {
                 bar.selectTab(1, false);
+                return;
+            }
     }
 
     private static void press(Screen s, String key) {
-        for (GuiEventListener l : s.children())
+        for (GuiEventListener l : List.copyOf(s.children()))
             if (l instanceof Button b && b.getMessage().getContents() instanceof TranslatableContents t && key.equals(t.getKey())) {
                 b.onPress();
                 return;

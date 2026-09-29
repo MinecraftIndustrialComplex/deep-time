@@ -1763,6 +1763,42 @@ event fires between Create and the integrated server's `initServer`; the first h
 staging folder into `<world>/deeptime/` (an atomic rename on the same filesystem, else copy, verify
 CRCs, delete) and binds `ActiveWorldData`.
 
+*As built in P1-11 (before the real stages):* the screens are client-only classes in `screen/`,
+reached only through `screen/ClientSetup`, a `@Mod(dist = CLIENT)` entry point (registers the
+editor for `deeptime:planet` and `planet_32k`); every rule lives in the plain-Java
+`screen/model/` (`EditorModel`, `EditorFields`, `TimelapseModel`, `ReviewModel`, `RunHandle` /
+`SessionRunHandle`, `Ramps`, `GlobeProjection`, `ProvinceHints`, `GuidanceModel`, `Formats`), which
+JUnit and the GameTests drive. **Parameters**: `EditorFields` names each field's preset JSON path
+(`planet.gravity_m_s2`, `scale.m_per_block_h`, `deposits.count_multiplier`,
+`scale.feature_scale.rivers`, `surface.drama`, `playability.essentials`, `fantasy.*`, …); a field
+is editable only when the selected preset carries its path, so the placeholder presets (which the
+core rejects any unknown key for) show them unavailable and the real presets light them up with no
+screen change (if P1-03…P1-17 name a path differently, only that catalogue line changes; fantasy
+toggles stay disabled until Phase 3). **Size** selects the built-in of the chosen family
+(`earthlike_quick` / `earthlike_full` × 16k / 32k); an imported code's size is fixed. **Run** is
+disabled until a start configuration and a length are chosen, the estimate is in and under the cap
+(default 4 GiB, any higher value accepted; the machine's free and total memory are shown beside it).
+`SimSession.launch` creates the session on the `deeptime-sim` worker (plan §6.2), which also
+collects keyframe infos and events after every step and before it destroys the session; keyframe
+pixels come through `copyKeyframe` while the session lives and from `keyframes/kf-<n>.dtk`
+(pure-Java `worlddata/KeyframeFiles`) afterwards, decoded on a loader thread into a 64 MiB ring. The
+globe is an orthographic projection drawn on the CPU into a 256² texture. The review page's map is
+the staged world data's `elevation` raster coloured with `ramps.json` (copied into the jar as
+`deeptime/ramps.json`); the spawn marker is the first `spawn/candidates.json` entry above sea
+level; ore-province hints are the dominant deposit type of 30° cells, sites blurred over their
+neighbours (`worlddata/SiteRecords` reads `sites/sites.dtsr`). The pack's biome names and the
+staged §7.2 mapping wait for P1-09. **Accept** is `PlanetGenerators.withStaging` (the current
+overworld's biome source and settings, `WorldDataRef` with the staging id and the preset's C;
+`PlanetShape` then shapes TW from that C at bake). `WorldDataBinder`'s HIGHEST listener runs
+`StagingMover` first, then `FirstStartGenerator.prepare`, then binds; a failed move stops a
+dedicated server (`ServerStop`) and throws on an integrated one. The copy route verifies every
+file's CRC32 against the source and every manifest entry, with plain reads (a memory-mapped tile
+pack would block the rename on Windows). **Create is disabled** for a Deep Time world until staged
+data exists (`PlanetGenerators.createBlock`: no run accepted, natives missing, or the staging
+folder gone); Enter is held back too (`screen/CreateWorldGuard`). Abandoned staging folders
+(untouched for 24 h and held by no open editor) are deleted at client setup and at every server
+start. A running simulation keeps going when the editor is closed; reopening Customize shows it.
+
 Tectonic 3.0.28 ships a client mixin, `WorldCreationUiStateMixin.tectonic$removeUnusablePresets`
 (injected at the return of `WorldCreationUiState.getNonEmptyList`). Decompiled, it only removes
 presets in the tag `#tectonic:incompatible`, whose shipped entries are `minecraft:large_biomes` and
@@ -2999,6 +3035,18 @@ a smoke benchmark and again at the end.
   - `cd neoforge && nix develop -c ./gradlew test --tests '*ShareCodeTest'`, then `junit-summary.py` → `failures=0 errors=0`
   - best effort, not a gate: mic-climate-style `gametest-client.sh` opens the Create World screen with
     the Deep Time preset without a client crash; result recorded
+- **As built (before P1-08, on the placeholder presets).** Class names differ from the list above:
+  the common models are `screen/model/{EditorModel, EditorFields, TimelapseModel, ReviewModel,
+  RunHandle, SessionRunHandle, …}` (share codes stay in P1-13's `preset/ShareCode`, whose
+  `ShareCodeTest` already decodes the Rust-made codes); staging is `server/{Staging, StagingMover}`
+  plus `worldgen/PlanetGenerators` (Accept's generator and the Create guard) instead of
+  `GeologicChunkGenerator.forStaging`. GameTests: `EditorModelGameTests.{acceptBuildsGenerator,
+  stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel}`; JUnit:
+  `EditorModelTest`, `TimelapseModelTest`, `ModelHelpersTest`, `StagingMoverTest`,
+  `TimelineAcrossJniTest`, `ScreenSourcesTest` (dist separation and language keys). The client
+  check is `tools/client/screenshots.sh` (HeadlessMC under Xvfb, `-Ddeeptime.dev.screenshots=true`
+  drives the editor and takes screenshots). Rerun with the real presets after P1-08, and add the
+  review page's biome names with P1-09.
 - **Ben reviews.** The same keyframes in the viewer (the screen itself is unverifiable, §9.8).
 
 #### P1-12 Strata pass with rock tags and `rock_states`
