@@ -32,8 +32,9 @@
 //! 0 … 5 on a log scale (UNEP's hyper-arid | arid | semi-arid | dry sub-humid | humid) — held
 //! inside each class's range: BW ≤ 0.95 (the driest band), BS 1.05 … 1.95, Af ≥ 4.1 (jungle),
 //! Am ≥ 3.2, Aw/As and Cs squeezed into 1.05 … 2.5 (savanna, plains, open forest), the
-//! subarctic D (Dsc, Dsd, Dwc, Dwd, Dfc, Dfd) ≥ 3.05 (taiga), other C/D ≥ 2.05, ET/EF ≤ 2.9 (no
-//! trees).
+//! subarctic D (Dsc, Dsd, Dwc, Dwd, Dfc, Dfd) ≥ 3.05 (taiga), other C/D ≥ 2.05, ET/EF ≤ 1.95 (no
+//! trees: vanilla picks snowy taiga at the frozen band's third humidity band as a variant, and grove on
+//! its slopes).
 //!
 //! These two are computed per L1 cell (where the climate lives), filled across the other medium
 //! by nearest value (so a coastal land cell interpolates between land values only), resampled
@@ -315,7 +316,7 @@ pub fn humidity_land(k: u8, aridity: f64) -> f64 {
         11..=16 => h.max(2.05),
         19 | 20 | 23 | 24 | 27 | 28 => h.max(3.05),
         17 | 18 | 21 | 22 | 25 | 26 => h.max(2.05),
-        29 | 30 => h.min(2.9),
+        29 | 30 => h.min(1.95),
         _ => h,
     }
 }
@@ -976,6 +977,8 @@ mod tests {
         let dfc_cold = middle("Dfc", -6.0, 12.0, -30.0, 0.9);
         assert!(dfc_cold.contains("taiga"), "a cold Dfc gives {dfc_cold}");
         assert_eq!(middle("ET", -6.0, 6.0, -15.0, 1.5), "snowy_plains");
+        // A wet ET stays below the humidity band whose variant is snowy taiga.
+        assert!(humidity_land(29, 5.0) < 2.0);
         assert_eq!(middle("EF", -55.0, -30.0, -70.0, 0.5), "snowy_plains");
         // Glaciated land is ice, whatever its class.
         assert!(thermal_land(26, 5.0, 18.0, -8.0, true) < 1.0);
