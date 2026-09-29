@@ -379,6 +379,10 @@ impl Preset {
                 if p.surface.is_some() {
                     // Coupled to the plates: one surface step after every plate step (plan §8).
                     stages.push(Box::new(crate::surface::SurfaceStage::new((**p).clone())));
+                    // Column strata and metamorphism on the surface's strata log (P1-07).
+                    stages.push(Box::new(crate::structure::StructureStage::new(
+                        (**p).clone(),
+                    )));
                 }
                 if p.deposits.is_some() {
                     // After the group: reads the history the plates and surface recorded (P1-14).

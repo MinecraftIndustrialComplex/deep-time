@@ -4,6 +4,7 @@
 mod alloc;
 mod dump;
 mod run;
+mod structure_view;
 mod synth;
 
 use std::path::PathBuf;
@@ -847,7 +848,7 @@ mod tests {
         .unwrap();
         let mid = deeptime_core::checkpoint::Checkpoint::read(&dir.join("plates.dtcp")).unwrap();
         assert_eq!(mid.next_stage_name(), Some("plates"));
-        assert_eq!(mid.stage_names, ["plates", "surface"]);
+        assert_eq!(mid.stage_names, ["plates", "surface", "structure"]);
         assert!(mid.world.surface.is_some(), "the group steps both stages");
         stage(
             "surface",
@@ -859,7 +860,7 @@ mod tests {
         )
         .unwrap();
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
-        assert_eq!(end.next_stage, 2);
+        assert_eq!(end.next_stage, 3);
         assert_eq!(end.world.t_years, 0.0);
         let st = end.world.surface.as_ref().unwrap();
         assert_eq!(st.totals.steps, 10);
@@ -877,6 +878,13 @@ mod tests {
             dir.join("viewer/keyframes/kf-0-surface_class.png")
                 .is_file()
         );
+        // P1-07: the structure stage's rock layer, the baked stacks and a cross-section.
+        assert!(
+            dir.join("viewer/keyframes/kf-0-structure_rock.png")
+                .is_file()
+        );
+        assert!(dir.join("viewer/layers/strata.js").is_file());
+        assert!(dir.join("viewer/sections/section-0.png").is_file());
         // `stage surface --preset` runs the group from the start.
         stage(
             "surface",
