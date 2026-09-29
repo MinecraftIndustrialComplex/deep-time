@@ -11,6 +11,8 @@
 //! strip with a time scrubber, an event ticker and a site list with the "Why here?" cause chain.
 //! [`write_bench_page`] writes `deeptime bench`'s timing page.
 
+pub mod section;
+
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -127,9 +129,18 @@ pub fn write_bundle_with(
     let mut strata_json = Value::Null;
     if let Some(st) = strata {
         let d = &st.layer.desc;
-        let k = d.stack_depth.unwrap_or(0);
         let stride = stride_for(d.grid.w, MAX_STRATA_W);
         let (vw, vh) = (d.grid.w.div_ceil(stride), d.grid.h.div_ceil(stride));
+        // Only as many horizons as some sampled cell uses (P1-07's stacks use a few of K = 32).
+        let mut k = 0;
+        for vj in 0..vh {
+            for vi in 0..vw {
+                let used = (0..d.stack_depth.unwrap_or(0))
+                    .take_while(|&h| st.layer.horizon(vi * stride, vj * stride, h).1 != 255)
+                    .count() as u32;
+                k = k.max(used);
+            }
+        }
         let mut tops = Vec::with_capacity((vw * vh * k * 2) as usize);
         let mut classes = Vec::with_capacity((vw * vh * k) as usize);
         for h in 0..k {
@@ -282,14 +293,20 @@ pub fn write_report(dir: &Path, report: &Value) -> io::Result<()> {
 }
 
 /// The report of a world's deposit stage: its census (from `manifest.json` notes or the world's
-/// notes) and every body.
+/// notes) and every site's bodies (bodies without a site, such as P1-07's plutons, are left out:
+/// the page draws bodies per site).
 pub fn deposit_report(census: Option<&Value>, bodies: &[Body]) -> Option<Value> {
-    if census.is_none() && bodies.is_empty() {
+    let sited: Vec<Value> = bodies
+        .iter()
+        .filter(|b| b.site.is_some())
+        .map(Body::to_json)
+        .collect();
+    if census.is_none() && sited.is_empty() {
         return None;
     }
     Some(json!({
         "deposits": census.cloned().unwrap_or(Value::Null),
-        "bodies": bodies.iter().map(Body::to_json).collect::<Vec<_>>(),
+        "bodies": sited,
     }))
 }
 
