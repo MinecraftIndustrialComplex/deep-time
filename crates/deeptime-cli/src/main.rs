@@ -795,4 +795,96 @@ mod tests {
         assert!(dir.join("viewer/keyframes/kf-0-crust_age.png").is_file());
         std::fs::remove_dir_all(&dir).unwrap();
     }
+
+    /// P1-04: `stage surface` runs the plates + surface group; a checkpoint written at the plates
+    /// stage (`stage plates --max-steps`) continues with `stage surface --in`.
+    #[test]
+    fn surface_stage_runs_from_a_plates_checkpoint() {
+        let dir = tmp("surface");
+        std::fs::create_dir_all(&dir).unwrap();
+        let json = super::run::load_preset_with(
+            "pipeline_quick_16k",
+            Some("scattered_continents"),
+            Some(20.0),
+        )
+        .unwrap();
+        let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        v["resolution"]["l0_samples"] = serde_json::json!(3000);
+        v["resolution"]["l1_r"] = serde_json::json!(64);
+        v["keyframes"]["size"] = serde_json::json!([64, 32]);
+        v["keyframes"]["every_myr"] = serde_json::json!(10.0);
+        let preset = dir.join("small.json");
+        std::fs::write(&preset, v.to_string()).unwrap();
+        let stage = |name: &str,
+                     input: Option<std::path::PathBuf>,
+                     preset: Option<String>,
+                     max_steps: Option<u64>,
+                     out: Option<std::path::PathBuf>,
+                     viewer: Option<std::path::PathBuf>| {
+            super::run::stage(&super::run::StageOptions {
+                name: name.into(),
+                input,
+                preset,
+                start: None,
+                length_myr: None,
+                max_steps,
+                out,
+                viewer,
+                work: None,
+                common: quiet(),
+            })
+        };
+        stage(
+            "plates",
+            None,
+            Some(preset.to_string_lossy().into_owned()),
+            Some(3),
+            Some(dir.join("plates.dtcp")),
+            None,
+        )
+        .unwrap();
+        let mid = deeptime_core::checkpoint::Checkpoint::read(&dir.join("plates.dtcp")).unwrap();
+        assert_eq!(mid.next_stage_name(), Some("plates"));
+        assert_eq!(mid.stage_names, ["plates", "surface"]);
+        assert!(mid.world.surface.is_some(), "the group steps both stages");
+        stage(
+            "surface",
+            Some(dir.join("plates.dtcp")),
+            None,
+            None,
+            Some(dir.join("end.dtcp")),
+            Some(dir.join("viewer")),
+        )
+        .unwrap();
+        let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
+        assert_eq!(end.next_stage, 2);
+        assert_eq!(end.world.t_years, 0.0);
+        let st = end.world.surface.as_ref().unwrap();
+        assert_eq!(st.totals.steps, 10);
+        assert!(
+            end.world
+                .history
+                .as_ref()
+                .is_some_and(|h| h.frames.len() == 2)
+        );
+        assert!(
+            dir.join("viewer/keyframes/kf-0-surface_drainage.png")
+                .is_file()
+        );
+        assert!(
+            dir.join("viewer/keyframes/kf-0-surface_class.png")
+                .is_file()
+        );
+        // `stage surface --preset` runs the group from the start.
+        stage(
+            "surface",
+            None,
+            Some(preset.to_string_lossy().into_owned()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }
