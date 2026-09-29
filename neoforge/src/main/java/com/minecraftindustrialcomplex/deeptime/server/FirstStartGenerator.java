@@ -60,8 +60,8 @@ import java.util.concurrent.TimeoutException;
  * </ol>
  *
  * Every stop goes through {@link ServerStop}: before {@code loadLevel()}, so no half-made world
- * is saved. Nothing here depends on which stages a preset runs: the real presets of P1-03…P1-08
- * replace the built-in placeholders without a change here.
+ * is saved. Nothing here depends on which stages a preset runs: P1-08 made the built-ins the real
+ * planet pipeline without a change here.
  */
 public final class FirstStartGenerator {
 

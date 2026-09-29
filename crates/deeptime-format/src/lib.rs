@@ -6,11 +6,14 @@
 //! reader (`com.minecraftindustrialcomplex.deeptime.worlddata`) implements the same document.
 
 pub mod bodies;
+pub mod column;
 pub mod container;
+pub mod detail;
 pub mod error;
 pub mod events;
 pub mod fsutil;
 pub mod keyframes;
+pub mod lazy;
 pub mod manifest;
 pub mod ramps;
 pub mod raster;
@@ -18,11 +21,14 @@ pub mod sites;
 pub mod tilepack;
 
 pub use bodies::{Body, BodyId, Shape, Zone};
+pub use column::{Column, ColumnWorld};
+pub use detail::{DetailSpec, Noise};
 pub use error::{FormatError, Result};
 pub use events::{
     Event, EventId, EventIndex, EventLog, EventWriter, GEOLOGY_WRITER, ParamValue, Params, Place,
 };
 pub use keyframes::{KeyframeEntry, KeyframeImage, KeyframeIndex};
+pub use lazy::LazyLayer;
 pub use manifest::{FileEntry, LayerEntry, Manifest, Scale, Writer};
 pub use ramps::{Ramp, Ramps};
 pub use raster::{Cell, Codec, DType, GridDesc, LayerDesc, LoadedLayer, Raster, RasterRead, TILE};
@@ -35,7 +41,7 @@ pub use tilepack::{TilePackReader, TilePackWriter, Written, encode_tile_pack, wr
 pub const FORMAT_VERSION: &str = env!("DEEPTIME_FORMAT_VERSION");
 
 /// The minor part of [`FORMAT_VERSION`], written into every file header (plan §5.7.2).
-pub const FORMAT_MINOR: u16 = 0;
+pub const FORMAT_MINOR: u16 = 1;
 
 #[cfg(test)]
 mod tests {

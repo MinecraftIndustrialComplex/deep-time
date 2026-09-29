@@ -390,49 +390,61 @@ impl LoadedLayer {
     }
 
     /// The horizon stack at block (x, z) exactly as the Java strata pass builds a column
-    /// (`StrataPass.column`, plan §7.5): classes from the nearest cell, each top bilinear between
-    /// the four surrounding cells (the nearest cell's where a corner lacks the horizon), floored to
-    /// a block and never above the horizon over it. `out` gets (top block y, class index),
-    /// top-down; horizon h fills from its top down to the next horizon's top + 1, the last down to
-    /// the world's floor.
+    /// ([`stack_at`]).
     pub fn stack_at(&self, x: i64, z: i64, out: &mut Vec<(i32, u8)>) {
-        out.clear();
-        let d = &self.desc;
-        let g = &d.grid;
-        let k = d.stack_depth.unwrap_or(0);
-        let c = i64::from(g.w) * i64::from(g.r);
-        let wx = (x + c / 2).rem_euclid(c) - c / 2;
-        let u = (wx - g.origin_block_x) as f64 / f64::from(g.r);
-        let v = (z - g.origin_block_z) as f64 / f64::from(g.r);
-        let (i_n, j_n) = ((u + 0.5).floor() as i64, (v + 0.5).floor() as i64);
-        let (i0, j0) = (u.floor() as i64, v.floor() as i64);
-        let (fu, fv) = (u - i0 as f64, v - j0 as f64);
-        let top_at = |i: i64, j: i64, h: u32| -> f64 {
-            let (t, _) = self.horizon(g.wrap_i(i), g.clamp_j(j), h);
-            if t == i16::MIN {
-                f64::NAN
-            } else {
-                f64::from(t) * d.scale + d.offset
-            }
-        };
-        let mut prev = i32::MAX;
-        for h in 0..k {
-            let (_, class) = self.horizon(g.wrap_i(i_n), g.clamp_j(j_n), h);
-            let nearest = top_at(i_n, j_n, h);
-            if class == 255 || nearest.is_nan() {
-                break;
-            }
-            let (t00, t10) = (top_at(i0, j0, h), top_at(i0 + 1, j0, h));
-            let (t01, t11) = (top_at(i0, j0 + 1, h), top_at(i0 + 1, j0 + 1, h));
-            let top = if [t00, t10, t01, t11].iter().any(|t| t.is_nan()) {
-                nearest
-            } else {
-                (t00 + (t10 - t00) * fu) * (1.0 - fv) + (t01 + (t11 - t01) * fu) * fv
-            };
-            let t = (top.floor() as i32).min(prev);
-            out.push((t, class));
-            prev = t;
+        stack_at(&self.desc, |i, j, k| self.horizon(i, j, k), x, z, out);
+    }
+}
+
+/// The horizon stack at block (x, z) of a `horizon_stack` layer described by `d`, whose in-range
+/// cells `horizon(i, j, k)` reads, exactly as the Java strata pass builds a column
+/// (`StrataPass.column`, `worlddata/Columns`, plan §7.5): classes from the nearest cell, each top
+/// bilinear between the four surrounding cells (the nearest cell's where a corner lacks the
+/// horizon), floored to a block and never above the horizon over it; the walk stops at the first
+/// unused horizon of the nearest cell. `out` gets (top block y, class index), top-down; horizon h
+/// fills from its top down to the next horizon's top + 1, the last down to the world's floor.
+pub fn stack_at(
+    d: &LayerDesc,
+    horizon: impl Fn(u32, u32, u32) -> (i16, u8),
+    x: i64,
+    z: i64,
+    out: &mut Vec<(i32, u8)>,
+) {
+    out.clear();
+    let g = &d.grid;
+    let k = d.stack_depth.unwrap_or(0);
+    let c = i64::from(g.w) * i64::from(g.r);
+    let wx = (x + c / 2).rem_euclid(c) - c / 2;
+    let u = (wx - g.origin_block_x) as f64 / f64::from(g.r);
+    let v = (z - g.origin_block_z) as f64 / f64::from(g.r);
+    let (i_n, j_n) = ((u + 0.5).floor() as i64, (v + 0.5).floor() as i64);
+    let (i0, j0) = (u.floor() as i64, v.floor() as i64);
+    let (fu, fv) = (u - i0 as f64, v - j0 as f64);
+    let top_at = |i: i64, j: i64, h: u32| -> f64 {
+        let (t, _) = horizon(g.wrap_i(i), g.clamp_j(j), h);
+        if t == i16::MIN {
+            f64::NAN
+        } else {
+            f64::from(t) * d.scale + d.offset
         }
+    };
+    let mut prev = i32::MAX;
+    for h in 0..k {
+        let (_, class) = horizon(g.wrap_i(i_n), g.clamp_j(j_n), h);
+        let nearest = top_at(i_n, j_n, h);
+        if class == 255 || nearest.is_nan() {
+            break;
+        }
+        let (t00, t10) = (top_at(i0, j0, h), top_at(i0 + 1, j0, h));
+        let (t01, t11) = (top_at(i0, j0 + 1, h), top_at(i0 + 1, j0 + 1, h));
+        let top = if [t00, t10, t01, t11].iter().any(|t| t.is_nan()) {
+            nearest
+        } else {
+            (t00 + (t10 - t00) * fu) * (1.0 - fv) + (t01 + (t11 - t01) * fu) * fv
+        };
+        let t = (top.floor() as i32).min(prev);
+        out.push((t, class));
+        prev = t;
     }
 }
 

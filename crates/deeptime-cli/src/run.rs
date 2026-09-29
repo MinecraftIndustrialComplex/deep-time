@@ -606,10 +606,8 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     drive(&s, o.common.verbose, |_, st| st == AdvanceStatus::Done)?;
     s.finalize_write()?;
     forward_log(&s, o.common.verbose);
-    if let Some(c) = deeptime_format::Manifest::read(&o.out)?
-        .notes
-        .get(deeptime_core::deposits::STAGE_NAME)
-    {
+    let manifest = deeptime_format::Manifest::read(&o.out)?;
+    if let Some(c) = manifest.notes.get(deeptime_core::deposits::STAGE_NAME) {
         print_census(c);
     }
     let p = s.progress();
@@ -645,6 +643,9 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     }
     if let Some(line) = spill_line(&s)? {
         println!("deeptime run: {line}");
+    }
+    if let Some(b) = manifest.notes.get(deeptime_core::bake::NOTES_KEY) {
+        println!("deeptime run: {}", deeptime_core::bake::summary_line(b));
     }
     if let Some(dir) = &o.viewer {
         let title = format!("Deep Time — run {} ({})", s.preset().name(), o.preset);
