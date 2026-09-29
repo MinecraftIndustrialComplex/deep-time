@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · Next: P1-09 climate mapping, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -30,7 +30,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-06 | Young landscape, amplification and the detail layer | done | 2026-09-29 | — | On `pipeline_quick_16k` (built-ins stay placeholders until P1-08). Mac: `cargo test -p deeptime-core surface::amplify` → 25 passed (no new sink outside the lakes on a wrapped planet with a lake, the flood repairs a pit nobody declared, streamed = whole-raster to the bit, tiled middle level = whole, 1 = 5 threads, the seam, drama, pack round trip, coupled pipeline on 1 and 3 threads, resume); workspace tests ok (core 204 + 2 ignored, cli 23, format 33, inspect 37, jni 7, viewer 5), clippy -D warnings, fmt, deny clean; 500 Myr planet: `stage young` 7.6 s, `stage amplify` 8192×4096 → sinks=0, 18.7 s on 12 threads / 53 s on 1 (erode 7.6/24.1, thermal 3.3/14.1, deposit 3.3/8.9, flood 3.2/2.9), streamed (8 tiles, halo 196) and 1 thread give all 512 of 512 tiles of both L3 layers identical to the in-memory run; 134 M-cell L3 (32k full's size) streams in 58.5 s; views: review/out/p1-amplify (16 MB, not published). Ben reviews: the before/after views and the drama figure |
 | P1-07 | Rock classes, column strata and metamorphism | done | 2026-09-29 | — | On the coupled pipeline preset (built-ins stay placeholders until P1-08). Mac: cargo test --workspace ok (core 149 + 1 ignored incl. structure:: 11: stacks ordered top-down, ≥ 1 block thick, classes valid, ≤ K; resume identical; every built-in deposit type finds all its fields incl. trap_structure and host/*), fmt, clippy -D warnings, deny clean; gradlew build test 106/0; ./gametest.sh All 45 passed (everyClassInTheWorld 59/59, 240 samples 0 wrong); `stage structure --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-structure` → horizon_check=ok, 3.88 horizons/cell, 22,000 plutons (8,138 bodies), 50 frames published; structure 4.8 s of 122 s |
 | P1-08 | Bake, world data v1 and parity | done | 2026-09-29 | — | Format 0.1; `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --out … --viewer review/out/p1-q16` → format_version 0.1 (752 s on a loaded Mac, bake 1.1 s, folder 156 MB); `./gradlew test --tests '*ColumnParityTest'` → tests=2 failures=0 errors=0 (500 of 500 columns equal, 77 through bodies, JNI sampleColumn identical); JUnit 124/0; real-preset first start PASS (generation 492 s, 441 chunks in 19 s); built-ins are the pipeline presets; see build log |
-| P1-09 | Climate mapping and biomes | doing | 2026-09-29 | | agent worktree agent-a116e3d557a130679, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c |
+| P1-09 | Climate mapping and biomes | done | 2026-09-29 | — | Real planet (earthlike_quick_16k, 500 Myr), `tools/review/p1-09-smoke.sh standalone mic` → both smokes PASS; whole-planet census (1024 × 512 samples) standalone / MIC: BW desert or badlands 75.1 / 78.0 % (any dry tag 90.4 / 92.3 %), Af jungle 84.3 / 82.2 %, Dfc taiga 88.9 / 66.5 %, ET/EF snowy or icy 97.7 / 99.3 %; Chunky areas rendered with `deeptime-inspect biomes` agree. cargo fmt/clippy -D warnings/test (core 238 + 3 ignored)/deny clean; JUnit 140/0; `./gametest.sh` All 50 passed (climateConsistent, bandsAreTheBuilders); `-PwithMic`: every finished test passes (48 of 50) but lakeHolds stalls and the JVM dies of heap, 4 of 4 runs (known flake, see build log). Review bundle review/out/p1-09 (3.4 MB, not published). See build log |
 | P1-10 | TerraBlender regions follow provinces | todo | | | |
 | P1-11 | Customize editor, timelapse and staging | doing | 2026-09-28 | d42375e | Screens, models and staging built on the placeholder presets (real stages pending). Mac, merged with master f14d258 (P1-03, P1-18): JUnit tests=101 failures=0 (new: EditorModelTest, TimelapseModelTest, ModelHelpersTest, StagingMoverTest, TimelineAcrossJniTest, ScreenSourcesTest); ./gametest.sh → All 31 required tests passed (EditorModelGameTests acceptBuildsGenerator, stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel, realPresetFieldsLightUp); cargo fmt/clippy -D warnings/test --locked (193 passed)/deny clean; gradlew build clean. Client (laptop, HeadlessMC + Xvfb): whole walk Create World → editor → run → review → Accept → world created from the moved staging, no crash; guidance panel with natives forced off; screenshots in review/out/p1-11-client. Rerun with the real presets after P1-08; biome names on the review page with P1-09 |
 | P1-12 | Strata pass with rock tags and `rock_states` | done | 2026-09-28 | — | Mac: ./gametest.sh and -PwithMic (+ MIC rock tags via -Ddeeptime.extraDatapack) → All 21 required tests passed each; coal stone / black argillite; Create stones in their classes; loess = projectatmosphere:dust[layers=8]; everyClassInTheWorld 59/59 classes, 240 samples 0 wrong; MIC smoke probe palette 59/59 (member 24, fallback 35); JUnit 46/0; bodies deferred (P1-08/P1-14) |
@@ -73,6 +73,107 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — P1-09 climate mapping and biomes (agent worktree agent-a116e3d557a130679, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** (1) **The mapping, in the bake** (`deeptime-core/src/bake/biomes.rs`; replaces P1-08's provisional
+  anchors). Physical climate → the five biome inputs in *band coordinates* against a reference,
+  `crates/deeptime-core/data/climate_mapping/default.json`: OverworldBiomeBuilder's band edges and vanilla's
+  land distributions of erosion and peaks-and-valleys (measured by `ClimateMappingBuilder` on the vanilla
+  router: seed 0, 65,536 points with continents ≥ −0.19 of 91,405). **Temperature** from the Köppen class
+  and the warmest/coldest month: E 0–0.75 by the warmest month, D 0.75–2 (Dfc's cold edge on snowy taiga),
+  C 2–2.95 by the coldest month, A and BSh 3–3.9 (never the hot band: jungle stays jungle), BW 4.05–4.95
+  (desert/badlands, cold deserts included), BSk as C or D; glaciated land ≤ 0.35; the sea by its own
+  temperature. **Humidity** from the aridity index P/PET (0.03, 0.2, 0.5, 1, 2, 5 → 0…5, log scale) held in
+  each class's range (BW ≤ 0.95, BS 1.05–1.95, Af ≥ 4.1, Am ≥ 3.2, Aw/As/Cs 1.05–2.5, subarctic D ≥ 3.05,
+  other C/D ≥ 2.05, ET/EF ≤ 1.95). Both on L1, filled across the other medium by nearest value, resampled
+  to L2, chosen by the L2 land mask. **Continentalness** from distance to the sea (0, beach, 200, 1,000,
+  5,000 blocks) and depth (0, 200, 2,500, 6,000 m). **Erosion**: relief (range over the terrain window,
+  box-smoothed) ranked over land → the reference's land quantiles below E6; wet flat lowlands into E6 by
+  `wetlands`; deep sea ≥ E4 (away from Terralith's sky-island band). **Weirdness**: ridge index ranked →
+  peaks-and-valleys quantiles above the valley slice → |w| on the rising branch, signed by a value noise;
+  no river biomes (Phase 2). `notes.bake.climate`: mapping `p1-09`, params, reference, per-Köppen mean band
+  coordinates, land shares per band. (2) **Knobs as settings** (standing rule, log 2026-09-29): preset
+  section `biomes` (`temperature_shift`, `humidity_shift`, `beach_blocks`, `terrain_window_blocks`,
+  `variant_blocks`, `wetlands`; optional keys, range checks naming the key); the four pipeline presets carry
+  it, built-ins resynced (`sync_builtin_presets.py`); `editor_fields.json` gains a `biomes` section with six
+  fields (lang keys; `EditorFields.Section.BIOMES`, `SetupPage`; the workbench test lists them).
+  (3) **Per world in the game** (`climate/{OverworldBands, ClimateMapping, ClimateMappingBuilder}`): at a
+  P1-09 world's first start `WorldDataBinder` (with the server's registries) builds the mapping from the
+  pack's bands (its copy of `data/deeptime/deeptime/climate_mapping/default.json`, copied into the jar by
+  Gradle; a datapack may override it) and its own `minecraft:overworld` router (65,536 land points), five
+  monotone tables, written as `<world data>/climate_mapping.json` and read on every later start.
+  `WorldDataTerrain.raster` applies them; in P1-09 worlds the weirdness is sampled as an odd field
+  (`RasterSampler.bilinearOdd`: |w| bilinear, sign of the nearest cell), because a bilinear ramp through 0
+  where the variant noise changes sign drew straight lines of river biome (found in the first 16k render:
+  1,184 river columns in the BW area, 0 after). Synthetic worlds keep their values. FORMAT.md "The climate
+  mapping" is the contract; plan §10 P1-09 has an "As built". (4) **Checks and tools:** `climate/BiomeCensus`
+  (surface biome from the biome source vs the Köppen class; per family the share whose biome carries a
+  matching `c:` tag, plus the narrow checks Ben asked for); `BiomeGameTests.climateConsistent` (floors) and
+  `bandsAreTheBuilders` (the reference edges = OverworldBiomeBuilder's, by reflection); `/deeptime probe
+  biomes [step]` (the whole planet, grid to `<server>/deeptime-probe/biomemap.json`); `deeptime-inspect
+  biomes` (chunk biome palettes parsed; the biome at each column's terrain top beside the world data's
+  Köppen map); `tools/review/biome_map.py` (the review page), `tools/review/p1-09-smoke.sh` (both profiles:
+  first start, Chunky over Af/BW/Dfc/ET/EF areas, the probe, inspect).
+- **Acceptance (real planet, `earthlike_quick_16k`, scattered continents, 500 Myr).**
+  `mac.sh --pack --server -- tools/review/p1-09-smoke.sh standalone mic` → both smokes **PASS** (first-start
+  generation 100 s / 133 s on a quiet Mac). Whole planet, one sample per 16 blocks (1024 × 512), share of a
+  Köppen family's columns whose biome carries the family's tags, standalone / MIC:
+  | check | columns | standalone | MIC |
+  |---|---|---|---|
+  | BW: desert or badlands | 7,798 | 75.1 % | 78.0 % |
+  | BW: any dry tag | 7,798 | 90.4 % | 92.3 % |
+  | Af: jungle | 4,651 | 84.3 % | 82.2 % |
+  | Dfc: taiga or coniferous | 11,847 | 88.9 % | 66.5 % |
+  | ET/EF: snowy or icy | 34,526 | 97.7 % | 99.3 % |
+  | A (hot/jungle/savanna/wet) | 13,751 | 76.3 % | 95.9 % |
+  | BS | 12,562 | 82.0 % | 75.8 % |
+  | C (temperate) | 23,232 | 96.0 % | 81.9 % |
+  | D | 24,429 | 100 % | 99.6 % |
+  | sea (ocean tags) | 367,253 | 100 % | 100 % |
+  Standalone: Af → bamboo jungle 50 %, jungle 25 %, sparse jungle 9 %; BWh → desert 57 %, badlands 14 %;
+  BWk → desert 48 %, badlands 28 %; Dfc → taiga 50 %, old-growth spruce 19 %, pine 14 %; ET → snowy plains
+  80 %; EF → snowy plains 53 %, snowy slopes 34 %, peaks 11 %. MIC (100 biomes placed, 49 Terralith): Af →
+  rocky/tropical jungle + vanilla jungles; BW → desert 28–38 %, (eroded) badlands 37–47 %, painted
+  mountains; Dfc → taiga 36 %, Terralith forested highlands 15 %, yellowstone 14 % (neither tagged taiga,
+  hence 66.5 %); ET → cold shrubland, snowy plains, gravel desert; EF → snowy slopes, snowy badlands,
+  scarlet mountains. MIC's mapping moved erosion by up to ±0.45 and weirdness ±0.2 (Tectonic's router:
+  stepped erosion −1/−0.5/0/0.3/0.6); standalone's tables are identity. Chunky areas (`deeptime-inspect
+  biomes`, the biomes the chunks store) agree with the probe map: the BW area is desert/badlands, Af jungle,
+  Dfc taiga, ET/EF snowy.
+  **First render, fixed before this one:** ET had 35 % snowy taiga and EF 34 % grove (vanilla's variant at
+  the frozen band's third humidity band, and its slope biome) → ET/EF humidity capped at 1.95; the river lines
+  above → odd sampling.
+- **GameTest floors** (`climateConsistent` on `test_planet_real`, C 4096, 150 Myr; first runs standalone /
+  MIC): BW 0.765 / 0.824 (17 columns: logged only), BS 0.738 / 0.825, C 0.86 / 0.86, D 1.0 / 1.0, Dsub 0.969 /
+  0.987, E 1.0 / 1.0, sea 1.0 / 1.0, Dfc:taiga — / 0.657, E:snow 1.0 / 1.0; floors about 0.1 under the lower.
+- **Gates** (branch merged with master 2a78b1c, the settings audit; the smoke renders ran on the tree before that merge,
+  whose defaults reproduce the same planet): cargo fmt, clippy `--locked -D warnings`, deny licenses bans clean; cargo test
+  --workspace (core 238 + 3 ignored incl. `bake::biomes` 8, cli 30, format 40, inspect 29, …); `./gradlew build test`
+  tests=140 failures=0; `./gametest.sh` → **All 50 required tests passed**;
+  `./gametest.sh -PwithMic` (after `install.sh mic`, 168 mods), four runs (the last on the final merge): every test that finished passed (48 of 50, `climateConsistent` and `bandsAreTheBuilders` among them), but each run stalled in `lakeHolds` and died of `OutOfMemoryError: Java heap space` (8 GB) before `lakeHolds` and `worldInfoFollowsThePlayer` reported — the known P1-12 flake (3 of 7 then), now 4 of 4. No Deep Time frame in the traces (C2ME workers). `-PwithMic` had not been run on master since P1-08 added the real-planet and deposit test levels; no control run of master was made, so whether P1-09 adds to the heap is not measured (it adds no chunk loading: the census samples the biome source).
+- **Found on the way (not P1-09).** `CompatGameTests.cdgOilFromTrap` failed under `-PwithMic` on the merged
+  master: the survivor-formula deposit world has traps sharing chunks, and the sum check compared the chunks a
+  trap fills with its whole charge (the deposits merge ran no GameTests). Fixed: the check leaves out blocks
+  in chunks another trap fills (passes since). `-PwithMic` also stalls in `lakeHolds` and dies of heap
+  (the known P1-12 flake) — see the MIC line above.
+- **Deviations.** The physical → vanilla step runs in Rust's bake, not in Java (the CLI, the workbench and the
+  game all bake; only the bake has every physical field); Java only maps baked values onto the pack's bands
+  and router distribution, which is the pack-dependent part. The anchors the plan put in a datapack file are
+  the preset's `biomes` section (Ben's settings rule); the datapack file holds the bands a pack may override.
+  The Create World review page's biome names stay a P1-11 follow-up. Class names as the plan
+  (`ClimateMappingBuilder`, `ClimateMapping`, `OverworldBands`) plus `BiomeCensus`.
+- **Review bundle** (not published): `review/out/p1-09/` (3.4 MB, laptop): the Köppen map beside the biome map,
+  standalone and MIC, hover readout, the family table, top biomes per Köppen class, the legend, and the five
+  Chunky areas (chunks' own biomes beside the Köppen map). Data: `review/out/p1-09-data/`; the first render
+  (before the ET/EF and river fixes): `review/out/p1-09-v1/`.
+- **For Ben.** (1) The `-PwithMic` gate: the `lakeHolds` heap stall now happens every run (above); options are
+  a master control run to see whether it predates P1-09, a larger `-PwithMic` heap, or chasing the stall. (2)
+  Mapping internals that stay constants (candidates for more settings under the standing rule): the inland
+  continentalness distances (200 / 1,000 / 5,000 blocks), the wetland thresholds (vegetation 2.5 bands, flattest
+  35 %, below 150 m) and the band placement per Köppen class. (3) In MIC, Dfc lands on Terralith's forested
+  highlands and yellowstone as well as taiga (66.5 % taiga-tagged); Dsb is 59 % yellowstone.
+- **Next.** Ben reviews the bundle; P1-10 (TerraBlender regions follow provinces) can start; P1-11's review
+  page could show biome names by running `BiomeCensus` on the staged world.
+
 ### 2026-09-29 — Settings audit: the world-shaping knobs become editor settings (agent worktree agent-aebf7d2ff8d444591, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Ben, 2026-09-29 (decisions log): "Again, shoud be configurable. For now go for Medium" (terrain carving), with the standing rule that
   tuning knobs that shape the world are settings with a sensible default, not constants. Then, on this work: "Wire them up
@@ -2744,6 +2845,10 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   chunk load under C2ME that never returns, with memory growing while it waits) is the thing to chase;
   a thread dump (`jstack`) during a stall would show it. Until then, rerun a `-PwithMic` gate that
   stalls in `lakeHolds`.
+  **2026-09-29 (P1-09):** now 4 of 4 `-PwithMic` runs on the tree merged with master (8 GB heap): every
+  other test finished and passed, then `lakeHolds` stalled and the JVM died of heap (it exited on its
+  own within ~10 min each time). `-PwithMic` had not run on master since P1-08 added the real-planet and
+  deposit test levels; no master control run was made.
 - **Not done / next.** Bodies in the strata pass (needs P1-08/P1-14's `bodies/`); the review
   artefacts (BlueMap cliffs with Create stones) wait for Ben's review round; `deposit_type`,
   `sim_field`, `essentials` registries come with their tasks. The MIC pack still has no copy of the
