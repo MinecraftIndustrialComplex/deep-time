@@ -2033,6 +2033,16 @@ community ports) are not opened for code.
   conglomerate, offshore or lacustrine fines → shale or mudstone, photic-zone carbonate → limestone,
   arid closed basin → evaporite, humid subsiding swamp → coal, duricrust flag → laterite. Adjacent
   layers of the same class merge; K caps the log (§5.7.5).
+  *As built in P1-04* (`crates/deeptime-core/src/surface/`; STATUS.md has the details): the surface
+  stage is coupled to the plates stage (`Stage::coupled_to`; the session steps plates, then surface,
+  per plate step; `tectonics.l1_every_steps` = 1). Its elevation is the plate model's L1 elevation
+  plus an offset advected with the plates (semi-Lagrangian, R(−Ω·Δt)), and its net change flows back
+  onto the L0 samples at the next plate step, so uplift is exactly the plate model's. D8 routing
+  (the O(n) implicit solve needs one receiver), Priority-Flood+ε with lakes, Braun–Willett + Yuan
+  (n = 2, m = 1 by default), a critical slope, mouth-fill delivery to the sea, Landlab's marine
+  diffusivity with 2D implicit diffusion (conjugate gradients), carbonates, evaporites, weathering
+  with laterites, local isostasy smoothed over 50 km, and the deposit engine's frames every 10 Myr.
+  Runoff comes from `climate/{t_mean_c,precip_mm}` when P1-05 writes them, else a zonal stand-in.
 - **Young landscape on L2** for the last 2–10 Myr at finer resolution, starting from L1 upsampled.
 - **Amplification to L3.** Schott et al. 2024, "Terrain Amplification using Multi-scale Erosion"
   (ACM TOG 43(4)); its code, `H-Schott/MultiScaleErosion` (MIT, commit 964a3d5), is GLSL compute

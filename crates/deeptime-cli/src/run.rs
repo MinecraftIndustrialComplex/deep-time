@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use deeptime_core::checkpoint::Checkpoint;
-use deeptime_core::session::{AdvanceStatus, Session, SessionOptions};
+use deeptime_core::session::{AdvanceStatus, Session, SessionOptions, group_of};
 use deeptime_format::keyframes::{KeyframeIndex, read_keyframe};
 use deeptime_format::manifest::rfc3339_utc;
 use serde_json::{Value, json};
@@ -128,6 +128,104 @@ fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
         .map(|st| deeptime_core::plates::stats::summary(st).line())
 }
 
+/// The surface's summary line (P1-04): `surface_final=<steps> land_frac=… sediment_km3=… …`,
+/// when the world has a surface.
+fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let st = world.surface.as_ref()?;
+    let t = &st.totals;
+    let n = st.log.cells().max(1) as f64;
+    let land = st
+        .elevation_m
+        .iter()
+        .filter(|&&z| f64::from(z) > st.sea_level_m)
+        .count() as f64;
+    let peak = st.elevation_m.iter().copied().fold(f32::MIN, f32::max);
+    let dx = f64::from(st.grid.r) * 300.0;
+    let sediment: f64 = (0..st.log.cells()).map(|c| st.log.total(c)).sum::<f64>() * dx * dx / 1e9;
+    let layers: f64 = st.log.count.iter().map(|&c| f64::from(c)).sum::<f64>() / n;
+    let hist = world.history.as_ref();
+    Some(format!(
+        "surface_final={} land_frac={:.3} max_elevation_m={:.0} sea_level_m={:.1} sediment_km3={:.3e} \
+         eroded_km3={:.3e} fluvial_km3={:.3e} lake_km3={:.3e} marine_km3={:.3e} carbonate_km3={:.3e} \
+         evaporite_km3={:.3e} to_sea_km3={:.3e} mass_residual_km3={:.3e} mean_log_layers={:.2} \
+         spl_iterations_per_step={:.2} cg_iterations_per_step={:.1} sinks={} erosion_pulses={} basins={} sea_events={} frames={} \
+         history_mib={:.1}",
+        t.steps,
+        land / n,
+        peak,
+        st.sea_level_m,
+        sediment,
+        t.eroded_km3,
+        t.fluvial_km3,
+        t.lake_km3,
+        t.marine_km3,
+        t.carbonate_km3,
+        t.evaporite_km3,
+        t.to_sea_km3,
+        t.mass_residual_km3,
+        layers,
+        t.spl_iterations as f64 / (t.steps.max(1)) as f64,
+        t.diffusion_iterations as f64 / (t.steps.max(1)) as f64,
+        t.sinks,
+        st.events.counts[0],
+        st.events.counts[1],
+        st.events.counts[2],
+        hist.map_or(0, |h| h.frames.len()),
+        hist.map_or(0.0, |h| h.bytes() as f64 / 1048576.0),
+    ))
+}
+
+/// The deposit engine's recorded history (P1-04): per field of the last frame, the share of cells
+/// where it is non-zero and its mean there.
+fn history_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    use deeptime_core::deposits::fields::FieldHistory;
+    let h = world.history.as_ref()?;
+    let k = h.frame_count().checked_sub(1)?;
+    let f = h.frame(k).ok()?;
+    let mut parts = vec![format!("frames={} last_t={}", h.frame_count(), f.t_years)];
+    for (name, v) in &f.fields {
+        let nz: Vec<f32> = v
+            .iter()
+            .copied()
+            .filter(|x| x.is_finite() && *x != 0.0)
+            .collect();
+        let mean = nz.iter().map(|&x| f64::from(x)).sum::<f64>() / nz.len().max(1) as f64;
+        parts.push(format!(
+            "{}={:.1}%/{:.3}",
+            name.trim_start_matches("deeptime:"),
+            100.0 * nz.len() as f64 / v.len().max(1) as f64,
+            mean
+        ));
+    }
+    Some(parts.join(" "))
+}
+
+/// Per-stage wall time, and the surface's per-process split when it ran to the end.
+fn timings_line(
+    timings: &[deeptime_core::session::StageTiming],
+    world: &deeptime_core::world::WorldState,
+) -> String {
+    let mut parts: Vec<String> = timings
+        .iter()
+        .map(|t| format!("{}={:.1}s/{}steps", t.name, t.millis / 1000.0, t.steps))
+        .collect();
+    if let Some(note) = world
+        .notes
+        .get(deeptime_core::surface::STAGE_NAME)
+        .and_then(|n| serde_json::from_str::<Value>(n).ok())
+        && let Some(ms) = note["millis"].as_object()
+    {
+        parts.push(format!(
+            "surface[{}]",
+            ms.iter()
+                .map(|(k, v)| format!("{k}={:.1}s", v.as_f64().unwrap_or(0.0) / 1000.0))
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
+    }
+    parts.join(" ")
+}
+
 pub struct RunOptions {
     /// A built-in name, a file or a share code.
     pub preset: String,
@@ -183,9 +281,17 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         alloc::peak() as f64 / 1048576.0,
         started.elapsed().as_secs_f64()
     );
-    if let Some(line) = plates_line(&s.checkpoint()?.world) {
+    let world = s.checkpoint()?.world;
+    if let Some(line) = plates_line(&world) {
         println!("deeptime run: {line}");
     }
+    if let Some(line) = surface_line(&world) {
+        println!("deeptime run: {line}");
+    }
+    println!(
+        "deeptime run: timings {}",
+        timings_line(&s.stage_timings()?, &world)
+    );
     if let Some(dir) = &o.viewer {
         let title = format!("Deep Time — run {} ({})", s.preset().name(), o.preset);
         deeptime_viewer::write_world_bundle(dir, &o.out, &title)?;
@@ -228,8 +334,17 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     let s = match (&o.input, &o.preset) {
         (Some(input), None) => {
             let ck = Checkpoint::read(input)?;
+            // A stage coupled to others (plates + surface) runs with its group, which starts at
+            // the group's lead: a checkpoint whose next stage is the lead serves any member.
+            let group = deeptime_core::preset::Preset::from_json(&ck.preset_json)
+                .ok()
+                .and_then(|p| group_of(&p.stages(), &o.name));
             match ck.next_stage_name() {
                 Some(next) if next == o.name => {}
+                Some(_)
+                    if group
+                        .as_ref()
+                        .is_some_and(|g| g.start == ck.next_stage as usize) => {}
                 next => {
                     let pos = ck.stage_names.iter().position(|n| *n == o.name);
                     let why = match (pos, next) {
@@ -255,17 +370,14 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         (None, Some(preset)) => {
             let json = load_preset_with(preset, o.start.as_deref(), o.length_myr)?;
             let s = Session::create(&json, "", opts, Arc::new(AllocGauge))?;
-            let target = s
-                .stage_names()
-                .iter()
-                .position(|n| *n == o.name)
-                .ok_or_else(|| {
-                    format!(
-                        "the pipeline {:?} has no stage {:?}",
-                        s.stage_names(),
-                        o.name
-                    )
-                })? as u32;
+            let stages = s.preset().stages();
+            let target = group_of(&stages, &o.name).map(|g| g.start).ok_or_else(|| {
+                format!(
+                    "the pipeline {:?} has no stage {:?}",
+                    s.stage_names(),
+                    o.name
+                )
+            })? as u32;
             if target > 0 {
                 drive(&s, o.common.verbose, |s, st| {
                     st == AdvanceStatus::Done || s.progress().stage_index >= target
@@ -323,6 +435,17 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             o.name
         );
     }
+    if let Some(line) = surface_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = history_line(&ck.world) {
+        println!("deeptime stage {}: history {line}", o.name);
+    }
+    println!(
+        "deeptime stage {}: timings {}",
+        o.name,
+        timings_line(&s.stage_timings()?, &ck.world)
+    );
     if let Some(out) = &o.out {
         ck.write(out)?;
         println!(
@@ -424,9 +547,17 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             .map(|t| json!({ "name": t.name, "steps": t.steps, "millis": t.millis }))
             .collect();
         stages.push(json!({ "name": "finalize", "steps": 1, "millis": finalize_ms }));
-        if let Some(line) = plates_line(&s.checkpoint()?.world) {
+        let world = s.checkpoint()?.world;
+        if let Some(line) = plates_line(&world) {
             println!("deeptime bench: threads={threads} {line}");
         }
+        if let Some(line) = surface_line(&world) {
+            println!("deeptime bench: threads={threads} {line}");
+        }
+        println!(
+            "deeptime bench: threads={threads} timings {}",
+            timings_line(&s.stage_timings()?, &world)
+        );
         println!(
             "deeptime bench: threads={threads} total_ms={total_ms:.1} peak_bytes={peak} stages={}",
             stages

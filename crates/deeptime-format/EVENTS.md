@@ -191,11 +191,11 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 | `deeptime:orogeny_phase` | mountain building, with a duration | plates (P1-03); dummy | see below; dummy: see below |
 | `deeptime:hotspot_track` | a hotspot's track over a plate | plates (P1-03) | see below |
 | `deeptime:large_igneous_province` | a LIP eruption | plates (P1-03) | see below |
-| `deeptime:basin_subsidence` | a sedimentary basin subsides | surface (P1-04) | set by P1-04 |
-| `deeptime:marine_transgression` | the sea advances over land | surface (P1-04) | set by P1-04 |
-| `deeptime:marine_regression` | the sea retreats | surface (P1-04) | set by P1-04 |
+| `deeptime:basin_subsidence` | a sedimentary basin subsides | surface (P1-04) | see "The surface's events" |
+| `deeptime:marine_transgression` | the sea advances over land | surface (P1-04) | see "The surface's events" |
+| `deeptime:marine_regression` | the sea retreats | surface (P1-04) | see "The surface's events" |
 | `deeptime:glaciation` | an ice age | climate (P1-05) | set by P1-05 |
-| `deeptime:erosion_pulse` | a burst of erosion | surface (P1-04); dummy | dummy: see below |
+| `deeptime:erosion_pulse` | a burst of erosion | surface (P1-04); dummy | see "The surface's events"; dummy: see below |
 | `deeptime:deposit_formation` | a deposit forms (place: its site) | deposits (P1-14); dummy | below |
 | `deeptime:deposit_exhumation` | erosion exposes (or destroys) a deposit | deposits (P1-14) | below |
 | `deeptime:placer_formation` | a placer forms from an eroded source | deposits (P1-14) | below |
@@ -236,6 +236,25 @@ the step at which it happened unless stated.
   event; below `collision_min_frac` they make a `terrane_accretion` only.
 - The L1 layer `plates/regime` uses these codes: 0 ocean basin, 1 ridge, 2 trench, 3 arc,
   4 back-arc, 5 collision, 6 rift, 7 hotspot, 8 craton, 9 passive margin.
+
+### The surface's events (source `deeptime:surface`, P1-04)
+
+Written by `crates/deeptime-core/src/surface/events.rs` (plan §8.2) once per frame of the deposit
+engine's history (`surface.frame_every_myr`, 10 Myr), from the frame-mean rates. Regions are
+8-connected groups of L1 cells of at least `surface.event_min_area_km2` (true area); a region whose
+centroid lies within 250 km (on the planet) of a tracked one continues it, and a region is written
+**when it ends** (or, still active, at the end of the run with `ongoing` = 1), spanning its life.
+Places are points: the region's centroid in its strongest frame. Areas and volumes are true
+(cos φ-weighted) km² and km³.
+
+| Kind | Region | Params | Magnitude | Causes |
+|---|---|---|---|---|
+| `erosion_pulse` | land eroding ≥ `erosion_pulse_m_myr` (200 m/Myr) | `peak_rate_m_myr`, `area_km2` (largest), `volume_km3` (eroded over its life), `ongoing` | peak rate / (4 × threshold), ≤ 1 | the nearest `orogeny_phase`, `collision` or `subduction_onset` active within 400 km and from 20 Myr before its start |
+| `basin_subsidence` | cells aggrading ≥ `basin_m_myr` (80 m/Myr), sea floor deeper than 2 km excluded | as above (`volume_km3` = deposited) plus `setting` (the plate regime covering most of it: `rift`, `passive_margin`, `back_arc` = foreland, `craton` = intracratonic, `trench`, …) | peak rate / (4 × threshold), ≤ 1 | the nearest `rift_onset`, `collision`, `orogeny_phase`, `subduction_onset` or `ridge_birth`, as above |
+| `marine_transgression`, `marine_regression` | the share f of continental crust (by area) under the sea, followed as a zigzag: a move of at least `transgression_frac` (0.04) that then reverses by as much is one event from its start to its turning point (and a last one, `ongoing` = 1, at the end of the run) | `flooded_from`, `flooded_to` (f), `sea_level_from_m`, `sea_level_to_m` (the preset's eustatic curve), `area_km2` (the land the sea gained or lost), `ongoing` | \|Δf\| / 0.3, ≤ 1 | — |
+
+Place of a transgression or regression: the centroid of the continental cells flooded at its end and
+not at its start (regression: the reverse); global when there are none.
 
 ### The dummy preset's events (source `deeptime:dummy`, until P1-03)
 
