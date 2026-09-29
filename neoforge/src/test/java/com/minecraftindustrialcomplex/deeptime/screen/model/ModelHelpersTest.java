@@ -149,7 +149,18 @@ class ModelHelpersTest {
      * placeholders; it bites when P1-08/P1-17 replace them.
      */
     @Test
-    void realPresetsCarryEveryField() {
+    void realPresetsCarryEveryField() throws java.io.IOException {
+        // Fields the catalogue marks planned (their stage or key does not exist yet) are exempt.
+        java.util.Set<String> planned = new java.util.HashSet<>();
+        try (var in = EditorFields.class.getResourceAsStream(EditorFields.RESOURCE)) {
+            var cat = com.google.gson.JsonParser.parseReader(
+                    new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            for (var e : cat.getAsJsonArray("fields")) {
+                var o = e.getAsJsonObject();
+                if (o.has("planned") && o.get("planned").getAsBoolean())
+                    planned.add(o.get("id").getAsString());
+            }
+        }
         int real = 0;
         for (String name : com.minecraftindustrialcomplex.deeptime.preset.Presets.BUILTIN) {
             var o = com.minecraftindustrialcomplex.deeptime.preset.Presets.parseObject(
@@ -158,10 +169,12 @@ class ModelHelpersTest {
                 continue;
             real++;
             for (EditorFields.Field f : EditorFields.ALL)
-                if (!f.phase3())
+                if (!f.phase3() && !planned.contains(f.id()))
                     assertTrue(f.availableIn(o), name + " has no " + f.path() + " (EditorFields." + f.id() + ")");
         }
-        System.out.println("[junit] realPresetsCarryEveryField: " + real + " real built-in presets checked");
+        System.out.println("[junit] realPresetsCarryEveryField: " + real + " real built-in presets checked, "
+                + planned.size() + " planned fields exempt");
+        assertEquals(4, real, "every built-in is a simulated planet since P1-08");
         java.util.Set<String> ids = new java.util.HashSet<>();
         for (EditorFields.Field f : EditorFields.ALL)
             assertTrue(ids.add(f.id()), "duplicate field id " + f.id());
