@@ -2133,6 +2133,22 @@ width, depth, discharge; widths × `feature_scale.rivers`), and channel incision
 - **Phase 1 (column strata).** Horizon stacks come straight from the strata log, with metamorphism
   by regime history (collision zones step shale → slate → phyllite → schist → gneiss along each
   class's `metamorphic_path`) and plutons as simple bodies under arcs. No folds or faults yet.
+  *As built in P1-07* (`crates/deeptime-core/src/structure/`; STATUS.md has the details): a stage
+  `structure`, the third member of the coupled group (plates, surface, structure, one step each per
+  plate step). **Metamorphism** steps every strata-log layer along its class's `metamorphic_path` as
+  far as the temperature at its mid-depth allows — a linear geotherm from the plate model's heat flow,
+  with depths scaled by the crust's thickening (e/35 km, at most ×2) under an active collision — in
+  the surface's log itself, so it is irreversible and metamorphic rocks erode as what they became;
+  the formation temperatures are rounded textbook facies boundaries (slate 250 °C … gneiss 650 °C;
+  no high-pressure series, which waits for Q8/P2-02). **Plutons** are a Poisson process under arcs
+  (and collision zones) at 2–6 km depth, sized by T = 0.6·L^0.6 (Cruden 1998); they ride their
+  plate, are unroofed by the surface's erosion and end as ellipsoid bodies (role `pluton`) with a
+  hornfels or skarn aureole zone. **Columns** are regolith, the strata log (the young, shallow part
+  of a clastic deposit shown loose through the new `loose_equivalent`; buried loose material and
+  palaeosols lithified through `lithifies_to`), the plate model's rock pools less the log (the
+  surface's basement rule per pool) and peridotite. The **bake** turns a column into at most K
+  horizons at least a block thick. The deposit engine's frames get `trap_structure` (fold-thrust
+  belts, salt domes, rift fault blocks, growth faults, drape) and `host/<class>` from the columns.
 - **Phase 2 (kinematic history).** Source: Noddy's inverse-kinematics evaluation (Jessell et al.
   2022; Wellmann et al. 2016); code: Loop3D `noddyverse` and `noddy_qt` (MIT) — port `unEvents.c`
   (`unfold`, `unfault`, `undyke`, `unplug`, `unbury`, `reverseEvents`), `taste.c` and `matrix.c`
@@ -3068,6 +3084,19 @@ a smoke benchmark and again at the end.
     thickness ≥ one block after scaling, classes valid
   - the viewer's rock layer and a meridian cross-section of horizon stacks
 - **Ben reviews.** The rock map and cross-section.
+
+- **As built (P1-07, on the coupled pipeline presets).** Files `structure/{mod, params, columns,
+  metamorphism, plutons, traps, hosts, bake_horizons, tests}.rs`; the stage is `structure` and runs in
+  every planet preset with a `surface` section (optional `structure` section). The 59 JSONs were
+  P1-12's; P1-07 reviewed them, added `lithifies_to` and `loose_equivalent`
+  (`tools/dev/gen_rock_classes.py`, the Java codec) and recorded the facies-rule vocabulary the core
+  forms. The acceptance ran on `pipeline_quick_16k` (the built-ins stay placeholders until P1-08):
+  `cargo run --release -p deeptime-cli -- stage structure --preset pipeline_quick_16k --start
+  scattered_continents --length-myr 500 --viewer review/out/p1-structure`; the viewer gets the rock
+  layer (keyframes `structure/rock` and the final `strata/outcrop`), the baked stacks in its
+  inspector, and meridian cross-sections (`deeptime_viewer::section`, the Java column rule of
+  `StrataPass`, mirrored as `LoadedLayer::stack_at`). The bake is produced on demand from the final
+  world; P1-08 writes it and the pluton bodies into the world data.
 
 #### P1-08 Bake, world data v1 and parity
 - **Goal.** Every Phase 1 chunk-time layer of §5.3 written; Java reads it; parity holds.

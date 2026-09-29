@@ -276,6 +276,27 @@
     legend();
   }
 
+  // ---- column strata (P1-07): meridian cross-sections of the horizon stacks, and a legend ------
+  function structure(st) {
+    const box = document.getElementById('structurebody');
+    document.getElementById('structure').hidden = false;
+    const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const deg = (v, pos, neg) => `${Math.abs(v).toFixed(1)}°${v >= 0 ? pos : neg}`;
+    let h = '';
+    if (st.summary) h += `<p class="hint">${esc(st.summary)}</p>`;
+    for (const s of st.sections || []) {
+      h += `<figure class="xsec"><img src="${esc(s.file)}" width="${s.w}" height="${s.h}" alt="${esc(s.title)}">` +
+        `<figcaption>${esc(s.title)} — lon ${s.lon.toFixed(1)}°, ${deg(s.lat0, 'N', 'S')} (left) to ${deg(s.lat1, 'N', 'S')} (right), ` +
+        `${s.km.toFixed(0)} km; y ${s.y0}…${s.y1}; vertical exaggeration of the picture ×${s.vertical_exaggeration.toFixed(0)} in real metres (the Minecraft world itself is ×15)` +
+        `${s.per_cell ? '; each strata cell drawn as its own stack' : '; columns as the game reads them'}</figcaption></figure>`;
+    }
+    if (st.legend && st.legend.length) {
+      h += '<div class="legend">' + st.legend.map(l =>
+        `<span><i style="background:${esc(l.colour)}"></i>${esc(l.class)}</span>`).join('') + '</div>';
+    }
+    box.innerHTML = h;
+  }
+
   // ---- the deposit census (P1-14): counts per type next to the §8.6 expectation --------------
   function census(c) {
     const box = document.getElementById('censusbody');
@@ -305,6 +326,7 @@
       bodiesOf.get(b.site).push(b);
     }
     if (R && R.deposits) census(R.deposits);
+    if (R && R.structure) structure(R.structure);
     if (!K.length && !E.length && !S.length) return;
     document.getElementById('timelapse').hidden = false;
     const byId = new Map(E.map(e => [e.id, e]));
