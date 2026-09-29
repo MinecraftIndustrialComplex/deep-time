@@ -14,21 +14,26 @@
 //! shared world itself; `step` takes a [`StageContext`] carrying the deadline, the Rayon pool,
 //! the log and the memory cap instead of `(until, pool)`.
 
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::time::Instant;
 
+use crate::deposits::recorded::HistoryHandle;
 use crate::error::CoreError;
 use crate::log::LogRing;
 use crate::session::{MemoryGauge, SessionState};
 use crate::world::WorldState;
 
 /// A stage's memory and time estimate (plan §5.7.5; P1-17 calibrates the cost models).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StageEstimate {
-    /// Peak native bytes while the stage runs, shared world state included.
+    /// Peak native bytes while the stage runs with everything in memory, shared world state
+    /// included.
     pub bytes: u64,
     /// Wall-clock seconds on one core (a design budget until measured).
     pub seconds: f64,
+    /// The part of `bytes` that is the recorded history (P1-04's frames): it goes to disk when
+    /// the memory cap needs the room (P1-17), so only `bytes - history_bytes` must fit the cap.
+    pub history_bytes: u64,
 }
 
 /// What a stage sees while it steps.
@@ -46,19 +51,55 @@ pub struct StageContext<'a> {
     pub(crate) gauge: &'a dyn MemoryGauge,
     pub(crate) mem_cap: u64,
     pub(crate) state: &'a AtomicU8,
+    /// The world's recorded history, whose frames in memory give way when a reservation would
+    /// not fit (P1-17; `None` before the history exists).
+    pub(crate) history: Option<&'a HistoryHandle>,
+    /// The most any reservation asked for, `[with, without]` the history's frames in memory
+    /// (bytes in use + bytes reserved), for the session's report of what the run needed of its
+    /// cap.
+    pub(crate) needed_peak: Option<&'a [AtomicU64; 2]>,
 }
 
 impl StageContext<'_> {
-    /// Checks, before allocating, that `bytes` more would stay within the memory cap.
+    /// Checks, before allocating, that `bytes` more would stay within the memory cap. When they
+    /// would not, the recorded history's oldest frames in memory go to the session's spill file
+    /// first, if that makes room (decisions log 2026-09-29: a run over its cap slows down instead
+    /// of failing); only what does not fit even then fails.
     pub fn reserve(&self, bytes: u64) -> Result<(), CoreError> {
         let needed = self.gauge.in_use().saturating_add(bytes);
-        if needed > self.mem_cap {
-            return Err(CoreError::MemoryCap {
-                needed,
-                cap: self.mem_cap,
-            });
+        if let Some(p) = self.needed_peak {
+            p[0].fetch_max(needed, Ordering::Relaxed);
+            let history = self.history.map_or(0, HistoryHandle::resident_bytes);
+            p[1].fetch_max(needed.saturating_sub(history), Ordering::Relaxed);
         }
-        Ok(())
+        if needed <= self.mem_cap {
+            return Ok(());
+        }
+        if let Some(h) = self.history {
+            let over = needed - self.mem_cap;
+            if h.resident_bytes() >= over {
+                let e = h.evict(over)?;
+                crate::session::log_evicted(
+                    self.log,
+                    &e,
+                    self.gauge,
+                    self.mem_cap,
+                    "a reservation",
+                );
+                let needed = self.gauge.in_use().saturating_add(bytes);
+                if needed <= self.mem_cap {
+                    return Ok(());
+                }
+                return Err(CoreError::MemoryCap {
+                    needed,
+                    cap: self.mem_cap,
+                });
+            }
+        }
+        Err(CoreError::MemoryCap {
+            needed,
+            cap: self.mem_cap,
+        })
     }
 
     /// True once the session was cancelled; long steps poll it and return early.
