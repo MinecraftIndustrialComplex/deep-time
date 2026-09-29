@@ -17,7 +17,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P0-08 | Cross-builds and the OS load matrix | done | 2026-09-28 | b20fbb8 | Mac: `nix run .#natives` → 8 libraries, gnu GLIBC_2.17, musl NEEDED libc.so only; `gradlew build -Prelease` → 8 in the jar, tests=30 failures=0; [natives.yml run 36492319610](https://github.com/MinecraftIndustrialComplex/deep-time/actions/runs/36492319610): all 9 jobs success, 8/8 load jobs `status=OK version=0.0.1` (Windows arm64 included) |
 | P0-09 | World-data format v0, synthetic planets, Java reader | done | 2026-09-28 | 75d90d3 | Mac: cargo test ok (format 15 tests); synth wrap-test 16k → format_version 0.0, viewer bundle; TilePackParityTest + Lz4RoundTripTest pass; wrap-test equals AnalyticTestTerrain within 1/32 block |
 | P0-10 | The generator on world data | done | 2026-09-28 | — | Mac ./gametest.sh → All 10 required tests passed: heightMatchesRaster cornerMax 0 maxAbsDiff 1; strataClassesResolve checked=32 wrong=0; spawnOnLand y=456 > 63. StagingMover deferred to P1-11 (no staging before the editor exists) |
-| P0-11 | `deeptime-inspect` | todo | | | |
+| P0-11 | `deeptime-inspect` | done | 2026-09-28 | 86140f2 | Mac: cargo test -p deeptime-inspect ok (19 unit + 7 fixture); `cargo run -p deeptime-inspect -- compare --world smoke/standalone/server/planet --world-data …/deeptime` → p99_abs_diff_blocks 1 (p50 0, max 5, 99.6 % within 1 block; 109,184 of 128,000 columns compared); seam 144 rows, 0 mismatches; clippy, fmt, deny ok |
 | P0-12 | Terralith, TerraBlender and Biomes O' Plenty checks | done | 2026-09-28 | 00db177 | Mac: ./gametest.sh default/-PwithMic/-PwithTerraBlender → All 13 passed; terralith=3008 of 4096 land samples (MIC), biomesoplenty=1325 of 4096 (TB), surface painted 24/24; smoke mic --synth wrap-test (production server) PASS: probe tw stamped/loopsX/!loopsZ/1024, locate village found, no C2ME/DH errors, chunky done, regions outside span 0 |
 | P0-13 | Water above sea level holds | done | 2026-09-28 | — | Mac ./gametest.sh → All 14 required tests passed: lakeHolds before=65304 after=65304 expected=65304 outside=0 (every source woken by a fluid tick, 400 ticks forceloaded), water_top_y=120 at the lake centre, generatedFluidTicks=0. The inspect section PNG (review picture) comes with P0-11; -PwithMic (Mac): All 14 required tests passed, lakeHolds identical (outside=0) |
 | P0-14 | BlueMap renders on MIC blocks | doing | 2026-09-28 | — | Mac: tools/review/render-bluemap.sh renders the MIC smoke world (surface map + a below-y-0 strata map) in ~30 s; web app 645 MB uncompressed (962 hires tiles × ~0.65 MB, 992-block height). Hosting on spacesheep undecided: gzip tiles + a decompressing service worker, or a smaller render mask |
@@ -55,6 +55,43 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 
 ## Build log
+
+### 2026-09-28 — P0-11 `deeptime-inspect` (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Created.** `crates/deeptime-inspect` (lib + binary): region files (4 KiB sectors; gzip, zlib,
+  raw and lz4-java `LZ4Block` chunks; external `.mcc`), an in-crate NBT reader, 1.21 sections
+  (palette + packed longs), heightmaps and structure pieces, and a small zip reader for jars.
+  Subcommands `colors`, `topdown`, `rock`, `ore`, `section`, `seam`, `regions`, `compare`, plus
+  `column` (one column's blocks) and `fixture` (copies chunks into a new region file). New deps,
+  all MIT/Apache: clap, flate2, lz4_flex, png, memmap2. Fixture: chunks 4..=9 × 0..=3 of the
+  standalone smoke world, 389 KB (`tests/fixtures/world/region/r.0.0.mca`).
+- **Gap 18 (compare made machine-checkable; plan §9.7 and P0-11 updated).** Measured = the
+  highest block that is not air, fluid or a feature (vegetation, logs, wood, leaves, roots, huge
+  mushrooms, coral, sea pickles, snow layers, sheet ice, …): `OCEAN_FLOOR` minus logs, leaves and
+  features. Expected = `⌈H⌉ − 1` (bilinear `elevation`, the GameTests' value). Full chunks only;
+  excluded and counted: `structure` (12 blocks around pieces reaching the surface) and `carved`
+  (2 columns around a pit ≥ 2 blocks below close₃₂(open₄(measured)); reads only the measured
+  surface). A first rule (air/fluid under neighbours' surfaces) missed vertical ravines and smooth
+  dry cave-entrance hollows on beaches (17 blocks deep, no overhang), hence the morphological
+  test. `section` prints `water_top_y=<y> water_block_y=<y−1> columns=<n>`, `water_top_y` being
+  the top face of the highest water block as P0-13's `lakeHolds` defines it. On P0-13's GameTest
+  world (main checkout's Mac copy) `section --world run-gametest/world/dimensions/deeptime/test_lake
+  --axis z --at 0 --from -88 --to 212` → `water_top_y=120 water_block_y=119 columns=209`.
+- **Measured** (Mac; `install.sh standalone --synth wrap-test --size 16384 && run.py --profile
+  standalone --fresh --chunky 128 --chunky-seam` → PASS): compare p99 1, p50 0, max 5,
+  histogram −3:9 −2:145 −1:2478 0:105190 +1:1106 +2:124 +3:85 +4:35 +5:12; excluded carved
+  11,792 (9.2 %), structure 7,024 (5.5 %). Renders in `review/out/p0-11/` (Mac and laptop,
+  gitignored); the colour table from the client-extra jar + the 6 standalone jars resolves 1,836
+  blocks.
+- **Findings.** (1) With aquifers on, the ocean floor carries aquifer-barrier stone (then sand)
+  2–6 blocks above H, and geodes poke through it: 0.2 % of the world's columns, 4 % in the
+  fixture's patch. (2) The game creates 0-byte region files beyond the seam (r.16.*, r.−17.*)
+  when it merely looks chunks up; TW folds every write. `run.py` now records them
+  (`outside_empty`) instead of failing the span check; `regions` does the same. (3) `run.py
+  --chunky-seam` pregenerates x ∈ [C/2 − 144, C/2) and [−C/2, −C/2 + 144), z ∈ [−64, 80): Chunky's
+  square is `(int) centre >> 4 ± ceil(radius / 16)` chunks.
+- **Limits.** The pit test would also drop real hollows narrower than 64 blocks (rivers, P2);
+  `rock` maps blocks through the `#deeptime:rock/*` tags until `/deeptime probe palette` exists;
+  format 0.0 has no site bodies to overlay. Next: P0-13 uses `section`, P0-14/15 the renders.
 
 ### 2026-09-28 — P0-13 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Created.** `worldgen/WaterPass` (after `StrataPass` in `buildSurface`; fills air below the water
