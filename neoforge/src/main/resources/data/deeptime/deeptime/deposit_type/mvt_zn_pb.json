@@ -2,7 +2,7 @@
   "id": "deeptime:mvt_zn_pb",
   "family": "basin_brine",
   "site_kind": "deposit",
-  "description": "Mississippi Valley-type zinc-lead: replacement and open-space ore in platform dolostone, deposited by basin brines that orogenic uplift drove through the carbonate aquifer.",
+  "description": "Mississippi Valley-type zinc-lead: replacement and open-space ore in platform carbonates, deposited by hot basinal brines that topography-driven flow from a rising orogen swept across a foreland basin into the carbonate platform at its margin.",
   "products": [
     {"material": "c:zinc", "grade_key": "zn_pct", "role": "primary"},
     {"material": "c:lead", "grade_key": "pb_pct", "role": "coproduct"},
@@ -90,6 +90,6 @@
     "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 2.9 (dolostone with sulfides), density_per_1e5km2 1 / 5 / 20 (no USGS MVT deposit density exists; SIR 2010-5070-A gives district areas of 1,600–10,000 km² and Pine Point's 60 ore bodies in 1,600 km², which local densities far exceed), formation_depth_m 1000.",
     "Design values: the curves' thresholds, integration_myr 5 (brine flushes are short: 0.5–5 Myr at Pine Point, Garven 1985), clustering, zoning, aspect, size multipliers.",
     "Create stones (decisions file): dolostone (asurine → zinc) is the preferred host at 1.5, and the ore body turns its host to dolostone (hydrothermal dolomite).",
-    "Balance (P1-17 calibration, 2026-09-29): count_mult 20. With the placeholder density the permissive platforms of a 16k planet (1,000–25,000 km²) expect well under one deposit, so the family would be absent from most planets; 20 × gives a few per 500-Myr pipeline_quick_16k run, many of which the ledger then erodes (the playability pass guarantees essentials). Carbonate hosts stay scarce on the recorded history (STATUS.md, P1-17 partial: calibration)."
+    "Counts (survivor formula, decisions log 2026-09-29, plan §8.6 as built): the density counts deposits that survive to the present, as USGS does; the engine forms more (deposits/survival.rs) so that the expected survivors are ρ_p50 · permissive area · count_mult. balance.count_mult stays 1: a pack lever, not a calibration. Driver reworked 2026-09-29 (Ben: 'Rework its driver'): basin-scale flow — a hot basin and a rising orogen within brine_flow_km (600 km, the USGS MVT tract criterion) feed brine to carbonate the site holds (deposits/regional.rs); hosts.full_at 0.05 lets a ~100 m carbonate unit in the 2 km host window count fully."
   ]
 }

@@ -330,7 +330,9 @@ pub fn octagon_mean(w: usize, h: usize, v: &[i64], r: usize) -> Vec<f32> {
             (Line::Diag(1), q),
             (Line::Diag(-1), q),
         ] {
-            x = pass(w, h, &x, line, &|seq: &[i64], circ| window_sum(seq, half, circ));
+            x = pass(w, h, &x, line, &|seq: &[i64], circ| {
+                window_sum(seq, half, circ)
+            });
         }
         x
     };
@@ -353,7 +355,9 @@ pub fn octagon_max(w: usize, h: usize, v: &[f32], r: usize) -> Vec<f32> {
         (Line::Diag(1), q),
         (Line::Diag(-1), q),
     ] {
-        x = pass(w, h, &x, line, &|seq: &[f32], circ| window_max(seq, half, circ));
+        x = pass(w, h, &x, line, &|seq: &[f32], circ| {
+            window_max(seq, half, circ)
+        });
     }
     x
 }
@@ -432,7 +436,9 @@ mod tests {
         assert_eq!(k[cj * w + ci + 5], k[cj * w + ci - 5]);
         assert!(k[cj * w + ci] > k[cj * w + ci + 15]);
         // Shifts.
-        let v: Vec<i64> = (0..w * h).map(|c| ((c * 7919) % 1013) as i64 * 1000).collect();
+        let v: Vec<i64> = (0..w * h)
+            .map(|c| ((c * 7919) % 1013) as i64 * 1000)
+            .collect();
         let vf: Vec<f32> = v.iter().map(|&x| x as f32).collect();
         let (a, b) = (octagon_mean(w, h, &v, r), octagon_max(w, h, &vf, r));
         let by = 7usize;
@@ -480,7 +486,13 @@ mod tests {
         f.fields.insert(
             BURIAL_TEMP.into(),
             (0..n)
-                .map(|c| if (8..24).contains(&col(c)) { 110.0 } else { 20.0 })
+                .map(|c| {
+                    if (8..24).contains(&col(c)) {
+                        110.0
+                    } else {
+                        20.0
+                    }
+                })
                 .collect(),
         );
         f.fields.insert(CRUST.into(), vec![38.0; n]);

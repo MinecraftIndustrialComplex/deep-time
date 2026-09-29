@@ -14,7 +14,9 @@
 //! and the task that provides it; `STATUS.md` repeats the table for P1-03…P1-07. Host-rock
 //! fractions are the open family `deeptime:host/<rock class>` (P1-07). A history may leave any
 //! field out: a type whose fields are missing is skipped with a warning, and a history with no
-//! host fields at all means "no lithology opinion" (every cell a full host).
+//! host fields at all means "no lithology opinion" (every cell a full host). The regional fields
+//! (`deeptime:basin_brine`, `deeptime:regional_head_drop_m_km`) are not recorded: the engine
+//! derives them from each frame it reads (`regional.rs`) when their inputs are there.
 
 use std::collections::BTreeMap;
 
