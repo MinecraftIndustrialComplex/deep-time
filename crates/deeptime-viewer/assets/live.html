@@ -1,0 +1,121 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
+<!-- Deep Time live page (`deeptime watch`): served by the watch server with live.js and ramps.json. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+  :root { --bg: #f7f7f5; --fg: #1d1d1b; --muted: #6b6b66; --panel: #ffffff; --line: #d9d9d4; --accent: #c0392b; --hl: #fff3c4; --ok: #2e8b57; --warn: #b8860b; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16171a; --fg: #e8e8e3; --muted: #9a9a94; --panel: #1f2024; --line: #33343a; --accent: #ff6b5b; --hl: #3a3420; --ok: #5fd08a; --warn: #f0c050; }
+  }
+  /* The TV (?tv): always dark, larger type. */
+  :root.tv { --bg: #0e0f11; --fg: #ecece6; --muted: #9a9a94; --panel: #17181b; --line: #2c2d33; --accent: #ff6b5b; --hl: #3a3420; --ok: #5fd08a; --warn: #f0c050; font-size: 17px; }
+  :root.tv.idle, :root.tv.idle * { cursor: none !important; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 1em/1.4 system-ui, sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 1.1em; margin: 0; }
+  header .meta { color: var(--muted); font-size: .8em; }
+  #prog { flex: 1 1 360px; display: flex; align-items: center; gap: 10px; min-width: 260px; }
+  #bar { flex: 1 1 auto; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; min-width: 80px; }
+  #bar > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  #bar.done > div { background: var(--ok); }
+  #bar.failed > div { background: var(--warn); }
+  #progtext { font-size: .8em; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #conn { font-size: .8em; white-space: nowrap; }
+  #conn::before { content: '● '; color: var(--warn); }
+  #conn.ok::before { color: var(--ok); }
+  main { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 30%); gap: 12px; padding: 12px 16px; min-height: 0; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  #left { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  #mapbox { position: relative; width: 100%; max-width: calc((100vh - 190px) * 2); }
+  #map { width: 100%; aspect-ratio: 2 / 1; display: block; background: #000; border: 1px solid var(--line); cursor: crosshair; }
+  #clock { position: absolute; left: 10px; top: 6px; color: #fff; font-size: 1.5em; font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px #000, 0 0 8px #000; pointer-events: none; }
+  #clock small { display: block; font-size: .55em; font-weight: 400; opacity: .85; }
+  #badge { position: absolute; right: 10px; top: 8px; color: #fff; background: #555; padding: 1px 9px; border-radius: 3px; font-weight: 600; font-size: .8em; letter-spacing: .06em; pointer-events: none; }
+  #badge.live { background: #d7301f; }
+  #waiting { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #ccc; font-size: 1.1em; pointer-events: none; }
+  #controls { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  #controls button, #controls select { font: inherit; padding: 2px 10px; min-width: 2.4em; }
+  #controls button.on { outline: 2px solid var(--accent); }
+  #scrub { flex: 1 1 240px; }
+  #tlabel { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .9em; }
+  #layers { display: flex; flex-wrap: wrap; gap: 4px; }
+  #layers button { font: inherit; font-size: .8em; padding: 2px 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 3px; cursor: pointer; }
+  #layers button.on { border-color: var(--accent); background: var(--hl); }
+  #layers button kbd { color: var(--muted); font: inherit; margin-right: 4px; }
+  .hint { color: var(--muted); font-size: .8em; }
+  aside { min-width: 0; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
+  .panel h2 { font-size: .8em; margin: 0 0 6px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+  #globebox { position: relative; }
+  #globe { width: 100%; max-width: calc(100vh - 420px); min-width: 200px; aspect-ratio: 1; display: block; margin: 0 auto; cursor: grab; touch-action: none; }
+  #legendbar { width: 100%; height: 14px; display: block; border: 1px solid var(--line); }
+  #legend .ends { display: flex; justify-content: space-between; font-size: .8em; color: var(--muted); }
+  #legendnote { font-size: .75em; color: var(--muted); margin-top: 3px; }
+  #evpanel { flex: 1 1 auto; min-height: 140px; display: flex; flex-direction: column; }
+  #ticker { flex: 1 1 auto; overflow-y: auto; font-size: .85em; min-height: 0; }
+  .row { padding: 2px 4px; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+  .row:hover { background: var(--hl); }
+  .row.new { font-weight: 600; background: var(--hl); }
+  .row .t { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 8ch; text-align: right; }
+  .dot { width: .6em; height: .6em; border-radius: 50%; display: inline-block; flex: 0 0 auto; border: 1px solid #0006; }
+  #details { max-height: 36vh; overflow-y: auto; }
+  table.kv { border-collapse: collapse; width: 100%; font-size: .85em; table-layout: fixed; }
+  table.kv td { padding: 1px 4px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+  table.kv td:first-child { color: var(--muted); width: 36%; }
+  a.ref { color: var(--accent); cursor: pointer; text-decoration: underline; }
+  #summary pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .75em; margin: 4px 0 0; }
+  button.x { border: 0; background: none; color: var(--muted); cursor: pointer; font: inherit; padding: 0 2px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1 id="title"></h1>
+    <div class="meta" id="meta">connecting…</div>
+  </div>
+  <div id="prog"><div id="bar"><div></div></div><span id="progtext"></span></div>
+  <span id="conn">connecting</span>
+</header>
+<main>
+  <div id="left">
+    <div id="mapbox">
+      <canvas id="map"></canvas>
+      <div id="clock"></div>
+      <div id="badge" hidden></div>
+      <div id="waiting">Waiting for the first step…</div>
+    </div>
+    <div id="controls">
+      <button id="rewind" title="back to the start (Home)">⏮</button>
+      <button id="back" title="one step back (←)">◀︎</button>
+      <button id="play" title="play / pause (space)">▶︎</button>
+      <button id="fwd" title="one step forward (→)">▶︎|</button>
+      <button id="live" title="follow the run live (End)">● live</button>
+      <label class="hint">speed <select id="rate" aria-label="playback speed">
+        <option value="0.5">0.5 Myr/s</option><option value="1">1 Myr/s</option><option value="2">2 Myr/s</option>
+        <option value="5">5 Myr/s</option><option value="10" selected>10 Myr/s</option><option value="20">20 Myr/s</option>
+        <option value="50">50 Myr/s</option><option value="100">100 Myr/s</option>
+      </select></label>
+      <input type="range" id="scrub" min="0" max="0" value="0" aria-label="step">
+      <span id="tlabel"></span>
+      <label class="hint"><input type="checkbox" id="markers" checked> events</label>
+    </div>
+    <div id="layers"></div>
+  </div>
+  <aside>
+    <div class="panel" id="globebox"><h2><span>Globe</span><span class="hint" id="globehint">drag to turn · double-click to spin</span></h2><canvas id="globe" width="480" height="480"></canvas></div>
+    <div class="panel" id="legend"><h2><span>Legend</span><span id="lname"></span></h2><canvas id="legendbar" width="256" height="14"></canvas><div class="ends"><span id="lmin"></span><span id="lunits"></span><span id="lmax"></span></div><div id="legendnote"></div></div>
+    <div class="panel" id="evpanel"><h2><span>Events up to this step</span><span id="evcount"></span></h2><div id="ticker" class="hint">No events yet.</div></div>
+    <div class="panel" id="detailpanel" hidden><h2><span>Details</span><button class="x" id="closedetails" title="close">✕</button></h2><div id="details"></div></div>
+    <details class="panel" id="summary"><summary class="hint">Run</summary><div id="runinfo"></div></details>
+  </aside>
+</main>
+<script src="live.js"></script>
+</body>
+</html>
