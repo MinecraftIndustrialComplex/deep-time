@@ -175,6 +175,7 @@ impl PlatesStage {
         let tectonics = self.preset.tectonics.clone();
         let env = self.env(&tectonics, step);
         let k = env.k;
+        self.apply_surface_feedback(st, world, &env)?;
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
 
         // Motion, then interactions at the new positions.
@@ -271,6 +272,97 @@ impl PlatesStage {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// The surface stage's changes since the last step (P1-04, `surface/mod.rs`): its elevation
+    /// change (`surface/feedback_m`) and the material it moved (`surface/material_m`) per L1 cell
+    /// are spread onto the samples with the last L1 sampling's barycentric weights (each sample
+    /// takes the weighted mean over the cells that see it), added to their elevation and rock
+    /// pools (erosion strips the column from the top, deposits join the sediment pool), and what
+    /// was applied is sampled back onto L1 (`surface/feedback_applied_m`), so the surface can take
+    /// it off its own offset. Runs before the step's motion, on the positions of the last sampling.
+    fn apply_surface_feedback(
+        &mut self,
+        st: &mut PlateState,
+        world: &mut WorldState,
+        env: &Env<'_>,
+    ) -> Result<(), CoreError> {
+        let Some(fb) = world.fields.remove(crate::surface::field::FEEDBACK) else {
+            return Ok(());
+        };
+        let material = world.fields.remove(crate::surface::field::MATERIAL);
+        let grid = self.l1_grid()?;
+        if fb.data.len() != grid.cells() {
+            return Ok(());
+        }
+        let cache = self.cache.as_mut().expect("built before the step");
+        if cache.coupling.is_none() {
+            // After a resume: link the cells exactly as the last sampling did (history-free).
+            let pos = geometry::positions(st, &cache.geo);
+            let tree = SampleTree::new(cache.geo.points());
+            let mut coupling = Coupling::build(&grid, &cache.geo.mesh, &tree);
+            let _ = l1::sample(st, &cache.geo, &mut coupling, &pos, env, &self.preset.scale);
+            cache.coupling = Some(coupling);
+        }
+        let coupling = cache.coupling.as_ref().expect("built above");
+        let mesh = &cache.geo.mesh;
+        let tris = mesh.triangles();
+        let n = st.samples.len();
+        let mut wsum = vec![0.0f64; n];
+        let mut zsum = vec![0.0f64; n];
+        let mut msum = vec![0.0f64; n];
+        for (c, l) in coupling.links().iter().enumerate() {
+            let t = tris[l.tri as usize];
+            let dz = f64::from(fb.data[c]);
+            let dm = material.as_ref().map_or(dz, |m| f64::from(m.data[c]));
+            for (&v, &w) in t.iter().zip(l.w.iter()) {
+                let w = f64::from(w);
+                if w > 0.0 {
+                    let v = v as usize;
+                    wsum[v] += w;
+                    zsum[v] += w * dz;
+                    msum[v] += w * dm;
+                }
+            }
+        }
+        let k = env.k;
+        let dz: Vec<f64> = st
+            .samples
+            .par_iter_mut()
+            .enumerate()
+            .map(|(v, s)| {
+                if wsum[v] <= 0.0 {
+                    return 0.0;
+                }
+                let z0 = s.elevation_m;
+                s.elevation_m = (f64::from(z0) + zsum[v] / wsum[v])
+                    .clamp(k.trench_elevation_m, k.max_elevation_m)
+                    as f32;
+                f64::from(s.elevation_m) - f64::from(z0)
+            })
+            .collect();
+        st.samples.par_iter_mut().enumerate().for_each(|(v, s)| {
+            if wsum[v] <= 0.0 {
+                return;
+            }
+            let dm = msum[v] / wsum[v];
+            if dm < 0.0 {
+                pools::strip(&mut s.pools, -dm);
+            } else {
+                s.pools[pool::SEDIMENT] += dm as f32;
+            }
+            pools::diagenesis(&mut s.pools, env.gravity);
+            s.thickness_m = s.pools.iter().sum();
+        });
+        let applied = coupling.interpolate(mesh, |v| dz[v as usize]);
+        world.fields.insert(
+            crate::surface::field::FEEDBACK_APPLIED.to_owned(),
+            Field {
+                grid,
+                data: applied.into_iter().map(|x| x as f32).collect(),
+            },
+        );
         Ok(())
     }
 

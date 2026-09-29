@@ -94,6 +94,16 @@ pub trait Stage: Send {
         &[]
     }
 
+    /// The stage this one is interleaved with (plan §8: "plates and deep-time surface processes
+    /// interleaved per plate step"), if any. A stage that names the stage just before it in the
+    /// pipeline (or a stage coupled to that one) joins its *group*: the session steps the group's
+    /// lead once, then every follower once, in pipeline order, until all of them are done. The
+    /// lead must take exactly one step per `step` call. Keyframes of a group draw the union of its
+    /// members' layers; a checkpoint taken inside a group stores every member's state.
+    fn coupled_to(&self) -> Option<&'static str> {
+        None
+    }
+
     /// The stage's private state (postcard bytes), for a checkpoint taken mid-stage.
     fn save_state(&self) -> Result<Vec<u8>, CoreError>;
 

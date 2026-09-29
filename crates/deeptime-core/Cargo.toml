@@ -20,3 +20,6 @@ serde_json.workspace = true
 # L0 geometry (P1-02, plan §5.2 and §13): vectors and the k-d tree. Both MIT OR Apache-2.0.
 glam = "0.33.11"
 kiddo = { version = "6.3.0", default-features = false, features = ["multi-threaded"] }
+# The deposit engine's recorded field history (P1-04): LZ4 block compression of packed frames,
+# the codec the format crate already uses for tile packs. MIT.
+lz4_flex = "0.14.0"
