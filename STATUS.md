@@ -73,6 +73,96 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — Deposits: the survivor formula and the regional MVT driver (agent worktree agent-afa559c18eb85c3f6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben, 2026-09-29 (decisions log): "Change the formula (Recommended)" — USGS densities count
+  deposits that survive to the present, the engine forms extra so the survivors match, no per-type
+  magic multipliers; and MVT "Rework its driver" — a regional (basin-wide flow) driver so most planets
+  get some.
+- **The formula** (`deposits/survival.rs`; plan §8.6 as-built note). Per type: target survivors
+  **N\* = count_mult · ρ_P50/10⁵ · Σ A_i** over the permissive tracts (density × permissive area,
+  Singer's three-part method — mean F no longer scales the total). Formation is spread over tracts
+  ∝ φ_i = A_i·F̄_i·E_i, within a tract ∝ F·E (unchanged placement), and in time ∝ each cell's
+  favourability hazard −(Δt/τ)·ln(1 − F_t) (the terms that integrate to F). p(c) = the chance a deposit
+  formed in cell c survives (centre D = z_f + B − E: D > −h, D ≥ h for `destroy`, body still in the
+  build range) integrated over that time distribution (exact within a frame, D linear in the instant)
+  and 32 tonnage quantiles; p̄_i = p averaged over tract i with the position weights. One formation
+  rate per type: **λ_i = N\* · φ_i / Σ_j φ_j p̄_j**, so Σ λ_i p̄_i = N\*. Petroleum forms at its charge,
+  `formation_time: cause` types before the history. Cap: planet preservation below
+  1/`deposits.max_formed_per_survivor` (new preset key, default 20) stops formation there (census
+  `capped`, a WARN). materialise now draws the formation frame ∝ the cell's hazard (was: the best
+  frame). Pass 2 replays every frame at **every tract cell** (was: the chosen cells), recording the
+  column and the hazard; the chosen cells' ledger series come from it, identical to before.
+  Porphyry/MVT/SEDEX/petroleum `balance.count_mult` 10/20/20/3 → 1 (the key stays, a pack lever).
+  Census per type: `target, preservation, formation_mult, capped, expected_formed, expected`
+  (survivors), `drawn` (formed), `expected_at_positions` (Σ p over where the formed ones landed);
+  forming events carry `p_survive`. CLI line and viewer census table updated; FORMAT.md updated.
+- **The MVT driver** (`deposits/regional.rs`, `mvt_zn_pb.json`). Two fields derived from every frame
+  on reading (not recorded; RecordedHistory untouched): `deeptime:basin_brine` = tapered share, within
+  `deposits.brine_flow_km` (new preset key, default 600 km = USGS SIR 2010-5070-A's MVT tract
+  criterion, platform carbonates "less than ~600 km inboard of Phanerozoic orogenic belts"), of hot
+  (burial temperature 50→100 °C; MVT fluids 75–200 °C, Garven 1985, Leach et al. 2005), aggrading
+  (≥ 10 m/Myr), continental basin; `deeptime:regional_head_drop_m_km` = (max within the reach of the
+  50-km head of ground rising ≥ 0.1 mm/yr − the cell's head) / reach (full at 3.3 m/km, Garven & Freeze
+  1984's base case; "MVT formed mainly during contractional events … platform carbonates with some
+  hydrological connection to orogenic belts", Leach et al. 2001; topography the dominant drive,
+  Bethke & Marshak 1990). MVT = source(basin_brine, full at 0.035) · driver(head drop) · pathway(faults,
+  crust ≥ 30 km) · trap(carbonate_platform 0.02→0.2) · host(#carbonate, dolostone 1.5, new
+  `hosts.full_at` 0.05 = ~100 m of carbonate in the 2 km host window). Windows are octagons of the
+  disk's area (square + two diagonal passes), integer sums / sliding maxima, exact under east–west
+  shifts (the drift test stays bit-exact). Tried first and rejected: brine share with a salinity term
+  and head drop from any high ground → MVT on 3.6 % of the planet, 9–31 sites (the drive and the brine
+  saturate over most continents at a 600 km reach); the hot-basin and active-orogen terms are what
+  discriminate. Viewer ramps `basin_brine`, `head_drop` added to ramps.json.
+- **Schema.** `hosts.full_at` in `deposit_type.schema.json` and `types.rs` (default 1, validated
+  (0, 1]; Java's codec ignores it). DepositParams gains `max_formed_per_survivor`, `brine_flow_km`
+  (serde defaults; the preset JSONs are not edited).
+- **Counts** (Mac, `stage deposits --in` the six group checkpoints of `stage structure --preset
+  pipeline_quick_16k --start {scattered_continents,supercontinent} --length-myr 500 --set seed={1,2,3}`
+  on master b8909e4; baseline = master with the calibration multipliers). Sites (target):
+
+  | type | baseline median (range), present | now median (range), present | targets N\* |
+  |---|---|---|---|
+  | porphyry | 8 (5–34), 6/6 | 5.5 (3–9), 6/6 | 5.9–12.3 (permissive 40–82 k km², preserved 27–59 %) |
+  | MVT | 0.5 (0–5), 3/6 | 4.5 (0–12), 5/6 | 2.6–11.0 (permissive 52–220 k km²) |
+  | SEDEX | 1.5 (0–6), 4/6 | 0.5 (0–1), 3/6 | 0.13–0.44 |
+  | petroleum | 2.5 (0–4), 5/6 | 3.5 (1–5), 6/6 | 2.1–4.5 |
+  | coal | 6.5 (1–9), 6/6 | 21 (14–53), 6/6 | 15–44 |
+  | placer Au | 7 (3–10) | 6 (2–13) | children of eroded porphyries |
+
+  Sites track `expected_at_positions` to within a site on every landscape (the ledger agrees with p).
+  The one MVT-less landscape (seed 2 scattered) formed 15 whose camps all fell on crust that eroded
+  (Σ p = 0.03 at their cells against 2.95 planned): clustering variance, not bias.
+- **Tests.** New: `survival::tests` (interval integration, `survives` = ledger + too-deep for every
+  built-in type, uniform erosion = closed form, plan hits target and caps), `regional::tests` (windows
+  = naive, octagon radius/density/shift-exactness, basin beside orogen), `recorded_tests::
+  the_survivor_formula_hits_its_target_in_expectation` (block favourable 100 Myr, 40 m/Myr erosion:
+  engine p̄ = closed form 0.4726 within 0.01; 300 planets: mean survivors 2.89 vs 3 ± 0.10, formed
+  6.26 vs 6.35), `recorded_tests::mvt_forms_where_a_basin_lies_beside_carbonate` (platform A beside a
+  hot foreland basin before a rising orogen: F > 0.5 and all sites there; platform B 1,000 km away,
+  no uplift, or a cold basin: F = 0, no sites). Determinism across thread counts: the coupled
+  pipeline test (1 vs 3 threads, sites/bodies/events/census identical) and the resume-in-stage test
+  pass unchanged. Pipeline tests that list the fields every built-in type reads now include the
+  derivable regional names.
+- **Gates** (Mac, before the master merge): `cargo test --workspace --locked` all pass (core 214 + 2
+  ignored), `cargo clippy --workspace --all-targets --locked -- -D warnings` clean, `cargo fmt --all
+  -- --check` clean, `cargo deny check licenses bans` ok, `cd neoforge && ./gradlew build test` →
+  tests=118 failures=0 (the synthetic deposit world: 72 sites). GameTests not run (no Java change).
+- **Viewer bundle** review/out/p1-deposits-survivors (seed 1 scattered, deposit layers + inputs incl.
+  the two regional fields, 3.8 MB, not published). Looked at: MVT favourability in belts on continental
+  margins beside orogens (strongest along one southern margin), porphyry along arcs, the brine field as
+  blobs round the hot basins, the head drop as octagonal plateaus round rising orogens (a max-within-
+  reach field). Chains: MVT site ← basin_subsidence + orogeny_phase near where the crust was when it
+  formed; porphyry ← subduction_onset/orogeny_phase; oil ← petroleum_generation ← basin_subsidence.
+- **Decisions for Ben** (not asked): (1) porphyry lands at 5.5 median (targets 6–12), below the
+  plan's "about 11": ρ_P50 × our permissive arcs (0.5–1.1 % of the planet). Using the mean of the USGS
+  density distribution (split lognormal through P90/P50/P10: porphyry 17.8, ×1.19) would be the
+  statistically proper expectation but also multiplies petroleum's placeholder by 3.8. (2) SEDEX
+  (placeholder density, no USGS value) is on a minority of planets now. (3) Coal triples (placeholder
+  30/10⁵ km² over 50–146 k km² of coal tracts). (4) Survivors count everything still in the build
+  range; counting only deposits within ~1 km of the surface (USGS "exposed permissive rock") would add
+  deeper extra sites.
+- **Next.** Main session merges the branch; Ben's answers on (1)–(4); P1-17 proper.
+
 ### 2026-09-29 — P1-17 partial: calibration with the real climate (agent worktree agent-ae48007457b607716, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Ben, 2026-09-29, "Now, beside P1-06 (Recommended)": recalibrate erosion and uplift with the climate on,
   turn the ice-sheet feedback on once elevations look Earth-like, retune deposit counts; P1-17 proper does the final
