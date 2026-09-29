@@ -1,0 +1,1594 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
+<!-- Deep Time review page: how the east–west wrap works. Source: tools/review/pages/wrap/ (plan §2.6).
+     Self-contained: one file, no build step, no network, no libraries (the 3D view is raw WebGL).
+     spacesheep's viewer CSP blocks web fonts, so the faces below are used when installed and fall back
+     to system faces otherwise. The mechanics are read from Toroidal World 0.19.3's source
+     (github.com/anyttng/toroidal_world at 3c1f3a3, the commit that stamped the 0.19.3 build). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deep Time — How the wrap works</title>
+<meta name="description" content="A graphics-first explainer of Deep Time's east–west wrap: where the seam is, what the server stores, what your game sees while you cross, two players either side of it, a full lap, and the Nether's 1:8 loop.">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#ECF0EF; --bg-2:#E1E7E6; --panel:#F8FAF9; --panel-2:#F0F4F3;
+  --ink:#13222A; --ink-2:#43545D; --ink-3:#5E6E76;
+  --rule:#C3CDCD; --rule-2:#D6DEDD;
+  --seam:#C2185F; --seam-bg:#F6DCE7;
+  --srv:#0B6E69; --srv-bg:#D2ECE8;
+  --cli:#2B55C6; --cli-bg:#DCE4F8;
+  --cap:#B97810; --stop:#C43A2E;
+  --ok:#1D6F43; --ok-bg:#D6EEDF;
+  --code:#2F4A7A; --code-bg:#DDE5F1;
+  --unv:#56468A; --unv-bg:#E5E0F3;
+  --alex:#D0661D; --bea:#8447CF;
+  --btn:#13222A; --btn-ink:#F8FAF9;
+  --stage:#0B1418; --stage-2:#12202A; --stage-ink:#DCE7EA; --stage-ink-2:#93A8B0; --stage-rule:#24363F;
+  --f-display:"Archivo","Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif;
+  --f-body:"Source Serif 4","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0E161A; --bg-2:#152027; --panel:#16222A; --panel-2:#1B2931;
+    --ink:#E2EAEC; --ink-2:#A8B7BD; --ink-3:#8A9BA2;
+    --rule:#2D3C44; --rule-2:#223038;
+    --seam:#FF5C9D; --seam-bg:#3B1929;
+    --srv:#4FD0C3; --srv-bg:#12332F;
+    --cli:#8AA8FF; --cli-bg:#1B2747;
+    --cap:#F0B240; --stop:#FF6F61;
+    --ok:#6AD39B; --ok-bg:#16372A;
+    --code:#A4BDEA; --code-bg:#1D2A40;
+    --unv:#BDAAF2; --unv-bg:#2A2444;
+    --alex:#FF9A52; --bea:#C09BFF;
+    --btn:#E2EAEC; --btn-ink:#0E161A;
+    --stage:#071014; --stage-2:#0E1B22; --stage-rule:#1F313A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0E161A; --bg-2:#152027; --panel:#16222A; --panel-2:#1B2931;
+  --ink:#E2EAEC; --ink-2:#A8B7BD; --ink-3:#8A9BA2;
+  --rule:#2D3C44; --rule-2:#223038;
+  --seam:#FF5C9D; --seam-bg:#3B1929;
+  --srv:#4FD0C3; --srv-bg:#12332F;
+  --cli:#8AA8FF; --cli-bg:#1B2747;
+  --cap:#F0B240; --stop:#FF6F61;
+  --ok:#6AD39B; --ok-bg:#16372A;
+  --code:#A4BDEA; --code-bg:#1D2A40;
+  --unv:#BDAAF2; --unv-bg:#2A2444;
+  --alex:#FF9A52; --bea:#C09BFF;
+  --btn:#E2EAEC; --btn-ink:#0E161A;
+  --stage:#071014; --stage-2:#0E1B22; --stage-rule:#1F313A;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:70px}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.55}
+.wrap{max-width:1160px;margin-inline:auto;padding-inline:24px}
+@media (max-width:520px){.wrap{padding-inline:16px}body{font-size:16px}}
+a{color:inherit;text-decoration-color:var(--seam);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--seam);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;line-height:1.08;letter-spacing:-.012em}
+h1{font-size:clamp(2.2rem,1.2rem + 4vw,4rem);font-weight:780;font-stretch:84%}
+h2{font-size:clamp(1.5rem,1.1rem + 1.6vw,2.15rem);font-weight:720;font-stretch:88%}
+h3{font-size:1rem;font-weight:690;letter-spacing:0}
+p{margin:0;max-width:66ch}
+.eyebrow{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin:0}
+code,.mono{font-family:var(--f-mono);font-size:.86em}
+code{background:var(--bg-2);padding:.06em .32em;border-radius:3px;overflow-wrap:anywhere}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.seamc{color:var(--seam)} .srvc{color:var(--srv)} .clic{color:var(--cli)}
+
+/* top bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--rule)}
+.bar-in{display:flex;align-items:center;gap:14px;min-height:54px}
+.brand{font-family:var(--f-display);font-weight:720;font-stretch:88%;font-size:1.02rem;text-decoration:none;white-space:nowrap}
+.brand span{color:var(--seam)}
+.nav{display:flex;gap:2px;margin-inline:auto;overflow-x:auto;scrollbar-width:none}
+.nav a{font-family:var(--f-display);font-size:.85rem;text-decoration:none;color:var(--ink-2);padding:6px 8px;border-radius:4px;white-space:nowrap}
+.nav a:hover{color:var(--ink);background:var(--bg-2)}
+@media (max-width:980px){.nav{display:none}.bar .seg{margin-left:auto}}
+
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--panel);flex:none;max-width:100%}
+.seg button{font-family:var(--f-display);font-size:.84rem;font-weight:620;border:0;background:transparent;color:var(--ink-2);padding:6px 10px;cursor:pointer;display:flex;gap:6px;align-items:baseline;white-space:nowrap;line-height:1.25}
+.seg button small{font-weight:450;font-size:.74rem;color:inherit;opacity:.85}
+.seg button[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink)}
+.seg button+button{border-left:1px solid var(--rule)}
+@media (max-width:430px){.bar .seg button small{display:none}}
+.btn{font-family:var(--f-display);font-size:.84rem;font-weight:620;border:1px solid var(--rule);background:var(--panel);color:var(--ink);padding:6px 11px;border-radius:6px;cursor:pointer;line-height:1.25;white-space:nowrap}
+.btn:hover{border-color:var(--ink-3)}
+.btn.primary{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}
+.btn[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools .sep{flex:1 1 auto}
+.check{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-display);font-size:.84rem;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.check input{accent-color:var(--seam);margin:0}
+input[type=range]{accent-color:var(--seam);width:100%;margin:0}
+.field{display:grid;gap:4px;font-family:var(--f-display);font-size:.82rem;color:var(--ink-2);min-width:0}
+.field output{font-family:var(--f-mono);color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* hero */
+.hero{padding-block:40px 30px;display:grid;gap:18px}
+.lede{font-size:1.16rem;color:var(--ink-2)}
+.short{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:2px solid var(--ink);margin:4px 0 0}
+.short>div{padding:14px 18px 4px 0;min-width:0}
+.short>div+div{padding-left:18px;border-left:1px solid var(--rule)}
+.short dt{font-family:var(--f-display);font-weight:720;font-size:1rem;display:flex;gap:9px;align-items:center}
+.short dd{margin:6px 0 0;color:var(--ink-2);font-size:.98rem}
+.sw{width:18px;height:4px;border-radius:2px;display:inline-block;flex:none}
+@media (max-width:780px){.short{grid-template-columns:minmax(0,1fr)}.short>div+div{padding-left:0;border-left:0;border-top:1px solid var(--rule)}}
+
+/* the planet stage (always dark: it is a window onto the planet) */
+.planet{position:relative;background:radial-gradient(120% 90% at 50% 38%,var(--stage-2),var(--stage) 70%);border-radius:14px;overflow:hidden;color:var(--stage-ink);isolation:isolate}
+.planet canvas{display:block;width:100%;height:clamp(440px,52vw,540px);touch-action:pan-y;cursor:grab}
+.planet canvas:active{cursor:grabbing}
+.planet .glabels{position:absolute;inset:0;pointer-events:none}
+.glabel{position:absolute;transform:translate(-50%,-50%);font-family:var(--f-mono);font-size:.72rem;line-height:1.25;white-space:nowrap;color:var(--stage-ink);text-shadow:0 1px 2px #000,0 0 6px #000;transition:opacity .2s}
+.glabel b{font-family:var(--f-display);font-weight:700;font-size:.8rem}
+.glabel.seam{color:#FF7DB0}
+.glabel.cap{color:#F6C35C}
+.glabel.stop{color:#FF8C80}
+.glabel.left{transform:translate(0,-50%)} .glabel.right{transform:translate(-100%,-50%)}
+.pbar{position:absolute;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:linear-gradient(to top,rgba(4,9,12,.92),rgba(4,9,12,0))}
+.pbar .seg{background:rgba(10,20,26,.8);border-color:var(--stage-rule)}
+.pbar .seg button{color:var(--stage-ink-2)}
+.pbar .seg button[aria-pressed="true"]{background:var(--stage-ink);color:var(--stage)}
+.pbar .seg button+button{border-left-color:var(--stage-rule)}
+.pbar .btn{background:rgba(10,20,26,.8);border-color:var(--stage-rule);color:var(--stage-ink)}
+.pbar .btn[aria-pressed="true"]{background:var(--stage-ink);color:var(--stage)}
+.pread{margin-left:auto;font-family:var(--f-mono);font-size:.78rem;color:var(--stage-ink);text-align:right;font-variant-numeric:tabular-nums;line-height:1.35}
+.pread span{color:var(--stage-ink-2)}
+.ptop{position:absolute;left:14px;top:12px;right:14px;display:flex;justify-content:space-between;gap:10px;pointer-events:none;font-family:var(--f-display);font-size:.78rem;color:var(--stage-ink-2)}
+@media (max-width:560px){.pread{margin-left:0;text-align:left;width:100%}.ptop .hide-s{display:none}}
+.nogl{position:absolute;left:14px;right:14px;top:40px;font-family:var(--f-display);font-size:.84rem;color:var(--stage-ink-2)}
+
+/* plates */
+.plate{border-top:1px solid var(--rule);padding-block:52px}
+.plate-head{display:grid;gap:12px;margin-bottom:22px}
+.plate-head>p:not(.eyebrow){color:var(--ink-2)}
+.evs{display:flex;flex-wrap:wrap;gap:6px}
+.ev{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-display);font-size:.74rem;font-weight:650;padding:2px 9px;border-radius:999px;white-space:nowrap;line-height:1.55}
+.ev::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.ev.seen{background:var(--ok-bg);color:var(--ok)}
+.ev.code{background:var(--code-bg);color:var(--code)}
+.ev.unv{background:var(--unv-bg);color:var(--unv)}
+.box{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px;display:grid;gap:12px;min-width:0}
+.box-h{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;justify-content:space-between}
+.box-h h3,.box>h3{display:flex;gap:8px;align-items:center}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+canvas.fig{display:block;width:100%;max-width:100%}
+canvas.fig:focus-visible{outline:2px solid var(--seam);outline-offset:3px}
+.hint{font-family:var(--f-display);font-size:.8rem;color:var(--ink-3);margin:0}
+.cap-t{font-size:.95rem;color:var(--ink-2)}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 12px;margin:0}
+.kv dt{font-family:var(--f-display);font-size:.8rem;color:var(--ink-3);padding-top:2px;white-space:nowrap}
+.kv dd{margin:0;font-family:var(--f-mono);font-size:.84rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:820px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.side{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;align-items:start}
+@media (max-width:900px){.side{grid-template-columns:minmax(0,1fr)}}
+
+/* Minecraft's F3 text: grey rows over the world, as the game draws them */
+.f3{background:#3a4a3a;background:linear-gradient(180deg,#5d7f4a,#3d5a33 60%,#2f4528);border-radius:8px;padding:10px;display:grid;gap:2px;justify-items:start;min-width:0;overflow-x:auto}
+.f3 div{font-family:var(--f-mono);font-size:.8rem;line-height:1.35;background:rgba(80,80,80,.62);color:#E0E0E0;padding:0 4px;white-space:pre;font-variant-numeric:tabular-nums}
+.f3 div.tw{color:#FFF6A8}
+.f3 .lbl{background:none;color:#DCEBD0;font-family:var(--f-display);font-size:.72rem;padding:0 0 3px;white-space:normal}
+@media (max-width:420px){.f3 div{font-size:.68rem}}
+
+.log{list-style:none;margin:0;padding:0;font-family:var(--f-mono);font-size:.78rem;display:grid;gap:5px;color:var(--ink-2)}
+.log li{display:grid;grid-template-columns:5.4em minmax(0,1fr);gap:6px}
+.log .tk{color:var(--ink-3)}
+.log .f{color:var(--seam)}
+.log li.new{animation:flash 1.2s ease-out}
+@keyframes flash{from{background:var(--seam-bg)}to{background:transparent}}
+@media (prefers-reduced-motion: reduce){.log li.new{animation:none}}
+
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:940px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.cards{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px;min-width:0;display:grid;gap:8px;align-content:start;grid-template-rows:auto 1fr auto}
+.card-h{display:flex;gap:10px;align-items:center}
+.card svg{width:30px;height:30px;flex:none;stroke:var(--ink);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.card svg .s{stroke:var(--seam)}
+.card p{font-size:.95rem;color:var(--ink-2)}
+.card q{font-family:var(--f-mono);font-size:.8rem;quotes:none;color:var(--ink)}
+
+.toast{position:absolute;right:10px;top:10px;background:#212121;border:2px solid #555;border-radius:4px;padding:8px 12px 8px 10px;display:flex;gap:10px;align-items:center;color:#fff;font-family:var(--f-display);box-shadow:0 4px 14px rgba(0,0,0,.35);transition:transform .35s,opacity .35s;max-width:calc(100% - 20px)}
+.toast[data-off="1"]{opacity:0;transform:translateY(-10px);pointer-events:none}
+.toast .t1{color:#FFFF55;font-size:.78rem;font-weight:700}
+.toast .t2{font-size:.86rem}
+.toast .ic{width:26px;height:26px;border-radius:4px;background:conic-gradient(from 0deg,#4CAF50,#2E7D32,#1B5E20,#4CAF50);flex:none;position:relative}
+.toast .ic::after{content:"";position:absolute;inset:8px;border-radius:50%;background:#212121}
+.rel{position:relative}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:8px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule-2);vertical-align:top}
+thead th{font-family:var(--f-display);font-weight:650;font-size:.8rem;letter-spacing:.02em;color:var(--ink-2);background:var(--panel-2);white-space:nowrap}
+tbody tr:last-child>*{border-bottom:0}
+tbody th{font-family:var(--f-display);font-weight:600;font-size:.9rem}
+td.e{font-size:.86rem;color:var(--ink-2)}
+td.e code{font-size:.8rem}
+.foot{border-top:1px solid var(--rule);padding-block:26px 44px;font-size:.88rem;color:var(--ink-3)}
+.foot p{max-width:none}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap bar-in">
+    <a class="brand" href="#top">Deep Time <span>wrap</span></a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#where">Where</a><a href="#cross">Crossing</a><a href="#two">Two players</a><a href="#lap">A full lap</a><a href="#else">Everything else</a><a href="#nether">Nether</a><a href="#checked">Checked?</a>
+    </nav>
+    <div class="seg" role="group" aria-label="Planet size">
+      <button type="button" id="size16" aria-pressed="true">16,384 <small>singleplayer</small></button>
+      <button type="button" id="size32" aria-pressed="false">32,768 <small>server</small></button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+<section class="wrap hero" id="where">
+  <p class="eyebrow">Deep Time · review page · 2026-09-28 · Toroidal World 0.19.3</p>
+  <h1>How the wrap works</h1>
+  <p class="lede">The overworld is a strip of land <span class="num" data-n="C">16,384</span> blocks wide. Its east edge is joined to its west edge, so if you walk east for long enough you end up back where you started. The join is called the <b class="seamc">seam</b>. You never see it. This page shows where it is and what happens when you cross it.</p>
+
+  <div class="planet" id="planet">
+    <canvas id="globe" aria-label="The Deep Time overworld as a map that rolls up into a cylinder. The magenta seam runs from pole to pole where the map's east and west edges meet. Drag to turn it."></canvas>
+    <div class="glabels" id="glabels" aria-hidden="true"></div>
+    <div class="ptop"><span>An invented planet: the terrain is decoration; the seam, grid and bands are real.</span><span class="hide-s">Drag to turn</span></div>
+    <div class="pbar">
+      <div class="seg" role="group" aria-label="Map shape">
+        <button type="button" id="gFlat" aria-pressed="false">Flat map</button>
+        <button type="button" id="gRoll" aria-pressed="true">Rolled up</button>
+      </div>
+      <button type="button" class="btn" id="gSeam">Turn to the seam</button>
+      <button type="button" class="btn" id="gWalk" aria-pressed="true">Walker</button>
+      <div class="pread" id="gRead" aria-live="off"></div>
+    </div>
+  </div>
+
+  <dl class="short">
+    <div><dt><span class="sw" style="background:var(--seam)"></span>Where it is</dt>
+      <dd>Along the line <b class="num">x = <span data-n="h">8,192</span></b>, which is the same line as <b class="num">x = −<span data-n="h">8,192</span></b>. It runs the whole way from the north pole to the south pole, on the opposite side of the planet from x = 0. Spawn goes wherever Deep Time finds the best starting spot, so it can be anywhere, even next to the seam.</dd></div>
+    <div><dt><span class="sw" style="background:var(--srv)"></span>How you get across</dt>
+      <dd>You just keep walking. The server keeps a single copy of the world, x from −<span class="num" data-n="h">8,192</span> to <span class="num" data-n="hm1">8,191</span>. Anything that steps past one end is moved to the other end in the same tick. Your game never sees that jump.</dd></div>
+    <div><dt><span class="sw" style="background:var(--cli)"></span>What your coordinates do</dt>
+      <dd>F3's <code>XYZ</code> line shows where the server stores you, so it jumps from <span class="num" data-n="hm1">8,191</span> to −<span class="num" data-n="h">8,192</span>. Toroidal World adds an <code>Unwrapped XYZ</code> line showing your game's own count. That one keeps counting up: after one lap east it reads <span class="num" data-n="C">16,384</span>.</dd></div>
+  </dl>
+</section>
+
+<section class="plate" id="cross"><div class="wrap">
+  <div class="plate-head">
+    <p class="eyebrow">The main event</p>
+    <h2>Crossing the seam, seen by the server and by your game</h2>
+    <p>Both panels show the same moment. The top one is what the server has on disk and in memory: only one copy of the world, so the two ends of the strip sit a whole world apart. The bottom one is what your game has: one long strip with no edge. The server sends you the chunks past the edge at the positions right next to you, not at the far end of the map.</p>
+    <div class="evs"><span class="ev code">Read in Toroidal World's code</span><span class="ev seen">Entity and Sable-ship crossings seen on a test server</span><span class="ev unv">Not yet watched in a game client</span></div>
+  </div>
+
+  <div class="box" id="xsBox">
+    <div class="tools">
+      <div class="seg" role="group" aria-label="How you travel">
+        <button type="button" data-mode="foot" aria-pressed="true">On foot</button>
+        <button type="button" data-mode="cart" aria-pressed="false">Minecart</button>
+        <button type="button" data-mode="ship" aria-pressed="false">Sable ship</button>
+      </div>
+      <button type="button" class="btn primary" id="xsPlay">Play ▸</button>
+      <button type="button" class="btn" id="xsDir">Heading east →</button>
+      <div class="seg" role="group" aria-label="Speed">
+        <button type="button" data-sp="0.25" aria-pressed="false">¼×</button>
+        <button type="button" data-sp="1" aria-pressed="true">1×</button>
+        <button type="button" data-sp="4" aria-pressed="false">4×</button>
+      </div>
+      <label class="check"><input type="checkbox" id="xsZombie" checked> A zombie is chasing you</label>
+      <button type="button" class="btn" id="xsBall">Throw a snowball</button>
+      <span class="sep"></span>
+      <button type="button" class="btn" id="xsReset">Reset</button>
+    </div>
+    <label class="field" for="xsPos"><span>Your position, as your game counts it: <output id="xsPosOut">8,152</output></span>
+      <input type="range" id="xsPos" min="0" max="1" step="0.1" value="0">
+    </label>
+
+    <div class="box-h"><h3><span class="dot" style="background:var(--srv)"></span>What the server stores</h3><span class="hint">Only x −<span data-n="h">8,192</span> … <span data-n="hm1">8,191</span> exists. The two ends are shown enlarged.</span></div>
+    <canvas class="fig" id="xsSrv" height="230" tabindex="0" aria-label="The server's stored strip: the whole world as a bar, with both ends enlarged below it."></canvas>
+    <dl class="kv" id="xsSrvKv"></dl>
+
+    <div class="box-h"><h3><span class="dot" style="background:var(--cli)"></span>What your game sees</h3><span class="hint">One strip with no edge, centred on you. A tag like <span class="seamc">= −512</span> means the chunk is stored at the other end.</span></div>
+    <canvas class="fig" id="xsCli" height="190" tabindex="0" aria-label="Your game's view: a continuous strip centred on you, with chunks from the far end of the stored strip placed right next to you."></canvas>
+
+    <div class="side">
+      <div class="box" style="background:var(--panel-2)">
+        <h3>What just happened</h3>
+        <ul class="log" id="xsLog" aria-live="polite"></ul>
+      </div>
+      <div class="f3" id="xsF3" aria-label="Your F3 screen"></div>
+    </div>
+    <p class="cap-t"><b>On foot</b>, your game moves you and reports your position. The server moves its copy of you across as soon as that report lands past the edge, and sends nothing back. <b>A minecart</b> is moved by the server: at the end of its tick it jumps across with you in it. <b>A Sable ship</b> jumps across as one piece when its centre crosses, not its bow. Until then the front of the hull sticks out past the east edge (dashed outline). In every case your game just gets the next position, one step further east.</p>
+  </div>
+</div></section>
+
+<section class="plate" id="two"><div class="wrap">
+  <div class="plate-head">
+    <p class="eyebrow">Multiplayer</p>
+    <h2>Two players, one either side of the seam</h2>
+    <p>Alex is 100 blocks west of the seam and Bea is just east of it. On the server they are at opposite ends of the strip. Each game gets the other player at the copy nearest to itself, so they see each other as neighbours. The server also uses the short distance for everything it measures: sounds, mobs, arrows, explosions.</p>
+    <div class="evs"><span class="ev code">Read in Toroidal World's code</span><span class="ev unv">Not yet watched with two game clients</span></div>
+  </div>
+  <div class="box">
+    <div class="tools">
+      <label class="field" for="twB" style="flex:1 1 240px"><span>Bea is <output id="twBOut">100</output> blocks east of the seam</span>
+        <input type="range" id="twB" min="4" max="300" step="1" value="100">
+      </label>
+      <div class="field" style="flex:0 1 auto"><span>How Bea got there</span>
+        <div class="seg" role="group" aria-label="How Bea got there">
+          <button type="button" id="twWalked" aria-pressed="true">Walked east across it</button>
+          <button type="button" id="twJoined" aria-pressed="false">Logged in there</button>
+        </div>
+      </div>
+    </div>
+    <canvas class="fig" id="twSrv" height="140" aria-label="The server's strip with Alex near the east end and Bea near the west end."></canvas>
+    <div class="grid2">
+      <div class="box" style="background:var(--panel-2)"><h3><span class="dot" style="background:var(--alex)"></span>Alex's game</h3><canvas class="fig" id="twA" height="150" aria-label="Alex's view"></canvas><dl class="kv" id="twAKv"></dl></div>
+      <div class="box" style="background:var(--panel-2)"><h3><span class="dot" style="background:var(--bea)"></span>Bea's game</h3><canvas class="fig" id="twBc" height="150" aria-label="Bea's view"></canvas><dl class="kv" id="twBKv"></dl></div>
+    </div>
+    <p class="cap-t" id="twCap"></p>
+  </div>
+</div></section>
+
+<section class="plate" id="lap"><div class="wrap">
+  <div class="plate-head">
+    <p class="eyebrow">Circumnavigation</p>
+    <h2>Walk all the way round</h2>
+    <p>This is the planet's equator seen from above the north pole. East is anticlockwise. The teal ring is the server's one copy of the world: you start at x = 0, go round, and arrive back at x = 0. The blue line is your game's own count, which never goes back to the start. Every lap moves it one ring further out. Toroidal World counts your laps separately and gives you an advancement for each one you finish.</p>
+    <div class="evs"><span class="ev code">Read in Toroidal World's code</span><span class="ev unv">Not yet watched in a game client</span></div>
+  </div>
+  <div class="side">
+    <div class="box rel">
+      <canvas class="fig" id="lapCv" height="460" data-sq="1" aria-label="The equator as a ring with the seam at the top and x = 0 at the bottom. A spiral shows your game's coordinate counting past each lap."></canvas>
+      <div class="toast" id="lapToast" data-off="1" role="status"><span class="ic"></span><span><span class="t1">Advancement Made!</span><br><span class="t2">Back Where You Started</span></span></div>
+    </div>
+    <div class="box">
+      <div class="tools">
+        <button type="button" class="btn primary" id="lapEast">Walk a lap east</button>
+        <button type="button" class="btn" id="lapWest">Walk a lap west</button>
+        <button type="button" class="btn" id="lapHalf">Walk to the seam</button>
+        <button type="button" class="btn" id="lapRejoin">Log out and back in</button>
+        <button type="button" class="btn" id="lapReset">Reset</button>
+      </div>
+      <dl class="kv" id="lapKv"></dl>
+      <div class="f3" id="lapF3"></div>
+      <p class="cap-t" id="lapCap"></p>
+      <p class="hint" id="lapTimes"></p>
+    </div>
+  </div>
+</div></section>
+
+<section class="plate" id="else"><div class="wrap">
+  <div class="plate-head">
+    <p class="eyebrow">Everything else</p>
+    <h2>Everything else that crosses</h2>
+    <p>Toroidal World handles each of these in its own code. The label on each card says whether we have seen it work on a test server or only read it in the code.</p>
+  </div>
+  <div class="cards">
+    <article class="card"><div class="card-h"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="8" y="6" width="16" height="16" rx="2"/><path d="M12 13h2M18 13h2M13 18h6M11 22v5M21 22v5"/><path class="s" d="M3 4v24"/></svg><h3>Mobs keep chasing you</h3></div>
+      <p>A mob that crosses is moved at the end of its own tick. Its path and the spot it was walking to are moved by the same amount, so a zombie chasing you across the seam doesn't lose you.</p>
+      <div class="evs"><span class="ev code">Code</span></div></article>
+    <article class="card"><div class="card-h"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 12h22l-3 9H8z"/><circle cx="11" cy="24" r="2"/><circle cx="21" cy="24" r="2"/><path d="M3 28h26"/><path class="s" d="M16 3v6"/></svg><h3>Vehicles take their riders</h3></div>
+      <p>A minecart or boat is moved together with everyone riding it, in the same tick. A boat or horse you steer is moved when its movement report crosses, the same way you are on foot. Speed is kept.</p>
+      <div class="evs"><span class="ev code">Code</span></div></article>
+    <article class="card"><div class="card-h"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 18h22l4-5H7z"/><path d="M10 13V8h8v5"/><path d="M14 8V4"/><path class="s" d="M16 21v8"/></svg><h3>Sable ships stay in one piece</h3></div>
+      <p>The whole ship, and anything joined to it, moves across when its centre does. On a test server, a 10-block jet at 40 blocks/s crossed 20 times out of 20 and kept its speed (38.6 blocks/s after). A hull saved while straddling the seam came back intact.</p>
+      <div class="evs"><span class="ev seen">Seen on a test server</span><span class="ev unv">How it looks: needs a client</span></div></article>
+    <article class="card"><div class="card-h"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 26L26 6"/><path d="M20 6h6v6"/><circle cx="8" cy="10" r="3"/><path class="s" d="M16 3v26"/></svg><h3>Distances go the short way</h3></div>
+      <p>Mob AI, pathfinding, arrows and snowballs, explosions, sounds and particles all measure to the nearest copy. A creeper three blocks across the seam is three blocks away. On the test server, a snowball thrown east from x = 8,188 was stored at about x = −8,187 a moment later: just past the seam, at the other end of the strip.</p>
+      <div class="evs"><span class="ev seen">Snowball: test server</span><span class="ev code">The rest: code</span></div></article>
+    <article class="card"><div class="card-h"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11"/><path d="M16 16l5-8" class="s"/><path d="M16 16l-5 8"/></svg><h3>Compasses point the short way</h3></div>
+      <p>A compass or lodestone compass points at the nearest copy of its target. If spawn or your lodestone is closer through the seam, the needle points through the seam.</p>
+      <div class="evs"><span class="ev code">Code</span></div></article>
+    <article class="card"><div class="card-h"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="6" width="26" height="20" rx="2"/><path d="M8 12l4 4-4 4M15 20h8"/></svg><h3>Commands take stored coordinates</h3></div>
+      <p>Coordinates you type have to be inside the stored strip. <q>/tp @s 9000 70 0</q> is refused with <q>9000 is outside this world — it must be between -<span data-n="h">8192</span> and <span data-n="hm1">8191</span></q>. <q>~</q> offsets work anywhere. <q>/fill</q> and <q>/clone</q> refuse a box that crosses the seam, so you run them once for each side.</p>
+      <div class="evs"><span class="ev seen">Seen with /forceload</span><span class="ev code">Rest: code</span></div></article>
+    <article class="card"><div class="card-h"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 7l8-3 8 3 8-3v21l-8 3-8-3-8 3z"/><path d="M12 4v21M20 7v21"/><path class="s" d="M4 16h24"/></svg><h3>Maps fold too</h3></div>
+      <p>Player and banner markers on vanilla maps use stored coordinates. Toroidal World lists Xaero's Minimap, Xaero's World Map, JourneyMap and FTB Chunks as supported: they file map tiles by stored coordinates and draw the repeats.</p>
+      <div class="evs"><span class="ev code">Code and TW's supported-mods list</span></div></article>
+    <article class="card"><div class="card-h"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4l-7 10h4l-5 8h16l-5-8h4z"/><path d="M16 22v6"/><path class="s" d="M3 28h26"/></svg><h3>The ground doesn't break</h3></div>
+      <p>Deep Time's terrain repeats exactly every <span data-n="C">16,384</span> blocks, so hills, rivers and ore continue straight through the seam. On the test server, terrain, a tree and a village house built across the seam all came out whole.</p>
+      <div class="evs"><span class="ev seen">Seen on a test server</span></div></article>
+    <article class="card"><div class="card-h"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 3h11l6 6v20H8z"/><path d="M19 3v6h6"/><path d="M12 16h9M12 21h9"/></svg><h3>The save holds one copy</h3></div>
+      <p>Region files exist only for the stored strip, <code>r.−<span data-n="rh">16</span></code> to <code>r.<span data-n="rhm1">15</span></code> along x. After generating a square across the seam, no region file outside that range held a chunk.</p>
+      <div class="evs"><span class="ev seen">Seen on a test server (16k and 32k)</span></div></article>
+  </div>
+  <p class="cap-t" style="margin-top:16px">Mods that work out positions or distances in their own code don't get any of this automatically. Toroidal World patches the ones on its supported list. Others, such as Simple Voice Chat's positional audio, may break near the seam. That hasn't been tested.</p>
+</div></section>
+
+<section class="plate" id="nether"><div class="wrap">
+  <div class="plate-head">
+    <p class="eyebrow">Other dimensions</p>
+    <h2>The Nether loops at exactly 1:8</h2>
+    <p>The Nether is <span data-n="nw">2,048</span> blocks round, exactly one eighth of the overworld, and its seam sits at x = ±<span data-n="nh">1,024</span>, directly under the overworld's. One Nether block still stands for 8 overworld blocks everywhere, including across both seams, so portals near the seam link up the same way they do anywhere else. The End doesn't loop at all: it's vanilla.</p>
+    <div class="evs"><span class="ev code">Set in Deep Time's code and Toroidal World's portal code</span><span class="ev unv">Not yet probed on a server</span></div>
+  </div>
+  <div class="side">
+    <div class="box"><canvas class="fig" id="nthCv" height="420" data-sq="1" aria-label="The overworld ring and the Nether ring, with their seams lined up at the top and a portal linking a position on each."></canvas></div>
+    <div class="box">
+      <label class="field" for="nthX"><span>Build a portal in the overworld at x = <output id="nthXOut">8,176</output></span>
+        <input type="range" id="nthX" min="0" max="1" step="0.0001" value="0.5">
+      </label>
+      <dl class="kv" id="nthKv"></dl>
+      <h3>Close up on both seams</h3>
+      <canvas class="fig" id="nthZoom" height="124" aria-label="Two portals either side of the seam in the overworld and their linked spots in the Nether, which sit either side of the Nether's seam."></canvas>
+      <p class="cap-t">Two portals 16 blocks either side of the overworld seam are 32 blocks apart through it. They link to Nether spots 2 blocks either side of the Nether seam, 4 blocks apart: 32 ÷ 8. Toroidal World refuses to start a world whose Nether width isn't exactly the overworld width divided by the portal scale.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="plate" id="checked"><div class="wrap">
+  <div class="plate-head">
+    <p class="eyebrow">Evidence</p>
+    <h2>What has been checked, and what hasn't</h2>
+    <p>Ben can't launch the game, so nobody has watched any of this through a game client yet. Everything here comes from a real test server running Deep Time with Toroidal World, or from reading Toroidal World 0.19.3's source code.</p>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th scope="col">Claim</th><th scope="col">State</th><th scope="col">Evidence</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">The overworld loops in x over <span data-n="chunks">1,024</span> chunks, not in z</th><td><span class="ev seen">Seen</span></td><td class="e"><code>/deeptime probe tw</code>: stamped=true, loopsX=true, loopsZ=false, widthChunks 1024 and 2048 (STATUS.md, P0-06)</td></tr>
+        <tr><th scope="row">Terrain, a tree and a house built across the seam are continuous</th><td><span class="ev seen">Seen</span></td><td class="e">GameTests columnsContinuous, treeStraddlesSeam, structureStraddlesSeam (P0-06)</td></tr>
+        <tr><th scope="row">A thrown entity crosses and is stored at the west end</th><td><span class="ev seen">Seen</span></td><td class="e">GameTest entityCrossesSeam: a snowball thrown east ends up at a negative x inside the stored strip</td></tr>
+        <tr><th scope="row">A Sable ship crosses, keeps its speed, survives a save straddling the seam</th><td><span class="ev seen">Seen</span></td><td class="e">jetCrossesSeam 20 of 20; scenario sable_straddle: same sub-level, 19 blocks, after a restart</td></tr>
+        <tr><th scope="row">The save holds only the stored strip</th><td><span class="ev seen">Seen</span></td><td class="e">MIC smoke with Chunky across the seam: regions outside span 0, at 16k and 32k</td></tr>
+        <tr><th scope="row">Non-player entities are moved at the end of their own tick, with passengers, path and speed</th><td><span class="ev code">Code</span></td><td class="e"><code>ServerLevelMixin</code> (tickNonPassenger, TAIL) → <code>SeamSnap.withPassengers</code></td></tr>
+        <tr><th scope="row">Players are moved when their movement report crosses; nothing is sent back</th><td><span class="ev code">Code</span></td><td class="e"><code>ServerGamePacketListenerImplMixin</code>: handleMovePlayer RETURN (and handleMoveVehicle for steered vehicles)</td></tr>
+        <tr><th scope="row">The server keeps track of which copy each game holds and rewrites everything it sends</th><td><span class="ev code">Code</span></td><td class="e"><code>ClientPosition</code> (a per-connection mirror of the game's own x), <code>PacketTranslator</code>, <code>TranslationContext</code></td></tr>
+        <tr><th scope="row">Your game's x keeps counting; F3 shows the stored x plus three <code>Unwrapped</code> lines</th><td><span class="ev code">Code</span></td><td class="e"><code>DebugEntryPositionMixin</code>: rewrites XYZ / Block / Chunk and adds Unwrapped XYZ / Block / Chunk</td></tr>
+        <tr><th scope="row">Joining, respawning or changing dimension resets your game's count to the stored x</th><td><span class="ev code">Code</span></td><td class="e"><code>ClientPosition.rebase</code>, called on join, respawn and dimension change</td></tr>
+        <tr><th scope="row">Laps are counted; each finished lap triggers "Back Where You Started"</th><td><span class="ev code">Code</span></td><td class="e"><code>SeamTravel</code>, <code>CircumnavigationTracker</code>; going back and forth cancels out</td></tr>
+        <tr><th scope="row">The Nether loops at 1:8, the End doesn't</th><td><span class="ev code">Code</span></td><td class="e"><code>wrap/PlanetShape.java</code> (spans.scaledDown(8), LoopSpans.NONE); TW's <code>DimensionMapping</code>. Not probed yet.</td></tr>
+        <tr><th scope="row">What crossing looks like: a hitch, chunks popping in, a ship's hull staying whole on screen</th><td><span class="ev unv">Needs a client</span></td><td class="e">No server-side test can show it</td></tr>
+        <tr><th scope="row">Two players seeing each other across the seam</th><td><span class="ev unv">Needs a client</span></td><td class="e">Needs two connected games, one either side of the seam</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div></section>
+</main>
+
+<footer class="wrap foot">
+  <p>Sources: Toroidal World 0.19.3 (github.com/anyttng/toroidal_world, branch mc/1.21 at 3c1f3a3: <code>docs/how-it-works.md</code>, <code>docs/modding.md</code> and the classes named in the table above; the same classes and strings checked in the 0.19.3 jar). Deep Time: <code>STATUS.md</code> (P0-06 build log, 2026-09-28), <code>neoforge/…/wrap/PlanetShape.java</code>, plan §5.1, §7.10 and §7.11, <code>docs/research/notes/wrapped_planet_worlds.md</code>. The companion page on the poles and the numbers is "How the seams work". The terrain on this page is invented; the coordinates, chunk and region numbers, and the rules for moving things across are the real ones. Page source: <code>tools/review/pages/wrap/</code>.</p>
+</footer>
+
+<script>
+"use strict";
+(function(){
+/* ============================ shared ============================ */
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const S = { C: 16384 };
+const H = () => S.C / 2;
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const fold = x => { const C = S.C, h = C / 2; return ((((x + h) % C) + C) % C) - h; };
+const nearest = (ref, x) => x + S.C * Math.round((ref - x) / S.C);
+const shortest = (from, to) => nearest(from, to) - from;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+function fmt(x, d) {
+  d = d || 0;
+  const r = Number(x.toFixed(d));
+  const s = Math.abs(r).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  return (r < 0 ? '−' : '') + s;
+}
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+let COL = {};
+function readColors() {
+  ['--bg','--bg-2','--panel','--panel-2','--ink','--ink-2','--ink-3','--rule','--rule-2','--seam','--seam-bg','--srv','--srv-bg','--cli','--cli-bg','--cap','--stop','--alex','--bea']
+    .forEach(k => COL[k.slice(2)] = css(k));
+}
+readColors();
+function setupCanvas(cv) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (!cv.dataset.h) cv.dataset.h = cv.getAttribute('height') || '200';
+  const w = Math.max(1, cv.clientWidth);
+  const h = cv.dataset.sq ? Math.round(Math.min(+cv.dataset.h, Math.max(320, w))) : +cv.dataset.h;
+  if (cv.style.height !== h + 'px') cv.style.height = h + 'px';
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; ctx.setLineDash([]); ctx.globalAlpha = 1;
+  return { ctx, w, h };
+}
+function fontOf(px, weight, fam) { return (weight || 400) + ' ' + px + 'px ' + (fam === 'd' ? css('--f-display') : css('--f-mono')); }
+function hexA(hex, a) {
+  const m = hex.replace('#', '');
+  const n = parseInt(m.length === 3 ? m.split('').map(c => c + c).join('') : m, 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+function kv(el, rows) {
+  el.innerHTML = rows.map(r => '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>').join('');
+}
+function f3(el, label, st) {
+  // st: {x, y, z, ux, uz} with x,z stored and ux,uz the game's own (unwrapped) coordinates
+  const bx = Math.floor(st.x), by = Math.floor(st.y), bz = Math.floor(st.z);
+  const ubx = Math.floor(st.ux), ubz = Math.floor(st.uz);
+  const cx = bx >> 4, cz = bz >> 4, ucx = ubx >> 4, ucz = ubz >> 4, sy = by >> 4;
+  const lines = [
+    ['XYZ: ' + st.x.toFixed(3) + ' / ' + st.y.toFixed(5) + ' / ' + st.z.toFixed(3), 1],
+    ['Block: ' + bx + ' ' + by + ' ' + bz + ' [' + (bx & 15) + ' ' + (by & 15) + ' ' + (bz & 15) + ']', 1],
+    ['Chunk: ' + cx + ' ' + sy + ' ' + cz + ' [' + (cx & 31) + ' ' + (cz & 31) + ' in r.' + (cx >> 5) + '.' + (cz >> 5) + '.mca]', 1],
+    ['Unwrapped XYZ: ' + st.ux.toFixed(3) + ' / ' + st.y.toFixed(5) + ' / ' + st.uz.toFixed(3), 2],
+    ['Unwrapped Block: ' + ubx + ' ' + by + ' ' + ubz, 2],
+    ['Unwrapped Chunk: ' + ucx + ' ' + sy + ' ' + ucz, 2]
+  ];
+  el.innerHTML = '<div class="lbl">' + label + '</div>' + lines.map(l => '<div class="' + (l[1] === 2 ? 'tw' : '') + '">' + l[0] + '</div>').join('');
+}
+
+/* ---------- periodic value noise (period = one lap, so the terrain continues through the seam) ---------- */
+function hash2(ix, iz, s) {
+  let h = Math.imul(ix | 0, 0x27d4eb2d) ^ Math.imul((iz | 0) + 0x165667b1, 0x85ebca6b) ^ Math.imul(s | 0, 0xc2b2ae35);
+  h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; h = Math.imul(h, 0x297a2d39); h ^= h >>> 15;
+  return (h >>> 0) / 4294967296;
+}
+function vper(xc, zc, P, seed) {           // xc, zc in lattice cells; x repeats every P cells
+  const ix = Math.floor(xc), iz = Math.floor(zc);
+  const tx = xc - ix, tz = zc - iz;
+  const sx = tx * tx * (3 - 2 * tx), sz = tz * tz * (3 - 2 * tz);
+  const x0 = ((ix % P) + P) % P, x1 = (x0 + 1) % P;
+  const a = hash2(x0, iz, seed), b = hash2(x1, iz, seed), c = hash2(x0, iz + 1, seed), d = hash2(x1, iz + 1, seed);
+  return a + (b - a) * sx + (c - a) * sz + (a - b - c + d) * sx * sz;
+}
+// planet elevation in map space: u in [0,1) around (u = 0 is the seam), v in [0,1] pole to pole
+function elevUV(u, v) {
+  let e = 0;
+  // a periodic domain warp breaks up the lattice; it repeats every lap, so the result still does
+  const wu = u + 0.05 * (vper(u * 5, (v - 0.5) * 2.5 + 7, 5, 31) - 0.5) + 0.02 * (vper(u * 13, (v - 0.5) * 6.5, 13, 32) - 0.5);
+  const wv = v + 0.05 * (vper(u * 5 + 2.5, (v - 0.5) * 2.5, 5, 33) - 0.5) + 0.02 * (vper(u * 13, (v - 0.5) * 6.5 + 3, 13, 34) - 0.5);
+  const ks = [3, 7, 16, 40, 100, 250, 600];
+  const ws = [0.3, 0.26, 0.17, 0.11, 0.07, 0.05, 0.035];
+  for (let i = 0; i < ks.length; i++) e += ws[i] * vper(wu * ks[i], (wv - 0.5) * ks[i] / 2, ks[i], 11 + i);
+  // a continent across the seam and one under x = 0, so both are on land
+  let du = u - Math.round(u); e += 0.2 * Math.exp(-(du * du / 0.0045 + (v - 0.5) * (v - 0.5) / 0.02));
+  du = u - 0.5; e += 0.14 * Math.exp(-(du * du / 0.004 + (v - 0.55) * (v - 0.55) / 0.012));
+  return e;
+}
+const SEA = 0.56;
+
+/* ============================ size switch ============================ */
+function bindNumbers() {
+  const C = S.C, h = C / 2;
+  const vals = {
+    C: fmt(C), h: fmt(h), hm1: fmt(h - 1), chunks: fmt(C / 16), nw: fmt(C / 8), nh: fmt(C / 16),
+    rh: String(C / 1024), rhm1: String(C / 1024 - 1)
+  };
+  $$('[data-n]').forEach(el => {
+    const k = el.getAttribute('data-n');
+    if (k in vals) el.textContent = el.closest('q') ? vals[k].replace(/,/g, '') : vals[k];
+  });
+}
+const listeners = [];
+function onSize(fn) { listeners.push(fn); }
+function setSize(C) {
+  S.C = C;
+  $('#size16').setAttribute('aria-pressed', String(C === 16384));
+  $('#size32').setAttribute('aria-pressed', String(C === 32768));
+  bindNumbers();
+  listeners.forEach(fn => fn());
+}
+$('#size16').addEventListener('click', () => setSize(16384));
+$('#size32').addEventListener('click', () => setSize(32768));
+bindNumbers();
+
+/* ============================ 1. the planet (WebGL) ============================ */
+const G = { t: 0, tTarget: 1, yaw: Math.PI * 0.8, pitch: 0.3, walker: true, wu: 0.93, time: 0, drag: null, yawAnim: null, gl: null };
+function makePlanetTexture() {
+  const W = 1024, Hh = 512;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = Hh;
+  const ctx = cv.getContext('2d');
+  const img = ctx.createImageData(W, Hh);
+  const E = new Float32Array(W * Hh);
+  for (let j = 0; j < Hh; j++) { const v = (j + 0.5) / Hh; for (let i = 0; i < W; i++) E[j * W + i] = elevUV((i + 0.5) / W, v); }
+  for (let j = 0; j < Hh; j++) {
+    const v = (j + 0.5) / Hh, lat = Math.abs(90 - 180 * v), cl = Math.cos(lat * Math.PI / 180);
+    for (let i = 0; i < W; i++) {
+      const e = E[j * W + i];
+      const eW = E[j * W + ((i + W - 1) % W)], eN = E[Math.max(0, j - 1) * W + i];
+      const shade = clamp(1 + (eW - e) * 38 + (eN - e) * 30, 0.72, 1.25);
+      const moist = vper(i / W * 20, v * 10, 20, 77);
+      const temp = cl - Math.max(0, e - SEA) * 1.3;
+      let r, g, b;
+      if (e < SEA) {
+        const d = clamp((SEA - e) / 0.2, 0, 1);
+        r = lerp(46, 14, d); g = lerp(112, 50, d); b = lerp(150, 92, d);
+        if (temp < 0.3) { const k = clamp((0.3 - temp) / 0.06, 0, 1); r = lerp(r, 214, k); g = lerp(g, 228, k); b = lerp(b, 236, k); }
+      } else {
+        const hgt = e - SEA;
+        if (hgt < 0.012) { r = 206; g = 192; b = 140; }
+        else if (moist < 0.38 && temp > 0.55) { r = 196; g = 170; b = 110; }
+        else if (moist > 0.58) { r = 52; g = 102; b = 50; }
+        else { r = 96; g = 146; b = 72; }
+        if (hgt > 0.12) { const k = clamp((hgt - 0.12) / 0.08, 0, 1); r = lerp(r, 128, k); g = lerp(g, 118, k); b = lerp(b, 102, k); }
+        if (hgt > 0.2 || temp < 0.36) { const k = clamp(Math.max((hgt - 0.2) / 0.06, (0.36 - temp) / 0.06), 0, 1); r = lerp(r, 236, k); g = lerp(g, 242, k); b = lerp(b, 244, k); }
+        r *= shade; g *= shade; b *= shade;
+      }
+      const o = (j * W + i) * 4;
+      img.data[o] = clamp(r, 0, 255); img.data[o + 1] = clamp(g, 0, 255); img.data[o + 2] = clamp(b, 0, 255); img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv;
+}
+const planetTex = makePlanetTexture();
+
+function initGlobe() {
+  const cv = $('#globe');
+  let gl = null;
+  try { gl = cv.getContext('webgl', { antialias: true }) || cv.getContext('experimental-webgl'); } catch (e) { gl = null; }
+  if (!gl) { console.warn('wrap page: no WebGL context'); return globeFallback(cv); }
+  const vs = `
+attribute vec2 a_uv;
+uniform float u_t, u_yaw, u_pitch, u_aspect, u_dist, u_flat;
+varying vec2 v_uv; varying vec3 v_n; varying vec3 v_view;
+void main(){
+  float t = max(u_t, 0.0005);
+  float R = 1.0 / t;
+  float a = (a_uv.x - 0.5) * 6.2831853 * t;
+  vec3 p = vec3(R * sin(a), (0.5 - a_uv.y) * 3.14159265, R * cos(a) - R + t);
+  vec3 n = vec3(sin(a), 0.0, cos(a));
+  p *= mix(u_flat, 1.0, u_t);
+  float cy = cos(u_yaw), sy = sin(u_yaw);
+  p = vec3(cy * p.x + sy * p.z, p.y, -sy * p.x + cy * p.z);
+  n = vec3(cy * n.x + sy * n.z, n.y, -sy * n.x + cy * n.z);
+  float cp = cos(u_pitch), sp = sin(u_pitch);
+  p = vec3(p.x, cp * p.y - sp * p.z, sp * p.y + cp * p.z);
+  n = vec3(n.x, cp * n.y - sp * n.z, sp * n.y + cp * n.z);
+  v_uv = a_uv; v_n = n; v_view = vec3(0.0, 0.0, u_dist) - p;
+  float zv = p.z - u_dist;
+  float f = 2.7474774;
+  float nr = 0.5; float fr = 40.0;
+  gl_Position = vec4(p.x * f / u_aspect, p.y * f + 0.08 * (-zv), (zv * (fr + nr) + 2.0 * fr * nr) / (nr - fr), -zv);
+}`;
+  const fs = `
+precision mediump float;
+uniform sampler2D u_tex;
+uniform vec3 u_seam, u_cap, u_stop, u_walk;
+uniform float u_time, u_tf, u_trail;
+varying vec2 v_uv; varying vec3 v_n; varying vec3 v_view;
+void main(){
+  vec3 col = texture2D(u_tex, v_uv).rgb;
+  vec3 n = normalize(v_n);
+  bool outer = dot(n, v_view) > 0.0 || u_tf < 0.03;
+  if (!outer) n = -n;
+  vec3 L = normalize(vec3(-0.45, 0.5, 0.75));
+  float dif = max(dot(n, L), 0.0);
+  float gu = abs(fract(v_uv.x * 12.0 + 0.5) - 0.5) / 12.0;
+  float gv = abs(fract(v_uv.y * 6.0 + 0.5) - 0.5) / 6.0;
+  float grid = max(1.0 - smoothstep(0.0, 0.0011, gu), 1.0 - smoothstep(0.0, 0.0022, gv));
+  col = mix(col, vec3(1.0), 0.16 * grid);
+  float lat = abs(90.0 - 180.0 * v_uv.y);
+  if (lat > 75.0) col = mix(col, u_cap, 0.42);
+  if (lat > 80.0) { float hh = step(0.5, fract((v_uv.x * 2.0 + v_uv.y) * 110.0)); col = mix(col, u_stop, 0.35 + 0.2 * hh); }
+  float bl = max(1.0 - smoothstep(0.0, 0.35, abs(lat - 75.0)), 1.0 - smoothstep(0.0, 0.35, abs(lat - 80.0)));
+  col = mix(col, vec3(1.0, 0.94, 0.8), 0.65 * bl);
+  col *= outer ? (0.48 + 0.62 * dif) : (0.26 + 0.18 * dif);
+  float du = min(v_uv.x, 1.0 - v_uv.x);
+  float pulse = 0.72 + 0.28 * sin(u_time * 2.3);
+  float core = 1.0 - smoothstep(0.0013, 0.0032, du);
+  float halo = 1.0 - smoothstep(0.0, 0.04, du);
+  col += u_seam * halo * halo * 0.6 * pulse;
+  col = mix(col, u_seam * 1.1 + 0.18, core);
+  if (u_walk.z > 0.5) {
+    float dx = v_uv.x - u_walk.x; dx -= floor(dx + 0.5);
+    float dy = (v_uv.y - u_walk.y) * 0.5;
+    float r = length(vec2(dx, dy));
+    float tr = (dx < 0.0 && dx > -u_trail && abs(dy) < 0.0011) ? (1.0 + dx / u_trail) : 0.0;
+    col = mix(col, vec3(1.0, 0.97, 0.85), 0.9 * tr);
+    col += vec3(1.0, 0.92, 0.6) * pow(1.0 - smoothstep(0.0, 0.028, r), 2.0) * 0.7;
+    col = mix(col, vec3(1.0), 1.0 - smoothstep(0.0045, 0.0065, r));
+  }
+  gl_FragColor = vec4(col, 1.0);
+}`;
+  function sh(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+  let prog;
+  try {
+    prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  } catch (e) { console.warn('wrap page: WebGL program failed', e && e.message); const fresh = cv.cloneNode(false); cv.replaceWith(fresh); return globeFallback(fresh); }
+  gl.useProgram(prog);
+  const NU = 192, NV = 64;
+  const uv = new Float32Array((NU + 1) * (NV + 1) * 2);
+  let k = 0;
+  for (let j = 0; j <= NV; j++) for (let i = 0; i <= NU; i++) { uv[k++] = i / NU; uv[k++] = j / NV; }
+  const idx = new Uint16Array(NU * NV * 6); k = 0;
+  for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) {
+    const a = j * (NU + 1) + i, b = a + 1, c = a + NU + 1, d = c + 1;
+    idx[k++] = a; idx[k++] = c; idx[k++] = b; idx[k++] = b; idx[k++] = c; idx[k++] = d;
+  }
+  const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, uv, gl.STATIC_DRAW);
+  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'a_uv'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, planetTex);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const U = {};
+  ['u_t','u_tf','u_flat','u_yaw','u_pitch','u_aspect','u_dist','u_tex','u_seam','u_cap','u_stop','u_walk','u_time','u_trail'].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+  gl.uniform1i(U.u_tex, 0);
+  gl.uniform3f(U.u_seam, 1.0, 0.33, 0.62);
+  gl.uniform3f(U.u_cap, 0.95, 0.70, 0.25);
+  gl.uniform3f(U.u_stop, 1.0, 0.42, 0.36);
+  gl.enable(gl.DEPTH_TEST);
+  G.gl = { gl, U, n: idx.length, cv };
+  return true;
+}
+function globeFallback(cv) {
+  const note = document.createElement('p'); note.className = 'nogl';
+  note.textContent = 'This browser has no WebGL here, so this is the flat map. Its left and right edges are the same line: the seam.';
+  $('#planet').appendChild(note);
+  $('#gFlat').disabled = $('#gRoll').disabled = $('#gSeam').disabled = true;
+  $('#gFlat').setAttribute('aria-pressed', 'true'); $('#gRoll').setAttribute('aria-pressed', 'false');
+  G.fallback = true;
+  return false;
+}
+const flatScale = aspect => Math.min(1.0, 0.68 * aspect);
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+// the same transform as the vertex shader, for the HTML labels
+function gproj(u, v, w, h) {
+  const tt = ease(clamp(G.t, 0, 1)), t = Math.max(tt, 0.0005), R = 1 / t, a = (u - 0.5) * 2 * Math.PI * t;
+  let p = [R * Math.sin(a), (0.5 - v) * Math.PI, R * Math.cos(a) - R + t];
+  let n = [Math.sin(a), 0, Math.cos(a)];
+  const sc = lerp(flatScale(w / h), 1, tt); p = p.map(c => c * sc);
+  const yaw = G.yaw * tt, pitch = G.pitch * tt;
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+  p = [cy * p[0] + sy * p[2], p[1], -sy * p[0] + cy * p[2]];
+  n = [cy * n[0] + sy * n[2], n[1], -sy * n[0] + cy * n[2]];
+  p = [p[0], cp * p[1] - sp * p[2], sp * p[1] + cp * p[2]];
+  n = [n[0], cp * n[1] - sp * n[2], sp * n[1] + cp * n[2]];
+  const dist = 6.6, zv = p[2] - dist, f = 2.7474774, W = -zv;
+  const x = (p[0] * f / (w / h)) / W, y = (p[1] * f) / W + 0.08;
+  const view = [-p[0], -p[1], dist - p[2]];
+  const front = tt < 0.03 || (n[0] * view[0] + n[1] * view[1] + n[2] * view[2]) > 0;
+  return { x: (x * 0.5 + 0.5) * w, y: (0.5 - y * 0.5) * h, front };
+}
+const gLabels = [];
+function gLabel(cls, html) { const el = document.createElement('div'); el.className = 'glabel ' + cls; el.innerHTML = html; $('#glabels').appendChild(el); gLabels.push(el); return el; }
+const GL_seam = gLabel('seam right', '<b>The seam</b> ▸<br>x = ±<span data-n="h">8,192</span> ▸');
+const GL_west = gLabel('seam left', '◂ west edge<br>x = −<span data-n="h">8,192</span>');
+const GL_east = gLabel('seam right', 'east edge ▸<br>x = <span data-n="hm1">8,191</span>');
+const GL_spawn = gLabel('', '<b>x = 0</b><br>middle of the strip');
+const GL_cap = gLabel('cap left', '75°–80°: soft pushback');
+const GL_stop = gLabel('stop left', '80°–90°: hard stop');
+const GL_n = gLabel('', 'north pole edge');
+function drawGlobe() {
+  const box = $('#planet');
+  const w = box.clientWidth, h = $('#globe').clientHeight;
+  if (G.gl) {
+    const { gl, U, n, cv } = G.gl;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    gl.viewport(0, 0, cv.width, cv.height);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    const tt = ease(clamp(G.t, 0, 1));
+    gl.uniform1f(U.u_t, tt); gl.uniform1f(U.u_tf, tt); gl.uniform1f(U.u_yaw, G.yaw * tt); gl.uniform1f(U.u_pitch, G.pitch * tt);
+    gl.uniform1f(U.u_aspect, w / h); gl.uniform1f(U.u_dist, 6.6); gl.uniform1f(U.u_flat, flatScale(w / h));
+    gl.uniform1f(U.u_time, G.time); gl.uniform3f(U.u_walk, G.wu, 0.5, G.walker ? 1 : 0); gl.uniform1f(U.u_trail, 0.12);
+    gl.drawElements(gl.TRIANGLES, n, gl.UNSIGNED_SHORT, 0);
+  } else if (G.fallback) {
+    const cv = $('#globe'); const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#071014'; ctx.fillRect(0, 0, w, h);
+    const mw = Math.min(w - 32, (h - 150) * 2), mh = mw / 2, x0 = (w - mw) / 2, y0 = 86;
+    ctx.drawImage(planetTex, x0, y0, mw, mh);
+    ctx.fillStyle = '#FF5C9D'; ctx.fillRect(x0 - 2, y0, 4, mh); ctx.fillRect(x0 + mw - 2, y0, 4, mh);
+    if (G.walker) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x0 + G.wu * mw, y0 + mh / 2, 4, 0, 7); ctx.fill(); }
+  }
+  // labels
+  const tt = ease(clamp(G.t, 0, 1));
+  const place = (el, u, v, show) => {
+    const p = gproj(u, v, w, h), lw = el.offsetWidth || 0;
+    const cl = el.classList, lo = cl.contains('left') ? 6 : cl.contains('right') ? 6 + lw : 6 + lw / 2, hi = cl.contains('left') ? w - 6 - lw : cl.contains('right') ? w - 6 : w - 6 - lw / 2;
+    el.style.left = clamp(p.x, lo, Math.max(lo, hi)) + 'px'; el.style.top = p.y + 'px';
+    el.style.opacity = (show && p.front && !G.fallback) ? 1 : 0;
+  };
+  const rolled = tt > 0.6;
+  place(GL_seam, 0.992, 0.3, rolled);
+  place(GL_west, 0.004, 0.3, !rolled && tt < 0.15);
+  place(GL_east, 0.996, 0.3, !rolled && tt < 0.15);
+  place(GL_spawn, 0.5, 0.5, tt < 0.15 || rolled);
+  const frontU = ((0.5 - (G.yaw) / (2 * Math.PI)) % 1 + 1) % 1;
+  const lu = tt < 0.15 ? 0.2 : ((frontU + 0.1) % 1 + 1) % 1;
+  place(GL_cap, lu, 0.5 - 77.5 / 180, true);
+  place(GL_stop, lu, 0.5 + 85 / 180, true);
+  place(GL_n, tt < 0.15 ? 0.5 : frontU, 0.0, tt < 0.15);
+  // readout
+  const wx = G.wu * S.C - H();
+  $('#gRead').innerHTML = G.walker
+    ? 'walker at <b>x = ' + fmt(Math.floor(wx)) + '</b><br><span>' + (Math.abs(wx) > H() - S.C * 0.03 ? 'at the seam: x ' + (wx > 0 ? 'about to jump to −' + fmt(H()) : 'just jumped from ' + fmt(H() - 1)) : 'longitude ' + fmt(360 * G.wu, 1) + '°') + '</span>'
+    : '<span>stored strip: x −' + fmt(H()) + ' … ' + fmt(H() - 1) + '</span>';
+}
+let gLast = 0, gVisible = true;
+function globeLoop(ts) {
+  const dt = gLast ? Math.min(0.05, (ts - gLast) / 1000) : 0; gLast = ts;
+  if (gVisible) {
+    if (G.t !== G.tTarget) { const s = RM ? 1 : dt / 1.6; G.t = G.tTarget > G.t ? Math.min(G.tTarget, G.t + s) : Math.max(G.tTarget, G.t - s); }
+    if (G.yawAnim) { G.yawAnim.k = Math.min(1, G.yawAnim.k + (RM ? 1 : dt / 1.1)); G.yaw = lerp(G.yawAnim.from, G.yawAnim.to, ease(G.yawAnim.k)); if (G.yawAnim.k >= 1) G.yawAnim = null; }
+    if (!RM) { G.time += dt; if (G.walker) G.wu = (G.wu + dt / 26) % 1; }
+    drawGlobe();
+  }
+  requestAnimationFrame(globeLoop);
+}
+initGlobe();
+if (!RM) { G.t = 0; setTimeout(() => { G.tTarget = 1; }, 500); } else { G.t = 1; }
+requestAnimationFrame(globeLoop);
+new IntersectionObserver(es => { gVisible = es[0].isIntersecting; }).observe($('#planet'));
+(function () {
+  const cv = $('#globe');
+  cv.addEventListener('pointerdown', e => { G.drag = { x: e.clientX, y: e.clientY, yaw: G.yaw, pitch: G.pitch }; G.yawAnim = null; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => {
+    if (!G.drag) return;
+    G.yaw = G.drag.yaw + (e.clientX - G.drag.x) * 0.008;
+    G.pitch = clamp(G.drag.pitch + (e.clientY - G.drag.y) * 0.005, -0.7, 0.7);
+    if (G.t < 0.5) { G.tTarget = 1; setShape(true); }
+    if (RM) drawGlobe();
+  });
+  const end = () => { G.drag = null; };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  function setShape(rolled) { G.tTarget = rolled ? 1 : 0; $('#gRoll').setAttribute('aria-pressed', String(rolled)); $('#gFlat').setAttribute('aria-pressed', String(!rolled)); if (RM) { G.t = G.tTarget; drawGlobe(); } }
+  $('#gFlat').addEventListener('click', () => setShape(false));
+  $('#gRoll').addEventListener('click', () => setShape(true));
+  $('#gSeam').addEventListener('click', () => {
+    setShape(true);
+    let to = Math.PI + 0.35; const cur = G.yaw; to += 2 * Math.PI * Math.round((cur - to) / (2 * Math.PI));
+    G.yawAnim = { from: cur, to, k: 0 }; G.pitch = 0.22;
+    if (RM) { G.yaw = to; G.yawAnim = null; drawGlobe(); }
+  });
+  $('#gWalk').addEventListener('click', () => { G.walker = !G.walker; $('#gWalk').setAttribute('aria-pressed', String(G.walker)); if (RM) drawGlobe(); });
+})();
+
+/* ============================ strip terrain (top-down, one pixel per block) ============================ */
+const STRIP = { half: 560, rows: 40, cv: null };   // covers the game-frame x range [h − 560, h + 560)
+// the illustrative terrain near the seam; every feature is placed with shortest(), so it is exactly periodic
+function stripBlock(x, z) {
+  const h = H();
+  const xf = fold(x);
+  const u = (xf + h) / S.C;
+  // absolute-cell detail noise (cells divide both world sizes, so it repeats every lap)
+  const n1 = vper((xf + h) / 32, z / 32, S.C / 32, 3), n2 = vper((xf + h) / 8, z / 8, S.C / 8, 4), n3 = vper((xf + h) / 4, z / 4, S.C / 4, 5);
+  const forest = n1 * 0.7 + n2 * 0.3;
+  // landmarks, measured from folded anchor points
+  const riverX = -h + 92 + 7 * Math.sin(z / 6);          // a river 92 blocks east of the seam
+  const lakeX = h - 150, lakeZ = -6;                       // a lake 150 blocks west of it
+  const dr = Math.abs(shortest(riverX, x));
+  const dl = Math.hypot(shortest(lakeX, x) / 1.6, z - lakeZ);
+  if (dr < 2.6) return dr < 1.4 ? [40, 104, 170] : [62, 128, 186];
+  if (dl < 14) return dl < 11 ? [36, 98, 164] : [70, 134, 190];
+  if (dl < 16) return [214, 202, 146];
+  const tower = Math.hypot(shortest(h - 44, x), z + 12);
+  if (tower < 3.2) return tower < 2 ? [118, 112, 104] : [150, 144, 134];
+  // three houses of a village just east of the seam
+  const hx = [-h + 30, -h + 42, -h + 56], hz = [-13, -8, -14];
+  for (let i = 0; i < 3; i++) {
+    const dx = shortest(hx[i], x), dz = z - hz[i];
+    if (Math.abs(dx) <= 3 && Math.abs(dz) <= 2) return (Math.abs(dx) === 3 || Math.abs(dz) === 2) ? [120, 76, 44] : [168, 104, 58];
+  }
+  if (z === 6) return [70, 64, 60];                                 // the rail line
+  if (z === 5 || z === 7) return (Math.floor(x) & 1) ? [132, 98, 64] : [104, 150, 78];
+  if (z === 0 || z === 1) return [176, 150, 104];                   // the path you walk
+  if (Math.abs(z) >= 17 && n1 > 0.55) return [128, 128, 122];        // rocky outcrops
+  let c = forest > 0.56 ? [52, 108, 50] : [98, 152, 74];
+  if (forest > 0.56 && n3 > 0.62) c = [34, 80, 36];                  // tree crowns
+  const k = 0.9 + n2 * 0.2; return [c[0] * k, c[1] * k, c[2] * k];
+}
+function buildStrip() {
+  const W = STRIP.half * 2, Hr = STRIP.rows, h = H();
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = Hr;
+  const ctx = cv.getContext('2d'); const img = ctx.createImageData(W, Hr);
+  for (let j = 0; j < Hr; j++) for (let i = 0; i < W; i++) {
+    const c = stripBlock(h - STRIP.half + i, j - Hr / 2), o = (j * W + i) * 4;
+    img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  STRIP.cv = cv;
+}
+buildStrip();
+// draw the terrain for x in [x0, x1) (any frame) into a rect; it maps x to the copy nearest the seam at +h
+function blitStrip(ctx, x0, x1, px, py, pw, ph) {
+  const h = H();
+  const sx0 = nearest(h, x0);
+  const off = sx0 - (h - STRIP.half);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(STRIP.cv, off, 0, x1 - x0, STRIP.rows, px, py, pw, ph);
+}
+
+/* ============================ 2. crossing: two views ============================ */
+const X = {
+  mode: 'foot', dir: 1, playing: false, speed: 1, tick: 0, acc: 0,
+  cx: 0, sx: 0, vs: 0, zombie: true, zx: 0, zcx: 0, balls: [], log: [], flash: null, W: 128, vd: 3, ended: false
+};
+const SPEED = { foot: 5.612, cart: 8, ship: 40 };
+const RANGE = 120;
+function xsReset() {
+  const h = H();
+  X.tick = 0; X.acc = 0; X.balls = []; X.log = []; X.flash = null; X.ended = false;
+  X.cx = h - (X.mode === 'ship' ? 70 : 40) * X.dir;
+  if (X.dir < 0) X.cx = h + (X.mode === 'ship' ? 70 : 40);
+  X.sx = fold(X.cx); X.vs = X.sx;
+  X.zx = fold(X.cx - 7 * X.dir);
+  pushLog('start', X.mode === 'foot' ? 'You are ' + fmt(Math.abs(h - X.cx)) + ' blocks from the seam, heading ' + (X.dir > 0 ? 'east' : 'west') + '.' :
+    X.mode === 'cart' ? 'You are in a minecart on the rail, ' + fmt(Math.abs(h - X.cx)) + ' blocks from the seam.' :
+    'You are on a 10-block Sable ship doing 40 blocks/s, ' + fmt(Math.abs(h - X.cx)) + ' blocks from the seam.');
+  syncSlider(); xsDraw();
+}
+function pushLog(kind, text) {
+  X.log.unshift({ t: X.tick, kind, text, fresh: true });
+  if (X.log.length > 5) X.log.length = 5;
+  renderLog();
+}
+function renderLog() {
+  $('#xsLog').innerHTML = X.log.map((e, i) => '<li class="' + (e.fresh && i === 0 && e.kind === 'fold' ? 'new' : '') + '"><span class="tk">tick ' + e.t + '</span><span' + (e.kind === 'fold' ? ' class="f"' : '') + '>' + e.text + '</span></li>').join('');
+  X.log.forEach(e => e.fresh = false);
+}
+const FOLD_TEXT = {
+  you: (a, b, e, d) => 'Your game reported x = ' + a + ', past the ' + e + ' edge. The server moved its copy of you to x = ' + b + ' (' + d + ') and sent nothing back.',
+  zombie: (a, b, e, d) => 'The zombie ended its tick at x = ' + a + ', past the ' + e + ' edge. The server moved it, and the path it is following, to x = ' + b + ' (' + d + ').',
+  ball: (a, b, e, d) => 'The snowball ended its tick at x = ' + a + ', past the ' + e + ' edge. The server moved it to x = ' + b + ' (' + d + '), keeping its speed.',
+  cart: (a, b, e, d) => 'The minecart ended its tick at x = ' + a + ', past the ' + e + ' edge. The server moved it, with you in it, to x = ' + b + ' (' + d + ').',
+  ship: (a, b, e, d) => 'The ship’s centre passed x = ' + a + ', past the ' + e + ' edge. The server moved the whole ship, with you on board, to x = ' + b + ' (' + d + ').'
+};
+const FOLD_WHO = { you: 'You', zombie: 'The zombie', ball: 'The snowball', cart: 'The minecart', ship: 'The ship' };
+function foldEvent(kind, from, to) {
+  X.flash = { t: performance.now(), who: FOLD_WHO[kind], from, to };
+  pushLog('fold', FOLD_TEXT[kind](fmt(from, 1), fmt(to, 1), from > 0 ? 'east' : 'west', (to > from ? '+' : '−') + fmt(S.C)));
+}
+function xsTick() {
+  const h = H(), dt = 0.05; X.tick++;
+  const v = SPEED[X.mode];
+  if (X.mode === 'foot') {
+    X.cx += X.dir * v * dt;
+    const un = nearest(X.sx, X.cx);           // the server reads your report next to its copy of you
+    if (un >= h || un < -h) { const f = fold(un); foldEvent('you', un, f); X.sx = f; }
+    else X.sx = un;
+  } else if (X.mode === 'cart') {
+    X.vs += X.dir * v * dt;
+    if (X.vs >= h || X.vs < -h) { const f = fold(X.vs); foldEvent('cart', X.vs, f); X.vs = f; }
+    X.sx = X.vs; X.cx = nearest(X.cx, X.vs);
+  } else {
+    X.vs += X.dir * v * dt;                     // X.vs is the ship's centre
+    if (X.vs >= h || X.vs < -h) { const f = fold(X.vs); foldEvent('ship', X.vs, f); X.vs = f; }
+    X.sx = X.vs; X.cx = nearest(X.cx, X.vs);
+  }
+  if (X.zombie) {
+    const d = shortest(X.zx, X.sx);            // mobs measure through the seam
+    if (Math.abs(d) > 2.5) X.zx += Math.sign(d) * Math.min(Math.abs(d) - 2.5, 5.2 * dt);
+    if (X.zx >= h || X.zx < -h) { const f = fold(X.zx); foldEvent('zombie', X.zx, f); X.zx = f; }
+  }
+  X.balls.forEach(b => {
+    b.x += b.v; b.v *= 0.99; b.age++;
+    if (b.x >= h || b.x < -h) { const f = fold(b.x); foldEvent('ball', b.x, f); b.x = f; }
+  });
+  X.balls = X.balls.filter(b => b.age < 70);
+  const lim = h + RANGE * X.dir;
+  if ((X.dir > 0 && X.cx >= lim) || (X.dir < 0 && X.cx <= lim)) { X.playing = false; X.ended = true; playLabel(); }
+}
+function playLabel() { $('#xsPlay').textContent = X.playing ? 'Pause ❚❚' : (X.ended ? 'Replay ↺' : 'Play ▸'); }
+function syncSlider() {
+  const s = $('#xsPos'); const h = H();
+  s.min = String(h - RANGE); s.max = String(h + RANGE); s.value = String(clamp(X.cx, h - RANGE, h + RANGE));
+  $('#xsPosOut').textContent = fmt(X.cx, 1);
+}
+function xyOnSrv(x, L) {  // stored x → canvas x in one of the two windows, or null
+  const h = H();
+  if (x >= h - L.W && x < h + 0.0001) return L.eX + (x - (h - L.W)) * L.ppb;
+  if (x >= -h - 0.0001 && x < -h + L.W) return L.wX + (x + h) * L.ppb;
+  return null;
+}
+function drawEntity(ctx, kind, px, py, ppb, label, dashed) {
+  ctx.save();
+  if (kind === 'you') {
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(px, py, Math.max(4, ppb * 1.1), 0, 7); ctx.fill(); ctx.stroke();
+  } else if (kind === 'zombie') {
+    const s = Math.max(6, ppb * 1.6);
+    ctx.fillStyle = '#3F8F3A'; ctx.strokeStyle = '#0E2A0C'; ctx.lineWidth = 1.5;
+    ctx.fillRect(px - s / 2, py - s / 2, s, s); ctx.strokeRect(px - s / 2, py - s / 2, s, s);
+    ctx.fillStyle = '#0E2A0C'; ctx.fillRect(px - s / 4 - 1, py - s / 6, 2, 2); ctx.fillRect(px + s / 4 - 1, py - s / 6, 2, 2);
+  } else if (kind === 'ball') {
+    ctx.fillStyle = '#F4F8FA'; ctx.strokeStyle = '#5a6a72'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(px, py, Math.max(2.5, ppb * 0.6), 0, 7); ctx.fill(); ctx.stroke();
+  }
+  if (label) {
+    const below = kind === 'zombie', off = Math.max(7, ppb * 1.6);
+    ctx.font = fontOf(11, 650, 'd'); ctx.textAlign = 'center'; ctx.textBaseline = below ? 'top' : 'bottom';
+    const ly = below ? py + off : py - off;
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.65)'; ctx.strokeText(label, px, ly);
+    ctx.fillStyle = '#fff'; ctx.fillText(label, px, ly);
+  }
+  ctx.restore();
+}
+const LANDMARKS = [
+  { name: 'village', x: () => -H() + 43, z: -18 },
+  { name: 'lake', x: () => H() - 150, z: 9 },
+  { name: 'river', x: () => -H() + 92, z: 12 },
+  { name: 'tower', x: () => H() - 44, z: -18 }
+];
+function drawLandmarks(ctx, toPx, zOf, lo, hi) {
+  ctx.save(); ctx.font = fontOf(10, 650, 'd'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  LANDMARKS.forEach(m => {
+    const px = toPx(m.x()); if (px === null || px < lo + 18 || px > hi - 18) return;
+    const y = zOf(m.z), tw = ctx.measureText(m.name).width + 8;
+    ctx.fillStyle = 'rgba(12,20,24,.62)'; ctx.fillRect(px - tw / 2, y - 7, tw, 14);
+    ctx.fillStyle = '#F2F6F4'; ctx.fillText(m.name, px, y);
+  });
+  ctx.restore();
+}
+function drawVehicle(ctx, kind, x0px, x1px, py, ppb, dashed) {
+  ctx.save();
+  if (kind === 'cart') {
+    ctx.fillStyle = '#5B5F66'; ctx.strokeStyle = '#1b1d20'; ctx.lineWidth = 1.5;
+    const w = Math.max(8, ppb * 1.6), hh = Math.max(6, ppb * 1.1);
+    ctx.fillRect(x0px - w / 2, py - hh / 2, w, hh); ctx.strokeRect(x0px - w / 2, py - hh / 2, w, hh);
+  } else {
+    ctx.fillStyle = dashed ? 'rgba(0,0,0,0)' : '#8A5A2E'; ctx.strokeStyle = dashed ? COL.seam : '#2d1a0b'; ctx.lineWidth = dashed ? 1.5 : 2;
+    if (dashed) ctx.setLineDash([4, 3]);
+    const hh = Math.max(8, ppb * 3);
+    ctx.beginPath(); ctx.rect(x0px, py - hh / 2, x1px - x0px, hh); ctx.fill(); ctx.stroke();
+    if (!dashed) { ctx.fillStyle = '#B98A55'; ctx.fillRect(x0px + 2, py - hh / 2 + 2, Math.max(0, x1px - x0px - 4), Math.max(0, hh / 2 - 3)); }
+  }
+  ctx.restore();
+}
+function xsDraw() {
+  const h = H();
+  // ------- server panel -------
+  {
+    const cv = $('#xsSrv'); const { ctx, w, h: ch } = setupCanvas(cv);
+    ctx.clearRect(0, 0, w, ch);
+    const pad = w < 520 ? 8 : 26, gap = w < 520 ? 26 : 56;
+    X.W = w < 700 ? 64 : 128;
+    const ww = (w - 2 * pad - gap) / 2, ppb = ww / X.W;
+    const top = 30, bw = w - 2 * pad;
+    // the whole stored strip
+    ctx.fillStyle = COL['bg-2']; ctx.fillRect(pad, top, bw, 10);
+    ctx.strokeStyle = COL.rule; ctx.strokeRect(pad + 0.5, top + 0.5, bw - 1, 9);
+    const wFrac = X.W / S.C * bw;
+    ctx.fillStyle = COL.srv; ctx.fillRect(pad, top, Math.max(3, wFrac), 10); ctx.fillRect(pad + bw - Math.max(3, wFrac), top, Math.max(3, wFrac), 10);
+    ctx.fillStyle = COL.seam; ctx.fillRect(pad - 1, top - 4, 3, 18); ctx.fillRect(pad + bw - 2, top - 4, 3, 18);
+    ctx.font = fontOf(11, 500); ctx.fillStyle = COL['ink-2']; ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'left'; ctx.fillText('x = −' + fmt(h) + ' (west end)', pad, top - 6);
+    ctx.textAlign = 'right'; ctx.fillText('(east end) x = ' + fmt(h - 1), pad + bw, top - 6);
+    ctx.textAlign = 'center'; ctx.fillText('0', pad + bw / 2, top - 6);
+    ctx.fillRect(pad + bw / 2 - 0.5, top - 3, 1, 16);
+    const mx = pad + (X.sx + h) / S.C * bw;
+    ctx.fillStyle = COL.ink; ctx.beginPath(); ctx.moveTo(mx, top + 12); ctx.lineTo(mx - 5, top + 20); ctx.lineTo(mx + 5, top + 20); ctx.fill();
+    // windows
+    const wy = 80, wh = Math.min(ch - wy - 34, Math.round(STRIP.rows * Math.max(ppb, 2.2)));
+    const L = { W: X.W, ppb, wX: pad, eX: pad + ww + gap, wy, wh };
+    // zoom lines
+    ctx.strokeStyle = hexA(COL.srv, 0.55); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad, top + 10); ctx.lineTo(L.wX, wy); ctx.moveTo(pad + wFrac, top + 10); ctx.lineTo(L.wX + ww, wy);
+    ctx.moveTo(pad + bw - wFrac, top + 10); ctx.lineTo(L.eX, wy); ctx.moveTo(pad + bw, top + 10); ctx.lineTo(L.eX + ww, wy); ctx.stroke();
+    blitStrip(ctx, -h, -h + X.W, L.wX, wy, ww, wh);
+    blitStrip(ctx, h - X.W, h, L.eX, wy, ww, wh);
+    // the gap between the two ends
+    ctx.fillStyle = COL['ink-3']; ctx.font = fontOf(w < 520 ? 14 : 18, 400); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('≈', pad + ww + gap / 2, wy + wh / 2);
+    if (w >= 520) { ctx.font = fontOf(10, 400); ctx.fillText(fmt(S.C - 2 * X.W), pad + ww + gap / 2, wy + wh / 2 + 16); ctx.fillText('blocks', pad + ww + gap / 2, wy + wh / 2 + 28); }
+    // chunk grid + labels (stored chunk numbers)
+    const perLabel = ppb * 16 >= 26 ? 1 : 2;
+    [[L.wX, -h], [L.eX, h - X.W]].forEach(([px0, x0]) => {
+      for (let c = 0; c <= X.W / 16; c++) {
+        const gx = px0 + c * 16 * ppb;
+        ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(Math.round(gx), wy, 1, wh);
+        if (c < X.W / 16 && c % perLabel === 0) {
+          ctx.fillStyle = COL['ink-2']; ctx.font = fontOf(10, 500); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+          ctx.fillText(String((x0 >> 4) + c).replace('-', '−'), gx + 8 * ppb, wy - 3);
+        }
+      }
+      ctx.fillStyle = COL['ink-3']; ctx.font = fontOf(10, 400); ctx.textBaseline = 'top';
+      ctx.textAlign = 'left'; ctx.fillText(fmt(x0), px0, wy + wh + 4);
+      ctx.textAlign = 'right'; ctx.fillText(fmt(x0 + X.W - 1), px0 + ww, wy + wh + 4);
+    });
+    ctx.fillStyle = COL['ink-3']; ctx.font = fontOf(10, 400); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText('chunk x above · block x below', w / 2, wy + wh + 18);
+    // the two edges of storage
+    ctx.fillStyle = COL.seam; ctx.fillRect(L.wX - 1, wy - 2, 3, wh + 4); ctx.fillRect(L.eX + ww - 2, wy - 2, 3, wh + 4);
+    // chunks the server keeps loaded for you
+    const pc = Math.floor(X.cx) >> 4;
+    ctx.strokeStyle = COL.cli; ctx.lineWidth = 2; ctx.fillStyle = hexA(COL.cli, 0.14);
+    for (let c = pc - X.vd; c <= pc + X.vd; c++) {
+      const sxc = fold(c * 16);
+      const p0 = xyOnSrv(sxc, L); if (p0 === null) continue;
+      ctx.fillRect(p0, wy, 16 * ppb, wh);
+    }
+    for (let c = pc - X.vd; c <= pc + X.vd; c++) {
+      const sxc = fold(c * 16), p0 = xyOnSrv(sxc, L); if (p0 === null) continue;
+      ctx.beginPath(); ctx.moveTo(p0, wy + 1); ctx.lineTo(p0 + 16 * ppb, wy + 1); ctx.moveTo(p0, wy + wh - 1); ctx.lineTo(p0 + 16 * ppb, wy + wh - 1); ctx.stroke();
+    }
+    // entities
+    const zOf = z => wy + (z + STRIP.rows / 2 + 0.5) / STRIP.rows * wh;
+    const rowPPB = wh / STRIP.rows;
+    if (X.mode === 'ship') {
+      const a = X.vs - 5, b = X.vs + 5;
+      // draw the hull in whichever window its centre is in; the part past the edge is dashed
+      const inEast = X.vs >= 0;
+      const base = inEast ? L.eX - (h - X.W) * ppb : L.wX + h * ppb;
+      const x0 = base + a * ppb, x1 = base + b * ppb;
+      const lo = inEast ? L.eX : L.wX, hi = lo + ww;
+      ctx.save(); ctx.beginPath(); ctx.rect(lo, wy - 4, ww, wh + 8); ctx.clip();
+      drawVehicle(ctx, 'ship', x0, x1, zOf(-8), rowPPB, false); ctx.restore();
+      if (x1 > hi) drawVehicle(ctx, 'ship', hi, Math.min(x1, hi + gap - 4), zOf(-8), rowPPB, true);
+      if (x0 < lo) drawVehicle(ctx, 'ship', Math.max(x0, 1), lo, zOf(-8), rowPPB, true);
+    }
+    drawLandmarks(ctx, x => xyOnSrv(x, L), zOf, 0, w);
+    if (X.mode === 'cart') { const p = xyOnSrv(X.vs, L); if (p !== null) drawVehicle(ctx, 'cart', p, 0, zOf(6), rowPPB); }
+    if (X.zombie) { const p = xyOnSrv(X.zx, L); if (p !== null) drawEntity(ctx, 'zombie', p, zOf(0), rowPPB, w >= 520 ? 'zombie' : ''); }
+    X.balls.forEach(b => { const p = xyOnSrv(b.x, L); if (p !== null) drawEntity(ctx, 'ball', p, zOf(-2), rowPPB); });
+    { const p = xyOnSrv(X.sx, L); const zz = X.mode === 'cart' ? 6 : X.mode === 'ship' ? -8 : 0;
+      if (p !== null) drawEntity(ctx, 'you', p, zOf(zz), rowPPB, 'you'); }
+    // the jump, drawn for a moment after something is moved
+    if (X.flash) {
+      const age = (performance.now() - X.flash.t) / 1400;
+      if (age < 1 || RM) {
+        const a = RM ? 1 : 1 - age;
+        const fromPx = X.flash.from > 0 ? L.eX + ww : L.wX, toPx = X.flash.from > 0 ? L.wX : L.eX + ww;
+        ctx.save(); ctx.strokeStyle = hexA(COL.seam, a); ctx.fillStyle = hexA(COL.seam, a); ctx.lineWidth = 2.5;
+        const ymid = wy - 24;
+        ctx.beginPath(); ctx.moveTo(fromPx, wy + 4); ctx.bezierCurveTo(fromPx, ymid - 10, toPx, ymid - 10, toPx, wy + 4); ctx.stroke();
+        const dir = toPx > fromPx ? 1 : -1;
+        ctx.beginPath(); ctx.moveTo(toPx, wy + 6); ctx.lineTo(toPx - 5, wy - 4); ctx.lineTo(toPx + 5, wy - 4); ctx.fill();
+        ctx.font = fontOf(12, 700, 'd'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const lbl = X.flash.who + ' moved ' + (X.flash.to > X.flash.from ? '+' : '−') + fmt(S.C) + ' in one tick';
+        const tw = ctx.measureText(lbl).width + 12;
+        ctx.fillStyle = hexA(COL.panel, 0.94 * a); ctx.fillRect(w / 2 - tw / 2, ymid - 10, tw, 18);
+        ctx.fillStyle = hexA(COL.seam, a); ctx.fillText(lbl, w / 2, ymid - 1);
+        ctx.restore();
+      } else X.flash = null;
+    }
+    kv($('#xsSrvKv'), [
+      ['you, stored at', 'x = ' + fmt(X.sx, 1) + ' · chunk ' + fmt(Math.floor(X.sx) >> 4) + ' · region r.' + fmt(Math.floor(X.sx) >> 9)],
+      ...(X.zombie ? [['zombie, stored at', 'x = ' + fmt(X.zx, 1) + ' · ' + fmt(Math.abs(shortest(X.zx, X.sx)), 1) + ' blocks from you, measured through the seam']] : []),
+      ['kept loaded for you', 'stored chunks ' + chunkRuns(pc)]
+    ]);
+  }
+  // ------- your game's panel -------
+  {
+    const cv = $('#xsCli'); const { ctx, w, h: ch } = setupCanvas(cv);
+    ctx.clearRect(0, 0, w, ch);
+    const Wv = X.W * 2, ppb = w / Wv;
+    const x0 = X.cx - X.W, wy = 22, wh = Math.min(ch - wy - 34, Math.round(STRIP.rows * Math.max(ppb, 2.2)));
+    const toPx = x => (x - x0) * ppb;
+    blitStrip(ctx, Math.floor(x0), Math.floor(x0) + Wv + 1, toPx(Math.floor(x0)), wy, (Wv + 1) * ppb, wh);
+    // chunk grid; chunks outside the stored range get a tag with their stored number
+    const c0 = Math.floor(x0 / 16), c1 = Math.ceil((x0 + Wv) / 16), cmax = S.C / 32;
+    const perLabel = ppb * 16 >= 30 ? 1 : 2;
+    for (let c = c0; c <= c1; c++) {
+      const gx = toPx(c * 16);
+      ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(Math.round(gx), wy, 1, wh);
+      const cx = gx + 8 * ppb;
+      if (cx < 10 || cx > w - 10 || c % perLabel !== 0) continue;
+      const foreign = c >= cmax || c < -cmax;
+      ctx.font = fontOf(10, foreign ? 650 : 500); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = COL['ink-2'];
+      ctx.fillText(String(c).replace('-', '−'), cx, wy - 3);
+      if (foreign) {
+        const t = (ppb * 16 >= 48 ? '= ' : '') + String(c - Math.sign(c) * S.C / 16).replace('-', '−');
+        ctx.font = fontOf(10, 700);
+        const tw = ctx.measureText(t).width + 6;
+        ctx.fillStyle = COL.seam; ctx.fillRect(cx - tw / 2, wy + wh + 3, tw, 14);
+        ctx.fillStyle = '#fff'; ctx.textBaseline = 'top'; ctx.fillText(t, cx, wy + wh + 4);
+      }
+    }
+    // where the seam is in this frame: nothing there in game
+    const seamX = nearest(X.cx, h);
+    const sp = toPx(seamX);
+    if (sp > -20 && sp < w + 20) {
+      ctx.save(); ctx.strokeStyle = COL.seam; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(sp, wy - 2); ctx.lineTo(sp, wy + wh + 2); ctx.stroke(); ctx.restore();
+      ctx.font = fontOf(11, 650, 'd'); ctx.textBaseline = 'top';
+      const t = w < 520 ? 'seam' : 'seam (nothing here in the game)';
+      const tw = ctx.measureText(t).width + 8;
+      const lx = clamp(sp + 4, 2, w - tw - 2);
+      ctx.fillStyle = hexA(COL.panel, 0.9); ctx.fillRect(lx, wy + wh - 19, tw, 16);
+      ctx.fillStyle = COL.seam; ctx.textAlign = 'left'; ctx.fillText(t, lx + 4, wy + wh - 17);
+    }
+    // your loaded chunks
+    const pc = Math.floor(X.cx) >> 4;
+    ctx.strokeStyle = COL.cli; ctx.lineWidth = 2; ctx.fillStyle = hexA(COL.cli, 0.12);
+    const la = toPx((pc - X.vd) * 16), lb = toPx((pc + X.vd + 1) * 16);
+    ctx.fillRect(la, wy, lb - la, wh); ctx.strokeRect(la, wy + 1, lb - la, wh - 2);
+    const zOf = z => wy + (z + STRIP.rows / 2 + 0.5) / STRIP.rows * wh;
+    const rowPPB = wh / STRIP.rows;
+    drawLandmarks(ctx, x => toPx(nearest(X.cx, x)), zOf, 0, w);
+    if (X.mode === 'ship') { const c = nearest(X.cx, X.vs); drawVehicle(ctx, 'ship', toPx(c - 5), toPx(c + 5), zOf(-8), rowPPB, false); }
+    if (X.mode === 'cart') drawVehicle(ctx, 'cart', toPx(nearest(X.cx, X.vs)), 0, zOf(6), rowPPB);
+    if (X.zombie) drawEntity(ctx, 'zombie', toPx(nearest(X.cx, X.zx)), zOf(0), rowPPB, 'zombie');
+    X.balls.forEach(b => drawEntity(ctx, 'ball', toPx(nearest(X.cx, b.x)), zOf(-2), rowPPB));
+    drawEntity(ctx, 'you', toPx(X.cx), zOf(X.mode === 'cart' ? 6 : X.mode === 'ship' ? -8 : 0), rowPPB, 'you');
+    // block x ruler in your game's numbers
+    ctx.fillStyle = COL['ink-3']; ctx.font = fontOf(10, 400); ctx.textBaseline = 'top';
+    const step = w < 520 ? 64 : 32;
+    for (let bx = Math.ceil(x0 / step) * step; bx < x0 + Wv; bx += step) {
+      const px = toPx(bx); if (px < 16 || px > w - 16) continue;
+      ctx.textAlign = 'center'; ctx.fillText(fmt(bx), px, wy + wh + 20);
+    }
+  }
+  f3($('#xsF3'), 'Your F3 screen (Toroidal World’s lines in yellow)', { x: X.sx, y: 72, z: X.mode === 'cart' ? 6.5 : X.mode === 'ship' ? -7.5 : 0.5, ux: X.cx, uz: X.mode === 'cart' ? 6.5 : X.mode === 'ship' ? -7.5 : 0.5 });
+  $('#xsPosOut').textContent = fmt(X.cx, 1);
+  const s = $('#xsPos'); if (document.activeElement !== s) s.value = String(clamp(X.cx, +s.min, +s.max));
+}
+function chunkRuns(pc) {
+  const list = []; for (let c = pc - X.vd; c <= pc + X.vd; c++) list.push(fold(c * 16) >> 4);
+  const runs = []; let a = list[0], p = list[0];
+  for (let i = 1; i <= list.length; i++) { const c = list[i]; if (c === p + 1) { p = c; continue; } runs.push(a === p ? fmt(a) : fmt(a) + ' … ' + fmt(p)); a = p = c; }
+  return runs.join(' and ') + (runs.length > 1 ? ' (both ends of storage)' : '');
+}
+let xsLast = 0, xsRaf = 0;
+function xsLoop(ts) {
+  xsRaf = 0;
+  const dt = xsLast ? Math.min(0.1, (ts - xsLast) / 1000) : 0; xsLast = ts;
+  if (X.playing) {
+    X.acc += dt * X.speed;
+    while (X.acc >= 0.05 && X.playing) { X.acc -= 0.05; xsTick(); }
+  }
+  xsDraw();
+  if (X.playing || (X.flash && !RM)) xsRaf = requestAnimationFrame(xsLoop); else xsLast = 0;
+}
+function xsKick() { if (!xsRaf) { xsLast = 0; xsRaf = requestAnimationFrame(xsLoop); } }
+$('#xsPlay').addEventListener('click', () => {
+  if (X.ended) { xsReset(); }
+  X.playing = !X.playing; playLabel(); xsKick();
+});
+$('#xsDir').addEventListener('click', () => { X.dir = -X.dir; $('#xsDir').textContent = X.dir > 0 ? 'Heading east →' : '← Heading west'; X.playing = false; xsReset(); playLabel(); });
+$$('#xsBox [data-mode]').forEach(b => b.addEventListener('click', () => {
+  X.mode = b.dataset.mode; $$('#xsBox [data-mode]').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+  X.playing = false; xsReset(); playLabel();
+}));
+$$('#xsBox [data-sp]').forEach(b => b.addEventListener('click', () => { X.speed = +b.dataset.sp; $$('#xsBox [data-sp]').forEach(o => o.setAttribute('aria-pressed', String(o === b))); }));
+$('#xsZombie').addEventListener('change', e => { X.zombie = e.target.checked; X.zx = fold(X.cx - 7 * X.dir); xsDraw(); });
+$('#xsBall').addEventListener('click', () => { X.balls.push({ x: X.sx + 0.5 * X.dir, v: 1.5 * X.dir, age: 0 }); pushLog('info', 'You threw a snowball ' + (X.dir > 0 ? 'east' : 'west') + ' at 30 blocks/s.'); if (!X.playing) { X.playing = true; playLabel(); } xsKick(); });
+$('#xsReset').addEventListener('click', () => { X.playing = false; xsReset(); playLabel(); });
+$('#xsPos').addEventListener('input', e => {
+  // moving the slider moves you as if you walked there: the same rules apply
+  const target = +e.target.value, stepN = Math.ceil(Math.abs(target - X.cx) / 0.5);
+  const was = X.mode, h = H();
+  for (let i = 0; i < stepN; i++) {
+    const nx = X.cx + clamp(target - X.cx, -0.5, 0.5);
+    if (was === 'foot') {
+      X.cx = nx; const un = nearest(X.sx, X.cx);
+      if (un >= h || un < -h) { const f = fold(un); foldEvent('you', un, f); X.sx = f; } else X.sx = un;
+    }
+    else {
+      const un = X.vs + (nx - X.cx);
+      if (un >= h || un < -h) foldEvent(was, un, fold(un));
+      X.vs = fold(un); X.cx = nx; X.sx = X.vs;
+    }
+  }
+  if (X.zombie) { X.zx = fold(X.cx - 7 * X.dir); }
+  X.ended = false; playLabel(); xsKick();
+});
+onSize(() => { buildStrip(); X.playing = false; xsReset(); playLabel(); });
+
+/* ============================ 3. two players ============================ */
+const T = { b: 100, walked: true };
+function twDraw() {
+  const h = H();
+  const ax = h - 100, bs = -h + T.b;            // stored positions
+  const aGame = ax;                               // Alex's game frame = stored (he never crossed)
+  const bGame = T.walked ? h + T.b : bs;          // Bea's own count
+  const through = (h - ax) + T.b, longWay = S.C - through;
+  // server strip
+  {
+    const cv = $('#twSrv'); const { ctx, w, h: ch } = setupCanvas(cv);
+    ctx.clearRect(0, 0, w, ch);
+    const pad = 14, bw = w - 2 * pad, y = 62;
+    const toPx = x => pad + (x + h) / S.C * bw;
+    // the join: the two ends are one line
+    ctx.save(); ctx.strokeStyle = COL.seam; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(pad, y - 10); ctx.bezierCurveTo(pad, 4, pad + bw, 4, pad + bw, y - 10); ctx.stroke(); ctx.restore();
+    ctx.font = fontOf(11, 650, 'd'); ctx.fillStyle = COL.seam; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(w < 460 ? 'the two ends are one line: the seam' : 'the two ends of the strip are the same line: the seam', w / 2, 26);
+    // the strip
+    ctx.fillStyle = COL['bg-2']; ctx.fillRect(pad, y - 6, bw, 12);
+    ctx.strokeStyle = COL.rule; ctx.lineWidth = 1; ctx.strokeRect(pad + 0.5, y - 5.5, bw - 1, 11);
+    ctx.fillStyle = COL.seam; ctx.fillRect(pad - 1, y - 10, 3, 20); ctx.fillRect(pad + bw - 2, y - 10, 3, 20);
+    ctx.fillStyle = COL['ink-3']; ctx.fillRect(toPx(0) - 0.5, y - 6, 1, 12);
+    const pa = toPx(ax), pb = toPx(bs);
+    // the short way, in two pieces: Alex to the east end, west end to Bea
+    ctx.strokeStyle = COL.ink; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(pa, y); ctx.lineTo(pad + bw, y); ctx.moveTo(pad, y); ctx.lineTo(pb, y); ctx.stroke();
+    // the long way
+    ctx.save(); ctx.strokeStyle = COL['ink-3']; ctx.setLineDash([2, 4]); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(pb, y + 30); ctx.lineTo(pa, y + 30); ctx.stroke(); ctx.restore();
+    ctx.font = fontOf(11, 400); ctx.fillStyle = COL['ink-3']; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(w < 520 ? 'long way round: ' + fmt(longWay) + ' (unused)' : 'the long way round: ' + fmt(longWay) + ' blocks, which nothing uses', w / 2, y + 36);
+    // players, names under the strip
+    [[pa, COL.alex, 'Alex', fmt(ax), 'right'], [pb, COL.bea, 'Bea', fmt(bs), 'left']].forEach(([p, c, n, t, al]) => {
+      ctx.fillStyle = c; ctx.strokeStyle = COL.panel; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(p, y, 7, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.font = fontOf(11, 700, 'd'); ctx.textBaseline = 'top'; ctx.textAlign = al;
+      ctx.fillStyle = c; ctx.fillText(n + ' ' + t, al === 'right' ? p + 4 : p - 4, y + 11);
+    });
+    ctx.font = fontOf(10, 400); ctx.fillStyle = COL['ink-3']; ctx.textBaseline = 'top'; ctx.textAlign = 'center';
+    ctx.fillText('0', toPx(0), y + 11);
+    // the answer
+    ctx.font = fontOf(12, 700, 'd'); ctx.fillStyle = COL.ink; ctx.textBaseline = 'top';
+    ctx.fillText(w < 520 ? 'Through the seam: ' + fmt(h - ax) + ' + ' + fmt(T.b) + ' = ' + fmt(through) + ' blocks' : 'Through the seam they are ' + fmt(h - ax) + ' + ' + fmt(T.b) + ' = ' + fmt(through) + ' blocks apart. Everything uses this.', w / 2, y + 56);
+  }
+  // one screen per player
+  function screen(id, selfGame, selfStored, selfCol, selfName, otherStored, otherCol, otherName, kvEl) {
+    const cv = $(id); const { ctx, w, h: ch } = setupCanvas(cv);
+    ctx.clearRect(0, 0, w, ch);
+    const span = w < 420 ? 360 : 440, ppb = w / span, x0 = selfGame - span / 2;
+    const wy = 20, wh = ch - wy - 28;
+    blitStrip(ctx, Math.floor(x0), Math.floor(x0) + span + 1, (Math.floor(x0) - x0) * ppb, wy, (span + 1) * ppb, wh);
+    ctx.fillStyle = 'rgba(8,16,20,.18)'; ctx.fillRect(0, wy, w, wh);
+    const toPx = x => (x - x0) * ppb;
+    const seamX = nearest(selfGame, h), sp = toPx(seamX);
+    ctx.save(); ctx.strokeStyle = COL.seam; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(sp, wy); ctx.lineTo(sp, wy + wh); ctx.stroke(); ctx.restore();
+    ctx.font = fontOf(10, 650, 'd'); ctx.fillStyle = COL.seam; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText('seam (invisible)', clamp(sp, 44, w - 44), wy - 3);
+    const other = nearest(selfGame, otherStored);
+    const ps = toPx(selfGame), po = toPx(other), py = wy + wh * 0.55;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(ps, py); ctx.lineTo(po, py); ctx.stroke();
+    ctx.font = fontOf(11, 700, 'd'); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.6)';
+    const mid = (ps + po) / 2, dtext = fmt(Math.abs(other - selfGame)) + ' blocks';
+    ctx.strokeText(dtext, mid, py - 6); ctx.fillStyle = '#fff'; ctx.fillText(dtext, mid, py - 6);
+    [[ps, selfCol, selfName + ' ' + fmt(selfGame)], [po, otherCol, otherName + ' ' + fmt(other)]].forEach(([p, c, t], i) => {
+      ctx.fillStyle = c; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p, py, 6.5, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.font = fontOf(11, 700, 'd'); ctx.textBaseline = 'top'; ctx.textAlign = 'center';
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.6)';
+      const lx = clamp(p, 50, w - 50);
+      ctx.strokeText(t, lx, py + 10); ctx.fillStyle = '#fff'; ctx.fillText(t, lx, py + 10);
+    });
+    ctx.fillStyle = COL['ink-3']; ctx.font = fontOf(10, 400); ctx.textBaseline = 'top';
+    for (let bx = Math.ceil(x0 / 100) * 100; bx < x0 + span; bx += 100) { const p = toPx(bx); if (p > 20 && p < w - 20) { ctx.textAlign = 'center'; ctx.fillText(fmt(bx), p, wy + wh + 6); } }
+    kv(kvEl, [
+      ['F3 XYZ x', fmt(selfStored, 0) + ' (stored)'],
+      ['F3 Unwrapped x', fmt(selfGame, 0) + (selfGame !== selfStored ? ' (' + (selfGame > selfStored ? 'a lap on' : 'a lap back') + ')' : ' (same)')],
+      [otherName + ' arrives at', 'x = ' + fmt(other) + ' in this game']
+    ]);
+  }
+  screen('#twA', aGame, ax, COL.alex, 'Alex', bs, COL.bea, 'Bea', $('#twAKv'));
+  screen('#twBc', bGame, bs, COL.bea, 'Bea', ax, COL.alex, 'Alex', $('#twBKv'));
+  $('#twCap').innerHTML = T.walked
+    ? 'Bea walked east across the seam, so her game kept counting and has her at x = ' + fmt(bGame) + '. Both games use the same numbers. The server stores her at x = ' + fmt(bs) + ', and that stored number is what her F3 <code>XYZ</code> line shows.'
+    : 'Bea logged in east of the seam, so her game starts at her stored x = ' + fmt(bs) + '. Her game places Alex at x = ' + fmt(nearest(bGame, ax)) + ', a lap away from the number Alex’s own game uses. It is still ' + fmt(through) + ' blocks from her, which is all that matters in the game.';
+}
+$('#twB').addEventListener('input', e => { T.b = +e.target.value; $('#twBOut').textContent = T.b; twDraw(); });
+$('#twWalked').addEventListener('click', () => { T.walked = true; $('#twWalked').setAttribute('aria-pressed', 'true'); $('#twJoined').setAttribute('aria-pressed', 'false'); twDraw(); });
+$('#twJoined').addEventListener('click', () => { T.walked = false; $('#twWalked').setAttribute('aria-pressed', 'false'); $('#twJoined').setAttribute('aria-pressed', 'true'); twDraw(); });
+onSize(twDraw);
+
+/* ============================ 4. a full lap ============================ */
+const P = { xu: 0, xs: 0, base: 0, laps: 0, travel: 0, anim: null, animId: 0, toastT: 0 };
+function lapStop() { P.anim = null; P.animId++; }
+const equatorRing = (() => {
+  const W = planetTex.width, row = planetTex.getContext('2d').getImageData(0, planetTex.height / 2, W, 1).data;
+  const out = [], per = W / 256;
+  for (let i = 0; i < 256; i++) {
+    let r = 0, g = 0, b = 0;
+    for (let k = 0; k < per; k++) { const o = (i * per + k) * 4; r += row[o]; g += row[o + 1]; b += row[o + 2]; }
+    out.push('rgb(' + Math.round(r / per) + ',' + Math.round(g / per) + ',' + Math.round(b / per) + ')');
+  }
+  return out;
+})();
+function lapAngle(x) { return -Math.PI / 2 - 2 * Math.PI * (x + H()) / S.C; }
+function lapDraw() {
+  const cv = $('#lapCv'); const { ctx, w, h: ch } = setupCanvas(cv);
+  ctx.clearRect(0, 0, w, ch);
+  const cx = w / 2, cy = ch / 2, size = Math.min(w, ch);
+  const r0 = size * 0.29, step = size * 0.05, th = Math.max(8, size * 0.03);
+  // the ring, coloured by the planet's equator
+  for (let i = 0; i < 256; i++) {
+    const a0 = lapAngle(-H() + i / 256 * S.C), a1 = lapAngle(-H() + (i + 1.2) / 256 * S.C);
+    ctx.strokeStyle = equatorRing[i]; ctx.lineWidth = th;
+    ctx.beginPath(); ctx.arc(cx, cy, r0, a1, a0); ctx.stroke();
+  }
+  ctx.strokeStyle = hexA(COL.srv, 0.9); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cx, cy, r0 - th / 2 - 2, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, r0 + th / 2 + 2, 0, 7); ctx.stroke();
+  // seam at the top
+  ctx.fillStyle = COL.seam; ctx.fillRect(cx - 1.5, cy - r0 - th - 6, 3, th * 2 + 12);
+  ctx.font = fontOf(12, 700, 'd'); ctx.fillStyle = COL.seam; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText('seam', cx, cy - r0 - th - 22);
+  ctx.font = fontOf(10, 500); ctx.textBaseline = 'bottom';
+  ctx.textAlign = 'right'; ctx.fillText('−' + fmt(H()) + ' ◂', cx - 6, cy - r0 - th - 8);
+  ctx.textAlign = 'left'; ctx.fillText('▸ ' + fmt(H() - 1), cx + 6, cy - r0 - th - 8);
+  // x = 0 at the bottom
+  ctx.fillStyle = COL.ink; ctx.beginPath(); ctx.arc(cx, cy + r0, 4, 0, 7); ctx.fill();
+  ctx.font = fontOf(11, 700, 'd'); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('x = 0, where you start', cx, cy + r0 + th / 2 + 6);
+  // east arrow
+  ctx.save(); ctx.strokeStyle = COL['ink-3']; ctx.lineWidth = 1.2;
+  const ar = r0 - th * 2.2;
+  ctx.beginPath(); ctx.arc(cx, cy, ar, Math.PI * 0.2, Math.PI * 0.05, true); ctx.stroke();
+  const ea = Math.PI * 0.05, ex = cx + ar * Math.cos(ea), ey = cy + ar * Math.sin(ea);
+  const tx = Math.sin(ea), ty = -Math.cos(ea), nx2 = Math.cos(ea), ny2 = Math.sin(ea);
+  ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex - 7 * tx + 4 * nx2, ey - 7 * ty + 4 * ny2); ctx.moveTo(ex, ey); ctx.lineTo(ex - 7 * tx - 4 * nx2, ey - 7 * ty - 4 * ny2); ctx.stroke();
+  ctx.font = fontOf(11, 500, 'd'); ctx.fillStyle = COL['ink-3']; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('east', cx + ar * 0.78, cy + ar * 0.36);
+  ctx.restore();
+  // the game's own count: a spiral, one ring further out per lap
+  const rOf = xu => clamp(r0 + step * (xu - P.base) / S.C, r0 - 2.4 * step, r0 + 3.4 * step);
+  ctx.strokeStyle = COL.cli; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath();
+  const n = Math.max(2, Math.ceil(Math.abs(P.xu - P.base) / S.C * 240));
+  for (let i = 0; i <= n; i++) {
+    const xu = P.base + (P.xu - P.base) * i / n, a = lapAngle(xu), r = rOf(xu);
+    const px = cx + r * Math.cos(a), py = cy + r * Math.sin(a);
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  // where you are, on both
+  const a = lapAngle(P.xs), rs = r0, ru = rOf(P.xu);
+  const sxp = cx + rs * Math.cos(a), syp = cy + rs * Math.sin(a), uxp = cx + ru * Math.cos(a), uyp = cy + ru * Math.sin(a);
+  if (Math.abs(ru - rs) > 3) { ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = COL['ink-2']; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(sxp, syp); ctx.lineTo(uxp, uyp); ctx.stroke(); ctx.restore(); }
+  ctx.fillStyle = COL.srv; ctx.strokeStyle = COL.panel; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(sxp, syp, 7, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = COL.cli; ctx.beginPath(); ctx.arc(uxp, uyp, 6, 0, 7); ctx.fill(); ctx.stroke();
+  // legend
+  ctx.font = fontOf(11, 600, 'd'); ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.fillStyle = COL.srv; ctx.fillRect(10, ch - 34, 12, 4); ctx.fillStyle = COL['ink-2']; ctx.fillText('server: one ring, the stored x', 28, ch - 32);
+  ctx.fillStyle = COL.cli; ctx.fillRect(10, ch - 16, 12, 4); ctx.fillStyle = COL['ink-2']; ctx.fillText('your game: keeps counting', 28, ch - 14);
+  // readouts
+  kv($('#lapKv'), [
+    ['server stores', '<span class="srvc">x = ' + fmt(P.xs, 0) + '</span>'],
+    ['your game’s x', '<span class="clic">' + fmt(P.xu, 0) + '</span>' + (Math.abs(P.xu - P.xs) > 0.5 ? ' (' + fmt((P.xu - P.xs) / S.C) + ' lap' + (Math.abs(P.xu - P.xs) / S.C === 1 ? '' : 's') + ' from the stored x)' : '')],
+    ['laps finished', String(P.laps) + ' · ' + fmt(Math.abs(P.travel), 0) + ' blocks towards the next']
+  ]);
+  f3($('#lapF3'), 'F3 (y and z made up)', { x: P.xs, y: 71, z: 0.5, ux: P.xu, uz: 0.5 });
+}
+function lapGo(dx, label) {
+  if (P.anim) return;
+  const from = P.xu, dur = RM ? 0 : Math.min(7000, 1200 + Math.abs(dx) / S.C * 5800);
+  const id = ++P.animId;
+  P.anim = { from, to: from + dx, t0: performance.now(), dur };
+  $('#lapCap').textContent = label;
+  const tick = now => {
+    if (id !== P.animId || !P.anim) return;
+    const k = P.anim.dur ? clamp((now - P.anim.t0) / P.anim.dur, 0, 1) : 1;
+    const e = k;                       // constant speed, like walking
+    const nx = lerp(P.anim.from, P.anim.to, e);
+    // TW's lap counter: net signed travel, one width comes off each time it reaches a full width
+    const stepD = nx - P.xu; P.travel = Math.round((P.travel + stepD) * 1e6) / 1e6;
+    while (Math.abs(P.travel) >= S.C) { P.travel -= Math.sign(P.travel) * S.C; P.laps++; showToast(); }
+    P.xu = nx; P.xs = fold(nx);
+    lapDraw();
+    if (k < 1) requestAnimationFrame(tick); else P.anim = null;
+  };
+  requestAnimationFrame(tick);
+}
+function showToast() { const t = $('#lapToast'); t.dataset.off = '0'; clearTimeout(P.toastT); P.toastT = setTimeout(() => t.dataset.off = '1', 2600); }
+$('#lapEast').addEventListener('click', () => lapGo(S.C, 'You walked one full lap east. The server has you back at x = ' + fmt(fold(P.xu + S.C)) + ', where you started. Your game’s own x went up by ' + fmt(S.C) + '. The lap closed, so "Back Where You Started" fired.'));
+$('#lapWest').addEventListener('click', () => lapGo(-S.C, 'A lap west counts too: Toroidal World counts laps in either direction. Your game’s x went down by ' + fmt(S.C) + '.'));
+$('#lapHalf').addEventListener('click', () => {
+  const target = nearest(P.xu, H()) > P.xu ? nearest(P.xu, H()) + 4 : nearest(P.xu, H()) + S.C + 4;
+  lapGo(target - P.xu, 'Just past the seam, heading east. The server has you at x = ' + fmt(fold(target)) + ', and so does F3’s XYZ line. Your game has you at ' + fmt(target) + ', which F3 shows as Unwrapped.');
+});
+$('#lapRejoin').addEventListener('click', () => {
+  lapStop(); P.base = P.xs; P.xu = P.xs; lapDraw();
+  $('#lapCap').textContent = 'When you join, respawn or change dimension, the server resets your game to the stored copy. Your game’s x is now ' + fmt(P.xs) + ' again. The lap counter is saved with you, so it doesn’t reset.';
+});
+$('#lapReset').addEventListener('click', () => { lapStop(); Object.assign(P, { xu: 0, xs: 0, base: 0, laps: 0, travel: 0 }); $('#lapCap').textContent = ''; lapDraw(); });
+function lapTimes() {
+  const t = v => { const s = S.C / v; const m = Math.floor(s / 60); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min ' + Math.round(s % 60) + ' s'; };
+  $('#lapTimes').textContent = 'One lap of ' + fmt(S.C) + ' blocks takes ' + t(5.612) + ' at a sprint, ' + t(8) + ' by minecart at 8 blocks/s, and ' + t(40) + ' in a Sable jet at 40 blocks/s.';
+}
+onSize(() => { lapStop(); Object.assign(P, { xu: 0, xs: 0, base: 0, laps: 0, travel: 0 }); lapTimes(); lapDraw(); });
+lapTimes();
+
+/* ============================ 5. Nether 1:8 ============================ */
+const N = { x: 0 };
+function nthPos() { return H() - 16; }
+function nthDraw() {
+  const cv = $('#nthCv'); const { ctx, w, h: ch } = setupCanvas(cv);
+  ctx.clearRect(0, 0, w, ch);
+  const h = H(), nh = h / 8, cx = w / 2, cy = ch / 2 + 8, size = Math.min(w, ch);
+  const r1 = size * 0.4, r2 = size * 0.22, th = Math.max(8, size * 0.028);
+  const ang = (x, half) => -Math.PI / 2 - 2 * Math.PI * (x + half) / (2 * half);
+  for (let i = 0; i < 256; i++) {
+    const a0 = ang(-h + i / 256 * S.C, h), a1 = ang(-h + (i + 1.2) / 256 * S.C, h);
+    ctx.strokeStyle = equatorRing[i]; ctx.lineWidth = th; ctx.beginPath(); ctx.arc(cx, cy, r1, a1, a0); ctx.stroke();
+  }
+  for (let i = 0; i < 128; i++) {
+    const a0 = ang(-nh + i / 128 * 2 * nh, nh), a1 = ang(-nh + (i + 1.2) / 128 * 2 * nh, nh);
+    const k = vper(i / 128 * 16, 0, 16, 91);
+    ctx.strokeStyle = 'rgb(' + Math.round(lerp(96, 150, k)) + ',' + Math.round(lerp(28, 50, k)) + ',' + Math.round(lerp(24, 34, k)) + ')';
+    ctx.lineWidth = th; ctx.beginPath(); ctx.arc(cx, cy, r2, a1, a0); ctx.stroke();
+  }
+  ctx.fillStyle = COL.seam; ctx.fillRect(cx - 1.5, cy - r1 - th - 6, 3, (r1 - r2) + th * 2 + 12);
+  ctx.font = fontOf(12, 700, 'd'); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText('both seams', cx, cy - r1 - th - 8);
+  ctx.font = fontOf(10, 500); ctx.textBaseline = 'middle';
+  ctx.textAlign = 'right'; ctx.fillText('±' + fmt(h), cx - 6, cy - r1 + th + 6);
+  ctx.textAlign = 'right'; ctx.fillText('±' + fmt(nh), cx - 6, cy - r2 + th + 6);
+  ctx.font = fontOf(11, 700, 'd'); ctx.fillStyle = COL['ink-2']; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('overworld, ' + fmt(S.C) + ' round', cx, cy + r1 + th / 2 + 6);
+  ctx.fillText('Nether, ' + fmt(S.C / 8) + ' round', cx, cy + r2 + th / 2 + 4);
+  function portal(xo, col, big) {
+    const xn = fold8(xo / 8), a = ang(xo, h);
+    const p1 = [cx + r1 * Math.cos(a), cy + r1 * Math.sin(a)], p2 = [cx + r2 * Math.cos(a), cy + r2 * Math.sin(a)];
+    ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = big ? 2 : 1.4; ctx.setLineDash(big ? [] : [3, 3]);
+    ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.stroke(); ctx.restore();
+    [p1, p2].forEach(p => { ctx.fillStyle = '#6A2BC2'; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.fillRect(p[0] - 4, p[1] - 6, 8, 12); ctx.strokeRect(p[0] - 4, p[1] - 6, 8, 12); });
+    return xn;
+  }
+  const fold8 = x => ((((x + nh) % (2 * nh)) + 2 * nh) % (2 * nh)) - nh;
+  const d = nthPos();
+  const xo = N.x, xn = portal(xo, COL.ink, true);
+  nthZoom(d);
+  $('#nthXOut').textContent = fmt(xo);
+  kv($('#nthKv'), [
+    ['your overworld portal', 'x = ' + fmt(xo)],
+    ['links to the Nether at', 'x = ' + fmt(xn, 1) + ' (' + fmt(xo) + ' ÷ 8, folded into ±' + fmt(nh) + ')'],
+    ['stored Nether strip', 'x −' + fmt(nh) + ' … ' + fmt(nh - 1)],
+    ['the End', 'does not loop (vanilla)']
+  ]);
+}
+$('#nthX').addEventListener('input', e => { N.x = Math.round(lerp(-H(), H() - 1, +e.target.value)); nthDraw(); });
+// a close-up of both seams, the Nether drawn at 8 times the overworld's scale so linked spots line up
+function nthZoom(d) {
+  const cv = $('#nthZoom'); const { ctx, w, h: ch } = setupCanvas(cv);
+  ctx.clearRect(0, 0, w, ch);
+  const h = H(), span = 48, x0 = h - span, ppb = (w - 20) / (2 * span), px = x => 10 + (x - x0) * ppb;
+  const rows = [{ y: 26, lbl: 'overworld', col: [96, 146, 72] }, { y: 86, lbl: 'Nether', col: [128, 40, 30] }];
+  rows.forEach((r, i) => {
+    ctx.fillStyle = 'rgb(' + r.col.join(',') + ')'; ctx.fillRect(10, r.y, w - 20, 22);
+    ctx.font = fontOf(10, 650, 'd'); ctx.fillStyle = COL['ink-2']; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText(r.lbl, 10, r.y - 3);
+    ctx.fillStyle = 'rgba(0,0,0,.22)';
+    const step = i === 0 ? 8 : 8;             // one Nether block = 8 overworld blocks
+    for (let x = x0; x <= h + span; x += step) ctx.fillRect(Math.round(px(x)), r.y, 1, 22);
+  });
+  ctx.save(); ctx.strokeStyle = COL.seam; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(px(h), 14); ctx.lineTo(px(h), 112); ctx.stroke(); ctx.restore();
+  ctx.font = fontOf(10, 700, 'd'); ctx.fillStyle = COL.seam; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText('seam', px(h), 13);
+  [h - (h - d), h + (h - d)].forEach((gx, i) => {
+    const p = px(gx), stored = fold(gx), nether = stored / 8;
+    ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(p, 48); ctx.lineTo(p, 86); ctx.stroke();
+    [26, 86].forEach(y => { ctx.fillStyle = '#6A2BC2'; ctx.strokeStyle = '#1b0b33'; ctx.lineWidth = 1.5; ctx.fillRect(p - 5, y + 2, 10, 18); ctx.strokeRect(p - 5, y + 2, 10, 18); });
+    ctx.font = fontOf(10, 500); ctx.fillStyle = COL.ink; ctx.textAlign = i ? 'left' : 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(fmt(stored), p + (i ? 9 : -9), 58);
+    ctx.fillText(fmt(nether, 0), p + (i ? 9 : -9), 74);
+  });
+}
+function nthInit() { N.x = H() - 16 - 0; N.x = Math.round(H() * 0.72); $('#nthX').value = String((N.x + H()) / (S.C - 1)); nthDraw(); }
+onSize(nthInit);
+
+/* ============================ boot, resize, theme ============================ */
+xsReset(); twDraw(); lapDraw(); nthInit(); renderLog();
+// #shot: a still, mid-story state for headless screenshots (runs the same tick rules, just without waiting)
+if (location.hash === '#shot') {
+  X.playing = false;
+  for (let i = 0; i < 2000 && X.cx < H() + 16; i++) { if (i === 120) X.balls.push({ x: X.sx + 0.5, v: 1.5, age: 0 }); xsTick(); }
+  X.flash = null; renderLog(); xsDraw();
+  const t = H() + 4; P.travel = t; P.xu = t; P.xs = fold(t); lapDraw();
+  G.t = G.tTarget = 1; G.wu = 0.975; G.yaw = Math.PI * 0.86; G.pitch = 0.26;
+}
+let rT = 0;
+const redrawAll = () => { readColors(); xsDraw(); twDraw(); lapDraw(); nthDraw(); if (RM) drawGlobe(); };
+new ResizeObserver(() => { clearTimeout(rT); rT = setTimeout(redrawAll, 60); }).observe(document.body);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redrawAll);
+new MutationObserver(redrawAll).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+if (!RM) {
+  const io = new IntersectionObserver(es => {
+    if (es[0].isIntersecting && !X.playing && X.tick === 0) { X.playing = true; playLabel(); xsKick(); io.disconnect(); }
+  }, { threshold: 0.45 });
+  io.observe($('#xsBox'));
+}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+# The mic set plus Excavated Variants and Dynamic Asset Generator, at the ev set's pins: the
+# "with EV" side of the plan Q10 comparison (same pack, same Deep Time jar, same seed).
+@include mic
+@include ev
