@@ -70,6 +70,81 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — Workbench previews can no longer boot a stale Deep Time jar (agent worktree agent-a2d1ff97d824f3782, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **The bug.** `preview.py install_profile()` ran `install.sh` only when `smoke/<profile>/install.json` was
+  missing, and the Deep Time jar in a server set is a copy taken at install time under a name that never
+  changes (`deeptime-1.21.1-0.0.1.jar`; install.json recorded only that name). The main checkout's `smoke/mic`
+  on the Mac kept the jar of 2026-09-28, so every preview died on `$.deposits_synthetic: unknown key`.
+- **The fix (option B, with a record).** Every job now runs `./gradlew jar` on the checkout (about a second
+  when nothing changed), compares the built jar's sha256 with the set's copy and replaces the copy when the
+  bytes differ (written aside as a non-`.jar` file and renamed into place, so a server that has the old jar
+  open keeps its inode; any other `deeptime-*.jar` is removed). Why Gradle and not a hash of the sources
+  kept in install.json: Gradle's `jar` task already tracks exactly what goes into the jar (Java sources,
+  resources, the built-in presets and the viewer assets `processResources` packs, and through
+  `hostNatives` -> `cargoBuildJni` the Rust natives), so the check cannot miss an input the way a
+  hand-kept list of trees can, and it costs one second. A source hash is still recorded (see below) but only
+  as a label. The jar is refreshed before the block-colour table and the server lock, so nothing stale is
+  ever read; a jar that does not build fails the job with Gradle's output instead of booting older code.
+- **Where.** `tools/smoke/jarstate.py` (stdlib, Python 3.9-safe: the Mac's `/usr/bin/python3` runs
+  `preview.py`): `refresh`, `built_jar` (named by `mod_version`, never "the last one sorted"),
+  `source_hash` (sha256 over the contents of `neoforge/`, `deeptime-{jni,core,format}`, the viewer assets,
+  `Cargo.toml/lock`; not mtimes, not build outputs, no git needed), `source_rev`, `record`, `status`.
+  `preview.py`: `refresh_deeptime_jar` (called by `run_job` right after `install_profile`),
+  `preview.py refresh-jar --profile P` (the same step alone: no server, no job, no lock), and `tool_env()`:
+  the live workbench (`deeptime watch`, started by `mac-watch.sh`, not by `mac.sh`) has no
+  `GRADLE_USER_HOME` / `CARGO_HOME`, so its jobs would have built into a second `~/.gradle` on the Mac's
+  small internal disk; `run_cmd` now points them at `deeptime-cache/{gradle,cargo}` when they are unset.
+  Checked from a bare `zsh -lc` ssh session (the workbench's environment): `nix develop <profile> -c
+  ./gradlew jar` current in 0.8 s, no `~/.gradle` created.
+- **Recorded.** `install.sh` merges into install.json `deeptime_jar_sha256`, `deeptime_src_rev` (the
+  laptop's `git describe --always --dirty` at the last `mac.sh` sync; the Mac's copy has no usable git, so
+  `mac.sh` writes `.sync-rev` beside the tree after `git add -A`, untracked and invisible to flakes; on the
+  laptop it asks git), `deeptime_src_commit`, `deeptime_src_hash`, `deeptime_jar_recorded`. A refresh
+  updates them. Job status: `jar` {`refreshed`, `sha256`, `was`, `src_rev`, `src_hash`, `seconds`},
+  `timings.jar_s`, `install` carries the sha and source, the message reads "refreshed the Deep Time jar
+  in smoke/mic: … -> …" (or "the Deep Time jar is current: …") and a refreshed job ends "exported;
+  refreshed the Deep Time jar first"; `preview-area.sh` prints a `Deep Time jar:` line. The smoke report
+  (`run.py`) has a "Deep Time build" row: sha, revision, tree hash, and "STALE: the sources changed since
+  this jar was installed" when the tree no longer matches (it can only warn; it does not build).
+- **Tests.** `tools/smoke/test_jarstate.py`, 13 tests on a throwaway checkout and server set with a fake
+  Gradle whose jar bytes are a function of the sources: source hash follows content and not mtime, build
+  output or docs; refresh installs / leaves same bytes alone (same inode) / replaces atomically (an open
+  handle keeps the old bytes) / drops other `deeptime-*.jar` and leaves other mods and `-sources.jar`;
+  `built_jar` picks the `mod_version` name over a higher-sorting stale one; record and `status`;
+  `.sync-rev` wins over git; and `refresh_deeptime_jar` end to end: stale -> refreshed, again -> current,
+  touch -> current, edit -> refreshed, revert -> refreshed, status file carries `jar`, a build failure
+  swaps nothing. `python3 -m unittest discover -s tools/smoke -p 'test_*.py'` passes on the laptop
+  (3.13), on the Mac's `/usr/bin/python3` 3.9.6 and in its dev shell.
+- **Verified on the Mac** (this worktree's own copy at `/Volumes/Graphide/ban/mic/mods/agent-a2d1ff97d824f3782`;
+  `smoke/mic` seeded from the main checkout's with the 2026-09-28 jar `a2e4ff02c0ba` put back in, i.e. the
+  bug's state; the live workbench on 8642 and the main checkout's `smoke/` were not touched):
+  1. `tools/workbench/preview-area.sh --profile mic --box -5698,-1158,-5666,-1126 --preset
+     …/deposits_world_16k.json --start supercontinent --length-myr 500` (32 x 32, the `mic` profile): **done**,
+     "exported; refreshed the Deep Time jar first", `jar` refreshed `a2e4ff02c0ba` -> `1703ead73d8b`
+     (`jar_s` 0.8, the jar was already built by an earlier Gradle run), the server generated the synthetic
+     deposit world (`source run:deposits_synthetic`, 42 sites; zero "unknown key" in server.log), 88.7 s
+     total (boot 61.0 s, Chunky 12.5 s).
+  2. The same command again: **the jar is current**, `1703ead73d8b` unchanged, `jar_s` 1.2, 60.4 s total.
+  3. `preview.py refresh-jar --profile mic` around edits made on the laptop and synced by `mac.sh`:
+     `touch` DeepTime.java -> current (1.3 s; same bytes, Gradle up to date); a real change to DeepTime.java
+     (a new constant) -> **refreshed** `1703ead73d8b` -> `f6889f351c06` (2.7 s, tree hash and revision
+     `74b80daa-dirty` change); reverted -> **refreshed** again (`6fa76e763deb`, 1.3 s; a rebuilt jar is never
+     byte-identical, so a revert costs one harmless copy); **natives**: a one-string change in
+     `crates/deeptime-jni/src/lib.rs` -> refreshed `b216dc736e51` (2.6 s including the Rust rebuild), and
+     the new string is inside `natives/deeptime/macos-aarch64/libdeeptime_jni.dylib` in the installed jar
+     (`unzip -p … | strings | grep -c` = 1); reverted -> refreshed, string gone, `jarstate.py status` says
+     current.
+  4. `tools/smoke/install.sh standalone` on the Mac ran to the end and printed the record line; `run.py`'s
+     "Deep Time build" row was exercised on it (current / STALE / not recorded).
+- **Not done / notes.** `smoke/run.py` and the `-PwithMic` gates do not build the jar: they only report it
+  (run `install.sh <profile>`, or `preview.py refresh-jar --profile P`, after Java or Rust changes).
+  Gradle is not reproducible byte for byte, so a `clean` or a branch switch that makes Gradle rebuild the
+  jar looks like a change and is refreshed once. The other profiles of the main checkout's Mac
+  (`standalone`, `ev`, `terrablender`) also hold jars from 2026-09-28; each is refreshed by the first
+  preview that uses it. To make the live 8642 workbench use this: merge, then restart it from the main
+  checkout with `tools/viewer/mac-watch.sh` (it syncs that checkout and points `--preview` at its
+  `tools/workbench/preview.py` on the Mac; the server binary itself is a copy).
+
 ### 2026-09-29 — P1-20: the workbench UI overhaul, dark (agent worktree agent-a95571be05fdd89d6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Ben opened the workbench: "Sorry, that looks shit. … a complete UI overhaul to look WAYY better.
   (Also, should be dark themed.)" Then, from real use: he ran `earthlike_full_32k` for 4,600 Myr and got
