@@ -59,6 +59,9 @@ tools/review/publish.sh <name> <folder>                 # private spacesheep pag
   and runs the command in a login shell there. The laptop edits, commits and pushes. Builds from
   several agents may overlap; anything that boots Minecraft (GameTests, planet/smoke servers,
   BlueMap) must pass `--server`, which holds the Mac's single server lock (fixed ports, 16 GB shared).
+- **Real-client runs** (booting a Minecraft client for screenshots) go to the Mac's logged-in desktop
+  session too, never the laptop's Xvfb (Ben, 2026-09-28). That desktop is shared with graphide's
+  agents: take a "drive" lease with graphide's `utilities/scripts/mactest/m6lock.sh` first.
 - Ben cannot launch the game. Every check must be runnable here and reviewable in a browser.
 - LGPL-3.0-or-later. No GPL code, no line-by-line port of GPL code, GPL tools only in tools/validation/.
   Attribute every port in NOTICE.md and the file header (`SPDX-License-Identifier: LGPL-3.0-or-later`).
