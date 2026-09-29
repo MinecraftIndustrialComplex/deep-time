@@ -28,6 +28,14 @@ pub const HOST_PREFIX: &str = "deeptime:host/";
 /// Prefix of the global clocks.
 pub const CLOCK_PREFIX: &str = "deeptime:clock/";
 
+/// Names of the crust-tracking fields a moving history's frames carry: for each L1 cell, where its
+/// crust was at the start of the frame, as a column and a row offset in cells (small integers,
+/// exact in the 16-bit packing; NaN for crust born in the frame). The engine carries its
+/// accumulators with the plates through them ([`FieldHistory::origins`]).
+pub const ORIGIN_FIELDS: [&str; 2] = ["deeptime:origin_di", "deeptime:origin_dj"];
+/// A cell whose crust did not exist at the start of the frame (or of the history).
+pub const NO_ORIGIN: u32 = u32::MAX;
+
 // The fields the engine itself reads (beyond each type's rules).
 pub const ELEVATION: &str = "deeptime:elevation_m";
 pub const EROSION: &str = "deeptime:erosion_rate_m_myr";
@@ -344,6 +352,31 @@ pub trait FieldHistory: Send + Sync {
     /// Present-day drainage: the L1 cell each cell drains to (itself for a sink or the sea), from
     /// P1-04's routing. `None` when unknown (placers then stay at their source).
     fn receivers(&self) -> Option<&[u32]>;
+
+    /// Crust motion into frame `k`: for each L1 cell, the cell that held its crust at the end of
+    /// frame `k − 1` ([`NO_ORIGIN`] for crust born in frame `k`). `None` when the crust does not
+    /// move in this history (the synthetic one, frame 0, a history recorded without the origin
+    /// fields): cells are then fixed crust parcels.
+    fn origins(&self, _k: usize) -> Result<Option<Vec<u32>>, CoreError> {
+        Ok(None)
+    }
+}
+
+/// Origin cells from the offsets of [`ORIGIN_FIELDS`] (`w` columns): NaN offsets are new crust.
+pub fn origins_from_offsets(w: usize, di: &[f32], dj: &[f32]) -> Vec<u32> {
+    let h = di.len() / w.max(1);
+    di.iter()
+        .zip(dj)
+        .enumerate()
+        .map(|(c, (&a, &b))| {
+            if !a.is_finite() || !b.is_finite() {
+                return NO_ORIGIN;
+            }
+            let i = (c % w) as i64 + a.round() as i64;
+            let j = ((c / w) as i64 + b.round() as i64).clamp(0, h as i64 - 1);
+            (j as usize * w + i.rem_euclid(w as i64) as usize) as u32
+        })
+        .collect()
 }
 
 /// A history held in memory (tests; and the shape P1-03…P1-07 can record into).
