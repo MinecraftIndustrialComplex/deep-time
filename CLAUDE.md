@@ -46,6 +46,7 @@ cd neoforge && nix develop -c ./gradlew build test && python3 ../tools/ci/junit-
 tools/smoke/install.sh <standalone|mic|terrablender> [--size N] [--synth K] && python3 tools/smoke/run.py --profile <p>
 tools/client/mac-screenshots.sh [--name N] [--no-guidance] [--no-create]   # real client on the Mac's desktop → review/out/N/
 tools/review/publish.sh <name> <folder>                 # private spacesheep page (plan §2.6)
+tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | status   # workbench on the Mac → http://mac-mini:8642/ (tailnet only)
 
 ## Rules
 - NixOS: nothing global. Run builds, tests and every `cargo` through `nix develop -c` (the profile's
