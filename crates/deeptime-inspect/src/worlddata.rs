@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The world data a render is checked against (`crates/deeptime-format/FORMAT.md`), sampled the
-//! way the mod samples it: `elevation` bilinear with x wrapped into the canonical span
-//! (`WorldData.height`), `water_level` nearest, and the strata stack of the nearest L1 cell
-//! (`StrataPass`).
+//! way the mod samples it: the terrain height with x wrapped into the canonical span
+//! (`WorldData.height`: `elevation` bilinear plus, in a baked world, the detail term),
+//! `water_level` nearest, and the strata stack of the nearest L1 cell (`StrataPass`).
 
 use std::path::{Path, PathBuf};
 
-use deeptime_format::{LoadedLayer, Manifest, RasterRead, TilePackReader};
+use deeptime_format::{DetailSpec, LoadedLayer, Manifest, Noise, RasterRead, TilePackReader};
 
 use crate::error::{Error, Result};
 
@@ -15,6 +15,8 @@ pub struct WorldData {
     pub manifest: Manifest,
     pub circumference: i64,
     elevation: LoadedLayer,
+    /// The detail term of a baked world (format 0.1): its spec, noise and amplitude layer.
+    detail: Option<(DetailSpec, Noise, LoadedLayer)>,
     water: Option<LoadedLayer>,
     strata: Option<LoadedLayer>,
     pub classes: Vec<String>,
@@ -35,6 +37,15 @@ impl WorldData {
             .ok_or_else(|| Error(format!("{}: no elevation layer", dir.display())))?;
         let water = load_layer(dir, &manifest, "water_level")?;
         let strata = load_layer(dir, &manifest, "strata/horizons")?;
+        let detail = match DetailSpec::of(&manifest)? {
+            Some(spec) => {
+                let amp = load_layer(dir, &manifest, &spec.layer)?
+                    .ok_or_else(|| Error(format!("{}: no {} layer", dir.display(), spec.layer)))?;
+                let noise = Noise::new(spec.seed()?, manifest.scale.circumference_blocks);
+                Some((spec, noise, amp))
+            }
+            None => None,
+        };
         let classes = std::fs::read_to_string(dir.join("strata/classes.json"))
             .ok()
             .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
@@ -52,6 +63,7 @@ impl WorldData {
             manifest,
             circumference,
             elevation,
+            detail,
             water,
             strata,
             classes,
@@ -64,10 +76,15 @@ impl WorldData {
         (x + c / 2).rem_euclid(c) - c / 2
     }
 
-    /// The terrain height H at column (x, z): bilinear `elevation`, NaN where it has no data.
+    /// The terrain height H at column (x, z): bilinear `elevation`, plus the detail term A·N in a
+    /// baked world (`deeptime_format::ColumnWorld::height`); NaN where it has no data.
     pub fn height(&self, x: i32, z: i32) -> f64 {
-        self.elevation
-            .bilinear(self.wrap_x(i64::from(x)) as f64, f64::from(z))
+        let (bx, bz) = (self.wrap_x(i64::from(x)) as f64, f64::from(z));
+        let e = self.elevation.bilinear(bx, bz);
+        match &self.detail {
+            Some((spec, noise, amp)) => e + amp.bilinear(bx, bz) * spec.noise(noise, bx, bz),
+            None => e,
+        }
     }
 
     /// The top solid block the generator must produce for H: `⌈H⌉ − 1` (the density is positive
