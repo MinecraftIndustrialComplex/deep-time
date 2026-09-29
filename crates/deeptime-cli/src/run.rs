@@ -156,11 +156,14 @@ pub fn print_census(census: &Value) {
     for t in census["types"].as_array().into_iter().flatten() {
         let f = |k: &str| t[k].as_f64().unwrap_or(0.0);
         println!(
-            "deposits {:<30} sites={:>3} target={:>7.2} expected={:>7.2} at_positions={:>7.2} preservation={:.3} formed_expected={:>7.2} drawn={:>3} capped={} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={}",
+            "deposits {:<30} sites={:>3} counted={:>3} density={:.1} target={:>7.2} expected={:>7.2} expected_sites={:>7.2} at_positions={:>7.2} preservation={:.3} formed_expected={:>7.2} drawn={:>3} capped={} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={}",
             t["id"].as_str().unwrap_or("?"),
             f("sites"),
+            f("counted"),
+            f("density"),
             f("target"),
             f("expected"),
+            f("expected_sites"),
             f("expected_at_positions"),
             f("preservation"),
             f("expected_formed"),

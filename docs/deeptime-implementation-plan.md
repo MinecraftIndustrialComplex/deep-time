@@ -2328,6 +2328,21 @@ regional MVT driver"):*
   N\* (`recorded_tests::the_survivor_formula_hits_its_target_in_expectation`). The census reports
   `target`, `preservation`, `expected_formed`, `expected` (survivors), `drawn` (formed) and
   `expected_at_positions`.
+- **Which density, which survivors** (decisions log 2026-09-29, Ben's answers to the three
+  follow-ups). ρ is the **mean** of the type's density distribution where a real USGS distribution
+  exists (`sizing.density_basis: measured`; porphyry: the split lognormal through Singer et al.
+  2005's 4 / 15 / 35 has mean 17.8), and its P50 otherwise (`estimate`: a single sourced figure or a
+  placeholder, never inflated). Only survivors whose **top lies within the assessment depth** count
+  toward N\* — `preservation.assessment_depth_m`, 1 km by default: USGS hard-rock assessments count
+  deposits to 1 km, a deposit counting if any part lies within it (Circular 1178, p. 15) — so
+  λ_i uses p̄₁ (the chance of surviving within that depth) and the deeper survivors are sites on
+  top (census `expected_sites`, `counted`). Coal counts to 1,800 m (Circular 891: coal deeper than
+  6,000 ft is excluded from resources), petroleum at any depth in the build range (USGS petroleum
+  assessments have no fixed cut-off; deep gas counts below 4.5 km, Dyman et al. 2002). Densities
+  researched: SEDEX 1 / 5 / 12.5 per 100,000 km² from the 1998 USGS National Mineral Resource
+  Assessment's sedex tracts (Circular 1178, mrdata.usgs.gov/nmra: 12 tracts with numeric
+  estimates, 207,508 km², about 2 / 10 / 26 undiscovered deposits; an estimate and a lower bound);
+  coal has no published deposit density (its 30 stays a placeholder).
 - **MVT's driver is regional.** MVT ore forms where basin-scale, topography-driven flow from a
   rising orogen sweeps hot basinal brines across a foreland basin into platform carbonates at its
   margin (Garven & Freeze 1984; Garven 1985; Bethke & Marshak 1990; Leach et al. 2001, 2005, 2010;

@@ -54,6 +54,7 @@
     "formation_depth_m": 800,
     "vertical_extent_m": 2,
     "erosion_behavior": "truncate",
+    "assessment_depth_m": 1800,
     "resistates": []
   },
   "coal": {
@@ -78,6 +79,6 @@
     "PLACEHOLDER tonnage 4.2 / 13 / 25 Mt: one mine-sized block of 1.2 km radius (Circular 891's indicated-reliability radius) × seams of 28, 84 and 168 in (Circular 891 thickness class limits) × 1.32 t/m³ — not a USGS distribution. The aspect follows (a 2 m seam over a 1–1.5 km block).",
     "PLACEHOLDERS: density_per_1e5km2 10 / 30 / 80 (no USGS density), min_separation_m 2400 (two block radii), formation_depth_m 800.",
     "Rank from Lopatin TTI of the coal layer: TTI 75 ↔ Ro ≈ 1.1 % (Waples' correspondence as tabulated by the Kansas Geological Survey, non-USGS; the high-volatile bituminous limit). The lignite, subbituminous and low-volatile bounds are PLACEHOLDERS (no USGS table of reflectance by rank was found).",
-    "Design values: the curves, clustering, dip, size_mult_v 20 (a 2 m seam is a tenth of a block at 20 m per block)."
+    "Density (research 2026-09-29, decisions log \"Research real densities\"): no published coal deposit density exists — USGS coal assessments count tonnage in beds, not deposits per area (Circular 891; the Powder River assessment, PP 1809: 47 beds over ~50,500 km²; IEA CCC/32 lists basins of 450–90,000 km²). The 30 per 100,000 km² stays a placeholder (P50, not inflated; decision for Ben: what a coal deposit is). The assessment depth is USGS Circular 891's: coal deeper than 6,000 ft (1,800 m) is excluded from resources (printed p. 24, Table 3 p. 14). Design values: the curves, clustering, dip, size_mult_v 20 (a 2 m seam is a tenth of a block at 20 m per block)."
   ]
 }

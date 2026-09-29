@@ -949,8 +949,8 @@ struct TypeCensus {
     tracts: usize,
     permissive_km2: f64,
     mean_f: f64,
-    /// N* = count_mult · ρ/10⁵ · Σ A: the survivors the USGS density asks for (plan §8.6 as
-    /// built 2026-09-29, [`survival`]).
+    /// N* = count_mult · ρ/10⁵ · Σ A: the survivors within the assessment depth the USGS density
+    /// asks for (plan §8.6 as built 2026-09-29, [`survival`]).
     target: f64,
     /// P̄: the share of what forms that the planet preserves (formation-weighted).
     preservation: f64,
@@ -960,8 +960,15 @@ struct TypeCensus {
     capped: bool,
     /// Σ λ: the deposits expected to form.
     expected_formed: f64,
-    /// Σ λ·p̄: the survivors expected (= `target` unless capped).
+    /// Σ λ·p̄₁: the survivors within the assessment depth expected (= `target` unless capped).
     expected: f64,
+    /// The density aimed at (per 100,000 km²): the mean of a measured distribution, P50 of an
+    /// estimate.
+    density: f64,
+    /// Σ λ·p̄: all survivors expected (sites, the deeper ones included).
+    expected_sites: f64,
+    /// Sites whose top lies within the assessment depth (what the density counts).
+    counted: usize,
     /// Deposits formed (drawn).
     drawn: u64,
     /// Σ p(c) over the deposits formed, at the cells they were placed in: the survivors the
@@ -1518,13 +1525,13 @@ impl DepositStage {
             // p(c): the chance a deposit formed in each tract cell survives to the present.
             let model = survival::FateModel::new(t);
             let pet_rules = t.petroleum.as_ref();
-            let p_cell: Vec<f64> = ctx.pool.install(|| {
+            let p_cell: Vec<(f64, f64)> = ctx.pool.install(|| {
                 plan.cells
                     .par_iter()
                     .enumerate()
                     .map(|(j, &cell)| {
                         let Some(i) = cols.index(cell) else {
-                            return 0.0;
+                            return (0.0, 0.0);
                         };
                         let net = cols.net(i, &self.state.frame_times);
                         let limit = survival::too_deep_limit_m(
@@ -1538,7 +1545,9 @@ impl DepositStage {
                             }
                             FormationKind::Start => survival::Formation::Start,
                             FormationKind::Charge => {
-                                let Some(r) = pet_rules else { return 0.0 };
+                                let Some(r) = pet_rules else {
+                                    return (0.0, 0.0);
+                                };
                                 let t_trap = f64::from(self.state.pet[cell as usize].t_trap);
                                 let Some(ch) = petroleum::charge(
                                     &grid,
@@ -1548,7 +1557,7 @@ impl DepositStage {
                                     r,
                                     sc.m_per_block_h,
                                 ) else {
-                                    return 0.0;
+                                    return (0.0, 0.0);
                                 };
                                 let k = self.frame_at(ch.t_charge);
                                 let (te, dt) = self.state.frame_times[k];
@@ -1562,16 +1571,23 @@ impl DepositStage {
                                 }
                             }
                         };
-                        survival::preservation(&model, &net, when, limit)
+                        (
+                            survival::preservation(&model, &net, when, limit, false),
+                            survival::preservation(&model, &net, when, limit, true),
+                        )
                     })
                     .collect()
             });
-            let p_of = |cell: u32| plan.cells.binary_search(&cell).map_or(0.0, |j| p_cell[j]);
+            // p: survives as a site; p₁: survives with its top within the assessment depth (what
+            // the density counts).
+            let p_of = |cell: u32| plan.cells.binary_search(&cell).map_or(0.0, |j| p_cell[j].0);
+            let p1_of = |cell: u32| plan.cells.binary_search(&cell).map_or(0.0, |j| p_cell[j].1);
             // Per tract: its endowment E_i, its formation weight φ_i = A·F̄·E and its preservation
             // p̄_i (p averaged with the position weights F·E).
             let mut areas = Vec::with_capacity(tracts.len());
             let mut phis = Vec::with_capacity(tracts.len());
             let mut pbars = Vec::with_capacity(tracts.len());
+            let mut pbars_site = Vec::with_capacity(tracts.len());
             for tr in tracts {
                 let e = tr
                     .cells
@@ -1579,25 +1595,30 @@ impl DepositStage {
                     .map(|c| endow[provinces.of_cell[*c as usize] as usize])
                     .sum::<f64>()
                     / tr.cells.len() as f64;
-                let (mut num, mut den, mut plain) = (0.0, 0.0, 0.0);
+                let (mut num, mut num_s, mut den, mut plain, mut plain_s) =
+                    (0.0, 0.0, 0.0, 0.0, 0.0);
                 for &c in &tr.cells {
                     let w = fv[c as usize] * endow[provinces.of_cell[c as usize] as usize];
-                    let p = p_of(c);
-                    num += w * p;
+                    let (p1, p) = (p1_of(c), p_of(c));
+                    num += w * p1;
+                    num_s += w * p;
                     den += w;
-                    plain += p;
+                    plain += p1;
+                    plain_s += p;
                 }
-                pbars.push(if den > 0.0 {
-                    num / den
+                let cells = tr.cells.len() as f64;
+                pbars.push(if den > 0.0 { num / den } else { plain / cells });
+                pbars_site.push(if den > 0.0 {
+                    num_s / den
                 } else {
-                    plain / tr.cells.len() as f64
+                    plain_s / cells
                 });
                 areas.push(tr.area_km2);
                 phis.push(tr.area_km2 * tr.mean_f * e);
             }
             let count_mult = self.params.count_mult * t.balance.count_mult;
             let fp = survival::plan(
-                t.sizing.density_per_1e5km2.p50,
+                t.sizing.density_target(),
                 count_mult,
                 &areas,
                 &phis,
@@ -1620,6 +1641,14 @@ impl DepositStage {
                 // (+ 0.0: an empty sum is −0.0.)
                 cen.expected_formed = fp.formed.iter().sum::<f64>() + 0.0;
                 cen.expected = fp.expected_survivors;
+                cen.density = t.sizing.density_target();
+                cen.expected_sites = fp
+                    .formed
+                    .iter()
+                    .zip(&pbars_site)
+                    .map(|(l, p)| l * p)
+                    .sum::<f64>()
+                    + 0.0;
             }
             if fp.capped {
                 ctx.log.push(
@@ -1813,7 +1842,7 @@ impl DepositStage {
             "bodies": world.bodies.len(),
             "max_formed_per_survivor": self.params.max_formed_per_survivor,
             "brine_flow_km": self.params.brine_flow_km,
-            "formula": "survivors: target = count_mult · ρ_p50/1e5 · Σ_tracts A_km2 (plan §8.6 as built 2026-09-29: USGS densities count survivors); formed λ_i = target · φ_i / Σ φ_j p̄_j with φ = A · mean_F · endowment and p̄ the tract's modelled preservation, capped at max_formed_per_survivor; expected = Σ λ_i p̄_i",
+            "formula": "survivors: target = count_mult · ρ/1e5 · Σ_tracts A_km2, ρ the mean of a measured USGS density distribution or the P50 of an estimate (plan §8.6 as built 2026-09-29: USGS densities count survivors whose top lies within the assessment depth, 1 km for hard-rock types); formed λ_i = target · φ_i / Σ φ_j p̄₁_j with φ = A · mean_F · endowment and p̄₁ the tract's modelled chance of surviving within the assessment depth, capped at max_formed_per_survivor; expected = Σ λ_i p̄₁_i; expected_sites = Σ λ_i p̄_i counts the deeper survivors too",
         });
         world
             .notes
@@ -1822,8 +1851,8 @@ impl DepositStage {
             ctx.log.push(
                 crate::log::Level::Info,
                 format!(
-                    "deposits {}: sites={} target={:.2} expected={:.2} at_positions={:.2} preservation={:.3} formed_expected={:.2} drawn={} tracts={} permissive_km2={:.0} mean_F={:.3} eroded={} truncated={} too_deep={} children={} guaranteed={}{}",
-                    tc.id, tc.sites, tc.target, tc.expected, tc.expected_at_positions, tc.preservation, tc.expected_formed, tc.drawn, tc.tracts, tc.permissive_km2,
+                    "deposits {}: sites={} counted={} target={:.2} expected={:.2} expected_sites={:.2} at_positions={:.2} preservation={:.3} formed_expected={:.2} drawn={} tracts={} permissive_km2={:.0} mean_F={:.3} eroded={} truncated={} too_deep={} children={} guaranteed={}{}",
+                    tc.id, tc.sites, tc.counted, tc.target, tc.expected, tc.expected_sites, tc.expected_at_positions, tc.preservation, tc.expected_formed, tc.drawn, tc.tracts, tc.permissive_km2,
                     tc.mean_f, tc.eroded, tc.truncated, tc.too_deep, tc.children, tc.guaranteed,
                     if tc.capped { " CAPPED" } else { "" }
                 ),
@@ -2150,6 +2179,9 @@ impl DepositStage {
             f.census[ti].truncated += 1;
         } else {
             f.census[ti].buried += 1;
+        }
+        if centre_depth - half_m <= t.preservation.assessment_depth_m {
+            f.census[ti].counted += 1;
         }
         let dip = if t.geometry.dip_deg[1] > t.geometry.dip_deg[0] {
             (t.geometry.dip_deg[0]
