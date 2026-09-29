@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · Next: P1-09 climate mapping, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · Next: P1-09 climate mapping, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -73,6 +73,95 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — Settings audit: the world-shaping knobs become editor settings (agent worktree agent-aebf7d2ff8d444591, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben, 2026-09-29 (decisions log): "Again, shoud be configurable. For now go for Medium" (terrain carving), with the standing rule that
+  tuning knobs that shape the world are settings with a sensible default, not constants. Then, on this work: "Wire them up
+  (Recommended)" (the planned Multipliers) and "Show only Earth-like (Recommended)" (the workbench's preset list).
+- **What.** `editor_fields.json` (shared by the game's `EditorFields` and the workbench) now has, besides the old sections:
+  a **Terrain** section (`drama`; **Terrain carving** = `amplify.incision_cap`, subtle 0.5 / **medium 3, the default** /
+  dramatic 10, range 0.25–10, named `stops` the workbench shows as buttons; the core accepts (0, 100] now, 10 is "practically
+  uncapped": on the 100 Myr planet the amplifier's eroded volume is 0.39 / 0.56 / 0.69 / 0.84 / 0.92 / 0.97 / 0.98 / 1.00 of the
+  uncapped run's at 0.25 / 0.5 / 1 / 3 / 5 / 8 / 12 / ∞, and the flood's largest repair is 3 m at 3, 13 m at 12, 82 m uncapped)
+  and **five collapsed Advanced sections, one per stage** (`advanced_sections`). Every field has a plain-language `hint`.
+  Defaults are the calibrated values, and **the pipeline presets (and so the built-in `earthlike_*`, synced by
+  `tools/dev/sync_builtin_presets.py`) now carry every such key**, since a field is editable only where the preset carries its path.
+  A path may index an array (`structure.pluton_length_km.0`, `surface.sea_level.cycles.0.amplitude_m`); a `choice` may list
+  `options` (`deposits.province`); `Formats.number` writes 2e-9 (six decimals rounded it away).
+  Settings added (id → key, range, default; the unit is in the catalogue):
+  - Terrain: carving `amplify.incision_cap` 0.25–10 (3); drama `surface.drama` 0–2 (1, existed).
+  - Multipliers (wired to the core, all default 1, replacing the eight `planned` fields except three): deposit count
+    `deposits.count_mult` 0–10; **deposit size** `deposits.size_mult` 0.1–10 (scales every type's tonnage percentiles, so the body
+    volume follows: 8× the ore is a body twice as wide); **deposit richness** `deposits.richness_mult` 0.1–10 (grades and the
+    metal each site holds, grades stay ≤ 1); province strength `deposits.province` off/weak/medium/**strong** (a fixed-list choice, was
+    a 0–1 proposal); **feature scale, deposits** `scale.feature_scale.deposits` 0.1–10 (ore bodies' size in blocks, tonnage and grade
+    unchanged); **feature scale, strata** `scale.feature_scale.strata` 0.1–10 (every layer's thickness in blocks: the bake divides the
+    metres per block by it). `params::FeatureScale`, `DepositParams.{size_mult, richness_mult}`, `select_types(params, feature)` folds
+    them into each type's own balance, so 1 is exact.
+  - Advanced · Plates and crust: plates `tectonics.initial_plates` 4–40 (14, integer); continents at the start
+    `tectonics.scattered_continents` 1–12 (6); breakup rate `rift_lambda0` 0–0.04 (0.012); ridge depth `ridge_elevation_m`
+    −4500…−500 m (−2500); flooded margin `continental_shelf_share` 0–0.6 (0.29); island-arc build-up `arc_uplift_mm_yr` 0.05–1 (0.3);
+    mountain uplift `subduction_uplift_mm_yr` 0.1–2 (0.6); mountain belt width `subduction_distance_km` 400–2000 (800); collision belt
+    width `collision_distance_km` 800–4200 (2000).
+  - Advanced · Erosion and coasts: erosion strength `surface.k_spl` 1e-10…1e-8 (2e-9); isostatic rebound `isostasy` 0.3–0.9 (0.8);
+    hillslope creep `kd_land_m2_yr` 0.1–20 (2); coastal erosion `kd_marine_m2_yr` 0–300 (100); wave base `wave_base_m` 10–200 (60);
+    limestone growth `carbonate_max_mm_yr` 0–30 (10); salt deposition `evaporite_m_myr` 0–500 (100); sea-level offset
+    `sea_level.base_m` ±200 (0); sea-level swings `sea_level.cycles.0.amplitude_m` 0–200 (80).
+  - Advanced · Climate: ice-sheet feedback `climate.ice_sheet_feedback` 0–1 (1); lapse rate 3–9 °C/km (6.5); rain reach
+    `moisture_decay_km` 1000–8000 (3500); monsoon shift `itcz_max_shift_deg` 0–35 (22); mountain rain `oro_hours_per_day` 0.1–3 (0.5);
+    snowline `ela_offset_c` ±8 °C (0).
+  - Advanced · Granite bodies: `structure.pluton_rate_km2_myr` 1e-7…1e-4 (1e-5); size `pluton_length_km.0` 8–80 km (25).
+  - Advanced · Ore provinces: province size `deposits.province_km` 300–3000 (800); brine flow reach `deposits.brine_flow_km` 100–2000 (600,
+    MVT's regional driver, added by the deposit rework).
+  Also the planet ranges moved to what the extremes allow: `planet.ocean_fraction` 0.31–0.95, `scale.m_per_block_h` 50–10000.
+  **Left out on purpose** (the catalogue's `_comment` says so): iteration counts, solver tolerances, tile and grid sizes, time steps,
+  frame and snapshot intervals, horizon and layer counts, event thresholds, the energy balance's radiation constants, the orographic
+  physics constants, the rest of Cortial's plate constants, `deposits.max_formed_per_survivor` (a cap of the count model),
+  `tectonics.abyssal_elevation_m` and `trench_elevation_m` (validated, never read by the model: an ocean-floor-depth knob changed
+  nothing in a 100 Myr run, so it was dropped again), `amplify` constants other than the cap, `surface.substeps`.
+  **Still `planned`, and why:** rivers and canyons scales (`scale.feature_scale.rivers` / `canyons`): the model has no rivers or
+  canyons to size before Phase 2's river and cave stages (the detail layer only fades noise along channels); the **essentials** list
+  (`playability.essentials`): it is pack-defined (datapack lists the game would offer), the core takes inline `Essential` entries and
+  there is no datapack loader for named lists yet.
+- **Game.** The setup page keeps the Advanced sections behind one header button ("+ Advanced settings (n)", "· k changed" when edited),
+  closed by default, open in the page's own scrolling list with each stage as a sub-header; tooltips show the hint and range; a choice
+  cycles its options. `EditorModel.advancedOpen/advancedAvailable/advancedEdited`, `EditorFields.ADVANCED/advancedFields/advancedSections`,
+  `Field.hint/options`. The ScreenshotDriver opens and scrolls it (`02b`, `02c`). **Workbench** (no `workbench.js` change was needed for
+  the sections; small additions): advanced sections start folded, integer knobs are sliders, choices list their options, `stops` are
+  buttons, and the page lists only the **Earth-like family** (`watch/editor.rs` `PresetEntry.hidden`: pipeline and plates presets stay
+  resolvable by name for tests and the CLI but are not in `/api/catalog`, and a share code of one loads as an imported preset); the
+  default is Earth-like · quick · 16k, and `FAMILY` names `earthlike_*`. The in-game editor lists only `Presets.BUILTIN` (unchanged).
+- **Extremes.** `tools/dev/knob_extremes.py` (stdlib) runs every catalogue field the preset carries at both ends (numbers) or each
+  option (choices) on a 100 Myr `pipeline_quick_16k` planet through the amplifier: about 110 runs over the session (Mac M6, `--jobs 3 --threads 4`, ~1–5 min each).
+  Verdict: process succeeds, no panic or non-finite value, mass residual ≤ 1e-2 km³ (all under 5e-3), no sink. **One found a bug:**
+  `planet.ocean_fraction` 0.25 with the presets' shelf share 0.29 asks for continental crust over 100 % of the planet and the surface
+  stage's elevations come out NaN everywhere (`body 0: centre is not finite`); `PlanetPreset::validate` now refuses continental crust
+  over 98 % (`params::MAX_CONTINENTAL_SHARE`, tested), naming both fields; ocean fraction min raised to 0.31 (land 0.85 there, flagged
+  "almost no sea" by the script and kept: a valid desert world) and `m_per_block_h` min to 50 (10 m/block left 0.000 of the planet
+  above the sea). Non-obvious extremes: `star_flux` 0.1 / 10 give −95 / +1030 °C land (planet ranges are P1-03's, not touched here);
+  `m_per_block_h` 10000 gives 274,262 plutons (the count scales with area). `drama`, `m_per_block_v`, the deposit and feature
+  scales change nothing in the amplifier's summary lines (they act in the bake and the deposit records).
+- **Default runs are bit-identical.** Master (16e4c90, before this branch) against this branch's merge with it, `pipeline_quick_16k`,
+  scattered continents, 100 Myr, 6 threads: `diff -rq` of the whole world folder (keyframes, L3 elevation and detail rasters) reports
+  nothing. (Checkpoints differ in size only: the preset they carry now names the keys explicitly.)
+- **Round trip.** Share codes: `crates/deeptime-core/tests/share-codes.json` case `pipeline_quick_16k_tuned` (a pipeline preset with 13 knobs
+  changed; Rust and Java encode it, both decode both): `AdvancedSettingsTest` (Java: every field of a code shows in its field, the model
+  writes back the same JSON, top of every range and last option survive export → import) and `editor.rs`
+  `a_tuned_code_from_the_game_loads_unchanged` (the workbench decodes both codes, `effective` returns the very same JSON and each
+  field's value). Game to workbench and back is the same two tests on one file.
+- **Measured gates** (Mac, branch merged with master b8788a7): `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`,
+  `deny check licenses bans` clean; `cargo test --workspace --locked`: cli 30, core 233 (+3 ignored), format 40, history_cap 1, others as before, 0 failed
+  (new: `deposits::tests::the_global_multipliers_fold_into_the_types`, `bake_horizons::tests::the_strata_feature_scale_thickens_every_layer`,
+  `params::tests::the_pipeline_presets_write_out_the_tuning_knobs_at_their_defaults`, incision-cap range, the ocean-floor refusal, several
+  editor tests); `cd neoforge && ./gradlew build test`: tests=134 failures=0 (new `AdvancedSettingsTest` 9, `Formats`, lang keys).
+  GameTests not re-run.
+- **Screenshots** (gitignored, on the laptop): real client
+  (`tools/client/mac-screenshots.sh --name settings --no-guidance --no-create`, the Mac's desktop, exit 0): `02b-setup-advanced.png`,
+  `02c-setup-advanced-scrolled.png` (the Advanced header open and the list scrolled to the erosion and climate sections) next to the
+  usual `01`…`09` (`review/out/settings/`); workbench (`review/out/settings-workbench/`) from a private instance on port 8653 (`tools/viewer/shot.py`, headless Chromium through an ssh tunnel; the live
+  8642 was not touched): `workbench-editor-default.png` (Earth-like · quick default, only the two families), `workbench-terrain-carving.png`
+  (the carving with its stops, the Multipliers), `workbench-advanced-open.png`.
+- **Next.** Rivers and canyons scales with Phase 2; the essentials list with the datapack loader. P1-17 proper should re-check that
+  every range still holds after its final numbers (`python3 tools/dev/knob_extremes.py --bin target/release/deeptime --out build/knobs`).
 ### 2026-09-29 — P1-20 stage 2 follow-up: previews and click-to-inspect show the run's own terrain (agent worktree agent-afd5791e0f5ea82cd, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What a finished workbench run leaves.** `deeptime watch` already bakes: `Run::drive` calls
   `Session::finalize_write`, which bakes every planet preset, so `<runs>/<id>/world/` holds manifest `format_version`
