@@ -13,8 +13,9 @@
 #
 #   --pack     also sync the MIC pack and its rock-tag datapack to the Mac (mic profiles)
 #   --name     the job id (default: <date>-<time>-laptop)
-#   --install  run tools/smoke/install.sh <profile> on the Mac first (always after Java changes:
-#              the server set carries the Deep Time jar it was installed with)
+#   --install  run tools/smoke/install.sh <profile> on the Mac first (for a changed pack or jar set;
+#              not needed for Java or Rust changes: every job builds the Deep Time jar and replaces
+#              the server set's copy when its bytes differ, and says so in its status)
 #
 # Everything else goes to tools/workbench/preview.py run (README.md next to this file). Paths are
 # relative to the repo root. The run holds the Mac's server lock (mac.sh --server), waiting for it
@@ -55,6 +56,10 @@ import json, sys
 s = json.load(open(sys.argv[1]))
 print(f"\njob {s['job']}: {s['state']} — {s.get('message', '')}")
 print("timings:", json.dumps(s.get("timings", {})))
+if s.get("jar"):
+    j = s["jar"]
+    print(f"Deep Time jar: {'REFRESHED' if j['refreshed'] else 'current'}, sha256 {j['sha256'][:12]}, "
+          f"source {j['src_rev']} / tree {j['src_hash']}, {j['seconds']} s")
 for e in s.get("exports", []):
     st = e["summary"]["stats"]
     print(f"  {e['file']}: box {e['box']}, {e['bytes'] / 1e6:.2f} MB, {st['non_air']:,} blocks, {st['runs']:,} runs, "

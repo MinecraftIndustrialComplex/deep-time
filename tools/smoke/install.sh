@@ -32,6 +32,10 @@
 # for the plan Q10 comparison; ev-client is the ev set plus Create, the smallest set a client needs to
 # generate EV's variant textures for every ore and stone the MIC pack has (tools/client/ev-assets.sh).
 #
+# install.json records the Deep Time jar's sha256 and the source it was built from (jarstate.py). The
+# jar copy goes stale as soon as the sources change; tools/workbench/preview.py refreshes it itself
+# (build, compare, replace), so a preview needs no re-install for Java or Rust changes.
+#
 # Idempotent: downloads are cached under smoke/cache/ and packwiz-installer syncs, so a
 # re-run picks up exactly what the pack pins today. NOTHING under pack/ is written, and
 # nothing under mods/mic-climate is read or written.
@@ -356,5 +360,8 @@ cat > "$SMOKE/install.json" <<EOF
  "pack_ref": "${PACK_REF:-}", "pack_stale_hashes": "${PACK_STALE:-}",
  "deeptime_jar": "$(basename "$JAR")", "game_port": $GAME_PORT, "rcon_port": $RCON_PORT}
 EOF
+# What the jar was built from (its sha256, the source revision and a hash of the source trees), so a
+# smoke run can report it and tools/workbench/preview.py can see when the copy went stale.
+python3 "$REPO/tools/smoke/jarstate.py" record "$SMOKE/install.json" "$SERVER/mods/$(basename "$JAR")" --repo "$REPO"
 echo "$NEO" > "$SMOKE/neoforge.version"
 say "ready: $SERVER (mods: $(find "$SERVER/mods" -maxdepth 1 -name '*.jar' | wc -l), excluded: $(wc -l < "$SMOKE/excluded.txt"))"
