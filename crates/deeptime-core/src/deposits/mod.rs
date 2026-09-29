@@ -27,8 +27,24 @@
 //! The stage reads a [`fields::FieldHistory`] in two passes: pass 1 steps through every frame
 //! (one frame per `step`) folding favourability and maturity into per-cell accumulators; the last
 //! step places deposits, replays the frames at the chosen cells only (pass 2: the ledger and the
-//! supergene windows), builds bodies and sites and emits the events. Until P1-03…P1-07 publish a
-//! real history, the only history is the synthetic one (`deposits_synthetic` preset).
+//! supergene windows), builds bodies and sites and emits the events.
+//!
+//! **Where the history comes from.** Two sources feed the same engine. The `deposits_synthetic`
+//! preset builds a synthetic history from a seed ([`synthetic`]; the engine's own tests and the
+//! deposit worlds of P1-15). A planet preset with a `deposits` section reads the history the
+//! plates and surface stages recorded into `WorldState::history` (P1-04's
+//! [`recorded::RecordedHistory`]: 16-bit and 8-bit LZ4 frames every `surface.frame_every_myr`, plus
+//! the present-day drainage receivers) — the stage takes it out of the world for the placement step
+//! and puts it back, so a checkpoint carries it and a resumed run replays the same frames.
+//!
+//! **Missing fields degrade, deterministically.** The field names are read from the history's own
+//! metadata ([`fields::FieldHistory::names`]), never from a list here. A deposit type whose rules
+//! read a name the history lacks is *skipped*: it accumulates nothing, places nothing, and the log
+//! and the census (`skipped`) name it and the fields it lacks (today the petroleum trap, until
+//! P1-07 publishes `deeptime:trap_structure`). A history with no `deeptime:host/<class>` field at
+//! all is a documented fallback rather than a skip: the host score is 1 everywhere ("no lithology
+//! opinion", [`rules`]), and the census says so (`fallbacks`). When a field appears in the history
+//! the type comes back with no other change.
 
 pub mod children;
 pub mod cluster;
@@ -264,11 +280,29 @@ const INPUT_LAYERS: &[(&str, &str)] = &[
 struct State {
     /// 0 = set-up, 1..=frames = pass 1, frames + 1 = placement; then done.
     step: u64,
+    /// The number of frames of the history, once set-up read it (a recorded history's count is
+    /// only known then; 0 before).
+    frames: usize,
     enabled: Vec<bool>,
     missing: Vec<Vec<String>>,
+    /// Documented fallbacks the history's missing fields forced (the census lists them).
+    fallbacks: Vec<String>,
+    /// The names the history carried at set-up (fields and clocks), for the census.
+    field_names: Vec<String>,
     acc: Vec<Vec<CellAcc>>,
     pet: Vec<CellPet>,
     frame_times: Vec<(f64, f64)>,
+}
+
+/// Where a stage's field history comes from.
+#[derive(Clone, Debug)]
+enum Source {
+    /// The synthetic history of a `deposits_synthetic` preset.
+    Synthetic(SyntheticParams),
+    /// The history the plates and surface stages recorded into the world (P1-04): the L1 grid it
+    /// was recorded on, and the number of frames the preset's timeline leads to (corrected from
+    /// the world's own history in set-up).
+    Recorded { circumference: u32, grid_r: u32 },
 }
 
 /// The deposit stage.
@@ -276,7 +310,7 @@ pub struct DepositStage {
     params: DepositParams,
     seed: u64,
     scales: Scales,
-    synthetic: SyntheticParams,
+    source: Source,
     types: Vec<DepositType>,
     history: Option<Box<dyn FieldHistory>>,
     synth_events: Vec<synthetic::SynthEvent>,
@@ -285,33 +319,100 @@ pub struct DepositStage {
     layers: Vec<&'static str>,
 }
 
+/// The types a run uses: every built-in type, or the requested ones and the children they spawn.
+fn select_types(params: &DepositParams) -> Result<Vec<DepositType>, CoreError> {
+    let mut types = types::builtin()?;
+    if !params.types.is_empty() {
+        for id in &params.types {
+            if !types.iter().any(|t| &t.id == id) {
+                return Err(CoreError::preset(
+                    "$.deposits.types",
+                    format!("unknown deposit type {id}"),
+                ));
+            }
+        }
+        // Keep the requested types and the children they spawn.
+        let mut keep: BTreeSet<String> = params.types.iter().cloned().collect();
+        for t in &types {
+            if keep.contains(&t.id) {
+                keep.extend(t.geometry.children.iter().map(|c| c.type_id.clone()));
+            }
+        }
+        types.retain(|t| keep.contains(&t.id));
+    }
+    Ok(types)
+}
+
+impl DepositParams {
+    /// Range checks and the type list, each naming its key under `path` (`$.deposits` in a planet
+    /// preset).
+    pub fn validate(&self, path: &str) -> Result<(), CoreError> {
+        if !(self.count_mult >= 0.0 && self.province_km > 0.0) {
+            return Err(CoreError::preset(
+                path,
+                "count_mult ≥ 0 and province_km > 0 are required",
+            ));
+        }
+        select_types(self).map(|_| ())
+    }
+}
+
 impl DepositStage {
     /// The stage on a synthetic history.
     pub fn synthetic(
         sp: SyntheticParams,
         params: DepositParams,
     ) -> Result<DepositStage, CoreError> {
-        let mut types = types::builtin()?;
-        if !params.types.is_empty() {
-            for id in &params.types {
-                if !types.iter().any(|t| &t.id == id) {
-                    return Err(CoreError::preset(
-                        "$.deposits.types",
-                        format!("unknown deposit type {id}"),
-                    ));
-                }
-            }
-            // Keep the requested types and the children they spawn.
-            let mut keep: BTreeSet<String> = params.types.iter().cloned().collect();
-            for t in &types {
-                if keep.contains(&t.id) {
-                    keep.extend(t.geometry.children.iter().map(|c| c.type_id.clone()));
-                }
-            }
-            types.retain(|t| keep.contains(&t.id));
-        }
+        let types = select_types(&params)?;
         let span = sp.t_end_years - sp.t_start_years;
         let frames = (span / sp.snapshot_every_years).ceil().max(1.0) as usize;
+        Ok(DepositStage::build(
+            sp.seed,
+            params,
+            Scales::default(),
+            Source::Synthetic(sp),
+            types,
+            frames,
+        ))
+    }
+
+    /// The stage on the history the plates and surface stages record into the world (a planet
+    /// preset with `surface` and `deposits` sections; the preset's scales, grid and seed).
+    pub fn recorded(preset: &crate::params::PlanetPreset) -> Result<DepositStage, CoreError> {
+        let params = preset.deposits.clone().unwrap_or_default();
+        let types = select_types(&params)?;
+        let every = preset.surface.as_ref().map_or(10.0, |s| s.frame_every_myr);
+        // The surface stage's frame count is known only from its history; this is the estimate
+        // the stage reports until set-up reads the real one.
+        let frames = (preset.length_myr() / every).ceil().max(1.0) as usize;
+        let sc = &preset.scale;
+        let scales = Scales {
+            m_per_block_h: sc.m_per_block_h,
+            m_per_block_v: sc.m_per_block_v,
+            min_y: sc.min_y,
+            max_y: sc.max_y,
+        };
+        Ok(DepositStage::build(
+            preset.seed,
+            params,
+            scales,
+            Source::Recorded {
+                circumference: sc.circumference_blocks,
+                grid_r: preset.resolution.l1_r,
+            },
+            types,
+            frames,
+        ))
+    }
+
+    fn build(
+        seed: u64,
+        params: DepositParams,
+        scales: Scales,
+        source: Source,
+        types: Vec<DepositType>,
+        frames: usize,
+    ) -> DepositStage {
         let mut layers: Vec<&'static str> = types
             .iter()
             .filter(|t| !t.child_only)
@@ -319,34 +420,65 @@ impl DepositStage {
             .collect();
         layers.push(SITES_LAYER);
         layers.extend(INPUT_LAYERS.iter().map(|(_, l)| *l));
-        Ok(DepositStage {
-            seed: sp.seed,
+        DepositStage {
+            seed,
             params,
-            scales: Scales::default(),
-            synthetic: sp,
+            scales,
+            source,
             types,
             history: None,
             synth_events: Vec::new(),
             frames,
             state: State::default(),
             layers,
-        })
+        }
     }
 
     fn grid(&self) -> GridDesc {
-        GridDesc::for_planet("L1", self.synthetic.circumference, self.synthetic.grid_r)
-            .expect("checked when the preset was parsed")
+        let (c, r) = match &self.source {
+            Source::Synthetic(sp) => (sp.circumference, sp.grid_r),
+            Source::Recorded {
+                circumference,
+                grid_r,
+            } => (*circumference, *grid_r),
+        };
+        GridDesc::for_planet("L1", c, r).expect("checked when the preset was parsed")
     }
 
-    /// The history, built on first use (on the session's pool); a fresh synthetic history also
-    /// hands over its tectonic events for [`DepositStage::setup`] to emit.
+    /// The synthetic history, built on first use (on the session's pool); a fresh one also hands
+    /// over its tectonic events for [`DepositStage::setup`] to emit.
     fn history(&mut self) -> Result<&dyn FieldHistory, CoreError> {
         if self.history.is_none() {
-            let h = SyntheticHistory::new(self.synthetic.clone())?;
+            let Source::Synthetic(sp) = &self.source else {
+                return Err(CoreError::InvalidState(
+                    "a recorded history lives in the world, not the stage".into(),
+                ));
+            };
+            let h = SyntheticHistory::new(sp.clone())?;
             self.synth_events = h.events();
             self.history = Some(Box::new(h));
         }
         Ok(self.history.as_deref().expect("just built"))
+    }
+
+    /// The world's recorded history.
+    fn recorded_of(world: &WorldState) -> Result<&recorded::RecordedHistory, CoreError> {
+        world.history.as_ref().ok_or_else(|| {
+            CoreError::InvalidState(
+                "the deposit stage needs the field history the surface stage records: the world \
+                 has none (run the plates and surface stages first, with a `surface` section)"
+                    .into(),
+            )
+        })
+    }
+
+    /// Frame `k` of whichever history this stage reads.
+    fn read_frame(&mut self, k: usize, world: &WorldState) -> Result<FieldFrame, CoreError> {
+        if matches!(self.source, Source::Synthetic(_)) {
+            self.history()?.frame(k)
+        } else {
+            DepositStage::recorded_of(world)?.frame(k)
+        }
     }
 
     /// Index of the petroleum type, if loaded and enabled.
@@ -371,9 +503,31 @@ impl DepositStage {
     fn setup(&mut self, world: &mut WorldState, ctx: &StageContext<'_>) -> Result<(), CoreError> {
         let grid = self.grid();
         let n = grid.cells();
-        let names = ctx.pool.install(|| self.history().map(|h| h.names()))?;
-        let frame_times: Vec<(f64, f64)> =
-            (0..self.frames).map(|k| self.synthetic_time(k)).collect();
+        // The names, and (recorded) the frames the surface stage really wrote.
+        let (names, frame_times): (Vec<String>, Vec<(f64, f64)>) =
+            if matches!(self.source, Source::Synthetic(_)) {
+                let names = ctx.pool.install(|| self.history().map(|h| h.names()))?;
+                let times = (0..self.frames).map(|k| self.synthetic_time(k)).collect();
+                (names, times)
+            } else {
+                let h = DepositStage::recorded_of(world)?;
+                if h.grid != grid {
+                    return Err(CoreError::InvalidState(format!(
+                        "the recorded history is on grid {:?}, the deposit stage expects {:?}",
+                        h.grid, grid
+                    )));
+                }
+                if h.frames.is_empty() {
+                    return Err(CoreError::InvalidState(
+                        "the recorded history has no frames (the surface stage has not finished)"
+                            .into(),
+                    ));
+                }
+                let times = h.frames.iter().map(|f| (f.t_years, f.dt_years)).collect();
+                (h.names(), times)
+            };
+        self.frames = frame_times.len();
+        self.state.frames = self.frames;
         let bytes = (self.types.len() as u64 * n as u64 * std::mem::size_of::<CellAcc>() as u64)
             + n as u64 * std::mem::size_of::<CellPet>() as u64;
         ctx.reserve(bytes)?;
@@ -391,7 +545,11 @@ impl DepositStage {
             if !ok {
                 ctx.log.push(
                     crate::log::Level::Warn,
-                    format!("deposit type {} skipped: the history lacks {want:?}", t.id),
+                    format!(
+                        "deposit type {} skipped: the history lacks {want:?}; it accumulates and \
+                         places nothing until a stage publishes them",
+                        t.id
+                    ),
                 );
             }
             enabled.push(ok);
@@ -403,8 +561,58 @@ impl DepositStage {
                 Vec::new()
             });
         }
+        // The documented fallback for absent host-rock fractions: no lithology opinion.
+        let mut fallbacks = Vec::new();
+        if !names.iter().any(|n| n.starts_with(fields::HOST_PREFIX)) {
+            let hosted: Vec<&str> = self
+                .types
+                .iter()
+                .zip(&enabled)
+                .filter(|(t, ok)| **ok && t.hosts.weights().is_ok_and(|w| !w.is_empty()))
+                .map(|(t, _)| t.id.as_str())
+                .collect();
+            if !hosted.is_empty() {
+                let note = format!(
+                    "the history has no {}<class> fields: host-rock scores are 1 (no lithology \
+                     opinion) for {}",
+                    fields::HOST_PREFIX,
+                    hosted.join(", ")
+                );
+                ctx.log
+                    .push(crate::log::Level::Warn, format!("deposits: {note}"));
+                fallbacks.push(note);
+            }
+        }
+        let skipped: Vec<&str> = self
+            .types
+            .iter()
+            .zip(&enabled)
+            .filter(|(_, ok)| !**ok)
+            .map(|(t, _)| t.id.as_str())
+            .collect();
+        let clocks = names
+            .iter()
+            .filter(|n| n.starts_with(fields::CLOCK_PREFIX))
+            .count();
+        ctx.log.push(
+            crate::log::Level::Info,
+            format!(
+                "deposits: {} of {} types run on {} frames ({} fields, {clocks} clocks){}",
+                self.types.len() - skipped.len(),
+                self.types.len(),
+                self.frames,
+                names.len() - clocks,
+                if skipped.is_empty() {
+                    String::new()
+                } else {
+                    format!("; skipped for missing fields: {}", skipped.join(", "))
+                }
+            ),
+        );
         self.state.enabled = enabled;
         self.state.missing = missing;
+        self.state.fallbacks = fallbacks;
+        self.state.field_names = names;
         self.state.acc = acc;
         self.state.pet = if self.burial_field().is_some() {
             vec![CellPet::default(); n]
@@ -412,7 +620,8 @@ impl DepositStage {
             Vec::new()
         };
         self.state.frame_times = frame_times;
-        // The synthetic history's own tectonic events (what P1-03…P1-07 will emit for real).
+        // The synthetic history's own tectonic events (what the plates and surface stages emit
+        // for real).
         for e in std::mem::take(&mut self.synth_events) {
             let ev = world
                 .event(e.t_start, e.kind, synthetic::SOURCE)
@@ -429,7 +638,9 @@ impl DepositStage {
     }
 
     fn synthetic_time(&self, k: usize) -> (f64, f64) {
-        let sp = &self.synthetic;
+        let Source::Synthetic(sp) = &self.source else {
+            unreachable!("only a synthetic history is timed by the preset");
+        };
         let dt = (sp.t_end_years - sp.t_start_years) / self.frames as f64;
         (sp.t_start_years + (k as f64 + 1.0) * dt, dt)
     }
@@ -443,7 +654,7 @@ impl DepositStage {
         let grid = self.grid();
         let burial = self.burial_field();
         let pet_rules = self.types.iter().find_map(|t| t.petroleum.clone());
-        let frame = ctx.pool.install(|| self.history()?.frame(k))?;
+        let frame = ctx.pool.install(|| self.read_frame(k, world))?;
         let types = &self.types;
         let state = &mut self.state;
         ctx.pool.install(|| {
@@ -491,7 +702,9 @@ impl DepositStage {
             }
         }
         // The last frame's favourability is drawn a year before its end, so the stage's closing
-        // keyframe (sites placed, at the frame's end) is a frame of its own.
+        // keyframe (sites placed, at the frame's end) is a frame of its own. (A recorded history
+        // reaches this stage at the end of time already, and the session tells the two keyframes
+        // apart by their stage.)
         let t = if k + 1 == self.frames {
             frame.t_years - 1.0
         } else {
@@ -586,6 +799,10 @@ impl Stage for DepositStage {
 
     fn load_state(&mut self, bytes: &[u8]) -> Result<(), CoreError> {
         self.state = from_state(bytes)?;
+        // A recorded history's frame count is read in set-up; a resumed stage takes it from there.
+        if self.state.frames > 0 {
+            self.frames = self.state.frames;
+        }
         Ok(())
     }
 }
@@ -733,8 +950,34 @@ fn time_eroded_to(series: &[ColumnSample], t_form: f64, depth_m: f64) -> Option<
 }
 
 impl DepositStage {
-    #[allow(clippy::too_many_lines)]
+    /// The placement step: takes the history out of where it lives (the stage for a synthetic
+    /// one, the world for a recorded one, whose placement then needs `&mut world`) and puts it
+    /// back, so a checkpoint taken afterwards still carries it.
     fn finish(&mut self, world: &mut WorldState, ctx: &StageContext<'_>) -> Result<(), CoreError> {
+        if matches!(self.source, Source::Synthetic(_)) {
+            // Built in set-up, or again after a resume.
+            ctx.pool.install(|| self.history().map(|_| ()))?;
+            let h = self.history.take().expect("built above");
+            let done = self.finish_with(world, ctx, h.as_ref());
+            self.history = Some(h);
+            done
+        } else {
+            let h = world.history.take().ok_or_else(|| {
+                CoreError::InvalidState("the recorded history vanished from the world".into())
+            })?;
+            let done = self.finish_with(world, ctx, &h);
+            world.history = Some(h);
+            done
+        }
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn finish_with(
+        &self,
+        world: &mut WorldState,
+        ctx: &StageContext<'_>,
+        hist: &dyn FieldHistory,
+    ) -> Result<(), CoreError> {
         let grid = self.grid();
         let n = grid.cells();
         let c = grid.circumference() as f64;
@@ -743,10 +986,6 @@ impl DepositStage {
         if let Some((t_end, _)) = self.state.frame_times.last() {
             world.t_years = world.t_years.max(*t_end);
         }
-        // Built in set-up, or again after a resume; from here on the history is only read.
-        ctx.pool.install(|| self.history().map(|_| ()))?;
-        let this: &DepositStage = self;
-        let hist = this.history.as_deref().expect("built above");
         let present = ctx.pool.install(|| hist.frame(last))?;
         let elev = present
             .fields
@@ -1041,8 +1280,24 @@ impl DepositStage {
                 data: layer,
             },
         );
+        let skipped: Vec<Value> = f
+            .census
+            .iter()
+            .filter(|tc| !tc.enabled)
+            .map(|tc| json!({ "type": tc.id, "missing": tc.missing }))
+            .collect();
         let census = json!({
             "stage": STAGE_NAME,
+            "history": {
+                "source": match self.source {
+                    Source::Synthetic(_) => "synthetic",
+                    Source::Recorded { .. } => "recorded",
+                },
+                "frames": self.frames,
+                "names": self.state.field_names,
+            },
+            "skipped": skipped,
+            "fallbacks": self.state.fallbacks,
             "count_mult": self.params.count_mult,
             "province": self.params.province.name(),
             "province_km": self.params.province_km,
@@ -1913,6 +2168,9 @@ pub fn sites_of<'a>(
         .iter()
         .filter(move |s| s.deposit_type == type_id)
 }
+
+#[cfg(test)]
+mod recorded_tests;
 
 #[cfg(test)]
 mod tests {

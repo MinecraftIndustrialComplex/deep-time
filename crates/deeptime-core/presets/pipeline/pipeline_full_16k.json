@@ -33,6 +33,13 @@
     "l2_r": 4,
     "l3_r": 2
   },
+  "deposits": {
+    "count_mult": 1.0,
+    "province": "strong",
+    "province_km": 800.0,
+    "types": [],
+    "essentials": []
+  },
   "tectonics": {
     "time_step_myr": 2.0,
     "model_radius_km": 6370.0,
