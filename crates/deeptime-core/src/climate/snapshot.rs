@@ -108,7 +108,11 @@ pub struct Snapshot {
 /// Thornthwaite's (1948) potential evapotranspiration from monthly mean temperatures, mm/yr
 /// (uncorrected for day length; Willmott et al. 1985's form above 26.5 °C).
 pub fn thornthwaite(t: &[f64; 12]) -> f64 {
-    let heat: f64 = t.iter().filter(|&&x| x > 0.0).map(|&x| (x / 5.0).powf(1.514)).sum();
+    let heat: f64 = t
+        .iter()
+        .filter(|&&x| x > 0.0)
+        .map(|&x| (x / 5.0).powf(1.514))
+        .sum();
     if heat <= 0.0 {
         return 0.0;
     }
@@ -153,7 +157,11 @@ fn band_means(lat: &[f64], w: usize, bands: usize, v: &dyn Fn(usize) -> f64) -> 
                     .min_by_key(|&&k| k.abs_diff(b))
                     .copied()
                     .unwrap_or(b);
-                if cnt[k] > 0 { sum[k] / cnt[k] as f64 } else { 0.0 }
+                if cnt[k] > 0 {
+                    sum[k] / cnt[k] as f64
+                } else {
+                    0.0
+                }
             }
         })
         .collect()
@@ -205,8 +213,16 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
         .map(|b| sheet.get(b).copied().unwrap_or(0.0) * p.ice_sheet_feedback)
         .collect();
     let er = ep.run(ebm, &land_frac, &sheet, years);
-    let t_o: Vec<[f64; 12]> = inp.lat.iter().map(|&l| at_lat(&er.lat_deg, &er.t_ocean, l)).collect();
-    let t_l: Vec<[f64; 12]> = inp.lat.iter().map(|&l| at_lat(&er.lat_deg, &er.t_land, l)).collect();
+    let t_o: Vec<[f64; 12]> = inp
+        .lat
+        .iter()
+        .map(|&l| at_lat(&er.lat_deg, &er.t_ocean, l))
+        .collect();
+    let t_l: Vec<[f64; 12]> = inp
+        .lat
+        .iter()
+        .map(|&l| at_lat(&er.lat_deg, &er.t_land, l))
+        .collect();
     time(&mut millis, "ebm", started);
 
     // 2. Land and sea nearby; the ITCZ; the basins and their gyres.
@@ -215,7 +231,15 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
     box_blur(&inp.d, &mut land_near, cells(500.0), 2);
     let mut sea_near: Vec<f64> = land.iter().map(|&l| if l { 0.0 } else { 1.0 }).collect();
     box_blur(&inp.d, &mut sea_near, cells(p.coast_km), 2);
-    let itcz = belts::itcz(p, w, inp.lat, &land_near, &t_o, &t_l, cells(p.itcz_smooth_km));
+    let itcz = belts::itcz(
+        p,
+        w,
+        inp.lat,
+        &land_near,
+        &t_o,
+        &t_l,
+        cells(p.itcz_smooth_km),
+    );
     let hemi: [f64; 12] =
         std::array::from_fn(|m| belts::hemispheric_shift(p, inp.planet.axial_tilt_deg, m));
     let true_km = |j: usize| dx * inp.lat[j].to_radians().cos().max(0.0) / (1000.0 * scale);
@@ -300,9 +324,19 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
     let oro_scale = 365.0 * p.oro_hours_per_day;
     let refs = Refs {
         t_mean: t_o.iter().map(|t| t.iter().sum::<f64>() / 12.0).collect(),
-        t_warm: t_o.iter().map(|t| t.iter().cloned().fold(f64::MIN, f64::max)).collect(),
-        t_cold: t_o.iter().map(|t| t.iter().cloned().fold(f64::MAX, f64::min)).collect(),
-        ln_precip: inp.lat.iter().map(|&l| belts::belt_precip(l).ln()).collect(),
+        t_warm: t_o
+            .iter()
+            .map(|t| t.iter().cloned().fold(f64::MIN, f64::max))
+            .collect(),
+        t_cold: t_o
+            .iter()
+            .map(|t| t.iter().cloned().fold(f64::MAX, f64::min))
+            .collect(),
+        ln_precip: inp
+            .lat
+            .iter()
+            .map(|&l| belts::belt_precip(l).ln())
+            .collect(),
     };
     struct Row {
         t_mean: Vec<f32>,
@@ -442,7 +476,11 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
                 row.t_cold[i] = t.iter().cloned().fold(f64::MAX, f64::min) as f32;
                 row.precip[i] = annual as f32;
                 let pet = thornthwaite(&t);
-                row.aridity[i] = if pet > 0.0 { (annual / pet).min(10.0) } else { 10.0 } as f32;
+                row.aridity[i] = if pet > 0.0 {
+                    (annual / pet).min(10.0)
+                } else {
+                    10.0
+                } as f32;
                 let t_ela = glaciers::ela_temperature(annual) + p.ela_offset_c;
                 let ela = if gamma > 1e-9 {
                     (glaciers::summer(&t_sl) - t_ela) / gamma
@@ -557,7 +595,9 @@ mod tests {
     #[test]
     fn thornthwaite_is_zero_when_frozen_and_grows_with_heat() {
         assert_eq!(thornthwaite(&[-5.0; 12]), 0.0);
-        let temperate = thornthwaite(&[2.0, 3.0, 6.0, 9.0, 13.0, 16.0, 18.0, 18.0, 15.0, 11.0, 6.0, 3.0]);
+        let temperate = thornthwaite(&[
+            2.0, 3.0, 6.0, 9.0, 13.0, 16.0, 18.0, 18.0, 15.0, 11.0, 6.0, 3.0,
+        ]);
         let tropical = thornthwaite(&[27.0; 12]);
         assert!((400.0..900.0).contains(&temperate), "{temperate}");
         assert!(tropical > 1400.0, "{tropical}");

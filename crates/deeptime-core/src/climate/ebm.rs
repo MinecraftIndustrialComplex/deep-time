@@ -220,8 +220,12 @@ impl EbmParams {
             })
             .collect();
         let wsum: f64 = cosl.iter().sum();
-        let f: Vec<f64> = (0..n).map(|j| land.get(j).copied().unwrap_or(0.0).clamp(0.0, 1.0)).collect();
-        let g_sheet: Vec<f64> = (0..n).map(|j| sheet.get(j).copied().unwrap_or(0.0).clamp(0.0, 1.0)).collect();
+        let f: Vec<f64> = (0..n)
+            .map(|j| land.get(j).copied().unwrap_or(0.0).clamp(0.0, 1.0))
+            .collect();
+        let g_sheet: Vec<f64> = (0..n)
+            .map(|j| sheet.get(j).copied().unwrap_or(0.0).clamp(0.0, 1.0))
+            .collect();
         let mut out = EbmResult {
             lat_deg: lat.iter().map(|l| l.to_degrees()).collect(),
             t_ocean: vec![[0.0; 12]; n],
@@ -307,8 +311,16 @@ impl EbmParams {
                 if self.d_ocean > 0.0 {
                     for j in 0..n {
                         let sea = (1.0 - f[j]).max(1e-6);
-                        let fl = if j > 0 { (1.0 - f[j]).min(1.0 - f[j - 1]) } else { 0.0 };
-                        let fu = if j + 1 < n { (1.0 - f[j]).min(1.0 - f[j + 1]) } else { 0.0 };
+                        let fl = if j > 0 {
+                            (1.0 - f[j]).min(1.0 - f[j - 1])
+                        } else {
+                            0.0
+                        };
+                        let fu = if j + 1 < n {
+                            (1.0 - f[j]).min(1.0 - f[j + 1])
+                        } else {
+                            0.0
+                        };
                         let k = self.d_ocean / (cosl[j] * dphi * dphi) * dt / (self.c_ocean * sea);
                         let (kl, ku) = (k * face[j] * fl, k * face[j + 1] * fu);
                         lo[j] = -kl;
@@ -401,17 +413,33 @@ mod tests {
         let land: Vec<f64> = (0..n)
             .map(|j| {
                 let lat = -90.0 + (j as f64 + 0.5) * 2.0;
-                if lat < -65.0 { 0.95 } else if lat > 30.0 { 0.5 } else { 0.25 }
+                if lat < -65.0 {
+                    0.95
+                } else if lat > 30.0 {
+                    0.5
+                } else {
+                    0.25
+                }
             })
             .collect();
         let sheet: Vec<f64> = (0..n)
-            .map(|j| if (j as f64 + 0.5) * 2.0 - 90.0 < -65.0 { 1.0 } else { 0.0 })
+            .map(|j| {
+                if (j as f64 + 0.5) * 2.0 - 90.0 < -65.0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            })
             .collect();
         let mut st = p.initial_state();
         let r = p.run(&mut st, &land, &sheet, 200);
         assert!(r.years < 200, "converged ({} years)", r.years);
         assert!(r.net_toa().abs() < 0.2, "ASR − OLR = {} W/m²", r.net_toa());
-        assert!((5.0..=20.0).contains(&r.t_global), "global mean {} °C", r.t_global);
+        assert!(
+            (5.0..=20.0).contains(&r.t_global),
+            "global mean {} °C",
+            r.t_global
+        );
         // Equator warm, poles cold, the continental interior's seasons larger than the sea's.
         let eq = n / 2;
         let north = n - 8; // ~74°N
@@ -428,7 +456,10 @@ mod tests {
             range(&r.t_land[mid]),
             range(&r.t_ocean[mid])
         );
-        assert!(r.t_land[mid][6] > r.t_land[mid][0] + 15.0, "July warmer than January");
+        assert!(
+            r.t_land[mid][6] > r.t_land[mid][0] + 15.0,
+            "July warmer than January"
+        );
         // A warm restart of the balanced state stays balanced.
         let r2 = p.run(&mut st, &land, &sheet, 3);
         assert!((r2.t_global - r.t_global).abs() < 0.05);
@@ -471,4 +502,3 @@ mod tests {
         assert!(t1 > t0 + 3.0, "{t0} → {t1}");
     }
 }
-

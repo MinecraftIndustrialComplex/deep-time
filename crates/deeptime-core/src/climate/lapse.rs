@@ -129,14 +129,27 @@ mod tests {
         let w = 100;
         let land: Vec<bool> = (0..w).map(|i| (20..80).contains(&i)).collect();
         let z: Vec<f64> = (0..w)
-            .map(|i| if (30..34).contains(&i) { 3000.0 } else if land[i] { 200.0 } else { 0.0 })
+            .map(|i| {
+                if (30..34).contains(&i) {
+                    3000.0
+                } else if land[i] {
+                    200.0
+                } else {
+                    0.0
+                }
+            })
             .collect();
         let basin = vec![0.5; w];
         let dsst = vec![2.0; w];
         let east = march(&land, &z, &basin, &dsst, 100.0, true, &params());
         // Westerlies: the west coast is maritime, the lee of the range dry, the interior drier.
         assert!(east.q[20] > 0.9 && east.maritime[20] > 0.9);
-        assert!(east.q[36] < 0.5 * east.q[29], "rain shadow {} vs {}", east.q[36], east.q[29]);
+        assert!(
+            east.q[36] < 0.5 * east.q[29],
+            "rain shadow {} vs {}",
+            east.q[36],
+            east.q[29]
+        );
         assert!(east.q[79] < 0.4 && east.maritime[79] < 0.05);
         assert_eq!(east.dsst[50], 2.0, "carried from the sea crossed");
         assert!((east.q[15] - 1.0).abs() < 0.01, "sea air is moist");
@@ -145,7 +158,15 @@ mod tests {
         assert!(west.q[79] > 0.9);
         assert!(west.q[27] < 0.5 * west.q[35]);
         // A row of land only: the floor.
-        let all = march(&[true; 10], &[100.0; 10], &[0.0; 10], &[0.0; 10], 1000.0, true, &params());
+        let all = march(
+            &[true; 10],
+            &[100.0; 10],
+            &[0.0; 10],
+            &[0.0; 10],
+            1000.0,
+            true,
+            &params(),
+        );
         assert!(all.q.iter().all(|&x| (x - 0.15).abs() < 1e-9));
     }
 }

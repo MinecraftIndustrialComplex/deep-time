@@ -57,6 +57,7 @@ const PLACES: [(&str, f64, f64, &str); 24] = [
     ("Vostok", -78.5, 106.8, "EF"),
 ];
 
+#[allow(clippy::needless_range_loop)]
 pub fn run(o: &Options) -> CliResult<()> {
     let started = Instant::now();
     let (w, h) = (o.w as usize, o.h as usize);
@@ -72,8 +73,10 @@ pub fn run(o: &Options) -> CliResult<()> {
         .into());
     }
     let z: Vec<f64> = bytes
-        .chunks_exact(4)
-        .map(|b| f64::from(f32::from_le_bytes([b[0], b[1], b[2], b[3]])))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|b| f64::from(f32::from_le_bytes(*b)))
         .collect();
     let (mut p, mut tilt, mut flux, mut day) = (ClimateParams::default(), 23.44, 1.0, 24.0);
     if let Some(arg) = &o.preset {

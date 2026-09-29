@@ -78,7 +78,11 @@ mod tests {
             sum += w * q;
             wsum += w;
         }
-        assert!((sum / wsum / (s0 / 4.0) - 1.0).abs() < 2e-3, "{}", sum / wsum);
+        assert!(
+            (sum / wsum / (s0 / 4.0) - 1.0).abs() < 2e-3,
+            "{}",
+            sum / wsum
+        );
         // No tilt: no seasons.
         let a = monthly(s0, 0.7, 0, 0.0, 10);
         let b = monthly(s0, 0.7, 6, 0.0, 10);

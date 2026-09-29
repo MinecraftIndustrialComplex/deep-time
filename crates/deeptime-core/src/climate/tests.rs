@@ -17,6 +17,7 @@ use crate::session::{AdvanceStatus, NoGauge, Session, SessionOptions};
 /// An idealised planet on 256 × 128 cells (16k, r 64): ocean at −4 km, a continent from 60° to
 /// 150° E between 60° S and 70° N at 300 m with a 3-km north–south range along 70–74° E from 25°
 /// to 60° N, and a 2-km polar continent south of 70° S.
+#[allow(clippy::needless_range_loop)]
 fn idealised() -> (GridDesc, Vec<f64>, Vec<f64>) {
     let grid = GridDesc::for_planet("L1", 16384, 64).unwrap();
     let (w, h) = (grid.w as usize, grid.h as usize);
@@ -75,8 +76,16 @@ fn an_idealised_planet_has_earthlike_zones() {
     let col = |deg: f64| ((deg / 360.0 * w as f64).round() as usize) % w;
     let at = |v: &[f32], la: f64, lo: f64| f64::from(v[row(la) * w + col(lo)]);
     // Temperature: warm equator, frozen polar continent, the lapse rate on the range.
-    assert!(at(&s.t_mean, 0.0, 250.0) > 22.0, "{}", at(&s.t_mean, 0.0, 250.0));
-    assert!(at(&s.t_mean, -80.0, 100.0) < -15.0, "{}", at(&s.t_mean, -80.0, 100.0));
+    assert!(
+        at(&s.t_mean, 0.0, 250.0) > 22.0,
+        "{}",
+        at(&s.t_mean, 0.0, 250.0)
+    );
+    assert!(
+        at(&s.t_mean, -80.0, 100.0) < -15.0,
+        "{}",
+        at(&s.t_mean, -80.0, 100.0)
+    );
     assert!(at(&s.t_mean, 40.0, 72.0) < at(&s.t_mean, 40.0, 85.0) - 10.0);
     // Seasons: the continental interior's range is larger than the ocean's at 50° N.
     let range = |la, lo| at(&s.t_warm, la, lo) - at(&s.t_cold, la, lo);
@@ -178,10 +187,19 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
     }
     let t = &world.fields[field::T_MEAN].data;
     let p = &world.fields[field::PRECIP].data;
-    assert!(t.iter().all(|x| (-80.0..50.0).contains(x)), "temperatures in range");
-    assert!(p.iter().all(|&x| (10.0..20_000.0).contains(&x)), "precipitation in range");
+    assert!(
+        t.iter().all(|x| (-80.0..50.0).contains(x)),
+        "temperatures in range"
+    );
+    assert!(
+        p.iter().all(|&x| (10.0..20_000.0).contains(&x)),
+        "precipitation in range"
+    );
     let k = &world.fields[field::KOPPEN].data;
-    assert!(k.iter().all(|&x| (0.0..=31.0).contains(&x) && x.fract() == 0.0));
+    assert!(
+        k.iter()
+            .all(|&x| (0.0..=31.0).contains(&x) && x.fract() == 0.0)
+    );
     assert!(k.iter().any(|&x| x < 31.0), "some land is classified");
     // The surface read the stage's climate, and the deposit frames carry it.
     let st = world.surface.as_ref().unwrap();
@@ -204,7 +222,10 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
     let fp = &frame.fields["deeptime:precip_mm"];
     let mean = |v: &[f32]| v.iter().map(|&x| f64::from(x)).sum::<f64>() / v.len() as f64;
     let (mf, mc) = (mean(fp), mean(p));
-    assert!((mf - mc).abs() < 0.2 * mc, "frame {mf} vs climate {mc} mm/yr");
+    assert!(
+        (mf - mc).abs() < 0.2 * mc,
+        "frame {mf} vs climate {mc} mm/yr"
+    );
     let note: serde_json::Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
     assert_eq!(note["snapshots"], 7, "t = 2, 10, …, 50 and 60 Myr: {note}");
 
@@ -229,8 +250,16 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
     .unwrap();
     finish(&s3);
     let got = s3.checkpoint().unwrap().world;
-    for name in [field::T_MEAN, field::PRECIP, field::KOPPEN, field::D_LN_PRECIP] {
-        assert_eq!(got.fields[name], world.fields[name], "{name} differs after resuming");
+    for name in [
+        field::T_MEAN,
+        field::PRECIP,
+        field::KOPPEN,
+        field::D_LN_PRECIP,
+    ] {
+        assert_eq!(
+            got.fields[name], world.fields[name],
+            "{name} differs after resuming"
+        );
     }
     assert_eq!(
         got.surface.as_ref().unwrap().elevation_m,

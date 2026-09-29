@@ -652,6 +652,7 @@ mod tests {
             max_steps: None,
             out: Some(dir.join("deposits.dtcp")),
             viewer: Some(dir.join("viewer")),
+            viewer_layers: Vec::new(),
             work: None,
             common: quiet(),
         })
@@ -709,6 +710,7 @@ mod tests {
             max_steps: None,
             out: Some(dir.join("a.dtcp")),
             viewer: None,
+            viewer_layers: Vec::new(),
             work: None,
             common: quiet(),
         };
@@ -722,6 +724,7 @@ mod tests {
             max_steps: None,
             out: Some(dir.join("b.dtcp")),
             viewer: Some(dir.join("viewer")),
+            viewer_layers: Vec::new(),
             work: None,
             common: quiet(),
         };
@@ -735,6 +738,7 @@ mod tests {
             input: Some(dir.join("b.dtcp")),
             out: None,
             viewer: None,
+            viewer_layers: Vec::new(),
             ..second
         };
         let err = super::run::stage(&again).unwrap_err().to_string();
@@ -795,6 +799,7 @@ mod tests {
                 max_steps,
                 out,
                 viewer,
+                viewer_layers: Vec::new(),
                 work,
                 common: quiet(),
             })

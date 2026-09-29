@@ -21,9 +21,9 @@
 //! Apache-2.0), run row by row and column by column in parallel; every 1-D transform is independent,
 //! so the result does not depend on the thread count.
 
-use rustfft::num_complex::Complex64;
 use rayon::prelude::*;
 use rustfft::FftPlanner;
+use rustfft::num_complex::Complex64;
 
 /// The model's constants.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -178,10 +178,23 @@ mod tests {
         let q = precipitation(&h, w, rows, dx, dx, -10.0, 0.0, f, &params(), 16);
         for i in 40..88 {
             let mirror = (2.0 * x0) as usize - i;
-            assert!((q[j * w + i] - p[j * w + mirror]).abs() < 1e-6 * (1.0 + p[j * w + mirror].abs()));
+            assert!(
+                (q[j * w + i] - p[j * w + mirror]).abs() < 1e-6 * (1.0 + p[j * w + mirror].abs())
+            );
         }
         // Flat terrain: no orographic rain.
-        let flat = precipitation(&vec![0.0; rows * w], w, rows, dx, dx, 10.0, 0.0, f, &params(), 8);
+        let flat = precipitation(
+            &vec![0.0; rows * w],
+            w,
+            rows,
+            dx,
+            dx,
+            10.0,
+            0.0,
+            f,
+            &params(),
+            8,
+        );
         assert!(flat.iter().all(|x| x.abs() < 1e-12));
     }
 }
