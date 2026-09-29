@@ -1,28 +1,32 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! The climate the surface reads — runoff, temperature, precipitation — behind the interface P1-05
-//! replaces (plan §8.2: "runoff from the latest climate snapshot").
+//! The climate the surface reads — runoff, temperature, precipitation (plan §8.2: "runoff from the
+//! latest climate snapshot").
 //!
 //! **The interface:** [`snapshot`] reads the fields `climate/t_mean_c` (°C) and `climate/precip_mm`
-//! (mm/yr) from the world when a climate stage has written them (P1-05 will), and otherwise builds
-//! the stand-in below. Everything the surface needs is derived from those two the same way in
-//! both cases: potential evapotranspiration PET = 60 mm/°C · T (0 below 0 °C, a Thornthwaite-like
-//! linear stand-in), actual evapotranspiration from Fu's form of the Budyko curve with ω = 2.6
-//! (Fu 1981; Zhang et al. 2004), runoff = P − ET, and the aridity index P / PET.
+//! (mm/yr) from the world when the climate stage has written them (P1-05: a planet preset with a
+//! `climate` section runs it before the surface every plate step, `crate::climate`), and otherwise
+//! builds the stand-in below. Everything the surface needs is derived from those two the same way
+//! in both cases: potential evapotranspiration PET = 60 mm/°C · T (0 below 0 °C, a
+//! Thornthwaite-like linear stand-in), actual evapotranspiration from Fu's form of the Budyko curve
+//! with ω = 2.6 (Fu 1981; Zhang et al. 2004), runoff = P − ET, and the aridity index P / PET. With
+//! the climate stage, the water temperature of carbonate factories (`sst_c`) is the stage's
+//! temperature at the cell (at sea it has no lapse rate); with the stand-in, its zonal sea-level
+//! temperature.
 //!
-//! **The stand-in (until P1-05; documented, not tuned):** temperature T = 28 − 42·sin²φ °C at sea
-//! level (≈ Earth's zonal annual mean: 17 °C at 30°, 7 °C at 45°, −3 °C at 60°) minus a 6.5 °C/km
-//! lapse rate; precipitation from a zonal profile of |φ| (mm/yr: 2,000 at the equator, a dry belt
+//! **The stand-in (presets without a `climate` section; documented, not tuned):** temperature
+//! T = 28 − 42·sin²φ °C at sea level (≈ Earth's zonal annual mean: 17 °C at 30°, 7 °C at 45°,
+//! −3 °C at 60°) minus a 6.5 °C/km lapse rate; precipitation from a zonal profile of |φ| (mm/yr: 2,000 at the equator, a dry belt
 //! of 350 at 27°, a wet belt of 1,000 at 45–55°, 150 at the poles — the three-cell belts of
 //! `surface_processes_climate.md` §5), times an orographic factor (up to +40 % by 1.5 km, drying
 //! above 3 km), times continentality 0.35 + 0.65·√(ocean fraction within ~400 km) so continental
-//! interiors dry out. There is no rain shadow and no season; P1-05's climate replaces all of it.
+//! interiors dry out. There is no rain shadow and no season; the climate stage replaces all of it.
 
 use rayon::prelude::*;
 
 use super::grid::{Dims, box_blur};
 use crate::world::WorldState;
 
-/// Field names a climate stage writes (P1-05) and this module reads.
+/// Field names the climate stage writes (P1-05, `crate::climate::field`) and this module reads.
 pub const T_FIELD: &str = "climate/t_mean_c";
 pub const P_FIELD: &str = "climate/precip_mm";
 
@@ -153,7 +157,7 @@ pub fn snapshot(
                 };
                 let e = (60.0 * tc).max(0.0);
                 t[i] = tc as f32;
-                sst[i] = t0 as f32;
+                sst[i] = if out.from_stage { tc } else { t0 } as f32;
                 p[i] = pc as f32;
                 pet[i] = e as f32;
                 ro[i] = ((pc - fu_et(pc, e)).max(0.0) / 1000.0) as f32;
