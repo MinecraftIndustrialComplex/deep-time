@@ -5,6 +5,7 @@ mod alloc;
 mod amplify_view;
 mod climate_dem;
 mod dump;
+mod parity;
 mod run;
 mod structure_view;
 mod synth;
@@ -265,6 +266,39 @@ enum Command {
         #[arg(long, value_enum, default_value_t = CodecArg::Lz4)]
         codec: CodecArg,
     },
+    /// The column evaluator (plan §9.3, P1-08): what Deep Time decides for one block column of a
+    /// world-data folder — the terrain height, water, the horizon stack, the bodies it passes
+    /// through and the rock from the top block down — as JSON, with every other layer's value there
+    /// and the sites whose box holds it.
+    #[command(allow_negative_numbers = true)]
+    InspectColumn {
+        /// World-data folder (a run's `--out`, a world's `deeptime/` folder).
+        #[arg(long)]
+        world_data: PathBuf,
+        /// Block x (any lap: it is folded into the canonical span).
+        x: i64,
+        /// Block z.
+        z: i64,
+        /// Only what `parity/columns.json` holds per column.
+        #[arg(long)]
+        parity: bool,
+    },
+    /// Write the Java↔Rust column parity fixture (plan §9.2): columns of a world-data folder as the
+    /// column evaluator answers them, for `ColumnParityTest` and the real-planet GameTest.
+    Parity {
+        /// World-data folder.
+        #[arg(long)]
+        world_data: PathBuf,
+        /// JSON file to write (default: <world-data>/parity/columns.json).
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// How many columns.
+        #[arg(long, default_value_t = parity::DEFAULT_COLUMNS)]
+        columns: usize,
+        /// Seed of the column choice.
+        #[arg(long, default_value_t = parity::DEFAULT_SEED)]
+        seed: u64,
+    },
     /// Dump a world's sites, index lookups, body evaluations and cause chains as JSON (the Java
     /// parity-test fixture, P1-15).
     DumpDeposits {
@@ -517,6 +551,52 @@ fn main() -> ExitCode {
                 &out,
             ),
         ),
+        Some(Command::InspectColumn {
+            world_data,
+            x,
+            z,
+            parity,
+        }) => match deeptime_format::ColumnWorld::open(&world_data) {
+            Ok(w) => {
+                let v = if parity {
+                    w.sample(x, z).to_json()
+                } else {
+                    w.inspect(x, z)
+                };
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&v).expect("a column serialises")
+                );
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("deeptime inspect-column: {e}");
+                ExitCode::FAILURE
+            }
+        },
+        Some(Command::Parity {
+            world_data,
+            out,
+            columns,
+            seed,
+        }) => {
+            let out = out.unwrap_or_else(|| world_data.join("parity/columns.json"));
+            let started = std::time::Instant::now();
+            match parity::run(&world_data, &out, columns, seed) {
+                Ok((n, through)) => {
+                    println!(
+                        "deeptime parity: {n} columns ({through} through a body) -> {} in {:.2}s",
+                        out.display(),
+                        started.elapsed().as_secs_f64()
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime parity: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::DumpDeposits { world, out }) => match dump::run(&world, &out) {
             Ok((sites, bodies, inside)) => {
                 println!(
@@ -1143,6 +1223,66 @@ mod tests {
         let group = deeptime_core::checkpoint::Checkpoint::read(&dir.join("group.dtcp")).unwrap();
         assert_eq!(group.next_stage_name(), Some("deposits"));
         stage("deposits", Some(dir.join("group.dtcp")), None, None, None).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// P1-08: `run` bakes a planet run (every chunk-time layer, format 0.1), `parity` writes the
+    /// fixture from it and `inspect-column` answers a column, all through the one evaluator.
+    #[test]
+    fn a_planet_run_bakes_and_parity_samples_it() {
+        let dir = tmp("planet");
+        let preset = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../deeptime-core/tests/presets/planet_world_4k.json"
+        );
+        let mut common = quiet();
+        common.set = vec![
+            "resolution.l0_samples=2000".into(),
+            "resolution.l1_r=32".into(),
+            "resolution.l2_r=16".into(),
+            "resolution.l3_r=8".into(),
+            "keyframes.size=[64, 32]".into(),
+            "amplify.erosion_iterations=4".into(),
+            "amplify.thermal_iterations=3".into(),
+            "amplify.deposition_iterations=2".into(),
+        ];
+        super::run::run(&super::run::RunOptions {
+            preset: preset.into(),
+            start: None,
+            length_myr: Some(40.0),
+            content: None,
+            out: dir.join("world"),
+            viewer: None,
+            checkpoints: false,
+            common,
+        })
+        .unwrap();
+        let m = deeptime_format::Manifest::read(&dir.join("world")).unwrap();
+        assert_eq!(m.format_version, "0.1");
+        assert_eq!(m.notes["bake"]["baked"], true);
+        let out = dir.join("world/parity/columns.json");
+        let (n, _) = super::parity::run(&dir.join("world"), &out, 60, 7).unwrap();
+        assert_eq!(n, 60);
+        let doc: serde_json::Value = serde_json::from_slice(&std::fs::read(&out).unwrap()).unwrap();
+        let cols = doc["columns"].as_array().unwrap();
+        assert_eq!(cols.len(), 60);
+        assert_eq!(doc["circumference"], 4096);
+        let w = deeptime_format::ColumnWorld::open(&dir.join("world")).unwrap();
+        // Compared as text: serde_json's default parser may land a float one ulp off (Java's
+        // Double.parseDouble does not), while its writer prints the shortest exact form.
+        let text = String::from_utf8(std::fs::read(&out).unwrap()).unwrap();
+        for c in cols {
+            let (x, z) = (c["x"].as_i64().unwrap(), c["z"].as_i64().unwrap());
+            let fresh = w.sample(x, z).to_json().to_string();
+            assert!(
+                text.contains(&fresh),
+                "the fixture holds what the evaluator says: {fresh}"
+            );
+        }
+        let v = w.inspect(-2047, 300);
+        assert_eq!(v["wx"], -2047);
+        assert!(v["layers"]["climate/temperature"]["bilinear"].is_number());
+        assert!(v["strata"].as_array().is_some_and(|a| !a.is_empty()));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
