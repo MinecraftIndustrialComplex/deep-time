@@ -738,7 +738,7 @@ mod tests {
         let r = run_state(addr, &slow);
         assert_eq!(r["state"], "cancelled");
         let kept_frames = r["frames"].as_u64().unwrap();
-        assert!(kept_frames >= 2 && kept_frames < 80, "{r}");
+        assert!((2..80).contains(&kept_frames), "{r}");
         assert_eq!(
             get(addr, &format!("/api/runs/{slow}/frames/1/0.png")).0,
             200

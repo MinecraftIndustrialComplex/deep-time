@@ -316,11 +316,10 @@ impl Catalog {
         if get(&base, &["scale".into(), "circumference_blocks".into()]).is_none() {
             return json!({ "error": "the preset in this code names no size (scale.circumference_blocks)" });
         }
-        let canon = base.to_string();
         let builtin = self
             .presets
             .iter()
-            .find(|p| p.base.to_string() == canon)
+            .find(|p| p.base == base)
             .map(|p| p.name.clone());
         json!({
             "preset": builtin,
