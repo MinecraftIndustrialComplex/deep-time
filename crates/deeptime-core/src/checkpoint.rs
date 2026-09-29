@@ -22,7 +22,7 @@ use crate::world::WorldState;
 /// Magic of a checkpoint file.
 pub const MAGIC: [u8; 4] = *b"DTCP";
 /// Bump whenever [`Checkpoint`], [`WorldState`] or any stage's saved state changes shape.
-pub const CHECKPOINT_SCHEMA: u32 = 1;
+pub const CHECKPOINT_SCHEMA: u32 = 2;
 const FIXED_BYTES: usize = 8;
 
 /// A run paused between (or inside) stages.

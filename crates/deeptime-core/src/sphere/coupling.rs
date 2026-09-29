@@ -179,6 +179,35 @@ impl Coupling {
             .sum()
     }
 
+    /// Re-links every cell through `f(cell index, cell direction, link)`, in parallel on the
+    /// current Rayon pool, and returns what `f` returns per cell (row-major, index j·W + i). For
+    /// samples that move between rebuilds (the plates, P1-03): the caller locates each cell in its
+    /// own frames and writes the triangle, weights and nearest sample it found, so
+    /// [`Coupling::interpolate`] and [`Coupling::categorical`] keep working on the moved crust.
+    pub fn relink<T: Send>(
+        &mut self,
+        f: impl Fn(usize, DVec3, &mut CellLink) -> T + Sync,
+    ) -> Vec<T> {
+        let (grid, frame) = (&self.grid, self.frame);
+        let w = grid.w as usize;
+        let rows: Vec<Vec<T>> = self
+            .links
+            .par_chunks_mut(w)
+            .enumerate()
+            .map(|(j, row)| {
+                let z = grid.block_z(j as i64) as f64;
+                row.iter_mut()
+                    .enumerate()
+                    .map(|(i, link)| {
+                        let q = frame.unit(grid.block_x(i as i64) as f64, z);
+                        f(j * w + i, q, link)
+                    })
+                    .collect()
+            })
+            .collect();
+        rows.into_iter().flatten().collect()
+    }
+
     /// The grid this coupling serves.
     pub fn grid(&self) -> &GridDesc {
         &self.grid

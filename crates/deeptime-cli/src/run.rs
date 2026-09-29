@@ -19,6 +19,50 @@ pub type CliResult<T> = Result<T, Box<dyn std::error::Error>>;
 /// Budget of one `advance` call; the CLI only needs it to print progress between calls.
 const ADVANCE_BUDGET: Duration = Duration::from_millis(250);
 
+/// The timeline choices a CLI run passes beside a planet preset (plan §5.1: the preset leaves
+/// them to the player).
+#[derive(Clone, Default)]
+pub struct Timeline {
+    pub start: Option<String>,
+    pub length_myr: Option<f64>,
+}
+
+/// Reads `--preset`: a JSON file, or the name of a built-in preset (`earthlike_quick_16k`, …),
+/// with the timeline choices applied.
+pub fn load_preset(preset: &Path, timeline: &Timeline) -> CliResult<String> {
+    let json = if preset.is_file() {
+        read_text(preset, "preset")?
+    } else {
+        let name = preset.to_string_lossy();
+        match deeptime_core::params::builtin(&name) {
+            Some(j) => j.to_owned(),
+            None => {
+                let names: Vec<&str> = deeptime_core::params::BUILTIN.iter().map(|b| b.0).collect();
+                return Err(format!(
+                    "preset {}: no such file, and not a built-in preset ({})",
+                    preset.display(),
+                    names.join(", ")
+                )
+                .into());
+            }
+        }
+    };
+    Ok(deeptime_core::params::with_timeline(
+        &json,
+        timeline.start.as_deref(),
+        timeline.length_myr,
+    )?)
+}
+
+/// The plate model's summary line (plan P1-03: `plates_final=<n> ocean_age_p90_myr=<a> …`), when
+/// the world has plates.
+fn plates_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    world
+        .plates
+        .as_ref()
+        .map(|st| deeptime_core::plates::stats::summary(st).line())
+}
+
 /// Options shared by the subcommands that run a session.
 pub struct Common {
     pub threads: usize,
@@ -68,6 +112,7 @@ fn drive(
 
 pub struct RunOptions {
     pub preset: PathBuf,
+    pub timeline: Timeline,
     pub content: Option<PathBuf>,
     pub out: PathBuf,
     pub viewer: Option<PathBuf>,
@@ -78,7 +123,7 @@ pub struct RunOptions {
 /// `deeptime run`: a whole planet into `--out`.
 pub fn run(o: &RunOptions) -> CliResult<()> {
     let started = Instant::now();
-    let preset = read_text(&o.preset, "preset")?;
+    let preset = load_preset(&o.preset, &o.timeline)?;
     let content = match &o.content {
         Some(p) => read_text(p, "content bundle")?,
         None => String::new(),
@@ -106,6 +151,10 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         alloc::peak() as f64 / 1048576.0,
         started.elapsed().as_secs_f64()
     );
+    let world = s.checkpoint()?.world;
+    if let Some(line) = plates_line(&world) {
+        println!("deeptime run: {line}");
+    }
     if let Some(dir) = &o.viewer {
         let title = format!(
             "Deep Time — run {} ({})",
@@ -125,6 +174,9 @@ pub struct StageOptions {
     pub name: String,
     pub input: Option<PathBuf>,
     pub preset: Option<PathBuf>,
+    pub timeline: Timeline,
+    /// Stop after this many steps of the stage (a mid-stage checkpoint).
+    pub max_steps: Option<u64>,
     pub out: Option<PathBuf>,
     pub viewer: Option<PathBuf>,
     pub work: Option<PathBuf>,
@@ -172,7 +224,7 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         }
         (None, Some(preset)) => {
             let s = Session::create(
-                &read_text(preset, "preset")?,
+                &load_preset(preset, &o.timeline)?,
                 "",
                 opts,
                 Arc::new(AllocGauge),
@@ -195,13 +247,31 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             }
             s
         }
-        _ => return Err("give exactly one of --in <checkpoint> and --preset <file>".into()),
+        _ => {
+            return Err(
+                "give exactly one of --in <checkpoint> and --preset <file or built-in name>".into(),
+            );
+        }
     };
     let events_before = s.progress().events_total;
     let stepping = Instant::now();
-    drive(&s, o.common.verbose, |_, st| {
-        matches!(st, AdvanceStatus::StageDone | AdvanceStatus::Done)
-    })?;
+    match o.max_steps {
+        None => {
+            drive(&s, o.common.verbose, |_, st| {
+                matches!(st, AdvanceStatus::StageDone | AdvanceStatus::Done)
+            })?;
+        }
+        Some(max) => {
+            // One step per call: advance with a zero budget runs exactly one.
+            for _ in 0..max {
+                let status = s.advance(Duration::ZERO);
+                forward_log(&s, o.common.verbose);
+                if status? != AdvanceStatus::Running {
+                    break;
+                }
+            }
+        }
+    }
     let seconds = stepping.elapsed().as_secs_f64();
     let ck = s.checkpoint()?;
     let timing = s
@@ -221,6 +291,12 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         p.keyframes_ready,
         seconds
     );
+    if let Some(line) = plates_line(&ck.world) {
+        println!(
+            "deeptime stage {}: {line} steps={timing} seconds={seconds:.3}",
+            o.name
+        );
+    }
     if let Some(out) = &o.out {
         ck.write(out)?;
         println!(
@@ -270,6 +346,7 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
 
 pub struct BenchOptions {
     pub preset: PathBuf,
+    pub timeline: Timeline,
     pub threads: Vec<usize>,
     pub out: PathBuf,
     pub viewer: Option<PathBuf>,
@@ -281,7 +358,7 @@ pub struct BenchOptions {
 /// `deeptime bench`: the preset once per thread count, with per-stage wall time and peak native
 /// memory, into `bench.json` and a timing page (the Phase 1 budget gate's skeleton, P1-17).
 pub fn bench(o: &BenchOptions) -> CliResult<()> {
-    let preset = read_text(&o.preset, "preset")?;
+    let preset = load_preset(&o.preset, &o.timeline)?;
     let temp = o.work.is_none();
     let work = o.work.clone().unwrap_or_else(|| {
         std::env::temp_dir().join(format!("deeptime-bench-{}", std::process::id()))
@@ -317,6 +394,9 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             .map(|t| json!({ "name": t.name, "steps": t.steps, "millis": t.millis }))
             .collect();
         stages.push(json!({ "name": "finalize", "steps": 1, "millis": finalize_ms }));
+        if let Some(line) = plates_line(&s.checkpoint()?.world) {
+            println!("deeptime bench: threads={threads} {line}");
+        }
         println!(
             "deeptime bench: threads={threads} total_ms={total_ms:.1} peak_bytes={peak} stages={}",
             stages

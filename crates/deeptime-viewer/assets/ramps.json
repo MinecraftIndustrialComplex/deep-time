@@ -51,6 +51,90 @@
         [-1, "#111111"],
         [1, "#f0f0f0"]
       ]
+    },
+    "plates": {
+      "_comment": "Categorical: the layer holds plate id * 7 mod 20 (crates/deeptime-core/src/plates/l1.rs).",
+      "stops": [
+        [0, "#e6194b"],
+        [0.999, "#e6194b"],
+        [1, "#3cb44b"],
+        [1.999, "#3cb44b"],
+        [2, "#ffe119"],
+        [2.999, "#ffe119"],
+        [3, "#4363d8"],
+        [3.999, "#4363d8"],
+        [4, "#f58231"],
+        [4.999, "#f58231"],
+        [5, "#911eb4"],
+        [5.999, "#911eb4"],
+        [6, "#46f0f0"],
+        [6.999, "#46f0f0"],
+        [7, "#f032e6"],
+        [7.999, "#f032e6"],
+        [8, "#bcf60c"],
+        [8.999, "#bcf60c"],
+        [9, "#fabebe"],
+        [9.999, "#fabebe"],
+        [10, "#008080"],
+        [10.999, "#008080"],
+        [11, "#e6beff"],
+        [11.999, "#e6beff"],
+        [12, "#9a6324"],
+        [12.999, "#9a6324"],
+        [13, "#fffac8"],
+        [13.999, "#fffac8"],
+        [14, "#800000"],
+        [14.999, "#800000"],
+        [15, "#aaffc3"],
+        [15.999, "#aaffc3"],
+        [16, "#808000"],
+        [16.999, "#808000"],
+        [17, "#ffd8b1"],
+        [17.999, "#ffd8b1"],
+        [18, "#000075"],
+        [18.999, "#000075"],
+        [19, "#808080"],
+        [19.999, "#808080"]
+      ]
+    },
+    "crust_age": {
+      "_comment": "Oceanic crust age in Myr (red young, blue old, as seafloor-age maps); -1 = continental crust.",
+      "stops": [
+        [-1, "#9a9a9a"],
+        [-0.001, "#9a9a9a"],
+        [0, "#b2182b"],
+        [20, "#ef8a62"],
+        [50, "#fddbc7"],
+        [100, "#d1e5f0"],
+        [150, "#67a9cf"],
+        [250, "#2166ac"],
+        [400, "#053061"]
+      ]
+    },
+    "regime": {
+      "_comment": "Tectonic regime codes 0-9: ocean basin, ridge, trench, arc, back-arc, collision, rift, hotspot, craton, passive margin (plates/state.rs).",
+      "stops": [
+        [0, "#1f4e79"],
+        [0.999, "#1f4e79"],
+        [1, "#e8f1fa"],
+        [1.999, "#e8f1fa"],
+        [2, "#08142e"],
+        [2.999, "#08142e"],
+        [3, "#d7301f"],
+        [3.999, "#d7301f"],
+        [4, "#fc8d59"],
+        [4.999, "#fc8d59"],
+        [5, "#7a0177"],
+        [5.999, "#7a0177"],
+        [6, "#fdae61"],
+        [6.999, "#fdae61"],
+        [7, "#ff00ff"],
+        [7.999, "#ff00ff"],
+        [8, "#8c6d31"],
+        [8.999, "#8c6d31"],
+        [9, "#c7e9c0"],
+        [9.999, "#c7e9c0"]
+      ]
     }
   },
   "layers": {
@@ -60,7 +144,10 @@
     "climate/vegetation": "vegetation",
     "climate/continents": "diverging",
     "climate/erosion": "grey",
-    "climate/ridges": "grey"
+    "climate/ridges": "grey",
+    "plates": "plates",
+    "crust_age": "crust_age",
+    "regime": "regime"
   },
   "default": "grey"
 }
