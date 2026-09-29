@@ -41,7 +41,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-17 | Benchmark gate and preset tuning | todo | | | |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
-| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. |
+| P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log) |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -68,6 +68,97 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+
+### 2026-09-29 — P1-20 stage 1: the browser workbench (`deeptime watch`) (agent worktree agent-a3abc4a868f0c3b81, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** `deeptime watch` (crates/deeptime-cli/src/watch/: `mod.rs` command and live cadence,
+  `editor.rs` the setup page's rules, `runs.rs` queue and kept runs, `live.rs` per-run stream state,
+  `http.rs` the server) serves one page (crates/deeptime-viewer/assets/workbench.{html,js}) with the
+  Create World editor's controls, the runs, and a live view of each run: map, globe, legend, layer
+  buttons, events (fresh ones ringed, older ones fading over 24 Myr, click for the cause chain), with
+  play/pause, step, rewind, speed (0.5–100 Myr/s), a scrubber over every finished step and "follow
+  live"; **compare** shows two runs side by side at the same time and layer (the focused pane drives
+  the clock, the other shows its frame at or before that time). `?tv` = dark, large, spinning globe,
+  no editor, follows the newest run. Commits 6eaf013 (live page), d12bc06 (shared catalogue), 97f06a2
+  (server), then the page and the wrapper; merged master 4070f62 cleanly.
+- **The editor is driven from the game's own definitions** (Ben: no hand-copied list). The field
+  catalogue moved out of `EditorFields.ALL` into `crates/deeptime-viewer/assets/editor_fields.json`,
+  which Gradle ships as `deeptime/editor_fields.json` (like ramps.json) and `EditorFields` now reads;
+  the workbench reads the same file (`include_str!`). It gained the **planet seed** (an integer field:
+  written as a JSON integer, the core's u64; `EditorFields.Field.integer`, `number()`), editable where a
+  preset carries a top-level `seed` (the planet pipelines; not the placeholders). Labels come from the
+  game's lang file (`deeptime.editor.*`, one new key `field.seed`). Presets: `preset::BUILTIN` (the
+  game's four, placeholders) plus `params::PIPELINE_BUILTIN` and `PLATES_BUILTIN` (the real simulation
+  until P1-08), grouped into families by `_<n>k` as `EditorModel.familyOf` does; the page defaults to
+  `pipeline_quick_16k`. Start configurations and the length range are the core's `StartConfig::ALL`,
+  `LENGTH_MYR_RANGE`. The server computes the effective preset with the game's rules (a field is
+  editable only when the preset carries its path; out-of-range or non-integer values are refused and
+  named; the timeline by `preset::with_timeline`; numbers written as the game writes them), and its
+  canonical JSON, share code (`share_code`, the Java twin's partner) and the core's `session::estimate`;
+  a pasted code selects the built-in it equals, else becomes an imported preset (`EditorModel.
+  importShareCode`). A run's own code is kept, so "Load its settings" refills the form. Tests:
+  `edits_land_where_the_core_reads_them` (every available field edited → the core accepts the preset;
+  the code round-trips to the same JSON), `a_built_in_code_selects_the_built_in…`, JUnit
+  `catalogueIsTheSharedFileAndTheSeedIsAnInteger`.
+- **Runs.** One at a time (the Mac is shared); up to 3 wait, a 4th is refused with a message (409);
+  cancelling a queued run removes it, cancelling the running one stops it after its current step and
+  keeps its frames. Each run is a folder under `--runs` (on the Mac `deeptime-cache/workbench/runs/`):
+  `run.json` (request, share code, meta, final status), `events.jsonl` (each event's JSON exactly as
+  the session wrote it: re-serialising moved float digits, caught by the stream test), `world/` (the
+  session's output: a keyframe per step + the world data) and `frames/` (PNG cache). A restart reads
+  every run back (an unfinished one as "interrupted"); the newest `--keep` (default 8) finished runs
+  stay, older folders are deleted. **Size: ~1 GB per 500-Myr pipeline_quick_16k run** (250 frames × 10
+  layers × 1024×512 RGBA `.dtk` ≈ 930 MB; PNGs ~0.7 MB per viewed layer), so 8 kept ≈ 8 GB of the SSD's
+  213 GB free.
+- **Watching changes nothing.** The run's preset gets `keyframes.every_myr = 1e-6` (a frame after every
+  step; `--every-myr` for fewer); keyframes are drawn from the world between steps and do not feed back
+  (plates' L1 sampling already runs every step in the pipeline presets). The runner advances with a zero
+  budget (exactly one step) and publishes frames (`keyframe_info`), events (`events_since`) and progress;
+  images come from `copy_keyframe` while it runs, from the `.dtk` files after. Test
+  `workbench_streams_every_step_and_matches_the_batch_run` (plates+surface, 3,000 samples, 20 Myr):
+  10 frames, one per step, times increasing to 0; every event in emission order; the last frame's 10
+  layers byte-equal (as PNG) the batch run's final keyframe; the watched world equals the batch
+  world (postcard bytes, wall-clock `millis` removed). At full size the watched scattered-continents
+  run printed exactly P1-04's batch summary (`land_frac=0.215 sediment_km3=9.571e6`, 1,238 events).
+- **Serving: tailnet only.** The server binds 127.0.0.1 on the Mac and `tailscale serve --bg --tcp 8642
+  tcp://127.0.0.1:8642` forwards the tailnet to it. Measured before choosing: the Mac's application
+  firewall is on and lists only known apps (tailscaled among them); a new binary bound to the 100.x
+  address would raise the "accept incoming connections?" dialog on the shared screen. The server also
+  refuses peers outside 127/8, ::1, 100.64/10, fd7a:115c:a1e0::/48 and any `--bind` outside them;
+  POSTs must be `application/json`, same-origin when the browser sends Origin, and addressed to a
+  tailnet/local Host (no DNS rebinding). From the laptop: page and SSE over `mac-mini:8642` 200,
+  `10.0.0.217:8642` (LAN) connection refused, a cross-origin POST 403. The tailscale CLI matching the
+  Mac's tailscaled 1.102.4 is GC-rooted at `deeptime-cache/tailscale` (the daemon ships none).
+- **`tools/viewer/mac-watch.sh`** `[--preset P --start S --length-myr L] [--port N] [--keep N]
+  [--threads N] [--tv]`, `stop`, `status`, `tv`: release build via mac.sh (no `--server` lock: no
+  Minecraft), the binary copied to `deeptime-cache/workbench/bin/`, started with nohup, pid and log in
+  `deeptime-cache/workbench/watch-<port>.{pid,log}`; `stop` kills only a `deeptime watch` pid, removes
+  the tailnet forward and the TV's caffeinate. `--tv`/`tv`: `vncdrive.sh status` (waits up to 15 min
+  while "locked", never types), `open -a Safari http://localhost:<port>/?tv`, `vncdrive.sh key
+  ctrl-super-f` (a moment of graphide's drive lease; reports if the M6 is busy), `vncdrive.sh close`,
+  and `caffeinate -d -w <server pid>`. Not run on the screen (Ben was using it); the lock parse was
+  checked read-only (`status` → "locked").
+- **Stage 2 hook (the sibling worktree's 3D preview and inspector).** Server: `POST /api/preview`
+  `{run, frame, t_years, box: {x0, z0, x1, z1} (blocks), lat_lon: {north, south, west, east}}` and
+  `GET /api/inspect?run=&frame=&x=&z=` answer 501 `{"available": false, "message"}`. Page: the one
+  `Stage2` object in workbench.js (a map click inspects the column there; the ▭ area tool drags a box
+  and asks for a preview) draws into the "Inspect & 3D preview" panel; its `render` already follows
+  a `status_url` and embeds a `url`, so the job contract (box → job id → status → export URL) needs
+  the server routes plus at most that object. Block coordinates from the map follow plan §5.2
+  (x = 360°-longitude scaled to C from the seam at −C/2, north −z).
+- **Measured** (Mac, `tools/remote/mac.sh`): `cargo test --workspace` (cli 20 incl. 3 editor, 2 watch
+  server, live, http; viewer 5; core 139; format 31; inspect 21; jni 7+7), `cargo clippy --workspace
+  --all-targets -D warnings`, `cargo fmt --check`, `cargo deny check licenses bans` clean; `cd neoforge
+  && ./gradlew build test` → tests=107 failures=0. End to end: `tools/viewer/mac-watch.sh --preset
+  pipeline_quick_16k --start scattered_continents --length-myr 500` → 250 frames live, 133 s; a second
+  run started through `/api/preset` + `/api/runs` from the laptop (supercontinent, seed 7, ocean 0.6)
+  → 250 frames, 2,510 events, 345 s (the Mac was loaded). Screenshots (headless Chromium over
+  DevTools, `tools/viewer/shot.py`: Chromium's `--screenshot` fires before a streamed page draws)
+  mid-run (LIVE at 380 Myr ago, globe, legend, events), compare at 298 and 98 Myr ago on elevation and
+  plates, the editor filled (Random, 800 Myr, gravity 3.71 → estimate peak 1.24 GiB, ~5:50, Run on).
+- **Next.** Stage 2 plugs into `/api/preview`, `/api/inspect` and `Stage2`. P1-05/P1-07's new
+  layers appear as buttons with no change here (checked by construction: layers are whatever the
+  frames name). Open for Ben: see the report's decisions (default keep 8 runs ≈ 8 GB; the TV path
+  untested on the screen).
 
 ### 2026-09-29 — MIC pack branch `deep-time`: Excavated Variants and its gaps (Q10), rock tags (Q16) (agent, pack worktree ../../pack-deeptime)
 - **What.** Pack branch `deep-time` pushed at 16dfd80 (on pack master 303fd89; master untouched): EV 4.3.1 + DAG 6.1.2
