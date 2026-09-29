@@ -595,9 +595,11 @@ fn site_cell(s: &deeptime_format::Site, circumference: u32, r: u32) -> (usize, u
 /// The survivor formula (plan §8.6 as built 2026-09-29) on a history whose preservation is known:
 /// a block of crust fully favourable for 100 Myr that erodes 40 m/Myr everywhere. Deposits form
 /// uniformly in time, so a deposit of half-height h formed at depth z survives when its age is
-/// below (z + h)/(40 m/Myr): P̄ = E_T[min(1, (z + h(T))/4 km)]. The engine's preservation is that
-/// closed form, and over 300 planets the mean number of survivors is the density's target ρ·A
-/// within sampling error, while about target / P̄ form.
+/// below (z + h)/(40 m/Myr) and counts toward the density (top within the 1 km assessment depth)
+/// when its age is also above (z − h − 1 km)/(40 m/Myr): P̄₁ = E_T[(age window)/100 Myr]. The
+/// engine's preservation is that closed form; over 300 planets the mean number of counted survivors
+/// is the density's target ρ·A within sampling error, all sites (the deeper ones too) average
+/// target · P̄/P̄₁, and about target / P̄₁ form.
 #[test]
 fn the_survivor_formula_hits_its_target_in_expectation() {
     let (circumference, r) = (2048u32, 16u32);
@@ -656,25 +658,34 @@ fn the_survivor_formula_hits_its_target_in_expectation() {
         p50: rho,
         p10: rho * 2.0,
     };
+    // A single estimate: the target is ρ itself (a measured distribution would take its mean).
+    t.sizing.density_basis = types::DensityBasis::Estimate;
     t.validate().unwrap();
     // The closed form, on a fine tonnage quadrature.
     let tonnage = sizing::SizeModel::new(&t.sizing).tonnage;
     let nodes = 20_000;
     let span_m = f64::from(rate) * 100.0;
-    let want_p: f64 = (0..nodes)
-        .map(|m| {
-            let q = (m as f64 + 0.5) / f64::from(nodes);
-            let h = geometry::half_height_m(&t, tonnage.quantile(q) * 1.0e6);
-            ((t.preservation.formation_depth_m + h) / span_m).min(1.0)
-        })
-        .sum::<f64>()
-        / f64::from(nodes);
+    let (z, a) = (
+        t.preservation.formation_depth_m,
+        t.preservation.assessment_depth_m,
+    );
+    let (mut want_p, mut want_p1) = (0.0, 0.0);
+    for m in 0..nodes {
+        let q = (f64::from(m) + 0.5) / f64::from(nodes);
+        let h = geometry::half_height_m(&t, tonnage.quantile(q) * 1.0e6);
+        let old = ((z + h) / span_m).min(1.0);
+        let young = ((z - h - a) / span_m).max(0.0);
+        want_p += old;
+        want_p1 += (old - young).max(0.0);
+    }
+    want_p /= f64::from(nodes);
+    want_p1 /= f64::from(nodes);
     assert!(
-        want_p > 0.3 && want_p < 0.8,
-        "a test with something to say: {want_p}"
+        want_p1 > 0.2 && want_p1 < want_p - 0.02 && want_p < 0.8,
+        "a test with something to say: {want_p1} of {want_p}"
     );
     let runs = 300u64;
-    let (mut survivors, mut formed) = (0usize, 0u64);
+    let (mut survivors, mut counted, mut formed) = (0usize, 0u64, 0u64);
     for seed in 0..runs {
         let (w, census) = run_on(
             circumference,
@@ -689,10 +700,16 @@ fn the_survivor_formula_hits_its_target_in_expectation() {
         let target = c["target"].as_f64().unwrap();
         assert!((target - 3.0).abs() < 1e-6, "target {target}");
         let p = c["preservation"].as_f64().unwrap();
-        assert!((p - want_p).abs() < 0.01, "preservation {p} vs {want_p}");
+        assert!((p - want_p1).abs() < 0.01, "preservation {p} vs {want_p1}");
+        let sites = c["expected_sites"].as_f64().unwrap();
+        assert!(
+            (sites - 3.0 * want_p / want_p1).abs() < 0.1,
+            "expected sites {sites}"
+        );
         assert!((c["expected"].as_f64().unwrap() - 3.0).abs() < 1e-6);
         assert_eq!(c["capped"], false);
         survivors += w.sites.len();
+        counted += c["counted"].as_u64().unwrap();
         formed += c["drawn"].as_u64().unwrap();
         for s in &w.sites {
             let (i, j) = site_cell(s, circumference, r);
@@ -703,21 +720,28 @@ fn the_survivor_formula_hits_its_target_in_expectation() {
         }
     }
     let n = runs as f64;
-    let mean = survivors as f64 / n;
+    let mean = counted as f64 / n;
     let se = (3.0 / n).sqrt();
     assert!(
         (mean - 3.0).abs() < 4.0 * se + 0.03,
-        "mean survivors {mean} vs target 3 (±{se:.3})"
+        "mean counted survivors {mean} vs target 3 (±{se:.3})"
+    );
+    let want_sites = 3.0 * want_p / want_p1;
+    let mean_sites = survivors as f64 / n;
+    assert!(
+        (mean_sites - want_sites).abs() < 4.0 * (want_sites / n).sqrt() + 0.05,
+        "mean sites {mean_sites} vs {want_sites}"
     );
     let mean_formed = formed as f64 / n;
-    let want_formed = 3.0 / want_p;
+    let want_formed = 3.0 / want_p1;
     assert!(
         (mean_formed - want_formed).abs() < 4.0 * (want_formed / n).sqrt() + 0.05,
         "mean formed {mean_formed} vs {want_formed}"
     );
     eprintln!(
-        "survivor formula: P̄ {want_p:.4}, mean survivors {mean:.3} (target 3), mean formed \
-         {mean_formed:.2} ({want_formed:.2} expected) over {runs} planets"
+        "survivor formula: P̄₁ {want_p1:.4}, P̄ {want_p:.4}, mean counted {mean:.3} (target 3), \
+         mean sites {mean_sites:.2} ({want_sites:.2}), mean formed {mean_formed:.2} \
+         ({want_formed:.2} expected) over {runs} planets"
     );
 }
 

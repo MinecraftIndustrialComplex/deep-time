@@ -300,13 +300,44 @@ pub struct Sizing {
     #[serde(default)]
     pub correlations: Vec<(String, String, f64)>,
     pub ore_density_t_m3: f64,
-    /// Deposits per 100,000 km² of permissive area (the count model uses p50).
+    /// Deposits per 100,000 km² of permissive area that survive within the assessment depth
+    /// (`deposits/survival.rs`).
     pub density_per_1e5km2: Percentiles,
+    /// Where the density comes from: `measured` (a published distribution over well-explored
+    /// control areas; the count model takes its mean, the expectation over many tracts) or
+    /// `estimate` (a single sourced estimate or a placeholder; the count model takes its p50 and
+    /// does not inflate it). Decisions log 2026-09-29.
+    #[serde(default)]
+    pub density_basis: DensityBasis,
     /// USGS same-deposit rule, metres.
     pub min_separation_m: f64,
     /// Favourability above which a cell is permissive.
     pub tract_threshold: f64,
     pub clustering: Clustering,
+}
+
+/// Where a type's deposit density comes from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DensityBasis {
+    /// A single estimate or a placeholder: the count model uses P50.
+    #[default]
+    Estimate,
+    /// A published distribution: the count model uses its mean.
+    Measured,
+}
+
+impl Sizing {
+    /// The density the survivor formula aims at (deposits per 100,000 km²): the mean of a
+    /// measured distribution (the split lognormal through P90/P50/P10), P50 of an estimate.
+    pub fn density_target(&self) -> f64 {
+        match self.density_basis {
+            DensityBasis::Estimate => self.density_per_1e5km2.p50,
+            DensityBasis::Measured => {
+                super::sizing::Lognormal::from_percentiles(&self.density_per_1e5km2).mean()
+            }
+        }
+    }
 }
 
 /// A zone of a body, relative to the type's grades.
@@ -423,6 +454,15 @@ pub struct Preservation {
     /// Products that survive erosion into placers.
     #[serde(default)]
     pub resistates: Vec<String>,
+    /// A survivor counts toward the density when its top lies at most this deep today (m): the
+    /// depth an assessment counts deposits to (USGS hard-rock assessments: 1 km). Deeper
+    /// survivors are sites too, on top of the density.
+    #[serde(default = "assessment_depth")]
+    pub assessment_depth_m: f64,
+}
+
+fn assessment_depth() -> f64 {
+    1000.0
 }
 
 /// Supergene enrichment rules (Sillitoe 2005), for a child type.

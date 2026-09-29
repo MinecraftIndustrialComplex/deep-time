@@ -51,6 +51,9 @@ pub struct FateModel {
     /// `balance.size_mult_v` (the build-range check scales the body's half-height).
     pub size_mult_v: f64,
     pub behavior: ErosionBehavior,
+    /// A survivor counts toward the density when its top lies at most this deep (m;
+    /// `preservation.assessment_depth_m`, the depth USGS assessments count deposits to).
+    pub assessment_depth_m: f64,
 }
 
 impl FateModel {
@@ -67,50 +70,58 @@ impl FateModel {
             half_heights_m,
             size_mult_v: t.balance.size_mult_v,
             behavior: t.preservation.erosion_behavior,
+            assessment_depth_m: t.preservation.assessment_depth_m,
         }
     }
 
     /// Survives a body of half-height `h` whose centre is `d` below the surface, with `limit_m` the
     /// depth below which a body's top misses the build range ([`too_deep_limit_m`])? Mirrors
-    /// `Ledger::apply` and the stage's too-deep check.
-    pub fn survives(&self, d: f64, h: f64, limit_m: f64) -> bool {
+    /// `Ledger::apply` and the stage's too-deep check. With `counted`, the survivor must also have
+    /// its top within the assessment depth to count toward the density.
+    pub fn survives(&self, d: f64, h: f64, limit_m: f64, counted: bool) -> bool {
         let kept = match self.behavior {
             ErosionBehavior::Destroy => d - h >= 0.0,
             ErosionBehavior::Truncate | ErosionBehavior::SpawnPlacer => d + h > 0.0,
         };
         kept && d - h * self.size_mult_v <= limit_m
+            && (!counted || d - h <= self.assessment_depth_m)
     }
 
     /// The share of tonnage nodes and of the formation instants U ∈ [0, 1] of one frame for which
     /// a deposit survives, its centre depth being `a + b·U` (a: depth for a deposit formed at the
     /// frame's end, b: the frame's own net burial, m).
-    pub fn survival_in_frame(&self, a: f64, b: f64, limit_m: f64) -> f64 {
+    pub fn survival_in_frame(&self, a: f64, b: f64, limit_m: f64, counted: bool) -> f64 {
         let mut s = 0.0;
         for &h in &self.half_heights_m {
-            let (lo, hi) = self.window(h, limit_m);
+            let (lo, hi) = self.window(h, limit_m, counted);
             s += fraction_between(a, b, lo, hi);
         }
         s / self.half_heights_m.len().max(1) as f64
     }
 
     /// The share of tonnage nodes for which a deposit at depth `d` survives.
-    pub fn survival_at(&self, d: f64, limit_m: f64) -> f64 {
+    pub fn survival_at(&self, d: f64, limit_m: f64, counted: bool) -> f64 {
         let n = self
             .half_heights_m
             .iter()
-            .filter(|&&h| self.survives(d, h, limit_m))
+            .filter(|&&h| self.survives(d, h, limit_m, counted))
             .count();
         n as f64 / self.half_heights_m.len().max(1) as f64
     }
 
     /// The open-closed depth window (lo, hi] a body of half-height `h` survives in.
-    fn window(&self, h: f64, limit_m: f64) -> (f64, f64) {
+    fn window(&self, h: f64, limit_m: f64, counted: bool) -> (f64, f64) {
         let lo = match self.behavior {
             // d ≥ h: the window's lower end is closed, which has measure zero.
             ErosionBehavior::Destroy => h,
             ErosionBehavior::Truncate | ErosionBehavior::SpawnPlacer => -h,
         };
-        (lo, limit_m + h * self.size_mult_v)
+        let hi = limit_m + h * self.size_mult_v;
+        if counted {
+            (lo, hi.min(self.assessment_depth_m + h))
+        } else {
+            (lo, hi)
+        }
     }
 }
 
@@ -177,8 +188,15 @@ pub enum Formation<'a> {
     Start,
 }
 
-/// p(c): the probability that a deposit formed in this column survives to the present.
-pub fn preservation(model: &FateModel, col: &ColumnNet, when: Formation<'_>, limit_m: f64) -> f64 {
+/// p(c): the probability that a deposit formed in this column survives to the present (with
+/// `counted`, survives with its top within the assessment depth).
+pub fn preservation(
+    model: &FateModel,
+    col: &ColumnNet,
+    when: Formation<'_>,
+    limit_m: f64,
+    counted: bool,
+) -> f64 {
     let z = model.formation_depth_m;
     match when {
         Formation::Hazard(h) => {
@@ -190,15 +208,16 @@ pub fn preservation(model: &FateModel, col: &ColumnNet, when: Formation<'_>, lim
                     continue;
                 }
                 den += hk;
-                num += hk * model.survival_in_frame(z + col.after(k), col.net_m[k], limit_m);
+                num +=
+                    hk * model.survival_in_frame(z + col.after(k), col.net_m[k], limit_m, counted);
             }
             if den > 0.0 { num / den } else { 0.0 }
         }
         Formation::At { k, u } => {
             let d = z + col.after(k) + u.clamp(0.0, 1.0) * col.net_m[k];
-            model.survival_at(d, limit_m)
+            model.survival_at(d, limit_m, counted)
         }
-        Formation::Start => model.survival_at(z + col.total(), limit_m),
+        Formation::Start => model.survival_at(z + col.total(), limit_m, counted),
     }
 }
 
@@ -301,7 +320,7 @@ mod tests {
                         continue;
                     }
                     assert_eq!(
-                        m.survives(d, h, limit),
+                        m.survives(d, h, limit, false),
                         is_site(fate, too_deep),
                         "{} d={d} h={h}",
                         t.id
@@ -321,7 +340,13 @@ mod tests {
         let (frames, dt_myr, r) = (50usize, 10.0, 8.0);
         let col = ColumnNet::new(vec![-r * dt_myr; frames]);
         let hazard = vec![1.0f32; frames];
-        let p = preservation(&m, &col, Formation::Hazard(&hazard), 1.0e9);
+        let mut m = m;
+        m.assessment_depth_m = 1.0e9;
+        let p = preservation(&m, &col, Formation::Hazard(&hazard), 1.0e9, true);
+        assert_eq!(
+            p,
+            preservation(&m, &col, Formation::Hazard(&hazard), 1.0e9, false)
+        );
         let span = r * dt_myr * frames as f64;
         let want = m
             .half_heights_m
@@ -333,7 +358,26 @@ mod tests {
         // Formation only in the last 10 % of the history: everything survives this erosion.
         let mut late = vec![0.0f32; frames];
         late[frames - 5..].iter_mut().for_each(|x| *x = 1.0);
-        assert!(preservation(&m, &col, Formation::Hazard(&late), 1.0e9) > 0.999);
+        assert!(preservation(&m, &col, Formation::Hazard(&late), 1.0e9, false) > 0.999);
+        // Counted within 1 km: a deposit formed at 1.5 km counts once erosion has brought its top
+        // within 1 km, and stops counting when it is gone; the counted share is a part of the
+        // surviving one.
+        m.assessment_depth_m = 1000.0;
+        let counted = preservation(&m, &col, Formation::Hazard(&hazard), 1.0e9, true);
+        let want_c = m
+            .half_heights_m
+            .iter()
+            .map(|h| {
+                let (z, r) = (m.formation_depth_m, 8.0);
+                // Age window in which z − r·age − h ≤ 1 km and z − r·age + h > 0.
+                let young = ((z - h - 1000.0) / r).max(0.0);
+                let old = ((z + h) / r).min(500.0);
+                ((old - young) / 500.0).max(0.0)
+            })
+            .sum::<f64>()
+            / m.half_heights_m.len() as f64;
+        assert!((counted - want_c).abs() < 1e-9, "{counted} vs {want_c}");
+        assert!(counted < p);
     }
 
     #[test]

@@ -131,6 +131,7 @@
         "correlations": {"type": "array", "items": {"type": "array", "prefixItems": [{"type": "string"}, {"type": "string"}, {"type": "number", "exclusiveMinimum": -1, "exclusiveMaximum": 1}], "minItems": 3, "maxItems": 3}},
         "ore_density_t_m3": {"type": "number", "exclusiveMinimum": 0},
         "density_per_1e5km2": {"$ref": "#/$defs/percentiles"},
+        "density_basis": {"enum": ["measured", "estimate"], "default": "estimate", "description": "measured: a published distribution over control areas (the survivor formula takes its mean); estimate: a single sourced estimate or a placeholder (its p50)"},
         "min_separation_m": {"type": "number", "minimum": 0},
         "tract_threshold": {"type": "number", "minimum": 0, "exclusiveMaximum": 1},
         "clustering": {
@@ -194,7 +195,8 @@
         "formation_depth_m": {"type": "number", "minimum": 0},
         "vertical_extent_m": {"type": "number", "minimum": 0},
         "erosion_behavior": {"enum": ["truncate", "spawn_placer", "destroy"]},
-        "resistates": {"type": "array", "items": {"type": "string"}}
+        "resistates": {"type": "array", "items": {"type": "string"}},
+        "assessment_depth_m": {"type": "number", "exclusiveMinimum": 0, "default": 1000, "description": "a survivor counts toward the density when its top lies at most this deep (USGS hard-rock assessments: 1 km)"}
       }
     },
     "weathering": {

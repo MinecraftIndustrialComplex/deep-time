@@ -109,6 +109,14 @@ impl Lognormal {
         (self.mu + s * z).exp()
     }
 
+    /// The mean: e^μ · (e^(σ_lo²/2)·Φ(−σ_lo) + e^(σ_hi²/2)·Φ(σ_hi)).
+    pub fn mean(&self) -> f64 {
+        let half = |s: f64| (0.5 * s * s).exp();
+        self.mu.exp()
+            * (half(self.sigma_lo) * normal_cdf(-self.sigma_lo)
+                + half(self.sigma_hi) * normal_cdf(self.sigma_hi))
+    }
+
     /// The value a fraction `q` of deposits is below.
     pub fn quantile(&self, q: f64) -> f64 {
         self.at(normal_quantile(q))
@@ -304,6 +312,7 @@ mod tests {
                 p50: 15.0,
                 p10: 35.0,
             },
+            density_basis: Default::default(),
             min_separation_m: 2000.0,
             tract_threshold: 0.2,
             clustering: Clustering {
@@ -315,6 +324,30 @@ mod tests {
     }
 
     /// Acceptance: porphyry σ = 1.49 ± 0.01 from 33 / 240 / 1,500 Mt.
+    /// The split lognormal's mean: porphyry density 4 / 15 / 35 per 100,000 km² (Singer et al.
+    /// 2005) has mean ≈ 17.8; a symmetric one e^(μ+σ²/2); and it matches a numerical integral.
+    #[test]
+    fn split_lognormal_mean() {
+        let l = Lognormal::from_percentiles(&Percentiles {
+            p90: 4.0,
+            p50: 15.0,
+            p10: 35.0,
+        });
+        let n = 200_000;
+        let num: f64 = (0..n)
+            .map(|k| l.quantile((f64::from(k) + 0.5) / f64::from(n)))
+            .sum::<f64>()
+            / f64::from(n);
+        assert!((l.mean() - num).abs() / num < 2e-3, "{} vs {num}", l.mean());
+        assert!((l.mean() - 17.8).abs() < 0.1, "{}", l.mean());
+        let sym = Lognormal {
+            mu: 1.0,
+            sigma_lo: 0.5,
+            sigma_hi: 0.5,
+        };
+        assert!((sym.mean() - (1.0f64 + 0.125).exp()).abs() < 1e-9);
+    }
+
     #[test]
     fn porphyry_sigma() {
         let l = Lognormal::from_percentiles(&porphyry_like().tonnage_mt);
