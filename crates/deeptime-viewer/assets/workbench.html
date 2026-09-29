@@ -82,9 +82,9 @@
   #panes { display: grid; grid-template-columns: 1fr; gap: 8px; }
   #panes.compare { grid-template-columns: 1fr 1fr; }
   .pane { min-width: 0; }
-  .pane .head { display: flex; gap: 8px; align-items: baseline; font-size: .85em; margin-bottom: 3px; }
-  .pane .head .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pane .head .tag { color: var(--muted); }
+  .pane .head { display: flex; gap: 8px; align-items: baseline; font-size: .85em; margin-bottom: 3px; white-space: nowrap; overflow: hidden; }
+  .pane .head .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 4em; }
+  .pane .head .tag { color: var(--muted); overflow: hidden; text-overflow: ellipsis; flex: 1 1 0; min-width: 0; }
   .pane.focus .head .name { color: var(--accent); }
   .mapbox { position: relative; width: 100%; max-width: calc((100vh - 200px) * 2); }
   #panes.compare .mapbox { max-width: none; }
