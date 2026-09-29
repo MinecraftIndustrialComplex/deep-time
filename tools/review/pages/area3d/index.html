@@ -1,0 +1,141 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deep Time Area Preview</title>
+<meta name="description" content="A box of a generated Deep Time world in 3D: strata, ore bodies and why they are there, from the real generator run headless.">
+<style>
+:root {
+  --bg: #f4f3ef; --panel: #ffffffee; --ink: #1d1d1b; --muted: #6b6a64; --line: #d8d6ce;
+  --accent: #1f6feb; --accent-ink: #fff; --scene: #dfe6ec; --warn: #b45309; --ok: #15803d; --chip: #eceae3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171a; --panel: #1d2024ee; --ink: #e8e6e1; --muted: #9a988f; --line: #33373d;
+    --accent: #58a6ff; --accent-ink: #0b0d10; --scene: #0f1216; --warn: #f0a24b; --ok: #4ade80; --chip: #2a2e34;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171a; --panel: #1d2024ee; --ink: #e8e6e1; --muted: #9a988f; --line: #33373d;
+  --accent: #58a6ff; --accent-ink: #0b0d10; --scene: #0f1216; --warn: #f0a24b; --ok: #4ade80; --chip: #2a2e34;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; }
+header { position: fixed; top: 0; left: 0; right: 0; height: 48px; display: flex; align-items: center; gap: 8px;
+  padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); z-index: 5; }
+header h1 { font-size: 15px; margin: 0; white-space: nowrap; }
+header .sub { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+button, select, .file { font: inherit; color: var(--ink); background: var(--chip); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.file input { display: none; }
+#scene { position: fixed; top: 48px; left: 0; right: 0; bottom: 0; }
+#scene canvas { display: block; }
+.panel { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  z-index: 4; overflow: auto; backdrop-filter: blur(6px); }
+#controls { top: 60px; left: 12px; width: 272px; max-height: calc(100% - 72px); padding: 10px 12px; }
+#inspect { top: 60px; right: 12px; width: 340px; max-height: calc(100% - 72px); padding: 10px 12px; display: none; }
+#inspect.show { display: block; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 12px 0 6px; }
+h2:first-child { margin-top: 0; }
+label { display: flex; align-items: center; gap: 6px; }
+.cats label { justify-content: space-between; }
+.cats label span.n { color: var(--muted); font-size: 12px; }
+.row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 4px 0; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid #0003; vertical-align: -2px; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 13px; }
+.kv b { font-weight: 600; color: var(--muted); }
+.chain { margin: 4px 0 0; padding-left: 16px; font-size: 13px; }
+.chain li { margin: 2px 0; }
+.site { border-top: 1px solid var(--line); padding-top: 6px; margin-top: 6px; }
+ul.sites { list-style: none; padding: 0; margin: 0; }
+ul.sites li { padding: 3px 0; cursor: pointer; font-size: 13px; }
+ul.sites li:hover { color: var(--accent); }
+.col { font-size: 12px; border-collapse: collapse; width: 100%; }
+.col td { padding: 1px 4px; border-bottom: 1px solid var(--line); }
+.col tr.here td { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+#status { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 12px; z-index: 4; white-space: nowrap;
+  max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; }
+a { color: var(--accent); }
+#drop { position: fixed; inset: 48px 0 0 0; display: none; align-items: center; justify-content: center; z-index: 3;
+  color: var(--muted); font-size: 16px; text-align: center; padding: 24px; }
+#drop.show { display: flex; }
+#toggle-controls { display: none; }
+.ok { color: var(--ok); } .warn { color: var(--warn); }
+@media (max-width: 720px) {
+  header .sub { display: none; }
+  #toggle-controls { display: inline-block; }
+  #controls { left: 8px; right: 8px; width: auto; top: 56px; max-height: 55%; display: none; }
+  #controls.open { display: block; }
+  #inspect { left: 8px; right: 8px; width: auto; top: auto; bottom: 8px; max-height: 50%; }
+  #status { bottom: auto; top: 56px; }
+}
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header>
+  <h1>Area preview</h1>
+  <span class="sub" id="subtitle">Deep Time · a box of a generated world</span>
+  <select id="exports" hidden aria-label="Export"></select>
+  <label class="file" title="Open a .dtva or .dtva.gz export">Open…<input type="file" id="file" accept=".gz,.dtva"></label>
+  <button id="toggle-controls" aria-label="Controls">☰</button>
+  <button id="theme" title="Theme: auto, light, dark" aria-label="Theme">◐</button>
+</header>
+<div id="scene"></div>
+<div id="drop">Drop a <code>.dtva.gz</code> export here, or open one with <b>Open…</b><br>
+  (<code>tools/workbench/preview-area.sh</code> makes them; <code>?src=&lt;url&gt;</code> loads one directly).</div>
+
+<aside class="panel" id="controls">
+  <h2>Show</h2>
+  <div class="row">
+    <button data-preset="all" class="on">Everything</button>
+    <button data-preset="nostone">Hide stone</button>
+    <button data-preset="ores">Ores &amp; deposits</button>
+  </div>
+  <div class="cats" id="cats"></div>
+  <label><input type="checkbox" id="bodies"> Deposit bodies (see-through)</label>
+  <h2>Colour by</h2>
+  <div class="row">
+    <select id="colour" aria-label="Colour by">
+      <option value="block">Block</option>
+      <option value="strata">Rock horizon (strata stack)</option>
+      <option value="body">Deposit body</option>
+    </select>
+  </div>
+  <label><input type="checkbox" id="vivid" checked> Vivid ores (colour by material)</label>
+  <h2>Cutaway</h2>
+  <div class="small">Top at y <b id="cuty-v"></b></div>
+  <input type="range" id="cuty" aria-label="Top cut">
+  <div class="row small">
+    <label>Section <select id="secaxis" aria-label="Cross-section axis">
+      <option value="none">off</option><option value="x">along x (keep west)</option><option value="z">along z (keep north)</option>
+    </select></label>
+    <label><input type="checkbox" id="secflip"> flip</label>
+  </div>
+  <div class="small" id="sec-v"></div>
+  <input type="range" id="secpos" aria-label="Cross-section position" disabled>
+  <h2>Sites in the box</h2>
+  <ul class="sites" id="sites"><li class="muted">none</li></ul>
+  <h2>About this box</h2>
+  <div id="about" class="small muted"></div>
+</aside>
+
+<aside class="panel" id="inspect" aria-live="polite"></aside>
+<div id="status">Loading…</div>
+
+<script type="module" src="area3d.js"></script>
+</body>
+</html>
