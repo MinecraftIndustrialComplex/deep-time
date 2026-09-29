@@ -2296,10 +2296,10 @@ writes PNGs plus a JSON summary:
 - `ore` — ore blocks by material, projected from above with depth shading.
 - `section --axis x|z --at <n> --from <a> --to <b>` — a vertical cross-section, blocks by colour,
   with site bodies and horizon lines overlaid from the world data. `--axis z --at <n>` is the plane
-  z = n, running along x. It prints `water_top_y=<y> surface_y=<y+1> columns=<n>` for every water
-  surface it crosses: `water_top_y` is the y of the highest block holding water above the terrain
-  surface (sea level 63 gives 62), `surface_y` the height of the water surface (cold-read review 2,
-  gap 18).
+  z = n, running along x. It prints `water_top_y=<y> water_block_y=<y−1> columns=<n>` for every
+  water surface it crosses: `water_top_y` is the top face of the highest block holding water above
+  the terrain surface, as P0-13's `lakeHolds` logs it (sea level 63 gives 63), `water_block_y` that
+  block's y (cold-read review 2, gap 18).
 - `seam` — the 128 columns on either side of x = C/2 as one strip, and the per-column height
   difference between the region files and the world data.
 - `compare --world <dir> --world-data <dir>` — generated surface height vs `elevation`, as a
@@ -2732,8 +2732,8 @@ of Phase 0 is built on it.
     with before = after = expected, and `[gametest] lakeHolds water_top_y=120` (the top face of the
     highest water block at the lake centre, `notes.lake.centre_block`; cold-read review 2, gap 18)
   - `nix develop -c cargo run -p deeptime-inspect -- section --world run-gametest/world/dimensions/deeptime/test_lake --axis z --at 0 --from -88 --to 212`
-    → a PNG with the water surface at y 120 (the lake centre is z 0 and the channel runs along it
-    to x 160; −88…212 is `lakeHolds`' scanned box; a review picture, P0-11)
+    → a PNG with the water surface at y 120 and the printed line `water_top_y=120` (the lake centre
+    is z 0 and the channel runs along it to x 160; −88…212 is `lakeHolds`' scanned box; P0-11)
 - **Ben reviews.** The cross-section and the BlueMap view of the lake.
 
 #### P0-14 BlueMap renders on MIC blocks
