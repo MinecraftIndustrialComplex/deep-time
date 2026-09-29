@@ -1853,7 +1853,13 @@ at its calibrated value (a field is editable only where the preset carries its p
 run is byte-identical; a number in a path indexes an array (`structure.pluton_length_km.0`). In the
 game the Advanced sections sit behind one collapsed header in the setup page's scrolling list
 (`EditorModel.advancedOpen`); in the workbench each is a section that starts folded. The list of
-what was left out on purpose is in the catalogue's `_comment`.
+what was left out on purpose is in the catalogue's `_comment`. The Multipliers section is wired to
+the core too: `deposits.size_mult` (tonnage percentiles, so a body's volume follows), `deposits.
+richness_mult` (grades), and `scale.feature_scale.{deposits, strata}` (ore bodies' and rock layers'
+size in blocks, `params::FeatureScale`), each 1 by default; the rivers and canyons scales and the
+essentials list stay `planned` (Phase 2, and the datapack loader). The workbench lists only the
+built-in Earth-like presets (`watch/editor.rs`: the pipeline and plates presets are `hidden`, still
+resolvable by name).
 
 Tectonic 3.0.28 ships a client mixin, `WorldCreationUiStateMixin.tectonic$removeUnusablePresets`
 (injected at the return of `WorldCreationUiState.getNonEmptyList`). Decompiled, it only removes
