@@ -173,7 +173,8 @@ def forceload(rcon, c, x0, z0, x1, z1, wait=180, points=()):
     outside this world"), so a box across the seam is folded and split into two canonical boxes.
     Forceloading is asynchronous; `/test run` puts a test on the WORLD_SURFACE heightmap of its
     position, which reads y = min build height (-352) until the chunk is there, so the harness
-    waits (execute if loaded, every corner) before running anything.
+    waits (execute if loaded, every corner) before running anything. Re-adding forced chunks is
+    harmless (the command reports that nothing changed), so this runs before every test.
     """
     half = c // 2
     a = (x0 + half) % c - half
@@ -213,8 +214,6 @@ def run_tests(spec, rcon, timeout, c):
     last_z = z + 8 * (len(names) - 1)
     # `/test run` at (x, z) puts the test at (x, surface + 1, z + 3).
     spots = [(x, z + 8 * i + 3) for i in range(len(names))]
-    if not forceload(rcon, c, x - dx, z - dz, x + dx, last_z + dz, points=spots):
-        return [f"{','.join(names)}: forceloaded chunks never loaded"]
     # One test at a time: 1.21.1's `/test run` begins with TestCommand.stopTests(), which cancels
     # every test still running, so a second /test run issued before the first test reported
     # silently kills it (P0-06 finding). Each test also gets its own spot, 8 blocks apart in z,
@@ -222,6 +221,10 @@ def run_tests(spec, rcon, timeout, c):
     summary = {}
     for n_i, name in enumerate(names):
         tz = z + 8 * n_i
+        # Forceload again before every test: when a test batch ends, vanilla's GameTestRunner
+        # un-forces every forced chunk of the level (level.getForcedChunks()), the harness's too.
+        if not forceload(rcon, c, x - dx, z - dz, x + dx, last_z + dz, points=spots):
+            return [f"{name}: forceloaded chunks never loaded"]
         m = PROBE.search(rcon(f"deeptime probe column {x} {tz + 3}"))
         where = json.loads(m.group(1)) if m else {}
         print(f"   spot {x},{tz + 3}: chunkLoaded={where.get('chunkLoaded')} worldSurface={where.get('worldSurface')} "
