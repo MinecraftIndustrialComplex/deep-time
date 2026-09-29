@@ -2,7 +2,11 @@
 package com.minecraftindustrialcomplex.deeptime.server;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.climate.ClimateMapping;
+import com.minecraftindustrialcomplex.deeptime.climate.ClimateMappingBuilder;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.server.packs.resources.ResourceManager;
 import com.minecraftindustrialcomplex.deeptime.worldgen.ActiveWorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataRef;
@@ -130,7 +134,7 @@ public final class WorldDataBinder {
         server.registryAccess().registryOrThrow(Registries.LEVEL_STEM).entrySet().forEach(e -> {
             if (!(e.getValue().generator() instanceof GeologicChunkGenerator g))
                 return;
-            if (!bindLevel(world, g.dataRef()))
+            if (!bindLevel(world, g.dataRef(), server.registryAccess(), server.getResourceManager()))
                 DeepTime.LOGGER.error("Deep Time level {} has no world data at {} (manifest.json missing)", e.getKey().location(),
                         world.resolve(g.dataRef().folder()));
         });
@@ -141,6 +145,16 @@ public final class WorldDataBinder {
      * holds no world data; {@code true} when bound, or when the ref has a test terrain (nothing to bind).
      */
     public static boolean bindLevel(Path world, WorldDataRef ref) {
+        return bindLevel(world, ref, null, null);
+    }
+
+    /**
+     * As {@link #bindLevel(Path, WorldDataRef)}, and binds the world's climate mapping (P1-09):
+     * {@code climate_mapping.json} from the folder, or — at a P1-09 world's first start, with the
+     * server's registries — built from the pack and written there ({@link ClimateMappingBuilder}).
+     * Without registries only an existing file is read.
+     */
+    public static boolean bindLevel(Path world, WorldDataRef ref, RegistryAccess access, ResourceManager resources) {
         if (ref.effectiveTestTerrain().isPresent())
             return true;
         String folder = ref.folder();
@@ -149,6 +163,15 @@ public final class WorldDataBinder {
             return false;
         WorldData wd = WorldData.open(dir);
         ActiveWorldData.put(folder, wd);
+        if (access != null) {
+            ActiveWorldData.putMapping(folder, ClimateMappingBuilder.forWorld(wd, access, resources));
+        } else if (Files.isRegularFile(dir.resolve(ClimateMapping.FILE))) {
+            try {
+                ActiveWorldData.putMapping(folder, ClimateMapping.read(dir.resolve(ClimateMapping.FILE)));
+            } catch (java.io.IOException | RuntimeException e) {
+                DeepTime.LOGGER.error("Cannot read {}: {}", dir.resolve(ClimateMapping.FILE), e.getMessage());
+            }
+        }
         DeepTime.LOGGER.info("Bound Deep Time world data {} (format {}, C = {}{})", dir, wd.manifest().formatVersion(),
                 wd.circumference(), ref.stagingId().map(s -> ", staged as " + s).orElse(""));
         return true;

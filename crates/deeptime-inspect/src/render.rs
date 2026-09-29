@@ -198,6 +198,179 @@ pub fn topdown(
     Ok(v)
 }
 
+/// Köppen class colours by index (Beck et al. 2018's palette, as `climate::koppen::COLOURS`; 31 =
+/// sea) and codes.
+pub const KOPPEN_COLOURS: [&str; 32] = [
+    "#0000ff", "#0078ff", "#46aafa", "#7fbfff", "#ff0000", "#ff9696", "#f5a500", "#ffdc64",
+    "#ffff00", "#c8c800", "#969600", "#96ff96", "#64c864", "#329632", "#c8ff50", "#64ff50",
+    "#32c800", "#ff00ff", "#c800c8", "#963296", "#966496", "#aaafff", "#5a78dc", "#4b50b4",
+    "#320087", "#00ffff", "#37c8ff", "#007d7d", "#00465f", "#b2b2b2", "#666666", "#0b1d3a",
+];
+pub const KOPPEN_CODES: [&str; 32] = [
+    "Af", "Am", "Aw", "As", "BWh", "BWk", "BSh", "BSk", "Csa", "Csb", "Csc", "Cwa", "Cwb", "Cwc",
+    "Cfa", "Cfb", "Cfc", "Dsa", "Dsb", "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb",
+    "Dfc", "Dfd", "ET", "EF", "sea",
+];
+
+/// Map colours of vanilla biomes (the conventional biome-map palette); others get a colour from a
+/// hash of their id.
+const BIOME_COLOURS: [(&str, &str); 52] = [
+    ("ocean", "#000070"),
+    ("deep_ocean", "#000030"),
+    ("warm_ocean", "#0000ac"),
+    ("lukewarm_ocean", "#000090"),
+    ("deep_lukewarm_ocean", "#000040"),
+    ("cold_ocean", "#202070"),
+    ("deep_cold_ocean", "#202038"),
+    ("frozen_ocean", "#7070d6"),
+    ("deep_frozen_ocean", "#404090"),
+    ("plains", "#8db360"),
+    ("sunflower_plains", "#b5db88"),
+    ("snowy_plains", "#ffffff"),
+    ("ice_spikes", "#b4dcdc"),
+    ("desert", "#fa9418"),
+    ("swamp", "#07f9b2"),
+    ("mangrove_swamp", "#67352b"),
+    ("forest", "#056621"),
+    ("flower_forest", "#2d8e49"),
+    ("birch_forest", "#307444"),
+    ("old_growth_birch_forest", "#589c6c"),
+    ("dark_forest", "#40511a"),
+    ("taiga", "#0b6659"),
+    ("old_growth_pine_taiga", "#596651"),
+    ("old_growth_spruce_taiga", "#818e79"),
+    ("snowy_taiga", "#31554a"),
+    ("savanna", "#bdb25f"),
+    ("savanna_plateau", "#a79d64"),
+    ("windswept_savanna", "#e5da87"),
+    ("windswept_hills", "#606060"),
+    ("windswept_gravelly_hills", "#888888"),
+    ("windswept_forest", "#507050"),
+    ("jungle", "#537b09"),
+    ("sparse_jungle", "#628b17"),
+    ("bamboo_jungle", "#768e14"),
+    ("badlands", "#d94515"),
+    ("eroded_badlands", "#ff6d3d"),
+    ("wooded_badlands", "#b09765"),
+    ("meadow", "#60a445"),
+    ("cherry_grove", "#ffa0d0"),
+    ("grove", "#47875a"),
+    ("snowy_slopes", "#c4c4c4"),
+    ("frozen_peaks", "#a0a0ff"),
+    ("jagged_peaks", "#dcdcdc"),
+    ("stony_peaks", "#7b8f74"),
+    ("river", "#0000ff"),
+    ("frozen_river", "#a0a0ff"),
+    ("beach", "#fade55"),
+    ("snowy_beach", "#faf0c0"),
+    ("stony_shore", "#a2a284"),
+    ("mushroom_fields", "#ff00ff"),
+    ("dripstone_caves", "#7b6d52"),
+    ("lush_caves", "#2c6d17"),
+];
+
+/// A biome's map colour.
+pub fn biome_colour(id: &str) -> Rgba {
+    if id == "terralith:deep_warm_ocean" {
+        return [0x00, 0x00, 0x60, 255];
+    }
+    let path = id.strip_prefix("minecraft:");
+    if let Some(p) = path
+        && let Some((_, c)) = BIOME_COLOURS.iter().find(|(n, _)| *n == p)
+    {
+        return crate::image::parse_hex(c).unwrap_or([128, 128, 128, 255]);
+    }
+    // FNV-1a of the id → a mid-light colour.
+    let mut h: u32 = 0x811c_9dc5;
+    for b in id.bytes() {
+        h = (h ^ u32::from(b)).wrapping_mul(0x0100_0193);
+    }
+    let ch = |s: u32| (64 + ((h >> s) & 0xff) * 160 / 255) as u8;
+    [ch(0), ch(8), ch(16), 255]
+}
+
+/// Surface biomes and the Köppen map of the same area (P1-09).
+pub fn biomes(
+    world_dir: &Path,
+    area: Option<Area>,
+    wd: Option<&WorldData>,
+    name: &str,
+    out: &Out,
+) -> Result<Value> {
+    let world = World::load_area(world_dir, area)?;
+    let list = areas(&world, area)?;
+    let mut files = Vec::new();
+    let mut counts: BTreeMap<String, u64> = BTreeMap::new();
+    let mut by_class: BTreeMap<u8, BTreeMap<String, u64>> = BTreeMap::new();
+    for (i, a) in list.iter().enumerate() {
+        let mut img = Image::new(a.width(), a.height(), TRANSPARENT);
+        let mut kimg = Image::new(a.width(), a.height(), TRANSPARENT);
+        for z in a.z0..a.z1 {
+            for x in a.x0..a.x1 {
+                let Some(c) = world.full_chunk(x, z) else {
+                    continue;
+                };
+                let Some(top) = world.terrain_top(x, z).or_else(|| world.top(x, z)) else {
+                    continue;
+                };
+                let Some(b) = c.biome((x & 15) as usize, top, (z & 15) as usize) else {
+                    continue;
+                };
+                let (px, pz) = ((x - a.x0) as usize, (z - a.z0) as usize);
+                img.set(px, pz, biome_colour(b));
+                *counts.entry(b.to_owned()).or_default() += 1;
+                if let Some(k) = wd.and_then(|w| w.koppen(x, z)) {
+                    let kc = crate::image::parse_hex(KOPPEN_COLOURS[usize::from(k)])
+                        .unwrap_or([0, 0, 0, 255]);
+                    kimg.set(px, pz, kc);
+                    *by_class
+                        .entry(k)
+                        .or_default()
+                        .entry(b.to_owned())
+                        .or_default() += 1;
+                }
+            }
+        }
+        let png = out.png(&img, &numbered(name, i, list.len(), "png"))?;
+        let mut f = json!({"area": a.to_json(), "png": png});
+        if wd.is_some() {
+            f["koppen_png"] = json!(out.png(
+                &kimg,
+                &numbered(&format!("{name}-koppen"), i, list.len(), "png")
+            )?);
+        }
+        files.push(f);
+    }
+    let mut legend: Vec<(String, u64)> = counts.into_iter().collect();
+    legend.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    let classes: serde_json::Map<String, Value> = by_class
+        .iter()
+        .map(|(k, m)| {
+            let total: u64 = m.values().sum();
+            let mut v: Vec<(&String, &u64)> = m.iter().collect();
+            v.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+            (
+                KOPPEN_CODES[usize::from(*k)].to_owned(),
+                json!({
+                    "columns": total,
+                    "biomes": v.iter().take(8).map(|(b, n)| json!([b, n])).collect::<Vec<_>>(),
+                }),
+            )
+        })
+        .collect();
+    let v = json!({
+        "command": "biomes",
+        "definition": "each pixel is one column: the biome the chunk stores at the column's terrain top (the highest block that is not air, fluid or a feature), coloured with the conventional biome-map palette (vanilla) or a hash of the id (mods); the -koppen image is the world data's climate/koppen at the same columns (nearest cell), Beck et al. 2018's palette; north is up",
+        "world": world_summary(&world),
+        "images": files,
+        "legend": legend.iter().map(|(b, n)| json!({"id": b, "columns": n, "colour": hex(biome_colour(b))})).collect::<Vec<_>>(),
+        "koppen_colours": KOPPEN_COLOURS.iter().zip(KOPPEN_CODES).map(|(c, k)| json!([k, c])).collect::<Vec<_>>(),
+        "by_koppen": classes,
+    });
+    out.json(&v, &format!("{name}.json"))?;
+    Ok(v)
+}
+
 /// Rock sources when neither `--palette` nor `--tags` is given: the world's server mods and
 /// datapacks, and this repository's resources if run from its root.
 pub fn default_tag_sources(world_dir: &Path) -> Vec<PathBuf> {

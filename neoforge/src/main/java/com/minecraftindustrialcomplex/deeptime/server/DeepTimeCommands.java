@@ -4,6 +4,7 @@ package com.minecraftindustrialcomplex.deeptime.server;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.climate.BiomeCensus;
 import com.minecraftindustrialcomplex.deeptime.compat.sable.SableTestOps;
 import com.minecraftindustrialcomplex.deeptime.gametest.DeepTimeTestReporter;
 import com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport;
@@ -60,6 +61,11 @@ public final class DeepTimeCommands {
                                                         IntegerArgumentType.getInteger(c, "x"), IntegerArgumentType.getInteger(c, "y"),
                                                         IntegerArgumentType.getInteger(c, "z")))))))
                 .then(Commands.literal("claims").executes(c -> SiteCommands.probeClaims(c.getSource())))
+                // P1-09: surface biomes against the Köppen map; the grid goes to deeptime-probe/biomemap.json.
+                .then(Commands.literal("biomes")
+                        .executes(c -> probeBiomes(c.getSource(), 16))
+                        .then(Commands.argument("step", IntegerArgumentType.integer(4, 4096))
+                                .executes(c -> probeBiomes(c.getSource(), IntegerArgumentType.getInteger(c, "step")))))
                 // P1-16: what Deep Time and COE / CDG hold for a chunk (work without the mods too).
                 .then(Commands.literal("coe")
                         .then(Commands.argument("chunkX", IntegerArgumentType.integer())
@@ -305,6 +311,28 @@ public final class DeepTimeCommands {
             channels.add(j);
         }
         o.add("channels", channels);
+        return emit(source, o);
+    }
+
+    /**
+     * {@code /deeptime probe biomes [step]} (P1-09): the overworld's surface biomes every
+     * {@code step} blocks against its Köppen map ({@link BiomeCensus}); the whole grid is written to
+     * {@code <server>/deeptime-probe/biomemap.json} for the review page.
+     */
+    private static int probeBiomes(CommandSourceStack source, int step) {
+        ServerLevel level = source.getServer().overworld();
+        JsonObject o;
+        try {
+            long t0 = System.nanoTime();
+            var r = BiomeCensus.run(level, step, 64,
+                    source.getServer().getServerDirectory().resolve("deeptime-probe").resolve("biomemap.json"));
+            o = r.json();
+            o.addProperty("seconds", Math.round((System.nanoTime() - t0) / 1e7) / 100.0);
+        } catch (Exception e) {
+            o = new JsonObject();
+            o.addProperty("error", e.toString());
+        }
+        o.addProperty("probe", "biomes");
         return emit(source, o);
     }
 

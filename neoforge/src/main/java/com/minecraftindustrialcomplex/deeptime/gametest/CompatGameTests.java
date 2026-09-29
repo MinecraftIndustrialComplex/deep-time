@@ -386,8 +386,10 @@ public final class CompatGameTests {
                 problems.add("trap " + t.id() + " has no chunk with oil");
             lines.add("trap " + t.id() + " charge " + charge + " mB × " + scale + " over " + counts.size() + " chunks ("
                     + total + " blocks), max chunk " + max + " mB, finite sum " + Math.round(sum));
-            if (trapInfinite == 0 && Math.abs(sum - charge * scale) > counts.size())
-                problems.add("trap " + t.id() + ": the chunks add up to " + sum + ", the scaled charge is " + charge * scale);
+            double own = charge * scale;   // every chunk the trap reaches adds its share, supplied or not
+            if (trapInfinite == 0 && Math.abs(sum - own) > counts.size())
+                problems.add("trap " + t.id() + ": the chunks add up to " + sum + ", the scaled charge of its own chunks is " + own
+                        + " (" + elsewhere + " of " + total + " blocks lie in chunks another trap fills)");
         }
         DeepTime.LOGGER.info("[gametest] cdgOilFromTrap: {} traps {}; chunks {}, with oil {}, infinite {} (threshold {}); CDG {}; problems {}",
                 traps.size(), lines, chunks, positive, infinite, threshold, cdg.map(CdgAccess::config).orElse("not installed"), problems);
