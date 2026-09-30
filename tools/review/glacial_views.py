@@ -150,9 +150,19 @@ def main() -> int:
     surf = np.where(np.isfinite(zs), zs, -1e9) if zs is not None else z2 + ice
     confined = np.clip((zmax - surf) / 300.0, 0.0, 1.0)
     mountain = np.where(land & (ice > 0), ero * confined, 0.0)
+    # Fjords: sea cells the glaciers cut that land surrounds on most sides (inlets, not open
+    # coast), away from the pole rows.
+    land_n = np.zeros_like(ice)
+    for dj in range(-2, 3):
+        for di in range(-2, 3):
+            land_n += np.roll(np.roll(land.astype(np.float32), dj, axis=0), di, axis=1)
+    inlet = np.clip((land_n - 10.0) / 8.0, 0.0, 1.0)
     coast = np.zeros_like(ice)
     below = (z2 < sea_m) & (ero > 0)
-    coast[below] = ero[below]
+    coast[below] = (ero * inlet)[below]
+    edge = max(1, ice.shape[0] // 20)
+    coast[:edge] = 0
+    coast[-edge:] = 0
     views = [("glaciated range", w) for w in best_windows(mountain, n2, 2)]
     views += [("fjord coast", w) for w in best_windows(coast, n2, 2)]
 
@@ -230,10 +240,14 @@ def main() -> int:
         fig.tight_layout()
         fig.savefig(args.out / f"{name}-section.png", dpi=110)
         plt.close(fig)
+        c_blocks = l3_r * runs[0][1].shape[1]
+        bx, bz = int(-c_blocks // 2 + ci * l3_r), int(-c_blocks // 4 + cj * l3_r)
         report.append({"kind": kind, "l2": [x0, y0], "l3_centre": [int(ci), int(cj)],
+                       "block_centre": [bx, bz],
                        "ice_max_m": float(ice_w.max()), "map": f"{name}-map.png",
                        "section": f"{name}-section.png"})
-        print(f"{name}: {kind} L2 ({x0},{y0}) ice max {ice_w.max():.0f} m, section at L3 ({ci},{cj})")
+        print(f"{name}: {kind} L2 ({x0},{y0}) ice max {ice_w.max():.0f} m, section at L3 ({ci},{cj}), "
+              f"block ({bx},{bz})")
 
     html = ["<!doctype html><meta charset=utf-8><title>Glacial landforms</title>",
             "<style>body{font:14px system-ui;background:#111;color:#ddd;margin:16px}img{max-width:100%}</style>",

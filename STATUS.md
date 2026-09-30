@@ -109,9 +109,13 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   Sugden 1978's selective linear erosion vs areal scouring) and the margin lateral (not a terminus or a tidewater
   front); half the carved rock goes back onto crests; fluvial incision × (1 − 0.8·ice) on every level; its radius
   (3·20 + 1 cells) is in the halo; the mountain character's fade (`character::apply`, new `glacier` argument) also
-  skips glaciated cells so gullies and fold ridges don't fight the troughs. (5) One place names the climate's
-  fields: `glacial::source` (`climate/anomaly/ela_m` now; provisional `climate/ice_thickness_m`,
-  `climate/ice_max_extent`, `climate/ela_glacial_m` for the ice-age agent — a name change switches). (6) Settings
+  skips the troughs the pass cut (the cut is handed over in `cap`/`zs`), so gullies and fold ridges don't fight
+  the U while crests above the ice keep their character. (5) One place names the climate's fields:
+  `glacial::source`, now the deep-time climate's (FORMAT.md "The climate's ice fields", merged from master
+  27e88f7): the ELA (`climate/anomaly/ela_m`); deep-time glaciers only where `climate/ice_max_thickness_m` > 0
+  (ice at some time in the step), eroding × `climate/ice_time_share`, and fluvial K also × (1 − ramp of
+  `climate/ice_thickness_m` 10–100 m) (the climate agent asked for no stream power under thick ice); the young
+  landscape's glaciers only inside `climate/ice_max_extent` (the LGM at the present). (6) Settings
   (presets + `editor_fields.json` + lang): `surface.glacial.strength` ("Glacial erosion", terrain), 
   `amplify.glacial.strength` ("Glacial valleys", terrain), `surface.glacial.young_ela_drop_m` ("Ice-age snowline
   drop", adv_climate), `amplify.glacial.ridge_share` ("Arêtes from troughs", adv_surface); every constant above is
@@ -160,10 +164,29 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   7 blocks wide, so troughs read as flat-floored gorges, and only the big outlet troughs are 20–60 blocks wide.
   (5) Eskers and drumlins not done; moraines are the till humps at termini (and the lakes they dam), no crisp
   crest line; hanging valleys and cirques come only from the physics and the parabola, not a dedicated pass.
-- **Deviations.** None from the plan's §8.2 structure; the plan has an "As built: glacial landforms" bullet. The
-  3D renders: see below.
-- **Next.** Switch `glacial::source` to the ice-age agent's field names when it lands (relay); rerun this
-  entry's run on its fields.
+- **With the deep-time climate** (after merging local master 27e88f7; `…--out target/glacial/after5`, 1,130 s wall
+  on a loaded Mac): `glacial_final eroded_km3=1.85e6 till_km3=3.6e5 lake_km3=4.8e5 sea_km3=1.0e6
+  ice_cells_max=66350 cut_below_sea_cells=2330 max_rate_m_myr=1121`, glaciated land 15.1 %, 3 glaciations, land
+  median 768 m, p90 2,180, max 9.6 km (this climate's ice lies mostly on low polar land under cold beds, so the
+  buzzsaw of the earlier runs is weaker); young 232,124 L2 cells under the LGM-masked glacial ice, 9.7e4 km³
+  eroded, 34,591 till cells; amplify 4.3e4 km³ carved, the flood raises 27,777 cells (max 267 m). Master's merge
+  left `climate/mod.rs`'s first snapshot `Input` without P1-25's `monthly` field (the lib did not compile); fixed
+  here with `monthly: false`.
+- **3D** (`tools/workbench/preview-area.sh --profile standalone --y 20,330 --box -2544,-3208,-2288,-2952 --box
+  2976,-3248,3232,-2992 --world-data target/glacial/after4`, and the same boxes of the same planet run with
+  `--set surface.glacial.young_ela_drop_m=-2000 --set amplify.glacial.strength=0`, i.e. without the ice-age
+  glaciers; shots by `area3d_shots.py` in `review/out/glacial-3d/`): the valley box is a V-shaped, gullied valley
+  without them and a deeper trough with a flat floor (sand, grass and trees, a small lake) and steep smooth snowy
+  walls with them; the coastal box shows a smoother, scoured lowland; its inlet reads weakly at this box.
+- **Gates.** On the tree merged with 8872c91: fmt, clippy, deny, `cargo test --workspace` (above) and `./gradlew
+  build test` (tests=146 failures=0) pass. After the climate merge only `cargo test -p deeptime-core --lib glacial`
+  (11 of 11, incl. the coupled resume test on the climate's ice) and the after5 run; then the Mac became
+  unreachable (the laptop's Tailscale stopped), so the full gates, `./gametest.sh --server` and the last change
+  (the character fade limited to the carved troughs) are not verified yet.
+- **Deviations.** None from the plan's §8.2 structure; the plan has an "As built: glacial landforms" bullet.
+- **Next.** Re-run the gates on the merged branch (cargo fmt/clippy/test/deny, gradlew, `mac.sh --server --
+  ./gametest.sh`), then look at the after5 views (`tools/review/glacial-compare.sh
+  target/glacial/after5/checkpoints/4-deposits.dtcp …`); merge into master once green.
 
 ### 2026-09-30 — P1-25: a climate API for mic-climate and Project Atmosphere (agent worktree agent-a02882c5e6567370e, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **The bake (format 0.1 → 0.2).**
