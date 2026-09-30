@@ -127,14 +127,24 @@ public final class ClimateApiGameTests {
         helper.assertTrue(o.isDeepTimeLevel() == deep, "the overworld is " + (deep ? "" : "not ") + "Deep Time's");
         if (!deep)
             helper.assertTrue(o.at(BlockPos.ZERO).isEmpty() && Double.isNaN(o.lapseRateCPerKm()), "nothing outside Deep Time");
+        // API 2: the planet's geometry, on the server from the generator (the synthetic level is a planet
+        // too; a level Deep Time did not generate is not).
+        int c = DeepTimeClimate.circumferenceBlocks(synthetic);
+        int expected = synthetic.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g ? g.dataRef().circumferenceBlocks() : -1;
+        helper.assertTrue(c > 0 && c == expected, "the synthetic planet's circumference " + c + " vs its generator's " + expected);
+        helper.assertTrue(deep || DeepTimeClimate.circumferenceBlocks(overworld) == 0, "a level Deep Time did not generate has no circumference");
+        helper.assertTrue(DeepTimeClimate.circumferenceBlocks(null) == 0, "no level, no circumference");
+        helper.assertTrue(DeepTimeClimate.latitudeDeg(-c / 4.0, c) == 90.0 && DeepTimeClimate.latitudeDeg(c / 8.0, c) == -45.0
+                        && DeepTimeClimate.latitudeDeg(0, c) == 0.0 && Double.isNaN(DeepTimeClimate.latitudeDeg(100, 0)),
+                "latitude: north is -z, the poles at |z| = C/4");
         // The year convention: month 0 starts at solar longitude 280°.
         helper.assertTrue(Math.abs(DeepTimeClimate.yearFractionAtSolarLongitude(0) - DeepTimeClimate.NORTHERN_SPRING_EQUINOX) < 1e-12
                         && Math.abs(DeepTimeClimate.yearFractionAtSolarLongitude(90) - DeepTimeClimate.NORTHERN_SUMMER_SOLSTICE) < 1e-12
                         && DeepTimeClimate.yearFractionAtSolarLongitude(280) == 0.0
                         && DeepTimeClimate.yearFractionAtSolarLongitude(279.9) > 0.99,
                 "year fractions of solar longitudes");
-        DeepTime.LOGGER.info("[gametest] climateApiIsEmptyElsewhere syntheticHasClimate={} overworldDeepTime={} api={}",
-                s.hasClimate(), deep, DeepTimeClimate.API_VERSION);
+        DeepTime.LOGGER.info("[gametest] climateApiIsEmptyElsewhere syntheticHasClimate={} overworldDeepTime={} api={} syntheticC={}",
+                s.hasClimate(), deep, DeepTimeClimate.API_VERSION, c);
         helper.succeed();
     }
 }
