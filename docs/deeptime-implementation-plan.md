@@ -1708,7 +1708,9 @@ generated surface is H bilinear over the noise-cell corners) — lake, sea, rive
 the column match: rivers cut or filled to their bed, lakes filled from their top to the ground,
 banks raised to the neighbouring water's top (+1 beside rivers) and sealed, so the rim holds by
 construction; the flowing and falling water a step or waterfall would spread is placed at
-generation, so the water is at rest.
+generation, so the water is at rest. Sea columns the aquifer leaves dry below sea level (coastal
+flats) are topped up with sea water. Carvers and noise caves still cut under the water, as above
+(Ben, log 2026-09-30, "Allow caves under water").
 
 ### 7.10 Toroidal World: the cylinder shape
 
@@ -2305,8 +2307,11 @@ width, depth, discharge; widths × `feature_scale.rivers`), and channel incision
 (`hydro/{mod, network, tests}.rs`) runs in the bake (`bake/water.rs`, after the climate part) on the
 L3 terrain itself (2 blocks a cell; 32k full's 134 M cells are averaged 2 × 2 first), not on L2:
 the open sea (height ≤ sea level − 1 block, a body ≥ 5,000 km²); Priority-Flood with the pit queue
-(Barnes et al. 2014, from the paper, as `surface::pflood`); receivers the steepest strictly lower
-neighbour on the filled surface, else the cell the flood came from; **lakes** = depressions ≥
+(Barnes et al. 2014, from the paper, as `surface::pflood`), the map's first and last rows (past the
+pole caps) draining as outlets; receivers the steepest strictly lower neighbour on the filled
+surface, across a flat the drainage mask of Barnes, Lehman & Mulla 2014 (towards the flat's outlets
+and away from higher ground, so a coastal plain carries one channel, not parallel rays), else the
+cell the flood came from; **lakes** = depressions ≥
 `hydro.lake_min_area_km2` and ≥ `lake_min_depth_blocks` deep, **always full to their spill level**
 (the P2 exit test holds by construction), passing on inflow less surface evaporation
 (`lake_evaporation`; an evaporation-limited level below the rim is Fill–Spill–Merge's partial fill,

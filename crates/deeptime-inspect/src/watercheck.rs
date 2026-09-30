@@ -14,7 +14,11 @@
 //! neighbouring column that holds no water, and the report gives each lake's surface y (the top
 //! face of its highest water block) and its lowest rim's top block + 1, so "the surface equals its
 //! lowest rim ±1 block" (plan P2 exit test) reads off directly. Water whose column's top is ice
-//! (frozen lakes) is found under the ice.
+//! (frozen lakes) is found under the ice. With the world data, a dry lake column beside the body
+//! is not rim: a carver cut through the lake there (vanilla's `overworld_carver_replaceables` tag
+//! lists water); nor is a rim column whose ground lies more than a block under the top the pass
+//! left it (a carver's trench through the shore). They are reported as `drained_columns` and
+//! `carved_rim_columns`.
 //!
 //! With the world data (`--world-data`), every finding is split by what Deep Time decided for its
 //! column (`deeptime_format::water`): **ours** in a river or lake column (the only water the pass
@@ -214,6 +218,9 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
         let mut cols = Vec::new();
         let mut rim_min = i32::MAX;
         let mut rim_at = (0, 0);
+        let mut drained: std::collections::HashSet<(i32, i32)> = std::collections::HashSet::new();
+        let mut carved_rim: std::collections::HashSet<(i32, i32)> =
+            std::collections::HashSet::new();
         let mut edge = false;
         while let Some((x, z)) = q.pop_front() {
             cols.push((x, z));
@@ -230,8 +237,23 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                         }
                     }
                     Some(_) => {}
-                    // The rim: dry neighbours (a river leaving the lake is water, not rim).
+                    // The rim: dry neighbours (a river leaving the lake is water, not rim). A lake
+                    // column with no water is not rim either: a carver cut the lake there (caves
+                    // may cut under and through the water, log 2026-09-30); it is counted apart.
                     None if !wet.contains(&n) => {
+                        let nc = col_of(n.0, n.1);
+                        if nc.is_some_and(|c| c.kind == WaterKind::Lake) {
+                            drained.insert(n);
+                            continue;
+                        }
+                        // Nor is ground more than a block under the top the pass left it (a
+                        // carver's trench through the shore): counted apart.
+                        if let (Some(c), Some(&g)) = (nc, ground_top.get(&n))
+                            && g < expected_top(&c) - 1
+                        {
+                            carved_rim.insert(n);
+                            continue;
+                        }
                         if let Some(&g) = ground_top.get(&n)
                             && g < rim_min
                         {
@@ -246,6 +268,8 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
         if cols.len() >= min_lake && !edge {
             lakes.push(json!({
                 "columns": cols.len(),
+                "drained_columns": drained.len(),
+                "carved_rim_columns": carved_rim.len(),
                 "surface_y": y0 + 1,
                 "lowest_rim_top": rim_min,
                 "rim_minus_surface": i64::from(rim_min) + 1 - i64::from(y0 + 1),
