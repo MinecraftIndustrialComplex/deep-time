@@ -80,7 +80,7 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     let s = session(&json, &dir, 2);
     assert_eq!(
         s.stage_names(),
-        ["plates", "climate", "surface", "structure"]
+        ["plates", "climate", "surface", "volcanoes", "structure"]
     );
     finish(&s);
     let world = s.checkpoint().unwrap().world;

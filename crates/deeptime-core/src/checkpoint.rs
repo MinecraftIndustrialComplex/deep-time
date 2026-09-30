@@ -39,8 +39,9 @@ use crate::world::WorldState;
 pub const MAGIC: [u8; 4] = *b"DTCP";
 /// Bump whenever [`Checkpoint`], [`WorldState`] or any stage's saved state changes shape (5: the
 /// surface's frame accumulator keeps the crust's origin and the deposit stage's state its frame
-/// count, P1-14; 6: the recorded history's frames in sections of their own, streamed, P1-17).
-pub const CHECKPOINT_SCHEMA: u32 = 6;
+/// count, P1-14; 6: the recorded history's frames in sections of their own, streamed, P1-17; 7: the
+/// world's volcano catalogue, P1-21).
+pub const CHECKPOINT_SCHEMA: u32 = 7;
 const FIXED_BYTES: usize = 8;
 /// The sections before the history's frames.
 const HEAD_SECTIONS: usize = 2;
@@ -470,7 +471,7 @@ mod tests {
         ] {
             let text = err.to_string();
             assert!(
-                text.contains("checkpoint schema 5") && text.contains("schema 6"),
+                text.contains("checkpoint schema 5") && text.contains(&format!("schema {CHECKPOINT_SCHEMA}")),
                 "{text}"
             );
         }

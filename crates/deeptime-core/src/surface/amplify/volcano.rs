@@ -1,0 +1,376 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+//! Volcano shapes at the amplifier's grids (P1-21, `surface/volcanoes`).
+//!
+//! The deep-time surface carries each edifice at L1 (4.8 km cells at 16k quick), where a 12-km
+//! cone is a smooth bump of a few cells, eroded like the land around it. From the catalogue the
+//! volcano stage leaves (`WorldState::volcanoes`), the amplifier puts the shape back at the finer
+//! grids, scaled by the height the surface preserved (its measured relief):
+//!
+//! 1. **Before the erosion passes**, on the young landscape's grid (L2): the band of the body
+//!    between L1 and L2 (`shape::band`), so the amplifier's erosion cuts radial gullies into a
+//!    real cone and its thermal pass slumps it to the rock's angle.
+//! 2. **After the last flood**, on the finest grid (L3, in the sink the tiles pass through): the
+//!    rest of the body (the sharp summit) and the depression — a summit crater or a caldera —
+//!    which the flood would have filled; and the flood-basalt terraces: where a pile crops out
+//!    (`volcanoes/flood_basalt`, written by the volcano stage), elevations are stepped into flat
+//!    treads and steep risers of `flood_basalt_step_m`.
+//!
+//! A dead volcano's detail fades: its crater and sharp summit with `fade_myr`, its cone's shape
+//! three times slower (the finest landforms erode first; the L1 surface erodes the rest). The
+//! thinned preview the stage keeps gets the same last-grid shaping, so the keyframes show it.
+
+use deeptime_format::GridDesc;
+
+use super::resample::Level;
+use super::tiles::{TileOut, TileSink};
+use crate::error::CoreError;
+use crate::params::PlanetPreset;
+use crate::surface::volcanoes::shape::{self, Radial};
+use crate::surface::volcanoes::{self as vol, VolcanoState};
+use crate::world::WorldState;
+
+/// One volcano's residuals.
+#[derive(Clone, Debug)]
+struct Item {
+    x: f64,
+    z: f64,
+    radius_m: f64,
+    /// Metres at ρ, for the young grid (before erosion) …
+    l2: Radial,
+    /// … and for the finest grid (after the flood).
+    l3: Radial,
+}
+
+/// The shapes a run's volcanoes add to the amplifier's grids.
+#[derive(Clone, Debug, Default)]
+pub struct Shaper {
+    items: Vec<Item>,
+    /// The flood-basalt outcrop on L1 (0–1) and its grid; the terrace step, m.
+    terraces: Option<(GridDesc, Vec<f32>)>,
+    step_m: f64,
+    sea: f64,
+    mh: f64,
+    circumference: u32,
+}
+
+impl Shaper {
+    /// The world's volcanoes as seen by a preset's grids; `None` without a volcano stage.
+    pub fn from_world(world: &WorldState, p: &PlanetPreset) -> Option<Shaper> {
+        let st: &VolcanoState = world.volcanoes.as_ref()?;
+        let params = p.volcanoes.clone().unwrap_or_default();
+        let mh = p.scale.m_per_block_h;
+        let dx1 = f64::from(p.resolution.l1_r) * mh;
+        let dx2 = f64::from(p.resolution.l2_r) * mh;
+        let fade = st.fade_myr.max(1e-3);
+        let items = st
+            .volcanoes
+            .iter()
+            .filter(|v| v.height_m >= 30.0)
+            .map(|v| {
+                let age = v.extinct_myr.map_or(0.0, |e| (st.t_myr - e).max(0.0));
+                let sharp = (-age / (3.0 * fade)).exp();
+                let dep = (-age / fade).exp();
+                let a = v.height_m;
+                let s = v.shape();
+                let body = |r: f64| s.body(r);
+                let r = v.radius_m;
+                let mut l2 = shape::band(&body, dx2 / r, dx1 / r);
+                let mut l3 = shape::band(&body, 0.0, dx2 / r);
+                for x in &mut l2.v {
+                    *x *= (a * sharp) as f32;
+                }
+                for (k, x) in l3.v.iter_mut().enumerate() {
+                    let rho = k as f64 * l3.step;
+                    *x = (f64::from(*x) * a * sharp - s.bowl(rho) * a * dep) as f32;
+                }
+                Item {
+                    x: v.x,
+                    z: v.z,
+                    radius_m: r,
+                    l2,
+                    l3,
+                }
+            })
+            .collect();
+        let terraces = world
+            .fields
+            .get(vol::field::FLOOD_BASALT)
+            .filter(|f| f.data.iter().any(|&x| x > 0.0))
+            .map(|f| (f.grid.clone(), f.data.clone()));
+        Some(Shaper {
+            items,
+            terraces,
+            step_m: params.flood_basalt_step_m,
+            sea: st.sea_level_m,
+            mh,
+            circumference: p.scale.circumference_blocks,
+        })
+    }
+
+    /// Volcanoes shaped.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Adds the young-grid band to the ladder's first level (the L2 terrain). Returns the cells
+    /// changed.
+    pub fn sharpen_level(&self, level: &mut Level, grid: &GridDesc) -> usize {
+        let mut changed = 0;
+        for it in &self.items {
+            vol::for_cells(grid, self.mh, it.x, it.z, it.l2.reach() * it.radius_m, |c, dx, dz| {
+                let v = it.l2.at(dx.hypot(dz) / it.radius_m);
+                if v != 0.0 {
+                    level.z[c] += v as f32;
+                    changed += 1;
+                }
+            });
+        }
+        changed
+    }
+
+    /// The last-grid change at block (bx, bz) of a cell of terrain `z` (m): the volcanoes' sharp
+    /// summits and depressions, then the flood-basalt steps.
+    fn fine_at(&self, near: &[&Item], bx: f64, bz: f64, z: f32) -> f32 {
+        let frame = crate::sphere::BlockFrame::new(self.circumference);
+        let mut out = f64::from(z);
+        for it in near {
+            let dx = frame.wrap_x(bx - it.x) * self.mh;
+            let dz = (bz - it.z) * self.mh;
+            let rho = dx.hypot(dz) / it.radius_m;
+            out += it.l3.at(rho);
+        }
+        if let Some((g, w)) = &self.terraces
+            && self.step_m > 0.0
+        {
+            let r = f64::from(g.r);
+            let fi = (bx - g.origin_block_x as f64) / r;
+            let fj = (bz - g.origin_block_z as f64) / r;
+            let wgt = f64::from(crate::surface::advect::bilinear(
+                g.w as usize,
+                g.h as usize,
+                w,
+                fi,
+                fj,
+            ));
+            if wgt > 0.0 && out > self.sea + self.step_m {
+                let q = (out - self.sea) / self.step_m;
+                let k = q.floor();
+                let f = q - k;
+                // Treads over 70 % of each step, a steep riser over the rest.
+                let stepped = self.sea + self.step_m * (k + smooth(0.7, 1.0, f));
+                out += wgt.min(1.0) * (stepped - out);
+            }
+        }
+        out as f32
+    }
+
+    /// The items whose reach overlaps the block rectangle [x0, x1] × [z0, z1] (x wraps).
+    fn near(&self, x0: f64, x1: f64, z0: f64, z1: f64) -> Vec<&Item> {
+        let frame = crate::sphere::BlockFrame::new(self.circumference);
+        let (cx, hw) = (0.5 * (x0 + x1), 0.5 * (x1 - x0));
+        let (cz, hh) = (0.5 * (z0 + z1), 0.5 * (z1 - z0));
+        self.items
+            .iter()
+            .filter(|it| {
+                let reach = it.l3.reach() * it.radius_m / self.mh;
+                frame.wrap_x(it.x - cx).abs() <= hw + reach && (it.z - cz).abs() <= hh + reach
+            })
+            .collect()
+    }
+
+    /// Applies the last-grid shaping to a row-major block of cells of `grid` starting at cell
+    /// (x0, y0), `w` wide, every `stride`-th cell of the grid.
+    pub fn shape_block(
+        &self,
+        grid: &GridDesc,
+        x0: usize,
+        y0: usize,
+        w: usize,
+        stride: usize,
+        z: &mut [f32],
+    ) {
+        if self.items.is_empty() && self.terraces.is_none() {
+            return;
+        }
+        let h = z.len() / w.max(1);
+        let r = f64::from(grid.r);
+        let bx = |i: usize| grid.origin_block_x as f64 + ((x0 + i * stride) as f64) * r;
+        let bz = |j: usize| grid.origin_block_z as f64 + ((y0 + j * stride) as f64) * r;
+        let near = self.near(bx(0), bx(w.saturating_sub(1)), bz(0), bz(h.saturating_sub(1)));
+        if near.is_empty() && self.terraces.is_none() {
+            return;
+        }
+        use rayon::prelude::*;
+        z.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+            let zb = bz(j);
+            for (i, v) in row.iter_mut().enumerate() {
+                *v = self.fine_at(&near, bx(i), zb, *v);
+            }
+        });
+    }
+}
+
+fn smooth(e0: f64, e1: f64, x: f64) -> f64 {
+    let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// A sink that adds the last-grid shaping to every tile before passing it on.
+pub struct Sink<'a> {
+    pub inner: &'a mut dyn TileSink,
+    pub shaper: &'a Shaper,
+    pub grid: GridDesc,
+}
+
+impl TileSink for Sink<'_> {
+    fn put(&mut self, t: &TileOut<'_>) -> Result<(), CoreError> {
+        let (x0, y0, w, _) = t.rect;
+        let mut z = t.z_m.to_vec();
+        self.shaper.shape_block(&self.grid, x0, y0, w, 1, &mut z);
+        self.inner.put(&TileOut {
+            rect: t.rect,
+            z_m: &z,
+            amp_blocks: t.amp_blocks,
+            level: None,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::surface::volcanoes::{Depression, Kind, Volcano};
+    use crate::world::Field;
+
+    fn strato(x: f64, z: f64, extinct: Option<f64>) -> Volcano {
+        Volcano {
+            id: 0,
+            kind: Kind::Strato,
+            x,
+            z,
+            plate: 0,
+            oceanic: false,
+            silicic: false,
+            hotspot: None,
+            chain: 0,
+            born_myr: -5.0,
+            dies_myr: 1.0,
+            extinct_myr: extinct,
+            radius_m: 14_000.0,
+            height_m: 2500.0,
+            peak_m: 2500.0,
+            built_m: 2500.0,
+            sunk_m: 0.0,
+            target_m: 2500.0,
+            flux_last: 1.0,
+            missed: 0,
+            flux_myr: 0.0,
+            active_myr: 0.0,
+            depression: Some(Depression {
+                rho: 0.05,
+                depth: 0.1,
+                caldera: false,
+            }),
+            caldera: None,
+            cause: None,
+            gone: None,
+        }
+    }
+
+    fn world_with(vs: Vec<Volcano>) -> (WorldState, PlanetPreset) {
+        let json = crate::preset::with_timeline(
+            crate::params::planet_builtin("pipeline_quick_16k").unwrap(),
+            Some("scattered_continents"),
+            Some(10.0),
+        )
+        .unwrap();
+        let preset = match crate::preset::Preset::from_json(&json).unwrap().body {
+            crate::preset::PresetBody::Planet(p) => (*p).clone(),
+            _ => unreachable!(),
+        };
+        let mut w = WorldState::new(1, 16_384, 0.0);
+        w.volcanoes = Some(VolcanoState {
+            volcanoes: vs,
+            t_myr: 0.0,
+            fade_myr: 5.0,
+            sea_level_m: 0.0,
+            ..VolcanoState::default()
+        });
+        (w, preset)
+    }
+
+    #[test]
+    fn a_cone_is_sharpened_and_its_crater_cut() {
+        let (world, preset) = world_with(vec![strato(0.0, 0.0, None)]);
+        let sh = Shaper::from_world(&world, &preset).unwrap();
+        assert_eq!(sh.len(), 1);
+        // L2 (8 blocks, 2.4 km): the band raises the summit and lowers the skirt a little; far
+        // away nothing changes; the volume stays about the same.
+        let g2 = GridDesc::for_planet("L2", 16_384, 8).unwrap();
+        let n = g2.cells();
+        let mut level = Level {
+            w: g2.w as usize,
+            h: g2.h as usize,
+            dx: 2400.0,
+            z: vec![100.0; n],
+            area: vec![1.0; n],
+            wgt: vec![1.0; n],
+            kfac: vec![1.0; n],
+            lake: vec![0; n],
+        };
+        assert!(sh.sharpen_level(&mut level, &g2) > 0);
+        let at = |g: &GridDesc, z: &[f32], bx: f64, bz: f64| {
+            z[crate::surface::volcanoes::cell_of(g, bx, bz)]
+        };
+        let top = at(&g2, &level.z, 0.0, 0.0);
+        assert!(top > 150.0, "{top}");
+        assert_eq!(at(&g2, &level.z, 1000.0, 0.0), 100.0);
+        let dv: f64 = level.z.iter().map(|&z| f64::from(z) - 100.0).sum();
+        assert!(dv.abs() < 0.2 * 2500.0, "volume change {dv} m·cells");
+        // L3 (2 blocks, 600 m): the crater: the centre below the rim; the summit sharper.
+        let g3 = GridDesc::for_planet("L3", 16_384, 2).unwrap();
+        let (w3, x0, y0) = (64usize, (g3.w / 2 - 32) as usize, (g3.h / 2 - 32) as usize);
+        let mut z = vec![0.0f32; w3 * w3];
+        sh.shape_block(&g3, x0, y0, w3, 1, &mut z);
+        let cell = |bx: f64, bz: f64| {
+            let i = ((bx - g3.origin_block_x as f64) / 2.0).round() as usize - x0;
+            let j = ((bz - g3.origin_block_z as f64) / 2.0).round() as usize - y0;
+            z[j * w3 + i]
+        };
+        let centre = cell(0.0, 0.0);
+        let rim = cell(2.0, 0.0).max(cell(4.0, 0.0));
+        assert!(centre < rim, "crater floor {centre} not below the rim {rim}");
+        assert!(rim > 0.0, "the sharp summit adds height");
+    }
+
+    #[test]
+    fn a_dead_volcano_loses_its_crater_first_and_basalts_step() {
+        let (mut world, preset) = world_with(vec![strato(0.0, 0.0, Some(-30.0))]);
+        let sh = Shaper::from_world(&world, &preset).unwrap();
+        let g3 = GridDesc::for_planet("L3", 16_384, 2).unwrap();
+        let (w3, x0, y0) = (16usize, (g3.w / 2 - 8) as usize, (g3.h / 2 - 8) as usize);
+        let mut z = vec![0.0f32; w3 * w3];
+        sh.shape_block(&g3, x0, y0, w3, 1, &mut z);
+        let centre = z[8 * w3 + 8];
+        let rim = z[8 * w3 + 9];
+        // Its crater has faded (e^-6 of it left): a few metres of the flat rim top's curvature.
+        assert!(rim - centre < 10.0, "a 30-Myr-dead crater: {centre} vs {rim}");
+        // Flood-basalt terraces: a ramp becomes treads and risers.
+        let g1 = GridDesc::for_planet("L1", 16_384, 16).unwrap();
+        world
+            .fields
+            .insert(vol::field::FLOOD_BASALT.to_owned(), Field::filled(g1, 1.0));
+        world.volcanoes.as_mut().unwrap().volcanoes.clear();
+        let sh = Shaper::from_world(&world, &preset).unwrap();
+        let mut ramp: Vec<f32> = (0..64).map(|i| 200.0 + 10.0 * i as f32).collect();
+        sh.shape_block(&g3, 0, 100, 64, 1, &mut ramp);
+        let flats = ramp.windows(2).filter(|p| (p[1] - p[0]).abs() < 0.5).count();
+        let steep = ramp.windows(2).filter(|p| p[1] - p[0] > 15.0).count();
+        assert!(flats >= 30 && steep >= 5, "flats {flats} steep {steep}: {ramp:?}");
+        assert!(ramp.windows(2).all(|p| p[1] >= p[0] - 1e-3), "monotone");
+    }
+}

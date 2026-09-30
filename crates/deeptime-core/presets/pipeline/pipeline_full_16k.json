@@ -249,6 +249,42 @@
       80.0
     ]
   },
+  "volcanoes": {
+    "density": 1.0,
+    "size": 1.0,
+    "arc_spacing_km": 60.0,
+    "arc_min_flux": 0.25,
+    "arc_height_km": [
+      1.2,
+      3.0
+    ],
+    "arc_radius_km": 14.0,
+    "arc_lifetime_myr": [
+      2.0,
+      8.0
+    ],
+    "hotspot_spacing_km": 70.0,
+    "shield_height_km": [
+      3.5,
+      6.5
+    ],
+    "shield_radius_km": 40.0,
+    "silicic_height_km": 0.9,
+    "silicic_radius_km": 35.0,
+    "island_subsidence_m_myr": 25.0,
+    "island_subsidence_max_m": 1500.0,
+    "caldera_rate_per_myr": 0.04,
+    "caldera_radius_km": [
+      3.0,
+      9.0
+    ],
+    "silicic_crust_km": 42.0,
+    "flood_basalt_flows": 8,
+    "flood_basalt_step_m": 80.0,
+    "build_myr": 1.0,
+    "fade_myr": 5.0,
+    "max_elevation_km": 6.8
+  },
   "biomes": {
     "temperature_shift": 0.0,
     "humidity_shift": 0.0,
