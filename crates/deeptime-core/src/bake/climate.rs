@@ -164,17 +164,31 @@ pub fn bake(
             &raw,
         )?;
     }
-    // The ice cover of the surface pass: blocks of snow and ice over ground above its equilibrium
-    // line (`ice.rs`); without the climate stage's line there is none.
+    // The ice cover of the surface pass (`ice.rs`): blocks of snow and ice over glaciated ground,
+    // from the climate's land-ice thickness when it has one (the deep-time climate's ice sheets and
+    // glaciers), else from the height above the equilibrium line; without either there is none.
     let mut ice_note = Value::Null;
-    if let Some(ela) = on_l1(climate::field::ELA_ALL) {
-        let spec = table.ice_cover();
-        let cover = ice::cover_blocks(&elev, &resample(ela, &l2, false), sea, spec);
+    let spec = table.ice_cover();
+    let cover = if let Some(th) = on_l1(climate::field::ICE_THICKNESS) {
+        Some((
+            "climate/ice_thickness_m",
+            ice::cover_from_thickness(&elev, &resample(th, &l2, false), sea, spec),
+        ))
+    } else {
+        on_l1(climate::field::ELA_ALL).map(|ela| {
+            (
+                "climate/anomaly/ela_m",
+                ice::cover_blocks(&elev, &resample(ela, &l2, false), sea, spec),
+            )
+        })
+    };
+    if let Some((source, cover)) = cover {
         out.layer(
             desc("climate/ice_cover", DType::U8, &l2, 1.0, "blocks", None),
             &cover,
         )?;
         ice_note = spec.record();
+        ice_note["source"] = json!(source);
         ice_note["cells"] = json!(cover.iter().filter(|&&b| b > 0).count());
         ice_note["thickest_blocks"] = json!(cover.iter().copied().max().unwrap_or(0));
         physical.push("climate/ice_cover");

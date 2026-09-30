@@ -117,6 +117,10 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     // The ice cover the game's surface pass lays is recorded with the table's section.
     assert_eq!(bake["climate"]["ice_cover"]["max_blocks"], 12);
     assert_eq!(bake["climate"]["ice_cover"]["snow"], "minecraft:snow_block");
+    assert_eq!(
+        bake["climate"]["ice_cover"]["source"], "climate/ice_thickness_m",
+        "the deep-time climate's land ice drives the cover"
+    );
     assert!(bake["meta"]["provinces"]["count"].as_u64().unwrap() >= 1);
     assert!(bake["terrain"]["spawn_candidates"].as_u64().unwrap() >= 1);
     let spec = DetailSpec::of(&m).unwrap().expect("a detail term");

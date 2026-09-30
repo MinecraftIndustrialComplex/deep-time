@@ -4,17 +4,18 @@
 //! Deep Time's own surface pass lays snow and packed ice on glaciated ground whatever biome the
 //! pack's biome source drew there (Ben, 2026-09-30, "Force snow/ice cover"): Terralith has no flat
 //! inland ice biome, and its gravel desert would otherwise show through an ice cap. This module is
-//! the bake's half: the **thickness of the cover** per L2 cell, from the climate stage's
-//! equilibrium-line altitude (`climate/anomaly/ela_m`, L1, every cell) and the ground the biome
-//! inputs were placed on. Where the ground lies above its ELA (the glacier rule of
-//! [`crate::climate::glaciers`], here on the finer grid) the cover is one block at the foot and one
-//! more per `step_m` of height above the line, up to the table's `max_blocks`; it is 0 elsewhere
-//! and on the sea.
+//! the bake's half: the **thickness of the cover** per L2 cell, `1 + ⌊t / step_m⌋` blocks up to the
+//! table's `max_blocks` where the land carries ice and 0 elsewhere and on the sea. `t` is, in
+//! order of preference, the climate stage's land-ice thickness (`climate/ice_thickness_m`, L1, m:
+//! the deep-time climate's ice sheets and glaciers, [`cover_from_thickness`]); else the height of the
+//! ground above its equilibrium line (`climate/anomaly/ela_m`, L1, every cell: the Ohmura rule of
+//! [`crate::climate::glaciers`] on the finer grid, [`cover_blocks`]); `notes.bake.climate.ice_cover.
+//! source` says which.
 //!
 //! The game reads the layer and the table's `ice_cover` record (`notes.bake.climate.ice_cover`)
 //! and lays the blocks (`worldgen/IcePass`): the cover replaces the top blocks of the ground, so
 //! the terrain's height is unchanged. The layer is the small interface between the climate and the
-//! pass: a climate stage that carries a real ice thickness only has to write it here.
+//! pass: a climate that changes how it carries ice only has to keep this layer's meaning.
 
 use super::placement::IceCoverSpec;
 
@@ -40,6 +41,30 @@ pub fn cover_blocks(
         .collect()
 }
 
+/// Blocks of cover per cell from the climate's land-ice thickness (`climate/ice_thickness_m`, m,
+/// on the same grid as `elevation_m`): the cell's ice where the ice is at least a metre thick (the
+/// glacier flag's own threshold) and the ground is above the sea, `1 + ⌊thickness / step_m⌋` blocks
+/// up to the ceiling. The thickness is the climate's own: ice sheets and glaciers as the ice model
+/// grew them, not a height above a line.
+pub fn cover_from_thickness(
+    elevation_m: &[f32],
+    thickness_m: &[f32],
+    sea_m: f64,
+    spec: &IceCoverSpec,
+) -> Vec<u8> {
+    elevation_m
+        .iter()
+        .zip(thickness_m)
+        .map(|(&z, &t)| {
+            if f64::from(z) - sea_m <= 0.0 || t.is_nan() || t < 1.0 {
+                0
+            } else {
+                spec.blocks(f64::from(t))
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -53,6 +78,18 @@ mod tests {
         let ela = [700.0; 7];
         let c = cover_blocks(&z, &ela, 0.0, &spec);
         assert_eq!(c, [0, 0, 2, 6, 12, 0, 0]);
+    }
+
+    #[test]
+    fn the_climate_s_ice_thickness_sets_the_cover() {
+        let spec = IceCoverSpec::default();
+        // Ice 0, 0.5 m (under the glacier threshold), 1 m, 159 m, 160 m, 3 km, NaN; the last is sea.
+        let z = [100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, -20.0];
+        let t = [0.0, 0.5, 1.0, 159.0, 160.0, 3000.0, f32::NAN, 500.0];
+        assert_eq!(
+            cover_from_thickness(&z, &t, 0.0, &spec),
+            [0, 0, 1, 1, 2, 12, 0, 0]
+        );
     }
 
     #[test]

@@ -11,11 +11,11 @@ import java.util.Optional;
  * ground at a block column, whatever the pack's biome source drew there (Ben, 2026-09-30, "Force
  * snow/ice cover": Terralith has no flat inland ice biome, so an ice cap's flats would show gravel).
  *
- * <p>This is the small interface between the climate and the surface pass. Today the bake writes the
- * cover's thickness as the layer {@code climate/ice_cover} (L2, u8, blocks) from the climate
- * stage's equilibrium-line altitude ({@code bake/ice.rs}); a climate stage that carries a real ice
- * thickness (a {@code climate/ice_thickness_m}) only has to be turned into that layer by the bake, and
- * the pass does not change. The table that shaped the cover (the placement file's {@code ice_cover}
+ * <p>This is the small interface between the climate and the surface pass. The bake writes the
+ * cover's thickness as the layer {@code climate/ice_cover} (L2, u8, blocks) from the climate's land-ice
+ * thickness ({@code climate/ice_thickness_m}; an older run without ice fields falls back to the
+ * ground's height above its equilibrium line; {@code bake/ice.rs}). The pass reads nothing of the
+ * climate but this layer, so a climate that changes how it carries ice does not change the pass. The table that shaped the cover (the placement file's {@code ice_cover}
  * section: the step, the ceiling, the snow and ice blocks) is recorded in
  * {@code notes.bake.climate.ice_cover}; FORMAT.md, "The ice cover".
  */
