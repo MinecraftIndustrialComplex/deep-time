@@ -143,6 +143,12 @@ pub struct GlacialParams {
     /// 1989 (Quat. Res. 32:245–261: snowlines some 500 m lower than today; ~900 m at the last
     /// glacial maximum, Porter 2001).
     pub young_ela_drop_m: f64,
+    /// How much wider than a real glacier the young landscape draws its troughs (the editor's
+    /// "Glacial valley width"; Ben, 2026-09-30: default wider, 1 is physical). At the game's
+    /// scale (300 m a block across, 20 m up) a real 2-km trough is 7 blocks wide and reads as a
+    /// gorge; this widens the glaciers' footprint and the spread of their erosion on L2, and so
+    /// the U the amplifier cuts under them. The deep-time surface always uses 1 (physics).
+    pub valley_width: f64,
 }
 
 impl Default for GlacialParams {
@@ -165,6 +171,7 @@ impl Default for GlacialParams {
             max_erosion_share: 0.5,
             substeps: 4,
             young_ela_drop_m: 500.0,
+            valley_width: 3.0,
         }
     }
 }
@@ -226,6 +233,9 @@ impl GlacialParams {
         }
         if !(fin(self.young_ela_drop_m) && (-2000.0..=3000.0).contains(&self.young_ela_drop_m)) {
             return Err(bad("young_ela_drop_m", "must be in [−2000, 3000]"));
+        }
+        if !(fin(self.valley_width) && (1.0..=8.0).contains(&self.valley_width)) {
+            return Err(bad("valley_width", "must be in [1, 8]"));
         }
         Ok(())
     }
@@ -574,7 +584,7 @@ pub fn ice(
         if !zs.is_finite() {
             continue;
         }
-        let half = 0.5 * st.width[c] / d.dx;
+        let half = 0.5 * st.width[c] * p.valley_width / d.dx;
         let reach = (half - 0.5).ceil().clamp(0.0, MAX_SPREAD as f64) as i64;
         for dj in -reach..=reach {
             for di in -reach..=reach {
@@ -668,7 +678,8 @@ pub fn step(
                 let w = ice_st.width[c];
                 let vol = rate * dts * w * d.dx;
                 let zs = ice_st.surface[c];
-                let half = 0.5 * w / d.dx;
+                // (drawn `valley_width` times as wide: the same volume, a wider trough)
+                let half = 0.5 * w * p.valley_width / d.dx;
                 let reach = (half - 0.5).ceil().clamp(0.0, MAX_SPREAD as f64) as i64;
                 spread.clear();
                 let mut sum = 0.0;

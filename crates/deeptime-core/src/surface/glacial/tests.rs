@@ -27,6 +27,52 @@ fn range(w: usize, h: usize, top: f64, sea_cols: usize, depth: f64) -> Vec<f64> 
     z
 }
 
+/// The physics: glaciers as wide as they are (the valley width is a readability setting).
+fn physical() -> GlacialParams {
+    GlacialParams {
+        valley_width: 1.0,
+        ..GlacialParams::default()
+    }
+}
+
+#[test]
+fn the_valley_width_widens_the_footprint_not_the_ice() {
+    let (w, h) = (48, 21);
+    let d = Dims::new(w, h, 1000.0, false);
+    let z = range(w, h, 2500.0, 6, 150.0);
+    let cl = climate(w * h, 600.0, -2.0);
+    let rt = route(&d, &z, 0.0);
+    let clim = IceClimate {
+        ela_z: &cl.ela,
+        precip_m_yr: &cl.p,
+        t_c: &cl.t,
+        allowed: None,
+        time_share: None,
+    };
+    let solve = |p: &GlacialParams| {
+        let mut st = IceState::default();
+        ice(
+            &d, &rt.r, &rt.kind, &z, &rt.filled, 0.0, &clim, p, 9.81, &mut st,
+        );
+        st
+    };
+    let one = solve(&physical());
+    let three = solve(&GlacialParams {
+        valley_width: 3.0,
+        ..GlacialParams::default()
+    });
+    // The same glaciers (the flow law does not see the setting) …
+    assert_eq!(one.thick, three.thick);
+    // … drawn over more ground.
+    let covered = |s: &IceState| s.footprint.iter().filter(|x| x.is_finite()).count();
+    assert!(
+        covered(&three) > covered(&one),
+        "{} vs {}",
+        covered(&three),
+        covered(&one)
+    );
+}
+
 struct Routed {
     kind: Vec<u8>,
     filled: Vec<f64>,
@@ -100,7 +146,7 @@ fn a_glacier_reaching_the_sea_cuts_a_fjord_below_sea_level() {
     let mut z = range(w, h, 2500.0, 6, 150.0);
     let z0 = z.clone();
     let cl = climate(w * h, 600.0, -2.0);
-    let p = GlacialParams::default();
+    let p = physical();
     let (out, _) = run(&d, &mut z, &cl, &p, 8, 5.0e5);
     assert!(out.ice.cells > 0, "the range is glaciated");
     // The valley's last land cells before the old coast are now below sea level: a fjord, deeper
@@ -138,7 +184,7 @@ fn eroded_rock_is_all_accounted_for() {
     let p = GlacialParams {
         till_share: 0.4,
         max_till_m: 30.0,
-        ..GlacialParams::default()
+        ..physical()
     };
     let before: f64 = z.iter().sum();
     let (_, tot) = run(&d, &mut z, &cl, &p, 6, 5.0e5);
@@ -167,7 +213,7 @@ fn a_cold_bed_does_not_erode_but_thick_ice_warms_it() {
     // nothing.
     let thin = GlacialParams {
         max_accumulation_m_yr: 0.05,
-        ..GlacialParams::default()
+        ..physical()
     };
     let mut z = range(w, h, 1200.0, 4, 100.0);
     let cl = climate(w * h, 200.0, -30.0);
@@ -185,7 +231,7 @@ fn a_cold_bed_does_not_erode_but_thick_ice_warms_it() {
     // the ice erodes.
     let mut z = range(w, h, 1200.0, 4, 100.0);
     let cl = climate(w * h, 200.0, -30.0);
-    let (out, tot) = run(&d, &mut z, &cl, &GlacialParams::default(), 2, 5.0e5);
+    let (out, tot) = run(&d, &mut z, &cl, &physical(), 2, 5.0e5);
     let thickest = out.ice.thick.iter().copied().fold(0.0, f64::max);
     assert!(thickest > 800.0 && tot[0] > 0.0, "{thickest} {}", tot[0]);
 }
@@ -197,7 +243,7 @@ fn no_ice_below_the_equilibrium_line_and_none_where_not_allowed() {
     let mut z = range(w, h, 800.0, 3, 50.0);
     let z0 = z.clone();
     let cl = climate(w * h, 2000.0, 0.0);
-    let (out, tot) = run(&d, &mut z, &cl, &GlacialParams::default(), 2, 5.0e5);
+    let (out, tot) = run(&d, &mut z, &cl, &physical(), 2, 5.0e5);
     assert_eq!(out.ice.cells, 0);
     assert_eq!(tot[0], 0.0);
     assert_eq!(z, z0);
@@ -221,7 +267,7 @@ fn no_ice_below_the_equilibrium_line_and_none_where_not_allowed() {
         &rt.filled,
         0.0,
         &clim,
-        &GlacialParams::default(),
+        &physical(),
         9.81,
         &mut st,
     );
@@ -242,7 +288,7 @@ fn the_same_bits_on_any_thread_count() {
         })
         .collect();
     let cl = climate(w * h, 700.0, -3.0);
-    let p = GlacialParams::default();
+    let p = physical();
     let go = |threads: usize| {
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
@@ -402,7 +448,7 @@ fn a_glaciated_planet_keeps_its_mass_logs_its_till_and_resumes() {
 
 #[test]
 fn the_flow_law_is_the_shallow_ice_approximation() {
-    let p = GlacialParams::default();
+    let p = physical();
     let f = Flow::new(&p, 9.81, 1.0e5);
     // Pure creep of a 1 km sheet on a 0.2 % slope: q = (2A/5)(ρgS)³H⁵ per unit width.
     let a = 2.4e-24 * SECONDS_PER_YEAR;
