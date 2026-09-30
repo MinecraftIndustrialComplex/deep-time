@@ -157,6 +157,8 @@ neoForge {
             systemProperty 'neoforge.enabledGameTestNamespaces', 'deeptime'
             systemProperty 'deeptime.gametest', 'true'
             if (extraDatapack) systemProperty 'deeptime.extraDatapack', extraDatapack.toString()
+            // -PgametestOnly=<name>[,<name>…]: run only those tests (GameTestServerMixin).
+            if (project.hasProperty('gametestOnly')) systemProperty 'deeptime.gametestOnly', project.property('gametestOnly').toString()
             // The 160-mod MIC set needs more heap than the default runtime (an intermittent
             // OutOfMemoryError in lakeHolds under -PwithMic, P1-12); one server runs at a time.
             jvmArgument(project.hasProperty('withMic') ? '-Xmx8G' : '-Xmx6G')

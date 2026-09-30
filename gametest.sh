@@ -49,10 +49,13 @@ dev cargo run --release -q -p deeptime-cli -- synth --kind lake-test --size 1024
 
 peak_rss_file=$(mktemp)
 echo 0 > "$peak_rss_file"
+# This checkout's game JVM: its command line names this checkout's mod folder (the game directory and
+# the other run options sit in an @argfile, so the old 'run-gametest' match never hit: 0 MB).
+jvm_marker="deeptime%%$PWD/neoforge/"
 (
     while true; do
-        rss=$(ps -eo rss=,args= 2>/dev/null \
-              | grep -F 'net.neoforged.devlaunch.Main' | grep -F 'run-gametest' \
+        rss=$(ps -ww -eo rss=,args= 2>/dev/null \
+              | grep -F -- "$jvm_marker" \
               | grep -v grep \
               | awk '{ if ($1 > max) max = $1 } END { print max + 0 }')
         if [ -n "${rss:-}" ] && [ "$rss" -gt "$(cat "$peak_rss_file")" ]; then
