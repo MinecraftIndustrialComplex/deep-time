@@ -42,6 +42,11 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
 | P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log). **Follow-up** (branch worktree-agent-afd5791e0f5ea82cd): a run with a bake is previewed and inspected as its own terrain (`/api/inspect` from `deeptime inspect-column --why` in 60-90 ms, previews boot the mod on the run's bake; height p50 0 vs the bake); runs without a bake keep the test world and say so (see build log). **UI overhaul** (branch worktree-agent-a95571be05fdd89d6, Ben: "should be dark themed"): dark map-first layout, run cards, sectioned editor with the estimate by Run, split/side-by-side compare, timeline dock, stage-2 job cards, `?tv` HUD, 390 px; placeholders hidden; Mac gates clean, JUnit 118/0; before/after in review/out/workbench-ui/ (see build log) |
+| P1-21 | Volcanoes as landforms (log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
+| P1-22 | Rivers and lakes (moved from P2-03, log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
+| P1-23 | Grid-artifact audit (log 2026-09-29) | todo | | | Starts after the mountain and strata work lands (they fix part of it). |
+| P1-24 | Faster Create World (log 2026-09-29) | todo | | | After P1-17's benchmarks; options go to Ben. |
+| P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -57,6 +62,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | p1-calib, p1-calib-super (P1-17 partial: 500 Myr on pipeline_quick_16k after recalibration with real climate; scattered continents / supercontinent) | https://spacesheep.dev/@benmac/deeptime-p1-calib · https://spacesheep.dev/@benmac/deeptime-p1-calib-super | calibrated 500 Myr 2026-09-29 | 2026-09-29 |
 | p1-amplify (P1-06: before/after amplification of mountains, highlands, coast, river, lake, a tile edge and the seam; drama figure) | https://spacesheep.dev/@benmac/deeptime-p1-amplify | P1-06 before/after amplification 2026-09-29 | 2026-09-29 |
 | p1-biomes (P1-09: Köppen beside biomes on earthlike_quick_16k 500 Myr, standalone and MIC; tag shares, top biomes per class, Chunky areas) | https://spacesheep.dev/@benmac/deeptime-p1-biomes | P1-09 biomes vs climate 2026-09-29 | 2026-09-29 |
+| mountains (block-scale mountain character before/after: arc, young collision, old range; standalone + MIC; vanilla and Terralith comparisons; ruggedness sweep) | https://spacesheep.dev/@benmac/deeptime-mountains | mountain character before/after 2026-09-30 | 2026-09-30 |
 | p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
 | p1-deposits-real (P1-14: deposits on the real 500 Myr history; not published, review/out/p1-deposits-real on the laptop and the Mac, 17 MB) | — | P1-14 real history 2026-09-29 | 2026-09-29 |
 | p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
@@ -73,6 +79,153 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — Block-scale mountain character, ruggedness setting, the striped-snow fix (agent worktree agent-a2d4bbb2f592ce1d7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-29 ("Do it now, in Phase 1"): P1-08's 6.8 km peak was a smooth dome, and its
+  snowfield had vertical stripes.
+- **The striped snow, found and fixed.** Not a resampling artefact of the rasters: the noise router. The final
+  density takes `deeptime:terrain` only within 1.5625·k blocks (k = 8: 12.5 blocks) of the surface and the cave
+  field below (vanilla's `range_choice` around `sloped_cheese`), and vanilla interpolates between corners 4 blocks
+  apart. On a face steeper than ~3 blocks per block the lower corner's cell mixed the upper corner's cave value
+  (≈ 0.5 instead of the terrain's 2–4) into the interpolation, so the surface jumped up-slope: 3-block benches and
+  20-block steps every 4 blocks. P1-08's world, x 2976..3000 at z −960 (`deeptime-inspect column`): tops 344, 337,
+  308, 308, 307, 287, 284, 283, 282, 275, 256, 254, 254, 233, … — each bench snow-capped, one N–S stripe per 4
+  blocks on the east flank. **Fix** (`worldgen/TerrainScale`, `TerrainDensity`): the density's scale doubles from
+  k until it covers 0.8 × the largest height difference to the 8 neighbouring corners (powers of two keep the
+  interpolation exact at whole-number heights; a 9.6 broke `lakeHolds`' floor by one block), and a new mode
+  `ratio` (k/scale) multiplies the router's cave-entrance term, so cave mouths stay where they were
+  (`planet.json`, and `tools/dev/gen_worldgen.py` regenerates it byte for byte). Corner columns are H exactly as
+  before; parity unchanged. `-Ddeeptime.steepScale=0` restores P1-08's router (the "before" renders use it).
+  Measured on steep noise cells (drop ≥ 16 over the cell, `stairs.py` over real exports): one step taking ≥ 70 % of
+  the drop on **43 % / 28 % of cells before, 11 % / 4 % after** (boxes A / C); median max-step/mean-step 2.6 → 1.2.
+- **The mountain character** (`crates/deeptime-core/src/surface/amplify/character.rs`, run on the amplifier's last
+  level after its passes, `tiles.rs`): all baked into `elevation`, so the Java height, the column evaluator and
+  the world-data contract are unchanged (format 0.1; FORMAT.md "The mountain character").
+  - *Drainage-aligned gullies:* 4 octaves of stripe noise (128 → 16 blocks) whose crests follow the slope of the
+    smoothed terrain (so the amplifier's multiple-flow valleys), each octave aligned with what the coarser left
+    (tributaries). Depth = 0.2 × slope × wavelength, capped by 0.35 × local relief, 0.25 × wavelength (hard rock;
+    60 % on soft) and the height above the local base level; faded on rivers (5–100 km² drainage) and at the coast.
+  - *Fold ridges:* ridged stripes along `plates/fold_trend_deg` where `plates/orogeny_type` records an orogen
+    (Himalayan 1.0, Andean 0.4, × youth), 0.18 × local relief; gaps where streams (1–10 km²) cross.
+  - *Young vs old:* youth = exp(−`plates/orogeny_age_myr`/60) or uplift; young terrain gets the convex part of an
+    unsharp mask (sharper, higher summits and ridgelines; one-sided, so no moats at mountain feet), old terrain is
+    pulled towards its smoothed self (rounded); gully profiles are triangles when young/hard, cosines when old/soft.
+  - *Cliffs:* a smooth terrace (8-block benches) where the rock is hard (`young/erodibility` ≤ ~1.3: granite,
+    gneiss, andesite, basalt, quartzite) and the slope over 0.6.
+  - *Drains:* a pit the character closes deeper than 1.5 blocks is softened back (radius 6 cells), then the flood
+    runs again: 0 new sinks; on the 16k planet the last flood raises 10k land cells by more than a block (8 by more
+    than 10), and softens 11.7 % of land cells somewhat.
+  - `amplify.ruggedness` (0..2, default 1; editor field `ruggedness`, section Terrain, stops Smooth 0 / Gentle 0.5 /
+    Natural 1 / Wild 1.6, lang key; all four `pipeline_*` / `earthlike_*` presets carry 1.0) scales everything;
+    0 is the P1-06 terrain bit for bit. The tuning knobs are `amplify.character.*` (every key optional).
+    `surface.drama` (thermal slope + the chunk-time A·N texture) and `amplify.incision_cap` (how deep the amplifier's
+    rivers cut) stay beside it, unchanged: they shape the simulated terrain, ruggedness shapes the block-scale
+    character on top of it.
+  - Keyframes/workbench: `amplify/youth`, `amplify/fold` (L1, ramp `unit`). Notes: `notes.amplify.character`
+    (cells changed, mean/max change, flood, softened, ms); the CLI's `amplify_final=` line prints them.
+  - Tiles: halo + the character's radius (≈ 36 cells) + two flood margins + 13; streamed = in memory to the bit
+    (the existing tests, now with the character on). Memory: +4 B a cell (71 B/cell whole-raster).
+- **Where a glacial pass plugs in** (the glacial-erosion agent, `amplify/glacial.rs`): in `tiles::run_tiles`, after
+  `run_passes` and before `character::apply` — the character then puts spurs and gullies on the glacial valleys'
+  walls and its `fade` (character.rs) is the place to take a glacial mask (ice-smoothed rock: less ruggedness, no
+  folds). Its halo adds to `Config::halo`.
+- **Numbers (Mac M6, shared).** `deeptime run --preset earthlike_quick_16k --start scattered_continents
+  --length-myr 500 --out …/mountains/after --checkpoints` → 109 s wall; amplify 13.1 s of which the character
+  3.8 s (12 threads); mean |change| on land 2.6 blocks, max +53/−50; sinks 0. Chunk generation (standalone, the
+  same three 384 × 384 boxes = 2,187 chunks, Chunky wall time, interleaved runs `t-after-1, t-before-1, t-after-2, t-before-2`): **after 30.9 / 31.0 ms per chunk, before 41.2 / 54.6** — no slowdown (the grown scale adds 8 memoised height lookups per corner column; the rest is load on the shared Mac, 8–22). P1-08 measured ≈ 43 ms (441 chunks, loaded Mac).
+- **Evidence** (`review/out/mountains/index.html`, not published, 12 MB): before/after of three areas of that planet through the
+  real generator (preview jobs, exports rendered isometrically and in the area3d viewer): A arc volcano (andesite,
+  active; 2752..3136 × −1152..−768), C young collision belt (−512..−128 × 2320..2704), O old collision belt (422 Myr;
+  5648..6032 × −2384..−2000); the same with the MIC set; vanilla (standalone `minecraft:normal`, seed 20260929:
+  jagged and stony peaks) and MIC's Terralith + Tectonic (`terralith:rocky_mountains`, `yosemite_cliffs`); before/after
+  sections; the ruggedness sweep 0/0.5/1/1.6; the youth and fold maps. BlueMap renders were made
+  (`review/out/mtn-bm/bm-after`, 139 MB) but its web camera distorts 450-block-tall boxes; the bundle uses the
+  exports instead.
+- **Tools.** `deeptime heightmap` (H, E, A·N and layers of a box as .npy), `deeptime stage … --bake` (bake after a
+  stage that finishes the run, for trying a later stage's settings on the game's terrain), preview.py
+  `--level-type` (a comparison world in the pack's own generator) with `--locate BIOME[@x,z]`, `--jvm-prop`,
+  `--max-side` passed to the export; ScreenshotDriver `.start/.length/.vista` properties and
+  `mac-screenshots.sh --prop`.
+- **Gates** (tree merged with master 00c02ce): cargo fmt, clippy `--locked -D warnings`, deny licenses bans
+  clean; `cargo test --workspace --locked` (cli 30, core 262 + 3 ignored incl. character:: 6 and amplify 25 with the
+  character on — streamed = in memory, 1 = N threads, no new sinks —, format 40, inspect 29 + 2 + 7, jni 7, viewer 5);
+  `./gradlew build test` 146/0 (`ColumnParityTest` 500 of 500 columns equal on the regenerated planet4k fixture,
+  `TerrainScaleTest` 3); `./gametest.sh` 50/50, `-PwithMic` 50/50 (MIC set installed today), `./gametest-planet.sh`
+  PASS. **lakeHolds** needed two changes on the way: the scale must be a power of two times k (a 9.6 put the lake
+  floor one block high at 442 corners), and under MIC a short plant at the waterline, which the new wall shape put
+  by the water, washed away into a 65,124th source — the test now allows such washable blocks (it counts and logs
+  them, `washable=1`) instead of calling them leaks.
+- **Real client** (`tools/client/mac-screenshots.sh --prop …`, the ScreenshotDriver's new `.start/.length/.vista`):
+  one run on the Mac's desktop, 27 min of in-client simulation on the loaded Mac; its four vistas came out empty
+  (sky only): the timeline properties were applied on only one of the driver's two paths (the planet was the default
+  supercontinent/1000 Myr one, so the coordinates missed the mountains) and 60 s did not generate terrain 200 blocks
+  from spawn. Both fixed after the run (the Advanced path reads them too; a vista waits until the chunk 160 blocks
+  ahead exists, then 15 s, at most 170 s); not re-run. `review/out/mtn-client/` has the walk's shots.
+- **Deferred / for Ben.** Talus and scree at cliff feet (a surface-block rule the column evaluator would have to
+  mirror for parity); overhangs/3D crags (Phase 2). The softening touches 11.7 % of land cells a little.
+- **Next.** Merge into master (the parent).
+
+### 2026-09-30 — Geologic provinces: a USGS-style view layer on every keyframe (agent worktree agent-a03fc35a652ae22e4, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Ben's decision (decisions log 2026-09-29, "Just want the view, don't change world generation"): a
+  `provinces` keyframe layer, drawn like `regime` or `crust_age`, so the workbench (layer picker, legend, globe, compare)
+  and the static viewer show it at every time step. View only: `core::provinces` derives it when a frame is drawn
+  (`keyframes::render` takes derived layers; `keyframes::add_derived` adds `provinces` to a group whose layers hold
+  `regime` and `crust_age`) into a scratch field; nothing is written to `WorldState`. Also: `deeptime provinces --in
+  <checkpoint> --out x.png` (prints each class's share; `DEEPTIME_PROVINCE_STATS=1` prints field quantiles,
+  `DEEPTIME_PROVINCE_DUMP=<dir>` dumps the fields as raw f32), the `provinces` ramp in `ramps.json` (9 classes, `labels`,
+  the rules as its `_comment`, which the workbench legend shows and the static viewer shows as a tooltip; existing ramps
+  untouched), the workbench's layer word "Geologic provinces", the plan's §8.1 note. The plates estimate counts one more
+  keyframe layer (16 frames × 2 MiB), so `notes.run.history.reserved_peak_bytes` grew by 23 MB.
+- **Rules** (first that applies wins; thresholds `provinces::Rules`, the plan's §8.1 note has the full text):
+  LIP = mafic volcanic pile ≥ 0.2 × the recorded LIP thickness above the column's own basalt (2 km where the gabbro
+  lower crust is 5 km, as on oceanic crust; none before the first LIP event); oceanic crust by `crust_age` 0–20 / 20–65 /
+  over 65 Ma, an island arc (regime arc, crust over 9 km) being an orogen; continental: orogen = collision or arc regime,
+  a Himalayan-type orogeny within 500 Myr, or an Andean one within 50 Myr on ground over 1.5 km; extended = rift or
+  passive-margin regime or crust under 20 km; basin = over 3 km of sediment + sedimentary rock (strata log or pools,
+  the thicker) or subsiding over 0.03 mm/yr under ≥ 1 km; shield = under 0.2 km of cover or a crystalline surface rock
+  (`structure/rock`, else `surface/class`, by the class table's family); platform = the rest. Then a 3 × 3 majority
+  filter over the continental classes.
+- **What calibration found.** `earthlike_quick_16k` scattered_continents, 500 Myr, final: continental crust is 35 % of
+  the planet and on it: `plates/orogeny_type` is Andean on 87 % of the cells (age median 20 Myr, also under regime
+  craton), so "orogeny within 500 Myr" made whole continents orogens (24 % of the planet at first); the collision type
+  is 11 % and is the one that persists. Continental columns carry 2 km of mafic volcanic rock wherever the crust was
+  oceanic or an emerged arc (the 4.5 km gabbro of a continent against 5 km of an ocean tells them apart), so a plain
+  "mafic pile over 300 m" flagged 8–14 % of the planet as LIP; with the baseline it is 1.1–2.1 %, about the area of
+  the run's LIP blobs. Oceanic arc-regime cells sit at a median −2.3 km (a thin rim around every continent); only the
+  ones with crust over 9 km (23 %) are island arcs. Continental crust is 28 km thick at the median, so the 28 km
+  "thinned" guess made half of it extended; 20 km is the 10th percentile of cratons.
+- **Measured** (Mac, release; the checkpoints from `stage plates … --max-steps 125` and the full stage):
+  class shares of the planet, mid (step 125) / final: shield 5.6 / 4.3 %, platform 8.8 / 4.5 %, orogen 22.7 / 11.9 %,
+  basin 5.8 / 6.3 %, LIP 1.1 / 2.1 %, extended 4.3 / 7.2 %, ocean 0–20 Ma 16.4 / 18.9 %, 20–65 Ma 17.9 / 26.6 %, over
+  65 Ma 17.6 / 18.4 %. By eye against the USGS map: shields and platforms fill continental interiors, orogens follow the
+  collisions and active margins, basins sit beside them, extended crust fringes margins and rifts, LIPs are round blobs,
+  the sea floor ages away from the ridges. Differences from Earth: too little platform against shield (the sim's
+  craton cover is patchy: median 0.8 km, 25 % over 3.9 km), and orogens are over-large at mid-run because the six
+  scattered continents all collide.
+- **Gates.** `cargo test --workspace` ok (core 256 + 3 ignored, incl. 5 provinces:: tests: every rule, LIP with and
+  without the event, the derivation leaves the world equal, the generalisation, ramp labels and colours); clippy
+  `--workspace --all-targets -D warnings` ok; `cargo fmt --check` ok; `cargo deny check licenses bans` ok; all four
+  re-run after merging master 553ecda (docs only): the same results.
+  **World files vs master** (`run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --threads
+  6`, master 032c94c binary against this branch): `diff -rq` differs only in `keyframes/index.json`, the 11 plate-group
+  `kf-*.dtk` and `manifest.json` (created_utc, the keyframe files' bytes/crc, timings, `reserved_peak_bytes`); every
+  raster, strata, event, site, body, spawn file is byte-identical.
+- **Screenshots** (private `deeptime watch --port 8653` on the Mac, own runs folder, reached through an ssh tunnel;
+  the live 8642 was not touched): `review/out/prov/wb-mid.png` (234 Myr ago, step 133) and `wb-final.png` (the present),
+  the workbench with the Geologic provinces layer, its legend and note; `mid.png`, `fin.png` are the bare maps.
+  (review/out is not committed.) The tool: `tools/viewer/shot.py` with `--eval` clicking `#lpickbtn`, then
+  `[data-layer=provinces]`, then Shift+← ten frames at a time.
+- **Would the world's provinces be better with these classes?** Probably yes, for TerraBlender: `meta/province` is the
+  regime setting (ocean, island, arc, orogen, rift, hotspot, craton, highland, margin) with connected regions of at least
+  50,000 km²; it has no sedimentary/crystalline distinction, so a craton's shield, platform and basin all become one
+  province (one biome region), and it makes every hotspot and LIP a small one. Provinces of shield/platform/basin/LIP
+  would give regions that follow the rock the player sees and the ore the deposit stages place (basins hold the coal,
+  petroleum and MVT, shields the BIF and orogens the porphyry). Not changed here (Ben: view only); if wanted, it is a
+  change to `bake/meta.rs` plus P1-10's region table, and it would change `meta/province` and the biome regions of
+  every world.
+- **Next.** Nothing blocks: merge to master when reviewed. Not checked in the game: the in-game timelapse builds its
+  layer list from the frames' layer names (`TimelapseModel`) and the frames are already coloured, so `provinces` should
+  appear in its picker (under its raw name) with the right colours; no Java changed.
+
 ### 2026-09-29 — Coal fields adjoin and stack: adjoining footprints, several seams per field from the sediment history (agent worktree agent-a3e41a57dc812f499, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben's follow-up (decisions log 2026-09-29, "Yes, adjoining + stacked (Recommended)"): coal fields in a basin
   may adjoin and fill its minable area (no spacing), and each field holds a stack of seams at different depths. Changes:

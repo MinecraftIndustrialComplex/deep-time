@@ -74,6 +74,7 @@
   "deeptime.editor.field.exotic_landforms": "Exotic landforms",
   "deeptime.editor.field.essentials": "Essentials list",
   "deeptime.editor.field.carving": "Terrain carving",
+  "deeptime.editor.field.ruggedness": "Ruggedness",
   "deeptime.editor.field.plate_count": "Number of plates",
   "deeptime.editor.field.continent_count": "Continents at the start",
   "deeptime.editor.field.breakup_rate": "Continental breakup rate",

@@ -102,7 +102,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 
 | Layer | Grid | dtype | scale, units | nodata | What |
 |---|---|---|---|---|---|
-| `elevation` | L3 | i16 | 1/16, block | — | terrain y: the amplifier's; without the amplify stage the young landscape (L2) or the deep-time surface (L1) upsampled bilinearly |
+| `elevation` | L3 | i16 | 1/16, block | — | terrain y: the amplifier's, mountain character included ("The mountain character"); without the amplify stage the young landscape (L2) or the deep-time surface (L1) upsampled bilinearly |
 | `detail/amplitude` | L3 | u8 | 1/16, block | — | the detail term's A (P1-06; absent without the amplify stage) |
 | `water_level` | L3 | i16 | 1/16, block | −32768 | every cell nodata: lakes and rivers are Phase 2 |
 | `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks, the first top raised ("The P1-08 bake") |
@@ -310,6 +310,34 @@ E the `elevation` layer bilinear, A the layer `notes.bake.detail.layer` bilinear
 `Noise::fbm(x, z, wavelength_blocks, octaves, salt)` of `Noise::new(seed, C)` below. A world without
 `notes.bake.detail` (every synthetic world) has H = E. Java: `WorldData.height`; Rust:
 `deeptime_format::ColumnWorld::height`.
+
+**What the game draws.** Vanilla evaluates the density at noise-cell corners four blocks apart and
+interpolates between them, so a corner column's top is ⌈H⌉ − 1 exactly and the columns between
+follow the bilinear H of the four corners. For that to hold on steep ground, `deeptime:terrain`'s
+density (H − y)/scale doubles its scale from k (8) until it reaches 0.8 × the largest height difference to the
+eight neighbouring corners (Java `worldgen/TerrainScale`, 2026-09-29): with the fixed k the router's
+cave band (the terrain value only within 1.5625·scale blocks of the surface) broke faces steeper
+than about three blocks per block into three-block benches and 20-block steps every four blocks
+(the "striped snow" of the P1-08 renders). The scale changes nothing the world data says: H, the
+corner columns and `ColumnParityTest` are as before; `-Ddeeptime.steepScale=0` restores the fixed
+scale.
+
+## The mountain character (in `elevation`, 2026-09-29)
+
+The amplifier's last level ends with the mountain character (`deeptime_core::surface::amplify::
+character`, the decisions log's "block-scale mountain character in Phase 1"): drainage-aligned
+gully octaves (stripe noise whose crests follow the slope of the smoothed terrain, depth ∝ slope ×
+wavelength, capped by the local relief, the wavelength and the height above the local base level,
+fading out on rivers and at the coast), ridged fold stripes along the plate model's fold trend where
+an orogen is recorded, unsharp masking of young terrain (orogeny age, uplift) and smoothing of old
+terrain, and cliff bands (a smooth terrace) where the surface rock is hard and steep; then, where it
+closed a pit deeper than 1.5 blocks, it is softened back, and the flood makes the surface drain again
+(no new sinks). `amplify.ruggedness` (0..2, default 1; the editor's "Ruggedness") scales all of it;
+0 leaves the passes' terrain bit for bit. Everything is baked into the `elevation` layer, so the
+game and the column evaluator read it like any other terrain: the contract (H = E + A·N, the
+layers, the column rule) is unchanged, and so is format 0.1. `notes.amplify.character` records what
+it did (cells changed, mean and largest change, the flood after it, milliseconds); the keyframes
+carry the youth and fold strength it read (`amplify/youth`, `amplify/fold`, L1).
 
 ## The detail layer (`rasters/detail/amplitude.dtr`, P1-06)
 

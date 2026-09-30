@@ -507,7 +507,8 @@
     function kfLegend() {
       const box = document.getElementById('kflegend');
       const ramp = layer ? rampOf(layer) : null;
-      if (!ramp || !ramp.stops || !ramp.stops.length) { box.innerHTML = ''; return; }
+      if (!ramp || !ramp.stops || !ramp.stops.length) { box.innerHTML = ''; box.title = ''; return; }
+      box.title = ramp._comment || '';   // the ramp's note: how the classes are derived (hover)
       if (ramp.labels) {
         box.innerHTML = ramp.labels.map((lab, k) => {
           const stop = ramp.stops.find(s => s[0] === k);

@@ -423,6 +423,30 @@
         [58.999, "#c0c0c8"]
       ]
     },
+    "provinces": {
+      "_comment": "Categorical, after the USGS map 'Geologic provinces of the world': a view of the current state, derived when a frame is drawn (core provinces.rs; the world is not changed). First rule that applies wins. Large igneous province: a mafic volcanic pile of at least a fifth of the recorded LIP thickness above the crust's own basalt. Oceanic crust by age (0-20, 20-65, over 65 Ma); a thickened island arc is an orogen. Orogen: active collision or arc, a collision belt from the last 500 Myr, or an Andean range over 1.5 km lifted in the last 50 Myr. Extended crust: rift, passive margin, or crust thinned below 20 km. Basin: over 3 km of sediment and sedimentary rock (or subsiding under over 1 km). Shield: old continental crust with basement at the surface (under 0.2 km of cover, or crystalline surface rock). Platform: the rest, under a thinner sedimentary cover. Continental classes are generalised to their neighbours' majority.",
+      "labels": ["Shield", "Platform", "Orogen", "Basin", "Large igneous province", "Extended crust", "Oceanic crust 0–20 Ma", "Oceanic crust 20–65 Ma", "Oceanic crust over 65 Ma"],
+      "stops": [
+        [0, "#f7955b"],
+        [0.999, "#f7955b"],
+        [1, "#f59bcb"],
+        [1.999, "#f59bcb"],
+        [2, "#8fe8c8"],
+        [2.999, "#8fe8c8"],
+        [3, "#9cc8f0"],
+        [3.999, "#9cc8f0"],
+        [4, "#9b5fa5"],
+        [4.999, "#9b5fa5"],
+        [5, "#f6f09a"],
+        [5.999, "#f6f09a"],
+        [6, "#c9d6e3"],
+        [6.999, "#c9d6e3"],
+        [7, "#a3b4c6"],
+        [7.999, "#a3b4c6"],
+        [8, "#7f8fa3"],
+        [8.999, "#7f8fa3"]
+      ]
+    },
     "deposition": {
       "stops": [
         [0, "#141414"],
@@ -545,10 +569,13 @@
     "amplify/elevation": "elevation",
     "amplify/detail": "detail",
     "amplify/drainage": "drainage",
+    "amplify/youth": "unit",
+    "amplify/fold": "unit",
     "climate/p_mm": "precip",
     "detail/amplitude": "detail",
     "surface/class_top": "rock_class",
-    "meta/crust_age_myr": "crust_age"
+    "meta/crust_age_myr": "crust_age",
+    "provinces": "provinces"
   },
   "default": "grey"
 }
