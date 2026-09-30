@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.api.climate;
 
+import com.minecraftindustrialcomplex.deeptime.net.ClientPlanetState;
 import com.minecraftindustrialcomplex.deeptime.worlddata.ClimateLayers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
@@ -43,6 +44,20 @@ final class LevelClimate implements DeepTimeClimate {
             ClimateLayers l = ClimateLayers.of(d);
             return new LevelClimate(true, l == null ? null : new ClimateColumns(l), d.manifest().seaLevelY());
         });
+    }
+
+    /**
+     * {@link DeepTimeClimate#circumferenceBlocks}: the generator's on a server level, the planet info's
+     * on a client level (both allocation-free), 0 for anything else.
+     */
+    static int circumferenceBlocks(Level level) {
+        if (level == null)
+            return 0;
+        if (level.isClientSide())
+            return ClientPlanetState.circumference(level);
+        if (level instanceof ServerLevel server && server.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g)
+            return g.dataRef().circumferenceBlocks();
+        return 0;
     }
 
     @Override
