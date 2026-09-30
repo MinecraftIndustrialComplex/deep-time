@@ -140,7 +140,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   Deposit bodies are unchanged (their depths are the ledger's); the horizon class at ore-body centres
   (`deeptime inspect-column`, 354 bodies): coal seams in sedimentary rock 48.7 % → 56.2 %, placer 61 → 72 %,
   MVT 29 → 43 %, SEDEX 50 → 75 %, porphyry 50 → 44 %.
-- **Gates** (Mac, on the branch after merging master 00c02ce): `cargo fmt --check`, `clippy --workspace --all-targets
+- **Gates** (Mac; run after merging master 00c02ce and again, all green, after merging master 5a70511 — cargo core 268, JUnit 147, both GameTest runs 50 of 50): `cargo fmt --check`, `clippy --workspace --all-targets
   --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` all pass (cli 30, core
   256 + 3 ignored, format 44 incl. `strata::tests` — the same stack everywhere is that stack, B-spline weights, a
   shared bed smooth and a missing one pinching out with every column within a block of its neighbour, a facies
