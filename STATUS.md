@@ -46,7 +46,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-22 | Rivers and lakes (moved from P2-03, log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
 | P1-23 | Grid-artifact audit (log 2026-09-29) | todo | | | Starts after the mountain and strata work lands (they fix part of it). |
 | P1-24 | Faster Create World (log 2026-09-29) | todo | | | After P1-17's benchmarks; options go to Ben. |
-| P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-a02882c5e6567370e, not yet merged. Format 0.2 bakes twelve monthly layers. `DeepTimeClimate` is at API version 1.<br>**Parity:** `ClimateParityTest` 500/500 blocks bit for bit, and the GameTest `climateApiOnTheRealPlanet` matches too.<br>**mic-climate `deep-time` branch** (pushed): Deep Time's climate plus Project Atmosphere's weather anomaly. Its GameTests pass 19/19, with and without Project Atmosphere.<br>**MIC planet probe** (earthlike_quick_16k): Af 24.5 °C, BWk 8.8/19.6 °C, Dfc −12.9/15.3 °C, ET −24.7/0.6 °C, EF plateau (4,860 m) −22.7/−46.7 °C, each pair midwinter/midsummer. Project Atmosphere read 8.6, 8.9, −0.6, 4.0 and 10.5 °C at the same places. Its simulated weather adds −2.4…+2.5 °C.<br>JUnit 147/0; cargo gates clean. See build log. |
+| P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-a02882c5e6567370e, not yet merged. Format 0.2 bakes twelve monthly layers. `DeepTimeClimate` is at API version 1.<br>**Parity:** `ClimateParityTest` 500/500 blocks bit for bit, and the GameTest `climateApiOnTheRealPlanet` matches too.<br>**mic-climate `deep-time` branch** (pushed): Deep Time's climate plus Project Atmosphere's weather anomaly. Its GameTests pass 19/19, with and without Project Atmosphere, and its pack smoke passes 20/20.<br>**MIC planet probe** (earthlike_quick_16k): Af 24.5 °C, BWk 8.8/19.6 °C, Dfc −12.9/15.3 °C, ET −24.7/0.6 °C, EF plateau (4,860 m) −22.7/−46.7 °C, each pair midwinter/midsummer. Project Atmosphere read 8.6, 8.9, −0.6, 4.0 and 10.5 °C at the same places. Its simulated weather adds −2.4…+2.5 °C.<br>JUnit 147/0; `./gametest.sh` All 52 passed; cargo gates clean. See build log. |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -159,11 +159,12 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   - `./gametest.sh --server`:
     - `climateApiOnTheRealPlanet` fixture 500/500 equal;
     - the first run failed its "tropical land" check because the 4k test planet has none; the check is now over land and sea;
-    - the rerun result is in the entry's last line.
+    - rerun after the fix: **All 52 required tests passed** (tropics 26.6 °C vs high latitudes −4.8 °C; 50 blocks up colder at 400 of 400).
   - mic-climate on the Mac (`tools/remote/mic-climate.sh`):
     - `./gametest.sh` passes 19/19;
     - `-PwithAtmosphere` passes 19/19, with Project Atmosphere present;
-    - smoke: see the last line.
+    - smoke (`smoke/install.sh` + `run.py`: the real pack, 166 mods, flat world, no Deep Time, this branch's jar) passes **20/20**;
+    - the smoke ran on the pack snapshot Deep Time's `install.sh mic` makes, because pack HEAD 4d0e685 carries a stale index hash for `kubejs/server_scripts/destroy_metallurgy_integration.js` that packwiz refuses (a pack finding, not this task's).
   - `mac.sh --pack --server -- tools/review/p1-25-probe.sh` (MIC, earthlike_quick_16k scattered 500 Myr, first start 191 s, smoke PASS). All values °C at the surface; D = midwinter (`season set mid_winter`), S = midsummer:
 
     | Site | Height | Deep Time mean / warmest / coldest | Unified, D / S | PA's own reading |
@@ -194,7 +195,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   3. **Serene Seasons' global seasons disagree with Deep Time in the southern hemisphere**, in SS's own visuals and crops. Accept, or look for a per-hemisphere option later.
   4. **Asking PA's author (xGabou) for a base-temperature provider hook** would allow coupling (b), so PA's snow, clouds and crops use Deep Time's numbers.
   5. **mic-climate `deep-time`**: merge, release and a pack pin are yours to call. It compiles against Deep Time's jar, which is private until the MVP.
-- **Next.** Merge this branch into master (the parent). Rerun the mic-climate smoke on a clean pack HEAD if it did not pass here.
+- **Next.** Merge this branch into master (the parent). Ben decides the "For Ben" items. Then mic-climate `deep-time` can be merged and released and pinned in the pack's deep-time branch.
 ### 2026-09-30 — Geologic provinces: a USGS-style view layer on every keyframe (agent worktree agent-a03fc35a652ae22e4, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben's decision (decisions log 2026-09-29, "Just want the view, don't change world generation"): a
   `provinces` keyframe layer, drawn like `regime` or `crust_age`, so the workbench (layer picker, legend, globe, compare)
