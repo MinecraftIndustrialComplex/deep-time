@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The climate's fine clock (deep-time climate, decisions log 2026-09-29): inside every plate step
-//! the carbon cycle, the EBM and the ice advance in steps of `carbon_step_kyr` (100 kyr), or of
+//! the carbon cycle, the EBM and the ice advance in steps of `carbon_step_kyr` (200 kyr), or of
 //! `orbital_step_kyr` (2 kyr) inside the recent ice-age window, so a snowball's onset and escape
 //! and the glacial cycles are resolved while the full geographic snapshot stays every 10 Myr.
 //!
@@ -606,6 +606,7 @@ mod tests {
                     })
                     .collect(),
                 ref_t_land: mean.clone(),
+                supply: Vec::new(),
             };
             let mut st = ClockState {
                 kernel,

@@ -271,7 +271,7 @@ still open at the end of the run it is written with `ongoing` = 1. Place: the ic
 centroid at its largest.
 
 **Snowballs and hothouses** come from the fine clock (`clock.rs`: carbon, EBM and ice every
-100 kyr, every 2 kyr in the recent ice-age window), not from a script: a snowball starts when sea
+200 kyr (`climate.carbon_step_kyr`), every 2 kyr in the recent ice-age window), not from a script: a snowball starts when sea
 ice covers `climate.snowball_on_frac` (0.95) of the ocean (annual mean) — the ice-albedo runaway
 takes the ice edge from mid latitudes to the equator — and ends when the cover falls below
 `snowball_off_frac` (0.5), written at its end (or at the end of the run with `ongoing` = 1). A
