@@ -75,9 +75,11 @@
 //! |weirdness| on the rising branch (|w| = (PV + 1)/3), signed by a value noise of wavelength
 //! `variant_blocks` (vanilla's variant biomes), except for a class whose placement names its branch:
 //! `weirdness: positive`, or `{positive_below_erosion: e}` (positive where the erosion is below `e`,
-//! negative above). EF has the second: its peaks are frozen peaks, never the negative branch's jagged
-//! peaks or Terralith's scarlet mountains, and its flats are off the positive-branch variants such as
-//! the cherry grove. PV stays above the valley slice: no river biomes
+//! negative above, except the `flats` it names: positive where the variant noise is above a value, at
+//! a |weirdness| of at most a cap). EF has the second: its peaks are frozen peaks, never the negative
+//! branch's jagged peaks or Terralith's scarlet mountains, and its flats are off the positive-branch
+//! variants such as the cherry grove, except a fifth of them at low |weirdness|, where vanilla's ice
+//! spikes are. PV stays above the valley slice: no river biomes
 //! until rivers exist (Phase 2).
 
 use std::sync::OnceLock;
@@ -100,6 +102,9 @@ pub const MAPPING: &str = "p1-09";
 
 /// `w_thr` of a class that always keeps the positive branch (above any erosion).
 const ALWAYS_POSITIVE: f32 = 9.0;
+
+/// `w_cap` of a class whose flats have no limit on |weirdness|.
+const NO_CAP: f32 = 9.0;
 
 /// Salt of the noise that signs the weirdness.
 pub const VARIANT_SALT: u32 = 1801;
@@ -655,6 +660,10 @@ struct Coords {
     /// The class's variant-noise rule (placement `weirdness`): NaN = the noise signs it, [`ALWAYS_POSITIVE`]
     /// = the positive branch, else the erosion below which it is positive (negative above).
     w_thr: Vec<f32>,
+    /// For a class with flats: the variant noise above which they are positive (1 = never), and the
+    /// largest |weirdness| they take ([`NO_CAP`] = none); NaN / [`NO_CAP`] otherwise.
+    w_noise: Vec<f32>,
+    w_cap: Vec<f32>,
     by_class: Value,
 }
 
@@ -670,6 +679,8 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     let mut e_lo = vec![f32::NAN; n];
     let mut e_hi = vec![f32::NAN; n];
     let mut w_thr = vec![f32::NAN; n];
+    let mut w_noise = vec![1.0f32; n];
+    let mut w_cap = vec![NO_CAP; n];
     let mut land = vec![false; n];
     let mut stats = [(0u64, 0f64, 0f64); 32];
     for k in 0..n {
@@ -699,7 +710,11 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         w_thr[k] = match placement.weirdness(class) {
             Weirdness::Noise => f32::NAN,
             Weirdness::Positive => ALWAYS_POSITIVE,
-            Weirdness::PositiveBelowErosion(e) => e as f32,
+            Weirdness::PositiveBelowErosion { erosion, flats } => {
+                w_noise[k] = flats.positive_noise_above as f32;
+                w_cap[k] = flats.max_magnitude.map_or(NO_CAP, |m| m as f32);
+                erosion as f32
+            }
         };
         let s = &mut stats[class as usize];
         s.0 += 1;
@@ -717,8 +732,13 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         e_lo = vec![-2.0; n];
         e_hi = vec![2.0; n];
     }
-    if !fill_nearest(&mut w_thr, &land, w, h) {
+    if !fill_nearest(&mut w_thr, &land, w, h)
+        || !fill_nearest(&mut w_noise, &land, w, h)
+        || !fill_nearest(&mut w_cap, &land, w, h)
+    {
         w_thr = vec![f32::NAN; n];
+        w_noise = vec![1.0; n];
+        w_cap = vec![NO_CAP; n];
     }
     if !fill_nearest(&mut t_sea, &sea, w, h) {
         t_sea = t_land.clone();
@@ -745,6 +765,8 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         e_lo,
         e_hi,
         w_thr,
+        w_noise,
+        w_cap,
         by_class: Value::Object(by_class),
     }
 }
@@ -785,7 +807,7 @@ pub fn map(
     let land: Vec<bool> = elev.iter().map(|&z| f64::from(z) > sea).collect();
 
     // Temperature and humidity.
-    let (t_land, h_land, t_sea, (e_lo, e_hi, w_thr), by_class) = match climate {
+    let (t_land, h_land, t_sea, (e_lo, e_hi, w_thr, w_noise, w_cap), by_class) = match climate {
         Some(c) => {
             let co = coords(c, g.l1, placement);
             let up = |v: Vec<f32>| {
@@ -813,7 +835,13 @@ pub fn map(
                 up(co.t_land),
                 up(co.h_land),
                 up(co.t_sea),
-                (near(co.e_lo), near(co.e_hi), near(co.w_thr)),
+                (
+                    near(co.e_lo),
+                    near(co.e_hi),
+                    near(co.w_thr),
+                    near(co.w_noise),
+                    near(co.w_cap),
+                ),
                 co.by_class,
             )
         }
@@ -829,7 +857,13 @@ pub fn map(
                 t.clone(),
                 vec![2.5; n],
                 t,
-                (vec![-2.0; n], vec![2.0; n], vec![f32::NAN; n]),
+                (
+                    vec![-2.0; n],
+                    vec![2.0; n],
+                    vec![f32::NAN; n],
+                    vec![1.0; n],
+                    vec![NO_CAP; n],
+                ),
                 Value::Null,
             )
         }
@@ -933,11 +967,15 @@ pub fn map(
             let k = j * w + i;
             let m = mag[k];
             let thr = w_thr[k];
-            let negative = if !land[k] || thr.is_nan() {
-                noise.value(bx, bz, p.variant_blocks, VARIANT_SALT) < 0.0
+            let value = || noise.value(bx, bz, p.variant_blocks, VARIANT_SALT);
+            let (negative, m) = if !land[k] || thr.is_nan() {
+                (value() < 0.0, m)
+            } else if thr > ALWAYS_POSITIVE - 1.0 || erosion[k] < thr {
+                // A class that keeps the positive branch: all of it, or its high relief.
+                (false, m)
             } else {
-                // A class that keeps the positive branch (all of it, or its high relief).
-                thr <= ALWAYS_POSITIVE - 1.0 && erosion[k] >= thr
+                // Its flats: negative unless the class lets some noise through, at most `w_cap` high.
+                (value() <= f64::from(w_noise[k]), m.min(w_cap[k]))
             };
             *o = if negative { -m } else { m };
         }
@@ -1373,7 +1411,10 @@ mod tests {
     /// the relief's.
     #[test]
     fn ef_peaks_are_positive_its_flats_negative_and_barren_ef_is_held_off_the_chasm() {
-        let table = placement::builtin();
+        // The default table lets some noise through on the flats (the next test): without that.
+        let mut base: serde_json::Value = serde_json::from_str(placement::PLACEMENT_JSON).unwrap();
+        base["classes"]["EF"]["weirdness"] = json!({"positive_below_erosion": -0.27});
+        let table = &Placement::from_value(&base).unwrap();
         // A short wavelength, so that the noise changes sign within the small planet.
         let params = BiomeParams {
             variant_blocks: 64.0,
@@ -1457,6 +1498,77 @@ mod tests {
         for (a, b) in m.layers[4].iter().zip(&free.layers[4]) {
             assert_eq!(a.abs().to_bits(), b.abs().to_bits());
         }
+    }
+
+    /// Ben, 2026-09-30, "Bring ice spikes back": some of EF's flats are on the positive branch, where
+    /// vanilla's ice spikes are (a variant of its middle biomes), at a |weirdness| held below where
+    /// Terralith's cherry groves are; its peaks stay positive and the rest of its flats negative.
+    #[test]
+    fn ef_flats_let_some_noise_through_below_a_magnitude() {
+        let params = BiomeParams {
+            variant_blocks: 64.0,
+            ..BiomeParams::default()
+        };
+        let all_ef = ["EF"; 4];
+        let with = |flats: serde_json::Value| {
+            let mut v: serde_json::Value = serde_json::from_str(placement::PLACEMENT_JSON).unwrap();
+            v["classes"]["EF"]["weirdness"] =
+                json!({"positive_below_erosion": -0.27, "flats": flats});
+            fixture_of(
+                &params,
+                &Placement::from_value(&v).unwrap(),
+                all_ef,
+                [true; 4],
+            )
+        };
+        let (base, w2) = fixture_of(&params, placement::builtin(), all_ef, [true; 4]);
+        let land: Vec<usize> = (16..48usize)
+            .flat_map(|j| (8..w2 - 8).map(move |i| j * w2 + i))
+            .collect();
+        let stats = |m: &Mapped| {
+            let (mut flats, mut positive, mut top) = (0usize, 0usize, 0f32);
+            for &k in &land {
+                let (e, w) = (m.layers[3][k], m.layers[4][k]);
+                if e < -0.27 {
+                    assert!(w > 0.0, "a peak stays positive: {w}");
+                } else {
+                    flats += 1;
+                    positive += usize::from(w > 0.0);
+                    top = top.max(w.abs());
+                }
+            }
+            (flats, positive, top)
+        };
+        // The default table: the noise above 0.2 is positive, at most 0.25 high.
+        let (flats, positive, top) = stats(&base);
+        assert!(flats > 500, "flats: {flats}");
+        assert!(
+            positive > flats / 50,
+            "some flats are positive: {positive} of {flats}"
+        );
+        assert!(
+            positive < flats * 6 / 10,
+            "but not most: {positive} of {flats}"
+        );
+        assert!(
+            top <= 0.25 + 1e-6,
+            "flats stay under the cherry magnitudes: {top}"
+        );
+        // Noise above 0 is half the noise; above 1 is none; with no cap the relief's magnitudes stand.
+        let (half, _) = with(json!({"positive_noise_above": 0.0}));
+        let (hf, hp, htop) = stats(&half);
+        assert!(
+            hp > positive && hp < hf,
+            "noise above 0 gives more than above 0.2: {hp} vs {positive}"
+        );
+        assert!(
+            htop > 0.25,
+            "uncapped flats are taller than the cap: {htop}"
+        );
+        let (none, _) = with(json!({"positive_noise_above": 1.0, "max_magnitude": 0.1}));
+        let (nf, np, ntop) = stats(&none);
+        assert_eq!(np, 0, "no noise gets through above 1: {np} of {nf}");
+        assert!(ntop <= 0.1 + 1e-6, "a cap of 0.1: {ntop}");
     }
 
     #[test]
