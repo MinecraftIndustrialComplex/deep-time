@@ -949,6 +949,7 @@ pub fn summary_line(v: &Value) -> String {
     format!(
         "amplify_final={}x{} mode={} tiles={} halo={} mid_tiles=[{level_tiles}] sinks={} pre_flood_raised_cells={} flood_raised_cells={} \
          flood_max_raise_m={:.2}@{} mean_abs_change_m={:.1} mean_detail_blocks={:.2} eroded_km3={:.3e} lost_in_transit_km3={:.3e} drama={} \
+         ruggedness={} character[mean_abs_blocks={:.2},flood_raised_cells={},softened_cells={},{:.1}s] \
          passes[{}] sample={:.1}s detail={:.1}s sink={:.1}s total={:.1}s",
         v["grid"]["w"],
         v["grid"]["h"],
@@ -965,6 +966,11 @@ pub fn summary_line(v: &Value) -> String {
         f("eroded_km3"),
         f("lost_in_transit_km3"),
         v["drama"],
+        v["ruggedness"],
+        v["character"]["mean_abs_change_blocks"].as_f64().unwrap_or(0.0),
+        v["character"]["flood_raised_cells"],
+        v["character"]["softened_cells"],
+        v["character"]["millis"].as_f64().unwrap_or(0.0) / 1000.0,
         pass,
         v["last"]["sample_ms"].as_f64().unwrap_or(0.0) / 1000.0,
         v["last"]["detail_ms"].as_f64().unwrap_or(0.0) / 1000.0,
