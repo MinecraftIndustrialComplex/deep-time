@@ -187,7 +187,9 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   7, with the follow-ups): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings`, `deny check
   licenses bans` clean; `cargo test --workspace --locked` ok (cli 30, core 290 + 3 ignored, history_cap 1, format 44,
   inspect 29 + 2 + 7, jni 7, viewer 5); `./gradlew build test` tests=151 failures=0; `mac.sh --server -- ./gametest.sh`:
-  GAMETEST2. (The merged tree before the follow-ups: the same cargo and Gradle results.) 3D previews of the gentler
+  **All 52 required tests passed**, after re-basing `climateConsistent`'s narrow `E:snow` floor 0.9 → 0.8 (it measured
+  0.899 on `test_planet_real`, E overall 0.98: master's EF barren frozen ground is not snowy-tagged, and the test planet
+  now runs the volcano stage). (The merged tree before the follow-ups: the same cargo and Gradle results.) 3D previews of the gentler
   cones: `review/out/p1-21/bundle/shots/` (arc cone at 0.5 beside the physical-profile shots of run q16f); the bundle is
   15.7 MB. Old scratch runs on the Mac SSD deleted (disk hygiene rule).
 - **Deviations.** Stratovolcano "centres" live 2–8 Myr (real cones 0.1–1 Myr) because a step is 2 Myr. Stratovolcanoes
