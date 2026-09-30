@@ -24,6 +24,12 @@ pub struct VolcanoParams {
     pub density: f64,
     /// How big: multiplies every edifice's height and radius (and a caldera's).
     pub size: f64,
+    /// How steep volcano flanks are, as a share of the real profile: every edifice's basal radius is
+    /// its physical one divided by this, the height unchanged. The world is 15 times taller than
+    /// wide (20 m against 300 m per block), so a cone of real proportions (1) is a steep spire in
+    /// blocks; the default 0.5 doubles the radius (Ben, 2026-09-30: "Setting, gentler default"),
+    /// broad enough to read as a volcano while cones 60 km apart along an arc still stand apart.
+    pub flank_steepness: f64,
     /// Spacing of stratovolcanoes along an arc, km. Real volcanic fronts space their centres
     /// 50–70 km apart (de Bremond d'Ars, Jaupart & Sparks 1995, JGR 100(B10):20421; the Andes,
     /// Cascades, Aleutians, Japan).
@@ -91,6 +97,7 @@ impl Default for VolcanoParams {
         VolcanoParams {
             density: 1.0,
             size: 1.0,
+            flank_steepness: 0.5,
             arc_spacing_km: 60.0,
             arc_min_flux: 0.25,
             arc_height_km: [1.2, 3.0],
@@ -138,6 +145,7 @@ impl VolcanoParams {
         };
         range(self.density, 0.0, 5.0, "density")?;
         range(self.size, 0.2, 3.0, "size")?;
+        range(self.flank_steepness, 0.1, 1.0, "flank_steepness")?;
         range(self.arc_spacing_km, 10.0, 500.0, "arc_spacing_km")?;
         range(self.arc_min_flux, 0.0, 1.0, "arc_min_flux")?;
         pair(self.arc_height_km, 0.1, 6.0, "arc_height_km")?;

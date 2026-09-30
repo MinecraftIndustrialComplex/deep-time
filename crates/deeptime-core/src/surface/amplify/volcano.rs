@@ -402,6 +402,7 @@ mod tests {
             }),
             caldera: None,
             cause: None,
+            segment: 0,
             gone: None,
         }
     }

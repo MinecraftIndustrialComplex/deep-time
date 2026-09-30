@@ -53,7 +53,10 @@
 //!    a steep edge. The amplifier steps its outcrop into terraces (`flood_basalt_step_m`).
 //! 8. **Retire.** A dead volcano worn to a tenth of its peak for 5 Myr leaves the catalogue.
 //!
-//! At the end the stage writes the events (`deeptime:volcano_*`, `EVENTS.md`), the flood-basalt
+//! At the end the stage writes the events (`deeptime:volcano_*`, `EVENTS.md`; Ben, 2026-09-30, "Group by
+//! arc/chain"): one per arc segment (the cones one subduction contact fed) and one per hotspot chain,
+//! each with its standing cones as a detail, and on their own only the notable ones — each group's
+//! tallest cone, the calderas still standing or large, the flood basalts. The flood-basalt
 //! outcrop layer the amplifier terraces (`volcanoes/flood_basalt`) and its summary
 //! (`notes.volcanoes`). Every draw comes from a stream seeded by the preset seed and the step, and
 //! every loop runs in catalogue order, so a run is the same on any thread count and after a resume.
@@ -95,6 +98,10 @@ pub const SOURCE: &str = "deeptime:volcanoes";
 
 /// Event kinds (`crates/deeptime-format/EVENTS.md`, "The volcanoes' events").
 pub mod kind {
+    /// A volcanic arc segment: the stratovolcanoes one subduction contact fed, with its cones.
+    pub const ARC: &str = "deeptime:volcano_arc";
+    /// A hotspot's chain of volcanoes, with its members.
+    pub const HOTSPOT_CHAIN: &str = "deeptime:volcano_hotspot_chain";
     pub const STRATOVOLCANO: &str = "deeptime:volcano_stratovolcano";
     pub const SHIELD: &str = "deeptime:volcano_shield";
     pub const CALDERA_COMPLEX: &str = "deeptime:volcano_caldera_complex";
@@ -192,6 +199,8 @@ pub struct Volcano {
     pub caldera: Option<Caldera>,
     /// Its subduction onset (arcs) or large igneous province (hotspots), when known.
     pub cause: Option<EventId>,
+    /// Its arc segment ([`segment_key`]; 0 for a hotspot's volcano).
+    pub segment: u64,
     /// Set when it left the catalogue.
     pub gone: Option<Gone>,
 }
@@ -207,6 +216,31 @@ impl Volcano {
     pub fn active(&self) -> bool {
         self.extinct_myr.is_none()
     }
+}
+
+/// A volcanic arc segment: the stratovolcanoes of one subduction contact (its onset event), or of one
+/// plate where the contact never had an onset event.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ArcSegment {
+    pub cause: Option<EventId>,
+    pub plate: u32,
+    pub first_myr: f64,
+    pub last_myr: f64,
+    /// Cones born, and how many of them on oceanic crust.
+    pub born: u32,
+    pub oceanic: u32,
+    /// Where its cones were born: a reference x and the sums of offsets from it, blocks.
+    pub ref_x: f64,
+    pub sum_dx: f64,
+    pub sum_z: f64,
+    /// The tallest any of its cones stood, m.
+    pub peak_m: f64,
+    pub calderas: u32,
+}
+
+/// The key of an arc segment: its onset event, else its plate.
+pub fn segment_key(cause: Option<EventId>, plate: u32) -> u64 {
+    cause.map_or((1 << 62) | u64::from(plate), |e| e.0)
 }
 
 /// A flood-basalt province.
@@ -256,6 +290,8 @@ pub struct VolcanoState {
     /// Hotspot volcanoes and calderas' volcanoes that left the catalogue (for their events).
     pub gone: Vec<Volcano>,
     pub basalts: Vec<FloodBasalt>,
+    /// The arc segments, by [`segment_key`].
+    pub arcs: BTreeMap<u64, ArcSegment>,
     pub next_id: u32,
     /// Volcanoes each hotspot made so far.
     pub chains: BTreeMap<u32, u32>,
@@ -272,8 +308,9 @@ pub struct VolcanoState {
     pub fade_myr: f64,
     /// Sea level of the last step, m.
     pub sea_level_m: f64,
-    /// Events written at the end.
+    /// Events written at the end, and by kind.
     pub events_emitted: u64,
+    pub events_by_kind: BTreeMap<String, u64>,
     /// L1 cells with the arc flag at the last step that had arc information.
     pub last_flagged: u64,
 }
@@ -844,13 +881,13 @@ impl VolcanoStage {
                     (
                         Kind::Silicic,
                         p.silicic_height_km,
-                        p.silicic_radius_km * 1000.0 * p.size,
+                        p.silicic_radius_km * 1000.0 * p.size / p.flank_steepness,
                     )
                 } else {
                     let hk = p.shield_height_km[0]
                         + (p.shield_height_km[1] - p.shield_height_km[0]) * strength;
                     let r = p.shield_radius_km * (hk / p.shield_height_km[1]).powf(0.8);
-                    (Kind::Shield, hk, r * 1000.0 * p.size)
+                    (Kind::Shield, hk, r * 1000.0 * p.size / p.flank_steepness)
                 };
                 let chain = st.chains.entry(hid).or_insert(0);
                 let v = Volcano {
@@ -880,6 +917,7 @@ impl VolcanoStage {
                     depression: None,
                     caldera: None,
                     cause: lip,
+                    segment: 0,
                     gone: None,
                 };
                 *chain += 1;
@@ -931,7 +969,8 @@ impl VolcanoStage {
                 let s01 = ((f - p.arc_min_flux) / (1.0 - p.arc_min_flux).max(1e-9)).clamp(0.0, 1.0);
                 let hk = p.arc_height_km[0] + (p.arc_height_km[1] - p.arc_height_km[0]) * s01;
                 let radius =
-                    p.arc_radius_km * (hk / p.arc_height_km[1]).powf(0.8) * 1000.0 * p.size;
+                    p.arc_radius_km * (hk / p.arc_height_km[1]).powf(0.8) * 1000.0 * p.size
+                        / p.flank_steepness;
                 let continental = crust[c] as u8 == CONTINENTAL;
                 let silicic = continental && f64::from(thick[c]) >= p.silicic_crust_km * 1000.0;
                 let plate = plate_id[c].max(0.0) as u32;
@@ -974,10 +1013,31 @@ impl VolcanoStage {
                     }),
                     caldera: None,
                     cause,
+                    segment: segment_key(cause, plate),
                     gone: None,
                 });
                 st.next_id += 1;
                 st.counts.strato_born += 1;
+                let seg = st
+                    .arcs
+                    .entry(segment_key(cause, plate))
+                    .or_insert(ArcSegment {
+                        cause,
+                        plate,
+                        first_myr: t,
+                        last_myr: t,
+                        born: 0,
+                        oceanic: 0,
+                        ref_x: bx,
+                        sum_dx: 0.0,
+                        sum_z: 0.0,
+                        peak_m: 0.0,
+                        calderas: 0,
+                    });
+                seg.born += 1;
+                seg.oceanic += u32::from(!continental);
+                seg.sum_dx += frame.wrap_x(bx - seg.ref_x);
+                seg.sum_z += bz;
             }
         }
         self.time("births", started);
@@ -1039,6 +1099,12 @@ impl VolcanoStage {
             v.kept_m = v.kept_m.max(v.height_m);
             v.built_m += dh;
             v.peak_m = v.peak_m.max(v.height_m);
+        }
+        for v in st.volcanoes.iter().filter(|v| v.kind == Kind::Strato && v.active()) {
+            if let Some(seg) = st.arcs.get_mut(&v.segment) {
+                seg.last_myr = t;
+                seg.peak_m = seg.peak_m.max(v.peak_m);
+            }
         }
         self.time("build", started);
 
@@ -1110,6 +1176,9 @@ impl VolcanoStage {
                 });
                 v.extinct_myr = Some(t);
                 st.counts.calderas += 1;
+                if let Some(seg) = st.arcs.get_mut(&v.segment) {
+                    seg.calderas += 1;
+                }
             } else {
                 st.counts.summit_calderas += 1;
             }
@@ -1431,115 +1500,242 @@ impl VolcanoStage {
         };
         let myr = 1.0e6;
         let mut emitted = 0u64;
-        let all: Vec<Volcano> = st.volcanoes.iter().chain(st.gone.iter()).cloned().collect();
-        for v in &all {
-            let summit = if v.gone.is_none() {
+        let first_event = world.events.len();
+        let frame = BlockFrame::new(s.circumference_blocks);
+        let size = self.p.size;
+        let standing = |v: &Volcano| v.gone.is_none() && v.height_m >= (0.25 * v.peak_m).max(300.0);
+        let summit_of = |v: &Volcano| {
+            if v.gone.is_none() {
                 sample_at(grid, &elev, v.x, v.z) - sea
             } else {
                 f64::NAN
-            };
-            let standing = v.gone.is_none() && v.height_m >= (0.25 * v.peak_m).max(300.0);
+            }
+        };
+        // Its cones as a detail: "lat,lon,radius_km,height_m" of each standing one, tallest first.
+        let cones_param = |vs: &mut Vec<&Volcano>| -> String {
+            vs.sort_by(|a, b| b.height_m.total_cmp(&a.height_m));
+            vs.iter()
+                .take(80)
+                .map(|v| {
+                    format!(
+                        "{:.3},{:.3},{:.1},{:.0}",
+                        frame.lat_deg(v.z),
+                        frame.lon_deg(v.x),
+                        v.radius_m / 1000.0,
+                        v.height_m
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(";")
+        };
+        // An individual volcano's event (the notable ones), caused by its arc segment or chain.
+        let volcano_event = |world: &mut WorldState, v: &Volcano, cause: Option<EventId>| {
+            let summit = summit_of(v);
             let fate = match (v.gone, v.kind) {
                 (Some(Gone::Subducted), _) => "subducted",
                 (Some(Gone::Eroded), _) => "eroded",
-                (None, _) if !standing => "eroded",
                 (None, _) if v.active() => "active",
                 (None, Kind::Shield) if summit < 0.0 => "seamount",
                 (None, Kind::Shield) => "island",
                 (None, _) => "extinct",
             };
-            // Stratovolcanoes: the live ones and the dead still near their peak (the others, many
-            // thousands over a run, are counted in the notes); every hotspot volcano.
-            let emit_volcano = match v.kind {
-                Kind::Strato => {
-                    v.gone.is_none()
-                        && (v.active() || v.height_m >= (0.5 * v.peak_m).max(800.0 * self.p.size))
-                }
-                Kind::Shield | Kind::Silicic => true,
+            let kind = match v.kind {
+                Kind::Strato => kind::STRATOVOLCANO,
+                Kind::Shield => kind::SHIELD,
+                Kind::Silicic => kind::CALDERA_COMPLEX,
             };
-            let cause = match v.hotspot {
-                Some(h) => tracks.get(&i64::from(h)).copied().or(v.cause),
-                None => v.cause,
+            let end = v.extinct_myr.unwrap_or(t).max(v.born_myr);
+            let setting = match (v.kind, v.oceanic) {
+                (Kind::Strato, true) => "island_arc",
+                (Kind::Strato, false) => "continental_arc",
+                (_, true) => "oceanic_hotspot",
+                (_, false) => "continental_hotspot",
             };
-            let mut volcano_event = None;
-            if emit_volcano {
-                let kind = match v.kind {
-                    Kind::Strato => kind::STRATOVOLCANO,
-                    Kind::Shield => kind::SHIELD,
-                    Kind::Silicic => kind::CALDERA_COMPLEX,
-                };
-                let end = v.extinct_myr.unwrap_or(t).max(v.born_myr);
-                let mean_flux = if v.active_myr > 0.0 {
-                    v.flux_myr / v.active_myr
-                } else {
-                    0.0
-                };
-                let setting = match (v.kind, v.oceanic) {
-                    (Kind::Strato, true) => "island_arc",
-                    (Kind::Strato, false) => "continental_arc",
-                    (_, true) => "oceanic_hotspot",
-                    (_, false) => "continental_hotspot",
-                };
-                let mut e = world
-                    .event(v.born_myr * myr, kind, SOURCE)
-                    .until(end * myr)
-                    .at(point(v.x, v.z))
-                    .magnitude((v.peak_m / 3000.0) as f32)
-                    .param("volcano", i64::from(v.id))
-                    .param("setting", setting)
-                    .param(
-                        "magma",
-                        match (v.kind, v.silicic) {
-                            (Kind::Shield, _) => "basaltic",
-                            (_, true) => "silicic",
-                            _ => "andesitic",
-                        },
-                    )
-                    .param("peak_height_m", v.peak_m.round())
-                    .param("height_m", v.height_m.round())
-                    .param("radius_km", (v.radius_m / 100.0).round() / 10.0)
-                    .param("plate", i64::from(v.plate))
-                    .param("fate", fate)
-                    .param("ongoing", i64::from(v.active()));
-                if summit.is_finite() {
-                    e = e.param("summit_m", summit.round());
-                }
-                if let Some(h) = v.hotspot {
-                    e = e
-                        .param("hotspot", i64::from(h))
-                        .param("chain_index", i64::from(v.chain));
-                } else {
-                    e = e.param("arc_flux", (mean_flux * 100.0).round() / 100.0);
-                }
-                if let Some(c) = cause {
-                    e = e.caused_by(c);
-                }
-                volcano_event = Some(world.emit(e)?);
+            let mut e = world
+                .event(v.born_myr * myr, kind, SOURCE)
+                .until(end * myr)
+                .at(point(v.x, v.z))
+                .magnitude((v.peak_m / 3000.0) as f32)
+                .param("volcano", i64::from(v.id))
+                .param("setting", setting)
+                .param(
+                    "magma",
+                    match (v.kind, v.silicic) {
+                        (Kind::Shield, _) => "basaltic",
+                        (_, true) => "silicic",
+                        _ => "andesitic",
+                    },
+                )
+                .param("peak_height_m", v.peak_m.round())
+                .param("height_m", v.height_m.round())
+                .param("radius_km", (v.radius_m / 100.0).round() / 10.0)
+                .param("plate", i64::from(v.plate))
+                .param("fate", fate)
+                .param("ongoing", i64::from(v.active()));
+            if summit.is_finite() {
+                e = e.param("summit_m", summit.round());
+            }
+            if let Some(h) = v.hotspot {
+                e = e
+                    .param("hotspot", i64::from(h))
+                    .param("chain_index", i64::from(v.chain));
+            } else if v.active_myr > 0.0 {
+                e = e.param("arc_flux", (v.flux_myr / v.active_myr * 100.0).round() / 100.0);
+            }
+            if let Some(c) = cause {
+                e = e.caused_by(c);
+            }
+            world.emit(e)
+        };
+        let all: Vec<Volcano> = st.volcanoes.iter().chain(st.gone.iter()).cloned().collect();
+        // Events of the groups and of the notable volcanoes, by volcano id.
+        let mut group_event: BTreeMap<u32, EventId> = BTreeMap::new();
+        let mut notable: BTreeMap<u32, EventId> = BTreeMap::new();
+
+        // 1. Arc segments: one event each, its standing cones as a detail; its tallest standing
+        // cone (at least 1.5 km × size) also on its own.
+        for (key, seg) in &st.arcs {
+            let mut members: Vec<&Volcano> = all
+                .iter()
+                .filter(|v| v.kind == Kind::Strato && v.segment == *key && standing(v))
+                .collect();
+            let live = members.iter().filter(|v| v.active()).count();
+            let (px, pz) = if members.is_empty() {
+                let n = f64::from(seg.born.max(1));
+                (frame.wrap_x(seg.ref_x + seg.sum_dx / n), seg.sum_z / n)
+            } else {
+                let rx = members[0].x;
+                let n = members.len() as f64;
+                let dx: f64 = members.iter().map(|v| frame.wrap_x(v.x - rx)).sum();
+                (frame.wrap_x(rx + dx / n), members.iter().map(|v| v.z).sum::<f64>() / n)
+            };
+            let tallest = members.iter().map(|v| v.height_m).fold(0.0f64, f64::max);
+            let cones = cones_param(&mut members);
+            let mut e = world
+                .event(seg.first_myr * myr, kind::ARC, SOURCE)
+                .until(seg.last_myr.max(seg.first_myr) * myr)
+                .at(point(px, pz))
+                .magnitude((f64::from(seg.born) / 50.0).min(1.0) as f32)
+                .param(
+                    "setting",
+                    if seg.oceanic * 2 > seg.born {
+                        "island_arc"
+                    } else {
+                        "continental_arc"
+                    },
+                )
+                .param("cones_built", i64::from(seg.born))
+                .param("live", live as i64)
+                .param("standing", members.len() as i64)
+                .param("tallest_m", tallest.round())
+                .param("peak_m", seg.peak_m.round())
+                .param("calderas", i64::from(seg.calderas))
+                .param("plate", i64::from(seg.plate))
+                .param("ongoing", i64::from(live > 0))
+                .param("cones", cones);
+            if let Some(c) = seg.cause {
+                e = e.caused_by(c);
+            }
+            let id = world.emit(e)?;
+            emitted += 1;
+            for v in all.iter().filter(|v| v.kind == Kind::Strato && v.segment == *key) {
+                group_event.insert(v.id, id);
+            }
+            if let Some(top) = members.first().filter(|v| v.height_m >= 1500.0 * size) {
+                notable.insert(top.id, volcano_event(world, top, Some(id))?);
                 emitted += 1;
             }
-            if let Some(cal) = &v.caldera {
-                let mut e = world
-                    .event(cal.t_myr * myr, kind::CALDERA, SOURCE)
-                    .at(point(cal.x, cal.z))
-                    .magnitude((cal.erupted_km3 / 1000.0).min(1.0) as f32)
-                    .param("volcano", i64::from(v.id))
-                    .param("radius_km", (cal.radius_m / 100.0).round() / 10.0)
-                    .param("depth_m", cal.depth_m.round())
-                    .param("erupted_km3", cal.erupted_km3.round())
-                    .param(
-                        "type",
-                        if v.kind == Kind::Shield {
-                            "summit"
-                        } else {
-                            "silicic"
-                        },
-                    );
-                if let Some(c) = volcano_event.or(cause) {
-                    e = e.caused_by(c);
-                }
-                world.emit(e)?;
+        }
+
+        // 2. Hotspot chains: one event each, its members as a detail; its tallest standing member
+        // also on its own.
+        let mut hotspots: BTreeMap<u32, Vec<&Volcano>> = BTreeMap::new();
+        for v in all.iter().filter(|v| v.hotspot.is_some()) {
+            hotspots.entry(v.hotspot.unwrap_or(0)).or_default().push(v);
+        }
+        for (h, vs) in &hotspots {
+            let first = vs.iter().map(|v| v.born_myr).fold(f64::INFINITY, f64::min);
+            let last = vs
+                .iter()
+                .map(|v| v.extinct_myr.unwrap_or(t))
+                .fold(f64::NEG_INFINITY, f64::max);
+            let youngest = vs
+                .iter()
+                .max_by(|a, b| a.born_myr.total_cmp(&b.born_myr))
+                .expect("a chain has a volcano");
+            let mut members: Vec<&Volcano> = vs.iter().copied().filter(|v| standing(v)).collect();
+            let islands = members.iter().filter(|v| summit_of(v) > 0.0).count();
+            let subducted = vs.iter().filter(|v| v.gone == Some(Gone::Subducted)).count();
+            let tallest = members.iter().map(|v| v.height_m).fold(0.0f64, f64::max);
+            let live = vs.iter().filter(|v| v.gone.is_none() && v.active()).count();
+            let cones = cones_param(&mut members);
+            let cause = tracks
+                .get(&i64::from(*h))
+                .copied()
+                .or(youngest.cause)
+                .or(vs.iter().find_map(|v| v.cause));
+            let mut e = world
+                .event(first * myr, kind::HOTSPOT_CHAIN, SOURCE)
+                .until(last.max(first) * myr)
+                .at(point(youngest.x, youngest.z))
+                .magnitude((vs.len() as f64 / 20.0).min(1.0) as f32)
+                .param("hotspot", i64::from(*h))
+                .param("volcanoes_built", st.chains.get(h).map_or(vs.len() as i64, |&n| i64::from(n)))
+                .param("standing", members.len() as i64)
+                .param("islands", islands as i64)
+                .param("seamounts", (members.len() - islands) as i64)
+                .param("subducted", subducted as i64)
+                .param("tallest_m", tallest.round())
+                .param("ongoing", i64::from(live > 0))
+                .param("cones", cones);
+            if let Some(c) = cause {
+                e = e.caused_by(c);
+            }
+            let id = world.emit(e)?;
+            emitted += 1;
+            for v in vs {
+                group_event.insert(v.id, id);
+            }
+            if let Some(top) = members.first() {
+                notable.insert(top.id, volcano_event(world, top, Some(id))?);
                 emitted += 1;
             }
+        }
+
+        // 3. Calderas: those whose volcano still stands, and every large one (≥ 6 km across × size).
+        for v in &all {
+            let Some(cal) = &v.caldera else {
+                continue;
+            };
+            if !(standing(v) || cal.radius_m >= 3000.0 * size) {
+                continue;
+            }
+            let cause = notable
+                .get(&v.id)
+                .or(group_event.get(&v.id))
+                .copied()
+                .or(v.cause);
+            let mut e = world
+                .event(cal.t_myr * myr, kind::CALDERA, SOURCE)
+                .at(point(cal.x, cal.z))
+                .magnitude((cal.erupted_km3 / 1000.0).min(1.0) as f32)
+                .param("volcano", i64::from(v.id))
+                .param("radius_km", (cal.radius_m / 100.0).round() / 10.0)
+                .param("depth_m", cal.depth_m.round())
+                .param("erupted_km3", cal.erupted_km3.round())
+                .param(
+                    "type",
+                    if v.kind == Kind::Shield {
+                        "summit"
+                    } else {
+                        "silicic"
+                    },
+                );
+            if let Some(c) = cause {
+                e = e.caused_by(c);
+            }
+            world.emit(e)?;
+            emitted += 1;
         }
         for (b, &(kept, pile)) in st.basalts.iter().zip(&preserved) {
             let area = std::f64::consts::PI * (b.radius_m / 1000.0).powi(2);
@@ -1558,6 +1754,14 @@ impl VolcanoStage {
             emitted += 1;
         }
         st.events_emitted = emitted;
+        st.events_by_kind = world.events[first_event..]
+            .iter()
+            .filter(|e| e.source == SOURCE)
+            .fold(BTreeMap::new(), |mut m, e| {
+                *m.entry(e.kind.trim_start_matches("deeptime:").to_owned())
+                    .or_insert(0) += 1;
+                m
+            });
         Ok(())
     }
 
@@ -1601,6 +1805,7 @@ impl VolcanoStage {
             "tallest_m": peak.round(),
             "flood_basalt_outcrop_cells": fb_on,
             "events": st.events_emitted,
+            "events_by_kind": st.events_by_kind,
             "params": self.p,
             "millis": self.timings,
         })

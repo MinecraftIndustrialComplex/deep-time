@@ -905,9 +905,10 @@ fn attach_why(v: &mut serde_json::Value, world_data: &std::path::Path) -> Result
     Ok(())
 }
 
-/// The volcano events (`deeptime:volcano_*`) whose footprint holds the point (lat, lon): a volcano
-/// out to its basal radius (at least 3 km), a caldera to its rim, a flood-basalt province over its
-/// area; each as `{event, chain, distance_km}`, nearest first.
+/// The volcano events (`deeptime:volcano_*`) whose footprint holds the point (lat, lon): a notable
+/// volcano out to its basal radius (at least 3 km), an arc segment or hotspot chain where one of its
+/// listed cones does, a caldera to its rim, a flood-basalt province over its area; each as
+/// `{event, chain, distance_km}`, nearest first (a cone's own event before its group's).
 fn landforms_at(
     log: &deeptime_format::events::EventLog,
     lat: f64,
@@ -930,13 +931,44 @@ fn landforms_at(
             let Place::Point { lat: la, lon: lo } = e.place else {
                 return None;
             };
-            let mut dlon = (lon - f64::from(lo)).rem_euclid(360.0);
-            if dlon > 180.0 {
-                dlon -= 360.0;
+            let dist = |la: f64, lo: f64| {
+                let mut dlon = (lon - lo).rem_euclid(360.0);
+                if dlon > 180.0 {
+                    dlon -= 360.0;
+                }
+                let dx = dlon / 360.0 * c * km_per_block;
+                let dz = (lat - la) / 360.0 * c * km_per_block;
+                dx.hypot(dz)
+            };
+            // An arc segment or a hotspot chain holds the column when one of its cones does.
+            if let Some(ParamValue::Str(cones)) = e.params.get("cones") {
+                let d = cones
+                    .split(';')
+                    .filter_map(|cone| {
+                        let f: Vec<f64> = cone.split(',').filter_map(|x| x.parse().ok()).collect();
+                        (f.len() >= 3)
+                            .then(|| (dist(f[0], f[1]), f[2].max(3.0)))
+                            .filter(|&(d, r)| d <= r)
+                            .map(|(d, _)| d)
+                    })
+                    .fold(f64::INFINITY, f64::min);
+                if !d.is_finite() {
+                    return None;
+                }
+                let chain: Vec<serde_json::Value> =
+                    log.cause_chain(e.id, 4).iter().map(|x| x.to_json()).collect();
+                let mut ev = e.to_json();
+                ev["params"]["cones"] = serde_json::json!("…");
+                return Some((
+                    d + 1.0e-3,
+                    serde_json::json!({
+                        "event": ev,
+                        "chain": chain,
+                        "distance_km": (d * 10.0).round() / 10.0,
+                    }),
+                ));
             }
-            let dx = dlon / 360.0 * c * km_per_block;
-            let dz = (lat - f64::from(la)) / 360.0 * c * km_per_block;
-            let d = dx.hypot(dz);
+            let d = dist(f64::from(la), f64::from(lo));
             let reach = match num(e, "area_km2") {
                 Some(a) => (a / std::f64::consts::PI).sqrt(),
                 None => num(e, "radius_km").unwrap_or(0.0).max(3.0),

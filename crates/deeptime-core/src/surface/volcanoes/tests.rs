@@ -365,7 +365,8 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
     for e in &fb {
         assert!(lips.contains(&e.causes[0]));
     }
-    // Volcano events and their causes: arcs by a subduction onset, hotspots by their track.
+    // Volcano events (grouped): arc segments caused by a subduction onset, hotspot chains by their
+    // track (or plume head); the notable cones by their group; one arc event per segment.
     let kind_of = |id: EventId| {
         world
             .events
@@ -373,31 +374,42 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
             .find(|e| e.id == id)
             .map(|e| e.kind.clone())
     };
-    let mut strato_events = 0;
+    let (mut arcs, mut chains_n, mut strato_events) = (0, 0, 0);
     for e in world.events.iter().filter(|e| e.source == SOURCE) {
         e.validate().unwrap();
+        let cause = e.causes.first().and_then(|&c| kind_of(c));
         match e.kind.as_str() {
-            kind::STRATOVOLCANO => {
-                strato_events += 1;
-                if let Some(&c) = e.causes.first() {
-                    assert_eq!(kind_of(c).as_deref(), Some("deeptime:subduction_onset"));
+            kind::ARC => {
+                arcs += 1;
+                if let Some(c) = &cause {
+                    assert_eq!(c, "deeptime:subduction_onset");
                 }
+                assert!(matches!(e.params.get("cones"), Some(ParamValue::Str(_))));
             }
-            kind::SHIELD | kind::CALDERA_COMPLEX => {
-                let c = kind_of(*e.causes.first().expect("a hotspot volcano has a cause"));
+            kind::HOTSPOT_CHAIN => {
+                chains_n += 1;
                 assert!(
                     matches!(
-                        c.as_deref(),
+                        cause.as_deref(),
                         Some("deeptime:hotspot_track" | "deeptime:large_igneous_province")
                     ),
-                    "{c:?}"
+                    "{cause:?}"
                 );
+            }
+            kind::STRATOVOLCANO => {
+                strato_events += 1;
+                assert_eq!(cause.as_deref(), Some(kind::ARC));
+            }
+            kind::SHIELD | kind::CALDERA_COMPLEX => {
+                assert_eq!(cause.as_deref(), Some(kind::HOTSPOT_CHAIN));
             }
             kind::CALDERA | kind::FLOOD_BASALT => assert!(!e.causes.is_empty()),
             other => panic!("unexpected kind {other}"),
         }
     }
-    assert!(strato_events > 0);
+    assert!(arcs > 0 && chains_n > 0 && strato_events > 0);
+    assert_eq!(arcs, st.arcs.len(), "one event per arc segment");
+    assert!(strato_events <= arcs, "at most one notable cone per segment");
 
     // The strata log holds the volcanic rock.
     let log = &world.surface.as_ref().unwrap().log;
