@@ -52,9 +52,12 @@ final class ScreenshotDriver {
 
     private enum Step { TITLE, CREATE_SCREEN, EDITOR, ADVANCED, TIMELINE, RUNNING, GLOBE, DONE, REVIEW, ACCEPTED, CREATING, IN_WORLD, VISTA, QUIT }
 
-    /** Ticks a vista waits for its terrain before the shot. */
-    private static final int VISTA_WAIT_TICKS = 20 * 60;
+    /** A vista waits until the chunk 160 blocks ahead is loaded, then this long for it to draw … */
+    private static final int VISTA_SETTLE_TICKS = 20 * 15;
+    /** … and shoots anyway after this long (the step timeout is 180 s). */
+    private static final int VISTA_MAX_TICKS = 20 * 170;
     private static int vista;
+    private static int vistaLoadedAt = -1;
 
     private static Step step = Step.TITLE;
     private static int ticks;
@@ -185,8 +188,8 @@ final class ScreenshotDriver {
                             // Back to the built-in preset, Advanced closed, for the rest of the walk.
                             model.setAdvancedOpen(false);
                             model.selectFamily(model.families().get(0));
-                            model.setStart("supercontinent");
-                            model.setLengthText("1000");
+                            model.setStart(System.getProperty(PROP + ".start", "supercontinent"));
+                            model.setLengthText(System.getProperty(PROP + ".length", "1000"));
                             ed.refresh();
                             go(Step.TIMELINE);
                         }
@@ -315,7 +318,16 @@ final class ScreenshotDriver {
                     }
                     if (mc.screen != null)
                         stepTicks = Math.min(stepTicks, 2);
-                    if (stepTicks == VISTA_WAIT_TICKS) {
+                    if (stepTicks == 2)
+                        vistaLoadedAt = -1;
+                    // The chunk 160 blocks ahead along the view: loaded means the terrain there exists.
+                    double yaw = Math.toRadians(v[3]);
+                    int ax = (int) Math.floor(v[0] - Math.sin(yaw) * 160), az = (int) Math.floor(v[2] + Math.cos(yaw) * 160);
+                    if (vistaLoadedAt < 0 && stepTicks > 100 && mc.level != null
+                            && mc.level.getChunkSource().hasChunk(ax >> 4, az >> 4))
+                        vistaLoadedAt = stepTicks;
+                    if ((vistaLoadedAt >= 0 && stepTicks == vistaLoadedAt + VISTA_SETTLE_TICKS) || stepTicks == VISTA_MAX_TICKS) {
+                        DeepTime.LOGGER.info("[deeptime-shot] vista {}: ahead chunk loaded at tick {}", vista, vistaLoadedAt);
                         shot("11-vista-" + vista);
                         vista++;
                         stepTicks = 0;
