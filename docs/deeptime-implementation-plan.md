@@ -2407,6 +2407,30 @@ regional MVT driver"):*
   (10–30); the fields are large enough that formed bodies cannot overlap, so 2–22 of 35–100 formed
   are dropped for separation on the six test landscapes (STATUS.md, build log 2026-09-29 "coal
   seam fields").
+- **Coal fields adjoin and hold stacked seams** (decisions log 2026-09-29, "Yes, adjoining +
+  stacked"; supersedes the 26 km spacing and camps above). *Adjoining:* `sizing.clustering.model`
+  gains `adjoining` (no camps, `min_separation_m` 0): each field, largest first, is drawn anywhere
+  in the tract (∝ F·E, 400 tries) where its plan ellipse (semi-axes a, c from the tonnage, a yaw
+  drawn at placement and kept for the body) crosses none placed before (`cluster::ellipses_overlap`:
+  separating-direction test, exact for convex shapes), so fields fill a basin, touching but not
+  overlapping. *Stacked:* the type's `geometry.stack` makes a deposit several parallel seams, one
+  `ore` body per seam (consecutive ids, one footprint, yaw and dip), its tonnage split by thickness
+  (`share_sigma`). The count comes from the history: the coal measures under the site are S = Σ_k
+  F_k · deposition_k · Δt_k over the frames its crust existed in (F recovered from the favourability
+  hazard the placement was drawn from), n = round(S / `seam_spacing_m` 25 m) clamped to 1–40 and
+  to cumulative thickness ÷ `min_seam_m` 0.7 m (Circular 891's thinnest minable bed); gaps average
+  S/n (`gap_sigma` 0.6); `spacing_mult_v` 6 enlarges the gaps in blocks as `size_mult_v` does the
+  thickness. Typical ranges from the coalfields tabulated (Appalachian Allegheny ~15 m of measures
+  per seam, Illinois 11–29, Ruhr 12–60, Silesia ~35, Jharia ~19, Illawarra ~27; several to ~40
+  mineable seams per section; cyclothems 160–400 kyr). The top seam lies half the measures above
+  the ledger's centre depth; erosion drops seams above the ground from the top, clips the one
+  crossing it, and the site's tonnage is what is left. The tonnage is rebased to *cumulative* seam
+  thickness (5 / 14 / 60 m × field area 300 / 1,000 / 3,000 km² × 1.32) = 3,800 / 19,800 / 115,000
+  Mt, the aspect (1, 5.15e-4, 1.5) keeping the median body a 1,000 km² field of 15 m of coal. Format:
+  no layout change (a site already owns several bodies); FORMAT.md states the stack and Java's
+  `SiteChunks` sums a site's ore bodies over each body's own bounds. On the six test landscapes coal
+  sites go 17.5 (10–30) → 20 (13–31), counted survivors 75 → 80 of the target 83 (STATUS.md, build
+  log 2026-09-29 "coal fields adjoin and stack").
 - **MVT's driver is regional.** MVT ore forms where basin-scale, topography-driven flow from a
   rising orogen sweeps hot basinal brines across a foreland basin into platform carbonates at its
   margin (Garven & Freeze 1984; Garven 1985; Bethke & Marshak 1990; Leach et al. 2001, 2005, 2010;

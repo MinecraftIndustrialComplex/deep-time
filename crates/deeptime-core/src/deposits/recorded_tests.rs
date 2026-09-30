@@ -825,3 +825,79 @@ fn mvt_forms_where_a_basin_lies_beside_carbonate() {
         assert!(w.sites.is_empty());
     }
 }
+
+/// Coal seam fields (2026-09-29): a deposit is a stack of seams, one `ore` body per seam with
+/// consecutive ids, the same footprint and yaw, running top to bottom without touching, and the
+/// fields of the whole planet adjoin without their plan footprints overlapping.
+#[test]
+fn coal_fields_adjoin_without_overlap_and_hold_stacked_seams() {
+    // The synthetic planet is 1,200 km around, so fields of a thousand km² are made small (ore
+    // amount 0.003×: footprints about a fifth as wide) to fit a dozen of them.
+    let sp = synthetic_params();
+    let mut p = preset_for(&sp, 400.0);
+    p.deposits.as_mut().unwrap().size_mult = 0.003;
+    let mut w = world_with(&sp, drifting(&sp, 0, &|_| true));
+    let mut stage = DepositStage::recorded(&p).unwrap();
+    drive(&mut stage, &mut w);
+    let coal: Vec<&deeptime_format::Site> = w
+        .sites
+        .iter()
+        .filter(|s| s.deposit_type == "deeptime:coal_seam")
+        .collect();
+    assert!(coal.len() >= 3, "coal sites: {}", coal.len());
+    let mut stacks = 0;
+    let mut footprints = Vec::new();
+    for s in &coal {
+        let bodies: Vec<&deeptime_format::bodies::Body> =
+            w.bodies.iter().filter(|b| b.site == Some(s.id)).collect();
+        assert!(!bodies.is_empty(), "site {} has no body", s.id);
+        assert_eq!(s.body, Some(bodies[0].id));
+        for (i, b) in bodies.iter().enumerate() {
+            assert_eq!(b.role, "ore");
+            assert_eq!(b.id, bodies[0].id + i as u32, "consecutive ids");
+            assert_eq!(
+                (b.center[0], b.center[2]),
+                (bodies[0].center[0], bodies[0].center[2])
+            );
+            assert_eq!(
+                (b.axes[0], b.axes[2]),
+                (bodies[0].axes[0], bodies[0].axes[2])
+            );
+            assert_eq!(b.yaw, bodies[0].yaw);
+            assert_eq!(b.dip, bodies[0].dip);
+            if let Some(next) = bodies.get(i + 1) {
+                // Parallel slabs (the dip tilts them alike): apart by more than their thickness.
+                let gap = (b.center[1] - next.center[1]) * f64::from(b.dip).cos();
+                assert!(
+                    gap >= f64::from(b.axes[1] + next.axes[1]) - 1e-3,
+                    "site {} seams {i}/{}: gap {gap} vs {} + {}",
+                    s.id,
+                    i + 1,
+                    b.axes[1],
+                    next.axes[1]
+                );
+            }
+        }
+        stacks += usize::from(bodies.len() > 1);
+        footprints.push((
+            (bodies[0].center[0], bodies[0].center[2]),
+            [
+                f64::from(bodies[0].axes[0]),
+                f64::from(bodies[0].axes[2]),
+                f64::from(bodies[0].yaw),
+            ],
+        ));
+    }
+    // The shrunken fields are thin (seams under 0.7 m are not minable, so few fit one field), yet
+    // a good part of the sites still stack.
+    assert!(stacks >= 5, "{stacks} of {} sites stack", coal.len());
+    let c = f64::from(sp.circumference);
+    for (i, (pa, ea)) in footprints.iter().enumerate() {
+        for (pb, eb) in &footprints[i + 1..] {
+            assert!(
+                !cluster::ellipses_overlap(c, *pa, *ea, *pb, *eb),
+                "coal fields at {pa:?} and {pb:?} overlap"
+            );
+        }
+    }
+}

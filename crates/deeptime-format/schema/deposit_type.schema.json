@@ -137,11 +137,11 @@
         "clustering": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["model", "camp_spacing_km", "cluster_radius_km"],
+          "required": ["model"],
           "properties": {
-            "model": {"const": "thomas"},
-            "camp_spacing_km": {"type": "number", "minimum": 0},
-            "cluster_radius_km": {"type": "number", "exclusiveMinimum": 0}
+            "model": {"enum": ["thomas", "adjoining"], "description": "thomas: camps, Gaussian offspring, hard minimum spacing; adjoining: no camps and no minimum spacing, only the plan footprints (ellipses) may not overlap"},
+            "camp_spacing_km": {"type": "number", "minimum": 0, "default": 0},
+            "cluster_radius_km": {"type": "number", "exclusiveMinimum": 0, "default": 1}
           }
         }
       }
@@ -183,6 +183,21 @@
               "type_id": {"$ref": "#/$defs/id"},
               "relation": {"enum": ["above_watertable", "downstream"]}
             }
+          }
+        },
+        "stack": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["seam_spacing_m", "min_seams", "max_seams", "spacing_mult_v"],
+          "description": "several parallel seams of the ore body's footprint at different depths, the tonnage split across them; their number follows the coal measures the history laid down under the site (deposition x time weighted by favourability) divided by seam_spacing_m. Written as one body per seam (role ore, consecutive ids); needs formation_time peak",
+          "properties": {
+            "seam_spacing_m": {"type": "number", "exclusiveMinimum": 0, "description": "typical thickness of coal measures per minable seam (m)"},
+            "min_seams": {"type": "integer", "minimum": 1},
+            "max_seams": {"type": "integer", "minimum": 1},
+            "min_seam_m": {"type": "number", "minimum": 0, "default": 0, "description": "the thinnest minable seam (m): the count is also capped at cumulative thickness / this; 0 = no cap"},
+            "share_sigma": {"type": "number", "minimum": 0, "default": 0, "description": "sigma of the log of a seam's share of the tonnage"},
+            "gap_sigma": {"type": "number", "minimum": 0, "default": 0, "description": "sigma of the log of the gap between neighbouring seams"},
+            "spacing_mult_v": {"type": "number", "exclusiveMinimum": 0, "description": "playability enlargement of the gaps in blocks (as size_mult_v is for thickness)"}
           }
         }
       }

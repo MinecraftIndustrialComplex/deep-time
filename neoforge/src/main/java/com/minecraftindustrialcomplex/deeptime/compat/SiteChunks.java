@@ -33,7 +33,10 @@ public final class SiteChunks {
     /** Body evaluations per site before the lattice coarsens. */
     public static final long MAX_SAMPLES = 2_000_000L;
 
-    /** The body role whose blocks count (FORMAT.md "Bodies"; every site's first body). */
+    /**
+     * The body role whose blocks count (FORMAT.md "Bodies"): every site's first body, and all of a stacked
+     * deposit's seams (consecutive bodies of this role).
+     */
     public static final String ORE_ROLE = "ore";
 
     private static final Map<Deposits, Map<Integer, Footprint>> CACHE = Collections.synchronizedMap(new WeakHashMap<>());
@@ -89,31 +92,30 @@ public final class SiteChunks {
         if (ore.isEmpty())
             return new Footprint(siteId, Map.of(), 0, 1);
         int c = d.circumference();
-        int[] min = ore.get(0).min().clone(), max = ore.get(0).max().clone();
+        // A site's ore bodies are disjoint (one per seam of a stacked deposit, FORMAT.md "Bodies"),
+        // so each is sampled over its own bounds and the counts add. The lattice step is set by
+        // the bounds' total volume: a stack of thin seams is not one tall box.
+        double box = 0;
         for (Body b : ore)
-            for (int i = 0; i < 3; i++) {
-                min[i] = Math.min(min[i], b.min()[i]);
-                max[i] = Math.max(max[i], b.max()[i]);
-            }
-        double box = (double) (max[0] - min[0] + 1) * (max[1] - min[1] + 1) * (max[2] - min[2] + 1) * ore.size();
+            box += (double) (b.max()[0] - b.min()[0] + 1) * (b.max()[1] - b.min()[1] + 1) * (b.max()[2] - b.min()[2] + 1);
         int stride = (int) Math.max(1, Math.ceil(Math.cbrt(box / MAX_SAMPLES)));
         double weight = (double) stride * stride * stride;
         Map<Long, Double> out = new HashMap<>();
         double total = 0;
-        for (int x = min[0]; x <= max[0]; x += stride) {
-            int cx = canonicalChunkX(c, x >> 4);
-            for (int z = min[2]; z <= max[2]; z += stride) {
-                long key = ChunkPos.asLong(cx, z >> 4);
-                double column = 0;
-                for (int y = min[1]; y <= max[1]; y += stride)
-                    for (Body b : ore)
-                        if (b.aabbContains(c, x, y, z) && b.locate(c, x, y, z) != null) {
+        for (Body b : ore) {
+            int[] min = b.min(), max = b.max();
+            for (int x = min[0]; x <= max[0]; x += stride) {
+                int cx = canonicalChunkX(c, x >> 4);
+                for (int z = min[2]; z <= max[2]; z += stride) {
+                    long key = ChunkPos.asLong(cx, z >> 4);
+                    double column = 0;
+                    for (int y = min[1]; y <= max[1]; y += stride)
+                        if (b.aabbContains(c, x, y, z) && b.locate(c, x, y, z) != null)
                             column += weight;
-                            break;
-                        }
-                if (column > 0) {
-                    out.merge(key, column, Double::sum);
-                    total += column;
+                    if (column > 0) {
+                        out.merge(key, column, Double::sum);
+                        total += column;
+                    }
                 }
             }
         }
