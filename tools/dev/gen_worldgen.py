@@ -39,6 +39,7 @@ MIN_Y, HEIGHT = -352, 992
 # terrain up to y ~620 is not flattened (cold-read review 2, gap 8).
 SLIDES = {(-64, -40): (MIN_Y, MIN_Y + 24), (240, 256): (624, 640)}
 TERRAIN_FINAL = {"type": "deeptime:terrain", "mode": "final"}
+TERRAIN_RATIO = {"type": "deeptime:terrain", "mode": "ratio"}
 
 
 def load(z, path):
@@ -59,6 +60,24 @@ def transform(node):
         return out
     if isinstance(node, list):
         return [transform(v) for v in node]
+    return node
+
+
+def scale_entrances(node):
+    """In the terrain band, min(terrain, 5·entrances) -> min(terrain, ratio·5·entrances): the terrain
+    density's scale grows on steep ground (worldgen/TerrainScale), and multiplying the entrance term
+    by k/scale (`deeptime:terrain` mode ratio) keeps cave mouths where the fixed scale had them."""
+    if isinstance(node, dict):
+        if node.get("type") == "minecraft:range_choice" and node.get("input") == TERRAIN_FINAL:
+            band = node["when_in_range"]
+            assert band["type"] == "minecraft:min" and band["argument1"] == TERRAIN_FINAL, band
+            band["argument2"] = {"type": "minecraft:mul", "argument1": copy.deepcopy(TERRAIN_RATIO),
+                                 "argument2": band["argument2"]}
+        for v in node.values():
+            scale_entrances(v)
+    elif isinstance(node, list):
+        for v in node:
+            scale_entrances(v)
     return node
 
 
@@ -95,7 +114,7 @@ def main():
         normal = load(z, "data/minecraft/worldgen/world_preset/normal.json")
 
     vr = ow["noise_router"]
-    final = transform(vr["final_density"])
+    final = scale_entrances(transform(vr["final_density"]))
     router = {
         # Aquifers as vanilla: sea level and local cave levels.
         "barrier": vr["barrier"],

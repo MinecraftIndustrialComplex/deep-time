@@ -37,7 +37,8 @@
     "glacial": {
       "strength": 1.0,
       "ridge_share": 0.5
-    }
+    },
+    "ruggedness": 1.0
   },
   "resolution": {
     "l0_samples": 100000,

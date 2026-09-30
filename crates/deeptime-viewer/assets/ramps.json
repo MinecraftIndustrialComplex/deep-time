@@ -559,6 +559,8 @@
     "amplify/elevation": "elevation",
     "amplify/detail": "detail",
     "amplify/drainage": "drainage",
+    "amplify/youth": "unit",
+    "amplify/fold": "unit",
     "climate/p_mm": "precip",
     "detail/amplitude": "detail",
     "surface/class_top": "rock_class",
