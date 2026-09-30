@@ -490,7 +490,7 @@ wide, sand on a wider one), water from bed + 1 to top, air above; a lake column 
 top down to the ground as P0-13's pass did, plugging a cave under `bed`; a bank is lowered to
 `max_ground` and raised to `min_ground` keeping its top block, and air from `seal_from` to
 `min_ground` is filled; where a water column's neighbour holds water higher up, the block at the
-higher top gets flowing water (level 1; a source where two such neighbours meet a one-block step)
+higher top gets flowing water (level 1, resting on the water under it)
 and the blocks between falling water (a waterfall). **River biomes**: the game's weirdness input is
 0 (the river valley slice) at columns whose `river_biome` is set (`WorldDataTerrain.raster`).
 

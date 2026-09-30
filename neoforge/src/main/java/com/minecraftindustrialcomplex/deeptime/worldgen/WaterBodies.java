@@ -213,29 +213,20 @@ public final class WaterBodies {
                 if (!col.kind().isWater())
                     continue;
                 int tb = col.top();
-                int m = Integer.MIN_VALUE, k = 0;
+                int m = Integer.MIN_VALUE;
                 for (int[] d : Water.NEIGHBOURS) {
                     Water.Core n = reg.at(lx + 1 + d[0], lz + 1 + d[1]);
-                    if (!n.kind().isWater())
-                        continue;
-                    if (n.top() > m) {
-                        m = n.top();
-                        k = 1;
-                    } else if (n.top() == m) {
-                        k++;
-                    }
+                    if (n.kind().isWater())
+                        m = Math.max(m, n.top());
                 }
                 if (m <= tb || m > maxY)
                     continue;
                 protect(masks, lx, lz, tb, m, minY, maxY);   // the fall, too, is left to the water
                 int x = x0 + lx, z = z0 + lz;
-                if (m == tb + 1 && k >= 2) {
-                    if (chunk.getBlockState(pos.set(x, m, z)).isAir()) {
-                        chunk.setBlockState(pos, WATER, false);
-                        flowing++;
-                    }
-                    continue;
-                }
+                // Flowing, never a source: where two higher neighbours meet a one-block step vanilla
+                // would turn this block into a source on its next update, and a source here would
+                // spread over a frozen pool or a boulder a feature drops in the channel; flowing
+                // water resting on water stays put (vanilla's "water hole").
                 if (chunk.getBlockState(pos.set(x, m, z)).isAir()) {
                     chunk.setBlockState(pos, FLOWING, false);
                     flowing++;
