@@ -838,6 +838,10 @@ input[type=range]:focus-visible { outline: none; }
 .tvhud .tvlegend .legend .lunit, .tvhud .tvlegend .legend .ticks, .tvhud .tvlegend .legend .cats div { font-size: .78rem; }
 .tvhud .tvlegend .legend canvas.bar, .tvhud .tvlegend .legend .strip { height: .8rem; }
 .tvhud .tvlegend .legend .note, .tvhud .tvlegend .legend .lraw { display: none; }
+/* A key with group headings (the satellite view) is wider on the big screen: three columns, no headings. */
+.tvhud .tvlegend:has(.cats.grouped) { width: 38rem; }
+.tvhud .tvlegend .legend .cats.grouped { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: none; gap: .2rem .9rem; }
+.tvhud .tvlegend .legend .cats .cgroup { display: none; }
 .tvhud .tvlegend .legend .lh { justify-content: space-between; }
 .tvhud .tvlegend .legend .lh .lname { display: block; }
 .tvhud .tvglobe { position: absolute; right: 1.2rem; bottom: 5.2rem; width: 17rem; height: 17rem; }

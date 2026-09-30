@@ -14,17 +14,22 @@
 //! # Colour rules
 //! The anchor colours are the classes of the `satellite` ramp in `ramps.json` ([`CLASSES`] are its
 //! `labels`), so the legend is a key to exactly the colours drawn. Per pixel, from the nearest
-//! cell of each field (the elevation averaged over the cells a pixel covers when its grid is finer):
+//! cell of each field (the elevation averaged over the cells a pixel covers when its grid is finer);
+//! the climate's fields are smoothed first over a few cells (`box_filter`: temperatures over ±3
+//! rows, moisture over 3 × 3 cells, sea ice over 5 × 17 sea cells, the herb and tree cover and the
+//! rock colour over 3 × 3 land cells), so the energy-balance model's latitude bands, the orographic
+//! rain's cell streaks and the Köppen borders do not show as stripes and steps:
 //!
 //! - **Sea** (the elevation below sea level): coloured by depth, turquoise over the shallowest
-//!   20 m, the shelf colour at 200 m, ocean blue at 2.5 km, deep navy from 5.5 km; annual sea-ice
+//!   8 m, the shelf colour at 120 m, ocean blue at 1.5 km, deep navy from 5 km; annual sea-ice
 //!   cover (`climate/sea_ice`) whitens it (fully from about 90 %).
 //! - **Land with a climate** (`climate/t_mean_c` and `climate/aridity` or `climate/precip_mm`): a
 //!   continuous land cover. Herb cover grows with the aridity index P/PET (none below 0.05, full
 //!   from 0.45) and tree cover from 0.5 to 1.0; herbs need a warmest month (`climate/t_warm_c`) over
 //!   about 0 °C and trees over about 10 °C (the treeline). The Köppen class (`climate/koppen`) keeps
 //!   the picture on its map: BW desert holds at most 15 % herbs and no trees, BS steppe 35–75 %
-//!   herbs and under 8 % trees, Af/Am full forest, Aw/As savanna 20–55 % trees, ET and EF no trees.
+//!   herbs and under 8 % trees, Af/Am full forest, Aw/As savanna 20–55 % trees, ET and EF no trees
+//!   (EF at most 20 % herbs).
 //!   Bare ground is desert sand where it is hot and grey-tan where it is cold, tinted by the
 //!   surface rock (`surface/class`: sandstone and sand pale, red beds and laterite reddish, basalt
 //!   dark, evaporites salt-white). Herbs are khaki steppe in drier land, olive savanna in wetter
@@ -33,7 +38,7 @@
 //! - **Mountains**: the ground turns to bare grey-brown rock from 2.5 km up (60 % at 5.5 km).
 //! - **Snow**: perennial where the warmest month is below freezing or the ground stands above the
 //!   snow line (`climate/ela_m`), 85 % snow colour; seasonal on cold land, a lighter tint growing
-//!   with the coldest month from −2 to −22 °C (up to 42 %, half that under forest).
+//!   with the coldest month from −2 to −22 °C (up to 35 %, half that under forest).
 //! - **Glacier ice** (`climate/ice_thickness_m` of 1 m or more, else `climate/glacier`): white,
 //!   85 % at the thinnest, 100 % from 200 m.
 //! - **Land without a climate** (plate-only frames, presets without the climate stage): bare ground
@@ -164,7 +169,7 @@ impl Default for Look {
             shade_land: 0.6,
             shade_ice: 0.45,
             shade_sea: 0.35,
-            depth_m: [8.0, 100.0, 2500.0, 5500.0],
+            depth_m: [8.0, 120.0, 1500.0, 5000.0],
             herb_ai: (0.05, 0.45),
             tree_ai: (0.5, 1.0),
             herb_t_warm: (-1.0, 8.0),
@@ -234,6 +239,13 @@ pub struct Cell {
     pub rock: f32,
     /// A plate-model regime code.
     pub regime: f32,
+    /// Herb and tree cover, 0–1, when the caller derived them already (`render` derives them per
+    /// cell and smooths them); `NaN`: derived here from the climate ([`cover`]).
+    pub herb_cover: f32,
+    pub tree_cover: f32,
+    /// The bare ground's rock colour when the caller derived it (`render` smooths it over the
+    /// neighbouring cells); `NaN`: from `rock`.
+    pub rock_rgb: [f32; 3],
 }
 
 impl Cell {
@@ -253,6 +265,9 @@ impl Cell {
             ela_m: f32::NAN,
             rock: f32::NAN,
             regime: f32::NAN,
+            herb_cover: f32::NAN,
+            tree_cover: f32::NAN,
+            rock_rgb: [f32::NAN; 3],
         }
     }
 
@@ -406,21 +421,23 @@ fn koppen(c: &Cell) -> Option<u8> {
     (c.koppen.is_finite() && c.koppen >= 0.0).then(|| c.koppen.round() as u8)
 }
 
-/// Land cover from the climate: (colour, tree cover).
-fn vegetated(c: &Cell, pal: &Palette, look: &Look) -> ([f32; 3], f32) {
-    let t = c.t_mean_c;
-    let tw = warmest(c);
-    let tc = coldest(c);
-    // P / PET; without it, Köppen's dryness threshold (20·T + 140 mm) gives a stand-in whose
-    // desert and steppe limits (half and all of it) fall near UNEP's 0.2 and 0.5.
-    let ai = if c.aridity.is_finite() {
+/// P / PET; without it, Köppen's dryness threshold (20·T + 140 mm) gives a stand-in whose desert
+/// and steppe limits (half and all of it) fall near UNEP's 0.2 and 0.5.
+fn aridity_index(c: &Cell) -> f32 {
+    if c.aridity.is_finite() {
         c.aridity
     } else {
-        0.42 * c.precip_mm / (20.0 * t.max(0.0) + 140.0)
-    };
+        0.42 * c.precip_mm / (20.0 * c.t_mean_c.max(0.0) + 140.0)
+    }
+}
+
+/// Herb and tree cover (0–1) the climate of `c` supports, the Köppen class holding it on its map.
+pub fn cover(c: &Cell, look: &Look) -> (f32, f32) {
+    let tw = warmest(c);
+    let ai = aridity_index(c);
     let mut herbs = smoothstep(look.herb_ai.0, look.herb_ai.1, ai);
     let mut trees = smoothstep(look.tree_ai.0, look.tree_ai.1, ai);
-    let grow = smoothstep(look.herb_t_warm.0, look.herb_t_warm.1, tw);
+    let mut grow = smoothstep(look.herb_t_warm.0, look.herb_t_warm.1, tw);
     let mut treeline = smoothstep(look.tree_t_warm.0, look.tree_t_warm.1, tw);
     match koppen(c) {
         Some(0 | 1) => {
@@ -439,15 +456,42 @@ fn vegetated(c: &Cell, pal: &Palette, look: &Look) -> ([f32; 3], f32) {
             herbs = herbs.clamp(0.35, 0.75);
             trees = trees.min(0.08);
         }
-        Some(29 | 30) => treeline = 0.0,
+        Some(29) => treeline = 0.0,
+        Some(30) => {
+            treeline = 0.0;
+            grow = grow.min(0.2);
+        }
         _ => {}
     }
+    (herbs * grow, trees * treeline)
+}
+
+/// The bare ground's rock colour of `c`, if known.
+fn ground_tint(c: &Cell, pal: &Palette) -> Option<[f32; 3]> {
+    if c.rock_rgb.iter().all(|v| v.is_finite()) {
+        Some(c.rock_rgb)
+    } else {
+        rock_tint(c.rock, pal)
+    }
+}
+
+/// Land cover from the climate: (colour, tree cover).
+fn vegetated(c: &Cell, pal: &Palette, look: &Look) -> ([f32; 3], f32) {
+    let t = c.t_mean_c;
+    let tw = warmest(c);
+    let tc = coldest(c);
+    let ai = aridity_index(c);
+    let (herb_cover, tree_cover) = if c.herb_cover.is_finite() && c.tree_cover.is_finite() {
+        (c.herb_cover, c.tree_cover)
+    } else {
+        cover(c, look)
+    };
     let mut ground = mix(
         pal.get(COLD_DESERT),
         pal.get(HOT_DESERT),
         smoothstep(2.0, 16.0, t),
     );
-    if let Some(tint) = rock_tint(c.rock, pal) {
+    if let Some(tint) = ground_tint(c, pal) {
         ground = mix(ground, tint, look.rock_tint);
     }
     let grassland = mix(pal.get(STEPPE), pal.get(SAVANNA), smoothstep(0.35, 0.8, ai));
@@ -461,9 +505,8 @@ fn vegetated(c: &Cell, pal: &Palette, look: &Look) -> ([f32; 3], f32) {
         pal.get(RAINFOREST),
         smoothstep(14.0, 19.0, tc),
     );
-    let tree_cover = trees * treeline;
     let rgb = mix(
-        mix(ground, herb_colour, herbs * grow),
+        mix(ground, herb_colour, herb_cover),
         forest_colour,
         tree_cover,
     );
@@ -473,7 +516,7 @@ fn vegetated(c: &Cell, pal: &Palette, look: &Look) -> ([f32; 3], f32) {
 /// Bare ground by geology (no climate).
 fn bare(c: &Cell, pal: &Palette) -> [f32; 3] {
     let lowland = mix(pal.get(HOT_DESERT), pal.get(COLD_DESERT), 0.5);
-    let rgb = match rock_tint(c.rock, pal) {
+    let rgb = match ground_tint(c, pal) {
         Some(t) => mix(lowland, t, 0.7),
         None => mix(
             lowland,
@@ -495,42 +538,75 @@ fn nearest(f: &Field, px: usize, py: usize, w: usize, h: usize) -> f32 {
     f.get(i, j)
 }
 
-/// The mean of `f` over the cells within `r` = (columns, rows) of the one nearest pixel (px, py),
-/// geometric when `log`, over the sea cells only when `sea` (a Köppen field on `f`'s grid) is
-/// given. The climate's moisture fields carry cell-to-cell streaks (the orographic rain's) and its
-/// sea ice steps from one energy-balance band to the next; a picture should show neither as
-/// stripes.
-fn window_mean(
+/// A box-filtered copy of `f`: each cell the mean over ±`rx` columns (wrapping) and ±`ry` rows
+/// (clamped), geometric when `log`, counting only the cells where `keep` holds (all when `None`).
+/// The climate's fields carry steps a picture should not show as stripes: the orographic rain's
+/// cell-to-cell streaks, and the energy-balance model's latitude bands in the temperatures and the
+/// sea ice (whose edge would otherwise be a ruled line).
+fn box_filter(
     f: &Field,
-    (px, py): (usize, usize),
-    (w, h): (usize, usize),
-    (rx, ry): (i64, i64),
+    (rx, ry): (usize, usize),
     log: bool,
-    sea: Option<&Field>,
-) -> f32 {
-    let i = (px as f64 * f64::from(f.grid.w) / w as f64).round() as i64;
-    let j = (py as f64 * f64::from(f.grid.h) / h as f64).round() as i64;
-    let sea = sea.filter(|k| k.grid == f.grid);
-    let (mut sum, mut n) = (0.0f64, 0u32);
-    for jj in j - ry..=j + ry {
-        for ii in i - rx..=i + rx {
-            let v = f.get(ii, jj);
-            let wet = sea.is_none_or(|k| k.get(ii, jj).round() as u8 == crate::climate::koppen::SEA);
-            if v.is_finite() && wet {
-                sum += if log {
-                    f64::from(v.max(1e-4)).ln()
-                } else {
-                    f64::from(v)
-                };
-                n += 1;
-            }
+    keep: Option<&dyn Fn(usize) -> bool>,
+) -> Field {
+    let (w, h) = (f.grid.w as usize, f.grid.h as usize);
+    let n = w * h;
+    let mut v = vec![0.0f64; n];
+    let mut wt = vec![0.0f64; n];
+    for k in 0..n.min(f.data.len()) {
+        let x = f.data[k];
+        if x.is_finite() && keep.is_none_or(|keep| keep(k)) {
+            v[k] = if log {
+                f64::from(x.max(1e-4)).ln()
+            } else {
+                f64::from(x)
+            };
+            wt[k] = 1.0;
         }
     }
-    let m = sum / f64::from(n.max(1));
-    match (n, log) {
-        (0, _) => f32::NAN,
-        (_, true) => m.exp() as f32,
-        (_, false) => m as f32,
+    // Rows (x wraps), then columns (y clamps).
+    let pass = |a: &[f64], horizontal: bool| -> Vec<f64> {
+        let mut out = vec![0.0f64; n];
+        for j in 0..h {
+            for i in 0..w {
+                let mut sum = 0.0;
+                if horizontal {
+                    for d in 0..=2 * rx {
+                        sum += a[j * w + (i + w * (rx / w + 1) + d - rx) % w];
+                    }
+                } else {
+                    for d in 0..=2 * ry {
+                        let jj = (j + d).saturating_sub(ry).min(h - 1);
+                        sum += a[jj * w + i];
+                    }
+                }
+                out[j * w + i] = sum;
+            }
+        }
+        out
+    };
+    let (v, wt) = if rx > 0 {
+        (pass(&v, true), pass(&wt, true))
+    } else {
+        (v, wt)
+    };
+    let (v, wt) = if ry > 0 {
+        (pass(&v, false), pass(&wt, false))
+    } else {
+        (v, wt)
+    };
+    let data = v
+        .iter()
+        .zip(&wt)
+        .map(|(&s, &c)| match (c > 0.0, log) {
+            (false, _) => f32::NAN,
+            (true, true) => (s / c).exp() as f32,
+            (true, false) => (s / c) as f32,
+        })
+        .collect();
+    Field {
+        grid: f.grid.clone(),
+        data,
     }
 }
 
@@ -559,6 +635,11 @@ fn mean(f: &Field, px: usize, py: usize, w: usize, h: usize) -> f32 {
     } else {
         (sum / f64::from(n)) as f32
     }
+}
+
+/// `f` if it lies on grid `g`.
+fn on_grid<'a>(f: Option<&'a Field>, g: &deeptime_format::GridDesc) -> Option<&'a Field> {
+    f.filter(|f| f.grid == *g)
 }
 
 /// The hill shade's factor per pixel (1 on flat ground) of heights `z` (m) on a `w × h`
@@ -628,22 +709,88 @@ pub fn render(
     }
     let shade = hillshade(&z, w, h, view.radius_m, &look);
     let field = |name: &str| world.fields.get(name);
-    let (t_mean, t_warm, t_cold, precip, aridity, koppen) = (
-        field(input::T_MEAN),
-        field(input::T_WARM),
-        field(input::T_COLD),
-        field(input::PRECIP),
-        field(input::ARIDITY),
-        field(input::KOPPEN),
+    // The climate's fields, smoothed where their model draws steps (see `box_filter`).
+    let smooth =
+        |name: &str, r: (usize, usize), log: bool| field(name).map(|f| box_filter(f, r, log, None));
+    let koppen = field(input::KOPPEN);
+    let (t_mean, t_warm, t_cold) = (
+        smooth(input::T_MEAN, (0, 3), false),
+        smooth(input::T_WARM, (0, 3), false),
+        smooth(input::T_COLD, (0, 3), false),
     );
-    let (ice, glacier, sea_ice, ela) = (
-        field(input::ICE),
-        field(input::GLACIER),
-        field(input::SEA_ICE),
-        field(input::ELA),
+    let (precip, aridity) = (
+        smooth(input::PRECIP, (1, 1), true),
+        smooth(input::ARIDITY, (1, 1), true),
     );
+    // Sea ice over the sea's cells only (it is 0 on land).
+    let sea_ice = field(input::SEA_ICE).map(|f| match koppen.filter(|k| k.grid == f.grid) {
+        Some(k) => {
+            let sea = |c: usize| k.data[c].round() as u8 == crate::climate::koppen::SEA;
+            box_filter(f, (2, 8), false, Some(&sea))
+        }
+        None => box_filter(f, (2, 8), false, None),
+    });
+    let (ice, glacier, ela) = (field(input::ICE), field(input::GLACIER), field(input::ELA));
     let rock = field(input::SURFACE_ROCK).or_else(|| field(input::STRUCTURE_ROCK));
     let regime = field(input::REGIME);
+    // Herb and tree cover per cell of the climate's grid, smoothed over the land's neighbouring
+    // cells so a Köppen border is a gradient, not a step.
+    let covers = t_mean.as_ref().map(|tm| {
+        let g = &tm.grid;
+        let (tw, tc) = (on_grid(t_warm.as_ref(), g), on_grid(t_cold.as_ref(), g));
+        let (ar, pr, kp) = (
+            on_grid(aridity.as_ref(), g),
+            on_grid(precip.as_ref(), g),
+            on_grid(koppen, g),
+        );
+        let get = |f: Option<&Field>, k: usize| f.map_or(f32::NAN, |f| f.data[k]);
+        let n = tm.data.len();
+        let (mut herb, mut tree) = (vec![f32::NAN; n], vec![f32::NAN; n]);
+        for k in 0..n {
+            let mut c = Cell::at(0.0);
+            c.t_mean_c = tm.data[k];
+            c.t_warm_c = get(tw, k);
+            c.t_cold_c = get(tc, k);
+            c.aridity = get(ar, k);
+            c.precip_mm = get(pr, k);
+            c.koppen = get(kp, k);
+            if c.has_climate() {
+                (herb[k], tree[k]) = cover(&c, &look);
+            }
+        }
+        let land = |k: usize| get(kp, k).round() as u8 != crate::climate::koppen::SEA;
+        let smooth = |data: Vec<f32>| {
+            let f = Field {
+                grid: tm.grid.clone(),
+                data,
+            };
+            box_filter(&f, (1, 1), false, Some(&land))
+        };
+        (smooth(herb), smooth(tree))
+    });
+    // The rock colour of bare ground per cell, smoothed over its neighbours (a speckle of cells
+    // with other rock is texture a satellite picture at this scale would not show).
+    let rock_rgb = rock.map(|f| {
+        let mut ch = [
+            vec![f32::NAN; f.data.len()],
+            vec![f32::NAN; f.data.len()],
+            vec![f32::NAN; f.data.len()],
+        ];
+        for (k, &v) in f.data.iter().enumerate() {
+            if let Some(t) = rock_tint(v, &pal) {
+                for c in 0..3 {
+                    ch[c][k] = t[c];
+                }
+            }
+        }
+        ch.map(|data| {
+            let g = Field {
+                grid: f.grid.clone(),
+                data,
+            };
+            box_filter(&g, (1, 1), false, None)
+        })
+    });
     let mut rgba = Vec::with_capacity(w * h * 4);
     for py in 0..h {
         for px in 0..w {
@@ -653,25 +800,26 @@ pub fn render(
                 continue;
             }
             let at = |f: Option<&Field>| f.map_or(f32::NAN, |f| nearest(f, px, py, w, h));
-            let smooth = |f: Option<&Field>, r: (i64, i64), log: bool| {
-                f.map_or(f32::NAN, |f| window_mean(f, (px, py), (w, h), r, log, None))
-            };
             let cell = Cell {
                 z_m: z[k],
-                t_mean_c: at(t_mean),
-                t_warm_c: at(t_warm),
-                t_cold_c: at(t_cold),
-                precip_mm: smooth(precip, (1, 1), true),
-                aridity: smooth(aridity, (1, 1), true),
+                t_mean_c: at(t_mean.as_ref()),
+                t_warm_c: at(t_warm.as_ref()),
+                t_cold_c: at(t_cold.as_ref()),
+                precip_mm: at(precip.as_ref()),
+                aridity: at(aridity.as_ref()),
                 koppen: at(koppen),
                 ice_m: at(ice),
                 glacier: at(glacier),
-                sea_ice: sea_ice.map_or(f32::NAN, |f| {
-                    window_mean(f, (px, py), (w, h), (1, 3), false, koppen)
-                }),
+                sea_ice: at(sea_ice.as_ref()),
                 ela_m: at(ela),
                 rock: at(rock),
                 regime: at(regime),
+                herb_cover: at(covers.as_ref().map(|c| &c.0)),
+                tree_cover: at(covers.as_ref().map(|c| &c.1)),
+                rock_rgb: match &rock_rgb {
+                    Some(ch) => [at(Some(&ch[0])), at(Some(&ch[1])), at(Some(&ch[2]))],
+                    None => [f32::NAN; 3],
+                },
             };
             let (rgb, strength) = colour(&cell, &pal, &look);
             let f = (1.0 + strength * (shade[k] - 1.0)).clamp(0.5, 1.35);
@@ -915,5 +1063,40 @@ mod tests {
         let at = |i: usize| s[4 * w + i];
         assert!(at(6) > 1.0 && at(10) < 1.0, "{} {}", at(6), at(10));
         assert!((at(0) - 1.0).abs() < 1e-6, "flat ground is unchanged");
+    }
+
+    #[test]
+    fn box_filter_smooths_bands_and_respects_the_mask() {
+        let grid = GridDesc::for_planet("L1", 8 * 16, 16).unwrap();
+        let (w, h) = (grid.w as usize, grid.h as usize);
+        // A step between rows 1 and 2, and a land column (masked out) holding 0.
+        let data: Vec<f32> = (0..w * h)
+            .map(|k| if k % w == 3 || k / w >= 2 { 0.0 } else { 1.0 })
+            .collect();
+        let f = Field { grid, data };
+        let keep = |k: usize| k % w != 3;
+        let b = box_filter(&f, (1, 1), false, Some(&keep));
+        // Row 1 now lies between the bands; the column beside the land keeps its value.
+        let v = b.data[w + 1];
+        assert!(v > 0.3 && v < 0.9, "{v}");
+        assert_eq!(
+            b.data[4], 1.0,
+            "the masked land column does not pull the sea down"
+        );
+        // x wraps: column 0 of row 0 averages columns 7, 0 and 1 of rows 0 and 1.
+        assert_eq!(b.data[0], 1.0);
+        // Geometric: 1, 100, 1 average to 100^(1/3).
+        let g = Field {
+            grid: f.grid.clone(),
+            data: (0..w * h)
+                .map(|k| if k % 2 == 0 { 1.0 } else { 100.0 })
+                .collect(),
+        };
+        let gb = box_filter(&g, (1, 0), true, None);
+        assert!(
+            (gb.data[1] - 100.0f32.powf(1.0 / 3.0)).abs() < 1e-3,
+            "{}",
+            gb.data[1]
+        );
     }
 }
