@@ -425,6 +425,9 @@ enum StrataArg {
     /// All 59 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
     /// columns hold every class 20 or more blocks below the surface (P1-12's GameTests).
     EveryClass,
+    /// A readable sedimentary basin, the same in every cell: eight beds over granite from 165
+    /// blocks down (the synthetic deposit world's strata).
+    Basin,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -770,6 +773,7 @@ fn main() -> ExitCode {
                 strata: match strata {
                     StrataArg::Placeholder => synth::Strata::Placeholder,
                     StrataArg::EveryClass => synth::Strata::EveryClass,
+                    StrataArg::Basin => synth::Strata::Basin,
                 },
                 size,
                 out,
