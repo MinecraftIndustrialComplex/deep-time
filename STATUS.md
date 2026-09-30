@@ -308,6 +308,39 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Next.** The floors of `climateConsistent` on the new test planet (not this work); Ben's call on the ice-cap humidity (caveat (a) above:
   the gravel desert it once fed is 0 in the boxes now); merge (this branch is not merged).
 
+### 2026-09-30 — `climateConsistent` after the deep-time climate: a weathering-runoff bug fixed, then the test planet's floors re-set (agent worktree agent-adc924860a859865c, branch worktree-agent-adc924860a859865c-gtfix, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Symptom.** Master (after the deep-time climate, continuous strata and P1-25) failed `climateconsistent`
+  standalone (BW 0.472 < 0.65 on 466 columns, Dsub 0.822, BW:desert 0.423) and under `-PwithMic` (BS 0.513,
+  Dfc:taiga 0.430). The strata agent reproduced it without the strata changes.
+- **Cause 1, a bug (970efd1).** `deeptime stage climate` on `planet_world_4k.json` with each change toggled
+  (`build/dtc/gt1.sh`, scratch): only the carbon cycle mattered — 8,475 ppm, 26.9 °C at the present against
+  280 ppm, 15.6 °C with it off. New series columns (land share, kernel, land runoff) showed the weathering
+  kernel falling as the planet warmed: the kernel's runoff used the stand-in PET (60 mm/°C, the surface
+  stage's) at the warmed temperature, which grows ~6 %/K while precipitation grows 2 %/K, so warming dried the
+  land and weakened the thermostat. Fixed: the weathering's runoff takes PET at the cell's temperature less
+  the global warming against `hydro_ref_c` (the spatial pattern kept, the global drying removed; runoff now
+  rises with warming as GEOCARB's does). The test planet then ends at 2,949 ppm and 23.1 °C.
+- **Cause 2, the sample (adda36d).** The planet is land-poor (8.4 % land area at the present in every
+  variant, before and after the climate merge), so under the carbon cycle it is genuinely warmer, and its
+  Köppen columns moved (census, standalone): E 1,765 → 319, D 1,296 → 1,964, BS 274 → 792, C 279 → 521,
+  BW 25 → 87. The mapping is right: with the old climate pinned in the preset (carbon cycle, sun, ice
+  window, glacio-eustasy, hydrological factor off; uncommitted experiment) the same master code passes both
+  profiles (standalone BS 0.741, Dfc:taiga 0.94, E:snow 0.956; MIC BS 0.825, Dfc:taiga 0.689, E:snow 0.999).
+  The lower shares sit where the new columns are: cold coasts whose shore biome is stony shore (ET 17 %, BWh
+  24 % standalone), Terralith's alpine highlands (26 %) and yellowstone (23 %) on the Dfc uplands that were ET,
+  moonlight valley (20 %) and gravel desert (14 %) on BSk. New shares (standalone / MIC): BW 0.793 / 0.931,
+  BS 0.610 / 0.519, C 0.881 / 0.891, D 1.0 / 1.0, Dsub 0.961 / 0.970, E 1.0 / 0.991, BW:desert 0.690 / 0.816,
+  Dfc:taiga 0.952 / 0.435, E:snow 0.824 / 0.991. BS, Dfc:taiga and E:snow take the file's rule (0.1 under the
+  lower): 0.42, 0.33, 0.72; the others keep their floors.
+- **Measured** (Mac): `./gametest.sh` and `./gametest.sh -PwithMic` (after `tools/smoke/install.sh mic`), both
+  with `--server`: All 52 required tests passed, both. `cargo test --workspace --release` all pass (core 280 + 3
+  ignored), clippy `-D warnings`, fmt, `cargo deny` clean; `./gradlew build test` tests=151 failures=0.
+  Earth-like 500-Myr runs after the fix (`stage climate --preset pipeline_quick_16k`): scattered 14.5 °C,
+  220 ppm, glaciated land 14.6 %, Köppen A .20/B .20/C .13/D .20/E .26; supercontinent 13.8 °C, 364 ppm,
+  25.4 % (land median 1,109 m against 671 m in the run before the fix: a different surface history — one run
+  per start; the calibration's range was 3–18 %). `climate-dem` does not run the carbon cycle: unchanged.
+- **Next.** The ice-sheet dynamics and supply-limited weathering (decisions log 2026-09-30) continue on
+  `worktree-agent-adc924860a859865c-ice`, which takes this branch.
 
 ### 2026-09-30 — P1-25: a climate API for mic-climate and Project Atmosphere (agent worktree agent-a02882c5e6567370e, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **The bake (format 0.1 → 0.2).**

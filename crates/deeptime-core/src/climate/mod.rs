@@ -362,14 +362,25 @@ impl Geometry {
 
 /// The weathering kernel of a step's climate: each band's Σ area·runoff·e^(k_T(T − 15)) over its
 /// land, and each band's EBM land temperature for it.
+///
+/// The runoff is P − ET (Fu's Budyko curve, the surface stage's), with the potential evaporation
+/// of the cell's temperature *less the planet's global warming against `hydro_ref_c`*: the
+/// stand-in PET (60 mm/°C) grows ~6 %/K at 15 °C while the model's precipitation grows 2 %/K
+/// (Held & Soden 2006), so evaluated at the warmed temperature it made a warmer planet's land
+/// drier and weathering weaker — a positive feedback inside the thermostat that ran a land-poor
+/// planet (the GameTest planet, 9 % land) to 8,500 ppm and 27 °C. Held at the reference climate's
+/// evaporation, the runoff keeps its spatial pattern and rises with the precipitation, as global
+/// runoff does with warming (GEOCARB's ~3.8 %/K, Berner & Kothavala 2001).
 fn kernel_of(
     g: &Geometry,
     land: &[bool],
     t_mean: &[f32],
     precip: &[f32],
     er: &EbmResult,
-    k_t: f64,
+    p: &ClimateParams,
 ) -> carbon::Kernel {
+    let k_t = p.weathering_temp_per_k;
+    let warming = er.t_global - p.hydro_ref_c;
     let mut band = vec![0.0; g.bands];
     for j in 0..g.h {
         let b = g.band[j];
@@ -379,9 +390,9 @@ fn kernel_of(
                 continue;
             }
             let t = f64::from(t_mean[c]);
-            let p = f64::from(precip[c]);
-            let pet = (60.0 * t).max(0.0);
-            let runoff = (p - crate::surface::climate::fu_et(p, pet)).max(0.0) / 1000.0;
+            let pr = f64::from(precip[c]);
+            let pet = (60.0 * (t - warming)).max(0.0);
+            let runoff = (pr - crate::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
             band[b] += carbon::cell_kernel(g.area[j], runoff, t, k_t);
         }
     }
@@ -682,14 +693,7 @@ impl ClimateStage {
             let s0 = snapshot::compute(&inp, &mut ebm0, &[]);
             let er0 = s0.ebm.clone().expect("a snapshot keeps its EBM year");
             let (mean0, summer0) = clock::land_temps(&er0);
-            self.s.clock.kernel = kernel_of(
-                &geo,
-                &land0,
-                &s0.t_mean,
-                &s0.precip,
-                &er0,
-                p.weathering_temp_per_k,
-            );
+            self.s.clock.kernel = kernel_of(&geo, &land0, &s0.t_mean, &s0.precip, &er0, &p);
             self.s.clock.snap_summer = summer0;
             self.s.clock.snap_t_global = er0.t_global;
             self.s.clock.sheet = s0.band_sheet.clone();
@@ -1142,11 +1146,23 @@ impl ClimateStage {
         self.s.tracker = tracker;
 
         // The next step's weathering reads this step's climate.
+        let mut runoff_mean = f64::NAN;
         if let Some(er) = &er_end {
             let t_mean = &world.fields[field::T_MEAN].data;
             let precip = &world.fields[field::PRECIP].data;
-            self.s.clock.kernel =
-                kernel_of(&geo, &land, t_mean, precip, er, p.weathering_temp_per_k);
+            self.s.clock.kernel = kernel_of(&geo, &land, t_mean, precip, er, &p);
+            let warming = er.t_global - p.hydro_ref_c;
+            let (mut ra, mut rs) = (0.0, 0.0);
+            for c in 0..n {
+                if land[c] {
+                    let (t, pr) = (f64::from(t_mean[c]), f64::from(precip[c]));
+                    let pet = (60.0 * (t - warming)).max(0.0);
+                    let a = geo.area[c / w];
+                    ra += a;
+                    rs += a * (pr - crate::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
+                }
+            }
+            runoff_mean = rs / ra.max(1e-9);
         }
         self.time("ice", started);
 
@@ -1175,6 +1191,10 @@ impl ClimateStage {
             f32::from(u8::from(self.s.clock.snowball.is_some())),
             activity.ridge_km2_yr as f32,
             activity.subduction_km2_yr as f32,
+            (geo.area_where(&|c| land[c]) / geo.area.iter().map(|a| a * w as f64).sum::<f64>())
+                as f32,
+            (self.s.clock.kernel.band.iter().sum::<f64>() / carbon::KERNEL_EARTH) as f32,
+            runoff_mean as f32,
         ]);
         self.s.omega = Some(omega_now);
         if last {
