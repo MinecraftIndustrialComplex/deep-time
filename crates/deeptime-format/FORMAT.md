@@ -157,6 +157,7 @@ jar ships it and the core compiles the same file in as the default). Band coordi
   "schema": 1,
   "_comment": "…",                       optional, ignored
   "glacier_cap": 0.35,                   land above its equilibrium line (climate/glacier) is held at or below it
+                                         (a class with a "glaciated" block, below, is not)
   "temperature_ramps": {                 named ramps
     "<name>": {
       "base": 2.0, "span": 0.95,         b = base + span · Σ weightᵢ · clamp01((xᵢ − fromᵢ) / (toᵢ − fromᵢ))
@@ -175,6 +176,11 @@ jar ships it and the core compiles the same file in as the default). Band coordi
   },
   "classes": {                           every land class Af … EF (31 of them; not "sea"), no others
     "Af":  { "temperature": "tropical", "humidity": "rainforest" },
+    "EF":  { "temperature": "polar_ice", "humidity": "polar_desert",       optional "glaciated": what the class does
+             "glaciated": { "humidity": "ice_cap" } },                     where the glacier flag is set: its own
+                                                                           "temperature" and/or "humidity" (at least
+                                                                           one; each falls back to the class's own)
+                                                                           optional "weirdness": "positive"
     "BSk": { "temperature": { "when": { "of": "t_cold", "above": 0.0 },   the ramp "then" where the input is above
                               "then": "temperate", "else": "boreal" },     the threshold, "else" elsewhere
              "humidity": "steppe" }
@@ -182,8 +188,25 @@ jar ships it and the core compiles the same file in as the default). Band coordi
 }
 ```
 
-The default table reproduces what P1-09 first compiled in, operation for operation (a test holds
-the core's default to the old formulas bit for bit). A ramp is a `base`/`span` pair rather than two
+**Glaciated land.** Without a `glaciated` block a class is held at or below `glacier_cap` wherever
+the glacier flag (`climate/glacier`, land above its equilibrium line) is set. With one, the block
+decides instead: its temperature ramp (else the class's own, uncapped) and its humidity rule (else
+the class's own). The default table gives EF one (Ben, 2026-09-29, "Ice only where there's ice"):
+EF above its equilibrium line is **ice cap** (humidity `ice_cap`, the fixed band coordinate 0.5,
+vanilla's first humidity band: ice spikes, frozen and jagged peaks, snowy slopes and plains, no
+forest) and the rest of EF is **barren frozen ground** (`polar_desert`, fixed 1.5: Terralith's gravel
+desert and cold shrubland, thin snow in vanilla, which has no dry frozen biome). Both sit at the
+temperature ramp `polar_ice` (0.6 … 0.8 by the warmest month), the upper part of the frozen band:
+Terralith splits the band at temperature −0.727 (coordinate 0.496) and puts its red, terracotta
+snowy badlands below it and its dry cold biomes above. Humidity for EF is fixed because P/PET says
+nothing in a freezing climate (PET is 0 below 0 °C, and the stage pins the index at 10). A rule
+with `min` = `max` is a fixed coordinate. ET is as it was (`polar`, `tundra`, capped where glaciated).
+A class may also carry `"weirdness": "positive"` (the only value): the bake then gives its land the
+positive sign of the variant noise everywhere, so its peaks are vanilla's frozen peaks and never the
+negative branch's (jagged peaks in vanilla; Terralith puts its scarlet mountains there). EF has it.
+
+The default table reproduces what P1-09 first compiled in, operation for operation for every class
+but EF (a test holds the core's default to the old formulas bit for bit). A ramp is a `base`/`span` pair rather than two
 end points so that the coordinates the default writes are exactly the ones P1-09 computed.
 The sea's own temperature curve, the aridity → humidity anchors and the depth anchors of the sea
 stay in the core.
