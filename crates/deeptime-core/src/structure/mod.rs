@@ -59,39 +59,95 @@ use columns::{Cell, Tables};
 use metamorphism::{Paths, Thermal};
 use plutons::{ArcInputs, Counts, Pluton};
 
-/// Per L1 cell, the thickness (m) of the sedimentary cover at the world's present: the depth
-/// from the cell's surface to the first unit of its column (`columns::build`) that is neither
-/// sedimentary nor loose (chemical or clastic sedimentary, unconsolidated and regolith classes) —
-/// a lava flow inside the strata log does not end it, the basement, a metamorphosed layer or the
-/// mantle does. The coal seams of a site are held inside it (`deposits`). Errors where the world
-/// lacks the fields the columns need.
-pub fn sedimentary_cover_m(world: &WorldState, preset: &PlanetPreset) -> Result<Vec<f32>, CoreError> {
-    let src = CellSource::new(world, preset)?;
-    let p = preset.structure.clone().unwrap_or_default();
-    let t = Tables::get();
-    let table = crate::surface::lithology::table();
-    let family = |c: u16| table[usize::from(c)].family.as_str();
-    let n = src.grid.cells();
-    Ok((0..n)
-        .into_par_iter()
-        .map_init(Vec::new, |units, c| {
-            columns::build(&src.cell(c), &t, &p, src.now_myr, 30_000.0, units);
-            let mut cover = 0.0f64;
-            for u in units.iter() {
-                let ok = match family(u.class) {
-                    "chemical_sedimentary" | "clastic_sedimentary" | "unconsolidated" => true,
-                    "volcanic" => u.source == columns::Source::Log,
-                    _ => false,
-                };
-                if !ok {
-                    break;
-                }
-                cover += f64::from(u.thickness_m);
-            }
-            cover as f32
-        })
-        .collect())
+/// The sedimentary cover as the world will draw it: the smoothed horizon stacks the bake writes
+/// (`bake_horizons::bake`, before the top raise, which only lifts the first top) read by the
+/// column rule (`deeptime_format::strata`), and per class whether it is sedimentary or loose
+/// (the chemical and clastic sedimentary and unconsolidated families, regolith included). The
+/// coal seams of a site are held inside it (`deposits`), so they sit in the rock the strata pass
+/// paints around them.
+pub struct Cover {
+    hz: bake_horizons::Horizons,
+    desc: deeptime_format::LayerDesc,
+    sedimentary: Vec<bool>,
 }
+
+impl Cover {
+    /// Bakes `world`'s horizon stacks the way the bake will (errors where the world lacks the
+    /// fields the columns need).
+    pub fn new(world: &WorldState, preset: &PlanetPreset) -> Result<Cover, CoreError> {
+        let hz = bake_horizons::bake(world, preset)?;
+        let mut desc = deeptime_format::LayerDesc::scalar(
+            "strata/horizons",
+            deeptime_format::DType::HorizonStack,
+            hz.grid.clone(),
+            deeptime_format::Codec::Raw,
+        );
+        desc.scale = 1.0 / 16.0;
+        desc.stack_depth = Some(hz.k);
+        desc.tongue_band_keys = Some(hz.tongues.0);
+        desc.tongue_minor_share = Some(hz.tongues.1);
+        let sedimentary = crate::surface::lithology::table()
+            .iter()
+            .map(|c| {
+                matches!(
+                    c.family.as_str(),
+                    "chemical_sedimentary" | "clastic_sedimentary" | "unconsolidated"
+                )
+            })
+            .collect();
+        Ok(Cover {
+            hz,
+            desc,
+            sedimentary,
+        })
+    }
+
+    /// Bytes the stacks hold (for the stage's memory reservation).
+    pub fn bytes(&self) -> u64 {
+        (self.hz.tops.len() * 7) as u64
+    }
+
+    /// Blocks of sedimentary rock under `surface_y` at block (x, z) by the column rule: down to
+    /// the top of the column's first horizon of another rock at least [`COVER_MIN_BLOCKS`] thick
+    /// (a thinner tongue does not end it), or to the floor.
+    pub fn blocks_at(&self, x: f64, z: f64, surface_y: f64) -> f64 {
+        let k = self.hz.k as usize;
+        let w = self.hz.grid.w as usize;
+        let horizon = |i: u32, j: u32, h: u32| {
+            let at = (j as usize * w + i as usize) * k + h as usize;
+            deeptime_format::strata::StoredHorizon {
+                top: self.hz.tops[at],
+                class: self.hz.classes[at],
+                key: self.hz.keys[at],
+            }
+        };
+        let mut col = Vec::new();
+        deeptime_format::strata::stack_at(
+            &self.desc,
+            self.hz.min_y,
+            horizon,
+            x.floor() as i64,
+            z.floor() as i64,
+            &mut col,
+        );
+        let floor = self.hz.min_y;
+        for (h, &(top, class, _)) in col.iter().enumerate() {
+            let bottom = col.get(h + 1).map_or(floor, |n| n.0);
+            let sed = self
+                .sedimentary
+                .get(usize::from(class))
+                .copied()
+                .unwrap_or(false);
+            if !sed && top - bottom >= COVER_MIN_BLOCKS {
+                return (surface_y - f64::from(top)).max(0.0);
+            }
+        }
+        (surface_y - f64::from(floor)).max(0.0)
+    }
+}
+
+/// The thinnest horizon of another rock that ends the sedimentary cover ([`Cover::blocks_at`]).
+pub const COVER_MIN_BLOCKS: i32 = 3;
 
 /// The stage's name in a pipeline (`deeptime stage structure`).
 pub const STAGE_NAME: &str = "structure";

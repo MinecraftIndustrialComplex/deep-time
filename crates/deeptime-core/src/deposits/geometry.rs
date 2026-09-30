@@ -285,7 +285,10 @@ pub enum StackFit {
     /// No cover to hold a seam: no coal here.
     NoCover,
     /// Smaller (measures capped to what the cover holds) and/or raised (its centre depth).
-    Capped { measures_m: f64, centre_depth_m: f64 },
+    Capped {
+        measures_m: f64,
+        centre_depth_m: f64,
+    },
 }
 
 /// Blocks of cover a stack keeps free under its lowest seam.
@@ -569,7 +572,10 @@ mod tests {
         assert_eq!(fit_stack(&k, &plan, shallow, 200.0, &sc), StackFit::Fits);
         // A deep one is raised until its lowest seam sits a margin above the cover's base.
         match fit_stack(&k, &plan, 3000.0, 200.0, &sc) {
-            StackFit::Capped { measures_m, centre_depth_m } => {
+            StackFit::Capped {
+                measures_m,
+                centre_depth_m,
+            } => {
                 assert_eq!(measures_m, 300.0);
                 let top = (centre_depth_m - 150.0) / sc.m_per_block_v;
                 assert!((top + span - room).abs() < 1e-9, "{top}");
@@ -578,11 +584,17 @@ mod tests {
         }
         // Thin cover holds fewer measures (so fewer seams), all inside it.
         match fit_stack(&k, &plan, shallow, 40.0, &sc) {
-            StackFit::Capped { measures_m, centre_depth_m } => {
+            StackFit::Capped {
+                measures_m,
+                centre_depth_m,
+            } => {
                 assert!(measures_m < 300.0);
                 let top = (centre_depth_m - measures_m / 2.0) / sc.m_per_block_v;
                 let bottom = top + measures_m * k.spacing_mult_v / sc.m_per_block_v;
-                assert!(top >= -1e-9 && bottom <= 40.0 - COVER_MARGIN_BLOCKS + 1e-9, "{top} {bottom}");
+                assert!(
+                    top >= -1e-9 && bottom <= 40.0 - COVER_MARGIN_BLOCKS + 1e-9,
+                    "{top} {bottom}"
+                );
                 let fewer = seam_plan(&k, measures_m, 1000.0, &mut Rng::new(3));
                 assert!(fewer.seams() < plan.seams());
             }
