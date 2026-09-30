@@ -2361,7 +2361,31 @@ regional MVT driver"):*
   researched: SEDEX 1 / 5 / 12.5 per 100,000 km² from the 1998 USGS National Mineral Resource
   Assessment's sedex tracts (Circular 1178, mrdata.usgs.gov/nmra: 12 tracts with numeric
   estimates, 207,508 km², about 2 / 10 / 26 undiscovered deposits; an estimate and a lower bound);
-  coal has no published deposit density (its 30 stays a placeholder).
+  coal has no published deposit density; it is defined and sized next (Ben, 2026-09-29, "define coal
+  as seams").
+- **A coal deposit is one minable seam field** (decisions log 2026-09-29): a contiguous area of
+  coal-bearing strata with minable seams, tens of km across, 300 / 1,000 / 3,000 km² (P90 / P50 /
+  P10; Circular 891's glossary "coal field": "a discrete area underlain by strata containing one or
+  more coal beds"; comparable units: Gillette ~4,150 km², Jharia 280–450, Raniganj 440–1,500,
+  Pennsylvania anthracite fields mean 313 km²). Not a mine block (Circular 891's measured radius is
+  0.4 km, indicated 1.2 km) and not a whole basin. **Density 4 / 14 / 40 per 10⁵ km² of permissive
+  coal-bearing tract, an estimate** (`density_basis: estimate`, so P50 14; was the placeholder 10 /
+  30 / 80): fields ÷ tract area for the Powder River (57,000 km², 6–9 named coalfields, USGS PP
+  1625-A: 10.5–15.8), the Sydney Basin (36,000 km², five coalfields: 14–17; low, the tract holds
+  non-coal strata), Upper Silesia (5,600 km², three coal areas: 54; high, the tract is the basin),
+  the Illinois Basin (~95,000 km², three fields of 30,000 km² or more: ~3, a low bound) and India
+  (~113 coalfields on 3.29 million km² of land: 3.4, a floor); geometric check 10⁵ · f / A with f
+  the minable share and A the field area (3.3 at f 0.10, A 3,000; 25 at f 0.25, A 1,000; 167 at
+  f 0.5, A 300). Every field count is a judgement about what to call a field, and the research
+  found no source that counts minable seam fields (figures, unverified ones and sources are in the
+  type's notes). Tonnage becomes field area × seam thickness × 1.32 t/m³ = 540 / 2,500 / 10,000
+  Mt (was the 4.2 / 13 / 25 Mt of one 1.2 km mine block); the seam body is a 1,000 km² × 1.9 m
+  cylinder at the median (29 × 44 km across; 49 × 73 blocks semi-axis at 300 m per block) with
+  `size_mult_h` 1 (was 6, which enlarged the mine block to 12 × 18 km), `min_separation_m` 26,000
+  and camps 100 / 40 km. The coal count per planet falls from a median 47.5 sites (25–56) to 17.5
+  (10–30); the fields are large enough that formed bodies cannot overlap, so 2–22 of 35–100 formed
+  are dropped for separation on the six test landscapes (STATUS.md, build log 2026-09-29 "coal
+  seam fields").
 - **MVT's driver is regional.** MVT ore forms where basin-scale, topography-driven flow from a
   rising orogen sweeps hot basinal brines across a foreland basin into platform carbonates at its
   margin (Garven & Freeze 1984; Garven 1985; Bethke & Marshak 1990; Leach et al. 2001, 2005, 2010;
