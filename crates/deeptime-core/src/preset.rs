@@ -447,6 +447,19 @@ impl Preset {
         }
     }
 
+    /// How the keyframes' view layers read heights (the satellite view): the planet's scale and
+    /// model sphere, else the defaults.
+    pub fn view_scale(&self) -> crate::keyframes::ViewScale {
+        match &self.body {
+            PresetBody::Planet(p) => crate::keyframes::ViewScale {
+                sea_level_y: f64::from(p.scale.sea_level_y),
+                m_per_block_v: p.scale.m_per_block_v,
+                radius_m: p.tectonics.model_radius_km * 1000.0,
+            },
+            _ => crate::keyframes::ViewScale::default(),
+        }
+    }
+
     /// The synthetic terrain a placeholder preset bakes at `finalize_write`, if any.
     pub fn synth(&self) -> Option<synth::Kind> {
         self.bake().map(|b| match b {
