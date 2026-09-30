@@ -82,6 +82,10 @@ use snapshot::{Planet, Refs};
 /// The stage's name in a pipeline (`deeptime stage climate`).
 pub const STAGE_NAME: &str = "climate";
 
+/// Carbonate thickness the step's weathering drawdown lays on the shelves (≤ 200 m deep), m, in
+/// `WorldState::globals`: the surface stage deposits it (after a snowball: the cap carbonate).
+pub const CAP_CARBONATE_GLOBAL: &str = "climate/cap_carbonate_m";
+
 /// The step's eustatic sea level (the surface section's curve plus glacio-eustasy), m, in
 /// `WorldState::globals`: the surface stage takes it instead of its curve.
 pub const SEA_LEVEL_GLOBAL: &str = "climate/sea_level_m";
@@ -169,6 +173,8 @@ struct Saved {
     /// Oceanic crust area of the last step and the smoothed consumption rate (degassing).
     ocean_km2: Option<f64>,
     subduction_km2_yr: Option<f64>,
+    /// Drawdown carbonate laid on the shelves over the run, m.
+    cap_carbonate_m: f64,
 }
 
 /// The climate stage.
@@ -784,6 +790,7 @@ impl ClimateStage {
                 t_max: f64::NAN,
                 sea_ice_max: 0.0,
                 steps: 0,
+                carbonate_excess_mol: 0.0,
             }
         };
         // The window's curve gets the ice the callback measured.
@@ -819,6 +826,18 @@ impl ClimateStage {
             curve + p.glacio_eustasy * ice::eustatic_m(v_pre - p.ice_reference_km3, ocean_km2);
         world.globals.insert(SEA_LEVEL_GLOBAL.into(), sea);
         let land = land_at(sea);
+        // The weathering's drawdown beyond the degassing precipitates as carbonate on the shelves
+        // (after a snowball: the cap carbonate), spread evenly over them.
+        let shelf_km2 = geo.area_where(&|c| {
+            h[c] <= sea && sea - h[c] <= crate::surface::SHELF_DEPTH_M
+        });
+        let cap_m = if shelf_km2 > 0.0 {
+            out.carbonate_excess_mol * carbon::CALCITE_M3_PER_MOL / (shelf_km2 * 1.0e6)
+        } else {
+            0.0
+        };
+        world.globals.insert(CAP_CARBONATE_GLOBAL.into(), cap_m);
+        self.s.cap_carbonate_m += cap_m;
         self.time("ice", started);
 
         let ppm = self.ppm();
@@ -1103,7 +1122,7 @@ impl ClimateStage {
         self.time("ice", started);
 
         // 4. Events and the curve.
-        self.emit(world, &out.happenings, last, t1)?;
+        self.emit(world, &out.happenings, last, t1, cap_m)?;
         let t_global = er_end.as_ref().map_or(f64::NAN, |e| e.t_global);
         let sea_ice_frac = er_end
             .as_ref()
@@ -1145,6 +1164,7 @@ impl ClimateStage {
         happenings: &[(f64, Happening)],
         last: bool,
         t_now: f64,
+        cap_m: f64,
     ) -> Result<(), CoreError> {
         let mut all: Vec<Happening> = happenings.iter().map(|(_, h)| h.clone()).collect();
         if last {
@@ -1196,6 +1216,7 @@ impl ClimateStage {
                         .param("degassing_escape_rel", degassing_rel)
                         .param("sun_rel", open.sun_rel)
                         .param("t_global_min_c", open.t_min_c)
+                        .param("cap_carbonate_m", if ongoing { 0.0 } else { cap_m })
                         .param(
                             "onset_cause",
                             if drawdown >= 1.5 {
@@ -1217,7 +1238,7 @@ impl ClimateStage {
                         .param("ongoing", i64::from(ongoing));
                     let id = world.emit(e)?;
                     if !ongoing {
-                        self.s.clock.last_escape = Some((t_end, id));
+                        self.s.clock.last_escape = Some((t_end, Some(id)));
                     }
                     if ongoing {
                         self.s.clock.snowball = None;
@@ -1239,9 +1260,13 @@ impl ClimateStage {
                             .param("peak_t_global_c", open.peak_c)
                             .param("peak_t_years", open.peak_t)
                             .param("co2_peak_ppm", open.co2_peak_ppm)
-                            .param("after_snowball", i64::from(open.after_snowball.is_some()))
+                            .param("after_snowball", i64::from(open.after_escape.is_some()))
                             .param("ongoing", i64::from(ongoing));
-                    if let Some(id) = open.after_snowball {
+                    let cause = match (open.after_escape, self.s.clock.last_escape) {
+                        (Some(te), Some((t_esc, Some(id)))) if (te - t_esc).abs() < 1.0 => Some(id),
+                        _ => None,
+                    };
+                    if let Some(id) = cause {
                         e = e.caused_by(id);
                     }
                     world.emit(e)?;
@@ -1265,6 +1290,7 @@ impl ClimateStage {
             o.insert("glaciated_land_frac".into(), json!(self.s.land_ice_frac));
             o.insert("degassing_mol_yr".into(), json!(self.s.clock.degassing));
             o.insert("weathering_mol_yr".into(), json!(self.s.clock.weathering));
+            o.insert("cap_carbonate_total_m".into(), json!(self.s.cap_carbonate_m));
         }
         let round = |v: &[Vec<f32>]| -> Vec<Vec<f64>> {
             v.iter()

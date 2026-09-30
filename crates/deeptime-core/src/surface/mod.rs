@@ -388,6 +388,9 @@ fn dominant(mix: &[f64; spl::FAMILIES]) -> Option<u16> {
     Some(strata_log::provenance(k, v / tot))
 }
 
+/// The climate's drawdown carbonate goes onto sea floor this shallow, m (the shelves).
+pub const SHELF_DEPTH_M: f64 = 200.0;
+
 /// Regolith at least this thick is the surface rock (for erodibility, diffusivity and the
 /// `surface/class` layer), m.
 pub const REGOLITH_SHOWS_M: f32 = 10.0;
@@ -600,6 +603,12 @@ impl SurfaceStage {
             .copied()
             .filter(|z| z.is_finite())
             .unwrap_or_else(|| p.sea_level.at(t_end_myr));
+        let cap_m = world
+            .globals
+            .get(crate::climate::CAP_CARBONATE_GLOBAL)
+            .copied()
+            .filter(|x| x.is_finite() && *x > 0.0)
+            .unwrap_or(0.0);
         let lat_of = |j: usize| fields::row_lat(&grid, j);
         let clim = climate::snapshot(world, &d, &lat_of, &sc.h, sea);
         let mut open: Vec<f64> =
@@ -772,6 +781,14 @@ impl SurfaceStage {
                     );
                     sc.h[c] += add;
                     parts.carbonate[c] += add as f32;
+                    // The climate's drawdown carbonate (after a snowball: its cap carbonate) on the
+                    // shelves, whatever the water's temperature, once per plate step.
+                    let z = sea - sc.h[c];
+                    if sub == 0 && cap_m > 0.0 && z > 0.0 && z <= SHELF_DEPTH_M {
+                        let extra = cap_m.min(z);
+                        sc.h[c] += extra;
+                        parts.carbonate[c] += extra as f32;
+                    }
                     let z = sea - sc.h[c];
                     if restricted[c]
                         && z > 0.0

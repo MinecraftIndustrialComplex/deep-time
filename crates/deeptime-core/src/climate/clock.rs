@@ -90,7 +90,9 @@ pub struct OpenHothouse {
     pub peak_c: f64,
     pub peak_t: f64,
     pub co2_peak_ppm: f64,
-    pub after_snowball: Option<EventId>,
+    /// The escape time of the snowball it began within 5 Myr of (its event, once written, is
+    /// the hothouse's cause).
+    pub after_escape: Option<f64>,
 }
 
 /// What the clock carries from step to step (in the stage's saved state).
@@ -120,8 +122,9 @@ pub struct ClockState {
     pub snowballs: u64,
     pub hothouse: Option<OpenHothouse>,
     pub hothouses: u64,
-    /// The last snowball's event and its escape time (a hothouse right after it is its aftermath).
-    pub last_escape: Option<(f64, EventId)>,
+    /// The last snowball's escape time and, once written, its event (a hothouse right after it
+    /// is its aftermath).
+    pub last_escape: Option<(f64, Option<EventId>)>,
     pub series: Vec<Vec<f32>>,
     pub window: Vec<Vec<f32>>,
     /// Degassing and weathering of the last clock step, mol/yr.
@@ -183,6 +186,9 @@ pub struct Output {
     pub t_max: f64,
     pub sea_ice_max: f64,
     pub steps: u32,
+    /// Carbon the weathering took out beyond the degassing over the plate step (the drawdown's
+    /// alkalinity, which precipitates as carbonate: after a snowball, its cap carbonate), mol.
+    pub carbonate_excess_mol: f64,
 }
 
 /// The star's luminosity at world time `t` (years) against today's.
@@ -262,6 +268,7 @@ pub fn run(
         t_max: f64::MIN,
         sea_ice_max: 0.0,
         steps: 0,
+        carbonate_excess_mol: 0.0,
     };
     if st.t_land.len() != bands {
         st.t_land = vec![0.0; bands];
@@ -327,6 +334,7 @@ pub fn run(
             break (d, next);
         };
         let dt = t_next - t;
+        out.carbonate_excess_mol += (st.carbon.total() - carbon_next.total()).max(0.0);
         st.carbon = carbon_next;
         let ppm = st.carbon.ppm();
         // 3. The EBM.
@@ -449,6 +457,7 @@ fn track(
             if ice_frac < p.snowball_off_frac {
                 let open = st.snowball.take().expect("open");
                 st.snowballs += 1;
+                st.last_escape = Some((t, None));
                 happenings.push((
                     t,
                     Happening::SnowballEscape {
@@ -467,13 +476,13 @@ fn track(
             let after = st
                 .last_escape
                 .filter(|(te, _)| t - te < 5.0e6)
-                .map(|(_, id)| id);
+                .map(|(te, _)| te);
             st.hothouse = Some(OpenHothouse {
                 t_start: t,
                 peak_c: er.t_global,
                 peak_t: t,
                 co2_peak_ppm: ppm,
-                after_snowball: after,
+                after_escape: after,
             });
         }
         Some(h) => {
