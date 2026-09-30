@@ -10,6 +10,7 @@ mod hydro;
 mod parity;
 mod provinces;
 mod run;
+mod satellite_view;
 mod structure_view;
 mod synth;
 mod watch;
@@ -362,6 +363,19 @@ enum Command {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Draw the satellite view layer (true colour: land cover from the climate, snow and glacier
+    /// ice, the sea by depth, sea ice, hill shading) of a checkpoint's world as a PNG.
+    Satellite {
+        /// A checkpoint written by `stage --out` or `run --checkpoints`.
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// PNG to write.
+        #[arg(long)]
+        out: PathBuf,
+        /// Width in pixels (the height is half of it).
+        #[arg(long, default_value_t = 1024)]
+        width: u32,
+    },
 }
 
 #[derive(Subcommand)]
@@ -422,6 +436,9 @@ enum StrataArg {
     /// All 59 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
     /// columns hold every class 20 or more blocks below the surface (P1-12's GameTests).
     EveryClass,
+    /// A readable sedimentary basin, the same in every cell: eight beds over granite from 165
+    /// blocks down (the synthetic deposit world's strata).
+    Basin,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -737,6 +754,22 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::Satellite { input, out, width }) => {
+            match satellite_view::run(&input, &out, width) {
+                Ok((t, elevation)) => {
+                    println!(
+                        "deeptime satellite: t = {:.1} Myr, drawn on {elevation} -> {}",
+                        t / 1.0e6,
+                        out.display()
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime satellite: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::DumpDeposits { world, out }) => match dump::run(&world, &out) {
             Ok((sites, bodies, inside)) => {
                 println!(
@@ -767,6 +800,7 @@ fn main() -> ExitCode {
                 strata: match strata {
                     StrataArg::Placeholder => synth::Strata::Placeholder,
                     StrataArg::EveryClass => synth::Strata::EveryClass,
+                    StrataArg::Basin => synth::Strata::Basin,
                 },
                 size,
                 out,

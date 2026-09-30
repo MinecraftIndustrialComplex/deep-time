@@ -343,6 +343,9 @@ within the tile, `cell_bytes` each, so its decoded size is `tw · th · cell_byt
 - `dtype`: `u8`, `i8`, `u16`, `i16`, `u32`, `f32` (IEEE 754 binary32), or `horizon_stack` (7K bytes a cell).
 - physical value = raw · `scale` + `offset`. `nodata` (optional) is a **raw** value.
 - `stack_depth` (only for `horizon_stack`): K.
+- `tongue_band_keys`, `tongue_minor_share` (optional, only for `horizon_stack`): the column rule's
+  band B and minor share m (below); absent: B = 64, m = 0.15. A baked run writes the preset's
+  (`structure.strata_tongue_scale` × 64, rounded; `structure.strata_minor_share`).
 - Unknown fields must be ignored by readers.
 
 ### `horizon_stack` cells (plan §5.7.4)
@@ -385,9 +388,10 @@ last); across a gap or past the last span, the next top (min_y). For block (x, z
    t = wₙ·(y_{n,q} − y_{n,q+1}) is positive gives its class: per class, the order (least key top +
    key base of its horizons), the unit (least key top) and the summed t, classes in the order cells
    first give them. One class: emit (Y_q, class, unit). Several: sort by (order, class) and
-   **intertongue**: T = Σ t; shares pᵢ = max(tᵢ/T − 0.15, 0) (if all are 0, pᵢ = tᵢ/T), P = Σ pᵢ;
-   for each band n from ⌊s_q/256⌋ to ⌊(s_{q+1} − 1)/256⌋ with base 256·n, walking the classes in
-   order with a running sum S (from 0): lo = base + 256·(S/P), S += pᵢ, hi = base + 256·(S/P),
+   **intertongue** with the layer's band B and minor share m (LayerDesc): T = Σ t; shares
+   pᵢ = max(tᵢ/T − m, 0) (if all are 0, pᵢ = tᵢ/T), P = Σ pᵢ; for each band n from ⌊s_q/B⌋ to
+   ⌊(s_{q+1} − 1)/B⌋ (integer division) with base B·n, walking the classes in order with a running
+   sum S (from 0): lo = base + B·(S/P), S += pᵢ, hi = base + B·(S/P),
    clipped to [s_q, s_{q+1}]; if lo < hi, emit (Y_q − (lo − s_q)/(s_{q+1} − s_q)·(Y_q − Y_{q+1}),
    class, unit).
 4. Emitting (top, class, unit): t = ⌊top⌋, at most the last emitted top; if it equals the last
@@ -412,12 +416,15 @@ the plate model's rock pools less the log, and peridotite below the crust. Pluto
 
 **The 0.2 bake** smooths the stacks laterally before writing them, because the strata log is
 carried cell by cell and neighbouring cells' stacks differ more than the rocks would: each cell's
-new stack is the Gaussian-weighted mean (σ 2.5 cells over the 11 × 11 cells around; x wraps, z
-clamps) of its neighbours' height functions, cut at every key top and base any of them has; each
-interval takes the class holding the largest weighted thickness there, equal neighbours join; the
-cell's own surface stays its first top (neighbours' units above it pinch out there; where the cell
-stands above the mean its top unit fills the difference); then the stack is settled again (at least
-a block thick, at most K). `notes.bake.strata.smoothing` records σ and the window.
+new stack is the Gaussian-weighted mean (σ = `structure.strata_smoothing_cells` L1 cells, default
+10; x wraps, z clamps) of its neighbours' height functions, cut at every key top and base any of
+them has; each interval takes the class holding the largest weighted thickness there, equal
+neighbours join; the cell's own surface stays its first top (neighbours' units above it pinch out
+there; where the cell stands above the mean its top unit fills the difference); then the stack is
+settled again (at least a block thick, at most K). The neighbours are the cells of a lattice of
+step ⌈σ / 2.5⌉ anchored at cell (0, 0) within 5 steps (11 × 11 samples whatever σ, and every cell
+samples the same lattice); σ 0 bakes each cell's own stack. `notes.bake.strata.smoothing` records
+σ, the step, the window and the tongue parameters.
 
 **The P1-08 bake** writes them with one change: the first horizon's top of every cell is raised,
 never lowered, to ⌈max E + max A⌉ + 1 blocks (at most `max_y`), E and A the `elevation` and
@@ -835,6 +842,20 @@ Pixel (px, py) is centred on longitude 360°·px/w (the seam is 0°, plan §5.2)
 passes the next multiple of the preset's keyframe interval (counted from the run's start) and at
 the end of each stage.
 
+Two layers are derived when a frame is drawn rather than read from one field, and are never stored
+in the world: `provinces` (geologic provinces, coloured with its ramp like any layer) and
+`satellite`, a true-colour picture composited from the elevation, the climate's fields (land cover
+from `climate/t_mean_c`, `t_warm_c`, `t_cold_c`, `aridity`, `precip_mm` and `koppen`; snow from the
+temperatures and `climate/ela_m`; `climate/ice_thickness_m` or `glacier` as glacier ice;
+`climate/sea_ice`), the surface rock (`surface/class`) and a hill shade (`deeptime_core::satellite`
+has the rules). It needs no layer kind of its own: it is RGBA8 like every layer, so any reader of
+these files (the viewer, the workbench, the game's timelapse) shows it unchanged. Its ramp in
+`ramps.json` (`satellite`: categorical, with `labels` and `groups`) is not applied to it: its classes
+are the compositor's anchor colours and the legend's key. It is the **first** layer of every frame of
+the plate model's group and of the young landscape's and amplification's frames, so a reader that
+opens on a frame's first layer opens on it. A frame without climate fields draws bare ground by
+geology (no plants, snow or ice).
+
 ## The climate's ice fields (pipeline fields and history frames; not world data yet)
 
 The climate stage (`crates/deeptime-core/src/climate/`, plan §8.3; deep-time climate 2026-09-29)
@@ -909,4 +930,7 @@ survives in, the finished folder. The manifest's `notes.run.history` reports wha
   i having class (6·i + h) mod 59, so any ten neighbouring cell columns show every class at
   h ≥ 2 (`notes.strata.class_rule`). Horizon h spans the keys 4096·h … 4096·h + 4095 in every
   cell, so the column rule correlates the synthetic stacks by index (and mixes the neighbouring
-  cell columns' classes in as thin tongues).
+  cell columns' classes in as thin tongues). `--strata basin`: a readable sedimentary basin, the
+  same in every cell — sandstone, shale, sandstone, mudstone, limestone, shale, sandstone and shale
+  from the surface, 0, 8, 22, 36, 55, 75, 100 and 130 blocks down, granite from 165 blocks to the
+  floor (classes `sandstone, shale, mudstone, limestone, granite`); `deposits_world_16k` uses it.
