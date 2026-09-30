@@ -2279,6 +2279,14 @@ Imbrie & Imbrie's asymmetric response; the maximum ice of the window is the glac
 **glacio-eustasy** (ρ_i/ρ_w·ΔV/A_ocean against the model's present-Earth ice): item 7's curve keeps
 its tectonic cycles and the ice's sea level is added to it; the surface stage takes the sum
 (`WorldState::globals`). The ice fields for glacial erosion are FORMAT.md "The climate's ice fields".
+*Revised 2026-09-30* (decisions log: ice-sheet dynamics, supply-limited weathering, 200-kyr clock):
+(13) **Ice sheets** flow (`sheet.rs`: shallow-ice approximation on a coarse grid, the mass balance
+on the ice *surface* against the equilibrium line — the elevation feedback — elastic-free
+isostasy with a 3-kyr lag, calving where the depressed bed lies below the sea); every clock step in
+the ice-age window, `ice_relax_kyr` per plate step in deep time; a cell's ice is the sheet's or the
+equilibrium glacier's, whichever is thicker. (14) **Weathering is supply-limited**: each band's
+kinetic weathering saturates at the Ca + Mg its erosion exposes (the surface stage's erosion, West
+2012's kinetic/supply regimes). (15) `carbon_step_kyr` 200 by default, an editor setting.
 
 ### 8.4 Hydrology — `core::hydro` (Phase 2; Phase 0 only proves water holds)
 

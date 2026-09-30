@@ -1289,6 +1289,7 @@ impl ClimateStage {
             f32::from(u8::from(self.s.clock.snowball.is_some())),
             activity.ridge_km2_yr as f32,
             activity.subduction_km2_yr as f32,
+            carbon::Weathering::supply(&self.s.clock.kernel, &self.s.clock.sheet) as f32,
         ]);
         self.s.omega = Some(omega_now);
         if last {
@@ -1382,6 +1383,7 @@ impl ClimateStage {
                     let id = world.emit(e)?;
                     if !ongoing {
                         self.s.clock.last_escape = Some((t_end, Some(id)));
+                        self.s.clock.spans.push([open.t_start / 1.0e6, t_end / 1.0e6]);
                     }
                     if ongoing {
                         self.s.clock.snowball = None;
@@ -1459,6 +1461,7 @@ impl ClimateStage {
             "snapshots": self.s.snapshots,
             "glaciations": self.s.tracker.count,
             "snowballs": self.s.clock.snowballs,
+            "snowball_spans_myr": self.s.clock.spans,
             "hothouses": self.s.clock.hothouses,
             "last": last,
             "series": {"columns": clock::SERIES_COLUMNS, "rows": round(&self.s.clock.series)},
