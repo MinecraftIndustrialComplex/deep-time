@@ -308,8 +308,11 @@ public final class StrataGameTests {
                     BlockState expected = palette.block(name, StrataPass.horizonKey(col.units[h], cls));
                     int bottom = h + 1 < col.count ? col.tops[h + 1] + 1 : col.tops[h] - 9;
                     // The column rule mixes in the neighbouring cell columns' classes as thin
-                    // tongues (format 0.2); sample only horizons with blocks to spare.
-                    if (col.tops[h] - bottom < 2)
+                    // tongues (format 0.2), so a horizon's index no longer says how deep it lies:
+                    // sample only horizons with blocks to spare, 20 blocks or more under the
+                    // surface rules and clear of the bedrock floor.
+                    if (col.tops[h] - bottom < 2 || col.tops[h] > col.tops[0] - 20
+                            || bottom < level.getMinBuildHeight() + 8)
                         continue;
                     for (int y : new int[]{col.tops[h] - 1, bottom + 1}) {
                         e.checked++;
