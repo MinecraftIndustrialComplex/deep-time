@@ -113,7 +113,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   scattered continents all collide.
 - **Gates.** `cargo test --workspace` ok (core 256 + 3 ignored, incl. 5 provinces:: tests: every rule, LIP with and
   without the event, the derivation leaves the world equal, the generalisation, ramp labels and colours); clippy
-  `--workspace --all-targets -D warnings` ok; `cargo fmt --check` ok; `cargo deny check licenses bans` ok.
+  `--workspace --all-targets -D warnings` ok; `cargo fmt --check` ok; `cargo deny check licenses bans` ok; all four
+  re-run after merging master 553ecda (docs only): the same results.
   **World files vs master** (`run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --threads
   6`, master 032c94c binary against this branch): `diff -rq` differs only in `keyframes/index.json`, the 11 plate-group
   `kf-*.dtk` and `manifest.json` (created_utc, the keyframe files' bytes/crc, timings, `reserved_peak_bytes`); every
