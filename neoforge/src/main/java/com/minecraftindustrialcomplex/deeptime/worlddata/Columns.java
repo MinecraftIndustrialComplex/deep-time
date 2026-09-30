@@ -94,9 +94,13 @@ public final class Columns {
      * @param horizons  [top y, class index] per horizon, top-down
      * @param bodies    runs inside bodies, ascending body id, each body's runs top-down
      * @param rock      the rock from {@code topY} down to min_y: a body's class (a zone's winning) over the horizon's
+     * @param hydro     the column's lake, river, sea or bank ({@link Water}, P1-22)
      */
     public record Sample(int x, int z, int wx, double elevation, double detail, double surface, int topY, double water,
-                         int[][] horizons, List<BodyRun> bodies, List<Run> rock) {}
+                         int[][] horizons, List<BodyRun> bodies, List<Run> rock, Water.Column hydro) {}
+
+    /** The noise cell width of the {@code deeptime:planet} generator the parity fixture assumes. */
+    public static final int NOISE_CELL = 4;
 
     /** Evaluates column (x, z) of {@code wd}. */
     public static Sample sample(WorldData wd, int x, int z) {
@@ -187,6 +191,6 @@ public final class Columns {
                 rock.add(new Run(y, y, cls));
         }
         return new Sample(x, z, wx, elevation, detail, surface, topY, water, horizons, List.copyOf(bodies),
-                List.copyOf(rock));
+                List.copyOf(rock), Water.column(wd, Water.Spec.of(wd, NOISE_CELL), x, z));
     }
 }

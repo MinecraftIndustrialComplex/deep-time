@@ -17,8 +17,10 @@ pub mod lazy;
 pub mod manifest;
 pub mod ramps;
 pub mod raster;
+pub mod rivers;
 pub mod sites;
 pub mod tilepack;
+pub mod water;
 
 pub use bodies::{Body, BodyId, Shape, Zone};
 pub use column::{Column, ColumnWorld};
@@ -32,8 +34,10 @@ pub use lazy::LazyLayer;
 pub use manifest::{FileEntry, LayerEntry, Manifest, Scale, Writer};
 pub use ramps::{Ramp, Ramps};
 pub use raster::{Cell, Codec, DType, GridDesc, LayerDesc, LoadedLayer, Raster, RasterRead, TILE};
+pub use rivers::{Chain, Mouth, RiverVertex, Rivers};
 pub use sites::{Extraction, Product, Site, SiteId, SiteIndex, SiteKind};
 pub use tilepack::{TilePackReader, TilePackWriter, Written, encode_tile_pack, write_tile_pack};
+pub use water::{WaterColumn, WaterKind, WaterSpec};
 
 /// The world-data format version this crate reads and writes (plan §5.7.2). Its one source is the
 /// workspace `Cargo.toml` (`[workspace.metadata.deeptime] format_version`), read by `build.rs`;

@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
 import com.minecraftindustrialcomplex.deeptime.climate.ClimateMapping;
+import com.minecraftindustrialcomplex.deeptime.worlddata.Rivers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 
 /**
@@ -62,6 +63,13 @@ public final class WorldDataTerrain implements TerrainSource {
     @Override
     public double raster(String layer, int x, int z) {
         ClimateMapping m = mapping();
+        if (ClimateMapping.RIDGES.equals(layer)) {
+            // P1-22: a channel wide enough for a river biome puts the column in the valley slice
+            // (weirdness 0, the middle of the river slice of every overworld-style parameter list).
+            Rivers r = data().rivers();
+            if (r != null && r.sample(wrapX(x), z).biome())
+                return 0.0;
+        }
         if (!m.isIdentity() && ClimateMapping.RIDGES.equals(layer))
             return m.apply(layer, data().layer(layer).bilinearOdd(wrapX(x), z));
         return m.apply(layer, data().raster(layer, wrapX(x), z));

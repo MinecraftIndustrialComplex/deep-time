@@ -19,6 +19,7 @@ pub mod nbt;
 pub mod palette;
 pub mod region;
 pub mod render;
+pub mod rivermap;
 pub mod surface;
 pub mod world;
 pub mod worlddata;

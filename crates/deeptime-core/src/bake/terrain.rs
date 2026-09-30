@@ -8,10 +8,9 @@
 //!   `elevation` upsampled bilinearly from the young landscape (L2), else from the deep-time
 //!   surface (L1), and no detail layer. Metres become block y as everywhere: y = sea_level_y +
 //!   (h − sea) / m_per_block_v, stored ×16 (i16).
-//! - **water_level.** Every cell nodata: lakes and rivers above the sea are Phase 2 (plan §5.3,
-//!   decisions file "Rivers and lakes"); the layer is written so every world has the same layers
-//!   and the Java `WaterPass` reads it as it reads the synthetic worlds'.
-//! - **spawn/candidates.json.** Ranked by the essentials that set `max_blocks_from_spawn` (the game
+//! - **water_level.** Every cell nodata here; the water part (`super::water`, P1-22) replaces it
+//!   with the lakes after the climate is baked (and leaves it so when `hydro.enabled` is false).
+//! - **spawn/candidates.json** ([`spawn`], called after the water part). Ranked by the essentials that set `max_blocks_from_spawn` (the game
 //!   passes the pack's list in the content bundle, P1-15), else the synthetic worlds' rule
 //!   (`synth::spawn_candidates`): dry land nearest to (0, 0).
 
@@ -125,9 +124,36 @@ pub fn bake(
     let written = w.finish()?;
     out.listed(&wd, rel, written.bytes, written.crc32);
 
-    // Spawn candidates.
-    let elev = LazyLayer::open(&elevation)?;
-    let water = LazyLayer::open(&out.dir.join(layer_path("water_level")))?;
+    Ok(Terrain {
+        note: json!({
+            "elevation": source,
+            "grid": l3,
+            "water_level": "nodata until the water part (P1-22) writes the lakes",
+        }),
+        l3,
+        elevation,
+        detail: amplitude.is_some(),
+        amplitude,
+    })
+}
+
+/// `spawn/candidates.json`, after the water part: ranked by the essentials that set
+/// `max_blocks_from_spawn` (the game passes the pack's list in the content bundle, P1-15), else the
+/// synthetic worlds' rule (`synth::spawn_candidates`): dry land nearest to (0, 0). Returns the
+/// number of candidates and whether they were ranked.
+pub fn spawn(
+    world: &WorldState,
+    p: &PlanetPreset,
+    terrain: &Terrain,
+    out: &mut Out<'_>,
+) -> Result<(usize, bool), CoreError> {
+    let s = &p.scale;
+    let elev = LazyLayer::open(&terrain.elevation)?;
+    let wl = out
+        .m
+        .layer("water_level")
+        .ok_or_else(|| CoreError::InvalidState("no water_level layer".into()))?;
+    let water = LazyLayer::open(&out.dir.join(&wl.path))?;
     let essentials = p
         .deposits
         .as_ref()
@@ -148,18 +174,5 @@ pub fn bake(
     };
     let n = spawn["candidates"].as_array().map_or(0, Vec::len);
     out.json("spawn/candidates.json", &spawn)?;
-
-    Ok(Terrain {
-        note: json!({
-            "elevation": source,
-            "grid": l3,
-            "water_level": "nodata everywhere (lakes and rivers above the sea: Phase 2)",
-            "spawn_candidates": n,
-            "spawn_ranked_by_essentials": ranked,
-        }),
-        l3,
-        elevation,
-        detail: amplitude.is_some(),
-        amplitude,
-    })
+    Ok((n, ranked))
 }
