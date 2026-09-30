@@ -9,6 +9,7 @@ mod heightmap;
 mod parity;
 mod provinces;
 mod run;
+mod satellite_view;
 mod structure_view;
 mod synth;
 mod watch;
@@ -350,6 +351,19 @@ enum Command {
         /// PNG to write.
         #[arg(long)]
         out: PathBuf,
+    },
+    /// Draw the satellite view layer (true colour: land cover from the climate, snow and glacier
+    /// ice, the sea by depth, sea ice, hill shading) of a checkpoint's world as a PNG.
+    Satellite {
+        /// A checkpoint written by `stage --out` or `run --checkpoints`.
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// PNG to write.
+        #[arg(long)]
+        out: PathBuf,
+        /// Width in pixels (the height is half of it).
+        #[arg(long, default_value_t = 1024)]
+        width: u32,
     },
 }
 
@@ -710,6 +724,22 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::Satellite { input, out, width }) => {
+            match satellite_view::run(&input, &out, width) {
+                Ok((t, elevation)) => {
+                    println!(
+                        "deeptime satellite: t = {:.1} Myr, drawn on {elevation} -> {}",
+                        t / 1.0e6,
+                        out.display()
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime satellite: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::DumpDeposits { world, out }) => match dump::run(&world, &out) {
             Ok((sites, bodies, inside)) => {
                 println!(

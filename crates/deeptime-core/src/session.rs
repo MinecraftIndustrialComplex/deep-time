@@ -30,7 +30,7 @@ use crate::checkpoint::{Checkpoint, CheckpointRef};
 use crate::deposits::recorded::Evicted;
 use crate::deposits::spill::SpillStore;
 use crate::error::CoreError;
-use crate::keyframes::{self, KeyframePolicy, KeyframeStore, RING_CAPACITY};
+use crate::keyframes::{self, KeyframePolicy, KeyframeStore, RING_CAPACITY, ViewScale};
 use crate::log::{Level, LogRing};
 use crate::world::WorldState;
 
@@ -302,6 +302,8 @@ pub struct Session {
     events_total: AtomicU64,
     keyframes: KeyframeStore,
     policy: KeyframePolicy,
+    /// The preset's scale as the keyframes' view layers read it (the satellite view).
+    view: ViewScale,
     has_keyframes: bool,
     ramps: Ramps,
     checkpoint_dir: Option<PathBuf>,
@@ -478,6 +480,7 @@ impl Session {
             })
             .collect();
         let policy = preset.keyframe_policy();
+        let view = preset.view_scale();
         let has_keyframes =
             policy.every_years.is_some() && stages.iter().any(|s| !s.keyframe_layers().is_empty());
         let preset_json = serde_json::to_string(&preset.to_json())
@@ -527,6 +530,7 @@ impl Session {
                 timings,
             }),
             policy,
+            view,
             has_keyframes,
             ramps: Ramps::builtin(),
             checkpoint_dir: None,
@@ -822,9 +826,15 @@ impl Session {
             return Ok(());
         }
         let n = self.keyframes.next_n();
-        if let Some(frame) =
-            keyframes::render(&s.world, &self.ramps, stage, layers, n, self.policy.size)
-        {
+        if let Some(frame) = keyframes::render(
+            &s.world,
+            &self.ramps,
+            &self.view,
+            stage,
+            layers,
+            n,
+            self.policy.size,
+        ) {
             self.keyframes.push(frame)?;
             s.last_kf_t = Some((s.world.t_years, s.current));
             self.log.push(
