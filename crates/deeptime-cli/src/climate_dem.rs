@@ -114,6 +114,7 @@ pub fn run(o: &Options) -> CliResult<()> {
         sea: 0.0,
         p: &p,
         planet,
+        monthly: false,
     };
     let mut ebm = EbmState::default();
     let mut s = snapshot::compute(&inp, &mut ebm, &[]);

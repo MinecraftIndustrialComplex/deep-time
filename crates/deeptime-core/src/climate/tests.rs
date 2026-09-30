@@ -64,6 +64,7 @@ fn an_idealised_planet_has_earthlike_zones() {
         sea: 0.0,
         p: &p,
         planet: planet(),
+        monthly: true,
     };
     let mut ebm = EbmState::default();
     let s = snapshot::compute(&inp, &mut ebm, &[]);

@@ -632,6 +632,8 @@ def planetWorldParity = tasks.register('testWorldPlanet4k', Exec) {
     def world = testWorldsDir.map { it.dir('planet4k') }
     def fixture = testWorldsDir.map { it.file('planet4k/parity/columns.json') }
     outputs.file fixture
+    // P1-25: `parity` also writes the climate API's evaluator (ClimateParityTest).
+    outputs.file testWorldsDir.map { it.file('planet4k/parity/climate.json') }
     workingDir repoRoot
     commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
             'parity', '--world-data', world.get().asFile.absolutePath, '--columns', '500'

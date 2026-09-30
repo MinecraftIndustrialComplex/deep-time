@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
-# Deep Time world-data format 0.1
+# Deep Time world-data format 0.2
 
 The contract between the Rust writer (`crates/deeptime-format`) and the Java reader
 (`neoforge/src/main/java/com/minecraftindustrialcomplex/deeptime/worlddata`). Plan §5.3 and §5.7
@@ -18,6 +18,12 @@ term a baked world declares ("The terrain height"); the first horizon of a baked
 the amplified terrain ("The P1-08 bake"); and the column evaluator both sides implement is specified
 ("Columns"). Nothing a 0.0 world held changed its bytes, only the minor.
 
+**0.2 (P1-25)** over 0.1: every header's minor is 2; a planet run with a climate section bakes the
+climate stage's twelve months on L1 (`climate/month/t_sl_c_01..12`, `climate/month/p_share_01..12`,
+`notes.bake.climate.monthly`), and the climate at a block that Deep Time's public climate API
+answers is specified ("The climate at a block"). Nothing a 0.1 world held changed its bytes, only
+the minor.
+
 ## Folder layout
 
 ```text
@@ -31,6 +37,8 @@ the amplified terrain ("The P1-08 bake"); and the column evaluator both sides im
   rasters/climate/t_mean_c.dtr  L1, i16, 0.01 °C            ┐
   rasters/climate/p_mm.dtr      L1, u16, mm/yr              │ a baked planet run only
   rasters/climate/koppen.dtr    L1, u8, Köppen code index   │ (P1-08, "The bake" below)
+  rasters/climate/month/*.dtr   L1: t_sl_c_NN i16 0.01 °C,  │ the twelve months (0.2, P1-25)
+                                p_share_NN u8 1/40          │
   rasters/surface/*.dtr         L2, u8                      │
   rasters/meta/*.dtr            L1, u16                     ┘
   strata/horizons.dtr           L1, horizon_stack, K = 3 in the synthetic worlds (8 with --strata every-class,
@@ -64,7 +72,7 @@ manifest last. The synthetic worlds have none of these.
 
 ```json
 {
-  "format_version": "0.1",
+  "format_version": "0.2",
   "writers": [{"name": "deeptime-cli", "version": "0.0.1", "format_crate": "0.0.1"}],
   "source": "synth:wrap-test",
   "preset_hash": null,
@@ -109,6 +117,8 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
 | `climate/koppen` | L1 | u8 | 1, code index | 255 | `notes.bake.climate.koppen_codes[i]` (31 = sea) |
+| `climate/month/t_sl_c_{01..12}` | L1 | i16 | 0.01, degC | — | each month's mean temperature at sea level (the lapse rate taken out: `+ lapse_c_per_km · max(0, h − sea)`), from the climate stage's last snapshot (0.2) |
+| `climate/month/p_share_{01..12}` | L1 | u8 | 1/40, ratio | — | each month's precipitation rate over the twelve's mean (0–6.375; they sum to 12 within the quantum) (0.2) |
 | `climate/{temperature,vegetation,continents,erosion,ridges}` | L2 | i16 | 1e-4, vanilla_param | — | the router's five biome inputs, placed against the reference bands and vanilla's land distributions (P1-09, "The climate mapping") |
 | `surface/regolith_blocks` | L2 | u8 | 1/16, block | — | regolith thickness |
 | `surface/class_top` | L2 | u8 | 1, class index | 255 | the rock class at the surface (`strata/classes.json`) |
@@ -121,6 +131,31 @@ what it did, `millis` per part, `bytes` and `layers` written, and **`detail`** �
 term: `{"layer": "detail/amplitude", "seed": "<u64, decimal>", "salt": 1729, "octaves": 3,
 "wavelength_blocks": 32.0}` (present exactly when `detail/amplitude` is). A preset without the
 deep-time surface (plate-only) bakes nothing (`baked: false`).
+
+### The climate at a block (0.2, P1-25)
+
+`notes.bake.climate.monthly` is `null` for a run without a climate section, else
+`{"t_sl": [the 12 layer names], "p_share": [...], "lapse_c_per_km": Γ, "months": "..."}`. Month 01
+starts at solar longitude 280° (about 1 January on Earth); the twelve months are equal 30° steps of
+solar longitude (a circular orbit), so year fraction f corresponds to λ = 280° + 360°·f and the
+northern spring equinox is at f = 80/360. What Deep Time's public climate API
+(`com.minecraftindustrialcomplex.deeptime.api.climate`) and Rust's `deeptime_format::ClimateWorld`
+answer at block (x, y, z), in this order (both sides bit for bit; `deeptime parity` writes
+`parity/climate.json`, 500 blocks, beside `parity/columns.json`):
+
+1. x folded into [−C/2, C/2); every raster sampled at (x, z) in block space (the `RasterRead`
+   bilinear and nearest of "Tile pack").
+2. `e = max(0, y − sea_level_y) · m_per_block_v` metres; `L = Γ · e / 1000`.
+3. for m = 0..11: `T[m] = bilinear(t_sl_c_{m+1}) − L`; `s[m] = bilinear(p_share_{m+1})`; `S = Σ s[m]`.
+4. `P = max(0, bilinear(climate/p_mm))`; for m = 0..11: `P[m] = P · (S > 0 ? 12 · s[m] / S : 1) / 12`.
+5. the mean `Σ T[m] / 12` (summed m ascending); the warmest and coldest month the first maximum
+   and minimum of T.
+6. the Köppen class `nearest(climate/koppen)` (NaN → 31), named by `notes.bake.climate.koppen_codes`
+   (31 → `sea`).
+
+Precipitation is not lapsed (the simulation's orographic rain is in `p_mm` already). Below sea level
+the temperature is the sea-level value. The values are the climate (long-term monthly means), not
+weather.
 
 ### The climate mapping (P1-09)
 
@@ -258,7 +293,7 @@ Equirectangular in block space (plan §5.2). A grid has `w` × `h` cells with `w
 offset        size  field
 0             4     magic "DTR1" (0x44 0x54 0x52 0x31)
 4             4     u32 header_len = 16 + json_len (bytes from file start to the end of the JSON)
-8             2     u16 format_minor (1 for "0.1")
+8             2     u16 format_minor (2 for "0.2")
 10            2     u16 flags, reserved, 0
 12            4     u32 CRC32 of bytes 0..12 followed by the JSON bytes
 16            json  LayerDesc, UTF-8 JSON, no BOM
@@ -451,7 +486,7 @@ of plan §5.7.2, fixed fields of the file type, a section table and the sections
 offset   size  field
 0        4     magic
 4        4     u32 header_len = 16 + F + 16·K (F fixed bytes, K sections)
-8        2     u16 format_minor (1 for "0.1")
+8        2     u16 format_minor (2 for "0.2")
 10       2     u16 flags, reserved, 0
 12       4     u32 CRC32 of bytes 0..12 followed by bytes 16..header_len
 16       F     fixed fields (per type, below)
@@ -622,7 +657,7 @@ dropped_separation`, plus `province`, `provinces`, `count_mult`, `max_formed_per
 Timelapse frames (plan §6.1), written while a run goes; frame `n` counts from 0.
 
 ```json
-{"format_version": "0.1",
+{"format_version": "0.2",
  "frames": [{"n": 0, "t": -390000000.0, "stage": "dummy_drift", "w": 256, "h": 128,
              "layers": ["elevation"], "path": "keyframes/kf-0.dtk", "bytes": 5321, "crc32": 1}]}
 ```
