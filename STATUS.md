@@ -146,9 +146,9 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   generator, `--keep-world`) then `deeptime-inspect section --axis z --at -1661 --from 1935 --to 2180 --y-from -140
   --y-to 20 --scale 4`: site 44, 15 seams in 130 blocks, a thick top seam and thin ones below with the speckle of
   60 % ore density, clipped at the top by the surface (the PNG is in `review/out/coalsection/`, gitignored).
-- **Gates** (Mac, on the branch after merging master 7f907ce): `cargo test --workspace --locked` all pass (core 246 + 3
+- **Gates** (Mac, on the branch after merging master c35f56f): `cargo test --workspace --locked` all pass (core 252 + 3
   ignored, cli 30, format 40, …), clippy `-D warnings` clean, fmt clean, `cargo deny check licenses bans` ok;
-  `cd neoforge && ./gradlew build test` → tests=140 failures=0; `tools/remote/mac.sh --server -- ./gametest.sh` → All 50
+  `cd neoforge && ./gradlew build test` → tests=143 failures=0; `tools/remote/mac.sh --server -- ./gametest.sh` → All 50
   required tests passed (`coePicksSiteVein` counts the coal stack's ore blocks per chunk block by block against
   `SiteChunks`: 11,557 blocks in one chunk of site 51).
   `tools/smoke/install.sh mic` + `./gametest.sh -PwithMic` (168 MIC mods, COE and CDG live) → Gradle BUILD SUCCESSFUL,
@@ -352,7 +352,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   the lever is `clustering.camp_spacing_km` or letting formed (not surviving) fields overlap in the engine.
 - **Gates** (Mac, on the branch after merging master b1cbc97): `cargo test --workspace --locked` all pass (core 239 + 3
   ignored, cli 30, format 40, …), clippy `-D warnings` clean, fmt clean, `cargo deny check licenses bans` ok;
-  `cd neoforge && ./gradlew build test` → tests=140 failures=0; `tools/remote/mac.sh --server -- ./gametest.sh` → All 50
+  `cd neoforge && ./gradlew build test` → tests=143 failures=0; `tools/remote/mac.sh --server -- ./gametest.sh` → All 50
   required tests passed. Scratch scripts `coal-gen.sh` / `coal-dep.sh` (untracked, not committed) made the checkpoints and ran
   the before/after counts; the checkpoints are in `/Volumes/Graphide/ban/deeptime-runs/coal/` on the Mac.
 - **Decisions for Ben** (not asked): (1) the size_mult_h 6 → 1 reading of "tens of km across" (physical field size, no
