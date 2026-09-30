@@ -3590,6 +3590,24 @@ on this machine.
 - **Acceptance.** Tests on placement from arc/hotspot/LIP fields; a real planet shows volcano
   chains in the right settings; 3D previews of an arc volcano, a hotspot island chain and a caldera.
 
+#### P1-22 Rivers and lakes (moved from P2-03, 2026-09-29)
+- **Goal.** The core of §8.4 hydrology in v1 (Ben, decisions log 2026-09-29): river networks from the
+  simulation's routing carved into the terrain at block scale, lakes that fill and spill
+  (`water_level` for real), river biomes; waterfalls, deltas and floodplain detail may stay in P2-03.
+
+#### P1-23 Grid-artifact audit (2026-09-29)
+- **Goal.** Sweep real worlds (sections, top-downs, 3D previews) for grid artifacts: staircase coasts,
+  axis-aligned gullies, cell-edge seams in biomes, strata or snow; fix them with before/after renders.
+
+#### P1-24 Faster Create World (2026-09-29)
+- **Goal.** Measure player-side generation on a mid-range PC profile, then choose (Ben) among a faster
+  quick mode, shipped pre-made planets and background generation, and build it.
+
+#### P1-25 Climate API for mic-climate and Project Atmosphere (2026-09-29)
+- **Goal.** Expose Deep Time's simulated temperature, seasons and rainfall per location through a
+  public API that MIC's mic-climate (Thermoo connector) reads, and make sure mic-climate and Project
+  Atmosphere use it properly (PA's public API only; PA is never redistributed).
+
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 
 - **P2-01 Noddy evaluator.** Port `unEvents.c`, `taste.c`, `matrix.c` from `noddyverse` (MIT);
@@ -3597,7 +3615,7 @@ on this machine.
   bodies.
 - **P2-02 Metamorphic grade** from restored burial and heat; facies table (hand-built from textbook
   facies boundaries, or generated offline — see Q8).
-- **P2-03 Hydrology** (§8.4): routing, Fill–Spill–Merge lakes, HAND floodplains, river vectors,
+- **P2-03 Hydrology** (§8.4; its core moved to P1-22 on 2026-09-29, the rest stays here): routing, Fill–Spill–Merge lakes, HAND floodplains, river vectors,
   channel carving, waterfalls, deltas; `water_level` for real.
 - **P2-04 Geology-driven caves.** Karst in carbonates (port of `aparis69/Karst-Synthesis`, MIT) and
   cave density modulated by lithology and water table, with vanilla cave functions kept as the
