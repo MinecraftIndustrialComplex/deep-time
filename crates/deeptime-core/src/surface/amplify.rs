@@ -967,7 +967,9 @@ pub fn summary_line(v: &Value) -> String {
         f("lost_in_transit_km3"),
         v["drama"],
         v["ruggedness"],
-        v["character"]["mean_abs_change_blocks"].as_f64().unwrap_or(0.0),
+        v["character"]["mean_abs_change_blocks"]
+            .as_f64()
+            .unwrap_or(0.0),
         v["character"]["flood_raised_cells"],
         v["character"]["softened_cells"],
         v["character"]["millis"].as_f64().unwrap_or(0.0) / 1000.0,
