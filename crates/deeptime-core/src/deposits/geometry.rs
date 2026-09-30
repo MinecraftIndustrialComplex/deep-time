@@ -14,7 +14,8 @@ use std::collections::BTreeMap;
 use deeptime_format::SiteId;
 use deeptime_format::bodies::{Body, NO_CLIP, Shape, Zone};
 
-use super::types::{DepositType, ExtraBody, When, ZoneDef};
+use super::random::Rng;
+use super::types::{DepositType, ExtraBody, Stack, When, ZoneDef};
 
 /// World scales the geometry needs.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -191,6 +192,186 @@ fn extra(
     b
 }
 
+/// The coal measures under a site, from its column's history (`geometry.stack`): the sediment
+/// laid down while the cell was coal-forming, Σ_k F_k · deposition_k · Δt_k over the frames k of
+/// the crust's life, in metres. F_k is the cell's favourability in frame k, recovered from the
+/// hazard h_k = −(Δt/τ)·ln(1 − F_k) the placement was drawn from. `hazard` is per frame of the
+/// history; `col` holds the frames the crust existed in, in order (`t_years` of each frame in
+/// `frame_years`, the same values).
+pub fn measures_thickness_m(
+    hazard: &[f32],
+    tau_myr: f64,
+    frame_years: &[f64],
+    col: &[super::children::ColumnSample],
+) -> f64 {
+    let mut total = 0.0;
+    let mut s = col.iter().peekable();
+    for (k, h) in hazard.iter().enumerate() {
+        let Some(&t) = frame_years.get(k) else { break };
+        while s.peek().is_some_and(|c| c.t_years < t) {
+            s.next();
+        }
+        let Some(c) = s.peek().filter(|c| c.t_years == t) else {
+            continue;
+        };
+        if !h.is_finite() || *h <= 0.0 {
+            continue;
+        }
+        let dt_myr = c.dt_years / 1.0e6;
+        let f = 1.0 - (-f64::from(*h) * tau_myr / dt_myr).exp();
+        total += f * c.deposition_m_myr.max(0.0) * dt_myr;
+    }
+    total
+}
+
+/// The seams of one stacked deposit, top seam first.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SeamPlan {
+    /// The coal measures' thickness the count came from (m).
+    pub measures_m: f64,
+    /// Each seam's share of the tonnage (sums to 1).
+    pub shares: Vec<f64>,
+    /// The real gaps between neighbouring seams (m), one fewer than seams; their mean is the
+    /// measures' thickness per seam.
+    pub gaps_m: Vec<f64>,
+}
+
+impl SeamPlan {
+    pub fn seams(&self) -> usize {
+        self.shares.len()
+    }
+}
+
+/// The seams a stack of `measures_m` metres of coal measures holds: n = round(measures /
+/// `seam_spacing_m`) clamped to the type's range and to `cumulative_m` / `min_seam_m` (the
+/// field's total seam thickness, m), shares and gaps drawn from `rng` (a fixed
+/// number of draws per seam, so the plan is a pure function of the stream).
+pub fn seam_plan(k: &Stack, measures_m: f64, cumulative_m: f64, rng: &mut Rng) -> SeamPlan {
+    let mut n = ((measures_m / k.seam_spacing_m).round().max(0.0) as u64)
+        .clamp(u64::from(k.min_seams), u64::from(k.max_seams));
+    if k.min_seam_m > 0.0 {
+        // Thinner seams than the minimum are not minable: fewer, thicker seams instead.
+        let cap = (cumulative_m / k.min_seam_m).floor().max(0.0) as u64;
+        n = n.min(cap.max(u64::from(k.min_seams)));
+    }
+    let n = n as usize;
+    let mut shares: Vec<f64> = (0..n)
+        .map(|_| (k.share_sigma * rng.normal()).exp())
+        .collect();
+    let sum: f64 = shares.iter().sum();
+    shares.iter_mut().for_each(|s| *s /= sum);
+    let mut gaps: Vec<f64> = (0..n.saturating_sub(1))
+        .map(|_| (k.gap_sigma * rng.normal()).exp())
+        .collect();
+    let mean = if gaps.is_empty() {
+        1.0
+    } else {
+        gaps.iter().sum::<f64>() / gaps.len() as f64
+    };
+    let per_seam = measures_m.max(0.0) / n as f64;
+    gaps.iter_mut().for_each(|g| *g *= per_seam / mean);
+    SeamPlan {
+        measures_m,
+        shares,
+        gaps_m: gaps,
+    }
+}
+
+/// A stack's bodies and how much of its tonnage is left in them.
+pub struct StackBodies {
+    pub bodies: Vec<Body>,
+    /// Σ share × (the part of the seam below the surface): the stack's remaining fraction of
+    /// its tonnage.
+    pub kept: f64,
+}
+
+/// The bodies of a stacked deposit (`geometry.stack`): one `ore` body per seam, ids consecutive
+/// from `next_id`, top seam first. The ore body of `tonnage_t` is sized as usual (its footprint
+/// is the field, its thickness the field's cumulative seam thickness); each seam keeps that
+/// footprint and takes `share` of the thickness and of the tonnage. The stack's centre is at
+/// `at.centre_depth_m`, so its top seam lies half the measures above it; the gaps between seams
+/// are enlarged by `spacing_mult_v` downwards from the top seam. A seam above the ground is
+/// eroded away (dropped), one crossing it is clipped at the surface, one below the world's floor
+/// is dropped.
+#[allow(clippy::too_many_arguments)]
+pub fn stack_bodies(
+    t: &DepositType,
+    k: &Stack,
+    site: SiteId,
+    tonnage_t: f64,
+    grades: &Grades,
+    at: &Placement,
+    plan: &SeamPlan,
+    sc: &Scales,
+    next_id: &mut dyn FnMut() -> u32,
+) -> StackBodies {
+    let shape = t.shape();
+    let volume = tonnage_t / t.sizing.ore_density_t_m3;
+    let semi_m = semi_axes_m(shape, t.geometry.aspect, volume);
+    let h = t.balance.size_mult_h / sc.m_per_block_h;
+    let v = t.balance.size_mult_v / sc.m_per_block_v;
+    let (a, c) = (
+        (semi_m[0] * h).max(0.5) as f32,
+        (semi_m[2] * h).max(0.5) as f32,
+    );
+    let top_y = at.surface_y - (at.centre_depth_m - plan.measures_m / 2.0) / sc.m_per_block_v;
+    let clip = at.surface_y.floor() as i32;
+    let mut bodies = Vec::new();
+    let mut kept = 0.0;
+    let mut below = 0.0;
+    for (i, share) in plan.shares.iter().enumerate() {
+        if i > 0 {
+            below += plan.gaps_m[i - 1] * k.spacing_mult_v / sc.m_per_block_v;
+        }
+        let axes = [a, (semi_m[1] * share * v).max(0.5) as f32, c];
+        let centre = [at.x, top_y - below, at.z];
+        let mut body = Body::new(
+            0,
+            Some(site),
+            shape,
+            "ore",
+            centre,
+            axes,
+            at.yaw,
+            at.dip,
+            NO_CLIP,
+        );
+        let [lo, hi] = body.aabb;
+        if hi[1] < sc.min_y {
+            continue;
+        }
+        let mut frac = 1.0;
+        if lo[1] > clip {
+            continue;
+        }
+        if hi[1] > clip {
+            frac = (f64::from(clip - lo[1]) / f64::from((hi[1] - lo[1]).max(1))).clamp(0.0, 1.0);
+            body = Body::new(
+                0,
+                Some(site),
+                shape,
+                "ore",
+                centre,
+                axes,
+                at.yaw,
+                at.dip,
+                clip,
+            );
+        }
+        body.id = next_id();
+        body.rock_class = t.geometry.rock_class.clone();
+        body.zones = t
+            .geometry
+            .zoning
+            .iter()
+            .map(|z| zone(z, grades, t.balance.richness_mult))
+            .collect();
+        kept += share * frac;
+        bodies.push(body);
+    }
+    StackBodies { bodies, kept }
+}
+
 /// The vertical half-height in metres of the ore body (before size_mult_v), for the ledger.
 pub fn half_height_m(t: &DepositType, tonnage_t: f64) -> f64 {
     semi_axes_m(
@@ -198,6 +379,17 @@ pub fn half_height_m(t: &DepositType, tonnage_t: f64) -> f64 {
         t.geometry.aspect,
         tonnage_t / t.sizing.ore_density_t_m3,
     )[1]
+}
+
+/// The plan footprint's semi-axes `[a, c]` in blocks, for adjoining placement.
+pub fn footprint_blocks(t: &DepositType, tonnage_t: f64, sc: &Scales) -> [f64; 2] {
+    let semi = semi_axes_m(
+        t.shape(),
+        t.geometry.aspect,
+        tonnage_t / t.sizing.ore_density_t_m3,
+    );
+    let b = to_blocks(semi, t, sc);
+    [f64::from(b[0]), f64::from(b[2])]
 }
 
 /// The horizontal radius in blocks (the larger horizontal semi-axis), for separation.
@@ -264,5 +456,166 @@ mod tests {
         );
         assert!(ore.validate().is_ok());
         assert!(b.iter().all(|x| x.id > 10));
+    }
+
+    fn coal() -> DepositType {
+        builtin()
+            .unwrap()
+            .into_iter()
+            .find(|t| t.id == "deeptime:coal_seam")
+            .unwrap()
+    }
+
+    /// The measures are Σ F · deposition · Δt over the frames the crust existed in, F recovered
+    /// from the hazard the placement was drawn from.
+    #[test]
+    fn measures_are_favourability_weighted_deposition() {
+        use crate::deposits::children::ColumnSample;
+        let (tau, dt_myr) = (10.0, 10.0);
+        let hazard_of = |f: f64| (-(dt_myr / tau) * (1.0_f64 - f).ln()) as f32;
+        let frames: Vec<f64> = (1..=4).map(|k| f64::from(k) * dt_myr * 1.0e6).collect();
+        let col: Vec<ColumnSample> = frames
+            .iter()
+            .enumerate()
+            .filter(|(k, _)| *k != 1) // the crust did not exist in frame 1
+            .map(|(_, t)| ColumnSample {
+                t_years: *t,
+                dt_years: dt_myr * 1.0e6,
+                erosion_m_myr: 0.0,
+                deposition_m_myr: 40.0,
+                water_table_m: 0.0,
+                precip_mm: 0.0,
+            })
+            .collect();
+        // F = 0.5 in frames 0 and 1 (frame 1 has no crust), 1 - e^-1-ish in frame 2, none in 3.
+        let hazard = [hazard_of(0.5), hazard_of(0.5), hazard_of(0.25), 0.0];
+        let s = measures_thickness_m(&hazard, tau, &frames, &col);
+        assert!((s - (0.5 * 400.0 + 0.25 * 400.0)).abs() < 0.5, "{s}");
+        assert_eq!(measures_thickness_m(&[0.0; 4], tau, &frames, &col), 0.0);
+    }
+
+    /// The seam count follows the measures, within the type's range and the minable thickness;
+    /// the shares sum to one and the gaps average the measures per seam; a fixed seed gives the
+    /// same plan.
+    #[test]
+    fn the_stack_follows_the_measures() {
+        let t = coal();
+        let k = t.geometry.stack.clone().unwrap();
+        let plan = |measures: f64, cumulative: f64, seed: u64| {
+            seam_plan(&k, measures, cumulative, &mut Rng::new(seed))
+        };
+        let n = |m: f64| plan(m, 1000.0, 1).seams();
+        assert_eq!(n(0.0), 1, "no measures: the minimum, one seam");
+        assert_eq!(n(100.0), 4);
+        assert_eq!(n(500.0), 20);
+        assert_eq!(n(1.0e6), k.max_seams as usize, "clamped at the maximum");
+        assert!(
+            n(200.0) < n(400.0) && n(400.0) < n(800.0),
+            "more measures, more seams"
+        );
+        // Seams thinner than the minimum are not minable: 5 m of coal holds at most 7.
+        assert_eq!(plan(1000.0, 5.0, 1).seams(), 7);
+        assert_eq!(plan(1000.0, 0.1, 1).seams(), k.min_seams as usize);
+        let p = plan(600.0, 30.0, 7);
+        assert_eq!(p.seams(), 24.min((30.0 / k.min_seam_m) as usize));
+        assert!((p.shares.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+        assert_eq!(p.gaps_m.len(), p.seams() - 1);
+        let mean = p.gaps_m.iter().sum::<f64>() / p.gaps_m.len() as f64;
+        assert!((mean - 600.0 / p.seams() as f64).abs() < 1e-9, "{mean}");
+        assert_eq!(p, plan(600.0, 30.0, 7), "deterministic");
+        assert_ne!(p, plan(600.0, 30.0, 8), "the seed matters");
+    }
+
+    /// A stack's bodies: one `ore` body per seam, consecutive ids, top first and apart; the
+    /// tonnage splits across them (volumes in proportion to the shares); a seam above the ground
+    /// is eroded away, one crossing it is clipped, and what is kept follows.
+    #[test]
+    fn stack_bodies_split_the_tonnage_and_erode_from_the_top() {
+        let t = coal();
+        let k = t.geometry.stack.clone().unwrap();
+        let grades: Grades = [("c:coal".to_string(), 1.0)].into_iter().collect();
+        let sc = Scales::default();
+        let plan = seam_plan(&k, 500.0, 30.0, &mut Rng::new(3));
+        assert!(plan.seams() >= 5);
+        let build = |depth: f64| {
+            let mut id = 100u32;
+            let at = Placement {
+                x: 10.0,
+                z: -20.0,
+                surface_y: 200.0,
+                centre_depth_m: depth,
+                yaw: 0.4,
+                dip: 0.0,
+                truncated: false,
+            };
+            stack_bodies(&t, &k, 9, 2.0e10, &grades, &at, &plan, &sc, &mut || {
+                id += 1;
+                id
+            })
+        };
+        // Deep: every seam kept, nothing clipped.
+        let deep = build(900.0);
+        assert_eq!(deep.bodies.len(), plan.seams());
+        assert!((deep.kept - 1.0).abs() < 1e-9);
+        for (i, b) in deep.bodies.iter().enumerate() {
+            assert_eq!(
+                (b.id, b.site, b.role.as_str()),
+                (101 + i as u32, Some(9), "ore")
+            );
+            assert_eq!(b.clip_top_y, deeptime_format::bodies::NO_CLIP);
+            assert!(b.validate().is_ok());
+            if i > 0 {
+                let prev = &deep.bodies[i - 1];
+                assert!(
+                    prev.center[1] - b.center[1] >= f64::from(prev.axes[1] + b.axes[1]),
+                    "seam {i} touches the one above"
+                );
+            }
+        }
+        // Volumes follow the shares (a body's axes are at least half a block, so compare seams
+        // thicker than that).
+        let v: Vec<f64> = deep.bodies.iter().map(Body::volume_blocks).collect();
+        let thick: Vec<usize> = (0..v.len())
+            .filter(|i| deep.bodies[*i].axes[1] > 0.6)
+            .collect();
+        assert!(thick.len() >= 2);
+        for w in thick.windows(2) {
+            let (i, j) = (w[0], w[1]);
+            let r = (v[i] / v[j]) / (plan.shares[i] / plan.shares[j]);
+            assert!((r - 1.0).abs() < 1e-3, "seams {i}/{j}: {r}");
+        }
+        // The top seam at the surface is clipped there, the rest kept whole.
+        let at_surface = build(plan.measures_m / 2.0);
+        assert_eq!(at_surface.bodies.len(), plan.seams());
+        assert_eq!(at_surface.bodies[0].clip_top_y, 200);
+        assert!(at_surface.kept < 1.0 && at_surface.kept > 0.0);
+        // Two blocks higher the top seam stands above the ground and is eroded away.
+        let above = build(plan.measures_m / 2.0 - 40.0);
+        assert!(above.bodies.len() < plan.seams(), "the top seam is eroded");
+        assert!(above.kept < at_surface.kept);
+        assert_eq!(above.bodies[0].id, 101, "ids start at the first kept seam");
+        // Far above the ground: nothing is left.
+        let gone = build(-1.0e5);
+        assert!(gone.bodies.is_empty() && gone.kept == 0.0);
+    }
+
+    /// The coal type is a field of tens of km: the median body is about a thousand km² of seam,
+    /// a few km per seam thick after the vertical enlargement.
+    #[test]
+    fn the_median_coal_field_is_tens_of_km_across() {
+        let t = coal();
+        let sc = Scales::default();
+        let [a, c] = footprint_blocks(&t, t.sizing.tonnage_mt.p50 * 1.0e6, &sc);
+        let (a_km, c_km) = (a * sc.m_per_block_h / 1000.0, c * sc.m_per_block_h / 1000.0);
+        let area = std::f64::consts::PI * a_km * c_km;
+        assert!((800.0..1200.0).contains(&area), "{area} km²");
+        assert!((20.0..100.0).contains(&(2.0 * c_km)), "{c_km} km semi-axis");
+        // P90 and P10 span 300 to 3,000 km² within a factor 1.5.
+        let ar = |mt: f64| {
+            let [a, c] = footprint_blocks(&t, mt * 1.0e6, &sc);
+            std::f64::consts::PI * a * c * (sc.m_per_block_h / 1000.0).powi(2)
+        };
+        assert!((200.0..500.0).contains(&ar(t.sizing.tonnage_mt.p90)));
+        assert!((2000.0..4500.0).contains(&ar(t.sizing.tonnage_mt.p10)));
     }
 }

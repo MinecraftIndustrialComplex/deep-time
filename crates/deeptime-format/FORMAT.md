@@ -475,7 +475,18 @@ Deposit sites (P1-14):
   whole ore (coal, crude oil) has grade 1. A site with no ore left (a porphyry whose preserved roots
   were all leached into its blanket) has no products.
 - `body` is the site's first body; its bodies are the records of `bodies/bodies.dtb` whose `site`
-  is the site's id (the ore body first, then a lithocap or a gossan).
+  is the site's id, consecutive ids from `body`: the ore body first, then a lithocap or a gossan.
+  A **stacked** deposit (coal seam fields: the type's `geometry.stack`) has **several ore bodies,
+  one per seam**, all with role `ore`, in consecutive ids from the top seam down: the same centre
+  x and z, footprint (a, c), yaw and dip, each with its own vertical centre and thickness, apart by
+  the gap between seams (no two touch), each carrying the type's zones. The site's `tonnage_t` is
+  the whole field's: a seam holds its share of it, in proportion to its thickness. Erosion removes
+  seams from the top (a seam above the ground is dropped, one crossing it is clipped at the surface
+  by its own `clip_top_y`), so a truncated stack holds fewer seams and `tonnage_t` counts what is
+  left. Readers treat the `ore` bodies of a site as disjoint and add them (Java's
+  `SiteChunks.footprint` sums them; the deposit feature and the strata pass already loop over every
+  body). Nothing in the file layout changed, so the format version stays: a reader that handled a
+  site's several bodies before handles a stack.
 - `amount_base` = `tonnage_t`; `coe_vein` is the deposit type's `minecraft.coe_vein`
   (`createoreexcavation:ore_vein_type/copper`, …); `cdg_charge_mb` (reservoirs) is the oil tonnage
   / 0.85 t/m³ · 1000 mB/m³. The records keep these physical values; the game scales them at run time
