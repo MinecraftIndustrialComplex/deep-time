@@ -195,6 +195,8 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 | `deeptime:marine_transgression` | the sea advances over land | surface (P1-04) | see "The surface's events" |
 | `deeptime:marine_regression` | the sea retreats | surface (P1-04) | see "The surface's events" |
 | `deeptime:glaciation` | an ice age | climate (P1-05) | see "The climate's events" |
+| `deeptime:snowball` | a snowball Earth: the ocean frozen over | climate (deep-time climate) | see "The climate's events" |
+| `deeptime:hothouse` | a hothouse: global mean above `climate.hothouse_c` | climate (deep-time climate) | see "The climate's events" |
 | `deeptime:erosion_pulse` | a burst of erosion | surface (P1-04); dummy | see "The surface's events"; dummy: see below |
 | `deeptime:deposit_formation` | a deposit forms (place: its site) | deposits (P1-14); dummy | below |
 | `deeptime:deposit_exhumation` | erosion exposes (or destroys) a deposit | deposits (P1-14) | below |
@@ -258,17 +260,29 @@ not at its start (regression: the reverse); global when there are none.
 
 ### The climate's events (source `deeptime:climate`, P1-05)
 
-Written by `crates/deeptime-core/src/climate/glaciers.rs` (plan §8.3 item 6), decided at each
-climate snapshot (every `climate.snapshot_every_myr`, 10 Myr, plus the first and last step). A cell is
-glaciated when its land lies above its equilibrium line (ELA from the summer temperature and
-Ohmura et al. 1992's precipitation relation). A glaciation starts at the first snapshot where
-glaciers cover at least `glaciation_on_frac` (0.02) of the land (true area) and ends at the first
-where they cover less than `glaciation_off_frac` (0.01); still open at the end of the run it is
-written with `ongoing` = 1. Place: the ice's area-weighted centroid at its largest.
+Written by `crates/deeptime-core/src/climate/` (plan §8.3 item 6; `glaciers.rs`, `clock.rs`,
+`mod.rs`). **Glaciations** are decided at the end of every plate step (since the deep-time climate;
+at each 10-Myr snapshot before): a cell is glaciated when land ice stands on it
+(`climate/ice_thickness_m` ≥ 1 m: its land above its equilibrium line, from the summer temperature
+and Ohmura et al. 1992's precipitation relation, the line moving with the fine clock's climate). A
+glaciation starts at the first step where ice covers at least `glaciation_on_frac` (0.02) of the
+land (true area) and ends at the first where it covers less than `glaciation_off_frac` (0.01);
+still open at the end of the run it is written with `ongoing` = 1. Place: the ice's area-weighted
+centroid at its largest.
+
+**Snowballs and hothouses** come from the fine clock (`clock.rs`: carbon, EBM and ice every
+100 kyr, every 2 kyr in the recent ice-age window), not from a script: a snowball starts when sea
+ice covers `climate.snowball_on_frac` (0.95) of the ocean (annual mean) — the ice-albedo runaway
+takes the ice edge from mid latitudes to the equator — and ends when the cover falls below
+`snowball_off_frac` (0.5), written at its end (or at the end of the run with `ongoing` = 1). A
+hothouse is a stretch with the EBM's global mean above `climate.hothouse_c` (25 °C), ending once
+it is 1 °C below. Both are global (place `Global`).
 
 | Kind | Params | Magnitude | Causes |
 |---|---|---|---|
 | `glaciation` | `peak_land_frac` (glaciated share of the land at its largest), `peak_area_km2`, `peak_t_years`, `ongoing` | peak share / 0.2, ≤ 1 | — |
+| `snowball` | `duration_myr`; CO₂ (ppm) `co2_before_ppm` (the most in the 10 Myr before the onset), `co2_onset_ppm`, `co2_escape_ppm`, `co2_max_ppm`, `co2_drawdown_factor` (the most / the least CO₂ of the 10 Myr before the onset), `co2_rise_factor` (escape / onset); `tropical_land_share` and `tropical_weathering_share` (within 30° of the equator, just before the onset); `degassing_onset_rel`, `degassing_escape_rel` (× Earth's today); `sun_rel`; `t_global_min_c`; `cap_carbonate_m` (the drawdown carbonate the escape's plate step laid on the sea floor above the compensation depth, ≤ 4 km: weathering beyond degassing precipitates as carbonate — the cap carbonate); `onset_cause` (`weathering_drawdown` when CO₂ fell by ≥ 1.5× over the 10 Myr before, else `slow_cooling`); `escape_cause` (`degassing_buildup` when CO₂ rose by ≥ 2× while frozen, else `warming`; `none` while ongoing); `ongoing` | duration / 50 Myr, ≤ 1 | — |
+| `hothouse` | `peak_t_global_c`, `peak_t_years`, `co2_peak_ppm`, `after_snowball` (1 when it began within 5 Myr of a snowball's end), `ongoing` | (peak − `hothouse_c`) / 25 °C, ≤ 1 | the `snowball` it followed |
 
 ### The dummy preset's events (source `deeptime:dummy`, until P1-03)
 
