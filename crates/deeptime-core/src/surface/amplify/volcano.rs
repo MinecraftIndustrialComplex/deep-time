@@ -121,13 +121,20 @@ impl Shaper {
     pub fn sharpen_level(&self, level: &mut Level, grid: &GridDesc) -> usize {
         let mut changed = 0;
         for it in &self.items {
-            vol::for_cells(grid, self.mh, it.x, it.z, it.l2.reach() * it.radius_m, |c, dx, dz| {
-                let v = it.l2.at(dx.hypot(dz) / it.radius_m);
-                if v != 0.0 {
-                    level.z[c] += v as f32;
-                    changed += 1;
-                }
-            });
+            vol::for_cells(
+                grid,
+                self.mh,
+                it.x,
+                it.z,
+                it.l2.reach() * it.radius_m,
+                |c, dx, dz| {
+                    let v = it.l2.at(dx.hypot(dz) / it.radius_m);
+                    if v != 0.0 {
+                        level.z[c] += v as f32;
+                        changed += 1;
+                    }
+                },
+            );
         }
         changed
     }
@@ -200,7 +207,12 @@ impl Shaper {
         let r = f64::from(grid.r);
         let bx = |i: usize| grid.origin_block_x as f64 + ((x0 + i * stride) as f64) * r;
         let bz = |j: usize| grid.origin_block_z as f64 + ((y0 + j * stride) as f64) * r;
-        let near = self.near(bx(0), bx(w.saturating_sub(1)), bz(0), bz(h.saturating_sub(1)));
+        let near = self.near(
+            bx(0),
+            bx(w.saturating_sub(1)),
+            bz(0),
+            bz(h.saturating_sub(1)),
+        );
         if near.is_empty() && self.terraces.is_none() {
             return;
         }
@@ -343,7 +355,10 @@ mod tests {
         };
         let centre = cell(0.0, 0.0);
         let rim = cell(2.0, 0.0).max(cell(4.0, 0.0));
-        assert!(centre < rim, "crater floor {centre} not below the rim {rim}");
+        assert!(
+            centre < rim,
+            "crater floor {centre} not below the rim {rim}"
+        );
         assert!(rim > 0.0, "the sharp summit adds height");
     }
 
@@ -358,7 +373,10 @@ mod tests {
         let centre = z[8 * w3 + 8];
         let rim = z[8 * w3 + 9];
         // Its crater has faded (e^-6 of it left): a few metres of the flat rim top's curvature.
-        assert!(rim - centre < 10.0, "a 30-Myr-dead crater: {centre} vs {rim}");
+        assert!(
+            rim - centre < 10.0,
+            "a 30-Myr-dead crater: {centre} vs {rim}"
+        );
         // Flood-basalt terraces: a ramp becomes treads and risers.
         let g1 = GridDesc::for_planet("L1", 16_384, 16).unwrap();
         world
@@ -368,9 +386,15 @@ mod tests {
         let sh = Shaper::from_world(&world, &preset).unwrap();
         let mut ramp: Vec<f32> = (0..64).map(|i| 200.0 + 10.0 * i as f32).collect();
         sh.shape_block(&g3, 0, 100, 64, 1, &mut ramp);
-        let flats = ramp.windows(2).filter(|p| (p[1] - p[0]).abs() < 0.5).count();
+        let flats = ramp
+            .windows(2)
+            .filter(|p| (p[1] - p[0]).abs() < 0.5)
+            .count();
         let steep = ramp.windows(2).filter(|p| p[1] - p[0] > 15.0).count();
-        assert!(flats >= 30 && steep >= 5, "flats {flats} steep {steep}: {ramp:?}");
+        assert!(
+            flats >= 30 && steep >= 5,
+            "flats {flats} steep {steep}: {ramp:?}"
+        );
         assert!(ramp.windows(2).all(|p| p[1] >= p[0] - 1e-3), "monotone");
     }
 }

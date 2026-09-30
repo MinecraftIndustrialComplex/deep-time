@@ -490,8 +490,8 @@ impl L1<'_> {
         let s = v.shape();
         let prof = |r: f64| s.body(r);
         let base = self.base(v.x, v.z, v.radius_m);
-        let centre = sample_at(self.grid, self.elev, v.x, v.z)
-            + sample_at(self.grid, &self.delta, v.x, v.z);
+        let centre =
+            sample_at(self.grid, self.elev, v.x, v.z) + sample_at(self.grid, &self.delta, v.x, v.z);
         let w = self.centre_weight(v.x, v.z, v.radius_m, &prof);
         let h = if w > 1e-3 {
             ((centre - base) / w).max(0.0)
@@ -669,8 +669,13 @@ impl VolcanoStage {
 
         // 3–4. Activity and births.
         let started = Instant::now();
-        let flux: Vec<f64> = (0..n).map(|c| arc_flux(flags[c], conv[c], crust[c])).collect();
-        let flagged = flags.iter().filter(|&&f| (f as u32 as u8) & ARC != 0).count() as u64;
+        let flux: Vec<f64> = (0..n)
+            .map(|c| arc_flux(flags[c], conv[c], crust[c]))
+            .collect();
+        let flagged = flags
+            .iter()
+            .filter(|&&f| (f as u32 as u8) & ARC != 0)
+            .count() as u64;
         let strong = flux.iter().filter(|&&f| f >= p.arc_min_flux).count() as u64;
         st.counts.arc_flag_cells_max = st.counts.arc_flag_cells_max.max(flagged);
         st.counts.arc_cells_max = st.counts.arc_cells_max.max(strong);
@@ -711,9 +716,8 @@ impl VolcanoStage {
                 (id, (x, z, uplift))
             })
             .collect();
-        let dist_m = |x0: f64, z0: f64, x1: f64, z1: f64| {
-            (frame.wrap_x(x1 - x0) * mh).hypot((z1 - z0) * mh)
-        };
+        let dist_m =
+            |x0: f64, z0: f64, x1: f64, z1: f64| (frame.wrap_x(x1 - x0) * mh).hypot((z1 - z0) * mh);
         for v in &mut st.volcanoes {
             if !v.active() {
                 continue;
@@ -850,7 +854,8 @@ impl VolcanoStage {
                 let f = flux[c];
                 let s01 = ((f - p.arc_min_flux) / (1.0 - p.arc_min_flux).max(1e-9)).clamp(0.0, 1.0);
                 let hk = p.arc_height_km[0] + (p.arc_height_km[1] - p.arc_height_km[0]) * s01;
-                let radius = p.arc_radius_km * (hk / p.arc_height_km[1]).powf(0.8) * 1000.0 * p.size;
+                let radius =
+                    p.arc_radius_km * (hk / p.arc_height_km[1]).powf(0.8) * 1000.0 * p.size;
                 let continental = crust[c] as u8 == CONTINENTAL;
                 let silicic = continental && f64::from(thick[c]) >= p.silicic_crust_km * 1000.0;
                 let plate = plate_id[c].max(0.0) as u32;
@@ -914,16 +919,17 @@ impl VolcanoStage {
             let target = match v.kind {
                 Kind::Strato => {
                     let f = v.flux_last;
-                    let s01 = ((f - p.arc_min_flux) / (1.0 - p.arc_min_flux).max(1e-9))
-                        .clamp(0.0, 1.0);
+                    let s01 =
+                        ((f - p.arc_min_flux) / (1.0 - p.arc_min_flux).max(1e-9)).clamp(0.0, 1.0);
                     let hk = p.arc_height_km[0] + (p.arc_height_km[1] - p.arc_height_km[0]) * s01;
                     // A cone never outgrows the height (and radius) it was born with.
                     (hk * 1000.0 * p.size).min(v.target_m)
                 }
                 Kind::Shield | Kind::Silicic => {
                     let prox = match v.hotspot.and_then(|hh| plume_at.get(&hh)) {
-                        Some(&(px, pz, _)) => (1.0 - (dist_m(v.x, v.z, px, pz) / spacing_h).powi(2))
-                            .clamp(0.0, 1.0),
+                        Some(&(px, pz, _)) => {
+                            (1.0 - (dist_m(v.x, v.z, px, pz) / spacing_h).powi(2)).clamp(0.0, 1.0)
+                        }
                         None => 0.0,
                     };
                     v.target_m * prox.sqrt()
@@ -980,7 +986,9 @@ impl VolcanoStage {
                 let rc = 0.08 * v.radius_m;
                 (rc, (0.04 * v.height_m).min(250.0))
             } else {
-                let rc = (range(&mut rng, p.caldera_radius_km[0], p.caldera_radius_km[1]) * 1000.0 * p.size)
+                let rc = (range(&mut rng, p.caldera_radius_km[0], p.caldera_radius_km[1])
+                    * 1000.0
+                    * p.size)
                     .min(0.6 * v.radius_m);
                 (rc, (0.5 * v.height_m).min(400.0 + 0.05 * rc))
             };
@@ -1046,7 +1054,8 @@ impl VolcanoStage {
                 if v.active() || !v.oceanic || v.sunk_m >= p.island_subsidence_max_m {
                     continue;
                 }
-                let sink = (p.island_subsidence_m_myr * dt).min(p.island_subsidence_max_m - v.sunk_m);
+                let sink =
+                    (p.island_subsidence_m_myr * dt).min(p.island_subsidence_max_m - v.sunk_m);
                 let kern = |r: f64| {
                     let x = r / 1.6;
                     if x >= 1.0 { 0.0 } else { (1.0 - x * x).powi(2) }
@@ -1116,7 +1125,8 @@ impl VolcanoStage {
         let mut kept = Vec::with_capacity(st.volcanoes.len());
         for mut v in std::mem::take(&mut st.volcanoes) {
             let dead_for = v.extinct_myr.map_or(0.0, |e| t - e);
-            if !v.active() && ((dead_for > 5.0 && v.height_m < 0.1 * v.peak_m) || dead_for > 250.0) {
+            if !v.active() && ((dead_for > 5.0 && v.height_m < 0.1 * v.peak_m) || dead_for > 250.0)
+            {
                 v.gone = Some(Gone::Eroded);
                 st.counts.eroded += 1;
                 gone_now.push(v);
@@ -1192,7 +1202,12 @@ impl VolcanoStage {
 
         // The map layer.
         let started = Instant::now();
-        let map = self.map(&st, &grid, &world.surface.as_ref().expect("checked").elevation_m, sea);
+        let map = self.map(
+            &st,
+            &grid,
+            &world.surface.as_ref().expect("checked").elevation_m,
+            sea,
+        );
         world.fields.insert(
             field::MAP.to_owned(),
             Field {
@@ -1460,7 +1475,12 @@ impl VolcanoStage {
                 .filter(|v| v.kind == k && v.height_m >= (0.25 * v.peak_m).max(300.0))
                 .count()
         };
-        let active = |k: Kind| st.volcanoes.iter().filter(|v| v.kind == k && v.active()).count();
+        let active = |k: Kind| {
+            st.volcanoes
+                .iter()
+                .filter(|v| v.kind == k && v.active())
+                .count()
+        };
         let peak = st
             .volcanoes
             .iter()
