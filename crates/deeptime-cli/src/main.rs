@@ -1113,7 +1113,7 @@ mod tests {
         assert_eq!(mid.next_stage_name(), Some("plates"));
         assert_eq!(
             mid.stage_names,
-            ["plates", "climate", "surface", "structure"]
+            ["plates", "climate", "surface", "volcanoes", "structure"]
         );
         assert!(mid.world.surface.is_some(), "the group steps every member");
         assert!(mid.world.fields.contains_key("climate/koppen"));
@@ -1233,7 +1233,7 @@ mod tests {
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
         assert_eq!(
             end.stage_names,
-            ["plates", "climate", "surface", "structure", "deposits"]
+            ["plates", "climate", "surface", "volcanoes", "structure", "deposits"]
         );
         assert_eq!(end.next_stage_name(), None, "the run is complete");
         assert!(
