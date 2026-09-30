@@ -160,8 +160,12 @@ fn dump_samples(manifest: &Manifest, layers: &[LoadedLayer], strata: &LoadedLaye
     for _ in 0..200 {
         let i = rng.below(u64::from(strata.desc.grid.w)) as u32;
         let j = rng.below(u64::from(strata.desc.grid.h)) as u32;
-        let (tops, classes): (Vec<i16>, Vec<u8>) = (0..k).map(|h| strata.horizon(i, j, h)).unzip();
-        stacks.push(json!([i, j, tops, classes]));
+        let hz: Vec<_> = (0..k).map(|h| strata.horizon(i, j, h)).collect();
+        let tops: Vec<i16> = hz.iter().map(|h| h.top).collect();
+        let classes: Vec<u8> = hz.iter().map(|h| h.class).collect();
+        let key_tops: Vec<u16> = hz.iter().map(|h| h.key[0]).collect();
+        let key_bases: Vec<u16> = hz.iter().map(|h| h.key[1]).collect();
+        stacks.push(json!([i, j, tops, classes, key_tops, key_bases]));
     }
     json!({
         "format_version": manifest.format_version,
@@ -226,7 +230,7 @@ mod tests {
         run(&opts).unwrap();
         let m = Manifest::read(&opts.out).unwrap();
         m.verify(&opts.out).unwrap();
-        assert_eq!(m.format_version, "0.1");
+        assert_eq!(m.format_version, "0.2");
         assert_eq!(m.layers.len(), 8);
         let e = TilePackReader::open(&opts.out.join("rasters/elevation.dtr"))
             .unwrap()

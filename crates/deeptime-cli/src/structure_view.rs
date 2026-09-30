@@ -70,7 +70,7 @@ pub fn build(world: &WorldState, preset_json: &str) -> CliResult<Option<Structur
             if !regolith.contains(&(rock[c] as usize)) {
                 return rock[c];
             }
-            let (_, classes) = h.cell(c);
+            let (_, classes, _) = h.cell(c);
             classes
                 .iter()
                 .find(|&&k| !regolith.contains(&usize::from(k)))
@@ -124,6 +124,7 @@ pub fn build(world: &WorldState, preset_json: &str) -> CliResult<Option<Structur
             z1: c / 4,
             y0: s.min_y,
             y1,
+            min_y: s.min_y,
             w: (2 * hgt) as u32,
             h: (((y1 - s.min_y) as f64) / 1.5).round() as u32,
             per_cell: false,
@@ -149,6 +150,7 @@ pub fn build(world: &WorldState, preset_json: &str) -> CliResult<Option<Structur
             z1: zc + half,
             y0,
             y1,
+            min_y: s.min_y,
             w: 1000,
             h: ((y1 - y0) * 2).clamp(100, 900) as u32,
             per_cell: false,
@@ -265,7 +267,7 @@ pub fn write(dir: &std::path::Path, v: &StructureView) -> CliResult<Value> {
     let k = v.strata.desc.stack_depth.unwrap_or(0) as usize;
     let cells = v.strata.desc.grid.cells();
     for c in 0..cells {
-        for &b in &v.strata.bytes[c * 3 * k + 2 * k..c * 3 * k + 3 * k] {
+        for &b in &v.strata.bytes[c * 7 * k + 2 * k..c * 7 * k + 3 * k] {
             if usize::from(b) < used.len() {
                 used[usize::from(b)] = true;
             }

@@ -132,4 +132,16 @@ public final class RasterSampler {
         int ci = grid.wrapI(i), cj = grid.clampJ(j);
         return tileFor(ci, cj).horizonClass(ci % tile, cj % tile, k);
     }
+
+    /** Horizon k's stratigraphic key top at cell (i, j) (format 0.2); 65535 if unused. */
+    public int horizonKeyTop(long i, long j, int k) {
+        int ci = grid.wrapI(i), cj = grid.clampJ(j);
+        return tileFor(ci, cj).horizonKeyTop(ci % tile, cj % tile, k);
+    }
+
+    /** Horizon k's stratigraphic key base at cell (i, j) (format 0.2); 65535 if unused. */
+    public int horizonKeyBase(long i, long j, int k) {
+        int ci = grid.wrapI(i), cj = grid.clampJ(j);
+        return tileFor(ci, cj).horizonKeyBase(ci % tile, cj % tile, k);
+    }
 }

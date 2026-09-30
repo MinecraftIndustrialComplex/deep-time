@@ -525,7 +525,8 @@ def main():
     ap.add_argument("--scenario", choices=sorted(SCENARIOS))
     ap.add_argument("--timeout", type=int, default=1500)
     ap.add_argument("--rcon", action="append", default=[], metavar="COMMAND",
-                    help="an RCON command run after the chunky tasks (repeatable, e.g. 'deeptime sites near 0 0 9000'); "
+                    help="an RCON command run after the chunky tasks (repeatable, e.g. 'deeptime sites near 0 0 9000'; "
+                         "'sleep <seconds>' pauses); "
                          "its [deeptime-probe] line (from the server log when RCON cuts it) is recorded in the report "
                          "and appended to smoke/<profile>/rcon.jsonl (P1-15)")
     a = ap.parse_args()
@@ -685,6 +686,10 @@ def main():
             if a.rcon:
                 open(os.path.join(smoke, "rcon.jsonl"), "w").close()
             for cmd in a.rcon:
+                # `sleep <seconds>` pauses between commands (P1-25: let a simulation run between probes).
+                if cmd.startswith("sleep "):
+                    time.sleep(float(cmd.split()[1]))
+                    continue
                 before = len(server.lines)
                 out = rcon(cmd, check=False)
                 time.sleep(1)   # RCON may cut a long reply; the server log has the whole probe line

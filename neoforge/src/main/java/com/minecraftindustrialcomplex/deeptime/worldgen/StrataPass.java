@@ -21,14 +21,16 @@ import java.util.Optional;
  * {@code minecraft:stone} and {@code minecraft:deepslate} are replaced, so soil, sand, water, ore and
  * anything a surface rule placed stay.
  *
- * <p><b>Columns.</b> Each column reads the horizon stack: horizon tops interpolated bilinearly
- * between the four surrounding strata cells (the nearest cell's top where a corner lacks that
- * horizon), classes from the nearest cell. With integer tops T_h = ⌊top_h⌋, horizon h fills the
- * blocks T_{h+1} &lt; y ≤ T_h, the last one down to the bottom of the world.
+ * <p><b>Columns.</b> Each column reads the horizon stack by the column rule of world data 0.2
+ * ({@link Columns#stack}): the 4 × 4 strata cells around it, their stacks correlated by
+ * stratigraphic key, so beds run on across cells, thin out where a cell lacks them and
+ * intertongue where the rock changes. With integer tops T_h, horizon h fills the blocks
+ * T_{h+1} &lt; y ≤ T_h, the last one down to the bottom of the world.
  *
  * <p><b>Blocks.</b> {@link RockPalette} resolves each class; a class with several members uses one
- * member per horizon, picked by a hash of the horizon's key ({@link #horizonKey}), so a layer is one
- * block type. A class that resolves to nothing leaves the crust as it is.
+ * member per unit, picked by a hash of the horizon's key ({@link #horizonKey}: the class and the
+ * era of its stratigraphic key), so a bed is one block type across columns. A class that resolves
+ * to nothing leaves the crust as it is.
  *
  * <p><b>Writes.</b> Whole runs go straight into the section palettes (sections holding no stone or
  * deepslate are skipped). Bodies (intrusions, alteration halos, gossans; {@code bodies/}, P1-14)
@@ -42,19 +44,41 @@ public final class StrataPass {
     private StrataPass() {}
 
     /**
-     * A horizon's key for the member choice. World data v0 has no horizon ids, so a horizon is
-     * named by its stack index and class; P1-08's format can give real unit ids.
+     * A horizon's key for the member choice: its class and the era of its unit key (the key's
+     * top four bits: the regolith, seven ages of the strata log, the basement pools, the mantle;
+     * a synthetic world's horizon h). The same bed gets the same key in every column.
      */
-    public static long horizonKey(int h, int classIndex) {
-        return ((long) h << 8) | classIndex;
+    public static long horizonKey(int unit, int classIndex) {
+        return ((long) (unit >>> 12) << 8) | classIndex;
     }
 
-    /** One column's horizons, top-down: integer tops and class indexes ({@link Columns.Stack}). */
+    /** One column's horizons, top-down: integer tops, class indexes and unit keys ({@link Columns.Stack}). */
     public static final class Column extends Columns.Stack {
         public Column(int k) {
             super(k);
         }
+
+        /** Appends horizon h of {@code from}. */
+        void emitCopy(Columns.Stack from, int h) {
+            if (count == tops.length) {
+                tops = java.util.Arrays.copyOf(tops, 2 * count);
+                classes = java.util.Arrays.copyOf(classes, 2 * count);
+                units = java.util.Arrays.copyOf(units, 2 * count);
+            }
+            tops[count] = from.tops[h];
+            classes[count] = from.classes[h];
+            units[count] = from.units[h];
+            count++;
+        }
     }
+
+    /** Per thread: the 256 columns of the chunk being painted. */
+    private static final ThreadLocal<Column[]> COLUMNS = ThreadLocal.withInitial(() -> {
+        Column[] c = new Column[256];
+        for (int i = 0; i < 256; i++)
+            c[i] = new Column(8);
+        return c;
+    });
 
     /**
      * Fills {@code out} with the stack at block (x, z): the column rule of the world-data contract
@@ -74,32 +98,44 @@ public final class StrataPass {
         int minY = chunk.getMinBuildHeight(), maxY = chunk.getMaxBuildHeight() - 1;
         int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
 
-        // Runs per column: [runTop, runBottom] → block, top-down.
-        int[] runTop = new int[256 * k], runBottom = new int[256 * k], runs = new int[256];
-        BlockState[] runBlock = new BlockState[256 * k];
+        // Runs per column, top-down: column ci's runs are [ci·k, ci·k + runs[ci]) of the arrays,
+        // with k the most any column of the chunk needs.
         Column col = new Column(k);
-        int highest = Integer.MIN_VALUE;
+        Column[] cols = COLUMNS.get();
+        int most = 1;
         for (int lx = 0; lx < 16; lx++) {
             for (int lz = 0; lz < 16; lz++) {
+                Column c = cols[lx * 16 + lz];
                 column(wd, strata, x0 + lx, z0 + lz, col);
-                int ci = lx * 16 + lz, n = 0;
-                for (int h = 0; h < col.count; h++) {
-                    int top = Math.min(col.tops[h], maxY);
-                    int bottom = h + 1 < col.count ? col.tops[h + 1] + 1 : minY;
-                    bottom = Math.max(bottom, minY);
-                    int cls = col.classes[h];
-                    var result = cls < byIndex.length ? byIndex[cls] : null;
-                    BlockState rock = result == null ? null : result.pick(horizonKey(h, cls));
-                    if (rock == null || top < bottom)
-                        continue;   // unclassified crust stays
-                    runTop[ci * k + n] = top;
-                    runBottom[ci * k + n] = bottom;
-                    runBlock[ci * k + n] = rock;
-                    n++;
-                    highest = Math.max(highest, top);
-                }
-                runs[ci] = n;
+                c.count = 0;
+                for (int h = 0; h < col.count; h++)
+                    c.emitCopy(col, h);
+                most = Math.max(most, c.count);
             }
+        }
+        k = most;
+        int[] runTop = new int[256 * k], runBottom = new int[256 * k], runs = new int[256];
+        BlockState[] runBlock = new BlockState[256 * k];
+        int highest = Integer.MIN_VALUE;
+        for (int ci = 0; ci < 256; ci++) {
+            Column c = cols[ci];
+            int n = 0;
+            for (int h = 0; h < c.count; h++) {
+                int top = Math.min(c.tops[h], maxY);
+                int bottom = h + 1 < c.count ? c.tops[h + 1] + 1 : minY;
+                bottom = Math.max(bottom, minY);
+                int cls = c.classes[h];
+                var result = cls < byIndex.length ? byIndex[cls] : null;
+                BlockState rock = result == null ? null : result.pick(horizonKey(c.units[h], cls));
+                if (rock == null || top < bottom)
+                    continue;   // unclassified crust stays
+                runTop[ci * k + n] = top;
+                runBottom[ci * k + n] = bottom;
+                runBlock[ci * k + n] = rock;
+                n++;
+                highest = Math.max(highest, top);
+            }
+            runs[ci] = n;
         }
         if (highest != Integer.MIN_VALUE)
             writeRuns(chunk, highest, k, runTop, runBottom, runBlock, runs);
@@ -238,9 +274,9 @@ public final class StrataPass {
     }
 
     /** A horizon at a block, for tests and probes. */
-    public record Horizon(int index, int classIndex, String rockClass, int top, int bottom) {
+    public record Horizon(int index, int classIndex, String rockClass, int top, int bottom, int unit) {
         public long key() {
-            return horizonKey(index, classIndex);
+            return horizonKey(unit, classIndex);
         }
     }
 
@@ -253,7 +289,8 @@ public final class StrataPass {
         if (h < 0)
             return Optional.empty();
         int bottom = h + 1 < col.count ? col.tops[h + 1] + 1 : Integer.MIN_VALUE;
-        return Optional.of(new Horizon(h, col.classes[h], classes(wd).get(col.classes[h]), col.tops[h], bottom));
+        return Optional.of(new Horizon(h, col.classes[h], classes(wd).get(col.classes[h]), col.tops[h], bottom,
+                col.units[h]));
     }
 
     /** The class at (x, y, z) per the stack; empty above the top horizon. */
