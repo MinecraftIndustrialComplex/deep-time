@@ -17,8 +17,9 @@
 //! (frozen lakes) is found under the ice.
 //!
 //! With the world data (`--world-data`), every finding is split by what Deep Time decided for its
-//! column (`deeptime_format::water`): **ours** in a river, lake or bank column, **other** elsewhere
-//! (vanilla's springs, cave aquifers, features), and a lake must be a lake column there.
+//! column (`deeptime_format::water`): **ours** in a river or lake column (the only water the pass
+//! places), **other** elsewhere (vanilla's springs, the aquifer's sea-level water in cave mouths,
+//! features), and a lake must be a lake column there. A neighbour's ice counts as the water under it.
 
 use std::collections::{HashMap, VecDeque};
 
@@ -46,9 +47,10 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
         let wd = wd?;
         Some(*kinds.entry((x, z)).or_insert_with(|| wd.hydro(i64::from(x), i64::from(z)).kind))
     };
-    let ours = |k: Option<WaterKind>| {
-        matches!(k, Some(WaterKind::River | WaterKind::Lake | WaterKind::Bank))
-    };
+    // Water the pass placed: in a river or lake column (it never puts water in a bank).
+    let ours = |k: Option<WaterKind>| matches!(k, Some(WaterKind::River | WaterKind::Lake));
+    // Ice over water is a frozen pool: water beside air over ice rests on it like on water.
+    let is_ice = |id: u32| w.reg.name(id).ends_with("ice");
     let (mut floating_ours, mut leaks_ours) = (0u64, 0u64);
     let is_water_block = |id: u32| {
         let s = &w.reg.states[id as usize];
@@ -115,7 +117,7 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                         continue;
                     }
                     let under = w.block(x + dx, y - 1, z + dz);
-                    if holds_water(under) {
+                    if holds_water(under) || is_ice(under) {
                         steps += 1;
                     } else {
                         leaks += 1;
@@ -152,6 +154,7 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
         seen.insert(start, true);
         let mut cols = Vec::new();
         let mut rim_min = i32::MAX;
+        let mut rim_at = (0, 0);
         let mut edge = false;
         while let Some((x, z)) = q.pop_front() {
             cols.push((x, z));
@@ -170,8 +173,11 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                     Some(_) => {}
                     // The rim: dry neighbours (a river leaving the lake is water, not rim).
                     None if !wet.contains(&n) => {
-                        if let Some(&g) = ground_top.get(&n) {
-                            rim_min = rim_min.min(g);
+                        if let Some(&g) = ground_top.get(&n)
+                            && g < rim_min
+                        {
+                            rim_min = g;
+                            rim_at = n;
                         }
                     }
                     None => {}
@@ -184,6 +190,11 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                 "surface_y": y0 + 1,
                 "lowest_rim_top": rim_min,
                 "rim_minus_surface": i64::from(rim_min) + 1 - i64::from(y0 + 1),
+                "lowest_rim_at": [rim_at.0, rim_at.1],
+                "lowest_rim_blocks": (rim_min - 1..=y0 + 1)
+                    .rev()
+                    .map(|y| w.reg.name(w.block(rim_at.0, y, rim_at.1)).to_owned())
+                    .collect::<Vec<_>>(),
                 "at": cols[0],
             }));
         }
