@@ -1023,6 +1023,11 @@ struct TypeCensus {
     /// Sites whose centre is above sea level at the end of the history (a sanity check on where
     /// the geology put them).
     on_land: usize,
+    /// Stacked types: seams over all sites, the most in one site, and the coal measures' total
+    /// thickness (m) over all sites (their means are the stack's numbers).
+    seams: usize,
+    seams_max: usize,
+    measures_m: f64,
     /// The most favourable cell of the planet: where, how favourable, and the component that
     /// limits it (the answer to "why so few?" for a type with an empty map).
     best_cell: Option<Value>,
@@ -1715,6 +1720,7 @@ impl DepositStage {
                 sigma: t.sizing.clustering.cluster_radius_km * 1000.0 / sc.m_per_block_h,
                 min_sep: t.sizing.min_separation_m / sc.m_per_block_h,
                 per_camp,
+                adjoining: t.sizing.clustering.adjoining(),
             };
             for (i, tract) in tracts.iter().enumerate() {
                 let lambda = fp.formed[i];
@@ -1741,8 +1747,20 @@ impl DepositStage {
                     weights: &weights,
                     allowed: &allowed,
                 };
-                let (pts, dropped) =
-                    cluster::place(&mut rng, &space, &spacing, &radii, &mut f.placed[ti]);
+                let footprints: Option<Vec<[f64; 2]>> = spacing.adjoining.then(|| {
+                    sizes
+                        .iter()
+                        .map(|s| geometry::footprint_blocks(t, s.tonnage_mt * 1.0e6, &sc))
+                        .collect()
+                });
+                let (pts, dropped) = cluster::place(
+                    &mut rng,
+                    &space,
+                    &spacing,
+                    &radii,
+                    footprints.as_deref(),
+                    &mut f.placed[ti],
+                );
                 f.census[ti].dropped_separation += dropped;
                 f.census[ti].placed += pts.len();
                 for (k, p) in &pts {
@@ -2206,8 +2224,25 @@ impl DepositStage {
         }
         let centre_depth = ledger.centre_depth_m();
         let centre_y = surf - centre_depth / sc.m_per_block_v;
+        // A stacked deposit's seams (coal measures): their number from the sediment the history
+        // laid down under the site while it was coal-forming; the top seam lies half the
+        // measures above the ledger's centre.
+        let seams = t.geometry.stack.as_ref().map(|k| {
+            let frame_years: Vec<f64> = self.state.frame_times.iter().map(|(te, _)| *te).collect();
+            let measures = geometry::measures_thickness_m(
+                cand.hazard.as_deref().unwrap_or(&[]),
+                t.integration_myr,
+                &frame_years,
+                col,
+            );
+            let mut srng = Rng::stream(self.seed, &format!("stack/{}/{cell}/{x:.3}", t.id));
+            geometry::seam_plan(k, measures, 2.0 * half_m, &mut srng)
+        });
+        let top_y = seams.as_ref().map_or(centre_y, |p| {
+            surf - (centre_depth - p.measures_m / 2.0) / sc.m_per_block_v
+        });
         let half_blocks = half_m / sc.m_per_block_v * t.balance.size_mult_v;
-        if centre_y + half_blocks < f64::from(sc.min_y + 4) {
+        if top_y + half_blocks < f64::from(sc.min_y + 4) {
             f.census[ti].too_deep += 1;
             return Ok(());
         }
@@ -2227,16 +2262,18 @@ impl DepositStage {
         } else {
             t.geometry.dip_deg[0].to_radians()
         };
+        let yaw_draw = rng.uniform() * std::f64::consts::PI;
         let placement = Placement {
             x,
             z,
             surface_y: surf,
             centre_depth_m: centre_depth,
-            yaw: (rng.uniform() * std::f64::consts::PI) as f32,
+            // An adjoining deposit's footprint was placed with its yaw.
+            yaw: cand.point.ellipse.map_or(yaw_draw, |e| e[2]) as f32,
             dip: dip as f32,
             truncated,
         };
-        let left = fate.fraction_left();
+        let mut left = fate.fraction_left();
         let mut grades = Grades::new();
         for p in &t.products {
             match &p.grade_key {
@@ -2250,11 +2287,63 @@ impl DepositStage {
                 }
             }
         }
+        // A stack is built before the site takes its id, so a deposit whose seams are all gone
+        // leaves no gap in the ids (the seams take their ids below).
+        let mut stacked = None;
+        if let (Some(k), Some(plan)) = (&t.geometry.stack, &seams) {
+            let mut n = 0;
+            let st = geometry::stack_bodies(
+                t,
+                k,
+                0,
+                tonnage_t,
+                &grades,
+                &placement,
+                plan,
+                &sc,
+                &mut || {
+                    n += 1;
+                    n
+                },
+            );
+            if st.bodies.is_empty() {
+                // Every seam is above the ground or below the world: the deposit is gone.
+                let c = &mut f.census[ti];
+                if truncated {
+                    c.truncated -= 1;
+                } else {
+                    c.buried -= 1;
+                }
+                if centre_depth - half_m <= t.preservation.assessment_depth_m {
+                    c.counted -= 1;
+                }
+                c.eroded += 1;
+                return Ok(());
+            }
+            left = st.kept;
+            stacked = Some(st.bodies);
+        }
+        if let Some(p) = &seams {
+            let c = &mut f.census[ti];
+            c.seams += stacked.as_ref().map_or(0, Vec::len);
+            c.seams_max = c.seams_max.max(stacked.as_ref().map_or(0, Vec::len));
+            c.measures_m += p.measures_m;
+        }
         let site_id = world.next_site_id();
-        let bodies =
-            geometry::bodies_for(t, site_id, tonnage_t, &grades, &placement, &sc, &mut || {
-                world.next_body_id()
-            });
+        let bodies = match stacked {
+            Some(mut bodies) => {
+                for b in &mut bodies {
+                    b.site = Some(site_id);
+                    b.id = world.next_body_id();
+                }
+                bodies
+            }
+            None => {
+                geometry::bodies_for(t, site_id, tonnage_t, &grades, &placement, &sc, &mut || {
+                    world.next_body_id()
+                })
+            }
+        };
         let mut remaining_t = tonnage_t * left;
         // The forming event.
         let kind = if cand.charge.is_some() {
@@ -2275,6 +2364,11 @@ impl DepositStage {
                     "trap_formed_years",
                     f64::from(self.state.pet[cell as usize].t_trap),
                 );
+        }
+        if let Some(plan) = &seams {
+            e = e
+                .param("seams", plan.seams() as i64)
+                .param("coal_measures_m", plan.measures_m);
         }
         if let Some(coal) = &t.coal
             && let Some(p) = self.state.pet.get(cell as usize)
@@ -2537,7 +2631,13 @@ impl DepositStage {
             f.census[ct].dropped_separation += 1;
             return Ok(());
         }
-        f.placed[ct].push(Point { x, z, cell, radius });
+        f.placed[ct].push(Point {
+            x,
+            z,
+            cell,
+            radius,
+            ellipse: None,
+        });
         let surf = f.surface_at(x, z);
         let half_m = geometry::half_height_m(child, tonnage_t);
         // Follow the drainage direction.
@@ -2790,7 +2890,13 @@ impl DepositStage {
         let tonnage_t = size.tonnage_mt * 1.0e6;
         let (x, z) = cluster::cell_xz(&f.grid, cell);
         let radius = geometry::radius_blocks(t, tonnage_t, &sc);
-        f.placed[ti].push(Point { x, z, cell, radius });
+        f.placed[ti].push(Point {
+            x,
+            z,
+            cell,
+            radius,
+            ellipse: None,
+        });
         let half_m = geometry::half_height_m(t, tonnage_t);
         let surf = f.surface_at(x, z);
         let depth = if ess.exposed {
@@ -2837,10 +2943,41 @@ impl DepositStage {
             dip: 0.0,
             truncated: false,
         };
-        let bodies =
+        let stacked = if let Some(k) = &t.geometry.stack {
+            // No column history here: a typical stack, six seams' worth of measures, its top
+            // seam at the surface when exposed.
+            let mut rng = Rng::stream(self.seed, &format!("stack/guaranteed/{}/{cell}", t.id));
+            let plan = geometry::seam_plan(k, 6.0 * k.seam_spacing_m, 2.0 * half_m, &mut rng);
+            let placement = Placement {
+                centre_depth_m: if ess.exposed {
+                    plan.measures_m / 2.0
+                } else {
+                    depth
+                },
+                ..placement
+            };
+            geometry::stack_bodies(
+                t,
+                k,
+                site_id,
+                tonnage_t,
+                &grades,
+                &placement,
+                &plan,
+                &sc,
+                &mut || world.next_body_id(),
+            )
+            .bodies
+        } else {
+            Vec::new()
+        };
+        let bodies = if stacked.is_empty() {
             geometry::bodies_for(t, site_id, tonnage_t, &grades, &placement, &sc, &mut || {
                 world.next_body_id()
-            });
+            })
+        } else {
+            stacked
+        };
         let (col, row) = (region as u32 % regions.cols, region as u32 / regions.cols);
         let mut e = world
             .event(t_ev, "deeptime:guaranteed_occurrence", SOURCE)
