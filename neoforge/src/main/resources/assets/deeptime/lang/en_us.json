@@ -78,6 +78,7 @@
   "deeptime.editor.field.glacial_valleys": "Glacial valleys",
   "deeptime.editor.field.ice_age_snowline": "Ice-age snowline drop",
   "deeptime.editor.field.glacial_aretes": "Arêtes from troughs",
+  "deeptime.editor.field.ruggedness": "Ruggedness",
   "deeptime.editor.field.plate_count": "Number of plates",
   "deeptime.editor.field.continent_count": "Continents at the start",
   "deeptime.editor.field.breakup_rate": "Continental breakup rate",

@@ -1463,7 +1463,11 @@ public final class GeologicChunkGenerator extends NoiseBasedChunkGenerator {   /
   - `deeptime:terrain {world, mode, k}` — (H(x,z) − y)/k, where H comes from the level's terrain
     source (the closed form for the test terrain; bicubic L3 `elevation` for world data) plus, from
     P1-06 on, the sub-cell detail term of §8.2 (drama slider). Linear in y, so vertical interpolation in
-    8-block cells is exact (`minecraft_integration_architecture.md` §2).
+    8-block cells is exact (`minecraft_integration_architecture.md` §2). *As built (2026-09-29):* k
+    doubles on steep ground until it covers 0.8 × the largest height difference to the eight neighbouring noise-cell
+    corners (`worldgen/TerrainScale`): with a fixed k the final density's cave band (the terrain value
+    only within 1.5625·k blocks of the surface) broke faces steeper than ~3 blocks per block into
+    benches and 20-block steps every four blocks, the "striped snow" of the P1-08 renders.
   - `deeptime:depth {world}` — as above.
   - `deeptime:beyond_pole {world}` — a mask for |z| beyond ±C/4 (past the pole edge), where terrain
     becomes an ice-sheet ocean; nobody reaches it through the soft cap, but chunks there still get
@@ -2188,6 +2192,23 @@ community ports) are not opened for code.
   drama maps to 0.25 + 0.75 · drama times the base slope, not drama times it, so 0 is smooth and
   not flat; the young stage adds erosion time without advancing the clock; the fine drainage area
   refines the coarse level's exact area instead of starting from zero.
+- **As built, mountain character (2026-09-29; decisions log "block-scale mountain character in
+  Phase 1"; STATUS.md has the renders and numbers).** The amplifier's last level ends with
+  `surface/amplify/character.rs`, driven by the simulation: gully octaves (stripe noise, 128 → 16
+  blocks) whose crests follow the slope of the smoothed terrain — so the amplifier's multiple-flow
+  valleys — each octave aligned with what the coarser left (tributaries), depth ∝ slope ×
+  wavelength and capped by the local relief, the wavelength and the height above the local base
+  level, fading out on rivers (drainage area) and at the coast; ridged stripes along the plate
+  model's fold trend (`plates/fold_trend_deg`) where an orogen is recorded (`plates/orogeny_type`),
+  with gaps where streams cross; unsharp masking of young terrain (`plates/orogeny_age_myr`,
+  `plates/uplift_mm_yr`: sharper, higher summits and ridgelines) and smoothing of old terrain
+  (rounded); cliff bands (a smooth terrace) where the surface rock is hard (`young/erodibility`) and
+  steep. Pits it closes deeper than 1.5 blocks are softened back and the flood runs again (no new
+  sinks). `amplify.ruggedness` (0..2, default 1, the editor's "Ruggedness") scales it; 0 is the
+  P1-06 terrain bit for bit. Baked into `elevation`, so the world-data contract and the column
+  evaluator are unchanged; the halo grows by the character's radius and two flood margins. Cost on
+  16k quick: 2.4–4 s of the amplify stage (12 threads). Deferred: talus/scree at cliff feet (a
+  surface-block rule the column evaluator would have to mirror) and 3D crags/overhangs (Phase 2).
 - **As built: glacial landforms** (Ben, 2026-09-29, decisions log "Glacial erosion landforms";
   `surface/glacial.rs`, `surface/amplify/glacial.rs`; STATUS.md has the runs). The deep-time
   surface and the young landscape run one glacier model per LEM step: a linear mass balance from
