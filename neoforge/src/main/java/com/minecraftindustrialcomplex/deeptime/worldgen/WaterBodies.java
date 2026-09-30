@@ -27,6 +27,10 @@ import net.minecraft.world.level.material.Fluids;
  *       never over air.</li>
  *   <li><b>Lake</b> columns fill the air from the lake's top down to the ground, as P0-13's pass
  *       did; a cave under the lake bed is plugged, and grass left under the water becomes dirt.</li>
+ *   <li><b>Sea</b> columns the aquifer left dry (it decides from its own noise near the surface, so
+ *       a coastal flat a block below sea level can stay land) are filled to the sea's top, so the
+ *       coast is where the terrain puts it and rivers reaching it meet water. The pass therefore
+ *       also runs in every chunk with elevation cells within 17 blocks of sea level.</li>
  *   <li><b>Bank</b> columns are raised to their {@code minGround} (the neighbouring water's top,
  *       +1 beside a river), lowered to their {@code maxGround} (a 1:1 slope from the channel), and
  *       air between the neighbours' beds and {@code minGround} is sealed, so no water finds a way
@@ -73,6 +77,19 @@ public final class WaterBodies {
                 || s.is(Blocks.GRAVEL) || s.is(Blocks.SNOW_BLOCK) || s.is(Blocks.CLAY);
     }
 
+    /** Whether any cell of {@code layer} in (or next to) block box [x0, x1] × [z0, z1] is below {@code level}. */
+    static boolean anyBelow(com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler layer, int x0, int z0, int x1, int z1, double level) {
+        var g = layer.desc().grid();
+        int r = g.r();
+        long i0 = Math.floorDiv(x0 - g.originBlockX(), r), i1 = Math.floorDiv(x1 - g.originBlockX(), r) + 1;
+        long j0 = Math.floorDiv(z0 - g.originBlockZ(), r), j1 = Math.floorDiv(z1 - g.originBlockZ(), r) + 1;
+        for (long i = i0; i <= i1; i++)
+            for (long j = j0; j <= j1; j++)
+                if (layer.get(i, j) < level)
+                    return true;
+        return false;
+    }
+
     /** Marks local column (lx, lz) from {@code lo} to {@code hi} in the carving masks. */
     static void protect(CarvingMask[] masks, int lx, int lz, int lo, int hi, int minY, int maxY) {
         for (CarvingMask m : masks)
@@ -89,7 +106,11 @@ public final class WaterBodies {
         int reach = spec.reach();
         boolean wet = wd.has(WorldData.WATER_LEVEL)
                 && WaterLevels.anyWet(wd.layer(WorldData.WATER_LEVEL), x0 - 1 - reach, z0 - 1 - reach, x0 + 16 + reach, z0 + 16 + reach);
-        if (!nearRiver && !wet)
+        // A column is sea when H = E + A·N < sea level − 1; A is at most 255/16 blocks and |N| ≤ 1,
+        // so no sea column lies where every elevation cell around is 17 blocks above sea level.
+        boolean nearSea = wd.has(WorldData.ELEVATION)
+                && anyBelow(wd.layer(WorldData.ELEVATION), x0 - 2, z0 - 2, x0 + 17, z0 + 17, spec.seaLevel() + 17);
+        if (!nearRiver && !wet && !nearSea)
             return Stats.NONE;
         Water.Region reg = Water.region(wd, spec, x0 - 1, z0 - 1, 18, 18);
         int minY = chunk.getMinBuildHeight(), maxY = chunk.getMaxBuildHeight() - 1;
@@ -104,9 +125,31 @@ public final class WaterBodies {
             for (int lx = 0; lx < 16; lx++) {
                 Water.Column col = reg.column(lx + 1, lz + 1);
                 cols[lz * 16 + lx] = col;
-                if (col.kind() == Water.Kind.NONE || col.kind() == Water.Kind.SEA)
+                if (col.kind() == Water.Kind.NONE)
                     continue;
                 int x = x0 + lx, z = z0 + lz;
+                if (col.kind() == Water.Kind.SEA) {
+                    // The aquifer's sea, where it left the column dry: a flat a little below sea level
+                    // (the aquifer decides from its own noise near the surface, not from the sea's
+                    // extent). Filled to the sea's top so the coast is where the terrain says, and
+                    // rivers and lakes that reach it meet water.
+                    int t = Math.min(col.top(), maxY);
+                    if (t >= minY && chunk.getBlockState(pos.set(x, t, z)).isAir()) {
+                        int y = t;
+                        for (; y > col.bed() && y >= minY && chunk.getBlockState(pos.set(x, y, z)).isAir(); y--) {
+                            chunk.setBlockState(pos, WATER, false);
+                            water++;
+                        }
+                        if (y == col.bed() && y >= minY && chunk.getBlockState(pos.set(x, y, z)).isAir()) {
+                            chunk.setBlockState(pos, DIRT, false);
+                            filled++;
+                        }
+                        if (y < t && y >= minY && chunk.getBlockState(pos.set(x, y, z)).getBlock() instanceof SpreadingSnowyDirtBlock)
+                            chunk.setBlockState(pos, DIRT, false);
+                        protect(masks, lx, lz, y - 1, t, minY, maxY);
+                    }
+                    continue;
+                }
                 int start = Math.min(maxY, chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, lx, lz) + 1);
                 int g = start;
                 while (g >= minY && open(chunk.getBlockState(pos.set(x, g, z))))

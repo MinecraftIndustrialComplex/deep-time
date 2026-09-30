@@ -52,6 +52,7 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
     // Ice over water is a frozen pool: water beside air over ice rests on it like on water.
     let is_ice = |id: u32| w.reg.name(id).ends_with("ice");
     let (mut floating_ours, mut leaks_ours) = (0u64, 0u64);
+    let mut leaks_by_kind: std::collections::BTreeMap<&'static str, u64> = std::collections::BTreeMap::new();
     let is_water_block = |id: u32| {
         let s = &w.reg.states[id as usize];
         s.name == "minecraft:water"
@@ -79,6 +80,10 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                 if !is_water_block(id) {
                     // Air, plants and ice (a frozen surface) are looked through; ground ends the column.
                     let f = w.reg.flags(id);
+                    if holds_water(id) && first_water.is_none() {
+                        // Seagrass, kelp, anything waterlogged: the water's surface all the same.
+                        first_water = Some((y, true));
+                    }
                     if is_air(id)
                         || f & (blocks::FEATURE | blocks::WATER) != 0
                         || w.reg.name(id).ends_with("ice")
@@ -123,6 +128,7 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                         leaks += 1;
                         let k = kind_of(x, z);
                         leaks_ours += u64::from(ours(k));
+                        *leaks_by_kind.entry(k.map_or("?", WaterKind::name)).or_default() += 1;
                         if samples.len() < 40 {
                             samples.push(json!({"what": "leak", "at": [x, y, z], "state": key,
                                                 "into": [x + dx, y, z + dz], "column": k.map(WaterKind::name)}));
@@ -215,6 +221,7 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
         "leaks": leaks,
         "floating_ours": wd.map(|_| floating_ours),
         "leaks_ours": wd.map(|_| leaks_ours),
+        "leaks_by_column": leaks_by_kind,
         "steps": steps,
         "lakes": lakes.len(),
         "lakes_within_1": within,
