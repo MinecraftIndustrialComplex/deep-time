@@ -89,6 +89,26 @@ pub mod field {
     pub const D_LN_PRECIP: &str = "climate/anomaly/ln_precip";
     /// The ELA of every cell, sea included (so it can be interpolated).
     pub const ELA_ALL: &str = "climate/anomaly/ela_m";
+    /// Land ice at the end of the step, m (0 at sea and where there is none). The ice-field
+    /// contract with the surface stage (glacial erosion) is FORMAT.md "The climate's ice fields".
+    pub const ICE_THICKNESS: &str = "climate/ice_thickness_m";
+    /// The thickest the ice stood during the step's fine clock; inside the recent ice-age window
+    /// the maximum since the window began (at the present: the last glacial maximum), m.
+    pub const ICE_MAX_THICKNESS: &str = "climate/ice_max_thickness_m";
+    /// 1 where `ICE_MAX_THICKNESS` > 0.
+    pub const ICE_MAX_EXTENT: &str = "climate/ice_max_extent";
+    /// Share of the step's time the cell was under ice, 0–1.
+    pub const ICE_TIME_SHARE: &str = "climate/ice_time_share";
+    /// Annual-mean sea-ice cover of the sea, 0–1 (0 on land).
+    pub const SEA_ICE: &str = "climate/sea_ice";
+}
+
+/// The ice fields the surface stage's field history records as frame means.
+pub mod history {
+    /// Time-mean land-ice thickness over the frame, m.
+    pub const ICE_THICKNESS: &str = "deeptime:ice_thickness_m";
+    /// Share of the frame's time under ice, 0–1.
+    pub const ICE_COVER: &str = "deeptime:ice_cover";
 }
 
 /// Keyframe layers (with the group's plates and surface layers).
