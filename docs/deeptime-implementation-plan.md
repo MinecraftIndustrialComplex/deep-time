@@ -2080,6 +2080,27 @@ community ports) are not opened for code.
 - **Checks.** Unit and property tests (plate area conserved across rifting; crust ages non-negative;
   no sample in two plates); statistical targets from the research (oceanic crust mostly younger than
   about 250 Myr, a few large plates plus small ones); a viewer page per run.
+- **Geologic provinces, a view layer (decisions log 2026-09-29).** Every keyframe of a run whose
+  stages draw the plate model's `regime` and `crust_age` also carries `provinces`: a USGS-style map
+  ("Geologic provinces of the world": shield, platform, orogen, basin, large igneous province,
+  extended crust, oceanic crust by age), derived by `core::provinces` when the frame is drawn from
+  fields the stages already wrote. It writes nothing into `WorldState`, so the world files, the
+  bake's `meta/province` (the settings that drive TerraBlender, §7.3) and the deposits are
+  untouched; `deeptime provinces --in <checkpoint> --out x.png` draws one from a checkpoint.
+  The first rule that applies wins: **LIP** = a mafic volcanic pile (`plates/pool/mafic_volcanic_m`)
+  of at least a fifth of the recorded LIP thickness above the crust's own basalt (2 km on crust
+  with a gabbro lower crust); **oceanic crust** by `crust_age` (0–20, 20–65, over 65 Ma), a
+  thickened island arc being an orogen; on continental crust **orogen** = active collision or arc,
+  a collision (Himalayan) belt from the last 500 Myr, or an Andean range over 1.5 km lifted in the
+  last 50 Myr (the plate model stamps Andean orogeny on every cell near a trench, so type and age
+  alone would make whole continents orogens); **extended crust** = rift, passive margin or crust
+  thinned below 20 km; **basin** = over 3 km of sediment and sedimentary rock (the strata log or the
+  plate model's sediment pools) or subsiding at over 0.03 mm/yr under at least 1 km; **shield** =
+  the rest where basement is at the surface (under 0.2 km of cover, or a crystalline surface rock
+  from `structure/rock`); **platform** = the rest. The continental classes are then generalised to
+  their neighbours' majority. Thresholds are `provinces::Rules`; the rules are also the layer's
+  legend note in `ramps.json`. Continental crust has no formation age in the model, so what no
+  orogen rule catches counts as old.
 
 ### 8.2 Erosion, deposition, diffusion and amplification — `core::surface` (Phase 1)
 
