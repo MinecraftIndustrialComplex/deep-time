@@ -80,10 +80,20 @@ pub mod field {
     pub const DETAIL: &str = "amplify/detail";
     /// log₁₀ of the effective drainage area, km² (NaN at sea).
     pub const DRAINAGE: &str = "amplify/drainage";
+    /// The youth the mountain character read (0 old … 1 active), L1.
+    pub const YOUTH: &str = "amplify/youth";
+    /// The fold strength the mountain character read (0 … 1), L1.
+    pub const FOLD: &str = "amplify/fold";
 }
 
 /// Keyframe layers of the stage.
-pub const KEYFRAME_LAYERS: [&str; 3] = [field::ELEVATION, field::DETAIL, field::DRAINAGE];
+pub const KEYFRAME_LAYERS: [&str; 5] = [
+    field::ELEVATION,
+    field::DETAIL,
+    field::DRAINAGE,
+    field::YOUTH,
+    field::FOLD,
+];
 
 /// Whether the last level streams.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -366,8 +376,11 @@ impl Config {
     pub fn halo(&self) -> usize {
         let base = plan_halo(&self.counts(false), self.p.repair_margin_cells as usize);
         if self.p.ruggedness > 0.0 {
-            base + character::radius_cells(&self.p.character, self.cell_blocks_l3())
-                + self.p.repair_margin_cells as usize
+            base + character::halo_cells(
+                &self.p.character,
+                self.cell_blocks_l3(),
+                self.p.repair_margin_cells as usize,
+            )
         } else {
             base
         }
@@ -730,23 +743,18 @@ impl AmplifyStage {
         let l3 = GridDesc::for_planet("L3", c, r.l3_r)?;
         let cfg = self.config(sea);
         let fields = CharacterFields::from_world(world, r.l1_r, r.l3_r, &self.p.character);
-        // TEMP-DEBUG (remove): raw dumps of the character fields.
-        if std::env::var_os("DEEPTIME_CHAR_DUMP").is_some() {
-            fields.debug_dump(ctx.out_dir);
-            for n in [
-                "plates/orogeny_type",
-                "plates/orogeny_age_myr",
-                "plates/uplift_mm_yr",
-                "plates/fold_trend_deg",
-            ] {
-                if let Some(f) = world.fields.get(n) {
-                    let b: Vec<u8> = f.data.iter().flat_map(|v| v.to_le_bytes()).collect();
-                    let _ = std::fs::write(
-                        ctx.out_dir
-                            .join(format!("debug/{}.f32", n.replace('/', "_"))),
-                        b,
-                    );
-                }
+        // The youth and fold strength the character read, for the keyframes and the workbench.
+        if !fields.neutral {
+            let l1 = GridDesc::for_planet("L1", c, r.l1_r)?;
+            let (youth, fold) = fields.maps();
+            for (name, data) in [(field::YOUTH, youth), (field::FOLD, fold)] {
+                world.fields.insert(
+                    name.to_owned(),
+                    Field {
+                        grid: l1.clone(),
+                        data,
+                    },
+                );
             }
         }
         let level = level_from_world(world, &self.preset)?;
@@ -871,6 +879,7 @@ impl AmplifyStage {
                 "max_raise_blocks": t.character.max_raise_blocks,
                 "max_cut_blocks": t.character.max_cut_blocks,
                 "flood_raised_cells": t.character_flood_raised_cells,
+                "softened_cells": t.character_softened_cells,
                 "flood_max_raise_m": t.character_flood_max_raise_m,
                 "millis": t.character_ms,
             },
