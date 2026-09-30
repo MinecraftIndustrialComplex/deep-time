@@ -540,7 +540,7 @@ vertices of 24 bytes, 1 K chains of 16 bytes, 2 `tiles_x · tiles_z + 1` u32 off
 vertex                                         chain
 0   4  f32 x (block; continuous along a chain)  0   4  u32 first vertex
 4   4  f32 z (block)                            4   4  u32 vertex count (≥ 2)
-8   4  f32 w: water surface (fills y < w)       8   1  u8 mouth: 0 sea, 1 lake, 2 river
+8   4  f32 w: water surface (fills y < w)       8   1  u8 mouth: 0 sea (or the polar edge row), 1 lake, 2 river
 12  4  f32 hw: half-width, blocks (> 0)         9   3  reserved, 0
 16  4  f32 depth at the centre, blocks (≥ 1)    12  4  u32 into: the lake (mouth 1) or chain (2), else u32::MAX
 20  4  f32 q: discharge, m³/s

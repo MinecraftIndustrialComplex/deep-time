@@ -60,7 +60,7 @@ pub struct RiverVertex {
 /// Where a chain ends.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mouth {
-    /// Its last vertex is in the sea.
+    /// Its last vertex is in the sea (or on the first or last row, where water leaves the map).
     Sea,
     /// Its last vertex is in lake `into`.
     Lake,

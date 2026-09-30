@@ -7,9 +7,10 @@
 //! `elevation`, 2 blocks a cell on every preset but 32k full, which is averaged to 4 blocks so the
 //! working set stays under ~600 MB) with the climate's runoff:
 //!
-//! 1. **Drainage.** The open sea is every below-sea-level cell of a connected body of at least
+//! 1. **Drainage.** The open sea is every cell at least a block below sea level in a connected body of at least
 //!    [`OPEN_SEA_KM2`]; a Priority-Flood (Barnes, Lehman & Mulla 2014, Algorithm 3 with the pit
 //!    queue of Algorithm 4, implemented from the paper as `surface::pflood` is) from its shores
+//!    (and the first and last rows, the poles past the hard cap, as outlets at their own height)
 //!    gives every land cell its spill level F and the cell it was reached from. Each cell drains to
 //!    its steepest strictly lower neighbour on F, else (flats and lakes) to the cell it was
 //!    reached from, so every path descends to the sea, and the receivers form a forest.
