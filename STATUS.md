@@ -144,7 +144,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   tundra brown-grey; snowball all white; no-climate frame bare rock and ice-free; ramp labels = classes; hill shade lit
   NW; box filter bands and mask — keyframes:: the satellite leads terrain frames only, viewer: the last satellite frame
   leads the world layers); clippy `--workspace --all-targets -D warnings` ok; `cargo fmt --check` ok; `cargo deny check
-  licenses bans` ok; `./gradlew build test` BUILD SUCCESSFUL, tests=151 failures=0 (the lang string; `ScreenSourcesTest` reads en_us.json).
+  licenses bans` ok; `./gradlew build test` BUILD SUCCESSFUL, tests=151 failures=0 (the lang string; `ScreenSourcesTest` reads en_us.json). All of them re-run after merging master 6f52b57 (the climate API's latitude, Java only): the same results (core 287 + 3 ignored; Gradle tests=151 failures=0).
 - **Next.** Merge when reviewed (the caller lands it). Not done: the in-game review page's final map could show the last
   satellite keyframe instead of the elevation ramp (a ReviewModel change); the workbench readout could give the
   elevation under the pointer on the satellite layer too.
