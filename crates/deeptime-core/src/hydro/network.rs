@@ -212,7 +212,11 @@ pub fn run(inp: &Input<'_>) -> Output {
     // Every cell after the cell it drains to: by height, then (on a flat) by mask.
     let key = |c: u32| -> (i16, u32, u32) {
         let cu = c as usize;
-        let m = if state[cu] & FLAT != 0 && mask[cu] != u32::MAX { mask[cu] } else { 0 };
+        let m = if state[cu] & FLAT != 0 && mask[cu] != u32::MAX {
+            mask[cu]
+        } else {
+            0
+        };
         (fill[cu], m, c)
     };
     order.par_sort_unstable_by_key(|&c| key(c));
@@ -694,7 +698,8 @@ fn flat_masks(g: &Grid, fill: &[i16], parent: &[u8], state: &mut [u8]) -> Vec<u3
         queue.clear();
         for &c in &members {
             let outlet = (0..8).any(|k| {
-                g.nb(c, k).is_some_and(|nb| fill[nb] == h && state[nb] & (FLAT | SEA) == 0)
+                g.nb(c, k)
+                    .is_some_and(|nb| fill[nb] == h && state[nb] & (FLAT | SEA) == 0)
             });
             if outlet {
                 mask[c] = 1;
