@@ -142,7 +142,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `snowball_on/off_frac`, `hothouse_c`, `orbital_step_kyr`, `ice_max_thickness_m`, `ice_response_kyr`,
   `ice_reference_km3`. `tools/dev/knob_extremes.py --stage climate --length-myr 100` on the 8 numeric knobs: 16 of
   16 ok (degassing 0 freezes the planet for good: land −63 °C, all ice — as it must without volcanoes).
-- **Measured** (Mac, heavily shared: load 60–110; gates on the tree merged with master 8872c91):
+- **Measured** (Mac, heavily shared: load 60–110; gates re-run on the tree merged with master 8bdbedc: core 280 + 3 ignored, Gradle 146/0):
   `cargo test --workspace --release` all pass (core 274 + 3 ignored; new: carbon ODE balance and mass
   conservation, sealed build-up 350× in 2–4 Myr, Gough, forcing forms, orbit ranges, Kepler annual mean, EDT
   exact, Nye/eustasy numbers, Imbrie asymmetry, band margins; clock: Earth-like 40 Myr stays 5–25 °C with no
