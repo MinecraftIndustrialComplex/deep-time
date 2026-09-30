@@ -46,7 +46,8 @@ fn the_valley_width_widens_the_footprint_not_the_ice() {
             z[j * w + i] -= (j as f64 - (h / 2) as f64).abs() * 55.0;
         }
     }
-    let cl = climate(w * h, 600.0, -2.0);
+    // Ice only on the high west: a valley glacier flows down the axis.
+    let cl = climate(w * h, 2000.0, -2.0);
     let rt = route(&d, &z, 0.0);
     let clim = IceClimate {
         ela_z: &cl.ela,
@@ -62,11 +63,18 @@ fn the_valley_width_widens_the_footprint_not_the_ice() {
         );
         st
     };
-    let one = solve(&physical());
+    // Broad glaciers (a tenth as deep as wide), so they span cells either way.
+    let one = solve(&GlacialParams {
+        form_ratio: 0.1,
+        ..physical()
+    });
     let three = solve(&GlacialParams {
+        form_ratio: 0.1,
         valley_width: 3.0,
         ..GlacialParams::default()
     });
+    let widest = one.width.iter().copied().fold(0.0, f64::max);
+    assert!(widest > 1000.0, "{widest}");
     // The same glaciers (the flow law does not see the setting) …
     assert_eq!(one.thick, three.thick);
     // … drawn over more ground.
