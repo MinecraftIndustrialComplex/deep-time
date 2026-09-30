@@ -129,7 +129,7 @@
     ['strata', 'Strata'], ['deposits', 'Deposits'], ['input', 'Deposit inputs']];
   const layerGroup = name => { const i = name.indexOf('/'); return i < 0 ? '' : name.slice(0, i); };
   const LAYER_WORDS = {
-    elevation: 'Elevation', plates: 'Plates', crust_age: 'Crust age', regime: 'Tectonic regime', water_level: 'Water level',
+    elevation: 'Elevation', plates: 'Plates', crust_age: 'Crust age', regime: 'Tectonic regime', provinces: 'Geologic provinces', water_level: 'Water level',
     t_mean: 'Mean temperature', t_warm: 'Warmest month', t_cold: 'Coldest month', precip: 'Precipitation', koppen: 'Köppen climate',
     aridity: 'Aridity', glacier: 'Glaciers', ela: 'Snow line', temperature: 'Temperature', vegetation: 'Vegetation',
     erosion: 'Erosion', deposition: 'Deposition', sediment: 'Sediment', class: 'Surface rock', drainage: 'Drainage', regolith: 'Regolith',
