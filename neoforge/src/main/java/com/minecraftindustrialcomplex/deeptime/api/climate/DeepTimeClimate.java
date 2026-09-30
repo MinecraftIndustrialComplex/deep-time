@@ -26,7 +26,9 @@ import java.util.OptionalDouble;
  * <p>Server side only (the world data lives with the server): on a client level, or any level Deep
  * Time did not generate, {@link #isDeepTimeLevel()} is false and every query is empty. A Deep Time
  * level without a simulated climate (the analytic test terrains) has {@link #hasClimate()} false.
- * Thread-safe; lookups are cached per block column, so calling it from a tick is cheap.
+ * Thread-safe; lookups are cached per block column, so calling it from a tick is cheap. The one
+ * exception is the planet's geometry ({@link #circumferenceBlocks(Level)}, {@link #latitudeDeg}),
+ * which a client knows too.
  *
  * <pre>{@code
  * DeepTimeClimate climate = DeepTimeClimate.of(level);
@@ -47,8 +49,13 @@ import java.util.OptionalDouble;
  */
 public interface DeepTimeClimate {
 
-    /** This interface's version: 1 = P1-25. */
-    int API_VERSION = 1;
+    /**
+     * This interface's version: 1 = P1-25; 2 adds the planet's geometry on both sides
+     * ({@link #circumferenceBlocks(Level)}, {@link #latitudeDeg}). A caller compiled against a newer
+     * version than the installed Deep Time gets a {@link NoSuchMethodError} from a newer method; read
+     * this field reflectively (javac inlines it) or catch that error.
+     */
+    int API_VERSION = 2;
 
     /** Months in the simulated year. */
     int MONTHS = 12;
@@ -66,6 +73,30 @@ public interface DeepTimeClimate {
      */
     static DeepTimeClimate of(Level level) {
         return LevelClimate.of(level);
+    }
+
+    /**
+     * The planet's circumference C in blocks (API 2): its east-west period, and the scale of latitude,
+     * φ = −z · 360° / C ({@link #latitudeDeg}). A positive C means {@code level} is a Deep Time planet
+     * (a real one or an analytic test terrain); any other level answers 0.
+     *
+     * <p>Unlike the rest of this interface it answers on both sides. On the server it is the level's
+     * generator's; on a client it is the planet info the server sends at login, respawn and dimension
+     * change, and 0 until that has arrived, for a level the info is not about, and after leaving the
+     * server. Cheap and allocation-free on both sides, so per-block callers (colour resolvers on mesh
+     * threads, per-column precipitation) may call it every time; it is safe from any thread.
+     */
+    static int circumferenceBlocks(Level level) {
+        return LevelClimate.circumferenceBlocks(level);
+    }
+
+    /**
+     * Latitude in degrees at block {@code z} on a planet of circumference {@code circumferenceBlocks}
+     * (API 2): φ = −z · 360° / C, north (−z) positive, the equator at z = 0 and the poles at
+     * |z| = C/4. NaN when the circumference is not positive (not a planet).
+     */
+    static double latitudeDeg(double z, int circumferenceBlocks) {
+        return circumferenceBlocks > 0 ? -z * 360.0 / circumferenceBlocks : Double.NaN;
     }
 
     /** Year fraction [0, 1) at solar longitude {@code degrees} (0° = northern spring equinox). */
