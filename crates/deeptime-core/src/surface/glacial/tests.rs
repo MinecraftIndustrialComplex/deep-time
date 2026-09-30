@@ -39,7 +39,13 @@ fn physical() -> GlacialParams {
 fn the_valley_width_widens_the_footprint_not_the_ice() {
     let (w, h) = (48, 21);
     let d = Dims::new(w, h, 1000.0, false);
-    let z = range(w, h, 2500.0, 6, 150.0);
+    // A broad valley (5 m a row across), so the footprint is not held in by steep walls.
+    let mut z = range(w, h, 2500.0, 6, 150.0);
+    for j in 0..h {
+        for i in 0..w - 6 {
+            z[j * w + i] -= (j as f64 - (h / 2) as f64).abs() * 55.0;
+        }
+    }
     let cl = climate(w * h, 600.0, -2.0);
     let rt = route(&d, &z, 0.0);
     let clim = IceClimate {
