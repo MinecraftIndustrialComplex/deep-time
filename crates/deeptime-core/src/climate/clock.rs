@@ -32,7 +32,7 @@ use deeptime_format::EventId;
 pub const MIN_STEP_YEARS: f64 = 1000.0;
 
 /// One row of the run's climate curve (one per plate step).
-pub const SERIES_COLUMNS: [&str; 18] = [
+pub const SERIES_COLUMNS: [&str; 21] = [
     "t_myr",
     "co2_ppm",
     "co2_min_ppm",
@@ -51,6 +51,9 @@ pub const SERIES_COLUMNS: [&str; 18] = [
     "snowball",
     "ridge_km2_yr",
     "subduction_km2_yr",
+    "land_frac",
+    "kernel_rel",
+    "runoff_land_m_yr",
 ];
 
 /// One row of the ice-age window's curve (one per fine-clock step inside the window).
