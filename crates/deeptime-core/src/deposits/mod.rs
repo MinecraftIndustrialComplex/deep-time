@@ -1115,10 +1115,9 @@ struct Finish {
     /// matter (kitchen centres, candidate sites): the place a deposit's forming events are
     /// looked up at.
     paths: BTreeMap<u32, Vec<u32>>,
-    /// Per L1 cell, the sedimentary cover (m) a coal stack must lie in, and the metres a block
-    /// stands for in the strata (`scale.m_per_block_v / feature_scale.strata`); None without a
+    /// The sedimentary cover a coal stack must lie in, as the world will draw it; None without a
     /// planet's columns (a synthetic history).
-    cover: Option<(Vec<f32>, f64)>,
+    cover: Option<crate::structure::Cover>,
 }
 
 /// Where the crust now at each of `cells` was at the end of every frame: `[i][k]`, [`NO_ORIGIN`]
@@ -1383,10 +1382,9 @@ impl DepositStage {
             present,
             paths: BTreeMap::new(),
             cover: self.planet.as_deref().and_then(|p| {
-                let mv = p.scale.m_per_block_v / p.scale.feature_scale.strata;
-                crate::structure::sedimentary_cover_m(world, p)
-                    .ok()
-                    .map(|c| (c, mv))
+                let cover = crate::structure::Cover::new(world, p).ok()?;
+                ctx.reserve(cover.bytes()).ok()?;
+                Some(cover)
             }),
         };
 
@@ -2264,8 +2262,8 @@ impl DepositStage {
         let mut centre_depth = centre_depth;
         let mut seams = seams;
         let fit = match (&t.geometry.stack, &seams, &f.cover) {
-            (Some(k), Some(plan), Some((cover, mv))) => Some((
-                geometry::fit_stack(k, plan, centre_depth, f64::from(cover[cell as usize]) / mv, &sc),
+            (Some(k), Some(plan), Some(cover)) => Some((
+                geometry::fit_stack(k, plan, centre_depth, cover.blocks_at(x, z, surf), &sc),
                 plan.measures_m,
             )),
             _ => None,
@@ -3012,8 +3010,8 @@ impl DepositStage {
             };
             // Held in the site's sedimentary cover like any stack; a guaranteed site keeps one
             // seam at the surface where there is none.
-            if let Some((cover, mv)) = &f.cover {
-                let cover_blocks = f64::from(cover[cell as usize]) / mv;
+            if let Some(cover) = &f.cover {
+                let cover_blocks = cover.blocks_at(x, z, surf);
                 let refit = match geometry::fit_stack(k, &plan, centre_depth_m, cover_blocks, &sc) {
                     geometry::StackFit::Fits => None,
                     geometry::StackFit::NoCover => Some((k.seam_spacing_m, k.seam_spacing_m / 2.0)),

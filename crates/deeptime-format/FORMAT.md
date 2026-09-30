@@ -406,7 +406,7 @@ the plate model's rock pools less the log, and peridotite below the crust. Pluto
 **The 0.2 bake** smooths the stacks laterally before writing them, because the strata log is
 carried cell by cell and neighbouring cells' stacks differ more than the rocks would: each cell's
 new stack is the Gaussian-weighted mean (σ = `structure.strata_smoothing_cells` L1 cells, default
-6; x wraps, z clamps) of its neighbours' height functions, cut at every key top and base any of
+10; x wraps, z clamps) of its neighbours' height functions, cut at every key top and base any of
 them has; each interval takes the class holding the largest weighted thickness there, equal
 neighbours join; the cell's own surface stays its first top (neighbours' units above it pinch out
 there; where the cell stands above the mean its top unit fills the difference); then the stack is

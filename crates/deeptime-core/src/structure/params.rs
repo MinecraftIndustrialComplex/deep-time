@@ -119,7 +119,7 @@ impl Default for StructureParams {
 }
 
 /// The default lateral smoothing of the rock layers, L1 cells (see `strata_smoothing_cells`).
-pub const DEFAULT_STRATA_SMOOTHING_CELLS: f64 = 6.0;
+pub const DEFAULT_STRATA_SMOOTHING_CELLS: f64 = 10.0;
 
 fn check(ok: bool, key: &str, reason: &str) -> Result<(), CoreError> {
     if ok {
