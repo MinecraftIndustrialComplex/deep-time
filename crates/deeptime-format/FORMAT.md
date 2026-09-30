@@ -314,7 +314,7 @@ E the `elevation` layer bilinear, A the layer `notes.bake.detail.layer` bilinear
 **What the game draws.** Vanilla evaluates the density at noise-cell corners four blocks apart and
 interpolates between them, so a corner column's top is ⌈H⌉ − 1 exactly and the columns between
 follow the bilinear H of the four corners. For that to hold on steep ground, `deeptime:terrain`'s
-density (H − y)/scale grows its scale from k (8) to 0.8 × the largest height difference to the
+density (H − y)/scale doubles its scale from k (8) until it reaches 0.8 × the largest height difference to the
 eight neighbouring corners (Java `worldgen/TerrainScale`, 2026-09-29): with the fixed k the router's
 cave band (the terrain value only within 1.5625·scale blocks of the surface) broke faces steeper
 than about three blocks per block into three-block benches and 20-block steps every four blocks

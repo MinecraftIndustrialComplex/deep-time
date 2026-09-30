@@ -4,7 +4,8 @@ package com.minecraftindustrialcomplex.deeptime.worldgen;
 /**
  * The density scale of {@code deeptime:terrain} at a column (plan §7.1): the terrain density is
  * (H − y) / scale, with scale = k where the terrain is gentle and, on steep ground,
- * {@link #STEEP_SCALE} × the largest height difference to the eight neighbouring noise-cell corners.
+ * at least {@link #STEEP_SCALE} × the largest height difference to the eight neighbouring noise-cell
+ * corners (k doubled until it is, so the scale stays a power of two times k).
  *
  * <p><b>Why.</b> The final density takes the terrain value only within 1.5625·scale blocks of the
  * surface and the cave field below (the router's {@code range_choice}, as vanilla's around
@@ -49,6 +50,13 @@ public final class TerrainScale {
                 drop = Math.max(drop, Math.abs(src.height(x + dx, z + dz) - h));
             }
         }
-        return Math.max(k, STEEP_SCALE * drop);
+        // Doubling keeps the scale a power of two times k: (H - y)/scale and vanilla's
+        // interpolation between corners then stay exact in binary floating point, so a column whose
+        // H is a whole number of sixteenths still tops out at ceil(H) - 1 (a scale of 9.6 leaves a
+        // 1e-16 residue at y = H and turns the block above the surface solid).
+        double need = STEEP_SCALE * drop, scale = k;
+        while (scale < need)
+            scale *= 2.0;
+        return scale;
     }
 }
