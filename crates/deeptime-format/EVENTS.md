@@ -191,6 +191,8 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 | `deeptime:orogeny_phase` | mountain building, with a duration | plates (P1-03); dummy | see below; dummy: see below |
 | `deeptime:hotspot_track` | a hotspot's track over a plate | plates (P1-03) | see below |
 | `deeptime:large_igneous_province` | a LIP eruption | plates (P1-03) | see below |
+| `deeptime:volcano_arc` | a volcanic arc segment, with its cones | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:volcano_hotspot_chain` | a hotspot's chain of volcanoes, with its members | volcanoes (P1-21) | see "The volcanoes' events" |
 | `deeptime:volcano_stratovolcano` | an arc stratovolcano, from its birth to its death | volcanoes (P1-21) | see "The volcanoes' events" |
 | `deeptime:volcano_shield` | a hotspot's shield volcano (an island or seamount of its chain) | volcanoes (P1-21) | see "The volcanoes' events" |
 | `deeptime:volcano_caldera_complex` | a continental hotspot's silicic centre | volcanoes (P1-21) | see "The volcanoes' events" |
@@ -265,22 +267,27 @@ not at its start (regression: the reverse); global when there are none.
 
 ### The volcanoes' events (source `deeptime:volcanoes`, P1-21)
 
-Written by `crates/deeptime-core/src/surface/volcanoes/` at the end of the coupled group (after
-the plate model has closed its hotspot tracks), so every cause exists when they are written. Place:
-the volcano's (or province's) position at the end of the run, where the world shows it (a caldera's:
-where its volcano stood when it collapsed). Heights are relief above the ground around the edifice,
-m; `summit_m` is its summit's elevation above the sea at the end; radii and areas are block-metric
-(the world's own), km and km². Stratovolcanoes are written while active, or dead but still holding half
-their peak height and at least 800 m (× `volcanoes.size`); the many thousands of others a run makes
-are counted in `notes.volcanoes`. Every hotspot volcano is written, whatever became of it.
+Written by `crates/deeptime-core/src/surface/volcanoes/` at the end of the coupled group (after the
+plate model has closed its hotspot tracks), so every cause exists when they are written. Grouped (Ben,
+2026-09-30, "Group by arc/chain"): one event per **arc segment** — the stratovolcanoes one subduction
+contact fed (keyed by its onset event; by plate where the contact never had one) — and one per
+**hotspot chain**, each with its standing cones as a detail; on their own only the notable ones: each
+group's tallest standing cone (a stratovolcano at least 1.5 km × `volcanoes.size`), the calderas whose
+volcano still stands or that are at least 6 km across (× size), and the flood basalts. Heights are relief
+above the ground round the edifice, m; `summit_m` its summit above the sea at the end; radii and areas
+block-metric (the world's own), km and km². A **cone list** (`cones`) is `lat,lon,radius_km,height_m`
+per standing cone, `;`-separated, tallest first, at most 80; `inspect-column --why` finds a column's
+cone in it.
 
-| Kind | t_start (t_end) | Params | Magnitude | Causes |
-|---|---|---|---|---|
-| `volcano_stratovolcano` | its birth (its death, or the end of the run while active) | `volcano` (catalogue id), `setting` (`continental_arc`, `island_arc`), `magma` (`andesitic`, `silicic`), `peak_height_m`, `height_m`, `radius_km`, `summit_m`, `arc_flux` (mean while active, 0–1), `plate`, `fate` (`active`, `extinct`, `eroded`), `ongoing` | peak height / 3 km | the subduction onset of the contact nearest it on its plate, when that contact has one |
-| `volcano_shield` | its birth over the plume (its death: it drifted away, or its hotspot died) | as above plus `hotspot`, `chain_index` (0 the first of its chain), `fate` (`active`, `island`, `seamount`, `eroded`, `subducted`) | as above | its hotspot's `hotspot_track`, else the hotspot's `large_igneous_province` |
-| `volcano_caldera_complex` | as a shield (a continental hotspot) | as `volcano_shield`, `magma` = `silicic` | as above | as `volcano_shield` |
-| `volcano_caldera` | the collapse | `volcano`, `radius_km`, `depth_m`, `erupted_km3`, `type` (`silicic`: the volcano collapsed and died; `summit`: a shield's summit caldera) | erupted volume / 1,000 km³, ≤ 1 | its volcano's event, else that volcano's cause |
-| `volcano_flood_basalt` | the eruption | `area_km2`, `thickness_m` (the pile at its centre), `flows`, `preserved_frac` (share of its area where the pile still crops out within 150 m of the surface), `pile_frac` (share where any of it is left, at any depth), `plate` | pile / 1 km | the plate model's `large_igneous_province` |
+| Kind | t_start (t_end) | Place | Params | Magnitude | Causes |
+|---|---|---|---|---|---|
+| `volcano_arc` | its first cone's birth (its last live step) | the centroid of its standing cones, else of where its cones were born | `setting` (`continental_arc`, `island_arc`: where most were born), `cones_built`, `live`, `standing`, `tallest_m`, `peak_m` (the tallest any stood), `calderas`, `plate`, `ongoing`, `cones` | cones built / 50, ≤ 1 | its subduction onset |
+| `volcano_hotspot_chain` | its first volcano's birth (its last death, or the end) | its youngest volcano | `hotspot`, `volcanoes_built`, `standing`, `islands`, `seamounts`, `subducted`, `tallest_m`, `ongoing`, `cones` | volcanoes / 20, ≤ 1 | the hotspot's `hotspot_track`, else its `large_igneous_province` |
+| `volcano_stratovolcano` | its birth (its death, or the end while active) | its summit at the end | `volcano` (catalogue id), `setting`, `magma` (`andesitic`, `silicic`), `peak_height_m`, `height_m`, `radius_km`, `summit_m`, `arc_flux` (mean while active, 0–1), `plate`, `fate` (`active`, `extinct`), `ongoing` | peak height / 3 km | its `volcano_arc` |
+| `volcano_shield` | its birth over the plume (its death) | as above | as above plus `hotspot`, `chain_index`; `magma` `basaltic`; `fate` (`active`, `island`, `seamount`) | as above | its `volcano_hotspot_chain` |
+| `volcano_caldera_complex` | as a shield (a continental hotspot) | as above | as `volcano_shield`, `magma` = `silicic` | as above | its `volcano_hotspot_chain` |
+| `volcano_caldera` | the collapse | where its volcano stood then | `volcano`, `radius_km`, `depth_m`, `erupted_km3`, `type` (`silicic`: the volcano collapsed and died; `summit`: a shield's summit caldera) | erupted volume / 1,000 km³, ≤ 1 | its volcano's event, else its arc segment or chain |
+| `volcano_flood_basalt` | the eruption | the province's centre at the end | `area_km2`, `thickness_m` (the pile at its centre), `flows`, `preserved_frac` (share of its area where the pile still crops out within 150 m of the surface), `pile_frac` (share where any of it is left), `plate` | pile / 1 km | the plate model's `large_igneous_province` |
 
 ### The climate's events (source `deeptime:climate`, P1-05)
 

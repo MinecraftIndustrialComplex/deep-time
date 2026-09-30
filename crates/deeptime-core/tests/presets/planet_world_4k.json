@@ -242,6 +242,7 @@
   "volcanoes": {
     "density": 1.0,
     "size": 1.0,
+    "flank_steepness": 0.5,
     "arc_spacing_km": 60.0,
     "arc_min_flux": 0.25,
     "arc_height_km": [
