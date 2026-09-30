@@ -105,6 +105,9 @@ pub const EVERY_CLASS: [&str; 59] = [
     "volcanic_ash",
 ];
 
+/// The basin strata's classes (`Strata::Basin`).
+pub const BASIN_CLASSES: [&str; 5] = ["sandstone", "shale", "mudstone", "limestone", "granite"];
+
 /// Which horizon stacks a synthetic world carries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Strata {
@@ -116,6 +119,11 @@ pub enum Strata {
     /// neighbouring cell columns hold every class at h ≥ 2 (20 blocks or more below the surface,
     /// under whatever the surface rules paint). The last horizon reaches down to min_y.
     EveryClass,
+    /// A readable sedimentary basin, the same in every cell: sandstone, shale, sandstone,
+    /// mudstone, limestone, shale, sandstone and shale beds from the surface down to 165 blocks,
+    /// then granite to the floor (the synthetic deposit world's strata, so its coal seams and
+    /// ore bodies sit in sections that read as geology).
+    Basin,
 }
 
 impl Strata {
@@ -123,12 +131,13 @@ impl Strata {
         match self {
             Strata::Placeholder => "placeholder",
             Strata::EveryClass => "every-class",
+            Strata::Basin => "basin",
         }
     }
 
-    /// The strata called `name` (`placeholder`, `every-class`).
+    /// The strata called `name` (`placeholder`, `every-class`, `basin`).
     pub fn from_name(name: &str) -> Option<Strata> {
-        [Strata::Placeholder, Strata::EveryClass]
+        [Strata::Placeholder, Strata::EveryClass, Strata::Basin]
             .into_iter()
             .find(|s| s.name() == name)
     }
@@ -138,6 +147,7 @@ impl Strata {
         match self {
             Strata::Placeholder => &STRATA_CLASSES,
             Strata::EveryClass => &EVERY_CLASS,
+            Strata::Basin => &BASIN_CLASSES,
         }
     }
 
@@ -146,6 +156,7 @@ impl Strata {
         match self {
             Strata::Placeholder => &[0, 6, 40],
             Strata::EveryClass => &[0, 10, 20, 30, 40, 50, 60, 70],
+            Strata::Basin => &[0, 8, 22, 36, 55, 75, 100, 130, 165],
         }
     }
 
@@ -154,6 +165,7 @@ impl Strata {
         match self {
             Strata::Placeholder => h as u8,
             Strata::EveryClass => ((6 * u64::from(i) + h as u64) % EVERY_CLASS.len() as u64) as u8,
+            Strata::Basin => [0, 1, 0, 2, 3, 1, 0, 1, 4][h.min(8)],
         }
     }
 }
@@ -487,6 +499,13 @@ fn strata_notes(kind: Strata) -> Value {
             "grid": "L1",
             "horizons": "8 per cell; horizon h's top is the surface (the L3 elevation at the cell's block) − 10·h blocks; the last reaches down to min_y",
             "class_rule": "horizon h of L1 cell column i has class index (6·i + h) mod 59, so any ten neighbouring cell columns hold every class at h ≥ 2"
+        }),
+        Strata::Basin => json!({
+            "placeholder": true,
+            "kind": kind.name(),
+            "grid": "L1",
+            "horizons": "9 per cell, the same in every cell: tops at the surface − 0, 8, 22, 36, 55, 75, 100, 130 and 165 blocks; the last reaches down to min_y",
+            "classes": ["sandstone", "shale", "sandstone", "mudstone", "limestone", "shale", "sandstone", "shale", "granite"]
         }),
     }
 }
