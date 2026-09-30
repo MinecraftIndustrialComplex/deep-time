@@ -166,6 +166,23 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   Deep Time's cavities, not the volcanoes'. (4) One run (q16c) showed a ~5 km deep pit on an Andean plateau already in the
   young landscape (not at a volcano); not investigated. (5) At 20 m vs 300 m per block the world is 15× taller than wide,
   so true-proportion cones are steep peaks in blocks.
+- **Follow-ups (Ben, decisions log 2026-09-30).** (1) **"Setting, gentler default"**: `volcanoes.flank_steepness`
+  (0.1–1, default **0.5**; the editor's Terrain field "Volcano flank steepness", stops Gentle 0.35 / Readable 0.5 /
+  Physical 1) divides every edifice's physical basal radius, the height unchanged: at 0.5 a 3-km arc cone is 26–28 km in
+  radius (56 blocks of relief per 90 blocks of run instead of per 45), shields up to 71 km; 1 is the physical profile.
+  (2) **"Group by arc/chain"**: one `deeptime:volcano_arc` per arc segment (the cones one subduction contact fed, keyed by
+  its onset event, else by plate; `ArcSegment` in the catalogue: first/last activity, cones born, where, peak, calderas)
+  and one `deeptime:volcano_hotspot_chain` per hotspot, each with its standing cones as a detail (`cones`:
+  `lat,lon,radius_km,height_m;…`, tallest first, ≤ 80); on their own only each group's tallest standing cone (a
+  stratovolcano ≥ 1.5 km × size), the calderas still standing or ≥ 6 km across, and the flood basalts. Notable cones are
+  caused by their group, groups by the subduction onset / hotspot track. `inspect-column --why` finds a column's cone in
+  a group's list (the notable cone's own event first); porphyry's `causes.pathway` now also lists `volcano_arc`, so a
+  porphyry of any age on an arc cites its segment (an arc event spans the segment's whole life) or a notable cone nearer.
+  **Event counts** on the same preset (`earthlike_quick_16k`, 500 Myr, run q16g): **611** volcano events of 2,931
+  (before: 1,468 of 3,498): `volcano_arc` 341, `volcano_hotspot_chain` 20, `volcano_stratovolcano` 73, `volcano_shield` 4,
+  `volcano_caldera_complex` 3, `volcano_caldera` 162, `volcano_flood_basalt` 8 (`notes.volcanoes.events_by_kind`).
+  Run: 420 s wall on the loaded Mac, volcanoes 22.7 s (the wider footprints: the erosion fit 13.5 s), amplify's volcano
+  sink 1.1 s; 282 live arc cones, 1 live shield, 137 calderas, 8 flood basalts.
 - **After merging master 84e2b1d** (continuous strata, deep-time climate, P1-25; checkpoint schema → 8 on top of the
   climate's 7): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings` (so every target compiles) and
   `deny check licenses bans` clean. The workspace tests, `./gradlew build test` and `./gametest.sh` were not re-run after

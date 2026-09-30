@@ -409,7 +409,10 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
     }
     assert!(arcs > 0 && chains_n > 0 && strato_events > 0);
     assert_eq!(arcs, st.arcs.len(), "one event per arc segment");
-    assert!(strato_events <= arcs, "at most one notable cone per segment");
+    assert!(
+        strato_events <= arcs,
+        "at most one notable cone per segment"
+    );
 
     // The strata log holds the volcanic rock.
     let log = &world.surface.as_ref().unwrap().log;

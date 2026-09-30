@@ -1100,7 +1100,11 @@ impl VolcanoStage {
             v.built_m += dh;
             v.peak_m = v.peak_m.max(v.height_m);
         }
-        for v in st.volcanoes.iter().filter(|v| v.kind == Kind::Strato && v.active()) {
+        for v in st
+            .volcanoes
+            .iter()
+            .filter(|v| v.kind == Kind::Strato && v.active())
+        {
             if let Some(seg) = st.arcs.get_mut(&v.segment) {
                 seg.last_myr = t;
                 seg.peak_m = seg.peak_m.max(v.peak_m);
@@ -1580,7 +1584,10 @@ impl VolcanoStage {
                     .param("hotspot", i64::from(h))
                     .param("chain_index", i64::from(v.chain));
             } else if v.active_myr > 0.0 {
-                e = e.param("arc_flux", (v.flux_myr / v.active_myr * 100.0).round() / 100.0);
+                e = e.param(
+                    "arc_flux",
+                    (v.flux_myr / v.active_myr * 100.0).round() / 100.0,
+                );
             }
             if let Some(c) = cause {
                 e = e.caused_by(c);
@@ -1607,7 +1614,10 @@ impl VolcanoStage {
                 let rx = members[0].x;
                 let n = members.len() as f64;
                 let dx: f64 = members.iter().map(|v| frame.wrap_x(v.x - rx)).sum();
-                (frame.wrap_x(rx + dx / n), members.iter().map(|v| v.z).sum::<f64>() / n)
+                (
+                    frame.wrap_x(rx + dx / n),
+                    members.iter().map(|v| v.z).sum::<f64>() / n,
+                )
             };
             let tallest = members.iter().map(|v| v.height_m).fold(0.0f64, f64::max);
             let cones = cones_param(&mut members);
@@ -1638,7 +1648,10 @@ impl VolcanoStage {
             }
             let id = world.emit(e)?;
             emitted += 1;
-            for v in all.iter().filter(|v| v.kind == Kind::Strato && v.segment == *key) {
+            for v in all
+                .iter()
+                .filter(|v| v.kind == Kind::Strato && v.segment == *key)
+            {
                 group_event.insert(v.id, id);
             }
             if let Some(top) = members.first().filter(|v| v.height_m >= 1500.0 * size) {
@@ -1665,7 +1678,10 @@ impl VolcanoStage {
                 .expect("a chain has a volcano");
             let mut members: Vec<&Volcano> = vs.iter().copied().filter(|v| standing(v)).collect();
             let islands = members.iter().filter(|v| summit_of(v) > 0.0).count();
-            let subducted = vs.iter().filter(|v| v.gone == Some(Gone::Subducted)).count();
+            let subducted = vs
+                .iter()
+                .filter(|v| v.gone == Some(Gone::Subducted))
+                .count();
             let tallest = members.iter().map(|v| v.height_m).fold(0.0f64, f64::max);
             let live = vs.iter().filter(|v| v.gone.is_none() && v.active()).count();
             let cones = cones_param(&mut members);
@@ -1680,7 +1696,10 @@ impl VolcanoStage {
                 .at(point(youngest.x, youngest.z))
                 .magnitude((vs.len() as f64 / 20.0).min(1.0) as f32)
                 .param("hotspot", i64::from(*h))
-                .param("volcanoes_built", st.chains.get(h).map_or(vs.len() as i64, |&n| i64::from(n)))
+                .param(
+                    "volcanoes_built",
+                    st.chains.get(h).map_or(vs.len() as i64, |&n| i64::from(n)),
+                )
                 .param("standing", members.len() as i64)
                 .param("islands", islands as i64)
                 .param("seamounts", (members.len() - islands) as i64)

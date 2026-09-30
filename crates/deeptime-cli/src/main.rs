@@ -955,8 +955,11 @@ fn landforms_at(
                 if !d.is_finite() {
                     return None;
                 }
-                let chain: Vec<serde_json::Value> =
-                    log.cause_chain(e.id, 4).iter().map(|x| x.to_json()).collect();
+                let chain: Vec<serde_json::Value> = log
+                    .cause_chain(e.id, 4)
+                    .iter()
+                    .map(|x| x.to_json())
+                    .collect();
                 let mut ev = e.to_json();
                 ev["params"]["cones"] = serde_json::json!("…");
                 return Some((
