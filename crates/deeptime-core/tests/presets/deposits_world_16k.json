@@ -21,6 +21,6 @@
         {"material": "c:zinc", "min_sites_per_region": 1, "region_blocks": 16384, "exposed": false}
       ]
     },
-    "terrain": {"strata": "every-class"}
+    "terrain": {"strata": "basin"}
   }
 }

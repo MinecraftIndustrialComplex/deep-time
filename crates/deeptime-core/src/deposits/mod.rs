@@ -213,7 +213,7 @@ pub struct SyntheticPreset {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TerrainBake {
-    /// The horizon stacks: `placeholder` (default) or `every-class` (`crate::synth::Strata`).
+    /// The horizon stacks: `placeholder` (default), `every-class` or `basin` (`crate::synth::Strata`).
     #[serde(default = "placeholder_strata")]
     pub strata: String,
 }
@@ -358,6 +358,9 @@ pub struct DepositStage {
     frames: usize,
     state: State,
     layers: Vec<&'static str>,
+    /// The planet preset of a recorded history (the sedimentary cover a coal stack is held in is
+    /// built from it and the world, `structure::sedimentary_cover_m`); None for a synthetic one.
+    planet: Option<Box<crate::params::PlanetPreset>>,
 }
 
 /// The types a run uses: every built-in type, or the requested ones and the children they spawn.
@@ -467,7 +470,7 @@ impl DepositStage {
             min_y: sc.min_y,
             max_y: sc.max_y,
         };
-        Ok(DepositStage::build(
+        let mut stage = DepositStage::build(
             preset.seed,
             params,
             scales,
@@ -477,20 +480,24 @@ impl DepositStage {
             },
             types,
             frames,
-        ))
+        );
+        stage.planet = Some(Box::new(preset.clone()));
+        Ok(stage)
     }
 
     /// The same stage running `types` instead (tests: a type written for the test).
     #[cfg(test)]
     fn with_types(self, types: Vec<DepositType>) -> DepositStage {
-        DepositStage::build(
+        let mut stage = DepositStage::build(
             self.seed,
             self.params,
             self.scales,
             self.source,
             types,
             self.frames,
-        )
+        );
+        stage.planet = self.planet;
+        stage
     }
 
     fn build(
@@ -519,6 +526,7 @@ impl DepositStage {
             frames,
             state: State::default(),
             layers,
+            planet: None,
         }
     }
 
@@ -1028,6 +1036,11 @@ struct TypeCensus {
     seams: usize,
     seams_max: usize,
     measures_m: f64,
+    /// Stacked types: deposits dropped because the site's sedimentary cover holds none of their
+    /// seams (basement at the surface, or the stack wholly under the cover), and stacks the cover
+    /// cut short.
+    no_cover: usize,
+    cover_capped: usize,
     /// The most favourable cell of the planet: where, how favourable, and the component that
     /// limits it (the answer to "why so few?" for a type with an empty map).
     best_cell: Option<Value>,
@@ -1103,6 +1116,9 @@ struct Finish {
     /// matter (kitchen centres, candidate sites): the place a deposit's forming events are
     /// looked up at.
     paths: BTreeMap<u32, Vec<u32>>,
+    /// The sedimentary cover a coal stack must lie in, as the world will draw it; None without a
+    /// planet's columns (a synthetic history).
+    cover: Option<crate::structure::Cover>,
 }
 
 /// Where the crust now at each of `cells` was at the end of every frame: `[i][k]`, [`NO_ORIGIN`]
@@ -1366,6 +1382,11 @@ impl DepositStage {
             placed: vec![Vec::new(); self.types.len()],
             present,
             paths: BTreeMap::new(),
+            cover: self.planet.as_deref().and_then(|p| {
+                let cover = crate::structure::Cover::new(world, p).ok()?;
+                ctx.reserve(cover.bytes()).ok()?;
+                Some(cover)
+            }),
         };
 
         // ---- petroleum kitchens (their events come first so traps can cite them) -------------
@@ -2223,7 +2244,6 @@ impl DepositStage {
             Fate::Buried { .. } | Fate::Truncated { .. } => {}
         }
         let centre_depth = ledger.centre_depth_m();
-        let centre_y = surf - centre_depth / sc.m_per_block_v;
         // A stacked deposit's seams (coal measures): their number from the sediment the history
         // laid down under the site while it was coal-forming; the top seam lies half the
         // measures above the ledger's centre.
@@ -2238,6 +2258,41 @@ impl DepositStage {
             let mut srng = Rng::stream(self.seed, &format!("stack/{}/{cell}/{x:.3}", t.id));
             geometry::seam_plan(k, measures, 2.0 * half_m, &mut srng)
         });
+        // A stack lies in the site's sedimentary cover: the seams under the cover's base are not
+        // there (fewer, shallower seams where the cover is thin), none where there is no cover.
+        let mut centre_depth = centre_depth;
+        let mut seams = seams;
+        let fit = match (&t.geometry.stack, &seams, &f.cover) {
+            (Some(k), Some(plan), Some(cover)) => Some((
+                geometry::fit_stack(k, plan, centre_depth, cover.blocks_at(x, z, surf), &sc),
+                plan.measures_m,
+            )),
+            _ => None,
+        };
+        match fit {
+            None | Some((geometry::StackFit::Fits, _)) => {}
+            Some((geometry::StackFit::NoCover, _)) => {
+                f.census[ti].no_cover += 1;
+                return Ok(());
+            }
+            Some((
+                geometry::StackFit::Capped {
+                    measures_m,
+                    centre_depth_m,
+                },
+                planned,
+            )) => {
+                f.census[ti].cover_capped += 1;
+                centre_depth = centre_depth_m;
+                if let Some(k) = &t.geometry.stack
+                    && measures_m < planned
+                {
+                    let mut srng = Rng::stream(self.seed, &format!("stack/{}/{cell}/{x:.3}", t.id));
+                    seams = Some(geometry::seam_plan(k, measures_m, 2.0 * half_m, &mut srng));
+                }
+            }
+        }
+        let centre_y = surf - centre_depth / sc.m_per_block_v;
         let top_y = seams.as_ref().map_or(centre_y, |p| {
             surf - (centre_depth - p.measures_m / 2.0) / sc.m_per_block_v
         });
@@ -2946,14 +3001,36 @@ impl DepositStage {
         let stacked = if let Some(k) = &t.geometry.stack {
             // No column history here: a typical stack, six seams' worth of measures, its top
             // seam at the surface when exposed.
-            let mut rng = Rng::stream(self.seed, &format!("stack/guaranteed/{}/{cell}", t.id));
-            let plan = geometry::seam_plan(k, 6.0 * k.seam_spacing_m, 2.0 * half_m, &mut rng);
+            let stream = format!("stack/guaranteed/{}/{cell}", t.id);
+            let mut rng = Rng::stream(self.seed, &stream);
+            let mut plan = geometry::seam_plan(k, 6.0 * k.seam_spacing_m, 2.0 * half_m, &mut rng);
+            let mut centre_depth_m = if ess.exposed {
+                plan.measures_m / 2.0
+            } else {
+                depth
+            };
+            // Held in the site's sedimentary cover like any stack; a guaranteed site keeps one
+            // seam at the surface where there is none.
+            if let Some(cover) = &f.cover {
+                let cover_blocks = cover.blocks_at(x, z, surf);
+                let refit = match geometry::fit_stack(k, &plan, centre_depth_m, cover_blocks, &sc) {
+                    geometry::StackFit::Fits => None,
+                    geometry::StackFit::NoCover => Some((k.seam_spacing_m, k.seam_spacing_m / 2.0)),
+                    geometry::StackFit::Capped {
+                        measures_m,
+                        centre_depth_m,
+                    } => Some((measures_m, centre_depth_m)),
+                };
+                if let Some((measures_m, d)) = refit {
+                    let mut rng = Rng::stream(self.seed, &stream);
+                    if measures_m < plan.measures_m {
+                        plan = geometry::seam_plan(k, measures_m, 2.0 * half_m, &mut rng);
+                    }
+                    centre_depth_m = d;
+                }
+            }
             let placement = Placement {
-                centre_depth_m: if ess.exposed {
-                    plan.measures_m / 2.0
-                } else {
-                    depth
-                },
+                centre_depth_m,
                 ..placement
             };
             geometry::stack_bodies(

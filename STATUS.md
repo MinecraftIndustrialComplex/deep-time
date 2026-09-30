@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -149,6 +149,85 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   satellite keyframe instead of the elevation ramp (a ReviewModel change); the workbench readout could give the
   elevation under the pointer on the satellite layer too.
 
+### 2026-09-30 — Coal held in the sedimentary cover; rock-layer settings with a flatter default; readable deposit-world strata (agent worktree agent-aacd864d2709d52dd, branch strata-coal-settings, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-30: "Cap coal to the sediment (Recommended)" and "Settings + flatter default
+  (Recommended)", plus readable strata for the synthetic deposit test world.
+- **Coal capped to the cover.** The deposit stage bakes the world's horizon stacks the way the bake will
+  (`structure::Cover`: `bake_horizons::bake`, smoothed, before the top raise) and reads the sedimentary cover at a
+  site off them with the column rule (`blocks_at`: down to the first horizon of a non-sedimentary class ≥ 3 blocks
+  thick; sedimentary = chemical/clastic sedimentary and unconsolidated families). `geometry::fit_stack` keeps the
+  preservation ledger's depth for the top seam and caps the stack from below: seams that would lie under the cover
+  (within one block of its base) are not there — thin cover leaves fewer, shallower seams (`seam_plan` on the capped
+  measures, same random stream); a top seam under the cover's base or < 2 blocks of cover leaves no coal (census
+  `no_cover`, `cover_capped`). The guaranteed coal site follows the same fit and keeps one seam at the surface where
+  there is no cover. A first version raised deep stacks into the cover instead; that turned `too_deep` sites into
+  counted ones and overshot the USGS targets by half (counted 101 against 68.6 on the six landscapes), so the cap
+  cuts from below. Unit test `a_stack_is_held_in_its_sedimentary_cover`.
+- **Settings** (preset `structure`, `editor_fields.json` under "Advanced · Granite and rock layers", lang keys, the
+  pipeline presets and the built-ins synced with `tools/dev/sync_builtin_presets.py`): `strata_smoothing_cells`
+  (σ, 0–16, **default 10**, stops Cell by cell 0 / Wavy 2.5 / Rolling 6 / Gentle 10 / Flat 16),
+  `strata_tongue_scale` (0.25–16 × the 64-key band) and `strata_minor_share` (0–0.45, default 0.15). The two tongue
+  settings go into the horizons layer's descriptor (`tongue_band_keys`, `tongue_minor_share`, optional, defaults
+  64 / 0.15) and both column rules (Rust `strata::stack_at`, Java `Columns.Stack`, `LayerDesc`) read them. The
+  smoothing samples an 11 × 11 lattice of step ⌈σ / 2.5⌉ anchored to the grid, so any σ costs the same.
+  `notes.bake.strata.smoothing` records σ, step, window and tongues. FORMAT.md updated (it still said 256 keys per
+  band from before; the rule is written with B and m now).
+- **Default σ from dips.** `dips.py` (Mac): 1,500 random columns of `earthlike_quick_16k` (scattered, 500 Myr, seed 1),
+  horizons matched by (unit key, class) 16 blocks east and south, beds ≥ 6 blocks thick below the ground, slope in
+  block space (the world's vertical exaggeration is 15×: 20 m per block up, 300 m across, so a real dip is
+  atan(tan(block dip) / 15)):
+
+  | σ (cells) | median dip, all | lowland (ground 23–103) | sea floor | upland | real-world median, lowland |
+  |---|---|---|---|---|---|
+  | 2.5 (master) | 38.3° | 43.2° | 28.3° | 44.4° | 3.6° |
+  | 6 | 23.8° | 26.0° | 17.4° | 30.0° | 1.9° |
+  | **10** | **15.6°** | **18.6°** | **12.7°** | **20.6°** | **1.3°** |
+
+  σ 10 reads as undisturbed basin fill in the sections (gently tilted beds, onlap onto basement highs, the coal
+  stack lying in shale), σ 6 still arches the layers under mountains. Strata bake 7.7 s at σ 10 (mean horizons per
+  cell 5.97 → 8.59).
+- **Basin strata** (`synth::Strata::Basin`, CLI `--strata basin`): sandstone, shale, sandstone, mudstone, limestone,
+  shale, sandstone, shale beds 0/8/22/36/55/75/100/130 blocks down, granite from 165 blocks, the same in every cell;
+  `deposits_world_16k` uses it (`deposits_world_4k` stays placeholder; the every-class pattern stays only in the
+  GameTest world `gametest.sh` writes).
+- **Coal measured** (Mac). Host rock at coal-body centres by the column rule (`hosts.py` over `deeptime
+  inspect-column`, the planet above, master vs branch): **sedimentary 60.5 % → 97.2 %** (152 → 72 seams: shale 41,
+  sandstone 28, slate 1, schist 1, black shale 1; before: sandstone 56, shale 35, gneiss 14, basalt 13, slate 13,
+  granodiorite 6). The six landscapes (`stage deposits --in` the `stage structure --preset pipeline_quick_16k --start
+  {scattered_continents,supercontinent} --length-myr 500 --set seed={1,2,3}` checkpoints, master's and the branch's
+  binary):
+
+  | coal | master | branch |
+  |---|---|---|
+  | sites, median (range) | 16.5 (5–25) | **9.5 (3–19)** |
+  | counted, six summed (target 68.6) | 58 | **50** |
+  | seams, six summed (per site) | 1,013 (10.6) | **364 (5.9)** |
+  | seams_max per landscape | 17–37 | 8–22 |
+  | no_cover / cover_capped | — | 56 / 29 |
+  | too_deep | 22 | 0 |
+
+- **Before/after** (`tools/workbench/preview.py run --keep-world`, standalone, master's jar on master's bake and the
+  branch's on its own, boxes 1800,−1260 (coal basin), −480,−1968 (a 430-block mountain), −1087,1754 (a basin coal
+  field); `deeptime-inspect section` along x and z; `wd-section` wider): before: layers folded in waves one to three cells long under the basin and arched under the mountain, the coal stack cutting across them, coal-field seams in gneiss and basalt in places; after: gently tilted basin fill, onlap onto basement highs, the coal stacks inside the shale and sandstone. Painted share: master
+  98.16 / 99.17 / 98.92 % (93,601,451 of 94,746,729, **98.79 %**), branch 98.21 / 99.10 / 98.62 % (91,617,663 of 92,822,166, **98.70 %**; the third box's "other" rock, surface-rule and feature blocks, rose from 286,611 to 371,492). Chunky (loaded Mac, not comparable run to run): master 39/48/42 ms/chunk, branch 51/73/73 ms/chunk.
+  Column-rule benchmark 0.34 ms/chunk (`ColumnRuleBenchTest`, mean 8.4 horizons per column). Review bundle (not
+  published): `review/out/strata-coal-settings/`.
+- **Gates** (Mac, the branch after merging master 18706c7): `cargo fmt --check`, `clippy --workspace --all-targets --locked
+  -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` all pass (cli 30, core 281 + 3
+  ignored, format 44, inspect 29 + 2 + 7, jni 7, viewer 5, …); `cd neoforge && ./gradlew build test` → tests=151
+  failures=0 (`ColumnParityTest` 500 columns, now with the layer's tongue parameters); `./gametest.sh` → 49 of 50
+  (`climateConsistent` fails: Köppen BW 0.472 < 0.650, Dsub 0.822 < 0.850, BW:desert 0.423 < 0.450 — **the same
+  numbers on master's own code** (control run in a copy of master 51c6c18), its floors predate the climate merges
+  that gave the test planet 466 BW columns instead of 17); `tools/smoke/install.sh mic` + `./gametest.sh -PwithMic` →
+  52 result lines, 1 not PASS (the same `climateConsistent`, BW 0.485, BS 0.513, BW:desert 0.446, Dfc:taiga
+  0.430).
+- **Decisions for Ben** (not asked): (1) With the cap, coal counted survivors fall to 73 % of the USGS target (50 of
+  68.6 over six landscapes; master 85 %): favourability does not know the cover, so fields drawn on thin cover are
+  dropped (`no_cover` 56). Folding the cover into coal's placement (a host term) would bring the count back.
+  (2) σ 10 is a look choice; the real-world dips of every σ are already a few degrees because the world's vertical
+  scale is 15× exaggerated. (3) Seams now sit in the drawn rock, so a player following a seam stays in shale or
+  sandstone.
+- **Next.** Merge into master (the parent); then, if Ben wants it, the coal cover in placement.
 ### 2026-09-30 — P1-25: a climate API for mic-climate and Project Atmosphere (agent worktree agent-a02882c5e6567370e, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **The bake (format 0.1 → 0.2).**
   - At its last snapshot the climate stage keeps every cell's twelve months:
