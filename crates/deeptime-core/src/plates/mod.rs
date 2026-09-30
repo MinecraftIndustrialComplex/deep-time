@@ -554,7 +554,8 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let n = u64::from(p.resolution.l0_samples);
     let bytes = n * (3 * sample + 400)
         + cells * (20 + 4 * 11)
-        + 16 * KEYFRAME_LAYERS.len() as u64 * u64::from(kw) * u64::from(kh) * 4;
+        // The frames' layers, and the geologic provinces the session derives from them.
+        + 16 * (KEYFRAME_LAYERS.len() as u64 + 1) * u64::from(kw) * u64::from(kh) * 4;
     StageEstimate {
         bytes,
         seconds,

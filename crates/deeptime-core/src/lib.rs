@@ -17,6 +17,7 @@ pub mod error;
 pub mod log;
 pub mod params;
 pub mod plates;
+pub mod provinces;
 pub mod session;
 pub mod sphere;
 
