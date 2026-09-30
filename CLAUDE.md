@@ -68,6 +68,10 @@ tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | 
   `--pull`. If something must run locally: one job at a time, wrapped as
   `systemd-run --user --scope -p CPUQuota=100% nice -n 19 <cmd>`. No parallel local batches; no
   `nix develop` builds on the laptop.
+- **Mac disk hygiene** (2026-09-30: the SSD filled to 100 % with ~60 worktree copies, each with its own
+  target/): once a worktree's branch is merged, delete its Mac copy
+  (`/Volumes/Graphide/ban/mic/mods/<checkout name>`) after checking no process uses it; keep scratch
+  runs small and delete them when done. Keep everything on the SSD, never the Mac's internal disk.
 - **Real-client runs** (booting a Minecraft client for screenshots) go to the Mac's logged-in desktop
   session too, never the laptop's Xvfb (Ben, 2026-09-28). That desktop is shared with graphide's
   agents: take a "drive" lease with graphide's `utilities/scripts/mactest/m6lock.sh` first.
