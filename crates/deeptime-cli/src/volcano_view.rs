@@ -436,9 +436,9 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
             192,
         ));
     }
-    if let Some(v) = tallest(&|v| {
-        v.kind == Kind::Strato && v.active() && v.oceanic && summit_y(v) > ctx.sea_y
-    }) {
+    if let Some(v) =
+        tallest(&|v| v.kind == Kind::Strato && v.active() && v.oceanic && summit_y(v) > ctx.sea_y)
+    {
         picks.push((
             "island_arc",
             "The tallest active island-arc stratovolcano that is an island".into(),
@@ -570,7 +570,10 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
                 let fi = (x - g.origin_block_x as f64) / r;
                 let fj = (z - g.origin_block_z as f64) / r;
                 let (w, h) = (g.w as i64, g.h as i64);
-                let (i, j) = (fi.round() as i64, fj.round().clamp(0.0, (h - 1) as f64) as i64);
+                let (i, j) = (
+                    fi.round() as i64,
+                    fj.round().clamp(0.0, (h - 1) as f64) as i64,
+                );
                 f64::from(f.data[(j * w + i.rem_euclid(w)) as usize])
             };
             let frame = deeptime_core::sphere::BlockFrame::new(s.circumference_blocks);

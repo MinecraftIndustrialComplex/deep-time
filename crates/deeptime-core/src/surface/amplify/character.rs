@@ -280,7 +280,12 @@ impl CharacterFields {
         if self.neutral || keep.len() != self.fold_c2.len() {
             return;
         }
-        for ((c, s), &k) in self.fold_c2.iter_mut().zip(self.fold_s2.iter_mut()).zip(keep) {
+        for ((c, s), &k) in self
+            .fold_c2
+            .iter_mut()
+            .zip(self.fold_s2.iter_mut())
+            .zip(keep)
+        {
             *c *= k;
             *s *= k;
         }

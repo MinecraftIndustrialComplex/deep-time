@@ -109,9 +109,15 @@ fn the_front_is_the_middle_of_the_arc_band() {
         .flat_map(|j| (500..540).map(move |i| j * w + i))
         .filter(|&c| front[c])
         .count();
-    assert!(patch < 200, "{patch} of 800 striped cells on the patch's skeleton");
+    assert!(
+        patch < 200,
+        "{patch} of 800 striped cells on the patch's skeleton"
+    );
     assert!(patch > 0);
-    assert!((600..700).all(|i| !front[50 * w + i]), "no front in a trench");
+    assert!(
+        (600..700).all(|i| !front[50 * w + i]),
+        "no front in a trench"
+    );
 }
 
 fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {

@@ -509,7 +509,6 @@ impl L1<'_> {
         ring.sort_by(f64::total_cmp);
         ring[ring.len() / 4]
     }
-
 }
 
 impl VolcanoStage {
@@ -689,9 +688,16 @@ impl VolcanoStage {
                 let sh = v.shape();
                 let prof = |r: f64| sh.body(r);
                 let mut cells = Vec::new();
-                for_cells(&grid, mh, v.x, v.z, 1.3 * v.radius_m + cell_m, |c, dx, dz| {
-                    cells.push((c, shape::cell_weight(&prof, dx, dz, cell_m, v.radius_m)));
-                });
+                for_cells(
+                    &grid,
+                    mh,
+                    v.x,
+                    v.z,
+                    1.3 * v.radius_m + cell_m,
+                    |c, dx, dz| {
+                        cells.push((c, shape::cell_weight(&prof, dx, dz, cell_m, v.radius_m)));
+                    },
+                );
                 v.kept_m = (v.kept_m + fit_change(&cells, m)).clamp(0.0, v.peak_m);
             }
         }
@@ -1758,8 +1764,8 @@ pub fn volcanic_front(
             }
             let (i, j) = ((c % w) as i64, (c / w) as i64);
             let d = dist[c];
-            let near_mask = (-1..=1)
-                .any(|dj| (-1..=1).any(|di| at(i + di, j + dj).is_some_and(|m| mask[m])));
+            let near_mask =
+                (-1..=1).any(|dj| (-1..=1).any(|di| at(i + di, j + dj).is_some_and(|m| mask[m])));
             near_mask
                 && d.is_finite()
                 && (-1..=1).all(|dj| {

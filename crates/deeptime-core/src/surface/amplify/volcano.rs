@@ -291,24 +291,26 @@ impl Shaper {
         // that reach them.
         const B: usize = 64;
         use rayon::prelude::*;
-        z.par_chunks_mut(w * B).enumerate().for_each(|(band, rows)| {
-            let j0 = band * B;
-            let nrows = rows.len() / w;
-            for i0 in (0..w).step_by(B) {
-                let i1 = (i0 + B).min(w);
-                let near = self.near(bx(i0), bx(i1 - 1), bz(j0), bz(j0 + nrows - 1));
-                if near.is_empty() && self.terraces.is_none() {
-                    continue;
-                }
-                for dj in 0..nrows {
-                    let zb = bz(j0 + dj);
-                    for i in i0..i1 {
-                        let v = &mut rows[dj * w + i];
-                        *v = self.fine_at(&near, bx(i), zb, *v);
+        z.par_chunks_mut(w * B)
+            .enumerate()
+            .for_each(|(band, rows)| {
+                let j0 = band * B;
+                let nrows = rows.len() / w;
+                for i0 in (0..w).step_by(B) {
+                    let i1 = (i0 + B).min(w);
+                    let near = self.near(bx(i0), bx(i1 - 1), bz(j0), bz(j0 + nrows - 1));
+                    if near.is_empty() && self.terraces.is_none() {
+                        continue;
+                    }
+                    for dj in 0..nrows {
+                        let zb = bz(j0 + dj);
+                        for i in i0..i1 {
+                            let v = &mut rows[dj * w + i];
+                            *v = self.fine_at(&near, bx(i), zb, *v);
+                        }
                     }
                 }
-            }
-        });
+            });
     }
 }
 
