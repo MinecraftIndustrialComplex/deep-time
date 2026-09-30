@@ -20,6 +20,7 @@ pub mod palette;
 pub mod region;
 pub mod render;
 pub mod rivermap;
+pub mod strata_section;
 pub mod surface;
 pub mod watercheck;
 pub mod world;

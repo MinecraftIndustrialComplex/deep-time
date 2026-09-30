@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The horizon bake (plan §5.7.4, §8.8): each L1 cell's column (`columns.rs`) as a horizon stack
 //! in block space — the `strata/horizons` layer the Java strata pass reads (`StrataPass`), K
-//! horizons per cell, each an i16 top (1/16 block) and a u8 class index into
-//! `strata/classes.json` (`synth::EVERY_CLASS`), top-down; horizon h fills from its top down to
-//! the next horizon's top, the last down to `min_y`. Unused horizons have top `i16::MIN` and class
-//! 255 (`deeptime_format::raster`).
+//! horizons per cell, each an i16 top (1/16 block), a u8 class index into `strata/classes.json`
+//! (`synth::EVERY_CLASS`) and its stratigraphic key span (`columns::key`), top-down; horizon h
+//! fills from its top down to the next horizon's top, the last down to `min_y`. Unused horizons
+//! have top `i16::MIN`, class 255 and keys `u16::MAX` (`deeptime_format::raster`). The keys let the
+//! column evaluator correlate neighbouring stacks (format 0.2): every merge below keeps the
+//! union of its members' spans, and the spans of a stack never overlap and grow downwards.
 //!
 //! Metres become blocks as the plan's bake does: an elevation of h metres above the sea of the
 //! time is y = sea_level_y + h / m_per_block_v, and a unit of t metres spans t / m_per_block_v
@@ -34,6 +36,8 @@ use super::{CellSource, StructureParams};
 pub const NO_TOP: i16 = i16::MIN;
 /// Unused horizon class.
 pub const NO_CLASS: u8 = 255;
+/// Unused horizon key.
+pub const NO_KEY: u16 = u16::MAX;
 
 /// The horizon stacks of a grid.
 #[derive(Clone, Debug, PartialEq)]
@@ -45,10 +49,21 @@ pub struct Horizons {
     pub tops: Vec<i16>,
     /// `classes[c·K + h]`, index into `synth::EVERY_CLASS`.
     pub classes: Vec<u8>,
+    /// `keys[c·K + h]`, the horizon's stratigraphic key span [top, base] (`columns::key`).
+    pub keys: Vec<[u16; 2]>,
 }
 
-/// Bakes one column: `units` top-down under a surface at `surface_y` (blocks) into `tops` and
-/// `classes` (length K, padded). Returns the number of horizons.
+/// A horizon while it is baked: top (1/16 block), class, key span.
+#[derive(Clone, Copy, Debug)]
+struct H {
+    top: i32,
+    class: u16,
+    key: [u16; 2],
+}
+
+/// Bakes one column: `units` top-down under a surface at `surface_y` (blocks) into `tops`,
+/// `classes` and `keys` (length K, padded). Returns the number of horizons.
+#[allow(clippy::too_many_arguments)]
 pub fn bake_cell(
     units: &[Unit],
     surface_y: f64,
@@ -57,44 +72,69 @@ pub fn bake_cell(
     m_per_block_v: f64,
     tops: &mut [i16],
     classes: &mut [u8],
+    keys: &mut [[u16; 2]],
 ) -> usize {
-    let k = tops.len();
-    let floor = min_y * 16;
     let top0 = surface_y.clamp(f64::from(min_y) + 1.0, f64::from(max_y));
-    let mut hz: Vec<(i32, u16)> = Vec::with_capacity(units.len());
+    let mut hz: Vec<H> = Vec::with_capacity(units.len());
     let mut y = top0;
     for u in units {
         if y <= f64::from(min_y) {
             break;
         }
         let q = (y * 16.0).round() as i32;
-        match hz.last() {
-            Some(&(_, c)) if c == u.class => {}
-            _ => hz.push((q, u.class)),
+        match hz.last_mut() {
+            Some(last) if last.class == u.class => last.key[1] = last.key[1].max(u.key[1]),
+            _ => hz.push(H {
+                top: q,
+                class: u.class,
+                key: u.key,
+            }),
         }
         y -= f64::from(u.thickness_m) / m_per_block_v;
     }
     if hz.is_empty() {
-        hz.push((
-            (top0 * 16.0).round() as i32,
-            units.last().map_or(0, |u| u.class),
-        ));
+        let (class, key) = units.last().map_or((0, [0, 1]), |u| (u.class, u.key));
+        hz.push(H {
+            top: (top0 * 16.0).round() as i32,
+            class,
+            key,
+        });
     }
-    let thick = |hz: &[(i32, u16)], i: usize| -> i32 {
-        let below = if i + 1 < hz.len() { hz[i + 1].0 } else { floor };
-        hz[i].0 - below
+    settle(&mut hz, min_y * 16, tops.len());
+    write_cell(&hz, tops, classes, keys)
+}
+
+/// Makes `hz` a valid stack: every horizon at least one block thick (the last down to `floor`,
+/// 1/16 block) and at most `k` of them — the thinnest horizon under one block merges with its
+/// thinner neighbour, then, while more than `k` remain, the adjacent pair with the smallest
+/// combined thickness; a merge keeps the upper top, the thicker member's class and both key
+/// spans, and neighbours of one class join. Then the key spans are made to grow downwards
+/// without overlapping or vanishing, whatever rounding did.
+fn settle(hz: &mut Vec<H>, floor: i32, k: usize) {
+    let thick = |hz: &[H], i: usize| -> i32 {
+        let below = if i + 1 < hz.len() {
+            hz[i + 1].top
+        } else {
+            floor
+        };
+        hz[i].top - below
     };
-    // Merge horizon i with i + 1: the upper top, the thicker member's class.
-    let merge = |hz: &mut Vec<(i32, u16)>, i: usize| {
+    let merge = |hz: &mut Vec<H>, i: usize| {
         let (ta, tb) = (thick(hz, i), thick(hz, i + 1));
-        let class = if ta >= tb { hz[i].1 } else { hz[i + 1].1 };
-        hz[i].1 = class;
+        let class = if ta >= tb {
+            hz[i].class
+        } else {
+            hz[i + 1].class
+        };
+        hz[i].class = class;
+        hz[i].key[1] = hz[i].key[1].max(hz[i + 1].key[1]);
         hz.remove(i + 1);
-        // Same-class neighbours join.
-        if i + 1 < hz.len() && hz[i + 1].1 == class {
+        if i + 1 < hz.len() && hz[i + 1].class == class {
+            hz[i].key[1] = hz[i].key[1].max(hz[i + 1].key[1]);
             hz.remove(i + 1);
         }
-        if i > 0 && hz[i - 1].1 == class {
+        if i > 0 && hz[i - 1].class == class {
+            hz[i - 1].key[1] = hz[i - 1].key[1].max(hz[i].key[1]);
             hz.remove(i);
         }
     };
@@ -102,14 +142,13 @@ pub fn bake_cell(
         if hz.len() < 2 {
             break;
         }
-        // The thinnest horizon under one block, merged with its thinner neighbour.
         let thin = (0..hz.len())
-            .filter(|&i| thick(&hz, i) < 16)
-            .min_by_key(|&i| (thick(&hz, i), i));
+            .filter(|&i| thick(hz, i) < 16)
+            .min_by_key(|&i| (thick(hz, i), i));
         if let Some(i) = thin {
-            let up = if i > 0 { Some(thick(&hz, i - 1)) } else { None };
+            let up = if i > 0 { Some(thick(hz, i - 1)) } else { None };
             let down = if i + 1 < hz.len() {
-                Some(thick(&hz, i + 1))
+                Some(thick(hz, i + 1))
             } else {
                 None
             };
@@ -118,31 +157,202 @@ pub fn bake_cell(
                 (Some(_), None) => true,
                 _ => false,
             };
-            merge(&mut hz, if with_up { i - 1 } else { i });
+            merge(hz, if with_up { i - 1 } else { i });
             continue;
         }
         if hz.len() > k {
             let i = (0..hz.len() - 1)
-                .min_by_key(|&i| (thick(&hz, i) + thick(&hz, i + 1), i))
+                .min_by_key(|&i| (thick(hz, i) + thick(hz, i + 1), i))
                 .expect("two or more horizons");
-            merge(&mut hz, i);
+            merge(hz, i);
             continue;
         }
         break;
     }
-    for h in 0..k {
+    let mut below_prev = 0u16;
+    for (h, x) in hz.iter_mut().enumerate() {
+        if h > 0 {
+            x.key[0] = x.key[0].max(below_prev);
+        }
+        x.key[1] = x.key[1].max(x.key[0].saturating_add(1));
+        below_prev = x.key[1];
+    }
+}
+
+/// Writes `hz` into one cell's K slots (padded); returns the horizons used.
+fn write_cell(hz: &[H], tops: &mut [i16], classes: &mut [u8], keys: &mut [[u16; 2]]) -> usize {
+    for h in 0..tops.len() {
         match hz.get(h) {
-            Some(&(t, c)) => {
-                tops[h] = t.clamp(i32::from(i16::MIN) + 1, i32::from(i16::MAX)) as i16;
-                classes[h] = c as u8;
+            Some(x) => {
+                tops[h] = x.top.clamp(i32::from(i16::MIN) + 1, i32::from(i16::MAX)) as i16;
+                classes[h] = x.class as u8;
+                keys[h] = x.key;
             }
             None => {
                 tops[h] = NO_TOP;
                 classes[h] = NO_CLASS;
+                keys[h] = [NO_KEY, NO_KEY];
             }
         }
     }
     hz.len()
+}
+
+/// The lateral smoothing of the stacks (format 0.2), in L1 cells: σ of the Gaussian and the
+/// window's half-width.
+pub const SMOOTH_SIGMA_CELLS: f64 = 2.5;
+pub const SMOOTH_RADIUS_CELLS: i64 = 5;
+
+impl Horizons {
+    /// Cell `c`'s height (1/16 block) at stratigraphic key `s`: its horizon tops at their key
+    /// tops, linear inside a span, the next top across a gap, `min_y` below the last span (the
+    /// column rule's reading of one stack, `deeptime_format::strata`).
+    pub fn height_at(&self, c: usize, s: u16) -> f64 {
+        let (tops, _, keys) = self.cell(c);
+        let floor = f64::from(self.min_y * 16);
+        if tops.is_empty() {
+            return floor;
+        }
+        if s <= keys[0][0] {
+            return f64::from(tops[0]);
+        }
+        let mut h = 0;
+        while h + 1 < tops.len() && keys[h + 1][0] <= s {
+            h += 1;
+        }
+        let t = f64::from(tops[h]);
+        let b = if h + 1 < tops.len() {
+            f64::from(tops[h + 1])
+        } else {
+            floor
+        };
+        let [kt, kb] = keys[h];
+        if s >= kb {
+            return b;
+        }
+        t - (t - b) * (f64::from(s - kt) / f64::from(kb - kt))
+    }
+
+    /// The stacks smoothed laterally, so that neighbouring cells tell one regional story
+    /// instead of each its own (the strata log is carried cell by cell and differs a lot between
+    /// neighbours): for each cell, the Gaussian-weighted mean (σ `sigma` cells over the
+    /// (2r + 1)² cells around; x wraps, z clamps) of the neighbours' height functions, cut at
+    /// every key top and base any of them has; each interval takes the class holding the largest
+    /// weighted thickness there, equal neighbours join. The cell's own surface stays its first
+    /// top (units the neighbours hold above it pinch out at it; where the cell stands above the
+    /// mean, its top unit fills the difference). The stacks are then settled again (at least a
+    /// block thick, at most K).
+    pub fn smoothed(&self, sigma: f64, r: i64) -> Horizons {
+        let (w, h) = (i64::from(self.grid.w), i64::from(self.grid.h));
+        let k = self.k as usize;
+        let mut kernel = Vec::new();
+        for dj in -r..=r {
+            for di in -r..=r {
+                let d2 = (di * di + dj * dj) as f64;
+                kernel.push((di, dj, (-d2 / (2.0 * sigma * sigma)).exp()));
+            }
+        }
+        let wsum: f64 = kernel.iter().map(|x| x.2).sum();
+        let mut out = self.clone();
+        out.tops
+            .par_chunks_mut(k)
+            .zip(out.classes.par_chunks_mut(k))
+            .zip(out.keys.par_chunks_mut(k))
+            .enumerate()
+            .for_each_init(
+                || (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                |(near, keys, ys, weight), (c, ((tc, cc), kc))| {
+                    let own = self.cell(c);
+                    if own.0.is_empty() {
+                        return;
+                    }
+                    let (i, j) = (c as i64 % w, c as i64 / w);
+                    near.clear();
+                    keys.clear();
+                    for &(di, dj, g) in &kernel {
+                        let jj = (j + dj).clamp(0, h - 1);
+                        let n = (jj * w + (i + di).rem_euclid(w)) as usize;
+                        near.push((n, g / wsum));
+                        for key in self.cell(n).2 {
+                            keys.extend_from_slice(key);
+                        }
+                    }
+                    keys.sort_unstable();
+                    keys.dedup();
+                    let m = keys.len();
+                    // ys[q]: the smoothed height at keys[q].
+                    ys.clear();
+                    ys.resize(m, 0.0f64);
+                    for &(n, g) in near.iter() {
+                        for (q, &s) in keys.iter().enumerate() {
+                            ys[q] += g * self.height_at(n, s);
+                        }
+                    }
+                    let top0 = f64::from(own.0[0]);
+                    let mut hz: Vec<H> = Vec::with_capacity(k);
+                    for q in 0..m.saturating_sub(1) {
+                        let (s0, s1) = (keys[q], keys[q + 1]);
+                        let (y0, y1) = (ys[q].min(top0), ys[q + 1].min(top0));
+                        if y1 >= y0 {
+                            continue;
+                        }
+                        // The class with the most weighted thickness in [s0, s1].
+                        weight.clear();
+                        for &(n, g) in near.iter() {
+                            let (tops, classes, nk) = self.cell(n);
+                            let Some(hh) =
+                                (0..tops.len()).find(|&x| nk[x][0] <= s0 && s1 <= nk[x][1])
+                            else {
+                                continue;
+                            };
+                            let t = g * (self.height_at(n, s0) - self.height_at(n, s1));
+                            match weight
+                                .iter_mut()
+                                .find(|e: &&mut (u8, f64)| e.0 == classes[hh])
+                            {
+                                Some(e) => e.1 += t,
+                                None => weight.push((classes[hh], t)),
+                            }
+                        }
+                        let Some(&(class, _)) = weight
+                            .iter()
+                            .filter(|e| e.1 > 0.0)
+                            .max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)))
+                        else {
+                            continue;
+                        };
+                        let top = if hz.is_empty() {
+                            own.0[0].into()
+                        } else {
+                            y0.round() as i32
+                        };
+                        match hz.last_mut() {
+                            Some(last) if last.class == u16::from(class) => last.key[1] = s1,
+                            _ => hz.push(H {
+                                top,
+                                class: u16::from(class),
+                                key: [s0, s1],
+                            }),
+                        }
+                    }
+                    // Tops strictly falling, none at or below the floor.
+                    for x in 1..hz.len() {
+                        hz[x].top = hz[x].top.min(hz[x - 1].top - 1);
+                    }
+                    hz.retain(|x| x.top > self.min_y * 16);
+                    if hz.is_empty() {
+                        hz.push(H {
+                            top: own.0[0].into(),
+                            class: u16::from(own.1[0]),
+                            key: own.2[0],
+                        });
+                    }
+                    settle(&mut hz, self.min_y * 16, k);
+                    write_cell(&hz, tc, cc, kc);
+                },
+            );
+        out
+    }
 }
 
 impl Horizons {
@@ -150,8 +360,8 @@ impl Horizons {
         self.grid.cells()
     }
 
-    /// Cell `c`'s used horizons: (tops, classes).
-    pub fn cell(&self, c: usize) -> (&[i16], &[u8]) {
+    /// Cell `c`'s used horizons: (tops, classes, key spans).
+    pub fn cell(&self, c: usize) -> (&[i16], &[u8], &[[u16; 2]]) {
         let k = self.k as usize;
         let n = self.classes[c * k..(c + 1) * k]
             .iter()
@@ -160,17 +370,31 @@ impl Horizons {
         (
             &self.tops[c * k..c * k + n],
             &self.classes[c * k..c * k + n],
+            &self.keys[c * k..c * k + n],
         )
     }
 
     /// The plan's acceptance (P1-07): every stack ordered top-down, every horizon at least one
     /// block thick (the last down to `min_y`), every class a class of the vocabulary, at most K,
-    /// padding only after the used horizons.
+    /// padding only after the used horizons; and (format 0.2) every key span non-empty, below the
+    /// one over it and not overlapping it.
     pub fn check(&self) -> Result<(), String> {
         let k = self.k as usize;
         let floor = self.min_y * 16;
         for c in 0..self.cells() {
-            let (tops, classes) = self.cell(c);
+            let (tops, classes, keys) = self.cell(c);
+            for h in 0..keys.len() {
+                if keys[h][1] <= keys[h][0] {
+                    return Err(format!("cell {c} horizon {h}: key span {:?}", keys[h]));
+                }
+                if h > 0 && keys[h][0] < keys[h - 1][1] {
+                    return Err(format!(
+                        "cell {c} horizon {h}: key span {:?} overlaps {:?} above it",
+                        keys[h],
+                        keys[h - 1]
+                    ));
+                }
+            }
             if tops.is_empty() {
                 return Err(format!("cell {c}: no horizons"));
             }
@@ -191,7 +415,10 @@ impl Horizons {
                 }
             }
             for h in tops.len()..k {
-                if self.tops[c * k + h] != NO_TOP || self.classes[c * k + h] != NO_CLASS {
+                if self.tops[c * k + h] != NO_TOP
+                    || self.classes[c * k + h] != NO_CLASS
+                    || self.keys[c * k + h] != [NO_KEY, NO_KEY]
+                {
                     return Err(format!("cell {c} horizon {h}: padding is not unused"));
                 }
             }
@@ -199,15 +426,21 @@ impl Horizons {
         Ok(())
     }
 
-    /// The `strata/horizons` layer (per cell K i16 tops, then K u8 classes).
+    /// The `strata/horizons` layer (per cell K i16 tops, K u8 classes, K u16 key tops, K u16 key
+    /// bases).
     pub fn to_layer(&self, codec: Codec) -> Result<LoadedLayer, FormatError> {
         let k = self.k as usize;
-        let mut bytes = Vec::with_capacity(self.cells() * 3 * k);
+        let mut bytes = Vec::with_capacity(self.cells() * 7 * k);
         for c in 0..self.cells() {
             for &t in &self.tops[c * k..(c + 1) * k] {
                 bytes.extend_from_slice(&t.to_le_bytes());
             }
             bytes.extend_from_slice(&self.classes[c * k..(c + 1) * k]);
+            for side in 0..2 {
+                for key in &self.keys[c * k..(c + 1) * k] {
+                    bytes.extend_from_slice(&key[side].to_le_bytes());
+                }
+            }
         }
         let mut d = LayerDesc::scalar(
             "strata/horizons",
@@ -215,7 +448,7 @@ impl Horizons {
             self.grid.clone(),
             codec,
         );
-        d.units = "block/16 top, class index".into();
+        d.units = "block/16 top, class index, key top, key base".into();
         d.scale = 1.0 / 16.0;
         d.stack_depth = Some(self.k);
         LoadedLayer::new(d, bytes)
@@ -264,14 +497,16 @@ pub fn bake_with(
     let n = src.grid.cells();
     let mut tops = vec![NO_TOP; n * k];
     let mut classes = vec![NO_CLASS; n * k];
+    let mut keys = vec![[NO_KEY, NO_KEY]; n * k];
     tops.par_chunks_mut(k)
         .zip(classes.par_chunks_mut(k))
+        .zip(keys.par_chunks_mut(k))
         .enumerate()
-        .for_each_init(Vec::new, |units, (c, (tc, cc))| {
+        .for_each_init(Vec::new, |units, (c, ((tc, cc), kc))| {
             let surface_y = src.surface_y(c, s);
             let depth = (surface_y - f64::from(s.min_y)).max(1.0) * mv + 100.0;
             columns::build(&src.cell(c), t, p, src.now_myr, depth, units);
-            bake_cell(units, surface_y, s.min_y, s.max_y, mv, tc, cc);
+            bake_cell(units, surface_y, s.min_y, s.max_y, mv, tc, cc, kc);
         });
     Horizons {
         grid: src.grid.clone(),
@@ -279,7 +514,9 @@ pub fn bake_with(
         min_y: s.min_y,
         tops,
         classes,
+        keys,
     }
+    .smoothed(SMOOTH_SIGMA_CELLS, SMOOTH_RADIUS_CELLS)
 }
 
 #[cfg(test)]
@@ -288,11 +525,16 @@ mod tests {
     use crate::structure::columns::Source;
     use crate::surface::lithology::index;
 
+    /// A unit whose key span follows the order it is made in (so a list of them is ordered).
     fn unit(name: &str, th: f32) -> Unit {
+        use std::sync::atomic::{AtomicU16, Ordering};
+        static NEXT: AtomicU16 = AtomicU16::new(0);
+        let k = NEXT.fetch_add(10, Ordering::Relaxed);
         Unit {
             class: index(name),
             thickness_m: th,
             source: Source::Log,
+            key: [k, k + 10],
         }
     }
 
@@ -310,7 +552,17 @@ mod tests {
         let bake = |mv: f64| {
             let mut tops = vec![0i16; 4];
             let mut classes = vec![0u8; 4];
-            bake_cell(&units, 100.0, -352, 639, mv, &mut tops, &mut classes);
+            let mut keys = vec![[0u16; 2]; 4];
+            bake_cell(
+                &units,
+                100.0,
+                -352,
+                639,
+                mv,
+                &mut tops,
+                &mut classes,
+                &mut keys,
+            );
             tops
         };
         let base = bake(20.0);
@@ -328,6 +580,7 @@ mod tests {
         let k = 4;
         let mut tops = vec![0i16; k];
         let mut classes = vec![0u8; k];
+        let mut keys = vec![[0u16; 2]; k];
         // Surface at y 100 (2,000 m above y 0 at 20 m/block): a 5-m soil, 400 m sandstone, 10 m
         // coal, 600 m shale, 3 km limestone, then granite to depth.
         let units = [
@@ -338,7 +591,16 @@ mod tests {
             unit("limestone", 3000.0),
             unit("granite", 20_000.0),
         ];
-        let n = bake_cell(&units, 100.0, -352, 639, 20.0, &mut tops, &mut classes);
+        let n = bake_cell(
+            &units,
+            100.0,
+            -352,
+            639,
+            20.0,
+            &mut tops,
+            &mut classes,
+            &mut keys,
+        );
         assert_eq!(n, 4);
         let h = Horizons {
             grid: GridDesc::for_planet("L1", 64, 32).unwrap(),
@@ -346,6 +608,7 @@ mod tests {
             min_y: -352,
             tops: tops.repeat(2),
             classes: classes.repeat(2),
+            keys: keys.repeat(2),
         };
         h.check().unwrap();
         // The soil and coal were thinner than a block and joined their neighbours.
@@ -368,7 +631,16 @@ mod tests {
                 )
             })
             .collect();
-        let n = bake_cell(&many, 300.0, -352, 639, 20.0, &mut tops, &mut classes);
+        let n = bake_cell(
+            &many,
+            300.0,
+            -352,
+            639,
+            20.0,
+            &mut tops,
+            &mut classes,
+            &mut keys,
+        );
         assert!((1..=k).contains(&n), "{n}");
         let h = Horizons {
             grid: GridDesc::for_planet("L1", 64, 32).unwrap(),
@@ -376,10 +648,20 @@ mod tests {
             min_y: -352,
             tops: tops.repeat(2),
             classes: classes.repeat(2),
+            keys: keys.repeat(2),
         };
         h.check().unwrap();
         // A surface below the world's floor still gets one horizon a block thick.
-        let n = bake_cell(&units, -500.0, -352, 639, 20.0, &mut tops, &mut classes);
+        let n = bake_cell(
+            &units,
+            -500.0,
+            -352,
+            639,
+            20.0,
+            &mut tops,
+            &mut classes,
+            &mut keys,
+        );
         assert_eq!(n, 1);
         assert_eq!(tops[0], (-351 * 16) as i16);
         assert_eq!(tops[1], NO_TOP);

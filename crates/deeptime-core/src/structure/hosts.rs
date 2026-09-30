@@ -87,6 +87,7 @@ mod tests {
             class: index(name),
             thickness_m: th,
             source: Source::Log,
+            key: [0, 1],
         };
         let units = [
             unit("sandstone", 500.0),

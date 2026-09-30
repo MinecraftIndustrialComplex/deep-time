@@ -162,6 +162,32 @@ enum Cmd {
         #[arg(long)]
         colors: Option<PathBuf>,
     },
+    /// A vertical cross-section of the world data alone (no world): Deep Time's column
+    /// evaluator per column, coloured by rock class, with a legend.
+    WdSection {
+        /// The world-data folder (a run's bake, `<world>/deeptime`).
+        #[arg(long)]
+        world_data: PathBuf,
+        /// Output folder for the PNG and JSON.
+        #[arg(long, default_value = "review/out/inspect")]
+        out: PathBuf,
+        /// Pixels per block.
+        #[arg(long, default_value_t = 1)]
+        scale: usize,
+        /// The fixed coordinate: `z` for the plane z = <at> (running along x), `x` for x = <at>.
+        #[arg(long, value_enum)]
+        axis: AxisArg,
+        #[arg(long, allow_hyphen_values = true)]
+        at: i32,
+        #[arg(long, allow_hyphen_values = true)]
+        from: i32,
+        #[arg(long, allow_hyphen_values = true)]
+        to: i32,
+        #[arg(long, allow_hyphen_values = true)]
+        y_from: Option<i32>,
+        #[arg(long, allow_hyphen_values = true)]
+        y_to: Option<i32>,
+    },
     /// The columns either side of x = C/2 as one strip, and their height difference.
     Seam {
         #[command(flatten)]
@@ -452,6 +478,39 @@ fn run(cli: Cli) -> Result<()> {
                 "sites": v["sites"], "ore_columns_in_site_footprints": v["ore_columns_in_site_footprints"],
                 "ore_columns_outside_sites": v["ore_columns_outside_sites"]}),
             )?;
+        }
+        Cmd::WdSection {
+            world_data,
+            out,
+            scale,
+            axis,
+            at,
+            from,
+            to,
+            y_from,
+            y_to,
+        } => {
+            let args = SectionArgs {
+                axis: match axis {
+                    AxisArg::X => Axis::X,
+                    AxisArg::Z => Axis::Z,
+                },
+                at,
+                from,
+                to,
+                y_from,
+                y_to,
+            };
+            std::fs::create_dir_all(&out).map_err(|e| Error(format!("{}: {e}", out.display())))?;
+            let v = deeptime_inspect::strata_section::wd_section(
+                &world_data,
+                &args,
+                &Out {
+                    dir: out,
+                    scale: scale.max(1),
+                },
+            )?;
+            println!("png={}", v["png"].as_str().unwrap_or(""));
         }
         Cmd::Section {
             common,

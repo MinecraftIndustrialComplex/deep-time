@@ -6,6 +6,7 @@
 //! reader (`com.minecraftindustrialcomplex.deeptime.worlddata`) implements the same document.
 
 pub mod bodies;
+pub mod climate;
 pub mod column;
 pub mod container;
 pub mod detail;
@@ -19,10 +20,12 @@ pub mod ramps;
 pub mod raster;
 pub mod rivers;
 pub mod sites;
+pub mod strata;
 pub mod tilepack;
 pub mod water;
 
 pub use bodies::{Body, BodyId, Shape, Zone};
+pub use climate::{ClimateSample, ClimateWorld};
 pub use column::{Column, ColumnWorld};
 pub use detail::{DetailSpec, Noise};
 pub use error::{FormatError, Result};
@@ -45,7 +48,7 @@ pub use water::{WaterColumn, WaterKind, WaterSpec};
 pub const FORMAT_VERSION: &str = env!("DEEPTIME_FORMAT_VERSION");
 
 /// The minor part of [`FORMAT_VERSION`], written into every file header (plan §5.7.2).
-pub const FORMAT_MINOR: u16 = 1;
+pub const FORMAT_MINOR: u16 = 2;
 
 #[cfg(test)]
 mod tests {
