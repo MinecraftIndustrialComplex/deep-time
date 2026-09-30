@@ -73,6 +73,67 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-30 — Geologic provinces: a USGS-style view layer on every keyframe (agent worktree agent-a03fc35a652ae22e4, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Ben's decision (decisions log 2026-09-29, "Just want the view, don't change world generation"): a
+  `provinces` keyframe layer, drawn like `regime` or `crust_age`, so the workbench (layer picker, legend, globe, compare)
+  and the static viewer show it at every time step. View only: `core::provinces` derives it when a frame is drawn
+  (`keyframes::render` takes derived layers; `keyframes::add_derived` adds `provinces` to a group whose layers hold
+  `regime` and `crust_age`) into a scratch field; nothing is written to `WorldState`. Also: `deeptime provinces --in
+  <checkpoint> --out x.png` (prints each class's share; `DEEPTIME_PROVINCE_STATS=1` prints field quantiles,
+  `DEEPTIME_PROVINCE_DUMP=<dir>` dumps the fields as raw f32), the `provinces` ramp in `ramps.json` (9 classes, `labels`,
+  the rules as its `_comment`, which the workbench legend shows and the static viewer shows as a tooltip; existing ramps
+  untouched), the workbench's layer word "Geologic provinces", the plan's §8.1 note. The plates estimate counts one more
+  keyframe layer (16 frames × 2 MiB), so `notes.run.history.reserved_peak_bytes` grew by 23 MB.
+- **Rules** (first that applies wins; thresholds `provinces::Rules`, the plan's §8.1 note has the full text):
+  LIP = mafic volcanic pile ≥ 0.2 × the recorded LIP thickness above the column's own basalt (2 km where the gabbro
+  lower crust is 5 km, as on oceanic crust; none before the first LIP event); oceanic crust by `crust_age` 0–20 / 20–65 /
+  over 65 Ma, an island arc (regime arc, crust over 9 km) being an orogen; continental: orogen = collision or arc regime,
+  a Himalayan-type orogeny within 500 Myr, or an Andean one within 50 Myr on ground over 1.5 km; extended = rift or
+  passive-margin regime or crust under 20 km; basin = over 3 km of sediment + sedimentary rock (strata log or pools,
+  the thicker) or subsiding over 0.03 mm/yr under ≥ 1 km; shield = under 0.2 km of cover or a crystalline surface rock
+  (`structure/rock`, else `surface/class`, by the class table's family); platform = the rest. Then a 3 × 3 majority
+  filter over the continental classes.
+- **What calibration found.** `earthlike_quick_16k` scattered_continents, 500 Myr, final: continental crust is 35 % of
+  the planet and on it: `plates/orogeny_type` is Andean on 87 % of the cells (age median 20 Myr, also under regime
+  craton), so "orogeny within 500 Myr" made whole continents orogens (24 % of the planet at first); the collision type
+  is 11 % and is the one that persists. Continental columns carry 2 km of mafic volcanic rock wherever the crust was
+  oceanic or an emerged arc (the 4.5 km gabbro of a continent against 5 km of an ocean tells them apart), so a plain
+  "mafic pile over 300 m" flagged 8–14 % of the planet as LIP; with the baseline it is 1.1–2.1 %, about the area of
+  the run's LIP blobs. Oceanic arc-regime cells sit at a median −2.3 km (a thin rim around every continent); only the
+  ones with crust over 9 km (23 %) are island arcs. Continental crust is 28 km thick at the median, so the 28 km
+  "thinned" guess made half of it extended; 20 km is the 10th percentile of cratons.
+- **Measured** (Mac, release; the checkpoints from `stage plates … --max-steps 125` and the full stage):
+  class shares of the planet, mid (step 125) / final: shield 5.6 / 4.3 %, platform 8.8 / 4.5 %, orogen 22.7 / 11.9 %,
+  basin 5.8 / 6.3 %, LIP 1.1 / 2.1 %, extended 4.3 / 7.2 %, ocean 0–20 Ma 16.4 / 18.9 %, 20–65 Ma 17.9 / 26.6 %, over
+  65 Ma 17.6 / 18.4 %. By eye against the USGS map: shields and platforms fill continental interiors, orogens follow the
+  collisions and active margins, basins sit beside them, extended crust fringes margins and rifts, LIPs are round blobs,
+  the sea floor ages away from the ridges. Differences from Earth: too little platform against shield (the sim's
+  craton cover is patchy: median 0.8 km, 25 % over 3.9 km), and orogens are over-large at mid-run because the six
+  scattered continents all collide.
+- **Gates.** `cargo test --workspace` ok (core 256 + 3 ignored, incl. 5 provinces:: tests: every rule, LIP with and
+  without the event, the derivation leaves the world equal, the generalisation, ramp labels and colours); clippy
+  `--workspace --all-targets -D warnings` ok; `cargo fmt --check` ok; `cargo deny check licenses bans` ok.
+  **World files vs master** (`run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --threads
+  6`, master 032c94c binary against this branch): `diff -rq` differs only in `keyframes/index.json`, the 11 plate-group
+  `kf-*.dtk` and `manifest.json` (created_utc, the keyframe files' bytes/crc, timings, `reserved_peak_bytes`); every
+  raster, strata, event, site, body, spawn file is byte-identical.
+- **Screenshots** (private `deeptime watch --port 8653` on the Mac, own runs folder, reached through an ssh tunnel;
+  the live 8642 was not touched): `review/out/prov/wb-mid.png` (234 Myr ago, step 133) and `wb-final.png` (the present),
+  the workbench with the Geologic provinces layer, its legend and note; `mid.png`, `fin.png` are the bare maps.
+  (review/out is not committed.) The tool: `tools/viewer/shot.py` with `--eval` clicking `#lpickbtn`, then
+  `[data-layer=provinces]`, then Shift+← ten frames at a time.
+- **Would the world's provinces be better with these classes?** Probably yes, for TerraBlender: `meta/province` is the
+  regime setting (ocean, island, arc, orogen, rift, hotspot, craton, highland, margin) with connected regions of at least
+  50,000 km²; it has no sedimentary/crystalline distinction, so a craton's shield, platform and basin all become one
+  province (one biome region), and it makes every hotspot and LIP a small one. Provinces of shield/platform/basin/LIP
+  would give regions that follow the rock the player sees and the ore the deposit stages place (basins hold the coal,
+  petroleum and MVT, shields the BIF and orogens the porphyry). Not changed here (Ben: view only); if wanted, it is a
+  change to `bake/meta.rs` plus P1-10's region table, and it would change `meta/province` and the biome regions of
+  every world.
+- **Next.** Nothing blocks: merge to master when reviewed. Not checked in the game: the in-game timelapse builds its
+  layer list from the frames' layer names (`TimelapseModel`) and the frames are already coloured, so `provinces` should
+  appear in its picker (under its raw name) with the right colours; no Java changed.
+
 ### 2026-09-29 — Coal fields adjoin and stack: adjoining footprints, several seams per field from the sediment history (agent worktree agent-a3e41a57dc812f499, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben's follow-up (decisions log 2026-09-29, "Yes, adjoining + stacked (Recommended)"): coal fields in a basin
   may adjoin and fill its minable area (no spacing), and each field holds a stack of seams at different depths. Changes:
