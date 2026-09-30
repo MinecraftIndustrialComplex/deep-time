@@ -165,3 +165,7 @@ the log entry once a question is answered. A newer log entry overrides an older 
 | 2026-09-30 | When to merge/release/pin mic-climate's `deep-time` branch? | "Merge to mic-climate main now" (done: mic-climate master 09ad694; no release, no pack pin). |
 | 2026-09-30 | Base-temperature hook for Project Atmosphere | Ben: "Add in some hooks to add in hooks for PA into MIC-CLimate"; after being told PA is All Rights Reserved and its public API can't set base temperature: "Mixin anyway". mic-climate adds a gated, optional mixin into PA; PA's jar is still never redistributed. |
 | 2026-09-30 | Serene Seasons' single global season in the southern hemisphere | "Look into per-hemisphere": research ways to make seasons per-hemisphere. |
+| 2026-09-30 | Ice-age cycles are small on Earth-like planets (~4 % of land, 10–15 m sea level vs Earth's 10→25 %, ~120 m). Add ice-sheet dynamics? | "Yes, add ice-sheet dynamics (Recommended)": elevation feedback + simple flow. |
+| 2026-09-30 | Low-degassing planets can refreeze ~1 Myr after a snowball (weathering has no supply limit). Supply-limited weathering? | "Yes, supply-limited (Recommended)": weathering capped by how fast erosion exposes fresh rock. |
+| 2026-09-30 | Present-day sea-level reference ice (runs' own 1.0·10⁷ km³ vs the model's Earth 2.5·10⁷ km³) | "Keep calibrated coastlines (Recommended)". |
+| 2026-09-30 | Carbon clock step 100 → 200 kyr to halve the climate stage's cost? | "200 kyrs, but make sure it is configurable". |
