@@ -169,3 +169,5 @@ the log entry once a question is answered. A newer log entry overrides an older 
 | 2026-09-30 | Low-degassing planets can refreeze ~1 Myr after a snowball (weathering has no supply limit). Supply-limited weathering? | "Yes, supply-limited (Recommended)": weathering capped by how fast erosion exposes fresh rock. |
 | 2026-09-30 | Present-day sea-level reference ice (runs' own 1.0·10⁷ km³ vs the model's Earth 2.5·10⁷ km³) | "Keep calibrated coastlines (Recommended)". |
 | 2026-09-30 | Carbon clock step 100 → 200 kyr to halve the climate stage's cost? | "200 kyrs, but make sure it is configurable". |
+| 2026-09-30 | ~44 % of coal-seam stacks sit in basement rock. Fix? | "Cap coal to the sediment (Recommended)": coal stacks limited to the sedimentary cover at the site. |
+| 2026-09-30 | Rock-layer look constants (smoothing σ, tongue band width, minor-rock cutoff) | "Settings + flatter default (Recommended)": all three under Advanced; stronger default smoothing so typical dips are gentle (folds come in Phase 2). Also switch the synthetic deposit test world to readable strata (the every-class test pattern stays only where tests need it). |
