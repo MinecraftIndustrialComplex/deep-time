@@ -79,7 +79,10 @@ class TilePackParityTest {
             for (int n = 0; n < k; n++) {
                 short top = a.get(2).getAsJsonArray().get(n).getAsShort();
                 int cls = a.get(3).getAsJsonArray().get(n).getAsInt();
-                if ((h.horizonTopRaw(i, j, n) != top || h.horizonClass(i, j, n) != cls) && bad.size() < MAX_REPORTED)
+                int kt = a.get(4).getAsJsonArray().get(n).getAsInt();
+                int kb = a.get(5).getAsJsonArray().get(n).getAsInt();
+                if ((h.horizonTopRaw(i, j, n) != top || h.horizonClass(i, j, n) != cls
+                        || h.horizonKeyTop(i, j, n) != kt || h.horizonKeyBase(i, j, n) != kb) && bad.size() < MAX_REPORTED)
                     bad.add("horizon " + n + " at (" + i + ", " + j + ")");
             }
         }

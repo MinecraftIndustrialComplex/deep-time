@@ -5,6 +5,14 @@
 //! 0.01 °C), `climate/p_mm` (u16, mm/yr), `climate/koppen` (u8, the index of
 //! `climate::koppen::CODES`, 31 = sea), from the climate stage's last snapshot.
 //!
+//! **The twelve months on L1** (format 0.2, P1-25: what Deep Time's climate API reads):
+//! `climate/month/t_sl_c_{01..12}` (i16, 0.01 °C, each month's temperature *at sea level*, so a
+//! reader applies the lapse rate at its own block height) and `climate/month/p_share_{01..12}`
+//! (u8, 1/40: each month's precipitation rate over the annual, 0–6.375; a month's precipitation is
+//! `p_mm` × share / 12 after the twelve are normalised to sum 12), from the climate stage's last
+//! snapshot. Month 01 starts at solar longitude 280°, about 1 January on Earth.
+//! `notes.bake.climate.monthly` records the layers, the lapse rate and the month convention.
+//!
 //! **The five biome inputs on L2** (`climate/{temperature, vegetation, continents, erosion,
 //! ridges}`, i16, vanilla parameter × 10,000): what the noise router's climate functions read
 //! (plan §7.1), from the physical climate and the ground by the §7.2 mapping in [`super::biomes`]
@@ -103,6 +111,7 @@ pub fn bake(
         )?;
         physical.push("climate/koppen");
     }
+    let monthly = bake_monthly(world, p, out)?;
 
     // The five biome inputs on L2.
     let sea = surface.sea_level_m;
@@ -177,10 +186,104 @@ pub fn bake(
         "biome_inputs": BIOME_INPUTS,
         "grid": l2,
         "from_climate_stage": climate_in.is_some(),
+        "monthly": monthly,
         "default_params": params == BiomeParams::default(),
     });
     if let (Value::Object(n), Value::Object(m)) = (&mut note, mapped.note) {
         n.extend(m);
     }
     Ok(note)
+}
+
+/// Layer names of the twelve months (P1-25; FORMAT.md "The twelve months").
+pub fn t_sl_month_layer(m: usize) -> String {
+    format!("climate/month/t_sl_c_{:02}", m + 1)
+}
+
+/// See [`t_sl_month_layer`].
+pub fn p_share_month_layer(m: usize) -> String {
+    format!("climate/month/p_share_{:02}", m + 1)
+}
+
+/// The scale of `climate/month/p_share_*` (u8 × 1/40: 0–6.375 times the annual mean rate).
+pub const P_SHARE_SCALE: f64 = 1.0 / 40.0;
+
+/// Writes the twelve months when the climate stage left them (its last snapshot); returns the
+/// note (`null` when there are none: a preset without a climate section).
+fn bake_monthly(
+    world: &WorldState,
+    p: &PlanetPreset,
+    out: &mut Out<'_>,
+) -> Result<Value, CoreError> {
+    let t: Vec<&Field> = (0..12)
+        .filter_map(|m| field(world, &climate::field::t_sl_month(m)))
+        .collect();
+    let pr: Vec<&Field> = (0..12)
+        .filter_map(|m| field(world, &climate::field::p_month(m)))
+        .collect();
+    if t.len() != 12 || pr.len() != 12 {
+        return Ok(Value::Null);
+    }
+    let grid = t[0].grid.clone();
+    let n = grid.cells();
+    if t.iter().chain(&pr).any(|f| f.grid != grid) {
+        return Err(CoreError::InvalidState(
+            "the climate stage's twelve months are not on one grid".into(),
+        ));
+    }
+    for (m, f) in t.iter().enumerate() {
+        let raw: Vec<i16> = f
+            .data
+            .iter()
+            .map(|&v| crate::synth::quantise(f64::from(v) * 100.0))
+            .collect();
+        out.layer(
+            desc(
+                &t_sl_month_layer(m),
+                DType::I16,
+                &grid,
+                0.01,
+                "degC at sea level",
+                None,
+            ),
+            &raw,
+        )?;
+    }
+    // Each month's rate over the mean of the twelve (the annual precipitation).
+    let mean: Vec<f64> = (0..n)
+        .map(|c| pr.iter().map(|f| f64::from(f.data[c])).sum::<f64>() / 12.0)
+        .collect();
+    for (m, f) in pr.iter().enumerate() {
+        let raw: Vec<u8> = f
+            .data
+            .iter()
+            .zip(&mean)
+            .map(|(&v, &a)| {
+                let share = if a > 0.0 && v.is_finite() {
+                    f64::from(v) / a
+                } else {
+                    1.0
+                };
+                (share / P_SHARE_SCALE).round().clamp(0.0, 255.0) as u8
+            })
+            .collect();
+        out.layer(
+            desc(
+                &p_share_month_layer(m),
+                DType::U8,
+                &grid,
+                P_SHARE_SCALE,
+                "month rate / annual mean rate",
+                None,
+            ),
+            &raw,
+        )?;
+    }
+    let lapse = p.climate.clone().unwrap_or_default().lapse_c_per_km;
+    Ok(json!({
+        "t_sl": (0..12).map(t_sl_month_layer).collect::<Vec<_>>(),
+        "p_share": (0..12).map(p_share_month_layer).collect::<Vec<_>>(),
+        "lapse_c_per_km": lapse,
+        "months": "12 equal steps of solar longitude from 280 deg (month 01 about 1 January)",
+    }))
 }

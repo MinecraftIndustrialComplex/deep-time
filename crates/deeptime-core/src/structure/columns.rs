@@ -31,6 +31,15 @@
 //! 4. **The mantle** (peridotite) below the crust, down to the depth asked for.
 //!
 //! Neighbouring units of one class merge. Plutons are bodies, not units (`plutons.rs`).
+//!
+//! **Stratigraphic keys** ([`key`]). Every unit carries the span of a key that orders units the
+//! same way in every column, so the column evaluator can correlate one cell's horizons with its
+//! neighbours' (FORMAT.md, "`horizon_stack` cells"): a key is a u16 that grows downwards — the
+//! regolith first, then the strata log by age (a layer spans the ages from the base of the layer
+//! above it to its own base), then the basement pools in erosion order (a block each, subdivided by
+//! metamorphic step), then the mantle. Two cells' layers of one deposition time get the same
+//! keys wherever the log holds them, so a bed stays one bed across cells and pinches out where a
+//! cell lacks it.
 
 use crate::plates::l1::TOP_ORDER;
 use crate::plates::state::{OCEANIC, OROGENY_ANDEAN, OROGENY_HIMALAYAN, pool};
@@ -55,6 +64,41 @@ pub enum Source {
     Mantle,
 }
 
+/// Stratigraphic keys: where a unit sits in the order every column shares (the module docs).
+pub mod key {
+    /// The regolith's span.
+    pub const REGOLITH: [u16; 2] = [0, 4095];
+    /// The strata log: key `LOG_TOP` is the present, `LOG_BASE` the oldest age of the run.
+    pub const LOG_TOP: u16 = 4096;
+    pub const LOG_BASE: u16 = 32767;
+    /// The first basement pool's block; pool q of `plates::l1::TOP_ORDER` spans
+    /// `POOL0 + q·POOL_BLOCK ..= POOL0 + (q + 1)·POOL_BLOCK − 1`.
+    pub const POOL0: u16 = 32768;
+    pub const POOL_BLOCK: u16 = 4096;
+    /// A pool's metamorphic step m (0 = unmetamorphosed) spans `m·STEP ..= m·STEP + STEP − 1` of
+    /// its block (steps past the eighth share the last slot).
+    pub const STEP: u16 = 512;
+    /// The mantle's span.
+    pub const MANTLE: [u16; 2] = [61440, 65535];
+
+    /// The key of an age `delta_myr` before the present in a log whose oldest layer can be
+    /// `span_myr` old: linear from `LOG_TOP` (now) to `LOG_BASE`.
+    pub fn of_age(delta_myr: f64, span_myr: f64) -> u16 {
+        let f = if span_myr > 0.0 {
+            (delta_myr / span_myr).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        (f64::from(LOG_TOP) + f * f64::from(LOG_BASE - LOG_TOP)).round() as u16
+    }
+
+    /// Pool `q`'s (position in `TOP_ORDER`) span at metamorphic step `m`.
+    pub fn pool(q: usize, m: usize) -> [u16; 2] {
+        let lo = POOL0 + q as u16 * POOL_BLOCK + m.min(7) as u16 * STEP;
+        [lo, lo + STEP - 1]
+    }
+}
+
 /// One unit of a column.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Unit {
@@ -62,6 +106,8 @@ pub struct Unit {
     pub class: u16,
     pub thickness_m: f32,
     pub source: Source,
+    /// Its stratigraphic key span [top, base] ([`key`]).
+    pub key: [u16; 2],
 }
 
 /// The class tables the columns need, resolved once.
@@ -163,6 +209,12 @@ pub struct Cell<'a> {
     /// metamorphism off).
     pub surface_c: f64,
     pub gradient_c_m: f64,
+    /// How old the oldest log layer of the run can be, Myr (the log's key scale, [`key::of_age`]).
+    pub log_span_myr: f64,
+    /// Whether the cell's surface is still accumulating (net deposition at the last step, over
+    /// the cell and its neighbours): its top log layer then reaches the present in key space;
+    /// otherwise erosion has taken an unknown part of it and it keeps only its base age.
+    pub top_active: bool,
 }
 
 /// The class of pool `p` below the top of the basement.
@@ -214,7 +266,7 @@ pub fn pool_class(t: &Tables, cell: &Cell<'_>, p: usize) -> u16 {
     }
 }
 
-fn push(out: &mut Vec<Unit>, class: u16, thickness_m: f64, source: Source) {
+fn push(out: &mut Vec<Unit>, class: u16, thickness_m: f64, source: Source, key: [u16; 2]) {
     if thickness_m.is_nan() || thickness_m <= 0.0 {
         return;
     }
@@ -222,12 +274,14 @@ fn push(out: &mut Vec<Unit>, class: u16, thickness_m: f64, source: Source) {
         && last.class == class
     {
         last.thickness_m += thickness_m as f32;
+        last.key[1] = last.key[1].max(key[1]);
         return;
     }
     out.push(Unit {
         class,
         thickness_m: thickness_m as f32,
         source,
+        key,
     });
 }
 
@@ -250,29 +304,43 @@ pub fn build(
             t.regolith_class(cell.regolith_kind),
             reg,
             Source::Regolith,
+            key::REGOLITH,
         );
         depth += reg;
     }
     let young_from = now_myr - p.loose_age_myr;
     let mut log_total = 0.0f64;
+    // A layer spans the ages from the base of the layer above it to its own base; the top layer
+    // reaches the present while the cell still accumulates, else it keeps only its base age.
+    let age_key = |age: f32| key::of_age(now_myr - f64::from(age), cell.log_span_myr);
+    let mut above: Option<u16> = None;
     for l in cell.log.iter().rev() {
         let th = f64::from(l.thickness_m);
         if th.is_nan() || th <= 0.0 {
             continue;
         }
         log_total += th;
+        let base = age_key(l.age_myr);
+        let kt = match above {
+            Some(k) => k,
+            None if cell.top_active => key::LOG_TOP,
+            None => base.saturating_sub(2).max(key::LOG_TOP),
+        };
+        let kb = base.max(kt.saturating_add(2));
+        above = Some(kb);
         if depth >= max_depth_m {
             depth += th;
             continue;
         }
+        let km = kt + (kb - kt) / 2;
         let young = f64::from(l.age_myr) >= young_from;
         let loose = if young {
             (p.loose_depth_m - depth).clamp(0.0, th)
         } else {
             0.0
         };
-        push(out, t.loose_form(l.class), loose, Source::Log);
-        push(out, t.rock_form(l.class), th - loose, Source::Log);
+        push(out, t.loose_form(l.class), loose, Source::Log, [kt, km]);
+        push(out, t.rock_form(l.class), th - loose, Source::Log, [km, kb]);
         depth += th;
     }
 
@@ -285,7 +353,7 @@ pub fn build(
         cover -= take;
     }
     let mut first = true;
-    for &k in &TOP_ORDER {
+    for (q, &k) in TOP_ORDER.iter().enumerate() {
         let th = pools[k];
         if th < 1.0 {
             continue;
@@ -306,9 +374,11 @@ pub fn build(
             pool_class(t, cell, k)
         };
         first = false;
-        // Split the pool at the isotherms of its class's path (continental crust only).
+        // Split the pool at the isotherms of its class's path (continental crust only); each
+        // metamorphic step keeps its own slot of the pool's key block.
         let mut top = depth;
         let mut current = class;
+        let mut step = 0;
         if cell.crust_type != OCEANIC && cell.gradient_c_m > 0.0 {
             for &(next, temp) in t.paths.steps(class) {
                 let z = (temp - cell.surface_c) / cell.gradient_c_m;
@@ -316,17 +386,26 @@ pub fn build(
                     break;
                 }
                 if z > top {
-                    push(out, current, z - top, Source::Basement(k as u8));
+                    let src = Source::Basement(k as u8);
+                    push(out, current, z - top, src, key::pool(q, step));
                     top = z;
                 }
                 current = next;
+                step += 1;
             }
         }
-        push(out, current, depth + th - top, Source::Basement(k as u8));
+        let src = Source::Basement(k as u8);
+        push(out, current, depth + th - top, src, key::pool(q, step));
         depth += th;
     }
     if depth < max_depth_m {
-        push(out, t.peridotite, max_depth_m - depth, Source::Mantle);
+        push(
+            out,
+            t.peridotite,
+            max_depth_m - depth,
+            Source::Mantle,
+            key::MANTLE,
+        );
     }
 }
 
@@ -375,6 +454,8 @@ mod tests {
             depth_below_sea_m: -200.0,
             surface_c: 10.0,
             gradient_c_m: 0.0,
+            log_span_myr: 500.0,
+            top_active: true,
         }
     }
 

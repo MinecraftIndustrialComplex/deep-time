@@ -784,7 +784,8 @@ pub fn section(
     for (i, c) in cols.iter().enumerate() {
         for (k, (top, _)) in c.horizons.iter().enumerate().skip(1) {
             let y = top.floor() as i32;
-            if (y0..=y1).contains(&y) {
+            // Only where there is ground: tops above the column's top block paint nothing.
+            if (y0..=y1).contains(&y) && c.top.is_some_and(|t| y <= t) {
                 let under = img.get(i, row(y));
                 img.set(i, row(y), mix(OVERLAY_HORIZONS[(k - 1) % 4], under, 0.75));
             }
@@ -865,7 +866,7 @@ pub fn section(
         "plane": format!("{axis_name} = {}", args.at),
         "along": along,
         "from": lo, "to": hi, "y_from": y0, "y_to": y1,
-        "definition": "one pixel per block (then scaled): blocks by colour, sky light blue, air under the column's top block near-black; overlays: magenta = the first block above the world data's expected top (ceil(H)), green = the world data's water_level, yellow/violet/green/orange = the tops of strata horizons 1.. (horizon 0 starts at the surface). water_top_y = the top face of the highest block holding water above the terrain surface (water_block_y + 1; P0-13's lakeHolds uses the same; sea level 63 gives water_top_y 63, water_block_y 62).",
+        "definition": "one pixel per block (then scaled): blocks by colour, sky light blue, air under the column's top block near-black; overlays: magenta = the first block above the world data's expected top (ceil(H)), green = the world data's water_level, yellow/violet/green/orange = the tops of strata horizons 1.. at or below the column's top block (horizon 0 starts at the surface). water_top_y = the top face of the highest block holding water above the terrain surface (water_block_y + 1; P0-13's lakeHolds uses the same; sea level 63 gives water_top_y 63, water_block_y 62).",
         "legend": {"expected_surface": hex(OVERLAY_EXPECTED), "water_level": hex(OVERLAY_WATER),
                    "horizons": OVERLAY_HORIZONS.iter().map(|c| hex(*c)).collect::<Vec<_>>()},
         "bodies": "none: world-data format 0.0 has no site bodies",

@@ -92,6 +92,10 @@ pub struct CellSource<'a> {
     orogeny_age: &'a [f32],
     heat: &'a [f32],
     t_mean: Option<&'a [f32]>,
+    /// The last surface step's deposition and erosion rates (m/Myr), where the surface wrote them.
+    rates: Option<(&'a [f32], &'a [f32])>,
+    /// The run's start, Myr (the strata log's oldest possible age).
+    t_start_myr: f64,
     p: StructureParams,
 }
 
@@ -145,8 +149,35 @@ impl<'a> CellSource<'a> {
                 .get("climate/t_mean_c")
                 .filter(|f| f.data.len() == n)
                 .map(|f| f.data.as_slice()),
+            rates: field_of(fields, crate::surface::field::DEPOSITION, n)
+                .ok()
+                .zip(field_of(fields, crate::surface::field::EROSION, n).ok()),
+            t_start_myr: preset.t_start_years() / 1.0e6,
             p: preset.structure.clone().unwrap_or_default(),
         })
+    }
+
+    /// Whether cell `c` is still accumulating: the last step's deposition minus erosion, summed
+    /// over the cell and its eight neighbours (x wraps, z clamps), is positive. True where the
+    /// surface wrote no rates.
+    pub fn top_active(&self, c: usize) -> bool {
+        let Some((dep, ero)) = self.rates else {
+            return true;
+        };
+        let (w, h) = (self.grid.w as i64, self.grid.h as i64);
+        let (i, j) = ((c as i64) % w, (c as i64) / w);
+        let mut net = 0.0f64;
+        for dj in -1..=1 {
+            let jj = (j + dj).clamp(0, h - 1);
+            for di in -1..=1 {
+                let k = (jj * w + (i + di).rem_euclid(w)) as usize;
+                let (d, e) = (f64::from(dep[k]), f64::from(ero[k]));
+                if d.is_finite() && e.is_finite() {
+                    net += d - e;
+                }
+            }
+        }
+        net > 0.0
     }
 
     /// Cell `c`'s inputs.
@@ -164,6 +195,8 @@ impl<'a> CellSource<'a> {
             depth_below_sea_m: self.sea_level_m - f64::from(s.elevation_m[c]),
             surface_c: self.surface_c(c),
             gradient_c_m: self.gradient_c_m(c),
+            log_span_myr: (self.now_myr - self.t_start_myr).max(1.0),
+            top_active: self.top_active(c),
         }
     }
 
@@ -644,9 +677,10 @@ impl StructureStage {
                         Vec::new(),
                         vec![0i16; p.horizons as usize],
                         vec![0u8; p.horizons as usize],
+                        vec![[0u16; 2]; p.horizons as usize],
                     )
                 },
-                |(units, tops, classes), c| {
+                |(units, tops, classes, keys), c| {
                     let surface_y = src.surface_y(c, s);
                     // Enough of the column that the first horizon is settled.
                     columns::build(&src.cell(c), t, p, src.now_myr, 2000.0, units);
@@ -658,6 +692,7 @@ impl StructureStage {
                         s.m_per_block_v,
                         tops,
                         classes,
+                        keys,
                     );
                     f32::from(classes[0])
                 },

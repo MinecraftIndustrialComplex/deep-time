@@ -126,42 +126,35 @@ impl WorldData {
     }
 
     /// One column's horizons as the strata pass builds them (`StrataPass.column`, through
-    /// `LoadedLayer::stack_at`): top-down (top block y, class index); horizon h fills
-    /// tops[h+1] < y ≤ tops[h], the last one to the bottom of the world. Empty without strata.
+    /// `LoadedLayer::stack_at`, the column rule of format 0.2): top-down (top block y, class
+    /// index); horizon h fills tops[h+1] < y ≤ tops[h], the last one to the bottom of the world.
+    /// Empty without strata.
     pub fn strata_column(&self, x: i32, z: i32) -> Vec<(i32, u8)> {
         let mut out = Vec::new();
         if let Some(s) = &self.strata {
-            s.stack_at(i64::from(x), i64::from(z), &mut out);
+            s.stack_at(
+                i64::from(x),
+                i64::from(z),
+                self.manifest.scale.min_y,
+                &mut out,
+            );
         }
-        out
+        out.into_iter().map(|(t, c, _)| (t, c)).collect()
     }
 
-    /// The horizon stack at (x, z) as `StrataPass` reads it: the nearest L1 cell, horizons
-    /// top-down as (top in blocks, class name), stopping at the first unused one.
+    /// The horizon stack at (x, z) as `StrataPass` reads it (the column rule): horizons top-down
+    /// as (top in blocks, class name).
     pub fn horizons(&self, x: i32, z: i32) -> Vec<(f64, String)> {
-        let Some(s) = &self.strata else {
-            return Vec::new();
-        };
-        let g = &s.desc.grid;
-        let wx = self.wrap_x(i64::from(x)) as f64;
-        // Java's Math.round: ⌊v + 0.5⌋.
-        let i = ((wx - g.origin_block_x as f64) / f64::from(g.r) + 0.5).floor() as i64;
-        let j = ((f64::from(z) - g.origin_block_z as f64) / f64::from(g.r) + 0.5).floor() as i64;
-        let (i, j) = (g.wrap_i(i), g.clamp_j(j));
-        let k = s.desc.stack_depth.unwrap_or(0);
-        let mut out = Vec::new();
-        for h in 0..k {
-            let (top, class) = s.horizon(i, j, h);
-            if class == 255 || top == i16::MIN {
-                break;
-            }
-            let name = self
-                .classes
-                .get(usize::from(class))
-                .cloned()
-                .unwrap_or_else(|| format!("class{class}"));
-            out.push((f64::from(top) * s.desc.scale + s.desc.offset, name));
-        }
-        out
+        self.strata_column(x, z)
+            .into_iter()
+            .map(|(top, class)| {
+                let name = self
+                    .classes
+                    .get(usize::from(class))
+                    .cloned()
+                    .unwrap_or_else(|| format!("class{class}"));
+                (f64::from(top), name)
+            })
+            .collect()
     }
 }
