@@ -674,6 +674,9 @@ impl ClimateStage {
                 sea: sea_prev,
                 p: &p,
                 planet: self.planet(ppm0, t0),
+                // The starting snapshot only seeds the weathering and the equilibrium line; the
+                // bake's months come from the last snapshot.
+                monthly: false,
             };
             let mut ebm0 = EbmState::default();
             let s0 = snapshot::compute(&inp, &mut ebm0, &[]);
