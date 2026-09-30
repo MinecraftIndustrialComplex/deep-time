@@ -3596,6 +3596,11 @@ on this machine.
   cave density modulated by lithology and water table, with vanilla cave functions kept as the
   baseline so every region stays playable; a connectivity metric per region.
 - **P2-05 Weathering blocks**: regolith, saprolite, laterite and bauxite caps, scree.
+- **P2-08 Meteor impacts** (Ben, decisions log 2026-09-29: "Yes, in full … not in v1, but before phase 3"):
+  impacts at an Earth-like, size-dependent rate (a setting); simple and complex craters aged and
+  buried by the surface stage; breccia and impact-melt units in the strata; impact deposit types
+  in the deposit engine (Sudbury-type Ni-Cu-PGE melt-sheet sulphides, impact-hydrothermal
+  Cu-Zn-Au, impact diamonds, crater-basin oil/uranium traps) with "why here" chains to the impact.
 - **P2-07 Per-chunk overhead**: Chunky throughput in the same smoke with a vanilla preset vs Deep
   Time.
 
