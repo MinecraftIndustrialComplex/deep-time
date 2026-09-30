@@ -387,6 +387,7 @@ mod tests {
             peak_m: 2500.0,
             built_m: 2500.0,
             sunk_m: 0.0,
+            kept_m: 2500.0,
             target_m: 2500.0,
             flux_last: 1.0,
             missed: 0,

@@ -178,6 +178,8 @@ pub struct Volcano {
     pub built_m: f64,
     /// Subsidence applied since it died, m.
     pub sunk_m: f64,
+    /// The relief left of what it built by the surface's erosion (the accounting of step 2), m.
+    pub kept_m: f64,
     /// Target height of the last step it was active, m.
     pub target_m: f64,
     /// Arc flux at its last step with arc information, and steps since it last had enough.
@@ -447,6 +449,48 @@ impl L1<'_> {
         out
     }
 
+    /// The rendered weight of `prof` at the volcano's centre (bilinear over the four cells round
+    /// it, as `sample_at` reads the surface there).
+    fn centre_weight(&self, x: f64, z: f64, radius_m: f64, prof: &dyn Fn(f64) -> f64) -> f64 {
+        let g = self.grid;
+        let r = f64::from(g.r);
+        let fi = (x - g.origin_block_x as f64) / r;
+        let fj = (z - g.origin_block_z as f64) / r;
+        let (i0, j0) = (fi.floor(), fj.floor());
+        let (ti, tj) = (fi - i0, fj - j0);
+        let frame = BlockFrame::new(g.circumference() as u32);
+        let mut s = 0.0;
+        for (di, dj, w) in [
+            (0.0, 0.0, (1.0 - ti) * (1.0 - tj)),
+            (1.0, 0.0, ti * (1.0 - tj)),
+            (0.0, 1.0, (1.0 - ti) * tj),
+            (1.0, 1.0, ti * tj),
+        ] {
+            let bx = g.origin_block_x as f64 + (i0 + di) * r;
+            let bz = g.origin_block_z as f64 + (j0 + dj) * r;
+            let dx = frame.wrap_x(bx - x) * self.mh;
+            let dz = (bz - z) * self.mh;
+            s += w * shape::cell_weight(prof, dx, dz, self.cell_m, radius_m);
+        }
+        s
+    }
+
+    /// The body height the surface shows: its relief at the centre over the foot (`base`), per
+    /// the weight the rendered body has there.
+    fn relief(&self, v: &Volcano) -> f64 {
+        let s = v.shape();
+        let prof = |r: f64| s.body(r);
+        let base = self.base(v.x, v.z, v.radius_m);
+        let centre =
+            sample_at(self.grid, self.elev, v.x, v.z) + sample_at(self.grid, &self.delta, v.x, v.z);
+        let w = self.centre_weight(v.x, v.z, v.radius_m, &prof);
+        if w > 1e-3 {
+            ((centre - base) / w).max(0.0)
+        } else {
+            0.0
+        }
+    }
+
     /// The ground around a foot: the lower quartile of the elevation over a ring from 1.05 R to
     /// 1.05 R + 1.5 cells.
     fn base(&self, x: f64, z: f64, radius_m: f64) -> f64 {
@@ -648,8 +692,14 @@ impl VolcanoStage {
                 for_cells(&grid, mh, v.x, v.z, 1.3 * v.radius_m + cell_m, |c, dx, dz| {
                     cells.push((c, shape::cell_weight(&prof, dx, dz, cell_m, v.radius_m)));
                 });
-                v.height_m = (v.height_m + fit_change(&cells, m)).clamp(0.0, v.peak_m);
+                v.kept_m = (v.kept_m + fit_change(&cells, m)).clamp(0.0, v.peak_m);
             }
+        }
+        // … and it stands no higher than the surface shows it either (the plate model's
+        // resampling and the advection of the offset also flatten a small edifice): the smaller
+        // of the two, each kept on its own so that a dip of one step does not stay.
+        for v in &mut st.volcanoes {
+            v.height_m = v.kept_m.min(l1.relief(v));
         }
         self.time("measure", started);
 
@@ -815,6 +865,7 @@ impl VolcanoStage {
                     peak_m: 0.0,
                     built_m: 0.0,
                     sunk_m: 0.0,
+                    kept_m: 0.0,
                     target_m: height * 1000.0 * p.size,
                     flux_last: 0.0,
                     missed: 0,
@@ -904,6 +955,7 @@ impl VolcanoStage {
                     peak_m: 0.0,
                     built_m: 0.0,
                     sunk_m: 0.0,
+                    kept_m: 0.0,
                     target_m: hk * 1000.0 * p.size,
                     flux_last: f,
                     missed: 0,
@@ -978,6 +1030,7 @@ impl VolcanoStage {
             }
             st.counts.built_km3 += vol * cell_km2 / 1000.0;
             v.height_m += dh;
+            v.kept_m = v.kept_m.max(v.height_m);
             v.built_m += dh;
             v.peak_m = v.peak_m.max(v.height_m);
         }
