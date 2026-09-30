@@ -729,6 +729,31 @@ Pixel (px, py) is centred on longitude 360°·px/w (the seam is 0°, plan §5.2)
 passes the next multiple of the preset's keyframe interval (counted from the run's start) and at
 the end of each stage.
 
+## The climate's ice fields (pipeline fields and history frames; not world data yet)
+
+The climate stage (`crates/deeptime-core/src/climate/`, plan §8.3; deep-time climate 2026-09-29)
+writes these L1 fields into the run's `WorldState` every plate step, *before* the surface stage's
+step of the same length, so the surface (glacial erosion) reads the ice of the ground it is about to
+erode. Thickness is in metres like the plates' elevations (ice sheets sized in Earth-normalized
+lengths, the planet's `R/R⊕` undone). Sea cells hold 0 in the land-ice fields.
+
+| Field | Units | What |
+|---|---|---|
+| `climate/ice_thickness_m` | m | land ice (glaciers and ice sheets) at the end of the step |
+| `climate/ice_max_thickness_m` | m | the thickest the ice stood during the step's fine climate clock; inside the recent ice-age window (`climate.orbital_window_myr`, the last 3 Myr by default) the maximum since the window began, so at the present it is the **last-glacial-maximum** ice (moved with the plates) |
+| `climate/ice_max_extent` | 0/1 | 1 where `climate/ice_max_thickness_m` > 0 (the LGM extent at the present) |
+| `climate/ice_time_share` | 0–1 | share of the step's time the cell was under ice |
+| `climate/sea_ice` | 0–1 | annual-mean sea-ice cover of the sea (0 on land) |
+| `climate/glacier` | 0/1 | (P1-05) 1 where land ice stands at the end of the step (= `climate/ice_thickness_m` > 0) |
+
+The surface stage's field history (the deposit engine's frames, `surface::fields::STEP_FIELDS`)
+records two of them as frame means:
+
+| Frame field | Units | What |
+|---|---|---|
+| `deeptime:ice_thickness_m` | m | time-mean land-ice thickness over the frame |
+| `deeptime:ice_cover` | 0–1 | share of the frame's time the cell was under ice (from `climate/ice_time_share`) |
+
 ## Checkpoints (`*.dtcp`, dev and CLI only)
 
 `DTCP` fixed fields: `u32 schema, u32 history_frames` (F). Section 0 is a JSON summary (`core_version`,
@@ -742,7 +767,8 @@ each: its fields' LZ4 blobs back to back in the head's order (the same record th
 holds). The next stage is always a group's lead: inside a group of coupled stages (plates + surface,
 P1-04) the saved state is the postcard `Vec<Vec<u8>>` of every member's state, in pipeline order.
 Schema 4 (P1-04) added the surface state and the recorded field history to `WorldState`; schema 6
-(P1-17) moved the history's frames out of the body into sections of their own, so a checkpoint is
+(P1-17) moved the history's frames out of the body into sections of their own (schema 7, the deep-time
+climate, added `WorldState::globals` and the climate stage's carbon cycle, fine clock and ice), so a checkpoint is
 written streamed (`<path>.tmp`, fsync, rename; frames copied from memory or from the spill file, never
 held whole) and read without loading the frames (every section's CRC is checked when it is read; the
 frames are read from the file on demand). Postcard is not self-describing: a checkpoint is read only

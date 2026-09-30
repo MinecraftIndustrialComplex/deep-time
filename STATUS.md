@@ -285,6 +285,111 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   changes give dips up to ~30° over short distances). (4) The B-spline rule approximates: a cell point shows a
   blend of its neighbours, not its own stored stack.
 - **Next.** Merge into master (the parent); then the coal-stack depth cap if Ben wants it.
+
+### 2026-09-29 — Deep-time climate: carbon cycle, brightening sun, emergent snowball Earths, ice-age cycles, ice-linked sea level (agent worktree agent-adc924860a859865c, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-29 (the last two entries: "Greenhouse & sun over time", "Recent ice-age
+  cycles", "Ice-linked sea level"; snowball Earth "emergent … not scripted"). Plan §8.3 has an "As built for the
+  deep-time climate" paragraph (items 8–12).
+- **The ice-field contract (committed first, 83b731d; FORMAT.md "The climate's ice fields").** World fields every
+  plate step, before the surface step: `climate/ice_thickness_m` (land ice at the step's end), `climate/
+  ice_max_thickness_m` (thickest during the step's fine clock; inside the ice-age window the maximum since it
+  began, so at the present the **LGM**), `climate/ice_max_extent` (0/1 of the former), `climate/ice_time_share`
+  (share of the step under ice), `climate/sea_ice` (sea-ice cover of the sea), and `climate/glacier` now means
+  ice ≥ 1 m. History frames (surface's accumulator): `deeptime:ice_thickness_m`, `deeptime:ice_cover` (frame
+  means; not deposit-engine fields, so 16-bit packed). Globals: `WorldState::globals["climate/sea_level_m"]` (the
+  surface's sea level) and `["climate/cap_carbonate_m"]`.
+- **What.** New `climate/{carbon,clock,orbit,ice}.rs`; `ebm.rs` (eccentric orbit with Kepler timing, forcing via
+  A, sea-ice conductance tapering to zero between 5 and 10 m so the EBM's latent store melts in model years —
+  the clock runs few EBM years per 100 kyr — early stop also waits for the ice, annual sea-ice cover out);
+  `insolation.rs` (`Orbit`: (a/r)² and Kepler λ); `snapshot.rs` (forcing, sun, orbit, hydrological factor
+  e^(0.02·(T_g − 15)) on precipitation, zonal refs from any EBM year); `mod.rs` rewritten around the clock.
+  `WorldState::globals` (checkpoint **schema 7**). Surface: sea level from the globals; the drawdown carbonate
+  laid on sea floor above 4 km; the ice fields into the frames. `deeptime stage --climate-json` writes the
+  climate note (summary + curves); `climate-dem` prints the Earth weathering kernel and ice volume.
+  - **Carbon** (`carbon.rs`): COPSE's 3.193·10¹⁸ mol reservoir split into air (4.96·10¹⁶ mol at 280 ppm) and a
+    buffered ocean (A/A₀ = (O/O₀)^5; Archer et al. 2009); the air–sea exchange shuts under sea ice, so a
+    snowball's degassing piles up in the air (350× in ~3 Myr at D₀, as Hoffman et al. 1998). Degassing D₀ =
+    6.65·10¹² mol/yr × `degassing_scale` × (½ sea-floor production / 3.4 km²/yr (Rowley 2002) + ½ ocean floor
+    consumed / 3.4 km²/yr — production minus the ocean floor's growth, smoothed 10 Myr; resolution-independent;
+    a first try with Σ arc-cell area × convergence varied 13× with the L0 resolution) + LIPs (0.5 wt % CO₂ of
+    their basalt over 1 Myr). Silicate weathering per land cell runoff × e^(0.09(T − 15)) (GEOCARB/WHAK), band
+    changes × e^(0.09ΔT)(1 + 0.038ΔT)^0.65 × (1 − ice share), × (CO₂/280)^0.3, normalized so Earth's relief under
+    the model's present climate at 280 ppm weathers D₀ (`KERNEL_EARTH` 2.845·10⁷, from `climate-dem`).
+    Forcing 5.35 x below 1,000 ppm, Byrne & Goldblatt 2014's 5.32 x + 0.39 x² above 2,000 ppm (checked in their
+    Table 2 by a Sonnet lookup: it gives their 38.1 W/m² at 50,000 ppm), blended between. Gough 1981 sun on the
+    timeline's age (`present_age_gyr` 4.57). Implicit carbon step (bisection), halved down to 1 kyr where CO₂
+    would move by more than half (a first version overshot to 33 ppm after an escape and refroze).
+  - **Clock** (`clock.rs`): per plate step, 100-kyr steps (2 kyr in the window): degassing, carbon, EBM (≤ 10
+    years, warm), each band's ELA shift from its summer land temperature, the ice (a callback), weathering,
+    trackers. Snowball = annual sea-ice cover ≥ 0.95 of the ocean, ends < 0.5; hothouse = global mean > 25 °C;
+    events `deeptime:snowball` (onset/escape CO₂, drawdown factor, tropical land and weathering shares,
+    degassing, sun, causes `weathering_drawdown`/`slow_cooling` and `degassing_buildup`, the escape step's cap
+    carbonate) and `deeptime:hothouse` (caused by its snowball) — EVENTS.md. First step: a starting snapshot,
+    then CO₂ bisected to weathering = degassing on the warm branch (`initial_co2_ppm` 0) or the preset's value.
+    Between snapshots the zonal refs follow the clock's EBM and the published ELA = snapshot ELA + band shift.
+  - **Orbit** (`orbit.rs`): last `orbital_window_myr` (3): obliquity 41 (+53.6) kyr ±1.2°, eccentricity 405/95/
+    124 kyr (0–0.055), perihelion 23 kyr, phases so t = 0 is today's (ε at the preset's tilt, e 0.018, ϖ 283°);
+    `orbital_strength` scales the swing and e (0 = circular: no cycles).
+  - **Ice** (`ice.rs`): Nye's plastic profile √(2τL/ρg) (τ 50 kPa) on the ice mask via an exact separable EDT
+    (Felzenszwalb & Huttenlocher, from the paper), Earth-normalized lengths, capped at 3,000 m (4,000 gave ~2 km
+    snowball sea-level falls against Hoffman et al. 2017's ~1 km); Imbrie & Imbrie lag in the window (growth
+    42.5 kyr, decay 10.6 kyr); glacio-eustasy −(ρ_i/ρ_w)ΔV/A_ocean (2.47 m per 10⁶ km³) against
+    `ice_reference_km3` 1.0·10⁷ (the calibrated Earth-like runs' present ice: 0.74–1.28·10⁷; the model puts 2.5·10⁷
+    on Earth's relief). **Sea level = the preset's curve (its 250- and 36-Myr cycles kept as the tectonic part)
+    + the ice's glacio-eustasy** ("alongside").
+  - **Cap carbonate**: the carbon that weathering removes beyond degassing (the drawdown's alkalinity) is laid as
+    carbonate on sea floor above 4 km (calcite 3.69·10⁻⁵ m³/mol); outside drawdowns it is millimetres.
+  - Removed after trying: snowball dust darkening (Abbot & Pierrehumbert 2010) — with Byrne & Goldblatt's
+    forcing the ice melts on CO₂ alone; `climate.snowball_dust_*` never shipped.
+- **Settings** (editor `adv_climate`, lang keys, all four pipeline presets + built-ins synced): `carbon_cycle`,
+  `initial_co2_ppm`, `degassing_scale`, `weathering_strength`, `solar_brightening`, `present_age_gyr`,
+  `orbital_window_myr`, `orbital_strength`, `glacio_eustasy`, `ice_yield_stress_kpa`. Preset-only (physics,
+  numerics, thresholds, per the catalogue's rule): `weathering_temp_per_k`, `runoff_temp_per_k`,
+  `weathering_co2_exponent`, `hydro_sensitivity_per_k`, `hydro_ref_c`, `carbon_step_kyr`, `ebm_clock_years`,
+  `snowball_on/off_frac`, `hothouse_c`, `orbital_step_kyr`, `ice_max_thickness_m`, `ice_response_kyr`,
+  `ice_reference_km3`. `tools/dev/knob_extremes.py --stage climate --length-myr 100` on the 8 numeric knobs: 16 of
+  16 ok (degassing 0 freezes the planet for good: land −63 °C, all ice — as it must without volcanoes).
+- **Measured** (Mac, heavily shared: load 60–110; gates re-run on the tree merged with master 8bdbedc: core 280 + 3 ignored, Gradle 146/0):
+  `cargo test --workspace --release` all pass (core 274 + 3 ignored; new: carbon ODE balance and mass
+  conservation, sealed build-up 350× in 2–4 Myr, Gough, forcing forms, orbit ranges, Kepler annual mean, EDT
+  exact, Nye/eustasy numbers, Imbrie asymmetry, band margins; clock: Earth-like 40 Myr stays 5–25 °C with no
+  snowball, a tropical supercontinent snowballs under a weathering ramp and escapes by degassing (CO₂ ×20+) into a
+  hothouse caused by it, orbital cycles ≥ 20 swings in 3 Myr on a cold planet and none at strength 0 or when warm;
+  coupled pipeline: every ice field, glacier = ice ≥ 1 m, the surface's sea level = the climate's, the curve and
+  window rows, weathering ≈ degassing at the end, frames carry the ice, resume on 3 threads from 1 identical
+  incl. ice fields, curve and globals), clippy `-D warnings`, fmt, `cargo deny` clean; `./gradlew build test`
+  tests=146 failures=0 (`AdvancedSettingsTest` now round-trips toggles). **Earth check** (`climate-dem`, Earth
+  1° relief): EBM 15.28 °C, glaciated 9.9 %, 19 of 24 cities in the right group (unchanged), Earth ice 2.47·10⁷ km³.
+  **Earth-like 500-Myr runs** (`stage climate --preset pipeline_quick_16k`, scattered seed 1 / supercontinent /
+  scattered seed 3): present T 14.5 / 14.3 / 14.0 °C, CO₂ 217 / 210 / 219 ppm, glaciated land 8.1 / 6.6 / 7.7 %,
+  Köppen A .17/.14/.17 B .27/.26/.24 C .21/.16/.18 D .17/.24/.16 E .18/.20/.25, sea level 27 / 29 / 32 m (curve 25),
+  **no snowball**; over the run CO₂ 157–2,665 ppm, T 10.4–17.8 °C, glaciated land 0–18 %, sea level −174…+132 m,
+  degassing 0.66–2.2× Earth; the window's land ice swings 4.9–8.9 / 4.2–7.3 / 4.4–8.5 %. **Snowball scenario**
+  (supercontinent, 1,000 Myr, `degassing_scale` 0.3): one snowball −807.3 → −760.6 Myr (46.7 Myr), onset after a
+  3.7× CO₂ drawdown to 321 ppm with 87 % of the weathering in the tropics (`weathering_drawdown`), T −38 °C,
+  sea level −1.48 km, escape at 5.5·10⁵ ppm (`degassing_buildup`, ×1,720), a 200-kyr hothouse at 36.6 °C, 16.8 m
+  of cap carbonate; present 12.1 °C, 116 ppm, 22 % glaciated, window swings 13.6–22.6 %. The same scenario on the
+  code one commit earlier (cap carbonate on ≤ 200 m shelves: 180–570 m, too thick) gave 6 snowballs (74, 68,
+  40, 35, 31, 26 Myr), each refreezing ~1 Myr after its hothouse; degassing 0.3 from scattered continents: 3;
+  supercontinent at 0.4: none — near the threshold the history is chaotic. Stage cost: climate 108 s vs plates
+  114 s on 3 loaded threads (P1-05: 12 s vs 37 s): the clock's ~6,500 EBM runs (serial) ≈ 45 %, ice ≈ 17 %.
+- **Review bundle** `review/out/deeptime-climate/` (1.8 MB, not published; `_shot.png` is the page as rendered):
+  CO₂, T, sea ice, land ice, ice volume, sea level, degassing, weathering, sun over the run for the snowball
+  scenario and two Earth-like runs; the window's ice, 65° N summer, obliquity, eccentricity; maps (elevation,
+  ice, sea ice, temperature) before, at, during, at the end of and after the snowball. Looked at: the runaway
+  and the escape are clean; the snowball's continents grow by their exposed shelves.
+- **For Ben** (not asked; the report lists them): (1) glacial cycles are ELA-driven (no ice–elevation feedback
+  or ablation-zone flow), so Earth-like swings are ~4 % of the land and ~10–15 m of sea level, not Earth's
+  10 → 25 % and 120 m; (2) post-snowball drawdown has no supply limit, so low-degassing planets can refreeze
+  within ~1 Myr (Earth's Cryogenian interlude was 9–19 Myr); (3) snowball sea-level falls reach ~1.5 km and the
+  surface keeps eroding under the ice and on exposed shelves (glacial erosion should stop fluvial erosion under
+  ice — the glacial-erosion agent's surface work); (4) escape needs ~0.5 bar CO₂ (the land ice keeps its albedo;
+  Pierrehumbert's GCM needs > 0.2 bar, Hoffman et al. 2017 quote 10⁴–10⁵ ppm); (5) `ice_reference_km3` is the
+  Earth-like runs' present ice (1.0·10⁷), not Earth's own (2.5·10⁷) — Earth's would raise present seas ~35 m;
+  (6) the climate stage now costs ~3× what P1-05 did (`carbon_step_kyr` 200 would halve the clock).
+- **Next.** Merge (the caller lands it). The glacial-erosion agent reads the FORMAT.md ice fields; P1-25's
+  climate API could expose CO₂ and the sea level.
+
 ### 2026-09-29 — Block-scale mountain character, ruggedness setting, the striped-snow fix (agent worktree agent-a2d4bbb2f592ce1d7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Decisions log 2026-09-29 ("Do it now, in Phase 1"): P1-08's 6.8 km peak was a smooth dome, and its
   snowfield had vertical stripes.

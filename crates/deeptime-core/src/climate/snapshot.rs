@@ -47,6 +47,26 @@ pub struct Planet {
     /// R / R⊕ of the Earth-normalized mapping (planetary-scale lengths shrink by it).
     pub earth_scale: f64,
     pub m_per_block_h: f64,
+    /// CO₂ forcing against 280 ppm, W/m² (lowers the EBM's longwave A; `carbon.rs`).
+    pub forcing_w_m2: f64,
+    /// The star's luminosity against today's (Gough 1981; `carbon.rs`), × `star_flux_rel`.
+    pub sun_rel: f64,
+    /// The orbit inside the recent ice-age window (`orbit.rs`); `None`: circular at the tilt.
+    pub orbit: Option<super::orbit::OrbitAt>,
+}
+
+impl Planet {
+    /// The EBM of climate section `p` on this planet.
+    pub fn ebm(&self, p: &ClimateParams) -> EbmParams {
+        let mut ep =
+            EbmParams::from_climate(p, self.axial_tilt_deg, self.star_flux_rel * self.sun_rel);
+        ep.a -= self.forcing_w_m2;
+        if let Some(o) = self.orbit {
+            ep.obliquity_rad = o.obliquity_deg.to_radians();
+            ep.orbit = o.orbit();
+        }
+        ep
+    }
 }
 
 /// What a snapshot needs.
@@ -106,6 +126,8 @@ pub struct Snapshot {
     pub ebm_t_global: f64,
     pub ebm_net_toa: f64,
     pub ebm_years: u32,
+    /// The EBM's last year (the stage's ELA and weathering references).
+    pub ebm: Option<super::ebm::EbmResult>,
     /// Mean ITCZ latitude in the months of greatest northward and southward reach, degrees.
     pub itcz_range: (f64, f64),
     /// Land elevation above the sea: median, 90th percentile (m) and share above 2 km (by cell).
@@ -138,13 +160,13 @@ pub fn thornthwaite(t: &[f64; 12]) -> f64 {
 }
 
 /// Band of the EBM holding latitude `lat` (degrees).
-fn band_of(lat: f64, bands: usize) -> usize {
+pub fn band_of(lat: f64, bands: usize) -> usize {
     (((lat + 90.0) / 180.0 * bands as f64).floor() as isize).clamp(0, bands as isize - 1) as usize
 }
 
 /// Per-band means of a per-cell quantity over rows (`None` where a band has no rows: filled from
 /// the nearest band that has some).
-fn band_means(lat: &[f64], w: usize, bands: usize, v: &dyn Fn(usize) -> f64) -> Vec<f64> {
+pub fn band_means(lat: &[f64], w: usize, bands: usize, v: &dyn Fn(usize) -> f64) -> Vec<f64> {
     let mut sum = vec![0.0; bands];
     let mut cnt = vec![0usize; bands];
     for (j, &l) in lat.iter().enumerate() {
@@ -176,7 +198,7 @@ fn band_means(lat: &[f64], w: usize, bands: usize, v: &dyn Fn(usize) -> f64) -> 
 }
 
 /// Interpolates band values to latitude `lat`.
-fn at_lat(lat_deg: &[f64], v: &[[f64; 12]], lat: f64) -> [f64; 12] {
+pub fn at_lat(lat_deg: &[f64], v: &[[f64; 12]], lat: f64) -> [f64; 12] {
     let n = lat_deg.len();
     let x = (lat + 90.0) / 180.0 * n as f64 - 0.5;
     let b0 = x.floor().clamp(0.0, (n - 1) as f64) as usize;
@@ -209,7 +231,7 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
 
     // 1. The EBM on the current land fractions.
     let started = Instant::now();
-    let ep = EbmParams::from_climate(p, inp.planet.axial_tilt_deg, inp.planet.star_flux_rel);
+    let ep = inp.planet.ebm(p);
     let bands = ep.bands;
     let land_frac = band_means(inp.lat, w, bands, &|c| if land[c] { 1.0 } else { 0.0 });
     let years = if ebm.t_ocean.len() == bands {
@@ -330,22 +352,10 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
         barrier_recover: km(p.barrier_recover_km),
     };
     let oro_scale = 365.0 * p.oro_hours_per_day;
-    let refs = Refs {
-        t_mean: t_o.iter().map(|t| t.iter().sum::<f64>() / 12.0).collect(),
-        t_warm: t_o
-            .iter()
-            .map(|t| t.iter().cloned().fold(f64::MIN, f64::max))
-            .collect(),
-        t_cold: t_o
-            .iter()
-            .map(|t| t.iter().cloned().fold(f64::MAX, f64::min))
-            .collect(),
-        ln_precip: inp
-            .lat
-            .iter()
-            .map(|&l| belts::belt_precip(l).ln())
-            .collect(),
-    };
+    // The hydrological cycle follows the global temperature (Held & Soden 2006).
+    let ln_hydro = hydro_ln(p, er.t_global);
+    let refs = zonal_refs(inp.lat, &er, ln_hydro);
+    let hydro = ln_hydro.exp();
     struct Row {
         t_mean: Vec<f32>,
         t_warm: Vec<f32>,
@@ -479,7 +489,7 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
                         base * (1.0 + oro_mm / base.max(1e-9)).max(p.oro_lee_floor)
                     }
                     .max(p.precip_min_mm);
-                    pm[m] = rate / 12.0;
+                    pm[m] = rate * hydro / 12.0;
                 }
                 if inp.monthly {
                     row.t_sl_month.push(t_sl.map(|v| v as f32));
@@ -523,6 +533,7 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
         ebm_t_global: er.t_global,
         ebm_net_toa: er.net_toa(),
         ebm_years: er.years,
+        ebm: Some(er.clone()),
         ..Snapshot::default()
     };
     for r in rows {
@@ -582,6 +593,35 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
     time(&mut millis, "assemble", started);
     s.millis = millis;
     s
+}
+
+/// ln of the hydrological factor at global mean `t_global` °C.
+pub fn hydro_ln(p: &ClimateParams, t_global: f64) -> f64 {
+    p.hydro_sensitivity_per_k * (t_global - p.hydro_ref_c)
+}
+
+/// The zonal references of every row from the EBM's ocean temperatures, with the hydrological
+/// factor `ln_hydro` in the precipitation's.
+pub fn zonal_refs(lat: &[f64], er: &super::ebm::EbmResult, ln_hydro: f64) -> Refs {
+    let t_o: Vec<[f64; 12]> = lat
+        .iter()
+        .map(|&l| at_lat(&er.lat_deg, &er.t_ocean, l))
+        .collect();
+    Refs {
+        t_mean: t_o.iter().map(|t| t.iter().sum::<f64>() / 12.0).collect(),
+        t_warm: t_o
+            .iter()
+            .map(|t| t.iter().cloned().fold(f64::MIN, f64::max))
+            .collect(),
+        t_cold: t_o
+            .iter()
+            .map(|t| t.iter().cloned().fold(f64::MAX, f64::min))
+            .collect(),
+        ln_precip: lat
+            .iter()
+            .map(|&l| belts::belt_precip(l).ln() + ln_hydro)
+            .collect(),
+    }
 }
 
 /// Glaciated and land area (true km²) and the ice's centroid.
