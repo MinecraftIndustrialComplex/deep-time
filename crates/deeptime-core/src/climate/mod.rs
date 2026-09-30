@@ -89,7 +89,23 @@ pub mod field {
     pub const D_LN_PRECIP: &str = "climate/anomaly/ln_precip";
     /// The ELA of every cell, sea included (so it can be interpolated).
     pub const ELA_ALL: &str = "climate/anomaly/ela_m";
+
+    /// Month `m`'s (0–11) sea-level temperature, °C (the lapse rate not applied), written at the
+    /// last step only (the bake stores it, P1-25). Month 0 starts at solar longitude 280°
+    /// (`insolation::YEAR_START_RAD`, about 1 January on Earth).
+    pub fn t_sl_month(m: usize) -> String {
+        format!("climate/month/t_sl_c_{:02}", m + 1)
+    }
+
+    /// Month `m`'s (0–11) precipitation rate, mm/yr (the month's share is the rate / 12), written
+    /// at the last step only.
+    pub fn p_month(m: usize) -> String {
+        format!("climate/month/p_mm_{:02}", m + 1)
+    }
 }
+
+/// Bytes the stage holds per L1 cell (`estimate`).
+const BYTES_PER_CELL: u64 = 110 + 96;
 
 /// Keyframe layers (with the group's plates and surface layers).
 pub const KEYFRAME_LAYERS: [&str; 3] = [field::T_MEAN, field::PRECIP, field::KOPPEN];
@@ -119,7 +135,8 @@ pub struct ClimateStage {
 }
 
 /// Memory and time estimate: the group's (surface or plates) plus ~110 B per L1 cell (13 fields,
-/// eight orographic rasters, an FFT band) and ~2 µs per cell per snapshot plus 0.2 µs per cell per
+/// eight orographic rasters, an FFT band), ~96 B more for the last snapshot's 24 monthly fields
+/// (P1-25), and ~2 µs per cell per snapshot plus 0.2 µs per cell per
 /// step (the advection between snapshots).
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let c = p.climate.clone().unwrap_or_default();
@@ -134,7 +151,7 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let steps = p.plate_steps() as f64;
     let snaps = (p.length_myr() / c.snapshot_every_myr).ceil() + 2.0;
     StageEstimate {
-        bytes: group.bytes + cells * 110,
+        bytes: group.bytes + cells * BYTES_PER_CELL,
         seconds: cells as f64 * (snaps * 2.0e-6 + steps * 0.2e-6),
         history_bytes: group.history_bytes,
     }
@@ -228,7 +245,7 @@ impl ClimateStage {
                 })
         };
         if self.s.done == 0 {
-            ctx.reserve(n as u64 * 110)?;
+            ctx.reserve(n as u64 * BYTES_PER_CELL)?;
         }
 
         // Where the crust went this plate step, and the ground the surface will erode.
@@ -311,6 +328,7 @@ impl ClimateStage {
                 sea,
                 p: &self.p,
                 planet,
+                monthly: last,
             };
             let sheet = std::mem::take(&mut self.s.sheet);
             let mut ebm = std::mem::take(&mut self.s.ebm);
@@ -358,6 +376,13 @@ impl ClimateStage {
             put(world, field::D_WARM, s.d_warm);
             put(world, field::D_COLD, s.d_cold);
             put(world, field::D_LN_PRECIP, s.d_ln_precip);
+            let monthly = s.t_sl_month.len() == 12 && s.p_month.len() == 12;
+            for (m, (t, p)) in s.t_sl_month.into_iter().zip(s.p_month).enumerate() {
+                if monthly && t.len() == n && p.len() == n {
+                    put(world, &field::t_sl_month(m), t);
+                    put(world, &field::p_month(m), p);
+                }
+            }
             self.time("snapshot", started);
         } else {
             // Carry the geographic part with the plates; the zonal part stays with the latitude.

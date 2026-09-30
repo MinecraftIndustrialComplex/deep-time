@@ -649,7 +649,19 @@ fn main() -> ExitCode {
                         out.display(),
                         started.elapsed().as_secs_f64()
                     );
-                    ExitCode::SUCCESS
+                    // P1-25: the climate API's evaluator beside it, when the world has the months.
+                    let cout = out.with_file_name("climate.json");
+                    match parity::run_climate(&world_data, &cout, columns, seed) {
+                        Ok(Some(k)) => {
+                            println!("deeptime parity: {k} climate samples -> {}", cout.display());
+                            ExitCode::SUCCESS
+                        }
+                        Ok(None) => ExitCode::SUCCESS,
+                        Err(e) => {
+                            eprintln!("deeptime parity (climate): {e}");
+                            ExitCode::FAILURE
+                        }
+                    }
                 }
                 Err(e) => {
                     eprintln!("deeptime parity: {e}");
@@ -1353,7 +1365,7 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
-    /// P1-08: `run` bakes a planet run (every chunk-time layer, format 0.1), `parity` writes the
+    /// P1-08: `run` bakes a planet run (every chunk-time layer, format 0.2), `parity` writes the
     /// fixture from it and `inspect-column` answers a column, all through the one evaluator.
     #[test]
     fn a_planet_run_bakes_and_parity_samples_it() {
@@ -1385,7 +1397,7 @@ mod tests {
         })
         .unwrap();
         let m = deeptime_format::Manifest::read(&dir.join("world")).unwrap();
-        assert_eq!(m.format_version, "0.1");
+        assert_eq!(m.format_version, "0.2");
         assert_eq!(m.notes["bake"]["baked"], true);
         let out = dir.join("world/parity/columns.json");
         let (n, _) = super::parity::run(&dir.join("world"), &out, 60, 7).unwrap();
@@ -1405,6 +1417,29 @@ mod tests {
                 text.contains(&fresh),
                 "the fixture holds what the evaluator says: {fresh}"
             );
+        }
+        // P1-25: the climate fixture, and the evaluator it holds.
+        let cout = dir.join("world/parity/climate.json");
+        assert_eq!(
+            super::parity::run_climate(&dir.join("world"), &cout, 30, 7).unwrap(),
+            Some(30)
+        );
+        let ctext = String::from_utf8(std::fs::read(&cout).unwrap()).unwrap();
+        let cdoc: serde_json::Value = serde_json::from_str(&ctext).unwrap();
+        let cw = deeptime_format::ClimateWorld::open(&dir.join("world"))
+            .unwrap()
+            .expect("a planet run bakes the twelve months");
+        for s in cdoc["samples"].as_array().unwrap() {
+            let (x, y, z) = (
+                s["x"].as_i64().unwrap(),
+                s["y"].as_i64().unwrap() as i32,
+                s["z"].as_i64().unwrap(),
+            );
+            let fresh = cw.sample(x, y, z);
+            assert!(ctext.contains(&fresh.to_json().to_string()));
+            assert!(fresh.t_warm >= fresh.t_mean && fresh.t_mean >= fresh.t_cold);
+            let p: f64 = fresh.p_month.iter().sum();
+            assert!((p - fresh.p_annual).abs() < 1e-6 * fresh.p_annual.max(1.0));
         }
         let v = w.inspect(-2047, 300);
         assert_eq!(v["wx"], -2047);
