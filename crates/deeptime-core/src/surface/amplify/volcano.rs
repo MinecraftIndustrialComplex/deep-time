@@ -168,6 +168,20 @@ impl Shaper {
         self.items.is_empty()
     }
 
+    /// Per L1 cell of `grid` (row-major), how much of the mountain character's fold ridges to keep:
+    /// 0 over a shaped volcano's body, rising to 1 at 1.3 radii.
+    pub fn fold_keep(&self, grid: &GridDesc) -> Vec<f32> {
+        let mut keep = vec![1.0f32; grid.cells()];
+        for it in &self.items {
+            vol::for_cells(grid, self.mh, it.x, it.z, 1.3 * it.radius_m, |c, dx, dz| {
+                let rho = dx.hypot(dz) / it.radius_m;
+                let k = smooth(0.9, 1.3, rho) as f32;
+                keep[c] = keep[c].min(k);
+            });
+        }
+        keep
+    }
+
     /// Adds the young-grid band to the ladder's first level (the L2 terrain). Returns the cells
     /// changed.
     pub fn sharpen_level(&self, level: &mut Level, grid: &GridDesc) -> usize {

@@ -11,15 +11,19 @@ use std::time::Instant;
 
 use deeptime_format::{Codec, DType, GridDesc, LayerDesc, TilePackWriter, Written};
 
-use super::kernels::{Buf, Counts, NoiseCfg, Physics, Times, count_sinks, relief5, run_passes};
+use super::character::{self, CharacterCtx, CharacterStats, Scratch};
+use super::kernels::{
+    Buf, Counts, NoiseCfg, Physics, Times, count_sinks, flood_repair, relief5, run_passes,
+};
 use super::resample::Level;
 use super::window::Win;
 use crate::error::CoreError;
 use crate::surface::detail::DetailParams;
 
 /// Bytes per cell of a window while a tile runs: the passes' arrays ([`Buf`]), the copy of the
-/// terrain the change is measured against, and the core's arrays handed to the sink.
-pub const TILE_BYTES_PER_CELL: u64 = Buf::BYTES_PER_CELL + 4 + 17;
+/// terrain the change is measured against, the core's arrays handed to the sink, and the mountain
+/// character's copy of the terrain before it.
+pub const TILE_BYTES_PER_CELL: u64 = Buf::BYTES_PER_CELL + 4 + 17 + 4;
 /// Bytes per cell of a [`Level`] (terrain, area, weight, erodibility, lake).
 pub const LEVEL_BYTES_PER_CELL: u64 = 17;
 
@@ -336,6 +340,13 @@ pub struct LastStats {
     pub times: Times,
     pub sample_ms: f64,
     pub detail_ms: f64,
+    /// The mountain character (the last level, ruggedness > 0), and the flood after it.
+    pub character: CharacterStats,
+    pub character_flood_raised_cells: u64,
+    /// Cells the character was softened on around pits it closed.
+    pub character_softened_cells: u64,
+    pub character_flood_max_raise_m: f32,
+    pub character_ms: f64,
     pub sink_ms: f64,
 }
 
@@ -353,6 +364,8 @@ pub struct TileCfg<'a> {
     /// The last level: the detail amplitude and the preview are made. An earlier level hands the
     /// sink the arrays of the next one instead ([`LevelTile`]).
     pub last: bool,
+    /// The mountain character the last level gets after its passes (None: ruggedness 0).
+    pub character: Option<CharacterCtx<'a>>,
 }
 
 /// Runs one ×2 level tile by tile from `level` into `sink`: the last level into the L3 layers,
@@ -397,6 +410,76 @@ pub fn run_tiles(
         buf.core = (cx, cy, core.2, core.3);
         let before = buf.z.clone();
         let pass = run_passes(&mut buf, &cfg.ph, &cfg.counts, &cfg.noise, &mut stats.times);
+        if let (true, Some(cc)) = (cfg.last, cfg.character.as_ref()) {
+            // Mountain character, then a flood so the surface still drains (the arrays the
+            // passes are done with are its scratch).
+            let started = Instant::now();
+            let z_pre = buf.z.clone();
+            let st = character::apply(
+                &win,
+                &mut buf.z,
+                &buf.a,
+                &buf.kfac,
+                &buf.lake,
+                Scratch {
+                    base: &mut buf.norm,
+                    smooth: &mut buf.a2,
+                    relief: &mut buf.cap,
+                    blur: &mut buf.tmult,
+                    acc: &mut buf.sed2,
+                    tmp: &mut buf.own,
+                    tmp2: &mut buf.z2,
+                },
+                cc,
+                buf.core,
+            );
+            // Where the character closed a deep pit (a gully dammed by its neighbour's crest), it
+            // is softened back towards the passes' terrain before the flood, so the flood fills
+            // puddles, not 20-block basins.
+            // (The character's scratch is free again: `a2` holds the flooded surface, `norm`
+            // the spread pit depth.)
+            buf.a2.copy_from_slice(&buf.z);
+            flood_repair(
+                &win,
+                &mut buf.a2,
+                &buf.lake,
+                cfg.ph.sea,
+                cfg.ph.eps_m,
+                &mut buf.z2,
+                buf.core,
+            );
+            let softened = character::soften_pits(
+                &win,
+                &mut buf.z,
+                &z_pre,
+                &buf.a2,
+                &mut buf.z2,
+                &mut buf.own,
+                &mut buf.norm,
+                cc,
+                buf.core,
+            );
+            drop(z_pre);
+            let fl = flood_repair(
+                &win,
+                &mut buf.z,
+                &buf.lake,
+                cfg.ph.sea,
+                cfg.ph.eps_m,
+                &mut buf.z2,
+                buf.core,
+            );
+            stats.character.land_cells += st.land_cells;
+            stats.character.abs_change_blocks_cells += st.abs_change_blocks_cells;
+            stats.character.max_raise_blocks =
+                stats.character.max_raise_blocks.max(st.max_raise_blocks);
+            stats.character.max_cut_blocks = stats.character.max_cut_blocks.max(st.max_cut_blocks);
+            stats.character_flood_raised_cells += fl.raised_cells;
+            stats.character_softened_cells += softened;
+            stats.character_flood_max_raise_m =
+                stats.character_flood_max_raise_m.max(fl.max_raise_m);
+            stats.character_ms += started.elapsed().as_secs_f64() * 1000.0;
+        }
         let (_, _, cw, ch) = core;
         let started = Instant::now();
         stats.sinks += count_sinks(&win, &buf.z, &buf.lake, sea, (cx, cy, cw, ch));

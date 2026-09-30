@@ -3,7 +3,7 @@
   "sections": {
     "planet": "The world itself: its seed, gravity, day, tilt, sunlight and oceans.",
     "scale": "How much real planet one block stands for, across and up.",
-    "terrain": "How the land looks: how steep the slopes are, how deeply rivers carve them and how many volcanoes stand on it.",
+    "terrain": "How the land looks: how steep the slopes are, how deeply rivers carve them, how rugged mountains are and how many volcanoes stand on it.",
     "multipliers": "Scale deposits and terrain features up or down, relative to the preset.",
     "biomes": "Where the pack's biomes go on the simulated climate: shifts, beaches, patch sizes, swamps.",
     "fantasy": "Terrain beyond geology. It arrives in Phase 3, so these stay off for now.",
@@ -28,6 +28,7 @@
     { "id": "m_per_block_v", "section": "scale", "kind": "number", "path": "scale.m_per_block_v", "min": 1, "max": 200, "unit": "m", "hint": "Metres of planet per block, up and down: smaller values make taller terrain." },
     { "id": "drama", "section": "terrain", "kind": "number", "path": "surface.drama", "min": 0, "max": 2, "unit": "", "hint": "Steepness of slopes and the strength of fine terrain detail. 1 is as simulated." },
     { "id": "carving", "section": "terrain", "kind": "number", "path": "amplify.incision_cap", "min": 0.25, "max": 10, "unit": "×", "stops": [{ "label": "Subtle", "value": 0.5 }, { "label": "Medium", "value": 3 }, { "label": "Dramatic", "value": 10 }], "hint": "How deeply rivers may cut valleys into the finished terrain, as a multiple of the local relief. Subtle 0.5, medium 3 (the default), dramatic 10 (practically no limit)." },
+    { "id": "ruggedness", "section": "terrain", "kind": "number", "path": "amplify.ruggedness", "min": 0, "max": 2, "unit": "×", "stops": [{ "label": "Smooth", "value": 0 }, { "label": "Gentle", "value": 0.5 }, { "label": "Natural", "value": 1 }, { "label": "Wild", "value": 1.6 }], "hint": "Block-scale mountain character: ridges and gullies down the slopes along the simulated drainage, cliff bands on hard rock, sharp young peaks and rounded old ones. 0 leaves the simulated terrain smooth; 1 (the default) is the look the planets are tuned for." },
     { "id": "volcano_density", "section": "terrain", "kind": "number", "path": "volcanoes.density", "min": 0, "max": 5, "unit": "×", "stops": [{"label": "None", "value": 0}, {"label": "Earth-like", "value": 1}, {"label": "Many", "value": 2.5}], "hint": "How many volcanoes stand along volcanic arcs and hotspot tracks, relative to Earth's spacing: 2 packs them twice as close, 0 makes none (flood basalts still come from the plates)." },
     { "id": "volcano_size", "section": "terrain", "kind": "number", "path": "volcanoes.size", "min": 0.2, "max": 3, "unit": "×", "stops": [{"label": "Small", "value": 0.5}, {"label": "Earth-like", "value": 1}, {"label": "Huge", "value": 2}], "hint": "How tall and wide volcanoes grow, and how big their calderas are, relative to real ones (a stratovolcano 1–3 km high, a shield island up to 6 km above the sea floor)." },
     { "id": "deposit_count", "section": "multipliers", "kind": "number", "path": "deposits.count_mult", "min": 0, "max": 10, "unit": "×", "hint": "How many ore deposits form, relative to the preset." },

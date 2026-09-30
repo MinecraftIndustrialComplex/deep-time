@@ -54,7 +54,8 @@ public final class WaterGameTests {
 
     /** One count over the box. */
     record Count(long expected, long sources, long outside, int columns, int shoreColumns, long analytic,
-                 int floorCornerMaxDiff, int cornerColumns, List<BlockPos> water, String detail) {}
+                 int floorCornerMaxDiff, int cornerColumns, List<BlockPos> water, String detail,
+                 java.util.Map<Long, Integer> floors, int washable) {}
 
     /**
      * Counts the water sources in the basin after generation, wakes every one of them with a fluid
@@ -107,10 +108,23 @@ public final class WaterGameTests {
 
             DeepTime.LOGGER.info("[gametest] lakeHolds before={} after={} expected={} outside={} outsideAtGeneration={} "
                             + "columns={} shoreColumns={} reach={} woken={} ticks={} generatedFluidTicks={} pendingFluidTicksAfter={} "
-                            + "analytic={} floorCornerMaxDiff={} cornerColumns={} chunks={}",
+                            + "analytic={} floorCornerMaxDiff={} cornerColumns={} chunks={} washable={}",
                     before.sources(), after.sources(), before.expected(), after.outside(), before.outside(),
                     before.columns(), before.shoreColumns(), reach, before.water().size(), WAIT_TICKS, generatedTicks,
-                    pendingAfter, before.analytic(), before.floorCornerMaxDiff(), before.cornerColumns(), chunks.size());
+                    pendingAfter, before.analytic(), before.floorCornerMaxDiff(), before.cornerColumns(), chunks.size(),
+                    before.washable());
+            // Columns whose floor moved while the lake was awake (what washed away, or filled).
+            StringBuilder moved = new StringBuilder();
+            for (var e : after.floors().entrySet()) {
+                Integer f0 = before.floors().get(e.getKey());
+                if (!e.getValue().equals(f0) && moved.length() < 800) {
+                    BlockPos c = BlockPos.of(e.getKey());
+                    moved.append(String.format(" (%d,%d) floor %s -> %d, block %s;", c.getX(), c.getZ(), f0, e.getValue(),
+                            f0 == null ? "?" : level.getBlockState(new BlockPos(c.getX(), f0, c.getZ()))));
+                }
+            }
+            if (moved.length() > 0)
+                DeepTime.LOGGER.info("[gametest] lakeHolds floors moved:{}", moved);
             if (!before.detail().isEmpty() || !after.detail().isEmpty())
                 DeepTime.LOGGER.info("[gametest] lakeHolds escaped water: atGeneration{} after{}", before.detail(), after.detail());
             double waterLevel = lake.get("water_level_y").getAsDouble();
@@ -127,8 +141,9 @@ public final class WaterGameTests {
                     "after generation " + before.sources() + " sources of " + before.expected() + " expected");
             helper.assertTrue(before.outside() == 0, before.outside() + " water blocks outside the lake after generation");
             helper.assertTrue(pendingAfter == 0, pendingAfter + " fluid ticks still pending after " + WAIT_TICKS + " ticks");
-            helper.assertTrue(after.sources() == before.expected(),
-                    "after " + WAIT_TICKS + " ticks " + after.sources() + " sources of " + before.expected() + " expected");
+            helper.assertTrue(after.sources() >= before.expected() && after.sources() <= before.expected() + before.washable(),
+                    "after " + WAIT_TICKS + " ticks " + after.sources() + " sources of " + before.expected() + " expected (+ up to "
+                            + before.washable() + " washable plants at the waterline)");
             helper.assertTrue(after.outside() == 0, after.outside() + " water blocks outside the lake after " + WAIT_TICKS + " ticks");
             helper.assertTrue(centre[2] == wantTop, "water top at the lake centre is y " + centre[2] + ", want " + wantTop);
             helper.succeed();
@@ -164,6 +179,8 @@ public final class WaterGameTests {
         int columns = 0, shore = 0, cornerMax = 0, corners = 0;
         List<BlockPos> water = new ArrayList<>();
         StringBuilder detail = new StringBuilder();
+        java.util.Map<Long, Integer> floors = new java.util.HashMap<>();
+        int washable = 0;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int x = box.minX(); x <= box.maxX(); x++) {
             for (int z = box.minZ(); z <= box.maxZ(); z++) {
@@ -172,10 +189,16 @@ public final class WaterGameTests {
                 int top = Integer.MIN_VALUE, floor = Integer.MIN_VALUE;
                 if (!Double.isNaN(wl)) {
                     top = WaterLevels.topWaterBlock(wl);
+                    // A plant or snow layer at the waterline is not a wall: flowing water washes it
+                    // away and the block becomes a source (not a leak).
+                    BlockState atTop = chunk.getBlockState(pos.set(x, top, z));
+                    if (!open(atTop) && atTop.canBeReplaced(net.minecraft.world.level.material.Fluids.WATER))
+                        washable++;
                     floor = top;
                     while (floor > level.getMinBuildHeight() && open(chunk.getBlockState(pos.set(x, floor, z))))
                         floor--;
                     if (top > floor) {
+                        floors.put(BlockPos.asLong(x, 0, z), floor);
                         columns++;
                         if (Double.isNaN(levels.nearest(x, z)))
                             shore++;
@@ -213,7 +236,8 @@ public final class WaterGameTests {
                 }
             }
         }
-        return new Count(expected, sources, outside, columns, shore, analytic, cornerMax, corners, water, detail.toString());
+        return new Count(expected, sources, outside, columns, shore, analytic, cornerMax, corners, water, detail.toString(),
+                floors, washable);
     }
 
     /** Air or a water block (source or flowing): what the lake should fill. */

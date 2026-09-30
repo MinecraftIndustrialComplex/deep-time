@@ -15,6 +15,9 @@
 #   --size WxH    window size (default the game's 854x480, the size of P1-11's laptop set)
 #   --timeout S   per client pass, default 1200
 #   --lease-wait  how long to wait for the Mac's desktop (graphide's M6 lock), default 600 s
+#   --prop K=V    a ScreenshotDriver property for the main pass (repeatable), as -Ddeeptime.dev.screenshots.K=V:
+#                 start=<start>, length=<Myr>, vista=x,y,z,yaw,pitch[;...] (mountain vistas after the
+#                 in-world shot, 11-vista-<n>.png)
 #
 # Steps: (1) tools/remote/mac.sh syncs this checkout and runs `./gradlew classes gametestClasses
 # createClientLaunchScript linkRunModsClient` (Deep Time's classes and host natives, ModDevGradle's
@@ -32,13 +35,15 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 REPO="$(git rev-parse --show-toplevel)"
 
-NAME=mac-client; BUILD=1; PASS=()
+NAME=mac-client; BUILD=1; PASS=(); PROPS=
 while [ $# -gt 0 ]; do
     case "$1" in
         --name) NAME="$2"; shift 2 ;;
         --no-build) BUILD=0; shift ;;
         --no-guidance|--no-create) PASS+=("$1"); shift ;;
         --size|--timeout|--lease-wait) PASS+=("$1" "$2"); shift 2 ;;
+        --prop) [[ "$2" =~ ^[a-z]+=[-0-9.,\;a-z_]+$ ]] || { echo "mac-screenshots: bad --prop $2" >&2; exit 2; }
+                PROPS="$PROPS -Ddeeptime.dev.screenshots.$2"; shift 2 ;;
         -h|--help) sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//' | sed '$d'; exit 0 ;;
         *) echo "mac-screenshots: unknown argument $1 (see --help)" >&2; exit 2 ;;
     esac
@@ -60,7 +65,7 @@ mcl_stop_on_interrupt
 rm -rf "review/out/$NAME"
 set +e
 tools/remote/mac.sh --no-sync --server --pull "review/out/$NAME" -- \
-    "tools/client/mac-client.sh --name $NAME --m6lock '$CACHE/m6lock.sh' ${PASS[*]:-}"
+    "MC_SHOT_PROPS='$PROPS' tools/client/mac-client.sh --name $NAME --m6lock '$CACHE/m6lock.sh' ${PASS[*]:-}"
 status=$?
 set -e
 trap - INT TERM

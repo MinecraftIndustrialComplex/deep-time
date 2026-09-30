@@ -21,8 +21,10 @@
 //! 1. **Motion.** Every volcano and flood-basalt province turns with the Ω of its plate (the plate
 //!    model's finite rotation, as `surface::advect`); oceanic crust carried under another plate
 //!    takes its volcanoes with it (subducted).
-//! 2. **Measure.** Each volcano's height now: the surface's relief at its centre above the mean of
-//!    a ring just outside its foot, divided by the weight the L1 rendering of its body has there.
+//! 2. **Erosion.** Each volcano loses what the surface stage just took off it: the surface's net
+//!    change of the step over its footprint (`surface/material_m`), fitted as dH × the body's
+//!    rendered weight plus a uniform part (erosion of the cone lowers it, sediment filling round it
+//!    buries it, a change of the whole area does neither).
 //! 3. **Arcs.** The arc flux of each cell is the deposit engine's `arc_magma_flux` (the plate
 //!    model's `ARC` flag × min(1, convergence / 80 mm/yr), × 0.7 on oceanic crust). A
 //!    stratovolcano is active while its planned life lasts and the flux within a cell of it is at
@@ -445,32 +447,6 @@ impl L1<'_> {
         out
     }
 
-    /// The rendered weight of `prof` at the volcano's centre (bilinear over the four cells round
-    /// it, as `sample_at` reads the surface there).
-    fn centre_weight(&self, x: f64, z: f64, radius_m: f64, prof: &dyn Fn(f64) -> f64) -> f64 {
-        let g = self.grid;
-        let r = f64::from(g.r);
-        let fi = (x - g.origin_block_x as f64) / r;
-        let fj = (z - g.origin_block_z as f64) / r;
-        let (i0, j0) = (fi.floor(), fj.floor());
-        let (ti, tj) = (fi - i0, fj - j0);
-        let frame = BlockFrame::new(g.circumference() as u32);
-        let mut s = 0.0;
-        for (di, dj, w) in [
-            (0.0, 0.0, (1.0 - ti) * (1.0 - tj)),
-            (1.0, 0.0, ti * (1.0 - tj)),
-            (0.0, 1.0, (1.0 - ti) * tj),
-            (1.0, 1.0, ti * tj),
-        ] {
-            let bx = g.origin_block_x as f64 + (i0 + di) * r;
-            let bz = g.origin_block_z as f64 + (j0 + dj) * r;
-            let dx = frame.wrap_x(bx - x) * self.mh;
-            let dz = (bz - z) * self.mh;
-            s += w * shape::cell_weight(prof, dx, dz, self.cell_m, radius_m);
-        }
-        s
-    }
-
     /// The ground around a foot: the lower quartile of the elevation over a ring from 1.05 R to
     /// 1.05 R + 1.5 cells.
     fn base(&self, x: f64, z: f64, radius_m: f64) -> f64 {
@@ -490,22 +466,6 @@ impl L1<'_> {
         ring[ring.len() / 4]
     }
 
-    /// The volcano's body height now (its relief over the ring, per the centre's weight) and
-    /// the ring's elevation.
-    fn measure(&self, v: &Volcano) -> (f64, f64) {
-        let s = v.shape();
-        let prof = |r: f64| s.body(r);
-        let base = self.base(v.x, v.z, v.radius_m);
-        let centre =
-            sample_at(self.grid, self.elev, v.x, v.z) + sample_at(self.grid, &self.delta, v.x, v.z);
-        let w = self.centre_weight(v.x, v.z, v.radius_m, &prof);
-        let h = if w > 1e-3 {
-            ((centre - base) / w).max(0.0)
-        } else {
-            0.0
-        };
-        (h, base)
-    }
 }
 
 impl VolcanoStage {
@@ -591,6 +551,12 @@ impl VolcanoStage {
         let flags = get(&world.fields, "plates/flags")?;
         let conv = get(&world.fields, "plates/convergence_mm_yr")?;
         let thick = get(&world.fields, "plates/thickness_m")?;
+        // The surface stage's net change of this step (erosion −, deposition +), per cell.
+        let material = world
+            .fields
+            .get(crate::surface::field::MATERIAL)
+            .filter(|f| f.data.len() == n)
+            .map(|f| f.data.clone());
         let mut st = world.volcanoes.take().unwrap_or_else(|| VolcanoState {
             omega: omega_now.clone(),
             fade_myr: p.fade_myr,
@@ -668,11 +634,22 @@ impl VolcanoStage {
         // Log changes: (cell, thickness (negative = erode), class) in order.
         let mut log_ops: Vec<(usize, f32, u16)> = Vec::new();
 
-        // 2. Measure: the relief over its foot, never more than the volcano ever stood (the
-        // measure alone would also count a ridge it sits on).
+        // 2. Erosion: each edifice loses what the surface stage just took off it — its net change
+        // over the footprint fitted as dH · (the body's weight) + a uniform part, so erosion
+        // concentrated on the cone lowers it and sediment filling round it buries it, while a
+        // change of the whole area does neither. The relief measured over its foot would also
+        // count the ridge or the chain neighbour beside it.
         let started = Instant::now();
-        for v in &mut st.volcanoes {
-            v.height_m = l1.measure(v).0.min(v.peak_m);
+        if let Some(m) = &material {
+            for v in &mut st.volcanoes {
+                let sh = v.shape();
+                let prof = |r: f64| sh.body(r);
+                let mut cells = Vec::new();
+                for_cells(&grid, mh, v.x, v.z, 1.3 * v.radius_m + cell_m, |c, dx, dz| {
+                    cells.push((c, shape::cell_weight(&prof, dx, dz, cell_m, v.radius_m)));
+                });
+                v.height_m = (v.height_m + fit_change(&cells, m)).clamp(0.0, v.peak_m);
+            }
         }
         self.time("measure", started);
 
@@ -956,8 +933,7 @@ impl VolcanoStage {
                 continue;
             }
             // New volcanoes are measured now; the others were measured before the births.
-            let (h, base) = l1.measure(v);
-            v.height_m = h.min(v.peak_m);
+            let base = l1.base(v.x, v.z, v.radius_m);
             let target = match v.kind {
                 Kind::Strato => {
                     let f = v.flux_last;
@@ -1631,6 +1607,23 @@ pub fn place_arcs(
         out.push((bx, bz, c));
     }
     out
+}
+
+/// The least-squares dH of `m[c] ≈ dH · w + b` over the cells (c, w) of a footprint: the change
+/// of an edifice's height from a field of per-cell changes.
+pub fn fit_change(cells: &[(usize, f64)], m: &[f32]) -> f64 {
+    if cells.len() < 3 {
+        return 0.0;
+    }
+    let k = cells.len() as f64;
+    let wm = cells.iter().map(|&(_, w)| w).sum::<f64>() / k;
+    let mm = cells.iter().map(|&(c, _)| f64::from(m[c])).sum::<f64>() / k;
+    let (mut cov, mut var) = (0.0, 0.0);
+    for &(c, w) in cells {
+        cov += (w - wm) * (f64::from(m[c]) - mm);
+        var += (w - wm) * (w - wm);
+    }
+    if var > 1e-9 { cov / var } else { 0.0 }
 }
 
 /// Arc crust deeper than this below the sea makes no volcano (a trench, not an arc), m.
