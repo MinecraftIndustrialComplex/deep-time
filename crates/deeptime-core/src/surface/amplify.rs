@@ -41,6 +41,7 @@ pub mod character;
 pub mod kernels;
 pub mod resample;
 pub mod tiles;
+pub mod volcano;
 pub mod window;
 
 #[cfg(test)]
@@ -742,7 +743,13 @@ impl AmplifyStage {
         let c = self.preset.scale.circumference_blocks;
         let l3 = GridDesc::for_planet("L3", c, r.l3_r)?;
         let cfg = self.config(sea);
-        let fields = CharacterFields::from_world(world, r.l1_r, r.l3_r, &self.p.character);
+        let mut fields = CharacterFields::from_world(world, r.l1_r, r.l3_r, &self.p.character);
+        // Volcanoes (P1-21) keep their cones: no fold ridges over them.
+        let shaper = volcano::Shaper::from_world(world, &self.preset);
+        if let Some(sh) = &shaper {
+            let l1 = GridDesc::for_planet("L1", c, r.l1_r)?;
+            fields.suppress_folds(&sh.fold_keep(&l1));
+        }
         // The youth and fold strength the character read, for the keyframes and the workbench.
         if !fields.neutral {
             let l1 = GridDesc::for_planet("L1", c, r.l1_r)?;
@@ -757,7 +764,14 @@ impl AmplifyStage {
                 );
             }
         }
-        let level = level_from_world(world, &self.preset)?;
+        let mut level = level_from_world(world, &self.preset)?;
+        // Volcanoes (P1-21): the cone put in place at L2 before the erosion passes, the rest at
+        // L3 after the character pass (the sink below).
+        let mut volcano_cells = 0;
+        if let Some(sh) = &shaper {
+            let g2 = GridDesc::for_planet("L2", c, r.l2_r)?;
+            volcano_cells = sh.sharpen_level(&mut level, &g2);
+        }
         let (gw, gh) = (l3.w as usize, l3.h as usize);
 
         // Whole raster in memory, or tile by tile (plan §5.7.5: streams automatically when the
@@ -783,17 +797,34 @@ impl AmplifyStage {
         let mut sink = PackSink::create(ctx.out_dir, &l3, 256, sea, cfg.sea_y, cfg.mv)?;
         let setup_ms = started.elapsed().as_secs_f64() * 1000.0;
         let cancelled = || ctx.cancelled();
-        let out = run(
-            level,
-            n_dbl,
-            &cfg,
-            cfg.character(&fields),
-            plan,
-            &mut sink,
-            &cancelled,
-            &reserve,
-        )?;
+        let character = cfg.character(&fields);
+        let mut out = match &shaper {
+            Some(sh) => {
+                let mut shaped = volcano::Sink {
+                    inner: &mut sink,
+                    shaper: sh,
+                    grid: l3.clone(),
+                };
+                run(
+                    level,
+                    n_dbl,
+                    &cfg,
+                    character,
+                    plan,
+                    &mut shaped,
+                    &cancelled,
+                    &reserve,
+                )?
+            }
+            None => run(
+                level, n_dbl, &cfg, character, plan, &mut sink, &cancelled, &reserve,
+            )?,
+        };
         let files = sink.finish()?;
+        if let Some(sh) = &shaper {
+            let (pw, ps) = (out.preview.w, out.preview.stride);
+            sh.shape_block(&l3, 0, 0, pw, ps, &mut out.preview.z_m);
+        }
 
         // The thinned copies (keyframes, the workbench) …
         let s = out.preview.stride;
@@ -906,6 +937,10 @@ impl AmplifyStage {
             "millis": {"setup": setup_ms, "total": total_ms},
             "preview": {"w": out.preview.w, "h": out.preview.h, "stride": s},
             "layers": [layer(&files.elevation), layer(&files.amplitude)],
+            "volcanoes": {
+                "shaped": shaper.as_ref().map_or(0, volcano::Shaper::len),
+                "l2_cells": volcano_cells,
+            },
         });
         world.notes.insert(STAGE_NAME.into(), note.to_string());
         ctx.log.push(crate::log::Level::Info, summary_line(&note));

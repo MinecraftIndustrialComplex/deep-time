@@ -135,6 +135,8 @@ public final class BiomeGameTests {
     // BW 0.793 / 0.931, BS 0.610 / 0.519, C 0.881 / 0.891, D 1.0 / 1.0, Dsub 0.961 / 0.970, E 1.0 / 0.991,
     // BW:desert 0.690 / 0.816, Dfc:taiga 0.952 / 0.435, E:snow 0.824 / 0.991. The three below their floors
     // take the same rule (0.1 under the lower); the others keep theirs, which the rule would only raise.
+    // P1-21 (volcano branch, before this re-set, not combined with it) had measured E:snow 0.899
+    // standalone with the volcano stage and EF's barren frozen ground; the lower floor above covers both.
     static final Map<String, Double> FLOORS = Map.ofEntries(
             Map.entry("A", 0.6), Map.entry("Af", 0.6), Map.entry("BW", 0.65), Map.entry("BS", 0.42), Map.entry("C", 0.75),
             Map.entry("D", 0.9), Map.entry("Dsub", 0.85), Map.entry("E", 0.9), Map.entry("sea", 0.95),

@@ -275,6 +275,25 @@
         [400, "#053061"]
       ]
     },
+    "volcanoes": {
+      "_comment": "Volcano map codes 1-7 (surface/volcanoes): active stratovolcano, dead stratovolcano, active shield, dead shield or seamount, silicic centre, caldera, flood basalt; NaN elsewhere.",
+      "stops": [
+        [1, "#ff3b1f"],
+        [1.999, "#ff3b1f"],
+        [2, "#b0724a"],
+        [2.999, "#b0724a"],
+        [3, "#ffc02e"],
+        [3.999, "#ffc02e"],
+        [4, "#4f8fd6"],
+        [4.999, "#4f8fd6"],
+        [5, "#d45cff"],
+        [5.999, "#d45cff"],
+        [6, "#ff79c6"],
+        [6.999, "#ff79c6"],
+        [7, "#9a8a7a"],
+        [7.999, "#9a8a7a"]
+      ]
+    },
     "regime": {
       "_comment": "Tectonic regime codes 0-9: ocean basin, ridge, trench, arc, back-arc, collision, rift, hotspot, craton, passive margin (plates/state.rs).",
       "stops": [
@@ -596,6 +615,8 @@
     "plates": "plates",
     "crust_age": "crust_age",
     "regime": "regime",
+    "volcanoes/map": "volcanoes",
+    "volcanoes/flood_basalt": "unit",
     "surface/erosion_m_myr": "erosion",
     "surface/deposition_m_myr": "deposition",
     "surface/sediment_m": "sediment",
