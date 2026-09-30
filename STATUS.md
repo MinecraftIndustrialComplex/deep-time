@@ -106,23 +106,59 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   positive so scarlet mountains stay off them, and the threshold −0.27 (not vanilla's −0.375) is where MIC's stretched erosion leaves no
   negative cell in scarlet's band (at −0.375 the box kept 11 % scarlet; −0.27 gives 0). Planet-wide glaciated EF, emulated: MIC ice 40 /
   snow 56 / barren 4 %, scarlet 0.2 %, cherry 0; identity mapping ice 48 / snow 36–47 / barren 6–12 %, cherry ≤ 0.6 %. Barren EF: cold
-  shrubland 79–81 %, snowy plains 9–13 %, glacial chasm 1 %. Side effect worth knowing: with the flats on the negative branch vanilla's
-  ice spikes (a positive-branch variant) disappear from ice caps (Terralith's stay); vanilla's flats there are snowy plains, now under
-  the ice cover.
+  shrubland 79–81 %, snowy plains 9–13 %, glacial chasm 1 %. Side effect (undone below): with all the flats on the negative branch vanilla's
+  ice spikes (a positive-branch variant) disappeared from ice caps (Terralith's stay).
 - **Tests.** Rust (`bake::placement`, `bake::biomes`, `bake::ice`, `bake::tests`): erosion limits and their errors, the weirdness forms,
   the ice-cover section (defaults, bounds, cover thickness), the cover layer from an ELA, EF's peaks positive / flats negative / barren held
   off the chasm. Java: `IceCoverTest` (record, block mix, the baked 4k planet's layer read back), GameTest `icePassLaysTheCover` (a chunk
   built for it: covers of 0, 1, 5 and 12 blocks, a lake column, a two-block column), `iceCoverLaidOnGlaciatedGround` (real planet,
   if it has cover; the 150 Myr 4k planet has none above its line), `BiomeCensus.FORBIDDEN` gains `EF:no_chasm_on_barren` and
   `EF:no_cherry` for `climateConsistent`.
-- **Verified so far (Mac).** `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings` clean; `cargo test -p deeptime-core
-  --lib bake::` 27/27; `./gradlew build test` 150/0 (first version of the GameTests not yet run); `deeptime run earthlike_quick_16k
-  supercontinent 500` rebakes with 18 layers (`climate/ice_cover` 83 MiB total bake): cover on 84 % of EF and 0.8 % of ET cells, 97.6 % of
-  the L1-glaciated L2 cells, thickest 12 blocks on 27,485 cells; the box (x 3675…3931, z −3779…−3523) has 916 of 1,024 cells at 12.
-- **Not yet run (the Mac's tailnet name stopped resolving mid-session: Tailscale on the laptop was stopped).** The real-generator
-  preview of the box on MIC (`preview-area.sh --world-data smoke/glaciercheck-after4/world`: biome shares and top blocks against the
-  pre-change world, `deeptime-inspect biomes` and `topdown`), `./gametest.sh` and `-PwithMic` (`climateConsistent`, the new GameTests),
-  `cargo test --workspace` and `cargo deny` on the final tree.
+- **Ice spikes back (Ben, 2026-09-30, "Bring ice spikes back").** The flats' branch is now `weirdness.flats`: `{positive_noise_above,
+  max_magnitude}` (new, optional; default never positive and no cap, which is what the entry above did). EF: the flats are positive
+  where the variant noise is above 0.2 (about a fifth of them), at |weirdness| at most 0.25 (vanilla's units), the rest negative;
+  peaks positive. Vanilla's ice spikes (a positive-branch variant at humidity band 0) come back on a share of the flats, and the cherry
+  groves (positive branch, |weirdness| 0.4 and up at mid erosion, where MIC's router puts reference 0.3 … 0.57) stay off: without the
+  cap a half of the flats positive gave cherry on 0.9 % of the ice cap, with it 0.1 % (emulated, MIC). The bake carries the two numbers
+  per class as nearest-cell L2 layers like the rest of the class rules. Tests: `bake::placement` (forms and errors),
+  `bake::biomes::ef_flats_let_some_noise_through_below_a_magnitude` (share between 2 % and 60 %, |w| at most the cap, noise above 0 gives
+  more, above 1 none, peaks stay positive).
+- **Ice cover from the climate's ice** (the climate agent's `climate/ice_thickness_m`, merged with master): `bake/ice.rs`
+  `cover_from_thickness`: ice of at least 1 m on ground above the sea gives `1 + ⌊t / step_m⌋` blocks (same table: 160 m per block, at
+  most 12), the L1 field resampled bilinearly; a run without ice fields falls back to the height above the equilibrium line as before.
+  `notes.bake.climate.ice_cover.source` names which. Cheap, so done. The 160 m step is unchanged: an ice sheet of 2 km or more is 12.
+- **The box moved.** Master's climate (carbon cycle, ice-age cycles, ice-linked sea level, continuous strata) makes `earthlike_quick_16k`
+  a different planet (9,544 EF L1 cells against 53,837; the old box, x 3675…3931, z −3779…−3523, is sea now), so the old before/after
+  cannot be redone. Control: the merged tree baked with master's table (`deeptime run --content` with the old `climate_placement`) and
+  its `climate/ice_cover` layer deleted (so no cover), against the new table on the same planet (`smoke/glaciercheck-ctl`, `-after6`).
+  On the new planet 99 % of EF land carries ice (the ice model and the Köppen class agree; 112 L2 cells are barren EF). Two boxes of the
+  real generator (`preview-area.sh --keep-world`, `deeptime-inspect biomes`, and the ground under the snow layer read from the
+  `.dtva` export): A x −3840…−3584, z 2112…2368 (91 % flats), B x −4160…−3904, z 1984…2240 (43 % flats), both ice cap at 12 blocks.
+  | box A (flats) / B (mixed), 65,536 columns each | before | after |
+  |---|---|---|
+  | MIC: gravel desert | 73.0 % / 29.9 % | 0 / 0 |
+  | MIC: snowy plains | 0 / 0 | 73.0 % / 29.9 % |
+  | MIC: snowy slopes, ice spikes, frozen peaks | 20.2, 6.8, 0 % / 68.3, 0, 1.8 % | the same |
+  | MIC: ground block snow or ice | 27.0 % / 69.1 % (granite 35 %, gravel 23 %, dripstone 12 % / gravel 22 %) | 99.6 % / 99.0 % |
+  | vanilla: ice spikes | 99.7 % / 75.9 % | 8.7 % / 32.2 % |
+  | vanilla: snowy plains, slopes, frozen peaks | 0, 0.3, 0 % / 0, 20.9, 3.2 % | 91.0, 0.3, 0 % / 43.8, 20.9, 3.2 % |
+  | vanilla: ground block snow or ice | 99.9 % / 98.9 % | 98.0 % / 99.7 % (the rest: a village's planks, grass, paths) |
+  (MIC's ice spikes are Terralith's own, at humidity band 0, for both signs, so they do not change; vanilla's were on all of the flats
+  when they were all positive.) Planet-wide, emulated on the Terralith list and MIC's mapping, ice cap: snowy slopes 54 %, frozen peaks
+  27 %, gravel/shrubland 7 % (12 % before), ice spikes 6.6 %, plains 5.7 % (0 before); cherry grove, scarlet mountains, snowy badlands,
+  glacial chasm 0.
+- **Verified (Mac, on the tree merged with master 39f7ad4 and these changes).** `cargo fmt --check`, `clippy --workspace --all-targets
+  --locked -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --locked` (core 287 + 3 ignored, cli 30, format
+  44, inspect 29, …) all pass; `./gradlew build test` 155/0. `./gametest.sh` and `-PwithMic`: 53 of 54 pass, including `icePassLaysTheCover`
+  (1,028 blocks placed as expected, none wrong) and `iceCoverLaidOnGlaciatedGround` (the 4k test planet has no ice cap: 0 columns, logged);
+  the one failure is `climateConsistent`: BW 0.47–0.49 < 0.65, Dsub 0.82 < 0.85, BW:desert 0.42–0.45 < 0.45 (standalone), and under MIC BW,
+  BS 0.51 < 0.60, Dfc:taiga 0.43 < 0.50. **It fails the same way on master without these changes** (same numbers, run on master 39f7ad4):
+  the 4k test planet is a different planet since the climate merge (466 BW columns where there were 17) and its floors were calibrated on
+  the old one; not EF. The planet has no polar land (E family 0 columns), so `EF:no_red`, `EF:no_chasm_on_barren` and `EF:no_cherry`
+  never get columns there (and sit after the floor check in the test); the floors need a recalibration by whoever owns the climate merge.
+- **Next.** The floors of `climateConsistent` on the new test planet (not this work); Ben's call on the ice-cap humidity (caveat (a) above:
+  the gravel desert it once fed is 0 in the boxes now); merge (this branch is not merged).
+
 
 ### 2026-09-30 — P1-25: a climate API for mic-climate and Project Atmosphere (agent worktree agent-a02882c5e6567370e, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **The bake (format 0.1 → 0.2).**
