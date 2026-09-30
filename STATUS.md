@@ -180,8 +180,12 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `--set surface.glacial.young_ela_drop_m=-2000 --set amplify.glacial.strength=0`, i.e. without the ice-age
   glaciers; shots by `area3d_shots.py` in `review/out/glacial-3d/`): the valley box is a V-shaped, gullied valley
   without them and a deeper trough with a flat floor (sand, grass and trees, a small lake) and steep smooth snowy
-  walls with them; the coastal box shows a smoother, scoured lowland. Width comparison (after5, `stage amplify
-  --bake`): `review/out/glacial-3dw/`.
+  walls with them; the coastal box shows a smoother, scoured lowland. Width comparison on after5 (young + `stage
+  amplify --bake` from its deposits checkpoint at width 3, width 1 and without ice-age glaciers; the same two boxes
+  in each, `review/out/glacial-3dw/`, bundle `review/out/glacial-review/`, 16 MB, not published): at x −6608..−6353,
+  z 2944..3199 a snowy plateau without them, a narrow fjord at real width, and at width 3 a wider fjord with a side
+  arm, steep rock walls and a flat, partly flooded floor; the other box (the thickest ice of the window, on an
+  ice-capped plateau) barely changes. Scratch runs deleted from the Mac afterwards.
 - **Gates** (branch merged with local master 51c6c18). c2ec70f (the character's fade limited to the carved
   troughs) compiled and passed, not reverted. cargo fmt, clippy `-D warnings`, deny, `cargo test --workspace
   --locked` (cli 30, core 291 + 3 ignored, format 44, inspect 29 + 2 + 7, jni 7, viewer 5) pass; after the width
