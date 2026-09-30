@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -62,6 +62,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | p1-calib, p1-calib-super (P1-17 partial: 500 Myr on pipeline_quick_16k after recalibration with real climate; scattered continents / supercontinent) | https://spacesheep.dev/@benmac/deeptime-p1-calib · https://spacesheep.dev/@benmac/deeptime-p1-calib-super | calibrated 500 Myr 2026-09-29 | 2026-09-29 |
 | p1-amplify (P1-06: before/after amplification of mountains, highlands, coast, river, lake, a tile edge and the seam; drama figure) | https://spacesheep.dev/@benmac/deeptime-p1-amplify | P1-06 before/after amplification 2026-09-29 | 2026-09-29 |
 | p1-biomes (P1-09: Köppen beside biomes on earthlike_quick_16k 500 Myr, standalone and MIC; tag shares, top biomes per class, Chunky areas) | https://spacesheep.dev/@benmac/deeptime-p1-biomes | P1-09 biomes vs climate 2026-09-29 | 2026-09-29 |
+| mountains (block-scale mountain character before/after: arc, young collision, old range; standalone + MIC; vanilla and Terralith comparisons; ruggedness sweep) | https://spacesheep.dev/@benmac/deeptime-mountains | mountain character before/after 2026-09-30 | 2026-09-30 |
 | p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
 | p1-deposits-real (P1-14: deposits on the real 500 Myr history; not published, review/out/p1-deposits-real on the laptop and the Mac, 17 MB) | — | P1-14 real history 2026-09-29 | 2026-09-29 |
 | p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
@@ -160,6 +161,183 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   changes give dips up to ~30° over short distances). (4) The B-spline rule approximates: a cell point shows a
   blend of its neighbours, not its own stored stack.
 - **Next.** Merge into master (the parent); then the coal-stack depth cap if Ben wants it.
+### 2026-09-29 — Block-scale mountain character, ruggedness setting, the striped-snow fix (agent worktree agent-a2d4bbb2f592ce1d7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-29 ("Do it now, in Phase 1"): P1-08's 6.8 km peak was a smooth dome, and its
+  snowfield had vertical stripes.
+- **The striped snow, found and fixed.** Not a resampling artefact of the rasters: the noise router. The final
+  density takes `deeptime:terrain` only within 1.5625·k blocks (k = 8: 12.5 blocks) of the surface and the cave
+  field below (vanilla's `range_choice` around `sloped_cheese`), and vanilla interpolates between corners 4 blocks
+  apart. On a face steeper than ~3 blocks per block the lower corner's cell mixed the upper corner's cave value
+  (≈ 0.5 instead of the terrain's 2–4) into the interpolation, so the surface jumped up-slope: 3-block benches and
+  20-block steps every 4 blocks. P1-08's world, x 2976..3000 at z −960 (`deeptime-inspect column`): tops 344, 337,
+  308, 308, 307, 287, 284, 283, 282, 275, 256, 254, 254, 233, … — each bench snow-capped, one N–S stripe per 4
+  blocks on the east flank. **Fix** (`worldgen/TerrainScale`, `TerrainDensity`): the density's scale doubles from
+  k until it covers 0.8 × the largest height difference to the 8 neighbouring corners (powers of two keep the
+  interpolation exact at whole-number heights; a 9.6 broke `lakeHolds`' floor by one block), and a new mode
+  `ratio` (k/scale) multiplies the router's cave-entrance term, so cave mouths stay where they were
+  (`planet.json`, and `tools/dev/gen_worldgen.py` regenerates it byte for byte). Corner columns are H exactly as
+  before; parity unchanged. `-Ddeeptime.steepScale=0` restores P1-08's router (the "before" renders use it).
+  Measured on steep noise cells (drop ≥ 16 over the cell, `stairs.py` over real exports): one step taking ≥ 70 % of
+  the drop on **43 % / 28 % of cells before, 11 % / 4 % after** (boxes A / C); median max-step/mean-step 2.6 → 1.2.
+- **The mountain character** (`crates/deeptime-core/src/surface/amplify/character.rs`, run on the amplifier's last
+  level after its passes, `tiles.rs`): all baked into `elevation`, so the Java height, the column evaluator and
+  the world-data contract are unchanged (format 0.1; FORMAT.md "The mountain character").
+  - *Drainage-aligned gullies:* 4 octaves of stripe noise (128 → 16 blocks) whose crests follow the slope of the
+    smoothed terrain (so the amplifier's multiple-flow valleys), each octave aligned with what the coarser left
+    (tributaries). Depth = 0.2 × slope × wavelength, capped by 0.35 × local relief, 0.25 × wavelength (hard rock;
+    60 % on soft) and the height above the local base level; faded on rivers (5–100 km² drainage) and at the coast.
+  - *Fold ridges:* ridged stripes along `plates/fold_trend_deg` where `plates/orogeny_type` records an orogen
+    (Himalayan 1.0, Andean 0.4, × youth), 0.18 × local relief; gaps where streams (1–10 km²) cross.
+  - *Young vs old:* youth = exp(−`plates/orogeny_age_myr`/60) or uplift; young terrain gets the convex part of an
+    unsharp mask (sharper, higher summits and ridgelines; one-sided, so no moats at mountain feet), old terrain is
+    pulled towards its smoothed self (rounded); gully profiles are triangles when young/hard, cosines when old/soft.
+  - *Cliffs:* a smooth terrace (8-block benches) where the rock is hard (`young/erodibility` ≤ ~1.3: granite,
+    gneiss, andesite, basalt, quartzite) and the slope over 0.6.
+  - *Drains:* a pit the character closes deeper than 1.5 blocks is softened back (radius 6 cells), then the flood
+    runs again: 0 new sinks; on the 16k planet the last flood raises 10k land cells by more than a block (8 by more
+    than 10), and softens 11.7 % of land cells somewhat.
+  - `amplify.ruggedness` (0..2, default 1; editor field `ruggedness`, section Terrain, stops Smooth 0 / Gentle 0.5 /
+    Natural 1 / Wild 1.6, lang key; all four `pipeline_*` / `earthlike_*` presets carry 1.0) scales everything;
+    0 is the P1-06 terrain bit for bit. The tuning knobs are `amplify.character.*` (every key optional).
+    `surface.drama` (thermal slope + the chunk-time A·N texture) and `amplify.incision_cap` (how deep the amplifier's
+    rivers cut) stay beside it, unchanged: they shape the simulated terrain, ruggedness shapes the block-scale
+    character on top of it.
+  - Keyframes/workbench: `amplify/youth`, `amplify/fold` (L1, ramp `unit`). Notes: `notes.amplify.character`
+    (cells changed, mean/max change, flood, softened, ms); the CLI's `amplify_final=` line prints them.
+  - Tiles: halo + the character's radius (≈ 36 cells) + two flood margins + 13; streamed = in memory to the bit
+    (the existing tests, now with the character on). Memory: +4 B a cell (71 B/cell whole-raster).
+- **Where a glacial pass plugs in** (the glacial-erosion agent, `amplify/glacial.rs`): in `tiles::run_tiles`, after
+  `run_passes` and before `character::apply` — the character then puts spurs and gullies on the glacial valleys'
+  walls and its `fade` (character.rs) is the place to take a glacial mask (ice-smoothed rock: less ruggedness, no
+  folds). Its halo adds to `Config::halo`.
+- **Numbers (Mac M6, shared).** `deeptime run --preset earthlike_quick_16k --start scattered_continents
+  --length-myr 500 --out …/mountains/after --checkpoints` → 109 s wall; amplify 13.1 s of which the character
+  3.8 s (12 threads); mean |change| on land 2.6 blocks, max +53/−50; sinks 0. Chunk generation (standalone, the
+  same three 384 × 384 boxes = 2,187 chunks, Chunky wall time, interleaved runs `t-after-1, t-before-1, t-after-2, t-before-2`): **after 30.9 / 31.0 ms per chunk, before 41.2 / 54.6** — no slowdown (the grown scale adds 8 memoised height lookups per corner column; the rest is load on the shared Mac, 8–22). P1-08 measured ≈ 43 ms (441 chunks, loaded Mac).
+- **Evidence** (`review/out/mountains/index.html`, not published, 12 MB): before/after of three areas of that planet through the
+  real generator (preview jobs, exports rendered isometrically and in the area3d viewer): A arc volcano (andesite,
+  active; 2752..3136 × −1152..−768), C young collision belt (−512..−128 × 2320..2704), O old collision belt (422 Myr;
+  5648..6032 × −2384..−2000); the same with the MIC set; vanilla (standalone `minecraft:normal`, seed 20260929:
+  jagged and stony peaks) and MIC's Terralith + Tectonic (`terralith:rocky_mountains`, `yosemite_cliffs`); before/after
+  sections; the ruggedness sweep 0/0.5/1/1.6; the youth and fold maps. BlueMap renders were made
+  (`review/out/mtn-bm/bm-after`, 139 MB) but its web camera distorts 450-block-tall boxes; the bundle uses the
+  exports instead.
+- **Tools.** `deeptime heightmap` (H, E, A·N and layers of a box as .npy), `deeptime stage … --bake` (bake after a
+  stage that finishes the run, for trying a later stage's settings on the game's terrain), preview.py
+  `--level-type` (a comparison world in the pack's own generator) with `--locate BIOME[@x,z]`, `--jvm-prop`,
+  `--max-side` passed to the export; ScreenshotDriver `.start/.length/.vista` properties and
+  `mac-screenshots.sh --prop`.
+- **Gates** (tree merged with master 00c02ce): cargo fmt, clippy `--locked -D warnings`, deny licenses bans
+  clean; `cargo test --workspace --locked` (cli 30, core 262 + 3 ignored incl. character:: 6 and amplify 25 with the
+  character on — streamed = in memory, 1 = N threads, no new sinks —, format 40, inspect 29 + 2 + 7, jni 7, viewer 5);
+  `./gradlew build test` 146/0 (`ColumnParityTest` 500 of 500 columns equal on the regenerated planet4k fixture,
+  `TerrainScaleTest` 3); `./gametest.sh` 50/50, `-PwithMic` 50/50 (MIC set installed today), `./gametest-planet.sh`
+  PASS. **lakeHolds** needed two changes on the way: the scale must be a power of two times k (a 9.6 put the lake
+  floor one block high at 442 corners), and under MIC a short plant at the waterline, which the new wall shape put
+  by the water, washed away into a 65,124th source — the test now allows such washable blocks (it counts and logs
+  them, `washable=1`) instead of calling them leaks.
+- **Real client** (`tools/client/mac-screenshots.sh --prop …`, the ScreenshotDriver's new `.start/.length/.vista`):
+  one run on the Mac's desktop, 27 min of in-client simulation on the loaded Mac; its four vistas came out empty
+  (sky only): the timeline properties were applied on only one of the driver's two paths (the planet was the default
+  supercontinent/1000 Myr one, so the coordinates missed the mountains) and 60 s did not generate terrain 200 blocks
+  from spawn. Both fixed after the run (the Advanced path reads them too; a vista waits until the chunk 160 blocks
+  ahead exists, then 15 s, at most 170 s); not re-run. `review/out/mtn-client/` has the walk's shots.
+- **Deferred / for Ben.** Talus and scree at cliff feet (a surface-block rule the column evaluator would have to
+  mirror for parity); overhangs/3D crags (Phase 2). The softening touches 11.7 % of land cells a little.
+- **Next.** Merge into master (the parent).
+
+### 2026-09-29 — EF is ice cap where the glacier model says ice, barren frozen ground elsewhere (agent worktree agent-adda9513719f24370, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** A workbench preview of run 1a0ef97aaca (`earthlike_quick_16k`, MIC, box x 3675…3931, z −3779…−3523, 77–83°N, EF
+  almost everywhere) came out 58 % `terralith:scarlet_mountains`, snowy slopes, `terralith:snowy_badlands`, frozen cliffs. Ben first
+  answered "Yes, EF means ice" and then, when told EF only means "warmest month below 0 °C" and includes ice-free cold desert
+  (Dry Valleys), **"Ice only where there's ice (Recommended)"**: where the glacier/ice-sheet model says ice accumulates, ice biomes;
+  EF too dry for ice, a frozen but barren biome (bare rock, gravel, thin snow; no ice spikes or packed ice; not Scarlet or a warm
+  or red biome); ET unchanged; all in the placement file (decisions log 2026-09-29; the coordinator writes that entry).
+- **Why the plateau was not "flagged glaciated": it was, and the flag is not the problem.** Reproduced the run (same preset, seed 1,
+  supercontinent, 500 Myr; 53,837 EF L1 cells, as `notes.bake.climate.koppen_bands`) and read `climate/glacier`, `ela_m`,
+  `precip_mm`, `t_warm_c` from the climate checkpoint: **46,026 of 53,837 EF cells (85.5 %) have glacier = 1, every cell of the
+  plateau in the box included** (L1 rows 19–34, `glacier` = 1; ELA 660–810 m, summer sea-level temperature about −2 … 0 °C, the
+  ground 1–4 km). Precipitation there is the `precip_min_mm` floor (10.0 mm/yr on the plateau: 2,744 EF cells at ≤ 10.5 mm, 6,432
+  more under 30 mm), and **every one of those 9,176 cells is glaciated**: the ELA rule (Ohmura et al. 1992 as P1-05 solves it,
+  T_ELA(P) = −2.3 °C at P → 0) has no cutoff for dryness, so any polar land whose summer stays under about −2.3 °C is ice
+  wherever it lies above its ELA. Not a bug: East Antarctica is ice at 20–50 mm/yr water equivalent; the fit is extrapolated
+  below its data (its lowest ELAs sit at a few hundred mm) but nothing better is wanted. The 7,811 unglaciated EF cells (14.5 %)
+  are the other kind of EF: median t_warm −0.3 °C (barely EF), median ground 738 m under an ELA of 784 m, 81–89°N, precipitation
+  44–120 mm (p10–p90): low-lying, marginal polar land, the Dry Valleys' kind. ET: 433 of 53,111 cells glaciated. **What the
+  flag did in P1-09:** only capped the temperature band at 0.35, which is a no-op where the class already sits at band 0 (EF's
+  polar ramp gives 0 at t_warm ≤ −20 °C: temperature −1.0, the bottom of the frozen band, glaciated or not). So the biome the pack
+  drew there was decided by the other inputs, not by the flag. **Found on the way:** P/PET is **pinned at 10** for every EF cell
+  (Thornthwaite PET is 0 below freezing), so ET/EF humidity was always the rule's cap (1.95) and never followed the climate.
+- **What the pack does with the frozen band** (probed, not assumed): vanilla `OverworldBiomeBuilder` on `test_planet_real`
+  (GameTest probe, standalone) and Terralith 2.6.2's parameter list (`data/minecraft/dimension/overworld.json`, 1,713 entries;
+  a Python emulation of `Climate.ParameterList` that reproduces the real MIC run to 0.1 %). Tectonic adds no biomes (router
+  only). Vanilla in the frozen band: ice spikes only at humidity band 0 with positive weirdness, snowy slopes at humidity ≤ 1,
+  grove above it, snowy taiga at humidity 3, jagged peaks (weirdness < 0) / frozen peaks (> 0), snowy plains between; the
+  temperature within the band does not matter; **vanilla has no dry frozen biome** (closest: snowy plains, `windswept_gravelly_hills`
+  at erosion 0.45–0.55). Terralith splits the band at temperature −0.727 (coordinate 0.496): **below it every dry cell
+  (humidity < −0.35) is `snowy_badlands`** (white and orange terracotta, red sand: what EF had drawn: 58 % of glaciated EF on
+  the planet), above it the dry cells are `gravel_desert`, `rocky_shrubland`, `cold_shrubland` (gravel, granite, coarse dirt, tuff:
+  the barren frozen biomes); `scarlet_mountains` takes every peak with weirdness −0.93 … −0.4 and humidity above −0.35 (no
+  temperature or humidity within the frozen band avoids it); `frozen_cliffs` only on the coast band; `glacial_chasm` (packed
+  ice) only at erosion ≥ 0.4 (≥ 0.565 whatever the humidity); `ice_spikes` at humidity < −0.35 near the coast (continentalness ≤ 0.03,
+  else nearest fit). Ice biomes Terralith lacks: any inland ice-sheet biome on low or mid erosion.
+- **Design (candidates swept offline over the planet's glaciated and unglaciated EF cells on the Terralith list; the
+  scripts are in the session scratchpad, not committed).** The levers the placement table has are the temperature and humidity
+  band coordinates; the result: temperature 0.55 … 0.9 all alike (upper frozen band, above Terralith's split) and humidity
+  fixed low for ice, fixed 1.5 for barren:
+  | planet-wide EF, Terralith list | ice | snow | barren | other |
+  |---|---|---|---|---|
+  | glaciated, before (t 0, h 1.95) | 5 % | 32 % | 0 % | 63 % (snowy badlands 59 %, scarlet 5 %) |
+  | glaciated, now (t 0.6–0.8, h 0.5, weirdness +) | 41 % | 26 % | 31 % | 2 % (cherry grove) |
+  | not glaciated, before | 2 % | 15 % | 2 % | 81 % (snowy badlands 80 %) |
+  | not glaciated, now (h 1.5) | 26 % | 5 % | 69 % | 0 % |
+  (ice = frozen/jagged peaks, ice spikes, glacial chasm, frozen cliffs; snow = snowy plains and slopes, beaches, frozen ocean;
+  barren = gravel desert, cold/rocky shrubland). Humidity band 2 and up turns the ice sheet into wintry forest, grove and snowy
+  taiga (trees), so ice cap is band 0.5, barren 1.5 (below the band whose variants are taiga and grove, as P1-09's 1.95 cap
+  was). The scarlet peaks are not reachable from temperature or humidity at all, hence the third lever.
+- **Change.** (1) `placement.json`: ramp `polar_ice` (0.6 … 0.8 by the warmest month, −20 → 0 °C), fixed humidity rules
+  `polar_desert` (1.5) and `ice_cap` (0.5), and EF = `{temperature: polar_ice, humidity: polar_desert, glaciated: {humidity:
+  ice_cap}, weirdness: positive}`; ET untouched. (2) Schema (`bake/placement.rs`, FORMAT.md "The climate mapping", no schema
+  version bump: both keys optional): a class may have a **`glaciated` block** (its own temperature and/or humidity where the glacier
+  flag is set; it replaces `glacier_cap` for that class, each key falling back to the class's ordinary one) and
+  **`weirdness: "positive"`** (the class's land keeps the positive branch of the variant noise: vanilla's frozen peaks, never the
+  negative branch's jagged peaks / Terralith's scarlet mountains). `humidity_land` takes the glacier flag; the bake resamples the
+  class's weirdness flag L1 → L2 like the humidity (`Coords.w_pos`). Every other class, ET included, is bit-identical
+  (the "default reproduces the compiled constants" test now covers all classes but EF, and asserts a glaciated `humidity_land` equals
+  the plain one for them). (3) GameTest `climateConsistent` gains a negative check (`BiomeCensus.FORBIDDEN`, `EF:no_red`: EF columns
+  on `snowy_badlands`, `scarlet_mountains`, vanilla badlands ≤ 10 %).
+- **Result on the workbench box** (`preview-area.sh --profile mic --world-data <rebake> --keep-world`, then `deeptime-inspect biomes`
+  on the kept world; 65,121 EF columns of the chunks' stored biomes; the pre-change kept world is jobs/20260929-195758-82h8):
+  | biome | before | after |
+  |---|---|---|
+  | scarlet mountains | 58.3 % | 0 |
+  | snowy badlands | 18.4 % | 0 |
+  | frozen peaks | 0 | 58.3 % |
+  | snowy slopes | 21.3 % | 21.3 % |
+  | gravel desert | 0 | 18.4 % |
+  | frozen cliffs | 2.0 % | 2.0 % |
+  The emulation predicted 60.8 / 20.7 / 17.8 / 0.7 → 60.8 (frozen peaks) / 20.7 / 17.8 (gravel desert) / 0.7. The glacier flag did not
+  change anywhere (the climate stage is untouched; continentalness and erosion layers are bit-identical, the weirdness magnitude is
+  identical and 131,822 L2 cells, all under EF or filled from it, changed sign). The box is one sign region of the 1,024-block variant noise (all negative), so
+  the whole scarlet share becomes frozen peaks; elsewhere half of the EF peaks were already frozen peaks.
+- **Caveats (for Ben).** (a) 18 % of this box, and 31 % of glaciated EF planet-wide, is `gravel_desert` (bare gravel on ice
+  cap): the flat, far-inland glaciated cells, where Terralith has no ice biome at humidity band 0 and, at humidity ≥ 2, only trees;
+  raising the ice-cap humidity to ≥ 2.05 trades it for wintry forest and grove. (b) 21 % of unglaciated EF gets Terralith's
+  `glacial_chasm` (packed ice; erosion-driven, unreachable from temperature or humidity); vanilla gives snowy plains and slopes
+  there (no dry frozen biome exists). (c) `snowy_cherry_grove` (pink, snowy) on about 2 % of glaciated EF at weirdness > 0.93 /
+  0.27–0.4. (d) EF temperature is now 0.6–0.8, warmer in band coordinate than ET's coldest (0.5): only Terralith's split at 0.496
+  reads it (vanilla's band is one). (e) EF humidity no longer follows P/PET (pinned at 10 below freezing); ET's still does.
+- **Gates** (Mac, this branch): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings`, `cargo test
+  --workspace --locked` (core 258 + 3 ignored, cli 30, format 40, inspect 29, …), `cargo deny check licenses bans` clean;
+  `./gradlew build test` 143/0; `./gametest.sh` all 50 passed (`climateConsistent`: E 1.0, E:snow 0.941 against its 0.9 floor: ET's
+  1,765 columns are unchanged code, EF has 29 columns on the small planet, `EF:no_red` 0 of 29); `-PwithMic` all 50 passed
+  (E 1.0, E:snow 1.0, `EF:no_red` 0 of 29; EF there: frozen peaks 59 %, frozen cliffs 31 %, snowy slopes 10 %). **Re-run after
+  merging master 00c02ce** (USGS provinces, coherent-continents decisions): fmt, clippy `-D warnings`, `cargo test --workspace`
+  (core 262 + 3 ignored, cli 30, format 40, inspect 29), deny, `./gradlew build test` 143/0, `./gametest.sh` 50 of 50 and
+  `./gametest.sh -PwithMic` 50 of 50.
+- **Next.** Ben's call on caveat (a) (ice-cap humidity band 0.5 vs ≥ 2.05); the coordinator merges (this branch is not merged).
+  ET is untouched (Scarlet stays on 3 % of ET, as Ben's "keep it" allows outside EF).
+
 ### 2026-09-30 — Geologic provinces: a USGS-style view layer on every keyframe (agent worktree agent-a03fc35a652ae22e4, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben's decision (decisions log 2026-09-29, "Just want the view, don't change world generation"): a
   `provinces` keyframe layer, drawn like `regime` or `crust_age`, so the workbench (layer picker, legend, globe, compare)

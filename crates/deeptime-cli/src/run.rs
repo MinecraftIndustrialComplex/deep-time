@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use deeptime_core::checkpoint::Checkpoint;
-use deeptime_core::session::{AdvanceStatus, Session, SessionOptions, group_of};
+use deeptime_core::session::{AdvanceStatus, Session, SessionOptions, SessionState, group_of};
 use deeptime_format::keyframes::{KeyframeIndex, read_keyframe};
 use deeptime_format::manifest::rfc3339_utc;
 use serde_json::{Value, json};
@@ -685,6 +685,8 @@ pub struct StageOptions {
     /// Keyframe layers the viewer bundle keeps (empty: all).
     pub viewer_layers: Vec<String>,
     pub work: Option<PathBuf>,
+    /// Bake the world data into the work folder when the stage finishes the run.
+    pub bake: bool,
     pub common: Common,
 }
 
@@ -841,6 +843,21 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         o.name,
         timings_line(&s.stage_timings()?, &ck.world)
     );
+    if o.bake {
+        if s.state() == SessionState::Done {
+            s.finalize_write()?;
+            println!(
+                "deeptime stage {}: baked the world data into {}",
+                o.name,
+                work.display()
+            );
+        } else {
+            println!(
+                "deeptime stage {}: --bake ignored, the run is not complete",
+                o.name
+            );
+        }
+    }
     if let Some(out) = &o.out {
         ck.write(out)?;
         println!(
