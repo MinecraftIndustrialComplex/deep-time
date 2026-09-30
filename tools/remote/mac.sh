@@ -74,7 +74,12 @@ EXCLUDES=(--exclude=/target/ --exclude=/smoke/ --exclude=/run/ --exclude=/run-ga
 GIT="$CACHE/git/bin/git"
 "${SSH[@]}" "exec zsh -lc $(printf '%q' "[ -x '$GIT' ] || nix build nixpkgs#git --out-link '$CACHE/git'")"
 if [ "$SYNC" = 1 ]; then
-    rsync -a --delete "${EXCLUDES[@]}" -e "ssh -o BatchMode=yes" "$REPO/" "$HOST:$REMOTE/"
+    # --checksum --no-times: copy a file only when its bytes differ, and give each copied file the
+    # Mac's current time. With plain -a the laptop's mtimes came across, so a file whose content went
+    # back to an older version (a merge, a branch switch) could be older than the build artifact made
+    # from the newer version, and Cargo kept the stale artifact (2026-09-30: release deeptime-cli
+    # failed with "no field min_y" while the sources were correct). Unchanged files keep their time.
+    rsync -rlpD --checksum --no-times --delete "${EXCLUDES[@]}" -e "ssh -o BatchMode=yes" "$REPO/" "$HOST:$REMOTE/"
     "${SSH[@]}" "cd '$REMOTE' && { [ -d .git ] || '$GIT' init -q -b master; } && '$GIT' add -A"
     # Which laptop revision this copy is (the Mac's .git has no commits, and Apple's git there is a
     # stub): tools/smoke/jarstate.py reads it into smoke/<profile>/install.json. Written after
