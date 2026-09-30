@@ -1292,6 +1292,7 @@ fn group_layers(stages: &[Box<dyn Stage>], g: &Range<usize>) -> Vec<&'static str
             }
         }
     }
+    keyframes::add_derived(&mut out);
     out
 }
 
