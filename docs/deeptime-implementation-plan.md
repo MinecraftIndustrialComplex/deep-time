@@ -814,7 +814,7 @@ every layer is a tile pack (§5.7.3).
 | Layer | Grid | Type | Meaning | Phase |
 |---|---|---|---|---|
 | `elevation` | L3 | i16, 1/16 block | terrain surface height (y) | 0 |
-| `water_level` | L3 | i16, 1/16 block; nodata = none | lake/river water surface above sea level | 0 (test), 2 |
+| `water_level` | L3 | i16, 1/16 block; nodata = none | lake water surface above sea level (rivers: `rivers/rivers.dtrv`, P1-22) | 0 (test), 1 (P1-22) |
 | `climate/{temperature,vegetation,continentalness,erosion,weirdness}` | L2 (half L1's cell size) | i16, vanilla parameter ×10,000 | the five 2D biome inputs after the §7.2 mapping | 1 |
 | `climate/{t_mean_c,p_mm,koppen}` | L1 | i16 / u16 / u8 | physical climate, for maps and rules | 1 |
 | `surface/regolith_blocks` | L2 | u8 | soil/regolith thickness | 1 |
