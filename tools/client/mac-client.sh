@@ -52,7 +52,10 @@ mc_start
 
 failed=0
 set +e
-mc_run_pass main -Ddeeptime.dev.screenshots=true "-Ddeeptime.dev.screenshots.create=$CREATE"; st=$?
+# MC_SHOT_PROPS: more -D properties for the main pass (space-separated), e.g. the timeline and the
+# vistas (ScreenshotDriver: deeptime.dev.screenshots.start/.length/.vista).
+# shellcheck disable=SC2086
+mc_run_pass main -Ddeeptime.dev.screenshots=true "-Ddeeptime.dev.screenshots.create=$CREATE" ${MC_SHOT_PROPS:-}; st=$?
 set -e
 [ "$st" = 0 ] || failed=1
 cp "$GAMEDIR"/screenshots/*.png "$OUT/" 2>/dev/null || true

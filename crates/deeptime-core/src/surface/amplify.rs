@@ -37,6 +37,7 @@
 //! `detail.rs`: the local relief × drama, damped along channels, as the u8 layer
 //! `detail/amplitude` that `deeptime:terrain` multiplies a C-periodic noise by (plan §8.2).
 
+pub mod character;
 pub mod kernels;
 pub mod resample;
 pub mod tiles;
@@ -52,6 +53,7 @@ use deeptime_format::{Codec, DType, GridDesc, LayerEntry, Manifest};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use self::character::{CharacterCtx, CharacterFields, CharacterParams, RUGGEDNESS_MAX};
 use self::kernels::{Counts, NoiseCfg, Physics, Times};
 use self::resample::Level;
 use self::tiles::{
@@ -78,10 +80,20 @@ pub mod field {
     pub const DETAIL: &str = "amplify/detail";
     /// log₁₀ of the effective drainage area, km² (NaN at sea).
     pub const DRAINAGE: &str = "amplify/drainage";
+    /// The youth the mountain character read (0 old … 1 active), L1.
+    pub const YOUTH: &str = "amplify/youth";
+    /// The fold strength the mountain character read (0 … 1), L1.
+    pub const FOLD: &str = "amplify/fold";
 }
 
 /// Keyframe layers of the stage.
-pub const KEYFRAME_LAYERS: [&str; 3] = [field::ELEVATION, field::DETAIL, field::DRAINAGE];
+pub const KEYFRAME_LAYERS: [&str; 5] = [
+    field::ELEVATION,
+    field::DETAIL,
+    field::DRAINAGE,
+    field::YOUTH,
+    field::FOLD,
+];
 
 /// Whether the last level streams.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -154,6 +166,10 @@ pub struct AmplifyParams {
     /// Width of the thinned copy kept for keyframes, cells.
     pub preview_width: u32,
     pub detail: DetailParams,
+    /// The editor's "Ruggedness" (0..2, default 1; decisions log 2026-09-29): how much block-scale
+    /// mountain character the last level gets (`character.rs`); 0 leaves the passes' terrain.
+    pub ruggedness: f64,
+    pub character: CharacterParams,
 }
 
 impl Default for AmplifyParams {
@@ -186,6 +202,8 @@ impl Default for AmplifyParams {
             tile_cells: 2048,
             preview_width: 2048,
             detail: DetailParams::default(),
+            ruggedness: 1.0,
+            character: CharacterParams::default(),
         }
     }
 }
@@ -267,6 +285,10 @@ impl AmplifyParams {
         if !(16..=16384).contains(&self.preview_width) {
             return Err(bad("preview_width", "must be in [16, 16384]"));
         }
+        if !(self.ruggedness.is_finite() && (0.0..=RUGGEDNESS_MAX).contains(&self.ruggedness)) {
+            return Err(bad("ruggedness", "must be in [0, 2]"));
+        }
+        self.character.validate("$.amplify.character")?;
         self.detail.validate("$.amplify.detail")
     }
 }
@@ -292,6 +314,8 @@ pub struct Config {
     pub sea_y: f64,
     pub mv: f64,
     pub mh: f64,
+    /// Blocks per cell of the last level (L3).
+    pub l3_r: u32,
 }
 
 impl Config {
@@ -347,9 +371,44 @@ impl Config {
         }
     }
 
-    /// The halo the last level needs.
+    /// The halo the last level needs: the passes', and with ruggedness the character's radius and
+    /// the reach of the flood that follows it.
     pub fn halo(&self) -> usize {
-        plan_halo(&self.counts(false), self.p.repair_margin_cells as usize)
+        let base = plan_halo(&self.counts(false), self.p.repair_margin_cells as usize);
+        if self.p.ruggedness > 0.0 {
+            base + character::halo_cells(
+                &self.p.character,
+                self.cell_blocks_l3(),
+                self.p.repair_margin_cells as usize,
+            )
+        } else {
+            base
+        }
+    }
+
+    /// Blocks per cell of the last level.
+    pub fn cell_blocks_l3(&self) -> f64 {
+        f64::from(self.l3_r)
+    }
+
+    /// The character's context over the last level (None at ruggedness 0).
+    pub fn character<'a>(&'a self, fields: &'a CharacterFields) -> Option<CharacterCtx<'a>> {
+        (self.p.ruggedness > 0.0).then(|| {
+            let c = f64::from(self.circumference);
+            CharacterCtx {
+                p: &self.p.character,
+                ruggedness: self.p.ruggedness,
+                fields,
+                seed: self.seed,
+                circumference: self.circumference,
+                cell_blocks: self.cell_blocks_l3(),
+                origin_x: -c / 2.0,
+                origin_z: -c / 4.0,
+                sea: self.sea as f32,
+                sea_y: self.sea_y,
+                mv: self.mv,
+            }
+        })
     }
 
     /// The plan of a last level `gw × gh` cells: one tile, or `tile_cells` tiles with the halo.
@@ -390,10 +449,12 @@ pub struct Outcome {
 /// The levels before it run on the whole raster, or in tiles of `p.tile_cells` when `p.stream` says
 /// so (or, for `auto`, when `reserve(bytes)`, which is asked before every allocation of buffers of
 /// that size, refuses the whole raster's).
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     l2: Level,
     doublings: u32,
     cfg: &Config,
+    character: Option<CharacterCtx<'_>>,
     plan: TilePlan,
     sink: &mut dyn TileSink,
     cancelled: &dyn Fn() -> bool,
@@ -441,6 +502,7 @@ pub fn run(
             plan: level_plan,
             preview_stride: 1,
             last: false,
+            character: None,
         };
         reserve((gw * gh) as u64 * LEVEL_BYTES_PER_CELL)?;
         let mut next = LevelSink::new(gw, gh, dxf);
@@ -467,6 +529,7 @@ pub fn run(
         plan,
         preview_stride: preview_stride(gw, cfg.p.preview_width as usize),
         last: true,
+        character,
     };
     let (preview, stats) = run_tiles(&level, &last, sink, cancelled, reserve)?;
     Ok(Outcome {
@@ -651,6 +714,7 @@ impl AmplifyStage {
             sea_y: f64::from(s.sea_level_y),
             mv: s.m_per_block_v,
             mh: s.m_per_block_h,
+            l3_r: self.preset.resolution.l3_r,
         }
     }
 
@@ -678,6 +742,21 @@ impl AmplifyStage {
         let c = self.preset.scale.circumference_blocks;
         let l3 = GridDesc::for_planet("L3", c, r.l3_r)?;
         let cfg = self.config(sea);
+        let fields = CharacterFields::from_world(world, r.l1_r, r.l3_r, &self.p.character);
+        // The youth and fold strength the character read, for the keyframes and the workbench.
+        if !fields.neutral {
+            let l1 = GridDesc::for_planet("L1", c, r.l1_r)?;
+            let (youth, fold) = fields.maps();
+            for (name, data) in [(field::YOUTH, youth), (field::FOLD, fold)] {
+                world.fields.insert(
+                    name.to_owned(),
+                    Field {
+                        grid: l1.clone(),
+                        data,
+                    },
+                );
+            }
+        }
         let level = level_from_world(world, &self.preset)?;
         let (gw, gh) = (l3.w as usize, l3.h as usize);
 
@@ -704,7 +783,16 @@ impl AmplifyStage {
         let mut sink = PackSink::create(ctx.out_dir, &l3, 256, sea, cfg.sea_y, cfg.mv)?;
         let setup_ms = started.elapsed().as_secs_f64() * 1000.0;
         let cancelled = || ctx.cancelled();
-        let out = run(level, n_dbl, &cfg, plan, &mut sink, &cancelled, &reserve)?;
+        let out = run(
+            level,
+            n_dbl,
+            &cfg,
+            cfg.character(&fields),
+            plan,
+            &mut sink,
+            &cancelled,
+            &reserve,
+        )?;
         let files = sink.finish()?;
 
         // The thinned copies (keyframes, the workbench) …
@@ -783,6 +871,18 @@ impl AmplifyStage {
             "window_cells_max": t.window_cells_max,
             "cells": t.cells,
             "drama": self.drama,
+            "ruggedness": self.p.ruggedness,
+            "character": {
+                "plate_fields": !fields.neutral,
+                "land_cells": t.character.land_cells,
+                "mean_abs_change_blocks": t.character.abs_change_blocks_cells / (t.character.land_cells.max(1) as f64),
+                "max_raise_blocks": t.character.max_raise_blocks,
+                "max_cut_blocks": t.character.max_cut_blocks,
+                "flood_raised_cells": t.character_flood_raised_cells,
+                "softened_cells": t.character_softened_cells,
+                "flood_max_raise_m": t.character_flood_max_raise_m,
+                "millis": t.character_ms,
+            },
             "erosion_iterations": self.p.erosion_iterations,
             "thermal_iterations": self.p.thermal_iterations,
             "deposition_iterations": self.p.deposition_iterations,
@@ -849,6 +949,7 @@ pub fn summary_line(v: &Value) -> String {
     format!(
         "amplify_final={}x{} mode={} tiles={} halo={} mid_tiles=[{level_tiles}] sinks={} pre_flood_raised_cells={} flood_raised_cells={} \
          flood_max_raise_m={:.2}@{} mean_abs_change_m={:.1} mean_detail_blocks={:.2} eroded_km3={:.3e} lost_in_transit_km3={:.3e} drama={} \
+         ruggedness={} character[mean_abs_blocks={:.2},flood_raised_cells={},softened_cells={},{:.1}s] \
          passes[{}] sample={:.1}s detail={:.1}s sink={:.1}s total={:.1}s",
         v["grid"]["w"],
         v["grid"]["h"],
@@ -865,6 +966,13 @@ pub fn summary_line(v: &Value) -> String {
         f("eroded_km3"),
         f("lost_in_transit_km3"),
         v["drama"],
+        v["ruggedness"],
+        v["character"]["mean_abs_change_blocks"]
+            .as_f64()
+            .unwrap_or(0.0),
+        v["character"]["flood_raised_cells"],
+        v["character"]["softened_cells"],
+        v["character"]["millis"].as_f64().unwrap_or(0.0) / 1000.0,
         pass,
         v["last"]["sample_ms"].as_f64().unwrap_or(0.0) / 1000.0,
         v["last"]["detail_ms"].as_f64().unwrap_or(0.0) / 1000.0,
