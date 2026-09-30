@@ -20,8 +20,8 @@ use crate::manifest::Manifest;
 use crate::raster::{DType, RasterRead};
 use crate::rivers::{Rivers, read_rivers};
 use crate::sites::{Site, SiteIndex, read_sites};
-use crate::water::{self, WaterColumn, WaterSource, WaterSpec};
 use crate::strata::ColumnHorizon;
+use crate::water::{self, WaterColumn, WaterSource, WaterSpec};
 
 /// The terrain layer.
 pub const ELEVATION: &str = "elevation";

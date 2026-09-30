@@ -721,7 +721,12 @@ fn run(cli: Cli) -> Result<()> {
                 }
                 None => None,
             };
-            print_json(&deeptime_inspect::watercheck::check(&w, area, min_lake, wd.as_ref()))?;
+            print_json(&deeptime_inspect::watercheck::check(
+                &w,
+                area,
+                min_lake,
+                wd.as_ref(),
+            ))?;
         }
         Cmd::Rivers {
             world_data,
