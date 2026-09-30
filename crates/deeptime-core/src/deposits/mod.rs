@@ -1036,8 +1036,9 @@ struct TypeCensus {
     seams: usize,
     seams_max: usize,
     measures_m: f64,
-    /// Stacked types: deposits dropped because the site has no sedimentary cover to hold a seam
-    /// (basement at the surface), and stacks the cover made smaller or shallower.
+    /// Stacked types: deposits dropped because the site's sedimentary cover holds none of their
+    /// seams (basement at the surface, or the stack wholly under the cover), and stacks the cover
+    /// cut short.
     no_cover: usize,
     cover_capped: usize,
     /// The most favourable cell of the planet: where, how favourable, and the component that
@@ -2257,8 +2258,8 @@ impl DepositStage {
             let mut srng = Rng::stream(self.seed, &format!("stack/{}/{cell}/{x:.3}", t.id));
             geometry::seam_plan(k, measures, 2.0 * half_m, &mut srng)
         });
-        // A stack lies in the site's sedimentary cover: fewer seams where the cover is thin,
-        // raised where the ledger put it below the cover's base, none where there is no cover.
+        // A stack lies in the site's sedimentary cover: the seams under the cover's base are not
+        // there (fewer, shallower seams where the cover is thin), none where there is no cover.
         let mut centre_depth = centre_depth;
         let mut seams = seams;
         let fit = match (&t.geometry.stack, &seams, &f.cover) {
