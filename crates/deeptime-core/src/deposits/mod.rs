@@ -1820,14 +1820,40 @@ impl DepositStage {
                         .map(|s| geometry::footprint_blocks(t, s.tonnage_mt * 1.0e6, &sc))
                         .collect()
                 });
+                // A field claims its footprint only if it will survive (its fate decided here the
+                // way `materialise` decides it, from the same random streams).
+                let mut placed = std::mem::take(&mut f.placed[ti]);
+                let t_end = self
+                    .state
+                    .frame_times
+                    .last()
+                    .map_or(world.t_years, |(t, _)| *t);
+                let mut claims = |k: usize, pt: &Point| -> bool {
+                    if !spacing.adjoining {
+                        return true;
+                    }
+                    let (Some(i), Ok(j)) =
+                        (cols.index(pt.cell), plan.cells.binary_search(&pt.cell))
+                    else {
+                        return true;
+                    };
+                    let hazard = match plan.formation {
+                        FormationKind::Hazard => Some(cols.hazard_of(pi, j)),
+                        _ => None,
+                    };
+                    let col = cols.series(i, &self.state.frame_times);
+                    self.survives(&f, ti, pt, &sizes[k], hazard, &col, t_end)
+                };
                 let (pts, dropped) = cluster::place(
                     &mut rng,
                     &space,
                     &spacing,
                     &radii,
                     footprints.as_deref(),
-                    &mut f.placed[ti],
+                    &mut placed,
+                    &mut claims,
                 );
+                f.placed[ti] = placed;
                 f.census[ti].dropped_separation += dropped;
                 f.census[ti].placed += pts.len();
                 for (k, p) in &pts {
@@ -2124,6 +2150,195 @@ impl DepositStage {
     }
 
     #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+    /// A deposit's formation time, and the random stream its materialisation goes on with: a
+    /// charged trap at its charge; a type that forms during the history at a frame drawn ∝ its
+    /// cell's favourability hazard, uniform within the frame (the distribution the survivor
+    /// formula integrated over, [`survival`]).
+    fn formation_draw(
+        &self,
+        ti: usize,
+        cell: u32,
+        x: f64,
+        hazard: Option<&[f32]>,
+        charge_t: Option<f64>,
+        t_end: f64,
+    ) -> (f64, Rng) {
+        let t = &self.types[ti];
+        let mut rng = Rng::stream(self.seed, &format!("materialise/{}/{cell}/{x:.3}", t.id));
+        let acc = self.state.acc[ti].get(cell as usize).copied();
+        let hazard_frame = hazard.and_then(|h| draw_frame(h, rng.uniform()));
+        let t_form = match (charge_t, hazard_frame, acc) {
+            (Some(tc), _, _) => tc,
+            (None, Some(k), _) => {
+                let (te, dt) = self.state.frame_times[k];
+                te - dt * rng.uniform()
+            }
+            (None, None, Some(a)) if a.k_best != u16::MAX => {
+                let (te, dt) = self.state.frame_times[a.k_best as usize];
+                te - dt * rng.uniform()
+            }
+            _ => t_end,
+        };
+        (t_form, rng)
+    }
+
+    /// A stacked deposit's seams and where its centre lies (coal measures: their number from the
+    /// sediment the history laid down under the site while it was coal-forming; the top seam
+    /// half the measures above the centre), held in the site's sedimentary cover
+    /// (`geometry::fit_stack`: the seams under the cover's base are not there, none where there
+    /// is no cover). (None, the ledger's depth, None) for a type without a stack.
+    #[allow(clippy::too_many_arguments)]
+    fn stack_plan(
+        &self,
+        f: &Finish,
+        ti: usize,
+        (cell, x, z): (u32, f64, f64),
+        surf: f64,
+        centre_depth: f64,
+        half_m: f64,
+        hazard: Option<&[f32]>,
+        col: &[ColumnSample],
+    ) -> (Option<geometry::SeamPlan>, f64, Option<geometry::StackFit>) {
+        let t = &self.types[ti];
+        let Some(k) = &t.geometry.stack else {
+            return (None, centre_depth, None);
+        };
+        let frame_years: Vec<f64> = self.state.frame_times.iter().map(|(te, _)| *te).collect();
+        let measures = geometry::measures_thickness_m(
+            hazard.unwrap_or(&[]),
+            t.integration_myr,
+            &frame_years,
+            col,
+        );
+        let stream = format!("stack/{}/{cell}/{x:.3}", t.id);
+        let plan = geometry::seam_plan(
+            k,
+            measures,
+            2.0 * half_m,
+            &mut Rng::stream(self.seed, &stream),
+        );
+        let Some(cover) = &f.cover else {
+            return (Some(plan), centre_depth, None);
+        };
+        let fit = geometry::fit_stack(k, &plan, centre_depth, cover.blocks_at(x, z, surf), &f.sc);
+        match fit {
+            geometry::StackFit::Capped {
+                measures_m,
+                centre_depth_m,
+            } => {
+                let plan = if measures_m < plan.measures_m {
+                    geometry::seam_plan(
+                        k,
+                        measures_m,
+                        2.0 * half_m,
+                        &mut Rng::stream(self.seed, &stream),
+                    )
+                } else {
+                    plan
+                };
+                (Some(plan), centre_depth_m, Some(fit))
+            }
+            _ => (Some(plan), centre_depth, Some(fit)),
+        }
+    }
+
+    /// Whether a field of type `ti` and `size` placed at `pt` becomes a site: its fate decided
+    /// exactly as [`Self::materialise`] decides it (the same formation draw, ledger, stack in the
+    /// cover, build-range check and seams below the ground), without touching the world. The
+    /// placement asks it so that only surviving fields reserve their footprint.
+    #[allow(clippy::too_many_arguments)]
+    fn survives(
+        &self,
+        f: &Finish,
+        ti: usize,
+        pt: &Point,
+        size: &SizeDraw,
+        hazard: Option<&[f32]>,
+        col: &[ColumnSample],
+        t_end: f64,
+    ) -> bool {
+        let t = &self.types[ti];
+        if t.formation_time == FormationTime::Cause {
+            // Its formation time follows its causes; the placement does not replay those.
+            return true;
+        }
+        let sc = f.sc;
+        let (x, z, cell) = (pt.x, pt.z, pt.cell);
+        let (t_form, mut rng) = self.formation_draw(ti, cell, x, hazard, None, t_end);
+        let tonnage_t = size.tonnage_mt * 1.0e6;
+        let half_m = geometry::half_height_m(t, tonnage_t);
+        let (eroded_m, buried_m) = since(col, t_form);
+        let ledger = Ledger {
+            formation_depth_m: t.preservation.formation_depth_m,
+            half_height_m: half_m,
+            eroded_m,
+            buried_m,
+        };
+        let fate = ledger.apply(t.preservation.erosion_behavior, t.shape().metric());
+        if matches!(fate, Fate::Eroded) {
+            return false;
+        }
+        let surf = f.surface_at(x, z);
+        let (seams, centre_depth, fit) = self.stack_plan(
+            f,
+            ti,
+            (cell, x, z),
+            surf,
+            ledger.centre_depth_m(),
+            half_m,
+            hazard,
+            col,
+        );
+        if fit == Some(geometry::StackFit::NoCover) {
+            return false;
+        }
+        let centre_y = surf - centre_depth / sc.m_per_block_v;
+        let top_y = seams.as_ref().map_or(centre_y, |p| {
+            surf - (centre_depth - p.measures_m / 2.0) / sc.m_per_block_v
+        });
+        let half_blocks = half_m / sc.m_per_block_v * t.balance.size_mult_v;
+        if top_y + half_blocks < f64::from(sc.min_y + 4) {
+            return false;
+        }
+        let (Some(k), Some(plan)) = (&t.geometry.stack, &seams) else {
+            return true;
+        };
+        // The same draws `materialise` makes next (dip, then yaw) for the stack's bodies.
+        let dip = if t.geometry.dip_deg[1] > t.geometry.dip_deg[0] {
+            (t.geometry.dip_deg[0] + rng.uniform() * (t.geometry.dip_deg[1] - t.geometry.dip_deg[0]))
+                .to_radians()
+        } else {
+            t.geometry.dip_deg[0].to_radians()
+        };
+        let yaw_draw = rng.uniform() * std::f64::consts::PI;
+        let placement = Placement {
+            x,
+            z,
+            surface_y: surf,
+            centre_depth_m: centre_depth,
+            yaw: pt.ellipse.map_or(yaw_draw, |e| e[2]) as f32,
+            dip: dip as f32,
+            truncated: matches!(fate, Fate::Truncated { .. }),
+        };
+        let mut n = 0;
+        !geometry::stack_bodies(
+            t,
+            k,
+            0,
+            tonnage_t,
+            &Grades::new(),
+            &placement,
+            plan,
+            &sc,
+            &mut || {
+                n += 1;
+                n
+            },
+        )
+        .bodies
+        .is_empty()
+    }
+
     fn materialise(
         &self,
         f: &mut Finish,
@@ -2139,32 +2354,21 @@ impl DepositStage {
         let (x, z) = (cand.point.x, cand.point.z);
         let cell = cand.point.cell;
         let col = &series[&cell];
-        let mut rng = Rng::stream(self.seed, &format!("materialise/{}/{cell}/{x:.3}", t.id));
         let acc = self.state.acc[cand.ty].get(cell as usize).copied();
         let slack = self.state.frame_times.first().map_or(1.0e7, |(_, dt)| *dt);
-        // Formation time: a charged trap at its charge; a type that forms during the history at
-        // a frame drawn ∝ its cell's favourability hazard, uniform within the frame (the
-        // distribution the survivor formula integrated over, [`survival`]).
-        let hazard_frame = cand
-            .hazard
-            .as_deref()
-            .and_then(|h| draw_frame(h, rng.uniform()));
-        let mut t_form = match (cand.charge, hazard_frame, acc) {
-            (Some((_, tc, _)), _, _) => tc,
-            (None, Some(k), _) => {
-                let (te, dt) = self.state.frame_times[k];
-                te - dt * rng.uniform()
-            }
-            (None, None, Some(a)) if a.k_best != u16::MAX => {
-                let (te, dt) = self.state.frame_times[a.k_best as usize];
-                te - dt * rng.uniform()
-            }
-            _ => self
-                .state
-                .frame_times
-                .last()
-                .map_or(world.t_years, |(t, _)| *t),
-        };
+        let t_end = self
+            .state
+            .frame_times
+            .last()
+            .map_or(world.t_years, |(t, _)| *t);
+        let (mut t_form, mut rng) = self.formation_draw(
+            cand.ty,
+            cell,
+            x,
+            cand.hazard.as_deref(),
+            cand.charge.map(|c| c.1),
+            t_end,
+        );
         let (xf, zf) = self.xz_at(f, cell, (x, z), t_form);
         let mut causes = f.cause_ids(t, xf, zf, t_form, slack);
         if t.formation_time == FormationTime::Cause
@@ -2289,54 +2493,23 @@ impl DepositStage {
             }
             Fate::Buried { .. } | Fate::Truncated { .. } => {}
         }
-        let centre_depth = ledger.centre_depth_m();
-        // A stacked deposit's seams (coal measures): their number from the sediment the history
-        // laid down under the site while it was coal-forming; the top seam lies half the
-        // measures above the ledger's centre.
-        let seams = t.geometry.stack.as_ref().map(|k| {
-            let frame_years: Vec<f64> = self.state.frame_times.iter().map(|(te, _)| *te).collect();
-            let measures = geometry::measures_thickness_m(
-                cand.hazard.as_deref().unwrap_or(&[]),
-                t.integration_myr,
-                &frame_years,
-                col,
-            );
-            let mut srng = Rng::stream(self.seed, &format!("stack/{}/{cell}/{x:.3}", t.id));
-            geometry::seam_plan(k, measures, 2.0 * half_m, &mut srng)
-        });
-        // A stack lies in the site's sedimentary cover: the seams under the cover's base are not
-        // there (fewer, shallower seams where the cover is thin), none where there is no cover.
-        let mut centre_depth = centre_depth;
-        let mut seams = seams;
-        let fit = match (&t.geometry.stack, &seams, &f.cover) {
-            (Some(k), Some(plan), Some(cover)) => Some((
-                geometry::fit_stack(k, plan, centre_depth, cover.blocks_at(x, z, surf), &sc),
-                plan.measures_m,
-            )),
-            _ => None,
-        };
+        let (seams, centre_depth, fit) = self.stack_plan(
+            f,
+            cand.ty,
+            (cell, x, z),
+            surf,
+            ledger.centre_depth_m(),
+            half_m,
+            cand.hazard.as_deref(),
+            col,
+        );
         match fit {
-            None | Some((geometry::StackFit::Fits, _)) => {}
-            Some((geometry::StackFit::NoCover, _)) => {
+            None | Some(geometry::StackFit::Fits) => {}
+            Some(geometry::StackFit::NoCover) => {
                 f.census[ti].no_cover += 1;
                 return Ok(());
             }
-            Some((
-                geometry::StackFit::Capped {
-                    measures_m,
-                    centre_depth_m,
-                },
-                planned,
-            )) => {
-                f.census[ti].cover_capped += 1;
-                centre_depth = centre_depth_m;
-                if let Some(k) = &t.geometry.stack
-                    && measures_m < planned
-                {
-                    let mut srng = Rng::stream(self.seed, &format!("stack/{}/{cell}/{x:.3}", t.id));
-                    seams = Some(geometry::seam_plan(k, measures_m, 2.0 * half_m, &mut srng));
-                }
-            }
+            Some(geometry::StackFit::Capped { .. }) => f.census[ti].cover_capped += 1,
         }
         let centre_y = surf - centre_depth / sc.m_per_block_v;
         let top_y = seams.as_ref().map_or(centre_y, |p| {
