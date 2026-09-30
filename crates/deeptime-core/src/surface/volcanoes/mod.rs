@@ -471,21 +471,23 @@ impl L1<'_> {
         s
     }
 
-    /// The ground around a foot: the mean elevation over a ring from 1.05 R to 1.05 R + 1.5 cells.
+    /// The ground around a foot: the lower quartile of the elevation over a ring from 1.05 R to
+    /// 1.05 R + 1.5 cells.
     fn base(&self, x: f64, z: f64, radius_m: f64) -> f64 {
         let (inner, outer) = (1.05 * radius_m, 1.05 * radius_m + 1.5 * self.cell_m);
-        let (mut s, mut k) = (0.0, 0usize);
+        let mut ring: Vec<f64> = Vec::new();
         for_cells(self.grid, self.mh, x, z, outer, |c, dx, dz| {
             if dx.hypot(dz) >= inner {
-                s += f64::from(self.elev[c]) + f64::from(self.delta[c]);
-                k += 1;
+                ring.push(f64::from(self.elev[c]) + f64::from(self.delta[c]));
             }
         });
-        if k == 0 {
-            sample_at(self.grid, self.elev, x, z)
-        } else {
-            s / k as f64
+        if ring.is_empty() {
+            return sample_at(self.grid, self.elev, x, z);
         }
+        // The lower quartile: a neighbour's flank on one side of the ring (shields of a chain
+        // overlap) does not lift the ground.
+        ring.sort_by(f64::total_cmp);
+        ring[ring.len() / 4]
     }
 
     /// The volcano's body height now (its relief over the ring, per the centre's weight) and
@@ -666,11 +668,11 @@ impl VolcanoStage {
         // Log changes: (cell, thickness (negative = erode), class) in order.
         let mut log_ops: Vec<(usize, f32, u16)> = Vec::new();
 
-        // 2. Measure: the relief left of what each volcano built (the measure alone would also
-        // count a ridge or a trench beside it; erosion and blur only lower it).
+        // 2. Measure: the relief over its foot, never more than the volcano ever stood (the
+        // measure alone would also count a ridge it sits on).
         let started = Instant::now();
         for v in &mut st.volcanoes {
-            v.height_m = v.height_m.min(l1.measure(v).0);
+            v.height_m = l1.measure(v).0.min(v.peak_m);
         }
         self.time("measure", started);
 
@@ -955,7 +957,7 @@ impl VolcanoStage {
             }
             // New volcanoes are measured now; the others were measured before the births.
             let (h, base) = l1.measure(v);
-            v.height_m = v.height_m.min(h);
+            v.height_m = h.min(v.peak_m);
             let target = match v.kind {
                 Kind::Strato => {
                     let f = v.flux_last;
