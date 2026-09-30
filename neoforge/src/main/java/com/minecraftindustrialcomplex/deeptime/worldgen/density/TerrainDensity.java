@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen.density;
 
+import com.minecraftindustrialcomplex.deeptime.worldgen.TerrainScale;
 import com.minecraftindustrialcomplex.deeptime.worldgen.TerrainSource;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.lang.ref.WeakReference;
 import net.minecraft.util.KeyDispatchDataCodec;
 import net.minecraft.util.StringRepresentable;
 
@@ -16,13 +18,20 @@ import net.minecraft.util.StringRepresentable;
  * the surface (sloped_cheese ≈ 4·factor/128 per block), which keeps the cave-entrance band of the
  * final density (terrain < 1.5625) about as deep as vanilla's.
  *
+ * <p>The scale k grows on steep ground ({@link TerrainScale}): with a fixed k the router's cave
+ * band breaks steep faces into steps between noise-cell corners.
+ *
+ * <p>{@code ratio} mode is k / scale (1 on gentle ground): the router multiplies the cave-entrance
+ * term of its terrain band by it, so min(terrain, 5·entrances) carves exactly where it did with the
+ * fixed k (both sides shrink by the same factor) and steep faces get no extra cave mouths.
+ *
  * <p>{@code initial} mode adds 0.390625: {@code NoiseChunk} takes the preliminary surface as the
  * highest cell y where initial density exceeds 0.390625, so this puts it at H.
  */
 public final class TerrainDensity extends DeepTimeDensity {
 
     public enum Mode implements StringRepresentable {
-        INITIAL("initial"), FINAL("final");
+        INITIAL("initial"), FINAL("final"), RATIO("ratio");
 
         public static final Codec<Mode> CODEC = StringRepresentable.fromEnum(Mode::values);
         private final String name;
@@ -60,14 +69,41 @@ public final class TerrainDensity extends DeepTimeDensity {
         return new TerrainDensity(source, mode, k);
     }
 
+    /** Per-thread memo of the last column: vanilla sweeps a column's corners bottom to top. */
+    private static final class Memo {
+        /** Weak, so a stopped server's world data is not kept alive by idle worker threads. */
+        WeakReference<TerrainSource> source = new WeakReference<>(null);
+        double baseK = Double.NaN;
+        int x = Integer.MIN_VALUE, z = Integer.MIN_VALUE;
+        double height, scale;
+    }
+
+    private static final ThreadLocal<Memo> MEMO = ThreadLocal.withInitial(Memo::new);
+
     @Override
     public double compute(FunctionContext ctx) {
-        double d = (source().height(ctx.blockX(), ctx.blockZ()) - ctx.blockY()) / k;
+        TerrainSource src = source();
+        int x = ctx.blockX(), z = ctx.blockZ();
+        Memo m = MEMO.get();
+        if (m.x != x || m.z != z || m.source.get() != src || m.baseK != k) {
+            double h = src.height(x, z);
+            m.height = h;
+            m.scale = TerrainScale.at(src, x, z, h, k);
+            m.x = x;
+            m.z = z;
+            m.source = new WeakReference<>(src);
+            m.baseK = k;
+        }
+        if (mode == Mode.RATIO)
+            return k / m.scale;
+        double d = (m.height - ctx.blockY()) / m.scale;
         return mode == Mode.INITIAL ? d + PRELIMINARY_SURFACE_THRESHOLD : d;
     }
 
     @Override
     public double minValue() {
+        if (mode == Mode.RATIO)
+            return 0.0;
         return -2048.0 / k;
     }
 

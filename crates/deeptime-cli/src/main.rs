@@ -5,6 +5,7 @@ mod alloc;
 mod amplify_view;
 mod climate_dem;
 mod dump;
+mod heightmap;
 mod hydro;
 mod parity;
 mod provinces;
@@ -143,6 +144,10 @@ enum Command {
         /// Folder for the stage's keyframes (default <out>.work, or a temporary folder).
         #[arg(long)]
         work: Option<PathBuf>,
+        /// When the stage finishes the run, bake the world data into the work folder (what `run`
+        /// writes), so a later stage's parameters can be tried on the game's terrain.
+        #[arg(long)]
+        bake: bool,
         #[command(flatten)]
         common: CommonArgs,
     },
@@ -316,6 +321,26 @@ enum Command {
         /// Sets a preset value first, `--set hydro.width_coef=1.5` (repeatable).
         #[arg(long = "set", value_name = "PATH=VALUE")]
         set: Vec<String>,
+    },
+    /// The terrain of a box of a world-data folder as a float32 NumPy array (H, E, A·N and any
+    /// --layers, nearest), for review renders without a Minecraft server.
+    #[command(allow_negative_numbers = true)]
+    Heightmap {
+        /// World-data folder.
+        #[arg(long)]
+        world_data: PathBuf,
+        /// x0,z0,x1,z1 in blocks (ends exclusive).
+        #[arg(long = "box", value_delimiter = ',', allow_negative_numbers = true)]
+        area: Vec<i64>,
+        /// Blocks between samples.
+        #[arg(long, default_value_t = 1)]
+        step: i64,
+        /// More layers to sample (nearest), comma-separated.
+        #[arg(long, value_delimiter = ',')]
+        layers: Vec<String>,
+        /// The .npy file to write (and <out>.json).
+        #[arg(long)]
+        out: PathBuf,
     },
     /// Dump a world's sites, index lookups, body evaluations and cause chains as JSON (the Java
     /// parity-test fixture, P1-15).
@@ -497,6 +522,7 @@ fn main() -> ExitCode {
             viewer,
             viewer_layers,
             work,
+            bake,
             common,
         }) => finish(
             "stage",
@@ -511,6 +537,7 @@ fn main() -> ExitCode {
                 viewer,
                 viewer_layers,
                 work,
+                bake,
                 common: common.common(),
             }),
         ),
@@ -653,6 +680,30 @@ fn main() -> ExitCode {
                 }
                 Err(e) => {
                     eprintln!("deeptime hydro: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        Some(Command::Heightmap {
+            world_data,
+            area,
+            step,
+            layers,
+            out,
+        }) => {
+            let b = heightmap::Box2 {
+                x0: area[0],
+                z0: area[1],
+                x1: area[2],
+                z1: area[3],
+            };
+            match heightmap::run(&world_data, &b, step, &layers, &out) {
+                Ok((rows, cols)) => {
+                    println!("deeptime heightmap: {rows} x {cols} -> {}", out.display());
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime heightmap: {e}");
                     ExitCode::FAILURE
                 }
             }
@@ -917,6 +968,7 @@ mod tests {
             viewer: Some(dir.join("viewer")),
             viewer_layers: Vec::new(),
             work: None,
+            bake: false,
             common: quiet(),
         })
         .unwrap();
@@ -975,6 +1027,7 @@ mod tests {
             viewer: None,
             viewer_layers: Vec::new(),
             work: None,
+            bake: false,
             common: quiet(),
         };
         super::run::stage(&first).unwrap();
@@ -989,6 +1042,7 @@ mod tests {
             viewer: Some(dir.join("viewer")),
             viewer_layers: Vec::new(),
             work: None,
+            bake: false,
             common: quiet(),
         };
         super::run::stage(&second).unwrap();
@@ -1064,6 +1118,7 @@ mod tests {
                 viewer,
                 viewer_layers: Vec::new(),
                 work,
+                bake: false,
                 common: quiet(),
             })
         };
@@ -1148,6 +1203,7 @@ mod tests {
                 viewer,
                 viewer_layers: Vec::new(),
                 work: None,
+                bake: false,
                 common: quiet(),
             })
         };
@@ -1269,6 +1325,7 @@ mod tests {
                 viewer,
                 viewer_layers: Vec::new(),
                 work: None,
+                bake: false,
                 common: quiet(),
             })
         };

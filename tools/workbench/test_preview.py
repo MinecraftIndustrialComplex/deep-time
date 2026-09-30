@@ -145,5 +145,32 @@ class Runs(unittest.TestCase):
         self.assertEqual(out["note_kind"], "test-world")
 
 
+
+class LevelTypeSpecs(unittest.TestCase):
+    """A comparison world in the pack's own generator (vanilla or Terralith, no Deep Time)."""
+
+    def test_a_level_type_world_with_located_boxes(self):
+        s = preview.normalise_spec({"profile": "mic", "world": {
+            "level_type": "minecraft:normal", "seed": 5,
+            "locate": ["terralith:emerald_peaks", "minecraft:jagged_peaks@1000,-2000"], "locate_side": 320,
+            "jvm_props": ["deeptime.steepScale=0"]}}, max_side=512)
+        self.assertEqual(s["boxes"], [])
+        self.assertEqual(s["y"], list(preview.VANILLA_Y))
+        self.assertEqual(s["world"]["locate_side"], 320)
+        self.assertEqual(s["max_side"], 512)
+
+    def test_bad_level_type_specs_are_refused(self):
+        for world in ({"level_type": "normal"},                       # not a resource location
+                      {"synth": "wrap-test", "locate": ["minecraft:plains"]},
+                      {"level_type": "minecraft:normal", "locate": ["minecraft:plains@x,1"]},
+                      {"level_type": "minecraft:normal", "locate": ["minecraft:plains"], "jvm_props": ["java.home=/"]},
+                      {"level_type": "minecraft:normal", "synth": "wrap-test", "box": [0, 0, 16, 16]}):
+            with self.assertRaises(ValueError, msg=str(world)):
+                spec = {"world": world}
+                if "box" in world:
+                    spec["box"] = world.pop("box")
+                preview.normalise_spec(spec)
+
+
 if __name__ == "__main__":
     unittest.main()
