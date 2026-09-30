@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -73,6 +73,77 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — MIC GameTest heap stall: the suite's scattered samples, not lakeHolds (agent worktree agent-a11ef8b35a6ebb8ee, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Ben's decision** (decisions log 2026-09-29, "Chase the stall (Recommended)"). Resolves the P1-12 known issue
+  (`-PwithMic` stalls in `lakeHolds` and runs out of heap; 4 of 4 runs at P1-09).
+- **Reproduced** (Mac, `tools/smoke/install.sh mic` → 168 mods, pack 4d0e685-dirty, then `./gametest.sh -PwithMic`):
+  4 of 4 runs failed as before. In three, 48 tests passed within ~20 s of the batch start, `lakeHolds` sat in
+  its 400-tick wait, the heap climbed to 8 GB and C2ME's workers threw `OutOfMemoryError` 40–80 s later; the
+  fourth ran out of heap during the batch start itself. `jcmd` could no longer attach once the heap was full. A watcher on the Mac (`jcmd GC.heap_info` / `Thread.print` every 2 s, `GC.class_histogram`
+  above 3 GB) caught it on the way up.
+- **Evidence.** (1) Class histogram at 5.1 GB live: 68,488 `LevelChunkSection[]` (one per chunk), 4.1 M
+  `LevelChunkSection`, 8.0 M `SingleValuePalette`/`ZeroBitStorage` (empty sections, i.e. proto-chunks), 12.4 M
+  `DataResult$Success` and 4.5 M `CompoundTag` (chunk serialization): ~68,000 chunks resident. (2) Thread
+  dumps: the server thread inside test start functions — `GeneratorGameTests.surfaceAtNoise` ←
+  `heightMatchesReference`, `RealPlanetGameTests.realPlanetHeightMatchesTheBake`, `BiomeGameTests.surfaceRulesApplied`
+  — each in `ServerChunkCache.getChunk` → `managedBlock`; after the batch, C2ME's `ReadFromDiskAsync.downgradeFromThis`
+  → `asyncSave` serializing the chunks as they unload. No frame in `lakeHolds`, no fluid ticking. (3) A new
+  chunk census (`ChunkCensus`, below) on the standalone run: peak **51,793** chunks; `heightMatchesReference`
+  alone added 41,408 (C = 16,384 `test_planet`), `realPlanetHeightMatchesTheBake` 21,463 (`test_planet_real`),
+  `periodicAcrossSeam` 9,614, `realPlanetRockMatchesTheParityFixture` 5,356; `lakeHolds` holds 1,428
+  (`test_lake`, forceloaded) — small. (4) `lakeHolds` alone under MIC (`./gametest.sh -PwithMic
+  -PgametestOnly=lakeHolds`): passes in 6.2 s, heap 2.3 GB, before=after=expected=65304, outside=0.
+- **Root cause.** A chunk requested at NOISE or later needs STRUCTURE_STARTS within radius 8
+  (`ChunkPyramid.GENERATION_PYRAMID`), so a sample far from the others loads up to 289 proto-chunks. A
+  `getChunk` ticket lasts one tick and nothing unloads inside a tick, and the sampling tests took all their
+  columns synchronously in their start ticks (the batch starts its 49 tests within ~40 ticks), so the suite's
+  whole footprint was resident at once and then unloaded (and serialized) at once. Standalone fits its 6 GB
+  (peak ~5.6 GB); the MIC server (C2ME's async chunk system and serialization, the pack's structure sets)
+  carries more per chunk and runs 8 GB out. `lakeHolds` is the one test still running (its 400-tick wait) when
+  that happens, and `worldInfoFollowsThePlayer` is in the next batch: that is why exactly those two never
+  reported. P1-08's real-planet level (~27,000 more chunks in the census) is consistent with the step from 3 of 7
+  runs to every run.
+- **Fix (test design, bounded per tick).** `gametest/ChunkSampling`: `forEach(helper, n, step, finish)` runs a
+  test's samples at most `STEPS_PER_TICK` = 8 per server tick, under one budget shared by the whole GameTest
+  server (a vanilla `GameTestSequence`: wait until sampled, then assert); a step that loads no chunk costs
+  nothing; an assertion inside a step fails the test after the rest are dropped. Each tick's chunks unload
+  before the next ones load, so the resident set is bounded by the budget (~8 × 289), not by the suite.
+  Every sample is still taken at the same status; only the timing changed. Converted: `heightMatchesReference`,
+  `periodicAcrossSeam`, `realPlanetHeightMatchesTheBake`, `realPlanetRockMatchesTheParityFixture` (a shared
+  `HeightTally` for the three height comparisons). The C = 1,024 samplers (`heightMatchesRaster`,
+  `strataClassesResolve`, `surfaceRulesApplied`, `everyClassInTheWorld`) stay synchronous: that planet is
+  small enough (≤ 3,540 chunks in the census) that they are bounded by it. Neither the heap nor the test list
+  changed.
+- **Also.** `gametest/ChunkCensus` logs `[gametest] chunks peak=… heapPeakMB=… liveHeapPeakMB=…` at the end of every
+  GameTest run (and `[gametest-chunks]` lines per passing test / new peak). Under C2ME `getLoadedChunksCount`
+  counts only promoted chunks, so for MIC the heap numbers are the measure. `-PgametestOnly=<name>[,…]`
+  (`GameTestServerMixin`, `-Ddeeptime.gametestOnly`) runs only the named tests. `gametest.sh`'s peak-RSS
+  sampler matched nothing (the game directory sits in ModDevGradle's @argfile) and printed 0 MB; it now
+  matches the JVM by its `-Dfml.modFolders=deeptime%%<checkout>/neoforge/…` argument (`ps -ww`). Class names:
+  `ChunkSampling`, `ChunkCensus`.
+- **Measured** (branch merged with master 7f907ce; Mac; one `tools/remote/mac.sh --server` loop of five
+  `./gametest.sh -PwithMic` then `./gametest.sh`):
+
+  | run | result | wall | heap peak (in use) | live heap peak | JVM RSS peak |
+  |---|---|---|---|---|---|
+  | MIC 1 | All 50 required tests passed | 81 s | 4,949 MB | 3,326 MB | 6,365 MB |
+  | MIC 2 | All 50 required tests passed | 62 s | 5,874 MB | 4,368 MB | 7,691 MB |
+  | MIC 3 | All 50 required tests passed | 52 s | 5,459 MB | 3,144 MB | 7,161 MB |
+  | MIC 4 | All 50 required tests passed | 58 s | 5,788 MB | 4,179 MB | 7,431 MB |
+  | MIC 5 | All 50 required tests passed | 51 s | 5,623 MB | 3,519 MB | 6,487 MB |
+  | standalone | All 50 required tests passed | 36 s | 3,578 MB | 1,344 MB | 4,866 MB |
+
+  (heap max 8,192 MB MIC / 6,144 MB standalone; "live" = G1 old generation after a collection.) Standalone chunk
+  peak 51,793 → 15,094. `lakeHolds` identical in every run: before=after=expected=65304, outside=0,
+  water_top_y=120. Before the fix: 4 of 4 MIC runs out of heap (8 GB) here, plus P1-09's 4 of 4.
+- **Gates** (merged tree): cargo fmt, clippy `--locked -D warnings`, deny licenses bans clean; cargo test --workspace
+  (core 239 + 3 ignored, …) ok; `./gradlew build test` tests=140 failures=0. No Rust changed on this branch.
+- **Found on the way.** A `tools/remote/mac.sh --server` command that dies of a zsh expansion error (an
+  argument starting with `=`) skips the `EXIT` trap and leaves `server.lock` behind (mine did once; I removed
+  my own stale lock after checking no process of this checkout held it). The stuck JVMs of the failed runs
+  were killed with `kill -9` on their verified PIDs (cwd = this checkout's `run-gametest`).
+- **Next.** New GameTests that sample columns across a planet should go through `ChunkSampling.forEach`; the
+  `[gametest] chunks peak` line shows a test's footprint.
 ### 2026-09-29 — Coal seam fields: a deposit is one minable seam field, density 4 / 14 / 40 per 100,000 km² (agent worktree agent-a3e41a57dc812f499, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben's decision (decisions log 2026-09-29, "OK; define coal as seams (Recommended)"): coal's survivor-based
   counts stay; a deposit is one minable seam field, tens of km across, with its density sized from coal-basin area
@@ -221,7 +292,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   Chunky areas (chunks' own biomes beside the Köppen map). Data: `review/out/p1-09-data/`; the first render
   (before the ET/EF and river fixes): `review/out/p1-09-v1/`.
 - **For Ben.** (1) The `-PwithMic` gate: the `lakeHolds` heap stall now happens every run (above); options are
-  a master control run to see whether it predates P1-09, a larger `-PwithMic` heap, or chasing the stall. (2)
+  a master control run to see whether it predates P1-09, a larger `-PwithMic` heap, or chasing the stall
+  (resolved 2026-09-29, build log "MIC GameTest heap stall"). (2)
   Mapping internals that stay constants (candidates for more settings under the standing rule): the inland
   continentalness distances (200 / 1,000 / 5,000 blocks), the wetland thresholds (vegetation 2.5 bands, flattest
   35 %, below 150 m) and the band placement per Köppen class. (3) In MIC, Dfc lands on Terralith's forested
@@ -2964,6 +3036,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   other test finished and passed, then `lakeHolds` stalled and the JVM died of heap (it exited on its
   own within ~10 min each time). `-PwithMic` had not run on master since P1-08 added the real-planet and
   deposit test levels; no master control run was made.
+  **Resolved 2026-09-29** (build log "MIC GameTest heap stall"): not a C2ME hang and not `lakeHolds`'
+  own chunks. The suite's scattered column samples held ~52,000+ chunks at once (each far sample pulls
+  289 proto-chunks for structure starts, and nothing unloads inside a tick); `lakeHolds` was the one test
+  still waiting when the heap ran out, and passes alone. The samples now run a few per tick; `-PwithMic`
+  passed 5 of 5.
 - **Not done / next.** Bodies in the strata pass (needs P1-08/P1-14's `bodies/`); the review
   artefacts (BlueMap cliffs with Create stones) wait for Ben's review round; `deposit_type`,
   `sim_field`, `essentials` registries come with their tasks. The MIC pack still has no copy of the
