@@ -481,10 +481,15 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
         .max_by(|a, b| {
             // The youngest (a caldera's detail fades), then the largest.
             let key = |v: &Volcano| {
-                let c = v.caldera.as_ref().map_or((0.0, 0.0), |c| (c.t_myr, c.radius_m));
+                let c = v
+                    .caldera
+                    .as_ref()
+                    .map_or((0.0, 0.0), |c| (c.t_myr, c.radius_m));
                 (c.0, c.1)
             };
-            key(a).partial_cmp(&key(b)).unwrap_or(std::cmp::Ordering::Equal)
+            key(a)
+                .partial_cmp(&key(b))
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
     {
         picks.push((
