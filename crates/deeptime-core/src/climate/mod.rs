@@ -7,14 +7,24 @@
 //! `fastscape-lem/orographic-precipitation`, rustfft), the Köppen classes (`koppen.rs`) and
 //! glaciers from the equilibrium line (`glaciers.rs`); `snapshot.rs` puts them together.
 //!
+//! **Deep time** (decisions log 2026-09-29): a long-term carbon cycle and a brightening star
+//! (`carbon.rs`) set the EBM's greenhouse and sunlight; a fine clock (`clock.rs`) advances the
+//! carbon, the EBM and the ice every 100 kyr inside each plate step, so snowball Earths can start
+//! and end on their own (events `deeptime:snowball`, `deeptime:hothouse`); the last 3 Myr run
+//! Milankovitch forcing (`orbit.rs`) with lagged ice sheets; the land ice has a thickness and a
+//! volume that lowers the sea (`ice.rs`), which the surface stage takes as its sea level.
+//!
 //! # In the pipeline
 //! The stage is interleaved with the plates like the surface (`Stage::coupled_to`) and sits
 //! between them, so a planet preset with a `climate` section runs `[plates, climate, surface]`
 //! each plate step. Every step it publishes `climate/{t_mean_c, precip_mm}` (what the surface's
-//! runoff, weathering, facies and the deposit engine's frames read, `surface/climate.rs`) and
-//! `climate/{koppen, t_warm_c, t_cold_c, aridity, glacier, ela_m}`, on the topography the surface
-//! step is about to erode: the plate model's elevation after this plate step plus the surface's
-//! offset carried with the plates exactly as the surface carries it.
+//! runoff, weathering, facies and the deposit engine's frames read, `surface/climate.rs`),
+//! `climate/{koppen, t_warm_c, t_cold_c, aridity, glacier, ela_m}` and the ice fields of FORMAT.md
+//! "The climate's ice fields" (`climate/ice_thickness_m`, `ice_max_thickness_m`,
+//! `ice_max_extent`, `ice_time_share`, `sea_ice`), on the topography the surface step is about to
+//! erode: the plate model's elevation after this plate step plus the surface's offset carried with
+//! the plates exactly as the surface carries it. The step's eustatic sea level goes to
+//! `WorldState::globals["climate/sea_level_m"]` (`SEA_LEVEL_GLOBAL`), which the surface uses.
 //!
 //! **Snapshots** (plan §8.3: every 10 Myr, plus the present): a full climate is computed at the
 //! first step, every `snapshot_every_myr` of simulated time, and at the last step. Between them
@@ -23,18 +33,24 @@
 //! Köppen class — moves with the plates (the surface's semi-Lagrangian advection, `surface::
 //! advect`), and the temperatures take the lapse rate of the current ground: a rain shadow stays
 //! behind its range as the range drifts, and a continent drifting toward the pole cools with its
-//! latitude's reference. Glaciation events are decided at snapshots.
+//! latitude's reference. The zonal references follow the fine clock's EBM every step (the
+//! greenhouse and the sun change between snapshots), and the equilibrium line moves with each
+//! band's summer temperature. Glaciation events are decided every step.
 //!
-//! The EBM's state is kept from snapshot to snapshot (a warm start of `ebm_warm_years`), and the
-//! ice sheets of one snapshot can brighten the EBM's land at the next (`ice_sheet_feedback`, on
-//! by default since P1-17's calibration made the continents Earth-low).
+//! The EBM's state is kept from step to step, and the ice of one step brightens the EBM's land at
+//! the next (`ice_sheet_feedback`, on by default since P1-17's calibration made the continents
+//! Earth-low).
 
 pub mod belts;
+pub mod carbon;
+pub mod clock;
 pub mod ebm;
 pub mod glaciers;
+pub mod ice;
 pub mod insolation;
 pub mod koppen;
 pub mod lapse;
+pub mod orbit;
 pub mod orographic;
 pub mod params;
 pub mod snapshot;
@@ -45,7 +61,7 @@ mod tests;
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use deeptime_format::GridDesc;
+use deeptime_format::{GridDesc, Place};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -59,11 +75,21 @@ use crate::stage::{Stage, StageContext, StageEstimate, from_state, to_state};
 use crate::surface::advect;
 use crate::surface::grid::Dims;
 use crate::world::{Field, WorldState};
-use ebm::EbmState;
+use clock::{ClockState, Happening};
+use ebm::{EbmResult, EbmState};
 use snapshot::{Planet, Refs};
 
 /// The stage's name in a pipeline (`deeptime stage climate`).
 pub const STAGE_NAME: &str = "climate";
+
+/// Carbonate thickness the step's weathering drawdown lays on the sea floor above the carbonate
+/// compensation depth (≤ 4 km deep, `surface::CARBONATE_FLOOR_M`), m, in
+/// `WorldState::globals`: the surface stage deposits it (after a snowball: the cap carbonate).
+pub const CAP_CARBONATE_GLOBAL: &str = "climate/cap_carbonate_m";
+
+/// The step's eustatic sea level (the surface section's curve plus glacio-eustasy), m, in
+/// `WorldState::globals`: the surface stage takes it instead of its curve.
+pub const SEA_LEVEL_GLOBAL: &str = "climate/sea_level_m";
 
 /// Fields the stage writes every step.
 pub mod field {
@@ -78,7 +104,7 @@ pub mod field {
     pub const T_COLD: &str = "climate/t_cold_c";
     /// P / PET (Thornthwaite), capped at 10.
     pub const ARIDITY: &str = "climate/aridity";
-    /// 1 where land lies above its equilibrium line.
+    /// 1 where land ice stands at the end of the step (`ICE_THICKNESS` > 0).
     pub const GLACIER: &str = "climate/glacier";
     /// Equilibrium-line altitude above sea level, m (NaN at sea).
     pub const ELA: &str = "climate/ela_m";
@@ -87,12 +113,62 @@ pub mod field {
     pub const D_WARM: &str = "climate/anomaly/t_warm_c";
     pub const D_COLD: &str = "climate/anomaly/t_cold_c";
     pub const D_LN_PRECIP: &str = "climate/anomaly/ln_precip";
-    /// The ELA of every cell, sea included (so it can be interpolated).
+    /// The ELA of every cell at the last snapshot, sea included (so it can be interpolated);
+    /// the published ELA is this plus its band's shift since.
     pub const ELA_ALL: &str = "climate/anomaly/ela_m";
+
+    /// Month `m`'s (0–11) sea-level temperature, °C (the lapse rate not applied), written at the
+    /// last step only (the bake stores it, P1-25). Month 0 starts at solar longitude 280°
+    /// (`insolation::YEAR_START_RAD`, about 1 January on Earth).
+    pub fn t_sl_month(m: usize) -> String {
+        format!("climate/month/t_sl_c_{:02}", m + 1)
+    }
+
+    /// Month `m`'s (0–11) precipitation rate, mm/yr (the month's share is the rate / 12), written
+    /// at the last step only.
+    pub fn p_month(m: usize) -> String {
+        format!("climate/month/p_mm_{:02}", m + 1)
+    }
+    /// Land ice at the end of the step, m (0 at sea and where there is none). The ice-field
+    /// contract with the surface stage (glacial erosion) is FORMAT.md "The climate's ice fields".
+    pub const ICE_THICKNESS: &str = "climate/ice_thickness_m";
+    /// The thickest the ice stood during the step's fine clock; inside the recent ice-age window
+    /// the maximum since the window began (at the present: the last glacial maximum), m.
+    pub const ICE_MAX_THICKNESS: &str = "climate/ice_max_thickness_m";
+    /// 1 where `ICE_MAX_THICKNESS` > 0.
+    pub const ICE_MAX_EXTENT: &str = "climate/ice_max_extent";
+    /// Share of the step's time the cell was under ice, 0–1.
+    pub const ICE_TIME_SHARE: &str = "climate/ice_time_share";
+    /// Annual-mean sea-ice cover of the sea, 0–1 (0 on land).
+    pub const SEA_ICE: &str = "climate/sea_ice";
 }
 
+/// The ice fields the surface stage's field history records as frame means.
+pub mod history {
+    /// Time-mean land-ice thickness over the frame, m.
+    pub const ICE_THICKNESS: &str = "deeptime:ice_thickness_m";
+    /// Share of the frame's time under ice, 0–1.
+    pub const ICE_COVER: &str = "deeptime:ice_cover";
+}
+
+/// Bytes the stage holds per L1 cell (`estimate`).
+const BYTES_PER_CELL: u64 = 150 + 96;
+
 /// Keyframe layers (with the group's plates and surface layers).
-pub const KEYFRAME_LAYERS: [&str; 3] = [field::T_MEAN, field::PRECIP, field::KOPPEN];
+pub const KEYFRAME_LAYERS: [&str; 5] = [
+    field::T_MEAN,
+    field::PRECIP,
+    field::KOPPEN,
+    field::ICE_THICKNESS,
+    field::SEA_ICE,
+];
+
+/// Event kinds of the deep-time climate (EVENTS.md "The climate's events").
+pub const SNOWBALL: &str = "deeptime:snowball";
+pub const HOTHOUSE: &str = "deeptime:hothouse";
+
+/// Ice thinner than this is no ice, m.
+pub const ICE_MIN_M: f32 = 1.0;
 
 /// What the stage keeps between steps (and in a checkpoint taken inside the group).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -101,12 +177,21 @@ struct Saved {
     /// Every plate's Ω after the last step (the motion of the next plate step).
     omega: Option<Vec<[f64; 3]>>,
     ebm: EbmState,
-    sheet: Vec<f64>,
     refs: Refs,
     tracker: glaciers::Tracker,
     snapshots: u64,
     /// The last snapshot's statistics, JSON text.
     last: String,
+    clock: ClockState,
+    /// Sea level and grounded ice of the last step (m; Earth-normalized km³).
+    sea_level_m: Option<f64>,
+    ice_volume_km3: f64,
+    land_ice_frac: f64,
+    /// Oceanic crust area of the last step and the smoothed consumption rate (degassing).
+    ocean_km2: Option<f64>,
+    subduction_km2_yr: Option<f64>,
+    /// Drawdown carbonate laid on the sea floor over the run, m.
+    cap_carbonate_m: f64,
 }
 
 /// The climate stage.
@@ -118,9 +203,11 @@ pub struct ClimateStage {
     timings: BTreeMap<&'static str, f64>,
 }
 
-/// Memory and time estimate: the group's (surface or plates) plus ~110 B per L1 cell (13 fields,
-/// eight orographic rasters, an FFT band) and ~2 µs per cell per snapshot plus 0.2 µs per cell per
-/// step (the advection between snapshots).
+/// Memory and time estimate: the group's (surface or plates) plus ~150 B per L1 cell (18 fields,
+/// eight orographic rasters, an FFT band), ~96 B more for the last snapshot's 24 monthly fields
+/// (P1-25), and ~2 µs per cell per snapshot plus 0.3 µs per cell per step (the advection between
+/// snapshots and the ice), plus ~5 ms per fine-clock step and, in the ice-age window, ~0.05 µs per
+/// cell per clock step.
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let c = p.climate.clone().unwrap_or_default();
     let circ = u64::from(p.scale.circumference_blocks);
@@ -133,9 +220,12 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     };
     let steps = p.plate_steps() as f64;
     let snaps = (p.length_myr() / c.snapshot_every_myr).ceil() + 2.0;
+    let clock = p.length_myr() * 1000.0 / c.carbon_step_kyr;
+    let window = c.orbital_window_myr.min(p.length_myr()) * 1000.0 / c.orbital_step_kyr;
     StageEstimate {
-        bytes: group.bytes + cells * 110,
-        seconds: cells as f64 * (snaps * 2.0e-6 + steps * 0.2e-6),
+        bytes: group.bytes + cells * BYTES_PER_CELL,
+        seconds: cells as f64 * (snaps * 2.0e-6 + steps * 0.3e-6 + window * 0.05e-6)
+            + (clock + window) * 5.0e-3,
         history_bytes: group.history_bytes,
     }
 }
@@ -169,6 +259,138 @@ fn fallback_koppen(t_warm: f64, t_cold: f64, precip: f64) -> u8 {
     koppen::classify(&t, &[precip / 12.0; 12])
 }
 
+/// The grid's geometry in the climate's Earth-normalized lengths.
+struct Geometry {
+    w: usize,
+    h: usize,
+    /// True Earth-normalized cell area of every row, km².
+    area: Vec<f64>,
+    /// True Earth-normalized cell width of every row and height, m.
+    sx: Vec<f64>,
+    sy: f64,
+    /// EBM band of every row.
+    band: Vec<usize>,
+    bands: usize,
+}
+
+impl Geometry {
+    fn cell_band(&self, c: usize) -> usize {
+        self.band[c / self.w]
+    }
+
+    /// Ice volume of a thickness field, Earth-normalized km³.
+    fn volume_km3(&self, ice: &[f32]) -> f64 {
+        (0..self.h)
+            .map(|j| {
+                let row: f64 = ice[j * self.w..(j + 1) * self.w]
+                    .iter()
+                    .map(|&x| f64::from(x))
+                    .sum();
+                row * self.area[j] / 1000.0
+            })
+            .sum()
+    }
+
+    /// Area of the cells `pick` selects, Earth-normalized km².
+    fn area_where(&self, pick: &dyn Fn(usize) -> bool) -> f64 {
+        (0..self.h)
+            .map(|j| (0..self.w).filter(|&i| pick(j * self.w + i)).count() as f64 * self.area[j])
+            .sum()
+    }
+
+    /// Of the land cells: each band's share under ice (thickness ≥ `ICE_MIN_M`), the ice-covered
+    /// area (km²) and the ice volume (km³), rows in parallel and summed in row order.
+    fn ice_stats(&self, ice: &[f32], land: &[bool]) -> (Vec<f64>, f64, f64) {
+        let rows: Vec<(usize, usize, f64, f64)> = (0..self.h)
+            .into_par_iter()
+            .map(|j| {
+                let (mut on, mut all, mut area, mut vol) = (0usize, 0usize, 0.0, 0.0);
+                for i in 0..self.w {
+                    let c = j * self.w + i;
+                    if !land[c] {
+                        continue;
+                    }
+                    all += 1;
+                    vol += f64::from(ice[c]);
+                    if ice[c] >= ICE_MIN_M {
+                        on += 1;
+                        area += 1.0;
+                    }
+                }
+                (on, all, area * self.area[j], vol * self.area[j] / 1000.0)
+            })
+            .collect();
+        let mut num = vec![0usize; self.bands];
+        let mut den = vec![0usize; self.bands];
+        let (mut area, mut vol) = (0.0, 0.0);
+        for (j, (on, all, a, v)) in rows.into_iter().enumerate() {
+            num[self.band[j]] += on;
+            den[self.band[j]] += all;
+            area += a;
+            vol += v;
+        }
+        let share = num
+            .iter()
+            .zip(&den)
+            .map(|(&a, &d)| if d > 0 { a as f64 / d as f64 } else { 0.0 })
+            .collect();
+        (share, area, vol)
+    }
+
+    /// Each band's share of `pick` among the cells `of` selects (0 where there are none).
+    fn band_share(&self, pick: &dyn Fn(usize) -> bool, of: &dyn Fn(usize) -> bool) -> Vec<f64> {
+        let mut num = vec![0usize; self.bands];
+        let mut den = vec![0usize; self.bands];
+        for j in 0..self.h {
+            let b = self.band[j];
+            for i in 0..self.w {
+                let c = j * self.w + i;
+                if of(c) {
+                    den[b] += 1;
+                    if pick(c) {
+                        num[b] += 1;
+                    }
+                }
+            }
+        }
+        num.iter()
+            .zip(&den)
+            .map(|(&a, &d)| if d > 0 { a as f64 / d as f64 } else { 0.0 })
+            .collect()
+    }
+}
+
+/// The weathering kernel of a step's climate: each band's Σ area·runoff·e^(k_T(T − 15)) over its
+/// land, and each band's EBM land temperature for it.
+fn kernel_of(
+    g: &Geometry,
+    land: &[bool],
+    t_mean: &[f32],
+    precip: &[f32],
+    er: &EbmResult,
+    k_t: f64,
+) -> carbon::Kernel {
+    let mut band = vec![0.0; g.bands];
+    for j in 0..g.h {
+        let b = g.band[j];
+        for i in 0..g.w {
+            let c = j * g.w + i;
+            if !land[c] {
+                continue;
+            }
+            let t = f64::from(t_mean[c]);
+            let p = f64::from(precip[c]);
+            let pet = (60.0 * t).max(0.0);
+            let runoff = (p - crate::surface::climate::fu_et(p, pet)).max(0.0) / 1000.0;
+            band[b] += carbon::cell_kernel(g.area[j], runoff, t, k_t);
+        }
+    }
+    carbon::Kernel {
+        band,
+        ref_t_land: clock::land_temps(er).0,
+    }
+}
+
 impl ClimateStage {
     pub fn new(preset: PlanetPreset) -> ClimateStage {
         let p = preset.climate.clone().unwrap_or_default();
@@ -186,11 +408,104 @@ impl ClimateStage {
         *self.timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
     }
 
-    fn sea_level(&self, t_myr: f64) -> f64 {
+    /// The surface section's sea-level curve at `t_myr`.
+    fn curve_sea_level(&self, t_myr: f64) -> f64 {
         self.preset
             .surface
             .as_ref()
             .map_or(0.0, |s| s.sea_level.at(t_myr))
+    }
+
+    fn earth_scale(&self) -> f64 {
+        self.preset.scale.radius_m() / (self.preset.tectonics.model_radius_km * 1000.0)
+    }
+
+    fn planet(&self, ppm: f64, t_years: f64) -> Planet {
+        Planet {
+            axial_tilt_deg: self.preset.planet.axial_tilt_deg,
+            star_flux_rel: self.preset.planet.star_flux_rel,
+            day_length_h: self.preset.planet.day_length_h,
+            earth_scale: self.earth_scale(),
+            m_per_block_h: self.preset.scale.m_per_block_h,
+            forcing_w_m2: carbon::forcing(ppm),
+            sun_rel: clock::sun_at(&self.p, t_years),
+            orbit: clock::orbit_at(&self.p, self.preset.planet.axial_tilt_deg, t_years),
+        }
+    }
+
+    /// CO₂ now, ppm.
+    fn ppm(&self) -> f64 {
+        if self.s.clock.started {
+            self.s.clock.carbon.ppm()
+        } else if self.p.initial_co2_ppm > 0.0 {
+            self.p.initial_co2_ppm
+        } else {
+            carbon::CO2_REF_PPM
+        }
+    }
+
+    /// The plates' activity this step: sea-floor production (young oceanic crust) and the ocean
+    /// floor consumed at trenches (production minus the ocean floor's growth since the last step,
+    /// smoothed), both Earth-normalized km²/yr.
+    fn activity(
+        &mut self,
+        world: &WorldState,
+        g: &Geometry,
+        n: usize,
+        dt_yr: f64,
+    ) -> carbon::Activity {
+        let Some(age) = world.fields.get("crust_age").filter(|f| f.data.len() == n) else {
+            return carbon::Activity {
+                ridge_km2_yr: carbon::RIDGE_EARTH_KM2_YR,
+                subduction_km2_yr: carbon::SUBDUCTION_EARTH_KM2_YR,
+            };
+        };
+        let (mut ridge, mut ocean) = (0.0, 0.0);
+        for j in 0..g.h {
+            for i in 0..g.w {
+                let a = age.data[j * g.w + i];
+                if a >= 0.0 {
+                    ocean += g.area[j];
+                    if a < carbon::RIDGE_WINDOW_MYR as f32 {
+                        ridge += g.area[j];
+                    }
+                }
+            }
+        }
+        let ridge = ridge / (carbon::RIDGE_WINDOW_MYR * 1.0e6);
+        let raw = match self.s.ocean_km2 {
+            Some(prev) => ridge - (ocean - prev) / dt_yr.max(1.0),
+            None => ridge,
+        };
+        let k = 1.0 - (-dt_yr / carbon::SUBDUCTION_SMOOTH_YEARS).exp();
+        let sub = match self.s.subduction_km2_yr {
+            Some(prev) => prev + (raw - prev) * k,
+            None => ridge,
+        }
+        .max(0.0);
+        self.s.ocean_km2 = Some(ocean);
+        self.s.subduction_km2_yr = Some(sub);
+        carbon::Activity {
+            ridge_km2_yr: ridge,
+            subduction_km2_yr: sub,
+        }
+    }
+
+    /// Large igneous provinces the plates erupted since the last look (their CO₂, spread over
+    /// `carbon::LIP_YEARS`).
+    fn new_provinces(&mut self, world: &WorldState) {
+        let seen = (self.s.clock.events_seen as usize).min(world.events.len());
+        let f2 = self.earth_scale().powi(2).max(1e-12);
+        for e in &world.events[seen..] {
+            if e.kind != crate::plates::events::LARGE_IGNEOUS_PROVINCE {
+                continue;
+            }
+            if let Some(deeptime_format::ParamValue::Float(v)) = e.params.get("volume_km3") {
+                let mol = v / f2 * carbon::LIP_MOL_PER_KM3;
+                self.s.clock.lips.push((e.t_start, carbon::LIP_YEARS, mol));
+            }
+        }
+        self.s.clock.events_seen = world.events.len() as u64;
     }
 
     fn advance(&mut self, world: &mut WorldState, ctx: &StageContext<'_>) -> Result<(), CoreError> {
@@ -208,6 +523,8 @@ impl ClimateStage {
         })?;
         let t_end_myr = plates.t_myr;
         let dt_myr = self.preset.length_myr() / self.total.max(1) as f64;
+        let t1 = t_end_myr * 1.0e6;
+        let t0 = t1 - dt_myr * 1.0e6;
         let omega_now: Vec<[f64; 3]> = plates
             .plates
             .iter()
@@ -228,8 +545,31 @@ impl ClimateStage {
                 })
         };
         if self.s.done == 0 {
-            ctx.reserve(n as u64 * 110)?;
+            ctx.reserve(n as u64 * BYTES_PER_CELL)?;
         }
+        let p = self.p.clone();
+        let es = self.earth_scale();
+        let bands = p.ebm_bands as usize;
+        let lat: Vec<f64> = (0..hgt).map(|j| lat_of_row(&grid, j as u32)).collect();
+        let geo = Geometry {
+            w,
+            h: hgt,
+            area: (0..hgt)
+                .map(|j| {
+                    cell_area_km2(&grid, j as u32, self.preset.scale.m_per_block_h) / (es * es)
+                })
+                .collect(),
+            sx: lat
+                .iter()
+                .map(|l| dx * l.to_radians().cos().max(0.0) / es)
+                .collect(),
+            sy: dx / es,
+            band: lat.iter().map(|&l| snapshot::band_of(l, bands)).collect(),
+            bands,
+        };
+        let gamma = p.lapse_c_per_km / 1000.0;
+        let tau = p.ice_yield_stress_kpa * 1000.0;
+        let cap = p.ice_max_thickness_m;
 
         // Where the crust went this plate step, and the ground the surface will erode.
         let started = Instant::now();
@@ -258,12 +598,29 @@ impl ClimateStage {
                 *z += f64::from(advect::bilinear(w, hgt, &off, fi, fj));
             });
         }
-        let sea = self.sea_level(t_end_myr);
+        // The fields carried with the plates to where their crust is now.
+        let carry = |world: &WorldState, name: &str| -> Option<Vec<f32>> {
+            let v = &world.fields.get(name).filter(|f| f.data.len() == n)?.data;
+            Some(match src.as_ref() {
+                Some(src) => src
+                    .par_iter()
+                    .map(|&[fi, fj]| advect::bilinear(w, hgt, v, fi, fj))
+                    .collect(),
+                None => v.clone(),
+            })
+        };
+        let mut ela_all = carry(world, field::ELA_ALL);
+        let ice_prev = carry(world, field::ICE_THICKNESS);
+        let ice_max_prev = carry(world, field::ICE_MAX_THICKNESS);
+        let sea_prev = self
+            .s
+            .sea_level_m
+            .unwrap_or_else(|| self.curve_sea_level(t0 / 1.0e6));
         self.time("topography", started);
 
         let k = self.s.done + 1;
         let last = k >= self.total;
-        let every = ((self.p.snapshot_every_myr / dt_myr).round() as u64).max(1);
+        let every = ((p.snapshot_every_myr / dt_myr).round() as u64).max(1);
         let have_anomalies = [
             field::D_MEAN,
             field::D_WARM,
@@ -281,8 +638,6 @@ impl ClimateStage {
             || src.is_none()
             || !have_anomalies
             || self.s.refs.t_mean.len() != hgt;
-        let lat: Vec<f64> = (0..hgt).map(|j| lat_of_row(&grid, j as u32)).collect();
-        let gamma = self.p.lapse_c_per_km / 1000.0;
         let put = |world: &mut WorldState, name: &str, data: Vec<f32>| {
             world.fields.insert(
                 name.to_owned(),
@@ -292,110 +647,315 @@ impl ClimateStage {
                 },
             );
         };
+        let land_at = |sea: f64| -> Vec<bool> { h.iter().map(|&z| z > sea).collect() };
+        let band_land = |land: &[bool]| -> Vec<f64> {
+            snapshot::band_means(&lat, w, bands, &|c| if land[c] { 1.0 } else { 0.0 })
+        };
 
-        if snap {
+        // 0. The first step: a snapshot of the starting world for the weathering and the
+        //    equilibrium line, then the carbon cycle in balance (or at the preset's CO₂).
+        let land0 = land_at(sea_prev);
+        let land_frac0 = band_land(&land0);
+        let activity = self.activity(world, &geo, n, dt_myr * 1.0e6);
+        let degassing = carbon::degassing(&activity, p.degassing_scale);
+        self.new_provinces(world);
+        if !self.s.clock.started {
             let started = Instant::now();
-            let planet = Planet {
-                axial_tilt_deg: self.preset.planet.axial_tilt_deg,
-                star_flux_rel: self.preset.planet.star_flux_rel,
-                day_length_h: self.preset.planet.day_length_h,
-                earth_scale: self.preset.scale.radius_m()
-                    / (self.preset.tectonics.model_radius_km * 1000.0),
-                m_per_block_h: self.preset.scale.m_per_block_h,
+            let ppm0 = if p.initial_co2_ppm > 0.0 {
+                p.initial_co2_ppm
+            } else {
+                carbon::CO2_REF_PPM
             };
             let inp = snapshot::Input {
                 grid: &grid,
                 d,
                 lat: &lat,
                 h: &h,
-                sea,
-                p: &self.p,
-                planet,
+                sea: sea_prev,
+                p: &p,
+                planet: self.planet(ppm0, t0),
             };
-            let sheet = std::mem::take(&mut self.s.sheet);
+            let mut ebm0 = EbmState::default();
+            let s0 = snapshot::compute(&inp, &mut ebm0, &[]);
+            let er0 = s0.ebm.clone().expect("a snapshot keeps its EBM year");
+            let (mean0, summer0) = clock::land_temps(&er0);
+            self.s.clock.kernel = kernel_of(
+                &geo,
+                &land0,
+                &s0.t_mean,
+                &s0.precip,
+                &er0,
+                p.weathering_temp_per_k,
+            );
+            self.s.clock.snap_summer = summer0;
+            self.s.clock.snap_t_global = er0.t_global;
+            self.s.clock.sheet = s0.band_sheet.clone();
+            self.s.clock.t_land = mean0;
+            if ela_all.is_none() {
+                ela_all = Some(s0.ela.clone());
+            }
+            let ppm = if p.carbon_cycle && p.initial_co2_ppm <= 0.0 {
+                let (ppm, state) = clock::balance(
+                    &p,
+                    self.preset.planet.axial_tilt_deg,
+                    self.preset.planet.star_flux_rel,
+                    t0,
+                    &land_frac0,
+                    &self.s.clock.sheet,
+                    &self.s.clock.kernel,
+                    degassing,
+                );
+                self.s.ebm = state;
+                ppm
+            } else {
+                self.s.ebm = ebm0;
+                ppm0
+            };
+            self.s.clock.carbon = carbon::Carbon::at_ppm(ppm);
+            self.s.clock.started = true;
+            self.time("carbon_start", started);
+        }
+
+        // 1. The fine clock over the plate step.
+        let started = Instant::now();
+        let ela0 = ela_all.clone().unwrap_or_else(|| vec![1.0e6; n]);
+        let mu0: Vec<f32> = (0..n)
+            .map(|c| {
+                if land0[c] {
+                    (h[c] - sea_prev - f64::from(ela0[c])) as f32
+                } else {
+                    f32::NAN
+                }
+            })
+            .collect();
+        let margins = ice::BandMargins::new(&mu0, &|c| geo.cell_band(c), bands);
+        let window_step = clock::in_window(&p, t1);
+        // The lagged ice sheets of the window: their thickness, the window's maximum, and the time
+        // each cell spent under ice this step.
+        let mut hs: Vec<f32> = ice_prev.clone().unwrap_or_else(|| vec![0.0; n]);
+        let mut hmax: Vec<f32> = if clock::in_window(&p, t0) {
+            ice_max_prev.clone().unwrap_or_else(|| hs.clone())
+        } else {
+            hs.clone()
+        };
+        let mut share_acc = vec![0.0f32; n];
+        let mut heq: Vec<f32> = vec![0.0; n];
+        let mut since_eq = f64::MAX;
+        let mut window_rows: Vec<(f64, f64)> = Vec::new(); // (land ice share, volume) per step
+        let land0_km2 = geo.area_where(&|c| land0[c]);
+        let dynamic = p.carbon_cycle || p.solar_brightening || window_step;
+        let out = if dynamic {
+            let cin = clock::Input {
+                p: &p,
+                tilt_deg: self.preset.planet.axial_tilt_deg,
+                star_flux_rel: self.preset.planet.star_flux_rel,
+                t0,
+                t1,
+                land_frac: &land_frac0,
+                band_lat: &(0..bands)
+                    .map(|b| -90.0 + (b as f64 + 0.5) * 180.0 / bands as f64)
+                    .collect::<Vec<_>>(),
+                degassing,
+            };
+            let mut ice_cb = |s: &clock::IceStep<'_>| -> Vec<f64> {
+                if !s.in_window {
+                    return margins.shares(s.delta);
+                }
+                // Equilibrium ice for this orbit (refreshed every ~5 kyr), then Imbrie's lag.
+                since_eq += s.dt_kyr;
+                if since_eq >= 5.0 - 1e-9 {
+                    let mask: Vec<bool> = (0..n)
+                        .map(|c| {
+                            mu0[c].is_finite() && f64::from(mu0[c]) > s.delta[geo.cell_band(c)]
+                        })
+                        .collect();
+                    heq = ice::thickness(w, hgt, &mask, &geo.sx, geo.sy, tau, cap);
+                    since_eq = 0.0;
+                }
+                let dtk = s.dt_kyr as f32;
+                hs.par_iter_mut()
+                    .zip(hmax.par_iter_mut())
+                    .zip(share_acc.par_iter_mut())
+                    .zip(heq.par_iter())
+                    .enumerate()
+                    .for_each(|(c, (((hh, hm), sa), &e))| {
+                        let e = if land0[c] { e } else { 0.0 };
+                        let mut x =
+                            ice::relax(f64::from(*hh), f64::from(e), s.dt_kyr, p.ice_response_kyr)
+                                as f32;
+                        if x < ICE_MIN_M && e < ICE_MIN_M {
+                            x = 0.0;
+                        }
+                        *hh = x;
+                        *hm = hm.max(x);
+                        if x >= ICE_MIN_M {
+                            *sa += dtk;
+                        }
+                    });
+                let (sheet, ice_a, vol) = geo.ice_stats(&hs, &land0);
+                window_rows.push((ice_a / land0_km2.max(1e-9), vol));
+                sheet
+            };
+            clock::run(&cin, &mut self.s.clock, &mut self.s.ebm, &mut ice_cb)
+        } else {
+            clock::Output {
+                last: None,
+                deltas: vec![(t1 - t0, vec![0.0; bands])],
+                happenings: Vec::new(),
+                co2_min: self.ppm(),
+                co2_max: self.ppm(),
+                t_min: f64::NAN,
+                t_max: f64::NAN,
+                sea_ice_max: 0.0,
+                steps: 0,
+                carbonate_excess_mol: 0.0,
+            }
+        };
+        // The window's curve gets the ice the callback measured.
+        if window_step {
+            let rows = self.s.clock.window.len();
+            let k0 = rows.saturating_sub(window_rows.len());
+            for (row, (share, vol)) in self.s.clock.window[k0..].iter_mut().zip(&window_rows) {
+                row[2] = *share as f32;
+                row[3] = *vol as f32;
+            }
+        }
+        let delta_end = out
+            .deltas
+            .last()
+            .map_or_else(|| vec![0.0; bands], |x| x.1.clone());
+        self.time("clock", started);
+
+        // 2. The end of the step's ice and the sea level it takes.
+        let started = Instant::now();
+        let mut mask_pre: Vec<bool> = Vec::new();
+        let ice_end_pre: Vec<f32> = if window_step {
+            hs.clone()
+        } else {
+            mask_pre = (0..n)
+                .map(|c| mu0[c].is_finite() && f64::from(mu0[c]) > delta_end[geo.cell_band(c)])
+                .collect();
+            ice::thickness(w, hgt, &mask_pre, &geo.sx, geo.sy, tau, cap)
+        };
+        let curve = self.curve_sea_level(t_end_myr);
+        let ocean_km2 = geo.area_where(&|c| h[c] <= curve);
+        let v_pre = geo.volume_km3(&ice_end_pre);
+        let sea =
+            curve + p.glacio_eustasy * ice::eustatic_m(v_pre - p.ice_reference_km3, ocean_km2);
+        world.globals.insert(SEA_LEVEL_GLOBAL.into(), sea);
+        let land = land_at(sea);
+        // The weathering's drawdown beyond the degassing precipitates as carbonate (after a
+        // snowball: the cap carbonate), spread evenly over the sea floor above the compensation
+        // depth.
+        let shelf_km2 =
+            geo.area_where(&|c| h[c] <= sea && sea - h[c] <= crate::surface::CARBONATE_FLOOR_M);
+        let cap_m = if shelf_km2 > 0.0 {
+            out.carbonate_excess_mol * carbon::CALCITE_M3_PER_MOL / (shelf_km2 * 1.0e6)
+        } else {
+            0.0
+        };
+        world.globals.insert(CAP_CARBONATE_GLOBAL.into(), cap_m);
+        self.s.cap_carbonate_m += cap_m;
+        self.time("ice", started);
+
+        let ppm = self.ppm();
+        let er_end: Option<EbmResult>;
+        let mut deltas = out.deltas.clone();
+        if snap {
+            let started = Instant::now();
+            let inp = snapshot::Input {
+                grid: &grid,
+                d,
+                lat: &lat,
+                h: &h,
+                sea,
+                p: &p,
+                planet: self.planet(ppm, t1),
+                monthly: last,
+            };
             let mut ebm = std::mem::take(&mut self.s.ebm);
-            let s = snapshot::compute(&inp, &mut ebm, &sheet);
+            let s = snapshot::compute(&inp, &mut ebm, &self.s.clock.sheet);
             self.s.ebm = ebm;
-            self.s.sheet = s.band_sheet.clone();
             for (k, v) in &s.millis {
                 *self.timings.entry(k).or_insert(0.0) += v;
             }
-            let t_end_years = t_end_myr * 1.0e6;
-            let mut tracker = std::mem::take(&mut self.s.tracker);
-            tracker.update(
-                world,
-                t_end_years,
-                &s.ice,
-                self.p.glaciation_on_frac,
-                self.p.glaciation_off_frac,
-                last,
-            )?;
-            self.s.tracker = tracker;
+            let er = s.ebm.clone().expect("a snapshot keeps its EBM year");
+            // The new equilibrium line is the reference: the clock's shifts become relative to
+            // the step's end.
+            let (_, summer) = clock::land_temps(&er);
+            self.s.clock.snap_summer = summer;
+            self.s.clock.snap_t_global = er.t_global;
+            for (_, dl) in &mut deltas {
+                for (x, e) in dl.iter_mut().zip(&delta_end) {
+                    *x -= e;
+                }
+            }
             self.s.refs = s.refs.clone();
             self.s.snapshots += 1;
             self.s.last = stats(&grid, &self.preset, &s, t_end_myr, sea, &h).to_string();
-            let ela: Vec<f32> = (0..n)
-                .map(|c| if h[c] > sea { s.ela[c] } else { f32::NAN })
-                .collect();
+            ela_all = Some(s.ela.clone());
             put(world, field::T_MEAN, s.t_mean);
             put(world, field::PRECIP, s.precip);
             put(world, field::T_WARM, s.t_warm);
             put(world, field::T_COLD, s.t_cold);
             put(world, field::ARIDITY, s.aridity);
-            put(world, field::ELA, ela);
-            put(world, field::ELA_ALL, s.ela);
             put(
                 world,
                 field::KOPPEN,
                 s.koppen.iter().map(|&x| f32::from(x)).collect(),
             );
-            put(
-                world,
-                field::GLACIER,
-                s.glacier.iter().map(|&x| f32::from(x)).collect(),
-            );
             put(world, field::D_MEAN, s.d_mean);
             put(world, field::D_WARM, s.d_warm);
             put(world, field::D_COLD, s.d_cold);
             put(world, field::D_LN_PRECIP, s.d_ln_precip);
+            let monthly = s.t_sl_month.len() == 12 && s.p_month.len() == 12;
+            for (m, (t, p)) in s.t_sl_month.into_iter().zip(s.p_month).enumerate() {
+                if monthly && t.len() == n && p.len() == n {
+                    put(world, &field::t_sl_month(m), t);
+                    put(world, &field::p_month(m), p);
+                }
+            }
+            er_end = Some(er);
             self.time("snapshot", started);
         } else {
-            // Carry the geographic part with the plates; the zonal part stays with the latitude.
+            // Carry the geographic part with the plates; the zonal part follows the clock's EBM.
             let started = Instant::now();
-            let src = src.expect("checked: no snapshot without a previous step");
-            let carry = |world: &WorldState, name: &str| -> Vec<f32> {
+            let src = src
+                .as_ref()
+                .expect("checked: no snapshot without a previous step");
+            let carry_now = |world: &WorldState, name: &str| -> Vec<f32> {
                 let v = &world.fields[name].data;
                 src.par_iter()
                     .map(|&[fi, fj]| advect::bilinear(w, hgt, v, fi, fj))
                     .collect()
             };
-            let d_mean = carry(world, field::D_MEAN);
-            let d_warm = carry(world, field::D_WARM);
-            let d_cold = carry(world, field::D_COLD);
-            let d_lnp = carry(world, field::D_LN_PRECIP);
-            let ela_all = carry(world, field::ELA_ALL);
-            let aridity = carry(world, field::ARIDITY);
+            let d_mean = carry_now(world, field::D_MEAN);
+            let d_warm = carry_now(world, field::D_WARM);
+            let d_cold = carry_now(world, field::D_COLD);
+            let d_lnp = carry_now(world, field::D_LN_PRECIP);
+            let aridity = carry_now(world, field::ARIDITY);
             let old_k = &world.fields[field::KOPPEN].data;
             let kop_carried: Vec<f32> = src
                 .par_iter()
                 .map(|&[fi, fj]| old_k[advect::nearest(w, hgt, fi, fj)])
                 .collect();
+            if let Some(er) = &out.last {
+                self.s.refs = snapshot::zonal_refs(&lat, er, snapshot::hydro_ln(&p, er.t_global));
+            }
             let refs = &self.s.refs;
             #[allow(clippy::needless_range_loop)]
-            let rows: Vec<[Vec<f32>; 7]> = (0..hgt)
+            let rows: Vec<[Vec<f32>; 5]> = (0..hgt)
                 .into_par_iter()
                 .map(|j| {
-                    let mut out: [Vec<f32>; 7] = std::array::from_fn(|_| vec![0.0; w]);
+                    let mut out: [Vec<f32>; 5] = std::array::from_fn(|_| vec![0.0; w]);
                     for i in 0..w {
                         let c = j * w + i;
-                        let land = h[c] > sea;
                         let z = (h[c] - sea).max(0.0);
                         let tm = refs.t_mean[j] + f64::from(d_mean[c]) - gamma * z;
                         let tw = refs.t_warm[j] + f64::from(d_warm[c]) - gamma * z;
                         let tc = refs.t_cold[j] + f64::from(d_cold[c]) - gamma * z;
                         let pr = (refs.ln_precip[j] + f64::from(d_lnp[c])).exp();
-                        let ela = f64::from(ela_all[c]);
-                        let kop = if !land {
+                        let kop = if !land[c] {
                             f32::from(koppen::SEA)
                         } else if kop_carried[c] as u8 == koppen::SEA {
                             f32::from(fallback_koppen(tw, tc, pr))
@@ -406,35 +966,213 @@ impl ClimateStage {
                         out[1][i] = pr as f32;
                         out[2][i] = tw as f32;
                         out[3][i] = tc as f32;
-                        out[4][i] = if land { ela as f32 } else { f32::NAN };
-                        out[5][i] = kop;
-                        out[6][i] = if land && z > ela { 1.0 } else { 0.0 };
+                        out[4][i] = kop;
                     }
                     out
                 })
                 .collect();
-            let mut cols: [Vec<f32>; 7] = std::array::from_fn(|_| Vec::with_capacity(n));
+            let mut cols: [Vec<f32>; 5] = std::array::from_fn(|_| Vec::with_capacity(n));
             for r in rows {
                 for (col, v) in cols.iter_mut().zip(r) {
                     col.extend(v);
                 }
             }
-            let [tm, pr, tw, tc, ela, kop, glac] = cols;
+            let [tm, pr, tw, tc, kop] = cols;
             put(world, field::T_MEAN, tm);
             put(world, field::PRECIP, pr);
             put(world, field::T_WARM, tw);
             put(world, field::T_COLD, tc);
-            put(world, field::ELA, ela);
             put(world, field::KOPPEN, kop);
-            put(world, field::GLACIER, glac);
             put(world, field::ARIDITY, aridity);
-            put(world, field::ELA_ALL, ela_all);
             put(world, field::D_MEAN, d_mean);
             put(world, field::D_WARM, d_warm);
             put(world, field::D_COLD, d_cold);
             put(world, field::D_LN_PRECIP, d_lnp);
+            er_end = out.last.clone();
             self.time("advect", started);
         }
+
+        // 3. The ice fields on the final ground and line.
+        let started = Instant::now();
+        let ela_all = ela_all.unwrap_or_else(|| vec![1.0e6; n]);
+        let d_end: Vec<f64> = deltas
+            .last()
+            .map_or_else(|| vec![0.0; bands], |x| x.1.clone());
+        let mu: Vec<f64> = (0..n)
+            .map(|c| {
+                if land[c] {
+                    h[c] - sea - f64::from(ela_all[c])
+                } else {
+                    f64::NEG_INFINITY
+                }
+            })
+            .collect();
+        let (thick, thick_max, share): (Vec<f32>, Vec<f32>, Vec<f32>) = if window_step {
+            let span = ((t1 - t0) / 1.0e3) as f32;
+            let keep = |v: &[f32]| -> Vec<f32> {
+                v.iter()
+                    .enumerate()
+                    .map(|(c, &x)| if land[c] { x } else { 0.0 })
+                    .collect()
+            };
+            (
+                keep(&hs),
+                keep(&hmax),
+                share_acc
+                    .iter()
+                    .enumerate()
+                    .map(|(c, &s)| {
+                        if land[c] {
+                            (s / span.max(1e-9)).min(1.0)
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect(),
+            )
+        } else {
+            let per_band: Vec<ice::ShiftTimes> = (0..bands)
+                .map(|b| {
+                    let v: Vec<(f64, f64)> = deltas.iter().map(|(dt, dl)| (dl[b], *dt)).collect();
+                    ice::ShiftTimes::new(&v)
+                })
+                .collect();
+            let end_mask: Vec<bool> = (0..n).map(|c| mu[c] > d_end[geo.cell_band(c)]).collect();
+            let max_mask: Vec<bool> = (0..n)
+                .map(|c| {
+                    mu[c]
+                        > per_band[geo.cell_band(c)]
+                            .min()
+                            .min(d_end[geo.cell_band(c)])
+                })
+                .collect();
+            // Without a snapshot the line and the ground moved little since the sea level's
+            // estimate: its ice is the end's when the masks agree.
+            let end = if end_mask == mask_pre {
+                ice_end_pre.clone()
+            } else {
+                ice::thickness(w, hgt, &end_mask, &geo.sx, geo.sy, tau, cap)
+            };
+            // The step's largest ice is most often its end's (a steady climate): no second
+            // distance transform then.
+            let max = if max_mask == end_mask {
+                end.clone()
+            } else {
+                ice::thickness(w, hgt, &max_mask, &geo.sx, geo.sy, tau, cap)
+            };
+            (
+                end,
+                max,
+                (0..n)
+                    .map(|c| {
+                        if land[c] {
+                            per_band[geo.cell_band(c)].share(mu[c]) as f32
+                        } else {
+                            0.0
+                        }
+                    })
+                    .collect(),
+            )
+        };
+        let glacier: Vec<bool> = thick.iter().map(|&x| x >= ICE_MIN_M).collect();
+        let ela_pub: Vec<f32> = (0..n)
+            .map(|c| {
+                if land[c] {
+                    (f64::from(ela_all[c]) + d_end[geo.cell_band(c)]) as f32
+                } else {
+                    f32::NAN
+                }
+            })
+            .collect();
+        let sea_ice: Vec<f32> = match &er_end {
+            Some(er) => (0..n)
+                .map(|c| {
+                    if land[c] {
+                        0.0
+                    } else {
+                        let b = geo.cell_band(c);
+                        er.sea_ice[b.min(er.sea_ice.len() - 1)] as f32
+                    }
+                })
+                .collect(),
+            None => vec![0.0; n],
+        };
+        let ice_cover = snapshot::ice_cover(
+            &grid,
+            self.preset.scale.m_per_block_h,
+            &land,
+            &glacier.iter().map(|&g| u8::from(g)).collect::<Vec<_>>(),
+        );
+        self.s.clock.sheet = geo.band_share(&|c| glacier[c], &|c| land[c]);
+        let volume = geo.volume_km3(&thick);
+        self.s.ice_volume_km3 = volume;
+        self.s.land_ice_frac = ice_cover.frac();
+        self.s.sea_level_m = Some(sea);
+        put(world, field::ELA_ALL, ela_all);
+        put(world, field::ELA, ela_pub);
+        put(
+            world,
+            field::GLACIER,
+            glacier.iter().map(|&g| f32::from(u8::from(g))).collect(),
+        );
+        put(
+            world,
+            field::ICE_MAX_EXTENT,
+            thick_max
+                .iter()
+                .map(|&x| f32::from(u8::from(x >= ICE_MIN_M)))
+                .collect(),
+        );
+        put(world, field::ICE_THICKNESS, thick);
+        put(world, field::ICE_MAX_THICKNESS, thick_max);
+        put(world, field::ICE_TIME_SHARE, share);
+        put(world, field::SEA_ICE, sea_ice);
+        let mut tracker = std::mem::take(&mut self.s.tracker);
+        tracker.update(
+            world,
+            t1,
+            &ice_cover,
+            p.glaciation_on_frac,
+            p.glaciation_off_frac,
+            last,
+        )?;
+        self.s.tracker = tracker;
+
+        // The next step's weathering reads this step's climate.
+        if let Some(er) = &er_end {
+            let t_mean = &world.fields[field::T_MEAN].data;
+            let precip = &world.fields[field::PRECIP].data;
+            self.s.clock.kernel =
+                kernel_of(&geo, &land, t_mean, precip, er, p.weathering_temp_per_k);
+        }
+        self.time("ice", started);
+
+        // 4. Events and the curve.
+        self.emit(world, &out.happenings, last, t1, cap_m)?;
+        let t_global = er_end.as_ref().map_or(f64::NAN, |e| e.t_global);
+        let sea_ice_frac = er_end
+            .as_ref()
+            .map_or(0.0, |e| clock::sea_ice_frac(e, &band_land(&land)));
+        self.s.clock.series.push(vec![
+            t_end_myr as f32,
+            ppm as f32,
+            out.co2_min as f32,
+            out.co2_max as f32,
+            t_global as f32,
+            out.t_min.min(t_global) as f32,
+            out.t_max.max(t_global) as f32,
+            sea_ice_frac as f32,
+            out.sea_ice_max.max(sea_ice_frac) as f32,
+            ice_cover.frac() as f32,
+            volume as f32,
+            sea as f32,
+            self.s.clock.degassing as f32,
+            self.s.clock.weathering as f32,
+            clock::sun_at(&p, t1) as f32,
+            f32::from(u8::from(self.s.clock.snowball.is_some())),
+            activity.ridge_km2_yr as f32,
+            activity.subduction_km2_yr as f32,
+        ]);
         self.s.omega = Some(omega_now);
         if last {
             world
@@ -444,18 +1182,174 @@ impl ClimateStage {
         Ok(())
     }
 
+    /// Writes the clock's snowballs and hothouses as events; at the end of the run the open ones
+    /// with `ongoing` = 1.
+    fn emit(
+        &mut self,
+        world: &mut WorldState,
+        happenings: &[(f64, Happening)],
+        last: bool,
+        t_now: f64,
+        cap_m: f64,
+    ) -> Result<(), CoreError> {
+        let mut all: Vec<Happening> = happenings.iter().map(|(_, h)| h.clone()).collect();
+        if last {
+            if let Some(open) = self.s.clock.snowball.clone() {
+                all.push(Happening::SnowballEscape {
+                    co2_escape_ppm: self.ppm(),
+                    degassing_rel: self.s.clock.degassing / carbon::DEGASSING_EARTH_MOL_YR,
+                    open,
+                    t_end: f64::NAN,
+                });
+            }
+            if let Some(open) = self.s.clock.hothouse.take() {
+                all.push(Happening::HothouseEnd {
+                    open,
+                    t_end: t_now,
+                    ongoing: true,
+                });
+            }
+        }
+        for hp in all {
+            match hp {
+                Happening::SnowballOnset => {}
+                Happening::SnowballEscape {
+                    open,
+                    t_end,
+                    co2_escape_ppm,
+                    degassing_rel,
+                } => {
+                    let ongoing = t_end.is_nan();
+                    let t_end = if ongoing { t_now } else { t_end };
+                    let dur = (t_end - open.t_start) / 1.0e6;
+                    let drawdown = open.co2_before_ppm / open.co2_low_ppm.max(1e-9);
+                    let rise = co2_escape_ppm / open.co2_onset_ppm.max(1e-9);
+                    let e = world
+                        .event(open.t_start, SNOWBALL, glaciers::SOURCE)
+                        .until(t_end.max(open.t_start))
+                        .at(Place::Global)
+                        .magnitude((dur / 50.0).clamp(0.0, 1.0) as f32)
+                        .param("duration_myr", dur)
+                        .param("co2_before_ppm", open.co2_before_ppm)
+                        .param("co2_onset_ppm", open.co2_onset_ppm)
+                        .param("co2_escape_ppm", co2_escape_ppm)
+                        .param("co2_max_ppm", open.co2_max_ppm)
+                        .param("co2_drawdown_factor", drawdown)
+                        .param("co2_rise_factor", rise)
+                        .param("tropical_land_share", open.tropical_land)
+                        .param("tropical_weathering_share", open.tropical_weathering)
+                        .param("degassing_onset_rel", open.degassing_rel)
+                        .param("degassing_escape_rel", degassing_rel)
+                        .param("sun_rel", open.sun_rel)
+                        .param("t_global_min_c", open.t_min_c)
+                        .param("cap_carbonate_m", if ongoing { 0.0 } else { cap_m })
+                        .param(
+                            "onset_cause",
+                            if drawdown >= 1.5 {
+                                "weathering_drawdown"
+                            } else {
+                                "slow_cooling"
+                            },
+                        )
+                        .param(
+                            "escape_cause",
+                            if ongoing {
+                                "none"
+                            } else if rise >= 2.0 {
+                                "degassing_buildup"
+                            } else {
+                                "warming"
+                            },
+                        )
+                        .param("ongoing", i64::from(ongoing));
+                    let id = world.emit(e)?;
+                    if !ongoing {
+                        self.s.clock.last_escape = Some((t_end, Some(id)));
+                    }
+                    if ongoing {
+                        self.s.clock.snowball = None;
+                    }
+                }
+                Happening::HothouseEnd {
+                    open,
+                    t_end,
+                    ongoing,
+                } => {
+                    let mut e =
+                        world
+                            .event(open.t_start, HOTHOUSE, glaciers::SOURCE)
+                            .until(t_end.max(open.t_start))
+                            .at(Place::Global)
+                            .magnitude(
+                                ((open.peak_c - self.p.hothouse_c) / 25.0).clamp(0.0, 1.0) as f32
+                            )
+                            .param("peak_t_global_c", open.peak_c)
+                            .param("peak_t_years", open.peak_t)
+                            .param("co2_peak_ppm", open.co2_peak_ppm)
+                            .param("after_snowball", i64::from(open.after_escape.is_some()))
+                            .param("ongoing", i64::from(ongoing));
+                    let cause = match (open.after_escape, self.s.clock.last_escape) {
+                        (Some(te), Some((t_esc, Some(id)))) if (te - t_esc).abs() < 1.0 => Some(id),
+                        _ => None,
+                    };
+                    if let Some(id) = cause {
+                        e = e.caused_by(id);
+                    }
+                    world.emit(e)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// The run summary (`manifest.json` `notes.climate`, the CLI's `climate_final` line).
     fn summary(&self) -> serde_json::Value {
-        let last: serde_json::Value = serde_json::from_str(&self.s.last).unwrap_or(json!({}));
+        let mut last: serde_json::Value = serde_json::from_str(&self.s.last).unwrap_or(json!({}));
+        if let Some(o) = last.as_object_mut() {
+            o.insert("co2_ppm".into(), json!(self.ppm()));
+            o.insert(
+                "sun_rel".into(),
+                json!(self.s.clock.series.last().map_or(1.0, |r| r[14])),
+            );
+            o.insert("ice_volume_km3".into(), json!(self.s.ice_volume_km3));
+            o.insert("sea_level_m".into(), json!(self.s.sea_level_m));
+            o.insert("glaciated_land_frac".into(), json!(self.s.land_ice_frac));
+            o.insert("degassing_mol_yr".into(), json!(self.s.clock.degassing));
+            o.insert("weathering_mol_yr".into(), json!(self.s.clock.weathering));
+            o.insert(
+                "cap_carbonate_total_m".into(),
+                json!(self.s.cap_carbonate_m),
+            );
+        }
+        let round = |v: &[Vec<f32>]| -> Vec<Vec<f64>> {
+            v.iter()
+                .map(|r| {
+                    r.iter()
+                        .map(|&x| {
+                            let x = f64::from(x);
+                            if x == 0.0 || !x.is_finite() {
+                                0.0
+                            } else {
+                                let m = 10f64.powi(4 - x.abs().log10().ceil() as i32);
+                                (x * m).round() / m
+                            }
+                        })
+                        .collect()
+                })
+                .collect()
+        };
         json!({
             "snapshots": self.s.snapshots,
             "glaciations": self.s.tracker.count,
+            "snowballs": self.s.clock.snowballs,
+            "hothouses": self.s.clock.hothouses,
             "last": last,
+            "series": {"columns": clock::SERIES_COLUMNS, "rows": round(&self.s.clock.series)},
+            "window": {"columns": clock::WINDOW_COLUMNS, "rows": round(&self.s.clock.window)},
             "millis": self.timings,
         })
     }
 }
-
 /// Statistics of a snapshot (true-area weighted over land unless stated).
 fn stats(
     grid: &GridDesc,

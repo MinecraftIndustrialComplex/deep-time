@@ -101,9 +101,16 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
         assert!((f64::from(h.cell(c).0[0]) - want).abs() <= 1.0, "cell {c}");
     }
     let layer = h.to_layer(deeptime_format::Codec::Raw).unwrap();
-    let (top, class) = layer.horizon(5, 7, 1);
+    let got = layer.horizon(5, 7, 1);
     let c = 7 * h.grid.w as usize + 5;
-    assert_eq!((top, class), (h.tops[c * 32 + 1], h.classes[c * 32 + 1]));
+    assert_eq!(
+        (got.top, got.class, got.key),
+        (
+            h.tops[c * 32 + 1],
+            h.classes[c * 32 + 1],
+            h.keys[c * 32 + 1]
+        )
+    );
 
     // Many classes appear: sediments, basement, metamorphic and mantle rocks.
     let mut seen = [false; 59];

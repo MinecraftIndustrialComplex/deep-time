@@ -2,7 +2,9 @@
 //! Insolation from latitude, the axial tilt and the star's flux (plan §8.3 item 1).
 //!
 //! Daily-mean insolation at the top of the atmosphere (Berger 1978; the form climlab's
-//! `daily_insolation` evaluates, MIT) for a **circular orbit** (the preset has no eccentricity):
+//! `daily_insolation` evaluates, MIT). In deep time the orbit is **circular** (the preset has no
+//! eccentricity); inside the recent ice-age window (`orbit.rs`) it is eccentric, with the distance
+//! factor (a/r)² and Kepler timing of [`Orbit`]:
 //!
 //! Q(φ, λ) = S₀/π · (h₀ sin φ sin δ + cos φ cos δ sin h₀),  sin δ = sin ε · sin λ,
 //! cos h₀ = −tan φ · tan δ (clamped: polar night h₀ = 0, polar day h₀ = π),
@@ -40,6 +42,54 @@ pub fn daily(s0: f64, lat: f64, lambda: f64, obliquity: f64) -> f64 {
 /// Solar longitude at year fraction `f` (0 = the start of month 0).
 pub fn lambda_at(f: f64) -> f64 {
     (YEAR_START_RAD + 2.0 * PI * f).rem_euclid(2.0 * PI)
+}
+
+/// An orbit: eccentricity and the solar longitude of perihelion (climlab's `long_peri`
+/// convention: the Earth passes perihelion when λ = ϖ; today ϖ ≈ 283°, early January).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Orbit {
+    pub ecc: f64,
+    pub long_peri_rad: f64,
+}
+
+impl Orbit {
+    /// Solar longitude at year fraction `f` (time, 0 = the start of month 0). The calendar is
+    /// anchored as on the circular orbit — λ = 280° at `f` = 0 — and λ then advances by Kepler's
+    /// second law (mean anomaly uniform in time), so months are equal in time, not in λ. On a
+    /// circular orbit this is [`lambda_at`].
+    pub fn lambda_at(&self, f: f64) -> f64 {
+        let e = self.ecc;
+        if e <= 0.0 {
+            return lambda_at(f);
+        }
+        let k = ((1.0 - e) / (1.0 + e)).sqrt();
+        let v0 = YEAR_START_RAD - self.long_peri_rad;
+        let e0 = 2.0 * (k * (0.5 * v0).tan()).atan();
+        let m = e0 - e * e0.sin() + 2.0 * PI * f;
+        // Kepler's equation E − e sin E = M by Newton (e < 0.2: a handful of steps).
+        let mut ea = m;
+        for _ in 0..8 {
+            ea -= (ea - e * ea.sin() - m) / (1.0 - e * ea.cos());
+        }
+        let v = 2.0 * ((0.5 * ea).tan() / k).atan();
+        (v + self.long_peri_rad).rem_euclid(2.0 * PI)
+    }
+
+    /// The distance factor (a/r)² at solar longitude λ: (1 + e cos(λ − ϖ))² / (1 − e²)²
+    /// (Berger 1978; climlab's `daily_insolation`).
+    pub fn distance_factor(&self, lambda: f64) -> f64 {
+        let e = self.ecc;
+        if e <= 0.0 {
+            return 1.0;
+        }
+        let x = 1.0 + e * (lambda - self.long_peri_rad).cos();
+        x * x / ((1.0 - e * e) * (1.0 - e * e))
+    }
+}
+
+/// Daily-mean insolation on an eccentric orbit, W/m² ([`daily`] × the distance factor).
+pub fn daily_orbit(s0: f64, lat: f64, lambda: f64, obliquity: f64, orbit: &Orbit) -> f64 {
+    daily(s0, lat, lambda, obliquity) * orbit.distance_factor(lambda)
 }
 
 /// Mean insolation over month `m` (0–11), `sub` samples per month.
@@ -89,5 +139,50 @@ mod tests {
         assert!((a - b).abs() < 1e-9);
         // July is northern summer.
         assert!(monthly(s0, 0.8, 6, eps, 10) > 2.0 * monthly(s0, 0.8, 0, eps, 10));
+    }
+
+    #[test]
+    fn an_eccentric_orbit_follows_kepler() {
+        let s0 = 1365.2;
+        let eps = 23.4f64.to_radians();
+        // A circular orbit is the plain calendar.
+        let circ = Orbit::default();
+        for k in 0..24 {
+            let f = k as f64 / 24.0;
+            assert_eq!(circ.lambda_at(f), lambda_at(f));
+        }
+        // e = 0.05: λ = 280° at the start of the year; the global annual mean is
+        // S₀/4/√(1 − e²) (time-averaged 1/r²); perihelion at λ = ϖ is the brightest.
+        let o = Orbit {
+            ecc: 0.05,
+            long_peri_rad: 283f64.to_radians(),
+        };
+        assert!((o.lambda_at(0.0) - YEAR_START_RAD).abs() < 1e-9);
+        let (mut sum, mut wsum) = (0.0, 0.0);
+        let steps = 720;
+        for j in 0..90 {
+            let lat = (-89.0 + 2.0 * j as f64).to_radians();
+            let w = lat.cos();
+            let q: f64 = (0..steps)
+                .map(|k| {
+                    let lam = o.lambda_at((k as f64 + 0.5) / steps as f64);
+                    daily_orbit(s0, lat, lam, eps, &o)
+                })
+                .sum::<f64>()
+                / steps as f64;
+            sum += w * q;
+            wsum += w;
+        }
+        let want = s0 / 4.0 / (1.0 - 0.05f64 * 0.05).sqrt();
+        assert!(
+            (sum / wsum / want - 1.0).abs() < 2e-3,
+            "{} vs {want}",
+            sum / wsum
+        );
+        assert!(o.distance_factor(o.long_peri_rad) > o.distance_factor(o.long_peri_rad + PI));
+        // Near perihelion the Earth moves faster: λ advances more per day in January than July.
+        let jan = o.lambda_at(0.01) - o.lambda_at(0.0);
+        let jul = o.lambda_at(0.51) - o.lambda_at(0.50);
+        assert!(jan > jul * 1.1, "{jan} {jul}");
     }
 }

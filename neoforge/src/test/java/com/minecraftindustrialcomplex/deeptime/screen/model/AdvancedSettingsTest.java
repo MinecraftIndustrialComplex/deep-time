@@ -249,7 +249,8 @@ class AdvancedSettingsTest {
                     assertTrue(a.fieldValid(f), f.id() + " = " + Formats.number(f.max()));
                 }
                 case CHOICE -> a.setChoice(f, f.options().get(f.options().size() - 1));
-                default -> { }
+                // Toggles (the deep-time climate's carbon cycle, brightening star): flipped.
+                case TOGGLE -> a.setToggle(f, !a.toggle(f));
             }
             edited.add(f.id());
         }
@@ -260,10 +261,11 @@ class AdvancedSettingsTest {
             if (!a.available(f))
                 continue;
             JsonElement v = f.get(out).orElseThrow(() -> new AssertionError(f.path()));
-            if (f.kind() == EditorFields.Kind.NUMBER)
-                assertEquals(f.max(), v.getAsDouble(), 0.0, f.id());
-            else
-                assertEquals(f.options().get(f.options().size() - 1), v.getAsString(), f.id());
+            switch (f.kind()) {
+                case NUMBER -> assertEquals(f.max(), v.getAsDouble(), 0.0, f.id());
+                case TOGGLE -> assertEquals(a.toggle(f), v.getAsBoolean(), f.id());
+                case CHOICE -> assertEquals(f.options().get(f.options().size() - 1), v.getAsString(), f.id());
+            }
         }
         EditorModel b = model();
         assertTrue(b.importShareCode(code).isEmpty());
@@ -274,6 +276,8 @@ class AdvancedSettingsTest {
             assertEquals(a.available(f), b.available(f), f.id());
             if (f.kind() == EditorFields.Kind.NUMBER && a.available(f))
                 assertEquals(a.fieldText(f), b.fieldText(f), f.id());
+            if (f.kind() == EditorFields.Kind.TOGGLE && a.available(f))
+                assertEquals(a.toggle(f), b.toggle(f), f.id());
         }
         assertEquals(a.effectivePresetJson(), b.effectivePresetJson());
         assertEquals(code, b.exportShareCode(), "one preset, one code");
