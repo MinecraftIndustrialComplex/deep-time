@@ -272,7 +272,10 @@
       25.0,
       8.0,
       80.0
-    ]
+    ],
+    "strata_smoothing_cells": 6.0,
+    "strata_tongue_scale": 1.0,
+    "strata_minor_share": 0.15
   },
   "biomes": {
     "temperature_shift": 0.0,

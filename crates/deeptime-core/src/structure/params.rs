@@ -78,6 +78,14 @@ pub struct StructureParams {
     /// Growth faults and rollover anticlines in sediment wedges thicker than this, m (deltas such
     /// as the Niger's, Doust & Omatsola 1990, AAPG Memoir 48).
     pub growth_fault_sediment_m: f64,
+    /// How far the bake smooths the rock layers sideways: σ of the Gaussian, in L1 cells (0 = each
+    /// cell's own stack). Larger values give gentler dips (`bake_horizons::Horizons::smoothed`).
+    pub strata_smoothing_cells: f64,
+    /// The size of the tongues two rocks interlock in where one changes into the other, as a
+    /// multiple of the column rule's default band (64 keys; `deeptime_format::strata`).
+    pub strata_tongue_scale: f64,
+    /// A rock's share of a layer below which it takes no part in the tongues (0–0.45).
+    pub strata_minor_share: f64,
 }
 
 impl Default for StructureParams {
@@ -103,9 +111,15 @@ impl Default for StructureParams {
             salt_min_m: 100.0,
             salt_overburden_m: 1000.0,
             growth_fault_sediment_m: 1500.0,
+            strata_smoothing_cells: DEFAULT_STRATA_SMOOTHING_CELLS,
+            strata_tongue_scale: 1.0,
+            strata_minor_share: deeptime_format::strata::MINOR_SHARE,
         }
     }
 }
+
+/// The default lateral smoothing of the rock layers, L1 cells (see `strata_smoothing_cells`).
+pub const DEFAULT_STRATA_SMOOTHING_CELLS: f64 = 6.0;
 
 fn check(ok: bool, key: &str, reason: &str) -> Result<(), CoreError> {
     if ok {
@@ -158,6 +172,21 @@ impl StructureParams {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
         }
         check(self.host_window_m > 0.0, "host_window_m", "must be > 0")?;
+        check(
+            (0.0..=16.0).contains(&self.strata_smoothing_cells),
+            "strata_smoothing_cells",
+            "must be in [0, 16]",
+        )?;
+        check(
+            (0.25..=16.0).contains(&self.strata_tongue_scale),
+            "strata_tongue_scale",
+            "must be in [0.25, 16]",
+        )?;
+        check(
+            (0.0..=0.45).contains(&self.strata_minor_share),
+            "strata_minor_share",
+            "must be in [0, 0.45]",
+        )?;
         let [m, lo, hi] = self.pluton_length_km;
         check(
             lo > 0.0 && lo <= m && m <= hi,

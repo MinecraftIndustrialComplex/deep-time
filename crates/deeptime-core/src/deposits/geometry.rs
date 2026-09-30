@@ -277,6 +277,63 @@ pub fn seam_plan(k: &Stack, measures_m: f64, cumulative_m: f64, rng: &mut Rng) -
     }
 }
 
+/// How a stack fits the sedimentary cover of its site ([`fit_stack`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StackFit {
+    /// Inside the cover as planned.
+    Fits,
+    /// No cover to hold a seam: no coal here.
+    NoCover,
+    /// Smaller (measures capped to what the cover holds) and/or raised (its centre depth).
+    Capped { measures_m: f64, centre_depth_m: f64 },
+}
+
+/// Blocks of cover a stack keeps free under its lowest seam.
+pub const COVER_MARGIN_BLOCKS: f64 = 1.0;
+
+/// Fits a stack of `plan` centred `centre_depth_m` below the surface into `cover_blocks` of
+/// sedimentary cover (the coal-measure sediment it must lie in; [`stack_bodies`] draws the
+/// seams from half the measures above the centre downwards, the gaps enlarged by
+/// `spacing_mult_v`): with less than [`COVER_MARGIN_BLOCKS`] plus one block of cover there is no
+/// coal; a stack taller than the cover keeps the measures that fit (so fewer seams); a stack
+/// reaching below the cover's base is raised until its lowest seam is [`COVER_MARGIN_BLOCKS`]
+/// above it (never above the ledger's depth, never higher than its top at the surface).
+pub fn fit_stack(
+    k: &Stack,
+    plan: &SeamPlan,
+    centre_depth_m: f64,
+    cover_blocks: f64,
+    sc: &Scales,
+) -> StackFit {
+    let room = cover_blocks - COVER_MARGIN_BLOCKS;
+    if !room.is_finite() || room < 1.0 {
+        return StackFit::NoCover;
+    }
+    let mult = k.spacing_mult_v.max(1e-9);
+    // The stack's height in blocks, top seam to bottom seam.
+    let span = |measures_m: f64| measures_m * mult / sc.m_per_block_v;
+    let mut measures = plan.measures_m;
+    if span(measures) > room {
+        measures = room * sc.m_per_block_v / mult;
+    }
+    // The top seam's depth in blocks below the surface, and the bottom seam's.
+    let top = (centre_depth_m - measures / 2.0) / sc.m_per_block_v;
+    let bottom = top + span(measures);
+    let mut depth = centre_depth_m;
+    if bottom > room {
+        let new_top = (room - span(measures)).max(0.0);
+        depth = new_top * sc.m_per_block_v + measures / 2.0;
+    }
+    if measures == plan.measures_m && depth == centre_depth_m {
+        StackFit::Fits
+    } else {
+        StackFit::Capped {
+            measures_m: measures,
+            centre_depth_m: depth,
+        }
+    }
+}
+
 /// A stack's bodies and how much of its tonnage is left in them.
 pub struct StackBodies {
     pub bodies: Vec<Body>,
@@ -497,6 +554,45 @@ mod tests {
     /// The seam count follows the measures, within the type's range and the minable thickness;
     /// the shares sum to one and the gaps average the measures per seam; a fixed seed gives the
     /// same plan.
+    #[test]
+    fn a_stack_is_held_in_its_sedimentary_cover() {
+        let t = coal();
+        let k = t.geometry.stack.clone().unwrap();
+        let sc = Scales::default();
+        let plan = seam_plan(&k, 300.0, 1000.0, &mut Rng::new(3));
+        // 300 m of measures stand spacing_mult_v · 300 / 20 blocks tall.
+        let span = 300.0 * k.spacing_mult_v / sc.m_per_block_v;
+        let room = 200.0 - COVER_MARGIN_BLOCKS;
+        assert!(span < room);
+        // A shallow stack in thick cover fits.
+        let shallow = 10.0 * sc.m_per_block_v + 150.0;
+        assert_eq!(fit_stack(&k, &plan, shallow, 200.0, &sc), StackFit::Fits);
+        // A deep one is raised until its lowest seam sits a margin above the cover's base.
+        match fit_stack(&k, &plan, 3000.0, 200.0, &sc) {
+            StackFit::Capped { measures_m, centre_depth_m } => {
+                assert_eq!(measures_m, 300.0);
+                let top = (centre_depth_m - 150.0) / sc.m_per_block_v;
+                assert!((top + span - room).abs() < 1e-9, "{top}");
+            }
+            other => panic!("{other:?}"),
+        }
+        // Thin cover holds fewer measures (so fewer seams), all inside it.
+        match fit_stack(&k, &plan, shallow, 40.0, &sc) {
+            StackFit::Capped { measures_m, centre_depth_m } => {
+                assert!(measures_m < 300.0);
+                let top = (centre_depth_m - measures_m / 2.0) / sc.m_per_block_v;
+                let bottom = top + measures_m * k.spacing_mult_v / sc.m_per_block_v;
+                assert!(top >= -1e-9 && bottom <= 40.0 - COVER_MARGIN_BLOCKS + 1e-9, "{top} {bottom}");
+                let fewer = seam_plan(&k, measures_m, 1000.0, &mut Rng::new(3));
+                assert!(fewer.seams() < plan.seams());
+            }
+            other => panic!("{other:?}"),
+        }
+        // Basement at the surface: no coal.
+        assert_eq!(fit_stack(&k, &plan, shallow, 1.5, &sc), StackFit::NoCover);
+        assert_eq!(fit_stack(&k, &plan, shallow, 0.0, &sc), StackFit::NoCover);
+    }
+
     #[test]
     fn the_stack_follows_the_measures() {
         let t = coal();

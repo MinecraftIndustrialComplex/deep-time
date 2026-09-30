@@ -59,6 +59,40 @@ use columns::{Cell, Tables};
 use metamorphism::{Paths, Thermal};
 use plutons::{ArcInputs, Counts, Pluton};
 
+/// Per L1 cell, the thickness (m) of the sedimentary cover at the world's present: the depth
+/// from the cell's surface to the first unit of its column (`columns::build`) that is neither
+/// sedimentary nor loose (chemical or clastic sedimentary, unconsolidated and regolith classes) —
+/// a lava flow inside the strata log does not end it, the basement, a metamorphosed layer or the
+/// mantle does. The coal seams of a site are held inside it (`deposits`). Errors where the world
+/// lacks the fields the columns need.
+pub fn sedimentary_cover_m(world: &WorldState, preset: &PlanetPreset) -> Result<Vec<f32>, CoreError> {
+    let src = CellSource::new(world, preset)?;
+    let p = preset.structure.clone().unwrap_or_default();
+    let t = Tables::get();
+    let table = crate::surface::lithology::table();
+    let family = |c: u16| table[usize::from(c)].family.as_str();
+    let n = src.grid.cells();
+    Ok((0..n)
+        .into_par_iter()
+        .map_init(Vec::new, |units, c| {
+            columns::build(&src.cell(c), &t, &p, src.now_myr, 30_000.0, units);
+            let mut cover = 0.0f64;
+            for u in units.iter() {
+                let ok = match family(u.class) {
+                    "chemical_sedimentary" | "clastic_sedimentary" | "unconsolidated" => true,
+                    "volcanic" => u.source == columns::Source::Log,
+                    _ => false,
+                };
+                if !ok {
+                    break;
+                }
+                cover += f64::from(u.thickness_m);
+            }
+            cover as f32
+        })
+        .collect())
+}
+
 /// The stage's name in a pipeline (`deeptime stage structure`).
 pub const STAGE_NAME: &str = "structure";
 
