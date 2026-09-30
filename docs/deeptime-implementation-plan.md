@@ -3628,6 +3628,16 @@ on this machine.
 - **Goal.** Expose Deep Time's simulated temperature, seasons and rainfall per location through a
   public API that MIC's mic-climate (Thermoo connector) reads, and make sure mic-climate and Project
   Atmosphere use it properly (PA's public API only; PA is never redistributed).
+- **As built (2026-09-30).**
+  - **The bake.** Format 0.2 bakes the climate stage's twelve months on L1. FORMAT.md "The climate at
+    a block" specifies what the API returns; Rust `ClimateWorld` and Java `ClimateLayers` agree bit
+    for bit (`parity/climate.json`).
+  - **The API.** `com.minecraftindustrialcomplex.deeptime.api.climate.DeepTimeClimate`
+    (`API_VERSION` 1) plus `ClimateSample`, and a `/deeptime climate` command.
+  - **Project Atmosphere cannot take a base temperature.** Its region base is final, derived from
+    the biomes, 2000 blocks wide, with one global season. mic-climate's `deep-time` branch therefore
+    adds only PA's weather to Deep Time's climate: PA's live temperature minus its own effective
+    base. STATUS build log, 2026-09-30.
 
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 
