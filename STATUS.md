@@ -352,7 +352,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   the lever is `clustering.camp_spacing_km` or letting formed (not surviving) fields overlap in the engine.
 - **Gates** (Mac, on the branch after merging master b1cbc97): `cargo test --workspace --locked` all pass (core 239 + 3
   ignored, cli 30, format 40, …), clippy `-D warnings` clean, fmt clean, `cargo deny check licenses bans` ok;
-  `cd neoforge && ./gradlew build test` → tests=143 failures=0; `tools/remote/mac.sh --server -- ./gametest.sh` → All 50
+  `cd neoforge && ./gradlew build test` → tests=140 failures=0; `tools/remote/mac.sh --server -- ./gametest.sh` → All 50
   required tests passed. Scratch scripts `coal-gen.sh` / `coal-dep.sh` (untracked, not committed) made the checkpoints and ran
   the before/after counts; the checkpoints are in `/Volumes/Graphide/ban/deeptime-runs/coal/` on the Mac.
 - **Decisions for Ben** (not asked): (1) the size_mult_h 6 → 1 reading of "tens of km across" (physical field size, no
