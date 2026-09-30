@@ -44,7 +44,9 @@ pub struct Input<'a> {
     pub grid: &'a GridDesc,
     /// Terrain height, 1/16 block, row-major.
     pub elev: &'a [i16],
-    /// Sea level, 1/16 block.
+    /// Sea level, 1/16 block: the sea's surface (its top water block is one below). A cell is
+    /// sea when its height is at most one block below it (its top block under the sea's top
+    /// block, `deeptime_format::water`); land up to sea level is beach, which rivers cross.
     pub sea_raw: i32,
     /// Metres per block horizontally.
     pub m_per_block_h: f64,
@@ -127,19 +129,21 @@ pub fn run(inp: &Input<'_>) -> Output {
     let t = std::time::Instant::now();
     let mut state = vec![0u8; n];
     let min_sea = ((OPEN_SEA_KM2 / cell_km2).ceil() as usize).max(1);
-    open_sea(&g, inp.elev, inp.sea_raw, min_sea, &mut state);
+    let sea_floor = inp.sea_raw - 16;
+    open_sea(&g, inp.elev, sea_floor, min_sea, &mut state);
     millis.insert("sea".into(), json!(ms(t)));
 
     // 2. Priority-Flood: spill levels, the cell each land cell was reached from, the order.
     let t = std::time::Instant::now();
     let sea_i16 = inp.sea_raw.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
+    let floor_i16 = sea_floor.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
     let mut fill: Vec<i16> = inp.elev.to_vec();
     let mut parent = vec![NONE; n];
     let mut order: Vec<u32> = Vec::new();
     flood(
         &g,
         inp.elev,
-        sea_i16,
+        floor_i16,
         &mut state,
         &mut fill,
         &mut parent,

@@ -95,7 +95,7 @@ pub fn planet(dir: &Path, out: &Path, step: usize, bbox: Option<[i64; 4]>) -> Re
             let bx = x0 + px as i64 * step + step / 2;
             let bz = z0 + py as i64 * step + step / 2;
             let wl = levels.nearest(w.wrap_x(bx) as f64, bz as f64);
-            let col = if h <= sea {
+            let col = if h <= sea - 1.0 {
                 mix(SEA_DEEP, SEA_SHALLOW, ((sea - h) / 150.0).clamp(0.0, 1.0))
             } else if wl.is_finite() && wl > h {
                 lake_px += 1;

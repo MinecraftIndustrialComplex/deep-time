@@ -21,6 +21,7 @@ pub mod region;
 pub mod render;
 pub mod rivermap;
 pub mod surface;
+pub mod watercheck;
 pub mod world;
 pub mod worlddata;
 pub mod zip;
