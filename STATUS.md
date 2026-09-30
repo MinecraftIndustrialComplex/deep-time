@@ -43,7 +43,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-19 | Phase 1 exit | todo | | | |
 | P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log). **Follow-up** (branch worktree-agent-afd5791e0f5ea82cd): a run with a bake is previewed and inspected as its own terrain (`/api/inspect` from `deeptime inspect-column --why` in 60-90 ms, previews boot the mod on the run's bake; height p50 0 vs the bake); runs without a bake keep the test world and say so (see build log). **UI overhaul** (branch worktree-agent-a95571be05fdd89d6, Ben: "should be dark themed"): dark map-first layout, run cards, sectioned editor with the estimate by Run, split/side-by-side compare, timeline dock, stage-2 job cards, `?tv` HUD, 390 px; placeholders hidden; Mac gates clean, JUnit 118/0; before/after in review/out/workbench-ui/ (see build log) |
 | P1-21 | Volcanoes as landforms (log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
-| P1-22 | Rivers and lakes (moved from P2-03, log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
+| P1-22 | Rivers and lakes (moved from P2-03, log 2026-09-29) | doing | 2026-09-30 | | Built on branch worktree-agent-ad204cf8d55ef26f5: core::hydro in the bake (lakes full to their spill level, river network rivers/rivers.dtrv), the column rule on both sides (parity 500/500), WaterBodies pass, river biomes, hydro settings; real 16k 500 Myr planet: 26 lakes, 3,337 rivers, 83,026 km, widest 33 blocks; ./gametest.sh 52/52 (riversHold 0 floating, 0 leaks); previews: 0 floating, 0 river/lake leaks, lakes at their rim. Final gates, fresh run and screenshots pending (the Mac is unreachable); see the build log |
 | P1-23 | Grid-artifact audit (log 2026-09-29) | todo | | | Starts after the mountain and strata work lands (they fix part of it). |
 | P1-24 | Faster Create World (log 2026-09-29) | todo | | | After P1-17's benchmarks; options go to Ben. |
 | P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
@@ -79,6 +79,91 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-30 — P1-22 rivers and lakes, in progress: built, tested, previewed; final gates pending (agent worktree agent-ad204cf8d55ef26f5, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Rivers and lakes in v1 (Ben, decisions log 2026-09-29, "Rivers & lakes in v1"). (1) **`core::hydro`**
+  (`hydro/{mod, network, tests}.rs`), run by the bake's new water part (`bake/water.rs`, after the climate part; the
+  spawn candidates now come after it, `terrain::spawn`) on the L3 terrain itself (2 blocks a cell; an L3 over 40 M
+  cells, 32k full, is averaged 2 × 2 into grid `L3h`): the open sea (cells at most a block below sea level, connected,
+  ≥ 5,000 km²); Priority-Flood with the pit queue (Barnes et al. 2014, from the paper, as `surface::pflood`);
+  receivers = steepest strictly lower neighbour on the filled surface, else the flood parent; **lakes** = depressions
+  ≥ `hydro.lake_min_area_km2` (1) and ≥ `lake_min_depth_blocks` (1) deep, always full to their spill level, passing on
+  inflow less surface evaporation (`endorheic` flagged when evaporation takes it all); runoff P − ET (Fu's curve, L1
+  climate) accumulated as discharge; river cells ≥ `river_min_discharge_m3s` (2) from ≥ `river_min_area_km2` (50),
+  crossing lake margins less than a block deep and the beach; chains cut at confluences (a chain follows its largest
+  donor); water surface F − `freeboard_blocks` (1), never below the sea or lake downstream; width
+  `width_coef`·Q^0.5·`scale.feature_scale.rivers` (1 block per √(m³/s)), depth `depth_coef`·Q^0.4 (0.5), ≥ 1 block,
+  capped 64 / 12; vertices Gaussian-smoothed (half-width 8 blocks), junctions pinned. Writes `water_level` (lake
+  surfaces), **`rivers/rivers.dtrv`** (new `DTRV` sectioned file: vertices x, z, w, hw, depth, Q; chains ending in
+  sea / lake / river; a 32-block tile index) and `notes.bake.water`. No format version change (the file is optional:
+  FORMAT.md "Rivers"). (2) **The column rule both sides implement** (`deeptime_format::water`, Java `worlddata/Water`;
+  FORMAT.md "Water columns"): the generated surface is H bilinear over the 4-block noise-cell corners; lake (P0-13's
+  shore rule) > sea (ground under the sea's top block) > river (a channel covers the column: top ⌈w⌉ − 1, parabolic
+  bed, ≥ 1 block of water) > bank (a 4-neighbour holds water: ground ≥ its top, +1 beside a river; air sealed from its
+  bed up, only the waterline beside the sea; within a channel's bank zone at most a 1:1 slope). The column JSON gains
+  `hydro`; `deeptime parity` picks 10 % of columns on/beside river vertices and 5 % around lake mouths and wet cells.
+  (3) **`worldgen/WaterBodies`** replaces the lake-only pass (`WaterPass` delegates): rivers cut/filled to their bed
+  (gravel under 6 blocks wide, sand wider), water to their top; lakes filled as P0-13 did, caves under them plugged;
+  sea columns the aquifer left dry topped up (it leaves coastal flats a block below sea level dry: they made river
+  mouths leak); banks raised/lowered keeping their top block, and sealed; a step in a river gets vanilla's resting
+  flowing block, a larger one a falling curtain (the cheap waterfalls); **carvers pass around the water** (water and
+  its shell are set in both carving masks, which vanilla's carvers skip). It runs in chunks near a river segment, a
+  wet `water_level` cell or elevation within 17 blocks of sea level, and logs its own cost every 512 chunks.
+  (4) **River biomes**: `WorldDataTerrain.raster(ridges)` returns 0 (the valley slice) under channels at least
+  `biome_min_width_blocks` (6) wide. (5) **Settings** (standing rule): preset section `hydro` (14 keys) in the four
+  pipeline presets and the built-ins; `scale.feature_scale.rivers` wired (no longer "planned"); editor: a "Rivers and
+  lakes" toggle (terrain), the river multiplier, section "Advanced · Rivers and lakes" (lang keys,
+  `EditorFields.Section.ADV_WATER`; workbench and JUnit catalogue tests updated). (6) **Tools**: `deeptime hydro
+  --world-data D [--set hydro.K=V]` re-runs the water part on a baked folder (2.5–4.6 s at 16k quick, 730 MB RSS);
+  `deeptime-inspect rivers` (planet/box maps; `--columns` = the column rule per block); `deeptime-inspect
+  water-check` (floating and leaking water, steps, lakes against their lowest rim, split by the column's kind).
+  (7) **Tests**: core `hydro::tests` 6 (every river descends to the sea or a lake, every lake full to its lowest rim —
+  exactly its spill height —, 1 = 3 threads and run = run byte for byte, a river across the seam, geometry follows Q,
+  a dry climate leaves the lake without an outlet); format `rivers` 4 and `water` 3; JUnit `ColumnParityTest` (hydro
+  compared; planet4k and the lake world lake1024), `WaterRegionTest` (the per-chunk path = the per-column path);
+  GameTests `RiverGameTests.riversHold` (level `deeptime:test_rivers`: the 4k planet with a bare biome, no carvers,
+  features or caves) and `riverBiomes`.
+- **Real planet** (`earthlike_quick_16k`, scattered continents, 500 Myr: `deeptime run … --checkpoints` on master
+  e5d98e3 in 519 s, peak 3,456 MiB, then `deeptime hydro` on a copy of its bake): 26 lakes (20,272 km², largest 3,401
+  km², 2 endorheic), 3,337 chains, 130,984 vertices, 83,026 km of rivers, largest discharge 1,105 m³/s, widest 33
+  blocks, 4.7 MB of `rivers.dtrv`; hydrology 2.5–4.6 s (flood 2.2 s, discharge 0.4 s with the climate loaded whole).
+  Maps: review/out/p1-22/maps (planet, a lake region, the column rule over a lake, the largest river's mouth,
+  mountain streams).
+- **3D previews and water checks** (`preview.py run --keep-world --y 0,260`, standalone, boxes 256 × 256 around the
+  largest river's mouth (2980,−2620), mountain streams (−330,2130) and a lake (−1480,1780); `deeptime-inspect
+  water-check --world-data`): six iterations, each finding fixed: (a) rivers ended short of lakes (lake margins < 1
+  block deep are dry ground) → rivers cross them; (b) river mouths stopped at beach flats → the sea is a block under
+  sea level; (c) carvers cut beds and banks, leaving 73–165 floating and up to 294 leaking blocks → carving mask;
+  (d) one-block steps pre-placed as sources spread over frozen pools and boulders → flowing only; (e) coastal flats the
+  aquifer leaves dry leaked into from river mouths → the pass tops the sea up. Last full check (after6): **0 floating;
+  0 leaks from river or lake water** in the river-mouth and lake boxes; lakes 3 of 3 with their surface at the lowest
+  rim (rim − surface 0, 0, 0); 1 leak in the mountain box, a flowing step block left on a mossy boulder that vanilla's
+  `forest_rock` feature dropped into the channel. Remaining leaks are the sea's and caves' (aquifer water at y 56–62
+  in cave mouths, 134 in the coastal box; the same box without rivers had 46): the coastal-bank sealing that answers
+  them is committed but not yet run.
+- **Chunk time.** `WaterRegionTest`: the pass's per-column work costs 0.69 ms a chunk where rivers are (JIT warm).
+  Chunky over the same three 361-chunk boxes, same bake with and without rivers, same jar (Mac load 15–130, other
+  agents): without 62–88 ms a chunk (26.7, 31.6, 22.3 s), with 54–63 (22.7, 21.5, 19.4 s) — within the noise.
+- **Gates run** (branch before the master merges of 00c02ce and 8872c91): cargo fmt, clippy `-D warnings`, deny
+  (bans, licenses) clean; `cargo test --workspace --no-fail-fast` all green; `./gradlew build test` 144/0 (parity 500 of
+  500, 26 river and 20 bank columns); `./gametest.sh` **All 52 required tests passed** (riversHold: 484 water
+  columns, 0 floating, 0 leaks, 0 top mismatches, 0 water outside after 300 ticks; riverBiomes 167 of 200 = 0.835,
+  the rest at river mouths over the sea, now skipped; lakeHolds unchanged).
+- **Not done yet (the Mac became unreachable at 00:22: the laptop's Tailscale was switched off).** After the last
+  three commits nothing was compiled; to finish: `mac.sh` gates on the merged branch (fmt, clippy, test, deny,
+  `./gradlew build test`, `./gametest.sh`, `install.sh mic` + `./gametest.sh -PwithMic`, `./gametest-planet.sh`); a
+  fresh `earthlike_quick_16k` 500 Myr run on the merged branch (the mountain character changes the terrain) so the
+  bake's own water part is exercised end to end; the final previews, water checks and 3D screenshots
+  (`/Volumes/Graphide/ban/deeptime-runs/rivers/shots.sh` on the Mac); the review bundle (review/out/p1-22, maps
+  only so far); then P1-22 → done.
+- **For P2-03.** Evaporation-limited lake levels below the rim (Fill–Spill–Merge's partial fills), HAND floodplains,
+  deltas, meanders beyond the smoothing, knickpoint waterfalls from erodibility, incision burned into `elevation`.
+- **For Ben.** (1) Carvers no longer cut into river and lake water or their banks (P0-13 had accepted lakes
+  draining into caves). (2) Coastal columns the aquifer left dry below sea level are filled with sea water, in every
+  coastal chunk. (3) Defaults to judge from the pictures: a stream from 2 m³/s and 50 km² (3,337 rivers on a 16k
+  planet), 1 block of width per √(m³/s), river biomes from 6 blocks. (4) Straight parallel streams on even slopes
+  (D8 on a square grid) are left for P1-23.
+</content>
+
 ### 2026-09-29 — Block-scale mountain character, ruggedness setting, the striped-snow fix (agent worktree agent-a2d4bbb2f592ce1d7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Decisions log 2026-09-29 ("Do it now, in Phase 1"): P1-08's 6.8 km peak was a smooth dome, and its
   snowfield had vertical stripes.
