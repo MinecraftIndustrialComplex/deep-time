@@ -1585,6 +1585,31 @@ impl DepositStage {
             let ti = plan.ti;
             let t = &self.types[ti];
             let (fv, endow, tracts) = (&plan.fv, &plan.endow, &plan.tracts);
+            // A stacked type (coal) lies in the sedimentary cover (`geometry::fit_stack`): per tract
+            // cell the room the cover leaves above its base (m, in the stack's vertical scale).
+            // Fields form only where it holds a seam, and a field survives only with its top in
+            // it, so the survivor formula counts what the placement will keep.
+            let room_m: Option<Vec<f64>> = match (&t.geometry.stack, &f.cover) {
+                (Some(_), Some(cover)) => Some(ctx.pool.install(|| {
+                    plan.cells
+                        .par_iter()
+                        .map(|&cell| {
+                            let (x, z) = cluster::cell_xz(&grid, cell);
+                            let surf = surface_y(f.elev[cell as usize], &sc);
+                            (cover.blocks_at(x, z, surf) - geometry::COVER_MARGIN_BLOCKS)
+                                * sc.m_per_block_v
+                        })
+                        .collect()
+                })),
+                _ => None,
+            };
+            // The cover factor of tract cell j: 1 where the cover holds at least a block of seams.
+            let holds = |j: usize| -> f64 {
+                room_m
+                    .as_ref()
+                    .map_or(1.0, |r| f64::from(u8::from(r[j] >= sc.m_per_block_v)))
+            };
+            let holds_cell = |cell: u32| plan.cells.binary_search(&cell).map_or(0.0, holds);
             // p(c): the chance a deposit formed in each tract cell survives to the present.
             let model = survival::FateModel::new(t);
             let pet_rules = t.petroleum.as_ref();
@@ -1596,12 +1621,19 @@ impl DepositStage {
                         let Some(i) = cols.index(cell) else {
                             return (0.0, 0.0);
                         };
+                        if holds(j) == 0.0 {
+                            return (0.0, 0.0);
+                        }
                         let net = cols.net(i, &self.state.frame_times);
-                        let limit = survival::too_deep_limit_m(
+                        let mut limit = survival::too_deep_limit_m(
                             surface_y(f.elev[cell as usize], &sc),
                             sc.min_y,
                             sc.m_per_block_v,
                         );
+                        if let Some(r) = &room_m {
+                            // A stack's top seam must lie in the cover.
+                            limit = limit.min(r[j]);
+                        }
                         let when = match plan.formation {
                             FormationKind::Hazard => {
                                 survival::Formation::Hazard(cols.hazard_of(pi, j))
@@ -1646,7 +1678,8 @@ impl DepositStage {
             let p_of = |cell: u32| plan.cells.binary_search(&cell).map_or(0.0, |j| p_cell[j].0);
             let p1_of = |cell: u32| plan.cells.binary_search(&cell).map_or(0.0, |j| p_cell[j].1);
             // Per tract: its endowment E_i, its formation weight φ_i = A·F̄·E and its preservation
-            // p̄_i (p averaged with the position weights F·E).
+            // p̄_i (p averaged with the position weights F·E); for a stacked type F carries the
+            // cover factor (F̄ the tract's mean of F·cover).
             let mut areas = Vec::with_capacity(tracts.len());
             let mut phis = Vec::with_capacity(tracts.len());
             let mut pbars = Vec::with_capacity(tracts.len());
@@ -1660,8 +1693,11 @@ impl DepositStage {
                     / tr.cells.len() as f64;
                 let (mut num, mut num_s, mut den, mut plain, mut plain_s) =
                     (0.0, 0.0, 0.0, 0.0, 0.0);
+                let mut f_held = 0.0;
                 for &c in &tr.cells {
-                    let w = fv[c as usize] * endow[provinces.of_cell[c as usize] as usize];
+                    let g = holds_cell(c);
+                    f_held += fv[c as usize] * g;
+                    let w = fv[c as usize] * g * endow[provinces.of_cell[c as usize] as usize];
                     let (p1, p) = (p1_of(c), p_of(c));
                     num += w * p1;
                     num_s += w * p;
@@ -1677,7 +1713,12 @@ impl DepositStage {
                     plain_s / cells
                 });
                 areas.push(tr.area_km2);
-                phis.push(tr.area_km2 * tr.mean_f * e);
+                let mean_f = if room_m.is_some() {
+                    f_held / cells
+                } else {
+                    tr.mean_f
+                };
+                phis.push(tr.area_km2 * mean_f * e);
             }
             let count_mult = self.params.count_mult * t.balance.count_mult;
             let fp = survival::plan(
@@ -1758,10 +1799,15 @@ impl DepositStage {
                 let weights: Vec<f64> = tract
                     .cells
                     .iter()
-                    .map(|c| fv[*c as usize] * endow[provinces.of_cell[*c as usize] as usize])
+                    .map(|c| {
+                        fv[*c as usize]
+                            * holds_cell(*c)
+                            * endow[provinces.of_cell[*c as usize] as usize]
+                    })
                     .collect();
                 let set: BTreeSet<u32> = tract.cells.iter().copied().collect();
-                let allowed = |c: u32| set.contains(&c) && fv[c as usize] > 0.0;
+                let allowed =
+                    |c: u32| set.contains(&c) && fv[c as usize] > 0.0 && holds_cell(c) > 0.0;
                 let space = TractSpace {
                     grid: &grid,
                     cells: &tract.cells,
