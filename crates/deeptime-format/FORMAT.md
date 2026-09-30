@@ -444,8 +444,8 @@ If d ≤ hw' the segment **covers** the column: the hit is the covering segment 
 d ≤ hw' + bank_zone + bank_ratio·hw, it offers the **bank cap** ⌈w⌉ + ⌊d − hw'⌋; the lowest offered
 is the column's `max_ground`.
 
-**How the bake builds it** (`deeptime_core::hydro`): on the `water_level` grid, the open sea (below
-sea level, connected, ≥ 5,000 km²); Priority-Flood with the pit queue from its shores (spill level F
+**How the bake builds it** (`deeptime_core::hydro`): on the `water_level` grid, the open sea (cells
+lower than one block below sea level, connected, ≥ 5,000 km²); Priority-Flood with the pit queue from its shores (spill level F
 and the cell each land cell was reached from); receivers the steepest strictly lower neighbour on F,
 else that cell; depressions (F > height) of at least `hydro.lake_min_area_km2` and
 `lake_min_depth_blocks` are lakes at their spill level (they are always full: "fill and spill");
@@ -476,7 +476,9 @@ width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore
    within `reach` blocks (cells visited by column then row, first at the smallest squared distance;
    Java `WaterLevels.levelAt`). **Lake** when level is finite and ground < top = ⌈level⌉ − 1; bed =
    ground.
-3. Else **sea** when ground < sea level − 1 (top = sea level − 1, bed = ground; the aquifer's water).
+3. Else **sea** when surface < sea level − 1, strictly (top = sea level − 1, bed = ground; the
+   aquifer's water; a flat exactly at the sea's top face is often left dry by the aquifer, so it is
+   land).
 4. Else **river** when a segment covers the column (the hit of "Rivers"): top = ⌈w⌉ − 1, bed =
    min(top − 1, ⌊w − max(1, depth · (1 − (d/hw')²))⌋).
 5. Else, visiting the neighbours (x+1, z), (x−1, z), (x, z+1), (x, z−1) evaluated by 1–4: for each

@@ -600,7 +600,7 @@ fn is_deep(state: &[u8], fill: &[i16], elev: &[i16], c: usize) -> bool {
     state[c] & LAKE != 0 && i32::from(fill[c]) - i32::from(elev[c]) >= 16
 }
 
-/// Marks the open sea: cells at or below sea level in an 8-connected body (x wrapping) of at
+/// Marks the open sea: cells below `sea_raw` in an 8-connected body (x wrapping) of at
 /// least `min_cells`. The others stay land.
 fn open_sea(g: &Grid, elev: &[i16], sea_raw: i32, min_cells: usize, state: &mut [u8]) {
     let n = g.w * g.h;
@@ -608,7 +608,7 @@ fn open_sea(g: &Grid, elev: &[i16], sea_raw: i32, min_cells: usize, state: &mut 
     let mut members: Vec<usize> = Vec::new();
     let mut stack: Vec<usize> = Vec::new();
     for c0 in 0..n {
-        if done[c0] || i32::from(elev[c0]) > sea_raw {
+        if done[c0] || i32::from(elev[c0]) >= sea_raw {
             continue;
         }
         members.clear();
@@ -619,7 +619,7 @@ fn open_sea(g: &Grid, elev: &[i16], sea_raw: i32, min_cells: usize, state: &mut 
             for k in 0..8 {
                 if let Some(nb) = g.nb(c, k)
                     && !done[nb]
-                    && i32::from(elev[nb]) <= sea_raw
+                    && i32::from(elev[nb]) < sea_raw
                 {
                     done[nb] = true;
                     stack.push(nb);
