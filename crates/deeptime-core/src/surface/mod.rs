@@ -648,11 +648,20 @@ impl SurfaceStage {
         } else {
             None
         };
-        let ice_allowed: Option<Vec<f32>> = world
-            .fields
-            .get(glacial::source::ICE_THICKNESS)
-            .filter(|f| f.data.len() == n)
-            .map(|f| f.data.clone());
+        // The climate's own ice (FORMAT.md, "The climate's ice fields"), when it has it: glaciers
+        // only where it had ice during the step, eroding for the share of the step it stood, and
+        // no rivers under thick ice.
+        let field_n = |name: &str| -> Option<Vec<f32>> {
+            world
+                .fields
+                .get(name)
+                .filter(|f| f.data.len() == n)
+                .map(|f| f.data.clone())
+        };
+        let ice_allowed = field_n(glacial::source::ICE_MAX_THICKNESS)
+            .or_else(|| field_n(glacial::source::ICE_THICKNESS));
+        let ice_share = field_n(glacial::source::ICE_TIME_SHARE);
+        let climate_ice = field_n(glacial::source::ICE_THICKNESS);
         let precip_m_yr: Vec<f32> = clim.precip_mm.iter().map(|&p| p / 1000.0).collect();
         let mut gtot = glacial::Totals::read(&world.notes);
         let mut ice_cells = 0u64;
@@ -755,6 +764,7 @@ impl SurfaceStage {
                     precip_m_yr: &precip_m_yr,
                     t_c: &clim.t_c,
                     allowed: ice_allowed.as_deref(),
+                    time_share: ice_share.as_deref(),
                 };
                 sc.ice = std::mem::take(&mut sc.glacial.ice);
                 glacial::ice(
@@ -770,7 +780,11 @@ impl SurfaceStage {
                     &mut sc.ice,
                 );
                 for c in 0..n {
-                    sc.kf_eff[c] = sc.kf[c] * (1.0 - sc.ice.cover[c]).max(0.0);
+                    // The glacier's share of the cell, or the climate's thick ice.
+                    let thick = climate_ice.as_ref().map_or(0.0, |v| {
+                        crate::climate::ebm::smoothstep(10.0, 100.0, f64::from(v[c]))
+                    });
+                    sc.kf_eff[c] = sc.kf[c] * (1.0 - sc.ice.cover[c].max(thick)).max(0.0);
                 }
                 self.time("glacial", started);
             } else {
@@ -847,6 +861,7 @@ impl SurfaceStage {
                     precip_m_yr: &precip_m_yr,
                     t_c: &clim.t_c,
                     allowed: ice_allowed.as_deref(),
+                    time_share: ice_share.as_deref(),
                 };
                 let mut g = std::mem::take(&mut sc.glacial);
                 // One ice state, not two: the cover's solve hands its arrays on.

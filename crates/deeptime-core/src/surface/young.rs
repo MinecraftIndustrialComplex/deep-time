@@ -528,6 +528,7 @@ impl YoungStage {
                 precip_m_yr: p_m,
                 t_c,
                 allowed: allowed.as_deref(),
+                time_share: None,
             };
             glacial::step(
                 &d, &rt, &kind, &filled, sea, &ic, &gp, gravity, dt, &mut h, &mut gout,
