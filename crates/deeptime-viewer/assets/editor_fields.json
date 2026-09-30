@@ -11,7 +11,7 @@
     "adv_plates": "How many plates and continents the planet starts with, how deep its oceans are and how fast mountains and island arcs are built.",
     "adv_surface": "How fast rivers, hillslopes and waves wear the land down, how the crust rebounds, and how the sea rises and falls.",
     "adv_climate": "Temperature, rain and ice: how the climate treats the land, and the greenhouse, sunlight and ice ages over deep time.",
-    "adv_rocks": "The granite bodies that intrude under mountain belts.",
+    "adv_rocks": "The granite bodies that intrude under mountain belts, and how rock layers run from place to place.",
     "adv_deposits": "How ore deposits cluster into regions.",
     "adv_biomes": "How far from the sea the inland biome bands begin, and where swamps may form."
   },
@@ -86,6 +86,9 @@
 
     { "id": "pluton_rate", "section": "adv_rocks", "kind": "number", "path": "structure.pluton_rate_km2_myr", "min": 1e-7, "max": 1e-4, "unit": "/km²/Myr", "hint": "How often granite bodies intrude under volcanic arcs. More plutons mean more granite outcrops and more porphyry host rock." },
     { "id": "pluton_size", "section": "adv_rocks", "kind": "number", "path": "structure.pluton_length_km.0", "min": 8, "max": 80, "unit": "km", "hint": "Typical length of a granite body. Each pluton stands for a whole intrusive suite; larger ones make bigger outcrops." },
+    { "id": "strata_smoothing", "section": "adv_rocks", "kind": "number", "path": "structure.strata_smoothing_cells", "min": 0, "max": 16, "unit": "cells", "stops": [{"label": "Cell by cell", "value": 0}, {"label": "Wavy", "value": 2.5}, {"label": "Gentle", "value": 6}, {"label": "Flat", "value": 12}], "hint": "How far rock layers are evened out sideways, in simulation cells (16 blocks each at the standard scale). Higher values make layers run flatter, with gentler dips; 0 draws each cell's own layers. The default, 6, gives the few-degree dips of undisturbed basins." },
+    { "id": "strata_tongues", "section": "adv_rocks", "kind": "number", "path": "structure.strata_tongue_scale", "min": 0.25, "max": 16, "unit": "×", "hint": "Where one rock turns into another along a layer (sandstone into shale, say), the two interlock in tongues instead of meeting at a wall. This sets how thick the tongues are: below 1 finer, above 1 coarser. 1 is the default." },
+    { "id": "strata_minor_rock", "section": "adv_rocks", "kind": "number", "path": "structure.strata_minor_share", "min": 0, "max": 0.45, "unit": "", "hint": "A rock that makes up less than this share of a layer at a spot is left out of the tongues, so a trace of it does not scatter single-block specks. 0 keeps every trace; the default is 0.15." },
 
     { "id": "province_size", "section": "adv_deposits", "kind": "number", "path": "deposits.province_km", "min": 300, "max": 3000, "unit": "km", "hint": "How wide an ore province is. Small provinces scatter ore types across the map, large ones give each region a single specialty." },
     { "id": "brine_reach", "section": "adv_deposits", "kind": "number", "path": "deposits.brine_flow_km", "min": 100, "max": 2000, "unit": "km", "hint": "How far underground brines flow from mountains and basins. It decides how far from a mountain belt lead–zinc deposits of the Mississippi Valley type can form; longer reach gives them more land to form on." },

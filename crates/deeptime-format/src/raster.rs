@@ -171,6 +171,14 @@ pub struct LayerDesc {
     /// K, for `horizon_stack` layers only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stack_depth: Option<u32>,
+    /// `horizon_stack` only: keys per band of the column rule's tongues (default
+    /// `strata::BAND_KEYS`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tongue_band_keys: Option<u32>,
+    /// `horizon_stack` only: the share below which a rock takes no part in the tongues (default
+    /// `strata::MINOR_SHARE`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tongue_minor_share: Option<f64>,
 }
 
 impl LayerDesc {
@@ -187,6 +195,8 @@ impl LayerDesc {
             codec,
             nodata: None,
             stack_depth: None,
+            tongue_band_keys: None,
+            tongue_minor_share: None,
         }
     }
 
@@ -249,6 +259,14 @@ impl LayerDesc {
             }
             (_, Some(_)) => return bad("stack_depth on a scalar layer".into()),
             _ => {}
+        }
+        if self.tongue_band_keys == Some(0) {
+            return bad("tongue_band_keys 0".into());
+        }
+        if let Some(m) = self.tongue_minor_share
+            && !(0.0..0.5).contains(&m)
+        {
+            return bad(format!("tongue_minor_share {m} outside [0, 0.5)"));
         }
         if !self.scale.is_finite() || !self.offset.is_finite() {
             return bad("non-finite scale or offset".into());
