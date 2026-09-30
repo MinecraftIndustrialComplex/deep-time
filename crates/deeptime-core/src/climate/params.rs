@@ -208,7 +208,10 @@ pub struct ClimateParams {
     // --- Ice sheets and sea level (`ice.rs`).
     /// Basal yield stress of Nye's ice-sheet profile, kPa (thicker sheets with more).
     pub ice_yield_stress_kpa: f64,
-    /// Thickest ice anywhere, m.
+    /// Thickest ice anywhere, m. 3,000 m: Antarctica's mean is ~2.1 km under domes of ~4 km, and
+    /// snowball ice sheets, fed by a dry atmosphere, are thought to hold ~1 km of sea level
+    /// (Hoffman et al. 2017, Sci. Adv. 3: e1600983); at 4,000 m this model's snowballs lowered
+    /// the sea by ~2 km.
     pub ice_max_thickness_m: f64,
     /// Imbrie & Imbrie's τ_m, kyr (the ice's response inside the orbital window).
     pub ice_response_kyr: f64,
@@ -218,7 +221,7 @@ pub struct ClimateParams {
     /// The grounded ice volume the sea-level curve already assumes, Earth-normalized km³: the
     /// present ice of the calibrated Earth-like 500-Myr runs (0.74–1.28·10⁷ km³ on
     /// `pipeline_quick_16k`, 2026-09-29), so their calibrated present coastlines hold. (The model
-    /// puts 2.5·10⁷ km³, 62 m of sea level, on Earth's own relief, `deeptime climate-dem`;
+    /// puts 2.5·10⁷ km³, 61 m of sea level, on Earth's own relief, `deeptime climate-dem`;
     /// Antarctica and Greenland hold ~3.0·10⁷ km³, 65 m, Fretwell et al. 2013, Morlighem et al.
     /// 2017.)
     pub ice_reference_km3: f64,
@@ -301,7 +304,7 @@ impl Default for ClimateParams {
             orbital_strength: 1.0,
             orbital_step_kyr: 2.0,
             ice_yield_stress_kpa: 50.0,
-            ice_max_thickness_m: 4000.0,
+            ice_max_thickness_m: 3000.0,
             ice_response_kyr: 17.0,
             glacio_eustasy: 1.0,
             ice_reference_km3: 1.0e7,

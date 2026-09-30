@@ -7,8 +7,8 @@
 //!   J. Glaciol. 2: 82–93; Cuffey & Paterson 2010, *The Physics of Glaciers*, §8.7):
 //!   H = √(2 τ₀ L / (ρ_i g)), L the distance to the ice margin, τ₀ the basal yield stress
 //!   (`ice_yield_stress_kpa`, 50 kPa: Antarctica's ~3.3 km over ~1,500 km gives ~32 kPa,
-//!   Greenland's ~3 km over ~500 km ~80 kPa), capped at `ice_max_thickness_m` (real sheets flatten
-//!   where interior accumulation is low; Antarctica's domes reach ~4 km). Distances are true
+//!   Greenland's ~3 km over ~500 km ~80 kPa), capped at `ice_max_thickness_m` (3 km: real sheets
+//!   flatten where interior accumulation is low; Antarctica averages ~2.1 km under ~4-km domes). Distances are true
 //!   Earth-normalized lengths (the climate's planetary scale: map metres ÷ R/R⊕, cos φ across a
 //!   row), so ice sheets are as thick as an Earth sheet of that angular size and the eustatic sea
 //!   level is Earth's for that ice. The distance is a separable exact Euclidean distance transform

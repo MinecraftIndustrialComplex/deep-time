@@ -81,6 +81,8 @@ pub const SUBDUCTION_SMOOTH_YEARS: f64 = 1.0e7;
 pub const RIDGE_WINDOW_MYR: f64 = 20.0;
 /// CO₂ of a large igneous province, mol C per km³ of basalt (2,900 kg/m³, 0.5 wt % CO₂).
 pub const LIP_MOL_PER_KM3: f64 = 2.9e12 * 0.005 / 0.044;
+/// Volume of a mole of calcite, m³ (100.09 g/mol at 2,710 kg/m³).
+pub const CALCITE_M3_PER_MOL: f64 = 0.10009 / 2710.0;
 /// A province degasses over this long, years.
 pub const LIP_YEARS: f64 = 1.0e6;
 /// The weathering kernel Σ a·r·e^(0.09·(T − 15)) (km² · m/yr) of Earth's present land under the

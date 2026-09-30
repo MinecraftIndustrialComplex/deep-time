@@ -260,7 +260,7 @@
     "orbital_strength": 1.0,
     "orbital_step_kyr": 2.0,
     "ice_yield_stress_kpa": 50.0,
-    "ice_max_thickness_m": 4000.0,
+    "ice_max_thickness_m": 3000.0,
     "ice_response_kyr": 17.0,
     "glacio_eustasy": 1.0,
     "ice_reference_km3": 10000000.0
