@@ -153,6 +153,73 @@ pub struct ClimateParams {
     /// A glaciation starts when glaciers cover this share of the land, and ends below the second.
     pub glaciation_on_frac: f64,
     pub glaciation_off_frac: f64,
+
+    // --- Greenhouse and sun over deep time (`carbon.rs`, `clock.rs`; decisions log 2026-09-29).
+    /// Run the long-term carbon cycle: volcanic and metamorphic degassing from the plates against
+    /// silicate weathering, CO₂ setting the EBM's longwave A (`olr_a_w_m2` is the 280 ppm value).
+    /// Off: CO₂ stays at `initial_co2_ppm` (280 when that is 0).
+    pub carbon_cycle: bool,
+    /// Atmospheric CO₂ at the start of the run, ppm; 0 starts the carbon cycle in balance
+    /// (degassing = weathering on the first step's geography and sun).
+    pub initial_co2_ppm: f64,
+    /// Scales the volcanic and metamorphic CO₂ degassing (1 = Earth's present rate for Earth's
+    /// present ridge and subduction activity).
+    pub degassing_scale: f64,
+    /// Scales silicate weathering (1 = Earth's present relief under its present climate weathers
+    /// exactly Earth's present degassing at 280 ppm).
+    pub weathering_strength: f64,
+    /// Temperature sensitivity of silicate weathering, 1/K (GEOCARB's e^(0.09·ΔT), an activation
+    /// energy of ~63 kJ/mol; Berner 1994).
+    pub weathering_temp_per_k: f64,
+    /// Runoff sensitivity to the global temperature between snapshots, 1/K (GEOCARB's
+    /// (1 + 0.038·ΔT)^0.65; Berner 1994).
+    pub runoff_temp_per_k: f64,
+    /// CO₂ fertilisation of weathering: W ∝ (CO₂/280 ppm)^this (Walker, Hays & Kasting 1981: 0.3).
+    pub weathering_co2_exponent: f64,
+    /// A brightening star: L(t) = L₀ / (1 + 0.4·(1 − age/`present_age_gyr`)) (Gough 1981), with the
+    /// planet's age from the run's timeline (the run ends at `present_age_gyr`). Off: L₀ always.
+    pub solar_brightening: bool,
+    /// The star's age at the end of the run, Gyr (the Sun: 4.57).
+    pub present_age_gyr: f64,
+    /// Global precipitation changes by e^(this·ΔT) with the EBM's global temperature against
+    /// `hydro_ref_c` (Held & Soden 2006: ~2 %/K).
+    pub hydro_sensitivity_per_k: f64,
+    pub hydro_ref_c: f64,
+    /// The fine clock (numerics): the carbon cycle, the EBM and the ice advance in steps of this
+    /// many kyr inside each plate step, with at most `ebm_clock_years` EBM years per step (the run
+    /// stops early once settled).
+    pub carbon_step_kyr: f64,
+    pub ebm_clock_years: u32,
+    /// A snowball (event `deeptime:snowball`) starts when sea ice covers this share of the ocean
+    /// (annual mean) and ends below the second.
+    pub snowball_on_frac: f64,
+    pub snowball_off_frac: f64,
+    /// A hothouse (event `deeptime:hothouse`) is a stretch with the EBM's global mean above this, °C.
+    pub hothouse_c: f64,
+
+    // --- Recent ice-age cycles (`orbit.rs`).
+    /// The last this many Myr of the run have Milankovitch-style orbital forcing (0: none).
+    pub orbital_window_myr: f64,
+    /// Scales the obliquity and eccentricity swings (1: Earth-like, 0: none).
+    pub orbital_strength: f64,
+    /// Fine-clock step inside the window, kyr (numerics).
+    pub orbital_step_kyr: f64,
+
+    // --- Ice sheets and sea level (`ice.rs`).
+    /// Basal yield stress of Nye's ice-sheet profile, kPa (thicker sheets with more).
+    pub ice_yield_stress_kpa: f64,
+    /// Thickest ice anywhere, m.
+    pub ice_max_thickness_m: f64,
+    /// Imbrie & Imbrie's τ_m, kyr (the ice's response inside the orbital window).
+    pub ice_response_kyr: f64,
+    /// How much ice volume moves sea level (0: the surface section's curve alone; 1: full
+    /// glacio-eustasy, ~2.5 m per 10⁶ km³).
+    pub glacio_eustasy: f64,
+    /// The grounded ice volume the sea-level curve already assumes, Earth-normalized km³ (the
+    /// model's ice on Earth's present relief, `deeptime climate-dem`: 2.5·10⁷ km³, 62 m of sea
+    /// level; Antarctica and Greenland hold ~3.0·10⁷ km³, 65 m, Fretwell et al. 2013, Morlighem
+    /// et al. 2017).
+    pub ice_reference_km3: f64,
 }
 
 impl Default for ClimateParams {
@@ -212,6 +279,30 @@ impl Default for ClimateParams {
             ela_offset_c: 0.0,
             glaciation_on_frac: 0.02,
             glaciation_off_frac: 0.01,
+            carbon_cycle: true,
+            initial_co2_ppm: 0.0,
+            degassing_scale: 1.0,
+            weathering_strength: 1.0,
+            weathering_temp_per_k: 0.09,
+            runoff_temp_per_k: 0.038,
+            weathering_co2_exponent: 0.3,
+            solar_brightening: true,
+            present_age_gyr: 4.57,
+            hydro_sensitivity_per_k: 0.02,
+            hydro_ref_c: 15.0,
+            carbon_step_kyr: 100.0,
+            ebm_clock_years: 10,
+            snowball_on_frac: 0.95,
+            snowball_off_frac: 0.5,
+            hothouse_c: 25.0,
+            orbital_window_myr: 3.0,
+            orbital_strength: 1.0,
+            orbital_step_kyr: 2.0,
+            ice_yield_stress_kpa: 50.0,
+            ice_max_thickness_m: 4000.0,
+            ice_response_kyr: 17.0,
+            glacio_eustasy: 1.0,
+            ice_reference_km3: 2.5e7,
         }
     }
 }
@@ -351,6 +442,49 @@ impl ClimateParams {
                 && self.glaciation_on_frac < 1.0,
             "glaciation_on_frac",
             "need 0 < glaciation_off_frac ≤ glaciation_on_frac < 1",
+        )?;
+        check(
+            self.initial_co2_ppm == 0.0 || (1.0..=1.0e6).contains(&self.initial_co2_ppm),
+            "initial_co2_ppm",
+            "0 (in balance) or 1–1,000,000 ppm",
+        )?;
+        for (v, key, lo, hi) in [
+            (self.degassing_scale, "degassing_scale", 0.0, 10.0),
+            (self.weathering_strength, "weathering_strength", 0.01, 100.0),
+            (self.weathering_temp_per_k, "weathering_temp_per_k", 0.0, 0.3),
+            (self.runoff_temp_per_k, "runoff_temp_per_k", 0.0, 0.2),
+            (self.weathering_co2_exponent, "weathering_co2_exponent", 0.0, 1.0),
+            (self.present_age_gyr, "present_age_gyr", 0.5, 12.0),
+            (self.hydro_sensitivity_per_k, "hydro_sensitivity_per_k", 0.0, 0.1),
+            (self.hydro_ref_c, "hydro_ref_c", -50.0, 50.0),
+            (self.carbon_step_kyr, "carbon_step_kyr", 1.0, 2000.0),
+            (self.hothouse_c, "hothouse_c", -50.0, 100.0),
+            (self.orbital_window_myr, "orbital_window_myr", 0.0, 20.0),
+            (self.orbital_strength, "orbital_strength", 0.0, 3.0),
+            (self.orbital_step_kyr, "orbital_step_kyr", 0.25, 20.0),
+            (self.ice_yield_stress_kpa, "ice_yield_stress_kpa", 5.0, 500.0),
+            (self.ice_max_thickness_m, "ice_max_thickness_m", 10.0, 10_000.0),
+            (self.ice_response_kyr, "ice_response_kyr", 0.1, 200.0),
+            (self.glacio_eustasy, "glacio_eustasy", 0.0, 1.0),
+            (self.ice_reference_km3, "ice_reference_km3", 0.0, 1.0e9),
+        ] {
+            check(
+                v.is_finite() && (lo..=hi).contains(&v),
+                key,
+                &format!("must be in [{lo}, {hi}]"),
+            )?;
+        }
+        check(
+            (1..=1000).contains(&self.ebm_clock_years),
+            "ebm_clock_years",
+            "must be in [1, 1000]",
+        )?;
+        check(
+            0.0 < self.snowball_off_frac
+                && self.snowball_off_frac <= self.snowball_on_frac
+                && self.snowball_on_frac <= 1.0,
+            "snowball_on_frac",
+            "need 0 < snowball_off_frac ≤ snowball_on_frac ≤ 1",
         )?;
         Ok(())
     }
