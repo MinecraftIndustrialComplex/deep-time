@@ -1464,7 +1464,7 @@ public final class GeologicChunkGenerator extends NoiseBasedChunkGenerator {   /
     source (the closed form for the test terrain; bicubic L3 `elevation` for world data) plus, from
     P1-06 on, the sub-cell detail term of §8.2 (drama slider). Linear in y, so vertical interpolation in
     8-block cells is exact (`minecraft_integration_architecture.md` §2). *As built (2026-09-29):* k
-    grows on steep ground to 0.8 × the largest height difference to the eight neighbouring noise-cell
+    doubles on steep ground until it covers 0.8 × the largest height difference to the eight neighbouring noise-cell
     corners (`worldgen/TerrainScale`): with a fixed k the final density's cave band (the terrain value
     only within 1.5625·k blocks of the surface) broke faces steeper than ~3 blocks per block into
     benches and 20-block steps every four blocks, the "striped snow" of the P1-08 renders.

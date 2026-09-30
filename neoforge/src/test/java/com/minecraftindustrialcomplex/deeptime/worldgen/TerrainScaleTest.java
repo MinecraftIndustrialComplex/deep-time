@@ -59,6 +59,16 @@ class TerrainScaleTest {
     }
 
     @Test
+    void theScaleIsKTimesAPowerOfTwoCoveringTheDrop() {
+        Plane p = new Plane(400, 6.0);
+        double s = TerrainScale.at(p, 0, 0, p.height(0, 0), 8.0);
+        assertEquals(32.0, s);   // 0.8 x 24 = 19.2: 8, 16, 32
+        // Exact at a whole-number height: the interpolated density is zero at y = H, not 1e-16.
+        double h = 110.0, d104 = (h - 104) / s, d112 = (h - 112) / s;
+        assertEquals(0.0, d104 + (d112 - d104) * (6.0 / 8.0));
+    }
+
+    @Test
     void gentleGroundKeepsK() {
         Plane p = new Plane(100, 0.5);
         assertEquals(8.0, TerrainScale.at(p, 0, 0, p.height(0, 0), 8.0));
