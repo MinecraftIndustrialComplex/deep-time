@@ -113,6 +113,11 @@ fn cfg(drama: f64) -> Config {
             coarse_iteration_factor: 2.0,
             repair_margin_cells: 8,
             incision_m: 8.0,
+            // A small glacial radius, so that the halo leaves real tiles on the test planet.
+            glacial: glacial::GlacialShape {
+                radius_cells: 5,
+                ..glacial::GlacialShape::default()
+            },
             ..AmplifyParams::default()
         },
         drama,
@@ -892,9 +897,10 @@ fn every_pipeline_preset_adds_little_by_streaming_when_it_must() {
             gib(own),
             amp["seconds"].as_f64().unwrap(),
         );
-        // What the amplifier adds to the world stays under 2.5 GiB on every preset: the whole
-        // raster when it fits (71 B a cell: 2.2 GiB at 16k quick), tiles when it does not (32k
-        // full would need 8 GiB whole).
-        assert!(own < (5u64 << 29), "{name}: the stage adds {own} bytes");
+        // What the amplifier adds to the world stays under 2.75 GiB on every preset: the whole
+        // raster when it fits (79 B a cell: 2.5 GiB at 16k quick), tiles when it does not (32k
+        // full would need 8 GiB whole). (2.5 GiB before the glaciers' surface, 4 B a cell in the
+        // window and in each level, `glacial.rs`.)
+        assert!(own < (11u64 << 28), "{name}: the stage adds {own} bytes");
     }
 }

@@ -37,8 +37,8 @@
 //! `detail.rs`: the local relief × drama, damped along channels, as the u8 layer
 //! `detail/amplitude` that `deeptime:terrain` multiplies a C-periodic noise by (plan §8.2).
 
-pub mod glacial;
 pub mod character;
+pub mod glacial;
 pub mod kernels;
 pub mod resample;
 pub mod tiles;

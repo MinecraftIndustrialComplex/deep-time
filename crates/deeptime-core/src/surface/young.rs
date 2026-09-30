@@ -494,9 +494,7 @@ impl YoungStage {
         self.time("glacial", started);
 
         let started = Instant::now();
-        let kf: Vec<f64> = (0..n)
-            .map(|c| sp.k_spl * k_scale * erod[cls(c)])
-            .collect();
+        let kf: Vec<f64> = (0..n).map(|c| sp.k_spl * k_scale * erod[cls(c)]).collect();
         let mut h_new = vec![0.0; n];
         let mut qin = vec![0.0; n];
         let spl_p = spl::SplParams {
