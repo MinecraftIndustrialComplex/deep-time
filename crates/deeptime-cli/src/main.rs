@@ -6,6 +6,7 @@ mod amplify_view;
 mod climate_dem;
 mod dump;
 mod parity;
+mod provinces;
 mod run;
 mod structure_view;
 mod synth;
@@ -315,6 +316,16 @@ enum Command {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Draw the geologic-provinces view layer (shield, platform, orogen, basin, LIP, extended
+    /// crust, oceanic crust by age) of a checkpoint's world as a PNG and print each class's share.
+    Provinces {
+        /// A checkpoint written by `stage --out` or `run --checkpoints`.
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// PNG to write.
+        #[arg(long)]
+        out: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -619,6 +630,19 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Some(Command::Provinces { input, out }) => match provinces::run(&input, &out) {
+            Ok(shares) => {
+                for (name, pct) in shares {
+                    println!("{pct:6.2} %  {name}");
+                }
+                println!("deeptime provinces: -> {}", out.display());
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("deeptime provinces: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some(Command::DumpDeposits { world, out }) => match dump::run(&world, &out) {
             Ok((sites, bodies, inside)) => {
                 println!(
