@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.zip.CRC32;
 
 /**
@@ -38,6 +39,8 @@ public final class WorldData {
     private volatile Deposits deposits;
     /** {@code strata/classes.json}, read on first use. */
     private volatile List<String> classes;
+    /** The ice cover, resolved on first use. */
+    private volatile Optional<IceCover> iceCover;
 
     private WorldData(Path folder, Manifest manifest, TileCache cache, Map<String, RasterSampler> layers) {
         this.folder = folder;
@@ -131,6 +134,19 @@ public final class WorldData {
                     }
                 }
                 c = classes;
+            }
+        }
+        return c;
+    }
+
+    /** The world's ice cover ({@link IceCover#of}), resolved once; empty for a world without one. */
+    public Optional<IceCover> iceCover() {
+        Optional<IceCover> c = iceCover;
+        if (c == null) {
+            synchronized (this) {
+                if (iceCover == null)
+                    iceCover = IceCover.of(this);
+                c = iceCover;
             }
         }
         return c;

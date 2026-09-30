@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.climate;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.minecraftindustrialcomplex.deeptime.worlddata.IceCover;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
@@ -68,8 +69,12 @@ public final class BiomeCensus {
             new Check("Dfc:taiga", "Dfc", k -> k == 27, List.of(c("is_taiga"), c("is_tree/coniferous"))),
             new Check("E:snow", "ET EF", k -> k == 29 || k == 30, List.of(c("is_snowy"), c("is_icy"))));
 
-    /** A Köppen family and biomes it must not land on (the share of its columns that do is bounded). */
-    public record Forbid(String name, String classes, IntPredicate koppen, java.util.Set<String> biomes) {}
+    /**
+     * A Köppen family and biomes it must not land on (the share of its columns that do is bounded);
+     * {@code glaciated} limits the family to its columns under the ice cover ({@code true}), or to
+     * those without ({@code false}); null is either.
+     */
+    public record Forbid(String name, String classes, IntPredicate koppen, Boolean glaciated, java.util.Set<String> biomes) {}
 
     /**
      * EF is ice cap where the glacier model puts ice and barren frozen ground elsewhere (Ben, 2026-09-29,
@@ -77,8 +82,12 @@ public final class BiomeCensus {
      * (Nether-stone) mountains, and never a warm badlands.
      */
     public static final List<Forbid> FORBIDDEN = List.of(
-            new Forbid("EF:no_red", "EF", k -> k == 30, java.util.Set.of("terralith:snowy_badlands", "terralith:scarlet_mountains",
-                    "minecraft:badlands", "minecraft:eroded_badlands", "minecraft:wooded_badlands")));
+            new Forbid("EF:no_red", "EF", k -> k == 30, null, java.util.Set.of("terralith:snowy_badlands", "terralith:scarlet_mountains",
+                    "minecraft:badlands", "minecraft:eroded_badlands", "minecraft:wooded_badlands")),
+            // Packed-ice canyons only where the ice model says ice (Ben, 2026-09-30, "Fix both").
+            new Forbid("EF:no_chasm_on_barren", "EF without ice", k -> k == 30, false, java.util.Set.of("terralith:glacial_chasm")),
+            // Cherry groves are positive-weirdness variants: ice caps are steered off them.
+            new Forbid("EF:no_cherry", "EF", k -> k == 30, null, java.util.Set.of("terralith:snowy_cherry_grove", "minecraft:cherry_grove")));
 
     public static final String[] KOPPEN = {"Af", "Am", "Aw", "As", "BWh", "BWk", "BSh", "BSk", "Csa", "Csb", "Csc", "Cwa", "Cwb",
             "Cwc", "Cfa", "Cfb", "Cfc", "Dsa", "Dsb", "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb", "Dfc", "Dfd", "ET", "EF",
@@ -119,6 +128,7 @@ public final class BiomeCensus {
             throw new IllegalStateException(level.dimension().location() + " is not a Deep Time level on world data");
         WorldData wd = t.data();
         RasterSampler kp = wd.layer("climate/koppen");
+        RasterSampler iceLayer = wd.has(IceCover.LAYER) ? wd.layer(IceCover.LAYER) : null;
         var sampler = level.getChunkSource().randomState().sampler();
         int c = t.circumference(), sea = g.getSeaLevel();
         int w = c / step, h = c / (2 * step);
@@ -174,6 +184,8 @@ public final class BiomeCensus {
                     }
                     for (Forbid f : FORBIDDEN) {
                         if (!f.koppen().test(k))
+                            continue;
+                        if (f.glaciated() != null && f.glaciated() != (iceLayer != null && iceLayer.nearest(x, z) > 0))
                             continue;
                         int[] n = forbidden.get(f.name());
                         n[1]++;

@@ -66,14 +66,18 @@
 //! (< `wetland_low_m`, 150 m) land that is not frozen goes
 //! into E6 in proportion to `wetlands` — swamps and mangroves only where they belong (vanilla
 //! puts E6 at hot temperatures to mangrove swamp, whatever the humidity). The deep sea keeps E4 or
-//! more, away from Terralith's sky-island band.
+//! more, away from Terralith's sky-island band. A class's placement may clamp its land's erosion
+//! (`erosion: {min, max}`; EF's barren ground is held below 0.3, off Terralith's packed-ice glacial
+//! chasm, and its ice cap is not).
 //!
 //! **Weirdness** from the ridge/valley index (the ground minus its window mean): its rank among the
 //! land cells read through the reference's peaks-and-valleys distribution above −0.8, turned into
 //! |weirdness| on the rising branch (|w| = (PV + 1)/3), signed by a value noise of wavelength
-//! `variant_blocks` (vanilla's variant biomes), except for a class whose placement says `weirdness:
-//! positive` (EF: its peaks are frozen peaks, never the negative branch's jagged peaks or Terralith's
-//! scarlet mountains). PV stays above the valley slice: no river biomes
+//! `variant_blocks` (vanilla's variant biomes), except for a class whose placement names its branch:
+//! `weirdness: positive`, or `{positive_below_erosion: e}` (positive where the erosion is below `e`,
+//! negative above). EF has the second: its peaks are frozen peaks, never the negative branch's jagged
+//! peaks or Terralith's scarlet mountains, and its flats are off the positive-branch variants such as
+//! the cherry grove. PV stays above the valley slice: no river biomes
 //! until rivers exist (Phase 2).
 
 use std::sync::OnceLock;
@@ -83,7 +87,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use super::placement::Placement;
+use super::placement::{Placement, Weirdness};
 use crate::climate::koppen;
 use crate::error::CoreError;
 use crate::world::Field;
@@ -93,6 +97,9 @@ pub const REFERENCE_JSON: &str = include_str!("../../data/climate_mapping/defaul
 
 /// `notes.bake.climate.mapping`: which mapping wrote the layers.
 pub const MAPPING: &str = "p1-09";
+
+/// `w_thr` of a class that always keeps the positive branch (above any erosion).
+const ALWAYS_POSITIVE: f32 = 9.0;
 
 /// Salt of the noise that signs the weirdness.
 pub const VARIANT_SALT: u32 = 1801;
@@ -641,8 +648,13 @@ struct Coords {
     t_land: Vec<f32>,
     h_land: Vec<f32>,
     t_sea: Vec<f32>,
-    /// 1 where the class keeps the positive branch of the variant noise (placement `weirdness`), else 0.
-    w_pos: Vec<f32>,
+    /// The class's erosion limits (placement `erosion`; ±2 where it has none), nearest-filled
+    /// across the sea like the others.
+    e_lo: Vec<f32>,
+    e_hi: Vec<f32>,
+    /// The class's variant-noise rule (placement `weirdness`): NaN = the noise signs it, [`ALWAYS_POSITIVE`]
+    /// = the positive branch, else the erosion below which it is positive (negative above).
+    w_thr: Vec<f32>,
     by_class: Value,
 }
 
@@ -655,7 +667,9 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     let mut t_land = vec![f32::NAN; n];
     let mut h_land = vec![f32::NAN; n];
     let mut t_sea = vec![f32::NAN; n];
-    let mut w_pos = vec![f32::NAN; n];
+    let mut e_lo = vec![f32::NAN; n];
+    let mut e_hi = vec![f32::NAN; n];
+    let mut w_thr = vec![f32::NAN; n];
     let mut land = vec![false; n];
     let mut stats = [(0u64, 0f64, 0f64); 32];
     for k in 0..n {
@@ -679,7 +693,14 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         let hu = placement.humidity_land(class, ai, glacier);
         t_land[k] = th as f32;
         h_land[k] = hu as f32;
-        w_pos[k] = f32::from(u8::from(placement.weirdness_positive(class)));
+        let lim = placement.erosion_limit(class, glacier);
+        e_lo[k] = lim.map_or(-2.0, |l| l.min as f32);
+        e_hi[k] = lim.map_or(2.0, |l| l.max as f32);
+        w_thr[k] = match placement.weirdness(class) {
+            Weirdness::Noise => f32::NAN,
+            Weirdness::Positive => ALWAYS_POSITIVE,
+            Weirdness::PositiveBelowErosion(e) => e as f32,
+        };
         let s = &mut stats[class as usize];
         s.0 += 1;
         s.1 += th;
@@ -692,8 +713,12 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     if !fill_nearest(&mut h_land, &land, w, h) {
         h_land = vec![2.5; n];
     }
-    if !fill_nearest(&mut w_pos, &land, w, h) {
-        w_pos = vec![0.0; n];
+    if !fill_nearest(&mut e_lo, &land, w, h) || !fill_nearest(&mut e_hi, &land, w, h) {
+        e_lo = vec![-2.0; n];
+        e_hi = vec![2.0; n];
+    }
+    if !fill_nearest(&mut w_thr, &land, w, h) {
+        w_thr = vec![f32::NAN; n];
     }
     if !fill_nearest(&mut t_sea, &sea, w, h) {
         t_sea = t_land.clone();
@@ -717,7 +742,9 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         t_land,
         h_land,
         t_sea,
-        w_pos,
+        e_lo,
+        e_hi,
+        w_thr,
         by_class: Value::Object(by_class),
     }
 }
@@ -758,7 +785,7 @@ pub fn map(
     let land: Vec<bool> = elev.iter().map(|&z| f64::from(z) > sea).collect();
 
     // Temperature and humidity.
-    let (t_land, h_land, t_sea, w_pos, by_class) = match climate {
+    let (t_land, h_land, t_sea, (e_lo, e_hi, w_thr), by_class) = match climate {
         Some(c) => {
             let co = coords(c, g.l1, placement);
             let up = |v: Vec<f32>| {
@@ -771,11 +798,22 @@ pub fn map(
                     false,
                 )
             };
+            // The class's rules are not blended across a border: the nearest L1 cell's.
+            let near = |v: Vec<f32>| {
+                super::resample(
+                    &Field {
+                        grid: g.l1.clone(),
+                        data: v,
+                    },
+                    l2,
+                    true,
+                )
+            };
             (
                 up(co.t_land),
                 up(co.h_land),
                 up(co.t_sea),
-                up(co.w_pos),
+                (near(co.e_lo), near(co.e_hi), near(co.w_thr)),
                 co.by_class,
             )
         }
@@ -787,7 +825,13 @@ pub fn map(
                     thermal_plain(28.0 - 0.55 * lat.abs()) as f32
                 })
                 .collect();
-            (t.clone(), vec![2.5; n], t, vec![0.0; n], Value::Null)
+            (
+                t.clone(),
+                vec![2.5; n],
+                t,
+                (vec![-2.0; n], vec![2.0; n], vec![f32::NAN; n]),
+                Value::Null,
+            )
         }
     };
     let mut temperature = vec![0f32; n];
@@ -854,7 +898,8 @@ pub fn map(
             e = e6 + 0.01 + (0.95 - e6 - 0.01) * unit((s - 0.15) / 0.6);
             wet_cells += 1;
         }
-        erosion[k] = e as f32;
+        // The class's own limits (EF: no packed-ice glacial chasm on barren polar desert).
+        erosion[k] = (e as f32).clamp(e_lo[k], e_hi[k].max(e_lo[k]));
     }
     if !fill_nearest(&mut erosion, &land, w, h) {
         erosion.iter_mut().for_each(|e| *e = 0.25);
@@ -885,14 +930,16 @@ pub fn map(
         let bz = l2.block_z(j as i64) as f64;
         for (i, o) in row.iter_mut().enumerate() {
             let bx = l2.block_x(i as i64) as f64;
-            let m = mag[j * w + i];
-            *o = if w_pos[j * w + i] < 0.5
-                && noise.value(bx, bz, p.variant_blocks, VARIANT_SALT) < 0.0
-            {
-                -m
+            let k = j * w + i;
+            let m = mag[k];
+            let thr = w_thr[k];
+            let negative = if !land[k] || thr.is_nan() {
+                noise.value(bx, bz, p.variant_blocks, VARIANT_SALT) < 0.0
             } else {
-                m
+                // A class that keeps the positive branch (all of it, or its high relief).
+                thr <= ALWAYS_POSITIVE - 1.0 && erosion[k] >= thr
             };
+            *o = if negative { -m } else { m };
         }
     });
 
@@ -1319,49 +1366,92 @@ mod tests {
         }
     }
 
-    /// EF keeps the positive branch of the variant noise: vanilla's frozen peaks, and no
-    /// Terralith scarlet mountains, on its peaks. Without the placement key the noise signs it.
+    /// EF's peaks keep the positive branch of the variant noise (vanilla's frozen peaks, no
+    /// Terralith scarlet mountains) and its flats the negative one (no cherry grove, which is a
+    /// positive-branch variant); barren EF is held below erosion 0.3 (off the packed-ice glacial
+    /// chasm), ice cap is not. Without the keys the noise signs the weirdness and the erosion is
+    /// the relief's.
     #[test]
-    fn ef_keeps_the_positive_variant() {
+    fn ef_peaks_are_positive_its_flats_negative_and_barren_ef_is_held_off_the_chasm() {
         let table = placement::builtin();
-        let all_ef = ["EF"; 4];
         // A short wavelength, so that the noise changes sign within the small planet.
         let params = BiomeParams {
             variant_blocks: 64.0,
             ..BiomeParams::default()
         };
-        let (m, w2) = fixture_of(&params, table, all_ef, [false; 4]);
-        let land = |j: usize| (16..48).contains(&j);
-        let count_negative = |m: &Mapped| {
-            let mut neg = 0usize;
-            let mut n = 0usize;
-            for (k, &v) in m.layers[4].iter().enumerate() {
-                if land(k / w2) && v.abs() > 0.0 {
-                    n += 1;
-                    neg += usize::from(v < 0.0);
+        let all_ef = ["EF"; 4];
+        let glaciated = [true, false, true, false];
+        let (m, w2) = fixture_of(&params, table, all_ef, glaciated);
+        // The layers' land cells of each quarter, two columns in from the quarter's edges (an L2
+        // cell takes its class from the nearest L1 cell).
+        let cells = |q: usize| {
+            let (lo, hi) = (q * w2 / 4 + 2, (q + 1) * w2 / 4 - 2);
+            (16..48usize)
+                .flat_map(move |j| (lo..hi).map(move |i| j * w2 + i))
+                .collect::<Vec<_>>()
+        };
+        let (mut peaks, mut flats) = (0, 0);
+        for q in 0..4 {
+            for k in cells(q) {
+                let (e, w) = (m.layers[3][k], m.layers[4][k]);
+                if e < -0.27 {
+                    peaks += 1;
+                    assert!(w > 0.0, "a peak (erosion {e}) is positive: {w}");
+                } else {
+                    flats += 1;
+                    assert!(w < 0.0, "a flat (erosion {e}) is negative: {w}");
                 }
             }
-            (neg, n)
+        }
+        assert!(peaks > 100 && flats > 100, "peaks {peaks}, flats {flats}");
+        let top = |m: &Mapped, q: usize| {
+            cells(q)
+                .into_iter()
+                .map(|k| m.layers[3][k])
+                .fold(f32::MIN, f32::max)
         };
-        let (neg, n) = count_negative(&m);
-        assert!(n > 1000, "land columns: {n}");
-        assert_eq!(neg, 0, "EF has no negative weirdness");
-        // The same planet with the key removed: the noise gives some columns the negative sign.
+        // Quarters 1 and 3 are barren (not glaciated): erosion at most 0.3; 0 and 2 are ice cap.
+        for q in [1, 3] {
+            assert!(
+                top(&m, q) <= 0.3 + 1e-6,
+                "barren quarter {q}: {}",
+                top(&m, q)
+            );
+        }
+        for q in [0, 2] {
+            assert!(
+                top(&m, q) > 0.3,
+                "ice cap quarter {q} keeps its flats: {}",
+                top(&m, q)
+            );
+        }
+        // The same planet without EF's keys: the relief's erosion everywhere, the noise's signs.
         let mut v: serde_json::Value = serde_json::from_str(placement::PLACEMENT_JSON).unwrap();
-        v["classes"]["EF"]
+        let ef = v["classes"]["EF"].as_object_mut().unwrap();
+        ef.remove("weirdness");
+        ef.remove("erosion");
+        ef.get_mut("glaciated")
+            .unwrap()
             .as_object_mut()
             .unwrap()
-            .remove("weirdness");
+            .remove("erosion");
         let (free, _) = fixture_of(
             &params,
             &Placement::from_value(&v).unwrap(),
             all_ef,
-            [false; 4],
+            glaciated,
         );
-        let (neg_free, _) = count_negative(&free);
         assert!(
-            neg_free > 0,
-            "the noise signs the weirdness without the key"
+            top(&free, 1) > 0.3,
+            "barren EF without the limit: {}",
+            top(&free, 1)
+        );
+        let negative_peak = (0..4)
+            .flat_map(cells)
+            .any(|k| free.layers[3][k] < -0.27 && free.layers[4][k] < 0.0);
+        assert!(
+            negative_peak,
+            "the noise gives some peak the negative sign without the key"
         );
         // Magnitudes are the same either way.
         for (a, b) in m.layers[4].iter().zip(&free.layers[4]) {
