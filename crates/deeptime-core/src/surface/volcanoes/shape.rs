@@ -124,7 +124,7 @@ pub struct Radial {
 impl Radial {
     /// Linear interpolation at ρ (0 beyond the table).
     pub fn at(&self, rho: f64) -> f64 {
-        if self.v.is_empty() || !(rho >= 0.0) {
+        if self.v.is_empty() || rho.is_nan() || rho < 0.0 {
             return 0.0;
         }
         let q = rho / self.step;

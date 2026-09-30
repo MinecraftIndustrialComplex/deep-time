@@ -420,7 +420,7 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
     }
     // The map layer marks them; the notes carry the summary.
     let map = &world.fields[field::MAP].data;
-    assert!(map.iter().any(|&x| x == code::STRATO_ACTIVE));
+    assert!(map.contains(&code::STRATO_ACTIVE));
     let note: serde_json::Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
     assert!(summary_line(&note).starts_with("volcanoes_final="));
     let _ = std::fs::remove_dir_all(dir);
