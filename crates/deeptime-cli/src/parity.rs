@@ -11,12 +11,12 @@
 //! 20 % inside the boxes of random bodies (so the bodies and their zones are exercised); a world
 //! without bodies gets random columns instead. A world with a river network (P1-22) also gets 10 %
 //! on and beside random river vertices (channel, banks) and 5 % around the mouths of rivers that end
-//! in lakes (lake water and shores).
+//! in lakes; a world with lakes 5 % around random wet `water_level` cells (lake water and shores).
 
 use std::path::Path;
 
 use deeptime_core::synth::SplitMix;
-use deeptime_format::{ColumnWorld, FormatError, fsutil::write_atomic};
+use deeptime_format::{ColumnWorld, FormatError, RasterRead, fsutil::write_atomic};
 use serde_json::{Value, json};
 
 /// The fixture's default size (plan §9.2: 500 columns).
@@ -54,6 +54,16 @@ pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
             i64::from(lo[2]) + rng.below((i64::from(hi[2]) - i64::from(lo[2]) + 1) as u64) as i64;
         out.push((x, z));
     }
+    // Lake shores (P1-22): around random wet cells of `water_level`.
+    let wet = wet_cells(w);
+    if !wet.is_empty() {
+        for _ in 0..n / 20 {
+            let (x, z) = wet[rng.below(wet.len() as u64) as usize];
+            let dx = rng.below(17) as i64 - 8;
+            let dz = rng.below(17) as i64 - 8;
+            out.push((x + dx, z + dz));
+        }
+    }
     if let Some(r) = &w.rivers
         && !r.vertices.is_empty()
     {
@@ -89,6 +99,30 @@ pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
         let x = rng.below(2 * c as u64) as i64 - c;
         let z = rng.below((c / 2) as u64) as i64 - c / 4;
         out.push((x, z));
+    }
+    out
+}
+
+/// Block positions of the `water_level` layer's wet cells (every one up to 100,000, else a stride).
+fn wet_cells(w: &ColumnWorld) -> Vec<(i64, i64)> {
+    let Some(e) = w.manifest.layer(deeptime_format::column::WATER_LEVEL) else {
+        return Vec::new();
+    };
+    let Ok(l) = deeptime_format::LazyLayer::open(&w.dir.join(&e.path)) else {
+        return Vec::new();
+    };
+    let g = l.desc().grid.clone();
+    let mut out = Vec::new();
+    for j in 0..i64::from(g.h) {
+        for i in 0..i64::from(g.w) {
+            if !l.get(i, j).is_nan() {
+                out.push((g.block_x(i), g.block_z(j)));
+            }
+        }
+    }
+    if out.len() > 100_000 {
+        let stride = out.len() / 100_000 + 1;
+        out = out.into_iter().step_by(stride).collect();
     }
     out
 }

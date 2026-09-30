@@ -586,6 +586,18 @@ def testWorldTasks = [wrap1024: 'wrap-test', lake1024: 'lake-test'].collect { na
                 '--dump-samples', samples.get().asFile.absolutePath
     }
 }
+// P1-22: Rust's column evaluator on the lake fixture (its lake water columns and their banks),
+// for ColumnParityTest.theLakeWorldIsEqual.
+def lakeWorldParity = tasks.register('testWorldLake1024Parity', Exec) {
+    description = "Writes Rust's column evaluator on 300 columns of the lake fixture (lake1024/parity/columns.json)."
+    dependsOn 'testWorldLake1024'
+    def world = testWorldsDir.map { it.dir('lake1024') }
+    def fixture = testWorldsDir.map { it.file('lake1024/parity/columns.json') }
+    outputs.file fixture
+    workingDir repoRoot
+    commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
+            'parity', '--world-data', world.get().asFile.absolutePath, '--columns', '300'
+}
 // P1-15: a synthetic deposit world (sites, bodies, events and a terrain) and Rust's own reading of
 // it (`deeptime dump-deposits`), for DepositDataParityTest.
 def depositWorldRun = tasks.register('testWorldDeposits4kRun', Exec) {
@@ -641,6 +653,7 @@ def testWorlds = tasks.register('testWorlds') {
     dependsOn testWorldTasks
     dependsOn depositWorldDump
     dependsOn planetWorldParity
+    dependsOn lakeWorldParity
 }
 tasks.named('test', Test) {
     dependsOn testWorlds

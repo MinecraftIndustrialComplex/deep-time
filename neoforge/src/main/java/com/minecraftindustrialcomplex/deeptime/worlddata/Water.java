@@ -155,8 +155,8 @@ public final class Water {
                     rs.biome(), rs.hit());
         Integer minGround = null, seal = null;
         for (Core c : n) {
-            if (!c.kind().isWater())
-                continue;
+            if (c.kind() != Kind.RIVER && c.kind() != Kind.LAKE)
+                continue;   // the sea is the aquifer's: vanilla's rules keep it
             int need = c.top() + (c.kind() == Kind.RIVER ? 1 : 0);
             minGround = minGround == null ? need : Math.max(minGround, need);
             int from = c.bed() + 1;

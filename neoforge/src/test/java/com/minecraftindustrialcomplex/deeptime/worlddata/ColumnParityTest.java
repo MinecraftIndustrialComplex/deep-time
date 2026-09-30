@@ -176,6 +176,38 @@ class ColumnParityTest {
         assertTrue(rivers > 0 && banks > 0, "the fixture reaches rivers and their banks (P1-22)");
     }
 
+    /**
+     * P1-22 on the synthetic lake world ({@code lake1024}, the GameTest lake's data): its columns,
+     * lake water and shores included, are Rust's too.
+     */
+    @Test
+    void theLakeWorldIsEqual() throws IOException {
+        Path w = Fixtures.world("lake1024");
+        JsonObject doc = JsonParser.parseString(Files.readString(w.resolve("parity/columns.json"), StandardCharsets.UTF_8))
+                .getAsJsonObject();
+        WorldData wd = WorldData.open(w);
+        int equal = 0, lakes = 0, banks = 0;
+        List<String> bad = new ArrayList<>();
+        JsonArray cols = doc.getAsJsonArray("columns");
+        for (JsonElement e : cols) {
+            JsonObject r = e.getAsJsonObject();
+            int x = r.get("x").getAsInt(), z = r.get("z").getAsInt();
+            Columns.Sample s = Columns.sample(wd, x, z);
+            List<String> diff = differences(s, r);
+            if (diff.isEmpty())
+                equal++;
+            else if (bad.size() < 10)
+                bad.add("(" + x + ", " + z + "): " + String.join("; ", diff));
+            if (s.hydro().kind() == Water.Kind.LAKE)
+                lakes++;
+            if (s.hydro().kind() == Water.Kind.BANK)
+                banks++;
+        }
+        System.out.println("[junit] ColumnParityTest lake1024 columns=" + cols.size() + " equal=" + equal + " lake=" + lakes + " bank=" + banks);
+        assertTrue(bad.isEmpty(), (cols.size() - equal) + " columns differ:\n" + String.join("\n", bad));
+        assertTrue(lakes > 0 && banks > 0, "the fixture reaches the lake and its shore");
+    }
+
     /** The terrain height the generator reads is the evaluator's surface. */
     @Test
     void theGeneratorsHeightIsTheSurface() throws IOException {
