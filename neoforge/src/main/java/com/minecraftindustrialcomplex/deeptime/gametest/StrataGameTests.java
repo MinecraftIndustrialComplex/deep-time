@@ -305,8 +305,12 @@ public final class StrataGameTests {
                 for (int h = 2; h < col.count; h++) {
                     int cls = col.classes[h];
                     String name = classes.get(cls);
-                    BlockState expected = palette.block(name, StrataPass.horizonKey(h, cls));
+                    BlockState expected = palette.block(name, StrataPass.horizonKey(col.units[h], cls));
                     int bottom = h + 1 < col.count ? col.tops[h + 1] + 1 : col.tops[h] - 9;
+                    // The column rule mixes in the neighbouring cell columns' classes as thin
+                    // tongues (format 0.2); sample only horizons with blocks to spare.
+                    if (col.tops[h] - bottom < 2)
+                        continue;
                     for (int y : new int[]{col.tops[h] - 1, bottom + 1}) {
                         e.checked++;
                         BlockState actual = chunk.getBlockState(new BlockPos(x, y, z));

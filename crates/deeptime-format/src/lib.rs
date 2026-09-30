@@ -18,6 +18,7 @@ pub mod manifest;
 pub mod ramps;
 pub mod raster;
 pub mod sites;
+pub mod strata;
 pub mod tilepack;
 
 pub use bodies::{Body, BodyId, Shape, Zone};
@@ -41,7 +42,7 @@ pub use tilepack::{TilePackReader, TilePackWriter, Written, encode_tile_pack, wr
 pub const FORMAT_VERSION: &str = env!("DEEPTIME_FORMAT_VERSION");
 
 /// The minor part of [`FORMAT_VERSION`], written into every file header (plan §5.7.2).
-pub const FORMAT_MINOR: u16 = 1;
+pub const FORMAT_MINOR: u16 = 2;
 
 #[cfg(test)]
 mod tests {

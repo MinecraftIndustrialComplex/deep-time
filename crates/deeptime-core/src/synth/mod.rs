@@ -423,6 +423,9 @@ fn layer_i16(
     LoadedLayer::new(d, ras.to_le_bytes())
 }
 
+/// The key span of a synthetic horizon: horizon h spans `h·STEP ..= h·STEP + STEP − 1`.
+pub const SYNTH_KEY_STEP: u16 = 4096;
+
 /// The horizon stacks: per L1 cell the horizons of `kind`, each top a fixed depth below the
 /// surface sampled from the L3 elevation at the same block.
 fn strata_layer(
@@ -434,7 +437,7 @@ fn strata_layer(
     let depths = kind.depths();
     let k = depths.len();
     let e = &elevation.desc.grid;
-    let mut bytes = Vec::with_capacity(l1.cells() * 3 * k);
+    let mut bytes = Vec::with_capacity(l1.cells() * 7 * k);
     for j in 0..l1.h {
         for i in 0..l1.w {
             // Same block, L3 index: (block − origin) / r.
@@ -450,10 +453,17 @@ fn strata_layer(
             for h in 0..k {
                 bytes.push(kind.class_index(i, h));
             }
+            // Horizon h's key span is the same in every cell (format 0.2): the column rule
+            // correlates the synthetic stacks by index.
+            for side in [0u16, SYNTH_KEY_STEP - 1] {
+                for h in 0..k as u16 {
+                    bytes.extend_from_slice(&(h * SYNTH_KEY_STEP + side).to_le_bytes());
+                }
+            }
         }
     }
     let mut d = LayerDesc::scalar("strata/horizons", DType::HorizonStack, l1.clone(), codec);
-    d.units = "block/16 top, class index".into();
+    d.units = "block/16 top, class index, key top, key base".into();
     d.scale = 1.0 / 16.0;
     d.stack_depth = Some(k as u32);
     LoadedLayer::new(d, bytes)
@@ -608,12 +618,12 @@ mod tests {
     fn every_class_strata_layer() {
         let w = build(Kind::WrapTest, Strata::EveryClass, 1024, Codec::Raw).unwrap();
         assert_eq!(w.strata.desc.stack_depth, Some(8));
-        let (top0, c0) = w.strata.horizon(3, 10, 0);
-        let (top2, c2) = w.strata.horizon(3, 10, 2);
-        assert_eq!(i32::from(top0) - i32::from(top2), 20 * 16);
-        assert_eq!((c0, c2), (18, 20));
+        let (h0, h2) = (w.strata.horizon(3, 10, 0), w.strata.horizon(3, 10, 2));
+        assert_eq!(i32::from(h0.top) - i32::from(h2.top), 20 * 16);
+        assert_eq!((h0.class, h2.class), (18, 20));
+        assert_eq!(h2.key, [2 * SYNTH_KEY_STEP, 3 * SYNTH_KEY_STEP - 1]);
         let p = build(Kind::WrapTest, Strata::Placeholder, 1024, Codec::Raw).unwrap();
         assert_eq!(p.strata.desc.stack_depth, Some(3));
-        assert_eq!(p.strata.horizon(3, 10, 1).1, 1);
+        assert_eq!(p.strata.horizon(3, 10, 1).class, 1);
     }
 }

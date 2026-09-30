@@ -65,7 +65,8 @@ class ColumnParityTest {
         else
             for (int i = 0; i < h.size(); i++) {
                 JsonArray e = h.get(i).getAsJsonArray();
-                if (s.horizons()[i][0] != e.get(0).getAsInt() || s.horizons()[i][1] != e.get(1).getAsInt())
+                if (s.horizons()[i][0] != e.get(0).getAsInt() || s.horizons()[i][1] != e.get(1).getAsInt()
+                        || s.horizons()[i][2] != e.get(2).getAsInt())
                     out.add("horizon " + i + " [" + s.horizons()[i][0] + ", " + s.horizons()[i][1] + "] vs " + e);
             }
         JsonArray b = r.getAsJsonArray("bodies");
