@@ -56,9 +56,9 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | p1-structure (P1-07: surface rock, bedrock, metamorphic grade, trap structure, plutons, six pole-to-pole cross-sections; trimmed to 23 MB) | https://spacesheep.dev/@benmac/deeptime-p1-structure | P1-07 rock classes and strata, 500 Myr 2026-09-29 | 2026-09-29 |
 | p1-calib, p1-calib-super (P1-17 partial: 500 Myr on pipeline_quick_16k after recalibration with real climate; scattered continents / supercontinent) | https://spacesheep.dev/@benmac/deeptime-p1-calib · https://spacesheep.dev/@benmac/deeptime-p1-calib-super | calibrated 500 Myr 2026-09-29 | 2026-09-29 |
 | p1-amplify (P1-06: before/after amplification of mountains, highlands, coast, river, lake, a tile edge and the seam; drama figure) | https://spacesheep.dev/@benmac/deeptime-p1-amplify | P1-06 before/after amplification 2026-09-29 | 2026-09-29 |
+| p1-biomes (P1-09: Köppen beside biomes on earthlike_quick_16k 500 Myr, standalone and MIC; tag shares, top biomes per class, Chunky areas) | https://spacesheep.dev/@benmac/deeptime-p1-biomes | P1-09 biomes vs climate 2026-09-29 | 2026-09-29 |
 | p1-deposits (deposit engine on synthetic fields, Why-here chains) | https://spacesheep.dev/@benmac/deeptime-p1-deposits | P1-14 first pass 2026-09-28 | 2026-09-28 |
 | p1-deposits-real (P1-14: deposits on the real 500 Myr history; not published, review/out/p1-deposits-real on the laptop and the Mac, 17 MB) | — | P1-14 real history 2026-09-29 | 2026-09-29 |
-| p1-amplify (P1-06: hill-shaded before/after views of L3 with a slider, D8 rivers of each terrain, the change, the tile corner and the seam, the drama slider; not published, review/out/p1-amplify on the laptop and the Mac, 16 MB) | — | P1-06 amplification 2026-09-29 | 2026-09-29 |
 | p0-bluemap (3D render on MIC blocks) | https://spacesheep.dev/@benmac/deeptime-p0-bluemap | P0-14 mountain render 2026-09-28 | 2026-09-28 |
 | q10-ev (Q10 evidence: the same deposits in MIC without and with Excavated Variants; cut screenshots, per-host ore table, costs, trade-offs) | https://spacesheep.dev/@benmac/deeptime-q10-ev | Q10 evidence 2026-09-28 | 2026-09-28 |
 | q10-map-plain (BlueMap, MIC without EV: 3 sites, surface + cut maps; linked from q10-ev) | https://spacesheep.dev/@benmac/deeptime-q10-map-plain | Q10 map without EV 2026-09-28 | 2026-09-28 |
@@ -73,6 +73,61 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — Coal seam fields: a deposit is one minable seam field, density 4 / 14 / 40 per 100,000 km² (agent worktree agent-a3e41a57dc812f499, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Ben's decision (decisions log 2026-09-29, "OK; define coal as seams (Recommended)"): coal's survivor-based
+  counts stay; a deposit is one minable seam field, tens of km across, with its density sized from coal-basin area
+  statistics and labelled an estimate. Only `deposit_type/coal_seam.json` changed (plus the plan's §8.6 as-built note and
+  two notes in `data/usgs/coal.json`; no schema change, no code): `density_per_1e5km2` 10 / 30 / 80 → **4 / 14 / 40**
+  (`density_basis: estimate`, so the P50 14 is used), `tonnage_mt` 4.2 / 13 / 25 → **540 / 2,500 / 10,000 Mt**, `aspect`
+  (1, 0.001, 1.5) → **(1, 6.5e-5, 1.5)**, `balance.size_mult_h` 6 → **1**, `min_separation_m` 2,400 → **26,000**,
+  `clustering` camps 20 / 8 km → **100 / 40 km**. The derivation and every source are in the type's `notes` and the plan.
+- **Research** (Sonnet sub-agent, explicit model; web search plus the USGS PDFs it downloaded). No source counts minable
+  seam fields; every count is a judgement, and the type's notes list what the research did not verify. Density = fields ÷
+  tract area × 10⁵: Powder River (Fort Union, 57,000 km², 6–9 named coalfields, PP 1625-A chap. PS/PG) 10.5–15.8; Sydney
+  Basin onshore (36,000 km², five coalfields) 14–17; Upper Silesia (5,600 km², three coal areas) 54; Illinois Basin
+  (~95,000 km², three fields ≥ 30,000 km²) ~3; India (~113 coalfields on 3.29 M km² of land) 3.4 (a floor); geometric check
+  10⁵ · f / A (f minable share, A field area 300–3,000 km²) 3–167. P50 14 = Powder River and Sydney; P90 4 = Illinois-style
+  large fields; P10 40 = Silesia-like. Field size 300 / 1,000 / 3,000 km² (Gillette study area ~4,150 km², Gondwana fields
+  280–2,200 km², Pennsylvania anthracite fields mean 313 km²; Averitt, USGS Bull. 1412; Circular 891 glossary "coal field").
+- **Body sizes changed, because they contradicted the definition.** The old block was 1.2 km radius (Circular 891's
+  indicated radius) with tonnage to match, drawn 6× wider (`size_mult_h` 6): 12 × 18 km across at the median for a
+  13 Mt "deposit", i.e. neither a mine block nor a field. Now the tonnage is field area × thickness (0.71 / 2.13 / 4.27 m,
+  Circular 891's thickness classes) × 1.32 t/m³, combined by simulation, and the body is the field with no enlargement:
+  median 1,000 km² × 1.9 m = 29 × 44 km across = 97 × 146 blocks at `m_per_block_h` 300 (semi-axes 49 × 73); P90 360 km² ×
+  1.1 m, P10 2,500 km² × 3.0 m (the engine scales all axes by the cube root of volume, so the area spread is 7× against the
+  sourced 10×). `size_mult_v` 20 stays (a 2 m seam is 2 blocks). COE's vein amount follows the site's tonnage *quantile*
+  within the type's distribution, so the 100× tonnage does not change amounts by itself.
+- **Counts** (Mac, `stage deposits --in` the six `stage structure --preset pipeline_quick_16k --start
+  {scattered_continents,supercontinent} --length-myr 500 --set seed={1,2,3}` checkpoints made on this base; the "before"
+  numbers are master 8cf16f9's binary on the same checkpoints and reproduce the earlier STATUS table):
+
+  | coal | before | after |
+  |---|---|---|
+  | sites, median (range) | 47.5 (25–56) | **17.5 (10–30)** |
+  | counted (within 1,800 m), median (range) | 23.5 (17–35) | **12.5 (4–22)** |
+  | target N\* (counted) | 15.2–43.8 | 7.1–20.4 |
+  | expected sites (all) | 30.5–75.0 | 14.2–35.0 |
+  | drawn (formed), total of six | 681 | 344 |
+  | dropped for separation, total of six | 34 | 76 |
+  | permissive tract | 50,598–145,979 km² (unchanged) | same |
+
+  Per landscape (sites / counted): scattered 1–3 56/35 → 25/15, 50/31 → 17/12, 25/18 → 10/4; supercontinent 1–3 41/20 →
+  18/13, 45/17 → 17/9, 56/27 → 30/22. Sites now come in 7–39 % (median 25 %) under `expected_sites`: fields tens of km across cannot
+  overlap, and the formed fields (target ÷ preservation, 17–37 %) crowd small tracts (scattered 3: 35 formed into 50,600 km²,
+  8 dropped by the sum-of-radii rule of `cluster::place`, one of six landscapes with counted 4 against target 7.1). That is
+  the size and the 100 km camp spacing at work, not a bias in the survivor formula; if Ben wants sites to sit closer to N\*,
+  the lever is `clustering.camp_spacing_km` or letting formed (not surviving) fields overlap in the engine.
+- **Gates** (Mac, on the branch after merging master b1cbc97): `cargo test --workspace --locked` all pass (core 239 + 3
+  ignored, cli 30, format 40, …), clippy `-D warnings` clean, fmt clean, `cargo deny check licenses bans` ok;
+  `cd neoforge && ./gradlew build test` → tests=140 failures=0; `tools/remote/mac.sh --server -- ./gametest.sh` → All 50
+  required tests passed. Scratch scripts `coal-gen.sh` / `coal-dep.sh` (untracked, not committed) made the checkpoints and ran
+  the before/after counts; the checkpoints are in `/Volumes/Graphide/ban/deeptime-runs/coal/` on the Mac.
+- **Decisions for Ben** (not asked): (1) the size_mult_h 6 → 1 reading of "tens of km across" (physical field size, no
+  enlargement); the other types keep their 6–12. (2) Coal is now the type with the biggest bodies: about 100 × 150 blocks and
+  2 blocks thick per site, 10–30 per planet. (3) P50 14 sits below the geometric median of 25; using the geometric case
+  would double the counts.
+- **Next.** Ben reviews the coal fields in a viewer bundle if he wants the look; the survivor/overlap question above.
+
 ### 2026-09-29 — P1-09 climate mapping and biomes (agent worktree agent-a116e3d557a130679, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** (1) **The mapping, in the bake** (`deeptime-core/src/bake/biomes.rs`; replaces P1-08's provisional
   anchors). Physical climate → the five biome inputs in *band coordinates* against a reference,
