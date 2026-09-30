@@ -31,6 +31,8 @@ const LAKE: u8 = 4;
 const RIVER: u8 = 8;
 const DEPRESSION: u8 = 16;
 const LABELLED: u8 = 32;
+const FLAT: u8 = 64;
+const FLAT_SEEN: u8 = 128;
 
 /// The neighbours, in the order every pass visits them: E, W, S, N, SE, SW, NE, NW.
 const DX: [i64; 8] = [1, -1, 0, 0, 1, -1, 1, -1];
@@ -151,13 +153,38 @@ pub fn run(inp: &Input<'_>) -> Output {
     );
     millis.insert("flood".into(), json!(ms(t)));
 
-    // 3. Receivers: the steepest strictly lower neighbour on the filled surface, else the parent.
+    // 3. Receivers: the steepest strictly lower neighbour on the filled surface; on a flat (no lower
+    // neighbour: quantised plains, lake floors) the flat's drainage mask, else the parent.
+    let t = std::time::Instant::now();
+    let mask = flat_masks(&g, &fill, &parent, &mut state);
+    millis.insert("flats".into(), json!(ms(t)));
     let t = std::time::Instant::now();
     let rcv: Vec<u8> = (0..n)
         .into_par_iter()
         .map(|c| {
             if state[c] & SEA != 0 {
                 return NONE;
+            }
+            if state[c] & FLAT != 0 && mask[c] != u32::MAX {
+                // Across the flat: the neighbour of the same height with the lowest mask (an outlet
+                // counts 0); the mask falls by at least one a step, so this ends at an outlet.
+                let mut best = NONE;
+                let mut best_m = mask[c];
+                for k in 0..8 {
+                    if let Some(nb) = g.nb(c, k)
+                        && fill[nb] == fill[c]
+                        && state[nb] & SEA == 0
+                    {
+                        let m = if state[nb] & FLAT != 0 { mask[nb] } else { 0 };
+                        if m < best_m {
+                            best = k as u8;
+                            best_m = m;
+                        }
+                    }
+                }
+                if best != NONE {
+                    return best;
+                }
             }
             let fc = f64::from(fill[c]);
             let mut best = NONE;
@@ -182,6 +209,14 @@ pub fn run(inp: &Input<'_>) -> Output {
         let k = rcv[c];
         if k == NONE { None } else { g.nb(c, k as usize) }
     };
+    // Every cell after the cell it drains to: by height, then (on a flat) by mask.
+    let key = |c: u32| -> (i16, u32, u32) {
+        let cu = c as usize;
+        let m = if state[cu] & FLAT != 0 && mask[cu] != u32::MAX { mask[cu] } else { 0 };
+        (fill[cu], m, c)
+    };
+    order.par_sort_unstable_by_key(|&c| key(c));
+    drop(mask);
     millis.insert("receivers".into(), json!(ms(t)));
 
     // 4. Depressions and lakes.
@@ -599,6 +634,121 @@ pub fn run(inp: &Input<'_>) -> Output {
 /// A lake cell at least a block deep: water in the game (a shallower one is dry ground).
 fn is_deep(state: &[u8], fill: &[i16], elev: &[i16], c: usize) -> bool {
     state[c] & LAKE != 0 && i32::from(fill[c]) - i32::from(elev[c]) >= 16
+}
+
+/// Drainage across flats (Garbrecht & Martz 1997, as improved by Barnes, Lehman & Mulla 2014, "An
+/// efficient assignment of drainage direction over flat surfaces in raster digital elevation models",
+/// Computers & Geosciences 62:128–135; implemented from the paper). A flat cell is a land cell with
+/// no strictly lower neighbour on the filled surface that is not a sink; a flat is a connected set of
+/// them at one height. Its outlets are neighbours of the same height that can drain. The mask is
+/// 2 × (steps to the nearest outlet) + (the flat's largest distance from higher ground − the cell's
+/// own), so water crosses a flat towards its outlets and away from the higher ground around it,
+/// gathering in one channel instead of fanning out in parallel rays (what following the flood's
+/// breadth-first parents does). Returns the mask per cell (`u32::MAX` off flats, or on a flat with
+/// no outlet, where the parent stays) and marks [`FLAT`] in `state`.
+fn flat_masks(g: &Grid, fill: &[i16], parent: &[u8], state: &mut [u8]) -> Vec<u32> {
+    let n = g.w * g.h;
+    let flat: Vec<bool> = (0..n)
+        .into_par_iter()
+        .map(|c| {
+            state[c] & SEA == 0
+                && parent[c] != NONE
+                && !(0..8).any(|k| g.nb(c, k).is_some_and(|nb| fill[nb] < fill[c]))
+        })
+        .collect();
+    for (c, f) in flat.iter().enumerate() {
+        if *f {
+            state[c] |= FLAT;
+        }
+    }
+    drop(flat);
+    let mut mask = vec![u32::MAX; n];
+    let mut away = vec![0u32; n];
+    let mut members: Vec<usize> = Vec::new();
+    let mut queue: VecDeque<usize> = VecDeque::new();
+    for c0 in 0..n {
+        if state[c0] & FLAT == 0 || state[c0] & FLAT_SEEN != 0 {
+            continue;
+        }
+        // The flat: 8-connected cells of one height.
+        let h = fill[c0];
+        members.clear();
+        queue.clear();
+        queue.push_back(c0);
+        state[c0] |= FLAT_SEEN;
+        while let Some(c) = queue.pop_front() {
+            members.push(c);
+            for k in 0..8 {
+                if let Some(nb) = g.nb(c, k)
+                    && state[nb] & FLAT != 0
+                    && state[nb] & FLAT_SEEN == 0
+                    && fill[nb] == h
+                {
+                    state[nb] |= FLAT_SEEN;
+                    queue.push_back(nb);
+                }
+            }
+        }
+        let same_flat = |nb: usize| state[nb] & FLAT != 0 && fill[nb] == h;
+        // Towards the outlets (the mask holds the distance for now).
+        queue.clear();
+        for &c in &members {
+            let outlet = (0..8).any(|k| {
+                g.nb(c, k).is_some_and(|nb| fill[nb] == h && state[nb] & (FLAT | SEA) == 0)
+            });
+            if outlet {
+                mask[c] = 1;
+                queue.push_back(c);
+            }
+        }
+        if queue.is_empty() {
+            continue; // no outlet: the parents stay
+        }
+        while let Some(c) = queue.pop_front() {
+            for k in 0..8 {
+                if let Some(nb) = g.nb(c, k)
+                    && same_flat(nb)
+                    && mask[nb] == u32::MAX
+                {
+                    mask[nb] = mask[c] + 1;
+                    queue.push_back(nb);
+                }
+            }
+        }
+        // Away from higher ground.
+        queue.clear();
+        for &c in &members {
+            let high = (0..8).any(|k| g.nb(c, k).is_some_and(|nb| fill[nb] > h));
+            if high {
+                away[c] = 1;
+                queue.push_back(c);
+            }
+        }
+        let mut max_away = 0;
+        while let Some(c) = queue.pop_front() {
+            max_away = max_away.max(away[c]);
+            for k in 0..8 {
+                if let Some(nb) = g.nb(c, k)
+                    && same_flat(nb)
+                    && away[nb] == 0
+                {
+                    away[nb] = away[c] + 1;
+                    queue.push_back(nb);
+                }
+            }
+        }
+        for &c in &members {
+            if mask[c] != u32::MAX {
+                let a = if away[c] > 0 { max_away - away[c] } else { 0 };
+                mask[c] = 2 * mask[c] + a;
+            }
+            away[c] = 0;
+        }
+    }
+    for s in state.iter_mut() {
+        *s &= !FLAT_SEEN;
+    }
+    mask
 }
 
 /// Marks the open sea: cells at or below `sea_raw` in an 8-connected body (x wrapping) of at

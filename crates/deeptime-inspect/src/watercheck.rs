@@ -23,7 +23,9 @@
 //!
 //! **Caves** (Ben, decisions log 2026-09-30, "Allow caves under water": carvers may cut under rivers
 //! and lakes) are counted apart so they do not hide a bank that leaks: a leak is *into a cave* when
-//! the air beside the water has ground above it (a covered hole, not the open surface), and water is
+//! the air beside the water has ground above it (a covered hole), or lies at or below the top the
+//! pass left that neighbour (its water's top, or its ground after the bank rule: only a carver or a
+//! noise cave removes that), and water is
 //! *floating over a cave* when the air under it is at or below the bed Deep Time decided for its
 //! column (the pass leaves every bed solid, so only a carver or a noise cave removes it).
 
@@ -44,6 +46,22 @@ fn level_of(key: &str) -> Option<u32> {
         .next()?
         .parse()
         .ok()
+}
+
+/// The top of the column as the pass leaves it: its water's top, or its ground after a bank's
+/// lowering and raising. Air at or below it was dug out later (a carver, a noise cave).
+fn expected_top(c: &deeptime_format::WaterColumn) -> i32 {
+    if let Some(t) = c.top {
+        return t;
+    }
+    let mut e = c.ground;
+    if let Some(mx) = c.max_ground {
+        e = e.min(mx);
+    }
+    if let Some(mn) = c.min_ground {
+        e = e.max(mn);
+    }
+    e
 }
 
 /// Checks `area` (x1, z1 exclusive; the outermost ring of columns is only read as neighbours).
@@ -142,8 +160,11 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                     let under = w.block(x + dx, y - 1, z + dz);
                     if holds_water(under) || is_ice(under) {
                         steps += 1;
-                    } else if w.terrain_top(x + dx, z + dz).is_some_and(|g| g > y) {
-                        // Air under ground: a cave (or a canyon's overhang) opened beside the water.
+                    } else if w.terrain_top(x + dx, z + dz).is_some_and(|g| g > y)
+                        || col_of(x + dx, z + dz).is_some_and(|n| y <= expected_top(&n))
+                    {
+                        // Air under ground (a cave), or air where the pass left ground or water (a
+                        // carver or a noise cave dug it out afterwards).
                         leaks_cave += 1;
                         if samples.len() < 40 {
                             samples.push(json!({"what": "leak into a cave", "at": [x, y, z], "state": key,
