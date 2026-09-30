@@ -284,6 +284,19 @@ enum Cmd {
         #[arg(long, default_value_t = 24)]
         depth: i32,
     },
+    /// Checks the water blocks of an area as the game would move them (P1-22): floating water,
+    /// water beside open air (leaks), river steps, and every lake's surface against its lowest rim.
+    /// Prints JSON.
+    WaterCheck {
+        /// The world or dimension folder (the one holding region/).
+        world: PathBuf,
+        /// x0,z0,x1,z1 (x1, z1 exclusive).
+        #[arg(long, value_parser = Area::parse, allow_hyphen_values = true)]
+        area: Area,
+        /// The fewest columns a water body needs to count as a lake.
+        #[arg(long, default_value_t = 24)]
+        min_lake: usize,
+    },
     /// River and lake maps from the world data alone (P1-22): the planet (or a box) at --step
     /// blocks a pixel with every river at its width, or with --columns a box at one block a pixel
     /// coloured by what the column evaluator decides (river, lake, sea, bank, ground).
@@ -631,6 +644,14 @@ fn run(cli: Cli) -> Result<()> {
                 );
             }
             print_json(&s)?;
+        }
+        Cmd::WaterCheck {
+            world,
+            area,
+            min_lake,
+        } => {
+            let w = World::load_area(&world, Some(area))?;
+            print_json(&deeptime_inspect::watercheck::check(&w, area, min_lake))?;
         }
         Cmd::Rivers {
             world_data,

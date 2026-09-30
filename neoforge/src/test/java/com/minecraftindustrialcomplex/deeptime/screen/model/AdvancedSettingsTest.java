@@ -36,10 +36,10 @@ class AdvancedSettingsTest {
     static final List<String> PIPELINES = List.of("pipeline_quick_16k", "pipeline_full_16k", "pipeline_quick_32k", "pipeline_full_32k");
 
     /**
-     * Fields no core parameter backs yet: rivers and canyons (Phase 2), the pack-defined essentials
-     * lists (the datapack loader), and Phase 3's fantasy toggles.
+     * Fields no core parameter backs yet: canyons (Phase 2; rivers are P1-22's), the pack-defined
+     * essentials lists (the datapack loader), and Phase 3's fantasy toggles.
      */
-    static final Set<String> NO_PARAMETER = Set.of("feature_rivers", "feature_canyons", "fantasy_fields", "sky_islands",
+    static final Set<String> NO_PARAMETER = Set.of("feature_canyons", "fantasy_fields", "sky_islands",
             "exotic_landforms", "essentials");
 
     EditorModel model() {
@@ -262,8 +262,10 @@ class AdvancedSettingsTest {
             JsonElement v = f.get(out).orElseThrow(() -> new AssertionError(f.path()));
             if (f.kind() == EditorFields.Kind.NUMBER)
                 assertEquals(f.max(), v.getAsDouble(), 0.0, f.id());
-            else
+            else if (f.kind() == EditorFields.Kind.CHOICE)
                 assertEquals(f.options().get(f.options().size() - 1), v.getAsString(), f.id());
+            else
+                assertTrue(v.isJsonPrimitive() && v.getAsJsonPrimitive().isBoolean(), f.id() + " stays a boolean");
         }
         EditorModel b = model();
         assertTrue(b.importShareCode(code).isEmpty());
