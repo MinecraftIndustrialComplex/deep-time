@@ -377,8 +377,8 @@ each column the object above plus its `x` and `z`. Numbers are serde_json's shor
 form: read them with a correctly rounded parser (Java's `Double.parseDouble`) and compare exactly.
 The 500 columns: 10 % within 40 blocks of the seam, 10 % near and past the poles, 20 % inside
 random bodies' boxes (none when the world has no bodies), with a river network 10 % on and beside
-random river vertices and 5 % around the mouths of rivers that end in lakes, the rest anywhere with
-x over two laps.
+random river vertices and 5 % around the mouths of rivers that end in lakes, with lakes 5 % within 8
+blocks of random wet `water_level` cells, the rest anywhere with x over two laps.
 
 ## Rivers (`rivers/rivers.dtrv`, P1-22)
 
@@ -452,7 +452,7 @@ width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore
 4. Else **river** when a segment covers the column (the hit of "Rivers"): top = ⌈w⌉ − 1, bed =
    min(top − 1, ⌊w − max(1, depth · (1 − (d/hw')²))⌋).
 5. Else, visiting the neighbours (x+1, z), (x−1, z), (x, z+1), (x, z−1) evaluated by 1–4: for each
-   that holds water (river, lake, sea), `min_ground` = max(top + 1 for a river, top otherwise) and
+   that holds river or lake water (not the sea, which is the aquifer's), `min_ground` = max(top + 1 for a river, top otherwise) and
    `seal_from` = min(bed + 1); `max_ground` = the column's bank cap. The column is a **bank** when
    either `min_ground` or `max_ground` is set, else **none**. `river_biome` and `river` (the hit)
    are kept whatever the kind.

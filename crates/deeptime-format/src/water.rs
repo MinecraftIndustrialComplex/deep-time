@@ -18,7 +18,8 @@
 //!    the water surface w gives `top` = ⌈w⌉ − 1 and the bed is cut (or filled) to
 //!    `bed` = min(top − 1, ⌊w − max(1, depth · (1 − (d / hw)²))⌋): a parabolic cross-section, at
 //!    least one block of water.
-//! 5. **Bank.** A column holding none of these is a bank when a 4-neighbour holds water: its ground
+//! 5. **Bank.** A column holding none of these is a bank when a 4-neighbour holds river or lake
+//!    water (the sea is the aquifer's, which vanilla's own rules keep in place): its ground
 //!    must reach `min_ground` = the highest neighbour `top` (+1 beside a river: the freeboard that
 //!    keeps a river's one-block steps inside its banks), and air from `seal_from` (one above the
 //!    lowest neighbour bed) up to `min_ground` is sealed, so no water finds a way out. Within a
@@ -235,7 +236,7 @@ pub fn finish(own: &Core, neighbours: &[Core; 4]) -> WaterColumn {
     let mut min_ground: Option<i32> = None;
     let mut seal: Option<i32> = None;
     for n in neighbours {
-        if !n.kind.is_water() {
+        if !matches!(n.kind, WaterKind::River | WaterKind::Lake) {
             continue;
         }
         let need = n.top + i32::from(n.kind == WaterKind::River);
