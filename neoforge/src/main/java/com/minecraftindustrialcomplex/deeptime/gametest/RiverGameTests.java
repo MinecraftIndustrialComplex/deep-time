@@ -235,7 +235,8 @@ public final class RiverGameTests {
         StringBuilder seen = new StringBuilder();
         for (int i = 0; i < r.vertexCount() && sampled < 200; i += 3) {
             int x = Math.round(r.vertexX(i)), z = Math.round(r.vertexZ(i));
-            if (!r.sample(x, z).biome())
+            // At sea level the channel is the river's mouth, over the sea's own biomes.
+            if (!r.sample(x, z).biome() || r.vertexW(i) <= t.data().manifest().seaLevelY() + 0.5f)
                 continue;
             int y = (int) Math.floor(r.vertexW(i)) - 1;
             Holder<Biome> b = g.getBiomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z), sampler);
