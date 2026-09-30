@@ -61,6 +61,13 @@ tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | 
   and runs the command in a login shell there. The laptop edits, commits and pushes. Builds from
   several agents may overlap; anything that boots Minecraft (GameTests, planet/smoke servers,
   BlueMap) must pass `--server`, which holds the Mac's single server lock (fixed ports, 16 GB shared).
+- **Nothing heavy on the laptop, not even "just a script"** (Ben, 2026-09-29, after agents' local
+  headless Chromium screenshot runs, Python sweeps and CFR decompiles drove it to load ~60 and swap):
+  screenshots (playwright/Chromium), decompiles (cfr/javap over jars), jar greps, Python sweeps and
+  analysis, image processing — all on the Mac via `tools/remote/mac.sh`, results pulled back with
+  `--pull`. If something must run locally: one job at a time, wrapped as
+  `systemd-run --user --scope -p CPUQuota=100% nice -n 19 <cmd>`. No parallel local batches; no
+  `nix develop` builds on the laptop.
 - **Real-client runs** (booting a Minecraft client for screenshots) go to the Mac's logged-in desktop
   session too, never the laptop's Xvfb (Ben, 2026-09-28). That desktop is shared with graphide's
   agents: take a "drive" lease with graphide's `utilities/scripts/mactest/m6lock.sh` first.
