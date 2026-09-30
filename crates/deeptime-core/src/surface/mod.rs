@@ -388,8 +388,9 @@ fn dominant(mix: &[f64; spl::FAMILIES]) -> Option<u16> {
     Some(strata_log::provenance(k, v / tot))
 }
 
-/// The climate's drawdown carbonate goes onto sea floor this shallow, m (the shelves).
-pub const SHELF_DEPTH_M: f64 = 200.0;
+/// The climate's drawdown carbonate settles on sea floor this shallow, m: above the carbonate
+/// compensation depth (~4–5 km today), where calcite is preserved.
+pub const CARBONATE_FLOOR_M: f64 = 4000.0;
 
 /// Regolith at least this thick is the surface rock (for erodibility, diffusivity and the
 /// `surface/class` layer), m.
@@ -782,9 +783,10 @@ impl SurfaceStage {
                     sc.h[c] += add;
                     parts.carbonate[c] += add as f32;
                     // The climate's drawdown carbonate (after a snowball: its cap carbonate) on the
-                    // shelves, whatever the water's temperature, once per plate step.
+                    // sea floor above the compensation depth, whatever the water's temperature,
+                    // once per plate step.
                     let z = sea - sc.h[c];
-                    if sub == 0 && cap_m > 0.0 && z > 0.0 && z <= SHELF_DEPTH_M {
+                    if sub == 0 && cap_m > 0.0 && z > 0.0 && z <= CARBONATE_FLOOR_M {
                         let extra = cap_m.min(z);
                         sc.h[c] += extra;
                         parts.carbonate[c] += extra as f32;

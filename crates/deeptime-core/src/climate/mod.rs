@@ -82,7 +82,8 @@ use snapshot::{Planet, Refs};
 /// The stage's name in a pipeline (`deeptime stage climate`).
 pub const STAGE_NAME: &str = "climate";
 
-/// Carbonate thickness the step's weathering drawdown lays on the shelves (≤ 200 m deep), m, in
+/// Carbonate thickness the step's weathering drawdown lays on the sea floor above the carbonate
+/// compensation depth (≤ 4 km deep, `surface::CARBONATE_FLOOR_M`), m, in
 /// `WorldState::globals`: the surface stage deposits it (after a snowball: the cap carbonate).
 pub const CAP_CARBONATE_GLOBAL: &str = "climate/cap_carbonate_m";
 
@@ -173,7 +174,7 @@ struct Saved {
     /// Oceanic crust area of the last step and the smoothed consumption rate (degassing).
     ocean_km2: Option<f64>,
     subduction_km2_yr: Option<f64>,
-    /// Drawdown carbonate laid on the shelves over the run, m.
+    /// Drawdown carbonate laid on the sea floor over the run, m.
     cap_carbonate_m: f64,
 }
 
@@ -826,11 +827,11 @@ impl ClimateStage {
             curve + p.glacio_eustasy * ice::eustatic_m(v_pre - p.ice_reference_km3, ocean_km2);
         world.globals.insert(SEA_LEVEL_GLOBAL.into(), sea);
         let land = land_at(sea);
-        // The weathering's drawdown beyond the degassing precipitates as carbonate on the shelves
-        // (after a snowball: the cap carbonate), spread evenly over them.
-        let shelf_km2 = geo.area_where(&|c| {
-            h[c] <= sea && sea - h[c] <= crate::surface::SHELF_DEPTH_M
-        });
+        // The weathering's drawdown beyond the degassing precipitates as carbonate (after a
+        // snowball: the cap carbonate), spread evenly over the sea floor above the compensation
+        // depth.
+        let shelf_km2 =
+            geo.area_where(&|c| h[c] <= sea && sea - h[c] <= crate::surface::CARBONATE_FLOOR_M);
         let cap_m = if shelf_km2 > 0.0 {
             out.carbonate_excess_mol * carbon::CALCITE_M3_PER_MOL / (shelf_km2 * 1.0e6)
         } else {
@@ -1290,7 +1291,10 @@ impl ClimateStage {
             o.insert("glaciated_land_frac".into(), json!(self.s.land_ice_frac));
             o.insert("degassing_mol_yr".into(), json!(self.s.clock.degassing));
             o.insert("weathering_mol_yr".into(), json!(self.s.clock.weathering));
-            o.insert("cap_carbonate_total_m".into(), json!(self.s.cap_carbonate_m));
+            o.insert(
+                "cap_carbonate_total_m".into(),
+                json!(self.s.cap_carbonate_m),
+            );
         }
         let round = |v: &[Vec<f32>]| -> Vec<Vec<f64>> {
             v.iter()
