@@ -130,7 +130,10 @@ impl VolcanoParams {
             if v.iter().all(|x| x.is_finite() && *x >= lo && *x <= hi) && v[0] <= v[1] {
                 Ok(())
             } else {
-                Err(bad(k, &format!("must be [min, max] with lo ≤ min ≤ max ≤ hi = [{lo}, {hi}]")))
+                Err(bad(
+                    k,
+                    &format!("must be [min, max] with lo ≤ min ≤ max ≤ hi = [{lo}, {hi}]"),
+                ))
             }
         };
         range(self.density, 0.0, 5.0, "density")?;

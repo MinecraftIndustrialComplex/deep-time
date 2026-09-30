@@ -191,6 +191,11 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 | `deeptime:orogeny_phase` | mountain building, with a duration | plates (P1-03); dummy | see below; dummy: see below |
 | `deeptime:hotspot_track` | a hotspot's track over a plate | plates (P1-03) | see below |
 | `deeptime:large_igneous_province` | a LIP eruption | plates (P1-03) | see below |
+| `deeptime:volcano_stratovolcano` | an arc stratovolcano, from its birth to its death | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:volcano_shield` | a hotspot's shield volcano (an island or seamount of its chain) | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:volcano_caldera_complex` | a continental hotspot's silicic centre | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:volcano_caldera` | a caldera collapse | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:volcano_flood_basalt` | a flood-basalt plateau (a large igneous province's lava pile) | volcanoes (P1-21) | see "The volcanoes' events" |
 | `deeptime:basin_subsidence` | a sedimentary basin subsides | surface (P1-04) | see "The surface's events" |
 | `deeptime:marine_transgression` | the sea advances over land | surface (P1-04) | see "The surface's events" |
 | `deeptime:marine_regression` | the sea retreats | surface (P1-04) | see "The surface's events" |
@@ -255,6 +260,25 @@ Places are points: the region's centroid in its strongest frame. Areas and volum
 
 Place of a transgression or regression: the centroid of the continental cells flooded at its end and
 not at its start (regression: the reverse); global when there are none.
+
+### The volcanoes' events (source `deeptime:volcanoes`, P1-21)
+
+Written by `crates/deeptime-core/src/surface/volcanoes/` at the end of the coupled group (after
+the plate model has closed its hotspot tracks), so every cause exists when they are written. Place:
+the volcano's (or province's) position at the end of the run, where the world shows it (a caldera's:
+where its volcano stood when it collapsed). Heights are relief above the ground around the edifice,
+m; `summit_m` is its summit's elevation above the sea at the end; radii and areas are block-metric
+(the world's own), km and km². Stratovolcanoes are written only while they stand (at least a quarter
+of their peak height and 300 m; the others are counted in `notes.volcanoes`); every hotspot volcano
+is written, whatever became of it.
+
+| Kind | t_start (t_end) | Params | Magnitude | Causes |
+|---|---|---|---|---|
+| `volcano_stratovolcano` | its birth (its death, or the end of the run while active) | `volcano` (catalogue id), `setting` (`continental_arc`, `island_arc`), `magma` (`andesitic`, `silicic`), `peak_height_m`, `height_m`, `radius_km`, `summit_m`, `arc_flux` (mean while active, 0–1), `plate`, `fate` (`active`, `extinct`, `eroded`), `ongoing` | peak height / 3 km | the subduction onset of the contact nearest it on its plate, when that contact has one |
+| `volcano_shield` | its birth over the plume (its death: it drifted away, or its hotspot died) | as above plus `hotspot`, `chain_index` (0 the first of its chain), `fate` (`active`, `island`, `seamount`, `eroded`, `subducted`) | as above | its hotspot's `hotspot_track`, else the hotspot's `large_igneous_province` |
+| `volcano_caldera_complex` | as a shield (a continental hotspot) | as `volcano_shield`, `magma` = `silicic` | as above | as `volcano_shield` |
+| `volcano_caldera` | the collapse | `volcano`, `radius_km`, `depth_m`, `erupted_km3`, `type` (`silicic`: the volcano collapsed and died; `summit`: a shield's summit caldera) | erupted volume / 1,000 km³, ≤ 1 | its volcano's event, else that volcano's cause |
+| `volcano_flood_basalt` | the eruption | `area_km2`, `thickness_m` (the pile at its centre), `flows`, `preserved_frac` (share of its area where the pile still crops out within 150 m of the surface), `plate` | pile / 1 km | the plate model's `large_igneous_province` |
 
 ### The climate's events (source `deeptime:climate`, P1-05)
 

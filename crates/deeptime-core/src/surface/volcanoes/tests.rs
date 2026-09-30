@@ -55,16 +55,26 @@ fn arcs_line_up_along_the_front_at_the_spacing() {
         nn.push(best);
     }
     let mean = nn.iter().sum::<f64>() / nn.len() as f64;
-    assert!((48.0..=80.0).contains(&mean), "mean neighbour distance {mean} km");
+    assert!(
+        (48.0..=80.0).contains(&mean),
+        "mean neighbour distance {mean} km"
+    );
     let count = born.len();
-    assert!((28..=52).contains(&count), "{count} volcanoes on 2,400 km of arc");
+    assert!(
+        (28..=52).contains(&count),
+        "{count} volcanoes on 2,400 km of arc"
+    );
     // Saturated: a second pass with the same occupancy adds almost nothing.
     let again = place_arcs(&grid, mh, &flux, 0.25, spacing, &mut occupied, &mut rng);
     assert!(again.len() <= count / 5, "{} more", again.len());
     // Density halves the spacing: about twice as many.
     let mut occ2 = Vec::new();
     let dense = place_arcs(&grid, mh, &flux, 0.25, spacing / 2.0, &mut occ2, &mut rng);
-    assert!(dense.len() as f64 > 1.6 * count as f64, "{} vs {count}", dense.len());
+    assert!(
+        dense.len() as f64 > 1.6 * count as f64,
+        "{} vs {count}",
+        dense.len()
+    );
 }
 
 fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
@@ -151,7 +161,11 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
                 f("plates/crust_type"),
             );
             let w = grid.w as usize;
-            for v in st.volcanoes.iter().filter(|v| v.id >= known && v.kind == Kind::Strato) {
+            for v in st
+                .volcanoes
+                .iter()
+                .filter(|v| v.id >= known && v.kind == Kind::Strato)
+            {
                 let c = cell_of(&grid, v.x, v.z);
                 let (i, j) = ((c % w) as i64, (c / w) as i64);
                 let mut best = 0.0f64;
@@ -162,7 +176,11 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
                         best = best.max(arc_flux(flags[cc], conv[cc], crust[cc]));
                     }
                 }
-                assert!(best >= p.arc_min_flux, "volcano {} born on flux {best}", v.id);
+                assert!(
+                    best >= p.arc_min_flux,
+                    "volcano {} born on flux {best}",
+                    v.id
+                );
                 births += 1;
             }
             known = st.next_id;
@@ -177,20 +195,44 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
     let n = grid.cells();
     let frame = BlockFrame::new(16_384);
     assert!(st.counts.strato_born > 0, "{:?}", st.counts);
-    assert!(st.counts.shield_born + st.counts.silicic_born > 0, "{:?}", st.counts);
+    assert!(
+        st.counts.shield_born + st.counts.silicic_born > 0,
+        "{:?}",
+        st.counts
+    );
 
     // Active stratovolcanoes last saw enough arc flux and have grown.
     let mut active = 0;
-    for v in st.volcanoes.iter().filter(|v| v.kind == Kind::Strato && v.active()) {
+    for v in st
+        .volcanoes
+        .iter()
+        .filter(|v| v.kind == Kind::Strato && v.active())
+    {
         active += 1;
-        assert!(v.flux_last >= p.arc_min_flux, "volcano {}: {}", v.id, v.flux_last);
+        assert!(
+            v.flux_last >= p.arc_min_flux,
+            "volcano {}: {}",
+            v.id,
+            v.flux_last
+        );
         assert!(v.radius_m > 0.0 && v.missed < 2);
     }
-    let stratos = st.volcanoes.iter().filter(|v| v.kind == Kind::Strato).count();
-    assert!(active > 0, "no active arc volcano: {stratos} in the catalogue, {:?}", st.counts);
+    let stratos = st
+        .volcanoes
+        .iter()
+        .filter(|v| v.kind == Kind::Strato)
+        .count();
+    assert!(
+        active > 0,
+        "no active arc volcano: {stratos} in the catalogue, {:?}",
+        st.counts
+    );
     // Active ones keep the spacing (they were placed apart and ride their plates together).
-    let live: Vec<&Volcano> =
-        st.volcanoes.iter().filter(|v| v.kind == Kind::Strato && v.active()).collect();
+    let live: Vec<&Volcano> = st
+        .volcanoes
+        .iter()
+        .filter(|v| v.kind == Kind::Strato && v.active())
+        .collect();
     let mut close = 0;
     for (a, va) in live.iter().enumerate() {
         for vb in &live[a + 1..] {
@@ -200,7 +242,11 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
             }
         }
     }
-    assert!(close * 20 <= live.len(), "{close} close pairs among {} live cones", live.len());
+    assert!(
+        close * 20 <= live.len(),
+        "{close} close pairs among {} live cones",
+        live.len()
+    );
 
     // Hotspot chains: in chain order, born later; every one but the newest two is dead; the live
     // ones lie within the spacing of their plume.
@@ -218,7 +264,12 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
             assert!(pair[0].born_myr < pair[1].born_myr, "hotspot {h}");
         }
         for v in &vs[..vs.len().saturating_sub(2)] {
-            assert!(!v.active(), "hotspot {h}: volcano {} of {} still active", v.chain, vs.len());
+            assert!(
+                !v.active(),
+                "hotspot {h}: volcano {} of {} still active",
+                v.chain,
+                vs.len()
+            );
         }
         if vs.len() >= 3 {
             long += 1;
@@ -227,15 +278,24 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         let (px, pz) = frame.block(DVec3::from_array(hs.pos));
         for v in vs.iter().filter(|v| v.active() && v.gone.is_none()) {
             let d = (frame.wrap_x(v.x - px) * 300.0).hypot((v.z - pz) * 300.0);
-            assert!(d <= p.hotspot_spacing_km * 1000.0 + 1.0, "{d} m from its plume");
+            assert!(
+                d <= p.hotspot_spacing_km * 1000.0 + 1.0,
+                "{d} m from its plume"
+            );
         }
         // Ageing along the track: the newest volcano on each plate is the nearest the plume.
         let newest = vs.last().unwrap();
         if newest.gone.is_none() {
             let dn = (frame.wrap_x(newest.x - px) * 300.0).hypot((newest.z - pz) * 300.0);
-            for v in vs.iter().filter(|v| v.gone.is_none() && v.plate == newest.plate) {
+            for v in vs
+                .iter()
+                .filter(|v| v.gone.is_none() && v.plate == newest.plate)
+            {
                 let d = (frame.wrap_x(v.x - px) * 300.0).hypot((v.z - pz) * 300.0);
-                assert!(d + 1.0 >= dn, "an older volcano nearer the plume ({d} < {dn})");
+                assert!(
+                    d + 1.0 >= dn,
+                    "an older volcano nearer the plume ({d} < {dn})"
+                );
             }
         }
     }
@@ -260,7 +320,13 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         assert!(lips.contains(&e.causes[0]));
     }
     // Volcano events and their causes: arcs by a subduction onset, hotspots by their track.
-    let kind_of = |id: EventId| world.events.iter().find(|e| e.id == id).map(|e| e.kind.clone());
+    let kind_of = |id: EventId| {
+        world
+            .events
+            .iter()
+            .find(|e| e.id == id)
+            .map(|e| e.kind.clone())
+    };
     let mut strato_events = 0;
     for e in world.events.iter().filter(|e| e.source == SOURCE) {
         e.validate().unwrap();
@@ -344,7 +410,11 @@ fn threads_and_a_resume_leave_the_volcanoes_unchanged() {
     assert_eq!(got.volcanoes, world.volcanoes);
     assert!(!world.volcanoes.as_ref().unwrap().volcanoes.is_empty());
     let ours = |w: &WorldState| -> Vec<deeptime_format::Event> {
-        w.events.iter().filter(|e| e.source == SOURCE).cloned().collect()
+        w.events
+            .iter()
+            .filter(|e| e.source == SOURCE)
+            .cloned()
+            .collect()
     };
     assert_eq!(ours(&got), ours(&world));
     assert_eq!(
@@ -352,7 +422,11 @@ fn threads_and_a_resume_leave_the_volcanoes_unchanged() {
         world.surface.as_ref().unwrap().elevation_m
     );
     let bits = |w: &WorldState| -> Vec<u32> {
-        w.fields[field::MAP].data.iter().map(|x| x.to_bits()).collect()
+        w.fields[field::MAP]
+            .data
+            .iter()
+            .map(|x| x.to_bits())
+            .collect()
     };
     assert_eq!(bits(&got), bits(&world));
     for d in [dir, dir2] {

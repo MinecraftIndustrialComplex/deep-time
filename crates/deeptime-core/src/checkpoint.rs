@@ -471,7 +471,8 @@ mod tests {
         ] {
             let text = err.to_string();
             assert!(
-                text.contains("checkpoint schema 5") && text.contains(&format!("schema {CHECKPOINT_SCHEMA}")),
+                text.contains("checkpoint schema 5")
+                    && text.contains(&format!("schema {CHECKPOINT_SCHEMA}")),
                 "{text}"
             );
         }

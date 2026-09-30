@@ -37,6 +37,7 @@
   "causes": {
     "source": ["deeptime:subduction_onset"],
     "driver": ["deeptime:orogeny_phase", "deeptime:collision"],
+    "pathway": ["deeptime:volcano_stratovolcano", "deeptime:volcano_caldera"],
     "trap": ["deeptime:terrane_accretion", "deeptime:orogeny_phase"],
     "preservation": ["deeptime:erosion_pulse", "deeptime:orogeny_phase"]
   },
