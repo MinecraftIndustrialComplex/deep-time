@@ -308,15 +308,18 @@ after the pack's surface rules, the strata pass and the water pass) therefore la
 glaciated ground regardless of biome. The contract between the climate and that pass is the layer
 `climate/ice_cover` (L2, u8, blocks; 0 = none) and the record `notes.bake.climate.ice_cover`:
 
-- **The layer** (`deeptime_core::bake::ice`): for each L2 cell whose ground is above the sea and above
-  its equilibrium line, `1 + ⌊(ground − sea − ELA) / step_m⌋` blocks, at most `max_blocks`; else 0.
-  The ELA is the climate stage's (`climate/anomaly/ela_m`, L1, every cell: the Ohmura rule of
-  `climate::glaciers`) resampled bilinearly to L2; the ground is the young landscape's elevation the
-  biome inputs were placed on. Absent when the world has no climate stage. Nothing else reads the
-  glacier flag: a climate that carries a real ice thickness (`climate/ice_thickness_m`) only has to be
-  turned into this layer by the bake, and the pass does not change.
+- **The layer** (`deeptime_core::bake::ice`): for each L2 cell whose ground is above the sea and
+  carries ice, `1 + ⌊t / step_m⌋` blocks, at most `max_blocks`; else 0. `t` is the climate's land-ice
+  thickness (`climate/ice_thickness_m`, L1, m: the ice sheets and glaciers of the deep-time climate,
+  "The climate's ice fields"; ice of at least 1 m counts, as for `climate/glacier`) resampled
+  bilinearly to L2, so a cover thins toward an ice edge; a world whose climate has no ice fields
+  (an older run) falls back to `t` = the ground's height above its equilibrium line
+  (`climate/anomaly/ela_m`, L1, every cell: the Ohmura rule of `climate::glaciers`; the ground is the
+  young landscape's elevation the biome inputs were placed on). `notes.bake.climate.ice_cover.source`
+  names the field used. Absent when the world has no climate stage. The pass does not read the climate
+  at all: a climate that changes how it carries ice only has to keep this layer's meaning.
 - **The record** is the placement table's `ice_cover` section, defaults filled in, plus `cells` and
-  `thickest_blocks`: `step_m`, `max_blocks`, `snow_blocks`, `blue_ice_from_blocks`,
+  `thickest_blocks` and `source`: `step_m`, `max_blocks`, `snow_blocks`, `blue_ice_from_blocks`,
   `blue_ice_blocks`, and the block ids `snow`, `ice`, `deep_ice`.
 - **The pass** reads the layer bilinearly (so a cover's edge is a slope of cells, not 8-block steps) and
   rounds, giving `n` blocks for the column. The cover **replaces** the top `n` solid blocks of the
