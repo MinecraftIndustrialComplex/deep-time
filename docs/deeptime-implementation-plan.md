@@ -3631,6 +3631,9 @@ on this machine.
   calderas, flood-basalt plateaus from LIP events; volcanic rock in the strata; events with causes.
 - **Acceptance.** Tests on placement from arc/hotspot/LIP fields; a real planet shows volcano
   chains in the right settings; 3D previews of an arc volcano, a hotspot island chain and a caldera.
+- **As built (2026-09-30).** A coupled stage `volcanoes` after the surface (`surface/volcanoes/`) and the
+  amplifier's shaping (`surface/amplify/volcano.rs`); design, numbers and pictures in STATUS.md's build log
+  ("P1-21 volcanoes as landforms").
 
 #### P1-22 Rivers and lakes (moved from P2-03, 2026-09-29)
 - **Goal.** The core of §8.4 hydrology in v1 (Ben, decisions log 2026-09-29): river networks from the
