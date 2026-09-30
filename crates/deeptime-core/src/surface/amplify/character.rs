@@ -694,9 +694,9 @@ pub fn apply(
         )
     };
     let is_land = |cell: usize| z[cell] > sea && lake[cell] == 0;
-    // How much of the character a land cell takes: none on rivers and at the coast, nor under the
-    // young landscape's glaciers (`glacier`, their surface; empty without them), whose troughs and
-    // cirques `glacial.rs` shaped: gullies and fold ridges would fight the U.
+    // How much of the character a land cell takes: none on rivers and at the coast, nor in the
+    // glacial troughs and cirques `glacial.rs` cut (`glacier`: the ground plus up to 100 m where
+    // it cut, NaN elsewhere; empty without glaciers): gullies and fold ridges would fight the U.
     let glaciated = |cell: usize| -> f64 {
         glacier.get(cell).map_or(0.0, |&zs| {
             if zs.is_finite() {

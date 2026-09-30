@@ -428,13 +428,27 @@ pub fn run_tiles(
             // passes are done with are its scratch).
             let started = Instant::now();
             let z_pre = buf.z.clone();
+            // The troughs the glacial pass cut (it left each cell's cut in `cap`, which nothing
+            // has touched since) fade the character there, so gullies and fold ridges do not
+            // fight the U; the crests above the ice keep theirs. `zs`, done with on the last
+            // level, carries them: the ground plus up to 100 m where cut, nothing elsewhere.
+            let troughs = cfg.counts.glacial > 0 && buf.zs.len() == buf.z.len();
+            if troughs {
+                for ((s, &z), &cut) in buf.zs.iter_mut().zip(&buf.z).zip(&buf.cap) {
+                    *s = if cut > 0.0 {
+                        z + (5.0 * cut).min(100.0)
+                    } else {
+                        f32::NAN
+                    };
+                }
+            }
             let st = character::apply(
                 &win,
                 &mut buf.z,
                 &buf.a,
                 &buf.kfac,
                 &buf.lake,
-                &buf.zs,
+                if troughs { buf.zs.as_slice() } else { &[] },
                 Scratch {
                     base: &mut buf.norm,
                     smooth: &mut buf.a2,
