@@ -40,6 +40,9 @@ public final class DeepTime {
     public DeepTime(IEventBus modBus) {
         DeepTimeRegistries.register(modBus);
         NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, e -> DeepTimeCommands.register(e.getDispatcher()));
+        // /deeptime climate (P1-25): merges into the same /deeptime node.
+        NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class,
+                e -> com.minecraftindustrialcomplex.deeptime.server.ClimateCommand.register(e.getDispatcher()));
         WorldDataBinder.init();
         SpawnHandler.init();
         RockPalette.init();

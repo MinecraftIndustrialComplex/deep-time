@@ -61,6 +61,9 @@ pub struct Input<'a> {
     pub sea: f64,
     pub p: &'a ClimateParams,
     pub planet: Planet,
+    /// Keep every cell's twelve months ([`Snapshot::t_sl_month`], [`Snapshot::p_month`]); the
+    /// stage asks for them at its last snapshot, which the bake stores (P1-25).
+    pub monthly: bool,
 }
 
 /// Per-row zonal references the geographic anomalies are measured from (sea-level °C; ln mm/yr).
@@ -86,6 +89,11 @@ pub struct Snapshot {
     pub ela: Vec<f32>,
     pub koppen: Vec<u8>,
     pub glacier: Vec<u8>,
+    /// Each month's sea-level temperature, °C (the lapse rate not applied), and precipitation
+    /// rate, mm/yr (a month's share is the rate / 12): twelve per-cell fields, only when
+    /// `Input::monthly` (empty otherwise).
+    pub t_sl_month: Vec<Vec<f32>>,
+    pub p_month: Vec<Vec<f32>>,
     /// Sea-level anomalies from `refs` (moved with the plates between snapshots).
     pub d_mean: Vec<f32>,
     pub d_warm: Vec<f32>,
@@ -347,6 +355,8 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
         ela: Vec<f32>,
         koppen: Vec<u8>,
         glacier: Vec<u8>,
+        t_sl_month: Vec<[f32; 12]>,
+        p_month: Vec<[f32; 12]>,
     }
     // The air's march along every row, both ways; then smoothed over `air_mixing_km` so the
     // rows' independent marches do not leave streaks (the winds have meridional components and
@@ -403,6 +413,8 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
                 ela: vec![0.0; w],
                 koppen: vec![koppen::SEA; w],
                 glacier: vec![0; w],
+                t_sl_month: Vec::with_capacity(if inp.monthly { w } else { 0 }),
+                p_month: Vec::with_capacity(if inp.monthly { w } else { 0 }),
             };
             let plateau = |zz: f64| (-(zz - p.plateau_m).max(0.0) / p.plateau_scale_m).exp();
             // How much each month is this row's summer (0 winter, 1 summer; follows the tilt).
@@ -469,6 +481,10 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
                     .max(p.precip_min_mm);
                     pm[m] = rate / 12.0;
                 }
+                if inp.monthly {
+                    row.t_sl_month.push(t_sl.map(|v| v as f32));
+                    row.p_month.push(pm.map(|v| (v * 12.0) as f32));
+                }
                 let annual: f64 = pm.iter().sum();
                 let mean = t.iter().sum::<f64>() / 12.0;
                 row.t_mean[i] = mean as f32;
@@ -518,6 +534,16 @@ pub fn compute(inp: &Input<'_>, ebm: &mut EbmState, sheet: &[f64]) -> Snapshot {
         s.ela.extend(r.ela);
         s.koppen.extend(r.koppen);
         s.glacier.extend(r.glacier);
+        if inp.monthly {
+            if s.t_sl_month.is_empty() {
+                s.t_sl_month = (0..12).map(|_| Vec::with_capacity(n)).collect();
+                s.p_month = (0..12).map(|_| Vec::with_capacity(n)).collect();
+            }
+            for m in 0..12 {
+                s.t_sl_month[m].extend(r.t_sl_month.iter().map(|v| v[m]));
+                s.p_month[m].extend(r.p_month.iter().map(|v| v[m]));
+            }
+        }
     }
     let lift = |c: usize| gamma * z[c];
     s.d_mean = (0..n)

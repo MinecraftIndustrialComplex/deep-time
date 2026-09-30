@@ -1405,9 +1405,9 @@ mod tests {
         assert!(matches!(s.keyframe_info(0), Err(CoreError::Unsupported(_))));
         let manifest = s.finalize_write().unwrap();
         let v: Value = serde_json::from_str(&manifest).unwrap();
-        assert_eq!(v["format_version"], "0.1");
+        assert_eq!(v["format_version"], "0.2");
         assert_eq!(v["layers"], json!([]));
-        assert!(manifest.contains("\"format_version\": \"0.1\""));
+        assert!(manifest.contains("\"format_version\": \"0.2\""));
         assert!(manifest.contains("\"layers\": []"));
         let on_disk = std::fs::read_to_string(dir.join("manifest.json")).unwrap();
         assert_eq!(on_disk, manifest);
