@@ -20,8 +20,8 @@ use crate::surface::detail::DetailParams;
 /// Bytes per cell of a window while a tile runs: the passes' arrays ([`Buf`]), the copy of the
 /// terrain the change is measured against, and the core's arrays handed to the sink.
 pub const TILE_BYTES_PER_CELL: u64 = Buf::BYTES_PER_CELL + 4 + 17;
-/// Bytes per cell of a [`Level`] (terrain, area, weight, erodibility, lake).
-pub const LEVEL_BYTES_PER_CELL: u64 = 17;
+/// Bytes per cell of a [`Level`] (terrain, area, weight, erodibility, lake, glaciers' surface).
+pub const LEVEL_BYTES_PER_CELL: u64 = 21;
 
 /// A rectangle of the fine grid: first column, first row, width, height.
 pub type Rect = (usize, usize, usize, usize);
@@ -105,6 +105,8 @@ pub struct LevelTile<'a> {
     pub wgt: &'a [f32],
     pub kfac: &'a [f32],
     pub lake: &'a [u8],
+    /// The glaciers' surface (empty without glaciers).
+    pub zs: &'a [f32],
 }
 
 /// Collects the cores of a level before the last into the arrays of the next.
@@ -125,6 +127,7 @@ impl LevelSink {
                 wgt: vec![0.0; n],
                 kfac: vec![0.0; n],
                 lake: vec![0; n],
+                zs: Vec::new(),
             },
         }
     }
@@ -145,7 +148,13 @@ impl TileSink for LevelSink {
             self.level.area[dst..dst + w].copy_from_slice(&l.area[src.clone()]);
             self.level.wgt[dst..dst + w].copy_from_slice(&l.wgt[src.clone()]);
             self.level.kfac[dst..dst + w].copy_from_slice(&l.kfac[src.clone()]);
-            self.level.lake[dst..dst + w].copy_from_slice(&l.lake[src]);
+            self.level.lake[dst..dst + w].copy_from_slice(&l.lake[src.clone()]);
+            if !l.zs.is_empty() {
+                if self.level.zs.len() != self.level.z.len() {
+                    self.level.zs = vec![0.0; self.level.z.len()];
+                }
+                self.level.zs[dst..dst + w].copy_from_slice(&l.zs[src]);
+            }
         }
         Ok(())
     }
@@ -332,6 +341,10 @@ pub struct LastStats {
     pub land_cells: u64,
     /// Σ detail amplitude over the same land cells, blocks · cells.
     pub detail_blocks_cells: f64,
+    /// The glacial pass (`glacial.rs`) over the cores: m · cells cut and raised, cells cut.
+    pub glacial_carved_m_cells: f64,
+    pub glacial_raised_m_cells: f64,
+    pub glacial_cells: u64,
     pub cells: u64,
     pub times: Times,
     pub sample_ms: f64,
@@ -412,14 +425,18 @@ pub fn run_tiles(
             );
         }
         stats.flood_unreached += pass.flood.unreached;
+        stats.glacial_carved_m_cells += pass.glacial.carved_m_cells;
+        stats.glacial_raised_m_cells += pass.glacial.raised_m_cells;
+        stats.glacial_cells += pass.glacial.glacier_cells;
         if cfg.last {
             // Local relief, then the detail amplitude of every core cell.
             relief5(&win, &buf.z, &mut buf.z2);
         }
         let mut z_core = Vec::with_capacity(cw * ch);
         let mut amp_core = Vec::with_capacity(if cfg.last { cw * ch } else { 0 });
-        let (mut area_core, mut wgt_core, mut kfac_core, mut lake_core) =
-            (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        let (mut area_core, mut wgt_core, mut kfac_core, mut lake_core, mut zs_core) =
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        let has_zs = buf.zs.len() == win.cells();
         if !cfg.last {
             area_core.reserve(cw * ch);
             wgt_core.reserve(cw * ch);
@@ -452,6 +469,9 @@ pub fn run_tiles(
                     wgt_core.push(buf.own[c] / a_fine);
                     kfac_core.push(buf.kfac[c]);
                     lake_core.push(buf.lake[c]);
+                    if has_zs {
+                        zs_core.push(buf.zs[c]);
+                    }
                 }
                 eroded += f64::from(buf.eroded[c]);
                 transit += f64::from(buf.sed[c]);
@@ -488,6 +508,7 @@ pub fn run_tiles(
                 wgt: &wgt_core,
                 kfac: &kfac_core,
                 lake: &lake_core,
+                zs: &zs_core,
             }),
         })?;
         stats.sink_ms += started.elapsed().as_secs_f64() * 1000.0;

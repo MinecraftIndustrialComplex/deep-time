@@ -2167,6 +2167,24 @@ community ports) are not opened for code.
   drama maps to 0.25 + 0.75 · drama times the base slope, not drama times it, so 0 is smooth and
   not flat; the young stage adds erosion time without advancing the clock; the fine drainage area
   refines the coarse level's exact area instead of starting from zero.
+- **As built: glacial landforms** (Ben, 2026-09-29, decisions log "Glacial erosion landforms";
+  `surface/glacial.rs`, `surface/amplify/glacial.rs`; STATUS.md has the runs). The deep-time
+  surface and the young landscape run one glacier model per LEM step: a linear mass balance from
+  the climate's ELA (Oerlemans 2011), capped by precipitation; ice flux routed down the fluvial D8
+  tree (as Hergarten 2021); the ice surface of every cell solved from its receiver's with the
+  shallow-ice approximation plus Weertman sliding on thawed beds (Cuffey & Paterson 2010), glaciers
+  `1/form_ratio` as wide as thick (up to seven cells, spreading their erosion across the trough);
+  erosion E = K_g·u_s (Humphrey & Raymond 1994; K_g = 10⁻⁵ from Hallet et al. 1996's rates), none
+  under cold beds, floating ice or supercooling adverse slopes (Alley et al. 2003); debris melts out
+  with the ice as till (a facies of its own, class `till`, in the strata log), the rest goes with the
+  meltwater to lakes and the sea. Fjords follow from ice grounded below sea level at the coast. Fluvial
+  K is reduced by the glaciers' cover. The young landscape uses the glacial state's ELA (the
+  present one lowered by `young_ela_drop_m`, Porter 1989's ~500 m, until the climate publishes
+  ice-age fields; `glacial::source` names them in one place) and hands its ice surface to the
+  amplifier, which turns confined, laterally bounded ice into parabolic troughs (Svensson 1959,
+  Harbor 1992) with cirque-like heads, pointwise from the ice depth and the valley's centre-line
+  depth, as a tiled Jacobi pass (its radius is in the halo). Settings: `surface.glacial.*`,
+  `amplify.glacial.*` (editor: glacial erosion, glacial valleys, ice-age snowline, arêtes).
 - **Oracle.** `tools/validation/fastscape_compare.py` runs fastscapelib (GPL-3.0, installed with
   `nix shell` + pip in a throwaway venv, never vendored) on the same uplift and parameters on a
   256² grid and compares hypsometry, χ/steepness statistics and drainage-area distributions with the

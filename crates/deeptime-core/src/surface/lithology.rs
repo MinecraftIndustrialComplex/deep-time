@@ -230,6 +230,7 @@ pub struct Classes {
     pub saprolite: u16,
     pub laterite: u16,
     pub bauxite: u16,
+    pub till: u16,
 }
 
 impl Classes {
@@ -258,6 +259,7 @@ impl Classes {
             saprolite: index("saprolite"),
             laterite: index("laterite"),
             bauxite: index("bauxite"),
+            till: index("till"),
         }
     }
 }

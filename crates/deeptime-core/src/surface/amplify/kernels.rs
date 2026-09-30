@@ -98,6 +98,8 @@ pub struct Physics {
     pub deposit_frac: f32,
     /// Rise per cell of a filled surface, m.
     pub eps_m: f32,
+    /// Block-scale glacial valleys (`glacial.rs`).
+    pub glacial: super::glacial::GlacialShape,
 }
 
 /// Iterations of each pass.
@@ -106,13 +108,18 @@ pub struct Counts {
     pub erode: u32,
     pub thermal: u32,
     pub deposit: u32,
+    /// Dependency radius of the glacial pass, cells (`GlacialShape::radius`; 0 when off).
+    pub glacial: u32,
 }
 
 impl Counts {
     /// Dependency radius, cells, of the seeding and the iterations (the flood's reach and the
     /// post-processing come on top, `tiles::halo`).
     pub fn radius(&self) -> usize {
-        1 + 2 * self.erode as usize + self.thermal as usize + 2 * self.deposit as usize
+        1 + 2 * self.erode as usize
+            + self.thermal as usize
+            + 2 * self.deposit as usize
+            + self.glacial as usize
     }
 }
 
@@ -152,11 +159,13 @@ pub struct Buf {
     pub tmult: Vec<f32>,
     /// The part of the window whose statistics count (`x0, y0, w, h`): the tile's core.
     pub core: (usize, usize, usize, usize),
+    /// The glaciers' surface, m (empty without glaciers; `glacial.rs`).
+    pub zs: Vec<f32>,
 }
 
 impl Buf {
     /// Bytes per cell of a buffer (the memory estimate).
-    pub const BYTES_PER_CELL: u64 = 12 * 4 + 2;
+    pub const BYTES_PER_CELL: u64 = 12 * 4 + 2 + 4;
 
     pub fn new(win: Win, fine: Fine) -> Buf {
         let n = win.cells();
@@ -177,6 +186,7 @@ impl Buf {
             cap: vec![0.0; n],
             tmult: vec![1.0; n],
             core: (0, 0, win.w, win.h),
+            zs: fine.zs,
         }
     }
 }
@@ -189,6 +199,7 @@ pub struct Times {
     pub thermal_ms: f64,
     pub deposit_ms: f64,
     pub flood_ms: f64,
+    pub glacial_ms: f64,
 }
 
 impl Times {
@@ -198,6 +209,7 @@ impl Times {
         self.thermal_ms += o.thermal_ms;
         self.deposit_ms += o.deposit_ms;
         self.flood_ms += o.flood_ms;
+        self.glacial_ms += o.glacial_ms;
     }
 }
 
@@ -661,6 +673,8 @@ pub struct PassStats {
     /// so no erosion pass deepens a pit into a slot) and the one at the end.
     pub pre_flood: FloodStats,
     pub flood: FloodStats,
+    /// The glacial valleys (`glacial.rs`).
+    pub glacial: super::glacial::ShapeStats,
 }
 
 /// Seeding, erosion, thermal erosion, deposition and the flood over one window; leaves the
@@ -698,6 +712,8 @@ pub fn run_passes(
     let started = Instant::now();
     buf.eroded.iter_mut().for_each(|e| *e = 0.0);
     incision_cap(&win, &buf.z, ph, &mut buf.cap);
+    // Rivers cut little where the glaciers were (`glacial.rs`); the rates come back after.
+    let kfac_saved = super::glacial::damp(&ph.glacial, &buf.z, &buf.zs, &mut buf.kfac);
     for _ in 0..counts.erode {
         norms(&win, &buf.z, ph, &mut buf.norm);
         area_step(&win, &buf.z, &buf.norm, &buf.a, &buf.own, ph, &mut buf.a2);
@@ -716,7 +732,36 @@ pub fn run_passes(
         );
         std::mem::swap(&mut buf.z, &mut buf.z2);
     }
+    if let Some(k) = kfac_saved {
+        buf.kfac = k;
+    }
     times.erode_ms += started.elapsed().as_secs_f64() * 1000.0;
+
+    // U-shaped troughs, cirques and aretes under the glaciers (`glacial.rs`), on the level whose
+    // counts ask for it (the last: its radius is in cells of the block-scale grid).
+    let started = Instant::now();
+    let glacial = if counts.glacial > 0 {
+        // The swap buffers and the flow norms are free between the erosion and the thermal
+        // passes.
+        super::glacial::shape(
+            &win,
+            &ph.glacial,
+            &mut buf.z,
+            &buf.zs,
+            buf.core,
+            [
+                &mut buf.z2,
+                &mut buf.a2,
+                &mut buf.norm,
+                &mut buf.sed,
+                &mut buf.sed2,
+                &mut buf.cap,
+            ],
+        )
+    } else {
+        super::glacial::ShapeStats::default()
+    };
+    times.glacial_ms += started.elapsed().as_secs_f64() * 1000.0;
 
     let started = Instant::now();
     for _ in 0..counts.thermal {
@@ -765,7 +810,11 @@ pub fn run_passes(
         buf.core,
     );
     times.flood_ms += started.elapsed().as_secs_f64() * 1000.0;
-    PassStats { pre_flood, flood }
+    PassStats {
+        pre_flood,
+        flood,
+        glacial,
+    }
 }
 
 #[cfg(test)]
@@ -794,6 +843,7 @@ mod tests {
             cap_slope_exp: 1.0,
             deposit_frac: 0.5,
             eps_m: 0.01,
+            glacial: super::super::glacial::GlacialShape::default(),
         }
     }
 
