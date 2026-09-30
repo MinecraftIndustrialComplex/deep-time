@@ -72,6 +72,9 @@ pub struct CharacterParams {
     pub active_uplift_mm_yr: f64,
     /// The character fades out between these effective drainage areas, km² (rivers stay smooth).
     pub channel_area_km2: [f64; 2],
+    /// Fold ridges fade out on smaller streams already, so every stream the amplifier made cuts a
+    /// gap through them instead of being dammed.
+    pub fold_channel_area_km2: [f64; 2],
     /// … and within this height above the sea, blocks (beaches stay smooth).
     pub coast_blocks: f64,
     /// The most the character moves a cell, blocks.
@@ -97,7 +100,8 @@ impl Default for CharacterParams {
             relief_radius_blocks: 32.0,
             youth_myr: 60.0,
             active_uplift_mm_yr: 0.1,
-            channel_area_km2: [20.0, 200.0],
+            channel_area_km2: [5.0, 100.0],
+            fold_channel_area_km2: [1.0, 10.0],
             coast_blocks: 6.0,
             max_change_blocks: 60.0,
         }
@@ -132,9 +136,13 @@ impl CharacterParams {
         range(self.relief_radius_blocks, 4.0, 256.0, "relief_radius_blocks")?;
         range(self.youth_myr, 1.0, 10_000.0, "youth_myr")?;
         range(self.active_uplift_mm_yr, 0.01, 100.0, "active_uplift_mm_yr")?;
-        let [a0, a1] = self.channel_area_km2;
-        if !(a0.is_finite() && a1.is_finite() && a0 > 0.0 && a1 > a0) {
-            return Err(bad("channel_area_km2", "[a0, a1] with 0 < a0 < a1 (km²)"));
+        for (k, [a0, a1]) in [
+            ("channel_area_km2", self.channel_area_km2),
+            ("fold_channel_area_km2", self.fold_channel_area_km2),
+        ] {
+            if !(a0.is_finite() && a1.is_finite() && a0 > 0.0 && a1 > a0) {
+                return Err(bad(k, "[a0, a1] with 0 < a0 < a1 (km²)"));
+            }
         }
         range(self.coast_blocks, 0.0, 64.0, "coast_blocks")?;
         range(self.max_change_blocks, 1.0, 400.0, "max_change_blocks")?;
@@ -245,13 +253,15 @@ impl CharacterFields {
         }
     }
 
-    /// TEMP-DEBUG (remove): writes youth, fold strength and the doubled-angle arrays as raw f32.
-    pub fn debug_dump(&self, dir: &std::path::Path) {
-        let _ = std::fs::create_dir_all(dir.join("debug"));
-        for (n, a) in [("youth", &self.youth), ("c2", &self.fold_c2), ("s2", &self.fold_s2)] {
-            let b: Vec<u8> = a.iter().flat_map(|v| v.to_le_bytes()).collect();
-            let _ = std::fs::write(dir.join(format!("debug/{n}_{}x{}.f32", self.w, self.h)), b);
-        }
+    /// The youth and the fold strength per L1 cell (row-major, the plate model's L1 grid).
+    pub fn maps(&self) -> (Vec<f32>, Vec<f32>) {
+        let fold = self
+            .fold_c2
+            .iter()
+            .zip(&self.fold_s2)
+            .map(|(&c, &s)| (c * c + s * s).sqrt().min(1.0))
+            .collect();
+        (self.youth.clone(), fold)
     }
 
     /// Uniform, moderate youth and no folds (a world without plate fields).
@@ -551,6 +561,25 @@ fn box_blur(win: &Win, src: &[f32], tmp: &mut [f32], dst: &mut [f32], r: usize) 
     });
 }
 
+/// The minimum of `src` over the (2r + 1)² cells around each cell, separably, into `dst`.
+fn min_filter(win: &Win, src: &[f32], tmp: &mut [f32], dst: &mut [f32], r: usize) {
+    let r = r as i64;
+    map_cells(win, tmp, |i, j, o| {
+        let mut m = f32::INFINITY;
+        for d in -r..=r {
+            m = m.min(src[at(win, i, j, d, 0)]);
+        }
+        *o = m;
+    });
+    map_cells(win, dst, |i, j, o| {
+        let mut m = f32::INFINITY;
+        for d in -r..=r {
+            m = m.min(tmp[at(win, i, j, 0, d)]);
+        }
+        *o = m;
+    });
+}
+
 /// max − min of `src` over the (2r + 1)² cells around each cell, separably, into `dst`.
 fn relief(win: &Win, src: &[f32], lo: &mut [f32], hi: &mut [f32], dst: &mut [f32], r: usize) {
     let r = r as i64;
@@ -604,6 +633,7 @@ pub fn apply(
     let (sea, sea_y, mv) = (ctx.sea, ctx.sea_y, ctx.mv);
     let to_y = |zm: f32| (sea_y + (f64::from(zm) - f64::from(sea)) / mv) as f32;
     let [a0, a1] = p.channel_area_km2;
+    let [f0, f1] = p.fold_channel_area_km2;
 
     // Block heights, then a 3 × 3 binomial smoothing: the amplifier's one-cell rills are finer
     // than the game's four-block corners can draw (they alias into stripes).
@@ -627,6 +657,10 @@ pub fn apply(
     box_blur(win, s.base, s.tmp, s.acc, rd.sharpen);
     box_blur(win, s.acc, s.tmp, s.tmp2, rd.sharpen);
     box_blur(win, s.tmp2, s.tmp, s.blur, rd.sharpen);
+    // The local base level: the lowest smoothed height within the relief radius. A gully cannot
+    // cut below it (a trough that outran its base level would end in a pit at the foot of the
+    // slope, which the flood would fill flat).
+    min_filter(win, s.smooth, s.tmp, s.tmp2, rd.relief);
 
     let global_xz = |i: usize, j: usize| {
         let (gi, gj) = win.global(i, j);
@@ -647,7 +681,9 @@ pub fn apply(
     };
 
     // Fold ridges.
-    let (base, smooth, rel) = (&*s.base, &*s.smooth, &*s.relief);
+    let (base, smooth, rel, low) = (&*s.base, &*s.smooth, &*s.relief, &*s.tmp2);
+    // How deep a trough may go at a cell: most of its height above the local base level.
+    let headroom = |cell: usize| 0.8 * f64::from(smooth[cell] - low[cell]).max(0.0);
     map_cells(win, s.acc, |i, j, o| {
         let cell = j * win.w + i;
         *o = 0.0;
@@ -673,7 +709,9 @@ pub fn apply(
         // Ridged: sharp crests at the stripes' zero lines, rounded troughs; plunging along strike.
         let ridged = 0.5 - (b + wob).abs().min(1.0);
         let plunge = 0.6 + 0.4 * value(ctx.seed, 213, c, bx, bz, 1.5 * p.fold_wavelength_blocks);
-        *o = (rug * p.fold_gain * fold * plunge * f64::from(rel[cell]) * ridged * fade(cell)) as f32;
+        let gap = 1.0 - smoothstep(f0, f1, f64::from(area[cell]) * 1.0e-6);
+        let amp = (rug * p.fold_gain * fold * plunge * f64::from(rel[cell])).min(2.0 * headroom(cell));
+        *o = (amp * ridged * fade(cell) * gap) as f32;
     });
 
     // Gully octaves, each aligned with the slope of the smoothed terrain plus everything so far.
@@ -712,7 +750,8 @@ pub fn apply(
             let shape = (0.45 + 0.55 * youth) * (0.55 + 0.45 * hard);
             let amp = (rug * p.gully_gain * shape * slope * lam * persist)
                 .min(p.gully_relief_cap * f64::from(rel[cell]))
-                .min(rug * p.gully_max_ratio * lam * (0.6 + 0.4 * hard) * persist);
+                .min(rug * p.gully_max_ratio * lam * (0.6 + 0.4 * hard) * persist)
+                .min(headroom(cell) * persist);
             let b = stripes(ctx.seed, 300 + k, c, bx, bz, dir, lam, sharp);
             *o = (amp * b * fade(cell)) as f32;
         });
@@ -741,8 +780,12 @@ pub fn apply(
         };
         let steep = smoothstep(0.3, 1.2, (mx * mx + mz * mz).sqrt()) * rug.min(1.0);
         let y0 = f64::from(base[cell]) + steep * f64::from(smooth[cell] - base[cell]);
-        let k_u = p.sharpen_gain * youth - p.round_gain * (1.0 - youth);
-        let unsharp = (rug * k_u).max(-1.0) * (y0 - f64::from(blur[cell]));
+        // Young: summits and ridgelines stand out (the convex part only: sharpening the concave
+        // part would dig moats at the foot of every steep front, which the flood then fills flat).
+        // Old: the terrain is pulled towards its smoothed self, both ways (rounded, no moats).
+        let excess = y0 - f64::from(blur[cell]);
+        let unsharp = rug * p.sharpen_gain * youth * excess.max(0.0)
+            - (rug * p.round_gain * (1.0 - youth)).min(1.0) * excess;
         let mut y = y0 + unsharp * f + f64::from(acc[cell]);
         // Cliff bands: a smooth terrace of the height where hard rock is steep.
         let h = |di, dj| f64::from(smooth[at(win, i, j, di, dj)]);
@@ -790,9 +833,202 @@ pub fn apply(
     st
 }
 
+/// Pit depths (blocks) from which the character is softened, and to which it is gone.
+pub const PIT_SOFTEN_BLOCKS: [f64; 2] = [1.5, 4.0];
+
+/// Radius, cells, the pit depth is spread over before it softens the character (so a pit's dam,
+/// a crest a cell or two wide beside it, softens too).
+pub const PIT_SOFTEN_RADIUS: usize = 6;
+
+/// Softens the character around the pits it closed: with `filled` the flooded surface of `z` (m),
+/// the depth of every pit (filled − z) is spread over [`PIT_SOFTEN_RADIUS`] cells and, where it
+/// passes [`PIT_SOFTEN_BLOCKS`], `z` goes back towards `z_pre` (the terrain before the character).
+/// Returns how many cells of `core` it softened.
+#[allow(clippy::too_many_arguments)]
+pub fn soften_pits(
+    win: &Win,
+    z: &mut [f32],
+    z_pre: &[f32],
+    filled: &[f32],
+    tmp: &mut [f32],
+    depth: &mut [f32],
+    ctx: &CharacterCtx<'_>,
+    core: (usize, usize, usize, usize),
+) -> u64 {
+    let mv = ctx.mv as f32;
+    map_cells(win, depth, |i, j, o| {
+        let c = j * win.w + i;
+        *o = (filled[c] - z[c]).max(0.0) / mv;
+    });
+    // A max filter then a box blur: the depth reaches the dam, and fades smoothly.
+    let r = PIT_SOFTEN_RADIUS as i64;
+    map_cells(win, tmp, |i, j, o| {
+        let mut m = 0f32;
+        for d in -r..=r {
+            m = m.max(depth[at(win, i, j, d, 0)]);
+        }
+        *o = m;
+    });
+    map_cells(win, depth, |i, j, o| {
+        let mut m = 0f32;
+        for d in -r..=r {
+            m = m.max(tmp[at(win, i, j, 0, d)]);
+        }
+        *o = m;
+    });
+    let spread = depth.to_vec();
+    box_blur(win, &spread, tmp, depth, PIT_SOFTEN_RADIUS);
+    let [d0, d1] = PIT_SOFTEN_BLOCKS;
+    let mut n = 0u64;
+    let (x0, y0, cw, ch) = core;
+    for (c, zc) in z.iter_mut().enumerate() {
+        let w = smoothstep(d0, d1, f64::from(depth[c])) as f32;
+        if w > 0.0 {
+            *zc += (z_pre[c] - *zc) * w;
+            let (i, j) = (c % win.w, c / win.w);
+            n += u64::from((x0..x0 + cw).contains(&i) && (y0..y0 + ch).contains(&j));
+        }
+    }
+    n
+}
+
+/// The halo the character needs on top of the passes': its own radius, the flood that measures
+/// the pits it closed, their softening, and the last flood.
+pub fn halo_cells(p: &CharacterParams, cell_blocks: f64, repair_margin: usize) -> usize {
+    radius_cells(p, cell_blocks) + 2 * repair_margin + 2 * PIT_SOFTEN_RADIUS + 1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    impl CharacterFields {
+        /// Uniform fields (tests): youth, fold strength and shortening direction everywhere.
+        fn uniform(youth: f32, fold: f32, dir_deg: f64) -> Self {
+            let th = 2.0 * dir_deg.to_radians();
+            CharacterFields {
+                w: 4,
+                h: 4,
+                ratio: 8.0,
+                youth: vec![youth; 16],
+                fold_c2: vec![fold * th.cos() as f32; 16],
+                fold_s2: vec![fold * th.sin() as f32; 16],
+                neutral: false,
+            }
+        }
+    }
+
+    const MV: f64 = 20.0;
+    const SEA_Y: f64 = 63.0;
+
+    /// A 400-block cone (a young volcano's size here) on a 320 × 160-cell window of 2-block
+    /// cells; land everywhere, 1 km² of drainage area (no rivers), erodibility `kfac`.
+    fn cone(kfac: f32) -> (Win, Vec<f32>, Vec<f32>, Vec<f32>, Vec<u8>) {
+        let win = Win::full(320, 160);
+        let mut z = vec![0f32; win.cells()];
+        for j in 0..win.h {
+            for i in 0..win.w {
+                let (dx, dz) = (i as f64 - 160.0, j as f64 - 80.0);
+                let r = (dx * dx + dz * dz).sqrt() * 2.0;
+                let y = SEA_Y + 4.0 + (300.0 - r).max(0.0);
+                z[j * win.w + i] = ((y - SEA_Y) * MV) as f32;
+            }
+        }
+        let n = win.cells();
+        (win, z, vec![1.0e6; n], vec![kfac; n], vec![0; n])
+    }
+
+    /// RMS change, blocks, of the character over the cone's flanks.
+    fn change(fields: &CharacterFields, kfac: f32, rug: f64) -> (f64, Vec<f32>) {
+        let (win, mut z, area, k, lake) = cone(kfac);
+        let before = z.clone();
+        let n = win.cells();
+        let mut sc: Vec<Vec<f32>> = (0..7).map(|_| vec![0f32; n]).collect();
+        let [a, b, c, d, e, f, g] = &mut sc[..] else { unreachable!() };
+        let p = CharacterParams::default();
+        let ctx = CharacterCtx {
+            p: &p,
+            ruggedness: rug,
+            fields,
+            seed: 11,
+            circumference: 640,
+            cell_blocks: 2.0,
+            origin_x: -320.0,
+            origin_z: -160.0,
+            sea: 0.0,
+            sea_y: SEA_Y,
+            mv: MV,
+        };
+        let scratch = Scratch { base: a, smooth: b, relief: c, blur: d, acc: e, tmp: f, tmp2: g };
+        apply(&win, &mut z, &area, &k, &lake, scratch, &ctx, (0, 0, win.w, win.h));
+        let mut sum = 0.0;
+        let mut cnt = 0.0;
+        for j in 30..130 {
+            for i in 60..260 {
+                let c = j * win.w + i;
+                let d = f64::from(z[c] - before[c]) / MV;
+                sum += d * d;
+                cnt += 1.0;
+            }
+        }
+        ((sum / cnt).sqrt(), z)
+    }
+
+    #[test]
+    fn young_hard_rock_gets_more_character_than_old_soft_rock() {
+        let young = CharacterFields::uniform(1.0, 0.0, 0.0);
+        let old = CharacterFields::uniform(0.0, 0.0, 0.0);
+        let (y_hard, _) = change(&young, 0.8, 1.0);
+        let (y_soft, _) = change(&young, 3.0, 1.0);
+        let (o_hard, _) = change(&old, 0.8, 1.0);
+        assert!(y_hard > 3.0, "a young cone in hard rock changes by {y_hard} blocks RMS");
+        assert!(y_hard > 1.3 * y_soft, "hard {y_hard} vs soft {y_soft}");
+        assert!(y_hard > 1.3 * o_hard, "young {y_hard} vs old {o_hard}");
+        // Ruggedness 0 leaves the terrain alone, and more ruggedness is more character.
+        let (none, _) = change(&young, 0.8, 0.0);
+        assert_eq!(none, 0.0);
+        let (more, _) = change(&young, 0.8, 2.0);
+        assert!(more > y_hard, "ruggedness 2: {more} vs 1: {y_hard}");
+    }
+
+    #[test]
+    fn the_sea_is_left_alone_and_no_land_goes_under_it() {
+        let young = CharacterFields::uniform(1.0, 1.0, 30.0);
+        let (win, before, ..) = cone(0.8);
+        let (_, z) = change(&young, 0.8, 2.0);
+        for c in 0..win.cells() {
+            if before[c] <= 0.0 {
+                assert_eq!(z[c], before[c]);
+            } else {
+                assert!(z[c] > 0.0, "cell {c} went under the sea");
+            }
+        }
+    }
+
+    #[test]
+    fn gullies_run_down_the_slope() {
+        // Around the cone, the character varies far more across the fall line (around the cone)
+        // than along it (towards the summit): its crests and valleys radiate from the peak.
+        let young = CharacterFields::uniform(1.0, 0.0, 0.0);
+        let (win, before, ..) = cone(0.8);
+        let (_, z) = change(&young, 0.8, 1.0);
+        let d = |i: f64, j: f64| {
+            let c = j.round() as usize * win.w + i.round() as usize;
+            f64::from(z[c] - before[c]) / MV
+        };
+        let (mut radial, mut around) = (0.0, 0.0);
+        for k in 0..720 {
+            let a = k as f64 * std::f64::consts::TAU / 720.0;
+            let (ca, sa) = (a.cos(), a.sin());
+            for r in [40.0, 55.0, 70.0] {
+                let (i, j) = (160.0 + r * ca, 80.0 + r * sa);
+                // Two cells towards the summit, and two cells around the cone.
+                radial += (d(i, j) - d(i - 2.0 * ca, j - 2.0 * sa)).abs();
+                around += (d(i, j) - d(i - 2.0 * sa, j + 2.0 * ca)).abs();
+            }
+        }
+        assert!(around > 1.5 * radial, "around {around} radial {radial}");
+    }
 
     #[test]
     fn stripes_are_periodic_bounded_and_run_across_their_direction() {
@@ -836,7 +1072,7 @@ mod tests {
         let r = radius_cells(&p, 2.0);
         assert!(r > (p.relief_radius_blocks / 2.0) as usize, "{r}");
         // Octaves under four cells are dropped.
-        assert_eq!(radii(&p, 2.0).octaves, 3);
-        assert_eq!(radii(&p, 4.0).octaves, 2);
+        assert_eq!(radii(&p, 2.0).octaves, 4);
+        assert_eq!(radii(&p, 8.0).octaves, 3);
     }
 }

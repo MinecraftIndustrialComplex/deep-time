@@ -431,6 +431,7 @@ fn the_seam_leaves_no_mark() {
     let mut c = cfg(1.0);
     c.p.seed_relief = 0.0;
     c.p.thermal_noise = 0.0;
+    c.p.ruggedness = 0.0;
     let (base, _) = run_mem(&l2, &c, plan_tiled(&c), 2);
     let shift = 24usize;
     let shifted = Level {
@@ -452,7 +453,9 @@ fn the_seam_leaves_no_mark() {
         worst < 0.05,
         "a rotated planet amplifies differently by up to {worst} m"
     );
-    // And the seam columns' steps are like any other column pair's.
+    // And the seam columns' steps are like any other column pair's, with the mountain character
+    // (its noise is periodic in x) as without.
+    let (base, _) = run_mem(&l2, &cfg(1.0), plan_tiled(&cfg(1.0)), 2);
     let gw = 4 * W2;
     let step = |i0: usize| -> f64 {
         (0..4 * H2)

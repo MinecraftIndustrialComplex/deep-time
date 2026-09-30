@@ -342,6 +342,8 @@ pub struct LastStats {
     /// The mountain character (the last level, ruggedness > 0), and the flood after it.
     pub character: CharacterStats,
     pub character_flood_raised_cells: u64,
+    /// Cells the character was softened on around pits it closed.
+    pub character_softened_cells: u64,
     pub character_flood_max_raise_m: f32,
     pub character_ms: f64,
     pub sink_ms: f64,
@@ -411,6 +413,7 @@ pub fn run_tiles(
             // Mountain character, then a flood so the surface still drains (the arrays the
             // passes are done with are its scratch).
             let started = Instant::now();
+            let z_pre = buf.z.clone();
             let st = character::apply(
                 &win,
                 &mut buf.z,
@@ -429,6 +432,30 @@ pub fn run_tiles(
                 cc,
                 buf.core,
             );
+            // Where the character closed a deep pit (a gully dammed by its neighbour's crest), it
+            // is softened back towards the passes' terrain before the flood, so the flood fills
+            // puddles, not 20-block basins.
+            let mut filled = buf.z.clone();
+            flood_repair(
+                &win,
+                &mut filled,
+                &buf.lake,
+                cfg.ph.sea,
+                cfg.ph.eps_m,
+                &mut buf.z2,
+                buf.core,
+            );
+            let softened = character::soften_pits(
+                &win,
+                &mut buf.z,
+                &z_pre,
+                &filled,
+                &mut buf.z2,
+                &mut buf.own,
+                cc,
+                buf.core,
+            );
+            drop(filled);
             let fl = flood_repair(
                 &win,
                 &mut buf.z,
@@ -443,6 +470,7 @@ pub fn run_tiles(
             stats.character.max_raise_blocks = stats.character.max_raise_blocks.max(st.max_raise_blocks);
             stats.character.max_cut_blocks = stats.character.max_cut_blocks.max(st.max_cut_blocks);
             stats.character_flood_raised_cells += fl.raised_cells;
+            stats.character_softened_cells += softened;
             stats.character_flood_max_raise_m = stats.character_flood_max_raise_m.max(fl.max_raise_m);
             stats.character_ms += started.elapsed().as_secs_f64() * 1000.0;
         }
