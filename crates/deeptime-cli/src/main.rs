@@ -315,6 +315,19 @@ enum Command {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Write fields of a checkpoint's world as raw little-endian f32 files (`<dir>/<name>.f32`,
+    /// `/` in a name becomes `__`) with an `index.json` of their grids, for analysis scripts.
+    DumpFields {
+        /// Checkpoint to read.
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// Folder to write.
+        #[arg(long)]
+        out: PathBuf,
+        /// Field names (comma-separated); default every field.
+        #[arg(long, value_delimiter = ',')]
+        fields: Vec<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -632,6 +645,18 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::DumpFields { input, out, fields }) => {
+            match dump::fields(&input, &out, &fields) {
+                Ok(n) => {
+                    println!("deeptime dump-fields: {n} fields -> {}", out.display());
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime dump-fields: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::Synth {
             kind,
             strata,

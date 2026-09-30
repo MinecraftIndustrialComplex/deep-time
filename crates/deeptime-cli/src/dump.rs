@@ -110,3 +110,27 @@ pub fn run(world: &Path, out: &Path) -> Result<(usize, usize, usize), FormatErro
     write_atomic(out, &bytes)?;
     Ok((sites.len(), bodies.len(), inside_total))
 }
+
+/// `deeptime dump-fields`: the named fields of a checkpoint's world (every field when `names` is
+/// empty) as raw little-endian f32 files with an `index.json` of their grids.
+pub fn fields(ckpt: &Path, out: &Path, names: &[String]) -> Result<usize, String> {
+    let ck = deeptime_core::checkpoint::Checkpoint::read(ckpt).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(out).map_err(|e| e.to_string())?;
+    let mut index = serde_json::Map::new();
+    for (name, f) in &ck.world.fields {
+        if !names.is_empty() && !names.iter().any(|n| n == name) {
+            continue;
+        }
+        let file = format!("{}.f32", name.replace('/', "__"));
+        let bytes: Vec<u8> = f.data.iter().flat_map(|x| x.to_le_bytes()).collect();
+        write_atomic(&out.join(&file), &bytes).map_err(|e| e.to_string())?;
+        index.insert(
+            name.clone(),
+            json!({ "file": file, "w": f.grid.w, "h": f.grid.h, "r": f.grid.r, "grid": f.grid.name }),
+        );
+    }
+    let n = index.len();
+    let text = serde_json::to_vec_pretty(&Value::Object(index)).expect("JSON");
+    write_atomic(&out.join("index.json"), &text).map_err(|e| e.to_string())?;
+    Ok(n)
+}

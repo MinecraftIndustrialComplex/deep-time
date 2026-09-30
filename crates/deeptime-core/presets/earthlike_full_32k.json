@@ -33,7 +33,11 @@
   },
   "young": {},
   "amplify": {
-    "incision_cap": 3.0
+    "incision_cap": 3.0,
+    "glacial": {
+      "strength": 1.0,
+      "ridge_share": 0.5
+    }
   },
   "resolution": {
     "l0_samples": 250000,
@@ -183,7 +187,11 @@
     "basin_m_myr": 80.0,
     "event_min_area_km2": 3000.0,
     "transgression_frac": 0.04,
-    "spl_max_iter": 6
+    "spl_max_iter": 6,
+    "glacial": {
+      "strength": 1.0,
+      "young_ela_drop_m": 500.0
+    }
   },
   "climate": {
     "snapshot_every_myr": 10.0,
