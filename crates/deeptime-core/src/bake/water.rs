@@ -85,6 +85,27 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
             std::fs::remove_file(&rivers_path).map_err(|e| CoreError::io(&rivers_path, e))?;
         }
         out.m.files.retain(|f| f.path != RIVERS_PATH);
+        // An all-nodata `water_level` on the elevation grid (a re-run over a folder that had
+        // lakes clears them).
+        if let Some(e) = out.m.layer("elevation") {
+            let grid = out
+                .m
+                .grids
+                .get(&e.grid)
+                .cloned()
+                .ok_or_else(|| CoreError::InvalidState(format!("no grid {}", e.grid)))?;
+            let wd = desc(
+                "water_level",
+                DType::I16,
+                &grid,
+                1.0 / 16.0,
+                "block",
+                Some(f64::from(network::NODATA)),
+            );
+            out.layer(wd, &vec![network::NODATA; grid.cells()])?;
+            let mut seen = false;
+            out.layers.retain(|l| l != "water_level" || !std::mem::replace(&mut seen, true));
+        }
         return Ok(Water {
             note: json!({"enabled": false, "why": "hydro.enabled is false: no lakes or rivers"}),
             output: None,
