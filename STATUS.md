@@ -166,6 +166,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   Deep Time's cavities, not the volcanoes'. (4) One run (q16c) showed a ~5 km deep pit on an Andean plateau already in the
   young landscape (not at a volcano); not investigated. (5) At 20 m vs 300 m per block the world is 15× taller than wide,
   so true-proportion cones are steep peaks in blocks.
+- **After merging master 84e2b1d** (continuous strata, deep-time climate, P1-25; checkpoint schema → 8 on top of the
+  climate's 7): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings` (so every target compiles) and
+  `deny check licenses bans` clean. The workspace tests, `./gradlew build test` and `./gametest.sh` were not re-run after
+  this merge: the laptop's Tailscale stopped mid-run (`mac-mini` no longer resolves); the numbers above are from the
+  tree before it (merged with master 8872c91).
 - **Deviations.** Stratovolcano "centres" live 2–8 Myr (real cones 0.1–1 Myr) because a step is 2 Myr. Stratovolcanoes
   that erode away are counted, not written as events (~24,000 per run). No lava or obsidian blocks, no volcanic ore
   (P2-10's epithermal), no guyot planing beyond the surface's wave-base diffusion (P2-11).
