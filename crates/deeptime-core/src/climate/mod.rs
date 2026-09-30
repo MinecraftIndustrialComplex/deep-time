@@ -1150,8 +1150,7 @@ impl ClimateStage {
         if let Some(er) = &er_end {
             let t_mean = &world.fields[field::T_MEAN].data;
             let precip = &world.fields[field::PRECIP].data;
-            self.s.clock.kernel =
-                kernel_of(&geo, &land, t_mean, precip, er, &p);
+            self.s.clock.kernel = kernel_of(&geo, &land, t_mean, precip, er, &p);
             let warming = er.t_global - p.hydro_ref_c;
             let (mut ra, mut rs) = (0.0, 0.0);
             for c in 0..n {
@@ -1192,7 +1191,8 @@ impl ClimateStage {
             f32::from(u8::from(self.s.clock.snowball.is_some())),
             activity.ridge_km2_yr as f32,
             activity.subduction_km2_yr as f32,
-            (geo.area_where(&|c| land[c]) / geo.area.iter().map(|a| a * w as f64).sum::<f64>()) as f32,
+            (geo.area_where(&|c| land[c]) / geo.area.iter().map(|a| a * w as f64).sum::<f64>())
+                as f32,
             (self.s.clock.kernel.band.iter().sum::<f64>() / carbon::KERNEL_EARTH) as f32,
             runoff_mean as f32,
         ]);
