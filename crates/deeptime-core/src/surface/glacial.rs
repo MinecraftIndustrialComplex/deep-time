@@ -74,18 +74,24 @@ use crate::error::CoreError;
 /// Where the climate's ice comes from: the one place that names the climate stage's fields, so
 /// that switching to the ice-age cycles' fields (Ben, 2026-09-29) is a change of these names.
 pub mod source {
+    use crate::climate::field;
     /// Equilibrium-line altitude above sea level of every cell (P1-05; carried with the plates
     /// between snapshots), m.
-    pub const ELA: &str = "climate/anomaly/ela_m";
-    /// Ice thickness of the climate's own ice model, when it has one, m (provisional name): the
-    /// deep-time glaciers are then allowed only where it has ice.
-    pub const ICE_THICKNESS: &str = "climate/ice_thickness_m";
-    /// The largest (last-glacial-maximum) ice extent, when the climate models ice-age cycles,
-    /// (provisional name; > 0 inside): the young landscape's glaciers are allowed only there.
-    pub const ICE_MAX_EXTENT: &str = "climate/ice_max_extent";
-    /// The ELA of the glacial state, when the climate publishes one, m above sea level
-    /// (provisional name); else the young landscape lowers the present one by
-    /// `young_ela_drop_m`.
+    pub const ELA: &str = field::ELA_ALL;
+    /// The climate's land ice at the end of the step, m (the deep-time climate, FORMAT.md "The
+    /// climate's ice fields"): where it is thick, ice and not rivers erodes.
+    pub const ICE_THICKNESS: &str = field::ICE_THICKNESS;
+    /// The thickest the climate's ice stood during the step, m: the deep-time glaciers are
+    /// allowed only where it had ice at some time in the step.
+    pub const ICE_MAX_THICKNESS: &str = field::ICE_MAX_THICKNESS;
+    /// Share of the step's time a cell was under the climate's ice: the glaciers erode for that
+    /// share of the step.
+    pub const ICE_TIME_SHARE: &str = field::ICE_TIME_SHARE;
+    /// The last-glacial-maximum extent at the present (0/1): the young landscape's glaciers
+    /// are allowed only there.
+    pub const ICE_MAX_EXTENT: &str = field::ICE_MAX_EXTENT;
+    /// The ELA of the glacial state, if the climate ever publishes one, m above sea level (not
+    /// written today); else the young landscape lowers the present one by `young_ela_drop_m`.
     pub const ELA_GLACIAL: &str = "climate/ela_glacial_m";
 }
 
@@ -241,6 +247,8 @@ pub struct IceClimate<'a> {
     pub t_c: &'a [f32],
     /// Where ice may be at all (> 0), when the climate has its own ice model.
     pub allowed: Option<&'a [f32]>,
+    /// Share of the step the ice stands (0–1; erosion scales with it), when the climate says.
+    pub time_share: Option<&'a [f32]>,
 }
 
 /// The ELA on the elevation datum from a world's ELA field (m above sea level), lowered by
@@ -653,7 +661,10 @@ pub fn step(
                 // The glacier's cross-section, W wide, erodes at `rate` under all of it: a
                 // glacier wider than a cell spreads it over the cells within W/2 of its centre
                 // line that lie under its surface, most at the centre (a parabolic trough).
-                let rate = k * u.powf(p.erosion_exponent);
+                let share = clim
+                    .time_share
+                    .map_or(1.0, |s| f64::from(s[c]).clamp(0.0, 1.0));
+                let rate = k * u.powf(p.erosion_exponent) * share;
                 let w = ice_st.width[c];
                 let vol = rate * dts * w * d.dx;
                 let zs = ice_st.surface[c];

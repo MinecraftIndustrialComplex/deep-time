@@ -79,6 +79,7 @@ fn run(
             precip_m_yr: &cl.p,
             t_c: &cl.t,
             allowed: None,
+            time_share: None,
         };
         step(
             d, &rt.r, &rt.kind, &rt.filled, 0.0, &clim, p, 9.81, dt, z, &mut out,
@@ -209,6 +210,7 @@ fn no_ice_below_the_equilibrium_line_and_none_where_not_allowed() {
         precip_m_yr: &cl.p,
         t_c: &cl.t,
         allowed: Some(&none),
+        time_share: None,
     };
     let mut st = IceState::default();
     ice(
