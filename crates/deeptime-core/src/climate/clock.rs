@@ -32,7 +32,7 @@ use deeptime_format::EventId;
 pub const MIN_STEP_YEARS: f64 = 1000.0;
 
 /// One row of the run's climate curve (one per plate step).
-pub const SERIES_COLUMNS: [&str; 18] = [
+pub const SERIES_COLUMNS: [&str; 19] = [
     "t_myr",
     "co2_ppm",
     "co2_min_ppm",
@@ -51,6 +51,7 @@ pub const SERIES_COLUMNS: [&str; 18] = [
     "snowball",
     "ridge_km2_yr",
     "subduction_km2_yr",
+    "weathering_supply_mol_yr",
 ];
 
 /// One row of the ice-age window's curve (one per fine-clock step inside the window).
@@ -127,6 +128,8 @@ pub struct ClockState {
     pub last_escape: Option<(f64, Option<EventId>)>,
     pub series: Vec<Vec<f32>>,
     pub window: Vec<Vec<f32>>,
+    /// Every finished snowball's onset and escape, Myr (world time).
+    pub spans: Vec<[f64; 2]>,
     /// Degassing and weathering of the last clock step, mol/yr.
     pub degassing: f64,
     pub weathering: f64,
@@ -756,6 +759,66 @@ mod tests {
             hot.t_start - t_esc < 1.0e6 && hot.peak_c > pl.p.hothouse_c,
             "{hot:?}"
         );
+    }
+
+    /// The tropical supercontinent under a weathering ramp (×1 → ×3 over 20 Myr, then `hold`)
+    /// with a supply of fresh rock `supply` × today's degassing spread over its land (0: none).
+    /// Returns every snowball's (onset, escape), Myr.
+    fn scenario(step_kyr: f64, hold: f64, supply: f64, myr: f64) -> Vec<(f64, f64)> {
+        let mut p = params();
+        p.carbon_step_kyr = step_kyr;
+        let pl = Planet::new(p, |l| if l.abs() < 25.0 { 0.8 } else { 0.03 });
+        let d = carbon::DEGASSING_EARTH_MOL_YR;
+        let (mut st, mut ebm) = pl.start(-700.0e6, d);
+        if supply > 0.0 {
+            let total: f64 = st.kernel.band.iter().sum();
+            st.kernel.supply = st
+                .kernel
+                .band
+                .iter()
+                .map(|&k| supply * d * k / total.max(1e-12))
+                .collect();
+        }
+        let ramp = move |k: usize| {
+            let k = k as f64;
+            if k < 10.0 { 1.0 + 2.0 * k / 10.0 } else { hold }
+        };
+        let (hap, _) = pl.run(&mut st, &mut ebm, -700.0e6, myr, d, &ramp);
+        hap.iter()
+            .filter_map(|(t, h)| match h {
+                Happening::SnowballEscape { open, .. } => Some((open.t_start / 1.0e6, *t / 1.0e6)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_200_kyr_clock_still_resolves_onset_and_escape() {
+        // The same snowball on the 100- and the 200-kyr clock: the adaptive halving keeps the
+        // escape's fast drawdown resolved, so onset and escape move by at most a step or two.
+        let fine = scenario(100.0, 1.0, 0.0, 60.0);
+        let coarse = scenario(200.0, 1.0, 0.0, 60.0);
+        assert!(!fine.is_empty() && !coarse.is_empty(), "{fine:?} {coarse:?}");
+        let (f, c) = (fine[0], coarse[0]);
+        assert!((f.0 - c.0).abs() <= 1.0, "onset {f:?} vs {c:?}");
+        assert!((f.1 - c.1).abs() <= 2.0, "escape {f:?} vs {c:?}");
+    }
+
+    #[test]
+    fn a_supply_limit_lengthens_the_gap_between_snowballs() {
+        // Weathering held at ×3: the planet cannot stay warm and refreezes after every escape.
+        // Unlimited, the hothouse's weathering draws the CO₂ down within about a million years;
+        // limited by the rock its erosion exposes (3× today's degassing, the Earth-like
+        // intensity), the drawdown and the gap take far longer.
+        let gap = |v: &[(f64, f64)]| -> f64 {
+            v.windows(2).map(|p| p[1].0 - p[0].1).fold(f64::MAX, f64::min)
+        };
+        let free = scenario(200.0, 3.0, 0.0, 120.0);
+        let limited = scenario(200.0, 3.0, 3.0, 120.0);
+        assert!(free.len() >= 2 && limited.len() >= 2, "{free:?} {limited:?}");
+        let (gf, gl) = (gap(&free), gap(&limited));
+        eprintln!("GAPS free {gf} limited {gl}: {free:?} {limited:?}");
+        assert!(gl > 2.0 * gf && gl > 3.0, "gap {gf} → {gl} Myr");
     }
 
     /// The recent ice-age window over a northern continent (60 % land from 45° to 80° N, ground
