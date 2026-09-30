@@ -460,6 +460,126 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   (P2-10's epithermal), no guyot planing beyond the surface's wave-base diffusion (P2-11).
 - **Next.** Merge into master (the parent). Ben: the volcano event volume (1,468 of 3,498 events) and whether cones should
   be less steep in blocks than real proportions (a `volcanoes.size`-independent flank setting).
+### 2026-09-30 — Glacial erosion landforms: troughs, fjords, till, U-shaped valleys at block scale (agent worktree agent-a9307a6541fa46794, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-29, "Which glacial features should Deep Time add?" → "Glacial erosion
+  landforms": U-valleys, cirques, fjords, moraines/till where ice sat, now or in past glaciations. Until now
+  P1-05's glaciers were only diagnosed.
+- **What.** (1) `surface/glacial.rs` (+ `glacial/tests.rs`): one glacier model per LEM step, `substeps` (4)
+  ice solves each, used by the deep-time surface (L1) and the young landscape (L2). Mass balance b = β(z − ELA),
+  β 0.005/yr (Oerlemans 2011), capped by precipitation and 2 m/yr, ablation ≤ 10 m/yr; ice flux routed down the
+  step's D8 tree (Hergarten 2021; goSPL's GPL docs read for comparison only); each cell's ice surface solved from
+  its receiver's by bisection on the shallow-ice flux q = (2A/5)(ρgS)³H⁵ + u_s·H, A = 2.4·10⁻²⁴ Pa⁻³s⁻¹,
+  Weertman sliding u_s = B τ³ (30 m/yr at 100 kPa) on thawed beds (mean annual T −14…−4 °C, or 800–2,500 m of
+  ice insulating), glacier width H/0.3 up to 7 cells; erosion E = K_g·u_s, K_g 10⁻⁵ (Humphrey & Raymond 1994's
+  law, the coefficient from Hallet et al. 1996's rates), spread parabolically across a glacier wider than its
+  cell, none under floating ice or where the bed rises towards the outlet more than 1.5× the ice-surface slope
+  (Alley et al. 1998/2003); debris melts out with the ice, 30 % as till (≤ 100 m per substep), the rest as
+  meltwater load into lakes it crosses and to the sea at its mouth (glaciomarine: `marine::fill` into the till
+  part). Mass kept exactly (tested). Fjords follow: ice grounded below sea level at a coast keeps cutting until it
+  floats. (2) Surface stage: fluvial K × (1 − the glaciers' cover); till is its own facies part (`Setting.glacial`
+  → class `till`, provenance in situ); the existing `till` class (P1-12; family unconsolidated, lithifies to
+  conglomerate) is used — no new class. New fields `surface/ice_thickness_m` (a keyframe layer, ramp `ice`) and
+  `surface/glacial_erosion_m_myr`; totals in `notes.glacial` (so checkpoints carry them; no schema change) and the
+  CLI's `glacial_final` line. (3) Young stage: the glacial state's ELA (the present one − `young_ela_drop_m`, 500 m,
+  Porter 1989's average glacial snowline; or the climate's own fields when published), sea-level temperature,
+  precipitation on L2; glaciers erode, leave till (≥ 5 m makes `young/class` till, so the bake's `class_top` shows
+  it) and hand `young/ice_surface_m` (over each glacier's whole width) to the amplifier; rivers keep their K
+  there (see findings). (4) Amplifier: `amplify/glacial.rs` on the **last level only**: from the ice depth D and
+  the valley's smoothed centre-line depth D_max, cells lowered by D_max·t(1 − t) (t = D/D_max: a V's walls cut to
+  the parabola of Svensson 1959/Harbor 1992), only where the ice is confined (ridges within reach stand above it:
+  Sugden 1978's selective linear erosion vs areal scouring) and the margin lateral (not a terminus or a tidewater
+  front); half the carved rock goes back onto crests; fluvial incision × (1 − 0.8·ice) on every level; its radius
+  (3·20 + 1 cells) is in the halo; the mountain character's fade (`character::apply`, new `glacier` argument) also
+  skips the troughs the pass cut (the cut is handed over in `cap`/`zs`), so gullies and fold ridges don't fight
+  the U while crests above the ice keep their character. (5) One place names the climate's fields:
+  `glacial::source`, now the deep-time climate's (FORMAT.md "The climate's ice fields", merged from master
+  27e88f7): the ELA (`climate/anomaly/ela_m`); deep-time glaciers only where `climate/ice_max_thickness_m` > 0
+  (ice at some time in the step), eroding × `climate/ice_time_share`, and fluvial K also × (1 − ramp of
+  `climate/ice_thickness_m` 10–100 m) (the climate agent asked for no stream power under thick ice); the young
+  landscape's glaciers only inside `climate/ice_max_extent` (the LGM at the present). (6) Settings
+  (presets + `editor_fields.json` + lang): `surface.glacial.strength` ("Glacial erosion", terrain), 
+  `amplify.glacial.strength` ("Glacial valleys", terrain), `surface.glacial.young_ela_drop_m` ("Ice-age snowline
+  drop", adv_climate), `amplify.glacial.ridge_share` ("Arêtes from troughs", adv_surface); every constant above is
+  a preset key. (7) Tools: `deeptime dump-fields --in ckpt --out dir [--fields a,b]` (raw f32 + index.json),
+  `tools/review/glacial-compare.sh` (young/amplify on/off from a deposits checkpoint → `glacial_views.py`: the most
+  glaciated confined range and fjord coast, maps, zooms and 1:1 block cross-sections), `glacial_planet.py`,
+  `area3d_shots.py` (headless shots of `.dtva` exports on the Mac).
+- **Tests** (`cargo test --workspace --locked` on the Mac after merging master 8872c91: cli 30, core 273 + 3
+  ignored, format 40, inspect 29 + 2 + 7, jni 7, viewer 5, all pass; clippy `-D warnings`, fmt, deny clean):
+  `glacial::tests` — a glacier reaching the sea cuts its valley below the sea floor (a fjord behind a sill),
+  eroded = till + lake + sink + sea to 1e-9 and the grid's change = −(sea loads), a thin polar cap erodes nothing
+  and a thick one thaws its bed, no ice below the ELA or where the climate forbids it, the same bits on 1 and 4
+  threads, the SIA flux law; `a_glaciated_planet_keeps_its_mass_logs_its_till_and_resumes` (plates + climate +
+  surface + structure, snowline pushed down, 40 Myr: totals partition, surface mass residual < 1e-6 of erosion,
+  the strata log holds till, a checkpoint resumed on 3 threads from 1 gives identical elevation, log, notes and ice
+  fields); `amplify::glacial::tests` — a glaciated V valley becomes y ∝ |x|^b with b > 1.6 (from 1.0; the axis and
+  the trimline stay), crests get some rock back, a flat bed under an ice sheet is untouched, a window with the halo
+  gives the whole raster's bits; `amplify::tests::a_glaciated_level_amplifies_the_same_in_tiles_and_on_any_thread_count`.
+- **Runs** (Mac M6, 12 threads, shared: load 20–96; `deeptime run --preset earthlike_quick_16k --start
+  scattered_continents --length-myr 500 --out target/glacial/after4 --checkpoints --viewer …`): 478 s wall (master's
+  baseline 236 s at lower load); surface 195 s of which glacial 19.7 s; young 15.6 s (glacial 2.2 s); amplify 61.7 s
+  (glacial pass 5.9 s); peak footprint 4.6 GB. `glacial_final eroded_km3=2.14e6 till_km3=4.6e5 lake_km3=3.1e5
+  sea_km3=1.37e6 steps_with_ice=250 ice_cells_max=45038 ice_cells_last=29771 cut_below_sea_cells=8654
+  max_rate_m_myr=1351` (2.4 % of the planet's 8.8e7 km³ of erosion; the mass residual stays −8.9e-4 km³);
+  young: 174,894 L2 cells under the glacial state's ice, 5.9e4 km³ eroded, 29,204 cells of till; amplify: 4.4e4 km³
+  carved, 6.2e3 raised, 5.97 M cells shaped, the final flood raises 22,330 cells, at most 121 m (overdeepened
+  basins filled flat: lake floors until water lands in Phase 2) vs 1,869 without glaciers. The glacial deep time
+  diverges from master's planet (the surface feeds the plates), so before/after compare statistics: land 0.271 →
+  0.332, median 601 → 665 m, p90 2,093 → 1,918, **p99 5,092 → 3,826 m**, max 8,246 → 7,757 (the high tail is cut
+  towards the ELA: the glacial buzzsaw), glaciated land 5.9 → 4.8 %.
+- **What the pictures show** (`review/out/glacial-review/`, not published; L3 in blocks at 1:1): planet maps and
+  hypsometry; the fjord coasts (long narrow drowned inlets on both sides of a glaciated island range, cut 10–20
+  blocks below sea level where the glaciers met the sea); an outlet trough off an ice-capped plateau with a flat
+  floor and steep walls (U) where the orange L2-only profile is a rounded V; ice-sheet interiors left smooth;
+  fold/gully texture absent under the ice. Iterations that the pictures forced: one-cell D8 slots and lakes
+  (glaciers now spread over their width), ridge-raise spikes (the ridge share is capped and needs a quarter of the
+  neighbourhood to be crest), carving on the coarse level (24-km radius) that printed grooves on ice caps (last
+  level only), max-filter streaks (smoothed), frontal margins cut like walls (the lateral factor), lowlands lifted
+  200 m under the young stage's ice (next bullet).
+- **Findings; Ben's answers (decisions log 2026-09-30).** (1) The glacial deep time lowers the highest ground (p99
+  −1.3 km on the first seed): **strength stays 1 (physical)**, heights are rechecked in P1-17. (2) At 300 m/block and
+  20 m/block the vertical exaggeration is 15×: a physical 2-km trough is 7 blocks wide and reads as a gorge →
+  **"Glacial valley width" setting, default 3, 1 = physical** (`surface.glacial.valley_width`, editor field
+  `glacial_width`): the young landscape draws each glacier's footprint and the spread of its erosion that many times
+  wider (the flow law, thickness and eroded volume are unchanged), so the amplifier's U spans the wider footprint;
+  the deep-time surface always uses 1. (3) Till lithifies to conglomerate (P1-12's class); a `diamictite`/tillite
+  class would be more correct — a 60th class touches Java, GameTests and the MIC rock-tag README (not asked yet).
+  (4) The young stage keeps fluvial K under the glacial-state ice: taking it away with the `balance` uplift lifted
+  ice-covered lowlands by ~200 m. (5) Eskers and drumlins not done; moraines are the till humps at termini (and the
+  lakes they dam), no crisp crest line; hanging valleys and cirques come only from the physics and the parabola.
+- **With the deep-time climate** (after merging local master 27e88f7; `…--out target/glacial/after5`, 1,130 s wall
+  on a loaded Mac): `glacial_final eroded_km3=1.85e6 till_km3=3.6e5 lake_km3=4.8e5 sea_km3=1.0e6
+  ice_cells_max=66350 cut_below_sea_cells=2330 max_rate_m_myr=1121`, glaciated land 15.1 %, 3 glaciations, land
+  median 768 m, p90 2,180, max 9.6 km (this climate's ice lies mostly on low polar land under cold beds, so the
+  buzzsaw of the earlier runs is weaker); young 232,124 L2 cells under the LGM-masked glacial ice, 9.7e4 km³
+  eroded, 34,591 till cells; amplify 4.3e4 km³ carved, the flood raises 27,777 cells (max 267 m). The views
+  (`review/out/glacial-width/`: young + amplify from after5's deposits checkpoint without ice-age glaciers, at real
+  width and at width 3) show fjord networks where the ice met the sea (drowned U-troughs 20–40 blocks wide at width
+  3, narrower and more ragged at 1) and ice-sheet interiors left smooth.
+- **3D** (`tools/workbench/preview-area.sh --profile standalone --y 20,330 --box -2544,-3208,-2288,-2952 --box
+  2976,-3248,3232,-2992 --world-data target/glacial/after4`, and the same boxes of the same planet run with
+  `--set surface.glacial.young_ela_drop_m=-2000 --set amplify.glacial.strength=0`, i.e. without the ice-age
+  glaciers; shots by `area3d_shots.py` in `review/out/glacial-3d/`): the valley box is a V-shaped, gullied valley
+  without them and a deeper trough with a flat floor (sand, grass and trees, a small lake) and steep smooth snowy
+  walls with them; the coastal box shows a smoother, scoured lowland. Width comparison on after5 (young + `stage
+  amplify --bake` from its deposits checkpoint at width 3, width 1 and without ice-age glaciers; the same two boxes
+  in each, `review/out/glacial-3dw/`, bundle `review/out/glacial-review/`, 16 MB, not published): at x −6608..−6353,
+  z 2944..3199 a snowy plateau without them, a narrow fjord at real width, and at width 3 a wider fjord with a side
+  arm, steep rock walls and a flat, partly flooded floor; the other box (the thickest ice of the window, on an
+  ice-capped plateau) barely changes. Scratch runs deleted from the Mac afterwards.
+- **Gates** (branch merged with local master 51c6c18). c2ec70f (the character's fade limited to the carved
+  troughs) compiled and passed, not reverted. cargo fmt, clippy `-D warnings`, deny, `cargo test --workspace
+  --locked` (cli 30, core 291 + 3 ignored, format 44, inspect 29 + 2 + 7, jni 7, viewer 5) pass; after the width
+  setting: `glacial` 12/12, `preset` 14/14, cli 30/30, clippy clean; `./gradlew build test` tests=151 failures=0;
+  `mac.sh --server -- ./gametest.sh`: every test passes but **`climateconsistent`** (BW 0.504 < 0.650, 409 columns).
+  Not the glaciers: the same run with the test planet baked at `surface.glacial.strength=0` and
+  `amplify.glacial.strength=0` fails it worse (BW 0.472, Dsub 0.822, BW:desert 0.423; 466 BW columns where P1-09
+  calibrated on 17): the merged deep-time climate made the 4k test planet much drier, and its BWk columns map to
+  plains 64 %. The floors (or the BWk mapping) need the climate agent's or P1-09's look.
+- **Deviations.** None from the plan's §8.2 structure; the plan has an "As built: glacial landforms" bullet.
+- **Next.** Merge into master (the coordinator); the `climateconsistent` floors after the deep-time climate;
+  a `diamictite` class if Ben wants it.
+
 ### 2026-09-30 — P1-25: a climate API for mic-climate and Project Atmosphere (agent worktree agent-a02882c5e6567370e, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **The bake (format 0.1 → 0.2).**
   - At its last snapshot the climate stage keeps every cell's twelve months:
