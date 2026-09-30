@@ -68,7 +68,8 @@ pub fn run(
     }
     header.push('\n');
     f.write_all(b"\x93NUMPY\x01\x00").map_err(io)?;
-    f.write_all(&(header.len() as u16).to_le_bytes()).map_err(io)?;
+    f.write_all(&(header.len() as u16).to_le_bytes())
+        .map_err(io)?;
     f.write_all(header.as_bytes()).map_err(io)?;
     for v in &data {
         f.write_all(&v.to_le_bytes()).map_err(io)?;
