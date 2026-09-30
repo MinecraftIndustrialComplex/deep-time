@@ -11,7 +11,7 @@
 //! 20 % inside the boxes of random bodies (so the bodies and their zones are exercised); a world
 //! without bodies gets random columns instead. A world with a river network (P1-22) also gets 10 %
 //! on and beside random river vertices (channel, banks) and 5 % around the mouths of rivers that end
-//! in lakes; a world with lakes 5 % around random wet `water_level` cells (lake water and shores).
+//! in lakes; a world with lakes 5 % around random shore cells of `water_level` (lake water, shores, banks).
 
 use std::path::Path;
 
@@ -103,7 +103,8 @@ pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
     out
 }
 
-/// Block positions of the `water_level` layer's wet cells (every one up to 100,000, else a stride).
+/// Block positions of the `water_level` layer's shore cells (wet beside dry; every one up to
+/// 100,000, else a stride).
 fn wet_cells(w: &ColumnWorld) -> Vec<(i64, i64)> {
     let Some(e) = w.manifest.layer(deeptime_format::column::WATER_LEVEL) else {
         return Vec::new();
@@ -115,7 +116,9 @@ fn wet_cells(w: &ColumnWorld) -> Vec<(i64, i64)> {
     let mut out = Vec::new();
     for j in 0..i64::from(g.h) {
         for i in 0..i64::from(g.w) {
-            if !l.get(i, j).is_nan() {
+            // A shore cell: wet, beside a dry one (so the columns round it reach the banks).
+            let dry = |di: i64, dj: i64| l.get(i + di, j + dj).is_nan();
+            if !l.get(i, j).is_nan() && (dry(1, 0) || dry(-1, 0) || dry(0, 1) || dry(0, -1)) {
                 out.push((g.block_x(i), g.block_z(j)));
             }
         }
