@@ -33,7 +33,8 @@
   },
   "young": {},
   "amplify": {
-    "incision_cap": 3.0
+    "incision_cap": 3.0,
+    "ruggedness": 1.0
   },
   "resolution": {
     "l0_samples": 100000,
