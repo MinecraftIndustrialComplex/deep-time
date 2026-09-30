@@ -125,7 +125,7 @@ public final class Water {
                 return new Core(Kind.LAKE, surface, ground, level, t, ground, rivers);
         }
         int seaTop = spec.seaLevel() - 1;
-        if (surface < seaTop)   // strictly: a flat at the sea's top face is often left dry by the aquifer
+        if (ground < seaTop)
             return new Core(Kind.SEA, surface, ground, level, seaTop, ground, rivers);
         Rivers.Hit h = rivers.hit();
         if (h != null) {
