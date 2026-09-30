@@ -215,10 +215,12 @@ pub struct ClimateParams {
     /// How much ice volume moves sea level (0: the surface section's curve alone; 1: full
     /// glacio-eustasy, ~2.5 m per 10⁶ km³).
     pub glacio_eustasy: f64,
-    /// The grounded ice volume the sea-level curve already assumes, Earth-normalized km³ (the
-    /// model's ice on Earth's present relief, `deeptime climate-dem`: 2.5·10⁷ km³, 62 m of sea
-    /// level; Antarctica and Greenland hold ~3.0·10⁷ km³, 65 m, Fretwell et al. 2013, Morlighem
-    /// et al. 2017).
+    /// The grounded ice volume the sea-level curve already assumes, Earth-normalized km³: the
+    /// present ice of the calibrated Earth-like 500-Myr runs (0.74–1.28·10⁷ km³ on
+    /// `pipeline_quick_16k`, 2026-09-29), so their calibrated present coastlines hold. (The model
+    /// puts 2.5·10⁷ km³, 62 m of sea level, on Earth's own relief, `deeptime climate-dem`;
+    /// Antarctica and Greenland hold ~3.0·10⁷ km³, 65 m, Fretwell et al. 2013, Morlighem et al.
+    /// 2017.)
     pub ice_reference_km3: f64,
 }
 
@@ -302,7 +304,7 @@ impl Default for ClimateParams {
             ice_max_thickness_m: 4000.0,
             ice_response_kyr: 17.0,
             glacio_eustasy: 1.0,
-            ice_reference_km3: 2.5e7,
+            ice_reference_km3: 1.0e7,
         }
     }
 }
@@ -451,19 +453,44 @@ impl ClimateParams {
         for (v, key, lo, hi) in [
             (self.degassing_scale, "degassing_scale", 0.0, 10.0),
             (self.weathering_strength, "weathering_strength", 0.01, 100.0),
-            (self.weathering_temp_per_k, "weathering_temp_per_k", 0.0, 0.3),
+            (
+                self.weathering_temp_per_k,
+                "weathering_temp_per_k",
+                0.0,
+                0.3,
+            ),
             (self.runoff_temp_per_k, "runoff_temp_per_k", 0.0, 0.2),
-            (self.weathering_co2_exponent, "weathering_co2_exponent", 0.0, 1.0),
+            (
+                self.weathering_co2_exponent,
+                "weathering_co2_exponent",
+                0.0,
+                1.0,
+            ),
             (self.present_age_gyr, "present_age_gyr", 0.5, 12.0),
-            (self.hydro_sensitivity_per_k, "hydro_sensitivity_per_k", 0.0, 0.1),
+            (
+                self.hydro_sensitivity_per_k,
+                "hydro_sensitivity_per_k",
+                0.0,
+                0.1,
+            ),
             (self.hydro_ref_c, "hydro_ref_c", -50.0, 50.0),
             (self.carbon_step_kyr, "carbon_step_kyr", 1.0, 2000.0),
             (self.hothouse_c, "hothouse_c", -50.0, 100.0),
             (self.orbital_window_myr, "orbital_window_myr", 0.0, 20.0),
             (self.orbital_strength, "orbital_strength", 0.0, 3.0),
             (self.orbital_step_kyr, "orbital_step_kyr", 0.25, 20.0),
-            (self.ice_yield_stress_kpa, "ice_yield_stress_kpa", 5.0, 500.0),
-            (self.ice_max_thickness_m, "ice_max_thickness_m", 10.0, 10_000.0),
+            (
+                self.ice_yield_stress_kpa,
+                "ice_yield_stress_kpa",
+                5.0,
+                500.0,
+            ),
+            (
+                self.ice_max_thickness_m,
+                "ice_max_thickness_m",
+                10.0,
+                10_000.0,
+            ),
             (self.ice_response_kyr, "ice_response_kyr", 0.1, 200.0),
             (self.glacio_eustasy, "glacio_eustasy", 0.0, 1.0),
             (self.ice_reference_km3, "ice_reference_km3", 0.0, 1.0e9),

@@ -423,7 +423,13 @@ impl ClimateStage {
     /// The plates' activity this step: sea-floor production (young oceanic crust) and the ocean
     /// floor consumed at trenches (production minus the ocean floor's growth since the last step,
     /// smoothed), both Earth-normalized km²/yr.
-    fn activity(&mut self, world: &WorldState, g: &Geometry, n: usize, dt_yr: f64) -> carbon::Activity {
+    fn activity(
+        &mut self,
+        world: &WorldState,
+        g: &Geometry,
+        n: usize,
+        dt_yr: f64,
+    ) -> carbon::Activity {
         let Some(age) = world.fields.get("crust_age").filter(|f| f.data.len() == n) else {
             return carbon::Activity {
                 ridge_km2_yr: carbon::RIDGE_EARTH_KM2_YR,
@@ -472,10 +478,7 @@ impl ClimateStage {
             }
             if let Some(deeptime_format::ParamValue::Float(v)) = e.params.get("volume_km3") {
                 let mol = v / f2 * carbon::LIP_MOL_PER_KM3;
-                self.s
-                    .clock
-                    .lips
-                    .push((e.t_start, carbon::LIP_YEARS, mol));
+                self.s.clock.lips.push((e.t_start, carbon::LIP_YEARS, mol));
             }
         }
         self.s.clock.events_seen = world.events.len() as u64;
@@ -528,7 +531,9 @@ impl ClimateStage {
             w,
             h: hgt,
             area: (0..hgt)
-                .map(|j| cell_area_km2(&grid, j as u32, self.preset.scale.m_per_block_h) / (es * es))
+                .map(|j| {
+                    cell_area_km2(&grid, j as u32, self.preset.scale.m_per_block_h) / (es * es)
+                })
                 .collect(),
             sx: lat
                 .iter()
@@ -650,7 +655,14 @@ impl ClimateStage {
             let s0 = snapshot::compute(&inp, &mut ebm0, &[]);
             let er0 = s0.ebm.clone().expect("a snapshot keeps its EBM year");
             let (mean0, summer0) = clock::land_temps(&er0);
-            self.s.clock.kernel = kernel_of(&geo, &land0, &s0.t_mean, &s0.precip, &er0, p.weathering_temp_per_k);
+            self.s.clock.kernel = kernel_of(
+                &geo,
+                &land0,
+                &s0.t_mean,
+                &s0.precip,
+                &er0,
+                p.weathering_temp_per_k,
+            );
             self.s.clock.snap_summer = summer0;
             self.s.clock.snap_t_global = er0.t_global;
             self.s.clock.sheet = s0.band_sheet.clone();
@@ -729,7 +741,9 @@ impl ClimateStage {
                 since_eq += s.dt_kyr;
                 if since_eq >= 5.0 - 1e-9 {
                     let mask: Vec<bool> = (0..n)
-                        .map(|c| mu0[c].is_finite() && f64::from(mu0[c]) > s.delta[geo.cell_band(c)])
+                        .map(|c| {
+                            mu0[c].is_finite() && f64::from(mu0[c]) > s.delta[geo.cell_band(c)]
+                        })
                         .collect();
                     heq = ice::thickness(w, hgt, &mask, &geo.sx, geo.sy, tau, cap);
                     since_eq = 0.0;
@@ -742,7 +756,9 @@ impl ClimateStage {
                     .enumerate()
                     .for_each(|(c, (((hh, hm), sa), &e))| {
                         let e = if land0[c] { e } else { 0.0 };
-                        let mut x = ice::relax(f64::from(*hh), f64::from(e), s.dt_kyr, p.ice_response_kyr) as f32;
+                        let mut x =
+                            ice::relax(f64::from(*hh), f64::from(e), s.dt_kyr, p.ice_response_kyr)
+                                as f32;
                         if x < ICE_MIN_M && e < ICE_MIN_M {
                             x = 0.0;
                         }
@@ -787,19 +803,20 @@ impl ClimateStage {
 
         // 2. The end of the step's ice and the sea level it takes.
         let started = Instant::now();
+        let mut mask_pre: Vec<bool> = Vec::new();
         let ice_end_pre: Vec<f32> = if window_step {
             hs.clone()
         } else {
-            let mask: Vec<bool> = (0..n)
+            mask_pre = (0..n)
                 .map(|c| mu0[c].is_finite() && f64::from(mu0[c]) > delta_end[geo.cell_band(c)])
                 .collect();
-            ice::thickness(w, hgt, &mask, &geo.sx, geo.sy, tau, cap)
+            ice::thickness(w, hgt, &mask_pre, &geo.sx, geo.sy, tau, cap)
         };
         let curve = self.curve_sea_level(t_end_myr);
         let ocean_km2 = geo.area_where(&|c| h[c] <= curve);
         let v_pre = geo.volume_km3(&ice_end_pre);
-        let sea = curve
-            + p.glacio_eustasy * ice::eustatic_m(v_pre - p.ice_reference_km3, ocean_km2);
+        let sea =
+            curve + p.glacio_eustasy * ice::eustatic_m(v_pre - p.ice_reference_km3, ocean_km2);
         world.globals.insert(SEA_LEVEL_GLOBAL.into(), sea);
         let land = land_at(sea);
         self.time("ice", started);
@@ -858,7 +875,9 @@ impl ClimateStage {
         } else {
             // Carry the geographic part with the plates; the zonal part follows the clock's EBM.
             let started = Instant::now();
-            let src = src.as_ref().expect("checked: no snapshot without a previous step");
+            let src = src
+                .as_ref()
+                .expect("checked: no snapshot without a previous step");
             let carry_now = |world: &WorldState, name: &str| -> Vec<f32> {
                 let v = &world.fields[name].data;
                 src.par_iter()
@@ -957,7 +976,13 @@ impl ClimateStage {
                 share_acc
                     .iter()
                     .enumerate()
-                    .map(|(c, &s)| if land[c] { (s / span.max(1e-9)).min(1.0) } else { 0.0 })
+                    .map(|(c, &s)| {
+                        if land[c] {
+                            (s / span.max(1e-9)).min(1.0)
+                        } else {
+                            0.0
+                        }
+                    })
                     .collect(),
             )
         } else {
@@ -969,11 +994,30 @@ impl ClimateStage {
                 .collect();
             let end_mask: Vec<bool> = (0..n).map(|c| mu[c] > d_end[geo.cell_band(c)]).collect();
             let max_mask: Vec<bool> = (0..n)
-                .map(|c| mu[c] > per_band[geo.cell_band(c)].min().min(d_end[geo.cell_band(c)]))
+                .map(|c| {
+                    mu[c]
+                        > per_band[geo.cell_band(c)]
+                            .min()
+                            .min(d_end[geo.cell_band(c)])
+                })
                 .collect();
+            // Without a snapshot the line and the ground moved little since the sea level's
+            // estimate: its ice is the end's when the masks agree.
+            let end = if end_mask == mask_pre {
+                ice_end_pre.clone()
+            } else {
+                ice::thickness(w, hgt, &end_mask, &geo.sx, geo.sy, tau, cap)
+            };
+            // The step's largest ice is most often its end's (a steady climate): no second
+            // distance transform then.
+            let max = if max_mask == end_mask {
+                end.clone()
+            } else {
+                ice::thickness(w, hgt, &max_mask, &geo.sx, geo.sy, tau, cap)
+            };
             (
-                ice::thickness(w, hgt, &end_mask, &geo.sx, geo.sy, tau, cap),
-                ice::thickness(w, hgt, &max_mask, &geo.sx, geo.sy, tau, cap),
+                end,
+                max,
                 (0..n)
                     .map(|c| {
                         if land[c] {
@@ -1053,7 +1097,8 @@ impl ClimateStage {
         if let Some(er) = &er_end {
             let t_mean = &world.fields[field::T_MEAN].data;
             let precip = &world.fields[field::PRECIP].data;
-            self.s.clock.kernel = kernel_of(&geo, &land, t_mean, precip, er, p.weathering_temp_per_k);
+            self.s.clock.kernel =
+                kernel_of(&geo, &land, t_mean, precip, er, p.weathering_temp_per_k);
         }
         self.time("ice", started);
 
@@ -1183,16 +1228,19 @@ impl ClimateStage {
                     t_end,
                     ongoing,
                 } => {
-                    let mut e = world
-                        .event(open.t_start, HOTHOUSE, glaciers::SOURCE)
-                        .until(t_end.max(open.t_start))
-                        .at(Place::Global)
-                        .magnitude(((open.peak_c - self.p.hothouse_c) / 25.0).clamp(0.0, 1.0) as f32)
-                        .param("peak_t_global_c", open.peak_c)
-                        .param("peak_t_years", open.peak_t)
-                        .param("co2_peak_ppm", open.co2_peak_ppm)
-                        .param("after_snowball", i64::from(open.after_snowball.is_some()))
-                        .param("ongoing", i64::from(ongoing));
+                    let mut e =
+                        world
+                            .event(open.t_start, HOTHOUSE, glaciers::SOURCE)
+                            .until(t_end.max(open.t_start))
+                            .at(Place::Global)
+                            .magnitude(
+                                ((open.peak_c - self.p.hothouse_c) / 25.0).clamp(0.0, 1.0) as f32
+                            )
+                            .param("peak_t_global_c", open.peak_c)
+                            .param("peak_t_years", open.peak_t)
+                            .param("co2_peak_ppm", open.co2_peak_ppm)
+                            .param("after_snowball", i64::from(open.after_snowball.is_some()))
+                            .param("ongoing", i64::from(ongoing));
                     if let Some(id) = open.after_snowball {
                         e = e.caused_by(id);
                     }
@@ -1208,7 +1256,10 @@ impl ClimateStage {
         let mut last: serde_json::Value = serde_json::from_str(&self.s.last).unwrap_or(json!({}));
         if let Some(o) = last.as_object_mut() {
             o.insert("co2_ppm".into(), json!(self.ppm()));
-            o.insert("sun_rel".into(), json!(self.s.clock.series.last().map_or(1.0, |r| r[14])));
+            o.insert(
+                "sun_rel".into(),
+                json!(self.s.clock.series.last().map_or(1.0, |r| r[14])),
+            );
             o.insert("ice_volume_km3".into(), json!(self.s.ice_volume_km3));
             o.insert("sea_level_m".into(), json!(self.s.sea_level_m));
             o.insert("glaciated_land_frac".into(), json!(self.s.land_ice_frac));

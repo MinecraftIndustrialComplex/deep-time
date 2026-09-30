@@ -174,7 +174,11 @@ mod tests {
             wsum += w;
         }
         let want = s0 / 4.0 / (1.0 - 0.05f64 * 0.05).sqrt();
-        assert!((sum / wsum / want - 1.0).abs() < 2e-3, "{} vs {want}", sum / wsum);
+        assert!(
+            (sum / wsum / want - 1.0).abs() < 2e-3,
+            "{} vs {want}",
+            sum / wsum
+        );
         assert!(o.distance_factor(o.long_peri_rad) > o.distance_factor(o.long_peri_rad + PI));
         // Near perihelion the Earth moves faster: λ advances more per day in January than July.
         let jan = o.lambda_at(0.01) - o.lambda_at(0.0);

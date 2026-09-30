@@ -197,12 +197,15 @@ pub fn run(o: &Options) -> CliResult<()> {
                 let t = f64::from(s.t_mean[c]);
                 let pr = f64::from(s.precip[c]);
                 let pet = (60.0 * t).max(0.0);
-                let runoff = (pr - deeptime_core::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
+                let runoff =
+                    (pr - deeptime_core::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
                 kernel += carbon::cell_kernel(area[j], runoff, t, p.weathering_temp_per_k);
                 land_a += area[j];
             }
         }
-        let mask: Vec<bool> = (0..w * h).map(|c| z[c] > 0.0 && s.glacier[c] != 0).collect();
+        let mask: Vec<bool> = (0..w * h)
+            .map(|c| z[c] > 0.0 && s.glacier[c] != 0)
+            .collect();
         let sx: Vec<f64> = lat
             .iter()
             .map(|l| cell_m * l.to_radians().cos().max(0.0) / es)
@@ -219,7 +222,10 @@ pub fn run(o: &Options) -> CliResult<()> {
         let vol: f64 = (0..w * h)
             .map(|c| f64::from(thick[c]) * area[c / w] / 1000.0)
             .sum();
-        let ocean: f64 = (0..w * h).filter(|&c| z[c] <= 0.0).map(|c| area[c / w]).sum();
+        let ocean: f64 = (0..w * h)
+            .filter(|&c| z[c] <= 0.0)
+            .map(|c| area[c / w])
+            .sum();
         println!(
             "deeptime climate-dem: weathering kernel {kernel:.4e} km²·m/yr over {land_a:.4e} km² of \
              land (KERNEL_EARTH {:.4e}); grounded ice {vol:.4e} km³ (reference {:.4e}), {:.1} m of \

@@ -501,7 +501,13 @@ fn track(
 
 /// Weathering of kernel `k` for the EBM result `er` at `ppm` with no ice change (the balance
 /// search's objective).
-pub fn weathering_at(p: &ClimateParams, k: &Kernel, er: &EbmResult, sheet: &[f64], ppm: f64) -> f64 {
+pub fn weathering_at(
+    p: &ClimateParams,
+    k: &Kernel,
+    er: &EbmResult,
+    sheet: &[f64],
+    ppm: f64,
+) -> f64 {
     let (mean, _) = land_temps(er);
     Weathering::from(p).flux(k, &mean, sheet, ppm)
 }
@@ -510,6 +516,7 @@ pub fn weathering_at(p: &ClimateParams, k: &Kernel, er: &EbmResult, sheet: &[f64
 /// each trial an EBM run from its warm initial state. Returns (ppm, the EBM state of the answer).
 /// Where no warm balance exists (the planet freezes before weathering falls to `d`) the answer is
 /// the coldest warm state, at the edge of the snowball.
+#[allow(clippy::too_many_arguments)]
 pub fn balance(
     p: &ClimateParams,
     tilt: f64,
@@ -548,6 +555,9 @@ pub fn balance(
 mod tests {
     use super::*;
     use crate::climate::ebm::EbmState;
+
+    /// (t, ppm, global mean °C, sea-ice cover) of one plate step.
+    type Row = (f64, f64, f64, f64);
 
     /// A zonal planet for the clock: land fraction per band, a weathering kernel from the EBM's
     /// present climate (runoff 0.3 m/yr on all land), and an ice callback that puts ice on the
@@ -612,7 +622,7 @@ mod tests {
             myr: f64,
             d: f64,
             strength: &dyn Fn(usize) -> f64,
-        ) -> (Vec<(f64, Happening)>, Vec<(f64, f64, f64, f64)>) {
+        ) -> (Vec<(f64, Happening)>, Vec<Row>) {
             let gamma = self.p.lapse_c_per_km / 1000.0;
             let mut all = Vec::new();
             let mut rows = Vec::new();
@@ -650,7 +660,8 @@ mod tests {
                 let out = run(&inp, st, ebm, &mut ice);
                 let er = out.last.expect("the clock ran");
                 rows.push((t + 2.0e6, st.carbon.ppm(), er.t_global, st.sea_ice));
-                st.series.push(vec![((t + 2.0e6) / 1.0e6) as f32, st.carbon.ppm() as f32]);
+                st.series
+                    .push(vec![((t + 2.0e6) / 1.0e6) as f32, st.carbon.ppm() as f32]);
                 all.extend(out.happenings);
                 t += 2.0e6;
             }
@@ -711,19 +722,30 @@ mod tests {
             .unwrap_or_else(|| panic!("no escape: {rows:?}"));
         assert!(onset < hap.len());
         let (t_esc, open, co2_esc) = esc;
-        assert!(open.co2_before_ppm > 1.4 * open.co2_low_ppm, "a drawdown: {open:?}");
-        assert!(co2_esc > 20.0 * open.co2_onset_ppm, "CO₂ built up: {open:?} → {co2_esc}");
+        assert!(
+            open.co2_before_ppm > 1.4 * open.co2_low_ppm,
+            "a drawdown: {open:?}"
+        );
+        assert!(
+            co2_esc > 20.0 * open.co2_onset_ppm,
+            "CO₂ built up: {open:?} → {co2_esc}"
+        );
         assert!(open.tropical_land > 0.7, "{open:?}");
         let dur = (t_esc - open.t_start) / 1.0e6;
         assert!((0.3..30.0).contains(&dur), "{dur} Myr");
         assert!(open.t_min_c < -20.0, "{open:?}");
         // Right after the escape: a hothouse, caused by the snowball.
         let hot = hap.iter().find_map(|(_, h)| match h {
-            Happening::HothouseEnd { open, .. } if open.t_start >= t_esc - 1.0 => Some(open.clone()),
+            Happening::HothouseEnd { open, .. } if open.t_start >= t_esc - 1.0 => {
+                Some(open.clone())
+            }
             _ => None,
         });
         let hot = hot.unwrap_or_else(|| panic!("no hothouse after {t_esc}: {hap:?}"));
-        assert!(hot.t_start - t_esc < 1.0e6 && hot.peak_c > pl.p.hothouse_c, "{hot:?}");
+        assert!(
+            hot.t_start - t_esc < 1.0e6 && hot.peak_c > pl.p.hothouse_c,
+            "{hot:?}"
+        );
     }
 
     /// The recent ice-age window over a northern continent (60 % land from 45° to 80° N, ground
@@ -736,7 +758,10 @@ mod tests {
             orbital_strength: strength,
             ..ClimateParams::default()
         };
-        let pl = Planet::new(p.clone(), |l| if (45.0..80.0).contains(&l) { 0.6 } else { 0.0 });
+        let pl = Planet::new(
+            p.clone(),
+            |l| if (45.0..80.0).contains(&l) { 0.6 } else { 0.0 },
+        );
         let t0 = -p.orbital_window_myr * 1.0e6;
         let ep = ebm_params(&p, 23.4, 1.0, ppm, t0);
         let mut ebm = ep.initial_state();
@@ -765,7 +790,8 @@ mod tests {
                     }
                     let ela = (summer[b] + gamma * s.delta[b] - 1.0) / gamma;
                     let eq = (1.0 - ela / 1000.0).clamp(0.0, 1.0);
-                    share[b] = crate::climate::ice::relax(share[b], eq, s.dt_kyr, p.ice_response_kyr);
+                    share[b] =
+                        crate::climate::ice::relax(share[b], eq, s.dt_kyr, p.ice_response_kyr);
                     let w = land[b] * lat[b].to_radians().cos();
                     on += w * share[b];
                     all += w;
@@ -824,7 +850,10 @@ mod tests {
         let cold = ice_age_window(60.0, 1.0);
         let (lo, hi, peaks) = stats(&cold);
         assert_eq!(cold.len(), 1500, "2-kyr steps over 3 Myr");
-        assert!(hi - lo > 0.015 && peaks >= 20, "cold: {lo:.3}..{hi:.3}, {peaks} cycles");
+        assert!(
+            hi - lo > 0.015 && peaks >= 20,
+            "cold: {lo:.3}..{hi:.3}, {peaks} cycles"
+        );
         // No orbital swing: no cycles.
         let (lo0, hi0, _) = stats(&ice_age_window(60.0, 0.0));
         assert!(hi0 - lo0 < 0.2 * (hi - lo), "still: {lo0:.3}..{hi0:.3}");

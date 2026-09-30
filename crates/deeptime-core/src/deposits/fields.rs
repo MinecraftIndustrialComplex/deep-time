@@ -264,20 +264,6 @@ pub const FIELDS: &[FieldSpec] = &[
         provider: "P1-05 climate",
         meaning: "mean annual temperature",
     },
-    FieldSpec {
-        name: "deeptime:ice_thickness_m",
-        units: "m",
-        range: (0.0, 4000.0),
-        provider: "deep-time climate",
-        meaning: "time-mean land-ice thickness (glacial erosion; FORMAT.md \"The climate's ice fields\")",
-    },
-    FieldSpec {
-        name: "deeptime:ice_cover",
-        units: "0–1",
-        range: (0.0, 1.0),
-        provider: "deep-time climate",
-        meaning: "share of the frame's time the cell was under land ice",
-    },
 ];
 
 /// Global clocks: one value per frame for the whole planet (plan §5.1 `AtmosphereClock`).
