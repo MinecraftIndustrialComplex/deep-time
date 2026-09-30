@@ -235,9 +235,13 @@ pub struct Counts {
     pub built_km3: f64,
     /// Steps whose arc flags the plate model had cleared (resampling steps).
     pub blind_steps: u64,
-    /// The most L1 cells with the arc flag, and with at least `arc_min_flux`, in one step.
+    /// Stratovolcanoes that died when plate motion brought a taller one within half the spacing.
+    pub merged: u64,
+    /// The most L1 cells with the arc flag, with at least `arc_min_flux`, and on the volcanic
+    /// front, in one step.
     pub arc_flag_cells_max: u64,
     pub arc_cells_max: u64,
+    pub front_cells_max: u64,
 }
 
 /// The catalogue, kept in `WorldState::volcanoes` (checkpoints carry it; the amplifier reads it).
@@ -543,7 +547,9 @@ impl VolcanoStage {
         let hotspots: Vec<(u32, [f64; 3], f64, Option<EventId>)> = plates
             .hotspots
             .iter()
-            .filter(|h| !h.closed && h.born_myr <= t && t < h.dies_myr)
+            // By its dates, not `closed`: at the last step the plate model has already closed the
+            // tracks of the hotspots still alive (`ongoing`).
+            .filter(|h| h.born_myr <= t && t < h.dies_myr)
             .map(|h| (h.id, h.pos, h.uplift_mm_yr, h.lip_event))
             .collect();
         // Subduction contacts with an onset event: (overriding plate, centroid, event).
@@ -660,10 +666,11 @@ impl VolcanoStage {
         // Log changes: (cell, thickness (negative = erode), class) in order.
         let mut log_ops: Vec<(usize, f32, u16)> = Vec::new();
 
-        // 2. Measure.
+        // 2. Measure: the relief left of what each volcano built (the measure alone would also
+        // count a ridge or a trench beside it; erosion and blur only lower it).
         let started = Instant::now();
         for v in &mut st.volcanoes {
-            v.height_m = l1.measure(v).0;
+            v.height_m = v.height_m.min(l1.measure(v).0);
         }
         self.time("measure", started);
 
@@ -760,6 +767,29 @@ impl VolcanoStage {
                 v.extinct_myr = Some(t);
             }
         }
+        // Vents that plate motion brought within half the arc spacing of each other merge: the
+        // lower (or, as high, the younger) dies, the other takes the magma.
+        if p.density > 0.0 {
+            let half = 0.5 * p.arc_spacing_km * 1000.0 / p.density;
+            let live: Vec<usize> = (0..st.volcanoes.len())
+                .filter(|&k| st.volcanoes[k].kind == Kind::Strato && st.volcanoes[k].active())
+                .collect();
+            for a in 0..live.len() {
+                for b in a + 1..live.len() {
+                    let (va, vb) = (&st.volcanoes[live[a]], &st.volcanoes[live[b]]);
+                    if !va.active() || !vb.active() || dist_m(va.x, va.z, vb.x, vb.z) >= half {
+                        continue;
+                    }
+                    let loser = if (va.height_m, -va.born_myr) >= (vb.height_m, -vb.born_myr) {
+                        live[b]
+                    } else {
+                        live[a]
+                    };
+                    st.volcanoes[loser].extinct_myr = Some(t);
+                    st.counts.merged += 1;
+                }
+            }
+        }
         // Hotspot births.
         if spacing_h.is_finite() {
             for &(hid, _, uplift, lip) in &hotspots {
@@ -841,17 +871,27 @@ impl VolcanoStage {
                 })
                 .map(|v| (v.x, v.z))
                 .collect();
+            let front = volcanic_front(&grid, &flux, &elev, sea, p.arc_min_flux);
+            // A front cell takes the strongest flux within a cell of it (a patch's skeleton may
+            // run along a gap between the lattice's stripes).
+            let front_flux: Vec<f64> = (0..n)
+                .map(|c| if front[c] { near_flux(c) } else { 0.0 })
+                .collect();
+            st.counts.front_cells_max = st
+                .counts
+                .front_cells_max
+                .max(front.iter().filter(|&&f| f).count() as u64);
             let born = place_arcs(
                 &grid,
                 mh,
-                &flux,
+                &front_flux,
                 p.arc_min_flux,
                 spacing,
                 &mut occupied,
                 &mut rng,
             );
             for (bx, bz, c) in born {
-                let f = flux[c];
+                let f = front_flux[c];
                 let s01 = ((f - p.arc_min_flux) / (1.0 - p.arc_min_flux).max(1e-9)).clamp(0.0, 1.0);
                 let hk = p.arc_height_km[0] + (p.arc_height_km[1] - p.arc_height_km[0]) * s01;
                 let radius =
@@ -914,8 +954,7 @@ impl VolcanoStage {
             }
             // New volcanoes are measured now; the others were measured before the births.
             let (h, base) = l1.measure(v);
-            v.height_m = h;
-            v.peak_m = v.peak_m.max(h);
+            v.height_m = v.height_m.min(h);
             let target = match v.kind {
                 Kind::Strato => {
                     let f = v.flux_last;
@@ -1277,13 +1316,14 @@ impl VolcanoStage {
         // Flood-basalt outcrops: the pile's layers (basalt and tuff laid down at its time) left in
         // the log, where the first of them lies within 150 m of the surface.
         let mut fb = vec![0.0f32; n];
-        let mut preserved: Vec<f64> = Vec::new();
+        let mut preserved: Vec<(f64, f64)> = Vec::new();
+        let (greenstone, amphibolite) = (index("greenstone"), index("amphibolite"));
         {
             let surf = world.surface.as_ref().expect("checked by the caller");
             let half = (0.5 * dt) as f32 + 1e-3;
             for b in &st.basalts {
                 let age = (b.t_myr - 0.5 * dt) as f32;
-                let (mut on, mut all) = (0usize, 0usize);
+                let (mut on, mut pile, mut all) = (0usize, 0usize, 0usize);
                 for_cells(grid, mh, b.x, b.z, b.radius_m, |c, _, _| {
                     all += 1;
                     let col = surf.log.column(c);
@@ -1291,7 +1331,11 @@ impl VolcanoStage {
                     let mut first = f64::NAN;
                     let mut left = 0.0;
                     for l in col.iter().rev() {
-                        let ours = (l.class == rocks.basalt || l.class == rocks.tuff)
+                        // Its basalt and tuff, or the basalt metamorphosed (greenstone, amphibolite).
+                        let ours = (l.class == rocks.basalt
+                            || l.class == rocks.tuff
+                            || l.class == greenstone
+                            || l.class == amphibolite)
                             && (l.age_myr - age).abs() <= half;
                         if ours {
                             if first.is_nan() {
@@ -1301,13 +1345,19 @@ impl VolcanoStage {
                         }
                         depth += f64::from(l.thickness_m);
                     }
+                    if first.is_finite() {
+                        pile += 1;
+                    }
                     if first.is_finite() && first <= 150.0 && left >= 30.0 {
                         let wv = (left / 300.0).min(1.0) as f32;
                         fb[c] = fb[c].max(wv);
                         on += 1;
                     }
                 });
-                preserved.push(on as f64 / all.max(1) as f64);
+                preserved.push((
+                    on as f64 / all.max(1) as f64,
+                    pile as f64 / all.max(1) as f64,
+                ));
             }
         }
         world.fields.insert(
@@ -1360,8 +1410,13 @@ impl VolcanoStage {
                 (None, Kind::Shield) => "island",
                 (None, _) => "extinct",
             };
+            // Stratovolcanoes: the live ones and the dead still near their peak (the others, many
+            // thousands over a run, are counted in the notes); every hotspot volcano.
             let emit_volcano = match v.kind {
-                Kind::Strato => standing,
+                Kind::Strato => {
+                    v.gone.is_none()
+                        && (v.active() || v.height_m >= (0.5 * v.peak_m).max(800.0 * self.p.size))
+                }
                 Kind::Shield | Kind::Silicic => true,
             };
             let cause = match v.hotspot {
@@ -1448,7 +1503,7 @@ impl VolcanoStage {
                 emitted += 1;
             }
         }
-        for (b, &kept) in st.basalts.iter().zip(&preserved) {
+        for (b, &(kept, pile)) in st.basalts.iter().zip(&preserved) {
             let area = std::f64::consts::PI * (b.radius_m / 1000.0).powi(2);
             let e = world
                 .event(b.t_myr * myr, kind::FLOOD_BASALT, SOURCE)
@@ -1458,6 +1513,7 @@ impl VolcanoStage {
                 .param("thickness_m", b.thickness_m.round())
                 .param("flows", i64::from(b.flows))
                 .param("preserved_frac", (kept * 1000.0).round() / 1000.0)
+                .param("pile_frac", (pile * 1000.0).round() / 1000.0)
                 .param("plate", i64::from(b.plate))
                 .caused_by(b.event);
             world.emit(e)?;
@@ -1572,6 +1628,96 @@ pub fn place_arcs(
         out.push((bx, bz, c));
     }
     out
+}
+
+/// Arc crust deeper than this below the sea makes no volcano (a trench, not an arc), m.
+pub const FRONT_MAX_DEPTH_M: f64 = 4000.0;
+
+/// The volcanic front of the arcs: the medial line of the cells with at least `min_flux` (and
+/// not deeper than [`FRONT_MAX_DEPTH_M`]). The plate model flags as arc a band a few L0 samples
+/// wide along every active margin and broad patches where intra-oceanic arcs overlap, striped by
+/// its lattice; real arcs line their volcanoes along one front. The mask is closed (a 3 × 3
+/// dilation, then erosion) so the stripes of a patch merge, its distance to the mask's edge is
+/// taken (chamfer 3-4, x wrapping), and the front is every masked cell at a local maximum of that
+/// distance with a masked cell within one cell of it: the band's centre line, a patch's skeleton.
+pub fn volcanic_front(
+    grid: &GridDesc,
+    flux: &[f64],
+    elev: &[f32],
+    sea: f64,
+    min_flux: f64,
+) -> Vec<bool> {
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    let n = w * h;
+    let mask: Vec<bool> = (0..n)
+        .map(|c| flux[c] >= min_flux && f64::from(elev[c]) >= sea - FRONT_MAX_DEPTH_M)
+        .collect();
+    let at = |i: i64, j: i64| -> Option<usize> {
+        (j >= 0 && j < h as i64).then(|| j as usize * w + i.rem_euclid(w as i64) as usize)
+    };
+    let morph = |src: &[bool], any: bool| -> Vec<bool> {
+        (0..n)
+            .map(|c| {
+                let (i, j) = ((c % w) as i64, (c / w) as i64);
+                let mut hit = !any;
+                for dj in -1..=1 {
+                    for di in -1..=1 {
+                        if let Some(m) = at(i + di, j + dj) {
+                            if any && src[m] {
+                                hit = true;
+                            } else if !any && !src[m] {
+                                hit = false;
+                            }
+                        }
+                    }
+                }
+                hit
+            })
+            .collect()
+    };
+    let closed = morph(&morph(&mask, true), false);
+    // Distance to the nearest cell outside the closed mask.
+    let inf = f32::INFINITY;
+    let mut dist: Vec<f32> = closed.iter().map(|&m| if m { inf } else { 0.0 }).collect();
+    let (a, b) = (1.0f32, std::f32::consts::SQRT_2);
+    for _ in 0..2 {
+        for j in 0..h as i64 {
+            for i in 0..w as i64 {
+                let c = j as usize * w + i as usize;
+                for (di, dj, s) in [(-1, 0, a), (-1, -1, b), (0, -1, a), (1, -1, b)] {
+                    if let Some(m) = at(i + di, j + dj) {
+                        dist[c] = dist[c].min(dist[m] + s);
+                    }
+                }
+            }
+        }
+        for j in (0..h as i64).rev() {
+            for i in (0..w as i64).rev() {
+                let c = j as usize * w + i as usize;
+                for (di, dj, s) in [(1, 0, a), (1, 1, b), (0, 1, a), (-1, 1, b)] {
+                    if let Some(m) = at(i + di, j + dj) {
+                        dist[c] = dist[c].min(dist[m] + s);
+                    }
+                }
+            }
+        }
+    }
+    (0..n)
+        .map(|c| {
+            if !closed[c] {
+                return false;
+            }
+            let (i, j) = ((c % w) as i64, (c / w) as i64);
+            let d = dist[c];
+            let near_mask = (-1..=1)
+                .any(|dj| (-1..=1).any(|di| at(i + di, j + dj).is_some_and(|m| mask[m])));
+            near_mask
+                && d.is_finite()
+                && (-1..=1).all(|dj| {
+                    (-1..=1).all(|di| at(i + di, j + dj).is_none_or(|m| dist[m] <= d + 1e-3))
+                })
+        })
+        .collect()
 }
 
 /// Fisher–Yates with the stage's stream.

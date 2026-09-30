@@ -70,7 +70,8 @@ impl Shaper {
                 let age = v.extinct_myr.map_or(0.0, |e| (st.t_myr - e).max(0.0));
                 let sharp = (-age / (3.0 * fade)).exp();
                 let dep = (-age / fade).exp();
-                let a = v.height_m;
+                // The relief the surface kept of what it built (never more than it was built to).
+                let a = v.height_m.min(1.25 * v.target_m);
                 let s = v.shape();
                 let body = |r: f64| s.body(r);
                 let r = v.radius_m;
@@ -203,24 +204,29 @@ impl Shaper {
         if self.items.is_empty() && self.terraces.is_none() {
             return;
         }
-        let h = z.len() / w.max(1);
         let r = f64::from(grid.r);
         let bx = |i: usize| grid.origin_block_x as f64 + ((x0 + i * stride) as f64) * r;
         let bz = |j: usize| grid.origin_block_z as f64 + ((y0 + j * stride) as f64) * r;
-        let near = self.near(
-            bx(0),
-            bx(w.saturating_sub(1)),
-            bz(0),
-            bz(h.saturating_sub(1)),
-        );
-        if near.is_empty() && self.terraces.is_none() {
-            return;
-        }
+        // Bands of rows in parallel; within a band, blocks of columns each with the volcanoes
+        // that reach them.
+        const B: usize = 64;
         use rayon::prelude::*;
-        z.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
-            let zb = bz(j);
-            for (i, v) in row.iter_mut().enumerate() {
-                *v = self.fine_at(&near, bx(i), zb, *v);
+        z.par_chunks_mut(w * B).enumerate().for_each(|(band, rows)| {
+            let j0 = band * B;
+            let nrows = rows.len() / w;
+            for i0 in (0..w).step_by(B) {
+                let i1 = (i0 + B).min(w);
+                let near = self.near(bx(i0), bx(i1 - 1), bz(j0), bz(j0 + nrows - 1));
+                if near.is_empty() && self.terraces.is_none() {
+                    continue;
+                }
+                for dj in 0..nrows {
+                    let zb = bz(j0 + dj);
+                    for i in i0..i1 {
+                        let v = &mut rows[dj * w + i];
+                        *v = self.fine_at(&near, bx(i), zb, *v);
+                    }
+                }
             }
         });
     }
