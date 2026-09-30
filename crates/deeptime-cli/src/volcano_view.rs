@@ -20,7 +20,7 @@ use deeptime_core::checkpoint::Checkpoint;
 use deeptime_core::deposits::fields::FieldHistory;
 use deeptime_core::surface::amplify::resample;
 use deeptime_core::surface::volcanoes::{Kind, Volcano, VolcanoState};
-use deeptime_format::{LoadedLayer, Manifest, Ramps, RasterRead, TilePackReader};
+use deeptime_format::{LoadedLayer, Ramps, RasterRead, TilePackReader};
 use serde_json::{Value, json};
 
 use crate::run::CliResult;
@@ -73,13 +73,18 @@ fn shade(y: &[f32], w: usize, h: usize, k: usize, ctx: &Ctx<'_>, dx: f64) -> Vec
             let tint = ramp.colour(yc);
             let (mut r, mut g, mut b) =
                 (f64::from(tint[0]), f64::from(tint[1]), f64::from(tint[2]));
-            if yc > ctx.sea_y {
+            {
+                // Shaded under the sea too (more softly), so seamounts show.
                 let gx = (at(i + 1, j) - at(i.saturating_sub(1), j)) * ctx.mv / (2.0 * dx);
                 let gs = (at(i, j + 1) - at(i, j.saturating_sub(1))) * ctx.mv / (2.0 * dx);
                 let n = (-VE * gx, VE * gs, 1.0f64);
                 let len = (n.0 * n.0 + n.1 * n.1 + n.2 * n.2).sqrt();
                 let s = ((n.0 * light.0 + n.1 * light.1 + n.2 * light.2) / len).max(0.0) / light.2;
-                let f = (0.3 + 0.7 * s).clamp(0.2, 1.3);
+                let f = if yc > ctx.sea_y {
+                    (0.3 + 0.7 * s).clamp(0.2, 1.3)
+                } else {
+                    (0.55 + 0.6 * s).clamp(0.4, 1.6)
+                };
                 r = (r * f).min(255.0);
                 g = (g * f).min(255.0);
                 b = (b * f).min(255.0);
@@ -253,10 +258,15 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
         .volcanoes
         .as_ref()
         .ok_or("the checkpoint's world has no volcano catalogue (a run without the stage?)")?;
-    let m = Manifest::read(world_data)?;
+    // The scale from the run's preset (so a `stage amplify --work` folder, which has no manifest,
+    // serves as well as a baked world).
+    let preset = deeptime_core::preset::Preset::from_json(&ck.preset_json)?;
+    let deeptime_core::preset::PresetBody::Planet(pp) = &preset.body else {
+        return Err("not a planet preset".into());
+    };
+    let s = &pp.scale;
     let layer = TilePackReader::open(&world_data.join("rasters/elevation.dtr"))?.load()?;
     let g = layer.desc.grid.clone();
-    let s = &m.scale;
     let ctx = Ctx {
         l3: &layer,
         gw: i64::from(g.w),
@@ -395,24 +405,43 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
     let scale = i64::from(z2f.grid.r / g.r);
     let live: Vec<&Volcano> = st.volcanoes.iter().filter(|v| standing(v)).collect();
     let mut picks: Vec<(&'static str, String, Vec<&Volcano>, usize)> = Vec::new();
+    // The summit's block height on L3 (the highest cell within two of its centre).
+    let summit_y = |v: &Volcano| {
+        let (ci, cj) = ctx.cell(v.x, v.z);
+        let mut top = f32::NEG_INFINITY;
+        for dj in -2..=2 {
+            for di in -2..=2 {
+                top = top.max(ctx.y(ci + di, cj + dj));
+            }
+        }
+        f64::from(top)
+    };
     let tallest = |f: &dyn Fn(&Volcano) -> bool| {
         live.iter()
             .copied()
             .filter(|v| f(v))
             .max_by(|a, b| a.height_m.total_cmp(&b.height_m))
     };
-    if let Some(v) = tallest(&|v| v.kind == Kind::Strato && v.active() && !v.oceanic) {
+    // The highest summit among the live continental-arc cones.
+    let highest = live
+        .iter()
+        .copied()
+        .filter(|v| v.kind == Kind::Strato && v.active() && !v.oceanic)
+        .max_by(|a, b| summit_y(a).total_cmp(&summit_y(b)));
+    if let Some(v) = highest {
         picks.push((
             "arc",
-            "The tallest active continental-arc stratovolcano".into(),
+            "The highest active continental-arc stratovolcano".into(),
             vec![v],
             192,
         ));
     }
-    if let Some(v) = tallest(&|v| v.kind == Kind::Strato && v.active() && v.oceanic) {
+    if let Some(v) = tallest(&|v| {
+        v.kind == Kind::Strato && v.active() && v.oceanic && summit_y(v) > ctx.sea_y
+    }) {
         picks.push((
             "island_arc",
-            "The tallest active island-arc stratovolcano".into(),
+            "The tallest active island-arc stratovolcano that is an island".into(),
             vec![v],
             192,
         ));
@@ -423,12 +452,18 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
             chains.entry(h).or_default().push(v);
         }
     }
-    if let Some((h, vs)) = chains.iter().max_by_key(|(_, vs)| vs.len()) {
+    // The chain with the most islands, then the most volcanoes standing.
+    let islands = |vs: &Vec<&Volcano>| vs.iter().filter(|v| summit_y(v) > ctx.sea_y).count();
+    if let Some((h, vs)) = chains
+        .iter()
+        .max_by_key(|(_, vs)| (islands(vs), vs.len()))
+    {
         picks.push((
             "chain",
             format!(
-                "The longest standing hotspot chain (hotspot {h}, {} volcanoes)",
-                vs.len()
+                "The hotspot chain with the most islands (hotspot {h}: {} volcanoes standing, {} of them islands)",
+                vs.len(),
+                islands(vs)
             ),
             vs.clone(),
             384,
@@ -500,14 +535,69 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
                 .unwrap_or_default(),
             side as f64 * ctx.dx / 1000.0
         );
+        let before = young_window(&z2f.data, w2, h2, scale, &ctx, i0, j0, side);
+        let after = window(&ctx, i0, j0, side);
+        // Relief over the ring just outside the foot, both terrains, blocks → m.
+        let (si, sj) = (summit.0 - i0, summit.1 - j0);
+        let rr = v.radius_m * 1.1 / ctx.dx;
+        let relief = |z: &[f32]| {
+            let (mut top, mut ring, mut k) = (f64::NEG_INFINITY, 0.0, 0.0);
+            for j in 0..side as i64 {
+                for i in 0..side as i64 {
+                    let d = ((i - si) as f64).hypot((j - sj) as f64);
+                    let y = f64::from(z[j as usize * side + i as usize]);
+                    if d <= 2.5 {
+                        top = top.max(y);
+                    } else if (d - rr).abs() < 1.0 {
+                        ring += y;
+                        k += 1.0;
+                    }
+                }
+            }
+            let ring = if k > 0.0 { ring / k } else { f64::NAN };
+            ((top - ring) * ctx.mv, (top - ctx.sea_y) * ctx.mv)
+        };
+        let (rb, _) = relief(&before);
+        let (ra, summit_m) = relief(&after);
+        // The same on the deep-time surface (L1) and the young landscape (L2), at their own cells.
+        let coarse = |f: &deeptime_core::world::Field| {
+            let g = &f.grid;
+            let r = f64::from(g.r);
+            let at = |x: f64, z: f64| {
+                let fi = (x - g.origin_block_x as f64) / r;
+                let fj = (z - g.origin_block_z as f64) / r;
+                let (w, h) = (g.w as i64, g.h as i64);
+                let (i, j) = (fi.round() as i64, fj.round().clamp(0.0, (h - 1) as f64) as i64);
+                f64::from(f.data[(j * w + i.rem_euclid(w)) as usize])
+            };
+            let frame = deeptime_core::sphere::BlockFrame::new(s.circumference_blocks);
+            let top = at(v.x, v.z);
+            let rr = v.radius_m * 1.1 / s.m_per_block_h;
+            let ring: f64 = (0..24)
+                .map(|k| {
+                    let th = std::f64::consts::TAU * f64::from(k) / 24.0;
+                    at(frame.wrap_x(v.x + rr * th.cos()), v.z + rr * th.sin())
+                })
+                .sum::<f64>()
+                / 24.0;
+            top - ring
+        };
+        let r1 = world
+            .fields
+            .get("surface/elevation_m")
+            .map_or(f64::NAN, &coarse);
+        let r2 = coarse(z2f);
+        let note = format!(
+            "{note}; relief over its foot: L1 surface {r1:.0} m, young L2 {r2:.0} m, L3 before {rb:.0} m, after {ra:.0} m; summit {summit_m:.0} m above the sea"
+        );
         closes.push(Close {
             id,
             title,
             note,
-            before: young_window(&z2f.data, w2, h2, scale, &ctx, i0, j0, side),
-            after: window(&ctx, i0, j0, side),
+            before,
+            after,
             side,
-            row: (summit.1 - j0).clamp(0, side as i64 - 1) as usize,
+            row: sj.clamp(0, side as i64 - 1) as usize,
         });
     }
     // The best-kept flood basalt.

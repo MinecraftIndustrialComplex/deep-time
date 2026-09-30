@@ -6,7 +6,9 @@
 //! volcano is round in the world whatever its latitude, like the plutons (`structure/plutons.rs`).
 //!
 //! **Profiles** (ρ = r / R, R the basal radius; the body is 1 at the summit and 0 at the foot):
-//! - stratovolcano: (1 − ρ)^1.8, a concave cone (upper flanks ~25° at 2.5 km over R = 12 km);
+//! - stratovolcano: (1 − ρ)^1.5, a concave cone (Fuji: a third of its relief at 0.55 of its radius;
+//!   upper flanks ~20° at 2.5 km over R = 14 km, steep in the world, which is 15 times taller than
+//!   wide at 300 by 20 m per block);
 //! - shield: (1 − ρ²)^1.5, broad and convex with flanks under ~10°;
 //! - silicic centre (a continental hotspot): (1 − ρ²)², low and broad.
 //!
@@ -75,7 +77,7 @@ impl Shape {
             return if rho < 0.0 { 1.0 } else { 0.0 };
         }
         match kind {
-            Kind::Strato => (1.0 - rho).powf(1.8),
+            Kind::Strato => (1.0 - rho).powf(1.5),
             Kind::Shield => (1.0 - rho * rho).powf(1.5),
             Kind::Silicic => (1.0 - rho * rho).powi(2),
         }

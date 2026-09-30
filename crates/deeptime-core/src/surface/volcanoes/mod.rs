@@ -905,7 +905,8 @@ impl VolcanoStage {
                     .filter(|(over, _, _)| *over == plate)
                     .min_by(|a, b| a.1.angle_between(here).total_cmp(&b.1.angle_between(here)))
                     .map(|&(_, _, e)| e);
-                let crater_rho = (600.0 * p.size).max(0.05 * radius) / radius;
+                // A crater a few blocks across at 300 m per block (real ones are 0.3–1 km).
+                let crater_rho = (1000.0 * p.size).max(0.07 * radius) / radius;
                 st.volcanoes.push(Volcano {
                     id: st.next_id,
                     kind: Kind::Strato,
@@ -931,7 +932,7 @@ impl VolcanoStage {
                     active_myr: 0.0,
                     depression: Some(Depression {
                         rho: crater_rho,
-                        depth: 0.1,
+                        depth: 0.06,
                         caldera: false,
                     }),
                     caldera: None,
