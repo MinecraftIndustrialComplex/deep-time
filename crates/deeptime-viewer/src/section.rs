@@ -25,6 +25,8 @@ pub struct Section {
     /// Block y at the bottom and top.
     pub y0: i32,
     pub y1: i32,
+    /// The world's floor (the last horizon reaches down to it).
+    pub min_y: i32,
     /// Pixels.
     pub w: u32,
     pub h: u32,
@@ -33,8 +35,9 @@ pub struct Section {
     pub per_cell: bool,
 }
 
-/// The stack of the strata cell nearest block (x, z), without interpolation: (top block, class).
-fn cell_stack(strata: &LoadedLayer, x: i64, z: i64, out: &mut Vec<(i32, u8)>) {
+/// The stack of the strata cell nearest block (x, z), without interpolation: (top block, class,
+/// key top).
+fn cell_stack(strata: &LoadedLayer, x: i64, z: i64, out: &mut Vec<(i32, u8, u16)>) {
     out.clear();
     let d = &strata.desc;
     let g = &d.grid;
@@ -43,11 +46,12 @@ fn cell_stack(strata: &LoadedLayer, x: i64, z: i64, out: &mut Vec<(i32, u8)>) {
     let i = ((wx - g.origin_block_x) as f64 / f64::from(g.r) + 0.5).floor() as i64;
     let j = ((z - g.origin_block_z) as f64 / f64::from(g.r) + 0.5).floor() as i64;
     for h in 0..d.stack_depth.unwrap_or(0) {
-        let (t, class) = strata.horizon(g.wrap_i(i), g.clamp_j(j), h);
-        if class == 255 || t == i16::MIN {
+        let s = strata.horizon(g.wrap_i(i), g.clamp_j(j), h);
+        if !s.is_used() {
             break;
         }
-        out.push(((f64::from(t) * d.scale + d.offset).floor() as i32, class));
+        let top = (f64::from(s.top) * d.scale + d.offset).floor() as i32;
+        out.push((top, s.class, s.key[0]));
     }
 }
 
@@ -105,7 +109,7 @@ pub fn render(
         if s.per_cell {
             cell_stack(strata, s.x, z, &mut stack);
         } else {
-            strata.stack_at(s.x, z, &mut stack);
+            strata.stack_at(s.x, z, s.min_y, &mut stack);
         }
         let near: Vec<&&Body> = on_plane
             .iter()

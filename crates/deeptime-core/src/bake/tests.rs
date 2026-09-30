@@ -81,7 +81,7 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     let m = Manifest::read(&dir).unwrap();
     m.verify(&dir).unwrap();
     assert_eq!(m.format_version, FORMAT_VERSION);
-    assert_eq!(FORMAT_VERSION, "0.1");
+    assert_eq!(FORMAT_VERSION, "0.2");
     for name in [
         "elevation",
         "detail/amplitude",

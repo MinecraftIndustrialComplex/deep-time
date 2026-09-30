@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
-# Deep Time world-data format 0.1
+# Deep Time world-data format 0.2
 
 The contract between the Rust writer (`crates/deeptime-format`) and the Java reader
 (`neoforge/src/main/java/com/minecraftindustrialcomplex/deeptime/worlddata`). Plan §5.3 and §5.7
@@ -18,6 +18,13 @@ term a baked world declares ("The terrain height"); the first horizon of a baked
 the amplified terrain ("The P1-08 bake"); and the column evaluator both sides implement is specified
 ("Columns"). Nothing a 0.0 world held changed its bytes, only the minor.
 
+**0.2 (continuous strata)** over 0.1: every header's minor is 2; a `horizon_stack` cell carries
+each horizon's stratigraphic key span (7K bytes instead of 3K); the column rule correlates the
+stacks of the 4 × 4 cells around a column by those keys, with B-spline weights, and intertongues
+facies changes, so beds run on across cells instead of stepping at cell edges; the bake smooths
+the stacks laterally ("The 0.2 bake"); a column's horizons carry a unit key (`[top y, class,
+unit]` in "Columns"). Every other file's bytes are as in 0.1.
+
 ## Folder layout
 
 ```text
@@ -33,8 +40,8 @@ the amplified terrain ("The P1-08 bake"); and the column evaluator both sides im
   rasters/climate/koppen.dtr    L1, u8, Köppen code index   │ (P1-08, "The bake" below)
   rasters/surface/*.dtr         L2, u8                      │
   rasters/meta/*.dtr            L1, u16                     ┘
-  strata/horizons.dtr           L1, horizon_stack, K = 3 in the synthetic worlds (8 with --strata every-class,
-                                32 in a baked run)
+  strata/horizons.dtr           L1, horizon_stack (7K bytes a cell), K = 3 in the synthetic worlds (8 with
+                                --strata every-class, 32 in a baked run)
   strata/classes.json           class index → rock class name
   spawn/candidates.json         land cells for spawn selection
   climate_mapping.json          written by the game at the world's first start (P1-09, plan §7.2; not listed
@@ -105,7 +112,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `elevation` | L3 | i16 | 1/16, block | — | terrain y: the amplifier's; without the amplify stage the young landscape (L2) or the deep-time surface (L1) upsampled bilinearly |
 | `detail/amplitude` | L3 | u8 | 1/16, block | — | the detail term's A (P1-06; absent without the amplify stage) |
 | `water_level` | L3 | i16 | 1/16, block | −32768 | every cell nodata: lakes and rivers are Phase 2 |
-| `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks, the first top raised ("The P1-08 bake") |
+| `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks with key spans, smoothed ("The 0.2 bake"), the first top raised ("The P1-08 bake") |
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
 | `climate/koppen` | L1 | u8 | 1, code index | 255 | `notes.bake.climate.koppen_codes[i]` (31 = sea) |
@@ -265,32 +272,84 @@ within the tile, `cell_bytes` each, so its decoded size is `tw · th · cell_byt
  "tile": 256, "codec": "lz4_block", "nodata": -32768.0}
 ```
 
-- `dtype`: `u8`, `i8`, `u16`, `i16`, `u32`, `f32` (IEEE 754 binary32), or `horizon_stack`.
+- `dtype`: `u8`, `i8`, `u16`, `i16`, `u32`, `f32` (IEEE 754 binary32), or `horizon_stack` (7K bytes a cell).
 - physical value = raw · `scale` + `offset`. `nodata` (optional) is a **raw** value.
 - `stack_depth` (only for `horizon_stack`): K.
 - Unknown fields must be ignored by readers.
 
 ### `horizon_stack` cells (plan §5.7.4)
 
-`cell_bytes = 3K`: K × i16 horizon top elevation (1/16 block), then K × u8 class index (into
-`strata/classes.json`). Horizons are ordered top-down; horizon k's rock fills from its top down to
-horizon k+1's top, the last one down to `min_y`. Unused horizons have top −32768 and class 255.
+`cell_bytes = 7K`: K × i16 horizon top elevation (1/16 block), K × u8 class index (into
+`strata/classes.json`), K × u16 **key top**, K × u16 **key base**. Horizons are ordered top-down;
+horizon k's rock fills from its top down to horizon k+1's top, the last one down to `min_y`.
+Unused horizons (only after the used ones) have top −32768, class 255 and keys 65535.
 
-A column at block (x, z) is read as the Java strata pass reads it (`StrataPass.column`;
-`LoadedLayer::stack_at` in Rust): x wrapped into [−C/2, C/2), u = (x − origin_x)/r, v = (z −
-origin_z)/r; each horizon's class from the nearest cell (⌊u + ½⌋, ⌊v + ½⌋), its top bilinear
-between the four cells around (u, v) (the nearest cell's top where a corner lacks the horizon),
-floored to a block and never above the horizon over it; the walk stops at the first unused horizon
-of the nearest cell.
+**Stratigraphic keys.** A key orders units the same way in every cell (it grows downwards, older
+and deeper); a horizon's span [key top, key base] (top < base) covers the units it stands for, and
+the spans of one stack grow downwards without overlapping (key top of k+1 ≥ key base of k). A gap
+between two spans is a hiatus: that cell has none of those units. The bake's key space
+(`deeptime_core::structure::columns::key`): regolith 0–4095; the strata log 4096 (the present) to
+32767 (the start of the run), linear in age — a layer spans the ages from the base of the layer
+above it to its own base, the top layer to the present where its cell still accumulates (net
+deposition over the cell and its eight neighbours at the last step) and only its base age where
+erosion has taken an unknown part of it, and the young loose part of a layer the upper half of
+its span; the basement pools in erosion order (`plates::l1::TOP_ORDER`), 4096 keys each from
+32768, each metamorphic step 512 of them; the mantle 61440–65535. The synthetic worlds give
+horizon h the span 4096·h … 4096·h + 4095 in every cell.
+
+**The column rule** (format 0.2; Rust `deeptime_format::strata::stack_at`, Java
+`worlddata/Columns.stack`; both must give equal answers). A cell's stack is read as a height
+function of the key: at key s ≤ the first key top, the first top; inside a span [kt, kb] of
+horizon h, t − (t − b)·((s − kt)/(kb − kt)) with t its top and b the next top (min_y after the
+last); across a gap or past the last span, the next top (min_y). For block (x, z):
+
+1. x wrapped into [−C/2, C/2), u = (x − origin_x)/r, v = (z − origin_z)/r, i0 = ⌊u⌋, j0 = ⌊v⌋. The
+   16 cells (i0 − 1 + a, j0 − 1 + b), a, b = 0…3 (x wraps, z clamps), in the order n = 4b + a,
+   have weights wₙ = Bₐ(u − i0)·B_b(v − j0) with the uniform cubic B-spline: for g = 1 − f,
+   B₀ = g·g·g/6, B₁ = (3f³ − 6f² + 4)/6, B₂ = (−3f³ + 3f² + 3f + 1)/6, B₃ = f³/6 (f² = f·f,
+   f³ = f²·f; evaluated in exactly this order).
+2. The keys: every key top and base of the 16 stacks' used horizons, sorted, duplicates removed:
+   s₀ < s₁ < … < s_{m−1}. The height at key q is Y_q = y_{5,q} + Σₙ wₙ·(y_{n,q} − y_{5,q}) (the sum in
+   order n = 0…15, y_{n,q} cell n's height at s_q; cell 5 is (i0, j0)). No key: no horizons. One key:
+   one horizon, the first used horizon of the first cell that has one, top Y₀.
+3. For each interval q (s_q, s_{q+1}), top Y_q, bottom Y_{q+1}: each cell n with wₙ > 0 whose
+   horizon h spans the interval (key top ≤ s_q and s_{q+1} ≤ key base) and whose thickness
+   t = wₙ·(y_{n,q} − y_{n,q+1}) is positive gives its class: per class, the order (least key top +
+   key base of its horizons), the unit (least key top) and the summed t, classes in the order cells
+   first give them. One class: emit (Y_q, class, unit). Several: sort by (order, class) and
+   **intertongue**: T = Σ t; shares pᵢ = max(tᵢ/T − 0.15, 0) (if all are 0, pᵢ = tᵢ/T), P = Σ pᵢ;
+   for each band n from ⌊s_q/256⌋ to ⌊(s_{q+1} − 1)/256⌋ with base 256·n, walking the classes in
+   order with a running sum S (from 0): lo = base + 256·(S/P), S += pᵢ, hi = base + 256·(S/P),
+   clipped to [s_q, s_{q+1}]; if lo < hi, emit (Y_q − (lo − s_q)/(s_{q+1} − s_q)·(Y_q − Y_{q+1}),
+   class, unit).
+4. Emitting (top, class, unit): t = ⌊top⌋, at most the last emitted top; if it equals the last
+   emitted top, that horizon (left with no block) is removed; then if the last emitted horizon has
+   the same class, nothing is added, else (t, class, unit) is appended.
+
+The result is continuous across cell edges (a cell whose weight is zero changes nothing), a bed
+present in every cell has smoothly interpolated top and base, a bed some cells lack thins out
+towards them, and a facies change (cells disagreeing about the rock of the same keys) becomes
+tongues of the two classes, each thinning towards the cells that lack it, on a band grid of the
+keys that every column shares (so the tongues follow the bedding).
 
 **The P1-07 bake** (`deeptime_core::structure::bake_horizons`) makes stacks with these properties:
 the first horizon's top is the cell's surface (y = sea_level_y + (h − sea level)/m_per_block_v,
 clamped to [min_y + 1, max_y]); every horizon is at least one block (16 raw) thick, the last one
-down to `min_y` too; at most K are used; neighbours differ in class. A stack walks the column of
+down to `min_y` too; at most K are used; neighbours differ in class; every horizon carries the key
+span of the units it stands for (a merge keeps the union). A stack walks the column of
 `structure::columns` from the top: regolith, the strata log (the young, shallow part of a clastic
 deposit as its `loose_equivalent`, buried loose material and palaeosols as their `lithifies_to`),
 the plate model's rock pools less the log, and peridotite below the crust. Plutons are bodies
 (role `pluton`, below), not horizons.
+
+**The 0.2 bake** smooths the stacks laterally before writing them, because the strata log is
+carried cell by cell and neighbouring cells' stacks differ more than the rocks would: each cell's
+new stack is the Gaussian-weighted mean (σ 2.5 cells over the 11 × 11 cells around; x wraps, z
+clamps) of its neighbours' height functions, cut at every key top and base any of them has; each
+interval takes the class holding the largest weighted thickness there, equal neighbours join; the
+cell's own surface stays its first top (neighbours' units above it pinch out there; where the cell
+stands above the mean its top unit fills the difference); then the stack is settled again (at least
+a block thick, at most K). `notes.bake.strata.smoothing` records σ and the window.
 
 **The P1-08 bake** writes them with one change: the first horizon's top of every cell is raised,
 never lowered, to ⌈max E + max A⌉ + 1 blocks (at most `max_y`), E and A the `elevation` and
@@ -350,7 +409,7 @@ answers for every column (`ColumnParityTest`):
    to [min_y − 1, max_y] (min_y − 1 when H is not finite).
 2. `water` = the `water_level` layer's nearest cell at (wx, z), null where nodata or absent.
 3. `horizons` = the stack at (x, z) by the column rule of "`horizon_stack` cells": `[top y, class
-   index]`, top-down.
+   index, unit key]`, top-down.
 4. `bodies`: every body whose AABB footprint holds (wx, z) (z inside [min z, max z]; wx inside the x
    span with wrap), ascending id; for each, y from min(aabb max y, max_y) down to max(aabb min y,
    min_y) located at block (wx, y, z) ("Bodies", step 1–3); each maximal run of inside blocks is
@@ -631,4 +690,6 @@ survives in, the finished folder. The manifest's `notes.run.history` reports wha
 - All: a three-horizon strata placeholder on L1 (`notes.strata`); with `--strata every-class`
   (P1-12) eight horizons 10 blocks apart holding all 59 rock classes, horizon h of L1 cell column
   i having class (6·i + h) mod 59, so any ten neighbouring cell columns show every class at
-  h ≥ 2 (`notes.strata.class_rule`).
+  h ≥ 2 (`notes.strata.class_rule`). Horizon h spans the keys 4096·h … 4096·h + 4095 in every
+  cell, so the column rule correlates the synthetic stacks by index (and mixes the neighbouring
+  cell columns' classes in as thin tongues).

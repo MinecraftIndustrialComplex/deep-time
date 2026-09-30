@@ -73,21 +73,30 @@ impl LazyLayer {
         (self.tile(t), (lj * tw as usize + li) * cb)
     }
 
-    /// Horizon `k` of the stack at in-range cell (i, j): (top in 1/16 block, class index).
-    pub fn horizon(&self, i: u32, j: u32, k: u32) -> (i16, u8) {
+    /// Horizon `k` of the stack at in-range cell (i, j).
+    pub fn horizon(&self, i: u32, j: u32, k: u32) -> crate::strata::StoredHorizon {
         let depth = self.reader.desc().stack_depth.unwrap_or(0) as usize;
         let (tile, at) = self.cell_bytes(i, j);
-        let t = at + 2 * k as usize;
-        (
-            i16::from_le_bytes([tile[t], tile[t + 1]]),
-            tile[at + 2 * depth + k as usize],
-        )
+        crate::raster::decode_horizon(&tile[at..at + 7 * depth], depth, k as usize)
     }
 
-    /// The horizon stack at block (x, z) as the Java strata pass builds a column (see
-    /// [`crate::raster::stack_at`]).
-    pub fn stack_at(&self, x: i64, z: i64, out: &mut Vec<(i32, u8)>) {
-        crate::raster::stack_at(self.desc(), |i, j, k| self.horizon(i, j, k), x, z, out);
+    /// The horizon stack at block (x, z) of a world whose floor is `min_y`, as the Java strata
+    /// pass builds a column (see [`crate::strata::stack_at`]).
+    pub fn stack_at(
+        &self,
+        x: i64,
+        z: i64,
+        min_y: i32,
+        out: &mut Vec<crate::strata::ColumnHorizon>,
+    ) {
+        crate::strata::stack_at(
+            self.desc(),
+            min_y,
+            |i, j, k| self.horizon(i, j, k),
+            x,
+            z,
+            out,
+        );
     }
 }
 
@@ -142,6 +151,11 @@ mod tests {
                     bytes.extend_from_slice(&top.to_le_bytes());
                 }
                 bytes.extend_from_slice(&[(i % 7) as u8, 20, 255]);
+                for key in [[0u16, 100, u16::MAX], [100, 200, u16::MAX]] {
+                    for kk in key {
+                        bytes.extend_from_slice(&kk.to_le_bytes());
+                    }
+                }
             }
         }
         let mut hd = LayerDesc::scalar("strata/horizons", DType::HorizonStack, grid, Codec::Raw);
@@ -153,10 +167,13 @@ mod tests {
         let loaded = LoadedLayer::new(hd, bytes).unwrap();
         let (mut a, mut b) = (Vec::new(), Vec::new());
         for (x, z) in [(-600, -300), (5, 7), (598, 299), (1201, -3)] {
-            lazy.stack_at(x, z, &mut a);
-            loaded.stack_at(x, z, &mut b);
+            lazy.stack_at(x, z, -64, &mut a);
+            loaded.stack_at(x, z, -64, &mut b);
             assert_eq!(a, b, "({x}, {z})");
-            assert_eq!(a.len(), 2, "the unused third horizon stops the walk");
+            assert!(
+                a.iter().all(|h| h.1 != 255),
+                "the unused third horizon stops the walk"
+            );
         }
         std::fs::remove_dir_all(&dir).unwrap();
     }

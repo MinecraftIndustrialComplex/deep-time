@@ -1304,7 +1304,7 @@ mod tests {
         })
         .unwrap();
         let m = deeptime_format::Manifest::read(&dir.join("world")).unwrap();
-        assert_eq!(m.format_version, "0.1");
+        assert_eq!(m.format_version, "0.2");
         assert_eq!(m.notes["bake"]["baked"], true);
         let out = dir.join("world/parity/columns.json");
         let (n, _) = super::parity::run(&dir.join("world"), &out, 60, 7).unwrap();
