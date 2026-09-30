@@ -10,11 +10,15 @@
 //! (plan §7.1), from the physical climate and the ground by the §7.2 mapping in [`super::biomes`]
 //! (P1-09; the preset's `biomes` section holds its knobs). The game maps them once more per world
 //! onto the pack's bands and distributions (`ClimateMappingBuilder`, `climate_mapping.json`).
+//!
+//! **The ice cover** (`climate/ice_cover`, L2, u8, blocks): how much snow and ice the game's surface
+//! pass lays over ground above its equilibrium line, whatever the biome ([`super::ice`]).
 
 use deeptime_format::DType;
 use serde_json::{Value, json};
 
 use super::biomes::{self, BiomeParams, Climate, Ground};
+use super::ice;
 use super::placement;
 use super::{Out, desc, field, grids, resample};
 use crate::climate;
@@ -130,6 +134,7 @@ pub fn bake(
         _ => None,
     };
     let params = p.biomes.clone().unwrap_or_default();
+    let table = p.placement.as_ref().unwrap_or_else(|| placement::builtin());
     let mapped = biomes::map(
         climate_in.as_ref(),
         &Ground {
@@ -141,7 +146,7 @@ pub fn bake(
             circumference: p.scale.circumference_blocks,
         },
         &params,
-        p.placement.as_ref().unwrap_or_else(|| placement::builtin()),
+        table,
     );
     for (name, data) in BIOME_INPUTS.iter().zip(&mapped.layers) {
         let raw: Vec<i16> = data.iter().map(|&v| to_raw(v)).collect();
@@ -150,7 +155,23 @@ pub fn bake(
             &raw,
         )?;
     }
+    // The ice cover of the surface pass: blocks of snow and ice over ground above its equilibrium
+    // line (`ice.rs`); without the climate stage's line there is none.
+    let mut ice_note = Value::Null;
+    if let Some(ela) = on_l1(climate::field::ELA_ALL) {
+        let spec = table.ice_cover();
+        let cover = ice::cover_blocks(&elev, &resample(ela, &l2, false), sea, spec);
+        out.layer(
+            desc("climate/ice_cover", DType::U8, &l2, 1.0, "blocks", None),
+            &cover,
+        )?;
+        ice_note = spec.record();
+        ice_note["cells"] = json!(cover.iter().filter(|&&b| b > 0).count());
+        ice_note["thickest_blocks"] = json!(cover.iter().copied().max().unwrap_or(0));
+        physical.push("climate/ice_cover");
+    }
     let mut note = json!({
+        "ice_cover": ice_note,
         "physical": physical,
         "koppen_codes": climate::koppen::CODES,
         "biome_inputs": BIOME_INPUTS,

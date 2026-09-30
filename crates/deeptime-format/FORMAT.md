@@ -31,6 +31,7 @@ the amplified terrain ("The P1-08 bake"); and the column evaluator both sides im
   rasters/climate/t_mean_c.dtr  L1, i16, 0.01 °C            ┐
   rasters/climate/p_mm.dtr      L1, u16, mm/yr              │ a baked planet run only
   rasters/climate/koppen.dtr    L1, u8, Köppen code index   │ (P1-08, "The bake" below)
+  rasters/climate/ice_cover.dtr L2, u8, blocks of snow/ice  │ ("The ice cover")
   rasters/surface/*.dtr         L2, u8                      │
   rasters/meta/*.dtr            L1, u16                     ┘
   strata/horizons.dtr           L1, horizon_stack, K = 3 in the synthetic worlds (8 with --strata every-class,
@@ -109,6 +110,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
 | `climate/koppen` | L1 | u8 | 1, code index | 255 | `notes.bake.climate.koppen_codes[i]` (31 = sea) |
+| `climate/ice_cover` | L2 | u8 | 1, blocks | — | blocks of snow and ice the surface pass lays over glaciated ground ("The ice cover"); absent without the climate stage |
 | `climate/{temperature,vegetation,continents,erosion,ridges}` | L2 | i16 | 1e-4, vanilla_param | — | the router's five biome inputs, placed against the reference bands and vanilla's land distributions (P1-09, "The climate mapping") |
 | `surface/regolith_blocks` | L2 | u8 | 1/16, block | — | regolith thickness |
 | `surface/class_top` | L2 | u8 | 1, class index | 255 | the rock class at the surface (`strata/classes.json`) |
@@ -177,21 +179,29 @@ jar ships it and the core compiles the same file in as the default). Band coordi
   "classes": {                           every land class Af … EF (31 of them; not "sea"), no others
     "Af":  { "temperature": "tropical", "humidity": "rainforest" },
     "EF":  { "temperature": "polar_ice", "humidity": "polar_desert",       optional "glaciated": what the class does
-             "glaciated": { "humidity": "ice_cap" } },                     where the glacier flag is set: its own
-                                                                           "temperature" and/or "humidity" (at least
-                                                                           one; each falls back to the class's own)
-                                                                           optional "weirdness": "positive"
+             "erosion": { "max": 0.3 },                                    where the glacier flag is set: its own
+             "weirdness": { "positive_below_erosion": -0.27 },             "temperature", "humidity" and/or "erosion"
+             "glaciated": { "humidity": "ice_cap",                         (at least one; each falls back to the
+                            "erosion": { "max": 1.0 } } },                 class's own); optional "erosion": the
+                                                                           class's land erosion is clamped into
+                                                                           {min, max} (−1 … 1, at least one key);
+                                                                           optional "weirdness": "positive" or
+                                                                           {"positive_below_erosion": e}
     "BSk": { "temperature": { "when": { "of": "t_cold", "above": 0.0 },   the ramp "then" where the input is above
                               "then": "temperate", "else": "boreal" },     the threshold, "else" elsewhere
              "humidity": "steppe" }
+  },
+  "ice_cover": {                         optional, every key optional (defaults as written here): "The ice cover"
+    "step_m": 160.0, "max_blocks": 12, "snow_blocks": 3, "blue_ice_from_blocks": 9, "blue_ice_blocks": 2,
+    "snow": "minecraft:snow_block", "ice": "minecraft:packed_ice", "deep_ice": "minecraft:blue_ice"
   }
 }
 ```
 
 **Glaciated land.** Without a `glaciated` block a class is held at or below `glacier_cap` wherever
 the glacier flag (`climate/glacier`, land above its equilibrium line) is set. With one, the block
-decides instead: its temperature ramp (else the class's own, uncapped) and its humidity rule (else
-the class's own). The default table gives EF one (Ben, 2026-09-29, "Ice only where there's ice"):
+decides instead: its temperature ramp (else the class's own, uncapped), its humidity rule (else
+the class's own) and its erosion limits (else the class's own). The default table gives EF one (Ben, 2026-09-29, "Ice only where there's ice"):
 EF above its equilibrium line is **ice cap** (humidity `ice_cap`, the fixed band coordinate 0.5,
 vanilla's first humidity band: ice spikes, frozen and jagged peaks, snowy slopes and plains, no
 forest) and the rest of EF is **barren frozen ground** (`polar_desert`, fixed 1.5: Terralith's gravel
@@ -201,9 +211,22 @@ Terralith splits the band at temperature −0.727 (coordinate 0.496) and puts it
 snowy badlands below it and its dry cold biomes above. Humidity for EF is fixed because P/PET says
 nothing in a freezing climate (PET is 0 below 0 °C, and the stage pins the index at 10). A rule
 with `min` = `max` is a fixed coordinate. ET is as it was (`polar`, `tundra`, capped where glaciated).
-A class may also carry `"weirdness": "positive"` (the only value): the bake then gives its land the
-positive sign of the variant noise everywhere, so its peaks are vanilla's frozen peaks and never the
-negative branch's (jagged peaks in vanilla; Terralith puts its scarlet mountains there). EF has it.
+**Erosion and weirdness (Ben, 2026-09-30, "Fix both").** A class may carry `"erosion": {min, max}`
+(vanilla's erosion units, −1 … 1; at least one key): its land's erosion is clamped into it, after the
+relief's rank and the wetlands have set it; a `glaciated` block may give its own. And it may carry
+`"weirdness"`: `"positive"` (its land takes the positive branch of the variant noise everywhere) or
+`{"positive_below_erosion": e}` (the positive branch where the land's erosion is below `e`, the
+negative one above). The default table uses all three for EF:
+- barren EF is held below erosion 0.3, which keeps it off Terralith's `glacial_chasm` (packed ice; it
+  takes erosion from 0.4, or from 0.565 at any humidity); ice cap (`glaciated`, `max` 1) keeps the
+  chasm, the one ice biome for low-relief land;
+- its peaks (erosion below −0.27) are on the positive branch, vanilla's frozen peaks, and never on the
+  negative branch (jagged peaks in vanilla, where Terralith puts its scarlet mountains): −0.27 is a
+  little above vanilla's −0.375 edge because MIC's Tectonic router stretches erosion, and the flats
+  (erosion above it) are on the negative branch, where vanilla's and Terralith's cherry groves, which
+  are positive-branch variants, do not grow. All of it is data a pack overrides; the limits are in
+  vanilla's units, which the game then maps onto the pack's, so a pack with another router wants
+  its own numbers (MIC's tuned ones are the defaults').
 
 The default table reproduces what P1-09 first compiled in, operation for operation for every class
 but EF (a test holds the core's default to the old formulas bit for bit). A ramp is a `base`/`span` pair rather than two
@@ -235,6 +258,33 @@ continentalness map band edge to band edge; erosion maps the reference's land qu
 onto the pack's below its E6, then E6 edge to edge; weirdness maps the peaks-and-valleys
 quantiles above the valley slice on the rising branch (|w| = (PV + 1)/3). A folder without a
 P1-09 record (the synthetic worlds, older bakes) gets no file: its values are used as written.
+
+### The ice cover (Ben, 2026-09-30, "Force snow/ice cover")
+
+Terralith has no flat inland ice biome, so an ice cap's flats would read as gravel desert or cold
+shrubland whatever biome tag the pack's source picked. Deep Time's own surface pass (`worldgen/IcePass`,
+after the pack's surface rules, the strata pass and the water pass) therefore lays snow and ice over
+glaciated ground regardless of biome. The contract between the climate and that pass is the layer
+`climate/ice_cover` (L2, u8, blocks; 0 = none) and the record `notes.bake.climate.ice_cover`:
+
+- **The layer** (`deeptime_core::bake::ice`): for each L2 cell whose ground is above the sea and above
+  its equilibrium line, `1 + ⌊(ground − sea − ELA) / step_m⌋` blocks, at most `max_blocks`; else 0.
+  The ELA is the climate stage's (`climate/anomaly/ela_m`, L1, every cell: the Ohmura rule of
+  `climate::glaciers`) resampled bilinearly to L2; the ground is the young landscape's elevation the
+  biome inputs were placed on. Absent when the world has no climate stage. Nothing else reads the
+  glacier flag: a climate that carries a real ice thickness (`climate/ice_thickness_m`) only has to be
+  turned into this layer by the bake, and the pass does not change.
+- **The record** is the placement table's `ice_cover` section, defaults filled in, plus `cells` and
+  `thickest_blocks`: `step_m`, `max_blocks`, `snow_blocks`, `blue_ice_from_blocks`,
+  `blue_ice_blocks`, and the block ids `snow`, `ice`, `deep_ice`.
+- **The pass** reads the layer bilinearly (so a cover's edge is a slope of cells, not 8-block steps) and
+  rounds, giving `n` blocks for the column. The cover **replaces** the top `n` solid blocks of the
+  ground, so the terrain's height is unchanged: the top `snow_blocks` (at most `n`) are `snow`, the
+  last `blue_ice_blocks` of a cover of at least `blue_ice_from_blocks` are `deep_ice`, the blocks
+  between `ice`. A column whose surface is fluid (a lake, the sea) and air, bedrock and fluid blocks
+  are left alone. Vanilla's `freeze_top_layer` feature then lays its snow layer on the snow block.
+  The layer is not part of the column evaluator: Java alone reads it, and Rust's `inspect-column`
+  prints it with the other layers.
 
 ## Grids
 

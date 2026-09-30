@@ -95,6 +95,7 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
         "climate/t_mean_c",
         "climate/p_mm",
         "climate/koppen",
+        "climate/ice_cover",
         "surface/regolith_blocks",
         "surface/class_top",
         "meta/plate_id",
@@ -113,6 +114,9 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     let bake = &m.notes["bake"];
     assert_eq!(bake["baked"], true);
     assert_eq!(bake["terrain"]["elevation"], "amplify");
+    // The ice cover the game's surface pass lays is recorded with the table's section.
+    assert_eq!(bake["climate"]["ice_cover"]["max_blocks"], 12);
+    assert_eq!(bake["climate"]["ice_cover"]["snow"], "minecraft:snow_block");
     assert!(bake["meta"]["provinces"]["count"].as_u64().unwrap() >= 1);
     assert!(bake["terrain"]["spawn_candidates"].as_u64().unwrap() >= 1);
     let spec = DetailSpec::of(&m).unwrap().expect("a detail term");
