@@ -63,6 +63,7 @@ pub mod routing;
 pub mod spl;
 pub mod strata_log;
 pub mod thermal;
+pub mod volcanoes;
 pub mod weathering;
 pub mod young;
 

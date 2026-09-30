@@ -41,8 +41,8 @@ pub const MAGIC: [u8; 4] = *b"DTCP";
 /// surface's frame accumulator keeps the crust's origin and the deposit stage's state its frame
 /// count, P1-14; 6: the recorded history's frames in sections of their own, streamed, P1-17;
 /// 7: `WorldState::globals` and the climate's carbon cycle, fine clock and ice state, deep-time
-/// climate).
-pub const CHECKPOINT_SCHEMA: u32 = 7;
+/// climate; 8: the world's volcano catalogue, P1-21).
+pub const CHECKPOINT_SCHEMA: u32 = 8;
 const FIXED_BYTES: usize = 8;
 /// The sections before the history's frames.
 const HEAD_SECTIONS: usize = 2;
@@ -472,7 +472,8 @@ mod tests {
         ] {
             let text = err.to_string();
             assert!(
-                text.contains("checkpoint schema 5") && text.contains("schema 7"),
+                text.contains("checkpoint schema 5")
+                    && text.contains(&format!("schema {CHECKPOINT_SCHEMA}")),
                 "{text}"
             );
         }

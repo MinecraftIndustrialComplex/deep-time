@@ -511,6 +511,16 @@ fn structure_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     Some(deeptime_core::structure::summary_line(&v))
 }
 
+/// The volcano stage's summary line (P1-21): `volcanoes_final=<steps> strato_born=… …`, when the
+/// pipeline ran it.
+fn volcanoes_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note = world
+        .notes
+        .get(deeptime_core::surface::volcanoes::STAGE_NAME)?;
+    let v: Value = serde_json::from_str(note).ok()?;
+    Some(deeptime_core::surface::volcanoes::summary_line(&v))
+}
+
 /// The young landscape's summary line (P1-06): `young_final=… land_z_p50_m=a->b …`, when the
 /// pipeline ran it.
 fn young_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -569,6 +579,7 @@ pub(crate) fn timings_line(
         deeptime_core::surface::STAGE_NAME,
         deeptime_core::climate::STAGE_NAME,
         deeptime_core::structure::STAGE_NAME,
+        deeptime_core::surface::volcanoes::STAGE_NAME,
         deeptime_core::surface::young::STAGE_NAME,
     ] {
         if let Some(note) = world
@@ -652,6 +663,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
             surface_line(world),
             climate_line(world),
             structure_line(world),
+            volcanoes_line(world),
             young_line(world),
             amplify_line(world),
         ]
@@ -841,6 +853,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         std::fs::write(path, note)?;
     }
     if let Some(line) = structure_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = volcanoes_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = young_line(&ck.world) {

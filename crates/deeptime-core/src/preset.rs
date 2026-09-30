@@ -387,6 +387,13 @@ impl Preset {
                 if p.surface.is_some() {
                     // Coupled to the plates: one surface step after every plate step (plan §8).
                     stages.push(Box::new(crate::surface::SurfaceStage::new((**p).clone())));
+                    if p.volcanoes.is_some() {
+                        // Coupled too: builds its edifices on the surface each step, before the
+                        // structure stage reads the strata log (P1-21).
+                        stages.push(Box::new(crate::surface::volcanoes::VolcanoStage::new(
+                            (**p).clone(),
+                        )));
+                    }
                     // Column strata and metamorphism on the surface's strata log (P1-07).
                     stages.push(Box::new(crate::structure::StructureStage::new(
                         (**p).clone(),
@@ -664,6 +671,7 @@ mod tests {
                     "plates",
                     "climate",
                     "surface",
+                    "volcanoes",
                     "structure",
                     "deposits",
                     "young",
