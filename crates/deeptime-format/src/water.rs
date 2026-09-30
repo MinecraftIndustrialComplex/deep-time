@@ -18,11 +18,11 @@
 //!    the water surface w gives `top` = ⌈w⌉ − 1 and the bed is cut (or filled) to
 //!    `bed` = min(top − 1, ⌊w − max(1, depth · (1 − (d / hw)²))⌋): a parabolic cross-section, at
 //!    least one block of water.
-//! 5. **Bank.** A column holding none of these is a bank when a 4-neighbour holds river or lake
-//!    water (the sea is the aquifer's, which vanilla's own rules keep in place): its ground
+//! 5. **Bank.** A column holding none of these is a bank when a 4-neighbour holds water: its ground
 //!    must reach `min_ground` = the highest neighbour `top` (+1 beside a river: the freeboard that
 //!    keeps a river's one-block steps inside its banks), and air from `seal_from` (one above the
-//!    lowest neighbour bed) up to `min_ground` is sealed, so no water finds a way out. Within a
+//!    lowest neighbour bed; beside the sea [`SEA_SEAL`] blocks under its top at most) up to
+//!    `min_ground` is sealed, so no water finds a way out. Within a
 //!    channel's bank zone the ground may be at most `max_ground`, a 1:1 slope up from a block above
 //!    the water. A column may be a bank for either reason.
 
@@ -210,6 +210,9 @@ pub fn core(src: &dyn WaterSource, spec: &WaterSpec, c: i64, x: i64, z: i64) -> 
     core_with_surface(src, spec, wx, z, surface, rivers)
 }
 
+/// How far below the sea's top a coastal bank is sealed, blocks.
+pub const SEA_SEAL: i32 = 3;
+
 /// The 4-neighbour offsets, in the order both readers visit them.
 pub const NEIGHBOURS: [(i64, i64); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
@@ -236,12 +239,18 @@ pub fn finish(own: &Core, neighbours: &[Core; 4]) -> WaterColumn {
     let mut min_ground: Option<i32> = None;
     let mut seal: Option<i32> = None;
     for n in neighbours {
-        if !matches!(n.kind, WaterKind::River | WaterKind::Lake) {
+        if !n.kind.is_water() {
             continue;
         }
         let need = n.top + i32::from(n.kind == WaterKind::River);
         min_ground = Some(min_ground.map_or(need, |m| m.max(need)));
-        let from = n.bed + 1;
+        // Beside the sea only the waterline is sealed (cave mouths at the coast), not the whole
+        // depth of the ocean.
+        let from = if n.kind == WaterKind::Sea {
+            (n.bed + 1).max(n.top - SEA_SEAL)
+        } else {
+            n.bed + 1
+        };
         seal = Some(seal.map_or(from, |s| s.min(from)));
     }
     out.min_ground = min_ground;

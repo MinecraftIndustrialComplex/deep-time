@@ -48,6 +48,9 @@ public final class Water {
     public record Column(Kind kind, double surface, int ground, Double level, Integer top, Integer bed,
                          Integer minGround, Integer maxGround, Integer sealFrom, boolean riverBiome, Rivers.Hit river) {}
 
+    /** How far below the sea's top a coastal bank is sealed, blocks (Rust {@code SEA_SEAL}). */
+    public static final int SEA_SEAL = 3;
+
     /** The 4-neighbour offsets, in the order both readers visit them. */
     public static final int[][] NEIGHBOURS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
@@ -155,11 +158,12 @@ public final class Water {
                     rs.biome(), rs.hit());
         Integer minGround = null, seal = null;
         for (Core c : n) {
-            if (c.kind() != Kind.RIVER && c.kind() != Kind.LAKE)
-                continue;   // the sea is the aquifer's: vanilla's rules keep it
+            if (!c.kind().isWater())
+                continue;
             int need = c.top() + (c.kind() == Kind.RIVER ? 1 : 0);
             minGround = minGround == null ? need : Math.max(minGround, need);
-            int from = c.bed() + 1;
+            // Beside the sea only the waterline is sealed (cave mouths at the coast).
+            int from = c.kind() == Kind.SEA ? Math.max(c.bed() + 1, c.top() - SEA_SEAL) : c.bed() + 1;
             seal = seal == null ? from : Math.min(seal, from);
         }
         Integer maxGround = rs.bankCap();

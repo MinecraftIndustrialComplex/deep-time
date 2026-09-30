@@ -482,8 +482,8 @@ width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore
 4. Else **river** when a segment covers the column (the hit of "Rivers"): top = ⌈w⌉ − 1, bed =
    min(top − 1, ⌊w − max(1, depth · (1 − (d/hw')²))⌋).
 5. Else, visiting the neighbours (x+1, z), (x−1, z), (x, z+1), (x, z−1) evaluated by 1–4: for each
-   that holds river or lake water (not the sea, which is the aquifer's), `min_ground` = max(top + 1 for a river, top otherwise) and
-   `seal_from` = min(bed + 1); `max_ground` = the column's bank cap. The column is a **bank** when
+   that holds water (river, lake, sea), `min_ground` = max(top + 1 for a river, top otherwise) and
+   `seal_from` = min(bed + 1, or for the sea max(bed + 1, top − 3): only its waterline); `max_ground` = the column's bank cap. The column is a **bank** when
    either `min_ground` or `max_ground` is set, else **none**. `river_biome` and `river` (the hit)
    are kept whatever the kind.
 

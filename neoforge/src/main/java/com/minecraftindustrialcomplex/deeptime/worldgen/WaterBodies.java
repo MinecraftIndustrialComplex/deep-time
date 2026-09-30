@@ -97,8 +97,33 @@ public final class WaterBodies {
                 m.set(lx, y, lz);
     }
 
+    /** Chunks seen, chunks with work, and nanoseconds spent (logged every {@link #LOG_EVERY} chunks). */
+    private static final java.util.concurrent.atomic.LongAdder CHUNKS = new java.util.concurrent.atomic.LongAdder(),
+            WORKED = new java.util.concurrent.atomic.LongAdder(), NANOS = new java.util.concurrent.atomic.LongAdder(),
+            WORKED_NANOS = new java.util.concurrent.atomic.LongAdder();
+    static final long LOG_EVERY = 512;
+
     /** Applies the pass to {@code chunk} with the generator's noise cell width. */
     public static Stats apply(ChunkAccess chunk, WorldData wd, int cell) {
+        long t0 = System.nanoTime();
+        Stats s = applyTimed(chunk, wd, cell);
+        long dt = System.nanoTime() - t0;
+        NANOS.add(dt);
+        if (s != Stats.NONE) {
+            WORKED.increment();
+            WORKED_NANOS.add(dt);
+        }
+        CHUNKS.increment();
+        if (CHUNKS.sum() % LOG_EVERY == 0) {
+            long n = CHUNKS.sum(), w = WORKED.sum();
+            com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(
+                    "[deeptime] water pass: {} chunks, {} with water or coast, {} µs a chunk on average ({} µs where it worked)",
+                    n, w, String.format("%.1f", NANOS.sum() / 1000.0 / n), String.format("%.1f", w == 0 ? 0.0 : WORKED_NANOS.sum() / 1000.0 / w));
+        }
+        return s;
+    }
+
+    private static Stats applyTimed(ChunkAccess chunk, WorldData wd, int cell) {
         Water.Spec spec = Water.Spec.of(wd, cell);
         int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
         Rivers rivers = wd.rivers();
