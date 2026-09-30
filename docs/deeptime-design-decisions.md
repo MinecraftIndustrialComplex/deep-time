@@ -176,3 +176,7 @@ the log entry once a question is answered. A newer log entry overrides an older 
 | 2026-09-30 | PA's per-biome client cache can't follow each hemisphere on screen | "Yes, per-player cache (Recommended)": send each player a Deep Time-based cache at login. |
 | 2026-09-30 | Glacial erosion strength default (it trims peaks toward the snowline) | "Keep 1 (physical) (Recommended)"; recheck heights in P1-17. |
 | 2026-09-30 | Glacial troughs read as gorges at 15× vertical exaggeration | "Setting, default wider (Recommended)": a "glacial valley width" setting, default wider (e.g. 3×), 1 = physical. |
+| 2026-09-30 | Volcano cones read as spikes at 15× vertical exaggeration. Flank setting? | "Setting, gentler default (Recommended)". |
+| 2026-09-30 | Volcano events flood the event list (1,468 of 3,498) | "Group by arc/chain (Recommended)": one event per arc segment or hotspot chain, individual events only for notable ones (calderas, flood basalts, tallest cones). |
+| 2026-09-30 | Carvers vs rivers/lakes; dry coastal flats below sea level | "Allow caves under water": carvers may cut beneath rivers and lakes (occasional drained water, underwater cave entrances). (Coastal-flat sea fill not objected to.) |
+| 2026-09-30 | Vanilla ice spikes disappeared from ice caps as a side effect | "Bring ice spikes back (Recommended)": allow them on a share of ice-cap flats via the placement file, still excluding cherry grove and Scarlet. |
