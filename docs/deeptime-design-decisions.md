@@ -182,3 +182,7 @@ the log entry once a question is answered. A newer log entry overrides an older 
 | 2026-09-30 | Vanilla ice spikes disappeared from ice caps as a side effect | "Bring ice spikes back (Recommended)": allow them on a share of ice-cap flats via the placement file, still excluding cherry grove and Scarlet. |
 | 2026-09-30 | Hook Destroy's pollution into Project Atmosphere via the mixins instead of the eroding public-API push? | "Yes, in all worlds (Recommended)": pollution warming added inside PA's own temperature calculation on every world (the Deep Time climate part stays Deep Time-only); the public-API push is retired; same gating and fail-safe. |
 | 2026-09-30 | Merge the PA Terralith temperature table into MIC pack master? | "Merge to pack master (Recommended)" (done: pack master 790e116; existing worlds need PA's saved forecasts reset to pick it up). |
+| 2026-09-30 | Merge mic-climate `seasons` (per-latitude seasons) into mic-climate master? | "Keep on branch". |
+| 2026-09-30 | Spring/autumn-only crops never grow within ~8° of the equator (seasonless = Mid Summer) | "Let them grow year-round (Recommended)": in the seasonless band every crop is in season. |
+| 2026-09-30 | Tropical wet/dry seasons fade with the other seasons near the equator | "Exempt wet/dry (Recommended)": keep a wet/dry cycle in the 5–25° bands (strongest ~10–20°), inverted in the south. |
+| 2026-09-30 | Seasons switch and full-season latitude in mic-climate's unsynced common config | "Server-synced (Recommended)". |
