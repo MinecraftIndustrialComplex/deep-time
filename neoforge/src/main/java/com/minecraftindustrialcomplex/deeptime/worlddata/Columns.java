@@ -21,9 +21,9 @@ public final class Columns {
     public static final int CELLS = 16;
     /** The stencil index of cell (i0, j0), the reference of the weighted mean. */
     private static final int REF = 5;
-    /** Keys per band of an interfingering facies change (Rust {@code strata::BAND_KEYS}). */
+    /** Keys per band of an interfingering facies change where the layer does not say (Rust {@code strata::BAND_KEYS}). */
     public static final int BAND_KEYS = 64;
-    /** A class's share below which it takes no part of a band (Rust {@code strata::MINOR_SHARE}). */
+    /** A class's share below which it takes no part of a band, where the layer does not say (Rust {@code strata::MINOR_SHARE}). */
     public static final double MINOR_SHARE = 0.15;
 
     /**
@@ -272,20 +272,21 @@ public final class Columns {
                         eUnit[r + 1] = un;
                         eThick[r + 1] = th;
                     }
-                    interfinger(ne, s0, s1, top, bottom);
+                    interfinger(ne, s0, s1, top, bottom, strata.desc().tongueBandKeys(),
+                            strata.desc().tongueMinorShare());
                 }
                 top = bottom;
             }
         }
 
         /** Rust {@code strata::interfinger}. */
-        private void interfinger(int ne, int s0, int s1, double top, double bottom) {
+        private void interfinger(int ne, int s0, int s1, double top, double bottom, int bandKeys, double minor) {
             double total = 0.0;
             for (int e = 0; e < ne; e++)
                 total += eThick[e];
             double kept = 0.0;
             for (int e = 0; e < ne; e++) {
-                share[e] = Math.max(eThick[e] / total - MINOR_SHARE, 0.0);
+                share[e] = Math.max(eThick[e] / total - minor, 0.0);
                 kept += share[e];
             }
             if (kept <= 0.0) {
@@ -295,9 +296,9 @@ public final class Columns {
                     kept += share[e];
                 }
             }
-            double k0 = s0, k1 = s1, band = BAND_KEYS;
-            for (int n = s0 / BAND_KEYS; n <= (s1 - 1) / BAND_KEYS; n++) {
-                double base = n * BAND_KEYS;
+            double k0 = s0, k1 = s1, band = bandKeys;
+            for (int n = s0 / bandKeys; n <= (s1 - 1) / bandKeys; n++) {
+                double base = n * bandKeys;
                 double sum = 0.0;
                 for (int e = 0; e < ne; e++) {
                     double lo = base + band * (sum / kept);
