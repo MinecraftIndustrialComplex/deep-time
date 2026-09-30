@@ -81,7 +81,7 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     let m = Manifest::read(&dir).unwrap();
     m.verify(&dir).unwrap();
     assert_eq!(m.format_version, FORMAT_VERSION);
-    assert_eq!(FORMAT_VERSION, "0.1");
+    assert_eq!(FORMAT_VERSION, "0.2");
     for name in [
         "elevation",
         "detail/amplitude",
@@ -132,6 +132,62 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
             assert!((-1.0..=1.0).contains(&v), "temperature {v}");
         }
     }
+
+    // P1-25: the twelve months. At every L1 cell the mean of the twelve sea-level months, less the
+    // lapse over the climate's own ground, is the annual mean the bake stores (to the quantum),
+    // and the twelve precipitation shares sum to 12 (to the u8 quantum).
+    let month = |name: String| {
+        deeptime_format::TilePackReader::open(&dir.join(format!("rasters/{name}.dtr")))
+            .unwrap()
+            .load()
+            .unwrap()
+    };
+    let t_sl: Vec<_> = (0..12)
+        .map(|m| month(super::climate::t_sl_month_layer(m)))
+        .collect();
+    let share: Vec<_> = (0..12)
+        .map(|m| month(super::climate::p_share_month_layer(m)))
+        .collect();
+    let t_mean = month("climate/t_mean_c".into());
+    assert!(bake["climate"]["monthly"]["lapse_c_per_km"].is_number());
+    let (mut sea_cells, mut worst_sea, mut worst_share) = (0, 0.0f64, 0.0f64);
+    for j in (0..t_mean.desc.grid.h).step_by(3) {
+        for i in (0..t_mean.desc.grid.w).step_by(5) {
+            let (i, j) = (i64::from(i), i64::from(j));
+            let mean_sl = t_sl.iter().map(|l| l.get(i, j)).sum::<f64>() / 12.0;
+            let tm = t_mean.get(i, j);
+            // Land cells are lapsed (tm ≤ mean_sl); sea cells are at sea level (equal).
+            assert!(
+                tm <= mean_sl + 0.011,
+                "({i}, {j}) mean {tm} over sea-level {mean_sl}"
+            );
+            if (tm - mean_sl).abs() < 0.02 {
+                sea_cells += 1;
+                worst_sea = worst_sea.max((tm - mean_sl).abs());
+            }
+            let s: f64 = share.iter().map(|l| l.get(i, j)).sum();
+            worst_share = worst_share.max((s - 12.0).abs());
+        }
+    }
+    assert!(sea_cells > 0, "some cells sit at sea level");
+    assert!(
+        worst_share <= 12.0 * super::climate::P_SHARE_SCALE / 2.0 + 1e-9,
+        "shares sum to 12 ± {worst_share}"
+    );
+    eprintln!(
+        "bake test: monthly sea cells {sea_cells}, worst {worst_sea:.4} °C, share sum ± {worst_share:.4}"
+    );
+    let cw = deeptime_format::ClimateWorld::open(&dir)
+        .unwrap()
+        .expect("the climate API's layers");
+    let s = cw.sample(123, 400, -456);
+    let low = cw.sample(123, 63, -456);
+    assert!(s.t_mean < low.t_mean, "colder higher up");
+    assert!(
+        ((low.t_mean - s.t_mean) - cw.lapse_c_per_km() * s.elevation_m / 1000.0).abs() < 1e-9,
+        "the lapse over {} m",
+        s.elevation_m
+    );
 
     // The column evaluator reads the folder; the first horizon covers the terrain everywhere.
     let w = ColumnWorld::open(&dir).unwrap();

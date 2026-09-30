@@ -19,6 +19,7 @@ use crate::lazy::LazyLayer;
 use crate::manifest::Manifest;
 use crate::raster::{DType, RasterRead};
 use crate::sites::{Site, SiteIndex, read_sites};
+use crate::strata::ColumnHorizon;
 
 /// The terrain layer.
 pub const ELEVATION: &str = "elevation";
@@ -66,8 +67,9 @@ pub struct Column {
     pub top_y: i32,
     /// The `water_level` layer, nearest, where it has data.
     pub water: Option<f64>,
-    /// (top y, class index) per horizon, top-down, as the strata pass reads the stack.
-    pub horizons: Vec<(i32, u8)>,
+    /// (top y, class index, unit key) per horizon, top-down, as the strata pass reads the stack
+    /// ([`crate::strata::stack_at`]).
+    pub horizons: Vec<ColumnHorizon>,
     /// (body id, top y, bottom y) per maximal run of the column's blocks inside a body, ascending id.
     pub bodies: Vec<(u32, i32, i32)>,
     /// (top y, bottom y, rock class) from `top_y` down to `min_y`: the body's class (a zone's
@@ -229,7 +231,7 @@ impl ColumnWorld {
             .filter(|v| !v.is_nan());
         let mut horizons = Vec::new();
         if let Some(h) = &self.horizons {
-            h.stack_at(x, z, &mut horizons);
+            h.stack_at(x, z, self.min_y, &mut horizons);
         }
         let near: Vec<&Body> = self.bodies_at(wx, z).collect();
 
@@ -309,9 +311,12 @@ impl ColumnWorld {
             .horizons
             .iter()
             .enumerate()
-            .map(|(h, &(top, class))| {
-                let bottom = col.horizons.get(h + 1).map_or(self.min_y, |&(t, _)| t + 1);
-                json!({ "top": top, "bottom": bottom, "class": named(class) })
+            .map(|(h, &(top, class, unit))| {
+                let bottom = col
+                    .horizons
+                    .get(h + 1)
+                    .map_or(self.min_y, |&(t, _, _)| t + 1);
+                json!({ "top": top, "bottom": bottom, "class": named(class), "unit": unit })
             })
             .collect();
         let bodies: Vec<Value> = col
@@ -356,7 +361,7 @@ impl ColumnWorld {
 }
 
 /// The horizon holding block y, or None above the first horizon's top (`Column.horizonAt`).
-pub fn horizon_at(horizons: &[(i32, u8)], y: i32) -> Option<usize> {
+pub fn horizon_at(horizons: &[ColumnHorizon], y: i32) -> Option<usize> {
     if horizons.is_empty() || y > horizons[0].0 {
         return None;
     }
@@ -379,7 +384,7 @@ impl Column {
             "elevation": finite(self.elevation), "detail": finite(self.detail),
             "surface": finite(self.surface), "top_y": self.top_y,
             "water": self.water,
-            "horizons": self.horizons.iter().map(|&(t, c)| json!([t, c])).collect::<Vec<_>>(),
+            "horizons": self.horizons.iter().map(|&(t, c, u)| json!([t, c, u])).collect::<Vec<_>>(),
             "bodies": self.bodies.iter().map(|&(id, t, b)| json!([id, t, b])).collect::<Vec<_>>(),
             "rock": self.rock.iter().map(|(t, b, c)| json!([t, b, c])).collect::<Vec<_>>(),
         })
@@ -392,7 +397,7 @@ mod tests {
 
     #[test]
     fn horizon_at_follows_the_java_rule() {
-        let h = [(100, 3u8), (80, 4), (10, 5)];
+        let h = [(100, 3u8, 0u16), (80, 4, 1), (10, 5, 2)];
         assert_eq!(horizon_at(&h, 101), None);
         assert_eq!(horizon_at(&h, 100), Some(0));
         assert_eq!(horizon_at(&h, 81), Some(0));

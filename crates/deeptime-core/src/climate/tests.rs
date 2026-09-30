@@ -47,6 +47,9 @@ fn planet() -> Planet {
         day_length_h: 24.0,
         earth_scale: 782.278 / 6370.0,
         m_per_block_h: 300.0,
+        forcing_w_m2: 0.0,
+        sun_rel: 1.0,
+        orbit: None,
     }
 }
 
@@ -64,6 +67,7 @@ fn an_idealised_planet_has_earthlike_zones() {
         sea: 0.0,
         p: &p,
         planet: planet(),
+        monthly: true,
     };
     let mut ebm = EbmState::default();
     let s = snapshot::compute(&inp, &mut ebm, &[]);
@@ -195,14 +199,34 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
         field::ARIDITY,
         field::GLACIER,
         field::ELA,
+        field::ICE_THICKNESS,
+        field::ICE_MAX_THICKNESS,
+        field::ICE_MAX_EXTENT,
+        field::ICE_TIME_SHARE,
+        field::SEA_ICE,
     ] {
         let f = world.fields.get(name).unwrap_or_else(|| panic!("{name}"));
         assert_eq!(f.data.len(), n, "{name}");
     }
+    // The ice fields agree with each other: glaciers where the ice is, the maximum at least the
+    // present, shares and cover in [0, 1].
+    let ice = &world.fields[field::ICE_THICKNESS].data;
+    let ice_max = &world.fields[field::ICE_MAX_THICKNESS].data;
+    let glacier = &world.fields[field::GLACIER].data;
+    let share = &world.fields[field::ICE_TIME_SHARE].data;
+    let sea_ice = &world.fields[field::SEA_ICE].data;
+    for c in 0..n {
+        assert_eq!(glacier[c] == 1.0, ice[c] >= ICE_MIN_M, "cell {c}");
+        assert!(ice_max[c] >= ice[c] - 1e-3 && ice[c] >= 0.0 && ice[c] <= 4000.0);
+        assert!((0.0..=1.0).contains(&share[c]) && (0.0..=1.0).contains(&sea_ice[c]));
+    }
+    // The sea level the surface used is the climate's: the curve plus the ice's glacio-eustasy.
+    let sea = world.globals[SEA_LEVEL_GLOBAL];
+    assert_eq!(world.surface.as_ref().unwrap().sea_level_m, sea);
     let t = &world.fields[field::T_MEAN].data;
     let p = &world.fields[field::PRECIP].data;
     assert!(
-        t.iter().all(|x| (-80.0..50.0).contains(x)),
+        t.iter().all(|x| (-90.0..60.0).contains(x)),
         "temperatures in range"
     );
     assert!(
@@ -241,7 +265,32 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
         "frame {mf} vs climate {mc} mm/yr"
     );
     let note: serde_json::Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
-    assert_eq!(note["snapshots"], 7, "t = 2, 10, …, 50 and 60 Myr: {note}");
+    assert_eq!(note["snapshots"], 7, "t = 2, 10, …, 50 and 60 Myr");
+    // The curve: one row per plate step; the ice-age window's rows every 2 kyr of the last 3 Myr;
+    // the carbon cycle balanced (weathering follows degassing) at the end.
+    let rows = note["series"]["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 30);
+    let window = note["window"]["rows"].as_array().unwrap();
+    assert_eq!(window.len(), 1500);
+    let last = rows.last().unwrap().as_array().unwrap();
+    let col = |name: &str| {
+        clock::SERIES_COLUMNS
+            .iter()
+            .position(|c| *c == name)
+            .unwrap()
+    };
+    let (d, w) = (
+        last[col("degassing_mol_yr")].as_f64().unwrap(),
+        last[col("weathering_mol_yr")].as_f64().unwrap(),
+    );
+    assert!(
+        (w / d - 1.0).abs() < 0.2,
+        "degassing {d:e}, weathering {w:e}"
+    );
+    assert!((last[col("sea_level_m")].as_f64().unwrap() - sea).abs() < 0.01);
+    // The ice goes into the deposit frames.
+    assert!(frame.fields.contains_key(history::ICE_THICKNESS));
+    assert!(frame.fields.contains_key(history::ICE_COVER));
 
     // Resume from a checkpoint inside the group on another thread count: the same world.
     let dir2 = temp_dir("resumed");
@@ -269,12 +318,31 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
         field::PRECIP,
         field::KOPPEN,
         field::D_LN_PRECIP,
+        field::ICE_THICKNESS,
+        field::ICE_MAX_THICKNESS,
+        field::ICE_TIME_SHARE,
+        field::SEA_ICE,
     ] {
         assert_eq!(
             got.fields[name], world.fields[name],
             "{name} differs after resuming"
         );
     }
+    let series = |w: &crate::world::WorldState| -> serde_json::Value {
+        let v: serde_json::Value = serde_json::from_str(&w.notes[STAGE_NAME]).unwrap();
+        serde_json::json!([
+            v["series"],
+            v["window"],
+            v["snowballs"],
+            v["last"]["co2_ppm"]
+        ])
+    };
+    assert_eq!(
+        series(&got),
+        series(&world),
+        "the climate curve differs after resuming"
+    );
+    assert_eq!(got.globals, world.globals);
     assert_eq!(
         got.surface.as_ref().unwrap().elevation_m,
         world.surface.as_ref().unwrap().elevation_m

@@ -30,6 +30,9 @@ pub struct Common {
     /// `--history-mem`: the recorded history's frames held in memory at most, bytes
     /// (`Session::set_history_budget`).
     pub history_mem: Option<u64>,
+    /// `--climate-json`: write the climate stage's note (its summary, the run's CO₂/temperature/
+    /// ice/sea-level curve and the ice-age window's) here after a `stage` run.
+    pub climate_json: Option<std::path::PathBuf>,
 }
 
 /// The recorded history's line: its size, and what went to the spill file (P1-17).
@@ -474,7 +477,8 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     Some(format!(
         "climate_final={} t_surface_c={:.1} t_land_c={:.1} precip_land_mm={:.0} koppen_land={} \
          glaciated_land_frac={:.3} glaciations={} ebm_t_global_c={:.1} ebm_net_toa_w_m2={:.3} \
-         itcz_deg={:.1}..{:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_above_2km={:.3}",
+         itcz_deg={:.1}..{:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_above_2km={:.3} \
+         co2_ppm={:.0} sea_level_m={:.1} ice_volume_km3={:.3e} snowballs={} hothouses={}",
         note["snapshots"],
         f(&last["t_surface_c"]),
         f(&last["t_land_c"]),
@@ -489,6 +493,11 @@ fn climate_line(world: &deeptime_core::world::WorldState) -> Option<String> {
         f(&last["land_z_p50_m"]),
         f(&last["land_z_p90_m"]),
         f(&last["land_above_2km"]),
+        f(&last["co2_ppm"]),
+        f(&last["sea_level_m"]),
+        f(&last["ice_volume_km3"]),
+        note["snowballs"],
+        note["hothouses"],
     ))
 }
 
@@ -834,6 +843,12 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
     }
     if let Some(line) = climate_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
+    }
+    if let (Some(path), Some(note)) = (
+        o.common.climate_json.as_ref(),
+        ck.world.notes.get(deeptime_core::climate::STAGE_NAME),
+    ) {
+        std::fs::write(path, note)?;
     }
     if let Some(line) = structure_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
