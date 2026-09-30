@@ -20,6 +20,12 @@
 //! column (`deeptime_format::water`): **ours** in a river or lake column (the only water the pass
 //! places), **other** elsewhere (vanilla's springs, the aquifer's sea-level water in cave mouths,
 //! features), and a lake must be a lake column there. A neighbour's ice counts as the water under it.
+//!
+//! **Caves** (Ben, decisions log 2026-09-30, "Allow caves under water": carvers may cut under rivers
+//! and lakes) are counted apart so they do not hide a bank that leaks: a leak is *into a cave* when
+//! the air beside the water has ground above it (a covered hole, not the open surface), and water is
+//! *floating over a cave* when the air under it is at or below the bed Deep Time decided for its
+//! column (the pass leaves every bed solid, so only a carver or a noise cave removes it).
 
 use std::collections::{HashMap, VecDeque};
 
@@ -42,13 +48,13 @@ fn level_of(key: &str) -> Option<u32> {
 
 /// Checks `area` (x1, z1 exclusive; the outermost ring of columns is only read as neighbours).
 pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -> Value {
-    let mut kinds: HashMap<(i32, i32), WaterKind> = HashMap::new();
-    let mut kind_of = |x: i32, z: i32| -> Option<WaterKind> {
+    let mut cols: HashMap<(i32, i32), deeptime_format::WaterColumn> = HashMap::new();
+    let mut col_of = |x: i32, z: i32| -> Option<deeptime_format::WaterColumn> {
         let wd = wd?;
         Some(
-            *kinds
+            *cols
                 .entry((x, z))
-                .or_insert_with(|| wd.hydro(i64::from(x), i64::from(z)).kind),
+                .or_insert_with(|| wd.hydro(i64::from(x), i64::from(z))),
         )
     };
     // Water the pass placed: in a river or lake column (it never puts water in a bank).
@@ -56,6 +62,7 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
     // Ice over water is a frozen pool: water beside air over ice rests on it like on water.
     let is_ice = |id: u32| w.reg.name(id).ends_with("ice");
     let (mut floating_ours, mut leaks_ours) = (0u64, 0u64);
+    let (mut floating_cave, mut leaks_cave) = (0u64, 0u64);
     let mut leaks_by_kind: std::collections::BTreeMap<&'static str, u64> =
         std::collections::BTreeMap::new();
     let is_water_block = |id: u32| {
@@ -107,12 +114,18 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                 }
                 let below = w.block(x, y - 1, z);
                 if is_air(below) {
-                    floating += 1;
-                    let k = kind_of(x, z);
-                    floating_ours += u64::from(ours(k));
+                    let col = col_of(x, z);
+                    let k = col.map(|c| c.kind);
+                    let cave = col.and_then(|c| c.bed).is_some_and(|bed| y - 1 <= bed);
+                    if cave {
+                        floating_cave += 1;
+                    } else {
+                        floating += 1;
+                        floating_ours += u64::from(ours(k));
+                    }
                     if samples.len() < 40 {
-                        samples.push(json!({"what": "floating", "at": [x, y, z], "state": key,
-                                            "column": k.map(WaterKind::name)}));
+                        samples.push(json!({"what": if cave { "floating over a cave" } else { "floating" },
+                                            "at": [x, y, z], "state": key, "column": k.map(WaterKind::name)}));
                     }
                 }
                 if !source && holds_water(below) {
@@ -129,9 +142,16 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                     let under = w.block(x + dx, y - 1, z + dz);
                     if holds_water(under) || is_ice(under) {
                         steps += 1;
+                    } else if w.terrain_top(x + dx, z + dz).is_some_and(|g| g > y) {
+                        // Air under ground: a cave (or a canyon's overhang) opened beside the water.
+                        leaks_cave += 1;
+                        if samples.len() < 40 {
+                            samples.push(json!({"what": "leak into a cave", "at": [x, y, z], "state": key,
+                                                "into": [x + dx, y, z + dz]}));
+                        }
                     } else {
                         leaks += 1;
-                        let k = kind_of(x, z);
+                        let k = col_of(x, z).map(|c| c.kind);
                         leaks_ours += u64::from(ours(k));
                         *leaks_by_kind
                             .entry(k.map_or("?", WaterKind::name))
@@ -147,7 +167,7 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                 wet.insert((x, z));
             }
             if let Some((y, true)) = first_water
-                && (wd.is_none() || kind_of(x, z) == Some(WaterKind::Lake))
+                && (wd.is_none() || col_of(x, z).map(|c| c.kind) == Some(WaterKind::Lake))
             {
                 top_water.insert((x, z), y);
             }
@@ -227,6 +247,8 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
         "floating": floating,
         "leaks": leaks,
         "floating_ours": wd.map(|_| floating_ours),
+        "floating_over_caves": wd.map(|_| floating_cave),
+        "leaks_into_caves": leaks_cave,
         "leaks_ours": wd.map(|_| leaks_ours),
         "leaks_by_column": leaks_by_kind,
         "steps": steps,
