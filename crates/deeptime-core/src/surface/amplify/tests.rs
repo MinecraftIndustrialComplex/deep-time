@@ -23,6 +23,9 @@ const R2: u32 = 8;
 const C: u32 = W2 as u32 * R2;
 const SEA_Y: f64 = 63.0;
 
+static NEUTRAL: std::sync::LazyLock<character::CharacterFields> =
+    std::sync::LazyLock::new(character::CharacterFields::neutral);
+
 /// A splitmix-style hash in [−1, 1] of a cell.
 fn hash(i: usize, j: usize, salt: u64) -> f32 {
     let mut x = (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
@@ -118,6 +121,7 @@ fn cfg(drama: f64) -> Config {
         sea_y: SEA_Y,
         mv: 20.0,
         mh: 300.0,
+        l3_r: 2,
     }
 }
 
@@ -136,7 +140,7 @@ fn run_mem(level: &Level, cfg: &Config, plan: TilePlan, threads: usize) -> (MemS
         .unwrap();
     let mut sink = MemSink::new(plan.gw, plan.gh);
     let out = pool
-        .install(|| run(level.clone(), 2, cfg, plan, &mut sink, &never, &free))
+        .install(|| run(level.clone(), 2, cfg, cfg.character(&NEUTRAL), plan, &mut sink, &never, &free))
         .unwrap();
     (sink, out)
 }
@@ -352,7 +356,7 @@ fn streamed_tile_packs_hold_what_the_memory_run_holds() {
     assert_eq!((l3.w as usize, l3.h as usize), (4 * W2, 4 * H2));
     let mut sink = PackSink::create(&dir, &l3, 32, c.sea, c.sea_y, c.mv).unwrap();
     let plan = plan_tiled(&c);
-    let out = run(l2.clone(), 2, &c, plan, &mut sink, &never, &free).unwrap();
+    let out = run(l2.clone(), 2, &c, c.character(&NEUTRAL), plan, &mut sink, &never, &free).unwrap();
     let files = sink.finish().unwrap();
     assert!(out.last.tiles >= 8);
     let elev = TilePackReader::open(&dir.join(tiles::ELEVATION_PATH))
