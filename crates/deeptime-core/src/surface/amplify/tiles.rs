@@ -21,8 +21,9 @@ use crate::error::CoreError;
 use crate::surface::detail::DetailParams;
 
 /// Bytes per cell of a window while a tile runs: the passes' arrays ([`Buf`]), the copy of the
-/// terrain the change is measured against, and the core's arrays handed to the sink.
-pub const TILE_BYTES_PER_CELL: u64 = Buf::BYTES_PER_CELL + 4 + 17;
+/// terrain the change is measured against, the core's arrays handed to the sink, and the mountain
+/// character's copy of the terrain before it.
+pub const TILE_BYTES_PER_CELL: u64 = Buf::BYTES_PER_CELL + 4 + 17 + 4;
 /// Bytes per cell of a [`Level`] (terrain, area, weight, erodibility, lake).
 pub const LEVEL_BYTES_PER_CELL: u64 = 17;
 
@@ -435,10 +436,12 @@ pub fn run_tiles(
             // Where the character closed a deep pit (a gully dammed by its neighbour's crest), it
             // is softened back towards the passes' terrain before the flood, so the flood fills
             // puddles, not 20-block basins.
-            let mut filled = buf.z.clone();
+            // (The character's scratch is free again: `a2` holds the flooded surface, `norm`
+            // the spread pit depth.)
+            buf.a2.copy_from_slice(&buf.z);
             flood_repair(
                 &win,
-                &mut filled,
+                &mut buf.a2,
                 &buf.lake,
                 cfg.ph.sea,
                 cfg.ph.eps_m,
@@ -449,13 +452,14 @@ pub fn run_tiles(
                 &win,
                 &mut buf.z,
                 &z_pre,
-                &filled,
+                &buf.a2,
                 &mut buf.z2,
                 &mut buf.own,
+                &mut buf.norm,
                 cc,
                 buf.core,
             );
-            drop(filled);
+            drop(z_pre);
             let fl = flood_repair(
                 &win,
                 &mut buf.z,
@@ -467,11 +471,13 @@ pub fn run_tiles(
             );
             stats.character.land_cells += st.land_cells;
             stats.character.abs_change_blocks_cells += st.abs_change_blocks_cells;
-            stats.character.max_raise_blocks = stats.character.max_raise_blocks.max(st.max_raise_blocks);
+            stats.character.max_raise_blocks =
+                stats.character.max_raise_blocks.max(st.max_raise_blocks);
             stats.character.max_cut_blocks = stats.character.max_cut_blocks.max(st.max_cut_blocks);
             stats.character_flood_raised_cells += fl.raised_cells;
             stats.character_softened_cells += softened;
-            stats.character_flood_max_raise_m = stats.character_flood_max_raise_m.max(fl.max_raise_m);
+            stats.character_flood_max_raise_m =
+                stats.character_flood_max_raise_m.max(fl.max_raise_m);
             stats.character_ms += started.elapsed().as_secs_f64() * 1000.0;
         }
         let (_, _, cw, ch) = core;

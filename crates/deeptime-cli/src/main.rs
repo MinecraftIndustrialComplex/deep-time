@@ -917,6 +917,7 @@ mod tests {
             viewer: Some(dir.join("viewer")),
             viewer_layers: Vec::new(),
             work: None,
+            bake: false,
             common: quiet(),
         })
         .unwrap();
@@ -975,6 +976,7 @@ mod tests {
             viewer: None,
             viewer_layers: Vec::new(),
             work: None,
+            bake: false,
             common: quiet(),
         };
         super::run::stage(&first).unwrap();
@@ -989,6 +991,7 @@ mod tests {
             viewer: Some(dir.join("viewer")),
             viewer_layers: Vec::new(),
             work: None,
+            bake: false,
             common: quiet(),
         };
         super::run::stage(&second).unwrap();
@@ -1064,6 +1067,7 @@ mod tests {
                 viewer,
                 viewer_layers: Vec::new(),
                 work,
+                bake: false,
                 common: quiet(),
             })
         };
@@ -1148,6 +1152,7 @@ mod tests {
                 viewer,
                 viewer_layers: Vec::new(),
                 work: None,
+                bake: false,
                 common: quiet(),
             })
         };
@@ -1269,6 +1274,7 @@ mod tests {
                 viewer,
                 viewer_layers: Vec::new(),
                 work: None,
+                bake: false,
                 common: quiet(),
             })
         };

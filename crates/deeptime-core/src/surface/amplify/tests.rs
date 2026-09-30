@@ -140,7 +140,18 @@ fn run_mem(level: &Level, cfg: &Config, plan: TilePlan, threads: usize) -> (MemS
         .unwrap();
     let mut sink = MemSink::new(plan.gw, plan.gh);
     let out = pool
-        .install(|| run(level.clone(), 2, cfg, cfg.character(&NEUTRAL), plan, &mut sink, &never, &free))
+        .install(|| {
+            run(
+                level.clone(),
+                2,
+                cfg,
+                cfg.character(&NEUTRAL),
+                plan,
+                &mut sink,
+                &never,
+                &free,
+            )
+        })
         .unwrap();
     (sink, out)
 }
@@ -356,7 +367,17 @@ fn streamed_tile_packs_hold_what_the_memory_run_holds() {
     assert_eq!((l3.w as usize, l3.h as usize), (4 * W2, 4 * H2));
     let mut sink = PackSink::create(&dir, &l3, 32, c.sea, c.sea_y, c.mv).unwrap();
     let plan = plan_tiled(&c);
-    let out = run(l2.clone(), 2, &c, c.character(&NEUTRAL), plan, &mut sink, &never, &free).unwrap();
+    let out = run(
+        l2.clone(),
+        2,
+        &c,
+        c.character(&NEUTRAL),
+        plan,
+        &mut sink,
+        &never,
+        &free,
+    )
+    .unwrap();
     let files = sink.finish().unwrap();
     assert!(out.last.tiles >= 8);
     let elev = TilePackReader::open(&dir.join(tiles::ELEVATION_PATH))
@@ -837,7 +858,7 @@ fn every_pipeline_preset_adds_little_by_streaming_when_it_must() {
             amp["seconds"].as_f64().unwrap(),
         );
         // What the amplifier adds to the world stays under 2.5 GiB on every preset: the whole
-        // raster when it fits (67 B a cell: 2.1 GiB at 16k quick), tiles when it does not (32k
+        // raster when it fits (71 B a cell: 2.2 GiB at 16k quick), tiles when it does not (32k
         // full would need 8 GiB whole).
         assert!(own < (5u64 << 29), "{name}: the stage adds {own} bytes");
     }

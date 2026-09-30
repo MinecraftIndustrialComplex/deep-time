@@ -118,7 +118,12 @@ impl CharacterParams {
                 Err(bad(k, &format!("must be in [{lo}, {hi}]")))
             }
         };
-        range(self.gully_wavelength_blocks, 8.0, 512.0, "gully_wavelength_blocks")?;
+        range(
+            self.gully_wavelength_blocks,
+            8.0,
+            512.0,
+            "gully_wavelength_blocks",
+        )?;
         if self.gully_octaves > 6 {
             return Err(bad("gully_octaves", "must be at most 6"));
         }
@@ -126,14 +131,29 @@ impl CharacterParams {
         range(self.gully_relief_cap, 0.0, 2.0, "gully_relief_cap")?;
         range(self.gully_max_ratio, 0.0, 1.0, "gully_max_ratio")?;
         range(self.gully_persistence, 0.1, 1.0, "gully_persistence")?;
-        range(self.fold_wavelength_blocks, 16.0, 1024.0, "fold_wavelength_blocks")?;
+        range(
+            self.fold_wavelength_blocks,
+            16.0,
+            1024.0,
+            "fold_wavelength_blocks",
+        )?;
         range(self.fold_gain, 0.0, 2.0, "fold_gain")?;
-        range(self.sharpen_radius_blocks, 4.0, 256.0, "sharpen_radius_blocks")?;
+        range(
+            self.sharpen_radius_blocks,
+            4.0,
+            256.0,
+            "sharpen_radius_blocks",
+        )?;
         range(self.sharpen_gain, 0.0, 4.0, "sharpen_gain")?;
         range(self.round_gain, 0.0, 1.0, "round_gain")?;
         range(self.terrace_step_blocks, 2.0, 64.0, "terrace_step_blocks")?;
         range(self.terrace_gain, 0.0, 2.0, "terrace_gain")?;
-        range(self.relief_radius_blocks, 4.0, 256.0, "relief_radius_blocks")?;
+        range(
+            self.relief_radius_blocks,
+            4.0,
+            256.0,
+            "relief_radius_blocks",
+        )?;
         range(self.youth_myr, 1.0, 10_000.0, "youth_myr")?;
         range(self.active_uplift_mm_yr, 0.01, 100.0, "active_uplift_mm_yr")?;
         for (k, [a0, a1]) in [
@@ -640,7 +660,8 @@ pub fn apply(
     map_cells(win, s.tmp, |i, j, o| *o = to_y(z[j * win.w + i]));
     map_cells(win, s.base, |i, j, o| {
         let g = |di, dj| s.tmp[at(win, i, j, di, dj)];
-        *o = (4.0 * g(0, 0) + 2.0 * (g(1, 0) + g(-1, 0) + g(0, 1) + g(0, -1))
+        *o = (4.0 * g(0, 0)
+            + 2.0 * (g(1, 0) + g(-1, 0) + g(0, 1) + g(0, -1))
             + g(1, 1)
             + g(1, -1)
             + g(-1, 1)
@@ -676,7 +697,11 @@ pub fn apply(
     let fade = |cell: usize| -> f64 {
         let a_km2 = f64::from(area[cell]) * 1.0e-6;
         let river = smoothstep(a0, a1, a_km2);
-        let coast = smoothstep(0.0, p.coast_blocks.max(1e-6), f64::from(s.smooth[cell]) - sea_y);
+        let coast = smoothstep(
+            0.0,
+            p.coast_blocks.max(1e-6),
+            f64::from(s.smooth[cell]) - sea_y,
+        );
         (1.0 - river) * coast
     };
 
@@ -696,21 +721,13 @@ pub fn apply(
             return;
         }
         let wob = 0.35 * value(ctx.seed, 207, c, bx, bz, 3.0 * p.fold_wavelength_blocks);
-        let b = stripes(
-            ctx.seed,
-            211,
-            c,
-            bx,
-            bz,
-            dir,
-            p.fold_wavelength_blocks,
-            0.0,
-        );
+        let b = stripes(ctx.seed, 211, c, bx, bz, dir, p.fold_wavelength_blocks, 0.0);
         // Ridged: sharp crests at the stripes' zero lines, rounded troughs; plunging along strike.
         let ridged = 0.5 - (b + wob).abs().min(1.0);
         let plunge = 0.6 + 0.4 * value(ctx.seed, 213, c, bx, bz, 1.5 * p.fold_wavelength_blocks);
         let gap = 1.0 - smoothstep(f0, f1, f64::from(area[cell]) * 1.0e-6);
-        let amp = (rug * p.fold_gain * fold * plunge * f64::from(rel[cell])).min(2.0 * headroom(cell));
+        let amp =
+            (rug * p.fold_gain * fold * plunge * f64::from(rel[cell])).min(2.0 * headroom(cell));
         *o = (amp * ridged * fade(cell) * gap) as f32;
     });
 
@@ -746,7 +763,8 @@ pub fn apply(
             let (youth, _, _) = ctx.fields.at(gi, gj);
             let hard = hardness(kfac[cell]).clamp(0.0, 1.0);
             // Finer octaves are rounder: sharp crests are the coarse ridgelines'.
-            let sharp = (0.2 + 0.45 * youth + 0.45 * hard).clamp(0.0, 1.0) * (1.0 - 0.2 * f64::from(k));
+            let sharp =
+                (0.2 + 0.45 * youth + 0.45 * hard).clamp(0.0, 1.0) * (1.0 - 0.2 * f64::from(k));
             let shape = (0.45 + 0.55 * youth) * (0.55 + 0.45 * hard);
             let amp = (rug * p.gully_gain * shape * slope * lam * persist)
                 .min(p.gully_relief_cap * f64::from(rel[cell]))
@@ -755,7 +773,10 @@ pub fn apply(
             let b = stripes(ctx.seed, 300 + k, c, bx, bz, dir, lam, sharp);
             *o = (amp * b * fade(cell)) as f32;
         });
-        s.acc.iter_mut().zip(s.tmp.iter()).for_each(|(a, &t)| *a += t);
+        s.acc
+            .iter_mut()
+            .zip(s.tmp.iter())
+            .for_each(|(a, &t)| *a += t);
         lam *= 0.5;
         persist *= p.gully_persistence;
     }
@@ -776,7 +797,10 @@ pub fn apply(
         // (axis and diagonal gullies a few cells wide) give way to the drainage-aligned ones.
         let (mx, mz) = {
             let h = |di, dj| f64::from(smooth[at(win, i, j, di, dj)]);
-            ((h(1, 0) - h(-1, 0)) / (2.0 * cb), (h(0, 1) - h(0, -1)) / (2.0 * cb))
+            (
+                (h(1, 0) - h(-1, 0)) / (2.0 * cb),
+                (h(0, 1) - h(0, -1)) / (2.0 * cb),
+            )
         };
         let steep = smoothstep(0.3, 1.2, (mx * mx + mz * mz).sqrt()) * rug.min(1.0);
         let y0 = f64::from(base[cell]) + steep * f64::from(smooth[cell] - base[cell]);
@@ -797,8 +821,7 @@ pub fn apply(
             .min(1.0)
             * f;
         if wt > 0.0 {
-            let step = p.terrace_step_blocks
-                * (1.0 + 0.3 * value(ctx.seed, 221, c, bx, bz, 96.0));
+            let step = p.terrace_step_blocks * (1.0 + 0.3 * value(ctx.seed, 221, c, bx, bz, 96.0));
             let off = step * value(ctx.seed, 223, c, bx, bz, 160.0);
             let q = (y + off) / step;
             let qi = q.floor();
@@ -852,6 +875,7 @@ pub fn soften_pits(
     filled: &[f32],
     tmp: &mut [f32],
     depth: &mut [f32],
+    spread: &mut [f32],
     ctx: &CharacterCtx<'_>,
     core: (usize, usize, usize, usize),
 ) -> u64 {
@@ -876,8 +900,8 @@ pub fn soften_pits(
         }
         *o = m;
     });
-    let spread = depth.to_vec();
-    box_blur(win, &spread, tmp, depth, PIT_SOFTEN_RADIUS);
+    spread.copy_from_slice(depth);
+    box_blur(win, spread, tmp, depth, PIT_SOFTEN_RADIUS);
     let [d0, d1] = PIT_SOFTEN_BLOCKS;
     let mut n = 0u64;
     let (x0, y0, cw, ch) = core;
@@ -944,7 +968,9 @@ mod tests {
         let before = z.clone();
         let n = win.cells();
         let mut sc: Vec<Vec<f32>> = (0..7).map(|_| vec![0f32; n]).collect();
-        let [a, b, c, d, e, f, g] = &mut sc[..] else { unreachable!() };
+        let [a, b, c, d, e, f, g] = &mut sc[..] else {
+            unreachable!()
+        };
         let p = CharacterParams::default();
         let ctx = CharacterCtx {
             p: &p,
@@ -959,8 +985,25 @@ mod tests {
             sea_y: SEA_Y,
             mv: MV,
         };
-        let scratch = Scratch { base: a, smooth: b, relief: c, blur: d, acc: e, tmp: f, tmp2: g };
-        apply(&win, &mut z, &area, &k, &lake, scratch, &ctx, (0, 0, win.w, win.h));
+        let scratch = Scratch {
+            base: a,
+            smooth: b,
+            relief: c,
+            blur: d,
+            acc: e,
+            tmp: f,
+            tmp2: g,
+        };
+        apply(
+            &win,
+            &mut z,
+            &area,
+            &k,
+            &lake,
+            scratch,
+            &ctx,
+            (0, 0, win.w, win.h),
+        );
         let mut sum = 0.0;
         let mut cnt = 0.0;
         for j in 30..130 {
@@ -981,7 +1024,10 @@ mod tests {
         let (y_hard, _) = change(&young, 0.8, 1.0);
         let (y_soft, _) = change(&young, 3.0, 1.0);
         let (o_hard, _) = change(&old, 0.8, 1.0);
-        assert!(y_hard > 3.0, "a young cone in hard rock changes by {y_hard} blocks RMS");
+        assert!(
+            y_hard > 3.0,
+            "a young cone in hard rock changes by {y_hard} blocks RMS"
+        );
         assert!(y_hard > 1.3 * y_soft, "hard {y_hard} vs soft {y_soft}");
         assert!(y_hard > 1.3 * o_hard, "young {y_hard} vs old {o_hard}");
         // Ruggedness 0 leaves the terrain alone, and more ruggedness is more character.

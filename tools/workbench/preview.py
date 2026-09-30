@@ -180,8 +180,8 @@ def normalise_spec(spec, max_side=MAX_SIDE):
         if not re.fullmatch(r"[a-z0-9_.-]+:[a-z0-9_./-]+", w["level_type"]):
             raise ValueError(f"level_type {w['level_type']!r} is not a resource location")
         for b in locate:
-            if not re.fullmatch(r"[a-z0-9_.-]+:[a-z0-9_./-]+", b):
-                raise ValueError(f"locate {b!r} is not a biome id")
+            if not re.fullmatch(r"[a-z0-9_.-]+:[a-z0-9_./-]+(@-?\d+,-?\d+)?", b):
+                raise ValueError(f"locate {b!r} is not a biome id (optionally @x,z: searched from there)")
         w["locate"] = locate
         side = int(w.get("locate_side", 256))
         if not 16 <= side <= max_side:
@@ -759,18 +759,23 @@ def locate_boxes(job, server, spec):
     w = spec["world"]
     side = w.get("locate_side", 256)
     found = []
-    for biome in w.get("locate", []):
-        job.set("locating", f"/locate biome {biome}")
-        reply = server.rcon(f"locate biome {biome}", timeout=600)
+    for spec_ in w.get("locate", []):
+        biome, _, at = spec_.partition("@")
+        cmd = f"locate biome {biome}"
+        if at:
+            ax, az = at.split(",")
+            cmd = f"execute positioned {ax} 64 {az} run {cmd}"
+        job.set("locating", f"/{cmd}")
+        reply = server.rcon(cmd, timeout=600)
         m = LOCATED.search(reply or "")
-        job.say(f"   locate biome {biome}: {(reply or '').strip()[:200]}")
+        job.say(f"   {cmd}: {(reply or '').strip()[:200]}")
         if not m:
-            found.append({"biome": biome, "reply": (reply or "").strip()[:300]})
+            found.append({"biome": spec_, "reply": (reply or "").strip()[:300]})
             continue
         x, z = int(m.group(1)), int(m.group(2))
         box = [x - side // 2, z - side // 2, x - side // 2 + side, z - side // 2 + side]
         spec["boxes"].append(box)
-        found.append({"biome": biome, "at": [x, z], "box": box})
+        found.append({"biome": spec_, "at": [x, z], "box": box})
     job.set(located=found)
     job.timing("located", found)
     return found
