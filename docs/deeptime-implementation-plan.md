@@ -3604,6 +3604,13 @@ the time budget on a 4-core laptop; the climate → biome mapping producing odd 
 counts and sizes that feel wrong in play; COE/CDG signature drift on pack updates; memory headroom
 on this machine.
 
+#### P1-21 Volcanoes as landforms (added 2026-09-29)
+- **Goal.** Volcano landforms driven by the plate model (Ben, decisions log 2026-09-29, "Volcanoes
+  (Recommended, v1)"): stratovolcanoes along arcs, shield volcanoes and island chains over hotspots,
+  calderas, flood-basalt plateaus from LIP events; volcanic rock in the strata; events with causes.
+- **Acceptance.** Tests on placement from arc/hotspot/LIP fields; a real planet shows volcano
+  chains in the right settings; 3D previews of an arc volcano, a hotspot island chain and a caldera.
+
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 
 - **P2-01 Noddy evaluator.** Port `unEvents.c`, `taste.c`, `matrix.c` from `noddyverse` (MIT);
@@ -3617,6 +3624,17 @@ on this machine.
   cave density modulated by lithology and water table, with vanilla cave functions kept as the
   baseline so every region stays playable; a connectivity metric per region.
 - **P2-05 Weathering blocks**: regolith, saprolite, laterite and bauxite caps, scree.
+- **P2-08 Meteor impacts** (Ben, decisions log 2026-09-29: "Yes, in full … not in v1, but before phase 3"):
+  impacts at an Earth-like, size-dependent rate (a setting); simple and complex craters aged and
+  buried by the surface stage; breccia and impact-melt units in the strata; impact deposit types
+  in the deposit engine (Sudbury-type Ni-Cu-PGE melt-sheet sulphides, impact-hydrothermal
+  Cu-Zn-Au, impact diamonds, crater-basin oil/uranium traps) with "why here" chains to the impact.
+- **P2-09 Surface landforms** (Ben, 2026-09-29): coral reefs, atolls and barrier islands; desert dunes
+  (ergs) and loess; surface rift valleys, grabens and fault scarps; plateau canyons, mesas and buttes.
+- **P2-10 More ore families** (Ben, 2026-09-29): volcanogenic massive sulphides, orogenic gold,
+  kimberlite diamonds, laterite nickel and bauxite, roll-front uranium, epithermal gold-silver.
+- **P2-11 Salt domes and seafloor** (Ben, 2026-09-29): salt diapirs (and their oil traps); seamounts,
+  guyots and submarine canyons.
 - **P2-07 Per-chunk overhead**: Chunky throughput in the same smoke with a vanilla preset vs Deep
   Time.
 
