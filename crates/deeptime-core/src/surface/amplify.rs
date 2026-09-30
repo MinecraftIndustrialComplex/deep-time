@@ -817,14 +817,7 @@ impl AmplifyStage {
                 )?
             }
             None => run(
-                level,
-                n_dbl,
-                &cfg,
-                character,
-                plan,
-                &mut sink,
-                &cancelled,
-                &reserve,
+                level, n_dbl, &cfg, character, plan, &mut sink, &cancelled, &reserve,
             )?,
         };
         let files = sink.finish()?;
