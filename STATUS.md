@@ -139,7 +139,17 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   Deposit bodies are unchanged (their depths are the ledger's); the horizon class at ore-body centres
   (`deeptime inspect-column`, 354 bodies): coal seams in sedimentary rock 48.7 % → 56.2 %, placer 61 → 72 %,
   MVT 29 → 43 %, SEDEX 50 → 75 %, porphyry 50 → 44 %.
-- **Gates** — see the next bullet (filled after the final merge).
+- **Gates** (Mac, on the branch after merging master 00c02ce): `cargo fmt --check`, `clippy --workspace --all-targets
+  --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` all pass (cli 30, core
+  256 + 3 ignored, format 44 incl. `strata::tests` — the same stack everywhere is that stack, B-spline weights, a
+  shared bed smooth and a missing one pinching out with every column within a block of its neighbour, a facies
+  change intertongues, a zero-weight cell changes nothing —, inspect 29 + 2 + 7, jni 7, viewer 5); `cd neoforge &&
+  ./gradlew build test` → tests=144 failures=0 (`ColumnParityTest` 500 columns equal, `TilePackParityTest` checks
+  the keys, `ColumnRuleBenchTest` 0.44–0.74 ms/chunk); `mac.sh --server -- ./gametest.sh` → **All 50 required tests
+  passed**; `tools/smoke/install.sh mic` + `./gametest.sh -PwithMic` → **All 50 required tests passed**, 50
+  `gametest-result` lines, 0 not PASS. `everyClassInTheWorld` first failed (59 wrong): it sampled horizons by
+  index, which now reach the surface-rule layer and the bedrock floor in the every-class world; it samples by depth
+  now (20+ blocks down, clear of the floor).
 - **Decisions for Ben** (not asked): (1) ~44 % of coal-seam bodies sit in basement rock (granodiorite, granite,
   gneiss) before and after — the stack's depth comes from the ledger, not from the sediment thickness at the site;
   capping a coal stack at the sedimentary cover would fix it (deposit engine, not strata). (2) `deposits_world_16k`
