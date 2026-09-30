@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -79,6 +79,76 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-30 — Satellite view: a true-colour keyframe layer, the default everywhere (agent worktree agent-a7ca2a0e875263a86, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Ben: "Default view on the viewer is currently an elevation map, can you turn it into an actual map. (I.E.
+  Approximately what you would see on google earth zoomed out all the way / satellite imagery.) So I can see where
+  glaciars / snow is". A derived, view-only keyframe layer `satellite` (`core::satellite`), composited when a frame is
+  drawn from fields the stages already wrote, like `provinces`: nothing goes into `WorldState`. `keyframes::add_derived`
+  puts it **first** in every frame of the plate model's group (`elevation` + `regime`, with or without a climate) and in
+  the young landscape's and amplification's frames (drawn on `young/elevation`, `amplify/elevation` box-averaged to the
+  frame); a dummy stage's `elevation` and the deposit frame get none. `keyframes::render` takes a `ViewScale`
+  (`Preset::view_scale`: `sea_level_y`, `m_per_block_v`, `model_radius_km`) to turn block y into metres. Also:
+  `deeptime satellite --in <checkpoint> --out x.png [--width W]` (for tuning without a rerun); `climate-dem --viewer`
+  now draws the satellite view of the relief it is given (Earth's, when there is a DEM).
+- **Colour rules** (the module docs have them in full; constants `satellite::Look`). The anchor colours are the 18
+  classes of the new `satellite` ramp in `ramps.json` (labels + `groups` Land / Snow and ice / Sea), so the legend is a
+  key to exactly the colours drawn. Sea by depth: turquoise under 8 m, shelf blue at 120 m, ocean at 1.5 km, deep navy
+  from 5 km; annual `climate/sea_ice` whitens it (fully from ~90 %). Land with a climate: herb cover from the aridity
+  index (0.05 → 0.45) and tree cover (0.5 → 1.0), herbs needing a warmest month over ~0 °C and trees over ~10 °C; the
+  Köppen class holds the picture on its map (BW ≤ 15 % herbs, no trees; BS 35–75 % herbs, < 8 % trees; Af/Am forest;
+  Aw/As 20–55 % trees; ET/EF no trees). Ground: sand where hot, grey-tan where cold, 45 % tinted by the surface rock
+  (`surface/class`: sandstone pale, red beds reddish, basalt dark, evaporites salt-white). Herbs: khaki steppe → olive
+  savanna with moisture, brown-grey tundra under cold summers; forest: boreal / temperate / rainforest by the coldest
+  month. Bare grey-brown rock from 2.5 km up. Snow: perennial (85 %) where the warmest month is below freezing, above
+  the snow line (`climate/ela_m`) or EF; seasonal tint up to 35 % as the coldest month goes −2 → −22 °C (half under
+  forest). Glacier ice (`climate/ice_thickness_m` ≥ 1 m, else `climate/glacier`) white. Hill shade: NW light at 45°,
+  heights ×14 on the model sphere, 60 % strength on land, 45 % on ice, 35 % on the sea floor, none under sea ice.
+  Smoothing (found in the first pictures): the energy-balance model's 2° bands drew ruled lines in the sea-ice edge and
+  the snow, the orographic rain's cell streaks drew stripes in the Sahel-like belts, Köppen borders drew steps and the
+  per-cell rock tint speckled deserts; so temperatures are box-filtered over ±3 rows, moisture over 3 × 3 (geometric),
+  sea ice over 5 × 17 sea cells, and the herb/tree cover and rock colour over 3 × 3 land cells before compositing.
+- **Frames without a climate** (plate-only presets, pipelines without the climate stage): bare ground by geology —
+  the surface rock's colour (`surface/class`, else `structure/rock`), else desert tan in the lowlands turning to grey-brown
+  rock with height, darker on hotspots; no plants, snow or sea ice (nothing says where they would be). In an
+  earthlike run every group frame has a climate (the climate steps before the first frame).
+- **Storage and the game.** No new layer kind: keyframe layers are RGBA8 already, so FORMAT.md's Keyframes section only
+  documents the two derived layers (the satellite ramp is a legend, not applied). The in-game timelapse builds its
+  buttons from the frames' layer names and takes the first as its default, so it opens on the satellite view with no
+  Java change; `deeptime.layer.satellite` = "Satellite" added to en_us.json. The review page's final map is still the
+  world data's elevation (not changed).
+- **Default.** Workbench: `DEFAULT_LAYERS = ['satellite', 'elevation']` (a `layer=` in the URL hash still wins); the Planet
+  group lists Satellite, then Elevation (keys 1, 2); the legend shows a key (swatches in the ramp's groups, wide columns
+  for long labels — provinces' labels benefit too); the pointer readout says "looks like temperate forest". `?tv`: the
+  same default, a three-column key without headings. Static bundle: the timelapse lists every layer any frame names and
+  opens on `satellite`; the world-data map gets a `satellite` image layer first (the last satellite keyframe, drawn on a
+  keyframe grid r = C/w; no values, no water overlay) with a swatch legend.
+- **Measured** (Mac, release). One 1024 × 512 frame < 0.3 s (the CLI from a checkpoint, reading included). Size: the
+  satellite layer is 0.58–1.17 MB LZ4 per frame (+16 % on a group frame: 7.0 → 8.2 MB at the present); the default run's
+  keyframes 68 → 80 MB; a workbench run with a frame every step (250) grows ~250 MB.
+  **World files vs master** (`run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --threads 3`,
+  master 18706c7 binary against this branch): `diff -rq` differs only in `keyframes/index.json`, 13 of 14 `kf-*.dtk` (the
+  deposit frame is identical) and `manifest.json` (created_utc, stage timings, the keyframe files' bytes/crc and
+  `reserved_peak_bytes`/`reserved_base_peak_bytes` +25.2 MB: the plates estimate counts one more keyframe layer).
+- **Screenshots** (headless Chromium on the Mac — Playwright's chrome-headless-shell through a `chromium` wrapper on
+  PATH for `tools/viewer/shot.py`; private `deeptime watch --port 8653` with its own runs folder on the SSD; 8642 untouched),
+  1600 × 900 in `review/out/sat/shots/`: `wb-present.png` and `wb-present-clean.png` (events off) — earthlike_quick_16k
+  scattered, 500 Myr, the present; `wb-mid.png` — 268 Myr ago; `wb-snowball.png`, `wb-snowball-clean.png` — the snowball
+  scenario (supercontinent, `degassing_scale` 0.3, 1,000 Myr; `deeptime:snowball` −807.3 → −760.6 Myr) at 784 Myr ago,
+  the whole planet white; `wb-tv.png` — `?tv`; `static-viewer.png` — the run's static bundle opening on the satellite
+  world map. Raw frames in `review/out/sat/frames/` (present, 244 and 498 Myr ago; 840, 784, 720 Myr ago in the snowball
+  run); `ck-present2.png`, `crop3x2.png` from `deeptime satellite`. Looked at: glaciers and ice caps stand out white on
+  mountains and poles, sea ice fades from the poles, deserts are tan in continental interiors and rain shadows, forests
+  green on wet margins, tundra brown-grey at high latitudes, shelves lighter than the deep sea with ridges visible.
+- **Gates.** `cargo test --workspace` ok (core 287 + 3 ignored, incl. satellite:: 6 — synthetic frame: deep ocean dark
+  navy, a shallow bank turquoise, hot desert tan, rainforest deep green, glacier and frozen sea white, steppe khaki,
+  tundra brown-grey; snowball all white; no-climate frame bare rock and ice-free; ramp labels = classes; hill shade lit
+  NW; box filter bands and mask — keyframes:: the satellite leads terrain frames only, viewer: the last satellite frame
+  leads the world layers); clippy `--workspace --all-targets -D warnings` ok; `cargo fmt --check` ok; `cargo deny check
+  licenses bans` ok; `./gradlew build test` BUILD SUCCESSFUL, tests=151 failures=0 (the lang string; `ScreenSourcesTest` reads en_us.json). All of them re-run after merging master 52b6626 (the climate API's latitude; coal in the sedimentary cover and the strata settings): all pass (core 288 + 3 ignored; Gradle tests=151 failures=0).
+- **Next.** Merge when reviewed (the caller lands it). Not done: the in-game review page's final map could show the last
+  satellite keyframe instead of the elevation ramp (a ReviewModel change); the workbench readout could give the
+  elevation under the pointer on the satellite layer too.
+
 ### 2026-09-30 — Coal held in the sedimentary cover; rock-layer settings with a flatter default; readable deposit-world strata (agent worktree agent-aacd864d2709d52dd, branch strata-coal-settings, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Decisions log 2026-09-30: "Cap coal to the sediment (Recommended)" and "Settings + flatter default
   (Recommended)", plus readable strata for the synthetic deposit test world.

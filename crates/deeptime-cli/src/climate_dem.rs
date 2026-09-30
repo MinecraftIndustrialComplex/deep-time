@@ -311,7 +311,15 @@ pub fn run(o: &Options) -> CliResult<()> {
             "climate/koppen",
             s.koppen.iter().map(|&k| f32::from(k)).collect(),
         );
+        put(
+            &mut world,
+            "climate/glacier",
+            s.glacier.iter().map(|&g| f32::from(g)).collect(),
+        );
+        put(&mut world, "climate/ela_m", s.ela.clone());
+        // The satellite view of the relief under this climate (its land cover, snow and glaciers).
         let layers = [
+            "satellite",
             "climate/koppen",
             "climate/t_mean_c",
             "climate/precip_mm",
@@ -323,6 +331,7 @@ pub fn run(o: &Options) -> CliResult<()> {
         let frame = deeptime_core::keyframes::render(
             &world,
             &Ramps::builtin(),
+            &deeptime_core::keyframes::ViewScale::default(),
             "climate",
             &layers,
             0,

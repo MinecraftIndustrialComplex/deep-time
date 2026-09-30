@@ -36,6 +36,7 @@ pub fn run(input: &Path, out: &Path) -> Result<Vec<(String, f64)>, Box<dyn std::
     let frame = deeptime_core::keyframes::render(
         &world,
         &Ramps::builtin(),
+        &deeptime_core::keyframes::ViewScale::default(),
         "provinces",
         &[provinces::LAYER],
         0,
