@@ -729,6 +729,20 @@ Pixel (px, py) is centred on longitude 360°·px/w (the seam is 0°, plan §5.2)
 passes the next multiple of the preset's keyframe interval (counted from the run's start) and at
 the end of each stage.
 
+Two layers are derived when a frame is drawn rather than read from one field, and are never stored
+in the world: `provinces` (geologic provinces, coloured with its ramp like any layer) and
+`satellite`, a true-colour picture composited from the elevation, the climate's fields (land cover
+from `climate/t_mean_c`, `t_warm_c`, `t_cold_c`, `aridity`, `precip_mm` and `koppen`; snow from the
+temperatures and `climate/ela_m`; `climate/ice_thickness_m` or `glacier` as glacier ice;
+`climate/sea_ice`), the surface rock (`surface/class`) and a hill shade (`deeptime_core::satellite`
+has the rules). It needs no layer kind of its own: it is RGBA8 like every layer, so any reader of
+these files (the viewer, the workbench, the game's timelapse) shows it unchanged. Its ramp in
+`ramps.json` (`satellite`: categorical, with `labels` and `groups`) is not applied to it: its classes
+are the compositor's anchor colours and the legend's key. It is the **first** layer of every frame of
+the plate model's group and of the young landscape's and amplification's frames, so a reader that
+opens on a frame's first layer opens on it. A frame without climate fields draws bare ground by
+geology (no plants, snow or ice).
+
 ## The climate's ice fields (pipeline fields and history frames; not world data yet)
 
 The climate stage (`crates/deeptime-core/src/climate/`, plan §8.3; deep-time climate 2026-09-29)

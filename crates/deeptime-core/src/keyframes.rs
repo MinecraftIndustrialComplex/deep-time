@@ -44,13 +44,39 @@ impl KeyframePolicy {
     };
 }
 
+/// What the derived view layers need of the preset's scale: block heights to metres, and the
+/// sphere the model runs on (the satellite view's hill shade).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ViewScale {
+    /// `scale.sea_level_y`.
+    pub sea_level_y: f64,
+    /// `scale.m_per_block_v`.
+    pub m_per_block_v: f64,
+    /// `tectonics.model_radius_km`, in metres.
+    pub radius_m: f64,
+}
+
+impl Default for ViewScale {
+    /// The defaults of a planet preset (sea level y 63, 20 m per block, 6,370 km).
+    fn default() -> ViewScale {
+        ViewScale {
+            sea_level_y: 63.0,
+            m_per_block_v: 20.0,
+            radius_m: 6.37e6,
+        }
+    }
+}
+
 /// Renders `layers` of `world.fields` (those present) at `size`. Pixel (px, py) is centred on
 /// longitude 360°·px/w (the seam is 0°, plan §5.2) and latitude 90° − 180°·py/h (as a tile
 /// pack's cell is a point sample, `FORMAT.md`) and takes the nearest grid cell, coloured with the
-/// layer's ramp; NaN is transparent. `None` when none of the layers exists yet.
+/// layer's ramp; NaN is transparent. The satellite view (`satellite`) is composited instead
+/// (`crate::satellite`; `view` turns block heights into metres). `None` when none of the layers
+/// exists yet.
 pub fn render(
     world: &WorldState,
     ramps: &Ramps,
+    view: &ViewScale,
     stage: &str,
     layers: &[&str],
     n: u32,
@@ -59,6 +85,12 @@ pub fn render(
     let (w, h) = size;
     let mut out = Vec::new();
     for &name in layers {
+        if name == crate::satellite::LAYER {
+            if let Some(rgba) = crate::satellite::render(world, ramps, view, size) {
+                out.push((name.to_owned(), rgba));
+            }
+            continue;
+        }
         // A view layer derived from the fields at render time (`provinces`) is drawn like any
         // other; it is never stored in the world.
         let derived;
@@ -98,7 +130,7 @@ pub fn render(
 }
 
 /// Keyframe layers derived from the world's fields when a frame is rendered, not stored in it.
-pub const DERIVED_LAYERS: [&str; 1] = [crate::provinces::LAYER];
+pub const DERIVED_LAYERS: [&str; 2] = [crate::satellite::LAYER, crate::provinces::LAYER];
 
 /// The derived layer `name` for `world`'s current state (`None`: not one, or its inputs are missing).
 fn derived_field(world: &WorldState, name: &str) -> Option<crate::world::Field> {
@@ -108,10 +140,18 @@ fn derived_field(world: &WorldState, name: &str) -> Option<crate::world::Field> 
 }
 
 /// Adds the derived layers a set of stage layers can feed: the geologic provinces need the plate
-/// model's `regime` and `crust_age` frames.
+/// model's `regime` and `crust_age` frames; the satellite view goes first (the default layer of
+/// the workbench, the viewer and the game's timelapse) on the plate model's frames (with or
+/// without a climate) and on the young landscape's and its amplification's.
 pub fn add_derived(layers: &mut Vec<&'static str>) {
     if layers.contains(&"regime") && layers.contains(&"crust_age") {
         layers.push(crate::provinces::LAYER);
+    }
+    let terrain = (layers.contains(&"elevation") && layers.contains(&"regime"))
+        || layers.contains(&crate::surface::young::field::ELEVATION)
+        || layers.contains(&crate::surface::amplify::field::ELEVATION);
+    if terrain && !layers.contains(&crate::satellite::LAYER) {
+        layers.insert(0, crate::satellite::LAYER);
     }
 }
 
@@ -299,12 +339,22 @@ mod tests {
         let mut field = Field::filled(grid, 63.0);
         field.data[0] = f32::NAN;
         world.fields.insert("elevation".into(), field);
-        assert!(render(&world, &ramps, "s", &["nothing"], 0, (8, 4)).is_none());
+        let view = ViewScale::default();
+        assert!(render(&world, &ramps, &view, "s", &["nothing"], 0, (8, 4)).is_none());
 
         let store = KeyframeStore::new(&dir, 2);
         for n in 0..5 {
             world.t_years = -1.0e6 + f64::from(n);
-            let f = render(&world, &ramps, "s", &["elevation", "missing"], n, (32, 16)).unwrap();
+            let f = render(
+                &world,
+                &ramps,
+                &view,
+                "s",
+                &["elevation", "missing"],
+                n,
+                (32, 16),
+            )
+            .unwrap();
             assert_eq!(f.layers.len(), 1);
             store.push(f).unwrap();
         }
@@ -330,5 +380,59 @@ mod tests {
         assert!(store.copy(0, 0, &mut buf[..10]).is_err());
         assert_eq!(KeyframeIndex::read(&dir).unwrap().frames.len(), 5);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_satellite_view_leads_terrain_frames_only() {
+        let mut plates = vec!["elevation", "plates", "crust_age", "regime"];
+        add_derived(&mut plates);
+        assert_eq!(
+            plates,
+            [
+                "satellite",
+                "elevation",
+                "plates",
+                "crust_age",
+                "regime",
+                "provinces"
+            ]
+        );
+        let mut young = vec!["young/elevation", "young/drainage"];
+        add_derived(&mut young);
+        assert_eq!(young[0], "satellite");
+        let mut amplify = vec!["amplify/elevation", "amplify/detail"];
+        add_derived(&mut amplify);
+        assert_eq!(amplify[0], "satellite");
+        // A dummy stage's elevation and the deposit stage's layers get none.
+        let mut dummy = vec!["elevation"];
+        add_derived(&mut dummy);
+        assert_eq!(dummy, ["elevation"]);
+        let mut deposits = vec!["deposits/sites"];
+        add_derived(&mut deposits);
+        assert_eq!(deposits, ["deposits/sites"]);
+
+        // A frame draws it first, RGBA like every layer.
+        let ramps = Ramps::builtin();
+        let mut world = WorldState::new(1, 1024, -1.0e6);
+        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
+        world
+            .fields
+            .insert("elevation".into(), Field::filled(grid.clone(), 40.0));
+        world
+            .fields
+            .insert("regime".into(), Field::filled(grid, 0.0));
+        let f = render(
+            &world,
+            &ramps,
+            &ViewScale::default(),
+            "s",
+            &["satellite", "elevation", "regime"],
+            0,
+            (64, 32),
+        )
+        .unwrap();
+        assert_eq!(f.layer_names(), ["satellite", "elevation", "regime"]);
+        assert_eq!(f.layers[0].1.len(), 64 * 32 * 4);
+        assert!(f.layers[0].1.chunks(4).all(|p| p[3] == 255));
     }
 }
