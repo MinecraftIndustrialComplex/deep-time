@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -73,6 +73,95 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — EF is ice cap where the glacier model says ice, barren frozen ground elsewhere (agent worktree agent-adda9513719f24370, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** A workbench preview of run 1a0ef97aaca (`earthlike_quick_16k`, MIC, box x 3675…3931, z −3779…−3523, 77–83°N, EF
+  almost everywhere) came out 58 % `terralith:scarlet_mountains`, snowy slopes, `terralith:snowy_badlands`, frozen cliffs. Ben first
+  answered "Yes, EF means ice" and then, when told EF only means "warmest month below 0 °C" and includes ice-free cold desert
+  (Dry Valleys), **"Ice only where there's ice (Recommended)"**: where the glacier/ice-sheet model says ice accumulates, ice biomes;
+  EF too dry for ice, a frozen but barren biome (bare rock, gravel, thin snow; no ice spikes or packed ice; not Scarlet or a warm
+  or red biome); ET unchanged; all in the placement file (decisions log 2026-09-29; the coordinator writes that entry).
+- **Why the plateau was not "flagged glaciated": it was, and the flag is not the problem.** Reproduced the run (same preset, seed 1,
+  supercontinent, 500 Myr; 53,837 EF L1 cells, as `notes.bake.climate.koppen_bands`) and read `climate/glacier`, `ela_m`,
+  `precip_mm`, `t_warm_c` from the climate checkpoint: **46,026 of 53,837 EF cells (85.5 %) have glacier = 1, every cell of the
+  plateau in the box included** (L1 rows 19–34, `glacier` = 1; ELA 660–810 m, summer sea-level temperature about −2 … 0 °C, the
+  ground 1–4 km). Precipitation there is the `precip_min_mm` floor (10.0 mm/yr on the plateau: 2,744 EF cells at ≤ 10.5 mm, 6,432
+  more under 30 mm), and **every one of those 9,176 cells is glaciated**: the ELA rule (Ohmura et al. 1992 as P1-05 solves it,
+  T_ELA(P) = −2.3 °C at P → 0) has no cutoff for dryness, so any polar land whose summer stays under about −2.3 °C is ice
+  wherever it lies above its ELA. Not a bug: East Antarctica is ice at 20–50 mm/yr water equivalent; the fit is extrapolated
+  below its data (its lowest ELAs sit at a few hundred mm) but nothing better is wanted. The 7,811 unglaciated EF cells (14.5 %)
+  are the other kind of EF: median t_warm −0.3 °C (barely EF), median ground 738 m under an ELA of 784 m, 81–89°N, precipitation
+  44–120 mm (p10–p90): low-lying, marginal polar land, the Dry Valleys' kind. ET: 433 of 53,111 cells glaciated. **What the
+  flag did in P1-09:** only capped the temperature band at 0.35, which is a no-op where the class already sits at band 0 (EF's
+  polar ramp gives 0 at t_warm ≤ −20 °C: temperature −1.0, the bottom of the frozen band, glaciated or not). So the biome the pack
+  drew there was decided by the other inputs, not by the flag. **Found on the way:** P/PET is **pinned at 10** for every EF cell
+  (Thornthwaite PET is 0 below freezing), so ET/EF humidity was always the rule's cap (1.95) and never followed the climate.
+- **What the pack does with the frozen band** (probed, not assumed): vanilla `OverworldBiomeBuilder` on `test_planet_real`
+  (GameTest probe, standalone) and Terralith 2.6.2's parameter list (`data/minecraft/dimension/overworld.json`, 1,713 entries;
+  a Python emulation of `Climate.ParameterList` that reproduces the real MIC run to 0.1 %). Tectonic adds no biomes (router
+  only). Vanilla in the frozen band: ice spikes only at humidity band 0 with positive weirdness, snowy slopes at humidity ≤ 1,
+  grove above it, snowy taiga at humidity 3, jagged peaks (weirdness < 0) / frozen peaks (> 0), snowy plains between; the
+  temperature within the band does not matter; **vanilla has no dry frozen biome** (closest: snowy plains, `windswept_gravelly_hills`
+  at erosion 0.45–0.55). Terralith splits the band at temperature −0.727 (coordinate 0.496): **below it every dry cell
+  (humidity < −0.35) is `snowy_badlands`** (white and orange terracotta, red sand: what EF had drawn: 58 % of glaciated EF on
+  the planet), above it the dry cells are `gravel_desert`, `rocky_shrubland`, `cold_shrubland` (gravel, granite, coarse dirt, tuff:
+  the barren frozen biomes); `scarlet_mountains` takes every peak with weirdness −0.93 … −0.4 and humidity above −0.35 (no
+  temperature or humidity within the frozen band avoids it); `frozen_cliffs` only on the coast band; `glacial_chasm` (packed
+  ice) only at erosion ≥ 0.4 (≥ 0.565 whatever the humidity); `ice_spikes` at humidity < −0.35 near the coast (continentalness ≤ 0.03,
+  else nearest fit). Ice biomes Terralith lacks: any inland ice-sheet biome on low or mid erosion.
+- **Design (candidates swept offline over the planet's glaciated and unglaciated EF cells on the Terralith list; the
+  scripts are in the session scratchpad, not committed).** The levers the placement table has are the temperature and humidity
+  band coordinates; the result: temperature 0.55 … 0.9 all alike (upper frozen band, above Terralith's split) and humidity
+  fixed low for ice, fixed 1.5 for barren:
+  | planet-wide EF, Terralith list | ice | snow | barren | other |
+  |---|---|---|---|---|
+  | glaciated, before (t 0, h 1.95) | 5 % | 32 % | 0 % | 63 % (snowy badlands 59 %, scarlet 5 %) |
+  | glaciated, now (t 0.6–0.8, h 0.5, weirdness +) | 41 % | 26 % | 31 % | 2 % (cherry grove) |
+  | not glaciated, before | 2 % | 15 % | 2 % | 81 % (snowy badlands 80 %) |
+  | not glaciated, now (h 1.5) | 26 % | 5 % | 69 % | 0 % |
+  (ice = frozen/jagged peaks, ice spikes, glacial chasm, frozen cliffs; snow = snowy plains and slopes, beaches, frozen ocean;
+  barren = gravel desert, cold/rocky shrubland). Humidity band 2 and up turns the ice sheet into wintry forest, grove and snowy
+  taiga (trees), so ice cap is band 0.5, barren 1.5 (below the band whose variants are taiga and grove, as P1-09's 1.95 cap
+  was). The scarlet peaks are not reachable from temperature or humidity at all, hence the third lever.
+- **Change.** (1) `placement.json`: ramp `polar_ice` (0.6 … 0.8 by the warmest month, −20 → 0 °C), fixed humidity rules
+  `polar_desert` (1.5) and `ice_cap` (0.5), and EF = `{temperature: polar_ice, humidity: polar_desert, glaciated: {humidity:
+  ice_cap}, weirdness: positive}`; ET untouched. (2) Schema (`bake/placement.rs`, FORMAT.md "The climate mapping", no schema
+  version bump: both keys optional): a class may have a **`glaciated` block** (its own temperature and/or humidity where the glacier
+  flag is set; it replaces `glacier_cap` for that class, each key falling back to the class's ordinary one) and
+  **`weirdness: "positive"`** (the class's land keeps the positive branch of the variant noise: vanilla's frozen peaks, never the
+  negative branch's jagged peaks / Terralith's scarlet mountains). `humidity_land` takes the glacier flag; the bake resamples the
+  class's weirdness flag L1 → L2 like the humidity (`Coords.w_pos`). Every other class, ET included, is bit-identical
+  (the "default reproduces the compiled constants" test now covers all classes but EF, and asserts a glaciated `humidity_land` equals
+  the plain one for them). (3) GameTest `climateConsistent` gains a negative check (`BiomeCensus.FORBIDDEN`, `EF:no_red`: EF columns
+  on `snowy_badlands`, `scarlet_mountains`, vanilla badlands ≤ 10 %).
+- **Result on the workbench box** (`preview-area.sh --profile mic --world-data <rebake> --keep-world`, then `deeptime-inspect biomes`
+  on the kept world; 65,121 EF columns of the chunks' stored biomes; the pre-change kept world is jobs/20260929-195758-82h8):
+  | biome | before | after |
+  |---|---|---|
+  | scarlet mountains | 58.3 % | 0 |
+  | snowy badlands | 18.4 % | 0 |
+  | frozen peaks | 0 | 58.3 % |
+  | snowy slopes | 21.3 % | 21.3 % |
+  | gravel desert | 0 | 18.4 % |
+  | frozen cliffs | 2.0 % | 2.0 % |
+  The emulation predicted 60.8 / 20.7 / 17.8 / 0.7 → 60.8 (frozen peaks) / 20.7 / 17.8 (gravel desert) / 0.7. The glacier flag did not
+  change anywhere (the climate stage is untouched; continentalness and erosion layers are bit-identical, the weirdness magnitude is
+  identical and 131,822 L2 cells, all under EF or filled from it, changed sign). The box is one sign region of the 1,024-block variant noise (all negative), so
+  the whole scarlet share becomes frozen peaks; elsewhere half of the EF peaks were already frozen peaks.
+- **Caveats (for Ben).** (a) 18 % of this box, and 31 % of glaciated EF planet-wide, is `gravel_desert` (bare gravel on ice
+  cap): the flat, far-inland glaciated cells, where Terralith has no ice biome at humidity band 0 and, at humidity ≥ 2, only trees;
+  raising the ice-cap humidity to ≥ 2.05 trades it for wintry forest and grove. (b) 21 % of unglaciated EF gets Terralith's
+  `glacial_chasm` (packed ice; erosion-driven, unreachable from temperature or humidity); vanilla gives snowy plains and slopes
+  there (no dry frozen biome exists). (c) `snowy_cherry_grove` (pink, snowy) on about 2 % of glaciated EF at weirdness > 0.93 /
+  0.27–0.4. (d) EF temperature is now 0.6–0.8, warmer in band coordinate than ET's coldest (0.5): only Terralith's split at 0.496
+  reads it (vanilla's band is one). (e) EF humidity no longer follows P/PET (pinned at 10 below freezing); ET's still does.
+- **Gates** (Mac, this branch): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings`, `cargo test
+  --workspace --locked` (core 258 + 3 ignored, cli 30, format 40, inspect 29, …), `cargo deny check licenses bans` clean;
+  `./gradlew build test` 143/0; `./gametest.sh` all 50 passed (`climateConsistent`: E 1.0, E:snow 0.941 against its 0.9 floor: ET's
+  1,765 columns are unchanged code, EF has 29 columns on the small planet, `EF:no_red` 0 of 29). See the merge line below for the
+  re-run on merged master and `-PwithMic`.
+- **Next.** Ben's call on caveat (a) (ice-cap humidity band 0.5 vs ≥ 2.05); the coordinator merges (this branch is not merged).
+  ET is untouched (Scarlet stays on 3 % of ET, as Ben's "keep it" allows outside EF).
+
 ### 2026-09-29 — Coal fields adjoin and stack: adjoining footprints, several seams per field from the sediment history (agent worktree agent-a3e41a57dc812f499, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben's follow-up (decisions log 2026-09-29, "Yes, adjoining + stacked (Recommended)"): coal fields in a basin
   may adjoin and fill its minable area (no spacing), and each field holds a stack of seams at different depths. Changes:
