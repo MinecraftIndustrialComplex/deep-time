@@ -2260,6 +2260,26 @@ the published fields are the annual mean, warmest and coldest month, precipitati
 Köppen, ELA and glacier. `deeptime climate-dem` runs one snapshot on a given relief (Earth's
 1° relief: 19 of 24 reference cities in the right Köppen group).
 
+*As built for the deep-time climate* (decisions log 2026-09-29: greenhouse and sun over time,
+emergent snowball Earths, recent ice-age cycles, ice-linked sea level; STATUS.md has the details):
+(8) A long-term **carbon cycle** (`carbon.rs`): COPSE's atmosphere–ocean reservoir split into the
+air and a buffered ocean (the ocean seals under full sea ice), degassing from sea-floor production
+and consumption plus large igneous provinces, GEOCARB/Walker–Hays–Kasting silicate weathering per
+land cell (runoff × e^(0.09 ΔT)), normalized on Earth's relief; CO₂ lowers the EBM's longwave A
+(Myhre, and Byrne & Goldblatt above 1,000 ppm). (9) A **brightening star** (Gough 1981) on the
+timeline's absolute age. (10) A **fine clock** (`clock.rs`) steps the carbon, the EBM and the ice
+every 100 kyr inside each plate step (halving through fast CO₂ changes), so the ice-albedo runaway
+and the escape by degassing happen on their own (events `deeptime:snowball`, `deeptime:hothouse`);
+the 10-Myr geographic snapshots stay, and between them the zonal references follow the clock's EBM
+and the equilibrium line moves with each band's summer temperature. (11) **Orbital forcing** over
+the last `orbital_window_myr` (3 Myr): a short Berger/Laskar-like series of obliquity, eccentricity
+and precession on an eccentric orbit with Kepler timing, 2-kyr steps, ice sheets lagging with
+Imbrie & Imbrie's asymmetric response; the maximum ice of the window is the glacier record's LGM.
+(12) **Ice thickness** from Nye's plastic profile on the ice mask (an exact distance transform) and
+**glacio-eustasy** (ρ_i/ρ_w·ΔV/A_ocean against the model's present-Earth ice): item 7's curve keeps
+its tectonic cycles and the ice's sea level is added to it; the surface stage takes the sum
+(`WorldState::globals`). The ice fields for glacial erosion are FORMAT.md "The climate's ice fields".
+
 ### 8.4 Hydrology — `core::hydro` (Phase 2; Phase 0 only proves water holds)
 
 On L2: flow routing and priority-flood; river extraction as vectors with discharge above a drainage

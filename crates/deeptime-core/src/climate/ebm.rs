@@ -64,6 +64,8 @@ pub struct EbmParams {
     pub d_ocean: f64,
     pub bands: usize,
     pub steps_per_year: usize,
+    /// The orbit (circular unless the recent ice-age window sets it, `orbit.rs`).
+    pub orbit: insolation::Orbit,
 }
 
 /// The model's state at the start of a year (what a warm start continues from).
@@ -91,6 +93,16 @@ pub const ICE_W_M_K: f64 = 2.2;
 /// Coupling of the sea's surface to its open mixed layer, W/m²/K.
 pub const OPEN_WATER_W_M2_K: f64 = 30.0;
 
+/// Sea ice thicker than this stops conducting (the conductance k/h tapers to zero between half
+/// this and this, m). It stands for the thick sea glacier of a very cold ocean, whose conduction
+/// balances only the geothermal flux (~0.09 W/m²): the ice stops growing there on its own, so no
+/// heat is invented or lost, and the latent heat it stores stays small enough to melt within a
+/// few model years once the surface above it thaws. The EBM runs years per Myr of geological time
+/// (the climate's fine clock), so a kilometre of stored ice would take thousands of model years to
+/// melt that the real ice — metres per year under a 50 W/m² surplus — melts in centuries.
+/// Present-day perennial sea ice in this model is ~4.5 m thick, below the taper.
+pub const SEA_ICE_CAP_M: f64 = 10.0;
+
 /// Monthly means of the last year run.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EbmResult {
@@ -98,6 +110,8 @@ pub struct EbmResult {
     pub lat_deg: Vec<f64>,
     pub t_ocean: Vec<[f64; 12]>,
     pub t_land: Vec<[f64; 12]>,
+    /// Annual-mean sea-ice cover of each band's sea, 0–1.
+    pub sea_ice: Vec<f64>,
     /// Area-weighted annual means of the last year, W/m²: absorbed shortwave, outgoing longwave.
     pub asr: f64,
     pub olr: f64,
@@ -142,6 +156,7 @@ impl EbmParams {
             d_ocean: c.ocean_diffusivity_w_m2_k,
             bands: c.ebm_bands as usize,
             steps_per_year: c.ebm_steps_per_year as usize,
+            orbit: insolation::Orbit::default(),
         }
     }
 
@@ -213,9 +228,11 @@ impl EbmParams {
         // Insolation of every step and band (the step's midpoint).
         let q: Vec<Vec<f64>> = (0..spy)
             .map(|s| {
-                let lam = insolation::lambda_at((s as f64 + 0.5) / spy as f64);
+                let lam = self.orbit.lambda_at((s as f64 + 0.5) / spy as f64);
                 lat.iter()
-                    .map(|&l| insolation::daily(self.s0, l, lam, self.obliquity_rad))
+                    .map(|&l| {
+                        insolation::daily_orbit(self.s0, l, lam, self.obliquity_rad, &self.orbit)
+                    })
                     .collect()
             })
             .collect();
@@ -230,18 +247,20 @@ impl EbmParams {
             lat_deg: lat.iter().map(|l| l.to_degrees()).collect(),
             t_ocean: vec![[0.0; 12]; n],
             t_land: vec![[0.0; 12]; n],
+            sea_ice: vec![0.0; n],
             asr: 0.0,
             olr: 0.0,
             t_global: 0.0,
             years: 0,
         };
-        let mut prev_mean: Option<Vec<f64>> = None;
+        let mut prev_mean: Option<(Vec<f64>, Vec<f64>)> = None;
         // Tridiagonal scratch.
         let (mut lo, mut di, mut up, mut rhs) =
             (vec![0.0; n], vec![0.0; n], vec![0.0; n], vec![0.0; n]);
         for year in 0..years.max(1) {
             let mut mo = vec![[0.0; 12]; n];
             let mut ml = vec![[0.0; 12]; n];
+            let mut si = vec![0.0; n];
             let (mut asr, mut olr, mut tg) = (0.0, 0.0, 0.0);
             for (s, qs) in q.iter().enumerate() {
                 let month = s / per_month;
@@ -251,8 +270,11 @@ impl EbmParams {
                     let (to, tl, tm) = (state.t_ocean[j], state.t_land[j], state.t_mixed[j]);
                     let h_ice = state.ice_j_m2[j] / ICE_J_M3;
                     let cover = (h_ice / FULL_ICE_M).min(1.0);
+                    let insulated = smoothstep(0.5 * SEA_ICE_CAP_M, SEA_ICE_CAP_M, h_ice);
                     let g = OPEN_WATER_W_M2_K * (1.0 - cover)
-                        + (ICE_W_M_K / h_ice.max(0.05)).min(OPEN_WATER_W_M2_K) * cover;
+                        + (ICE_W_M_K / h_ice.max(0.05)).min(OPEN_WATER_W_M2_K)
+                            * cover
+                            * (1.0 - insulated);
                     let ao = self.albedo(free[j], to, cover);
                     let al = self.albedo(free[j], tl, g_sheet[j]);
                     let so = qs[j] * (1.0 - ao);
@@ -347,6 +369,7 @@ impl EbmParams {
                     let (to, tl) = (state.t_ocean[j], state.t_land[j]);
                     mo[j][month] += to / per_month as f64;
                     ml[j][month] += tl / per_month as f64;
+                    si[j] += (state.ice_j_m2[j] / ICE_J_M3 / FULL_ICE_M).min(1.0) / spy as f64;
                     tg += cosl[j] * (f[j] * tl + (1.0 - f[j]) * to);
                 }
             }
@@ -356,6 +379,7 @@ impl EbmParams {
             out.t_global = tg / steps;
             out.t_ocean = mo;
             out.t_land = ml;
+            out.sea_ice = si;
             out.years = year + 1;
             let annual: Vec<f64> = (0..n)
                 .map(|j| {
@@ -365,12 +389,19 @@ impl EbmParams {
                         / 12.0
                 })
                 .collect();
-            if let Some(p) = &prev_mean
+            // Settled when no band's annual mean moved by 0.005 K and no band's sea ice by 2 cm
+            // (a slowly melting or growing ice store can hold the temperature still).
+            let ice = state.ice_j_m2.clone();
+            if let Some((p, pi)) = &prev_mean
                 && p.iter().zip(&annual).all(|(a, b)| (a - b).abs() < 0.005)
+                && pi
+                    .iter()
+                    .zip(&ice)
+                    .all(|(a, b)| (a - b).abs() < 0.02 * ICE_J_M3)
             {
                 break;
             }
-            prev_mean = Some(annual);
+            prev_mean = Some((annual, ice));
         }
         out
     }
