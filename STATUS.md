@@ -183,11 +183,13 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `volcano_caldera_complex` 3, `volcano_caldera` 162, `volcano_flood_basalt` 8 (`notes.volcanoes.events_by_kind`).
   Run: 420 s wall on the loaded Mac, volcanoes 22.7 s (the wider footprints: the erosion fit 13.5 s), amplify's volcano
   sink 1.1 s; 282 live arc cones, 1 live shield, 137 calderas, 8 flood basalts.
-- **After merging master 84e2b1d** (continuous strata, deep-time climate, P1-25; checkpoint schema → 8 on top of the
-  climate's 7): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings` (so every target compiles) and
-  `deny check licenses bans` clean. The workspace tests, `./gradlew build test` and `./gametest.sh` were not re-run after
-  this merge: the laptop's Tailscale stopped mid-run (`m6-mac-mini` no longer resolves); the numbers above are from the
-  tree before it (merged with master 8872c91).
+- **Gates on the final tree** (master 84e2b1d and the decisions-log commits after it merged, schema 8 on the climate's
+  7, with the follow-ups): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings`, `deny check
+  licenses bans` clean; `cargo test --workspace --locked` ok (cli 30, core 290 + 3 ignored, history_cap 1, format 44,
+  inspect 29 + 2 + 7, jni 7, viewer 5); `./gradlew build test` tests=151 failures=0; `mac.sh --server -- ./gametest.sh`:
+  GAMETEST2. (The merged tree before the follow-ups: the same cargo and Gradle results.) 3D previews of the gentler
+  cones: `review/out/p1-21/bundle/shots/` (arc cone at 0.5 beside the physical-profile shots of run q16f); the bundle is
+  15.7 MB. Old scratch runs on the Mac SSD deleted (disk hygiene rule).
 - **Deviations.** Stratovolcano "centres" live 2–8 Myr (real cones 0.1–1 Myr) because a step is 2 Myr. Stratovolcanoes
   that erode away are counted, not written as events (~24,000 per run). No lava or obsidian blocks, no volcanic ore
   (P2-10's epithermal), no guyot planing beyond the surface's wave-base diffusion (P2-11).
