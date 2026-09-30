@@ -674,8 +674,8 @@ impl ClimateStage {
                 sea: sea_prev,
                 p: &p,
                 planet: self.planet(ppm0, t0),
-                // The starting world's snapshot feeds the carbon cycle only (P1-25's monthly
-                // fields come with the step's own snapshots).
+                // The starting snapshot only seeds the weathering and the equilibrium line; the
+                // bake's months come from the last snapshot.
                 monthly: false,
             };
             let mut ebm0 = EbmState::default();
