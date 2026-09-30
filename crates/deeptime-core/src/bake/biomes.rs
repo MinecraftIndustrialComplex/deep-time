@@ -21,14 +21,19 @@
 //!
 //! | Köppen | band coordinate | vanilla middle biomes there |
 //! |---|---|---|
-//! | EF, ET | 0 … 0.75 by the warmest month (−20 → 10 °C) | snowy plains, ice spikes |
+//! | ET | 0 … 0.75 by the warmest month (−20 → 10 °C) | snowy plains, ice spikes |
+//! | EF | 0.6 … 0.8 by the warmest month (−20 → 0 °C) | snowy plains, ice spikes |
 //! | D | 0.75 … 2 by the warmest (10 → 22 °C, weight 0.65) and coldest month (−30 → 0 °C) | snowy taiga (Dfc's cold edge), taiga, plains, forest |
 //! | C | 2 … 2.95 by the coldest month (0 → 18 °C) | plains, forest, birch, dark forest |
 //! | A, BSh | 3 … 3.9 (coldest month 18 → 28 °C; BSh by the mean 18 → 30 °C) | savanna, forest, jungle |
 //! | BW | 4.05 … 4.95 by the mean (5 → 30 °C) | desert (badlands on plateaus) |
 //! | BSk | as C or D by its coldest month | plains, meadow |
 //!
-//! Land above its equilibrium line (`climate/glacier`) is capped at 0.35 (ice). The sea's own
+//! Land above its equilibrium line (`climate/glacier`) is capped at 0.35 (ice), except a class with a
+//! `glaciated` block in the placement table: EF (ice-cap climate) is held at 0.6 … 0.8 whether
+//! glaciated or not, because Terralith puts its dry cold biomes (gravel desert, cold shrubland) above
+//! band 0.5 and its red, terracotta snowy badlands below it; what differs is the humidity, below.
+//! The sea's own
 //! temperature (sea ice below −2 °C → frozen, 6, 18, 25 °C → cold, temperate, warm, hot oceans)
 //! drives the ocean biomes.
 //!
@@ -36,9 +41,13 @@
 //! 0 … 5 on a log scale (UNEP's hyper-arid | arid | semi-arid | dry sub-humid | humid) — held
 //! inside each class's range: BW ≤ 0.95 (the driest band), BS 1.05 … 1.95, Af ≥ 4.1 (jungle),
 //! Am ≥ 3.2, Aw/As and Cs squeezed into 1.05 … 2.5 (savanna, plains, open forest), the
-//! subarctic D (Dsc, Dsd, Dwc, Dwd, Dfc, Dfd) ≥ 3.05 (taiga), other C/D ≥ 2.05, ET/EF ≤ 1.95 (no
+//! subarctic D (Dsc, Dsd, Dwc, Dwd, Dfc, Dfd) ≥ 3.05 (taiga), other C/D ≥ 2.05, ET ≤ 1.95 (no
 //! trees: vanilla picks snowy taiga at the frozen band's third humidity band as a variant, and grove on
-//! its slopes).
+//! its slopes). EF is the exception (P/PET is pinned at 10 below freezing, so the index says
+//! nothing there): glaciated EF (ice cap) is a fixed 0.5, humidity band 0 (vanilla's ice spikes,
+//! snowy slopes and plains; Terralith's no forest), and EF the glacier model does not cover is a
+//! fixed 1.5 (barren frozen ground: Terralith's gravel desert and cold shrubland, thin snow in
+//! vanilla, which has no dry frozen biome). Ben, 2026-09-29: ice only where there is ice.
 //!
 //! These two are computed per L1 cell (where the climate lives), filled across the other medium
 //! by nearest value (so a coastal land cell interpolates between land values only), resampled
@@ -62,7 +71,9 @@
 //! **Weirdness** from the ridge/valley index (the ground minus its window mean): its rank among the
 //! land cells read through the reference's peaks-and-valleys distribution above −0.8, turned into
 //! |weirdness| on the rising branch (|w| = (PV + 1)/3), signed by a value noise of wavelength
-//! `variant_blocks` (vanilla's variant biomes). PV stays above the valley slice: no river biomes
+//! `variant_blocks` (vanilla's variant biomes), except for a class whose placement says `weirdness:
+//! positive` (EF: its peaks are frozen peaks, never the negative branch's jagged peaks or Terralith's
+//! scarlet mountains). PV stays above the valley slice: no river biomes
 //! until rivers exist (Phase 2).
 
 use std::sync::OnceLock;
@@ -630,6 +641,8 @@ struct Coords {
     t_land: Vec<f32>,
     h_land: Vec<f32>,
     t_sea: Vec<f32>,
+    /// 1 where the class keeps the positive branch of the variant noise (placement `weirdness`), else 0.
+    w_pos: Vec<f32>,
     by_class: Value,
 }
 
@@ -642,6 +655,7 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     let mut t_land = vec![f32::NAN; n];
     let mut h_land = vec![f32::NAN; n];
     let mut t_sea = vec![f32::NAN; n];
+    let mut w_pos = vec![f32::NAN; n];
     let mut land = vec![false; n];
     let mut stats = [(0u64, 0f64, 0f64); 32];
     for k in 0..n {
@@ -662,9 +676,10 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         let ai = at(c.aridity, k).unwrap_or(1.0);
         let glacier = at(c.glacier, k).is_some_and(|g| g >= 0.5);
         let th = placement.thermal_land(class, tm, tw, tc, glacier);
-        let hu = placement.humidity_land(class, ai);
+        let hu = placement.humidity_land(class, ai, glacier);
         t_land[k] = th as f32;
         h_land[k] = hu as f32;
+        w_pos[k] = f32::from(u8::from(placement.weirdness_positive(class)));
         let s = &mut stats[class as usize];
         s.0 += 1;
         s.1 += th;
@@ -676,6 +691,9 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     }
     if !fill_nearest(&mut h_land, &land, w, h) {
         h_land = vec![2.5; n];
+    }
+    if !fill_nearest(&mut w_pos, &land, w, h) {
+        w_pos = vec![0.0; n];
     }
     if !fill_nearest(&mut t_sea, &sea, w, h) {
         t_sea = t_land.clone();
@@ -699,6 +717,7 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         t_land,
         h_land,
         t_sea,
+        w_pos,
         by_class: Value::Object(by_class),
     }
 }
@@ -739,7 +758,7 @@ pub fn map(
     let land: Vec<bool> = elev.iter().map(|&z| f64::from(z) > sea).collect();
 
     // Temperature and humidity.
-    let (t_land, h_land, t_sea, by_class) = match climate {
+    let (t_land, h_land, t_sea, w_pos, by_class) = match climate {
         Some(c) => {
             let co = coords(c, g.l1, placement);
             let up = |v: Vec<f32>| {
@@ -752,7 +771,13 @@ pub fn map(
                     false,
                 )
             };
-            (up(co.t_land), up(co.h_land), up(co.t_sea), co.by_class)
+            (
+                up(co.t_land),
+                up(co.h_land),
+                up(co.t_sea),
+                up(co.w_pos),
+                co.by_class,
+            )
         }
         None => {
             let t: Vec<f32> = (0..n)
@@ -762,7 +787,7 @@ pub fn map(
                     thermal_plain(28.0 - 0.55 * lat.abs()) as f32
                 })
                 .collect();
-            (t.clone(), vec![2.5; n], t, Value::Null)
+            (t.clone(), vec![2.5; n], t, vec![0.0; n], Value::Null)
         }
     };
     let mut temperature = vec![0f32; n];
@@ -861,7 +886,9 @@ pub fn map(
         for (i, o) in row.iter_mut().enumerate() {
             let bx = l2.block_x(i as i64) as f64;
             let m = mag[j * w + i];
-            *o = if noise.value(bx, bz, p.variant_blocks, VARIANT_SALT) < 0.0 {
+            *o = if w_pos[j * w + i] < 0.5
+                && noise.value(bx, bz, p.variant_blocks, VARIANT_SALT) < 0.0
+            {
                 -m
             } else {
                 m
@@ -932,7 +959,7 @@ mod tests {
     fn middle(class: &str, t_mean: f64, t_warm: f64, t_cold: f64, aridity: f64) -> &'static str {
         let k = koppen::index(class).unwrap();
         let t = placement::builtin().thermal_land(k, t_mean, t_warm, t_cold, false);
-        let hu = placement::builtin().humidity_land(k, aridity);
+        let hu = placement::builtin().humidity_land(k, aridity, false);
         MIDDLE[(t.floor() as usize).min(4)][(hu.floor() as usize).min(4)]
     }
 
@@ -976,8 +1003,20 @@ mod tests {
         assert!(dfc_cold.contains("taiga"), "a cold Dfc gives {dfc_cold}");
         assert_eq!(middle("ET", -6.0, 6.0, -15.0, 1.5), "snowy_plains");
         // A wet ET stays below the humidity band whose variant is snowy taiga.
-        assert!(placement::builtin().humidity_land(29, 5.0) < 2.0);
+        assert!(placement::builtin().humidity_land(29, 5.0, false) < 2.0);
         assert_eq!(middle("EF", -55.0, -30.0, -70.0, 0.5), "snowy_plains");
+        // Ice cap (glaciated EF) is humidity band 0, whatever the aridity index says.
+        let (ef, p) = (koppen::index("EF").unwrap(), placement::builtin());
+        let ice = p.thermal_land(ef, -55.0, -30.0, -70.0, true);
+        let ice_h = p.humidity_land(ef, 10.0, true);
+        assert_eq!(
+            MIDDLE[ice.floor() as usize][ice_h.floor() as usize],
+            "snowy_plains"
+        );
+        assert!(
+            ice_h < 1.0,
+            "band {ice_h}: ice spikes are the frozen band's first humidity band"
+        );
         // Glaciated land is ice, whatever its class.
         assert!(placement::builtin().thermal_land(26, 5.0, 18.0, -8.0, true) < 1.0);
         // Oceans: sea ice frozen, tropical water warm.
@@ -1057,11 +1096,22 @@ mod tests {
     /// BWh, a Dfc and an ET quarter, a ridge through the middle. Returns the mapped layers and
     /// L2's width.
     fn fixture(params: &BiomeParams, table: &Placement) -> (Mapped, usize) {
+        fixture_of(params, table, ["Af", "BWh", "Dfc", "ET"], [false; 4])
+    }
+
+    /// As [`fixture`], with the Köppen class of each quarter (`Af`, `BWh`, `Dfc`, `ET` or `EF`; each
+    /// class has its climate) and whether the glacier flag is set in it.
+    fn fixture_of(
+        params: &BiomeParams,
+        table: &Placement,
+        classes: [&str; 4],
+        glaciated: [bool; 4],
+    ) -> (Mapped, usize) {
         let c = 1024u32;
         let l1 = GridDesc::for_planet("L1", c, 16).unwrap();
         let l2 = GridDesc::for_planet("L2", c, 8).unwrap();
         let (w1, h1) = (l1.w as usize, l1.h as usize);
-        let quarter = |i: usize| ["Af", "BWh", "Dfc", "ET"][i * 4 / w1];
+        let quarter = |i: usize| classes[i * 4 / w1];
         let field = |f: &dyn Fn(usize, usize) -> f32| Field {
             grid: l1.clone(),
             data: (0..w1 * h1).map(|k| f(k % w1, k / w1)).collect(),
@@ -1078,26 +1128,32 @@ mod tests {
             "Af" => 27.0,
             "BWh" => 26.0,
             "Dfc" => 0.0,
+            "EF" => -40.0,
             _ => -8.0,
         });
         let tw = field(&|i, _| match quarter(i) {
             "Af" => 28.0,
             "BWh" => 36.0,
             "Dfc" => 16.0,
+            "EF" => -30.0,
             _ => 5.0,
         });
         let tc = field(&|i, _| match quarter(i) {
             "Af" => 26.0,
             "BWh" => 14.0,
             "Dfc" => -15.0,
+            "EF" => -50.0,
             _ => -20.0,
         });
+        // P/PET is pinned at 10 below freezing (PET = 0), as the climate stage writes it.
         let ai = field(&|i, _| match quarter(i) {
             "Af" => 2.5,
             "BWh" => 0.03,
             "Dfc" => 1.2,
+            "EF" => 10.0,
             _ => 1.0,
         });
+        let gl = field(&|i, _| f32::from(u8::from(glaciated[i * 4 / w1])));
         let (w2, h2) = (l2.w as usize, l2.h as usize);
         let elev: Vec<f32> = (0..w2 * h2)
             .map(|k| {
@@ -1115,7 +1171,7 @@ mod tests {
             t_cold: Some(&tc),
             aridity: Some(&ai),
             koppen: &kp,
-            glacier: None,
+            glacier: Some(&gl),
         };
         let g = Ground {
             elevation_m: &elev,
@@ -1217,6 +1273,100 @@ mod tests {
         // The layers that do not read the table are the same everywhere.
         assert_eq!(base.layers[2], changed.layers[2], "continentalness");
         assert_eq!(base.layers[4], changed.layers[4], "weirdness");
+    }
+
+    /// Ben, 2026-09-29, "Ice only where there's ice": EF above its equilibrium line is ice cap
+    /// (humidity band 0: vanilla's ice spikes and snowy slopes, no forest), the rest of EF is barren
+    /// frozen ground (band 1), and both stay in the upper half of the frozen band, where Terralith's
+    /// dry cold biomes are and its terracotta snowy badlands are not; ET is untouched.
+    #[test]
+    fn ef_maps_to_ice_cap_where_glaciated_and_barren_ground_elsewhere() {
+        let b = &reference().bands;
+        let table = placement::builtin();
+        let (base, w2) = fixture(&BiomeParams::default(), table);
+        let (m, w2b) = fixture_of(
+            &BiomeParams::default(),
+            table,
+            ["EF", "EF", "Dfc", "ET"],
+            [true, false, false, false],
+        );
+        assert_eq!(w2, w2b);
+        let t = |q: usize| quarter_band(&m, w2, 0, &b.temperature, q);
+        let h = |q: usize| quarter_band(&m, w2, 1, &b.vegetation, q);
+        for q in [0, 1] {
+            assert!(
+                (0.5..1.0).contains(&t(q)),
+                "EF quarter {q} sits in the upper frozen band: {}",
+                t(q)
+            );
+        }
+        assert!(h(0) < 1.0, "ice cap is humidity band 0: {}", h(0));
+        assert!(
+            (1.0..2.0).contains(&h(1)),
+            "barren ground is humidity band 1: {}",
+            h(1)
+        );
+        // Dfc (quarter 2) and ET (quarter 3) are where the default table put them.
+        for q in 2..4 {
+            for layer in [0, 1] {
+                let i = q * w2 / 4 + w2 / 8 + 3;
+                assert_eq!(
+                    base.layers[layer][32 * w2 + i].to_bits(),
+                    m.layers[layer][32 * w2 + i].to_bits(),
+                    "quarter {q} layer {layer}"
+                );
+            }
+        }
+    }
+
+    /// EF keeps the positive branch of the variant noise: vanilla's frozen peaks, and no
+    /// Terralith scarlet mountains, on its peaks. Without the placement key the noise signs it.
+    #[test]
+    fn ef_keeps_the_positive_variant() {
+        let table = placement::builtin();
+        let all_ef = ["EF"; 4];
+        // A short wavelength, so that the noise changes sign within the small planet.
+        let params = BiomeParams {
+            variant_blocks: 64.0,
+            ..BiomeParams::default()
+        };
+        let (m, w2) = fixture_of(&params, table, all_ef, [false; 4]);
+        let land = |j: usize| (16..48).contains(&j);
+        let count_negative = |m: &Mapped| {
+            let mut neg = 0usize;
+            let mut n = 0usize;
+            for (k, &v) in m.layers[4].iter().enumerate() {
+                if land(k / w2) && v.abs() > 0.0 {
+                    n += 1;
+                    neg += usize::from(v < 0.0);
+                }
+            }
+            (neg, n)
+        };
+        let (neg, n) = count_negative(&m);
+        assert!(n > 1000, "land columns: {n}");
+        assert_eq!(neg, 0, "EF has no negative weirdness");
+        // The same planet with the key removed: the noise gives some columns the negative sign.
+        let mut v: serde_json::Value = serde_json::from_str(placement::PLACEMENT_JSON).unwrap();
+        v["classes"]["EF"]
+            .as_object_mut()
+            .unwrap()
+            .remove("weirdness");
+        let (free, _) = fixture_of(
+            &params,
+            &Placement::from_value(&v).unwrap(),
+            all_ef,
+            [false; 4],
+        );
+        let (neg_free, _) = count_negative(&free);
+        assert!(
+            neg_free > 0,
+            "the noise signs the weirdness without the key"
+        );
+        // Magnitudes are the same either way.
+        for (a, b) in m.layers[4].iter().zip(&free.layers[4]) {
+            assert_eq!(a.abs().to_bits(), b.abs().to_bits());
+        }
     }
 
     #[test]

@@ -30,7 +30,10 @@ Commands:
 
 Spec options: --profile, --size, --box x0,z0,x1,z1 (repeatable), --y lo,hi, and one world source:
 --synth K [--strata S] | --preset P [--start S] [--length-myr N] | --world-data DIR |
---test-terrain K; plus --datapack DIR (repeatable), --seed N, --no-mic-rock-tags.
+--test-terrain K | --level-type T (not a Deep Time world: the pack's own generator, e.g.
+minecraft:normal, for comparison renders of vanilla or Terralith terrain; --locate BIOME
+(repeatable) then centres a --locate-side box on the nearest such biome, found with /locate after
+the boot); plus --datapack DIR (repeatable), --seed N, --no-mic-rock-tags.
 
 Locking: every server boot on the Mac holds Deep Time's single server lock (the one
 tools/remote/mac.sh --server takes). `run` takes it itself, unless --lock-held says the caller
@@ -64,6 +67,7 @@ VIEWER = os.path.join(REPO, "tools", "review", "pages", "area3d")
 PROFILES = ("standalone", "mic", "mic-ev", "terrablender", "ev")
 MAX_SIDE = 256
 DEEP_TIME_Y = (-352, 639)
+VANILLA_Y = (-64, 319)
 LEVEL_TYPES = {16384: "deeptime:planet", 32768: "deeptime:planet_32k"}
 # The Mac's shared cache (tools/remote/mac.sh): the server lock and the dev-shell profiles.
 MAC_CACHE = "/Volumes/Graphide/ban/deeptime-cache"
@@ -140,7 +144,11 @@ def normalise_spec(spec, max_side=MAX_SIDE):
     if s["size"] not in LEVEL_TYPES:
         raise ValueError("size must be 16384 or 32768")
     boxes = s.pop("boxes", None) or ([s.pop("box")] if "box" in s else [])
-    if not boxes:
+    w0 = s.get("world", {})
+    locate = [str(b) for b in (w0.get("locate") or [])]
+    if locate and not w0.get("level_type"):
+        raise ValueError("locate needs level_type (a biome is located in the pack's own generator)")
+    if not boxes and not locate:
         raise ValueError("a box is required: [x0, z0, x1, z1] (x1, z1 exclusive)")
     norm = []
     for b in boxes:
@@ -158,16 +166,27 @@ def normalise_spec(spec, max_side=MAX_SIDE):
             raise ValueError(f"box {b}: z must lie within ±C/4 = ±{c // 4}")
         norm.append([x0, z0, x1, z1])
     s["boxes"] = norm
-    y = s.get("y") or list(DEEP_TIME_Y)
+    y = s.get("y") or list(VANILLA_Y if w0.get("level_type") else DEEP_TIME_Y)
     if isinstance(y, str):
         y = [int(v) for v in y.split(",")]
     if len(y) != 2 or y[1] < y[0] or y[0] < DEEP_TIME_Y[0] or y[1] > DEEP_TIME_Y[1]:
         raise ValueError(f"y {y} must be lo, hi within {DEEP_TIME_Y[0]}..{DEEP_TIME_Y[1]}")
     s["y"] = y
     w = s.setdefault("world", {})
-    sources = [k for k in ("synth", "preset", "world_data", "test_terrain") if w.get(k)]
+    sources = [k for k in ("synth", "preset", "world_data", "test_terrain", "level_type") if w.get(k)]
     if len(sources) != 1:
-        raise ValueError("world needs exactly one of synth, preset, world_data, test_terrain")
+        raise ValueError("world needs exactly one of synth, preset, world_data, test_terrain, level_type")
+    if w.get("level_type"):
+        if not re.fullmatch(r"[a-z0-9_.-]+:[a-z0-9_./-]+", w["level_type"]):
+            raise ValueError(f"level_type {w['level_type']!r} is not a resource location")
+        for b in locate:
+            if not re.fullmatch(r"[a-z0-9_.-]+:[a-z0-9_./-]+(@-?\d+,-?\d+)?", b):
+                raise ValueError(f"locate {b!r} is not a biome id (optionally @x,z: searched from there)")
+        w["locate"] = locate
+        side = int(w.get("locate_side", 256))
+        if not 16 <= side <= max_side:
+            raise ValueError(f"locate_side {side} must be in 16..{max_side}")
+        w["locate_side"] = side
     if w.get("world_data"):
         w["world_data"] = check_path(w["world_data"], "world_data")
         if not os.path.isfile(os.path.join(w["world_data"], "manifest.json")):
@@ -182,13 +201,20 @@ def normalise_spec(spec, max_side=MAX_SIDE):
             raise ValueError(f"datapack {d} has no pack.mcmeta")
     if w.get("seed") is not None:
         w["seed"] = int(w["seed"])
+    props = [str(p) for p in (w.get("jvm_props") or [])]
+    for p in props:
+        if not re.fullmatch(r"deeptime\.[A-Za-z0-9_.]+=[A-Za-z0-9_.:-]*", p):
+            raise ValueError(f"jvm_prop {p!r} must be deeptime.<name>=<value>")
+    w["jvm_props"] = props
     s["keep_world"] = bool(s.get("keep_world", False))
+    s["max_side"] = int(max_side)
     return s
 
 
 def spec_from_args(a):
     world = {}
-    for k in ("synth", "strata", "preset", "start", "world_data", "test_terrain", "seed"):
+    for k in ("synth", "strata", "preset", "start", "world_data", "test_terrain", "seed", "level_type",
+              "locate", "locate_side", "jvm_props"):
         v = getattr(a, k, None)
         if v is not None:
             world[k] = v
@@ -659,6 +685,9 @@ def prepare_world(job, spec, smoke, prep):
                         ignore=shutil.ignore_patterns("keyframes"))
     elif w.get("test_terrain"):
         jvm.append(f"-Ddeeptime.testTerrain={w['test_terrain']}")
+    elif w.get("level_type"):
+        job.set("preparing", f"a {w['level_type']} world (the pack's own generator, no Deep Time world data)")
+    jvm += [f"-D{p}" for p in w.get("jvm_props", [])]
     # config/deeptime/server.json decides a first start (P1-13); only a preset job has one.
     cfg = os.path.join(prep.server, "config", "deeptime", "server.json")
     prep.save(cfg)
@@ -683,7 +712,8 @@ def prepare_world(job, spec, smoke, prep):
     props = os.path.join(prep.server, "server.properties")
     prep.save(props)
     text = open(props).read()
-    text = re.sub(r"(?m)^level-type=.*$", "level-type=" + LEVEL_TYPES[c].replace(":", "\\:"), text)
+    level = w.get("level_type") or LEVEL_TYPES[c]
+    text = re.sub(r"(?m)^level-type=.*$", "level-type=" + level.replace(":", "\\:"), text)
     if w.get("seed") is not None:
         text = re.sub(r"(?m)^level-seed=.*\n?", "", text) + f"level-seed={w['seed']}\n"
     open(props, "w").write(text)
@@ -721,7 +751,39 @@ def generate(job, server, spec):
     return runs
 
 
+LOCATED = re.compile(r"is at \[(-?\d+), [^,]+, (-?\d+)\]")
+
+
+def locate_boxes(job, server, spec):
+    """Appends a locate_side box centred on the nearest of each located biome (level_type worlds)."""
+    w = spec["world"]
+    side = w.get("locate_side", 256)
+    found = []
+    for spec_ in w.get("locate", []):
+        biome, _, at = spec_.partition("@")
+        cmd = f"locate biome {biome}"
+        if at:
+            ax, az = at.split(",")
+            cmd = f"execute positioned {ax} 64 {az} run {cmd}"
+        job.set("locating", f"/{cmd}")
+        reply = server.rcon(cmd, timeout=600)
+        m = LOCATED.search(reply or "")
+        job.say(f"   {cmd}: {(reply or '').strip()[:200]}")
+        if not m:
+            found.append({"biome": spec_, "reply": (reply or "").strip()[:300]})
+            continue
+        x, z = int(m.group(1)), int(m.group(2))
+        box = [x - side // 2, z - side // 2, x - side // 2 + side, z - side // 2 + side]
+        spec["boxes"].append(box)
+        found.append({"biome": spec_, "at": [x, z], "box": box})
+    job.set(located=found)
+    job.timing("located", found)
+    return found
+
+
 def probe(job, server, spec):
+    if spec["world"].get("level_type"):
+        return None   # not a Deep Time world: nothing to probe
     job.set("probing", "Deep Time's probes (palette, claims, sites, why)")
     t = time.time()
     path = os.path.join(job.dir, "probes.jsonl")
@@ -773,6 +835,8 @@ def export(job, spec, inspect, colors, probes):
         cmd = [inspect, "export-area", "--world", world, "--box", ",".join(map(str, box)),
                "--y", f"{spec['y'][0]},{spec['y'][1]}", "--span", str(spec["size"]), "--out", out,
                "--meta", meta, "--verify"]
+        if spec.get("max_side", MAX_SIDE) > MAX_SIDE:
+            cmd += ["--max-side", str(spec["max_side"])]
         if probes:
             cmd += ["--probes", probes]
         if colors:
@@ -817,6 +881,8 @@ def run_job(job, lock_held=False):
         dones = [t for t, l in server.timed if GEN_DONE.search(l)]
         if starts and dones:
             job.timing("first_start_generation_s", round(dones[0] - starts[0], 1))
+        if spec["world"].get("locate"):
+            locate_boxes(job, server, spec)
         generate(job, server, spec)
         probes = probe(job, server, spec)
         job.set("stopping", "save-all flush, stop")
@@ -1224,6 +1290,11 @@ def main():
         p.add_argument("--length-myr", type=float)
         p.add_argument("--world-data")
         p.add_argument("--test-terrain")
+        p.add_argument("--level-type", help="not a Deep Time world: the pack's generator, e.g. minecraft:normal")
+        p.add_argument("--locate", action="append", help="a biome id to centre a box on (with --level-type)")
+        p.add_argument("--locate-side", type=int)
+        p.add_argument("--jvm-prop", dest="jvm_props", action="append",
+                       help="deeptime.<name>=<value>, a system property for the server (e.g. deeptime.steepScale=0)")
         p.add_argument("--datapack", action="append")
         p.add_argument("--seed", type=int)
         p.add_argument("--no-mic-rock-tags", action="store_true")
