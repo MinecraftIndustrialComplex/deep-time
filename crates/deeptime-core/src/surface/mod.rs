@@ -633,7 +633,12 @@ impl SurfaceStage {
         let lat_of = |j: usize| fields::row_lat(&grid, j);
         let clim = climate::snapshot(world, &d, &lat_of, &sc.h, sea);
         // The glaciers' climate (`glacial.rs`): the ELA of the climate stage; none without it.
-        let gp = p.glacial.clone();
+        // The deep-time surface is physics: glaciers as wide as they are (the valley width is the
+        // young landscape's readability setting).
+        let gp = glacial::GlacialParams {
+            valley_width: 1.0,
+            ..p.glacial.clone()
+        };
         let gravity = self.preset.planet.gravity_m_s2;
         let ela_z = if gp.active() {
             glacial::ela_z_from(
