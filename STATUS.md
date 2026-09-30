@@ -228,6 +228,87 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   scale is 15× exaggerated. (3) Seams now sit in the drawn rock, so a player following a seam stays in shale or
   sandstone.
 - **Next.** Merge into master (the parent); then, if Ben wants it, the coal cover in placement.
+### 2026-09-30 — Ice cover over glaciated ground; no chasm on barren EF; ice caps off cherry grove (agent worktree agent-adda9513719f24370, branch `ef-ice-cover`, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-30: "Force snow/ice cover (Recommended)" (Terralith has no flat inland ice biome, so 31 % of glaciated EF
+  had come out as gravel desert) and "Fix both (Recommended)" (glacial chasm only on glaciated ground; ice caps steered off snowy cherry
+  grove; via the placement file, pack-overridable).
+- **Ice cover.** The bake writes **`climate/ice_cover`** (L2, u8, blocks; `bake/ice.rs`): for ground above the sea and above its equilibrium
+  line (the climate stage's `climate/anomaly/ela_m`, L1 every cell, resampled to L2; the young landscape's elevation), `1 + ⌊height above
+  the line / step_m⌋` blocks up to `max_blocks`. The table's new **`ice_cover`** section (`placement.json`; defaults: step 160 m, at
+  most 12 blocks, 3 snow blocks on top, blue ice for the last 2 of a cover of 9 or more, blocks `snow_block` / `packed_ice` / `blue_ice`)
+  is validated by `bake/placement.rs` and recorded in `notes.bake.climate.ice_cover`. Java: `worlddata/IceCover` (the small interface:
+  `blocks(x, z)` and the block mix `Spec.kind(index, total)`; `WorldData.iceCover()`) and `worldgen/IcePass`, called last in
+  `GeologicChunkGenerator.buildSurface` (after the pack's surface rules, the strata pass and the water pass): the cover **replaces** the
+  top `n` solid blocks of the ground (the terrain's height does not change), reading the layer bilinearly and rounding, so a cover's
+  edge is a slope of cells, not 8-block steps; fluid-topped columns, air and bedrock are left alone. It reads the climate only through
+  `IceCover`: a climate stage that carries a real ice thickness (`climate/ice_thickness_m`) only has to be turned into the layer by the
+  bake. Not in the column evaluator (Java alone reads the layer; `inspect-column` prints it with the other layers), so no Rust/Java
+  parity obligation arises; FORMAT.md has "The ice cover" and the layer table row.
+- **Fix both, through the placement file** (schema additions, no version bump: all optional): a class may carry **`erosion: {min, max}`**
+  (clamp, vanilla's units; a `glaciated` block may give its own) and **`weirdness`** as `"positive"` or **`{"positive_below_erosion": e}`**
+  (positive branch below `e`, negative above). EF: `erosion.max` 0.3 (barren), `glaciated.erosion.max` 1.0 (ice cap keeps the chasm),
+  `weirdness.positive_below_erosion` −0.27. Why these (evidence, offline on the planet's glaciated and unglaciated EF cells with
+  Terralith's parameter list under MIC's mapping and under the identity mapping): barren EF at erosion ≥ 0.4 gets `glacial_chasm`
+  (21 % in MIC) and holding it below 0.3 gives 0 (gravel desert 53 → 74 %, cold shrubland 16 %); the cherry grove that stayed on ice caps
+  after the first change (2 %) is the positive-branch variant at erosion −0.22 … 0.05 and weirdness ≥ 0.4, mid-inland, which no window on
+  erosion or weirdness in vanilla units removes (MIC's router squashes both), but negative-branch flats cannot have it; the peaks stay
+  positive so scarlet mountains stay off them, and the threshold −0.27 (not vanilla's −0.375) is where MIC's stretched erosion leaves no
+  negative cell in scarlet's band (at −0.375 the box kept 11 % scarlet; −0.27 gives 0). Planet-wide glaciated EF, emulated: MIC ice 40 /
+  snow 56 / barren 4 %, scarlet 0.2 %, cherry 0; identity mapping ice 48 / snow 36–47 / barren 6–12 %, cherry ≤ 0.6 %. Barren EF: cold
+  shrubland 79–81 %, snowy plains 9–13 %, glacial chasm 1 %. Side effect (undone below): with all the flats on the negative branch vanilla's
+  ice spikes (a positive-branch variant) disappeared from ice caps (Terralith's stay).
+- **Tests.** Rust (`bake::placement`, `bake::biomes`, `bake::ice`, `bake::tests`): erosion limits and their errors, the weirdness forms,
+  the ice-cover section (defaults, bounds, cover thickness), the cover layer from an ELA, EF's peaks positive / flats negative / barren held
+  off the chasm. Java: `IceCoverTest` (record, block mix, the baked 4k planet's layer read back), GameTest `icePassLaysTheCover` (a chunk
+  built for it: covers of 0, 1, 5 and 12 blocks, a lake column, a two-block column), `iceCoverLaidOnGlaciatedGround` (real planet,
+  if it has cover; the 150 Myr 4k planet has none above its line), `BiomeCensus.FORBIDDEN` gains `EF:no_chasm_on_barren` and
+  `EF:no_cherry` for `climateConsistent`.
+- **Ice spikes back (Ben, 2026-09-30, "Bring ice spikes back").** The flats' branch is now `weirdness.flats`: `{positive_noise_above,
+  max_magnitude}` (new, optional; default never positive and no cap, which is what the entry above did). EF: the flats are positive
+  where the variant noise is above 0.2 (about a fifth of them), at |weirdness| at most 0.25 (vanilla's units), the rest negative;
+  peaks positive. Vanilla's ice spikes (a positive-branch variant at humidity band 0) come back on a share of the flats, and the cherry
+  groves (positive branch, |weirdness| 0.4 and up at mid erosion, where MIC's router puts reference 0.3 … 0.57) stay off: without the
+  cap a half of the flats positive gave cherry on 0.9 % of the ice cap, with it 0.1 % (emulated, MIC). The bake carries the two numbers
+  per class as nearest-cell L2 layers like the rest of the class rules. Tests: `bake::placement` (forms and errors),
+  `bake::biomes::ef_flats_let_some_noise_through_below_a_magnitude` (share between 2 % and 60 %, |w| at most the cap, noise above 0 gives
+  more, above 1 none, peaks stay positive).
+- **Ice cover from the climate's ice** (the climate agent's `climate/ice_thickness_m`, merged with master): `bake/ice.rs`
+  `cover_from_thickness`: ice of at least 1 m on ground above the sea gives `1 + ⌊t / step_m⌋` blocks (same table: 160 m per block, at
+  most 12), the L1 field resampled bilinearly; a run without ice fields falls back to the height above the equilibrium line as before.
+  `notes.bake.climate.ice_cover.source` names which. Cheap, so done. The 160 m step is unchanged: an ice sheet of 2 km or more is 12.
+- **The box moved.** Master's climate (carbon cycle, ice-age cycles, ice-linked sea level, continuous strata) makes `earthlike_quick_16k`
+  a different planet (9,544 EF L1 cells against 53,837; the old box, x 3675…3931, z −3779…−3523, is sea now), so the old before/after
+  cannot be redone. Control: the merged tree baked with master's table (`deeptime run --content` with the old `climate_placement`) and
+  its `climate/ice_cover` layer deleted (so no cover), against the new table on the same planet (`smoke/glaciercheck-ctl`, `-after6`).
+  On the new planet 99 % of EF land carries ice (the ice model and the Köppen class agree; 112 L2 cells are barren EF). Two boxes of the
+  real generator (`preview-area.sh --keep-world`, `deeptime-inspect biomes`, and the ground under the snow layer read from the
+  `.dtva` export): A x −3840…−3584, z 2112…2368 (91 % flats), B x −4160…−3904, z 1984…2240 (43 % flats), both ice cap at 12 blocks.
+  | box A (flats) / B (mixed), 65,536 columns each | before | after |
+  |---|---|---|
+  | MIC: gravel desert | 73.0 % / 29.9 % | 0 / 0 |
+  | MIC: snowy plains | 0 / 0 | 73.0 % / 29.9 % |
+  | MIC: snowy slopes, ice spikes, frozen peaks | 20.2, 6.8, 0 % / 68.3, 0, 1.8 % | the same |
+  | MIC: ground block snow or ice | 27.0 % / 69.1 % (granite 35 %, gravel 23 %, dripstone 12 % / gravel 22 %) | 99.6 % / 99.0 % |
+  | vanilla: ice spikes | 99.7 % / 75.9 % | 8.7 % / 32.2 % |
+  | vanilla: snowy plains, slopes, frozen peaks | 0, 0.3, 0 % / 0, 20.9, 3.2 % | 91.0, 0.3, 0 % / 43.8, 20.9, 3.2 % |
+  | vanilla: ground block snow or ice | 99.9 % / 98.9 % | 98.0 % / 99.7 % (the rest: a village's planks, grass, paths) |
+  (MIC's ice spikes are Terralith's own, at humidity band 0, for both signs, so they do not change; vanilla's were on all of the flats
+  when they were all positive.) Planet-wide, emulated on the Terralith list and MIC's mapping, ice cap: snowy slopes 54 %, frozen peaks
+  27 %, gravel/shrubland 7 % (12 % before), ice spikes 6.6 %, plains 5.7 % (0 before); cherry grove, scarlet mountains, snowy badlands,
+  glacial chasm 0.
+- **Verified (Mac, on the tree merged with master 39f7ad4 and these changes).** `cargo fmt --check`, `clippy --workspace --all-targets
+  --locked -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --locked` (core 287 + 3 ignored, cli 30, format
+  44, inspect 29, …) all pass; `./gradlew build test` 155/0. `./gametest.sh` and `-PwithMic`: 53 of 54 pass, including `icePassLaysTheCover`
+  (1,028 blocks placed as expected, none wrong) and `iceCoverLaidOnGlaciatedGround` (the 4k test planet has no ice cap: 0 columns, logged);
+  the one failure is `climateConsistent`: BW 0.47–0.49 < 0.65, Dsub 0.82 < 0.85, BW:desert 0.42–0.45 < 0.45 (standalone), and under MIC BW,
+  BS 0.51 < 0.60, Dfc:taiga 0.43 < 0.50. **It fails the same way on master without these changes** (same numbers, run on master 39f7ad4):
+  the 4k test planet is a different planet since the climate merge (466 BW columns where there were 17) and its floors were calibrated on
+  the old one; not EF. The planet has no polar land (E family 0 columns), so `EF:no_red`, `EF:no_chasm_on_barren` and `EF:no_cherry`
+  never get columns there (and sit after the floor check in the test); the floors need a recalibration by whoever owns the climate merge.
+- **Next.** The floors of `climateConsistent` on the new test planet (not this work); Ben's call on the ice-cap humidity (caveat (a) above:
+  the gravel desert it once fed is 0 in the boxes now); merge (this branch is not merged).
+
+
 ### 2026-09-30 — P1-25: a climate API for mic-climate and Project Atmosphere (agent worktree agent-a02882c5e6567370e, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **The bake (format 0.1 → 0.2).**
   - At its last snapshot the climate stage keeps every cell's twelve months:
