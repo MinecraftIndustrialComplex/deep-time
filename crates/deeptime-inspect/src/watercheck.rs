@@ -45,14 +45,19 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
     let mut kinds: HashMap<(i32, i32), WaterKind> = HashMap::new();
     let mut kind_of = |x: i32, z: i32| -> Option<WaterKind> {
         let wd = wd?;
-        Some(*kinds.entry((x, z)).or_insert_with(|| wd.hydro(i64::from(x), i64::from(z)).kind))
+        Some(
+            *kinds
+                .entry((x, z))
+                .or_insert_with(|| wd.hydro(i64::from(x), i64::from(z)).kind),
+        )
     };
     // Water the pass placed: in a river or lake column (it never puts water in a bank).
     let ours = |k: Option<WaterKind>| matches!(k, Some(WaterKind::River | WaterKind::Lake));
     // Ice over water is a frozen pool: water beside air over ice rests on it like on water.
     let is_ice = |id: u32| w.reg.name(id).ends_with("ice");
     let (mut floating_ours, mut leaks_ours) = (0u64, 0u64);
-    let mut leaks_by_kind: std::collections::BTreeMap<&'static str, u64> = std::collections::BTreeMap::new();
+    let mut leaks_by_kind: std::collections::BTreeMap<&'static str, u64> =
+        std::collections::BTreeMap::new();
     let is_water_block = |id: u32| {
         let s = &w.reg.states[id as usize];
         s.name == "minecraft:water"
@@ -128,7 +133,9 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                         leaks += 1;
                         let k = kind_of(x, z);
                         leaks_ours += u64::from(ours(k));
-                        *leaks_by_kind.entry(k.map_or("?", WaterKind::name)).or_default() += 1;
+                        *leaks_by_kind
+                            .entry(k.map_or("?", WaterKind::name))
+                            .or_default() += 1;
                         if samples.len() < 40 {
                             samples.push(json!({"what": "leak", "at": [x, y, z], "state": key,
                                                 "into": [x + dx, y, z + dz], "column": k.map(WaterKind::name)}));
