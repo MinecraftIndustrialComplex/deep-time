@@ -38,13 +38,23 @@ import java.util.List;
  * {@code [deeptime-shot]} line. Used by {@code tools/client/mac-screenshots.sh} (the client on the
  * Mac's desktop session; P1-11's laptop route was {@code tools/client/screenshots.sh}), P1-11's
  * best-effort client check, plan §9.8; never active in a normal game.
+ *
+ * <p>{@code -Ddeeptime.dev.screenshots.start=<start>} and {@code .length=<Myr>} choose the timeline
+ * (default supercontinent, 1000), and {@code .vista=x,y,z,yaw,pitch[;…]} adds, after the in-world
+ * shot, one screenshot per viewpoint: the player is put there in spectator mode, the render
+ * distance raised to 16 chunks, and the shot taken once the terrain around has had time to
+ * generate and draw ({@code 11-vista-<n>}).
  */
 final class ScreenshotDriver {
 
     private static final String PROP = "deeptime.dev.screenshots";
     private static final int STEP_TIMEOUT_TICKS = 20 * 180;
 
-    private enum Step { TITLE, CREATE_SCREEN, EDITOR, ADVANCED, TIMELINE, RUNNING, GLOBE, DONE, REVIEW, ACCEPTED, CREATING, IN_WORLD, QUIT }
+    private enum Step { TITLE, CREATE_SCREEN, EDITOR, ADVANCED, TIMELINE, RUNNING, GLOBE, DONE, REVIEW, ACCEPTED, CREATING, IN_WORLD, VISTA, QUIT }
+
+    /** Ticks a vista waits for its terrain before the shot. */
+    private static final int VISTA_WAIT_TICKS = 20 * 60;
+    private static int vista;
 
     private static Step step = Step.TITLE;
     private static int ticks;
@@ -155,8 +165,8 @@ final class ScreenshotDriver {
                             ed.refresh();
                             go(Step.ADVANCED);
                         } else {
-                            model.setStart("supercontinent");
-                            model.setLengthText("1000");
+                            model.setStart(System.getProperty(PROP + ".start", "supercontinent"));
+                            model.setLengthText(System.getProperty(PROP + ".length", "1000"));
                             ed.refresh();
                             go(Step.TIMELINE);
                         }
@@ -280,7 +290,35 @@ final class ScreenshotDriver {
                     if (stepTicks == 200) {
                         shot("10-in-world");
                         DeepTime.LOGGER.info("[deeptime-shot] in world at {}", mc.player == null ? "?" : mc.player.blockPosition());
+                        go(vistas().isEmpty() ? Step.QUIT : Step.VISTA);
+                    }
+                }
+                case VISTA -> {
+                    List<double[]> vs = vistas();
+                    if (vista >= vs.size()) {
                         go(Step.QUIT);
+                        return;
+                    }
+                    double[] v = vs.get(vista);
+                    if (stepTicks == 1) {
+                        mc.options.renderDistance().set(16);
+                        var server = mc.getSingleplayerServer();
+                        var uuid = mc.player.getUUID();
+                        server.execute(() -> {
+                            var sp = server.getPlayerList().getPlayer(uuid);
+                            if (sp != null) {
+                                sp.setGameMode(net.minecraft.world.level.GameType.SPECTATOR);
+                                sp.teleportTo(sp.serverLevel(), v[0], v[1], v[2], (float) v[3], (float) v[4]);
+                            }
+                        });
+                        DeepTime.LOGGER.info("[deeptime-shot] vista {} at {},{},{} yaw {} pitch {}", vista, v[0], v[1], v[2], v[3], v[4]);
+                    }
+                    if (mc.screen != null)
+                        stepTicks = Math.min(stepTicks, 2);
+                    if (stepTicks == VISTA_WAIT_TICKS) {
+                        shot("11-vista-" + vista);
+                        vista++;
+                        stepTicks = 0;
                     }
                 }
                 case QUIT -> {
@@ -294,6 +332,22 @@ final class ScreenshotDriver {
             DeepTime.LOGGER.error("[deeptime-shot] FAILED at step {}", step, e);
             go(Step.QUIT);
         }
+    }
+
+    /** The {@code .vista} viewpoints: x, y, z, yaw, pitch each. */
+    private static List<double[]> vistas() {
+        String p = System.getProperty(PROP + ".vista", "");
+        List<double[]> out = new java.util.ArrayList<>();
+        for (String v : p.split(";")) {
+            String[] f = v.trim().split(",");
+            if (f.length == 5) {
+                double[] d = new double[5];
+                for (int i = 0; i < 5; i++)
+                    d[i] = Double.parseDouble(f[i].trim());
+                out.add(d);
+            }
+        }
+        return out;
     }
 
     private static void worldTab(CreateWorldScreen cws) {

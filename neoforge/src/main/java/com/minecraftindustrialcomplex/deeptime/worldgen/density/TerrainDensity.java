@@ -21,13 +21,17 @@ import net.minecraft.util.StringRepresentable;
  * <p>The scale k grows on steep ground ({@link TerrainScale}): with a fixed k the router's cave
  * band breaks steep faces into steps between noise-cell corners.
  *
+ * <p>{@code ratio} mode is k / scale (1 on gentle ground): the router multiplies the cave-entrance
+ * term of its terrain band by it, so min(terrain, 5·entrances) carves exactly where it did with the
+ * fixed k (both sides shrink by the same factor) and steep faces get no extra cave mouths.
+ *
  * <p>{@code initial} mode adds 0.390625: {@code NoiseChunk} takes the preliminary surface as the
  * highest cell y where initial density exceeds 0.390625, so this puts it at H.
  */
 public final class TerrainDensity extends DeepTimeDensity {
 
     public enum Mode implements StringRepresentable {
-        INITIAL("initial"), FINAL("final");
+        INITIAL("initial"), FINAL("final"), RATIO("ratio");
 
         public static final Codec<Mode> CODEC = StringRepresentable.fromEnum(Mode::values);
         private final String name;
@@ -90,12 +94,16 @@ public final class TerrainDensity extends DeepTimeDensity {
             m.source = new WeakReference<>(src);
             m.baseK = k;
         }
+        if (mode == Mode.RATIO)
+            return k / m.scale;
         double d = (m.height - ctx.blockY()) / m.scale;
         return mode == Mode.INITIAL ? d + PRELIMINARY_SURFACE_THRESHOLD : d;
     }
 
     @Override
     public double minValue() {
+        if (mode == Mode.RATIO)
+            return 0.0;
         return -2048.0 / k;
     }
 
