@@ -47,6 +47,9 @@ fn planet() -> Planet {
         day_length_h: 24.0,
         earth_scale: 782.278 / 6370.0,
         m_per_block_h: 300.0,
+        forcing_w_m2: 0.0,
+        sun_rel: 1.0,
+        orbit: None,
     }
 }
 
@@ -194,6 +197,8 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
     }
     let t = &world.fields[field::T_MEAN].data;
     let p = &world.fields[field::PRECIP].data;
+    eprintln!("NOTE {}", world.notes[STAGE_NAME]);
+    eprintln!("T range {:?}", t.iter().fold((f32::MAX, f32::MIN), |a, &x| (a.0.min(x), a.1.max(x))));
     assert!(
         t.iter().all(|x| (-80.0..50.0).contains(x)),
         "temperatures in range"

@@ -350,6 +350,9 @@ struct CommonArgs {
     /// memory cap decides). Results are the same either way; for measuring the spill.
     #[arg(long)]
     history_mem: Option<u64>,
+    /// Writes the climate stage's note (summary and curves, JSON) to this file after `stage`.
+    #[arg(long)]
+    climate_json: Option<PathBuf>,
 }
 
 impl CommonArgs {
@@ -360,6 +363,7 @@ impl CommonArgs {
             verbose: self.verbose,
             set: self.set.clone(),
             history_mem: self.history_mem,
+            climate_json: self.climate_json.clone(),
         }
     }
 }
@@ -812,6 +816,7 @@ mod tests {
             verbose: false,
             set: Vec::new(),
             history_mem: None,
+            climate_json: None,
         }
     }
 

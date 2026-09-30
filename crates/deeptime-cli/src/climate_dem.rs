@@ -105,6 +105,12 @@ pub fn run(o: &Options) -> CliResult<()> {
         day_length_h: day,
         earth_scale: o.circumference_km / (std::f64::consts::TAU * 6370.0),
         m_per_block_h: cell_m,
+        // The present: 280 ppm, today's sun, and the ice-age window's present orbit when the
+        // preset runs the window (the stage's last snapshot sees the same).
+        forcing_w_m2: 0.0,
+        sun_rel: 1.0,
+        orbit: (p.orbital_window_myr > 0.0)
+            .then(|| deeptime_core::climate::orbit::present(tilt, p.orbital_strength)),
     };
     let inp = snapshot::Input {
         grid: &grid,
@@ -170,6 +176,60 @@ pub fn run(o: &Options) -> CliResult<()> {
             .collect::<Vec<_>>()
             .join("/")
     );
+    // The carbon cycle's and the sea level's Earth references (deep-time climate): the weathering
+    // kernel Σ a·runoff·e^(k_T(T − 15 °C)) over the land (km²·m/yr, true Earth-normalized areas;
+    // `climate::carbon::KERNEL_EARTH`) and the grounded ice of Nye's profile on the glaciated land
+    // (km³; `climate.ice_reference_km3`).
+    {
+        use deeptime_core::climate::{carbon, ice};
+        let es = planet.earth_scale;
+        let area: Vec<f64> = lat
+            .iter()
+            .map(|l| (cell_m / 1000.0).powi(2) * l.to_radians().cos().max(0.0) / (es * es))
+            .collect();
+        let (mut kernel, mut land_a) = (0.0, 0.0);
+        for j in 0..h {
+            for i in 0..w {
+                let c = j * w + i;
+                if z[c] <= 0.0 {
+                    continue;
+                }
+                let t = f64::from(s.t_mean[c]);
+                let pr = f64::from(s.precip[c]);
+                let pet = (60.0 * t).max(0.0);
+                let runoff = (pr - deeptime_core::surface::climate::fu_et(pr, pet)).max(0.0) / 1000.0;
+                kernel += carbon::cell_kernel(area[j], runoff, t, p.weathering_temp_per_k);
+                land_a += area[j];
+            }
+        }
+        let mask: Vec<bool> = (0..w * h).map(|c| z[c] > 0.0 && s.glacier[c] != 0).collect();
+        let sx: Vec<f64> = lat
+            .iter()
+            .map(|l| cell_m * l.to_radians().cos().max(0.0) / es)
+            .collect();
+        let thick = ice::thickness(
+            w,
+            h,
+            &mask,
+            &sx,
+            cell_m / es,
+            p.ice_yield_stress_kpa * 1000.0,
+            p.ice_max_thickness_m,
+        );
+        let vol: f64 = (0..w * h)
+            .map(|c| f64::from(thick[c]) * area[c / w] / 1000.0)
+            .sum();
+        let ocean: f64 = (0..w * h).filter(|&c| z[c] <= 0.0).map(|c| area[c / w]).sum();
+        println!(
+            "deeptime climate-dem: weathering kernel {kernel:.4e} km²·m/yr over {land_a:.4e} km² of \
+             land (KERNEL_EARTH {:.4e}); grounded ice {vol:.4e} km³ (reference {:.4e}), {:.1} m of \
+             sea level, peak {:.0} m",
+            carbon::KERNEL_EARTH,
+            p.ice_reference_km3,
+            -ice::eustatic_m(vol, ocean),
+            thick.iter().cloned().fold(0.0f32, f32::max)
+        );
+    }
     // The printed check: the class at each known place, and whether its group matches.
     let (mut same, mut group) = (0, 0);
     for (name, la, lo, want) in PLACES {

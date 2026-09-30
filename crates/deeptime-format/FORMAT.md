@@ -623,7 +623,8 @@ each: its fields' LZ4 blobs back to back in the head's order (the same record th
 holds). The next stage is always a group's lead: inside a group of coupled stages (plates + surface,
 P1-04) the saved state is the postcard `Vec<Vec<u8>>` of every member's state, in pipeline order.
 Schema 4 (P1-04) added the surface state and the recorded field history to `WorldState`; schema 6
-(P1-17) moved the history's frames out of the body into sections of their own, so a checkpoint is
+(P1-17) moved the history's frames out of the body into sections of their own (schema 7, the deep-time
+climate, added `WorldState::globals` and the climate stage's carbon cycle, fine clock and ice), so a checkpoint is
 written streamed (`<path>.tmp`, fsync, rename; frames copied from memory or from the spill file, never
 held whole) and read without loading the frames (every section's CRC is checked when it is read; the
 frames are read from the file on demand). Postcard is not self-describing: a checkpoint is read only
