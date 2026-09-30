@@ -255,7 +255,9 @@ fn lateral(win: &Win, zmean: &[f32], zs: &[f32], i: usize, j: usize) -> f32 {
 }
 
 /// The trough, cirque and ridge pass over a window (`z` in place; `zs` the ice surface; `scratch`
-/// six arrays of the window's size whose contents are overwritten).
+/// six arrays of the window's size whose contents are overwritten). Once the pass has looked at
+/// the window, the last scratch array holds each cell's cut, m (0 where it cut nothing): the
+/// amplifier hands it to the mountain character's fade (`tiles::run_tiles`).
 pub fn shape(
     win: &Win,
     p: &GlacialShape,
@@ -273,6 +275,7 @@ pub fn shape(
     let r = p.radius_cells as usize;
     depth(z, zs, d);
     if d.iter().all(|&x| x <= 0.0) {
+        cut.iter_mut().for_each(|x| *x = 0.0);
         return st;
     }
     // The centre-line depth: the largest depth within reach, smoothed by a box mean of the same
