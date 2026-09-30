@@ -2268,7 +2268,7 @@ and consumption plus large igneous provinces, GEOCARB/Walker–Hays–Kasting si
 land cell (runoff × e^(0.09 ΔT)), normalized on Earth's relief; CO₂ lowers the EBM's longwave A
 (Myhre, and Byrne & Goldblatt above 1,000 ppm). (9) A **brightening star** (Gough 1981) on the
 timeline's absolute age. (10) A **fine clock** (`clock.rs`) steps the carbon, the EBM and the ice
-every 100 kyr inside each plate step (halving through fast CO₂ changes), so the ice-albedo runaway
+every 200 kyr (`carbon_step_kyr`, a setting since 2026-09-30) inside each plate step (halving through fast CO₂ changes), so the ice-albedo runaway
 and the escape by degassing happen on their own (events `deeptime:snowball`, `deeptime:hothouse`);
 the 10-Myr geographic snapshots stay, and between them the zonal references follow the clock's EBM
 and the equilibrium line moves with each band's summer temperature. (11) **Orbital forcing** over

@@ -176,6 +176,16 @@ pub struct ClimateParams {
     pub runoff_temp_per_k: f64,
     /// CO₂ fertilisation of weathering: W ∝ (CO₂/280 ppm)^this (Walker, Hays & Kasting 1981: 0.3).
     pub weathering_co2_exponent: f64,
+    /// Limit weathering by the supply of fresh rock: each band's weathering cannot outrun what its
+    /// erosion (the surface stage's, at least `weathering_min_denudation_m_myr`) exposes, times
+    /// `weathering_rock_mol_kg` of Ca + Mg (West 2012; `carbon::supply_limited`).
+    pub weathering_supply: bool,
+    /// Ca + Mg of the eroded silicate rock, mol/kg (upper continental crust: CaO 3.6 %, MgO 2.5 %,
+    /// Rudnick & Gao 2003 → 1.26 mol/kg).
+    pub weathering_rock_mol_kg: f64,
+    /// Denudation the supply assumes at least, m/Myr (soil production on flat, slowly eroding
+    /// ground; cratons weather 2–10 m/Myr, Dixon & von Blanckenburg 2012).
+    pub weathering_min_denudation_m_myr: f64,
     /// A brightening star: L(t) = L₀ / (1 + 0.4·(1 − age/`present_age_gyr`)) (Gough 1981), with the
     /// planet's age from the run's timeline (the run ends at `present_age_gyr`). Off: L₀ always.
     pub solar_brightening: bool,
@@ -185,9 +195,11 @@ pub struct ClimateParams {
     /// `hydro_ref_c` (Held & Soden 2006: ~2 %/K).
     pub hydro_sensitivity_per_k: f64,
     pub hydro_ref_c: f64,
-    /// The fine clock (numerics): the carbon cycle, the EBM and the ice advance in steps of this
-    /// many kyr inside each plate step, with at most `ebm_clock_years` EBM years per step (the run
-    /// stops early once settled).
+    /// The fine clock: the carbon cycle, the EBM and the ice advance in steps of this many kyr
+    /// inside each plate step (200 by default; Ben 2026-09-30: "200 kyrs, but make sure it is
+    /// configurable" — an editor setting), halved down to 1 kyr wherever CO₂ would move by more
+    /// than half, with at most `ebm_clock_years` EBM years per step (the run stops early once
+    /// settled).
     pub carbon_step_kyr: f64,
     pub ebm_clock_years: u32,
     /// A snowball (event `deeptime:snowball`) starts when sea ice covers this share of the ocean
@@ -215,6 +227,26 @@ pub struct ClimateParams {
     pub ice_max_thickness_m: f64,
     /// Imbrie & Imbrie's τ_m, kyr (the ice's response inside the orbital window).
     pub ice_response_kyr: f64,
+    /// Ice-sheet dynamics (`sheet.rs`): the shallow-ice flow with the elevation feedback, isostasy
+    /// and calving on a coarse grid, in the ice-age window every clock step and in deep time for
+    /// `ice_relax_kyr` per plate step. Off: Nye's equilibrium profile and Imbrie's lag.
+    pub ice_dynamics: bool,
+    /// Glen's flow factor A, Pa⁻³ yr⁻¹ (EISMINT: 10⁻¹⁶).
+    pub ice_flow_a: f64,
+    /// Mass-balance gradients above and below the equilibrium line, (m of ice/yr) per m of height
+    /// (Oerlemans 1981: a few mm/yr per m).
+    pub ice_accumulation_gradient: f64,
+    pub ice_ablation_gradient: f64,
+    /// The most accumulation at 1 m/yr of precipitation, m of ice/yr (scaled by the precipitation:
+    /// a dry cold climate grows its sheets slowly).
+    pub ice_accumulation_max_m_yr: f64,
+    /// Isostatic e-folding time of the bed under the ice, kyr (Le Meur & Huybrechts 1996: ~3).
+    pub ice_isostasy_kyr: f64,
+    /// Columns of the sheet's coarse grid, about (numerics).
+    pub ice_grid_cells: u32,
+    /// Deep time: the sheet runs this long at every plate step's end climate from the ice the
+    /// plates carried, kyr (numerics).
+    pub ice_relax_kyr: f64,
     /// How much ice volume moves sea level (0: the surface section's curve alone; 1: full
     /// glacio-eustasy, ~2.5 m per 10⁶ km³).
     pub glacio_eustasy: f64,
@@ -291,11 +323,14 @@ impl Default for ClimateParams {
             weathering_temp_per_k: 0.09,
             runoff_temp_per_k: 0.038,
             weathering_co2_exponent: 0.3,
+            weathering_supply: true,
+            weathering_rock_mol_kg: 1.26,
+            weathering_min_denudation_m_myr: 2.0,
             solar_brightening: true,
             present_age_gyr: 4.57,
             hydro_sensitivity_per_k: 0.02,
             hydro_ref_c: 15.0,
-            carbon_step_kyr: 100.0,
+            carbon_step_kyr: 200.0,
             ebm_clock_years: 10,
             snowball_on_frac: 0.95,
             snowball_off_frac: 0.5,
@@ -306,6 +341,14 @@ impl Default for ClimateParams {
             ice_yield_stress_kpa: 50.0,
             ice_max_thickness_m: 3000.0,
             ice_response_kyr: 17.0,
+            ice_dynamics: true,
+            ice_flow_a: 1.0e-16,
+            ice_accumulation_gradient: 0.005,
+            ice_ablation_gradient: 0.01,
+            ice_accumulation_max_m_yr: 0.5,
+            ice_isostasy_kyr: 3.0,
+            ice_grid_cells: 256,
+            ice_relax_kyr: 30.0,
             glacio_eustasy: 1.0,
             ice_reference_km3: 1.0e7,
         }
@@ -469,6 +512,13 @@ impl ClimateParams {
                 0.0,
                 1.0,
             ),
+            (self.weathering_rock_mol_kg, "weathering_rock_mol_kg", 0.01, 10.0),
+            (
+                self.weathering_min_denudation_m_myr,
+                "weathering_min_denudation_m_myr",
+                0.0,
+                1000.0,
+            ),
             (self.present_age_gyr, "present_age_gyr", 0.5, 12.0),
             (
                 self.hydro_sensitivity_per_k,
@@ -495,6 +545,22 @@ impl ClimateParams {
                 10_000.0,
             ),
             (self.ice_response_kyr, "ice_response_kyr", 0.1, 200.0),
+            (self.ice_flow_a, "ice_flow_a", 1.0e-19, 1.0e-13),
+            (
+                self.ice_accumulation_gradient,
+                "ice_accumulation_gradient",
+                0.0,
+                0.1,
+            ),
+            (self.ice_ablation_gradient, "ice_ablation_gradient", 0.0, 0.1),
+            (
+                self.ice_accumulation_max_m_yr,
+                "ice_accumulation_max_m_yr",
+                0.0,
+                10.0,
+            ),
+            (self.ice_isostasy_kyr, "ice_isostasy_kyr", 0.1, 100.0),
+            (self.ice_relax_kyr, "ice_relax_kyr", 0.0, 1000.0),
             (self.glacio_eustasy, "glacio_eustasy", 0.0, 1.0),
             (self.ice_reference_km3, "ice_reference_km3", 0.0, 1.0e9),
         ] {
@@ -508,6 +574,11 @@ impl ClimateParams {
             (1..=1000).contains(&self.ebm_clock_years),
             "ebm_clock_years",
             "must be in [1, 1000]",
+        )?;
+        check(
+            (8..=4096).contains(&self.ice_grid_cells),
+            "ice_grid_cells",
+            "must be in [8, 4096]",
         )?;
         check(
             0.0 < self.snowball_off_frac

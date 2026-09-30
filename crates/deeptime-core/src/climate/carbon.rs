@@ -239,11 +239,39 @@ pub fn climate_factor(dt: f64, k_t: f64, k_r: f64) -> f64 {
 }
 
 /// The weathering of one plate step's geography: each EBM band's kernel (the cells' Σ a·r·e^(k_T(T
-/// − 15)), km²·m/yr) and the band's land temperature when the cells' climate was computed.
+/// − 15)), km²·m/yr), the band's land temperature when the cells' climate was computed, and the
+/// band's supply of fresh rock (mol C/yr its erosion could take up if every eroded grain weathered
+/// completely; empty: no supply limit).
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Kernel {
     pub band: Vec<f64>,
     pub ref_t_land: Vec<f64>,
+    pub supply: Vec<f64>,
+}
+
+/// Density of the eroded rock, kg/m³.
+pub const ROCK_KG_M3: f64 = 2700.0;
+
+/// The supply of one land cell, mol C/yr: true area (km², Earth-normalized) × denudation (m/Myr,
+/// at least `min_m_myr`) × ρ_rock × `mol_kg` (the Ca + Mg of the rock, each ion finally burying
+/// one carbonate).
+pub fn cell_supply(area_km2: f64, erosion_m_myr: f64, min_m_myr: f64, mol_kg: f64) -> f64 {
+    area_km2 * 1.0e6 * erosion_m_myr.max(min_m_myr) * 1.0e-6 * ROCK_KG_M3 * mol_kg
+}
+
+/// Weathering limited by its supply: the kinetic flux `kin` where the supply `s` is ample, the
+/// supply where the kinetics would outrun it, s·(1 − e^(−kin/s)) between (the kinetic and
+/// supply-limited regimes of West, Galy & Bickle 2005 and West 2012).
+pub fn supply_limited(kin: f64, s: f64) -> f64 {
+    if s <= 0.0 || kin <= 0.0 {
+        return 0.0;
+    }
+    let x = kin / s;
+    if x < 1.0e-6 {
+        kin
+    } else {
+        s * -(-x).exp_m1()
+    }
 }
 
 /// Weathering parameters.
@@ -266,10 +294,12 @@ impl Weathering {
     }
 
     /// Silicate weathering, mol C/yr, of kernel `k` with each band's land at `t_land` °C and
-    /// `ice` of its land under ice, at `ppm`.
+    /// `ice` of its land under ice, at `ppm`: each band's kinetic flux, limited by its supply of
+    /// fresh rock where the kernel has one (`supply_limited`).
     pub fn flux(&self, k: &Kernel, t_land: &[f64], ice: &[f64], ppm: f64) -> f64 {
-        let sum: f64 = k
-            .band
+        let scale = DEGASSING_EARTH_MOL_YR * self.strength / KERNEL_EARTH
+            * (ppm.max(1e-6) / CO2_REF_PPM).powf(self.beta);
+        k.band
             .iter()
             .enumerate()
             .map(|(b, &kb)| {
@@ -279,11 +309,22 @@ impl Weathering {
                 let dt = t_land.get(b).copied().unwrap_or(0.0)
                     - k.ref_t_land.get(b).copied().unwrap_or(0.0);
                 let free = 1.0 - ice.get(b).copied().unwrap_or(0.0).clamp(0.0, 1.0);
-                kb * climate_factor(dt, self.k_t, self.k_r) * free
+                let kin = scale * kb * climate_factor(dt, self.k_t, self.k_r) * free;
+                match k.supply.get(b) {
+                    Some(&s) => supply_limited(kin, s * free),
+                    None => kin,
+                }
             })
-            .sum();
-        DEGASSING_EARTH_MOL_YR * self.strength * sum / KERNEL_EARTH
-            * (ppm.max(1e-6) / CO2_REF_PPM).powf(self.beta)
+            .sum()
+    }
+
+    /// The supply of fresh rock of the land not under ice, mol C/yr (0 without a supply limit).
+    pub fn supply(k: &Kernel, ice: &[f64]) -> f64 {
+        k.supply
+            .iter()
+            .enumerate()
+            .map(|(b, &s)| s * (1.0 - ice.get(b).copied().unwrap_or(0.0).clamp(0.0, 1.0)))
+            .sum()
     }
 }
 
@@ -373,9 +414,10 @@ mod tests {
             k_r: 0.038,
             beta: 0.3,
         };
-        let k = Kernel {
+        let mut k = Kernel {
             band: vec![KERNEL_EARTH * 0.5, KERNEL_EARTH * 0.5],
             ref_t_land: vec![10.0, 20.0],
+            supply: Vec::new(),
         };
         let base = w.flux(&k, &[10.0, 20.0], &[0.0, 0.0], 280.0);
         assert!((base / DEGASSING_EARTH_MOL_YR - 1.0).abs() < 1e-12);
@@ -387,5 +429,15 @@ mod tests {
         // A frozen, dry planet (−40 K) barely weathers.
         assert!(w.flux(&k, &[-30.0, -20.0], &[0.0, 0.0], 280.0) < 1e-3 * base);
         assert!(w.flux(&k, &[10.0, 20.0], &[0.0, 0.0], 2800.0) > 1.9 * base);
+        // Supply-limited: ample supply changes little, and no warming lifts weathering past it.
+        k.supply = vec![20.0 * DEGASSING_EARTH_MOL_YR, 20.0 * DEGASSING_EARTH_MOL_YR];
+        let limited = w.flux(&k, &[10.0, 20.0], &[0.0, 0.0], 280.0);
+        assert!(limited < base && limited > 0.97 * base, "{limited} vs {base}");
+        let hot = w.flux(&k, &[50.0, 60.0], &[0.0, 0.0], 5.0e5);
+        assert!(hot < 40.0 * DEGASSING_EARTH_MOL_YR && hot > 30.0 * DEGASSING_EARTH_MOL_YR, "{hot}");
+        assert_eq!(supply_limited(1.0, 0.0), 0.0);
+        assert!((supply_limited(1.0e-9, 1.0) - 1.0e-9).abs() < 1e-18);
+        // 1 km² eroding 50 m/Myr of rock with 1.2 mol/kg of Ca + Mg: 162,000 mol/yr.
+        assert!((cell_supply(1.0, 50.0, 2.0, 1.2) - 1.62e5).abs() < 1.0);
     }
 }
