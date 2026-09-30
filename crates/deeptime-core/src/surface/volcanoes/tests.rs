@@ -77,6 +77,43 @@ fn arcs_line_up_along_the_front_at_the_spacing() {
     );
 }
 
+#[test]
+fn the_front_is_the_middle_of_the_arc_band() {
+    let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
+    let (w, n) = (grid.w as usize, grid.cells());
+    let mut flux = vec![0.0f64; n];
+    let mut elev = vec![0.0f32; n];
+    // A band five cells wide along rows 100–104.
+    for j in 100..105 {
+        for i in 200..400 {
+            flux[j * w + i] = 1.0;
+        }
+    }
+    // A patch 40 × 40 cells striped every other row (the plate model's lattice stripes).
+    for j in (300..340).step_by(2) {
+        for i in 500..540 {
+            flux[j * w + i] = 1.0;
+        }
+    }
+    // A trench: strong flux but 6 km deep.
+    for i in 600..700 {
+        flux[50 * w + i] = 1.0;
+        elev[50 * w + i] = -6000.0;
+    }
+    let front = volcanic_front(&grid, &flux, &elev, 0.0, 0.25);
+    let rows: Vec<usize> = (100..105)
+        .filter(|&j| (200..400).any(|i| front[j * w + i]))
+        .collect();
+    assert_eq!(rows, vec![102], "the band's centre row");
+    let patch = (300..340)
+        .flat_map(|j| (500..540).map(move |i| j * w + i))
+        .filter(|&c| front[c])
+        .count();
+    assert!(patch < 200, "{patch} of 800 striped cells on the patch's skeleton");
+    assert!(patch > 0);
+    assert!((600..700).all(|i| !front[50 * w + i]), "no front in a trench");
+}
+
 fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
     let json = with_timeline(
         planet_builtin("pipeline_quick_16k").unwrap(),

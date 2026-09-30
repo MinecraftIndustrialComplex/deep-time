@@ -268,9 +268,9 @@ the plate model has closed its hotspot tracks), so every cause exists when they 
 the volcano's (or province's) position at the end of the run, where the world shows it (a caldera's:
 where its volcano stood when it collapsed). Heights are relief above the ground around the edifice,
 m; `summit_m` is its summit's elevation above the sea at the end; radii and areas are block-metric
-(the world's own), km and km². Stratovolcanoes are written only while they stand (at least a quarter
-of their peak height and 300 m; the others are counted in `notes.volcanoes`); every hotspot volcano
-is written, whatever became of it.
+(the world's own), km and km². Stratovolcanoes are written while active, or dead but still holding half
+their peak height and at least 800 m (× `volcanoes.size`); the many thousands of others a run makes
+are counted in `notes.volcanoes`. Every hotspot volcano is written, whatever became of it.
 
 | Kind | t_start (t_end) | Params | Magnitude | Causes |
 |---|---|---|---|---|
@@ -278,7 +278,7 @@ is written, whatever became of it.
 | `volcano_shield` | its birth over the plume (its death: it drifted away, or its hotspot died) | as above plus `hotspot`, `chain_index` (0 the first of its chain), `fate` (`active`, `island`, `seamount`, `eroded`, `subducted`) | as above | its hotspot's `hotspot_track`, else the hotspot's `large_igneous_province` |
 | `volcano_caldera_complex` | as a shield (a continental hotspot) | as `volcano_shield`, `magma` = `silicic` | as above | as `volcano_shield` |
 | `volcano_caldera` | the collapse | `volcano`, `radius_km`, `depth_m`, `erupted_km3`, `type` (`silicic`: the volcano collapsed and died; `summit`: a shield's summit caldera) | erupted volume / 1,000 km³, ≤ 1 | its volcano's event, else that volcano's cause |
-| `volcano_flood_basalt` | the eruption | `area_km2`, `thickness_m` (the pile at its centre), `flows`, `preserved_frac` (share of its area where the pile still crops out within 150 m of the surface), `plate` | pile / 1 km | the plate model's `large_igneous_province` |
+| `volcano_flood_basalt` | the eruption | `area_km2`, `thickness_m` (the pile at its centre), `flows`, `preserved_frac` (share of its area where the pile still crops out within 150 m of the surface), `pile_frac` (share where any of it is left, at any depth), `plate` | pile / 1 km | the plate model's `large_igneous_province` |
 
 ### The climate's events (source `deeptime:climate`, P1-05)
 
