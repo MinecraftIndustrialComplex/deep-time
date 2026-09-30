@@ -424,7 +424,7 @@
       ]
     },
     "satellite": {
-      "_comment": "True colour, as a satellite mosaic shows the planet (core satellite.rs): a view of the current state composited when a frame is drawn, not a ramp of one field (the world is not changed); these classes are its anchor colours. Sea by depth (turquoise under 20 m, shelf at 200 m, ocean at 2.5 km, deep from 5.5 km), whitened by annual sea-ice cover. Land with a climate: herb cover grows with the aridity index P/PET (0.05 to 0.45) and trees from 0.5 to 1.0, trees only where the warmest month passes about 10 °C; the Köppen class holds deserts bare, steppes grassy and Af/Am forested. Bare ground is sand where hot, grey-tan where cold, tinted by the surface rock (red beds reddish, basalt dark, evaporites white); herbs are khaki steppe to olive savanna, brown-grey tundra when summers are cold; forest is boreal, temperate or rainforest by the coldest month. Rock shows through on high ground from 2.5 km. Snow: perennial above the snow line or where the warmest month is below freezing; seasonal snow on cold land is a lighter tint. Glacier ice (land ice 1 m or more) is white. A frame without a climate shows bare ground by geology (no plants, snow or ice). Relief is a soft hill shade lit from the north-west.",
+      "_comment": "True colour, as a satellite mosaic shows the planet (core satellite.rs): a view of the current state composited when a frame is drawn, not a ramp of one field (the world is not changed); these classes are its anchor colours. Sea by depth (turquoise under 8 m, shelf at 120 m, ocean at 1.5 km, deep from 5 km), whitened by annual sea-ice cover. Land with a climate: herb cover grows with the aridity index P/PET (0.05 to 0.45) and trees from 0.5 to 1.0, trees only where the warmest month passes about 10 °C; the Köppen class holds deserts bare, steppes grassy and Af/Am forested. Bare ground is sand where hot, grey-tan where cold, tinted by the surface rock (red beds reddish, basalt dark, evaporites white); herbs are khaki steppe to olive savanna, brown-grey tundra when summers are cold; forest is boreal, temperate or rainforest by the coldest month. Rock shows through on high ground from 2.5 km. Snow: perennial above the snow line or where the warmest month is below freezing; seasonal snow on cold land is a lighter tint. Glacier ice (land ice 1 m or more) is white. A frame without a climate shows bare ground by geology (no plants, snow or ice). Relief is a soft hill shade lit from the north-west. The climate's fields are smoothed over a few cells first, so its latitude bands and cell streaks do not show as stripes.",
       "labels": ["Tropical rainforest", "Temperate forest", "Boreal forest", "Savanna and shrubland", "Grassland and steppe", "Hot desert", "Cold desert", "Tundra", "Bare rock and high mountains", "Volcanic rock", "Salt flat", "Snow", "Glacier ice", "Sea ice", "Shallow sea", "Continental shelf", "Ocean", "Deep ocean"],
       "groups": [["Land", 0, 10], ["Snow and ice", 11, 13], ["Sea", 14, 17]],
       "stops": [
@@ -458,8 +458,8 @@
         [13.999, "#e2eaf2"],
         [14, "#3fa5b5"],
         [14.999, "#3fa5b5"],
-        [15, "#1f6b9c"],
-        [15.999, "#1f6b9c"],
+        [15, "#25649a"],
+        [15.999, "#25649a"],
         [16, "#113a78"],
         [16.999, "#113a78"],
         [17, "#071a42"],

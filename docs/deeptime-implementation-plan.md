@@ -2572,6 +2572,20 @@ something Ben can look at in a browser.
   click-to-inspect (lat/lon, block x/z, every layer value, Köppen, province, the column's rock
   stack); sites with their "Why here?" cause chain; and a globe view. No build step, no npm: plain
   JS in the page.
+- **The satellite view, the default layer (Ben, 2026-09-30: "Default view on the viewer is currently
+  an elevation map, can you turn it into an actual map … so I can see where glaciars / snow is").**
+  Every frame of the plate model's group (with or without a climate) and of the young landscape and
+  its amplification carries `satellite` as its first layer: a true-colour picture composited by
+  `core::satellite` when the frame is drawn, view only like the geologic provinces (nothing is
+  written to `WorldState`). The sea by depth and sea ice; land cover from the climate (herb and tree
+  cover from the aridity index and the warmest month, held to the Köppen map; ground by temperature
+  and surface rock; khaki steppe, olive savanna, brown-grey tundra; boreal, temperate or tropical
+  forest by the coldest month); bare rock on high ground; perennial and seasonal snow; glacier ice
+  white; a soft hill shade. A frame without a climate shows bare ground by geology. Its `ramps.json`
+  entry is the legend's key (18 classes in three groups), not a ramp applied to a field. The
+  workbench, `?tv` and the static bundle (timelapse and, from the last satellite frame, the
+  world-data map) open on it, and the game's timelapse shows it as its first layer ("Satellite");
+  `deeptime satellite --in <checkpoint> --out x.png` draws one from a checkpoint.
 
 ### 9.4 NeoForge GameTests
 
