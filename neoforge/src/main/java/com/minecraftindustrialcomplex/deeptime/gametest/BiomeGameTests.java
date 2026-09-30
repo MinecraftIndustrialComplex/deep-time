@@ -122,6 +122,8 @@ public final class BiomeGameTests {
             Map.entry("D", 0.9), Map.entry("Dsub", 0.85), Map.entry("E", 0.9), Map.entry("sea", 0.95),
             Map.entry("BW:desert", 0.45), Map.entry("Af:jungle", 0.5), Map.entry("Dfc:taiga", 0.5), Map.entry("E:snow", 0.9));
     static final int MIN_COLUMNS = 20;
+    /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
+    static final double FORBIDDEN_CEILING = 0.10;
 
     /**
      * P1-09: biomes follow the simulated climate. On the real baked planet ({@code test_planet_real},
@@ -152,6 +154,16 @@ public final class BiomeGameTests {
                 low.append(String.format(java.util.Locale.ROOT, " %s %.3f < %.3f (%d columns)", ch.name(), share, floor, r.total(ch.name())));
         }
         helper.assertTrue(low.isEmpty(), "Köppen families below their floor:" + low);
+        // EF is ice or barren frozen ground, never the red badlands or Nether-stone mountains.
+        StringBuilder red = new StringBuilder();
+        for (var f : BiomeCensus.FORBIDDEN) {
+            double share = r.forbiddenShare(f.name());
+            DeepTime.LOGGER.info("[gametest] climateConsistent {} {} of {} columns", f.name(), share, r.forbiddenTotal(f.name()));
+            if (r.forbiddenTotal(f.name()) >= MIN_COLUMNS && share > FORBIDDEN_CEILING)
+                red.append(String.format(java.util.Locale.ROOT, " %s %.3f > %.3f (%d columns)", f.name(), share, FORBIDDEN_CEILING,
+                        r.forbiddenTotal(f.name())));
+        }
+        helper.assertTrue(red.isEmpty(), "families on biomes they must not have:" + red);
         helper.succeed();
     }
 

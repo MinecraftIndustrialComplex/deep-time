@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "_comment": "Where each Köppen climate class goes on vanilla's temperature and humidity bands (plan §7.2, P1-09). One file, two readers, like default.json beside it: the core (crates/deeptime-core/src/bake/placement.rs, include_str!) uses it as the bake's default, and the game ships it as data/deeptime/deeptime/climate_mapping/placement.json. A datapack may override it: at a dedicated server's first start FirstStartGenerator reads the pack's copy and hands it to the bake in the content bundle (key 'climate_placement'), so the bake places the world's climate by the pack's table; the table used is recorded in the world data (manifest notes.bake.climate.placement). Coordinates are band coordinates: temperature 0 to 5 over frozen | cold | temperate | warm | hot, humidity 0 to 5 over the five humidity bands (b = 2.5 is the middle of the third band). 'temperature_ramps' name a band coordinate as base + span * (the weighted sum of inputs, each a temperature clamped between its 'from' and 'to' and scaled to 0..1); 'humidity_rules' start from the aridity index's band coordinate (0.03, 0.2, 0.5, 1, 2, 5 -> 0 to 5 on a log scale) and squeeze it into 'squeeze' (band coordinate 1 to 4 mapped linearly onto [lo, hi]), then hold it at or above 'min' and at or below 'max'; 'classes' give every land class a temperature ramp (by name, or a 'when' switch on one input) and a humidity rule. Land above its equilibrium line (glaciated) is capped at 'glacier_cap'. Every one of the 31 land classes (Af to EF) must be present. FORMAT.md, 'The climate mapping', is the schema.",
+ "_comment": "Where each Köppen climate class goes on vanilla's temperature and humidity bands (plan §7.2, P1-09). One file, two readers, like default.json beside it: the core (crates/deeptime-core/src/bake/placement.rs, include_str!) uses it as the bake's default, and the game ships it as data/deeptime/deeptime/climate_mapping/placement.json. A datapack may override it: at a dedicated server's first start FirstStartGenerator reads the pack's copy and hands it to the bake in the content bundle (key 'climate_placement'), so the bake places the world's climate by the pack's table; the table used is recorded in the world data (manifest notes.bake.climate.placement). Coordinates are band coordinates: temperature 0 to 5 over frozen | cold | temperate | warm | hot, humidity 0 to 5 over the five humidity bands (b = 2.5 is the middle of the third band). 'temperature_ramps' name a band coordinate as base + span * (the weighted sum of inputs, each a temperature clamped between its 'from' and 'to' and scaled to 0..1); 'humidity_rules' start from the aridity index's band coordinate (0.03, 0.2, 0.5, 1, 2, 5 -> 0 to 5 on a log scale) and squeeze it into 'squeeze' (band coordinate 1 to 4 mapped linearly onto [lo, hi]), then hold it at or above 'min' and at or below 'max'; 'classes' give every land class a temperature ramp (by name, or a 'when' switch on one input) and a humidity rule. Land above its equilibrium line (glaciated) is capped at 'glacier_cap', unless its class has a 'glaciated' block: that block (a temperature ramp and/or a humidity rule, each falling back to the class's ordinary one, uncapped) then decides for glaciated land. EF has one (Ben, 2026-09-29, 'Ice only where there's ice'): EF above its equilibrium line is ice cap (humidity band 0.5: ice spikes, frozen and jagged peaks, snowy slopes and plains), the rest of EF is barren frozen ground (humidity band 1.5: gravel and shrubland where the pack has them, thin snow where it has not); both sit at temperature band 0.6 to 0.8, the upper part of the frozen band, where Terralith puts its dry cold biomes (gravel desert, cold shrubland) rather than the red, terracotta snowy badlands it uses below band 0.5. P/PET says nothing in a freezing climate (PET is 0 below 0 C, so the index is pinned at 10), which is why EF takes fixed humidity rules (min = max). A class may also say 'weirdness': 'positive' (the only value): its land keeps the positive branch of the variant noise, so its peaks are vanilla's frozen peaks and never the negative branch's (jagged peaks in vanilla, Terralith's scarlet mountains in their place); EF has it. Every one of the 31 land classes (Af to EF) must be present. FORMAT.md, 'The climate mapping', is the schema.",
  "glacier_cap": 0.35,
  "temperature_ramps": {
   "polar": {
@@ -8,6 +8,13 @@
    "span": 0.75,
    "inputs": [
     {"of": "t_warm", "from": -20.0, "to": 10.0}
+   ]
+  },
+  "polar_ice": {
+   "base": 0.6,
+   "span": 0.2,
+   "inputs": [
+    {"of": "t_warm", "from": -20.0, "to": 0.0}
    ]
   },
   "boreal": {
@@ -56,7 +63,9 @@
   "mediterranean": {"squeeze": [1.05, 2.5]},
   "humid": {"min": 2.05},
   "taiga": {"min": 3.05},
-  "tundra": {"max": 1.95}
+  "tundra": {"max": 1.95},
+  "polar_desert": {"min": 1.5, "max": 1.5},
+  "ice_cap": {"min": 0.5, "max": 0.5}
  },
  "classes": {
   "Af": {"temperature": "tropical", "humidity": "rainforest"},
@@ -89,6 +98,6 @@
   "Dfc": {"temperature": "boreal", "humidity": "taiga"},
   "Dfd": {"temperature": "boreal", "humidity": "taiga"},
   "ET": {"temperature": "polar", "humidity": "tundra"},
-  "EF": {"temperature": "polar", "humidity": "tundra"}
+  "EF": {"temperature": "polar_ice", "humidity": "polar_desert", "glaciated": {"humidity": "ice_cap"}, "weirdness": "positive"}
  }
 }
