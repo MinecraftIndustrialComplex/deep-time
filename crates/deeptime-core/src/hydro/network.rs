@@ -340,7 +340,8 @@ pub fn run(inp: &Input<'_>) -> Output {
         } else {
             match to(cu) {
                 Some(r) => base[r],
-                None => sea_i16,
+                // A sink (the planet's north or south edge): its own level.
+                None => fill[cu],
             }
         };
     }
@@ -637,7 +638,8 @@ fn open_sea(g: &Grid, elev: &[i16], sea_raw: i32, min_cells: usize, state: &mut 
 /// Priority-Flood with the pit queue from the open sea's shores. Fills `fill` (the spill level
 /// of every land cell; the sea at sea level), `parent` (the direction to the cell each land cell
 /// was reached from) and `order` (land cells as they left the queues: every cell after the cell
-/// it drains to). Land that no sea reaches drains to its lowest cell, a sink.
+/// it drains to). The first and last rows drain off the map (sinks at their own height); land that
+/// neither reaches drains to its lowest cell, a sink.
 fn flood(
     g: &Grid,
     elev: &[i16],
@@ -660,6 +662,15 @@ fn flood(
         if state[c] & SEA != 0 && (0..8).any(|k| g.nb(c, k).is_some_and(|nb| state[nb] & SEA == 0))
         {
             heap.push(Reverse((sea, c as u32)));
+        }
+    }
+    // The first and last rows (the poles, past the hard cap) are outlets too: water that reaches
+    // them leaves the map there instead of running along the edge.
+    for c in (0..g.w).chain((g.h - 1) * g.w..n) {
+        if state[c] & VISITED == 0 {
+            state[c] |= VISITED;
+            parent[c] = NONE;
+            heap.push(Reverse((elev[c], c as u32)));
         }
     }
     let mut next_unvisited = 0usize;
