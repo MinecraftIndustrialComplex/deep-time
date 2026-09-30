@@ -526,7 +526,7 @@ form: read them with a correctly rounded parser (Java's `Double.parseDouble`) an
 The 500 columns: 10 % within 40 blocks of the seam, 10 % near and past the poles, 20 % inside
 random bodies' boxes (none when the world has no bodies), with a river network 10 % on and beside
 random river vertices and 5 % around the mouths of rivers that end in lakes, with lakes 5 % within 8
-blocks of random wet `water_level` cells, the rest anywhere with x over two laps.
+blocks of random shore cells of `water_level` (wet beside dry), the rest anywhere with x over two laps.
 
 ## Rivers (`rivers/rivers.dtrv`, P1-22)
 
