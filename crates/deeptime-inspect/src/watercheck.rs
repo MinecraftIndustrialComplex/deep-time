@@ -15,10 +15,17 @@
 //! face of its highest water block) and its lowest rim's top block + 1, so "the surface equals its
 //! lowest rim ±1 block" (plan P2 exit test) reads off directly. Water whose column's top is ice
 //! (frozen lakes) is found under the ice.
+//!
+//! With the world data (`--world-data`), every finding is split by what Deep Time decided for its
+//! column (`deeptime_format::water`): **ours** in a river, lake or bank column, **other** elsewhere
+//! (vanilla's springs, cave aquifers, features), and a lake must be a lake column there.
 
 use std::collections::{HashMap, VecDeque};
 
 use serde_json::{Value, json};
+
+use deeptime_format::ColumnWorld;
+use deeptime_format::water::WaterKind;
 
 use crate::blocks;
 use crate::world::{Area, World};
@@ -33,7 +40,16 @@ fn level_of(key: &str) -> Option<u32> {
 }
 
 /// Checks `area` (x1, z1 exclusive; the outermost ring of columns is only read as neighbours).
-pub fn check(w: &World, area: Area, min_lake: usize) -> Value {
+pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -> Value {
+    let mut kinds: HashMap<(i32, i32), WaterKind> = HashMap::new();
+    let mut kind_of = |x: i32, z: i32| -> Option<WaterKind> {
+        let wd = wd?;
+        Some(*kinds.entry((x, z)).or_insert_with(|| wd.hydro(i64::from(x), i64::from(z)).kind))
+    };
+    let ours = |k: Option<WaterKind>| {
+        matches!(k, Some(WaterKind::River | WaterKind::Lake | WaterKind::Bank))
+    };
+    let (mut floating_ours, mut leaks_ours) = (0u64, 0u64);
     let is_water_block = |id: u32| {
         let s = &w.reg.states[id as usize];
         s.name == "minecraft:water"
@@ -46,6 +62,7 @@ pub fn check(w: &World, area: Area, min_lake: usize) -> Value {
     // Per column: the top water block y (source), for the lake census.
     let mut top_water: HashMap<(i32, i32), i32> = HashMap::new();
     let mut ground_top: HashMap<(i32, i32), i32> = HashMap::new();
+    let mut wet: std::collections::HashSet<(i32, i32)> = std::collections::HashSet::new();
     for x in area.x0 + 1..area.x1 - 1 {
         for z in area.z0 + 1..area.z1 - 1 {
             let Some(c) = w.chunk(x, z) else { continue };
@@ -79,8 +96,11 @@ pub fn check(w: &World, area: Area, min_lake: usize) -> Value {
                 let below = w.block(x, y - 1, z);
                 if is_air(below) {
                     floating += 1;
+                    let k = kind_of(x, z);
+                    floating_ours += u64::from(ours(k));
                     if samples.len() < 40 {
-                        samples.push(json!({"what": "floating", "at": [x, y, z], "state": key}));
+                        samples.push(json!({"what": "floating", "at": [x, y, z], "state": key,
+                                            "column": k.map(WaterKind::name)}));
                     }
                 }
                 if !source && holds_water(below) {
@@ -99,14 +119,21 @@ pub fn check(w: &World, area: Area, min_lake: usize) -> Value {
                         steps += 1;
                     } else {
                         leaks += 1;
+                        let k = kind_of(x, z);
+                        leaks_ours += u64::from(ours(k));
                         if samples.len() < 40 {
                             samples.push(json!({"what": "leak", "at": [x, y, z], "state": key,
-                                                "into": [x + dx, y, z + dz]}));
+                                                "into": [x + dx, y, z + dz], "column": k.map(WaterKind::name)}));
                         }
                     }
                 }
             }
-            if let Some((y, true)) = first_water {
+            if first_water.is_some() {
+                wet.insert((x, z));
+            }
+            if let Some((y, true)) = first_water
+                && (wd.is_none() || kind_of(x, z) == Some(WaterKind::Lake))
+            {
                 top_water.insert((x, z), y);
             }
         }
@@ -141,11 +168,13 @@ pub fn check(w: &World, area: Area, min_lake: usize) -> Value {
                         }
                     }
                     Some(_) => {}
-                    None => {
+                    // The rim: dry neighbours (a river leaving the lake is water, not rim).
+                    None if !wet.contains(&n) => {
                         if let Some(&g) = ground_top.get(&n) {
                             rim_min = rim_min.min(g);
                         }
                     }
+                    None => {}
                 }
             }
         }
@@ -173,6 +202,8 @@ pub fn check(w: &World, area: Area, min_lake: usize) -> Value {
         "sources": sources,
         "floating": floating,
         "leaks": leaks,
+        "floating_ours": wd.map(|_| floating_ours),
+        "leaks_ours": wd.map(|_| leaks_ours),
         "steps": steps,
         "lakes": lakes.len(),
         "lakes_within_1": within,

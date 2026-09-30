@@ -9,7 +9,10 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SpreadingSnowyDirtBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.CarvingMask;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.Fluids;
 
@@ -36,6 +39,13 @@ import net.minecraft.world.level.material.Fluids;
  *
  * <p>Everything is decided from (x, z) and the world data alone; only the column's own blocks
  * are read. No fluid tick is scheduled, no position is marked for post-processing.
+ *
+ * <p><b>Carvers.</b> Vanilla's carvers run after this pass and skip every position their chunk's
+ * carving mask already holds ({@code WorldCarver.carveEllipsoid}); above sea level they carve air,
+ * so a cave or canyon cut through a river bed or a bank would drain the water into it. The pass
+ * marks the water and the shell that holds it — each water column from two blocks under its bed to
+ * a block over its top, each bank from two blocks under the neighbouring beds to its top — in both
+ * masks, so carvers pass around the water instead (caves still run under and beside it).
  */
 public final class WaterBodies {
 
@@ -63,6 +73,13 @@ public final class WaterBodies {
                 || s.is(Blocks.GRAVEL) || s.is(Blocks.SNOW_BLOCK) || s.is(Blocks.CLAY);
     }
 
+    /** Marks local column (lx, lz) from {@code lo} to {@code hi} in the carving masks. */
+    static void protect(CarvingMask[] masks, int lx, int lz, int lo, int hi, int minY, int maxY) {
+        for (CarvingMask m : masks)
+            for (int y = Math.max(lo, minY); y <= Math.min(hi, maxY); y++)
+                m.set(lx, y, lz);
+    }
+
     /** Applies the pass to {@code chunk} with the generator's noise cell width. */
     public static Stats apply(ChunkAccess chunk, WorldData wd, int cell) {
         Water.Spec spec = Water.Spec.of(wd, cell);
@@ -76,6 +93,10 @@ public final class WaterBodies {
             return Stats.NONE;
         Water.Region reg = Water.region(wd, spec, x0 - 1, z0 - 1, 18, 18);
         int minY = chunk.getMinBuildHeight(), maxY = chunk.getMaxBuildHeight() - 1;
+        CarvingMask[] masks = chunk instanceof ProtoChunk proto
+                ? new CarvingMask[]{proto.getOrCreateCarvingMask(GenerationStep.Carving.AIR),
+                        proto.getOrCreateCarvingMask(GenerationStep.Carving.LIQUID)}
+                : new CarvingMask[0];
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int water = 0, cut = 0, filled = 0, flowing = 0;
         Water.Column[] cols = new Water.Column[256];
@@ -124,6 +145,7 @@ public final class WaterBodies {
                                     : h != null && h.hw() >= 3.0 ? Blocks.SAND.defaultBlockState() : Blocks.GRAVEL.defaultBlockState();
                             chunk.setBlockState(pos.set(x, bed, z), bedBlock, false);
                         }
+                        protect(masks, lx, lz, bed - 2, t + 1, minY, maxY);
                     }
                     case LAKE -> {
                         int t = Math.min(col.top(), maxY), bed = col.bed();
@@ -146,6 +168,7 @@ public final class WaterBodies {
                         }
                         if (y < t && y >= minY && chunk.getBlockState(pos.set(x, y, z)).getBlock() instanceof SpreadingSnowyDirtBlock)
                             chunk.setBlockState(pos, DIRT, false);
+                        protect(masks, lx, lz, Math.min(y, bed) - 2, t + 1, minY, maxY);
                     }
                     case BANK -> {
                         BlockState top = g >= minY ? chunk.getBlockState(pos.set(x, g, z)) : DIRT;
@@ -170,12 +193,14 @@ public final class WaterBodies {
                             filled++;
                             g = minG;
                         }
-                        if (minG != null && col.sealFrom() != null)
+                        if (minG != null && col.sealFrom() != null) {
                             for (int y = Math.max(minY, col.sealFrom()); y <= Math.min(minG, maxY); y++)
                                 if (chunk.getBlockState(pos.set(x, y, z)).isAir()) {
                                     chunk.setBlockState(pos, DIRT, false);
                                     filled++;
                                 }
+                            protect(masks, lx, lz, col.sealFrom() - 3, Math.max(minG, g), minY, maxY);
+                        }
                     }
                     default -> {}
                 }
@@ -202,6 +227,7 @@ public final class WaterBodies {
                 }
                 if (m <= tb || m > maxY)
                     continue;
+                protect(masks, lx, lz, tb, m, minY, maxY);   // the fall, too, is left to the water
                 int x = x0 + lx, z = z0 + lz;
                 if (m == tb + 1 && k >= 2) {
                     if (chunk.getBlockState(pos.set(x, m, z)).isAir()) {

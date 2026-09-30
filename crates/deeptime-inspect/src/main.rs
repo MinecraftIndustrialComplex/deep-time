@@ -296,6 +296,10 @@ enum Cmd {
         /// The fewest columns a water body needs to count as a lake.
         #[arg(long, default_value_t = 24)]
         min_lake: usize,
+        /// World data: split findings into Deep Time's water columns and the rest, and count only
+        /// its lake columns as lakes.
+        #[arg(long)]
+        world_data: Option<PathBuf>,
     },
     /// River and lake maps from the world data alone (P1-22): the planet (or a box) at --step
     /// blocks a pixel with every river at its width, or with --columns a box at one block a pixel
@@ -649,9 +653,16 @@ fn run(cli: Cli) -> Result<()> {
             world,
             area,
             min_lake,
+            world_data,
         } => {
             let w = World::load_area(&world, Some(area))?;
-            print_json(&deeptime_inspect::watercheck::check(&w, area, min_lake))?;
+            let wd = match world_data {
+                Some(p) => {
+                    Some(deeptime_format::ColumnWorld::open(&p).map_err(|e| Error(e.to_string()))?)
+                }
+                None => None,
+            };
+            print_json(&deeptime_inspect::watercheck::check(&w, area, min_lake, wd.as_ref()))?;
         }
         Cmd::Rivers {
             world_data,
