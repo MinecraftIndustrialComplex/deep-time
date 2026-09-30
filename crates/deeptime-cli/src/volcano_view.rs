@@ -175,6 +175,7 @@ fn window(ctx: &Ctx<'_>, i0: i64, j0: i64, side: usize) -> Vec<f32> {
 }
 
 /// The young landscape (L2, metres) over the same L3 window, by the amplifier's interpolation.
+#[allow(clippy::too_many_arguments)]
 fn young_window(
     z2: &[f32],
     w2: usize,
@@ -474,16 +475,21 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
     if let Some(v) = live
         .iter()
         .copied()
-        .filter(|v| v.caldera.as_ref().is_some_and(|c| c.radius_m > 1500.0))
+        .filter(|v| {
+            v.kind != Kind::Shield && v.caldera.as_ref().is_some_and(|c| c.radius_m > 3000.0)
+        })
         .max_by(|a, b| {
-            let ra = a.caldera.as_ref().map_or(0.0, |c| c.radius_m);
-            let rb = b.caldera.as_ref().map_or(0.0, |c| c.radius_m);
-            ra.total_cmp(&rb)
+            // The youngest (a caldera's detail fades), then the largest.
+            let key = |v: &Volcano| {
+                let c = v.caldera.as_ref().map_or((0.0, 0.0), |c| (c.t_myr, c.radius_m));
+                (c.0, c.1)
+            };
+            key(a).partial_cmp(&key(b)).unwrap_or(std::cmp::Ordering::Equal)
         })
     {
         picks.push((
             "caldera",
-            "The largest standing caldera".into(),
+            "The youngest large caldera still standing".into(),
             vec![v],
             192,
         ));
@@ -502,7 +508,12 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
         let (mut sx, mut sz, mut n) = (0.0, 0.0, 0.0);
         let frame = deeptime_core::sphere::BlockFrame::new(s.circumference_blocks);
         let x_ref = vs[0].x;
-        for v in &vs {
+        // The first volcano and those near enough to share its window.
+        let near = 0.35 * side as f64 * ctx.r;
+        for v in vs
+            .iter()
+            .filter(|v| frame.wrap_x(v.x - x_ref).hypot(v.z - vs[0].z) <= near)
+        {
             sx += x_ref + frame.wrap_x(v.x - x_ref);
             sz += v.z;
             n += 1.0;
