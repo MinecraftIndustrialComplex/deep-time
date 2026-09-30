@@ -255,6 +255,12 @@
     "beach_blocks": 16.0,
     "terrain_window_blocks": 64.0,
     "variant_blocks": 1024.0,
-    "wetlands": 1.0
+    "wetlands": 1.0,
+    "inland_mid_blocks": 200.0,
+    "inland_far_blocks": 1000.0,
+    "inland_interior_blocks": 5000.0,
+    "wetland_humidity": 2.5,
+    "wetland_flat_share": 0.35,
+    "wetland_low_m": 150.0
   }
 }

@@ -535,9 +535,12 @@ tasks.named('processResources', ProcessResources) {
         into 'deeptime'
     }
     // The climate mapping's reference (plan §7.2, P1-09): the bake compiles it in with include_str!,
-    // the game reads it as the default of a datapack resource a pack may override.
+    // the game reads it as the default of a datapack resource a pack may override. placement.json
+    // (which temperature and humidity band each Köppen class takes) is the same kind of file; the
+    // server hands a pack's copy to the bake in the content bundle.
     from(new File(repoRoot, 'crates/deeptime-core/data/climate_mapping')) {
         include 'default.json'
+        include 'placement.json'
         into 'data/deeptime/deeptime/climate_mapping'
     }
     if (project.hasProperty('release')) {

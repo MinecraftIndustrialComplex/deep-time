@@ -4,6 +4,8 @@ package com.minecraftindustrialcomplex.deeptime.server;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.climate.ClimatePlacement;
+import com.minecraftindustrialcomplex.deeptime.climate.PlacementBundle;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.CancelledException;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeLoader;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeStatus;
@@ -32,6 +34,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -221,13 +224,24 @@ public final class FirstStartGenerator {
         // The content bundle (plan §5.4): today the deeptime:essentials registry, which replaces the
         // preset's essentials in the core's playability pass (P1-15).
         String contentJson = com.minecraftindustrialcomplex.deeptime.ore.OreData.contentJson(server);
+        String essentialsOnly = contentJson;
+        // ... and the pack's climate class placement table (P1-09): the bake places the world's climate by it.
+        Optional<PlacementBundle.Found> placement;
+        try {
+            placement = ClimatePlacement.read(server.getResourceManager());
+        } catch (IOException e) {
+            throw new Stop("the pack's climate placement table cannot be used: " + e.getMessage(),
+                    "Fix or remove the pack's data/deeptime/deeptime/climate_mapping/placement.json (FORMAT.md, \"The climate mapping\").");
+        }
+        contentJson = PlacementBundle.addTo(contentJson, placement);
         try {
             estimate = Estimate.parse(SimSession.estimate(presetJson, contentJson));
             for (Estimate.Stage st : estimate.stages())
                 stageNames.add(st.name());
         } catch (RuntimeException e) {
-            throw new Stop("the preset " + name + " is not valid: " + e.getMessage(),
-                    "Fix the preset (or choose a built-in one) in " + configFile + ".");
+            throw new Stop("the preset " + name + " or the pack's content is not valid: " + e.getMessage(),
+                    "Fix the preset (or choose a built-in one) in " + configFile + ", or the datapack data the message names\n"
+                            + "(content.climate_placement is the pack's climate_mapping/placement.json).");
         }
         // Only the base must fit: the recorded history spills to the work folder over the cap (P1-17).
         long peak = estimate.peakUnder(cap);
@@ -259,7 +273,8 @@ public final class FirstStartGenerator {
                 name.equals(resolved.label()) ? name : name + " (" + resolved.label() + ")", c, timeline, threads,
                 gib(cap), gib(peak), stageNames.size(), dir);
         long started = System.nanoTime();
-        DeepTime.LOGGER.info("[deeptime] content bundle: {}", contentJson);
+        DeepTime.LOGGER.info("[deeptime] content bundle: {}; climate placement table: {}", essentialsOnly,
+                placement.map(f -> "from pack " + f.packId()).orElse("the core's default"));
         String manifestJson = run(server, presetJson, contentJson, work, threads, cap, stageNames, started);
 
         // 5. Into place, whole.
