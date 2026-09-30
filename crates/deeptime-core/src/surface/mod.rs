@@ -1070,8 +1070,14 @@ impl SurfaceStage {
         }
         // The climate's ice as frame means (FORMAT.md "The climate's ice fields").
         for (name, from) in [
-            (crate::climate::history::ICE_THICKNESS, crate::climate::field::ICE_THICKNESS),
-            (crate::climate::history::ICE_COVER, crate::climate::field::ICE_TIME_SHARE),
+            (
+                crate::climate::history::ICE_THICKNESS,
+                crate::climate::field::ICE_THICKNESS,
+            ),
+            (
+                crate::climate::history::ICE_COVER,
+                crate::climate::field::ICE_TIME_SHARE,
+            ),
         ] {
             if let Some(f) = world.fields.get(from).filter(|f| f.data.len() == n) {
                 st.acc.add(name, &f.data, dt);

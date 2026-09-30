@@ -201,11 +201,13 @@ pub fn forcing(ppm: f64) -> f64 {
     let x = (ppm.max(1e-3) / CO2_REF_PPM).ln();
     let myhre = 5.35 * x;
     let bg = 5.32 * x + 0.39 * x * x;
-    let (a, b) = ((1000.0f64 / CO2_REF_PPM).ln(), (2000.0f64 / CO2_REF_PPM).ln());
+    let (a, b) = (
+        (1000.0f64 / CO2_REF_PPM).ln(),
+        (2000.0f64 / CO2_REF_PPM).ln(),
+    );
     let f = ((x - a) / (b - a)).clamp(0.0, 1.0);
     myhre + f * (bg - myhre)
 }
-
 
 /// The star's luminosity at age `age_gyr` against its luminosity at `present_gyr` (Gough 1981).
 pub fn gough(age_gyr: f64, present_gyr: f64) -> f64 {
@@ -376,7 +378,10 @@ mod tests {
         let base = w.flux(&k, &[10.0, 20.0], &[0.0, 0.0], 280.0);
         assert!((base / DEGASSING_EARTH_MOL_YR - 1.0).abs() < 1e-12);
         assert!(w.flux(&k, &[15.0, 25.0], &[0.0, 0.0], 280.0) > 1.5 * base);
-        assert!(w.flux(&k, &[10.0, 20.0], &[1.0, 1.0], 280.0) == 0.0, "ice stops it");
+        assert!(
+            w.flux(&k, &[10.0, 20.0], &[1.0, 1.0], 280.0) == 0.0,
+            "ice stops it"
+        );
         // A frozen, dry planet (−40 K) barely weathers.
         assert!(w.flux(&k, &[-30.0, -20.0], &[0.0, 0.0], 280.0) < 1e-3 * base);
         assert!(w.flux(&k, &[10.0, 20.0], &[0.0, 0.0], 2800.0) > 1.9 * base);

@@ -7,8 +7,8 @@
 //! insolation and Quaternary climatic changes", J. Atmos. Sci. 35: 2362–2367) and Laskar et al.
 //! (2004, A&A 428: 261–285) — a simple analytic stand-in, not the true Earth solution:
 //!
-//! - **obliquity** ε(t) = ε₀ + A_ε·[cos(2π(t − t_ε)/41 kyr) − cos(2π(−t_ε)/41 kyr)]
-//!   + 0.25·A_ε·[cos(2π(t − t_ε)/53.6 kyr) − cos(2π(−t_ε)/53.6 kyr)], A_ε = 1.2° (Earth's
+//! - **obliquity** ε(t) = ε₀ + A_ε·[cos(2π(t − t_ε)/41 kyr) − cos(2π(−t_ε)/41 kyr)] +
+//!   0.25·A_ε·[cos(2π(t − t_ε)/53.6 kyr) − cos(2π(−t_ε)/53.6 kyr)], A_ε = 1.2° (Earth's
 //!   obliquity swings between about 22.1° and 24.5°), t_ε = −10 kyr (the last maximum, ~10 ka),
 //!   so ε(0) is the preset's tilt;
 //! - **eccentricity** e(t) = 0.028 − 0.011·cos(2π(t − t_e)/405 kyr) − 0.009·cos(2π(t − t_e)/95 kyr)
@@ -57,7 +57,9 @@ pub fn at(t_years: f64, tilt_deg: f64, strength: f64) -> OrbitAt {
                 + 0.25 * (wave(x, -10.0, 53.6) - wave(0.0, -10.0, 53.6)))
     };
     let ecc_of = |x: f64| {
-        0.028 - 0.011 * wave(x, 27.0, 405.0) - 0.009 * wave(x, 27.0, 95.0)
+        0.028
+            - 0.011 * wave(x, 27.0, 405.0)
+            - 0.009 * wave(x, 27.0, 95.0)
             - 0.007 * wave(x, 27.0, 124.0)
     };
     OrbitAt {
@@ -91,8 +93,14 @@ mod tests {
             emin = emin.min(o.ecc);
             emax = emax.max(o.ecc);
         }
-        assert!((21.5..22.6).contains(&lo) && (24.0..25.2).contains(&hi), "{lo}..{hi}");
-        assert!(emin < 0.01 && (0.035..0.06).contains(&emax), "{emin}..{emax}");
+        assert!(
+            (21.5..22.6).contains(&lo) && (24.0..25.2).contains(&hi),
+            "{lo}..{hi}"
+        );
+        assert!(
+            emin < 0.01 && (0.035..0.06).contains(&emax),
+            "{emin}..{emax}"
+        );
         // Perihelion near the northern summer solstice (λ 90°) about 11 ka.
         let o = at(-11_500.0, 23.44, 1.0);
         assert!((o.long_peri_deg - 103.0).abs() < 1.0);

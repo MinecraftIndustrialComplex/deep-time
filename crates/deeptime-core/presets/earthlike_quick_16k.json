@@ -263,7 +263,7 @@
     "ice_max_thickness_m": 4000.0,
     "ice_response_kyr": 17.0,
     "glacio_eustasy": 1.0,
-    "ice_reference_km3": 25000000.0
+    "ice_reference_km3": 10000000.0
   },
   "structure": {
     "pluton_rate_km2_myr": 1e-05,

@@ -20,8 +20,8 @@
 //!   it shrinks (τ_m = `ice_response_kyr`, 17 kyr; b = 0.6): slow build-up, fast terminations.
 //! - **Glacio-eustasy.** Grounded ice lowers the sea by (ρ_i/ρ_w)·ΔV / A_ocean — about 2.5 m per
 //!   10⁶ km³ of ice on Earth's 3.61·10⁸ km² of ocean — measured from `ice_reference_km3`, the ice
-//!   the preset's sea-level curve already assumes (the model's own present-Earth ice, so an
-//!   Earth-like present keeps the calibrated coastline).
+//!   the preset's sea-level curve already assumes (the present ice of the calibrated Earth-like
+//!   runs, so an Earth-like present keeps its calibrated coastline).
 
 use rayon::prelude::*;
 
@@ -39,7 +39,6 @@ const INF: f64 = 1.0e30;
 /// d(p) = min_q (s·(p − q))² + f(q). `f` holds 0 at sites and `INF` elsewhere (or any sampled
 /// function). `v`, `z` are scratch.
 fn dt_1d(f: &[f64], s: f64, out: &mut [f64], v: &mut Vec<usize>, z: &mut Vec<f64>) {
-    let n = f.len();
     v.clear();
     z.clear();
     let s2 = s * s;
@@ -48,8 +47,8 @@ fn dt_1d(f: &[f64], s: f64, out: &mut [f64], v: &mut Vec<usize>, z: &mut Vec<f64
     let inter = |q: usize, r: usize| -> f64 {
         ((f[q] + s2 * (q * q) as f64) - (f[r] + s2 * (r * r) as f64)) / (2.0 * s2 * (q - r) as f64)
     };
-    for q in 0..n {
-        if f[q] >= INF {
+    for (q, &fq) in f.iter().enumerate() {
+        if fq >= INF {
             continue;
         }
         loop {
@@ -120,7 +119,9 @@ pub fn distance_to_margin(w: usize, h: usize, ice: &[bool], sx: &[f64], sy: f64)
 
 /// Nye's equilibrium thickness at distance `l_m` from the margin, m.
 pub fn nye(l_m: f64, tau_pa: f64, cap_m: f64) -> f64 {
-    (2.0 * tau_pa * l_m.max(0.0) / (RHO_ICE * G)).sqrt().min(cap_m)
+    (2.0 * tau_pa * l_m.max(0.0) / (RHO_ICE * G))
+        .sqrt()
+        .min(cap_m)
 }
 
 /// Thickness of every cell of an ice mask, m: Nye's profile at the distance to the margin (the
@@ -282,12 +283,20 @@ mod tests {
         let d = distance_to_margin(w, h, &ice, &sx, 3.0);
         for j in 0..h {
             for i in 0..w {
-                let dx5 = (i as i64 - 5).rem_euclid(w as i64).min((5 - i as i64).rem_euclid(w as i64));
+                let dx5 = (i as i64 - 5)
+                    .rem_euclid(w as i64)
+                    .min((5 - i as i64).rem_euclid(w as i64));
                 let a = ((dx5 as f64 * 2.0).powi(2) + ((j as f64 - 5.0) * 3.0).powi(2)).sqrt();
-                let di = (i as i64 - 30).rem_euclid(w as i64).min((30 - i as i64).rem_euclid(w as i64));
+                let di = (i as i64 - 30)
+                    .rem_euclid(w as i64)
+                    .min((30 - i as i64).rem_euclid(w as i64));
                 let b = di as f64 * 2.0;
                 let want = a.min(b);
-                assert!((d[j * w + i] - want).abs() < 1e-9, "({i},{j}) {} vs {want}", d[j * w + i]);
+                assert!(
+                    (d[j * w + i] - want).abs() < 1e-9,
+                    "({i},{j}) {} vs {want}",
+                    d[j * w + i]
+                );
             }
         }
         // All ice: every distance is huge; no ice: zero.
