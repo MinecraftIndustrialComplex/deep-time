@@ -9,7 +9,9 @@
 //! The columns: 60 % anywhere on the planet with x over two laps ([−C, C), so half of them need
 //! the wrap), 10 % within 40 blocks of the seam, 10 % near the poles and past them (z clamps), and
 //! 20 % inside the boxes of random bodies (so the bodies and their zones are exercised); a world
-//! without bodies gets random columns instead.
+//! without bodies gets random columns instead. A world with a river network (P1-22) also gets 10 %
+//! on and beside random river vertices (channel, banks) and 5 % around the mouths of rivers that end
+//! in lakes (lake water and shores).
 
 use std::path::Path;
 
@@ -51,6 +53,37 @@ pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
         let z =
             i64::from(lo[2]) + rng.below((i64::from(hi[2]) - i64::from(lo[2]) + 1) as u64) as i64;
         out.push((x, z));
+    }
+    if let Some(r) = &w.rivers
+        && !r.vertices.is_empty()
+    {
+        for _ in 0..n / 10 {
+            let v = &r.vertices[rng.below(r.vertices.len() as u64) as usize];
+            let reach = (f64::from(v.hw) + 3.0).ceil() as u64;
+            let dx = rng.below(2 * reach + 1) as i64 - reach as i64;
+            let dz = rng.below(2 * reach + 1) as i64 - reach as i64;
+            out.push((
+                f64::from(v.x).round() as i64 + dx,
+                f64::from(v.z).round() as i64 + dz,
+            ));
+        }
+        let lake_mouths: Vec<usize> = r
+            .chains
+            .iter()
+            .filter(|ch| ch.mouth == deeptime_format::rivers::Mouth::Lake)
+            .map(|ch| (ch.first + ch.count - 1) as usize)
+            .collect();
+        if !lake_mouths.is_empty() {
+            for _ in 0..n / 20 {
+                let v = &r.vertices[lake_mouths[rng.below(lake_mouths.len() as u64) as usize]];
+                let dx = rng.below(13) as i64 - 6;
+                let dz = rng.below(13) as i64 - 6;
+                out.push((
+                    f64::from(v.x).round() as i64 + dx,
+                    f64::from(v.z).round() as i64 + dz,
+                ));
+            }
+        }
     }
     while out.len() < n {
         let x = rng.below(2 * c as u64) as i64 - c;

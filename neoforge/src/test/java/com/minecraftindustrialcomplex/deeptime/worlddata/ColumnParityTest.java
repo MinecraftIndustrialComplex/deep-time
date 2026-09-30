@@ -78,6 +78,7 @@ class ColumnParityTest {
                 if (j.id() != (int) e.get(0).getAsLong() || j.top() != e.get(1).getAsInt() || j.bottom() != e.get(2).getAsInt())
                     out.add("body run " + i + " " + j + " vs " + e);
             }
+        out.addAll(hydroDifferences(s.hydro(), r.getAsJsonObject("hydro")));
         JsonArray k = r.getAsJsonArray("rock");
         if (k.size() != s.rock().size())
             out.add("rock runs " + s.rock().size() + " vs " + k.size() + ": " + s.rock() + " vs " + k);
@@ -93,6 +94,46 @@ class ColumnParityTest {
         return out;
     }
 
+    private static Integer optInt(JsonElement e) {
+        return e == null || e.isJsonNull() ? null : e.getAsInt();
+    }
+
+    /** The differences in the {@code hydro} object (P1-22, {@link Water}). */
+    static List<String> hydroDifferences(Water.Column h, JsonObject r) {
+        List<String> out = new ArrayList<>();
+        if (r == null) {
+            out.add("hydro missing from the fixture");
+            return out;
+        }
+        if (!h.kind().id.equals(r.get("kind").getAsString()))
+            out.add("hydro.kind " + h.kind().id + " vs " + r.get("kind"));
+        if (!same(h.surface(), number(r.get("surface"))))
+            out.add("hydro.surface " + h.surface() + " vs " + r.get("surface"));
+        if (h.ground() != r.get("ground").getAsInt())
+            out.add("hydro.ground " + h.ground() + " vs " + r.get("ground"));
+        if (!same(h.level() == null ? Double.NaN : h.level(), number(r.get("level"))))
+            out.add("hydro.level " + h.level() + " vs " + r.get("level"));
+        String[] keys = {"top", "bed", "min_ground", "max_ground", "seal_from"};
+        Integer[] mine = {h.top(), h.bed(), h.minGround(), h.maxGround(), h.sealFrom()};
+        for (int i = 0; i < keys.length; i++)
+            if (!java.util.Objects.equals(mine[i], optInt(r.get(keys[i]))))
+                out.add("hydro." + keys[i] + " " + mine[i] + " vs " + r.get(keys[i]));
+        if (h.riverBiome() != r.get("river_biome").getAsBoolean())
+            out.add("hydro.river_biome " + h.riverBiome() + " vs " + r.get("river_biome"));
+        JsonElement rv = r.get("river");
+        if ((h.river() == null) != (rv == null || rv.isJsonNull()))
+            out.add("hydro.river " + h.river() + " vs " + rv);
+        else if (h.river() != null) {
+            JsonObject o = rv.getAsJsonObject();
+            Rivers.Hit x = h.river();
+            if (x.seg() != o.get("seg").getAsInt() || !same(x.t(), o.get("t").getAsDouble()) || !same(x.d(), o.get("d").getAsDouble())
+                    || !same(x.w(), o.get("w").getAsDouble()) || !same(x.hw(), o.get("hw").getAsDouble())
+                    || !same(x.depth(), o.get("depth").getAsDouble()))
+                out.add("hydro.river " + x + " vs " + o);
+        }
+        return out;
+    }
+
     @Test
     void everyColumnOfTheFixtureIsEqual() throws IOException {
         JsonObject doc = fixture();
@@ -102,7 +143,7 @@ class ColumnParityTest {
         assertTrue(wd.detailNoise() != null, "the real planet has a detail term");
         JsonArray cols = doc.getAsJsonArray("columns");
         assertEquals(500, cols.size(), "plan §9.2: 500 columns");
-        int equal = 0, bodies = 0, water = 0, detailed = 0;
+        int equal = 0, bodies = 0, water = 0, detailed = 0, rivers = 0, lakes = 0, banks = 0;
         List<String> bad = new ArrayList<>();
         for (JsonElement e : cols) {
             JsonObject r = e.getAsJsonObject();
@@ -119,12 +160,20 @@ class ColumnParityTest {
                 water++;
             if (s.detail() != 0.0)
                 detailed++;
+            switch (s.hydro().kind()) {
+                case RIVER -> rivers++;
+                case LAKE -> lakes++;
+                case BANK -> banks++;
+                default -> {}
+            }
         }
         System.out.println("[junit] ColumnParityTest columns=" + cols.size() + " equal=" + equal
-                + " throughBodies=" + bodies + " withWater=" + water + " withDetail=" + detailed);
+                + " throughBodies=" + bodies + " withWater=" + water + " withDetail=" + detailed
+                + " river=" + rivers + " lake=" + lakes + " bank=" + banks);
         assertTrue(bad.isEmpty(), (cols.size() - equal) + " columns differ:\n" + String.join("\n", bad));
         assertTrue(bodies > 0, "some columns pass through bodies");
         assertTrue(detailed > 0, "some columns have a detail term");
+        assertTrue(rivers > 0 && banks > 0, "the fixture reaches rivers and their banks (P1-22)");
     }
 
     /** The terrain height the generator reads is the evaluator's surface. */

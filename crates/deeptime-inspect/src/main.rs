@@ -284,6 +284,29 @@ enum Cmd {
         #[arg(long, default_value_t = 24)]
         depth: i32,
     },
+    /// River and lake maps from the world data alone (P1-22): the planet (or a box) at --step
+    /// blocks a pixel with every river at its width, or with --columns a box at one block a pixel
+    /// coloured by what the column evaluator decides (river, lake, sea, bank, ground).
+    Rivers {
+        /// World-data folder.
+        #[arg(long)]
+        world_data: PathBuf,
+        /// The PNG to write.
+        #[arg(long)]
+        out: PathBuf,
+        /// x0,z0,x1,z1 (x1, z1 exclusive); default the whole planet.
+        #[arg(long = "box")]
+        bbox: Option<String>,
+        /// Blocks per pixel (planet map).
+        #[arg(long, default_value_t = 8)]
+        step: usize,
+        /// Per-column water kinds at one block a pixel (needs --box).
+        #[arg(long)]
+        columns: bool,
+        /// Pixels per block (--columns).
+        #[arg(long, default_value_t = 1)]
+        scale: usize,
+    },
     /// Copies chunks cx0..=cx1, cz0..=cz1 of one region file into a new one (test fixtures).
     Fixture {
         #[arg(long)]
@@ -608,6 +631,36 @@ fn run(cli: Cli) -> Result<()> {
                 );
             }
             print_json(&s)?;
+        }
+        Cmd::Rivers {
+            world_data,
+            out,
+            bbox,
+            step,
+            columns,
+            scale,
+        } => {
+            let parsed = match bbox {
+                Some(b) => {
+                    let v: Vec<i64> = b
+                        .split(',')
+                        .map(|s| s.trim().parse::<i64>())
+                        .collect::<std::result::Result<_, _>>()
+                        .map_err(|e| Error(format!("--box {b}: {e}")))?;
+                    if v.len() != 4 {
+                        return Err(Error(format!("--box {b}: expected x0,z0,x1,z1")));
+                    }
+                    Some([v[0], v[1], v[2], v[3]])
+                }
+                None => None,
+            };
+            let v = if columns {
+                let b = parsed.ok_or_else(|| Error("--columns needs --box".into()))?;
+                deeptime_inspect::rivermap::columns(&world_data, &out, b, scale)?
+            } else {
+                deeptime_inspect::rivermap::planet(&world_data, &out, step, parsed)?
+            };
+            print_json(&v)?;
         }
         Cmd::Column { world, x, z, depth } => {
             let w = deeptime_inspect::world::World::load(&world, |cx, cz| {

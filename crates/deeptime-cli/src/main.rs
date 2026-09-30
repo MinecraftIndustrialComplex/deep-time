@@ -5,6 +5,7 @@ mod alloc;
 mod amplify_view;
 mod climate_dem;
 mod dump;
+mod hydro;
 mod parity;
 mod run;
 mod structure_view;
@@ -304,6 +305,16 @@ enum Command {
         /// Seed of the column choice.
         #[arg(long, default_value_t = parity::DEFAULT_SEED)]
         seed: u64,
+    },
+    /// Re-run the bake's water part (P1-22: lakes, `water_level`, the river network) on a baked
+    /// world-data folder with its own preset and `--set hydro.KEY=VALUE` overrides (tuning).
+    Hydro {
+        /// World-data folder a planet run baked.
+        #[arg(long)]
+        world_data: PathBuf,
+        /// Sets a preset value first, `--set hydro.width_coef=1.5` (repeatable).
+        #[arg(long = "set", value_name = "PATH=VALUE")]
+        set: Vec<String>,
     },
     /// Dump a world's sites, index lookups, body evaluations and cause chains as JSON (the Java
     /// parity-test fixture, P1-15).
@@ -615,6 +626,22 @@ fn main() -> ExitCode {
                 }
                 Err(e) => {
                     eprintln!("deeptime parity: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        Some(Command::Hydro { world_data, set }) => {
+            let started = std::time::Instant::now();
+            match hydro::run(&world_data, &set) {
+                Ok(line) => {
+                    println!(
+                        "deeptime hydro: {line} in {:.2}s",
+                        started.elapsed().as_secs_f64()
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime hydro: {e}");
                     ExitCode::FAILURE
                 }
             }
