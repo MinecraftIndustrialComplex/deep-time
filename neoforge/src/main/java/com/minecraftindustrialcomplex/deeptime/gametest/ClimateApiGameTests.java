@@ -79,19 +79,20 @@ public final class ClimateApiGameTests {
                 firstBad = s + " vs " + r;
         }
 
-        // Physical sense: the tropics' land is warmer than the high latitudes', and height cools.
+        // Physical sense: the tropics (land and sea, at the surface) are warmer than the high
+        // latitudes, and 50 blocks up is colder everywhere (at sea level the lapse starts at 0, so
+        // this holds over the sea too). The small test planet may have no tropical land at all.
         int c = t.circumference(), sea = level.getSeaLevel();
         double tropics = 0, high = 0;
-        int nt = 0, nh = 0, land = 0, lapsed = 0;
-        for (int i = 0; i < 400; i++) {
+        int nt = 0, nh = 0, land = 0, lapsed = 0, n = 400;
+        for (int i = 0; i < n; i++) {
             int x = -c / 2 + (i * 97) % c;
             int z = ((i * 61) % (c / 2)) - c / 4;
             double lat = -z / (c / 4.0) * 90.0;
-            int y = (int) Math.ceil(t.height(x, z));
-            ClimateSample s = climate.at(x, Math.max(y, sea), z).orElseThrow();
-            if (s.isSea())
-                continue;
-            land++;
+            int y = Math.max((int) Math.ceil(t.height(x, z)), sea);
+            ClimateSample s = climate.at(x, y, z).orElseThrow();
+            if (!s.isSea())
+                land++;
             if (Math.abs(lat) < 15) {
                 tropics += s.meanC();
                 nt++;
@@ -99,19 +100,18 @@ public final class ClimateApiGameTests {
                 high += s.meanC();
                 nh++;
             }
-            ClimateSample up = climate.at(x, Math.max(y, sea) + 50, z).orElseThrow();
-            if (up.meanC() < s.meanC())
+            if (climate.at(x, y + 50, z).orElseThrow().meanC() < s.meanC())
                 lapsed++;
         }
-        DeepTime.LOGGER.info("[gametest] climateApiOnTheRealPlanet fixture={} equal={} tropicsLand={} meanC={} "
-                        + "highLatLand={} meanC={} colderHigher={} firstBad={}",
+        DeepTime.LOGGER.info("[gametest] climateApiOnTheRealPlanet fixture={} equal={} tropics={} meanC={} "
+                        + "highLat={} meanC={} land={} colderHigher={} of {} firstBad={}",
                 samples.size(), equal, nt, nt == 0 ? Double.NaN : tropics / nt, nh, nh == 0 ? Double.NaN : high / nh,
-                lapsed, firstBad);
+                land, lapsed, n, firstBad);
         helper.assertTrue(samples.size() == 500, "the fixture has " + samples.size() + " samples");
         helper.assertTrue(equal == samples.size(), (samples.size() - equal) + " samples differ from Rust's: " + firstBad);
-        helper.assertTrue(nt > 5 && nh > 5, "land samples: tropics " + nt + ", high latitudes " + nh);
+        helper.assertTrue(nt > 5 && nh > 5, "samples: tropics " + nt + ", high latitudes " + nh);
         helper.assertTrue(tropics / nt > high / nh + 10, "tropics " + tropics / nt + " vs high latitudes " + high / nh);
-        helper.assertTrue(lapsed == land, "50 blocks up is colder at " + lapsed + " of " + land + " land samples");
+        helper.assertTrue(lapsed == n, "50 blocks up is colder at " + lapsed + " of " + n + " samples");
         helper.succeed();
     }
 
