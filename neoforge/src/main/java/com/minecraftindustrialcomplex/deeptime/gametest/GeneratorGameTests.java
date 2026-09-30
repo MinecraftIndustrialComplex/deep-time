@@ -72,9 +72,8 @@ public final class GeneratorGameTests {
         ServerLevel level = testPlanet(helper);
         TerrainSource t = generator(helper, level).terrain();
         int c = t.circumference();
-        int corners = 0, cornerMax = 0, maxDiff = 0, worst = 0;
-        String worstAt = "";
-        for (int i = 0; i < 128; i++) {
+        ChunkSampling.HeightTally tally = new ChunkSampling.HeightTally();
+        ChunkSampling.forEach(helper, 128, i -> {
             boolean corner = i % 2 == 0;
             // Longitudes sweep the planet; every 8th sample lands on the mountain range.
             int x = (i % 8 == 3) ? c / 8 + (i - 64) * 3 : -c / 2 + 64 + i * (c / 130);
@@ -85,24 +84,15 @@ public final class GeneratorGameTests {
                 x += 1 + (i % 3);
                 z += 2;
             }
-            int expected = (int) Math.ceil(t.height(x, z)) - 1;
-            int actual = surfaceAtNoise(level, x, z);
-            int diff = Math.abs(actual - expected);
-            if (corner) {
-                corners++;
-                cornerMax = Math.max(cornerMax, diff);
-            }
-            maxDiff = Math.max(maxDiff, diff);
-            if (diff > worst) {
-                worst = diff;
-                worstAt = "(" + x + ", " + z + ") expected " + expected + " got " + actual + " H=" + t.height(x, z);
-            }
-        }
-        DeepTime.LOGGER.info("[gametest] heightMatchesReference columns=128 cornerColumns={} cornerMaxAbsDiff={} maxAbsDiff={} worst={}",
-                corners, cornerMax, maxDiff, worstAt);
-        helper.assertTrue(cornerMax == 0, "corner columns differ by up to " + cornerMax + ": " + worstAt);
-        helper.assertTrue(maxDiff <= 1, "columns differ by up to " + maxDiff + ": " + worstAt);
-        helper.succeed();
+            tally.add(x, z, corner, (int) Math.ceil(t.height(x, z)) - 1, surfaceAtNoise(level, x, z), t.height(x, z));
+            return true;
+        }, () -> {
+            DeepTime.LOGGER.info("[gametest] heightMatchesReference columns=128 cornerColumns={} cornerMaxAbsDiff={} maxAbsDiff={} worst={}",
+                    tally.corners, tally.cornerMax, tally.maxDiff, tally.worst);
+            helper.assertTrue(tally.cornerMax == 0, "corner columns differ by up to " + tally.cornerMax + ": " + tally.worst);
+            helper.assertTrue(tally.maxDiff <= 1, "columns differ by up to " + tally.maxDiff + ": " + tally.worst);
+            helper.succeed();
+        });
     }
 
     /** Columns x = C/2 − 1 and x = −C/2 continue each other (the terrain is periodic in x). */
@@ -110,9 +100,9 @@ public final class GeneratorGameTests {
     public static void periodicAcrossSeam(GameTestHelper helper) {
         ServerLevel level = testPlanet(helper);
         int c = generator(helper, level).terrain().circumference();
-        int mismatches = 0;
+        int[] mismatches = {0};
         StringBuilder detail = new StringBuilder();
-        for (int k = 0; k < 16; k++) {
+        ChunkSampling.forEach(helper, 16, k -> {
             int z = (k - 8) * 250 + 2;
             int east = surfaceAtNoise(level, c / 2 - 1, z);
             int west = surfaceAtNoise(level, -c / 2, z);
@@ -120,13 +110,15 @@ public final class GeneratorGameTests {
             int westStep = Math.abs(surfaceAtNoise(level, -c / 2 + 1, z) - west);
             int seamStep = Math.abs(east - west);
             if (seamStep > Math.max(Math.max(eastStep, westStep), 1)) {
-                mismatches++;
+                mismatches[0]++;
                 detail.append(" z=").append(z).append(": ").append(east).append(" vs ").append(west);
             }
-        }
-        DeepTime.LOGGER.info("[gametest] periodicAcrossSeam pairs=16 mismatches={}{}", mismatches, detail);
-        helper.assertTrue(mismatches == 0, "seam discontinuities:" + detail);
-        helper.succeed();
+            return true;
+        }, () -> {
+            DeepTime.LOGGER.info("[gametest] periodicAcrossSeam pairs=16 mismatches={}{}", mismatches[0], detail);
+            helper.assertTrue(mismatches[0] == 0, "seam discontinuities:" + detail);
+            helper.succeed();
+        });
     }
 
     /** Vanilla's large ore veins are off in Deep Time worlds (decisions file, "Other mods' ores"). */
