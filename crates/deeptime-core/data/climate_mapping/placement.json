@@ -1,0 +1,94 @@
+{
+ "schema": 1,
+ "_comment": "Where each Köppen climate class goes on vanilla's temperature and humidity bands (plan §7.2, P1-09). One file, two readers, like default.json beside it: the core (crates/deeptime-core/src/bake/placement.rs, include_str!) uses it as the bake's default, and the game ships it as data/deeptime/deeptime/climate_mapping/placement.json. A datapack may override it: at a dedicated server's first start FirstStartGenerator reads the pack's copy and hands it to the bake in the content bundle (key 'climate_placement'), so the bake places the world's climate by the pack's table; the table used is recorded in the world data (manifest notes.bake.climate.placement). Coordinates are band coordinates: temperature 0 to 5 over frozen | cold | temperate | warm | hot, humidity 0 to 5 over the five humidity bands (b = 2.5 is the middle of the third band). 'temperature_ramps' name a band coordinate as base + span * (the weighted sum of inputs, each a temperature clamped between its 'from' and 'to' and scaled to 0..1); 'humidity_rules' start from the aridity index's band coordinate (0.03, 0.2, 0.5, 1, 2, 5 -> 0 to 5 on a log scale) and squeeze it into 'squeeze' (band coordinate 1 to 4 mapped linearly onto [lo, hi]), then hold it at or above 'min' and at or below 'max'; 'classes' give every land class a temperature ramp (by name, or a 'when' switch on one input) and a humidity rule. Land above its equilibrium line (glaciated) is capped at 'glacier_cap'. Every one of the 31 land classes (Af to EF) must be present. FORMAT.md, 'The climate mapping', is the schema.",
+ "glacier_cap": 0.35,
+ "temperature_ramps": {
+  "polar": {
+   "base": 0.0,
+   "span": 0.75,
+   "inputs": [
+    {"of": "t_warm", "from": -20.0, "to": 10.0}
+   ]
+  },
+  "boreal": {
+   "base": 0.75,
+   "span": 1.25,
+   "inputs": [
+    {"of": "t_warm", "from": 10.0, "to": 22.0, "weight": 0.65},
+    {"of": "t_cold", "from": -30.0, "to": 0.0, "weight": 0.35}
+   ]
+  },
+  "temperate": {
+   "base": 2.0,
+   "span": 0.95,
+   "inputs": [
+    {"of": "t_cold", "from": 0.0, "to": 18.0}
+   ]
+  },
+  "tropical": {
+   "base": 3.0,
+   "span": 0.9,
+   "inputs": [
+    {"of": "t_cold", "from": 18.0, "to": 28.0}
+   ]
+  },
+  "hot_steppe": {
+   "base": 3.0,
+   "span": 0.9,
+   "inputs": [
+    {"of": "t_mean", "from": 18.0, "to": 30.0}
+   ]
+  },
+  "desert": {
+   "base": 4.05,
+   "span": 0.9,
+   "inputs": [
+    {"of": "t_mean", "from": 5.0, "to": 30.0}
+   ]
+  }
+ },
+ "humidity_rules": {
+  "rainforest": {"min": 4.1},
+  "monsoon": {"min": 3.2},
+  "savanna": {"squeeze": [1.05, 2.55]},
+  "desert": {"min": 0.0, "max": 0.95},
+  "steppe": {"min": 1.05, "max": 1.95},
+  "mediterranean": {"squeeze": [1.05, 2.5]},
+  "humid": {"min": 2.05},
+  "taiga": {"min": 3.05},
+  "tundra": {"max": 1.95}
+ },
+ "classes": {
+  "Af": {"temperature": "tropical", "humidity": "rainforest"},
+  "Am": {"temperature": "tropical", "humidity": "monsoon"},
+  "Aw": {"temperature": "tropical", "humidity": "savanna"},
+  "As": {"temperature": "tropical", "humidity": "savanna"},
+  "BWh": {"temperature": "desert", "humidity": "desert"},
+  "BWk": {"temperature": "desert", "humidity": "desert"},
+  "BSh": {"temperature": "hot_steppe", "humidity": "steppe"},
+  "BSk": {"temperature": {"when": {"of": "t_cold", "above": 0.0}, "then": "temperate", "else": "boreal"}, "humidity": "steppe"},
+  "Csa": {"temperature": "temperate", "humidity": "mediterranean"},
+  "Csb": {"temperature": "temperate", "humidity": "mediterranean"},
+  "Csc": {"temperature": "temperate", "humidity": "mediterranean"},
+  "Cwa": {"temperature": "temperate", "humidity": "humid"},
+  "Cwb": {"temperature": "temperate", "humidity": "humid"},
+  "Cwc": {"temperature": "temperate", "humidity": "humid"},
+  "Cfa": {"temperature": "temperate", "humidity": "humid"},
+  "Cfb": {"temperature": "temperate", "humidity": "humid"},
+  "Cfc": {"temperature": "temperate", "humidity": "humid"},
+  "Dsa": {"temperature": "boreal", "humidity": "humid"},
+  "Dsb": {"temperature": "boreal", "humidity": "humid"},
+  "Dsc": {"temperature": "boreal", "humidity": "taiga"},
+  "Dsd": {"temperature": "boreal", "humidity": "taiga"},
+  "Dwa": {"temperature": "boreal", "humidity": "humid"},
+  "Dwb": {"temperature": "boreal", "humidity": "humid"},
+  "Dwc": {"temperature": "boreal", "humidity": "taiga"},
+  "Dwd": {"temperature": "boreal", "humidity": "taiga"},
+  "Dfa": {"temperature": "boreal", "humidity": "humid"},
+  "Dfb": {"temperature": "boreal", "humidity": "humid"},
+  "Dfc": {"temperature": "boreal", "humidity": "taiga"},
+  "Dfd": {"temperature": "boreal", "humidity": "taiga"},
+  "ET": {"temperature": "polar", "humidity": "tundra"},
+  "EF": {"temperature": "polar", "humidity": "tundra"}
+ }
+}

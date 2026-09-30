@@ -846,6 +846,14 @@ mod tests {
             assert_eq!(value("feature_deposits"), 2.0);
             assert_eq!(value("feature_strata"), 0.5);
             assert_eq!(value("province_strength"), "medium");
+            // The biome placement settings (P1-09's remaining constants).
+            assert_eq!(value("beach_width"), 40.0);
+            assert_eq!(value("inland_mid"), 300.0);
+            assert_eq!(value("inland_far"), 1500.0);
+            assert_eq!(value("inland_interior"), 8000.0);
+            assert_eq!(value("wetland_humidity"), 3.0);
+            assert_eq!(value("wetland_flat_share"), 0.5);
+            assert_eq!(value("wetland_lowland"), 250.0);
         }
     }
 
@@ -860,7 +868,7 @@ mod tests {
             .iter()
             .map(|s| s.as_str().unwrap())
             .collect();
-        assert_eq!(adv.len(), 5);
+        assert_eq!(adv.len(), 6);
         let fields = j["fields"].as_array().unwrap();
         let sections: Vec<&str> = fields
             .iter()

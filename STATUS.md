@@ -144,6 +144,77 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   were killed with `kill -9` on their verified PIDs (cwd = this checkout's `run-gametest`).
 - **Next.** New GameTests that sample columns across a planet should go through `ChunkSampling.forEach`; the
   `[gametest] chunks peak` line shows a test's footprint.
+
+### 2026-09-29 — P1-09 follow-up: every biome-mapping constant is configurable (agent worktree agent-a506f027d5a6b70e1, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben, 2026-09-29 (decisions log): "All of them" — the inland continentalness distances, the wetland thresholds and
+  the band placement per Köppen class that P1-09's "For Ben (2)" listed as constants.
+- **Settings** (preset section `biomes`, optional keys with the old values as defaults; the pipeline and built-in presets carry
+  them, resynced with `sync_builtin_presets.py`; range checks name the key; one new **Advanced · Biome placement** section
+  `adv_biomes`, after the other advanced ones, in `editor_fields.json`, the game's `EditorFields.Section.ADV_BIOMES` and lang):
+
+  | id | key | default | range |
+  |---|---|---|---|
+  | Mid-inland distance (`inland_mid`) | `biomes.inland_mid_blocks` | 200 blocks | 160–800 |
+  | Far-inland distance (`inland_far`) | `biomes.inland_far_blocks` | 1,000 | 900–3,000 |
+  | Continental interior distance (`inland_interior`) | `biomes.inland_interior_blocks` | 5,000 | 3,500–20,000 |
+  | Swamp humidity threshold (`wetland_humidity`) | `biomes.wetland_humidity` | 2.5 bands (full at +1.5) | 1–4.5 |
+  | Swamp flat-land share (`wetland_flat_share`) | `biomes.wetland_flat_share` | 0.35 | 0.05–0.9 |
+  | Swamp height limit (`wetland_lowland`) | `biomes.wetland_low_m` | 150 m | 20–600 |
+
+  The three inland ranges do not overlap (and the beach, ≤ 150, stays below the mid-inland edge), so the edges stay in order
+  whatever the player sets. The wetland gate `s > 0.15`, the thaw condition and the sea's depth anchors stay in the core.
+- **The placement table** is data: `crates/deeptime-core/data/climate_mapping/placement.json`, beside `default.json`; the jar
+  ships it as `data/deeptime/deeptime/climate_mapping/placement.json` (one added `include` in `neoforge/build.gradle`'s
+  climate-mapping copy: the only edit to a Gradle file) and the core compiles it in (`include_str!`, `bake/placement.rs`). Schema
+  (FORMAT.md, "The climate mapping"): `glacier_cap`; named `temperature_ramps` (`base + span · Σ weight · clamp01((t − from)/(to − from))`
+  over `t_mean` / `t_warm` / `t_cold`, weights adding to 1); named `humidity_rules` (`squeeze` [lo, hi] over band 1…4, then `min`,
+  `max`); `classes`: each of the 31 land classes a ramp by name (or a `{when: {of, above}, then, else}` switch, as BSk needs) and a
+  humidity rule. Ramps use `base`/`span`, not two end points, because 2.95 − 2.0 ≠ 0.95 in f64 and the default must reproduce the old
+  constants bit for bit. The default has six ramps (polar, boreal, temperate, tropical, hot_steppe, desert) and nine rules
+  (rainforest, monsoon, savanna, desert, steppe, mediterranean, humid, taiga, tundra).
+- **How a pack's table reaches the bake.** The bake is Rust and runs before the game can read a datapack, so the table travels
+  in the **content bundle** (the JSON passed with the preset since P1-15, key `climate_placement`). At a dedicated server's first
+  start `FirstStartGenerator` reads `deeptime:deeptime/climate_mapping/placement.json` from the server's resource manager (the
+  highest-priority pack's copy; the jar's own when nothing overrides it; a file that is not a JSON object stops the start with the
+  pack named) and adds it to the bundle (`climate/ClimatePlacement`, pure part `PlacementBundle`, JUnit `PlacementBundleTest`);
+  `Preset::with_content` parses and checks it (`Placement::from_value`, errors carry the path, e.g.
+  `$.climate_placement.classes.Af.temperature`) and keeps it on `PlanetPreset.placement` (not in the preset JSON, so share codes
+  and `preset.json` are unchanged); the bake places the climate by it and records the whole table in the world data,
+  `notes.bake.climate.placement = {source: "default" | "content bundle", table}`. Java never interprets the table again (the world's
+  values are already baked with it). `deeptime run --content <file>` takes the same key. **Not covered:** the Create World editor's
+  runs and the workbench pass no content bundle (as with the essentials), so they use the core's default; a pack override applies to
+  dedicated-server first starts. A singleplayer world made through the editor keeps the default table until the editor learns to pass a bundle (it
+  needs the datapack registries of the world being created).
+- **Bit-identical.** `planet_world_4k` (C = 4096, 150 Myr, `deeptime run --threads 6`, release), master 8cf16f9 vs this branch:
+  `diff -rq` of the two world folders reports only `manifest.json`; every raster, event, keyframe, strata, sites, bodies and
+  `preset.json` are identical. The manifest differs in timings and `created_utc` and in the record: `notes.bake.climate.params` has the six new
+  keys and `notes.bake.climate.placement` is new. Also `placement::tests::the_default_table_reproduces_the_compiled_in_constants_bit_for_bit`
+  (the old formulas kept in the test as an oracle; every class, 35 temperatures × 3 × 7 month sets × glacier, 400 aridities: identical bits).
+- **Extremes** (`tools/dev/knob_extremes.py --stage run`, new: `deeptime run` with the bake, reads `notes.bake.climate` back and checks
+  the biome inputs' land shares are finite and add up to 1; Mac, `--jobs 3 --threads 4`). Small planet (`planet_world_4k` with a `biomes` section, 150 Myr),
+  all 7 biome knobs at both ends + the default: 15 of 15 ok. Wetland cells (default 53): humidity 1.0 → 921, 4.5 → 0; flat share 0.05 → 0, 0.9 → 843;
+  height 20 m → 20, 600 m → 202. The small planet has no land beyond ~1,000 blocks from the sea, so the inland knobs ran on
+  `pipeline_quick_16k` (100 Myr, scattered continents, 9 runs, 0 failed; land shares of the seven continentalness bands, near / mid / far-inland =
+  the last three): default 0.303 / 0.628 / 0.037 (the coast band holds 0.032); mid-inland edge 160 → 0.239 / 0.692 / 0.037, 800 → 0.875 / 0.056 / 0.037;
+  far edge 900 → 0.303 / 0.607 / 0.059, 3,000 → 0.303 / 0.666 / 0.000; interior edge 3,500 and 20,000 → unchanged shares (that edge only sets the
+  top of the last band's scale: it changes the values inside it, not the band shares); height 20 m → 6 wetland cells, 600 m → 9,207 (default 842).
+- **Tests.** Rust: `bake::placement` (bit-for-bit default, a changed table changes the answers, every bad table names its path), `bake::biomes`
+  (`a_changed_placement_table_changes_the_biome_inputs`: Af moved to the desert ramp and the tundra rule changes the temperature and humidity layers
+  of that quarter only and nothing else, and the note records the table; `the_inland_distances_and_wetland_thresholds_are_settings`; range checks).
+  Java: `PlacementBundleTest` (the jar's copy is the core's file; the bundle carries a pack's table), the catalogue tests count six advanced
+  sections, the tuned share-code case now carries a `biomes` section with all twelve keys non-default (`share-codes.json` regenerated on the Mac with
+  `share_code_fixture.py`: Rust and Java write the same code; `AdvancedSettingsTest.aTunedPipelineCodeLoadsUnchanged` and the workbench's
+  `a_tuned_code_from_the_game_loads_unchanged` read every biome field back and the JSON unchanged).
+- **Gates** (Mac, run on the branch, then again after merging master 7f907ce, coal seam fields: same numbers): `cargo fmt --check`, `clippy --workspace
+  --all-targets --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked --no-fail-fast`: cli 30, core 245 (+3 ignored),
+  history_cap 1, format 40, inspect 29 + 2 + 7, jni 7, viewer 5, 0 failed; `cd neoforge && ./gradlew build test`: tests=143 failures=0 (+3);
+  `./gametest.sh --server` (both times): **All 50 required tests passed** (`climateConsistent`, `bandsAreTheBuilders` among them). Not run: `-PwithMic` (the MIC stall is another agent's).
+- **Deviations.** The plan put "anchors in a datapack file"; P1-09 had made them the preset's section, and the placement per class is now that file. The
+  ramp form is `base`/`span` (above). `mapping` in the note stays `"p1-09"` (Java checks it).
+- **Left as constants:** the sea's temperature curve, the aridity → humidity anchors, the depth anchors of the sea, the wetland gate and the E6 band's
+  internal steps.
+- **Next.** The editor could pass the content bundle (essentials and this table) once it can read the datapack registries of the world being created.
+
 ### 2026-09-29 — Coal seam fields: a deposit is one minable seam field, density 4 / 14 / 40 per 100,000 km² (agent worktree agent-a3e41a57dc812f499, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben's decision (decisions log 2026-09-29, "OK; define coal as seams (Recommended)"): coal's survivor-based
   counts stay; a deposit is one minable seam field, tens of km across, with its density sized from coal-basin area

@@ -20,6 +20,7 @@
 pub mod biomes;
 pub mod climate;
 pub mod meta;
+pub mod placement;
 pub mod strata;
 pub mod surface;
 pub mod terrain;
