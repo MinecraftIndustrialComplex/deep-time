@@ -11,11 +11,20 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.RegistrationInfo;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTestServer;
+import net.minecraft.gametest.framework.TestFunction;
 import net.minecraft.server.WorldLoader;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.levelgen.WorldDimensions;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Lets Deep Time's test dimensions exist in the GameTest server (plan §9.4).
@@ -26,6 +35,10 @@ import org.spongepowered.asm.mixin.injection.At;
  * only those, so a pack datapack that defines {@code minecraft:overworld} or another mod's
  * dimension cannot change the GameTest world (cold-read review 2, gap 9). Applied only with
  * {@code -Ddeeptime.gametest=true} (DeepTimeMixinPlugin).
+ *
+ * <p>It also honours {@code -Ddeeptime.gametestOnly=<name>[,<name>…]} ({@code ./gametest.sh
+ * -PgametestOnly=lakeHolds}): the server runs only the named tests (case-insensitive method names),
+ * so one test can be run alone. Unset, every registered test runs.
  */
 @Mixin(GameTestServer.class)
 abstract class GameTestServerMixin {
@@ -43,5 +56,21 @@ abstract class GameTestServerMixin {
                 .forEach(e -> ours.register(e.getKey(), e.getValue(), RegistrationInfo.BUILT_IN));
         DeepTime.LOGGER.info("[gametest] GameTest server gets {} Deep Time test dimension(s): {}", ours.size(), ours.keySet());
         return original.call(dims, ours.freeze());
+    }
+
+    @ModifyVariable(method = "create", at = @At("HEAD"), argsOnly = true)
+    private static Collection<TestFunction> deeptime$onlyNamedTests(Collection<TestFunction> tests) {
+        String only = System.getProperty("deeptime.gametestOnly", "");
+        if (only.isBlank())
+            return tests;
+        Set<String> names = Arrays.stream(only.split(",")).map(String::trim).filter(n -> !n.isEmpty())
+                .map(n -> n.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+        List<TestFunction> kept = tests.stream().filter(t -> {
+            String name = t.testName().toLowerCase(Locale.ROOT);
+            return names.contains(name) || names.contains(name.substring(name.lastIndexOf('.') + 1));
+        }).toList();
+        DeepTime.LOGGER.info("[gametest] -Ddeeptime.gametestOnly={}: running {} of {} tests: {}", only, kept.size(), tests.size(),
+                kept.stream().map(TestFunction::testName).toList());
+        return kept;
     }
 }

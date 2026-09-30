@@ -528,6 +528,10 @@ pub struct PlanetPreset {
     /// The knobs of the climate → biome-input mapping (P1-09, plan §7.2); the bake uses the
     /// defaults when the section is absent.
     pub biomes: Option<crate::bake::biomes::BiomeParams>,
+    /// The climate class placement table a datapack supplied through the content bundle
+    /// (`climate_placement`, `bake::placement`); `None` uses the core's default table. Not part
+    /// of the preset's JSON: it is pack data, recorded in the world data by the bake.
+    pub placement: Option<crate::bake::placement::Placement>,
 }
 
 type Obj = Map<String, Value>;
@@ -593,6 +597,7 @@ impl PlanetPreset {
             young,
             amplify,
             biomes,
+            placement: None,
         };
         preset.validate()?;
         Ok(preset)

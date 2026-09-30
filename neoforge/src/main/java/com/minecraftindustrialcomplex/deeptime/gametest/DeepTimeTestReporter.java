@@ -59,6 +59,7 @@ public final class DeepTimeTestReporter implements TestReporter {
     public synchronized void onTestSuccess(GameTestInfo info) {
         entry(info).pass++;
         DeepTime.LOGGER.info("[gametest-result] {} PASS required={} {}ms", info.getTestName(), info.isRequired(), info.getRunTime());
+        ChunkCensus.afterTest(info.getTestName());
     }
 
     @Override

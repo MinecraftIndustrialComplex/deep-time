@@ -12,6 +12,10 @@
 //! (`ClimateMappingBuilder`, stored as `climate_mapping.json`); it reads the reference this bake
 //! used from `notes.bake.climate.reference`.
 //!
+//! **Where each Köppen class goes** on the temperature and humidity bands is data, not code:
+//! `data/climate_mapping/placement.json` ([`super::placement`], a datapack may override it). The
+//! defaults are the tables below.
+//!
 //! **Temperature** (5 bands: frozen, cold, temperate, warm, hot) from the Köppen class and the
 //! warmest/coldest-month temperatures, so that each main group lands in its band:
 //!
@@ -40,15 +44,17 @@
 //! by nearest value (so a coastal land cell interpolates between land values only), resampled
 //! to L2 and chosen by the L2 land mask.
 //!
-//! **Continentalness** from the distance to the sea on land — 0, `beach_blocks`, 200, 1,000,
-//! 5,000 blocks → the coast band's bottom, near-inland, mid-inland, far-inland, top — and from
+//! **Continentalness** from the distance to the sea on land — 0, `beach_blocks`,
+//! `inland_mid_blocks` (200), `inland_far_blocks` (1,000), `inland_interior_blocks` (5,000) blocks →
+//! the coast band's bottom, near-inland, mid-inland, far-inland, top — and from
 //! the depth at sea — 0, 200, 2,500, 6,000 m → coast | ocean, the shelf, ocean | deep ocean, the
 //! abyss.
 //!
 //! **Erosion** from the local relief (range of the ground, the sea surface counted as ground, in
 //! a `terrain_window_blocks` window, box-smoothed): its rank among the land cells, high relief
 //! first, read through the reference's land erosion distribution below the swamp band (E6).
-//! Wet (vegetation ≥ 2.5), flat (the flattest 35 %), low (< 150 m) land that is not frozen goes
+//! Wet (vegetation ≥ `wetland_humidity`, 2.5), flat (the flattest `wetland_flat_share`, 35 %), low
+//! (< `wetland_low_m`, 150 m) land that is not frozen goes
 //! into E6 in proportion to `wetlands` — swamps and mangroves only where they belong (vanilla
 //! puts E6 at hot temperatures to mangrove swamp, whatever the humidity). The deep sea keeps E4 or
 //! more, away from Terralith's sky-island band.
@@ -66,6 +72,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use super::placement::Placement;
 use crate::climate::koppen;
 use crate::error::CoreError;
 use crate::world::Field;
@@ -96,6 +103,19 @@ pub struct BiomeParams {
     pub variant_blocks: f64,
     /// How readily wet, flat lowlands become swamps (0 = never).
     pub wetlands: f64,
+    /// Distance from the sea, blocks, where the mid-inland continentalness band begins.
+    pub inland_mid_blocks: f64,
+    /// Distance from the sea, blocks, where the far-inland band begins.
+    pub inland_far_blocks: f64,
+    /// Distance from the sea, blocks, where continentalness reaches its top (the deep interior).
+    pub inland_interior_blocks: f64,
+    /// The humidity band coordinate (0 … 5) from which land counts as wet for swamps; the wetness
+    /// reaches its full weight 1.5 bands above it.
+    pub wetland_humidity: f64,
+    /// The share of land, flattest first, that lowland swamps may take (by relief rank).
+    pub wetland_flat_share: f64,
+    /// Height above the sea, m, at which lowland stops counting as low for swamps.
+    pub wetland_low_m: f64,
 }
 
 impl Default for BiomeParams {
@@ -107,6 +127,12 @@ impl Default for BiomeParams {
             terrain_window_blocks: 64.0,
             variant_blocks: 1024.0,
             wetlands: 1.0,
+            inland_mid_blocks: 200.0,
+            inland_far_blocks: 1000.0,
+            inland_interior_blocks: 5000.0,
+            wetland_humidity: 2.5,
+            wetland_flat_share: 0.35,
+            wetland_low_m: 150.0,
         }
     }
 }
@@ -134,7 +160,19 @@ impl BiomeParams {
             "terrain_window_blocks",
         )?;
         within(self.variant_blocks, 64.0, 16_384.0, "variant_blocks")?;
-        within(self.wetlands, 0.0, 1.0, "wetlands")
+        within(self.wetlands, 0.0, 1.0, "wetlands")?;
+        // The ranges keep the coast band, the three inland distances in this order.
+        within(self.inland_mid_blocks, 160.0, 800.0, "inland_mid_blocks")?;
+        within(self.inland_far_blocks, 900.0, 3000.0, "inland_far_blocks")?;
+        within(
+            self.inland_interior_blocks,
+            3500.0,
+            20_000.0,
+            "inland_interior_blocks",
+        )?;
+        within(self.wetland_humidity, 1.0, 4.5, "wetland_humidity")?;
+        within(self.wetland_flat_share, 0.05, 0.9, "wetland_flat_share")?;
+        within(self.wetland_low_m, 20.0, 600.0, "wetland_low_m")
     }
 }
 
@@ -221,39 +259,8 @@ pub fn piecewise(anchors: &[(f64, f64)], x: f64) -> f64 {
     anchors[anchors.len() - 1].1
 }
 
-fn unit(v: f64) -> f64 {
+pub(super) fn unit(v: f64) -> f64 {
     v.clamp(0.0, 1.0)
-}
-
-/// The D formula (also BSk with a freezing coldest month).
-fn thermal_d(t_warm: f64, t_cold: f64) -> f64 {
-    0.75 + 1.25 * (0.65 * unit((t_warm - 10.0) / 12.0) + 0.35 * unit((t_cold + 30.0) / 30.0))
-}
-
-/// The C formula (also BSk with a mild coldest month).
-fn thermal_c(t_cold: f64) -> f64 {
-    2.0 + 0.95 * unit(t_cold / 18.0)
-}
-
-/// Temperature band coordinate of a land cell of Köppen class `k`.
-pub fn thermal_land(k: u8, t_mean: f64, t_warm: f64, t_cold: f64, glacier: bool) -> f64 {
-    let b = match k {
-        29 | 30 => 0.75 * unit((t_warm + 20.0) / 30.0),
-        17..=28 => thermal_d(t_warm, t_cold),
-        8..=16 => thermal_c(t_cold),
-        0..=3 => 3.0 + 0.9 * unit((t_cold - 18.0) / 10.0),
-        4 | 5 => 4.05 + 0.9 * unit((t_mean - 5.0) / 25.0),
-        6 => 3.0 + 0.9 * unit((t_mean - 18.0) / 12.0),
-        7 => {
-            if t_cold > 0.0 {
-                thermal_c(t_cold)
-            } else {
-                thermal_d(t_warm, t_cold)
-            }
-        }
-        _ => thermal_sea(t_mean),
-    };
-    if glacier { b.min(0.35) } else { b }
 }
 
 /// Temperature band coordinate of a sea cell (from its surface temperature).
@@ -300,25 +307,6 @@ pub fn humidity_of_aridity(aridity: f64) -> f64 {
         ],
         x,
     )
-}
-
-/// Humidity band coordinate of a land cell of Köppen class `k`.
-pub fn humidity_land(k: u8, aridity: f64) -> f64 {
-    let h = humidity_of_aridity(aridity);
-    let squeeze = |lo: f64, hi: f64| lo + (hi - lo) * unit((h - 1.0) / 3.0);
-    match k {
-        0 => h.max(4.1),
-        1 => h.max(3.2),
-        2 | 3 => squeeze(1.05, 2.55),
-        4 | 5 => h.clamp(0.0, 0.95),
-        6 | 7 => h.clamp(1.05, 1.95),
-        8..=10 => squeeze(1.05, 2.5),
-        11..=16 => h.max(2.05),
-        19 | 20 | 23 | 24 | 27 | 28 => h.max(3.05),
-        17 | 18 | 21 | 22 | 25 | 26 => h.max(2.05),
-        29 | 30 => h.min(1.95),
-        _ => h,
-    }
 }
 
 /// A quantile function from sorted samples at u = i / (n − 1).
@@ -645,7 +633,7 @@ struct Coords {
     by_class: Value,
 }
 
-fn coords(c: &Climate<'_>, l1: &GridDesc) -> Coords {
+fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     let (w, h) = (l1.w as usize, l1.h as usize);
     let n = w * h;
     // A missing field or a NaN cell falls back to the defaults below (never to "driest").
@@ -673,8 +661,8 @@ fn coords(c: &Climate<'_>, l1: &GridDesc) -> Coords {
         let tc = at(c.t_cold, k).unwrap_or(tm - 8.0);
         let ai = at(c.aridity, k).unwrap_or(1.0);
         let glacier = at(c.glacier, k).is_some_and(|g| g >= 0.5);
-        let th = thermal_land(class, tm, tw, tc, glacier);
-        let hu = humidity_land(class, ai);
+        let th = placement.thermal_land(class, tm, tw, tc, glacier);
+        let hu = placement.humidity_land(class, ai);
         t_land[k] = th as f32;
         h_land[k] = hu as f32;
         let s = &mut stats[class as usize];
@@ -735,7 +723,12 @@ fn shares(v: &[f32], mask: &[bool], edges: &[f64], abs: bool) -> Vec<f64> {
 
 /// The mapping (module documentation). `climate` is `None` without the climate stage: the
 /// temperature then follows latitude (28 − 0.55·|lat| °C) and humidity is middling.
-pub fn map(climate: Option<&Climate<'_>>, g: &Ground<'_>, p: &BiomeParams) -> Mapped {
+pub fn map(
+    climate: Option<&Climate<'_>>,
+    g: &Ground<'_>,
+    p: &BiomeParams,
+    placement: &Placement,
+) -> Mapped {
     let r = reference();
     let bands = &r.bands;
     let l2 = g.l2;
@@ -748,7 +741,7 @@ pub fn map(climate: Option<&Climate<'_>>, g: &Ground<'_>, p: &BiomeParams) -> Ma
     // Temperature and humidity.
     let (t_land, h_land, t_sea, by_class) = match climate {
         Some(c) => {
-            let co = coords(c, g.l1);
+            let co = coords(c, g.l1, placement);
             let up = |v: Vec<f32>| {
                 super::resample(
                     &Field {
@@ -784,13 +777,13 @@ pub fn map(climate: Option<&Climate<'_>>, g: &Ground<'_>, p: &BiomeParams) -> Ma
     // Continentalness.
     let r2 = f64::from(l2.r);
     let to_sea = distance_cells(&land, w, h, true);
-    let beach = p.beach_blocks.min(190.0);
+    let beach = p.beach_blocks.min(0.95 * p.inland_mid_blocks);
     let land_anchors = [
         (0.0, 3.0),
         (beach.max(1e-3), 4.0),
-        (200.0, 5.0),
-        (1000.0, 6.0),
-        (5000.0, 7.0),
+        (p.inland_mid_blocks, 5.0),
+        (p.inland_far_blocks, 6.0),
+        (p.inland_interior_blocks, 7.0),
     ];
     let sea_anchors = [(0.0, 3.0), (200.0, 2.585), (2500.0, 2.0), (6000.0, 1.084)];
     let mut cont_band = vec![0f32; n];
@@ -827,9 +820,9 @@ pub fn map(climate: Option<&Climate<'_>>, g: &Ground<'_>, p: &BiomeParams) -> Ma
         }
         let u = f64::from(u_relief[k]);
         let mut e = q_ero.at(1.0 - u);
-        let wet = unit((f64::from(h_land[k]) + p.humidity_shift - 2.5) / 1.5);
-        let flat = unit((0.35 - u) / 0.35);
-        let low = unit(1.0 - (f64::from(elev[k]) - sea) / 150.0);
+        let wet = unit((f64::from(h_land[k]) + p.humidity_shift - p.wetland_humidity) / 1.5);
+        let flat = unit((p.wetland_flat_share - u) / p.wetland_flat_share);
+        let low = unit(1.0 - (f64::from(elev[k]) - sea) / p.wetland_low_m);
         let thawed = f64::from(t_land[k]) + p.temperature_shift >= 1.0;
         let s = p.wetlands * wet * flat * low;
         if thawed && s > 0.15 {
@@ -880,6 +873,10 @@ pub fn map(climate: Option<&Climate<'_>>, g: &Ground<'_>, p: &BiomeParams) -> Ma
     let note = json!({
         "mapping": MAPPING,
         "params": p,
+        "placement": {
+            "source": if placement == super::placement::builtin() { "default" } else { "content bundle" },
+            "table": placement.table(),
+        },
         "reference": { "bands": bands, "reference": r.reference },
         "koppen_bands": by_class,
         "window_cells": k,
@@ -902,6 +899,7 @@ pub fn map(climate: Option<&Climate<'_>>, g: &Ground<'_>, p: &BiomeParams) -> Ma
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bake::placement;
 
     /// Vanilla's middle biomes (OverworldBiomeBuilder.MIDDLE_BIOMES, 1.21.1), by temperature and
     /// humidity band.
@@ -933,8 +931,8 @@ mod tests {
 
     fn middle(class: &str, t_mean: f64, t_warm: f64, t_cold: f64, aridity: f64) -> &'static str {
         let k = koppen::index(class).unwrap();
-        let t = thermal_land(k, t_mean, t_warm, t_cold, false);
-        let hu = humidity_land(k, aridity);
+        let t = placement::builtin().thermal_land(k, t_mean, t_warm, t_cold, false);
+        let hu = placement::builtin().humidity_land(k, aridity);
         MIDDLE[(t.floor() as usize).min(4)][(hu.floor() as usize).min(4)]
     }
 
@@ -978,10 +976,10 @@ mod tests {
         assert!(dfc_cold.contains("taiga"), "a cold Dfc gives {dfc_cold}");
         assert_eq!(middle("ET", -6.0, 6.0, -15.0, 1.5), "snowy_plains");
         // A wet ET stays below the humidity band whose variant is snowy taiga.
-        assert!(humidity_land(29, 5.0) < 2.0);
+        assert!(placement::builtin().humidity_land(29, 5.0) < 2.0);
         assert_eq!(middle("EF", -55.0, -30.0, -70.0, 0.5), "snowy_plains");
         // Glaciated land is ice, whatever its class.
-        assert!(thermal_land(26, 5.0, 18.0, -8.0, true) < 1.0);
+        assert!(placement::builtin().thermal_land(26, 5.0, 18.0, -8.0, true) < 1.0);
         // Oceans: sea ice frozen, tropical water warm.
         assert!(thermal_sea(-5.0) < 1.0);
         assert!(thermal_sea(28.0) >= 4.0);
@@ -1055,10 +1053,10 @@ mod tests {
         assert!(v.iter().all(|&x| x == 7.0));
     }
 
-    #[test]
-    fn a_planet_maps_by_its_koppen_map() {
-        // 64 × 32 L1 cells, L2 twice as fine; land in the middle rows with an Af, a BWh, a Dfc and
-        // an ET quarter, a ridge through the middle.
+    /// A small planet: 64 x 32 L1 cells, L2 twice as fine; land in the middle rows with an Af, a
+    /// BWh, a Dfc and an ET quarter, a ridge through the middle. Returns the mapped layers and
+    /// L2's width.
+    fn fixture(params: &BiomeParams, table: &Placement) -> (Mapped, usize) {
         let c = 1024u32;
         let l1 = GridDesc::for_planet("L1", c, 16).unwrap();
         let l2 = GridDesc::for_planet("L2", c, 8).unwrap();
@@ -1127,7 +1125,13 @@ mod tests {
             seed: 3,
             circumference: c,
         };
-        let m = map(Some(&climate), &g, &BiomeParams::default());
+        let m = map(Some(&climate), &g, params, table);
+        (m, w2)
+    }
+
+    #[test]
+    fn a_planet_maps_by_its_koppen_map() {
+        let (m, w2) = fixture(&BiomeParams::default(), placement::builtin());
         let b = &reference().bands;
         let band = |layer: usize, edges: &[f64], i: usize, j: usize| {
             band_coord(edges, f64::from(m.layers[layer][j * w2 + i])).floor() as usize
@@ -1161,5 +1165,151 @@ mod tests {
         assert!(m.layers[4][jr * w2 + ri].abs() > m.layers[4][jr * w2 + flat_i].abs());
         assert!(m.layers[3][jr * w2 + ri] < m.layers[3][jr * w2 + flat_i]);
         assert_eq!(m.note["mapping"], MAPPING);
+    }
+
+    /// The layer's band coordinate at the middle of an L2 quarter, at a lowland row.
+    fn quarter_band(m: &Mapped, w2: usize, layer: usize, edges: &[f64], q: usize) -> f64 {
+        let i = q * w2 / 4 + w2 / 8 + 3;
+        band_coord(edges, f64::from(m.layers[layer][32 * w2 + i]))
+    }
+
+    #[test]
+    fn a_changed_placement_table_changes_the_biome_inputs() {
+        let b = &reference().bands;
+        let (base, w2) = fixture(&BiomeParams::default(), placement::builtin());
+        assert_eq!(base.note["placement"]["source"], "default");
+        // Af (quarter 0) goes to the desert ramp and the tundra rule: from hot and wet to a
+        // desert's temperature and the dry end of the humidity bands.
+        let mut v: serde_json::Value = serde_json::from_str(placement::PLACEMENT_JSON).unwrap();
+        v["classes"]["Af"]["temperature"] = json!("desert");
+        v["classes"]["Af"]["humidity"] = json!("tundra");
+        let table = Placement::from_value(&v).unwrap();
+        let (changed, w2b) = fixture(&BiomeParams::default(), &table);
+        assert_eq!(w2, w2b);
+        assert_eq!(changed.note["placement"]["source"], "content bundle");
+        assert_eq!(
+            changed.note["placement"]["table"]["classes"]["Af"]["humidity"],
+            "tundra"
+        );
+        let (t0, t1) = (
+            quarter_band(&base, w2, 0, &b.temperature, 0),
+            quarter_band(&changed, w2, 0, &b.temperature, 0),
+        );
+        assert!((3.0..4.0).contains(&t0), "Af was warm: {t0}");
+        assert!(t1 >= 4.05, "Af is now a desert's temperature: {t1}");
+        let (h0, h1) = (
+            quarter_band(&base, w2, 1, &b.vegetation, 0),
+            quarter_band(&changed, w2, 1, &b.vegetation, 0),
+        );
+        assert!(h0 >= 3.0, "Af was humid: {h0}");
+        assert!(h1 <= 1.96, "Af is now capped dry: {h1}");
+        // The other classes did not move: same bits in the other three quarters.
+        for q in 1..4 {
+            for layer in [0, 1] {
+                let i = q * w2 / 4 + w2 / 8 + 3;
+                assert_eq!(
+                    base.layers[layer][32 * w2 + i].to_bits(),
+                    changed.layers[layer][32 * w2 + i].to_bits(),
+                    "quarter {q} layer {layer}"
+                );
+            }
+        }
+        // The layers that do not read the table are the same everywhere.
+        assert_eq!(base.layers[2], changed.layers[2], "continentalness");
+        assert_eq!(base.layers[4], changed.layers[4], "weirdness");
+    }
+
+    #[test]
+    fn the_inland_distances_and_wetland_thresholds_are_settings() {
+        let b = &reference().bands;
+        let table = placement::builtin();
+        let (base, w2) = fixture(&BiomeParams::default(), table);
+        // The fixture's land is at most 128 blocks from the sea: a nearer mid-inland edge puts the
+        // same cell further into the near-inland band.
+        let near = BiomeParams {
+            inland_mid_blocks: 160.0,
+            ..BiomeParams::default()
+        };
+        let (n, _) = fixture(&near, table);
+        let (c0, c1) = (
+            quarter_band(&base, w2, 2, &b.continents, 0),
+            quarter_band(&n, w2, 2, &b.continents, 0),
+        );
+        assert!(c1 > c0, "mid-inland edge 160 > 200: {c1} vs {c0}");
+        // The far edges only matter past 200 blocks: nothing moves here.
+        let far = BiomeParams {
+            inland_far_blocks: 900.0,
+            inland_interior_blocks: 3500.0,
+            ..BiomeParams::default()
+        };
+        assert_eq!(fixture(&far, table).0.layers[2], base.layers[2]);
+        // The wetlands: this fixture's land stands 200 m above the sea, so at the default 150 m
+        // there is none; a 600 m ceiling admits it, and a stricter humidity threshold or a
+        // smaller flat share takes some away.
+        assert_eq!(base.note["wetland_cells"], 0);
+        let low = BiomeParams {
+            wetland_low_m: 600.0,
+            ..BiomeParams::default()
+        };
+        let (l, _) = fixture(&low, table);
+        let wet = l.note["wetland_cells"].as_u64().unwrap();
+        assert!(wet > 0, "wetlands with a 600 m ceiling");
+        let dry = BiomeParams {
+            wetland_low_m: 600.0,
+            wetland_humidity: 4.5,
+            ..BiomeParams::default()
+        };
+        let (d, _) = fixture(&dry, table);
+        assert!(
+            d.note["wetland_cells"].as_u64().unwrap() < wet,
+            "a stricter humidity threshold"
+        );
+        let thin = BiomeParams {
+            wetland_low_m: 600.0,
+            wetland_flat_share: 0.05,
+            ..BiomeParams::default()
+        };
+        let (t, _) = fixture(&thin, table);
+        assert!(
+            t.note["wetland_cells"].as_u64().unwrap() < wet,
+            "a smaller flat share"
+        );
+    }
+
+    #[test]
+    fn the_new_settings_are_checked() {
+        let bad = |f: &dyn Fn(&mut BiomeParams)| {
+            let mut p = BiomeParams::default();
+            f(&mut p);
+            match p.validate().expect_err("refused") {
+                CoreError::PresetInvalid { path, .. } => path,
+                e => panic!("{e}"),
+            }
+        };
+        assert!(BiomeParams::default().validate().is_ok());
+        assert_eq!(
+            bad(&|p| p.inland_mid_blocks = 100.0),
+            "$.biomes.inland_mid_blocks"
+        );
+        assert_eq!(
+            bad(&|p| p.inland_far_blocks = 3500.0),
+            "$.biomes.inland_far_blocks"
+        );
+        assert_eq!(
+            bad(&|p| p.inland_interior_blocks = 1000.0),
+            "$.biomes.inland_interior_blocks"
+        );
+        assert_eq!(
+            bad(&|p| p.wetland_humidity = 5.0),
+            "$.biomes.wetland_humidity"
+        );
+        assert_eq!(
+            bad(&|p| p.wetland_flat_share = 0.0),
+            "$.biomes.wetland_flat_share"
+        );
+        assert_eq!(
+            bad(&|p| p.wetland_low_m = f64::NAN),
+            "$.biomes.wetland_low_m"
+        );
     }
 }
