@@ -6,12 +6,17 @@
 //! volcano stage leaves (`WorldState::volcanoes`), the amplifier puts the shape back at the finer
 //! grids, scaled by the height the surface preserved (its measured relief):
 //!
-//! 1. **Before the erosion passes**, on the young landscape's grid (L2): the band of the body
-//!    between L1 and L2 (`shape::band`), so the amplifier's erosion cuts radial gullies into a
-//!    real cone and its thermal pass slumps it to the rock's angle.
+//! 1. **Before the erosion passes**, on the young landscape's grid (L2): the coarse bump the
+//!    young landscape holds of the edifice (the body blurred by the deep-time grid, about a tent
+//!    1.5 L1 cells wide, scaled to the relief measured over its foot, never more than the volcano
+//!    built) is taken away and the true profile put in its place, scaled by the share of that
+//!    relief kept; the amplifier's erosion then cuts radial gullies into a real cone and its
+//!    thermal pass slumps it to the rock's angle.
 //! 2. **After the last flood**, on the finest grid (L3, in the sink the tiles pass through): the
-//!    rest of the body (the sharp summit) and the depression — a summit crater or a caldera —
-//!    which the flood would have filled; and the flood-basalt terraces: where a pile crops out
+//!    part of the profile L2 cannot hold (the sharp summit, the body less its L2 blur,
+//!    `shape::blurred`) and the depression — a summit crater, or a caldera's flat floor inside a
+//!    slightly irregular steep rim — which the flood would have filled; and the flood-basalt
+//!    terraces: where a pile crops out
 //!    (`volcanoes/flood_basalt`, written by the volcano stage), elevations are stepped into flat
 //!    treads and steep risers of `flood_basalt_step_m`.
 //!
@@ -39,6 +44,9 @@ struct Item {
     l2: Radial,
     /// … and for the finest grid (after the flood).
     l3: Radial,
+    /// A caldera: its rim radius (ρ), the level of its flat floor (m) and the phases of its rim's
+    /// irregularity.
+    caldera: Option<(f64, f64, f64, f64)>,
 }
 
 /// The shapes a run's volcanoes add to the amplifier's grids.
@@ -62,6 +70,8 @@ impl Shaper {
         let dx1 = f64::from(p.resolution.l1_r) * mh;
         let dx2 = f64::from(p.resolution.l2_r) * mh;
         let fade = st.fade_myr.max(1e-3);
+        let young = world.fields.get(crate::surface::young::field::ELEVATION_M);
+        let frame = crate::sphere::BlockFrame::new(p.scale.circumference_blocks);
         let items = st
             .volcanoes
             .iter()
@@ -70,26 +80,67 @@ impl Shaper {
                 let age = v.extinct_myr.map_or(0.0, |e| (st.t_myr - e).max(0.0));
                 let sharp = (-age / (3.0 * fade)).exp();
                 let dep = (-age / fade).exp();
-                // The relief the surface kept of what it built (never more than it was built to).
+                // What the volcano stage says the edifice stands (never more than it was built
+                // to), and the shape it has.
                 let a = v.height_m.min(1.25 * v.target_m);
                 let s = v.shape();
                 let body = |r: f64| s.body(r);
                 let r = v.radius_m;
-                let mut l2 = shape::band(&body, dx2 / r, dx1 / r);
-                let mut l3 = shape::band(&body, 0.0, dx2 / r);
-                for x in &mut l2.v {
-                    *x *= (a * sharp) as f32;
-                }
-                for (k, x) in l3.v.iter_mut().enumerate() {
-                    let rho = k as f64 * l3.step;
-                    *x = (f64::from(*x) * a * sharp - s.bowl(rho) * a * dep) as f32;
-                }
+                // The bump the young landscape holds of it: the body blurred by the deep-time
+                // grid (cell-averaged rendering, bilinear advection, the interpolation to L2:
+                // about a tent 1.5 L1 cells wide), and its measured relief there.
+                let coarse = shape::blurred(&body, 1.5 * dx1 / r);
+                let e0 = coarse.at(0.0).max(1e-3);
+                let expected = a * e0;
+                let held = young.map_or(expected, |f| {
+                    let top = sample(f, v.x, v.z);
+                    let rr = 1.1 * r / mh;
+                    let ring: f64 = (0..24)
+                        .map(|k| {
+                            let th = std::f64::consts::TAU * f64::from(k) / 24.0;
+                            sample(f, frame.wrap_x(v.x + rr * th.cos()), v.z + rr * th.sin())
+                        })
+                        .sum::<f64>()
+                        / 24.0;
+                    top - ring
+                });
+                let removed = held.clamp(0.0, expected);
+                // The cone it becomes: the relief kept, the true profile (a dead one keeps more of
+                // the blurred shape as it ages).
+                let at = a * (removed / expected);
+                let fine = shape::blurred(&body, dx2 / r);
+                let reach = coarse.reach().max(fine.reach()).max(1.05);
+                let l2 = table(reach, |rho| {
+                    let target = at * (sharp * body(rho) + (1.0 - sharp) * coarse.at(rho));
+                    target - removed * coarse.at(rho) / e0
+                });
+                let is_caldera = s.depression.is_some_and(|d| d.caldera);
+                let l3 = table(reach, |rho| {
+                    let bowl = if is_caldera { 0.0 } else { s.bowl(rho) };
+                    at * sharp * (body(rho) - fine.at(rho)) - bowl * at * dep
+                });
+                // A caldera's floor: flat, its depth below the mean level of its rim, the rim read
+                // from the young landscape with the young-grid change (the same for every tile).
+                let caldera = s.depression.filter(|d| d.caldera).and_then(|d| {
+                    let f = young?;
+                    let rim_m = d.rho * r;
+                    let mut sum = 0.0;
+                    for k in 0..32 {
+                        let th = std::f64::consts::TAU * f64::from(k) / 32.0;
+                        let bx = frame.wrap_x(v.x + rim_m * th.cos() / mh);
+                        sum += sample(f, bx, v.z + rim_m * th.sin() / mh);
+                    }
+                    let rim = sum / 32.0 + l2.at(d.rho);
+                    let h = (v.id as f64 * 0.618_033_988_7).fract() * std::f64::consts::TAU;
+                    Some((d.rho, rim - d.depth * at * sharp, h, 2.3 * h + 1.0))
+                });
                 Item {
                     x: v.x,
                     z: v.z,
                     radius_m: r,
                     l2,
                     l3,
+                    caldera,
                 }
             })
             .collect();
@@ -151,6 +202,21 @@ impl Shaper {
             let rho = dx.hypot(dz) / it.radius_m;
             out += it.l3.at(rho);
         }
+        // Calderas: a flat floor inside a slightly irregular, steep-walled rim (only ever lowers).
+        for it in near {
+            let Some((rc, floor, p2, p3)) = it.caldera else {
+                continue;
+            };
+            let dx = frame.wrap_x(bx - it.x) * self.mh;
+            let dz = (bz - it.z) * self.mh;
+            let th = dz.atan2(dx);
+            let rim = rc * (1.0 + 0.1 * (2.0 * th + p2).sin() + 0.05 * (3.0 * th + p3).sin());
+            let x = dx.hypot(dz) / it.radius_m / rim;
+            if x < 1.0 {
+                let inside = 1.0 - smooth(0.78, 1.0, x);
+                out = out.min(out + (floor - out) * inside);
+            }
+        }
         if let Some((g, w)) = &self.terraces
             && self.step_m > 0.0
         {
@@ -184,7 +250,7 @@ impl Shaper {
         self.items
             .iter()
             .filter(|it| {
-                let reach = it.l3.reach() * it.radius_m / self.mh;
+                let reach = it.l3.reach().max(1.2) * it.radius_m / self.mh;
                 frame.wrap_x(it.x - cx).abs() <= hw + reach && (it.z - cz).abs() <= hh + reach
             })
             .collect()
@@ -229,6 +295,30 @@ impl Shaper {
                 }
             }
         });
+    }
+}
+
+/// Bilinear value of a field at block (x, z).
+fn sample(f: &crate::world::Field, x: f64, z: f64) -> f64 {
+    let g = &f.grid;
+    let fi = (x - g.origin_block_x as f64) / f64::from(g.r);
+    let fj = (z - g.origin_block_z as f64) / f64::from(g.r);
+    f64::from(crate::surface::advect::bilinear(
+        g.w as usize,
+        g.h as usize,
+        &f.data,
+        fi,
+        fj,
+    ))
+}
+
+/// A radial table of `f` out to ρ = `reach`.
+fn table(reach: f64, f: impl Fn(f64) -> f64) -> Radial {
+    const N: usize = 128;
+    let step = reach / (N - 1) as f64;
+    Radial {
+        step,
+        v: (0..N).map(|k| f(k as f64 * step) as f32).collect(),
     }
 }
 
