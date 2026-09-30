@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -46,7 +46,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-22 | Rivers and lakes (moved from P2-03, log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
 | P1-23 | Grid-artifact audit (log 2026-09-29) | todo | | | Starts after the mountain and strata work lands (they fix part of it). |
 | P1-24 | Faster Create World (log 2026-09-29) | todo | | | After P1-17's benchmarks; options go to Ben. |
-| P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
+| P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-a02882c5e6567370e, not yet merged. Format 0.2 bakes twelve monthly layers. `DeepTimeClimate` is at API version 1.<br>**Parity:** `ClimateParityTest` 500/500 blocks bit for bit, and the GameTest `climateApiOnTheRealPlanet` matches too.<br>**mic-climate `deep-time` branch** (pushed): Deep Time's climate plus Project Atmosphere's weather anomaly. Its GameTests pass 19/19, with and without Project Atmosphere, and its pack smoke passes 20/20.<br>**MIC planet probe** (earthlike_quick_16k): Af 24.5 °C, BWk 8.8/19.6 °C, Dfc −12.9/15.3 °C, ET −24.7/0.6 °C, EF plateau (4,860 m) −22.7/−46.7 °C, each pair midwinter/midsummer. Project Atmosphere read 8.6, 8.9, −0.6, 4.0 and 10.5 °C at the same places. Its simulated weather adds −2.4…+2.5 °C.<br>JUnit 150/0 and `./gametest.sh` All 52 passed after merging master 8872c91; cargo gates clean. See build log. |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -165,6 +165,317 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Next.** Switch `glacial::source` to the ice-age agent's field names when it lands (relay); rerun this
   entry's run on its fields.
 
+### 2026-09-30 — P1-25: a climate API for mic-climate and Project Atmosphere (agent worktree agent-a02882c5e6567370e, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **The bake (format 0.1 → 0.2).**
+  - At its last snapshot the climate stage keeps every cell's twelve months:
+    - the sea-level temperature `t_sl`;
+    - the precipitation rate.
+  - The switch is `snapshot::Input::monthly`. The fields are `climate::field::{t_sl_month, p_month}`, written only at the last step. The stage estimate grows by 96 B per L1 cell.
+  - The bake stores the months on L1:
+    - `climate/month/t_sl_c_01..12`, i16 at 0.01 °C, at sea level so a reader lapses at its own height;
+    - `climate/month/p_share_01..12`, u8 at 1/40, each month's rate over the annual.
+  - `notes.bake.climate.monthly` records the layer names, `lapse_c_per_km` and the month convention (month 01 starts at solar longitude 280°, about 1 January). This adds 24 layers, about 12 MB raw on a 16k planet.
+  - The version is pinned in: Cargo.toml, `FORMAT_MINOR`, Java `FormatVersion` (CURRENT and MINOR), and the tests' pins, including the JNI version string.
+  - FORMAT.md has the "0.2 over 0.1" paragraph and "The climate at a block": the evaluator, in order. It does:
+    - bilinear months, less the lapse over `max(0, y − sea)·m_per_block_v`;
+    - shares normalised to 12;
+    - the Köppen class as the nearest cell.
+  - Rust `deeptime_format::ClimateWorld` and Java `worlddata.ClimateLayers` implement it operation for operation.
+  - `deeptime parity` also writes `parity/climate.json`: 500 blocks, a third each at the terrain top, at sea level, and at a random height. The Gradle `testWorldPlanet4k` task lists it as an output.
+- **The API** (package `com.minecraftindustrialcomplex.deeptime.api.climate`).
+  - Public surface:
+    - `DeepTimeClimate`: `of(Level)`, `API_VERSION = 1`, `isDeepTimeLevel()`, `hasClimate()`, `at(BlockPos)`, `at(x, y, z)`, `temperatureC(pos, yearFraction)`, `lapseRateCPerKm()`, `seaLevelY()`, and the year convention `yearFractionAtSolarLongitude` / `NORTHERN_SPRING_EQUINOX`;
+    - `ClimateSample`: twelve months at the block's height, mean / warmest / coldest (with month indices), `temperatureC(f)` (periodic linear between month midpoints), annual and monthly precipitation, `precipitationRateMmPerYear(f)`, wettest and driest month, `precipitationSeasonality()` (BIO15 CV %), Köppen code and group, `seaLevelMonthC`.
+  - Internals, package-private:
+    - `LevelClimate`, one per WorldData;
+    - `ClimateColumns`, which caches the height-independent column: 16,384 columns, dropped when full.
+  - Behaviour outside a Deep Time climate:
+    - it is server-side only;
+    - a client or non-Deep-Time level answers `isDeepTimeLevel` false and every query empty;
+    - a synthetic level has `hasClimate` false.
+  - `/deeptime climate [pos]` logs a `[deeptime-probe]` JSON line; its own listener merges into `/deeptime`.
+  - Inputs are baked fields only, as agreed with the climate-forcing agent. The only change outside the new package and the bake is those 24 fields.
+- **What Project Atmosphere 0.9.1.2 allows** (a Sonnet lookup over the jar, decompiles on the Mac):
+  - **No base-temperature hook.** It has:
+    - no provider, registry or event for the base;
+    - `RegionAtmosphereState.baseTemperature` as `private final`, set once from a persisted 7-day forecast that is sampled from biome **base** temperatures (no height) through a per-biome table (`BiomeTempConfig`);
+    - no Terralith biomes in that table, so they get `Range(0,0)` and count as about 0 °C;
+    - regions 2000 blocks square;
+    - region keys with no dimension.
+  - **Written temperatures do not hold.** `setTemperature` and `adjustTemperature` are public, but the scheduler blends back toward its own target (0.6 every 20 ticks when active), so a pushed base erodes within a few updates.
+  - **Seasons are global.** The season offset is one value for the whole server (+6 summer, −8 winter, from Serene Seasons) and applies to both hemispheres.
+  - **It simulates only while a player is in the overworld** (`serverLevel.players().isEmpty()`). Regions are created at boot within 10,000 blocks of spawn, and hold `temperature == base` exactly until the first update.
+  - **What it consumes from its own regions:**
+    - its snow and freeze mixin blends the region with the local biome's range, plus a height lapse;
+    - clouds, crop stress and Serene Seasons Plus snow read the region directly.
+  - **No command sets a region's temperature.** `/weather` is hijacked to spawn a cloud.
+  - Readable through public classes (no mixins): `AtmoApi.getCurrentWeather`, `AtmosphericStateRegistry.getState(RegionInstanceKey.from(pos))`, `getTemperature()` and `getEffectiveBaseTemperature()`. mic-climate already used these for pollution.
+- **The coupling chosen: (a), and not (b).**
+  - (b), pushing Deep Time's base into Project Atmosphere's regions, is not possible through its API. It would erode, and one value per 2000-block region is about a quarter of the planet's pole-to-pole height.
+  - mic-climate's `mic_climate:unified` provider, in a Deep Time world with a climate:
+
+    ```
+    T = DeepTime(pos, SS date) + clamp(PA live − PA effective base, ±20) + pollution
+    ```
+
+    - Deep Time's monthly mean at the block's height, at the Serene Seasons date. Early Spring is read as the start of March, so the cycle maps linearly onto the year from month 2. Without Serene Seasons it uses Thermoo's season middle month; without a season source, the annual mean.
+    - Project Atmosphere's anomaly carries its day/night swing, rain, the forecast and advection. Its season offset cancels, and a never-simulated region gives no anomaly.
+    - Pollution arrives through the anomaly in ATMOSPHERE mode and is added directly otherwise.
+  - Everything else takes the old path: worlds Deep Time did not generate, packs without Deep Time, and the client.
+  - Other mic-climate changes:
+    - `Climate` caches per chunk section, because height now matters;
+    - `/mic_climate probe` gains `deeptime` and `dt+weather` lines;
+    - config `deepTime.{enabled, weatherAnomaly, maxAnomaly}`;
+    - `/mic_climate atmosphere drive <ticks>`, only with `-Dmic_climate.driveAtmosphere=true`, calls Project Atmosphere's own public `AtmosphericUpdateScheduler.tick` and `SeasonalAtmosphericDrift.tick` on a headless server;
+    - `gametest.sh` runs Gradle directly inside an existing dev shell (its flake's Linux-only libraries do not build on the Mac);
+    - `DeepTimeGameTests` covers the calendar, the cap, and other worlds unchanged;
+    - `plans/phase-07-deep-time.md`.
+  - The branch is `deep-time` on MinecraftIndustrialComplex/mic-climate (default branch `master`), pushed. Master, releases and the pack are untouched.
+  - The branch compiles against `libs/deeptime-1.21.1.jar`, gitignored like the Project Atmosphere jar.
+- **Serene Seasons vs Deep Time.**
+  - Serene Seasons' seasons are global. Its own temperature effect only shifts cool, non-tropical biomes by −0.8 biome units in winter. Its visuals (leaves, crops, its snowfall shift) stay northern everywhere.
+  - Deep Time's amplitude is per place, from the simulation: tropics about 1.4 °C, desert 12 °C, Dfc 30 °C, ET 28 °C, EF 26 °C.
+  - mic-climate follows Deep Time's amplitude and hemisphere. The temperature machines read is right; Serene Seasons' visuals disagree in the south.
+- **Measured.**
+  - Mac, after merging master 00c02ce:
+    - `cargo fmt --check`, clippy `--locked -D warnings`, and `deny licenses bans` are clean;
+    - `cargo test --workspace --release` passes (core 256 + 3 ignored, including the bake test's monthly checks, 1,520 sea cells equal within 0.02 °C, share sums within ±0.1);
+    - `./gradlew build test` gives tests=147 failures=0;
+    - `ClimateParityTest` is 500 of 500 equal (112 on land, 143 above the sea);
+    - `DeepTimeClimateTest`: warmest month in the local summer at 126 of 126 seasonal samples.
+  - `./gametest.sh --server`:
+    - `climateApiOnTheRealPlanet` fixture 500/500 equal;
+    - the first run failed its "tropical land" check because the 4k test planet has none; the check is now over land and sea;
+    - rerun after the fix: **All 52 required tests passed** (tropics 26.6 °C vs high latitudes −4.8 °C; 50 blocks up colder at 400 of 400).
+  - mic-climate on the Mac (`tools/remote/mic-climate.sh`):
+    - `./gametest.sh` passes 19/19;
+    - `-PwithAtmosphere` passes 19/19, with Project Atmosphere present;
+    - smoke (`smoke/install.sh` + `run.py`: the real pack, 166 mods, flat world, no Deep Time, this branch's jar) passes **20/20**;
+    - the smoke ran on the pack snapshot Deep Time's `install.sh mic` makes, because pack HEAD 4d0e685 carries a stale index hash for `kubejs/server_scripts/destroy_metallurgy_integration.js` that packwiz refuses (a pack finding, not this task's).
+  - `mac.sh --pack --server -- tools/review/p1-25-probe.sh` (MIC, earthlike_quick_16k scattered 500 Myr, first start 191 s, smoke PASS). All values °C at the surface; D = midwinter (`season set mid_winter`), S = midsummer:
+
+    | Site | Height | Deep Time mean / warmest / coldest | Unified, D / S | PA's own reading |
+    |---|---|---|---|---|
+    | Af (-3968, 32) | 440 m | 25.2 / 25.8 / 24.4 | 24.5 / 24.6 | 8.6 |
+    | BWk (-4544, -1120) | 1,060 m | 14.8 / 20.0 / 8.1 | 8.8 / 19.6 | 13.7 → 8.9 |
+    | Dfc (7504, -2416) | 260 m | 0.3 / 16.1 / −14.2 | −12.9 / 15.3 | −0.6 |
+    | ET (2800, -3184) | 1,100 m | −14.1 / 1.6 / −26.7 | −24.7 / 0.6 | 4.0 |
+    | EF plateau (1744, 2912, south) | 4,860 m | −35.5 / −22.3 / −48.0 | −22.7 / −46.7 | 10.5 |
+
+    - The unified value is what Power Grid, Destroy, LSO and Thermoo all read.
+    - Before this change the unified value was PA's own reading.
+    - The seasons invert across the equator.
+  - With PA's simulation driven:
+    - anomaly at noon: +2.2, −0.2, +1.4, +2.5, +1.6;
+    - anomaly at midnight: −1.2, −1.0, −2.4, −1.3, −0.9;
+    - so the unified value swings by 1–4 °C day to night on top of Deep Time's climate.
+  - `/weather rain` spawned its cloud at the spawn region, not at the sites, so no rain term showed.
+  - Data: review/out/p1-25/ (`summary.txt`, `rcon.jsonl`, `report.md`), not published.
+- **Tools.**
+  - `tools/remote/mic-climate.sh` runs a mic-climate checkout on the Mac inside Deep Time's dev shell. It syncs its gitignored libs and the Destroy / petrolpark / mic-destroy-electric jars its build reads, and takes `--server` for Deep Time's lock.
+  - `tools/review/p1-25-probe.sh` and `tools/review/p1-25-gates.sh`.
+  - `tools/smoke/run.py` accepts `--rcon 'sleep N'`.
+  - Resource note (Ben, 2026-09-29): the Project Atmosphere decompiles and the Serene Seasons lookups moved to the Mac. The first CFR runs had finished on the laptop before the order; nothing heavy has run locally since.
+- **For Ben.**
+  1. **Format 0.2 invalidates 0.1 worlds and workbench runs** in the new mod. A peer branch that bumps too (rivers?) must bump again at its merge.
+  2. **Project Atmosphere's biome table has no Terralith entries**, so in the whole MIC pack (not only Deep Time worlds) Terralith-dominated regions sit near 0 °C in PA's own model. A pack-side `config/projectatmosphere/biome_temps.json` would fix PA's own visuals. That is a pack change, so it needs your decision.
+  3. **Serene Seasons' global seasons disagree with Deep Time in the southern hemisphere**, in SS's own visuals and crops. Accept, or look for a per-hemisphere option later.
+  4. **Asking PA's author (xGabou) for a base-temperature provider hook** would allow coupling (b), so PA's snow, clouds and crops use Deep Time's numbers.
+  5. **mic-climate `deep-time`**: merge, release and a pack pin are yours to call. It compiles against Deep Time's jar, which is private until the MVP.
+- **Gates after merging master 8872c91** (the mountain-character merge), on the Mac:
+  - cargo fmt, clippy `--locked -D warnings` and deny are clean;
+  - `cargo test --workspace --release` passes (core 262 + 3 ignored);
+  - `./gradlew build test` gives tests=150 failures=0;
+  - `./gametest.sh` (`--server`): **All 52 required tests passed**.
+- **Next.** Merge this branch into master (the parent). Ben decides the "For Ben" items. Then mic-climate `deep-time` can be merged and released and pinned in the pack's deep-time branch.
+
+### 2026-09-29 — Continuous strata across cells: stratigraphic keys, a correlating column rule, smoothed stacks; format 0.2 (agent worktree agent-aacd864d2709d52dd, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-29, "Fix now (Recommended)": cross-sections showed the host rock as vertical
+  stripes one L1 cell wide. **Cause** (read from the code and the stacks): the column rule (`raster::stack_at`,
+  Java `Columns.stack`) matched horizons by their *index* in each cell's stack and took every class from the
+  *nearest* cell. Index h is a different unit in neighbouring cells — the stacks hold different units, and the
+  bake merges thin ones and caps K differently per cell — so no bed could continue: classes switched at the
+  nearest-cell line (the walls) and tops of unrelated units were interpolated into each other (the triangles
+  under the P1-08 mountain). Bilinear tops were applied to every horizon; they could not help. Under that, the
+  strata log itself differs a lot from one 16-block cell to the next (it is carried cell by cell through plate
+  motion): neighbouring cells 4.8 km apart hold 60–340-block units of different classes. **The coal-stack
+  picture** (`deeptime-inspect section`, site 44) is a different case: it is the synthetic deposit world
+  (`deposits_world_16k.json`, `"strata": "every-class"`), whose horizon h of cell column i is class
+  (6·i + h) mod 59 by design (P1-12's test pattern), so its stripes are the pattern, not the pipeline.
+- **Design.** (1) **Stratigraphic keys** (`structure::columns::key`): every unit carries a u16 span that orders
+  units the same way in every cell — regolith 0–4095; the strata log 4096 (now) … 32767 (the run's start),
+  linear in age (a layer spans from the base of the layer above to its own base; the top layer to the present
+  where the cell and its neighbours still accumulate at the last step, else only its base age; the young
+  loose part of a layer the upper half of its span); the basement pools by erosion order, 4096 keys each, 512
+  per metamorphic step; the mantle 61440–65535. Every merge in the bake keeps the union. (2) **The column
+  rule** (`deeptime_format::strata`, Java `worlddata/Columns.Stack`): the 4 × 4 cells around a column with
+  uniform cubic B-spline weights; each key's height is the weighted mean of the cells' key→height functions
+  (linear inside a span, flat across a hiatus), so a shared bed is interpolated smoothly and a bed some cells
+  lack thins out towards them; where cells disagree about the rock of the same keys (a facies change) the
+  classes **intertongue** on a 64-key band grid every column shares (shares less a 0.15 soft threshold,
+  stacked by key-span midpoint), so the answer is independent of how intervals are cut: a zero-weight cell
+  changes nothing and columns are continuous across cell edges (a first per-run wedge version was not, and
+  showed rectangles at cell lines). (3) **Smoothed stacks** (`Horizons::smoothed`, in `bake_with`): each
+  cell's stack becomes the Gaussian mean (σ 2.5 cells, 11 × 11) of its neighbours' height functions cut at
+  every key any of them has, each interval the class with the largest weighted thickness; the cell's own
+  surface stays its first top (the P1-08 raise follows, unchanged). σ 1.5 still read as tight folds.
+- **Format 0.2** (`Cargo.toml`, `FORMAT_MINOR`, Java `FormatVersion`): `horizon_stack` cells are 7K bytes (K tops,
+  K classes, K key tops, K key bases; padding keys 65535); column JSON horizons are `[top, class, unit]`; the
+  synthetic worlds give horizon h the span 4096·h … in every cell. FORMAT.md: the 0.2 note, the cell layout,
+  the key space, the column rule step by step (the parity contract), "The 0.2 bake"; `notes.bake.strata.smoothing`.
+  **Java:** `Columns.Stack` caches the 16 stacks of the L1 square it was last asked about (one read per chunk),
+  grows as needed; `StrataPass` sizes its runs per chunk and picks a class's member by `horizonKey(unit, class)`
+  = class + the key's era (top four bits: a bed keeps one block type across columns; a synthetic world's era is
+  its horizon index, as before). `StrataGameTests.everyClassInTheWorld` samples only horizons with blocks to
+  spare (the rule mixes neighbouring columns' classes in as thin tongues). **Tools:** `deeptime-inspect
+  wd-section` (the world data's own cross-section by rock class, legend; no world needed), its `section`
+  overlays use the column rule and skip tops above the ground; the viewer's sections pass `min_y`.
+- **Before/after** (Mac; `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500`
+  on master dc8528e and on the branch — the same history; then `tools/workbench/preview.py run --profile
+  standalone --world-data <bake> --box 2500,2202,2756,2458 --box -320,2312,-64,2568 --box -2900,-1988,-2644,-1732
+  --keep-world` in each checkout and `deeptime-inspect section` along x and z through a coal basin, a 430-block
+  mountain and a northern basin with coal fields). Before: walls one cell wide from the surface to the floor and
+  wedges between them. After: beds run across the sections, pinch out, onlap a basement high, dip gently over
+  the mountain's granite core; coal-seam bodies lie in the shale and sandstone. Review bundle (not published,
+  584 kB): `review/out/strata-continuous/` (index.html; before, after and world-data-only sections of all six
+  planes; hosts JSON).
+- **Measured.** Strata pass painted share (export-area `strata`, rock below the first top that is its horizon's or
+  body's class): before 98.57 / 98.93 / 98.97 % (86,585,695 of 87,609,999 blocks, **98.83 %**), after 98.49 /
+  98.97 / 99.06 % (86,062,219 of 87,053,558, **98.86 %**). Column rule, the strata pass's per-chunk evaluation
+  (`ColumnRuleBenchTest`, planet4k, 936 chunks, single thread, JIT warm): **0.048 → 0.744 ms/chunk** (mean
+  horizons per column 3.6 → 7.6). Chunky on the loaded Mac (other agents' servers; wall, not comparable run to
+  run): before 59 / 71 / 45 ms/chunk, after 104 / 95 / 56 ms/chunk for the three 361-chunk boxes — the rule's
+  0.7 ms cannot explain the difference; the controlled number is the benchmark. Bake strata 0.1–0.4 s → 6.0 s
+  (the smoothing), run 138 s → 149–170 s; mean horizons per cell 3.71 → 5.99; the bake's bytes 78.6 → 86.2 MiB.
+  Deposit bodies are unchanged (their depths are the ledger's); the horizon class at ore-body centres
+  (`deeptime inspect-column`, 354 bodies): coal seams in sedimentary rock 48.7 % → 56.2 %, placer 61 → 72 %,
+  MVT 29 → 43 %, SEDEX 50 → 75 %, porphyry 50 → 44 %.
+- **Gates** (Mac; run after merging master 00c02ce and again, all green, after merging master 5a70511 — cargo core 268, JUnit 147, both GameTest runs 50 of 50): `cargo fmt --check`, `clippy --workspace --all-targets
+  --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` all pass (cli 30, core
+  256 + 3 ignored, format 44 incl. `strata::tests` — the same stack everywhere is that stack, B-spline weights, a
+  shared bed smooth and a missing one pinching out with every column within a block of its neighbour, a facies
+  change intertongues, a zero-weight cell changes nothing —, inspect 29 + 2 + 7, jni 7, viewer 5); `cd neoforge &&
+  ./gradlew build test` → tests=144 failures=0 (`ColumnParityTest` 500 columns equal, `TilePackParityTest` checks
+  the keys, `ColumnRuleBenchTest` 0.44–0.74 ms/chunk); `mac.sh --server -- ./gametest.sh` → **All 50 required tests
+  passed**; `tools/smoke/install.sh mic` + `./gametest.sh -PwithMic` → **All 50 required tests passed**, 50
+  `gametest-result` lines, 0 not PASS. `everyClassInTheWorld` first failed (59 wrong): it sampled horizons by
+  index, which now reach the surface-rule layer and the bedrock floor in the every-class world; it samples by depth
+  now (20+ blocks down, clear of the floor).
+- **Decisions for Ben** (not asked): (1) ~44 % of coal-seam bodies sit in basement rock (granodiorite, granite,
+  gneiss) before and after — the stack's depth comes from the ledger, not from the sediment thickness at the site;
+  capping a coal stack at the sedimentary cover would fix it (deposit engine, not strata). (2) `deposits_world_16k`
+  (the coal pictures, workbench previews of runs without a bake) uses the every-class test strata, which will
+  always look striped (now as tongues); switching it to the placeholder strata would make its sections readable.
+  (3) Taste levers, all constants for now: smoothing σ 2.5 cells, band 64 keys, minor share 0.15 — larger σ
+  flattens the undulating beds further (the log's thickness really varies; Phase 1 has no folds, but thickness
+  changes give dips up to ~30° over short distances). (4) The B-spline rule approximates: a cell point shows a
+  blend of its neighbours, not its own stored stack.
+- **Next.** Merge into master (the parent); then the coal-stack depth cap if Ben wants it.
+
+### 2026-09-29 — Deep-time climate: carbon cycle, brightening sun, emergent snowball Earths, ice-age cycles, ice-linked sea level (agent worktree agent-adc924860a859865c, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-29 (the last two entries: "Greenhouse & sun over time", "Recent ice-age
+  cycles", "Ice-linked sea level"; snowball Earth "emergent … not scripted"). Plan §8.3 has an "As built for the
+  deep-time climate" paragraph (items 8–12).
+- **The ice-field contract (committed first, 83b731d; FORMAT.md "The climate's ice fields").** World fields every
+  plate step, before the surface step: `climate/ice_thickness_m` (land ice at the step's end), `climate/
+  ice_max_thickness_m` (thickest during the step's fine clock; inside the ice-age window the maximum since it
+  began, so at the present the **LGM**), `climate/ice_max_extent` (0/1 of the former), `climate/ice_time_share`
+  (share of the step under ice), `climate/sea_ice` (sea-ice cover of the sea), and `climate/glacier` now means
+  ice ≥ 1 m. History frames (surface's accumulator): `deeptime:ice_thickness_m`, `deeptime:ice_cover` (frame
+  means; not deposit-engine fields, so 16-bit packed). Globals: `WorldState::globals["climate/sea_level_m"]` (the
+  surface's sea level) and `["climate/cap_carbonate_m"]`.
+- **What.** New `climate/{carbon,clock,orbit,ice}.rs`; `ebm.rs` (eccentric orbit with Kepler timing, forcing via
+  A, sea-ice conductance tapering to zero between 5 and 10 m so the EBM's latent store melts in model years —
+  the clock runs few EBM years per 100 kyr — early stop also waits for the ice, annual sea-ice cover out);
+  `insolation.rs` (`Orbit`: (a/r)² and Kepler λ); `snapshot.rs` (forcing, sun, orbit, hydrological factor
+  e^(0.02·(T_g − 15)) on precipitation, zonal refs from any EBM year); `mod.rs` rewritten around the clock.
+  `WorldState::globals` (checkpoint **schema 7**). Surface: sea level from the globals; the drawdown carbonate
+  laid on sea floor above 4 km; the ice fields into the frames. `deeptime stage --climate-json` writes the
+  climate note (summary + curves); `climate-dem` prints the Earth weathering kernel and ice volume.
+  - **Carbon** (`carbon.rs`): COPSE's 3.193·10¹⁸ mol reservoir split into air (4.96·10¹⁶ mol at 280 ppm) and a
+    buffered ocean (A/A₀ = (O/O₀)^5; Archer et al. 2009); the air–sea exchange shuts under sea ice, so a
+    snowball's degassing piles up in the air (350× in ~3 Myr at D₀, as Hoffman et al. 1998). Degassing D₀ =
+    6.65·10¹² mol/yr × `degassing_scale` × (½ sea-floor production / 3.4 km²/yr (Rowley 2002) + ½ ocean floor
+    consumed / 3.4 km²/yr — production minus the ocean floor's growth, smoothed 10 Myr; resolution-independent;
+    a first try with Σ arc-cell area × convergence varied 13× with the L0 resolution) + LIPs (0.5 wt % CO₂ of
+    their basalt over 1 Myr). Silicate weathering per land cell runoff × e^(0.09(T − 15)) (GEOCARB/WHAK), band
+    changes × e^(0.09ΔT)(1 + 0.038ΔT)^0.65 × (1 − ice share), × (CO₂/280)^0.3, normalized so Earth's relief under
+    the model's present climate at 280 ppm weathers D₀ (`KERNEL_EARTH` 2.845·10⁷, from `climate-dem`).
+    Forcing 5.35 x below 1,000 ppm, Byrne & Goldblatt 2014's 5.32 x + 0.39 x² above 2,000 ppm (checked in their
+    Table 2 by a Sonnet lookup: it gives their 38.1 W/m² at 50,000 ppm), blended between. Gough 1981 sun on the
+    timeline's age (`present_age_gyr` 4.57). Implicit carbon step (bisection), halved down to 1 kyr where CO₂
+    would move by more than half (a first version overshot to 33 ppm after an escape and refroze).
+  - **Clock** (`clock.rs`): per plate step, 100-kyr steps (2 kyr in the window): degassing, carbon, EBM (≤ 10
+    years, warm), each band's ELA shift from its summer land temperature, the ice (a callback), weathering,
+    trackers. Snowball = annual sea-ice cover ≥ 0.95 of the ocean, ends < 0.5; hothouse = global mean > 25 °C;
+    events `deeptime:snowball` (onset/escape CO₂, drawdown factor, tropical land and weathering shares,
+    degassing, sun, causes `weathering_drawdown`/`slow_cooling` and `degassing_buildup`, the escape step's cap
+    carbonate) and `deeptime:hothouse` (caused by its snowball) — EVENTS.md. First step: a starting snapshot,
+    then CO₂ bisected to weathering = degassing on the warm branch (`initial_co2_ppm` 0) or the preset's value.
+    Between snapshots the zonal refs follow the clock's EBM and the published ELA = snapshot ELA + band shift.
+  - **Orbit** (`orbit.rs`): last `orbital_window_myr` (3): obliquity 41 (+53.6) kyr ±1.2°, eccentricity 405/95/
+    124 kyr (0–0.055), perihelion 23 kyr, phases so t = 0 is today's (ε at the preset's tilt, e 0.018, ϖ 283°);
+    `orbital_strength` scales the swing and e (0 = circular: no cycles).
+  - **Ice** (`ice.rs`): Nye's plastic profile √(2τL/ρg) (τ 50 kPa) on the ice mask via an exact separable EDT
+    (Felzenszwalb & Huttenlocher, from the paper), Earth-normalized lengths, capped at 3,000 m (4,000 gave ~2 km
+    snowball sea-level falls against Hoffman et al. 2017's ~1 km); Imbrie & Imbrie lag in the window (growth
+    42.5 kyr, decay 10.6 kyr); glacio-eustasy −(ρ_i/ρ_w)ΔV/A_ocean (2.47 m per 10⁶ km³) against
+    `ice_reference_km3` 1.0·10⁷ (the calibrated Earth-like runs' present ice: 0.74–1.28·10⁷; the model puts 2.5·10⁷
+    on Earth's relief). **Sea level = the preset's curve (its 250- and 36-Myr cycles kept as the tectonic part)
+    + the ice's glacio-eustasy** ("alongside").
+  - **Cap carbonate**: the carbon that weathering removes beyond degassing (the drawdown's alkalinity) is laid as
+    carbonate on sea floor above 4 km (calcite 3.69·10⁻⁵ m³/mol); outside drawdowns it is millimetres.
+  - Removed after trying: snowball dust darkening (Abbot & Pierrehumbert 2010) — with Byrne & Goldblatt's
+    forcing the ice melts on CO₂ alone; `climate.snowball_dust_*` never shipped.
+- **Settings** (editor `adv_climate`, lang keys, all four pipeline presets + built-ins synced): `carbon_cycle`,
+  `initial_co2_ppm`, `degassing_scale`, `weathering_strength`, `solar_brightening`, `present_age_gyr`,
+  `orbital_window_myr`, `orbital_strength`, `glacio_eustasy`, `ice_yield_stress_kpa`. Preset-only (physics,
+  numerics, thresholds, per the catalogue's rule): `weathering_temp_per_k`, `runoff_temp_per_k`,
+  `weathering_co2_exponent`, `hydro_sensitivity_per_k`, `hydro_ref_c`, `carbon_step_kyr`, `ebm_clock_years`,
+  `snowball_on/off_frac`, `hothouse_c`, `orbital_step_kyr`, `ice_max_thickness_m`, `ice_response_kyr`,
+  `ice_reference_km3`. `tools/dev/knob_extremes.py --stage climate --length-myr 100` on the 8 numeric knobs: 16 of
+  16 ok (degassing 0 freezes the planet for good: land −63 °C, all ice — as it must without volcanoes).
+- **Measured** (Mac, heavily shared: load 60–110; gates re-run on the tree merged with master 8bdbedc: core 280 + 3 ignored, Gradle 146/0):
+  `cargo test --workspace --release` all pass (core 274 + 3 ignored; new: carbon ODE balance and mass
+  conservation, sealed build-up 350× in 2–4 Myr, Gough, forcing forms, orbit ranges, Kepler annual mean, EDT
+  exact, Nye/eustasy numbers, Imbrie asymmetry, band margins; clock: Earth-like 40 Myr stays 5–25 °C with no
+  snowball, a tropical supercontinent snowballs under a weathering ramp and escapes by degassing (CO₂ ×20+) into a
+  hothouse caused by it, orbital cycles ≥ 20 swings in 3 Myr on a cold planet and none at strength 0 or when warm;
+  coupled pipeline: every ice field, glacier = ice ≥ 1 m, the surface's sea level = the climate's, the curve and
+  window rows, weathering ≈ degassing at the end, frames carry the ice, resume on 3 threads from 1 identical
+  incl. ice fields, curve and globals), clippy `-D warnings`, fmt, `cargo deny` clean; `./gradlew build test`
+  tests=146 failures=0 (`AdvancedSettingsTest` now round-trips toggles). **Earth check** (`climate-dem`, Earth
+  1° relief): EBM 15.28 °C, glaciated 9.9 %, 19 of 24 cities in the right group (unchanged), Earth ice 2.47·10⁷ km³.
+  **Earth-like 500-Myr runs** (`stage climate --preset pipeline_quick_16k`, scattered seed 1 / supercontinent /
+  scattered seed 3): present T 14.5 / 14.3 / 14.0 °C, CO₂ 217 / 210 / 219 ppm, glaciated land 8.1 / 6.6 / 7.7 %,
+  Köppen A .17/.14/.17 B .27/.26/.24 C .21/.16/.18 D .17/.24/.16 E .18/.20/.25, sea level 27 / 29 / 32 m (curve 25),
+  **no snowball**; over the run CO₂ 157–2,665 ppm, T 10.4–17.8 °C, glaciated land 0–18 %, sea level −174…+132 m,
+  degassing 0.66–2.2× Earth; the window's land ice swings 4.9–8.9 / 4.2–7.3 / 4.4–8.5 %. **Snowball scenario**
+  (supercontinent, 1,000 Myr, `degassing_scale` 0.3): one snowball −807.3 → −760.6 Myr (46.7 Myr), onset after a
+  3.7× CO₂ drawdown to 321 ppm with 87 % of the weathering in the tropics (`weathering_drawdown`), T −38 °C,
+  sea level −1.48 km, escape at 5.5·10⁵ ppm (`degassing_buildup`, ×1,720), a 200-kyr hothouse at 36.6 °C, 16.8 m
+  of cap carbonate; present 12.1 °C, 116 ppm, 22 % glaciated, window swings 13.6–22.6 %. The same scenario on the
+  code one commit earlier (cap carbonate on ≤ 200 m shelves: 180–570 m, too thick) gave 6 snowballs (74, 68,
+  40, 35, 31, 26 Myr), each refreezing ~1 Myr after its hothouse; degassing 0.3 from scattered continents: 3;
+  supercontinent at 0.4: none — near the threshold the history is chaotic. Stage cost: climate 108 s vs plates
+  114 s on 3 loaded threads (P1-05: 12 s vs 37 s): the clock's ~6,500 EBM runs (serial) ≈ 45 %, ice ≈ 17 %.
+- **Review bundle** `review/out/deeptime-climate/` (1.8 MB, not published; `_shot.png` is the page as rendered):
+  CO₂, T, sea ice, land ice, ice volume, sea level, degassing, weathering, sun over the run for the snowball
+  scenario and two Earth-like runs; the window's ice, 65° N summer, obliquity, eccentricity; maps (elevation,
+  ice, sea ice, temperature) before, at, during, at the end of and after the snowball. Looked at: the runaway
+  and the escape are clean; the snowball's continents grow by their exposed shelves.
+- **For Ben** (not asked; the report lists them): (1) glacial cycles are ELA-driven (no ice–elevation feedback
+  or ablation-zone flow), so Earth-like swings are ~4 % of the land and ~10–15 m of sea level, not Earth's
+  10 → 25 % and 120 m; (2) post-snowball drawdown has no supply limit, so low-degassing planets can refreeze
+  within ~1 Myr (Earth's Cryogenian interlude was 9–19 Myr); (3) snowball sea-level falls reach ~1.5 km and the
+  surface keeps eroding under the ice and on exposed shelves (glacial erosion should stop fluvial erosion under
+  ice — the glacial-erosion agent's surface work); (4) escape needs ~0.5 bar CO₂ (the land ice keeps its albedo;
+  Pierrehumbert's GCM needs > 0.2 bar, Hoffman et al. 2017 quote 10⁴–10⁵ ppm); (5) `ice_reference_km3` is the
+  Earth-like runs' present ice (1.0·10⁷), not Earth's own (2.5·10⁷) — Earth's would raise present seas ~35 m;
+  (6) the climate stage now costs ~3× what P1-05 did (`carbon_step_kyr` 200 would halve the clock).
+- **Next.** Merge (the caller lands it). The glacial-erosion agent reads the FORMAT.md ice fields; P1-25's
+  climate API could expose CO₂ and the sea level.
+
 ### 2026-09-29 — Block-scale mountain character, ruggedness setting, the striped-snow fix (agent worktree agent-a2d4bbb2f592ce1d7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Decisions log 2026-09-29 ("Do it now, in Phase 1"): P1-08's 6.8 km peak was a smooth dome, and its
   snowfield had vertical stripes.
@@ -249,6 +560,98 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Deferred / for Ben.** Talus and scree at cliff feet (a surface-block rule the column evaluator would have to
   mirror for parity); overhangs/3D crags (Phase 2). The softening touches 11.7 % of land cells a little.
 - **Next.** Merge into master (the parent).
+
+### 2026-09-29 — EF is ice cap where the glacier model says ice, barren frozen ground elsewhere (agent worktree agent-adda9513719f24370, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** A workbench preview of run 1a0ef97aaca (`earthlike_quick_16k`, MIC, box x 3675…3931, z −3779…−3523, 77–83°N, EF
+  almost everywhere) came out 58 % `terralith:scarlet_mountains`, snowy slopes, `terralith:snowy_badlands`, frozen cliffs. Ben first
+  answered "Yes, EF means ice" and then, when told EF only means "warmest month below 0 °C" and includes ice-free cold desert
+  (Dry Valleys), **"Ice only where there's ice (Recommended)"**: where the glacier/ice-sheet model says ice accumulates, ice biomes;
+  EF too dry for ice, a frozen but barren biome (bare rock, gravel, thin snow; no ice spikes or packed ice; not Scarlet or a warm
+  or red biome); ET unchanged; all in the placement file (decisions log 2026-09-29; the coordinator writes that entry).
+- **Why the plateau was not "flagged glaciated": it was, and the flag is not the problem.** Reproduced the run (same preset, seed 1,
+  supercontinent, 500 Myr; 53,837 EF L1 cells, as `notes.bake.climate.koppen_bands`) and read `climate/glacier`, `ela_m`,
+  `precip_mm`, `t_warm_c` from the climate checkpoint: **46,026 of 53,837 EF cells (85.5 %) have glacier = 1, every cell of the
+  plateau in the box included** (L1 rows 19–34, `glacier` = 1; ELA 660–810 m, summer sea-level temperature about −2 … 0 °C, the
+  ground 1–4 km). Precipitation there is the `precip_min_mm` floor (10.0 mm/yr on the plateau: 2,744 EF cells at ≤ 10.5 mm, 6,432
+  more under 30 mm), and **every one of those 9,176 cells is glaciated**: the ELA rule (Ohmura et al. 1992 as P1-05 solves it,
+  T_ELA(P) = −2.3 °C at P → 0) has no cutoff for dryness, so any polar land whose summer stays under about −2.3 °C is ice
+  wherever it lies above its ELA. Not a bug: East Antarctica is ice at 20–50 mm/yr water equivalent; the fit is extrapolated
+  below its data (its lowest ELAs sit at a few hundred mm) but nothing better is wanted. The 7,811 unglaciated EF cells (14.5 %)
+  are the other kind of EF: median t_warm −0.3 °C (barely EF), median ground 738 m under an ELA of 784 m, 81–89°N, precipitation
+  44–120 mm (p10–p90): low-lying, marginal polar land, the Dry Valleys' kind. ET: 433 of 53,111 cells glaciated. **What the
+  flag did in P1-09:** only capped the temperature band at 0.35, which is a no-op where the class already sits at band 0 (EF's
+  polar ramp gives 0 at t_warm ≤ −20 °C: temperature −1.0, the bottom of the frozen band, glaciated or not). So the biome the pack
+  drew there was decided by the other inputs, not by the flag. **Found on the way:** P/PET is **pinned at 10** for every EF cell
+  (Thornthwaite PET is 0 below freezing), so ET/EF humidity was always the rule's cap (1.95) and never followed the climate.
+- **What the pack does with the frozen band** (probed, not assumed): vanilla `OverworldBiomeBuilder` on `test_planet_real`
+  (GameTest probe, standalone) and Terralith 2.6.2's parameter list (`data/minecraft/dimension/overworld.json`, 1,713 entries;
+  a Python emulation of `Climate.ParameterList` that reproduces the real MIC run to 0.1 %). Tectonic adds no biomes (router
+  only). Vanilla in the frozen band: ice spikes only at humidity band 0 with positive weirdness, snowy slopes at humidity ≤ 1,
+  grove above it, snowy taiga at humidity 3, jagged peaks (weirdness < 0) / frozen peaks (> 0), snowy plains between; the
+  temperature within the band does not matter; **vanilla has no dry frozen biome** (closest: snowy plains, `windswept_gravelly_hills`
+  at erosion 0.45–0.55). Terralith splits the band at temperature −0.727 (coordinate 0.496): **below it every dry cell
+  (humidity < −0.35) is `snowy_badlands`** (white and orange terracotta, red sand: what EF had drawn: 58 % of glaciated EF on
+  the planet), above it the dry cells are `gravel_desert`, `rocky_shrubland`, `cold_shrubland` (gravel, granite, coarse dirt, tuff:
+  the barren frozen biomes); `scarlet_mountains` takes every peak with weirdness −0.93 … −0.4 and humidity above −0.35 (no
+  temperature or humidity within the frozen band avoids it); `frozen_cliffs` only on the coast band; `glacial_chasm` (packed
+  ice) only at erosion ≥ 0.4 (≥ 0.565 whatever the humidity); `ice_spikes` at humidity < −0.35 near the coast (continentalness ≤ 0.03,
+  else nearest fit). Ice biomes Terralith lacks: any inland ice-sheet biome on low or mid erosion.
+- **Design (candidates swept offline over the planet's glaciated and unglaciated EF cells on the Terralith list; the
+  scripts are in the session scratchpad, not committed).** The levers the placement table has are the temperature and humidity
+  band coordinates; the result: temperature 0.55 … 0.9 all alike (upper frozen band, above Terralith's split) and humidity
+  fixed low for ice, fixed 1.5 for barren:
+  | planet-wide EF, Terralith list | ice | snow | barren | other |
+  |---|---|---|---|---|
+  | glaciated, before (t 0, h 1.95) | 5 % | 32 % | 0 % | 63 % (snowy badlands 59 %, scarlet 5 %) |
+  | glaciated, now (t 0.6–0.8, h 0.5, weirdness +) | 41 % | 26 % | 31 % | 2 % (cherry grove) |
+  | not glaciated, before | 2 % | 15 % | 2 % | 81 % (snowy badlands 80 %) |
+  | not glaciated, now (h 1.5) | 26 % | 5 % | 69 % | 0 % |
+  (ice = frozen/jagged peaks, ice spikes, glacial chasm, frozen cliffs; snow = snowy plains and slopes, beaches, frozen ocean;
+  barren = gravel desert, cold/rocky shrubland). Humidity band 2 and up turns the ice sheet into wintry forest, grove and snowy
+  taiga (trees), so ice cap is band 0.5, barren 1.5 (below the band whose variants are taiga and grove, as P1-09's 1.95 cap
+  was). The scarlet peaks are not reachable from temperature or humidity at all, hence the third lever.
+- **Change.** (1) `placement.json`: ramp `polar_ice` (0.6 … 0.8 by the warmest month, −20 → 0 °C), fixed humidity rules
+  `polar_desert` (1.5) and `ice_cap` (0.5), and EF = `{temperature: polar_ice, humidity: polar_desert, glaciated: {humidity:
+  ice_cap}, weirdness: positive}`; ET untouched. (2) Schema (`bake/placement.rs`, FORMAT.md "The climate mapping", no schema
+  version bump: both keys optional): a class may have a **`glaciated` block** (its own temperature and/or humidity where the glacier
+  flag is set; it replaces `glacier_cap` for that class, each key falling back to the class's ordinary one) and
+  **`weirdness: "positive"`** (the class's land keeps the positive branch of the variant noise: vanilla's frozen peaks, never the
+  negative branch's jagged peaks / Terralith's scarlet mountains). `humidity_land` takes the glacier flag; the bake resamples the
+  class's weirdness flag L1 → L2 like the humidity (`Coords.w_pos`). Every other class, ET included, is bit-identical
+  (the "default reproduces the compiled constants" test now covers all classes but EF, and asserts a glaciated `humidity_land` equals
+  the plain one for them). (3) GameTest `climateConsistent` gains a negative check (`BiomeCensus.FORBIDDEN`, `EF:no_red`: EF columns
+  on `snowy_badlands`, `scarlet_mountains`, vanilla badlands ≤ 10 %).
+- **Result on the workbench box** (`preview-area.sh --profile mic --world-data <rebake> --keep-world`, then `deeptime-inspect biomes`
+  on the kept world; 65,121 EF columns of the chunks' stored biomes; the pre-change kept world is jobs/20260929-195758-82h8):
+  | biome | before | after |
+  |---|---|---|
+  | scarlet mountains | 58.3 % | 0 |
+  | snowy badlands | 18.4 % | 0 |
+  | frozen peaks | 0 | 58.3 % |
+  | snowy slopes | 21.3 % | 21.3 % |
+  | gravel desert | 0 | 18.4 % |
+  | frozen cliffs | 2.0 % | 2.0 % |
+  The emulation predicted 60.8 / 20.7 / 17.8 / 0.7 → 60.8 (frozen peaks) / 20.7 / 17.8 (gravel desert) / 0.7. The glacier flag did not
+  change anywhere (the climate stage is untouched; continentalness and erosion layers are bit-identical, the weirdness magnitude is
+  identical and 131,822 L2 cells, all under EF or filled from it, changed sign). The box is one sign region of the 1,024-block variant noise (all negative), so
+  the whole scarlet share becomes frozen peaks; elsewhere half of the EF peaks were already frozen peaks.
+- **Caveats (for Ben).** (a) 18 % of this box, and 31 % of glaciated EF planet-wide, is `gravel_desert` (bare gravel on ice
+  cap): the flat, far-inland glaciated cells, where Terralith has no ice biome at humidity band 0 and, at humidity ≥ 2, only trees;
+  raising the ice-cap humidity to ≥ 2.05 trades it for wintry forest and grove. (b) 21 % of unglaciated EF gets Terralith's
+  `glacial_chasm` (packed ice; erosion-driven, unreachable from temperature or humidity); vanilla gives snowy plains and slopes
+  there (no dry frozen biome exists). (c) `snowy_cherry_grove` (pink, snowy) on about 2 % of glaciated EF at weirdness > 0.93 /
+  0.27–0.4. (d) EF temperature is now 0.6–0.8, warmer in band coordinate than ET's coldest (0.5): only Terralith's split at 0.496
+  reads it (vanilla's band is one). (e) EF humidity no longer follows P/PET (pinned at 10 below freezing); ET's still does.
+- **Gates** (Mac, this branch): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings`, `cargo test
+  --workspace --locked` (core 258 + 3 ignored, cli 30, format 40, inspect 29, …), `cargo deny check licenses bans` clean;
+  `./gradlew build test` 143/0; `./gametest.sh` all 50 passed (`climateConsistent`: E 1.0, E:snow 0.941 against its 0.9 floor: ET's
+  1,765 columns are unchanged code, EF has 29 columns on the small planet, `EF:no_red` 0 of 29); `-PwithMic` all 50 passed
+  (E 1.0, E:snow 1.0, `EF:no_red` 0 of 29; EF there: frozen peaks 59 %, frozen cliffs 31 %, snowy slopes 10 %). **Re-run after
+  merging master 00c02ce** (USGS provinces, coherent-continents decisions): fmt, clippy `-D warnings`, `cargo test --workspace`
+  (core 262 + 3 ignored, cli 30, format 40, inspect 29), deny, `./gradlew build test` 143/0, `./gametest.sh` 50 of 50 and
+  `./gametest.sh -PwithMic` 50 of 50.
+- **Next.** Ben's call on caveat (a) (ice-cap humidity band 0.5 vs ≥ 2.05); the coordinator merges (this branch is not merged).
+  ET is untouched (Scarlet stays on 3 % of ET, as Ben's "keep it" allows outside EF).
 
 ### 2026-09-30 — Geologic provinces: a USGS-style view layer on every keyframe (agent worktree agent-a03fc35a652ae22e4, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben's decision (decisions log 2026-09-29, "Just want the view, don't change world generation"): a

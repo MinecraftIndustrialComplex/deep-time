@@ -253,7 +253,7 @@ pub const FIELDS: &[FieldSpec] = &[
     FieldSpec {
         name: PRECIP,
         units: "mm/yr",
-        range: (0.0, 4000.0),
+        range: (0.0, 3000.0),
         provider: "P1-05 climate",
         meaning: "mean annual precipitation",
     },

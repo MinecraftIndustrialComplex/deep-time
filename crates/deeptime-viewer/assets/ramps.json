@@ -476,14 +476,22 @@
       ]
     },
     "ice": {
-      "_comment": "Glacier thickness, m (surface/glacial.rs): 0 is no ice.",
+      "_comment": "Land-ice thickness, m (climate/ice_thickness_m, ice_max_thickness_m; deep-time climate): dark where there is none.",
       "stops": [
         [0, "#141414"],
-        [1, "#1c3450"],
-        [100, "#3f7fb8"],
-        [500, "#8fc4ea"],
-        [1500, "#d8eefc"],
+        [0.999, "#141414"],
+        [1, "#5f8fb0"],
+        [300, "#9cc3dc"],
+        [1500, "#d4e8f4"],
         [3000, "#ffffff"]
+      ]
+    },
+    "sea_ice": {
+      "_comment": "Sea-ice cover of the sea, 0-1 (climate/sea_ice; deep-time climate).",
+      "stops": [
+        [0, "#10233f"],
+        [0.5, "#5f7f9f"],
+        [1, "#f4f8ff"]
       ]
     },
     "regolith": {
@@ -529,6 +537,11 @@
     "climate/aridity": "aridity",
     "climate/koppen": "koppen",
     "climate/glacier": "unit",
+    "climate/ice_thickness_m": "ice",
+    "climate/ice_max_thickness_m": "ice",
+    "climate/ice_max_extent": "unit",
+    "climate/ice_time_share": "unit",
+    "climate/sea_ice": "sea_ice",
     "climate/ela_m": "relief",
     "deposits/favourability/*": "favourability",
     "deposits/sites": "sites",

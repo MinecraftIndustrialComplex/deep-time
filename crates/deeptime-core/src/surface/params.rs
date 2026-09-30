@@ -25,7 +25,9 @@ pub struct SeaCycle {
 
 /// Eustatic sea level (plan §8.3 item 7: "a curve from the preset"): `base_m` plus the cycles plus
 /// the piecewise-linear `curve` of `[t_myr, m]` points (t relative to world creation, negative in
-/// the past; held flat beyond its ends).
+/// the past; held flat beyond its ends). Its cycles stand for the tectonic sea level (ridge volume,
+/// the supercontinent cycle); with a climate stage the ice's glacio-eustasy is added to it
+/// (`climate::ice`, `climate.glacio_eustasy`) and the surface takes the sum.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct SeaLevel {

@@ -91,3 +91,52 @@ pub fn run(world: &Path, out: &Path, n: usize, seed: u64) -> Result<(usize, usiz
     write_atomic(out, &bytes)?;
     Ok((n, through))
 }
+
+/// Writes the climate parity fixture (`parity/climate.json`, P1-25) when the world has the twelve
+/// months: the climate evaluator (`deeptime_format::ClimateWorld::sample`, what Deep Time's
+/// climate API answers) at `n` blocks — the columns [`pick`] chooses, a third each at the terrain's
+/// top, at sea level and at a random height in the build range. Returns the blocks written, or
+/// None for a world without the months (nothing written).
+pub fn run_climate(
+    world: &Path,
+    out: &Path,
+    n: usize,
+    seed: u64,
+) -> Result<Option<usize>, FormatError> {
+    let Some(cw) = deeptime_format::ClimateWorld::open(world)? else {
+        return Ok(None);
+    };
+    let w = ColumnWorld::open(world)?;
+    let mut rng = SplitMix(seed ^ 0xC11A_7E00);
+    let sea = w.manifest.scale.sea_level_y;
+    let span = (w.max_y - w.min_y + 1) as u64;
+    let samples: Vec<Value> = pick(&w, n, seed)
+        .into_iter()
+        .enumerate()
+        .map(|(k, (x, z))| {
+            let y = match k % 3 {
+                0 => w.sample(x, z).top_y + 1,
+                1 => sea,
+                _ => w.min_y + rng.below(span) as i32,
+            };
+            cw.sample(x, y, z).to_json()
+        })
+        .collect();
+    let doc = json!({
+        "format_version": w.manifest.format_version,
+        "world": w.manifest.source,
+        "circumference": w.c,
+        "lapse_c_per_km": cw.lapse_c_per_km(),
+        "seed": seed.to_string(),
+        "samples": samples,
+    });
+    let bytes = serde_json::to_vec(&doc).map_err(|e| FormatError::Invalid(e.to_string()))?;
+    if let Some(parent) = out.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| FormatError::Io {
+            path: parent.to_owned(),
+            source: e,
+        })?;
+    }
+    write_atomic(out, &bytes)?;
+    Ok(Some(n))
+}
