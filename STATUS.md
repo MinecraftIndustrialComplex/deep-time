@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -78,6 +78,78 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — Continuous strata across cells: stratigraphic keys, a correlating column rule, smoothed stacks; format 0.2 (agent worktree agent-aacd864d2709d52dd, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-29, "Fix now (Recommended)": cross-sections showed the host rock as vertical
+  stripes one L1 cell wide. **Cause** (read from the code and the stacks): the column rule (`raster::stack_at`,
+  Java `Columns.stack`) matched horizons by their *index* in each cell's stack and took every class from the
+  *nearest* cell. Index h is a different unit in neighbouring cells — the stacks hold different units, and the
+  bake merges thin ones and caps K differently per cell — so no bed could continue: classes switched at the
+  nearest-cell line (the walls) and tops of unrelated units were interpolated into each other (the triangles
+  under the P1-08 mountain). Bilinear tops were applied to every horizon; they could not help. Under that, the
+  strata log itself differs a lot from one 16-block cell to the next (it is carried cell by cell through plate
+  motion): neighbouring cells 4.8 km apart hold 60–340-block units of different classes. **The coal-stack
+  picture** (`deeptime-inspect section`, site 44) is a different case: it is the synthetic deposit world
+  (`deposits_world_16k.json`, `"strata": "every-class"`), whose horizon h of cell column i is class
+  (6·i + h) mod 59 by design (P1-12's test pattern), so its stripes are the pattern, not the pipeline.
+- **Design.** (1) **Stratigraphic keys** (`structure::columns::key`): every unit carries a u16 span that orders
+  units the same way in every cell — regolith 0–4095; the strata log 4096 (now) … 32767 (the run's start),
+  linear in age (a layer spans from the base of the layer above to its own base; the top layer to the present
+  where the cell and its neighbours still accumulate at the last step, else only its base age; the young
+  loose part of a layer the upper half of its span); the basement pools by erosion order, 4096 keys each, 512
+  per metamorphic step; the mantle 61440–65535. Every merge in the bake keeps the union. (2) **The column
+  rule** (`deeptime_format::strata`, Java `worlddata/Columns.Stack`): the 4 × 4 cells around a column with
+  uniform cubic B-spline weights; each key's height is the weighted mean of the cells' key→height functions
+  (linear inside a span, flat across a hiatus), so a shared bed is interpolated smoothly and a bed some cells
+  lack thins out towards them; where cells disagree about the rock of the same keys (a facies change) the
+  classes **intertongue** on a 64-key band grid every column shares (shares less a 0.15 soft threshold,
+  stacked by key-span midpoint), so the answer is independent of how intervals are cut: a zero-weight cell
+  changes nothing and columns are continuous across cell edges (a first per-run wedge version was not, and
+  showed rectangles at cell lines). (3) **Smoothed stacks** (`Horizons::smoothed`, in `bake_with`): each
+  cell's stack becomes the Gaussian mean (σ 2.5 cells, 11 × 11) of its neighbours' height functions cut at
+  every key any of them has, each interval the class with the largest weighted thickness; the cell's own
+  surface stays its first top (the P1-08 raise follows, unchanged). σ 1.5 still read as tight folds.
+- **Format 0.2** (`Cargo.toml`, `FORMAT_MINOR`, Java `FormatVersion`): `horizon_stack` cells are 7K bytes (K tops,
+  K classes, K key tops, K key bases; padding keys 65535); column JSON horizons are `[top, class, unit]`; the
+  synthetic worlds give horizon h the span 4096·h … in every cell. FORMAT.md: the 0.2 note, the cell layout,
+  the key space, the column rule step by step (the parity contract), "The 0.2 bake"; `notes.bake.strata.smoothing`.
+  **Java:** `Columns.Stack` caches the 16 stacks of the L1 square it was last asked about (one read per chunk),
+  grows as needed; `StrataPass` sizes its runs per chunk and picks a class's member by `horizonKey(unit, class)`
+  = class + the key's era (top four bits: a bed keeps one block type across columns; a synthetic world's era is
+  its horizon index, as before). `StrataGameTests.everyClassInTheWorld` samples only horizons with blocks to
+  spare (the rule mixes neighbouring columns' classes in as thin tongues). **Tools:** `deeptime-inspect
+  wd-section` (the world data's own cross-section by rock class, legend; no world needed), its `section`
+  overlays use the column rule and skip tops above the ground; the viewer's sections pass `min_y`.
+- **Before/after** (Mac; `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500`
+  on master dc8528e and on the branch — the same history; then `tools/workbench/preview.py run --profile
+  standalone --world-data <bake> --box 2500,2202,2756,2458 --box -320,2312,-64,2568 --box -2900,-1988,-2644,-1732
+  --keep-world` in each checkout and `deeptime-inspect section` along x and z through a coal basin, a 430-block
+  mountain and a northern basin with coal fields). Before: walls one cell wide from the surface to the floor and
+  wedges between them. After: beds run across the sections, pinch out, onlap a basement high, dip gently over
+  the mountain's granite core; coal-seam bodies lie in the shale and sandstone. Review bundle (not published,
+  584 kB): `review/out/strata-continuous/` (index.html; before, after and world-data-only sections of all six
+  planes; hosts JSON).
+- **Measured.** Strata pass painted share (export-area `strata`, rock below the first top that is its horizon's or
+  body's class): before 98.57 / 98.93 / 98.97 % (86,585,695 of 87,609,999 blocks, **98.83 %**), after 98.49 /
+  98.97 / 99.06 % (86,062,219 of 87,053,558, **98.86 %**). Column rule, the strata pass's per-chunk evaluation
+  (`ColumnRuleBenchTest`, planet4k, 936 chunks, single thread, JIT warm): **0.048 → 0.744 ms/chunk** (mean
+  horizons per column 3.6 → 7.6). Chunky on the loaded Mac (other agents' servers; wall, not comparable run to
+  run): before 59 / 71 / 45 ms/chunk, after 104 / 95 / 56 ms/chunk for the three 361-chunk boxes — the rule's
+  0.7 ms cannot explain the difference; the controlled number is the benchmark. Bake strata 0.1–0.4 s → 6.0 s
+  (the smoothing), run 138 s → 149–170 s; mean horizons per cell 3.71 → 5.99; the bake's bytes 78.6 → 86.2 MiB.
+  Deposit bodies are unchanged (their depths are the ledger's); the horizon class at ore-body centres
+  (`deeptime inspect-column`, 354 bodies): coal seams in sedimentary rock 48.7 % → 56.2 %, placer 61 → 72 %,
+  MVT 29 → 43 %, SEDEX 50 → 75 %, porphyry 50 → 44 %.
+- **Gates** — see the next bullet (filled after the final merge).
+- **Decisions for Ben** (not asked): (1) ~44 % of coal-seam bodies sit in basement rock (granodiorite, granite,
+  gneiss) before and after — the stack's depth comes from the ledger, not from the sediment thickness at the site;
+  capping a coal stack at the sedimentary cover would fix it (deposit engine, not strata). (2) `deposits_world_16k`
+  (the coal pictures, workbench previews of runs without a bake) uses the every-class test strata, which will
+  always look striped (now as tongues); switching it to the placeholder strata would make its sections readable.
+  (3) Taste levers, all constants for now: smoothing σ 2.5 cells, band 64 keys, minor share 0.15 — larger σ
+  flattens the undulating beds further (the log's thickness really varies; Phase 1 has no folds, but thickness
+  changes give dips up to ~30° over short distances). (4) The B-spline rule approximates: a cell point shows a
+  blend of its neighbours, not its own stored stack.
+- **Next.** Merge into master (the parent); then the coal-stack depth cap if Ben wants it.
 ### 2026-09-30 — Geologic provinces: a USGS-style view layer on every keyframe (agent worktree agent-a03fc35a652ae22e4, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben's decision (decisions log 2026-09-29, "Just want the view, don't change world generation"): a
   `provinces` keyframe layer, drawn like `regime` or `crust_age`, so the workbench (layer picker, legend, globe, compare)
