@@ -26,8 +26,9 @@
 //! the air beside the water has ground above it (a covered hole), or lies at or below the top the
 //! pass left that neighbour (its water's top, or its ground after the bank rule: only a carver or a
 //! noise cave removes that), and water is
-//! *floating over a cave* when the air under it is at or below the bed Deep Time decided for its
-//! column (the pass leaves every bed solid, so only a carver or a noise cave removes it).
+//! *floating over a cave* when it is in a river, lake or sea column (the pass leaves those full
+//! from their top down to a solid bed, so air under their water was dug out afterwards). The
+//! GameTest `riversHold` checks the pass without carvers, features or caves, with no exemption.
 
 use std::collections::{HashMap, VecDeque};
 
@@ -134,7 +135,9 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                 if is_air(below) {
                     let col = col_of(x, z);
                     let k = col.map(|c| c.kind);
-                    let cave = col.and_then(|c| c.bed).is_some_and(|bed| y - 1 <= bed);
+                    // The pass leaves every river, lake and sea column full from its top down to a
+                    // solid bed; air under such water was dug out afterwards.
+                    let cave = col.is_some_and(|c| c.kind.is_water());
                     if cave {
                         floating_cave += 1;
                     } else {
