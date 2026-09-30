@@ -133,10 +133,10 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   sections, the tuned share-code case now carries a `biomes` section with all twelve keys non-default (`share-codes.json` regenerated on the Mac with
   `share_code_fixture.py`: Rust and Java write the same code; `AdvancedSettingsTest.aTunedPipelineCodeLoadsUnchanged` and the workbench's
   `a_tuned_code_from_the_game_loads_unchanged` read every biome field back and the JSON unchanged).
-- **Gates** (Mac, branch merged with master b1cbc97, which only touched STATUS and review pages): `cargo fmt --check`, `clippy --workspace
+- **Gates** (Mac, run on the branch, then again after merging master 7f907ce, coal seam fields: same numbers): `cargo fmt --check`, `clippy --workspace
   --all-targets --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked --no-fail-fast`: cli 30, core 245 (+3 ignored),
   history_cap 1, format 40, inspect 29 + 2 + 7, jni 7, viewer 5, 0 failed; `cd neoforge && ./gradlew build test`: tests=143 failures=0 (+3);
-  `./gametest.sh --server` (on the merged tree): **All 50 required tests passed** (`climateConsistent`, `bandsAreTheBuilders` among them). Not run: `-PwithMic` (the MIC stall is another agent's).
+  `./gametest.sh --server` (both times): **All 50 required tests passed** (`climateConsistent`, `bandsAreTheBuilders` among them). Not run: `-PwithMic` (the MIC stall is another agent's).
 - **Deviations.** The plan put "anchors in a datapack file"; P1-09 had made them the preset's section, and the placement per class is now that file. The
   ramp form is `base`/`span` (above). `mapping` in the note stays `"p1-09"` (Java checks it).
 - **Left as constants:** the sea's temperature curve, the aridity → humidity anchors, the depth anchors of the sea, the wetland gate and the E6 band's
