@@ -46,6 +46,8 @@ pub struct Setting {
     pub marine_clastic: f64,
     pub carbonate: f64,
     pub evaporite: f64,
+    /// Till and glaciomarine diamict (`glacial.rs`), m.
+    pub glacial: f64,
     /// Net deposition rate, m/Myr.
     pub rate_m_myr: f64,
     /// Land plants exist (the atmosphere clock; coal needs them).
@@ -98,6 +100,7 @@ pub fn classify(s: &Setting, c: &Classes) -> (u16, Kind) {
         (s.lake, 2),
         (s.marine_clastic, 3),
         (s.fluvial, 4),
+        (s.glacial, 5),
     ];
     let total: f64 = parts.iter().map(|p| p.0.max(0.0)).sum();
     let main = parts
@@ -114,6 +117,7 @@ pub fn classify(s: &Setting, c: &Classes) -> (u16, Kind) {
     };
     match main {
         0 if total > 0.0 => evaporite(s.aridity),
+        5 => (c.till, Kind::Clastic),
         1 => {
             if s.aridity < EVAPORITE_ARIDITY && s.depth_m < DOLOMITE_DEPTH_M {
                 (c.dolostone, Kind::Carbonate)
@@ -232,5 +236,13 @@ mod tests {
             ..base
         };
         assert_eq!(classify(&playa, &c).0, c.halite);
+        // A moraine: melt-out debris outweighs the rivers' sand.
+        let moraine = Setting {
+            fluvial: 5.0,
+            glacial: 40.0,
+            t_c: -3.0,
+            ..base
+        };
+        assert_eq!(classify(&moraine, &c), (c.till, Kind::Clastic));
     }
 }

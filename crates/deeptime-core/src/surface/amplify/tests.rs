@@ -91,6 +91,7 @@ fn l2_level() -> Level {
         area: area.iter().map(|&a| a as f32).collect(),
         wgt,
         kfac: vec![1.0; w * h],
+        zs: Vec::new(),
         lake: (0..w * h)
             .map(|c| {
                 u8::from(
@@ -112,6 +113,11 @@ fn cfg(drama: f64) -> Config {
             coarse_iteration_factor: 2.0,
             repair_margin_cells: 8,
             incision_m: 8.0,
+            // A small glacial radius, so that the halo leaves real tiles on the test planet.
+            glacial: glacial::GlacialShape {
+                radius_cells: 5,
+                ..glacial::GlacialShape::default()
+            },
             ..AmplifyParams::default()
         },
         drama,
@@ -168,6 +174,7 @@ fn lake_l3(l2: &Level) -> Vec<u8> {
         wgt: vec![1.0; 4 * l2.w * l2.h],
         kfac: mid.kfac,
         lake: mid.lake,
+        zs: Vec::new(),
     };
     l1.sample(&Win::full(4 * l2.w, 4 * l2.h)).lake
 }
@@ -276,6 +283,36 @@ fn the_flood_repairs_a_pit_nobody_declared_a_lake() {
     );
     assert_eq!(global_sinks(&sink.z, &lake_l3(&l2), 0.0), 0);
     assert_eq!(out.last.sinks, 0);
+}
+
+#[test]
+fn a_glaciated_level_amplifies_the_same_in_tiles_and_on_any_thread_count() {
+    // Ice 250 m thick over the high ground (the young landscape's `young/ice_surface_m`); the
+    // glacial pass (`glacial.rs`) carves, and its radius is in the halo.
+    let mut l2 = l2_level();
+    l2.zs =
+        l2.z.iter()
+            .map(|&z| if z > 900.0 { z + 250.0 } else { z - 1.0 })
+            .collect();
+    let c = cfg(1.0);
+    assert!(c.p.glacial.active() && c.halo() > c.p.glacial.radius());
+    let (whole, whole_out) = run_mem(&l2, &c, plan_whole(), 2);
+    assert!(
+        whole_out.last.glacial_cells > 0,
+        "the glaciers shaped something"
+    );
+    assert_eq!(whole_out.last.sinks, 0);
+    let plan = plan_tiled(&c);
+    assert!(plan.halo * 2 + plan.tile < plan.gw, "real tiles");
+    let (tiled, _) = run_mem(&l2, &c, plan, 4);
+    let (one, _) = run_mem(&l2, &c, plan_whole(), 1);
+    let bits = |v: &[f32]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+    assert_eq!(bits(&whole.z), bits(&tiled.z), "tiles");
+    assert_eq!(bits(&whole.z), bits(&one.z), "threads");
+    // And it differs from the same level without ice.
+    l2.zs.clear();
+    let (plain, _) = run_mem(&l2, &c, plan_whole(), 2);
+    assert_ne!(bits(&whole.z), bits(&plain.z));
 }
 
 #[test]
@@ -848,9 +885,12 @@ fn every_pipeline_preset_adds_little_by_streaming_when_it_must() {
         let crate::preset::PresetBody::Planet(p) = &preset.body else {
             panic!("a planet preset");
         };
-        let world = crate::surface::estimate(p).bytes;
+        // Without the recorded history: under the cap it spills to disk (P1-17), so a stage's
+        // `bytes` can be below the surface's whole estimate on the big presets.
+        let s_est = crate::surface::estimate(p);
+        let world = s_est.bytes - s_est.history_bytes;
         let gib = |b: u64| b as f64 / (1u64 << 30) as f64;
-        let own = amp["bytes"].as_u64().unwrap() - world;
+        let own = amp["base_bytes"].as_u64().unwrap() - world;
         eprintln!(
             "{name}: young {:.2} GiB, amplify {:.2} GiB of which the stage's own {:.2} GiB, {:.0} s on one core",
             gib(young["bytes"].as_u64().unwrap()),
@@ -858,9 +898,10 @@ fn every_pipeline_preset_adds_little_by_streaming_when_it_must() {
             gib(own),
             amp["seconds"].as_f64().unwrap(),
         );
-        // What the amplifier adds to the world stays under 2.5 GiB on every preset: the whole
-        // raster when it fits (71 B a cell: 2.2 GiB at 16k quick), tiles when it does not (32k
-        // full would need 8 GiB whole).
-        assert!(own < (5u64 << 29), "{name}: the stage adds {own} bytes");
+        // What the amplifier adds to the world stays under 2.75 GiB on every preset: the whole
+        // raster when it fits (79 B a cell: 2.5 GiB at 16k quick), tiles when it does not (32k
+        // full would need 8 GiB whole). (2.5 GiB before the glaciers' surface, 4 B a cell in the
+        // window and in each level, `glacial.rs`.)
+        assert!(own < (11u64 << 28), "{name}: the stage adds {own} bytes");
     }
 }

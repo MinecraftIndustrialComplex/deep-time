@@ -53,6 +53,7 @@ pub mod diffusion;
 pub mod events;
 pub mod facies;
 pub mod fields;
+pub mod glacial;
 pub mod grid;
 pub mod lithology;
 pub mod marine;
@@ -117,17 +118,22 @@ pub mod field {
     pub const MATERIAL: &str = "surface/material_m";
     /// Written by the plate model: the feedback it applied, sampled back onto L1, m.
     pub const FEEDBACK_APPLIED: &str = "surface/feedback_applied_m";
+    /// Centre-line thickness of the glaciers of the step's last ice solve, m (`glacial.rs`).
+    pub const ICE: &str = "surface/ice_thickness_m";
+    /// Glacial erosion of the step, m/Myr.
+    pub const GLACIAL_EROSION: &str = "surface/glacial_erosion_m_myr";
 }
 
 /// Keyframe layers (the group adds the plate model's `elevation`, `plates`, `crust_age`,
 /// `regime`; `elevation` shows the surface's).
-pub const KEYFRAME_LAYERS: [&str; 6] = [
+pub const KEYFRAME_LAYERS: [&str; 7] = [
     field::EROSION,
     field::DEPOSITION,
     field::SEDIMENT,
     field::CLASS,
     field::DRAINAGE,
     field::REGOLITH,
+    field::ICE,
 ];
 
 /// Cumulative volumes of the run, km³ (block metric: cell area (r·300 m)²).
@@ -193,6 +199,10 @@ struct Scratch {
     weight: Vec<f32>,
     mix: Vec<[f64; spl::FAMILIES]>,
     fill: marine::FillScratch,
+    /// K with the glaciers' share of each cell taken out (ice, not rivers, erodes under it).
+    kf_eff: Vec<f64>,
+    ice: glacial::IceState,
+    glacial: glacial::GlacialOut,
 }
 
 impl Scratch {
@@ -213,6 +223,9 @@ impl Scratch {
             weight: vec![1.0; n],
             mix: Vec::new(),
             fill: marine::FillScratch::default(),
+            kf_eff: vec![0.0; n],
+            ice: glacial::IceState::default(),
+            glacial: glacial::GlacialOut::default(),
         }
     }
 }
@@ -246,6 +259,10 @@ struct Parts {
     marine: Vec<f32>,
     carbonate: Vec<f32>,
     evaporite: Vec<f32>,
+    /// Till and glaciomarine diamict (`glacial.rs`).
+    till: Vec<f32>,
+    /// Glacial erosion (also in `eroded`).
+    glacial_eroded: Vec<f32>,
     prov_marine: Vec<u16>,
 }
 
@@ -258,6 +275,8 @@ impl Parts {
             marine: vec![0.0; n],
             carbonate: vec![0.0; n],
             evaporite: vec![0.0; n],
+            till: vec![0.0; n],
+            glacial_eroded: vec![0.0; n],
             prov_marine: vec![IN_SITU; n],
         }
     }
@@ -418,7 +437,8 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         + 2 * log // the log and its advected copy
         + 30 * 4 // fields
         + (fields::STEP_FIELDS.len() as u64) * 4 // the frame accumulator
-        + 24; // mix, weights, kinds
+        + 24 // mix, weights, kinds
+        + 21 * 8; // the glaciers' ice state, loads and passes (`glacial.rs`)
     let frames = (p.length_myr() / s.frame_every_myr).ceil().max(1.0) as u64;
     let history = frames * cells * 12; // packed frames, ~12 B/cell after LZ4 (measured in P1-04)
     let steps = p.plate_steps() as f64 * f64::from(s.substeps);
@@ -613,6 +633,44 @@ impl SurfaceStage {
             .unwrap_or(0.0);
         let lat_of = |j: usize| fields::row_lat(&grid, j);
         let clim = climate::snapshot(world, &d, &lat_of, &sc.h, sea);
+        // The glaciers' climate (`glacial.rs`): the ELA of the climate stage; none without it.
+        // The deep-time surface is physics: glaciers as wide as they are (the valley width is the
+        // young landscape's readability setting).
+        let gp = glacial::GlacialParams {
+            valley_width: 1.0,
+            ..p.glacial.clone()
+        };
+        let gravity = self.preset.planet.gravity_m_s2;
+        let ela_z = if gp.active() {
+            glacial::ela_z_from(
+                world
+                    .fields
+                    .get(glacial::source::ELA)
+                    .map(|f| f.data.as_slice()),
+                n,
+                sea,
+                0.0,
+            )
+        } else {
+            None
+        };
+        // The climate's own ice (FORMAT.md, "The climate's ice fields"), when it has it: glaciers
+        // only where it had ice during the step, eroding for the share of the step it stood, and
+        // no rivers under thick ice.
+        let field_n = |name: &str| -> Option<Vec<f32>> {
+            world
+                .fields
+                .get(name)
+                .filter(|f| f.data.len() == n)
+                .map(|f| f.data.clone())
+        };
+        let ice_allowed = field_n(glacial::source::ICE_MAX_THICKNESS)
+            .or_else(|| field_n(glacial::source::ICE_THICKNESS));
+        let ice_share = field_n(glacial::source::ICE_TIME_SHARE);
+        let climate_ice = field_n(glacial::source::ICE_THICKNESS);
+        let precip_m_yr: Vec<f32> = clim.precip_mm.iter().map(|&p| p / 1000.0).collect();
+        let mut gtot = glacial::Totals::read(&world.notes);
+        let mut ice_cells = 0u64;
         let mut open: Vec<f64> =
             sc.h.iter()
                 .map(|&z| if z <= sea { 1.0 } else { 0.0 })
@@ -704,6 +762,40 @@ impl SurfaceStage {
             routing::stack(&d, &sc.kind, &mut sc.routing);
             routing::accumulate(&d, &sc.routing, &sc.weight, &mut sc.area);
             self.time("routing", started);
+            // Under a glacier the ice erodes, not a river: K keeps the ice-free share of a cell.
+            if let Some(ela) = &ela_z {
+                let started = Instant::now();
+                let ic = glacial::IceClimate {
+                    ela_z: ela,
+                    precip_m_yr: &precip_m_yr,
+                    t_c: &clim.t_c,
+                    allowed: ice_allowed.as_deref(),
+                    time_share: ice_share.as_deref(),
+                };
+                sc.ice = std::mem::take(&mut sc.glacial.ice);
+                glacial::ice(
+                    &d,
+                    &sc.routing,
+                    &sc.kind,
+                    &sc.h,
+                    &sc.filled,
+                    sea,
+                    &ic,
+                    &gp,
+                    gravity,
+                    &mut sc.ice,
+                );
+                for c in 0..n {
+                    // The glacier's share of the cell, or the climate's thick ice.
+                    let thick = climate_ice.as_ref().map_or(0.0, |v| {
+                        crate::climate::ebm::smoothstep(10.0, 100.0, f64::from(v[c]))
+                    });
+                    sc.kf_eff[c] = sc.kf[c] * (1.0 - sc.ice.cover[c].max(thick)).max(0.0);
+                }
+                self.time("glacial", started);
+            } else {
+                sc.kf_eff.copy_from_slice(&sc.kf);
+            }
             let started = Instant::now();
             let input = spl::SplInput {
                 kind: &sc.kind,
@@ -711,7 +803,7 @@ impl SurfaceStage {
                 filled: &sc.filled,
                 base_z: &sc.base_z,
                 area: &sc.area,
-                kf: &sc.kf,
+                kf: &sc.kf_eff,
             };
             let rep = spl::solve(&d, &sc.routing, &input, &spl_p, &mut sc.h_new, &mut sc.qin);
             iterations += rep.iterations as u64;
@@ -766,6 +858,85 @@ impl SurfaceStage {
                 }
             }
             self.time("marine_fill", started);
+
+            // Glaciers: erosion, till, and their loads into lakes and the sea (`glacial.rs`).
+            if let Some(ela) = &ela_z {
+                let started = Instant::now();
+                let ic = glacial::IceClimate {
+                    ela_z: ela,
+                    precip_m_yr: &precip_m_yr,
+                    t_c: &clim.t_c,
+                    allowed: ice_allowed.as_deref(),
+                    time_share: ice_share.as_deref(),
+                };
+                let mut g = std::mem::take(&mut sc.glacial);
+                // One ice state, not two: the cover's solve hands its arrays on.
+                g.ice = std::mem::take(&mut sc.ice);
+                let above: Vec<bool> = sc.h.iter().map(|&z| z >= sea).collect();
+                glacial::step(
+                    &d,
+                    &sc.routing,
+                    &sc.kind,
+                    &sc.filled,
+                    sea,
+                    &ic,
+                    &gp,
+                    gravity,
+                    dts,
+                    &mut sc.h,
+                    &mut g,
+                );
+                #[allow(clippy::needless_range_loop)]
+                for c in 0..n {
+                    let e = g.eroded[c] as f32;
+                    parts.eroded[c] += e;
+                    parts.glacial_eroded[c] += e;
+                    parts.till[c] += g.till[c] as f32;
+                    parts.lake[c] += g.lake[c] as f32;
+                    if above[c] && sc.h[c] < sea && g.eroded[c] > 0.0 {
+                        gtot.cut_below_sea_cells += 1;
+                    }
+                }
+                let sea_mask: Vec<bool> = sc.kind.iter().map(|&k| k == BASE).collect();
+                for m in 0..n {
+                    let (ice_load, melt_load) = (g.sea_ice_load[m], g.sea_melt_load[m]);
+                    if ice_load > 0.0 {
+                        to_sea += ice_load;
+                        marine::fill(
+                            &d,
+                            &sea_mask,
+                            m,
+                            ice_load,
+                            &fill_p,
+                            &mut sc.h,
+                            &mut parts.till,
+                            &mut sc.fill,
+                        );
+                    }
+                    if melt_load > 0.0 {
+                        to_sea += melt_load;
+                        marine::fill(
+                            &d,
+                            &sea_mask,
+                            m,
+                            melt_load,
+                            &fill_p,
+                            &mut sc.h,
+                            &mut parts.marine,
+                            &mut sc.fill,
+                        );
+                    }
+                }
+                let km3 = 1.0e-9;
+                gtot.eroded_km3 += g.eroded_m3 * km3;
+                gtot.till_km3 += g.till_m3 * km3;
+                gtot.lake_km3 += g.lake_m3 * km3;
+                gtot.sink_km3 += g.sink_m3 * km3;
+                gtot.sea_km3 += g.sea_m3 * km3;
+                ice_cells = ice_cells.max(g.ice.cells as u64);
+                sc.glacial = g;
+                self.time("glacial", started);
+            }
 
             // Carbonates and evaporites.
             let started = Instant::now();
@@ -889,6 +1060,7 @@ impl SurfaceStage {
                         marine_clastic: f64::from(parts.marine[c]),
                         carbonate: f64::from(parts.carbonate[c]),
                         evaporite: f64::from(parts.evaporite[c]),
+                        glacial: f64::from(parts.till[c]),
                         rate_m_myr: dm / dt_myr,
                         land_plants: true,
                     };
@@ -900,6 +1072,7 @@ impl SurfaceStage {
                         }
                         let (class, kind) = facies::classify(&setting, &cls);
                         let prov = match kind {
+                            _ if class == cls.till => IN_SITU,
                             Kind::Clastic | Kind::Euxinic => {
                                 if f64::from(parts.marine[c])
                                     >= f64::from(parts.fluvial[c] + parts.lake[c])
@@ -1050,6 +1223,38 @@ impl SurfaceStage {
         put(world, field::REGOLITH, st.regolith_m.clone());
         put(world, field::FEEDBACK, feedback);
         put(world, field::MATERIAL, material);
+        let ice_now: Vec<f32> = if ela_z.is_some() && sc.glacial.ice.footprint.len() == n {
+            // Over the glaciers' whole width, on the ground as it now is.
+            (0..n)
+                .map(|c| {
+                    let s = sc.glacial.ice.footprint[c];
+                    if s.is_finite() {
+                        (s - sc.h[c]).max(0.0) as f32
+                    } else {
+                        0.0
+                    }
+                })
+                .collect()
+        } else {
+            vec![0.0; n]
+        };
+        let g_rate: Vec<f32> = parts
+            .glacial_eroded
+            .iter()
+            .map(|&e| (f64::from(e) / dt_myr) as f32)
+            .collect();
+        if ela_z.is_some() {
+            if ice_cells > 0 {
+                gtot.steps_with_ice += 1;
+            }
+            gtot.ice_cells_max = gtot.ice_cells_max.max(ice_cells);
+            gtot.ice_cells_last = ice_cells;
+            let fastest = g_rate.iter().copied().fold(0.0f32, f32::max);
+            gtot.max_rate_m_myr = gtot.max_rate_m_myr.max(f64::from(fastest));
+            gtot.write(&mut world.notes);
+        }
+        put(world, field::ICE, ice_now);
+        put(world, field::GLACIAL_EROSION, g_rate);
         world.fields.remove(field::FEEDBACK_APPLIED);
         self.time("outputs", started);
 

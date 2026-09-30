@@ -154,6 +154,8 @@ pub struct SurfaceParams {
     /// scales the amplifier's thermal critical slope (`thermal::critical_slope`) and the
     /// amplitude of the sub-cell detail term (`detail.rs`).
     pub drama: f64,
+    /// Glacial erosion, till and fjords (`glacial.rs`; Ben, 2026-09-29).
+    pub glacial: super::glacial::GlacialParams,
 }
 
 impl Default for SurfaceParams {
@@ -192,6 +194,7 @@ impl Default for SurfaceParams {
             transgression_frac: 0.04,
             spl_max_iter: 6,
             drama: 1.0,
+            glacial: super::glacial::GlacialParams::default(),
         }
     }
 }
@@ -274,6 +277,7 @@ impl SurfaceParams {
             "drama",
             "must be in [0, 2]",
         )?;
+        self.glacial.validate()?;
         for c in &self.sea_level.cycles {
             check(
                 c.amplitude_m.is_finite() && c.period_myr > 0.0,
