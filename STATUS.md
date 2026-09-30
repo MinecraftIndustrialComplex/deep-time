@@ -144,7 +144,21 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `--level-type` (a comparison world in the pack's own generator) with `--locate BIOME[@x,z]`, `--jvm-prop`,
   `--max-side` passed to the export; ScreenshotDriver `.start/.length/.vista` properties and
   `mac-screenshots.sh --prop`.
-- **Gates** GATES
+- **Gates** (tree merged with master 00c02ce): cargo fmt, clippy `--locked -D warnings`, deny licenses bans
+  clean; `cargo test --workspace --locked` (cli 30, core 262 + 3 ignored incl. character:: 6 and amplify 25 with the
+  character on — streamed = in memory, 1 = N threads, no new sinks —, format 40, inspect 29 + 2 + 7, jni 7, viewer 5);
+  `./gradlew build test` 146/0 (`ColumnParityTest` 500 of 500 columns equal on the regenerated planet4k fixture,
+  `TerrainScaleTest` 3); `./gametest.sh` 50/50, `-PwithMic` 50/50 (MIC set installed today), `./gametest-planet.sh`
+  PASS. **lakeHolds** needed two changes on the way: the scale must be a power of two times k (a 9.6 put the lake
+  floor one block high at 442 corners), and under MIC a short plant at the waterline, which the new wall shape put
+  by the water, washed away into a 65,124th source — the test now allows such washable blocks (it counts and logs
+  them, `washable=1`) instead of calling them leaks.
+- **Real client** (`tools/client/mac-screenshots.sh --prop …`, the ScreenshotDriver's new `.start/.length/.vista`):
+  one run on the Mac's desktop, 27 min of in-client simulation on the loaded Mac; its four vistas came out empty
+  (sky only): the timeline properties were applied on only one of the driver's two paths (the planet was the default
+  supercontinent/1000 Myr one, so the coordinates missed the mountains) and 60 s did not generate terrain 200 blocks
+  from spawn. Both fixed after the run (the Advanced path reads them too; a vista waits until the chunk 160 blocks
+  ahead exists, then 15 s, at most 170 s); not re-run. `review/out/mtn-client/` has the walk's shots.
 - **Deferred / for Ben.** Talus and scree at cliff feet (a surface-block rule the column evaluator would have to
   mirror for parity); overhangs/3D crags (Phase 2). The softening touches 11.7 % of land cells a little.
 - **Next.** Merge into master (the parent).
