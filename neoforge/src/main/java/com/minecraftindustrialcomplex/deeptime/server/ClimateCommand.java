@@ -17,8 +17,9 @@ import java.util.Locale;
 
 /**
  * {@code /deeptime climate [pos]} (P1-25): what the public climate API ({@link DeepTimeClimate})
- * answers at a block, as a chat line and as one JSON line in the server log
- * ({@code [deeptime-climate] {...}}) for scripts comparing it with other mods' temperatures.
+ * answers at a block, as a chat line and as one JSON probe line in the server log
+ * ({@code [deeptime-probe] {"probe": "climate", ...}}, what the smoke harness records) for scripts
+ * comparing it with other mods' temperatures.
  */
 public final class ClimateCommand {
 
@@ -71,7 +72,7 @@ public final class ClimateCommand {
                     pos.getX(), pos.getY(), pos.getZ(), s.koppen(), s.meanC(), s.warmestMonthC(), s.coldestMonthC(),
                     s.annualPrecipitationMm(), s.elevationMetres());
         }
-        DeepTime.LOGGER.info("[deeptime-climate] {}", o);
+        DeepTime.LOGGER.info("{}{}", DeepTimeCommands.PROBE_PREFIX, o);
         source.sendSuccess(() -> Component.literal(text), false);
         return s == null ? 0 : 1;
     }
