@@ -167,8 +167,10 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                         // carver or a noise cave dug it out afterwards).
                         leaks_cave += 1;
                         if samples.len() < 40 {
-                            samples.push(json!({"what": "leak into a cave", "at": [x, y, z], "state": key,
-                                                "into": [x + dx, y, z + dz]}));
+                            samples.push(
+                                json!({"what": "leak into a cave", "at": [x, y, z], "state": key,
+                                                "into": [x + dx, y, z + dz]}),
+                            );
                         }
                     } else {
                         leaks += 1;

@@ -104,7 +104,8 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
             );
             out.layer(wd, &vec![network::NODATA; grid.cells()])?;
             let mut seen = false;
-            out.layers.retain(|l| l != "water_level" || !std::mem::replace(&mut seen, true));
+            out.layers
+                .retain(|l| l != "water_level" || !std::mem::replace(&mut seen, true));
         }
         return Ok(Water {
             note: json!({"enabled": false, "why": "hydro.enabled is false: no lakes or rivers"}),
