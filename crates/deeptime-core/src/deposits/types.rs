@@ -279,12 +279,24 @@ pub struct GradeDist {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Clustering {
-    /// Only `thomas` in v1.
+    /// `thomas`: camps with Gaussian offspring and a hard minimum spacing; `adjoining`: no
+    /// camps and no minimum spacing, deposits fill the tract and only their plan footprints
+    /// (ellipses) may not overlap (coal seam fields in a basin, 2026-09-29).
     pub model: String,
-    /// Minimum spacing of camp centres (km, block metric).
+    /// Minimum spacing of camp centres (km, block metric); unused by `adjoining`.
+    #[serde(default)]
     pub camp_spacing_km: f64,
-    /// Standard deviation of a deposit's offset from its camp centre (km).
+    /// Standard deviation of a deposit's offset from its camp centre (km); unused by
+    /// `adjoining`.
+    #[serde(default = "one")]
     pub cluster_radius_km: f64,
+}
+
+impl Clustering {
+    /// Whether deposits adjoin (footprints touch but never overlap) instead of clustering.
+    pub fn adjoining(&self) -> bool {
+        self.model == "adjoining"
+    }
 }
 
 /// Sizing (plan §8.6 steps 2–4).
@@ -429,6 +441,36 @@ pub struct Geometry {
     pub extra_bodies: Vec<ExtraBody>,
     #[serde(default)]
     pub children: Vec<ChildDef>,
+    /// A stack of seams: the deposit is several parallel bodies of the ore body's footprint at
+    /// different depths, its tonnage split across them (coal measures).
+    #[serde(default)]
+    pub stack: Option<Stack>,
+}
+
+/// A stack of parallel seams in one deposit (`geometry.stack`). The number of seams follows the
+/// thickness of the coal measures the history laid down under the site: the sediment that
+/// accumulated while the cell was coal-forming (deposition × time, weighted by the cell's
+/// favourability F), divided by `seam_spacing_m` and clamped to `min_seams..=max_seams`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Stack {
+    /// Typical thickness of coal measures per minable seam (m).
+    pub seam_spacing_m: f64,
+    pub min_seams: u32,
+    pub max_seams: u32,
+    /// The thinnest minable seam (m): the count is also capped at cumulative thickness ÷ this
+    /// (Circular 891: 28 in for bituminous reserve base), 0 = no cap.
+    #[serde(default)]
+    pub min_seam_m: f64,
+    /// σ of the log of each seam's share of the tonnage (0 = equal seams).
+    #[serde(default)]
+    pub share_sigma: f64,
+    /// σ of the log of the gap between neighbouring seams (0 = even spacing).
+    #[serde(default)]
+    pub gap_sigma: f64,
+    /// Playability enlargement of the gaps between seams in blocks (like `size_mult_v` for
+    /// thickness): a 30 m gap is 1.5 blocks at 20 m per block, too tight to tell seams apart.
+    pub spacing_mult_v: f64,
 }
 
 /// What erosion does (plan §8.6 step 6).
@@ -965,10 +1007,31 @@ impl DepositType {
         if !(0.0..1.0).contains(&s.tract_threshold) {
             return Err("sizing.tract_threshold must lie in [0, 1)".into());
         }
-        if s.clustering.model != "thomas"
+        if !matches!(s.clustering.model.as_str(), "thomas" | "adjoining")
             || !(s.clustering.camp_spacing_km >= 0.0 && s.clustering.cluster_radius_km > 0.0)
         {
-            return Err("sizing.clustering: model thomas with radii ≥ 0".into());
+            return Err(
+                "sizing.clustering: model thomas or adjoining, camp spacing ≥ 0, cluster radius > 0"
+                    .into(),
+            );
+        }
+        if let Some(k) = &self.geometry.stack {
+            let ok = k.seam_spacing_m > 0.0
+                && k.min_seams >= 1
+                && k.max_seams >= k.min_seams
+                && k.min_seam_m >= 0.0
+                && k.share_sigma >= 0.0
+                && k.gap_sigma >= 0.0
+                && k.spacing_mult_v > 0.0;
+            if !ok {
+                return Err("geometry.stack: seam_spacing_m > 0, 1 ≤ min_seams ≤ max_seams, sigmas ≥ 0, spacing_mult_v > 0".into());
+            }
+            if self.formation_time != FormationTime::Peak {
+                return Err(
+                    "geometry.stack needs formation_time peak (it reads the favourability hazard)"
+                        .into(),
+                );
+            }
         }
         if Shape::from_name(&self.geometry.shape).is_none() {
             return Err(format!(
