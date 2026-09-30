@@ -12,9 +12,8 @@
 //! 2. **Lake.** `level` is the `water_level` layer by the shore rule (its nearest cell, else the
 //!    nearest wet cell within `reach` blocks; Java `WaterLevels.levelAt`). Where
 //!    `ground` < `top` = ⌈level⌉ − 1 the column holds lake water from `ground` + 1 to `top`.
-//! 3. **Sea.** Otherwise, where `surface` < sea level − 1 (strictly: a flat exactly at the sea's
-//!    top face is often left dry by the aquifer), the aquifer's sea covers it (`top` = sea level −
-//!    1); nothing here places that water.
+//! 3. **Sea.** Otherwise, where `ground` < sea level − 1, the sea covers it (`top` = sea level − 1):
+//!    the aquifer's water, which the game's pass tops up where the aquifer left the column dry.
 //! 4. **River.** Otherwise, where a channel covers the column ([`crate::rivers::Rivers::sample`]),
 //!    the water surface w gives `top` = ⌈w⌉ − 1 and the bed is cut (or filled) to
 //!    `bed` = min(top − 1, ⌊w − max(1, depth · (1 − (d / hw)²))⌋): a parabolic cross-section, at
@@ -186,9 +185,7 @@ pub fn core_with_surface(
         }
     }
     let sea_top = spec.sea_level_y - 1;
-    // Strictly below: ground exactly at the sea's top face (a flat at sea level − 1) is often left
-    // dry by the aquifer, so it counts as land.
-    if surface < f64::from(sea_top) {
+    if ground < sea_top {
         out.kind = WaterKind::Sea;
         out.top = sea_top;
         out.bed = ground;
