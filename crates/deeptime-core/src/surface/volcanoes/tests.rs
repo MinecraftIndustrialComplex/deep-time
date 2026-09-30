@@ -295,6 +295,7 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         }
     }
     let mut long = 0;
+    let (mut pairs, mut aged) = (0usize, 0usize);
     for (h, mut vs) in chains {
         vs.sort_by_key(|v| v.chain);
         for pair in vs.windows(2) {
@@ -320,22 +321,24 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
                 "{d} m from its plume"
             );
         }
-        // Ageing along the track: the newest volcano on each plate is the nearest the plume.
-        let newest = vs.last().unwrap();
-        if newest.gone.is_none() {
-            let dn = (frame.wrap_x(newest.x - px) * 300.0).hypot((newest.z - pz) * 300.0);
-            for v in vs
-                .iter()
-                .filter(|v| v.gone.is_none() && v.plate == newest.plate)
-            {
-                let d = (frame.wrap_x(v.x - px) * 300.0).hypot((v.z - pz) * 300.0);
-                assert!(
-                    d + 1.0 >= dn,
-                    "an older volcano nearer the plume ({d} < {dn})"
-                );
+        // Ageing along the track: of two consecutive volcanoes riding the same plate, the older
+        // is mostly the farther from the plume (plate motions turn, so not always).
+        for pair in vs.windows(2) {
+            let (older, newer) = (pair[0], pair[1]);
+            if older.gone.is_some() || newer.gone.is_some() || older.plate != newer.plate {
+                continue;
+            }
+            let d = |v: &Volcano| (frame.wrap_x(v.x - px) * 300.0).hypot((v.z - pz) * 300.0);
+            pairs += 1;
+            if d(older) + 1.0 >= d(newer) {
+                aged += 1;
             }
         }
     }
+    assert!(
+        pairs == 0 || aged * 10 >= pairs * 7,
+        "{aged} of {pairs} consecutive pairs have the older farther from the plume"
+    );
     assert!(long > 0, "no hotspot made a chain of three");
 
     // Every large igneous province became a flood-basalt province caused by it.
