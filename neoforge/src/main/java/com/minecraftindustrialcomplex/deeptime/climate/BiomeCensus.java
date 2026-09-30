@@ -68,12 +68,24 @@ public final class BiomeCensus {
             new Check("Dfc:taiga", "Dfc", k -> k == 27, List.of(c("is_taiga"), c("is_tree/coniferous"))),
             new Check("E:snow", "ET EF", k -> k == 29 || k == 30, List.of(c("is_snowy"), c("is_icy"))));
 
+    /** A Köppen family and biomes it must not land on (the share of its columns that do is bounded). */
+    public record Forbid(String name, String classes, IntPredicate koppen, java.util.Set<String> biomes) {}
+
+    /**
+     * EF is ice cap where the glacier model puts ice and barren frozen ground elsewhere (Ben, 2026-09-29,
+     * "Ice only where there's ice"): never Terralith's red, terracotta snowy badlands or its scarlet
+     * (Nether-stone) mountains, and never a warm badlands.
+     */
+    public static final List<Forbid> FORBIDDEN = List.of(
+            new Forbid("EF:no_red", "EF", k -> k == 30, java.util.Set.of("terralith:snowy_badlands", "terralith:scarlet_mountains",
+                    "minecraft:badlands", "minecraft:eroded_badlands", "minecraft:wooded_badlands")));
+
     public static final String[] KOPPEN = {"Af", "Am", "Aw", "As", "BWh", "BWk", "BSh", "BSk", "Csa", "Csb", "Csc", "Cwa", "Cwb",
             "Cwc", "Cfa", "Cfb", "Cfc", "Dsa", "Dsb", "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb", "Dfc", "Dfd", "ET", "EF",
             "sea"};
 
     /** Counts per check: matching columns, columns. */
-    public record Result(Map<String, int[]> checks, JsonObject json) {
+    public record Result(Map<String, int[]> checks, Map<String, int[]> forbidden, JsonObject json) {
         public double share(String check) {
             int[] c = checks.get(check);
             return c == null || c[1] == 0 ? Double.NaN : c[0] / (double) c[1];
@@ -81,6 +93,17 @@ public final class BiomeCensus {
 
         public int total(String check) {
             int[] c = checks.get(check);
+            return c == null ? 0 : c[1];
+        }
+
+        /** The share of a {@link #FORBIDDEN} family's columns that landed on a forbidden biome. */
+        public double forbiddenShare(String name) {
+            int[] c = forbidden.get(name);
+            return c == null || c[1] == 0 ? Double.NaN : c[0] / (double) c[1];
+        }
+
+        public int forbiddenTotal(String name) {
+            int[] c = forbidden.get(name);
             return c == null ? 0 : c[1];
         }
     }
@@ -108,6 +131,9 @@ public final class BiomeCensus {
         Map<String, int[]> checks = new LinkedHashMap<>();
         for (Check ch : CHECKS)
             checks.put(ch.name(), new int[2]);
+        Map<String, int[]> forbidden = new LinkedHashMap<>();
+        for (Forbid f : FORBIDDEN)
+            forbidden.put(f.name(), new int[2]);
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
         for (int j = 0; j < h; j++) {
             int z = -c / 4 + step / 2 + j * step;
@@ -146,6 +172,14 @@ public final class BiomeCensus {
                                 break;
                             }
                     }
+                    for (Forbid f : FORBIDDEN) {
+                        if (!f.koppen().test(k))
+                            continue;
+                        int[] n = forbidden.get(f.name());
+                        n[1]++;
+                        if (f.biomes().contains(nameOf(b)))
+                            n[0]++;
+                    }
                     classBiomes.computeIfAbsent(k, kk -> new HashMap<>()).merge(idx, 1, Integer::sum);
                 }
             }
@@ -170,6 +204,20 @@ public final class BiomeCensus {
             cj.add(ch.name(), e);
         }
         o.add("checks", cj);
+        JsonObject fj = new JsonObject();
+        for (Forbid f : FORBIDDEN) {
+            int[] n = forbidden.get(f.name());
+            JsonObject e = new JsonObject();
+            e.addProperty("classes", f.classes());
+            e.addProperty("columns", n[1]);
+            e.addProperty("forbidden", n[0]);
+            e.addProperty("share", n[1] == 0 ? null : Math.round(n[0] * 1000.0 / n[1]) / 1000.0);
+            JsonArray names = new JsonArray();
+            f.biomes().stream().sorted().forEach(names::add);
+            e.add("biomes", names);
+            fj.add(f.name(), e);
+        }
+        o.add("forbidden", fj);
         // The five commonest biomes of each Köppen class present.
         JsonObject top = new JsonObject();
         for (int k = 0; k < 32; k++) {
@@ -220,7 +268,7 @@ public final class BiomeCensus {
             Files.writeString(mapFile, map.toString(), StandardCharsets.UTF_8);
             o.addProperty("file", mapFile.toString());
         }
-        return new Result(checks, o);
+        return new Result(checks, forbidden, o);
     }
 
     static String nameOf(Holder<Biome> b) {
