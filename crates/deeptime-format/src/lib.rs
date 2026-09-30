@@ -19,6 +19,7 @@ pub mod manifest;
 pub mod ramps;
 pub mod raster;
 pub mod sites;
+pub mod strata;
 pub mod tilepack;
 
 pub use bodies::{Body, BodyId, Shape, Zone};

@@ -154,7 +154,7 @@ pub fn write_bundle_with(
         for vj in 0..vh {
             for vi in 0..vw {
                 let used = (0..d.stack_depth.unwrap_or(0))
-                    .take_while(|&h| st.layer.horizon(vi * stride, vj * stride, h).1 != 255)
+                    .take_while(|&h| st.layer.horizon(vi * stride, vj * stride, h).is_used())
                     .count() as u32;
                 k = k.max(used);
             }
@@ -164,9 +164,9 @@ pub fn write_bundle_with(
         for h in 0..k {
             for vj in 0..vh {
                 for vi in 0..vw {
-                    let (t, c) = st.layer.horizon(vi * stride, vj * stride, h);
-                    tops.extend_from_slice(&t.to_le_bytes());
-                    classes.push(c);
+                    let s = st.layer.horizon(vi * stride, vj * stride, h);
+                    tops.extend_from_slice(&s.top.to_le_bytes());
+                    classes.push(s.class);
                 }
             }
         }

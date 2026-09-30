@@ -53,7 +53,19 @@ public final class Tile {
 
     /** Horizon k's class index (0–255) at tile-local (ci, cj) of a horizon-stack tile. */
     public int horizonClass(int ci, int cj, int k) {
-        int depth = cellBytes / 3;
+        int depth = cellBytes / 7;
         return data.get((cj * width + ci) * cellBytes + 2 * depth + k) & 0xFF;
+    }
+
+    /** Horizon k's stratigraphic key top (0–65535) at tile-local (ci, cj) of a horizon-stack tile. */
+    public int horizonKeyTop(int ci, int cj, int k) {
+        int depth = cellBytes / 7;
+        return data.getShort((cj * width + ci) * cellBytes + 3 * depth + 2 * k) & 0xFFFF;
+    }
+
+    /** Horizon k's stratigraphic key base (0–65535) at tile-local (ci, cj) of a horizon-stack tile. */
+    public int horizonKeyBase(int ci, int cj, int k) {
+        int depth = cellBytes / 7;
+        return data.getShort((cj * width + ci) * cellBytes + 5 * depth + 2 * k) & 0xFFFF;
     }
 }
