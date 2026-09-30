@@ -19,7 +19,7 @@ public record LayerDesc(String name, DType dtype, double scale, double offset, S
     public enum DType {
         U8(1), I8(1), U16(2), I16(2), U32(4), F32(4), HORIZON_STACK(0);
 
-        /** Bytes per cell of a scalar type; 0 for the horizon stack (3K). */
+        /** Bytes per cell of a scalar type; 0 for the horizon stack (7K, format 0.2). */
         public final int bytes;
 
         DType(int bytes) {
@@ -70,7 +70,7 @@ public record LayerDesc(String name, DType dtype, double scale, double offset, S
     }
 
     public int cellBytes() {
-        return dtype == DType.HORIZON_STACK ? 3 * stackDepth : dtype.bytes;
+        return dtype == DType.HORIZON_STACK ? 7 * stackDepth : dtype.bytes;
     }
 
     public int tilesX() {

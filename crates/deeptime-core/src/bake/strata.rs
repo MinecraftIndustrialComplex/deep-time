@@ -58,6 +58,11 @@ pub fn bake(
         "top_raised_cells": raised,
         "top_raise_blocks_max": max_raise,
         "top_rule": "the first horizon's top is at least the highest elevation plus the highest detail amplitude over the L3 cells within two L1 cells, plus one block",
+        "smoothing": {
+            "sigma_cells": bake_horizons::SMOOTH_SIGMA_CELLS,
+            "radius_cells": bake_horizons::SMOOTH_RADIUS_CELLS,
+            "rule": "each cell's stack is the Gaussian-weighted mean of its neighbours' height functions, cut at every key any of them has, each interval the class of the largest weighted thickness; the cell's own surface stays its first top",
+        },
     }))
 }
 

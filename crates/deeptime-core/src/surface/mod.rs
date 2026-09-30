@@ -22,7 +22,8 @@
 //!
 //! # One step (Δt = the plate step, `substeps` LEM steps inside it)
 //! 1. Advect the offset, regolith and strata log; clear them on crust born this step.
-//! 2. h = plate elevation + offset; sea level from the preset (`params::SeaLevel`); climate
+//! 2. h = plate elevation + offset; sea level from the preset (`params::SeaLevel`), or, with a
+//!    climate stage, its eustatic sea level (the curve plus glacio-eustasy); climate
 //!    (`climate.rs`: the climate stage's fields, which it wrote just before this step on the same
 //!    ground, when the preset has a `climate` section (P1-05), else the stand-in).
 //! 3. Per LEM step: the sea is the base level; priority-flood (`pflood.rs`), D8 routing and the
@@ -387,6 +388,10 @@ fn dominant(mix: &[f64; spl::FAMILIES]) -> Option<u16> {
     Some(strata_log::provenance(k, v / tot))
 }
 
+/// The climate's drawdown carbonate settles on sea floor this shallow, m: above the carbonate
+/// compensation depth (~4–5 km today), where calcite is preserved.
+pub const CARBONATE_FLOOR_M: f64 = 4000.0;
+
 /// Regolith at least this thick is the surface rock (for erodibility, diffusivity and the
 /// `surface/class` layer), m.
 pub const REGOLITH_SHOWS_M: f32 = 10.0;
@@ -591,7 +596,20 @@ impl SurfaceStage {
             .enumerate()
             .for_each(|(c, h)| *h = f64::from(pf.elevation[c]) + f64::from(st.offset_m[c]));
         let h_start = sc.h.clone();
-        let sea = p.sea_level.at(t_end_myr);
+        // Sea level: the climate stage's when it ran this step (the curve plus glacio-eustasy:
+        // ice sheets lower the sea and expose the shelves, `climate::ice`), else the curve.
+        let sea = world
+            .globals
+            .get(crate::climate::SEA_LEVEL_GLOBAL)
+            .copied()
+            .filter(|z| z.is_finite())
+            .unwrap_or_else(|| p.sea_level.at(t_end_myr));
+        let cap_m = world
+            .globals
+            .get(crate::climate::CAP_CARBONATE_GLOBAL)
+            .copied()
+            .filter(|x| x.is_finite() && *x > 0.0)
+            .unwrap_or(0.0);
         let lat_of = |j: usize| fields::row_lat(&grid, j);
         let clim = climate::snapshot(world, &d, &lat_of, &sc.h, sea);
         let mut open: Vec<f64> =
@@ -764,6 +782,15 @@ impl SurfaceStage {
                     );
                     sc.h[c] += add;
                     parts.carbonate[c] += add as f32;
+                    // The climate's drawdown carbonate (after a snowball: its cap carbonate) on the
+                    // sea floor above the compensation depth, whatever the water's temperature,
+                    // once per plate step.
+                    let z = sea - sc.h[c];
+                    if sub == 0 && cap_m > 0.0 && z > 0.0 && z <= CARBONATE_FLOOR_M {
+                        let extra = cap_m.min(z);
+                        sc.h[c] += extra;
+                        parts.carbonate[c] += extra as f32;
+                    }
                     let z = sea - sc.h[c];
                     if restricted[c]
                         && z > 0.0
@@ -1059,6 +1086,21 @@ impl SurfaceStage {
         );
         for (name, v) in fields::STEP_FIELDS.iter().zip(&step_fields) {
             st.acc.add(name, v, dt);
+        }
+        // The climate's ice as frame means (FORMAT.md "The climate's ice fields").
+        for (name, from) in [
+            (
+                crate::climate::history::ICE_THICKNESS,
+                crate::climate::field::ICE_THICKNESS,
+            ),
+            (
+                crate::climate::history::ICE_COVER,
+                crate::climate::field::ICE_TIME_SHARE,
+            ),
+        ] {
+            if let Some(f) = world.fields.get(from).filter(|f| f.data.len() == n) {
+                st.acc.add(name, &f.data, dt);
+            }
         }
         st.acc.span_years += dt;
         let last = self.done + 1 >= self.total;
