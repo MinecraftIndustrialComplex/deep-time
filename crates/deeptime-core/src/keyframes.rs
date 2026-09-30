@@ -59,8 +59,18 @@ pub fn render(
     let (w, h) = size;
     let mut out = Vec::new();
     for &name in layers {
-        let Some(field) = world.fields.get(name) else {
-            continue;
+        // A view layer derived from the fields at render time (`provinces`) is drawn like any
+        // other; it is never stored in the world.
+        let derived;
+        let field = match world.fields.get(name) {
+            Some(f) => f,
+            None => match derived_field(world, name) {
+                Some(f) => {
+                    derived = f;
+                    &derived
+                }
+                None => continue,
+            },
         };
         let (_, ramp) = ramps.for_layer(name);
         let (gw, gh) = (field.grid.w as f64, field.grid.h as f64);
@@ -85,6 +95,24 @@ pub fn render(
         h,
         layers: out,
     })
+}
+
+/// Keyframe layers derived from the world's fields when a frame is rendered, not stored in it.
+pub const DERIVED_LAYERS: [&str; 1] = [crate::provinces::LAYER];
+
+/// The derived layer `name` for `world`'s current state (`None`: not one, or its inputs are missing).
+fn derived_field(world: &WorldState, name: &str) -> Option<crate::world::Field> {
+    (name == crate::provinces::LAYER)
+        .then(|| crate::provinces::derive(world))
+        .flatten()
+}
+
+/// Adds the derived layers a set of stage layers can feed: the geologic provinces need the plate
+/// model's `regime` and `crust_age` frames.
+pub fn add_derived(layers: &mut Vec<&'static str>) {
+    if layers.contains(&"regime") && layers.contains(&"crust_age") {
+        layers.push(crate::provinces::LAYER);
+    }
 }
 
 struct Ring {
