@@ -2226,7 +2226,12 @@ community ports) are not opened for code.
   amplifier, which turns confined, laterally bounded ice into parabolic troughs (Svensson 1959,
   Harbor 1992) with cirque-like heads, pointwise from the ice depth and the valley's centre-line
   depth, as a tiled Jacobi pass (its radius is in the halo). Settings: `surface.glacial.*`,
-  `amplify.glacial.*` (editor: glacial erosion, glacial valleys, ice-age snowline, arêtes).
+  `amplify.glacial.*` (editor: glacial erosion, glacial valleys, glacial valley width, ice-age snowline,
+  arêtes). The valley width (Ben, 2026-09-30; default 3, 1 = physical) draws the young landscape's glacier
+  footprints and trough spread wider for readability at the game's 15× vertical exaggeration; the
+  deep-time surface stays physical. Since the deep-time climate (2026-09-30) the glaciers read its ice fields:
+  deep-time ice only where the climate had ice in the step, eroding for its time share, rivers off under
+  thick ice; the young landscape's ice inside the last-glacial-maximum extent.
 - **Oracle.** `tools/validation/fastscape_compare.py` runs fastscapelib (GPL-3.0, installed with
   `nix shell` + pip in a throwaway venv, never vendored) on the same uplift and parameters on a
   256² grid and compares hypsometry, χ/steepness statistics and drainage-area distributions with the
