@@ -116,11 +116,13 @@ public final class BiomeGameTests {
     // First calibrated runs (2026-09-29, test_planet_real, standalone / MIC): BW 0.765 / 0.824, BS 0.738 / 0.825,
     // C 0.86 / 0.86, D 1.0 / 1.0, Dsub 0.969 / 0.987, E 1.0 / 1.0, sea 1.0 / 1.0, BW:desert — / 0.588,
     // Dfc:taiga — / 0.657, E:snow 1.0 / 1.0; the small planet has no A and only 17 BW columns (logged only).
-    // Floors sit about 0.1 under the lower of the two.
+    // Floors sit about 0.1 under the lower of the two. E:snow re-based 2026-09-30 (P1-21): since EF maps
+    // to barren frozen ground where the glacier model has no ice (not snowy-tagged) and the test planet
+    // runs the volcano stage (new peaks), standalone measured 0.899 (E overall 0.98): floor 0.8.
     static final Map<String, Double> FLOORS = Map.ofEntries(
             Map.entry("A", 0.6), Map.entry("Af", 0.6), Map.entry("BW", 0.65), Map.entry("BS", 0.6), Map.entry("C", 0.75),
             Map.entry("D", 0.9), Map.entry("Dsub", 0.85), Map.entry("E", 0.9), Map.entry("sea", 0.95),
-            Map.entry("BW:desert", 0.45), Map.entry("Af:jungle", 0.5), Map.entry("Dfc:taiga", 0.5), Map.entry("E:snow", 0.9));
+            Map.entry("BW:desert", 0.45), Map.entry("Af:jungle", 0.5), Map.entry("Dfc:taiga", 0.5), Map.entry("E:snow", 0.8));
     static final int MIN_COLUMNS = 20;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
