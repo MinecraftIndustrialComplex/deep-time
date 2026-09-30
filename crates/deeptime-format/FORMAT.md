@@ -227,7 +227,8 @@ jar ships it and the core compiles the same file in as the default). Band coordi
                                                                            class's land erosion is clamped into
                                                                            {min, max} (−1 … 1, at least one key);
                                                                            optional "weirdness": "positive" or
-                                                                           {"positive_below_erosion": e}
+                                                                           {"positive_below_erosion": e,
+                                                                            "flats": {positive_noise_above, max_magnitude}}
     "BSk": { "temperature": { "when": { "of": "t_cold", "above": 0.0 },   the ramp "then" where the input is above
                               "then": "temperate", "else": "boreal" },     the threshold, "else" elsewhere
              "humidity": "steppe" }
@@ -256,8 +257,11 @@ with `min` = `max` is a fixed coordinate. ET is as it was (`polar`, `tundra`, ca
 (vanilla's erosion units, −1 … 1; at least one key): its land's erosion is clamped into it, after the
 relief's rank and the wetlands have set it; a `glaciated` block may give its own. And it may carry
 `"weirdness"`: `"positive"` (its land takes the positive branch of the variant noise everywhere) or
-`{"positive_below_erosion": e}` (the positive branch where the land's erosion is below `e`, the
-negative one above). The default table uses all three for EF:
+`{"positive_below_erosion": e, "flats": {"positive_noise_above": n, "max_magnitude": m}}` (the positive
+branch where the land's erosion is below `e`, the negative one above, except that the flats, the land
+above `e`, are positive where the variant noise (-1 .. 1) is above `n` (default 1: never; 0: the
+noise's own half) and their |weirdness| is at most `m` (0.07 .. 1, default none); `flats` is
+optional). The default table uses all three for EF:
 - barren EF is held below erosion 0.3, which keeps it off Terralith's `glacial_chasm` (packed ice; it
   takes erosion from 0.4, or from 0.565 at any humidity); ice cap (`glaciated`, `max` 1) keeps the
   chasm, the one ice biome for low-relief land;
@@ -265,7 +269,11 @@ negative one above). The default table uses all three for EF:
   negative branch (jagged peaks in vanilla, where Terralith puts its scarlet mountains): −0.27 is a
   little above vanilla's −0.375 edge because MIC's Tectonic router stretches erosion, and the flats
   (erosion above it) are on the negative branch, where vanilla's and Terralith's cherry groves, which
-  are positive-branch variants, do not grow. All of it is data a pack overrides; the limits are in
+  are positive-branch variants, do not grow, except where the variant noise is above 0.2 (about a
+  fifth of them): those are positive, so that vanilla's ice spikes, a positive-branch variant, come
+  back on the ice cap (Ben, 2026-09-30, "Bring ice spikes back"), and their |weirdness| is held to 0.25,
+  below the magnitudes the cherry groves need (0.4 and up at mid erosion; MIC's router puts every
+  reference value from 0.3 to 0.57 there). All of it is data a pack overrides; the limits are in
   vanilla's units, which the game then maps onto the pack's, so a pack with another router wants
   its own numbers (MIC's tuned ones are the defaults').
 

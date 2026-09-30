@@ -107,9 +107,30 @@ pub enum Weirdness {
     Noise,
     /// Always the positive branch.
     Positive,
-    /// The positive branch where the cell's erosion is below the value (high relief: frozen
-    /// peaks), the negative branch elsewhere (flats).
-    PositiveBelowErosion(f64),
+    /// The positive branch where the cell's erosion is below `erosion` (high relief: frozen
+    /// peaks); elsewhere (flats) the negative branch, except as `flats` says.
+    PositiveBelowErosion { erosion: f64, flats: Flats },
+}
+
+/// What a class's flats take of the variant noise (the land its `positive_below_erosion` does not
+/// keep positive).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Flats {
+    /// The flats are on the positive branch where the variant noise (−1 … 1) is above this, on the
+    /// negative one elsewhere: 1 (the default) is never, 0 is the noise's own sign (about half).
+    pub positive_noise_above: f64,
+    /// The largest |weirdness| a flat takes (vanilla's units, 0.07 … 1), or none. The positive
+    /// branch's variants at a high |weirdness| include Terralith's cherry grove.
+    pub max_magnitude: Option<f64>,
+}
+
+impl Default for Flats {
+    fn default() -> Self {
+        Flats {
+            positive_noise_above: 1.0,
+            max_magnitude: None,
+        }
+    }
 }
 
 /// The ice cover the bake writes (`climate/ice_cover`) and the game's ice pass lays
@@ -299,12 +320,35 @@ fn parse_weirdness(v: &Value, path: &str) -> Result<Weirdness, CoreError> {
     match v {
         Value::String(s) if s == "positive" => Ok(Weirdness::Positive),
         Value::Object(o) => {
-            no_other_keys(o, &["positive_below_erosion"], path)?;
+            no_other_keys(o, &["positive_below_erosion", "flats"], path)?;
             let k = format!("{path}.positive_below_erosion");
             let e = o
                 .get("positive_below_erosion")
                 .ok_or_else(|| err(&k, "missing"))?;
-            Ok(Weirdness::PositiveBelowErosion(number(e, &k, -1.0, 1.0)?))
+            let mut flats = Flats::default();
+            if let Some(f) = o.get("flats") {
+                let fp = format!("{path}.flats");
+                let f = object(f, &fp)?;
+                no_other_keys(f, &["positive_noise_above", "max_magnitude"], &fp)?;
+                if f.is_empty() {
+                    return Err(err(
+                        &fp,
+                        "needs at least one of positive_noise_above, max_magnitude",
+                    ));
+                }
+                if let Some(x) = f.get("positive_noise_above") {
+                    flats.positive_noise_above =
+                        number(x, &format!("{fp}.positive_noise_above"), -1.0, 1.0)?;
+                }
+                if let Some(x) = f.get("max_magnitude") {
+                    flats.max_magnitude =
+                        Some(number(x, &format!("{fp}.max_magnitude"), 0.07, 1.0)?);
+                }
+            }
+            Ok(Weirdness::PositiveBelowErosion {
+                erosion: number(e, &k, -1.0, 1.0)?,
+                flats,
+            })
         }
         _ => Err(err(
             path,
@@ -971,11 +1015,17 @@ mod tests {
     }
 
     #[test]
-    fn ef_takes_its_peaks_positive_and_its_flats_negative_and_bad_values_name_their_path() {
+    fn ef_takes_its_peaks_positive_and_its_flats_mostly_negative_and_bad_values_name_their_path() {
         let p = builtin();
         for k in 0..32u8 {
             let want = if k == EF {
-                Weirdness::PositiveBelowErosion(-0.27)
+                Weirdness::PositiveBelowErosion {
+                    erosion: -0.27,
+                    flats: Flats {
+                        positive_noise_above: 0.2,
+                        max_magnitude: Some(0.25),
+                    },
+                }
             } else {
                 Weirdness::Noise
             };
@@ -996,6 +1046,29 @@ mod tests {
             format!("{at}.positive_below_erosion")
         );
         assert_eq!(path(json!({"x": 1})), format!("{at}.x"));
+        // Without `flats` the flats are all negative and unclamped.
+        let q =
+            edited(|v| v["classes"]["EF"]["weirdness"] = json!({"positive_below_erosion": -0.3}))
+                .unwrap();
+        let ef = Weirdness::PositiveBelowErosion {
+            erosion: -0.3,
+            flats: Flats::default(),
+        };
+        assert_eq!(q.weirdness(EF), ef);
+        assert_eq!(Flats::default().positive_noise_above, 1.0);
+        let flats = |f: Value| path(json!({"positive_below_erosion": -0.3, "flats": f}));
+        assert_eq!(flats(json!({})), format!("{at}.flats"));
+        assert_eq!(flats(json!(1)), format!("{at}.flats"));
+        assert_eq!(flats(json!({"x": 1})), format!("{at}.flats.x"));
+        assert_eq!(
+            flats(json!({"positive_noise_above": 2})),
+            format!("{at}.flats.positive_noise_above")
+        );
+        assert_eq!(
+            flats(json!({"max_magnitude": 0.05})),
+            format!("{at}.flats.max_magnitude"),
+            "under the valley slice: rivers"
+        );
     }
 
     #[test]
