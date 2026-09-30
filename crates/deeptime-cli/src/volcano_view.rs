@@ -455,9 +455,11 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
     // The chain with the most islands, then the most volcanoes standing.
     let islands = |vs: &Vec<&Volcano>| vs.iter().filter(|v| summit_y(v) > ctx.sea_y).count();
     if let Some((h, vs)) = chains
-        .iter()
+        .iter_mut()
         .max_by_key(|(_, vs)| (islands(vs), vs.len()))
     {
+        // The youngest first: the close view's notes are about it.
+        vs.sort_by(|a, b| b.born_myr.total_cmp(&a.born_myr));
         picks.push((
             "chain",
             format!(
@@ -486,7 +488,8 @@ pub fn run(checkpoint: &Path, world_data: &Path, out: &Path) -> CliResult<Value>
             192,
         ));
     }
-    if let Some(v) = tallest(&|v| v.kind == Kind::Silicic) {
+    let caldera_id = picks.iter().find(|p| p.0 == "caldera").map(|p| p.2[0].id);
+    if let Some(v) = tallest(&|v| v.kind == Kind::Silicic && Some(v.id) != caldera_id) {
         picks.push((
             "silicic",
             "The tallest continental hotspot centre".into(),
