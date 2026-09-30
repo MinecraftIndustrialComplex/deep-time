@@ -73,6 +73,97 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-29 — Coal fields adjoin and stack: adjoining footprints, several seams per field from the sediment history (agent worktree agent-a3e41a57dc812f499, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Ben's follow-up (decisions log 2026-09-29, "Yes, adjoining + stacked (Recommended)"): coal fields in a basin
+  may adjoin and fill its minable area (no spacing), and each field holds a stack of seams at different depths. Changes:
+  `deposits/cluster.rs` (`clustering.model: adjoining`, `ellipses_overlap`, `Point.ellipse`), `deposits/geometry.rs`
+  (`measures_thickness_m`, `seam_plan`, `stack_bodies`, `footprint_blocks`), `deposits/types.rs` (`Stack`,
+  `Geometry.stack`, validation), `deposits/mod.rs` (placement passes footprints; `materialise` builds the stack; the
+  playability-guaranteed coal site is a six-seam stack; census `seams`, `seams_max`, `measures_m`; forming events carry
+  `seams` and `coal_measures_m`), the schema (`clustering.model` enum, `geometry.stack`), `coal_seam.json`, FORMAT.md,
+  Java `compat/SiteChunks.java`, the plan's §8.6 note. Other types are untouched (their tests and counts are unchanged).
+- **Adjoining.** No camps, `min_separation_m` 0. Each field, largest first, is drawn anywhere in the tract (∝ F·E, up to
+  400 tries) where its plan ellipse crosses none placed before; the yaw is drawn at placement and the body uses it. Two
+  ellipses are disjoint when a direction u exists with u·(pb − pa) > h_a(u) + h_b(u) (support functions); 360 directions
+  and a 0.1 %-of-the-smaller-axis margin make "not overlapping" exact for the placed bodies (checked independently in
+  the test by sampling each boundary against the other ellipse).
+- **Stacked seams.** One body per seam (role `ore`, consecutive ids from the top, one footprint, yaw and dip), so the
+  world-data layout is unchanged (a site already owned several bodies; the Java deposit feature, strata pass and
+  `LevelSites` already loop over all of them) and the format version stays. The count comes from the recorded history:
+  coal measures under the site S = Σ_k F_k · deposition_k · Δt_k over the frames its crust existed in (F recovered from the
+  favourability hazard the placement was drawn from), n = round(S / 25 m) clamped to 1–40 and to cumulative thickness ÷
+  0.7 m (Circular 891's thinnest minable bed); gap mean S/n, `gap_sigma` 0.6; tonnage split by thickness (`share_sigma`
+  0.7). `spacing_mult_v` 6 enlarges the gaps in blocks (25 m is 1.25 blocks at 20 m per block). The top seam is half the
+  measures above the ledger's centre depth; seams above the ground are dropped from the top, the one crossing it is
+  clipped, and the site's tonnage is what is left. Ledger and survival stay per field (one thin equivalent body).
+- **Research** (Sonnet sub-agent, explicit model; a second one after the first, for stacking). Real numbers with URLs
+  are in the type's notes; the ones the agent marked (calc) are its own arithmetic and the paywalled ones (Heckel 1986,
+  Hampson 1999, the Silesia MDPI paper, the Ruhr counts) come from search snippets. Measures per seam 12–60 m (Allegheny
+  ~15, Illinois 11–29, Ruhr 12 all coals / ~60 economic, Silesia ~35, Jharia ~19, Illawarra ~27, Highveld 16–60); up to
+  ~40 mineable seams in a section (Llewellyn 40, Donets 30–40 workable, Illinois ~20 mined of 75 named); cyclothems
+  160–400 kyr, so about one minable seam in two to four cycles; cumulative minable coal per field 4.6–20 m in most
+  basins (Illinois, Allegheny, Highveld, Illawarra, Witbank), ~30–46 m in the Powder River's merged zone, ~100–140 m
+  in Jharia and Silesia.
+- **Tonnage rebased (contradiction with the previous entry, and why).** The 540 / 2,500 / 10,000 Mt used *one* bed's
+  thickness (Circular 891's classes); a field of ~11 seams outgrows that, and a stack needs the *cumulative* thickness so
+  that seams stay minable (≥ 0.7 m). Now cumulative 5 / 14 / 60 m × area 300 / 1,000 / 3,000 km² × 1.32 = **3,800 /
+  19,800 / 115,000 Mt** (about 15 Mt per km² at the median, between Silesia ~13 and Jharia/Raniganj ~110–130); the aspect
+  (1, 5.15e-4, 1.5) keeps the median body at 1,000 km² and 15 m of coal (29 × 44 km, 49 × 73 blocks semi-axis), P90 334
+  km² × 8.7 m, P10 3,230 km² × 27 m. COE's vein amount follows the tonnage quantile, so amounts do not change.
+- **Counts** (Mac, the same six `stage structure` checkpoints as the previous entry, `stage deposits --in`):
+
+  | coal | first entry (before) | seam fields, camps + 26 km spacing | adjoining + stacked |
+  |---|---|---|---|
+  | sites, median (range) | 47.5 (25–56) | 17.5 (10–30) | **20 (13–31)** |
+  | counted, median (range) | 23.5 (17–35) | 12.5 (4–22) | **14 (6–19)** |
+  | counted, six landscapes summed | 148 | 75 | **80** |
+  | target N\* (counted), summed | 178.3 | 83.1 | 83.1 |
+  | formed / dropped for overlap | 681 / 34 | 344 / 76 | 330 / 44 |
+
+  Per landscape (counted / target, sites): scattered 1–3 16 / 18.1 (26), 15 / 14.4 (20), 6 / 7.1 (13); supercontinent
+  1–3 13 / 11.9 (20), 11 / 11.2 (17), 19 / 20.4 (31). Counted survivors are now 96 % of the target (75 before: 90 %);
+  sites still run 17 % under `expected_sites` (127 of 153): 44 of 330 formed fields find no room (the formed ones outnumber
+  the survivors 3–6× and cannot overlap in plan, while in a real basin an old field would be buried under a later one:
+  the same limit as before, smaller). Stacks: 1,460 seams over 127 sites, 11.5 per field on average, the most 38; the
+  coal measures under a site 287–861 m on average per landscape (many are held to 15–20 seams by the 0.7 m minimum:
+  cumulative thickness ÷ 0.7).
+- **Checks.** Tests: `geometry::tests` (measures = Σ F·deposition·Δt by hand; the count follows the measures, the type's
+  clamps and the minable thickness, shares sum to 1, gaps average S/n, deterministic per seed; a stack's bodies are
+  disjoint, ids consecutive, volumes follow the shares, erosion removes seams from the top and clips the crossing one,
+  nothing is left far above the ground; the median field is ~1,000 km² and tens of km across), `cluster::tests`
+  (`ellipses_overlap` on circles, aligned and quarter-turned ellipses and across the seam; 40 seeds of adjoining fields
+  in a tract with no overlap by independent boundary sampling), `recorded_tests::coal_fields_adjoin_without_overlap_and_hold_stacked_seams`
+  (a shrunken coal on the synthetic planet: consecutive `ore` bodies, one footprint, apart, no two fields overlap). The
+  existing 1-vs-3-thread test (sites, bodies, events, census identical) and the resume tests cover determinism.
+- **Java.** `SiteChunks.compute` used to sample one box over all ore bodies' union (a stack's box would be a tall mostly
+  empty volume and the lattice would coarsen past the 1-block seams); it now samples each ore body over its own bounds and
+  adds (ore bodies of a site are disjoint), the lattice set by the bounds' total volume. The deposit feature, strata pass
+  (`Columns`), `LevelSites.at` and the GameTests' block-by-block counts already loop over all of a site's bodies. Codec:
+  Java reads only `products`, `minecraft` and `sizing.tonnage_mt` of a deposit type, so `geometry.stack` and
+  `clustering.model` need nothing there (like `hosts.full_at`).
+- **Render.** A cross-section of a real generated coal field, headless: `tools/workbench/preview.py run` on the Mac
+  (`--profile standalone`, the synthetic deposit world `deposits_world_16k.json`, box 1930,−1790..2186,−1534, real mod and
+  generator, `--keep-world`) then `deeptime-inspect section --axis z --at -1661 --from 1935 --to 2180 --y-from -140
+  --y-to 20 --scale 4`: site 44, 15 seams in 130 blocks, a thick top seam and thin ones below with the speckle of
+  60 % ore density, clipped at the top by the surface (the PNG is in `review/out/coalsection/`, gitignored).
+- **Gates** (Mac, on the branch after merging master c35f56f): `cargo test --workspace --locked` all pass (core 252 + 3
+  ignored, cli 30, format 40, …), clippy `-D warnings` clean, fmt clean, `cargo deny check licenses bans` ok;
+  `cd neoforge && ./gradlew build test` → tests=143 failures=0; `tools/remote/mac.sh --server -- ./gametest.sh` → All 50
+  required tests passed (`coePicksSiteVein` counts the coal stack's ore blocks per chunk block by block against
+  `SiteChunks`: 11,557 blocks in one chunk of site 51).
+  `tools/smoke/install.sh mic` + `./gametest.sh -PwithMic` (168 MIC mods, COE and CDG live) → Gradle BUILD SUCCESSFUL,
+  48 `gametest-result` lines, 0 not PASS (`coepickssitevein`, `coedropsclaimednoise`, `coeamountscaleswithtonnage`,
+  `cdgoilfromtrap`, `cdgzeroelsewhere` all PASS; the coal site's 11,557 ore blocks per chunk match `SiteChunks`); the
+  "All N required tests passed" line did not print in that run (the MIC run's known end-of-run behaviour), so the count is
+  from the result lines.
+- **Decisions for Ben** (not asked): (1) the tonnage rebase to cumulative thickness above (7.9× the median of the previous
+  entry). (2) A coal site is now ~11 bodies with ~1.4 blocks of coal each, spaced ~7 blocks apart over up to ~150
+  blocks of depth, under a 29 × 44 km footprint; `spacing_mult_v` 6 is a playability lever (1 keeps the real 25 m).
+  (3) Formed-but-eroded fields still cannot overlap in plan (the 13 % of formed fields dropped); letting them would
+  raise sites to the target's `expected_sites`.
+- **Next.** A look at the coal in the workbench 3D view (`tools/workbench/view.sh` on the export) if Ben wants one; the
+  overlap of formed-but-eroded fields above.
+
 ### 2026-09-29 — MIC GameTest heap stall: the suite's scattered samples, not lakeHolds (agent worktree agent-a11ef8b35a6ebb8ee, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Ben's decision** (decisions log 2026-09-29, "Chase the stall (Recommended)"). Resolves the P1-12 known issue
   (`-PwithMic` stalls in `lakeHolds` and runs out of heap; 4 of 4 runs at P1-09).
