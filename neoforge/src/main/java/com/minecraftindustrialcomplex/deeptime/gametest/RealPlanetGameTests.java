@@ -69,9 +69,9 @@ public final class RealPlanetGameTests {
         WorldData wd = t.data();
         helper.assertTrue(wd.detailNoise() != null, "the real planet has a detail term");
         int c = t.circumference();
-        int corners = 0, cornerMax = 0, maxDiff = 0, detailed = 0, checked = 0;
-        String worst = "";
-        for (int i = 0; i < 96; i++) {
+        int[] detailed = {0};
+        ChunkSampling.HeightTally tally = new ChunkSampling.HeightTally();
+        ChunkSampling.forEach(helper, 96, i -> {
             boolean corner = i % 2 == 0;
             int x = (-c / 2 + 8 + i * (c / 98)) & ~3;
             int z = (((i * 37) % 97 - 48) * 18) & ~3;
@@ -80,29 +80,22 @@ public final class RealPlanetGameTests {
                 z += 2;
             }
             if (wd.detail(t.wrapX(x), z) != 0.0)
-                detailed++;
+                detailed[0]++;
             int expected = (int) Math.ceil(t.height(x, z)) - 1;
             if (expected < level.getMinBuildHeight() + 32)
-                continue;   // the floor band: the router's bottom slide, not the bake
+                return false;   // the floor band: the router's bottom slide, not the bake
             int actual = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.NOISE, true)
                     .getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z);
-            int diff = Math.abs(actual - expected);
-            checked++;
-            if (corner) {
-                corners++;
-                cornerMax = Math.max(cornerMax, diff);
-            }
-            if (diff > maxDiff) {
-                maxDiff = diff;
-                worst = "(" + x + ", " + z + ") expected " + expected + " got " + actual + " H=" + t.height(x, z);
-            }
-        }
-        DeepTime.LOGGER.info("[gametest] realPlanetHeightMatchesTheBake columns={} cornerColumns={} cornerMaxAbsDiff={} "
-                + "maxAbsDiff={} withDetail={} worst={}", checked, corners, cornerMax, maxDiff, detailed, worst);
-        helper.assertTrue(corners >= 24, "only " + corners + " corner columns above the floor band");
-        helper.assertTrue(cornerMax == 0, "corner columns differ by up to " + cornerMax + ": " + worst);
-        helper.assertTrue(maxDiff <= 12, "columns differ by up to " + maxDiff + ": " + worst);
-        helper.succeed();
+            tally.add(x, z, corner, expected, actual, t.height(x, z));
+            return true;
+        }, () -> {
+            DeepTime.LOGGER.info("[gametest] realPlanetHeightMatchesTheBake columns={} cornerColumns={} cornerMaxAbsDiff={} "
+                    + "maxAbsDiff={} withDetail={} worst={}", tally.checked, tally.corners, tally.cornerMax, tally.maxDiff, detailed[0], tally.worst);
+            helper.assertTrue(tally.corners >= 24, "only " + tally.corners + " corner columns above the floor band");
+            helper.assertTrue(tally.cornerMax == 0, "corner columns differ by up to " + tally.cornerMax + ": " + tally.worst);
+            helper.assertTrue(tally.maxDiff <= 12, "columns differ by up to " + tally.maxDiff + ": " + tally.worst);
+            helper.succeed();
+        });
     }
 
     /** The class a rock run of the fixture gives block y, or null (unclassified crust). */
@@ -137,16 +130,17 @@ public final class RealPlanetGameTests {
         }
         RockPalette palette = RockPalette.get();
         int c = wd.circumference();
-        int columns = 0, checked = 0, bodyChecks = 0, other = 0, wrong = 0;
+        int[] n = new int[5];   // columns, checked, bodyChecks, surface-rule blocks, wrong
         List<String> detail = new ArrayList<>();
-        for (JsonElement e : doc.getAsJsonArray("columns")) {
-            if (columns >= 48)
-                break;
-            JsonObject col = e.getAsJsonObject();
+        JsonArray fixture = doc.getAsJsonArray("columns");
+        ChunkSampling.forEach(helper, fixture.size(), k -> {
+            if (n[0] >= 48)
+                return false;
+            JsonObject col = fixture.get(k).getAsJsonObject();
             int x = col.get("wx").getAsInt(), z = col.get("z").getAsInt();
             if (Math.abs(z) > c / 4 - 32)
-                continue;   // past the pole edge: the beyond-pole mask, not the bake
-            columns++;
+                return false;   // past the pole edge: the beyond-pole mask, not the bake
+            n[0]++;
             ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.SURFACE, true);
             int surface = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z);
             Columns.Sample java = Columns.sample(wd, x, z);
@@ -156,7 +150,7 @@ public final class RealPlanetGameTests {
                 int mid = (r.get(1).getAsInt() + r.get(2).getAsInt()) / 2;
                 if (mid < surface - 8) {
                     ys.add(mid);
-                    bodyChecks++;
+                    n[2]++;
                 }
             }
             for (int y : ys) {
@@ -166,27 +160,29 @@ public final class RealPlanetGameTests {
                 String javaCls = fixtureClass(runsOf(java), y);
                 BlockState expected = StrataPass.predictedRock(wd, x, y, z);
                 BlockState actual = chunk.getBlockState(new BlockPos(x, y, z));
-                checked++;
+                n[1]++;
                 boolean ok = Objects.equals(cls, javaCls)
                         && (cls == null ? expected == null : expected == null || palette.classesOf(expected).contains(cls));
                 boolean placed = expected == null ? StrataPass.isCrust(actual) : actual == expected;
                 if (!placed && !StrataPass.isCrust(actual) && palette.classesOf(actual).isEmpty()) {
-                    other++;   // a surface rule's block (sand, terracotta, …): not the strata pass's to paint
+                    n[3]++;   // a surface rule's block (sand, terracotta, …): not the strata pass's to paint
                     continue;
                 }
                 if (!ok || !placed) {
-                    wrong++;
+                    n[4]++;
                     if (detail.size() < 8)
                         detail.add("(" + x + ", " + y + ", " + z + ") fixture " + cls + " java " + javaCls + " expected "
                                 + expected + " placed " + actual);
                 }
             }
-        }
-        DeepTime.LOGGER.info("[gametest] realPlanetRockMatchesTheParityFixture columns={} checked={} bodyChecks={} "
-                + "surfaceRuleBlocks={} wrong={} {}", columns, checked, bodyChecks, other, wrong, detail);
-        helper.assertTrue(columns >= 32 && checked >= 96, "only " + columns + " columns, " + checked + " samples");
-        helper.assertTrue(wrong == 0, wrong + " samples differ: " + detail);
-        helper.succeed();
+            return true;
+        }, () -> {
+            DeepTime.LOGGER.info("[gametest] realPlanetRockMatchesTheParityFixture columns={} checked={} bodyChecks={} "
+                    + "surfaceRuleBlocks={} wrong={} {}", n[0], n[1], n[2], n[3], n[4], detail);
+            helper.assertTrue(n[0] >= 32 && n[1] >= 96, "only " + n[0] + " columns, " + n[1] + " samples");
+            helper.assertTrue(n[4] == 0, n[4] + " samples differ: " + detail);
+            helper.succeed();
+        });
     }
 
     static JsonArray runsOf(Columns.Sample s) {

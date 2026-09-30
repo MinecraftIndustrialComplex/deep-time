@@ -98,6 +98,7 @@ public final class GameTestSupport {
                 e -> DeepTime.LOGGER.info("[gametest] Deep Time GameTest support enabled"));
         modBus.addListener(AddPackFindersEvent.class, GameTestSupport::addTestPack);
         extraDatapack().ifPresent(dir -> modBus.addListener(AddPackFindersEvent.class, e -> addExtraPack(e, dir)));
+        ChunkCensus.register();
         // The planet server is a normal dedicated server with /test enabled: give it a reporter
         // that logs passes (the GameTest server logs its own summary).
         if (Boolean.getBoolean("neoforge.enableGameTest"))

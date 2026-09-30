@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -164,6 +164,148 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Next.** A look at the coal in the workbench 3D view (`tools/workbench/view.sh` on the export) if Ben wants one; the
   overlap of formed-but-eroded fields above.
 
+### 2026-09-29 — MIC GameTest heap stall: the suite's scattered samples, not lakeHolds (agent worktree agent-a11ef8b35a6ebb8ee, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Ben's decision** (decisions log 2026-09-29, "Chase the stall (Recommended)"). Resolves the P1-12 known issue
+  (`-PwithMic` stalls in `lakeHolds` and runs out of heap; 4 of 4 runs at P1-09).
+- **Reproduced** (Mac, `tools/smoke/install.sh mic` → 168 mods, pack 4d0e685-dirty, then `./gametest.sh -PwithMic`):
+  4 of 4 runs failed as before. In three, 48 tests passed within ~20 s of the batch start, `lakeHolds` sat in
+  its 400-tick wait, the heap climbed to 8 GB and C2ME's workers threw `OutOfMemoryError` 40–80 s later; the
+  fourth ran out of heap during the batch start itself. `jcmd` could no longer attach once the heap was full. A watcher on the Mac (`jcmd GC.heap_info` / `Thread.print` every 2 s, `GC.class_histogram`
+  above 3 GB) caught it on the way up.
+- **Evidence.** (1) Class histogram at 5.1 GB live: 68,488 `LevelChunkSection[]` (one per chunk), 4.1 M
+  `LevelChunkSection`, 8.0 M `SingleValuePalette`/`ZeroBitStorage` (empty sections, i.e. proto-chunks), 12.4 M
+  `DataResult$Success` and 4.5 M `CompoundTag` (chunk serialization): ~68,000 chunks resident. (2) Thread
+  dumps: the server thread inside test start functions — `GeneratorGameTests.surfaceAtNoise` ←
+  `heightMatchesReference`, `RealPlanetGameTests.realPlanetHeightMatchesTheBake`, `BiomeGameTests.surfaceRulesApplied`
+  — each in `ServerChunkCache.getChunk` → `managedBlock`; after the batch, C2ME's `ReadFromDiskAsync.downgradeFromThis`
+  → `asyncSave` serializing the chunks as they unload. No frame in `lakeHolds`, no fluid ticking. (3) A new
+  chunk census (`ChunkCensus`, below) on the standalone run: peak **51,793** chunks; `heightMatchesReference`
+  alone added 41,408 (C = 16,384 `test_planet`), `realPlanetHeightMatchesTheBake` 21,463 (`test_planet_real`),
+  `periodicAcrossSeam` 9,614, `realPlanetRockMatchesTheParityFixture` 5,356; `lakeHolds` holds 1,428
+  (`test_lake`, forceloaded) — small. (4) `lakeHolds` alone under MIC (`./gametest.sh -PwithMic
+  -PgametestOnly=lakeHolds`): passes in 6.2 s, heap 2.3 GB, before=after=expected=65304, outside=0.
+- **Root cause.** A chunk requested at NOISE or later needs STRUCTURE_STARTS within radius 8
+  (`ChunkPyramid.GENERATION_PYRAMID`), so a sample far from the others loads up to 289 proto-chunks. A
+  `getChunk` ticket lasts one tick and nothing unloads inside a tick, and the sampling tests took all their
+  columns synchronously in their start ticks (the batch starts its 49 tests within ~40 ticks), so the suite's
+  whole footprint was resident at once and then unloaded (and serialized) at once. Standalone fits its 6 GB
+  (peak ~5.6 GB); the MIC server (C2ME's async chunk system and serialization, the pack's structure sets)
+  carries more per chunk and runs 8 GB out. `lakeHolds` is the one test still running (its 400-tick wait) when
+  that happens, and `worldInfoFollowsThePlayer` is in the next batch: that is why exactly those two never
+  reported. P1-08's real-planet level (~27,000 more chunks in the census) is consistent with the step from 3 of 7
+  runs to every run.
+- **Fix (test design, bounded per tick).** `gametest/ChunkSampling`: `forEach(helper, n, step, finish)` runs a
+  test's samples at most `STEPS_PER_TICK` = 8 per server tick, under one budget shared by the whole GameTest
+  server (a vanilla `GameTestSequence`: wait until sampled, then assert); a step that loads no chunk costs
+  nothing; an assertion inside a step fails the test after the rest are dropped. Each tick's chunks unload
+  before the next ones load, so the resident set is bounded by the budget (~8 × 289), not by the suite.
+  Every sample is still taken at the same status; only the timing changed. Converted: `heightMatchesReference`,
+  `periodicAcrossSeam`, `realPlanetHeightMatchesTheBake`, `realPlanetRockMatchesTheParityFixture` (a shared
+  `HeightTally` for the three height comparisons). The C = 1,024 samplers (`heightMatchesRaster`,
+  `strataClassesResolve`, `surfaceRulesApplied`, `everyClassInTheWorld`) stay synchronous: that planet is
+  small enough (≤ 3,540 chunks in the census) that they are bounded by it. Neither the heap nor the test list
+  changed.
+- **Also.** `gametest/ChunkCensus` logs `[gametest] chunks peak=… heapPeakMB=… liveHeapPeakMB=…` at the end of every
+  GameTest run (and `[gametest-chunks]` lines per passing test / new peak). Under C2ME `getLoadedChunksCount`
+  counts only promoted chunks, so for MIC the heap numbers are the measure. `-PgametestOnly=<name>[,…]`
+  (`GameTestServerMixin`, `-Ddeeptime.gametestOnly`) runs only the named tests. `gametest.sh`'s peak-RSS
+  sampler matched nothing (the game directory sits in ModDevGradle's @argfile) and printed 0 MB; it now
+  matches the JVM by its `-Dfml.modFolders=deeptime%%<checkout>/neoforge/…` argument (`ps -ww`). Class names:
+  `ChunkSampling`, `ChunkCensus`.
+- **Measured** (branch merged with master 7f907ce; Mac; one `tools/remote/mac.sh --server` loop of five
+  `./gametest.sh -PwithMic` then `./gametest.sh`):
+
+  | run | result | wall | heap peak (in use) | live heap peak | JVM RSS peak |
+  |---|---|---|---|---|---|
+  | MIC 1 | All 50 required tests passed | 81 s | 4,949 MB | 3,326 MB | 6,365 MB |
+  | MIC 2 | All 50 required tests passed | 62 s | 5,874 MB | 4,368 MB | 7,691 MB |
+  | MIC 3 | All 50 required tests passed | 52 s | 5,459 MB | 3,144 MB | 7,161 MB |
+  | MIC 4 | All 50 required tests passed | 58 s | 5,788 MB | 4,179 MB | 7,431 MB |
+  | MIC 5 | All 50 required tests passed | 51 s | 5,623 MB | 3,519 MB | 6,487 MB |
+  | standalone | All 50 required tests passed | 36 s | 3,578 MB | 1,344 MB | 4,866 MB |
+
+  (heap max 8,192 MB MIC / 6,144 MB standalone; "live" = G1 old generation after a collection.) Standalone chunk
+  peak 51,793 → 15,094. `lakeHolds` identical in every run: before=after=expected=65304, outside=0,
+  water_top_y=120. Before the fix: 4 of 4 MIC runs out of heap (8 GB) here, plus P1-09's 4 of 4.
+- **Gates** (merged tree): cargo fmt, clippy `--locked -D warnings`, deny licenses bans clean; cargo test --workspace
+  (core 239 + 3 ignored, …) ok; `./gradlew build test` tests=140 failures=0. No Rust changed on this branch.
+- **Found on the way.** A `tools/remote/mac.sh --server` command that dies of a zsh expansion error (an
+  argument starting with `=`) skips the `EXIT` trap and leaves `server.lock` behind (mine did once; I removed
+  my own stale lock after checking no process of this checkout held it). The stuck JVMs of the failed runs
+  were killed with `kill -9` on their verified PIDs (cwd = this checkout's `run-gametest`).
+- **Next.** New GameTests that sample columns across a planet should go through `ChunkSampling.forEach`; the
+  `[gametest] chunks peak` line shows a test's footprint.
+
+### 2026-09-29 — P1-09 follow-up: every biome-mapping constant is configurable (agent worktree agent-a506f027d5a6b70e1, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben, 2026-09-29 (decisions log): "All of them" — the inland continentalness distances, the wetland thresholds and
+  the band placement per Köppen class that P1-09's "For Ben (2)" listed as constants.
+- **Settings** (preset section `biomes`, optional keys with the old values as defaults; the pipeline and built-in presets carry
+  them, resynced with `sync_builtin_presets.py`; range checks name the key; one new **Advanced · Biome placement** section
+  `adv_biomes`, after the other advanced ones, in `editor_fields.json`, the game's `EditorFields.Section.ADV_BIOMES` and lang):
+
+  | id | key | default | range |
+  |---|---|---|---|
+  | Mid-inland distance (`inland_mid`) | `biomes.inland_mid_blocks` | 200 blocks | 160–800 |
+  | Far-inland distance (`inland_far`) | `biomes.inland_far_blocks` | 1,000 | 900–3,000 |
+  | Continental interior distance (`inland_interior`) | `biomes.inland_interior_blocks` | 5,000 | 3,500–20,000 |
+  | Swamp humidity threshold (`wetland_humidity`) | `biomes.wetland_humidity` | 2.5 bands (full at +1.5) | 1–4.5 |
+  | Swamp flat-land share (`wetland_flat_share`) | `biomes.wetland_flat_share` | 0.35 | 0.05–0.9 |
+  | Swamp height limit (`wetland_lowland`) | `biomes.wetland_low_m` | 150 m | 20–600 |
+
+  The three inland ranges do not overlap (and the beach, ≤ 150, stays below the mid-inland edge), so the edges stay in order
+  whatever the player sets. The wetland gate `s > 0.15`, the thaw condition and the sea's depth anchors stay in the core.
+- **The placement table** is data: `crates/deeptime-core/data/climate_mapping/placement.json`, beside `default.json`; the jar
+  ships it as `data/deeptime/deeptime/climate_mapping/placement.json` (one added `include` in `neoforge/build.gradle`'s
+  climate-mapping copy: the only edit to a Gradle file) and the core compiles it in (`include_str!`, `bake/placement.rs`). Schema
+  (FORMAT.md, "The climate mapping"): `glacier_cap`; named `temperature_ramps` (`base + span · Σ weight · clamp01((t − from)/(to − from))`
+  over `t_mean` / `t_warm` / `t_cold`, weights adding to 1); named `humidity_rules` (`squeeze` [lo, hi] over band 1…4, then `min`,
+  `max`); `classes`: each of the 31 land classes a ramp by name (or a `{when: {of, above}, then, else}` switch, as BSk needs) and a
+  humidity rule. Ramps use `base`/`span`, not two end points, because 2.95 − 2.0 ≠ 0.95 in f64 and the default must reproduce the old
+  constants bit for bit. The default has six ramps (polar, boreal, temperate, tropical, hot_steppe, desert) and nine rules
+  (rainforest, monsoon, savanna, desert, steppe, mediterranean, humid, taiga, tundra).
+- **How a pack's table reaches the bake.** The bake is Rust and runs before the game can read a datapack, so the table travels
+  in the **content bundle** (the JSON passed with the preset since P1-15, key `climate_placement`). At a dedicated server's first
+  start `FirstStartGenerator` reads `deeptime:deeptime/climate_mapping/placement.json` from the server's resource manager (the
+  highest-priority pack's copy; the jar's own when nothing overrides it; a file that is not a JSON object stops the start with the
+  pack named) and adds it to the bundle (`climate/ClimatePlacement`, pure part `PlacementBundle`, JUnit `PlacementBundleTest`);
+  `Preset::with_content` parses and checks it (`Placement::from_value`, errors carry the path, e.g.
+  `$.climate_placement.classes.Af.temperature`) and keeps it on `PlanetPreset.placement` (not in the preset JSON, so share codes
+  and `preset.json` are unchanged); the bake places the climate by it and records the whole table in the world data,
+  `notes.bake.climate.placement = {source: "default" | "content bundle", table}`. Java never interprets the table again (the world's
+  values are already baked with it). `deeptime run --content <file>` takes the same key. **Not covered:** the Create World editor's
+  runs and the workbench pass no content bundle (as with the essentials), so they use the core's default; a pack override applies to
+  dedicated-server first starts. A singleplayer world made through the editor keeps the default table until the editor learns to pass a bundle (it
+  needs the datapack registries of the world being created).
+- **Bit-identical.** `planet_world_4k` (C = 4096, 150 Myr, `deeptime run --threads 6`, release), master 8cf16f9 vs this branch:
+  `diff -rq` of the two world folders reports only `manifest.json`; every raster, event, keyframe, strata, sites, bodies and
+  `preset.json` are identical. The manifest differs in timings and `created_utc` and in the record: `notes.bake.climate.params` has the six new
+  keys and `notes.bake.climate.placement` is new. Also `placement::tests::the_default_table_reproduces_the_compiled_in_constants_bit_for_bit`
+  (the old formulas kept in the test as an oracle; every class, 35 temperatures × 3 × 7 month sets × glacier, 400 aridities: identical bits).
+- **Extremes** (`tools/dev/knob_extremes.py --stage run`, new: `deeptime run` with the bake, reads `notes.bake.climate` back and checks
+  the biome inputs' land shares are finite and add up to 1; Mac, `--jobs 3 --threads 4`). Small planet (`planet_world_4k` with a `biomes` section, 150 Myr),
+  all 7 biome knobs at both ends + the default: 15 of 15 ok. Wetland cells (default 53): humidity 1.0 → 921, 4.5 → 0; flat share 0.05 → 0, 0.9 → 843;
+  height 20 m → 20, 600 m → 202. The small planet has no land beyond ~1,000 blocks from the sea, so the inland knobs ran on
+  `pipeline_quick_16k` (100 Myr, scattered continents, 9 runs, 0 failed; land shares of the seven continentalness bands, near / mid / far-inland =
+  the last three): default 0.303 / 0.628 / 0.037 (the coast band holds 0.032); mid-inland edge 160 → 0.239 / 0.692 / 0.037, 800 → 0.875 / 0.056 / 0.037;
+  far edge 900 → 0.303 / 0.607 / 0.059, 3,000 → 0.303 / 0.666 / 0.000; interior edge 3,500 and 20,000 → unchanged shares (that edge only sets the
+  top of the last band's scale: it changes the values inside it, not the band shares); height 20 m → 6 wetland cells, 600 m → 9,207 (default 842).
+- **Tests.** Rust: `bake::placement` (bit-for-bit default, a changed table changes the answers, every bad table names its path), `bake::biomes`
+  (`a_changed_placement_table_changes_the_biome_inputs`: Af moved to the desert ramp and the tundra rule changes the temperature and humidity layers
+  of that quarter only and nothing else, and the note records the table; `the_inland_distances_and_wetland_thresholds_are_settings`; range checks).
+  Java: `PlacementBundleTest` (the jar's copy is the core's file; the bundle carries a pack's table), the catalogue tests count six advanced
+  sections, the tuned share-code case now carries a `biomes` section with all twelve keys non-default (`share-codes.json` regenerated on the Mac with
+  `share_code_fixture.py`: Rust and Java write the same code; `AdvancedSettingsTest.aTunedPipelineCodeLoadsUnchanged` and the workbench's
+  `a_tuned_code_from_the_game_loads_unchanged` read every biome field back and the JSON unchanged).
+- **Gates** (Mac, run on the branch, then again after merging master 7f907ce, coal seam fields: same numbers): `cargo fmt --check`, `clippy --workspace
+  --all-targets --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked --no-fail-fast`: cli 30, core 245 (+3 ignored),
+  history_cap 1, format 40, inspect 29 + 2 + 7, jni 7, viewer 5, 0 failed; `cd neoforge && ./gradlew build test`: tests=143 failures=0 (+3);
+  `./gametest.sh --server` (both times): **All 50 required tests passed** (`climateConsistent`, `bandsAreTheBuilders` among them). Not run: `-PwithMic` (the MIC stall is another agent's).
+- **Deviations.** The plan put "anchors in a datapack file"; P1-09 had made them the preset's section, and the placement per class is now that file. The
+  ramp form is `base`/`span` (above). `mapping` in the note stays `"p1-09"` (Java checks it).
+- **Left as constants:** the sea's temperature curve, the aridity → humidity anchors, the depth anchors of the sea, the wetland gate and the E6 band's
+  internal steps.
+- **Next.** The editor could pass the content bundle (essentials and this table) once it can read the datapack registries of the world being created.
+
 ### 2026-09-29 — Coal seam fields: a deposit is one minable seam field, density 4 / 14 / 40 per 100,000 km² (agent worktree agent-a3e41a57dc812f499, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben's decision (decisions log 2026-09-29, "OK; define coal as seams (Recommended)"): coal's survivor-based
   counts stay; a deposit is one minable seam field, tens of km across, with its density sized from coal-basin area
@@ -312,7 +454,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   Chunky areas (chunks' own biomes beside the Köppen map). Data: `review/out/p1-09-data/`; the first render
   (before the ET/EF and river fixes): `review/out/p1-09-v1/`.
 - **For Ben.** (1) The `-PwithMic` gate: the `lakeHolds` heap stall now happens every run (above); options are
-  a master control run to see whether it predates P1-09, a larger `-PwithMic` heap, or chasing the stall. (2)
+  a master control run to see whether it predates P1-09, a larger `-PwithMic` heap, or chasing the stall
+  (resolved 2026-09-29, build log "MIC GameTest heap stall"). (2)
   Mapping internals that stay constants (candidates for more settings under the standing rule): the inland
   continentalness distances (200 / 1,000 / 5,000 blocks), the wetland thresholds (vegetation 2.5 bands, flattest
   35 %, below 150 m) and the band placement per Köppen class. (3) In MIC, Dfc lands on Terralith's forested
@@ -3055,6 +3198,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   other test finished and passed, then `lakeHolds` stalled and the JVM died of heap (it exited on its
   own within ~10 min each time). `-PwithMic` had not run on master since P1-08 added the real-planet and
   deposit test levels; no master control run was made.
+  **Resolved 2026-09-29** (build log "MIC GameTest heap stall"): not a C2ME hang and not `lakeHolds`'
+  own chunks. The suite's scattered column samples held ~52,000+ chunks at once (each far sample pulls
+  289 proto-chunks for structure starts, and nothing unloads inside a tick); `lakeHolds` was the one test
+  still waiting when the heap ran out, and passes alone. The samples now run a few per tick; `-PwithMic`
+  passed 5 of 5.
 - **Not done / next.** Bodies in the strata pass (needs P1-08/P1-14's `bodies/`); the review
   artefacts (BlueMap cliffs with Create stones) wait for Ben's review round; `deposit_type`,
   `sim_field`, `essentials` registries come with their tasks. The MIC pack still has no copy of the
