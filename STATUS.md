@@ -162,8 +162,11 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Gates** (Mac, this branch): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings`, `cargo test
   --workspace --locked` (core 258 + 3 ignored, cli 30, format 40, inspect 29, …), `cargo deny check licenses bans` clean;
   `./gradlew build test` 143/0; `./gametest.sh` all 50 passed (`climateConsistent`: E 1.0, E:snow 0.941 against its 0.9 floor: ET's
-  1,765 columns are unchanged code, EF has 29 columns on the small planet, `EF:no_red` 0 of 29). See the merge line below for the
-  re-run on merged master and `-PwithMic`.
+  1,765 columns are unchanged code, EF has 29 columns on the small planet, `EF:no_red` 0 of 29); `-PwithMic` all 50 passed
+  (E 1.0, E:snow 1.0, `EF:no_red` 0 of 29; EF there: frozen peaks 59 %, frozen cliffs 31 %, snowy slopes 10 %). **Re-run after
+  merging master 00c02ce** (USGS provinces, coherent-continents decisions): fmt, clippy `-D warnings`, `cargo test --workspace`
+  (core 262 + 3 ignored, cli 30, format 40, inspect 29), deny, `./gradlew build test` 143/0, `./gametest.sh` 50 of 50 and
+  `./gametest.sh -PwithMic` 50 of 50.
 - **Next.** Ben's call on caveat (a) (ice-cap humidity band 0.5 vs ≥ 2.05); the coordinator merges (this branch is not merged).
   ET is untouched (Scarlet stays on 3 % of ET, as Ben's "keep it" allows outside EF).
 
