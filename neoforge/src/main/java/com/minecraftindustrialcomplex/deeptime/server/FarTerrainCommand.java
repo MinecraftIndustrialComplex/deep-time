@@ -53,6 +53,11 @@ public final class FarTerrainCommand {
         dispatcher.register(Commands.literal("deeptime").requires(s -> s.hasPermission(2))
                 .then(Commands.literal("probe")
                         .then(Commands.literal("far")
+                                .then(Commands.literal("land")
+                                        .then(Commands.argument("x", IntegerArgumentType.integer())
+                                                .then(Commands.argument("z", IntegerArgumentType.integer())
+                                                        .executes(c -> land(c.getSource(), IntegerArgumentType.getInteger(c, "x"),
+                                                                IntegerArgumentType.getInteger(c, "z"))))))
                                 .then(Commands.literal("bench")
                                         .then(Commands.argument("x", IntegerArgumentType.integer())
                                                 .then(Commands.argument("z", IntegerArgumentType.integer())
@@ -126,6 +131,33 @@ public final class FarTerrainCommand {
         if (terrain.isPresent()) {
             o.add("far", describe(terrain.get().column(x, z)));
             o.add("real", describe(FarTerrainCheck.real(level.getChunk(x >> 4, z >> 4), x, z)));
+        }
+        return DeepTimeCommands.emit(source, o);
+    }
+
+    /**
+     * {@code /deeptime probe far land <x> <z>}: the share of dry columns in the 512 × 512 blocks
+     * around a block, from far terrain alone (no chunk is generated), so a check can pick land.
+     */
+    static int land(CommandSourceStack source, int x, int z) {
+        ServerLevel level = source.getLevel();
+        JsonObject o = header("far-land", level);
+        o.addProperty("x", x);
+        o.addProperty("z", z);
+        Optional<FarTerrain> terrain = FarTerrain.of(level);
+        o.addProperty("deep_time_level", terrain.isPresent());
+        if (terrain.isPresent()) {
+            int[] n = new int[2];
+            terrain.get().build(x - 256, z - 256, 8, 64, (relX, relZ, count, bottom, top, block, material, light, biome) -> {
+                n[0]++;
+                boolean water = false;
+                for (int k = 0; k < count; k++)
+                    water |= material[k] == com.minecraftindustrialcomplex.deeptime.worlddata.FarColumn.WATER
+                            || material[k] == com.minecraftindustrialcomplex.deeptime.worlddata.FarColumn.WATER_ICE;
+                if (!water)
+                    n[1]++;
+            });
+            o.addProperty("land_share", Math.round(1000.0 * n[1] / n[0]) / 1000.0);
         }
         return DeepTimeCommands.emit(source, o);
     }
@@ -207,11 +239,12 @@ public final class FarTerrainCommand {
         List<DhApiBinding.StoredPoint> sorted = new ArrayList<>(stored);
         sorted.sort((p, q) -> Integer.compare(p.bottomY(), q.bottomY()));
         for (DhApiBinding.StoredPoint p : sorted) {
-            if (!ab.isEmpty() && ab.get(ab.size() - 1) == p.block() && a.get(a.size() - 1)[1] == p.bottomY())
+            Object pb = p.block() == null ? Blocks.AIR.defaultBlockState() : p.block();   // DH's air wraps nothing
+            if (!ab.isEmpty() && ab.get(ab.size() - 1) == pb && a.get(a.size() - 1)[1] == p.bottomY())
                 a.get(a.size() - 1)[1] = p.topY();
             else {
                 a.add(new int[]{p.bottomY(), p.topY()});
-                ab.add(p.block());
+                ab.add(pb);
             }
         }
         List<int[]> f = new ArrayList<>();
