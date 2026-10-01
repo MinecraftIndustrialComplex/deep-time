@@ -3828,14 +3828,14 @@ on this machine.
     Tools: `notes.plates.margins`, `deeptime margins`, `notes.volcanoes.arc_bases`, the provinces
     coherence line, `tools/review/p1-27-*`. STATUS.md build log, 2026-09-30 (P1-27).
 
-#### P1-28 Stone crafting on rock worlds (2026-10-01)
-- **Goal.** Deep Time paints rock-specific blocks, so cobblestone-type blocks (vanilla's only inputs
-  for stone tools, furnaces and stone recipes) are rare. Ben (log 2026-10-01): hardness tiers plus
-  river cobbles. (1) Stone tools from hard, tough rock only (`minecraft:stone_tool_materials`);
-  (2) furnaces and stone recipes from any solid rock (`minecraft:stone_crafting_materials`), soft or
-  soluble rock excluded; both lists generated from the rock classes' data and pack-overridable;
-  (3) tool-grade rock guaranteed near spawn (§7.8 essentials); (4) cobbles where nature puts them:
-  cobblestone in river beds, on beaches and in glacial debris.
+#### P1-28 Stone for common rocks (2026-10-01)
+- **Goal.** Deep Time paints rock-specific blocks, so stone and cobblestone, which vanilla is
+  balanced around (tools, furnaces, building), were rare. Ben (log 2026-10-01, final answer): "Use
+  stone for common rocks": `minecraft:stone` is the block of the common fine-grained grey
+  sedimentary classes without a block of their own (shale, mudstone, …) and `minecraft:deepslate` of
+  the common altered and deep ones (slate, phyllite, schist, gneiss, …); classes with a distinctive
+  block keep it. Through the rock class table and tags, pack-overridable. No recipe or item-tag
+  changes; no spawn guarantee, no placed cobbles (the earlier hardness-tier plan is dropped).
 
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 
