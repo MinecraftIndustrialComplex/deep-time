@@ -755,6 +755,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
         let mut lines: Vec<String> = [
             plates_line(world),
             margins_line(world),
+            deeptime_core::provinces::coherence_line(world),
             surface_line(world),
             glacial_line(world),
             climate_line(world),
@@ -931,6 +932,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         );
     }
     if let Some(line) = margins_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = deeptime_core::provinces::coherence_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = surface_line(&ck.world) {

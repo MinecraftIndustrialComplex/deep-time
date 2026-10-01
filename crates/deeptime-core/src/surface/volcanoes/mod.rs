@@ -318,9 +318,11 @@ pub struct VolcanoState {
     pub arc_bases: Vec<ArcBase>,
 }
 
-/// The ground active stratovolcanoes on continental crust stand on at one time (P1-27: cones on a
-/// cordillera, not on a coastal plain): the lower quartile of the ring just outside each cone
-/// (the base the stage measures), above the sea.
+/// The ground active stratovolcanoes on continental landmasses stand on at one time (P1-27: cones
+/// on a cordillera, not on a coastal plain): the surface at each summit less the relief the cone
+/// built, above the sea. Landmasses smaller than
+/// `plates::stats::MARGIN_MIN_LANDMASS_KM2` (Earth-normalized) are left out: island arcs stand on
+/// the sea floor by nature.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct ArcBase {
     pub t_myr: f64,
@@ -334,6 +336,53 @@ pub struct ArcBase {
 
 /// The arc bases are recorded this often, Myr.
 const ARC_BASE_EVERY_MYR: f64 = 10.0;
+
+/// Per L1 cell: continental crust (`plates/crust_type`) in a connected landmass of at least
+/// `min_km2` (4-neighbour, x wraps).
+fn landmasses(grid: &GridDesc, crust: &[f32], min_km2: f64, cell_m: f64) -> Vec<bool> {
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    let land = |c: usize| crust[c] >= 0.5;
+    let mut out = vec![false; w * h];
+    let mut seen = vec![false; w * h];
+    let mut stack = Vec::new();
+    for start in 0..w * h {
+        if seen[start] || !land(start) {
+            continue;
+        }
+        let mut members = Vec::new();
+        seen[start] = true;
+        stack.push(start);
+        let mut area = 0.0;
+        while let Some(c) = stack.pop() {
+            members.push(c);
+            let (i, j) = (c % w, c / w);
+            // Cells shrink towards the poles (the grid is equirectangular).
+            let lat = std::f64::consts::PI * (0.5 - (j as f64 + 0.5) / h as f64);
+            area += cell_m * cell_m * lat.cos() / 1.0e6;
+            let mut nb = [usize::MAX; 4];
+            nb[0] = j * w + (i + 1) % w;
+            nb[1] = j * w + (i + w - 1) % w;
+            if j > 0 {
+                nb[2] = (j - 1) * w + i;
+            }
+            if j + 1 < h {
+                nb[3] = (j + 1) * w + i;
+            }
+            for q in nb {
+                if q != usize::MAX && !seen[q] && land(q) {
+                    seen[q] = true;
+                    stack.push(q);
+                }
+            }
+        }
+        if area >= min_km2 {
+            for c in members {
+                out[c] = true;
+            }
+        }
+    }
+    out
+}
 
 /// Estimate: the catalogue is small; a few L1 arrays per step.
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
@@ -1068,6 +1117,17 @@ impl VolcanoStage {
         let cell_km2 = cell_m * cell_m / 1.0e6;
         let every = (ARC_BASE_EVERY_MYR / dt).round().max(1.0) as u64;
         let record_bases = (self.done + 1).is_multiple_of(every) || last;
+        // Continental arcs only: cones on a landmass of at least a continent's size (island
+        // arcs on small crust fragments stand on the sea floor by nature).
+        let big_land = if record_bases {
+            let model_km = self.preset.tectonics.model_radius_km;
+            let planet_km = self.preset.scale.radius_m() / 1000.0;
+            let min_km2 =
+                crate::plates::stats::MARGIN_MIN_LANDMASS_KM2 * (planet_km / model_km).powi(2);
+            landmasses(&grid, &crust, min_km2, cell_m)
+        } else {
+            Vec::new()
+        };
         let mut bases: Vec<f64> = Vec::new();
         for v in &mut st.volcanoes {
             if !v.active() {
@@ -1075,8 +1135,13 @@ impl VolcanoStage {
             }
             // New volcanoes are measured now; the others were measured before the births.
             let base = l1.base(v.x, v.z, v.radius_m);
-            if record_bases && v.kind == Kind::Strato && !v.oceanic {
-                bases.push(base - sea);
+            if record_bases && v.kind == Kind::Strato && big_land[cell_of(&grid, v.x, v.z)] {
+                // The ground under the cone: the surface at its summit less the relief it built
+                // (a ring round a cone wider than the range it stands on would read the
+                // foothills or, at a coast, the sea).
+                let c = cell_of(&grid, v.x, v.z);
+                let here = f64::from(l1.elev[c]) + f64::from(l1.delta[c]);
+                bases.push(here - v.height_m - sea);
             }
             let target = match v.kind {
                 Kind::Strato => {

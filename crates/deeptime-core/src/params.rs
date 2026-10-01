@@ -318,6 +318,10 @@ pub struct TectonicParams {
     /// Cap on Δc·A, the discrete collision uplift (design choice; Δc·A of a whole continent
     /// would be tens of kilometres).
     pub collision_uplift_max_m: f64,
+    /// Crust lifted by at least this share of a collision's peak uplift becomes a collision
+    /// orogen (Himalayan orogeny, folds, regional metamorphism); the rest of the surge only rises
+    /// (P1-27: Earth's collision belts are a few hundred to ~1,500 km wide, not the whole surge).
+    pub collision_orogen_core: f64,
     /// Axis change of a subducting plate towards its fronts per 1,000 km of front and Myr
     /// (slab pull, Cortial §4.1's ε scaled by front length).
     pub slab_pull_rad_per_1000km_myr: f64,
@@ -383,6 +387,17 @@ pub struct TectonicParams {
     pub arc_uplift_mm_yr: f64,
     /// New arc crust per Myr at the arc axis at v = v_0, metres.
     pub arc_magma_m_per_myr: f64,
+    /// Uplift of continental crust over a magmatic arc at v = v_0, mm/yr: the arc's own
+    /// cordillera, built by arc magmatism and crustal thickening (P1-27; 0, the default and the
+    /// plate-only presets' value, leaves only Cortial's subduction uplift; the planet pipeline
+    /// presets use 0.2).
+    pub cordillera_uplift_mm_yr: f64,
+    /// … the half-width of its band, centred on the arc axis, km (Earth-normalized; the Andes
+    /// and Cascades ranges are 100–300 km wide across the arc) …
+    pub cordillera_width_km: f64,
+    /// … and the height it builds towards, m: the uplift slows to nothing there (thickened arc
+    /// crust spreads; the Central Andes' plateau stands near 4 km, the Cascades' base 1.2–2 km).
+    pub cordillera_height_m: f64,
     /// Fraction of the way to z_t a trench sample moves per step.
     pub trench_relax: f64,
     /// Pelagic sedimentation on oceanic crust, m/Myr.
@@ -412,11 +427,19 @@ pub struct TectonicParams {
     /// Terranes of at least this fraction of A_0 make a collision (and a collision orogeny);
     /// smaller ones are a terrane accretion only.
     pub collision_min_frac: f64,
+    /// A colliding continent of at least this fraction of A_0 sutures its whole plate to the
+    /// receiving one, keeping the ocean on its other sides (P1-27: moving the continent alone
+    /// left its passive margins facing an ocean that kept converging, so they all turned
+    /// active); a smaller terrane moves alone (an island arc or microcontinent accretes).
+    pub collision_suture_frac: f64,
     /// Oceanic crust older than this, on a plate that subducts nowhere, can start subducting on
     /// its own (Wilson cycle), Myr.
     pub subduction_initiation_age_myr: f64,
     /// Expected subduction initiations per step per A_0 of such old crust.
     pub subduction_initiation_rate: f64,
+    /// Old crust can start subducting only this far from every trench, km (Earth-normalized;
+    /// a new subduction zone does not open beside a working one).
+    pub subduction_initiation_clearance_km: f64,
     /// Convergence given to the plate a subduction initiation splits off, mm/yr.
     pub subduction_initiation_speed_mm_yr: [f64; 2],
     /// Contacts unseen for this many steps are closed.
@@ -447,6 +470,7 @@ impl Default for TectonicParams {
             collision_threshold_km: 300.0,
             subduction_peak_km: 300.0,
             collision_uplift_max_m: 4000.0,
+            collision_orogen_core: 0.5,
             slab_pull_rad_per_1000km_myr: 0.002,
             slab_pull_speed_mm_yr: 80.0,
             slab_pull_front_km: 3000.0,
@@ -474,6 +498,9 @@ impl Default for TectonicParams {
             arc_width_km: 60.0,
             arc_uplift_mm_yr: 0.1,
             arc_magma_m_per_myr: 20.0,
+            cordillera_uplift_mm_yr: 0.0,
+            cordillera_width_km: 120.0,
+            cordillera_height_m: 2500.0,
             trench_relax: 0.5,
             pelagic_m_per_myr: 5.0,
             hotspots_initial: 8,
@@ -488,8 +515,10 @@ impl Default for TectonicParams {
             lip_rift_boost_myr: 20.0,
             terrane_event_min_frac: 0.005,
             collision_min_frac: 0.1,
+            collision_suture_frac: 0.1,
             subduction_initiation_age_myr: 150.0,
-            subduction_initiation_rate: 0.1,
+            subduction_initiation_rate: 0.3,
+            subduction_initiation_clearance_km: 1000.0,
             subduction_initiation_speed_mm_yr: [30.0, 60.0],
             contact_timeout_steps: 12,
             collision_orogeny_myr: 30.0,
@@ -748,6 +777,7 @@ impl PlanetPreset {
             )?;
         }
         for (v, key) in [
+            (k.collision_orogen_core, "$.tectonics.collision_orogen_core"),
             (k.min_plate_area_frac, "$.tectonics.min_plate_area_frac"),
             (k.trench_relax, "$.tectonics.trench_relax"),
             (k.lip_probability, "$.tectonics.lip_probability"),
@@ -759,6 +789,21 @@ impl PlanetPreset {
             "$.tectonics.continental_shelf_share",
             "must be in [0, 0.9)",
         )?;
+        for (v, key) in [
+            (k.collision_suture_frac, "$.tectonics.collision_suture_frac"),
+            (
+                k.subduction_initiation_clearance_km,
+                "$.tectonics.subduction_initiation_clearance_km",
+            ),
+            (
+                k.cordillera_uplift_mm_yr,
+                "$.tectonics.cordillera_uplift_mm_yr",
+            ),
+        ] {
+            check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
+        }
+        pos(k.cordillera_width_km, "$.tectonics.cordillera_width_km")?;
+        pos(k.cordillera_height_m, "$.tectonics.cordillera_height_m")?;
         // A planet without ocean floor has no ocean crust for the plate model and the surface to
         // work with: the surface stage's elevations come out NaN everywhere (found by the settings
         // audit's extremes: ocean_fraction 0.25 with the pipeline presets' shelf share 0.29).

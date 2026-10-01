@@ -310,6 +310,8 @@ pub struct Counters {
     pub initiations: u32,
     /// Subduction polarity reversals.
     pub reversals: u32,
+    /// Collisions that sutured the subducting plate whole to the receiving one (P1-27).
+    pub sutures: u32,
     pub ridges: u32,
     pub hotspots: u32,
     pub lips: u32,

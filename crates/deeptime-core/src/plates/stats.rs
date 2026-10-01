@@ -124,8 +124,10 @@ const MARGIN_ADJACENT_SPACINGS: f64 = 1.5;
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Margins {
     /// Time, Myr relative to world creation.
+    #[serde(deserialize_with = "nan_if_null")]
     pub t_myr: f64,
     /// Margin length, km (Earth-normalized: one sample spacing per coastal sample).
+    #[serde(deserialize_with = "nan_if_null")]
     pub coast_km: f64,
     /// Coastal samples, and of them …
     pub coast: u32,
@@ -147,12 +149,14 @@ pub struct Margins {
     pub regime_arc: u32,
     /// Median age of the oceanic crust next to passive margins, Myr (how long margins stay
     /// passive: the floor beside a rifted margin is as old as the ocean).
+    #[serde(deserialize_with = "nan_if_null")]
     pub passive_floor_age_p50_myr: f64,
     /// Polarity reversals so far (the run's counter).
     pub reversals: u32,
     /// Coastal samples with another plate's crust adjacent (a plate boundary at the coast).
     pub at_boundary: u32,
     /// Median distance from a subduction margin to its front, km (Earth-normalized).
+    #[serde(deserialize_with = "nan_if_null")]
     pub front_km_p50: f64,
     /// Samples on the overriding side of a live subduction front (its length in spacings), …
     pub front_over: u32,
@@ -163,7 +167,13 @@ pub struct Margins {
     /// Coastal samples of smaller fragments (island arcs, slivers), not counted above.
     pub fragment_coast: u32,
     /// Continental crust on fragments, as a share of all visible continental crust.
+    #[serde(deserialize_with = "nan_if_null")]
     pub fragment_crust_share: f64,
+}
+
+/// JSON has no NaN (serde_json writes it as null): read null back as NaN.
+fn nan_if_null<'de, D: serde::Deserializer<'de>>(d: D) -> Result<f64, D::Error> {
+    Ok(Option::<f64>::deserialize(d)?.unwrap_or(f64::NAN))
 }
 
 impl Margins {
@@ -482,8 +492,8 @@ impl Summary {
             "plates_final={} ocean_age_p90_myr={:.1} ocean_age_p50_myr={:.1} \
              ocean_younger_250={:.3} ocean_frac={:.3} largest_plate_frac={:.3} \
              plates_over_5pct={} plates_under_1pct={} rifts={} initiations={} reversals={} \
-             subductions={} collisions={} accretions={} ridges={} births={} deaths={} lips={} \
-             resamplings={}",
+             subductions={} collisions={} sutures={} accretions={} ridges={} births={} deaths={} \
+             lips={} resamplings={}",
             self.plates,
             self.ocean_age_p90_myr,
             self.ocean_age_p50_myr,
@@ -497,6 +507,7 @@ impl Summary {
             self.counters.reversals,
             self.counters.subduction_onsets,
             self.counters.collisions,
+            self.counters.sutures,
             self.counters.accretions,
             self.counters.ridges,
             self.counters.plate_births,

@@ -30,7 +30,7 @@ use deeptime_format::EventId;
 use glam::DVec3;
 
 use super::Env;
-use super::events::{self, COLLISION, OROGENY_PHASE, TERRANE_ACCRETION};
+use super::events::{self, COLLISION, OROGENY_PHASE, PLATE_DEATH, TERRANE_ACCRETION};
 use super::geometry::{Geo, coast_split, dijkstra};
 use super::kinematics::{cap_speed, quat, tangent, to_group};
 use super::state::{CONTINENTAL, Group, HIDDEN, OROGENY_HIMALAYAN, PlateState, pool};
@@ -38,8 +38,18 @@ use super::subduction::ceiling;
 use crate::error::CoreError;
 use crate::world::WorldState;
 
+/// What a collision did.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Collided {
+    /// The collision (or terrane accretion) event, when one was written.
+    pub event: Option<EventId>,
+    /// The subducting plate sutured whole to the receiving one (it is dead now; the caller
+    /// resamples the crust this step, so its subducted slab is consumed).
+    pub sutured: bool,
+}
+
 /// Runs the collision of contact `k`, whose subducting plate's continental crust `seeds` has been
-/// forced under the overriding plate; returns the collision event (none when nothing collided).
+/// forced under the overriding plate.
 pub fn collide(
     state: &mut PlateState,
     world: &mut WorldState,
@@ -48,13 +58,13 @@ pub fn collide(
     env: &Env,
     k: usize,
     seeds: &[u32],
-) -> Result<Option<EventId>, CoreError> {
+) -> Result<Collided, CoreError> {
     let p = env.k;
     let t_myr = env.t_myr;
     let norm = env.norm;
     let (under, over) = (state.contacts[k].under, state.contacts[k].over);
     if under == over || !state.plates[under as usize].alive || !state.plates[over as usize].alive {
-        return Ok(None);
+        return Ok(Collided::default());
     }
     let n = state.samples.len();
     let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
@@ -81,7 +91,7 @@ pub fn collide(
     }
     if terrane.is_empty() {
         state.contacts[k].depth_km = 0.0;
-        return Ok(None);
+        return Ok(Collided::default());
     }
     terrane.sort_unstable();
     let area_km2 = terrane.len() as f64 * norm.sample_area_km2();
@@ -92,26 +102,45 @@ pub fn collide(
         .sum::<DVec3>()
         .normalize_or(DVec3::from_array(state.contacts[k].centroid));
 
-    // The terrane's coasts whose ocean stays behind on the subducting plate.
-    let split_coast = coast_split(
-        geo,
-        state,
-        &terrane,
-        |i| plate_of[i] == under,
-        |i| u32::from(in_terrane[i]),
-    );
-    // Transfer: each of the terrane's groups gets a twin in the receiving plate.
-    let mut twin: BTreeMap<u32, u32> = BTreeMap::new();
-    for &i in &terrane {
-        let g = state.samples[i as usize].group;
-        let new = *twin.entry(g).or_insert_with(|| {
-            let rot = state.groups[g as usize].rot;
-            state.groups.push(Group { plate: over, rot });
-            (state.groups.len() - 1) as u32
-        });
-        let s = &mut state.samples[i as usize];
-        s.group = new;
-        s.flags &= !HIDDEN;
+    let suture = area_km2 / state.a0_km2 >= p.collision_suture_frac;
+    // The terrane's coasts whose ocean stays behind on the subducting plate (none with a suture).
+    let split_coast = if suture {
+        0
+    } else {
+        coast_split(
+            geo,
+            state,
+            &terrane,
+            |i| plate_of[i] == under,
+            |i| u32::from(in_terrane[i]),
+        )
+    };
+    // A continent too large to be carried under sutures its whole plate to the receiving one
+    // (P1-27): the two plates become one, so the continent keeps the ocean on its other sides
+    // and those margins stay passive. A smaller terrane moves alone to the receiving plate
+    // (an island arc or a microcontinent accretes and subduction steps outboard of it).
+    let under_samples = f64::from(state.plates[under as usize].samples.max(1));
+    if suture {
+        for g in state.groups.iter_mut().filter(|g| g.plate == under) {
+            g.plate = over;
+        }
+        for &i in &terrane {
+            state.samples[i as usize].flags &= !HIDDEN;
+        }
+    } else {
+        // Transfer: each of the terrane's groups gets a twin in the receiving plate.
+        let mut twin: BTreeMap<u32, u32> = BTreeMap::new();
+        for &i in &terrane {
+            let g = state.samples[i as usize].group;
+            let new = *twin.entry(g).or_insert_with(|| {
+                let rot = state.groups[g as usize].rot;
+                state.groups.push(Group { plate: over, rot });
+                (state.groups.len() - 1) as u32
+            });
+            let s = &mut state.samples[i as usize];
+            s.group = new;
+            s.flags &= !HIDDEN;
+        }
     }
 
     // The surge around the suture.
@@ -151,7 +180,10 @@ pub fn collide(
         let z = f64::from(s.elevation_m);
         let dz = dz_max * w * ceiling(z, p.max_elevation_m);
         s.elevation_m = (z + dz).min(p.max_elevation_m) as f32;
-        if dz > 10.0 {
+        // The orogen proper is the core of the surge, where the crust thickened most (P1-27:
+        // stamping everything the surge lifted by 10 m made belts 4,000 km wide, and most of
+        // every continent a collision orogen); the rest only rises.
+        if dz > 10.0 && w >= p.collision_orogen_core {
             uplifted += 1;
             s.orogeny = OROGENY_HIMALAYAN;
             s.orogeny_myr = t_myr as f32;
@@ -165,8 +197,12 @@ pub fn collide(
         }
     }
 
-    // The receiving plate carries the terrane's momentum.
-    let t_samples = terrane.len() as f64;
+    // The receiving plate carries the terrane's momentum (with a suture, the whole plate's).
+    let t_samples = if suture {
+        under_samples
+    } else {
+        terrane.len() as f64
+    };
     let merged = (omega_o * over_samples + omega_u * t_samples) / (over_samples + t_samples);
     state.plates[over as usize].omega =
         cap_speed(merged, &norm, p.max_plate_speed_mm_yr).to_array();
@@ -175,11 +211,11 @@ pub fn collide(
     let planet_area = norm.planet_area_km2(area_km2);
     let onset = super::subduction::confirm(state, world, env, k)?;
     let frac = area_km2 / state.a0_km2;
-    if frac < p.terrane_event_min_frac {
+    let coast_km = norm.planet_len_km(split_coast as f64 * norm.km(norm.spacing_rad()));
+    let event = if frac < p.terrane_event_min_frac {
         state.counters.accretions += 1;
-        return Ok(None);
-    }
-    if frac < p.collision_min_frac {
+        None
+    } else if frac < p.collision_min_frac {
         let e = events::event(world, t_myr, TERRANE_ACCRETION, q)
             .magnitude(frac as f32)
             .param("from_plate", i64::from(under))
@@ -187,47 +223,63 @@ pub fn collide(
             .param("area_km2", planet_area)
             .param("samples", terrane.len() as i64)
             .param("uplift_m", dz_max)
-            .param(
-                "coast_split_km",
-                norm.planet_len_km(split_coast as f64 * norm.km(norm.spacing_rad())),
-            )
+            .param("coast_split_km", coast_km)
+            .param("sutured", i64::from(suture))
             .caused_by(onset);
         let id = world.emit(e)?;
         state.counters.accretions += 1;
-        return Ok(Some(id));
+        Some(id)
+    } else {
+        let e = events::event(world, t_myr, COLLISION, centroid)
+            .magnitude((dz_max / 1000.0) as f32)
+            .param("plate_a", i64::from(under))
+            .param("plate_b", i64::from(over))
+            .param("terrane_area_km2", planet_area)
+            .param("uplift_m", dz_max)
+            .param("radius_km", norm.planet_len_km(r_km))
+            .param("convergence_mm_yr", conv)
+            .param("coast_split_km", coast_km)
+            .param("sutured", i64::from(suture))
+            .caused_by(onset);
+        let collision = world.emit(e)?;
+        let e = events::event(world, t_myr, TERRANE_ACCRETION, q)
+            .magnitude((area_km2 / state.a0_km2) as f32)
+            .param("from_plate", i64::from(under))
+            .param("to_plate", i64::from(over))
+            .param("area_km2", planet_area)
+            .param("samples", terrane.len() as i64)
+            .caused_by(collision);
+        world.emit(e)?;
+        let e = events::event(world, t_myr, OROGENY_PHASE, centroid)
+            .until((t_myr + p.collision_orogeny_myr) * 1.0e6)
+            .magnitude((dz_max / 1000.0) as f32)
+            .param("orogeny", "himalayan")
+            .param("plate", i64::from(over))
+            .param("uplift_m", dz_max)
+            .param("uplifted_samples", uplifted as i64)
+            .caused_by(collision);
+        world.emit(e)?;
+        state.counters.collisions += 1;
+        state.counters.accretions += 1;
+        Some(collision)
+    };
+    if suture {
+        let at = DVec3::from_array(state.plates[under as usize].centroid);
+        let e = events::event(world, t_myr, PLATE_DEATH, at)
+            .param("plate", i64::from(under))
+            .param("fate", "sutured")
+            .param("absorbed_by", i64::from(over))
+            .caused_by(event.unwrap_or(onset));
+        world.emit(e)?;
+        let dead = &mut state.plates[under as usize];
+        dead.alive = false;
+        dead.died_myr = Some(t_myr);
+        dead.samples = 0;
+        state.counters.plate_deaths += 1;
+        state.counters.sutures += 1;
     }
-    let e = events::event(world, t_myr, COLLISION, centroid)
-        .magnitude((dz_max / 1000.0) as f32)
-        .param("plate_a", i64::from(under))
-        .param("plate_b", i64::from(over))
-        .param("terrane_area_km2", planet_area)
-        .param("uplift_m", dz_max)
-        .param("radius_km", norm.planet_len_km(r_km))
-        .param("convergence_mm_yr", conv)
-        .param(
-            "coast_split_km",
-            norm.planet_len_km(split_coast as f64 * norm.km(norm.spacing_rad())),
-        )
-        .caused_by(onset);
-    let collision = world.emit(e)?;
-    let e = events::event(world, t_myr, TERRANE_ACCRETION, q)
-        .magnitude((area_km2 / state.a0_km2) as f32)
-        .param("from_plate", i64::from(under))
-        .param("to_plate", i64::from(over))
-        .param("area_km2", planet_area)
-        .param("samples", terrane.len() as i64)
-        .caused_by(collision);
-    world.emit(e)?;
-    let e = events::event(world, t_myr, OROGENY_PHASE, centroid)
-        .until((t_myr + p.collision_orogeny_myr) * 1.0e6)
-        .magnitude((dz_max / 1000.0) as f32)
-        .param("orogeny", "himalayan")
-        .param("plate", i64::from(over))
-        .param("uplift_m", dz_max)
-        .param("uplifted_samples", uplifted as i64)
-        .caused_by(collision);
-    world.emit(e)?;
-    state.counters.collisions += 1;
-    state.counters.accretions += 1;
-    Ok(Some(collision))
+    Ok(Collided {
+        event,
+        sutured: suture,
+    })
 }

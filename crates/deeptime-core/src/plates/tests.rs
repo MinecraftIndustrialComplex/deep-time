@@ -441,3 +441,176 @@ fn the_shelf_share_floods_the_continents_margins() {
         );
     }
 }
+
+/// P1-27: the margins are measured every 10 Myr into `notes.plates.margins`; at the start, with no
+/// subduction zone yet, every coast is passive or another plate boundary, and the classes add up.
+#[test]
+fn margins_are_measured_and_add_up() {
+    let p = preset(6000, 40.0, "scattered_continents", 7);
+    let env = PlatesStage::new(p.clone()).env(&p.tectonics, 1);
+    let (st, geo) = init::initial_state(&p, &env).unwrap();
+    let pos = geometry::positions(&st, &geo);
+    let (m, class) = stats::margin_classes(&st, &pos, &env.norm, &|_| false);
+    assert!(m.coast > 0 && m.coast_km > 0.0);
+    assert_eq!(
+        m.subduction + m.collision,
+        0,
+        "no subduction zone at the start"
+    );
+    assert_eq!(m.passive + m.boundary + m.subduction + m.collision, m.coast);
+    assert_eq!(class.len(), st.samples.len());
+    assert_eq!(
+        class
+            .iter()
+            .filter(|&&c| c & !stats::margin_class::FRONT == stats::margin_class::PASSIVE)
+            .count() as u32,
+        m.passive
+    );
+    let world = run_stage(&p, |_, _, _| {});
+    let note: serde_json::Value = serde_json::from_str(&world.notes["plates"]).unwrap();
+    let list = note["margins"].as_array().unwrap();
+    assert_eq!(list.len(), 4, "one record every 10 Myr of 40");
+    for r in list {
+        let r: stats::Margins = serde_json::from_value(r.clone()).unwrap();
+        assert_eq!(r.passive + r.boundary + r.subduction + r.collision, r.coast);
+        assert!(r.andean <= r.subduction && r.initiated <= r.subduction);
+    }
+}
+
+/// P1-27: a continent too large to be carried under sutures its whole plate to the receiving one
+/// (the plate dies "sutured", owns nothing, and its margins keep their ocean); subduction
+/// initiations never tear a continent (only slivers stranded in the old floor ride along); a
+/// suture leaves no coast behind.
+#[test]
+fn sutures_and_initiations_keep_continents_whole() {
+    let mut sutures = 0;
+    let mut initiations = 0;
+    for (start, seed) in [("supercontinent", 21), ("scattered_continents", 22)] {
+        let p = preset(8000, 300.0, start, seed);
+        let mut seen = 0usize;
+        let world = run_stage(&p, |stage, world, st| {
+            assert!(stats::summary(st).partition_ok);
+            // A plate born of a subduction initiation this step holds no continental crust that
+            // touches its parent's: a continent is never torn (a sliver stranded in the old
+            // floor may ride along whole).
+            let geo = &stage.cache.as_ref().unwrap().geo;
+            for e in &world.events[seen..] {
+                if e.params.get("origin")
+                    != Some(&deeptime_format::ParamValue::Str(
+                        "subduction_initiation".into(),
+                    ))
+                {
+                    continue;
+                }
+                let (
+                    Some(deeptime_format::ParamValue::Int(id)),
+                    Some(deeptime_format::ParamValue::Int(parent)),
+                ) = (e.params.get("plate"), e.params.get("parent"))
+                else {
+                    panic!("an initiation without its plates");
+                };
+                if geo.lattice != st.lattice || st.resample_step == st.step {
+                    continue;
+                }
+                for i in 0..st.samples.len() {
+                    if st.plate_of(i) != *id as u32 || !st.samples[i].is_continental() {
+                        continue;
+                    }
+                    for (u, _) in geo.edges(i as u32) {
+                        let o = &st.samples[u as usize];
+                        assert!(
+                            !(o.is_continental() && st.plate_of(u as usize) == *parent as u32),
+                            "{start}: an initiation tore a continent"
+                        );
+                    }
+                }
+            }
+            seen = world.events.len();
+            for e in world
+                .events
+                .iter()
+                .filter(|e| e.kind == events::PLATE_DEATH)
+            {
+                if e.params.get("fate") == Some(&deeptime_format::ParamValue::Str("sutured".into()))
+                {
+                    let Some(deeptime_format::ParamValue::Int(id)) = e.params.get("plate") else {
+                        panic!("a sutured plate without its id");
+                    };
+                    let id = *id as u32;
+                    assert!(!st.plates[id as usize].alive);
+                    assert!(
+                        (0..st.samples.len()).all(|i| st.plate_of(i) != id),
+                        "a sutured plate still owns crust"
+                    );
+                }
+            }
+        });
+        let st = world.plates.as_ref().unwrap();
+        let sutured = world
+            .events
+            .iter()
+            .filter(|e| {
+                e.params.get("fate") == Some(&deeptime_format::ParamValue::Str("sutured".into()))
+            })
+            .count() as u32;
+        assert_eq!(sutured, st.counters.sutures, "{start}");
+        sutures += st.counters.sutures;
+        for e in world.events.iter().filter(|e| {
+            e.params.get("origin")
+                == Some(&deeptime_format::ParamValue::Str(
+                    "subduction_initiation".into(),
+                ))
+        }) {
+            initiations += 1;
+            let Some(deeptime_format::ParamValue::Float(f)) = e.params.get("continental_frac")
+            else {
+                panic!("an initiation without its continental fraction");
+            };
+            assert!(
+                *f < 0.5,
+                "{start}: an initiation's plate is {f} continental"
+            );
+        }
+        for e in world.events.iter().filter(|e| {
+            e.kind == events::COLLISION
+                && e.params.get("sutured") == Some(&deeptime_format::ParamValue::Int(1))
+        }) {
+            assert_eq!(
+                e.params.get("coast_split_km"),
+                Some(&deeptime_format::ParamValue::Float(0.0)),
+                "a suture leaves no coast behind"
+            );
+        }
+    }
+    assert!(sutures > 0, "no collision sutured in two 300-Myr runs");
+    assert!(
+        initiations > 0,
+        "no subduction initiation in two 300-Myr runs"
+    );
+}
+
+/// P1-27: with `cordillera_uplift_mm_yr` the continental crust over an arc stands higher than
+/// without it, over the same history.
+#[test]
+fn arcs_build_a_cordillera() {
+    let mean_arc = |uplift: f64| {
+        let mut p = preset(8000, 60.0, "scattered_continents", 31);
+        p.tectonics.cordillera_uplift_mm_yr = uplift;
+        let mut sum = (0.0, 0usize);
+        run_stage(&p, |_, _, st| {
+            for s in &st.samples {
+                if s.is_continental() && s.flags & state::ARC != 0 {
+                    sum.0 += f64::from(s.elevation_m);
+                    sum.1 += 1;
+                }
+            }
+        });
+        assert!(sum.1 > 0, "no continental arc in 60 Myr");
+        sum.0 / sum.1 as f64
+    };
+    let (flat, range) = (mean_arc(0.0), mean_arc(0.5));
+    assert!(
+        range > flat + 300.0,
+        "arc crust {range:.0} m with the cordillera vs {flat:.0} m without"
+    );
+}
