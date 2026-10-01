@@ -21,7 +21,7 @@ use glam::DVec3;
 
 use super::Env;
 use super::events::{self, PLATE_BIRTH, RIFT_ONSET};
-use super::geometry::{Geo, connect_plates};
+use super::geometry::{Geo, coast_split, connect_plates};
 use super::kinematics::cap_speed;
 use super::noise::fbm;
 use super::state::{CONTINENTAL, Group, Plate, PlateState, RiftLink};
@@ -134,6 +134,7 @@ pub fn rift(
     }
     let member = membership(&members, n);
     connect_plates(geo, &mut label, |i| member[i]);
+    let split_coast = coast_split(geo, state, &members, |i| member[i], |i| label[i]);
     let mut counts = vec![0usize; fragments as usize];
     for &i in &members {
         counts[label[i as usize] as usize] += 1;
@@ -214,7 +215,11 @@ pub fn rift(
         .param("plate", i64::from(id))
         .param("fragments", order.len() as i64)
         .param("continental_frac", cont_frac)
-        .param("area_km2", area_planet);
+        .param("area_km2", area_planet)
+        .param(
+            "coast_split_km",
+            norm.planet_len_km(split_coast as f64 * norm.km(norm.spacing_rad())),
+        );
     if let Some(lip) = parent.lip_event.filter(|_| t < parent.lip_until_myr) {
         e = e.caused_by(lip);
     }
@@ -374,6 +379,7 @@ fn initiate(
         label[i as usize] = u32::from(da < db);
     }
     connect_plates(geo, &mut label, |i| member[i]);
+    let split_coast = coast_split(geo, state, &members, |i| member[i], |i| label[i]);
     let split: Vec<u32> = members
         .iter()
         .copied()
@@ -444,7 +450,11 @@ fn initiate(
             norm.planet_area_km2(count as f64 * norm.sample_area_km2()),
         )
         .param("mean_ocean_age_myr", mean_age)
-        .param("speed_mm_yr", norm.speed_mm_yr(omega, c));
+        .param("speed_mm_yr", norm.speed_mm_yr(omega, c))
+        .param(
+            "coast_split_km",
+            norm.planet_len_km(split_coast as f64 * norm.km(norm.spacing_rad())),
+        );
     let birth = world.emit(e)?;
     state.plates[new_id as usize].birth_event = Some(birth);
     state.counters.plate_births += 1;

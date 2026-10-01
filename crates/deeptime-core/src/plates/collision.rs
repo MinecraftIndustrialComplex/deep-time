@@ -31,7 +31,7 @@ use glam::DVec3;
 
 use super::Env;
 use super::events::{self, COLLISION, OROGENY_PHASE, TERRANE_ACCRETION};
-use super::geometry::{Geo, dijkstra};
+use super::geometry::{Geo, coast_split, dijkstra};
 use super::kinematics::{cap_speed, quat, tangent, to_group};
 use super::state::{CONTINENTAL, Group, HIDDEN, OROGENY_HIMALAYAN, PlateState, pool};
 use super::subduction::ceiling;
@@ -92,6 +92,14 @@ pub fn collide(
         .sum::<DVec3>()
         .normalize_or(DVec3::from_array(state.contacts[k].centroid));
 
+    // The terrane's coasts whose ocean stays behind on the subducting plate.
+    let split_coast = coast_split(
+        geo,
+        state,
+        &terrane,
+        |i| plate_of[i] == under,
+        |i| u32::from(in_terrane[i]),
+    );
     // Transfer: each of the terrane's groups gets a twin in the receiving plate.
     let mut twin: BTreeMap<u32, u32> = BTreeMap::new();
     for &i in &terrane {
@@ -179,6 +187,10 @@ pub fn collide(
             .param("area_km2", planet_area)
             .param("samples", terrane.len() as i64)
             .param("uplift_m", dz_max)
+            .param(
+                "coast_split_km",
+                norm.planet_len_km(split_coast as f64 * norm.km(norm.spacing_rad())),
+            )
             .caused_by(onset);
         let id = world.emit(e)?;
         state.counters.accretions += 1;
@@ -192,6 +204,10 @@ pub fn collide(
         .param("uplift_m", dz_max)
         .param("radius_km", norm.planet_len_km(r_km))
         .param("convergence_mm_yr", conv)
+        .param(
+            "coast_split_km",
+            norm.planet_len_km(split_coast as f64 * norm.km(norm.spacing_rad())),
+        )
         .caused_by(onset);
     let collision = world.emit(e)?;
     let e = events::event(world, t_myr, TERRANE_ACCRETION, q)
