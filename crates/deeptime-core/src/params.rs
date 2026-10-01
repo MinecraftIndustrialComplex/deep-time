@@ -261,6 +261,17 @@ impl Default for FeatureScale {
     }
 }
 
+/// The density of continental crust the strength comparison uses, kg/m³.
+pub const CRUST_DENSITY_KG_M3: f64 = 2800.0;
+
+impl TectonicParams {
+    /// The height above the sea at which the crust's own weight reaches its strength,
+    /// S / (ρ_c · g), m: where spreading starts. Gravity enters here and nowhere else.
+    pub fn strength_height_m(&self, gravity_m_s2: f64) -> f64 {
+        self.crust_strength_mpa * 1.0e6 / (CRUST_DENSITY_KG_M3 * gravity_m_s2)
+    }
+}
+
 impl ScaleParams {
     /// Where the finished terrain's compression starts and what it never reaches ([`BuildFit`]).
     pub fn build_fit(&self) -> BuildFit {
@@ -349,8 +360,29 @@ pub struct TectonicParams {
     pub abyssal_elevation_m: f64,
     /// z_t, oceanic trench (−10 km).
     pub trench_elevation_m: f64,
-    /// z_c, highest continental altitude (10 km).
+    /// A numerical guard on the plate model's elevation, not a limit that shapes the world: with
+    /// the crust spreading (`crust_strength_mpa`) the pipeline presets put it at 30 km, where it
+    /// never binds (`plate_cap_bound_share` on the `surface_final` line says how often it did).
+    /// Cortial's z_c (10 km) in the plate-only presets, which have nothing else to stop a range.
     pub max_elevation_m: f64,
+    /// Cortial's z_c as the scale of the uplift transfer function: the subducting crust's height
+    /// is measured between the trench depth and this (10 km). A scale only; nothing is limited
+    /// by it.
+    pub uplift_reference_m: f64,
+    /// The height at which tectonic uplift fades to nothing, uplift × (1 − z/this) (Cortial-style
+    /// isostatic ceiling, `plates::subduction::ceiling`); 0 = no fading. The plate-only presets
+    /// keep 10 km. The pipeline presets set 0: there the height of a range is what uplift,
+    /// erosion and the spreading of over-thick crust leave (Ben, decisions log 2026-10-01: the
+    /// limit must emerge, not be a number).
+    pub uplift_ceiling_m: f64,
+    /// The strength of the crust, MPa: where the weight of the land above sea level, ρ_c·g·h,
+    /// passes it, the lower crust flows out from under the range and the surface spreads into a
+    /// plateau (`surface::spread`). 140 MPa holds 5.1 km at Earth's gravity (Tibet stands near
+    /// 5 km), 13.4 km at Mars's.
+    pub crust_strength_mpa: f64,
+    /// How fast over-thick crust spreads: the diffusivity of the surface at twice the strength
+    /// height, km²/Myr (it grows with the cube of the excess, the channel-flow law); 0 = off.
+    pub crust_flow_km2_myr: f64,
     /// r_s (1,800 km).
     pub subduction_distance_km: f64,
     /// r_c (4,200 km).
@@ -530,6 +562,10 @@ impl Default for TectonicParams {
             abyssal_elevation_m: -6000.0,
             trench_elevation_m: -10000.0,
             max_elevation_m: 10000.0,
+            uplift_reference_m: 10000.0,
+            uplift_ceiling_m: 10000.0,
+            crust_strength_mpa: 140.0,
+            crust_flow_km2_myr: 0.0,
             subduction_distance_km: 1800.0,
             collision_distance_km: 4200.0,
             collision_coefficient_per_km: 1.3e-5,
@@ -844,6 +880,18 @@ impl PlanetPreset {
                 && k.oceanic_floor_elevation_m < k.ridge_elevation_m,
             "$.tectonics.oceanic_floor_elevation_m",
             "must be in [trench_elevation_m, ridge_elevation_m)",
+        )?;
+        check(
+            k.uplift_reference_m > 0.0 && k.uplift_ceiling_m >= 0.0,
+            "$.tectonics.uplift_ceiling_m",
+            "need uplift_reference_m > 0 and uplift_ceiling_m >= 0 (0 = no ceiling)",
+        )?;
+        check(
+            k.crust_strength_mpa > 0.0
+                && k.crust_flow_km2_myr >= 0.0
+                && k.crust_flow_km2_myr.is_finite(),
+            "$.tectonics.crust_strength_mpa",
+            "need crust_strength_mpa > 0 and crust_flow_km2_myr >= 0",
         )?;
         check(
             (2..=200).contains(&k.initial_plates),
