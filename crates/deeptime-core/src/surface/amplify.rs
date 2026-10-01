@@ -38,9 +38,11 @@
 //! `detail/amplitude` that `deeptime:terrain` multiplies a C-periodic noise by (plan §8.2).
 
 pub mod character;
+pub mod glacial;
 pub mod kernels;
 pub mod resample;
 pub mod tiles;
+pub mod volcano;
 pub mod window;
 
 #[cfg(test)]
@@ -166,6 +168,8 @@ pub struct AmplifyParams {
     /// Width of the thinned copy kept for keyframes, cells.
     pub preview_width: u32,
     pub detail: DetailParams,
+    /// Block-scale glacial valleys under the young landscape's glaciers (`glacial.rs`).
+    pub glacial: glacial::GlacialShape,
     /// The editor's "Ruggedness" (0..2, default 1; decisions log 2026-09-29): how much block-scale
     /// mountain character the last level gets (`character.rs`); 0 leaves the passes' terrain.
     pub ruggedness: f64,
@@ -202,6 +206,7 @@ impl Default for AmplifyParams {
             tile_cells: 2048,
             preview_width: 2048,
             detail: DetailParams::default(),
+            glacial: glacial::GlacialShape::default(),
             ruggedness: 1.0,
             character: CharacterParams::default(),
         }
@@ -285,6 +290,7 @@ impl AmplifyParams {
         if !(16..=16384).contains(&self.preview_width) {
             return Err(bad("preview_width", "must be in [16, 16384]"));
         }
+        self.glacial.validate("$.amplify.glacial")?;
         if !(self.ruggedness.is_finite() && (0.0..=RUGGEDNESS_MAX).contains(&self.ruggedness)) {
             return Err(bad("ruggedness", "must be in [0, 2]"));
         }
@@ -330,6 +336,12 @@ impl Config {
             erode: n(self.p.erosion_iterations),
             thermal: n(self.p.thermal_iterations),
             deposit: n(self.p.deposition_iterations),
+            // The glacial trough pass runs on the last level only (`glacial.rs`).
+            glacial: if coarse {
+                0
+            } else {
+                self.p.glacial.radius() as u32
+            },
         }
     }
 
@@ -356,6 +368,7 @@ impl Config {
             cap_slope_exp: 1.0,
             deposit_frac: p.deposit_fraction as f32,
             eps_m: p.sink_eps_m as f32,
+            glacial: p.glacial,
         }
     }
 
@@ -618,15 +631,32 @@ pub fn level_from_world(world: &WorldState, p: &PlanetPreset) -> Result<Level, C
             })
     };
     let lake = get(young::field::LAKE_M)?;
+    let z = get(young::field::ELEVATION_M)?;
+    // The glaciers' surface where they were (a metre under the ground elsewhere), when the young
+    // landscape had glaciers.
+    let zs: Vec<f32> = match world
+        .fields
+        .get(young::field::ICE_SURFACE)
+        .filter(|f| f.data.len() == n && f.data.iter().any(|x| x.is_finite()))
+    {
+        Some(f) => f
+            .data
+            .iter()
+            .zip(z)
+            .map(|(&s, &g)| if s.is_finite() && s > g { s } else { g - 1.0 })
+            .collect(),
+        None => Vec::new(),
+    };
     Ok(Level {
         w: grid.w as usize,
         h: grid.h as usize,
         dx: f64::from(grid.r) * p.scale.m_per_block_h,
-        z: get(young::field::ELEVATION_M)?.clone(),
+        z: z.clone(),
         area: get(young::field::AREA_M2)?.clone(),
         wgt: get(young::field::WEIGHT)?.clone(),
         kfac: get(young::field::ERODIBILITY)?.clone(),
         lake: lake.iter().map(|&m| u8::from(m > 0.0)).collect(),
+        zs,
     })
 }
 
@@ -742,7 +772,13 @@ impl AmplifyStage {
         let c = self.preset.scale.circumference_blocks;
         let l3 = GridDesc::for_planet("L3", c, r.l3_r)?;
         let cfg = self.config(sea);
-        let fields = CharacterFields::from_world(world, r.l1_r, r.l3_r, &self.p.character);
+        let mut fields = CharacterFields::from_world(world, r.l1_r, r.l3_r, &self.p.character);
+        // Volcanoes (P1-21) keep their cones: no fold ridges over them.
+        let shaper = volcano::Shaper::from_world(world, &self.preset);
+        if let Some(sh) = &shaper {
+            let l1 = GridDesc::for_planet("L1", c, r.l1_r)?;
+            fields.suppress_folds(&sh.fold_keep(&l1));
+        }
         // The youth and fold strength the character read, for the keyframes and the workbench.
         if !fields.neutral {
             let l1 = GridDesc::for_planet("L1", c, r.l1_r)?;
@@ -757,7 +793,14 @@ impl AmplifyStage {
                 );
             }
         }
-        let level = level_from_world(world, &self.preset)?;
+        let mut level = level_from_world(world, &self.preset)?;
+        // Volcanoes (P1-21): the cone put in place at L2 before the erosion passes, the rest at
+        // L3 after the character pass (the sink below).
+        let mut volcano_cells = 0;
+        if let Some(sh) = &shaper {
+            let g2 = GridDesc::for_planet("L2", c, r.l2_r)?;
+            volcano_cells = sh.sharpen_level(&mut level, &g2);
+        }
         let (gw, gh) = (l3.w as usize, l3.h as usize);
 
         // Whole raster in memory, or tile by tile (plan §5.7.5: streams automatically when the
@@ -783,17 +826,34 @@ impl AmplifyStage {
         let mut sink = PackSink::create(ctx.out_dir, &l3, 256, sea, cfg.sea_y, cfg.mv)?;
         let setup_ms = started.elapsed().as_secs_f64() * 1000.0;
         let cancelled = || ctx.cancelled();
-        let out = run(
-            level,
-            n_dbl,
-            &cfg,
-            cfg.character(&fields),
-            plan,
-            &mut sink,
-            &cancelled,
-            &reserve,
-        )?;
+        let character = cfg.character(&fields);
+        let mut out = match &shaper {
+            Some(sh) => {
+                let mut shaped = volcano::Sink {
+                    inner: &mut sink,
+                    shaper: sh,
+                    grid: l3.clone(),
+                };
+                run(
+                    level,
+                    n_dbl,
+                    &cfg,
+                    character,
+                    plan,
+                    &mut shaped,
+                    &cancelled,
+                    &reserve,
+                )?
+            }
+            None => run(
+                level, n_dbl, &cfg, character, plan, &mut sink, &cancelled, &reserve,
+            )?,
+        };
         let files = sink.finish()?;
+        if let Some(sh) = &shaper {
+            let (pw, ps) = (out.preview.w, out.preview.stride);
+            sh.shape_block(&l3, 0, 0, pw, ps, &mut out.preview.z_m);
+        }
 
         // The thinned copies (keyframes, the workbench) …
         let s = out.preview.stride;
@@ -897,6 +957,11 @@ impl AmplifyStage {
             "mean_abs_change_m": t.change_m_cells / (t.land_cells.max(1) as f64),
             "mean_detail_blocks": t.detail_blocks_cells / (t.land_cells.max(1) as f64),
             "eroded_km3": t.eroded_m_cells * km3,
+            "glacial": {
+                "carved_km3": t.glacial_carved_m_cells * km3,
+                "raised_km3": t.glacial_raised_m_cells * km3,
+                "cells": t.glacial_cells,
+            },
             "lost_in_transit_km3": t.transit_m_cells * km3,
             "levels": levels,
             "last": {
@@ -906,6 +971,10 @@ impl AmplifyStage {
             "millis": {"setup": setup_ms, "total": total_ms},
             "preview": {"w": out.preview.w, "h": out.preview.h, "stride": s},
             "layers": [layer(&files.elevation), layer(&files.amplitude)],
+            "volcanoes": {
+                "shaped": shaper.as_ref().map_or(0, volcano::Shaper::len),
+                "l2_cells": volcano_cells,
+            },
         });
         world.notes.insert(STAGE_NAME.into(), note.to_string());
         ctx.log.push(crate::log::Level::Info, summary_line(&note));
@@ -917,7 +986,7 @@ impl AmplifyStage {
 fn timing_json(t: &Times) -> Value {
     json!({
         "seed": t.seed_ms, "erode": t.erode_ms, "thermal": t.thermal_ms,
-        "deposit": t.deposit_ms, "flood": t.flood_ms,
+        "deposit": t.deposit_ms, "flood": t.flood_ms, "glacial": t.glacial_ms,
     })
 }
 
@@ -926,7 +995,7 @@ pub fn summary_line(v: &Value) -> String {
     let f = |k: &str| v[k].as_f64().unwrap_or(0.0);
     let mut per_pass = BTreeMap::new();
     let mut add = |p: &Value| {
-        for k in ["seed", "erode", "thermal", "deposit", "flood"] {
+        for k in ["seed", "erode", "thermal", "deposit", "flood", "glacial"] {
             *per_pass.entry(k).or_insert(0.0) += p[k].as_f64().unwrap_or(0.0);
         }
     };
@@ -948,7 +1017,8 @@ pub fn summary_line(v: &Value) -> String {
         .join(",");
     format!(
         "amplify_final={}x{} mode={} tiles={} halo={} mid_tiles=[{level_tiles}] sinks={} pre_flood_raised_cells={} flood_raised_cells={} \
-         flood_max_raise_m={:.2}@{} mean_abs_change_m={:.1} mean_detail_blocks={:.2} eroded_km3={:.3e} lost_in_transit_km3={:.3e} drama={} \
+         flood_max_raise_m={:.2}@{} mean_abs_change_m={:.1} mean_detail_blocks={:.2} eroded_km3={:.3e} lost_in_transit_km3={:.3e} \
+         glacial_carved_km3={:.3e} glacial_raised_km3={:.3e} glacial_cells={} drama={} \
          ruggedness={} character[mean_abs_blocks={:.2},flood_raised_cells={},softened_cells={},{:.1}s] \
          passes[{}] sample={:.1}s detail={:.1}s sink={:.1}s total={:.1}s",
         v["grid"]["w"],
@@ -965,6 +1035,9 @@ pub fn summary_line(v: &Value) -> String {
         f("mean_detail_blocks"),
         f("eroded_km3"),
         f("lost_in_transit_km3"),
+        v["glacial"]["carved_km3"].as_f64().unwrap_or(0.0),
+        v["glacial"]["raised_km3"].as_f64().unwrap_or(0.0),
+        v["glacial"]["cells"],
         v["drama"],
         v["ruggedness"],
         v["character"]["mean_abs_change_blocks"]

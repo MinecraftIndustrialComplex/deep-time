@@ -273,6 +273,24 @@ impl CharacterFields {
         }
     }
 
+    /// Scales the fold ridges down by `keep` (0–1) per L1 cell, row-major on the L1 grid: the
+    /// volcano edifices (P1-21, `amplify/volcano.rs`) keep their cones' shape instead of taking
+    /// the strike ridges of the orogen they stand on. A neutral set (no plate fields) has none.
+    pub fn suppress_folds(&mut self, keep: &[f32]) {
+        if self.neutral || keep.len() != self.fold_c2.len() {
+            return;
+        }
+        for ((c, s), &k) in self
+            .fold_c2
+            .iter_mut()
+            .zip(self.fold_s2.iter_mut())
+            .zip(keep)
+        {
+            *c *= k;
+            *s *= k;
+        }
+    }
+
     /// The youth and the fold strength per L1 cell (row-major, the plate model's L1 grid).
     pub fn maps(&self) -> (Vec<f32>, Vec<f32>) {
         let fold = self
@@ -638,6 +656,7 @@ pub fn apply(
     area: &[f32],
     kfac: &[f32],
     lake: &[u8],
+    glacier: &[f32],
     s: Scratch<'_>,
     ctx: &CharacterCtx<'_>,
     core: (usize, usize, usize, usize),
@@ -693,7 +712,18 @@ pub fn apply(
         )
     };
     let is_land = |cell: usize| z[cell] > sea && lake[cell] == 0;
-    // How much of the character a land cell takes: none on rivers and at the coast.
+    // How much of the character a land cell takes: none on rivers and at the coast, nor in the
+    // glacial troughs and cirques `glacial.rs` cut (`glacier`: the ground plus up to 100 m where
+    // it cut, NaN elsewhere; empty without glaciers): gullies and fold ridges would fight the U.
+    let glaciated = |cell: usize| -> f64 {
+        glacier.get(cell).map_or(0.0, |&zs| {
+            if zs.is_finite() {
+                smoothstep(0.0, 100.0, f64::from(zs - z[cell]))
+            } else {
+                0.0
+            }
+        })
+    };
     let fade = |cell: usize| -> f64 {
         let a_km2 = f64::from(area[cell]) * 1.0e-6;
         let river = smoothstep(a0, a1, a_km2);
@@ -702,7 +732,7 @@ pub fn apply(
             p.coast_blocks.max(1e-6),
             f64::from(s.smooth[cell]) - sea_y,
         );
-        (1.0 - river) * coast
+        (1.0 - river) * coast * (1.0 - glaciated(cell))
     };
 
     // Fold ridges.
@@ -1000,6 +1030,7 @@ mod tests {
             &area,
             &k,
             &lake,
+            &[],
             scratch,
             &ctx,
             (0, 0, win.w, win.h),
