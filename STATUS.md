@@ -172,19 +172,19 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   - After (rivers): 20.4, 20.3 and 19.4 s, so 54–57 ms a chunk. The difference is within the load noise.
   - The pass's own logged cost is 0.27 ms a chunk on average and 0.32 ms where it works (1,298 of 1,536 chunks). Without rivers it still tops up coasts in 692 chunks at 0.29 ms.
   - `WaterRegionTest`'s per-column path costs 0.69 ms a chunk where rivers are (JIT warm).
-- **Gates** (branch after merging master 6f52b57, the climate latitude API; cargo and Gradle also on 18706c7):
-  - `cargo fmt`, clippy `-D warnings` and deny (bans, licenses) are clean. `cargo test --workspace` all green (core 286 + 3 ignored).
+- **Gates.** Run on the branch after merging master 0905793 (satellite view, coal held in the cover, strata look settings), and before that on 6f52b57 and 18706c7 with the same results:
+  - `cargo fmt`, clippy `-D warnings` and deny (bans, licenses) are clean. `cargo test --workspace` all green (core 294 + 3 ignored).
   - `./gradlew build test`: 153/0. Parity: 500 of 500 equal (19 river and 14 bank columns); the lake world lake1024 300 of 300 (8 lake, 1 bank).
-  - `./gametest.sh` (`--server`, twice): **53 of 54 pass**.
+  - `./gametest.sh` (`--server`, three times): **53 of 54 pass**.
     - `riversHold`: 3 sites, 40 chunks, 368 water columns, 946 of 946 blocks; 0 floating, 0 leaks, 0 top mismatches, 0 water outside.
     - `riverBiomes`: 101 of 107 = 0.944.
     - `lakeHolds` is unchanged.
     - The one failure is `climateConsistent`: BW 0.472 < 0.650, Dsub 0.822 < 0.850, BW:desert 0.423 < 0.450. It comes from master's carbon-cycle merge 27e88f7, not this branch. The glacial-erosion branch fails with exactly the same numbers without any P1-22 code, and the census samples only the biome at the terrain height.
   - `./gametest.sh -PwithMic` (after `install.sh mic`, 160 mods linked):
-    - The first run never reached the tests: a mod-loading race in Artifacts ("unbound value … artifacts:generic.attack_burning_duration" while registries reverted to vanilla), outside Deep Time.
-    - The retry: **53 of 54 pass**. `riversHold` and `riverBiomes` give the same numbers as standalone.
+    - One run (on 6f52b57) never reached the tests: a mod-loading race in Artifacts ("unbound value … artifacts:generic.attack_burning_duration" while registries reverted to vanilla), outside Deep Time.
+    - The retry and the run on 0905793: **53 of 54 pass**. `riversHold` and `riverBiomes` give the same numbers as standalone.
     - The failure is again `climateConsistent`, with MIC's biomes: BW 0.485, BS 0.509, BW:desert 0.446, Dfc:taiga 0.430. The carbon-cycle branch shows the same kind of BS and Dfc:taiga failure.
-  - `./gametest-planet.sh`: PASS (wrap-test planet, TW stamped, loopsX).
+  - `./gametest-planet.sh`: PASS, twice (wrap-test planet, TW stamped, loopsX).
 - **Review bundle.** review/out/p1-22 (index.html, maps, 3D shots, the area3d viewer with the four boxes, water-check JSONs), 16 MB. Not published.
 - **For P2-03:**
   - evaporation-limited lake levels below the rim (Fill–Spill–Merge's partial fills);
