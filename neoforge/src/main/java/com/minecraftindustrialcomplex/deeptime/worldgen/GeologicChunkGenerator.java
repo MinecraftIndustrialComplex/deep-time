@@ -30,6 +30,7 @@ import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
  * lava; cave lakes at y −10 or lower may be). This generator measures them from the world's floor:
  * the global fluid picker is {@link LavaFluids}'s, and the router's {@code lava} function carries
  * the {@code deeptime:lava_lakes} gate. {@link LavaRules} has the rules and their settings.
+ * Lava above that is the magma of the world's active volcanoes ({@link Magma}, {@link MagmaPass}).
  */
 public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
 
@@ -113,6 +114,9 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         if (terrain() instanceof WorldDataTerrain w) {
             StrataPass.apply(chunk, w.data());
             WaterBodies.apply(chunk, w.data(), waterReach());  // lakes, rivers, banks (plan §7.9, P1-22)
+            // Magma under and in the active volcanoes, after the water so a river's cut counts as ground.
+            var settings = sourceSettings.value();
+            MagmaPass.apply(chunk, w.magma(waterReach(), settings.noiseSettings().minY(), settings.seaLevel()));
             IcePass.apply(chunk, w.data());                    // snow and ice over glaciated ground, whatever the biome
         }
     }
@@ -129,6 +133,15 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         super.applyCarvers(region, seed, random, biomes, structures, chunk, step);
         if (step == net.minecraft.world.level.levelgen.GenerationStep.Carving.AIR && terrain() instanceof WorldDataTerrain w)
             WaterBodies.wake(chunk, w.data(), waterReach());
+    }
+
+    /**
+     * Whether this level leaves out the biomes' random lava lakes and springs
+     * ({@code underground.remove_lava_features}; {@link LavaFeatures}). A level on a test terrain has
+     * no settings and takes the default.
+     */
+    public boolean removesLavaFeatures() {
+        return terrain() instanceof WorldDataTerrain w ? w.magmaRules().removeLavaFeatures() : MagmaRules.DEFAULT.removeLavaFeatures();
     }
 
     /**
