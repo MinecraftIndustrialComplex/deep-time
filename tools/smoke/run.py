@@ -389,7 +389,7 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
                  note=f"{sections} sections in {pregen_s:.0f} s wall; {level.get('by_detail')}; "
                       f"{level.get('points_per_column')} data points a column")
 
-    side = 24
+    side = 10   # chunks a side, four columns in each; every one is generated in full on the server thread
     chk, out = probe_json(server, rcon, f"deeptime probe dh check {cx - 192} {cz - 192} {side}", wait=3.0)
     if not steps.check("dh: /deeptime probe dh check answers", "[deeptime-probe] JSON", "ok" if chk else out[:200], chk is not None):
         return
