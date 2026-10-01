@@ -80,6 +80,58 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-30 — P1-26 per-cell climate: design doc (agent worktree agent-a2104321849041969, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** The design Ben asked for ("Design doc first", decisions log 2026-09-30) is
+  `docs/design/p1-26-per-cell-climate.md`, awaiting his approval. No code changed. It covers:
+  - the current banding measured;
+  - a seasonal 2-D EBM on a 128 × 64 climate grid: land/sea tiles, per-cell sea ice and albedo,
+    surface-dependent diffusion, zonal heat advection by a low-level wind profile, Stommel gyres
+    from the coastlines, and an overturning conveyor in the narrowest polar-connected basin;
+  - a monthly steady moisture budget (belt + ITCZ + thermal winds, bulk evaporation, soil bucket,
+    Bretherton precipitation, Smith & Barstad kept on L1 as a sink) behind `climate.rain_model`,
+    with today's belts, fed by the per-cell temperatures, as the first default;
+  - the 1-D clock, flux-corrected per band at each snapshot, with pattern scaling between snapshots
+    and triggered snapshots at snowball and hothouse crossings;
+  - unchanged baked layers and climate API, so mic-climate needs nothing;
+  - costs, validation targets, tasks T1–T11, licences, and open questions Q1–Q11.
+
+  The plan's P1-26 entry points at the doc. It fits the ice branch (`458c15c`): its `sheet::Grid`
+  becomes the shared coarse grid, and the sheet's ELA and precipitation forcing come from the 2-D
+  climate.
+- **Measured** on the Mac (load 70–95; it rebooted once; scratch under
+  `/Volumes/Graphide/ban/deeptime-runs/p1-26-design/`, deleted at the end).
+  - **The real run.** `deeptime stage climate --preset earthlike_quick_16k --start
+    scattered_continents --length-myr 500` took 864 s. The climate stage was 186 s: clock 76.5,
+    snapshots 38.5 (51 × 0.75 s), ice 31.4. Fields were taken with `dump-fields`.
+  - **Earth's relief.** A scratch copy of `climate-dem` ran on GMT `earth_relief_30m_p` and dumped
+    the months.
+  - **Observations.** Beck et al. 2018 Köppen and Beck et al. 2023 monthly T/P, 0.5°, CC BY 4.0,
+    validation only.
+  - **How banded today's climate is.** Latitude explains 99.6 % of land sea-level temperature
+    variance (Earth 96.8 %). Winter along-row std is 3.1 K on the real run and 3.4 K on Earth's
+    relief, against Earth's 6.1 K. Sea ice has η² 0.998, and the southern ice edge has a std over
+    longitudes of 0.23° (0.00° on Earth's relief). The polar continent is all ET/EF.
+  - **Today's skill on Earth's relief.** Köppen agreement with Beck is 34.6 % exact and 64.9 % by
+    main group. Monthly T RMSE is 6.6 K and ln P RMSE 1.11. Yakutsk in January is −16.5 °C (observed
+    −39), and Mumbai gets 531 mm (observed 3,096).
+- **Prototype** (scratch Rust, not committed; Appendix B of the doc). It is the 2-D EBM + ocean +
+  moisture budget at 2.5° on Earth's relief.
+  - **Cost.** 0.10–0.13 s CPU per model year on one core, 0.3–0.8 s for the twelve monthly moisture
+    solves, 26 MB.
+  - **Closure.** Global means 14.9–15.5 °C against the 1-D model's 15.2 °C, net TOA ≤ 0.01 W/m²,
+    water to 3·10⁻⁶.
+  - **Contradicts the plan's premise:** a plain diffusive 2-D EBM keeps winter temperatures as
+    banded as today (3.2 K).
+  - **What fixed it.** The conveyor (January sea off Brest 4.3 → 9.2 °C, northern ocean heat
+    transport 0.7 → 1.6 PW), a low-level westerly profile for heat advection and a winter inversion
+    term. With them the best run beat today's model on the same grid: winter RMSE 4.9 against
+    7.2 K, along-row std 5.4 against 3.3 K (Earth 6.0), η² 0.949 against 0.975 (Earth 0.944).
+  - **Rain is not yet better than today's belts.** ln P RMSE is 1.7–2.0 against 1.05, even though
+    the bucket gives the Sahara 32 mm and the Kazakh steppe 170 mm. Hence the staged rain plan
+    (Q2).
+- **Next.** Ben answers Q1–Q11 (doc §10). The build starts after the ice branch lands: T1, the
+  shared coarse grid, first, then T2/T3/T4 in parallel.
+
 ### 2026-09-30 — Satellite view: a true-colour keyframe layer, the default everywhere (agent worktree agent-a7ca2a0e875263a86, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben: "Default view on the viewer is currently an elevation map, can you turn it into an actual map. (I.E.
   Approximately what you would see on google earth zoomed out all the way / satellite imagery.) So I can see where
