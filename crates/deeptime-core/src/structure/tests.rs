@@ -500,7 +500,12 @@ fn baked_stacks_and_blended_columns_have_no_grade_inversion_and_no_sliver() {
         hz.check_bake(&tables.min_blocks).unwrap();
         // The stored stacks: nothing to object to.
         let cells = realism::census_of_cells(&hz, &rules, &Limits::default(), 1);
-        assert_eq!(cells.with_inversion, 0, "seed {seed}: {:?}", cells.to_json());
+        assert_eq!(
+            cells.with_inversion,
+            0,
+            "seed {seed}: {:?}",
+            cells.to_json()
+        );
         assert_eq!(cells.with_sliver, 0, "seed {seed}: {:?}", cells.to_json());
         assert_eq!(cells.with_sheet, 0, "seed {seed}: {:?}", cells.to_json());
         assert!(
@@ -514,7 +519,17 @@ fn baked_stacks_and_blended_columns_have_no_grade_inversion_and_no_sliver() {
         // have where it ends sideways (`deeptime_format::strata::drop_slivers`).
         let columns = rule_columns(&hz, seed ^ 0x5EED, 6000);
         assert!(columns.with_metamorphic > 0);
-        assert_eq!(columns.with_sliver, 0, "seed {seed}: {:?}", columns.to_json());
-        assert_eq!(columns.with_sheet, 0, "seed {seed}: {:?}", columns.to_json());
+        assert_eq!(
+            columns.with_sliver,
+            0,
+            "seed {seed}: {:?}",
+            columns.to_json()
+        );
+        assert_eq!(
+            columns.with_sheet,
+            0,
+            "seed {seed}: {:?}",
+            columns.to_json()
+        );
     }
 }
