@@ -117,10 +117,22 @@ public final class BiomeGameTests {
     // C 0.86 / 0.86, D 1.0 / 1.0, Dsub 0.969 / 0.987, E 1.0 / 1.0, sea 1.0 / 1.0, BW:desert — / 0.588,
     // Dfc:taiga — / 0.657, E:snow 1.0 / 1.0; the small planet has no A and only 17 BW columns (logged only).
     // Floors sit about 0.1 under the lower of the two.
+    //
+    // Re-set 2026-09-30 after the deep-time climate (carbon cycle, brightening sun): the 4k test planet is
+    // land-poor (~8 % land), so its weathering balances degassing only at 2,949 ppm and it ends at 23 °C
+    // instead of the fixed 280 ppm and 15.6 °C it had. Its Köppen columns moved: E 1,765 → 319, D 1,296 → 1,964,
+    // BS 274 → 792, C 279 → 521, BW 25 → 87. The mapping did not change: with the old climate pinned
+    // (carbon cycle, sun, ice window, glacio-eustasy, hydrological factor off) the same code passes, standalone
+    // and MIC. The lower shares are where the new columns sit: cold coasts whose shore biome is stony shore
+    // (ET 17 %, BWh 24 % standalone), Terralith's alpine highlands (26 %) and yellowstone (23 %) on the Dfc
+    // uplands that were ET before, moonlight valley and gravel desert on BSk. New runs (standalone / MIC):
+    // BW 0.793 / 0.931, BS 0.610 / 0.519, C 0.881 / 0.891, D 1.0 / 1.0, Dsub 0.961 / 0.970, E 1.0 / 0.991,
+    // BW:desert 0.690 / 0.816, Dfc:taiga 0.952 / 0.435, E:snow 0.824 / 0.991. The three below their floors
+    // take the same rule (0.1 under the lower); the others keep theirs, which the rule would only raise.
     static final Map<String, Double> FLOORS = Map.ofEntries(
-            Map.entry("A", 0.6), Map.entry("Af", 0.6), Map.entry("BW", 0.65), Map.entry("BS", 0.6), Map.entry("C", 0.75),
+            Map.entry("A", 0.6), Map.entry("Af", 0.6), Map.entry("BW", 0.65), Map.entry("BS", 0.42), Map.entry("C", 0.75),
             Map.entry("D", 0.9), Map.entry("Dsub", 0.85), Map.entry("E", 0.9), Map.entry("sea", 0.95),
-            Map.entry("BW:desert", 0.45), Map.entry("Af:jungle", 0.5), Map.entry("Dfc:taiga", 0.5), Map.entry("E:snow", 0.9));
+            Map.entry("BW:desert", 0.45), Map.entry("Af:jungle", 0.5), Map.entry("Dfc:taiga", 0.33), Map.entry("E:snow", 0.72));
     static final int MIN_COLUMNS = 20;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
