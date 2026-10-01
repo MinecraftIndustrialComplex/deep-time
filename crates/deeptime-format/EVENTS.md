@@ -191,6 +191,13 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 | `deeptime:orogeny_phase` | mountain building, with a duration | plates (P1-03); dummy | see below; dummy: see below |
 | `deeptime:hotspot_track` | a hotspot's track over a plate | plates (P1-03) | see below |
 | `deeptime:large_igneous_province` | a LIP eruption | plates (P1-03) | see below |
+| `deeptime:volcano_arc` | a volcanic arc segment, with its cones | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:volcano_hotspot_chain` | a hotspot's chain of volcanoes, with its members | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:volcano_stratovolcano` | an arc stratovolcano, from its birth to its death | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:volcano_shield` | a hotspot's shield volcano (an island or seamount of its chain) | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:volcano_caldera_complex` | a continental hotspot's silicic centre | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:volcano_caldera` | a caldera collapse | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:volcano_flood_basalt` | a flood-basalt plateau (a large igneous province's lava pile) | volcanoes (P1-21) | see "The volcanoes' events" |
 | `deeptime:basin_subsidence` | a sedimentary basin subsides | surface (P1-04) | see "The surface's events" |
 | `deeptime:marine_transgression` | the sea advances over land | surface (P1-04) | see "The surface's events" |
 | `deeptime:marine_regression` | the sea retreats | surface (P1-04) | see "The surface's events" |
@@ -216,13 +223,13 @@ the step at which it happened unless stated.
 
 | Kind | Params | Magnitude | Causes |
 |---|---|---|---|
-| `plate_birth` | `plate`, `parent`, `origin` (`rift` or `subduction_initiation`), `area_km2`, `speed_mm_yr`; rifts add `continental_frac`, initiations `mean_ocean_age_myr` | area / average initial plate area | its `rift_onset` (rifts) |
-| `plate_death` | `plate`, `fate` (`consumed`: no crust left; `absorbed`: too small, merged), `absorbed_by` | 0 | the plate's last `subduction_onset` or the `collision` that took its crust, when known |
-| `rift_onset` | `plate` (the parent), `fragments`, `continental_frac`, `area_km2` | continental fraction | the `large_igneous_province` under the plate, when one boosted it |
+| `plate_birth` | `plate`, `parent`, `origin` (`rift` or `subduction_initiation`), `area_km2`, `speed_mm_yr`, `continental_frac` (near 0 for an initiation: it takes old oceanic crust and at most slivers stranded in it); initiations add `mean_ocean_age_myr` and `coast_split_km` (continental margin the split cut off its ocean, km) | area / average initial plate area | its `rift_onset` (rifts) |
+| `plate_death` | `plate`, `fate` (`consumed`: no crust left; `absorbed`: too small, merged; `sutured`: a continental collision welded it whole to `absorbed_by`), `absorbed_by` | 0 | the plate's last `subduction_onset` or the `collision` that took its crust, when known |
+| `rift_onset` | `plate` (the parent), `fragments`, `continental_frac`, `area_km2`, `coast_split_km` (continental margin the rift cut off its ocean, km) | continental fraction | the `large_igneous_province` under the plate, when one boosted it |
 | `ridge_birth` | `plate_a`, `plate_b`, `spreading_mm_yr`, `new_samples` (L0 samples of new crust between them) | spreading / 100 mm/yr | the `rift_onset` that separated them, if any |
 | `subduction_onset` | `subducting_plate`, `overriding_plate`, `setting` (`ocean_ocean`, `ocean_continent`, `continent_continent`), `convergence_mm_yr`, `slab_age_myr` | convergence / 100 mm/yr | — |
-| `collision` | `plate_a` (the terrane's former plate), `plate_b` (the receiving plate), `terrane_area_km2`, `uplift_m`, `radius_km`, `convergence_mm_yr` | uplift, km | the contact's `subduction_onset` |
-| `terrane_accretion` | `from_plate`, `to_plate`, `area_km2`, `samples`; without a collision also `uplift_m` | area / average initial plate area | its `collision`, or the contact's `subduction_onset` |
+| `collision` | `plate_a` (the terrane's former plate), `plate_b` (the receiving plate), `terrane_area_km2`, `uplift_m`, `radius_km`, `convergence_mm_yr`, `sutured` (1: plate_a welded whole to plate_b, which then dies `sutured`), `coast_split_km` (the terrane's margin left facing plate_a's ocean, km; 0 with a suture) | uplift, km | the contact's `subduction_onset` |
+| `terrane_accretion` | `from_plate`, `to_plate`, `area_km2`, `samples`; without a collision also `uplift_m`, `sutured`, `coast_split_km` (as for `collision`) | area / average initial plate area | its `collision`, or the contact's `subduction_onset` |
 | `orogeny_phase` | `orogeny` (`andean` or `himalayan`), `plate`; Andean: `subducting_plate`, `max_uplift_mm_yr`, `ongoing` (1 when the run ended first); Himalayan: `uplift_m`, `uplifted_samples` | uplift / u_0 (Andean), uplift in km (Himalayan) | `subduction_onset` (Andean), `collision` (Himalayan) |
 | `hotspot_track` | `hotspot`, `plates` (the plates it sat under, e.g. `"3,7,12"`), `track_km`, `uplift_mm_yr`, `ongoing` | strength relative to the preset's | its `large_igneous_province`, if it had a plume head |
 | `large_igneous_province` | `area_km2`, `volume_km3`, `thickness_m`, `plate` | lava pile, km | — |
@@ -257,6 +264,33 @@ Places are points: the region's centroid in its strongest frame. Areas and volum
 
 Place of a transgression or regression: the centroid of the continental cells flooded at its end and
 not at its start (regression: the reverse); global when there are none.
+
+### The volcanoes' events (source `deeptime:volcanoes`, P1-21)
+
+Written by `crates/deeptime-core/src/surface/volcanoes/` at the end of the coupled group (after the
+plate model has closed its hotspot tracks), so every cause exists when they are written. Grouped (Ben,
+2026-09-30, "Group by arc/chain"): one event per **arc segment** — the stratovolcanoes one subduction
+contact fed (keyed by its onset event; by plate where the contact never had one) — and one per
+**hotspot chain**, each with its standing cones as a detail; on their own only the notable ones: each
+group's tallest standing cone (a stratovolcano at least 1.5 km × `volcanoes.size`), the calderas whose
+volcano still stands or that are at least 6 km across (× size), and the flood basalts. Heights are relief
+above the ground round the edifice, m; `summit_m` its summit above the sea at the end; radii and areas
+block-metric (the world's own), km and km². A **cone list** (`cones`) is `lat,lon,radius_km,height_m`
+per standing cone, `;`-separated, tallest first, at most 80; `inspect-column --why` finds a column's
+cone in it. An arc segment that built fewer than 3 cones (Ben, 2026-09-30, "Count small ones") has no event of
+its own: it is counted on its `subduction_onset` event, which gains `volcano_cones_built`,
+`volcano_cones_standing` and `volcano_cones` (the same list format), added at the end of the coupled
+group; its notable cone, if any, is caused by that onset.
+
+| Kind | t_start (t_end) | Place | Params | Magnitude | Causes |
+|---|---|---|---|---|---|
+| `volcano_arc` | its first cone's birth (its last live step) | the centroid of its standing cones, else of where its cones were born | `setting` (`continental_arc`, `island_arc`: where most were born), `cones_built`, `live`, `standing`, `tallest_m`, `peak_m` (the tallest any stood), `calderas`, `plate`, `ongoing`, `cones` | cones built / 50, ≤ 1 | its subduction onset |
+| `volcano_hotspot_chain` | its first volcano's birth (its last death, or the end) | its youngest volcano | `hotspot`, `volcanoes_built`, `standing`, `islands`, `seamounts`, `subducted`, `tallest_m`, `ongoing`, `cones` | volcanoes / 20, ≤ 1 | the hotspot's `hotspot_track`, else its `large_igneous_province` |
+| `volcano_stratovolcano` | its birth (its death, or the end while active) | its summit at the end | `volcano` (catalogue id), `setting`, `magma` (`andesitic`, `silicic`), `peak_height_m`, `height_m`, `radius_km`, `summit_m`, `arc_flux` (mean while active, 0–1), `plate`, `fate` (`active`, `extinct`), `ongoing` | peak height / 3 km | its `volcano_arc`, or the `subduction_onset` of a small segment |
+| `volcano_shield` | its birth over the plume (its death) | as above | as above plus `hotspot`, `chain_index`; `magma` `basaltic`; `fate` (`active`, `island`, `seamount`) | as above | its `volcano_hotspot_chain` |
+| `volcano_caldera_complex` | as a shield (a continental hotspot) | as above | as `volcano_shield`, `magma` = `silicic` | as above | its `volcano_hotspot_chain` |
+| `volcano_caldera` | the collapse | where its volcano stood then | `volcano`, `radius_km`, `depth_m`, `erupted_km3`, `type` (`silicic`: the volcano collapsed and died; `summit`: a shield's summit caldera) | erupted volume / 1,000 km³, ≤ 1 | its volcano's event, else its arc segment or chain |
+| `volcano_flood_basalt` | the eruption | the province's centre at the end | `area_km2`, `thickness_m` (the pile at its centre), `flows`, `preserved_frac` (share of its area where the pile still crops out within 150 m of the surface), `pile_frac` (share where any of it is left), `plate` | pile / 1 km | the plate model's `large_igneous_province` |
 
 ### The climate's events (source `deeptime:climate`, P1-05)
 

@@ -43,7 +43,7 @@ def description(name: str, p: dict) -> str:
     return (
         f"An Earth-like planet, {'quick' if quick else 'full'} "
         f"({'singleplayer' if c == 16384 else 'server'} size, C = {c} blocks): plates and crust, "
-        f"climate, deep-time erosion and strata, rock and metamorphism, ore deposits, the young "
+        f"climate, deep-time erosion and strata, volcanoes, rock and metamorphism, ore deposits, the young "
         f"landscape and its amplification, baked for the game. L0 {r['l0_samples']} samples, "
         f"L1 {w('l1_r')}x{w('l1_r') // 2}, L2 {w('l2_r')}x{w('l2_r') // 2}, "
         f"L3 {w('l3_r')}x{w('l3_r') // 2}. The same parameters as {MAPPING[name]} (calibrated "

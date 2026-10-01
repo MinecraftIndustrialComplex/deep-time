@@ -6,11 +6,15 @@ mod amplify_view;
 mod climate_dem;
 mod dump;
 mod heightmap;
+mod hydro;
+mod margins_view;
 mod parity;
 mod provinces;
 mod run;
+mod satellite_view;
 mod structure_view;
 mod synth;
+mod volcano_view;
 mod watch;
 
 use std::net::IpAddr;
@@ -311,6 +315,29 @@ enum Command {
         #[arg(long, default_value_t = parity::DEFAULT_SEED)]
         seed: u64,
     },
+    /// Re-run the bake's water part (P1-22: lakes, `water_level`, the river network) on a baked
+    /// world-data folder with its own preset and `--set hydro.KEY=VALUE` overrides (tuning).
+    Hydro {
+        /// World-data folder a planet run baked.
+        #[arg(long)]
+        world_data: PathBuf,
+        /// Sets a preset value first, `--set hydro.width_coef=1.5` (repeatable).
+        #[arg(long = "set", value_name = "PATH=VALUE")]
+        set: Vec<String>,
+    },
+    /// Review pictures of a run's volcanoes (P1-21): the finished terrain with them marked, the
+    /// settings that made them, and close views before and after the amplifier's shaping.
+    VolcanoView {
+        /// The run's last checkpoint (`run --checkpoints` writes `<out>/checkpoints/<n>-amplify.dtcp`).
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// The run's world-data folder (its `--out`).
+        #[arg(long)]
+        world_data: PathBuf,
+        /// Folder to write the pictures, `volcanoes.json` and `index.html` into.
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// The terrain of a box of a world-data folder as a float32 NumPy array (H, E, A·N and any
     /// --layers, nearest), for review renders without a Minecraft server.
     #[command(allow_negative_numbers = true)]
@@ -341,6 +368,30 @@ enum Command {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Write fields of a checkpoint's world as raw little-endian f32 files (`<dir>/<name>.f32`,
+    /// `/` in a name becomes `__`) with an `index.json` of their grids, for analysis scripts.
+    DumpFields {
+        /// Checkpoint to read.
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// Folder to write.
+        #[arg(long)]
+        out: PathBuf,
+        /// Field names (comma-separated); default every field.
+        #[arg(long, value_delimiter = ',')]
+        fields: Vec<String>,
+    },
+    /// Draw the continental margins of a checkpoint's plate model by tectonic setting (P1-27:
+    /// passive, Andean, subducting, collision, other plate boundary) over the sea floor by age,
+    /// with plate boundaries and subduction fronts, as a PNG, and print the margin shares.
+    Margins {
+        /// A checkpoint written by `stage --out` or `run --checkpoints`.
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// PNG to write.
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Draw the geologic-provinces view layer (shield, platform, orogen, basin, LIP, extended
     /// crust, oceanic crust by age) of a checkpoint's world as a PNG and print each class's share.
     Provinces {
@@ -350,6 +401,19 @@ enum Command {
         /// PNG to write.
         #[arg(long)]
         out: PathBuf,
+    },
+    /// Draw the satellite view layer (true colour: land cover from the climate, snow and glacier
+    /// ice, the sea by depth, sea ice, hill shading) of a checkpoint's world as a PNG.
+    Satellite {
+        /// A checkpoint written by `stage --out` or `run --checkpoints`.
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// PNG to write.
+        #[arg(long)]
+        out: PathBuf,
+        /// Width in pixels (the height is half of it).
+        #[arg(long, default_value_t = 1024)]
+        width: u32,
     },
 }
 
@@ -408,9 +472,12 @@ impl CommonArgs {
 enum StrataArg {
     /// Three horizons: sandstone, red beds from 6 blocks down, granite from 40 (P0-09).
     Placeholder,
-    /// All 59 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
+    /// All 60 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
     /// columns hold every class 20 or more blocks below the surface (P1-12's GameTests).
     EveryClass,
+    /// A readable sedimentary basin, the same in every cell: eight beds over granite from 165
+    /// blocks down (the synthetic deposit world's strata).
+    Basin,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -638,6 +705,20 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::VolcanoView {
+            input,
+            world_data,
+            out,
+        }) => match volcano_view::run(&input, &world_data, &out) {
+            Ok(v) => {
+                println!("deeptime volcano-view: {v} -> {}", out.display());
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("deeptime volcano-view: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some(Command::Parity {
             world_data,
             out,
@@ -673,6 +754,22 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Some(Command::Hydro { world_data, set }) => {
+            let started = std::time::Instant::now();
+            match hydro::run(&world_data, &set) {
+                Ok(line) => {
+                    println!(
+                        "deeptime hydro: {line} in {:.2}s",
+                        started.elapsed().as_secs_f64()
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime hydro: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::Heightmap {
             world_data,
             area,
@@ -697,6 +794,35 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Some(Command::Margins { input, out }) => match margins_view::run(&input, &out) {
+            Ok(m) => {
+                println!(
+                    "deeptime margins: t_myr={:.0} coast_km={:.0} active={:.3} subduction={:.3} \
+                     andean={:.3} boundary={:.3} passive={:.3} regime_active={:.3} \
+                     passive_floor_age_p50_myr={:.1} front_km_p50={:.0} landmasses={} \
+                     fragment_crust={:.3} fragment_coast_km={:.0} -> {}",
+                    m.t_myr,
+                    m.coast_km,
+                    m.active_share(),
+                    m.subduction_share(),
+                    f64::from(m.andean) / f64::from(m.coast.max(1)),
+                    m.boundary_share(),
+                    m.passive_share(),
+                    m.regime_active_share(),
+                    m.passive_floor_age_p50_myr,
+                    m.front_km_p50,
+                    m.landmasses,
+                    m.fragment_crust_share,
+                    m.coast_km * f64::from(m.fragment_coast) / f64::from(m.coast.max(1)),
+                    out.display()
+                );
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("deeptime margins: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some(Command::Provinces { input, out }) => match provinces::run(&input, &out) {
             Ok(shares) => {
                 for (name, pct) in shares {
@@ -710,6 +836,22 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::Satellite { input, out, width }) => {
+            match satellite_view::run(&input, &out, width) {
+                Ok((t, elevation)) => {
+                    println!(
+                        "deeptime satellite: t = {:.1} Myr, drawn on {elevation} -> {}",
+                        t / 1.0e6,
+                        out.display()
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime satellite: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::DumpDeposits { world, out }) => match dump::run(&world, &out) {
             Ok((sites, bodies, inside)) => {
                 println!(
@@ -723,6 +865,18 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::DumpFields { input, out, fields }) => {
+            match dump::fields(&input, &out, &fields) {
+                Ok(n) => {
+                    println!("deeptime dump-fields: {n} fields -> {}", out.display());
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime dump-fields: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::Synth {
             kind,
             strata,
@@ -740,6 +894,7 @@ fn main() -> ExitCode {
                 strata: match strata {
                     StrataArg::Placeholder => synth::Strata::Placeholder,
                     StrataArg::EveryClass => synth::Strata::EveryClass,
+                    StrataArg::Basin => synth::Strata::Basin,
                 },
                 size,
                 out,
@@ -846,13 +1001,22 @@ fn preset_command(action: PresetAction) -> run::CliResult<()> {
 }
 
 /// `inspect-column --why`: puts `why` on each of the answer's sites: the forming event and its
-/// cause chain (four links deep, as the 3D export's site cards do) from the world data's event log.
+/// cause chain (four links deep, as the 3D export's site cards do) from the world data's event log;
+/// and `landforms`: the volcanoes and flood-basalt provinces (P1-21) whose footprint holds the
+/// column, nearest first, each with its event and cause chain.
 fn attach_why(v: &mut serde_json::Value, world_data: &std::path::Path) -> Result<(), String> {
     use deeptime_format::events::{EventId, EventLog};
+    let log = EventLog::load(world_data).map_err(|e| e.to_string())?;
+    if let (Some(lat), Some(lon)) = (v["lat"].as_f64(), v["lon"].as_f64()) {
+        let m = deeptime_format::Manifest::read(world_data).map_err(|e| e.to_string())?;
+        let landforms = landforms_at(&log, lat, lon, &m.scale);
+        if !landforms.is_empty() {
+            v["landforms"] = serde_json::json!(landforms);
+        }
+    }
     let Some(sites) = v["sites"].as_array_mut().filter(|s| !s.is_empty()) else {
         return Ok(());
     };
-    let log = EventLog::load(world_data).map_err(|e| e.to_string())?;
     for site in sites {
         let formed = site["forming_event"]
             .as_u64()
@@ -868,9 +1032,145 @@ fn attach_why(v: &mut serde_json::Value, world_data: &std::path::Path) -> Result
     Ok(())
 }
 
+/// The volcano events (`deeptime:volcano_*`) whose footprint holds the point (lat, lon): a notable
+/// volcano out to its basal radius (at least 3 km), an arc segment or hotspot chain where one of its
+/// listed cones does, a caldera to its rim, a flood-basalt province over its area; each as
+/// `{event, chain, distance_km}`, nearest first (a cone's own event before its group's).
+fn landforms_at(
+    log: &deeptime_format::events::EventLog,
+    lat: f64,
+    lon: f64,
+    scale: &deeptime_format::Scale,
+) -> Vec<serde_json::Value> {
+    use deeptime_format::{ParamValue, Place};
+    let c = f64::from(scale.circumference_blocks);
+    let km_per_block = scale.m_per_block_h / 1000.0;
+    let num = |e: &deeptime_format::Event, k: &str| match e.params.get(k) {
+        Some(ParamValue::Float(x)) => Some(*x),
+        Some(ParamValue::Int(x)) => Some(*x as f64),
+        _ => None,
+    };
+    let mut hits: Vec<(f64, serde_json::Value)> = log
+        .events()
+        .iter()
+        .filter(|e| {
+            e.source == deeptime_core::surface::volcanoes::SOURCE
+                || e.params.contains_key("volcano_cones")
+        })
+        .filter_map(|e| {
+            let dist = |la: f64, lo: f64| {
+                let mut dlon = (lon - lo).rem_euclid(360.0);
+                if dlon > 180.0 {
+                    dlon -= 360.0;
+                }
+                let dx = dlon / 360.0 * c * km_per_block;
+                let dz = (lat - la) / 360.0 * c * km_per_block;
+                dx.hypot(dz)
+            };
+            // An arc segment or a hotspot chain holds the column when one of its cones does (a
+            // small segment's cones are listed on its subduction onset, `volcano_cones`, wherever
+            // that event is placed).
+            if let Some(ParamValue::Str(cones)) =
+                e.params.get("cones").or(e.params.get("volcano_cones"))
+            {
+                let d = cones
+                    .split(';')
+                    .filter_map(|cone| {
+                        let f: Vec<f64> = cone.split(',').filter_map(|x| x.parse().ok()).collect();
+                        (f.len() >= 3)
+                            .then(|| (dist(f[0], f[1]), f[2].max(3.0)))
+                            .filter(|&(d, r)| d <= r)
+                            .map(|(d, _)| d)
+                    })
+                    .fold(f64::INFINITY, f64::min);
+                if !d.is_finite() {
+                    return None;
+                }
+                let chain: Vec<serde_json::Value> = log
+                    .cause_chain(e.id, 4)
+                    .iter()
+                    .map(|x| x.to_json())
+                    .collect();
+                let mut ev = e.to_json();
+                for k in ["cones", "volcano_cones"] {
+                    if ev["params"].get(k).is_some() {
+                        ev["params"][k] = serde_json::json!("…");
+                    }
+                }
+                return Some((
+                    d + 1.0e-3,
+                    serde_json::json!({
+                        "event": ev,
+                        "chain": chain,
+                        "distance_km": (d * 10.0).round() / 10.0,
+                    }),
+                ));
+            }
+            let Place::Point { lat: la, lon: lo } = e.place else {
+                return None;
+            };
+            let d = dist(f64::from(la), f64::from(lo));
+            let reach = match num(e, "area_km2") {
+                Some(a) => (a / std::f64::consts::PI).sqrt(),
+                None => num(e, "radius_km").unwrap_or(0.0).max(3.0),
+            };
+            (d <= reach).then(|| {
+                let chain: Vec<serde_json::Value> = log
+                    .cause_chain(e.id, 4)
+                    .iter()
+                    .map(|x| x.to_json())
+                    .collect();
+                (
+                    d,
+                    serde_json::json!({
+                        "event": e.to_json(),
+                        "chain": chain,
+                        "distance_km": (d * 10.0).round() / 10.0,
+                    }),
+                )
+            })
+        })
+        .collect();
+    hits.sort_by(|a, b| a.0.total_cmp(&b.0));
+    hits.into_iter().map(|(_, v)| v).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use clap::CommandFactory;
+
+    #[test]
+    fn why_here_finds_a_small_arc_segments_cone_on_its_subduction_onset() {
+        use deeptime_core::session::GEOLOGY_WRITER_NAME;
+        use deeptime_format::{
+            Event, EventId, EventLog, EventWriter, GEOLOGY_WRITER, ParamValue, Place,
+        };
+        let dir = std::env::temp_dir().join(format!("deeptime-landforms-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // The onset sits at the contact's centroid, far from the cone it fed.
+        let mut onset = Event::new(
+            EventId::new(GEOLOGY_WRITER, 1),
+            -40.0e6,
+            "deeptime:subduction_onset",
+            "deeptime:plates",
+        );
+        onset.place = Place::Point { lat: 0.0, lon: 0.0 };
+        onset.params.insert(
+            "volcano_cones".into(),
+            ParamValue::Str("10.000,20.000,20.0,2500".into()),
+        );
+        let mut w = EventWriter::open(&dir, GEOLOGY_WRITER, GEOLOGY_WRITER_NAME).unwrap();
+        w.append(&[onset]).unwrap();
+        let log = EventLog::load(&dir).unwrap();
+        let scale = deeptime_format::Scale::default_for(16_384);
+        let hits = super::landforms_at(&log, 10.0, 20.05, &scale);
+        assert_eq!(hits.len(), 1, "{hits:?}");
+        assert_eq!(hits[0]["event"]["kind"], "deeptime:subduction_onset");
+        assert_eq!(hits[0]["event"]["params"]["volcano_cones"], "…");
+        assert!(super::landforms_at(&log, 0.0, 0.0, &scale).is_empty());
+        std::fs::remove_dir_all(&dir).ok();
+    }
 
     #[test]
     fn version_nonempty() {
@@ -1210,7 +1510,7 @@ mod tests {
         assert_eq!(mid.next_stage_name(), Some("plates"));
         assert_eq!(
             mid.stage_names,
-            ["plates", "climate", "surface", "structure"]
+            ["plates", "climate", "surface", "volcanoes", "structure"]
         );
         assert!(mid.world.surface.is_some(), "the group steps every member");
         assert!(mid.world.fields.contains_key("climate/koppen"));
@@ -1224,7 +1524,7 @@ mod tests {
         )
         .unwrap();
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
-        assert_eq!(end.next_stage, 4);
+        assert_eq!(end.next_stage, 5);
         assert_eq!(end.world.t_years, 0.0);
         let st = end.world.surface.as_ref().unwrap();
         assert_eq!(st.totals.steps, 10);
@@ -1331,7 +1631,14 @@ mod tests {
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
         assert_eq!(
             end.stage_names,
-            ["plates", "climate", "surface", "structure", "deposits"]
+            [
+                "plates",
+                "climate",
+                "surface",
+                "volcanoes",
+                "structure",
+                "deposits"
+            ]
         );
         assert_eq!(end.next_stage_name(), None, "the run is complete");
         assert!(

@@ -113,8 +113,9 @@ they are until P0-01; afterwards use the §1.2 table.
 11. `tectonics_engines.md` (plates, Noddy), `surface_processes_climate.md` (erosion, climate,
     hydrology), `ore_genesis_modeling.md` (deposits, sizing, schema), `runtime_packaging_options.md`
     (natives, determinism, servers), `player_demand_prior_art.md` (market context only).
-12. `/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md` — the 59 rock
-    classes, the tag vocabulary and the `rock_states` format.
+12. `/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md` — the rock
+    classes (59 there; Deep Time ships 60 since `diamictite`, decisions log 2026-09-30), the tag
+    vocabulary and the `rock_states` format.
 
 Items 6–9 and 11 are research notes, in `/home/greencheetah/Projects/mic/Docs/research_notes/Geologic
 history worldgen mod/` until P0-01 and in `docs/research/notes/` after it.
@@ -131,7 +132,7 @@ history worldgen mod/` until P0-01 and in `docs/research/notes/` after it.
 | **Staging** | `<gamedir>/deeptime/staging/<session-uuid>/`, where the Create World screen writes world data before the world folder exists (§7.12). |
 | **Event log** | The shared, append-only record of what happened, where, when and why (§5.5). Feeds the timelapse, "Why here?" and a later legends view; the civ module appends to it. |
 | **Site / site registry** | A site is one fixed-by-generation resource location (deposit, reservoir, placer) with extent, grade, type and forming event. The registry is the list plus a spatial index and a Java API (§5.6). |
-| **Rock class** | One of the 59 lithologies in the rock-tag vocabulary, e.g. `granodiorite`, `black_shale`. The simulation decides classes; tags decide blocks (§5.4). |
+| **Rock class** | One of the 60 lithologies in the rock-tag vocabulary (`diamictite`, lithified till, joined on 2026-09-30), e.g. `granodiorite`, `black_shale`. The simulation decides classes; tags decide blocks (§5.4). |
 | **Rock group** | A union tag of classes, e.g. `deeptime:rock/carbonate`. |
 | **Stand-in / fallback** | A look-alike block used when a class has no member block: the first *installed* entry of `deeptime:rock_fallback/<class>` (never a random one). |
 | **Unclassified crust** | `minecraft:stone` and `minecraft:deepslate`, used where the simulation has no lithology opinion. Not a class. |
@@ -814,7 +815,7 @@ every layer is a tile pack (§5.7.3).
 | Layer | Grid | Type | Meaning | Phase |
 |---|---|---|---|---|
 | `elevation` | L3 | i16, 1/16 block | terrain surface height (y) | 0 |
-| `water_level` | L3 | i16, 1/16 block; nodata = none | lake/river water surface above sea level | 0 (test), 2 |
+| `water_level` | L3 | i16, 1/16 block; nodata = none | lake water surface above sea level (rivers: `rivers/rivers.dtrv`, P1-22) | 0 (test), 1 (P1-22) |
 | `climate/{temperature,vegetation,continentalness,erosion,weirdness}` | L2 (half L1's cell size) | i16, vanilla parameter ×10,000 | the five 2D biome inputs after the §7.2 mapping | 1 |
 | `climate/{t_mean_c,p_mm,koppen}` | L1 | i16 / u16 / u8 | physical climate, for maps and rules | 1 |
 | `surface/regolith_blocks` | L2 | u8 | soil/regolith thickness | 1 |
@@ -861,7 +862,8 @@ serialises the registries' contents through their codecs into one JSON document 
 }
 ```
 
-Deep Time ships definitions for all 59 classes of the vocabulary in
+Deep Time ships definitions for all 60 classes of the vocabulary (59, plus `diamictite` for lithified
+till: decisions log 2026-09-30) in
 `/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md` in its own jar
 (`neoforge/src/main/resources/data/deeptime/deeptime/rock_class/`). The numeric properties are
 relative multipliers the erosion and structure stages consume; their values are tuning parameters
@@ -1702,6 +1704,16 @@ least one noise cell beyond the last wet cell. (P0-13: the ice comes from vanill
 `freeze_top_layer` feature, which every overworld biome runs after this pass.) Carvers run after this pass and can open caves under a lake; that drains into caves the way
 vanilla lakes do and is accepted.
 
+*As built (P1-22):* the pass is `worldgen/WaterBodies` (`WaterPass` delegates to it). Instead of
+relying on the rim, it decides every column from (x, z) alone (FORMAT.md "Water columns": the
+generated surface is H bilinear over the noise-cell corners) — lake, sea, river or bank — and makes
+the column match: rivers cut or filled to their bed, lakes filled from their top to the ground,
+banks raised to the neighbouring water's top (+1 beside rivers) and sealed, so the rim holds by
+construction; the flowing and falling water a step or waterfall would spread is placed at
+generation, so the water is at rest. Sea columns the aquifer leaves dry below sea level (coastal
+flats) are topped up with sea water. Carvers and noise caves still cut under the water, as above
+(Ben, log 2026-09-30, "Allow caves under water").
+
 ### 7.10 Toroidal World: the cylinder shape
 
 - **Dependency.** Toroidal World 0.19.3 (MIT, NeoForge 1.21.1). It has no published Maven artifact
@@ -2057,7 +2069,14 @@ community ports) are not opened for code.
   transfer when interpenetration exceeds 300 km, Poisson-triggered rifting into 2–4 plates, oceanic
   crust generation between diverging plates with global resampling every 10–60 steps, continental
   erosion, oceanic damping and trench sediment accretion every step. Hotspots are added as
-  mantle-fixed points (Cortial's own suggested extension). Constants from Cortial's Appendix A:
+  mantle-fixed points (Cortial's own suggested extension). P1-27 (2026-09-30): a colliding
+  continent of at least `collision_suture_frac`·A_0 sutures its whole plate to the receiving one
+  instead of moving alone (which left its passive margins facing an ocean that kept converging);
+  old oceanic crust starts subducting wherever it lies far from every trench
+  (`subduction_initiation_clearance_km`), never taking continental crust; continental arcs build a
+  cordillera (`cordillera_*`); a collision stamps its orogen only over the core of its surge
+  (`collision_orogen_core`); an emerged island arc turns continental only once it is mature
+  (`arc_continental_m`). Constants from Cortial's Appendix A:
   2 Myr step, subduction distance 1,800 km, collision distance 4,200 km, 100 mm/yr speed cap,
   damping 0.04 mm/yr, erosion 0.03 mm/yr, accretion 0.3 mm/yr, subduction uplift 0.6 mm/yr, and the
   elevation envelope of §5.1.
@@ -2097,12 +2116,14 @@ community ports) are not opened for code.
   thickened island arc being an orogen; on continental crust **orogen** = active collision or arc,
   a collision (Himalayan) belt from the last 500 Myr, or an Andean range over 1.5 km lifted in the
   last 50 Myr (the plate model stamps Andean orogeny on every cell near a trench, so type and age
-  alone would make whole continents orogens); **extended crust** = rift, passive margin or crust
-  thinned below 20 km; **basin** = over 3 km of sediment and sedimentary rock (the strata log or the
+  alone would make whole continents orogens); **extended crust** = rift or crust thinned below
+  20 km, and the rifted margins: a band 150 km (1.35°) wide along every quiet coast (P1-27; the
+  plate model's one-sample passive-margin regime drew a dashed line); **basin** = over 3 km of sediment and sedimentary rock (the strata log or the
   plate model's sediment pools) or subsiding at over 0.03 mm/yr under at least 1 km; **shield** =
   the rest where basement is at the surface (under 0.2 km of cover, or a crystalline surface rock
-  from `structure/rock`); **platform** = the rest. The continental classes are then generalised to
-  their neighbours' majority. Thresholds are `provinces::Rules`; the rules are also the layer's
+  from `structure/rock`); **platform** = the rest. The continental classes are then generalised like
+  a printed map to the USGS map's 150 km features: each takes its neighbours' majority within half
+  that, and continental specks smaller than it (island arcs) take the sea floor's class (P1-27). Thresholds are `provinces::Rules`; the rules are also the layer's
   legend note in `ramps.json`. Continental crust has no formation age in the model, so what no
   orogen rule catches counts as old.
 
@@ -2209,6 +2230,29 @@ community ports) are not opened for code.
   evaluator are unchanged; the halo grows by the character's radius and two flood margins. Cost on
   16k quick: 2.4–4 s of the amplify stage (12 threads). Deferred: talus/scree at cliff feet (a
   surface-block rule the column evaluator would have to mirror) and 3D crags/overhangs (Phase 2).
+- **As built: glacial landforms** (Ben, 2026-09-29, decisions log "Glacial erosion landforms";
+  `surface/glacial.rs`, `surface/amplify/glacial.rs`; STATUS.md has the runs). The deep-time
+  surface and the young landscape run one glacier model per LEM step: a linear mass balance from
+  the climate's ELA (Oerlemans 2011), capped by precipitation; ice flux routed down the fluvial D8
+  tree (as Hergarten 2021); the ice surface of every cell solved from its receiver's with the
+  shallow-ice approximation plus Weertman sliding on thawed beds (Cuffey & Paterson 2010), glaciers
+  `1/form_ratio` as wide as thick (up to seven cells, spreading their erosion across the trough);
+  erosion E = K_g·u_s (Humphrey & Raymond 1994; K_g = 10⁻⁵ from Hallet et al. 1996's rates), none
+  under cold beds, floating ice or supercooling adverse slopes (Alley et al. 2003); debris melts out
+  with the ice as till (a facies of its own, class `till`, in the strata log), the rest goes with the
+  meltwater to lakes and the sea. Fjords follow from ice grounded below sea level at the coast. Fluvial
+  K is reduced by the glaciers' cover. The young landscape uses the glacial state's ELA (the
+  present one lowered by `young_ela_drop_m`, Porter 1989's ~500 m, until the climate publishes
+  ice-age fields; `glacial::source` names them in one place) and hands its ice surface to the
+  amplifier, which turns confined, laterally bounded ice into parabolic troughs (Svensson 1959,
+  Harbor 1992) with cirque-like heads, pointwise from the ice depth and the valley's centre-line
+  depth, as a tiled Jacobi pass (its radius is in the halo). Settings: `surface.glacial.*`,
+  `amplify.glacial.*` (editor: glacial erosion, glacial valleys, glacial valley width, ice-age snowline,
+  arêtes). The valley width (Ben, 2026-09-30; default 3, 1 = physical) draws the young landscape's glacier
+  footprints and trough spread wider for readability at the game's 15× vertical exaggeration; the
+  deep-time surface stays physical. Since the deep-time climate (2026-09-30) the glaciers read its ice fields:
+  deep-time ice only where the climate had ice in the step, eroding for its time share, rivers off under
+  thick ice; the young landscape's ice inside the last-glacial-maximum extent.
 - **Oracle.** `tools/validation/fastscape_compare.py` runs fastscapelib (GPL-3.0, installed with
   `nix shell` + pip in a throwaway venv, never vendored) on the same uplift and parameters on a
   256² grid and compares hypsometry, χ/steepness statistics and drainage-area distributions with the
@@ -2300,6 +2344,31 @@ erodibility knickpoints. Baked outputs: `water_level` (L3), `rivers/segments.dtb
 width, depth, discharge; widths × `feature_scale.rivers`), and channel incision burned into
 `elevation`. Cost: 1–4 M cells gives about 1–6 s per solve by linear scaling of Cordonnier 2019's
 16,384² figure (`surface_processes_climate.md` §6).
+
+*As built (P1-22, 2026-09-29; moved into Phase 1 by Ben's "Rivers & lakes in v1"):* `core::hydro`
+(`hydro/{mod, network, tests}.rs`) runs in the bake (`bake/water.rs`, after the climate part) on the
+L3 terrain itself (2 blocks a cell; 32k full's 134 M cells are averaged 2 × 2 first), not on L2:
+the open sea (height ≤ sea level − 1 block, a body ≥ 5,000 km²); Priority-Flood with the pit queue
+(Barnes et al. 2014, from the paper, as `surface::pflood`), the map's first and last rows (past the
+pole caps) draining as outlets; receivers the steepest strictly lower neighbour on the filled
+surface, across a flat the drainage mask of Barnes, Lehman & Mulla 2014 (towards the flat's outlets
+and away from higher ground, so a coastal plain carries one channel, not parallel rays), else the
+cell the flood came from; **lakes** = depressions ≥
+`hydro.lake_min_area_km2` and ≥ `lake_min_depth_blocks` deep, **always full to their spill level**
+(the P2 exit test holds by construction), passing on inflow less surface evaporation
+(`lake_evaporation`; an evaporation-limited level below the rim is Fill–Spill–Merge's partial fill,
+left for P2-03, and those lakes are only flagged `endorheic`); discharge from the climate's runoff
+(Fu's Budyko curve, as the surface stage); river cells ≥ `river_min_discharge_m3s` from ≥
+`river_min_area_km2`; chains cut at confluences; water surface F − `freeboard_blocks`, never below
+the sea or lake downstream; width `width_coef·Q^0.5·feature_scale.rivers`, depth `depth_coef·Q^0.4`
+(Leopold & Maddock's exponents; the coefficients are the block world's, not the research's, and are
+settings); vertices Gaussian-smoothed. Written: `water_level` (lake surfaces) and
+`rivers/rivers.dtrv` (polylines with w, hw, depth, Q and a tile index; FORMAT.md "Rivers"), **not**
+`rivers/segments.dtb`, and **no incision is burned into `elevation`**: the channel is carved at block
+scale by the game (`worldgen/WaterBodies`) from a per-column rule both sides implement
+(`deeptime_format::water`, Java `worlddata/Water`, FORMAT.md "Water columns"), because a 1–2 block
+stream cannot survive the density's 4-block noise-cell interpolation. HAND floodplains and
+knickpoint waterfalls stay P2-03 (steps in the water surface already fall as vanilla waterfalls).
 
 ### 8.5 3D structure, Noddy-style — `core::structure` (Phase 1 simple, Phase 2 full)
 
@@ -2580,6 +2649,20 @@ something Ben can look at in a browser.
   click-to-inspect (lat/lon, block x/z, every layer value, Köppen, province, the column's rock
   stack); sites with their "Why here?" cause chain; and a globe view. No build step, no npm: plain
   JS in the page.
+- **The satellite view, the default layer (Ben, 2026-09-30: "Default view on the viewer is currently
+  an elevation map, can you turn it into an actual map … so I can see where glaciars / snow is").**
+  Every frame of the plate model's group (with or without a climate) and of the young landscape and
+  its amplification carries `satellite` as its first layer: a true-colour picture composited by
+  `core::satellite` when the frame is drawn, view only like the geologic provinces (nothing is
+  written to `WorldState`). The sea by depth and sea ice; land cover from the climate (herb and tree
+  cover from the aridity index and the warmest month, held to the Köppen map; ground by temperature
+  and surface rock; khaki steppe, olive savanna, brown-grey tundra; boreal, temperate or tropical
+  forest by the coldest month); bare rock on high ground; perennial and seasonal snow; glacier ice
+  white; a soft hill shade. A frame without a climate shows bare ground by geology. Its `ramps.json`
+  entry is the legend's key (18 classes in three groups), not a ramp applied to a field. The
+  workbench, `?tv` and the static bundle (timelapse and, from the last satellite frame, the
+  world-data map) open on it, and the game's timelapse shows it as its first layer ("Satellite");
+  `deeptime satellite --in <checkpoint> --out x.png` draws one from a checkpoint.
 
 ### 9.4 NeoForge GameTests
 
@@ -3659,11 +3742,21 @@ on this machine.
   calderas, flood-basalt plateaus from LIP events; volcanic rock in the strata; events with causes.
 - **Acceptance.** Tests on placement from arc/hotspot/LIP fields; a real planet shows volcano
   chains in the right settings; 3D previews of an arc volcano, a hotspot island chain and a caldera.
+- **As built (2026-09-30).** A coupled stage `volcanoes` after the surface (`surface/volcanoes/`) and the
+  amplifier's shaping (`surface/amplify/volcano.rs`); design, numbers and pictures in STATUS.md's build log
+  ("P1-21 volcanoes as landforms").
 
 #### P1-22 Rivers and lakes (moved from P2-03, 2026-09-29)
 - **Goal.** The core of §8.4 hydrology in v1 (Ben, decisions log 2026-09-29): river networks from the
   simulation's routing carved into the terrain at block scale, lakes that fill and spill
   (`water_level` for real), river biomes; waterfalls, deltas and floodplain detail may stay in P2-03.
+- *As built (2026-09-29):* §8.4's "As built"; FORMAT.md "Rivers" and "Water columns"; the preset
+  section `hydro` (14 settings, editor section Advanced · Rivers and lakes, plus the "Rivers and
+  lakes" toggle and `scale.feature_scale.rivers`); `deeptime hydro --world-data` re-runs the water
+  part on a baked folder; `deeptime-inspect rivers` (maps) and `water-check` (floating and leaking
+  water in generated chunks); GameTests `RiverGameTests.riversHold` (level `deeptime:test_rivers`) and
+  `riverBiomes`; river biomes by putting wide channels in the weirdness valley slice. STATUS.md's
+  build log has the numbers.
 
 #### P1-23 Grid-artifact audit (2026-09-29)
 - **Goal.** Sweep real worlds (sections, top-downs, 3D previews) for grid artifacts: staircase coasts,
@@ -3688,6 +3781,61 @@ on this machine.
     adds only PA's weather to Deep Time's climate: PA's live temperature minus its own effective
     base. STATUS build log, 2026-09-30.
 
+#### P1-26 Per-cell climate (2026-09-30)
+- **Goal.** Replace the banded backbone of the climate with a per-cell one (Ben, log 2026-09-30:
+  "climate in general should probably be per cell as opposed to completely banded across a single
+  lattitude"): a seasonal 2-D energy balance on a coarse grid (per-cell heat capacity, albedo and
+  sea ice, 2-D heat transport, ocean heat transport by basin) and precipitation from a moisture
+  budget (evaporation, transport by the winds, monsoon thermal lows, sinking air; the existing
+  orographic model and rain shadows kept). The fast carbon/ice clock may stay banded, calibrated to
+  the 2-D model's zonal means. Absorbs the per-cell sea ice asked for the same day.
+- **Order.** Design doc first (Opus), approved by Ben; building after the climate agent's
+  ice-sheet branch lands (same code).
+- **Check.** Set out in the design doc (Earth-topography comparison, Köppen shares, energy balance,
+  run-time budget, downstream recalibration).
+- **Design** (2026-09-30, awaiting Ben's approval): `docs/design/p1-26-per-cell-climate.md`. It
+  covers:
+  - the current banding measured, with a prototype on Earth's relief;
+  - a seasonal 2-D EBM on a 128 × 64 climate grid with land and sea tiles, per-cell sea ice,
+    Stommel gyres and an overturning conveyor;
+  - a monthly moisture budget behind `climate.rain_model`, with today's belts as the first
+    default;
+  - a 1-D clock flux-corrected to the 2-D zonal means;
+  - an unchanged world format and climate API;
+  - tasks T1–T11 and open questions Q1–Q11.
+
+#### P1-27 Plate margins and coherent continents (2026-09-30)
+- **Goal.** (1) Margins: in a 750-Myr earthlike_quick_16k run nearly every continental coast became
+  an active margin with a line of arc cones by ~200 Myr in; on Earth most continental coastline is
+  passive. Measure the active/passive share over whole runs, confirm the cause (suspected: the
+  spontaneous subduction initiation of `plates/rifting.rs` fires on any floor older than
+  `subduction_initiation_age_myr`, which always lies against the continents), retune so young
+  oceans keep passive margins for 100+ Myr (a Wilson cycle), and give continental arcs their own
+  cordillera so the cones stand on a range. (2) The coherent-continents investigation (log
+  2026-09-29): continental crust and cover came out patchy; continents should form large coherent
+  cratons with platform cover, re-checked against the USGS provinces map. Ben (log 2026-09-30):
+  "Investigate + fix".
+- **Check.** Active share of continental coastline over time against Earth's; arc relief
+  (cordillera height under the cones); provinces view coherence; downstream calibration (land
+  fraction, hypsometry, climateConsistent) re-checked.
+- **As built (2026-09-30).**
+  - **Cause.** Not the spontaneous initiation (0–2 per 750-Myr run): Cortial's collision moved a
+    colliding continent alone to the overriding plate and left its ocean behind, still converging,
+    so its passive margins all turned into plate boundaries and then Andean margins (collisions cut
+    295,000–455,000 km of margin off its ocean per run; rifts ~2,000 km, initiations < 300 km).
+  - **Fixes** (all settings, in the presets and the editor): a large collision sutures the whole
+    plate (`collision_suture_frac`); old floor starts subducting wherever it is clear of trenches
+    (`subduction_initiation_clearance_km`; rate 0.3); continental arcs build a cordillera
+    (`cordillera_uplift_mm_yr`, `_width_km`, `_height_m`); a collision's orogen is only its surge's
+    core (`collision_orogen_core`); island arcs turn continental only once mature
+    (`arc_continental_m`). The provinces view draws rifted margins as a continuous band and
+    generalises to the USGS map's 150-km features.
+  - **Measured** (6 pipeline runs × 400 Myr, before → after): active share of the continental margin
+    0.67 → 0.31 (Earth ≈ 0.3, Bradley 2008), floor beside passive margins 50 → 102 Myr, ground under
+    arc cones 0.31 → 0.81 km, provinces orogen 0.51 → 0.40, land 0.40 → 0.39, ocean p90 108 → 194 Myr.
+    Tools: `notes.plates.margins`, `deeptime margins`, `notes.volcanoes.arc_bases`, the provinces
+    coherence line, `tools/review/p1-27-*`. STATUS.md build log, 2026-09-30 (P1-27).
+
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 
 - **P2-01 Noddy evaluator.** Port `unEvents.c`, `taste.c`, `matrix.c` from `noddyverse` (MIT);
@@ -3696,7 +3844,10 @@ on this machine.
 - **P2-02 Metamorphic grade** from restored burial and heat; facies table (hand-built from textbook
   facies boundaries, or generated offline — see Q8).
 - **P2-03 Hydrology** (§8.4; its core moved to P1-22 on 2026-09-29, the rest stays here): routing, Fill–Spill–Merge lakes, HAND floodplains, river vectors,
-  channel carving, waterfalls, deltas; `water_level` for real.
+  channel carving, waterfalls, deltas; `water_level` for real. *Left after P1-22:* evaporation-limited
+  lake levels below the rim (Fill–Spill–Merge's partial fills; P1-22 keeps every lake full and flags
+  the `endorheic` ones), HAND floodplains, deltas and braided mouths, meanders beyond the smoothing,
+  knickpoint waterfalls from erodibility, and incision burned into `elevation` for the far terrain.
 - **P2-04 Geology-driven caves.** Karst in carbonates (port of `aparis69/Karst-Synthesis`, MIT) and
   cave density modulated by lithology and water table, with vanilla cave functions kept as the
   baseline so every region stays playable; a connectivity metric per region.

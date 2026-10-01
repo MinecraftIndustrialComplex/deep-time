@@ -18,6 +18,7 @@ pub mod log;
 pub mod params;
 pub mod plates;
 pub mod provinces;
+pub mod satellite;
 pub mod session;
 pub mod sphere;
 
@@ -32,6 +33,9 @@ pub mod structure;
 
 // The bake: a finished planet run as the chunk-time layers the game reads (P1-08).
 pub mod bake;
+
+// Rivers and lakes on the finished terrain (P1-22).
+pub mod hydro;
 
 // Presets, share codes and the synthetic terrains of the placeholder presets (P1-13).
 pub mod preset;

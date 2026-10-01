@@ -1,7 +1,7 @@
 {
   "schema": 0,
   "name": "planet_world_4k",
-  "description": "A small real planet for the tests (P1-08): every stage of the pipeline (plates, climate, surface, structure, deposits, young, amplify) on the calibrated parameters of pipeline_quick_16k at C = 4096 blocks, L0 5000 samples, L1 256x128, L2 512x256, L3 2048x1024, 150 Myr from scattered continents, with ten times the pluton rate and more deposits so the columns cross bodies. Its bake is the world of ColumnParityTest (Gradle testWorldPlanet4k) and of the GameTest level deeptime:test_planet_real (gametest.sh). Not a game preset.",
+  "description": "A small real planet for the tests (P1-08): every stage of the pipeline (plates, climate, surface, volcanoes, structure, deposits, young, amplify) on the calibrated parameters of pipeline_quick_16k at C = 4096 blocks, L0 5000 samples, L1 256x128, L2 512x256, L3 2048x1024, 150 Myr from scattered continents, with ten times the pluton rate and more deposits so the columns cross bodies. Its bake is the world of ColumnParityTest (Gradle testWorldPlanet4k) and of the GameTest level deeptime:test_planet_real (gametest.sh). Not a game preset.",
   "seed": 11,
   "planet": {
     "gravity_m_s2": 9.81,
@@ -60,6 +60,7 @@
     "collision_threshold_km": 300.0,
     "subduction_peak_km": 300.0,
     "collision_uplift_max_m": 4000.0,
+    "collision_orogen_core": 0.5,
     "slab_pull_rad_per_1000km_myr": 0.002,
     "slab_pull_speed_mm_yr": 80.0,
     "slab_pull_front_km": 3000.0,
@@ -99,6 +100,10 @@
     "arc_width_km": 60.0,
     "arc_uplift_mm_yr": 0.3,
     "arc_magma_m_per_myr": 20.0,
+    "arc_continental_m": 80.0,
+    "cordillera_uplift_mm_yr": 0.2,
+    "cordillera_width_km": 120.0,
+    "cordillera_height_m": 2500.0,
     "trench_relax": 0.5,
     "pelagic_m_per_myr": 5.0,
     "hotspots_initial": 8,
@@ -116,8 +121,10 @@
     "lip_rift_boost_myr": 20.0,
     "terrane_event_min_frac": 0.005,
     "collision_min_frac": 0.1,
+    "collision_suture_frac": 0.1,
     "subduction_initiation_age_myr": 150.0,
-    "subduction_initiation_rate": 0.1,
+    "subduction_initiation_rate": 0.3,
+    "subduction_initiation_clearance_km": 1000.0,
     "subduction_initiation_speed_mm_yr": [
       30.0,
       60.0
@@ -238,5 +245,42 @@
   },
   "structure": {
     "pluton_rate_km2_myr": 0.0001
+  },
+  "volcanoes": {
+    "density": 1.0,
+    "size": 1.0,
+    "flank_steepness": 0.5,
+    "arc_spacing_km": 60.0,
+    "arc_min_flux": 0.25,
+    "arc_height_km": [
+      1.2,
+      3.0
+    ],
+    "arc_radius_km": 14.0,
+    "arc_lifetime_myr": [
+      2.0,
+      8.0
+    ],
+    "hotspot_spacing_km": 70.0,
+    "shield_height_km": [
+      3.5,
+      6.5
+    ],
+    "shield_radius_km": 40.0,
+    "silicic_height_km": 0.9,
+    "silicic_radius_km": 35.0,
+    "island_subsidence_m_myr": 25.0,
+    "island_subsidence_max_m": 1500.0,
+    "caldera_rate_per_myr": 0.04,
+    "caldera_radius_km": [
+      3.0,
+      9.0
+    ],
+    "silicic_crust_km": 42.0,
+    "flood_basalt_flows": 8,
+    "flood_basalt_step_m": 80.0,
+    "build_myr": 1.0,
+    "fade_myr": 5.0,
+    "max_elevation_km": 6.8
   }
 }

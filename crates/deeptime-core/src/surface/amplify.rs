@@ -38,9 +38,11 @@
 //! `detail/amplitude` that `deeptime:terrain` multiplies a C-periodic noise by (plan §8.2).
 
 pub mod character;
+pub mod glacial;
 pub mod kernels;
 pub mod resample;
 pub mod tiles;
+pub mod volcano;
 pub mod window;
 
 #[cfg(test)]
@@ -99,10 +101,65 @@ pub const KEYFRAME_LAYERS: [&str; 5] = [
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StreamMode {
-    /// In memory when the memory cap allows it, else tile by tile (plan §5.7.5).
+    /// In memory when the memory cap allows the whole path's full peak ([`whole_last_level_peak`]),
+    /// else tile by tile (plan §5.7.5).
     Auto,
     Always,
     Never,
+}
+
+/// Bytes per cell of the thinned copy the last level keeps for the keyframes (three f32 arrays:
+/// terrain, detail amplitude, drainage), allocated before the first tile runs.
+pub const PREVIEW_BYTES_PER_CELL: u64 = 12;
+
+/// The most the last level adds to what the run holds when the amplifier starts, if it runs on the
+/// whole raster: every reservation it will make, with what it holds by then.
+///
+/// - the whole raster's buffers (`gw × gh` cells at [`TILE_BYTES_PER_CELL`]), reserved by
+///   `run_tiles` when the last level starts;
+/// - the level before it (`gw/2 × gh/2` cells), which the ladder keeps until the last level is done,
+///   in place of the L2 level (`l2_bytes`, held now and dropped after the first ×2 level), when
+///   there are levels before the last (`doublings` ≥ 2);
+/// - the preview, allocated before that reservation.
+///
+/// The decision between memory and tiles is made against this, not against the buffers alone
+/// (2026-09-30: with the buffers alone, a 1000 Myr `earthlike_quick_16k` run chose memory with
+/// 1.64 GB held and then went over 4 GiB at the last level's reservation, where the ladder
+/// holds 0.16 GB more). The levels before the last decide for themselves, with the gauge as it is
+/// when they start, so they are not part of this.
+pub fn whole_last_level_peak(
+    l2_bytes: u64,
+    doublings: u32,
+    gw: usize,
+    gh: usize,
+    preview_width: u32,
+) -> u64 {
+    let buffers = (gw * gh) as u64 * TILE_BYTES_PER_CELL;
+    let kept = if doublings >= 2 {
+        ((gw / 2) * (gh / 2)) as u64 * LEVEL_BYTES_PER_CELL
+    } else {
+        l2_bytes
+    }
+    .saturating_sub(l2_bytes);
+    let s = preview_stride(gw, preview_width as usize);
+    let preview = (gw.div_ceil(s) * gh.div_ceil(s)) as u64 * PREVIEW_BYTES_PER_CELL;
+    buffers + kept + preview
+}
+
+/// Whether a level runs in tiles: `always` and `never` as they say; `auto` when `reserve` refuses
+/// `peak_bytes`, the most the whole-raster path would add to what the run holds (so that once it
+/// runs whole, none of its later reservations fails; `reserve` may spill the recorded history to
+/// make the room, as it does for any stage).
+pub fn streams(
+    mode: StreamMode,
+    peak_bytes: u64,
+    reserve: &dyn Fn(u64) -> Result<(), CoreError>,
+) -> bool {
+    match mode {
+        StreamMode::Always => true,
+        StreamMode::Never => false,
+        StreamMode::Auto => reserve(peak_bytes).is_err(),
+    }
 }
 
 /// The `amplify` section (plan §5.1 `SurfaceParams`, amplification): every key optional.
@@ -166,6 +223,8 @@ pub struct AmplifyParams {
     /// Width of the thinned copy kept for keyframes, cells.
     pub preview_width: u32,
     pub detail: DetailParams,
+    /// Block-scale glacial valleys under the young landscape's glaciers (`glacial.rs`).
+    pub glacial: glacial::GlacialShape,
     /// The editor's "Ruggedness" (0..2, default 1; decisions log 2026-09-29): how much block-scale
     /// mountain character the last level gets (`character.rs`); 0 leaves the passes' terrain.
     pub ruggedness: f64,
@@ -202,6 +261,7 @@ impl Default for AmplifyParams {
             tile_cells: 2048,
             preview_width: 2048,
             detail: DetailParams::default(),
+            glacial: glacial::GlacialShape::default(),
             ruggedness: 1.0,
             character: CharacterParams::default(),
         }
@@ -285,6 +345,7 @@ impl AmplifyParams {
         if !(16..=16384).contains(&self.preview_width) {
             return Err(bad("preview_width", "must be in [16, 16384]"));
         }
+        self.glacial.validate("$.amplify.glacial")?;
         if !(self.ruggedness.is_finite() && (0.0..=RUGGEDNESS_MAX).contains(&self.ruggedness)) {
             return Err(bad("ruggedness", "must be in [0, 2]"));
         }
@@ -330,6 +391,12 @@ impl Config {
             erode: n(self.p.erosion_iterations),
             thermal: n(self.p.thermal_iterations),
             deposit: n(self.p.deposition_iterations),
+            // The glacial trough pass runs on the last level only (`glacial.rs`).
+            glacial: if coarse {
+                0
+            } else {
+                self.p.glacial.radius() as u32
+            },
         }
     }
 
@@ -356,6 +423,7 @@ impl Config {
             cap_slope_exp: 1.0,
             deposit_frac: p.deposit_fraction as f32,
             eps_m: p.sink_eps_m as f32,
+            glacial: p.glacial,
         }
     }
 
@@ -477,11 +545,8 @@ pub fn run(
         let counts = cfg.counts(true);
         // The whole raster's buffers, and the next level's arrays which are kept either way.
         let whole_bytes = (gw * gh) as u64 * (TILE_BYTES_PER_CELL + LEVEL_BYTES_PER_CELL);
-        let tiled = match cfg.p.stream {
-            StreamMode::Always => true,
-            StreamMode::Never => false,
-            StreamMode::Auto => reserve(whole_bytes).is_err(),
-        } && (cfg.p.tile_cells as usize) < gw.max(gh);
+        let tiled =
+            streams(cfg.p.stream, whole_bytes, reserve) && (cfg.p.tile_cells as usize) < gw.max(gh);
         let level_plan = if tiled {
             TilePlan {
                 gw,
@@ -618,15 +683,32 @@ pub fn level_from_world(world: &WorldState, p: &PlanetPreset) -> Result<Level, C
             })
     };
     let lake = get(young::field::LAKE_M)?;
+    let z = get(young::field::ELEVATION_M)?;
+    // The glaciers' surface where they were (a metre under the ground elsewhere), when the young
+    // landscape had glaciers.
+    let zs: Vec<f32> = match world
+        .fields
+        .get(young::field::ICE_SURFACE)
+        .filter(|f| f.data.len() == n && f.data.iter().any(|x| x.is_finite()))
+    {
+        Some(f) => f
+            .data
+            .iter()
+            .zip(z)
+            .map(|(&s, &g)| if s.is_finite() && s > g { s } else { g - 1.0 })
+            .collect(),
+        None => Vec::new(),
+    };
     Ok(Level {
         w: grid.w as usize,
         h: grid.h as usize,
         dx: f64::from(grid.r) * p.scale.m_per_block_h,
-        z: get(young::field::ELEVATION_M)?.clone(),
+        z: z.clone(),
         area: get(young::field::AREA_M2)?.clone(),
         wgt: get(young::field::WEIGHT)?.clone(),
         kfac: get(young::field::ERODIBILITY)?.clone(),
         lake: lake.iter().map(|&m| u8::from(m > 0.0)).collect(),
+        zs,
     })
 }
 
@@ -657,6 +739,12 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         StreamMode::Auto if base + whole > cap => streamed,
         StreamMode::Auto => whole,
     };
+    // The pick is made from the buffers alone, under the default cap, as before; the run's own
+    // decision (`whole_last_level_peak`) also counts the level the ladder keeps and the preview,
+    // about 0.15 GiB at 16k. So a last level this lists whole may run in tiles (the estimate
+    // then overstates), and one that does run whole needs that much more than listed. Making
+    // `Stage::estimate` take the run's cap would close both (the workbench judges a run against
+    // its cap less 512 MiB, which the default-cap pick here does not know).
     let last = pick(l3 * TILE_BYTES_PER_CELL, window(p.resolution.l3_r));
     // The levels before the last also keep the next level's arrays.
     let mut peak = last;
@@ -742,7 +830,14 @@ impl AmplifyStage {
         let c = self.preset.scale.circumference_blocks;
         let l3 = GridDesc::for_planet("L3", c, r.l3_r)?;
         let cfg = self.config(sea);
-        let fields = CharacterFields::from_world(world, r.l1_r, r.l3_r, &self.p.character);
+        let mut fields = CharacterFields::from_world(world, r.l1_r, r.l3_r, &self.p.character);
+        // Volcanoes (P1-21) keep their cones: no fold ridges over them.
+        let shaper = volcano::Shaper::from_world(world, &self.preset);
+        if let Some(sh) = &shaper {
+            let l1 = GridDesc::for_planet("L1", c, r.l1_r)?;
+            fields.suppress_folds(&sh.fold_keep(&l1));
+            fields.calm_volcanoes(&sh.youth_keep(&l1));
+        }
         // The youth and fold strength the character read, for the keyframes and the workbench.
         if !fields.neutral {
             let l1 = GridDesc::for_planet("L1", c, r.l1_r)?;
@@ -757,25 +852,33 @@ impl AmplifyStage {
                 );
             }
         }
-        let level = level_from_world(world, &self.preset)?;
+        let mut level = level_from_world(world, &self.preset)?;
+        // Volcanoes (P1-21): the cone put in place at L2 before the erosion passes, the rest at
+        // L3 after the character pass (the sink below).
+        let mut volcano_cells = 0;
+        if let Some(sh) = &shaper {
+            let g2 = GridDesc::for_planet("L2", c, r.l2_r)?;
+            volcano_cells = sh.sharpen_level(&mut level, &g2);
+        }
         let (gw, gh) = (l3.w as usize, l3.h as usize);
 
         // Whole raster in memory, or tile by tile (plan §5.7.5: streams automatically when the
         // buffers would not fit under the memory cap).
+        // `auto` is asked about the whole path's full peak (the last level's buffers, the level
+        // before it which the ladder keeps, the preview), not the buffers alone: those are the
+        // reservations the last level will make, with what the run holds by then.
         let whole_bytes = (gw * gh) as u64 * TILE_BYTES_PER_CELL;
-        let streamed = match self.p.stream {
-            StreamMode::Always => true,
-            StreamMode::Never => false,
-            StreamMode::Auto => ctx.reserve(whole_bytes).is_err(),
-        };
+        let peak_bytes = whole_last_level_peak(level.bytes(), n_dbl, gw, gh, self.p.preview_width);
+        let streamed = streams(self.p.stream, peak_bytes, &|b| ctx.reserve(b));
         let plan = cfg.plan(gw, gh, streamed && self.p.tile_cells < (gw.max(gh)) as u32);
         ctx.log.push(
             crate::log::Level::Info,
             format!(
-                "amplify: {} MiB in use of the {} MiB cap; the last level of {gw} x {gh} cells needs {} MiB whole and runs {}",
+                "amplify: {} MiB in use of the {} MiB cap; the last level of {gw} x {gh} cells needs {} MiB whole ({} MiB at its fullest, with the level the ladder keeps and the preview) and runs {}",
                 ctx.gauge.in_use() >> 20,
                 ctx.mem_cap >> 20,
                 whole_bytes >> 20,
+                peak_bytes >> 20,
                 if plan.tile >= gw.max(gh) { "in memory" } else { "in tiles" }
             ),
         );
@@ -783,17 +886,34 @@ impl AmplifyStage {
         let mut sink = PackSink::create(ctx.out_dir, &l3, 256, sea, cfg.sea_y, cfg.mv)?;
         let setup_ms = started.elapsed().as_secs_f64() * 1000.0;
         let cancelled = || ctx.cancelled();
-        let out = run(
-            level,
-            n_dbl,
-            &cfg,
-            cfg.character(&fields),
-            plan,
-            &mut sink,
-            &cancelled,
-            &reserve,
-        )?;
+        let character = cfg.character(&fields);
+        let mut out = match &shaper {
+            Some(sh) => {
+                let mut shaped = volcano::Sink {
+                    inner: &mut sink,
+                    shaper: sh,
+                    grid: l3.clone(),
+                };
+                run(
+                    level,
+                    n_dbl,
+                    &cfg,
+                    character,
+                    plan,
+                    &mut shaped,
+                    &cancelled,
+                    &reserve,
+                )?
+            }
+            None => run(
+                level, n_dbl, &cfg, character, plan, &mut sink, &cancelled, &reserve,
+            )?,
+        };
         let files = sink.finish()?;
+        if let Some(sh) = &shaper {
+            let (pw, ps) = (out.preview.w, out.preview.stride);
+            sh.shape_block(&l3, 0, 0, pw, ps, &mut out.preview.z_m);
+        }
 
         // The thinned copies (keyframes, the workbench) …
         let s = out.preview.stride;
@@ -897,6 +1017,11 @@ impl AmplifyStage {
             "mean_abs_change_m": t.change_m_cells / (t.land_cells.max(1) as f64),
             "mean_detail_blocks": t.detail_blocks_cells / (t.land_cells.max(1) as f64),
             "eroded_km3": t.eroded_m_cells * km3,
+            "glacial": {
+                "carved_km3": t.glacial_carved_m_cells * km3,
+                "raised_km3": t.glacial_raised_m_cells * km3,
+                "cells": t.glacial_cells,
+            },
             "lost_in_transit_km3": t.transit_m_cells * km3,
             "levels": levels,
             "last": {
@@ -906,6 +1031,10 @@ impl AmplifyStage {
             "millis": {"setup": setup_ms, "total": total_ms},
             "preview": {"w": out.preview.w, "h": out.preview.h, "stride": s},
             "layers": [layer(&files.elevation), layer(&files.amplitude)],
+            "volcanoes": {
+                "shaped": shaper.as_ref().map_or(0, volcano::Shaper::len),
+                "l2_cells": volcano_cells,
+            },
         });
         world.notes.insert(STAGE_NAME.into(), note.to_string());
         ctx.log.push(crate::log::Level::Info, summary_line(&note));
@@ -917,7 +1046,7 @@ impl AmplifyStage {
 fn timing_json(t: &Times) -> Value {
     json!({
         "seed": t.seed_ms, "erode": t.erode_ms, "thermal": t.thermal_ms,
-        "deposit": t.deposit_ms, "flood": t.flood_ms,
+        "deposit": t.deposit_ms, "flood": t.flood_ms, "glacial": t.glacial_ms,
     })
 }
 
@@ -926,7 +1055,7 @@ pub fn summary_line(v: &Value) -> String {
     let f = |k: &str| v[k].as_f64().unwrap_or(0.0);
     let mut per_pass = BTreeMap::new();
     let mut add = |p: &Value| {
-        for k in ["seed", "erode", "thermal", "deposit", "flood"] {
+        for k in ["seed", "erode", "thermal", "deposit", "flood", "glacial"] {
             *per_pass.entry(k).or_insert(0.0) += p[k].as_f64().unwrap_or(0.0);
         }
     };
@@ -948,7 +1077,8 @@ pub fn summary_line(v: &Value) -> String {
         .join(",");
     format!(
         "amplify_final={}x{} mode={} tiles={} halo={} mid_tiles=[{level_tiles}] sinks={} pre_flood_raised_cells={} flood_raised_cells={} \
-         flood_max_raise_m={:.2}@{} mean_abs_change_m={:.1} mean_detail_blocks={:.2} eroded_km3={:.3e} lost_in_transit_km3={:.3e} drama={} \
+         flood_max_raise_m={:.2}@{} mean_abs_change_m={:.1} mean_detail_blocks={:.2} eroded_km3={:.3e} lost_in_transit_km3={:.3e} \
+         glacial_carved_km3={:.3e} glacial_raised_km3={:.3e} glacial_cells={} drama={} \
          ruggedness={} character[mean_abs_blocks={:.2},flood_raised_cells={},softened_cells={},{:.1}s] \
          passes[{}] sample={:.1}s detail={:.1}s sink={:.1}s total={:.1}s",
         v["grid"]["w"],
@@ -965,6 +1095,9 @@ pub fn summary_line(v: &Value) -> String {
         f("mean_detail_blocks"),
         f("eroded_km3"),
         f("lost_in_transit_km3"),
+        v["glacial"]["carved_km3"].as_f64().unwrap_or(0.0),
+        v["glacial"]["raised_km3"].as_f64().unwrap_or(0.0),
+        v["glacial"]["cells"],
         v["drama"],
         v["ruggedness"],
         v["character"]["mean_abs_change_blocks"]

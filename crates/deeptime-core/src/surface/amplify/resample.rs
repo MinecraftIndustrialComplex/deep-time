@@ -40,6 +40,18 @@ pub struct Level {
     pub kfac: Vec<f32>,
     /// 1 inside the lakes (and closed basins) the young landscape had, else 0.
     pub lake: Vec<u8>,
+    /// The glaciers' surface, m, where they were, and a metre under the ground elsewhere (so it
+    /// interpolates smoothly across their margins); empty without glaciers (`glacial.rs`).
+    pub zs: Vec<f32>,
+}
+
+impl Level {
+    /// Bytes the arrays hold.
+    pub fn bytes(&self) -> u64 {
+        4 * (self.z.len() + self.area.len() + self.wgt.len() + self.kfac.len() + self.zs.len())
+            as u64
+            + self.lake.len() as u64
+    }
 }
 
 /// The fine values of a window (see [`Level::sample`]).
@@ -50,6 +62,7 @@ pub struct Fine {
     pub own: Vec<f32>,
     pub kfac: Vec<f32>,
     pub lake: Vec<u8>,
+    pub zs: Vec<f32>,
 }
 
 /// The Catmull–Rom value half-way between `p1` and `p2`, clamped between them.
@@ -177,6 +190,7 @@ impl Level {
             own: vec![0.0; n],
             kfac: vec![0.0; n],
             lake: vec![0; n],
+            zs: Vec::new(),
         };
         let dxf = self.fine_dx();
         let a_fine = (dxf * dxf) as f32;
@@ -218,6 +232,25 @@ impl Level {
                     lr[i] = lake;
                 }
             });
+        if self.zs.len() == self.cells() {
+            // Clamped Catmull-Rom, like the terrain: a glacier's surface is smooth.
+            f.zs = vec![0.0; n];
+            f.zs.par_chunks_mut(w).enumerate().for_each(|(j, zr)| {
+                for (i, o) in zr.iter_mut().enumerate() {
+                    let (gi, gj) = win.global(i, j);
+                    let (gi, gj) = (gi as i64, gj as i64);
+                    *o = z_at(
+                        &self.zs,
+                        self.w,
+                        self.h,
+                        gi >> 1,
+                        gj >> 1,
+                        gi & 1 == 1,
+                        gj & 1 == 1,
+                    );
+                }
+            });
+        }
         f
     }
 
@@ -242,6 +275,7 @@ mod tests {
             wgt: vec![1.0; n],
             kfac: vec![1.0; n],
             lake: vec![0; n],
+            zs: Vec::new(),
         }
     }
 

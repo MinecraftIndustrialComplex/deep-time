@@ -159,7 +159,7 @@ pub fn print_census(census: &Value) {
     for t in census["types"].as_array().into_iter().flatten() {
         let f = |k: &str| t[k].as_f64().unwrap_or(0.0);
         println!(
-            "deposits {:<30} sites={:>3} counted={:>3} density={:.1} target={:>7.2} expected={:>7.2} expected_sites={:>7.2} at_positions={:>7.2} preservation={:.3} formed_expected={:>7.2} drawn={:>3} capped={} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={} seams={} seams_max={} measures_m={:.0}",
+            "deposits {:<30} sites={:>3} counted={:>3} density={:.1} target={:>7.2} expected={:>7.2} expected_sites={:>7.2} at_positions={:>7.2} preservation={:.3} formed_expected={:>7.2} drawn={:>3} capped={} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={} seams={} seams_max={} measures_m={:.0} no_cover={} cover_capped={}",
             t["id"].as_str().unwrap_or("?"),
             f("sites"),
             f("counted"),
@@ -186,6 +186,8 @@ pub fn print_census(census: &Value) {
             f("seams"),
             f("seams_max"),
             f("measures_m"),
+            f("no_cover"),
+            f("cover_capped"),
         );
         if let Some(b) = t["best_cell"].as_object() {
             let g = |k: &str| b[k].as_f64().unwrap_or(0.0);
@@ -237,6 +239,94 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
         .plates
         .as_ref()
         .map(|st| deeptime_core::plates::stats::summary(st).line())
+}
+
+/// The continental margins over the run (P1-27, `notes.plates.margins`): the mean shares by
+/// setting over the record after the first 100 Myr (the start's own margins are not the model's),
+/// the last record, and the series of active / passive shares.
+pub(crate) fn margins_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note: Value = serde_json::from_str(world.notes.get("plates")?).ok()?;
+    let list = note["margins"].as_array()?;
+    let rec: Vec<deeptime_core::plates::stats::Margins> = list
+        .iter()
+        .filter_map(|v| serde_json::from_value(v.clone()).ok())
+        .collect();
+    let (first, last) = (rec.first()?, rec.last()?);
+    let after: Vec<_> = rec
+        .iter()
+        .filter(|m| m.t_myr - first.t_myr >= 90.0)
+        .collect();
+    let pool = if after.is_empty() {
+        rec.iter().collect()
+    } else {
+        after
+    };
+    let mean = |f: &dyn Fn(&deeptime_core::plates::stats::Margins) -> f64| {
+        pool.iter().map(|m| f(m)).sum::<f64>() / pool.len() as f64
+    };
+    let andean =
+        |m: &deeptime_core::plates::stats::Margins| f64::from(m.andean) / f64::from(m.coast.max(1));
+    let initiated = |m: &deeptime_core::plates::stats::Margins| {
+        f64::from(m.initiated) / f64::from(m.coast.max(1))
+    };
+    let ratio = |a: u32, b: u32| f64::from(a) / f64::from(b.max(1));
+    let at_boundary = mean(&|m| ratio(m.at_boundary, m.coast));
+    let front_km = mean(&|m| {
+        if m.front_km_p50.is_finite() {
+            m.front_km_p50
+        } else {
+            0.0
+        }
+    });
+    let front_cont = mean(&|m| ratio(m.front_over_continental, m.front_over));
+    let front_len = mean(&|m| f64::from(m.front_over) / f64::from(m.coast.max(1)));
+    let fragment_crust = mean(&|m| m.fragment_crust_share);
+    let fragment_coast = mean(&|m| ratio(m.fragment_coast, m.coast + m.fragment_coast));
+    let floor: Vec<f64> = pool
+        .iter()
+        .map(|m| m.passive_floor_age_p50_myr)
+        .filter(|a| a.is_finite())
+        .collect();
+    let series: Vec<String> = rec
+        .iter()
+        .map(|m| {
+            format!(
+                "{:.0}:{:.2}/{:.2}",
+                m.t_myr,
+                m.active_share(),
+                m.passive_share()
+            )
+        })
+        .collect();
+    Some(format!(
+        "margins records={} active_mean={:.3} subduction_mean={:.3} andean_mean={:.3} \
+         initiated_mean={:.3} boundary_mean={:.3} passive_mean={:.3} regime_active_mean={:.3} \
+         passive_floor_age_p50_mean={:.1} at_boundary_mean={:.3} front_km_p50_mean={:.0} \
+         front_continental_mean={:.3} front_per_coast_mean={:.3} fragment_crust_mean={:.3} \
+         fragment_coast_mean={:.3} final_landmasses={} final_active={:.3} \
+         final_passive={:.3} final_coast_km={:.0} reversals={} series(t:active/passive)={}",
+        rec.len(),
+        mean(&|m| m.active_share()),
+        mean(&|m| m.subduction_share()),
+        mean(&andean),
+        mean(&initiated),
+        mean(&|m| m.boundary_share()),
+        mean(&|m| m.passive_share()),
+        mean(&|m| m.regime_active_share()),
+        floor.iter().sum::<f64>() / floor.len().max(1) as f64,
+        at_boundary,
+        front_km,
+        front_cont,
+        front_len,
+        fragment_crust,
+        fragment_coast,
+        last.landmasses,
+        last.active_share(),
+        last.passive_share(),
+        last.coast_km,
+        last.reversals,
+        series.join(",")
+    ))
 }
 
 /// The surface's summary line (P1-04): `surface_final=<steps> land_frac=… sediment_km3=… …`,
@@ -509,6 +599,22 @@ fn structure_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     Some(deeptime_core::structure::summary_line(&v))
 }
 
+/// The volcano stage's summary line (P1-21): `volcanoes_final=<steps> strato_born=… …`, when the
+/// pipeline ran it.
+fn volcanoes_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note = world
+        .notes
+        .get(deeptime_core::surface::volcanoes::STAGE_NAME)?;
+    let v: Value = serde_json::from_str(note).ok()?;
+    Some(deeptime_core::surface::volcanoes::summary_line(&v))
+}
+
+/// The glaciers' summary line: `glacial_final eroded_km3=… till_km3=… …`, when the surface had
+/// glaciers to model (a climate stage).
+fn glacial_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    deeptime_core::surface::glacial::summary_line(&world.notes)
+}
+
 /// The young landscape's summary line (P1-06): `young_final=… land_z_p50_m=a->b …`, when the
 /// pipeline ran it.
 fn young_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -567,6 +673,7 @@ pub(crate) fn timings_line(
         deeptime_core::surface::STAGE_NAME,
         deeptime_core::climate::STAGE_NAME,
         deeptime_core::structure::STAGE_NAME,
+        deeptime_core::surface::volcanoes::STAGE_NAME,
         deeptime_core::surface::young::STAGE_NAME,
     ] {
         if let Some(note) = world
@@ -647,9 +754,13 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     let lines = s.with_world(|world| {
         let mut lines: Vec<String> = [
             plates_line(world),
+            margins_line(world),
+            deeptime_core::provinces::coherence_line(world),
             surface_line(world),
+            glacial_line(world),
             climate_line(world),
             structure_line(world),
+            volcanoes_line(world),
             young_line(world),
             amplify_line(world),
         ]
@@ -820,7 +931,16 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             o.name
         );
     }
+    if let Some(line) = margins_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = deeptime_core::provinces::coherence_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
     if let Some(line) = surface_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = glacial_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = hypsometry_line(&ck.world) {
@@ -839,6 +959,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         std::fs::write(path, note)?;
     }
     if let Some(line) = structure_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = volcanoes_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = young_line(&ck.world) {

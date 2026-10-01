@@ -644,11 +644,11 @@ mod tests {
             "the deposit count multiplier"
         );
         // The Multipliers section is wired to the core (Ben, 2026-09-29): tonnage, grade, and the
-        // feature scales of ore bodies and rock layers.
+        // feature scales of ore bodies, rock layers and (P1-22) rivers.
         assert!(text.contains("\"size_mult\":5.05"), "{text}");
         assert!(text.contains("\"richness_mult\":5.05"), "{text}");
         assert!(
-            text.contains("\"feature_scale\":{\"deposits\":5.05,\"strata\":5.05}"),
+            text.contains("\"feature_scale\":{\"deposits\":5.05,\"rivers\":5.05,\"strata\":5.05}"),
             "{text}"
         );
         let unavailable: Vec<&str> = r["fields"]
@@ -661,8 +661,7 @@ mod tests {
         assert_eq!(
             unavailable,
             [
-                // Rivers and canyons (Phase 2), Phase 3, and the pack-defined essentials lists.
-                "feature_rivers",
+                // Canyons (Phase 2), Phase 3, and the pack-defined essentials lists.
                 "feature_canyons",
                 "fantasy_fields",
                 "sky_islands",
@@ -868,7 +867,7 @@ mod tests {
             .iter()
             .map(|s| s.as_str().unwrap())
             .collect();
-        assert_eq!(adv.len(), 6);
+        assert_eq!(adv.len(), 8);
         let fields = j["fields"].as_array().unwrap();
         let sections: Vec<&str> = fields
             .iter()

@@ -18,8 +18,10 @@ use crate::error::{FormatError, Result};
 use crate::lazy::LazyLayer;
 use crate::manifest::Manifest;
 use crate::raster::{DType, RasterRead};
+use crate::rivers::{Rivers, read_rivers};
 use crate::sites::{Site, SiteIndex, read_sites};
 use crate::strata::ColumnHorizon;
+use crate::water::{self, WaterColumn, WaterSource, WaterSpec};
 
 /// The terrain layer.
 pub const ELEVATION: &str = "elevation";
@@ -48,6 +50,8 @@ pub struct ColumnWorld {
     pub bodies: Vec<Body>,
     sites: Option<(Vec<Site>, SiteIndex)>,
     others: Vec<(String, LazyLayer)>,
+    /// `rivers/rivers.dtrv` (P1-22), when the world has one.
+    pub rivers: Option<Rivers>,
 }
 
 /// What the evaluator decides for one column (FORMAT.md, "Columns").
@@ -75,6 +79,8 @@ pub struct Column {
     /// (top y, bottom y, rock class) from `top_y` down to `min_y`: the body's class (a zone's
     /// winning) over the horizon's; None where neither names one (unclassified crust).
     pub rock: Vec<(i32, i32, Option<String>)>,
+    /// Lakes, rivers, the sea and banks at the column (P1-22, [`crate::water`]).
+    pub hydro: WaterColumn,
 }
 
 fn io(path: &Path, e: std::io::Error) -> FormatError {
@@ -146,6 +152,7 @@ impl ColumnWorld {
         Ok(ColumnWorld {
             dir: dir.to_owned(),
             sites: read_sites(dir)?,
+            rivers: read_rivers(dir)?,
             min_y: manifest.scale.min_y,
             max_y: manifest.scale.max_y,
             manifest,
@@ -181,6 +188,16 @@ impl ColumnWorld {
     pub fn height(&self, x: i64, z: i64) -> f64 {
         let (e, d) = self.height_parts(x, z);
         if self.detail.is_some() { e + d } else { e }
+    }
+
+    /// The water constants of this world (FORMAT.md, "Water columns").
+    pub fn water_spec(&self) -> WaterSpec {
+        WaterSpec::planet(self.manifest.scale.sea_level_y, self.min_y, self.max_y)
+    }
+
+    /// The water of column (x, z) (any lap).
+    pub fn hydro(&self, x: i64, z: i64) -> WaterColumn {
+        water::column(self, &self.water_spec(), self.c, x, z)
     }
 
     /// Bodies whose AABB footprint holds column (wx, z), ascending id.
@@ -283,6 +300,7 @@ impl ColumnWorld {
             horizons,
             bodies,
             rock,
+            hydro: self.hydro(x, z),
         }
     }
 
@@ -360,6 +378,58 @@ impl ColumnWorld {
     }
 }
 
+impl WaterSource for ColumnWorld {
+    fn height(&self, x: i64, z: i64) -> f64 {
+        ColumnWorld::height(self, x, z)
+    }
+
+    fn level(&self, x: i64, z: i64, reach: i64) -> f64 {
+        match &self.water {
+            Some(w) => water_level_at(w, x, z, reach),
+            None => f64::NAN,
+        }
+    }
+
+    fn rivers(&self) -> Option<&Rivers> {
+        self.rivers.as_ref()
+    }
+}
+
+/// The shore rule (Java `WaterLevels.levelAt`): the `water_level` cell nearest block (x, z), else
+/// the value of the nearest wet cell within `reach` blocks (first found at the smallest squared
+/// distance, cells visited by column then row); NaN when there is none.
+pub fn water_level_at(levels: &impl RasterRead, x: i64, z: i64, reach: i64) -> f64 {
+    let own = levels.nearest(x as f64, z as f64);
+    if !own.is_nan() || reach <= 0 {
+        return own;
+    }
+    let g = &levels.desc().grid;
+    let r = i64::from(g.r);
+    let (ox, oz) = (g.origin_block_x, g.origin_block_z);
+    let i0 = (x - reach - ox).div_euclid(r);
+    let i1 = (x + reach - ox).div_euclid(r) + 1;
+    let j0 = (z - reach - oz).div_euclid(r);
+    let j1 = (z + reach - oz).div_euclid(r) + 1;
+    let mut best = f64::NAN;
+    let mut best_d2 = reach * reach + 1;
+    for i in i0..=i1 {
+        let dx = ox + i * r - x;
+        for j in j0..=j1 {
+            let dz = oz + j * r - z;
+            let d2 = dx * dx + dz * dz;
+            if d2 >= best_d2 {
+                continue;
+            }
+            let v = levels.get(i, j);
+            if !v.is_nan() {
+                best = v;
+                best_d2 = d2;
+            }
+        }
+    }
+    best
+}
+
 /// The horizon holding block y, or None above the first horizon's top (`Column.horizonAt`).
 pub fn horizon_at(horizons: &[ColumnHorizon], y: i32) -> Option<usize> {
     if horizons.is_empty() || y > horizons[0].0 {
@@ -387,6 +457,7 @@ impl Column {
             "horizons": self.horizons.iter().map(|&(t, c, u)| json!([t, c, u])).collect::<Vec<_>>(),
             "bodies": self.bodies.iter().map(|&(id, t, b)| json!([id, t, b])).collect::<Vec<_>>(),
             "rock": self.rock.iter().map(|(t, b, c)| json!([t, b, c])).collect::<Vec<_>>(),
+            "hydro": self.hydro.to_json(),
         })
     }
 }

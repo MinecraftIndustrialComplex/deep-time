@@ -36,10 +36,10 @@ class AdvancedSettingsTest {
     static final List<String> PIPELINES = List.of("pipeline_quick_16k", "pipeline_full_16k", "pipeline_quick_32k", "pipeline_full_32k");
 
     /**
-     * Fields no core parameter backs yet: rivers and canyons (Phase 2), the pack-defined essentials
-     * lists (the datapack loader), and Phase 3's fantasy toggles.
+     * Fields no core parameter backs yet: canyons (Phase 2; rivers are P1-22's), the pack-defined
+     * essentials lists (the datapack loader), and Phase 3's fantasy toggles.
      */
-    static final Set<String> NO_PARAMETER = Set.of("feature_rivers", "feature_canyons", "fantasy_fields", "sky_islands",
+    static final Set<String> NO_PARAMETER = Set.of("feature_canyons", "fantasy_fields", "sky_islands",
             "exotic_landforms", "essentials");
 
     EditorModel model() {
@@ -144,7 +144,8 @@ class AdvancedSettingsTest {
     void theCatalogueGroupsTheAdvancedSectionsLast() {
         List<EditorFields.Section> adv = EditorFields.advancedSections();
         assertEquals(List.of(EditorFields.Section.ADV_PLATES, EditorFields.Section.ADV_SURFACE, EditorFields.Section.ADV_CLIMATE,
-                EditorFields.Section.ADV_ROCKS, EditorFields.Section.ADV_DEPOSITS, EditorFields.Section.ADV_BIOMES), adv);
+                EditorFields.Section.ADV_ROCKS, EditorFields.Section.ADV_VOLCANOES, EditorFields.Section.ADV_DEPOSITS,
+                EditorFields.Section.ADV_BIOMES, EditorFields.Section.ADV_WATER), adv);
         assertEquals(Set.copyOf(adv), EditorFields.ADVANCED);
         boolean seen = false;
         for (EditorFields.Field f : EditorFields.ALL) {

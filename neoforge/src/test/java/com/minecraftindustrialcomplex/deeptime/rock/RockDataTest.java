@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * P1-12: the data Deep Time ships in its jar. The 59 {@code rock_class} definitions (plan §5.4.1),
+ * P1-12: the data Deep Time ships in its jar. The 60 {@code rock_class} definitions (plan §5.4.1),
  * the vanilla member tags, and no fallback tags at all (plan §7.5, Q15). The game parses the same
  * files with {@link RockClass#CODEC}; this test checks the rules the codec cannot.
  */
@@ -50,9 +50,9 @@ class RockDataTest {
     }
 
     @Test
-    void fiftyNineClassesWithTheirFields() throws IOException {
+    void sixtyClassesWithTheirFields() throws IOException {
         Map<String, JsonObject> classes = classes();
-        assertEquals(59, classes.size());
+        assertEquals(60, classes.size());
         List<String> bad = new ArrayList<>();
         classes.forEach((name, o) -> {
             if (!name.equals(o.get("class").getAsString()))
@@ -91,6 +91,11 @@ class RockDataTest {
         assertEquals("minecraft:stone", classes.get("coal").get("vanilla_fallback").getAsString());
         assertEquals("sandstone", classes.get("sand").get("lithifies_to").getAsString());
         assertEquals("sand", classes.get("sandstone").get("loose_equivalent").getAsString());
+        // Buried till is diamictite, not conglomerate (Ben, 2026-09-30), with its own stand-in.
+        assertEquals("diamictite", classes.get("till").get("lithifies_to").getAsString());
+        assertEquals("till", classes.get("diamictite").get("loose_equivalent").getAsString());
+        assertEquals("clastic_sedimentary", classes.get("diamictite").get("family").getAsString());
+        assertEquals("minecraft:cobbled_deepslate", classes.get("diamictite").get("vanilla_fallback").getAsString());
     }
 
     @Test

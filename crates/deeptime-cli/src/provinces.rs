@@ -36,12 +36,16 @@ pub fn run(input: &Path, out: &Path) -> Result<Vec<(String, f64)>, Box<dyn std::
     let frame = deeptime_core::keyframes::render(
         &world,
         &Ramps::builtin(),
+        &deeptime_core::keyframes::ViewScale::default(),
         "provinces",
         &[provinces::LAYER],
         0,
         deeptime_core::keyframes::DEFAULT_SIZE,
     )
     .ok_or("nothing to draw")?;
+    if let Some(line) = provinces::coherence_line(&world) {
+        println!("{line}");
+    }
     let png = deeptime_viewer::encode_png(frame.w, frame.h, &frame.layers[0].1)?;
     std::fs::write(out, png)?;
     Ok(shares)

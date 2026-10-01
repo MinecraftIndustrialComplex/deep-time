@@ -21,9 +21,9 @@ public final class Columns {
     public static final int CELLS = 16;
     /** The stencil index of cell (i0, j0), the reference of the weighted mean. */
     private static final int REF = 5;
-    /** Keys per band of an interfingering facies change (Rust {@code strata::BAND_KEYS}). */
+    /** Keys per band of an interfingering facies change where the layer does not say (Rust {@code strata::BAND_KEYS}). */
     public static final int BAND_KEYS = 64;
-    /** A class's share below which it takes no part of a band (Rust {@code strata::MINOR_SHARE}). */
+    /** A class's share below which it takes no part of a band, where the layer does not say (Rust {@code strata::MINOR_SHARE}). */
     public static final double MINOR_SHARE = 0.15;
 
     /**
@@ -272,20 +272,21 @@ public final class Columns {
                         eUnit[r + 1] = un;
                         eThick[r + 1] = th;
                     }
-                    interfinger(ne, s0, s1, top, bottom);
+                    interfinger(ne, s0, s1, top, bottom, strata.desc().tongueBandKeys(),
+                            strata.desc().tongueMinorShare());
                 }
                 top = bottom;
             }
         }
 
         /** Rust {@code strata::interfinger}. */
-        private void interfinger(int ne, int s0, int s1, double top, double bottom) {
+        private void interfinger(int ne, int s0, int s1, double top, double bottom, int bandKeys, double minor) {
             double total = 0.0;
             for (int e = 0; e < ne; e++)
                 total += eThick[e];
             double kept = 0.0;
             for (int e = 0; e < ne; e++) {
-                share[e] = Math.max(eThick[e] / total - MINOR_SHARE, 0.0);
+                share[e] = Math.max(eThick[e] / total - minor, 0.0);
                 kept += share[e];
             }
             if (kept <= 0.0) {
@@ -295,9 +296,9 @@ public final class Columns {
                     kept += share[e];
                 }
             }
-            double k0 = s0, k1 = s1, band = BAND_KEYS;
-            for (int n = s0 / BAND_KEYS; n <= (s1 - 1) / BAND_KEYS; n++) {
-                double base = n * BAND_KEYS;
+            double k0 = s0, k1 = s1, band = bandKeys;
+            for (int n = s0 / bandKeys; n <= (s1 - 1) / bandKeys; n++) {
+                double base = n * bandKeys;
                 double sum = 0.0;
                 for (int e = 0; e < ne; e++) {
                     double lo = base + band * (sum / kept);
@@ -353,9 +354,13 @@ public final class Columns {
      * @param horizons  [top y, class index, unit key] per horizon, top-down
      * @param bodies    runs inside bodies, ascending body id, each body's runs top-down
      * @param rock      the rock from {@code topY} down to min_y: a body's class (a zone's winning) over the horizon's
+     * @param hydro     the column's lake, river, sea or bank ({@link Water}, P1-22)
      */
     public record Sample(int x, int z, int wx, double elevation, double detail, double surface, int topY, double water,
-                         int[][] horizons, List<BodyRun> bodies, List<Run> rock) {}
+                         int[][] horizons, List<BodyRun> bodies, List<Run> rock, Water.Column hydro) {}
+
+    /** The noise cell width of the {@code deeptime:planet} generator the parity fixture assumes. */
+    public static final int NOISE_CELL = 4;
 
     /** Evaluates column (x, z) of {@code wd}. */
     public static Sample sample(WorldData wd, int x, int z) {
@@ -446,6 +451,6 @@ public final class Columns {
                 rock.add(new Run(y, y, cls));
         }
         return new Sample(x, z, wx, elevation, detail, surface, topY, water, horizons, List.copyOf(bodies),
-                List.copyOf(rock));
+                List.copyOf(rock), Water.column(wd, Water.Spec.of(wd, NOISE_CELL), x, z));
     }
 }

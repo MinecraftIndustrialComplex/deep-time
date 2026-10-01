@@ -387,6 +387,13 @@ impl Preset {
                 if p.surface.is_some() {
                     // Coupled to the plates: one surface step after every plate step (plan §8).
                     stages.push(Box::new(crate::surface::SurfaceStage::new((**p).clone())));
+                    if p.volcanoes.is_some() {
+                        // Coupled too: builds its edifices on the surface each step, before the
+                        // structure stage reads the strata log (P1-21).
+                        stages.push(Box::new(crate::surface::volcanoes::VolcanoStage::new(
+                            (**p).clone(),
+                        )));
+                    }
                     // Column strata and metamorphism on the surface's strata log (P1-07).
                     stages.push(Box::new(crate::structure::StructureStage::new(
                         (**p).clone(),
@@ -444,6 +451,19 @@ impl Preset {
                 every_years: Some(p.keyframes.every_myr * 1.0e6),
                 size: (p.keyframes.size[0], p.keyframes.size[1]),
             },
+        }
+    }
+
+    /// How the keyframes' view layers read heights (the satellite view): the planet's scale and
+    /// model sphere, else the defaults.
+    pub fn view_scale(&self) -> crate::keyframes::ViewScale {
+        match &self.body {
+            PresetBody::Planet(p) => crate::keyframes::ViewScale {
+                sea_level_y: f64::from(p.scale.sea_level_y),
+                m_per_block_v: p.scale.m_per_block_v,
+                radius_m: p.tectonics.model_radius_km * 1000.0,
+            },
+            _ => crate::keyframes::ViewScale::default(),
         }
     }
 
@@ -651,6 +671,7 @@ mod tests {
                     "plates",
                     "climate",
                     "surface",
+                    "volcanoes",
                     "structure",
                     "deposits",
                     "young",

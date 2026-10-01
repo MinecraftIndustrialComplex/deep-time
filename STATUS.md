@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · P1-27 plate margins (sutures, initiation clear of trenches, arc cordilleras) + coherent provinces done on its branch (worktree-agent-ad3b417fd428c1ac2) · Updated: 2026-09-30 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -31,7 +31,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-07 | Rock classes, column strata and metamorphism | done | 2026-09-29 | — | On the coupled pipeline preset (built-ins stay placeholders until P1-08). Mac: cargo test --workspace ok (core 149 + 1 ignored incl. structure:: 11: stacks ordered top-down, ≥ 1 block thick, classes valid, ≤ K; resume identical; every built-in deposit type finds all its fields incl. trap_structure and host/*), fmt, clippy -D warnings, deny clean; gradlew build test 106/0; ./gametest.sh All 45 passed (everyClassInTheWorld 59/59, 240 samples 0 wrong); `stage structure --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-structure` → horizon_check=ok, 3.88 horizons/cell, 22,000 plutons (8,138 bodies), 50 frames published; structure 4.8 s of 122 s |
 | P1-08 | Bake, world data v1 and parity | done | 2026-09-29 | — | Format 0.1; `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --out … --viewer review/out/p1-q16` → format_version 0.1 (752 s on a loaded Mac, bake 1.1 s, folder 156 MB); `./gradlew test --tests '*ColumnParityTest'` → tests=2 failures=0 errors=0 (500 of 500 columns equal, 77 through bodies, JNI sampleColumn identical); JUnit 124/0; real-preset first start PASS (generation 492 s, 441 chunks in 19 s); built-ins are the pipeline presets; see build log |
 | P1-09 | Climate mapping and biomes | done | 2026-09-29 | — | Real planet (earthlike_quick_16k, 500 Myr), `tools/review/p1-09-smoke.sh standalone mic` → both smokes PASS; whole-planet census (1024 × 512 samples) standalone / MIC: BW desert or badlands 75.1 / 78.0 % (any dry tag 90.4 / 92.3 %), Af jungle 84.3 / 82.2 %, Dfc taiga 88.9 / 66.5 %, ET/EF snowy or icy 97.7 / 99.3 %; Chunky areas rendered with `deeptime-inspect biomes` agree. cargo fmt/clippy -D warnings/test (core 238 + 3 ignored)/deny clean; JUnit 140/0; `./gametest.sh` All 50 passed (climateConsistent, bandsAreTheBuilders); `-PwithMic`: every finished test passes (48 of 50) but lakeHolds stalls and the JVM dies of heap, 4 of 4 runs (known flake, see build log). Review bundle review/out/p1-09 (3.4 MB, not published). See build log |
-| P1-10 | TerraBlender regions follow provinces | todo | | | |
+| P1-10 | TerraBlender regions follow provinces | todo | | | Includes the USGS province classes (log 2026-09-29) and the orogen-heavy provinces from P1-27 (orogen 0.40 vs Earth ~0.17, ~10 collisions per 100 Myr vs 3–4; log 2026-10-01). |
 | P1-11 | Customize editor, timelapse and staging | doing | 2026-09-28 | d42375e | Screens, models and staging built on the placeholder presets (real stages pending). Mac, merged with master f14d258 (P1-03, P1-18): JUnit tests=101 failures=0 (new: EditorModelTest, TimelapseModelTest, ModelHelpersTest, StagingMoverTest, TimelineAcrossJniTest, ScreenSourcesTest); ./gametest.sh → All 31 required tests passed (EditorModelGameTests acceptBuildsGenerator, stagingMovedOnStart, editorRunsAcceptsAndBinds, shareCodeThroughModel, realPresetFieldsLightUp); cargo fmt/clippy -D warnings/test --locked (193 passed)/deny clean; gradlew build clean. Client (laptop, HeadlessMC + Xvfb): whole walk Create World → editor → run → review → Accept → world created from the moved staging, no crash; guidance panel with natives forced off; screenshots in review/out/p1-11-client. Rerun with the real presets after P1-08; biome names on the review page with P1-09 |
 | P1-12 | Strata pass with rock tags and `rock_states` | done | 2026-09-28 | — | Mac: ./gametest.sh and -PwithMic (+ MIC rock tags via -Ddeeptime.extraDatapack) → All 21 required tests passed each; coal stone / black argillite; Create stones in their classes; loess = projectatmosphere:dust[layers=8]; everyClassInTheWorld 59/59 classes, 240 samples 0 wrong; MIC smoke probe palette 59/59 (member 24, fallback 35); JUnit 46/0; bodies deferred (P1-08/P1-14) |
 | P1-13 | Dedicated server: generate on first start | doing | 2026-09-28 | 743b69d | Mechanism verified on placeholder presets (dummy pipeline + wrap-test bake): standalone and MIC first starts generate in ~12 s with progress lines ≤ 5 s apart, restart does not regenerate; no-config / circumference-mismatch / native-failure all stop cleanly before loadLevel. Rerun with the real presets after P1-08 |
@@ -42,11 +42,13 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
 | P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log). **Follow-up** (branch worktree-agent-afd5791e0f5ea82cd): a run with a bake is previewed and inspected as its own terrain (`/api/inspect` from `deeptime inspect-column --why` in 60-90 ms, previews boot the mod on the run's bake; height p50 0 vs the bake); runs without a bake keep the test world and say so (see build log). **UI overhaul** (branch worktree-agent-a95571be05fdd89d6, Ben: "should be dark themed"): dark map-first layout, run cards, sectioned editor with the estimate by Run, split/side-by-side compare, timeline dock, stage-2 job cards, `?tv` HUD, 390 px; placeholders hidden; Mac gates clean, JUnit 118/0; before/after in review/out/workbench-ui/ (see build log) |
-| P1-21 | Volcanoes as landforms (log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
-| P1-22 | Rivers and lakes (moved from P2-03, log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
+| P1-21 | Volcanoes as landforms (log 2026-09-29) | done | 2026-09-30 | | Branch worktree-agent-a348bd3bf6e50dd72 (session f981c0d3-5144-49ec-8686-2946d755872c): coupled `volcanoes` stage (arc stratovolcanoes on the volcanic front ~60 km apart, hotspot shields and island chains that age and subside, calderas, flood-basalt plateaus from LIPs), volcanic rock in the strata log, `deeptime:volcano_*` events with causes (workbench, `inspect-column --why` landforms, porphyry pathway), block-scale cones/craters/calderas/terraces in amplify, every knob a setting. Mac: earthlike_quick_16k 500 Myr 418 s (volcanoes 14.1 s), 203 live arc cones, 8 standing shields, 295 calderas, 9 flood basalts, 1,468 events; cargo test/clippy -D warnings/fmt/deny clean; gradlew build test 146/0; `mac.sh --server -- ./gametest.sh` All 50 required tests passed; bundle review/out/p1-21/bundle (11 MB, not published); follow-ups (log 2026-09-30): flank steepness setting (default 0.5), one event per arc segment / hotspot chain, segments under 3 cones counted on their subduction onset, young volcanoes exempt from the mountain pass's unsharp mask; see build log |
+| P1-22 | Rivers and lakes (moved from P2-03, log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-ad204cf8d55ef26f5, not yet merged. core::hydro in the bake (lakes full to their spill level; river network `rivers/rivers.dtrv`, format 0.2), the column rule on both sides, the WaterBodies pass, river biomes, `hydro` settings. <br>**Real 16k 500 Myr planet:** 27 lakes (68,139 km²), 4,489 rivers, 119,813 km, widest 36.7 blocks; water part 4.9 s. <br>**Parity:** 500/500 and lake1024 300/300. <br>**GameTests:** `./gametest.sh` and `-PwithMic` 53/54 each on master 0905793 (riversHold 0 floating, 0 leaks; the one failure was master's climateConsistent, fixed on master since); `./gametest-planet.sh` PASS; the last merge (5d4147b) got cargo and Gradle only (157/0), per the new rule. <br>**Previews:** 0 floating and 0 river/lake leaks in 3 of 4 boxes, 1 on a boulder in the 4th; the whole lake's rim − surface = 0. <br>**Chunk time:** the pass costs 0.3 ms a chunk. <br>Review bundle review/out/p1-22 (not published); see the build log |
 | P1-23 | Grid-artifact audit (log 2026-09-29) | todo | | | Starts after the mountain and strata work lands (they fix part of it). |
 | P1-24 | Faster Create World (log 2026-09-29) | todo | | | After P1-17's benchmarks; options go to Ben. |
 | P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-a02882c5e6567370e, not yet merged. Format 0.2 bakes twelve monthly layers. `DeepTimeClimate` is at API version 1.<br>**Parity:** `ClimateParityTest` 500/500 blocks bit for bit, and the GameTest `climateApiOnTheRealPlanet` matches too.<br>**mic-climate `deep-time` branch** (pushed): Deep Time's climate plus Project Atmosphere's weather anomaly. Its GameTests pass 19/19, with and without Project Atmosphere, and its pack smoke passes 20/20.<br>**MIC planet probe** (earthlike_quick_16k): Af 24.5 °C, BWk 8.8/19.6 °C, Dfc −12.9/15.3 °C, ET −24.7/0.6 °C, EF plateau (4,860 m) −22.7/−46.7 °C, each pair midwinter/midsummer. Project Atmosphere read 8.6, 8.9, −0.6, 4.0 and 10.5 °C at the same places. Its simulated weather adds −2.4…+2.5 °C.<br>JUnit 150/0 and `./gametest.sh` All 52 passed after merging master 8872c91; cargo gates clean. See build log. |
+| P1-26 | Per-cell climate: 2-D energy balance, sea ice, moisture (log 2026-09-30) | doing | 2026-09-30 | | Design approved 2026-10-01 (docs/design/p1-26-per-cell-climate.md, recommended answers); tasks T1–T11 start after the climate agent's ice-sheet branch (worktree-agent-adc924860a859865c-ice) lands. |
+| P1-27 | Plate margins and coherent continents (logs 2026-09-29, 2026-09-30) | done | 2026-09-30 | | Branch worktree-agent-ad3b417fd428c1ac2 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. Cause: a collision moved the continent alone to the overriding plate, leaving its passive margins facing an ocean that kept converging (collisions cut 295,000–455,000 km of margin off its ocean per 750-Myr run; rifts ~2,000, initiations < 300). Fixed by sutures, initiation anywhere clear of trenches (rate 0.3), arc cordilleras, collision orogen cores, arc maturity; provinces view generalised to the USGS map's 150 km. Mac, 6 pipeline runs × 400 Myr before → after: active margin 0.67 → 0.31 (Earth ~0.3, Bradley 2008), passive 0.30 → 0.63, floor beside passive margins 50 → 102 Myr, ground under arc cones 307 → 812 m, provinces orogen 0.51 → 0.40, shield+platform 0.17 → 0.29, edge density 0.078 → 0.060; land 0.398 → 0.391, median 1,350 → 1,030 m, ocean p90 108 → 194 Myr. cargo test/clippy/fmt/deny clean, JUnit 155/0; evidence review/out/p1-27/ (not committed); see build log |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -79,6 +81,810 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-10-01 — Climate ice branch: master merged, nothing built; what is left and the runs to make (agent worktree agent-adc924860a859865c, branch `worktree-agent-adc924860a859865c-ice`, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **State.** Master 90e07ba is merged into the branch **without a build or a test** (M6 paused, new
+  machine pending). One textual conflict, `checkpoint.rs`: master's volcano catalogue took schema 8, so
+  the ice sheet / weathering supply / snowball list is now **schema 9** (FORMAT.md says so). Everything
+  else merged automatically, including `surface/mod.rs` (+212 lines of rivers and margins), the presets,
+  `editor_fields.json` and `BiomeGameTests.java`; none of that is compiled yet, so the first job on the
+  new machine is the build. The code before the merge (4867998) was built and short-tested; 269feae
+  (docs) and this merge were not.
+- **On the branch, written.** (1) Ice-sheet dynamics: `climate/sheet.rs`, shallow-ice flow (Mahaffy
+  scheme, n = 3) on a ~256-column grid, mass balance on the ice surface against the snowline (the
+  elevation feedback), isostasy (3 kyr), calving; every 2-kyr step in the orbital window, relaxed
+  30 kyr per plate step in deep time; switch `ice_dynamics`. (2) Supply-limited weathering (West
+  2012): per band W = S(1 − e^(−K/S)), S from the surface stage's erosion (floor 2 m/Myr) × 2700 kg/m³
+  × 1.26 mol/kg × `weathering_supply_scale` 2 × 2^(ΔT/10); plus a seafloor-weathering sink
+  (`seafloor_weathering_share` 0.2), added because the raw cap alone ran to a hothouse. (3)
+  `carbon_step_kyr` default 200, a setting (25–500 kyr) in `editor_fields.json`, presets synced; the
+  halving down to 1 kyr is unchanged and `the_200_kyr_clock_still_resolves_onset_and_escape` holds
+  onset and escape to 1.5 / 2 Myr against the 50-kyr clock (last passed at 4867998).
+- **Measured so far (before the merge, short runs only).** Synthetic snowball gap 0.23 → 9.1 Myr with the
+  supply cap (before the seafloor sink was added; not re-measured after). 4k test planet 21.0 °C /
+  1,694 ppm (master: 23 °C / 2,949 ppm). Earth-like 150 Myr: 15.7 °C, 367 ppm, 10 % of land glaciated.
+- **Not done.** The ice-age cycle's size on a real planet (target ~10 → 25 % of land glaciated, 100–130 m
+  of sea level); the snowball gap on a real planet (target 9–19 Myr near the threshold); snowball
+  frequency at the defaults after the runoff fix 970efd1 (the diamictite agent found none at
+  `degassing_scale` 0.3 and six at 0.1 over 1000 Myr on master); the 500-Myr calibration; the
+  `climateConsistent` floors, which were set for the 23 °C planet; knob extremes; the review page.
+- **Runs, in this order** (`D` = the release `deeptime` binary; outputs under the new machine's
+  `deeptime-runs/climate-ice/`; the scripts are this worktree's gitignored `build/dtc/runs5.sh`,
+  `runs6.sh`, `runs7.sh`, `summ.py`, `gaps.py`, paths to be changed for the new host):
+  1. Gates on the merge: `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`,
+     `cargo test --workspace`, `cargo deny check licenses bans`, `cd neoforge && ./gradlew build test`.
+  2. Earth check: `D climate-dem` on GMT `earth_relief_30m_p` (the 720-column dump was on the deleted
+     Mac copy; fetch it again). Pass: 19/24 as before, `KERNEL_EARTH` within 2 % of 2.845·10⁷.
+  3. Pre-window checkpoints, three planets:
+     `D stage climate --preset pipeline_quick_16k --start <S> --seed <N> --length-myr 500 --max-steps 248 --out <ck>`
+     for (scattered_continents, 1), (supercontinent, 1), (scattered_continents, 3).
+  4. Ice-age window from each checkpoint: `D stage climate --in <ck> --climate-json <f> --out <ck2>`
+     with the defaults, then one change at a time: `--set climate.ice_accumulation_gradient=0.01`,
+     `--set climate.ice_ablation_gradient=0.005`, `--set climate.ice_isostasy_kyr=10`,
+     `--set climate.ice_dynamics=false` (the old Nye + lag model, for the comparison). Read from the
+     series: glaciated share of land (min, max), sea-level swing, period.
+  5. Calibration: the same three planets, 500 Myr in full, no `--max-steps`, with
+     `--viewer <dir> --viewer-layers` for the review page. Compare with master's table in the 2026-09-29
+     entry (temperature, ppm, glaciated share, S/D).
+  6. Snowball frequency, 1000 Myr, supercontinent and scattered_continents (seed 1):
+     `--set climate.degassing_scale=X` for X = 1.0 (default), 0.3, 0.25, 0.2, 0.1, each with
+     `climate.weathering_supply` true and false (20 runs). From `snowball_spans_myr`: count, lengths, gaps.
+     If nothing snowballs at the defaults in plausible conditions, the retune options go to Ben with
+     these numbers; no default changes without his answer.
+  7. `tools/dev/knob_extremes.py --stage climate` for the new settings.
+  8. `./gametest.sh` and `./gametest.sh -PwithMic` (server slot) for `climateConsistent` on the now
+     21 °C test planet; re-set floors only with the class counts to show for it.
+  9. Review page, this entry completed, report. No merge into master by this agent.
+- **What P1-26 (per-cell climate) needs first.** It builds on `sheet::Grid` (moved to
+  `climate/coarse.rs`), on the sheet's forcing (`ela`, `precip`), on `kernel_of` with the supply limit
+  and on the clock's `Input`/`balance` signatures, and it re-measures `KERNEL_EARTH`. So before it
+  starts: steps 1–2 (the merge compiles and the Earth check holds), steps 4–6 decided (any retune of
+  the ice gradients, `weathering_supply_scale`, the seafloor share or degassing settles the carbon
+  balance P1-26 will normalise against), schema 9 fixed, and the branch merged into master. Steps 7–9
+  can follow in the same batch. P1-26 re-sets the `climateConsistent` floors itself (its §5.3), so step 8
+  only has to pass, not be tuned finely.
+
+### 2026-10-01 — M6 paused; batch 4 pushed with one GameTest re-run pending (session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Pause.** Ben: our test load on the M6 made graphide's ms-precision timing tests flaky; "please cease
+  testing on the m6, I will be provisioning a new machine for your tests". All Deep Time jobs there were
+  killed (six P1-17 calibration runs, the climate agent's run, two workbench timing runs, our Gradle
+  daemon); the idle workbench server (port 8642) stays up. `mac.sh` now refuses while
+  `/Volumes/Graphide/ban/deeptime-cache/PAUSED` exists on the M6 (4051cbb); CLAUDE.md says so.
+- **Batch 4** (amplify memory fix 80cd51b, water protection ce8a4fa, test fix 05a3073): cargo (fmt, clippy,
+  test, deny) and `./gradlew build test` (160/0) green on ce8a4fa; GameTests 55/56 on both profiles, the
+  one failure the new `carversSpareWater` (its premise counted only air under the beds, but the test
+  level has no aquifer, so carved cells below sea level fill with water). The fix (8b48bce) passed
+  `carversSpareWater` alone (`-PgametestOnly`: columns=695 drained=0 holes=0 carvedBelow=1589
+  entrances=246); the full `./gametest.sh` and `-PwithMic` re-run waits for the new test machine.
+- **Next.** Wire the new machine into `mac.sh` (`DEEPTIME_MAC`, SSD path), re-run the batch-4 GameTests,
+  then resume the paused agents' work (P1-17 hypsometry, the climate ice branch, the four workbench
+  features).
+
+### 2026-09-30 — P1-27 plate margins and coherent continents (agent worktree agent-ad3b417fd428c1ac2, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben (decisions log 2026-09-29, "Provinces view shows speckled, patchy continents"; 2026-09-30, "most coast lines
+  are getting speckled with mountains"): "Investigate + fix". Workbench run 1a0f5089640 (earthlike_quick_16k,
+  supercontinent, 750 Myr) at step 101 had an arc + back-arc band on nearly every continental coast and arc cones
+  about 60 km apart on all of them, on low coastal plains.
+- **Measuring margins** (new; `plates::stats::margins`, recorded every 10 Myr into `notes.plates.margins`; `stage`/`run`
+  print a `margins` line with the means after the first 100 Myr and the series; `deeptime margins --in <checkpoint>
+  --out map.png` draws the classes). The margin is the continent–ocean boundary: visible continental samples with
+  oceanic crust within 1.5 spacings, one spacing of coast each, on landmasses of at least 200,000 km² Earth-normalized
+  (smaller island-arc specks are counted apart, `fragment_coast`). Classes, first that applies: collision (regime) >
+  subduction (a confirmed, converging front within 400 km on either plate; "Andean" when the continent overrides) >
+  other plate boundary > passive. Also the regime layer's share (arc, back-arc, trench, collision at the coast) and
+  the age of the floor beside passive margins.
+- **Earth.** Present-day passive margins total 105,000 km against 53,000 km of convergent plate boundaries (Bradley
+  2008, Earth-Sci. Rev. 91:1–26); active continental margins ~45,000 km counting arcs like Japan (Lallemand, Encycl.
+  Marine Geosciences), ~28,000–32,000 km with continental overriding plates only (tallied from Schellart et al. 2008,
+  Earth-Sci. Rev. 88:118, Table 1); convergent ≈ 48 % of continental margin length counting island arcs (Mercier de
+  Lépinay et al. 2016, Tectonophysics 693). So **passive ≈ 0.7, active ≈ 0.2–0.3** (0.48 at most). Modern passive
+  margins average 104 Myr old (oldest 180); ancient ones lasted 181 Myr on average (Bradley 2008), who calls a direct
+  passive-to-subduction conversion "rare indeed"; Stern 2004 (EPSL 226:275) and Stern & Gerya 2018 (Tectonophysics
+  746:173): no Cenozoic passive-margin collapse, subduction starts at transforms/fracture zones or by polarity reversal.
+- **Before** (master's plate model with the instruments, commit 4cf2cda): plates only, 4 runs × 750 Myr (2 starts × 2
+  seeds): active 0.61–0.70 of the margin, passive 0.29–0.37, regime arc/back-arc 0.60–0.68, floor beside passive
+  margins (median) 64–72 Myr. Coupled pipeline, 6 runs × 400 Myr (`tools/review/p1-27-ensemble.sh`): active 0.67
+  [0.59–0.74], passive 0.30, regime 0.69, floor 50 Myr.
+- **The cause, measured.** Not the spontaneous initiation: it fired 0–2 times per 750-Myr run (only plates that subducted
+  nowhere qualified), and switching it off left the active share at 0.59–0.71. Nor rifting (half the rate: 0.57–0.69),
+  plate-motion noise (none: 0.59–0.68), slab pull (off: 0.56–0.66), slow slab-free plates (0.65–0.69), slow continents
+  (0.60–0.67) or fewer plates (≤ 20: 0.56–0.68). Every rift, initiation and collision now reports the continental margin
+  it cut off its own ocean (`coast_split_km`): per 750-Myr run (planet km; the whole coast is ~61,000) collisions
+  295,000–455,000, terrane accretions 89,000–130,000, rifts 1,700–2,400, initiations 40–270. **Cortial's collision
+  moved the colliding continent alone to the overriding plate and left its ocean on the old plate, which kept
+  converging: every passive margin of that continent became a plate boundary and then an Andean margin** (~10
+  collisions per 100 Myr). The regime layer adds an 800-km back-arc halo (`subduction_distance_km`), so its map showed
+  more active coast than there was. Rifted margins only become plate boundaries transiently.
+- **Changes** (all settings; pipeline/earthlike presets, editor fields with lang keys, plate-only presets at P1-03's
+  behaviour where noted):
+
+  | setting | value | what |
+  |---|---|---|
+  | `tectonics.collision_suture_frac` (new) | 0.1 | a colliding continent of at least this share of an average plate sutures its whole plate to the receiving one (plate_death `sutured`), keeping the ocean on its other coasts; the crust is resampled at once so the welded slab is consumed. Smaller terranes still transfer alone |
+  | `tectonics.subduction_initiation_clearance_km` (new) | 1,000 | old floor may start subducting wherever it lies this far from every trench (before: only on plates that subducted nowhere, so welded plates' old floor aged for ever); the split never tears a continent (slivers stranded in the old floor ride along) |
+  | `tectonics.subduction_initiation_rate` | 0.1 → 0.3 | keeps the floor recycled with sutures (ocean p90 ~190 Myr) |
+  | `tectonics.cordillera_uplift_mm_yr` / `_width_km` / `_height_m` (new) | 0.2 / 120 / 2,500 (plate-only 0) | continental crust over an arc above an oceanic slab rises in a Gaussian band round the arc axis towards the height (thickened crust spreads), with its Airy root added to the crust's felsic plutonic (0.6) and metamorphic (0.4) pools |
+  | `tectonics.collision_orogen_core` (new) | 0.5 | a collision stamps its Himalayan orogeny (folds, metamorphism) only where its surge reached half its peak; before, everything lifted by 10 m: belts up to 4,000 km wide |
+  | `tectonics.arc_continental_m` (new) | 80 (plate-only 0) | an emerged island arc becomes continental only after this much arc magma (~8 Myr of arc): volcano cones lifted young intra-oceanic arcs above the sea, and with initiation in the open ocean the continental crust grew from 0.41 to 0.56 of the planet in 750 Myr (0: 51,000 conversions; 300: crust fell to 0.20; 60: 0.44–0.48; 120: 0.30–0.37; 80 keeps it at ~0.40) |
+
+- **Cone heights do not double-count.** The volcano stage's cone relief is the height it built (`height_m`, target from
+  the arc flux), not measured from the ground; the ground only enters the summit ceiling (6.8 km above the sea). The
+  amplifier's measured relief is clamped to the built cone. A range under a cone raises the summit, not the cone.
+  The volcano stage now records the ground under active cones on continental landmasses (surface at the summit less
+  the cone's own relief) every 10 Myr (`notes.volcanoes.arc_bases`). Scale note: at 16k a cone's footprint (radius ~28
+  km with the default flank steepness 0.5) is about as wide as an Andes-wide range shrunk by the Earth normalization
+  (×0.123), so the range shows as the cones' common base more than as a separate ridge.
+- **Provinces (Part 2).** Causes of the patchwork, measured with a new coherence line (`provinces …`: class shares by
+  true area, edge density = share of neighbouring continental cells of different classes, speck share = cells in
+  same-class patches under 25 cells, and why cells are orogens): (1) the active-margin rings (arc regime and Andean
+  ranges) on every coast, gone with the margins fix; (2) collision stamps covering most of every continent (the 10-m
+  threshold over surges up to 2,000 km), fixed by `collision_orogen_core`; (3) the one-sample passive-margin regime
+  drawn as dashed "extended crust" along every coast; (4) island-arc specks in the oceans. View fixes (`provinces.rs`,
+  view-only): rifted margins are a continuous band 150 km (1.35°) wide along every quiet coast (`rifted_margin_deg`),
+  the generalisation looks half the USGS map's 150-km feature size (radius 2 cells at 1024) and continental patches
+  smaller than that feature squared (15 cells) take the sea floor's class (`feature_deg`, `drop_specks`).
+  Earth reference (CRUST 2.0 crust types, land without Antarctica, derived by a sub-agent): Precambrian basement 45 %
+  (exposed ~27 %) + Phanerozoic platform 25.5 % ≈ 71 % cratons, orogens 12 % + arcs 5 %, extended + rift 7 %.
+- **After** (this branch; `tools/review/p1-27-ensemble.sh 400 "1 2 3" "supercontinent scattered_continents"`, 6 runs
+  × 400 Myr, mean [min–max], before → after):
+  - margins: active 0.67 → **0.31** [0.29–0.35], passive 0.30 → **0.63** [0.59–0.66], regime layer 0.69 → 0.45, floor beside
+    passive margins 50 → **102** Myr; plates only (4 runs × 750 Myr): active 0.29–0.36, passive 0.59–0.65, floor 103–141 Myr;
+  - arcs: ground under continental arc cones 307 → **812** m (median of the 10-Myr records), cones on ground below 500 m
+    62 % → 41 %;
+  - provinces: shield 0.065 → 0.148, platform 0.106 → 0.143, orogen 0.513 → 0.401, basin 0.124 → 0.085, LIP 0.032 →
+    0.058, extended 0.161 → 0.165; edge density 0.078 → 0.060, specks 0.062 → 0.033;
+  - hypsometry: land 0.398 → 0.391, land median 1,350 → 1,030 m, p90 4,120 → 3,560 m, above 2 km 0.336 → 0.267,
+    continental crust 0.461 → 0.420 (dry 0.82 → 0.81); glaciated land 0.235 → 0.204; Köppen A/B/C/D/E 0.09/0.17/0.18/0.12/0.44
+    → 0.08/0.22/0.21/0.10/0.40;
+  - plates: 17.3 → 10.5 at the end, ocean p90 108 → 194 Myr [162–228], younger than 250 Myr 0.996 → 0.955, collisions 43
+    → 40, initiations 1.2 → 25.5.
+  - 750 Myr, seed 1 (`tools/review/p1-27-evidence.sh`): supercontinent active 0.67 → 0.32, floor 58 → 124 Myr, land 0.33 →
+    0.32, crust 0.40 → 0.40, ocean p90 116 → 224 Myr; scattered active 0.70 → 0.32, floor 54 → 128 Myr, land 0.38 → 0.41,
+    crust 0.44 → 0.40, ocean p90 104 → 209 Myr.
+- **Against P1-17.** Master itself has drifted from P1-17's calibration (land 0.27–0.28, median ~0.6 km at 500 Myr then;
+  0.40 and 1.35 km in the before ensemble at 400 Myr; Earth 0.29 and 0.43 km): this branch does not widen the gap
+  (median and high ground come down), but P1-17 proper needs a recalibration pass.
+- **Evidence** (pulled, not committed): review/out/p1-27/evidence/index.html (margin series chart, run summaries, the
+  same keyframes before/after of regime, elevation, satellite, provinces and volcanoes for both starts, 750 Myr, seed 1;
+  each run is also a viewer bundle), review/out/p1-27/maps/ (margin-class maps, plates only, supercontinent seed 1),
+  review/out/p1-27/diag/ and seq/ (the investigation's maps).
+- **Tests.** `plates::tests::margins_are_measured_and_add_up`, `sutures_and_initiations_keep_continents_whole` (sutured
+  plates own nothing; initiations never tear a continent; a suture leaves no coast behind), `arcs_build_a_cordillera`;
+  `geometry::tests::coast_split_counts_continental_edges_cut_off_their_ocean`; `provinces::tests::
+  rifted_margins_are_a_band_on_quiet_coasts_only`, `specks_below_the_feature_size_go_to_the_sea`; the volcano pipeline
+  test checks `arc_bases`. Fixed on the way: a subtraction overflow when an initiation split a plate whose count was
+  stale after a suture.
+- **Gates** (Mac): `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo deny check
+  licenses bans` clean; `cargo test --workspace` core 323 + 3 ignored, cli 30, …, all pass; `cargo test --release -p
+  deeptime-core plates::tests::statistics -- --ignored` passes (p90 165–200 Myr, 95.7–97.1 % < 250 Myr, 27–30 plates);
+  `./gradlew build test` tests=155 failures=0 errors=0. Re-run after merging master 4105de7 (P1-22 rivers and
+  lakes, volcano follow-ups, diamictite, coal placement): core 332 + 3 ignored, cli 31, fmt, clippy, deny clean, JUnit
+  157/0; one 400-Myr scattered run on the merged tree matches the ensemble (active 0.31, passive 0.63, floor 103 Myr,
+  orogen 0.33, cones' ground 745 m). No GameTests (coordinator).
+- **For the coordinator's GameTests.** The built-in planets change (plate model, cordillera, presets, the test planet
+  `planet_world_4k`): expect different land/biome counts in planet-world tests; climate shares on the 400-Myr ensemble
+  stay close (E 0.44 → 0.40, B 0.17 → 0.22), so `climateConsistent` floors re-based on the test planet may need the
+  same treatment as after the EF change. Checkpoints from before this branch do not resume (new state fields).
+- **Next.** Ben's decisions (final report); P1-17 recalibration of master's hypsometry; P1-10 uses the provinces.
+### 2026-10-01 — Protect water blocks: carvers never replace Deep Time's lake and river water (agent worktree agent-af1249582ad3d3fa3, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Ben's decision of 2026-10-01 ("Protect water blocks"): caves still run beneath rivers and lakes and may open into a bed, but carvers never replace water blocks Deep Time placed. Vanilla's `#minecraft:overworld_carver_replaceables` lists water, so since 2026-09-30 ("Allow caves under water", no carving mask) carvers cut air pockets through lakes and rivers and now and then a hole in a lake's surface.
+- **Mechanism: the carving mask, water cells only.**
+  - Vanilla's `WorldCarver.carveEllipsoid` tests the chunk's `CarvingMask` before `carveBlock`, so a masked position is never replaced. `WaterBodies` already runs before the carvers (in `buildSurface`), so it marks each water block it places or keeps in a river, lake or topped-up sea column, for the air and liquid steps. Cells: a river's bed + 1 to top; a lake's first ground + 1 to top; the sea cells it filled; and the flowing and falling blocks of a step. Nothing else is masked: bed, banks, plugs and ground under and beside the water stay carvable.
+  - The first build (2026-09-29, b3d4750) masked a shell two blocks under the beds and a block over the tops, which kept caves from the ground under the water; Ben's 2026-09-30 decision removed it. This one is the middle option the P1-22 entry asked about.
+  - **Why not re-assert after the carvers:** a post-carve pass would need the whole column region again (the pass's 0.3 ms a chunk) and a hook, and it would still let the carver write air first. The mask costs a bit per water block, no hook for the protection itself, and uses vanilla's own contract.
+  - **Why not edit the replaceables tag:** it is global (every pack's water, the aquifer's sea too), cannot be switched per world, and another pack's tag can add water back.
+- **Where a cave opens into a lake or river bed.**
+  - The lowest water block of that column now sits over air, and the game does not tick anything placed at generation, so left alone it would hang (the water-check counts it as water floating over a cave).
+  - `GeologicChunkGenerator.applyCarvers` (new override, air step only) calls `WaterBodies.wake`: for each column whose lowest water block has air under it, that block is marked for post-processing (`markPosForPostprocessing`). Vanilla runs `postProcessGeneration` when a chunk first ticks and ticks the fluid: the source spreads down as falling water into the cave, as for any fluid a carver exposes. The lake's own sources never drain; a stream spreads on the cave floor up to 7 blocks.
+  - Chunky only generates to FULL, which does not tick, so a pregenerated region holds the marks and the flow starts at first ticking.
+  - `wake` runs only in chunks a river or wet `water_level` cell reaches, and walks each column from its top down through water: about 256 block reads.
+- **Setting:** `hydro.protect_water_from_carvers` (bool, default true, all eight presets, section "Advanced · Rivers and lakes", toggle "Caves spare water"). It lands in `notes.bake.water.params`, which the game reads (`Water.protectsFromCarvers`; absent means true, so a world baked earlier is protected). Off, the pass masks nothing and `wake` does nothing: exactly the behaviour of 2026-09-30.
+- **Tests.**
+  - JUnit `WaterProtectionTest` (3): the reader's default and parsing, and that a baked world (planet4k) records the setting as true.
+  - GameTest `RiverGameTests.carversSpareWater` on a new level `deeptime:test_rivers_carved` (`test_rivers`' world data under biome `deeptime:test_carved`, whose only carver `deeptime:test_wide_caves` is a cave carver that starts in every chunk, 1.5 to 2.5 times vanilla's width, y -32 to 180). It reads back every river and lake column in the four `riversHold` boxes: no air between the bed and the top, no top block of air, and asserts the carvers did cut the ground under the beds and opened some beds. **Written, compiled, not run** (no GameTests on a branch): the coordinator's batch run will be its first.
+  - `deeptime-inspect water-check` gained, with the world data: `water_columns`, `drained_water_blocks`, `drained_water_columns`, `surface_holes` (air above a river or lake column's lowest water block, and air for its top block), `drained_samples`, and `floating_over_caves_sources`.
+- **Measured** (Mac, standalone profile, `preview.py run --keep-world`, the synthetic lake world `deeptime synth --kind lake-test --size 16384` (a basin and channel of 7,298 columns, floor y 110, water surface at y 120), box -64,-96,192,160, y 0..260, seed 7; before = the same jar with `hydro.protect_water_from_carvers` false in the manifest, after = true; `deeptime-inspect water-check --min-lake 50`):
+
+| | carvers | drained columns | drained blocks | surface holes | water over caves | leaks into caves | lakes found |
+|---|---|---|---|---|---|---|---|
+| before | vanilla | 601 | 1,281 | 305 | 341 | 553 | 1 (6,993 columns) |
+| after | vanilla | 0 | 0 | 0 | 22 | 42 | 1 (7,298 columns, rim − surface 0) |
+| before | `tools/dev/datapacks/wide-caves` | 1,700 | 5,568 | 1,189 | 924 | 1,717 | 5 pieces |
+| after | wide caves | 0 | 0 | 0 | 182 | 578 | 1 (7,298, rim − surface 0) |
+| after, settled | wide caves | 0 | 0 | 0 | 0 | 48 | 1 (7,298, rim − surface 0) |
+
+  - "Water over caves" is water over air in a river or lake column, in the saved region files. "Settled" is the same world booted again with the box force-loaded for 120 s (`forceload add`, so the chunks tick and post-processing runs): the 182 sources hanging over carved beds became falling water (water blocks 66,755 to 67,905; sources 66,293 to 66,429), 0 left floating, the lake intact. The commands are below.
+  - The lake census still lists 1 to 3 "drained" lake columns beside the lake in the after rows (3 and 1 vanilla, 1 wide): shore columns whose generated ground stands above the lake's level, so there is no water to place there. They are not carved water (the new counters read 0).
+  - Cost not re-measured: the pass adds a bit-set write per water block (two masks); `wake` reads about 256 columns' water in a chunk that has any.
+- **Commands.** `tools/remote/mac.sh --server -- 'python3 tools/workbench/preview.py run --lock-held --job J --profile standalone --size 16384 --box=-64,-96,192,160 --y=0,260 --world-data=smoke/wp/lake-on --datapack=tools/dev/datapacks/wide-caves --seed=7 --keep-world'` (lake-off has the setting false in its manifest); then `deeptime-inspect water-check --area=-64,-96,192,160 --world-data J/world/deeptime --min-lake 50 J/world`. The settle run was a scratch script over preview.py's `Server` (boot, `forceload add -64 -96 191 159`, wait, `save-all flush`, stop), not committed.
+- **Gates** (Mac, on this branch, base bb6672b): `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo deny check licenses bans` clean; `cargo test --workspace --no-fail-fast` all green (core 326 + 3 ignored, the others as before); `./gradlew build test` BUILD SUCCESSFUL, `tests=160 failures=0 errors=0` (157 + the 3 of `WaterProtectionTest`; parity and the editor catalogue tests unchanged). No GameTests (branch rule).
+- **Follow-up: `carversSpareWater` premise (batch run failed "the carvers cut only 0 blocks under the beds").**
+  - **Cause:** the test's metric, not the carver. `test_rivers_carved` uses `deeptime:planet_nocaves` (no aquifer), whose fluid picker fills a carver's cut below sea level (63) with water, so cuts under beds near the sea were water, not air, and the test counted only air. The carver was on the biome (`[deeptime:test_wide_caves]` read back) and cut 42 % of the ground cells sampled in the boxes (23,193 of 56,696 water, 653 air).
+  - **Fix (commit 8b48bce):** `carvedBelow` and `entrances` count air or fluid under the beds (the pass leaves solid ground there); a new premise needs 20+ columns with water above sea level (the only place a carver leaves air) and 20+ cuts under them; the test carver's `replaceable` is `neoforge:or` of the vanilla tag and `mineable/pickaxe` and `mineable/shovel` (Deep Time's rock, e.g. polished tuff, is outside the vanilla tag); premise diagnostics are logged.
+  - **Run:** `./gametest.sh -PgametestOnly=carversSpareWater` on the Mac, standalone: PASS, `columns=695 drainedBlocks=0 holes=0 carvedBelow=1589 entrances=246 highColumns=106 carvedBelowHigh=434`. With `hydro.protect_water_from_carvers` false in the test planet's preset the test fails at its first check (`protectsWater`), not on drained water; the drained-water side has not been shown to fail in-game with protection off (the water-check run above shows it on the lake world).
+  - **Not run** (Ben stopped Mac testing, 2026-10-01): the full `./gametest.sh` and `-PwithMic`.
+- **Not done / for the coordinator.** `carversSpareWater` has not run. The measurement jar was built before the periodic log line gained its two counters (water blocks kept from the carvers, columns woken); nothing else changed in it. With vanilla carvers on a real planet the effect is as above but rarer: a cave has to reach a lake. Scratch on the Mac (`smoke/wp`, the `wp-*` jobs) is deleted.
+
+### 2026-09-30 — P1-26 per-cell climate: design doc (agent worktree agent-a2104321849041969, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** The design Ben asked for ("Design doc first", decisions log 2026-09-30) is
+  `docs/design/p1-26-per-cell-climate.md`, awaiting his approval. No code changed. It covers:
+  - the current banding measured;
+  - a seasonal 2-D EBM on a 128 × 64 climate grid: land/sea tiles, per-cell sea ice and albedo,
+    surface-dependent diffusion, zonal heat advection by a low-level wind profile, Stommel gyres
+    from the coastlines, and an overturning conveyor in the narrowest polar-connected basin;
+  - a monthly steady moisture budget (belt + ITCZ + thermal winds, bulk evaporation, soil bucket,
+    Bretherton precipitation, Smith & Barstad kept on L1 as a sink) behind `climate.rain_model`,
+    with today's belts, fed by the per-cell temperatures, as the first default;
+  - the 1-D clock, flux-corrected per band at each snapshot, with pattern scaling between snapshots
+    and triggered snapshots at snowball and hothouse crossings;
+  - unchanged baked layers and climate API, so mic-climate needs nothing;
+  - costs, validation targets, tasks T1–T11, licences, and open questions Q1–Q11.
+
+  The plan's P1-26 entry points at the doc. It fits the ice branch (`458c15c`): its `sheet::Grid`
+  becomes the shared coarse grid, and the sheet's ELA and precipitation forcing come from the 2-D
+  climate.
+- **Measured** on the Mac (load 70–95; it rebooted once; scratch under
+  `/Volumes/Graphide/ban/deeptime-runs/p1-26-design/`, deleted at the end).
+  - **The real run.** `deeptime stage climate --preset earthlike_quick_16k --start
+    scattered_continents --length-myr 500` took 864 s. The climate stage was 186 s: clock 76.5,
+    snapshots 38.5 (51 × 0.75 s), ice 31.4. Fields were taken with `dump-fields`.
+  - **Earth's relief.** A scratch copy of `climate-dem` ran on GMT `earth_relief_30m_p` and dumped
+    the months.
+  - **Observations.** Beck et al. 2018 Köppen and Beck et al. 2023 monthly T/P, 0.5°, CC BY 4.0,
+    validation only.
+  - **How banded today's climate is.** Latitude explains 99.6 % of land sea-level temperature
+    variance (Earth 96.8 %). Winter along-row std is 3.1 K on the real run and 3.4 K on Earth's
+    relief, against Earth's 6.1 K. Sea ice has η² 0.998, and the southern ice edge has a std over
+    longitudes of 0.23° (0.00° on Earth's relief). The polar continent is all ET/EF.
+  - **Today's skill on Earth's relief.** Köppen agreement with Beck is 34.6 % exact and 64.9 % by
+    main group. Monthly T RMSE is 6.6 K and ln P RMSE 1.11. Yakutsk in January is −16.5 °C (observed
+    −39), and Mumbai gets 531 mm (observed 3,096).
+- **Prototype** (scratch Rust, not committed; Appendix B of the doc). It is the 2-D EBM + ocean +
+  moisture budget at 2.5° on Earth's relief.
+  - **Cost.** 0.10–0.13 s CPU per model year on one core, 0.3–0.8 s for the twelve monthly moisture
+    solves, 26 MB.
+  - **Closure.** Global means 14.9–15.5 °C against the 1-D model's 15.2 °C, net TOA ≤ 0.01 W/m²,
+    water to 3·10⁻⁶.
+  - **Contradicts the plan's premise:** a plain diffusive 2-D EBM keeps winter temperatures as
+    banded as today (3.2 K).
+  - **What fixed it.** The conveyor (January sea off Brest 4.3 → 9.2 °C, northern ocean heat
+    transport 0.7 → 1.6 PW), a low-level westerly profile for heat advection and a winter inversion
+    term. With them the best run beat today's model on the same grid: winter RMSE 4.9 against
+    7.2 K, along-row std 5.4 against 3.3 K (Earth 6.0), η² 0.949 against 0.975 (Earth 0.944).
+  - **Rain is not yet better than today's belts.** ln P RMSE is 1.7–2.0 against 1.05, even though
+    the bucket gives the Sahara 32 mm and the Kazakh steppe 170 mm. Hence the staged rain plan
+    (Q2).
+- **Next.** Ben answers Q1–Q11 (doc §10). The build starts after the ice branch lands: T1, the
+  shared coarse grid, first, then T2/T3/T4 in parallel.
+### 2026-09-30 — Coal placement knows the sedimentary cover; eroded fields free their space (agent worktree agent-aacd864d2709d52dd, branch coal-cover-placement, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** After coal was capped to the cover (entry below), counted coal fell to 73 % of the USGS target: fields
+  were drawn where there is no cover to hold seams. Follow-up asked for: fields form only where there is cover, in the
+  formation weights, not a post-hoc fix; then Ben (decisions log 2026-09-30): "Yes, eroded fields free their space
+  (Recommended)".
+- **Cover in the weights** (`deposits::mod`, the counts loop). For a stacked type with a cover, each tract cell's room
+  is `(Cover::blocks_at − COVER_MARGIN_BLOCKS) × m_per_block_v`; a cell with less than one block of room holds no
+  coal. Such cells get zero preservation (`p_cell`), the ledger's depth limit is cut to the room, the tract weight
+  φ = A·F̄·E uses the favourability of the holding cells only, and the placement weights and `allowed` skip cells that
+  hold nothing. The survivor formula then rescales λ so the target is met from the cells that can hold coal.
+- **Eroded fields free their space.** The weights alone did not bring the count back (counted 46, sites 62, 93 of
+  352 drawn fields found no room): coal is the one adjoining type (non-overlapping plan ellipses), and a field that
+  would later be eroded or find no cover still took its footprint. `cluster::place` now takes a `claims(k, point)`
+  callback and only a field that claims keeps its ellipse in `placed`; the stage answers with `survives`, which decides
+  the field's fate exactly as `materialise` does — the same formation draw (`formation_draw`, shared), the preservation
+  ledger, the stack in the cover (`stack_plan`, shared: seam plan, `fit_stack`, capped re-plan), the build-range check
+  and the seams left below the ground (`stack_bodies`) — from the same random streams, without touching the world.
+  Surviving fields still never overlap; eroded, cover-less and too-deep ones do not crowd them out. Deterministic:
+  `materialise`'s draws are unchanged by the refactor, `claims` draws nothing from the placement stream (a second
+  `stage deposits` run gives the same census for every type). Types formed at their causes skip the check (none is
+  adjoining). Unit test `only_claiming_fields_reserve_space` (a one-cell tract: six fields land when none claims, one
+  when all do, four when the fourth is the first to claim).
+- **Measured** (Mac, release; the six landscapes: `stage deposits --in` the `stage structure --preset
+  pipeline_quick_16k --start {scattered_continents,supercontinent} --length-myr 500 --set seed={1,2,3}` checkpoints;
+  master 52b6626's binary, the cover-weights commit c51f775's, and this branch's):
+
+  | coal, six landscapes | master | cover in weights | **+ eroded fields free space** |
+  |---|---|---|---|
+  | counted (target 11.92 / 13.94 / 11.61 / 5.32 / 9.85 / 15.99, Σ 68.6) | 9 / 9 / 6 / 2 / 5 / 19 = 50 (73 %) | 3 / 10 / 6 / 5 / 8 / 14 = 46 | **8 / 20 / 13 / 5 / 7 / 17 = 70 (102 %)** |
+  | sites | 12 / 15 / 7 / 3 / 6 / 19 = 62 | 7 / 13 / 6 / 7 / 9 / 20 = 62 | **13 / 25 / 14 / 7 / 10 / 18 = 87** |
+  | fields that found no room (of drawn) | 57 of 294 | 93 of 352 | **7 of 320** (0 / 2 / 0 / 0 / 4 / 1) |
+  | expected sites at the placed positions vs the formula's | 94.5 vs 125.7 | 65.5 vs 82.6 | **82.8 vs 82.6** |
+  | no_cover / eroded | 56 / 119 | 75 / 122 | 86 / 140 |
+  | seams (max per landscape) | 364 (8–22) | 411 (13–22) | 560 (13–24) |
+
+  Per landscape the counts scatter around their targets (Poisson draws; scattered 2 has 20 against 13.9), the sum is
+  on target. `stage deposits` 51–74 s per landscape.
+
+  **On master's new histories** (the branch after merging master bca3ff3, which brought the weathering-runoff climate fix,
+  volcanoes and glacial landforms: the six histories rebuilt with the merged binary, same command). The new climate
+  roughly doubles coal's permissive area (85,126 → 145,780 km² on scattered 1), so the USGS target is now
+  **20.41 / 25.33 / 27.87 / 10.45 / 22.58 / 26.89 = 133.5**, not 68.6:
+
+  | coal, six new histories | merged branch |
+  |---|---|
+  | counted (target Σ 133.5) | **17 / 29 / 35 / 12 / 21 / 28 = 142 (106 %)** |
+  | sites | 23 / 32 / 39 / 14 / 28 / 31 = 167 |
+  | fields that found no room (of drawn) | **28 of 647** (0 / 6 / 10 / 0 / 5 / 7) |
+  | expected sites at the placed positions vs the formula's | 165.9 vs 161.4 |
+  | no_cover / eroded | 144 / 308 |
+  | seams (max per landscape) | 1,137 (17–22) |
+
+  `stage deposits` 25–126 s per landscape (the Mac's load swung between 19 and 99 during the runs).
+- **Gates** (Mac, the branch after merging master bca3ff3, final tree): `cargo fmt --check`, `clippy --workspace
+  --all-targets --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` 444 passed,
+  0 failed, 3 ignored; `cd neoforge && ./gradlew build test` → tests=155 failures=0. GameTests are no longer a
+  branch gate (Ben, 2026-09-30: the coordinator runs both profiles once per merge batch on master); a run already
+  queued on the merged tree gave `./gametest.sh` 54 of 54 and `install.sh mic` + `./gametest.sh -PwithMic` 54 of
+  54. (Before that merge, on master 0905793: 51 PASS / 1 FAIL in both, `climateConsistent` with master's own
+  numbers, since fixed on master in 6070e9e.) The Mac copy and the scratch runs are deleted.
+- **Next.** Merge into master (the coordinator merges when green).
+
+### 2026-09-30 — Diamictite: lithified till is its own (60th) rock class (agent worktree agent-a9307a6541fa46794, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-30, "Add diamictite (Recommended)": buried glacial till turned into
+  conglomerate (cobblestone), which reads wrong for the snowball and ice-age deposits the climate now makes.
+- **What.** `tools/dev/gen_rock_classes.py` gains a `diamictite` row (clastic sedimentary, after conglomerate in
+  the README's family order; groups `deeptime:rock/clastic` + `sedimentary`): density 2,600 kg/m³, erodibility
+  1.2, diffusivity 1.1 (a matrix-strong, unbedded rock between conglomerate and mudstone), weathers to soil,
+  `loose_equivalent` till, pelitic metamorphic path (slate → phyllite → schist → gneiss: the mud matrix decides),
+  stand-in **`minecraft:cobbled_deepslate`**. `till.lithifies_to` conglomerate → diamictite, and till's
+  metamorphic path [] → the same pelitic path (gravel and loess already follow their rocks' paths; the empty
+  path left hot buried till as till). The generator takes a per-row `tuned` note; its count check is 60.
+  Core: `synth::EVERY_CLASS` and `surface/lithology.rs` FILES are 60 long (diamictite at index 14, every later
+  index +1; world data maps indices through `strata/classes.json`, so no reader depends on the order), the
+  `deeptime:rock/clastic` group, the satellite colour (grey, with the schists), deeptime-inspect's section
+  palette, the every-class synthetic rule `(6·i + h) mod 60` (still every class in any ten cell columns at
+  h ≥ 2); two tests sized by the list instead of 59. Viewer: the categorical `rock_class` ramp renumbered,
+  diamictite **plum #804080** (the most distinct muted colour against the other 59; a dark grey-green sat on
+  hornfels and slate). Java: RockDataTest (60 classes; till → diamictite, diamictite → till, the stand-in),
+  StrataGameTests (60 throughout; the vanilla view resolves diamictite to cobbled deepslate; the live palette
+  keeps that stand-in until a pack names diamictite, then accepts the pack's member or fallback). FORMAT.md
+  (the lithification note, `strata/classes.json`, the synthetic rule), the plan's counts (§1.3, glossary,
+  §5.4.1), the decisions file's MIC row "(see log 2026-09-30)".
+- **Stand-in: cobbled deepslate.** A diamictite is a dark, fine mud matrix with clasts of every size and shape
+  floating in it. Cobbled deepslate's texture is that: a near-black matrix with lighter angular and rounded
+  fragments of mixed size, irregularly spaced. Conglomerate's cobblestone is clast-supported (the cobbles touch),
+  which is the difference between the two rocks. No other class uses it; overworld block; not filler
+  (`StrataPass.isCrust` is stone and deepslate only); not terracotta. Rejected: tuff (seven classes, reads
+  volcanic), gravel and coarse dirt (loose: till's own look), andesite and polished blocks (no clasts). Like
+  cobblestone under stone, cobbled deepslate is on the MIC README's excluded-variants list as a *member*; it is
+  a stand-in only.
+- **Measured** (Mac, load ~80; `deeptime run --preset earthlike_quick_16k --start supercontinent --length-myr
+  1000 --set climate.degassing_scale=X --set amplify.stream=always`, then `deeptime parity --columns 20000` and
+  a scratch plot of the baked horizons; pictures in `review/out/diamictite/degassing-{0.3,0.1}/`, unpublished):
+  - **degassing 0.3 no longer snowballs** on this master (the climate agent's −807 → −761 Myr snowball predates
+    the weathering-runoff fix 970efd1): coldest 4.1 °C at −824 Myr, sea ice at most 27 % (the onset needs 95 %),
+    land ice up to 36 %; 1,816 s. Diamictite in 3.2 % of columns (780 beds, median 2 blocks, up to 67),
+    all from the last 230 Myr; the thickest a 67-block bed at 36–37 Myr, lat −59°.
+  - **degassing 0.1: six snowballs** (Myr ago, onset → escape: 902–814, 806–732, 726–638, 628–548, 116–72,
+    68–8), six hothouses; 1,365 s, 4.2 GB peak. Diamictite in **31.8 %** of columns (13,909 beds, 12,614 of them
+    snowball-age; median 2 blocks, up to 127); till (young, shallow) in 4. Thickest: x −13963, z 690
+    (lat −15°), y −174…−48, 32–45 Myr ago, inside the 68–8 Myr snowball, a marine basin filled with diamictite
+    under 70 blocks of younger shale, with five thinner snowball beds above it and one below (`diamictite-column.png`); the
+    meridian section shows the basin fill and tongues running off along the bedding (`diamictite-section.png`).
+    The four early snowballs left almost nothing in the baked columns (largest bars at 380, 270, 190 Myr):
+    probably 500 Myr of ~40 % land ice eroding them, or burial past the pelitic isotherms.
+- **Gates** (Mac, branch merged with master ab5259e): `cargo fmt --check`, `cargo clippy --workspace
+  --all-targets -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace` all pass except
+  one structure test with a `[false; 59]` array (now sized by `EVERY_CLASS`; `structure::` re-run 11/11, the
+  viewer and inspect crates re-run after the colour change); `./gradlew build test` 155/0. GameTests not run
+  (Ben, 2026-09-30: once per merge batch on master): StrataGameTests' new diamictite checks first run there.
+- **Found on the way.** (1) The 1000-Myr `earthlike_quick_16k` run fails at the default 4 GiB cap in amplify
+  ("needed 4,451,574,045 bytes"): `stream: auto` decides in memory from the last level's buffers alone, then a
+  later reservation passes the cap; `--set amplify.stream=always` finishes (76 s). (2) The Mac rebooted at
+  ~19:06 while this task's first 16k run (cap 6 GB, structure stage, ~2 GB in use) ran beside other agents'
+  servers at load ~80; 16 GB of RAM in all. Later runs kept the 4 GiB default.
+- **For MIC.** The rock-tag README (outside this repo) is not edited: rows for it are in the coordinator report
+  (Classes row, clastic group, fallback row and tag file, empty member tag, header counts 60 / 44).
+- **Next.** MIC adds those rows and files; then the `-PwithMic` palette shows diamictite as `fallback`, which
+  StrataGameTests accepts. The coordinator's batch GameTests run the new checks.
+### 2026-09-30 — P1-22 rivers and lakes: done on its branch (agent worktree agent-ad204cf8d55ef26f5, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Rivers and lakes in v1 (Ben, decisions log 2026-09-29, "Rivers & lakes in v1").
+  1. **`core::hydro`** (`hydro/{mod, network, tests}.rs`), run by the bake's new water part (`bake/water.rs`)
+     - It runs after the climate part; the spawn candidates now come after it (`terrain::spawn`).
+     - It works on the L3 terrain itself, 2 blocks a cell. An L3 over 40 M cells (32k full) is averaged 2 × 2 into grid `L3h`.
+     - **The open sea** is every cell at most a block below sea level, connected, in a body ≥ 5,000 km².
+     - **Priority-Flood** uses the pit queue (Barnes et al. 2014, from the paper, as `surface::pflood`). The map's first and last rows, past the pole caps, drain as outlets, so no river runs along the map's edge.
+     - **Receivers** are the steepest strictly lower neighbour on the filled surface. Across a flat, the receiver comes from the flat's drainage mask (Barnes, Lehman & Mulla 2014, from the paper): towards the flat's outlets and away from higher ground. The first build took the flood's breadth-first parent there, and coastal plains carried parallel straight rays.
+     - **Lakes** are depressions ≥ `hydro.lake_min_area_km2` (1) and ≥ `lake_min_depth_blocks` (1) deep, always full to their spill level. A lake passes on its inflow less surface evaporation, and is flagged `endorheic` when evaporation takes all of it.
+     - **Discharge** accumulates runoff P − ET (Fu's curve, L1 climate).
+     - **River cells** need ≥ `river_min_discharge_m3s` (2) and ≥ `river_min_area_km2` (50). They cross lake margins less than a block deep, and the beach.
+     - **Chains** are cut at confluences; a chain follows its largest donor.
+     - **Geometry.** The water surface is F − `freeboard_blocks` (1), never below the sea or lake downstream. Width is `width_coef`·Q^0.5·`scale.feature_scale.rivers` (1 block per √(m³/s)). Depth is `depth_coef`·Q^0.4 (0.5), at least 1 block. They are capped at 64 and 12. Vertices are Gaussian-smoothed (half-width 8 blocks), with junctions pinned.
+     - **It writes** `water_level` (lake surfaces), **`rivers/rivers.dtrv`** and `notes.bake.water`. The `.dtrv` file is a new `DTRV` sectioned file: vertices x, z, w, hw, depth, Q; chains ending in sea, lake or river; a 32-block tile index.
+     - `hydro.enabled = false` writes an all-nodata `water_level` and no rivers file.
+     - **Format.** `rivers.dtrv` is part of **format 0.2**, which is unreleased. FORMAT.md's 0.2 note now lists three changes: continuous strata, the monthly climate and the rivers file. The file is optional: a folder without it has no rivers.
+  2. **The column rule both sides implement** (`deeptime_format::water`, Java `worlddata/Water`; FORMAT.md "Water columns")
+     - The generated surface is H bilinear over the 4-block noise-cell corners.
+     - The kinds, in order of priority:
+       - lake (P0-13's shore rule);
+       - sea (ground under the sea's top block);
+       - river: a channel covers the column; top ⌈w⌉ − 1, parabolic bed, at least 1 block of water;
+       - bank: a 4-neighbour holds water. Ground reaches at least its top (+1 beside a river). Air is sealed from its bed up (only the waterline beside the sea). Within a channel's bank zone, at most a 1:1 slope.
+     - The column JSON gains `hydro`.
+     - `deeptime parity` adds columns: 10 % on and beside river vertices, 5 % around lake mouths, and 5 % around lake shore cells (wet beside dry).
+  3. **`worldgen/WaterBodies`** replaces the lake-only pass (`WaterPass` delegates)
+     - Rivers are cut or filled to their bed (gravel under 6 blocks wide, sand wider), with water to their top.
+     - Lakes are filled as in P0-13.
+     - Sea columns the aquifer left dry are topped up. The aquifer leaves coastal flats a block below sea level dry, and river mouths leaked into them.
+     - Banks are raised or lowered, keeping their top block, and sealed.
+     - A one-block step in a river gets vanilla's resting flowing block; a larger step gets a falling curtain (the cheap waterfalls).
+     - **Caves may cut under the water** (Ben, log 2026-09-30, "Allow caves under water"). The carving mask that kept carvers off water and banks in the first build is gone.
+     - It runs only in chunks near a river segment, a wet `water_level` cell, or elevation within 17 blocks of sea level, and logs its own cost every 512 chunks.
+  4. **River biomes.** `WorldDataTerrain.raster(ridges)` returns 0 (the valley slice) under channels at least `biome_min_width_blocks` (6) wide.
+  5. **Settings** (standing rule)
+     - Preset section `hydro` (14 keys) in the four pipeline presets and the built-ins.
+     - `scale.feature_scale.rivers` is wired (no longer "planned").
+     - Editor: a "Rivers and lakes" toggle (terrain), the river multiplier, and section "Advanced · Rivers and lakes" (lang keys, `EditorFields.Section.ADV_WATER`; workbench and JUnit catalogue tests updated).
+  6. **Tools**
+     - `deeptime hydro --world-data D [--set hydro.K=V]` re-runs the water part on a baked folder.
+     - `deeptime-inspect rivers` draws planet and box maps; `--columns` shows the column rule per block.
+     - `deeptime-inspect water-check` counts water that floats (air under it) and leaks (air beside it over ground), resting steps, and lakes against their lowest rim, split by the column's kind. Water over air under river, lake or sea water, and leaks into covered air or into ground the pass had left, are counted apart as caves.
+  7. **Tests**
+     - Core `hydro::tests`, 6 tests:
+       - every river descends to the sea or a lake;
+       - every lake is full to its lowest rim (exactly its spill height);
+       - 1 thread = 3 threads, and run = run byte for byte;
+       - a river crosses the seam;
+       - geometry follows Q;
+       - a dry climate leaves a lake without an outlet.
+     - Format: `rivers` 4 tests, `water` 3 tests.
+     - JUnit:
+       - `ColumnParityTest` compares hydro, on planet4k and on the lake world lake1024 (which must have lake columns);
+       - `WaterRegionTest`: the per-chunk path equals the per-column path.
+     - GameTests:
+       - `RiverGameTests.riversHold`, on level `deeptime:test_rivers` (the 4k planet with a bare biome, no carvers, features or caves);
+       - `riverBiomes`.
+- **Real planet.** `earthlike_quick_16k`: scattered continents, 500 Myr, format 0.2, on the branch after the master merge of 2026-09-30. `deeptime hydro` was re-run on its bake after the flats and edge-outlet commits.
+  - **Lakes:** 27, covering 68,139 km². The largest is 16,068 km²; 6 are endorheic.
+  - **Rivers:** 4,489 chains, 190,265 vertices, 119,813 km. Largest discharge 1,345 m³/s; widest channel 36.7 blocks. `rivers.dtrv` is 6.6 MB.
+  - **Time:** the bake's water part took 4.9 s (flood 1.8 s, discharge 0.7 s, flats 0.2 s) of a 30 s bake.
+  - **For comparison:** the first build on master e5d98e3's terrain gave 26 lakes and 3,337 chains.
+  - **Maps:** `deeptime-inspect rivers`.
+- **3D previews and water checks.**
+  - **Previews:** `preview.py run --keep-world --y 0,260`, standalone, on the final bake. Three 256 × 256 boxes:
+    - the largest river's mouth (−6300, 2130);
+    - mountain streams (−700, −1950);
+    - streams entering a large lake (2200, −1130).
+  - **Checks:** `deeptime-inspect water-check --world-data` on each box.
+  - **Results:**
+    - 0 floating water blocks in all three.
+    - 0 leaks in the river-mouth and lake boxes.
+    - 1 leak in the mountain box: a flowing step block on a mossy boulder that vanilla's `forest_rock` dropped into the channel.
+    - Caves under or beside water: 357 floating / 435 leaks at the river mouth and 221 / 373 at the lake. The same river-mouth box without rivers has 231 / 201.
+    - Resting steps: 79, 2 and 22.
+  - **Whole lake.** A fourth box, 300 × 260 at (1936, −1546), holds one complete lake of 40,950 columns (952,927 water blocks).
+    - 0 floating, 0 leaks.
+    - Surface y 80; lowest rim top 79, at the outlet. **Rim − surface = 0.**
+    - Vanilla's carvers also replace water: `overworld_carver_replaceables` lists `minecraft:water`. So with the carving mask gone, they cut air pockets through the lake itself, not only beneath it. In this box: 34 lake columns with no water left at the top, 1 shore column trenched, and 1,959 / 3,844 cave floating / leaks.
+    - water-check now reports those as `drained_columns` and `carved_rim_columns` instead of taking them as the rim. Counted as rim, the trench reads 5 blocks under the surface.
+  - **Iterations.** Seven, each fixing what it found:
+    - rivers ended short of lakes;
+    - river mouths stopped at beach flats;
+    - carvers cut beds (a carving mask, since removed by Ben's decision);
+    - step sources spread over ice and boulders;
+    - coastal flats left dry;
+    - parallel rays across flats;
+    - rivers along the polar edge.
+- **Chunk time.** Measured with Chunky over the same three 361-chunk boxes: same bake with and without rivers, same jar, Mac at load 30–100 from other agents.
+  - Before (no rivers): 21.5, 21.4 and 14.3 s, so 40–60 ms a chunk.
+  - After (rivers): 20.4, 20.3 and 19.4 s, so 54–57 ms a chunk. The difference is within the load noise.
+  - The pass's own logged cost is 0.27 ms a chunk on average and 0.32 ms where it works (1,298 of 1,536 chunks). Without rivers it still tops up coasts in 692 chunks at 0.29 ms.
+  - `WaterRegionTest`'s per-column path costs 0.69 ms a chunk where rivers are (JIT warm).
+- **Gates on the last merge** (master 5d4147b: volcanoes, glacial landforms, the climateConsistent fix, EF ice cover). Branch agents no longer run GameTests (Ben, 2026-09-30, through the coordinator), so this merge got cargo and Gradle only:
+  - cargo fmt, clippy `-D warnings` and deny are clean; `cargo test --workspace --no-fail-fast` all green (core 323 + 3 ignored).
+  - `./gradlew build test`: 157/0. Parity: 500 of 500 (23 river, 3 lake and 25 bank columns: the volcanic and glacial terrain gives the 4k test planet lakes); lake1024 300 of 300.
+  - Two fixes in the merge:
+    - the editor catalogue test now expects 8 advanced sections (Rivers and lakes plus Volcanoes);
+    - a FORMAT.md layer-table hunk from the format-0.2 merge be67401 had been committed with its conflict markers; it now holds this branch's `water_level` row and master's `strata/horizons` row.
+- **Gates on the earlier merges** (master 0905793, 6f52b57 and 18706c7, the same results each time):
+  - `cargo fmt`, clippy `-D warnings` and deny (bans, licenses) are clean. `cargo test --workspace` all green (core 294 + 3 ignored).
+  - `./gradlew build test`: 153/0. Parity: 500 of 500 equal (19 river and 14 bank columns); the lake world lake1024 300 of 300 (8 lake, 1 bank).
+  - `./gametest.sh` (`--server`, three times): **53 of 54 pass**.
+    - `riversHold`: 3 sites, 40 chunks, 368 water columns, 946 of 946 blocks; 0 floating, 0 leaks, 0 top mismatches, 0 water outside.
+    - `riverBiomes`: 101 of 107 = 0.944.
+    - `lakeHolds` is unchanged.
+    - The one failure is `climateConsistent`: BW 0.472 < 0.650, Dsub 0.822 < 0.850, BW:desert 0.423 < 0.450. It comes from master's carbon-cycle merge 27e88f7, not this branch. The glacial-erosion branch fails with exactly the same numbers without any P1-22 code, and the census samples only the biome at the terrain height.
+  - `./gametest.sh -PwithMic` (after `install.sh mic`, 160 mods linked):
+    - One run (on 6f52b57) never reached the tests: a mod-loading race in Artifacts ("unbound value … artifacts:generic.attack_burning_duration" while registries reverted to vanilla), outside Deep Time.
+    - The retry and the run on 0905793: **53 of 54 pass**. `riversHold` and `riverBiomes` give the same numbers as standalone.
+    - The failure is again `climateConsistent`, with MIC's biomes: BW 0.485, BS 0.509, BW:desert 0.446, Dfc:taiga 0.430. The carbon-cycle branch shows the same kind of BS and Dfc:taiga failure.
+  - `./gametest-planet.sh`: PASS, twice (wrap-test planet, TW stamped, loopsX).
+- **Review bundle.** review/out/p1-22 (index.html, maps, 3D shots, the area3d viewer with the four boxes, water-check JSONs), 16 MB. Not published.
+- **For P2-03:**
+  - evaporation-limited lake levels below the rim (Fill–Spill–Merge's partial fills);
+  - HAND floodplains;
+  - deltas;
+  - meanders beyond the smoothing;
+  - knickpoint waterfalls from erodibility;
+  - incision burned into `elevation`.
+- **For Ben:**
+  1. Defaults to judge from the pictures:
+     - a stream starts at 2 m³/s and 50 km² (4,489 rivers on a 16k planet);
+     - 1 block of width per √(m³/s);
+     - river biomes from 6 blocks wide.
+  2. **Caves under water.** Vanilla's carver tag includes water, so with no carving mask the carvers cut through the water itself: air pockets inside lakes and rivers, and now and then a hole in a lake's surface. The game refills these with flowing water. This goes beyond cutting beneath the water. The middle option is to mask only the water blocks, so carvers still cut the beds and banks under the water but skip the water. It is a small change in `WaterBodies` (the removed mask, limited to the water); it waits for your call.
+  3. A polar river near z ≈ −4020 lies inside the unplayable pole cap (cosmetic).
+  4. Straight parallel streams on even slopes (D8 on a square grid) outside flats are left for P1-23.
+### 2026-10-01 — Amplify's `auto` decides on the whole path's full peak, so a long run no longer fails at the 4 GiB cap (agent worktree agent-af5b7754a329c4418, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Bug.** `deeptime run --preset earthlike_quick_16k --start supercontinent --length-myr 1000` failed in amplify at the
+  default 4 GiB cap ("needed … bytes"); `--set amplify.stream=always` finished. Reproduced on the Mac before the fix
+  (`stage amplify` log: "1565 MiB in use of the 4096 MiB cap; the last level of 8192 x 4096 cells needs 2528 MiB whole
+  and runs in memory", then `needed 4449249634 bytes, cap 4294967296 bytes`; the first report had 4,451,574,045).
+- **Cause.** `AmplifyStage::advance` asked `ctx.reserve` for the last level's buffers alone (8192 x 4096 x 79 B =
+  2,650,800,128 B) when amplify starts, with the L2 level, 2,048 x 1,024 cells, as the only level held. By the time the
+  last level reserves those buffers (`run_tiles`) the ladder holds the 4096 x 2048 level (176 MB) in place of L2 (44 MB)
+  and the preview arrays (25 MB, three f32 a cell on 2048 x 1024) are allocated: 157 MB more than at the decision.
+  `reserve` is a check against the gauge, not a hold, so nothing kept that room. The 1000 Myr history (100 frames,
+  783 MiB) is in memory at that point, `reserve` spilled 724 MiB of it so the buffers fit, with about 3 MB to spare, and
+  the later reservation went over. (With every frame spilled the full path is 4,185 MiB there, so memory was never
+  possible; streaming was.)
+- **Fix** (`surface/amplify.rs`). `whole_last_level_peak(l2_bytes, doublings, gw, gh, preview_width)` = the last level's
+  buffers + (the level before it − L2, when there are levels before the last) + the preview, and
+  `streams(mode, peak_bytes, reserve)` is the one decision: `always` true, `never` false, `auto` when `reserve(peak)` is
+  refused (so the history spill still makes room first when that is enough). `advance` asks it with the actual
+  `Level::bytes()` (new, `resample.rs`) and the preview width; the levels before the last use it with their own
+  `whole_bytes` as before (their decision is made with the gauge as it is when they start, so it was already complete).
+  The log line now also prints the full peak. `always` and `never` are unchanged.
+- **Estimate left as it was.** `amplify::estimate` still picks whole or streamed from the buffers alone under the default
+  cap. Adding the kept level and preview to it (+157 MB at 16k) pushed `pipeline_quick_16k`'s estimate over the
+  workbench's cap-less-512-MiB limit and broke four `deeptime-cli` tests (`a_run_over_its_memory_cap…`,
+  `a_tuned_code_from_the_game…`, `edits_land_where_the_core_reads_them`, `workbench_queue_editor_and_kept_runs`), because
+  `Stage::estimate` has no cap parameter and the workbench's lower cap is not seen by the pick. Not changed; a
+  follow-up is to give `Stage::estimate` the run's cap (comment at the pick in `estimate`). Consequence now: a last
+  level the estimate lists whole may run in tiles (it overstates), and one that does run whole needs ~0.15 GiB (16k)
+  more than listed.
+- **Tests** (`surface/amplify/tests.rs`). `auto_streams_when_the_whole_path_peak_would_not_fit_though_the_last_level_alone_does`
+  (the 16k numbers: held 1,643,487,517 B, the last level alone fits, the full peak needs the reported
+  4,451,574,045 and does not; `auto` streams, `never` does not, `always` does; every cap from "last level alone" to one
+  byte under the peak streams, the peak exactly keeps memory); `the_whole_path_peak_is_what_the_last_reservation_sees`
+  (runs the ladder in memory with a recording reserve and checks the formula against the last request, the level
+  the run kept and the preview it made); `the_stage_streams_under_auto_when_only_the_whole_path_peak_is_over_the_cap`
+  (the small coupled pipeline, two ×2 levels, a gauge holding a fixed amount: a cap 1 MB over the buffers alone gives
+  `mode: streamed`, a roomy cap gives `in_memory`).
+- **Measured** (Mac, release `deeptime run --preset earthlike_quick_16k --start supercontinent --length-myr N`, default
+  4 GiB cap, loaded Mac, load ~12):
+
+  | Run | Amplify decision | Amplify | Run peak (counting allocator) | Total |
+  |---|---|---|---|---|
+  | 1000 Myr, before | in memory, then failed (`needed 4449249634`) | failed | — | 481 s |
+  | 1000 Myr, after (two runs) | 2289 MiB in use, full peak 2678 MiB: tiles (`mode=streamed`, 8 tiles) | 56.7 s, then 26.6 s | 3089.3 MiB | 453 s, 376 s |
+  | 500 Myr, after | 1412 MiB in use (history spilled 249 MiB for the reservation): in memory (`mode=in_memory`) | 23.1 s | 3802.5 MiB | 239 s |
+
+  The 1000 Myr run keeps its whole history in memory now (the old rule spilled 724 MiB of it for nothing). The
+  session's `reserved_peak_mib` (4967) still counts the refused probe of the full peak; it is a probe, not an allocation.
+- **Gates** (Mac): `cargo test --workspace --locked --no-fail-fast` all ok (core 320 + 3 ignored, cli 30, format 44,
+  inspect 29 + 2 + 7, jni 7, viewer 6); `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all
+  -- --check`, `cargo deny check licenses bans` clean; `cd neoforge && ./gradlew build test` BUILD SUCCESSFUL, 155 tests,
+  0 failures. No GameTests (per the batch rule). Mac scratch (`deeptime-runs/amplify-cap`) deleted.
+- **Next.** The coordinator merges with the batch and runs `mac-gc.sh`. Optional follow-up: cap-aware `Stage::estimate`.
+
+### 2026-09-30 — Satellite view: a true-colour keyframe layer, the default everywhere (agent worktree agent-a7ca2a0e875263a86, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** Ben: "Default view on the viewer is currently an elevation map, can you turn it into an actual map. (I.E.
+  Approximately what you would see on google earth zoomed out all the way / satellite imagery.) So I can see where
+  glaciars / snow is". A derived, view-only keyframe layer `satellite` (`core::satellite`), composited when a frame is
+  drawn from fields the stages already wrote, like `provinces`: nothing goes into `WorldState`. `keyframes::add_derived`
+  puts it **first** in every frame of the plate model's group (`elevation` + `regime`, with or without a climate) and in
+  the young landscape's and amplification's frames (drawn on `young/elevation`, `amplify/elevation` box-averaged to the
+  frame); a dummy stage's `elevation` and the deposit frame get none. `keyframes::render` takes a `ViewScale`
+  (`Preset::view_scale`: `sea_level_y`, `m_per_block_v`, `model_radius_km`) to turn block y into metres. Also:
+  `deeptime satellite --in <checkpoint> --out x.png [--width W]` (for tuning without a rerun); `climate-dem --viewer`
+  now draws the satellite view of the relief it is given (Earth's, when there is a DEM).
+- **Colour rules** (the module docs have them in full; constants `satellite::Look`). The anchor colours are the 18
+  classes of the new `satellite` ramp in `ramps.json` (labels + `groups` Land / Snow and ice / Sea), so the legend is a
+  key to exactly the colours drawn. Sea by depth: turquoise under 8 m, shelf blue at 120 m, ocean at 1.5 km, deep navy
+  from 5 km; annual `climate/sea_ice` whitens it (fully from ~90 %). Land with a climate: herb cover from the aridity
+  index (0.05 → 0.45) and tree cover (0.5 → 1.0), herbs needing a warmest month over ~0 °C and trees over ~10 °C; the
+  Köppen class holds the picture on its map (BW ≤ 15 % herbs, no trees; BS 35–75 % herbs, < 8 % trees; Af/Am forest;
+  Aw/As 20–55 % trees; ET/EF no trees). Ground: sand where hot, grey-tan where cold, 45 % tinted by the surface rock
+  (`surface/class`: sandstone pale, red beds reddish, basalt dark, evaporites salt-white). Herbs: khaki steppe → olive
+  savanna with moisture, brown-grey tundra under cold summers; forest: boreal / temperate / rainforest by the coldest
+  month. Bare grey-brown rock from 2.5 km up. Snow: perennial (85 %) where the warmest month is below freezing, above
+  the snow line (`climate/ela_m`) or EF; seasonal tint up to 35 % as the coldest month goes −2 → −22 °C (half under
+  forest). Glacier ice (`climate/ice_thickness_m` ≥ 1 m, else `climate/glacier`) white. Hill shade: NW light at 45°,
+  heights ×14 on the model sphere, 60 % strength on land, 45 % on ice, 35 % on the sea floor, none under sea ice.
+  Smoothing (found in the first pictures): the energy-balance model's 2° bands drew ruled lines in the sea-ice edge and
+  the snow, the orographic rain's cell streaks drew stripes in the Sahel-like belts, Köppen borders drew steps and the
+  per-cell rock tint speckled deserts; so temperatures are box-filtered over ±3 rows, moisture over 3 × 3 (geometric),
+  sea ice over 5 × 17 sea cells, and the herb/tree cover and rock colour over 3 × 3 land cells before compositing.
+- **Frames without a climate** (plate-only presets, pipelines without the climate stage): bare ground by geology —
+  the surface rock's colour (`surface/class`, else `structure/rock`), else desert tan in the lowlands turning to grey-brown
+  rock with height, darker on hotspots; no plants, snow or sea ice (nothing says where they would be). In an
+  earthlike run every group frame has a climate (the climate steps before the first frame).
+- **Storage and the game.** No new layer kind: keyframe layers are RGBA8 already, so FORMAT.md's Keyframes section only
+  documents the two derived layers (the satellite ramp is a legend, not applied). The in-game timelapse builds its
+  buttons from the frames' layer names and takes the first as its default, so it opens on the satellite view with no
+  Java change; `deeptime.layer.satellite` = "Satellite" added to en_us.json. The review page's final map is still the
+  world data's elevation (not changed).
+- **Default.** Workbench: `DEFAULT_LAYERS = ['satellite', 'elevation']` (a `layer=` in the URL hash still wins); the Planet
+  group lists Satellite, then Elevation (keys 1, 2); the legend shows a key (swatches in the ramp's groups, wide columns
+  for long labels — provinces' labels benefit too); the pointer readout says "looks like temperate forest". `?tv`: the
+  same default, a three-column key without headings. Static bundle: the timelapse lists every layer any frame names and
+  opens on `satellite`; the world-data map gets a `satellite` image layer first (the last satellite keyframe, drawn on a
+  keyframe grid r = C/w; no values, no water overlay) with a swatch legend.
+- **Measured** (Mac, release). One 1024 × 512 frame < 0.3 s (the CLI from a checkpoint, reading included). Size: the
+  satellite layer is 0.58–1.17 MB LZ4 per frame (+16 % on a group frame: 7.0 → 8.2 MB at the present); the default run's
+  keyframes 68 → 80 MB; a workbench run with a frame every step (250) grows ~250 MB.
+  **World files vs master** (`run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --threads 3`,
+  master 18706c7 binary against this branch): `diff -rq` differs only in `keyframes/index.json`, 13 of 14 `kf-*.dtk` (the
+  deposit frame is identical) and `manifest.json` (created_utc, stage timings, the keyframe files' bytes/crc and
+  `reserved_peak_bytes`/`reserved_base_peak_bytes` +25.2 MB: the plates estimate counts one more keyframe layer).
+- **Screenshots** (headless Chromium on the Mac — Playwright's chrome-headless-shell through a `chromium` wrapper on
+  PATH for `tools/viewer/shot.py`; private `deeptime watch --port 8653` with its own runs folder on the SSD; 8642 untouched),
+  1600 × 900 in `review/out/sat/shots/`: `wb-present.png` and `wb-present-clean.png` (events off) — earthlike_quick_16k
+  scattered, 500 Myr, the present; `wb-mid.png` — 268 Myr ago; `wb-snowball.png`, `wb-snowball-clean.png` — the snowball
+  scenario (supercontinent, `degassing_scale` 0.3, 1,000 Myr; `deeptime:snowball` −807.3 → −760.6 Myr) at 784 Myr ago,
+  the whole planet white; `wb-tv.png` — `?tv`; `static-viewer.png` — the run's static bundle opening on the satellite
+  world map. Raw frames in `review/out/sat/frames/` (present, 244 and 498 Myr ago; 840, 784, 720 Myr ago in the snowball
+  run); `ck-present2.png`, `crop3x2.png` from `deeptime satellite`. Looked at: glaciers and ice caps stand out white on
+  mountains and poles, sea ice fades from the poles, deserts are tan in continental interiors and rain shadows, forests
+  green on wet margins, tundra brown-grey at high latitudes, shelves lighter than the deep sea with ridges visible.
+- **Gates.** `cargo test --workspace` ok (core 287 + 3 ignored, incl. satellite:: 6 — synthetic frame: deep ocean dark
+  navy, a shallow bank turquoise, hot desert tan, rainforest deep green, glacier and frozen sea white, steppe khaki,
+  tundra brown-grey; snowball all white; no-climate frame bare rock and ice-free; ramp labels = classes; hill shade lit
+  NW; box filter bands and mask — keyframes:: the satellite leads terrain frames only, viewer: the last satellite frame
+  leads the world layers); clippy `--workspace --all-targets -D warnings` ok; `cargo fmt --check` ok; `cargo deny check
+  licenses bans` ok; `./gradlew build test` BUILD SUCCESSFUL, tests=151 failures=0 (the lang string; `ScreenSourcesTest` reads en_us.json). All of them re-run after merging master 52b6626 (the climate API's latitude; coal in the sedimentary cover and the strata settings): all pass (core 288 + 3 ignored; Gradle tests=151 failures=0).
+- **Next.** Merge when reviewed (the caller lands it). Not done: the in-game review page's final map could show the last
+  satellite keyframe instead of the elevation ramp (a ReviewModel change); the workbench readout could give the
+  elevation under the pointer on the satellite layer too.
+
+### 2026-09-30 — Coal held in the sedimentary cover; rock-layer settings with a flatter default; readable deposit-world strata (agent worktree agent-aacd864d2709d52dd, branch strata-coal-settings, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-30: "Cap coal to the sediment (Recommended)" and "Settings + flatter default
+  (Recommended)", plus readable strata for the synthetic deposit test world.
+- **Coal capped to the cover.** The deposit stage bakes the world's horizon stacks the way the bake will
+  (`structure::Cover`: `bake_horizons::bake`, smoothed, before the top raise) and reads the sedimentary cover at a
+  site off them with the column rule (`blocks_at`: down to the first horizon of a non-sedimentary class ≥ 3 blocks
+  thick; sedimentary = chemical/clastic sedimentary and unconsolidated families). `geometry::fit_stack` keeps the
+  preservation ledger's depth for the top seam and caps the stack from below: seams that would lie under the cover
+  (within one block of its base) are not there — thin cover leaves fewer, shallower seams (`seam_plan` on the capped
+  measures, same random stream); a top seam under the cover's base or < 2 blocks of cover leaves no coal (census
+  `no_cover`, `cover_capped`). The guaranteed coal site follows the same fit and keeps one seam at the surface where
+  there is no cover. A first version raised deep stacks into the cover instead; that turned `too_deep` sites into
+  counted ones and overshot the USGS targets by half (counted 101 against 68.6 on the six landscapes), so the cap
+  cuts from below. Unit test `a_stack_is_held_in_its_sedimentary_cover`.
+- **Settings** (preset `structure`, `editor_fields.json` under "Advanced · Granite and rock layers", lang keys, the
+  pipeline presets and the built-ins synced with `tools/dev/sync_builtin_presets.py`): `strata_smoothing_cells`
+  (σ, 0–16, **default 10**, stops Cell by cell 0 / Wavy 2.5 / Rolling 6 / Gentle 10 / Flat 16),
+  `strata_tongue_scale` (0.25–16 × the 64-key band) and `strata_minor_share` (0–0.45, default 0.15). The two tongue
+  settings go into the horizons layer's descriptor (`tongue_band_keys`, `tongue_minor_share`, optional, defaults
+  64 / 0.15) and both column rules (Rust `strata::stack_at`, Java `Columns.Stack`, `LayerDesc`) read them. The
+  smoothing samples an 11 × 11 lattice of step ⌈σ / 2.5⌉ anchored to the grid, so any σ costs the same.
+  `notes.bake.strata.smoothing` records σ, step, window and tongues. FORMAT.md updated (it still said 256 keys per
+  band from before; the rule is written with B and m now).
+- **Default σ from dips.** `dips.py` (Mac): 1,500 random columns of `earthlike_quick_16k` (scattered, 500 Myr, seed 1),
+  horizons matched by (unit key, class) 16 blocks east and south, beds ≥ 6 blocks thick below the ground, slope in
+  block space (the world's vertical exaggeration is 15×: 20 m per block up, 300 m across, so a real dip is
+  atan(tan(block dip) / 15)):
+
+  | σ (cells) | median dip, all | lowland (ground 23–103) | sea floor | upland | real-world median, lowland |
+  |---|---|---|---|---|---|
+  | 2.5 (master) | 38.3° | 43.2° | 28.3° | 44.4° | 3.6° |
+  | 6 | 23.8° | 26.0° | 17.4° | 30.0° | 1.9° |
+  | **10** | **15.6°** | **18.6°** | **12.7°** | **20.6°** | **1.3°** |
+
+  σ 10 reads as undisturbed basin fill in the sections (gently tilted beds, onlap onto basement highs, the coal
+  stack lying in shale), σ 6 still arches the layers under mountains. Strata bake 7.7 s at σ 10 (mean horizons per
+  cell 5.97 → 8.59).
+- **Basin strata** (`synth::Strata::Basin`, CLI `--strata basin`): sandstone, shale, sandstone, mudstone, limestone,
+  shale, sandstone, shale beds 0/8/22/36/55/75/100/130 blocks down, granite from 165 blocks, the same in every cell;
+  `deposits_world_16k` uses it (`deposits_world_4k` stays placeholder; the every-class pattern stays only in the
+  GameTest world `gametest.sh` writes).
+- **Coal measured** (Mac). Host rock at coal-body centres by the column rule (`hosts.py` over `deeptime
+  inspect-column`, the planet above, master vs branch): **sedimentary 60.5 % → 97.2 %** (152 → 72 seams: shale 41,
+  sandstone 28, slate 1, schist 1, black shale 1; before: sandstone 56, shale 35, gneiss 14, basalt 13, slate 13,
+  granodiorite 6). The six landscapes (`stage deposits --in` the `stage structure --preset pipeline_quick_16k --start
+  {scattered_continents,supercontinent} --length-myr 500 --set seed={1,2,3}` checkpoints, master's and the branch's
+  binary):
+
+  | coal | master | branch |
+  |---|---|---|
+  | sites, median (range) | 16.5 (5–25) | **9.5 (3–19)** |
+  | counted, six summed (target 68.6) | 58 | **50** |
+  | seams, six summed (per site) | 1,013 (10.6) | **364 (5.9)** |
+  | seams_max per landscape | 17–37 | 8–22 |
+  | no_cover / cover_capped | — | 56 / 29 |
+  | too_deep | 22 | 0 |
+
+- **Before/after** (`tools/workbench/preview.py run --keep-world`, standalone, master's jar on master's bake and the
+  branch's on its own, boxes 1800,−1260 (coal basin), −480,−1968 (a 430-block mountain), −1087,1754 (a basin coal
+  field); `deeptime-inspect section` along x and z; `wd-section` wider): before: layers folded in waves one to three cells long under the basin and arched under the mountain, the coal stack cutting across them, coal-field seams in gneiss and basalt in places; after: gently tilted basin fill, onlap onto basement highs, the coal stacks inside the shale and sandstone. Painted share: master
+  98.16 / 99.17 / 98.92 % (93,601,451 of 94,746,729, **98.79 %**), branch 98.21 / 99.10 / 98.62 % (91,617,663 of 92,822,166, **98.70 %**; the third box's "other" rock, surface-rule and feature blocks, rose from 286,611 to 371,492). Chunky (loaded Mac, not comparable run to run): master 39/48/42 ms/chunk, branch 51/73/73 ms/chunk.
+  Column-rule benchmark 0.34 ms/chunk (`ColumnRuleBenchTest`, mean 8.4 horizons per column). Review bundle (not
+  published): `review/out/strata-coal-settings/`.
+- **Gates** (Mac, the branch after merging master 18706c7): `cargo fmt --check`, `clippy --workspace --all-targets --locked
+  -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` all pass (cli 30, core 281 + 3
+  ignored, format 44, inspect 29 + 2 + 7, jni 7, viewer 5, …); `cd neoforge && ./gradlew build test` → tests=151
+  failures=0 (`ColumnParityTest` 500 columns, now with the layer's tongue parameters); `./gametest.sh` → 49 of 50
+  (`climateConsistent` fails: Köppen BW 0.472 < 0.650, Dsub 0.822 < 0.850, BW:desert 0.423 < 0.450 — **the same
+  numbers on master's own code** (control run in a copy of master 51c6c18), its floors predate the climate merges
+  that gave the test planet 466 BW columns instead of 17); `tools/smoke/install.sh mic` + `./gametest.sh -PwithMic` →
+  52 result lines, 1 not PASS (the same `climateConsistent`, BW 0.485, BS 0.513, BW:desert 0.446, Dfc:taiga
+  0.430).
+- **Decisions for Ben** (not asked): (1) With the cap, coal counted survivors fall to 73 % of the USGS target (50 of
+  68.6 over six landscapes; master 85 %): favourability does not know the cover, so fields drawn on thin cover are
+  dropped (`no_cover` 56). Folding the cover into coal's placement (a host term) would bring the count back.
+  (2) σ 10 is a look choice; the real-world dips of every σ are already a few degrees because the world's vertical
+  scale is 15× exaggerated. (3) Seams now sit in the drawn rock, so a player following a seam stays in shale or
+  sandstone.
+- **Next.** Merge into master (the parent); then, if Ben wants it, the coal cover in placement.
+### 2026-09-30 — Ice cover over glaciated ground; no chasm on barren EF; ice caps off cherry grove (agent worktree agent-adda9513719f24370, branch `ef-ice-cover`, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-30: "Force snow/ice cover (Recommended)" (Terralith has no flat inland ice biome, so 31 % of glaciated EF
+  had come out as gravel desert) and "Fix both (Recommended)" (glacial chasm only on glaciated ground; ice caps steered off snowy cherry
+  grove; via the placement file, pack-overridable).
+- **Ice cover.** The bake writes **`climate/ice_cover`** (L2, u8, blocks; `bake/ice.rs`): for ground above the sea and above its equilibrium
+  line (the climate stage's `climate/anomaly/ela_m`, L1 every cell, resampled to L2; the young landscape's elevation), `1 + ⌊height above
+  the line / step_m⌋` blocks up to `max_blocks`. The table's new **`ice_cover`** section (`placement.json`; defaults: step 160 m, at
+  most 12 blocks, 3 snow blocks on top, blue ice for the last 2 of a cover of 9 or more, blocks `snow_block` / `packed_ice` / `blue_ice`)
+  is validated by `bake/placement.rs` and recorded in `notes.bake.climate.ice_cover`. Java: `worlddata/IceCover` (the small interface:
+  `blocks(x, z)` and the block mix `Spec.kind(index, total)`; `WorldData.iceCover()`) and `worldgen/IcePass`, called last in
+  `GeologicChunkGenerator.buildSurface` (after the pack's surface rules, the strata pass and the water pass): the cover **replaces** the
+  top `n` solid blocks of the ground (the terrain's height does not change), reading the layer bilinearly and rounding, so a cover's
+  edge is a slope of cells, not 8-block steps; fluid-topped columns, air and bedrock are left alone. It reads the climate only through
+  `IceCover`: a climate stage that carries a real ice thickness (`climate/ice_thickness_m`) only has to be turned into the layer by the
+  bake. Not in the column evaluator (Java alone reads the layer; `inspect-column` prints it with the other layers), so no Rust/Java
+  parity obligation arises; FORMAT.md has "The ice cover" and the layer table row.
+- **Fix both, through the placement file** (schema additions, no version bump: all optional): a class may carry **`erosion: {min, max}`**
+  (clamp, vanilla's units; a `glaciated` block may give its own) and **`weirdness`** as `"positive"` or **`{"positive_below_erosion": e}`**
+  (positive branch below `e`, negative above). EF: `erosion.max` 0.3 (barren), `glaciated.erosion.max` 1.0 (ice cap keeps the chasm),
+  `weirdness.positive_below_erosion` −0.27. Why these (evidence, offline on the planet's glaciated and unglaciated EF cells with
+  Terralith's parameter list under MIC's mapping and under the identity mapping): barren EF at erosion ≥ 0.4 gets `glacial_chasm`
+  (21 % in MIC) and holding it below 0.3 gives 0 (gravel desert 53 → 74 %, cold shrubland 16 %); the cherry grove that stayed on ice caps
+  after the first change (2 %) is the positive-branch variant at erosion −0.22 … 0.05 and weirdness ≥ 0.4, mid-inland, which no window on
+  erosion or weirdness in vanilla units removes (MIC's router squashes both), but negative-branch flats cannot have it; the peaks stay
+  positive so scarlet mountains stay off them, and the threshold −0.27 (not vanilla's −0.375) is where MIC's stretched erosion leaves no
+  negative cell in scarlet's band (at −0.375 the box kept 11 % scarlet; −0.27 gives 0). Planet-wide glaciated EF, emulated: MIC ice 40 /
+  snow 56 / barren 4 %, scarlet 0.2 %, cherry 0; identity mapping ice 48 / snow 36–47 / barren 6–12 %, cherry ≤ 0.6 %. Barren EF: cold
+  shrubland 79–81 %, snowy plains 9–13 %, glacial chasm 1 %. Side effect (undone below): with all the flats on the negative branch vanilla's
+  ice spikes (a positive-branch variant) disappeared from ice caps (Terralith's stay).
+- **Tests.** Rust (`bake::placement`, `bake::biomes`, `bake::ice`, `bake::tests`): erosion limits and their errors, the weirdness forms,
+  the ice-cover section (defaults, bounds, cover thickness), the cover layer from an ELA, EF's peaks positive / flats negative / barren held
+  off the chasm. Java: `IceCoverTest` (record, block mix, the baked 4k planet's layer read back), GameTest `icePassLaysTheCover` (a chunk
+  built for it: covers of 0, 1, 5 and 12 blocks, a lake column, a two-block column), `iceCoverLaidOnGlaciatedGround` (real planet,
+  if it has cover; the 150 Myr 4k planet has none above its line), `BiomeCensus.FORBIDDEN` gains `EF:no_chasm_on_barren` and
+  `EF:no_cherry` for `climateConsistent`.
+- **Ice spikes back (Ben, 2026-09-30, "Bring ice spikes back").** The flats' branch is now `weirdness.flats`: `{positive_noise_above,
+  max_magnitude}` (new, optional; default never positive and no cap, which is what the entry above did). EF: the flats are positive
+  where the variant noise is above 0.2 (about a fifth of them), at |weirdness| at most 0.25 (vanilla's units), the rest negative;
+  peaks positive. Vanilla's ice spikes (a positive-branch variant at humidity band 0) come back on a share of the flats, and the cherry
+  groves (positive branch, |weirdness| 0.4 and up at mid erosion, where MIC's router puts reference 0.3 … 0.57) stay off: without the
+  cap a half of the flats positive gave cherry on 0.9 % of the ice cap, with it 0.1 % (emulated, MIC). The bake carries the two numbers
+  per class as nearest-cell L2 layers like the rest of the class rules. Tests: `bake::placement` (forms and errors),
+  `bake::biomes::ef_flats_let_some_noise_through_below_a_magnitude` (share between 2 % and 60 %, |w| at most the cap, noise above 0 gives
+  more, above 1 none, peaks stay positive).
+- **Ice cover from the climate's ice** (the climate agent's `climate/ice_thickness_m`, merged with master): `bake/ice.rs`
+  `cover_from_thickness`: ice of at least 1 m on ground above the sea gives `1 + ⌊t / step_m⌋` blocks (same table: 160 m per block, at
+  most 12), the L1 field resampled bilinearly; a run without ice fields falls back to the height above the equilibrium line as before.
+  `notes.bake.climate.ice_cover.source` names which. Cheap, so done. The 160 m step is unchanged: an ice sheet of 2 km or more is 12.
+- **The box moved.** Master's climate (carbon cycle, ice-age cycles, ice-linked sea level, continuous strata) makes `earthlike_quick_16k`
+  a different planet (9,544 EF L1 cells against 53,837; the old box, x 3675…3931, z −3779…−3523, is sea now), so the old before/after
+  cannot be redone. Control: the merged tree baked with master's table (`deeptime run --content` with the old `climate_placement`) and
+  its `climate/ice_cover` layer deleted (so no cover), against the new table on the same planet (`smoke/glaciercheck-ctl`, `-after6`).
+  On the new planet 99 % of EF land carries ice (the ice model and the Köppen class agree; 112 L2 cells are barren EF). Two boxes of the
+  real generator (`preview-area.sh --keep-world`, `deeptime-inspect biomes`, and the ground under the snow layer read from the
+  `.dtva` export): A x −3840…−3584, z 2112…2368 (91 % flats), B x −4160…−3904, z 1984…2240 (43 % flats), both ice cap at 12 blocks.
+  | box A (flats) / B (mixed), 65,536 columns each | before | after |
+  |---|---|---|
+  | MIC: gravel desert | 73.0 % / 29.9 % | 0 / 0 |
+  | MIC: snowy plains | 0 / 0 | 73.0 % / 29.9 % |
+  | MIC: snowy slopes, ice spikes, frozen peaks | 20.2, 6.8, 0 % / 68.3, 0, 1.8 % | the same |
+  | MIC: ground block snow or ice | 27.0 % / 69.1 % (granite 35 %, gravel 23 %, dripstone 12 % / gravel 22 %) | 99.6 % / 99.0 % |
+  | vanilla: ice spikes | 99.7 % / 75.9 % | 8.7 % / 32.2 % |
+  | vanilla: snowy plains, slopes, frozen peaks | 0, 0.3, 0 % / 0, 20.9, 3.2 % | 91.0, 0.3, 0 % / 43.8, 20.9, 3.2 % |
+  | vanilla: ground block snow or ice | 99.9 % / 98.9 % | 98.0 % / 99.7 % (the rest: a village's planks, grass, paths) |
+  (MIC's ice spikes are Terralith's own, at humidity band 0, for both signs, so they do not change; vanilla's were on all of the flats
+  when they were all positive.) Planet-wide, emulated on the Terralith list and MIC's mapping, ice cap: snowy slopes 54 %, frozen peaks
+  27 %, gravel/shrubland 7 % (12 % before), ice spikes 6.6 %, plains 5.7 % (0 before); cherry grove, scarlet mountains, snowy badlands,
+  glacial chasm 0.
+- **Verified (Mac, on the tree merged with master 39f7ad4 and these changes).** `cargo fmt --check`, `clippy --workspace --all-targets
+  --locked -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --locked` (core 287 + 3 ignored, cli 30, format
+  44, inspect 29, …) all pass; `./gradlew build test` 155/0. `./gametest.sh` and `-PwithMic`: 53 of 54 pass, including `icePassLaysTheCover`
+  (1,028 blocks placed as expected, none wrong) and `iceCoverLaidOnGlaciatedGround` (the 4k test planet has no ice cap: 0 columns, logged);
+  the one failure is `climateConsistent`: BW 0.47–0.49 < 0.65, Dsub 0.82 < 0.85, BW:desert 0.42–0.45 < 0.45 (standalone), and under MIC BW,
+  BS 0.51 < 0.60, Dfc:taiga 0.43 < 0.50. **It fails the same way on master without these changes** (same numbers, run on master 39f7ad4):
+  the 4k test planet is a different planet since the climate merge (466 BW columns where there were 17) and its floors were calibrated on
+  the old one; not EF. The planet has no polar land (E family 0 columns), so `EF:no_red`, `EF:no_chasm_on_barren` and `EF:no_cherry`
+  never get columns there (and sit after the floor check in the test); the floors need a recalibration by whoever owns the climate merge.
+- **Next.** The floors of `climateConsistent` on the new test planet (not this work); Ben's call on the ice-cap humidity (caveat (a) above:
+  the gravel desert it once fed is 0 in the boxes now); merge (this branch is not merged).
+
 ### 2026-09-30 — `climateConsistent` after the deep-time climate: a weathering-runoff bug fixed, then the test planet's floors re-set (agent worktree agent-adc924860a859865c, branch worktree-agent-adc924860a859865c-gtfix, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Symptom.** Master (after the deep-time climate, continuous strata and P1-25) failed `climateconsistent`
   standalone (BW 0.472 < 0.65 on 466 columns, Dsub 0.822, BW:desert 0.423) and under `-PwithMic` (BS 0.513,
@@ -112,6 +918,289 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   per start; the calibration's range was 3–18 %). `climate-dem` does not run the carbon cycle: unchanged.
 - **Next.** The ice-sheet dynamics and supply-limited weathering (decisions log 2026-09-30) continue on
   `worktree-agent-adc924860a859865c-ice`, which takes this branch.
+
+### 2026-09-30 — P1-21 volcanoes as landforms (agent worktree agent-a348bd3bf6e50dd72, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What.** A new coupled stage `volcanoes` (`crates/deeptime-core/src/surface/volcanoes/{mod, shape, params, tests}.rs`)
+  between the surface and the structure stage (`[plates, climate, surface, volcanoes, structure]`, one step per plate
+  step), the amplifier's shaping (`surface/amplify/volcano.rs`), the preset section `volcanoes` (every key a setting,
+  `VolcanoParams`, in all four `pipeline_*` presets, the synced `earthlike_*` built-ins and `tests/presets/planet_world_4k.json`),
+  `WorldState::volcanoes` (the catalogue; checkpoint schema 7 → 8 after merging the deep-time climate's 7), the `deeptime:volcano_*` events (EVENTS.md, "The
+  volcanoes' events"), the keyframe layer `volcanoes/map` and the end layer `volcanoes/flood_basalt` (ramps.json
+  `volcanoes`), editor fields (Terrain: `volcano_density`, `volcano_size`; new section Advanced · Volcanoes with the 24
+  other keys; Java `EditorFields.Section.ADV_VOLCANOES`, lang keys, `AdvancedSettingsTest`), workbench event colours and
+  layer names, `inspect-column --why` → `landforms` (the volcano and flood-basalt events whose footprint holds the column,
+  with their cause chains; the workbench's inspect panel shows them as "Why here: …"), porphyry's `causes.pathway`
+  (`volcano_stratovolcano`, `volcano_caldera`: a porphyry's chain can now cite its arc volcano), `deeptime volcano-view`
+  (`crates/deeptime-cli/src/volcano_view.rs`: global map, settings map, before/after close views with profiles and
+  relief numbers at L1/L2/L3), the CLI summary line `volcanoes_final=…`.
+- **Model.** A catalogue of discrete edifices (block position, kind, basal radius, height) that ride their plates like the
+  plutons. Each step: (1) motion with the plate's Ω (oceanic ones subduct with their crust); (2) erosion: the surface
+  stage's net change of the step (`surface/material_m`) fitted over the footprint as dH × the body's rendered weight +
+  a uniform part (erosion of the cone lowers it, burial by sediment round it too, a change of the whole area neither),
+  and the height is the smaller of that account and the relief the L1 surface shows over the foot's lower-quartile
+  level (so blur and the plate model's resampling also age it) — each kept separately, so a one-step dip does not stay;
+  (3) arcs: the plate model's arc flag covers ~12 % of the planet at 100k samples (bands a few samples wide plus broad
+  hatched patches where intra-oceanic arcs overlap), so volcanoes form only on the **volcanic front**, the medial line
+  of the closed flux ≥ `arc_min_flux` mask (not deeper than 4 km: trenches excluded), highest flux first, Poisson-disk
+  spaced at `arc_spacing_km / density` × U(0.8, 1.2) from live, just-dead and still-standing cones; target height from
+  the flux (`arc_height_km` 1.2–3 km), R ∝ H^0.8 (14 km at the top), life U(2, 8) Myr; silicic on crust ≥ 42 km;
+  vents plate motion brings within half the spacing merge (the lower dies); steps whose arc flags the plate model
+  cleared (every resampling and the last step) are "blind": no births, no deaths; (4) hotspots: a shield (oceanic) or
+  silicic centre (continental) at the plume once the chain's last volcano has drifted `hotspot_spacing_km / density`
+  away; it builds while within that distance, more the closer it is; dead oceanic ones subside 25 m/Myr (≤ 1.5 km);
+  (5) growth (target − height)·(1 − e^(−Δt/1 Myr)), capped at 6.8 km above the sea (shields 4.4 km), laid on the strata
+  log (strato: tuff under andesite, rhyolite when silicic; shield: basalt; silicic: tuff + rhyolite; regolith buried as a
+  palaeosol), and added to the surface's offset, elevation and the plate feedback (`surface/feedback_m`, so L0 carries
+  the edifice); (6) calderas: silicic cones at 0.04/Myr (continental hotspots 0.12), shields over 4 km a summit caldera;
+  the summit inside the rim is removed, half the volume becomes an ignimbrite (tuff) sheet to 4 rim radii, half a tuff
+  fill; (7) each new `large_igneous_province` becomes a flood-basalt province: 8 basalt flows each under a thin tuff bed
+  over its radius, the plate model's dome of a third of the pile flattened to a plateau; (8) dead cones worn to a tenth of
+  their peak for 5 Myr leave the catalogue. Events at the end of the group (all causes exist then): every hotspot volcano,
+  live stratovolcanoes and dead ones still at half their peak and ≥ 800 m, calderas, flood basalts (causes: the nearest
+  subduction onset on its plate / the hotspot track, else its LIP / the volcano / the LIP).
+- **Block-scale shape (amplify).** The young landscape holds a blurred, weaker bump of each edifice (measured: 50–70 % of
+  the nominal relief at L1, less after the young stage). Before the erosion passes, on L2, that bump (the body blurred by
+  a tent 1.5 L1 cells wide, scaled to the relief measured over the foot, never more than the volcano built) is replaced
+  by the true profile — stratovolcano (1 − ρ)^1.5 (Fuji's), shield (1 − ρ²)^1.5, silicic (1 − ρ²)² — scaled by the relief
+  kept, so the amplifier's erosion cuts radial gullies into a real cone; after the last flood (in a `TileSink` wrapper,
+  tile-independent) the part L2 cannot hold (the sharp summit), the crater (radius max(1 km, 0.07 R), 6 % deep), a
+  caldera's flat floor inside a slightly irregular steep rim (floor level from the young landscape's rim), and the
+  flood-basalt terraces (80 m treads and risers where a pile crops out within 150 m). Dead volcanoes fade: crater with
+  `fade_myr` (5), cone and caldera with 3 × that. **Mountain character (merged from master, 50464ac):** the volcano
+  footprints suppress its fold ridges (`CharacterFields::suppress_folds`, fold strength × 0 inside the body rising to 1 at
+  1.3 R); its gullies, young-peak sharpening and cliff bands still act on the cones (the L3 residual comes after it;
+  since the second follow-ups young volcanoes are exempt from the unsharp mask, below).
+- **Measured.** `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --checkpoints`
+  (Mac M6, shared, load 60–110): 418 s wall, peak 3.6 GiB (unchanged); **volcanoes 14.1 s** (births 6.0, erosion
+  accounting 6.0), amplify's volcano sink 0.6 s. `volcanoes_final=250 strato_born=24017 shield_born=181
+  caldera_complex_born=91 standing_strato=1275 standing_shield=8 standing_caldera_complex=5 active_strato=203
+  active_shield=2 calderas=295 summit_calderas=27 flood_basalts=9 tallest_m=4643 flood_basalt_outcrop_cells=389
+  events=1468` (of 3,498). Close views (`deeptime volcano-view`): the highest live continental-arc cone relief 2.1 km
+  (young L2) → 3.1 km (L3), summit 3.6 km a.s.l.; an island-arc cone 2.5 → 3.2 km, an island 418 m high; the youngest
+  shield of the chain with most islands 4.8 → 5.0 km (756 m island) with two older islands and islets down-chain; a 2-Myr
+  caldera 14.6 km across, flat floor 764 m deep. `cargo test --workspace --locked` (core 272 + 3 ignored, cli 30, format
+  40, inspect 29 + 2 + 7, jni 7, viewer 5), `clippy --workspace --all-targets --locked -D warnings`, `fmt --check`, `deny
+  check licenses bans` clean; `./gradlew build test` tests=146 failures=0; `tools/remote/mac.sh --server -- ./gametest.sh` → All 50 required tests
+  passed (realPlanetHeightMatchesTheBake and realPlanetRockMatchesTheParityFixture on the 4k planet, which now runs the
+  volcano stage).
+- **Tests.** `the_front_is_the_middle_of_the_arc_band` (band → its centre row, striped patch → a skeleton, no front in a
+  trench), `arcs_line_up_along_the_front_at_the_spacing` (2,400 km arc: all on flux cells, no pair nearer than 0.8 ×
+  60 km, mean neighbour 48–80 km, 28–52 cones, saturation, density 2 → ≥ 1.6×), `the_pipeline_puts_volcanoes_where_the_plates_say`
+  (20k samples, 120 Myr: every stratovolcano born on a flux ≥ threshold cell of its own step; live ones ≥ 0.5 × spacing
+  apart; hotspot chains born in order, only the newest two alive, the live ones within the spacing of their plume, ≥ 70 %
+  of consecutive same-plate pairs older-farther; every LIP → one flood basalt caused by it; every event's causes of the
+  right kinds; andesite, basalt and tuff in the log; log invariants), `threads_and_a_resume_leave_the_volcanoes_unchanged`
+  (1 thread straight = 3 threads resumed from a mid-group checkpoint: catalogue, events, elevation, map bit for bit),
+  shape tests (profiles, caldera truncation, blur keeps volume), amplifier tests (a cone sharpened at L2 with the volume
+  kept, its crater cut at L3; a 30-Myr-dead crater gone; terraces monotone with treads and risers).
+- **Pictures.** `review/out/p1-21/bundle/` (11 MB, not published): `index.html` with the global map (volcano chains along
+  every active margin and island arc, hotspot islands, flood-basalt rings), the settings map (the last frame's arc flux
+  and live plumes under the markers), before/after close views with E–W profiles, and nine 3D previews from the real
+  generator on this run's bake (`tools/workbench/preview-area.sh --world-data review/out/p1-21/q16f`, standalone,
+  256 × 256 blocks; screenshots by Playwright's headless Chromium on the Mac — nixpkgs' chromium does not build for
+  aarch64-darwin): a mid-latitude coastal arc cone, the highest arc cone, a caldera with flat floor and tuff/andesite walls,
+  an island-arc volcano, the youngest shield of a chain and an older member.
+- **Findings (not changed here).** (1) The plate model clears its `ARC`… flags on resampled crust, so every resampling step
+  and the last step have no arc anywhere (`arc_magma_flux` of those steps is 0 for plutons and the deposit frames too; the
+  frames average it away). (2) Its arc band is ~12 % of the planet at 100k samples. (3) Under deep ocean the 3D previews
+  show caves below y −54 filled with lava (4.5 M lava blocks in a 256 × 256 box of sea floor): vanilla's lava level in
+  Deep Time's cavities, not the volcanoes'. (4) One run (q16c) showed a ~5 km deep pit on an Andean plateau already in the
+  young landscape (not at a volcano); not investigated. (5) At 20 m vs 300 m per block the world is 15× taller than wide,
+  so true-proportion cones are steep peaks in blocks.
+- **Follow-ups (Ben, decisions log 2026-09-30).** (1) **"Setting, gentler default"**: `volcanoes.flank_steepness`
+  (0.1–1, default **0.5**; the editor's Terrain field "Volcano flank steepness", stops Gentle 0.35 / Readable 0.5 /
+  Physical 1) divides every edifice's physical basal radius, the height unchanged: at 0.5 a 3-km arc cone is 26–28 km in
+  radius (56 blocks of relief per 90 blocks of run instead of per 45), shields up to 71 km; 1 is the physical profile.
+  (2) **"Group by arc/chain"**: one `deeptime:volcano_arc` per arc segment (the cones one subduction contact fed, keyed by
+  its onset event, else by plate; `ArcSegment` in the catalogue: first/last activity, cones born, where, peak, calderas)
+  and one `deeptime:volcano_hotspot_chain` per hotspot, each with its standing cones as a detail (`cones`:
+  `lat,lon,radius_km,height_m;…`, tallest first, ≤ 80); on their own only each group's tallest standing cone (a
+  stratovolcano ≥ 1.5 km × size), the calderas still standing or ≥ 6 km across, and the flood basalts. Notable cones are
+  caused by their group, groups by the subduction onset / hotspot track. `inspect-column --why` finds a column's cone in
+  a group's list (the notable cone's own event first); porphyry's `causes.pathway` now also lists `volcano_arc`, so a
+  porphyry of any age on an arc cites its segment (an arc event spans the segment's whole life) or a notable cone nearer.
+  **Event counts** on the same preset (`earthlike_quick_16k`, 500 Myr, run q16g): **611** volcano events of 2,931
+  (before: 1,468 of 3,498): `volcano_arc` 341, `volcano_hotspot_chain` 20, `volcano_stratovolcano` 73, `volcano_shield` 4,
+  `volcano_caldera_complex` 3, `volcano_caldera` 162, `volcano_flood_basalt` 8 (`notes.volcanoes.events_by_kind`).
+  Run: 420 s wall on the loaded Mac, volcanoes 22.7 s (the wider footprints: the erosion fit 13.5 s), amplify's volcano
+  sink 1.1 s; 282 live arc cones, 1 live shield, 137 calderas, 8 flood basalts.
+- **Second follow-ups (Ben, decisions log 2026-09-30, commit 86d66d6; branch merged with master 86d66d6 first:
+  EF ice cover, the climateConsistent runoff fix, glacial landforms).** (1) **"Count small ones"**: an arc segment that
+  built fewer than `SMALL_SEGMENT` = 3 cones and has a subduction onset writes no `volcano_arc`; the onset event gains
+  `volcano_cones_built`, `volcano_cones_standing` and `volcano_cones` (the same `lat,lon,radius_km,height_m;…` list,
+  several small segments of one contact add up), set at the end of the coupled group (the events file is written from
+  the world's events at finalize; a live watcher keeps the onset as first published); a notable cone of such a segment is
+  caused by the onset; plate-keyed segments (no onset) keep their event. `inspect-column --why` reads `volcano_cones` on
+  any event, wherever the event itself is placed (`why_here_finds_a_small_arc_segments_cone_on_its_subduction_onset`).
+  Notes: `counts.small_arc_segments`, `counts.small_arc_cones` (`Counts` now `#[serde(default)]`, so older schema-8
+  checkpoints load). (2) **"Smooth young, rugged old"**: `Shaper::youth_keep` (1 − the volcano's youth inside its body,
+  back to 1 at 1.3 R; youth = 1 while active, e^(−age/`fade_myr`) once dead, the crater's clock) →
+  `CharacterFields::calm_volcanoes`: there the mountain character's unsharp mask is faded out both ways (no young-peak
+  sharpening, and no old-ground rounding, which would blunt the cone towards its 24-block blur) and its gullies take old
+  ground's soft shape; folds stay suppressed as before. The sea is untouched by the character anyway, so a submerged
+  shield does not change. Tests: `young_volcanoes_get_no_young_peak_sharpening_and_old_ones_regain_it` (active 0,
+  5-Myr-dead 1 − e⁻¹, 30-Myr-dead ≈ 1), `a_young_volcano_keeps_its_profile_on_young_ground` (the cone fixture: young
+  ground lifts the summit, a calmed one barely moves; keep 1 changes nothing), the pipeline test's event rules.
+  **Run** (`deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --checkpoints`,
+  `/Volumes/Graphide/ban/deeptime-runs/p1-21/after`, Mac at load ~80): 1,269 s wall, peak 4.0 GiB, volcanoes 31.0 s;
+  **585 volcano events of 2,499**: `volcano_arc` 296, `volcano_caldera` 164, `volcano_stratovolcano` 87,
+  `volcano_hotspot_chain` 21, `volcano_shield` 8, `volcano_caldera_complex` 2, `volcano_flood_basalt` 7; **15 small
+  segments (20 cones) counted on their onsets** (most segments build ≥ 3 cones: arc events fall by 5 %, not more).
+  **A/B of the calm mask** on that run's young landscape (`deeptime stage amplify --in 6-young.dtcp --bake` with the
+  mask line removed = before; the run's own bake = after; `deeptime heightmap` over the boxes): the active continental-arc
+  cone 19773 (2,976 m, x 371 z −2765) summit y 452 → 442 (the sharpened spike gone), mean |∇²| on its land 0.656 → 0.613
+  blocks, mean |Δ| 0.16 blocks; the active shield 19366 (4,673 m, x −3668 z 658, a 38-block island in a 70-km body)
+  mean |∇²| 0.919 → 0.826, the highest ground in its body (a peak 110 blocks off the vent) y 415 → 380, mean |Δ| 0.74
+  blocks; the whole planet's character change 1.86 → 1.78 blocks mean. 3D previews (`preview.py run`, standalone,
+  same boxes, before/after) and shots: `review/out/p1-21/shots3/` (arc cone 256²: the craggy, notched summit becomes a
+  clean cone; shield 384²: its vent is a low island and the two peaks inside its body, older ground, go from spiky to
+  rounded; the submerged active shield 19757 for contrast: no change), the arc and the emergent shield pairs copied
+  into `review/out/p1-21/bundle/` (now 19 MB, not published). This run has no emergent young shield with a clean dome
+  of its own: of the 8 standing young shields and caldera complexes, the tallest above the sea is a 38-block island.
+  Master bd1cc0f's `deeptime-core` lib tests did not compile (the volcano shaper test's `Level` literal lacked the
+  glacial work's new `zs` field); fixed here and on master the same way, so the merge of master (9d7fb4b) was clean.
+  **Gates** (the follow-ups merged with master 9d7fb4b): `cargo fmt --check`, `clippy --workspace --all-targets
+  --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` ok (cli 31, core 319 + 3
+  ignored, history_cap 1, format 44, inspect 29 + 2 + 7, jni 7, viewer 6); `./gradlew build test` tests=155
+  failures=0 (on the tree before the master merge, which only brought docs, a probe script and the -O1 test profile).
+  GameTests not run on the branch (Ben, 2026-09-30: once per merge batch on master). The Mac rebooted mid-way
+  (~19:06); its server lock from before the reboot (owner `deep-time`, no process left) was removed so the previews
+  could run. Scratch runs under `/Volumes/Graphide/ban/deeptime-runs/p1-21/` and the old q16f/q16g runs deleted.
+- **Gates on the final tree** (master 84e2b1d and the decisions-log commits after it merged, schema 8 on the climate's
+  7, with the follow-ups): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings`, `deny check
+  licenses bans` clean; `cargo test --workspace --locked` ok (cli 30, core 290 + 3 ignored, history_cap 1, format 44,
+  inspect 29 + 2 + 7, jni 7, viewer 5); `./gradlew build test` tests=151 failures=0; `mac.sh --server -- ./gametest.sh`:
+  **All 52 required tests passed**, after re-basing `climateConsistent`'s narrow `E:snow` floor 0.9 → 0.8 (it measured
+  0.899 on `test_planet_real`, E overall 0.98: master's EF barren frozen ground is not snowy-tagged, and the test planet
+  now runs the volcano stage). (The merged tree before the follow-ups: the same cargo and Gradle results.) 3D previews of the gentler
+  cones: `review/out/p1-21/bundle/shots/` (arc cone at 0.5 beside the physical-profile shots of run q16f); the bundle is
+  15.7 MB. Old scratch runs on the Mac SSD deleted (disk hygiene rule).
+- **Deviations.** Stratovolcano "centres" live 2–8 Myr (real cones 0.1–1 Myr) because a step is 2 Myr. Stratovolcanoes
+  that erode away are counted, not written as events (~24,000 per run). No lava or obsidian blocks, no volcanic ore
+  (P2-10's epithermal), no guyot planing beyond the surface's wave-base diffusion (P2-11).
+- **Next.** Merge into master (the parent). Ben: the volcano event volume (1,468 of 3,498 events) and whether cones should
+  be less steep in blocks than real proportions (a `volcanoes.size`-independent flank setting).
+  Answered and done (follow-ups above); next: the parent merges commit 899d797 and its STATUS commit into master and
+  runs the GameTest batch there.
+### 2026-09-30 — Glacial erosion landforms: troughs, fjords, till, U-shaped valleys at block scale (agent worktree agent-a9307a6541fa46794, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-29, "Which glacial features should Deep Time add?" → "Glacial erosion
+  landforms": U-valleys, cirques, fjords, moraines/till where ice sat, now or in past glaciations. Until now
+  P1-05's glaciers were only diagnosed.
+- **What.** (1) `surface/glacial.rs` (+ `glacial/tests.rs`): one glacier model per LEM step, `substeps` (4)
+  ice solves each, used by the deep-time surface (L1) and the young landscape (L2). Mass balance b = β(z − ELA),
+  β 0.005/yr (Oerlemans 2011), capped by precipitation and 2 m/yr, ablation ≤ 10 m/yr; ice flux routed down the
+  step's D8 tree (Hergarten 2021; goSPL's GPL docs read for comparison only); each cell's ice surface solved from
+  its receiver's by bisection on the shallow-ice flux q = (2A/5)(ρgS)³H⁵ + u_s·H, A = 2.4·10⁻²⁴ Pa⁻³s⁻¹,
+  Weertman sliding u_s = B τ³ (30 m/yr at 100 kPa) on thawed beds (mean annual T −14…−4 °C, or 800–2,500 m of
+  ice insulating), glacier width H/0.3 up to 7 cells; erosion E = K_g·u_s, K_g 10⁻⁵ (Humphrey & Raymond 1994's
+  law, the coefficient from Hallet et al. 1996's rates), spread parabolically across a glacier wider than its
+  cell, none under floating ice or where the bed rises towards the outlet more than 1.5× the ice-surface slope
+  (Alley et al. 1998/2003); debris melts out with the ice, 30 % as till (≤ 100 m per substep), the rest as
+  meltwater load into lakes it crosses and to the sea at its mouth (glaciomarine: `marine::fill` into the till
+  part). Mass kept exactly (tested). Fjords follow: ice grounded below sea level at a coast keeps cutting until it
+  floats. (2) Surface stage: fluvial K × (1 − the glaciers' cover); till is its own facies part (`Setting.glacial`
+  → class `till`, provenance in situ); the existing `till` class (P1-12; family unconsolidated, lithifies to
+  conglomerate) is used — no new class. New fields `surface/ice_thickness_m` (a keyframe layer, ramp `ice`) and
+  `surface/glacial_erosion_m_myr`; totals in `notes.glacial` (so checkpoints carry them; no schema change) and the
+  CLI's `glacial_final` line. (3) Young stage: the glacial state's ELA (the present one − `young_ela_drop_m`, 500 m,
+  Porter 1989's average glacial snowline; or the climate's own fields when published), sea-level temperature,
+  precipitation on L2; glaciers erode, leave till (≥ 5 m makes `young/class` till, so the bake's `class_top` shows
+  it) and hand `young/ice_surface_m` (over each glacier's whole width) to the amplifier; rivers keep their K
+  there (see findings). (4) Amplifier: `amplify/glacial.rs` on the **last level only**: from the ice depth D and
+  the valley's smoothed centre-line depth D_max, cells lowered by D_max·t(1 − t) (t = D/D_max: a V's walls cut to
+  the parabola of Svensson 1959/Harbor 1992), only where the ice is confined (ridges within reach stand above it:
+  Sugden 1978's selective linear erosion vs areal scouring) and the margin lateral (not a terminus or a tidewater
+  front); half the carved rock goes back onto crests; fluvial incision × (1 − 0.8·ice) on every level; its radius
+  (3·20 + 1 cells) is in the halo; the mountain character's fade (`character::apply`, new `glacier` argument) also
+  skips the troughs the pass cut (the cut is handed over in `cap`/`zs`), so gullies and fold ridges don't fight
+  the U while crests above the ice keep their character. (5) One place names the climate's fields:
+  `glacial::source`, now the deep-time climate's (FORMAT.md "The climate's ice fields", merged from master
+  27e88f7): the ELA (`climate/anomaly/ela_m`); deep-time glaciers only where `climate/ice_max_thickness_m` > 0
+  (ice at some time in the step), eroding × `climate/ice_time_share`, and fluvial K also × (1 − ramp of
+  `climate/ice_thickness_m` 10–100 m) (the climate agent asked for no stream power under thick ice); the young
+  landscape's glaciers only inside `climate/ice_max_extent` (the LGM at the present). (6) Settings
+  (presets + `editor_fields.json` + lang): `surface.glacial.strength` ("Glacial erosion", terrain), 
+  `amplify.glacial.strength` ("Glacial valleys", terrain), `surface.glacial.young_ela_drop_m` ("Ice-age snowline
+  drop", adv_climate), `amplify.glacial.ridge_share` ("Arêtes from troughs", adv_surface); every constant above is
+  a preset key. (7) Tools: `deeptime dump-fields --in ckpt --out dir [--fields a,b]` (raw f32 + index.json),
+  `tools/review/glacial-compare.sh` (young/amplify on/off from a deposits checkpoint → `glacial_views.py`: the most
+  glaciated confined range and fjord coast, maps, zooms and 1:1 block cross-sections), `glacial_planet.py`,
+  `area3d_shots.py` (headless shots of `.dtva` exports on the Mac).
+- **Tests** (`cargo test --workspace --locked` on the Mac after merging master 8872c91: cli 30, core 273 + 3
+  ignored, format 40, inspect 29 + 2 + 7, jni 7, viewer 5, all pass; clippy `-D warnings`, fmt, deny clean):
+  `glacial::tests` — a glacier reaching the sea cuts its valley below the sea floor (a fjord behind a sill),
+  eroded = till + lake + sink + sea to 1e-9 and the grid's change = −(sea loads), a thin polar cap erodes nothing
+  and a thick one thaws its bed, no ice below the ELA or where the climate forbids it, the same bits on 1 and 4
+  threads, the SIA flux law; `a_glaciated_planet_keeps_its_mass_logs_its_till_and_resumes` (plates + climate +
+  surface + structure, snowline pushed down, 40 Myr: totals partition, surface mass residual < 1e-6 of erosion,
+  the strata log holds till, a checkpoint resumed on 3 threads from 1 gives identical elevation, log, notes and ice
+  fields); `amplify::glacial::tests` — a glaciated V valley becomes y ∝ |x|^b with b > 1.6 (from 1.0; the axis and
+  the trimline stay), crests get some rock back, a flat bed under an ice sheet is untouched, a window with the halo
+  gives the whole raster's bits; `amplify::tests::a_glaciated_level_amplifies_the_same_in_tiles_and_on_any_thread_count`.
+- **Runs** (Mac M6, 12 threads, shared: load 20–96; `deeptime run --preset earthlike_quick_16k --start
+  scattered_continents --length-myr 500 --out target/glacial/after4 --checkpoints --viewer …`): 478 s wall (master's
+  baseline 236 s at lower load); surface 195 s of which glacial 19.7 s; young 15.6 s (glacial 2.2 s); amplify 61.7 s
+  (glacial pass 5.9 s); peak footprint 4.6 GB. `glacial_final eroded_km3=2.14e6 till_km3=4.6e5 lake_km3=3.1e5
+  sea_km3=1.37e6 steps_with_ice=250 ice_cells_max=45038 ice_cells_last=29771 cut_below_sea_cells=8654
+  max_rate_m_myr=1351` (2.4 % of the planet's 8.8e7 km³ of erosion; the mass residual stays −8.9e-4 km³);
+  young: 174,894 L2 cells under the glacial state's ice, 5.9e4 km³ eroded, 29,204 cells of till; amplify: 4.4e4 km³
+  carved, 6.2e3 raised, 5.97 M cells shaped, the final flood raises 22,330 cells, at most 121 m (overdeepened
+  basins filled flat: lake floors until water lands in Phase 2) vs 1,869 without glaciers. The glacial deep time
+  diverges from master's planet (the surface feeds the plates), so before/after compare statistics: land 0.271 →
+  0.332, median 601 → 665 m, p90 2,093 → 1,918, **p99 5,092 → 3,826 m**, max 8,246 → 7,757 (the high tail is cut
+  towards the ELA: the glacial buzzsaw), glaciated land 5.9 → 4.8 %.
+- **What the pictures show** (`review/out/glacial-review/`, not published; L3 in blocks at 1:1): planet maps and
+  hypsometry; the fjord coasts (long narrow drowned inlets on both sides of a glaciated island range, cut 10–20
+  blocks below sea level where the glaciers met the sea); an outlet trough off an ice-capped plateau with a flat
+  floor and steep walls (U) where the orange L2-only profile is a rounded V; ice-sheet interiors left smooth;
+  fold/gully texture absent under the ice. Iterations that the pictures forced: one-cell D8 slots and lakes
+  (glaciers now spread over their width), ridge-raise spikes (the ridge share is capped and needs a quarter of the
+  neighbourhood to be crest), carving on the coarse level (24-km radius) that printed grooves on ice caps (last
+  level only), max-filter streaks (smoothed), frontal margins cut like walls (the lateral factor), lowlands lifted
+  200 m under the young stage's ice (next bullet).
+- **Findings; Ben's answers (decisions log 2026-09-30).** (1) The glacial deep time lowers the highest ground (p99
+  −1.3 km on the first seed): **strength stays 1 (physical)**, heights are rechecked in P1-17. (2) At 300 m/block and
+  20 m/block the vertical exaggeration is 15×: a physical 2-km trough is 7 blocks wide and reads as a gorge →
+  **"Glacial valley width" setting, default 3, 1 = physical** (`surface.glacial.valley_width`, editor field
+  `glacial_width`): the young landscape draws each glacier's footprint and the spread of its erosion that many times
+  wider (the flow law, thickness and eroded volume are unchanged), so the amplifier's U spans the wider footprint;
+  the deep-time surface always uses 1. (3) Till lithifies to conglomerate (P1-12's class); a `diamictite`/tillite
+  class would be more correct — a 60th class touches Java, GameTests and the MIC rock-tag README (not asked yet).
+  (4) The young stage keeps fluvial K under the glacial-state ice: taking it away with the `balance` uplift lifted
+  ice-covered lowlands by ~200 m. (5) Eskers and drumlins not done; moraines are the till humps at termini (and the
+  lakes they dam), no crisp crest line; hanging valleys and cirques come only from the physics and the parabola.
+- **With the deep-time climate** (after merging local master 27e88f7; `…--out target/glacial/after5`, 1,130 s wall
+  on a loaded Mac): `glacial_final eroded_km3=1.85e6 till_km3=3.6e5 lake_km3=4.8e5 sea_km3=1.0e6
+  ice_cells_max=66350 cut_below_sea_cells=2330 max_rate_m_myr=1121`, glaciated land 15.1 %, 3 glaciations, land
+  median 768 m, p90 2,180, max 9.6 km (this climate's ice lies mostly on low polar land under cold beds, so the
+  buzzsaw of the earlier runs is weaker); young 232,124 L2 cells under the LGM-masked glacial ice, 9.7e4 km³
+  eroded, 34,591 till cells; amplify 4.3e4 km³ carved, the flood raises 27,777 cells (max 267 m). The views
+  (`review/out/glacial-width/`: young + amplify from after5's deposits checkpoint without ice-age glaciers, at real
+  width and at width 3) show fjord networks where the ice met the sea (drowned U-troughs 20–40 blocks wide at width
+  3, narrower and more ragged at 1) and ice-sheet interiors left smooth.
+- **3D** (`tools/workbench/preview-area.sh --profile standalone --y 20,330 --box -2544,-3208,-2288,-2952 --box
+  2976,-3248,3232,-2992 --world-data target/glacial/after4`, and the same boxes of the same planet run with
+  `--set surface.glacial.young_ela_drop_m=-2000 --set amplify.glacial.strength=0`, i.e. without the ice-age
+  glaciers; shots by `area3d_shots.py` in `review/out/glacial-3d/`): the valley box is a V-shaped, gullied valley
+  without them and a deeper trough with a flat floor (sand, grass and trees, a small lake) and steep smooth snowy
+  walls with them; the coastal box shows a smoother, scoured lowland. Width comparison on after5 (young + `stage
+  amplify --bake` from its deposits checkpoint at width 3, width 1 and without ice-age glaciers; the same two boxes
+  in each, `review/out/glacial-3dw/`, bundle `review/out/glacial-review/`, 16 MB, not published): at x −6608..−6353,
+  z 2944..3199 a snowy plateau without them, a narrow fjord at real width, and at width 3 a wider fjord with a side
+  arm, steep rock walls and a flat, partly flooded floor; the other box (the thickest ice of the window, on an
+  ice-capped plateau) barely changes. Scratch runs deleted from the Mac afterwards.
+- **Gates** (branch merged with local master 51c6c18). c2ec70f (the character's fade limited to the carved
+  troughs) compiled and passed, not reverted. cargo fmt, clippy `-D warnings`, deny, `cargo test --workspace
+  --locked` (cli 30, core 291 + 3 ignored, format 44, inspect 29 + 2 + 7, jni 7, viewer 5) pass; after the width
+  setting: `glacial` 12/12, `preset` 14/14, cli 30/30, clippy clean; `./gradlew build test` tests=151 failures=0;
+  `mac.sh --server -- ./gametest.sh`: every test passes but **`climateconsistent`** (BW 0.504 < 0.650, 409 columns).
+  Not the glaciers: the same run with the test planet baked at `surface.glacial.strength=0` and
+  `amplify.glacial.strength=0` fails it worse (BW 0.472, Dsub 0.822, BW:desert 0.423; 466 BW columns where P1-09
+  calibrated on 17): the merged deep-time climate made the 4k test planet much drier, and its BWk columns map to
+  plains 64 %. The floors (or the BWk mapping) need the climate agent's or P1-09's look.
+- **Deviations.** None from the plan's §8.2 structure; the plan has an "As built: glacial landforms" bullet.
+- **Next.** Merge into master (the coordinator); the `climateconsistent` floors after the deep-time climate;
+  a `diamictite` class if Ben wants it.
 
 ### 2026-09-30 — P1-25: a climate API for mic-climate and Project Atmosphere (agent worktree agent-a02882c5e6567370e, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **The bake (format 0.1 → 0.2).**

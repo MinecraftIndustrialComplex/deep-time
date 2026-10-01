@@ -741,6 +741,7 @@ pub fn rock_group(name: &str) -> Option<&'static [&'static str]> {
         ],
         "deeptime:rock/clastic" => &[
             "conglomerate",
+            "diamictite",
             "sandstone",
             "red_bed",
             "mudstone",
