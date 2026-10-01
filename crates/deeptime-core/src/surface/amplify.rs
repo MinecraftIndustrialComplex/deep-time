@@ -778,6 +778,7 @@ impl AmplifyStage {
         if let Some(sh) = &shaper {
             let l1 = GridDesc::for_planet("L1", c, r.l1_r)?;
             fields.suppress_folds(&sh.fold_keep(&l1));
+            fields.calm_volcanoes(&sh.youth_keep(&l1));
         }
         // The youth and fold strength the character read, for the keyframes and the workbench.
         if !fields.neutral {
