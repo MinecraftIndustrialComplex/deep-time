@@ -65,9 +65,9 @@ customizable unless stated otherwise; the listed value is the default.
 | Create's ore stones | Keep their geological classes, and each is a preferred host for its Create metal (crimsite → iron, ochrum → gold, veridium → copper, asurine → zinc) |
 | Ore blocks | Excavated Variants' ore-in-rock blocks when it is installed; otherwise normal stone or deepslate ores |
 | Other mods' ores | Materials that Deep Time simulates lose their scatter. Unknown ores keep scattering, gated by host rock. Vanilla's large ore veins are off |
-| MIC rock tags | `datapacks/deeptime-mic-rock-tags/`, which ships **in the MIC pack**, not in Deep Time. 59 classes, 60 with `diamictite` (see log 2026-09-30). Stone and deepslate are `unclassified_crust` filler. No Nether/End blocks and no terracotta. Ice and Fire's ash counts as volcanic ash; charred stone is excluded. No Create Nuclear blocks: Create Nuclear is leaving MIC for CROWNS, and uranium will map to CROWNS blocks |
+| MIC rock tags | `datapacks/deeptime-mic-rock-tags/`, which ships **in the MIC pack**, not in Deep Time. 59 classes, 60 with `diamictite` (see log 2026-09-30). Stone and deepslate are `unclassified_crust` filler, and also the stand-in of the common classes (shale, mudstone, slate, phyllite, schist, gneiss; see log 2026-10-01). No Nether/End blocks and no terracotta. Ice and Fire's ash counts as volcanic ash; charred stone is excluded. No Create Nuclear blocks: Create Nuclear is leaving MIC for CROWNS, and uranium will map to CROWNS blocks |
 | Tag rules (backend) | Always use the first installed fallback entry. Rock mappings support block-state entries through the adopted `data/<ns>/deeptime/rock_states/<name>.json` format (class, member/fallback role, entries of block + state + required; e.g. Project Atmosphere `dust` at `layers=8` as loess) |
-| Coal stand-in | Born in Chaos black argillite, then `minecraft:stone` (the one class allowed to fall back to filler stone) |
+| Coal stand-in | Born in Chaos black argillite, then `minecraft:stone` (once the one class allowed to fall back to filler stone; since the log of 2026-10-01 the common classes use stone or deepslate too) |
 
 ## Ores, prospecting, MIC hooks, playability
 | Topic | Decision |
