@@ -159,9 +159,11 @@ impl ClockState {
 }
 
 /// The present-state nudge (`present_climate`): over the run's last stretch the atmosphere's
-/// share of the carbon changes by a factor, as the ocean takes up or gives back CO₂ (what moves
-/// CO₂ between 180 and 280 ppm over Earth's glacial cycles; Sigman & Boyle 2000, Nature 407:
-/// 859–869). The factor ramps in over `ramp_years` from `t_start`.
+/// CO₂ is held at a factor of its level at the stretch's start, as when the ocean takes up or
+/// gives back carbon (what moves CO₂ between 180 and 280 ppm over Earth's glacial cycles; Sigman
+/// & Boyle 2000, Nature 407: 859–869). The factor ramps in over `ramp_years` from `t_start`; the
+/// carbon reservoirs stand still meanwhile (the weathering is still computed and reported, but
+/// it does not take the factor back).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Nudge {
     pub t_start: f64,
@@ -382,7 +384,9 @@ pub fn run(
                 / dt.max(1.0);
             let d = inp.degassing + lip;
             let fac = inp.nudge.map_or(1.0, |n| n.at(t_next));
-            if !p.carbon_cycle {
+            // Under the present-state nudge the reservoirs are held: the factor is a CO₂ level
+            // kept up to the present (weathering would take a large one back within ~100 kyr).
+            if !p.carbon_cycle || inp.nudge.is_some() {
                 break (d, st.carbon, fac);
             }
             let (kernel, t_land, sheet) = (&st.kernel, &st.t_land, &st.sheet);
@@ -837,14 +841,14 @@ mod tests {
         let (ppm0, t0, ice0, snow0) = end(0.0);
         assert!(!snow0 && ice0 < 0.3, "natural: sea ice {ice0}");
         let (ppm_w, t_w, _, snow_w) = end(4.0f64.ln());
-        // The weathering takes back part of the factor within 100 kyr, not all of it.
+        // The level is held (the reservoirs stand still under the nudge).
         assert!(
-            ppm_w > 1.3 * ppm0 && ppm_w < 4.01 * ppm0 && t_w > t0 + 1.0 && !snow_w,
+            ppm_w > 3.8 * ppm0 && ppm_w < 4.2 * ppm0 && t_w > t0 + 2.0 && !snow_w,
             "warm: {ppm_w} ppm against {ppm0}, {t_w} °C against {t0}"
         );
         let (ppm_c, t_c, ice_c, snow_c) = end((1.0f64 / 3000.0).ln());
         assert!(
-            snow_c && ice_c >= 0.95 && t_c < -20.0 && ppm_c < 0.1 * ppm0,
+            snow_c && ice_c >= 0.95 && t_c < -20.0 && ppm_c < 0.001 * ppm0,
             "cold: {ppm_c} ppm, {t_c} °C, sea ice {ice_c}"
         );
     }

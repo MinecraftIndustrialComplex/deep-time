@@ -170,6 +170,9 @@ pub const HOTHOUSE: &str = "deeptime:hothouse";
 
 /// Ice thinner than this is no ice, m.
 pub const ICE_MIN_M: f32 = 1.0;
+/// How far an interglacial's warm summers lift the equilibrium line above its mean, m (about
+/// 2 °C of summer warmth; Earth's early Holocene), in the deep-time sheet's relaxation.
+pub const INTERGLACIAL_RISE_M: f32 = 300.0;
 
 /// What the stage keeps between steps (and in a checkpoint taken inside the group).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -1371,12 +1374,29 @@ impl ClimateStage {
                     .map(|(cc, &e)| e + d_end[coarse_band[cc / sg.w]] as f32)
                     .collect();
                 let mut st = sheet::State::settled(sg.coarsen(&hs, &|_| true));
+                // A sheet outlives the line that grew it (on Earth's relief 16 % of the land
+                // stays under ice at today's line after a glacial, against 11 % from bare
+                // ground), and in deep time nothing would ever melt it back: the ice would only
+                // ratchet up from plate step to plate step. So the first third of the run stands
+                // for an interglacial's warm summers, the line `INTERGLACIAL_RISE_M` higher (as
+                // the orbit does every cycle), and the rest runs at the step's line.
+                let warm: Vec<f32> = ela_c.iter().map(|e| e + INTERGLACIAL_RISE_M).collect();
+                st.step(
+                    &sg,
+                    &sheet::Forcing {
+                        bed: &bed_c,
+                        ela: &warm,
+                        precip: &precip0_c,
+                    },
+                    &sp,
+                    p.ice_relax_kyr * 1000.0 / 3.0,
+                );
                 let forcing = sheet::Forcing {
                     bed: &bed_c,
                     ela: &ela_c,
                     precip: &precip0_c,
                 };
-                st.step(&sg, &forcing, &sp, p.ice_relax_kyr * 1000.0);
+                st.step(&sg, &forcing, &sp, p.ice_relax_kyr * 1000.0 * 2.0 / 3.0);
                 let fine = sg.refine(&st.thick);
                 for c in 0..n {
                     if land[c] && fine[c] >= ICE_MIN_M {
