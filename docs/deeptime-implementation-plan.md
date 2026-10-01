@@ -3720,6 +3720,16 @@ on this machine.
     adds only PA's weather to Deep Time's climate: PA's live temperature minus its own effective
     base. STATUS build log, 2026-09-30.
 
+#### P1-26 Per-cell sea ice (2026-09-30)
+- **Goal.** Sea ice from each sea cell's own monthly temperature (the cells stage's sea-level
+  temperatures, which already carry the coastal-current offsets and the land's influence), freezing
+  near −1.8 °C, with a winter maximum and a summer minimum, instead of one value per energy-balance
+  band. The edge then bends around continents and currents; the band's ice-albedo feedback keeps
+  its own band-mean cover. Ben (log 2026-09-30), after a run showed a ruler-straight sea-ice edge.
+- **Check.** A planet with an ocean bounded by continents gets an edge that varies with longitude
+  (warm-current coasts ice-free, cold-current coasts icier); the band-mean cover and the global
+  energy balance match the current model within tolerance.
+
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 
 - **P2-01 Noddy evaluator.** Port `unEvents.c`, `taste.c`, `matrix.c` from `noddyverse` (MIT);

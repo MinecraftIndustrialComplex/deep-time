@@ -47,6 +47,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-23 | Grid-artifact audit (log 2026-09-29) | todo | | | Starts after the mountain and strata work lands (they fix part of it). |
 | P1-24 | Faster Create World (log 2026-09-29) | todo | | | After P1-17's benchmarks; options go to Ben. |
 | P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-a02882c5e6567370e, not yet merged. Format 0.2 bakes twelve monthly layers. `DeepTimeClimate` is at API version 1.<br>**Parity:** `ClimateParityTest` 500/500 blocks bit for bit, and the GameTest `climateApiOnTheRealPlanet` matches too.<br>**mic-climate `deep-time` branch** (pushed): Deep Time's climate plus Project Atmosphere's weather anomaly. Its GameTests pass 19/19, with and without Project Atmosphere, and its pack smoke passes 20/20.<br>**MIC planet probe** (earthlike_quick_16k): Af 24.5 °C, BWk 8.8/19.6 °C, Dfc −12.9/15.3 °C, ET −24.7/0.6 °C, EF plateau (4,860 m) −22.7/−46.7 °C, each pair midwinter/midsummer. Project Atmosphere read 8.6, 8.9, −0.6, 4.0 and 10.5 °C at the same places. Its simulated weather adds −2.4…+2.5 °C.<br>JUnit 150/0 and `./gametest.sh` All 52 passed after merging master 8872c91; cargo gates clean. See build log. |
+| P1-26 | Per-cell sea ice (log 2026-09-30) | todo | | | After the climate agent's ice-sheet branch (worktree-agent-adc924860a859865c-ice) lands; same code. |
 
 ## Review pages
 | Name | URL | Version label | Date |
