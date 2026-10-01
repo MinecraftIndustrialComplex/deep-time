@@ -978,6 +978,7 @@ input[type=range]:focus-visible { outline: none; }
       </div>
       <div class="seg ovl" role="group" aria-label="Map overlays">
         <button id="markers" aria-pressed="true" data-tip="Event markers" data-key="M"><svg class="ic ic-s"><use href="#i-events"/></svg><span class="lbl">Events</span></button>
+        <button id="depbtn" aria-pressed="true" data-tip="Deposits: coal fields and ore sites by family, over any layer" data-key="D"><svg class="ic ic-s" viewBox="0 0 24 24"><path d="M6.6 4.5h10.8l3.1 4.4L12 19.6 3.5 8.9z"/><path d="M3.5 8.9h17M9.6 4.5L8.1 8.9l3.9 10.7M14.4 4.5l1.5 4.4-3.9 10.7"/></svg><span class="lbl">Deposits</span></button>
         <button id="gridbtn" aria-pressed="true" data-tip="Graticule and seam"><svg class="ic ic-s"><use href="#i-grid"/></svg><span class="lbl">Grid</span></button>
       </div>
       <span class="grow"></span>
@@ -1049,6 +1050,7 @@ input[type=range]:focus-visible { outline: none; }
         <button class="btn btn-icon btn-sm" id="lnext" aria-label="Next layer" data-tip="Next layer" data-key="↓"><svg class="ic ic-s"><use href="#i-chev"/></svg></button>
       </div>
       <div class="legend" id="legend"><div class="lh"><span class="lname muted">No layer yet</span></div></div>
+      <div class="legend dlegend" id="deplegend" hidden></div>
       <div class="popover" id="layerpop" hidden><div class="layers" id="layers"></div></div>
     </section>
     <section class="card grow" id="inspector" data-mtab="inspect">
@@ -1107,6 +1109,7 @@ input[type=range]:focus-visible { outline: none; }
 <div id="tip" role="tooltip"></div>
 <div id="toasts" aria-live="polite"></div>
 <div class="modal" id="modal" hidden><div class="modal-card" id="modalcard"><div class="modal-h"><h3 id="modaltitle"></h3><span id="modalacts"></span><button class="btn btn-ghost btn-icon" id="modalclose" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button></div><div class="modal-b" id="modalbody"></div></div></div>
+<script src="deposits.js"></script>
 <script src="workbench.js"></script>
 </body>
 </html>
