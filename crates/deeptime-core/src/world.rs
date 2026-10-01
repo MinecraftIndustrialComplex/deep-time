@@ -75,6 +75,9 @@ pub struct WorldState {
     /// The folds and faults the history left (P2-01), once the structure stage has finished:
     /// events the column rule undoes, youngest first.
     pub structure: Option<deeptime_format::structure::Structure>,
+    /// Per event of `structure`: how much of its relief is left on the ground (0–1 × the
+    /// setting; `structure::deform::relief_left`). The amplifier shapes the terrain from it.
+    pub structure_relief: Vec<f32>,
     /// The deposit engine's field history recorded by the history stages (P1-04 on). Not in the
     /// postcard body: a checkpoint carries its head in the body and its frames in sections of
     /// their own, streamed (`checkpoint.rs`), since frames may be on disk (P1-17).
@@ -101,6 +104,7 @@ impl WorldState {
             surface: None,
             volcanoes: None,
             structure: None,
+            structure_relief: Vec::new(),
             history: None,
             next_event_seq: 0,
             next_site_id: 0,

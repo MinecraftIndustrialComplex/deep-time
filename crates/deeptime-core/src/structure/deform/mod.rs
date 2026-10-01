@@ -31,7 +31,7 @@ pub mod params;
 mod tests;
 
 pub use emplace::{Inputs, Strain, emplace, strain};
-pub use feature::{Counts, Feature, Kind, advance};
+pub use feature::{Counts, Feature, Kind, advance, wear};
 pub use params::DeformationParams;
 
 use deeptime_format::structure::{PROFILE_SAMPLES, Structure};
@@ -60,16 +60,47 @@ pub fn undo_order(features: &mut [Feature]) {
 }
 
 /// The world's structure from the structures the run left: `features` in [`undo_order`];
-/// `surface_y(x, z)` is the ground's height at a block position (a fault's trace lies on it).
-pub fn finish(features: &[Feature], surface_y: impl Fn(f64, f64) -> f64) -> Structure {
+/// `surface_y(x, z)` is the ground's height at a block position (a fault's trace lies on it) and
+/// `key(feature)` its age as a stratigraphic key of the horizon stacks
+/// (`columns::key::of_age`).
+pub fn finish(
+    features: &[Feature],
+    surface_y: impl Fn(f64, f64) -> f64,
+    key: impl Fn(&Feature) -> u16,
+) -> Structure {
     Structure {
         events: features
             .iter()
-            .map(|f| f.to_baked(surface_y(f.x, f.z)))
+            .map(|f| f.to_baked(surface_y(f.x, f.z), key(f)))
             .collect(),
         profiles: vec![sine_profile()],
         margin: deeptime_format::structure::REACH_MARGIN,
     }
+}
+
+/// How much of a structure's relief is left on the ground at `now_myr` (0 to `relief`): it fades
+/// linearly over `relief_age_myr`, and as the surface has eroded or buried the ground there
+/// ([`Feature::wear_m`]) by `relief_wear` times the structure's own height, as drawn
+/// (`m_per_block_v` metres a block). A strike-slip fault has none.
+pub fn relief_left(f: &Feature, now_myr: f64, p: &DeformationParams, m_per_block_v: f64) -> f32 {
+    if p.relief <= 0.0 {
+        return 0.0;
+    }
+    let height_blocks = match f.kind {
+        Kind::FoldTrain => f64::from(f.amplitude),
+        Kind::Thrust | Kind::Normal => {
+            f64::from(f.slip.abs()) * f64::from(f.dip_deg).to_radians().sin()
+        }
+        Kind::StrikeSlip => 0.0,
+    };
+    let height_m = height_blocks * m_per_block_v;
+    if height_m <= 0.0 {
+        return 0.0;
+    }
+    let age = (now_myr - f64::from(f.t_myr)).max(0.0);
+    let young = (1.0 - age / p.relief_age_myr).clamp(0.0, 1.0);
+    let whole = (1.0 - f64::from(f.wear_m) / (p.relief_wear * height_m)).clamp(0.0, 1.0);
+    (p.relief * young * whole) as f32
 }
 
 /// Makes sure the structure's margin covers the furthest any chain of faults moves rock sideways:

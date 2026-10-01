@@ -119,6 +119,12 @@ pub struct RockWorld {
     sites: HashMap<SiteId, Site>,
 }
 
+thread_local! {
+    /// The deformed column rule's working memory (P2-01), one per reader thread.
+    static DEFORM: std::cell::RefCell<deeptime_format::structure::DeformScratch> =
+        std::cell::RefCell::new(deeptime_format::structure::DeformScratch::default());
+}
+
 impl RockWorld {
     pub fn open(world: &Path) -> Result<RockWorld, FormatError> {
         let cw = ColumnWorld::open(world)?;
@@ -160,7 +166,23 @@ impl RockWorld {
 
     /// The horizon stack at block (x, z).
     pub fn stack(&self, scratch: &mut StackScratch, x: i64, z: i64, out: &mut Vec<ColumnHorizon>) {
-        self.strata.stack_at_with(scratch, x, z, self.cw.min_y, out);
+        match self.cw.structure() {
+            Some(d) => {
+                let min_y = self.cw.min_y;
+                let strata = &self.strata;
+                DEFORM.with_borrow_mut(|ds| {
+                    d.stack(
+                        x,
+                        z,
+                        min_y,
+                        &mut |sx, sz, o| strata.stack_at_with(scratch, sx, sz, min_y, o),
+                        ds,
+                        out,
+                    );
+                });
+            }
+            None => self.strata.stack_at_with(scratch, x, z, self.cw.min_y, out),
+        }
     }
 
     /// The class a painting body gives block (wx, y, z), if one does (the first by id).

@@ -105,6 +105,26 @@ pub struct DeformationParams {
     pub trend_scatter_deg: f64,
     /// The most structures a world keeps (a guard, far above what the rates give).
     pub max_structures: u32,
+
+    /// How much of their relief young structures put on the ground (fault scarps, rift valleys,
+    /// fold ridges; `surface::amplify::structure`): 0 leaves the terrain as it was, 1 moves the
+    /// ground of a structure made in the last plate step as far as its rock moved.
+    pub relief: f64,
+    /// A structure's relief fades to nothing over this long, Myr. Design value: metre-scale
+    /// scarps soften within about 100 kyr and range fronts stand for millions of years; a
+    /// structure here stands for a fault's whole active life.
+    pub relief_age_myr: f64,
+    /// … and as the deep-time surface erodes or buries the ground there by this many times the
+    /// structure's own height (a fault that is still slipping renews its scarp, so more than
+    /// once).
+    pub relief_wear: f64,
+    /// The share of a fold train's shift that shows as ridges and valleys.
+    pub fold_relief: f64,
+    /// The foot wall's movement the other way, as a share of the hanging wall's (the uplifted
+    /// shoulders of a rift, the foredeep in front of a thrust). Rift flanks rise by flexure when
+    /// the hanging wall unloads them (Weissel & Karner 1989, J. Geophys. Res. 94:13919-13950);
+    /// the share is a design value.
+    pub footwall_share: f64,
 }
 
 impl Default for DeformationParams {
@@ -136,6 +156,11 @@ impl Default for DeformationParams {
             overprint_myr: 30.0,
             trend_scatter_deg: 12.0,
             max_structures: 60_000,
+            relief: 1.0,
+            relief_age_myr: 10.0,
+            relief_wear: 5.0,
+            fold_relief: 0.5,
+            footwall_share: 0.2,
         }
     }
 }
@@ -228,6 +253,31 @@ impl DeformationParams {
             self.arc_uplift_mm_yr > 0.0 && self.arc_uplift_mm_yr.is_finite(),
             "arc_uplift_mm_yr",
             "must be > 0",
+        )?;
+        check(
+            (0.0..=2.0).contains(&self.relief),
+            "relief",
+            "must be in [0, 2]",
+        )?;
+        check(
+            self.relief_age_myr > 0.0 && self.relief_age_myr.is_finite(),
+            "relief_age_myr",
+            "must be > 0",
+        )?;
+        check(
+            self.relief_wear > 0.0 && self.relief_wear.is_finite(),
+            "relief_wear",
+            "must be > 0",
+        )?;
+        check(
+            (0.0..=1.0).contains(&self.fold_relief),
+            "fold_relief",
+            "must be in [0, 1]",
+        )?;
+        check(
+            (0.0..=1.0).contains(&self.footwall_share),
+            "footwall_share",
+            "must be in [0, 1]",
         )?;
         check(
             (1..=16).contains(&self.max_overlap),

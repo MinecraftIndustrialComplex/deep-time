@@ -21,6 +21,7 @@ use crate::raster::{DType, RasterRead};
 use crate::rivers::{Rivers, read_rivers};
 use crate::sites::{Site, SiteIndex, read_sites};
 use crate::strata::ColumnHorizon;
+use crate::structure::{DeformScratch, Deformer};
 use crate::water::{self, WaterColumn, WaterSource, WaterSpec};
 
 /// The terrain layer.
@@ -44,6 +45,8 @@ pub struct ColumnWorld {
     detail: Option<(DetailSpec, Noise, LazyLayer)>,
     water: Option<LazyLayer>,
     horizons: Option<LazyLayer>,
+    /// `structure/events.dtst` (P2-01): the folds and faults the stacks are read through.
+    structure: Option<Deformer>,
     /// `strata/classes.json`, index → rock class.
     pub classes: Vec<String>,
     /// Every body, ascending id.
@@ -149,8 +152,10 @@ impl ColumnWorld {
                 others.push((e.name.clone(), LazyLayer::open(&dir.join(&e.path))?));
             }
         }
+        let structure = Deformer::read(dir, manifest.scale.circumference_blocks)?;
         Ok(ColumnWorld {
             dir: dir.to_owned(),
+            structure,
             sites: read_sites(dir)?,
             rivers: read_rivers(dir)?,
             min_y: manifest.scale.min_y,
@@ -187,6 +192,32 @@ impl ColumnWorld {
     /// The `strata/horizons` layer, when the world has one (its stored stacks, cell by cell).
     pub fn strata(&self) -> Option<&LazyLayer> {
         self.horizons.as_ref()
+    }
+
+    /// The world's folds and faults, when it has any.
+    pub fn structure(&self) -> Option<&Deformer> {
+        self.structure.as_ref()
+    }
+
+    /// The horizon stack of column (x, z) as the strata pass paints it: the column rule
+    /// ([`crate::strata::stack_at`]) read through the world's folds and faults
+    /// ([`crate::structure::Structure::deformed_stack`]). Empty without a strata layer.
+    pub fn stack(&self, x: i64, z: i64, scratch: &mut DeformScratch, out: &mut Vec<ColumnHorizon>) {
+        out.clear();
+        let Some(h) = &self.horizons else {
+            return;
+        };
+        match &self.structure {
+            Some(d) => d.stack(
+                x,
+                z,
+                self.min_y,
+                &mut |sx, sz, o| h.stack_at(sx, sz, self.min_y, o),
+                scratch,
+                out,
+            ),
+            None => h.stack_at(x, z, self.min_y, out),
+        }
     }
 
     /// The top block of the terrain at column (x, z) (`min_y − 1` where there is none), as
@@ -264,9 +295,7 @@ impl ColumnWorld {
             .map(|w| w.nearest(wx as f64, z as f64))
             .filter(|v| !v.is_nan());
         let mut horizons = Vec::new();
-        if let Some(h) = &self.horizons {
-            h.stack_at(x, z, self.min_y, &mut horizons);
-        }
+        self.stack(x, z, &mut DeformScratch::default(), &mut horizons);
         let near: Vec<&Body> = self.bodies_at(wx, z).collect();
 
         let mut bodies = Vec::new();

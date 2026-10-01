@@ -19,6 +19,8 @@ pub struct WorldData {
     detail: Option<(DetailSpec, Noise, LoadedLayer)>,
     water: Option<LoadedLayer>,
     strata: Option<LoadedLayer>,
+    /// The world's folds and faults (P2-01), which the stacks are read through.
+    structure: Option<deeptime_format::structure::Deformer>,
     pub classes: Vec<String>,
     koppen: std::sync::OnceLock<Option<LoadedLayer>>,
 }
@@ -59,7 +61,10 @@ impl WorldData {
             })
             .unwrap_or_default();
         let circumference = i64::from(manifest.scale.circumference_blocks);
+        let structure =
+            deeptime_format::structure::Deformer::read(dir, manifest.scale.circumference_blocks)?;
         Ok(WorldData {
+            structure,
             dir: dir.to_owned(),
             manifest,
             circumference,
@@ -132,12 +137,18 @@ impl WorldData {
     pub fn strata_column(&self, x: i32, z: i32) -> Vec<(i32, u8)> {
         let mut out = Vec::new();
         if let Some(s) = &self.strata {
-            s.stack_at(
-                i64::from(x),
-                i64::from(z),
-                self.manifest.scale.min_y,
-                &mut out,
-            );
+            let min_y = self.manifest.scale.min_y;
+            match &self.structure {
+                Some(d) => d.stack(
+                    i64::from(x),
+                    i64::from(z),
+                    min_y,
+                    &mut |sx, sz, o| s.stack_at(sx, sz, min_y, o),
+                    &mut deeptime_format::structure::DeformScratch::default(),
+                    &mut out,
+                ),
+                None => s.stack_at(i64::from(x), i64::from(z), min_y, &mut out),
+            }
         }
         out.into_iter().map(|(t, c, _)| (t, c)).collect()
     }

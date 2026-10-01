@@ -125,8 +125,10 @@ pub enum Shape {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StructEvent {
     pub id: u32,
-    /// When it happened, years relative to world creation (negative: the past). Rock younger
-    /// than this is not deformed by it.
+    /// Its age as a stratigraphic key of the horizon stacks (`strata/horizons`): a horizon whose
+    /// unit key is below this is rock laid down after the event, which the event did not deform.
+    pub key: u16,
+    /// When it happened, years relative to world creation (negative: the past).
     pub t_years: f64,
     pub window: Window,
     pub shape: Shape,
@@ -368,6 +370,469 @@ impl Structure {
     }
 }
 
+// ------------------------------------------------------------------------- the deformed stack
+
+use crate::strata::ColumnHorizon;
+
+/// One piece of a column while its events are being undone.
+#[derive(Clone, Copy, Debug)]
+struct Piece {
+    /// Heights of the column the piece covers, [lo, hi).
+    lo: f64,
+    hi: f64,
+    /// Where its rock is read: the source column (block position) and the height offset.
+    sx: f64,
+    sz: f64,
+    dy: f64,
+    /// The key of the oldest event that moved it: its rock is at least that old.
+    key: u16,
+    /// Rock younger than an event that would have moved it: no older event touches it.
+    done: bool,
+    /// Index of its source column's stack in the scratch.
+    src: usize,
+}
+
+/// Working memory of [`Structure::deformed_stack`], kept per thread by a reader of many columns.
+#[derive(Default)]
+pub struct DeformScratch {
+    cands: Vec<u32>,
+    pieces: Vec<Piece>,
+    /// Stacks of the source columns met, by block column.
+    stacks: Vec<((i64, i64), Vec<ColumnHorizon>)>,
+    spare: Vec<Vec<ColumnHorizon>>,
+}
+
+impl DeformScratch {
+    fn reset(&mut self) {
+        for (_, v) in self.stacks.drain(..) {
+            self.spare.push(v);
+        }
+        self.pieces.clear();
+    }
+
+    /// The scratch index of the stack of block column (x, z), read with `stack` when new.
+    fn source(
+        &mut self,
+        x: i64,
+        z: i64,
+        stack: &mut dyn FnMut(i64, i64, &mut Vec<ColumnHorizon>),
+    ) -> usize {
+        if let Some(i) = self.stacks.iter().position(|(at, _)| *at == (x, z)) {
+            return i;
+        }
+        let mut v = self.spare.pop().unwrap_or_default();
+        stack(x, z, &mut v);
+        self.stacks.push(((x, z), v));
+        self.stacks.len() - 1
+    }
+}
+
+impl Structure {
+    /// **The deformed column rule** (FORMAT.md, "Structural events"): the horizon stack of block
+    /// column (x, z) with the world's folds and faults, top-down like the undeformed rule's
+    /// ([`crate::strata::stack_at`], which `stack(x, z, out)` must be).
+    ///
+    /// 1. The column's own stack S₀ and its candidate events ([`StructIndex`]). No candidates (or
+    ///    an empty stack): S₀.
+    /// 2. One piece covers every height, reading S₀ unshifted. The events are undone youngest
+    ///    first; each one, for every piece not yet finished whose source column it has weight at:
+    ///    - **Cover.** In the piece's source stack, the first horizon (top-down) whose unit key is
+    ///      at least the event's key is the youngest rock the event deformed. None: the whole
+    ///      piece is younger and is finished. Otherwise the part of the piece above that
+    ///      horizon's top (source heights ≥ top + 1) is split off and finished: rock laid down
+    ///      after the event is not moved by it, nor by anything older.
+    ///    - **Fold:** the rest is shifted (`dy −= weight · amplitude · profile`).
+    ///    - **Fault:** the rest is cut at the fault plane; the part above it now reads the column
+    ///      `weight · slip` back along the slip, from the stack of the block column that holds
+    ///      that position.
+    ///
+    ///    A moved piece takes the event's key.
+    /// 3. The pieces are written out top-down. A piece holds the blocks y with lo ≤ y + ½ < hi
+    ///    (the top piece up to S₀'s first top, the bottom one down to `min_y`); block y reads
+    ///    source block y + ⌊dy + ½⌋ of the piece's source stack, whose first horizon reaches up
+    ///    for ever; a horizon whose unit key is below the piece's key (rock younger than the
+    ///    event that moved the piece: the shift has reached up into the cover) reads as the next
+    ///    horizon down that is old enough. Equal classes in a row join.
+    #[allow(clippy::too_many_arguments)]
+    pub fn deformed_stack(
+        &self,
+        index: &StructIndex,
+        x: i64,
+        z: i64,
+        min_y: i32,
+        stack: &mut dyn FnMut(i64, i64, &mut Vec<ColumnHorizon>),
+        scratch: &mut DeformScratch,
+        out: &mut Vec<ColumnHorizon>,
+    ) {
+        out.clear();
+        scratch.reset();
+        let c = index.circumference();
+        let (fx, fz) = (x as f64, z as f64);
+        let mut cands = std::mem::take(&mut scratch.cands);
+        index.candidates(self, fx, fz, &mut cands);
+        let own = scratch.source(x, z, stack);
+        if cands.is_empty() || scratch.stacks[own].1.is_empty() {
+            out.extend_from_slice(&scratch.stacks[own].1);
+            scratch.cands = cands;
+            return;
+        }
+        scratch.pieces.push(Piece {
+            lo: f64::NEG_INFINITY,
+            hi: f64::INFINITY,
+            sx: fx,
+            sz: fz,
+            dy: 0.0,
+            key: 0,
+            done: false,
+            src: own,
+        });
+        for &e in &cands {
+            let ev = &self.events[e as usize];
+            let mut k = 0;
+            while k < scratch.pieces.len() {
+                let p = scratch.pieces[k];
+                if p.done {
+                    k += 1;
+                    continue;
+                }
+                let (a, b) = ev.window.local(p.sx, p.sz, c);
+                let w = ev.window.weight(a, b);
+                if w == 0.0 {
+                    k += 1;
+                    continue;
+                }
+                // Cover: what the event is too old to have moved.
+                let cover = {
+                    let s = &scratch.stacks[p.src].1;
+                    s.iter().position(|hz| hz.2 >= ev.key).map(|h| (h, s[h].0))
+                };
+                let Some((h, top)) = cover else {
+                    scratch.pieces[k].done = true;
+                    k += 1;
+                    continue;
+                };
+                let mut next = k + 1;
+                if h > 0 {
+                    let cut = f64::from(top + 1) - p.dy;
+                    if cut <= p.lo {
+                        scratch.pieces[k].done = true;
+                        k += 1;
+                        continue;
+                    }
+                    if cut < p.hi {
+                        scratch.pieces[k].hi = cut;
+                        scratch.pieces.insert(
+                            k + 1,
+                            Piece {
+                                lo: cut,
+                                done: true,
+                                ..p
+                            },
+                        );
+                        next += 1;
+                    }
+                }
+                let p = scratch.pieces[k];
+                match ev.shape {
+                    Shape::Fold {
+                        wavelength,
+                        amplitude,
+                        offset,
+                        profile,
+                    } => {
+                        let phase = (b - offset) * NODDY_TAU / wavelength;
+                        let v = profile_at(&self.profiles[usize::from(profile)], phase);
+                        scratch.pieces[k].dy = p.dy - w * (amplitude * v);
+                        scratch.pieces[k].key = ev.key;
+                    }
+                    Shape::Fault { y, pole, slip } => {
+                        let (dx, dz) = (
+                            a * ev.window.along[0] + b * ev.window.across[0],
+                            a * ev.window.along[1] + b * ev.window.across[1],
+                        );
+                        let plane = y - (dx * pole[0] + dz * pole[2]) / pole[1];
+                        let cut = plane - p.dy;
+                        if cut < p.hi {
+                            let (sx, sz) = (p.sx - w * slip[0], p.sz - w * slip[2]);
+                            let src = scratch.source(sx.floor() as i64, sz.floor() as i64, stack);
+                            let moved = Piece {
+                                lo: if cut > p.lo { cut } else { p.lo },
+                                hi: p.hi,
+                                sx,
+                                sz,
+                                dy: p.dy - w * slip[1],
+                                key: ev.key,
+                                done: false,
+                                src,
+                            };
+                            if cut > p.lo {
+                                scratch.pieces[k].hi = cut;
+                                scratch.pieces.insert(k + 1, moved);
+                                next += 1;
+                            } else {
+                                scratch.pieces[k] = moved;
+                            }
+                        }
+                    }
+                }
+                k = next;
+            }
+        }
+        scratch.cands = cands;
+        let top_limit = scratch.stacks[own].1[0].0;
+        for p in scratch.pieces.iter().rev() {
+            let y_max = if p.hi == f64::INFINITY {
+                top_limit
+            } else {
+                top_limit.min((p.hi - 0.5).ceil() as i32 - 1)
+            };
+            let y_min = if p.lo == f64::NEG_INFINITY {
+                min_y
+            } else {
+                min_y.max((p.lo - 0.5).ceil() as i32)
+            };
+            if y_max < y_min {
+                continue;
+            }
+            let d = (p.dy + 0.5).floor() as i32;
+            let s = &scratch.stacks[p.src].1;
+            let n = s.len();
+            for h in 0..n {
+                let top = if h == 0 { y_max } else { y_max.min(s[h].0 - d) };
+                let bottom = if h + 1 < n {
+                    y_min.max(s[h + 1].0 + 1 - d)
+                } else {
+                    y_min
+                };
+                if top < bottom {
+                    continue;
+                }
+                let mut hh = h;
+                while s[hh].2 < p.key && hh + 1 < n {
+                    hh += 1;
+                }
+                if out.last().is_none_or(|l| l.1 != s[hh].1) {
+                    out.push((top, s[hh].1, s[hh].2));
+                }
+            }
+        }
+    }
+}
+
+/// A world's structure ready to deform columns: the events and their index.
+pub struct Deformer {
+    pub structure: Structure,
+    pub index: StructIndex,
+}
+
+impl Deformer {
+    pub fn new(structure: Structure, circumference: u32) -> Deformer {
+        let index = StructIndex::new(&structure, circumference);
+        Deformer { structure, index }
+    }
+
+    /// The deformer of a world-data folder; `None` when the world has no structural events.
+    pub fn read(world: &Path, circumference: u32) -> Result<Option<Deformer>> {
+        Ok(read_structure(world)?
+            .filter(|s| !s.events.is_empty())
+            .map(|s| Deformer::new(s, circumference)))
+    }
+
+    /// [`Structure::deformed_stack`] at block column (x, z).
+    pub fn stack(
+        &self,
+        x: i64,
+        z: i64,
+        min_y: i32,
+        stack: &mut dyn FnMut(i64, i64, &mut Vec<ColumnHorizon>),
+        scratch: &mut DeformScratch,
+        out: &mut Vec<ColumnHorizon>,
+    ) {
+        self.structure
+            .deformed_stack(&self.index, x, z, min_y, stack, scratch, out);
+    }
+}
+
+// ------------------------------------------------------------------------------------- the file
+
+use std::path::Path;
+
+use crate::container::{self, f64_at, u16_at, u32_at};
+use crate::error::{FormatError, Result};
+use crate::fsutil::write_atomic;
+
+/// The world's structural events, relative to the world-data folder.
+pub const STRUCTURE_PATH: &str = "structure/events.dtst";
+const MAGIC: [u8; 4] = *b"DTST";
+const FIXED_BYTES: usize = 16;
+/// Bytes of one event record.
+pub const EVENT_BYTES: usize = 136;
+
+/// Encodes `structure/events.dtst` (FORMAT.md, "Structural events").
+pub fn encode_structure(st: &Structure) -> Result<Vec<u8>> {
+    let mut records = Vec::with_capacity(st.events.len() * EVENT_BYTES);
+    for e in &st.events {
+        let start = records.len();
+        records.extend_from_slice(&e.id.to_le_bytes());
+        let (kind, profile, tail): (u8, u8, [f64; 7]) = match e.shape {
+            Shape::Fold {
+                wavelength,
+                amplitude,
+                offset,
+                profile,
+            } => (
+                0,
+                profile,
+                [wavelength, amplitude, offset, 0.0, 0.0, 0.0, 0.0],
+            ),
+            Shape::Fault { y, pole, slip } => (
+                1,
+                0,
+                [y, pole[0], pole[1], pole[2], slip[0], slip[1], slip[2]],
+            ),
+        };
+        records.push(kind);
+        records.push(profile);
+        records.extend_from_slice(&e.key.to_le_bytes());
+        let w = &e.window;
+        for v in [
+            e.t_years,
+            w.centre[0],
+            w.centre[1],
+            w.along[0],
+            w.along[1],
+            w.across[0],
+            w.across[1],
+            w.half_along,
+            w.half_across,
+        ]
+        .into_iter()
+        .chain(tail)
+        {
+            records.extend_from_slice(&v.to_le_bytes());
+        }
+        debug_assert_eq!(records.len() - start, EVENT_BYTES);
+    }
+    let mut profiles = Vec::with_capacity(st.profiles.len() * PROFILE_SAMPLES * 4);
+    for p in &st.profiles {
+        if p.len() != PROFILE_SAMPLES {
+            return Err(FormatError::Invalid(format!(
+                "a fold profile has {} samples, not {PROFILE_SAMPLES}",
+                p.len()
+            )));
+        }
+        for v in p {
+            profiles.extend_from_slice(&v.to_le_bytes());
+        }
+    }
+    let mut fixed = Vec::with_capacity(FIXED_BYTES);
+    fixed.extend_from_slice(&(st.events.len() as u32).to_le_bytes());
+    fixed.extend_from_slice(&(st.profiles.len() as u32).to_le_bytes());
+    fixed.extend_from_slice(&st.margin.to_le_bytes());
+    container::encode(MAGIC, &fixed, &[&records, &profiles])
+}
+
+/// Decodes `structure/events.dtst`, checking what the column rule relies on.
+pub fn decode_structure(path: &Path, b: &[u8]) -> Result<Structure> {
+    let p = container::parse(path, b, MAGIC, FIXED_BYTES, |_| 2)?;
+    let n = u32_at(p.fixed, 0) as usize;
+    let np = u32_at(p.fixed, 4) as usize;
+    let margin = f64_at(p.fixed, 8);
+    let (records, profs) = (p.sections[0], p.sections[1]);
+    let corrupt = |m: String| FormatError::corrupt(path, m);
+    if records.len() != n * EVENT_BYTES || profs.len() != np * PROFILE_SAMPLES * 4 {
+        return Err(corrupt(
+            "event or profile section has the wrong length".into(),
+        ));
+    }
+    if !(margin.is_finite() && margin >= 0.0) {
+        return Err(corrupt(format!("margin {margin}")));
+    }
+    let profiles: Vec<Vec<f32>> = (0..np)
+        .map(|k| {
+            (0..PROFILE_SAMPLES)
+                .map(|i| crate::container::f32_at(profs, (k * PROFILE_SAMPLES + i) * 4))
+                .collect()
+        })
+        .collect();
+    let mut events = Vec::with_capacity(n);
+    for r in 0..n {
+        let rec = &records[r * EVENT_BYTES..(r + 1) * EVENT_BYTES];
+        let id = u32_at(rec, 0);
+        let f = |k: usize| f64_at(rec, 8 + 8 * k);
+        if (0..16).any(|k| !f(k).is_finite()) {
+            return Err(corrupt(format!("event {id}: a value is not finite")));
+        }
+        let window = Window {
+            centre: [f(1), f(2)],
+            along: [f(3), f(4)],
+            across: [f(5), f(6)],
+            half_along: f(7),
+            half_across: f(8),
+        };
+        if !(window.half_along > 0.0 && window.half_across > 0.0) {
+            return Err(corrupt(format!("event {id}: an empty window")));
+        }
+        let shape = match rec[4] {
+            0 => {
+                let profile = rec[5];
+                if usize::from(profile) >= np || f(9) == 0.0 {
+                    return Err(corrupt(format!("event {id}: fold profile or wavelength")));
+                }
+                Shape::Fold {
+                    wavelength: f(9),
+                    amplitude: f(10),
+                    offset: f(11),
+                    profile,
+                }
+            }
+            1 => {
+                if f(11) <= 0.0 {
+                    return Err(corrupt(format!("event {id}: the pole must point up")));
+                }
+                Shape::Fault {
+                    y: f(9),
+                    pole: [f(10), f(11), f(12)],
+                    slip: [f(13), f(14), f(15)],
+                }
+            }
+            k => return Err(corrupt(format!("event {id}: kind {k}"))),
+        };
+        events.push(StructEvent {
+            id,
+            key: u16_at(rec, 6),
+            t_years: f(0),
+            window,
+            shape,
+        });
+    }
+    if events.windows(2).any(|w| w[0].key > w[1].key) {
+        return Err(corrupt("events are not youngest first".into()));
+    }
+    Ok(Structure {
+        events,
+        profiles,
+        margin,
+    })
+}
+
+/// Writes `structure/events.dtst` under `world` (atomically); returns (bytes, CRC32).
+pub fn write_structure(world: &Path, st: &Structure) -> Result<(u64, u32)> {
+    let bytes = encode_structure(st)?;
+    let crc = write_atomic(&world.join(STRUCTURE_PATH), &bytes)?;
+    Ok((bytes.len() as u64, crc))
+}
+
+/// Reads `structure/events.dtst`; `None` when the folder has none.
+pub fn read_structure(world: &Path) -> Result<Option<Structure>> {
+    let path = world.join(STRUCTURE_PATH);
+    match std::fs::read(&path) {
+        Ok(b) => Ok(Some(decode_structure(&path, &b)?)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(FormatError::io(&path, e)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -392,6 +857,7 @@ mod tests {
     fn fold() -> StructEvent {
         StructEvent {
             id: 0,
+            key: 9000,
             t_years: -1.0e8,
             window: window(),
             shape: Shape::Fold {
@@ -408,6 +874,7 @@ mod tests {
         let (s, c) = (60.0f64.to_radians().sin(), 60.0f64.to_radians().cos());
         StructEvent {
             id: 1,
+            key: 7000,
             t_years: -5.0e7,
             window: window(),
             shape: Shape::Fault {

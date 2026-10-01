@@ -12,6 +12,11 @@ use super::*;
 use crate::deposits::random::Rng;
 use crate::structure::params::StructureParams;
 
+/// A key for a test structure's age: older is larger, as the bake's keys are.
+fn test_key(f: &Feature) -> u16 {
+    (4096.0 - 20.0 * f64::from(f.t_myr)).clamp(4096.0, 32767.0) as u16
+}
+
 /// Random structures of every kind scattered over a patch of a 4,096-block planet, some across
 /// the seam.
 fn scatter(n: usize, seed: u64) -> Vec<Feature> {
@@ -42,6 +47,7 @@ fn scatter(n: usize, seed: u64) -> Vec<Feature> {
             slip: 0.0,
             cause: 0,
             adrift: 0,
+            wear_m: 0.0,
         };
         match kind {
             Kind::FoldTrain => {
@@ -83,7 +89,7 @@ fn the_column_rule_is_the_noddy_port() {
         assert!(w[0].t_myr >= w[1].t_myr, "youngest first");
     }
     // Faults' traces at different heights, as the ground would put them.
-    let st = finish(&features, |x, z| 60.0 + 0.02 * x - 0.03 * z);
+    let st = finish(&features, |x, z| 60.0 + 0.02 * x - 0.03 * z, test_key);
     assert_eq!(st.events.len(), features.len());
     assert_eq!(st.profiles.len(), 1);
     let index = StructIndex::new(&st, 4096);
@@ -144,9 +150,10 @@ fn each_kind_moves_rock_the_way_its_name_says() {
         slip: 10.0,
         cause: 0,
         adrift: 0,
+        wear_m: 0.0,
     };
     let column = |f: &Feature, x: f64, z: f64| {
-        let st = finish(std::slice::from_ref(f), |_, _| 64.0);
+        let st = finish(std::slice::from_ref(f), |_, _| 64.0, test_key);
         let mut segs = Vec::new();
         st.column(&[0], x, z, 4096.0, &mut segs);
         segs
@@ -194,7 +201,7 @@ fn each_kind_moves_rock_the_way_its_name_says() {
     );
     // Nothing is baked wrongly: poles point up, folds' phases are never negative in the window.
     for f in scatter(60, 5) {
-        match f.to_baked(64.0).shape {
+        match f.to_baked(64.0, 5000).shape {
             Shape::Fault { pole, .. } => {
                 assert!(pole[1] > 0.0);
                 let len = (pole[0] * pole[0] + pole[1] * pole[1] + pole[2] * pole[2]).sqrt();
@@ -213,7 +220,7 @@ fn a_planet_of_structures_evaluates_on_a_lattice() {
     let (mut features, counts) = p.run(&sp, 20, 21);
     assert!(counts.fold_trains > 0 && counts.thrusts > 0 && counts.normal_faults > 0);
     undo_order(&mut features);
-    let mut st = finish(&features, |_, _| 70.0);
+    let mut st = finish(&features, |_, _| 70.0, test_key);
     let l2 = GridDesc::for_planet("L2", 4096, 8).unwrap();
     // The margin holds the furthest sideways shift, with room to spare.
     let settled = settle_margin(&mut st, 4096, &l2, -352.0, 640.0);

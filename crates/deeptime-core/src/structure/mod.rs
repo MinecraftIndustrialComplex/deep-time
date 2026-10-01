@@ -574,6 +574,9 @@ impl StructureStage {
                 crust,
                 &mut self.st.deform_counts,
             );
+            if let Some(m) = material {
+                deform::wear(&mut self.st.features, &grid, m);
+            }
             let flags = field_of(fields, "plates/flags", n)?;
             let orogen_km = traps::orogen_distance_km(&d, reg, crust, flags);
             let inputs = deform::Inputs {
@@ -677,9 +680,19 @@ impl StructureStage {
         let structure = if last {
             let started = Instant::now();
             deform::undo_order(&mut self.st.features);
-            let mut st = deform::finish(&self.st.features, |x, z| {
-                src.surface_y(plutons::cell_of(&grid, x, z), &s)
-            });
+            let span = (src.now_myr - self.preset.t_start_years() / 1.0e6).max(1.0);
+            let now = src.now_myr;
+            let mut st = deform::finish(
+                &self.st.features,
+                |x, z| src.surface_y(plutons::cell_of(&grid, x, z), &s),
+                |f| columns::key::of_age(0, now - f64::from(f.t_myr), span),
+            );
+            let relief: Vec<f32> = self
+                .st
+                .features
+                .iter()
+                .map(|f| deform::relief_left(f, now, &p.deformation, s.m_per_block_v))
+                .collect();
             let report = deform::report(
                 &self.st.features,
                 &mut st,
@@ -705,7 +718,7 @@ impl StructureStage {
                     }
                 }
             }
-            Some((st, report))
+            Some((st, report, relief))
         } else {
             None
         };
@@ -741,8 +754,11 @@ impl StructureStage {
             }
             self.st.plutons = plutons;
             let (mean_horizons, check) = summary.expect("baked on the last step");
-            let (structure, deformation) = structure.expect("finished on the last step");
+            let (structure, mut deformation, relief) =
+                structure.expect("finished on the last step");
+            deformation["with_relief"] = json!(relief.iter().filter(|r| **r > 0.01).count());
             world.structure = Some(structure);
+            world.structure_relief = relief;
             ctx.log.push(
                 crate::log::Level::Info,
                 format!("structure deformation: {deformation}"),
