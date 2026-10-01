@@ -218,7 +218,7 @@ public final class FarTerrain {
                 int exposure = FarColumn.exposure(s.shapes, n, i, j);
                 int rockDepth = Math.min(MAX_ROCK_DEPTH, exposure + ROCK_MARGIN);
                 if (strata != null)
-                    Columns.stack(wd, strata, wx, z, s.stack);
+                    FarColumn.rock(wd, strata, wx, z, step, s.stack);
                 FarColumn.layers(levelMinY, levelMaxY, shape, s.soil, strata == null ? null : s.stack, rockDepth, cover.spec(), layers);
 
                 if (s.blocks.length < layers.count) {

@@ -155,6 +155,10 @@ public final class FarTerrainCommand {
 
     static int dh(CommandSourceStack source) {
         JsonObject o = header("dh", source.getLevel());
+        JsonArray spawn = new JsonArray();
+        spawn.add(source.getLevel().getSharedSpawnPos().getX());
+        spawn.add(source.getLevel().getSharedSpawnPos().getZ());
+        o.add("spawn", spawn);   // the smoke harness checks an area beside the spawn chunks
         o.addProperty("installed", DhFarTerrain.installed());
         o.addProperty("enabled", DhFarTerrain.enabled());
         if (DhFarTerrain.installed() && DhFarTerrain.enabled()) {
@@ -256,13 +260,17 @@ public final class FarTerrainCommand {
         FarTerrain far = terrain.get();
         int spacing = 16;
         // 1. What Distant Horizons holds, before any chunk is generated here.
-        int held = 0, equal = 0;
+        int held = 0, equal = 0, generated = 0;
         StringBuilder why = new StringBuilder();
         if (bound != null && bound.levelWrapper() != null && DhFarTerrain.api().isPresent()) {
             DhApiBinding api = DhFarTerrain.api().get();
             for (int j = 0; j < n; j++) {
                 for (int i = 0; i < n; i++) {
                     int x = x0 + i * spacing + 5, z = z0 + j * spacing + 9;
+                    if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) != null) {
+                        generated++;   // a loaded chunk: Distant Horizons holds the chunk's own column there
+                        continue;
+                    }
                     try {
                         List<DhApiBinding.StoredPoint> stored = api.storedColumn(bound.levelWrapper(), x, z);
                         if (stored == null || stored.isEmpty()
@@ -282,7 +290,8 @@ public final class FarTerrainCommand {
             }
         }
         JsonObject stored = new JsonObject();
-        stored.addProperty("asked", n * n);
+        stored.addProperty("asked", n * n - generated);
+        stored.addProperty("skipped_loaded_chunks", generated);
         stored.addProperty("held", held);
         stored.addProperty("equal_to_far_terrain", equal);
         if (why.length() > 0)
