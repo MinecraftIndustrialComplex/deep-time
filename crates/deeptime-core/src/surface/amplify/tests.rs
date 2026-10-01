@@ -905,3 +905,192 @@ fn every_pipeline_preset_adds_little_by_streaming_when_it_must() {
         assert!(own < (11u64 << 28), "{name}: the stage adds {own} bytes");
     }
 }
+
+/// A reserve that models a gauge holding `held` bytes under `cap` (what `StageContext::reserve`
+/// checks, without the history to spill).
+fn gauge_model(held: u64, cap: u64) -> impl Fn(u64) -> Result<(), CoreError> {
+    move |bytes| {
+        let needed = held + bytes;
+        if needed <= cap {
+            Ok(())
+        } else {
+            Err(CoreError::MemoryCap { needed, cap })
+        }
+    }
+}
+
+#[test]
+fn auto_streams_when_the_whole_path_peak_would_not_fit_though_the_last_level_alone_does() {
+    // earthlike_quick_16k: L2 2048 x 1024 (r 8), L3 8192 x 4096 (r 2), two ×2 levels.
+    let (gw, gh) = (8192usize, 4096usize);
+    let l2_bytes = 2048 * 1024 * LEVEL_BYTES_PER_CELL;
+    let last_only = (gw * gh) as u64 * TILE_BYTES_PER_CELL;
+    let peak = whole_last_level_peak(l2_bytes, 2, gw, gh, 2048);
+    // The buffers, plus the 4096 x 2048 level the ladder keeps in place of L2, plus the preview
+    // (2048 x 1024 cells, three f32 each).
+    assert_eq!(
+        peak,
+        last_only + (4096 * 2048 * LEVEL_BYTES_PER_CELL - l2_bytes) + 2048 * 1024 * 12
+    );
+    assert!(peak > last_only);
+
+    // The failing 1000 Myr run (2026-09-30): 1,643,487,517 bytes held when amplify starts, the
+    // default 4 GiB cap. The last level's buffers alone fit; the reservation it makes after the
+    // ladder holds the level before it and the preview needs 4,451,574,045.
+    let cap = crate::session::DEFAULT_MEM_CAP;
+    let held = 4_451_574_045 - peak;
+    assert_eq!(held, 1_643_487_517);
+    assert!(
+        gauge_model(held, cap)(last_only).is_ok(),
+        "the last level alone fits"
+    );
+    let Err(CoreError::MemoryCap { needed, .. }) = gauge_model(held, cap)(peak) else {
+        panic!("the full peak must not fit");
+    };
+    assert_eq!(needed, 4_451_574_045);
+
+    // auto streams there; never and always are what they say whatever the cap.
+    let reserve = gauge_model(held, cap);
+    assert!(streams(StreamMode::Auto, peak, &reserve));
+    assert!(!streams(StreamMode::Never, peak, &reserve));
+    assert!(streams(StreamMode::Always, peak, &reserve));
+
+    // Any cap between "the last level alone" and "the full peak" does the same, and one that
+    // holds the full peak keeps the whole raster in memory (to the byte).
+    let held = 1_000_000_000;
+    for cap in [held + last_only, held + last_only + 1, held + peak - 1] {
+        let reserve = gauge_model(held, cap);
+        assert!(reserve(last_only).is_ok());
+        assert!(streams(StreamMode::Auto, peak, &reserve), "cap {cap}");
+        assert!(!streams(StreamMode::Never, peak, &reserve));
+        assert!(streams(StreamMode::Always, peak, &reserve));
+    }
+    for cap in [held + peak, held + peak + (1 << 30)] {
+        let reserve = gauge_model(held, cap);
+        assert!(!streams(StreamMode::Auto, peak, &reserve), "cap {cap}");
+        assert!(!streams(StreamMode::Never, peak, &reserve));
+        assert!(streams(StreamMode::Always, peak, &reserve));
+    }
+    // One ×2 level: the ladder keeps L2 itself, so only the preview comes on top of the buffers.
+    assert_eq!(
+        whole_last_level_peak(l2_bytes, 1, 4096, 2048, 2048),
+        (4096 * 2048) as u64 * TILE_BYTES_PER_CELL + 2048 * 1024 * 12
+    );
+}
+
+#[test]
+fn the_whole_path_peak_is_what_the_last_reservation_sees() {
+    // Run the ladder in memory (2 levels) with a reserve that records every request, and rebuild
+    // what the run holds when the last one is made from what the run did: L2 dropped, the middle
+    // level kept, the preview allocated. The decision's figure is that plus the request.
+    let l2 = l2_level();
+    let c = cfg(1.0);
+    let (gw, gh) = (4 * W2, 4 * H2);
+    let asked = std::sync::Mutex::new(Vec::<u64>::new());
+    let record = |bytes: u64| {
+        asked.lock().unwrap().push(bytes);
+        Ok(())
+    };
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(2)
+        .build()
+        .unwrap();
+    let mut sink = MemSink::new(gw, gh);
+    let out = pool
+        .install(|| {
+            run(
+                l2.clone(),
+                2,
+                &c,
+                c.character(&NEUTRAL),
+                TilePlan::whole(gw, gh),
+                &mut sink,
+                &never,
+                &record,
+            )
+        })
+        .unwrap();
+    let asked = asked.into_inner().unwrap();
+    let last = *asked.last().unwrap();
+    assert_eq!(last, (gw * gh) as u64 * TILE_BYTES_PER_CELL);
+    assert_eq!(out.levels.len(), 1);
+    let mid = &out.levels[0];
+    assert_eq!((mid.w, mid.h), (2 * W2, 2 * H2));
+    let kept = (mid.w * mid.h) as u64 * LEVEL_BYTES_PER_CELL;
+    let preview =
+        (out.preview.z_m.len() + out.preview.amp_blocks.len() + out.preview.drainage.len()) as u64
+            * 4;
+    let l2_bytes = l2.bytes();
+    let peak = whole_last_level_peak(l2_bytes, 2, gw, gh, c.p.preview_width);
+    assert_eq!(peak, last + (kept - l2_bytes) + preview);
+}
+
+/// A gauge that reports the same bytes in use whatever happens: "the run already holds this much".
+struct HeldGauge(u64);
+
+impl crate::session::MemoryGauge for HeldGauge {
+    fn in_use(&self) -> u64 {
+        self.0
+    }
+    fn peak(&self) -> u64 {
+        self.0
+    }
+}
+
+/// The amplify note's `mode` of the small coupled pipeline (two ×2 levels, `auto`) run under `cap`
+/// with `held` bytes in use before and during it.
+fn auto_mode_under(cap: u64, held: u64, name: &str) -> String {
+    let json = small_pipeline(40.0);
+    let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    v["resolution"]["l1_r"] = serde_json::json!(128);
+    v["resolution"]["l2_r"] = serde_json::json!(64);
+    v["resolution"]["l3_r"] = serde_json::json!(16);
+    v["amplify"]["stream"] = serde_json::json!("auto");
+    let dir = temp_dir(name);
+    let s = Session::create(
+        &v.to_string(),
+        "",
+        SessionOptions {
+            out_dir: dir.clone(),
+            threads: 2,
+            mem_cap: cap,
+        },
+        Arc::new(HeldGauge(held)),
+    )
+    .unwrap();
+    loop {
+        match s.advance(std::time::Duration::from_secs(60)).unwrap() {
+            AdvanceStatus::Done => break,
+            AdvanceStatus::Cancelled => panic!("cancelled"),
+            _ => {}
+        }
+    }
+    let world = s.checkpoint().unwrap().world;
+    let note: Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    note["mode"].as_str().unwrap().to_owned()
+}
+
+#[test]
+fn the_stage_streams_under_auto_when_only_the_whole_path_peak_is_over_the_cap() {
+    // L3 1024 x 512 from L2 256 x 128: 41.4 MB of buffers whole, and the middle level (512 x 256)
+    // and the preview on top of them in memory. A cap 1 MB over the buffers alone holds those but
+    // not the peak: `auto` must tile the last level, not reserve the rest late and fail.
+    let (gw, gh) = (1024usize, 512usize);
+    let last_only = (gw * gh) as u64 * TILE_BYTES_PER_CELL;
+    let peak_over_l2 = whole_last_level_peak(0, 2, gw, gh, 128);
+    assert!(
+        peak_over_l2 > last_only + (2 << 20),
+        "the case is not degenerate"
+    );
+    let held = 0;
+    assert_eq!(
+        auto_mode_under(held + last_only + (1 << 20), held, "auto-between"),
+        "streamed"
+    );
+    // A cap with room for all of it keeps the whole raster in memory.
+    assert_eq!(
+        auto_mode_under(held + peak_over_l2 + (1 << 20), held, "auto-roomy"),
+        "in_memory"
+    );
+}
