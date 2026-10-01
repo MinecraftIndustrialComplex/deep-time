@@ -10,8 +10,11 @@
 set -euo pipefail
 OUT=${1:?out dir}; LABEL=${2:?label}; START=${3:?start}; SEED=${4:?seed}; LEN=${5:?length}; shift 5
 [ "${1:-}" = "--" ] && shift
-BIN=target/release/deeptime
-cargo build --release -q -p deeptime-cli
+# BIN=<another build> (the "before" tree) skips the build.
+if [ -z "${BIN:-}" ]; then
+    BIN=target/release/deeptime
+    cargo build --release -q -p deeptime-cli
+fi
 mkdir -p "$OUT"
 f="$OUT/$LABEL-$START-$SEED.txt"
 "$BIN" stage volcanoes --preset earthlike_quick_16k --start "$START" --length-myr "$LEN" \
@@ -20,5 +23,5 @@ f="$OUT/$LABEL-$START-$SEED.txt"
     ${CKPT:+--out "$CKPT"} "$@" > "$f" 2>&1 || { tail -20 "$f"; exit 1; }
 rm -rf "$OUT/work-$LABEL-$START-$SEED"
 echo "== $LABEL $START seed=$SEED ${LEN} Myr"
-grep -E "margins records|volcanoes_final|hypsometry|climate_final|plates_final|seconds=" "$f" \
+grep -E "margins records|provinces shield|volcanoes_final|hypsometry|climate_final|plates_final|seconds=" "$f" \
     | sed -E 's/series\(t:active\/passive\)=[^ ]*//' | cut -c1-1200

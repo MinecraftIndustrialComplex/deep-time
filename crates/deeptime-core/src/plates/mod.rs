@@ -188,11 +188,14 @@ impl PlatesStage {
         let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
+        let mut sutured = false;
         for (c, seeds) in &resolved.collisions {
             let under = st.contacts[*c].under;
-            if let Some(ev) = collision::collide(st, world, &cache.geo, &pos, &env, *c, seeds)? {
+            let done = collision::collide(st, world, &cache.geo, &pos, &env, *c, seeds)?;
+            if let Some(ev) = done.event {
                 causes.insert(under, ev);
             }
+            sutured |= done.sutured;
         }
         hotspots::step(st, world, &pos, &tree, &env)?;
         surface(st, &cache.geo, &env);
@@ -235,8 +238,10 @@ impl PlatesStage {
         ridges::bury(st, world, None, &pos, &env, &causes)?;
 
         // Resample when due, and once at the end so the final crust has no gaps or hidden slabs.
+        // A suture resamples at once, so the welded plate's subducted slab is consumed (hidden
+        // crust of one plate under the same plate would surface).
         let final_step = step >= self.total;
-        if ridges::due(st, &env) || (final_step && st.resample_step != st.step) {
+        if ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step) {
             let geo = ridges::resample(st, world, &pos, &cache.geo, &env)?;
             pos = geo.points().to_vec();
             let doomed: BTreeMap<u32, EventId> = st
