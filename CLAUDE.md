@@ -50,6 +50,11 @@ tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | 
 tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete merged worktrees' Mac copies
 
 ## Rules
+- **The M6 Mac is off limits for now** (Ben, 2026-10-01: our test load made graphide's ms-precision
+  timing tests flaky). Run nothing on mac-mini: no builds, tests, runs, servers or screenshots.
+  `tools/remote/mac.sh` refuses while `/Volumes/Graphide/ban/deeptime-cache/PAUSED` exists there. A
+  dedicated test machine is being provisioned; until it is wired in (`DEEPTIME_MAC`), commit work
+  without the Mac gates and say so. Nothing heavy on the laptop either.
 - NixOS: nothing global. Run builds, tests and every `cargo` through `nix develop -c` (the profile's
   `cargo` is a bare rustup shim); one-off tools via `nix shell nixpkgs#<pkg> -c <cmd>`. Stage new files
   with `git add` before Nix reads them (flakes see only tracked files). Never `nix eval` a whole
