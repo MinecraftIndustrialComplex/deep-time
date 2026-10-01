@@ -797,6 +797,7 @@ def probe(job, server, spec):
     rec("deeptime probe tw")
     rec("deeptime probe palette")
     rec("deeptime probe claims")
+    rec("deeptime probe magma")
     c = spec["size"]
     why_done = set()
     for box in spec["boxes"]:
