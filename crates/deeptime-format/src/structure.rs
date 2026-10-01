@@ -1267,19 +1267,31 @@ mod tests {
             ],
             "an intrusion older than the rock at its level leaves that rock alone"
         );
-        // A younger fold lifts the stock with the beds; an older fold does not move it.
+        // A younger fold lifts the stock with the beds (its top stays cut off at the base of
+        // the cover; its floor rises); an older fold does not move it.
         let w = bump(25.0 / 150.0);
         let lift = (w * 12.0 + 0.5).floor() as i32;
         let mut young_fold = fold();
         young_fold.key = 7000;
-        let hh = 30.0 * (1.0 - (25.0f64 / 40.0) * (25.0 / 40.0)).sqrt();
-        let top_plain = (40.0 + hh - 0.5).ceil() as i32 - 1;
-        let lifted = deformed(&world(vec![young_fold, stock(8000)]), 125, 200, 0);
-        let body = lifted.iter().find(|h| h.1 == 9).expect("the stock");
-        assert!((body.0 - (top_plain + lift)).abs() <= 1, "{lifted:?}");
-        let cut = deformed(&world(vec![stock(8000), fold()]), 125, 200, 0);
-        let body = cut.iter().find(|h| h.1 == 9).expect("the stock");
-        assert_eq!(body.0, top_plain, "{cut:?}");
+        // (top of the stock, top of the rock under it)
+        let body = |col: &[ColumnHorizon]| {
+            let i = col.iter().position(|h| h.1 == 9).expect("the stock");
+            (col[i].0, col[i + 1].0)
+        };
+        let alone = body(&deformed(&world(vec![stock(8000)]), 125, 200, 0));
+        let lifted = body(&deformed(
+            &world(vec![young_fold, stock(8000)]),
+            125,
+            200,
+            0,
+        ));
+        assert_eq!(lifted.0, 60, "cut off under the cover");
+        assert!(
+            (lifted.1 - (alone.1 + lift)).abs() <= 1,
+            "{lifted:?} {alone:?}"
+        );
+        let cut = body(&deformed(&world(vec![stock(8000), fold()]), 125, 200, 0));
+        assert_eq!(cut, alone);
         // Whatever the order: tops descend, neighbours differ.
         for events in [
             vec![fault(), stock(8000), fold()],
@@ -1293,6 +1305,107 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Whatever the events and wherever the column: the stack is well formed (tops descend,
+    /// neighbours differ, the first horizon is the column's own, nothing outside the world's
+    /// height), every rock in it comes from a stack or an intrusion, and a column outside every
+    /// window is the plain stack.
+    #[test]
+    fn any_history_gives_well_formed_columns() {
+        let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+        let mut rnd = move || {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (seed >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let mut total = 0usize;
+        for world_n in 0..40 {
+            let n = 1 + (rnd() * 12.0) as usize;
+            let mut events: Vec<StructEvent> = (0..n)
+                .map(|id| {
+                    let az = rnd() * std::f64::consts::TAU;
+                    let window = Window {
+                        centre: [rnd() * 600.0 - 300.0, rnd() * 600.0 - 300.0],
+                        along: [az.sin(), -az.cos()],
+                        across: [az.cos(), az.sin()],
+                        half_along: 40.0 + rnd() * 300.0,
+                        half_across: 20.0 + rnd() * 150.0,
+                    };
+                    let shape = match (rnd() * 3.0) as u32 {
+                        0 => Shape::Fold {
+                            wavelength: 20.0 + rnd() * 100.0,
+                            amplitude: rnd() * 30.0,
+                            offset: -400.0,
+                            profile: 0,
+                        },
+                        1 => {
+                            let dip = (10.0 + rnd() * 79.0f64).to_radians();
+                            let slip = (rnd() - 0.5) * 60.0;
+                            Shape::Fault {
+                                y: rnd() * 120.0 - 20.0,
+                                pole: [
+                                    dip.sin() * window.across[0],
+                                    dip.cos(),
+                                    dip.sin() * window.across[1],
+                                ],
+                                slip: [
+                                    slip * dip.cos() * window.across[0],
+                                    -slip * dip.sin(),
+                                    slip * dip.cos() * window.across[1],
+                                ],
+                            }
+                        }
+                        _ => Shape::Intrusion {
+                            y: rnd() * 140.0 - 40.0,
+                            half_height: 5.0 + rnd() * 80.0,
+                            class: 9,
+                        },
+                    };
+                    StructEvent {
+                        id: id as u32,
+                        key: (rnd() * 45000.0) as u16,
+                        t_years: 0.0,
+                        window,
+                        shape,
+                    }
+                })
+                .collect();
+            events.sort_by_key(|e| e.key);
+            let st = world(events);
+            let step: i32 = world_n % 3;
+            let mut touched = 0;
+            for _ in 0..200 {
+                let (x, z) = (
+                    (rnd() * 1400.0 - 700.0) as i64,
+                    (rnd() * 1400.0 - 700.0) as i64,
+                );
+                let col = deformed(&st, x, z, step);
+                let mut plain = Vec::new();
+                cake(step)(x, z, &mut plain);
+                assert!(
+                    col.windows(2).all(|w| w[0].0 > w[1].0 && w[0].1 != w[1].1),
+                    "{col:?}"
+                );
+                assert_eq!(col[0], plain[0], "the youngest rock is the column's own");
+                assert!(col.iter().all(|h| h.1 <= 9), "{col:?}");
+                // (The rule writes nothing under the world's floor.)
+                plain.retain(|h| h.0 >= -64);
+                let outside = st.events.iter().all(|e| {
+                    let (a, b) = e.window.local(x as f64, z as f64, 4096.0);
+                    e.window.weight(a, b) == 0.0
+                });
+                let mut col = col;
+                col.retain(|h| h.0 >= -64);
+                if outside {
+                    assert_eq!(col, plain);
+                }
+                touched += usize::from(col != plain);
+            }
+            total += touched;
+        }
+        assert!(total > 200, "only {total} of 8,000 columns changed");
     }
 
     #[test]
