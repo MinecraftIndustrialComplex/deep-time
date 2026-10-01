@@ -12,7 +12,7 @@ import java.util.Optional;
 
 /**
  * One rock class of the {@code deeptime:rock_class} datapack registry (plan §5.4.1), read from
- * {@code data/<ns>/deeptime/rock_class/<name>.json}. Deep Time ships the 59 classes of the rock-tag
+ * {@code data/<ns>/deeptime/rock_class/<name>.json}. Deep Time ships the 60 classes of the rock-tag
  * vocabulary; packs add or override classes with ordinary data files.
  *
  * <p>The numeric properties are relative multipliers the erosion and structure stages consume
