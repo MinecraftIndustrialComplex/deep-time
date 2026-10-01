@@ -79,8 +79,99 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | Date | Task | Question | Asked how |
 |---|---|---|---|
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
+| 2026-10-01 | bake / P1-06 | **Terrain above the build limit.** Nothing bounds the terrain to the world's height: the test planet on x86 has 2.5 % of its land above y 639 (peaks to y 969), and two of four 16k 500-Myr runs peaked at 12.4 and 13.0 km against 11.5 km; the game cuts such ground flat at y 639. Options: **(1, recommended)** bound it where it arises and guarantee it at the end: the surface stage's elevation respects `tectonics.max_elevation_m` (the plate cap's taper applied to the offset's rises), the preset check requires that cap plus the amplifier's headroom to fit under `max_y`, and the amplifier compresses whatever is still above a knee smoothly into the headroom, so no seed can clip; (2) compress only at the amplifier (a smooth remap of everything above a knee into the range below `max_y`): the simulation and its keyframes keep 13–20 km mountains the world does not have; (3) scale the whole world's vertical relief so its highest peak fits: one peak flattens every landscape and moves ore depths; (4) a taller world (`max_y` 639 → 1023, +7.7 km): every chunk costs more and 20 km still clips; (5) leave it: flat-topped mountains at y 639, now counted by the bake. | Not asked yet: for the coordinator to put to Ben (build log 2026-10-01, x86_64 gates) |
 
 ## Build log
+### 2026-10-01 — First gates on the x86_64 test VM: five failures traced; real-planet tests assert properties, not one planet's numbers (agent worktree agent-ac2a33b7f51fa4bf8, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Symptom.** Master bd6250e/5c45b04 on the new VM (x86_64 Linux): `cargo test --workspace` failed one CLI test
+  (`deposit_stage_reads_the_recorded_history`, main.rs:1676) and `./gametest.sh`, both profiles, failed
+  `climateConsistent`, `realPlanetHeightMatchesTheBake`, `riversHold` and `carversSpareWater`. The Mac (aarch64 macOS)
+  had passed all of it on the same simulation code.
+- **The planet differs by platform, not by thread count or run.** `deeptime run --preset planet_world_4k.json` seven
+  times on the VM (`--threads` 1, 2, 3, 6, 6, 12, and master's own GameTest bake at 6): the CRC32 of all 42 layers is
+  identical in every run (land 0.187, 56 lakes, 286 river chains). Against the Mac there is no bake to compare (the M6
+  is off limits), only its log on the same code: `carversSpareWater columns=695 highColumns=106 carvedBelow=1589` there,
+  `columns=915 highColumns=271 carvedBelow=1072` here, from the same box rule. So one preset is one planet per
+  platform. **Where it comes from:** the simulation calls the platform's libm about 280 times in non-test code (`exp`
+  63, `ln` 45, `sin`/`cos`/`sin_cos` 98, `powf` 29, `hypot` 17, `atan2` 7, …), and those functions are not correctly
+  rounded: Apple's libm, glibc, musl and the Windows CRT differ in the last bit, and 75 coupled plate steps with
+  thresholds (collisions, rifts, subduction starts) turn a last bit into another history. Rust never fuses a
+  multiply-add on its own, and the thread count changes nothing (measured above). The Linux natives link the
+  system's libm, so two Linux distributions can differ too. Ben
+  (2026-10-01, relayed by the coordinator): identical runs across machines are not a goal; speed is. So tests must
+  hold on any planet. Stored data stays exact: a baked world plays the same everywhere, and the Rust/Java parity tests
+  on baked data are unchanged.
+- **A way to test on other planets.** `DEEPTIME_TEST_PLANET_SET="seed=12" ./gametest.sh [-PwithMic]` bakes the
+  real-planet level from the same preset with `--set` overrides. Every real-planet test below was run on seeds 11–16
+  standalone and 11–14 with MIC.
+- **`realPlanetHeightMatchesTheBake` (a real defect, reported, not fixed).** Column (−892, 324) of the x86 planet has
+  H = 726.8 and the world ends at y 639. **Nothing bounds the terrain to the build range.** The plate model caps its
+  own elevation at `tectonics.max_elevation_m` (10 km = y 563), but the surface stage's elevation is the plate
+  elevation plus an offset that carries deposition and isostatic rebound, and when the plates refuse a rise at their
+  cap the remainder stays in the offset (`plates::apply_surface_feedback` clamps, `surface` subtracts only what was
+  applied). On this planet 237 L1 cells stand above 10 km at the end (offset up to +10.5 km over a plate at 9.6 km,
+  under 15–38 km of logged sediment and the 3 km ice cap), 16 km already after 10 steps; the young stage and the
+  amplifier pass it on, the bake writes it, and the game cuts it flat at y 639 (the column evaluator's `top_y` is
+  clamped to `max_y`, so strata and parity stay consistent). Baked: 8,977 L3 cells above y 639, 2.5 % of the land,
+  highest y 969. Of the six seeds two do it (seed 13: 1.0 % of land, y 801); of the four distinct 500-Myr 16k
+  runs in other agents' logs on the VM, two ended with surface peaks of 12.4 and 13.0 km (the others 9.1 and
+  9.2 km) against a build limit of 11.5 km above the sea, before the amplifier adds its own relief. The
+  bake now counts it (`notes.bake.terrain.build_limit`: cells above, share of land, highest y; `above_max_y=` on the
+  `bake` line) and the GameTest compares with the clamped top and logs `aboveBuildLimit`. What to do about it is a
+  world-shaping choice: pending question below.
+  The test's other bound changed too: "non-corner columns within 12 blocks of their own H" is a planet's number (1
+  to 10 on the seeds: it grows with the slope, the corners do not see the raster inside a cell); the property is that
+  a column between corners tops out between its cell's four corner tops ± 1 (`outsideCellCorners=0` on all ten runs).
+- **`riversHold` (the test, not the water).** The six columns are lake columns one or two blocks deep by the
+  column rule (bilinear surface 61.7–63.0, lake top 63) whose generated ground is y 63: grass at 63, dirt under it,
+  nothing drained.
+  The lake pass fills the air down to the generated ground (FORMAT.md says so), and between noise-cell corners that
+  ground can stand a block or two above the rule's bilinear `ground`; where it reaches the lake's top the column is
+  dry shore, flush with the water beside it. Banks around it are raised as if it held water, so nothing leaks
+  (`leaks=0`, `outside=0` before and after 300 ticks). The test now counts such columns apart (`dryShore`, at most 1 in
+  20 water columns; measured 6/915, 1/429 and 0 on four planets) and still fails a lake column whose top block is
+  open without water and any river column below its top. FORMAT.md's "Water columns" names the case.
+- **`carversSpareWater` (the test, not the carvers).** The same columns: the carver cut the shore's ground block at
+  y 63, and the test called air in a lake column's water range "drained". It now compares with the uncarved twin
+  level (`test_rivers`, same world data): a block that is water without carvers and air with them is drained
+  (0 on every run, over 929 to 9,458 water blocks); carved ground in that range is counted apart (`carvedShore`,
+  0 to 5). Its premise (water above sea level with cuts under it) failed on seed 14, whose lakes and mouths all sit at
+  the coast (`highColumns=28 carvedBelowHigh=0`): the test adds up to six boxes on rivers between sea level + 4 and
+  y 170 (`highSites`), and then holds everywhere (567 to 2,605 high columns).
+- **`climateConsistent` (floors read from one planet).** A 0.553 < 0.6 and Dsub 0.812 < 0.85 with no change to the
+  mapping. Ten censuses (shares, lowest–highest): A 0.553–0.944, Af 0.642–0.963, BW 0.675–0.925, BS 0.623–0.744,
+  C 0.849–0.968, D 0.984–1.0, Dsub 0.659–0.882, E 0.922–1.0, BW:desert 0.475–0.827, Af:jungle 0.515–0.774,
+  Dfc:taiga 0.563–0.822, E:snow 0.849–0.998. Floors are now 0.1 under the lowest share on any planet, the Mac's
+  earlier ones included: A 0.45, Af 0.54, BW 0.57, D 0.88, Dsub 0.55, E 0.82, BW:desert 0.37, Af:jungle 0.41; BS 0.42,
+  C 0.75, sea 0.95, Dfc:taiga 0.33, E:snow 0.72 unchanged. `MIN_COLUMNS` 20 → 40. One thing the census shows that
+  is the mapping's, not the test's: on seed 11 standalone the Aw and As columns are 63–71 % `minecraft:forest`
+  (savanna climates drawn as forest); with MIC the same planet gives A 0.761. For P1-09's owner.
+- **The CLI test: not reproduced, cause not established.** `cargo test -p deeptime-cli` 12 more times on the VM (load
+  30–65; three of them pinned to two cores with 32 test threads): 0 failures. The failed run left its folder
+  behind; replaying its last step (`deeptime stage deposits --in group.dtcp`) from that very checkpoint succeeds, so
+  the checkpoint was good and the failure was in the process at that moment (load ~100, minutes after the VM
+  booted). Ruled out by measurement: the memory cap (the test process's counted allocations peak at 1.06 GiB of the
+  4 GiB cap), a spilled history (resuming from a checkpoint whose frames are on disk works), two calls sharing the
+  temporary work folder (only this call uses it in the process; the folder is per call now anyway). If it recurs,
+  the panic's `Err(…)` text is what is needed.
+- **Also fixed.** `gametest.sh` reported `Peak server-JVM RSS: 0 MB` on the VM: `$PWD` was the symlinked path
+  while Gradle's command line has the physical one, and inside the dev shell the system `ps` fails on the shell's
+  `LD_LIBRARY_PATH`. Now 6.3–7.1 GB.
+- **Measured** (VM `deeptime-test`, x86_64 Linux, through `tools/remote/mac.sh` with its default caps,
+  `CARGO_BUILD_JOBS=8` and `RAYON_NUM_THREADS=6`; load average 27–35 during cargo and Gradle, 15–17 during the
+  GameTests): `cargo fmt --all -- --check` clean; `cargo clippy --workspace --all-targets --locked -- -D warnings`
+  clean; `cargo test --workspace --locked` all pass (469: cli 31, core 335 + 3 ignored); `cargo deny check licenses
+  bans` ok; `./gradlew build test` tests=160 failures=0 errors=0 skipped=1; `./gametest.sh` All 57 required tests
+  passed (wall 541 s, server JVM peak 7.1 GB); `tools/smoke/install.sh mic` (168 mods), `./gametest.sh -PwithMic` All
+  57 required tests passed (wall 91 s, 9.3 GB). The nine real-planet tests alone on seeds 12–16 standalone with the
+  final code: All 9 passed, five times. The MIC runs of seeds 11–14 were made before the new floors and the
+  corner-bracket check (their river tests are the final ones and passed; their censuses are in the ranges above).
+  **Verified on:** x86_64 Linux only; bakes at 1, 2, 3, 6 and 12 threads, everything else at 6. Not run on aarch64
+  macOS (the M6 is off limits): the Mac's planet is one more planet, like another seed.
+- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/x86-diag/` on the VM, deleted.
+- **Next.** Ben's choice on terrain above the build limit (pending question); then the fix and a GameTest that
+  fails on any column above `max_y` (`aboveBuildLimit` must be 0 on every seed).
+
 ### 2026-10-01 — M6 paused; batch 4 pushed with one GameTest re-run pending (session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Pause.** Ben: our test load on the M6 made graphide's ms-precision timing tests flaky; "please cease
   testing on the m6, I will be provisioning a new machine for your tests". All Deep Time jobs there were
@@ -5426,6 +5517,16 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
+- **Terrain above the build limit (2026-10-01).** No stage bounds the terrain to `scale.max_y`: the surface
+  stage's offset (deposition, isostatic rebound) rises over the plate model's 10 km cap, and the young stage, the
+  amplifier and the bake pass it on. The game ends such ground at y 639 (flat tops); strata and parity stay
+  consistent because the column evaluator clamps `top_y`. The bake counts it (`notes.bake.terrain.build_limit`,
+  `above_max_y=` on the `bake` line) and `realPlanetHeightMatchesTheBake` logs `aboveBuildLimit`. Pending question
+  above; build log 2026-10-01 (x86_64 gates).
+- **One preset, one planet per platform (2026-10-01).** The simulation is not bit-identical across platforms (the
+  platform's libm); it is across runs and thread counts on one machine. Ben does not want it otherwise. Tests on a
+  simulated planet assert properties and floors measured over several planets (`DEEPTIME_TEST_PLANET_SET="seed=N"
+  ./gametest.sh`); an exact number belongs only to tests on baked data.
 - **P1-06 caveats.** (1) A checkpoint carries the preset it was made with, defaults included: to pick up
   a changed default of a stage that has not run, resume with `--set "amplify={}"` (or the key). (2) Tests
   that derive a small planet from a `pipeline_*` preset must remove the `young` and `amplify` sections

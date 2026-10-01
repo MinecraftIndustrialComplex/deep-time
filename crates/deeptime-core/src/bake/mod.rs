@@ -263,7 +263,15 @@ pub fn bake(
     }
 
     let t = Instant::now();
-    note.insert("strata".into(), strata::bake(world, p, &terrain, &mut out)?);
+    let mut strata = strata::bake(world, p, &terrain, &mut out)?;
+    // The strata part reads every elevation tile once (the top raise) and counts the terrain above
+    // the build limit on the way; the count belongs to the terrain's note.
+    if let Some(limit) = strata.as_object_mut().and_then(|s| s.remove("build_limit"))
+        && let Some(tn) = note.get_mut("terrain")
+    {
+        tn["build_limit"] = limit;
+    }
+    note.insert("strata".into(), strata);
     millis.insert("strata".into(), json!(ms(t)));
 
     let t = Instant::now();
@@ -313,11 +321,21 @@ pub fn summary_line(v: &Value) -> String {
     }
     let ms = |k: &str| v["millis"][k].as_f64().unwrap_or(0.0) / 1000.0;
     format!(
-        "bake layers={} bytes={:.1}MiB elevation={} horizons_mean={:.2} top_raised_cells={} provinces={} \
-         spawn_candidates={} lakes={} river_chains={} millis[terrain={:.1}s strata={:.1}s climate={:.1}s water={:.1}s surface={:.1}s meta={:.1}s total={:.1}s]",
+        "bake layers={} bytes={:.1}MiB elevation={} above_max_y={}cells({:.2}%_of_land,highest_y={:.0}) horizons_mean={:.2} \
+         top_raised_cells={} provinces={} spawn_candidates={} lakes={} river_chains={} millis[terrain={:.1}s strata={:.1}s climate={:.1}s water={:.1}s surface={:.1}s meta={:.1}s total={:.1}s]",
         v["layers"].as_array().map_or(0, Vec::len),
         v["bytes"].as_f64().unwrap_or(0.0) / 1_048_576.0,
         v["terrain"]["elevation"].as_str().unwrap_or("?"),
+        v["terrain"]["build_limit"]["cells_above"]
+            .as_u64()
+            .unwrap_or(0),
+        v["terrain"]["build_limit"]["share_of_land"]
+            .as_f64()
+            .unwrap_or(0.0)
+            * 100.0,
+        v["terrain"]["build_limit"]["highest_y"]
+            .as_f64()
+            .unwrap_or(f64::NAN),
         v["strata"]["mean_horizons"].as_f64().unwrap_or(0.0),
         v["strata"]["top_raised_cells"],
         v["meta"]["provinces"]["count"],
