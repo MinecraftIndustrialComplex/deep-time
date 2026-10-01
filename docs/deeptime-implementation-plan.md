@@ -3720,6 +3720,34 @@ on this machine.
     adds only PA's weather to Deep Time's climate: PA's live temperature minus its own effective
     base. STATUS build log, 2026-09-30.
 
+#### P1-26 Per-cell climate (2026-09-30)
+- **Goal.** Replace the banded backbone of the climate with a per-cell one (Ben, log 2026-09-30:
+  "climate in general should probably be per cell as opposed to completely banded across a single
+  lattitude"): a seasonal 2-D energy balance on a coarse grid (per-cell heat capacity, albedo and
+  sea ice, 2-D heat transport, ocean heat transport by basin) and precipitation from a moisture
+  budget (evaporation, transport by the winds, monsoon thermal lows, sinking air; the existing
+  orographic model and rain shadows kept). The fast carbon/ice clock may stay banded, calibrated to
+  the 2-D model's zonal means. Absorbs the per-cell sea ice asked for the same day.
+- **Order.** Design doc first (Opus), approved by Ben; building after the climate agent's
+  ice-sheet branch lands (same code).
+- **Check.** Set out in the design doc (Earth-topography comparison, Köppen shares, energy balance,
+  run-time budget, downstream recalibration).
+
+#### P1-27 Plate margins and coherent continents (2026-09-30)
+- **Goal.** (1) Margins: in a 750-Myr earthlike_quick_16k run nearly every continental coast became
+  an active margin with a line of arc cones by ~200 Myr in; on Earth most continental coastline is
+  passive. Measure the active/passive share over whole runs, confirm the cause (suspected: the
+  spontaneous subduction initiation of `plates/rifting.rs` fires on any floor older than
+  `subduction_initiation_age_myr`, which always lies against the continents), retune so young
+  oceans keep passive margins for 100+ Myr (a Wilson cycle), and give continental arcs their own
+  cordillera so the cones stand on a range. (2) The coherent-continents investigation (log
+  2026-09-29): continental crust and cover came out patchy; continents should form large coherent
+  cratons with platform cover, re-checked against the USGS provinces map. Ben (log 2026-09-30):
+  "Investigate + fix".
+- **Check.** Active share of continental coastline over time against Earth's; arc relief
+  (cordillera height under the cones); provinces view coherence; downstream calibration (land
+  fraction, hypsometry, climateConsistent) re-checked.
+
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 
 - **P2-01 Noddy evaluator.** Port `unEvents.c`, `taste.c`, `matrix.c` from `noddyverse` (MIT);
