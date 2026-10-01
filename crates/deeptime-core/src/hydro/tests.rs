@@ -382,6 +382,14 @@ fn the_thaw_and_the_budget_follow_the_seasons() {
     // A short cool summer melts only part of a heavy snowfall.
     let b = p.budget(&Climate::of(2000.0, -12.0, 1.0, -25.0));
     assert!(b.rain_mm > 0.0 && b.rain_mm < 500.0, "{b:?}");
+    // A cold land with a warm summer evaporates in that summer (Holdridge's biotemperature): less
+    // runs off than falls.
+    let boreal = Climate::of(500.0, -2.0, 16.0, -20.0);
+    let b = p.budget(&boreal);
+    assert_eq!(b.rain_mm, 500.0);
+    let et = crate::surface::climate::fu_et(500.0, 60.0 * boreal.thaw().0);
+    assert!((b.runoff_mm - (500.0 - et)).abs() < 1e-9);
+    assert!(b.runoff_mm > 150.0 && b.runoff_mm < 400.0, "{b:?}");
     // Evaporation off: a lake loses nothing.
     let off = HydroParams {
         lake_evaporation: false,
