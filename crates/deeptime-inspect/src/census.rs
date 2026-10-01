@@ -69,17 +69,27 @@ pub const DIG_BLOCKS: i32 = 32;
 /// The census of the dry land of `dir` on a lattice `step` blocks apart, `top_n` blocks deep. With
 /// `stone_classes` (the classes a pack gives plain stone or deepslate) it also reports how much of
 /// the land has none of them within `reach` blocks, at the surface and within `DIG_BLOCKS` below it.
-pub fn run(dir: &Path, step: i64, top_n: i32, stone_classes: &[String], reach: i64) -> Result<Value> {
+pub fn run(
+    dir: &Path,
+    step: i64,
+    top_n: i32,
+    stone_classes: &[String],
+    reach: i64,
+) -> Result<Value> {
     let w = ColumnWorld::open(dir).map_err(|e| Error(e.to_string()))?;
     let c = w.c;
     let sea = w.manifest.scale.sea_level_y;
     let step = step.max(1);
     let mut t = Tally::default();
     let (mut land, mut sampled) = (0u64, 0u64);
-    let (cols, rows) = (((c / step) as usize).max(1), (((c / 2) / step) as usize).max(1));
+    let (cols, rows) = (
+        ((c / step) as usize).max(1),
+        (((c / 2) / step) as usize).max(1),
+    );
     // Per lattice cell: None = not dry land, else (stone class at the top block, within DIG_BLOCKS).
     let mut cells: Vec<Option<(bool, bool)>> = vec![None; cols * rows];
-    let is_stone = |class: &Option<String>| class.as_ref().is_some_and(|c| stone_classes.contains(c));
+    let is_stone =
+        |class: &Option<String>| class.as_ref().is_some_and(|c| stone_classes.contains(c));
     let mut z = -c / 4 + step / 2;
     while z < c / 4 {
         let mut x = -c / 2 + step / 2;
@@ -92,10 +102,9 @@ pub fn run(dir: &Path, step: i64, top_n: i32, stone_classes: &[String], reach: i
                 let (i, j) = (((x + c / 2) / step) as usize, ((z + c / 4) / step) as usize);
                 if i < cols && j < rows {
                     let top = col.rock.first().is_some_and(|r| is_stone(&r.2));
-                    let dig = col
-                        .rock
-                        .iter()
-                        .any(|(hi, lo, class)| is_stone(class) && *lo <= col.top_y && *hi >= col.top_y - DIG_BLOCKS + 1);
+                    let dig = col.rock.iter().any(|(hi, lo, class)| {
+                        is_stone(class) && *lo <= col.top_y && *hi >= col.top_y - DIG_BLOCKS + 1
+                    });
                     cells[j * cols + i] = Some((top, dig));
                 }
                 t.add(&col.rock, col.top_y, top_n);
