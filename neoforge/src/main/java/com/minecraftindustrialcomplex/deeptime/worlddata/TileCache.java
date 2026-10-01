@@ -25,8 +25,22 @@ public final class TileCache {
     private final Cache<Key, Tile> cache;
     private final long maxBytes;
 
+    /**
+     * The least a cache segment must hold: several of the largest tiles. A 256 × 256 tile of
+     * {@code strata/horizons} with K = 32 horizons is 14.7 MiB decoded.
+     */
+    static final long MIN_SEGMENT_BYTES = 64L << 20;
+
+    /**
+     * A cache of {@code maxBytes} with as many segments as fit {@link #MIN_SEGMENT_BYTES} each, at
+     * most one per processor (4 for the default budget). Guava never keeps an entry heavier than
+     * its segment's share: with one segment per processor a 32-core machine had 8 MiB segments, the
+     * strata tiles were never cached, and every sample that left a thread's last tile decoded
+     * 14.7 MiB again (P3-04, measured on a C = 16,384 planet: a far section at a strata tile's edge
+     * 566 ms against 34 ms). Reads take no lock, so fewer segments cost only concurrent decodes.
+     */
     public TileCache(long maxBytes) {
-        this(maxBytes, Math.max(4, Runtime.getRuntime().availableProcessors()));
+        this(maxBytes, (int) Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), maxBytes / MIN_SEGMENT_BYTES)));
     }
 
     /**
