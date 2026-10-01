@@ -41,6 +41,7 @@ fn scatter(n: usize, seed: u64) -> Vec<Feature> {
             dip_deg: 0.0,
             slip: 0.0,
             cause: 0,
+            adrift: 0,
         };
         match kind {
             Kind::FoldTrain => {
@@ -142,6 +143,7 @@ fn each_kind_moves_rock_the_way_its_name_says() {
         dip_deg: 60.0,
         slip: 10.0,
         cause: 0,
+        adrift: 0,
     };
     let column = |f: &Feature, x: f64, z: f64| {
         let st = finish(std::slice::from_ref(f), |_, _| 64.0);

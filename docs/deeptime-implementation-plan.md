@@ -2395,6 +2395,41 @@ knickpoint waterfalls stay P2-03 (steps in the water surface already fall as van
   0.19 s per 16×16×384 column (report), several times a chunk's budget. The lattice result is fitted
   back into horizon stacks (folds and thrust repeats become extra horizons) and bodies. Metamorphic
   grade comes from each point's restored burial and heat history.
+  *As built in P2-01, stage A (2026-10-01; STATUS.md has the details).* **The port** is its own
+  crate, `crates/deeptime-noddy` (no dependencies, no Minecraft): folds, faults (translation,
+  rotation, elliptical, curved, ring), shear zones, kinks, unconformities, dykes, plugs, tilts and
+  strain, `reverseEvents`, the sequence codes and `taste`, the layer lookup and `matrix.c`, from
+  Loop3D/noddyverse 6a21b23 (MIT) with the helpers the three files call (`utils.c`, `ellFault.c`,
+  `proflib.c`, `which.c`, the loaders' orientation set-up); `unbury`, `unloft` and `unbiot` are dead
+  code in the original and DXF surfaces, imported blocks and geophysics were left out. A harness
+  (`tools/validation/noddy/`) compiles the original C and runs it on random events and histories;
+  the port restores all 6,360 points of its 159 cases to the same place, to the last bit on the
+  test machine. **What changed from the sketch above:** the events are *not* fitted back into the
+  horizon stacks. The stacks sit on L1 (16 blocks a cell) and the column rule blends 4 × 4 cells, so
+  a fitted fault would be a flexure three cells wide and a fold shorter than four cells could not be
+  stored. Instead the world keeps the events and undoes them **per block column**
+  (`deeptime_format::structure`): every event used has a strength that depends on the map position
+  only (a polynomial window of finite extent, `deeptime_noddy::windowed`, Deep Time's addition to
+  the port), a fold train shifts the whole column vertically by Noddy's sine profile, and a fault
+  moves the part of the column above its plane by one vector, so a deformed column is a few
+  intervals, each a shifted copy of part of an undeformed one. The arithmetic is `+ − × /`, `floor`
+  and a stored profile table, for a bit-exact Java twin. The Noddy port is the reference: the
+  column rule and the port's `History` of windowed events agree to 1e-5 block on every lattice
+  point checked, in tests and on each real planet (the run summary carries the check). **Plate
+  events → local events** (`core::structure::deform`): each plate step, per continental L1 cell,
+  the collision regime, lifted Andean margins and forelands within `foreland_km` of an active orogen
+  shorten (fold trains and thrusts along the plate model's fold trend, thrusts dipping under the
+  high ground, folds tighter where the crust is thicker), the rift regime extends (normal faults
+  along the rift, dipping towards its axis), and lifted margins with oblique convergence shear
+  (strike-slip faults); each a Poisson process like the plutons, capped where `max_overlap` of a
+  kind already lie. Structures ride their plates (a rift's normal faults end up on the two passive
+  margins) and are dated; rock laid down later will not be deformed by them, which is where
+  unconformities come from (stage B). Sizes are true in block space: wavelengths and lengths in
+  km on the horizontal block scale, amplitudes and slips by shape ratios (A/λ = √e/π from the
+  shortening e; slip = γ·length), not metres at the vertical scale. Settings:
+  `structure.deformation.*` (strength, density, size, wavelengths, lengths, slip ratios, rates,
+  foreland width, overlap), in the editor and the workbench. Plugs, dykes, discordant plutons and
+  the column rule in the game are stage B.
 - **Check.** The P2 exit review compares cliffs in BlueMap renders and cross-sections (§9.7) with
   the event log's folds and faults.
 
@@ -3841,7 +3876,16 @@ on this machine.
 
 - **P2-01 Noddy evaluator.** Port `unEvents.c`, `taste.c`, `matrix.c` from `noddyverse` (MIT);
   translate plate events into local events (§8.5); lattice evaluation at bake; fit to horizons and
-  bodies.
+  bodies. Pulled forward on 2026-10-01 (decisions log). *As built, stage A (standalone):* the port
+  (`crates/deeptime-noddy`, checked bit for bit against the original C), the translation of the
+  plate model's regimes into fold trains, thrusts, normal and strike-slip faults that ride their
+  plates (`core::structure::deform`), the world's structural events and the per-column rule that
+  undoes them (`deeptime_format::structure`, replacing "fit to horizons": §8.5 says why), and a
+  lattice evaluation of the planet at the end of every run with a point-by-point check of the
+  column rule against the port. *Stage B (after the rock-order fix lands):* the events in the world
+  data and in the Java column readers and the strata pass, rock younger than an event left
+  undeformed (unconformities), discordant plutons, dykes and plugs as bodies, trap structure from
+  the real folds and faults, sections and the realism check.
 - **P2-02 Metamorphic grade** from restored burial and heat; facies table (hand-built from textbook
   facies boundaries, or generated offline — see Q8).
 - **P2-03 Hydrology** (§8.4; its core moved to P1-22 on 2026-09-29, the rest stays here): routing, Fill–Spill–Merge lakes, HAND floodplains, river vectors,
