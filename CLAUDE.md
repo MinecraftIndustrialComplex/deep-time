@@ -50,11 +50,17 @@ tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | 
 tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete merged worktrees' Mac copies
 
 ## Rules
-- **The M6 Mac is off limits for now** (Ben, 2026-10-01: our test load made graphide's ms-precision
-  timing tests flaky). Run nothing on m6-mac-mini: no builds, tests, runs, servers or screenshots.
-  `tools/remote/mac.sh` refuses while `/Volumes/Graphide/ban/deeptime-cache/PAUSED` exists there. A
-  dedicated test machine is being provisioned; until it is wired in (`DEEPTIME_MAC`), commit work
-  without the Mac gates and say so. Nothing heavy on the laptop either.
+- **The test machine is the Azure VM `deeptime-test`** (Ben, 2026-10-01; D32as_v7, 32 vCPU, 125 GiB,
+  x86_64 Ubuntu 24.04, West US 2, resource group `deeptime-test`, pay-as-you-go). The `tools/remote/`
+  scripts and `tools/viewer/mac-watch.sh` default to it (`DEEPTIME_MAC` overrides); its data disk is
+  mounted at `/data` with `/Volumes/Graphide -> /data`, so every `/Volumes/Graphide/ban/...` path in
+  this file and in tools/ holds there. Where this file says "the Mac", read this machine.
+  **Never run Deep Time jobs on the M6 Mac (m6-mac-mini) again**: our load made graphide's ms-precision
+  timing tests flaky. The subscription also holds graphide's production: touch nothing outside the
+  `deeptime-test` resource group. The box is ours but shared by every agent: cargo at most 8 jobs
+  (`CARGO_BUILD_JOBS=8`), simulation sweeps at most 4 runs of 2 threads at once, one Minecraft server
+  at a time (`--server`). It bills by the hour while running: `az vm deallocate -g deeptime-test -n
+  deeptime-test` stops the charge, `az vm start` brings it back.
 - NixOS: nothing global. Run builds, tests and every `cargo` through `nix develop -c` (the profile's
   `cargo` is a bare rustup shim); one-off tools via `nix shell nixpkgs#<pkg> -c <cmd>`. Stage new files
   with `git add` before Nix reads them (flakes see only tracked files). Never `nix eval` a whole
