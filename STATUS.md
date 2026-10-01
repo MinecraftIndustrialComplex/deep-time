@@ -81,7 +81,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
-### 2026-10-01 — Workbench deposits overlay: coal fields and ore sites by family, hover, "why here" (WIP, stopped by Ben's Mac freeze; agent worktree agent-aae4250c131f0cf7a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+### 2026-10-01 — Workbench deposits overlay: coal fields and ore sites by family, hover, "why here" (agent worktree agent-aae4250c131f0cf7a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Ask.** Ben, 2026-10-01, "Deposits layer": draw coal fields and ore deposits by type on the map at every frame where the
   deposit stage has run (and the baked deposits at the end); one symbol and colour per family, coal as footprint areas; a legend
   with counts; hover for family, size, age; click opens the inspector with the site's event and cause chain; works over any
@@ -123,39 +123,36 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   (135 sites, 8 families): legend counts add up, hover cards, click opens Why here, kin links, overlay over another layer, family
   and overlay toggles, no script errors (two checks failed only on upper-case headings in the driver, fixed, not rerun).
   Screenshots of that run (before the last legend/nudge fixes) are in `review/out/wb-deposits/` (not committed).
-- **Run time (the one number still owed).** Baseline, unmodified binary at 8dae3f2, `deeptime watch --preset earthlike_quick_16k
-  --start scattered_continents --length-myr 500 --exit-when-done --mem-cap 8589934592` under `/usr/bin/time -l`, Mac load average
-  60 to 90 from other agents: **1354 s wall, 1509 s user + 121 s sys, 21.39e12 instructions retired**, peak 4248 MiB, 253 frames, 3,308
-  events (plates 188, climate 227, surface 406, structure 215, deposits 152, young 20, amplify 69 s). (A first baseline at the
-  workbench's bare default 4 GiB cap failed at amplify, 4.44 GB needed: use `--mem-cap` 8 GiB as `mac-watch.sh` does.) The run of
-  the new binary was started and killed with the Mac stopped (load 115); **not measured**. The diff changes no simulation code;
-  the only addition on a run's thread is one clone of the site list between two steps.
-- **Left.** (1) The after run and its instructions-retired comparison, on the new test machine. (2) `cargo test --workspace`,
-  `cargo deny check licenses bans`, `./gradlew build test` (not run; nothing outside deeptime-cli/deeptime-viewer changed).
-  (3) Rerun `tools/viewer/deposits-shots.sh --reuse <kept runs dir>` on a real 500 Myr run for the final screenshots, the live path
-  (page open while the run goes on: legend note "as the deposit stage placed them", then "baked" when done, no reload) and the
-  draw-cost line (`render cost`: the driver measures `draw` and `hit` for the run's sites and ten times as many). (4) Not done on
-  purpose: deposits on the globe, and sites at their position before the end of the run (the record holds the present position
-  only; the engine's per-frame origin maps are not kept).
-
-- **Commands for the new test machine** (from the repo root; `M=tools/remote/mac.sh` with `DEEPTIME_MAC` pointing at it; one job
-  at a time, nothing on the laptop):
-  1. `$M -- cargo fmt --all -- --check` and `$M -- cargo clippy --workspace --all-targets -- -D warnings`
-  2. `$M -- cargo test --workspace` (new: `watch::deposits::*`, `watch::tests::the_deposits_overlay_reads_the_sites_live_and_baked`)
-  3. `$M -- cargo deny check licenses bans`
-  4. `$M -- nix shell nixpkgs#nodejs -c node tools/viewer/deposits-check.js`
-  5. `cd neoforge && $M -- ./gradlew build test`, then `python3 ../tools/ci/junit-summary.py build/test-results/test` (nothing in neoforge
-     changed; run for the gate)
-  6. After-run timing, same shape as the baseline (1354 s wall, 21.39e12 instructions retired at 8dae3f2), on a quiet machine, the
-     baseline binary built from a checkout of 8dae3f2 (a separate worktree) and the new one from this branch, back to back:
-     `$M -- 'cargo build --release -p deeptime-cli && S=<scratch>/wb-deposits && mkdir -p $S && /usr/bin/time -l target/release/deeptime watch --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --exit-when-done --runs $S/runs-after --port 0 --keep 2 --mem-cap 8589934592 > $S/after.log 2>&1; grep -v "^  INFO" $S/after.log | cut -c1-800 | tail -30'`
-     (the baseline: the same command from the 8dae3f2 checkout; compare wall and instructions retired; `/usr/bin/time -l` is the macOS form,
-     use `-v` on Linux.)
-  7. Screenshots, live path (page open while a run goes on) and draw cost:
-     `$M --pull review/out/wb-deposits -- tools/viewer/deposits-shots.sh --bin target/release/deeptime --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --work <scratch>/wb-deposits`
-     (needs a Chrome for Testing build: set `DEEPTIME_CHROMIUM`; it takes a private port on 127.0.0.1, never 8642). With a kept run:
-     `... --reuse <kept runs dir> --work <scratch>/wb-deposits`.
-  8. Delete `<scratch>/wb-deposits` when done; `tools/remote/mac-gc.sh` after the merge.
+- **Gates (Azure VM `deeptime-test`, branch at master 5c45b04's mac.sh).** `cargo fmt --check` and `cargo clippy --workspace
+  --all-targets -- -D warnings` clean; `cargo test --workspace` all ok (core 335 + 3 ignored, cli 37, format 51, inspect 29, viewer 7, jni 6,
+  ...; includes `watch::deposits::*` and `the_deposits_overlay_reads_the_sites_live_and_baked`); `cargo deny check licenses bans` ok;
+  `node tools/viewer/deposits-check.js` ok; `neoforge/gradlew build test` BUILD SUCCESSFUL (3 m 22 s; nothing in neoforge changed).
+  No GameTests (per the rule).
+- **Run time before/after (the gate "run time unchanged").** `earthlike_quick_16k`, scattered_continents, 500 Myr through `deeptime
+  watch --exit-when-done --threads 6 --mem-cap 8 GiB`, release binaries built on the VM, one run at a time, `/usr/bin/time -v`,
+  box shared (load 33 to 57 from other agents, so compare CPU, not wall): **before** (8dae3f2): 858 s wall, **2194 s user** +
+  38 s sys, 5.99 GB max RSS; **after** (this branch): 814 s wall, **2249 s user** + 35 s sys, 5.87 GB. Same world both times
+  (2,767 events, 253 frames, identical `surface_final` line to the last digit), so the overlay changes nothing in the run; the
+  +2.5 % user CPU is inside the noise of a loaded box (the per-stage seconds swing the other way: plates 118 vs 103 s, deposits
+  27 vs 36 s). The only addition on a run's thread is one clone of the site list between two steps (about 55 sites here).
+  (The earlier M6 baseline, 1354 s wall / 21.39e12 instructions, is not comparable: different machine, 12 threads, load 60 to 90.)
+- **Browser checks on a real run** (`tools/viewer/deposits-shots.sh`, private server on 127.0.0.1 with the page open while the run
+  went on, Chromium from nixpkgs, headless; 0 failed): the legend appears when the first frame names `deposits/sites`; while the run
+  is going the legend says the sites are as the stage placed them (live), and when it ends it switches to the baked sites with no
+  reload; 55 sites (coal 28, petroleum 5, porphyry 4, placer 9, MVT 7, SEDEX 2; supergene and BIF 0 on this planet) and the legend
+  counts add up to what the server sent; hover on a coal field and a porphyry shows family, size, footprint, age (and grade and
+  by-products); clicking opens the Details tab with the site card, "Why here" (the cause chain) and the forming event; the overlay
+  stays over the elevation layer; a legend row hides its family; the toggle hides and restores the overlay and legend; the
+  legend says when the sites appear on steps before the deposit stage; no script errors. **Draw cost** (2048 x 1024 canvas, in the
+  page): 55 sites draw in 0.2 to 0.3 ms and hit-test in 0.08 ms; ten times as many sites (550) draw in 12.9 ms (prepare 7.5 ms,
+  once per fetch). Screenshots in `review/out/wb-deposits/` (not committed): `00-live-overlay` (mid-run), `01-satellite-overlay`,
+  `02-hover-coal`, `03-click-coal-why-here`, `04-hover-porphyry_cu_mo_au`, `05-click-porphyry_cu_mo_au`, `07-elevation-overlay`,
+  `08-family-hidden`, `09-overlay-off`, `10-first-step`. Linux Chromium needs a font: `~/.config/fontconfig/fonts.conf` on the VM now
+  points at nixpkgs `dejavu_fonts` (without one the page draws no text); `deposits-shots.sh` finds Chromium on PATH or builds
+  `nixpkgs#chromium`.
+- **Left / not done on purpose.** Deposits on the globe, and sites at their position before the end of the run (the record holds
+  only the present position; the engine's per-frame origin maps are not kept). The supergene/BIF rows are empty on this seed, so the
+  kin links (placer to porphyry, blanket to porphyry) were checked on the synthetic 16k deposit world, not on the 500 Myr planet.
 ### 2026-10-01 — M6 paused; batch 4 pushed with one GameTest re-run pending (session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Pause.** Ben: our test load on the M6 made graphide's ms-precision timing tests flaky; "please cease
   testing on the m6, I will be provisioning a new machine for your tests". All Deep Time jobs there were

@@ -105,11 +105,11 @@ def main():
         ok = wait("(() => { const b = document.querySelector('#deplegend'); return !!b && !b.hidden && b.querySelectorAll('.dep-row').length > 0; })()", 7200, "the deposits legend")
         check(ok, "the deposits legend appears once the run's frames name the sites layer")
         state = run_state()
-        note = ev("document.querySelector('#deplegend .note').innerText") or ""
+        note = ev("document.querySelector('#deplegend .note').textContent") or ""
         if state != "done":
             check("as the deposit stage placed" in note, f"while the run is {state} the sites are the live ones ({note[:50]!r})")
             shot("00-live-overlay.png")
-            check(wait("(() => { const n = document.querySelector('#deplegend .note'); return !!n && n.innerText.includes('baked'); })()", 1800, "the baked sites"),
+            check(wait("(() => { const n = document.querySelector('#deplegend .note'); return !!n && n.textContent.includes('baked'); })()", 1800, "the baked sites"),
                   "when the run is done the legend switches to the baked sites, without a reload")
         else:
             print("the run was already done: the live path was not observed here", flush=True)
