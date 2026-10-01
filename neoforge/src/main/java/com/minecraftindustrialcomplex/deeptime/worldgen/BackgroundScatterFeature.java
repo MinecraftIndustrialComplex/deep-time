@@ -74,7 +74,7 @@ public final class BackgroundScatterFeature extends Feature<NoneFeatureConfigura
                 BlockState host = level.getBlockState(pos);
                 if (palette.host(host) != RockPalette.Host.ROCK)
                     continue;
-                if (!(p.draw() < rule.bias(palette.classesOf(host))))
+                if (!(p.draw() < bias(wd, palette, rule, host, p.x(), p.y(), p.z())))
                     continue;
                 BlockState ore = ores.resolve(rule.material(), host, p.y());
                 if (ore == null)
@@ -84,6 +84,29 @@ public final class BackgroundScatterFeature extends Feature<NoneFeatureConfigura
             }
         }
         return placed;
+    }
+
+    /**
+     * The rock classes the host block at (x, y, z) stands for. A block of one class says so itself.
+     * Stone and deepslate are the unclassified crust and, since P1-28, also the block of every class
+     * that resolves to them (shale, mudstone, slate, gneiss, … in a vanilla-only pack), so there the
+     * world data's horizon at the position decides: its class when the palette puts it in that
+     * block, else the unclassified crust. (The block alone would give every stone block the best
+     * bias of all the stone-looking classes.)
+     */
+    public static List<String> hostClasses(WorldData wd, RockPalette palette, BlockState host, int x, int y, int z) {
+        List<String> byBlock = palette.classesOf(host);
+        if (!StrataPass.isCrust(host) || byBlock.size() <= 1)
+            return byBlock;
+        if (!wd.has(StrataPass.LAYER))
+            return List.of(RockPalette.UNCLASSIFIED_CRUST);
+        return StrataPass.classAt(wd, x, y, z).filter(byBlock::contains).map(List::of)
+                .orElse(List.of(RockPalette.UNCLASSIFIED_CRUST));
+    }
+
+    /** The host-bias weight of a visited block; the horizon is read only for rules whose bias depends on the class. */
+    public static double bias(WorldData wd, RockPalette palette, OreData.ScatterRule rule, BlockState host, int x, int y, int z) {
+        return rule.classBlind() ? rule.bias(List.of()) : rule.bias(hostClasses(wd, palette, host, x, y, z));
     }
 
     /** A block a cluster visits, with the draw its host bias is tested against. */
