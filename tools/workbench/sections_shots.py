@@ -205,8 +205,13 @@ def main():
             checks.append(("Esc leaves the section tool", p.js("window.DTWB.tool()") == "select"))
             for what, ok in checks:
                 print(f"check {what}: {'ok' if ok else 'FAILED'}")
+            failed = [what for what, ok in checks if not ok]
+        else:
+            failed = []
         errs = p.js("window.__errs")
         print("page errors:", errs if errs else "none")
+        if failed or errs:
+            sys.exit(f"sections_shots: failed: {failed} page errors: {errs}")
     finally:
         proc.terminate()
         try:
