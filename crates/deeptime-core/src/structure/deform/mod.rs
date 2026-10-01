@@ -180,6 +180,7 @@ pub fn report(
             "strike_slip_fault": counts.strike_slip_faults,
         },
         "saturated": counts.saturated,
+        "overprinted": counts.overprinted,
         "subducted": counts.subducted,
         "median": {
             "fold_wavelength_blocks": of(Kind::FoldTrain, &|f| f64::from(f.wavelength)),

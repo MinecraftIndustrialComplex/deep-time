@@ -615,10 +615,10 @@ impl StructureStage {
                     t_end_myr * 1.0e6,
                 )
             };
-            let born = deform::emplace(
+            deform::emplace(
                 &inputs,
                 p,
-                &self.st.features,
+                &mut self.st.features,
                 dt_myr,
                 t_end_myr,
                 &mut rng,
@@ -626,7 +626,6 @@ impl StructureStage {
                 &mut self.st.deform_counts,
                 &cause,
             );
-            self.st.features.extend(born);
         }
         add_time(&mut self.timings, "deformation", started);
 
