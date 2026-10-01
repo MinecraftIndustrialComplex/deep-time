@@ -181,11 +181,14 @@ pub struct Structure {
     pub events: Vec<StructEvent>,
     /// Fold profiles, [`PROFILE_SAMPLES`] values each.
     pub profiles: Vec<Vec<f32>>,
+    /// Blocks added to an event's reach when deciding which columns it is a candidate for
+    /// ([`StructIndex`]): at least the furthest any fault chain moves rock sideways in this world
+    /// (the bake measures it), so the source of every segment still meets every event that could
+    /// touch it.
+    pub margin: f64,
 }
 
-/// Blocks added to an event's reach when deciding which columns it is a candidate for: the
-/// source of a segment may lie this far from its column (faults move rock sideways) and still
-/// meet every event that could touch it.
+/// The least [`Structure::margin`] a bake writes, blocks.
 pub const REACH_MARGIN: f64 = 64.0;
 
 /// Side of the index's buckets, blocks.
@@ -194,7 +197,7 @@ const BUCKET: f64 = 128.0;
 /// Which events to undo at a column. **The rule** (both sides of the contract apply it, so it is
 /// part of the answer, not only a shortcut): event `e` is a candidate for the column at block
 /// position (x, z) when |x − centre x|, taken the short way round the planet, and |z − centre z|
-/// are both at most `reach(e) + REACH_MARGIN`; the candidates are undone in the order of
+/// are both at most `reach(e) + margin` ([`Structure::margin`]); the candidates are undone in the order of
 /// [`Structure::events`].
 #[derive(Clone, Debug)]
 pub struct StructIndex {
@@ -215,7 +218,7 @@ impl StructIndex {
         let radius: Vec<f64> = st
             .events
             .iter()
-            .map(|e| e.window.reach() + REACH_MARGIN)
+            .map(|e| e.window.reach() + st.margin)
             .collect();
         let mut buckets = vec![Vec::new(); w * h];
         for (n, e) in st.events.iter().enumerate() {
@@ -420,6 +423,7 @@ mod tests {
         let st = Structure {
             events: vec![fold()],
             profiles: vec![sine()],
+            margin: REACH_MARGIN,
         };
         let mut segs = Vec::new();
         // A quarter wavelength east of the centre: the crest, the full amplitude.
@@ -450,6 +454,7 @@ mod tests {
         let st = Structure {
             events: vec![fault()],
             profiles: vec![sine()],
+            margin: REACH_MARGIN,
         };
         let mut segs = Vec::new();
         // 20 blocks into the hanging wall: the plane is 20·tan 60° below the trace.
@@ -491,6 +496,7 @@ mod tests {
         let st = Structure {
             events: vec![fault(), fold()],
             profiles: vec![sine()],
+            margin: REACH_MARGIN,
         };
         let mut segs = Vec::new();
         st.column(&[0, 1], 120.0, 200.0, 4096.0, &mut segs);
@@ -500,6 +506,7 @@ mod tests {
         let only_fold = Structure {
             events: vec![fold()],
             profiles: vec![sine()],
+            margin: REACH_MARGIN,
         };
         only_fold.column(&[0], segs[1].x, segs[1].z, 4096.0, &mut alone);
         let fault_dy = bump(20.0 / 150.0) * 10.0 * 60.0f64.to_radians().sin();

@@ -213,9 +213,18 @@ fn a_planet_of_structures_evaluates_on_a_lattice() {
     let (mut features, counts) = p.run(&sp, 20, 21);
     assert!(counts.fold_trains > 0 && counts.thrusts > 0 && counts.normal_faults > 0);
     undo_order(&mut features);
-    let st = finish(&features, |_, _| 70.0);
-    let index = StructIndex::new(&st, 4096);
+    let mut st = finish(&features, |_, _| 70.0);
     let l2 = GridDesc::for_planet("L2", 4096, 8).unwrap();
+    // The margin holds the furthest sideways shift, with room to spare.
+    let settled = settle_margin(&mut st, 4096, &l2, -352.0, 640.0);
+    assert!(
+        settled.max_heave * 1.25 <= st.margin,
+        "{} vs {}",
+        settled.max_heave,
+        st.margin
+    );
+    assert!(st.margin >= deeptime_format::structure::REACH_MARGIN);
+    let index = StructIndex::new(&st, 4096);
     let stats = lattice::columns(&st, &index, &l2, -352.0, 640.0);
     assert_eq!(stats.columns, l2.cells() as u64);
     // The belt and the rift are deformed, the craton between them is not: a minority of the
