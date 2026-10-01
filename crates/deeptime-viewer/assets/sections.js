@@ -728,7 +728,7 @@ button.chip[aria-pressed="true"] { border-color: var(--accent-line); background:
   const panel = $('ip-section');
   function renderPanel() {
     if (!panel) return;
-    let h = '<div class="sec">';
+    let h = '<div class="sec">', big = false;
     if (S.state === 'idle') {
       h += '<p>Cut the planet open along a line. Pick the Section tool <kbd>S</kbd> and click two points on the map: you get the strata between them, in the map’s rock colours, with the surface, water and sea level, and the deposits and seams the line crosses, read from the run’s bake.</p>' +
         `<div class="sec-acts"><button type="button" class="btn btn-primary btn-sm" data-sec="start">${ic('section', 'ic-s')}Cut a section</button></div>` +
@@ -742,11 +742,13 @@ button.chip[aria-pressed="true"] { border-color: var(--accent-line); background:
         '<div class="sec-acts"><button type="button" class="btn btn-sm" data-sec="retry">Try again</button><button type="button" class="btn btn-sm btn-ghost" data-sec="clear">Clear</button></div>';
     } else {
       const d = S.data;
+      big = W.inspectorBig();
       h += `<div><div class="sec-t">${abChip('A', S.a)} → ${abChip('B', S.b)}</div><div class="sec-s">${stats(d)}</div></div>` +
+        (big ? `<div class="sec-acts">${controls()}</div><div class="sec-inline"></div>` : '') +
         `<div class="sec-acts"><button type="button" class="btn btn-primary btn-sm" data-sec="show">Show over the map</button>` +
         `<button type="button" class="btn btn-sm" data-sec="big">${ic('full', 'ic-s')}Enlarge</button><button type="button" class="btn btn-sm" data-sec="swap">Swap A and B</button>` +
         `<button type="button" class="btn btn-sm" data-sec="again">${ic('section', 'ic-s')}New section</button><button type="button" class="btn btn-sm btn-ghost" data-sec="clear">Clear</button></div>` +
-        `<div class="sv-leg" style="gap:4px">${legendHTML(d)}</div><div class="sv-note">${esc(d.stats.total ? `${fmtInt(d.stats.total)} blocks of rock in the ${fmtInt(d.n)} columns.` : '')}</div>`;
+        (big ? '' : `<div class="sv-leg" style="gap:4px">${legendHTML(d)}</div><div class="sv-note">${esc(d.stats.total ? `${fmtInt(d.stats.total)} blocks of rock in the ${fmtInt(d.n)} columns.` : '')}</div>`);
     }
     const same = o => S.state === 'done' && S.a && o.a.lat === S.a.lat && o.a.lon === S.a.lon && o.b.lat === S.b.lat && o.b.lon === S.b.lon;
     const others = S.recent.filter(o => !same(o));
@@ -754,7 +756,12 @@ button.chip[aria-pressed="true"] { border-color: var(--accent-line); background:
       h += `<div class="recent"><h5>Recent sections</h5>${others.map(o => `<button type="button" data-recent="${S.recent.indexOf(o)}">${abChip('A', o.a)} → ${abChip('B', o.b)} <span style="margin-left:auto;color:var(--fg-4)">${kmText(o.km)} km</span></button>`).join('')}</div>`;
     }
     panel.innerHTML = h + '</div>';
+    // The expanded inspector draws the section itself, large, in the tab (the "Enlarge" dialog stays for
+    // the side panel and the dock).
+    const inline = big && panel.querySelector('.sec-inline');
+    if (inline) buildView(inline);
   }
+  document.addEventListener('dt:inspector-big', () => { renderPanel(); redrawViews(false); });
   function renderAll() { renderPanel(); renderDock(); }
 
   // One listener for every control of the section views, the dock and the tab.
