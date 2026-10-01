@@ -34,6 +34,12 @@ serde_json = "1"
 panic = "unwind"
 lto = "thin"
 
+[profile.dev]
+# The workspace's own crates at -O1 in dev and test builds (Ben, 2026-09-30): at -O0 the core's
+# test suite took ~38 min on the Mac, because the simulation kernels live in deeptime-core itself.
+# Debug assertions and overflow checks stay on.
+opt-level = 1
+
 [profile.dev.package."*"]
 # Dependencies optimised even in dev builds; simulation kernels are unusable at -O0.
 opt-level = 2
