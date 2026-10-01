@@ -205,9 +205,12 @@ pub struct HydroParams {
     /// full to its rim, as before 2026-10-01.
     pub lake_balance: bool,
     /// What open water loses in a year at the freezing point, mm: the evaporation of the cool
-    /// season and the sublimation of lake ice. Lakes lose more than the land's potential
-    /// evapotranspiration says in cold climates (Lake Superior about 600 mm a year at a mean of
-    /// 4 °C, Baikal 400–500 at −1 °C, high-Arctic and Antarctic lakes 150–350).
+    /// season and the sublimation of lake ice. In cold climates lakes lose more than the land's
+    /// potential evapotranspiration (60 mm/°C) says. Calibration: Earth's 1.42 million lakes
+    /// evaporate 1,500 ± 150 km³ a year without the Caspian (Zhao et al. 2022, "Evaporative water
+    /// loss of 1.42 million global lakes", Nature Communications 13:3686), about 650 mm a year
+    /// over their 2.3 million km², and most of that area is in cold climates (Canada, Siberia,
+    /// Scandinavia: about 6–8 °C of mean temperature above freezing), which 200 + 60 · 7 meets.
     pub lake_evaporation_base_mm: f64,
     /// Scales open-water evaporation: `lake_evaporation_base_mm` plus 60 mm/yr per °C of the
     /// year's mean temperature above freezing, times this.
@@ -335,8 +338,8 @@ impl HydroParams {
     ///   temperature (0 below freezing), as the surface stage.
     /// - **Open-water evaporation** = `lake_evaporation_factor` × (`lake_evaporation_base_mm` +
     ///   60 mm/°C × the year's mean temperature above freezing): 200 mm a year at the freezing
-    ///   point (the cool season and the ice's sublimation), 1,100 at 15 °C, 2,000 at 30 °C; about
-    ///   what Lake Superior, the Caspian and Lake Chad lose (0 when `lake_evaporation` is false).
+    ///   point (the cool season and the ice's sublimation), 1,100 at 15 °C, 2,000 at 30 °C (0
+    ///   when `lake_evaporation` is false).
     pub fn budget(&self, c: &Climate) -> Budget {
         let (above, share) = c.thaw();
         let p = c.precip_mm.max(0.0);
