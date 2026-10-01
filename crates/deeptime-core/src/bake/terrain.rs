@@ -74,9 +74,10 @@ pub fn bake(
             };
             let metres = resample(&from, &l3, false);
             let (sy, mv) = (f64::from(s.sea_level_y), s.m_per_block_v);
+            let fit = s.build_fit();
             let raw: Vec<i16> = metres
                 .par_iter()
-                .map(|&h| quantise((sy + (f64::from(h) - sea) / mv) * 16.0))
+                .map(|&h| quantise(fit.compress(sy + (f64::from(h) - sea) / mv) * 16.0))
                 .collect();
             out.layer(
                 desc("elevation", DType::I16, &l3, 1.0 / 16.0, "block", None),

@@ -235,7 +235,7 @@
       // m³/s, ticks in m³/s); the other colours are in the ramp's `keys`.
       const keys = info.ramp.keys || {}, span = info.hi - info.lo || 1;
       const key = (c, t) => `<div title="${esc(t)}"><i style="background:${esc(c || '#888')}"></i><span>${esc(t)}</span></div>`;
-      h += `<div class="cats">${key(keys.lake, 'Lake')}${key(keys.land, 'Land')}${key(keys.sea, 'Sea')}</div>`;
+      h += `<div class="cats">${key(keys.lake, 'Lake')}${key(keys.frozen_lake, 'Frozen lake')}${key(keys.salt_flat, 'Salt flat')}${key(keys.land, 'Land')}${key(keys.sea, 'Sea')}</div>`;
       h += `<canvas class="bar" data-ramp="${esc(info.name)}" data-target="${target}"></canvas><div class="ticks">`;
       h += [2, 10, 100, 1000].map((q, i) => `<span style="left:${(100 * (Math.log10(q) - info.lo) / span).toFixed(2)}%;transform:${i ? 'translateX(-50%)' : 'none'}">${fmtInt(q)}</span>`).join('');
       h += '</div>';
@@ -364,8 +364,12 @@
     layerIndex(f) { return Math.max(0, f.layers.indexOf(layer)); }
     image(n) {
       const f = this.frames[n];
-      if (!f) return null;
-      const li = this.layerIndex(f);
+      return f ? this.imageAt(n, this.layerIndex(f)) : null;
+    }
+    // Layer `li` of frame n (the chosen layer's is image(n); the satellite view's pointer also
+    // reads the frame's Rivers & lakes layer).
+    imageAt(n, li) {
+      if (!this.frames[n]) return null;
       const key = `${n}/${li}`;
       let img = this.images.get(key);
       if (img) { this.images.delete(key); this.images.set(key, img); return img; }
@@ -874,13 +878,40 @@
     const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
     if (pix.d[q + 3] === 0) return { name, rgb, nodata: true };
     if (info && info.name === 'rivers') return { name, info, ...riversRead(pix, px, py, info) };
+    // The satellite view draws the frame's lakes over the land (core water_view.rs): a lake reads
+    // as a lake, not as the land or sea class its colour happens to be nearest to. What lies under
+    // the pointer is read from the frame's Rivers & lakes layer, where the lakes are hard-edged in
+    // their key colours; it counts only where the satellite picture shows it (glacier ice hides it).
+    if (info && info.name === 'satellite') {
+      const body = lakeUnder(p, r, dn, f, lat, lon);
+      if (body && lakeKind(info, rgb, 1200) === body) return { name, rgb, info, body };
+    }
     return { name, rgb, info, val: valueAt(info, rgb) };
   }
+  function lakeUnder(p, r, dn, f, lat, lon) {
+    const ri = f.layers.indexOf('rivers');
+    if (ri < 0) return null;
+    const img = r.imageAt(dn, ri), rinfo = rampInfo(f.ramps && f.ramps[ri]);
+    if (!ready(img) || !rinfo) return null;
+    if (p.lakeImg !== img) { p.lakePix = pixels(img); p.lakeImg = img; }
+    const pix = p.lakePix;
+    const px = Math.min(pix.w - 1, Math.floor((((lon % 360) + 360) % 360) / 360 * pix.w));
+    const py = clamp(Math.floor((90 - lat) / 180 * pix.h), 0, pix.h - 1), q = (py * pix.w + px) * 4;
+    return pix.d[q + 3] === 0 ? null : lakeKind(rinfo, [pix.d[q], pix.d[q + 1], pix.d[q + 2]], 150);
+  }
+  // The lake colours of a ramp's `keys` (lake, frozen lake, salt flat) and their hover names.
+  const LAKE_KEYS = [['lake', 'lake', '#5cc0ea'], ['frozen_lake', 'frozen lake', '#a9d3e6'], ['salt_flat', 'salt flat', '#f0d9a8']];
+  // The lake kind whose key colour `rgb` is within `tol` (squared distance) of, or null.
+  function lakeKind(info, rgb, tol) {
+    const keys = (info.ramp && info.ramp.keys) || {};
+    let best = null, bd = tol;
+    for (const [k, label, fallback] of LAKE_KEYS) { const d = dist2(rgb, hexRgb(keys[k] || fallback)); if (d < bd) { bd = d; best = label; } }
+    return best;
+  }
   // The Rivers & lakes layer (core water_view.rs): a river is a pixel on the ramp (log10 of its
-  // discharge), a lake one of the ramp's lake key colour; rivers are a pixel or two wide, so the
-  // pointer reads the strongest water within a pixel of it.
+  // discharge), a lake, a frozen lake or a salt flat one of the ramp's key colours; rivers are a
+  // pixel or two wide, so the pointer reads the strongest water within a pixel of it.
   function riversRead(pix, px, py, info) {
-    const lake = hexRgb((info.ramp.keys && info.ramp.keys.lake) || '#5cc0ea');
     let best = null;
     for (let k = 0; k < 9; k++) {
       const dx = k === 0 ? 0 : [-1, 0, 1, -1, 1, -1, 0, 1][k - 1], dy = k === 0 ? 0 : [-1, -1, -1, 0, 0, 1, 1, 1][k - 1];
@@ -888,7 +919,8 @@
       if (pix.d[q + 3] === 0) continue;
       const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
       let w = null;
-      if (dist2(rgb, lake) < 150) w = { kind: 'lake', v: Infinity };
+      const body = lakeKind(info, rgb, 150);
+      if (body) w = { kind: body, v: Infinity };
       else { const r = valueAt(info, rgb); if (r && !r.far) w = { kind: 'river', v: r.v }; }
       if (w && (!best || w.v > best.w.v)) best = { w, rgb };
       if (k === 0 && w) break;   // the pixel under the pointer is water: that is the answer
@@ -905,7 +937,8 @@
   function valueText(s) {
     if (!s) return '';
     if (s.nodata) return 'no data';
-    if (s.water !== undefined) return s.water ? (s.water.kind === 'lake' ? 'lake' : `river (~${riverFlowText(s.water.v)} m³/s)`) : '';
+    if (s.water !== undefined) return s.water ? (s.water.kind === 'river' ? `river (~${riverFlowText(s.water.v)} m³/s)` : s.water.kind) : '';
+    if (s.body) return s.body;
     if (!s.val) return '';
     // The satellite view is true colour, so the nearest key colour is only what the spot looks like.
     if (s.val.cls && s.info && s.info.name === 'satellite') return `looks like ${(s.val.cls.label || '').toLowerCase()}`;
@@ -1735,17 +1768,64 @@
   // Inspector: events, details (an event's cause chain, a point's values), the run
   // =================================================================================================
   let selectedEvent = null, pin = null;
+  let inspBig = false, curITab = 'events';
   function setITab(name, reveal) {
+    // Expanded, the Events tab shows the details beside the list: picking an event keeps the list in view.
+    if (inspBig && reveal && name === 'details' && curITab === 'events') name = 'events';
+    curITab = name;
+    const split = inspBig && name === 'events';
     for (const b of document.querySelectorAll('[data-itab]')) b.setAttribute('aria-selected', String(b.dataset.itab === name));
-    for (const k of ['events', 'details', 's2', 'section', 'run']) $(`ip-${k}`).hidden = k !== name;
+    for (const k of ['events', 'details', 's2', 'section', 'run']) $(`ip-${k}`).hidden = !(k === name || (split && k === 'details'));
+    $('ipanes').classList.toggle('split', split);
     store.set('itab', name);
     // Something new to read there: bring the inspector into view on a short screen.
-    if (reveal && !narrow.matches && !TV) {
+    if (reveal && !inspBig && !narrow.matches && !TV) {
       const rp = $('rpanel'), rr = rp.getBoundingClientRect(), ir = $('inspector').getBoundingClientRect();
       const below = ir.top + Math.min(ir.height, name === 's2' ? 460 : 340) - rr.bottom;
       if (below > 0) rp.scrollBy({ top: below + 12, behavior: reducedMotion.matches ? 'auto' : 'smooth' });
     }
   }
+  // The inspector as a large overlay: the same card gains a class (nothing is moved or rebuilt, so the tab,
+  // scrolling, the selected event and the 3D previews are exactly as they were). Not on a phone, where the
+  // inspector already has the whole page, and not in ?tv.
+  function setInspBig(on, focusBtn) {
+    on = !!on && !narrow.matches && !TV;
+    if (on === inspBig) return;
+    inspBig = on;
+    const card = $('inspector'), btn = $('inspbig');
+    // A stand-in of the card's old size keeps the side panel as it was (and its scroll position, which the
+    // browser's scroll anchoring would otherwise move).
+    const rpTop = $('rpanel').scrollTop;
+    if (on) { const g = document.createElement('div'); g.id = 'inspghost'; g.style.cssText = `flex:none;height:${card.offsetHeight}px`; card.before(g); }
+    else if ($('inspghost')) $('inspghost').remove();
+    card.classList.toggle('big', on);
+    $('rpanel').scrollTop = rpTop;
+    $('inspscrim').hidden = !on;
+    card.tabIndex = on ? -1 : '';
+    if (!on) card.removeAttribute('tabindex');
+    if (on) { card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', 'Inspector, expanded'); }
+    else { card.removeAttribute('role'); card.removeAttribute('aria-modal'); card.removeAttribute('aria-label'); }
+    btn.setAttribute('aria-expanded', String(on));
+    btn.setAttribute('aria-label', on ? 'Close the expanded inspector' : 'Expand the inspector');
+    btn.dataset.tip = on ? 'Back to the side panel' : 'Expand the inspector';
+    btn.innerHTML = `<svg class="ic ic-s"><use href="#${on ? 'i-shrink' : 'i-full'}"/></svg>`;
+    document.dispatchEvent(new Event('pointerdown'));   // drop a tooltip that still has the old words
+    setITab(curITab);
+    document.dispatchEvent(new CustomEvent('dt:inspector-big', { detail: { on } }));
+    if (focusBtn !== false) btn.focus();
+  }
+  $('inspbig').addEventListener('click', () => setInspBig(!inspBig));
+  $('inspscrim').addEventListener('click', () => setInspBig(false));
+  narrow.addEventListener('change', () => { if (narrow.matches) setInspBig(false, false); });
+  // Tab stays inside the expanded card.
+  $('inspector').addEventListener('keydown', ev => {
+    if (!inspBig || ev.key !== 'Tab' || !$('modal').hidden) return;
+    const f = [...$('inspector').querySelectorAll('a[href], button, input, select, textarea, iframe, [tabindex]:not([tabindex="-1"])')].filter(e => !e.disabled && e.getClientRects().length);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (ev.shiftKey && (document.activeElement === first || document.activeElement === $('inspector') || !$('inspector').contains(document.activeElement))) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+  });
   for (const b of document.querySelectorAll('[data-itab]')) b.addEventListener('click', () => setITab(b.dataset.itab));
 
   let evShownKey = '';
@@ -2167,6 +2247,7 @@
     const k = ev.key;
     if (k === 'Escape') {
       if (!$('modal').hidden) { closeModal(); return; }
+      if (inspBig) { setInspBig(false); return; }
       if (!$('layerpop').hidden && !narrow.matches) { layerPop(false); $('lpickbtn').focus(); return; }
       if ($('app').classList.contains('drawer')) { $('app').classList.remove('drawer'); return; }
       if (tool !== 'select') { setTool('select'); return; }
@@ -2175,7 +2256,7 @@
       return;
     }
     const control = ev.target.closest ? ev.target.closest('input, select, textarea, button, [role=separator]') : null;
-    if (control && !(k === ' ' && control.id === 'timeline')) return;   // a focused control takes its own keys
+    if (control && !(k === ' ' && control.id === 'timeline') && !(k === 'p' && control.id === 'inspbig')) return;   // a focused control takes its own keys
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if (!$('modal').hidden) return;
     if (k === ' ') { ev.preventDefault(); togglePlay(); }
@@ -2190,6 +2271,7 @@
     else if (k === 'd') $('depbtn').click();
     else if (k === 'c') { if (comparing) setCompare(false); else setCompare(true); }
     else if (k === 'e') toggleSidebar();
+    else if (k === 'p') setInspBig(!inspBig);
     else if (k === 'v') setTool('select');
     else if (k === 'i') setTool('inspect');
     else if (k === 'b') setTool('area');
@@ -2287,7 +2369,7 @@
       K(['Space'], 'Play or pause'), K(['←', '→'], 'One step back or forward (Shift: ten)'), K(['Home'], 'Back to the start'),
       K(['L'], 'Follow the run live (End too)'), K(['[', ']'], 'Slower, faster'), K(['1', '…', '9'], 'Layers in the order they appeared'), K(['↑', '↓'], 'Previous or next layer'),
       K(['V'], 'Select tool: events and point values'), K(['I'], 'Inspect a column in 3D'), K(['B'], 'Preview an area in 3D'), K(['S'], 'Cross-section: click two points'),
-      K(['C'], 'Compare two runs'), K(['M'], 'Event markers on or off'), K(['D'], 'Deposits on or off'), K(['G'], 'Spin the globe'), K(['E'], 'Runs and editor'),
+      K(['C'], 'Compare two runs'), K(['M'], 'Event markers on or off'), K(['D'], 'Deposits on or off'), K(['G'], 'Spin the globe'), K(['E'], 'Runs and editor'), K(['P'], 'Pop the inspector out to a large overlay (Esc closes)'),
       K(['F'], 'Full screen'), K(['Esc'], 'Back to Select; clear the box and pin'), K(['?'], 'This list'),
     ].join('')}</div>`, '', true);
   }
@@ -2917,7 +2999,8 @@
   window.DTWB = {
     $, esc, ic, clamp, fmtInt, api, store, toast, modal, closeModal, niceTicks, rampInfo, rampOfLayer, layerLabel, latLonText,
     latText, lonText, runName,
-    panes, blockXZ, circ, llToCanvas, mapLatLon, setTool, setITab, setMTab,
+    panes, blockXZ, circ, llToCanvas, mapLatLon, setTool, setITab, setMTab, setInspBig,
+    inspectorBig: () => inspBig,
     focused: P, layer: () => layer, tool: () => tool, narrow: () => narrow.matches,
     redraw() { mapDirty = globeDirty = true; },
     legend() { legendDirty = true; },

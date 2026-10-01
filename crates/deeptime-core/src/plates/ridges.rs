@@ -229,7 +229,7 @@ pub fn resample(
         std::f64::consts::PI,
     );
     let since = (t - state.resample_myr).max(env.dt_myr);
-    let (zr, zt) = (k.ridge_elevation_m, k.trench_elevation_m);
+    let (zr, zf) = (k.ridge_elevation_m, k.oceanic_floor_elevation_m);
     let damping = k.oceanic_damping_mm_yr;
     let omega: Vec<DVec3> = state
         .plates
@@ -238,7 +238,7 @@ pub fn resample(
         .collect();
     let edge_z = |s: &Sample| -> f64 {
         if s.kind == CONTINENTAL {
-            ocean_elevation(since, zr, zt, damping)
+            ocean_elevation(since, zr, zf, damping)
         } else {
             f64::from(s.elevation_m)
         }
@@ -269,7 +269,7 @@ pub fn resample(
         };
         let age = alpha * since;
         let p = new_pts[i];
-        let z = alpha * zbar + (1.0 - alpha) * ocean_elevation(age, zr, zt, damping);
+        let z = alpha * zbar + (1.0 - alpha) * ocean_elevation(age, zr, zf, damping);
         let mut s = Sample::blank(0);
         s.kind = OCEANIC;
         s.regime = regime::RIDGE;

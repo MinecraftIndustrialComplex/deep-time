@@ -116,7 +116,7 @@ pub const PLANET_KEYS: [&str; 14] = [
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
-pub const SCALE_KEYS: [&str; 8] = [
+pub const SCALE_KEYS: [&str; 9] = [
     "circumference_blocks",
     "m_per_block_h",
     "m_per_block_v",
@@ -125,6 +125,7 @@ pub const SCALE_KEYS: [&str; 8] = [
     "sea_level_y",
     "pole_cap_deg",
     "feature_scale",
+    "build_limit_band_blocks",
 ];
 
 /// The most of the planet the initial continental crust, (1 − ocean_fraction)/(1 − shelf share),
@@ -171,6 +172,38 @@ fn d_sea_level_y() -> i32 {
 fn d_pole_cap_deg() -> f64 {
     75.0
 }
+fn d_build_limit_band() -> f64 {
+    48.0
+}
+
+/// The most the detail term adds to the baked elevation, blocks (`detail/amplitude` is a u8 of
+/// sixteenths: at most 255/16).
+pub const DETAIL_HEADROOM_BLOCKS: f64 = 16.0;
+
+/// How the finished terrain is kept under the world's build limit (Ben, decisions log 2026-10-01:
+/// Minecraft's height is a real limit; nothing is ever cut flat). Elevations up to `knee_y` are
+/// stored as simulated; above it they are compressed smoothly towards `top_y`, which they never
+/// reach: y ↦ knee + B·(1 − e^(−(y − knee)/B)), B = top − knee. The map is increasing and its slope
+/// is 1 at the knee, so ridges stay ridges and drainage keeps its direction. `top_y` leaves room
+/// for the detail term, so E + A·N stays below `max_y`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BuildFit {
+    pub knee_y: f64,
+    pub top_y: f64,
+}
+
+impl BuildFit {
+    /// The stored elevation of simulated elevation `y`, blocks.
+    pub fn compress(&self, y: f64) -> f64 {
+        let band = self.top_y - self.knee_y;
+        // (NaN stays NaN.)
+        if y > self.knee_y && band > 0.0 {
+            self.knee_y + band * (1.0 - (-(y - self.knee_y) / band).exp())
+        } else {
+            y
+        }
+    }
+}
 
 /// Block-space scales (plan §5.1).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -194,6 +227,11 @@ pub struct ScaleParams {
     /// block scale (the editor's "feature scale" settings); 1 everywhere is the calibrated world.
     #[serde(default)]
     pub feature_scale: FeatureScale,
+    /// The band under the build limit that terrain above its foot is compressed into, blocks
+    /// ([`BuildFit`]): the foot (the knee) is at `max_y` − 16 − this. Terrain below the knee is
+    /// as simulated.
+    #[serde(default = "d_build_limit_band")]
+    pub build_limit_band_blocks: f64,
 }
 
 /// Multipliers of feature sizes in blocks (plan §5.1 `feature_scale`; the editor's Multipliers
@@ -223,6 +261,20 @@ impl Default for FeatureScale {
 }
 
 impl ScaleParams {
+    /// Where the finished terrain's compression starts and what it never reaches ([`BuildFit`]).
+    pub fn build_fit(&self) -> BuildFit {
+        let top_y = f64::from(self.max_y) - DETAIL_HEADROOM_BLOCKS;
+        BuildFit {
+            knee_y: top_y - self.build_limit_band_blocks,
+            top_y,
+        }
+    }
+
+    /// The highest elevation above the sea the world shows as simulated (the knee), m.
+    pub fn uncompressed_height_m(&self) -> f64 {
+        (self.build_fit().knee_y - f64::from(self.sea_level_y)) * self.m_per_block_v
+    }
+
     /// radius_m = C · m_per_block_h / 2π (plan §5.1).
     pub fn radius_m(&self) -> f64 {
         f64::from(self.circumference_blocks) * self.m_per_block_h / std::f64::consts::TAU
@@ -308,6 +360,16 @@ pub struct TectonicParams {
     pub max_plate_speed_mm_yr: f64,
     /// ε_o (0.04 mm/yr).
     pub oceanic_damping_mm_yr: f64,
+    /// The elevation ageing ocean floor subsides towards, m: z(a) = z_f + (z_r − z_f)·
+    /// exp(−a·ε_o/|z_f|). Cortial's model subsides towards the trench depth (−10 km, the default
+    /// and the plate-only presets'), which leaves floor older than ~120 Myr deeper than any abyssal
+    /// plain. −5,600 m is GDH1's old-floor depth (Stein & Stein 1992, Nature 359:123–129); with
+    /// ε_o 0.215 mm/yr from a −2,500 m ridge the law follows GDH1 within 0.12 km from 20 Myr on.
+    /// The pipeline presets use −5,600 m with ε_o 0.12 mm/yr (3.6 km at 20 Myr, 4.5 at 50, 5.2 at
+    /// 100, 5.6 beyond): at GDH1's full rate the young floor is deep enough that island arcs rarely
+    /// emerge and the continental crust shrinks from 0.39 to 0.29 of the planet in 500 Myr (P1-17
+    /// hypsometry recalibration, 2026-10-01; median sea depth 4.0 km, Earth 4.06).
+    pub oceanic_floor_elevation_m: f64,
     /// ε_c (0.03 mm/yr).
     pub continental_erosion_mm_yr: f64,
     /// ε_t (0.3 mm/yr).
@@ -472,6 +534,7 @@ impl Default for TectonicParams {
             collision_coefficient_per_km: 1.3e-5,
             max_plate_speed_mm_yr: 100.0,
             oceanic_damping_mm_yr: 0.04,
+            oceanic_floor_elevation_m: -10000.0,
             continental_erosion_mm_yr: 0.03,
             sediment_accretion_mm_yr: 0.3,
             subduction_uplift_mm_yr: 0.6,
@@ -726,7 +789,21 @@ impl PlanetPreset {
             "$.resolution.l1_r",
             "L1 would be more than 8192 cells wide",
         )?;
+        check(
+            s.build_limit_band_blocks.is_finite() && s.build_limit_band_blocks >= 8.0,
+            "$.scale.build_limit_band_blocks",
+            "must be at least 8",
+        )?;
+        check(
+            s.build_fit().knee_y >= f64::from(s.sea_level_y) + 64.0,
+            "$.scale.build_limit_band_blocks",
+            "leaves less than 64 blocks between sea level and the compression band under max_y",
+        )?;
         let k = &self.tectonics;
+        // No check that the plate model's elevation guard fits under the knee: the editor's
+        // sliders (vertical scale, this band) must be valid at both ends, and a world too short
+        // for its mountains is squeezed, not refused. The bake says how much
+        // (`notes.bake.terrain.build_limit.cells_compressed`).
         let pos = |v: f64, key: &str| check(v.is_finite() && v > 0.0, key, "must be > 0");
         pos(k.time_step_myr, "$.tectonics.time_step_myr")?;
         pos(k.model_radius_km, "$.tectonics.model_radius_km")?;
@@ -754,6 +831,12 @@ impl PlanetPreset {
                 && k.max_elevation_m > 0.0,
             "$.tectonics.ridge_elevation_m",
             "need trench < abyssal < ridge < 0 < max_elevation",
+        )?;
+        check(
+            k.trench_elevation_m <= k.oceanic_floor_elevation_m
+                && k.oceanic_floor_elevation_m < k.ridge_elevation_m,
+            "$.tectonics.oceanic_floor_elevation_m",
+            "must be in [trench_elevation_m, ridge_elevation_m)",
         )?;
         check(
             (2..=200).contains(&k.initial_plates),
@@ -1119,5 +1202,46 @@ mod tests {
             edit(&|v| v["dummy"] = json!({"steps": 1, "sleep_ms": 0})),
             "$"
         );
+    }
+
+    /// The build-limit compression (2026-10-01): as simulated below the knee, increasing and
+    /// smooth through it, never at the top however high the terrain; and a band too thin is refused.
+    #[test]
+    fn the_top_band_is_compressed() {
+        let p = planet(PIPELINE_BUILTIN[0].1);
+        let fit = p.scale.build_fit();
+        assert_eq!((fit.knee_y, fit.top_y), (575.0, 623.0));
+        assert_eq!(p.scale.uncompressed_height_m(), 10_240.0);
+        for y in [-352.0, 63.0, 574.9, 575.0] {
+            assert_eq!(fit.compress(y), y);
+        }
+        let mut last = 575.0;
+        for k in 1..=4000 {
+            let y = 575.0 + f64::from(k) * 0.25;
+            let c = fit.compress(y);
+            assert!(c > last && c < fit.top_y && c <= y, "{y} -> {c}");
+            last = c;
+        }
+        // Slope 1 at the knee; 20 km of mountain (y 1063) still under the top.
+        assert!((fit.compress(575.25) - 575.25).abs() < 1e-3);
+        assert!(fit.compress(1063.0) < 623.0 && fit.compress(1063.0) > 622.9);
+        assert!(fit.compress(f64::NAN).is_nan());
+
+        let edit = |f: &dyn Fn(&mut Value)| {
+            let mut v: Value = serde_json::from_str(PIPELINE_BUILTIN[0].1).unwrap();
+            f(&mut v);
+            match Preset::from_json(&v.to_string()) {
+                Err(CoreError::PresetInvalid { path, reason }) => format!("{path}: {reason}"),
+                other => panic!("expected a preset error, got {other:?}"),
+            }
+        };
+        assert_eq!(
+            edit(&|v| v["scale"]["build_limit_band_blocks"] = json!(2.0)),
+            "$.scale.build_limit_band_blocks: must be at least 8"
+        );
+        // A world too short for its mountains is squeezed, not refused (the sliders' ends are valid).
+        let mut v: Value = serde_json::from_str(PIPELINE_BUILTIN[0].1).unwrap();
+        v["scale"]["m_per_block_v"] = json!(1.0);
+        Preset::from_json(&v.to_string()).unwrap();
     }
 }
