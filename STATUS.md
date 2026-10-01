@@ -79,6 +79,64 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-30 — Diamictite: lithified till is its own (60th) rock class (agent worktree agent-a9307a6541fa46794, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-09-30, "Add diamictite (Recommended)": buried glacial till turned into
+  conglomerate (cobblestone), which reads wrong for the snowball and ice-age deposits the climate now makes.
+- **What.** `tools/dev/gen_rock_classes.py` gains a `diamictite` row (clastic sedimentary, after conglomerate in
+  the README's family order; groups `deeptime:rock/clastic` + `sedimentary`): density 2,600 kg/m³, erodibility
+  1.2, diffusivity 1.1 (a matrix-strong, unbedded rock between conglomerate and mudstone), weathers to soil,
+  `loose_equivalent` till, pelitic metamorphic path (slate → phyllite → schist → gneiss: the mud matrix decides),
+  stand-in **`minecraft:cobbled_deepslate`**. `till.lithifies_to` conglomerate → diamictite, and till's
+  metamorphic path [] → the same pelitic path (gravel and loess already follow their rocks' paths; the empty
+  path left hot buried till as till). The generator takes a per-row `tuned` note; its count check is 60.
+  Core: `synth::EVERY_CLASS` and `surface/lithology.rs` FILES are 60 long (diamictite at index 14, every later
+  index +1; world data maps indices through `strata/classes.json`, so no reader depends on the order), the
+  `deeptime:rock/clastic` group, the satellite colour (grey, with the schists), deeptime-inspect's section
+  palette, the every-class synthetic rule `(6·i + h) mod 60` (still every class in any ten cell columns at
+  h ≥ 2); two tests sized by the list instead of 59. Viewer: the categorical `rock_class` ramp renumbered,
+  diamictite **plum #804080** (the most distinct muted colour against the other 59; a dark grey-green sat on
+  hornfels and slate). Java: RockDataTest (60 classes; till → diamictite, diamictite → till, the stand-in),
+  StrataGameTests (60 throughout; the vanilla view resolves diamictite to cobbled deepslate; the live palette
+  keeps that stand-in until a pack names diamictite, then accepts the pack's member or fallback). FORMAT.md
+  (the lithification note, `strata/classes.json`, the synthetic rule), the plan's counts (§1.3, glossary,
+  §5.4.1), the decisions file's MIC row "(see log 2026-09-30)".
+- **Stand-in: cobbled deepslate.** A diamictite is a dark, fine mud matrix with clasts of every size and shape
+  floating in it. Cobbled deepslate's texture is that: a near-black matrix with lighter angular and rounded
+  fragments of mixed size, irregularly spaced. Conglomerate's cobblestone is clast-supported (the cobbles touch),
+  which is the difference between the two rocks. No other class uses it; overworld block; not filler
+  (`StrataPass.isCrust` is stone and deepslate only); not terracotta. Rejected: tuff (seven classes, reads
+  volcanic), gravel and coarse dirt (loose: till's own look), andesite and polished blocks (no clasts). Like
+  cobblestone under stone, cobbled deepslate is on the MIC README's excluded-variants list as a *member*; it is
+  a stand-in only.
+- **Measured** (Mac, load ~80; `deeptime run --preset earthlike_quick_16k --start supercontinent --length-myr
+  1000 --set climate.degassing_scale=X --set amplify.stream=always`, then `deeptime parity --columns 20000` and
+  a scratch plot of the baked horizons; pictures in `review/out/diamictite/degassing-{0.3,0.1}/`, unpublished):
+  - **degassing 0.3 no longer snowballs** on this master (the climate agent's −807 → −761 Myr snowball predates
+    the weathering-runoff fix 970efd1): coldest 4.1 °C at −824 Myr, sea ice at most 27 % (the onset needs 95 %),
+    land ice up to 36 %; 1,816 s. Diamictite in 3.2 % of columns (780 beds, median 2 blocks, up to 67),
+    all from the last 230 Myr; the thickest a 67-block bed at 36–37 Myr, lat −59°.
+  - **degassing 0.1: six snowballs** (Myr ago, onset → escape: 902–814, 806–732, 726–638, 628–548, 116–72,
+    68–8), six hothouses; 1,365 s, 4.2 GB peak. Diamictite in **31.8 %** of columns (13,909 beds, 12,614 of them
+    snowball-age; median 2 blocks, up to 127); till (young, shallow) in 4. Thickest: x −13963, z 690
+    (lat −15°), y −174…−48, 32–45 Myr ago, inside the 68–8 Myr snowball, a marine basin filled with diamictite
+    under 70 blocks of younger shale, with five thinner snowball beds above it and one below (`diamictite-column.png`); the
+    meridian section shows the basin fill and tongues running off along the bedding (`diamictite-section.png`).
+    The four early snowballs left almost nothing in the baked columns (largest bars at 380, 270, 190 Myr):
+    probably 500 Myr of ~40 % land ice eroding them, or burial past the pelitic isotherms.
+- **Gates** (Mac, branch merged with master ab5259e): `cargo fmt --check`, `cargo clippy --workspace
+  --all-targets -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace` all pass except
+  one structure test with a `[false; 59]` array (now sized by `EVERY_CLASS`; `structure::` re-run 11/11, the
+  viewer and inspect crates re-run after the colour change); `./gradlew build test` 155/0. GameTests not run
+  (Ben, 2026-09-30: once per merge batch on master): StrataGameTests' new diamictite checks first run there.
+- **Found on the way.** (1) The 1000-Myr `earthlike_quick_16k` run fails at the default 4 GiB cap in amplify
+  ("needed 4,451,574,045 bytes"): `stream: auto` decides in memory from the last level's buffers alone, then a
+  later reservation passes the cap; `--set amplify.stream=always` finishes (76 s). (2) The Mac rebooted at
+  ~19:06 while this task's first 16k run (cap 6 GB, structure stage, ~2 GB in use) ran beside other agents'
+  servers at load ~80; 16 GB of RAM in all. Later runs kept the 4 GiB default.
+- **For MIC.** The rock-tag README (outside this repo) is not edited: rows for it are in the coordinator report
+  (Classes row, clastic group, fallback row and tag file, empty member tag, header counts 60 / 44).
+- **Next.** MIC adds those rows and files; then the `-PwithMic` palette shows diamictite as `fallback`, which
+  StrataGameTests accepts. The coordinator's batch GameTests run the new checks.
 ### 2026-09-30 — Satellite view: a true-colour keyframe layer, the default everywhere (agent worktree agent-a7ca2a0e875263a86, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben: "Default view on the viewer is currently an elevation map, can you turn it into an actual map. (I.E.
   Approximately what you would see on google earth zoomed out all the way / satellite imagery.) So I can see where
