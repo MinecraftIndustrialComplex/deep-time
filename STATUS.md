@@ -158,7 +158,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
     (first pictures had 44–65 blocks of saprolite, then of clay, on ridges), and the unit that fills a ridge is the thickest
     one beginning within 16 blocks of the mean rock surface, the thin beds over it riding up with the ground (first pictures had
     25-block coal caps on two peaks).
-- **After** (the same history: `stage amplify --in big-base/checkpoints/6-young.dtcp --bake`; the small run from scratch):
+- **After** (the same history: `stage amplify --in big-base/checkpoints/6-young.dtcp --bake`; the small run from scratch; a
+  from-scratch run of the 1000 Myr preset with the final code wrote a byte-identical `strata/horizons.dtr`, `cmp`):
 
   | share of columns | grade inversion | metamorphic sliver | high-grade sliver | plutonic sheet | plutonic with a floor | horizons / column |
   |---|---|---|---|---|---|---|
@@ -199,7 +200,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   deny=0 gradle=0`; cargo test: cli 52, core 359 + 3 ignored (+ 1), format 53, inspect 29 + 2 + 7, jni 7, viewer 6; JUnit
   tests=160 failures=0 errors=0 skipped=1 (`MacMemoryTest`, not this change); `ColumnRuleBenchTest` 0.61 ms/chunk at 13.3
   horizons per column. No GameTests (the coordinator's, per merge batch): `StrataGameTests` and the deposit tests read the
-  strata and may need their numbers looked at. Strata bake 36.9 s → 33.2 s on the small run.
+  strata and may need their numbers looked at. Strata bake 36.9 s → 33.2 s on the small run, 61.7 s → 56.2 s on the 1000 Myr one.
 - **What changes in a world.** Metamorphic rock is no longer at the surface on its neighbours' cover; belts read as
   cover → slate/quartzite → phyllite → schist → gneiss → granite/granodiorite → gabbro downwards. Fewer horizons per column
   (15.4 → 12.1). The host fractions the deposit stage reads change a little (pool units under a metamorphosed log are now
@@ -211,6 +212,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   have killed any other agent's cargo then running. None was running a minute later; an agent whose build died at that time
   should simply re-run it.
 - **Decisions for Ben** (listed under Pending questions; not asked, not decided here).
+- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/rock-order/` (runs, checkpoints, censuses, binaries) deleted at the end.
 - **Next.** Merge (the coordinator), run both GameTest suites on the batch, re-bake the workbench run; then Ben's answers.
 
 ### 2026-10-01 — Workbench deposits overlay: coal fields and ore sites by family, hover, "why here" (agent worktree agent-aae4250c131f0cf7a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
