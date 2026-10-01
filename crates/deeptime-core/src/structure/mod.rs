@@ -10,6 +10,8 @@
 //!    and move with the plates like every other layer.
 //! 2. **Plutons** (`plutons.rs`): the existing ones ride their plates and are unroofed; arc and
 //!    collision magmatism emplaces new ones.
+//!    2b. **Folds and faults** (`deform/`, P2-01): the existing ones ride their plates; the step's
+//!    shortening, rifting and oblique convergence start new ones.
 //! 3. **The deposit engine's fields** (P1-14's interface): whenever the surface has closed a frame
 //!    of the recorded history this step, the stage adds `deeptime:trap_structure` (`traps.rs`) and
 //!    the host-rock fractions `deeptime:host/<class>` (`hosts.rs`) to it, from the columns at the
@@ -17,7 +19,8 @@
 //! 4. **Keyframe layers** at the keyframe times: `structure/rock` (the rock at the surface: the
 //!    top horizon of the baked column, where no pluton crops out), `structure/log_grade` (the
 //!    highest metamorphic grade in the strata log), `structure/trap_structure`.
-//! 5. At the end: the plutons become bodies (`WorldState::bodies`), and the run's summary
+//! 5. At the end: the plutons become bodies (`WorldState::bodies`), the folds and faults the
+//!    world's structural events (`WorldState::structure`), and the run's summary
 //!    (`notes.structure`) records them, the metamorphosed volume and the baked stacks' shape.
 //!
 //! The horizon stacks themselves are baked on demand from the final world
@@ -26,6 +29,7 @@
 
 pub mod bake_horizons;
 pub mod columns;
+pub mod deform;
 pub mod hosts;
 pub mod metamorphism;
 pub mod params;
@@ -342,6 +346,10 @@ pub struct StructureState {
     pub counts: Counts,
     /// Strata-log volume that changed class, km³ (block metric).
     pub metamorphosed_km3: f64,
+    /// Folds and faults (P2-01), riding their plates.
+    pub features: Vec<deform::Feature>,
+    pub next_feature: u32,
+    pub deform_counts: deform::Counts,
 }
 
 /// The structure stage.
@@ -421,6 +429,7 @@ impl StructureStage {
             fields,
             surface,
             history,
+            events,
             ..
         } = world;
         let surface = surface.as_mut().ok_or_else(|| {
@@ -561,6 +570,63 @@ impl StructureStage {
         self.st.plutons.extend(born);
         add_time(&mut self.timings, "plutons", started);
 
+        // 2b. Folds and faults: carried, then started where the crust is strained.
+        let started = Instant::now();
+        if p.deformation.enabled() {
+            deform::advance(
+                &mut self.st.features,
+                &grid,
+                &omega_of,
+                dt_myr * 1.0e6,
+                plate_id,
+                crust,
+                &mut self.st.deform_counts,
+            );
+            let flags = field_of(fields, "plates/flags", n)?;
+            let orogen_km = traps::orogen_distance_km(&d, reg, crust, flags);
+            let inputs = deform::Inputs {
+                grid: &grid,
+                m_per_block_h: s.m_per_block_h,
+                regime: reg,
+                crust_type: crust,
+                flags,
+                convergence: field_of(fields, "plates/convergence_mm_yr", n)?,
+                obliquity: field_of(fields, "plates/obliquity_deg", n)?,
+                thickness: thick,
+                fold_trend: field_of(fields, "plates/fold_trend_deg", n)?,
+                plate_id,
+                elevation: &src.surface.elevation_m,
+                orogen_km: &orogen_km,
+            };
+            let mut rng = Rng::stream(
+                step_seed(self.preset.seed, self.st.done),
+                "structure/deform",
+            );
+            let cause = |kind: deform::Kind, x: f64, z: f64| {
+                deform::cause_of(
+                    events,
+                    kind,
+                    x,
+                    z,
+                    s.circumference_blocks,
+                    t_end_myr * 1.0e6,
+                )
+            };
+            let born = deform::emplace(
+                &inputs,
+                p,
+                &self.st.features,
+                dt_myr,
+                t_end_myr,
+                &mut rng,
+                &mut self.st.next_feature,
+                &mut self.st.deform_counts,
+                &cause,
+            );
+            self.st.features.extend(born);
+        }
+        add_time(&mut self.timings, "deformation", started);
+
         // 3. The deposit engine's fields for frames the surface closed this step.
         let started = Instant::now();
         let frames = history.as_ref().map_or(0, |h| h.frame_count() as u64);
@@ -612,6 +678,21 @@ impl StructureStage {
         } else {
             Vec::new()
         };
+        // The folds and faults as the world's structural events, with a lattice evaluation of
+        // the whole planet (what it finds, and what it costs).
+        let structure = if last {
+            let started = Instant::now();
+            deform::undo_order(&mut self.st.features);
+            let st = deform::finish(&self.st.features, |x, z| {
+                src.surface_y(plutons::cell_of(&grid, x, z), &s)
+            });
+            let report =
+                deform::report(&self.st.features, &st, &self.preset, &self.st.deform_counts)?;
+            add_time(&mut self.timings, "deformation_lattice", started);
+            Some((st, report))
+        } else {
+            None
+        };
         drop(src);
         for (name, data) in outputs {
             fields.insert(
@@ -644,6 +725,8 @@ impl StructureStage {
             }
             self.st.plutons = plutons;
             let (mean_horizons, check) = summary.expect("baked on the last step");
+            let (structure, deformation) = structure.expect("finished on the last step");
+            world.structure = Some(structure);
             let note = json!({
                 "steps": self.st.done + 1,
                 "plutons": {
@@ -654,6 +737,7 @@ impl StructureStage {
                     "bodies": bodies,
                 },
                 "metamorphosed_km3": self.st.metamorphosed_km3,
+                "deformation": deformation,
                 "frames_published": self.st.frames_seen,
                 "host_classes": self.host_classes.iter().map(|&k| EVERY_CLASS[usize::from(k)]).collect::<Vec<_>>(),
                 "horizons": {
@@ -825,10 +909,24 @@ fn step_seed(seed: u64, step: u64) -> u64 {
 pub fn summary_line(note: &serde_json::Value) -> String {
     let pl = &note["plutons"];
     let hz = &note["horizons"];
+    let df = &note["deformation"];
+    let kinds = &df["structures"];
+    let deformation = format!(
+        " fold_trains={} thrusts={} normal_faults={} strike_slip_faults={} \
+         deformed_frac={:.4} faulted_frac={:.4} lattice_s={:.2} noddy_worst={:.1e}",
+        kinds["fold_train"].as_u64().unwrap_or(0),
+        kinds["thrust"].as_u64().unwrap_or(0),
+        kinds["normal_fault"].as_u64().unwrap_or(0),
+        kinds["strike_slip_fault"].as_u64().unwrap_or(0),
+        df["lattice"]["deformed_frac"].as_f64().unwrap_or(0.0),
+        df["lattice"]["faulted_frac"].as_f64().unwrap_or(0.0),
+        df["lattice"]["seconds"].as_f64().unwrap_or(0.0),
+        df["noddy_check"]["worst"].as_f64().unwrap_or(0.0),
+    );
     format!(
         "structure_final={} plutons_emplaced={} plutons_alive={} plutons_eroded={} \
          plutons_subducted={} pluton_bodies={} metamorphosed_km3={:.3e} frames_published={} \
-         horizons_k={} mean_horizons={:.2} horizon_check={}",
+         horizons_k={} mean_horizons={:.2} horizon_check={}{deformation}",
         note["steps"],
         pl["emplaced"],
         pl["alive"],

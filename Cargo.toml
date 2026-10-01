@@ -21,6 +21,7 @@ format_version = "0.2"
 [workspace.dependencies]
 deeptime-format = { path = "crates/deeptime-format" }
 deeptime-core = { path = "crates/deeptime-core" }
+deeptime-noddy = { path = "crates/deeptime-noddy" }
 deeptime-viewer = { path = "crates/deeptime-viewer" }
 # The JNI binding (plan §6.1); only deeptime-jni uses it. MIT OR Apache-2.0.
 jni = "=0.22.4"

@@ -72,6 +72,9 @@ pub struct WorldState {
     /// The volcano catalogue (P1-21), once the volcano stage has started; the amplifier shapes
     /// the edifices from it.
     pub volcanoes: Option<crate::surface::volcanoes::VolcanoState>,
+    /// The folds and faults the history left (P2-01), once the structure stage has finished:
+    /// events the column rule undoes, youngest first.
+    pub structure: Option<deeptime_format::structure::Structure>,
     /// The deposit engine's field history recorded by the history stages (P1-04 on). Not in the
     /// postcard body: a checkpoint carries its head in the body and its frames in sections of
     /// their own, streamed (`checkpoint.rs`), since frames may be on disk (P1-17).
@@ -97,6 +100,7 @@ impl WorldState {
             plates: None,
             surface: None,
             volcanoes: None,
+            structure: None,
             history: None,
             next_event_seq: 0,
             next_site_id: 0,
