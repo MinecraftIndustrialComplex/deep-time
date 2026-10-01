@@ -15,6 +15,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 : "${SCRATCH:?set SCRATCH to a scratch folder on the test machine}"
+# No Chromium given and none on PATH (the Linux test machine): run again inside `nix shell`.
+if [ -z "${DEEPTIME_CHROME:-}" ] && ! ls ~/Library/Caches/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-*/chrome-headless-shell > /dev/null 2>&1; then
+    command -v chromium > /dev/null 2>&1 || exec nix shell nixpkgs#chromium -c "$0" "$@"
+    DEEPTIME_CHROME="$(command -v chromium)"
+    export DEEPTIME_CHROME
+fi
+mkdir -p "$SCRATCH"
 PORT="${PORT:-8661}"
 B="http://127.0.0.1:$PORT"
 OUT="${OUT:-review/out/wb-sections}"
@@ -46,10 +53,10 @@ for d in 0 20 50 100 200 floor; do
     curl -s -o /dev/null -w "slice depth $d: %{http_code} %{size_download} bytes %{time_total}s (cold)\n" "$B/api/runs/bakeA/rock/slice.png?depth=$d"
 done
 curl -s -o /dev/null -w "slice depth 50 again: %{http_code} %{time_total}s (cached)\n" "$B/api/runs/bakeA/rock/slice.png?depth=50"
-for q in 'x0=-2000&z0=-500&x1=3000&z1=800' 'x0=-4900&z0=2500&x1=-4100&z1=3350' 'x0=8000&z0=-300&x1=-7900&z1=200'; do
+for q in 'x0=-2000&z0=-500&x1=3000&z1=800' 'x0=1237&z0=3100&x1=1237&z1=3650' 'x0=8000&z0=-300&x1=-7900&z1=200'; do
     curl -s -o /dev/null -w "section $q: %{http_code} %{size_download} bytes %{time_total}s\n" "$B/api/runs/bakeA/rock/section?$q"
 done
 
 python3 tools/workbench/sections_shots.py "$B" bakeA "$OUT" --depths 20,100,floor \
-    --section dia=-4900,2500,-4100,3350 --section coal=700,-650,1100,-450 --section seam=8000,-300,-7900,200
+    --section dia=1237,3100,1237,3650 --section coal=3422,700,3422,1250 --section seam=8000,-300,-7900,200
 echo "watch log:"; cat "$SCRATCH/watch-$PORT.log"
