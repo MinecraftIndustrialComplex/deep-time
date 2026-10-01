@@ -133,6 +133,8 @@ pub fn report(
     st: &Structure,
     preset: &crate::params::PlanetPreset,
     counts: &Counts,
+    regime: &[f32],
+    crust_type: &[f32],
 ) -> Result<serde_json::Value, crate::error::CoreError> {
     use deeptime_format::structure::StructIndex;
     use serde_json::json;
@@ -161,7 +163,10 @@ pub fn report(
         median(features.iter().filter(|f| f.kind == k).map(get).collect())
     };
     let frac = |n: u64| n as f64 / cols.columns.max(1) as f64;
+    let l1 = deeptime_format::GridDesc::for_planet("L1", c, preset.resolution.l1_r)?;
+    let coverage = coverage(st, &index, &l1, regime, crust_type);
     Ok(json!({
+        "coverage": coverage,
         "structures": {
             "fold_train": alive(Kind::FoldTrain),
             "thrust": alive(Kind::Thrust),
@@ -196,8 +201,6 @@ pub fn report(
             "max_segments": cols.max_segments,
             "max_shift_blocks": cols.max_shift,
             "max_heave_blocks": cols.max_heave,
-            "seconds": cols.seconds,
-            "threads": rayon::current_num_threads(),
             "points_at_4_blocks": voxels,
         },
         "noddy_check": {
@@ -207,13 +210,84 @@ pub fn report(
             "worst": check.worst,
             "side_flips": check.side_flips,
             "events_per_point": check.events_per_point,
-            "ns_per_point_noddy": check.ns_per_point_noddy(),
-            "ns_per_point_columns": check.ns_per_point_columns(),
+        },
+        // Wall-clock numbers: the stage moves them into the note's `millis`, the one part of a
+        // note that may differ between two runs of the same world.
+        "timing": {
+            "lattice_s": cols.seconds,
+            "threads": rayon::current_num_threads(),
+            "noddy_ns_point": check.ns_per_point_noddy(),
+            "column_ns_point": check.ns_per_point_columns(),
             // What the general engine would take for the whole lattice on one thread, were
             // every column as busy as the sampled ones that have events.
-            "planet_lattice_seconds_noddy": check.ns_per_point_noddy() * 1.0e-9 * voxels
+            "noddy_planet_s": check.ns_per_point_noddy() * 1.0e-9 * voxels
                 * (check.columns_with_events as f64 / check.columns.max(1) as f64),
         },
         "bytes": std::mem::size_of_val(features) + st.events.len() * std::mem::size_of::<deeptime_format::structure::StructEvent>(),
     }))
+}
+
+/// Where the structures are, by what the crust is now: per tectonic regime of the continental L1
+/// cells, the share with at least one structure over the cell (`covered`), with one made in the
+/// last 50 Myr of the run (`young`), and the mean number of structures over a cell. This is the
+/// realism check's first half ("folded near orogens, flat on cratons"); the other half, which
+/// rock is old enough to be deformed, is the column's.
+pub fn coverage(
+    st: &Structure,
+    index: &deeptime_format::structure::StructIndex,
+    l1: &deeptime_format::GridDesc,
+    regime: &[f32],
+    crust_type: &[f32],
+) -> serde_json::Value {
+    use crate::plates::state::{CONTINENTAL, regime as rg};
+    let c = index.circumference();
+    let newest = st
+        .events
+        .iter()
+        .map(|e| e.t_years)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let w = l1.w as usize;
+    let mut rows = vec![[0u64; 4]; rg::NAMES.len()];
+    let mut cand = Vec::new();
+    for k in 0..l1.cells().min(regime.len()) {
+        if crust_type[k] as u8 != CONTINENTAL {
+            continue;
+        }
+        let r = (regime[k] as usize).min(rg::NAMES.len() - 1);
+        let (x, z) = (
+            l1.block_x((k % w) as i64) as f64,
+            l1.block_z((k / w) as i64) as f64,
+        );
+        index.candidates(st, x, z, &mut cand);
+        let (mut n, mut young) = (0u64, false);
+        for &e in &cand {
+            let ev = &st.events[e as usize];
+            let (a, b) = ev.window.local(x, z, c);
+            if ev.window.weight(a, b) > 0.0 {
+                n += 1;
+                young |= ev.t_years >= newest - 50.0e6;
+            }
+        }
+        rows[r][0] += 1;
+        rows[r][1] += u64::from(n > 0);
+        rows[r][2] += u64::from(young);
+        rows[r][3] += n;
+    }
+    let mut out = serde_json::Map::new();
+    for (r, row) in rows.iter().enumerate() {
+        if row[0] == 0 {
+            continue;
+        }
+        let cells = row[0] as f64;
+        out.insert(
+            rg::NAMES[r].to_owned(),
+            serde_json::json!({
+                "cells": row[0],
+                "covered": row[1] as f64 / cells,
+                "young": row[2] as f64 / cells,
+                "mean_structures": row[3] as f64 / cells,
+            }),
+        );
+    }
+    serde_json::Value::Object(out)
 }

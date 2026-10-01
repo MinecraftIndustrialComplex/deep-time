@@ -5,10 +5,10 @@
 //! | Where (per L1 cell, continental crust) | Strain | What forms |
 //! |---|---|---|
 //! | the collision regime (a Himalayan orogeny in progress) | shortening, full strength | fold trains and thrusts along the plate model's fold trend, thrusts dipping under the high ground |
-//! | a continental arc and its back-arc while the plates converge (an Andean orogeny) | shortening, half strength at 80 mm/yr | the same, verging away from the arc |
-//! | the foreland, out to `structure.fold_belt_km` from an active orogen | shortening, fading with distance | gentler folds and thrusts (the Zagros, the Subandean belt) |
+//! | a continental arc and its back-arc where the plate model is lifting the crust (an Andean orogeny) | shortening, half strength at 80 mm/yr of convergence and `arc_uplift_mm_yr` of uplift | the same, dipping under the high ground |
+//! | the foreland, out to `foreland_km` from an active orogen | shortening, fading with distance | gentler folds and thrusts (the Zagros, the Subandean belt) |
 //! | the rift regime | extension | normal faults along the rift, dipping towards its axis (one in four the other way) |
-//! | inside a subduction zone's reach where convergence is more than 30° oblique | shear | strike-slip faults along the margin |
+//! | a lifted margin inside a subduction zone's reach where convergence is more than 30° oblique | shear | strike-slip faults along the margin (slip partitioning) |
 //!
 //! Each is a Poisson process in space and time, like the plutons: the expected number in a step
 //! is Σ strain × cell area × the kind's rate × Δt, and a structure is not started where
@@ -45,10 +45,16 @@ pub struct Inputs<'a> {
     /// The plate model's fold trend, degrees clockwise from north in [0, 180); NaN where none.
     pub fold_trend: &'a [f32],
     pub plate_id: &'a [f32],
+    /// The plate model's uplift over the last step, mm/yr.
+    pub uplift: &'a [f32],
     /// Ground height, m (any datum: only its slope is read).
     pub elevation: &'a [f32],
-    /// Distance to the nearest active orogen, km (`traps::orogen_distance_km`).
+    /// Distance to the nearest active orogen, km on the block metric
+    /// (`traps::orogen_distance_km`).
     pub orogen_km: &'a [f32],
+    /// Blocks per km of the plate model's sphere (C / 2π·`tectonics.model_radius_km`): tectonic
+    /// widths are Earth-normalized, like the plate model's own distances.
+    pub blocks_per_model_km: f64,
 }
 
 /// The strain a cell is under: shortening, extension and shear, each 0–1.
@@ -68,22 +74,34 @@ pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
     let flags = x.flags[c] as u32 as u8;
     let conv = f64::from(x.convergence[c].max(0.0));
     let speed = (conv / 80.0).min(1.0);
+    let p = &sp.deformation;
     let shortening = if reg == regime::COLLISION {
         1.0
-    } else if flags & ARC != 0 || reg == regime::ARC || reg == regime::BACK_ARC {
-        0.5 * speed
     } else {
-        let d = f64::from(x.orogen_km[c]);
-        if d > 0.0 && d < sp.fold_belt_km {
-            0.6 * (1.0 - d / sp.fold_belt_km)
+        // An Andean margin shortens where it is being lifted: the plate model's back-arc regime
+        // reaches the whole subduction distance inland, most of it undeformed.
+        let andean = if flags & ARC != 0 || reg == regime::ARC || reg == regime::BACK_ARC {
+            let lift = f64::from(x.uplift[c].max(0.0)) / p.arc_uplift_mm_yr.max(1e-9);
+            0.5 * speed * lift.min(1.0)
         } else {
             0.0
-        }
+        };
+        let d = f64::from(x.orogen_km[c]) * 1000.0 / x.m_per_block_h;
+        let belt = p.foreland_km * x.blocks_per_model_km;
+        let foreland = if d > 0.0 && d < belt {
+            0.6 * (1.0 - d / belt)
+        } else {
+            0.0
+        };
+        andean.max(foreland)
     };
     let extension = if reg == regime::RIFT { 1.0 } else { 0.0 };
     let obliquity = f64::from(x.obliquity[c]);
+    // Slip partitioning: the margin-parallel part of oblique convergence is taken up by
+    // strike-slip faults in the arc (the Sumatran fault), where the margin is being lifted.
     let shear = if flags & SUBDUCTION_ZONE != 0 && obliquity > 30.0 {
-        ((obliquity - 30.0) / 45.0).min(1.0) * speed
+        let lift = f64::from(x.uplift[c].max(0.0)) / p.arc_uplift_mm_yr.max(1e-9);
+        ((obliquity - 30.0) / 45.0).min(1.0) * speed * lift.min(1.0)
     } else {
         0.0
     };
@@ -305,6 +323,7 @@ pub fn emplace(
                 dip_deg: 0.0,
                 slip: 0.0,
                 cause: cause(kind, bx, bz),
+                adrift: 0,
             };
             match kind {
                 Kind::FoldTrain => {
@@ -405,6 +424,7 @@ pub(crate) mod tests {
         pub thickness: Vec<f32>,
         pub trend: Vec<f32>,
         pub plate: Vec<f32>,
+        pub uplift: Vec<f32>,
         pub elevation: Vec<f32>,
         pub orogen_km: Vec<f32>,
     }
@@ -424,6 +444,7 @@ pub(crate) mod tests {
                 thickness: vec![35_000.0; n],
                 trend: vec![f32::NAN; n],
                 plate: vec![0.0; n],
+                uplift: vec![0.0; n],
                 elevation: vec![300.0; n],
                 orogen_km: vec![3000.0; n],
             };
@@ -465,8 +486,11 @@ pub(crate) mod tests {
                 thickness: &self.thickness,
                 fold_trend: &self.trend,
                 plate_id: &self.plate,
+                uplift: &self.uplift,
                 elevation: &self.elevation,
                 orogen_km: &self.orogen_km,
+                // The default 250 km of foreland is 600 blocks here (37 cells).
+                blocks_per_model_km: 2.4,
             }
         }
 
@@ -516,7 +540,17 @@ pub(crate) mod tests {
         q.flags[60 * w + 30] = f32::from(SUBDUCTION_ZONE);
         q.obliquity[60 * w + 30] = 75.0;
         q.convergence[60 * w + 30] = 80.0;
+        q.uplift[60 * w + 30] = 0.2;
         assert_eq!(strain(&q.inputs(), 60 * w + 30, &sp).shear, 1.0);
+        // A back-arc shortens only where the plate model is lifting it.
+        let c = 60 * w + 20;
+        q.regime[c] = f32::from(regime::BACK_ARC);
+        q.convergence[c] = 80.0;
+        assert_eq!(strain(&q.inputs(), c, &sp).shortening, 0.0);
+        q.uplift[c] = 0.05;
+        assert!((strain(&q.inputs(), c, &sp).shortening - 0.25).abs() < 1e-6);
+        q.uplift[c] = 1.0;
+        assert_eq!(strain(&q.inputs(), c, &sp).shortening, 0.5);
     }
 
     #[test]
@@ -604,7 +638,8 @@ pub(crate) mod tests {
             let axis_x = p.grid.block_x(179) as f64 + 8.0;
             let dip_dir = direction(f64::from(f.azimuth_deg) + 90.0);
             let to_axis = axis_x - f.x;
-            if to_axis.abs() < 8.0 {
+            // (Within a cell of the axis the side is a coin toss.)
+            if to_axis.abs() < 20.0 {
                 continue;
             }
             if dip_dir[0] * to_axis > 0.0 {

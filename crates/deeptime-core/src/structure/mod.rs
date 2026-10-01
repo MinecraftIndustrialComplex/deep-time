@@ -595,8 +595,11 @@ impl StructureStage {
                 thickness: thick,
                 fold_trend: field_of(fields, "plates/fold_trend_deg", n)?,
                 plate_id,
+                uplift: field_of(fields, "plates/uplift_mm_yr", n)?,
                 elevation: &src.surface.elevation_m,
                 orogen_km: &orogen_km,
+                blocks_per_model_km: f64::from(s.circumference_blocks)
+                    / (std::f64::consts::TAU * self.preset.tectonics.model_radius_km),
             };
             let mut rng = Rng::stream(
                 step_seed(self.preset.seed, self.st.done),
@@ -686,9 +689,31 @@ impl StructureStage {
             let st = deform::finish(&self.st.features, |x, z| {
                 src.surface_y(plutons::cell_of(&grid, x, z), &s)
             });
-            let report =
-                deform::report(&self.st.features, &st, &self.preset, &self.st.deform_counts)?;
+            let report = deform::report(
+                &self.st.features,
+                &st,
+                &self.preset,
+                &self.st.deform_counts,
+                src.regime,
+                src.crust,
+            )?;
             add_time(&mut self.timings, "deformation_lattice", started);
+            let mut report = report;
+            if let Some(serde_json::Value::Object(timing)) =
+                report.as_object_mut().and_then(|o| o.remove("timing"))
+            {
+                for (key, name) in [
+                    ("lattice_s", "deformation_columns_s"),
+                    ("threads", "deformation_threads"),
+                    ("noddy_ns_point", "deformation_noddy_ns_point"),
+                    ("column_ns_point", "deformation_column_ns_point"),
+                    ("noddy_planet_s", "deformation_noddy_planet_s"),
+                ] {
+                    if let Some(v) = timing.get(key).and_then(serde_json::Value::as_f64) {
+                        self.timings.insert(name, v);
+                    }
+                }
+            }
             Some((st, report))
         } else {
             None
@@ -727,6 +752,10 @@ impl StructureStage {
             let (mean_horizons, check) = summary.expect("baked on the last step");
             let (structure, deformation) = structure.expect("finished on the last step");
             world.structure = Some(structure);
+            ctx.log.push(
+                crate::log::Level::Info,
+                format!("structure deformation: {deformation}"),
+            );
             let note = json!({
                 "steps": self.st.done + 1,
                 "plutons": {
@@ -913,15 +942,35 @@ pub fn summary_line(note: &serde_json::Value) -> String {
     let kinds = &df["structures"];
     let deformation = format!(
         " fold_trains={} thrusts={} normal_faults={} strike_slip_faults={} \
-         deformed_frac={:.4} faulted_frac={:.4} lattice_s={:.2} noddy_worst={:.1e}",
+         deformed_frac={:.4} faulted_frac={:.4} max_candidates={} max_shift_blocks={:.1} \
+         lattice_s={:.2} noddy_worst={:.1e} noddy_ns_point={:.0} column_ns_point={:.1} \
+         covered_craton={:.3} covered_collision={:.3} covered_rift={:.3} covered_passive_margin={:.3}",
         kinds["fold_train"].as_u64().unwrap_or(0),
         kinds["thrust"].as_u64().unwrap_or(0),
         kinds["normal_fault"].as_u64().unwrap_or(0),
         kinds["strike_slip_fault"].as_u64().unwrap_or(0),
         df["lattice"]["deformed_frac"].as_f64().unwrap_or(0.0),
         df["lattice"]["faulted_frac"].as_f64().unwrap_or(0.0),
-        df["lattice"]["seconds"].as_f64().unwrap_or(0.0),
+        df["lattice"]["max_candidates"].as_u64().unwrap_or(0),
+        df["lattice"]["max_shift_blocks"].as_f64().unwrap_or(0.0),
+        note["millis"]["deformation_columns_s"]
+            .as_f64()
+            .unwrap_or(0.0),
         df["noddy_check"]["worst"].as_f64().unwrap_or(0.0),
+        note["millis"]["deformation_noddy_ns_point"]
+            .as_f64()
+            .unwrap_or(0.0),
+        note["millis"]["deformation_column_ns_point"]
+            .as_f64()
+            .unwrap_or(0.0),
+        df["coverage"]["craton"]["covered"].as_f64().unwrap_or(0.0),
+        df["coverage"]["collision"]["covered"]
+            .as_f64()
+            .unwrap_or(0.0),
+        df["coverage"]["rift"]["covered"].as_f64().unwrap_or(0.0),
+        df["coverage"]["passive_margin"]["covered"]
+            .as_f64()
+            .unwrap_or(0.0),
     );
     format!(
         "structure_final={} plutons_emplaced={} plutons_alive={} plutons_eroded={} \

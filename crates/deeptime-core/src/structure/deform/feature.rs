@@ -89,7 +89,13 @@ pub struct Feature {
     pub slip: f32,
     /// The tectonic event that made it (the event log's id), 0 when none was found.
     pub cause: u64,
+    /// Plate steps in a row it has not had continental crust under it.
+    pub adrift: u8,
 }
+
+/// A structure that has had no continental crust under it for this many plate steps is lost (its
+/// crust went under another plate, or it was carried off by the wrong plate at a boundary).
+pub const LOST_AFTER_STEPS: u8 = 10;
 
 /// Counters for the run summary.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -100,7 +106,7 @@ pub struct Counts {
     pub strike_slip_faults: u64,
     /// Not started because enough structures of the kind were already there.
     pub saturated: u64,
-    /// Lost with oceanic crust that went under another plate.
+    /// Lost: no continental crust under them for [`LOST_AFTER_STEPS`] plate steps.
     pub subducted: u64,
 }
 
@@ -264,9 +270,14 @@ impl Feature {
     }
 }
 
-/// Moves every feature with its plate over `dt_yr` (Ω per plate id, rad/yr), turning its azimuth
-/// with the plate, then takes the plate now under it; features on oceanic crust that went under
-/// another plate are lost.
+/// Moves every feature with its plate over `dt_yr` (Ω per plate id, rad/yr; zero for a plate that
+/// is gone), turning its azimuth with the plate, then looks at the crust now under it. On
+/// continental crust it takes that crust's plate (its own, the fragment a rift left it on, or the
+/// plate a collision welded it to). A structure is born on continental crust and continents are
+/// not consumed, so oceanic crust under it means the L1 cell at a plate boundary read the other
+/// side: it keeps riding its plate, or, if that plate is gone, takes the continental plate of a
+/// neighbouring cell. Only one that stays off continental crust for [`LOST_AFTER_STEPS`] steps is
+/// dropped.
 pub fn advance(
     features: &mut Vec<Feature>,
     grid: &GridDesc,
@@ -297,13 +308,35 @@ pub fn advance(
             f.z = z1;
         }
         let cell = cell_of(grid, f.x, f.z);
-        let now = plate_id[cell].max(0.0) as u32;
-        if now != f.plate {
-            if crust_type[cell] as u8 != CONTINENTAL {
-                counts.subducted += 1;
-                return false;
+        if crust_type[cell] as u8 == CONTINENTAL {
+            f.plate = plate_id[cell].max(0.0) as u32;
+            f.adrift = 0;
+            return true;
+        }
+        f.adrift = f.adrift.saturating_add(1);
+        if f.adrift > LOST_AFTER_STEPS {
+            counts.subducted += 1;
+            return false;
+        }
+        if om == [0.0; 3] {
+            // Its plate is gone: the nearest continental cell within two cells names the new one.
+            let w = grid.w as i64;
+            let (i, j) = ((cell as i64) % w, (cell as i64) / w);
+            let mut best: Option<(i64, u32)> = None;
+            for dj in -2..=2i64 {
+                let jj = j + dj;
+                if jj < 0 || jj >= i64::from(grid.h) {
+                    continue;
+                }
+                for di in -2..=2i64 {
+                    let k = (jj * w + (i + di).rem_euclid(w)) as usize;
+                    let d2 = di * di + dj * dj;
+                    if crust_type[k] as u8 == CONTINENTAL && best.is_none_or(|b| d2 < b.0) {
+                        best = Some((d2, plate_id[k].max(0.0) as u32));
+                    }
+                }
             }
-            f.plate = now;
+            f.plate = best.map_or(plate_id[cell].max(0.0) as u32, |b| b.1);
         }
         true
     });
@@ -330,6 +363,7 @@ mod tests {
             dip_deg: 0.0,
             slip: 0.0,
             cause: 0,
+            adrift: 0,
         }
     }
 
@@ -381,19 +415,40 @@ mod tests {
             (turned - 20.0).abs() < 0.5 || (turned - 340.0).abs() < 0.5,
             "turned {turned}"
         );
-        // On oceanic crust under another plate: lost.
+        // Oceanic crust under it for a step or two (a boundary cell read from the other side):
+        // kept, still on its plate while that plate lives.
         let other = vec![3.0f32; n];
         let ocean = vec![0.0f32; n];
+        let alive = |_: u32| [0.0, 0.0, 1.0e-12];
+        advance(&mut fs, &grid, &alive, 0.0, &other, &ocean, &mut counts);
+        assert_eq!((fs.len(), fs[0].plate, fs[0].adrift), (1, 0, 1));
+        // Back on continental crust: the count starts again.
+        advance(&mut fs, &grid, &alive, 0.0, &plate, &crust, &mut counts);
+        assert_eq!(fs[0].adrift, 0);
+        // Off continental crust for good: lost after LOST_AFTER_STEPS steps.
+        for _ in 0..LOST_AFTER_STEPS {
+            advance(&mut fs, &grid, &alive, 0.0, &other, &ocean, &mut counts);
+            assert_eq!(fs.len(), 1);
+        }
+        advance(&mut fs, &grid, &alive, 0.0, &other, &ocean, &mut counts);
+        assert!(fs.is_empty() && counts.subducted == 1);
+        // Its plate gone and oceanic crust under it, a continent one cell away: that plate.
+        let mut fs = vec![fold(100.0, 50.0, 0.0)];
+        let c0 = cell_of(&grid, 100.0, 50.0);
+        let mut mixed_crust = ocean.clone();
+        let mut mixed_plate = other.clone();
+        mixed_crust[c0 + 1] = f32::from(CONTINENTAL);
+        mixed_plate[c0 + 1] = 7.0;
         advance(
             &mut fs,
             &grid,
             &|_| [0.0; 3],
             0.0,
-            &other,
-            &ocean,
+            &mixed_plate,
+            &mixed_crust,
             &mut counts,
         );
-        assert!(fs.is_empty() && counts.subducted == 1);
+        assert_eq!((fs[0].plate, fs[0].adrift), (7, 1));
         // On continental crust that changed plate (a terrane docked): kept, on the new plate.
         let mut fs = vec![fold(100.0, 50.0, 0.0)];
         advance(

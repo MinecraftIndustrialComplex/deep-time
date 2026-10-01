@@ -146,6 +146,7 @@
   "deeptime.editor.field.thrust_rate": "Thrust frequency",
   "deeptime.editor.field.normal_rate": "Normal fault frequency",
   "deeptime.editor.field.strike_slip_rate": "Strike-slip fault frequency",
+  "deeptime.editor.field.foreland_width": "Foreland fold belt width",
   "deeptime.editor.field.deform_overlap": "Overlapping structures",
   "deeptime.editor.field.volcano_density": "Volcanoes",
   "deeptime.editor.field.volcano_size": "Volcano size",

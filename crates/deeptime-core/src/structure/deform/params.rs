@@ -32,49 +32,53 @@ pub struct DeformationParams {
     pub size: f64,
 
     /// Fold wavelength, km: [median, min, max] of a lognormal with `fold_wavelength_sigma`.
-    /// Median 16 km: the Zagros Simply Folded Belt's folds are 15.8 ± 5.3 km apart (Mouthereau,
-    /// Tensi, Bellahsen, Lacombe, De Boisgrollier & Kargar 2007, Tectonics 26:TC5006); the first
-    /// -order folds of the Appalachian Valley and Ridge and of the Jura are 5–20 km. The wavelength
-    /// follows the thickness of the stiff layers being buckled (Biot 1961, Geol. Soc. Am. Bull.
-    /// 72:1595–1620; Sherwin & Chapple 1968, Am. J. Sci. 266:167–179).
+    /// Median 16 km: the folds of the Zagros Folded Belt have "homogeneous fold wavelengths
+    /// (15.8 ± 5.3 km)" (Mouthereau, Tensi, Bellahsen, Lacombe, De Boisgrollier & Kargar 2007,
+    /// Tectonics 26:TC5006). The range is a design value about it. In buckling theory the
+    /// wavelength follows the thickness of the stiff layers (Biot 1961, Geol. Soc. Am. Bull.
+    /// 72:1595–1620, tested on natural folds by Sherwin & Chapple 1968, Am. J. Sci. 266:167–179);
+    /// here it is drawn, not derived from the strata.
     pub fold_wavelength_km: [f64; 3],
     pub fold_wavelength_sigma: f64,
     /// Wavelengths across one fold train, [min, max]: a train is a bundle of a few parallel
     /// anticlines and synclines that dies out sideways.
     pub fold_train_waves: [f64; 2],
-    /// A fold train's length along its axis over its wavelength, [min, max]. Zagros anticlines are
-    /// several times as long as they are wide and plunge out at both ends (Blanc, Allen, Inger &
-    /// Hassani 2003, J. Geol. Soc. 160:401–412).
+    /// A fold train's length along its axis over its wavelength, [min, max]. A design value after
+    /// the long, doubly plunging anticlines of the Zagros Simple Folded Zone (its structural
+    /// styles: Blanc, Allen, Inger & Hassani 2003, J. Geol. Soc. 160:401–412).
     pub fold_length_ratio: [f64; 2],
     /// Shortening taken up by folding, [least, most], as a fraction: a sine fold of amplitude A
-    /// and wavelength λ has shortened by about (πA/λ)², so A/λ = √e/π. Fold-thrust belts shorten
-    /// by roughly a tenth to a third (McQuarrie 2004, J. Struct. Geol. 26:519–535, for the
-    /// Zagros); the least is used in forelands, the most where a collision has thickened the
-    /// crust the most (1 − `structure.reference_crust_m` / the plate model's thickness gives the
-    /// local value in between).
+    /// and wavelength λ has shortened by about (πA/λ)², so A/λ = √e/π. The Zagros Folded Belt
+    /// has shortened by 16–19 % (Mouthereau et al. 2007) or about 20 % (McQuarrie 2004, J.
+    /// Struct. Geol. 26:519–535). The least (a design value) is used in forelands, the most (a
+    /// design value: limbs at about 45°) where a collision has thickened the crust the most;
+    /// 1 − `structure.reference_crust_m` / the plate model's thickness gives the local value in
+    /// between.
     pub fold_shortening: [f64; 2],
     /// Fold trains per km² of full-strength shortening per Myr. Design value: a train covers
     /// about 28 λ² (7,000 km² at 16 km), so 6e-6 covers a collision belt about 1.3 times over in
     /// 30 Myr.
     pub fold_rate_km2_myr: f64,
 
-    /// Fault trace length, km: [median, min, max] of a lognormal with `fault_length_sigma`. Rift
-    /// border-fault segments are some tens of km long before they link (Gawthorpe & Leeder 2000,
-    /// Basin Res. 12:195–218).
+    /// Fault trace length, km: [median, min, max] of a lognormal with `fault_length_sigma`.
+    /// Design values (segments of some tens of km); faults grow by the linkage of such segments
+    /// (Gawthorpe & Leeder 2000, Basin Res. 12:195–218).
     pub fault_length_km: [f64; 3],
     pub fault_length_sigma: f64,
-    /// How far into the hanging wall a fault's displacement reaches, as a share of its length
-    /// (the half-graben's width; rift half-grabens are about as wide as a third to a half of
-    /// their border fault's length).
+    /// How far into the hanging wall a fault's displacement reaches, as a share of its length:
+    /// the width of the tilted block (a half-graben). A design value.
     pub fault_reach_ratio: f64,
-    /// Greatest slip over trace length. Displacement scales with length, D = γ·L, with γ between
-    /// about 0.01 and 0.1 (Cowie & Scholz 1992, J. Struct. Geol. 14:1149–1156; Schlische, Young,
-    /// Ackermann & Gupta 1996, Geology 24:683–686: D = 0.03·L^1.06; Kim & Sanderson 2005, Earth
-    /// -Sci. Rev. 68:317–334, who find thrusts at the high end).
+    /// Greatest slip over trace length. A fault's greatest displacement grows in proportion to
+    /// its length, D = γ·L (Cowie & Scholz 1992, J. Struct. Geol. 14:1149–1156), with γ about
+    /// 0.03 for normal faults from millimetres to kilometres long (Schlische, Young, Ackermann &
+    /// Gupta 1996, Geology 24:683–686) and a spread of an order of magnitude between data sets
+    /// (reviewed by Kim & Sanderson 2005, Earth-Sci. Rev. 68:317–334). The values here are design
+    /// values inside that spread, chosen so that offsets read at block scale.
     pub normal_slip_ratio: f64,
     pub thrust_slip_ratio: f64,
     pub strike_slip_ratio: f64,
-    /// Dip of normal faults, degrees [min, max] (Andersonian ~60°), and of thrust ramps (~30°).
+    /// Dip of normal faults, degrees [min, max] (about 60°), and of thrusts (about 30°): the
+    /// fault angles of Anderson 1951, The Dynamics of Faulting, 2nd ed.
     pub normal_dip_deg: [f64; 2],
     pub thrust_dip_deg: [f64; 2],
     /// Faults per km² of full-strength regime per Myr: thrusts where the crust shortens, normal
@@ -83,6 +87,13 @@ pub struct DeformationParams {
     pub normal_rate_km2_myr: f64,
     pub strike_slip_rate_km2_myr: f64,
 
+    /// How far into the foreland of an active orogen the crust still shortens, km on the plate
+    /// model's (Earth-normalized) sphere: the Zagros Simply Folded Belt is about 250 km wide, the
+    /// Subandean belt 100–200 km. On a 16,384-block planet 250 km is about 100 blocks.
+    pub foreland_km: f64,
+    /// The plate model's uplift rate at which an Andean margin shortens at full strength, mm/yr
+    /// (the amplifier's `active_uplift_mm_yr` is the same 0.1).
+    pub arc_uplift_mm_yr: f64,
     /// Structures of one kind that may overlap at a place; a new one is not started where this
     /// many already are (strain goes on being taken up by the structures that exist).
     pub max_overlap: u32,
@@ -115,6 +126,8 @@ impl Default for DeformationParams {
             thrust_rate_km2_myr: 2.0e-5,
             normal_rate_km2_myr: 4.0e-5,
             strike_slip_rate_km2_myr: 4.0e-6,
+            foreland_km: 250.0,
+            arc_uplift_mm_yr: 0.1,
             max_overlap: 3,
             trend_scatter_deg: 12.0,
             max_structures: 60_000,
@@ -189,6 +202,7 @@ impl DeformationParams {
             (self.normal_rate_km2_myr, "normal_rate_km2_myr"),
             (self.strike_slip_rate_km2_myr, "strike_slip_rate_km2_myr"),
             (self.trend_scatter_deg, "trend_scatter_deg"),
+            (self.foreland_km, "foreland_km"),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
         }
@@ -203,6 +217,11 @@ impl DeformationParams {
             self.fault_reach_ratio > 0.0 && self.fault_reach_ratio <= 2.0,
             "fault_reach_ratio",
             "must be in (0, 2]",
+        )?;
+        check(
+            self.arc_uplift_mm_yr > 0.0 && self.arc_uplift_mm_yr.is_finite(),
+            "arc_uplift_mm_yr",
+            "must be > 0",
         )?;
         check(
             (1..=16).contains(&self.max_overlap),

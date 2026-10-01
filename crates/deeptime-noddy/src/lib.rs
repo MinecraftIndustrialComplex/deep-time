@@ -15,8 +15,10 @@
 //! inside a dyke or a plug), and the layer of the base stratigraphy (or of the unconformity's
 //! cover) that holds the restored point is the rock ([`History::rock_at`]). Nothing is stored
 //! between points, so any point of an unbounded Cartesian space can be asked, in any order and at
-//! any resolution (Jessell & Valenta 1996; Jessell et al. 2022, Earth Syst. Sci. Data 14:381-392;
-//! Wellmann et al. 2016, Geosci. Model Dev. 9:1019-1035).
+//! any resolution (Jessell & Valenta 1996, "Structural geophysics: integrated structural and
+//! geophysical modelling", in De Paor (ed.), Structural Geology and Personal Computers,
+//! Pergamon, 303-324; Jessell et al. 2022, Earth Syst. Sci. Data 14:381-392; Wellmann et al.
+//! 2016, Geosci. Model Dev. 9:1019-1035).
 //!
 //! # What is ported, and from where
 //!
