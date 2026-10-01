@@ -826,23 +826,88 @@ impl Session {
             return Ok(());
         }
         let n = self.keyframes.next_n();
-        if let Some(frame) = keyframes::render(
-            &s.world,
-            &self.ramps,
-            &self.view,
-            stage,
-            layers,
-            n,
-            self.policy.size,
-        ) {
+        let drawn = Instant::now();
+        // In the session's own pool: the water view's hydrology is parallel in places.
+        let world = &s.world;
+        if let Some(frame) = self.pool.install(|| {
+            keyframes::render(
+                world,
+                &self.ramps,
+                &self.view,
+                stage,
+                layers,
+                n,
+                self.policy.size,
+            )
+        }) {
+            let millis = drawn.elapsed().as_secs_f64() * 1000.0;
             self.keyframes.push(frame)?;
             s.last_kf_t = Some((s.world.t_years, s.current));
             self.log.push(
                 Level::Debug,
-                format!("keyframe {n} at t={} ({stage})", s.world.t_years),
+                format!(
+                    "keyframe {n} at t={} ({stage}), drawn in {millis:.0} ms",
+                    s.world.t_years
+                ),
             );
         }
         Ok(())
+    }
+
+    /// The bake wrote `rivers/rivers.dtrv` and the `water_level` layer: the last frame that shows
+    /// the water (`satellite`, `rivers`) is drawn again from them, so the final map has exactly
+    /// the rivers and lakes of the bake, not the ones derived from the frame's terrain. Without a
+    /// rivers file (no bake, or `hydro.enabled` false) the frame stays as it was; a failure is a
+    /// warning, never the run's.
+    fn bake_water_into_last_frame(
+        &self,
+        world: &WorldState,
+        dir: &Path,
+        m: &deeptime_format::Manifest,
+    ) {
+        let index = self.keyframes.index();
+        let Some(entry) = index.frames.iter().rev().find(|f| {
+            f.layers
+                .iter()
+                .any(|l| l == crate::satellite::LAYER || l == crate::water_view::LAYER)
+        }) else {
+            return;
+        };
+        let started = Instant::now();
+        let result = (|| -> Result<Option<String>, CoreError> {
+            let water = crate::water_view::from_bake(
+                world,
+                &self.view,
+                dir,
+                m.layer("water_level").map(|l| l.path.as_str()),
+                (entry.w, entry.h),
+            )?;
+            let Some(water) = water else {
+                return Ok(None);
+            };
+            let frame = self.keyframes.get(entry.n)?;
+            let Some(redrawn) = self.pool.install(|| {
+                keyframes::redraw_water(&frame, world, &self.ramps, &self.view, &water)
+            }) else {
+                return Ok(None);
+            };
+            self.keyframes.replace(redrawn)?;
+            Ok(Some(format!(
+                "keyframe {} drawn again with the bake's water ({} river chains, {:.0} px of lakes) in {:.0} ms",
+                entry.n,
+                water.info.chains,
+                water.info.lake_px,
+                started.elapsed().as_secs_f64() * 1000.0
+            )))
+        })();
+        match result {
+            Ok(Some(line)) => self.log.push(Level::Info, line),
+            Ok(None) => {}
+            Err(e) => self.log.push(
+                Level::Warn,
+                format!("could not draw the last keyframe with the bake's water: {e}"),
+            ),
+        }
     }
 
     /// The current stage just finished: a closing keyframe, a checkpoint if asked for, next stage.
@@ -1155,6 +1220,9 @@ impl Session {
                 .install(|| crate::bake::bake(world, p, dir, &mut m))?;
             self.log.push(Level::Info, crate::bake::summary_line(&note));
             m.notes.insert(crate::bake::NOTES_KEY.into(), note);
+            // The last frame shows the rivers and lakes the bake wrote (before the frame files
+            // are listed in the manifest below).
+            self.bake_water_into_last_frame(world, dir, &m);
         }
         let mut files = std::mem::take(&mut m.files);
 

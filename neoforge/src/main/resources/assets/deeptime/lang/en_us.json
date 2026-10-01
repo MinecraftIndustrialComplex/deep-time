@@ -258,6 +258,7 @@
   "deeptime.create.blocked.staging_missing": "The accepted run's data is gone. Open Customize and run the simulation again.",
 
   "deeptime.layer.satellite": "Satellite",
+  "deeptime.layer.rivers": "Rivers & lakes",
   "deeptime.layer.elevation": "Elevation",
   "deeptime.layer.plates": "Plates",
   "deeptime.layer.crust_age": "Crust age",
