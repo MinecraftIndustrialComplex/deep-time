@@ -644,10 +644,11 @@ else that cell; depressions (F > height) of at least `hydro.lake_min_area_km2` a
 their departures from the year's mean added to the cell's mean, ± 8 °C without them; a sinusoidal
 year between the two months gives the share of the year above freezing and its mean temperature
 above freezing T⁺; liquid = min(P, P · share + `snow_melt_mm_per_degree_day` · 365.25 · T⁺); runoff
-= liquid − ET, ET by Fu's Budyko curve with PET = 60 mm/°C · T, as the surface stage; ground whose
-warmest month is below freezing gives none). **A basin's lake level is its water balance**
+= liquid − ET, ET by Fu's Budyko curve on the liquid water with PET = `pet_mm_per_c` (60) · T⁺,
+Holdridge's biotemperature rule, which is the surface stage's 60 mm/°C · T where there is no frost;
+ground whose warmest month is below freezing gives none). **A basin's lake level is its water balance**
 (`lake_balance`, on by default): a cell under water loses its runoff as land and its evaporation
-(`lake_evaporation_factor` · (`lake_evaporation_base_mm` + 60 mm/°C · T⁺); 0 when
+(`lake_evaporation_factor` · (`lake_evaporation_base_mm` + `pet_mm_per_c` · T⁺); 0 when
 `lake_evaporation` is false) less the liquid precipitation on it. A basin that, wet to its rim, still gains (inflow ≥ those losses) is a lake at
 its spill level and spills the surplus. One that does not is terminal: its lowest cell becomes a
 sink, a Priority-Flood of the basin alone from that cell drains its floor to it (receivers and
