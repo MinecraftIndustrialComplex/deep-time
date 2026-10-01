@@ -66,6 +66,8 @@ pub struct Run {
     /// After it ran: its keyframe index, read once.
     index: Mutex<Option<Arc<KeyframeIndex>>>,
     events_file: Mutex<Option<BufWriter<File>>>,
+    /// The deposits overlay's data, as last answered (`deposits.rs`).
+    pub deposits: super::deposits::Cache,
     #[cfg(test)]
     pub final_world: Mutex<Option<deeptime_core::world::WorldState>>,
 }
@@ -88,6 +90,36 @@ impl Run {
 
     pub fn is_finished(&self) -> bool {
         FINAL_STATES.contains(&self.state().as_str())
+    }
+
+    /// `GET /api/runs/<id>/deposits`: the sites the page draws over the map (`deposits.rs`).
+    pub fn deposits_answer(&self) -> std::sync::Arc<Vec<u8>> {
+        let circumference = self.live.meta()["circumference"].as_u64().unwrap_or(0) as u32;
+        super::deposits::answer(
+            &self.deposits,
+            self.state() == "done",
+            &self.world_dir(),
+            circumference,
+            &self.preset_json,
+        )
+    }
+
+    /// Takes the sites out of the world in memory, between two steps (the deposit stage has just
+    /// placed them); the page's overlay shows them while the run goes on.
+    fn capture_deposits(&self, s: &Session) {
+        let circumference = self.live.meta()["circumference"].as_u64().unwrap_or(0) as u32;
+        let scale = super::deposits::m_per_block_h(&self.preset_json);
+        if let Ok(v) = s.with_world(|w| {
+            super::deposits::view(
+                &w.sites,
+                &w.bodies,
+                circumference,
+                scale,
+                super::deposits::LIVE,
+            )
+        }) {
+            self.deposits.set(super::deposits::LIVE, &v);
+        }
     }
 
     /// Layer `layer` of frame `n` as RGBA8: from the session while it runs, else from the frame's
@@ -385,6 +417,7 @@ impl Workbench {
             cancel: AtomicBool::new(false),
             index: Mutex::new(None),
             events_file: Mutex::new(None),
+            deposits: Default::default(),
             #[cfg(test)]
             final_world: Mutex::new(None),
         });
@@ -643,6 +676,12 @@ impl Workbench {
             ));
             p.frames += 1;
         }
+        // The deposit stage has placed its sites (a frame names the sites layer): take them for the
+        // overlay before the page hears of the frame, so its first request finds them.
+        if !p.deposits && frames.iter().any(|(m, _)| super::deposits::names_sites(m)) {
+            p.deposits = true;
+            run.capture_deposits(s);
+        }
         // One event per call keeps each event's JSON text exactly as the session wrote it.
         let mut events = Vec::new();
         loop {
@@ -700,6 +739,8 @@ struct Published {
     frames: u32,
     events: u64,
     progress_at: Option<Instant>,
+    /// The deposit stage's sites have been taken for the page's overlay.
+    deposits: bool,
 }
 
 /// A run read back from its folder.
@@ -764,6 +805,7 @@ fn restore(dir: &Path, ramps: &Ramps) -> CliResult<Run> {
         cancel: AtomicBool::new(false),
         index: Mutex::new(None),
         events_file: Mutex::new(None),
+        deposits: Default::default(),
         #[cfg(test)]
         final_world: Mutex::new(None),
     };

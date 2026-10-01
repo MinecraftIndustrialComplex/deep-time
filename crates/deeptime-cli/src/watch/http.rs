@@ -14,7 +14,7 @@
 //! from, and addressed to a tailnet or local name (no DNS rebinding).
 //!
 //! Routes:
-//! - `/` the page, `/workbench.js`, `/ramps.json`
+//! - `/` the page, `/workbench.js`, `/deposits.js`, `/ramps.json`
 //! - `GET /api/catalog` the editor's definitions; `POST /api/preset` a form state's effective
 //!   preset, share code, problems and estimate; `POST /api/decode` a share code as a form state
 //! - `GET /api/runs` the runs and the queue; `POST /api/runs` queue a run (`{"json", "label",
@@ -24,7 +24,8 @@
 //! - `GET /api/runs/<id>/stream` (SSE: `hello`, then `events`, `frame`, `progress`, `status`,
 //!   `bye`; a comment line every 15 s), `/api/runs/<id>/state.json` (the `hello`),
 //!   `/api/runs/<id>/frames/<n>/<layer index>.png` (encoded on first request, cached in the run's
-//!   `frames/`)
+//!   `frames/`), `/api/runs/<id>/deposits` (the deposit sites the overlay draws, from the world in
+//!   memory while the run goes on and from the finished run's `sites/` and `bodies/`; `deposits.rs`)
 //! - `GET /api/runs/<id>/rock[/slice.png|/section]`, `/sections.js`: the rock at a depth below the
 //!   surface and cross-sections, read from the run's bake ([`super::sections`])
 //! - the final world map: `GET /api/runs/<id>/world.json`, `…/world/sample?x=&z=` and
@@ -476,6 +477,11 @@ fn get(app: &App, req: &Request) -> Response {
             NO_CACHE,
             deeptime_viewer::WORKBENCH_JS.as_bytes().to_vec(),
         ),
+        "/deposits.js" => Response::ok(
+            "text/javascript; charset=utf-8",
+            NO_CACHE,
+            deeptime_viewer::DEPOSITS_JS.as_bytes().to_vec(),
+        ),
         "/worldmap.js" => Response::ok(
             "text/javascript; charset=utf-8",
             NO_CACHE,
@@ -517,6 +523,13 @@ fn get(app: &App, req: &Request) -> Response {
                     "application/json",
                     "no-store",
                     run.live.snapshot().0.into_bytes(),
+                );
+            }
+            if tail == "deposits" {
+                return Response::ok(
+                    "application/json",
+                    "no-store",
+                    run.deposits_answer().to_vec(),
                 );
             }
             if let Some(a) = super::tiles::route(&run.dir, tail, &req.query) {
