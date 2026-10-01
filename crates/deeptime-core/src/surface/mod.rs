@@ -1306,7 +1306,10 @@ impl SurfaceStage {
             }
         }
         put(world, field::GLACIAL_EROSION, g_rate);
-        *world.globals.entry(FOREIGN_CRUST_GLOBAL.to_owned()).or_insert(0.0) += foreign_cells as f64;
+        *world
+            .globals
+            .entry(FOREIGN_CRUST_GLOBAL.to_owned())
+            .or_insert(0.0) += foreign_cells as f64;
         world.fields.remove(field::FEEDBACK_APPLIED);
         self.time("outputs", started);
 
