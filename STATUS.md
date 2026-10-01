@@ -82,8 +82,75 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 | 2026-10-01 | surface / plates | **The emergent height limit (stage 2).** Stage 1 (build log 2026-10-01, "Terrain above the build limit, stage 1") removed the bookkeeping that built 13–20 km and added the compression band; Earth-like 16k worlds now peak at 9.0–11.2 km on L1, held by the plate model's uplift ceiling, not by physics. Build stage 2 (crust over its strength spreads: σ = ρ·g·h against `crust_strength_mpa`, plateaus at about 5 km on Earth, 13 km at 0.38 g)? And inside it: drop the plate model's 10 km uplift ceiling to a 30 km guard and recalibrate uplift with the hypsometry work (recommended), or keep it and let the spreading act under it? Also: keep squeezing a world too short for its mountains (now), or raise the vertical-scale slider's minimum to 19.6 m and refuse? | Not asked yet: for the coordinator to put to Ben |
+| 2026-10-01 | climate (ice branch) | **Flowing ice sheets: on or off by default?** With `climate.ice_dynamics` on, three Earth-like planets end with 47–52 % of the land under ice and the sea ~300 m down (off: 8–21 %, +20 to −50 m). Recommended: off until the per-cell climate (P1-26); the alternatives are on as it is, or more tuning on the banded climate first. Numbers: build log 2026-10-01, "Climate ice branch", and https://spacesheep.dev/@benmac/deeptime-climate-ice. | agent report to the coordinator |
 
 ## Build log
+### 2026-10-01 — Climate ice branch: supply-limited weathering, the 200-kyr clock, the present-day climate setting, flowing ice sheets (not Earth-like yet: a decision for Ben) (agent worktree agent-adc924860a859865c, branch `worktree-agent-adc924860a859865c-ice`, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Review page:** https://spacesheep.dev/@benmac/deeptime-climate-ice (private; tables of every run below).
+- **Open decision (pending question): the flowing sheets' default.** `climate.ice_dynamics` is **on** in the
+  presets on this branch (Ben, 2026-09-30: "Yes, add ice-sheet dynamics") and does not give Earth-like ice on
+  the game's planets: three 500-Myr planets end with 47–52 % of the land under ice and the sea 273–312 m down
+  (off: 8–21 %, +20 to −50 m; master: 13–22 %, +16 to −19 m), the ice hardly cycles in the last 3 Myr, and the
+  default `temperate` present can then only clear the ice by heating the world to ~29 °C. **Do not merge with
+  the toggle on.** Recommended: off by default until the per-cell climate (P1-26), which replaces the banded
+  snowline and albedo the sheet is driven by. Not changed here: a default is Ben's.
+- **What the sheet itself does** (`deeptime climate-dem`, new "sheet" lines, Earth's 1° relief): 11.0 % of the
+  land under ice at today's line from bare ground (Earth ~10 %), 21.2 % with the line 1 km lower (LGM ~25 %),
+  12.6 % after an interglacial peak (line +300 m for 10 kyr), 15.8 % when the line only returns to today's.
+  So the flow, isostasy and calving are sound; the overgrowth comes from the coupling (band-wide albedo cooling
+  under a regional sheet, the sea-level drop lifting all land against the line, the elevation feedback). Six
+  one-change runs on seed 3 did not cure it (`ice_sheet_feedback` 0.5, `ice_ablation_gradient` 0.03,
+  `ice_accumulation_max_m_yr` 0.2, `glacio_eustasy` 0, `ice_relax_kyr` 0: 46–86 % ice).
+- **Sheet changes since the WIP:** calving at margins whose depressed bed lies below the sea
+  (`ice_calving_m_yr` 20, Pollard 1982; without it 19 % of Earth's land kept its ice after a glacial); a
+  diffusivity limiter (`MIN_STEP_YEARS` 10: same extents on Earth, 8× faster; the ice-age window 40 min → 4 min
+  at 2 threads); deep time's relaxation runs a third of its time with the line `INTERGLACIAL_RISE_M` (300 m)
+  higher.
+- **Supply-limited weathering** (Ben, 2026-09-30). Three fixes to the unverified WIP, found by the tests it
+  broke: (1) the sea floor's sink counts against the air only for the ice-free ocean (with all of it on the air
+  a frozen supercontinent stood at 0.6 bar CO₂ after 70 Myr and had not thawed); (2) the sea floor's sink is
+  itself supply-limited (`SEAFLOOR_SUPPLY_REL` 1 × today's degassing per unit of spreading); (3) the land's
+  supply follows the runoff (1 + k_r·ΔT), not the kinetics' 2^(ΔT/10), which had made the limit toothless.
+  Synthetic gap between snowballs 0.39 → 3.65 Myr; on a real planet (supercontinent, degassing 0.3, 1000 Myr,
+  sheets on) the gaps are 17.4 and 18.4 Myr (and one of 461), Ben's 9–19 Myr near the threshold; with the
+  sheets off they are 57–92 Myr at 0.3 and 3–8 Myr at 0.1.
+- **Snowball frequency after the runoff fix** (1000 Myr, `--set climate.degassing_scale=X`): at the default
+  degassing a supercontinent start has **2** snowballs with the sheets off (22 and 24 Myr long) and 0 with
+  them on; a scattered start has 0 either way. 0.3: 4 either way. 0.2 (off): 2. 0.1 (off): 8. No retune of
+  the defaults is proposed.
+- **Calibration, sheets off, against master** (same day's master binary, its presets): seed 1 scattered
+  12.7 °C / 180 ppm / 8 % ice / +20 m (master 13.8 / 198 / 15 % / +15); supercontinent 13.0 / 206 / 15 % / −10
+  (12.6 / 124 / 13 % / +16); seed 3 11.5 / 190 / 21 % / −50 (11.5 / 99 / 22 % / −19). The Earth check is
+  unchanged: 19 of 24 cities, kernel 2.8448·10⁷. The ice-age window swings 3–14 m of sea level with the sheets
+  off, as on master: Earth-size cycles need the sheets.
+- **`carbon_step_kyr` 200**, an editor setting; `the_200_kyr_clock_still_resolves_onset_and_escape` passes
+  (onset within 1.5 Myr, escape within 2 Myr of the 100-kyr clock).
+- **The present-day climate** (Ben, 2026-10-01): `climate.present_climate` = `temperate` (default) | `natural`
+  | `ice_age` | `snowball`; editor field `present_climate` (section Planet, a choice), lang keys, presets.
+  The run's last `present_adjust_kyr` (100) is run again with the atmosphere's CO₂ held at a factor of its
+  level (ramped in over 10 kyr), the smallest factor that reaches the state (bracket, four halvings, at most
+  ×10⁴); nothing is touched when the simulation already ends there. The carbon reservoirs stand still under
+  the factor (weathering took a large one back within the stretch). Everything older is the same run: the
+  test compares every plate step's row but the last and the window's rows before the stretch. A snowball the
+  setting sets off or ends carries `present_setting` as its cause; the note's `present` object has the factor
+  and the state without it. With the sheets off (3 planets): temperate leaves two alone and takes seed 3
+  from 21 % to 15 % ice with CO₂ × 3.3 (15.9 °C); ice age needs × 0.17–0.55 (25 % ice, 1.6–8.5 °C, sea −58 to
+  −80 m); snowball × 0.12–0.23 (−40 °C, all sea frozen, sea −330 m). Cost 17–41 s a run.
+- **For the hydrology** (Ben, 2026-10-01, "Yes, with the ice-sheet branch"): the climate publishes at L1 every
+  step `climate/ice_thickness_m`, `climate/glacier` (1 where ≥ 1 m), `climate/ice_time_share`, the LGM pair
+  `climate/ice_max_thickness_m` / `ice_max_extent`, and new `climate/ice_balance_m_yr` (surface mass balance:
+  negative = melt, the meltwater's source at the ice edge; FORMAT.md "The climate's ice fields"); per frame the
+  history has `deeptime:ice_thickness_m` and `deeptime:ice_cover`. All reflect the present-day setting.
+- **Checkpoint schema 9** (ice sheet, weathering supply, snowball list, the nudge's factor and note).
+- **Gates** (test machine): cargo fmt, clippy, `cargo test --workspace`, `cargo deny`, `./gradlew build test`
+  green on c831063 (160 Java tests); re-run on the final tree, see the commit. Knob extremes
+  (`tools/dev/knob_extremes.py --stage climate --only …present_climate,carbon_step`): 6 of 6 ok. No GameTests
+  (coordinator). **Not re-checked:** the `climateConsistent` floors on the test planet (its ice may change).
+- **Lost and redone:** a `mac.sh --pull` finished while I was editing the same files and overwrote two
+  edits; do not edit under a running `--pull`.
+- **Next.** Ben's answer on the sheets' default; then merge; P1-26 builds on `sheet::Grid`, `kernel_of` with
+  the supply limit and the clock's `Input`.
+
 ### 2026-10-01 — Climate ice branch: master merged, nothing built; what is left and the runs to make (agent worktree agent-adc924860a859865c, branch `worktree-agent-adc924860a859865c-ice`, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **State.** Master 90e07ba is merged into the branch **without a build or a test** (M6 paused, new
   machine pending). One textual conflict, `checkpoint.rs`: master's volcano catalogue took schema 8, so

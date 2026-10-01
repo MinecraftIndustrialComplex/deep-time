@@ -142,6 +142,10 @@ pub mod field {
     pub const ICE_TIME_SHARE: &str = "climate/ice_time_share";
     /// Annual-mean sea-ice cover of the sea, 0–1 (0 on land).
     pub const SEA_ICE: &str = "climate/sea_ice";
+    /// Surface mass balance of the land ice at the end of the step, m of ice per year: positive
+    /// where snow builds it (above the equilibrium line, at most what the precipitation allows),
+    /// negative where it melts (below the line: the meltwater's source); 0 off the ice.
+    pub const ICE_BALANCE: &str = "climate/ice_balance_m_yr";
 }
 
 /// The ice fields the surface stage's field history records as frame means.
@@ -153,7 +157,7 @@ pub mod history {
 }
 
 /// Bytes the stage holds per L1 cell (`estimate`).
-const BYTES_PER_CELL: u64 = 150 + 96;
+const BYTES_PER_CELL: u64 = 154 + 96;
 
 /// Keyframe layers (with the group's plates and surface layers).
 pub const KEYFRAME_LAYERS: [&str; 5] = [
@@ -1456,6 +1460,29 @@ impl ClimateStage {
         self.s.ice_volume_km3 = volume;
         self.s.land_ice_frac = ice_cover.frac();
         self.s.sea_level_m = Some(sea);
+        // The ice's surface mass balance (for the hydrology: no runoff under the ice, meltwater
+        // where the balance is negative): the sheet's law on the ice surface against the line.
+        let precip_m: Option<Vec<f32>> = world
+            .fields
+            .get(field::PRECIP)
+            .filter(|f| f.data.len() == n)
+            .map(|f| f.data.clone());
+        let balance: Vec<f32> = (0..n)
+            .map(|c| {
+                if !glacier[c] {
+                    return 0.0;
+                }
+                let above = h[c] - sea + f64::from(thick[c]) - f64::from(ela_pub[c]);
+                let pr = precip_m.as_ref().map_or(0.5, |v| f64::from(v[c]) / 1000.0);
+                if above >= 0.0 {
+                    (p.ice_accumulation_gradient * above)
+                        .min(p.ice_accumulation_max_m_yr * pr.max(0.0)) as f32
+                } else {
+                    (p.ice_ablation_gradient * above) as f32
+                }
+            })
+            .collect();
+        put(world, field::ICE_BALANCE, balance);
         put(world, field::ELA_ALL, ela_all);
         put(world, field::ELA, ela_pub);
         put(

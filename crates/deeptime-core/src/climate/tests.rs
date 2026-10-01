@@ -274,10 +274,20 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
         field::ICE_MAX_EXTENT,
         field::ICE_TIME_SHARE,
         field::SEA_ICE,
+        field::ICE_BALANCE,
     ] {
         let f = world.fields.get(name).unwrap_or_else(|| panic!("{name}"));
         assert_eq!(f.data.len(), n, "{name}");
     }
+    // The mass balance is the ice's alone, and finite.
+    let balance = &world.fields[field::ICE_BALANCE].data;
+    let on_ice = &world.fields[field::GLACIER].data;
+    assert!(
+        balance
+            .iter()
+            .zip(on_ice)
+            .all(|(b, g)| b.is_finite() && (*g == 1.0 || *b == 0.0))
+    );
     // The ice fields agree with each other: glaciers where the ice is, the maximum at least the
     // present, shares and cover in [0, 1].
     let ice = &world.fields[field::ICE_THICKNESS].data;

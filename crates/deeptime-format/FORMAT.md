@@ -1001,6 +1001,7 @@ continental sheets that flowed below the snowline.
 | `climate/ice_max_extent` | 0/1 | 1 where `climate/ice_max_thickness_m` > 0 (the LGM extent at the present) |
 | `climate/ice_time_share` | 0–1 | share of the step's time the cell was under ice |
 | `climate/sea_ice` | 0–1 | annual-mean sea-ice cover of the sea (0 on land) |
+| `climate/ice_balance_m_yr` | m ice/yr | surface mass balance of the land ice at the end of the step: positive where snow builds it (above the equilibrium line `climate/ela_m`, at most `ice_accumulation_max_m_yr` × the precipitation in m/yr), negative where it melts (`ice_ablation_gradient` × the ice surface's depth below the line); 0 off the ice. For the hydrology (decisions log 2026-10-01, "Yes, with the ice-sheet branch"): no runoff and no lake where `climate/ice_thickness_m` ≥ 1 m, and meltwater −balance × 0.917 m of water per year where it is negative (the ice edge) |
 | `climate/glacier` | 0/1 | (P1-05) 1 where land ice stands at the end of the step (= `climate/ice_thickness_m` > 0) |
 
 The surface stage's field history (the deposit engine's frames, `surface::fields::STEP_FIELDS`)
