@@ -180,7 +180,25 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `sections_shots.py`'s fold/close/Esc checks were never run). Formatting of the Rust files was re-checked with rustfmt
   on the laptop (clean). **Not run at all:** `cargo test --workspace`, `cargo clippy --workspace`, `cargo deny`,
   `cd neoforge && ./gradlew build test` (which exercises the Java parity tests against the new `stack_at`).
-  First thing on the new machine: those five, then `tools/workbench/sections_shots.py` against a run with a bake.
+  Merged with master 90e07ba (only STATUS.md conflicted) and the never-built edits re-read by hand (the bucket
+  arithmetic for C = 1200 and 4096 worked through against the new tests).
+  **Commands for the new machine** (host in `DEEPTIME_MAC`; from the worktree on the laptop; `M=tools/remote/mac.sh`):
+  1. Gates: `$M -- 'cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
+     && cargo deny check licenses bans'`, then `$M -- 'cd neoforge && ./gradlew build test && python3
+     ../tools/ci/junit-summary.py build/test-results/test'` (the Gradle run writes `planet4k/parity/columns.json` with the
+     new `stack_at` and `ColumnParityTest` compares it with Java: 500 of 500 columns must be equal). No `--server`, no GameTests.
+  2. The page and the routes on a real planet: `$M --pull review/out/wb-sections -- 'SCRATCH=<scratch>/wb-sections
+     tools/workbench/check-sections.sh'`. It runs a 500-Myr `earthlike_quick_16k` into `<scratch>/runs/bakeA/world`, starts
+     its own `deeptime watch` on port 8661, curls the slice (cold and cached) and section times, then drives headless
+     Chromium (`DEEPTIME_CHROME` if the playwright shell is not at its Mac path) and exits non-zero on a failed check or a
+     page error. The diamictite section's coordinates (-4900,2500 → -4100,3350) are for the seed-1 run of 2026-10-01; if
+     the new run differs, find a bed with `/api/runs/bakeA/rock/slice.png?depth=50` (diamictite is plum #804080).
+  3. Run time before and after, same preset, same machine, one at a time and nothing else heavy running:
+     `git worktree add ../deeptime-base 90e07ba` on the laptop (git only), then in both trees
+     `$M -- 'cargo build --release -p deeptime-cli && mkdir -p <scratch>/t && /usr/bin/time -l target/release/deeptime run
+     --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --out <scratch>/t/world 2> <scratch>/t/time.log;
+     tail -30 <scratch>/t/time.log'` (`-v` instead of `-l` on Linux). Compare user seconds and max RSS; the base tree is
+     master, so the only difference between the two is this branch. Delete `<scratch>` and remove the base worktree after.
 - **Next.** The coordinator merges this with the rivers, deposits and zoomable-map branches (the conflicts will be the
   `workbench.js`/`workbench.html` hunks and this file's top); restart the live workbench on the Mac to get it
   (`tools/viewer/mac-watch.sh`). Runs made before format 0.2 show "needs a bake" until they are run again.
