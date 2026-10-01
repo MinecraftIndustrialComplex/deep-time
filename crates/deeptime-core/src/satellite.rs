@@ -48,6 +48,9 @@
 //! - **Relief**: a hill shade from the elevation (light from the north-west at 45°, heights
 //!   exaggerated 14×, slopes in the model sphere's metres), applied softly: 60 % of its effect on
 //!   land, 45 % on ice, 35 % on the sea floor (none under sea ice).
+//!
+//! This module draws the ground only. The rivers and lakes of the terrain are drawn over its
+//! picture, after the shading, by `keyframes::render` (`crate::water_view`).
 
 use deeptime_format::{Ramp, Ramps};
 
@@ -532,7 +535,7 @@ fn bare(c: &Cell, pal: &Palette) -> [f32; 3] {
 }
 
 /// The cell of `f` nearest pixel (px, py) of a `w × h` picture (keyframe pixel centres).
-fn nearest(f: &Field, px: usize, py: usize, w: usize, h: usize) -> f32 {
+pub(crate) fn nearest(f: &Field, px: usize, py: usize, w: usize, h: usize) -> f32 {
     let i = (px as f64 * f64::from(f.grid.w) / w as f64).round() as i64;
     let j = (py as f64 * f64::from(f.grid.h) / h as f64).round() as i64;
     f.get(i, j)
@@ -682,23 +685,17 @@ pub fn hillshade(z: &[f32], w: usize, h: usize, radius_m: f64, look: &Look) -> V
     out
 }
 
-/// The satellite picture of `world`'s current state at `size`, RGBA8 (row 0 north, column 0 the
-/// seam, as every keyframe layer); `None` without an elevation field.
-pub fn render(
-    world: &WorldState,
-    ramps: &Ramps,
-    view: &ViewScale,
-    size: (u32, u32),
-) -> Option<Vec<u8>> {
-    let elevation = ELEVATION_FIELDS
+/// The finest elevation field of `world` (`ELEVATION_FIELDS`), if there is one.
+pub fn elevation_field(world: &WorldState) -> Option<&Field> {
+    ELEVATION_FIELDS
         .iter()
-        .find_map(|&name| world.fields.get(name))?;
-    let pal = ramps
-        .ramps
-        .get(RAMP)
-        .map(Palette::from_ramp)
-        .unwrap_or_else(Palette::builtin);
-    let look = Look::default();
+        .find_map(|&name| world.fields.get(name))
+}
+
+/// Height above sea level (m; NaN where the field has none) of each pixel of a `size` picture of
+/// `elevation` (block y): the mean over the cells a pixel covers when its grid is finer, else the
+/// nearest cell. The satellite view and the water view draw on the same pixels.
+pub fn heights_m(elevation: &Field, view: &ViewScale, size: (u32, u32)) -> Vec<f32> {
     let (w, h) = (size.0 as usize, size.1 as usize);
     let mut z = Vec::with_capacity(w * h);
     for py in 0..h {
@@ -707,6 +704,26 @@ pub fn render(
             z.push(((f64::from(y) - view.sea_level_y) * view.m_per_block_v) as f32);
         }
     }
+    z
+}
+
+/// The satellite picture of `world`'s current state at `size`, RGBA8 (row 0 north, column 0 the
+/// seam, as every keyframe layer); `None` without an elevation field.
+pub fn render(
+    world: &WorldState,
+    ramps: &Ramps,
+    view: &ViewScale,
+    size: (u32, u32),
+) -> Option<Vec<u8>> {
+    let elevation = elevation_field(world)?;
+    let pal = ramps
+        .ramps
+        .get(RAMP)
+        .map(Palette::from_ramp)
+        .unwrap_or_else(Palette::builtin);
+    let look = Look::default();
+    let (w, h) = (size.0 as usize, size.1 as usize);
+    let z = heights_m(elevation, view, size);
     let shade = hillshade(&z, w, h, view.radius_m, &look);
     let field = |name: &str| world.fields.get(name);
     // The climate's fields, smoothed where their model draws steps (see `box_filter`).
