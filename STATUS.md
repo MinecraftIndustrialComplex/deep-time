@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · P1-27 plate margins (sutures, initiation clear of trenches, arc cordilleras) + coherent provinces done on its branch (worktree-agent-ad3b417fd428c1ac2) · Rivers & lakes on the workbench maps (view-only; satellite overlay + a `rivers` layer) done on its branch (worktree-agent-a3d4fadfe3e053b77) · Updated: 2026-10-01 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · P1-27 plate margins (sutures, initiation clear of trenches, arc cordilleras) + coherent provinces done on its branch (worktree-agent-ad3b417fd428c1ac2) · Rivers & lakes on the workbench maps (view-only; satellite overlay + a `rivers` layer) done on its branch (worktree-agent-a3d4fadfe3e053b77) · P1-28 stone and deepslate for the common rocks done on its branch (worktree-agent-a72907749021691b5) · Updated: 2026-10-01 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -50,7 +50,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-a02882c5e6567370e, not yet merged. Format 0.2 bakes twelve monthly layers. `DeepTimeClimate` is at API version 1.<br>**Parity:** `ClimateParityTest` 500/500 blocks bit for bit, and the GameTest `climateApiOnTheRealPlanet` matches too.<br>**mic-climate `deep-time` branch** (pushed): Deep Time's climate plus Project Atmosphere's weather anomaly. Its GameTests pass 19/19, with and without Project Atmosphere, and its pack smoke passes 20/20.<br>**MIC planet probe** (earthlike_quick_16k): Af 24.5 °C, BWk 8.8/19.6 °C, Dfc −12.9/15.3 °C, ET −24.7/0.6 °C, EF plateau (4,860 m) −22.7/−46.7 °C, each pair midwinter/midsummer. Project Atmosphere read 8.6, 8.9, −0.6, 4.0 and 10.5 °C at the same places. Its simulated weather adds −2.4…+2.5 °C.<br>JUnit 150/0 and `./gametest.sh` All 52 passed after merging master 8872c91; cargo gates clean. See build log. |
 | P1-26 | Per-cell climate: 2-D energy balance, sea ice, moisture (log 2026-09-30) | doing | 2026-09-30 | | Design approved 2026-10-01 (docs/design/p1-26-per-cell-climate.md, recommended answers); tasks T1–T11 start after the climate agent's ice-sheet branch (worktree-agent-adc924860a859865c-ice) lands. |
 | P1-27 | Plate margins and coherent continents (logs 2026-09-29, 2026-09-30) | done | 2026-09-30 | | Branch worktree-agent-ad3b417fd428c1ac2 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. Cause: a collision moved the continent alone to the overriding plate, leaving its passive margins facing an ocean that kept converging (collisions cut 295,000–455,000 km of margin off its ocean per 750-Myr run; rifts ~2,000, initiations < 300). Fixed by sutures, initiation anywhere clear of trenches (rate 0.3), arc cordilleras, collision orogen cores, arc maturity; provinces view generalised to the USGS map's 150 km. Mac, 6 pipeline runs × 400 Myr before → after: active margin 0.67 → 0.31 (Earth ~0.3, Bradley 2008), passive 0.30 → 0.63, floor beside passive margins 50 → 102 Myr, ground under arc cones 307 → 812 m, provinces orogen 0.51 → 0.40, shield+platform 0.17 → 0.29, edge density 0.078 → 0.060; land 0.398 → 0.391, median 1,350 → 1,030 m, ocean p90 108 → 194 Myr. cargo test/clippy/fmt/deny clean, JUnit 155/0; evidence review/out/p1-27/ (not committed); see build log |
-| P1-28 | Stone for common rocks (log 2026-10-01) | doing | 2026-10-01 | | Stone for shale/mudstone-type classes, deepslate for slate/schist/gneiss-type classes, through the rock table and tags; no recipe changes. |
+| P1-28 | Stone and deepslate for the common rocks (log 2026-10-01; first the hardness tiers, replaced the same day) | done | 2026-10-01 | | Branch worktree-agent-a72907749021691b5 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. `minecraft:stone` is the `vanilla_fallback` of shale and mudstone, `minecraft:deepslate` of slate, phyllite, schist and gneiss (`CRUST_STAND_INS` in `tools/dev/gen_rock_classes.py`); no recipe, item tag or drop touched. Stone or deepslate share of the placed rock, top 64 blocks / whole column: 0.0 % → 47.8 % / 55.3 % (12 generated boxes, standalone), census of the whole planet 0.1 % → 56.2 % / 0.0 % → 56.0 %. Gates: cargo fmt/clippy/test/deny clean, gradlew build test 161/0, `./gametest.sh` and `-PwithMic` All 58 passed. MIC rows are in the build log; see the entry. |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -263,6 +263,87 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
 - **Measured** (VM `deeptime-test`, x86_64 Linux, `mac.sh` default caps; load average 10–30): `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --locked` all pass (509: cli 52, core 353 + 3 ignored); `./gradlew build test` tests=160 failures=0 errors=0 skipped=1; `./gametest.sh` All 57 required tests passed (wall 485 s) and, after `tools/smoke/install.sh mic`, `./gametest.sh -PwithMic` All 57 passed (81 s), both with `above_max_y=0cells compressed=0cells highest_y=281` on the default planet. The nine real-planet tests on other planets (`DEEPTIME_TEST_PLANET_SET="seed=N"`): seeds 12, 13, 15, 16 standalone All 9 passed; seed 14 failed two (the rock and Dsub items above), and with those fixed seed 14 standalone and seeds 13 and 14 with MIC All 9 passed. On all six seeds the bake has 0 cells above `max_y` and 0 compressed (highest y 274–287); seeds 11 and 13 had 2.5 % and 1.0 % of their land above it before. The two full `./gametest.sh` runs were made one commit before the rock-test and Dsub-floor changes (test code only); cargo, Gradle and the seed-14 and MIC seed runs are on the final code. x86_64 Linux only.
 - **Next.** Ben's go for stage 2 and his choice on the uplift ceiling; the hypsometry agent
   (worktree-agent-aee888e01d29a40db) takes this base first.
+### 2026-10-01 — P1-28 stone and deepslate for the common rocks (agent worktree agent-a72907749021691b5, branch worktree-agent-a72907749021691b5, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Ask.** Ben, 2026-10-01 (decisions log): "I'm seeing very little minecraft:stone, will things like stone tools still be easily
+  craftable?" The first answer (hardness tiers for `minecraft:stone_tool_materials` / `stone_crafting_materials`, tool-grade rock near
+  spawn, river/beach/till cobbles) was **replaced** the same day: no recipe or item tag is widened ("How can we fix this w/o just
+  having a cheeky lil 'yeah, your crafting recipes can now use some extra materials'"), and "Use stone for common rocks and we
+  should be chilling". That work was built and then reverted (commits bb7f2f5 and e601959, reverted by 678a0e7 and ef4272e; the
+  history keeps it: the per-class `stone_use` tiers with reasons, the generated item tags and the `ground` settings draft). Nothing of it
+  ships.
+- **What changed.**
+  - `tools/dev/gen_rock_classes.py`: `CRUST_STAND_INS`, class → (block, why). `minecraft:stone` is now the `vanilla_fallback` of
+    `shale` and `mudstone` (coal already had it); `minecraft:deepslate` of `slate`, `phyllite`, `schist`, `gneiss`. Each class file
+    says why in `sources.vanilla_fallback`. The generator's rule that stone and deepslate are never a class block is gone (its
+    validation now demands exactly the table's classes).
+  - Why these: on the 500 Myr `earthlike_quick_16k` planet the top-64-block share of the placed classes is shale 34.7 %, gneiss 17.6 %,
+    mudstone 1.3 %, schist 1.0 %, slate 0.9 %, phyllite 0.7 % (the rest: sandstone 25.8 %, rhyolite 7.7 %, basalt 1.8 %, gypsum 1.7 %,
+    granite 1.1 %, black shale 0.8 %, …). Shale and mudstone are the fine-grained grey sedimentary rocks nothing in vanilla looks
+    like; slate, phyllite, schist and gneiss are one dark-grey foliated pelite-to-gneiss series. Kept on their own blocks: granite,
+    diorite, andesite, basalt, tuff, sandstone, red sandstone, calcite (limestone, marble, the evaporites, chalk), dripstone, obsidian,
+    cobblestone for conglomerate; and, as rare (each under 0.3 % of the surface blocks) with a look worth more than their share,
+    hornfels, amphibolite, greenstone, blueschist, eclogite, quartzite, serpentinite; black shale (0.8 %) keeps smooth basalt as
+    its vanilla-only stand-in (Born in Chaos' argillite in MIC) so the source rock stays recognisable.
+  - `PaletteRules`: only air is rejected now. `RockPalette.classesOf` gives, for stone and deepslate, every class that resolves to
+    them plus `unclassified_crust` (`RockPalette.UNCLASSIFIED_CRUST`). `BackgroundScatterFeature.hostClasses/bias`: where the host
+    block is stone or deepslate the horizon at the position (not the block) decides the host bias, so the coal scatter still prefers
+    shale and mudstone over the unclassified crust; only rules whose bias depends on the class pay for the lookup
+    (`OreData.ScatterRule.classBlind`). The strata pass is unchanged: a class that resolves to stone is painted stone even where the
+    crust was deepslate (and the reverse).
+  - `deeptime-inspect rock-census` (new, `crates/deeptime-inspect/src/census.rs`): per-class shares of a baked planet's dry land (top
+    rock, 4 blocks down, top N blocks, whole column), review-box examples, and with `--stone-classes` the share of land with no
+    stone-class rock within a reach. `tools/review/p1-28-stone-share.py` maps a census to the pure-vanilla blocks of two revisions;
+    `tools/review/p1-28-block-share.py` counts stone/deepslate in generated boxes (`.dtva`).
+- **Measured.** Planet: `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --threads 4` on the VM
+  (land 21 %, 49,642 land columns at step 24). Top rock under the soil: shale 36.3 %, sandstone 26.2 %, gneiss 18.6 % (Ben's run: shale 39 %).
+  Stone or deepslate share of the placed rock blocks, **before → after**:
+
+  | | top 64 blocks | whole column |
+  |---|---|---|
+  | census, whole planet, pure-vanilla pack | 0.1 % → 56.2 % | 0.0 % → 56.0 % |
+  | generated, 12 boxes of 96 × 96 (the real generator, standalone) | 0.0 % → 47.8 % | 0.0 % → 55.3 % |
+  | generated, same boxes, MIC, rows applied as an overlay (before: pack as is) | 0.0 % → 47.6 % | 1.5 % → 43.8 % (deepslate 34.1, stone 9.7, and blackstone 10.2) |
+
+  The 12 boxes are evenly spread dry-land columns (`census.examples["*land*"]`), not picked by rock. Most of the 56 % is
+  stone (shale, 35 %) in the top blocks and deepslate (gneiss) in depth. **MIC finding:** in the MIC after run blackstone is 10 % of the
+  whole column (y −320…−160 in five boxes, 0.2 % before): a Terralith cave feature
+  (`terralith:cave/…/blackstone`) turns deepslate into blackstone, and deep gneiss was granite before, so it had nothing to work on.
+  Not part of this change; Ben may want it off or accepted.
+- **A start in granite or basalt country.** Only this change, no cobbles and no spawn rule: stone and deepslate come from the six classes
+  above, so a start on pure granite/basalt/andesite/sandstone/gypsum ground has no stone or deepslate at the surface. From the census (the
+  classes shale, mudstone, coal, slate, phyllite, schist, gneiss; `--stone-classes`, step 16): no such surface rock within 32 / 64 / 128
+  blocks of 31 % / 24 % / 13 % of the dry land; none even within 32 blocks of digging down (of which any of them counts) of 17 % / 11 % /
+  5.7 %. Those players have granite, diorite, andesite, smooth basalt, sandstone to build with but no cobblestone for stone tools or a
+  furnace until they walk to the next stone or deepslate (under 130 blocks for 94 % of land); a pickaxe of wood or iron mines
+  granite and drops granite, which crafts nothing stone. That is the cost of dropping the spawn guarantee; see Ben's options in the report.
+- **Mining.** `miningTheCommonRocksDropsVanillaCobbles`: stone → cobblestone, deepslate → cobbled deepslate, and 12 other placed
+  blocks drop their own item, unchanged; no loot table, recipe or item tag comes from Deep Time's jar (checked through the resource
+  manager's pack ids), and a JUnit test asserts `data/minecraft` holds only the world preset tag. Side effect worth knowing: vanilla
+  ore features target `#stone_ore_replaceables` and `#deepslate_ore_replaceables` (stone, granite, diorite, andesite / deepslate,
+  tuff), so ore that vanilla features place now has far more stone and deepslate to sit in (polished tuff and packed mud, the old
+  shale and mudstone blocks, were in neither tag).
+- **MIC rows** (not applied; MIC's datapack and README were not edited). The MIC pack's fallback tags are read before
+  `vanilla_fallback`, so MIC worlds stay as they were until these change. In `deeptime-mic-rock-tags` (and the pack's copy under
+  `pack/kubejs/data/deeptime/`), replace the fallback tag files `data/deeptime/tags/block/rock_fallback/<class>.json` with
+  `{"replace": true, "values": ["minecraft:stone"]}` for `shale` and `mudstone` and `{"replace": true, "values": ["minecraft:deepslate"]}`
+  for `slate`, `phyllite`, `schist`, `gneiss` (or simply edit their value lists to that single entry). README rows to change:
+  Classes table, Stand-in column: `mudstone` `minecraft:packed_mud` → `minecraft:stone`; `shale` `born_in_chaos_v1:black_argillite` →
+  `minecraft:stone`; `slate` and `phyllite` `born_in_chaos_v1:black_argillite` → `minecraft:deepslate`; `schist` `minecraft:tuff` →
+  `minecraft:deepslate`; `gneiss` `minecraft:granite` → `minecraft:deepslate`. Fallbacks table, rows `mudstone`, `shale`, `slate`,
+  `phyllite`, `schist`, `gneiss`: stand-ins "`minecraft:stone`" / "`minecraft:deepslate`", why "the commonest sedimentary rock, fine, grey,
+  fissile; vanilla has nothing like it" (shale), "shale's unlaminated twin" (mudstone), "metamorphosed shale: dark grey, foliated" (slate,
+  phyllite, schist), "banded grey crystalline basement" (gneiss). Text: the Vocabulary row of `deeptime:rock/unclassified_crust` ("Never
+  used as a stand-in, with one documented exception") and the paragraph "Stand-ins follow Ben's rules: … never `stone` or `deepslate`
+  (reserved for `unclassified_crust`), except `stone` as the last `coal` fallback" become "stone and deepslate are also the stand-ins
+  of the six common classes above (decisions log 2026-10-01); `unclassified_crust` stays the filler no class owns". `black_argillite`
+  stays the member of `black_shale` and the first fallback of `coal` and `hornfels`'s fired variant. Checked as an overlay datapack
+  (`replace: true` tags for the six classes) on the MIC server set: stone 35.8 % and deepslate 11.8 % of the top 64 blocks (table above).
+- **Gates** (VM `deeptime-test`): `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`, `cargo test --workspace`,
+  `cargo deny check licenses bans` clean; `./gradlew build test` 161 tests, 0 failures; `./gametest.sh` and `./gametest.sh -PwithMic`
+  (after `tools/smoke/install.sh mic`, `--pack`): All 58 required tests passed each (the first default run had 3 failures, all the
+  `deepslate[axis=y]` state string in my new assertions; fixed).
+- **Next.** Ben decides the options in the report (spawn cobbles for stoneless starts; MIC rows; the Terralith blackstone). The coordinator
+  merges and runs the batch GameTests.
 
 ### 2026-10-01 — Workbench deposits overlay: coal fields and ore sites by family, hover, "why here" (agent worktree agent-aae4250c131f0cf7a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Ask.** Ben, 2026-10-01, "Deposits layer": draw coal fields and ore deposits by type on the map at every frame where the
