@@ -980,6 +980,7 @@ input[type=range]:focus-visible { outline: none; }
         <button id="markers" aria-pressed="true" data-tip="Event markers" data-key="M"><svg class="ic ic-s"><use href="#i-events"/></svg><span class="lbl">Events</span></button>
         <button id="gridbtn" aria-pressed="true" data-tip="Graticule and seam"><svg class="ic ic-s"><use href="#i-grid"/></svg><span class="lbl">Grid</span></button>
       </div>
+      <div class="seg worldseg" role="group" aria-label="Final world"><button id="worldbtn" aria-pressed="false" data-tip="Final world: a zoomable map of the finished run's baked terrain, down to single blocks" data-key="W"><svg class="ic ic-s"><use href="#i-globe"/></svg><span class="lbl">Final world</span></button></div>
       <span class="grow"></span>
       <div class="bpick" id="bpick" hidden>
         <select class="input" id="bselect" aria-label="Run B"></select>
@@ -1022,6 +1023,7 @@ input[type=range]:focus-visible { outline: none; }
       <div class="maphint" id="maphint" hidden></div>
       <div class="stage-empty" id="stageempty" hidden></div>
     </div>
+    <div class="worldview" id="worldview" hidden></div>
     <div class="tvhud" id="tvhud" aria-hidden="true">
       <div class="scrim-t"></div><div class="scrim-b"></div>
       <div class="title"><div class="brandline"><svg><use href="#i-logo"/></svg>Deep Time</div><div class="name" id="tv-name"></div><div class="when" id="tv-when"></div><span class="stage" id="tv-stage"></span></div>
@@ -1108,5 +1110,6 @@ input[type=range]:focus-visible { outline: none; }
 <div id="toasts" aria-live="polite"></div>
 <div class="modal" id="modal" hidden><div class="modal-card" id="modalcard"><div class="modal-h"><h3 id="modaltitle"></h3><span id="modalacts"></span><button class="btn btn-ghost btn-icon" id="modalclose" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button></div><div class="modal-b" id="modalbody"></div></div></div>
 <script src="workbench.js"></script>
+<script src="worldmap.js"></script>
 </body>
 </html>
