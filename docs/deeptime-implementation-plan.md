@@ -3898,6 +3898,33 @@ exists anywhere, so visual credibility at block scale is unknown; hydrology cost
   MIC ships DH 3.3.0 while TW compiles against 3.3.1 and folds DH through internal mixins, so the
   exact DH version matters.
 
+  *As built (P3-04, 2026-10-01, ahead of the rest of Phase 3; STATUS.md has the measurements):*
+  - **Columns.** `worlddata/FarColumn` (plain Java) turns the column rule into layers: the ground
+    the generator draws (`Water.cellSurface`), the lake, sea or river over it with its bed, banks,
+    the ice cover on the top blocks, strata bed by bed where a side shows them, water ice and the
+    snow layer where the biome freezes, air to the top. `farterrain/FarTerrain` adds the biome
+    (the level's biome source at the quart cell a chunk stores), the soil (a datapack table,
+    `data/deeptime/deeptime/far_terrain/surface.json`: the pack's surface rules need a generated
+    chunk, so far terrain's top blocks come from a table by biome) and the blocks (rock palette,
+    the strata pass's member choice). No trees, features, caves or bodies.
+  - **Detail.** DH asks 64 × 64 columns of 2^d blocks, d = 0…12. One- and two-block columns get the
+    full column rules (the strata rule only where rock shows); wider ones are sampled at their
+    centre, without banks, with the nearest strata cell's stack.
+  - **Binding.** `compat/dh` binds the API by name at run time, not `compileOnly`: DH 3.3.0's merged
+    jar renames every NeoForge class `<Class>_neoforge`, the API included, and 3.3.1+ has the
+    published names (API 7.1.0 / 7.2.0; "API 4.0.0" above is stale). `DhApiBindingTest` opens the
+    real 3.3.0 and 3.3.3 jars. The generator is a `Proxy` of `IDhApiWorldGenerator` returning
+    `API_DATA_SOURCES`; data point y counts from the level's bottom; columns are written with
+    step `LIGHT`. Registered at `LevelEvent.Load` (lowest priority, after DH's own listener).
+  - **Toroidal World.** TW 0.19.3 refuses every non-DH generator on a wrapped level
+    (`WorldGeneratorInjectorMixin`). With DH 3.3.0 TW's DH mixins target classes NeoForge never
+    loads, so they are inert and the override registers; from 3.3.1 they apply and the override
+    is refused (logged, DH generates from real chunks). Not worked around: STATUS.md, pending
+    questions.
+  - **Checks.** `FarColumnTest` (the exit test), `FarTerrainGameTests`, and
+    `tools/smoke/run.py --profile dh --dh`, which drives DH's server-side `/dh pregen` and compares
+    what DH stores with far terrain and with the chunks generated afterwards.
+
 **Exit test.** Sections through sky islands show strata from their source crust; `probe column`
 at island tops returns Terralith skylands biomes, and skylands biomes do not appear on open ocean
 without an island above; fantasy deposits follow their rules; the DH generator's column-to-LOD

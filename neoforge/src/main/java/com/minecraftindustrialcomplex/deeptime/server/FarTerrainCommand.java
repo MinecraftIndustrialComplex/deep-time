@@ -33,7 +33,7 @@ import java.util.Optional;
  *   <li>{@code /deeptime probe dh}: whether Distant Horizons is installed, which API was bound, and
  *       for every bound level whether the override registered, how many sections Distant Horizons
  *       has asked for and how long they took.</li>
- *   <li>{@code /deeptime probe dh check <x> <z> <n>}: an n × n grid of columns, 16 blocks apart,
+ *   <li>{@code /deeptime probe dh check <x> <z> <n>}: n × n chunks, four columns in each,
  *       from block (x, z): first what Distant Horizons holds for each (its own store, so only
  *       after it generated the area, e.g. {@code /dh pregen start}), then far terrain's column,
  *       then the generated chunk. {@code stored} says how many columns DH held and how many of
@@ -45,6 +45,9 @@ import java.util.Optional;
 public final class FarTerrainCommand {
 
     private FarTerrainCommand() {}
+
+    /** The four columns `probe dh check` samples in each chunk. */
+    private static final int[][] OFFSETS = {{5, 9}, {13, 2}, {1, 14}, {9, 6}};
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("deeptime").requires(s -> s.hasPermission(2))
@@ -258,15 +261,15 @@ public final class FarTerrainCommand {
         if (terrain.isEmpty())
             return DeepTimeCommands.emit(source, o);
         FarTerrain far = terrain.get();
-        int spacing = 16;
+        int spacing = 16;   // n x n chunks, four columns in each
         // 1. What Distant Horizons holds, before any chunk is generated here.
         int held = 0, equal = 0, generated = 0;
         StringBuilder why = new StringBuilder();
         if (bound != null && bound.levelWrapper() != null && DhFarTerrain.api().isPresent()) {
             DhApiBinding api = DhFarTerrain.api().get();
             for (int j = 0; j < n; j++) {
-                for (int i = 0; i < n; i++) {
-                    int x = x0 + i * spacing + 5, z = z0 + j * spacing + 9;
+                for (int i = 0; i < 4 * n; i++) {
+                    int x = x0 + (i / 4) * spacing + OFFSETS[i % 4][0], z = z0 + j * spacing + OFFSETS[i % 4][1];
                     if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) != null) {
                         generated++;   // a loaded chunk: Distant Horizons holds the chunk's own column there
                         continue;
@@ -290,7 +293,7 @@ public final class FarTerrainCommand {
             }
         }
         JsonObject stored = new JsonObject();
-        stored.addProperty("asked", n * n - generated);
+        stored.addProperty("asked", 4 * n * n - generated);
         stored.addProperty("skipped_loaded_chunks", generated);
         stored.addProperty("held", held);
         stored.addProperty("equal_to_far_terrain", equal);
@@ -300,8 +303,8 @@ public final class FarTerrainCommand {
         // 2. Far terrain against the generated chunks.
         FarTerrainCheck.Tally tally = new FarTerrainCheck.Tally();
         for (int j = 0; j < n; j++) {
-            for (int i = 0; i < n; i++) {
-                int x = x0 + i * spacing + 5, z = z0 + j * spacing + 9;
+            for (int i = 0; i < 4 * n; i++) {
+                int x = x0 + (i / 4) * spacing + OFFSETS[i % 4][0], z = z0 + j * spacing + OFFSETS[i % 4][1];
                 tally.add(far.column(x, z), FarTerrainCheck.real(level.getChunk(x >> 4, z >> 4), x, z));
             }
         }
