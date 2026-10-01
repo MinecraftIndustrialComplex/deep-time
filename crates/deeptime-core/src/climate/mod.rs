@@ -593,21 +593,35 @@ impl ClimateStage {
             .iter()
             .map(|&z| f64::from(z))
             .collect();
-        if let (Some(st), Some(src)) = (world.surface.as_ref(), src.as_ref()) {
-            let mut off = st.offset_m.clone();
-            if let Some(ap) = world
-                .fields
-                .get(crate::surface::field::FEEDBACK_APPLIED)
-                .filter(|f| f.data.len() == n)
-            {
-                off.par_iter_mut()
-                    .zip(ap.data.par_iter())
-                    .for_each(|(o, a)| *o -= a);
-            }
-            h.par_iter_mut().enumerate().for_each(|(c, z)| {
-                let [fi, fj] = src[c];
-                *z += f64::from(advect::bilinear(w, hgt, &off, fi, fj));
+        if let (Some(st), Some(src), Some(prev)) =
+            (world.surface.as_ref(), src.as_ref(), self.s.omega.as_ref())
+        {
+            // The ground the surface stage will start from: its own rule (`advect::carried_elevation`).
+            let ids = |name: &str| {
+                world
+                    .fields
+                    .get(name)
+                    .filter(|f| f.data.len() == n)
+                    .map(|f| f.data.as_slice())
+            };
+            let (carried, _) = advect::carried_elevation(&advect::Carry {
+                w,
+                h: hgt,
+                src,
+                prev_elevation: &st.elevation_m,
+                prev_plate: ids(crate::surface::field::CRUST_PLATE),
+                prev_group: ids(crate::surface::field::CRUST_GROUP),
+                plate: pid,
+                group: ids("plates/group_id"),
+                plate_elevation: need("plates/elevation_m")?,
+                uplift_mm_yr: need("plates/uplift_mm_yr")?,
+                parents: &parents,
+                known_plates: prev.len(),
+                dt_yr: dt_myr * 1.0e6,
             });
+            h.par_iter_mut()
+                .zip(carried.par_iter())
+                .for_each(|(z, &c)| *z = f64::from(c));
         }
         // The fields carried with the plates to where their crust is now.
         let carry = |world: &WorldState, name: &str| -> Option<Vec<f32>> {
