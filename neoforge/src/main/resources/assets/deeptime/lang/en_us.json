@@ -87,6 +87,7 @@
   "deeptime.editor.field.continent_count": "Continents at the start",
   "deeptime.editor.field.breakup_rate": "Continental breakup rate",
   "deeptime.editor.field.ridge_depth": "Mid-ocean ridge depth",
+  "deeptime.editor.field.abyssal_depth": "Abyssal plain depth",
   "deeptime.editor.field.shelf_share": "Flooded continental margin",
   "deeptime.editor.field.arc_buildup": "Island-arc build-up",
   "deeptime.editor.field.mountain_uplift": "Mountain uplift rate",

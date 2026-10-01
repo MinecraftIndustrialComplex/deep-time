@@ -448,6 +448,7 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>) {
         pelagic_m: k.pelagic_m_per_myr * env.dt_myr,
         z_c: k.max_elevation_m,
         z_t: k.trench_elevation_m,
+        z_floor: k.oceanic_floor_elevation_m,
         trench_relax: k.trench_relax,
         gravity: env.gravity,
     };
