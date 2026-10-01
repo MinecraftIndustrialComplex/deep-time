@@ -10,6 +10,7 @@
 
 pub mod area;
 pub mod blocks;
+pub mod census;
 pub mod chunk;
 pub mod colors;
 pub mod error;

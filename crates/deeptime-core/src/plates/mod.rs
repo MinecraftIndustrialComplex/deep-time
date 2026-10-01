@@ -257,6 +257,27 @@ impl PlatesStage {
         }
 
         self.done = step;
+        // How often the elevation cap binds: visible samples standing at `max_elevation_m` after
+        // the step, and visible continental samples, summed over the steps (2026-10-01: the cap is
+        // meant to be a guard that almost never binds; `run`/`stage` print the share).
+        let cap = env.k.max_elevation_m as f32 - 0.5;
+        let (at_cap, continental) = st
+            .samples
+            .par_iter()
+            .filter(|s| !s.is_hidden() && s.kind == state::CONTINENTAL)
+            .fold(
+                || (0u64, 0u64),
+                |(a, n), s| (a + u64::from(s.elevation_m >= cap), n + 1),
+            )
+            .reduce(|| (0, 0), |x, y| (x.0 + y.0, x.1 + y.1));
+        *world
+            .globals
+            .entry(CAP_BOUND_GLOBAL.to_owned())
+            .or_insert(0.0) += at_cap as f64;
+        *world
+            .globals
+            .entry(CONTINENTAL_GLOBAL.to_owned())
+            .or_insert(0.0) += continental as f64;
         let last = self.done >= self.total;
         let margin_every = (MARGIN_EVERY_MYR / env.dt_myr).round().max(1.0) as u64;
         if last || step.is_multiple_of(margin_every) {
@@ -284,13 +305,15 @@ impl PlatesStage {
         Ok(())
     }
 
-    /// The surface stage's changes since the last step (P1-04, `surface/mod.rs`): its elevation
-    /// change (`surface/feedback_m`) and the material it moved (`surface/material_m`) per L1 cell
-    /// are spread onto the samples with the last L1 sampling's barycentric weights (each sample
-    /// takes the weighted mean over the cells that see it), added to their elevation and rock
-    /// pools (erosion strips the column from the top, deposits join the sediment pool), and what
-    /// was applied is sampled back onto L1 (`surface/feedback_applied_m`), so the surface can take
-    /// it off its own offset. Runs before the step's motion, on the positions of the last sampling.
+    /// The surface stage's state since the last step (P1-04, `surface/mod.rs`): where its surface
+    /// stands over this model's elevation (`surface/feedback_m`, the whole offset since
+    /// 2026-10-01, so a sample's elevation is the surface's at its scale) and the material it moved
+    /// (`surface/material_m`) per L1 cell are spread onto the samples with the last L1 sampling's
+    /// barycentric weights (each sample takes the weighted mean over the cells that see it), added
+    /// to their elevation and rock pools (erosion strips the column from the top, deposits join
+    /// the sediment pool); what was applied is sampled back onto L1
+    /// (`surface/feedback_applied_m`, a diagnostic). Runs before the step's motion, on the
+    /// positions of the last sampling.
     fn apply_surface_feedback(
         &mut self,
         st: &mut PlateState,
@@ -401,6 +424,11 @@ impl PlatesStage {
         Ok(())
     }
 }
+
+/// `WorldState::globals`: visible continental sample-steps standing at the elevation cap, and all
+/// visible continental sample-steps.
+pub const CAP_BOUND_GLOBAL: &str = "plates/cap_bound_sample_steps";
+pub const CONTINENTAL_GLOBAL: &str = "plates/continental_sample_steps";
 
 /// The continental margins are measured this often, Myr (P1-27; `notes.plates.margins`).
 pub const MARGIN_EVERY_MYR: f64 = 10.0;

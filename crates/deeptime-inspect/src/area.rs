@@ -185,8 +185,9 @@ impl AreaBox {
 
 /// A block category, for the viewer's toggles: `air`, `water`, `lava`, `ore`, `plant` (anything
 /// [`blocks::is_feature`] names: vegetation, tree parts, snow layers, sheet ice), `soil` (surface
-/// material, [`blocks::is_surface_material`]), `crust` (`minecraft:stone` and `deepslate`, the
-/// unclassified crust the strata pass paints over) and `rock` (every other block).
+/// material, [`blocks::is_surface_material`]), `crust` (`minecraft:stone` and `deepslate`: the
+/// unclassified crust the strata pass paints over and, since P1-28, also the blocks of the classes that
+/// stand in with them, which only the horizon says apart) and `rock` (every other block).
 pub fn category(name: &str, flags: u16) -> &'static str {
     if flags & blocks::AIR != 0 {
         "air"
@@ -903,7 +904,7 @@ pub fn build(world: &World, bx: &AreaBox, ctx: &Context) -> Result<Export> {
             "painted": strata_check[1],
             "crust": strata_check[2],
             "other": strata_check[3],
-            "definition": "rock and crust blocks at or below the column's first horizon top: painted = the block is a member of the horizon's class (or of the class a deposit body gives it there), crust = minecraft:stone/deepslate, other = anything else (surface-rule and feature rock)",
+            "definition": "rock and crust blocks at or below the column's first horizon top: painted = the block is a member of the horizon's class (or of the class a deposit body gives it there), crust = minecraft:stone/deepslate that is not a member of the horizon's class (the unclassified crust; since P1-28 stone and deepslate are also the blocks of shale, mudstone, slate, phyllite, schist and gneiss, which then count as painted), other = anything else (surface-rule and feature rock)",
         }) } else { Value::Null },
         "missing_chunks": missing_chunks.iter().map(|&(x, z)| [x, z]).collect::<Vec<_>>(),
         "chunks_not_full": not_full.iter().map(|(&(x, z), s)| json!([x, z, s])).collect::<Vec<_>>(),

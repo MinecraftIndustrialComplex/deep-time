@@ -99,14 +99,23 @@ public final class RockPalette {
         return hostOfBlock.getOrDefault(s.getBlock(), Host.NONE);
     }
 
+    /** The name of the filler tag's pseudo-class: stone and deepslate the strata pass has not repainted. */
+    public static final String UNCLASSIFIED_CRUST = "unclassified_crust";
+
     /**
-     * The rock classes {@code s} is a block of (several where classes share a stand-in), sorted;
-     * {@code unclassified_crust} for stone and deepslate; empty for non-rock.
+     * The rock classes {@code s} is a block of (several where classes share a stand-in), sorted.
+     * Stone and deepslate are also the unclassified crust, so they are always
+     * {@link #UNCLASSIFIED_CRUST} and, since P1-28, every class that resolves to them as well
+     * (shale, mudstone, slate, gneiss, … in a vanilla-only pack); empty for non-rock.
      */
     public List<String> classesOf(BlockState s) {
-        if (s.is(Blocks.STONE) || s.is(Blocks.DEEPSLATE))
-            return List.of("unclassified_crust");
-        return classesOfBlock.getOrDefault(s.getBlock(), List.of());
+        List<String> classes = classesOfBlock.getOrDefault(s.getBlock(), List.of());
+        if (!s.is(Blocks.STONE) && !s.is(Blocks.DEEPSLATE))
+            return classes;
+        List<String> out = new ArrayList<>(classes);
+        out.add(UNCLASSIFIED_CRUST);
+        java.util.Collections.sort(out);
+        return List.copyOf(out);
     }
 
     public static void init() {
@@ -153,22 +162,7 @@ public final class RockPalette {
                     state(entry, named.id(), problems.computeIfAbsent(rs.rockClass(), k -> new ArrayList<>())).ifPresent(into::add);
             }
         }
-        PaletteRules.Kinds<BlockState> kinds = new PaletteRules.Kinds<>() {
-            @Override
-            public boolean isStone(BlockState b) {
-                return b.is(Blocks.STONE);
-            }
-
-            @Override
-            public boolean isFiller(BlockState b) {
-                return b.is(Blocks.STONE) || b.is(Blocks.DEEPSLATE);
-            }
-
-            @Override
-            public boolean isRejected(BlockState b) {
-                return b.isAir();
-            }
-        };
+        PaletteRules.Kinds<BlockState> kinds = BlockState::isAir;
         Map<String, PaletteRules.Result<BlockState>> out = new TreeMap<>();
         classes.forEach((name, rc) -> {
             List<String> own = problems.computeIfAbsent(name, k -> new ArrayList<>());
