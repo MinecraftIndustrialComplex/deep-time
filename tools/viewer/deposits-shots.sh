@@ -19,7 +19,8 @@
 #              then opens on a finished run: the baked sites; the live path is not seen)
 #   --keep-server   leave the server running when the checks end (prints its pid and port)
 #
-# Chromium is the playwright build in ~/Library/Caches/ms-playwright (override: DEEPTIME_CHROMIUM).
+# Chromium: DEEPTIME_CHROMIUM, else the one on PATH, else nixpkgs#chromium (the Linux test VM), else the
+# playwright build in ~/Library/Caches/ms-playwright (a Mac).
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -39,7 +40,11 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$WORK" ] && { [ -n "$PRESET" ] || [ -n "$REUSE" ]; } || { echo "deposits-shots: --work and --preset (or --reuse RUNS_DIR) are required" >&2; exit 2; }
 case "$WORK" in /Volumes/Graphide/ban/*) ;; *) echo "deposits-shots: --work must be on the SSD (/Volumes/Graphide/ban/...)" >&2; exit 2 ;; esac
-CHROMIUM="${DEEPTIME_CHROMIUM:-$HOME/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing}"
+CHROMIUM="${DEEPTIME_CHROMIUM:-$(command -v chromium || true)}"
+if [ -z "$CHROMIUM" ] && [ "$(uname)" = Linux ]; then
+    CHROMIUM="$(nix build nixpkgs#chromium --no-link --print-out-paths | head -1)/bin/chromium"
+fi
+[ -n "$CHROMIUM" ] || CHROMIUM="$HOME/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
 [ -x "$CHROMIUM" ] || { echo "deposits-shots: no Chromium at $CHROMIUM" >&2; exit 2; }
 
 mkdir -p "$WORK" review/out/wb-deposits
@@ -50,7 +55,7 @@ else
     RUNS="$WORK/runs"; rm -rf "$RUNS"
     QUEUE=(--preset "$PRESET" ${START[@]+"${START[@]}"} ${LEN[@]+"${LEN[@]}"})
 fi
-"$BIN" watch ${QUEUE[@]+"${QUEUE[@]}"} --runs "$RUNS" --port 0 --bind 127.0.0.1 --keep 2 --mem-cap 8589934592 > "$WORK/watch.log" 2>&1 &
+"$BIN" watch ${QUEUE[@]+"${QUEUE[@]}"} --runs "$RUNS" --port 0 --bind 127.0.0.1 --keep 2 --threads 6 --mem-cap 8589934592 > "$WORK/watch.log" 2>&1 &
 PID=$!
 cleanup() { if [ "$KEEP" = 0 ]; then kill "$PID" 2>/dev/null || true; fi; }
 trap cleanup EXIT
@@ -78,6 +83,6 @@ echo "deposits-shots: run $RUN"
 # The page opens now, while the run goes on: the driver waits for the sites to appear (the live
 # path), then for the run to end and the legend to switch to the baked ones, then checks the rest.
 status=0
-/usr/bin/python3 tools/viewer/deposits_shots.py --url "$URL/" --run "$RUN" --out review/out/wb-deposits --chromium "$CHROMIUM" || status=$?
+/usr/bin/python3 tools/viewer/deposits_shots.py --url "$URL/" --run "$RUN" --out review/out/wb-deposits --chromium "$CHROMIUM" --size "${DEPOSITS_SHOT_SIZE:-1600x1150}" || status=$?
 grep -E "timings|peak" "$WORK/watch.log" | cut -c1-400 || true
 exit "$status"
