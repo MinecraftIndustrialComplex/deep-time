@@ -93,7 +93,18 @@ public final class FarTerrainCheck {
         public String worstHeight = "";
         private final Map<String, Integer> blockPairs = new HashMap<>(), biomePairs = new HashMap<>();
 
+        /** Columns where a feature of ice stands in the water far terrain shows (an iceberg): counted apart. */
+        public int icebergs;
+
         public void add(FarTerrain.Column far, RealColumn real) {
+            // An iceberg is a feature (vanilla's, in frozen oceans): packed or blue ice from the sea
+            // floor to above the surface, where the world data and far terrain have open water.
+            if (far.water() && !real.water() && real.ground() > far.ground()
+                    && (real.groundBlock().is(Blocks.PACKED_ICE) || real.groundBlock().is(Blocks.BLUE_ICE)
+                    || real.groundBlock().is(Blocks.SNOW_BLOCK) || real.groundBlock().is(Blocks.ICE))) {
+                icebergs++;
+                return;
+            }
             columns++;
             boolean landBoth = !far.water() && !real.water();
             int d = Math.abs(far.ground() - real.ground());
@@ -153,6 +164,7 @@ public final class FarTerrainCheck {
         public JsonObject toJson() {
             JsonObject o = new JsonObject();
             o.addProperty("columns", columns);
+            o.addProperty("icebergs_set_aside", icebergs);
             o.addProperty("height_exact", heightExact);
             o.addProperty("height_within_1", heightWithin1);
             o.addProperty("height_within_2", heightWithin2);
