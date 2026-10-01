@@ -83,6 +83,35 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | bake / P1-06 | **Terrain above the build limit.** Nothing bounds the terrain to the world's height: the test planet on x86 has 2.5 % of its land above y 639 (peaks to y 969), and two of four 16k 500-Myr runs peaked at 12.4 and 13.0 km against 11.5 km; the game cuts such ground flat at y 639. Options: **(1, recommended)** bound it where it arises and guarantee it at the end: the surface stage's elevation respects `tectonics.max_elevation_m` (the plate cap's taper applied to the offset's rises), the preset check requires that cap plus the amplifier's headroom to fit under `max_y`, and the amplifier compresses whatever is still above a knee smoothly into the headroom, so no seed can clip; (2) compress only at the amplifier (a smooth remap of everything above a knee into the range below `max_y`): the simulation and its keyframes keep 13–20 km mountains the world does not have; (3) scale the whole world's vertical relief so its highest peak fits: one peak flattens every landscape and moves ore depths; (4) a taller world (`max_y` 639 → 1023, +7.7 km): every chunk costs more and 20 km still clips; (5) leave it: flat-topped mountains at y 639, now counted by the bake. | Not asked yet: for the coordinator to put to Ben (build log 2026-10-01, x86_64 gates) |
 
 ## Build log
+### 2026-10-01 — Workbench: the Inspector pops out to a large overlay (agent worktree agent-a2a973aae56130698, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen' button so I can pop it out".
+- **What**: an expand button in the Inspector card's header (`#inspbig`, `aria-label`, `aria-expanded`, tooltip with **P**).
+  It adds a class to the same card (`#inspector.big`, `position: fixed`, nearly the whole window, over a dimmed scrim), so
+  nothing is moved or rebuilt: the tab, scrolling, the selected event, the jobs and the 3D iframes stay as they are. A
+  stand-in keeps the side panel's height and scroll. The same button (icon and label swap), **P**, **Esc** or a click on the
+  scrim put it back. In-page overlay; the browser Fullscreen API adds nothing here (F still does the whole page).
+- **Layout** (all CSS under `#inspector.big`, plus an invisible `.ipanes` wrapper): Events shows the list and the details
+  side by side (picking an event stays on Events; the Details tab is still there); Details and Run get wider columns
+  (key/value rows, 190 px stat tiles); 3D job cards become a grid with the preview iframe `clamp(380px, 62dvh, 860px)` high
+  (was 210 px); the Section tab draws the cross-section large in the tab itself (`buildView` from sections.js, via the new
+  `dt:inspector-big` event and `DTWB.inspectorBig()`), so its "Enlarge" button is hidden there; the dock's and the side
+  panel's Enlarge dialog is unchanged.
+- **Accessibility**: the card is `role=dialog aria-modal` while open, Tab and Shift+Tab stay inside it, Esc closes (a
+  dialog opened over it, e.g. Enlarge or help, closes first), focus goes to the button on open and close.
+- **Not touched**: `?tv` (button and scrim are `display: none`, P does nothing). Phones (<= 760 px): the button is hidden
+  and P does nothing, since the inspector already has the page; narrowing the window while expanded closes it. The
+  mobile tab bar was checked (screenshots 30, 31).
+- **Shortcut**: **P** (free: the list had space, arrows, Home, End/L, G, M, D, C, E, V, I, B, S, [ ], ?, F, 1-9); listed in
+  the help ("Pop the inspector out to a large overlay (Esc closes)").
+- **Checks** (test VM, private `deeptime watch` on a spare port, a 60 Myr `earthlike_quick_16k` run, Chromium via nix):
+  new `tools/workbench/inspector-check.sh` + `inspector_shots.py` (about 55 checks: open/close paths, tab/scroll/selection kept,
+  side-by-side events, iframe fills the embed, large section, focus trap, dialog stacking, phone, ?tv, no page errors) all
+  pass; screenshots in review/out/wb-inspector/ (not committed). Existing checks re-run: `deposits-check.js`, the deposits
+  shot driver (`deposits-shots.sh --reuse`) and `sections-shots.sh` all pass; `cargo fmt --check`, `clippy --workspace
+  --all-targets -D warnings`, `cargo test -p deeptime-cli -p deeptime-viewer` (52 + 6) clean.
+- **Not covered**: a real 3D preview iframe (needs the Minecraft preview server, off on this workbench): the check uses an
+  iframe stand-in inside a real `.embed` card, and the iframe fills its box. Not merged or pushed (asked to leave it).
+
 ### 2026-10-01 — Workbench deposits overlay: coal fields and ore sites by family, hover, "why here" (agent worktree agent-aae4250c131f0cf7a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Ask.** Ben, 2026-10-01, "Deposits layer": draw coal fields and ore deposits by type on the map at every frame where the
   deposit stage has run (and the baked deposits at the end); one symbol and colour per family, coal as footprint areas; a legend
