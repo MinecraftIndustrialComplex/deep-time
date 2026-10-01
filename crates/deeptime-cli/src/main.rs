@@ -4,6 +4,7 @@
 mod alloc;
 mod amplify_view;
 mod climate_dem;
+mod deposit_audit;
 mod dump;
 mod heightmap;
 mod hydro;
@@ -298,6 +299,33 @@ enum Command {
         /// the world data's event log) to the answer; the workbench's click-to-inspect asks for it.
         #[arg(long, conflicts_with = "parity")]
         why: bool,
+    },
+    /// How a baked planet's deposits come out in blocks, per deposit type, beside the background
+    /// scatter and vanilla's ore density (no Minecraft server: the bake evaluated as the mod's
+    /// deposit and scatter features do). Prints a table; --json writes every site's row.
+    #[command(allow_negative_numbers = true)]
+    DepositAudit {
+        /// World-data folder a planet run baked.
+        #[arg(long)]
+        world_data: PathBuf,
+        /// A folder of scatter rules (`*.json`) laid over the jar's own, by material.
+        #[arg(long)]
+        scatter_dir: Option<PathBuf>,
+        /// Random land chunks the scatter is measured on.
+        #[arg(long, default_value_t = 2000)]
+        chunks: usize,
+        /// Seed of the chunk choice.
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        /// Top solid blocks of a land column counted as soil (no bedrock host).
+        #[arg(long, default_value_t = 4)]
+        soil: i32,
+        /// Also count one block box (X0 Z0 X1 Z1, inclusive), to compare with an export-area.
+        #[arg(long = "box", num_args = 4, value_names = ["X0", "Z0", "X1", "Z1"])]
+        area: Option<Vec<i64>>,
+        /// Write the full report (every site) as JSON.
+        #[arg(long)]
+        json: Option<PathBuf>,
     },
     /// Write the Java↔Rust column parity fixture (plan §9.2): columns of a world-data folder as the
     /// column evaluator answers them, for `ColumnParityTest` and the real-planet GameTest.
@@ -724,6 +752,35 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::DepositAudit {
+            world_data,
+            scatter_dir,
+            chunks,
+            seed,
+            soil,
+            area,
+            json,
+        }) => {
+            let o = deposit_audit::Options {
+                world_data,
+                scatter_dir,
+                chunks,
+                seed,
+                soil,
+                area: area.map(|a| [a[0], a[1], a[2], a[3]]),
+                json,
+            };
+            match deposit_audit::run(&o) {
+                Ok(report) => {
+                    print!("{}", deposit_audit::table(&report));
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime deposit-audit: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::Parity {
             world_data,
             out,
