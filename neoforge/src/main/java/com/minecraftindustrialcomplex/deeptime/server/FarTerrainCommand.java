@@ -283,6 +283,45 @@ public final class FarTerrainCommand {
         return true;
     }
 
+    /**
+     * Whether DH's stored column shows what far terrain's does: the same top block at the same
+     * height, the same ground block at the same height, the same water top. Distant Horizons'
+     * default world compression ({@code VISUALLY_EQUAL}) merges blocks no side shows (the dirt
+     * under grass) into their neighbour when it saves a section, so buried layers may differ.
+     */
+    static boolean sameSurface(List<DhApiBinding.StoredPoint> stored, FarTerrain.Column far, StringBuilder why) {
+        int top = Integer.MIN_VALUE, ground = Integer.MIN_VALUE, waterTop = Integer.MIN_VALUE;
+        BlockState topBlock = Blocks.AIR.defaultBlockState(), groundBlock = topBlock;
+        List<DhApiBinding.StoredPoint> sorted = new ArrayList<>(stored);
+        sorted.sort((p, q) -> Integer.compare(p.bottomY(), q.bottomY()));
+        boolean water = false;
+        for (DhApiBinding.StoredPoint p : sorted) {
+            if (!(p.block() instanceof BlockState s) || s.isAir())
+                continue;
+            top = p.topY() - 1;
+            topBlock = s;
+            if (s.is(Blocks.WATER) || s.is(Blocks.ICE) && water) {
+                water = true;
+                waterTop = p.topY() - 1;
+            } else if (!s.is(Blocks.SNOW)) {
+                ground = p.topY() - 1;
+                groundBlock = s;
+            }
+        }
+        // A frozen puddle one block deep is ice on the bed: far terrain calls it water.
+        if (far.water() && !water && groundBlock.is(Blocks.ICE)) {
+            water = true;
+            waterTop = ground;
+        }
+        boolean same = top == far.top() && topBlock == far.topBlock() && water == far.water()
+                && (water ? waterTop == far.waterTop() : ground == far.ground() && groundBlock == far.groundBlock());
+        if (!same)
+            why.append("(").append(far.x()).append(", ").append(far.z()).append("): stored top ").append(top).append(" ").append(id(topBlock))
+                    .append(" ground ").append(ground).append(" ").append(id(groundBlock)).append(", far top ").append(far.top()).append(" ")
+                    .append(id(far.topBlock())).append(" ground ").append(far.ground()).append(" ").append(id(far.groundBlock()));
+        return same;
+    }
+
     static int dhCheck(CommandSourceStack source, int x0, int z0, int n) {
         ServerLevel level = source.getLevel();
         JsonObject o = header("dh-check", level);
@@ -296,7 +335,8 @@ public final class FarTerrainCommand {
         FarTerrain far = terrain.get();
         int spacing = 16;   // n x n chunks, four columns in each
         // 1. What Distant Horizons holds, before any chunk is generated here.
-        int held = 0, equal = 0, generated = 0;
+        int held = 0, equal = 0, generated = 0, surface = 0;
+        StringBuilder surfaceWhy = new StringBuilder();
         int[] coarser = new int[4];
         String[] example = new String[1];
         StringBuilder why = new StringBuilder();
@@ -316,6 +356,11 @@ public final class FarTerrainCommand {
                             continue;
                         held++;
                         StringBuilder w = new StringBuilder();
+                        StringBuilder sw = new StringBuilder();
+                        if (sameSurface(stored, far.column(x, z), sw))
+                            surface++;
+                        else if (surfaceWhy.length() < 400)
+                            surfaceWhy.append(sw).append("; ");
                         if (sameLayers(stored, far, x, z, w)) {
                             equal++;
                         } else {
@@ -349,6 +394,9 @@ public final class FarTerrainCommand {
         stored.addProperty("asked", 4 * n * n - generated);
         stored.addProperty("skipped_loaded_chunks", generated);
         stored.addProperty("held", held);
+        stored.addProperty("same_surface_as_far_terrain", surface);
+        if (surfaceWhy.length() > 0)
+            stored.addProperty("surface_differences", surfaceWhy.toString());
         stored.addProperty("equal_to_far_terrain", equal);
         stored.addProperty("equal_to_the_2_block_cell_corner", coarser[1]);
         stored.addProperty("equal_to_the_4_block_cell_corner", coarser[2]);

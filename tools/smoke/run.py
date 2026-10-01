@@ -409,8 +409,14 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     stored, vs = chk.get("stored", {}), chk.get("vs_real", {})
     asked, held, equal = stored.get("asked", 0), stored.get("held", 0), stored.get("equal_to_far_terrain", 0)
     steps.check("dh: Distant Horizons holds the columns it was given", f">= 90 % of {asked}", held, asked > 0 and held >= 0.9 * asked)
-    steps.check("dh: what it holds is far terrain, layer for layer", f"{held} of {held}", f"{equal} of {held}",
-                held > 0 and equal == held, note=stored.get("differences", ""))
+    # Distant Horizons' default world compression (VISUALLY_EQUAL) merges blocks no side shows (the
+    # dirt under grass) when it saves a section, so the surface is compared, and the columns that
+    # are far terrain's layer for layer are only recorded.
+    surface = stored.get("same_surface_as_far_terrain", 0)
+    steps.check("dh: what it holds is far terrain's surface (top block, ground and water heights)", f"{held} of {held}",
+                f"{surface} of {held}", held > 0 and surface == held, note=stored.get("surface_differences", "")[:400])
+    steps.record("dh: columns stored layer for layer (the rest had buried blocks merged by Distant Horizons)", f"{equal} of {held}",
+                 note=stored.get("example", "")[:300])
     n = vs.get("columns", 0)
     share = lambda k: f"{vs.get(k, 0)} of {n} ({100.0 * vs.get(k, 0) / n:.1f} %)" if n else "no columns"
     # Caves, carvers and features open or raise the ground of a real chunk (this set has vanilla's
