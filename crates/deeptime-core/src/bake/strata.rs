@@ -38,7 +38,8 @@ pub fn bake(
     let mut hz = bake_horizons::bake(world, p)?;
     hz.check()
         .map_err(|e| CoreError::InvalidState(format!("the horizon bake failed its check: {e}")))?;
-    let (raised, max_raise) = raise_tops(&mut hz, terrain, p.scale.max_y)?;
+    let (raised, max_raise, limit) =
+        raise_tops(&mut hz, terrain, p.scale.max_y, p.scale.sea_level_y)?;
     hz.check().map_err(|e| {
         CoreError::InvalidState(format!(
             "the horizons failed their check after the raise: {e}"
@@ -58,6 +59,7 @@ pub fn bake(
         "mean_horizons": mean,
         "top_raised_cells": raised,
         "top_raise_blocks_max": max_raise,
+        "build_limit": limit.note(p.scale.max_y),
         "top_rule": "the first horizon's top is at least the highest elevation plus the highest detail amplitude over the L3 cells within two L1 cells, plus one block",
         "smoothing": {
             "sigma_cells": sp.strata_smoothing_cells,
@@ -70,9 +72,61 @@ pub fn bake(
     }))
 }
 
+/// How much of the baked `elevation` stands above the world's build limit (`scale.max_y`): the game
+/// cannot place those blocks, so such ground ends in a flat top at the limit (the column
+/// evaluator's `top_y` is clamped there). Nothing in the pipeline bounds the terrain to the build
+/// range; the bake counts it so a run says so (`notes.bake.terrain.build_limit`, the `bake` line).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BuildLimit {
+    /// L3 cells whose elevation is above `max_y`.
+    pub cells_above: u64,
+    /// L3 cells at or above sea level.
+    pub land_cells: u64,
+    /// The highest elevation, blocks (y); −∞ when no cell has a value.
+    pub highest_y: f64,
+}
+
+impl BuildLimit {
+    const NONE: BuildLimit = BuildLimit {
+        cells_above: 0,
+        land_cells: 0,
+        highest_y: f64::NEG_INFINITY,
+    };
+
+    fn merge(self, o: BuildLimit) -> BuildLimit {
+        BuildLimit {
+            cells_above: self.cells_above + o.cells_above,
+            land_cells: self.land_cells + o.land_cells,
+            highest_y: self.highest_y.max(o.highest_y),
+        }
+    }
+
+    pub fn note(&self, max_y: i32) -> Value {
+        let share = if self.land_cells == 0 {
+            0.0
+        } else {
+            self.cells_above as f64 / self.land_cells as f64
+        };
+        json!({
+            "max_y": max_y,
+            "cells_above": self.cells_above,
+            "land_cells": self.land_cells,
+            "share_of_land": share,
+            "highest_y": if self.highest_y.is_finite() { json!(self.highest_y) } else { Value::Null },
+            "rule": "elevation cells above max_y (the detail term not counted); the game ends such ground at max_y",
+        })
+    }
+}
+
 /// Per L1 cell, the highest L3 terrain its interpolation reaches, and the first horizon's top
-/// raised to it. Returns (cells raised, largest raise in blocks).
-fn raise_tops(hz: &mut Horizons, t: &Terrain, max_y: i32) -> Result<(u64, f64), CoreError> {
+/// raised to it. Returns (cells raised, largest raise in blocks, the elevation against the build
+/// limit).
+fn raise_tops(
+    hz: &mut Horizons,
+    t: &Terrain,
+    max_y: i32,
+    sea_level_y: i32,
+) -> Result<(u64, f64, BuildLimit), CoreError> {
     let g1 = hz.grid.clone();
     let (w1, h1) = (g1.w as usize, g1.h as usize);
     let l3 = &t.l3;
@@ -85,40 +139,48 @@ fn raise_tops(hz: &mut Horizons, t: &Terrain, max_y: i32) -> Result<(u64, f64), 
     let ratio = (g1.r / l3.r) as usize;
     // Highest elevation and highest amplitude of the L3 cells in each L1 cell's square
     // [x1, x1 + r1) × [z1, z1 + r1), in blocks.
-    let square = |path: &std::path::Path| -> Result<Vec<f64>, CoreError> {
+    let (limit_y, sea_y) = (f64::from(max_y), f64::from(sea_level_y));
+    type Tile = (usize, usize, usize, Vec<f64>, BuildLimit);
+    let square = |path: &std::path::Path| -> Result<(Vec<f64>, BuildLimit), CoreError> {
         let r = TilePackReader::open(path)?;
         let d = r.desc().clone();
         let mut best = vec![f64::NEG_INFINITY; w1 * h1];
         // Each tile covers whole L1 squares (its edge, 256 cells, is a multiple of the ratio), so
         // tiles fill disjoint parts of `best`.
-        let tiles: Vec<(usize, usize, usize, Vec<f64>)> = (0..d.tile_count())
+        let tiles: Vec<Tile> = (0..d.tile_count())
             .into_par_iter()
-            .map(
-                |tix| -> Result<(usize, usize, usize, Vec<f64>), CoreError> {
-                    let bytes = r.read_tile(tix)?;
-                    let (x0, z0, tw, th) = d.tile_rect(tix);
-                    let cb = d.cell_bytes();
-                    let (i0, j0) = (x0 as usize / ratio, z0 as usize / ratio);
-                    let lw = (tw as usize).div_ceil(ratio);
-                    let lh = (th as usize).div_ceil(ratio);
-                    let mut local = vec![f64::NEG_INFINITY; lw * lh];
-                    for lj in 0..th as usize {
-                        let sj = (z0 as usize + lj) / ratio - j0;
-                        for li in 0..tw as usize {
-                            let si = (x0 as usize + li) / ratio - i0;
-                            let at = (lj * tw as usize + li) * cb;
-                            let v = d.physical(d.dtype.decode_scalar(&bytes[at..at + cb]));
-                            let c = sj * lw + si;
-                            if v.is_finite() && v > local[c] {
-                                local[c] = v;
-                            }
+            .map(|tix| -> Result<Tile, CoreError> {
+                let bytes = r.read_tile(tix)?;
+                let (x0, z0, tw, th) = d.tile_rect(tix);
+                let cb = d.cell_bytes();
+                let (i0, j0) = (x0 as usize / ratio, z0 as usize / ratio);
+                let lw = (tw as usize).div_ceil(ratio);
+                let lh = (th as usize).div_ceil(ratio);
+                let mut local = vec![f64::NEG_INFINITY; lw * lh];
+                let mut limit = BuildLimit::NONE;
+                for lj in 0..th as usize {
+                    let sj = (z0 as usize + lj) / ratio - j0;
+                    for li in 0..tw as usize {
+                        let si = (x0 as usize + li) / ratio - i0;
+                        let at = (lj * tw as usize + li) * cb;
+                        let v = d.physical(d.dtype.decode_scalar(&bytes[at..at + cb]));
+                        let c = sj * lw + si;
+                        if v.is_finite() && v > local[c] {
+                            local[c] = v;
+                        }
+                        if v.is_finite() {
+                            limit.cells_above += u64::from(v > limit_y);
+                            limit.land_cells += u64::from(v >= sea_y);
+                            limit.highest_y = limit.highest_y.max(v);
                         }
                     }
-                    Ok((i0, j0, lw, local))
-                },
-            )
+                }
+                Ok((i0, j0, lw, local, limit))
+            })
             .collect::<Result<_, _>>()?;
-        for (i0, j0, lw, local) in tiles {
+        let mut limit = BuildLimit::NONE;
+        for (i0, j0, lw, local, l) in tiles {
+            limit = limit.merge(l);
             for (k, v) in local.into_iter().enumerate() {
                 let (i, j) = (i0 + k % lw, j0 + k / lw);
                 if i < w1 && j < h1 {
@@ -129,11 +191,11 @@ fn raise_tops(hz: &mut Horizons, t: &Terrain, max_y: i32) -> Result<(u64, f64), 
                 }
             }
         }
-        Ok(best)
+        Ok((best, limit))
     };
-    let elev = square(&t.elevation)?;
+    let (elev, limit) = square(&t.elevation)?;
     let amp = match &t.amplitude {
-        Some(a) => square(a)?,
+        Some(a) => square(a)?.0,
         None => vec![0.0; w1 * h1],
     };
     // Over the 4 × 4 squares i − 2 ..= i + 1, j − 2 ..= j + 1 (x wraps, z clamps).
@@ -176,5 +238,5 @@ fn raise_tops(hz: &mut Horizons, t: &Terrain, max_y: i32) -> Result<(u64, f64), 
         hz.tops[c * k] = top;
         max_raise = max_raise.max(raise);
     }
-    Ok((tops.len() as u64, max_raise))
+    Ok((tops.len() as u64, max_raise, limit))
 }

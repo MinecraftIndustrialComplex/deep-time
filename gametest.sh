@@ -9,6 +9,8 @@
 #   ./gametest.sh -PextraDatapack=<folder>   one more datapack folder for any profile
 #   ./gametest.sh -PwithTerraBlender plus TerraBlender, Biomes O' Plenty, GlitchCore
 #   ./gametest.sh -PwithEv           plus Excavated Variants and Dynamic Asset Generator
+#   ./gametest.sh -PgametestOnly=<name>[,<name>…]   only those tests
+#   DEEPTIME_TEST_PLANET_SET="seed=12" ./gametest.sh   the real-planet level on another planet (see below)
 #
 # Boots NeoForge's GameTest server (namespace `deeptime`, -Ddeeptime.gametest=true), runs
 # every required test and exits non-zero if anything failed or the run never reached the
@@ -39,7 +41,12 @@ dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/
 # World data for the test_planet_real level (P1-08): a small real planet (every stage, baked, format
 # 0.1) and Rust's column evaluator on 500 of its columns (parity/columns.json), which the real-planet
 # GameTests compare placed blocks with.
-dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/planet_world_4k.json --out run-gametest/world/deeptime-real \
+# DEEPTIME_TEST_PLANET_SET="seed=12 planet.ocean_fraction=0.6" bakes another planet from the same
+# preset (each word a `--set`): the real-planet tests assert properties, not one planet's numbers,
+# so they must pass on any of them (the simulation is not bit-identical across platforms).
+planet_sets=()
+for kv in ${DEEPTIME_TEST_PLANET_SET:-}; do planet_sets+=(--set "$kv"); done
+dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/planet_world_4k.json "${planet_sets[@]}" --out run-gametest/world/deeptime-real \
     || { echo "FAILED: deeptime run planet_world_4k"; exit 1; }
 dev cargo run --release -q -p deeptime-cli -- parity --world-data run-gametest/world/deeptime-real \
     || { echo "FAILED: deeptime parity"; exit 1; }
@@ -50,11 +57,14 @@ dev cargo run --release -q -p deeptime-cli -- synth --kind lake-test --size 1024
 peak_rss_file=$(mktemp)
 echo 0 > "$peak_rss_file"
 # This checkout's game JVM: its command line names this checkout's mod folder (the game directory and
-# the other run options sit in an @argfile, so the old 'run-gametest' match never hit: 0 MB).
-jvm_marker="deeptime%%$PWD/neoforge/"
+# the other run options sit in an @argfile, so the old 'run-gametest' match never hit: 0 MB). The
+# physical path: Gradle resolves symlinks (/Volumes/Graphide -> /data on the test VM), $PWD does not.
+jvm_marker="deeptime%%$(pwd -P)/neoforge/"
 (
     while true; do
-        rss=$(ps -ww -eo rss=,args= 2>/dev/null \
+        # Without the dev shell's LD_LIBRARY_PATH: on Linux the system ps otherwise loads the shell's
+        # libsystemd, fails against the system glibc and reports nothing (0 MB).
+        rss=$(env -u LD_LIBRARY_PATH ps -ww -eo rss=,args= 2>/dev/null \
               | grep -F -- "$jvm_marker" \
               | grep -v grep \
               | awk '{ if ($1 > max) max = $1 } END { print max + 0 }')
