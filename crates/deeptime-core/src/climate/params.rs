@@ -18,6 +18,35 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
 
+/// The climate the world is baked and played in (`present_climate`; decisions log 2026-10-01,
+/// "prevent ice ages / snowball events for the final state"). It governs the run's last
+/// `present_adjust_kyr` only: the history before it, its events and deposits stay as simulated.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PresentClimate {
+    /// No ice age and no snowball at the present: an interglacial like Earth's today (ice caps
+    /// may remain; at most `present_interglacial_ice_frac` of the land under ice).
+    #[default]
+    Temperate,
+    /// Whatever the simulation gives.
+    Natural,
+    /// A glacial maximum: at least `present_glacial_ice_frac` of the land under ice, no snowball.
+    IceAge,
+    /// A snowball: the ocean frozen over.
+    Snowball,
+}
+
+impl PresentClimate {
+    pub fn name(self) -> &'static str {
+        match self {
+            PresentClimate::Temperate => "temperate",
+            PresentClimate::Natural => "natural",
+            PresentClimate::IceAge => "ice_age",
+            PresentClimate::Snowball => "snowball",
+        }
+    }
+}
+
 /// The climate section.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
@@ -240,6 +269,18 @@ pub struct ClimateParams {
     /// and calving on a coarse grid, in the ice-age window every clock step and in deep time for
     /// `ice_relax_kyr` per plate step. Off: Nye's equilibrium profile and Imbrie's lag.
     pub ice_dynamics: bool,
+    /// The climate at the present, the state the world is baked and played in: `temperate` (no
+    /// ice age, no snowball; the default), `natural`, `ice_age` or `snowball`. Over the run's
+    /// last `present_adjust_kyr` the atmosphere's CO₂ is moved by the smallest factor that reaches
+    /// the state (the ocean taking up or giving back carbon, as in Earth's glacial terminations),
+    /// ramped in over `present_ramp_kyr`; nothing changes when the simulation already ends there.
+    pub present_climate: PresentClimate,
+    pub present_adjust_kyr: f64,
+    pub present_ramp_kyr: f64,
+    /// `temperate` allows at most this share of the land under ice (Earth today: 0.10);
+    /// `ice_age` wants at least the second (the last glacial maximum: about 0.25).
+    pub present_interglacial_ice_frac: f64,
+    pub present_glacial_ice_frac: f64,
     /// Glen's flow factor A, Pa⁻³ yr⁻¹ (EISMINT: 10⁻¹⁶).
     pub ice_flow_a: f64,
     /// Mass-balance gradients above and below the equilibrium line, (m of ice/yr) per m of height
@@ -353,6 +394,11 @@ impl Default for ClimateParams {
             ice_max_thickness_m: 3000.0,
             ice_response_kyr: 17.0,
             ice_dynamics: true,
+            present_climate: PresentClimate::Temperate,
+            present_adjust_kyr: 100.0,
+            present_ramp_kyr: 10.0,
+            present_interglacial_ice_frac: 0.15,
+            present_glacial_ice_frac: 0.25,
             ice_flow_a: 1.0e-16,
             ice_accumulation_gradient: 0.005,
             ice_ablation_gradient: 0.01,
@@ -560,6 +606,20 @@ impl ClimateParams {
             (self.orbital_window_myr, "orbital_window_myr", 0.0, 20.0),
             (self.orbital_strength, "orbital_strength", 0.0, 3.0),
             (self.orbital_step_kyr, "orbital_step_kyr", 0.25, 20.0),
+            (self.present_adjust_kyr, "present_adjust_kyr", 1.0, 2000.0),
+            (self.present_ramp_kyr, "present_ramp_kyr", 0.0, 2000.0),
+            (
+                self.present_interglacial_ice_frac,
+                "present_interglacial_ice_frac",
+                0.0,
+                1.0,
+            ),
+            (
+                self.present_glacial_ice_frac,
+                "present_glacial_ice_frac",
+                0.0,
+                1.0,
+            ),
             (
                 self.ice_yield_stress_kpa,
                 "ice_yield_stress_kpa",

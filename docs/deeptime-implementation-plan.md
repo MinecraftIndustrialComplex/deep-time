@@ -2332,6 +2332,21 @@ equilibrium glacier's, whichever is thicker. (14) **Weathering is supply-limited
 kinetic weathering saturates at the Ca + Mg its erosion exposes (the surface stage's erosion, West
 2012's kinetic/supply regimes). (15) `carbon_step_kyr` 200 by default, an editor setting.
 
+*Revised 2026-10-01* (decisions log: "prevent ice ages / snowball events for the final state"):
+(16) **The present-day climate is a setting**, `climate.present_climate`: `temperate` (default; no
+snowball and at most `present_interglacial_ice_frac`, 0.15, of the land under ice), `natural`,
+`ice_age` (at least `present_glacial_ice_frac`, 0.25, no snowball) or `snowball`. Only the run's
+last `present_adjust_kyr` (100) is touched: when the simulated end is not the state asked for, that
+stretch is run again with the atmosphere's CO₂ multiplied by a factor ramped in over
+`present_ramp_kyr` (10) — the ocean taking up or releasing carbon, the mechanism of Earth's own
+glacial terminations (Sigman & Boyle 2000) — and the smallest factor that reaches the state is kept
+(bracketing, then four halvings; at most ×10⁴ either way). The energy balance, the sea ice, the
+flowing ice sheets, the sea level and the weathering all respond to that CO₂ as they do to any
+other, so the present is a state the model itself produced. Everything older is the same run: the
+events, the deposits, the largest-ice fields of the last glacial cycles. The stage's note records
+the factor and the state without it (`present`); a snowball the setting set off or ended carries
+`present_setting` as its cause.
+
 ### 8.4 Hydrology — `core::hydro` (Phase 2; Phase 0 only proves water holds)
 
 On L2: flow routing and priority-flood; river extraction as vectors with discharge above a drainage

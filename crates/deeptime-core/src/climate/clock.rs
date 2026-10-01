@@ -138,6 +138,42 @@ pub struct ClockState {
     /// Degassing and weathering of the last clock step, mol/yr.
     pub degassing: f64,
     pub weathering: f64,
+    /// The present-state nudge's CO₂ factor after the last clock step (0 before any: read as 1).
+    pub co2_factor: f64,
+}
+
+impl ClockState {
+    /// The nudge's factor on the atmosphere's CO₂ (1 outside the run's last stretch).
+    pub fn factor(&self) -> f64 {
+        if self.co2_factor > 0.0 {
+            self.co2_factor
+        } else {
+            1.0
+        }
+    }
+
+    /// The atmosphere's CO₂ as the climate sees it, ppm.
+    pub fn ppm(&self) -> f64 {
+        self.carbon.ppm() * self.factor()
+    }
+}
+
+/// The present-state nudge (`present_climate`): over the run's last stretch the atmosphere's
+/// share of the carbon changes by a factor, as the ocean takes up or gives back CO₂ (what moves
+/// CO₂ between 180 and 280 ppm over Earth's glacial cycles; Sigman & Boyle 2000, Nature 407:
+/// 859–869). The factor ramps in over `ramp_years` from `t_start`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Nudge {
+    pub t_start: f64,
+    pub ramp_years: f64,
+    pub ln_factor: f64,
+}
+
+impl Nudge {
+    pub fn at(&self, t: f64) -> f64 {
+        let x = ((t - self.t_start) / self.ramp_years.max(1.0)).clamp(0.0, 1.0);
+        (self.ln_factor * x * x * (3.0 - 2.0 * x)).exp()
+    }
 }
 
 /// A decision the clock made that becomes an event (emitted by the stage).
@@ -182,6 +218,8 @@ pub struct Input<'a> {
     pub degassing: f64,
     /// Sea-floor production against Earth's today (seafloor weathering).
     pub ridge_rel: f64,
+    /// The present-state nudge, in the run's last stretch.
+    pub nudge: Option<Nudge>,
 }
 
 /// What a plate step's clock returns.
@@ -199,6 +237,23 @@ pub struct Output {
     /// Carbon the weathering took out beyond the degassing over the plate step (the drawdown's
     /// alkalinity, which precipitates as carbonate: after a snowball, its cap carbonate), mol.
     pub carbonate_excess_mol: f64,
+}
+
+impl Output {
+    /// This stretch followed by `next` (one plate step run in two parts).
+    pub fn then(mut self, next: Output) -> Output {
+        self.last = next.last.or(self.last);
+        self.deltas.extend(next.deltas);
+        self.happenings.extend(next.happenings);
+        self.co2_min = self.co2_min.min(next.co2_min);
+        self.co2_max = self.co2_max.max(next.co2_max);
+        self.t_min = self.t_min.min(next.t_min);
+        self.t_max = self.t_max.max(next.t_max);
+        self.sea_ice_max = self.sea_ice_max.max(next.sea_ice_max);
+        self.steps += next.steps;
+        self.carbonate_excess_mol += next.carbonate_excess_mol;
+        self
+    }
 }
 
 /// The star's luminosity at world time `t` (years) against today's.
@@ -312,8 +367,8 @@ pub fn run(
         //    corrects them in 3). Where CO₂ would move by more than half (a snowball's end, the
         //    hothouse's drawdown) the step is halved, down to `MIN_STEP_YEARS`, so the EBM and its
         //    ice feedback follow the change instead of a linear guess.
-        let ppm_before = st.carbon.ppm();
-        let (d, carbon_next) = loop {
+        let ppm_before = st.ppm();
+        let (d, carbon_next, fac) = loop {
             let dt = t_next - t;
             st.lips.retain(|&(t0, years, _)| t0 + years > t);
             let lip: f64 = st
@@ -326,29 +381,37 @@ pub fn run(
                 .sum::<f64>()
                 / dt.max(1.0);
             let d = inp.degassing + lip;
+            let fac = inp.nudge.map_or(1.0, |n| n.at(t_next));
             if !p.carbon_cycle {
-                break (d, st.carbon);
+                break (d, st.carbon, fac);
             }
             let (kernel, t_land, sheet) = (&st.kernel, &st.t_land, &st.sheet);
             let t_global = st.t_global;
+            // Under sea ice the ocean is sealed from the air: the sea floor's sink draws on the
+            // ocean, and the atmosphere feels only the open share of it.
+            let open = (1.0 - st.sea_ice).clamp(0.0, 1.0);
             let w_of = |ppm: f64| -> f64 {
+                let ppm = ppm * fac;
                 let shift = lambda * (ppm.max(1e-9) / ppm_before.max(1e-9)).ln();
                 let t: Vec<f64> = t_land.iter().map(|x| x + shift).collect();
                 wp.flux(kernel, &t, sheet, ppm)
-                    + wp.seafloor_flux(inp.ridge_rel, t_global + shift, ppm)
+                    + open * wp.seafloor_flux(inp.ridge_rel, t_global + shift, ppm)
             };
             let next = st.carbon.step(d, &w_of, 1.0 - st.sea_ice, dt);
-            let change = (next.ppm().max(1e-9) / ppm_before.max(1e-9)).ln().abs();
+            let change = ((next.ppm() * fac).max(1e-9) / ppm_before.max(1e-9))
+                .ln()
+                .abs();
             if change > 1.5f64.ln() && dt > 2.0 * MIN_STEP_YEARS {
                 t_next = t + 0.5 * dt;
                 continue;
             }
-            break (d, next);
+            break (d, next, fac);
         };
         let dt = t_next - t;
         out.carbonate_excess_mol += (st.carbon.total() - carbon_next.total()).max(0.0);
         st.carbon = carbon_next;
-        let ppm = st.carbon.ppm();
+        st.co2_factor = fac;
+        let ppm = st.ppm();
         // 3. The EBM.
         let ep = ebm_params(p, inp.tilt_deg, inp.star_flux_rel, ppm, t_next);
         let sheet: Vec<f64> = st.sheet.iter().map(|s| s * p.ice_sheet_feedback).collect();
@@ -368,7 +431,8 @@ pub fn run(
         st.t_land = mean;
         // 5. Weathering and the trackers.
         let w = wp.flux(&st.kernel, &st.t_land, &st.sheet, ppm)
-            + wp.seafloor_flux(inp.ridge_rel, er.t_global, ppm);
+            + (1.0 - sea_ice_frac(&er, inp.land_frac)).clamp(0.0, 1.0)
+                * wp.seafloor_flux(inp.ridge_rel, er.t_global, ppm);
         st.t_global = er.t_global;
         st.degassing = d;
         st.weathering = w;
@@ -531,10 +595,13 @@ pub fn weathering_at(
     sheet: &[f64],
     ppm: f64,
     ridge_rel: f64,
+    land: &[f64],
 ) -> f64 {
     let (mean, _) = land_temps(er);
     let wp = Weathering::from(p);
-    wp.flux(k, &mean, sheet, ppm) + wp.seafloor_flux(ridge_rel, er.t_global, ppm)
+    wp.flux(k, &mean, sheet, ppm)
+        + (1.0 - sea_ice_frac(er, land)).clamp(0.0, 1.0)
+            * wp.seafloor_flux(ridge_rel, er.t_global, ppm)
 }
 
 /// The CO₂ at which weathering balances degassing `d` on the warm branch: bisection on ln CO₂,
@@ -560,7 +627,7 @@ pub fn balance(
         let ep = ebm_params(p, tilt, flux, ppm, t);
         let mut s = ep.initial_state();
         let er = ep.run(&mut s, land, &sheet_fb, p.ebm_spinup_years.max(40));
-        (weathering_at(p, k, &er, sheet, ppm, ridge_rel) - d, s)
+        (weathering_at(p, k, &er, sheet, ppm, ridge_rel, land) - d, s)
     };
     for _ in 0..40 {
         let mid = 0.5 * (lo + hi);
@@ -686,6 +753,7 @@ mod tests {
                     band_lat: &self.lat,
                     degassing: d,
                     ridge_rel: 1.0,
+                    nudge: None,
                 };
                 let out = run(&inp, st, ebm, &mut ice);
                 let er = out.last.expect("the clock ran");
@@ -718,6 +786,67 @@ mod tests {
         assert!((5.0..25.0).contains(&t), "T {t}");
         assert!((50.0..3000.0).contains(&ppm), "CO₂ {ppm}");
         assert!(ice < 0.5, "sea ice {ice}");
+    }
+
+    #[test]
+    fn a_co2_nudge_over_the_last_stretch_sets_the_present() {
+        // The ramp: nothing at its start, all of it after `ramp_years`.
+        let n = Nudge {
+            t_start: -100.0e3,
+            ramp_years: 10.0e3,
+            ln_factor: 2.0f64.ln(),
+        };
+        assert!((n.at(-100.0e3) - 1.0).abs() < 1e-12);
+        assert!((n.at(-95.0e3) - 2.0f64.sqrt()).abs() < 1e-9);
+        assert!((n.at(-90.0e3) - 2.0).abs() < 1e-12 && (n.at(0.0) - 2.0).abs() < 1e-12);
+        // An Earth-like planet in balance; its last 100 kyr without a nudge, with CO₂ × 4 and
+        // with CO₂ ÷ 3000.
+        let pl = Planet::new(
+            ClimateParams {
+                orbital_window_myr: 0.0,
+                carbon_step_kyr: 10.0,
+                ..ClimateParams::default()
+            },
+            |_| 0.3,
+        );
+        let d = carbon::DEGASSING_EARTH_MOL_YR;
+        let (st0, ebm0) = pl.start(-100.0e3, d);
+        let end = |ln_factor: f64| -> (f64, f64, f64, bool) {
+            let (mut st, mut ebm) = (st0.clone(), ebm0.clone());
+            let inp = Input {
+                p: &pl.p,
+                tilt_deg: 23.4,
+                star_flux_rel: 1.0,
+                t0: -100.0e3,
+                t1: 0.0,
+                land_frac: &pl.land,
+                band_lat: &pl.lat,
+                degassing: d,
+                ridge_rel: 1.0,
+                nudge: (ln_factor != 0.0).then_some(Nudge {
+                    t_start: -100.0e3,
+                    ramp_years: 10.0e3,
+                    ln_factor,
+                }),
+            };
+            let mut ice = |_: &IceStep<'_>| -> Vec<f64> { vec![0.0; pl.land.len()] };
+            let out = run(&inp, &mut st, &mut ebm, &mut ice);
+            let t = out.last.expect("the clock ran").t_global;
+            (st.ppm(), t, st.sea_ice, st.snowball.is_some())
+        };
+        let (ppm0, t0, ice0, snow0) = end(0.0);
+        assert!(!snow0 && ice0 < 0.3, "natural: sea ice {ice0}");
+        let (ppm_w, t_w, _, snow_w) = end(4.0f64.ln());
+        // The weathering takes back part of the factor within 100 kyr, not all of it.
+        assert!(
+            ppm_w > 1.3 * ppm0 && ppm_w < 4.01 * ppm0 && t_w > t0 + 1.0 && !snow_w,
+            "warm: {ppm_w} ppm against {ppm0}, {t_w} °C against {t0}"
+        );
+        let (ppm_c, t_c, ice_c, snow_c) = end((1.0f64 / 3000.0).ln());
+        assert!(
+            snow_c && ice_c >= 0.95 && t_c < -20.0 && ppm_c < 0.1 * ppm0,
+            "cold: {ppm_c} ppm, {t_c} °C, sea ice {ice_c}"
+        );
     }
 
     #[test]
@@ -784,6 +913,7 @@ mod tests {
     fn scenario(step_kyr: f64, hold: f64, supply: f64, myr: f64) -> Vec<(f64, f64)> {
         let mut p = params();
         p.carbon_step_kyr = step_kyr;
+        p.weathering_supply = supply > 0.0;
         let pl = Planet::new(p, |l| if l.abs() < 25.0 { 0.8 } else { 0.03 });
         let d = carbon::DEGASSING_EARTH_MOL_YR;
         let (mut st, mut ebm) = pl.start(-700.0e6, d);
@@ -908,6 +1038,7 @@ mod tests {
                 band_lat: &pl.lat,
                 degassing: 0.0,
                 ridge_rel: 1.0,
+                nudge: None,
             };
             run(&inp, &mut st, &mut ebm, &mut ice);
             t = (t + 2.0e6).min(0.0);
