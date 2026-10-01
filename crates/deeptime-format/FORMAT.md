@@ -488,11 +488,11 @@ last); across a gap or past the last span, the next top (min_y). For block (x, z
    emitted top, that horizon (left with no block) is removed; then if the last emitted horizon has
    the same class, nothing is added, else (t, class, unit) is appended.
 5. Slivers, where the layer has `min_blocks` (N_c for class c; 1 for a class past its end): with
-   the emitted horizons h = 0 … n − 1 (tops T_h), the first is kept; then for h = 1 … n − 1 in
-   order: if h < n − 1 and N_class(h) > 1 and T_h − T_{h+1} < N_class(h), horizon h is removed;
-   else if its class is the class of the last horizon kept, it is removed (it continues that
-   one); else it is kept. The horizon above a removed one reaches down in its place. (The
-   thickness test uses the tops as emitted in step 4, whatever was removed above.)
+   the emitted horizons h = 0 … n − 1 (tops T_h), the first is kept and a carried top C starts
+   unset; then for h = 1 … n − 1 in order, with t = C if it is set, else T_h: if h < n − 1 and
+   N_class(h) > 1 and t − T_{h+1} < N_class(h), horizon h is removed and C = t (its blocks go to
+   the horizon under it); else C is unset and, if its class is the class of the last horizon
+   kept, it is removed (it continues that one), else it is kept with top t.
 
 The result is continuous across cell edges (a cell whose weight is zero changes nothing), a bed
 present in every cell has smoothly interpolated top and base, a bed some cells lack thins out
@@ -510,9 +510,10 @@ horizon carries the key span of the units it stands for — a merge keeps the un
 members lie in one key domain, and the span of the member whose class it keeps where they do not
 (the other's keys become a hiatus), so no horizon's height is spread over keys that other cells
 give to other rocks. A horizon of regional-metamorphic rock under the first horizon and over the
-last is at least 8 blocks thick and one of plutonic rock at least 16 (a thinner one merges into
-its thinner neighbour like a horizon under one block): such rock is a regional body, not a sheet
-between other rocks. A stack walks the column of
+last is at least 8 blocks thick and one of plutonic rock at least 16 (a thinner one gives its
+blocks to the horizon under it where that is of its key domain, else to the one over it where
+that is, else to the one under it; that horizon keeps its class and keys): such rock is a
+regional body, not a sheet between other rocks. A stack walks the column of
 `structure::columns` from the top: regolith, the strata log (the young, shallow part of a clastic
 deposit as its `loose_equivalent`, buried loose material and palaeosols as their `lithifies_to`:
 glacial till, the deep-time glaciers', the ice ages' and a snowball Earth's alike, becomes
@@ -532,7 +533,8 @@ them has; each interval takes the class holding the largest weighted thickness t
 neighbours of one key domain join; the cell's own surface stays its first top: the regolith and
 the loose sediment on top (the unconsolidated classes) lie on it with their mean thickness,
 neighbours' rock units above their base pinch out there, and where the cell stands above the mean
-its top rock unit fills the difference; then the stack is settled again (at least a block thick, metamorphic and plutonic
+the first rock unit at least 8 blocks thick (in the mean) fills the difference, thinner units
+over it keeping their thickness; then the stack is settled again (at least a block thick, metamorphic and plutonic
 rock inside it at least 8 and 16 blocks, at most K). The neighbours are the cells of a lattice of
 step ⌈σ / 2.5⌉ anchored at cell (0, 0) within 5 steps (11 × 11 samples whatever σ, and every cell
 samples the same lattice); σ 0 bakes each cell's own stack. `notes.bake.strata.realism` records the share of the stored
