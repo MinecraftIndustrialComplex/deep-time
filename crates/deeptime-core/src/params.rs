@@ -308,6 +308,16 @@ pub struct TectonicParams {
     pub max_plate_speed_mm_yr: f64,
     /// ε_o (0.04 mm/yr).
     pub oceanic_damping_mm_yr: f64,
+    /// The elevation ageing ocean floor subsides towards, m: z(a) = z_f + (z_r − z_f)·
+    /// exp(−a·ε_o/|z_f|). Cortial's model subsides towards the trench depth (−10 km, the default
+    /// and the plate-only presets'), which leaves floor older than ~120 Myr deeper than any abyssal
+    /// plain. −5,600 m is GDH1's old-floor depth (Stein & Stein 1992, Nature 359:123–129); with
+    /// ε_o 0.215 mm/yr from a −2,500 m ridge the law follows GDH1 within 0.12 km from 20 Myr on.
+    /// The pipeline presets use −5,600 m with ε_o 0.12 mm/yr (3.6 km at 20 Myr, 4.5 at 50, 5.2 at
+    /// 100, 5.6 beyond): at GDH1's full rate the young floor is deep enough that island arcs rarely
+    /// emerge and the continental crust shrinks from 0.39 to 0.29 of the planet in 500 Myr (P1-17
+    /// hypsometry recalibration, 2026-10-01; median sea depth 4.0 km, Earth 4.06).
+    pub oceanic_floor_elevation_m: f64,
     /// ε_c (0.03 mm/yr).
     pub continental_erosion_mm_yr: f64,
     /// ε_t (0.3 mm/yr).
@@ -472,6 +482,7 @@ impl Default for TectonicParams {
             collision_coefficient_per_km: 1.3e-5,
             max_plate_speed_mm_yr: 100.0,
             oceanic_damping_mm_yr: 0.04,
+            oceanic_floor_elevation_m: -10000.0,
             continental_erosion_mm_yr: 0.03,
             sediment_accretion_mm_yr: 0.3,
             subduction_uplift_mm_yr: 0.6,
@@ -754,6 +765,12 @@ impl PlanetPreset {
                 && k.max_elevation_m > 0.0,
             "$.tectonics.ridge_elevation_m",
             "need trench < abyssal < ridge < 0 < max_elevation",
+        )?;
+        check(
+            k.trench_elevation_m <= k.oceanic_floor_elevation_m
+                && k.oceanic_floor_elevation_m < k.ridge_elevation_m,
+            "$.tectonics.oceanic_floor_elevation_m",
+            "must be in [trench_elevation_m, ridge_elevation_m)",
         )?;
         check(
             (2..=200).contains(&k.initial_plates),

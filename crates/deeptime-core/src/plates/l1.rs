@@ -140,11 +140,11 @@ pub fn sample(
     let t = env.t_myr;
     let mesh = &geo.mesh;
     let since = (t - state.resample_myr).max(env.dt_myr);
-    let (zr, zt) = (k.ridge_elevation_m, k.trench_elevation_m);
+    let (zr, zf) = (k.ridge_elevation_m, k.oceanic_floor_elevation_m);
     let edge_z = |v: u32| {
         let s = &samples[v as usize];
         if s.kind == CONTINENTAL {
-            ocean_elevation(since, zr, zt, k.oceanic_damping_mm_yr)
+            ocean_elevation(since, zr, zf, k.oceanic_damping_mm_yr)
         } else {
             f64::from(s.elevation_m)
         }
@@ -164,7 +164,7 @@ pub fn sample(
         };
         let age = alpha * since;
         (
-            alpha * zbar + (1.0 - alpha) * ocean_elevation(age, zr, zt, k.oceanic_damping_mm_yr),
+            alpha * zbar + (1.0 - alpha) * ocean_elevation(age, zr, zf, k.oceanic_damping_mm_yr),
             age,
         )
     };
