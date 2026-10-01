@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
+import com.minecraftindustrialcomplex.deeptime.worlddata.LakeIce;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Rivers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
@@ -26,7 +27,10 @@ import net.minecraft.world.level.material.Fluids;
  *       channel's top, air above: gravel on the bed of a narrow channel, sand on a wide one,
  *       never over air.</li>
  *   <li><b>Lake</b> columns fill the air from the lake's top down to the ground, as P0-13's pass
- *       did; a cave under the lake bed is plugged, and grass left under the water becomes dirt.</li>
+ *       did; a cave under the lake bed is plugged, and grass left under the water becomes dirt.
+ *       Where the climate freezes the lake ({@link LakeIce}: the mean annual temperature at the
+ *       column is below the preset's {@code hydro.lake_freeze_mean_c}) its top water block is
+ *       ice, whatever the biome; {@link LakeFreeze} keeps the other lake columns open.</li>
  *   <li><b>Sea</b> columns the aquifer left dry (it decides from its own noise near the surface, so
  *       a coastal flat a block below sea level can stay land) are filled to the sea's top, so the
  *       coast is where the terrain puts it and rivers reaching it meet water. The pass therefore
@@ -71,6 +75,7 @@ public final class WaterBodies {
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
     private static final BlockState WATER = Blocks.WATER.defaultBlockState();
     private static final BlockState DIRT = Blocks.DIRT.defaultBlockState();
+    private static final BlockState ICE = Blocks.ICE.defaultBlockState();
     private static final BlockState FLOWING = Fluids.FLOWING_WATER.getFlowing(7, false).createLegacyBlock();
     private static final BlockState FALLING = Fluids.FLOWING_WATER.getFlowing(8, true).createLegacyBlock();
 
@@ -223,6 +228,7 @@ public final class WaterBodies {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int water = 0, cut = 0, filled = 0, flowing = 0, shielded = 0;
         CarvingMask[] masks = carvingMasks(chunk, wd);
+        LakeIce lakeIce = LakeIce.of(wd);
         Water.Column[] cols = new Water.Column[256];
         for (int lz = 0; lz < 16; lz++) {
             for (int lx = 0; lx < 16; lx++) {
@@ -307,6 +313,10 @@ public final class WaterBodies {
                         }
                         // The loop stopped on the lake's bed or on the first ground: the water is above it.
                         shielded += shield(masks, lx, lz, y + 1, t, minY, maxY);
+                        // A frozen lake: ice on its water, whatever the biome.
+                        if (lakeIce != null && y < t && t >= minY && lakeIce.frozen(x, z)
+                                && chunk.getBlockState(pos.set(x, t, z)).is(Blocks.WATER))
+                            chunk.setBlockState(pos, ICE, false);
                         if (y == bed && bed >= minY) {
                             // The analytic bed: open ground under it is a cave; plug a few blocks.
                             for (int p = bed; p >= Math.max(minY, bed - 3) && open(chunk.getBlockState(pos.set(x, p, z))); p--) {
