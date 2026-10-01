@@ -45,17 +45,18 @@ const SCATTER: &[&str] = &[
 
 /// Ore blocks per chunk in a vanilla 1.21.1 overworld (all heights, every biome of the sample),
 /// measured with `tools/review/deposit-audit.sh vanilla` (STATUS.md, build log "deposit audit"):
-/// material → blocks per chunk. Lead, silver and molybdenum have no vanilla ore.
+/// material → blocks per chunk. One sample: 1,024 chunks around 0,0 of seed 20261001 on the
+/// standalone set with level-type `minecraft:normal` (2026-10-01), so zinc is Create's own ore
+/// feature, and copper is high for a world average (the sample's copper is 92 % above y 0, which
+/// points at `ore_copper_large` under dripstone caves). Lead, silver and molybdenum have no ore
+/// feature in that set.
 pub const VANILLA_PER_CHUNK: &[(&str, f64)] = &[
-    ("c:coal", VANILLA_COAL),
-    ("c:copper", VANILLA_COPPER),
-    ("c:gold", VANILLA_GOLD),
-    ("c:iron", VANILLA_IRON),
+    ("c:coal", 101.07),
+    ("c:copper", 293.19),
+    ("c:gold", 25.58),
+    ("c:iron", 77.40),
+    ("c:zinc", 76.18),
 ];
-const VANILLA_COAL: f64 = 0.0;
-const VANILLA_COPPER: f64 = 0.0;
-const VANILLA_GOLD: f64 = 0.0;
-const VANILLA_IRON: f64 = 0.0;
 
 /// A stack of ore, and the audit's yardstick: ten of them.
 pub const TEN_STACKS: f64 = 640.0;
