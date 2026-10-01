@@ -84,6 +84,8 @@ pub struct Options {
     /// compare with an `export-area` of the same box.
     pub area: Option<[i64; 4]>,
     pub json: Option<PathBuf>,
+    /// Only the sites of these deposit types (ids, with or without `deeptime:`); empty = all.
+    pub only: Vec<String>,
 }
 
 /// A uniform draw in [0, 1) from a block position and a salt: `DepositFeature.unit`.
@@ -290,7 +292,16 @@ struct BodyCount {
     chunks: HashSet<(i64, i64)>,
 }
 
-fn count_body(m: &mut Model<'_>, b: &Body, area: Option<[i64; 4]>) -> BodyCount {
+/// Counts body `b`. `seen` holds the blocks earlier bodies of the same site covered (a placer's
+/// bars overlap): a block in it is not counted again as volume, and takes a second draw only if
+/// the first left it rock, as in the game.
+fn count_body(
+    m: &mut Model<'_>,
+    b: &Body,
+    area: Option<[i64; 4]>,
+    seen: &mut HashMap<(i64, i32, i64), bool>,
+    track: bool,
+) -> BodyCount {
     let c = m.w.c;
     let (min_y, max_y) = (m.w.min_y, m.w.max_y);
     let body_loose = b.rock_class.as_deref().is_some_and(|k| m.loose.contains(k));
@@ -309,13 +320,24 @@ fn count_body(m: &mut Model<'_>, b: &Body, area: Option<[i64; 4]>) -> BodyCount 
                 let Some(at) = b.locate(c as u32, wx as i32, y, z as i32) else {
                     continue;
                 };
-                out.volume += 1;
+                let before = if track { seen.get(&(wx, y, z)).copied() } else { None };
+                if before.is_none() {
+                    out.volume += 1;
+                    if track {
+                        seen.insert((wx, y, z), false);
+                    }
+                }
                 out.chunks.insert((wx.div_euclid(16), z.div_euclid(16)));
+                if before == Some(true) {
+                    continue;
+                }
                 let kind = m.host(wx, y, z);
                 if kind == Host::None || (kind == Host::Loose && !body_loose) {
                     continue;
                 }
-                out.hosted += 1;
+                if before.is_none() {
+                    out.hosted += 1;
+                }
                 let u = unit(wx as i32, y, z as i32, b.id as i32);
                 let mut acc = 0.0;
                 let mut any = false;
@@ -328,10 +350,13 @@ fn count_body(m: &mut Model<'_>, b: &Body, area: Option<[i64; 4]>) -> BodyCount 
                     acc += f64::from(zone.density);
                     if u < acc {
                         *out.ore.entry(mat.clone()).or_default() += 1;
+                        if track {
+                            seen.insert((wx, y, z), true);
+                        }
                         break;
                     }
                 }
-                out.in_zone += u64::from(any);
+                out.in_zone += u64::from(any && before.is_none());
             }
         }
     }
@@ -475,7 +500,7 @@ pub fn run(o: &Options) -> CliResult<Value> {
         let mut ore: BTreeMap<String, u64> = BTreeMap::new();
         let mut per_body = Vec::new();
         for b in &w.bodies {
-            let n = count_body(&mut m, b, Some(a));
+            let n = count_body(&mut m, b, Some(a), &mut HashMap::new(), false);
             if n.volume > 0 {
                 per_body.push(json!({"body": b.id, "site": b.site, "role": b.role,
                     "voxels": n.volume, "ore": n.ore}));
@@ -525,11 +550,26 @@ pub fn run(o: &Options) -> CliResult<Value> {
     }
     let mut stats: Vec<Row> = Vec::new();
     for s in &sites {
+        if !o.only.is_empty()
+            && !o
+                .only
+                .iter()
+                .any(|t| s.deposit_type == *t || s.deposit_type == format!("deeptime:{t}"))
+        {
+            continue;
+        }
         let bodies = by_body.get(&s.id).cloned().unwrap_or_default();
         let mut tot = BodyCount::default();
         let mut ore_volume = 0u64;
+        // Only a site whose bodies' boxes overlap (a placer's bars) needs the per-block record.
+        let track = bodies.iter().enumerate().any(|(i, a)| {
+            bodies[..i].iter().any(|o| {
+                (0..3).all(|k| a.aabb[0][k] <= o.aabb[1][k] && o.aabb[0][k] <= a.aabb[1][k])
+            })
+        });
+        let mut seen = HashMap::new();
         for b in &bodies {
-            let n = count_body(&mut m, b, None);
+            let n = count_body(&mut m, b, None, &mut seen, track);
             if b.role == "ore" || b.role == "reservoir" {
                 ore_volume += n.volume;
             }
@@ -551,8 +591,11 @@ pub fn run(o: &Options) -> CliResult<Value> {
             .unwrap_or(0);
         let tonnage = s.products.first().map_or(0.0, |p| p.tonnage_t);
         let chunks = tot.chunks.len() as f64;
+        let here = w.hydro(i64::from(s.center[0]), i64::from(s.center[2]));
         rows.push(json!({
             "site": s.id, "type": s.deposit_type, "center": s.center, "bodies": bodies.len(),
+            // The ground and the water at the site's centre column.
+            "ground_y": here.ground, "water": here.kind.name(),
             "tonnage_t": tonnage,
             "grade": s.products.first().map(|p| p.grade),
             "primary": primary,

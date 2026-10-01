@@ -537,6 +537,14 @@ pub struct PlacerRules {
     pub capture_fraction: f64,
     /// Where the channel gradient falls below this (m/km), gold drops out.
     pub flatten_gradient_m_km: f64,
+    /// How far (km) a placer looks for a river channel of the baked network to lie in
+    /// ([`super::placer_channels`]); with none within reach it stays a bench on the ground.
+    #[serde(default = "river_reach_km")]
+    pub river_reach_km: f64,
+}
+
+fn river_reach_km() -> f64 {
+    30.0
 }
 
 /// Petroleum-system rules (Lopatin TTI; Waples 1980).
