@@ -517,7 +517,10 @@ mod tests {
         let at = |bx: f64| keep[crate::surface::volcanoes::cell_of(&g1, bx, 0.0)];
         assert!(at(0.0) < 0.01, "active: {}", at(0.0));
         let dead5 = at(2000.0);
-        assert!((dead5 - (1.0 - (-1.0f32).exp())).abs() < 0.05, "5 Myr dead: {dead5}");
+        assert!(
+            (dead5 - (1.0 - (-1.0f32).exp())).abs() < 0.05,
+            "5 Myr dead: {dead5}"
+        );
         assert!(at(4000.0) > 0.99, "30 Myr dead: {}", at(4000.0));
         assert_eq!(at(1000.0), 1.0, "between the cones");
     }
