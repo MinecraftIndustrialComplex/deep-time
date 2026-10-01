@@ -179,6 +179,7 @@
   "deeptime.editor.field.river_biome_width": "River biome width",
   "deeptime.editor.field.bank_zone": "Bank slope zone",
   "deeptime.editor.field.bank_ratio": "Bank zone per width",
+  "deeptime.editor.field.protect_water": "Caves spare water",
   "deeptime.editor.option.province_strength.off": "Off",
   "deeptime.editor.option.province_strength.weak": "Weak",
   "deeptime.editor.option.province_strength.medium": "Medium",
