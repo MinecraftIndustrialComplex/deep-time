@@ -222,6 +222,7 @@ mod tests {
             transport_km: 50.0,
             capture_fraction: 0.5,
             flatten_gradient_m_km: 10.0,
+            river_reach_km: 30.0,
         };
         let (cell, km) = placer_cell(&grid, Some(&rec), &elev, row as u32, &r, 300.0);
         assert_eq!(cell as usize, row + 3, "stops where the gradient flattens");

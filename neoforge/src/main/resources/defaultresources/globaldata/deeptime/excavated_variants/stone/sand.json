@@ -1,0 +1,10 @@
+{
+  "types": [
+    "excavated_variants:overworld"
+  ],
+  "translations": {
+    "en_us": "Sand"
+  },
+  "block": "minecraft:sand",
+  "ore_tags": []
+}
