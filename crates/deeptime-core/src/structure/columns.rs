@@ -219,6 +219,8 @@ pub struct Tables {
     /// (`bake_horizons`): [`METAMORPHIC_MIN_BLOCKS`] for regional-metamorphic rock,
     /// [`PLUTONIC_MIN_BLOCKS`] for plutonic rock, one block for the rest.
     pub min_blocks: Vec<i32>,
+    /// Per class: unconsolidated (the regolith classes and the loose forms of young sediment).
+    pub unconsolidated: Vec<bool>,
     pub paths: Paths,
 }
 
@@ -282,6 +284,7 @@ impl Tables {
                     }
                 })
                 .collect(),
+            unconsolidated: t.iter().map(|c| c.family == "unconsolidated").collect(),
             paths: Paths::get(),
         }
     }
