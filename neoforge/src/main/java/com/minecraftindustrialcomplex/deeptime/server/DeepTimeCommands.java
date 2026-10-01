@@ -53,6 +53,8 @@ public final class DeepTimeCommands {
                                 .executes(c -> probePole(c.getSource(), IntegerArgumentType.getInteger(c, "z")))))
                 .then(Commands.literal("network").executes(c -> probeNetwork(c.getSource())))
                 .then(Commands.literal("palette").executes(c -> probePalette(c.getSource())))
+                // Where the level has lava: the active volcanoes' magma, the lava features refused, the distances.
+                .then(Commands.literal("magma").executes(c -> MagmaProbe.probe(c.getSource())))
                 .then(Commands.literal("site")
                         .then(Commands.argument("x", IntegerArgumentType.integer())
                                 .then(Commands.argument("y", IntegerArgumentType.integer())
