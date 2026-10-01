@@ -6,6 +6,7 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.Rivers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.WaterBodies;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -212,6 +213,92 @@ public final class RiverGameTests {
             helper.assertTrue(after.floating == 0, after.floating + " water blocks over air after " + WAIT_TICKS + " ticks");
             helper.succeed();
         });
+    }
+
+    /**
+     * Carvers never replace the water Deep Time places (Ben, decisions log 2026-10-01, "Protect
+     * water blocks"; {@code hydro.protect_water_from_carvers}, on by default). On
+     * {@code deeptime:test_rivers_carved}, {@code test_rivers}' world data under a biome whose only
+     * carver is {@code deeptime:test_wide_caves} (a cave carver that starts in every chunk, with
+     * tunnels 1.5 to 2.5 times vanilla's width, at every height from y -32 to 180), the boxes around
+     * rivers and lakes are generated, and every river and lake column is read back:
+     * <ul>
+     *   <li>no air between its bed and its top ({@code drainedBlocks}), and no column whose top water
+     *       block is air ({@code holes}): the carvers replaced none of the water;</li>
+     *   <li>the carvers did reach it: air in the ground right under the beds ({@code carvedBelow}),
+     *       and some beds opened ({@code entrances}, the block at the bed is air): the ground under
+     *       the water is still carved, so caves open into river and lake beds.</li>
+     * </ul>
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
+    public static void carversSpareWater(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel().getServer().getLevel(GameTestSupport.TEST_RIVERS_CARVED);
+        if (level == null) {
+            helper.fail("level " + GameTestSupport.TEST_RIVERS_CARVED.location() + " does not exist");
+            return;
+        }
+        if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g && g.terrain() instanceof WorldDataTerrain w)) {
+            helper.fail("test_rivers_carved is not generating from world data");
+            return;
+        }
+        WorldData wd = w.data();
+        Rivers r = wd.rivers();
+        if (r == null || r.chainCount() == 0) {
+            helper.fail("the real test planet has no river network");
+            return;
+        }
+        helper.assertTrue(WaterBodies.protectsWater(wd), "the test planet's hydro settings do not protect the water");
+        Water.Spec spec = Water.Spec.of(wd, g.waterReach());
+        List<Site> sites = sites(r);
+        List<LevelChunk> chunks = new ArrayList<>();
+        for (Site s : sites)
+            for (int cx = (s.x() - HALF) >> 4; cx <= (s.x() + HALF) >> 4; cx++)
+                for (int cz = (s.z() - HALF) >> 4; cz <= (s.z() + HALF) >> 4; cz++) {
+                    level.setChunkForced(cx, cz, true);
+                    chunks.add(level.getChunk(cx, cz));
+                }
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        long columns = 0, drainedBlocks = 0, drainedColumns = 0, holes = 0, carvedBelow = 0, entrances = 0;
+        StringBuilder detail = new StringBuilder();
+        for (Site s : sites)
+            for (int x = s.x() - HALF + 1; x < s.x() + HALF - 1; x++)
+                for (int z = s.z() - HALF + 1; z < s.z() + HALF - 1; z++) {
+                    Water.Column col = Water.column(wd, spec, x, z);
+                    if ((col.kind() != Water.Kind.RIVER && col.kind() != Water.Kind.LAKE) || col.top() == null || col.bed() == null)
+                        continue;
+                    int top = col.top(), bed = col.bed();
+                    LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
+                    columns++;
+                    int air = 0;
+                    for (int y = bed + 1; y <= top; y++)
+                        if (chunk.getBlockState(pos.set(x, y, z)).isAir())
+                            air++;
+                    if (air > 0) {
+                        drainedColumns++;
+                        drainedBlocks += air;
+                        if (detail.length() < 600)
+                            detail.append(" drained(").append(x).append(',').append(top).append(',').append(z).append(")x").append(air);
+                    }
+                    if (chunk.getBlockState(pos.set(x, top, z)).isAir())
+                        holes++;
+                    if (chunk.getBlockState(pos.set(x, bed, z)).isAir())
+                        entrances++;
+                    for (int y = Math.max(level.getMinBuildHeight(), bed - 8); y < bed; y++)
+                        if (chunk.getBlockState(pos.set(x, y, z)).isAir())
+                            carvedBelow++;
+                }
+        for (LevelChunk c : chunks)
+            level.setChunkForced(c.getPos().x, c.getPos().z, false);
+        DeepTime.LOGGER.info("[gametest] carversSpareWater sites={} chunks={} columns={} drainedBlocks={} drainedColumns={} holes={} "
+                        + "carvedBelow={} entrances={}{}",
+                sites.size(), chunks.size(), columns, drainedBlocks, drainedColumns, holes, carvedBelow, entrances,
+                detail.length() == 0 ? "" : " " + detail);
+        helper.assertTrue(columns > 50, "only " + columns + " river or lake columns in the boxes");
+        helper.assertTrue(carvedBelow >= 20, "the carvers cut only " + carvedBelow + " blocks under the beds: they did not reach the water, so the check proves nothing");
+        helper.assertTrue(entrances > 0, "no bed was opened by a cave: the ground under the water must stay carvable");
+        helper.assertTrue(drainedBlocks == 0, drainedBlocks + " water blocks in " + drainedColumns + " columns were replaced by air:" + detail);
+        helper.assertTrue(holes == 0, holes + " river or lake columns have air for their top water block");
+        helper.succeed();
     }
 
     /**
