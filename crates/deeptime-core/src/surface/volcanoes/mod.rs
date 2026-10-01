@@ -258,8 +258,9 @@ pub struct FloodBasalt {
     pub flows: u32,
 }
 
-/// Counters for the summary.
+/// Counters for the summary. (Defaults fill counters a checkpoint predates.)
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Counts {
     pub strato_born: u64,
     pub shield_born: u64,
@@ -275,6 +276,10 @@ pub struct Counts {
     pub blind_steps: u64,
     /// Stratovolcanoes that died when plate motion brought a taller one within half the spacing.
     pub merged: u64,
+    /// Arc segments too small for an event of their own (counted on their subduction onset), and
+    /// the cones they built.
+    pub small_arc_segments: u64,
+    pub small_arc_cones: u64,
     /// The most L1 cells with the arc flag, with at least `arc_min_flux`, and on the volcanic
     /// front, in one step.
     pub arc_flag_cells_max: u64,
@@ -1600,12 +1605,50 @@ impl VolcanoStage {
         let mut notable: BTreeMap<u32, EventId> = BTreeMap::new();
 
         // 1. Arc segments: one event each, its standing cones as a detail; its tallest standing
-        // cone (at least 1.5 km × size) also on its own.
+        // cone (at least 1.5 km × size) also on its own. A segment that built fewer than
+        // `SMALL_SEGMENT` cones is a count on its subduction onset instead (Ben, 2026-09-30, "Count
+        // small ones"), with its standing cones listed there for "why here".
+        let (mut small_segments, mut small_cones) = (0u64, 0u64);
         for (key, seg) in &st.arcs {
             let mut members: Vec<&Volcano> = all
                 .iter()
                 .filter(|v| v.kind == Kind::Strato && v.segment == *key && standing(v))
                 .collect();
+            if seg.born < SMALL_SEGMENT
+                && let Some(onset) = seg.cause
+                && let Some(ix) = world.events.iter().position(|e| e.id == onset)
+            {
+                small_segments += 1;
+                small_cones += u64::from(seg.born);
+                let cones = cones_param(&mut members);
+                let e = &mut world.events[ix];
+                let num = |e: &deeptime_format::Event, k: &str| match e.params.get(k) {
+                    Some(ParamValue::Int(n)) => *n,
+                    _ => 0,
+                };
+                let built = num(e, "volcano_cones_built") + i64::from(seg.born);
+                let standing_n = num(e, "volcano_cones_standing") + members.len() as i64;
+                e.params
+                    .insert("volcano_cones_built".into(), ParamValue::Int(built));
+                e.params
+                    .insert("volcano_cones_standing".into(), ParamValue::Int(standing_n));
+                if !cones.is_empty() {
+                    let all_cones = match e.params.get("volcano_cones") {
+                        Some(ParamValue::Str(old)) if !old.is_empty() => format!("{old};{cones}"),
+                        _ => cones,
+                    };
+                    e.params
+                        .insert("volcano_cones".into(), ParamValue::Str(all_cones));
+                }
+                for v in all.iter().filter(|v| v.kind == Kind::Strato && v.segment == *key) {
+                    group_event.insert(v.id, onset);
+                }
+                if let Some(top) = members.first().filter(|v| v.height_m >= 1500.0 * size) {
+                    notable.insert(top.id, volcano_event(world, top, Some(onset))?);
+                    emitted += 1;
+                }
+                continue;
+            }
             let live = members.iter().filter(|v| v.active()).count();
             let (px, pz) = if members.is_empty() {
                 let n = f64::from(seg.born.max(1));
@@ -1773,6 +1816,8 @@ impl VolcanoStage {
             emitted += 1;
         }
         st.events_emitted = emitted;
+        st.counts.small_arc_segments = small_segments;
+        st.counts.small_arc_cones = small_cones;
         st.events_by_kind = world.events[first_event..]
             .iter()
             .filter(|e| e.source == SOURCE)
@@ -1908,6 +1953,10 @@ pub fn fit_change(cells: &[(usize, f64)], m: &[f32]) -> f64 {
     }
     if var > 1e-9 { cov / var } else { 0.0 }
 }
+
+/// An arc segment that built fewer cones than this is a count on its subduction onset event, not an
+/// event of its own (Ben, 2026-09-30, "Count small ones").
+pub const SMALL_SEGMENT: u32 = 3;
 
 /// Arc crust deeper than this below the sea makes no volcano (a trench, not an arc), m.
 pub const FRONT_MAX_DEPTH_M: f64 = 4000.0;

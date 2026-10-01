@@ -985,7 +985,10 @@ fn landforms_at(
     let mut hits: Vec<(f64, serde_json::Value)> = log
         .events()
         .iter()
-        .filter(|e| e.source == deeptime_core::surface::volcanoes::SOURCE)
+        .filter(|e| {
+            e.source == deeptime_core::surface::volcanoes::SOURCE
+                || e.params.contains_key("volcano_cones")
+        })
         .filter_map(|e| {
             let Place::Point { lat: la, lon: lo } = e.place else {
                 return None;
@@ -1000,7 +1003,10 @@ fn landforms_at(
                 dx.hypot(dz)
             };
             // An arc segment or a hotspot chain holds the column when one of its cones does.
-            if let Some(ParamValue::Str(cones)) = e.params.get("cones") {
+            // (a small segment's cones are listed on its subduction onset, `volcano_cones`.)
+            if let Some(ParamValue::Str(cones)) =
+                e.params.get("cones").or(e.params.get("volcano_cones"))
+            {
                 let d = cones
                     .split(';')
                     .filter_map(|cone| {
@@ -1020,7 +1026,11 @@ fn landforms_at(
                     .map(|x| x.to_json())
                     .collect();
                 let mut ev = e.to_json();
-                ev["params"]["cones"] = serde_json::json!("…");
+                for k in ["cones", "volcano_cones"] {
+                    if ev["params"].get(k).is_some() {
+                        ev["params"][k] = serde_json::json!("…");
+                    }
+                }
                 return Some((
                     d + 1.0e-3,
                     serde_json::json!({
