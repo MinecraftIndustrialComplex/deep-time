@@ -816,6 +816,22 @@ Deposit sites (P1-14):
   `SiteChunks.footprint` sums them; the deposit feature and the strata pass already loop over every
   body). Nothing in the file layout changed, so the format version stays: a reader that handled a
   site's several bodies before handles a stack.
+  A **placer** of a planet run (a world with a river network, `rivers/rivers.dtrv`) also has
+  **several ore bodies**: after the bake it is laid where the finished world has its gravel
+  (`deeptime_core::deposits::placer_channels`, `notes.bake.placers`). With a river channel within
+  its type's `placer.river_reach_km` it becomes gravel bars along the channel: one `channel` body
+  per straight piece of the centre line (at most 24 blocks; downstream through confluences), its
+  local x along the piece and 1.2 times its length, so neighbouring bars overlap a little, its
+  half-width the channel's plus 2 blocks, and its blocks from the water's top block down to three
+  blocks (or the ribbon's thickness, if more) under the bed at the channel's centre. Without one it
+  becomes a bench: the ribbon in pieces of at most 24 blocks along its direction, each with its top
+  block at the terrain's top solid block (the bed under water) at the piece's centre. Either way
+  the bodies have consecutive ids from `body`, the type's rock class (gravel) and zones (the pay
+  streak in the lower half), and the site's `center` is the channel vertex it settled at (y the
+  bed) or its own place (y the ground). A placer's bars overlap, so a block may lie in two of the
+  site's bodies: the deposit feature draws once per body, lowest id first, and a block already
+  turned to ore hosts nothing more; `SiteChunks.footprint` counts the overlap twice (a share of a
+  chunk, never the ore). A synthetic world's placer (no river network) stays one ribbon.
 - `amount_base` = `tonnage_t`; `coe_vein` is the deposit type's `minecraft.coe_vein`
   (`createoreexcavation:ore_vein_type/copper`, …); `cdg_charge_mb` (reservoirs) is the oil tonnage
   / 0.85 t/m³ · 1000 mB/m³. The records keep these physical values; the game scales them at run time
