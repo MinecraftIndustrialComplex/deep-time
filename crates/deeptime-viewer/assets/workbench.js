@@ -235,7 +235,7 @@
       // m³/s, ticks in m³/s); the other colours are in the ramp's `keys`.
       const keys = info.ramp.keys || {}, span = info.hi - info.lo || 1;
       const key = (c, t) => `<div title="${esc(t)}"><i style="background:${esc(c || '#888')}"></i><span>${esc(t)}</span></div>`;
-      h += `<div class="cats">${key(keys.lake, 'Lake')}${key(keys.land, 'Land')}${key(keys.sea, 'Sea')}</div>`;
+      h += `<div class="cats">${key(keys.lake, 'Lake')}${key(keys.frozen_lake, 'Frozen lake')}${key(keys.salt_flat, 'Salt flat')}${key(keys.land, 'Land')}${key(keys.sea, 'Sea')}</div>`;
       h += `<canvas class="bar" data-ramp="${esc(info.name)}" data-target="${target}"></canvas><div class="ticks">`;
       h += [2, 10, 100, 1000].map((q, i) => `<span style="left:${(100 * (Math.log10(q) - info.lo) / span).toFixed(2)}%;transform:${i ? 'translateX(-50%)' : 'none'}">${fmtInt(q)}</span>`).join('');
       h += '</div>';
@@ -364,8 +364,12 @@
     layerIndex(f) { return Math.max(0, f.layers.indexOf(layer)); }
     image(n) {
       const f = this.frames[n];
-      if (!f) return null;
-      const li = this.layerIndex(f);
+      return f ? this.imageAt(n, this.layerIndex(f)) : null;
+    }
+    // Layer `li` of frame n (the chosen layer's is image(n); the satellite view's pointer also
+    // reads the frame's Rivers & lakes layer).
+    imageAt(n, li) {
+      if (!this.frames[n]) return null;
       const key = `${n}/${li}`;
       let img = this.images.get(key);
       if (img) { this.images.delete(key); this.images.set(key, img); return img; }
@@ -874,13 +878,40 @@
     const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
     if (pix.d[q + 3] === 0) return { name, rgb, nodata: true };
     if (info && info.name === 'rivers') return { name, info, ...riversRead(pix, px, py, info) };
+    // The satellite view draws the frame's lakes over the land (core water_view.rs): a lake reads
+    // as a lake, not as the land or sea class its colour happens to be nearest to. What lies under
+    // the pointer is read from the frame's Rivers & lakes layer, where the lakes are hard-edged in
+    // their key colours; it counts only where the satellite picture shows it (glacier ice hides it).
+    if (info && info.name === 'satellite') {
+      const body = lakeUnder(p, r, dn, f, lat, lon);
+      if (body && lakeKind(info, rgb, 1200) === body) return { name, rgb, info, body };
+    }
     return { name, rgb, info, val: valueAt(info, rgb) };
   }
+  function lakeUnder(p, r, dn, f, lat, lon) {
+    const ri = f.layers.indexOf('rivers');
+    if (ri < 0) return null;
+    const img = r.imageAt(dn, ri), rinfo = rampInfo(f.ramps && f.ramps[ri]);
+    if (!ready(img) || !rinfo) return null;
+    if (p.lakeImg !== img) { p.lakePix = pixels(img); p.lakeImg = img; }
+    const pix = p.lakePix;
+    const px = Math.min(pix.w - 1, Math.floor((((lon % 360) + 360) % 360) / 360 * pix.w));
+    const py = clamp(Math.floor((90 - lat) / 180 * pix.h), 0, pix.h - 1), q = (py * pix.w + px) * 4;
+    return pix.d[q + 3] === 0 ? null : lakeKind(rinfo, [pix.d[q], pix.d[q + 1], pix.d[q + 2]], 150);
+  }
+  // The lake colours of a ramp's `keys` (lake, frozen lake, salt flat) and their hover names.
+  const LAKE_KEYS = [['lake', 'lake', '#5cc0ea'], ['frozen_lake', 'frozen lake', '#a9d3e6'], ['salt_flat', 'salt flat', '#f0d9a8']];
+  // The lake kind whose key colour `rgb` is within `tol` (squared distance) of, or null.
+  function lakeKind(info, rgb, tol) {
+    const keys = (info.ramp && info.ramp.keys) || {};
+    let best = null, bd = tol;
+    for (const [k, label, fallback] of LAKE_KEYS) { const d = dist2(rgb, hexRgb(keys[k] || fallback)); if (d < bd) { bd = d; best = label; } }
+    return best;
+  }
   // The Rivers & lakes layer (core water_view.rs): a river is a pixel on the ramp (log10 of its
-  // discharge), a lake one of the ramp's lake key colour; rivers are a pixel or two wide, so the
-  // pointer reads the strongest water within a pixel of it.
+  // discharge), a lake, a frozen lake or a salt flat one of the ramp's key colours; rivers are a
+  // pixel or two wide, so the pointer reads the strongest water within a pixel of it.
   function riversRead(pix, px, py, info) {
-    const lake = hexRgb((info.ramp.keys && info.ramp.keys.lake) || '#5cc0ea');
     let best = null;
     for (let k = 0; k < 9; k++) {
       const dx = k === 0 ? 0 : [-1, 0, 1, -1, 1, -1, 0, 1][k - 1], dy = k === 0 ? 0 : [-1, -1, -1, 0, 0, 1, 1, 1][k - 1];
@@ -888,7 +919,8 @@
       if (pix.d[q + 3] === 0) continue;
       const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
       let w = null;
-      if (dist2(rgb, lake) < 150) w = { kind: 'lake', v: Infinity };
+      const body = lakeKind(info, rgb, 150);
+      if (body) w = { kind: body, v: Infinity };
       else { const r = valueAt(info, rgb); if (r && !r.far) w = { kind: 'river', v: r.v }; }
       if (w && (!best || w.v > best.w.v)) best = { w, rgb };
       if (k === 0 && w) break;   // the pixel under the pointer is water: that is the answer
@@ -905,7 +937,8 @@
   function valueText(s) {
     if (!s) return '';
     if (s.nodata) return 'no data';
-    if (s.water !== undefined) return s.water ? (s.water.kind === 'lake' ? 'lake' : `river (~${riverFlowText(s.water.v)} m³/s)`) : '';
+    if (s.water !== undefined) return s.water ? (s.water.kind === 'river' ? `river (~${riverFlowText(s.water.v)} m³/s)` : s.water.kind) : '';
+    if (s.body) return s.body;
     if (!s.val) return '';
     // The satellite view is true colour, so the nearest key colour is only what the spot looks like.
     if (s.val.cls && s.info && s.info.name === 'satellite') return `looks like ${(s.val.cls.label || '').toLowerCase()}`;

@@ -12,7 +12,9 @@ the whole table validates.
 The vocabulary (class names, families, groups, stand-ins) is MIC's rock-tag README,
 /home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md: CLASSES follows
 its Classes table in order, GROUPS its Groups table. `vanilla_fallback` is the class's vanilla member
-there, or the last entry of its fallback list.
+there, or the last entry of its fallback list, except for the classes in CRUST_STAND_INS (P1-28,
+Ben, decisions log 2026-10-01), which use plain stone or deepslate: the common rocks should be the
+two blocks players know, and mining them drops vanilla's cobblestone and cobbled deepslate.
 
 density_kg_m3 is a typical dry bulk density (bulk density of the loose material for unconsolidated
 classes). erodibility and diffusivity are relative multipliers on the stream-power K and the hillslope
@@ -85,7 +87,30 @@ CREATE_METAL_HOSTS = {"banded_iron_formation": "iron", "ironstone": "gold",
                       "serpentinite": "copper", "dolostone": "zinc"}
 
 FILLER = {"minecraft:stone", "minecraft:deepslate"}
-FILLER_EXCEPTIONS = {("coal", "minecraft:stone")}  # README "Coal stand-in (decided)"
+
+# P1-28 (Ben, decisions log 2026-10-01: "Use stone for common rocks and we should be chilling"):
+# the common classes that have no real, distinctive block of their own use plain stone or deepslate
+# as their vanilla_fallback, so most of a planet's rock is the two blocks players already know and
+# mining it drops vanilla's cobblestone and cobbled deepslate (stone tools, furnaces and every
+# recipe that names cobblestone then just work; no recipe or item tag is touched). The README
+# had kept stone and deepslate for the unclassified crust and given these classes look-alike
+# stand-ins; those stay in the MIC pack's fallback tags until the pack's rows change (they are read
+# before vanilla_fallback), and a pack overrides any class here the same way, through its tags.
+# stone: the common, fine-grained, grey sedimentary rocks, which nothing in vanilla looks like.
+# deepslate: the common altered and deep rocks, the dark-grey foliated and baked ones.
+# Classes with a distinctive block keep it (granite, diorite, andesite, basalt, tuff, sandstone,
+# calcite for limestone and the evaporites, dripstone, ...), and so do the rare ones, whose own
+# look is worth more than their share. class: (block, why). coal's stone is older (Ben's pick,
+# 2026-09-27): no natural block looks like a coal seam without being a resource.
+CRUST_STAND_INS = {
+    "coal": ("minecraft:stone", "no natural block looks like a coal seam without being a resource (Ben's pick 2026-09-27)"),
+    "shale": ("minecraft:stone", "the commonest sedimentary rock: fine-grained, grey, fissile; vanilla has no block that looks like it"),
+    "mudstone": ("minecraft:stone", "shale's unlaminated twin (siltstone, claystone): fine-grained and grey-brown"),
+    "slate": ("minecraft:deepslate", "metamorphosed shale: dark grey, finely foliated"),
+    "phyllite": ("minecraft:deepslate", "slate's next grade: dark grey with a faint sheen"),
+    "schist": ("minecraft:deepslate", "the next grade up the pelite path: dark grey, coarsely foliated"),
+    "gneiss": ("minecraft:deepslate", "the commonest deep crystalline rock: banded grey, foliated; the shield and the root of every range"),
+}
 
 REFERENCE_CLASSES = {"granite", "gneiss"}
 
@@ -352,7 +377,7 @@ CLASSES = [
          path=[], wx=None, facies="peat_swamp", tags=["source_rock", "reduced", "friable"],
          vf="minecraft:stone", vf_from="fallback",
          notes="Coal from lignite to anthracite; rank rises within the class, so no metamorphic path. Its "
-               "vanilla fallback is stone, the one allowed filler exception."),
+               "vanilla fallback is stone (Ben's pick, 2026-09-27)."),
     dict(name="ironstone", family="chemical_sedimentary", rho=3000,
          rho_src="judgment: iron-oxide-rich oolitic sedimentary rock",
          k=1.3, k_why="moderately strong ferruginous rock",
@@ -586,6 +611,13 @@ CLASSES = [
          notes="Unconsolidated volcanic ash and tephra; lithifies to tuff, whose metamorphic path it takes."),
 ]
 
+# Apply CRUST_STAND_INS: the class's vanilla_fallback becomes stone or deepslate; the README's own
+# stand-in is kept for the sources text.
+for _r in CLASSES:
+    _r["vf_readme"] = _r["vf"]
+    if _r["name"] in CRUST_STAND_INS:
+        _r["vf"], _r["vf_from"] = CRUST_STAND_INS[_r["name"]][0], "crust"
+
 SNAKE = re.compile(r"^[a-z][a-z0-9_]*$")
 TAG = re.compile(r"^[a-z][a-z0-9_]*(:[a-z][a-z0-9_]*)?$")
 
@@ -686,10 +718,14 @@ def validate(groups):
         vf = r["vf"]
         if not vf.startswith("minecraft:"):
             errors.append(f"{n}: vanilla_fallback {vf} is not in the minecraft namespace")
-        if vf in FILLER and (n, vf) not in FILLER_EXCEPTIONS:
-            errors.append(f"{n}: vanilla_fallback {vf} is filler")
-        if r["vf_from"] not in ("member", "fallback"):
-            errors.append(f"{n}: vf_from must be member or fallback")
+        if (vf in FILLER) != (n in CRUST_STAND_INS):
+            errors.append(f"{n}: vanilla_fallback {vf} and CRUST_STAND_INS disagree (only the listed classes use stone or deepslate)")
+        if r["vf_from"] not in ("member", "fallback", "crust"):
+            errors.append(f"{n}: vf_from must be member, fallback or crust")
+        if n in CRUST_STAND_INS and r["vf_from"] != "crust":
+            errors.append(f"{n}: a crust stand-in must have vf_from crust")
+        if n in CRUST_STAND_INS and (CRUST_STAND_INS[n][0] not in FILLER or not CRUST_STAND_INS[n][1].strip()):
+            errors.append(f"{n}: CRUST_STAND_INS needs stone or deepslate and a reason")
         for ident in [vf] + class_groups(n, groups):
             if "terracotta" in ident:
                 errors.append(f"{n}: id {ident} contains terracotta")
@@ -715,9 +751,12 @@ def sources(r):
         basis = K_LOOSE if r["family"] == "unconsolidated" else K_BEDROCK
         k = f"judgment, relative to granite: {r['k_why']}; {basis}; {tuned}"
         d = f"judgment, relative to granite: {r['d_why']}; {D_BASIS}; {tuned}"
-    vf = VF_MEMBER if r["vf_from"] == "member" else VF_FALLBACK
-    if (n, r["vf"]) in FILLER_EXCEPTIONS:
-        vf += "; stone is the one allowed filler exception (Ben's pick 2026-09-27)"
+    if r["vf_from"] == "crust":
+        vf = (f"P1-28 (Ben, decisions log 2026-10-01): {r['vf'].split(':')[1]} stands in for the class: "
+              f"{CRUST_STAND_INS[n][1]}. The MIC rock-tag README's stand-in was {r['vf_readme']}; "
+              "a pack's fallback tags are read first and override this")
+    else:
+        vf = VF_MEMBER if r["vf_from"] == "member" else VF_FALLBACK
     return {"density_kg_m3": rho, "erodibility": k, "diffusivity": d, "vanilla_fallback": vf}
 
 
