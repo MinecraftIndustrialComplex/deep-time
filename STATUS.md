@@ -137,9 +137,10 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Gates** (Mac, the branch after merging master bca3ff3, final tree): `cargo fmt --check`, `clippy --workspace
   --all-targets --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` 444 passed,
   0 failed, 3 ignored; `cd neoforge && ./gradlew build test` → tests=155 failures=0. GameTests are no longer a
-  branch gate (Ben, 2026-09-30: the coordinator runs both profiles once per merge batch on master). Before that
-  merge (master 0905793) they gave 51 PASS / 1 FAIL standalone and with MIC, the one failure `climateConsistent`
-  with master's own numbers (since fixed on master, 6070e9e).
+  branch gate (Ben, 2026-09-30: the coordinator runs both profiles once per merge batch on master); a run already
+  queued on the merged tree gave `./gametest.sh` 54 of 54 and `install.sh mic` + `./gametest.sh -PwithMic` 54 of
+  54. (Before that merge, on master 0905793: 51 PASS / 1 FAIL in both, `climateConsistent` with master's own
+  numbers, since fixed on master in 6070e9e.) The Mac copy and the scratch runs are deleted.
 - **Next.** Merge into master (the coordinator merges when green).
 
 ### 2026-09-30 — Satellite view: a true-colour keyframe layer, the default everywhere (agent worktree agent-a7ca2a0e875263a86, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
