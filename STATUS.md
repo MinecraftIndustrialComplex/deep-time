@@ -42,7 +42,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
 | P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log). **Follow-up** (branch worktree-agent-afd5791e0f5ea82cd): a run with a bake is previewed and inspected as its own terrain (`/api/inspect` from `deeptime inspect-column --why` in 60-90 ms, previews boot the mod on the run's bake; height p50 0 vs the bake); runs without a bake keep the test world and say so (see build log). **UI overhaul** (branch worktree-agent-a95571be05fdd89d6, Ben: "should be dark themed"): dark map-first layout, run cards, sectioned editor with the estimate by Run, split/side-by-side compare, timeline dock, stage-2 job cards, `?tv` HUD, 390 px; placeholders hidden; Mac gates clean, JUnit 118/0; before/after in review/out/workbench-ui/ (see build log) |
-| P1-21 | Volcanoes as landforms (log 2026-09-29) | done | 2026-09-30 | | Branch worktree-agent-a348bd3bf6e50dd72 (session f981c0d3-5144-49ec-8686-2946d755872c): coupled `volcanoes` stage (arc stratovolcanoes on the volcanic front ~60 km apart, hotspot shields and island chains that age and subside, calderas, flood-basalt plateaus from LIPs), volcanic rock in the strata log, `deeptime:volcano_*` events with causes (workbench, `inspect-column --why` landforms, porphyry pathway), block-scale cones/craters/calderas/terraces in amplify, every knob a setting. Mac: earthlike_quick_16k 500 Myr 418 s (volcanoes 14.1 s), 203 live arc cones, 8 standing shields, 295 calderas, 9 flood basalts, 1,468 events; cargo test/clippy -D warnings/fmt/deny clean; gradlew build test 146/0; `mac.sh --server -- ./gametest.sh` All 50 required tests passed; bundle review/out/p1-21/bundle (11 MB, not published); see build log |
+| P1-21 | Volcanoes as landforms (log 2026-09-29) | done | 2026-09-30 | | Branch worktree-agent-a348bd3bf6e50dd72 (session f981c0d3-5144-49ec-8686-2946d755872c): coupled `volcanoes` stage (arc stratovolcanoes on the volcanic front ~60 km apart, hotspot shields and island chains that age and subside, calderas, flood-basalt plateaus from LIPs), volcanic rock in the strata log, `deeptime:volcano_*` events with causes (workbench, `inspect-column --why` landforms, porphyry pathway), block-scale cones/craters/calderas/terraces in amplify, every knob a setting. Mac: earthlike_quick_16k 500 Myr 418 s (volcanoes 14.1 s), 203 live arc cones, 8 standing shields, 295 calderas, 9 flood basalts, 1,468 events; cargo test/clippy -D warnings/fmt/deny clean; gradlew build test 146/0; `mac.sh --server -- ./gametest.sh` All 50 required tests passed; bundle review/out/p1-21/bundle (11 MB, not published); follow-ups (log 2026-09-30): flank steepness setting (default 0.5), one event per arc segment / hotspot chain, segments under 3 cones counted on their subduction onset, young volcanoes exempt from the mountain pass's unsharp mask; see build log |
 | P1-22 | Rivers and lakes (moved from P2-03, log 2026-09-29) | doing | 2026-09-29 | | Agent started. |
 | P1-23 | Grid-artifact audit (log 2026-09-29) | todo | | | Starts after the mountain and strata work lands (they fix part of it). |
 | P1-24 | Faster Create World (log 2026-09-29) | todo | | | After P1-17's benchmarks; options go to Ben. |
@@ -564,7 +564,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   flood-basalt terraces (80 m treads and risers where a pile crops out within 150 m). Dead volcanoes fade: crater with
   `fade_myr` (5), cone and caldera with 3 × that. **Mountain character (merged from master, 50464ac):** the volcano
   footprints suppress its fold ridges (`CharacterFields::suppress_folds`, fold strength × 0 inside the body rising to 1 at
-  1.3 R); its gullies, young-peak sharpening and cliff bands still act on the cones (the L3 residual comes after it).
+  1.3 R); its gullies, young-peak sharpening and cliff bands still act on the cones (the L3 residual comes after it;
+  since the second follow-ups young volcanoes are exempt from the unsharp mask, below).
 - **Measured.** `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --checkpoints`
   (Mac M6, shared, load 60–110): 418 s wall, peak 3.6 GiB (unchanged); **volcanoes 14.1 s** (births 6.0, erosion
   accounting 6.0), amplify's volcano sink 0.6 s. `volcanoes_final=250 strato_born=24017 shield_born=181
@@ -619,6 +620,48 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `volcano_caldera_complex` 3, `volcano_caldera` 162, `volcano_flood_basalt` 8 (`notes.volcanoes.events_by_kind`).
   Run: 420 s wall on the loaded Mac, volcanoes 22.7 s (the wider footprints: the erosion fit 13.5 s), amplify's volcano
   sink 1.1 s; 282 live arc cones, 1 live shield, 137 calderas, 8 flood basalts.
+- **Second follow-ups (Ben, decisions log 2026-09-30, commit 86d66d6; branch merged with master 86d66d6 first:
+  EF ice cover, the climateConsistent runoff fix, glacial landforms).** (1) **"Count small ones"**: an arc segment that
+  built fewer than `SMALL_SEGMENT` = 3 cones and has a subduction onset writes no `volcano_arc`; the onset event gains
+  `volcano_cones_built`, `volcano_cones_standing` and `volcano_cones` (the same `lat,lon,radius_km,height_m;…` list,
+  several small segments of one contact add up), set at the end of the coupled group (the events file is written from
+  the world's events at finalize; a live watcher keeps the onset as first published); a notable cone of such a segment is
+  caused by the onset; plate-keyed segments (no onset) keep their event. `inspect-column --why` reads `volcano_cones` on
+  any event, wherever the event itself is placed (`why_here_finds_a_small_arc_segments_cone_on_its_subduction_onset`).
+  Notes: `counts.small_arc_segments`, `counts.small_arc_cones` (`Counts` now `#[serde(default)]`, so older schema-8
+  checkpoints load). (2) **"Smooth young, rugged old"**: `Shaper::youth_keep` (1 − the volcano's youth inside its body,
+  back to 1 at 1.3 R; youth = 1 while active, e^(−age/`fade_myr`) once dead, the crater's clock) →
+  `CharacterFields::calm_volcanoes`: there the mountain character's unsharp mask is faded out both ways (no young-peak
+  sharpening, and no old-ground rounding, which would blunt the cone towards its 24-block blur) and its gullies take old
+  ground's soft shape; folds stay suppressed as before. The sea is untouched by the character anyway, so a submerged
+  shield does not change. Tests: `young_volcanoes_get_no_young_peak_sharpening_and_old_ones_regain_it` (active 0,
+  5-Myr-dead 1 − e⁻¹, 30-Myr-dead ≈ 1), `a_young_volcano_keeps_its_profile_on_young_ground` (the cone fixture: young
+  ground lifts the summit, a calmed one barely moves; keep 1 changes nothing), the pipeline test's event rules.
+  **Run** (`deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --checkpoints`,
+  `/Volumes/Graphide/ban/deeptime-runs/p1-21/after`, Mac at load ~80): 1,269 s wall, peak 4.0 GiB, volcanoes 31.0 s;
+  **585 volcano events of 2,499**: `volcano_arc` 296, `volcano_caldera` 164, `volcano_stratovolcano` 87,
+  `volcano_hotspot_chain` 21, `volcano_shield` 8, `volcano_caldera_complex` 2, `volcano_flood_basalt` 7; **15 small
+  segments (20 cones) counted on their onsets** (most segments build ≥ 3 cones: arc events fall by 5 %, not more).
+  **A/B of the calm mask** on that run's young landscape (`deeptime stage amplify --in 6-young.dtcp --bake` with the
+  mask line removed = before; the run's own bake = after; `deeptime heightmap` over the boxes): the active continental-arc
+  cone 19773 (2,976 m, x 371 z −2765) summit y 452 → 442 (the sharpened spike gone), mean |∇²| on its land 0.656 → 0.613
+  blocks, mean |Δ| 0.16 blocks; the active shield 19366 (4,673 m, x −3668 z 658, a 38-block island in a 70-km body)
+  mean |∇²| 0.919 → 0.826, the highest ground in its body (a peak 110 blocks off the vent) y 415 → 380, mean |Δ| 0.74
+  blocks; the whole planet's character change 1.86 → 1.78 blocks mean. 3D previews (`preview.py run`, standalone,
+  same boxes, before/after) and shots: `review/out/p1-21/shots3/` (arc cone 256²: the craggy, notched summit becomes a
+  clean cone; shield 384²: its vent is a low island and the two peaks inside its body, older ground, go from spiky to
+  rounded; the submerged active shield 19757 for contrast: no change), the arc and the emergent shield pairs copied
+  into `review/out/p1-21/bundle/` (now 19 MB, not published). This run has no emergent young shield with a clean dome
+  of its own: of the 8 standing young shields and caldera complexes, the tallest above the sea is a 38-block island.
+  Master bd1cc0f's `deeptime-core` lib tests did not compile (the volcano shaper test's `Level` literal lacked the
+  glacial work's new `zs` field); fixed here and on master the same way, so the merge of master (9d7fb4b) was clean.
+  **Gates** (the follow-ups merged with master 9d7fb4b): `cargo fmt --check`, `clippy --workspace --all-targets
+  --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` ok (cli 31, core 319 + 3
+  ignored, history_cap 1, format 44, inspect 29 + 2 + 7, jni 7, viewer 6); `./gradlew build test` tests=155
+  failures=0 (on the tree before the master merge, which only brought docs, a probe script and the -O1 test profile).
+  GameTests not run on the branch (Ben, 2026-09-30: once per merge batch on master). The Mac rebooted mid-way
+  (~19:06); its server lock from before the reboot (owner `deep-time`, no process left) was removed so the previews
+  could run. Scratch runs under `/Volumes/Graphide/ban/deeptime-runs/p1-21/` and the old q16f/q16g runs deleted.
 - **Gates on the final tree** (master 84e2b1d and the decisions-log commits after it merged, schema 8 on the climate's
   7, with the follow-ups): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings`, `deny check
   licenses bans` clean; `cargo test --workspace --locked` ok (cli 30, core 290 + 3 ignored, history_cap 1, format 44,
@@ -633,6 +676,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   (P2-10's epithermal), no guyot planing beyond the surface's wave-base diffusion (P2-11).
 - **Next.** Merge into master (the parent). Ben: the volcano event volume (1,468 of 3,498 events) and whether cones should
   be less steep in blocks than real proportions (a `volcanoes.size`-independent flank setting).
+  Answered and done (follow-ups above); next: the parent merges commit 899d797 and its STATUS commit into master and
+  runs the GameTest batch there.
 ### 2026-09-30 — Glacial erosion landforms: troughs, fjords, till, U-shaped valleys at block scale (agent worktree agent-a9307a6541fa46794, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Decisions log 2026-09-29, "Which glacial features should Deep Time add?" → "Glacial erosion
   landforms": U-valleys, cirques, fjords, moraines/till where ice sat, now or in past glaciations. Until now

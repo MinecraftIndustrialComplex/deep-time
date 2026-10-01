@@ -23,6 +23,12 @@
 //! A dead volcano's detail fades: its crater and sharp summit with `fade_myr`, its cone's shape
 //! three times slower (the finest landforms erode first; the L1 surface erodes the rest). The
 //! thinned preview the stage keeps gets the same last-grid shaping, so the keyframes show it.
+//!
+//! The mountain character (`character.rs`) leaves the edifices alone where it would fight them:
+//! no fold ridges over a volcano's body (`fold_keep`), and on an active or young one no unsharp
+//! mask — no young-peak sharpening, no rounding — and soft gullies (`youth_keep`; Ben,
+//! 2026-09-30, "Smooth young, rugged old"), so cones stay clean and shields domed; it returns on
+//! the crater's clock as a dead volcano erodes.
 
 use deeptime_format::GridDesc;
 
@@ -47,6 +53,9 @@ struct Item {
     /// A caldera: its rim radius (ρ), the level of its flat floor (m) and the phases of its rim's
     /// irregularity.
     caldera: Option<(f64, f64, f64, f64)>,
+    /// How young it is for the mountain character: 1 while active, fading with `fade_myr` once
+    /// dead (the crater's clock).
+    young: f64,
 }
 
 /// The shapes a run's volcanoes add to the amplifier's grids.
@@ -141,6 +150,7 @@ impl Shaper {
                     l2,
                     l3,
                     caldera,
+                    young: dep,
                 }
             })
             .collect();
@@ -176,6 +186,22 @@ impl Shaper {
             vol::for_cells(grid, self.mh, it.x, it.z, 1.3 * it.radius_m, |c, dx, dz| {
                 let rho = dx.hypot(dz) / it.radius_m;
                 let k = smooth(0.9, 1.3, rho) as f32;
+                keep[c] = keep[c].min(k);
+            });
+        }
+        keep
+    }
+
+    /// Per L1 cell of `grid` (row-major), how much of the mountain character's unsharp mask (its
+    /// young-peak sharpening) and gully youth to keep: 1 − the volcano's youth over its body,
+    /// rising back to 1 at 1.3 radii; an active volcano keeps none, a dead one regains it on the
+    /// crater's clock.
+    pub fn youth_keep(&self, grid: &GridDesc) -> Vec<f32> {
+        let mut keep = vec![1.0f32; grid.cells()];
+        for it in self.items.iter().filter(|it| it.young > 0.01) {
+            vol::for_cells(grid, self.mh, it.x, it.z, 1.3 * it.radius_m, |c, dx, dz| {
+                let inside = 1.0 - smooth(0.9, 1.3, dx.hypot(dz) / it.radius_m);
+                let k = (1.0 - it.young * inside) as f32;
                 keep[c] = keep[c].min(k);
             });
         }
@@ -475,6 +501,28 @@ mod tests {
             "crater floor {centre} not below the rim {rim}"
         );
         assert!(rim > 0.0, "the sharp summit adds height");
+    }
+
+    #[test]
+    fn young_volcanoes_get_no_young_peak_sharpening_and_old_ones_regain_it() {
+        // An active cone, one dead 5 Myr (one fade time) and one dead 30 Myr, far apart.
+        let (world, preset) = world_with(vec![
+            strato(0.0, 0.0, None),
+            strato(2000.0, 0.0, Some(-5.0)),
+            strato(4000.0, 0.0, Some(-30.0)),
+        ]);
+        let sh = Shaper::from_world(&world, &preset).unwrap();
+        let g1 = GridDesc::for_planet("L1", 16_384, 16).unwrap();
+        let keep = sh.youth_keep(&g1);
+        let at = |bx: f64| keep[crate::surface::volcanoes::cell_of(&g1, bx, 0.0)];
+        assert!(at(0.0) < 0.01, "active: {}", at(0.0));
+        let dead5 = at(2000.0);
+        assert!(
+            (dead5 - (1.0 - (-1.0f32).exp())).abs() < 0.05,
+            "5 Myr dead: {dead5}"
+        );
+        assert!(at(4000.0) > 0.99, "30 Myr dead: {}", at(4000.0));
+        assert_eq!(at(1000.0), 1.0, "between the cones");
     }
 
     #[test]
