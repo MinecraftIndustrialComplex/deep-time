@@ -174,6 +174,8 @@ pub fn active_volcanoes(st: &VolcanoState) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::surface::volcanoes::shape::{Depression, Kind};
+    use crate::surface::volcanoes::{Gone, Volcano};
 
     #[test]
     fn defaults_are_vanillas_heights_above_the_floor() {
@@ -182,6 +184,75 @@ mod tests {
         assert_eq!(-64 + d.lava_floor_blocks as i32, -54);
         assert_eq!(-64 + d.lava_lake_blocks as i32, -10);
         d.validate().unwrap();
+    }
+
+    fn volcano(id: u32, kind: Kind) -> Volcano {
+        Volcano {
+            id,
+            kind,
+            x: -100.5,
+            z: 42.25,
+            plate: 1,
+            oceanic: kind == Kind::Shield,
+            silicic: false,
+            hotspot: (kind != Kind::Strato).then_some(3),
+            chain: 0,
+            born_myr: -4.0,
+            dies_myr: f64::INFINITY,
+            extinct_myr: None,
+            radius_m: 20_000.0,
+            height_m: 2_000.0,
+            peak_m: 2_000.0,
+            built_m: 2_000.0,
+            sunk_m: 0.0,
+            kept_m: 2_000.0,
+            target_m: 2_000.0,
+            flux_last: 0.6,
+            missed: 0,
+            flux_myr: 3.0,
+            active_myr: 4.0,
+            depression: Some(Depression {
+                rho: 0.07,
+                depth: 0.06,
+                caldera: false,
+            }),
+            caldera: None,
+            cause: None,
+            segment: 0,
+            gone: None,
+        }
+    }
+
+    #[test]
+    fn only_the_volcanoes_active_at_the_present_are_listed() {
+        let mut dead = volcano(2, Kind::Strato);
+        dead.extinct_myr = Some(-1.0);
+        let mut eroded = volcano(3, Kind::Strato);
+        eroded.gone = Some(Gone::Eroded);
+        let mut plain = volcano(1, Kind::Shield);
+        plain.depression = None;
+        let st = VolcanoState {
+            volcanoes: vec![volcano(7, Kind::Strato), dead, eroded, plain],
+            t_myr: 0.0,
+            ..VolcanoState::default()
+        };
+        let v = active_volcanoes(&st);
+        assert_eq!(v["version"], VOLCANOES_VERSION);
+        let list = v["volcanoes"].as_array().unwrap();
+        let ids: Vec<u64> = list.iter().map(|e| e["id"].as_u64().unwrap()).collect();
+        assert_eq!(ids, [1, 7], "in id order, the dead and the eroded left out");
+        // The shield: a hotspot's activity is its mean plume proximity (3 / 4), and it has no crater.
+        assert_eq!(list[0]["kind"], "shield");
+        assert_eq!(list[0]["activity"], 0.75);
+        assert!(list[0]["crater"].is_null());
+        assert_eq!(list[0]["oceanic"], true);
+        // The arc volcano: its last flux, and its crater in metres (7 % of 20 km, 6 % of 2 km).
+        assert_eq!(list[1]["kind"], "stratovolcano");
+        assert_eq!(list[1]["activity"], 0.6);
+        assert_eq!(list[1]["x"], -100.5);
+        assert_eq!(list[1]["crater"]["radius_m"], 1400.0);
+        assert_eq!(list[1]["crater"]["depth_m"], 120.0);
+        assert_eq!(list[1]["age_myr"], 4.0);
     }
 
     #[test]
