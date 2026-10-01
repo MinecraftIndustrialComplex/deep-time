@@ -33,6 +33,12 @@ the amplified terrain ("The P1-08 bake"); and the column evaluator both sides im
   `hydro` section, and the column evaluator decides each column's water ("Water columns"; `hydro`
   in "Columns" and `parity/columns.json`). A reader treats a folder without `rivers/rivers.dtrv` as
   having no rivers (the synthetic worlds have none).
+- *Lakes sized by the climate (2026-10-01, no format change):* a bake now writes a lake's level from
+  its water balance, so `water_level` may hold a level below the basin's rim and fewer, smaller
+  lakes in dry and frozen climates ("Rivers", how the bake builds it). The layer, the rivers file and
+  the column rule are byte-for-byte what they were: a folder baked before loads and plays exactly
+  as it did (its lakes stay full), and a reader needs no change. Frozen lakes are not stored: the
+  game's frozen biomes ice their water.
 Every other file's bytes are as in 0.1.
 
 ## Folder layout
@@ -125,7 +131,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 |---|---|---|---|---|---|
 | `elevation` | L3 | i16 | 1/16, block | — | terrain y: the amplifier's, mountain character included ("The mountain character"); without the amplify stage the young landscape (L2) or the deep-time surface (L1) upsampled bilinearly |
 | `detail/amplitude` | L3 | u8 | 1/16, block | — | the detail term's A (P1-06; absent without the amplify stage) |
-| `water_level` | L3 (L3h: L3 averaged 2 × 2 when L3 has more than 40 M cells, 32k full) | i16 | 1/16, block | −32768 | each lake's cells hold its surface, nodata elsewhere (P1-22, "Rivers"); all nodata when `hydro.enabled` is false |
+| `water_level` | L3 (L3h: L3 averaged 2 × 2 when L3 has more than 40 M cells, 32k full) | i16 | 1/16, block | −32768 | each lake's cells hold its surface, nodata elsewhere (P1-22, "Rivers"): its basin's rim when the lake is full, the level of its water balance, below the rim, when it is not (2026-10-01; a reader does not tell them apart); all nodata when `hydro.enabled` is false |
 | `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks with key spans, smoothed ("The 0.2 bake"), the first top raised ("The P1-08 bake") |
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
@@ -402,6 +408,12 @@ within the tile, `cell_bytes` each, so its decoded size is `tw · th · cell_byt
 - `tongue_band_keys`, `tongue_minor_share` (optional, only for `horizon_stack`): the column rule's
   band B and minor share m (below); absent: B = 64, m = 0.15. A baked run writes the preset's
   (`structure.strata_tongue_scale` × 64, rounded; `structure.strata_minor_share`).
+- `min_blocks` (optional, only for `horizon_stack`): per class index, the least thickness in blocks
+  of a horizon of that class inside a column (the column rule's step 5); absent, or 0 or 1 for a
+  class: none. A baked run writes 8 for the regional-metamorphic classes (slate, phyllite, schist,
+  gneiss, quartzite, marble, greenstone, amphibolite), 16 for the plutonic ones (granite,
+  granodiorite, diorite, gabbro, anorthosite) and 1 for the rest; the synthetic worlds
+  write none.
 - Unknown fields must be ignored by readers.
 
 ### `horizon_stack` cells (plan §5.7.4)
@@ -414,15 +426,36 @@ Unused horizons (only after the used ones) have top −32768, class 255 and keys
 **Stratigraphic keys.** A key orders units the same way in every cell (it grows downwards, older
 and deeper); a horizon's span [key top, key base] (top < base) covers the units it stands for, and
 the spans of one stack grow downwards without overlapping (key top of k+1 ≥ key base of k). A gap
-between two spans is a hiatus: that cell has none of those units. The bake's key space
-(`deeptime_core::structure::columns::key`): regolith 0–4095; the strata log 4096 (the present) to
-32767 (the start of the run), linear in age — a layer spans the ages from the base of the layer
+between two spans is a hiatus: that cell has none of those units. The key space is the baker's
+choice (the column rule below reads any keys that grow downwards). The synthetic worlds give
+horizon h the span 4096·h … 4096·h + 4095 in every cell.
+
+**The bake's key space** (`deeptime_core::structure::columns::key`) is ordered by metamorphic
+grade first, so that any blend of neighbouring stacks by key has the grade rising downwards (no
+schist on shale; Phase 1 has no thrusts that could put it there):
+
+| keys | what |
+|---|---|
+| 0–4095 | regolith |
+| 4096–32767 | band 0 (unmetamorphosed), the strata log: 4096 the present, 32767 the start of the run, linear in age |
+| 32768–34559 | band 0, the basement pools |
+| 34560 + 4480·(b − 1) … + 2687 | band b = 1…6, the strata log, linear in age |
+| … + 2688 … + 4479 | band b, the basement pools |
+| 61440–65535 | the mantle |
+
+Bands are the formation temperatures of the regional metamorphic classes: 1 from 250 °C (slate),
+2 from 300 (quartzite, marble, greenstone), 3 from 350 (phyllite), 4 from 450 (schist), 5 from
+500 (amphibolite), 6 from 650 (gneiss). A unit's band is that of the hottest formation
+temperature at or above it in its own column (so a column's bands never decrease downwards);
+plutonic pool units (granite, granodiorite, gabbro) are always in band 6, with the gneiss: the
+crystalline basement. In a band's strata log a layer spans the ages from the base of the layer
 above it to its own base, the top layer to the present where its cell still accumulates (net
 deposition over the cell and its eight neighbours at the last step) and only its base age where
 erosion has taken an unknown part of it, and the young loose part of a layer the upper half of
-its span; the basement pools in erosion order (`plates::l1::TOP_ORDER`), 4096 keys each from
-32768, each metamorphic step 512 of them; the mantle 61440–65535. The synthetic worlds give
-horizon h the span 4096·h … 4096·h + 4095 in every cell.
+its span. In a band's pools, pool q of `plates::l1::TOP_ORDER` has the 256 keys from q·256, each
+of its metamorphic steps 64 of them (one tongue band at the default B). The parts — the regolith,
+each band's log, each band's pools, the mantle — are the **key domains**: a baked horizon's span
+lies inside one of them.
 
 **The column rule** (format 0.2; Rust `deeptime_format::strata::stack_at`, Java
 `worlddata/Columns.stack`; both must give equal answers). A cell's stack is read as a height
@@ -453,35 +486,60 @@ last); across a gap or past the last span, the next top (min_y). For block (x, z
 4. Emitting (top, class, unit): t = ⌊top⌋, at most the last emitted top; if it equals the last
    emitted top, that horizon (left with no block) is removed; then if the last emitted horizon has
    the same class, nothing is added, else (t, class, unit) is appended.
+5. Slivers, where the layer has `min_blocks` (N_c for class c; 1 for a class past its end): with
+   the emitted horizons h = 0 … n − 1 (tops T_h), the first is kept and a carried top C starts
+   unset; then for h = 1 … n − 1 in order, with t = C if it is set, else T_h: if h < n − 1 and
+   N_class(h) > 1 and t − T_{h+1} < N_class(h), horizon h is removed and C = t (its blocks go to
+   the horizon under it); else C is unset and, if its class is the class of the last horizon
+   kept, it is removed (it continues that one), else it is kept with top t.
 
 The result is continuous across cell edges (a cell whose weight is zero changes nothing), a bed
 present in every cell has smoothly interpolated top and base, a bed some cells lack thins out
 towards them, and a facies change (cells disagreeing about the rock of the same keys) becomes
 tongues of the two classes, each thinning towards the cells that lack it, on a band grid of the
-keys that every column shares (so the tongues follow the bedding).
+keys that every column shares (so the tongues follow the bedding). With `min_blocks`, a unit of a
+named class that ends sideways ends at a step of that many blocks instead of thinning to a sheet
+one block thick; a class the layer does not name still thins out continuously.
 
 **The P1-07 bake** (`deeptime_core::structure::bake_horizons`) makes stacks with these properties:
 the first horizon's top is the cell's surface (y = sea_level_y + (h − sea level)/m_per_block_v,
 clamped to [min_y + 1, max_y]); every horizon is at least one block (16 raw) thick, the last one
-down to `min_y` too; at most K are used; neighbours differ in class; every horizon carries the key
-span of the units it stands for (a merge keeps the union). A stack walks the column of
+down to `min_y` too; at most K are used; neighbours differ in class or in key domain; every
+horizon carries the key span of the units it stands for — a merge keeps the union where both
+members lie in one key domain, and the span of the member whose class it keeps where they do not
+(the other's keys become a hiatus), so no horizon's height is spread over keys that other cells
+give to other rocks. A horizon of regional-metamorphic rock under the first horizon and over the
+last is at least 8 blocks thick and one of plutonic rock at least 16 (a thinner one gives its
+blocks to the horizon under it where that is of its key domain, else to the one over it where
+that is, else to the one under it; that horizon keeps its class and keys): such rock is a
+regional body, not a sheet between other rocks. A stack walks the column of
 `structure::columns` from the top: regolith, the strata log (the young, shallow part of a clastic
 deposit as its `loose_equivalent`, buried loose material and palaeosols as their `lithifies_to`:
 glacial till, the deep-time glaciers', the ice ages' and a snowball Earth's alike, becomes
 `diamictite`, and young, shallow diamictite shows as `till`),
-the plate model's rock pools less the log, and peridotite below the crust. Plutons are bodies
-(role `pluton`, below), not horizons.
+the plate model's rock pools less the log, and peridotite below the crust. No unit is cooler
+than the rock above it: a sedimentary or volcanic pool under a metamorphosed log layer steps
+along its metamorphic path at least as far as that layer's formation temperature (the pools
+themselves know only today's geotherm), and a plutonic pool stays what it is (it may be younger
+than the metamorphism of its roof) but for granite turning to gneiss at the 650 °C isotherm.
+Plutons are bodies (role `pluton`, below), not horizons.
 
 **The 0.2 bake** smooths the stacks laterally before writing them, because the strata log is
 carried cell by cell and neighbouring cells' stacks differ more than the rocks would: each cell's
 new stack is the Gaussian-weighted mean (σ = `structure.strata_smoothing_cells` L1 cells, default
 10; x wraps, z clamps) of its neighbours' height functions, cut at every key top and base any of
 them has; each interval takes the class holding the largest weighted thickness there, equal
-neighbours join; the cell's own surface stays its first top (neighbours' units above it pinch out
-there; where the cell stands above the mean its top unit fills the difference); then the stack is
-settled again (at least a block thick, at most K). The neighbours are the cells of a lattice of
+neighbours of one key domain join; the cell's own surface stays its first top: the regolith and
+the loose sediment on top (the unconsolidated classes) lie on it with their mean thickness,
+neighbours' rock units above their base pinch out there, and where the cell stands above the mean
+the thickest rock unit that begins within 16 blocks of the mean rock surface fills the
+difference, the thinner beds over it keeping their thickness; then the stack is settled again (at least a block thick, metamorphic and plutonic
+rock inside it at least 8 and 16 blocks, at most K). The neighbours are the cells of a lattice of
 step ⌈σ / 2.5⌉ anchored at cell (0, 0) within 5 steps (11 × 11 samples whatever σ, and every cell
-samples the same lattice); σ 0 bakes each cell's own stack. `notes.bake.strata.smoothing` records
+samples the same lattice); σ 0 bakes each cell's own stack. `notes.bake.strata.realism` records the share of the stored
+stacks a geologist would object to (a grade inversion, a metamorphic sliver, a plutonic sheet,
+plutonic rock over other rock; `deeptime strata-check` measures the same on the columns of a
+world-data folder). `notes.bake.strata.smoothing` records
 σ, the step, the window and the tongue parameters.
 
 **The P1-08 bake** writes them with one change: the first horizon's top of every cell is raised,
@@ -633,17 +691,43 @@ is the column's `max_ground`.
 most one block below sea level: their top block is under the sea's; connected, ≥ 5,000 km²); Priority-Flood with the pit queue from its shores (spill level F
 and the cell each land cell was reached from); receivers the steepest strictly lower neighbour on F,
 else that cell; depressions (F > height) of at least `hydro.lake_min_area_km2` and
-`lake_min_depth_blocks` are lakes at their spill level (they are always full: "fill and spill");
-runoff P − ET (Fu's Budyko curve, PET = 60 mm/°C·T) from the L1 climate accumulated as discharge, a
-lake passing on its inflow less its surface's evaporation (`lake_evaporation`); river cells carry ≥
+`lake_min_depth_blocks` are basins. The liquid runoff of the L1 climate is accumulated as discharge
+(precipitation, the mean temperature and the warmest and coldest month from `climate/month/t_sl_c_*`,
+their departures from the year's mean added to the cell's mean, ± 8 °C without them; a sinusoidal
+year between the two months gives the share of the year above freezing and its mean temperature
+above freezing T⁺; liquid = min(P, P · share + `snow_melt_mm_per_degree_day` · 365.25 · T⁺); runoff
+= liquid − ET, ET by Fu's Budyko curve with PET = 60 mm/°C · T, as the surface stage; ground whose
+warmest month is below freezing gives none). **A basin's lake level is its water balance**
+(`lake_balance`, on by default): a cell under water loses its runoff as land and its evaporation
+(`lake_evaporation_factor` · (`lake_evaporation_base_mm` + 60 mm/°C · T⁺); 0 when
+`lake_evaporation` is false) less the liquid precipitation on it. A basin that, wet to its rim, still gains (inflow ≥ those losses) is a lake at
+its spill level and spills the surplus. One that does not is terminal: its lowest cell becomes a
+sink, a Priority-Flood of the basin alone from that cell drains its floor to it (receivers and
+spill levels of the exposed floor; the basins inside it are solved the same way first, up to 8
+deep), and the lake stands at the highest 1/16-block step of the basin's hypsometry (cells counted
+by their spill level towards the sink) whose losses the inflow at the sink still covers, at most
+one step below the rim, and at sea level at least where the basin's floor lies a block or more
+below sea level (the column rule floods such ground with the sea's water whatever the bake says, so
+the bake says the same); a lake inside the basin that this level covers becomes part of it. A
+balance lake under the lake thresholds is a playa (not stored), and a basin no water reaches is
+dry. Basins are solved in drainage order, so a lake that does not spill passes nothing downstream.
+With `lake_balance` false every basin is a full lake, as before 2026-10-01. River cells carry ≥
 `river_min_discharge_m3s` from ≥ `river_min_area_km2`, a lake cell less than a block deep counting
 as ground a river crosses; chains follow the largest donor; w = max(F − `freeboard_blocks`, the
 level of the sea or lake downstream); width `width_coef · Q^0.5 · scale.feature_scale.rivers` and
 depth `depth_coef · Q^0.4` (at least 1, at most `max_width_blocks`, `max_depth_blocks`); vertex
 positions smoothed by a Gaussian of half-width `smoothing_blocks` (ends fixed; a tributary's mouth
-on the smoothed vertex it joins). `notes.bake.water`: `enabled`, `method` ("p1-22"), `params`,
-`width_scale`, `grid`, `halved`, `climate`, `rivers_file`, `rivers_bytes`, `stats` (counts, lengths,
-largest discharge and width, milliseconds per step).
+on the smoothed vertex it joins). `notes.bake.water`: `enabled`, `method`, `params`,
+`width_scale`, `grid`, `halved`, `climate`, `seasons`, `rivers_file`, `rivers_bytes`, `stats`
+(counts, lengths, largest discharge and width, milliseconds per step; since "p1-22b" also
+`lake_share_of_land`, `basins` (candidates, full, below_rim, playa, dry, merged, nested_too_deep),
+`playa_km2`, the lakes `below_rim`, `frozen` (mean annual temperature over the lake below
+`lake_freeze_mean_c`), `arid` (P/PET < 0.2), `polar` (warmest month < 10 °C) as counts, km² and
+shares of the lake area, the five `largest` lakes, and `frozen_in_frozen_band` /
+`open_in_frozen_band`: the share of the frozen and of the open lake cells whose biome temperature
+input `climate/temperature` lies in the frozen band, below −0.45, where the game ices the water).
+`method` is "p1-22" in a folder baked before the water balance and "p1-22b" since; the game does
+not read it.
 
 ## Water columns (P1-22)
 
@@ -693,6 +777,27 @@ and beside the water stays carvable, so caves run under rivers and lakes and may
 After the air carvers the lowest water block of each column that now has air under it is marked for
 post-processing, so vanilla's fluid tick lets it run into the cave. Set to false, the carvers cut
 through the water like any other block.
+
+## Lava (game side, `notes.bake.underground`)
+
+`notes.bake.underground.params` is the preset's `underground` section (its defaults when the preset
+has none): `{"lava_floor_blocks": 10, "lava_lake_blocks": 54}`. No layer holds lava; the game reads
+the two numbers when it generates chunks (Java `worldgen/LavaRules`, `LavaFluids`,
+`density/LavaLakesDensity`), and a world without the note uses the defaults. With `min_y` the floor
+of the noise settings (−352) and cover = 8:
+
+- **The lava floor.** Open space with y < `min_y + lava_floor_blocks` (never above sea level) is lava.
+  In a column whose terrain height H is that low, the limit is `min(that, ⌊H⌋ − cover)`: lava stays
+  8 blocks below a sea bed, and everything above the limit is the sea. 0: no lava floor.
+- **Lava lakes.** A cave lake (an aquifer with its own level) may be lava only when its 40-block
+  level cell `⌊y/40⌋` is centred at or below `min_y + lava_lake_blocks`; lake surfaces lie within 12
+  blocks of the cell's centre. 0: no lava lakes.
+
+Both are vanilla's rules (lava below y −54, lava lakes at y −10 and lower, in a world whose floor is
+y −64) measured from the floor instead of from y 0. Vanilla's own constants flood the lowest 298
+blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −352.
+Lava that features and carvers place (lava lakes and springs of the pack's biomes, carver lava in
+the bottom eight blocks) is not covered by these rules.
 
 ## `strata/classes.json`
 
@@ -931,18 +1036,22 @@ geology (no plants, snow or ice).
 
 `rivers` is the water of the frame's terrain: the **last** layer of every frame that has the
 satellite view, and the same water is drawn over the satellite view (rivers blended over the land,
-lakes flat). It is RGBA8 too: a quiet base (land, sea), the lakes in one flat colour and the rivers
+lakes flat). It is RGBA8 too: a quiet base (land, sea), the lakes in flat colours (open water, lake
+ice where the frame's mean annual temperature at the cell is below `hydro.lake_freeze_mean_c`, and
+the playas of basins too dry for a lake as salt flats) and the rivers
 in the colours of the `rivers` ramp of `ramps.json`, whose stops run over log₁₀ of the discharge in
 m³/s (a river is also drawn wider by flow), so a reader can read the discharge back from a pixel's
-colour; the ramp's `keys` hold the land, sea and lake colours (`deeptime_core::water_view` has the
+colour; the ramp's `keys` hold the land, sea, lake, frozen-lake and salt-flat colours, and the
+`satellite` ramp's `keys` the three the satellite view draws them in (`deeptime_core::water_view` has the
 rules). The water is **derived, not stored**: the bake's own hydrology (`hydro::network`, P1-22: the
 open sea, a Priority-Flood of the frame's terrain, lakes from `hydro.lake_min_area_km2` and a block
-deep, the climate's runoff accumulated down the steepest descent, rivers from
+deep at the level of their water balance, the climate's liquid runoff accumulated down the steepest descent, rivers from
 `hydro.river_min_discharge_m3s` and `river_min_area_km2`) is run on the frame's elevation at render
 time (a grid over 600,000 cells is averaged down first), so it adds nothing to the simulation or the
 bake; with `hydro.enabled` false there is no layer and the satellite view is dry. **The run's last
 frame that has these layers is drawn again after the bake**, from `rivers/rivers.dtrv` and the
-`water_level` layer, so the final map shows the exact rivers and lakes of the world data (the
+`water_level` layer (frozen where the frame's climate says so; the playas, which the bake does not
+store, are the frame's own), so the final map shows the exact rivers and lakes of the world data (the
 frame's file and its index entry are rewritten before the manifest lists them); a run without a
 bake keeps the derived water.
 

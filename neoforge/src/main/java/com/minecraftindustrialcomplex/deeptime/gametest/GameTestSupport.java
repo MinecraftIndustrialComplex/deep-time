@@ -97,6 +97,15 @@ public final class GameTestSupport {
     public static final ResourceKey<Level> TEST_RIVERS_CARVED =
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_rivers_carved"));
 
+    /**
+     * The real planet's world data (folder {@code deeptime-real}) with the full router,
+     * {@code deeptime:planet} (noise caves and aquifers; every other test level uses
+     * {@code planet_nocaves}), under the bare biome: {@code LavaGameTests.lavaStaysAtTheFloor}
+     * reads back what the aquifer and the fluid picker put in the caves and under the sea.
+     */
+    public static final ResourceKey<Level> TEST_PLANET_CAVES =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_planet_caves"));
+
     /** A second level over the same deposit world data, for the regeneration check. */
     public static final ResourceKey<Level> TEST_DEPOSITS_TWIN =
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_deposits_twin"));

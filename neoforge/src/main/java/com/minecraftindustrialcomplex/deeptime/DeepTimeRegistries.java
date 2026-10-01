@@ -13,6 +13,7 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.DepositFeature;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.BeyondPoleDensity;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.DepthDensity;
+import com.minecraftindustrialcomplex.deeptime.worldgen.density.LavaLakesDensity;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.RasterDensity;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.TerrainDensity;
 import com.mojang.serialization.MapCodec;
@@ -54,6 +55,7 @@ public final class DeepTimeRegistries {
         DENSITY_FUNCTIONS.register("depth", () -> DepthDensity.MAP_CODEC);
         DENSITY_FUNCTIONS.register("raster", () -> RasterDensity.MAP_CODEC);
         DENSITY_FUNCTIONS.register("beyond_pole", () -> BeyondPoleDensity.MAP_CODEC);
+        DENSITY_FUNCTIONS.register("lava_lakes", () -> LavaLakesDensity.MAP_CODEC);
         RULES.register("delegate", () -> DelegatingRuleSource.MAP_CODEC);
         BIOME_MODIFIERS.register("claim_ores", () -> ClaimOresBiomeModifier.CODEC);
     }

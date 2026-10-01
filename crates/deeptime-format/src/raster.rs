@@ -179,6 +179,11 @@ pub struct LayerDesc {
     /// `strata::MINOR_SHARE`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tongue_minor_share: Option<f64>,
+    /// `horizon_stack` only: per class index, the least thickness (blocks) of a horizon of that
+    /// class inside a column; the column rule drops a thinner one (`strata`, step 5). Absent, or
+    /// 0 or 1 for a class: nothing is dropped.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_blocks: Option<Vec<u8>>,
 }
 
 impl LayerDesc {
@@ -197,6 +202,7 @@ impl LayerDesc {
             stack_depth: None,
             tongue_band_keys: None,
             tongue_minor_share: None,
+            min_blocks: None,
         }
     }
 

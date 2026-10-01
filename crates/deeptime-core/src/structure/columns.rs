@@ -32,14 +32,33 @@
 //!
 //! Neighbouring units of one class merge. Plutons are bodies, not units (`plutons.rs`).
 //!
+//! **A column never gets cooler downwards.** The strata log keeps what its layers became at their
+//! deepest burial, and the pools know only today's geotherm, so a pool unit under a metamorphosed
+//! log layer would otherwise be unmetamorphosed rock under schist. The rock under a layer was at
+//! least as hot as the layer whenever both were there, so every unit takes at least the grade of
+//! the hottest formation temperature above it: a sedimentary or volcanic pool steps along its path
+//! as far as that temperature (or the present geotherm, whichever is hotter) allows. A plutonic
+//! pool is taken to be younger than the metamorphism of its roof and stays what it is: gabbro
+//! under gneiss is gabbro, not greenstone, and only the step of the highest grade (granite to
+//! gneiss at 650 °C) is taken, at its isotherm.
+//!
 //! **Stratigraphic keys** ([`key`]). Every unit carries the span of a key that orders units the
 //! same way in every column, so the column evaluator can correlate one cell's horizons with its
-//! neighbours' (FORMAT.md, "`horizon_stack` cells"): a key is a u16 that grows downwards — the
-//! regolith first, then the strata log by age (a layer spans the ages from the base of the layer
-//! above it to its own base), then the basement pools in erosion order (a block each, subdivided by
-//! metamorphic step), then the mantle. Two cells' layers of one deposition time get the same
-//! keys wherever the log holds them, so a bed stays one bed across cells and pinches out where a
-//! cell lacks it.
+//! neighbours' (FORMAT.md, "`horizon_stack` cells"): a key is a u16 that grows downwards. The key
+//! space is ordered by **metamorphic grade first**: the regolith, then one band per formation
+//! temperature ([`key::BAND_FROM_C`]: unmetamorphosed, then 250, 300, 350, 450, 500 and 650 °C),
+//! then the mantle. A unit's band is that of the hottest formation temperature at or above it in
+//! its own column, so bands never decrease downwards in a column; plutonic pool units are
+//! crystalline basement and always lie in the last band, with the gneiss. Inside a band come the strata
+//! log's layers by age (a layer spans the ages from the base of the layer above it to its own
+//! base) and then the basement pools in erosion order (a slot per pool and metamorphic step).
+//! Two cells' layers of one deposition time and one grade get the same keys wherever the log
+//! holds them, so a bed stays one bed across cells and pinches out where a cell lacks it — and
+//! whatever blend of neighbouring columns the bake's smoothing and the column rule make, ordered
+//! by key, has the grade rising downwards: a metamorphic belt's rocks lie under its neighbours'
+//! unmetamorphosed cover and over everyone's crystalline basement, never as schist on shale.
+//! (Before, the log was keyed by age alone, and a belt's schist was correlated with the shale its
+//! neighbours laid down at the same time: 57 % of a planet's columns had a grade inversion.)
 
 use crate::plates::l1::TOP_ORDER;
 use crate::plates::state::{OCEANIC, OROGENY_ANDEAN, OROGENY_HIMALAYAN, pool};
@@ -68,34 +87,97 @@ pub enum Source {
 pub mod key {
     /// The regolith's span.
     pub const REGOLITH: [u16; 2] = [0, 4095];
-    /// The strata log: key `LOG_TOP` is the present, `LOG_BASE` the oldest age of the run.
+    /// Grade bands: band b holds the units whose hottest formation temperature (their own or of
+    /// anything above them in their column) is at least `BAND_FROM_C[b]` and below the next
+    /// (`metamorphism::formation_temp_c`: slate 250, quartzite, marble and greenstone 300,
+    /// phyllite 350, schist 450, amphibolite 500, gneiss 650 °C).
+    pub const BAND_FROM_C: [f64; BANDS] = [0.0, 250.0, 300.0, 350.0, 450.0, 500.0, 650.0];
+    pub const BANDS: usize = 7;
+    /// Band 0's strata log: key `LOG_TOP` is the present, `LOG_BASE` the oldest age of the run.
     pub const LOG_TOP: u16 = 4096;
     pub const LOG_BASE: u16 = 32767;
-    /// The first basement pool's block; pool q of `plates::l1::TOP_ORDER` spans
-    /// `POOL0 + q·POOL_BLOCK ..= POOL0 + (q + 1)·POOL_BLOCK − 1`.
+    /// Keys of one pool slot (one pool at one metamorphic step, in one band): one band of the
+    /// column rule's tongues at its default (`deeptime_format::strata::BAND_KEYS`).
+    pub const SLOT: u16 = 64;
+    /// Slots a pool has in a band (metamorphic steps past the fourth share the last).
+    pub const STEPS: u16 = 4;
+    /// A pool's keys in a band; pool q of `plates::l1::TOP_ORDER` follows pool q − 1.
+    pub const POOL_BLOCK: u16 = SLOT * STEPS;
+    /// The pools' keys in a band (seven pools).
+    pub const POOLS: u16 = 7 * POOL_BLOCK;
+    /// Band 0's first pool key.
     pub const POOL0: u16 = 32768;
-    pub const POOL_BLOCK: u16 = 4096;
-    /// A pool's metamorphic step m (0 = unmetamorphosed) spans `m·STEP ..= m·STEP + STEP − 1` of
-    /// its block (steps past the eighth share the last slot).
-    pub const STEP: u16 = 512;
+    /// The first metamorphic band's first key; band b ≥ 1 starts at `META0 + (b − 1)·META_BAND`:
+    /// `META_LOG` keys of strata log by age, then the pools.
+    pub const META0: u16 = POOL0 + POOLS;
+    pub const META_LOG: u16 = 2688;
+    pub const META_BAND: u16 = META_LOG + POOLS;
     /// The mantle's span.
     pub const MANTLE: [u16; 2] = [61440, 65535];
 
-    /// The key of an age `delta_myr` before the present in a log whose oldest layer can be
-    /// `span_myr` old: linear from `LOG_TOP` (now) to `LOG_BASE`.
-    pub fn of_age(delta_myr: f64, span_myr: f64) -> u16 {
+    /// The band of a formation temperature, °C.
+    pub fn band_of(formed_at_c: f64) -> usize {
+        BAND_FROM_C
+            .iter()
+            .rposition(|&t| formed_at_c >= t)
+            .unwrap_or(0)
+    }
+
+    /// The strata log's keys in band `band`: [the present, the oldest age of the run].
+    pub fn log_range(band: usize) -> [u16; 2] {
+        if band == 0 {
+            [LOG_TOP, LOG_BASE]
+        } else {
+            let lo = META0 + (band.min(BANDS - 1) as u16 - 1) * META_BAND;
+            [lo, lo + META_LOG - 1]
+        }
+    }
+
+    /// The key in band `band` of an age `delta_myr` before the present in a log whose oldest
+    /// layer can be `span_myr` old: linear across the band's log range.
+    pub fn of_age(band: usize, delta_myr: f64, span_myr: f64) -> u16 {
         let f = if span_myr > 0.0 {
             (delta_myr / span_myr).clamp(0.0, 1.0)
         } else {
             0.0
         };
-        (f64::from(LOG_TOP) + f * f64::from(LOG_BASE - LOG_TOP)).round() as u16
+        let [lo, hi] = log_range(band);
+        (f64::from(lo) + f * f64::from(hi - lo)).round() as u16
     }
 
-    /// Pool `q`'s (position in `TOP_ORDER`) span at metamorphic step `m`.
-    pub fn pool(q: usize, m: usize) -> [u16; 2] {
-        let lo = POOL0 + q as u16 * POOL_BLOCK + m.min(7) as u16 * STEP;
-        [lo, lo + STEP - 1]
+    /// Pool `q`'s (position in `TOP_ORDER`) span at metamorphic step `m` in band `band`.
+    pub fn pool(band: usize, q: usize, m: usize) -> [u16; 2] {
+        let lo = log_range(band)[1]
+            + 1
+            + q.min(6) as u16 * POOL_BLOCK
+            + m.min(usize::from(STEPS) - 1) as u16 * SLOT;
+        [lo, lo + SLOT - 1]
+    }
+
+    /// The part of the key space `k` lies in: 0 the regolith, 1 + 2b band b's strata log,
+    /// 2 + 2b band b's pools, 15 the mantle. Units of different domains are never one horizon:
+    /// a horizon's span stays inside one domain, so its height is never spread over keys that
+    /// other columns give to other rocks.
+    pub fn domain(k: u16) -> u8 {
+        if k < LOG_TOP {
+            0
+        } else if k >= MANTLE[0] {
+            15
+        } else if k < POOL0 {
+            1
+        } else if k < META0 {
+            2
+        } else {
+            let b = (k - META0) / META_BAND;
+            let log = (k - META0) % META_BAND < META_LOG;
+            (1 + 2 * (b + 1) + u16::from(!log)) as u8
+        }
+    }
+
+    /// Whether a unit spanning `b` may join the horizon spanning `a` above it: both in one
+    /// domain.
+    pub fn joins(a: [u16; 2], b: [u16; 2]) -> bool {
+        domain(a[1]) == domain(b[0]) && domain(a[0]) == domain(b[1])
     }
 }
 
@@ -127,8 +209,26 @@ pub struct Tables {
     pub carbonate: Vec<bool>,
     /// Per class: crystalline (intrusive, special or regional-metamorphic above slate grade).
     pub crystalline: Vec<bool>,
+    /// Per class: the least temperature a regional-metamorphic class formed at, °C (0 for every
+    /// other class; `realism::Rules` reads the same).
+    pub formed_at_c: Vec<f64>,
+    /// Per class: intrusive rock (the intrusive and special-host families), which may be younger
+    /// than the metamorphism of the rock above it.
+    pub intrusive: Vec<bool>,
+    /// Per class: the least thickness of a horizon inside a stack, blocks
+    /// (`bake_horizons`): [`METAMORPHIC_MIN_BLOCKS`] for regional-metamorphic rock,
+    /// [`PLUTONIC_MIN_BLOCKS`] for plutonic rock, one block for the rest.
+    pub min_blocks: Vec<i32>,
+    /// Per class: unconsolidated (the regolith classes and the loose forms of young sediment).
+    pub unconsolidated: Vec<bool>,
     pub paths: Paths,
 }
+
+/// The thinnest horizon of regional-metamorphic rock inside a stack, blocks: metamorphic rock
+/// is a regional body, not a sheet between other rocks.
+pub const METAMORPHIC_MIN_BLOCKS: i32 = 8;
+/// The thinnest horizon of plutonic rock inside a stack, blocks.
+pub const PLUTONIC_MIN_BLOCKS: i32 = 16;
 
 impl Tables {
     pub fn get() -> Tables {
@@ -155,6 +255,36 @@ impl Tables {
                             && !matches!(c.name, "slate" | "phyllite" | "serpentinite"))
                 })
                 .collect(),
+            formed_at_c: t
+                .iter()
+                .map(|c| {
+                    super::metamorphism::formation_temp_c(c.name)
+                        .filter(|&x| {
+                            c.family == "metamorphic" && x >= super::realism::METAMORPHIC_FROM_C
+                        })
+                        .unwrap_or(0.0)
+                })
+                .collect(),
+            intrusive: t
+                .iter()
+                .map(|c| c.family == "intrusive_igneous" || c.family == "special_host")
+                .collect(),
+            min_blocks: t
+                .iter()
+                .map(|c| {
+                    if c.family == "metamorphic"
+                        && super::metamorphism::formation_temp_c(c.name)
+                            .is_some_and(|x| x >= super::realism::METAMORPHIC_FROM_C)
+                    {
+                        METAMORPHIC_MIN_BLOCKS
+                    } else if c.family == "intrusive_igneous" && c.name != "peridotite" {
+                        PLUTONIC_MIN_BLOCKS
+                    } else {
+                        1
+                    }
+                })
+                .collect(),
+            unconsolidated: t.iter().map(|c| c.family == "unconsolidated").collect(),
             paths: Paths::get(),
         }
     }
@@ -272,6 +402,7 @@ fn push(out: &mut Vec<Unit>, class: u16, thickness_m: f64, source: Source, key: 
     }
     if let Some(last) = out.last_mut()
         && last.class == class
+        && key::joins(last.key, key)
     {
         last.thickness_m += thickness_m as f32;
         last.key[1] = last.key[1].max(key[1]);
@@ -310,24 +441,38 @@ pub fn build(
     }
     let young_from = now_myr - p.loose_age_myr;
     let mut log_total = 0.0f64;
-    // A layer spans the ages from the base of the layer above it to its own base; the top layer
-    // reaches the present while the cell still accumulates, else it keeps only its base age.
-    let age_key = |age: f32| key::of_age(now_myr - f64::from(age), cell.log_span_myr);
-    let mut above: Option<u16> = None;
+    // The hottest formation temperature so far, from the top (the module docs).
+    let mut hot = 0.0f64;
+    // A layer spans the ages from the base of the layer above it to its own base, in its band;
+    // the top layer reaches the present while the cell still accumulates, else it keeps only its
+    // base age.
+    let age_key =
+        |band: usize, age: f32| key::of_age(band, now_myr - f64::from(age), cell.log_span_myr);
+    // The layer above: (its band, its base key, its base age).
+    let mut above: Option<(usize, u16, f32)> = None;
     for l in cell.log.iter().rev() {
         let th = f64::from(l.thickness_m);
         if th.is_nan() || th <= 0.0 {
             continue;
         }
         log_total += th;
-        let base = age_key(l.age_myr);
+        // The log's layers are already what their burial made them; a class without a path of
+        // its own that shows as one with a path (a buried soil shows as mudstone) follows the
+        // rock above it.
+        let rock = t.paths.at(t.rock_form(l.class), hot);
+        hot = hot.max(t.formed_at_c[usize::from(rock)]);
+        let band = key::band_of(hot);
+        let [lo, hi] = key::log_range(band);
+        let base = age_key(band, l.age_myr);
         let kt = match above {
-            Some(k) => k,
-            None if cell.top_active => key::LOG_TOP,
-            None => base.saturating_sub(2).max(key::LOG_TOP),
-        };
-        let kb = base.max(kt.saturating_add(2));
-        above = Some(kb);
+            Some((b, k, _)) if b == band => k,
+            Some((_, _, age)) => age_key(band, age),
+            None if cell.top_active => lo,
+            None => base.saturating_sub(2).max(lo),
+        }
+        .min(hi - 2);
+        let kb = base.max(kt + 2).min(hi);
+        above = Some((band, kb, l.age_myr));
         if depth >= max_depth_m {
             depth += th;
             continue;
@@ -340,7 +485,7 @@ pub fn build(
             0.0
         };
         push(out, t.loose_form(l.class), loose, Source::Log, [kt, km]);
-        push(out, t.rock_form(l.class), th - loose, Source::Log, [km, kb]);
+        push(out, rock, th - loose, Source::Log, [km, kb]);
         depth += th;
     }
 
@@ -353,6 +498,8 @@ pub fn build(
         cover -= take;
     }
     let mut first = true;
+    // The band of the last pool unit: bands never decrease downwards.
+    let mut band = key::band_of(hot);
     for (q, &k) in TOP_ORDER.iter().enumerate() {
         let th = pools[k];
         if th < 1.0 {
@@ -374,28 +521,56 @@ pub fn build(
             pool_class(t, cell, k)
         };
         first = false;
-        // Split the pool at the isotherms of its class's path (continental crust only); each
-        // metamorphic step keeps its own slot of the pool's key block.
+        // Split the pool where its class steps along its path: at the isotherms of the present
+        // geotherm (continental crust only), and at once for every step the rock above was
+        // already hot enough for; a plutonic pool passes over the steps cooler than its roof
+        // (the module docs). Each step keeps its own slot of the pool's keys in its band.
+        let geotherm = cell.crust_type != OCEANIC && cell.gradient_c_m > 0.0;
+        let isotherm = |temp: f64| {
+            if geotherm {
+                (temp - cell.surface_c) / cell.gradient_c_m
+            } else {
+                f64::INFINITY
+            }
+        };
+        let intrusive = t.intrusive[usize::from(class)];
+        let src = Source::Basement(k as u8);
+        let bottom = depth + th;
         let mut top = depth;
         let mut current = class;
         let mut step = 0;
-        if cell.crust_type != OCEANIC && cell.gradient_c_m > 0.0 {
-            for &(next, temp) in t.paths.steps(class) {
-                let z = (temp - cell.surface_c) / cell.gradient_c_m;
-                if z >= depth + th {
-                    break;
-                }
-                if z > top {
-                    let src = Source::Basement(k as u8);
-                    push(out, current, z - top, src, key::pool(q, step));
-                    top = z;
-                }
-                current = next;
-                step += 1;
+        let mut emit = |out: &mut Vec<Unit>, class: u16, th: f64, step: usize, hot: &mut f64| {
+            *hot = hot.max(t.formed_at_c[usize::from(class)]);
+            // Plutonic rock is crystalline basement: the last band, whatever lies on it.
+            band = band.max(if t.intrusive[usize::from(class)] {
+                key::BANDS - 1
+            } else {
+                key::band_of(*hot)
+            });
+            push(out, class, th, src, key::pool(band, q, step));
+        };
+        for &(next, temp) in t.paths.steps(class) {
+            let z = if temp < super::realism::METAMORPHIC_FROM_C {
+                // Diagenesis: the present geotherm alone.
+                isotherm(temp)
+            } else if intrusive && temp < key::BAND_FROM_C[key::BANDS - 1] {
+                continue;
+            } else if !intrusive && temp <= hot {
+                f64::NEG_INFINITY
+            } else {
+                isotherm(temp)
+            };
+            if z >= bottom {
+                break;
             }
+            if z > top {
+                emit(out, current, z - top, step, &mut hot);
+                top = z;
+            }
+            current = next;
+            step += 1;
         }
-        let src = Source::Basement(k as u8);
-        push(out, current, depth + th - top, src, key::pool(q, step));
+        emit(out, current, bottom - top, step, &mut hot);
         depth += th;
     }
     if depth < max_depth_m {

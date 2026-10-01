@@ -16,6 +16,7 @@ public final class WorldDataTerrain implements TerrainSource {
     private final WorldDataRef ref;
     private volatile WorldData data;
     private volatile ClimateMapping mapping;
+    private volatile LavaRules lava;
 
     public WorldDataTerrain(WorldDataRef ref) {
         this.ref = ref;
@@ -42,6 +43,17 @@ public final class WorldDataTerrain implements TerrainSource {
             mapping = m;
         }
         return m;
+    }
+
+    /** The world's lava rules ({@code notes.bake.underground.params}, preset section {@code underground}). */
+    @Override
+    public LavaRules lava() {
+        LavaRules l = lava;
+        if (l == null) {
+            l = LavaRules.of(data().manifest().notes());
+            lava = l;
+        }
+        return l;
     }
 
     @Override
