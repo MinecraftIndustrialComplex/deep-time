@@ -143,13 +143,14 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   (K = 32 slots), baked 206 MB. *Slice* (1024 × 512): 3.4–4.0 s wall before the `stack_at` change at load 47, then 2.1–3.4 s,
   and 1.1–1.6 s (4.4 s of CPU, 8 µs a column) at load 63; cached: 3 ms. *Section* of 2,048 columns: 25–37 ms (cached 2 ms).
   *Opening the bake:* 0.15–0.21 s. A planet run adds nothing: the page only reads.
-  **Run time before and after** (`/usr/bin/time -l deeptime run --preset earthlike_quick_16k --start scattered_continents
-  --length-myr 500 --out …`, release build of this branch's base): **before 880 s wall, 1,357 s user, 2.56 GB max RSS** (load
-  average 27 at the start, 78 at the end). **After: not measured.** The run was started with this branch's binary at
-  01:29 and killed unfinished at ~01:46 when Ben stopped all Mac testing (log 2026-10-01); redo it on the new test
-  machine: `/usr/bin/time -l` the same command with both binaries and compare user seconds. The only code that a run
-  executes and this branch changed is `strata::stack_at` (the deposits stage's coal cover), bit-identical and with fewer
-  allocations (above).
+  **Run time before and after** (Azure test VM, `/usr/bin/time -v deeptime run --preset earthlike_quick_16k --start
+  scattered_continents --length-myr 500 --threads 6`, release builds of master b46f512 (base) and of this branch, one run at a
+  time in the order base, branch, branch, base, load average 25–50 from other agents' jobs): **user seconds base 1,934 and
+  1,714 (mean 1,824), branch 1,866 and 1,799 (mean 1,832)**; wall 9:53 / 7:22 against 8:50 / 7:48; max RSS 6.1 / 5.1 GB
+  against 5.7 / 5.1 GB. The two builds differ by less than the spread between repeats of one build (the second run of each pair
+  was faster as the box quieted): no measurable change. The only code a run executes that this branch changed is
+  `strata::stack_at` (the deposits stage's coal cover, 42 / 23 s base against 24 / 26 s branch), bit-identical and with
+  fewer allocations.
 - **Tests.** `watch::sections::tests::rock_at_depth_and_sections_agree_with_the_column_evaluator` (a tiny baked planet,
   through `route()` as the server calls it): 96,932 blocks of 368 sampled section columns equal `ColumnWorld::sample`'s
   rock block for block; the water and ground equal `hydro()`; body spans equal `sample().bodies`, 93 of them through the
@@ -170,42 +171,23 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   0.04 % of surface pixels and 0.09 % at 50 blocks, mostly at 85–87° latitude and in a basin near 67° S; coal 0.07 % at the
   surface, 0.2 % at 50 blocks. (3) The first slice of a run opens the strata (117 MB at 16k, about 470 MB at 32k full):
   they stay for ten minutes. (4) A run that is still running has no bake until it ends; the page says so.
-- **Gates: incomplete, the Mac was stopped under me** (Ben, 2026-10-01). Run on the Mac before the stop, on an earlier
-  state of the branch: `cargo test -p deeptime-format` (52 passed, incl. the new `stack_at` equality test),
-  `cargo test -p deeptime-cli sections` (5 passed incl. the tiny-planet test), `cargo clippy -p deeptime-cli -p
-  deeptime-viewer --all-targets -D warnings` clean, `cargo fmt --check` clean. **Edits made after those runs have never
-  been built or run:** the body index's bucket edge (`bucket_for`, so an odd circumference cannot index out of range) and
-  its two tests in `world.rs`, the per-bake cache folder (`cache_dir` with a stamp) and the test helper `kept` in
-  `tests.rs`, and the last `sections.js` changes (dock placement, the hint pill, opaque dimming; `node --check` ok;
-  `sections_shots.py`'s fold/close/Esc checks were never run). Formatting of the Rust files was re-checked with rustfmt
-  on the laptop (clean). **Not run at all:** `cargo test --workspace`, `cargo clippy --workspace`, `cargo deny`,
-  `cd neoforge && ./gradlew build test` (which exercises the Java parity tests against the new `stack_at`).
-  Merged with master 90e07ba (only STATUS.md conflicted) and the never-built edits re-read by hand (the bucket
-  arithmetic for C = 1200 and 4096 worked through against the new tests).
-  **Commands for the new machine** (host in `DEEPTIME_MAC`; from the worktree on the laptop; `M=tools/remote/mac.sh`):
-  1. Gates: `$M -- 'cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
-     && cargo deny check licenses bans'`, then `$M -- 'cd neoforge && ./gradlew build test && python3
-     ../tools/ci/junit-summary.py build/test-results/test'` (the Gradle run writes `planet4k/parity/columns.json` with the
-     new `stack_at` and `ColumnParityTest` compares it with Java: 500 of 500 columns must be equal). No `--server`, no GameTests.
-  2. The page and the routes on a real planet: `$M --pull review/out/wb-sections -- 'SCRATCH=<scratch>/wb-sections
-     tools/workbench/check-sections.sh'`. It runs a 500-Myr `earthlike_quick_16k` into `<scratch>/runs/bakeA/world`, starts
-     its own `deeptime watch` on port 8661, curls the slice (cold and cached) and section times, then drives headless
-     Chromium (`DEEPTIME_CHROME` if the playwright shell is not at its Mac path) and exits non-zero on a failed check or a
-     page error. The diamictite section's coordinates (-4900,2500 → -4100,3350) are for the seed-1 run of 2026-10-01; if
-     the new run differs, find a bed with `/api/runs/bakeA/rock/slice.png?depth=50` (diamictite is plum #804080).
-  3. Run time before and after, same preset, same machine, one at a time and nothing else heavy running:
-     `git worktree add ../deeptime-base 90e07ba` on the laptop (git only), then in both trees
-     `$M -- 'cargo build --release -p deeptime-cli && mkdir -p <scratch>/t && /usr/bin/time -l target/release/deeptime run
-     --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --out <scratch>/t/world 2> <scratch>/t/time.log;
-     tail -30 <scratch>/t/time.log'` (`-v` instead of `-l` on Linux). Compare user seconds and max RSS; the base tree is
-     master, so the only difference between the two is this branch. Delete `<scratch>` and remove the base worktree after.
+- **Gates** (Azure test VM, this branch merged with master b46f512; `CARGO_BUILD_JOBS=8`): `cargo fmt --check` clean; `cargo clippy
+  --workspace --all-targets -D warnings` clean (it first caught a needless borrow in `stack_at_with`, fixed); `cargo test
+  --workspace` all pass (core 335 + 3 ignored, cli 38 incl. the five `watch::sections` tests, format 52 incl. the `stack_at`
+  equality test, inspect 29 + 9, jni 7, viewer 6, history_cap 1); `cargo deny check licenses bans` ok; `cd neoforge &&
+  ./gradlew build test` BUILD SUCCESSFUL, tests=160 failures=0 errors=0 skipped=1, **ColumnParityTest `columns=500 equal=500`**
+  (71 through bodies, 31 with water; lake1024 300/300) against the new `stack_at`. No GameTests (branch rule).
+- **On a real baked planet** (`tools/workbench/check-sections.sh`, a fresh 500-Myr `earthlike_quick_16k`,
+  merged master): the slice takes 1.4–2.0 s cold (load ~40, 12.1 horizons a cell), the section of 2,048 columns 0.03 s; opening the
+  bake 0.07 s; `sections_shots.py` in Chromium 153: depth chips, three sections, fold, unfold, close, show from the tab, the
+  surface chip and Esc all ok, no page errors. The pictures were first made without fonts (nixpkgs' Chromium has none);
+  `tools/workbench/sections-shots.sh` now gives it DejaVu. A section through a diamictite bed (68.1° S 207.2° E → 80.2° S,
+  165 km, `dia-big-lit.png`): a 1.8 % bed the key lights up in plum, thinning up a slope and cropping out in a fjord-like
+  trough. New diamictite coordinates differ from the first run's (master changed the planet).
 - **Next.** The coordinator merges this with the rivers, deposits and zoomable-map branches (the conflicts will be the
-  `workbench.js`/`workbench.html` hunks and this file's top); restart the live workbench on the Mac to get it
-  (`tools/viewer/mac-watch.sh`). Runs made before format 0.2 show "needs a bake" until they are run again.
-  Left on the Mac (nothing running; not deleted because Ben said to start nothing there): the scratch folder
-  `/Volumes/Graphide/ban/deeptime-runs/wb-sections/` (the baseline 500-Myr world, the half-made "after" run, two
-  binaries, test runs folders, logs) and this worktree's copy `/Volumes/Graphide/ban/mic/mods/agent-aa7d40b4ebf642bd7`
-  with its `target/`; `tools/remote/mac-gc.sh` takes the second after the merge.
+  `workbench.js`/`workbench.html` hunks and this file's top); restart the live workbench on the test machine to get it
+  (`tools/viewer/mac-watch.sh`). Runs made before format 0.2 show "needs a bake" until they are run again. Scratch deleted;
+  this worktree's checkout copy `/data/ban/mic/mods/agent-aa7d40b4ebf642bd7` stays until `tools/remote/mac-gc.sh` after the merge.
 
 ### 2026-09-30 — P1-27 plate margins and coherent continents (agent worktree agent-ad3b417fd428c1ac2, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Ben (decisions log 2026-09-29, "Provinces view shows speckled, patchy continents"; 2026-09-30, "most coast lines
