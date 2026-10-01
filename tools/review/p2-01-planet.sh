@@ -13,6 +13,8 @@
 #       the tail of every log, and what is still running
 #   tools/remote/mac.sh --no-sync -- tools/review/p2-01-planet.sh summary <name>
 #       the run's summary lines (structure_final=…) and its notes.structure.deformation
+#   tools/remote/mac.sh --no-sync -- tools/review/p2-01-planet.sh stop <name>
+#       stops that planet run
 #   tools/remote/mac.sh --no-sync -- tools/review/p2-01-planet.sh clean
 #       deletes the scratch folder (when the task has landed)
 set -euo pipefail
@@ -26,6 +28,17 @@ detach() { # <log> <command…>
     local log="$1"; shift
     setsid nohup "$@" > "$log" 2>&1 < /dev/null &
     echo "started pid $! → $log"
+}
+
+# The planet runs of this script, as "pid command". (The dev shell's pgrep does not start on the
+# test machine: it loads the system libc under the Nix libsystemd.)
+mine() {
+    for d in /proc/[0-9]*; do
+        c="$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null || true)"
+        case "$c" in
+            "$RUNS/deeptime-"*) echo "${d#/proc/} $c" ;;
+        esac
+    done
 }
 
 case "${1:-}" in
@@ -45,7 +58,14 @@ case "${1:-}" in
             echo "== $f"; tail -n "${2:-6}" "$f"
         done
         echo "== running"
-        /usr/bin/pgrep -af "$RUNS/deeptime-|cargo test --workspace" | grep -v pgrep || echo "nothing"
+        mine | grep . || echo "no planet run of this script (a detached test run is not listed)"
+        ;;
+    stop)
+        # Stops one of this script's own planet runs, found by its binary's path (never by a
+        # bare process name: the machine is shared).
+        mine | grep -F "$RUNS/deeptime-$2 " | while read -r pid _; do
+            kill -TERM "$pid" && echo "stopped $pid"
+        done
         ;;
     summary)
         name="$2"
@@ -60,6 +80,6 @@ case "${1:-}" in
         rm -rf "$RUNS"
         ;;
     *)
-        sed -n '3,20p' "$0"; exit 2
+        sed -n '3,22p' "$0"; exit 2
         ;;
 esac

@@ -936,7 +936,8 @@ pub fn summary_line(note: &serde_json::Value) -> String {
         " fold_trains={} thrusts={} normal_faults={} strike_slip_faults={} \
          deformed_frac={:.4} faulted_frac={:.4} max_candidates={} max_shift_blocks={:.1} \
          lattice_s={:.2} noddy_worst={:.1e} noddy_ns_point={:.0} column_ns_point={:.1} \
-         covered_craton={:.3} covered_collision={:.3} covered_rift={:.3} covered_passive_margin={:.3}",
+         covered_craton={:.3} covered_collision={:.3} covered_rift={:.3} covered_passive_margin={:.3} \
+         deform_steps_s={:.2} deform_report_s={:.2}",
         kinds["fold_train"].as_u64().unwrap_or(0),
         kinds["thrust"].as_u64().unwrap_or(0),
         kinds["normal_fault"].as_u64().unwrap_or(0),
@@ -963,6 +964,11 @@ pub fn summary_line(note: &serde_json::Value) -> String {
         df["coverage"]["passive_margin"]["covered"]
             .as_f64()
             .unwrap_or(0.0),
+        note["millis"]["deformation"].as_f64().unwrap_or(0.0) / 1000.0,
+        note["millis"]["deformation_lattice"]
+            .as_f64()
+            .unwrap_or(0.0)
+            / 1000.0,
     );
     format!(
         "structure_final={} plutons_emplaced={} plutons_alive={} plutons_eroded={} \
