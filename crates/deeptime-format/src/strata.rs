@@ -25,6 +25,11 @@
 //!    cell whose weight is zero changes nothing and the column is continuous across cell edges.
 //! 4. Heights are floored to blocks; a horizon left with no block is dropped and equal classes
 //!    in a row join. The last horizon reaches down to the floor.
+//! 5. Slivers ([`drop_slivers`]): where the layer names a least thickness for a class
+//!    (`LayerDesc::min_blocks`; the bake does for metamorphic and plutonic rock), a horizon of
+//!    that class under the first horizon and over the last that is thinner is removed, and the
+//!    horizon above it reaches down in its place. A unit that ends sideways thus ends at a small
+//!    step instead of thinning to a sheet one block thick.
 
 use crate::raster::LayerDesc;
 
@@ -260,6 +265,32 @@ pub fn stack_at_with(
         }
         top = bottom;
     }
+    if let Some(min_blocks) = &d.min_blocks {
+        drop_slivers(out, min_blocks);
+    }
+}
+
+/// Step 5 of the column rule: walking `out` from its second horizon down, a horizon that is not
+/// the last and whose class has a least thickness above one block in `min_blocks` (by class
+/// index) and that is thinner (its top less the next horizon's top, as emitted) is removed; a
+/// horizon of the class of the last one kept is removed too (it continues it). The first horizon
+/// always stays, and the last unless it continues the one kept before it.
+pub fn drop_slivers(out: &mut Vec<ColumnHorizon>, min_blocks: &[u8]) {
+    let n = out.len();
+    let mut kept = 1;
+    for h in 1..n {
+        let (top, class, unit) = out[h];
+        let need = i32::from(min_blocks.get(usize::from(class)).copied().unwrap_or(1));
+        if h + 1 < n && need > 1 && top - out[h + 1].0 < need {
+            continue;
+        }
+        if out[kept - 1].1 == class {
+            continue;
+        }
+        out[kept] = (top, class, unit);
+        kept += 1;
+    }
+    out.truncate(kept.min(n));
 }
 
 /// Keys per band of an interfingering facies change ([`interfinger`]) where the layer does not
@@ -456,6 +487,40 @@ mod tests {
         assert!(mid.iter().filter(|&&(_, c)| c == 7).count() >= 2, "{mid:?}");
         assert_eq!(at(&l, -128 + 32), [(40, 6), (-20, 3)]);
         assert_eq!(at(&l, -128 + 32 * 6), [(40, 7), (-20, 3)]);
+    }
+
+    #[test]
+    fn slivers_of_the_named_classes_are_dropped_inside_a_column() {
+        // Class 5 needs 8 blocks, class 6 needs 4; the rest one.
+        let min = [1u8, 1, 1, 1, 1, 8, 4];
+        let run = |col: &[(i32, u8)]| {
+            let mut out: Vec<ColumnHorizon> = col.iter().map(|&(t, c)| (t, c, 0)).collect();
+            drop_slivers(&mut out, &min);
+            out.into_iter().map(|(t, c, _)| (t, c)).collect::<Vec<_>>()
+        };
+        // A 3-block sliver of class 5 between 1 and 3: gone, 1 reaches down.
+        assert_eq!(
+            run(&[(100, 1), (60, 5), (57, 3), (0, 2)]),
+            [(100, 1), (57, 3), (0, 2)]
+        );
+        // Thick enough: kept. At the top and at the bottom of the column: kept.
+        assert_eq!(
+            run(&[(100, 1), (60, 5), (52, 3)]),
+            [(100, 1), (60, 5), (52, 3)]
+        );
+        assert_eq!(run(&[(100, 5), (98, 1), (50, 5)]), [(100, 5), (98, 1), (50, 5)]);
+        // Two slivers in a row both go; the same class on both sides of one joins.
+        assert_eq!(run(&[(100, 1), (60, 5), (57, 6), (55, 2)]), [(100, 1), (55, 2)]);
+        assert_eq!(run(&[(100, 1), (60, 5), (57, 1), (20, 2)]), [(100, 1), (20, 2)]);
+        // A layer that names nothing changes nothing.
+        let mut out: Vec<ColumnHorizon> = vec![(100, 1, 0), (60, 5, 0), (57, 3, 0)];
+        drop_slivers(&mut out, &[]);
+        assert_eq!(out.len(), 3);
+        // Through the rule: cells 0–3 hold a 3-block bed of class 5, the layer says 8.
+        let mut l = layer(|_| vec![(40, 1, 0, 10), (30, 5, 10, 12), (27, 1, 12, 20), (0, 3, 20, 30)]);
+        assert_eq!(at(&l, 0), [(40, 1), (30, 5), (27, 1), (0, 3)]);
+        l.desc.min_blocks = Some(min.to_vec());
+        assert_eq!(at(&l, 0), [(40, 1), (0, 3)]);
     }
 
     #[test]

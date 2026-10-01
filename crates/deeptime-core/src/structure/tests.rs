@@ -101,7 +101,9 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     assert_eq!(cells.with_inversion, 0, "{:?}", cells.to_json());
     assert_eq!(cells.with_sliver, 0, "{:?}", cells.to_json());
     assert_eq!(cells.with_sheet, 0, "{:?}", cells.to_json());
-    rule_columns(&h, 11, 3000);
+    let columns = rule_columns(&h, 11, 3000);
+    assert_eq!(columns.with_sliver, 0, "{:?}", columns.to_json());
+    assert_eq!(columns.with_sheet, 0, "{:?}", columns.to_json());
     assert!(h.mean_horizons() > 2.0, "{}", h.mean_horizons());
     // The stack's top is the surface, and the layer round-trips through the format.
     let src = CellSource::new(&world, &preset).unwrap();
@@ -452,12 +454,13 @@ fn random_horizons(seed: u64, sigma: f64) -> bake_horizons::Horizons {
         classes,
         keys,
         tongues: bake_horizons::tongue_params(&p),
+        min_blocks: tables.min_blocks.iter().map(|&b| b as u8).collect(),
     }
     .smoothed(sigma, &tables.min_blocks)
 }
 
 /// The columns the game builds from `hz` (the column rule at random blocks, each under its own
-/// first top) checked; returns (columns, columns holding metamorphic rock, the census).
+/// first top), every one asserted free of grade inversions; returns their census.
 fn rule_columns(hz: &bake_horizons::Horizons, seed: u64, n: usize) -> realism::Census {
     let rules = Rules::builtin();
     let layer = hz.to_layer(deeptime_format::Codec::Raw).unwrap();
@@ -507,7 +510,11 @@ fn baked_stacks_and_blended_columns_have_no_grade_inversion_and_no_sliver() {
         );
         // The columns the game builds (sixteen stacks blended by key): no inversion (asserted
         // column by column in `rule_columns`).
+        // … and no sliver: the rule drops the thin edge a metamorphic or plutonic unit would
+        // have where it ends sideways (`deeptime_format::strata::drop_slivers`).
         let columns = rule_columns(&hz, seed ^ 0x5EED, 6000);
         assert!(columns.with_metamorphic > 0);
+        assert_eq!(columns.with_sliver, 0, "seed {seed}: {:?}", columns.to_json());
+        assert_eq!(columns.with_sheet, 0, "seed {seed}: {:?}", columns.to_json());
     }
 }

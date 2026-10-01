@@ -68,6 +68,9 @@ pub struct Horizons {
     pub keys: Vec<[u16; 2]>,
     /// The column rule's tongue parameters written into the layer (keys per band, minor share).
     pub tongues: (u32, f64),
+    /// Per class, the least thickness (blocks) of a horizon inside a column, written into the
+    /// layer for the column rule (`deeptime_format::strata::drop_slivers`); empty: none.
+    pub min_blocks: Vec<u8>,
 }
 
 /// A horizon while it is baked: top (1/16 block), class, key span.
@@ -533,6 +536,25 @@ impl Horizons {
         Ok(())
     }
 
+    /// The `strata/horizons` layer's descriptor: what the column rule reads beside the cells.
+    pub fn desc(&self, codec: Codec) -> LayerDesc {
+        let mut d = LayerDesc::scalar(
+            "strata/horizons",
+            DType::HorizonStack,
+            self.grid.clone(),
+            codec,
+        );
+        d.units = "block/16 top, class index, key top, key base".into();
+        d.scale = 1.0 / 16.0;
+        d.stack_depth = Some(self.k);
+        d.tongue_band_keys = Some(self.tongues.0);
+        d.tongue_minor_share = Some(self.tongues.1);
+        if !self.min_blocks.is_empty() {
+            d.min_blocks = Some(self.min_blocks.clone());
+        }
+        d
+    }
+
     /// The `strata/horizons` layer (per cell K i16 tops, K u8 classes, K u16 key tops, K u16 key
     /// bases).
     pub fn to_layer(&self, codec: Codec) -> Result<LoadedLayer, FormatError> {
@@ -549,18 +571,7 @@ impl Horizons {
                 }
             }
         }
-        let mut d = LayerDesc::scalar(
-            "strata/horizons",
-            DType::HorizonStack,
-            self.grid.clone(),
-            codec,
-        );
-        d.units = "block/16 top, class index, key top, key base".into();
-        d.scale = 1.0 / 16.0;
-        d.stack_depth = Some(self.k);
-        d.tongue_band_keys = Some(self.tongues.0);
-        d.tongue_minor_share = Some(self.tongues.1);
-        LoadedLayer::new(d, bytes)
+        LoadedLayer::new(self.desc(codec), bytes)
     }
 
     /// `strata/classes.json`.
@@ -635,6 +646,7 @@ pub fn bake_with(
         classes,
         keys,
         tongues: tongue_params(p),
+        min_blocks: t.min_blocks.iter().map(|&b| b.clamp(1, 255) as u8).collect(),
     }
     .smoothed(p.strata_smoothing_cells, &t.min_blocks)
 }
@@ -732,6 +744,7 @@ mod tests {
             classes: classes.repeat(2),
             keys: keys.repeat(2),
             tongues: (64, 0.15),
+            min_blocks: Vec::new(),
         };
         h.check().unwrap();
         // The soil and coal were thinner than a block and joined their neighbours.
@@ -774,6 +787,7 @@ mod tests {
             classes: classes.repeat(2),
             keys: keys.repeat(2),
             tongues: (64, 0.15),
+            min_blocks: Vec::new(),
         };
         h.check().unwrap();
         // A surface below the world's floor still gets one horizon a block thick.
@@ -844,6 +858,7 @@ mod tests {
             classes: classes.repeat(2),
             keys: keys.repeat(2),
             tongues: (64, 0.15),
+            min_blocks: Vec::new(),
         };
         h.check().unwrap();
         h.check_bake(&t.min_blocks).unwrap();

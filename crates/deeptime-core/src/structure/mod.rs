@@ -77,16 +77,7 @@ impl Cover {
     /// fields the columns need).
     pub fn new(world: &WorldState, preset: &PlanetPreset) -> Result<Cover, CoreError> {
         let hz = bake_horizons::bake(world, preset)?;
-        let mut desc = deeptime_format::LayerDesc::scalar(
-            "strata/horizons",
-            deeptime_format::DType::HorizonStack,
-            hz.grid.clone(),
-            deeptime_format::Codec::Raw,
-        );
-        desc.scale = 1.0 / 16.0;
-        desc.stack_depth = Some(hz.k);
-        desc.tongue_band_keys = Some(hz.tongues.0);
-        desc.tongue_minor_share = Some(hz.tongues.1);
+        let desc = hz.desc(deeptime_format::Codec::Raw);
         let sedimentary = crate::surface::lithology::table()
             .iter()
             .map(|c| {
