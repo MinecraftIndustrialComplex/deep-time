@@ -38,7 +38,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-14 | Deposit engine: the four families | done | 2026-09-29 | — | On the real recorded history (plates → surface → structure → deposits, `pipeline_{quick,full}_{16k,32k}` have a `deposits` section). Mac: cargo test --workspace ok (core 155 + 1 ignored incl. deposits::recorded_tests 6: 1 vs 3 threads give identical sites/bodies/events/census, a checkpoint inside the deposit stage resumes on another thread count to the same sites, favourability of a rigidly drifting crust = the fixed-crust map moved cell for cell, missing fields skip exactly the types that read them and change nothing else, every family on recorded frames; cli 21 incl. `stage deposits` on the real history; format 32, inspect 28, jni 7, viewer 5); clippy -D warnings, deny licenses bans clean; gradlew build test 118/0; fmt clean for every file this task touches (watch/editor.rs on master is not); `stage deposits --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --viewer review/out/p1-deposits-real` → 154 s (plates 30.0, surface 111.6, structure 5.0, deposits 4.4), 5 sites at count_mult 1 (porphyry 1, coal 4; MVT, SEDEX, petroleum expected 0.00 / 0.00 / 0.11), 42 at count_mult 10; 17 MB bundle. Ben reviews: ore provinces, site list, three chains; see the build log for what is empty and why |
 | P1-15 | Deposits in the world | doing | 2026-09-28 | — | On the synthetic deposit world (real fields wait for P1-03…P1-08). Mac: ./gametest.sh, -PwithEv, -PwithMic → All 30 required tests passed each (DepositGameTests body 1222/1222 ore exact, 0 missed, 0 unexplained, regeneration 0 of 44,880 differ; ClaimGameTests; SpawnGameTests); ./gametest-planet.sh claimoninplanetworld PASS standalone (19 removed) and -PwithMic (38 removed); JUnit 62/0 incl. DepositDataParityTest (19,649 body samples, worst Δ 3.3e-16); smoke standalone first-start deposit world PASS + `deeptime-inspect ore` render |
 | P1-16 | COE and CDG hooks | done | 2026-09-28 | — | Mac: `./gametest.sh` and `-PwithMic` → All 45 required tests passed each; CompatGameTests with COE 1.6.8 + CDG 1.3.15: 7 of 7 site chunks = the site's vein in COE, 30 of 30 claimed noise veins dropped (COE picks them in the overworld), 34 unclaimed kept, 33 stored randomMul = the site's quantile (24 = Rust's drawn quantile, worst Δ 2.8e-8), 16 trap chunks = charge × cdg_scale × share, 111 chunks outside traps 0. MIC smoke (16k deposit world) PASS: `probe coe` at 9 site chunks = the site's vein (agrees), `probe cdg` over trap 27 > 0 (infinite / 553,979 mB), 0 elsewhere; `/coe locate` copper not found, redstone found. JUnit 106/0; cargo fmt/clippy/test/deny clean. Driven by the synthetic deposit world (see build log) |
-| P1-17 | Benchmark gate and preset tuning | doing | 2026-09-29 | | Partial (surface parallelism, branch worktree-agent-a9bc0ab99e68b4a07): stream-power solve 34.0 → 6.5 s at 12 threads, bit-identical; flood left serial on purpose; diffusion is now the largest surface cost; see the build log entry "P1-17 partial". Partial (calibration with the real climate, branch worktree-agent-ae48007457b607716, Ben 2026-09-29): pipeline presets + surface/climate/structure defaults + four deposit balance multipliers; Mac: `stage deposits --preset pipeline_quick_16k --length-myr 500` scattered / supercontinent → land median 2,352 / 1,743 → 601 / 624 m (Earth 427), above 2 km 0.56 / 0.45 → 0.11 / 0.07 (Earth 0.10), land 0.233 / 0.215 → 0.270 / 0.282, Köppen E 0.53 / 0.64 → 0.18 / 0.23, glaciated 0.31 (feedback off) → 0.06 / 0.07 (on), sites porphyry 1 / 1 → 5 / 34 (median 8 over 3 seeds × 2 starts), SEDEX, MVT, oil on 4, 3, 5 of 6 planets, plutons 7,830 / 5,374 → 1,192 / 885 bodies, mass residual ≤ 1.9e-3 km³; Earth check 19/24 (unchanged), 9.7 % glaciated with the feedback; cargo test/clippy/fmt/deny clean, gradlew build test 118/0; bundles review/out/p1-calib-{scattered_continents,supercontinent} (20 / 15 MB, not published); see the build log entry "P1-17 partial: calibration" Partial (history spill, branch worktree-agent-a33c2dc374c0ccd2f, Ben 2026-09-29): the recorded history spills to the run folder over the memory cap; `pipeline_full_32k` 1000 Myr finishes under 4 GiB (2.3 GiB on disk); spilled = in-memory byte for byte; see the build log entry "the recorded history spills to the SSD" |
+| P1-17 | Benchmark gate and preset tuning | doing | 2026-09-29 | | Partial (surface parallelism, branch worktree-agent-a9bc0ab99e68b4a07): stream-power solve 34.0 → 6.5 s at 12 threads, bit-identical; flood left serial on purpose; diffusion is now the largest surface cost; see the build log entry "P1-17 partial". Partial (calibration with the real climate, branch worktree-agent-ae48007457b607716, Ben 2026-09-29): pipeline presets + surface/climate/structure defaults + four deposit balance multipliers; Mac: `stage deposits --preset pipeline_quick_16k --length-myr 500` scattered / supercontinent → land median 2,352 / 1,743 → 601 / 624 m (Earth 427), above 2 km 0.56 / 0.45 → 0.11 / 0.07 (Earth 0.10), land 0.233 / 0.215 → 0.270 / 0.282, Köppen E 0.53 / 0.64 → 0.18 / 0.23, glaciated 0.31 (feedback off) → 0.06 / 0.07 (on), sites porphyry 1 / 1 → 5 / 34 (median 8 over 3 seeds × 2 starts), SEDEX, MVT, oil on 4, 3, 5 of 6 planets, plutons 7,830 / 5,374 → 1,192 / 885 bodies, mass residual ≤ 1.9e-3 km³; Earth check 19/24 (unchanged), 9.7 % glaciated with the feedback; cargo test/clippy/fmt/deny clean, gradlew build test 118/0; bundles review/out/p1-calib-{scattered_continents,supercontinent} (20 / 15 MB, not published); see the build log entry "P1-17 partial: calibration" Partial (history spill, branch worktree-agent-a33c2dc374c0ccd2f, Ben 2026-09-29): the recorded history spills to the run folder over the memory cap; `pipeline_full_32k` 1000 Myr finishes under 4 GiB (2.3 GiB on disk); spilled = in-memory byte for byte; see the build log entry "the recorded history spills to the SSD" Hypsometry recalibration 2026-10-01 (branch worktree-agent-aee888e01d29a40db): 10 runs × 500 Myr land 0.414 → 0.293, median 1,324 → 640 m, above 2 km 0.329 → 0.127, sea median 2,910 → 3,394 m, T 5.7 → 11.0 °C, glaciated 0.261 → 0.155; see the build log entry "P1-17 hypsometry recalibration 2026-10-01" |
 | P1-18 | Pole cap and client info | done | 2026-09-28 | — | Mac: JUnit 65/0; ./gametest.sh All 26 passed; planet PASS: entitypushedback, hardstopat80, sablehullpushedback, worldinfochannelrequired + seam set + sable_straddle; refuse_client OK (NeoForge client without Deep Time refused naming deeptime:world_info + pole_storm; with it accepted; vanilla refused). Client code compiled only (see build log) |
 | P1-19 | Phase 1 exit | todo | | | |
 | P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log). **Follow-up** (branch worktree-agent-afd5791e0f5ea82cd): a run with a bake is previewed and inspected as its own terrain (`/api/inspect` from `deeptime inspect-column --why` in 60-90 ms, previews boot the mod on the run's bake; height p50 0 vs the bake); runs without a bake keep the test world and say so (see build log). **UI overhaul** (branch worktree-agent-a95571be05fdd89d6, Ben: "should be dark themed"): dark map-first layout, run cards, sectioned editor with the estimate by Run, split/side-by-side compare, timeline dock, stage-2 job cards, `?tv` HUD, 390 px; placeholders hidden; Mac gates clean, JUnit 118/0; before/after in review/out/workbench-ui/ (see build log) |
@@ -300,38 +300,145 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Next.** Wire the new machine into `mac.sh` (`DEEPTIME_MAC`, SSD path), re-run the batch-4 GameTests,
   then resume the paused agents' work (P1-17 hypsometry, the climate ice branch, the four workbench
   features).
-### 2026-10-01 — P1-17 hypsometry recalibration: WIP, stopped (agent worktree agent-aee888e01d29a40db, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
-- **Stopped** on Ben's order (M6 Mac off limits, 2026-10-01) mid-way through the driver experiments. No preset
-  changed yet; no gates run on the final tree (`plates::pools` tests passed once on the Mac before the last edit).
-- **Tools (committed).** `deeptime stage` prints a `hypsometry_curve` line (elevation at 0…100 % of the surface,
-  cos φ-weighted). `tools/review/p1-17-hyps.sh` (variants × seeds × starts in parallel, `--set` lists separated by
-  `;`, `STAGE`/`BIN` for older builds) and `p1-17-hyps.py` (per-run and per-variant summary + JSON);
-  `p1-17-hyps-plot.py` (curves against Earth, HTML/SVG). Earth from GMT earth_relief 30′ (SRTM15+, Tozer et al. 2019,
-  `build/earth/earth_720.f32`, cos-weighted): land 0.289, median 427 m, p90 2,022 m, above 2 km 0.102, sea median
-  4,062 m, sea mean 3,683 m (Charette & Smith 2010, Oceanography 23(2):112, SRTM30_PLUS: 3,682 m, ocean 361.84 M km²).
-- **Code (untested by the gates).** `tectonics.oceanic_floor_elevation_m` (default −10,000 = Cortial's trench
-  asymptote, so every preset is unchanged): ocean floor subsides towards it; −5,600 m with damping 0.215 mm/yr follows
-  GDH1 (Stein & Stein 1992) within 0.12 km beyond 20 Myr (test `plates::pools::tests::the_gdh1_floor_follows_stein_and_stein`).
-  Not yet in any preset; editor field (`abyssal_depth`, adv_plates) still to add with it.
-- **Baseline** (master 8dae3f2, `earthlike_quick_16k`, 500 Myr, seeds 1–3 × supercontinent/scattered, mean [min–max]):
-  land 0.450 [0.40–0.52], median 1,323 m [1,128–1,636], p90 4,045, above 2 km 0.343, sea median 2,738 m, continental
-  crust 0.438 (dry 0.86, Earth 0.71), T_surface 6.5 °C [0.8–8.9], glaciated land 0.251, Köppen E 0.42 / B 0.20, active
-  margin 0.31, ground under arc cones 834 m; 588 s per run at 2 threads (load ~15). Bands below −6 km 0.048 (Earth 0.003),
-  −5…−4 km 0.084 (Earth 0.229): old floor too deep, young floor too shallow (Cortial's law).
-- **Drivers so far** (same 6 runs each): no glacial model (`surface.glacial.strength` 0: no K = 0 under ice) → land
-  0.410, median 1,046, p90 3,389, >2 km 0.254, T 8.6, ice 0.229 (ice protection is ~280 m of the median); fixed CO₂
-  (`climate.carbon_cycle` false) → land 0.382, median 1,383, T −0.3 (one planet froze): the carbon cycle is not the
-  cause, it is the thermostat. Present sea level −8 … −401 m (ice 2.2·10⁷–1.5·10⁸ km³ vs `ice_reference_km3` 10⁷):
-  glacio-eustasy exposes the shelves on the cold planets (land 0.47–0.52 where the sea is −270…−400 m). Short runs
-  (supercontinent seed 3): the dry share jumps 0.71 → 0.88 in the first 10 Myr (all uplift off 0.79, no erosion or
-  diffusion 0.83, no sea-level change 0.91): subduction uplift of the margins, progradation and the L0→L1 interpolation.
-  Median land rises through every run (≈450 m at −450 Myr → 0.9–1.7 km at 0). Unfinished: nocord, K 4e-9, marine fill
-  40 m, continents [50, 600], then collision cap 2 km, subduction uplift 0.3, no volcanoes, sea level +50 m, GDH1 floor,
-  and a bisection over a3c63fe / 6070e9e / bd1cc0f (sources and binaries built under
-  /Volumes/Graphide/ban/deeptime-runs/p1-17-hyps/ — delete with the run folder when the task lands).
-- **Next.** On the new test machine: finish the driver runs, then calibrate (K, collision cap, cordillera 0.2 → 0.3?,
-  the GDH1 floor), check one 750–1000 Myr run and the full/32k presets, re-sync built-ins, gates, plots under
-  review/out/p1-17-hyps/.
+### 2026-10-01 — P1-17 hypsometry recalibration 2026-10-01 (agent worktree agent-aee888e01d29a40db, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-10-01 ("Now, after this batch"): master had drifted from the 2026-09-29 calibration.
+  All numbers below are from the Azure test VM (x86; planets differ from the M6's by libm), `earthlike_quick_16k`,
+  500 Myr, `deeptime stage volcanoes`, `tools/review/p1-17-hyps.sh` (4 runs of 2 threads at once, niced), true-area
+  weighted. z50/z90 = land median/p90, >2 = land above 2 km, sea = median sea depth, T = mean surface temperature,
+  arc = ground under continental arc cones (mean of the 10-Myr medians).
+- **Earth reference.** GMT earth_relief 30′ (SRTM15+, Tozer et al. 2019), cos φ-weighted like the CLI's line
+  (`p1-17-hyps-plot.py` recomputes it): land 0.289, median 427 m, p90 2,022 m, above 2 km 0.102, sea median 4,062 m,
+  sea mean 3,683 m (Charette & Smith 2010, Oceanography 23(2):112–114, on SRTM30_PLUS: 3,682 m, ocean 361.84 M km² =
+  70.9 %), 1-km bands from below −6 to above +5 km `0.003/0.137/0.229/0.170/0.060/0.036/0.076/0.216/0.044/0.016/0.009/0.004/0.001`.
+- **Which merge moved it** (old commits built from `git archive`, seeds 1–2 × both starts):
+
+  | build | land | z50 | z90 | >2 | sea | T | ice | E |
+  |---|---|---|---|---|---|---|---|---|
+  | 6070e9e (calibration + carbon cycle + runoff fix) | 0.283 | 625 | 2,172 | 0.118 | 3,312 | 13.8 | 0.090 | 0.26 |
+  | bd1cc0f (+ volcanoes, glacial landforms) | 0.383 | 1,385 | 4,281 | 0.343 | 3,130 | 10.3 | 0.220 | 0.42 |
+  | master (+ rivers, P1-27) | 0.381 | 1,211 | 3,933 | 0.307 | 3,076 | 8.9 | 0.226 | 0.39 |
+
+  The drift came with the volcano and glacial merges; the deep-time climate did not cause it and P1-27 lowered it a
+  little. (a3c63fe's CLI rejected the run's arguments; 6070e9e carries the same calibration.)
+- **Drivers on master** (one change each; 4 runs, seeds 1–2 × both starts; baseline of the same 4 runs first):
+
+  | variant | land | z50 | z90 | >2 | sea | crust | T | ice | arc |
+  |---|---|---|---|---|---|---|---|---|---|
+  | master | 0.381 | 1,211 | 3,933 | 0.307 | 3,076 | 0.385 | 8.9 | 0.226 | 753 |
+  | `volcanoes.density` 0 | 0.316 | 766 | 2,781 | 0.170 | 3,045 | 0.387 | 11.7 | 0.160 | – |
+  | `surface.k_spl` 4e-9 | 0.355 | 803 | 2,628 | 0.162 | 3,218 | 0.385 | 10.7 | 0.128 | 597 |
+  | `tectonics.subduction_uplift_mm_yr` 0.3 | 0.354 | 835 | 3,003 | 0.189 | 3,276 | 0.393 | 10.5 | 0.174 | 731 |
+  | `tectonics.collision_uplift_max_m` 2,000 | 0.324 | 915 | 2,750 | 0.198 | 3,001 | 0.382 | 11.5 | 0.142 | 710 |
+  | `tectonics.cordillera_uplift_mm_yr` 0 | 0.359 | 1,130 | 3,916 | 0.300 | 3,068 | 0.387 | 10.0 | 0.260 | 388 |
+  | `tectonics.continent_elevation_m` [50, 600] | 0.421 | 1,154 | 3,858 | 0.302 | 2,788 | 0.414 | 8.6 | 0.212 | 844 |
+  | `climate.glacio_eustasy` 0 | 0.394 | 1,173 | 3,982 | 0.319 | 2,771 | 0.409 | 7.7 | 0.263 | 654 |
+  | `surface.sea_level.base_m` 50 | 0.382 | 1,176 | 4,069 | 0.306 | 3,047 | 0.407 | 8.7 | 0.248 | 712 |
+  | `surface.marine_fill_depth_m` 40 | 0.406 | 1,367 | 4,695 | 0.370 | 2,657 | 0.405 | 7.5 | 0.299 | 778 |
+  | GDH1 floor −5,600 m at 0.215 mm/yr | 0.204 | 848 | 3,182 | 0.213 | 4,785 | 0.291 | 14.4 | 0.140 | 750 |
+
+  On the M6 before the pause (6 runs, its own baseline land 0.450, z50 1,323): no glacial model (no K = 0 under ice)
+  z50 1,046, >2 0.254; fixed CO₂ z50 1,383, T −0.3 with one frozen planet (the carbon cycle is the thermostat, not
+  the cause). Reading: the cones (2·10⁷ km³ built per run, a fifth of everything eroded) and the ice's protection of
+  high ground raised the land; high land is cold, ice-covered and, through the ice's sea-level fall (−8 … −400 m),
+  larger. Erosion efficiency, the collision cap and the Andean uplift are the levers that bring it down; the start
+  elevation, the sea-level datum, glacio-eustasy and the shelf fill depth are not (within the noise of 4 chaotic runs,
+  about ±0.03 land and ±150 m). The cordillera costs little height overall. The ocean law is the lever for sea depth,
+  but at GDH1's full rate island arcs stop emerging and the continental crust shrinks.
+- **Calibration rounds** (4 runs each; K = `k_spl`, cap = collision cap, G = floor −5,600 m at 0.12 mm/yr):
+
+  | variant | land | z50 | z90 | >2 | sea | crust | T | ice | arc |
+  |---|---|---|---|---|---|---|---|---|---|
+  | K 4e-9, cap 2,000 | 0.343 | 720 | 2,218 | 0.131 | 2,921 | 0.414 | 11.0 | 0.088 | 548 |
+  | K 3e-9, cap 2,000 | 0.318 | 707 | 2,511 | 0.165 | 2,975 | 0.373 | 11.7 | 0.133 | 546 |
+  | K 4e-9, cap 2,500 | 0.354 | 749 | 2,522 | 0.155 | 2,901 | 0.389 | 11.6 | 0.131 | 534 |
+  | K 6e-9, cap 2,500 | 0.326 | 710 | 2,686 | 0.170 | 2,820 | 0.381 | 11.2 | 0.137 | 500 |
+  | K 3e-9, cap 1,500 | 0.311 | 684 | 2,134 | 0.114 | 3,254 | 0.379 | 11.7 | 0.092 | 525 |
+  | G alone | 0.239 | 805 | 2,979 | 0.194 | 4,179 | 0.312 | 12.1 | 0.170 | 766 |
+  | K 4e-9, cap 2,000, G | 0.219 | 543 | 2,080 | 0.109 | 3,959 | 0.322 | 14.3 | 0.092 | 592 |
+  | S = K 3e-9, cap 2,000, G; `arc_continental_m` 50 | 0.213 | 557 | 2,026 | 0.103 | 4,040 | 0.325 | 13.0 | 0.085 | 546 |
+  | S, 50, cordillera 0.3 to 3,000 m | 0.242 | 656 | 2,530 | 0.155 | 3,950 | 0.329 | 13.3 | 0.128 | 849 |
+  | S, 50, cordillera 0.4 to 3,000 m | 0.242 | 696 | 2,471 | 0.146 | 4,142 | 0.316 | 13.3 | 0.133 | 951 |
+  | S, `arc_continental_m` 30 | 0.203 | 482 | 1,920 | 0.093 | 3,934 | 0.325 | 12.8 | 0.083 | 612 |
+  | S, 50, `volcanoes.density` 0.5 | 0.233 | 582 | 1,710 | 0.070 | 4,019 | 0.332 | 13.1 | 0.068 | 506 |
+  | S, cordillera 0.3, `arc_uplift_mm_yr` 0.45 | 0.246 | 604 | 2,440 | 0.142 | 3,646 | 0.356 | 12.9 | 0.122 | 584 |
+  | **S, cordillera 0.3, arc 0.6 (chosen)** | 0.270 | 585 | 2,072 | 0.110 | 3,488 | 0.400 | 10.9 | 0.127 | 749 |
+  | S, cordillera 0.4, arc 0.6 | 0.290 | 758 | 2,670 | 0.170 | 3,308 | 0.422 | 11.0 | 0.184 | 825 |
+  | S, arc 0.6 (cordillera 0.2) | 0.264 | 585 | 2,219 | 0.123 | 3,408 | 0.416 | 11.8 | 0.184 | 497 |
+
+  With the deeper young floor the continental crust falls to 0.32 whatever `arc_continental_m` is (arcs do not
+  emerge); raising the island-arc build-up restores it (0.356 at 0.45, 0.40 at 0.6) at the cost of some sea depth.
+- **Changes** (the four `presets/pipeline/*.json`, built-ins re-synced; nothing else in the presets; for the merge with
+  the ice branch: six lines in `tectonics`, one new, and one in `surface`):
+
+  | key | before → after | why |
+  |---|---|---|
+  | `surface.k_spl` | 2e-9 → 3e-9 | compensates the cones' added rock and the ice's protection; editor hint updated |
+  | `tectonics.collision_uplift_max_m` | 4,000 → 2,000 | a surge lifts ⅓ of its peak over up to 2,000 km, 30+ times per run, and isostasy 0.8 makes each km cost 5 km of erosion |
+  | `tectonics.oceanic_floor_elevation_m` (new) | −10,000 (Cortial) → −5,600 | GDH1's old-floor depth (Stein & Stein 1992); floor below −6 km 0.061 → 0.020 of the planet (Earth 0.003) |
+  | `tectonics.oceanic_damping_mm_yr` | 0.05 → 0.12 | 3.6 km at 20 Myr, 4.5 at 50, 5.2 at 100; GDH1's own rate (0.215) drowned the arcs |
+  | `tectonics.arc_uplift_mm_yr` | 0.3 → 0.6 | island arcs build from a floor 1 km deeper; keeps the continental crust at 0.40–0.42 |
+  | `tectonics.cordillera_uplift_mm_yr` | 0.2 → 0.3 | Ben's revisit: ground under the cones 497 → 749 m at the same land share |
+  | `tectonics.cordillera_height_m` | 2,500 → 3,000 | with it |
+
+  Not changed: isostasy (Airy), `glacial.strength` (Ben: physical), volcano density (Ben's call, below), the climate,
+  `planet_world_4k.json` (the GameTest planet keeps its values; coordinator's call), `SurfaceParams::default` (K 2e-9).
+- **Code.** `TectonicParams::oceanic_floor_elevation_m` (default = Cortial's trench, plate-only presets and old
+  checkpoints unchanged: a 60-Myr run of master and of this build with the key unset print the same hypsometry line);
+  `pools::{surface_step, ocean_elevation}` subside towards it; validation `[trench, ridge)`; tests
+  `plates::pools::tests::{dampening_matches_its_closed_form, the_gdh1_floor_follows_stein_and_stein}`. Editor field
+  `abyssal_depth` (adv_plates, −8,000…−4,600 m, lang key); `tools/dev/knob_extremes.py --only abyssal_depth --length-myr
+  100`: both ends ok (sea median 4,367 / 3,723 m). `deeptime stage` prints `hypsometry_curve`. Tools:
+  `tools/review/p1-17-hyps.{sh,py}`, `p1-17-hyps-plot.py`.
+- **Before → after, per run** (master efafc88's presets → this branch; seeds 1–5):
+
+  | start, seed | land | z50 | z90 | >2 | sea | T | ice | E | B | active | arc |
+  |---|---|---|---|---|---|---|---|---|---|---|---|
+  | super 1 | 0.459 → 0.300 | 1,059 → 711 | 3,845 → 2,499 | 0.267 → 0.158 | 3,059 → 3,071 | 6.8 → 11.2 | 0.223 → 0.227 | 0.38 → 0.41 | 0.20 → 0.18 | 0.29 → 0.31 | 806 → 801 |
+  | super 2 | 0.383 → 0.249 | 1,169 → 473 | 4,065 → 1,737 | 0.312 → 0.073 | 3,004 → 3,578 | 9.4 → 11.1 | 0.300 → 0.086 | 0.47 → 0.25 | 0.19 → 0.24 | 0.31 → 0.33 | 774 → 709 |
+  | super 3 | 0.425 → 0.232 | 1,149 → 338 | 3,538 → 1,791 | 0.287 → 0.082 | 2,870 → 3,412 | 9.5 → 10.9 | 0.183 → 0.170 | 0.38 → 0.34 | 0.18 → 0.15 | 0.35 → 0.29 | 872 → 618 |
+  | super 4 | 0.376 → 0.292 | 1,177 → 736 | 3,443 → 2,490 | 0.283 → 0.154 | 3,302 → 3,401 | 9.2 → 14.0 | 0.109 → 0.154 | 0.31 → 0.31 | 0.24 → 0.23 | 0.33 → 0.28 | 775 → 550 |
+  | super 5 | 0.421 → 0.333 | 1,124 → 722 | 3,400 → 2,866 | 0.254 → 0.181 | 3,070 → 3,306 | 9.0 → 10.2 | 0.177 → 0.196 | 0.34 → 0.38 | 0.22 → 0.16 | 0.34 → 0.33 | 747 → 777 |
+  | scattered 1 | 0.331 → 0.297 | 1,364 → 661 | 3,792 → 2,224 | 0.345 → 0.123 | 3,057 → 3,754 | 9.0 → 8.9 | 0.213 → 0.090 | 0.36 → 0.22 | 0.25 → 0.27 | 0.30 → 0.35 | 671 → 972 |
+  | scattered 2 | 0.351 → 0.233 | 1,251 → 494 | 4,030 → 1,829 | 0.306 → 0.085 | 3,184 → 3,548 | 10.6 → 12.5 | 0.168 → 0.104 | 0.35 → 0.24 | 0.22 → 0.28 | 0.34 → 0.31 | 762 → 514 |
+  | scattered 3 | 0.384 → 0.351 | 1,190 → 775 | 3,556 → 2,433 | 0.297 → 0.151 | 3,100 → 3,371 | 10.5 → 10.1 | 0.159 → 0.212 | 0.34 → 0.37 | 0.24 → 0.21 | 0.36 → 0.33 | 779 → 730 |
+  | scattered 4 | 0.659 → 0.350 | 2,505 → 845 | 5,441 → 2,563 | 0.616 → 0.165 | 1,676 → 3,224 | −28.1 → 10.4 | 0.908 → 0.179 | 1.00 → 0.32 | 0.00 → 0.23 | 0.28 → 0.36 | 1,006 → 745 |
+  | scattered 5 | 0.354 → 0.289 | 1,249 → 645 | 3,495 → 1,978 | 0.318 → 0.097 | 2,777 → 3,275 | 11.3 → 10.4 | 0.165 → 0.132 | 0.34 → 0.31 | 0.25 → 0.15 | 0.33 → 0.36 | 744 → 616 |
+  | **mean** | 0.414 → **0.293** | 1,324 → **640** | 3,860 → **2,241** | 0.329 → **0.127** | 2,910 → **3,394** | 5.7 → **11.0** | 0.261 → **0.155** | 0.43 → **0.32** | 0.20 → **0.21** | 0.33 → 0.33 | 794 → 703 |
+  | Earth | 0.289 | 427 | 2,022 | 0.102 | 4,062 | 14–15 | 0.10 | 0.13 (model on Earth 0.23) | 0.30 (0.26) | ≈ 0.3 | 1,200–4,000 |
+
+  Continental crust 0.401 → 0.419 (dry share 0.86 → 0.67; Earth 0.41, 0.71). Mean 1-km bands after:
+  `0.020/0.117/0.139/0.130/0.093/0.053/0.155/0.191/0.063/0.023/0.009/0.004/0.002` (before
+  `0.061/0.044/0.072/0.114/0.117/0.057/0.121/0.161/0.110/0.063/0.036/0.021/0.023`). Master's scattered seed 4 froze
+  (snowball to the present); none of the calibrated runs did.
+- **Other checks** (one run each unless stated):
+  - 1,000 Myr: supercontinent seed 1 land 0.249, z50 430, z90 1,967, >2 0.097, T 11.5, ice 0.103 (master: land 0.375,
+    z50 2,175, >2 0.521, T 4.9, ice 0.493); scattered seed 2 land 0.270, z50 585, >2 0.103, T 12.7, ice 0.096. No
+    upward drift after 500 Myr.
+  - `earthlike_quick_32k` (seed 1, both starts): land 0.358 → 0.323, z50 1,181 → 696, >2 0.306 → 0.155, sea 3,330 →
+    3,847, T 11.2 → 9.2, ice 0.234 → 0.197.
+  - `earthlike_full_16k` (scattered seed 1): land 0.604 → 0.378, z50 2,043 → 1,013, z90 6,032 → 2,896, >2 0.507 →
+    0.218, sea 1,662 → 2,858, T 0.1 → 8.9, ice 0.418 → 0.180. **The full preset stays higher than the quick one** (one
+    run; its finer grid and 250,000 samples behave differently); it needs its own ensemble.
+  - Run time (same seed, side by side, 2 threads, `/usr/bin/time -v`): user CPU 716 → 692 s (−3 %), wall 450 → 424 s,
+    peak RSS 2.40 → 2.38 GB; stage seconds plates 102 → 98, climate 69 → 68, surface 153 → 139, volcanoes 26 → 28,
+    structure 99 → 91.
+- **Land above 10 km** (the build-limit fix on worktree-agent-ac2a33b7f51fa4bf8): no calibrated run has any (maxima
+  6.5–9.3 km over the ten runs), so none of the after figures depends on it. Master's runs reach 10.7–13.0 km on five
+  of ten planets, in the top 1 % of the surface: the before maxima depend on it, the before medians, p90 and >2 km
+  shares do not measurably.
+- **Still off.** (1) The climate is on the cold side: T 11.0 °C, ice 0.155, E 0.32 against 14–15, 0.10 and the
+  model's own 0.23 on Earth's relief; not tuned (ice branch, P1-26). (2) Too much shallow sea: 0.155 of the planet
+  between −1 and 0 km (Earth 0.076), so the sea median is 3.4 km, not 4.06. (3) Ground under arc cones is ~0.7 km, not
+  an Andean 2–4 km: raising the rate to 0.4 gave 825 m and cost 0.06 above 2 km and 0.06 ice. (4) The full preset.
+- **Evidence** (pulled, not committed): review/out/p1-17-hyps/index.html (mean and per-run hypsographic curves against
+  Earth's, land-only curve, numbers; `_shot.png` is the page as rendered; master's seeds 4–5 have no curve, its
+  build lacks the line), the `summary-*.json` of every variant and the stage logs beside it.
+- **Gates** (VM, tree d76c491 = this branch merged with master efafc88): `cargo fmt --all -- --check`, `cargo clippy
+  --workspace --all-targets -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace
+  --no-fail-fast` core 352 + 3 ignored, cli 52, all pass; `./gradlew build test` tests=160 failures=0. No GameTests
+  (coordinator); the built-in planets change, so property floors measured on them may move.
+- **Decisions for Ben** (not asked): cordillera strength; volcano volume; the full presets; see the final report.
+- **Next.** Re-check after the build-limit fix, the ice branch and P1-26; an ensemble on `earthlike_full_16k`.
 
 ### 2026-10-01 — Zoomable final world: a deep-zoom map of a run's bake (WIP, stopped at Ben's request; agent worktree agent-ad5fc9991593ce7ef, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Status: built and working, not finished.** Ben stopped all Mac testing mid-task (the load broke graphide's timing tests), so the gates, the "after" run time and the final screenshot set were not done. Not merged, not pushed.
