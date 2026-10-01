@@ -247,9 +247,12 @@ fn the_ramps_json_keys_are_the_colours_drawn() {
     // The satellite view's pointer reads the three by the same colours.
     let sat = &v["ramps"][satellite::LAYER]["keys"];
     assert_eq!(sat["lake"], hex(LAKE));
-    assert_eq!(sat["frozen_lake"], hex(FROZEN));
+    assert_eq!(sat["frozen_lake"], hex(FROZEN_SATELLITE));
     assert_eq!(sat["salt_flat"], hex(PLAYA_SATELLITE));
-    let salt = satellite::CLASSES.iter().position(|&c| c == "Salt flat").unwrap();
+    let salt = satellite::CLASSES
+        .iter()
+        .position(|&c| c == "Salt flat")
+        .unwrap();
     assert_eq!(
         Ramps::builtin().ramps[satellite::LAYER].colour(salt as f64 + 0.5),
         PLAYA_SATELLITE
@@ -271,8 +274,7 @@ fn a_cold_lake_is_drawn_as_ice_on_both_views() {
         (crate::climate::field::T_WARM, 10.0),
         (crate::climate::field::T_COLD, -20.0),
     ] {
-        w.fields
-            .insert(name.into(), Field::filled(grid.clone(), t));
+        w.fields.insert(name.into(), Field::filled(grid.clone(), t));
     }
     let v = derive(&w, &view, SIZE).unwrap();
     let k = at(&v, 23, 13);
@@ -284,7 +286,7 @@ fn a_cold_lake_is_drawn_as_ice_on_both_views() {
     let mut rgba: Vec<u8> = (0..W * H).flat_map(|_| grey).collect();
     v.overlay(&mut rgba, &ramps);
     for c in 0..3 {
-        let want = f32::from(grey[c]) * 0.05 + f32::from(FROZEN[c]) * 0.95;
+        let want = f32::from(grey[c]) * 0.05 + f32::from(FROZEN_SATELLITE[c]) * 0.95;
         assert!((f32::from(rgba[k * 4 + c]) - want).abs() <= 1.0);
     }
     // The freezing point is the preset's.

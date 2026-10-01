@@ -77,7 +77,12 @@ impl Seasons {
         let (fu, fv) = (u - fi, v - fj);
         let at = |i: i64, j: i64| g.clamp_j(j) as usize * g.w as usize + g.wrap_i(i) as usize;
         let (i0, j0) = (fi as i64, fj as i64);
-        let k = [at(i0, j0), at(i0 + 1, j0), at(i0, j0 + 1), at(i0 + 1, j0 + 1)];
+        let k = [
+            at(i0, j0),
+            at(i0 + 1, j0),
+            at(i0, j0 + 1),
+            at(i0 + 1, j0 + 1),
+        ];
         let mix = |d: &[f32]| {
             let a = f64::from(d[k[0]]) + f64::from(d[k[1]] - d[k[0]]) * fu;
             let b = f64::from(d[k[2]]) + f64::from(d[k[3]] - d[k[2]]) * fu;
@@ -220,7 +225,9 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
                 (zonal_temperature(lat), zonal_precip(lat))
             }
         };
-        let (warm, cold) = seasons.as_ref().map_or((f64::NAN, f64::NAN), |s| s.at(x, z));
+        let (warm, cold) = seasons
+            .as_ref()
+            .map_or((f64::NAN, f64::NAN), |s| s.at(x, z));
         hydro::Climate::of(pr, t, t + warm, t + cold)
     };
     let sea_raw = s.sea_level_y * 16;
@@ -255,7 +262,13 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
                 open_in_band += u64::from(cold);
             }
         }
-        let share = |a: u64, b: u64| if b > 0 { json!((a as f64 / b as f64 * 1e4).round() / 1e4) } else { Value::Null };
+        let share = |a: u64, b: u64| {
+            if b > 0 {
+                json!((a as f64 / b as f64 * 1e4).round() / 1e4)
+            } else {
+                Value::Null
+            }
+        };
         stats["frozen_in_frozen_band"] = share(in_band, frozen);
         stats["open_in_frozen_band"] = share(open_in_band, open);
     }

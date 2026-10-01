@@ -360,6 +360,7 @@
     "lake_min_depth_blocks": 1.0,
     "lake_evaporation": true,
     "lake_balance": true,
+    "lake_evaporation_base_mm": 200.0,
     "lake_evaporation_factor": 1.0,
     "snow_melt_mm_per_degree_day": 4.0,
     "lake_freeze_mean_c": 0.0,

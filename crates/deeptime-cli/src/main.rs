@@ -419,6 +419,10 @@ enum Command {
         /// `young/elevation`; `amplify/elevation`), not the finest the world has.
         #[arg(long)]
         on: Option<String>,
+        /// Sets a value of the checkpoint's preset before drawing, `--set hydro.lake_balance=false`
+        /// (repeatable): the view's hydrology settings can be compared without a new run.
+        #[arg(long = "set", value_name = "PATH=VALUE")]
+        set: Vec<String>,
     },
 }
 
@@ -846,7 +850,8 @@ fn main() -> ExitCode {
             out,
             width,
             on,
-        }) => match satellite_view::run(&input, &out, width, on.as_deref()) {
+            set,
+        }) => match satellite_view::run(&input, &out, width, on.as_deref(), &set) {
             Ok(r) => {
                 println!(
                     "deeptime satellite: t = {:.1} Myr, drawn on {} -> {}",
@@ -868,6 +873,19 @@ fn main() -> ExitCode {
                         w.phases,
                         r.draw_ms
                     );
+                    let mut lakes = w.stats.clone();
+                    if let Some(o) = lakes.as_object_mut() {
+                        for k in [
+                            "grid",
+                            "millis",
+                            "index_entries",
+                            "vertices",
+                            "open_sea_min_cells",
+                        ] {
+                            o.remove(k);
+                        }
+                    }
+                    println!("deeptime satellite: lakes {lakes}");
                 }
                 ExitCode::SUCCESS
             }
