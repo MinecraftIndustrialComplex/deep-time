@@ -2396,10 +2396,13 @@ least where the floor lies below sea level, which the game floods anyway). This 
 equilibrium form of Fill–Spill–Merge's partial fills (a level per basin from its hypsometry and a
 merge when a terminal lake rises over a lake inside it), not its volume bookkeeping. **Frozen
 lakes**: where the mean annual temperature is below `hydro.lake_freeze_mean_c` (0 °C: ice for more
-than half the year) the views draw lake ice; the bake marks nothing, because the frozen biomes'
-`freeze_top_layer` already ices that water (the bake's note records how much of the frozen lake
-area lies in the frozen band). `water_level`, the rivers file and the column rule are unchanged
-(format 0.2, old bakes load as they were). Settings `lake_balance`, `lake_evaporation_base_mm`,
+than half the year) the views draw lake ice, and the game ices the lake's top block there and
+keeps the other lakes open, whatever the biome (`worlddata/LakeIce`, `WaterBodies`, and a mixin on
+`Biome.shouldFreeze`; FORMAT.md "Lake ice"). **Playas** are baked as the layer `playa` and laid as
+the halite class's block (`worldgen/PlayaPass`). **Runoff**: the land's evapotranspiration uses the
+year's mean temperature above freezing (Holdridge's biotemperature), so cold lands with warm
+summers no longer send all their precipitation to the rivers. Settings `pet_mm_per_c`,
+`playa_blocks`, `lake_balance`, `lake_evaporation_base_mm`,
 `lake_evaporation_factor`, `snow_melt_mm_per_degree_day`, `lake_freeze_mean_c`; FORMAT.md "Rivers".
 
 ### 8.5 3D structure, Noddy-style — `core::structure` (Phase 1 simple, Phase 2 full)
@@ -3795,10 +3798,11 @@ on this machine.
   lake some 2,500 km across was drawn as open water at 77°N: a lake's level follows its water
   balance (inflow against the evaporation of its surface), so dry and polar basins hold small
   lakes, salt flats or nothing; lakes in freezing climates are ice-covered in the views and the
-  game; the workbench's pointer names a lake a lake. No format change.
+  game; the workbench's pointer names a lake a lake.
 - *As built (2026-10-01):* §8.4's second "As built"; FORMAT.md "Rivers" (how the bake builds it);
-  five `hydro` settings (`lake_balance`, `lake_evaporation_base_mm`, `lake_evaporation_factor`,
-  `snow_melt_mm_per_degree_day`, `lake_freeze_mean_c`) with editor fields; the Rivers & lakes layer's "Frozen lake" and "Salt
+  seven `hydro` settings (`pet_mm_per_c`, `lake_balance`, `lake_evaporation_base_mm`,
+  `lake_evaporation_factor`, `snow_melt_mm_per_degree_day`, `lake_freeze_mean_c`, `playa_blocks`)
+  with editor fields; lake ice and salt flats in the game; the Rivers & lakes layer's "Frozen lake" and "Salt
   flat" legend entries; `deeptime satellite --set` to compare the view under other settings.
   STATUS.md's build log has the numbers.
 
@@ -3925,8 +3929,9 @@ on this machine.
 - **P2-03 Hydrology** (§8.4; its core moved to P1-22 on 2026-09-29, the rest stays here): routing, Fill–Spill–Merge lakes, HAND floodplains, river vectors,
   channel carving, waterfalls, deltas; `water_level` for real. *Left after P1-22 and P1-22b:*
   (evaporation-limited lake levels below the rim moved to P1-22b on 2026-10-01, Ben's "Both: freeze
-  them and size them by climate": §8.4's second "As built") a salt-flat surface in the game where a
-  basin holds a playa, HAND floodplains, deltas and braided mouths, meanders beyond the smoothing,
+  them and size them by climate": §8.4's second "As built") dry land below sea level (a terminal
+  basin below sea level stands at sea level, because the column rule and the aquifer flood such
+  ground; deferred by Ben on 2026-10-01), HAND floodplains, deltas and braided mouths, meanders beyond the smoothing,
   knickpoint waterfalls from erodibility, and incision burned into `elevation` for the far terrain.
 - **P2-04 Geology-driven caves.** Karst in carbonates (port of `aparis69/Karst-Synthesis`, MIT) and
   cave density modulated by lithology and water table, with vanilla cave functions kept as the

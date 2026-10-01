@@ -1187,6 +1187,8 @@ fn statistics(
                 "below_rim_blocks": f64::from(l.rim - l.level) / 16.0,
                 "depth_blocks": f64::from(l.depth) / 16.0,
                 "endorheic": l.endorheic,
+                "inflow_m3s": (l.inflow * 10.0).round() / 10.0,
+                "evaporation_m3s": (l.evaporation * 10.0).round() / 10.0,
                 "frozen": l.frozen,
                 "t_mean_c": round(l.t_mean_c),
                 "t_warm_c": round(l.t_warm_c),

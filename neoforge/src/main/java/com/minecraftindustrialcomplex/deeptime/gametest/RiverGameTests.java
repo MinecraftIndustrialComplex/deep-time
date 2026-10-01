@@ -133,7 +133,7 @@ public final class RiverGameTests {
 
     /** Counts over the boxes. */
     static final class Tally {
-        long waterBlocks, floating, leaks, steps, topMismatch, waterColumns, outside, dryShore, lakeColumns;
+        long waterBlocks, floating, leaks, steps, topMismatch, waterColumns, outside, dryShore, lakeColumns, iced, wrongIce;
         final List<BlockPos> water = new ArrayList<>();
         final StringBuilder detail = new StringBuilder();
 
@@ -160,6 +160,7 @@ public final class RiverGameTests {
     static Tally count(ServerLevel level, WorldData wd, Water.Spec spec, List<Site> sites) {
         Tally t = new Tally();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        com.minecraftindustrialcomplex.deeptime.worlddata.LakeIce lakeIce = com.minecraftindustrialcomplex.deeptime.worlddata.LakeIce.of(wd);
         for (Site s : sites) {
             for (int x = s.x() - HALF + 1; x < s.x() + HALF - 1; x++) {
                 for (int z = s.z() - HALF + 1; z < s.z() + HALF - 1; z++) {
@@ -205,7 +206,19 @@ public final class RiverGameTests {
                         boolean lake = col.kind() == Water.Kind.LAKE;
                         if (lake)
                             t.lakeColumns++;
-                        if (lake && highestWater < col.top() && !atTop.isAir() && atTop.getFluidState().isEmpty()) {
+                        // A frozen lake's top block is ice (LakeIce), an open lake's never: the
+                        // climate's rule, whatever the biome.
+                        boolean ice = lake && atTop.is(net.minecraft.world.level.block.Blocks.ICE);
+                        boolean frozen = lake && lakeIce != null && lakeIce.frozen(x, z);
+                        if (ice)
+                            t.iced++;
+                        if (lake && (ice || isWater(atTop)) && ice != frozen) {
+                            t.wrongIce++;
+                            t.note(frozen ? "open-but-frozen" : "iced-but-open", x, col.top(), z);
+                        }
+                        if (ice) {
+                            // Water under the ice, or the ice rests on the bed: nothing to add.
+                        } else if (lake && highestWater < col.top() && !atTop.isAir() && atTop.getFluidState().isEmpty()) {
                             t.dryShore++;
                         } else if (highestWater < col.top()) {
                             t.topMismatch++;
@@ -264,9 +277,9 @@ public final class RiverGameTests {
             for (LevelChunk c : chunks)
                 level.setChunkForced(c.getPos().x, c.getPos().z, false);
             DeepTime.LOGGER.info("[gametest] riversHold sites={} chunks={} waterColumns={} waterBlocks={}/{} floating={}/{} leaks={}/{} "
-                            + "steps={}/{} topMismatch={} dryShore={} of {} lake columns outside={}/{} generatedFluidTicks={} chains={} vertices={}",
+                            + "steps={}/{} topMismatch={} dryShore={} of {} lake columns (iced={} wrongIce={}) outside={}/{} generatedFluidTicks={} chains={} vertices={}",
                     sites.size(), chunks.size(), before.waterColumns, before.waterBlocks, after.waterBlocks, before.floating, after.floating,
-                    before.leaks, after.leaks, before.steps, after.steps, before.topMismatch, before.dryShore, before.lakeColumns,
+                    before.leaks, after.leaks, before.steps, after.steps, before.topMismatch, before.dryShore, before.lakeColumns, before.iced, before.wrongIce,
                     before.outside, after.outside, ticksAtGeneration, r.chainCount(), r.vertexCount());
             DeepTime.LOGGER.info("[gametest] riversHold sites: {}", sites);
             if (!before.detail.isEmpty() || !after.detail.isEmpty())
@@ -280,6 +293,7 @@ public final class RiverGameTests {
             // pass not filling lakes at all, every lake column over open ground would be a mismatch above.
             helper.assertTrue(before.dryShore * MAX_DRY_SHORE_INV <= before.waterColumns, before.dryShore + " of " + before.waterColumns
                     + " water columns are lake columns with ground at the waterline: more than 1 in " + MAX_DRY_SHORE_INV);
+            helper.assertTrue(before.wrongIce == 0, before.wrongIce + " lake columns are iced where the climate keeps them open, or open where it freezes them");
             helper.assertTrue(before.outside == 0, before.outside + " dry columns hold water after generation");
             helper.assertTrue(after.outside == 0, after.outside + " dry columns hold water after " + WAIT_TICKS + " ticks");
             helper.assertTrue(after.floating == 0, after.floating + " water blocks over air after " + WAIT_TICKS + " ticks");
