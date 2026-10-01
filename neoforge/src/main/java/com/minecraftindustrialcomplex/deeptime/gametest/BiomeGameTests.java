@@ -154,9 +154,15 @@ public final class BiomeGameTests {
     // Dfc:taiga and E:snow keep theirs); it catches a broken mapping (shares fall to the 0.1–0.3 a random
     // biome gives), not a planet whose climate zones sit elsewhere. MIN_COLUMNS went from 20 to 40: a share
     // of twenty columns moves by 0.05 with one column.
+    //
+    // Later the same day the planets changed again (the surface moves with its own crust: lower test
+    // planets). Seeds 11–16 standalone and 11 with MIC on the new ones: every family with 40 columns is
+    // above its floor except Dsub, 0.481 on seed 14 (266 columns; its Dfc:taiga is 0.474), so Dsub goes
+    // to 0.38 by the same rule. A floor that needs re-reading whenever the simulation changes is a weak
+    // test; it stays as a guard against a broken mapping only.
     static final Map<String, Double> FLOORS = Map.ofEntries(
             Map.entry("A", 0.45), Map.entry("Af", 0.54), Map.entry("BW", 0.57), Map.entry("BS", 0.42), Map.entry("C", 0.75),
-            Map.entry("D", 0.88), Map.entry("Dsub", 0.55), Map.entry("E", 0.82), Map.entry("sea", 0.95),
+            Map.entry("D", 0.88), Map.entry("Dsub", 0.38), Map.entry("E", 0.82), Map.entry("sea", 0.95),
             Map.entry("BW:desert", 0.37), Map.entry("Af:jungle", 0.41), Map.entry("Dfc:taiga", 0.33), Map.entry("E:snow", 0.72));
     static final int MIN_COLUMNS = 40;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */

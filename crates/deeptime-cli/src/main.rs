@@ -448,6 +448,10 @@ enum Command {
         /// `young/elevation`; `amplify/elevation`), not the finest the world has.
         #[arg(long)]
         on: Option<String>,
+        /// Sets a value of the checkpoint's preset before drawing, `--set hydro.lake_balance=false`
+        /// (repeatable): the view's hydrology settings can be compared without a new run.
+        #[arg(long = "set", value_name = "PATH=VALUE")]
+        set: Vec<String>,
     },
 }
 
@@ -922,7 +926,8 @@ fn main() -> ExitCode {
             out,
             width,
             on,
-        }) => match satellite_view::run(&input, &out, width, on.as_deref()) {
+            set,
+        }) => match satellite_view::run(&input, &out, width, on.as_deref(), &set) {
             Ok(r) => {
                 println!(
                     "deeptime satellite: t = {:.1} Myr, drawn on {} -> {}",
@@ -932,16 +937,31 @@ fn main() -> ExitCode {
                 );
                 if let (Some(p), Some(w)) = (&r.rivers, &r.water) {
                     println!(
-                        "deeptime satellite: rivers & lakes -> {} ({} river chains, {} vertices, {:.0} px of lakes); satellite picture {:.0} ms, water derived in {:.0} ms (phases {}) and drawn in {:.0} ms",
+                        "deeptime satellite: rivers & lakes -> {} ({} river chains, {} vertices, {:.0} px of lakes, {:.0} of them frozen, {:.0} px of playa); satellite picture {:.0} ms, water derived in {:.0} ms (phases {}) and drawn in {:.0} ms",
                         p.display(),
                         w.chains,
                         w.vertices,
                         w.lake_px,
+                        w.frozen_px,
+                        w.playa_px,
                         r.satellite_ms,
                         r.derive_ms,
                         w.phases,
                         r.draw_ms
                     );
+                    let mut lakes = w.stats.clone();
+                    if let Some(o) = lakes.as_object_mut() {
+                        for k in [
+                            "grid",
+                            "millis",
+                            "index_entries",
+                            "vertices",
+                            "open_sea_min_cells",
+                        ] {
+                            o.remove(k);
+                        }
+                    }
+                    println!("deeptime satellite: lakes {lakes}");
                 }
                 ExitCode::SUCCESS
             }

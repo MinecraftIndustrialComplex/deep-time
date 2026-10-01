@@ -33,6 +33,12 @@ the amplified terrain ("The P1-08 bake"); and the column evaluator both sides im
   `hydro` section, and the column evaluator decides each column's water ("Water columns"; `hydro`
   in "Columns" and `parity/columns.json`). A reader treats a folder without `rivers/rivers.dtrv` as
   having no rivers (the synthetic worlds have none).
+- *Lakes sized by the climate (2026-10-01, no format change):* a bake now writes a lake's level from
+  its water balance, so `water_level` may hold a level below the basin's rim and fewer, smaller
+  lakes in dry and frozen climates ("Rivers", how the bake builds it). The layer, the rivers file and
+  the column rule are byte-for-byte what they were: a folder baked before loads and plays exactly
+  as it did (its lakes stay full), and a reader needs no change. Frozen lakes are not stored: the
+  game's frozen biomes ice their water.
 Every other file's bytes are as in 0.1.
 
 ## Folder layout
@@ -125,7 +131,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 |---|---|---|---|---|---|
 | `elevation` | L3 | i16 | 1/16, block | — | terrain y: the amplifier's, mountain character included ("The mountain character"); without the amplify stage the young landscape (L2) or the deep-time surface (L1) upsampled bilinearly |
 | `detail/amplitude` | L3 | u8 | 1/16, block | — | the detail term's A (P1-06; absent without the amplify stage) |
-| `water_level` | L3 (L3h: L3 averaged 2 × 2 when L3 has more than 40 M cells, 32k full) | i16 | 1/16, block | −32768 | each lake's cells hold its surface, nodata elsewhere (P1-22, "Rivers"); all nodata when `hydro.enabled` is false |
+| `water_level` | L3 (L3h: L3 averaged 2 × 2 when L3 has more than 40 M cells, 32k full) | i16 | 1/16, block | −32768 | each lake's cells hold its surface, nodata elsewhere (P1-22, "Rivers"): its basin's rim when the lake is full, the level of its water balance, below the rim, when it is not (2026-10-01; a reader does not tell them apart); all nodata when `hydro.enabled` is false |
 | `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks with key spans, smoothed ("The 0.2 bake"), the first top raised ("The P1-08 bake") |
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
@@ -406,8 +412,8 @@ within the tile, `cell_bytes` each, so its decoded size is `tw · th · cell_byt
   of a horizon of that class inside a column (the column rule's step 5); absent, or 0 or 1 for a
   class: none. A baked run writes 8 for the regional-metamorphic classes (slate, phyllite, schist,
   gneiss, quartzite, marble, greenstone, amphibolite), 16 for the plutonic ones (granite,
-  granodiorite, diorite, gabbro, anorthosite) and 1 for the rest. Worlds written before
-  2026-10-01 lack it and read as before.
+  granodiorite, diorite, gabbro, anorthosite) and 1 for the rest; the synthetic worlds
+  write none.
 - Unknown fields must be ignored by readers.
 
 ### `horizon_stack` cells (plan §5.7.4)
@@ -450,13 +456,6 @@ its span. In a band's pools, pool q of `plates::l1::TOP_ORDER` has the 256 keys 
 of its metamorphic steps 64 of them (one tongue band at the default B). The parts — the regolith,
 each band's log, each band's pools, the mantle — are the **key domains**: a baked horizon's span
 lies inside one of them.
-
-A run baked before 2026-10-01 has the older key space (the strata log by age alone, 4096–32767;
-the pools 4096 keys each from 32768, 512 a metamorphic step; a merged horizon's span the union
-of its members'). It loads and reads exactly as before: the column rule did not change. Its
-columns show what the new key space removes — metamorphic rock correlated with its neighbours'
-unmetamorphosed rock of the same age, so schist over shale in more than half of the columns —
-until the world data is baked again.
 
 **The column rule** (format 0.2; Rust `deeptime_format::strata::stack_at`, Java
 `worlddata/Columns.stack`; both must give equal answers). A cell's stack is read as a height
@@ -692,17 +691,43 @@ is the column's `max_ground`.
 most one block below sea level: their top block is under the sea's; connected, ≥ 5,000 km²); Priority-Flood with the pit queue from its shores (spill level F
 and the cell each land cell was reached from); receivers the steepest strictly lower neighbour on F,
 else that cell; depressions (F > height) of at least `hydro.lake_min_area_km2` and
-`lake_min_depth_blocks` are lakes at their spill level (they are always full: "fill and spill");
-runoff P − ET (Fu's Budyko curve, PET = 60 mm/°C·T) from the L1 climate accumulated as discharge, a
-lake passing on its inflow less its surface's evaporation (`lake_evaporation`); river cells carry ≥
+`lake_min_depth_blocks` are basins. The liquid runoff of the L1 climate is accumulated as discharge
+(precipitation, the mean temperature and the warmest and coldest month from `climate/month/t_sl_c_*`,
+their departures from the year's mean added to the cell's mean, ± 8 °C without them; a sinusoidal
+year between the two months gives the share of the year above freezing and its mean temperature
+above freezing T⁺; liquid = min(P, P · share + `snow_melt_mm_per_degree_day` · 365.25 · T⁺); runoff
+= liquid − ET, ET by Fu's Budyko curve with PET = 60 mm/°C · T, as the surface stage; ground whose
+warmest month is below freezing gives none). **A basin's lake level is its water balance**
+(`lake_balance`, on by default): a cell under water loses its runoff as land and its evaporation
+(`lake_evaporation_factor` · (`lake_evaporation_base_mm` + 60 mm/°C · T⁺); 0 when
+`lake_evaporation` is false) less the liquid precipitation on it. A basin that, wet to its rim, still gains (inflow ≥ those losses) is a lake at
+its spill level and spills the surplus. One that does not is terminal: its lowest cell becomes a
+sink, a Priority-Flood of the basin alone from that cell drains its floor to it (receivers and
+spill levels of the exposed floor; the basins inside it are solved the same way first, up to 8
+deep), and the lake stands at the highest 1/16-block step of the basin's hypsometry (cells counted
+by their spill level towards the sink) whose losses the inflow at the sink still covers, at most
+one step below the rim, and at sea level at least where the basin's floor lies a block or more
+below sea level (the column rule floods such ground with the sea's water whatever the bake says, so
+the bake says the same); a lake inside the basin that this level covers becomes part of it. A
+balance lake under the lake thresholds is a playa (not stored), and a basin no water reaches is
+dry. Basins are solved in drainage order, so a lake that does not spill passes nothing downstream.
+With `lake_balance` false every basin is a full lake, as before 2026-10-01. River cells carry ≥
 `river_min_discharge_m3s` from ≥ `river_min_area_km2`, a lake cell less than a block deep counting
 as ground a river crosses; chains follow the largest donor; w = max(F − `freeboard_blocks`, the
 level of the sea or lake downstream); width `width_coef · Q^0.5 · scale.feature_scale.rivers` and
 depth `depth_coef · Q^0.4` (at least 1, at most `max_width_blocks`, `max_depth_blocks`); vertex
 positions smoothed by a Gaussian of half-width `smoothing_blocks` (ends fixed; a tributary's mouth
-on the smoothed vertex it joins). `notes.bake.water`: `enabled`, `method` ("p1-22"), `params`,
-`width_scale`, `grid`, `halved`, `climate`, `rivers_file`, `rivers_bytes`, `stats` (counts, lengths,
-largest discharge and width, milliseconds per step).
+on the smoothed vertex it joins). `notes.bake.water`: `enabled`, `method`, `params`,
+`width_scale`, `grid`, `halved`, `climate`, `seasons`, `rivers_file`, `rivers_bytes`, `stats`
+(counts, lengths, largest discharge and width, milliseconds per step; since "p1-22b" also
+`lake_share_of_land`, `basins` (candidates, full, below_rim, playa, dry, merged, nested_too_deep),
+`playa_km2`, the lakes `below_rim`, `frozen` (mean annual temperature over the lake below
+`lake_freeze_mean_c`), `arid` (P/PET < 0.2), `polar` (warmest month < 10 °C) as counts, km² and
+shares of the lake area, the five `largest` lakes, and `frozen_in_frozen_band` /
+`open_in_frozen_band`: the share of the frozen and of the open lake cells whose biome temperature
+input `climate/temperature` lies in the frozen band, below −0.45, where the game ices the water).
+`method` is "p1-22" in a folder baked before the water balance and "p1-22b" since; the game does
+not read it.
 
 ## Water columns (P1-22)
 
@@ -990,18 +1015,22 @@ geology (no plants, snow or ice).
 
 `rivers` is the water of the frame's terrain: the **last** layer of every frame that has the
 satellite view, and the same water is drawn over the satellite view (rivers blended over the land,
-lakes flat). It is RGBA8 too: a quiet base (land, sea), the lakes in one flat colour and the rivers
+lakes flat). It is RGBA8 too: a quiet base (land, sea), the lakes in flat colours (open water, lake
+ice where the frame's mean annual temperature at the cell is below `hydro.lake_freeze_mean_c`, and
+the playas of basins too dry for a lake as salt flats) and the rivers
 in the colours of the `rivers` ramp of `ramps.json`, whose stops run over log₁₀ of the discharge in
 m³/s (a river is also drawn wider by flow), so a reader can read the discharge back from a pixel's
-colour; the ramp's `keys` hold the land, sea and lake colours (`deeptime_core::water_view` has the
+colour; the ramp's `keys` hold the land, sea, lake, frozen-lake and salt-flat colours, and the
+`satellite` ramp's `keys` the three the satellite view draws them in (`deeptime_core::water_view` has the
 rules). The water is **derived, not stored**: the bake's own hydrology (`hydro::network`, P1-22: the
 open sea, a Priority-Flood of the frame's terrain, lakes from `hydro.lake_min_area_km2` and a block
-deep, the climate's runoff accumulated down the steepest descent, rivers from
+deep at the level of their water balance, the climate's liquid runoff accumulated down the steepest descent, rivers from
 `hydro.river_min_discharge_m3s` and `river_min_area_km2`) is run on the frame's elevation at render
 time (a grid over 600,000 cells is averaged down first), so it adds nothing to the simulation or the
 bake; with `hydro.enabled` false there is no layer and the satellite view is dry. **The run's last
 frame that has these layers is drawn again after the bake**, from `rivers/rivers.dtrv` and the
-`water_level` layer, so the final map shows the exact rivers and lakes of the world data (the
+`water_level` layer (frozen where the frame's climate says so; the playas, which the bake does not
+store, are the frame's own), so the final map shows the exact rivers and lakes of the world data (the
 frame's file and its index entry are rewritten before the manifest lists them); a run without a
 bake keeps the derived water.
 

@@ -884,6 +884,8 @@ impl AmplifyStage {
         );
         let reserve = |bytes: u64| ctx.reserve(bytes);
         let mut sink = PackSink::create(ctx.out_dir, &l3, 256, sea, cfg.sea_y, cfg.mv)?;
+        // Nothing is stored above the build limit: the top band is compressed (`params::BuildFit`).
+        sink.fit = Some(self.preset.scale.build_fit());
         let setup_ms = started.elapsed().as_secs_f64() * 1000.0;
         let cancelled = || ctx.cancelled();
         let character = cfg.character(&fields);
