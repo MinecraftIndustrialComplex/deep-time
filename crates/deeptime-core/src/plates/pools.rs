@@ -131,6 +131,8 @@ pub struct SurfaceRates {
     pub pelagic_m: f64,
     pub z_c: f64,
     pub z_t: f64,
+    /// The elevation oceanic crust subsides towards (`oceanic_floor_elevation_m`; Cortial: z_t).
+    pub z_floor: f64,
     pub trench_relax: f64,
     pub gravity: f64,
 }
@@ -140,7 +142,7 @@ pub fn surface_step(s: &mut Sample, r: &SurfaceRates) -> f64 {
     let mut z = f64::from(s.elevation_m);
     let mut eroded = 0.0;
     if s.kind == OCEANIC {
-        z -= (1.0 - z / r.z_t) * r.damping_m;
+        z -= (1.0 - z / r.z_floor) * r.damping_m;
         if !s.is_hidden() {
             s.pools[pool::SEDIMENT] += r.pelagic_m as f32;
         }
@@ -159,11 +161,12 @@ pub fn surface_step(s: &mut Sample, r: &SurfaceRates) -> f64 {
     eroded
 }
 
-/// Oceanic depth of crust `age_myr` old implied by Cortial's dampening from the ridge height:
-/// z(a) = z_t + (z_r − z_t)·exp(−a·ε_o / |z_t|).
-pub fn ocean_elevation(age_myr: f64, z_r: f64, z_t: f64, damping_mm_yr: f64) -> f64 {
-    let tau_myr = z_t.abs() / (damping_mm_yr * 1.0e-3) / 1.0e6;
-    z_t + (z_r - z_t) * (-age_myr.max(0.0) / tau_myr).exp()
+/// Oceanic depth of crust `age_myr` old implied by the dampening from the ridge height towards
+/// the floor z_f: z(a) = z_f + (z_r − z_f)·exp(−a·ε_o / |z_f|). Cortial's z_f is the trench depth;
+/// the pipeline presets' (`oceanic_floor_elevation_m`) follows GDH1.
+pub fn ocean_elevation(age_myr: f64, z_r: f64, z_f: f64, damping_mm_yr: f64) -> f64 {
+    let tau_myr = z_f.abs() / (damping_mm_yr * 1.0e-3) / 1.0e6;
+    z_f + (z_r - z_f) * (-age_myr.max(0.0) / tau_myr).exp()
 }
 
 /// Oceanic heat flow, mW/m²: q = 510 / √t (Stein & Stein 1992, GDH1), capped at 300.
@@ -213,6 +216,7 @@ mod tests {
             pelagic_m: 0.0,
             z_c: 10_000.0,
             z_t: -10_000.0,
+            z_floor: -10_000.0,
             trench_relax: 0.5,
             gravity: 9.81,
         };
@@ -227,6 +231,47 @@ mod tests {
             "{} vs {expect}",
             s.elevation_m
         );
+        // A shallower floor (the pipeline presets' GDH1 fit): the steps follow the same closed form.
+        let r = SurfaceRates {
+            damping_m: 0.215e-3 * 1.0e6,
+            z_floor: -5600.0,
+            ..r
+        };
+        let mut s = Sample::blank(0);
+        s.elevation_m = -2500.0;
+        for _ in 0..60 {
+            surface_step(&mut s, &r);
+        }
+        let expect = ocean_elevation(60.0, -2500.0, -5600.0, 0.215);
+        assert!(
+            (f64::from(s.elevation_m) - expect).abs() < 60.0,
+            "{} vs {expect}",
+            s.elevation_m
+        );
         assert!(ocean_heat_flow(100.0) > 50.0 && ocean_heat_flow(0.0) == 300.0);
+    }
+
+    /// The pipeline presets' floor (−5,600 m at 0.215 mm/yr from a −2,500 m ridge) against Stein &
+    /// Stein's GDH1 (1992): d = 2,600 + 365·√t m up to 20 Myr, 5,651 − 2,473·e^(−0.0278·t) after.
+    /// Cortial's law (towards the −10 km trench at 0.05 mm/yr) is 0.9 km too shallow at 10 Myr
+    /// and 1.6 km too deep at 200.
+    #[test]
+    fn the_gdh1_floor_follows_stein_and_stein() {
+        let gdh1 = |t: f64| {
+            if t < 20.0 {
+                2600.0 + 365.0 * t.sqrt()
+            } else {
+                5651.0 - 2473.0 * (-0.0278 * t).exp()
+            }
+        };
+        for t in [5.0, 10.0, 20.0, 35.0, 50.0, 80.0, 100.0, 150.0, 200.0] {
+            // The exponential cannot follow GDH1's √t near the ridge: within 0.4 km there, 0.12 km
+            // from 20 Myr on.
+            let tol = if t < 20.0 { 400.0 } else { 120.0 };
+            let z = ocean_elevation(t, -2500.0, -5600.0, 0.215);
+            assert!((-z - gdh1(t)).abs() < tol, "{t} Myr: {z} vs GDH1 {}", gdh1(t));
+        }
+        let cortial = |t: f64| -ocean_elevation(t, -2500.0, -10_000.0, 0.05);
+        assert!(gdh1(10.0) - cortial(10.0) > 800.0 && cortial(200.0) - gdh1(200.0) > 1500.0);
     }
 }

@@ -81,6 +81,39 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-10-01 — P1-17 hypsometry recalibration: WIP, stopped (agent worktree agent-aee888e01d29a40db, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Stopped** on Ben's order (M6 Mac off limits, 2026-10-01) mid-way through the driver experiments. No preset
+  changed yet; no gates run on the final tree (`plates::pools` tests passed once on the Mac before the last edit).
+- **Tools (committed).** `deeptime stage` prints a `hypsometry_curve` line (elevation at 0…100 % of the surface,
+  cos φ-weighted). `tools/review/p1-17-hyps.sh` (variants × seeds × starts in parallel, `--set` lists separated by
+  `;`, `STAGE`/`BIN` for older builds) and `p1-17-hyps.py` (per-run and per-variant summary + JSON);
+  `p1-17-hyps-plot.py` (curves against Earth, HTML/SVG). Earth from GMT earth_relief 30′ (SRTM15+, Tozer et al. 2019,
+  `build/earth/earth_720.f32`, cos-weighted): land 0.289, median 427 m, p90 2,022 m, above 2 km 0.102, sea median
+  4,062 m, sea mean 3,683 m (Charette & Smith 2010, Oceanography 23(2):112, SRTM30_PLUS: 3,682 m, ocean 361.84 M km²).
+- **Code (untested by the gates).** `tectonics.oceanic_floor_elevation_m` (default −10,000 = Cortial's trench
+  asymptote, so every preset is unchanged): ocean floor subsides towards it; −5,600 m with damping 0.215 mm/yr follows
+  GDH1 (Stein & Stein 1992) within 0.12 km beyond 20 Myr (test `plates::pools::tests::the_gdh1_floor_follows_stein_and_stein`).
+  Not yet in any preset; editor field (`abyssal_depth`, adv_plates) still to add with it.
+- **Baseline** (master 8dae3f2, `earthlike_quick_16k`, 500 Myr, seeds 1–3 × supercontinent/scattered, mean [min–max]):
+  land 0.450 [0.40–0.52], median 1,323 m [1,128–1,636], p90 4,045, above 2 km 0.343, sea median 2,738 m, continental
+  crust 0.438 (dry 0.86, Earth 0.71), T_surface 6.5 °C [0.8–8.9], glaciated land 0.251, Köppen E 0.42 / B 0.20, active
+  margin 0.31, ground under arc cones 834 m; 588 s per run at 2 threads (load ~15). Bands below −6 km 0.048 (Earth 0.003),
+  −5…−4 km 0.084 (Earth 0.229): old floor too deep, young floor too shallow (Cortial's law).
+- **Drivers so far** (same 6 runs each): no glacial model (`surface.glacial.strength` 0: no K = 0 under ice) → land
+  0.410, median 1,046, p90 3,389, >2 km 0.254, T 8.6, ice 0.229 (ice protection is ~280 m of the median); fixed CO₂
+  (`climate.carbon_cycle` false) → land 0.382, median 1,383, T −0.3 (one planet froze): the carbon cycle is not the
+  cause, it is the thermostat. Present sea level −8 … −401 m (ice 2.2·10⁷–1.5·10⁸ km³ vs `ice_reference_km3` 10⁷):
+  glacio-eustasy exposes the shelves on the cold planets (land 0.47–0.52 where the sea is −270…−400 m). Short runs
+  (supercontinent seed 3): the dry share jumps 0.71 → 0.88 in the first 10 Myr (all uplift off 0.79, no erosion or
+  diffusion 0.83, no sea-level change 0.91): subduction uplift of the margins, progradation and the L0→L1 interpolation.
+  Median land rises through every run (≈450 m at −450 Myr → 0.9–1.7 km at 0). Unfinished: nocord, K 4e-9, marine fill
+  40 m, continents [50, 600], then collision cap 2 km, subduction uplift 0.3, no volcanoes, sea level +50 m, GDH1 floor,
+  and a bisection over a3c63fe / 6070e9e / bd1cc0f (sources and binaries built under
+  /Volumes/Graphide/ban/deeptime-runs/p1-17-hyps/ — delete with the run folder when the task lands).
+- **Next.** On the new test machine: finish the driver runs, then calibrate (K, collision cap, cordillera 0.2 → 0.3?,
+  the GDH1 floor), check one 750–1000 Myr run and the full/32k presets, re-sync built-ins, gates, plots under
+  review/out/p1-17-hyps/.
+
 ### 2026-09-30 — P1-27 plate margins and coherent continents (agent worktree agent-ad3b417fd428c1ac2, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Ben (decisions log 2026-09-29, "Provinces view shows speckled, patchy continents"; 2026-09-30, "most coast lines
   are getting speckled with mountains"): "Investigate + fix". Workbench run 1a0f5089640 (earthlike_quick_16k,
