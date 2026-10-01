@@ -138,6 +138,24 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   purpose: deposits on the globe, and sites at their position before the end of the run (the record holds the present position
   only; the engine's per-frame origin maps are not kept).
 
+- **Commands for the new test machine** (from the repo root; `M=tools/remote/mac.sh` with `DEEPTIME_MAC` pointing at it; one job
+  at a time, nothing on the laptop):
+  1. `$M -- cargo fmt --all -- --check` and `$M -- cargo clippy --workspace --all-targets -- -D warnings`
+  2. `$M -- cargo test --workspace` (new: `watch::deposits::*`, `watch::tests::the_deposits_overlay_reads_the_sites_live_and_baked`)
+  3. `$M -- cargo deny check licenses bans`
+  4. `$M -- nix shell nixpkgs#nodejs -c node tools/viewer/deposits-check.js`
+  5. `cd neoforge && $M -- ./gradlew build test`, then `python3 ../tools/ci/junit-summary.py build/test-results/test` (nothing in neoforge
+     changed; run for the gate)
+  6. After-run timing, same shape as the baseline (1354 s wall, 21.39e12 instructions retired at 8dae3f2), on a quiet machine, the
+     baseline binary built from a checkout of 8dae3f2 (a separate worktree) and the new one from this branch, back to back:
+     `$M -- 'cargo build --release -p deeptime-cli && S=<scratch>/wb-deposits && mkdir -p $S && /usr/bin/time -l target/release/deeptime watch --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --exit-when-done --runs $S/runs-after --port 0 --keep 2 --mem-cap 8589934592 > $S/after.log 2>&1; grep -v "^  INFO" $S/after.log | cut -c1-800 | tail -30'`
+     (the baseline: the same command from the 8dae3f2 checkout; compare wall and instructions retired; `/usr/bin/time -l` is the macOS form,
+     use `-v` on Linux.)
+  7. Screenshots, live path (page open while a run goes on) and draw cost:
+     `$M --pull review/out/wb-deposits -- tools/viewer/deposits-shots.sh --bin target/release/deeptime --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --work <scratch>/wb-deposits`
+     (needs a Chrome for Testing build: set `DEEPTIME_CHROMIUM`; it takes a private port on 127.0.0.1, never 8642). With a kept run:
+     `... --reuse <kept runs dir> --work <scratch>/wb-deposits`.
+  8. Delete `<scratch>/wb-deposits` when done; `tools/remote/mac-gc.sh` after the merge.
 ### 2026-10-01 — M6 paused; batch 4 pushed with one GameTest re-run pending (session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Pause.** Ben: our test load on the M6 made graphide's ms-precision timing tests flaky; "please cease
   testing on the m6, I will be provisioning a new machine for your tests". All Deep Time jobs there were

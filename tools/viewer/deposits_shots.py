@@ -130,8 +130,9 @@ def main():
         # Where the first coal field and the first site of another family are, in viewport pixels.
         loc = ev("""(() => {
           const c = document.querySelector('#paneA canvas.map'), r = c.getBoundingClientRect();
+          const seen = new Map();   // sites on one spot are drawn 10 px apart, in id order (deposits.js)
           return fetch('api/runs/__RUN__/deposits').then(x => x.json()).then(d => d.sites.map(s => ({
-            id: s.id, type: s.type, x: r.left + r.width * ((s.lon % 360) / 360), y: r.top + r.height * (90 - s.lat) / 180,
+            id: s.id, type: s.type, x: r.left + r.width * ((s.lon % 360) / 360) + 10 * (() => { const k = `${s.lat},${s.lon}`, n = seen.get(k) || 0; seen.set(k, n + 1); return n; })(), y: r.top + r.height * (90 - s.lat) / 180,
             ev: s.forming_event, parent: s.parent })));
         })()""".replace("__RUN__", a.run))
         coal = [s for s in loc if s["type"].endswith("coal_seam")]
