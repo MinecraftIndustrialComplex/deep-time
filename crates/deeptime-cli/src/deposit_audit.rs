@@ -36,21 +36,11 @@ use crate::run::CliResult;
 
 /// The scatter rules the jar ships (`data/deeptime/deeptime/scatter/*.json`).
 const SCATTER: &[&str] = &[
-    include_str!(
-        "../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/coal.json"
-    ),
-    include_str!(
-        "../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/copper.json"
-    ),
-    include_str!(
-        "../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/gold.json"
-    ),
-    include_str!(
-        "../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/iron.json"
-    ),
-    include_str!(
-        "../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/zinc.json"
-    ),
+    include_str!("../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/coal.json"),
+    include_str!("../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/copper.json"),
+    include_str!("../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/gold.json"),
+    include_str!("../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/iron.json"),
+    include_str!("../../../neoforge/src/main/resources/data/deeptime/deeptime/scatter/zinc.json"),
 ];
 
 /// Ore blocks per chunk in a vanilla 1.21.1 overworld (all heights, every biome of the sample),
@@ -96,7 +86,8 @@ pub fn unit(x: i32, y: i32, z: i32, salt: i32) -> f64 {
         z ^ (z >> 31)
     }
     let l = |v: i32| i64::from(v) as u64;
-    let mut h = mix(0x9E37_79B9_7F4A_7C15u64.wrapping_mul(l(x).wrapping_add(0x632B_E59B_D9B4_E019)));
+    let mut h =
+        mix(0x9E37_79B9_7F4A_7C15u64.wrapping_mul(l(x).wrapping_add(0x632B_E59B_D9B4_E019)));
     h = mix(h ^ 0xC2B2_AE3D_27D4_EB4Fu64.wrapping_mul(l(y).wrapping_add(0x2545_F491_4F6C_DD1D)));
     h = mix(h ^ 0x1656_67B1_9E37_79F9u64.wrapping_mul(l(z).wrapping_add(0x1B87_3593)));
     h = mix(h ^ u64::from(salt as u32));
@@ -320,7 +311,11 @@ fn count_body(
                 let Some(at) = b.locate(c as u32, wx as i32, y, z as i32) else {
                     continue;
                 };
-                let before = if track { seen.get(&(wx, y, z)).copied() } else { None };
+                let before = if track {
+                    seen.get(&(wx, y, z)).copied()
+                } else {
+                    None
+                };
                 if before.is_none() {
                     out.volume += 1;
                     if track {
@@ -688,7 +683,34 @@ pub fn run(o: &Options) -> CliResult<Value> {
         }));
     }
 
+    // The planet's ore by where it comes from: every deposit's blocks against the scatter of the
+    // land between the caps (the sampled share of land × the chunks there).
+    let band_chunks = (c / 16) as f64 * ((c / 2 / 16) * 7 / 8) as f64;
+    let land_chunks = band_chunks * land.len() as f64 / tries.max(1) as f64;
+    let mut in_deposits: BTreeMap<String, u64> = BTreeMap::new();
+    for r in &rows {
+        for (k, v) in r["ore_blocks"].as_object().into_iter().flatten() {
+            *in_deposits.entry(k.clone()).or_default() += v.as_u64().unwrap_or(0);
+        }
+    }
+    let mut totals = serde_json::Map::new();
+    let mut materials: Vec<&String> = in_deposits.keys().chain(scatter.keys()).collect();
+    materials.sort();
+    materials.dedup();
+    for k in materials {
+        let d = in_deposits.get(k).copied().unwrap_or(0) as f64;
+        let s = scatter.get(k).copied().unwrap_or(0.0) * land_chunks;
+        totals.insert(
+            k.clone(),
+            json!({
+                "in_deposits": d, "in_scatter": s.round(),
+                "deposit_share": if d + s > 0.0 { num(d / (d + s)) } else { Value::Null },
+            }),
+        );
+    }
+
     let report = json!({
+        "planet": {"land_chunks_estimate": land_chunks.round(), "ore_by_source": totals},
         "world_data": o.world_data.display().to_string(),
         "circumference": c,
         "preset": w.manifest.notes.get("run").and_then(|r| r.get("preset")).cloned(),
@@ -731,7 +753,10 @@ pub fn table(report: &Value) -> String {
     for t in report["types"].as_array().into_iter().flatten() {
         out.push_str(&format!(
             "| {} | {} ({}) | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
-            t["type"].as_str().unwrap_or("?").trim_start_matches("deeptime:"),
+            t["type"]
+                .as_str()
+                .unwrap_or("?")
+                .trim_start_matches("deeptime:"),
             t["sites"],
             t["sites_with_ore"],
             f(&t["volume_blocks"]["p50"]),
@@ -761,6 +786,23 @@ pub fn table(report: &Value) -> String {
             f(&v["per_km2_of_blocks"]),
             f(&v["vanilla_per_chunk"]),
             f(&v["chunks_for_ten_stacks"]),
+        ));
+    }
+    out.push_str(&format!(
+        "\n| material | ore blocks in deposits | in scatter (≈{} land chunks) | deposits' share |\n|---|---|---|---|\n",
+        report["planet"]["land_chunks_estimate"]
+    ));
+    for (k, v) in report["planet"]["ore_by_source"]
+        .as_object()
+        .into_iter()
+        .flatten()
+    {
+        out.push_str(&format!(
+            "| {} | {} | {} | {} |\n",
+            k,
+            f(&v["in_deposits"]),
+            f(&v["in_scatter"]),
+            f(&v["deposit_share"]),
         ));
     }
     if !report["area"].is_null() {

@@ -370,10 +370,7 @@ pub fn settle(
                 moves.push(d);
                 lengths.push(b.length);
                 let x = fold(c, f64::from(v.x));
-                (
-                    b.pieces,
-                    [x.round() as i32, bed as i32, v.z.round() as i32],
-                )
+                (b.pieces, [x.round() as i32, bed as i32, v.z.round() as i32])
             }
             None => {
                 let top = ground(s.center[0].into(), s.center[2].into());
@@ -640,7 +637,10 @@ mod tests {
         assert_eq!(out.note["in_channels"], 1);
         assert_eq!(out.note["benches"], 0);
         assert!(out.bodies.contains(&other), "other bodies stay");
-        assert!(!out.bodies.iter().any(|x| x.id == 7), "the ribbon is replaced");
+        assert!(
+            !out.bodies.iter().any(|x| x.id == 7),
+            "the ribbon is replaced"
+        );
         let bars: Vec<&Body> = out.bodies.iter().filter(|x| x.site == Some(3)).collect();
         assert!(bars.len() >= 2, "{}", bars.len());
         let site = &out.sites[0];
@@ -657,7 +657,11 @@ mod tests {
                 .unwrap_or_else(|| panic!("bar {k} at {:?} is off the channel", bar.center));
             // It spans the water's top block down to three blocks under the bed.
             let (bottom, top) = (bar.aabb[0][1], bar.aabb[1][1]);
-            assert!(f64::from(top) >= h.w.ceil() - 1.0, "top {top}, water {}", h.w);
+            assert!(
+                f64::from(top) >= h.w.ceil() - 1.0,
+                "top {top}, water {}",
+                h.w
+            );
             assert!(
                 f64::from(bottom) <= (h.w - h.depth).floor() - (MIN_GRAVEL_BLOCKS - 1.0),
                 "bottom {bottom} for a bed at {}",
@@ -683,12 +687,18 @@ mod tests {
         let (s, b) = placer(3, 60.0, 104.0);
         let out = settle(&[s], std::slice::from_ref(&b), &r, &reach, &hill);
         let len = out.note["median_length_blocks"].as_f64().unwrap();
-        assert!((MIN_LENGTH_BLOCKS..=MAX_STRETCH * 79.4).contains(&len), "{len}");
+        assert!(
+            (MIN_LENGTH_BLOCKS..=MAX_STRETCH * 79.4).contains(&len),
+            "{len}"
+        );
         // A tiny placer still gets the shortest run.
         let (s2, b2) = placer(4, 60.0, 104.0);
         let out = settle(&[s2], &[b2], &r, &tiny, &hill);
         let len = out.note["median_length_blocks"].as_f64().unwrap();
-        assert!((MIN_LENGTH_BLOCKS..MIN_LENGTH_BLOCKS + 4.0).contains(&len), "{len}");
+        assert!(
+            (MIN_LENGTH_BLOCKS..MIN_LENGTH_BLOCKS + 4.0).contains(&len),
+            "{len}"
+        );
         // A big one at the tributary's mouth runs on down the main river (z > 100 there).
         let big = |s: &Site| {
             reach(s).map(|r| Ribbon {
@@ -707,7 +717,11 @@ mod tests {
         assert!(south >= 1, "no bar below the confluence");
         for b in out.bodies.iter().filter(|b| b.site == Some(5)) {
             let on = r.sample(b.center[0].round() as i64, b.center[2].round() as i64);
-            assert!(on.hit.is_some(), "bar at {:?} is off the channels", b.center);
+            assert!(
+                on.hit.is_some(),
+                "bar at {:?} is off the channels",
+                b.center
+            );
         }
     }
 
@@ -755,7 +769,13 @@ mod tests {
     fn a_placer_out_of_reach_becomes_a_bench_on_the_ground() {
         let r = river();
         let (s, b) = placer(3, 900.0, 900.0);
-        let out = settle(std::slice::from_ref(&s), std::slice::from_ref(&b), &r, &reach, &hill);
+        let out = settle(
+            std::slice::from_ref(&s),
+            std::slice::from_ref(&b),
+            &r,
+            &reach,
+            &hill,
+        );
         assert_eq!(out.note["benches"], 1);
         assert_eq!(out.note["in_channels"], 0);
         let site = &out.sites[0];
@@ -766,8 +786,13 @@ mod tests {
         for p in &pieces {
             let g = hill(p.center[0].round() as i64, p.center[2].round() as i64);
             let at = |y: i32| {
-                p.locate(4096, p.center[0].floor() as i32, y, p.center[2].floor() as i32)
-                    .is_some()
+                p.locate(
+                    4096,
+                    p.center[0].floor() as i32,
+                    y,
+                    p.center[2].floor() as i32,
+                )
+                .is_some()
             };
             assert!(at(g) && !at(g + 1), "the top block is the ground ({g})");
             assert!(at(g - 2) && !at(g - 3), "three blocks thick");
@@ -785,12 +810,24 @@ mod tests {
         let r = river();
         let (mut s2, b2) = placer(3, 60.0, 104.0);
         s2.deposit_type = "x:other".into();
-        let out = settle(std::slice::from_ref(&s2), std::slice::from_ref(&b2), &r, &reach, &hill);
+        let out = settle(
+            std::slice::from_ref(&s2),
+            std::slice::from_ref(&b2),
+            &r,
+            &reach,
+            &hill,
+        );
         assert_eq!(out.sites, vec![s2.clone()]);
         assert_eq!(out.bodies, vec![b2.clone()]);
         s2.deposit_type = "deeptime:placer_au".into();
         s2.kind = SiteKind::Deposit;
-        let out = settle(std::slice::from_ref(&s2), std::slice::from_ref(&b2), &r, &reach, &hill);
+        let out = settle(
+            std::slice::from_ref(&s2),
+            std::slice::from_ref(&b2),
+            &r,
+            &reach,
+            &hill,
+        );
         assert_eq!(out.bodies, vec![b2]);
         assert_eq!(out.note["placers"], 0);
     }
