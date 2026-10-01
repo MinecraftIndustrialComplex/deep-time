@@ -40,6 +40,9 @@ const BENCH_HTML: &str = include_str!("../assets/bench.html");
 const WORKBENCH_HTML: &str = include_str!("../assets/workbench.html");
 /// The workbench page's script (`deeptime watch` serves it as `workbench.js`).
 pub const WORKBENCH_JS: &str = include_str!("../assets/workbench.js");
+/// The workbench's deposits overlay (symbols, footprints, legend, hover text; `deposits.js`, served
+/// beside `workbench.js`): a module of pure functions the page calls.
+pub const DEPOSITS_JS: &str = include_str!("../assets/deposits.js");
 /// The workbench's "Rock at depth" and cross-section tool (served as `sections.js`, after
 /// `workbench.js`; it reads `/api/runs/<id>/rock…`).
 pub const SECTIONS_JS: &str = include_str!("../assets/sections.js");
@@ -548,6 +551,7 @@ mod tests {
         assert!(page.contains("<title>live &lt;run&gt;</title>"));
         assert!(page.contains("workbench.js") && !page.contains("{{TITLE}}"));
         assert!(WORKBENCH_JS.contains("EventSource"));
+        assert!(page.contains("deposits.js") && DEPOSITS_JS.contains("DTDeposits"));
         let fields: Value = serde_json::from_str(EDITOR_FIELDS_JSON).unwrap();
         assert!(fields["fields"].as_array().unwrap().len() > 10);
         let lang: Value = serde_json::from_str(LANG_EN_US_JSON).unwrap();

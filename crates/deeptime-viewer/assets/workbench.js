@@ -294,13 +294,14 @@
       this.rampOf = new Map();     // layer -> ramp name
       this.images = new Map();     // "n/li" -> Image (LRU)
       this.failed = new Map();
+      this.deposits = null; this.depFrom = -1; this.depState = '';   // the deposits overlay (below)
       this.connected = false;
       this.es = new EventSource(`api/runs/${encodeURIComponent(id)}/stream`);
       this.es.addEventListener('hello', ev => this.hello(JSON.parse(ev.data)));
       this.es.addEventListener('frame', ev => this.addFrames([JSON.parse(ev.data)]));
       this.es.addEventListener('events', ev => this.addEvents(JSON.parse(ev.data).events));
       this.es.addEventListener('progress', ev => { this.progress = JSON.parse(ev.data); changed(this); });
-      this.es.addEventListener('status', ev => { this.status = JSON.parse(ev.data); changed(this); });
+      this.es.addEventListener('status', ev => { this.status = JSON.parse(ev.data); changed(this); depStatus(this); });
       this.es.addEventListener('bye', () => { this.es.close(); this.connected = false; changed(this); });
       this.es.onerror = () => { this.connected = false; changed(this); };
     }
@@ -325,6 +326,7 @@
           if (!this.layers.includes(name)) this.layers.push(name);
           if (f.ramps && f.ramps[i] && !this.rampOf.has(name)) this.rampOf.set(name, f.ramps[i]);
         });
+        depFrame(this, f);
       }
       if (!quiet) changed(this, true);
     }
@@ -757,6 +759,7 @@
         }
       }
     }
+    drawDeposits(p, r, f);
     if (pin && pin.pane === p.i) {
       const [x, y] = llToCanvas(p, pin.lat, pin.lon);
       ctx.beginPath(); ctx.arc(x, y, 7 * dpr, 0, 2 * Math.PI);
@@ -995,6 +998,179 @@
     const cut = w > 256 || h > 256;
     return { north, south, west, east, w, h, cut, text: `${fmtInt(w)} × ${fmtInt(h)} blocks${cut ? ' → cut to 256 × 256' : ''}` };
   }
+
+  // =================================================================================================
+  // The deposits overlay (Ben, 2026-10-01): the run's coal fields and ore deposits by family, drawn
+  // over whatever layer the map shows. A view of data the run keeps: the sites the deposit stage
+  // placed (`GET api/runs/<id>/deposits`, from the world in memory while the run goes on and from
+  // the finished run's bake after) and the events the page already holds for each site's age and
+  // "why here". Drawing, hit-testing, the legend and the texts are `DTDeposits` (deposits.js); this
+  // is the wiring to the panes, the legend card and the inspector. It is an overlay, not a layer:
+  // the keyframe layers are images the core draws on the stepping thread, which cannot carry
+  // symbols to hover or click, and an overlay works over every base layer, the new ones too.
+  // =================================================================================================
+  const DEP_LAYER = 'deposits/sites';
+  let depositsOn = store.get('deposits', true);
+  let depHidden = new Set(store.get('depHidden', []));
+  // A frame names the sites layer: the deposit stage has run, and its sites are fetched once (again
+  // when the run is done, for the baked ones).
+  function depFrame(r, f) {
+    if (!f.layers.includes(DEP_LAYER)) return;
+    if (r.depFrom < 0 || f.n < r.depFrom) { r.depFrom = f.n; depDirty(); }
+    if (!r.depState) loadDeposits(r);
+  }
+  function depStatus(r) {
+    if (r.depFrom >= 0 && r.status && r.status.state === 'done' && r.depSource !== 'bake') loadDeposits(r);
+  }
+  function depDirty() { mapDirty = legendDirty = true; }
+  async function loadDeposits(r) {
+    if (r.depState === 'loading') { r.depAgain = true; return; }
+    r.depState = 'loading';
+    const res = await api(`api/runs/${encodeURIComponent(r.id)}/deposits`);
+    if (res.ok && res.body.available) {
+      r.deposits = DTDeposits.prepare(res.body); r.depSource = res.body.source; r.depState = 'ready';
+    } else r.depState = res.ok ? 'none' : 'failed';
+    depDirty(); buttons();
+    if (r.depAgain) { r.depAgain = false; loadDeposits(r); }
+  }
+  // The sites show on the frames where the deposit stage has run.
+  const depShown = (r, n) => !!r && !!r.deposits && r.depFrom >= 0 && n >= r.depFrom;
+  // The map's pixels for a lat/lon, as the event markers use them.
+  function depView(p, f) {
+    const c = p.canvas;
+    return { project: (lat, lon) => mapXY(lat, lon, f, c.width), ppdx: c.width / 360, ppdy: c.height / 180, worldW: c.width, dpr: window.devicePixelRatio || 1 };
+  }
+  // The site whose forming event the inspector shows is the selected one.
+  const depSelected = (p, r) => { const s = p.i === focus && selectedEvent ? r.deposits.byEvent.get(selectedEvent) : null; return s ? s.id : null; };
+  function drawDeposits(p, r, f) {
+    if (!depositsOn || !depShown(r, p.cur)) return;
+    DTDeposits.draw(p.ctx, r.deposits, depView(p, f), { hidden: depHidden, hover: p.depHover ?? null, selected: depSelected(p, r) });
+  }
+  const depAge = (r, s) => { const e = r.byId.get(s.forming_event); return e ? fmtT(e.t_start) : ''; };
+
+  // The toggle and the legend.
+  function depButton() {
+    const b = $('depbtn');
+    const r = P().run;
+    b.setAttribute('aria-pressed', String(depositsOn));
+    const none = !r || !r.deposits;
+    b.dataset.tip = none ? 'Deposits: coal fields and ore sites by family (they appear when the deposit stage has placed them)' : 'Deposits: coal fields and ore sites by family, over any layer';
+    b.classList.toggle('dim', none);
+  }
+  $('depbtn').addEventListener('click', () => { depositsOn = !depositsOn; store.set('deposits', depositsOn); depDirty(); buttons(); });
+  function depLegend() {
+    const box = $('deplegend'), p = P(), r = p.run;
+    if (!depositsOn || !r || !r.deposits || r.depFrom < 0) { box.hidden = true; box.dataset.key = ''; return; }
+    const pending = p.cur < r.depFrom;
+    const key = [r.id, r.depSource, r.deposits.sites.length, [...depHidden].join(), pending].join('|');
+    box.hidden = false;
+    if (box.dataset.key === key) return;
+    box.dataset.key = key;
+    const note = pending ? `The deposit stage places the sites at the end of the run; they show from step ${r.depFrom + 1}.` : undefined;
+    box.innerHTML = DTDeposits.legendHTML(r.deposits, depHidden, { note });
+  }
+  $('deplegend').addEventListener('click', ev => {
+    const note = ev.target.closest('.note');
+    if (note) { note.classList.toggle('open'); return; }
+    const b = ev.target.closest('[data-fam]');
+    if (!b) return;
+    const k = b.dataset.fam;
+    if (ev.altKey || ev.metaKey) {   // alone: hide every other family
+      const all = [...b.parentElement.children].map(x => x.dataset.fam);
+      depHidden = new Set(all.filter(x => x !== k));
+    } else if (depHidden.has(k)) depHidden.delete(k); else depHidden.add(k);
+    store.set('depHidden', [...depHidden]);
+    depDirty();
+  });
+
+  // Hover (a card with the family, size and age) and click (the inspector, "why here").
+  for (const p of panes) {
+    const at = ev => { const rect = p.canvas.getBoundingClientRect(), d = window.devicePixelRatio || 1; return [(ev.clientX - rect.left) * d, (ev.clientY - rect.top) * d, ev.clientX - rect.left, ev.clientY - rect.top]; };
+    const siteAt = ev => {
+      const r = p.run;
+      if (TV || !depositsOn || !r || p.cur < 0 || !depShown(r, p.cur) || !r.frames[p.cur]) return null;
+      const [x, y] = at(ev);
+      return DTDeposits.hit(r.deposits, depView(p, r.frames[p.cur]), x, y, { hidden: depHidden });
+    };
+    const tip = () => {
+      if (!p.depTip) { p.depTip = document.createElement('div'); p.depTip.className = 'dep-tip'; p.depTip.hidden = true; p.frame.appendChild(p.depTip); }
+      return p.depTip;
+    };
+    const leave = () => { if (p.depHover != null) { p.depHover = null; mapDirty = true; } p.canvas.style.cursor = ''; if (p.depTip) p.depTip.hidden = true; };
+    p.canvas.addEventListener('pointermove', ev => {
+      if (p.drag && p.drag.box) { leave(); return; }
+      const s = siteAt(ev);
+      if (!s) { leave(); return; }
+      if (p.depHover !== s.id) { p.depHover = s.id; mapDirty = true; }
+      p.canvas.style.cursor = tool === 'select' ? 'pointer' : '';
+      const t = tip(), [, , cx, cy] = at(ev);
+      t.innerHTML = DTDeposits.tipHTML(s, depAge(p.run, s));
+      t.hidden = false;
+      const w = t.offsetWidth, h = t.offsetHeight, fw = p.frame.clientWidth, fh = p.frame.clientHeight;
+      t.style.left = `${clamp(cx + 16 + w > fw ? cx - 16 - w : cx + 16, 4, Math.max(4, fw - w - 4))}px`;
+      t.style.top = `${clamp(cy + 16 + h > fh ? cy - 12 - h : cy + 16, 4, Math.max(4, fh - h - 4))}px`;
+    });
+    p.canvas.addEventListener('pointerleave', leave);
+    // A click with the Select tool on a deposit opens it; this runs before the map's own click
+    // (a point's values, the nearest event) and takes the click when it is a hit.
+    let down = null;
+    p.canvas.addEventListener('pointerdown', ev => { down = [ev.clientX, ev.clientY]; }, true);
+    p.canvas.addEventListener('pointerup', ev => {
+      if (tool !== 'select' || !down || Math.abs(ev.clientX - down[0]) + Math.abs(ev.clientY - down[1]) > 6) return;
+      const s = siteAt(ev);
+      if (!s) return;
+      ev.stopImmediatePropagation();
+      p.drag = null;
+      setFocus(p.i);
+      showSite(p.run, s);
+    }, true);
+  }
+
+  // A site in the inspector: its card and "why here" (the forming event and its causes, up to four
+  // links deep, as `deeptime inspect-column --why` lists them), then the forming event itself, as
+  // the Events tab shows any event. Chain links open the events; the kin links open other sites.
+  function showSite(r, s) {
+    const model = r.deposits, e = r.byId.get(s.forming_event);
+    const where = latLonText(s.lat, s.lon), age = depAge(r, s);
+    const head = `<div class="dh" style="--c:${s.family.ui || s.family.colour}"><span class="d"></span><div><h4>${esc(s.family.label)}</h4><div class="id">site ${s.id} · ${esc(s.type)}</div></div></div>`;
+    const kv = `<div class="kv">${DTDeposits.factRows(s, model, { where, age }).map(([a, b]) => `<div>${esc(a)}</div><div>${b}</div>`).join('')}</div>`;
+    const kin = [];
+    const parent = s.parent != null ? model.byId.get(s.parent) : null;
+    const kids = model.sites.filter(o => o.parent === s.id);
+    const siteBtn = o => `<button data-site="${o.id}" style="--c:${o.family.ui || o.family.colour}"><i></i>${esc(o.family.label)}<span class="t">site ${o.id}</span></button>`;
+    if (parent) kin.push(`<h5>Came from</h5><div class="chain">${siteBtn(parent)}</div>`);
+    if (kids.length) kin.push(`<h5>Led to</h5><div class="chain">${kids.map(siteBtn).join('')}</div>`);
+    let why;
+    if (e) {
+      const chain = DTDeposits.causeChain(r.byId, e.id, 4);
+      why = `<h5>Why here</h5><div class="dep-why"><div class="chain"><div class="lv"><span class="lvn">0</span>${evLink(r, e.id)}</div>` +
+        chain.map(c => `<div class="lv" style="padding-left:${(c.depth - 1) * 10}px"><span class="lvn">${c.depth}</span>${evLink(r, c.id)}</div>`).join('') +
+        `</div></div><div class="desc" style="margin-top:6px">Level 0 formed the deposit; each level below is a cause of the one above it.</div>`;
+    } else why = '<h5>Why here</h5><div class="chain"><span class="none">The forming event is not in this run’s event log.</span></div>';
+    const acts = `<div class="acts"><button class="btn btn-sm" data-sitegoto="${s.id}">${ic('target', 'ic-s')}Turn the globe here</button></div>`;
+    const card = head + kv + acts + why + kin.join('') + (e ? '<h5>Forming event</h5>' : '');
+    if (e) {
+      showEvent(r, e.id);
+      $('details').insertAdjacentHTML('afterbegin', card);
+    } else {
+      selectedEvent = null; pin = null;
+      $('details').innerHTML = card;
+      $('details').dataset.curEv = '';
+      setITab('details', true);
+      if (narrow.matches) setMTab('inspect');
+      mapDirty = true; evShownKey = ''; tickerDirty = true;
+    }
+    G.lon0 = s.lon; G.lat0 = clamp(s.lat, -80, 80); G.spin = false; spinButton(); globeDirty = true;
+  }
+  $('details').addEventListener('click', ev => {
+    const r = P().run;
+    const kin = ev.target.closest('[data-site]'), go = ev.target.closest('[data-sitegoto]');
+    if (!r || !r.deposits || (!kin && !go)) return;
+    const s = r.deposits.byId.get(Number(kin ? kin.dataset.site : go.dataset.sitegoto));
+    if (!s) return;
+    if (kin) showSite(r, s);
+    else { G.lon0 = s.lon; G.lat0 = clamp(s.lat, -80, 80); G.spin = false; spinButton(); globeDirty = true; }
+  });
 
   // =================================================================================================
   // Stage 2: the 3D block preview of an area and click-to-inspect (tools/workbench/preview.py,
@@ -1286,6 +1462,7 @@
   // Legend and layer picker
   // =================================================================================================
   function legend() {
+    depLegend();
     const p = P(), r = p.run;
     const el = $('legend');
     let name = layer, info = null;
@@ -1424,6 +1601,7 @@
     for (const b of document.querySelectorAll('.s2-tool')) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
     $('markers').setAttribute('aria-pressed', String(markersOn));
     $('gridbtn').setAttribute('aria-pressed', String(gridOn));
+    depButton();
     for (const q of panes) badge(q);
   }
 
@@ -2009,6 +2187,7 @@
     else if (k === 'End' || k === 'l') setMode('live');
     else if (k === 'g') { G.spin = !G.spin; spinButton(); }
     else if (k === 'm') $('markers').click();
+    else if (k === 'd') $('depbtn').click();
     else if (k === 'c') { if (comparing) setCompare(false); else setCompare(true); }
     else if (k === 'e') toggleSidebar();
     else if (k === 'v') setTool('select');
@@ -2108,7 +2287,7 @@
       K(['Space'], 'Play or pause'), K(['←', '→'], 'One step back or forward (Shift: ten)'), K(['Home'], 'Back to the start'),
       K(['L'], 'Follow the run live (End too)'), K(['[', ']'], 'Slower, faster'), K(['1', '…', '9'], 'Layers in the order they appeared'), K(['↑', '↓'], 'Previous or next layer'),
       K(['V'], 'Select tool: events and point values'), K(['I'], 'Inspect a column in 3D'), K(['B'], 'Preview an area in 3D'), K(['S'], 'Cross-section: click two points'),
-      K(['C'], 'Compare two runs'), K(['M'], 'Event markers on or off'), K(['G'], 'Spin the globe'), K(['E'], 'Runs and editor'),
+      K(['C'], 'Compare two runs'), K(['M'], 'Event markers on or off'), K(['D'], 'Deposits on or off'), K(['G'], 'Spin the globe'), K(['E'], 'Runs and editor'),
       K(['F'], 'Full screen'), K(['Esc'], 'Back to Select; clear the box and pin'), K(['?'], 'This list'),
     ].join('')}</div>`, '', true);
   }
