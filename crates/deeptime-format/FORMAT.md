@@ -18,7 +18,7 @@ term a baked world declares ("The terrain height"); the first horizon of a baked
 the amplified terrain ("The P1-08 bake"); and the column evaluator both sides implement is specified
 ("Columns"). Nothing a 0.0 world held changed its bytes, only the minor.
 
-**0.2** over 0.1 (two changes, released together): every header's minor is 2.
+**0.2** over 0.1 (three changes, released together): every header's minor is 2.
 - *Monthly climate (P1-25):* a planet run with a climate section bakes the climate stage's twelve
   months on L1 (`climate/month/t_sl_c_01..12`, `climate/month/p_share_01..12`,
   `notes.bake.climate.monthly`), and the climate at a block that Deep Time's public climate API
@@ -28,6 +28,11 @@ the amplified terrain ("The P1-08 bake"); and the column evaluator both sides im
   keys, with B-spline weights, and intertongues facies changes, so beds run on across cells instead
   of stepping at cell edges; the bake smooths the stacks laterally ("The 0.2 bake"); a column's
   horizons carry a unit key (`[top y, class, unit]` in "Columns").
+- *Rivers and lakes (P1-22):* `water_level` holds the lakes a run's bake finds (it was all nodata),
+  the new `rivers/rivers.dtrv` (`DTRV`) holds the river network ("Rivers"), the preset gains a
+  `hydro` section, and the column evaluator decides each column's water ("Water columns"; `hydro`
+  in "Columns" and `parity/columns.json`). A reader treats a folder without `rivers/rivers.dtrv` as
+  having no rivers (the synthetic worlds have none).
 Every other file's bytes are as in 0.1.
 
 ## Folder layout
@@ -36,7 +41,8 @@ Every other file's bytes are as in 0.1.
 <world-data>/
   manifest.json                 written last (tmp + fsync + rename); present ⇒ folder complete
   rasters/elevation.dtr         L3, i16, 1/16 block
-  rasters/water_level.dtr       L3, i16, 1/16 block, nodata −32768
+  rasters/water_level.dtr       L3, i16, 1/16 block, nodata −32768 (lake surfaces; grid L3h on 32k full)
+  rivers/rivers.dtrv            optional: the river network (P1-22, "Rivers")
   rasters/detail/amplitude.dtr  L3, u8, 1/16 block: amplitude of the sub-cell detail term (P1-06)
   rasters/climate/<name>.dtr    L2, i16, vanilla parameter × 10,000
                                 (<name> ∈ temperature, vegetation, continents, erosion, ridges)
@@ -119,7 +125,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 |---|---|---|---|---|---|
 | `elevation` | L3 | i16 | 1/16, block | — | terrain y: the amplifier's, mountain character included ("The mountain character"); without the amplify stage the young landscape (L2) or the deep-time surface (L1) upsampled bilinearly |
 | `detail/amplitude` | L3 | u8 | 1/16, block | — | the detail term's A (P1-06; absent without the amplify stage) |
-| `water_level` | L3 | i16 | 1/16, block | −32768 | every cell nodata: lakes and rivers are Phase 2 |
+| `water_level` | L3 (L3h: L3 averaged 2 × 2 when L3 has more than 40 M cells, 32k full) | i16 | 1/16, block | −32768 | each lake's cells hold its surface, nodata elsewhere (P1-22, "Rivers"); all nodata when `hydro.enabled` is false |
 | `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks with key spans, smoothed ("The 0.2 bake"), the first top raised ("The P1-08 bake") |
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
@@ -134,7 +140,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `meta/crust_age_myr` | L1 | u16 | 1, Myr | 65535 | oceanic crust age; nodata on continental crust |
 | `meta/province` | L1 | u16 | 1, province id | — | contiguous geologic provinces ≥ 50,000 km² (`notes.bake.meta.provinces`) |
 
-`notes.bake`: `version` (1), `baked`, per part (`terrain`, `strata`, `climate`, `surface`, `meta`)
+`notes.bake`: `version` (1), `baked`, per part (`terrain`, `strata`, `climate`, `water`, `surface`, `meta`)
 what it did, `millis` per part, `bytes` and `layers` written, and **`detail`** — the game's detail
 term: `{"layer": "detail/amplitude", "seed": "<u64, decimal>", "salt": 1729, "octaves": 3,
 "wavelength_blocks": 32.0}` (present exactly when `detail/amplitude` is). A preset without the
@@ -574,13 +580,107 @@ answers for every column (`ColumnParityTest`):
    that holds block (wx, y, z), its `rock_class`, a zone's where one applies (the last zone that
    applies and names one); a body naming none leaves the class as it is. Runs of equal class are
    `[top y, bottom y, class or null]`.
+6. `hydro` (P1-22): the column's water as "Water columns" decides it: `{"kind", "surface", "ground",
+   "level", "top", "bed", "min_ground", "max_ground", "seal_from", "river_biome", "river"}`, `river`
+   `{"seg", "t", "d", "w", "hw", "depth"}` or null, absent values null.
 
 `parity/columns.json` (`deeptime parity --world-data <dir>`): `{"format_version", "world" (the
 manifest's source), "circumference", "min_y", "max_y", "seed" (decimal), "classes", "columns": [ … ]}`,
 each column the object above plus its `x` and `z`. Numbers are serde_json's shortest round-trip
 form: read them with a correctly rounded parser (Java's `Double.parseDouble`) and compare exactly.
 The 500 columns: 10 % within 40 blocks of the seam, 10 % near and past the poles, 20 % inside
-random bodies' boxes (none when the world has no bodies), the rest anywhere with x over two laps.
+random bodies' boxes (none when the world has no bodies), with a river network 10 % on and beside
+random river vertices and 5 % around the mouths of rivers that end in lakes, with lakes 5 % within 8
+blocks of random shore cells of `water_level` (wet beside dry), the rest anywhere with x over two laps.
+
+## Rivers (`rivers/rivers.dtrv`, P1-22)
+
+Code `crates/deeptime-format/src/rivers.rs` (Java `worlddata/Rivers`); written by the bake's water
+part (`deeptime_core::hydro`, `bake::water`; plan §8.4). `DTRV` fixed fields (48 bytes): `u32 C, u32
+tile (32), u32 tiles_x (C / tile), u32 tiles_z (C / 2 / tile), u32 V vertices, u32 K chains, u32 E
+index entries, f32 biome_min_width, f32 bank_zone, f32 bank_ratio, 8 reserved bytes`. Sections: 0 V
+vertices of 24 bytes, 1 K chains of 16 bytes, 2 `tiles_x · tiles_z + 1` u32 offsets, 3 E u32 entries.
+
+```text
+vertex                                         chain
+0   4  f32 x (block; continuous along a chain)  0   4  u32 first vertex
+4   4  f32 z (block)                            4   4  u32 vertex count (≥ 2)
+8   4  f32 w: water surface (fills y < w)       8   1  u8 mouth: 0 sea (or the polar edge row), 1 lake, 2 river
+12  4  f32 hw: half-width, blocks (> 0)         9   3  reserved, 0
+16  4  f32 depth at the centre, blocks (≥ 1)    12  4  u32 into: the lake (mouth 1) or chain (2), else u32::MAX
+20  4  f32 q: discharge, m³/s
+```
+
+Chains are consecutive in the vertex array; **segment s** is vertices (s, s + 1) when both belong to
+one chain. A chain runs downstream from a spring or a lake's outlet (whose first vertex is the lake
+cell feeding it) to its mouth: its last vertex lies in the sea, in lake `into`, or on a vertex of
+chain `into` (a confluence, where the tributary keeps its own width). w never rises along a chain.
+**The index**: tile (tx, tz) covers x ∈ [−C/2 + tx·tile, …), z ∈ [−C/4 + tz·tile, …); entries
+`offsets[t] … offsets[t+1]` of tile t = tz·tiles_x + tx are the segments, ascending, whose box grown
+by `max(hw_a, hw_b, 0.71) + bank_zone + bank_ratio · max(hw_a, hw_b) + 1` touches it (x folded).
+
+**Sampling column (x, z)** — both readers, in this order, doubles from the f32 values:
+wx = x folded; over the entries of wx's tile, for segment (a, b): `k = ⌊(ax − wx)/C + 0.5⌋`,
+`px = wx + k·C`; `e = b − a`; `t = ((px − ax)·ex + (z − az)·ez) / (ex² + ez²)` (0 when the length is
+0), clamped to [0, 1] (`t < 0 → 0`, `t > 1 → 1`); `d = √(dx² + dz²)` with `dx = px − (ax + t·ex)`,
+`dz = z − (az + t·ez)`; `hw = hw_a + (hw_b − hw_a)·t`, `hw' = max(hw, 0.71)`; likewise w, depth, q.
+If d ≤ hw' the segment **covers** the column: the hit is the covering segment with the lowest w
+(ties: the lowest segment id), and `river_biome` is set when 2·hw ≥ biome_min_width. Otherwise, if
+d ≤ hw' + bank_zone + bank_ratio·hw, it offers the **bank cap** ⌈w⌉ + ⌊d − hw'⌋; the lowest offered
+is the column's `max_ground`.
+
+**How the bake builds it** (`deeptime_core::hydro`): on the `water_level` grid, the open sea (cells at
+most one block below sea level: their top block is under the sea's; connected, ≥ 5,000 km²); Priority-Flood with the pit queue from its shores (spill level F
+and the cell each land cell was reached from); receivers the steepest strictly lower neighbour on F,
+else that cell; depressions (F > height) of at least `hydro.lake_min_area_km2` and
+`lake_min_depth_blocks` are lakes at their spill level (they are always full: "fill and spill");
+runoff P − ET (Fu's Budyko curve, PET = 60 mm/°C·T) from the L1 climate accumulated as discharge, a
+lake passing on its inflow less its surface's evaporation (`lake_evaporation`); river cells carry ≥
+`river_min_discharge_m3s` from ≥ `river_min_area_km2`, a lake cell less than a block deep counting
+as ground a river crosses; chains follow the largest donor; w = max(F − `freeboard_blocks`, the
+level of the sea or lake downstream); width `width_coef · Q^0.5 · scale.feature_scale.rivers` and
+depth `depth_coef · Q^0.4` (at least 1, at most `max_width_blocks`, `max_depth_blocks`); vertex
+positions smoothed by a Gaussian of half-width `smoothing_blocks` (ends fixed; a tributary's mouth
+on the smoothed vertex it joins). `notes.bake.water`: `enabled`, `method` ("p1-22"), `params`,
+`width_scale`, `grid`, `halved`, `climate`, `rivers_file`, `rivers_bytes`, `stats` (counts, lengths,
+largest discharge and width, milliseconds per step).
+
+## Water columns (P1-22)
+
+Code `crates/deeptime-format/src/water.rs` (Java `worlddata/Water`); the game's
+`worldgen/WaterBodies` pass makes every generated column match it (after the strata pass, before
+carvers and features). A function of (x, z) and the world data only, with the generator's noise cell
+width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore rule's `reach`:
+
+1. **surface** = H (the terrain height) bilinear between the four corners of the noise cell holding
+   the column (corners at multiples of `cell`, fractions (wx − x0)/cell, (z − z0)/cell, the corner H
+   values h00, h10, h01, h11 as `a = h00 + (h10 − h00)·fx`, `b = h01 + (h11 − h01)·fx`,
+   `a + (b − a)·fz`): the generated surface. **ground** = ⌈surface⌉ − 1 clamped to [min_y − 1,
+   max_y] (min_y − 1 when not finite).
+2. **level** = the `water_level` cell nearest the column, else the value of the nearest wet cell
+   within `reach` blocks (cells visited by column then row, first at the smallest squared distance;
+   Java `WaterLevels.levelAt`). **Lake** when level is finite and ground < top = ⌈level⌉ − 1; bed =
+   ground.
+3. Else **sea** when ground < sea level − 1 (top = sea level − 1, bed = ground): the aquifer's
+   water, which the pass tops up where the aquifer left such a column dry (it decides from its own
+   noise near the surface, and leaves coastal flats a block below sea level dry).
+4. Else **river** when a segment covers the column (the hit of "Rivers"): top = ⌈w⌉ − 1, bed =
+   min(top − 1, ⌊w − max(1, depth · (1 − (d/hw')²))⌋).
+5. Else, visiting the neighbours (x+1, z), (x−1, z), (x, z+1), (x, z−1) evaluated by 1–4: for each
+   that holds water (river, lake, sea), `min_ground` = max(top + 1 for a river, top otherwise) and
+   `seal_from` = min(bed + 1, or for the sea max(bed + 1, top − 3): only its waterline); `max_ground` = the column's bank cap. The column is a **bank** when
+   either `min_ground` or `max_ground` is set, else **none**. `river_biome` and `river` (the hit)
+   are kept whatever the kind.
+
+The pass: a sea column the aquifer left dry is filled from the sea's top down to the ground (the
+pass runs in every chunk with elevation cells within 17 blocks of sea level for this); a river column is cut or filled to `bed` (gravel on the bed of a channel under 6 blocks
+wide, sand on a wider one), water from bed + 1 to top, air above; a lake column fills the air from
+top down to the ground as P0-13's pass did, plugging a cave under `bed`; a bank is lowered to
+`max_ground` and raised to `min_ground` keeping its top block, and air from `seal_from` to
+`min_ground` is filled; where a water column's neighbour holds water higher up, the block at the
+higher top gets flowing water (level 1, resting on the water under it)
+and the blocks between falling water (a waterfall). **River biomes**: the game's weirdness input is
+0 (the river valley slice) at columns whose `river_biome` is set (`WorldDataTerrain.raster`).
 
 ## `strata/classes.json`
 
@@ -634,6 +734,7 @@ tables are `u32 byte length + UTF-8 bytes`, back to back, with the count in the 
 | `DTSR` | `sites/sites.dtsr` | 16 | 3 | below |
 | `DTSI` | `sites/index.dtsi` | 32 | 2 | below |
 | `DTBD` | `bodies/bodies.dtb` | 16 | 3 | below |
+| `DTRV` | `rivers/rivers.dtrv` | 48 | 4 | "Rivers" |
 | `DTKF` | `keyframes/kf-<n>.dtk` | 24 | 1 + layers | below |
 | `DTCP` | `checkpoints/*.dtcp` | 8 | 2 | below (dev only) |
 

@@ -6,6 +6,7 @@ mod amplify_view;
 mod climate_dem;
 mod dump;
 mod heightmap;
+mod hydro;
 mod parity;
 mod provinces;
 mod run;
@@ -312,6 +313,16 @@ enum Command {
         /// Seed of the column choice.
         #[arg(long, default_value_t = parity::DEFAULT_SEED)]
         seed: u64,
+    },
+    /// Re-run the bake's water part (P1-22: lakes, `water_level`, the river network) on a baked
+    /// world-data folder with its own preset and `--set hydro.KEY=VALUE` overrides (tuning).
+    Hydro {
+        /// World-data folder a planet run baked.
+        #[arg(long)]
+        world_data: PathBuf,
+        /// Sets a preset value first, `--set hydro.width_coef=1.5` (repeatable).
+        #[arg(long = "set", value_name = "PATH=VALUE")]
+        set: Vec<String>,
     },
     /// Review pictures of a run's volcanoes (P1-21): the finished terrain with them marked, the
     /// settings that made them, and close views before and after the amplifier's shaping.
@@ -727,6 +738,22 @@ fn main() -> ExitCode {
                 }
                 Err(e) => {
                     eprintln!("deeptime parity: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        Some(Command::Hydro { world_data, set }) => {
+            let started = std::time::Instant::now();
+            match hydro::run(&world_data, &set) {
+                Ok(line) => {
+                    println!(
+                        "deeptime hydro: {line} in {:.2}s",
+                        started.elapsed().as_secs_f64()
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime hydro: {e}");
                     ExitCode::FAILURE
                 }
             }
