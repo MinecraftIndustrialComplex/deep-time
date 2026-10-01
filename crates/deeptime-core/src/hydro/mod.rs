@@ -55,7 +55,7 @@ pub const WIDTH_EXPONENT: f64 = 0.5;
 pub const DEPTH_EXPONENT: f64 = 0.4;
 
 /// The `hydro` section of a preset (every key optional).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct HydroParams {
     /// Rivers and lakes at all (false: `water_level` all nodata and no river network, as before
