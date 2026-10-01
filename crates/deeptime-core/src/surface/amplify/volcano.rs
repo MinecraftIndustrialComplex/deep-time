@@ -447,6 +447,7 @@ mod tests {
             wgt: vec![1.0; n],
             kfac: vec![1.0; n],
             lake: vec![0; n],
+            zs: Vec::new(),
         };
         assert!(sh.sharpen_level(&mut level, &g2) > 0);
         let at = |g: &GridDesc, z: &[f32], bx: f64, bz: f64| {
