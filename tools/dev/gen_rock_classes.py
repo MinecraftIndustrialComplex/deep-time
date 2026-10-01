@@ -27,6 +27,11 @@ the clastic rocks the facies rules lay down (how the young, shallow part of such
 sandstone's top as sand). The metamorphic path is the prograde regional sequence the stage steps a
 class along; the temperature of each step is the structure stage's (metamorphism.rs).
 
+P1-28 adds `stone_use` (see STONE_USE below): whether a class's blocks are tool-grade stone, building stone
+or neither. It is the class's own data (rock_class/<class>.json), and the generator derives from it the
+two item tags that gate vanilla's stone recipes, `minecraft:stone_tool_materials` and
+`minecraft:stone_crafting_materials` (data/minecraft/tags/item/, `replace: false`).
+
 `facies_rule` names the setting that forms a class. The Phase 1 core forms these: carbonate_platform,
 dolomitisation, evaporite_basin, euxinic_basin, marine_shelf_mud, floodplain, alluvial_fan,
 peat_swamp (surface/facies.rs), pedogenesis, deep_weathering, tropical_weathering
@@ -43,6 +48,9 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     REPO, "neoforge", "src", "main", "resources", "data", "deeptime", "deeptime", "rock_class")
+
+# The data root the item tags go to: the one the rock_class folder sits in, unless it was moved.
+DATA = os.path.dirname(os.path.dirname(os.path.dirname(OUT)))
 
 # README families, in its order.
 FAMILIES = (
@@ -586,6 +594,95 @@ CLASSES = [
          notes="Unconsolidated volcanic ash and tephra; lithifies to tuff, whose metamorphic path it takes."),
 ]
 
+# P1-28 (Ben, decisions log 2026-10-01): which rock is fit to make stone tools and furnaces from.
+# Vanilla's recipes read two item tags that hold only cobblestone, cobbled deepslate and blackstone:
+#   minecraft:stone_tool_materials      stone axe, hoe, pickaxe, shovel, sword (and repairing them)
+#   minecraft:stone_crafting_materials  furnace, brewing stand
+# so a player standing on granite or shale could not make a stone pickaxe or a furnace. (Everything
+# else that wants cobblestone names the block itself: piston, dispenser, dropper, lever, observer,
+# the cobblestone slabs. River, beach and till cobbles, CobblePass, supply those.) Each class gets
+# a stone_use:
+#   tool   hard, tough rock that holds an edge: Mohs hardness about 5.5+ and compressive strength
+#          above ~100 MPa, massive or only weakly foliated, insoluble. In both tags.
+#   build  solid, workable rock that is fit for walls and furnaces but would not hold an edge: soft
+#          carbonates (Mohs 3), sandstone (hard grains, weak cement), foliated metamorphic rock that
+#          splits along its planes, coarse crystals that cleave. In stone_crafting_materials only.
+#   none   soft, crumbly, porous, soluble or loose: shale and the mudrocks, chalk, evaporites, coal,
+#          pumice, scoria, most tuff, kimberlite, every unconsolidated class. In neither tag.
+# The tier is the class's; the tags are made of ITEMS, so the generator maps classes to the blocks
+# Deep Time itself places (the member tags in data/deeptime/tags/block/rock and each class's
+# vanilla_fallback) and then to the items those drop. An item takes the tier of the class that owns
+# it (the class whose member tag lists it); an item that is only ever a stand-in takes the lowest
+# tier of the classes that stand in with it, because it may be standing in for the softer one.
+# Items that serve classes of different tiers are printed by the generator; a pack fixes them by
+# giving the hard classes stand-ins of their own. Cobblestone, cobbled deepslate and blackstone stay
+# in the tags as vanilla has them (the tags are `replace: false`, so packs can add to them).
+STONE_USE = {
+    # name: (tier, reason)
+    "granite": ("tool", "massive crystalline quartz-feldspar rock, Mohs 6, 150-250 MPa: the standard hard rock"),
+    "granodiorite": ("tool", "as granite: Mohs 6, 100-250 MPa"),
+    "diorite": ("tool", "tough interlocking plagioclase and hornblende, 150-250 MPa; ground-stone axes were made of it"),
+    "gabbro": ("tool", "coarse intrusive basalt, among the toughest rocks (200-300 MPa); dolerite is a classic axe stone"),
+    "anorthosite": ("tool", "almost all plagioclase (Mohs 6), coarse but strong, 150-250 MPa"),
+    "peridotite": ("tool", "fresh olivine rock is hard (Mohs 6.5-7) and dense; it softens only where it serpentinises"),
+    "rhyolite": ("tool", "fine-grained, siliceous and conchoidal: knapped and ground for tools worldwide"),
+    "andesite": ("tool", "fine-grained, strong (100-250 MPa) lava; a common axe and mill stone"),
+    "basalt": ("tool", "dense fine-grained lava, 150-300 MPa; the commonest ground-stone axe rock"),
+    "tuff": ("none", "consolidated ash is porous and weak (5-30 MPa) and weathers to clay; welded ignimbrite is the exception and is not told apart"),
+    "obsidian": ("tool", "volcanic glass: the sharpest edge there is (Mohs 5-5.5), brittle but a premier knapping stone"),
+    "scoria": ("none", "vesicular, weakly welded cinder; crumbles under load"),
+    "pumice": ("none", "frothy glass, lighter than water, abrades to powder"),
+    "conglomerate": ("tool", "cemented pebbles of hard rock; its stand-in is cobblestone, which vanilla already counts"),
+    "diamictite": ("tool", "lithified till, well cemented and clast-rich; its stand-in is cobbled deepslate, which vanilla already counts"),
+    "sandstone": ("build", "quartz grains (Mohs 7) in a cement of varying strength: a classic walling stone, not a toolstone"),
+    "red_bed": ("build", "hematite-cemented sandstone and mudstone: as sandstone, weaker"),
+    "mudstone": ("none", "compacted mud: weak (10-40 MPa), slakes in water"),
+    "shale": ("none", "splits into flakes along its bedding; weak and fissile"),
+    "black_shale": ("none", "organic-rich shale: weaker still, and it burns"),
+    "limestone": ("build", "calcite, Mohs 3, 50-150 MPa: scratches with a knife and takes no edge, but it is the commonest sedimentary rock and the standard walling and hearth stone, so a limestone world must still be able to build a furnace"),
+    "dolostone": ("build", "dolomite, Mohs 3.5-4: harder and less soluble than limestone, still no toolstone"),
+    "chalk": ("none", "soft, porous, friable micrite (1-10 MPa); it marks, it does not build"),
+    "chert": ("tool", "microcrystalline silica (Mohs 7) with a conchoidal fracture: flint, the toolstone of the Stone Age"),
+    "travertine": ("build", "dense banded carbonate quarried for the Colosseum; Mohs 3-4"),
+    "halite": ("none", "water-soluble, Mohs 2.5"),
+    "gypsum": ("none", "Mohs 2, scratches with a fingernail, soluble"),
+    "anhydrite": ("none", "Mohs 3.5, hydrates to gypsum and dissolves"),
+    "coal": ("none", "a fuel, not a rock to build with: Mohs 1-2.5 and brittle"),
+    "ironstone": ("build", "iron-cemented sediment, hard but patchy and bedded: walls and hearths"),
+    "banded_iron_formation": ("tool", "jasper and chert bands with hematite: extremely hard and tough (Mohs 6-7)"),
+    "phosphorite": ("none", "soft, pelletal marine phosphate (crumbly)"),
+    "slate": ("build", "splits into thin plates: roofing and paving, but it shatters rather than flakes to an edge"),
+    "phyllite": ("build", "foliated with a silky sheen; splits like slate and is weaker"),
+    "schist": ("build", "mica-rich and foliated: splits along the mica and crumbles in a wall, but it is solid bedrock"),
+    "blueschist": ("tool", "dense, tough high-pressure metabasite (glaucophane, Mohs 6); with greenstone and amphibolite, a toolstone family"),
+    "greenstone": ("tool", "tough metabasalt, the Neolithic axe stone of Langdale and Mount William"),
+    "gneiss": ("tool", "banded, hard feldspar and quartz rock, 100-200 MPa; it cleaves only along weak bands"),
+    "quartzite": ("tool", "fused quartz grains (Mohs 7), the toughest of the common rocks and a classic knapping stone"),
+    "marble": ("build", "recrystallised calcite, Mohs 3: takes a polish, holds no edge"),
+    "amphibolite": ("tool", "dense, tough metabasalt (hornblende, Mohs 5-6); ground-stone axes worldwide"),
+    "eclogite": ("tool", "garnet and omphacite (Mohs 6-7), extremely dense and hard"),
+    "hornfels": ("tool", "baked, massive, fine-grained and conchoidal: knapped into tools; the hardest contact rock"),
+    "skarn": ("build", "patchy garnet and pyroxene (hard) in calcite (soft) with ore minerals: too uneven to knap"),
+    "serpentinite": ("build", "Mohs 3-4 and slippery, carved rather than flaked; a solid building stone"),
+    "kimberlite": ("none", "serpentinised and clay-altered 'blue ground' that weathers to a crumbling soil"),
+    "carbonatite": ("build", "igneous carbonate, Mohs 3: solid but soft"),
+    "pegmatite": ("build", "huge feldspar and quartz crystals that cleave: strong in a wall, shatters when knapped"),
+    "greisen": ("build", "quartz-mica rock: hard quartz but flaky mica; fit for walls"),
+    "soil": ("none", "loose"),
+    "saprolite": ("none", "rotted rock that crumbles in the hand"),
+    "laterite": ("none", "loose to earthy regolith (hardened ferricrete is not told apart)"),
+    "bauxite": ("none", "earthy to pisolitic regolith"),
+    "gravel": ("none", "loose"),
+    "sand": ("none", "loose"),
+    "clay": ("none", "loose"),
+    "mud": ("none", "loose"),
+    "till": ("none", "loose"),
+    "loess": ("none", "loose silt"),
+    "volcanic_ash": ("none", "loose"),
+}
+STONE_TIERS = ("none", "build", "tool")   # lowest to highest
+VANILLA_STONE_ITEMS = ("minecraft:cobblestone", "minecraft:cobbled_deepslate", "minecraft:blackstone")
+
 SNAKE = re.compile(r"^[a-z][a-z0-9_]*$")
 TAG = re.compile(r"^[a-z][a-z0-9_]*(:[a-z][a-z0-9_]*)?$")
 
@@ -695,8 +792,66 @@ def validate(groups):
                 errors.append(f"{n}: id {ident} contains terracotta")
         if not r["notes"].strip():
             errors.append(f"{n}: empty notes")
+    for n in STONE_USE:
+        if n not in known:
+            errors.append(f"STONE_USE: unknown class {n}")
+    for r in CLASSES:
+        n = r["name"]
+        use = STONE_USE.get(n)
+        if use is None:
+            errors.append(f"{n}: no STONE_USE row")
+        elif use[0] not in STONE_TIERS or not use[1].strip():
+            errors.append(f"{n}: STONE_USE needs a tier of {STONE_TIERS} and a reason")
+        members = block_members(n)
+        if r["vf_from"] == "member" and r["vf"] not in members:
+            errors.append(f"{n}: vanilla_fallback {r['vf']} is said to be a member but is not in its member tag")
     if errors:
         raise SystemExit("rock-class table invalid:\n  " + "\n  ".join(errors))
+
+
+MEMBER_TAGS = os.path.join(REPO, "neoforge", "src", "main", "resources", "data", "deeptime", "tags", "block", "rock")
+
+
+def block_members(name):
+    """The blocks Deep Time's own member tag `deeptime:rock/<name>` lists (a pack adds more)."""
+    path = os.path.join(MEMBER_TAGS, name + ".json")
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        return [v for v in json.load(f)["values"] if isinstance(v, str) and not v.startswith("#")]
+
+
+def stone_items():
+    """Item id -> tier, and the items serving classes of more than one tier (item -> {class: tier}).
+
+    The blocks Deep Time itself places are each class's member tag and its vanilla_fallback; the
+    item a block drops has the block's id for all of them. See STONE_USE for the ownership rule."""
+    owners, riders = {}, {}
+    for r in CLASSES:
+        n = r["name"]
+        tier = STONE_USE[n][0]
+        members = block_members(n)
+        for m in members:
+            owners.setdefault(m, {})[n] = tier
+        if r["vf"] not in members:
+            riders.setdefault(r["vf"], {})[n] = tier
+    tiers = {}
+    for item, by in owners.items():
+        tiers[item] = max(by.values(), key=STONE_TIERS.index)
+    for item, by in riders.items():
+        if item not in owners:
+            tiers[item] = min(by.values(), key=STONE_TIERS.index)
+    shared = {}
+    for item in set(owners) | set(riders):
+        by = dict(owners.get(item, {}))
+        by.update(riders.get(item, {}))
+        if len(set(by.values())) > 1:
+            shared[item] = by
+    return tiers, shared
+
+
+def item_tag(comment, items):
+    return {"replace": False, "_comment": comment, "values": sorted(items)}
 
 
 def class_groups(name, groups):
@@ -718,7 +873,8 @@ def sources(r):
     vf = VF_MEMBER if r["vf_from"] == "member" else VF_FALLBACK
     if (n, r["vf"]) in FILLER_EXCEPTIONS:
         vf += "; stone is the one allowed filler exception (Ben's pick 2026-09-27)"
-    return {"density_kg_m3": rho, "erodibility": k, "diffusivity": d, "vanilla_fallback": vf}
+    return {"density_kg_m3": rho, "erodibility": k, "diffusivity": d, "vanilla_fallback": vf,
+            "stone_use": f"judgment (P1-28, Ben's hardness tiers 2026-10-01): {STONE_USE[n][1]}"}
 
 
 def document(r, groups):
@@ -741,6 +897,7 @@ def document(r, groups):
         doc["facies_rule"] = r["facies"]
     doc["tags"] = list(r["tags"])
     doc["vanilla_fallback"] = r["vf"]
+    doc["stone_use"] = STONE_USE[r["name"]][0]
     doc["sources"] = sources(r)
     doc["notes"] = r["notes"]
     return doc
@@ -758,6 +915,40 @@ def main():
             f.write(json.dumps(doc, indent=2, ensure_ascii=False))
             f.write("\n")
     print(f"wrote {len(docs)} rock classes to {os.path.relpath(OUT, REPO)}")
+    write_stone_tags()
+
+
+def write_stone_tags():
+    """data/minecraft/tags/item/stone_{tool,crafting}_materials.json from the classes' stone_use."""
+    tiers, shared = stone_items()
+    tool = [i for i, t in tiers.items() if t == "tool" and i not in VANILLA_STONE_ITEMS]
+    build = [i for i, t in tiers.items() if t == "build"]
+    by_tier = {t: sorted(n for n, (u, _) in STONE_USE.items() if u == t) for t in STONE_TIERS}
+    note = ("generated by tools/dev/gen_rock_classes.py from each rock class's stone_use (P1-28); "
+            "replace is false, so packs add their own stones")
+    tags = {
+        "stone_tool_materials": item_tag(
+            note + ". Hard rock classes (vanilla already lists cobblestone, cobbled deepslate and blackstone): " + ", ".join(by_tier["tool"]), tool),
+        "stone_crafting_materials": item_tag(
+            note + ". The tool items, plus solid rock that is fit for building but not for tools: "
+            + ", ".join(by_tier["build"]), tool + build),
+    }
+    folder = os.path.join(DATA, "minecraft", "tags", "item")
+    os.makedirs(folder, exist_ok=True)
+    for name, tag in tags.items():
+        with open(os.path.join(folder, name + ".json"), "w", encoding="utf-8") as f:
+            f.write(json.dumps(tag, indent=2, ensure_ascii=False))
+            f.write("\n")
+    print(f"wrote {len(tags)} item tags to {os.path.relpath(folder, REPO)}: "
+          f"{len(tool)} tool items, {len(build)} building-only items")
+    print("stone_use: " + "; ".join(f"{t} {len(by_tier[t])}" for t in reversed(STONE_TIERS)))
+    for item, by in sorted(shared.items()):
+        print(f"  shared item {item} is {tiers.get(item, 'none')}: "
+              + ", ".join(f"{n} ({t})" for n, t in sorted(by.items())))
+    vf = {r["name"]: r["vf"] for r in CLASSES}
+    riders = [n for n in by_tier["tool"]
+              if not any(tiers.get(b) == "tool" for b in block_members(n) + [vf[n]])]
+    print("hard classes whose vanilla-only blocks are not tool-grade: " + ", ".join(riders))
 
 
 if __name__ == "__main__":
