@@ -22,6 +22,11 @@ public interface TerrainSource {
      */
     double raster(String layer, int x, int z);
 
+    /** Where the level has lava underground: vanilla's rules, measured from the floor, unless the world data says otherwise. */
+    default LavaRules lava() {
+        return LavaRules.DEFAULT;
+    }
+
     /** Folds x into the canonical span [-C/2, C/2). */
     default int wrapX(int x) {
         int c = circumference();
