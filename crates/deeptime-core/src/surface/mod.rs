@@ -106,6 +106,11 @@ pub mod field {
     pub const DEPOSITION: &str = "surface/deposition_m_myr";
     /// Thickness of the strata log, m.
     pub const SEDIMENT: &str = "surface/sediment_m";
+    /// The plate and the rigid group under each cell after the last step (`plates/plate_id`,
+    /// `plates/group_id` as the stage saw them): the next step's advection carries the offset only
+    /// from cells that held the same crust (`advect::bilinear_same`).
+    pub const CRUST_PLATE: &str = "surface/crust_plate";
+    pub const CRUST_GROUP: &str = "surface/crust_group";
     /// The surface rock class (index into `synth::EVERY_CLASS`).
     pub const CLASS: &str = "surface/class";
     /// log₁₀ of the drainage area in km² (land; NaN at sea).
@@ -282,11 +287,17 @@ impl Parts {
     }
 }
 
+/// `WorldState::globals`: cell-steps so far where another plate's crust arrived under a cell and
+/// the surface's offset started again from the plate model's elevation (`advect::bilinear_same`).
+pub const FOREIGN_CRUST_GLOBAL: &str = "surface/foreign_crust_cell_steps";
+
 /// The plate fields the stage reads each step.
 struct PlateFields {
     elevation: Vec<f32>,
     uplift: Vec<f32>,
     plate_id: Vec<f32>,
+    /// `plates/group_id`; absent in worlds built without the plate model's L1 sampling (tests).
+    group_id: Option<Vec<f32>>,
     crust_type: Vec<f32>,
     crust_age: Vec<f32>,
     regime: Vec<f32>,
@@ -321,6 +332,7 @@ impl PlateFields {
             elevation: get("plates/elevation_m")?,
             uplift: get("plates/uplift_mm_yr")?,
             plate_id: get("plates/plate_id")?,
+            group_id: get("plates/group_id").ok(),
             crust_type: get("plates/crust_type")?,
             crust_age: get("crust_age")?,
             regime: get("regime")?,
@@ -511,6 +523,11 @@ impl SurfaceStage {
 
         // 1. The state, carried with the plates.
         let started = Instant::now();
+        let mut trace_prev: Option<Vec<f32>> = None; // TRACE
+        let mut trace_off: Option<Vec<f32>> = None; // TRACE
+        let mut trace_app: Option<Vec<f32>> = None; // TRACE
+        // Cells where another plate's crust arrived this step (the offset starts again there).
+        let mut foreign_cells = 0u64;
         let mut st = match world.surface.take() {
             Some(mut st) => {
                 ctx.reserve(StrataLog::bytes_per_cell(st.log.k) * n as u64 + 16 * n as u64)?;
@@ -536,10 +553,95 @@ impl SurfaceStage {
                     })
                     .collect();
                 let src = advect::sources(&grid, &pf.plate_id, &omega, dt);
+                if std::env::var_os("DEEPTIME_SURFACE_TRACE").is_some() {
+                    // TRACE
+                    trace_off = Some(
+                        src.par_iter()
+                            .map(|&[fi, fj]| advect::bilinear(w, hgt, &st.offset_m, fi, fj))
+                            .collect(),
+                    );
+                    if let Some(ap) = &applied {
+                        trace_app = Some(
+                            src.par_iter()
+                                .map(|&[fi, fj]| advect::bilinear(w, hgt, ap, fi, fj))
+                                .collect(),
+                        );
+                    }
+                }
+                // The offset moves with its own crust: a corner cell counts when it held the
+                // same rigid group before the step (a group keeps its number when a collision
+                // hands it to another plate), the same plate, or the parent of a plate born this
+                // step. Where no corner did, the crust is new at this place (another plate's edge
+                // arrived over a trench, a small plate was absorbed) and starts at the plate
+                // model's elevation: what the surface had built here belongs to the crust that
+                // left. Without the last step's ids (the first step after an older checkpoint)
+                // every corner counts, as before.
+                let prev_ids = |name: &str| {
+                    world
+                        .fields
+                        .get(name)
+                        .filter(|f| f.data.len() == n)
+                        .map(|f| f.data.clone())
+                };
+                let prev_plate = prev_ids(field::CRUST_PLATE);
+                let prev_group = prev_ids(field::CRUST_GROUP);
+                let known = st.omega.len();
+                let old_rule = std::env::var_os("DEEPTIME_OLD_OFFSET").is_some(); // TRACE
+                let same_crust = |c: usize, s: usize| -> bool {
+                    if old_rule {
+                        return true; // TRACE
+                    }
+                    let Some(pp) = prev_plate.as_ref() else {
+                        return true;
+                    };
+                    let now = pf.plate_id[c];
+                    if pp[s] == now {
+                        return true;
+                    }
+                    if let (Some(pg), Some(g)) = (prev_group.as_ref(), pf.group_id.as_ref())
+                        && pg[s] == g[c]
+                    {
+                        // The same rigid group under another plate: a sutured terrane.
+                        return true;
+                    }
+                    // A plate born this step: its crust was its parent's.
+                    let mut k = now as usize;
+                    for _ in 0..64 {
+                        if !(now.is_finite() && now >= 0.0) || k < known {
+                            break;
+                        }
+                        match parents.get(k).copied().flatten() {
+                            Some(pk) => {
+                                if pp[s] == pk as f32 {
+                                    return true;
+                                }
+                                k = pk as usize;
+                            }
+                            None => break,
+                        }
+                    }
+                    false
+                };
+                let foreign = std::sync::atomic::AtomicU64::new(0);
                 st.offset_m = src
                     .par_iter()
-                    .map(|&[fi, fj]| advect::bilinear(w, hgt, &off, fi, fj))
+                    .enumerate()
+                    .map(|(c, &[fi, fj])| {
+                        advect::bilinear_same(w, hgt, &off, fi, fj, |s| same_crust(c, s)).unwrap_or_else(|| {
+                            foreign.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            0.0
+                        })
+                    })
                     .collect();
+                foreign_cells = foreign.into_inner();
+                if std::env::var_os("DEEPTIME_SURFACE_TRACE").is_some() {
+                    // TRACE
+                    trace_prev = Some(
+                        src.par_iter()
+                            .map(|&[fi, fj]| advect::bilinear(w, hgt, &st.elevation_m, fi, fj))
+                            .collect(),
+                    );
+                }
                 let reg = std::mem::take(&mut st.regolith_m);
                 st.regolith_m = src
                     .par_iter()
@@ -1149,6 +1251,89 @@ impl SurfaceStage {
             iso -= l;
         }
         self.time("isostasy", started);
+        if let Ok(path) = std::env::var("DEEPTIME_SURFACE_TRACE") {
+            // TRACE
+            use std::io::Write;
+            let mut line = format!("{{\"t\":{t_end_myr:.0}");
+            for (name, thr) in [("land", sea), ("hi8", 8000.0), ("hi10", 10000.0)] {
+                let mut a = [0.0f64; 9];
+                let mut m = 0usize;
+                for c in 0..n {
+                    if sc.h[c] <= thr {
+                        continue;
+                    }
+                    m += 1;
+                    let plate = f64::from(pf.elevation[c]);
+                    a[0] += plate;
+                    a[1] += h_start[c] - plate;
+                    a[2] += h_start[c];
+                    a[3] += trace_prev.as_ref().map_or(0.0, |p| h_start[c] - f64::from(p[c]));
+                    a[4] += net[c].min(0.0);
+                    a[5] += net[c].max(0.0);
+                    a[6] += -load[c];
+                    a[7] += sc.h[c];
+                    a[8] += applied.as_ref().map_or(0.0, |ap| f64::from(ap[c]));
+                }
+                let k = m.max(1) as f64;
+                line += &format!(
+                    ",\"{name}\":{{\"n\":{m},\"plate\":{:.0},\"off\":{:.0},\"h0\":{:.0},\"tect\":{:.0},\"ero\":{:.0},\"dep\":{:.0},\"iso\":{:.0},\"h1\":{:.0},\"applied\":{:.0}}}",
+                    a[0] / k, a[1] / k, a[2] / k, a[3] / k, a[4] / k, a[5] / k, a[6] / k, a[7] / k, a[8] / k
+                );
+            }
+            if let Some(p) = trace_prev.as_ref() {
+                // risers: cells the plate model lifted by more than 1 km this step, on land.
+                let (mut m, mut t, mut h0, mut pl, mut hi, mut ap) = (0usize, 0.0, 0.0, 0.0, 0usize, 0.0);
+                let mut worst = (0.0f64, 0usize);
+                for c in 0..n {
+                    let d = h_start[c] - f64::from(p[c]);
+                    if d > 1000.0 && h_start[c] > sea {
+                        m += 1;
+                        t += d;
+                        h0 += h_start[c];
+                        pl += f64::from(pf.elevation[c]);
+                        ap += applied.as_ref().map_or(0.0, |x| f64::from(x[c]));
+                        if h_start[c] > 10000.0 {
+                            hi += 1;
+                        }
+                        if d > worst.0 {
+                            worst = (d, c);
+                        }
+                    }
+                }
+                let k = m.max(1) as f64;
+                let wc = worst.1;
+                let po = trace_off.as_ref().map_or(0.0, |x| f64::from(x[wc]));
+                let pa = trace_app.as_ref().map_or(0.0, |x| f64::from(x[wc]));
+                // Sum over risers of the two parts of the lift: the plate's own change and the unapplied feedback.
+                let (mut dplate, mut unapp) = (0.0, 0.0);
+                for c in 0..n {
+                    let d = h_start[c] - f64::from(p[c]);
+                    if d > 1000.0 && h_start[c] > sea {
+                        let prev_plate = f64::from(p[c]) - trace_off.as_ref().map_or(0.0, |x| f64::from(x[c]));
+                        dplate += f64::from(pf.elevation[c]) - prev_plate;
+                        unapp += -trace_app.as_ref().map_or(0.0, |x| f64::from(x[c]));
+                    }
+                }
+                line += &format!(
+                    ",\"risers\":{{\"n\":{m},\"tect\":{:.0},\"h0\":{:.0},\"plate\":{:.0},\"dplate\":{:.0},\"minus_applied\":{:.0},\"above10\":{hi},\"worst\":{{\"lift\":{:.0},\"h0\":{:.0},\"plate\":{:.0},\"prevH\":{:.0},\"prevPlate\":{:.0},\"prevOff\":{:.0},\"appliedAdv\":{:.0},\"crust\":{:.0},\"age\":{:.1}}}}}",
+                    t / k, h0 / k, pl / k, dplate / k, unapp / k, worst.0, h_start[wc], pf.elevation[wc], p[wc],
+                    f64::from(p[wc]) - po, po, pa, pf.crust_type[wc], pf.crust_age[wc]
+                );
+            }
+            let top = (0..n).max_by(|&x, &y| sc.h[x].total_cmp(&sc.h[y])).unwrap_or(0);
+            line += &format!(
+                ",\"top\":{{\"h1\":{:.0},\"plate\":{:.0},\"h0\":{:.0},\"tect\":{:.0},\"net\":{:.0},\"iso\":{:.0}}}}}\n",
+                sc.h[top],
+                pf.elevation[top],
+                h_start[top],
+                trace_prev.as_ref().map_or(0.0, |p| h_start[top] - f64::from(p[top])),
+                net[top],
+                -load[top]
+            );
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                let _ = f.write_all(line.as_bytes());
+            }
+        }
 
         // 6. Outputs.
         let started = Instant::now();
@@ -1254,7 +1439,15 @@ impl SurfaceStage {
             gtot.write(&mut world.notes);
         }
         put(world, field::ICE, ice_now);
+        put(world, field::CRUST_PLATE, pf.plate_id.clone());
+        match &pf.group_id {
+            Some(g) => put(world, field::CRUST_GROUP, g.clone()),
+            None => {
+                world.fields.remove(field::CRUST_GROUP);
+            }
+        }
         put(world, field::GLACIAL_EROSION, g_rate);
+        *world.globals.entry(FOREIGN_CRUST_GLOBAL.to_owned()).or_insert(0.0) += foreign_cells as f64;
         world.fields.remove(field::FEEDBACK_APPLIED);
         self.time("outputs", started);
 
