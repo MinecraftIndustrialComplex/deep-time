@@ -58,5 +58,5 @@ for q in 'x0=-2000&z0=-500&x1=3000&z1=800' 'x0=1237&z0=3100&x1=1237&z1=3650' 'x0
 done
 
 python3 tools/workbench/sections_shots.py "$B" bakeA "$OUT" --depths 20,100,floor \
-    --section dia=1237,3100,1237,3650 --section coal=3422,700,3422,1250 --section seam=8000,-300,-7900,200
+    --section dia=1237,3100,1237,3650 --section coal=3422,700,3422,1250 --section seam=8000,-300,-7900,200 --other-views
 echo "watch log:"; cat "$SCRATCH/watch-$PORT.log"

@@ -234,6 +234,13 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `tools/workbench/sections-shots.sh` now gives it DejaVu. A section through a diamictite bed (68.1° S 207.2° E → 80.2° S,
   165 km, `dia-big-lit.png`): a 1.8 % bed the key lights up in plum, thinning up a slope and cropping out in a fjord-like
   trough. New diamictite coordinates differ from the first run's (master changed the planet).
+- **Merged with the rivers & lakes and final-world branches** (master 386bd14; conflicts in STATUS.md, `http.rs`, `workbench.html`,
+  `workbench.js`, `lib.rs`, all keep-both): one `window.DTWB` now serves `sections.js` and `worldmap.js`; the rock legend limit
+  (64 classes) sits beside the rivers legend branch. Re-run on the Azure VM: fmt, clippy `-D warnings`, `cargo test --workspace`
+  (core 351, cli 46, format 52), `./gradlew build test` (160/0, `ColumnParityTest columns=500 equal=500`) all green, and
+  `check-sections.sh --other-views` on a fresh baked run: the sections checks pass, the Rivers & lakes layer shows its own
+  legend (no depth control), the Final world view opens, paints and closes, the rock layer's depth control comes back, no
+  page errors (a slice 0.8–1.2 s cold with the box quieter).
 - **Next.** The coordinator merges this with the rivers, deposits and zoomable-map branches (the conflicts will be the
   `workbench.js`/`workbench.html` hunks and this file's top); restart the live workbench on the test machine to get it
   (`tools/viewer/mac-watch.sh`). Runs made before format 0.2 show "needs a bake" until they are run again. Scratch deleted;
