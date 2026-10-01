@@ -97,6 +97,7 @@
   "deeptime.editor.field.subduction_start_age": "Sea floor sinking age",
   "deeptime.editor.field.subduction_start_clearance": "New trench clearance",
   "deeptime.editor.field.suture_size": "Continent size that welds plates",
+  "deeptime.editor.field.arc_maturity": "Island-arc maturity",
   "deeptime.editor.field.erosion_strength": "Erosion strength",
   "deeptime.editor.field.isostasy": "Isostatic rebound",
   "deeptime.editor.field.hillslope_creep": "Hillslope creep",

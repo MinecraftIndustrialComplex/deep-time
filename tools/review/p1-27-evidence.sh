@@ -8,7 +8,7 @@
 # index.html), and each run's summary lines (the margins line carries the active / passive series
 # every 10 Myr).
 #
-#   tools/review/p1-27-evidence.sh <length Myr> "<starts>" <seed> [-- --set k=v ...]
+#   [LABELS="after"] tools/review/p1-27-evidence.sh <length Myr> "<starts>" <seed> [-- --set k=v ...]
 set -euo pipefail
 LEN=$1; STARTS=$2; SEED=$3; shift 3
 [ "${1:-}" = "--" ] && shift
@@ -18,7 +18,7 @@ BEFORE=${BEFORE:-/Volumes/Graphide/ban/deeptime-runs/p1-27/before-src/target/rel
 mkdir -p "$R" "$OUT"
 cargo build --release -q -p deeptime-cli
 for start in $STARTS; do
-    for label in before after; do
+    for label in ${LABELS:-before after}; do
         rm -rf "$R/view-$label-$start"
         if [ "$label" = before ]; then
             BIN="$BEFORE" VIEW="$R/view-$label-$start" tools/review/p1-27-pipeline.sh "$R" "$label" "$start" "$SEED" "$LEN"

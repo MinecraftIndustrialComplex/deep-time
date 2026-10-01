@@ -100,6 +100,7 @@
     "arc_width_km": 60.0,
     "arc_uplift_mm_yr": 0.3,
     "arc_magma_m_per_myr": 20.0,
+    "arc_continental_m": 80.0,
     "cordillera_uplift_mm_yr": 0.2,
     "cordillera_width_km": 120.0,
     "cordillera_height_m": 2500.0,

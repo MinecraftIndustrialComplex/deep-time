@@ -2063,7 +2063,8 @@ community ports) are not opened for code.
   old oceanic crust starts subducting wherever it lies far from every trench
   (`subduction_initiation_clearance_km`), never taking continental crust; continental arcs build a
   cordillera (`cordillera_*`); a collision stamps its orogen only over the core of its surge
-  (`collision_orogen_core`). Constants from Cortial's Appendix A:
+  (`collision_orogen_core`); an emerged island arc turns continental only once it is mature
+  (`arc_continental_m`). Constants from Cortial's Appendix A:
   2 Myr step, subduction distance 1,800 km, collision distance 4,200 km, 100 mm/yr speed cap,
   damping 0.04 mm/yr, erosion 0.03 mm/yr, accretion 0.3 mm/yr, subduction uplift 0.6 mm/yr, and the
   elevation envelope of §5.1.
@@ -3755,6 +3756,23 @@ on this machine.
 - **Check.** Active share of continental coastline over time against Earth's; arc relief
   (cordillera height under the cones); provinces view coherence; downstream calibration (land
   fraction, hypsometry, climateConsistent) re-checked.
+- **As built (2026-09-30).**
+  - **Cause.** Not the spontaneous initiation (0–2 per 750-Myr run): Cortial's collision moved a
+    colliding continent alone to the overriding plate and left its ocean behind, still converging,
+    so its passive margins all turned into plate boundaries and then Andean margins (collisions cut
+    295,000–455,000 km of margin off its ocean per run; rifts ~2,000 km, initiations < 300 km).
+  - **Fixes** (all settings, in the presets and the editor): a large collision sutures the whole
+    plate (`collision_suture_frac`); old floor starts subducting wherever it is clear of trenches
+    (`subduction_initiation_clearance_km`; rate 0.3); continental arcs build a cordillera
+    (`cordillera_uplift_mm_yr`, `_width_km`, `_height_m`); a collision's orogen is only its surge's
+    core (`collision_orogen_core`); island arcs turn continental only once mature
+    (`arc_continental_m`). The provinces view draws rifted margins as a continuous band and
+    generalises to the USGS map's 150-km features.
+  - **Measured** (6 pipeline runs × 400 Myr, before → after): active share of the continental margin
+    0.67 → 0.31 (Earth ≈ 0.3, Bradley 2008), floor beside passive margins 50 → 102 Myr, ground under
+    arc cones 0.31 → 0.81 km, provinces orogen 0.51 → 0.40, land 0.40 → 0.39, ocean p90 108 → 194 Myr.
+    Tools: `notes.plates.margins`, `deeptime margins`, `notes.volcanoes.arc_bases`, the provinces
+    coherence line, `tools/review/p1-27-*`. STATUS.md build log, 2026-09-30 (P1-27).
 
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 

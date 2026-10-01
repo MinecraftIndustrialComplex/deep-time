@@ -502,8 +502,16 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
         })
         .collect();
     let dt_yr = env.dt_yr;
+    // An emerged island arc becomes continental crust once it is a mature arc (P1-27: volcano
+    // cones lift young arcs above the sea long before their crust thickens, and with subduction
+    // starting in the open ocean every such arc turned into continent).
+    let mature_m = env.k.arc_continental_m as f32;
     st.samples.par_iter_mut().enumerate().for_each(|(i, s)| {
-        if s.kind == OCEANIC && s.elevation_m > 0.0 && s.flags & ARC != 0 {
+        if s.kind == OCEANIC
+            && s.elevation_m > 0.0
+            && s.flags & ARC != 0
+            && s.arc_oceanic_m >= mature_m
+        {
             s.kind = CONTINENTAL;
             s.flags |= EMERGED;
             if s.orogeny != OROGENY_HIMALAYAN {
@@ -560,6 +568,7 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
         };
         s.thickness_m = s.pools.iter().sum();
     });
+    st.counters.emerged += st.samples.iter().filter(|s| s.flags & EMERGED != 0).count() as u32;
 }
 
 /// Table 2 of Cortial et al. 2019 (C++, i7-6700K): seconds per regular step, per oceanic crust
