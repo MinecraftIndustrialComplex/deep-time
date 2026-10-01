@@ -19,8 +19,8 @@ pub enum Profile {
     /// sin(phase), evaluated exactly.
     Sine,
     /// Noddy's sampled profile: at least [`X_RESOLUTION`] values in units of 1/100, sample i at
-    /// phase 2π·i/628, linear between samples.
-    Table(Vec<f32>),
+    /// phase 2π·i/628, linear between samples. Shared, so events can be cloned cheaply.
+    Table(std::sync::Arc<[f32]>),
 }
 
 impl Profile {

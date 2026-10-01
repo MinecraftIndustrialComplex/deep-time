@@ -235,6 +235,7 @@ version = "0.0.1"
 dependencies = [
  "crc32fast",
  "deeptime-format",
+ "deeptime-noddy",
  "flate2",
  "glam",
  "kiddo",
@@ -280,6 +281,10 @@ dependencies = [
  "rayon",
  "serde_json",
 ]
+
+[[package]]
+name = "deeptime-noddy"
+version = "0.0.1"
 
 [[package]]
 name = "deeptime-viewer"

@@ -30,6 +30,9 @@
 //! | [`profile`] | `proflib.c` `calcProfile` |
 //! | [`matrix`] | `matrix.c` |
 //!
+//! [`windowed`] is not Noddy's: it gives the ported events a finite extent on the map, which a
+//! planet needs and a 4 km model cube does not.
+//!
 //! Not ported: surfaces read from DXF files (faults and unconformities are planes, or the curved
 //! and ring geometries Noddy computes), imported voxel blocks (`unImport`), Biot folds (`unbiot`,
 //! unreachable in the original: its call is commented out and its solver is a no-op), `unloft` and
@@ -71,6 +74,7 @@ pub mod matrix;
 pub mod orient;
 pub mod profile;
 pub mod taste;
+pub mod windowed;
 
 pub use events::{
     Dyke, DykeKind, Event, Fault, FaultGeometry, FaultKind, Fold, Movement, Plug, PlugShape,
@@ -79,6 +83,7 @@ pub use events::{
 pub use history::{History, Restored, Rock, Stratigraphy};
 pub use profile::Profile;
 pub use taste::{Code, Sequence};
+pub use windowed::{Window, Windowed};
 
 /// A point or vector: `[x, y, z]`, x east, y north, z up.
 pub type V3 = [f64; 3];

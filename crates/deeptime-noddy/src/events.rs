@@ -816,12 +816,18 @@ pub enum Event {
     Strain(Strain),
     /// Noddy's `STOP`: the unravelling ends here, as if the history began after this event.
     Stop,
+    /// One of the above under a window of finite extent (Deep Time's addition, `windowed.rs`).
+    Windowed(crate::windowed::Windowed),
 }
 
 impl Event {
     /// A dyke or a plug.
     pub fn is_igneous(&self) -> bool {
-        matches!(self, Event::Dyke(_) | Event::Plug(_))
+        match self {
+            Event::Dyke(_) | Event::Plug(_) => true,
+            Event::Windowed(w) => w.inner.is_igneous(),
+            _ => false,
+        }
     }
 
     /// Undoes the event for one point. `previous_igneous`: whether the event before this one in
@@ -836,6 +842,7 @@ impl Event {
             Event::Tilt(e) => e.undo(p),
             Event::Strain(e) => e.undo(p),
             Event::Stop => Step::Moved(p),
+            Event::Windowed(e) => e.undo(p, place, previous_igneous, seq),
         }
     }
 }

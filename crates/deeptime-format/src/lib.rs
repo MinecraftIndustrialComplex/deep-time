@@ -21,6 +21,7 @@ pub mod raster;
 pub mod rivers;
 pub mod sites;
 pub mod strata;
+pub mod structure;
 pub mod tilepack;
 pub mod water;
 
