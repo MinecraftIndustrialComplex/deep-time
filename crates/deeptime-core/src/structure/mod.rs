@@ -683,6 +683,7 @@ impl StructureStage {
         } else {
             None
         };
+        let trap_shares = last.then(|| self.trap_shares(&src, &d, fields));
         add_time(&mut self.timings, "outputs", started);
         let surface_y: Vec<f64> = if last {
             self.st
@@ -812,6 +813,7 @@ impl StructureStage {
                 world.emit(e)?;
             }
             deformation["with_relief"] = json!(relief.iter().filter(|r| **r > 0.01).count());
+            deformation["traps"] = trap_shares.unwrap_or_default();
             world.structure = Some(structure);
             world.structure_relief = relief;
             ctx.log.push(
@@ -903,6 +905,45 @@ impl StructureStage {
         d: &Dims,
         fields: &BTreeMap<String, Field>,
     ) -> Vec<f32> {
+        self.trap_field_as(src, d, fields, TrapSource::Configured)
+    }
+
+    /// The share of continental cells whose structural closure is at least a half, three ways:
+    /// as the world has it, from the regime rule alone, and from the regime rule with the belt
+    /// width on the block metric (what Phase 1 did; `fold_belt_km` was read as block-km).
+    fn trap_shares(
+        &self,
+        src: &CellSource<'_>,
+        d: &Dims,
+        fields: &BTreeMap<String, Field>,
+    ) -> serde_json::Value {
+        let n = src.grid.cells();
+        let land = (0..n).filter(|&c| src.continental(c)).count().max(1) as f64;
+        let share = |from: TrapSource| {
+            let t = self.trap_field_as(src, d, fields, from);
+            let (mut half, mut sum) = (0u64, 0.0f64);
+            for (c, &v) in t.iter().enumerate() {
+                if src.continental(c) {
+                    half += u64::from(v >= 0.5);
+                    sum += f64::from(v);
+                }
+            }
+            json!({"closure_at_least_half": half as f64 / land, "mean": sum / land})
+        };
+        json!({
+            "world": share(TrapSource::Configured),
+            "regime_rule": share(TrapSource::Regime),
+            "regime_rule_block_km": share(TrapSource::RegimeBlockKm),
+        })
+    }
+
+    fn trap_field_as(
+        &self,
+        src: &CellSource<'_>,
+        d: &Dims,
+        fields: &BTreeMap<String, Field>,
+        from: TrapSource,
+    ) -> Vec<f32> {
         let n = src.grid.cells();
         let flags = fields
             .get("plates/flags")
@@ -914,18 +955,20 @@ impl StructureStage {
         let halite = self.tables.halite;
         let p = &self.p;
         // The world's own folds and faults, where it has any (P2-01).
-        let structural = p
-            .deformation
-            .enabled()
+        let structural = (from == TrapSource::Configured && p.deformation.enabled())
             .then(|| traps::structural(&self.st.features, &src.grid));
         // Distances on the plate model's Earth-sized sphere, as `fold_belt_km` is given: the
         // orogen distance is km on the block metric (300 m a block), and a planet 16,384 blocks
         // round is about an eighth of the Earth's size on it.
         let s = &self.preset.scale;
-        let model_km_per_block_km = 1000.0
-            / s.m_per_block_h
-            / (f64::from(s.circumference_blocks)
-                / (std::f64::consts::TAU * self.preset.tectonics.model_radius_km));
+        let model_km_per_block_km = if from == TrapSource::RegimeBlockKm {
+            1.0
+        } else {
+            1000.0
+                / s.m_per_block_h
+                / (f64::from(s.circumference_blocks)
+                    / (std::f64::consts::TAU * self.preset.tectonics.model_radius_km))
+        };
         (0..n)
             .into_par_iter()
             .map(|c| {
@@ -1000,6 +1043,17 @@ impl StructureStage {
             })
             .collect()
     }
+}
+
+/// Where a trap field's fold and fault closure comes from.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TrapSource {
+    /// The world's own structures when it has any, else the regime rule.
+    Configured,
+    /// The regime rule (belts within `fold_belt_km` of an orogen, rifts).
+    Regime,
+    /// The regime rule with the belt width in km on the block metric (Phase 1's reading).
+    RegimeBlockKm,
 }
 
 fn add_time(timings: &mut BTreeMap<&'static str, f64>, what: &'static str, since: Instant) {

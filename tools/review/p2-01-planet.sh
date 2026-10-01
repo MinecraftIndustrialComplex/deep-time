@@ -7,6 +7,10 @@
 #   tools/remote/mac.sh -- tools/review/p2-01-planet.sh start <name> <length-myr> [start-config] [preset]
 #       builds the release CLI and runs `deeptime stage structure` (plates, surface, structure)
 #       detached; the checkpoint is <name>.dtcp, the log <name>.log
+#   tools/remote/mac.sh -- tools/review/p2-01-planet.sh world <name> <preset> [--set PATH=VALUE]...
+#       builds the release CLI and runs the whole planet (`deeptime run`, 3 threads) detached into
+#       <name>-world/, then `strata-check`, `structure-sections` (<name>-sections/) and the
+#       parity fixture on it; the log is <name>.log
 #   tools/remote/mac.sh -- tools/review/p2-01-planet.sh tests
 #       runs `cargo test --workspace` detached (log: tests.log)
 #   tools/remote/mac.sh --no-sync -- tools/review/p2-01-planet.sh status
@@ -48,6 +52,18 @@ case "${1:-}" in
             && cp target/release/deeptime '$RUNS/deeptime-$name' \
             && /usr/bin/time -v '$RUNS/deeptime-$name' stage structure --preset '$preset' \
                --start '$start' --length-myr '$length' --out '$RUNS/$name.dtcp'"
+        ;;
+    world)
+        name="$2"; preset="$3"; shift 3
+        sets=""; for a in "$@"; do sets="$sets '$a'"; done
+        detach "$RUNS/$name.log" sh -c "cargo build --release -p deeptime-cli \
+            && cp target/release/deeptime '$RUNS/deeptime-$name' \
+            && rm -rf '$RUNS/$name-world' '$RUNS/$name-sections' \
+            && /usr/bin/time -v '$RUNS/deeptime-$name' run --preset '$preset' --threads 3 \
+               --out '$RUNS/$name-world' $sets \
+            && '$RUNS/deeptime-$name' strata-check --world-data '$RUNS/$name-world' > '$RUNS/$name-strata.json' \
+            && '$RUNS/deeptime-$name' structure-sections --world-data '$RUNS/$name-world' --out '$RUNS/$name-sections' \
+            && '$RUNS/deeptime-$name' parity --world-data '$RUNS/$name-world' --columns 2000"
         ;;
     tests)
         detach "$RUNS/tests.log" cargo test --workspace --no-fail-fast

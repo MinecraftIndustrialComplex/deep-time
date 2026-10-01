@@ -306,6 +306,25 @@ pub fn groups(features: &[Feature], c: f64, m_per_block_h: f64, m_per_block_v: f
         if cause == 0 {
             params.push(("plate", f64::from(plate)));
         }
+        // Where to look: the structure that moved the rock furthest up or down (a strike-slip
+        // system's longest), and the azimuth of its long axis (a section across it runs at
+        // right angles to that).
+        let height = |f: &Feature| match f.kind {
+            Kind::FoldTrain => f64::from(f.amplitude),
+            Kind::Thrust | Kind::Normal => {
+                f64::from(f.slip.abs()) * f64::from(f.dip_deg).to_radians().sin()
+            }
+            Kind::StrikeSlip => f64::from(f.half_along) * 1e-3,
+            Kind::Stock | Kind::Dyke | Kind::Plug => 0.0,
+        };
+        if let Some(best) = fs
+            .iter()
+            .max_by(|a, b| height(a).total_cmp(&height(b)).then(b.id.cmp(&a.id)))
+        {
+            params.push(("strongest_x", best.x.round()));
+            params.push(("strongest_z", best.z.round()));
+            params.push(("strongest_azimuth_deg", f64::from(best.azimuth_deg)));
+        }
         out.push(Group {
             kind,
             setting,
