@@ -97,6 +97,10 @@ pub struct DeformationParams {
     /// Structures of one kind that may overlap at a place; a new one is not started where this
     /// many already are (strain goes on being taken up by the structures that exist).
     pub max_overlap: u32,
+    /// At a place that is full, a new structure replaces the oldest one there when that one is at
+    /// least this much older, Myr (a later orogenic pulse overprints an earlier one). Design
+    /// value: the plate model's collision phase lasts 30 Myr.
+    pub overprint_myr: f64,
     /// Scatter of a structure's trend about the regional trend, degrees (one standard deviation).
     pub trend_scatter_deg: f64,
     /// The most structures a world keeps (a guard, far above what the rates give).
@@ -129,6 +133,7 @@ impl Default for DeformationParams {
             foreland_km: 250.0,
             arc_uplift_mm_yr: 0.1,
             max_overlap: 3,
+            overprint_myr: 30.0,
             trend_scatter_deg: 12.0,
             max_structures: 60_000,
         }
@@ -203,6 +208,7 @@ impl DeformationParams {
             (self.strike_slip_rate_km2_myr, "strike_slip_rate_km2_myr"),
             (self.trend_scatter_deg, "trend_scatter_deg"),
             (self.foreland_km, "foreland_km"),
+            (self.overprint_myr, "overprint_myr"),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
         }

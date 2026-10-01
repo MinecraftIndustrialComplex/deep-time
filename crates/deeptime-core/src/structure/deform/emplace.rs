@@ -11,8 +11,12 @@
 //! | a lifted margin inside a subduction zone's reach where convergence is more than 30° oblique | shear | strike-slip faults along the margin (slip partitioning) |
 //!
 //! Each is a Poisson process in space and time, like the plutons: the expected number in a step
-//! is Σ strain × cell area × the kind's rate × Δt, and a structure is not started where
-//! `max_overlap` of its kind already lie (the existing ones take up the strain). A structure is
+//! is Σ strain × cell area × the kind's rate × Δt, the area on the block metric (structures are
+//! sized in blocks, so a belt is as busy on the map at 60° as at the equator). Where
+//! `max_overlap` structures of the kind already lie, a new one is not started (the existing ones
+//! take up the strain), unless the oldest of them is `overprint_myr` older: then the new one
+//! takes its place, so a belt that is active again deforms the rock laid down since, and the
+//! number of structures over a place stays bounded however long the history. A structure is
 //! dated to the step that made it and never changes afterwards; it rides its plate
 //! (`feature::advance`), so the normal faults of a rift end up along the two passive margins the
 //! rift becomes, and the folds of a collision stay in the suture when the orogen has worn down.
@@ -26,7 +30,6 @@ use deeptime_format::GridDesc;
 
 use super::feature::{Counts, Feature, Kind, azimuth_of, direction};
 use super::params::DeformationParams;
-use crate::deposits::fields::cell_area_km2;
 use crate::deposits::random::Rng;
 use crate::plates::state::{ARC, CONTINENTAL, SUBDUCTION_ZONE, regime};
 use crate::sphere::BlockFrame;
@@ -217,24 +220,25 @@ fn length_blocks(v: [f64; 3], sigma: f64, km_to_blocks: f64, rng: &mut Rng) -> f
     (median * (sigma * rng.normal()).exp()).clamp(lo, hi) * km_to_blocks
 }
 
-/// Draws this step's new structures. `existing` are the ones already there (for the overlap
-/// rule); `cause(kind, x, z)` names the tectonic event behind a structure at a block position.
+/// Draws this step's new structures into `features` (the ones already there decide the overlap
+/// rule, and the oldest may give way); `cause(kind, x, z)` names the tectonic event behind a
+/// structure at a block position. Returns how many were started.
 #[allow(clippy::too_many_arguments)]
 pub fn emplace(
     x: &Inputs<'_>,
     sp: &StructureParams,
-    existing: &[Feature],
+    features: &mut Vec<Feature>,
     dt_myr: f64,
     t_myr: f64,
     rng: &mut Rng,
     next_id: &mut u32,
     counts: &mut Counts,
     cause: &dyn Fn(Kind, f64, f64) -> u64,
-) -> Vec<Feature> {
+) -> usize {
     let p: &DeformationParams = &sp.deformation;
-    let mut out: Vec<Feature> = Vec::new();
+    let mut born = 0usize;
     if !p.enabled() {
-        return out;
+        return born;
     }
     let grid = x.grid;
     let n = grid.cells();
@@ -251,9 +255,10 @@ pub fn emplace(
         Vec::with_capacity(n),
     ];
     let mut total = [0.0f64; 3];
+    let side_km = r * x.m_per_block_h / 1000.0;
+    let area = side_km * side_km;
     for c in 0..n {
         let s = strain(x, c, sp);
-        let area = cell_area_km2(grid, (c / w) as u32, x.m_per_block_h);
         for (k, v) in [s.shortening, s.extension, s.shear].into_iter().enumerate() {
             if v > 0.0 {
                 total[k] += v * area;
@@ -275,8 +280,8 @@ pub fn emplace(
         }
         let count = rng.poisson(total[which] * rate * per);
         for _ in 0..count {
-            if existing.len() + out.len() >= p.max_structures as usize {
-                return out;
+            if features.len() >= p.max_structures as usize {
+                return born;
             }
             let target = rng.uniform() * total[which];
             let c = cum[which].partition_point(|&v| v <= target).min(n - 1);
@@ -297,14 +302,28 @@ pub fn emplace(
             );
             let length = length_blocks(p.fault_length_km, p.fault_length_sigma, km_to_blocks, rng);
             let random_trend = 180.0 * rng.uniform();
-            let covered = existing
+            let covering: Vec<usize> = features
                 .iter()
-                .chain(out.iter())
-                .filter(|f| f.kind == kind && f.covers(bx, bz, c_blocks))
-                .count();
-            if covered >= p.max_overlap as usize {
-                counts.saturated += 1;
-                continue;
+                .enumerate()
+                .filter(|(_, f)| f.kind == kind && f.covers(bx, bz, c_blocks))
+                .map(|(k, _)| k)
+                .collect();
+            if covering.len() >= p.max_overlap as usize {
+                // Room is made by the oldest ones, if enough of them are old enough to give way.
+                let mut by_age = covering;
+                by_age.sort_by(|&a, &b| features[a].t_myr.total_cmp(&features[b].t_myr));
+                let needed = by_age.len() + 1 - p.max_overlap as usize;
+                let gives_way = |k: usize| f64::from(features[k].t_myr) <= t_myr - p.overprint_myr;
+                if !by_age[..needed].iter().all(|&k| gives_way(k)) {
+                    counts.saturated += 1;
+                    continue;
+                }
+                let mut gone: Vec<usize> = by_age[..needed].to_vec();
+                gone.sort_unstable_by(|a, b| b.cmp(a));
+                for k in gone {
+                    features.remove(k);
+                    counts.overprinted += 1;
+                }
             }
             let lerp = |v: [f64; 2], t: f64| v[0] + (v[1] - v[0]) * t;
             let mut f = Feature {
@@ -403,10 +422,11 @@ pub fn emplace(
             }
             *next_id += 1;
             counts.add(kind);
-            out.push(f);
+            features.push(f);
+            born += 1;
         }
     }
-    out
+    born
 }
 
 #[cfg(test)]
@@ -501,10 +521,10 @@ pub(crate) mod tests {
             let mut next = 0u32;
             for s in 0..steps {
                 let mut rng = Rng::stream(seed ^ (u64::from(s) << 20), "structure/deform");
-                let born = emplace(
+                emplace(
                     &self.inputs(),
                     sp,
-                    &all,
+                    &mut all,
                     2.0,
                     -100.0 + 2.0 * f64::from(s),
                     &mut rng,
@@ -512,7 +532,6 @@ pub(crate) mod tests {
                     &mut counts,
                     &|_, _, _| 0,
                 );
-                all.extend(born);
             }
             (all, counts)
         }

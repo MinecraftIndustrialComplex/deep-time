@@ -93,9 +93,12 @@ pub struct Feature {
     pub adrift: u8,
 }
 
-/// A structure that has had no continental crust under it for this many plate steps is lost (its
-/// crust went under another plate, or it was carried off by the wrong plate at a boundary).
+/// A structure that has had no continental crust under or beside it for this many plate steps is
+/// lost (its crust went under another plate).
 pub const LOST_AFTER_STEPS: u8 = 10;
+
+/// How far (L1 cells) a structure over oceanic crust looks for its continent's edge.
+const EDGE_CELLS: i64 = 3;
 
 /// Counters for the run summary.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -106,6 +109,8 @@ pub struct Counts {
     pub strike_slip_faults: u64,
     /// Not started because enough structures of the kind were already there.
     pub saturated: u64,
+    /// Old structures that gave way to a new one at a place that was full.
+    pub overprinted: u64,
     /// Lost: no continental crust under them for [`LOST_AFTER_STEPS`] plate steps.
     pub subducted: u64,
 }
@@ -273,11 +278,10 @@ impl Feature {
 /// Moves every feature with its plate over `dt_yr` (Ω per plate id, rad/yr; zero for a plate that
 /// is gone), turning its azimuth with the plate, then looks at the crust now under it. On
 /// continental crust it takes that crust's plate (its own, the fragment a rift left it on, or the
-/// plate a collision welded it to). A structure is born on continental crust and continents are
-/// not consumed, so oceanic crust under it means the L1 cell at a plate boundary read the other
-/// side: it keeps riding its plate, or, if that plate is gone, takes the continental plate of a
-/// neighbouring cell. Only one that stays off continental crust for [`LOST_AFTER_STEPS`] steps is
-/// dropped.
+/// plate a collision welded it to). A structure is born on continental crust, so oceanic crust
+/// under it means it sits at its continent's edge or left a boundary cell with the wrong plate:
+/// it takes the plate of the nearest continental cell within three cells. Only one with no
+/// continent that near for [`LOST_AFTER_STEPS`] steps is dropped.
 pub fn advance(
     features: &mut Vec<Feature>,
     grid: &GridDesc,
@@ -313,30 +317,38 @@ pub fn advance(
             f.adrift = 0;
             return true;
         }
+        // Oceanic crust under it: it sits at its continent's edge (a rifted margin, a coast the
+        // last resampling moved by a cell) or rode the wrong plate out of a boundary cell. The
+        // nearest continental cell within EDGE_CELLS is its continent.
+        let w = grid.w as i64;
+        let (i, j) = ((cell as i64) % w, (cell as i64) / w);
+        let mut best: Option<(i64, u32)> = None;
+        for dj in -EDGE_CELLS..=EDGE_CELLS {
+            let jj = j + dj;
+            if jj < 0 || jj >= i64::from(grid.h) {
+                continue;
+            }
+            for di in -EDGE_CELLS..=EDGE_CELLS {
+                let k = (jj * w + (i + di).rem_euclid(w)) as usize;
+                let d2 = di * di + dj * dj;
+                if crust_type[k] as u8 == CONTINENTAL && best.is_none_or(|b| d2 < b.0) {
+                    best = Some((d2, plate_id[k].max(0.0) as u32));
+                }
+            }
+        }
+        if let Some((_, plate)) = best {
+            f.plate = plate;
+            f.adrift = 0;
+            return true;
+        }
         f.adrift = f.adrift.saturating_add(1);
         if f.adrift > LOST_AFTER_STEPS {
             counts.subducted += 1;
             return false;
         }
         if om == [0.0; 3] {
-            // Its plate is gone: the nearest continental cell within two cells names the new one.
-            let w = grid.w as i64;
-            let (i, j) = ((cell as i64) % w, (cell as i64) / w);
-            let mut best: Option<(i64, u32)> = None;
-            for dj in -2..=2i64 {
-                let jj = j + dj;
-                if jj < 0 || jj >= i64::from(grid.h) {
-                    continue;
-                }
-                for di in -2..=2i64 {
-                    let k = (jj * w + (i + di).rem_euclid(w)) as usize;
-                    let d2 = di * di + dj * dj;
-                    if crust_type[k] as u8 == CONTINENTAL && best.is_none_or(|b| d2 < b.0) {
-                        best = Some((d2, plate_id[k].max(0.0) as u32));
-                    }
-                }
-            }
-            f.plate = best.map_or(plate_id[cell].max(0.0) as u32, |b| b.1);
+            // Its plate is gone: whatever is under it carries it.
+            f.plate = plate_id[cell].max(0.0) as u32;
         }
         true
     });
@@ -448,7 +460,7 @@ mod tests {
             &mixed_crust,
             &mut counts,
         );
-        assert_eq!((fs[0].plate, fs[0].adrift), (7, 1));
+        assert_eq!((fs[0].plate, fs[0].adrift), (7, 0));
         // On continental crust that changed plate (a terrane docked): kept, on the new plate.
         let mut fs = vec![fold(100.0, 50.0, 0.0)];
         advance(
