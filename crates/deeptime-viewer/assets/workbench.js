@@ -1735,17 +1735,64 @@
   // Inspector: events, details (an event's cause chain, a point's values), the run
   // =================================================================================================
   let selectedEvent = null, pin = null;
+  let inspBig = false, curITab = 'events';
   function setITab(name, reveal) {
+    // Expanded, the Events tab shows the details beside the list: picking an event keeps the list in view.
+    if (inspBig && reveal && name === 'details' && curITab === 'events') name = 'events';
+    curITab = name;
+    const split = inspBig && name === 'events';
     for (const b of document.querySelectorAll('[data-itab]')) b.setAttribute('aria-selected', String(b.dataset.itab === name));
-    for (const k of ['events', 'details', 's2', 'section', 'run']) $(`ip-${k}`).hidden = k !== name;
+    for (const k of ['events', 'details', 's2', 'section', 'run']) $(`ip-${k}`).hidden = !(k === name || (split && k === 'details'));
+    $('ipanes').classList.toggle('split', split);
     store.set('itab', name);
     // Something new to read there: bring the inspector into view on a short screen.
-    if (reveal && !narrow.matches && !TV) {
+    if (reveal && !inspBig && !narrow.matches && !TV) {
       const rp = $('rpanel'), rr = rp.getBoundingClientRect(), ir = $('inspector').getBoundingClientRect();
       const below = ir.top + Math.min(ir.height, name === 's2' ? 460 : 340) - rr.bottom;
       if (below > 0) rp.scrollBy({ top: below + 12, behavior: reducedMotion.matches ? 'auto' : 'smooth' });
     }
   }
+  // The inspector as a large overlay: the same card gains a class (nothing is moved or rebuilt, so the tab,
+  // scrolling, the selected event and the 3D previews are exactly as they were). Not on a phone, where the
+  // inspector already has the whole page, and not in ?tv.
+  function setInspBig(on, focusBtn) {
+    on = !!on && !narrow.matches && !TV;
+    if (on === inspBig) return;
+    inspBig = on;
+    const card = $('inspector'), btn = $('inspbig');
+    // A stand-in of the card's old size keeps the side panel as it was (and its scroll position, which the
+    // browser's scroll anchoring would otherwise move).
+    const rpTop = $('rpanel').scrollTop;
+    if (on) { const g = document.createElement('div'); g.id = 'inspghost'; g.style.cssText = `flex:none;height:${card.offsetHeight}px`; card.before(g); }
+    else if ($('inspghost')) $('inspghost').remove();
+    card.classList.toggle('big', on);
+    $('rpanel').scrollTop = rpTop;
+    $('inspscrim').hidden = !on;
+    card.tabIndex = on ? -1 : '';
+    if (!on) card.removeAttribute('tabindex');
+    if (on) { card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-label', 'Inspector, expanded'); }
+    else { card.removeAttribute('role'); card.removeAttribute('aria-modal'); card.removeAttribute('aria-label'); }
+    btn.setAttribute('aria-expanded', String(on));
+    btn.setAttribute('aria-label', on ? 'Close the expanded inspector' : 'Expand the inspector');
+    btn.dataset.tip = on ? 'Back to the side panel' : 'Expand the inspector';
+    btn.innerHTML = `<svg class="ic ic-s"><use href="#${on ? 'i-shrink' : 'i-full'}"/></svg>`;
+    document.dispatchEvent(new Event('pointerdown'));   // drop a tooltip that still has the old words
+    setITab(curITab);
+    document.dispatchEvent(new CustomEvent('dt:inspector-big', { detail: { on } }));
+    if (focusBtn !== false) btn.focus();
+  }
+  $('inspbig').addEventListener('click', () => setInspBig(!inspBig));
+  $('inspscrim').addEventListener('click', () => setInspBig(false));
+  narrow.addEventListener('change', () => { if (narrow.matches) setInspBig(false, false); });
+  // Tab stays inside the expanded card.
+  $('inspector').addEventListener('keydown', ev => {
+    if (!inspBig || ev.key !== 'Tab' || !$('modal').hidden) return;
+    const f = [...$('inspector').querySelectorAll('a[href], button, input, select, textarea, iframe, [tabindex]:not([tabindex="-1"])')].filter(e => !e.disabled && e.getClientRects().length);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (ev.shiftKey && (document.activeElement === first || document.activeElement === $('inspector') || !$('inspector').contains(document.activeElement))) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+  });
   for (const b of document.querySelectorAll('[data-itab]')) b.addEventListener('click', () => setITab(b.dataset.itab));
 
   let evShownKey = '';
@@ -2167,6 +2214,7 @@
     const k = ev.key;
     if (k === 'Escape') {
       if (!$('modal').hidden) { closeModal(); return; }
+      if (inspBig) { setInspBig(false); return; }
       if (!$('layerpop').hidden && !narrow.matches) { layerPop(false); $('lpickbtn').focus(); return; }
       if ($('app').classList.contains('drawer')) { $('app').classList.remove('drawer'); return; }
       if (tool !== 'select') { setTool('select'); return; }
@@ -2175,7 +2223,7 @@
       return;
     }
     const control = ev.target.closest ? ev.target.closest('input, select, textarea, button, [role=separator]') : null;
-    if (control && !(k === ' ' && control.id === 'timeline')) return;   // a focused control takes its own keys
+    if (control && !(k === ' ' && control.id === 'timeline') && !(k === 'p' && control.id === 'inspbig')) return;   // a focused control takes its own keys
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
     if (!$('modal').hidden) return;
     if (k === ' ') { ev.preventDefault(); togglePlay(); }
@@ -2190,6 +2238,7 @@
     else if (k === 'd') $('depbtn').click();
     else if (k === 'c') { if (comparing) setCompare(false); else setCompare(true); }
     else if (k === 'e') toggleSidebar();
+    else if (k === 'p') setInspBig(!inspBig);
     else if (k === 'v') setTool('select');
     else if (k === 'i') setTool('inspect');
     else if (k === 'b') setTool('area');
@@ -2287,7 +2336,7 @@
       K(['Space'], 'Play or pause'), K(['←', '→'], 'One step back or forward (Shift: ten)'), K(['Home'], 'Back to the start'),
       K(['L'], 'Follow the run live (End too)'), K(['[', ']'], 'Slower, faster'), K(['1', '…', '9'], 'Layers in the order they appeared'), K(['↑', '↓'], 'Previous or next layer'),
       K(['V'], 'Select tool: events and point values'), K(['I'], 'Inspect a column in 3D'), K(['B'], 'Preview an area in 3D'), K(['S'], 'Cross-section: click two points'),
-      K(['C'], 'Compare two runs'), K(['M'], 'Event markers on or off'), K(['D'], 'Deposits on or off'), K(['G'], 'Spin the globe'), K(['E'], 'Runs and editor'),
+      K(['C'], 'Compare two runs'), K(['M'], 'Event markers on or off'), K(['D'], 'Deposits on or off'), K(['G'], 'Spin the globe'), K(['E'], 'Runs and editor'), K(['P'], 'Pop the inspector out to a large overlay (Esc closes)'),
       K(['F'], 'Full screen'), K(['Esc'], 'Back to Select; clear the box and pin'), K(['?'], 'This list'),
     ].join('')}</div>`, '', true);
   }
@@ -2917,7 +2966,8 @@
   window.DTWB = {
     $, esc, ic, clamp, fmtInt, api, store, toast, modal, closeModal, niceTicks, rampInfo, rampOfLayer, layerLabel, latLonText,
     latText, lonText, runName,
-    panes, blockXZ, circ, llToCanvas, mapLatLon, setTool, setITab, setMTab,
+    panes, blockXZ, circ, llToCanvas, mapLatLon, setTool, setITab, setMTab, setInspBig,
+    inspectorBig: () => inspBig,
     focused: P, layer: () => layer, tool: () => tool, narrow: () => narrow.matches,
     redraw() { mapDirty = globeDirty = true; },
     legend() { legendDirty = true; },

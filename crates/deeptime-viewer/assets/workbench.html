@@ -654,6 +654,45 @@ input[type=range]:focus-visible { outline: none; }
 .s2-tool:hover { border-color: var(--accent-line); }
 .s2-tool[aria-pressed="true"] { border-color: var(--accent-line); background: var(--accent-soft); }
 
+/* Inspector, expanded: a large overlay over the window (the same card, so tab, scroll, selection and the 3D
+   previews are kept). The wrapper is invisible to layout until then. */
+.ipanes { display: contents; }
+.inspscrim { position: fixed; inset: 0; z-index: 930; background: rgba(3, 5, 8, .72); backdrop-filter: blur(5px); animation: fade-in .18s var(--ease); }
+#inspector.big {
+  position: fixed; z-index: 940; inset: 0; margin: auto; flex: none; min-height: 0; overflow: hidden;
+  width: min(2000px, calc(100vw - 48px)); height: min(1200px, calc(100dvh - 48px));
+  background: var(--bg-1); border-color: var(--line-2); border-radius: 16px; box-shadow: 0 30px 90px rgba(0, 0, 0, .7); animation: fade-in .18s var(--ease);
+}
+#inspector.big:focus { outline: none; }
+#inspector.big .card-h { min-height: 52px; padding: 0 10px 0 18px; font-size: 12px; border-bottom: 1px solid var(--line-1); margin-bottom: 12px; }
+#inspector.big .itabs { margin: 0 18px 12px; width: max-content; max-width: calc(100% - 36px); }
+#inspector.big .itabs button { padding-left: 22px; padding-right: 22px; }
+#inspector.big .ipanes { display: flex; flex: 1 1 auto; min-height: 0; gap: 0; }
+#inspector.big .ipane { min-width: 0; }
+#inspector.big .ipanes > .ipane:not([hidden]) { flex: 1 1 0; }
+#inspector.big .ipanes.split > #ip-events { flex: 0 0 clamp(340px, 34%, 560px); border-right: 1px solid var(--line-1); }
+#inspector.big .ipanes.split > #ip-details { flex: 1 1 0; }
+#inspector.big .ev-tools, #inspector.big .ev-kinds { padding-left: 18px; padding-right: 18px; }
+#inspector.big .evlist { padding: 0 10px 14px; }
+#inspector.big .evrow { min-height: 38px; font-size: 13.5px; }
+#inspector.big .evrow .t { font-size: 12.5px; }
+#inspector.big .detail { padding: 0 24px 24px; font-size: 13.5px; max-width: 1240px; }
+#inspector.big .detail .dh h4 { font-size: 18px; }
+#inspector.big .detail:empty::before { content: "Pick an event on the left, or a point on the map, to read it here."; display: block; padding: 28px 4px; color: var(--fg-4); font-size: 13px; }
+#inspector.big .kv { font-size: 13.5px; grid-template-columns: minmax(150px, 24%) 1fr; }
+#inspector.big .stats { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+#inspector.big .chain { flex-direction: row; flex-wrap: wrap; }
+#inspector.big .chain button { font-size: 12.5px; }
+#inspector.big .lines { font-size: 12px; }
+#inspector.big .s2-intro { padding: 0 18px 14px; max-width: 1240px; }
+#inspector.big .jobs { padding: 0 18px 18px; display: grid; gap: 14px; align-content: start; align-items: start; grid-template-columns: repeat(auto-fit, minmax(min(100%, 640px), 1fr)); }
+#inspector.big .job .embed { height: clamp(380px, 62dvh, 860px); }
+#inspector.big .job .jmsg { font-size: 12px; }
+#inspector.big #ip-section .sec-inline { flex: 1 1 auto; min-height: 380px; display: flex; flex-direction: column; }
+#inspector.big #ip-section .sv-grid { grid-template-columns: minmax(0, 1fr) 300px; padding: 0 0 4px; }
+#inspector.big #ip-section .sec { padding: 0 18px 18px; }
+#inspector.big #ip-section .sec [data-sec="big"] { display: none; }
+
 /* Dock: transport and the timeline */
 .dock { grid-area: dock; position: relative; z-index: 10; padding: 10px 16px 12px; background: linear-gradient(180deg, #0e131b, #0b0f15); border-top: 1px solid var(--line-1); }
 .dockrow { display: flex; align-items: center; gap: 14px; min-width: 0; }
@@ -745,7 +784,7 @@ input[type=range]:focus-visible { outline: none; }
   .macpill .txt { display: none; }
   .macpill { padding: 0 10px; gap: 7px; }
   .topbar { position: sticky; top: 0; height: 52px; padding: 0 8px; gap: 8px; }
-  .brand .sub, .brand .name, .vsep, .conn .txt, #helpbtn, #fsbtn, .runhead .chips { display: none; }
+  .brand .sub, .brand .name, .vsep, .conn .txt, #helpbtn, #fsbtn, #inspbig, .runhead .chips { display: none; }
   .macpill { padding: 0 9px; max-width: 46vw; }
   .macpill .bar { width: 36px; }
   #togglesidebar { display: none; }
@@ -798,7 +837,7 @@ input[type=range]:focus-visible { outline: none; }
 :root.tv { font-size: clamp(16px, 1.08vw, 44px); }
 :root.tv .app { grid-template-columns: 0 minmax(0, 1fr) 0; grid-template-rows: 0 minmax(0, 1fr) 0; }
 :root.tv .topbar, :root.tv .sidebar, :root.tv .rpanel, :root.tv .stagebar, :root.tv .axes, :root.tv .phead, :root.tv .readout, :root.tv .xhair, :root.tv .transport,
-:root.tv .speed, :root.tv #livebtn, :root.tv .mtabs, :root.tv .maphint { display: none !important; }
+:root.tv .speed, :root.tv #livebtn, :root.tv .mtabs, :root.tv .maphint, :root.tv #inspbig, :root.tv .inspscrim { display: none !important; }
 :root.tv .stage { background: #030407; }
 :root.tv .stage::before { display: none; }
 :root.tv .mapframe canvas.map { border-radius: 0; box-shadow: none; }
@@ -899,6 +938,7 @@ input[type=range]:focus-visible { outline: none; }
   <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5"/><path d="M4 15.5v2.5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5"/></symbol>
   <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M9.3 10h.01M12.6 10h.01M15.9 10h.01M18 10h.01M7.5 14.3h9"/></symbol>
   <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/></symbol>
+  <symbol id="i-shrink" viewBox="0 0 24 24"><path d="M9 4v3.5A1.5 1.5 0 0 1 7.5 9H4M20 9h-3.5A1.5 1.5 0 0 1 15 7.5V4M15 20v-3.5a1.5 1.5 0 0 1 1.5-1.5H20M4 15h3.5A1.5 1.5 0 0 1 9 16.5V20"/></symbol>
   <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></symbol>
   <symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="8.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.1" fill="currentColor"/><circle cx="12" cy="12" r="1.1" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.1" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.1" fill="currentColor"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
@@ -1057,7 +1097,9 @@ input[type=range]:focus-visible { outline: none; }
       <div class="popover" id="layerpop" hidden><div class="layers" id="layers"></div></div>
     </section>
     <section class="card grow" id="inspector" data-mtab="inspect">
-      <div class="card-h"><span class="title"><svg class="ic ic-s"><use href="#i-events"/></svg>Inspector</span></div>
+      <div class="card-h"><span class="title"><svg class="ic ic-s"><use href="#i-events"/></svg>Inspector</span><span class="spacer"></span>
+        <button class="btn btn-ghost btn-icon btn-sm" id="inspbig" aria-label="Expand the inspector" aria-expanded="false" aria-controls="inspector" data-tip="Expand the inspector" data-key="P"><svg class="ic ic-s"><use href="#i-full"/></svg></button>
+      </div>
       <div class="seg full itabs" role="tablist" aria-label="Inspector">
         <button role="tab" data-itab="events" aria-selected="true">Events</button>
         <button role="tab" data-itab="details" aria-selected="false">Details</button>
@@ -1065,6 +1107,7 @@ input[type=range]:focus-visible { outline: none; }
         <button role="tab" data-itab="section" aria-selected="false">Section</button>
         <button role="tab" data-itab="run" aria-selected="false">Run</button>
       </div>
+      <div class="ipanes" id="ipanes">
       <div class="ipane" id="ip-events">
         <div class="ev-tools"><span id="evcount">No events</span><span class="spacer"></span><button class="btn btn-ghost btn-sm" id="evfilter" aria-pressed="false"><svg class="ic ic-s"><use href="#i-filter"/></svg>Kinds</button></div>
         <div class="ev-kinds" id="evkinds" hidden></div>
@@ -1083,6 +1126,7 @@ input[type=range]:focus-visible { outline: none; }
       </div>
       <div class="ipane" id="ip-section" hidden></div>
       <div class="ipane" id="ip-run" hidden><div class="detail" id="runinfo"></div></div>
+      </div>
     </section>
   </aside>
 
@@ -1111,6 +1155,7 @@ input[type=range]:focus-visible { outline: none; }
   </footer>
 </div>
 
+<div class="inspscrim" id="inspscrim" hidden></div>
 <div id="tip" role="tooltip"></div>
 <div id="toasts" aria-live="polite"></div>
 <div class="modal" id="modal" hidden><div class="modal-card" id="modalcard"><div class="modal-h"><h3 id="modaltitle"></h3><span id="modalacts"></span><button class="btn btn-ghost btn-icon" id="modalclose" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button></div><div class="modal-b" id="modalbody"></div></div></div>
