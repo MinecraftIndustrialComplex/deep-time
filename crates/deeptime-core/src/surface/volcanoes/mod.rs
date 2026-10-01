@@ -1119,6 +1119,13 @@ impl VolcanoStage {
         // 5. Build.
         let started = Instant::now();
         let grow = 1.0 - (-dt / p.build_myr).exp();
+        // The strength height of this planet's crust over Earth's with the default crust (140 MPa
+        // at 9.81 m/s²): 1 on an Earth-like preset.
+        let strength_scale = self
+            .preset
+            .tectonics
+            .strength_height_m(self.preset.planet.gravity_m_s2)
+            / (140.0e6 / (crate::params::CRUST_DENSITY_KG_M3 * 9.81));
         let cell_km2 = cell_m * cell_m / 1.0e6;
         let every = (ARC_BASE_EVERY_MYR / dt).round().max(1.0) as u64;
         let record_bases = (self.done + 1).is_multiple_of(every) || last;
@@ -1167,10 +1174,15 @@ impl VolcanoStage {
                     v.target_m * prox.sqrt()
                 }
             };
-            let ceiling = match v.kind {
-                Kind::Shield => 0.65 * p.max_elevation_km * 1000.0,
-                _ => p.max_elevation_km * 1000.0,
-            };
+            // The ceiling is the same comparison as the crust's (`surface::spread`): an edifice's
+            // weight ρ·g·h against the strength under it. `max_elevation_km` is the height that
+            // strength holds at Earth's gravity with the default crust (140 MPa), so it scales
+            // with the strength height: 6.8 km on Earth, 17.9 km at Mars's gravity.
+            let ceiling = strength_scale
+                * match v.kind {
+                    Kind::Shield => 0.65 * p.max_elevation_km * 1000.0,
+                    _ => p.max_elevation_km * 1000.0,
+                };
             let target = target.min((sea + ceiling - base).max(0.0));
             let dh = (target - v.height_m).max(0.0) * grow;
             if dh <= 0.0 {
