@@ -45,7 +45,8 @@ impl KeyframePolicy {
 }
 
 /// What the derived view layers need of the preset's scale: block heights to metres, and the
-/// sphere the model runs on (the satellite view's hill shade).
+/// sphere the model runs on (the satellite view's hill shade), and what the water view's
+/// hydrology reads (the horizontal scale, the rivers' feature scale and the `hydro` section).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ViewScale {
     /// `scale.sea_level_y`.
@@ -54,15 +55,25 @@ pub struct ViewScale {
     pub m_per_block_v: f64,
     /// `tectonics.model_radius_km`, in metres.
     pub radius_m: f64,
+    /// `scale.m_per_block_h`.
+    pub m_per_block_h: f64,
+    /// `scale.feature_scale.rivers`.
+    pub rivers_scale: f64,
+    /// The preset's `hydro` section (its defaults without one); `enabled: false` draws no water.
+    pub hydro: crate::hydro::HydroParams,
 }
 
 impl Default for ViewScale {
-    /// The defaults of a planet preset (sea level y 63, 20 m per block, 6,370 km).
+    /// The defaults of a planet preset (sea level y 63, 20 m per block, 6,370 km, 300 m a block
+    /// across, the default hydrology).
     fn default() -> ViewScale {
         ViewScale {
             sea_level_y: 63.0,
             m_per_block_v: 20.0,
             radius_m: 6.37e6,
+            m_per_block_h: 300.0,
+            rivers_scale: 1.0,
+            hydro: crate::hydro::HydroParams::default(),
         }
     }
 }
@@ -71,8 +82,9 @@ impl Default for ViewScale {
 /// longitude 360°·px/w (the seam is 0°, plan §5.2) and latitude 90° − 180°·py/h (as a tile
 /// pack's cell is a point sample, `FORMAT.md`) and takes the nearest grid cell, coloured with the
 /// layer's ramp; NaN is transparent. The satellite view (`satellite`) is composited instead
-/// (`crate::satellite`; `view` turns block heights into metres). `None` when none of the layers
-/// exists yet.
+/// (`crate::satellite`; `view` turns block heights into metres), with the water of the frame's
+/// terrain drawn on it, and the `rivers` layer is drawn from that same water
+/// (`crate::water_view`, derived once for both). `None` when none of the layers exists yet.
 pub fn render(
     world: &WorldState,
     ramps: &Ramps,
@@ -84,9 +96,14 @@ pub fn render(
 ) -> Option<KeyframeImage> {
     let (w, h) = size;
     let mut out = Vec::new();
+    let water = layers
+        .iter()
+        .any(|l| WATER_LAYERS.contains(l))
+        .then(|| crate::water_view::derive(world, view, size))
+        .flatten();
     for &name in layers {
-        if name == crate::satellite::LAYER {
-            if let Some(rgba) = crate::satellite::render(world, ramps, view, size) {
+        if WATER_LAYERS.contains(&name) {
+            if let Some(rgba) = water_layer(world, ramps, view, name, size, water.as_ref()) {
                 out.push((name.to_owned(), rgba));
             }
             continue;
@@ -130,7 +147,61 @@ pub fn render(
 }
 
 /// Keyframe layers derived from the world's fields when a frame is rendered, not stored in it.
-pub const DERIVED_LAYERS: [&str; 2] = [crate::satellite::LAYER, crate::provinces::LAYER];
+pub const DERIVED_LAYERS: [&str; 3] = [
+    crate::satellite::LAYER,
+    crate::provinces::LAYER,
+    crate::water_view::LAYER,
+];
+
+/// The layers that show the water of the terrain (`crate::water_view`): the satellite view draws
+/// it over the land, `rivers` is the water on a quiet map.
+const WATER_LAYERS: [&str; 2] = [crate::satellite::LAYER, crate::water_view::LAYER];
+
+/// The RGBA picture of the water layer `name` (`satellite` or `rivers`) at `size`, with `water`
+/// (derived from the terrain, or read from the bake; `None`: no water to draw, the satellite view
+/// stays dry and the `rivers` layer is not drawn).
+fn water_layer(
+    world: &WorldState,
+    ramps: &Ramps,
+    view: &ViewScale,
+    name: &str,
+    size: (u32, u32),
+    water: Option<&crate::water_view::WaterView>,
+) -> Option<Vec<u8>> {
+    if name == crate::satellite::LAYER {
+        let mut rgba = crate::satellite::render(world, ramps, view, size)?;
+        if let Some(water) = water {
+            water.overlay(&mut rgba, ramps);
+        }
+        Some(rgba)
+    } else {
+        water?.render(ramps, view)
+    }
+}
+
+/// `frame` with its water layers (`satellite`, `rivers`) drawn again from `water`: the run's last
+/// frame once the bake has written the rivers and lakes (the other layers are kept). `None` when
+/// the frame has no water layer, or none could be drawn.
+pub fn redraw_water(
+    frame: &KeyframeImage,
+    world: &WorldState,
+    ramps: &Ramps,
+    view: &ViewScale,
+    water: &crate::water_view::WaterView,
+) -> Option<KeyframeImage> {
+    let size = (frame.w, frame.h);
+    let mut out = frame.clone();
+    let mut changed = false;
+    for (name, rgba) in &mut out.layers {
+        if WATER_LAYERS.contains(&name.as_str())
+            && let Some(new) = water_layer(world, ramps, view, name, size, Some(water))
+        {
+            *rgba = new;
+            changed = true;
+        }
+    }
+    changed.then_some(out)
+}
 
 /// The derived layer `name` for `world`'s current state (`None`: not one, or its inputs are missing).
 fn derived_field(world: &WorldState, name: &str) -> Option<crate::world::Field> {
@@ -152,6 +223,11 @@ pub fn add_derived(layers: &mut Vec<&'static str>) {
         || layers.contains(&crate::surface::amplify::field::ELEVATION);
     if terrain && !layers.contains(&crate::satellite::LAYER) {
         layers.insert(0, crate::satellite::LAYER);
+    }
+    // The water of a terrain frame: the rivers and lakes as a layer of their own (the satellite
+    // view carries them too).
+    if terrain && !layers.contains(&crate::water_view::LAYER) {
+        layers.push(crate::water_view::LAYER);
     }
 }
 
@@ -246,6 +322,21 @@ impl KeyframeStore {
             ring.frames.pop_front();
         }
         self.count.fetch_add(1, Ordering::AcqRel);
+        Ok(())
+    }
+
+    /// Replaces frame `frame.n` (already pushed) by `frame`, in the ring, in its file and in the
+    /// index: the run's last frame, drawn again from the bake's water. The frame's number, time,
+    /// stage and size must be the old one's; the caller holds the stepper, so nothing else writes.
+    pub fn replace(&self, frame: KeyframeImage) -> Result<(), CoreError> {
+        self.check(frame.n)?;
+        let entry = write_keyframe(&self.dir, &frame)?;
+        let mut ring = self.lock();
+        ring.index.frames[frame.n as usize] = entry;
+        ring.index.write(&self.dir)?;
+        if let Some(slot) = ring.frames.iter_mut().find(|f| f.n == frame.n) {
+            *slot = Arc::new(frame);
+        }
         Ok(())
     }
 
@@ -394,15 +485,18 @@ mod tests {
                 "plates",
                 "crust_age",
                 "regime",
-                "provinces"
+                "provinces",
+                "rivers"
             ]
         );
         let mut young = vec!["young/elevation", "young/drainage"];
         add_derived(&mut young);
         assert_eq!(young[0], "satellite");
+        assert_eq!(young.last(), Some(&"rivers"));
         let mut amplify = vec!["amplify/elevation", "amplify/detail"];
         add_derived(&mut amplify);
         assert_eq!(amplify[0], "satellite");
+        assert_eq!(amplify.last(), Some(&"rivers"));
         // A dummy stage's elevation and the deposit stage's layers get none.
         let mut dummy = vec!["elevation"];
         add_derived(&mut dummy);
@@ -434,5 +528,100 @@ mod tests {
         assert_eq!(f.layer_names(), ["satellite", "elevation", "regime"]);
         assert_eq!(f.layers[0].1.len(), 64 * 32 * 4);
         assert!(f.layers[0].1.chunks(4).all(|p| p[3] == 255));
+    }
+
+    /// A 64 × 32 planet: sea in the west, a plain in the east.
+    fn half_land() -> WorldState {
+        let mut world = WorldState::new(1, 1024, -1.0e6);
+        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
+        let data = (0..64 * 32)
+            .map(|k| if k % 64 < 32 { 40.0 } else { 70.0 })
+            .collect();
+        world
+            .fields
+            .insert("elevation".into(), Field { grid, data });
+        world
+    }
+
+    #[test]
+    fn a_frame_draws_the_water_beside_the_satellite_view_and_draws_it_again_from_a_bake() {
+        let ramps = Ramps::builtin();
+        let view = ViewScale::default();
+        let world = half_land();
+        let f = render(
+            &world,
+            &ramps,
+            &view,
+            "s",
+            &["satellite", "rivers"],
+            0,
+            (64, 32),
+        )
+        .unwrap();
+        assert_eq!(f.layer_names(), ["satellite", "rivers"]);
+        assert!(f.layers.iter().all(|(_, rgba)| rgba.len() == 64 * 32 * 4));
+        // The rivers layer: sea in the west, pale land in the east.
+        let rivers = &f.layers[1].1;
+        assert_eq!(&rivers[(16 * 64 + 5) * 4..][..3], &crate::water_view::SEA);
+        assert!(rivers[(16 * 64 + 50) * 4] > 150);
+        // Hydrology off: the satellite view is drawn dry and there is no rivers layer.
+        let mut off = view;
+        off.hydro.enabled = false;
+        let dry = render(
+            &world,
+            &ramps,
+            &off,
+            "s",
+            &["satellite", "rivers"],
+            0,
+            (64, 32),
+        )
+        .unwrap();
+        assert_eq!(dry.layer_names(), ["satellite"]);
+        // Drawn again from other water: the other layers are kept, these two are new.
+        let other = {
+            let mut v = view;
+            v.hydro.lake_min_depth_blocks = 64.0;
+            crate::water_view::derive(&world, &v, (64, 32)).unwrap()
+        };
+        let mut with = f.clone();
+        with.layers.push(("elevation".into(), vec![9; 64 * 32 * 4]));
+        let again = redraw_water(&with, &world, &ramps, &view, &other).unwrap();
+        assert_eq!(again.layer_names(), ["satellite", "rivers", "elevation"]);
+        assert_eq!(again.layers[2].1, vec![9; 64 * 32 * 4]);
+        // A frame with no water layer is not touched.
+        let mut bare = f;
+        bare.layers.clear();
+        assert!(redraw_water(&bare, &world, &ramps, &view, &other).is_none());
+    }
+
+    #[test]
+    fn a_frame_can_be_replaced_in_the_ring_the_file_and_the_index() {
+        let dir = std::env::temp_dir().join(format!("dt-core-kf-replace-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (ramps, view, world) = (Ramps::builtin(), ViewScale::default(), half_land());
+        let store = KeyframeStore::new(&dir, 4);
+        for n in 0..2 {
+            let f = render(&world, &ramps, &view, "s", &["satellite"], n, (64, 32)).unwrap();
+            store.push(f).unwrap();
+        }
+        let mut again = (*store.get(1).unwrap()).clone();
+        again.layers[0].1[0] = 7;
+        again.layers[0].1[1] = 8;
+        store.replace(again.clone()).unwrap();
+        let mut buf = vec![0u8; 64 * 32 * 4];
+        store.copy(1, 0, &mut buf).unwrap();
+        assert_eq!(&buf[..2], &[7, 8]);
+        store.copy(0, 0, &mut buf).unwrap();
+        assert_ne!(&buf[..2], &[7, 8], "frame 0 is untouched");
+        // The file and the index say the same: the frame reads back, CRC checked.
+        let index = KeyframeIndex::read(&dir).unwrap();
+        assert_eq!(index.frames.len(), 2);
+        let back = read_keyframe(&dir, &index.frames[1]).unwrap();
+        assert_eq!(back, again);
+        assert_eq!(store.index().frames[1].crc32, index.frames[1].crc32);
+        assert!(store.replace(KeyframeImage { n: 5, ..again }).is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
