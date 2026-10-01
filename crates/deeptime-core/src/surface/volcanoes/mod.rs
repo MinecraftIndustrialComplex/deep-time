@@ -1196,11 +1196,6 @@ impl VolcanoStage {
                     ((top - here) / (dh * wgt)).clamp(0.0, 1.0)
                 })
                 .fold(1.0f64, f64::min);
-            let room = if std::env::var_os("DEEPTIME_OLD_OFFSET").is_some() {
-                1.0 // TRACE
-            } else {
-                room
-            };
             let dh = dh * room;
             if dh <= 0.0 {
                 continue;

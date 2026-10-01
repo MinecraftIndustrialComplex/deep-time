@@ -122,6 +122,7 @@ impl BuildLimit {
             "knee_y": fit.knee_y,
             "top_y": fit.top_y,
             "cells_compressed": self.cells_compressed,
+            "rule_compressed": "elevation cells above knee_y: stored compressed towards top_y (scale.build_limit_band_blocks), never above it",
             "land_cells": self.land_cells,
             "share_of_land": share,
             "highest_y": if self.highest_y.is_finite() { json!(self.highest_y) } else { Value::Null },

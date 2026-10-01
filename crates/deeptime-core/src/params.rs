@@ -196,10 +196,12 @@ impl BuildFit {
     /// The stored elevation of simulated elevation `y`, blocks.
     pub fn compress(&self, y: f64) -> f64 {
         let band = self.top_y - self.knee_y;
-        if !(y > self.knee_y) || !(band > 0.0) {
-            return y;
+        // (NaN stays NaN.)
+        if y > self.knee_y && band > 0.0 {
+            self.knee_y + band * (1.0 - (-(y - self.knee_y) / band).exp())
+        } else {
+            y
         }
-        self.knee_y + band * (1.0 - (-(y - self.knee_y) / band).exp())
     }
 }
 
@@ -787,23 +789,10 @@ impl PlanetPreset {
             "leaves less than 64 blocks between sea level and the compression band under max_y",
         )?;
         let k = &self.tectonics;
-        // The world must be tall enough for the mountains the plate model may raise: its elevation
-        // guard has to fit below the compression knee, or every high range would be squeezed.
-        if k.max_elevation_m > s.uncompressed_height_m() {
-            return Err(CoreError::preset(
-                "$.scale.m_per_block_v",
-                format!(
-                    "the world is not tall enough: tectonics.max_elevation_m is {:.0} m, and with {} m per block \
-                     and max_y {} only {:.0} m above the sea fit under the build limit's compression band; \
-                     use at least {:.1} m per block, a higher max_y or a lower max_elevation_m",
-                    k.max_elevation_m,
-                    s.m_per_block_v,
-                    s.max_y,
-                    s.uncompressed_height_m(),
-                    (10.0 * k.max_elevation_m / (s.build_fit().knee_y - f64::from(s.sea_level_y))).ceil() / 10.0,
-                ),
-            ));
-        }
+        // No check that the plate model's elevation guard fits under the knee: the editor's
+        // sliders (vertical scale, this band) must be valid at both ends, and a world too short
+        // for its mountains is squeezed, not refused. The bake says how much
+        // (`notes.bake.terrain.build_limit.cells_compressed`).
         let pos = |v: f64, key: &str| check(v.is_finite() && v > 0.0, key, "must be > 0");
         pos(k.time_step_myr, "$.tectonics.time_step_myr")?;
         pos(k.model_radius_km, "$.tectonics.model_radius_km")?;
@@ -1199,10 +1188,9 @@ mod tests {
     }
 
     /// The build-limit compression (2026-10-01): as simulated below the knee, increasing and
-    /// smooth through it, never at the top however high the terrain; and a world too short for
-    /// the plate model's elevation guard is refused with the numbers that would fit.
+    /// smooth through it, never at the top however high the terrain; and a band too thin is refused.
     #[test]
-    fn the_top_band_is_compressed_and_a_short_world_is_refused() {
+    fn the_top_band_is_compressed() {
         let p = planet(PIPELINE_BUILTIN[0].1);
         let fit = p.scale.build_fit();
         assert_eq!((fit.knee_y, fit.top_y), (575.0, 623.0));
@@ -1230,20 +1218,13 @@ mod tests {
                 other => panic!("expected a preset error, got {other:?}"),
             }
         };
-        let short = edit(&|v| v["scale"]["m_per_block_v"] = json!(10.0));
-        assert!(
-            short.starts_with("$.scale.m_per_block_v: the world is not tall enough"),
-            "{short}"
-        );
-        assert!(short.contains("at least 19.6 m per block"), "{short}");
         assert_eq!(
             edit(&|v| v["scale"]["build_limit_band_blocks"] = json!(2.0)),
             "$.scale.build_limit_band_blocks: must be at least 8"
         );
-        // A lower guard fits a shorter world: 12 m per block holds 6 km.
+        // A world too short for its mountains is squeezed, not refused (the sliders' ends are valid).
         let mut v: Value = serde_json::from_str(PIPELINE_BUILTIN[0].1).unwrap();
-        v["scale"]["m_per_block_v"] = json!(12.0);
-        v["tectonics"]["max_elevation_m"] = json!(6000.0);
+        v["scale"]["m_per_block_v"] = json!(1.0);
         Preset::from_json(&v.to_string()).unwrap();
     }
 }
