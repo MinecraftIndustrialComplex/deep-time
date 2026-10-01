@@ -101,10 +101,65 @@ pub const KEYFRAME_LAYERS: [&str; 5] = [
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StreamMode {
-    /// In memory when the memory cap allows it, else tile by tile (plan §5.7.5).
+    /// In memory when the memory cap allows the whole path's full peak ([`whole_last_level_peak`]),
+    /// else tile by tile (plan §5.7.5).
     Auto,
     Always,
     Never,
+}
+
+/// Bytes per cell of the thinned copy the last level keeps for the keyframes (three f32 arrays:
+/// terrain, detail amplitude, drainage), allocated before the first tile runs.
+pub const PREVIEW_BYTES_PER_CELL: u64 = 12;
+
+/// The most the last level adds to what the run holds when the amplifier starts, if it runs on the
+/// whole raster: every reservation it will make, with what it holds by then.
+///
+/// - the whole raster's buffers (`gw × gh` cells at [`TILE_BYTES_PER_CELL`]), reserved by
+///   `run_tiles` when the last level starts;
+/// - the level before it (`gw/2 × gh/2` cells), which the ladder keeps until the last level is done,
+///   in place of the L2 level (`l2_bytes`, held now and dropped after the first ×2 level), when
+///   there are levels before the last (`doublings` ≥ 2);
+/// - the preview, allocated before that reservation.
+///
+/// The decision between memory and tiles is made against this, not against the buffers alone
+/// (2026-09-30: with the buffers alone, a 1000 Myr `earthlike_quick_16k` run chose memory with
+/// 1.64 GB held and then went over 4 GiB at the last level's reservation, where the ladder
+/// holds 0.16 GB more). The levels before the last decide for themselves, with the gauge as it is
+/// when they start, so they are not part of this.
+pub fn whole_last_level_peak(
+    l2_bytes: u64,
+    doublings: u32,
+    gw: usize,
+    gh: usize,
+    preview_width: u32,
+) -> u64 {
+    let buffers = (gw * gh) as u64 * TILE_BYTES_PER_CELL;
+    let kept = if doublings >= 2 {
+        ((gw / 2) * (gh / 2)) as u64 * LEVEL_BYTES_PER_CELL
+    } else {
+        l2_bytes
+    }
+    .saturating_sub(l2_bytes);
+    let s = preview_stride(gw, preview_width as usize);
+    let preview = (gw.div_ceil(s) * gh.div_ceil(s)) as u64 * PREVIEW_BYTES_PER_CELL;
+    buffers + kept + preview
+}
+
+/// Whether a level runs in tiles: `always` and `never` as they say; `auto` when `reserve` refuses
+/// `peak_bytes`, the most the whole-raster path would add to what the run holds (so that once it
+/// runs whole, none of its later reservations fails; `reserve` may spill the recorded history to
+/// make the room, as it does for any stage).
+pub fn streams(
+    mode: StreamMode,
+    peak_bytes: u64,
+    reserve: &dyn Fn(u64) -> Result<(), CoreError>,
+) -> bool {
+    match mode {
+        StreamMode::Always => true,
+        StreamMode::Never => false,
+        StreamMode::Auto => reserve(peak_bytes).is_err(),
+    }
 }
 
 /// The `amplify` section (plan §5.1 `SurfaceParams`, amplification): every key optional.
@@ -490,11 +545,8 @@ pub fn run(
         let counts = cfg.counts(true);
         // The whole raster's buffers, and the next level's arrays which are kept either way.
         let whole_bytes = (gw * gh) as u64 * (TILE_BYTES_PER_CELL + LEVEL_BYTES_PER_CELL);
-        let tiled = match cfg.p.stream {
-            StreamMode::Always => true,
-            StreamMode::Never => false,
-            StreamMode::Auto => reserve(whole_bytes).is_err(),
-        } && (cfg.p.tile_cells as usize) < gw.max(gh);
+        let tiled =
+            streams(cfg.p.stream, whole_bytes, reserve) && (cfg.p.tile_cells as usize) < gw.max(gh);
         let level_plan = if tiled {
             TilePlan {
                 gw,
@@ -687,6 +739,12 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         StreamMode::Auto if base + whole > cap => streamed,
         StreamMode::Auto => whole,
     };
+    // The pick is made from the buffers alone, under the default cap, as before; the run's own
+    // decision (`whole_last_level_peak`) also counts the level the ladder keeps and the preview,
+    // about 0.15 GiB at 16k. So a last level this lists whole may run in tiles (the estimate
+    // then overstates), and one that does run whole needs that much more than listed. Making
+    // `Stage::estimate` take the run's cap would close both (the workbench judges a run against
+    // its cap less 512 MiB, which the default-cap pick here does not know).
     let last = pick(l3 * TILE_BYTES_PER_CELL, window(p.resolution.l3_r));
     // The levels before the last also keep the next level's arrays.
     let mut peak = last;
@@ -806,20 +864,21 @@ impl AmplifyStage {
 
         // Whole raster in memory, or tile by tile (plan §5.7.5: streams automatically when the
         // buffers would not fit under the memory cap).
+        // `auto` is asked about the whole path's full peak (the last level's buffers, the level
+        // before it which the ladder keeps, the preview), not the buffers alone: those are the
+        // reservations the last level will make, with what the run holds by then.
         let whole_bytes = (gw * gh) as u64 * TILE_BYTES_PER_CELL;
-        let streamed = match self.p.stream {
-            StreamMode::Always => true,
-            StreamMode::Never => false,
-            StreamMode::Auto => ctx.reserve(whole_bytes).is_err(),
-        };
+        let peak_bytes = whole_last_level_peak(level.bytes(), n_dbl, gw, gh, self.p.preview_width);
+        let streamed = streams(self.p.stream, peak_bytes, &|b| ctx.reserve(b));
         let plan = cfg.plan(gw, gh, streamed && self.p.tile_cells < (gw.max(gh)) as u32);
         ctx.log.push(
             crate::log::Level::Info,
             format!(
-                "amplify: {} MiB in use of the {} MiB cap; the last level of {gw} x {gh} cells needs {} MiB whole and runs {}",
+                "amplify: {} MiB in use of the {} MiB cap; the last level of {gw} x {gh} cells needs {} MiB whole ({} MiB at its fullest, with the level the ladder keeps and the preview) and runs {}",
                 ctx.gauge.in_use() >> 20,
                 ctx.mem_cap >> 20,
                 whole_bytes >> 20,
+                peak_bytes >> 20,
                 if plan.tile >= gw.max(gh) { "in memory" } else { "in tiles" }
             ),
         );
