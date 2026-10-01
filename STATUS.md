@@ -81,6 +81,22 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-10-01 — M6 paused; batch 4 pushed with one GameTest re-run pending (session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Pause.** Ben: our test load on the M6 made graphide's ms-precision timing tests flaky; "please cease
+  testing on the m6, I will be provisioning a new machine for your tests". All Deep Time jobs there were
+  killed (six P1-17 calibration runs, the climate agent's run, two workbench timing runs, our Gradle
+  daemon); the idle workbench server (port 8642) stays up. `mac.sh` now refuses while
+  `/Volumes/Graphide/ban/deeptime-cache/PAUSED` exists on the M6 (4051cbb); CLAUDE.md says so.
+- **Batch 4** (amplify memory fix 80cd51b, water protection ce8a4fa, test fix 05a3073): cargo (fmt, clippy,
+  test, deny) and `./gradlew build test` (160/0) green on ce8a4fa; GameTests 55/56 on both profiles, the
+  one failure the new `carversSpareWater` (its premise counted only air under the beds, but the test
+  level has no aquifer, so carved cells below sea level fill with water). The fix (8b48bce) passed
+  `carversSpareWater` alone (`-PgametestOnly`: columns=695 drained=0 holes=0 carvedBelow=1589
+  entrances=246); the full `./gametest.sh` and `-PwithMic` re-run waits for the new test machine.
+- **Next.** Wire the new machine into `mac.sh` (`DEEPTIME_MAC`, SSD path), re-run the batch-4 GameTests,
+  then resume the paused agents' work (P1-17 hypsometry, the climate ice branch, the four workbench
+  features).
+
 ### 2026-09-30 — P1-27 plate margins and coherent continents (agent worktree agent-ad3b417fd428c1ac2, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Ben (decisions log 2026-09-29, "Provinces view shows speckled, patchy continents"; 2026-09-30, "most coast lines
   are getting speckled with mountains"): "Investigate + fix". Workbench run 1a0f5089640 (earthlike_quick_16k,
