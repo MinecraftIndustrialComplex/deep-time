@@ -84,6 +84,153 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | surface / plates | **The emergent height limit (stage 2).** Stage 1 (build log 2026-10-01, "Terrain above the build limit, stage 1") removed the bookkeeping that built 13–20 km and added the compression band; Earth-like 16k worlds now peak at 9.0–11.2 km on L1, held by the plate model's uplift ceiling, not by physics. Build stage 2 (crust over its strength spreads: σ = ρ·g·h against `crust_strength_mpa`, plateaus at about 5 km on Earth, 13 km at 0.38 g)? And inside it: drop the plate model's 10 km uplift ceiling to a 30 km guard and recalibrate uplift with the hypsometry work (recommended), or keep it and let the spreading act under it? Also: keep squeezing a world too short for its mountains (now), or raise the vertical-scale slider's minimum to 19.6 m and refuse? | Not asked yet: for the coordinator to put to Ben |
 
 ## Build log
+### 2026-10-01 — Rock columns: grade rises downwards, no metamorphic or plutonic slivers; `deeptime strata-check` (agent worktree agent-a4c7bf65d55bc4810, branch worktree-agent-a4c7bf65d55bc4810, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Ask.** Ben, 2026-10-01 ("Investigate and fix"), on the workbench run `1a0f6e918c9` (`earthlike_quick_16k`, supercontinent,
+  1000 Myr): at x −6901, z −128 schist lies on unmetamorphosed shale (and again deeper), gneiss is a 3-block sheet between
+  greenstone and granodiorite, and granodiorite and gabbro lie in the pile like beds. A second column from the coordinator
+  (x −7697, z 46, a 3.7 km mountain): slate over unaltered sandstone, grade falling under the gneiss, many 1–5 block slivers.
+- **The measurement** (`deeptime strata-check`, new; `structure::realism`). Three findings a column can have:
+  a **grade inversion** — a horizon whose class was never as hot as a horizon above it formed at (each regional-metamorphic class
+  has its formation temperature, each class with a metamorphic path the temperature of its first step: schist ≥ 450 °C over shale
+  < 250 °C; cover on basement is the other way round and fine; a plutonic horizon is never the lower member, steps under 200 °C
+  are diagenesis); a **metamorphic sliver** — a regional-metamorphic horizon under 8 blocks with other rock over and under it
+  (one cut by the ground or the floor is not one); **plutonic rock as a bed** — an intrusive horizon with rock of another
+  family under it ("with a floor"), a *sheet* when it is under 16 blocks. `--world-data <folder>` checks the columns the game
+  builds (the column rule under the terrain, 20,000 random blocks, seed 1) and the stored stacks cell by cell;
+  `--checkpoint <file>` the stacks before and after the bake's smoothing; `--column X,Z` prints stacks (with `--checkpoint`:
+  the cell's log, pools, units and keys). The bake writes the stored stacks' shares into `notes.bake.strata.realism`.
+- **Before** (VM; the workbench bake, and the same preset re-run on master efafc88 as `big-base`: identical shares and column):
+
+  | share of columns | grade inversion | metamorphic sliver | high-grade sliver | plutonic sheet | plutonic with a floor | horizons / column |
+  |---|---|---|---|---|---|---|
+  | 1000 Myr supercontinent, all (20,000) | **57.1 %** | **56.3 %** | 35.5 % | 10.7 % | 28.6 % | 15.4 |
+  | … land (8,384) | 71.5 % | 73.9 % | 46.6 % | 15.3 % | 45.0 % | 23.0 |
+  | … stored stacks (524,288 cells) | 56.7 % | 56.0 % | 33.9 % | 8.7 % | 27.0 % | 13.9 |
+  | 300 Myr scattered, seed 7, all | 26.2 % | 36.8 % | 24.8 % | 7.7 % | 13.1 % | — |
+  | … its stacks **before the smoothing** | 0.73 % | 3.97 % | 3.65 % | 0.09 % | 0.71 % | 4.5 |
+  | … its stacks after the smoothing | 26.6 % | 37.0 % | 24.3 % | 6.4 % | 12.1 % | 8.2 |
+
+- **Causes** (read from the code, each shown by a measurement or a dumped stack).
+  1. **The key space ordered the strata log by age alone, and the bake's smoothing (σ 10 cells) and the column rule blend
+     neighbouring stacks by key.** Metamorphic grade is not a function of age: a belt's schist (buried deep, then exhumed) got
+     the same keys as the shale its neighbours laid down at that time and never buried, so the blend put them in one sequence
+     — schist over shale. One cell's own log cannot do it (a layer's class steps by the temperature at its depth, deeper is
+     hotter, classes never go back): 0.7 % of the unsmoothed stacks have an inversion, 26.6 % of the smoothed ones.
+  2. **Merges took the union of key spans** (`settle`, `bake_cell`, `columns::push`, the smoothing's join): a metre of soil
+     merged into kilometres of basement schist gave the schist the keys 0 … 49,663 — the regolith's, the whole log's and four
+     pools' — and its height became a straight line over keys that neighbours give to other rocks. Ben's top horizon is exactly
+     that: `schist`, unit key 0 (`inspect-column`), 63 blocks of it over the neighbours' shale.
+  3. **The pools know only today's geotherm; the log keeps its peak.** A pool unit under a metamorphosed log layer stayed
+     unmetamorphosed (schist log over `sandstone` pool), and the mafic plutonic pool under the gneiss pool turned to greenstone
+     at 300 °C (gneiss over greenstone: 2,968 horizons, the most frequent pair in the unsmoothed stacks of the small run). A buried soil without a path
+     of its own showed as mudstone under metamorphic rock.
+  4. **Slivers**: every pool thicker than 1 m is a unit (the 3-block gneiss is a 60-m leftover of the metamorphic pool); thin
+     metamorphic log layers; the tongues of the column rule between classes of one age; and every unit that ends sideways thins
+     through 1 … 7 blocks.
+  5. **Plutonic rock as beds**: the basement is the plate model's rock pools stacked in erosion order (`TOP_ORDER`: sediment,
+     sedimentary, felsic and mafic volcanic, metamorphic, felsic plutonic, mafic plutonic), each a unit. That is a composition
+     ledger, not a structure. The discordant plutons P1-07 has are the bodies (ellipsoids with aureoles, painted over the
+     horizons); the pools are something else and are still layers (see the decisions).
+- **Fixes.**
+  - *Grade-ordered keys* (`columns::key`; FORMAT.md, "The bake's key space"): regolith 0–4095; band 0 (unmetamorphosed) log
+    4096–32767 by age as before, then its pools 32768–34559; six metamorphic bands of 4,480 keys from 34,560 (from 250, 300, 350,
+    450, 500, 650 °C: slate; quartzite, marble, greenstone; phyllite; schist; amphibolite; gneiss), each a log by age (2,688
+    keys) and the pools (7 × 4 slots of 64 keys); mantle 61440–65535. A unit's band is that of the hottest formation temperature
+    at or above it in its own column; plutonic pool units are always in band 6 with the gneiss (the crystalline basement).
+    Any blend of stacks by key therefore has the grade rising downwards: a belt's rocks lie under its neighbours'
+    unmetamorphosed cover and over everyone's crystalline basement.
+  - *No unit cooler than the rock above it* (`columns::build`): a sedimentary or volcanic pool steps along its path at least
+    as far as the hottest formation temperature above it; a plutonic pool stays what it is (gabbro under gneiss is gabbro;
+    only granite → gneiss at the 650 °C isotherm is taken); a log layer shown as another class (buried soil → mudstone)
+    follows the rock above it.
+  - *Key spans stay in one key domain* (regolith, each band's log, each band's pools, mantle): a merge across domains keeps
+    the kept class's span, the other's keys become a hiatus; units of one class in different domains stay separate horizons.
+  - *No slivers in the stored stacks* (`settle`): inside a stack a regional-metamorphic horizon is ≥ 8 blocks and a plutonic
+    one ≥ 16; a thinner one gives its blocks to the horizon under it (of its domain; else the one over it), which keeps its
+    class and keys.
+  - *No slivers in the columns* (**the column rule's new step 5**, Rust `strata::drop_slivers`, Java `Columns.Stack.dropSlivers`):
+    the layer descriptor's optional `min_blocks` (per class; the bake writes 8 / 16 / 1) names least thicknesses; a thinner
+    horizon of such a class under the first and over the last is removed and its blocks go to the horizon under it. A unit that
+    ends sideways ends at a step of that many blocks instead of a one-block sheet.
+  - *The smoothing's top* (two regressions the key fix would otherwise have exposed, both from "the top unit fills the height
+    of a cell standing over the mean surface"): the regolith and loose sediment now lie on the ground with their mean thickness
+    (first pictures had 44–65 blocks of saprolite, then of clay, on ridges), and the unit that fills a ridge is the thickest
+    one beginning within 16 blocks of the mean rock surface, the thin beds over it riding up with the ground (first pictures had
+    25-block coal caps on two peaks).
+- **After** (the same history: `stage amplify --in big-base/checkpoints/6-young.dtcp --bake`; the small run from scratch; a
+  from-scratch run of the 1000 Myr preset with the final code wrote a byte-identical `strata/horizons.dtr`, `cmp`):
+
+  | share of columns | grade inversion | metamorphic sliver | high-grade sliver | plutonic sheet | plutonic with a floor | horizons / column |
+  |---|---|---|---|---|---|---|
+  | 1000 Myr supercontinent, all | **0** | **0** | 0 | 0 | 0.50 % | 12.1 |
+  | … land | 0 | 0 | 0 | 0 | 1.04 % | 17.3 |
+  | … stored stacks | 0 | 0 | 0 | 0 | 0.57 % | 12.1 |
+  | 300 Myr scattered, seed 7, all / land / stored | 0 / 0 / 0 | 0 / 0 / 0 | 0 | 0 | 0.17 / 0.46 / 0.15 % | 7.3 |
+  | the JUnit test planet (`planet4k`), all / stored | 0 / 0 | 0 / 0 | 0 | 0 | 0 / 0 | — |
+
+  **x −6901, z −128** (class, top y, blocks), before: schist 56 (56) · shale 0 (57) · andesite −57 (3) · tuff −60 (4) · sandstone
+  −64 (2) · tuff −66 (2) · shale −68 (16) · basalt −84 (22) · phyllite −106 (5) · schist −111 (5) · shale −116 (41) · sandstone
+  −157 (17) · basalt −174 (45) · greenstone −219 (3) · gneiss −222 (30) · granodiorite −252 (60) · gabbro −312 (39) · greenstone
+  −351 (2): 9 inversions, 3 slivers. After: mud 56 (5) · shale 51 (112) · andesite −61 (4) · tuff −65 (3) · sandstone −68 (2) ·
+  tuff −70 (1) · shale −71 (5) · sandstone −76 (1) · shale −77 (10) · basalt −87 (22) · sandstone −109 (2) · shale −111 (28) ·
+  basalt −139 (58) · phyllite −197 (9) · schist −206 (15) · gneiss −221 (31) · granodiorite −252 (59) · gabbro −311 (42): none.
+  **x −7697, z 46**, before: 36 horizons, 9 inversions, 13 slivers (slate 5, quartzite 4, slate 3, slate 4, schist 1, slate 2,
+  schist 6, gneiss 6, schist 1, phyllite 1, schist 1, phyllite 4, greenstone 6). After: mudstone 210 (1) · shale 209 (75) · 19
+  thin sandstone, mudstone, shale and tuff beds 134 … 57 · sandstone 56 (86) · basalt −30 (56) · slate −86 (25) · sandstone −111
+  (8) · basalt −119 (1) · quartzite −120 (13) · greenstone −133 (18) · phyllite −151 (12) · greenstone −163 (11) · schist −174
+  (48) · gneiss −222 (117) · gabbro −339 (14): none. Sections through both (`deeptime-inspect wd-section`, before, after, and
+  the rejected "all thin beds ride up" variant): `review/out/rock-order/{big-base,big-after,ride-all}/` (not published).
+- **Format** (stays 0.2, FORMAT.md updated): the key layout is the baker's choice and the column rule reads any keys, so
+  **old bakes load and read exactly as before** — and keep their inversions until the world data is baked again. `min_blocks`
+  is an optional descriptor field; a layer without it (every older bake, the synthetic worlds) skips step 5. A jar from before
+  this change reading a new bake would ignore `min_blocks` and paint the slivers the Rust evaluator drops (no version bump was
+  made for it, as for the tongue parameters; say so if a bump is wanted). `StrataPass.horizonKey` (the block-variant era, the
+  key's top four bits) works unchanged; its eras over 32768 now are grade bands instead of pools.
+- **Tests** (planet-independent): `structure::tests::no_column_holds_rock_that_was_never_as_hot_as_the_rock_above_it` (4,000
+  random cells — logs with deposits, burial metamorphism and erosion, random pools, crust, regime, geotherm: keys ordered, every
+  span in one domain, no inversion); `…::baked_stacks_and_blended_columns_have_no_grade_inversion_and_no_sliver` (four random
+  64 × 32 planets of provinces, σ 0 / 2.5 / 10: `check`, `check_bake`, zero inversions, slivers and sheets in the stored stacks
+  and in 6,000 columns by the column rule each); the pipeline test asserts the same on its real small planet;
+  `realism::tests` (Ben's column is flagged; cover on basement is not); `bake_horizons` (sliver merge and domains, a sliver
+  joins the horizon under it, the regolith follows the ground, a thin top bed does not fill a ridge);
+  `strata::tests::slivers_of_the_named_classes_are_dropped_inside_a_column`; Java↔Rust: `ColumnParityTest` on the re-baked
+  `planet4k` (its layer carries `min_blocks`), 500 of 500 columns equal.
+- **Gates** (VM, `tools/dev/gates.sh`, new: the branch gates detached with one log; HEAD d92b6c4): `GATES fmt=0 clippy=0 test=0
+  deny=0 gradle=0`; cargo test: cli 52, core 359 + 3 ignored (+ 1), format 53, inspect 29 + 2 + 7, jni 7, viewer 6; JUnit
+  tests=160 failures=0 errors=0 skipped=1 (`MacMemoryTest`, not this change); `ColumnRuleBenchTest` 0.61 ms/chunk at 13.3
+  horizons per column. No GameTests (the coordinator's, per merge batch): `StrataGameTests` and the deposit tests read the
+  strata and may need their numbers looked at. Strata bake 36.9 s → 33.2 s on the small run, 61.7 s → 56.2 s on the 1000 Myr one.
+- **What changes in a world.** Metamorphic rock is no longer at the surface on its neighbours' cover; belts read as
+  cover → slate/quartzite → phyllite → schist → gneiss → granite/granodiorite → gabbro downwards. Fewer horizons per column
+  (15.4 → 12.1). The host fractions the deposit stage reads change a little (pool units under a metamorphosed log are now
+  metamorphic; gabbro no longer turns to greenstone), so deposit sites differ slightly from a master run of the same seed.
+- **Observed, not changed.** The mountain at x −7697 still has one thick unit holding its top (shale, 75 blocks, before 84 of
+  shale): the smoothing has no information about a ridge above the mean surface (σ 10 cells = 160 blocks) and fills it with
+  one formation (see the decisions).
+- **A mistake to report.** While restarting my own gates I ran `pkill -x cargo` on the shared VM (18:27 VM time): it would
+  have killed any other agent's cargo then running. None was running a minute later; an agent whose build died at that time
+  should simply re-run it.
+- **Decisions for Ben, answered 2026-10-01** (relayed by the coordinator): granite-type rock stays as flat basement layers
+  until folds and faults ("Leave it until folds and faults"); a ridge is filled by the thickest nearby formation, as built; no
+  format bump (his standing rule: no backward compatibility before a public release, so no "old bakes still load" concerns).
+- **Merged with master 94c54c2** (mountain-height stage 1, hypsometry, lakes by climate, P1-28; merge commit 6599c81; conflicts
+  in STATUS.md and `bake/strata.rs`, both sides kept: the realism note beside the build-limit counters). FORMAT.md no longer
+  speaks of older bakes (Ben's rule: no backward compatibility before a public release). VM, on the merge: `tools/dev/gates.sh`
+  → `GATES fmt=0 clippy=0 test=0 deny=0 gradle=0` (cargo: cli 52, core 371 + 3 ignored, format 53, inspect 31 + 2 + 7, jni 7,
+  viewer 6; JUnit tests=161 failures=0, `ColumnParityTest columns=500 equal=500`, lake world 300 of 300). A fresh bake
+  (`run --preset earthlike_quick_16k --start scattered_continents --length-myr 300 --set seed=7`) + `strata-check`: grade
+  inversion, metamorphic sliver, plutonic sheet and plutonic with a floor all 0 in 20,000 columns, 6,278 land columns and
+  524,288 stored stacks (`notes.bake.strata.realism.stack_rules` ok). `mac.sh --server -- ./gametest.sh` → **All 58 required
+  tests passed** (58 result lines, 0 not PASS). `tools/smoke/install.sh mic` (`--pack`) + `./gametest.sh -PwithMic` → 57 of
+  58: `firstinstalledfallback` fails with "shale: expected fallback born_in_chaos_v1:black_argillite, got minecraft:stone;
+  gneiss: expected minecraft:granite, got minecraft:deepslate[axis=y]". Not this branch: the MIC rock-tag datapack
+  (`mic/Docs/datapacks/deeptime-mic-rock-tags`, outside the repo, synced by `--pack`) had its `rock_fallback` rows for shale,
+  mudstone, slate, phyllite, schist and gneiss changed to stone and deepslate on 2026-10-01 (P1-28's MIC rows), and
+  `StrataGameTests.firstInstalledFallback` on master still expects the old MIC stand-ins under `rockTags`. The fix is two
+  expectation lines in that test, left to P1-28's owner or the coordinator.
+- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/rock-order/` (runs, checkpoints, censuses, binaries) deleted at the end.
+- **Next.** Merge (the coordinator), run both GameTest suites on the batch, re-bake the workbench run; then Ben's answers.
+
 ### 2026-10-01 — P1-22b lakes sized by the climate, and frozen (agent worktree agent-a2195c5c858c73075, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 Ben's decision of 2026-10-01, "Both: freeze them and size them by climate". On branch `worktree-agent-a2195c5c858c73075`, not merged, not pushed.
 

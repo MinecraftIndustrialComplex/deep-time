@@ -45,8 +45,9 @@ public final class StrataPass {
 
     /**
      * A horizon's key for the member choice: its class and the era of its unit key (the key's
-     * top four bits: the regolith, seven ages of the strata log, the basement pools, the mantle;
-     * a synthetic world's horizon h). The same bed gets the same key in every column.
+     * top four bits: the regolith, seven ages of the unmetamorphosed strata log, the metamorphic
+     * grade bands and the basement pools, the mantle; a synthetic world's horizon h). The same
+     * bed gets the same key in every column.
      */
     public static long horizonKey(int unit, int classIndex) {
         return ((long) (unit >>> 12) << 8) | classIndex;
