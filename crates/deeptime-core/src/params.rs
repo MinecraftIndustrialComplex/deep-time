@@ -98,7 +98,7 @@ pub fn planet_builtin(name: &str) -> Option<&'static str> {
 }
 
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 13] = [
+pub const PLANET_KEYS: [&str; 14] = [
     "seed",
     "planet",
     "keyframes",
@@ -111,6 +111,7 @@ pub const PLANET_KEYS: [&str; 13] = [
     "young",
     "amplify",
     "biomes",
+    "hydro",
     "volcanoes",
 ];
 
@@ -196,8 +197,8 @@ pub struct ScaleParams {
 }
 
 /// Multipliers of feature sizes in blocks (plan §5.1 `feature_scale`; the editor's Multipliers
-/// section). Only features the model has today are here: rivers and canyons arrive with Phase 2's
-/// river and cave stages, and get their keys then.
+/// section). Only features the model has today are here: rivers since P1-22; canyons arrive with
+/// Phase 2's cave stage and get their key then.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct FeatureScale {
@@ -207,6 +208,8 @@ pub struct FeatureScale {
     /// Rock layers: the thickness in blocks of every stratum of the baked columns (the history
     /// and the ore stay as they are; `scale.m_per_block_v` moves everything).
     pub strata: f64,
+    /// Rivers: the width in blocks of every channel (P1-22; the discharge stays as it is).
+    pub rivers: f64,
 }
 
 impl Default for FeatureScale {
@@ -214,6 +217,7 @@ impl Default for FeatureScale {
         FeatureScale {
             deposits: 1.0,
             strata: 1.0,
+            rivers: 1.0,
         }
     }
 }
@@ -565,6 +569,9 @@ pub struct PlanetPreset {
     /// The knobs of the climate → biome-input mapping (P1-09, plan §7.2); the bake uses the
     /// defaults when the section is absent.
     pub biomes: Option<crate::bake::biomes::BiomeParams>,
+    /// Rivers and lakes on the finished terrain (P1-22); the bake uses the defaults when the
+    /// section is absent.
+    pub hydro: Option<crate::hydro::HydroParams>,
     /// The climate class placement table a datapack supplied through the content bundle
     /// (`climate_placement`, `bake::placement`); `None` uses the core's default table. Not part
     /// of the preset's JSON: it is pack data, recorded in the world data by the bake.
@@ -611,6 +618,7 @@ impl PlanetPreset {
         let young: Option<crate::surface::young::YoungParams> = section(obj, "young")?;
         let amplify: Option<crate::surface::amplify::AmplifyParams> = section(obj, "amplify")?;
         let biomes: Option<crate::bake::biomes::BiomeParams> = section(obj, "biomes")?;
+        let hydro: Option<crate::hydro::HydroParams> = section(obj, "hydro")?;
         let volcanoes: Option<crate::surface::volcanoes::VolcanoParams> =
             section(obj, "volcanoes")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
@@ -637,6 +645,7 @@ impl PlanetPreset {
             amplify,
             volcanoes,
             biomes,
+            hydro,
             placement: None,
         };
         preset.validate()?;
@@ -686,6 +695,7 @@ impl PlanetPreset {
         for (v, key) in [
             (s.feature_scale.deposits, "$.scale.feature_scale.deposits"),
             (s.feature_scale.strata, "$.scale.feature_scale.strata"),
+            (s.feature_scale.rivers, "$.scale.feature_scale.rivers"),
         ] {
             check(
                 v.is_finite() && (0.1..=10.0).contains(&v),
@@ -898,6 +908,9 @@ impl PlanetPreset {
         if let Some(b) = &self.biomes {
             b.validate()?;
         }
+        if let Some(h) = &self.hydro {
+            h.validate()?;
+        }
         if let Some(v) = &self.volcanoes {
             v.validate()?;
             check(
@@ -940,6 +953,9 @@ impl PlanetPreset {
         }
         if let Some(b) = &self.biomes {
             v["biomes"] = json!(b);
+        }
+        if let Some(h) = &self.hydro {
+            v["hydro"] = json!(h);
         }
         if let Some(x) = &self.volcanoes {
             v["volcanoes"] = json!(x);

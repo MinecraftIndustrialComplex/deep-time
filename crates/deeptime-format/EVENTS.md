@@ -277,13 +277,16 @@ volcano still stands or that are at least 6 km across (× size), and the flood b
 above the ground round the edifice, m; `summit_m` its summit above the sea at the end; radii and areas
 block-metric (the world's own), km and km². A **cone list** (`cones`) is `lat,lon,radius_km,height_m`
 per standing cone, `;`-separated, tallest first, at most 80; `inspect-column --why` finds a column's
-cone in it.
+cone in it. An arc segment that built fewer than 3 cones (Ben, 2026-09-30, "Count small ones") has no event of
+its own: it is counted on its `subduction_onset` event, which gains `volcano_cones_built`,
+`volcano_cones_standing` and `volcano_cones` (the same list format), added at the end of the coupled
+group; its notable cone, if any, is caused by that onset.
 
 | Kind | t_start (t_end) | Place | Params | Magnitude | Causes |
 |---|---|---|---|---|---|
 | `volcano_arc` | its first cone's birth (its last live step) | the centroid of its standing cones, else of where its cones were born | `setting` (`continental_arc`, `island_arc`: where most were born), `cones_built`, `live`, `standing`, `tallest_m`, `peak_m` (the tallest any stood), `calderas`, `plate`, `ongoing`, `cones` | cones built / 50, ≤ 1 | its subduction onset |
 | `volcano_hotspot_chain` | its first volcano's birth (its last death, or the end) | its youngest volcano | `hotspot`, `volcanoes_built`, `standing`, `islands`, `seamounts`, `subducted`, `tallest_m`, `ongoing`, `cones` | volcanoes / 20, ≤ 1 | the hotspot's `hotspot_track`, else its `large_igneous_province` |
-| `volcano_stratovolcano` | its birth (its death, or the end while active) | its summit at the end | `volcano` (catalogue id), `setting`, `magma` (`andesitic`, `silicic`), `peak_height_m`, `height_m`, `radius_km`, `summit_m`, `arc_flux` (mean while active, 0–1), `plate`, `fate` (`active`, `extinct`), `ongoing` | peak height / 3 km | its `volcano_arc` |
+| `volcano_stratovolcano` | its birth (its death, or the end while active) | its summit at the end | `volcano` (catalogue id), `setting`, `magma` (`andesitic`, `silicic`), `peak_height_m`, `height_m`, `radius_km`, `summit_m`, `arc_flux` (mean while active, 0–1), `plate`, `fate` (`active`, `extinct`), `ongoing` | peak height / 3 km | its `volcano_arc`, or the `subduction_onset` of a small segment |
 | `volcano_shield` | its birth over the plume (its death) | as above | as above plus `hotspot`, `chain_index`; `magma` `basaltic`; `fate` (`active`, `island`, `seamount`) | as above | its `volcano_hotspot_chain` |
 | `volcano_caldera_complex` | as a shield (a continental hotspot) | as above | as `volcano_shield`, `magma` = `silicic` | as above | its `volcano_hotspot_chain` |
 | `volcano_caldera` | the collapse | where its volcano stood then | `volcano`, `radius_km`, `depth_m`, `erupted_km3`, `type` (`silicic`: the volcano collapsed and died; `summit`: a shield's summit caldera) | erupted volume / 1,000 km³, ≤ 1 | its volcano's event, else its arc segment or chain |

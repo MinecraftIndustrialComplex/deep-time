@@ -113,7 +113,7 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     );
 
     // Many classes appear: sediments, basement, metamorphic and mantle rocks.
-    let mut seen = [false; 59];
+    let mut seen = [false; crate::synth::EVERY_CLASS.len()];
     for &k in &h.classes {
         if k != bake_horizons::NO_CLASS {
             seen[usize::from(k)] = true;
@@ -170,7 +170,10 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     assert_eq!(note["horizons"]["check"], "ok");
     // Keyframe layers exist with valid values.
     let rock = &world.fields[field::ROCK].data;
-    assert!(rock.iter().all(|&k| k >= 0.0 && (k as usize) < 59));
+    assert!(
+        rock.iter()
+            .all(|&k| k >= 0.0 && (k as usize) < crate::synth::EVERY_CLASS.len())
+    );
     let _ = std::fs::remove_dir_all(dir);
 }
 

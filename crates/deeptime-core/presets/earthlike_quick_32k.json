@@ -21,7 +21,8 @@
     "pole_cap_deg": 75.0,
     "feature_scale": {
       "deposits": 1.0,
-      "strata": 1.0
+      "strata": 1.0,
+      "rivers": 1.0
     }
   },
   "keyframes": {
@@ -343,5 +344,22 @@
     "wetland_humidity": 2.5,
     "wetland_flat_share": 0.35,
     "wetland_low_m": 150.0
+  },
+  "hydro": {
+    "enabled": true,
+    "river_min_discharge_m3s": 2.0,
+    "river_min_area_km2": 50.0,
+    "width_coef": 1.0,
+    "depth_coef": 0.5,
+    "max_width_blocks": 64.0,
+    "max_depth_blocks": 12.0,
+    "freeboard_blocks": 1.0,
+    "smoothing_blocks": 8.0,
+    "lake_min_area_km2": 1.0,
+    "lake_min_depth_blocks": 1.0,
+    "lake_evaporation": true,
+    "biome_min_width_blocks": 6.0,
+    "bank_zone_blocks": 1.0,
+    "bank_zone_ratio": 0.5
   }
 }

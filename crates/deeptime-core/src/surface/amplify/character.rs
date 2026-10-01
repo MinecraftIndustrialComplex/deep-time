@@ -187,6 +187,9 @@ pub struct CharacterFields {
     /// direction averages without its sign cancelling.
     fold_c2: Vec<f32>,
     fold_s2: Vec<f32>,
+    /// How much of a young volcano stands in each L1 cell (0–1; empty: none): there the edifice
+    /// keeps its own profile (`calm_volcanoes`).
+    calm: Vec<f32>,
     /// Background youth where the plate fields are absent.
     pub neutral: bool,
 }
@@ -269,6 +272,7 @@ impl CharacterFields {
             youth,
             fold_c2: c2,
             fold_s2: s2,
+            calm: Vec::new(),
             neutral: false,
         }
     }
@@ -291,6 +295,19 @@ impl CharacterFields {
         }
     }
 
+    /// Leaves young volcanoes their own profile: `keep` (0–1) per L1 cell, row-major on the L1
+    /// grid, is how much of the character's unsharp mask to keep there (P1-21; Ben, 2026-09-30,
+    /// "Smooth young, rugged old"). Where it is 0 (an active volcano) there is no young-peak
+    /// sharpening and no rounding either — clean cones, domed shields — and the gullies are the
+    /// soft ones of old ground; it returns on the crater's clock as a dead volcano erodes. A neutral
+    /// set (no plate fields) is left as it is.
+    pub fn calm_volcanoes(&mut self, keep: &[f32]) {
+        if self.neutral || keep.len() != self.youth.len() || keep.iter().all(|&k| k >= 1.0) {
+            return;
+        }
+        self.calm = keep.iter().map(|&k| (1.0 - k).clamp(0.0, 1.0)).collect();
+    }
+
     /// The youth and the fold strength per L1 cell (row-major, the plate model's L1 grid).
     pub fn maps(&self) -> (Vec<f32>, Vec<f32>) {
         let fold = self
@@ -311,16 +328,17 @@ impl CharacterFields {
             youth: vec![NEUTRAL_YOUTH],
             fold_c2: vec![0.0],
             fold_s2: vec![0.0],
+            calm: Vec::new(),
             neutral: true,
         }
     }
 
-    /// (youth, fold strength, shortening direction (x, z)) at global L3 cell (gi, gj): bilinear
-    /// on L1, x wrapping.
+    /// (youth, fold strength, shortening direction (x, z), calm) at global L3 cell (gi, gj):
+    /// bilinear on L1, x wrapping.
     #[inline]
-    fn at(&self, gi: usize, gj: usize) -> (f64, f64, (f64, f64)) {
+    fn at(&self, gi: usize, gj: usize) -> (f64, f64, (f64, f64), f64) {
         if self.neutral {
-            return (f64::from(NEUTRAL_YOUTH), 0.0, (1.0, 0.0));
+            return (f64::from(NEUTRAL_YOUTH), 0.0, (1.0, 0.0), 0.0);
         }
         let u = gi as f64 / self.ratio;
         let v = (gj as f64 / self.ratio).min((self.h - 1) as f64);
@@ -336,15 +354,20 @@ impl CharacterFields {
             t + (b - t) * fv
         };
         let y = bl(&self.youth);
+        let calm = if self.calm.is_empty() {
+            0.0
+        } else {
+            bl(&self.calm)
+        };
         let (c2, s2) = (bl(&self.fold_c2), bl(&self.fold_s2));
         let m = (c2 * c2 + s2 * s2).sqrt();
         if m < 1e-6 {
-            return (y, 0.0, (1.0, 0.0));
+            return (y, 0.0, (1.0, 0.0), calm);
         }
         let (c2, s2) = (c2 / m, s2 / m);
         let dx = (0.5 * (1.0 + c2)).max(0.0).sqrt();
         let dz = (0.5 * (1.0 - c2)).max(0.0).sqrt() * if s2 < 0.0 { -1.0 } else { 1.0 };
-        (y, m.min(1.0), (dx, dz))
+        (y, m.min(1.0), (dx, dz), calm)
     }
 }
 
@@ -746,7 +769,7 @@ pub fn apply(
             return;
         }
         let (bx, bz, gi, gj) = global_xz(i, j);
-        let (_, fold, dir) = ctx.fields.at(gi, gj);
+        let (_, fold, dir, _) = ctx.fields.at(gi, gj);
         if fold <= 0.0 {
             return;
         }
@@ -790,7 +813,9 @@ pub fn apply(
             let mz = (m(0, 1) - m(0, -1)) / (2.0 * cb);
             let slope = (mx * mx + mz * mz).sqrt();
             let (bx, bz, gi, gj) = global_xz(i, j);
-            let (youth, _, _) = ctx.fields.at(gi, gj);
+            let (youth, _, _, calm) = ctx.fields.at(gi, gj);
+            // (a young volcano's gullies are old ground's soft ones.)
+            let youth = youth * (1.0 - calm);
             let hard = hardness(kfac[cell]).clamp(0.0, 1.0);
             // Finer octaves are rounder: sharp crests are the coarse ridgelines'.
             let sharp =
@@ -821,7 +846,7 @@ pub fn apply(
             return;
         }
         let (bx, bz, gi, gj) = global_xz(i, j);
-        let (youth, _, _) = ctx.fields.at(gi, gj);
+        let (youth, _, _, calm) = ctx.fields.at(gi, gj);
         let f = fade(cell);
         // On steep ground the smoothed surface is the base: the amplifier's grid-bound rills
         // (axis and diagonal gullies a few cells wide) give way to the drainage-aligned ones.
@@ -838,8 +863,10 @@ pub fn apply(
         // part would dig moats at the foot of every steep front, which the flood then fills flat).
         // Old: the terrain is pulled towards its smoothed self, both ways (rounded, no moats).
         let excess = y0 - f64::from(blur[cell]);
-        let unsharp = rug * p.sharpen_gain * youth * excess.max(0.0)
-            - (rug * p.round_gain * (1.0 - youth)).min(1.0) * excess;
+        // A young volcano keeps its own profile (neither).
+        let unsharp = (rug * p.sharpen_gain * youth * excess.max(0.0)
+            - (rug * p.round_gain * (1.0 - youth)).min(1.0) * excess)
+            * (1.0 - calm);
         let mut y = y0 + unsharp * f + f64::from(acc[cell]);
         // Cliff bands: a smooth terrace of the height where hard rock is steep.
         let h = |di, dj| f64::from(smooth[at(win, i, j, di, dj)]);
@@ -967,6 +994,7 @@ mod tests {
                 youth: vec![youth; 16],
                 fold_c2: vec![fold * th.cos() as f32; 16],
                 fold_s2: vec![fold * th.sin() as f32; 16],
+                calm: Vec::new(),
                 neutral: false,
             }
         }
@@ -1066,6 +1094,37 @@ mod tests {
         assert_eq!(none, 0.0);
         let (more, _) = change(&young, 0.8, 2.0);
         assert!(more > y_hard, "ruggedness 2: {more} vs 1: {y_hard}");
+    }
+
+    #[test]
+    fn a_young_volcano_keeps_its_profile_on_young_ground() {
+        // The cone as an active volcano on a young orogen: no young-peak sharpening of its summit,
+        // and less character over its flanks; as a dead one (calm 0) it gets it back.
+        let young = CharacterFields::uniform(1.0, 0.0, 0.0);
+        let mut volcano = young.clone();
+        volcano.calm_volcanoes(&[0.0; 16]);
+        let (win, before, ..) = cone(0.8);
+        let top = 80 * win.w + 160;
+        let (y_rms, y_z) = change(&young, 0.8, 1.0);
+        let (v_rms, v_z) = change(&volcano, 0.8, 1.0);
+        let lift = |z: &[f32]| f64::from(z[top] - before[top]) / MV;
+        assert!(
+            lift(&y_z) > 2.0,
+            "young ground sharpens the summit: {}",
+            lift(&y_z)
+        );
+        assert!(
+            lift(&v_z).abs() < 0.5 * lift(&y_z),
+            "a young volcano's summit: {}",
+            lift(&v_z)
+        );
+        assert!(
+            v_rms < y_rms,
+            "flanks: volcano {v_rms} vs young ground {y_rms}"
+        );
+        let mut dead = young.clone();
+        dead.calm_volcanoes(&[1.0; 16]);
+        assert_eq!(change(&dead, 0.8, 1.0).0, y_rms);
     }
 
     #[test]

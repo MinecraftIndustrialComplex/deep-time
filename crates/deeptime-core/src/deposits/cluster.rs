@@ -110,11 +110,12 @@ pub fn place(
     radii: &[f64],
     footprints: Option<&[[f64; 2]]>,
     placed: &mut Vec<Point>,
+    claims: &mut dyn FnMut(usize, &Point) -> bool,
 ) -> (Vec<(usize, Point)>, usize) {
     let c = t.grid.circumference() as f64;
     if s.adjoining {
         let footprints = footprints.expect("adjoining placement needs the footprints");
-        return place_adjoining(rng, t, radii, footprints, placed);
+        return place_adjoining(rng, t, radii, footprints, placed, claims);
     }
     let mut order: Vec<usize> = (0..radii.len()).collect();
     order.sort_by(|a, b| radii[*b].total_cmp(&radii[*a]));
@@ -238,13 +239,18 @@ pub fn ellipses_overlap(
     true
 }
 
-/// [`place`] for `adjoining` deposits.
+/// [`place`] for `adjoining` deposits: each field, largest first, anywhere in the tract (∝ the weights) where
+/// its plan ellipse crosses none of the fields that claim space. `claims(k, point)` says whether
+/// field k, placed at `point`, reserves its footprint — a field that will not survive (eroded,
+/// held by no cover) frees its space for later ones (Ben, 2026-09-30), so surviving fields never
+/// overlap while the eroded ones do not crowd them out.
 fn place_adjoining(
     rng: &mut Rng,
     t: &TractSpace<'_>,
     radii: &[f64],
     footprints: &[[f64; 2]],
     placed: &mut Vec<Point>,
+    claims: &mut dyn FnMut(usize, &Point) -> bool,
 ) -> (Vec<(usize, Point)>, usize) {
     let c = t.grid.circumference() as f64;
     let mut order: Vec<usize> = (0..radii.len()).collect();
@@ -284,7 +290,9 @@ fn place_adjoining(
                     radius: radii[k],
                     ellipse: Some(e),
                 };
-                placed.push(pt);
+                if claims(k, &pt) {
+                    placed.push(pt);
+                }
                 out.push((k, pt));
             }
             None => dropped += 1,
@@ -342,7 +350,9 @@ mod tests {
             let mut rng = Rng::new(seed);
             let radii: Vec<f64> = (0..25).map(|_| 2.0 + 10.0 * rng.uniform()).collect();
             let mut placed = Vec::new();
-            let (out, dropped) = place(&mut rng, &t, &s, &radii, None, &mut placed);
+            let (out, dropped) = place(&mut rng, &t, &s, &radii, None, &mut placed, &mut |_, _| {
+                true
+            });
             assert_eq!(out.len() + dropped, radii.len());
             total += out.len();
             let out: Vec<Point> = out
@@ -460,7 +470,15 @@ mod tests {
                 .collect();
             let radii: Vec<f64> = semi.iter().map(|e| e[0].max(e[1])).collect();
             let mut placed = Vec::new();
-            let (out, dropped) = place(&mut rng, &t, &s, &radii, Some(&semi), &mut placed);
+            let (out, dropped) = place(
+                &mut rng,
+                &t,
+                &s,
+                &radii,
+                Some(&semi),
+                &mut placed,
+                &mut |_, _| true,
+            );
             assert_eq!(out.len() + dropped, radii.len());
             total += out.len();
             requested += radii.len();
@@ -480,5 +498,58 @@ mod tests {
         }
         // min_sep 1e6 would forbid every pair under the Thomas rule; adjoining ignores it.
         assert!(total * 10 > requested * 7, "{total} of {requested} placed");
+    }
+
+    /// A field that does not claim its footprint (it will not survive) leaves the space to later
+    /// fields: in a tract that holds one field, every field is placed when none claims, one when
+    /// all do.
+    #[test]
+    fn only_claiming_fields_reserve_space() {
+        let grid = GridDesc::for_planet("L1", 2048, 16).unwrap();
+        let cells: Vec<u32> = vec![20 * 128 + 10];
+        let weights = vec![1.0];
+        let allowed = |c: u32| c == cells[0];
+        let t = TractSpace {
+            grid: &grid,
+            cells: &cells,
+            weights: &weights,
+            allowed: &allowed,
+        };
+        let s = Spacing {
+            camp_spacing: 500.0,
+            sigma: 500.0,
+            min_sep: 0.0,
+            per_camp: 4.0,
+            adjoining: true,
+        };
+        // Fields as large as the cell: two of them cannot sit side by side in it.
+        let semi = vec![[20.0, 20.0]; 6];
+        let radii = vec![20.0; 6];
+        let run = |claim: &dyn Fn(usize) -> bool| {
+            let mut rng = Rng::new(7);
+            let mut placed = Vec::new();
+            let (out, dropped) = place(
+                &mut rng,
+                &t,
+                &s,
+                &radii,
+                Some(&semi),
+                &mut placed,
+                &mut |k, _| claim(k),
+            );
+            (out, dropped, placed)
+        };
+        let (out, dropped, placed) = run(&|_| false);
+        assert_eq!((out.len(), dropped, placed.len()), (6, 0, 0));
+        let (out, dropped, placed) = run(&|_| true);
+        assert_eq!((out.len(), dropped, placed.len()), (1, 5, 1));
+        // (Equal sizes keep their order.) The first three will not survive and all land; the
+        // fourth survives and claims the cell, so the last two find no room.
+        let (out, dropped, placed) = run(&|k| k >= 3);
+        assert_eq!((out.len(), dropped, placed.len()), (4, 2, 1));
+        assert_eq!(
+            out.iter().map(|(k, _)| *k).collect::<Vec<_>>(),
+            [0, 1, 2, 3]
+        );
     }
 }

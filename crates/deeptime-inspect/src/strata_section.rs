@@ -31,6 +31,8 @@ fn class_colour(name: &str, index: usize, ramps: &Ramps) -> Rgba {
         "sandstone" => Some([0xe6, 0xc8, 0x5a]),
         "red_bed" => Some([0xc0, 0x5a, 0x3c]),
         "conglomerate" => Some([0xd8, 0x9a, 0x3a]),
+        // Diamictite (lithified till): plum, as in the viewer's rock_class ramp, apart from the tans.
+        "diamictite" => Some([0x80, 0x40, 0x80]),
         "mudstone" => Some([0x9a, 0x8c, 0x74]),
         "shale" => Some([0x6e, 0x78, 0x6a]),
         "black_shale" => Some([0x3a, 0x3e, 0x3c]),
