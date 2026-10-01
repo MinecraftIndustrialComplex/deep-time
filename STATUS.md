@@ -173,7 +173,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   - The pass's own logged cost is 0.27 ms a chunk on average and 0.32 ms where it works (1,298 of 1,536 chunks). Without rivers it still tops up coasts in 692 chunks at 0.29 ms.
   - `WaterRegionTest`'s per-column path costs 0.69 ms a chunk where rivers are (JIT warm).
 - **Gates on the last merge** (master 5d4147b: volcanoes, glacial landforms, the climateConsistent fix, EF ice cover). Branch agents no longer run GameTests (Ben, 2026-09-30, through the coordinator), so this merge got cargo and Gradle only:
-  - cargo fmt, clippy `-D warnings` and deny are clean; `cargo test --workspace --no-fail-fast` all green (core 323 + 3 ignored, cli 30, format 51).
+  - cargo fmt, clippy `-D warnings` and deny are clean; `cargo test --workspace --no-fail-fast` all green (core 323 + 3 ignored).
   - `./gradlew build test`: 157/0. Parity: 500 of 500 (23 river, 3 lake and 25 bank columns: the volcanic and glacial terrain gives the 4k test planet lakes); lake1024 300 of 300.
   - Two fixes in the merge:
     - the editor catalogue test now expects 8 advanced sections (Rivers and lakes plus Volcanoes);
