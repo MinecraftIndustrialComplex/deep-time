@@ -1458,7 +1458,8 @@ public final class GeologicChunkGenerator extends NoiseBasedChunkGenerator {   /
 
 | Router field | Value |
 |---|---|
-| `barrier`, `fluid_level_floodedness`, `fluid_level_spread`, `lava` | the vanilla `minecraft:overworld/…` aquifer functions, by reference |
+| `barrier`, `fluid_level_floodedness`, `fluid_level_spread` | the vanilla `minecraft:overworld/…` aquifer functions, by reference |
+| `lava` | *As built (2026-10-01):* `deeptime:lava_lakes` × vanilla's `aquifer_lava` noise: lava cave lakes only near the world's floor. Vanilla's two lava heights (everything open below y −54 is lava, from `NoiseBasedChunkGenerator.createFluidPicker`; lava lakes at y −10 and lower, from `Aquifer.computeFluidType`) are hard-coded for a floor at y −64 and flooded the lowest 298 blocks of this world, the deep sea included. The generator therefore also replaces the global fluid picker (`worldgen/LavaFluids`); both distances are the preset's `underground` settings (`worldgen/LavaRules`, FORMAT.md "Lava") |
 | `temperature`, `vegetation`, `continents`, `erosion`, `ridges` | `flat_cache(deeptime:raster{layer: "climate/<name>"})` |
 | `depth` | `deeptime:depth` = (H(x,z) − y) / 128, zero at the terrain surface, as vanilla's surface biome points expect (P1-09's biome tests would expose a wrong offset). Vanilla's `overworld/depth` falls 3.0 over 384 blocks (1.5 at y = −64 to −1.5 at y = 320), i.e. 1/128 per block; keeping that slope keeps biome `depth` bands meaningful |
 | `initial_density_without_jaggedness` | `deeptime:terrain{mode: "initial"}` |

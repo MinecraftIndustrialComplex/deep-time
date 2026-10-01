@@ -38,6 +38,9 @@ pub mod bake;
 // Rivers and lakes on the finished terrain (P1-22).
 pub mod hydro;
 
+// What the game puts in the open space below ground: the lava floor and lava lakes.
+pub mod underground;
+
 // Presets, share codes and the synthetic terrains of the placeholder presets (P1-13).
 pub mod preset;
 pub mod share_code;

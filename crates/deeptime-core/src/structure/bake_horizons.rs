@@ -15,7 +15,22 @@
 //! scaling** (the last one down to `min_y` too) and **at most K are kept**: the thinnest horizon
 //! under one block merges with its thinner neighbour, then, while more than K remain, the adjacent
 //! pair with the smallest combined thickness merges (the strata log's cap rule); a merged horizon
-//! takes the thicker member's class, and neighbours of one class merge.
+//! takes the thicker member's class, and neighbours of one class and one key domain merge.
+//!
+//! **No slivers of metamorphic or plutonic rock.** Inside a stack (under its first horizon and
+//! over its last, which the ground and the world's floor may cut anywhere) a horizon of
+//! regional-metamorphic rock is at least `columns::METAMORPHIC_MIN_BLOCKS` thick and one of
+//! plutonic rock at least `columns::PLUTONIC_MIN_BLOCKS`: a thinner one gives its blocks to the
+//! horizon under it (the one over it where only that is of its key domain). Such rock is a regional body; a three-block sheet of gneiss between
+//! greenstone and granodiorite is a thin leftover of the plate model's rock pools, not geology.
+//!
+//! **A horizon's key span stays inside one key domain** (`columns::key::domain`: the regolith,
+//! each grade band's strata log, each grade band's pools, the mantle). A merge across domains
+//! keeps the span of the member whose class it keeps (the other member's keys become a hiatus:
+//! this cell has none of those units), not the union. The union made one horizon's height a
+//! straight line over keys that neighbouring cells give to other rocks — a metre of soil merged
+//! into six kilometres of basement schist gave the schist the regolith's and the whole strata
+//! log's keys, and the smoothing then laid a share of it over the neighbours' shale.
 //!
 //! Plutons stay bodies (`plutons.rs`); P1-08 writes this layer and the bodies into the world data
 //! (this task produces the stacks for the viewer and the tests).
@@ -29,7 +44,7 @@ use crate::params::PlanetPreset;
 use crate::synth::EVERY_CLASS;
 use crate::world::WorldState;
 
-use super::columns::{self, Tables, Unit};
+use super::columns::{self, Tables, Unit, key};
 use super::{CellSource, StructureParams};
 
 /// Unused horizon top.
@@ -53,6 +68,9 @@ pub struct Horizons {
     pub keys: Vec<[u16; 2]>,
     /// The column rule's tongue parameters written into the layer (keys per band, minor share).
     pub tongues: (u32, f64),
+    /// Per class, the least thickness (blocks) of a horizon inside a column, written into the
+    /// layer for the column rule (`deeptime_format::strata::drop_slivers`); empty: none.
+    pub min_blocks: Vec<u8>,
 }
 
 /// A horizon while it is baked: top (1/16 block), class, key span.
@@ -72,6 +90,7 @@ pub fn bake_cell(
     min_y: i32,
     max_y: i32,
     m_per_block_v: f64,
+    min_blocks: &[i32],
     tops: &mut [i16],
     classes: &mut [u8],
     keys: &mut [[u16; 2]],
@@ -85,7 +104,9 @@ pub fn bake_cell(
         }
         let q = (y * 16.0).round() as i32;
         match hz.last_mut() {
-            Some(last) if last.class == u.class => last.key[1] = last.key[1].max(u.key[1]),
+            Some(last) if last.class == u.class && key::joins(last.key, u.key) => {
+                last.key[1] = last.key[1].max(u.key[1])
+            }
             _ => hz.push(H {
                 top: q,
                 class: u.class,
@@ -102,17 +123,22 @@ pub fn bake_cell(
             key,
         });
     }
-    settle(&mut hz, min_y * 16, tops.len());
+    settle(&mut hz, min_y * 16, tops.len(), min_blocks);
     write_cell(&hz, tops, classes, keys)
 }
 
 /// Makes `hz` a valid stack: every horizon at least one block thick (the last down to `floor`,
-/// 1/16 block) and at most `k` of them — the thinnest horizon under one block merges with its
-/// thinner neighbour, then, while more than `k` remain, the adjacent pair with the smallest
-/// combined thickness; a merge keeps the upper top, the thicker member's class and both key
-/// spans, and neighbours of one class join. Then the key spans are made to grow downwards
-/// without overlapping or vanishing, whatever rounding did.
-fn settle(hz: &mut Vec<H>, floor: i32, k: usize) {
+/// 1/16 block), every horizon inside the stack at least its class's `min_blocks` thick, and at
+/// most `k` of them. The thinnest horizon under its least thickness goes first: one under a
+/// block merges with its thinner neighbour; a thicker one (a sliver of metamorphic or plutonic
+/// rock) gives its blocks to the horizon under it where that is of its key domain, else to the
+/// one over it where that is, else to the one under it, and that horizon keeps its class and
+/// keys. Then, while more than `k` remain, the adjacent pair with the smallest combined
+/// thickness merges. A merge keeps the upper top and the thicker member's class, with both key
+/// spans where they lie in one key domain and the kept class's span where they do not;
+/// neighbours of one class and one domain join. Then the key spans are made to grow downwards without
+/// overlapping or vanishing, whatever rounding did.
+fn settle(hz: &mut Vec<H>, floor: i32, k: usize, min_blocks: &[i32]) {
     let thick = |hz: &[H], i: usize| -> i32 {
         let below = if i + 1 < hz.len() {
             hz[i + 1].top
@@ -121,21 +147,37 @@ fn settle(hz: &mut Vec<H>, floor: i32, k: usize) {
         };
         hz[i].top - below
     };
+    // The least thickness of horizon i: a block, and inside the stack its class's.
+    let need = |hz: &[H], i: usize| -> i32 {
+        if i == 0 || i + 1 == hz.len() {
+            16
+        } else {
+            16 * min_blocks
+                .get(usize::from(hz[i].class))
+                .copied()
+                .unwrap_or(1)
+                .max(1)
+        }
+    };
     let merge = |hz: &mut Vec<H>, i: usize| {
         let (ta, tb) = (thick(hz, i), thick(hz, i + 1));
-        let class = if ta >= tb {
-            hz[i].class
-        } else {
-            hz[i + 1].class
-        };
+        let (a, b) = (hz[i], hz[i + 1]);
+        let upper = ta >= tb;
+        let class = if upper { a.class } else { b.class };
         hz[i].class = class;
-        hz[i].key[1] = hz[i].key[1].max(hz[i + 1].key[1]);
+        hz[i].key = if key::joins(a.key, b.key) {
+            [a.key[0], a.key[1].max(b.key[1])]
+        } else if upper {
+            a.key
+        } else {
+            b.key
+        };
         hz.remove(i + 1);
-        if i + 1 < hz.len() && hz[i + 1].class == class {
+        if i + 1 < hz.len() && hz[i + 1].class == class && key::joins(hz[i].key, hz[i + 1].key) {
             hz[i].key[1] = hz[i].key[1].max(hz[i + 1].key[1]);
             hz.remove(i + 1);
         }
-        if i > 0 && hz[i - 1].class == class {
+        if i > 0 && hz[i - 1].class == class && key::joins(hz[i - 1].key, hz[i].key) {
             hz[i - 1].key[1] = hz[i - 1].key[1].max(hz[i].key[1]);
             hz.remove(i);
         }
@@ -145,8 +187,28 @@ fn settle(hz: &mut Vec<H>, floor: i32, k: usize) {
             break;
         }
         let thin = (0..hz.len())
-            .filter(|&i| thick(hz, i) < 16)
+            .filter(|&i| thick(hz, i) < need(hz, i))
             .min_by_key(|&i| (thick(hz, i), i));
+        if let Some(i) = thin
+            && thick(hz, i) >= 16
+        {
+            // A sliver of metamorphic or plutonic rock (inside the stack: horizons lie over and
+            // under it): its blocks go to the horizon under it where that is of its key domain,
+            // else to the one over it where that is, else to the one under it; that horizon
+            // keeps its class and its keys (the sliver's keys become a hiatus), so the same
+            // unit is the same rock in the next cell, whichever of the two is thicker there.
+            let below = key::joins(hz[i].key, hz[i + 1].key);
+            let above = key::joins(hz[i - 1].key, hz[i].key);
+            if below || !above {
+                hz[i + 1].top = hz[i].top;
+            }
+            hz.remove(i);
+            if hz[i - 1].class == hz[i].class && key::joins(hz[i - 1].key, hz[i].key) {
+                hz[i - 1].key[1] = hz[i - 1].key[1].max(hz[i].key[1]);
+                hz.remove(i);
+            }
+            continue;
+        }
         if let Some(i) = thin {
             let up = if i > 0 { Some(thick(hz, i - 1)) } else { None };
             let down = if i + 1 < hz.len() {
@@ -211,6 +273,12 @@ pub fn smooth_stride(sigma: f64) -> i64 {
     (sigma / SMOOTH_SAMPLE_SIGMA).ceil().max(1.0) as i64
 }
 
+/// How far under the mean rock surface (blocks) the smoothing looks for the unit that fills the
+/// height of a cell standing above the mean surface (`Horizons::smoothed`): the thickest unit
+/// beginning within it. The beds over that unit (thinner than this, together) rise with the
+/// ground.
+pub const RIDGE_SEARCH_BLOCKS: i32 = 16;
+
 /// The column rule's tongue parameters a preset asks for: (keys per band, minor share).
 pub fn tongue_params(p: &StructureParams) -> (u32, f64) {
     let band = (f64::from(deeptime_format::strata::BAND_KEYS) * p.strata_tongue_scale)
@@ -257,10 +325,20 @@ impl Horizons {
     /// join. The neighbours are the cells on a lattice of step [`smooth_stride`] anchored to the
     /// grid (every cell samples the same lattice, so neighbouring cells see the same data) within
     /// [`SMOOTH_RADIUS_SAMPLES`] steps, so the cost stays (2·5 + 1)² stacks a cell for any σ. The
-    /// cell's own surface stays its first top (units the neighbours hold above it pinch out at
-    /// it; where the cell stands above the mean, its top unit fills the difference). The stacks
-    /// are then settled again (at least a block thick, at most K). σ 0 changes nothing.
-    pub fn smoothed(&self, sigma: f64) -> Horizons {
+    /// cell's own surface stays its first top: the regolith and the loose sediment on top
+    /// (the unconsolidated classes) lie on it with their mean thickness (they follow the ground,
+    /// not the mean surface), and the rock units the neighbours hold above their base pinch out
+    /// there. Where the cell stands above the mean, the thickest rock unit that begins within
+    /// [`RIDGE_SEARCH_BLOCKS`] of the mean rock surface fills the difference, and the thinner
+    /// beds over it keep their thickness and rise with the ground: a ridge 60 blocks over the
+    /// mean surface is the region's top formation, not 60 blocks of saprolite, clay or of a
+    /// coal seam that happens to be the youngest bed. The stacks
+    /// are then settled again (at least a block thick, metamorphic and plutonic rock inside the
+    /// stack at least `t.min_blocks` of its class, at most K). An interval takes its class from
+    /// horizons that span it, and a span lies in one key domain, so a new horizon's span does
+    /// too: a class that wins on both sides of a domain's edge makes two horizons. σ 0 changes
+    /// nothing.
+    pub fn smoothed(&self, sigma: f64, t: &Tables) -> Horizons {
         if sigma <= 0.0 {
             return self.clone();
         }
@@ -280,8 +358,8 @@ impl Horizons {
             .zip(out.keys.par_chunks_mut(k))
             .enumerate()
             .for_each_init(
-                || (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-                |(near, keys, ys, weight), (c, ((tc, cc), kc))| {
+                || (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                |(near, keys, ys, weight, win), (c, ((tc, cc), kc))| {
                     let own = self.cell(c);
                     if own.0.is_empty() {
                         return;
@@ -320,13 +398,14 @@ impl Horizons {
                     }
                     let top0 = f64::from(own.0[0]);
                     let mut hz: Vec<H> = Vec::with_capacity(k);
+                    // The class of every interval: the most weighted thickness in [s0, s1].
+                    win.clear();
+                    win.resize(m.saturating_sub(1), NO_CLASS);
                     for q in 0..m.saturating_sub(1) {
                         let (s0, s1) = (keys[q], keys[q + 1]);
-                        let (y0, y1) = (ys[q].min(top0), ys[q + 1].min(top0));
-                        if y1 >= y0 {
+                        if ys[q + 1] >= ys[q] {
                             continue;
                         }
-                        // The class with the most weighted thickness in [s0, s1].
                         weight.clear();
                         for &(n, g) in near.iter() {
                             let (tops, classes, nk) = self.cell(n);
@@ -335,29 +414,116 @@ impl Horizons {
                             else {
                                 continue;
                             };
-                            let t = g * (self.height_at(n, s0) - self.height_at(n, s1));
+                            let th = g * (self.height_at(n, s0) - self.height_at(n, s1));
                             match weight
                                 .iter_mut()
                                 .find(|e: &&mut (u8, f64)| e.0 == classes[hh])
                             {
-                                Some(e) => e.1 += t,
-                                None => weight.push((classes[hh], t)),
+                                Some(e) => e.1 += th,
+                                None => weight.push((classes[hh], th)),
                             }
                         }
-                        let Some(&(class, _)) = weight
+                        if let Some(&(class, _)) = weight
                             .iter()
                             .filter(|e| e.1 > 0.0)
                             .max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)))
-                        else {
+                        {
+                            win[q] = class;
+                        }
+                    }
+                    // The regolith and loose sediment: they lie on the cell's own surface with
+                    // their mean thickness, wherever the mean surface is.
+                    let loose = |q: usize| {
+                        key::domain(keys[q + 1]) == 0
+                            || t.unconsolidated.get(usize::from(win[q])) == Some(&true)
+                    };
+                    // The unit that fills the height of a cell standing over the mean surface:
+                    // the thickest rock unit (a run of intervals of one class in one key domain,
+                    // by its mean thickness) that begins within `RIDGE_SEARCH_BLOCKS` of the
+                    // mean rock surface. The thinner beds over it keep their thickness and rise
+                    // with the ground.
+                    let mut fill: Option<(usize, f64)> = None;
+                    let mut depth = 0.0f64;
+                    let mut q = 0;
+                    while q + 1 < m && depth < f64::from(16 * RIDGE_SEARCH_BLOCKS) {
+                        if win[q] == NO_CLASS || loose(q) {
+                            q += 1;
                             continue;
+                        }
+                        let (class, dom) = (win[q], key::domain(keys[q]));
+                        let (mut e, mut th) = (q, 0.0f64);
+                        while e + 1 < m
+                            && (win[e] == NO_CLASS
+                                || (win[e] == class
+                                    && key::domain(keys[e]) == dom
+                                    && key::domain(keys[e + 1]) == dom))
+                        {
+                            if win[e] != NO_CLASS {
+                                th += ys[e] - ys[e + 1];
+                            }
+                            e += 1;
+                        }
+                        if fill.is_none_or(|f| th > f.1) {
+                            fill = Some((q, th));
+                        }
+                        depth += th;
+                        q = e.max(q + 1);
+                    }
+                    let fill = fill.map(|f| f.0);
+                    // The loose cover laid on the cell's own surface so far (1/16 block), how far
+                    // the cell's rock surface stands over the mean one, and whether a rock
+                    // horizon has begun.
+                    let (mut cover, mut shift, mut rock) = (0.0f64, 0.0f64, false);
+                    for q in 0..m.saturating_sub(1) {
+                        let class = win[q];
+                        if class == NO_CLASS {
+                            continue;
+                        }
+                        let (s0, s1) = (keys[q], keys[q + 1]);
+                        let drape = !rock && loose(q);
+                        let rock_top = top0 - cover;
+                        if !drape && !rock {
+                            shift = (rock_top - ys[q]).max(0.0);
+                        }
+                        // Boundaries down to the fill unit's top rise with the ground.
+                        let lift = |b: usize| {
+                            if fill.is_some_and(|f| b <= f) {
+                                shift
+                            } else {
+                                0.0
+                            }
                         };
+                        let (y0, y1) = if drape {
+                            (rock_top, rock_top - (ys[q] - ys[q + 1]))
+                        } else {
+                            (
+                                (ys[q] + lift(q)).min(rock_top),
+                                (ys[q + 1] + lift(q + 1)).min(rock_top),
+                            )
+                        };
+                        if y1 >= y0 {
+                            continue;
+                        }
                         let top = if hz.is_empty() {
                             own.0[0].into()
+                        } else if !drape && !rock {
+                            // The first rock unit starts at the cover's base.
+                            rock_top.round() as i32
                         } else {
                             y0.round() as i32
                         };
+                        if drape {
+                            cover += y0 - y1;
+                        } else {
+                            rock = true;
+                        }
                         match hz.last_mut() {
-                            Some(last) if last.class == u16::from(class) => last.key[1] = s1,
+                            Some(last)
+                                if last.class == u16::from(class)
+                                    && key::joins(last.key, [s0, s1]) =>
+                            {
+                                last.key[1] = s1
+                            }
                             _ => hz.push(H {
                                 top,
                                 class: u16::from(class),
@@ -377,7 +543,7 @@ impl Horizons {
                             key: own.2[0],
                         });
                     }
-                    settle(&mut hz, self.min_y * 16, k);
+                    settle(&mut hz, self.min_y * 16, k, &t.min_blocks);
                     write_cell(&hz, tc, cc, kc);
                 },
             );
@@ -456,6 +622,57 @@ impl Horizons {
         Ok(())
     }
 
+    /// What the bake's own stacks hold beyond [`Horizons::check`] (a synthetic world's stacks
+    /// need not): every key span inside one key domain (`columns::key::domain`), and every
+    /// horizon inside a stack at least its class's `min_blocks` thick.
+    pub fn check_bake(&self, min_blocks: &[i32]) -> Result<(), String> {
+        for c in 0..self.cells() {
+            let (tops, classes, keys) = self.cell(c);
+            for h in 0..tops.len() {
+                if key::domain(keys[h][0]) != key::domain(keys[h][1]) {
+                    return Err(format!(
+                        "cell {c} horizon {h}: key span {:?} crosses key domains",
+                        keys[h]
+                    ));
+                }
+                let need = min_blocks
+                    .get(usize::from(classes[h]))
+                    .copied()
+                    .unwrap_or(1);
+                if h > 0
+                    && h + 1 < tops.len()
+                    && i32::from(tops[h]) - i32::from(tops[h + 1]) < 16 * need
+                {
+                    return Err(format!(
+                        "cell {c} horizon {h}: class {} is {} sixteenths thick, under its {need} blocks",
+                        classes[h],
+                        i32::from(tops[h]) - i32::from(tops[h + 1])
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// The `strata/horizons` layer's descriptor: what the column rule reads beside the cells.
+    pub fn desc(&self, codec: Codec) -> LayerDesc {
+        let mut d = LayerDesc::scalar(
+            "strata/horizons",
+            DType::HorizonStack,
+            self.grid.clone(),
+            codec,
+        );
+        d.units = "block/16 top, class index, key top, key base".into();
+        d.scale = 1.0 / 16.0;
+        d.stack_depth = Some(self.k);
+        d.tongue_band_keys = Some(self.tongues.0);
+        d.tongue_minor_share = Some(self.tongues.1);
+        if !self.min_blocks.is_empty() {
+            d.min_blocks = Some(self.min_blocks.clone());
+        }
+        d
+    }
+
     /// The `strata/horizons` layer (per cell K i16 tops, K u8 classes, K u16 key tops, K u16 key
     /// bases).
     pub fn to_layer(&self, codec: Codec) -> Result<LoadedLayer, FormatError> {
@@ -472,18 +689,7 @@ impl Horizons {
                 }
             }
         }
-        let mut d = LayerDesc::scalar(
-            "strata/horizons",
-            DType::HorizonStack,
-            self.grid.clone(),
-            codec,
-        );
-        d.units = "block/16 top, class index, key top, key base".into();
-        d.scale = 1.0 / 16.0;
-        d.stack_depth = Some(self.k);
-        d.tongue_band_keys = Some(self.tongues.0);
-        d.tongue_minor_share = Some(self.tongues.1);
-        LoadedLayer::new(d, bytes)
+        LoadedLayer::new(self.desc(codec), bytes)
     }
 
     /// `strata/classes.json`.
@@ -538,7 +744,17 @@ pub fn bake_with(
             let surface_y = src.surface_y(c, s);
             let depth = (surface_y - f64::from(s.min_y)).max(1.0) * mv + 100.0;
             columns::build(&src.cell(c), t, p, src.now_myr, depth, units);
-            bake_cell(units, surface_y, s.min_y, s.max_y, mv, tc, cc, kc);
+            bake_cell(
+                units,
+                surface_y,
+                s.min_y,
+                s.max_y,
+                mv,
+                &t.min_blocks,
+                tc,
+                cc,
+                kc,
+            );
         });
     Horizons {
         grid: src.grid.clone(),
@@ -548,8 +764,13 @@ pub fn bake_with(
         classes,
         keys,
         tongues: tongue_params(p),
+        min_blocks: t
+            .min_blocks
+            .iter()
+            .map(|&b| b.clamp(1, 255) as u8)
+            .collect(),
     }
-    .smoothed(p.strata_smoothing_cells)
+    .smoothed(p.strata_smoothing_cells, t)
 }
 
 #[cfg(test)]
@@ -592,6 +813,7 @@ mod tests {
                 -352,
                 639,
                 mv,
+                &[],
                 &mut tops,
                 &mut classes,
                 &mut keys,
@@ -630,6 +852,7 @@ mod tests {
             -352,
             639,
             20.0,
+            &[],
             &mut tops,
             &mut classes,
             &mut keys,
@@ -643,6 +866,7 @@ mod tests {
             classes: classes.repeat(2),
             keys: keys.repeat(2),
             tongues: (64, 0.15),
+            min_blocks: Vec::new(),
         };
         h.check().unwrap();
         // The soil and coal were thinner than a block and joined their neighbours.
@@ -671,6 +895,7 @@ mod tests {
             -352,
             639,
             20.0,
+            &[],
             &mut tops,
             &mut classes,
             &mut keys,
@@ -684,6 +909,7 @@ mod tests {
             classes: classes.repeat(2),
             keys: keys.repeat(2),
             tongues: (64, 0.15),
+            min_blocks: Vec::new(),
         };
         h.check().unwrap();
         // A surface below the world's floor still gets one horizon a block thick.
@@ -693,6 +919,7 @@ mod tests {
             -352,
             639,
             20.0,
+            &[],
             &mut tops,
             &mut classes,
             &mut keys,
@@ -700,5 +927,236 @@ mod tests {
         assert_eq!(n, 1);
         assert_eq!(tops[0], (-351 * 16) as i16);
         assert_eq!(tops[1], NO_TOP);
+    }
+
+    /// Units with the keys `columns::build` would give them: a log layer or a pool slot of a band.
+    fn keyed(name: &str, th: f32, key: [u16; 2]) -> Unit {
+        Unit {
+            class: index(name),
+            thickness_m: th,
+            source: Source::Log,
+            key,
+        }
+    }
+
+    #[test]
+    fn metamorphic_and_plutonic_slivers_merge_and_spans_stay_in_their_domain() {
+        let t = Tables::get();
+        let k = 8;
+        let mut tops = vec![0i16; k];
+        let mut classes = vec![0u8; k];
+        let mut keys = vec![[0u16; 2]; k];
+        // A metre of soil on 1 km of schist, a 60-m (3-block) gneiss, a 200-m (10-block)
+        // granodiorite, then gabbro: the soil is under a block and joins the schist, which keeps
+        // its own keys (not the regolith's); the gneiss sliver and the plutonic sheet are gone.
+        let schist = key::pool(4, 4, 0);
+        let units = [
+            keyed("soil", 1.0, key::REGOLITH),
+            keyed("schist", 1000.0, schist),
+            keyed("gneiss", 60.0, key::pool(6, 4, 1)),
+            keyed("granodiorite", 200.0, key::pool(6, 5, 0)),
+            keyed("gabbro", 20_000.0, key::pool(6, 6, 0)),
+        ];
+        let n = bake_cell(
+            &units,
+            100.0,
+            -352,
+            639,
+            20.0,
+            &t.min_blocks,
+            &mut tops,
+            &mut classes,
+            &mut keys,
+        );
+        assert_eq!(n, 2, "{classes:?}");
+        assert_eq!(classes[0], index("schist") as u8);
+        assert_eq!(keys[0], schist, "the soil's keys are a hiatus");
+        assert_eq!(classes[1], index("gabbro") as u8);
+        let h = Horizons {
+            grid: GridDesc::for_planet("L1", 64, 32).unwrap(),
+            k: k as u32,
+            min_y: -352,
+            tops: tops.repeat(2),
+            classes: classes.repeat(2),
+            keys: keys.repeat(2),
+            tongues: (64, 0.15),
+            min_blocks: Vec::new(),
+        };
+        h.check().unwrap();
+        h.check_bake(&t.min_blocks).unwrap();
+        // Thick enough, they stay; at the surface and at the floor a thin one stays too.
+        let units = [
+            keyed("schist", 60.0, schist),
+            keyed("gneiss", 400.0, key::pool(6, 4, 1)),
+            keyed("granodiorite", 800.0, key::pool(6, 5, 0)),
+            keyed("gabbro", 20_000.0, key::pool(6, 6, 0)),
+        ];
+        let n = bake_cell(
+            &units,
+            100.0,
+            -352,
+            639,
+            20.0,
+            &t.min_blocks,
+            &mut tops,
+            &mut classes,
+            &mut keys,
+        );
+        assert_eq!(n, 4, "{classes:?}");
+    }
+
+    /// The smoothing keeps the regolith on the ground: a ridge standing over the mean surface is
+    /// its top rock unit under the regolith's own two blocks and the loose sand's three, not
+    /// sixty blocks of saprolite or sand.
+    #[test]
+    fn the_regolith_follows_the_ground_through_the_smoothing() {
+        let t = Tables::get();
+        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
+        let (w, n, k) = (grid.w as usize, grid.cells(), 8);
+        let units = [
+            keyed("saprolite", 40.0, key::REGOLITH),
+            keyed("sand", 60.0, [4096, 4500]),
+            keyed("sandstone", 2000.0, [4500, 6000]),
+            keyed("granite", 20_000.0, key::pool(6, 5, 0)),
+        ];
+        let mut tops = vec![NO_TOP; n * k];
+        let mut classes = vec![NO_CLASS; n * k];
+        let mut keys = vec![[NO_KEY; 2]; n * k];
+        // A ridge three cells wide, 60 blocks over the plain.
+        let ridge = |c: usize| (30..33).contains(&(c % w));
+        for c in 0..n {
+            bake_cell(
+                &units,
+                if ridge(c) { 160.0 } else { 100.0 },
+                -352,
+                639,
+                20.0,
+                &t.min_blocks,
+                &mut tops[c * k..(c + 1) * k],
+                &mut classes[c * k..(c + 1) * k],
+                &mut keys[c * k..(c + 1) * k],
+            );
+        }
+        let h = Horizons {
+            grid,
+            k: k as u32,
+            min_y: -352,
+            tops,
+            classes,
+            keys,
+            tongues: (64, 0.15),
+            min_blocks: Vec::new(),
+        }
+        .smoothed(2.5, &t);
+        h.check().unwrap();
+        for c in [10 * w + 31, 10 * w + 5, 10 * w + 29] {
+            let (tops, classes, _) = h.cell(c);
+            assert_eq!(classes[0], index("saprolite") as u8, "cell {c}");
+            assert_eq!(classes[1], index("sand") as u8, "cell {c}");
+            assert_eq!(classes[2], index("sandstone") as u8, "cell {c}");
+            assert_eq!(
+                tops[0] - tops[1],
+                2 * 16,
+                "cell {c}: the regolith's own 40 m"
+            );
+            assert_eq!(
+                tops[1] - tops[2],
+                3 * 16,
+                "cell {c}: the loose sand's own 60 m"
+            );
+            assert_eq!(
+                i32::from(tops[0]),
+                if ridge(c) { 160 * 16 } else { 100 * 16 },
+                "cell {c}"
+            );
+        }
+    }
+
+    /// A ridge is made of the region's top formation: a thin youngest bed (a coal seam) rides
+    /// up with the ground instead of filling the ridge.
+    #[test]
+    fn a_thin_top_bed_does_not_fill_a_ridge() {
+        let t = Tables::get();
+        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
+        let (w, n, k) = (grid.w as usize, grid.cells(), 8);
+        let units = [
+            keyed("coal", 40.0, [4096, 4200]),
+            keyed("sandstone", 2000.0, [4200, 6000]),
+            keyed("granite", 20_000.0, key::pool(6, 5, 0)),
+        ];
+        let mut tops = vec![NO_TOP; n * k];
+        let mut classes = vec![NO_CLASS; n * k];
+        let mut keys = vec![[NO_KEY; 2]; n * k];
+        let ridge = |c: usize| (30..33).contains(&(c % w));
+        for c in 0..n {
+            bake_cell(
+                &units,
+                if ridge(c) { 160.0 } else { 100.0 },
+                -352,
+                639,
+                20.0,
+                &t.min_blocks,
+                &mut tops[c * k..(c + 1) * k],
+                &mut classes[c * k..(c + 1) * k],
+                &mut keys[c * k..(c + 1) * k],
+            );
+        }
+        let h = Horizons {
+            grid,
+            k: k as u32,
+            min_y: -352,
+            tops,
+            classes,
+            keys,
+            tongues: (64, 0.15),
+            min_blocks: Vec::new(),
+        }
+        .smoothed(2.5, &t);
+        h.check().unwrap();
+        for c in [10 * w + 31, 10 * w + 5] {
+            let (tops, classes, _) = h.cell(c);
+            assert_eq!(classes[0], index("coal") as u8, "cell {c}");
+            assert_eq!(classes[1], index("sandstone") as u8, "cell {c}");
+            assert_eq!(tops[0] - tops[1], 2 * 16, "cell {c}: the seam's own 40 m");
+        }
+        // The sandstone under the ridge is the plain's 100 blocks and the ridge's 60.
+        let (plain, ridge_cell) = (h.cell(10 * w + 5).0, h.cell(10 * w + 31).0);
+        let extra = (ridge_cell[1] - ridge_cell[2]) - (plain[1] - plain[2]);
+        assert!(extra > 25 * 16, "{extra}");
+    }
+
+    /// A sliver gives its blocks to the horizon under it, which keeps its class: two thin
+    /// basement units between a cover and the lower crust do not turn into more cover.
+    #[test]
+    fn a_sliver_joins_the_horizon_under_it() {
+        let t = Tables::get();
+        let k = 8;
+        let mut tops = vec![0i16; k];
+        let mut classes = vec![0u8; k];
+        let mut keys = vec![[0u16; 2]; k];
+        let units = [
+            keyed("phyllite", 260.0, key::pool(3, 0, 1)),
+            keyed("gneiss", 140.0, key::pool(6, 4, 0)),
+            keyed("granodiorite", 280.0, key::pool(6, 5, 0)),
+            keyed("gabbro", 20_000.0, key::pool(6, 6, 0)),
+        ];
+        let n = bake_cell(
+            &units,
+            100.0,
+            -352,
+            639,
+            20.0,
+            &t.min_blocks,
+            &mut tops,
+            &mut classes,
+            &mut keys,
+        );
+        // Gneiss (7 blocks) joins the granodiorite (14 + 7 = 21 blocks, over its 16).
+        assert_eq!(n, 3, "{classes:?}");
+        assert_eq!(classes[0], index("phyllite") as u8);
+        assert_eq!(classes[1], index("granodiorite") as u8);
+        assert_eq!(keys[1], key::pool(6, 5, 0));
+        assert_eq!(i32::from(tops[0] - tops[1]), 13 * 16);
+        assert_eq!(classes[2], index("gabbro") as u8);
     }
 }

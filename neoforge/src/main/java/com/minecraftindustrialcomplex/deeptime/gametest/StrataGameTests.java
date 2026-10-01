@@ -294,12 +294,13 @@ public final class StrataGameTests {
         if (rejected.stream().noneMatch(s -> s.startsWith("minecraft:air")))
             e.wrong.add("test_fallback did not reject air: " + rejected);
         if (rockTags(helper)) {
-            e.that(live, "shale", Source.FALLBACK, loaded(BIC) ? "born_in_chaos_v1:black_argillite" : "minecraft:polished_tuff");
+            // The MIC rows since 2026-10-01 (decisions log, "Use stone for common rocks").
+            e.that(live, "shale", Source.FALLBACK, "minecraft:stone");
             e.that(live, "hornfels", Source.FALLBACK, loaded(BIC) ? "born_in_chaos_v1:fired_black_argillite" : "minecraft:smooth_basalt");
             e.that(live, "peridotite", Source.FALLBACK, loaded(CREATE) ? "create:veridium" : "minecraft:tuff");
             e.that(live, "anhydrite", Source.FALLBACK, loaded(CREATE) ? "create:limestone" : "minecraft:diorite");
             e.that(live, "bauxite", Source.FALLBACK, loaded(CREATE) ? "create:ochrum" : "minecraft:red_sand");
-            e.that(live, "gneiss", Source.FALLBACK, "minecraft:granite");
+            e.that(live, "gneiss", Source.FALLBACK, stateOf("minecraft:deepslate"));
         } else {
             e.that(live, "shale", Source.VANILLA_FALLBACK, "minecraft:stone");
             e.that(live, "gneiss", Source.VANILLA_FALLBACK, stateOf("minecraft:deepslate"));
