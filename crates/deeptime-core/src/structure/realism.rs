@@ -379,7 +379,7 @@ mod tests {
         assert!(ok.clean(), "{ok:?}");
         assert!(ok.floored.is_empty());
         // Ben's column: schist at the surface over unmetamorphosed shale.
-        let bad = findings(&[("schist", 63), ("shale", 57), ("andesite", 30)]);
+        let bad = findings(&[("schist", 63), ("shale", 57), ("granite", 30)]);
         assert_eq!(bad.inversions.len(), 1, "{bad:?}");
         let (up, low, _) = bad.inversions[0];
         assert_eq!((up, low), (index("schist") as u8, index("shale") as u8));

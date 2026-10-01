@@ -781,6 +781,7 @@ impl StructureStage {
                         s.min_y,
                         s.max_y,
                         s.m_per_block_v,
+                        &t.min_blocks,
                         tops,
                         classes,
                         keys,
