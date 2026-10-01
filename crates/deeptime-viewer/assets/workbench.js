@@ -134,7 +134,7 @@
     ['strata', 'Strata'], ['volcanoes', 'Volcanoes'], ['deposits', 'Deposits'], ['input', 'Deposit inputs']];
   const layerGroup = name => { const i = name.indexOf('/'); return i < 0 ? '' : name.slice(0, i); };
   const LAYER_WORDS = {
-    satellite: 'Satellite', elevation: 'Elevation', plates: 'Plates', crust_age: 'Crust age', regime: 'Tectonic regime', provinces: 'Geologic provinces', water_level: 'Water level',
+    satellite: 'Satellite', elevation: 'Elevation', plates: 'Plates', crust_age: 'Crust age', regime: 'Tectonic regime', provinces: 'Geologic provinces', water_level: 'Water level', rivers: 'Rivers & lakes',
     t_mean: 'Mean temperature', t_warm: 'Warmest month', t_cold: 'Coldest month', precip: 'Precipitation', koppen: 'Köppen climate',
     aridity: 'Aridity', glacier: 'Glaciers', ela: 'Snow line', temperature: 'Temperature', vegetation: 'Vegetation',
     erosion: 'Erosion', deposition: 'Deposition', sediment: 'Sediment', class: 'Surface rock', drainage: 'Drainage', regolith: 'Regolith',
@@ -151,6 +151,7 @@
     for (const [s, u] of UNIT_SUFFIX) if (base.endsWith(s) && base.length > s.length) { base = base.slice(0, -s.length); unit = u; break; }
     if (name === 'elevation') unit = 'block y';
     if (name === 'crust_age') unit = 'Myr';
+    if (name === 'rivers') unit = 'river flow, m³/s';
     return { label: LAYER_WORDS[base] || cap1(base.replace(/_/g, ' ')), unit };
   }
 
@@ -229,6 +230,18 @@
     const { label, unit } = layerLabel(layerName);
     let h = `<div class="lh"><span class="lname">${esc(label || 'No layer')}</span><span class="lraw">${esc(layerName || '')}${info && info.name !== layerName ? ` · ramp ${esc(info.name)}` : ''}</span><span class="lunit">${esc(unit)}</span></div>`;
     if (!info) return h + '<div class="note">Loading the colours…</div>';
+    if (layerName === 'rivers' && !info.cat) {
+      // Rivers & lakes (core water_view.rs): the ramp is the river's colour by discharge (log10
+      // m³/s, ticks in m³/s); the other colours are in the ramp's `keys`.
+      const keys = info.ramp.keys || {}, span = info.hi - info.lo || 1;
+      const key = (c, t) => `<div title="${esc(t)}"><i style="background:${esc(c || '#888')}"></i><span>${esc(t)}</span></div>`;
+      h += `<div class="cats">${key(keys.lake, 'Lake')}${key(keys.land, 'Land')}${key(keys.sea, 'Sea')}</div>`;
+      h += `<canvas class="bar" data-ramp="${esc(info.name)}" data-target="${target}"></canvas><div class="ticks">`;
+      h += [2, 10, 100, 1000].map((q, i) => `<span style="left:${(100 * (Math.log10(q) - info.lo) / span).toFixed(2)}%;transform:${i ? 'translateX(-50%)' : 'none'}">${fmtInt(q)}</span>`).join('');
+      h += '</div>';
+      if (info.comment) h += `<div class="note">${esc(info.comment)}</div>`;
+      return h;
+    }
     if (info.cat && info.labelled && info.classes.length <= 40) {
       // A key: swatches with their labels, wider columns for long labels, under the ramp's group
       // headings when it has them (the satellite view's land, snow and ice, sea).
@@ -853,11 +866,39 @@
     const q = (py * pix.w + px) * 4;
     const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
     if (pix.d[q + 3] === 0) return { name, rgb, nodata: true };
+    if (info && info.name === 'rivers') return { name, info, ...riversRead(pix, px, py, info) };
     return { name, rgb, info, val: valueAt(info, rgb) };
+  }
+  // The Rivers & lakes layer (core water_view.rs): a river is a pixel on the ramp (log10 of its
+  // discharge), a lake one of the ramp's lake key colour; rivers are a pixel or two wide, so the
+  // pointer reads the strongest water within a pixel of it.
+  function riversRead(pix, px, py, info) {
+    const lake = hexRgb((info.ramp.keys && info.ramp.keys.lake) || '#5cc0ea');
+    let best = null;
+    for (let k = 0; k < 9; k++) {
+      const dx = k === 0 ? 0 : [-1, 0, 1, -1, 1, -1, 0, 1][k - 1], dy = k === 0 ? 0 : [-1, -1, -1, 0, 0, 1, 1, 1][k - 1];
+      const x = (px + dx + pix.w) % pix.w, y = clamp(py + dy, 0, pix.h - 1), q = (y * pix.w + x) * 4;
+      if (pix.d[q + 3] === 0) continue;
+      const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
+      let w = null;
+      if (dist2(rgb, lake) < 150) w = { kind: 'lake', v: Infinity };
+      else { const r = valueAt(info, rgb); if (r && !r.far) w = { kind: 'river', v: r.v }; }
+      if (w && (!best || w.v > best.w.v)) best = { w, rgb };
+      if (k === 0 && w) break;   // the pixel under the pointer is water: that is the answer
+    }
+    return best ? { rgb: best.rgb, water: best.w } : { rgb: [pix.d[(py * pix.w + px) * 4], pix.d[(py * pix.w + px) * 4 + 1], pix.d[(py * pix.w + px) * 4 + 2]], water: null };
+  }
+  function riverFlowText(logq) {
+    const q = 10 ** logq;
+    if (q < 10) return q.toFixed(1);
+    if (q < 100) return String(Math.round(q));
+    const p = 10 ** (Math.floor(Math.log10(q)) - 1);
+    return fmtInt(Math.round(q / p) * p);
   }
   function valueText(s) {
     if (!s) return '';
     if (s.nodata) return 'no data';
+    if (s.water !== undefined) return s.water ? (s.water.kind === 'lake' ? 'lake' : `river (~${riverFlowText(s.water.v)} m³/s)`) : '';
     if (!s.val) return '';
     // The satellite view is true colour, so the nearest key colour is only what the spot looks like.
     if (s.val.cls && s.info && s.info.name === 'satellite') return `looks like ${(s.val.cls.label || '').toLowerCase()}`;
