@@ -60,7 +60,13 @@ public final class RealPlanetGameTests {
     /**
      * The terrain is the baked height, detail term included: at noise-cell corner columns (x ≡ z ≡ 0
      * mod 4) the top block is ⌈H⌉ − 1 exactly; elsewhere the density is interpolated between
-     * corners, so the difference is only logged, with a loose bound.
+     * corners, which do not see the raster's relief inside the cell, so the difference from the
+     * column's own H is only logged (it grows with the slope: 1 to 10 blocks on the planets
+     * measured) and the top block must lie between the lowest and the highest top of the four
+     * corners of its noise cell, give or take a block. Where the bake stands above the
+     * world's build limit the top block is the limit: that is the format's rule, and how many sampled
+     * columns it cut is logged ({@code aboveBuildLimit}); whether a bake may hold such terrain at
+     * all is a pipeline question (STATUS.md, known issues: "terrain above the build limit").
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void realPlanetHeightMatchesTheBake(GameTestHelper helper) {
@@ -70,6 +76,10 @@ public final class RealPlanetGameTests {
         helper.assertTrue(wd.detailNoise() != null, "the real planet has a detail term");
         int c = t.circumference();
         int[] detailed = {0};
+        int limit = Math.min(level.getMaxBuildHeight() - 1, wd.manifest().maxY());
+        int[] clipped = {0, Integer.MIN_VALUE};   // columns whose baked top is above the build limit, the highest of them
+        int[] outside = {0};                      // columns between corners whose top is outside their cell's corner tops
+        StringBuilder outsideDetail = new StringBuilder();
         ChunkSampling.HeightTally tally = new ChunkSampling.HeightTally();
         ChunkSampling.forEach(helper, 96, i -> {
             boolean corner = i % 2 == 0;
@@ -81,19 +91,45 @@ public final class RealPlanetGameTests {
             }
             if (wd.detail(t.wrapX(x), z) != 0.0)
                 detailed[0]++;
-            int expected = (int) Math.ceil(t.height(x, z)) - 1;
-            if (expected < level.getMinBuildHeight() + 32)
+            int unclipped = (int) Math.ceil(t.height(x, z)) - 1;
+            if (unclipped < level.getMinBuildHeight() + 32)
                 return false;   // the floor band: the router's bottom slide, not the bake
+            // Baked terrain above the build limit ends at the limit (the column evaluator's topY is
+            // ⌈H⌉ − 1 clamped to max_y, FORMAT.md): counted, so the log shows how much of a planet is cut.
+            int expected = Math.min(unclipped, limit);
+            if (unclipped > limit) {
+                clipped[0]++;
+                clipped[1] = Math.max(clipped[1], unclipped);
+            }
             int actual = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.NOISE, true)
                     .getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z);
             tally.add(x, z, corner, expected, actual, t.height(x, z));
+            if (!corner) {
+                int x0 = Math.floorDiv(x, 4) * 4, z0 = Math.floorDiv(z, 4) * 4;
+                double lo = Double.POSITIVE_INFINITY, hi = Double.NEGATIVE_INFINITY;
+                for (int dx = 0; dx <= 4; dx += 4)
+                    for (int dz = 0; dz <= 4; dz += 4) {
+                        double h = t.height(x0 + dx, z0 + dz);
+                        lo = Math.min(lo, h);
+                        hi = Math.max(hi, h);
+                    }
+                int loTop = Math.min((int) Math.ceil(lo) - 1, limit), hiTop = Math.min((int) Math.ceil(hi) - 1, limit);
+                if (actual < loTop - 1 || actual > hiTop + 1) {
+                    outside[0]++;
+                    if (outsideDetail.length() < 300)
+                        outsideDetail.append(" (").append(x).append(", ").append(z).append(") got ").append(actual)
+                                .append(", its cell's corners ").append(loTop).append("..").append(hiTop);
+                }
+            }
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] realPlanetHeightMatchesTheBake columns={} cornerColumns={} cornerMaxAbsDiff={} "
-                    + "maxAbsDiff={} withDetail={} worst={}", tally.checked, tally.corners, tally.cornerMax, tally.maxDiff, detailed[0], tally.worst);
+                    + "maxAbsDiff={} outsideCellCorners={} withDetail={} aboveBuildLimit={} (limit y {}, highest baked top {}) worst={}",
+                    tally.checked, tally.corners, tally.cornerMax, tally.maxDiff, outside[0], detailed[0], clipped[0], limit,
+                    clipped[0] == 0 ? "-" : clipped[1], tally.worst);
             helper.assertTrue(tally.corners >= 24, "only " + tally.corners + " corner columns above the floor band");
             helper.assertTrue(tally.cornerMax == 0, "corner columns differ by up to " + tally.cornerMax + ": " + tally.worst);
-            helper.assertTrue(tally.maxDiff <= 12, "columns differ by up to " + tally.maxDiff + ": " + tally.worst);
+            helper.assertTrue(outside[0] == 0, outside[0] + " columns between corners are outside their cell's corner tops:" + outsideDetail);
             helper.succeed();
         });
     }

@@ -1733,6 +1733,15 @@ mod tests {
         let m = deeptime_format::Manifest::read(&dir.join("world")).unwrap();
         assert_eq!(m.format_version, "0.2");
         assert_eq!(m.notes["bake"]["baked"], true);
+        // The bake says how much of its terrain stands above the build limit (whatever the planet).
+        let limit = &m.notes["bake"]["terrain"]["build_limit"];
+        assert_eq!(limit["max_y"], 639);
+        assert!(limit["land_cells"].as_u64().is_some_and(|n| n > 0));
+        assert!(limit["cells_above"].as_u64().unwrap() <= limit["land_cells"].as_u64().unwrap());
+        assert_eq!(
+            limit["cells_above"].as_u64().unwrap() > 0,
+            limit["highest_y"].as_f64().unwrap() > 639.0
+        );
         let out = dir.join("world/parity/columns.json");
         let (n, _) = super::parity::run(&dir.join("world"), &out, 60, 7).unwrap();
         assert_eq!(n, 60);
