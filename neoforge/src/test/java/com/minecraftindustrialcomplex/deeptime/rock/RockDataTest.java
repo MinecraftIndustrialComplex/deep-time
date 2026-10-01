@@ -31,6 +31,17 @@ class RockDataTest {
     private static final Set<String> FAMILIES = Set.of("intrusive_igneous", "volcanic", "clastic_sedimentary",
             "chemical_sedimentary", "metamorphic", "special_host", "unconsolidated");
 
+    /**
+     * P1-28 (Ben, decisions log 2026-10-01: "Use stone for common rocks"): the classes whose
+     * vanilla_fallback is plain stone or deepslate, the same table as {@code CRUST_STAND_INS} in
+     * tools/dev/gen_rock_classes.py. Stone: the common fine-grained grey sedimentary rocks;
+     * deepslate: the common altered and deep ones. Coal's stone is older (Ben's pick, 2026-09-27).
+     */
+    static final Map<String, String> CRUST_STAND_INS = Map.of(
+            "coal", "minecraft:stone", "shale", "minecraft:stone", "mudstone", "minecraft:stone",
+            "slate", "minecraft:deepslate", "phyllite", "minecraft:deepslate", "schist", "minecraft:deepslate",
+            "gneiss", "minecraft:deepslate");
+
     private static Path data() {
         String root = System.getProperty("deeptime.repoRoot");
         if (root == null)
@@ -68,8 +79,9 @@ class RockDataTest {
             String vf = o.get("vanilla_fallback").getAsString();
             if (!vf.startsWith("minecraft:") || vf.contains("terracotta"))
                 bad.add(name + ": vanilla_fallback " + vf);
-            if ((vf.equals("minecraft:stone") && !name.equals("coal")) || vf.equals("minecraft:deepslate"))
-                bad.add(name + ": vanilla_fallback is filler " + vf);
+            String crust = CRUST_STAND_INS.get(name);
+            if (crust == null ? (vf.equals("minecraft:stone") || vf.equals("minecraft:deepslate")) : !crust.equals(vf))
+                bad.add(name + ": vanilla_fallback " + vf + " but P1-28 gives " + crust);
             List<String> refs = new ArrayList<>();
             o.getAsJsonArray("metamorphic_path").forEach(e -> refs.add(e.getAsString()));
             for (String key : List.of("weathers_to", "lithifies_to", "loose_equivalent"))
@@ -117,6 +129,47 @@ class RockDataTest {
             }
         }
         assertEquals(18, blocks, "the README's 18 vanilla member blocks");
+    }
+
+    /**
+     * P1-28: stone and deepslate stand in for the common classes, so vanilla's cobblestone recipes work
+     * with no recipe change (Ben, 2026-10-01: no widened recipes). Deep Time ships no recipe, loot
+     * table or item/block tag under {@code data/minecraft} or {@code data/c}, and the class data names
+     * the stand-ins with a reason.
+     */
+    @Test
+    void stoneStandInsTouchNoRecipesDropsOrItemTags() throws IOException {
+        Path minecraft = data().resolve("minecraft");
+        try (Stream<Path> files = Files.walk(minecraft)) {
+            for (Path f : files.filter(Files::isRegularFile).toList()) {
+                String rel = minecraft.relativize(f).toString().replace('\\', '/');
+                assertTrue(rel.startsWith("tags/worldgen/"), "Deep Time ships " + rel + " under data/minecraft: only the world preset tag is expected");
+            }
+        }
+        for (String ns : List.of("c", "neoforge")) {
+            Path dir = data().resolve(ns);
+            if (Files.exists(dir))
+                try (Stream<Path> files = Files.walk(dir)) {
+                    assertTrue(files.noneMatch(f -> f.toString().contains("recipe") || f.toString().contains("loot_table")),
+                            "Deep Time ships a recipe or loot table under data/" + ns);
+                }
+        }
+        Map<String, JsonObject> classes = classes();
+        classes.forEach((name, o) -> {
+            String why = o.getAsJsonObject("sources").get("vanilla_fallback").getAsString();
+            if (CRUST_STAND_INS.containsKey(name) && !name.equals("coal"))
+                assertTrue(why.contains("P1-28") && why.contains("stands in"), name + ": sources say '" + why + "'");
+        });
+        // The common grey sedimentary classes are stone, the common altered and deep ones deepslate; classes
+        // with a distinctive block keep it.
+        for (String keeps : List.of("granite", "diorite", "andesite", "basalt", "tuff", "sandstone", "limestone", "marble",
+                "gypsum", "quartzite", "black_shale", "hornfels"))
+            assertFalse(CRUST_STAND_INS.containsKey(keeps), keeps + " keeps its own block");
+        for (String cls : classes.keySet()) {
+            String vf = classes.get(cls).get("vanilla_fallback").getAsString();
+            boolean crust = vf.equals("minecraft:stone") || vf.equals("minecraft:deepslate");
+            assertEquals(CRUST_STAND_INS.containsKey(cls), crust, cls + " vanilla_fallback " + vf);
+        }
     }
 
     @Test
