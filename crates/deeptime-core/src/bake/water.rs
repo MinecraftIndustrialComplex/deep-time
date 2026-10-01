@@ -32,7 +32,7 @@ pub struct Water {
 }
 
 /// Loads an i16 layer whole.
-fn load_i16(path: &Path) -> Result<(GridDesc, Vec<i16>), CoreError> {
+pub(crate) fn load_i16(path: &Path) -> Result<(GridDesc, Vec<i16>), CoreError> {
     let l = TilePackReader::open(path)?.load()?;
     if l.desc.dtype != DType::I16 {
         return Err(CoreError::InvalidState(format!(
@@ -51,7 +51,7 @@ fn load_i16(path: &Path) -> Result<(GridDesc, Vec<i16>), CoreError> {
 }
 
 /// Averages a raster 2 × 2 (x wraps: W is even).
-fn halve(g: &GridDesc, v: &[i16]) -> (GridDesc, Vec<i16>) {
+pub(crate) fn halve(g: &GridDesc, v: &[i16]) -> (GridDesc, Vec<i16>) {
     let (w, h) = (g.w as usize, g.h as usize);
     let (w2, h2) = (w / 2, h / 2);
     let mut out = vec![0i16; w2 * h2];
@@ -78,7 +78,7 @@ fn halve(g: &GridDesc, v: &[i16]) -> (GridDesc, Vec<i16>) {
 
 /// Runs the hydrology on the folder `out.dir` and writes its layers and file.
 pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
-    let params = p.hydro.clone().unwrap_or_default();
+    let params = p.hydro.unwrap_or_default();
     let rivers_path = out.dir.join(RIVERS_PATH);
     if !params.enabled {
         if rivers_path.exists() {

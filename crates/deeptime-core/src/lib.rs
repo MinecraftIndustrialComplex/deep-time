@@ -21,6 +21,7 @@ pub mod provinces;
 pub mod satellite;
 pub mod session;
 pub mod sphere;
+pub mod water_view;
 
 // Deep-time surface processes on L1 (P1-04).
 pub mod surface;

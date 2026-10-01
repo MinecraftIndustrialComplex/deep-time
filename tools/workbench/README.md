@@ -196,6 +196,53 @@ stats, bodies, sites, verify).
 Jobs live in `smoke/workbench/jobs/` (gitignored; `DEEPTIME_WORKBENCH_JOBS` moves them). One job
 boots a server at a time; concurrent jobs queue on the lock.
 
+## Final world: a zoomable map of a run's bake
+
+The stage bar's **Final world** button (key `w`) swaps the frame map for a deep-zoom map of the
+focused run's **bake** (`<run>/world`, FORMAT.md "The bake"): the satellite look, the elevation under
+a hill shade, or the water, from the whole planet down to a block a pixel (and magnified 4x past it).
+View only: it reads the finished world data, writes nothing into it and adds nothing to the simulation
+or the bake. A run that has not finished (or has no terrain layer) says so and checks again.
+
+| Piece | Where |
+|---|---|
+| Tile geometry, the bake as a map, the painters, `sample` | `crates/deeptime-cli/src/watch/worldmap.rs` |
+| Routes and the per-run tile cache | `crates/deeptime-cli/src/watch/tiles.rs` |
+| The view (own canvas slippy map, no library, nothing from the network) | `crates/deeptime-viewer/assets/worldmap.js` |
+| Lighting and colour rules shared with the frame maps | `crates/deeptime-core/src/satellite.rs` (`colour`, `cover`, `box_filter`, `Light`, `shaded`) |
+| Timing and pyramid size | `tools/workbench/tiles_bench.py` |
+| Finding a volcano or a fjord to look at | `tools/workbench/find_places.py` |
+
+**Using it.** Drag to pan; wheel, double click (Shift: out), pinch, `+`/`-` or the buttons to zoom;
+arrows pan; `0` shows the whole planet; `Esc` closes. The world wraps east-west. The readout gives
+block (x, z), latitude and longitude, and after a pause the bake's terrain y, surface (land, lake,
+river, sea), Koeppen class, temperature and precipitation. **3D preview here** sends the middle 256 x
+256 blocks of the view (the dashed square) to the Area 3D preview. The address follows the view:
+`?run=<id>&world=<sat|elev|water>/<block x>/<block z>/<blocks per pixel>` opens the map there.
+
+**Routes** (all `GET`, under `/api/runs/<id>/`):
+
+| Route | Answer |
+|---|---|
+| `world.json` | `{available: false, reason}`, or the pyramid (`tile_px` 256, `max_zoom`, `circumference`, `blocks_per_px` per zoom), `layers`, the world's scale, `finest` (what the last zoom is made of), `has`, `cache` (bytes, tiles, cap), `timing` (tiles drawn, mean and max ms per layer) |
+| `tiles/<layer>/<z>/<x>/<y>.png` | one tile; layer `sat`, `elev`, `water`, or `overlay` (rivers and lakes alone, transparent). XYZ, geodetic 2:1: zoom `z` is `2^(z+1) x 2^z` tiles, `x` east from the seam, `y` south from the north edge. `409` before the run has a bake, `404` outside the pyramid |
+| `world/sample?x=&z=` | what the bake says at a block (any lap) |
+
+**Resolution.** Zoom 0 is 32 blocks a pixel at C = 16,384; the last native zoom (5; 6 at 32k) is one
+block a pixel. The terrain there is the bake's own height `H = E + A*N` at every block (the L3 grid,
+bilinear, plus the game's sub-cell detail noise), i.e. the amplified terrain, drawn on demand at no
+extra cost. Coarser tiles read box-averaged mips of L3, so there is no aliasing. Colour comes from
+the L1 climate and L2 rock and ice grids (16 and 8 blocks a cell), lapsed to each block's height
+with the monthly temperatures (the climate API's rule), so snow lines and tree lines follow the
+relief but vegetation has no block-scale detail. Rivers are drawn from `rivers.dtrv` (the larger
+ones at coarse zooms, all at the finest, at least a pixel wide), lakes from `water_level`.
+
+**Cache.** `<run>/tiles/v<N>/<layer>/<z>/<x>/<y>.png`, capped per run at 384 MiB
+(`DEEPTIME_TILE_CACHE_MIB`), the least recently asked tile dropped first; a folder of another render
+version is deleted; it goes with the run. At most two runs' maps (mips and climate fields, ~60 MiB
+each at 16k) are held in memory. A full 16k pyramid (2,730 tiles a layer) is about 98 MiB of
+satellite, 204 of elevation, 204 of water and 9 of overlay, 85 % of it the finest zoom.
+
 ## Still to do
 
 - the viewer's `describe()` (`area3d.js`): a click outside every exported box could ask the same
