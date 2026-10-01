@@ -67,7 +67,7 @@ fn within(x: f64, r: [f32; 2]) -> bool {
 }
 
 /// The class a body paints at (x, y, z), if any.
-fn body_class(b: &Body, c: u32, x: i32, y: i32, z: i32) -> Option<&str> {
+pub fn body_class(b: &Body, c: u32, x: i32, y: i32, z: i32) -> Option<&str> {
     let at = b.locate(c, x, y, z)?;
     let mut class = b.rock_class.as_deref();
     for zone in &b.zones {
