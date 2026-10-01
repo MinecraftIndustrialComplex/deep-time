@@ -471,7 +471,8 @@ public final class DepositGameTests {
                         BlockState s = chunk.getBlockState(new BlockPos(p.x(), p.y(), p.z()));
                         if (OreBlockResolver.isOreOf(s, r.material()))
                             placed++;
-                        else if (palette.host(s) == RockPalette.Host.ROCK && p.draw() < r.bias(palette.classesOf(s))
+                        else if (palette.host(s) == RockPalette.Host.ROCK
+                                && p.draw() < BackgroundScatterFeature.bias(wd, palette, r, s, p.x(), p.y(), p.z())
                                 && wd.deposits().bodiesIn(p.x(), p.y(), p.z(), p.x(), p.y(), p.z()).isEmpty()) {
                             wrong++;
                             if (problem.isEmpty())

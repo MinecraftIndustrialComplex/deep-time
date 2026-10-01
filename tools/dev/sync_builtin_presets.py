@@ -47,7 +47,7 @@ def description(name: str, p: dict) -> str:
         f"landscape and its amplification, baked for the game. L0 {r['l0_samples']} samples, "
         f"L1 {w('l1_r')}x{w('l1_r') // 2}, L2 {w('l2_r')}x{w('l2_r') // 2}, "
         f"L3 {w('l3_r')}x{w('l3_r') // 2}. The same parameters as {MAPPING[name]} (calibrated "
-        f"2026-09-29, final numbers in P1-17). It names no timeline: choose the start and the "
+        f"2026-10-01, P1-17). It names no timeline: choose the start and the "
         f"length in the editor or config/deeptime/server.json."
     )
 

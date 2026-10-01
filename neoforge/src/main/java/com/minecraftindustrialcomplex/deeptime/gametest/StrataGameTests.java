@@ -107,10 +107,27 @@ public final class StrataGameTests {
     }
 
     /**
+     * The classes whose {@code vanilla_fallback} is plain stone or deepslate (P1-28; Ben, decisions log
+     * 2026-10-01, "Use stone for common rocks"): the common fine-grained grey sedimentary rocks are stone,
+     * the common altered and deep ones deepslate; coal's stone is older (2026-09-27). The twin of
+     * {@code CRUST_STAND_INS} in tools/dev/gen_rock_classes.py and of the JUnit {@code RockDataTest}.
+     */
+    static final Map<String, String> CRUST_STAND_INS = Map.of(
+            "coal", "minecraft:stone", "shale", "minecraft:stone", "mudstone", "minecraft:stone",
+            "slate", "minecraft:deepslate", "phyllite", "minecraft:deepslate", "schist", "minecraft:deepslate",
+            "gneiss", "minecraft:deepslate");
+
+    /** A block's default state as the palette prints it (deepslate is {@code deepslate[axis=y]}). */
+    static String stateOf(String block) {
+        return BlockStateParser.serialize(net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                .get(net.minecraft.resources.ResourceLocation.parse(block)).defaultBlockState());
+    }
+
+    /**
      * A pure-vanilla pack resolves all 60 classes: the palette built from only the {@code minecraft:}
      * members of the member tags plus each class's {@code vanilla_fallback} gives every class a
-     * vanilla block, never stone or deepslate except coal's stone, and rejects nothing. Without a
-     * rock datapack the live palette is exactly that view.
+     * vanilla block, stone or deepslate for exactly the {@link #CRUST_STAND_INS} and for no other
+     * class, and rejects nothing. Without a rock datapack the live palette is exactly that view.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 200)
     public static void vanillaOnlyResolvesEveryClass(GameTestHelper helper) {
@@ -131,8 +148,9 @@ public final class StrataGameTests {
             for (BlockState b : r.blocks()) {
                 if (!id(b).startsWith("minecraft:"))
                     e.wrong.add(cls + ": " + id(b) + " is not vanilla");
-                if (StrataPass.isCrust(b) && !(cls.equals(PaletteRules.COAL) && b.is(Blocks.STONE)))
-                    e.wrong.add(cls + ": " + id(b) + " is filler");
+                if (StrataPass.isCrust(b) != CRUST_STAND_INS.containsKey(cls))
+                    e.wrong.add(cls + ": " + id(b) + (StrataPass.isCrust(b) ? " is stone or deepslate, which P1-28 reserves for "
+                            + CRUST_STAND_INS.keySet() : ", but P1-28 gives it " + CRUST_STAND_INS.get(cls)));
             }
             if (!r.rejected().isEmpty())
                 e.wrong.add(cls + " rejected " + r.rejected());
@@ -147,47 +165,119 @@ public final class StrataGameTests {
         e.that(vanilla, "marble", Source.MEMBER, "minecraft:calcite");
         e.that(vanilla, "basalt", Source.MEMBER, "minecraft:smooth_basalt");
         e.that(vanilla, "limestone", Source.VANILLA_FALLBACK, "minecraft:calcite");
-        e.that(vanilla, "shale", Source.VANILLA_FALLBACK, "minecraft:polished_tuff");
+        CRUST_STAND_INS.forEach((cls, block) -> e.that(vanilla, cls, Source.VANILLA_FALLBACK, stateOf(block)));
         e.that(vanilla, "loess", Source.VANILLA_FALLBACK, "minecraft:smooth_sandstone");
         e.that(vanilla, "peridotite", Source.VANILLA_FALLBACK, "minecraft:tuff");
-        e.that(vanilla, "coal", Source.VANILLA_FALLBACK, "minecraft:stone");
         e.that(vanilla, "diamictite", Source.VANILLA_FALLBACK, "minecraft:cobbled_deepslate");
+        e.that(vanilla, "black_shale", Source.VANILLA_FALLBACK, "minecraft:smooth_basalt");
+        e.that(vanilla, "rhyolite", Source.VANILLA_FALLBACK, "minecraft:granite");
         DeepTime.LOGGER.info("[gametest] vanillaOnlyResolvesEveryClass classes={} sources={} rockTags={}", ours.size(), bySource, rockTags(helper));
         e.done(helper, "vanillaOnlyResolvesEveryClass");
     }
 
     /**
-     * Coal is the one class that may fall back to filler stone: stone without Born in Chaos or
-     * without the rock tags, black argillite with both (the decisions file). No other class
-     * resolves to stone or deepslate.
+     * Stone and deepslate stand in for the common classes (P1-28, {@link #CRUST_STAND_INS}) as their
+     * {@code vanilla_fallback}, the last resort: without a rock datapack the live palette gives exactly
+     * those classes stone or deepslate and no other class either. A pack's fallback tags are read
+     * first, so with the MIC rock tags every one of those classes resolves from its fallback tag
+     * instead (the pack decides what it looks like; coal's list ends in stone, after Born in Chaos'
+     * black argillite when that is installed).
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 200)
-    public static void coalFallsBackToStone(GameTestHelper helper) {
+    public static void crustStandInsYieldToPackTags(GameTestHelper helper) {
         RockPalette live = RockPalette.get();
         Expect e = new Expect();
-        if (!rockTags(helper))
-            e.that(live, "coal", Source.VANILLA_FALLBACK, "minecraft:stone");
-        else if (loaded(BIC))
-            e.that(live, "coal", Source.FALLBACK, "born_in_chaos_v1:black_argillite");
-        else
+        boolean tags = rockTags(helper);
+        CRUST_STAND_INS.forEach((cls, block) -> {
+            if (!tags)
+                e.that(live, cls, Source.VANILLA_FALLBACK, stateOf(block));
+            else {
+                e.checked++;
+                var r = live.result(cls).orElse(null);
+                if (r == null || r.source() != Source.FALLBACK)
+                    e.wrong.add(cls + ": with the rock tags the pack's fallback list should decide, got "
+                            + (r == null ? "no class" : r.source().id() + " " + r.blocks().stream().map(StrataGameTests::id).toList()));
+            }
+        });
+        if (tags && !loaded(BIC))
             e.that(live, "coal", Source.FALLBACK, "minecraft:stone");
-        e.that(RockPalette.build(helper.getLevel().registryAccess(), RockPalette.View.VANILLA_ONLY), "coal",
-                Source.VANILLA_FALLBACK, "minecraft:stone");
-        for (String cls : live.classes()) {
-            if (cls.equals(PaletteRules.COAL))
-                continue;
-            e.checked++;
-            live.result(cls).orElseThrow().blocks().stream().filter(StrataPass::isCrust)
-                    .forEach(b -> e.wrong.add(cls + " resolves to filler " + id(b)));
+        if (!tags) {
+            for (String cls : live.classes()) {
+                if (CRUST_STAND_INS.containsKey(cls))
+                    continue;
+                e.checked++;
+                live.result(cls).orElseThrow().blocks().stream().filter(StrataPass::isCrust)
+                        .forEach(b -> e.wrong.add(cls + " resolves to " + id(b) + ", which is for " + CRUST_STAND_INS.keySet()));
+            }
         }
-        DeepTime.LOGGER.info("[gametest] coalFallsBackToStone coal={} rockTags={} bornInChaos={}",
-                live.primary("coal").map(StrataGameTests::id).orElse("nothing"), rockTags(helper), loaded(BIC));
-        e.done(helper, "coalFallsBackToStone");
+        // The palette tells a class from the filler where a block cannot: stone is the unclassified crust
+        // and every class that resolves to it, deepslate likewise.
+        if (!tags) {
+            e.checked++;
+            var stone = live.classesOf(Blocks.STONE.defaultBlockState());
+            var deepslate = live.classesOf(Blocks.DEEPSLATE.defaultBlockState());
+            for (var en : CRUST_STAND_INS.entrySet()) {
+                var of = en.getValue().equals("minecraft:stone") ? stone : deepslate;
+                if (!of.contains(en.getKey()) || !of.contains(RockPalette.UNCLASSIFIED_CRUST))
+                    e.wrong.add("classesOf(" + en.getValue() + ") = " + of + " lacks " + en.getKey() + " or the unclassified crust");
+            }
+            if (stone.contains("slate") || deepslate.contains("shale"))
+                e.wrong.add("stone and deepslate classes mixed up: " + stone + " / " + deepslate);
+        }
+        DeepTime.LOGGER.info("[gametest] crustStandInsYieldToPackTags rockTags={} bornInChaos={} shale={} gneiss={} coal={}", tags, loaded(BIC),
+                live.primary("shale").map(StrataGameTests::id).orElse("nothing"), live.primary("gneiss").map(StrataGameTests::id).orElse("nothing"),
+                live.primary("coal").map(StrataGameTests::id).orElse("nothing"));
+        e.done(helper, "crustStandInsYieldToPackTags");
+    }
+
+    /**
+     * Mining stone and deepslate drops vanilla's cobblestone and cobbled deepslate (so stone tools,
+     * furnaces and every cobblestone recipe work on a planet made mostly of the two), and every other
+     * block a class can place drops what vanilla gives, unchanged (Ben, 2026-10-01: no recipe, item
+     * tag or drop is widened). The loot tables and recipes in play are vanilla's; none comes from
+     * Deep Time's own pack.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 200)
+    public static void miningTheCommonRocksDropsVanillaCobbles(GameTestHelper helper) {
+        var level = helper.getLevel();
+        Expect e = new Expect();
+        var tool = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND_PICKAXE);
+        Map<String, String> expected = new TreeMap<>(Map.ofEntries(
+                Map.entry("minecraft:stone", "minecraft:cobblestone"),
+                Map.entry("minecraft:deepslate", "minecraft:cobbled_deepslate"),
+                Map.entry("minecraft:granite", "minecraft:granite"), Map.entry("minecraft:diorite", "minecraft:diorite"),
+                Map.entry("minecraft:andesite", "minecraft:andesite"), Map.entry("minecraft:smooth_basalt", "minecraft:smooth_basalt"),
+                Map.entry("minecraft:tuff", "minecraft:tuff"), Map.entry("minecraft:sandstone", "minecraft:sandstone"),
+                Map.entry("minecraft:red_sandstone", "minecraft:red_sandstone"), Map.entry("minecraft:calcite", "minecraft:calcite"),
+                Map.entry("minecraft:dripstone_block", "minecraft:dripstone_block"), Map.entry("minecraft:obsidian", "minecraft:obsidian"),
+                Map.entry("minecraft:packed_mud", "minecraft:packed_mud"), Map.entry("minecraft:polished_tuff", "minecraft:polished_tuff")));
+        BlockPos pos = helper.absolutePos(new BlockPos(1, 1, 1));
+        expected.forEach((block, drop) -> {
+            e.checked++;
+            var state = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                    .get(net.minecraft.resources.ResourceLocation.parse(block)).defaultBlockState();
+            var got = net.minecraft.world.level.block.Block.getDrops(state, level, pos, null, null, tool).stream()
+                    .map(s -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()).toString()).toList();
+            if (!got.equals(List.of(drop)))
+                e.wrong.add(block + " drops " + got + ", vanilla gives " + drop);
+        });
+        // Nothing of Deep Time's overrides a loot table, a recipe or an item tag of vanilla's or the common namespace.
+        var resources = level.getServer().getResourceManager();
+        for (String dir : List.of("loot_table", "recipe", "tags/item"))
+            for (String ns : List.of("minecraft", "c", "neoforge")) {
+                e.checked++;
+                resources.listResources(dir, rl -> rl.getNamespace().equals(ns)).forEach((rl, res) -> {
+                    if (res.sourcePackId().equals("mod/" + DeepTime.MODID))
+                        e.wrong.add("Deep Time's jar ships " + rl);
+                });
+            }
+        DeepTime.LOGGER.info("[gametest] miningTheCommonRocksDropsVanillaCobbles checked={} wrong={}", e.checked, e.wrong.size());
+        e.done(helper, "miningTheCommonRocksDropsVanillaCobbles");
     }
 
     /**
      * An empty member tag falls back to the first <em>installed</em> fallback entry, in list order:
-     * {@code test_fallback}'s list is [an absent optional block, stone (filler, rejected),
+     * {@code test_fallback}'s list is [an absent optional block, air (rejected),
      * polished_andesite, andesite] then a {@code rock_states} fallback entry, so polished_andesite;
      * {@code test_state_fallback} has only {@code rock_states} fallback entries (an absent optional
      * block, then polished_granite). With the MIC rock tags, classes whose first stand-in is modded
@@ -201,8 +291,8 @@ public final class StrataGameTests {
         e.that(live, "test_state_fallback", Source.FALLBACK, "minecraft:polished_granite");
         e.checked++;
         var rejected = live.result("test_fallback").map(PaletteRules.Result::rejected).orElse(List.of());
-        if (rejected.stream().noneMatch(s -> s.startsWith("minecraft:stone")))
-            e.wrong.add("test_fallback did not reject filler stone: " + rejected);
+        if (rejected.stream().noneMatch(s -> s.startsWith("minecraft:air")))
+            e.wrong.add("test_fallback did not reject air: " + rejected);
         if (rockTags(helper)) {
             e.that(live, "shale", Source.FALLBACK, loaded(BIC) ? "born_in_chaos_v1:black_argillite" : "minecraft:polished_tuff");
             e.that(live, "hornfels", Source.FALLBACK, loaded(BIC) ? "born_in_chaos_v1:fired_black_argillite" : "minecraft:smooth_basalt");
@@ -211,8 +301,8 @@ public final class StrataGameTests {
             e.that(live, "bauxite", Source.FALLBACK, loaded(CREATE) ? "create:ochrum" : "minecraft:red_sand");
             e.that(live, "gneiss", Source.FALLBACK, "minecraft:granite");
         } else {
-            e.that(live, "shale", Source.VANILLA_FALLBACK, "minecraft:polished_tuff");
-            e.that(live, "gneiss", Source.VANILLA_FALLBACK, "minecraft:granite");
+            e.that(live, "shale", Source.VANILLA_FALLBACK, "minecraft:stone");
+            e.that(live, "gneiss", Source.VANILLA_FALLBACK, stateOf("minecraft:deepslate"));
         }
         DeepTime.LOGGER.info("[gametest] firstInstalledFallback test_fallback={} shale={} peridotite={} rockTags={}",
                 live.primary("test_fallback").map(StrataGameTests::id).orElse("nothing"),
@@ -294,8 +384,9 @@ public final class StrataGameTests {
      * every-class strata ({@code deeptime synth --strata every-class}), where any ten neighbouring
      * 16-block cell columns hold all 60 classes 20 or more blocks below the surface. In ten cell
      * columns on two rows, at SURFACE status, every horizon from the third down holds its class's
-     * block (the member its key picks) at two depths, and a class that resolves to nothing, or to
-     * stone, leaves the crust.
+     * block (the member its key picks) at two depths, and a class that resolves to nothing leaves the crust (a
+     * class that resolves to stone or deepslate (P1-28) is painted as that block, even where the crust was
+     * the other one).
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void everyClassInTheWorld(GameTestHelper helper) {
@@ -329,7 +420,7 @@ public final class StrataGameTests {
                     for (int y : new int[]{col.tops[h] - 1, bottom + 1}) {
                         e.checked++;
                         BlockState actual = chunk.getBlockState(new BlockPos(x, y, z));
-                        boolean ok = expected == null || expected.is(Blocks.STONE) ? StrataPass.isCrust(actual) : actual == expected;
+                        boolean ok = expected == null ? StrataPass.isCrust(actual) : actual == expected;
                         if (!ok)
                             e.wrong.add("(" + x + "," + y + "," + z + ") h" + h + " " + name + ": expected "
                                     + (expected == null ? "crust" : id(expected)) + ", got " + id(actual));
