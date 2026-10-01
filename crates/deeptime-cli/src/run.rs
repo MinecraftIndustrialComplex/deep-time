@@ -368,7 +368,7 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
          evaporite_km3={:.3e} to_sea_km3={:.3e} mass_residual_km3={:.3e} mean_log_layers={:.2} \
          spl_iterations_per_step={:.2} cg_iterations_per_step={:.1} sinks={} erosion_pulses={} basins={} sea_events={} frames={} \
          history_mib={:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_z_p99_m={:.0} plate_cap_bound_share={:.5} \
-         foreign_crust_cell_steps={:.0}",
+         foreign_crust_cell_steps={:.0} spread_cell_steps={:.0} spread_km3={:.3e}",
         t.steps,
         land / n,
         peak,
@@ -396,6 +396,8 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         z99,
         cap_share,
         global(deeptime_core::surface::FOREIGN_CRUST_GLOBAL),
+        global(deeptime_core::surface::spread::CELLS_GLOBAL),
+        global(deeptime_core::surface::spread::MOVED_GLOBAL),
     ))
 }
 
