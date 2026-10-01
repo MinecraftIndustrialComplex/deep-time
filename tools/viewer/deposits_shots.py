@@ -210,6 +210,43 @@ def main():
         time.sleep(0.6)
         check(ev("document.querySelector('#deplegend').hidden") is False, "and shows them again")
 
+        # The other workbench features still work with the overlay on: Rivers & lakes, the section tool,
+        # the Final world view (each opened, then put back).
+        has_rivers = ev("!!document.querySelector('[data-layer=\"rivers\"]')")
+        if has_rivers:
+            ev("document.querySelector('[data-layer=\"rivers\"]').click()")
+            time.sleep(2.5)
+            check(ev("document.querySelector('#lpickname').textContent") == "Rivers & lakes"
+                  and ev("document.querySelector('#deplegend').hidden") is False,
+                  "the Rivers & lakes layer shows with the overlay on")
+            shot("11-rivers-overlay.png")
+            ev("document.querySelector('[data-layer=\"elevation\"]').click()")
+        else:
+            check(False, "the run has a Rivers & lakes layer")
+        ev("document.querySelector('#tool-section').click()")
+        time.sleep(0.5)
+        check(ev("document.querySelector('#tool-section').getAttribute('aria-pressed')") == "true", "the section tool opens")
+        pts = [s for s in loc if s["type"].endswith("coal_seam")][:2]
+        if len(pts) == 2:
+            for s in pts:
+                mouse("mousePressed", s["x"], s["y"] + 40, "left", 1)
+                mouse("mouseReleased", s["x"], s["y"] + 40, "left", 1)
+                time.sleep(0.4)
+            time.sleep(4)
+            sec = ev("document.querySelector('#ip-section').innerText") or ""
+            print("section panel:", repr(sec[:160]), flush=True)
+            check(ev("document.querySelector('#ip-section').hidden") is False and len(sec) > 10, "two clicks with the section tool fill the Section panel")
+            shot("12-section-overlay.png")
+        ev("document.querySelector('#tool-select').click()")
+        ev("document.querySelector('#worldbtn').click()")
+        time.sleep(3)
+        check(ev("document.querySelector('#worldview').hidden") is False, "the Final world view opens")
+        shot("13-final-world.png")
+        ev("document.querySelector('#worldbtn').click()")
+        time.sleep(1)
+        check(ev("document.querySelector('#worldview').hidden") is True and ev("document.querySelector('#deplegend').hidden") is False,
+              "and closes again with the overlay still there")
+
         # What the overlay costs a frame: the run's sites, and ten times as many (every redraw does it).
         cost = ev("""(async () => {
           const d = await fetch('api/runs/__RUN__/deposits').then(r => r.json());
