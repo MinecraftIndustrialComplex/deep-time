@@ -269,7 +269,11 @@ mod tests {
             // from 20 Myr on.
             let tol = if t < 20.0 { 400.0 } else { 120.0 };
             let z = ocean_elevation(t, -2500.0, -5600.0, 0.215);
-            assert!((-z - gdh1(t)).abs() < tol, "{t} Myr: {z} vs GDH1 {}", gdh1(t));
+            assert!(
+                (-z - gdh1(t)).abs() < tol,
+                "{t} Myr: {z} vs GDH1 {}",
+                gdh1(t)
+            );
         }
         let cortial = |t: f64| -ocean_elevation(t, -2500.0, -10_000.0, 0.05);
         assert!(gdh1(10.0) - cortial(10.0) > 800.0 && cortial(200.0) - gdh1(200.0) > 1500.0);
