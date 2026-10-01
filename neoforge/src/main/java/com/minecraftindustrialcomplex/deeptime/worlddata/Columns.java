@@ -277,6 +277,40 @@ public final class Columns {
                 }
                 top = bottom;
             }
+            int[] minBlocks = strata.desc().minBlocks();
+            if (minBlocks != null)
+                dropSlivers(minBlocks);
+        }
+
+        /**
+         * Rust {@code strata::drop_slivers}, the column rule's step 5: from the second horizon down, a
+         * horizon that is not the last and is thinner than its class's least thickness is removed and
+         * its blocks go to the horizon under it (whose top becomes the removed one's); one of the class
+         * of the last one kept is removed too.
+         */
+        private void dropSlivers(int[] minBlocks) {
+            int n = count;
+            int kept = Math.min(1, n);
+            boolean carrying = false;
+            int carried = 0;
+            for (int h = 1; h < n; h++) {
+                int cls = classes[h];
+                int top = carrying ? carried : tops[h];
+                int need = cls < minBlocks.length ? minBlocks[cls] : 1;
+                if (h + 1 < n && need > 1 && top - tops[h + 1] < need) {
+                    carrying = true;
+                    carried = top;
+                    continue;
+                }
+                carrying = false;
+                if (classes[kept - 1] == cls)
+                    continue;
+                tops[kept] = top;
+                classes[kept] = cls;
+                units[kept] = units[h];
+                kept++;
+            }
+            count = kept;
         }
 
         /** Rust {@code strata::interfinger}. */

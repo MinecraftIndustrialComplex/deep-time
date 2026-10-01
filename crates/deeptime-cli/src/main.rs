@@ -12,6 +12,7 @@ mod parity;
 mod provinces;
 mod run;
 mod satellite_view;
+mod strata_check;
 mod structure_view;
 mod synth;
 mod volcano_view;
@@ -299,6 +300,34 @@ enum Command {
         #[arg(long, conflicts_with = "parity")]
         why: bool,
     },
+    /// How many rock columns a geologist would object to: metamorphic grade inversions (a
+    /// higher grade above rock that was never that hot), thin metamorphic slivers, and plutonic
+    /// rock lying in the pile like a bed. On a world-data folder: the columns the game builds and
+    /// the stored stacks; on a checkpoint: the stacks before and after the bake's smoothing.
+    #[command(allow_negative_numbers = true)]
+    StrataCheck {
+        /// World-data folder (a run's `--out`).
+        #[arg(long)]
+        world_data: Option<PathBuf>,
+        /// A checkpoint whose world has run the structure stage (`run --checkpoints`).
+        #[arg(long)]
+        checkpoint: Option<PathBuf>,
+        /// How many random columns of the world data.
+        #[arg(long, default_value_t = 20_000)]
+        columns: usize,
+        /// Seed of the column choice.
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        /// A metamorphic horizon thinner than this inside the pile is a sliver, blocks.
+        #[arg(long, default_value_t = 8)]
+        sliver_blocks: i32,
+        /// A plutonic horizon thinner than this between other rocks is a sheet, blocks.
+        #[arg(long, default_value_t = 16)]
+        sheet_blocks: i32,
+        /// Print this column's stack and findings instead of the census, `X,Z` (repeatable).
+        #[arg(long = "column", value_name = "X,Z", allow_hyphen_values = true)]
+        column: Vec<String>,
+    },
     /// Write the Java↔Rust column parity fixture (plan §9.2): columns of a world-data folder as the
     /// column evaluator answers them, for `ColumnParityTest` and the real-planet GameTest.
     Parity {
@@ -419,6 +448,10 @@ enum Command {
         /// `young/elevation`; `amplify/elevation`), not the finest the world has.
         #[arg(long)]
         on: Option<String>,
+        /// Sets a value of the checkpoint's preset before drawing, `--set hydro.lake_balance=false`
+        /// (repeatable): the view's hydrology settings can be compared without a new run.
+        #[arg(long = "set", value_name = "PATH=VALUE")]
+        set: Vec<String>,
     },
 }
 
@@ -724,6 +757,53 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::StrataCheck {
+            world_data,
+            checkpoint,
+            columns,
+            seed,
+            sliver_blocks,
+            sheet_blocks,
+            column,
+        }) => {
+            let at: Result<Vec<(i64, i64)>, String> = column
+                .iter()
+                .map(|s| {
+                    let bad = || format!("--column {s}: expected X,Z");
+                    let (x, z) = s.split_once(',').ok_or_else(bad)?;
+                    Ok((
+                        x.trim().parse().map_err(|_| bad())?,
+                        z.trim().parse().map_err(|_| bad())?,
+                    ))
+                })
+                .collect();
+            let answer = at.map_err(Into::into).and_then(|at| {
+                strata_check::run(&strata_check::Options {
+                    world_data: world_data.as_deref(),
+                    checkpoint: checkpoint.as_deref(),
+                    columns,
+                    seed,
+                    limits: deeptime_core::structure::realism::Limits {
+                        sliver_blocks,
+                        sheet_blocks,
+                    },
+                    at: &at,
+                })
+            });
+            match answer {
+                Ok(v) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&v).expect("a census serialises")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime strata-check: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::Parity {
             world_data,
             out,
@@ -846,7 +926,8 @@ fn main() -> ExitCode {
             out,
             width,
             on,
-        }) => match satellite_view::run(&input, &out, width, on.as_deref()) {
+            set,
+        }) => match satellite_view::run(&input, &out, width, on.as_deref(), &set) {
             Ok(r) => {
                 println!(
                     "deeptime satellite: t = {:.1} Myr, drawn on {} -> {}",
@@ -856,16 +937,31 @@ fn main() -> ExitCode {
                 );
                 if let (Some(p), Some(w)) = (&r.rivers, &r.water) {
                     println!(
-                        "deeptime satellite: rivers & lakes -> {} ({} river chains, {} vertices, {:.0} px of lakes); satellite picture {:.0} ms, water derived in {:.0} ms (phases {}) and drawn in {:.0} ms",
+                        "deeptime satellite: rivers & lakes -> {} ({} river chains, {} vertices, {:.0} px of lakes, {:.0} of them frozen, {:.0} px of playa); satellite picture {:.0} ms, water derived in {:.0} ms (phases {}) and drawn in {:.0} ms",
                         p.display(),
                         w.chains,
                         w.vertices,
                         w.lake_px,
+                        w.frozen_px,
+                        w.playa_px,
                         r.satellite_ms,
                         r.derive_ms,
                         w.phases,
                         r.draw_ms
                     );
+                    let mut lakes = w.stats.clone();
+                    if let Some(o) = lakes.as_object_mut() {
+                        for k in [
+                            "grid",
+                            "millis",
+                            "index_entries",
+                            "vertices",
+                            "open_sea_min_cells",
+                        ] {
+                            o.remove(k);
+                        }
+                    }
+                    println!("deeptime satellite: lakes {lakes}");
                 }
                 ExitCode::SUCCESS
             }

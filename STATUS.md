@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · P1-27 plate margins (sutures, initiation clear of trenches, arc cordilleras) + coherent provinces done on its branch (worktree-agent-ad3b417fd428c1ac2) · Rivers & lakes on the workbench maps (view-only; satellite overlay + a `rivers` layer) done on its branch (worktree-agent-a3d4fadfe3e053b77) · Updated: 2026-10-01 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · P1-27 plate margins (sutures, initiation clear of trenches, arc cordilleras) + coherent provinces done on its branch (worktree-agent-ad3b417fd428c1ac2) · Rivers & lakes on the workbench maps (view-only; satellite overlay + a `rivers` layer) done on its branch (worktree-agent-a3d4fadfe3e053b77) · P1-28 stone and deepslate for the common rocks done on its branch (worktree-agent-a72907749021691b5) · Updated: 2026-10-01 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -44,12 +44,13 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-20 | Browser workbench on the Mac (log 2026-09-28): stage 1 editor controls + live runs + compare; stage 2 click-to-inspect and 3D block preview | doing | 2026-09-28 | | Both stages in parallel (Ben, 2026-09-28): stage 1 grows out of the live viewer; stage 2 runs the real generator headless on the Mac and exports the area (`deeptime-inspect export-area`), so it does not wait for P1-08; a fast Rust column path joins after P1-08. **Stage 1 built** (branch worktree-agent-a3abc4a868f0c3b81): `tools/viewer/mac-watch.sh` → http://m6-mac-mini:8642/ (tailnet only); Mac: cargo test --workspace, clippy -D warnings, fmt, deny clean, JUnit 107/0; two real 500-Myr pipeline_quick_16k runs watched live (the scattered run equals P1-04's batch numbers: 1,238 events, land_frac 0.215), compared side by side, screenshots looked at; stage 2 hooks are 501 stubs (see build log). **Stage 2 built** (branch worktree-agent-a63e3a8af506069de): `deeptime-inspect export-area` + `tools/workbench/preview.py` (real generator headless on the Mac) + `tools/review/pages/area3d/` viewer, wired as `deeptime watch --preview`; 256 × 256 × 992 boxes in 44 s (standalone) / 90 s (MIC), verify 0 wrong, 6/6 probe site agree; until P1-08 a preview is the synthetic deposit world at the box's lat/lon and says so (see build log). **Follow-up** (branch worktree-agent-afd5791e0f5ea82cd): a run with a bake is previewed and inspected as its own terrain (`/api/inspect` from `deeptime inspect-column --why` in 60-90 ms, previews boot the mod on the run's bake; height p50 0 vs the bake); runs without a bake keep the test world and say so (see build log). **UI overhaul** (branch worktree-agent-a95571be05fdd89d6, Ben: "should be dark themed"): dark map-first layout, run cards, sectioned editor with the estimate by Run, split/side-by-side compare, timeline dock, stage-2 job cards, `?tv` HUD, 390 px; placeholders hidden; Mac gates clean, JUnit 118/0; before/after in review/out/workbench-ui/ (see build log) |
 | P1-21 | Volcanoes as landforms (log 2026-09-29) | done | 2026-09-30 | | Branch worktree-agent-a348bd3bf6e50dd72 (session f981c0d3-5144-49ec-8686-2946d755872c): coupled `volcanoes` stage (arc stratovolcanoes on the volcanic front ~60 km apart, hotspot shields and island chains that age and subside, calderas, flood-basalt plateaus from LIPs), volcanic rock in the strata log, `deeptime:volcano_*` events with causes (workbench, `inspect-column --why` landforms, porphyry pathway), block-scale cones/craters/calderas/terraces in amplify, every knob a setting. Mac: earthlike_quick_16k 500 Myr 418 s (volcanoes 14.1 s), 203 live arc cones, 8 standing shields, 295 calderas, 9 flood basalts, 1,468 events; cargo test/clippy -D warnings/fmt/deny clean; gradlew build test 146/0; `mac.sh --server -- ./gametest.sh` All 50 required tests passed; bundle review/out/p1-21/bundle (11 MB, not published); follow-ups (log 2026-09-30): flank steepness setting (default 0.5), one event per arc segment / hotspot chain, segments under 3 cones counted on their subduction onset, young volcanoes exempt from the mountain pass's unsharp mask; see build log |
 | P1-22 | Rivers and lakes (moved from P2-03, log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-ad204cf8d55ef26f5, not yet merged. core::hydro in the bake (lakes full to their spill level; river network `rivers/rivers.dtrv`, format 0.2), the column rule on both sides, the WaterBodies pass, river biomes, `hydro` settings. <br>**Real 16k 500 Myr planet:** 27 lakes (68,139 km²), 4,489 rivers, 119,813 km, widest 36.7 blocks; water part 4.9 s. <br>**Parity:** 500/500 and lake1024 300/300. <br>**GameTests:** `./gametest.sh` and `-PwithMic` 53/54 each on master 0905793 (riversHold 0 floating, 0 leaks; the one failure was master's climateConsistent, fixed on master since); `./gametest-planet.sh` PASS; the last merge (5d4147b) got cargo and Gradle only (157/0), per the new rule. <br>**Previews:** 0 floating and 0 river/lake leaks in 3 of 4 boxes, 1 on a boulder in the 4th; the whole lake's rim − surface = 0. <br>**Chunk time:** the pass costs 0.3 ms a chunk. <br>Review bundle review/out/p1-22 (not published); see the build log |
+| P1-22b | Climate-sized and frozen lakes (log 2026-10-01; the lake part of P2-03 pulled forward) | done | 2026-10-01 | — | On branch worktree-agent-a2195c5c858c73075, not yet merged. Lake levels from a per-basin water balance (full, below the rim, playa or dry), frozen lakes, pointer text, 5 `hydro` settings; no format change. <br>Bake B: lakes 4.51 % → 2.46 % of land, largest 74,262 → 9,995 km². <br>Gates: cargo, Gradle 160/0, GameTests 57/57, browser check 11/11. See the build log. |
 | P1-23 | Grid-artifact audit (log 2026-09-29) | todo | | | Starts after the mountain and strata work lands (they fix part of it). |
 | P1-24 | Faster Create World (log 2026-09-29) | todo | | | After P1-17's benchmarks; options go to Ben. |
 | P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-a02882c5e6567370e, not yet merged. Format 0.2 bakes twelve monthly layers. `DeepTimeClimate` is at API version 1.<br>**Parity:** `ClimateParityTest` 500/500 blocks bit for bit, and the GameTest `climateApiOnTheRealPlanet` matches too.<br>**mic-climate `deep-time` branch** (pushed): Deep Time's climate plus Project Atmosphere's weather anomaly. Its GameTests pass 19/19, with and without Project Atmosphere, and its pack smoke passes 20/20.<br>**MIC planet probe** (earthlike_quick_16k): Af 24.5 °C, BWk 8.8/19.6 °C, Dfc −12.9/15.3 °C, ET −24.7/0.6 °C, EF plateau (4,860 m) −22.7/−46.7 °C, each pair midwinter/midsummer. Project Atmosphere read 8.6, 8.9, −0.6, 4.0 and 10.5 °C at the same places. Its simulated weather adds −2.4…+2.5 °C.<br>JUnit 150/0 and `./gametest.sh` All 52 passed after merging master 8872c91; cargo gates clean. See build log. |
 | P1-26 | Per-cell climate: 2-D energy balance, sea ice, moisture (log 2026-09-30) | doing | 2026-09-30 | | Design approved 2026-10-01 (docs/design/p1-26-per-cell-climate.md, recommended answers); tasks T1–T11 start after the climate agent's ice-sheet branch (worktree-agent-adc924860a859865c-ice) lands. |
 | P1-27 | Plate margins and coherent continents (logs 2026-09-29, 2026-09-30) | done | 2026-09-30 | | Branch worktree-agent-ad3b417fd428c1ac2 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. Cause: a collision moved the continent alone to the overriding plate, leaving its passive margins facing an ocean that kept converging (collisions cut 295,000–455,000 km of margin off its ocean per 750-Myr run; rifts ~2,000, initiations < 300). Fixed by sutures, initiation anywhere clear of trenches (rate 0.3), arc cordilleras, collision orogen cores, arc maturity; provinces view generalised to the USGS map's 150 km. Mac, 6 pipeline runs × 400 Myr before → after: active margin 0.67 → 0.31 (Earth ~0.3, Bradley 2008), passive 0.30 → 0.63, floor beside passive margins 50 → 102 Myr, ground under arc cones 307 → 812 m, provinces orogen 0.51 → 0.40, shield+platform 0.17 → 0.29, edge density 0.078 → 0.060; land 0.398 → 0.391, median 1,350 → 1,030 m, ocean p90 108 → 194 Myr. cargo test/clippy/fmt/deny clean, JUnit 155/0; evidence review/out/p1-27/ (not committed); see build log |
-| P1-28 | Stone for common rocks (log 2026-10-01) | doing | 2026-10-01 | | Stone for shale/mudstone-type classes, deepslate for slate/schist/gneiss-type classes, through the rock table and tags; no recipe changes. |
+| P1-28 | Stone and deepslate for the common rocks (log 2026-10-01; first the hardness tiers, replaced the same day) | done | 2026-10-01 | | Branch worktree-agent-a72907749021691b5 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. `minecraft:stone` is the `vanilla_fallback` of shale and mudstone, `minecraft:deepslate` of slate, phyllite, schist and gneiss (`CRUST_STAND_INS` in `tools/dev/gen_rock_classes.py`); no recipe, item tag or drop touched. Stone or deepslate share of the placed rock, top 64 blocks / whole column: 0.0 % → 47.8 % / 55.3 % (12 generated boxes, standalone), census of the whole planet 0.1 % → 56.2 % / 0.0 % → 56.0 %. Gates: cargo fmt/clippy/test/deny clean, gradlew build test 161/0, `./gametest.sh` and `-PwithMic` All 58 passed. MIC rows are in the build log; see the entry. |
 
 | P2-01 | Fold-and-fault engine (Noddy evaluator; pulled forward, log 2026-10-01) | doing | 2026-10-01 | | Branch worktree-agent-a49703993341aa701 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c). Stage A (standalone port, tests against the reference C, event translation, cost) first; stage B (baked columns, discordant plutons) after the rock-order fix is on master. |
 ## Review pages
@@ -82,8 +83,280 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 | 2026-10-01 | surface / plates | **The emergent height limit (stage 2).** Stage 1 (build log 2026-10-01, "Terrain above the build limit, stage 1") removed the bookkeeping that built 13–20 km and added the compression band; Earth-like 16k worlds now peak at 9.0–11.2 km on L1, held by the plate model's uplift ceiling, not by physics. Build stage 2 (crust over its strength spreads: σ = ρ·g·h against `crust_strength_mpa`, plateaus at about 5 km on Earth, 13 km at 0.38 g)? And inside it: drop the plate model's 10 km uplift ceiling to a 30 km guard and recalibrate uplift with the hypsometry work (recommended), or keep it and let the spreading act under it? Also: keep squeezing a world too short for its mountains (now), or raise the vertical-scale slider's minimum to 19.6 m and refuse? | Not asked yet: for the coordinator to put to Ben |
+| 2026-10-01 | lava | **Where lava should be, beyond the fix** (build log 2026-10-01, "Lava floods"). The fix makes the generator's own lava vanilla's, measured from the world's floor: a lava floor in the lowest 10 blocks and lava cave lakes below about y −288. What is left above that is the pack's and vanilla's **lava-lake features** (80 to 140 blocks each, anywhere from deep caves to a mountain's flank: 3 in the coast box, 7 to 9 in the mountain box, standalone and MIC alike) and single-block lava springs. Options: **(1, recommended)** keep the fix as the default and take the random lava-lake features and springs out of Deep Time worlds (a biome modifier like `deeptime:claim_ores`, with a setting), then put lava back where the simulation says it belongs: crater lakes and shallow magma under the volcanoes the run marks active (101 in Ben's run), which needs the bake to write the active volcanoes for the game, so it is its own task; (2) keep the fix and leave the features alone: vanilla's amount of lava, a few small lakes per 256 × 256 blocks at any depth; (3) no lava from the generator at all (`underground.lava_floor_blocks` and `lava_lake_blocks` 0) until the volcano task exists; (4) a deeper or shallower lava zone (the two settings; each default is vanilla's distance from the floor). | Not asked yet: for the coordinator to put to Ben |
 
 ## Build log
+### 2026-10-01 — Rock columns: grade rises downwards, no metamorphic or plutonic slivers; `deeptime strata-check` (agent worktree agent-a4c7bf65d55bc4810, branch worktree-agent-a4c7bf65d55bc4810, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Ask.** Ben, 2026-10-01 ("Investigate and fix"), on the workbench run `1a0f6e918c9` (`earthlike_quick_16k`, supercontinent,
+  1000 Myr): at x −6901, z −128 schist lies on unmetamorphosed shale (and again deeper), gneiss is a 3-block sheet between
+  greenstone and granodiorite, and granodiorite and gabbro lie in the pile like beds. A second column from the coordinator
+  (x −7697, z 46, a 3.7 km mountain): slate over unaltered sandstone, grade falling under the gneiss, many 1–5 block slivers.
+- **The measurement** (`deeptime strata-check`, new; `structure::realism`). Three findings a column can have:
+  a **grade inversion** — a horizon whose class was never as hot as a horizon above it formed at (each regional-metamorphic class
+  has its formation temperature, each class with a metamorphic path the temperature of its first step: schist ≥ 450 °C over shale
+  < 250 °C; cover on basement is the other way round and fine; a plutonic horizon is never the lower member, steps under 200 °C
+  are diagenesis); a **metamorphic sliver** — a regional-metamorphic horizon under 8 blocks with other rock over and under it
+  (one cut by the ground or the floor is not one); **plutonic rock as a bed** — an intrusive horizon with rock of another
+  family under it ("with a floor"), a *sheet* when it is under 16 blocks. `--world-data <folder>` checks the columns the game
+  builds (the column rule under the terrain, 20,000 random blocks, seed 1) and the stored stacks cell by cell;
+  `--checkpoint <file>` the stacks before and after the bake's smoothing; `--column X,Z` prints stacks (with `--checkpoint`:
+  the cell's log, pools, units and keys). The bake writes the stored stacks' shares into `notes.bake.strata.realism`.
+- **Before** (VM; the workbench bake, and the same preset re-run on master efafc88 as `big-base`: identical shares and column):
+
+  | share of columns | grade inversion | metamorphic sliver | high-grade sliver | plutonic sheet | plutonic with a floor | horizons / column |
+  |---|---|---|---|---|---|---|
+  | 1000 Myr supercontinent, all (20,000) | **57.1 %** | **56.3 %** | 35.5 % | 10.7 % | 28.6 % | 15.4 |
+  | … land (8,384) | 71.5 % | 73.9 % | 46.6 % | 15.3 % | 45.0 % | 23.0 |
+  | … stored stacks (524,288 cells) | 56.7 % | 56.0 % | 33.9 % | 8.7 % | 27.0 % | 13.9 |
+  | 300 Myr scattered, seed 7, all | 26.2 % | 36.8 % | 24.8 % | 7.7 % | 13.1 % | — |
+  | … its stacks **before the smoothing** | 0.73 % | 3.97 % | 3.65 % | 0.09 % | 0.71 % | 4.5 |
+  | … its stacks after the smoothing | 26.6 % | 37.0 % | 24.3 % | 6.4 % | 12.1 % | 8.2 |
+
+- **Causes** (read from the code, each shown by a measurement or a dumped stack).
+  1. **The key space ordered the strata log by age alone, and the bake's smoothing (σ 10 cells) and the column rule blend
+     neighbouring stacks by key.** Metamorphic grade is not a function of age: a belt's schist (buried deep, then exhumed) got
+     the same keys as the shale its neighbours laid down at that time and never buried, so the blend put them in one sequence
+     — schist over shale. One cell's own log cannot do it (a layer's class steps by the temperature at its depth, deeper is
+     hotter, classes never go back): 0.7 % of the unsmoothed stacks have an inversion, 26.6 % of the smoothed ones.
+  2. **Merges took the union of key spans** (`settle`, `bake_cell`, `columns::push`, the smoothing's join): a metre of soil
+     merged into kilometres of basement schist gave the schist the keys 0 … 49,663 — the regolith's, the whole log's and four
+     pools' — and its height became a straight line over keys that neighbours give to other rocks. Ben's top horizon is exactly
+     that: `schist`, unit key 0 (`inspect-column`), 63 blocks of it over the neighbours' shale.
+  3. **The pools know only today's geotherm; the log keeps its peak.** A pool unit under a metamorphosed log layer stayed
+     unmetamorphosed (schist log over `sandstone` pool), and the mafic plutonic pool under the gneiss pool turned to greenstone
+     at 300 °C (gneiss over greenstone: 2,968 horizons, the most frequent pair in the unsmoothed stacks of the small run). A buried soil without a path
+     of its own showed as mudstone under metamorphic rock.
+  4. **Slivers**: every pool thicker than 1 m is a unit (the 3-block gneiss is a 60-m leftover of the metamorphic pool); thin
+     metamorphic log layers; the tongues of the column rule between classes of one age; and every unit that ends sideways thins
+     through 1 … 7 blocks.
+  5. **Plutonic rock as beds**: the basement is the plate model's rock pools stacked in erosion order (`TOP_ORDER`: sediment,
+     sedimentary, felsic and mafic volcanic, metamorphic, felsic plutonic, mafic plutonic), each a unit. That is a composition
+     ledger, not a structure. The discordant plutons P1-07 has are the bodies (ellipsoids with aureoles, painted over the
+     horizons); the pools are something else and are still layers (see the decisions).
+- **Fixes.**
+  - *Grade-ordered keys* (`columns::key`; FORMAT.md, "The bake's key space"): regolith 0–4095; band 0 (unmetamorphosed) log
+    4096–32767 by age as before, then its pools 32768–34559; six metamorphic bands of 4,480 keys from 34,560 (from 250, 300, 350,
+    450, 500, 650 °C: slate; quartzite, marble, greenstone; phyllite; schist; amphibolite; gneiss), each a log by age (2,688
+    keys) and the pools (7 × 4 slots of 64 keys); mantle 61440–65535. A unit's band is that of the hottest formation temperature
+    at or above it in its own column; plutonic pool units are always in band 6 with the gneiss (the crystalline basement).
+    Any blend of stacks by key therefore has the grade rising downwards: a belt's rocks lie under its neighbours'
+    unmetamorphosed cover and over everyone's crystalline basement.
+  - *No unit cooler than the rock above it* (`columns::build`): a sedimentary or volcanic pool steps along its path at least
+    as far as the hottest formation temperature above it; a plutonic pool stays what it is (gabbro under gneiss is gabbro;
+    only granite → gneiss at the 650 °C isotherm is taken); a log layer shown as another class (buried soil → mudstone)
+    follows the rock above it.
+  - *Key spans stay in one key domain* (regolith, each band's log, each band's pools, mantle): a merge across domains keeps
+    the kept class's span, the other's keys become a hiatus; units of one class in different domains stay separate horizons.
+  - *No slivers in the stored stacks* (`settle`): inside a stack a regional-metamorphic horizon is ≥ 8 blocks and a plutonic
+    one ≥ 16; a thinner one gives its blocks to the horizon under it (of its domain; else the one over it), which keeps its
+    class and keys.
+  - *No slivers in the columns* (**the column rule's new step 5**, Rust `strata::drop_slivers`, Java `Columns.Stack.dropSlivers`):
+    the layer descriptor's optional `min_blocks` (per class; the bake writes 8 / 16 / 1) names least thicknesses; a thinner
+    horizon of such a class under the first and over the last is removed and its blocks go to the horizon under it. A unit that
+    ends sideways ends at a step of that many blocks instead of a one-block sheet.
+  - *The smoothing's top* (two regressions the key fix would otherwise have exposed, both from "the top unit fills the height
+    of a cell standing over the mean surface"): the regolith and loose sediment now lie on the ground with their mean thickness
+    (first pictures had 44–65 blocks of saprolite, then of clay, on ridges), and the unit that fills a ridge is the thickest
+    one beginning within 16 blocks of the mean rock surface, the thin beds over it riding up with the ground (first pictures had
+    25-block coal caps on two peaks).
+- **After** (the same history: `stage amplify --in big-base/checkpoints/6-young.dtcp --bake`; the small run from scratch; a
+  from-scratch run of the 1000 Myr preset with the final code wrote a byte-identical `strata/horizons.dtr`, `cmp`):
+
+  | share of columns | grade inversion | metamorphic sliver | high-grade sliver | plutonic sheet | plutonic with a floor | horizons / column |
+  |---|---|---|---|---|---|---|
+  | 1000 Myr supercontinent, all | **0** | **0** | 0 | 0 | 0.50 % | 12.1 |
+  | … land | 0 | 0 | 0 | 0 | 1.04 % | 17.3 |
+  | … stored stacks | 0 | 0 | 0 | 0 | 0.57 % | 12.1 |
+  | 300 Myr scattered, seed 7, all / land / stored | 0 / 0 / 0 | 0 / 0 / 0 | 0 | 0 | 0.17 / 0.46 / 0.15 % | 7.3 |
+  | the JUnit test planet (`planet4k`), all / stored | 0 / 0 | 0 / 0 | 0 | 0 | 0 / 0 | — |
+
+  **x −6901, z −128** (class, top y, blocks), before: schist 56 (56) · shale 0 (57) · andesite −57 (3) · tuff −60 (4) · sandstone
+  −64 (2) · tuff −66 (2) · shale −68 (16) · basalt −84 (22) · phyllite −106 (5) · schist −111 (5) · shale −116 (41) · sandstone
+  −157 (17) · basalt −174 (45) · greenstone −219 (3) · gneiss −222 (30) · granodiorite −252 (60) · gabbro −312 (39) · greenstone
+  −351 (2): 9 inversions, 3 slivers. After: mud 56 (5) · shale 51 (112) · andesite −61 (4) · tuff −65 (3) · sandstone −68 (2) ·
+  tuff −70 (1) · shale −71 (5) · sandstone −76 (1) · shale −77 (10) · basalt −87 (22) · sandstone −109 (2) · shale −111 (28) ·
+  basalt −139 (58) · phyllite −197 (9) · schist −206 (15) · gneiss −221 (31) · granodiorite −252 (59) · gabbro −311 (42): none.
+  **x −7697, z 46**, before: 36 horizons, 9 inversions, 13 slivers (slate 5, quartzite 4, slate 3, slate 4, schist 1, slate 2,
+  schist 6, gneiss 6, schist 1, phyllite 1, schist 1, phyllite 4, greenstone 6). After: mudstone 210 (1) · shale 209 (75) · 19
+  thin sandstone, mudstone, shale and tuff beds 134 … 57 · sandstone 56 (86) · basalt −30 (56) · slate −86 (25) · sandstone −111
+  (8) · basalt −119 (1) · quartzite −120 (13) · greenstone −133 (18) · phyllite −151 (12) · greenstone −163 (11) · schist −174
+  (48) · gneiss −222 (117) · gabbro −339 (14): none. Sections through both (`deeptime-inspect wd-section`, before, after, and
+  the rejected "all thin beds ride up" variant): `review/out/rock-order/{big-base,big-after,ride-all}/` (not published).
+- **Format** (stays 0.2, FORMAT.md updated): the key layout is the baker's choice and the column rule reads any keys, so
+  **old bakes load and read exactly as before** — and keep their inversions until the world data is baked again. `min_blocks`
+  is an optional descriptor field; a layer without it (every older bake, the synthetic worlds) skips step 5. A jar from before
+  this change reading a new bake would ignore `min_blocks` and paint the slivers the Rust evaluator drops (no version bump was
+  made for it, as for the tongue parameters; say so if a bump is wanted). `StrataPass.horizonKey` (the block-variant era, the
+  key's top four bits) works unchanged; its eras over 32768 now are grade bands instead of pools.
+- **Tests** (planet-independent): `structure::tests::no_column_holds_rock_that_was_never_as_hot_as_the_rock_above_it` (4,000
+  random cells — logs with deposits, burial metamorphism and erosion, random pools, crust, regime, geotherm: keys ordered, every
+  span in one domain, no inversion); `…::baked_stacks_and_blended_columns_have_no_grade_inversion_and_no_sliver` (four random
+  64 × 32 planets of provinces, σ 0 / 2.5 / 10: `check`, `check_bake`, zero inversions, slivers and sheets in the stored stacks
+  and in 6,000 columns by the column rule each); the pipeline test asserts the same on its real small planet;
+  `realism::tests` (Ben's column is flagged; cover on basement is not); `bake_horizons` (sliver merge and domains, a sliver
+  joins the horizon under it, the regolith follows the ground, a thin top bed does not fill a ridge);
+  `strata::tests::slivers_of_the_named_classes_are_dropped_inside_a_column`; Java↔Rust: `ColumnParityTest` on the re-baked
+  `planet4k` (its layer carries `min_blocks`), 500 of 500 columns equal.
+- **Gates** (VM, `tools/dev/gates.sh`, new: the branch gates detached with one log; HEAD d92b6c4): `GATES fmt=0 clippy=0 test=0
+  deny=0 gradle=0`; cargo test: cli 52, core 359 + 3 ignored (+ 1), format 53, inspect 29 + 2 + 7, jni 7, viewer 6; JUnit
+  tests=160 failures=0 errors=0 skipped=1 (`MacMemoryTest`, not this change); `ColumnRuleBenchTest` 0.61 ms/chunk at 13.3
+  horizons per column. No GameTests (the coordinator's, per merge batch): `StrataGameTests` and the deposit tests read the
+  strata and may need their numbers looked at. Strata bake 36.9 s → 33.2 s on the small run, 61.7 s → 56.2 s on the 1000 Myr one.
+- **What changes in a world.** Metamorphic rock is no longer at the surface on its neighbours' cover; belts read as
+  cover → slate/quartzite → phyllite → schist → gneiss → granite/granodiorite → gabbro downwards. Fewer horizons per column
+  (15.4 → 12.1). The host fractions the deposit stage reads change a little (pool units under a metamorphosed log are now
+  metamorphic; gabbro no longer turns to greenstone), so deposit sites differ slightly from a master run of the same seed.
+- **Observed, not changed.** The mountain at x −7697 still has one thick unit holding its top (shale, 75 blocks, before 84 of
+  shale): the smoothing has no information about a ridge above the mean surface (σ 10 cells = 160 blocks) and fills it with
+  one formation (see the decisions).
+- **A mistake to report.** While restarting my own gates I ran `pkill -x cargo` on the shared VM (18:27 VM time): it would
+  have killed any other agent's cargo then running. None was running a minute later; an agent whose build died at that time
+  should simply re-run it.
+- **Decisions for Ben, answered 2026-10-01** (relayed by the coordinator): granite-type rock stays as flat basement layers
+  until folds and faults ("Leave it until folds and faults"); a ridge is filled by the thickest nearby formation, as built; no
+  format bump (his standing rule: no backward compatibility before a public release, so no "old bakes still load" concerns).
+- **Merged with master 94c54c2** (mountain-height stage 1, hypsometry, lakes by climate, P1-28; merge commit 6599c81; conflicts
+  in STATUS.md and `bake/strata.rs`, both sides kept: the realism note beside the build-limit counters). FORMAT.md no longer
+  speaks of older bakes (Ben's rule: no backward compatibility before a public release). VM, on the merge: `tools/dev/gates.sh`
+  → `GATES fmt=0 clippy=0 test=0 deny=0 gradle=0` (cargo: cli 52, core 371 + 3 ignored, format 53, inspect 31 + 2 + 7, jni 7,
+  viewer 6; JUnit tests=161 failures=0, `ColumnParityTest columns=500 equal=500`, lake world 300 of 300). A fresh bake
+  (`run --preset earthlike_quick_16k --start scattered_continents --length-myr 300 --set seed=7`) + `strata-check`: grade
+  inversion, metamorphic sliver, plutonic sheet and plutonic with a floor all 0 in 20,000 columns, 6,278 land columns and
+  524,288 stored stacks (`notes.bake.strata.realism.stack_rules` ok). `mac.sh --server -- ./gametest.sh` → **All 58 required
+  tests passed** (58 result lines, 0 not PASS). `tools/smoke/install.sh mic` (`--pack`) + `./gametest.sh -PwithMic` → 57 of
+  58: `firstinstalledfallback` fails with "shale: expected fallback born_in_chaos_v1:black_argillite, got minecraft:stone;
+  gneiss: expected minecraft:granite, got minecraft:deepslate[axis=y]". Not this branch: the MIC rock-tag datapack
+  (`mic/Docs/datapacks/deeptime-mic-rock-tags`, outside the repo, synced by `--pack`) had its `rock_fallback` rows for shale,
+  mudstone, slate, phyllite, schist and gneiss changed to stone and deepslate on 2026-10-01 (P1-28's MIC rows), and
+  `StrataGameTests.firstInstalledFallback` on master still expects the old MIC stand-ins under `rockTags`. The fix is two
+  expectation lines in that test, left to P1-28's owner or the coordinator.
+- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/rock-order/` (runs, checkpoints, censuses, binaries) deleted at the end.
+- **Next.** Merge (the coordinator), run both GameTest suites on the batch, re-bake the workbench run; then Ben's answers.
+
+### 2026-10-01 — Lava floods: lava is measured from the world's floor, not from y 0 (agent worktree agent-a04fab824846efbfc, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Report.** Ben, 2026-10-01, from a workbench 3D preview of run `1a0f6e918c9` (earthlike_quick_16k, MIC profile) around
+  x −6901, z −128: a lava-filled wedge more than 100 blocks deep under a coastal valley, lava bodies all through the rock,
+  "a bunch of overlap between lava pools & the ocean". A second box (x −7801..−7546, z −209..46, a mountain) had 311,110
+  lava blocks.
+- **Cause.** Vanilla hard-codes two lava heights for a world whose floor is y −64, and Deep Time's floor is y −352.
+  - `NoiseBasedChunkGenerator.createFluidPicker` fills **every open block below y −54** with lava (floor + 10 in vanilla;
+    floor + 298 here). `Aquifer.computeSubstance` asks that picker first, before any aquifer, so it holds for caves and for
+    open sea alike.
+  - `Aquifer.computeFluidType` lets a cave lake whose surface is at **y −10 or lower** be lava (floor + 54 in vanilla).
+  - The plan (§7.1, the router table) keeps the aquifer functions "as vanilla, by reference" and never mentions the
+    picker. Tectonic patches the same constant for its own deeper worlds; the plan notes that patch does not fire for us.
+- **Evidence** (`tools/workbench/lava_stats.py` on the exports of Ben's own two preview jobs, MIC):
+  - Coast box: 2,152,868 lava blocks, 51,040 of 65,536 columns. Below y −54 the open space is 100 % lava (0 cave air);
+    above it 337 blocks. 4,020 sea columns have their water standing directly on lava, down to y −267: the "wedge" is a
+    submarine canyon whose water turns to lava at y −55 (screenshot `before-coast-section-z72.png`). 5,810 lava faces
+    touch water.
+  - Mountain box: 311,110 lava blocks (the workbench's own counter says the same), 100 % of the open space below y −54.
+  - Neither `WaterBodies` (it only fills air above the ground with water) nor the pack is involved: the pack's share is
+    a few lava-lake features (below).
+- **Fix** (the default; both rules are vanilla's, measured from the floor).
+  - `worldgen/LavaRules` (plain Java): the lava floor is `min_y + lava_floor_blocks` (10 → y −342); lava lakes only in
+    aquifer level cells centred at or below `min_y + lava_lake_blocks` (54 → cells centred at y −300 and −340, surfaces
+    up to about y −288); under a sea bed that reaches the lava floor the lava stays 8 blocks below the bed.
+  - `worldgen/LavaFluids`: Deep Time's global fluid picker. `GeologicChunkGenerator` puts it in the superclass's
+    `globalFluidPicker` field (one access-transformer line, `public-f`).
+  - `worldgen/density/LavaLakesDensity` (`deeptime:lava_lakes {min_y}`): the router's `lava` is now this 0/1 gate times
+    vanilla's `aquifer_lava` noise (`planet.json`, `planet_nocaves.json`, `tools/dev/gen_worldgen.py`, which reproduces
+    both files). The aquifer samples that function at cell coordinates (⌊x/64⌋, ⌊y/40⌋, ⌊z/64⌋), so the gate reads the
+    cell's y. A density function, not a mixin on the aquifer, because C2ME rewrites the aquifer.
+  - **Settings** (preset section `underground`, in all eight presets; editor section "Advanced · Caves and lava"):
+    `lava_floor_blocks` (10, "Lava floor height") and `lava_lake_blocks` (54, "Lava lakes up to"); 0 turns either off.
+    The bake records them in `notes.bake.underground.params`; the game reads them per level (`WorldDataTerrain.lava`).
+    FORMAT.md, "Lava".
+- **Measured after** (VM, `tools/workbench/preview.py run --profile … --world-data <the run's bake> --box … --box …`,
+  then `lava_stats.py`; screenshots and the censuses in `review/out/lava-diag/`).
+
+  | Box | Before (Ben's jobs, MIC) | After (MIC, another seed) |
+  |---|---|---|
+  | coast | 2,152,868 lava; 4,020 sea columns on lava; 5,810 lava–water faces | 8,267 lava (8,163 of them below y −300, the lava floor); 0; 0 |
+  | mountain | 311,110 lava | 568 lava (60 at the floor, the rest feature lakes) |
+
+  A preview's world seed is random, so the cave layout differs between those two. The same seed (`--seed 20261001`), with
+  the old levels brought back through the settings (a copy of the bake with `lava_floor_blocks` 298 and
+  `lava_lake_blocks` 342, i.e. y −54 and y −10; the sea-bed rule stays on):
+
+  | Box | Old levels, MIC | Default, MIC | Default, standalone |
+  |---|---|---|---|
+  | coast | 732,008 | 395 | 3,719 |
+  | mountain | 930,637 | 1,421 | 3,249 |
+
+  Lava by depth after the fix: nothing between y −250 and y −54 except single-block lava springs; lava-lake aquifers at
+  y −324..−307 (standalone: 3,586 and 1,017 blocks); the lava floor at y ≤ −343. Above y −54 only lava-lake
+  **features** remain, 80 to 140 blocks each: 3 in the coast box (y −24, 25, 35, under the sea bed), 7 to 9 in the
+  mountain box (y 51 to 156), in standalone and MIC alike. They are the open question above.
+- **Tests.**
+  - JUnit `LavaRulesTest` (7): the defaults are vanilla's heights from the floor, the sea-bed rule, the lake cells, the
+    reader, a baked world carries the settings. Rust `underground::tests` (2). `AdvancedSettingsTest` and the workbench
+    catalogue test know the ninth advanced section.
+  - GameTest `LavaGameTests.lavaStaysAtTheFloor` on the new level `deeptime:test_planet_caves` (the real test planet
+    with the full router, `deeptime:planet`; every other test level uses `planet_nocaves`, which is why nothing saw
+    this): chunks at the deepest sea, a sea about 150 blocks deep, a coast and high ground; no lava above y −288, no sea
+    column standing on lava, open space below the floor level is lava.
+    With the fix: `lava=0 lavaAboveLakes=0 seaOnLava=0 openDeep=42275` (4,096 columns, 2,048 of them over a sea bed
+    below y −60). **With vanilla's picker put back** (the one assignment removed on the VM's copy, then restored): FAIL,
+    `lava=256029 topLavaY=-55 lavaAboveLakes=238767 seaOnLava=418`: the test catches the bug.
+- **Gates** (VM, after merging master 83aaa51 into the branch, tree 4c928b7): `cargo fmt --check`, `clippy -D warnings`,
+  `cargo deny` ok; `cargo test --workspace` 523 passed, 0 failed, 3 ignored; `./gradlew build test` → tests=168
+  failures=0; `./gametest.sh` → All 59 required tests passed (458 s); `./gametest.sh -PwithMic
+  -PgametestOnly=lavaStaysAtTheFloor` → passed (`lava=0 lavaAboveLakes=0 seaOnLava=0 openDeep=78373`; the MIC set is a
+  copy of the workbench's, pack 790e116). A first MIC attempt died in mod loading before any test (Cobblemon's
+  `PrioritizedList.add` raced during parallel mod construction, reported as tim_core failing to load); the next start
+  loaded. The full MIC suite was not run here. Before the merge the default suite's heap peaked at 6,134 of 6,144 MB;
+  the new level held 800 of the 24,263 chunks at that peak.
+- **Also seen, not changed.**
+  - The test planet's deepest sea bed is at y −399 (y −389 after the merge), below the world's floor (y −352): the sea there is water down to
+    bedrock level. It is the mirror of terrain above the build limit (the height-limit question above).
+  - In the old worlds the flooded zone also held a few hundred thousand blocks of plain deepslate and blackstone per box
+    where the fixed worlds have open cave (crust 296,087 → 12,819 in the coast box): something reacting with the lava.
+    Not investigated; it is gone with the lava.
+- **Contradicts the plan:** §7.1's router table says `lava` is vanilla's function by reference; it is now gated, and the
+  fluid picker is Deep Time's.
+- **Next step.** Ben's answer to the lava question above. The MIC full GameTest suite is the coordinator's per-batch run;
+  the new level adds one more loaded dimension to it.
+### 2026-10-01 — P1-22b lakes sized by the climate, and frozen (agent worktree agent-a2195c5c858c73075, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+Ben's decision of 2026-10-01, "Both: freeze them and size them by climate". On branch `worktree-agent-a2195c5c858c73075`, not merged, not pushed.
+
+- **What changed.**
+  - **Lake levels from a water balance** (`hydro/network.rs`, `Net::resolve`). Each basin (a depression over the lake thresholds) is solved when the discharge pass has met its last cell, so everything upstream has given.
+    - Wet to its rim and still gaining (inflow ≥ the losses of its cells): a lake full to the rim that spills the surplus, as before.
+    - Otherwise terminal: its lowest cell becomes a sink, a Priority-Flood of the basin alone drains its floor to it (the exposed floor's streams follow the real ground; basins inside it are solved first, to 8 levels), and the lake stands at the highest 1/16-block step of the basin's hypsometry (cells binned by their spill level towards the sink) whose losses the inflow at the sink covers. A lake inside that this level covers becomes part of it.
+    - A balance lake under the lake thresholds is a playa (drawn as a salt flat, not stored); a basin no water reaches is dry.
+    - A terminal basin whose floor lies a block or more below sea level stands at sea level at least: the column rule and the aquifer flood such ground in the game whatever the bake says.
+    - Chains: basins are solved in drainage order, and a lake that does not spill passes nothing downstream.
+  - **The budget** (`HydroParams::budget`). Liquid water = rain in the share of the year above freezing plus the snow the year's degree-days melt (`snow_melt_mm_per_degree_day`, 4); ground whose warmest month is below freezing gives no runoff. Runoff = liquid − ET (Fu, PET 60 mm/°C·T, as before). Open water loses `lake_evaporation_factor` × (`lake_evaporation_base_mm` 200 + 60 mm/°C × the year's mean temperature above freezing). The base is calibrated on Earth's lakes: 1,500 km³ a year from 2.3 M km² without the Caspian, about 650 mm, mostly in cold climates (Zhao et al. 2022, Nat. Commun. 13:3686).
+  - **Frozen lakes.** Criterion: mean annual temperature below `lake_freeze_mean_c` (0 °C), which with a yearly cycle means ice for more than half the year. Chosen over the coldest month (would call every mid-latitude lake with a frosty January frozen) and over the warmest month (perennial ice only, which almost no lake has). The views draw it per cell from the frame's `climate/t_mean_c`. **The bake marks nothing**: `WaterPass` places lake water before features, and vanilla's `freeze_top_layer` ices it in the frozen biomes; the bake's note records how much of the frozen lake area lies in the biome temperature layer's frozen band (91–96 % on the two planets below), so a second mechanism would double up.
+  - **View** (`water_view.rs`, `ramps.json`, `workbench.js`): frozen lakes and playas on both views, "Frozen lake" and "Salt flat" in the Rivers & lakes legend, and the pointer on the satellite view reads the frame's Rivers & lakes layer, so a lake says "lake" or "frozen lake" (was "looks like shallow sea").
+  - **Settings** (`hydro`): `lake_balance` (true; false is the old rule), `lake_evaporation_base_mm`, `lake_evaporation_factor`, `snow_melt_mm_per_degree_day`, `lake_freeze_mean_c`; editor fields, lang keys, the 8 preset files.
+  - **CLI**: `deeptime satellite --set PATH=VALUE` and a `lakes {…}` statistics line; `deeptime hydro` prints the share of land, the largest lake and what became of the basins. `tools/workbench/lakes-check.sh` is the browser check.
+- **Data and parity.** No format change (0.2). `water_level` still holds each lake's surface; it may now be a level below the rim. The rivers file, the column rule (Rust `deeptime_format::water`, Java `worlddata/Water`) and the parity fixture are untouched, and no Java source changed. **Old bakes load and play exactly as they did** (their lakes stay full). `notes.bake.water.method` is "p1-22b" (the game does not read it). FORMAT.md "Rivers" has the method.
+- **Measured** (test VM; `deeptime run --preset earthlike_quick_16k --length-myr 500 --checkpoints` with master's binary, then `deeptime hydro --world-data` and `deeptime satellite --in …/7-amplify.dtcp [--on elevation]` with this branch's, `--set hydro.lake_balance=false` for the old rule on the same planet). Areas are at the preset's scale (300 m a block).
+
+  | | lakes | lake area, km² | share of land | largest, km² | frozen (share of lake area) | arid, P/PET < 0.2 | polar, warmest month < 10 °C | below rim / playa / dry |
+  |---|---|---|---|---|---|---|---|---|
+  | Bake A (start random), old rule | 1,056 | 66,229 | 2.37 % | 17,433 | 540 (26 %) | 8 (0.1 %) | 625 (29 %) | — |
+  | Bake A, balance | 1,035 | 62,398 | 2.23 % | 17,433 | 520 (27 %) | 7 (0.1 %) | 30 % of area | 159 / 5 / 26 |
+  | Bake B (start supercontinent), old rule | 931 | 192,375 | 4.51 % | 74,262 (32°N, P/PET 0.40) | 618 (29 %) | 0.01 % | 29 % | — |
+  | Bake B, balance | 896 | 105,090 | 2.46 % | 9,995 | 581 (50 %) | 0.01 % | 48 % | 167 / 13 / 49 |
+  | View frame B (L1 terrain), old rule | 158 | 152,571 | 3.44 % | 28,040 | 108 (31 %) | 3 (1.2 %) | 31 % | — |
+  | View frame B, balance | 116 | 92,252 | 2.08 % | 11,497 | 66 (39 %) | 0 | 39 % | 25 / 8 / 54 |
+  | View, Ben's case (1000-Myr random run at 676 Myr ago), old rule | 173 | 574,894 | 11.29 % | 374,907 (the polar lake) | 125 (79 %) | 1 | 79 % | — |
+  | View, Ben's case, balance | 118 | 528,261 | 10.37 % | 374,907, now drawn frozen | 72 (78 %) | 0 | 79 % | 40 / 11 / 89 |
+
+  - Earth for reference: lakes cover 1.8 % of the land (HydroLAKES, lakes of 10 ha and more: 1.42 million, 2.67 M km²; Messager et al. 2016, Nat. Commun. 7:13603) to 3.7 % of the non-glaciated land (117 million lakes over 0.002 km², 5.0 M km²; Verpoorter et al. 2014, GRL 41:6396). The Caspian is about 371,000–390,000 km².
+  - **The polar lake of Ben's case stays full.** It is frozen now, but the balance fills it: mean −13 °C, warmest month +3.6 °C, 141 mm of precipitation against a loss of 230 mm, and a thawing catchment larger than the lake. It only starts to shrink at `lake_evaporation_base_mm` 400 (330,785 km²) and halves at 600 (195,218 km²), which is more than polar lakes lose. See the decisions below.
+  - Rivers: the frozen-ground rule removes rivers from ground that never thaws (bake A: 4,228 chains and 77,175 km with master's binary, 3,490 and 68,186 km now, under either lake rule).
+- **Cost.** Bake's water part: A 4.5 s → 4.1 s, B 7.2 s (inside the run) → 5.0 s (`deeptime hydro`); no measurable change. View, water derived per frame at 1024 × 512: A 63 → 77 ms, B 75 → 78 ms, Ben's case 127 → 90–112 ms (the satellite picture itself is 225–290 ms).
+- **Gates** (test VM): `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (core 361 passed), `cargo deny check licenses bans` ok; `./gradlew build test` tests=160 failures=0. Browser check `tools/workbench/lakes-check.sh` on a private port: 11 of 11 (legend, pointer text on a lake and a frozen lake on both layers). GameTests: `tools/remote/mac.sh --server -- ./gametest.sh` all 57 required tests passed (`riversHold` floating 0/0, leaks 0/0, 749 lake columns; `carversSpareWater` drained 0, holes 0; `lakeHolds` 65,040 before and after); `-PwithMic` not run on the branch (left to the merge batch).
+- **Tests** assert properties, not one planet's numbers: no lake leaks (no dry cell beside a lake lies below its level) on rough ground in four climates; drier climates hold less lake; a lake grows with the rain until it spills; an upstream terminal lake feeds nothing downstream; frozen and never-thawing cases; a basin below sea level stands at sea level; thread-count independence.
+- **Pictures**: review/out/lakes/ (not committed): `ben676-{before,full,after}[-rivers].png`, `{a,b}-frame-…`, `{a,b}-final-…`, `workbench-{satellite,rivers-layer}.png`.
+- **Scratch** under /Volumes/Graphide/ban/deeptime-runs/lakes/ deleted.
+- **Decisions for Ben** (in the hand-back report): the polar lake that still fills; dry land below sea level; a salt-flat surface in the game; whether the bake should force lake ice; the runoff law of cold climates.
+- **Next step:** merge this branch in the next batch; the coordinator's GameTest run covers it.
+
 ### 2026-10-01 — Workbench: the Inspector pops out to a large overlay (agent worktree agent-a2a973aae56130698, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen' button so I can pop it out".
 - **What**: an expand button in the Inspector card's header (`#inspbig`, `aria-label`, `aria-expanded`, tooltip with **P**).
@@ -223,6 +496,87 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
 - **Measured** (VM `deeptime-test`, x86_64 Linux, `mac.sh` default caps; load average 10–30): `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --locked` all pass (509: cli 52, core 353 + 3 ignored); `./gradlew build test` tests=160 failures=0 errors=0 skipped=1; `./gametest.sh` All 57 required tests passed (wall 485 s) and, after `tools/smoke/install.sh mic`, `./gametest.sh -PwithMic` All 57 passed (81 s), both with `above_max_y=0cells compressed=0cells highest_y=281` on the default planet. The nine real-planet tests on other planets (`DEEPTIME_TEST_PLANET_SET="seed=N"`): seeds 12, 13, 15, 16 standalone All 9 passed; seed 14 failed two (the rock and Dsub items above), and with those fixed seed 14 standalone and seeds 13 and 14 with MIC All 9 passed. On all six seeds the bake has 0 cells above `max_y` and 0 compressed (highest y 274–287); seeds 11 and 13 had 2.5 % and 1.0 % of their land above it before. The two full `./gametest.sh` runs were made one commit before the rock-test and Dsub-floor changes (test code only); cargo, Gradle and the seed-14 and MIC seed runs are on the final code. x86_64 Linux only.
 - **Next.** Ben's go for stage 2 and his choice on the uplift ceiling; the hypsometry agent
   (worktree-agent-aee888e01d29a40db) takes this base first.
+### 2026-10-01 — P1-28 stone and deepslate for the common rocks (agent worktree agent-a72907749021691b5, branch worktree-agent-a72907749021691b5, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Ask.** Ben, 2026-10-01 (decisions log): "I'm seeing very little minecraft:stone, will things like stone tools still be easily
+  craftable?" The first answer (hardness tiers for `minecraft:stone_tool_materials` / `stone_crafting_materials`, tool-grade rock near
+  spawn, river/beach/till cobbles) was **replaced** the same day: no recipe or item tag is widened ("How can we fix this w/o just
+  having a cheeky lil 'yeah, your crafting recipes can now use some extra materials'"), and "Use stone for common rocks and we
+  should be chilling". That work was built and then reverted (commits bb7f2f5 and e601959, reverted by 678a0e7 and ef4272e; the
+  history keeps it: the per-class `stone_use` tiers with reasons, the generated item tags and the `ground` settings draft). Nothing of it
+  ships.
+- **What changed.**
+  - `tools/dev/gen_rock_classes.py`: `CRUST_STAND_INS`, class → (block, why). `minecraft:stone` is now the `vanilla_fallback` of
+    `shale` and `mudstone` (coal already had it); `minecraft:deepslate` of `slate`, `phyllite`, `schist`, `gneiss`. Each class file
+    says why in `sources.vanilla_fallback`. The generator's rule that stone and deepslate are never a class block is gone (its
+    validation now demands exactly the table's classes).
+  - Why these: on the 500 Myr `earthlike_quick_16k` planet the top-64-block share of the placed classes is shale 34.7 %, gneiss 17.6 %,
+    mudstone 1.3 %, schist 1.0 %, slate 0.9 %, phyllite 0.7 % (the rest: sandstone 25.8 %, rhyolite 7.7 %, basalt 1.8 %, gypsum 1.7 %,
+    granite 1.1 %, black shale 0.8 %, …). Shale and mudstone are the fine-grained grey sedimentary rocks nothing in vanilla looks
+    like; slate, phyllite, schist and gneiss are one dark-grey foliated pelite-to-gneiss series. Kept on their own blocks: granite,
+    diorite, andesite, basalt, tuff, sandstone, red sandstone, calcite (limestone, marble, the evaporites, chalk), dripstone, obsidian,
+    cobblestone for conglomerate; and, as rare (each under 0.3 % of the surface blocks) with a look worth more than their share,
+    hornfels, amphibolite, greenstone, blueschist, eclogite, quartzite, serpentinite; black shale (0.8 %) keeps smooth basalt as
+    its vanilla-only stand-in (Born in Chaos' argillite in MIC) so the source rock stays recognisable.
+  - `PaletteRules`: only air is rejected now. `RockPalette.classesOf` gives, for stone and deepslate, every class that resolves to
+    them plus `unclassified_crust` (`RockPalette.UNCLASSIFIED_CRUST`). `BackgroundScatterFeature.hostClasses/bias`: where the host
+    block is stone or deepslate the horizon at the position (not the block) decides the host bias, so the coal scatter still prefers
+    shale and mudstone over the unclassified crust; only rules whose bias depends on the class pay for the lookup
+    (`OreData.ScatterRule.classBlind`). The strata pass is unchanged: a class that resolves to stone is painted stone even where the
+    crust was deepslate (and the reverse).
+  - `deeptime-inspect rock-census` (new, `crates/deeptime-inspect/src/census.rs`): per-class shares of a baked planet's dry land (top
+    rock, 4 blocks down, top N blocks, whole column), review-box examples, and with `--stone-classes` the share of land with no
+    stone-class rock within a reach. `tools/review/p1-28-stone-share.py` maps a census to the pure-vanilla blocks of two revisions;
+    `tools/review/p1-28-block-share.py` counts stone/deepslate in generated boxes (`.dtva`).
+- **Measured.** Planet: `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --threads 4` on the VM
+  (land 21 %, 49,642 land columns at step 24). Top rock under the soil: shale 36.3 %, sandstone 26.2 %, gneiss 18.6 % (Ben's run: shale 39 %).
+  Stone or deepslate share of the placed rock blocks, **before → after**:
+
+  | | top 64 blocks | whole column |
+  |---|---|---|
+  | census, whole planet, pure-vanilla pack | 0.1 % → 56.2 % | 0.0 % → 56.0 % |
+  | generated, 12 boxes of 96 × 96 (the real generator, standalone) | 0.0 % → 47.8 % | 0.0 % → 55.3 % |
+  | generated, same boxes, MIC, rows applied as an overlay (before: pack as is) | 0.0 % → 47.6 % | 1.5 % → 43.8 % (deepslate 34.1, stone 9.7, and blackstone 10.2) |
+
+  The 12 boxes are evenly spread dry-land columns (`census.examples["*land*"]`), not picked by rock. Most of the 56 % is
+  stone (shale, 35 %) in the top blocks and deepslate (gneiss) in depth. **MIC finding:** in the MIC after run blackstone is 10 % of the
+  whole column (y −320…−160 in five boxes, 0.2 % before): a Terralith cave feature
+  (`terralith:cave/…/blackstone`) turns deepslate into blackstone, and deep gneiss was granite before, so it had nothing to work on.
+  Not part of this change; Ben may want it off or accepted.
+- **A start in granite or basalt country.** Only this change, no cobbles and no spawn rule: stone and deepslate come from the six classes
+  above, so a start on pure granite/basalt/andesite/sandstone/gypsum ground has no stone or deepslate at the surface. From the census (the
+  classes shale, mudstone, coal, slate, phyllite, schist, gneiss; `--stone-classes`, step 16): no such surface rock within 32 / 64 / 128
+  blocks of 31 % / 24 % / 13 % of the dry land; none even within 32 blocks of digging down (of which any of them counts) of 17 % / 11 % /
+  5.7 %. Those players have granite, diorite, andesite, smooth basalt, sandstone to build with but no cobblestone for stone tools or a
+  furnace until they walk to the next stone or deepslate (under 130 blocks for 94 % of land); a pickaxe of wood or iron mines
+  granite and drops granite, which crafts nothing stone. That is the cost of dropping the spawn guarantee; see Ben's options in the report.
+- **Mining.** `miningTheCommonRocksDropsVanillaCobbles`: stone → cobblestone, deepslate → cobbled deepslate, and 12 other placed
+  blocks drop their own item, unchanged; no loot table, recipe or item tag comes from Deep Time's jar (checked through the resource
+  manager's pack ids), and a JUnit test asserts `data/minecraft` holds only the world preset tag. Side effect worth knowing: vanilla
+  ore features target `#stone_ore_replaceables` and `#deepslate_ore_replaceables` (stone, granite, diorite, andesite / deepslate,
+  tuff), so ore that vanilla features place now has far more stone and deepslate to sit in (polished tuff and packed mud, the old
+  shale and mudstone blocks, were in neither tag).
+- **MIC rows** (not applied; MIC's datapack and README were not edited). The MIC pack's fallback tags are read before
+  `vanilla_fallback`, so MIC worlds stay as they were until these change. In `deeptime-mic-rock-tags` (and the pack's copy under
+  `pack/kubejs/data/deeptime/`), replace the fallback tag files `data/deeptime/tags/block/rock_fallback/<class>.json` with
+  `{"replace": true, "values": ["minecraft:stone"]}` for `shale` and `mudstone` and `{"replace": true, "values": ["minecraft:deepslate"]}`
+  for `slate`, `phyllite`, `schist`, `gneiss` (or simply edit their value lists to that single entry). README rows to change:
+  Classes table, Stand-in column: `mudstone` `minecraft:packed_mud` → `minecraft:stone`; `shale` `born_in_chaos_v1:black_argillite` →
+  `minecraft:stone`; `slate` and `phyllite` `born_in_chaos_v1:black_argillite` → `minecraft:deepslate`; `schist` `minecraft:tuff` →
+  `minecraft:deepslate`; `gneiss` `minecraft:granite` → `minecraft:deepslate`. Fallbacks table, rows `mudstone`, `shale`, `slate`,
+  `phyllite`, `schist`, `gneiss`: stand-ins "`minecraft:stone`" / "`minecraft:deepslate`", why "the commonest sedimentary rock, fine, grey,
+  fissile; vanilla has nothing like it" (shale), "shale's unlaminated twin" (mudstone), "metamorphosed shale: dark grey, foliated" (slate,
+  phyllite, schist), "banded grey crystalline basement" (gneiss). Text: the Vocabulary row of `deeptime:rock/unclassified_crust` ("Never
+  used as a stand-in, with one documented exception") and the paragraph "Stand-ins follow Ben's rules: … never `stone` or `deepslate`
+  (reserved for `unclassified_crust`), except `stone` as the last `coal` fallback" become "stone and deepslate are also the stand-ins
+  of the six common classes above (decisions log 2026-10-01); `unclassified_crust` stays the filler no class owns". `black_argillite`
+  stays the member of `black_shale` and the first fallback of `coal` and `hornfels`'s fired variant. Checked as an overlay datapack
+  (`replace: true` tags for the six classes) on the MIC server set: stone 35.8 % and deepslate 11.8 % of the top 64 blocks (table above).
+- **Gates** (VM `deeptime-test`): `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`, `cargo test --workspace`,
+  `cargo deny check licenses bans` clean; `./gradlew build test` 161 tests, 0 failures; `./gametest.sh` and `./gametest.sh -PwithMic`
+  (after `tools/smoke/install.sh mic`, `--pack`): All 58 required tests passed each (the first default run had 3 failures, all the
+  `deepslate[axis=y]` state string in my new assertions; fixed).
+- **Next.** Ben decides the options in the report (spawn cobbles for stoneless starts; MIC rows; the Terralith blackstone). The coordinator
+  merges and runs the batch GameTests.
 
 ### 2026-10-01 — Workbench deposits overlay: coal fields and ore sites by family, hover, "why here" (agent worktree agent-aae4250c131f0cf7a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Ask.** Ben, 2026-10-01, "Deposits layer": draw coal fields and ore deposits by type on the map at every frame where the
