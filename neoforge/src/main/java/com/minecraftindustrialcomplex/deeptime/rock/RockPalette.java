@@ -41,7 +41,7 @@ public final class RockPalette {
     public static final String TAG_MEMBERS = "rock/";
     public static final String TAG_FALLBACK = "rock_fallback/";
 
-    private static final RockPalette EMPTY = new RockPalette(Map.of(), Map.of(), Map.of(), Map.of());
+    private static final RockPalette EMPTY = new RockPalette(Map.of(), Map.of(), Map.of());
     private static volatile RockPalette current = EMPTY;
 
     /** What a block is to the deposit feature and background scatter (P1-15). */
@@ -64,15 +64,12 @@ public final class RockPalette {
     private final Map<Block, Host> hostOfBlock;
     /** Class → family ({@link RockClass#family()}). */
     private final Map<String, String> families;
-    /** Class → {@link RockClass#stoneUse()} (P1-28). */
-    private final Map<String, RockClass.StoneUse> stoneUses;
 
     private RockPalette(Map<String, PaletteRules.Result<BlockState>> byClass, Map<String, List<String>> problems,
-                        Map<String, String> families, Map<String, RockClass.StoneUse> stoneUses) {
+                        Map<String, String> families) {
         this.byClass = byClass;
         this.problems = problems;
         this.families = Map.copyOf(families);
-        this.stoneUses = Map.copyOf(stoneUses);
         Map<Block, List<String>> classes = new java.util.HashMap<>();
         Map<Block, Host> hosts = new java.util.HashMap<>();
         byClass.forEach((name, r) -> {
@@ -193,31 +190,9 @@ public final class RockPalette {
         });
         problems.values().removeIf(List::isEmpty);
         Map<String, String> families = new TreeMap<>();
-        Map<String, RockClass.StoneUse> uses = new TreeMap<>();
-        classes.forEach((name, rc) -> {
-            families.put(name, rc.family());
-            uses.put(name, rc.stoneUse());
-        });
+        classes.forEach((name, rc) -> families.put(name, rc.family()));
         return new RockPalette(java.util.Collections.unmodifiableMap(out), java.util.Collections.unmodifiableMap(problems),
-                families, uses);
-    }
-
-    /**
-     * How fit a class's rock is for stone tools and furnaces (P1-28); {@link RockClass.StoneUse#NONE}
-     * for an unknown class and for the unclassified crust (mining stone drops cobblestone anyway).
-     */
-    public RockClass.StoneUse stoneUse(String rockClass) {
-        return stoneUses.getOrDefault(rockClass, RockClass.StoneUse.NONE);
-    }
-
-    /** The class names whose {@link #stoneUse} is at least {@code min} (TOOL: the toolstone classes). */
-    public java.util.Set<String> classesWithUse(RockClass.StoneUse min) {
-        java.util.Set<String> out = new java.util.TreeSet<>();
-        stoneUses.forEach((name, use) -> {
-            if (use.ordinal() >= min.ordinal())
-                out.add(name);
-        });
-        return out;
+                families);
     }
 
     /** A tag's blocks in list order (absent optional entries were dropped when the tag loaded). */

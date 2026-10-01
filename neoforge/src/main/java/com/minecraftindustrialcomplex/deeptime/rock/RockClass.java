@@ -32,50 +32,11 @@ import java.util.Optional;
  * @param faciesRule      the name of the setting that forms the class (the settings the core forms
  *                        are listed in {@code tools/dev/gen_rock_classes.py})
  * @param tags            flags the deposit and structure stages key on
- * @param stoneUse        whether the class is tool-grade rock, building rock or neither (P1-28); the
- *                        generator turns it into the item tags {@code minecraft:stone_tool_materials}
- *                        and {@code minecraft:stone_crafting_materials}, and spawn wants tool-grade
- *                        rock near it
  */
 public record RockClass(String name, String family, List<String> groups, double densityKgM3, double erodibility,
                         double diffusivity, List<String> metamorphicPath, Optional<String> weathersTo,
                         Optional<String> lithifiesTo, Optional<String> looseEquivalent, Optional<String> faciesRule, List<String> tags, Optional<ResourceLocation> vanillaFallback,
-                        StoneUse stoneUse, Map<String, String> sources, Optional<String> notes) {
-
-    /**
-     * How fit a class's rock is to make stone tools and furnaces from (P1-28; the reasons are in
-     * {@code tools/dev/gen_rock_classes.py}).
-     */
-    public enum StoneUse {
-        /** Soft, crumbly, soluble or loose: in neither vanilla tag. */
-        NONE("none"),
-        /** Solid and workable but it holds no edge: furnaces and brewing stands, no tools. */
-        BUILD("build"),
-        /** Hard and tough: tools and furnaces. */
-        TOOL("tool");
-
-        public static final Codec<StoneUse> CODEC = Codec.STRING.comapFlatMap(s -> {
-            for (StoneUse u : values())
-                if (u.id.equals(s))
-                    return DataResult.success(u);
-            return DataResult.error(() -> "stone_use '" + s + "' is not none, build or tool");
-        }, u -> u.id);
-
-        private final String id;
-
-        StoneUse(String id) {
-            this.id = id;
-        }
-
-        public String id() {
-            return id;
-        }
-
-        /** Whether the class's blocks go in {@code minecraft:stone_crafting_materials}. */
-        public boolean building() {
-            return this != NONE;
-        }
-    }
+                        Map<String, String> sources, Optional<String> notes) {
 
     /** Class names are block-tag path segments. */
     public static final Codec<String> NAME = Codec.STRING.validate(s -> s.matches("[a-z0-9_]+")
@@ -95,7 +56,6 @@ public record RockClass(String name, String family, List<String> groups, double 
             Codec.STRING.optionalFieldOf("facies_rule").forGetter(RockClass::faciesRule),
             Codec.STRING.listOf().optionalFieldOf("tags", List.of()).forGetter(RockClass::tags),
             ResourceLocation.CODEC.optionalFieldOf("vanilla_fallback").forGetter(RockClass::vanillaFallback),
-            StoneUse.CODEC.optionalFieldOf("stone_use", StoneUse.NONE).forGetter(RockClass::stoneUse),
             Codec.unboundedMap(Codec.STRING, Codec.STRING).optionalFieldOf("sources", Map.of()).forGetter(RockClass::sources),
             Codec.STRING.optionalFieldOf("notes").forGetter(RockClass::notes)
     ).apply(i, RockClass::new));
