@@ -143,6 +143,85 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   balance P1-26 will normalise against), schema 9 fixed, and the branch merged into master. Steps 7–9
   can follow in the same batch. P1-26 re-sets the `climateConsistent` floors itself (its §5.3), so step 8
   only has to pass, not be tuned finely.
+### 2026-10-01 — Workbench deposits overlay: coal fields and ore sites by family, hover, "why here" (agent worktree agent-aae4250c131f0cf7a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Ask.** Ben, 2026-10-01, "Deposits layer": draw coal fields and ore deposits by type on the map at every frame where the
+  deposit stage has run (and the baked deposits at the end); one symbol and colour per family, coal as footprint areas; a legend
+  with counts; hover for family, size, age; click opens the inspector with the site's event and cause chain; works over any
+  base layer; view-only (nothing added to the simulation or the bake); run time unchanged.
+- **Overlay, not a layer (why).** Keyframe layers are RGBA images the core draws on the stepping thread at keyframe time. They
+  cannot carry symbols to hover or click, a new one would be extra work on that thread for every frame, and it would only
+  exist where a stage names it. An overlay drawn on the pane's canvas from the site list works over satellite, elevation and
+  any layer the other workbench changes add, like the event markers do (same `mapXY` projection). Toggle: the Deposits button
+  in the map overlays group (key `D`, remembered); the legend sits in the Layer card.
+- **Data (nothing new is computed).** `GET /api/runs/<id>/deposits` (`watch/deposits.rs`, new): one JSON object with each site's
+  type, lat/lon, block position, depth range, footprint ellipse (the widest of its bodies, else its box), products with
+  tonnage and the forming event id. While a run goes on, the driver thread takes it once from `world.sites`/`world.bodies`
+  between two steps, when the first published frame names `deposits/sites` (`Run::capture_deposits`, 3 lines in
+  `Workbench::publish`); a done run answers from `sites/sites.dtsr` + `bodies/bodies.dtb` of its world data (the baked deposits;
+  also what a restarted workbench shows). Age and the cause chain come from the events the page already holds. `git diff
+  --stat` touches nothing in deeptime-core or deeptime-format. The overlay shows from the first frame that names the sites layer
+  on (the deposit stage and the young/amplify frames after it); earlier frames say when the sites appear.
+- **Look.** Eight families, colours = the data-viz palette's dark-mode categorical steps in slot order (blue MVT, orange
+  porphyry, aqua supergene, yellow placer, magenta SEDEX, violet petroleum, red BIF; green left out, it is the land), checked
+  with its `validate_palette.py` (all checks pass), plus shape as the second cue (hexagon, up/down triangle, star, square, drop,
+  diamond); coal is a charcoal footprint with a light outline, drawn at its real size (widest body's ellipse) but never under 7 px
+  across. A symbol's size follows its rank by tonnage inside its family. Sites that share a spot (a blanket under its porphyry)
+  are drawn side by side. Hover: card with family, size (tonnes of the primary product), footprint km2, age (formed X Myr ago),
+  grade and by-products; the site's footprint and the link to its parent or children light up. Click (Select tool): the Details
+  tab gets the site card (facts, yields), "Why here" (the forming event and its causes four links deep, breadth first as
+  `inspect-column --why` lists them, with levels), links to the deposit it came from or led to, then the forming event's own
+  detail (the Events tab row is selected). Legend rows toggle a family (Alt-click: only it), counts include zeros.
+- **Pieces.** `crates/deeptime-viewer/assets/deposits.js` (new, served as `/deposits.js`, pure functions in `DTDeposits`: families,
+  model, draw, hit-test, legend/hover/details text, cause chain), `watch/deposits.rs` (new), small hooks in `workbench.js` (one
+  section plus one-line hooks in `RunView`, `drawPane`, `legend`, `buttons`, the key handler), `workbench.html` (button, legend slot,
+  script tag), `http.rs` (two routes), `runs.rs` (cache, capture), viewer `lib.rs` (`DEPOSITS_JS`). Checks: `tools/viewer/deposits-check.js`
+  (node: the module, run on the Mac), `tools/viewer/deposits-shots.sh` + `deposits_shots.py` (private `deeptime watch` on 127.0.0.1 and
+  headless Chrome for Testing from the playwright cache, real mouse input; never port 8642).
+- **Measured / checked (Mac, before the stop).** `cargo clippy --workspace --all-targets -D warnings` and `cargo fmt --check` clean;
+  `cargo test -p deeptime-cli -p deeptime-viewer` watch tests pass, incl. new `the_deposits_overlay_reads_the_sites_live_and_baked`
+  (synthetic deposit world: the live capture and the bake agree site for site, every forming event is in the stream, a restart
+  reads the same sites) and 5 `watch::deposits` unit tests; `node tools/viewer/deposits-check.js` passes (hit-testing across the
+  seam, coal areas, co-located sites, draw counts, text, cause chain); the browser driver on the synthetic 16k deposit world
+  (135 sites, 8 families): legend counts add up, hover cards, click opens Why here, kin links, overlay over another layer, family
+  and overlay toggles, no script errors (two checks failed only on upper-case headings in the driver, fixed, not rerun).
+  Screenshots of that run (before the last legend/nudge fixes) are in `review/out/wb-deposits/` (not committed).
+- **Gates (Azure VM `deeptime-test`, branch at master 5c45b04's mac.sh).** `cargo fmt --check` and `cargo clippy --workspace
+  --all-targets -- -D warnings` clean; `cargo test --workspace` all ok (core 335 + 3 ignored, cli 37, format 51, inspect 29, viewer 7, jni 6,
+  ...; includes `watch::deposits::*` and `the_deposits_overlay_reads_the_sites_live_and_baked`); `cargo deny check licenses bans` ok;
+  `node tools/viewer/deposits-check.js` ok; `neoforge/gradlew build test` BUILD SUCCESSFUL (3 m 22 s; nothing in neoforge changed).
+  No GameTests (per the rule).
+- **Run time before/after (the gate "run time unchanged").** `earthlike_quick_16k`, scattered_continents, 500 Myr through `deeptime
+  watch --exit-when-done --threads 6 --mem-cap 8 GiB`, release binaries built on the VM, one run at a time, `/usr/bin/time -v`,
+  box shared (load 33 to 57 from other agents, so compare CPU, not wall): **before** (8dae3f2): 858 s wall, **2194 s user** +
+  38 s sys, 5.99 GB max RSS; **after** (this branch): 814 s wall, **2249 s user** + 35 s sys, 5.87 GB. Same world both times
+  (2,767 events, 253 frames, identical `surface_final` line to the last digit), so the overlay changes nothing in the run; the
+  +2.5 % user CPU is inside the noise of a loaded box (the per-stage seconds swing the other way: plates 118 vs 103 s, deposits
+  27 vs 36 s). The only addition on a run's thread is one clone of the site list between two steps (about 55 sites here).
+  (The earlier M6 baseline, 1354 s wall / 21.39e12 instructions, is not comparable: different machine, 12 threads, load 60 to 90.)
+- **Browser checks on a real run** (`tools/viewer/deposits-shots.sh`, private server on 127.0.0.1 with the page open while the run
+  went on, Chromium from nixpkgs, headless; 0 failed): the legend appears when the first frame names `deposits/sites`; while the run
+  is going the legend says the sites are as the stage placed them (live), and when it ends it switches to the baked sites with no
+  reload; 55 sites (coal 28, petroleum 5, porphyry 4, placer 9, MVT 7, SEDEX 2; supergene and BIF 0 on this planet) and the legend
+  counts add up to what the server sent; hover on a coal field and a porphyry shows family, size, footprint, age (and grade and
+  by-products); clicking opens the Details tab with the site card, "Why here" (the cause chain) and the forming event; the overlay
+  stays over the elevation layer; a legend row hides its family; the toggle hides and restores the overlay and legend; the
+  legend says when the sites appear on steps before the deposit stage; no script errors. **Draw cost** (2048 x 1024 canvas, in the
+  page): 55 sites draw in 0.2 to 0.3 ms and hit-test in 0.08 ms; ten times as many sites (550) draw in 12.9 ms (prepare 7.5 ms,
+  once per fetch). Screenshots in `review/out/wb-deposits/` (not committed): `00-live-overlay` (mid-run), `01-satellite-overlay`,
+  `02-hover-coal`, `03-click-coal-why-here`, `04-hover-porphyry_cu_mo_au`, `05-click-porphyry_cu_mo_au`, `07-elevation-overlay`,
+  `08-family-hidden`, `09-overlay-off`, `10-first-step`. Linux Chromium needs a font: `~/.config/fontconfig/fonts.conf` on the VM now
+  points at nixpkgs `dejavu_fonts` (without one the page draws no text); `deposits-shots.sh` finds Chromium on PATH or builds
+  `nixpkgs#chromium`.
+- **Merged with the other three workbench features (master e4094d6: rivers & lakes, Final world, rock at depth and sections).**
+  Conflicts in STATUS.md, `watch/http.rs` (both new routes and docs kept), `workbench.js` (the help list: S and D keys) and viewer
+  `lib.rs` (all three script constants); the script tags and `DTWB` needed nothing. Re-run on the VM: fmt, clippy `-D warnings`,
+  `cargo test --workspace` (all ok; core 351), deny, `deposits-check.js`, `gradlew build test` (ok, 2 m 5 s); the browser driver on a
+  fresh 500 Myr run (live, then baked; 0 failed) now also checks, with the overlay on: the Rivers & lakes layer shows
+  (`11-rivers-overlay`), the section tool opens and two clicks fill the Section panel (`12-section-overlay`), the Final world view
+  opens and closes with the overlay still there (`13-final-world`). Draw cost on the merged page: 55 sites 0.5 ms, 550 sites 17.8 ms.
+- **Left / not done on purpose.** Deposits on the globe, and sites at their position before the end of the run (the record holds
+  only the present position; the engine's per-frame origin maps are not kept). The supergene/BIF rows are empty on this seed, so the
+  kin links (placer to porphyry, blanket to porphyry) were checked on the synthetic 16k deposit world, not on the 500 Myr planet.
 ### 2026-10-01 — Rivers & lakes on the workbench maps: view-only, on every frame, the bake's own on the last (agent worktree agent-a3d4fadfe3e053b77, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What (Ben, 2026-10-01: "Rivers & lakes on the maps").** Rivers (width and colour by flow) and lakes are drawn over the satellite view of every terrain frame, and a new derived layer `rivers` ("Rivers & lakes") shows them on a quiet map. Nothing is added to the simulation or the bake (no new field, no stage work): like `satellite` and `provinces` it is derived when a frame is drawn.
   1. **`core::water_view`** (`water_view.rs`, tests in `water_view/tests.rs`)
