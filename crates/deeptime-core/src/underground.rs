@@ -83,6 +83,9 @@ mod tests {
         }
         .validate()
         .unwrap_err();
-        assert!(e.to_string().contains("$.underground.lava_floor_blocks"), "{e}");
+        assert!(
+            e.to_string().contains("$.underground.lava_floor_blocks"),
+            "{e}"
+        );
     }
 }
