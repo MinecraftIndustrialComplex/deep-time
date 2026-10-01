@@ -43,6 +43,9 @@ pub const WORKBENCH_JS: &str = include_str!("../assets/workbench.js");
 /// The workbench's "Rock at depth" and cross-section tool (served as `sections.js`, after
 /// `workbench.js`; it reads `/api/runs/<id>/rock…`).
 pub const SECTIONS_JS: &str = include_str!("../assets/sections.js");
+/// The workbench's "Final world" view (a zoomable map of a finished run's bake; `deeptime watch`
+/// serves it as `worldmap.js`, loaded after `workbench.js`, which it hooks into).
+pub const WORLDMAP_JS: &str = include_str!("../assets/worldmap.js");
 /// The planet editor's field catalogue, shared with the game (Gradle ships it in the jar as
 /// `deeptime/editor_fields.json` for `screen/model/EditorFields`); the workbench's form is built
 /// from it.
@@ -406,6 +409,26 @@ pub fn encode_png(w: u32, h: u32, rgba: &[u8]) -> io::Result<Vec<u8>> {
     enc.set_compression(png::Compression::Fast);
     let mut writer = enc.write_header().map_err(io::Error::other)?;
     writer.write_image_data(rgba).map_err(io::Error::other)?;
+    writer.finish().map_err(io::Error::other)?;
+    Ok(out)
+}
+
+/// RGB8 (`w·h·3` bytes) as PNG bytes, with png's fast deflate: the workbench's map tiles, which
+/// have no transparent pixels.
+pub fn encode_png_rgb(w: u32, h: u32, rgb: &[u8]) -> io::Result<Vec<u8>> {
+    if rgb.len() as u64 != u64::from(w) * u64::from(h) * 3 {
+        return Err(io::Error::other(format!(
+            "{} bytes are not a {w}×{h} RGB image",
+            rgb.len()
+        )));
+    }
+    let mut out = Vec::with_capacity(rgb.len() / 3);
+    let mut enc = png::Encoder::new(&mut out, w, h);
+    enc.set_color(png::ColorType::Rgb);
+    enc.set_depth(png::BitDepth::Eight);
+    enc.set_compression(png::Compression::Fast);
+    let mut writer = enc.write_header().map_err(io::Error::other)?;
+    writer.write_image_data(rgb).map_err(io::Error::other)?;
     writer.finish().map_err(io::Error::other)?;
     Ok(out)
 }
