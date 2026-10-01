@@ -94,12 +94,12 @@ public final class MagmaPass {
                                         chunk.setBlockState(pos, LAVA, false);
                                         placed++;
                                     }
-                                } else if (!open(here)) {
-                                    chunk.setBlockState(pos, MAGMA, false);
+                                } else if (y <= ground) {
+                                    chunk.setBlockState(pos, MAGMA, false);   // a cave here too: the lava below stays capped
                                 }
                             }
                             case PLUG -> {
-                                if (!open(here))
+                                if (y <= ground)
                                     chunk.setBlockState(pos, MAGMA, false);
                             }
                             case LAKE -> {
