@@ -81,10 +81,112 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | Date | Task | Question | Asked how |
 |---|---|---|---|
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
-| 2026-10-01 | surface / plates | **The emergent height limit (stage 2).** Stage 1 (build log 2026-10-01, "Terrain above the build limit, stage 1") removed the bookkeeping that built 13–20 km and added the compression band; Earth-like 16k worlds now peak at 9.0–11.2 km on L1, held by the plate model's uplift ceiling, not by physics. Build stage 2 (crust over its strength spreads: σ = ρ·g·h against `crust_strength_mpa`, plateaus at about 5 km on Earth, 13 km at 0.38 g)? And inside it: drop the plate model's 10 km uplift ceiling to a 30 km guard and recalibrate uplift with the hypsometry work (recommended), or keep it and let the spreading act under it? Also: keep squeezing a world too short for its mountains (now), or raise the vertical-scale slider's minimum to 19.6 m and refuse? | Not asked yet: for the coordinator to put to Ben |
+| 2026-10-01 | world height / mountains | After stage 2 (build log 2026-10-01, "The height limit, stage 2"): **(1) the bottom:** default trenches reach y −412 to −472 against `min_y` −352: lower `min_y` to −512 (+16 % sections; recommended), squeeze the bottom band only, or leave flat trench floors? **(2) summits:** Earth-like worlds top out at 6.0–6.9 km (plateaus at 5–5.7 km, little summit relief above them): give the amplifier summit relief over plateaus (recommended) or raise `crust_strength_mpa` to ~190? **(3) light planets** get taller volcanoes but not taller fold belts, since erosion and uplift do not know gravity: leave, or make them? **(4) the top** stays at y 639 (default worlds end 166 blocks under the compression knee) unless Mars-like worlds matter now (then `max_y` 1023, +39 % sections). | Not asked yet: for the coordinator to put to Ben |
 | 2026-10-01 | lava | **Where lava should be, beyond the fix** (build log 2026-10-01, "Lava floods"). The fix makes the generator's own lava vanilla's, measured from the world's floor: a lava floor in the lowest 10 blocks and lava cave lakes below about y −288. What is left above that is the pack's and vanilla's **lava-lake features** (80 to 140 blocks each, anywhere from deep caves to a mountain's flank: 3 in the coast box, 7 to 9 in the mountain box, standalone and MIC alike) and single-block lava springs. Options: **(1, recommended)** keep the fix as the default and take the random lava-lake features and springs out of Deep Time worlds (a biome modifier like `deeptime:claim_ores`, with a setting), then put lava back where the simulation says it belongs: crater lakes and shallow magma under the volcanoes the run marks active (101 in Ben's run), which needs the bake to write the active volcanoes for the game, so it is its own task; (2) keep the fix and leave the features alone: vanilla's amount of lava, a few small lakes per 256 × 256 blocks at any depth; (3) no lava from the generator at all (`underground.lava_floor_blocks` and `lava_lake_blocks` 0) until the volcano task exists; (4) a deeper or shallower lava zone (the two settings; each default is vanilla's distance from the floor). | Not asked yet: for the coordinator to put to Ben |
 
 ## Build log
+### 2026-10-01 — The height limit, stage 2: crust over its strength spreads; the plate model's cap is a guard (agent worktree agent-ac2a33b7f51fa4bf8, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben (decisions log 2026-10-01): "Build it out": the height limit and its dependence on gravity come from
+  the simulation, not from a number in the plate model; the world's height may rise if the model needs it.
+- **The mechanism** (`surface/spread.rs`, step 5b of the surface stage, after isostasy). Where the weight of the land
+  above the sea, ρ_c·g·h (ρ_c 2,800 kg/m³), passes the crust's strength S, the surface relaxes sideways as the lower
+  crust flows out from under it: ∂h/∂t = ∇·(D ∇h), D = D₀·min(x, 2)³, x = max(0, ρ_c·g·h/S − 1). Conservative
+  and implicit (the surface's own diffusion solver), solved only when some cell is over the threshold. It moves
+  crust, not surface rock: strata log and mass residual untouched; the plate model takes it through the feedback.
+  Nothing is clamped. Settings: `tectonics.crust_strength_mpa` (140: 5.1 km at 1 g) and `tectonics.crust_flow_km2_myr`
+  (D₀ at twice the strength height; 30,000), both in the editor (Advanced · Plates, `crust_strength`, `crust_flow`)
+  with lang keys.
+- **The plate model's cap is demoted.** `tectonics.max_elevation_m` is 30 km in the pipeline presets, a guard that
+  bound 0 continental sample-steps in every run below. The uplift ceiling (uplift × (1 − z/10 km), which did the
+  work before) is its own setting, `uplift_ceiling_m`, and 0 (none) in the pipeline presets; Cortial's z_c as the
+  scale of the subduction transfer function is `uplift_reference_m` (10 km, a scale only). The struct's defaults and
+  the plate-only presets keep the old behaviour (10 km, ceiling on, no spreading): they have no surface stage.
+- **Volcanoes.** The ceiling (`volcanoes.max_elevation_km`, 6.8) is now that height times the planet's strength
+  height over Earth's with the default crust: unchanged at 1 g and 140 MPa, 17.9 km at 0.38 g, 3.4 km at 2 g.
+- **Recalibration.** Without the uplift ceiling the land ran high with strong spreading alone (land 0.317, median
+  768 m, above 2 km 0.163, n = 4), so `subduction_uplift_mm_yr` 0.6 → 0.42 and `collision_uplift_max_m` 2000 → 1400
+  (×0.7) in the four pipeline presets and the built-ins (and the test planet, 4000 → 2800). `tools/review/p1-17-hyps.sh`,
+  500 Myr, `earthlike_quick_16k`, area-weighted, mean [min, max]:
+
+  | | n | land | median, m | p90, m | above 2 km |
+  |---|---|---|---|---|---|
+  | Earth | | 0.289 | 427 | 2,022 | 0.102 |
+  | targets (recalibration 8600e03) | | ≈ 0.29 | 430–640 | | 0.10–0.13 |
+  | before: stage 1 + recalibrated presets | 6 | 0.292 [0.283, 0.307] | 695 [604, 800] | 2,444 | 0.151 [0.115, 0.198] |
+  | no ceiling, D₀ 3,000 | 4 | 0.277 [0.243, 0.318] | 601 [481, 803] | 2,423 | 0.139 [0.095, 0.187] |
+  | no ceiling, D₀ 30,000 | 4 | 0.317 [0.248, 0.396] | 768 [513, 1001] | 2,496 | 0.163 [0.101, 0.225] |
+  | **the presets now: D₀ 30,000, uplift × 0.7** | 6 | 0.273 [0.234, 0.310] | 547 [436, 701] | 2,102 [1,789, 2,392] | 0.114 [0.085, 0.152] |
+
+  Histories are chaotic: with n = 4–6 a mean moves by about ±0.02 in land and ±100 m in the median between batches.
+- **Heights, deep-time surface on L1** (same runs; seeds 1–3 × both starts, "before" has seeds 1, 2 from the first
+  batch and seed 3 with the old settings on the new binary):
+
+  | | max, km | p99 land (cells), km | cap bound |
+  |---|---|---|---|
+  | before | 6.4–7.8 | 4.3–5.1 | 0 |
+  | now | 5.7–6.8 | 4.2–5.5 | 0 |
+  | now, 0.38 g (n = 4) | 9.5–11.0 | 3.4–5.7 | 0 |
+  | now, 2 g (n = 4) | 3.42–3.43 | 2.9–3.1 | 0 |
+
+  At 2 g everything above 2.55 km spreads (2–3 million km³ moved per run against 0.2–0.7 million at 1 g) and the
+  highest ground is the volcanoes at their 3.4 km ceiling. At 0.38 g the strength height is 13.4 km and **no cell
+  ever reached it** (spread 0): ranges there are limited by how fast uplift feeds them against erosion, which does
+  not depend on gravity in this model, so their p99 is the Earth-like one; the 9.5–11 km summits are volcanoes under
+  their higher ceiling. So gravity lowers mountains on heavy planets and frees volcanoes on light ones, but a light
+  planet's fold belts are not markedly taller: that would need erosion (or uplift) to know gravity. For Ben.
+- **Plateaus** (`deeptime stage volcanoes … --out`, seed 1, supercontinent; `review/out/height-stage2/map-{old,new,g038}.png`,
+  sections through the highest cell, km per L1 cell of 4.8 km). Before: a dome, `… 4.2 5.1 5.6 5.9 6.1 6.3 6.3 6.4 6.3
+  6.2 6.1 6.0 5.9 …`. Now: a table with steep edges, `0.8 1.0 2.3 3.2 4.5 5.4 5.6 5.6 5.6 5.7 5.7 5.7 5.7 5.6 5.6 5.6 5.5
+  5.3 5.1 4.8 …` (1 km to 5.4 km in five cells, then 13 cells within 0.2 km). Land above 5 km: 0.30 % → 0.42 %,
+  nothing above 6 km. At 0.38 g the highest ground is a cone, `… 5.9 7.1 8.2 9.1 9.4 9.2 8.6 7.7 …`.
+- **The finished world** (`deeptime run`, amplifier and bake included, the six default runs; H every 8th block):
+  highest terrain y 365–409 = **6.0–6.9 km** (6.92, 6.17, 6.14, 6.03, 6.43, 6.45), p99.9 5.2–6.2 km, p99 4.0–5.6 km;
+  0 cells above the compression knee (y 575), 0 compressed, in all six. The amplifier adds at most a few hundred
+  metres to the L1 maxima. **So the compression band does not shape Earth-like worlds, and the world height does not
+  need to rise for them**: the highest block is 166 blocks under the knee.
+- **Run time.** The spreading solve is 22–35 s of a 190–240 s surface stage over 250 steps (about 13 %, 4–5 % of
+  the 500-Myr run of ~580 s at 2 threads); more than the few per cent I estimated, because the solve runs over the
+  whole grid. Restricting it to the cells over the threshold and their surroundings is the obvious saving.
+- **World height, the numbers asked for.** Minecraft allows a dimension from y −2032 to 2031 (`min_y` and `height`
+  multiples of 16, height ≤ 4064); NeoForge adds no limit. Deep Time's `planet_overworld` is −352..639 (62
+  sections). Not needed for default worlds (above). It is needed for what low gravity can build: at 0.38 g volcanoes
+  reach 11 km on L1 (ceiling 17.9 km = y 958), which today is squeezed into the 48-block band under y 623.
+  Options: **(A, recommended) leave 639** and let the band take low-gravity summits until someone wants Mars-like
+  worlds; (B) `max_y` 1023 (86 sections, +39 %): holds 19.2 km, costs every world's noise fill, lighting and
+  heightmaps in proportion to the extra 24 empty-air sections per chunk (not measured; the dimension type and noise
+  settings are one JSON each, the format already carries `max_y`, existing test worlds would need regenerating);
+  (C) a per-preset height (the dimension type chosen from the preset's gravity): only tall planets pay, but the
+  dimension type becomes dynamic, which Toroidal World and the client-info channel would have to follow.
+- **The bottom** (the lava work found seabeds under the world's floor). In the six default runs the deepest finished
+  sea floor is y −412 to −472, 9.5–10.7 km under the sea (`tectonics.trench_elevation_m` is −10 km), against `min_y`
+  −352 (8.3 km): 0.01–0.08 % of the sea's cells are below the floor and 0.14–0.49 % in its lowest 32 blocks, the
+  router's bottom slide. Nothing squeezes the bottom as the band does the top. Options: **(A, recommended) `min_y`
+  −512** (72 sections instead of 62, +16 %: 11.5 km of sea, real trenches fit with the slide), with the same
+  smooth squeeze above the floor as a net for deeper settings; (B) the squeeze only, at −352: no cost, trenches
+  flatten gently at 8 km; (C) leave it: flat trench floors at bedrock in under 0.1 % of the sea. Either way existing
+  test worlds are regenerated; the format already carries `min_y`.
+- **The full preset** (`earthlike_full_16k`: 250,000 samples, L1 r 8; the ensemble Ben approved, 2 seeds × 2 starts,
+  500 Myr, 2,600 s a run at 2 threads): land 0.327 [0.266, 0.359], median 746 m [652, 861], p90 2,491 m, above 2 km
+  0.148 [0.099, 0.168]; L1 max 6.6–6.8 km, cap bound 0. Still high (one run before all of today's changes had land
+  0.38, median 1,013 m). With uplift × 0.8 on top (`subduction_uplift_mm_yr` 0.34, `collision_uplift_max_m` 1100; n = 4): land 0.292 [0.257, 0.319], median 630 m [577, 675], p90 2,049 m, above 2 km 0.106 [0.082, 0.131], L1 max 5.7–6.8 km: inside the targets, so the two full presets carry these values (the quick ones keep 0.42 and 1400).
+- **Not in these runs:** the folds-and-faults term (worktree-agent-a49703993341aa701), which is on its own branch
+  and switchable; the combined effect is to be re-checked after both land.
+- **Tests.** `surface::spread` (a 9 km block on a plain sinks to between the strength height and 7.5 km and widens,
+  volume kept, nothing moves at 0.38 g or with the flow off), the editor's catalogue test covers the two new
+  settings in every pipeline preset. `riverBiomes` failed on seed 16's new planet (12 river of 37 wide-channel
+  samples, 21 of them swamp): vanilla's own valley slice is swamp on the flattest, wettest ground, so swamp and
+  mangrove swamp count with river.
+- **Measured** (VM `deeptime-test`, x86_64 Linux, `mac.sh` default caps): on the tree merged with master e6a7af0 (load average 13–25): `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --locked` all pass (533: cli 52, core 374 + 3 ignored); `./gradlew build test` tests=168 failures=0 errors=0 skipped=1; `./gametest.sh` All 59 required tests passed (wall 455 s, bake `above_max_y=0cells compressed=0cells highest_y=280`); `tools/smoke/install.sh mic`, `./gametest.sh -PwithMic` All 59 passed (89 s). The nine real-planet tests on other planets (`DEEPTIME_TEST_PLANET_SET="seed=N"`), one merge earlier: seeds 12–15 standalone All 9 passed, seed 16 failed `riverBiomes` (above) and passed after the fix, seed 13 again All 9. A MIC run one merge earlier failed `firstInstalledFallback` (shale and gneiss): master`s own fix 13b8657, in the final tree. After the gates only the two full presets` uplift values changed; `cargo test` and `./gradlew build test` were run again on that (all pass, 168/0). The laptop`s address changed twice during the runs and the VM was unreachable for minutes at a time; the detached jobs were not affected. x86_64 Linux only.
+- **For Ben.** (1) Earth-like summits are 6.0–6.9 km in the finished world, under the 8–10 km he expected: the
+  plateau level is where Tibet's is and the highest ground is plateau, not peaks, because neither the surface stage
+  nor the amplifier puts 3 km of summit relief on a plateau. Options: **leave it and give the amplifier summit
+  relief over high plateaus (recommended; the mountain-character work)**, or raise `crust_strength_mpa` to about
+  190 (plateaus near 7 km, summits 8–9 km, less like Earth below the summits). (2) Light planets: taller volcanoes
+  but not taller fold belts (above); making erosion or uplift depend on gravity is its own piece of work.
+  (3) The world's bottom, options above. (4) The top stays at 639 unless Mars-like worlds matter now.
+- **Next.** The full preset's own uplift factor (one more ensemble); the spreading solve restricted to the cells
+  that need it; the hypsometry and folds branches re-checked on this base.
+
 ### 2026-10-01 — Rock columns: grade rises downwards, no metamorphic or plutonic slivers; `deeptime strata-check` (agent worktree agent-a4c7bf65d55bc4810, branch worktree-agent-a4c7bf65d55bc4810, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Ask.** Ben, 2026-10-01 ("Investigate and fix"), on the workbench run `1a0f6e918c9` (`earthlike_quick_16k`, supercontinent,
   1000 Myr): at x −6901, z −128 schist lies on unmetamorphosed shale (and again deeper), gneiss is a 3-block sheet between
@@ -6378,11 +6480,11 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
-- **Terrain above the build limit (2026-10-01): fixed in two parts, the third pending.** The 13–20 km
-  "mountains" were bookkeeping (the surface's offset added to whatever crust a cell read next; fixed, build log
-  2026-10-01 stage 1), and the stored elevation is compressed into a band under `max_y`, so nothing is cut flat
-  (`scale.build_limit_band_blocks`; the GameTest fails on any cell above the limit). The height limit itself is still
-  the plate model's uplift ceiling, not an emergent one: stage 2, pending question above.
+- **Mountain heights (2026-10-01).** The 13–20 km "mountains" were bookkeeping (fixed, stage 1); the height limit is
+  now crust spreading over its strength (stage 2, `surface/spread.rs`), with the plate model's cap a 30 km guard that
+  never binds; the stored elevation is squeezed under `max_y` only for extreme settings. Open: sea floors below
+  `min_y` in under 0.1 % of the sea, summits at 6–7 km, the full preset's land still high (pending question above;
+  build log 2026-10-01 stage 2).
 - **One preset, one planet per platform (2026-10-01).** The simulation is not bit-identical across platforms (the
   platform's libm); it is across runs and thread counts on one machine. Ben does not want it otherwise. Tests on a
   simulated planet assert properties and floors measured over several planets (`DEEPTIME_TEST_PLANET_SET="seed=N"
