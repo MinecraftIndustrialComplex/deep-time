@@ -239,7 +239,7 @@ def main() -> int:
     for i, (name, _) in enumerate(sums):
         legend.append(f'<span><i class="key" style="background:var(--{cls[i]})"></i>{html.escape(name)}</span>')
     legend.append("</div>")
-    parts = [f"<title>P1-17 hypsometry</title><style>{CSS}</style><main>",
+    parts = [f"<meta charset=\"utf-8\"><title>P1-17 hypsometry</title><style>{CSS}</style><main>",
              "<h1>P1-17 hypsometry recalibration</h1>",
              "<p>Hypsographic curves of earthlike_quick_16k planets at the end of their runs against Earth's: the "
              "elevation (relative to sea level) that each share of the surface stands above, true-area weighted. "
