@@ -25,7 +25,7 @@
 
 set -euo pipefail
 
-HOST="${DEEPTIME_MAC:-ban@mac-mini}"
+HOST="${DEEPTIME_MAC:-ban@20.120.160.3}"
 SSD=/Volumes/Graphide/ban
 CACHE="$SSD/deeptime-cache"
 MODS=/home/greencheetah/Projects/mic/mods
@@ -72,7 +72,7 @@ fi
 if [ "$SERVER" = 1 ]; then
     LOCK="$CACHE/server.lock"
     CMD="while ! mkdir '$LOCK' 2>/dev/null; do
-           age=\$(( \$(date +%s) - \$(/usr/bin/stat -f %m '$LOCK' 2>/dev/null || date +%s) ))
+           age=\$(( \$(date +%s) - \$(stat -c %Y '$LOCK' 2>/dev/null || /usr/bin/stat -f %m '$LOCK' 2>/dev/null || date +%s) ))
            if [ \$age -gt 10800 ]; then echo 'mic-climate.sh: breaking a stale server lock'; rm -rf '$LOCK'; continue; fi
            echo \"mic-climate.sh: waiting for the server lock (held by \$(cat '$LOCK/owner' 2>/dev/null))\"; sleep 30
          done
