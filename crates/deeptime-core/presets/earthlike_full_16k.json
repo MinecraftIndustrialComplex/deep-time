@@ -374,6 +374,10 @@
   },
   "underground": {
     "lava_floor_blocks": 10,
-    "lava_lake_blocks": 54
+    "lava_lake_blocks": 54,
+    "magma_chamber_depth_km": 3.0,
+    "magma_chamber_size": 1.0,
+    "crater_lake_share": 0.25,
+    "remove_lava_features": true
   }
 }

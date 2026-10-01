@@ -82,9 +82,97 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 | 2026-10-01 | surface / plates | **The emergent height limit (stage 2).** Stage 1 (build log 2026-10-01, "Terrain above the build limit, stage 1") removed the bookkeeping that built 13–20 km and added the compression band; Earth-like 16k worlds now peak at 9.0–11.2 km on L1, held by the plate model's uplift ceiling, not by physics. Build stage 2 (crust over its strength spreads: σ = ρ·g·h against `crust_strength_mpa`, plateaus at about 5 km on Earth, 13 km at 0.38 g)? And inside it: drop the plate model's 10 km uplift ceiling to a 30 km guard and recalibrate uplift with the hypsometry work (recommended), or keep it and let the spreading act under it? Also: keep squeezing a world too short for its mountains (now), or raise the vertical-scale slider's minimum to 19.6 m and refuse? | Not asked yet: for the coordinator to put to Ben |
-| 2026-10-01 | lava | **Where lava should be, beyond the fix** (build log 2026-10-01, "Lava floods"). The fix makes the generator's own lava vanilla's, measured from the world's floor: a lava floor in the lowest 10 blocks and lava cave lakes below about y −288. What is left above that is the pack's and vanilla's **lava-lake features** (80 to 140 blocks each, anywhere from deep caves to a mountain's flank: 3 in the coast box, 7 to 9 in the mountain box, standalone and MIC alike) and single-block lava springs. Options: **(1, recommended)** keep the fix as the default and take the random lava-lake features and springs out of Deep Time worlds (a biome modifier like `deeptime:claim_ores`, with a setting), then put lava back where the simulation says it belongs: crater lakes and shallow magma under the volcanoes the run marks active (101 in Ben's run), which needs the bake to write the active volcanoes for the game, so it is its own task; (2) keep the fix and leave the features alone: vanilla's amount of lava, a few small lakes per 256 × 256 blocks at any depth; (3) no lava from the generator at all (`underground.lava_floor_blocks` and `lava_lake_blocks` 0) until the volcano task exists; (4) a deeper or shallower lava zone (the two settings; each default is vanilla's distance from the floor). | Not asked yet: for the coordinator to put to Ben |
+| 2026-10-01 | lava | **How far a player is from lava** (build log 2026-10-01, "Magma under active volcanoes"). With lava only at active volcanoes and the world's floor, on the 16k quick planet measured (123 active volcanoes, 100 on land, 16 crater lakes) a land point is a median 658 blocks (p90 1,309) from the nearest active volcano on land, where lava lies six blocks under the crater's magma plug, a median 1,178 blocks (p90 2,251) from the nearest open crater lake, and 438 blocks (p90 510) straight down from the lava floor. Vanilla has lava within about 100 blocks of anywhere. Options: **(1, recommended)** keep it: lava is a place to travel to, which is what the decision asked for (what MIC's early recipes need lava for was not checked); **(2)** a crater lake at every active volcano on land (`crater_lake_share` 1: about 62 of the 100 can hold one, four times today's 16); **(3)** a second, shallower source: lava in the deep cave aquifers again (`lava_lake_blocks` raised, e.g. 150: lava lakes in caves below about y -200); **(4)** keep the biomes' random lava (`remove_lava_features` off): vanilla's amount, geologically arbitrary. Also open: **the lava floor** at the bottom of the world (`lava_floor_blocks` 10; Ben has not decided whether to keep it), and **spreading ridges and rifts**, which the bake does not export (no lava there yet). | Not asked yet: for the coordinator to put to Ben |
 
 ## Build log
+### 2026-10-01 — Magma under active volcanoes; the biomes' random lava removed (agent worktree agent-a04fab824846efbfc, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Ask.** Ben, decisions log 2026-10-01, "Volcanoes is a go ahead": lava where the simulation has it. Branch
+  `worktree-agent-a04fab824846efbfc`, master merged in, not merged to master, not pushed.
+- **The bake** writes `volcanoes/active.json`: the volcanoes the volcano stage leaves active at the present (id, kind,
+  summit x and z, basal radius, height, activity 0–1, oceanic, silicic, age, crater radius and depth), in id order
+  (`crate::underground::active_volcanoes`; FORMAT.md, "Lava"). Dead, eroded and subducted ones are not listed.
+  **Spreading ridges and rifts are not exported**: they are plate-boundary geometry, not cheap, and nothing draws them yet.
+- **In the world** (`worldgen/Magma` decides every block from the list, the settings and the terrain height, once per
+  level; `worldgen/MagmaPass` places it in the surface step after the water pass).
+  - **Chamber**: an ellipsoid of lava whose top is `magma_chamber_depth_km` (3 km = 150 blocks) under the crater floor;
+    radius a tenth of the volcano's basal radius (1.2 to 4.5 km), half-height a fifth of that. In blocks it is a tall lens,
+    because the world is 15 times taller than wide: 19 across and 57 high (9,500 blocks) under a 28-km arc cone, 31 across
+    and 91 high (42,400 blocks) under the shield. Raised to stay 8 blocks over the lava floor, squeezed under thin ground.
+  - **Conduit**: a plus-shaped column of lava from the chamber's centre to six blocks under the crater floor, then a plug
+    of magma blocks: to the surface on land, buried three blocks under the bed under water.
+  - **Crater lava lake** at the `crater_lake_share` (0.25) most active volcanoes that can hold one: radius half the
+    crater's (2 to 10 blocks), lava up to one block under the lowest ground around it, the ground above opened to the sky.
+    Not under or beside water, not beyond the pole cap's line, not where the summit is too sharp (a cut over 12 blocks).
+  - **Sealed.** Open space within a block or two of magma becomes smooth basalt, and every block of a body and its
+    shell is in the carving masks, so lava never touches the sea, a lake, a river, an aquifer or a cave. A volcano
+    **under the sea or at the coast** keeps its chamber and conduit under at least 8 blocks of rock, gets no lava lake,
+    and its plug stays buried. Dead volcanoes get nothing.
+- **Random lava removed** (`underground.remove_lava_features`, on by default). Traced first, in the 168-mod MIC set and
+  vanilla: `minecraft:lake_lava_surface`, `lake_lava_underground`, `spring_lava`, `spring_lava_frozen` (in nearly every
+  overworld biome, Terralith's included) and Terralith's `volcano/lava_lakes`, `volcano/lava_flow`, `volcano/spring_lava`,
+  `cave/mantle/lava_drip`. `worldgen/LavaFeatures` refuses any placed feature whose configuration holds a lava block or
+  fluid state, where it is placed (`PlacedFeature.placeWithContext`, one small mixin), for Deep Time generators only.
+  Not a biome modifier: those run once per server, before a new world's data is in place, and for every dimension.
+  - **Terralith's `cave/frostfire/lava_remover` is refused too.** It turns lava sources into deepslate, 300 blobs of
+    radius 10 to 12 per chunk below y 30 in frostfire caves, and ate the chamber of a submarine volcano under such a
+    cave (4,226 of 4,521 blocks became deepslate in MIC; standalone kept all). It also explains the deepslate seen in
+    the flooded zone in the first lava entry.
+- **Settings** (preset section `underground`, all eight presets; editor section "Advanced · Lava and magma"):
+  `magma_chamber_depth_km` (3.0), `magma_chamber_size` (1.0; 0 = no magma), `crater_lake_share` (0.25),
+  `remove_lava_features` (true). `lava_floor_blocks` and `lava_lake_blocks` are unchanged (10, 54).
+- **Evidence** (a fresh 16k quick planet, supercontinent, 500 Myr, baked by this branch: 123 active volcanoes, 119 arc
+  stratovolcanoes, 3 caldera complexes, 1 shield; `tools/workbench/preview.py run`, seed 20261001, three 256 × 256 × 992
+  boxes per profile; screenshots, censuses and the probes in `review/out/lava-volcano/`).
+
+  | Box | MIC | Standalone | What the lava is |
+  |---|---|---|---|
+  | arc stratovolcano 12529 (crater lake, summit y 190) | 10,300 | 10,300 | one body of 10,239 from y −16 to 182 (chamber, conduit, lake); 29 faces open to the sky, the lake's surface; 61 blocks at the lava floor |
+  | shield 12523 (summit 81 blocks under the sea) | 43,188 | 45,677 | one body of 43,051 from y −258 to −24, 0 faces on water; the rest lava floor and lava-lake aquifers below y −300 |
+  | oceanic arc volcano 12565 (summit at y −91, under frostfire caves in MIC) | 5,709 | 6,747 | one body of 5,181 from y −285 to −97, 0 faces on water; the rest below y −300 |
+
+  Lava above y −288 that is not a volcano's: 0 blocks in all six boxes. Lava touching water: 0 faces. The bodies are
+  block-for-block the same in both profiles.
+  - **What it means for a player** (`/deeptime probe magma`: 4,000 land points drawn evenly inside the pole cap). On
+    this planet 100 of the 123 active volcanoes stand on land and 16 hold a crater lake.
+
+    | From a random land point | p10 | median | p90 |
+    |---|---|---|---|
+    | to the nearest active volcano on land (lava six blocks under the plug in its crater) | 169 | 658 | 1,309 blocks |
+    | to the nearest open crater lava lake | 380 | 1,178 | 2,251 blocks |
+    | straight down to the lava floor (y −342) | 411 | 438 | 510 blocks |
+
+    Vanilla has lava within about 100 blocks of anywhere. That gap is the pending question above.
+- **Tests.**
+  - JUnit `MagmaTest` (8, cones in closed form, no planet): chamber, conduit and plug where the rule puts them; the most
+    active volcanoes get the lakes and the ring holds them; **every molten block's six neighbours belong to the body**
+    (only a lake's surface faces air); under or beside water no lake and a buried plug; chambers stay between the ground
+    and the lava floor; bodies across the seam; the settings and the list; what makes a lava feature.
+  - Rust `underground::tests` (3): only the volcanoes active at the present are listed.
+  - GameTest `magmaUnderActiveVolcanoes` (the level with caves and aquifers): up to four of the planet's bodies read
+    back block by block at the surface step: the molten blocks are lava, no lava outside a body above the lava-lake
+    zone, no lava face on water or on air except a lake's surface, the lake open to the sky. A planet without an active
+    volcano passes with a line saying so.
+  - GameTest `lavaFeaturesStayOut`: every placed feature is asked; vanilla's four are refused for the Deep Time level and
+    placed for any other; water springs, ores and trees are untouched; with Terralith, its four and the lava remover.
+  - `lavaStaysAtTheFloor`, `riversHold`, `carversSpareWater`: in the suites below.
+- **Gates** (VM, master merged in, tree 2e49b4d): `cargo fmt --check`, `clippy -D warnings`, `cargo deny` ok; `cargo test
+  --workspace` 533 passed, 0 failed, 3 ignored; `./gradlew build test` → tests=180 failures=0; `./gametest.sh` → All 62
+  required tests passed (544 s); `./gametest.sh -PwithMic` → All 62 required tests passed (the MIC set is a copy of the
+  workbench's, pack 790e116). In both, `magmaUnderActiveVolcanoes` read three shields of the test planet (a crater lake,
+  one under water, one on land): 43,075 / 42,881 / 43,051 molten blocks, all lava, `stray=0 wetFaces=0 airFaces=0`; with
+  MIC `lavaFeaturesStayOut` refused 14 of 932 placed features (vanilla's and Terralith's, the lava remover included).
+  After the carving-mask change the lake volcano was generated again (MIC): the only lava faces on air are the 29 of
+  the lake's surface (before it, a carver left 41 more at the chamber's side).
+- **Also seen, not changed.**
+  - **Baked summits are not bowls.** At every lake volcano the ground three to five blocks from the listed summit lies
+    1 to 11 blocks below it, and in the section through 12529 the cone's highest point stands beside the listed column.
+    So the lake sits in a pit the pass cuts, beside the peak, and a summit too sharp for that gets no lake (about 62 of
+    the 100 land volcanoes can hold one). The amplifier's crater and the catalogue's position should be compared at L3.
+  - Activity saturates at 1.0 for most arc volcanoes, so the lakes go to the lowest ids among them.
+  - 13 of the first 20 lakes stood within 160 blocks of the pole edge (an arc along the edge of the map) and 2 more
+    beyond the pole cap, which is why lakes now stop at the cap's line.
+- **Contradicts the plan:** nothing in the plan places lava; §7.1 keeps vanilla's aquifer and features.
+- **Next step.** Ben's answer to the lava question above.
 ### 2026-10-01 — Rock columns: grade rises downwards, no metamorphic or plutonic slivers; `deeptime strata-check` (agent worktree agent-a4c7bf65d55bc4810, branch worktree-agent-a4c7bf65d55bc4810, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Ask.** Ben, 2026-10-01 ("Investigate and fix"), on the workbench run `1a0f6e918c9` (`earthlike_quick_16k`, supercontinent,
   1000 Myr): at x −6901, z −128 schist lies on unmetamorphosed shale (and again deeper), gneiss is a 3-block sheet between
