@@ -80,8 +80,84 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 | 2026-10-01 | bake / P1-06 | **Terrain above the build limit.** Nothing bounds the terrain to the world's height: the test planet on x86 has 2.5 % of its land above y 639 (peaks to y 969), and two of four 16k 500-Myr runs peaked at 12.4 and 13.0 km against 11.5 km; the game cuts such ground flat at y 639. Options: **(1, recommended)** bound it where it arises and guarantee it at the end: the surface stage's elevation respects `tectonics.max_elevation_m` (the plate cap's taper applied to the offset's rises), the preset check requires that cap plus the amplifier's headroom to fit under `max_y`, and the amplifier compresses whatever is still above a knee smoothly into the headroom, so no seed can clip; (2) compress only at the amplifier (a smooth remap of everything above a knee into the range below `max_y`): the simulation and its keyframes keep 13–20 km mountains the world does not have; (3) scale the whole world's vertical relief so its highest peak fits: one peak flattens every landscape and moves ore depths; (4) a taller world (`max_y` 639 → 1023, +7.7 km): every chunk costs more and 20 km still clips; (5) leave it: flat-topped mountains at y 639, now counted by the bake. | Not asked yet: for the coordinator to put to Ben (build log 2026-10-01, x86_64 gates) |
+| 2026-10-01 | lava | **Where lava should be, beyond the fix** (build log 2026-10-01, "Lava floods"). The fix makes the generator's own lava vanilla's, measured from the world's floor: a lava floor in the lowest 10 blocks and lava cave lakes below about y −288. What is left above that is the pack's and vanilla's **lava-lake features** (80 to 140 blocks each, anywhere from deep caves to a mountain's flank: 3 in the coast box, 7 to 9 in the mountain box, standalone and MIC alike) and single-block lava springs. Options: **(1, recommended)** keep the fix as the default and take the random lava-lake features and springs out of Deep Time worlds (a biome modifier like `deeptime:claim_ores`, with a setting), then put lava back where the simulation says it belongs: crater lakes and shallow magma under the volcanoes the run marks active (101 in Ben's run), which needs the bake to write the active volcanoes for the game, so it is its own task; (2) keep the fix and leave the features alone: vanilla's amount of lava, a few small lakes per 256 × 256 blocks at any depth; (3) no lava from the generator at all (`underground.lava_floor_blocks` and `lava_lake_blocks` 0) until the volcano task exists; (4) a deeper or shallower lava zone (the two settings; each default is vanilla's distance from the floor). | Not asked yet: for the coordinator to put to Ben |
 
 ## Build log
+### 2026-10-01 — Lava floods: lava is measured from the world's floor, not from y 0 (agent worktree agent-a04fab824846efbfc, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Report.** Ben, 2026-10-01, from a workbench 3D preview of run `1a0f6e918c9` (earthlike_quick_16k, MIC profile) around
+  x −6901, z −128: a lava-filled wedge more than 100 blocks deep under a coastal valley, lava bodies all through the rock,
+  "a bunch of overlap between lava pools & the ocean". A second box (x −7801..−7546, z −209..46, a mountain) had 311,110
+  lava blocks.
+- **Cause.** Vanilla hard-codes two lava heights for a world whose floor is y −64, and Deep Time's floor is y −352.
+  - `NoiseBasedChunkGenerator.createFluidPicker` fills **every open block below y −54** with lava (floor + 10 in vanilla;
+    floor + 298 here). `Aquifer.computeSubstance` asks that picker first, before any aquifer, so it holds for caves and for
+    open sea alike.
+  - `Aquifer.computeFluidType` lets a cave lake whose surface is at **y −10 or lower** be lava (floor + 54 in vanilla).
+  - The plan (§7.1, the router table) keeps the aquifer functions "as vanilla, by reference" and never mentions the
+    picker. Tectonic patches the same constant for its own deeper worlds; the plan notes that patch does not fire for us.
+- **Evidence** (`tools/workbench/lava_stats.py` on the exports of Ben's own two preview jobs, MIC):
+  - Coast box: 2,152,868 lava blocks, 51,040 of 65,536 columns. Below y −54 the open space is 100 % lava (0 cave air);
+    above it 337 blocks. 4,020 sea columns have their water standing directly on lava, down to y −267: the "wedge" is a
+    submarine canyon whose water turns to lava at y −55 (screenshot `before-coast-section-z72.png`). 5,810 lava faces
+    touch water.
+  - Mountain box: 311,110 lava blocks (the workbench's own counter says the same), 100 % of the open space below y −54.
+  - Neither `WaterBodies` (it only fills air above the ground with water) nor the pack is involved: the pack's share is
+    a few lava-lake features (below).
+- **Fix** (the default; both rules are vanilla's, measured from the floor).
+  - `worldgen/LavaRules` (plain Java): the lava floor is `min_y + lava_floor_blocks` (10 → y −342); lava lakes only in
+    aquifer level cells centred at or below `min_y + lava_lake_blocks` (54 → cells centred at y −300 and −340, surfaces
+    up to about y −288); under a sea bed that reaches the lava floor the lava stays 8 blocks below the bed.
+  - `worldgen/LavaFluids`: Deep Time's global fluid picker. `GeologicChunkGenerator` puts it in the superclass's
+    `globalFluidPicker` field (one access-transformer line, `public-f`).
+  - `worldgen/density/LavaLakesDensity` (`deeptime:lava_lakes {min_y}`): the router's `lava` is now this 0/1 gate times
+    vanilla's `aquifer_lava` noise (`planet.json`, `planet_nocaves.json`, `tools/dev/gen_worldgen.py`, which reproduces
+    both files). The aquifer samples that function at cell coordinates (⌊x/64⌋, ⌊y/40⌋, ⌊z/64⌋), so the gate reads the
+    cell's y. A density function, not a mixin on the aquifer, because C2ME rewrites the aquifer.
+  - **Settings** (preset section `underground`, in all eight presets; editor section "Advanced · Caves and lava"):
+    `lava_floor_blocks` (10, "Lava floor height") and `lava_lake_blocks` (54, "Lava lakes up to"); 0 turns either off.
+    The bake records them in `notes.bake.underground.params`; the game reads them per level (`WorldDataTerrain.lava`).
+    FORMAT.md, "Lava".
+- **Measured after** (VM, `tools/workbench/preview.py run --profile … --world-data <the run's bake> --box … --box …`,
+  then `lava_stats.py`; screenshots and the censuses in `review/out/lava-diag/`).
+
+  | Box | Before (Ben's jobs, MIC) | After (MIC, another seed) |
+  |---|---|---|
+  | coast | 2,152,868 lava; 4,020 sea columns on lava; 5,810 lava–water faces | 8,267 lava (8,163 of them below y −300, the lava floor); 0; 0 |
+  | mountain | 311,110 lava | 568 lava (60 at the floor, the rest feature lakes) |
+
+  A preview's world seed is random, so the cave layout differs between those two. The same seed (`--seed 20261001`), with
+  the old levels brought back through the settings (a copy of the bake with `lava_floor_blocks` 298 and
+  `lava_lake_blocks` 342, i.e. y −54 and y −10; the sea-bed rule stays on):
+
+  | Box | Old levels, MIC | Default, MIC | Default, standalone |
+  |---|---|---|---|
+  | coast | 732,008 | 395 | 3,719 |
+  | mountain | 930,637 | 1,421 | 3,249 |
+
+  Lava by depth after the fix: nothing between y −250 and y −54 except single-block lava springs; lava-lake aquifers at
+  y −324..−307 (standalone: 3,586 and 1,017 blocks); the lava floor at y ≤ −343. Above y −54 only lava-lake
+  **features** remain, 80 to 140 blocks each: 3 in the coast box (y −24, 25, 35, under the sea bed), 7 to 9 in the
+  mountain box (y 51 to 156), in standalone and MIC alike. They are the open question above.
+- **Tests.**
+  - JUnit `LavaRulesTest` (7): the defaults are vanilla's heights from the floor, the sea-bed rule, the lake cells, the
+    reader, a baked world carries the settings. Rust `underground::tests` (2). `AdvancedSettingsTest` and the workbench
+    catalogue test know the ninth advanced section.
+  - GameTest `LavaGameTests.lavaStaysAtTheFloor` on the new level `deeptime:test_planet_caves` (the real test planet
+    with the full router, `deeptime:planet`; every other test level uses `planet_nocaves`, which is why nothing saw
+    this): chunks at the deepest sea, a sea about 150 blocks deep, a coast and high ground; no lava above y −288, no sea
+    column standing on lava, open space below the floor level is lava. GAMETEST_RESULTS
+- **Gates** (VM): `cargo fmt --check`, `clippy -D warnings`, `cargo test --workspace` (353 core + the rest, 0 failed),
+  `cargo deny` ok; `./gradlew build test` → tests=167 failures=0. GAMETEST_GATES
+- **Also seen, not changed.**
+  - The test planet's deepest sea bed is at y −399, below the world's floor (y −352): the sea there is water down to
+    bedrock level. It is the mirror of "terrain above the build limit" (pending question above).
+  - In the old worlds the flooded zone also held a few hundred thousand blocks of plain deepslate and blackstone per box
+    where the fixed worlds have open cave (crust 296,087 → 12,819 in the coast box): something reacting with the lava.
+    Not investigated; it is gone with the lava.
+- **Contradicts the plan:** §7.1's router table says `lava` is vanilla's function by reference; it is now gated, and the
+  fluid picker is Deep Time's.
+- **Next step.** Ben's answer to the lava question above. The MIC full GameTest suite is the coordinator's per-batch run;
+  the new level adds one more loaded dimension to it.
 ### 2026-10-01 — Workbench deposits overlay: coal fields and ore sites by family, hover, "why here" (agent worktree agent-aae4250c131f0cf7a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Ask.** Ben, 2026-10-01, "Deposits layer": draw coal fields and ore deposits by type on the map at every frame where the
   deposit stage has run (and the baked deposits at the end); one symbol and colour per family, coal as footprint areas; a legend
