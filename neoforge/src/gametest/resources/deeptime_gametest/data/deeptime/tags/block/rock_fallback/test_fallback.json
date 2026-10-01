@@ -2,7 +2,7 @@
   "replace": false,
   "values": [
     {"id": "deeptime_absent:no_such_block", "required": false},
-    "minecraft:stone",
+    "minecraft:air",
     "minecraft:polished_andesite",
     "minecraft:andesite"
   ]
