@@ -62,7 +62,9 @@ impl Grid {
         let dy = sy * k as f64;
         let dx = (0..h)
             .map(|j| {
-                let rows = (j * k..((j + 1) * k).min(fh)).map(|r| sx[r]).collect::<Vec<_>>();
+                let rows = (j * k..((j + 1) * k).min(fh))
+                    .map(|r| sx[r])
+                    .collect::<Vec<_>>();
                 let mean = rows.iter().sum::<f64>() / rows.len().max(1) as f64;
                 (mean * k as f64).max(0.25 * dy)
             })
@@ -238,10 +240,7 @@ impl State {
                 .collect();
             let active: Vec<bool> = (0..h)
                 .map(|j| {
-                    can_grow[j]
-                        || has[j]
-                        || (j > 0 && has[j - 1])
-                        || (j + 1 < h && has[j + 1])
+                    can_grow[j] || has[j] || (j > 0 && has[j - 1]) || (j + 1 < h && has[j + 1])
                 })
                 .collect();
             if !active.iter().any(|&a| a) {
@@ -250,7 +249,11 @@ impl State {
             // The surface: the ice's top, else the ground, else the sea.
             for c in 0..n {
                 let bed = f64::from(f.bed[c]) - depress[c];
-                s[c] = if thick[c] > 0.0 { bed + thick[c] } else { bed.max(0.0) };
+                s[c] = if thick[c] > 0.0 {
+                    bed + thick[c]
+                } else {
+                    bed.max(0.0)
+                };
             }
             // Diffusivity on the x faces (i + ½, j) and y faces (i, j + ½).
             let mut dmax = 0.0f64;
@@ -299,12 +302,18 @@ impl State {
                 }
             }
             // The elevation feedback (dH/dt ≈ β·H near the line) stays explicit-stable too.
-            let dt = if dmax > 0.0 { 0.2 * min_d2 / dmax } else { left }
-                .min(300.0)
-                .min(left);
+            let dt = if dmax > 0.0 {
+                0.2 * min_d2 / dmax
+            } else {
+                left
+            }
+            .min(300.0)
+            .min(left);
             let relax = 1.0 - (-dt / p.isostasy_years.max(1.0)).exp();
             // The update: flux divergence (face fluxes −D ∂s/∂n per unit length) and the balance.
-            let qx = |c: usize, j: usize, i: i64| -> f64 { -dfx[c] * (s[at(i + 1, j)] - s[c]) / g.dx[j] };
+            let qx = |c: usize, j: usize, i: i64| -> f64 {
+                -dfx[c] * (s[at(i + 1, j)] - s[c]) / g.dx[j]
+            };
             let qy = |c: usize, j: usize, i: i64| -> f64 {
                 if j + 1 >= h {
                     0.0
@@ -313,15 +322,27 @@ impl State {
                 }
             };
             let mut new = thick.clone();
-            for j in 0..h {
-                if !active[j] {
+            for (j, &on) in active.iter().enumerate().take(h) {
+                if !on {
                     continue;
                 }
-                let len_n = if j + 1 < h { 0.5 * (g.dx[j] + g.dx[j + 1]) } else { 0.0 };
-                let len_s = if j > 0 { 0.5 * (g.dx[j] + g.dx[j - 1]) } else { 0.0 };
+                let len_n = if j + 1 < h {
+                    0.5 * (g.dx[j] + g.dx[j + 1])
+                } else {
+                    0.0
+                };
+                let len_s = if j > 0 {
+                    0.5 * (g.dx[j] + g.dx[j - 1])
+                } else {
+                    0.0
+                };
                 for i in 0..w as i64 {
                     let c = at(i, j);
-                    let q_s = if j > 0 { qy(at(i, j - 1), j - 1, i) } else { 0.0 };
+                    let q_s = if j > 0 {
+                        qy(at(i, j - 1), j - 1, i)
+                    } else {
+                        0.0
+                    };
                     let div = (qx(c, j, i) - qx(at(i - 1, j), j, i - 1)) / g.dx[j]
                         + (qy(c, j, i) * len_n - q_s * len_s) / (g.dx[j] * g.dy);
                     let above = s[c] - f64::from(f.ela[c]);
@@ -377,7 +398,11 @@ mod tests {
         let bed: Vec<f32> = (0..fw * fh)
             .map(|c| {
                 let (i, j) = ((c % fw) as i64 - 32, (c / fw) as i64 - 16);
-                if i.abs() < 10 && j.abs() < 10 { 200.0 } else { -3000.0 }
+                if i.abs() < 10 && j.abs() < 10 {
+                    200.0
+                } else {
+                    -3000.0
+                }
             })
             .collect();
         (g, bed, vec![ela; fw * fh], vec![1.0; fw * fh])
@@ -389,11 +414,18 @@ mod tests {
         // elevation feedback), domes up and flows to the coast.
         let (g, bed, ela, precip) = continent(100.0);
         let mut st = State::default();
-        let f = Forcing { bed: &bed, ela: &ela, precip: &precip };
+        let f = Forcing {
+            bed: &bed,
+            ela: &ela,
+            precip: &precip,
+        };
         st.step(&g, &f, &params(), 60_000.0);
         let centre = st.thick[16 * 64 + 32];
         let edge = st.thick[16 * 64 + 41];
-        assert!(centre > 1500.0 && centre > 1.5 * edge, "centre {centre}, edge {edge}");
+        assert!(
+            centre > 1500.0 && centre > 1.5 * edge,
+            "centre {centre}, edge {edge}"
+        );
         assert!(st.thick[0] == 0.0, "no ice on the open sea");
         assert!(st.depress[16 * 64 + 32] > 0.2 * centre * 0.9 * (RHO_ICE / RHO_MANTLE) as f32);
         // Without a mass balance the flow alone conserves the ice: a dome on land everywhere.
@@ -409,7 +441,11 @@ mod tests {
         let mut st2 = State::settled(dome);
         let v0 = st2.volume_m3(&g2);
         let high = vec![1.0e6f32; fw * fh];
-        let f0 = Forcing { bed: &land, ela: &high, precip: &vec![0.0; fw * fh] };
+        let f0 = Forcing {
+            bed: &land,
+            ela: &high,
+            precip: &vec![0.0; fw * fh],
+        };
         let mut p0 = params();
         p0.beta_abl = 0.0;
         st2.step(&g2, &f0, &p0, 5000.0);
@@ -423,13 +459,21 @@ mod tests {
     fn a_warm_line_melts_the_sheet_and_the_same_line_keeps_a_sheet_it_did_not_grow() {
         // The line at 300 m, above the 200-m continent: no ice grows from nothing …
         let (g, bed, ela, precip) = continent(300.0);
-        let f = Forcing { bed: &bed, ela: &ela, precip: &precip };
+        let f = Forcing {
+            bed: &bed,
+            ela: &ela,
+            precip: &precip,
+        };
         let mut bare = State::default();
         bare.step(&g, &f, &params(), 30_000.0);
         assert!(bare.thick.iter().all(|&x| x == 0.0));
         // … but a thick sheet, its surface high above the line, survives it (hysteresis).
         let (_, _, ela_cold, _) = continent(100.0);
-        let fc = Forcing { bed: &bed, ela: &ela_cold, precip: &precip };
+        let fc = Forcing {
+            bed: &bed,
+            ela: &ela_cold,
+            precip: &precip,
+        };
         let mut big = State::default();
         big.step(&g, &fc, &params(), 60_000.0);
         let v = big.volume_m3(&g);
@@ -437,7 +481,11 @@ mod tests {
         assert!(big.volume_m3(&g) > 0.5 * v, "the sheet held its height");
         // A line far above it melts it.
         let (_, _, ela_hot, _) = continent(4000.0);
-        let fh = Forcing { bed: &bed, ela: &ela_hot, precip: &precip };
+        let fh = Forcing {
+            bed: &bed,
+            ela: &ela_hot,
+            precip: &precip,
+        };
         big.step(&g, &fh, &params(), 20_000.0);
         assert!(big.volume_m3(&g) < 0.05 * v);
     }

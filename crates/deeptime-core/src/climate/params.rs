@@ -523,9 +523,24 @@ impl ClimateParams {
                 0.0,
                 1.0,
             ),
-            (self.weathering_rock_mol_kg, "weathering_rock_mol_kg", 0.01, 10.0),
-            (self.weathering_supply_scale, "weathering_supply_scale", 0.01, 100.0),
-            (self.seafloor_weathering_share, "seafloor_weathering_share", 0.0, 0.9),
+            (
+                self.weathering_rock_mol_kg,
+                "weathering_rock_mol_kg",
+                0.01,
+                10.0,
+            ),
+            (
+                self.weathering_supply_scale,
+                "weathering_supply_scale",
+                0.01,
+                100.0,
+            ),
+            (
+                self.seafloor_weathering_share,
+                "seafloor_weathering_share",
+                0.0,
+                0.9,
+            ),
             (
                 self.weathering_min_denudation_m_myr,
                 "weathering_min_denudation_m_myr",
@@ -565,7 +580,12 @@ impl ClimateParams {
                 0.0,
                 0.1,
             ),
-            (self.ice_ablation_gradient, "ice_ablation_gradient", 0.0, 0.1),
+            (
+                self.ice_ablation_gradient,
+                "ice_ablation_gradient",
+                0.0,
+                0.1,
+            ),
             (
                 self.ice_accumulation_max_m_yr,
                 "ice_accumulation_max_m_yr",
