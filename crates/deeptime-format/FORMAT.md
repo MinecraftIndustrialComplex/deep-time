@@ -402,6 +402,12 @@ within the tile, `cell_bytes` each, so its decoded size is `tw · th · cell_byt
 - `tongue_band_keys`, `tongue_minor_share` (optional, only for `horizon_stack`): the column rule's
   band B and minor share m (below); absent: B = 64, m = 0.15. A baked run writes the preset's
   (`structure.strata_tongue_scale` × 64, rounded; `structure.strata_minor_share`).
+- `min_blocks` (optional, only for `horizon_stack`): per class index, the least thickness in blocks
+  of a horizon of that class inside a column (the column rule's step 5); absent, or 0 or 1 for a
+  class: none. A baked run writes 8 for the regional-metamorphic classes (slate, phyllite, schist,
+  gneiss, quartzite, marble, greenstone, amphibolite), 16 for the plutonic ones (granite,
+  granodiorite, diorite, gabbro, anorthosite) and 1 for the rest. Worlds written before
+  2026-10-01 lack it and read as before.
 - Unknown fields must be ignored by readers.
 
 ### `horizon_stack` cells (plan §5.7.4)
@@ -481,12 +487,20 @@ last); across a gap or past the last span, the next top (min_y). For block (x, z
 4. Emitting (top, class, unit): t = ⌊top⌋, at most the last emitted top; if it equals the last
    emitted top, that horizon (left with no block) is removed; then if the last emitted horizon has
    the same class, nothing is added, else (t, class, unit) is appended.
+5. Slivers, where the layer has `min_blocks` (N_c for class c; 1 for a class past its end): with
+   the emitted horizons h = 0 … n − 1 (tops T_h), the first is kept; then for h = 1 … n − 1 in
+   order: if h < n − 1 and N_class(h) > 1 and T_h − T_{h+1} < N_class(h), horizon h is removed;
+   else if its class is the class of the last horizon kept, it is removed (it continues that
+   one); else it is kept. The horizon above a removed one reaches down in its place. (The
+   thickness test uses the tops as emitted in step 4, whatever was removed above.)
 
 The result is continuous across cell edges (a cell whose weight is zero changes nothing), a bed
 present in every cell has smoothly interpolated top and base, a bed some cells lack thins out
 towards them, and a facies change (cells disagreeing about the rock of the same keys) becomes
 tongues of the two classes, each thinning towards the cells that lack it, on a band grid of the
-keys that every column shares (so the tongues follow the bedding).
+keys that every column shares (so the tongues follow the bedding). With `min_blocks`, a unit of a
+named class that ends sideways ends at a step of that many blocks instead of thinning to a sheet
+one block thick; a class the layer does not name still thins out continuously.
 
 **The P1-07 bake** (`deeptime_core::structure::bake_horizons`) makes stacks with these properties:
 the first horizon's top is the cell's surface (y = sea_level_y + (h − sea level)/m_per_block_v,
