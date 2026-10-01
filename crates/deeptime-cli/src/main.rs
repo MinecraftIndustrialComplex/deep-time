@@ -6,6 +6,7 @@ mod amplify_view;
 mod climate_dem;
 mod dump;
 mod heightmap;
+mod hydro;
 mod margins_view;
 mod parity;
 mod provinces;
@@ -314,6 +315,16 @@ enum Command {
         #[arg(long, default_value_t = parity::DEFAULT_SEED)]
         seed: u64,
     },
+    /// Re-run the bake's water part (P1-22: lakes, `water_level`, the river network) on a baked
+    /// world-data folder with its own preset and `--set hydro.KEY=VALUE` overrides (tuning).
+    Hydro {
+        /// World-data folder a planet run baked.
+        #[arg(long)]
+        world_data: PathBuf,
+        /// Sets a preset value first, `--set hydro.width_coef=1.5` (repeatable).
+        #[arg(long = "set", value_name = "PATH=VALUE")]
+        set: Vec<String>,
+    },
     /// Review pictures of a run's volcanoes (P1-21): the finished terrain with them marked, the
     /// settings that made them, and close views before and after the amplifier's shaping.
     VolcanoView {
@@ -461,7 +472,7 @@ impl CommonArgs {
 enum StrataArg {
     /// Three horizons: sandstone, red beds from 6 blocks down, granite from 40 (P0-09).
     Placeholder,
-    /// All 59 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
+    /// All 60 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
     /// columns hold every class 20 or more blocks below the surface (P1-12's GameTests).
     EveryClass,
     /// A readable sedimentary basin, the same in every cell: eight beds over granite from 165
@@ -739,6 +750,22 @@ fn main() -> ExitCode {
                 }
                 Err(e) => {
                     eprintln!("deeptime parity: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        Some(Command::Hydro { world_data, set }) => {
+            let started = std::time::Instant::now();
+            match hydro::run(&world_data, &set) {
+                Ok(line) => {
+                    println!(
+                        "deeptime hydro: {line} in {:.2}s",
+                        started.elapsed().as_secs_f64()
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime hydro: {e}");
                     ExitCode::FAILURE
                 }
             }
@@ -1026,11 +1053,11 @@ fn landforms_at(
     let mut hits: Vec<(f64, serde_json::Value)> = log
         .events()
         .iter()
-        .filter(|e| e.source == deeptime_core::surface::volcanoes::SOURCE)
+        .filter(|e| {
+            e.source == deeptime_core::surface::volcanoes::SOURCE
+                || e.params.contains_key("volcano_cones")
+        })
         .filter_map(|e| {
-            let Place::Point { lat: la, lon: lo } = e.place else {
-                return None;
-            };
             let dist = |la: f64, lo: f64| {
                 let mut dlon = (lon - lo).rem_euclid(360.0);
                 if dlon > 180.0 {
@@ -1040,8 +1067,12 @@ fn landforms_at(
                 let dz = (lat - la) / 360.0 * c * km_per_block;
                 dx.hypot(dz)
             };
-            // An arc segment or a hotspot chain holds the column when one of its cones does.
-            if let Some(ParamValue::Str(cones)) = e.params.get("cones") {
+            // An arc segment or a hotspot chain holds the column when one of its cones does (a
+            // small segment's cones are listed on its subduction onset, `volcano_cones`, wherever
+            // that event is placed).
+            if let Some(ParamValue::Str(cones)) =
+                e.params.get("cones").or(e.params.get("volcano_cones"))
+            {
                 let d = cones
                     .split(';')
                     .filter_map(|cone| {
@@ -1061,7 +1092,11 @@ fn landforms_at(
                     .map(|x| x.to_json())
                     .collect();
                 let mut ev = e.to_json();
-                ev["params"]["cones"] = serde_json::json!("…");
+                for k in ["cones", "volcano_cones"] {
+                    if ev["params"].get(k).is_some() {
+                        ev["params"][k] = serde_json::json!("…");
+                    }
+                }
                 return Some((
                     d + 1.0e-3,
                     serde_json::json!({
@@ -1071,6 +1106,9 @@ fn landforms_at(
                     }),
                 ));
             }
+            let Place::Point { lat: la, lon: lo } = e.place else {
+                return None;
+            };
             let d = dist(f64::from(la), f64::from(lo));
             let reach = match num(e, "area_km2") {
                 Some(a) => (a / std::f64::consts::PI).sqrt(),
@@ -1100,6 +1138,39 @@ fn landforms_at(
 #[cfg(test)]
 mod tests {
     use clap::CommandFactory;
+
+    #[test]
+    fn why_here_finds_a_small_arc_segments_cone_on_its_subduction_onset() {
+        use deeptime_core::session::GEOLOGY_WRITER_NAME;
+        use deeptime_format::{
+            Event, EventId, EventLog, EventWriter, GEOLOGY_WRITER, ParamValue, Place,
+        };
+        let dir = std::env::temp_dir().join(format!("deeptime-landforms-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // The onset sits at the contact's centroid, far from the cone it fed.
+        let mut onset = Event::new(
+            EventId::new(GEOLOGY_WRITER, 1),
+            -40.0e6,
+            "deeptime:subduction_onset",
+            "deeptime:plates",
+        );
+        onset.place = Place::Point { lat: 0.0, lon: 0.0 };
+        onset.params.insert(
+            "volcano_cones".into(),
+            ParamValue::Str("10.000,20.000,20.0,2500".into()),
+        );
+        let mut w = EventWriter::open(&dir, GEOLOGY_WRITER, GEOLOGY_WRITER_NAME).unwrap();
+        w.append(&[onset]).unwrap();
+        let log = EventLog::load(&dir).unwrap();
+        let scale = deeptime_format::Scale::default_for(16_384);
+        let hits = super::landforms_at(&log, 10.0, 20.05, &scale);
+        assert_eq!(hits.len(), 1, "{hits:?}");
+        assert_eq!(hits[0]["event"]["kind"], "deeptime:subduction_onset");
+        assert_eq!(hits[0]["event"]["params"]["volcano_cones"], "…");
+        assert!(super::landforms_at(&log, 0.0, 0.0, &scale).is_empty());
+        std::fs::remove_dir_all(&dir).ok();
+    }
 
     #[test]
     fn version_nonempty() {

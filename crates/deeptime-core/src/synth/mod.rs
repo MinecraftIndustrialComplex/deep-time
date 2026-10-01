@@ -43,7 +43,7 @@ pub const STRATA_CLASSES: [&str; 3] = ["sandstone", "red_bed", "granite"];
 /// (`/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md`). The
 /// definitions are Deep Time's `rock_class` data (`neoforge/src/main/resources/data/deeptime/
 /// deeptime/rock_class/`); a unit test keeps the two lists equal.
-pub const EVERY_CLASS: [&str; 59] = [
+pub const EVERY_CLASS: [&str; 60] = [
     "granite",
     "granodiorite",
     "diorite",
@@ -58,6 +58,7 @@ pub const EVERY_CLASS: [&str; 59] = [
     "scoria",
     "pumice",
     "conglomerate",
+    "diamictite",
     "sandstone",
     "red_bed",
     "mudstone",
@@ -115,7 +116,7 @@ pub enum Strata {
     /// blocks down to the bottom of the world (P0-09).
     Placeholder,
     /// Every rock class (P1-12): eight horizons 10 blocks apart from the surface down; horizon
-    /// h of L1 cell column i has class (6·i + h) mod 59 of [`EVERY_CLASS`], so any ten
+    /// h of L1 cell column i has class (6·i + h) mod 60 of [`EVERY_CLASS`], so any ten
     /// neighbouring cell columns hold every class at h ≥ 2 (20 blocks or more below the surface,
     /// under whatever the surface rules paint). The last horizon reaches down to min_y.
     EveryClass,
@@ -498,7 +499,7 @@ fn strata_notes(kind: Strata) -> Value {
             "kind": kind.name(),
             "grid": "L1",
             "horizons": "8 per cell; horizon h's top is the surface (the L3 elevation at the cell's block) − 10·h blocks; the last reaches down to min_y",
-            "class_rule": "horizon h of L1 cell column i has class index (6·i + h) mod 59, so any ten neighbouring cell columns hold every class at h ≥ 2"
+            "class_rule": "horizon h of L1 cell column i has class index (6·i + h) mod 60, so any ten neighbouring cell columns hold every class at h ≥ 2"
         }),
         Strata::Basin => json!({
             "placeholder": true,

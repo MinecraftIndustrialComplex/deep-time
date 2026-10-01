@@ -17,30 +17,7 @@ public final class WaterLevels {
      * that of the nearest wet cell within {@code reach} blocks (the shore rule, see {@link WaterPass}).
      */
     public static double levelAt(RasterSampler levels, int x, int z, int reach) {
-        double own = levels.nearest(x, z);   // x wraps in the sampler
-        if (!Double.isNaN(own) || reach <= 0)
-            return own;
-        GridDesc g = levels.desc().grid();
-        int r = g.r();
-        long i0 = Math.floorDiv(x - reach - g.originBlockX(), r), i1 = Math.floorDiv(x + reach - g.originBlockX(), r) + 1;
-        long j0 = Math.floorDiv(z - reach - g.originBlockZ(), r), j1 = Math.floorDiv(z + reach - g.originBlockZ(), r) + 1;
-        double best = Double.NaN;
-        long bestD2 = (long) reach * reach + 1;
-        for (long i = i0; i <= i1; i++) {
-            long dx = g.originBlockX() + i * r - x;
-            for (long j = j0; j <= j1; j++) {
-                long dz = g.originBlockZ() + j * r - z;
-                long d2 = dx * dx + dz * dz;
-                if (d2 >= bestD2)
-                    continue;
-                double v = levels.get(i, j);
-                if (!Double.isNaN(v)) {
-                    best = v;
-                    bestD2 = d2;
-                }
-            }
-        }
-        return best;
+        return com.minecraftindustrialcomplex.deeptime.worlddata.Water.levelAt(levels, x, z, reach);
     }
 
     /** Whether any cell whose block position lies in the box [x0, x1] × [z0, z1] (or next to it) is wet. */

@@ -398,7 +398,13 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
             }
             kind::STRATOVOLCANO => {
                 strato_events += 1;
-                assert_eq!(cause.as_deref(), Some(kind::ARC));
+                assert!(
+                    matches!(
+                        cause.as_deref(),
+                        Some(kind::ARC | "deeptime:subduction_onset")
+                    ),
+                    "{cause:?}"
+                );
             }
             kind::SHIELD | kind::CALDERA_COMPLEX => {
                 assert_eq!(cause.as_deref(), Some(kind::HOTSPOT_CHAIN));
@@ -408,11 +414,34 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         }
     }
     assert!(arcs > 0 && chains_n > 0 && strato_events > 0);
-    assert_eq!(arcs, st.arcs.len(), "one event per arc segment");
+    // One event per arc segment, but small segments with an onset are counts on it.
+    let small = st
+        .arcs
+        .values()
+        .filter(|g| {
+            g.born < SMALL_SEGMENT
+                && g.cause
+                    .is_some_and(|c| world.events.iter().any(|e| e.id == c))
+        })
+        .count();
+    assert_eq!(
+        arcs + small,
+        st.arcs.len(),
+        "one event per segment or a count on its onset"
+    );
+    assert_eq!(st.counts.small_arc_segments as usize, small);
     assert!(
-        strato_events <= arcs,
+        strato_events <= st.arcs.len(),
         "at most one notable cone per segment"
     );
+    if small > 0 {
+        let counted = world
+            .events
+            .iter()
+            .filter(|e| matches!(e.params.get("volcano_cones_built"), Some(ParamValue::Int(n)) if *n > 0))
+            .count();
+        assert!(counted > 0, "small segments counted on their onsets");
+    }
 
     // The strata log holds the volcanic rock.
     let log = &world.surface.as_ref().unwrap().log;

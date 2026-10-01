@@ -313,7 +313,7 @@ fn rock_tint(k: f32, pal: &Palette) -> Option<[f32; 3]> {
         "limestone" | "dolostone" | "chalk" | "chert" | "travertine" | "marble" | "carbonatite"
         | "phosphorite" => [214.0, 204.0, 180.0],
         "halite" | "gypsum" | "anhydrite" => pal.get(SALT),
-        "schist" | "gneiss" | "hornfels" | "skarn" => [150.0, 138.0, 120.0],
+        "schist" | "gneiss" | "hornfels" | "skarn" | "diamictite" => [150.0, 138.0, 120.0],
         // Mudrocks, slate, soils, till, coal.
         _ => [140.0, 124.0, 102.0],
     })

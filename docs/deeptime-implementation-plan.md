@@ -113,8 +113,9 @@ they are until P0-01; afterwards use the §1.2 table.
 11. `tectonics_engines.md` (plates, Noddy), `surface_processes_climate.md` (erosion, climate,
     hydrology), `ore_genesis_modeling.md` (deposits, sizing, schema), `runtime_packaging_options.md`
     (natives, determinism, servers), `player_demand_prior_art.md` (market context only).
-12. `/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md` — the 59 rock
-    classes, the tag vocabulary and the `rock_states` format.
+12. `/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md` — the rock
+    classes (59 there; Deep Time ships 60 since `diamictite`, decisions log 2026-09-30), the tag
+    vocabulary and the `rock_states` format.
 
 Items 6–9 and 11 are research notes, in `/home/greencheetah/Projects/mic/Docs/research_notes/Geologic
 history worldgen mod/` until P0-01 and in `docs/research/notes/` after it.
@@ -131,7 +132,7 @@ history worldgen mod/` until P0-01 and in `docs/research/notes/` after it.
 | **Staging** | `<gamedir>/deeptime/staging/<session-uuid>/`, where the Create World screen writes world data before the world folder exists (§7.12). |
 | **Event log** | The shared, append-only record of what happened, where, when and why (§5.5). Feeds the timelapse, "Why here?" and a later legends view; the civ module appends to it. |
 | **Site / site registry** | A site is one fixed-by-generation resource location (deposit, reservoir, placer) with extent, grade, type and forming event. The registry is the list plus a spatial index and a Java API (§5.6). |
-| **Rock class** | One of the 59 lithologies in the rock-tag vocabulary, e.g. `granodiorite`, `black_shale`. The simulation decides classes; tags decide blocks (§5.4). |
+| **Rock class** | One of the 60 lithologies in the rock-tag vocabulary (`diamictite`, lithified till, joined on 2026-09-30), e.g. `granodiorite`, `black_shale`. The simulation decides classes; tags decide blocks (§5.4). |
 | **Rock group** | A union tag of classes, e.g. `deeptime:rock/carbonate`. |
 | **Stand-in / fallback** | A look-alike block used when a class has no member block: the first *installed* entry of `deeptime:rock_fallback/<class>` (never a random one). |
 | **Unclassified crust** | `minecraft:stone` and `minecraft:deepslate`, used where the simulation has no lithology opinion. Not a class. |
@@ -814,7 +815,7 @@ every layer is a tile pack (§5.7.3).
 | Layer | Grid | Type | Meaning | Phase |
 |---|---|---|---|---|
 | `elevation` | L3 | i16, 1/16 block | terrain surface height (y) | 0 |
-| `water_level` | L3 | i16, 1/16 block; nodata = none | lake/river water surface above sea level | 0 (test), 2 |
+| `water_level` | L3 | i16, 1/16 block; nodata = none | lake water surface above sea level (rivers: `rivers/rivers.dtrv`, P1-22) | 0 (test), 1 (P1-22) |
 | `climate/{temperature,vegetation,continentalness,erosion,weirdness}` | L2 (half L1's cell size) | i16, vanilla parameter ×10,000 | the five 2D biome inputs after the §7.2 mapping | 1 |
 | `climate/{t_mean_c,p_mm,koppen}` | L1 | i16 / u16 / u8 | physical climate, for maps and rules | 1 |
 | `surface/regolith_blocks` | L2 | u8 | soil/regolith thickness | 1 |
@@ -861,7 +862,8 @@ serialises the registries' contents through their codecs into one JSON document 
 }
 ```
 
-Deep Time ships definitions for all 59 classes of the vocabulary in
+Deep Time ships definitions for all 60 classes of the vocabulary (59, plus `diamictite` for lithified
+till: decisions log 2026-09-30) in
 `/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md` in its own jar
 (`neoforge/src/main/resources/data/deeptime/deeptime/rock_class/`). The numeric properties are
 relative multipliers the erosion and structure stages consume; their values are tuning parameters
@@ -1702,6 +1704,16 @@ least one noise cell beyond the last wet cell. (P0-13: the ice comes from vanill
 `freeze_top_layer` feature, which every overworld biome runs after this pass.) Carvers run after this pass and can open caves under a lake; that drains into caves the way
 vanilla lakes do and is accepted.
 
+*As built (P1-22):* the pass is `worldgen/WaterBodies` (`WaterPass` delegates to it). Instead of
+relying on the rim, it decides every column from (x, z) alone (FORMAT.md "Water columns": the
+generated surface is H bilinear over the noise-cell corners) — lake, sea, river or bank — and makes
+the column match: rivers cut or filled to their bed, lakes filled from their top to the ground,
+banks raised to the neighbouring water's top (+1 beside rivers) and sealed, so the rim holds by
+construction; the flowing and falling water a step or waterfall would spread is placed at
+generation, so the water is at rest. Sea columns the aquifer leaves dry below sea level (coastal
+flats) are topped up with sea water. Carvers and noise caves still cut under the water, as above
+(Ben, log 2026-09-30, "Allow caves under water").
+
 ### 7.10 Toroidal World: the cylinder shape
 
 - **Dependency.** Toroidal World 0.19.3 (MIT, NeoForge 1.21.1). It has no published Maven artifact
@@ -2324,6 +2336,31 @@ erodibility knickpoints. Baked outputs: `water_level` (L3), `rivers/segments.dtb
 width, depth, discharge; widths × `feature_scale.rivers`), and channel incision burned into
 `elevation`. Cost: 1–4 M cells gives about 1–6 s per solve by linear scaling of Cordonnier 2019's
 16,384² figure (`surface_processes_climate.md` §6).
+
+*As built (P1-22, 2026-09-29; moved into Phase 1 by Ben's "Rivers & lakes in v1"):* `core::hydro`
+(`hydro/{mod, network, tests}.rs`) runs in the bake (`bake/water.rs`, after the climate part) on the
+L3 terrain itself (2 blocks a cell; 32k full's 134 M cells are averaged 2 × 2 first), not on L2:
+the open sea (height ≤ sea level − 1 block, a body ≥ 5,000 km²); Priority-Flood with the pit queue
+(Barnes et al. 2014, from the paper, as `surface::pflood`), the map's first and last rows (past the
+pole caps) draining as outlets; receivers the steepest strictly lower neighbour on the filled
+surface, across a flat the drainage mask of Barnes, Lehman & Mulla 2014 (towards the flat's outlets
+and away from higher ground, so a coastal plain carries one channel, not parallel rays), else the
+cell the flood came from; **lakes** = depressions ≥
+`hydro.lake_min_area_km2` and ≥ `lake_min_depth_blocks` deep, **always full to their spill level**
+(the P2 exit test holds by construction), passing on inflow less surface evaporation
+(`lake_evaporation`; an evaporation-limited level below the rim is Fill–Spill–Merge's partial fill,
+left for P2-03, and those lakes are only flagged `endorheic`); discharge from the climate's runoff
+(Fu's Budyko curve, as the surface stage); river cells ≥ `river_min_discharge_m3s` from ≥
+`river_min_area_km2`; chains cut at confluences; water surface F − `freeboard_blocks`, never below
+the sea or lake downstream; width `width_coef·Q^0.5·feature_scale.rivers`, depth `depth_coef·Q^0.4`
+(Leopold & Maddock's exponents; the coefficients are the block world's, not the research's, and are
+settings); vertices Gaussian-smoothed. Written: `water_level` (lake surfaces) and
+`rivers/rivers.dtrv` (polylines with w, hw, depth, Q and a tile index; FORMAT.md "Rivers"), **not**
+`rivers/segments.dtb`, and **no incision is burned into `elevation`**: the channel is carved at block
+scale by the game (`worldgen/WaterBodies`) from a per-column rule both sides implement
+(`deeptime_format::water`, Java `worlddata/Water`, FORMAT.md "Water columns"), because a 1–2 block
+stream cannot survive the density's 4-block noise-cell interpolation. HAND floodplains and
+knickpoint waterfalls stay P2-03 (steps in the water surface already fall as vanilla waterfalls).
 
 ### 8.5 3D structure, Noddy-style — `core::structure` (Phase 1 simple, Phase 2 full)
 
@@ -3705,6 +3742,13 @@ on this machine.
 - **Goal.** The core of §8.4 hydrology in v1 (Ben, decisions log 2026-09-29): river networks from the
   simulation's routing carved into the terrain at block scale, lakes that fill and spill
   (`water_level` for real), river biomes; waterfalls, deltas and floodplain detail may stay in P2-03.
+- *As built (2026-09-29):* §8.4's "As built"; FORMAT.md "Rivers" and "Water columns"; the preset
+  section `hydro` (14 settings, editor section Advanced · Rivers and lakes, plus the "Rivers and
+  lakes" toggle and `scale.feature_scale.rivers`); `deeptime hydro --world-data` re-runs the water
+  part on a baked folder; `deeptime-inspect rivers` (maps) and `water-check` (floating and leaking
+  water in generated chunks); GameTests `RiverGameTests.riversHold` (level `deeptime:test_rivers`) and
+  `riverBiomes`; river biomes by putting wide channels in the weirdness valley slice. STATUS.md's
+  build log has the numbers.
 
 #### P1-23 Grid-artifact audit (2026-09-29)
 - **Goal.** Sweep real worlds (sections, top-downs, 3D previews) for grid artifacts: staircase coasts,
@@ -3741,6 +3785,16 @@ on this machine.
   ice-sheet branch lands (same code).
 - **Check.** Set out in the design doc (Earth-topography comparison, Köppen shares, energy balance,
   run-time budget, downstream recalibration).
+- **Design** (2026-09-30, awaiting Ben's approval): `docs/design/p1-26-per-cell-climate.md`. It
+  covers:
+  - the current banding measured, with a prototype on Earth's relief;
+  - a seasonal 2-D EBM on a 128 × 64 climate grid with land and sea tiles, per-cell sea ice,
+    Stommel gyres and an overturning conveyor;
+  - a monthly moisture budget behind `climate.rain_model`, with today's belts as the first
+    default;
+  - a 1-D clock flux-corrected to the 2-D zonal means;
+  - an unchanged world format and climate API;
+  - tasks T1–T11 and open questions Q1–Q11.
 
 #### P1-27 Plate margins and coherent continents (2026-09-30)
 - **Goal.** (1) Margins: in a 750-Myr earthlike_quick_16k run nearly every continental coast became
@@ -3782,7 +3836,10 @@ on this machine.
 - **P2-02 Metamorphic grade** from restored burial and heat; facies table (hand-built from textbook
   facies boundaries, or generated offline — see Q8).
 - **P2-03 Hydrology** (§8.4; its core moved to P1-22 on 2026-09-29, the rest stays here): routing, Fill–Spill–Merge lakes, HAND floodplains, river vectors,
-  channel carving, waterfalls, deltas; `water_level` for real.
+  channel carving, waterfalls, deltas; `water_level` for real. *Left after P1-22:* evaporation-limited
+  lake levels below the rim (Fill–Spill–Merge's partial fills; P1-22 keeps every lake full and flags
+  the `endorheic` ones), HAND floodplains, deltas and braided mouths, meanders beyond the smoothing,
+  knickpoint waterfalls from erodibility, and incision burned into `elevation` for the far terrain.
 - **P2-04 Geology-driven caves.** Karst in carbonates (port of `aparis69/Karst-Synthesis`, MIT) and
   cave density modulated by lithology and water table, with vanilla cave functions kept as the
   baseline so every region stays playable; a connectivity metric per region.

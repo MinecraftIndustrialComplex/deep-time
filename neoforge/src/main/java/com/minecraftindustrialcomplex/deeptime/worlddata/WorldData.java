@@ -39,6 +39,9 @@ public final class WorldData {
     private volatile Deposits deposits;
     /** {@code strata/classes.json}, read on first use. */
     private volatile List<String> classes;
+    /** {@code rivers/rivers.dtrv} (P1-22), read on first use; {@link #NO_RIVERS} when absent. */
+    private volatile Object rivers;
+    private static final Object NO_RIVERS = new Object();
     /** The ice cover, resolved on first use. */
     private volatile Optional<IceCover> iceCover;
 
@@ -115,6 +118,21 @@ public final class WorldData {
             }
         }
         return d;
+    }
+
+    /** The river network (P1-22), read and checked on first use; null for a world without one. */
+    public Rivers rivers() {
+        Object r = rivers;
+        if (r == null) {
+            synchronized (this) {
+                if (rivers == null) {
+                    Rivers read = Rivers.read(folder);
+                    rivers = read == null ? NO_RIVERS : read;
+                }
+                r = rivers;
+            }
+        }
+        return r == NO_RIVERS ? null : (Rivers) r;
     }
 
     /** {@code strata/classes.json}: class index → rock class id (read once). */

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""Generate Deep Time's 59 rock-class definitions (plan §5.4.1) from the table below.
+"""Generate Deep Time's 60 rock-class definitions (plan §5.4.1) from the table below.
 
     tools/dev/gen_rock_classes.py [<output dir>]
 
@@ -61,7 +61,7 @@ GROUPS = (
     ("volcanic", "rhyolite andesite basalt tuff obsidian scoria pumice"),
     ("special", "kimberlite carbonatite pegmatite greisen"),
     ("igneous", "#intrusive #volcanic kimberlite carbonatite pegmatite"),
-    ("clastic", "conglomerate sandstone red_bed mudstone shale black_shale"),
+    ("clastic", "conglomerate diamictite sandstone red_bed mudstone shale black_shale"),
     ("chemical", "limestone dolostone chalk chert travertine halite gypsum anhydrite coal ironstone "
                  "banded_iron_formation phosphorite"),
     ("sedimentary", "#clastic #chemical"),
@@ -116,13 +116,13 @@ PELITE = ["slate", "phyllite", "schist", "gneiss"]
 LITHIFIES_TO = {
     "soil": "mudstone", "saprolite": "mudstone", "laterite": "ironstone",
     "gravel": "conglomerate", "sand": "sandstone", "clay": "mudstone", "mud": "shale",
-    "till": "conglomerate", "loess": "mudstone", "volcanic_ash": "tuff",
+    "till": "diamictite", "loess": "mudstone", "volcanic_ash": "tuff",
 }
 # P1-07: how the young, shallow part of a clastic deposit is shown (structure/columns.rs): the
 # facies rules lay down the rock class, and sediment still within the lithification depth and age is
 # its loose equivalent. Red beds show as sand (the sand class holds red sand).
 LOOSE_EQUIVALENT = {
-    "conglomerate": "gravel", "sandstone": "sand", "red_bed": "sand", "mudstone": "clay",
+    "conglomerate": "gravel", "diamictite": "till", "sandstone": "sand", "red_bed": "sand", "mudstone": "clay",
     "shale": "mud", "black_shale": "mud", "tuff": "volcanic_ash",
 }
 MAFIC = ["greenstone", "amphibolite"]
@@ -233,6 +233,21 @@ CLASSES = [
          vf="minecraft:cobblestone", vf_from="fallback",
          notes="Conglomerate, breccia and quartz-pebble conglomerate (host of Witwatersrand-type "
                "gold-uranium palaeoplacers). Metaconglomerate is taken as quartzite."),
+    # Ben, 2026-09-30 ("Add diamictite"): lithified till, so buried glacial deposits (the deep-time
+    # glaciers', the ice ages', a snowball Earth's) stop turning into conglomerate.
+    dict(name="diamictite", family="clastic_sedimentary", rho=2600,
+         rho_src="judgment: a compact, poorly sorted mud-matrix rock with dense clasts; slightly above "
+                 "conglomerate",
+         k=1.2, k_why="strength set by the indurated mud matrix; the clasts of every size resist",
+         d=1.1, d_why="massive, unbedded rock that sheds a bouldery, clayey regolith",
+         path=PELITE, wx="soil", facies="glacial", tags=[],
+         vf="minecraft:cobbled_deepslate", vf_from="fallback",
+         tuned="set with the glacial landforms (2026-09-30), between conglomerate and mudstone",
+         notes="Diamictite and tillite: lithified till and glaciomarine diamict, clasts of every size "
+               "floating in a mud matrix (the Neoproterozoic snowball diamictites, the Dwyka Group). "
+               "Its muddy matrix takes the pelitic metamorphic path. Stand-in: cobbled deepslate, a "
+               "dark matrix with lighter fragments of mixed size and shape, unlike conglomerate's "
+               "clast-supported cobblestone."),
     dict(name="sandstone", family="clastic_sedimentary", rho=2350,
          k=1.5, k_why="weaker than granite; strongly dependent on its cement",
          d=1.3, d_why="soft sedimentary rock that sheds sand",
@@ -549,9 +564,10 @@ CLASSES = [
          rho_src="judgment: dense, overconsolidated lodgement till",
          k=4.5, k_why="dense, bouldery, overconsolidated diamict",
          d=2.5, d_why="dense but loose-textured sediment",
-         path=[], wx="soil", facies="glacial", tags=[],
+         path=PELITE, wx="soil", facies="glacial", tags=[],
          vf="minecraft:coarse_dirt", vf_from="member",
-         notes="Glacial till and diamict."),
+         notes="Glacial till and diamict. Lithifies to diamictite on burial (2026-09-30; it was "
+               "conglomerate before), and heated it follows diamictite's pelitic path."),
     dict(name="loess", family="unconsolidated", rho=1400,
          rho_src="judgment: loess is characteristically light and open-structured",
          k=10.0, k_why="cohesionless silt that gullies readily; top of the range",
@@ -612,8 +628,8 @@ def validate(groups):
                 errors.append(f"{what}: unknown class {k}")
     names = [r["name"] for r in CLASSES]
     known = set(names)
-    if len(CLASSES) != 59:
-        errors.append(f"expected 59 classes, got {len(CLASSES)}")
+    if len(CLASSES) != 60:
+        errors.append(f"expected 60 classes, got {len(CLASSES)}")
     if len(known) != len(names):
         errors.append("duplicate class names")
     if len(GROUPS) != 17:
@@ -690,14 +706,15 @@ def class_groups(name, groups):
 
 def sources(r):
     n = r["name"]
-    rho = f"{r['rho_src'] if r.get('rho_src') else DENSITY_TYPICAL}; rounded to 10 kg/m³; {TUNED}"
+    tuned = r.get("tuned", TUNED)
+    rho = f"{r['rho_src'] if r.get('rho_src') else DENSITY_TYPICAL}; rounded to 10 kg/m³; {tuned}"
     if n in REFERENCE_CLASSES:
-        k = f"reference: generic crystalline basement (granite, gneiss) is 1.0; {K_BEDROCK}; {TUNED}"
-        d = f"reference: generic crystalline basement (granite, gneiss) is 1.0; {D_BASIS}; {TUNED}"
+        k = f"reference: generic crystalline basement (granite, gneiss) is 1.0; {K_BEDROCK}; {tuned}"
+        d = f"reference: generic crystalline basement (granite, gneiss) is 1.0; {D_BASIS}; {tuned}"
     else:
         basis = K_LOOSE if r["family"] == "unconsolidated" else K_BEDROCK
-        k = f"judgment, relative to granite: {r['k_why']}; {basis}; {TUNED}"
-        d = f"judgment, relative to granite: {r['d_why']}; {D_BASIS}; {TUNED}"
+        k = f"judgment, relative to granite: {r['k_why']}; {basis}; {tuned}"
+        d = f"judgment, relative to granite: {r['d_why']}; {D_BASIS}; {tuned}"
     vf = VF_MEMBER if r["vf_from"] == "member" else VF_FALLBACK
     if (n, r["vf"]) in FILLER_EXCEPTIONS:
         vf += "; stone is the one allowed filler exception (Ben's pick 2026-09-27)"
