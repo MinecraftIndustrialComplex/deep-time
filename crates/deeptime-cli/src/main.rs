@@ -449,7 +449,7 @@ impl CommonArgs {
 enum StrataArg {
     /// Three horizons: sandstone, red beds from 6 blocks down, granite from 40 (P0-09).
     Placeholder,
-    /// All 59 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
+    /// All 60 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
     /// columns hold every class 20 or more blocks below the surface (P1-12's GameTests).
     EveryClass,
     /// A readable sedimentary basin, the same in every cell: eight beds over granite from 165
