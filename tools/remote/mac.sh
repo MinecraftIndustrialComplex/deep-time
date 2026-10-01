@@ -62,6 +62,12 @@ if "${SSH[@]}" 'test -e /Users/Shared/graphide-nix-maintenance -o -e /Users/Shar
     echo "mac.sh: the Mac's Nix is under maintenance or unhealthy (/Users/Shared/graphide-nix-*); not running" >&2
     exit 75
 fi
+# Ben paused Deep Time jobs on the M6 on 2026-10-01: our load made graphide's timing-sensitive tests
+# flaky. The marker lives on the machine, so pointing DEEPTIME_MAC at the new test box is unaffected.
+if "${SSH[@]}" "test -e '$CACHE/PAUSED'"; then
+    echo "mac.sh: Deep Time jobs on $HOST are paused ($CACHE/PAUSED): $("${SSH[@]}" "cat '$CACHE/PAUSED'")" >&2
+    exit 75
+fi
 "${SSH[@]}" "test -d /Volumes/Graphide/ban && mkdir -p '$REMOTE' '$CACHE/gradle' '$CACHE/cargo' '$CACHE/xwin' '$CACHE/tmp' '$SSD/mic/pack'" \
     || { echo "mac.sh: /Volumes/Graphide is not mounted on $HOST" >&2; exit 1; }
 
