@@ -42,9 +42,27 @@
 //! supercontinent in the tropics draws CO₂ down. Between snapshots each latitude band's weathering
 //! follows the EBM's temperature change there: × e^(k_T·ΔT)·max(0, 1 + k_r·ΔT)^0.65 (GEOCARB's
 //! runoff term) × (1 − the band's ice-covered land); and globally × (CO₂/280 ppm)^β. Normalized so
-//! Earth's present relief under the model's present climate at 280 ppm weathers exactly D₀
-//! ([`KERNEL_EARTH`], measured with `deeptime climate-dem`), times `weathering_strength`. Under
-//! full ice cover the land is frozen and dry: weathering stops, degassing builds CO₂ up.
+//! Earth's present relief under the model's present climate at 280 ppm weathers exactly the land's
+//! share of D₀ ([`KERNEL_EARTH`], measured with `deeptime climate-dem`), times
+//! `weathering_strength`. Under full ice cover the land is frozen and dry: weathering stops,
+//! degassing builds CO₂ up.
+//!
+//! **Supply limit** (decisions log 2026-09-30, "Yes, supply-limited"): each band's kinetic
+//! weathering K saturates at the Ca + Mg its denudation exposes, S·(1 − e^(−K/S)) (the kinetic
+//! and supply-limited regimes of West, Galy & Bickle 2005, "Tectonic and climatic controls on
+//! silicate weathering", EPSL 235: 211–228, and West 2012, Geology 40: 811–814). S is the surface
+//! stage's erosion (at least `weathering_min_denudation_m_myr`) × 2,700 kg/m³ × 1.26 mol/kg
+//! (Rudnick & Gao 2003) × `weathering_supply_scale` (the L1 grid's erosion against Earth's ~20
+//! Gt/yr of pre-human denudation, Syvitski et al. 2005), doubling every 10 K of warming as soil
+//! production does. A hothouse after a snowball draws CO₂ down at the supply's pace, millions of
+//! years, not at its kinetics' pace.
+//!
+//! **Seafloor weathering** (`seafloor_weathering_share`, 20 % of today's; Lenton et al. 2018's
+//! COPSE reloaded): young ocean crust's basalt, ∝ sea-floor production × e^(E_a/R·(1/T₀ − 1/T))
+//! on the bottom water (E_a 75 kJ/mol) × (CO₂/280 ppm)^0.23 (Krissansen-Totton & Catling 2017).
+//! It needs neither land nor erosion, so a land-poor planet keeps a thermostat under the supply
+//! limit (without it the 8 %-land GameTest planet ran to 90,000 ppm); Foley 2015 (ApJ 812: 36)
+//! shows the land-fraction sensitivity of supply-limited weathering it buffers.
 //!
 //! **Forcing.** ΔF = 5.35 x (Myhre et al. 1998, "New estimates of radiative forcing due to well
 //! mixed greenhouse gases", GRL 25: 2715–2718) up to 1,000 ppm, and above 2,000 ppm Byrne &
