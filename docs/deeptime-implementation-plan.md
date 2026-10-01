@@ -3732,6 +3732,16 @@ on this machine.
   ice-sheet branch lands (same code).
 - **Check.** Set out in the design doc (Earth-topography comparison, Köppen shares, energy balance,
   run-time budget, downstream recalibration).
+- **Design** (2026-09-30, awaiting Ben's approval): `docs/design/p1-26-per-cell-climate.md`. It
+  covers:
+  - the current banding measured, with a prototype on Earth's relief;
+  - a seasonal 2-D EBM on a 128 × 64 climate grid with land and sea tiles, per-cell sea ice,
+    Stommel gyres and an overturning conveyor;
+  - a monthly moisture budget behind `climate.rain_model`, with today's belts as the first
+    default;
+  - a 1-D clock flux-corrected to the 2-D zonal means;
+  - an unchanged world format and climate API;
+  - tasks T1–T11 and open questions Q1–Q11.
 
 #### P1-27 Plate margins and coherent continents (2026-09-30)
 - **Goal.** (1) Margins: in a 750-Myr earthlike_quick_16k run nearly every continental coast became
