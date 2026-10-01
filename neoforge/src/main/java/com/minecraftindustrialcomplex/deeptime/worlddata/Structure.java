@@ -17,8 +17,9 @@ import java.util.Arrays;
  *
  * <p>An event's strength at a block column is a window weight that depends on the map position
  * only; a fold shifts the column vertically by its profile, a fault moves the part of the column
- * above its plane by one vector. Events are undone youngest first; rock younger than an event
- * (horizons whose unit key is below the event's key) is not moved by it.
+ * above its plane by one vector, an intrusion replaces the rock inside its ellipsoid. Events are
+ * undone youngest first; rock younger than an event (horizons whose unit key is below the event's
+ * key) is not touched by it.
  *
  * <p>Arithmetic: IEEE doubles, {@code + − × /}, comparisons, {@code floor} and {@code ceil}, in the
  * order written; nothing here calls a library function whose result could differ from Rust's.
@@ -39,7 +40,7 @@ public final class Structure {
     private final int[] kind, profile, key;
     /** Window: centre (x, z), along (x, z), across (x, z), half-lengths. */
     private final double[] cx, cz, alx, alz, acx, acz, halfAlong, halfAcross;
-    /** Fold: wavelength, amplitude, offset. Fault: y, pole x y z, slip x y z. */
+    /** Fold: wavelength, amplitude, offset. Fault: y, pole x y z, slip x y z. Intrusion: y, half-height (its class is {@code profile}). */
     private final double[][] tail;
     private final float[][] profiles;
     private final double margin;
@@ -144,6 +145,9 @@ public final class Structure {
             } else if (kind[e] == 1) {
                 if (!(tail[e][2] > 0.0))
                     throw Sectioned.corrupt(path, "event " + id + ": the pole must point up");
+            } else if (kind[e] == 2) {
+                if (!(tail[e][1] > 0.0))
+                    throw Sectioned.corrupt(path, "event " + id + ": an intrusion of no height");
             } else {
                 throw Sectioned.corrupt(path, "event " + id + ": kind " + kind[e]);
             }
@@ -199,6 +203,8 @@ public final class Structure {
         // Pieces, bottom-up.
         double[] lo = new double[16], hi = new double[16], sx = new double[16], sz = new double[16], dy = new double[16];
         int[] pkey = new int[16], src = new int[16];
+        /** An intrusion's rock class, or -1: the piece reads its source stack. Its unit key is {@code pkey}. */
+        int[] prock = new int[16];
         boolean[] done = new boolean[16];
         int np;
         // The stacks of the source columns met.
@@ -215,6 +221,7 @@ public final class Structure {
             dy = Arrays.copyOf(dy, cap);
             pkey = Arrays.copyOf(pkey, cap);
             src = Arrays.copyOf(src, cap);
+            prock = Arrays.copyOf(prock, cap);
             done = Arrays.copyOf(done, cap);
         }
 
@@ -238,6 +245,7 @@ public final class Structure {
             dy[b] = dy[a];
             pkey[b] = pkey[a];
             src[b] = src[a];
+            prock[b] = prock[a];
             done[b] = done[a];
         }
 
@@ -305,6 +313,7 @@ public final class Structure {
         s.pkey[0] = 0;
         s.done[0] = false;
         s.src[0] = own;
+        s.prock[0] = -1;
         s.np = 1;
         for (int ci = 0; ci < s.nc; ci++) {
             int e = s.cands[ci];
@@ -360,6 +369,40 @@ public final class Structure {
                     double v = profileAt(profiles[profile[e]], phase);
                     s.dy[k] = s.dy[k] - wgt * (t[1] * v);
                     s.pkey[k] = key[e];
+                } else if (kind[e] == 2) {
+                    double ua = a / halfAlong[e], ub = b / halfAcross[e];
+                    double r2 = ua * ua + ub * ub;
+                    if (r2 < 1.0) {
+                        double hh = t[1] * Math.sqrt(1.0 - r2);
+                        double plo = s.lo[k], phi = s.hi[k];
+                        double lo = (t[0] - hh) - s.dy[k];
+                        double hi = (t[0] + hh) - s.dy[k];
+                        if (!(lo > plo))
+                            lo = plo;
+                        if (!(hi < phi))
+                            hi = phi;
+                        if (lo < hi) {
+                            int at = k;
+                            if (lo > plo) {
+                                s.insertCopy(k + 1, k);
+                                s.hi[k] = lo;
+                                at = k + 1;
+                                next++;
+                            }
+                            if (hi < phi) {
+                                // The rest of the piece above the body, as it was.
+                                s.insertCopy(at + 1, at);
+                                s.lo[at + 1] = hi;
+                                s.hi[at + 1] = phi;
+                                next++;
+                            }
+                            s.lo[at] = lo;
+                            s.hi[at] = hi;
+                            s.done[at] = true;
+                            s.prock[at] = profile[e];
+                            s.pkey[at] = key[e];
+                        }
+                    }
                 } else {
                     double dx = a * alx[e] + b * acx[e];
                     double dz = a * alz[e] + b * acz[e];
@@ -396,6 +439,11 @@ public final class Structure {
             int yMin = s.lo[k] == Double.NEGATIVE_INFINITY ? minY : Math.max(minY, (int) Math.ceil(s.lo[k] - 0.5));
             if (yMax < yMin)
                 continue;
+            if (s.prock[k] >= 0) {
+                if (out.count == 0 || out.classes[out.count - 1] != s.prock[k])
+                    out.push(yMax, s.prock[k], s.pkey[k]);
+                continue;
+            }
             int d = (int) Math.floor(s.dy[k] + 0.5);
             Columns.Stack st = s.stacks[s.src[k]];
             int cnt = st.count;

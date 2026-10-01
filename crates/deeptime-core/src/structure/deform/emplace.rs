@@ -21,10 +21,10 @@
 //! (`feature::advance`), so the normal faults of a rift end up along the two passive margins the
 //! rift becomes, and the folds of a collision stay in the suture when the orogen has worn down.
 //!
-//! What is not translated here: plutons (they are bodies already, `plutons.rs`), dykes and plugs
-//! (bodies too, with the bake), and unconformities, which need no event: rock laid down after a
-//! structure formed is simply not deformed by it, so every structure is sealed by the first
-//! strata younger than itself.
+//! What is not translated here: batholiths (they are bodies already, `plutons.rs`), the small
+//! intrusions (`intrude.rs`: stocks, dykes and plugs, events too), and unconformities, which need
+//! no event: rock laid down after a structure formed is simply not deformed by it, so every
+//! structure is sealed by the first strata younger than itself.
 
 use deeptime_format::GridDesc;
 
@@ -118,7 +118,7 @@ pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
 /// The long axis of the cells around `c` (within `radius` cells) that satisfy `on`, as an
 /// azimuth in [0°, 180°), and the offset (blocks, x and z) of their centroid from the cell.
 /// `None` when fewer than three cells are on or they have no long axis.
-fn mask_axis(
+pub(super) fn mask_axis(
     grid: &GridDesc,
     c: usize,
     radius: i64,
@@ -215,7 +215,7 @@ fn trend_near(x: &Inputs<'_>, c: usize) -> Option<f64> {
 }
 
 /// A lognormal length in blocks from `[median, min, max]` km.
-fn length_blocks(v: [f64; 3], sigma: f64, km_to_blocks: f64, rng: &mut Rng) -> f64 {
+pub(super) fn length_blocks(v: [f64; 3], sigma: f64, km_to_blocks: f64, rng: &mut Rng) -> f64 {
     let [median, lo, hi] = v;
     (median * (sigma * rng.normal()).exp()).clamp(lo, hi) * km_to_blocks
 }
@@ -344,6 +344,9 @@ pub fn emplace(
                 cause: cause(kind, bx, bz),
                 adrift: 0,
                 wear_m: 0.0,
+                half_height: 0.0,
+                depth: 0.0,
+                rock: 0,
             };
             match kind {
                 Kind::FoldTrain => {
@@ -420,6 +423,8 @@ pub fn emplace(
                     let sense = if flip < 0.5 { -1.0 } else { 1.0 };
                     f.slip = (sense * p.strength * p.strike_slip_ratio * length) as f32;
                 }
+                // Intrusions are `intrude.rs`'s.
+                Kind::Stock | Kind::Dyke | Kind::Plug => continue,
             }
             *next_id += 1;
             counts.add(kind);
@@ -608,7 +613,7 @@ pub(crate) mod tests {
                     assert!(off_axis(f.azimuth_deg, 0.0) < 50.0, "{}", f.azimuth_deg);
                     assert!(f.slip > 0.0 && (55.0..=70.0).contains(&f.dip_deg));
                 }
-                Kind::StrikeSlip => unreachable!(),
+                _ => unreachable!(),
             }
             assert!(f.half_along > 0.0 && f.half_across > 0.0);
         }

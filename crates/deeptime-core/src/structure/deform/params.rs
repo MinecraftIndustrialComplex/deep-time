@@ -125,6 +125,36 @@ pub struct DeformationParams {
     /// the hanging wall unloads them (Weissel & Karner 1989, J. Geophys. Res. 94:13919-13950);
     /// the share is a design value.
     pub footwall_share: f64,
+
+    /// How many small intrusions form (stocks, dykes, plugs: `intrude.rs`): multiplies their
+    /// rates; 0 turns them off. They cut the layering and the folds older than themselves.
+    pub intrusions: f64,
+    /// Stocks per km² of collision or arc per Myr. A design value.
+    pub stock_rate_km2_myr: f64,
+    /// A stock's radius, km: [median, min, max] of a lognormal (sigma 0.4). By definition a
+    /// stock crops out over less than 100 km² (a radius under 5.6 km); larger bodies are the
+    /// batholiths of `plutons.rs`.
+    pub stock_radius_km: [f64; 3],
+    /// A stock's vertical half-axis over its radius, in blocks (a design value: a cupola).
+    pub stock_height_ratio: f64,
+    /// How far a stock's top lies under the ground, blocks [min, max] (negative: it crops out).
+    pub stock_top_depth_blocks: [f64; 2],
+    /// Dykes per km² of continental rift per Myr. A design value.
+    pub dyke_rate_km2_myr: f64,
+    /// A dyke's length, km: [median, min, max] of a lognormal (sigma 0.5). Design values;
+    /// single dykes of rift swarms run for kilometres to tens of kilometres.
+    pub dyke_length_km: [f64; 3],
+    /// A dyke's half-width at its middle, blocks [min, max]. Real dykes are metres wide; a
+    /// block is the least that can be drawn.
+    pub dyke_half_width_blocks: [f64; 2],
+    /// A dyke's vertical half-axis, blocks.
+    pub dyke_half_height_blocks: f64,
+    /// A plug's radius as a share of its volcano's basal radius, and its range in blocks
+    /// [min, max]. Design values (necks are tens to hundreds of metres across).
+    pub plug_radius_share: f64,
+    pub plug_radius_blocks: [f64; 2],
+    /// A plug's vertical half-axis, blocks.
+    pub plug_half_height_blocks: f64,
 }
 
 impl Default for DeformationParams {
@@ -161,6 +191,18 @@ impl Default for DeformationParams {
             relief_wear: 5.0,
             fold_relief: 0.5,
             footwall_share: 0.2,
+            intrusions: 1.0,
+            stock_rate_km2_myr: 2.0e-5,
+            stock_radius_km: [4.0, 2.0, 10.0],
+            stock_height_ratio: 3.0,
+            stock_top_depth_blocks: [-4.0, 60.0],
+            dyke_rate_km2_myr: 8.0e-5,
+            dyke_length_km: [15.0, 5.0, 50.0],
+            dyke_half_width_blocks: [1.0, 2.5],
+            dyke_half_height_blocks: 120.0,
+            plug_radius_share: 0.08,
+            plug_radius_blocks: [2.5, 8.0],
+            plug_half_height_blocks: 100.0,
         }
     }
 }
@@ -202,6 +244,8 @@ impl DeformationParams {
         for (v, key) in [
             (self.fold_wavelength_km, "fold_wavelength_km"),
             (self.fault_length_km, "fault_length_km"),
+            (self.stock_radius_km, "stock_radius_km"),
+            (self.dyke_length_km, "dyke_length_km"),
         ] {
             let [m, lo, hi] = v;
             check(
@@ -216,6 +260,8 @@ impl DeformationParams {
             (self.fold_shortening, "fold_shortening", 0.6),
             (self.normal_dip_deg, "normal_dip_deg", 89.0),
             (self.thrust_dip_deg, "thrust_dip_deg", 89.0),
+            (self.dyke_half_width_blocks, "dyke_half_width_blocks", 16.0),
+            (self.plug_radius_blocks, "plug_radius_blocks", 64.0),
         ] {
             let [a, b] = v;
             check(
@@ -234,6 +280,9 @@ impl DeformationParams {
             (self.trend_scatter_deg, "trend_scatter_deg"),
             (self.foreland_km, "foreland_km"),
             (self.overprint_myr, "overprint_myr"),
+            (self.stock_rate_km2_myr, "stock_rate_km2_myr"),
+            (self.dyke_rate_km2_myr, "dyke_rate_km2_myr"),
+            (self.plug_radius_share, "plug_radius_share"),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
         }
@@ -278,6 +327,24 @@ impl DeformationParams {
             (0.0..=1.0).contains(&self.footwall_share),
             "footwall_share",
             "must be in [0, 1]",
+        )?;
+        check(
+            (0.0..=10.0).contains(&self.intrusions),
+            "intrusions",
+            "must be in [0, 10]",
+        )?;
+        for (v, key) in [
+            (self.stock_height_ratio, "stock_height_ratio"),
+            (self.dyke_half_height_blocks, "dyke_half_height_blocks"),
+            (self.plug_half_height_blocks, "plug_half_height_blocks"),
+        ] {
+            check(v > 0.0 && v.is_finite(), key, "must be > 0")?;
+        }
+        let [a, b] = self.stock_top_depth_blocks;
+        check(
+            a <= b && a.is_finite() && b.is_finite(),
+            "stock_top_depth_blocks",
+            "[min, max] with min ≤ max",
         )?;
         check(
             (1..=16).contains(&self.max_overlap),

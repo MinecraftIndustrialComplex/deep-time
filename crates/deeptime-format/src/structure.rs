@@ -119,6 +119,18 @@ pub enum Shape {
         /// The hanging wall's displacement at weight 1, block (x, y, z).
         slip: [f64; 3],
     },
+    /// An intrusion (a stock, a dyke, a volcanic plug): an ellipsoid of igneous rock with a
+    /// vertical axis, its horizontal half-axes the window's `half_along` and `half_across`. It
+    /// moves nothing: it replaces the rock older than itself inside it, so it cuts the folds and
+    /// faults before it and is offset by the ones after.
+    Intrusion {
+        /// Height (block y) of its centre.
+        y: f64,
+        /// Its vertical half-axis, blocks.
+        half_height: f64,
+        /// The rock class it is made of (index into the world's classes).
+        class: u8,
+    },
 }
 
 /// One structural event.
@@ -344,6 +356,7 @@ impl Structure {
                             k += 1;
                         }
                     }
+                    Shape::Intrusion { .. } => k += 1,
                 }
             }
         }
@@ -390,6 +403,8 @@ struct Piece {
     done: bool,
     /// Index of its source column's stack in the scratch.
     src: usize,
+    /// An intrusion's rock (class, unit key): the piece is that rock, whatever its source says.
+    rock: Option<(u8, u16)>,
 }
 
 /// Working memory of [`Structure::deformed_stack`], kept per thread by a reader of many columns.
@@ -445,6 +460,9 @@ impl Structure {
     ///    - **Fault:** the rest is cut at the fault plane; the part above it now reads the column
     ///      `weight · slip` back along the slip, from the stack of the block column that holds
     ///      that position.
+    ///    - **Intrusion:** the part of the rest inside the ellipsoid (read at the piece's source
+    ///      position, so younger faults and folds have moved it) becomes the intrusion's rock and
+    ///      is finished.
     ///
     ///    A moved piece takes the event's key.
     /// 3. The pieces are written out top-down. A piece holds the blocks y with lo ≤ y + ½ < hi
@@ -485,6 +503,7 @@ impl Structure {
             key: 0,
             done: false,
             src: own,
+            rock: None,
         });
         for &e in &cands {
             let ev = &self.events[e as usize];
@@ -564,6 +583,7 @@ impl Structure {
                                 key: ev.key,
                                 done: false,
                                 src,
+                                rock: None,
                             };
                             if cut > p.lo {
                                 scratch.pieces[k].hi = cut;
@@ -571,6 +591,43 @@ impl Structure {
                                 next += 1;
                             } else {
                                 scratch.pieces[k] = moved;
+                            }
+                        }
+                    }
+                    Shape::Intrusion {
+                        y,
+                        half_height,
+                        class,
+                    } => {
+                        let (ua, ub) = (a / ev.window.half_along, b / ev.window.half_across);
+                        let r2 = ua * ua + ub * ub;
+                        if r2 < 1.0 {
+                            let hh = half_height * (1.0 - r2).sqrt();
+                            let lo = (y - hh) - p.dy;
+                            let hi = (y + hh) - p.dy;
+                            let lo = if lo > p.lo { lo } else { p.lo };
+                            let hi = if hi < p.hi { hi } else { p.hi };
+                            if lo < hi {
+                                let body = Piece {
+                                    lo,
+                                    hi,
+                                    done: true,
+                                    rock: Some((class, ev.key)),
+                                    ..p
+                                };
+                                let mut at = k;
+                                if lo > p.lo {
+                                    scratch.pieces[k].hi = lo;
+                                    at = k + 1;
+                                    scratch.pieces.insert(at, body);
+                                    next += 1;
+                                } else {
+                                    scratch.pieces[k] = body;
+                                }
+                                if hi < p.hi {
+                                    scratch.pieces.insert(at + 1, Piece { lo: hi, ..p });
+                                    next += 1;
+                                }
                             }
                         }
                     }
@@ -592,6 +649,12 @@ impl Structure {
                 min_y.max((p.lo - 0.5).ceil() as i32)
             };
             if y_max < y_min {
+                continue;
+            }
+            if let Some((class, unit)) = p.rock {
+                if out.last().is_none_or(|l| l.1 != class) {
+                    out.push((y_max, class, unit));
+                }
                 continue;
             }
             let d = (p.dy + 0.5).floor() as i32;
@@ -690,6 +753,11 @@ pub fn encode_structure(st: &Structure) -> Result<Vec<u8>> {
                 0,
                 [y, pole[0], pole[1], pole[2], slip[0], slip[1], slip[2]],
             ),
+            Shape::Intrusion {
+                y,
+                half_height,
+                class,
+            } => (2, class, [y, half_height, 0.0, 0.0, 0.0, 0.0, 0.0]),
         };
         records.push(kind);
         records.push(profile);
@@ -794,6 +862,16 @@ pub fn decode_structure(path: &Path, b: &[u8]) -> Result<Structure> {
                     y: f(9),
                     pole: [f(10), f(11), f(12)],
                     slip: [f(13), f(14), f(15)],
+                }
+            }
+            2 => {
+                if f(10) <= 0.0 {
+                    return Err(corrupt(format!("event {id}: an intrusion of no height")));
+                }
+                Shape::Intrusion {
+                    y: f(9),
+                    half_height: f(10),
+                    class: rec[5],
                 }
             }
             k => return Err(corrupt(format!("event {id}: kind {k}"))),
@@ -1128,9 +1206,98 @@ mod tests {
         }
     }
 
+    /// A stock about (100, 40, 200): 60 by 40 blocks across, 30 blocks of half-height.
+    fn stock(key: u16) -> StructEvent {
+        StructEvent {
+            id: 2,
+            key,
+            t_years: -6.0e7,
+            window: Window {
+                half_along: 60.0,
+                half_across: 40.0,
+                ..window()
+            },
+            shape: Shape::Intrusion {
+                y: 40.0,
+                half_height: 30.0,
+                class: 9,
+            },
+        }
+    }
+
+    #[test]
+    fn an_intrusion_cuts_older_rock_and_is_cut_by_younger_structures() {
+        // Younger than the third bed (key 9000), older than the cover (5000): its ellipsoid
+        // holds y 10 to 70 at the centre, and it rises through the third bed to the base of
+        // the cover at y 60, which was laid down on it.
+        let st = world(vec![stock(8000)]);
+        assert_eq!(
+            deformed(&st, 100, 200, 0),
+            [
+                (100, 0, 100),
+                (90, 1, 5000),
+                (60, 9, 8000),
+                (9, 3, 20000),
+                (0, 4, 40000)
+            ]
+        );
+        // Off centre the ellipsoid is thinner; outside it the plain stack.
+        let off = deformed(&st, 100 + 30, 200, 0);
+        let hh = 30.0 * (1.0 - 0.75f64 * 0.75).sqrt();
+        assert_eq!(off[2], (60, 2, 9000));
+        assert_eq!(
+            off[3],
+            ((40.0 + hh - 0.5).ceil() as i32 - 1, 9, 8000),
+            "{off:?}"
+        );
+        let mut plain = Vec::new();
+        cake(0)(100, 200, &mut plain);
+        assert_eq!(deformed(&st, 100 + 41, 200, 0), plain);
+        assert_eq!(deformed(&st, 100, 200 + 61, 0), plain);
+        // Older than every bed but the last: it lies wholly inside the oldest rock.
+        let deep = deformed(&world(vec![stock(30000)]), 100, 200, 0);
+        assert_eq!(
+            deep,
+            [
+                (100, 0, 100),
+                (90, 1, 5000),
+                (60, 2, 9000),
+                (30, 3, 20000),
+                (0, 4, 40000)
+            ],
+            "an intrusion older than the rock at its level leaves that rock alone"
+        );
+        // A younger fold lifts the stock with the beds; an older fold does not move it.
+        let w = bump(25.0 / 150.0);
+        let lift = (w * 12.0 + 0.5).floor() as i32;
+        let mut young_fold = fold();
+        young_fold.key = 7000;
+        let hh = 30.0 * (1.0 - (25.0f64 / 40.0) * (25.0 / 40.0)).sqrt();
+        let top_plain = (40.0 + hh - 0.5).ceil() as i32 - 1;
+        let lifted = deformed(&world(vec![young_fold, stock(8000)]), 125, 200, 0);
+        let body = lifted.iter().find(|h| h.1 == 9).expect("the stock");
+        assert!((body.0 - (top_plain + lift)).abs() <= 1, "{lifted:?}");
+        let cut = deformed(&world(vec![stock(8000), fold()]), 125, 200, 0);
+        let body = cut.iter().find(|h| h.1 == 9).expect("the stock");
+        assert_eq!(body.0, top_plain, "{cut:?}");
+        // Whatever the order: tops descend, neighbours differ.
+        for events in [
+            vec![fault(), stock(8000), fold()],
+            vec![stock(6000), fault(), fold()],
+        ] {
+            for x in [70, 95, 100, 120, 135] {
+                let col = deformed(&world(events.clone()), x, 190, 1);
+                assert!(
+                    col.windows(2).all(|w| w[0].0 > w[1].0 && w[0].1 != w[1].1),
+                    "{col:?}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn the_structure_file_round_trips() {
-        let mut st = world(vec![fault(), fold()]);
+        let mut st = world(vec![fault(), stock(8000), fold()]);
         st.margin = 109.0;
         let bytes = encode_structure(&st).unwrap();
         assert_eq!(
