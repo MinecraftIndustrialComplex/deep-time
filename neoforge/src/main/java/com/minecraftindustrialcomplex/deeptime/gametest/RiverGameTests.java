@@ -6,18 +6,22 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.Rivers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.WaterBodies;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.ticks.ScheduledTick;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -212,6 +216,144 @@ public final class RiverGameTests {
             helper.assertTrue(after.floating == 0, after.floating + " water blocks over air after " + WAIT_TICKS + " ticks");
             helper.succeed();
         });
+    }
+
+    /** Whether a block is air or holds fluid: what a carver's cut leaves (see {@link #carversSpareWater}). */
+    static boolean cut(BlockState s) {
+        return s.isAir() || !s.getFluidState().isEmpty();
+    }
+
+    /**
+     * Carvers never replace the water Deep Time places (Ben, decisions log 2026-10-01, "Protect
+     * water blocks"; {@code hydro.protect_water_from_carvers}, on by default). On
+     * {@code deeptime:test_rivers_carved}, {@code test_rivers}' world data under a biome whose only
+     * carver is {@code deeptime:test_wide_caves} (a cave carver that starts in every chunk, with
+     * tunnels 1.5 to 2.5 times vanilla's width, at every height from y -32 to 180), the boxes around
+     * rivers and lakes are generated, and every river and lake column is read back:
+     * <ul>
+     *   <li>no air between its bed and its top ({@code drainedBlocks}), and no column whose top water
+     *       block is air ({@code holes}): the carvers replaced none of the water;</li>
+     *   <li>the carvers did reach it: ground right under the beds is cut ({@code carvedBelow}: the
+     *       pass leaves it solid, so air or fluid there is a carver's cut) and some beds opened
+     *       ({@code entrances}, the bed block itself is cut): the ground under the water is still
+     *       carved, so caves open into river and lake beds.</li>
+     *   <li>the carvers cut under water above sea level ({@code highColumns}, {@code carvedBelowHigh}):
+     *       this level has no aquifer, so a cut below sea level fills with sea water and a carver
+     *       replacing river water there would leave water; only above sea level does it leave air,
+     *       so only there can the first check fail.</li>
+     * </ul>
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
+    public static void carversSpareWater(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel().getServer().getLevel(GameTestSupport.TEST_RIVERS_CARVED);
+        if (level == null) {
+            helper.fail("level " + GameTestSupport.TEST_RIVERS_CARVED.location() + " does not exist");
+            return;
+        }
+        if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g && g.terrain() instanceof WorldDataTerrain w)) {
+            helper.fail("test_rivers_carved is not generating from world data");
+            return;
+        }
+        WorldData wd = w.data();
+        Rivers r = wd.rivers();
+        if (r == null || r.chainCount() == 0) {
+            helper.fail("the real test planet has no river network");
+            return;
+        }
+        helper.assertTrue(WaterBodies.protectsWater(wd), "the test planet's hydro settings do not protect the water");
+        Water.Spec spec = Water.Spec.of(wd, g.waterReach());
+        List<Site> sites = sites(r);
+        List<LevelChunk> chunks = new ArrayList<>();
+        for (Site s : sites)
+            for (int cx = (s.x() - HALF) >> 4; cx <= (s.x() + HALF) >> 4; cx++)
+                for (int cz = (s.z() - HALF) >> 4; cz <= (s.z() + HALF) >> 4; cz++) {
+                    level.setChunkForced(cx, cz, true);
+                    chunks.add(level.getChunk(cx, cz));
+                }
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        long columns = 0, drainedBlocks = 0, drainedColumns = 0, holes = 0, carvedBelow = 0, entrances = 0, highColumns = 0, carvedBelowHigh = 0;
+        StringBuilder detail = new StringBuilder();
+        java.util.Map<String, Integer> underBed = new java.util.TreeMap<>();
+        for (Site s : sites)
+            for (int x = s.x() - HALF + 1; x < s.x() + HALF - 1; x++)
+                for (int z = s.z() - HALF + 1; z < s.z() + HALF - 1; z++) {
+                    Water.Column col = Water.column(wd, spec, x, z);
+                    if ((col.kind() != Water.Kind.RIVER && col.kind() != Water.Kind.LAKE) || col.top() == null || col.bed() == null)
+                        continue;
+                    int top = col.top(), bed = col.bed();
+                    LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
+                    columns++;
+                    int air = 0;
+                    for (int y = bed + 1; y <= top; y++)
+                        if (chunk.getBlockState(pos.set(x, y, z)).isAir())
+                            air++;
+                    if (air > 0) {
+                        drainedColumns++;
+                        drainedBlocks += air;
+                        if (detail.length() < 600)
+                            detail.append(" drained(").append(x).append(',').append(top).append(',').append(z).append(")x").append(air);
+                    }
+                    if (chunk.getBlockState(pos.set(x, top, z)).isAir())
+                        holes++;
+                    // The pass leaves solid ground under the bed, so a block there that is air or fluid was cut
+                    // by a carver. Below sea level a carver's cut fills with water (this level has no aquifer:
+                    // the fluid picker puts the sea there), above it the cut is air.
+                    if (cut(chunk.getBlockState(pos.set(x, bed, z))))
+                        entrances++;
+                    boolean high = top >= spec.seaLevel();
+                    if (high)
+                        highColumns++;
+                    for (int y = Math.max(level.getMinBuildHeight(), bed - 8); y < bed; y++)
+                        if (cut(chunk.getBlockState(pos.set(x, y, z)))) {
+                            carvedBelow++;
+                            if (high)
+                                carvedBelowHigh++;
+                        }
+                    for (int y = bed - 1; y >= bed - 2; y--) {
+                        BlockState b = chunk.getBlockState(pos.set(x, y, z));
+                        underBed.merge(BuiltInRegistries.BLOCK.getKey(b.getBlock()).toString() + (b.is(BlockTags.OVERWORLD_CARVER_REPLACEABLES) ? "+" : "-"), 1, Integer::sum);
+                    }
+                }
+        // Premise diagnostics: is the carver on the level's biome, and did it cut the ground anywhere in the boxes?
+        StringBuilder carvers = new StringBuilder();
+        for (Holder<Biome> b : g.getBiomeSource().possibleBiomes())
+            for (var c : b.value().getGenerationSettings().getCarvers(GenerationStep.Carving.AIR))
+                carvers.append(c.unwrapKey().map(k -> k.location().toString()).orElse("?")).append(' ');
+        long groundAir = 0, groundCells = 0, groundReplaceable = 0;
+        java.util.Map<String, Integer> groundBlocks = new java.util.TreeMap<>();
+        for (Site s : sites)
+            for (int x = s.x() - HALF + 1; x < s.x() + HALF - 1; x += 2)
+                for (int z = s.z() - HALF + 1; z < s.z() + HALF - 1; z += 2) {
+                    Water.Column col = Water.column(wd, spec, x, z);
+                    if (col.kind().isWater())
+                        continue;
+                    LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
+                    for (int y = col.ground() - 3; y >= Math.max(level.getMinBuildHeight(), col.ground() - 40); y--) {
+                        groundCells++;
+                        BlockState gb = chunk.getBlockState(pos.set(x, y, z));
+                        if (gb.isAir())
+                            groundAir++;
+                        else if (gb.is(BlockTags.OVERWORLD_CARVER_REPLACEABLES))
+                            groundReplaceable++;
+                        groundBlocks.merge(BuiltInRegistries.BLOCK.getKey(gb.getBlock()).toString(), 1, Integer::sum);
+                    }
+                }
+        DeepTime.LOGGER.info("[gametest] carversSpareWater premise: biome carvers [{}] groundAir={}/{} replaceableByVanillaTag={} underBed={} ground={}",
+                carvers.toString().trim(), groundAir, groundCells, groundReplaceable, underBed, groundBlocks);
+        for (LevelChunk c : chunks)
+            level.setChunkForced(c.getPos().x, c.getPos().z, false);
+        DeepTime.LOGGER.info("[gametest] carversSpareWater sites={} chunks={} columns={} drainedBlocks={} drainedColumns={} holes={} "
+                        + "carvedBelow={} entrances={} highColumns={} carvedBelowHigh={}{}",
+                sites.size(), chunks.size(), columns, drainedBlocks, drainedColumns, holes, carvedBelow, entrances, highColumns,
+                carvedBelowHigh, detail.length() == 0 ? "" : " " + detail);
+        helper.assertTrue(columns > 50, "only " + columns + " river or lake columns in the boxes");
+        helper.assertTrue(carvedBelow >= 20, "the carvers cut only " + carvedBelow + " blocks under the beds: they did not reach the water, so the check proves nothing");
+        helper.assertTrue(highColumns >= 20 && carvedBelowHigh >= 20, "only " + highColumns + " columns hold water above sea level, with " + carvedBelowHigh
+                + " blocks cut under them: only there does a carver leave air, so the check proves nothing");
+        helper.assertTrue(entrances > 0, "no bed was opened by a cave: the ground under the water must stay carvable");
+        helper.assertTrue(drainedBlocks == 0, drainedBlocks + " water blocks in " + drainedColumns + " columns were replaced by air:" + detail);
+        helper.assertTrue(holes == 0, holes + " river or lake columns have air for their top water block");
+        helper.succeed();
     }
 
     /**
