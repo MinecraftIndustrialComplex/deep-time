@@ -305,13 +305,15 @@ impl PlatesStage {
         Ok(())
     }
 
-    /// The surface stage's changes since the last step (P1-04, `surface/mod.rs`): its elevation
-    /// change (`surface/feedback_m`) and the material it moved (`surface/material_m`) per L1 cell
-    /// are spread onto the samples with the last L1 sampling's barycentric weights (each sample
-    /// takes the weighted mean over the cells that see it), added to their elevation and rock
-    /// pools (erosion strips the column from the top, deposits join the sediment pool), and what
-    /// was applied is sampled back onto L1 (`surface/feedback_applied_m`), so the surface can take
-    /// it off its own offset. Runs before the step's motion, on the positions of the last sampling.
+    /// The surface stage's state since the last step (P1-04, `surface/mod.rs`): where its surface
+    /// stands over this model's elevation (`surface/feedback_m`, the whole offset since
+    /// 2026-10-01, so a sample's elevation is the surface's at its scale) and the material it moved
+    /// (`surface/material_m`) per L1 cell are spread onto the samples with the last L1 sampling's
+    /// barycentric weights (each sample takes the weighted mean over the cells that see it), added
+    /// to their elevation and rock pools (erosion strips the column from the top, deposits join
+    /// the sediment pool); what was applied is sampled back onto L1
+    /// (`surface/feedback_applied_m`, a diagnostic). Runs before the step's motion, on the
+    /// positions of the last sampling.
     fn apply_surface_feedback(
         &mut self,
         st: &mut PlateState,
