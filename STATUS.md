@@ -151,10 +151,14 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
     With the fix: `lava=0 lavaAboveLakes=0 seaOnLava=0 openDeep=42275` (4,096 columns, 2,048 of them over a sea bed
     below y −60). **With vanilla's picker put back** (the one assignment removed on the VM's copy, then restored): FAIL,
     `lava=256029 topLavaY=-55 lavaAboveLakes=238767 seaOnLava=418`: the test catches the bug.
-- **Gates** (VM): `cargo fmt --check`, `clippy -D warnings`, `cargo test --workspace` (353 core + the rest, 0 failed),
-  `cargo deny` ok; `./gradlew build test` → tests=167 failures=0; `./gametest.sh` → All 58 required tests passed (555 s, chunk peak
-  24,263, heap peak 6,134 of 6,144 MB: the new level held 800 chunks at the peak). `./gametest.sh -PwithMic
-  -PgametestOnly=lavaStaysAtTheFloor`: MIC_GT
+- **Gates** (VM, after merging master 83aaa51 into the branch, tree 4c928b7): `cargo fmt --check`, `clippy -D warnings`,
+  `cargo deny` ok; `cargo test --workspace` 523 passed, 0 failed, 3 ignored; `./gradlew build test` → tests=168
+  failures=0; `./gametest.sh` → All 59 required tests passed (458 s); `./gametest.sh -PwithMic
+  -PgametestOnly=lavaStaysAtTheFloor` → passed (`lava=0 lavaAboveLakes=0 seaOnLava=0 openDeep=78373`; the MIC set is a
+  copy of the workbench's, pack 790e116). A first MIC attempt died in mod loading before any test (Cobblemon's
+  `PrioritizedList.add` raced during parallel mod construction, reported as tim_core failing to load); the next start
+  loaded. The full MIC suite was not run here. Before the merge the default suite's heap peaked at 6,134 of 6,144 MB;
+  the new level held 800 of the 24,263 chunks at that peak.
 - **Also seen, not changed.**
   - The test planet's deepest sea bed is at y −399, below the world's floor (y −352): the sea there is water down to
     bedrock level. It is the mirror of terrain above the build limit (the height-limit question above).
