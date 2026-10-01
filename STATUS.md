@@ -79,6 +79,51 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-30 — Coal placement knows the sedimentary cover; eroded fields free their space (agent worktree agent-aacd864d2709d52dd, branch coal-cover-placement, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** After coal was capped to the cover (entry below), counted coal fell to 73 % of the USGS target: fields
+  were drawn where there is no cover to hold seams. Follow-up asked for: fields form only where there is cover, in the
+  formation weights, not a post-hoc fix; then Ben (decisions log 2026-09-30): "Yes, eroded fields free their space
+  (Recommended)".
+- **Cover in the weights** (`deposits::mod`, the counts loop). For a stacked type with a cover, each tract cell's room
+  is `(Cover::blocks_at − COVER_MARGIN_BLOCKS) × m_per_block_v`; a cell with less than one block of room holds no
+  coal. Such cells get zero preservation (`p_cell`), the ledger's depth limit is cut to the room, the tract weight
+  φ = A·F̄·E uses the favourability of the holding cells only, and the placement weights and `allowed` skip cells that
+  hold nothing. The survivor formula then rescales λ so the target is met from the cells that can hold coal.
+- **Eroded fields free their space.** The weights alone did not bring the count back (counted 46, sites 62, 93 of
+  352 drawn fields found no room): coal is the one adjoining type (non-overlapping plan ellipses), and a field that
+  would later be eroded or find no cover still took its footprint. `cluster::place` now takes a `claims(k, point)`
+  callback and only a field that claims keeps its ellipse in `placed`; the stage answers with `survives`, which decides
+  the field's fate exactly as `materialise` does — the same formation draw (`formation_draw`, shared), the preservation
+  ledger, the stack in the cover (`stack_plan`, shared: seam plan, `fit_stack`, capped re-plan), the build-range check
+  and the seams left below the ground (`stack_bodies`) — from the same random streams, without touching the world.
+  Surviving fields still never overlap; eroded, cover-less and too-deep ones do not crowd them out. Deterministic:
+  `materialise`'s draws are unchanged by the refactor, `claims` draws nothing from the placement stream (a second
+  `stage deposits` run gives the same census for every type). Types formed at their causes skip the check (none is
+  adjoining). Unit test `only_claiming_fields_reserve_space` (a one-cell tract: six fields land when none claims, one
+  when all do, four when the fourth is the first to claim).
+- **Measured** (Mac, release; the six landscapes: `stage deposits --in` the `stage structure --preset
+  pipeline_quick_16k --start {scattered_continents,supercontinent} --length-myr 500 --set seed={1,2,3}` checkpoints;
+  master 52b6626's binary, the cover-weights commit c51f775's, and this branch's):
+
+  | coal, six landscapes | master | cover in weights | **+ eroded fields free space** |
+  |---|---|---|---|
+  | counted (target 11.92 / 13.94 / 11.61 / 5.32 / 9.85 / 15.99, Σ 68.6) | 9 / 9 / 6 / 2 / 5 / 19 = 50 (73 %) | 3 / 10 / 6 / 5 / 8 / 14 = 46 | **8 / 20 / 13 / 5 / 7 / 17 = 70 (102 %)** |
+  | sites | 12 / 15 / 7 / 3 / 6 / 19 = 62 | 7 / 13 / 6 / 7 / 9 / 20 = 62 | **13 / 25 / 14 / 7 / 10 / 18 = 87** |
+  | fields that found no room (of drawn) | 57 of 294 | 93 of 352 | **7 of 320** (0 / 2 / 0 / 0 / 4 / 1) |
+  | expected sites at the placed positions vs the formula's | 94.5 vs 125.7 | 65.5 vs 82.6 | **82.8 vs 82.6** |
+  | no_cover / eroded | 56 / 119 | 75 / 122 | 86 / 140 |
+  | seams (max per landscape) | 364 (8–22) | 411 (13–22) | 560 (13–24) |
+
+  Per landscape the counts scatter around their targets (Poisson draws; scattered 2 has 20 against 13.9), the sum is
+  on target. `stage deposits` 51–74 s per landscape.
+- **Gates** (Mac, the branch after merging master 0905793): `cargo fmt --check`, `clippy --workspace --all-targets
+  --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` 415 passed, 0 failed,
+  3 ignored; `cd neoforge && ./gradlew build test` → tests=151 failures=0; `./gametest.sh` → 51 PASS, 1 FAIL
+  (`climateConsistent`: BW 0.472 < 0.650, Dsub 0.822 < 0.850, BW:desert 0.423 < 0.450 — the same numbers as on
+  master, being fixed by the climate agent); `tools/smoke/install.sh mic` + `./gametest.sh -PwithMic` → 51 PASS, 1
+  FAIL (the same `climateConsistent`: BW 0.485, BS 0.513, BW:desert 0.446, Dfc:taiga 0.430).
+- **Next.** Merge into master (the parent merges when green).
+
 ### 2026-09-30 — Satellite view: a true-colour keyframe layer, the default everywhere (agent worktree agent-a7ca2a0e875263a86, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben: "Default view on the viewer is currently an elevation map, can you turn it into an actual map. (I.E.
   Approximately what you would see on google earth zoomed out all the way / satellite imagery.) So I can see where
