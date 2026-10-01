@@ -42,6 +42,8 @@ public final class WorldData {
     /** {@code rivers/rivers.dtrv} (P1-22), read on first use; {@link #NO_RIVERS} when absent. */
     private volatile Object rivers;
     private static final Object NO_RIVERS = new Object();
+    /** {@code volcanoes/active.json}, read on first use. */
+    private volatile Volcanoes volcanoes;
     /** The ice cover, resolved on first use. */
     private volatile Optional<IceCover> iceCover;
 
@@ -133,6 +135,19 @@ public final class WorldData {
             }
         }
         return r == NO_RIVERS ? null : (Rivers) r;
+    }
+
+    /** The volcanoes active at the present ({@code volcanoes/active.json}); none for a world without the file. */
+    public Volcanoes volcanoes() {
+        Volcanoes v = volcanoes;
+        if (v == null) {
+            synchronized (this) {
+                if (volcanoes == null)
+                    volcanoes = Volcanoes.read(folder);
+                v = volcanoes;
+            }
+        }
+        return v;
     }
 
     /** {@code strata/classes.json}: class index → rock class id (read once). */

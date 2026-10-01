@@ -7,6 +7,7 @@
   "mixins": [
     "MinecraftServerFirstStartMixin",
     "WorldDimensionsShapeMixin",
+    "PlacedFeatureLavaMixin",
     "compat.excavated_variants.OreReplacerMixin",
     "compat.createoreexcavation.OreVeinGeneratorMixin",
     "compat.createoreexcavation.OreDataMixin",
