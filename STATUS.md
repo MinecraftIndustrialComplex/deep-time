@@ -145,9 +145,14 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   - GameTest `LavaGameTests.lavaStaysAtTheFloor` on the new level `deeptime:test_planet_caves` (the real test planet
     with the full router, `deeptime:planet`; every other test level uses `planet_nocaves`, which is why nothing saw
     this): chunks at the deepest sea, a sea about 150 blocks deep, a coast and high ground; no lava above y −288, no sea
-    column standing on lava, open space below the floor level is lava. GAMETEST_RESULTS
+    column standing on lava, open space below the floor level is lava.
+    With the fix: `lava=0 lavaAboveLakes=0 seaOnLava=0 openDeep=42275` (4,096 columns, 2,048 of them over a sea bed
+    below y −60). **With vanilla's picker put back** (the one assignment removed on the VM's copy, then restored): FAIL,
+    `lava=256029 topLavaY=-55 lavaAboveLakes=238767 seaOnLava=418`: the test catches the bug.
 - **Gates** (VM): `cargo fmt --check`, `clippy -D warnings`, `cargo test --workspace` (353 core + the rest, 0 failed),
-  `cargo deny` ok; `./gradlew build test` → tests=167 failures=0. GAMETEST_GATES
+  `cargo deny` ok; `./gradlew build test` → tests=167 failures=0; `./gametest.sh` → All 58 required tests passed (555 s, chunk peak
+  24,263, heap peak 6,134 of 6,144 MB: the new level held 800 chunks at the peak). `./gametest.sh -PwithMic
+  -PgametestOnly=lavaStaysAtTheFloor`: MIC_GT
 - **Also seen, not changed.**
   - The test planet's deepest sea bed is at y −399, below the world's floor (y −352): the sea there is water down to
     bedrock level. It is the mirror of "terrain above the build limit" (pending question above).
