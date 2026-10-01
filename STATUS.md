@@ -178,7 +178,10 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Gates** (Mac): `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo deny check
   licenses bans` clean; `cargo test --workspace` core 323 + 3 ignored, cli 30, …, all pass; `cargo test --release -p
   deeptime-core plates::tests::statistics -- --ignored` passes (p90 165–200 Myr, 95.7–97.1 % < 250 Myr, 27–30 plates);
-  `./gradlew build test` tests=155 failures=0 errors=0. No GameTests (coordinator).
+  `./gradlew build test` tests=155 failures=0 errors=0. Re-run after merging master 4105de7 (P1-22 rivers and
+  lakes, volcano follow-ups, diamictite, coal placement): core 332 + 3 ignored, cli 31, fmt, clippy, deny clean, JUnit
+  157/0; one 400-Myr scattered run on the merged tree matches the ensemble (active 0.31, passive 0.63, floor 103 Myr,
+  orogen 0.33, cones' ground 745 m). No GameTests (coordinator).
 - **For the coordinator's GameTests.** The built-in planets change (plate model, cordillera, presets, the test planet
   `planet_world_4k`): expect different land/biome counts in planet-world tests; climate shares on the 400-Myr ensemble
   stay close (E 0.44 → 0.40, B 0.17 → 0.22), so `climateConsistent` floors re-based on the test planet may need the
