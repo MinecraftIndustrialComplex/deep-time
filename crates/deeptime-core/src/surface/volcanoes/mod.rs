@@ -1180,7 +1180,32 @@ impl VolcanoStage {
             let prof = |r: f64| sh.body(r);
             let layers = rocks.of(v);
             let mut vol = 0.0;
-            for (c, wgt) in l1.render(v.x, v.z, v.radius_m, 1.0, &prof) {
+            let cells = l1.render(v.x, v.z, v.radius_m, 1.0, &prof);
+            // No cell the cone stands on passes the ceiling. The target above is measured from the
+            // ground round the cone (`base`), and that alone let the surface under a cone ratchet
+            // up: every step the surface stage eroded the cone, isostasy gave part of it back,
+            // the cone's height was debited the whole erosion and rebuilt it. With the ground
+            // rising and the ring round it not, cones stood on 15–25 km of their own rebuilding
+            // (2026-10-01, seed 13 of the test planet).
+            let top = sea + ceiling;
+            let room = cells
+                .iter()
+                .filter(|&&(_, wgt)| wgt > 0.0)
+                .map(|&(c, wgt)| {
+                    let here = f64::from(l1.elev[c]) + f64::from(l1.delta[c]);
+                    ((top - here) / (dh * wgt)).clamp(0.0, 1.0)
+                })
+                .fold(1.0f64, f64::min);
+            let room = if std::env::var_os("DEEPTIME_OLD_OFFSET").is_some() {
+                1.0 // TRACE
+            } else {
+                room
+            };
+            let dh = dh * room;
+            if dh <= 0.0 {
+                continue;
+            }
+            for (c, wgt) in cells {
                 let dz = (dh * wgt) as f32;
                 l1.delta[c] += dz;
                 vol += f64::from(dz);

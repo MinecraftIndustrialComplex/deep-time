@@ -623,16 +623,39 @@ impl SurfaceStage {
                     false
                 };
                 let foreign = std::sync::atomic::AtomicU64::new(0);
-                st.offset_m = src
+                // The surface is carried as an elevation, not as an offset: before the step this
+                // crust's surface stood at h (the same-crust corners of its source), and the plate
+                // model then moved that crust up or down by its own uplift (`plates/uplift_mm_yr`:
+                // each sample's elevation change over the step, after the feedback). The offset is
+                // what is left over the plate model's elevation here.
+                //
+                // It used to be advected as an offset and added to the plate model's elevation
+                // under the cell. That elevation is sampled anew every step from another mix of
+                // L0 samples, and under a cell it can change by kilometres with no uplift at all
+                // (the cell now reads the high side of a margin); the offset, built against the
+                // low side, was added on top: +5 to +8 km in a step, the 13–20 km "mountains" of
+                // 2026-10-01. The plate model's cap never saw them, since its own elevation was fine.
+                let lift = dt * 1.0e-3;
+                let prev_h = &st.elevation_m;
+                let moved: Vec<f32> = src
                     .par_iter()
                     .enumerate()
                     .map(|(c, &[fi, fj])| {
-                        advect::bilinear_same(w, hgt, &off, fi, fj, |s| same_crust(c, s)).unwrap_or_else(|| {
-                            foreign.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            0.0
-                        })
+                        if old_rule {
+                            return advect::bilinear(w, hgt, &off, fi, fj); // TRACE
+                        }
+                        match advect::bilinear_same(w, hgt, prev_h, fi, fj, |s| same_crust(c, s)) {
+                            Some(h) => {
+                                (f64::from(h) + f64::from(pf.uplift[c]) * lift - f64::from(pf.elevation[c])) as f32
+                            }
+                            None => {
+                                foreign.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                0.0
+                            }
+                        }
                     })
                     .collect();
+                st.offset_m = moved;
                 foreign_cells = foreign.into_inner();
                 if std::env::var_os("DEEPTIME_SURFACE_TRACE").is_some() {
                     // TRACE
@@ -1315,9 +1338,10 @@ impl SurfaceStage {
                     }
                 }
                 line += &format!(
-                    ",\"risers\":{{\"n\":{m},\"tect\":{:.0},\"h0\":{:.0},\"plate\":{:.0},\"dplate\":{:.0},\"minus_applied\":{:.0},\"above10\":{hi},\"worst\":{{\"lift\":{:.0},\"h0\":{:.0},\"plate\":{:.0},\"prevH\":{:.0},\"prevPlate\":{:.0},\"prevOff\":{:.0},\"appliedAdv\":{:.0},\"crust\":{:.0},\"age\":{:.1}}}}}",
+                    ",\"risers\":{{\"n\":{m},\"tect\":{:.0},\"h0\":{:.0},\"plate\":{:.0},\"dplate\":{:.0},\"minus_applied\":{:.0},\"above10\":{hi},\"worst\":{{\"lift\":{:.0},\"h0\":{:.0},\"plate\":{:.0},\"prevH\":{:.0},\"prevPlate\":{:.0},\"prevOff\":{:.0},\"appliedAdv\":{:.0},\"crust\":{:.0},\"age\":{:.1},\"uplift_m\":{:.0},\"orog\":{:.0},\"orog_age\":{:.0}}}}}",
                     t / k, h0 / k, pl / k, dplate / k, unapp / k, worst.0, h_start[wc], pf.elevation[wc], p[wc],
-                    f64::from(p[wc]) - po, po, pa, pf.crust_type[wc], pf.crust_age[wc]
+                    f64::from(p[wc]) - po, po, pa, pf.crust_type[wc], pf.crust_age[wc],
+                    f64::from(pf.uplift[wc]) * dt_myr * 1000.0, pf.orogeny_type[wc], pf.orogeny_age[wc]
                 );
             }
             let top = (0..n).max_by(|&x, &y| sc.h[x].total_cmp(&sc.h[y])).unwrap_or(0);
@@ -1383,7 +1407,24 @@ impl SurfaceStage {
         let elevation_y: Vec<f32> = (0..n)
             .map(|c| (sea_y + (sc.h[c] - sea) / m_per_block_v) as f32)
             .collect();
-        let feedback: Vec<f32> = (0..n).map(|c| (sc.h[c] - h_start[c]) as f32).collect();
+        // What the plate model is told: where the surface stands over the plate model's own
+        // elevation, all of it, not only this step's change. Each sample takes the mean over its
+        // cells, so its elevation is the surface's at its scale and the uplift laws that look at
+        // it (the ceiling on collision and subduction uplift, the cap) see the real height. With
+        // only the step's change handed over, whatever a sample had not taken (the spread onto
+        // coarser samples, its clamps) stayed in the surface for good and the two drifted apart:
+        // crust the plate model held at 2.8 km stood at 14 km and still took a full collision
+        // surge.
+        let old_feedback = std::env::var_os("DEEPTIME_OLD_OFFSET").is_some(); // TRACE
+        let feedback: Vec<f32> = (0..n)
+            .map(|c| {
+                if old_feedback {
+                    (sc.h[c] - h_start[c]) as f32 // TRACE
+                } else {
+                    (sc.h[c] - f64::from(pf.elevation[c])) as f32
+                }
+            })
+            .collect();
         let material: Vec<f32> = net.iter().map(|&x| x as f32).collect();
         st.offset_m = (0..n)
             .map(|c| (sc.h[c] - f64::from(pf.elevation[c])) as f32)
