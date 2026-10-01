@@ -10,7 +10,7 @@ page. Nothing is claimed until you have looked: open each link and check the sho
 
 - volcanoes: the run's own events (`deeptime:volcano_*` with a standing height) with their block.
 - fjords: a lattice of `world/sample` calls (step 24 blocks) over 45..80 degrees of latitude for sea
-  points more than 8 blocks below sea level with land at least 25 blocks (500 m) high within 36 blocks
+  points more than 8 blocks below sea level with land at least FJORD_WALL (25) blocks high within FJORD_REACH (36) blocks
   on both sides of an axis: a narrow deep arm between high ground, ranked by the lower side.
 - mouths: the river network's largest mouths in the sea (rivers/rivers.dtrv, read from --world).
 Standard library only.
@@ -49,7 +49,9 @@ def sample(base, x, z):
 
 def fjords(base, info):
     c, sea = info["circumference"], info["sea_level_y"]
-    step, reach = 24, 36
+    import os
+    step, reach = 24, int(os.environ.get("FJORD_REACH", 36))
+    wall = float(os.environ.get("FJORD_WALL", 25))
     found = []
     for hemi in (-1, 1):
         for zi in range(int(45 / 360 * c), int(80 / 360 * c), step):
@@ -61,7 +63,7 @@ def fjords(base, info):
                 for dx, dz in ((reach, 0), (0, reach)):
                     a, b = sample(base, x - dx, z - dz), sample(base, x + dx, z + dz)
                     low = min(a["terrain_y"], b["terrain_y"])
-                    if a["surface"] != "sea" and b["surface"] != "sea" and low > sea + 25:
+                    if a["surface"] != "sea" and b["surface"] != "sea" and low > sea + wall:
                         found.append((low - sea, x, z))
     found.sort(reverse=True)
     seen = []
