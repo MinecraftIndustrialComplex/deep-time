@@ -1,0 +1,6 @@
+# Deep Time's standalone set plus Distant Horizons at the MIC pack's pin (P3-04, plan §10.5): the
+# smallest server on which Distant Horizons' server side takes its LODs from Deep Time's world data
+# (python3 tools/smoke/run.py --profile dh --dh). Keep the id equal to pack/mods/distanthorizons.pw.toml
+# and to dh_version in neoforge/gradle.properties; install.sh warns when the pack's differs.
+@include standalone
+distanthorizons     EtH8QtMq   # 3.3.0-1.21.1 (pack pin; LGPL-3.0; merged jar, API classes named <Class>_neoforge)

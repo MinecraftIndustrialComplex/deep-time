@@ -13,6 +13,21 @@ and contribute no code.
 | [climlab](https://github.com/climlab/climlab) by Brian Rose — `climlab/model/ebm.py` (`EBM`, `EBM_seasonal`), with the processes it assembles (`AplusBT`, `StepFunctionAlbedo`, `MeridionalHeatDiffusion`, `DailyInsolation`), read on 2026-09-28 (commit fcbde37) | [MIT](https://github.com/climlab/climlab/blob/main/LICENSE), Copyright (c) 2017 Brian E. J. Rose | The climate's energy balance (P1-05): the diffusive EBM equation C ∂T/∂t = (1−α)Q − (A + BT) + (1/cos φ)∂/∂φ(cos φ D ∂T/∂φ), the P₂ albedo with an ice step, the daily-mean insolation formula and climlab's default constants (ported as equations; adapted: a land and a slab-ocean surface per band, a smoothed ice step, sea-ice insulation, ice sheets, implicit time stepping, a circular orbit) | `crates/deeptime-core/src/climate/{ebm.rs, insolation.rs}` |
 | [MultiScaleErosion](https://github.com/H-Schott/MultiScaleErosion) by H-Schott (Schott et al. 2024, "Terrain Amplification using Multi-scale Erosion", ACM TOG 43(4)) — `data/shaders/{erosion,thermal,deposition}.glsl` and the "Result" sequences of `src/code/src/main.cpp` (commit 964a3d5), read on 2026-09-29 | [MIT](https://github.com/H-Schott/MultiScaleErosion/blob/main/LICENSE), Copyright (c) 2023 Schott | The amplifier's passes (P1-06): the multiple-flow drainage area (a cell sends its area to each lower neighbour in proportion to slope^p and takes what its neighbours send, one hop per iteration), the stream-power lowering k·A^m·S^n clamped to the receiver's height, the thermal pass (a neighbour more than tan θ below takes matter, more than tan θ above gives it; the threshold angle carries smooth noise) and the deposition pass (sediment travels along the same weights and settles where the flow's capacity is below the load), and the workflow erosion → thermal → deposition alternated with ×2 upsampling (ported as equations, not line by line; adapted: SI units and an incision length at a reference area and slope, a coarse-level drainage-area prior refined instead of started from zero, pairwise excess-proportional thermal transfer, deposition of the eroded load with a half-gap cap, Priority-Flood repair, tiles with halos on the CPU) | `crates/deeptime-core/src/surface/{amplify.rs, amplify/kernels.rs, thermal.rs}` |
 
+## APIs called (nothing ported, nothing shipped)
+
+- **Distant Horizons** by James Seibel and the Distant Horizons team
+  (https://gitlab.com/distant-horizons-team/distant-horizons), LGPL-3.0. When it is installed, Deep
+  Time registers a world generator through its public API (`com.seibel.distanthorizons.api`:
+  `DhApi.worldGenOverrides`, `IDhApiWorldGenerator.generateLod`, `IDhApiFullDataSource`,
+  `DhApiTerrainDataPoint`, `IDhApiWrapperFactory`, `IDhApiWorldProxy`, `IDhApiTerrainDataRepo`), so
+  its far terrain comes from Deep Time's world data (P3-04). The API is bound by name at run time
+  (`neoforge/src/main/java/.../compat/dh/DhApiBinding.java`); no Distant Horizons class is compiled
+  against, copied or included in Deep Time's jar. What the API expects of a generator (the y of a
+  data point counted from the level's bottom, air up to the top of the level, the generation step
+  of a finished column) was read from the class files of Distant Horizons 3.3.0, 3.3.1 and 3.3.3
+  with `javap` and a decompiler; no code was taken. The tests download the 3.3.0 and 3.3.3 jars
+  from Modrinth and open them (`DhApiBindingTest`); they are never redistributed.
+
 ## Data
 
 - **U.S. Geological Survey grade–tonnage models and reports** (public domain, works of the U.S.
