@@ -6,23 +6,27 @@
 //! # Coupling with the plates (plan §8 intro)
 //! The stage is interleaved with the plates stage (`Stage::coupled_to`): after every plate step it
 //! takes one step of the same length. L1 is fixed on the planet and the crust moves over it, so the
-//! surface keeps its elevation as the plate model's (`plates/elevation_m`, sampled onto L1 every
-//! step; the pipeline presets set `tectonics.l1_every_steps` = 1) plus an **offset** — valleys,
-//! basins, eroded ranges, everything the plate model's coarse L0 elevation does not carry — which
-//! moves with the plates (`advect.rs`) together with the regolith and the strata log. Uplift is
-//! therefore whatever the plate model did to the crust under a cell (subduction and collision
-//! uplift, thermal subsidence, trench accretion), exactly P1-03's `plates/uplift_mm_yr`.
+//! surface's elevation, regolith and strata log move with the plate under each cell (`advect.rs`),
+//! each with its own crust: a cell takes them from the cells that held the same crust before the
+//! step, and where another plate's crust has arrived it starts from the plate model's elevation.
+//! Uplift is what the plate model did to the crust under a cell (subduction and collision uplift,
+//! thermal subsidence, trench accretion), exactly P1-03's `plates/uplift_mm_yr`: the surface
+//! starts a step at its last elevation, carried, plus that uplift. The **offset** is what stands
+//! between it and the plate model's own elevation (`plates/elevation_m`, sampled onto L1 every
+//! step; the pipeline presets set `tectonics.l1_every_steps` = 1): valleys, basins, eroded ranges,
+//! what the coarse L0 samples do not carry. It is an output, not the state (2026-10-01: carried as
+//! the state and added to the plate model's elevation, it was added to whatever crust the cell
+//! read next, and built 13–20 km "mountains").
 //!
-//! The surface's changes flow back: the net elevation change of every cell (`surface/feedback_m`,
-//! and the material moved, `surface/material_m`) is spread onto the L0 samples at the start of the
-//! next plate step (`plates::PlatesStage`), which reports what it applied as seen from L1
-//! (`surface/feedback_applied_m`); the offset is corrected by it, so the two elevations never
-//! drift apart. The plate model's own continental erosion (Cortial's ε_c) is off in the pipeline
-//! presets — this stage does erosion.
+//! The surface flows back: the whole offset of every cell (`surface/feedback_m`, and the material
+//! moved this step, `surface/material_m`) is spread onto the L0 samples at the start of the next
+//! plate step (`plates::PlatesStage`), so a sample's elevation is the surface's at its scale and
+//! the plate model's uplift laws see the real height. The plate model's own continental erosion
+//! (Cortial's ε_c) is off in the pipeline presets — this stage does erosion.
 //!
 //! # One step (Δt = the plate step, `substeps` LEM steps inside it)
-//! 1. Advect the offset, regolith and strata log; clear them on crust born this step.
-//! 2. h = plate elevation + offset; sea level from the preset (`params::SeaLevel`), or, with a
+//! 1. Carry the elevation, regolith and strata log; clear them on crust born this step.
+//! 2. h = carried elevation + the plate model's uplift; sea level from the preset (`params::SeaLevel`), or, with a
 //!    climate stage, its eustatic sea level (the curve plus glacio-eustasy); climate
 //!    (`climate.rs`: the climate stage's fields, which it wrote just before this step on the same
 //!    ground, when the preset has a `climate` section (P1-05), else the stand-in).
@@ -513,30 +517,16 @@ impl SurfaceStage {
         let parents: Vec<Option<u32>> = plates.plates.iter().map(|p| p.parent).collect();
         let pstep = plates.step;
         let pf = PlateFields::read(world, n)?;
-        let applied = world
-            .fields
-            .get(field::FEEDBACK_APPLIED)
-            .filter(|f| f.data.len() == n)
-            .map(|f| f.data.clone());
         let cls = self.classes;
         let p = self.p.clone();
 
         // 1. The state, carried with the plates.
         let started = Instant::now();
-        let mut trace_prev: Option<Vec<f32>> = None; // TRACE
-        let mut trace_off: Option<Vec<f32>> = None; // TRACE
-        let mut trace_app: Option<Vec<f32>> = None; // TRACE
         // Cells where another plate's crust arrived this step (the offset starts again there).
         let mut foreign_cells = 0u64;
         let mut st = match world.surface.take() {
             Some(mut st) => {
                 ctx.reserve(StrataLog::bytes_per_cell(st.log.k) * n as u64 + 16 * n as u64)?;
-                let mut off = st.offset_m.clone();
-                if let Some(ap) = &applied {
-                    off.par_iter_mut()
-                        .zip(ap.par_iter())
-                        .for_each(|(o, a)| *o -= a);
-                }
                 // Plates born this step moved with their parent's Ω.
                 let omega: Vec<[f64; 3]> = (0..parents.len())
                     .map(|mut k| {
@@ -553,118 +543,37 @@ impl SurfaceStage {
                     })
                     .collect();
                 let src = advect::sources(&grid, &pf.plate_id, &omega, dt);
-                if std::env::var_os("DEEPTIME_SURFACE_TRACE").is_some() {
-                    // TRACE
-                    trace_off = Some(
-                        src.par_iter()
-                            .map(|&[fi, fj]| advect::bilinear(w, hgt, &st.offset_m, fi, fj))
-                            .collect(),
-                    );
-                    if let Some(ap) = &applied {
-                        trace_app = Some(
-                            src.par_iter()
-                                .map(|&[fi, fj]| advect::bilinear(w, hgt, ap, fi, fj))
-                                .collect(),
-                        );
-                    }
-                }
-                // The offset moves with its own crust: a corner cell counts when it held the
-                // same rigid group before the step (a group keeps its number when a collision
-                // hands it to another plate), the same plate, or the parent of a plate born this
-                // step. Where no corner did, the crust is new at this place (another plate's edge
-                // arrived over a trench, a small plate was absorbed) and starts at the plate
-                // model's elevation: what the surface had built here belongs to the crust that
-                // left. Without the last step's ids (the first step after an older checkpoint)
-                // every corner counts, as before.
+                // The elevation moves with its own crust and takes the plate model's uplift
+                // (`advect::carried_elevation`); the offset is what stands over the plate model's
+                // elevation here.
                 let prev_ids = |name: &str| {
                     world
                         .fields
                         .get(name)
                         .filter(|f| f.data.len() == n)
-                        .map(|f| f.data.clone())
+                        .map(|f| f.data.as_slice())
                 };
-                let prev_plate = prev_ids(field::CRUST_PLATE);
-                let prev_group = prev_ids(field::CRUST_GROUP);
-                let known = st.omega.len();
-                let old_rule = std::env::var_os("DEEPTIME_OLD_OFFSET").is_some(); // TRACE
-                let same_crust = |c: usize, s: usize| -> bool {
-                    if old_rule {
-                        return true; // TRACE
-                    }
-                    let Some(pp) = prev_plate.as_ref() else {
-                        return true;
-                    };
-                    let now = pf.plate_id[c];
-                    if pp[s] == now {
-                        return true;
-                    }
-                    if let (Some(pg), Some(g)) = (prev_group.as_ref(), pf.group_id.as_ref())
-                        && pg[s] == g[c]
-                    {
-                        // The same rigid group under another plate: a sutured terrane.
-                        return true;
-                    }
-                    // A plate born this step: its crust was its parent's.
-                    let mut k = now as usize;
-                    for _ in 0..64 {
-                        if !(now.is_finite() && now >= 0.0) || k < known {
-                            break;
-                        }
-                        match parents.get(k).copied().flatten() {
-                            Some(pk) => {
-                                if pp[s] == pk as f32 {
-                                    return true;
-                                }
-                                k = pk as usize;
-                            }
-                            None => break,
-                        }
-                    }
-                    false
-                };
-                let foreign = std::sync::atomic::AtomicU64::new(0);
-                // The surface is carried as an elevation, not as an offset: before the step this
-                // crust's surface stood at h (the same-crust corners of its source), and the plate
-                // model then moved that crust up or down by its own uplift (`plates/uplift_mm_yr`:
-                // each sample's elevation change over the step, after the feedback). The offset is
-                // what is left over the plate model's elevation here.
-                //
-                // It used to be advected as an offset and added to the plate model's elevation
-                // under the cell. That elevation is sampled anew every step from another mix of
-                // L0 samples, and under a cell it can change by kilometres with no uplift at all
-                // (the cell now reads the high side of a margin); the offset, built against the
-                // low side, was added on top: +5 to +8 km in a step, the 13–20 km "mountains" of
-                // 2026-10-01. The plate model's cap never saw them, since its own elevation was fine.
-                let lift = dt * 1.0e-3;
-                let prev_h = &st.elevation_m;
-                let moved: Vec<f32> = src
+                let (carried, foreign) = advect::carried_elevation(&advect::Carry {
+                    w,
+                    h: hgt,
+                    src: &src,
+                    prev_elevation: &st.elevation_m,
+                    prev_plate: prev_ids(field::CRUST_PLATE),
+                    prev_group: prev_ids(field::CRUST_GROUP),
+                    plate: &pf.plate_id,
+                    group: pf.group_id.as_deref(),
+                    plate_elevation: &pf.elevation,
+                    uplift_mm_yr: &pf.uplift,
+                    parents: &parents,
+                    known_plates: st.omega.len(),
+                    dt_yr: dt,
+                });
+                foreign_cells = foreign;
+                st.offset_m = carried
                     .par_iter()
-                    .enumerate()
-                    .map(|(c, &[fi, fj])| {
-                        if old_rule {
-                            return advect::bilinear(w, hgt, &off, fi, fj); // TRACE
-                        }
-                        match advect::bilinear_same(w, hgt, prev_h, fi, fj, |s| same_crust(c, s)) {
-                            Some(h) => {
-                                (f64::from(h) + f64::from(pf.uplift[c]) * lift - f64::from(pf.elevation[c])) as f32
-                            }
-                            None => {
-                                foreign.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                0.0
-                            }
-                        }
-                    })
+                    .zip(pf.elevation.par_iter())
+                    .map(|(h, z)| h - z)
                     .collect();
-                st.offset_m = moved;
-                foreign_cells = foreign.into_inner();
-                if std::env::var_os("DEEPTIME_SURFACE_TRACE").is_some() {
-                    // TRACE
-                    trace_prev = Some(
-                        src.par_iter()
-                            .map(|&[fi, fj]| advect::bilinear(w, hgt, &st.elevation_m, fi, fj))
-                            .collect(),
-                    );
-                }
                 let reg = std::mem::take(&mut st.regolith_m);
                 st.regolith_m = src
                     .par_iter()
@@ -1274,90 +1183,6 @@ impl SurfaceStage {
             iso -= l;
         }
         self.time("isostasy", started);
-        if let Ok(path) = std::env::var("DEEPTIME_SURFACE_TRACE") {
-            // TRACE
-            use std::io::Write;
-            let mut line = format!("{{\"t\":{t_end_myr:.0}");
-            for (name, thr) in [("land", sea), ("hi8", 8000.0), ("hi10", 10000.0)] {
-                let mut a = [0.0f64; 9];
-                let mut m = 0usize;
-                for c in 0..n {
-                    if sc.h[c] <= thr {
-                        continue;
-                    }
-                    m += 1;
-                    let plate = f64::from(pf.elevation[c]);
-                    a[0] += plate;
-                    a[1] += h_start[c] - plate;
-                    a[2] += h_start[c];
-                    a[3] += trace_prev.as_ref().map_or(0.0, |p| h_start[c] - f64::from(p[c]));
-                    a[4] += net[c].min(0.0);
-                    a[5] += net[c].max(0.0);
-                    a[6] += -load[c];
-                    a[7] += sc.h[c];
-                    a[8] += applied.as_ref().map_or(0.0, |ap| f64::from(ap[c]));
-                }
-                let k = m.max(1) as f64;
-                line += &format!(
-                    ",\"{name}\":{{\"n\":{m},\"plate\":{:.0},\"off\":{:.0},\"h0\":{:.0},\"tect\":{:.0},\"ero\":{:.0},\"dep\":{:.0},\"iso\":{:.0},\"h1\":{:.0},\"applied\":{:.0}}}",
-                    a[0] / k, a[1] / k, a[2] / k, a[3] / k, a[4] / k, a[5] / k, a[6] / k, a[7] / k, a[8] / k
-                );
-            }
-            if let Some(p) = trace_prev.as_ref() {
-                // risers: cells the plate model lifted by more than 1 km this step, on land.
-                let (mut m, mut t, mut h0, mut pl, mut hi, mut ap) = (0usize, 0.0, 0.0, 0.0, 0usize, 0.0);
-                let mut worst = (0.0f64, 0usize);
-                for c in 0..n {
-                    let d = h_start[c] - f64::from(p[c]);
-                    if d > 1000.0 && h_start[c] > sea {
-                        m += 1;
-                        t += d;
-                        h0 += h_start[c];
-                        pl += f64::from(pf.elevation[c]);
-                        ap += applied.as_ref().map_or(0.0, |x| f64::from(x[c]));
-                        if h_start[c] > 10000.0 {
-                            hi += 1;
-                        }
-                        if d > worst.0 {
-                            worst = (d, c);
-                        }
-                    }
-                }
-                let k = m.max(1) as f64;
-                let wc = worst.1;
-                let po = trace_off.as_ref().map_or(0.0, |x| f64::from(x[wc]));
-                let pa = trace_app.as_ref().map_or(0.0, |x| f64::from(x[wc]));
-                // Sum over risers of the two parts of the lift: the plate's own change and the unapplied feedback.
-                let (mut dplate, mut unapp) = (0.0, 0.0);
-                for c in 0..n {
-                    let d = h_start[c] - f64::from(p[c]);
-                    if d > 1000.0 && h_start[c] > sea {
-                        let prev_plate = f64::from(p[c]) - trace_off.as_ref().map_or(0.0, |x| f64::from(x[c]));
-                        dplate += f64::from(pf.elevation[c]) - prev_plate;
-                        unapp += -trace_app.as_ref().map_or(0.0, |x| f64::from(x[c]));
-                    }
-                }
-                line += &format!(
-                    ",\"risers\":{{\"n\":{m},\"tect\":{:.0},\"h0\":{:.0},\"plate\":{:.0},\"dplate\":{:.0},\"minus_applied\":{:.0},\"above10\":{hi},\"worst\":{{\"lift\":{:.0},\"h0\":{:.0},\"plate\":{:.0},\"prevH\":{:.0},\"prevPlate\":{:.0},\"prevOff\":{:.0},\"appliedAdv\":{:.0},\"crust\":{:.0},\"age\":{:.1},\"uplift_m\":{:.0},\"orog\":{:.0},\"orog_age\":{:.0}}}}}",
-                    t / k, h0 / k, pl / k, dplate / k, unapp / k, worst.0, h_start[wc], pf.elevation[wc], p[wc],
-                    f64::from(p[wc]) - po, po, pa, pf.crust_type[wc], pf.crust_age[wc],
-                    f64::from(pf.uplift[wc]) * dt_myr * 1000.0, pf.orogeny_type[wc], pf.orogeny_age[wc]
-                );
-            }
-            let top = (0..n).max_by(|&x, &y| sc.h[x].total_cmp(&sc.h[y])).unwrap_or(0);
-            line += &format!(
-                ",\"top\":{{\"h1\":{:.0},\"plate\":{:.0},\"h0\":{:.0},\"tect\":{:.0},\"net\":{:.0},\"iso\":{:.0}}}}}\n",
-                sc.h[top],
-                pf.elevation[top],
-                h_start[top],
-                trace_prev.as_ref().map_or(0.0, |p| h_start[top] - f64::from(p[top])),
-                net[top],
-                -load[top]
-            );
-            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
-                let _ = f.write_all(line.as_bytes());
-            }
-        }
 
         // 6. Outputs.
         let started = Instant::now();
@@ -1415,15 +1240,8 @@ impl SurfaceStage {
         // coarser samples, its clamps) stayed in the surface for good and the two drifted apart:
         // crust the plate model held at 2.8 km stood at 14 km and still took a full collision
         // surge.
-        let old_feedback = std::env::var_os("DEEPTIME_OLD_OFFSET").is_some(); // TRACE
         let feedback: Vec<f32> = (0..n)
-            .map(|c| {
-                if old_feedback {
-                    (sc.h[c] - h_start[c]) as f32 // TRACE
-                } else {
-                    (sc.h[c] - f64::from(pf.elevation[c])) as f32
-                }
-            })
+            .map(|c| (sc.h[c] - f64::from(pf.elevation[c])) as f32)
             .collect();
         let material: Vec<f32> = net.iter().map(|&x| x as f32).collect();
         st.offset_m = (0..n)
