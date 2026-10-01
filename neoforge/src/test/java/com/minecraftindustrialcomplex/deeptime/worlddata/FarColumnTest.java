@@ -317,6 +317,47 @@ class FarColumnTest {
         }
     }
 
+    /**
+     * A wide column's rock is its nearest strata cell's stack as stored; a column up to
+     * {@link FarColumn#FULL_RULE_MAX_STEP} blocks wide gets the column rule itself.
+     */
+    @Test
+    void wideColumnsTakeTheNearestCellsStack() {
+        RasterSampler strata = planet.layer(WorldData.HORIZONS);
+        GridDesc g = strata.desc().grid();
+        Columns.Stack got = new Columns.Stack(8), rule = new Columns.Stack(8);
+        int c = planet.circumference(), checked = 0;
+        for (int n = 0; n < 400; n++) {
+            long x = -c / 2 + (n * 97L) % c, z = -c / 4 + (n * 61L) % (c / 2);
+            for (int step : new int[]{1, 2}) {
+                FarColumn.rock(planet, strata, x, z, step, got);
+                Columns.stack(planet, strata, (int) x, (int) z, rule);
+                assertEquals(rule.count, got.count, "step " + step + " column " + x + ", " + z);
+                for (int h = 0; h < rule.count; h++) {
+                    assertEquals(rule.tops[h], got.tops[h]);
+                    assertEquals(rule.classes[h], got.classes[h]);
+                    assertEquals(rule.units[h], got.units[h]);
+                }
+            }
+            FarColumn.rock(planet, strata, x, z, 8, got);
+            long i = Math.round(Math.floor((double) (x - g.originBlockX()) / g.r() + 0.5));
+            long j = Math.round(Math.floor((double) (z - g.originBlockZ()) / g.r() + 0.5));
+            assertTrue(got.count > 0, "no rock at column " + x + ", " + z);
+            // Top-down, strictly descending tops, and every class is one the cell stores, in its order.
+            int h = 0;
+            for (int q = 0; q < got.count; q++) {
+                if (q > 0)
+                    assertTrue(got.tops[q] < got.tops[q - 1], "tops descend at column " + x + ", " + z);
+                while (h < strata.stackDepth() && strata.horizonClass(i, j, h) != got.classes[q])
+                    h++;
+                assertTrue(h < strata.stackDepth(), "class " + got.classes[q] + " is not in the nearest cell's stack, in order");
+            }
+            assertEquals((int) Math.floor(strata.horizonTop(i, j, 0)), got.tops[0], "the first horizon's top at column " + x + ", " + z);
+            checked++;
+        }
+        assertEquals(400, checked);
+    }
+
     // ---- The layer rules, on hand-made columns ----
 
     static FarColumn.Shape shape(Water.Kind kind, int ground, int waterTop, int ice) {
@@ -455,7 +496,7 @@ class FarColumnTest {
             for (int i = 0; i < 64; i++) {
                 FarColumn.Shape s = grid[(j + 1) * 66 + (i + 1)];
                 if (strata != null)
-                    Columns.stack(wd, strata, (int) FarColumn.wrapX(wd, x0 + (long) i * step + half), (int) (z0 + (long) j * step + half), stack);
+                    FarColumn.rock(wd, strata, FarColumn.wrapX(wd, x0 + (long) i * step + half), z0 + (long) j * step + half, step, stack);
                 soil.frozen = s.ice > 0;
                 FarColumn.layers(spec.minY(), spec.maxY(), s, soil, strata == null ? null : stack,
                         Math.min(256, FarColumn.exposure(grid, 64, i, j) + 8), cover, layers);
@@ -534,8 +575,27 @@ class FarColumnTest {
                 best = Math.min(best, (System.nanoTime() - t0) / 1e6 / sections);
             }
             assertTrue(sections > 0 && sink != 0);
-            System.out.printf("[bench] far section step=%d (%d blocks wide) ms/section=%.3f us/column=%.3f sections=%d%n", step, span,
-                    best, best * 1000.0 / 4096.0, sections);
+            // Where the time goes: the geometry alone, and the strata rule alone, over the same sections.
+            Water.Spec spec = spec(planet);
+            RasterSampler strata = planet.layer(WorldData.HORIZONS);
+            double gridMs = Double.MAX_VALUE, stackMs = Double.MAX_VALUE;
+            for (int pass = 0; pass < 2; pass++) {
+                long t0 = System.nanoTime();
+                for (long z = -c / 4; z < c / 4; z += Math.max(span, c / 16))
+                    for (long x = -c / 2; x < c / 2; x += Math.max(span, c / 16))
+                        FarColumn.grid(planet, spec, x, z, step, 64, grid);
+                gridMs = Math.min(gridMs, (System.nanoTime() - t0) / 1e6 / sections);
+                t0 = System.nanoTime();
+                for (long z = -c / 4; z < c / 4; z += Math.max(span, c / 16))
+                    for (long x = -c / 2; x < c / 2; x += Math.max(span, c / 16))
+                        for (int j = 0; j < 64; j++)
+                            for (int i = 0; i < 64; i++)
+                                FarColumn.rock(planet, strata, FarColumn.wrapX(planet, x + (long) i * step + step / 2),
+                                        z + (long) j * step + step / 2, step, stack);
+                stackMs = Math.min(stackMs, (System.nanoTime() - t0) / 1e6 / sections);
+            }
+            System.out.printf("[bench] far section step=%d (%d blocks wide) ms/section=%.3f us/column=%.3f sections=%d "
+                            + "(geometry %.3f ms, strata %.3f ms)%n", step, span, best, best * 1000.0 / 4096.0, sections, gridMs, stackMs);
         }
     }
 }

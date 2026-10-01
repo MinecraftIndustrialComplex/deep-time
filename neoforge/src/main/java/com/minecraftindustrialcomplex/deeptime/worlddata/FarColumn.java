@@ -275,6 +275,39 @@ public final class FarColumn {
         out.add(top, maxY + 1, AIR, 0, 0);
     }
 
+    /** The widest column that still gets the full strata column rule ({@link #rock}). */
+    public static final int FULL_RULE_MAX_STEP = 2;
+
+    /**
+     * The horizon stack of a column {@code step} blocks wide at canonical block (wx, z).
+     *
+     * <p>Up to {@link #FULL_RULE_MAX_STEP} blocks wide it is the column rule itself
+     * ({@link Columns#stack}: the 4 × 4 strata cells around, beds correlated and intertongued), so
+     * far rock is the rock the strata pass paints. A wider column takes the stack of its nearest
+     * strata cell as stored: the rule's blend between cells moves a bed's edge by less than such a
+     * column is wide, and its stencil is built per strata cell, which costs a wide column (one new
+     * cell each) ten times what it costs a chunk's columns (one cell for many).
+     */
+    public static void rock(WorldData wd, RasterSampler strata, long wx, long z, int step, Columns.Stack out) {
+        if (step <= FULL_RULE_MAX_STEP) {
+            Columns.stack(wd, strata, (int) wx, (int) z, out);
+            return;
+        }
+        GridDesc g = strata.desc().grid();
+        long i = (long) Math.floor((double) (wx - g.originBlockX()) / g.r() + 0.5);
+        long j = (long) Math.floor((double) (z - g.originBlockZ()) / g.r() + 0.5);
+        double scale = strata.desc().scale(), offset = strata.desc().offset();
+        out.count = 0;
+        int k = strata.stackDepth();
+        for (int h = 0; h < k; h++) {
+            int cls = strata.horizonClass(i, j, h);
+            short top = strata.horizonTopRaw(i, j, h);
+            if (cls == 255 || top == Short.MIN_VALUE)
+                break;
+            out.emit(top * scale + offset, cls, strata.horizonKeyTop(i, j, h));
+        }
+    }
+
     /** ⌈h⌉ − 1: the top block of terrain height h ({@link Water#topBlock}). */
     public static int topBlock(double h) {
         return Water.topBlock(h);
@@ -311,16 +344,16 @@ public final class FarColumn {
             }
             return;
         }
+        // Each column asks its own river tile: gathering the segments of the whole area once, as the
+        // one-block grid does, would hand every column of a wide area most of the planet's rivers.
         Rivers rivers = wd.rivers();
-        long x1 = x0 + (long) (n + 1) * step, z1 = z0 + (long) (n + 1) * step;
-        int[] segs = rivers == null ? new int[0] : rivers.entriesIn(x0 - step, z0 - step, x1, z1);
         int half = step / 2;
         for (int j = 0; j < m; j++) {
             for (int i = 0; i < m; i++) {
                 long x = x0 + (long) (i - 1) * step + half, z = z0 + (long) (j - 1) * step + half;
                 long wx = wrapX(wd, x);
                 double surface = wd.height(wx, z);
-                Rivers.Sample rs = segs.length == 0 ? Rivers.Sample.NONE : rivers.sampleAmong(segs, wx, z);
+                Rivers.Sample rs = rivers == null ? Rivers.Sample.NONE : rivers.sample(wx, z);
                 int cover = ice == null ? 0 : ice.blocks((int) wx, (int) z);
                 shape(Water.core(wd, spec, wx, z, surface, rs), cover, minY, maxY, out[j * m + i]);
             }
