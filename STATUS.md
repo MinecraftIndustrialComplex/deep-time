@@ -151,6 +151,13 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `08-family-hidden`, `09-overlay-off`, `10-first-step`. Linux Chromium needs a font: `~/.config/fontconfig/fonts.conf` on the VM now
   points at nixpkgs `dejavu_fonts` (without one the page draws no text); `deposits-shots.sh` finds Chromium on PATH or builds
   `nixpkgs#chromium`.
+- **Merged with the other three workbench features (master e4094d6: rivers & lakes, Final world, rock at depth and sections).**
+  Conflicts in STATUS.md, `watch/http.rs` (both new routes and docs kept), `workbench.js` (the help list: S and D keys) and viewer
+  `lib.rs` (all three script constants); the script tags and `DTWB` needed nothing. Re-run on the VM: fmt, clippy `-D warnings`,
+  `cargo test --workspace` (all ok; core 351), deny, `deposits-check.js`, `gradlew build test` (ok, 2 m 5 s); the browser driver on a
+  fresh 500 Myr run (live, then baked; 0 failed) now also checks, with the overlay on: the Rivers & lakes layer shows
+  (`11-rivers-overlay`), the section tool opens and two clicks fill the Section panel (`12-section-overlay`), the Final world view
+  opens and closes with the overlay still there (`13-final-world`). Draw cost on the merged page: 55 sites 0.5 ms, 550 sites 17.8 ms.
 - **Left / not done on purpose.** Deposits on the globe, and sites at their position before the end of the run (the record holds
   only the present position; the engine's per-frame origin maps are not kept). The supergene/BIF rows are empty on this seed, so the
   kin links (placer to porphyry, blanket to porphyry) were checked on the synthetic 16k deposit world, not on the 500 Myr planet.
