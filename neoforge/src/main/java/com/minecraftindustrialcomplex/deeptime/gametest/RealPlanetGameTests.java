@@ -64,9 +64,10 @@ public final class RealPlanetGameTests {
      * column's own H is only logged (it grows with the slope: 1 to 10 blocks on the planets
      * measured) and the top block must lie between the lowest and the highest top of the four
      * corners of its noise cell, give or take a block. Where the bake stands above the
-     * world's build limit the top block is the limit: that is the format's rule, and how many sampled
-     * columns it cut is logged ({@code aboveBuildLimit}); whether a bake may hold such terrain at
-     * all is a pipeline question (STATUS.md, known issues: "terrain above the build limit").
+     * world's build limit the top block would be the limit (the format's rule), but no bake may
+     * hold such terrain: the amplifier compresses what would stand above a knee into a band under
+     * the limit ({@code scale.build_limit_band_blocks}), so the test fails on any sampled column
+     * above the limit and on any cell the bake counted above {@code max_y}.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void realPlanetHeightMatchesTheBake(GameTestHelper helper) {
@@ -129,9 +130,36 @@ public final class RealPlanetGameTests {
                     clipped[0] == 0 ? "-" : clipped[1], tally.worst);
             helper.assertTrue(tally.corners >= 24, "only " + tally.corners + " corner columns above the floor band");
             helper.assertTrue(tally.cornerMax == 0, "corner columns differ by up to " + tally.cornerMax + ": " + tally.worst);
+            // Nothing stands above the build limit (Ben, decisions log 2026-10-01): not a sampled column,
+            // and not a cell of the bake's own count over the whole elevation layer.
+            helper.assertTrue(clipped[0] == 0, clipped[0] + " sampled columns stand above the build limit y " + limit
+                    + " (highest baked top " + clipped[1] + ")");
+            long above = bakeCount(wd, "cells_above");
+            DeepTime.LOGGER.info("[gametest] realPlanetHeightMatchesTheBake bake build_limit: cells_above={} cells_compressed={} highest_y={}",
+                    above, bakeCount(wd, "cells_compressed"), bakeNumber(wd, "highest_y"));
+            helper.assertTrue(above == 0, above + " cells of the baked elevation stand above max_y (notes.bake.terrain.build_limit)");
+            helper.assertTrue(bakeNumber(wd, "highest_y") + 16.0 <= wd.manifest().maxY(), "the highest baked elevation "
+                    + bakeNumber(wd, "highest_y") + " leaves no room for the detail term under max_y " + wd.manifest().maxY());
             helper.assertTrue(outside[0] == 0, outside[0] + " columns between corners are outside their cell's corner tops:" + outsideDetail);
             helper.succeed();
         });
+    }
+
+    /** {@code notes.bake.terrain.build_limit.<key>} of the world's manifest; NaN when absent. */
+    static double bakeNumber(WorldData wd, String key) {
+        JsonElement e = wd.manifest().notes();
+        for (String k : new String[]{"bake", "terrain", "build_limit", key}) {
+            if (e == null || !e.isJsonObject())
+                return Double.NaN;
+            e = e.getAsJsonObject().get(k);
+        }
+        return e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber() ? e.getAsDouble() : Double.NaN;
+    }
+
+    /** The same as a count; −1 when absent (a bake from before the count is a failure, not a pass). */
+    static long bakeCount(WorldData wd, String key) {
+        double v = bakeNumber(wd, key);
+        return Double.isNaN(v) ? -1 : (long) v;
     }
 
     /** The class a rock run of the fixture gives block y, or null (unclassified crust). */
@@ -198,7 +226,10 @@ public final class RealPlanetGameTests {
                 BlockState actual = chunk.getBlockState(new BlockPos(x, y, z));
                 n[1]++;
                 boolean ok = Objects.equals(cls, javaCls)
-                        && (cls == null ? expected == null : expected == null || palette.classesOf(expected).contains(cls));
+                        && (cls == null ? expected == null : expected == null || palette.classesOf(expected).contains(cls)
+                        // A class whose stand-in is plain stone (coal without a coal rock installed): stone
+                        // reads as unclassified crust in classesOf, so ask the class for its blocks.
+                        || palette.result(cls).map(r -> r.blocks().contains(expected)).orElse(false));
                 boolean placed = expected == null ? StrataPass.isCrust(actual) : actual == expected;
                 if (!placed && !StrataPass.isCrust(actual) && palette.classesOf(actual).isEmpty()) {
                     n[3]++;   // a surface rule's block (sand, terracotta, …): not the strata pass's to paint

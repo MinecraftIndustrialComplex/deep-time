@@ -37,14 +37,22 @@
 //! log₁₀(m³/s): a clear water blue that deepens with flow. Lakes are one flat colour ([`LAKE`]).
 //! Neither is drawn on the sea (a pixel at least a block below sea level).
 //!
+//! **Lakes follow the climate** (Ben, 2026-10-01, "freeze them and size them by climate"; the
+//! hydrology's water balance, `hydro`): a basin that evaporates more than it gets holds a smaller
+//! lake below its rim, or only a **playa** (its floor, where the water that reaches it dries:
+//! drawn as a salt flat, [`PLAYA`]), or nothing. A lake cell whose mean annual temperature is
+//! below `hydro.lake_freeze_mean_c` (0 °C: under ice for more than half the year, the frame's
+//! `climate/t_mean_c` at the cell) is a **frozen lake**, drawn as lake ice ([`FROZEN`]).
+//!
 //! - **On the satellite view** ([`WaterView::overlay`]): rivers are blended over the land at 60 %
-//!   (a stream) to 92 % (the largest river), lakes at 95 %, after the hill shade, so they are
-//!   flat water. Under glacier ice (`climate/ice_thickness_m`, gone from 60 m of it) none show,
-//!   as the ice is drawn white over the ground.
+//!   (a stream) to 92 % (the largest river), lakes (open and frozen) at 95 % and playas at 80 %,
+//!   after the hill shade, so they are flat. Under glacier ice (`climate/ice_thickness_m`, gone
+//!   from 60 m of it) none show, as the ice is drawn white over the ground.
 //! - **As a layer** ([`WaterView::render`]): a quiet base (land in a pale neutral with a soft hill
-//!   shade, the sea in slate) with the lakes and rivers hard-edged on it, so the workbench can read
-//!   the colour back under the pointer: a pixel on the ramp is "river (~N m³/s)", one of [`LAKE`]
-//!   is "lake".
+//!   shade, the sea in slate) with the lakes, playas and rivers hard-edged on it, so the workbench
+//!   can read the colour back under the pointer: a pixel on the ramp is "river (~N m³/s)", one of
+//!   [`LAKE`] is "lake", of [`FROZEN`] "frozen lake", of [`PLAYA`] "salt flat". On the satellite
+//!   view the pointer reads the same three by their colours.
 
 use std::path::Path;
 use std::time::Instant;
@@ -54,7 +62,8 @@ use deeptime_format::{GridDesc, Ramp, Ramps};
 
 use crate::bake::water::{halve, load_i16};
 use crate::error::CoreError;
-use crate::hydro::network::{self, NODATA};
+use crate::hydro::Climate;
+use crate::hydro::network::{self, NODATA, kind};
 use crate::keyframes::ViewScale;
 use crate::satellite;
 use crate::surface::climate::{P_FIELD, T_FIELD, zonal_precip, zonal_temperature};
@@ -74,6 +83,16 @@ pub const MAX_CELLS: usize = 600_000;
 pub const LAND: [u8; 3] = [0xdd, 0xd9, 0xcd];
 pub const SEA: [u8; 3] = [0x2c, 0x40, 0x56];
 pub const LAKE: [u8; 3] = [0x5c, 0xc0, 0xea];
+/// A frozen lake (lake ice: a pale blue, greyer than open water and bluer than snow, glacier ice
+/// and sea ice; on both views) and a playa (a salt flat) on the layer (`rivers.keys`:
+/// `frozen_lake`, `salt_flat`).
+pub const FROZEN: [u8; 3] = [0xa9, 0xd3, 0xe6];
+pub const PLAYA: [u8; 3] = [0xf0, 0xd9, 0xa8];
+/// A playa on the satellite view: its Salt flat class's colour (`satellite.keys.salt_flat`).
+pub const PLAYA_SATELLITE: [u8; 3] = [0xe3, 0xdd, 0xd0];
+/// A frozen lake on the satellite view: snow-covered lake ice, nearly white with a blue cast, so
+/// it reads as ice beside open water and as a lake beside snow (`satellite.keys.frozen_lake`).
+pub const FROZEN_SATELLITE: [u8; 3] = [0xd0, 0xe6, 0xf0];
 
 /// The look's constants (the module docs give them in words).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -87,8 +106,9 @@ pub struct Look {
     pub alpha_min: f32,
     pub alpha_max: f32,
     pub alpha_decades: f32,
-    /// How opaque lakes are on the satellite view.
+    /// How opaque lakes (open and frozen) and playas are on the satellite view.
     pub lake_alpha: f32,
+    pub playa_alpha: f32,
     /// The thickness of land ice (m) under which the satellite view shows no water.
     pub ice_full_m: f32,
     /// The share of the hill shade's effect on the layer's land.
@@ -104,6 +124,7 @@ impl Default for Look {
             alpha_max: 0.92,
             alpha_decades: 2.5,
             lake_alpha: 0.95,
+            playa_alpha: 0.8,
             ice_full_m: 60.0,
             relief: 0.5,
         }
@@ -125,13 +146,19 @@ pub struct Info {
     pub source: Source,
     pub chains: usize,
     pub vertices: usize,
-    /// The lakes' area in pixels (summed coverage).
+    /// The lakes' area in pixels (summed coverage), open and frozen together, and the frozen
+    /// lakes' and the playas' alone.
     pub lake_px: f64,
+    pub frozen_px: f64,
+    pub playa_px: f64,
     /// Milliseconds it took to make.
     pub millis: f64,
     /// The hydrology's own milliseconds per phase (`hydro::network`'s `stats.millis`: sea, flood,
     /// flats, receivers, lakes, discharge, rivers); `Null` for water read from the bake.
     pub phases: serde_json::Value,
+    /// The hydrology's statistics (`hydro::network`'s `stats`: the lakes, what became of the
+    /// basins, the lakes by climate, the largest); `Null` for water read from the bake.
+    pub stats: serde_json::Value,
 }
 
 /// The water of one frame in the picture's pixels (row 0 north, pixel (px, py) centred on the
@@ -146,8 +173,10 @@ pub struct WaterView {
     river: Vec<f32>,
     /// Discharge under each river pixel, m³/s (0 where there is none).
     q: Vec<f32>,
-    /// Lake coverage, 0–1.
+    /// Lake coverage, 0–1: open water, lake ice, and playas.
     lake: Vec<f32>,
+    frozen: Vec<f32>,
+    playa: Vec<f32>,
     /// How much of each pixel's water the land ice hides on the satellite view, 0–1: the
     /// glacier ice (`climate/ice_thickness_m`) is drawn white over rivers and lakes, so under
     /// [`Look::ice_full_m`] of it none show. The `rivers` layer shows the terrain's water as it is.
@@ -179,33 +208,40 @@ fn work_terrain(field: &Field, sea_raw: i32) -> (GridDesc, Vec<i16>) {
     (grid, elev)
 }
 
-/// The precipitation and potential evapotranspiration (mm/yr) at block (x, z), as the bake's water
-/// part reads them (PET = 60 mm/°C · T, 0 below 0 °C): bilinear from the frame's L1 climate, else
-/// the surface stage's zonal stand-in.
+/// The climate at block (x, z), as the bake's water part reads it: precipitation, mean
+/// temperature and the warmest and coldest month (`climate/t_warm_c`, `climate/t_cold_c`; the
+/// mean ± 8 °C without them) bilinear from the frame's L1 climate, else the surface stage's zonal
+/// stand-in.
 fn climate_at<'w>(
     world: &'w WorldState,
     circumference: f64,
-) -> impl Fn(i64, i64) -> (f64, f64) + Sync + 'w {
+) -> impl Fn(i64, i64) -> Climate + Sync + 'w {
     let ok = |f: &&Field| f.data.len() == f.grid.cells() && !f.data.is_empty();
     let t = world.fields.get(T_FIELD).filter(ok);
     let p = world.fields.get(P_FIELD).filter(ok);
+    let warm = world.fields.get(crate::climate::field::T_WARM).filter(ok);
+    let cold = world.fields.get(crate::climate::field::T_COLD).filter(ok);
     move |bx, bz| {
         let (x, z) = (bx as f64, bz as f64);
-        let (t, pr) = match (t, p) {
-            (Some(t), Some(p)) => (
-                f64::from(crate::bake::bilinear(t, x, z)),
+        let at =
+            |f: Option<&Field>| f.map_or(f64::NAN, |f| f64::from(crate::bake::bilinear(f, x, z)));
+        match (t, p) {
+            (Some(t), Some(p)) => Climate::of(
                 f64::from(crate::bake::bilinear(p, x, z)),
+                f64::from(crate::bake::bilinear(t, x, z)),
+                at(warm),
+                at(cold),
             ),
             _ => {
                 let lat = -360.0 * z / circumference;
-                (zonal_temperature(lat), zonal_precip(lat))
+                Climate::of(
+                    zonal_precip(lat),
+                    zonal_temperature(lat),
+                    f64::NAN,
+                    f64::NAN,
+                )
             }
-        };
-        let (t, pr) = (
-            if t.is_finite() { t } else { 0.0 },
-            if pr.is_finite() { pr.max(0.0) } else { 0.0 },
-        );
-        (pr, (60.0 * t).max(0.0))
+        }
     }
 }
 
@@ -272,14 +308,19 @@ impl WaterView {
             river: vec![0.0; w * h],
             q: vec![0.0; w * h],
             lake: vec![0.0; w * h],
+            frozen: vec![0.0; w * h],
+            playa: vec![0.0; w * h],
             ice,
             info: Info {
                 source: Source::Derived,
                 chains: 0,
                 vertices: 0,
                 lake_px: 0.0,
+                frozen_px: 0.0,
+                playa_px: 0.0,
                 millis: 0.0,
                 phases: serde_json::Value::Null,
+                stats: serde_json::Value::Null,
             },
         })
     }
@@ -372,9 +413,17 @@ impl WaterView {
             source,
             chains: rivers.chains.len(),
             vertices: rivers.vertices.len(),
-            lake_px: self.lake.iter().map(|&c| f64::from(c)).sum(),
+            lake_px: self
+                .lake
+                .iter()
+                .zip(&self.frozen)
+                .map(|(&a, &b)| f64::from(a) + f64::from(b))
+                .sum(),
+            frozen_px: self.frozen.iter().map(|&c| f64::from(c)).sum(),
+            playa_px: self.playa.iter().map(|&c| f64::from(c)).sum(),
             millis: started.elapsed().as_secs_f64() * 1000.0,
             phases: serde_json::Value::Null,
+            stats: serde_json::Value::Null,
         };
     }
 
@@ -418,8 +467,24 @@ impl WaterView {
                     * shown;
                 blend(px, Self::river_rgb(ramp, q), a);
             }
-            if self.lake[k] > 0.0 && shown > 0.0 {
-                blend(px, LAKE, self.lake[k] * look.lake_alpha * shown);
+            if shown > 0.0 {
+                if self.playa[k] > 0.0 {
+                    blend(
+                        px,
+                        PLAYA_SATELLITE,
+                        self.playa[k] * look.playa_alpha * shown,
+                    );
+                }
+                if self.lake[k] > 0.0 {
+                    blend(px, LAKE, self.lake[k] * look.lake_alpha * shown);
+                }
+                if self.frozen[k] > 0.0 {
+                    blend(
+                        px,
+                        FROZEN_SATELLITE,
+                        self.frozen[k] * look.lake_alpha * shown,
+                    );
+                }
             }
         }
     }
@@ -448,8 +513,14 @@ impl WaterView {
                 rgba.extend_from_slice(&[0, 0, 0, 0]);
                 continue;
             }
-            let rgb = if self.lake[k] >= 0.5 {
-                LAKE
+            let rgb = if self.lake[k] + self.frozen[k] >= 0.5 {
+                if self.frozen[k] > self.lake[k] {
+                    FROZEN
+                } else {
+                    LAKE
+                }
+            } else if self.playa[k] >= 0.5 {
+                PLAYA
             } else if self.river[k] >= 0.5 && self.q[k] > 0.0 {
                 Self::river_rgb(ramp, self.q[k])
             } else if z < 0.0 {
@@ -496,19 +567,20 @@ fn derive_with_rivers(
     });
     // Lake cells a block deep or more: a shallower one is dry ground in the game (and, on a cell
     // of 4.8 km, a margin of the flat a lake fills, which draws as streaks).
-    out.lake = lake_cover(
-        grid.w as usize,
-        grid.h as usize,
-        &|c| {
-            let level = net.water_level[c];
-            level != NODATA && i32::from(level) - i32::from(elev[c]) >= 16
-        },
-        (out.w, out.h),
-    );
+    let (gw, gh) = (grid.w as usize, grid.h as usize);
+    let deep = |c: usize| {
+        let level = net.water_level[c];
+        level != NODATA && i32::from(level) - i32::from(elev[c]) >= 16
+    };
+    let size_px = (out.w, out.h);
+    out.lake = lake_cover(gw, gh, &|c| net.kind[c] == kind::LAKE && deep(c), size_px);
+    out.frozen = lake_cover(gw, gh, &|c| net.kind[c] == kind::FROZEN && deep(c), size_px);
+    out.playa = lake_cover(gw, gh, &|c| net.kind[c] == kind::PLAYA, size_px);
     let look = Look::default();
     out.draw_rivers(&net.rivers, view, &look);
     out.finish(&net.rivers, Source::Derived, started);
     out.info.phases = net.stats["millis"].clone();
+    out.info.stats = net.stats;
     Some((out, net.rivers))
 }
 
@@ -531,12 +603,24 @@ pub fn from_bake(
     };
     if let Some(path) = water_level {
         let (grid, levels) = load_i16(&dir.join(path))?;
-        out.lake = lake_cover(
-            grid.w as usize,
-            grid.h as usize,
-            &|c| levels[c] != NODATA,
-            (out.w, out.h),
-        );
+        // Frozen where the cell's mean annual temperature says so, as the hydrology marks it.
+        let climate = climate_at(world, grid.circumference() as f64);
+        let (gw, gh) = (grid.w as usize, grid.h as usize);
+        let (ox, oz, r) = (grid.origin_block_x, grid.origin_block_z, i64::from(grid.r));
+        let frozen = |c: usize| {
+            let cl = climate(ox + (c % gw) as i64 * r, oz + (c / gw) as i64 * r);
+            view.hydro.frozen(cl.t_mean_c)
+        };
+        let size_px = (out.w, out.h);
+        out.lake = lake_cover(gw, gh, &|c| levels[c] != NODATA && !frozen(c), size_px);
+        out.frozen = lake_cover(gw, gh, &|c| levels[c] != NODATA && frozen(c), size_px);
+        // The bake stores no playas (they hold no water): the frame's own.
+        if let Some(derived) = derive(world, view, size) {
+            out.playa = derived.playa;
+            for (p, (&a, &b)) in out.playa.iter_mut().zip(out.lake.iter().zip(&out.frozen)) {
+                *p = p.min(1.0 - a - b).max(0.0);
+            }
+        }
     }
     let look = Look::default();
     out.draw_rivers(&rivers, view, &look);
