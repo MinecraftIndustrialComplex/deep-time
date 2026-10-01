@@ -106,6 +106,23 @@ struct File {
     loose_equivalent: Option<String>,
     #[serde(default)]
     tags: Vec<String>,
+    #[serde(default)]
+    stone_use: StoneUse,
+}
+
+/// How fit a class's rock is to make stone tools and furnaces from (P1-28,
+/// `tools/dev/gen_rock_classes.py` has the reasons): the game's item tags follow it, and the spawn
+/// ranking wants `Tool` rock near the spawn.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StoneUse {
+    /// Soft, crumbly, soluble or loose.
+    #[default]
+    None,
+    /// Solid and workable but it holds no edge.
+    Build,
+    /// Hard and tough: tools and furnaces.
+    Tool,
 }
 
 /// What the surface needs of one class.
@@ -128,6 +145,8 @@ pub struct RockClass {
     pub lithifies_to: Option<u16>,
     /// How the young, shallow part of a deposit of this class is shown (P1-07).
     pub loose_equivalent: Option<u16>,
+    /// Fit for stone tools and furnaces (P1-28).
+    pub stone_use: StoneUse,
 }
 
 /// The table, in `EVERY_CLASS` order.
@@ -173,6 +192,7 @@ pub fn table() -> &'static [RockClass] {
                     lithifies_to: f.lithifies_to.as_deref().map(resolve),
                     loose_equivalent: f.loose_equivalent.as_deref().map(resolve),
                     groups: f.groups,
+                    stone_use: f.stone_use,
                 }
             })
             .collect()
@@ -196,6 +216,13 @@ pub fn erodibility() -> Vec<f64> {
 /// Diffusivity multipliers, indexed by class.
 pub fn diffusivity() -> Vec<f64> {
     table().iter().map(|c| c.diffusivity).collect()
+}
+
+/// Whether class `k` is tool-grade rock (`stone_use` tool; false for an index outside the table).
+pub fn is_toolstone(k: u16) -> bool {
+    table()
+        .get(usize::from(k))
+        .is_some_and(|c| c.stone_use == StoneUse::Tool)
 }
 
 /// Whether class `k` carries `tag`.
