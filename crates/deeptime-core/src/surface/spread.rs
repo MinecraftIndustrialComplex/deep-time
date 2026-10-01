@@ -84,7 +84,14 @@ pub fn diffusivity(z_above_sea: f64, strength_height_m: f64, d0_km2_myr: f64) ->
 }
 
 /// One step of the spreading over `dt_yr` on elevations `h` (m, datum of the plate model).
-pub fn step(d: &Dims, h: &mut [f64], sea: f64, strength_height_m: f64, d0_km2_myr: f64, dt_yr: f64) -> Spread {
+pub fn step(
+    d: &Dims,
+    h: &mut [f64],
+    sea: f64,
+    strength_height_m: f64,
+    d0_km2_myr: f64,
+    dt_yr: f64,
+) -> Spread {
     if d0_km2_myr.is_nan() || d0_km2_myr <= 0.0 {
         return Spread::default();
     }
@@ -98,11 +105,7 @@ pub fn step(d: &Dims, h: &mut [f64], sea: f64, strength_height_m: f64, d0_km2_my
     }
     let before = h.to_vec();
     diffusion::step(d, h, &kd, dt_yr);
-    let moved_m = h
-        .iter()
-        .zip(&before)
-        .map(|(a, b)| (a - b).max(0.0))
-        .sum();
+    let moved_m = h.iter().zip(&before).map(|(a, b)| (a - b).max(0.0)).sum();
     Spread { cells, moved_m }
 }
 
@@ -118,7 +121,9 @@ mod tests {
         let d = Dims::new(64, 32, 5000.0, true);
         let n = d.cells();
         let block = |c: usize| (28..36).contains(&(c % 64)) && (12..20).contains(&(c / 64));
-        let start: Vec<f64> = (0..n).map(|c| if block(c) { 9000.0 } else { 1000.0 }).collect();
+        let start: Vec<f64> = (0..n)
+            .map(|c| if block(c) { 9000.0 } else { 1000.0 })
+            .collect();
         let mut h = start.clone();
         let mut total = Spread::default();
         for _ in 0..10 {
@@ -127,20 +132,35 @@ mod tests {
             total.moved_m += s.moved_m;
         }
         let sum = |v: &[f64]| v.iter().sum::<f64>();
-        assert!((sum(&h) - sum(&start)).abs() < 1e-3 * n as f64, "volume kept");
+        assert!(
+            (sum(&h) - sum(&start)).abs() < 1e-3 * n as f64,
+            "volume kept"
+        );
         let top = h.iter().cloned().fold(f64::MIN, f64::max);
-        assert!(top < 7500.0 && top > 5000.0, "the block sank towards the strength height: {top}");
+        assert!(
+            top < 7500.0 && top > 5000.0,
+            "the block sank towards the strength height: {top}"
+        );
         let wide = h.iter().filter(|&&z| z > 3000.0).count();
-        assert!(wide > 64, "and widened: {wide} cells above 3 km, 64 at the start");
+        assert!(
+            wide > 64,
+            "and widened: {wide} cells above 3 km, 64 at the start"
+        );
         assert_eq!(h[0], 1000.0, "the plain far away did not move");
         assert!(total.cells > 0 && total.moved_m > 0.0);
         // Lower gravity: the same strength holds a taller range.
         let mut low = start.clone();
-        assert_eq!(step(&d, &mut low, 0.0, 13_200.0, 400.0, 2.0e6), Spread::default());
+        assert_eq!(
+            step(&d, &mut low, 0.0, 13_200.0, 400.0, 2.0e6),
+            Spread::default()
+        );
         assert_eq!(low, start);
         // Off.
         let mut off = start.clone();
-        assert_eq!(step(&d, &mut off, 0.0, 5000.0, 0.0, 2.0e6), Spread::default());
+        assert_eq!(
+            step(&d, &mut off, 0.0, 5000.0, 0.0, 2.0e6),
+            Spread::default()
+        );
         assert_eq!(off, start);
         assert_eq!(diffusivity(10_000.0, 5000.0, 400.0), 400.0);
         assert_eq!(diffusivity(7500.0, 5000.0, 400.0), 50.0);
