@@ -253,6 +253,10 @@ impl PlatesStage {
 
         self.done = step;
         let last = self.done >= self.total;
+        let margin_every = (MARGIN_EVERY_MYR / env.dt_myr).round().max(1.0) as u64;
+        if last || step.is_multiple_of(margin_every) {
+            record_margins(st, world, &pos, &env);
+        }
         let kf_every = self.preset.keyframes.every_myr * 1.0e6;
         let kf_due = world.t_years >= self.next_output_years;
         if kf_due {
@@ -391,6 +395,40 @@ impl PlatesStage {
         }
         Ok(())
     }
+}
+
+/// The continental margins are measured this often, Myr (P1-27; `notes.plates.margins`).
+pub const MARGIN_EVERY_MYR: f64 = 10.0;
+
+/// Appends the continental margins of now ([`stats::margins`]) to the run's note
+/// (`notes.plates.margins`, a series the CLI and the manifest report).
+fn record_margins(st: &PlateState, world: &mut WorldState, pos: &[DVec3], env: &Env<'_>) {
+    let initiated: std::collections::BTreeSet<u32> = world
+        .events
+        .iter()
+        .filter(|e| {
+            e.kind == events::PLATE_BIRTH
+                && matches!(e.params.get("origin"),
+                    Some(deeptime_format::ParamValue::Str(o)) if o == "subduction_initiation")
+        })
+        .filter_map(|e| match e.params.get("plate") {
+            Some(deeptime_format::ParamValue::Int(p)) => u32::try_from(*p).ok(),
+            _ => None,
+        })
+        .collect();
+    let m = stats::margins(st, pos, &env.norm, &|p| initiated.contains(&p));
+    let mut note: serde_json::Value = world
+        .notes
+        .get(STAGE_NAME)
+        .and_then(|s| serde_json::from_str(s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+    if !note["margins"].is_array() {
+        note["margins"] = serde_json::json!([]);
+    }
+    if let (Some(list), Ok(v)) = (note["margins"].as_array_mut(), serde_json::to_value(&m)) {
+        list.push(v);
+    }
+    world.notes.insert(STAGE_NAME.to_owned(), note.to_string());
 }
 
 /// Continental erosion, oceanic dampening, trench accretion and the rock pools (Cortial §4.5,

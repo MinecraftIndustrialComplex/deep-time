@@ -313,7 +313,27 @@ pub struct VolcanoState {
     pub events_by_kind: BTreeMap<String, u64>,
     /// L1 cells with the arc flag at the last step that had arc information.
     pub last_flagged: u64,
+    /// The ground under active continental arc cones, every 10 Myr (P1-27).
+    #[serde(default)]
+    pub arc_bases: Vec<ArcBase>,
 }
+
+/// The ground active stratovolcanoes on continental crust stand on at one time (P1-27: cones on a
+/// cordillera, not on a coastal plain): the lower quartile of the ring just outside each cone
+/// (the base the stage measures), above the sea.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ArcBase {
+    pub t_myr: f64,
+    pub cones: u32,
+    pub base_p25_m: f64,
+    pub base_p50_m: f64,
+    pub base_p75_m: f64,
+    /// Share of them standing on ground below 500 m.
+    pub low_share: f64,
+}
+
+/// The arc bases are recorded this often, Myr.
+const ARC_BASE_EVERY_MYR: f64 = 10.0;
 
 /// Estimate: the catalogue is small; a few L1 arrays per step.
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
@@ -1046,12 +1066,18 @@ impl VolcanoStage {
         let started = Instant::now();
         let grow = 1.0 - (-dt / p.build_myr).exp();
         let cell_km2 = cell_m * cell_m / 1.0e6;
+        let every = (ARC_BASE_EVERY_MYR / dt).round().max(1.0) as u64;
+        let record_bases = (self.done + 1).is_multiple_of(every) || last;
+        let mut bases: Vec<f64> = Vec::new();
         for v in &mut st.volcanoes {
             if !v.active() {
                 continue;
             }
             // New volcanoes are measured now; the others were measured before the births.
             let base = l1.base(v.x, v.z, v.radius_m);
+            if record_bases && v.kind == Kind::Strato && !v.oceanic {
+                bases.push(base - sea);
+            }
             let target = match v.kind {
                 Kind::Strato => {
                     let f = v.flux_last;
@@ -1099,6 +1125,25 @@ impl VolcanoStage {
             v.kept_m = v.kept_m.max(v.height_m);
             v.built_m += dh;
             v.peak_m = v.peak_m.max(v.height_m);
+        }
+        if record_bases {
+            bases.sort_by(f64::total_cmp);
+            let q = |f: f64| {
+                if bases.is_empty() {
+                    f64::NAN
+                } else {
+                    bases[((bases.len() - 1) as f64 * f).round() as usize]
+                }
+            };
+            st.arc_bases.push(ArcBase {
+                t_myr: t,
+                cones: bases.len() as u32,
+                base_p25_m: q(0.25),
+                base_p50_m: q(0.5),
+                base_p75_m: q(0.75),
+                low_share: bases.iter().filter(|&&b| b < 500.0).count() as f64
+                    / bases.len().max(1) as f64,
+            });
         }
         for v in st
             .volcanoes
@@ -1825,6 +1870,7 @@ impl VolcanoStage {
             "flood_basalt_outcrop_cells": fb_on,
             "events": st.events_emitted,
             "events_by_kind": st.events_by_kind,
+            "arc_bases": st.arc_bases,
             "params": self.p,
             "millis": self.timings,
         })
@@ -2020,11 +2066,34 @@ fn smooth(e0: f64, e1: f64, x: f64) -> f64 {
 /// `volcanoes_final=<steps> strato=… shield=… …` (the CLI's line), from `notes.volcanoes`.
 pub fn summary_line(v: &serde_json::Value) -> String {
     let c = &v["counts"];
+    // The arc bases with cones, after the first 100 Myr (the start has no arcs of its own yet).
+    let bases: Vec<&serde_json::Value> = v["arc_bases"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter(|b| b["cones"].as_u64().unwrap_or(0) > 0)
+                .collect()
+        })
+        .unwrap_or_default();
+    let t0 = bases
+        .first()
+        .and_then(|b| b["t_myr"].as_f64())
+        .unwrap_or(0.0);
+    let later: Vec<&&serde_json::Value> = bases
+        .iter()
+        .filter(|b| b["t_myr"].as_f64().unwrap_or(0.0) - t0 >= 100.0)
+        .collect();
+    let mean_of = |k: &str| {
+        let xs: Vec<f64> = later.iter().filter_map(|b| b[k].as_f64()).collect();
+        xs.iter().sum::<f64>() / xs.len().max(1) as f64
+    };
+    let last_of = |k: &str| bases.last().and_then(|b| b[k].as_f64()).unwrap_or(f64::NAN);
     format!(
         "volcanoes_final={} strato_born={} shield_born={} caldera_complex_born={} \
          standing_strato={} standing_shield={} standing_caldera_complex={} active_strato={} \
          active_shield={} calderas={} summit_calderas={} flood_basalts={} eroded={} subducted={} \
-         built_km3={:.3e} tallest_m={} flood_basalt_outcrop_cells={} events={}",
+         built_km3={:.3e} tallest_m={} flood_basalt_outcrop_cells={} events={} \
+         arc_base_p50_mean_m={:.0} arc_base_low_share_mean={:.3} arc_base_p50_final_m={:.0}",
         v["steps"],
         c["strato_born"],
         c["shield_born"],
@@ -2043,6 +2112,9 @@ pub fn summary_line(v: &serde_json::Value) -> String {
         v["tallest_m"],
         v["flood_basalt_outcrop_cells"],
         v["events"],
+        mean_of("base_p50_m"),
+        mean_of("low_share"),
+        last_of("base_p50_m"),
     )
 }
 

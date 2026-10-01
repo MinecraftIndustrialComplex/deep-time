@@ -392,6 +392,35 @@ pub fn connect_plates(geo: &Geo, plate: &mut [u32], active: impl Fn(usize) -> bo
     moved
 }
 
+/// Continental margin cut off its ocean by a relabelling (a rift's or a subduction initiation's
+/// split, a collision's terrane transfer): the samples of `members` that are continental and have
+/// a lattice neighbour in `members`, of the same rigid group, that is oceanic and carries another
+/// label. Such a coast was a passive margin (crust and ocean on one plate) and is now a plate
+/// boundary. `label(i)` is the sample's new plate or fragment.
+pub fn coast_split(
+    geo: &Geo,
+    state: &PlateState,
+    members: &[u32],
+    member: impl Fn(usize) -> bool,
+    label: impl Fn(usize) -> u32,
+) -> usize {
+    use super::state::CONTINENTAL;
+    members
+        .iter()
+        .filter(|&&i| {
+            let s = &state.samples[i as usize];
+            s.kind == CONTINENTAL
+                && geo.edges(i).any(|(u, _)| {
+                    let o = &state.samples[u as usize];
+                    member(u as usize)
+                        && o.group == s.group
+                        && o.kind != CONTINENTAL
+                        && label(u as usize) != label(i as usize)
+                })
+        })
+        .count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
