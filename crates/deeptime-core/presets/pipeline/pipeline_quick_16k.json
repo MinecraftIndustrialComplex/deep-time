@@ -296,6 +296,7 @@
     "ice_ablation_gradient": 0.01,
     "ice_accumulation_max_m_yr": 0.5,
     "ice_isostasy_kyr": 3.0,
+    "ice_calving_m_yr": 20.0,
     "ice_grid_cells": 256,
     "ice_relax_kyr": 30.0,
     "glacio_eustasy": 1.0,

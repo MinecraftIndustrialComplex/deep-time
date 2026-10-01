@@ -292,6 +292,10 @@ pub struct ClimateParams {
     pub ice_accumulation_max_m_yr: f64,
     /// Isostatic e-folding time of the bed under the ice, kyr (Le Meur & Huybrechts 1996: ~3).
     pub ice_isostasy_kyr: f64,
+    /// Calving at an ice margin whose depressed bed lies below the sea (the sea or a proglacial
+    /// lake floods it), m of ice/yr (Pollard 1982: 20). With the bed's lagged rebound this is what
+    /// lets a big sheet collapse when the line rises again; 0: sheets once grown stay.
+    pub ice_calving_m_yr: f64,
     /// Columns of the sheet's coarse grid, about (numerics).
     pub ice_grid_cells: u32,
     /// Deep time: the sheet runs this long at every plate step's end climate from the ice the
@@ -404,6 +408,7 @@ impl Default for ClimateParams {
             ice_ablation_gradient: 0.01,
             ice_accumulation_max_m_yr: 0.5,
             ice_isostasy_kyr: 3.0,
+            ice_calving_m_yr: 20.0,
             ice_grid_cells: 256,
             ice_relax_kyr: 30.0,
             glacio_eustasy: 1.0,
@@ -653,6 +658,7 @@ impl ClimateParams {
                 10.0,
             ),
             (self.ice_isostasy_kyr, "ice_isostasy_kyr", 0.1, 100.0),
+            (self.ice_calving_m_yr, "ice_calving_m_yr", 0.0, 1000.0),
             (self.ice_relax_kyr, "ice_relax_kyr", 0.0, 1000.0),
             (self.glacio_eustasy, "glacio_eustasy", 0.0, 1.0),
             (self.ice_reference_km3, "ice_reference_km3", 0.0, 1.0e9),

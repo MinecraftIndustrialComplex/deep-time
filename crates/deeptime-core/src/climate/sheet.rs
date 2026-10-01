@@ -24,7 +24,10 @@
 //!   1980 ("Model experiments on the 100,000-yr glacial cycle", Nature 287: 430–432) and Pollard
 //!   1982 ("A simple ice sheet model yields realistic 100 kyr glacial cycles", Nature 296: 334–338).
 //! - **Calving.** Ice not thick enough to stay grounded where the depressed bed lies below the sea
-//!   (H < ρ_w/ρ_i · depth) floats away.
+//!   (H < ρ_w/ρ_i · depth) floats away, and a grounded margin whose depressed bed lies below the
+//!   sea loses `ice_calving_m_yr` (20 m/yr, Pollard 1982's calving into the sea or the proglacial
+//!   lake) — without it a sheet grown under a lowered line outlives the line's return (on Earth's
+//!   relief 19 % of the land stayed under ice at the present line after a 1-km lowering).
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -35,6 +38,8 @@ use super::ice::{G, RHO_ICE, RHO_SEA};
 pub const RHO_MANTLE: f64 = 3300.0;
 /// Glen's exponent (the flux below is written out for n = 3: D = Γ·H⁵·|∇s|²).
 pub const GLEN_N: f64 = 3.0;
+/// The shortest explicit step the flow is allowed to ask for, years (see `State::step`).
+pub const MIN_STEP_YEARS: f64 = 10.0;
 
 /// The coarse grid.
 #[derive(Clone, Debug, PartialEq)]
@@ -151,6 +156,8 @@ pub struct Params {
     pub isostasy_years: f64,
     /// Thickest ice, m.
     pub cap_m: f64,
+    /// Calving at a margin standing in water, m ice/yr.
+    pub calving: f64,
 }
 
 impl Params {
@@ -162,6 +169,7 @@ impl Params {
             acc_max: p.ice_accumulation_max_m_yr,
             isostasy_years: p.ice_isostasy_kyr * 1000.0,
             cap_m: p.ice_max_thickness_m,
+            calving: p.ice_calving_m_yr,
         }
     }
 }
@@ -221,6 +229,10 @@ impl State {
         let gamma = 2.0 * p.a * (RHO_ICE * G).powf(GLEN_N) / (GLEN_N + 2.0);
         let float = RHO_SEA / RHO_ICE;
         let min_d2 = g.dx.iter().map(|d| d * d).fold(g.dy * g.dy, f64::min);
+        // The fastest ice (thick, steep margins) is held to the diffusivity an explicit step of
+        // `MIN_STEP_YEARS` can carry: the few faces above it would otherwise set every cell's time
+        // step (a year or less) for a flux the mass balance bounds anyway.
+        let d_cap = 0.2 * min_d2 / MIN_STEP_YEARS;
         // Rows whose ground can grow ice at all (above the line somewhere): always stepped.
         let can_grow: Vec<bool> = (0..h)
             .map(|j| (0..w).any(|i| f.bed[j * w + i] > f.ela[j * w + i] && f.bed[j * w + i] > 0.0))
@@ -277,7 +289,7 @@ impl State {
                             (s[at(i, jn)] + s[at(i + 1, jn)] - s[at(i, js)] - s[at(i + 1, js)])
                                 / (2.0 * (jn - js) as f64 * g.dy)
                         };
-                        gamma * hf.powi(5) * (dsdx * dsdx + dsdy * dsdy)
+                        (gamma * hf.powi(5) * (dsdx * dsdx + dsdy * dsdy)).min(d_cap)
                     } else {
                         0.0
                     };
@@ -291,7 +303,7 @@ impl State {
                                 - s[at(i - 1, j)]
                                 - s[at(i - 1, j + 1)])
                                 / (4.0 * dxm);
-                            gamma * hf.powi(5) * (dsdx * dsdx + dsdy * dsdy)
+                            (gamma * hf.powi(5) * (dsdx * dsdx + dsdy * dsdy)).min(d_cap)
                         } else {
                             0.0
                         }
@@ -355,8 +367,20 @@ impl State {
                     let mut hh = (thick[c] + dt * (b - div)).clamp(0.0, p.cap_m);
                     // Calving: ice that would float where the depressed bed lies below the sea.
                     let bed = f64::from(f.bed[c]) - depress[c];
-                    if bed < 0.0 && hh < float * -bed {
-                        hh = 0.0;
+                    if bed < 0.0 {
+                        if hh < float * -bed {
+                            hh = 0.0;
+                        } else if p.calving > 0.0 && hh > 0.0 {
+                            // A grounded margin standing in water (the sea, or the lake that fills
+                            // the bed the ice pressed down) calves (Pollard 1982).
+                            let open = thick[at(i - 1, j)] <= 0.0
+                                || thick[at(i + 1, j)] <= 0.0
+                                || (j > 0 && thick[at(i, j - 1)] <= 0.0)
+                                || (j + 1 < h && thick[at(i, j + 1)] <= 0.0);
+                            if open {
+                                hh = (hh - dt * p.calving).max(0.0);
+                            }
+                        }
                     }
                     new[c] = hh;
                 }
@@ -382,6 +406,7 @@ mod tests {
 
     fn params() -> Params {
         Params {
+            calving: 0.0,
             a: 1.0e-16,
             beta_acc: 0.005,
             beta_abl: 0.01,
