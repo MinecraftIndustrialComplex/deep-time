@@ -1,0 +1,6 @@
+{
+  "pack": {
+    "pack_format": 48,
+    "description": "Deep Time measurement pack: vanilla's cave carver starts in every chunk and cuts tunnels 1.5 to 2.5 times as wide, so a carver reaches every lake and river (water-check before/after runs; never ships)"
+  }
+}

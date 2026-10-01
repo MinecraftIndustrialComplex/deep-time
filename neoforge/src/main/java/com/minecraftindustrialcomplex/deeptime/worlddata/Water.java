@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worlddata;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
 /**
  * Where the water goes in one block column (P1-22; FORMAT.md "Water columns"; Rust
  * {@code deeptime_format::water}, operation for operation): the lake, sea, river or bank a column
@@ -37,6 +40,21 @@ public final class Water {
             Manifest m = wd.manifest();
             return new Spec(cell, cell, m.seaLevelY(), m.minY(), m.maxY());
         }
+    }
+
+    /**
+     * Whether the world's carvers spare the water Deep Time places: {@code
+     * notes.bake.water.params.protect_water_from_carvers}. True when the key is absent (a world baked
+     * before the setting existed, or with {@code hydro.enabled} false, which has no water anyway).
+     */
+    public static boolean protectsFromCarvers(JsonObject notes) {
+        JsonElement e = notes;
+        for (String key : new String[]{"bake", "water", "params", "protect_water_from_carvers"}) {
+            if (e == null || !e.isJsonObject())
+                return true;
+            e = e.getAsJsonObject().get(key);
+        }
+        return e == null || !e.isJsonPrimitive() || !e.getAsJsonPrimitive().isBoolean() || e.getAsBoolean();
     }
 
     /** A column's kind, surface, level, top and bed before its neighbours are looked at. */

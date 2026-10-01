@@ -25,6 +25,17 @@
 //! places), **other** elsewhere (vanilla's springs, the aquifer's sea-level water in cave mouths,
 //! features), and a lake must be a lake column there. A neighbour's ice counts as the water under it.
 //!
+//! **Carved water** (Ben, decisions log 2026-10-01, "Protect water blocks": carvers never replace the
+//! water Deep Time places). With the world data, every river and lake column's water range, the
+//! blocks above its bed up to its top, is read back: `drained_water_blocks` counts the air above
+//! the column's lowest water block (a carver replaced water with air; a column with no water left
+//! counts all its air), `drained_water_columns` the columns that have any, and `surface_holes` the
+//! columns whose top water block is air (a hole in the surface). All three are 0 when
+//! `hydro.protect_water_from_carvers` is on and carvers ran; with it off they count what the
+//! carvers cut. Air under the lowest water block is ground a carver cut, not water: an underwater
+//! cave entrance (or, on a steep shore, ground that ran above the analytic bed) is not counted here,
+//! only as water floating over a cave.
+//!
 //! **Caves** (Ben, decisions log 2026-09-30, "Allow caves under water": carvers may cut under rivers
 //! and lakes) are counted apart so they do not hide a bank that leaks: a leak is *into a cave* when
 //! the air beside the water has ground above it (a covered hole), or lies at or below the top the
@@ -85,7 +96,7 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
     // Ice over water is a frozen pool: water beside air over ice rests on it like on water.
     let is_ice = |id: u32| w.reg.name(id).ends_with("ice");
     let (mut floating_ours, mut leaks_ours) = (0u64, 0u64);
-    let (mut floating_cave, mut leaks_cave) = (0u64, 0u64);
+    let (mut floating_cave, mut floating_cave_sources, mut leaks_cave) = (0u64, 0u64, 0u64);
     let mut leaks_by_kind: std::collections::BTreeMap<&'static str, u64> =
         std::collections::BTreeMap::new();
     let is_water_block = |id: u32| {
@@ -97,6 +108,10 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
     let (mut water, mut sources, mut floating, mut leaks, mut steps) =
         (0u64, 0u64, 0u64, 0u64, 0u64);
     let mut samples: Vec<Value> = Vec::new();
+    let mut drained_samples: Vec<Value> = Vec::new();
+    // Carved water: air inside the water range of a river or lake column, and holes in its top.
+    let (mut water_columns, mut drained_blocks, mut drained_cols, mut surface_holes) =
+        (0u64, 0u64, 0u64, 0u64);
     // Per column: the top water block y (source), for the lake census.
     let mut top_water: HashMap<(i32, i32), i32> = HashMap::new();
     let mut ground_top: HashMap<(i32, i32), i32> = HashMap::new();
@@ -107,6 +122,34 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
             let Some(top) = w.top(x, z) else { continue };
             if let Some(g) = w.terrain_top(x, z) {
                 ground_top.insert((x, z), g);
+            }
+            if let Some(col) = col_of(x, z)
+                && ours(Some(col.kind))
+                && let (Some(t), Some(b)) = (col.top, col.bed)
+            {
+                water_columns += 1;
+                // The column's water range, bottom (bed + 1) to top. Air above its lowest water
+                // block replaced water (a pocket, a hole in the surface, a drained column); air
+                // under it is ground a carver cut (a cave opening into the bed, or ground where the
+                // generated surface ran above the bed on a steep shore), counted as caves below.
+                let cells: Vec<u32> = (b + 1..=t).map(|y| w.block(x, y, z)).collect();
+                let is_wet = |id: u32| is_water_block(id) || holds_water(id) || is_ice(id);
+                let from = cells.iter().position(|&id| is_wet(id)).map_or(0, |i| i + 1);
+                let air: Vec<i32> = (from..cells.len())
+                    .filter(|&i| is_air(cells[i]))
+                    .map(|i| b + 1 + i as i32)
+                    .collect();
+                if !air.is_empty() {
+                    drained_blocks += air.len() as u64;
+                    drained_cols += 1;
+                    if drained_samples.len() < 40 {
+                        drained_samples.push(json!({"at": [x, t, z], "bed": b, "air_y": air,
+                                                    "column": col.kind.name()}));
+                    }
+                }
+                if is_air(w.block(x, t, z)) {
+                    surface_holes += 1;
+                }
             }
             let low = (top - 64).max(c.min_y());
             let mut first_water: Option<(i32, bool)> = None;
@@ -144,6 +187,7 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
                     let cave = col.is_some_and(|c| c.kind.is_water());
                     if cave {
                         floating_cave += 1;
+                        floating_cave_sources += u64::from(source);
                     } else {
                         floating += 1;
                         floating_ours += u64::from(ours(k));
@@ -298,9 +342,15 @@ pub fn check(w: &World, area: Area, min_lake: usize, wd: Option<&ColumnWorld>) -
         "leaks": leaks,
         "floating_ours": wd.map(|_| floating_ours),
         "floating_over_caves": wd.map(|_| floating_cave),
+        "floating_over_caves_sources": wd.map(|_| floating_cave_sources),
         "leaks_into_caves": leaks_cave,
         "leaks_ours": wd.map(|_| leaks_ours),
         "leaks_by_column": leaks_by_kind,
+        "water_columns": wd.map(|_| water_columns),
+        "drained_water_blocks": wd.map(|_| drained_blocks),
+        "drained_water_columns": wd.map(|_| drained_cols),
+        "surface_holes": wd.map(|_| surface_holes),
+        "drained_samples": drained_samples,
         "steps": steps,
         "lakes": lakes.len(),
         "lakes_within_1": within,
