@@ -39,9 +39,11 @@ pub fn run(
     out: &Path,
     width: u32,
     on: Option<&str>,
+    set: &[String],
 ) -> Result<Report, Box<dyn std::error::Error>> {
     let ck = Checkpoint::read(input)?;
-    let view = Preset::from_json(&ck.preset_json)?.view_scale();
+    let preset_json = crate::run::apply_overrides(&ck.preset_json, set)?;
+    let view = Preset::from_json(&preset_json)?.view_scale();
     let mut world = ck.world;
     if let Some(on) = on {
         if !deeptime_core::satellite::ELEVATION_FIELDS.contains(&on) {
