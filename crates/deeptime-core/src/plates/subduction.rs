@@ -304,9 +304,11 @@ pub fn resolve(
 /// The isostatic ceiling on uplift (design choice): crust at height z above sea level rises by
 /// (1 − z/z_c) of the tectonic forcing, so repeated uplift approaches z_c slowly instead of
 /// saturating it (thickened crust spreads and collapses; Cortial's erosion alone is too slow to
-/// balance repeated collisions).
+/// balance repeated collisions). `tectonics.uplift_ceiling_m`; 0 (the pipeline presets) is no
+/// ceiling: there the surface stage spreads over-thick crust itself (`surface::spread`), and the
+/// height of a range is not a number in the plate model.
 pub fn ceiling(z: f64, zc: f64) -> f64 {
-    if z <= 0.0 {
+    if z <= 0.0 || zc <= 0.0 {
         1.0
     } else {
         (1.0 - z / zc).max(0.0)
@@ -560,7 +562,8 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
     let u0_m = k.subduction_uplift_mm_yr * 1.0e-3 * dt_yr;
     let arc_m = k.arc_uplift_mm_yr * 1.0e-3 * dt_yr;
     let cord_m = k.cordillera_uplift_mm_yr * 1.0e-3 * dt_yr;
-    let (zt, zc) = (k.trench_elevation_m, k.max_elevation_m);
+    let (zt, zc) = (k.trench_elevation_m, k.uplift_reference_m);
+    let z_ceiling = k.uplift_ceiling_m;
     let x0 = k.subduction_peak_km / k.subduction_distance_km;
     let v0 = k.max_plate_speed_mm_yr;
     let smooth = |t: f64| t * t * (3.0 - 2.0 * t);
@@ -589,7 +592,7 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
             let zn = ((src.z_sub - zt) / (zc - zt)).clamp(0.0, 1.0);
             let h = zn * zn;
             let z = f64::from(s.elevation_m);
-            let mut dz = u0_m * f * g * h * ceiling(z, zc);
+            let mut dz = u0_m * f * g * h * ceiling(z, z_ceiling);
             let w_arc = (-((d_km - k.arc_distance_km) / k.arc_width_km).powi(2)).exp();
             if z < 0.0 {
                 dz += arc_m * w_arc * g;

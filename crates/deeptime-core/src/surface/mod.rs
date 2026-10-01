@@ -41,6 +41,8 @@
 //!    (`weathering.rs`); buried regolith becomes a log layer (a palaeosol).
 //! 5. Local isostasy: the load change, smoothed over `isostasy_radius_km`, is compensated by
 //!    `isostasy` (0.7 of it under water).
+//!    Then crust that stands higher than its strength holds spreads sideways (`spread.rs`:
+//!    lower-crustal flow; the height of plateaus, and its dependence on gravity, come from here).
 //! 6. Keyframe fields, the plate feedback, the deposit engine's frame (`fields.rs`) and, every
 //!    frame, the events (`events.rs`).
 //!
@@ -66,6 +68,7 @@ pub mod params;
 pub mod pflood;
 pub mod routing;
 pub mod spl;
+pub mod spread;
 pub mod strata_log;
 pub mod thermal;
 pub mod volcanoes;
@@ -1183,6 +1186,30 @@ impl SurfaceStage {
             iso -= l;
         }
         self.time("isostasy", started);
+
+        // 5b. Crust over its strength spreads (`spread.rs`): it moves crust, not surface rock, so
+        // it comes after the step's net change was logged; the plate model learns of it through
+        // the feedback.
+        let started = Instant::now();
+        let flow = spread::step(
+            &d,
+            &mut sc.h,
+            sea,
+            self.preset.tectonics.strength_height_m(gravity),
+            self.preset.tectonics.crust_flow_km2_myr,
+            dt,
+        );
+        if flow.cells > 0 {
+            *world
+                .globals
+                .entry(spread::CELLS_GLOBAL.to_owned())
+                .or_insert(0.0) += flow.cells as f64;
+            *world
+                .globals
+                .entry(spread::MOVED_GLOBAL.to_owned())
+                .or_insert(0.0) += flow.moved_m * a / 1.0e9;
+        }
+        self.time("spread", started);
 
         // 6. Outputs.
         let started = Instant::now();
