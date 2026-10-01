@@ -2219,6 +2219,29 @@ community ports) are not opened for code.
   evaluator are unchanged; the halo grows by the character's radius and two flood margins. Cost on
   16k quick: 2.4–4 s of the amplify stage (12 threads). Deferred: talus/scree at cliff feet (a
   surface-block rule the column evaluator would have to mirror) and 3D crags/overhangs (Phase 2).
+- **As built: glacial landforms** (Ben, 2026-09-29, decisions log "Glacial erosion landforms";
+  `surface/glacial.rs`, `surface/amplify/glacial.rs`; STATUS.md has the runs). The deep-time
+  surface and the young landscape run one glacier model per LEM step: a linear mass balance from
+  the climate's ELA (Oerlemans 2011), capped by precipitation; ice flux routed down the fluvial D8
+  tree (as Hergarten 2021); the ice surface of every cell solved from its receiver's with the
+  shallow-ice approximation plus Weertman sliding on thawed beds (Cuffey & Paterson 2010), glaciers
+  `1/form_ratio` as wide as thick (up to seven cells, spreading their erosion across the trough);
+  erosion E = K_g·u_s (Humphrey & Raymond 1994; K_g = 10⁻⁵ from Hallet et al. 1996's rates), none
+  under cold beds, floating ice or supercooling adverse slopes (Alley et al. 2003); debris melts out
+  with the ice as till (a facies of its own, class `till`, in the strata log), the rest goes with the
+  meltwater to lakes and the sea. Fjords follow from ice grounded below sea level at the coast. Fluvial
+  K is reduced by the glaciers' cover. The young landscape uses the glacial state's ELA (the
+  present one lowered by `young_ela_drop_m`, Porter 1989's ~500 m, until the climate publishes
+  ice-age fields; `glacial::source` names them in one place) and hands its ice surface to the
+  amplifier, which turns confined, laterally bounded ice into parabolic troughs (Svensson 1959,
+  Harbor 1992) with cirque-like heads, pointwise from the ice depth and the valley's centre-line
+  depth, as a tiled Jacobi pass (its radius is in the halo). Settings: `surface.glacial.*`,
+  `amplify.glacial.*` (editor: glacial erosion, glacial valleys, glacial valley width, ice-age snowline,
+  arêtes). The valley width (Ben, 2026-09-30; default 3, 1 = physical) draws the young landscape's glacier
+  footprints and trough spread wider for readability at the game's 15× vertical exaggeration; the
+  deep-time surface stays physical. Since the deep-time climate (2026-09-30) the glaciers read its ice fields:
+  deep-time ice only where the climate had ice in the step, eroding for its time share, rivers off under
+  thick ice; the young landscape's ice inside the last-glacial-maximum extent.
 - **Oracle.** `tools/validation/fastscape_compare.py` runs fastscapelib (GPL-3.0, installed with
   `nix shell` + pip in a throwaway venv, never vendored) on the same uplift and parameters on a
   256² grid and compares hypsometry, χ/steepness statistics and drainage-area distributions with the
@@ -3700,6 +3723,9 @@ on this machine.
   calderas, flood-basalt plateaus from LIP events; volcanic rock in the strata; events with causes.
 - **Acceptance.** Tests on placement from arc/hotspot/LIP fields; a real planet shows volcano
   chains in the right settings; 3D previews of an arc volcano, a hotspot island chain and a caldera.
+- **As built (2026-09-30).** A coupled stage `volcanoes` after the surface (`surface/volcanoes/`) and the
+  amplifier's shaping (`surface/amplify/volcano.rs`); design, numbers and pictures in STATUS.md's build log
+  ("P1-21 volcanoes as landforms").
 
 #### P1-22 Rivers and lakes (moved from P2-03, 2026-09-29)
 - **Goal.** The core of §8.4 hydrology in v1 (Ben, decisions log 2026-09-29): river networks from the

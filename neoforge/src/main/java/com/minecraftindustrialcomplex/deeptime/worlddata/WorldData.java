@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.zip.CRC32;
 
 /**
@@ -41,6 +42,8 @@ public final class WorldData {
     /** {@code rivers/rivers.dtrv} (P1-22), read on first use; {@link #NO_RIVERS} when absent. */
     private volatile Object rivers;
     private static final Object NO_RIVERS = new Object();
+    /** The ice cover, resolved on first use. */
+    private volatile Optional<IceCover> iceCover;
 
     private WorldData(Path folder, Manifest manifest, TileCache cache, Map<String, RasterSampler> layers) {
         this.folder = folder;
@@ -149,6 +152,19 @@ public final class WorldData {
                     }
                 }
                 c = classes;
+            }
+        }
+        return c;
+    }
+
+    /** The world's ice cover ({@link IceCover#of}), resolved once; empty for a world without one. */
+    public Optional<IceCover> iceCover() {
+        Optional<IceCover> c = iceCover;
+        if (c == null) {
+            synchronized (this) {
+                if (iceCover == null)
+                    iceCover = IceCover.of(this);
+                c = iceCover;
             }
         }
         return c;

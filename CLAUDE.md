@@ -47,6 +47,7 @@ tools/smoke/install.sh <standalone|mic|terrablender> [--size N] [--synth K] && p
 tools/client/mac-screenshots.sh [--name N] [--no-guidance] [--no-create]   # real client on the Mac's desktop → review/out/N/
 tools/review/publish.sh <name> <folder>                 # private spacesheep page (plan §2.6)
 tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | status   # workbench on the Mac → http://mac-mini:8642/ (tailnet only)
+tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete merged worktrees' Mac copies
 
 ## Rules
 - NixOS: nothing global. Run builds, tests and every `cargo` through `nix develop -c` (the profile's
@@ -69,9 +70,13 @@ tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | 
   `systemd-run --user --scope -p CPUQuota=100% nice -n 19 <cmd>`. No parallel local batches; no
   `nix develop` builds on the laptop.
 - **Mac disk hygiene** (2026-09-30: the SSD filled to 100 % with ~60 worktree copies, each with its own
-  target/): once a worktree's branch is merged, delete its Mac copy
-  (`/Volumes/Graphide/ban/mic/mods/<checkout name>`) after checking no process uses it; keep scratch
-  runs small and delete them when done. Keep everything on the SSD, never the Mac's internal disk.
+  target/; Ben: "Be more efficient about mac storage usage in the future"): after every merge run
+  `tools/remote/mac-gc.sh`, which deletes the Mac copies of merged, idle worktrees and prunes stale
+  incremental caches (`--dry-run` to preview). Scratch runs go under
+  `/Volumes/Graphide/ban/deeptime-runs/<task>/`, never inside target/; use the smallest planet and
+  fewest keyframes that answer the question, and delete them when the task lands. mac.sh builds with
+  `CARGO_INCREMENTAL=0` and line-table debuginfo to keep each copy's target/ small; do not override
+  that. Keep everything on the SSD, never the Mac's internal disk.
 - **Real-client runs** (booting a Minecraft client for screenshots) go to the Mac's logged-in desktop
   session too, never the laptop's Xvfb (Ben, 2026-09-28). That desktop is shared with graphide's
   agents: take a "drive" lease with graphide's `utilities/scripts/mactest/m6lock.sh` first.
