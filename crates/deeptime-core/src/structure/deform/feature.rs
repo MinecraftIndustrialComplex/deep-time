@@ -91,6 +91,9 @@ pub struct Feature {
     pub cause: u64,
     /// Plate steps in a row it has not had continental crust under it.
     pub adrift: u8,
+    /// How much the deep-time surface has eroded or buried the ground at its centre since it
+    /// formed, m: what wears its relief off the ground (`relief_left`).
+    pub wear_m: f32,
 }
 
 /// A structure that has had no continental crust under or beside it for this many plate steps is
@@ -221,9 +224,9 @@ impl Feature {
         -(waves + f64::from(self.phase)) * wl
     }
 
-    /// The feature as a baked event of the world data. The vectors are taken from the Noddy
-    /// event's own frame, so the two agree.
-    pub fn to_baked(&self, surface_y: f64) -> StructEvent {
+    /// The feature as a baked event of the world data (`key`: its age as a stratigraphic key).
+    /// The vectors are taken from the Noddy event's own frame, so the two agree.
+    pub fn to_baked(&self, surface_y: f64, key: u16) -> StructEvent {
         let az = f64::from(self.azimuth_deg);
         let window = Window {
             centre: [self.x, self.z],
@@ -268,9 +271,21 @@ impl Feature {
         };
         StructEvent {
             id: self.id,
+            key,
             t_years: f64::from(self.t_myr) * 1.0e6,
             window,
             shape,
+        }
+    }
+}
+
+/// Adds a step's change of the ground (`surface/material_m`: deposition positive, erosion
+/// negative, m) at every feature's centre to its wear.
+pub fn wear(features: &mut [Feature], grid: &GridDesc, material_m: &[f32]) {
+    for f in features {
+        let m = material_m[cell_of(grid, f.x, f.z)];
+        if m.is_finite() {
+            f.wear_m += m.abs();
         }
     }
 }
@@ -376,6 +391,7 @@ mod tests {
             slip: 0.0,
             cause: 0,
             adrift: 0,
+            wear_m: 0.0,
         }
     }
 

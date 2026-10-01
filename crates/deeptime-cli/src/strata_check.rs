@@ -57,12 +57,13 @@ fn world_data(dir: &Path, o: &Options<'_>) -> CliResult<Value> {
     let layer = w
         .strata()
         .ok_or_else(|| format!("{}: no strata/horizons layer", dir.display()))?;
+    let mut deform = deeptime_format::structure::DeformScratch::default();
     let rules = Rules::for_classes(&w.classes);
     let sea = w.manifest.scale.sea_level_y;
     let (mut stack, mut raw, mut col, mut f) =
         (Vec::new(), Vec::new(), Vec::new(), Findings::default());
     let mut column = |x: i64, z: i64, col: &mut Vec<realism::Visible>, f: &mut Findings| -> i32 {
-        layer.stack_at(x, z, w.min_y, &mut stack);
+        w.stack(x, z, &mut deform, &mut stack);
         raw.clear();
         raw.extend(stack.iter().map(|&(top, class, _)| (top, class)));
         let ground = w.top_y(x, z);

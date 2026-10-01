@@ -343,6 +343,7 @@ pub fn emplace(
                 slip: 0.0,
                 cause: cause(kind, bx, bz),
                 adrift: 0,
+                wear_m: 0.0,
             };
             match kind {
                 Kind::FoldTrain => {

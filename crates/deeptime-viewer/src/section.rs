@@ -78,10 +78,12 @@ fn body_class(b: &Body, c: u32, x: i32, y: i32, z: i32) -> Option<&str> {
     class
 }
 
-/// Renders `s` from the horizon stacks `strata` (classes named by `classes`) and `bodies`;
-/// RGBA, `s.w` × `s.h`.
+/// Renders `s` from the horizon stacks `strata` (classes named by `classes`), read through the
+/// world's folds and faults when `structure` is given, and `bodies`; RGBA, `s.w` × `s.h`.
+#[allow(clippy::too_many_arguments)]
 pub fn render(
     strata: &LoadedLayer,
+    structure: Option<&deeptime_format::structure::Deformer>,
     bodies: &[Body],
     classes: &[String],
     circumference: u32,
@@ -103,11 +105,21 @@ pub fn render(
     let index = |name: &str| classes.iter().position(|c| c == name);
     let mut rgba = vec![0u8; (s.w * s.h * 4) as usize];
     let mut stack = Vec::new();
+    let mut deform = deeptime_format::structure::DeformScratch::default();
     for px in 0..s.w {
         let z = s.z0 as f64 + (s.z1 - s.z0) as f64 * (f64::from(px) + 0.5) / f64::from(s.w);
         let z = z.floor() as i64;
         if s.per_cell {
             cell_stack(strata, s.x, z, &mut stack);
+        } else if let Some(d) = structure {
+            d.stack(
+                s.x,
+                z,
+                s.min_y,
+                &mut |sx, sz, o| strata.stack_at(sx, sz, s.min_y, o),
+                &mut deform,
+                &mut stack,
+            );
         } else {
             strata.stack_at(s.x, z, s.min_y, &mut stack);
         }
@@ -157,6 +169,7 @@ pub fn render(
 pub fn write_sections(
     dir: &Path,
     strata: &LoadedLayer,
+    structure: Option<&deeptime_format::structure::Deformer>,
     bodies: &[Body],
     classes: &[String],
     circumference: u32,
@@ -168,7 +181,16 @@ pub fn write_sections(
     fs::create_dir_all(dir.join("sections"))?;
     let mut out = Vec::new();
     for (n, s) in sections.iter().enumerate() {
-        let rgba = render(strata, bodies, classes, circumference, sea_level_y, s, ramp);
+        let rgba = render(
+            strata,
+            structure,
+            bodies,
+            classes,
+            circumference,
+            sea_level_y,
+            s,
+            ramp,
+        );
         let file = format!("sections/section-{n}.png");
         crate::write_rgba_png(&dir.join(&file), s.w, s.h, &rgba)?;
         let c = f64::from(circumference);
