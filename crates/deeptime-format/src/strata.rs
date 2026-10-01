@@ -256,7 +256,7 @@ pub fn stack_at_with(
             emit(out, top, entries[0].1, entries[0].2);
         } else if entries.len() > 1 {
             entries.sort_unstable_by_key(|e| (e.0, e.1));
-            interfinger(out, &entries, (s0, s1), (top, bottom), band_keys, minor);
+            interfinger(out, entries, (s0, s1), (top, bottom), band_keys, minor);
         }
         top = bottom;
     }
