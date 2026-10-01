@@ -30,6 +30,7 @@ pub mod hosts;
 pub mod metamorphism;
 pub mod params;
 pub mod plutons;
+pub mod realism;
 pub mod traps;
 
 #[cfg(test)]
