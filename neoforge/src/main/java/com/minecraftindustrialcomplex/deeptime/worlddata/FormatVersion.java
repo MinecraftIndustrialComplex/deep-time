@@ -9,7 +9,7 @@ package com.minecraftindustrialcomplex.deeptime.worlddata;
 public final class FormatVersion {
 
     /** The version string written in {@code manifest.json}. */
-    public static final String CURRENT = "0.2";
+    public static final String CURRENT = "0.3";
 
     /** The minor part of {@link #CURRENT}, written into every file header. */
     public static final int MINOR = 2;

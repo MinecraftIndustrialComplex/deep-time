@@ -220,6 +220,14 @@ impl ColumnWorld {
         }
     }
 
+    /// The horizon stack of column (x, z) before any fold or fault ([`crate::strata::stack_at`]).
+    pub fn plain_stack(&self, x: i64, z: i64, out: &mut Vec<ColumnHorizon>) {
+        out.clear();
+        if let Some(h) = &self.horizons {
+            h.stack_at(x, z, self.min_y, out);
+        }
+    }
+
     /// The top block of the terrain at column (x, z) (`min_y − 1` where there is none), as
     /// [`ColumnWorld::sample`] gives it.
     pub fn top_y(&self, x: i64, z: i64) -> i32 {

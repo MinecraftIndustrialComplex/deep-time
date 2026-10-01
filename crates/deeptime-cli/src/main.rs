@@ -1827,7 +1827,7 @@ mod tests {
         })
         .unwrap();
         let m = deeptime_format::Manifest::read(&dir.join("world")).unwrap();
-        assert_eq!(m.format_version, "0.2");
+        assert_eq!(m.format_version, "0.3");
         assert_eq!(m.notes["bake"]["baked"], true);
         // The bake says how much of its terrain stands above the build limit (whatever the planet).
         let limit = &m.notes["bake"]["terrain"]["build_limit"];

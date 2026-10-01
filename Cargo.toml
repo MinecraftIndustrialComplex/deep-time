@@ -16,7 +16,7 @@ repository = "https://github.com/MinecraftIndustrialComplex/deep-time"
 # The world-data format version (plan §5.7.2). Mirrored by deeptime_format::FORMAT_VERSION and Java's
 # FormatVersion.CURRENT (a test on each side fails on drift); read by
 # Gradle (hostNatives / natives.json) and by tools/natives/build-natives.sh.
-format_version = "0.2"
+format_version = "0.3"
 
 [workspace.dependencies]
 deeptime-format = { path = "crates/deeptime-format" }
