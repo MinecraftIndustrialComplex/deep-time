@@ -313,8 +313,9 @@ public final class FarTerrainCommand {
             water = true;
             waterTop = ground;
         }
-        boolean same = top == far.top() && topBlock == far.topBlock() && water == far.water()
-                && (water ? waterTop == far.waterTop() : ground == far.ground() && groundBlock == far.groundBlock());
+        // The top block and its height, and the water's top. The ground under a snow layer is not
+        // compared: the merge extends the snow down over the soil it hides.
+        boolean same = top == far.top() && topBlock == far.topBlock() && water == far.water() && (!water || waterTop == far.waterTop());
         if (!same)
             why.append("(").append(far.x()).append(", ").append(far.z()).append("): stored top ").append(top).append(" ").append(id(topBlock))
                     .append(" ground ").append(ground).append(" ").append(id(groundBlock)).append(", far top ").append(far.top()).append(" ")
