@@ -37,6 +37,9 @@ public final class WorldData {
     private final RasterSampler amplitude;
     /** Sites, bodies and events, read on first use (P1-15). */
     private volatile Deposits deposits;
+    /** {@code structure/events.dtst} (P2-01), read on first use; {@link #NO_STRUCTURE} when the world has none. */
+    private volatile Object structure;
+    private static final Object NO_STRUCTURE = new Object();
     /** {@code strata/classes.json}, read on first use. */
     private volatile List<String> classes;
     /** {@code rivers/rivers.dtrv} (P1-22), read on first use; {@link #NO_RIVERS} when absent. */
@@ -121,6 +124,21 @@ public final class WorldData {
     }
 
     /** The river network (P1-22), read and checked on first use; null for a world without one. */
+    /** The world's folds and faults ({@code structure/events.dtst}, P2-01), or null when it has none. */
+    public Structure structure() {
+        Object st = structure;
+        if (st == null) {
+            synchronized (this) {
+                if (structure == null) {
+                    Structure read = Structure.read(folder, circumference());
+                    structure = read == null ? NO_STRUCTURE : read;
+                }
+                st = structure;
+            }
+        }
+        return st == NO_STRUCTURE ? null : (Structure) st;
+    }
+
     public Rivers rivers() {
         Object r = rivers;
         if (r == null) {
