@@ -22,12 +22,20 @@
 //! page only chooses a new run's inputs or cancels one. The test
 //! `workbench_streams_every_step_and_matches_the_batch_run` holds it to that (the watched world
 //! equals the batch run's, and its last frame is the batch run's last keyframe pixel for pixel).
+//!
+//! The deposits overlay ([`deposits`]) is such a view: the sites the deposit stage placed are
+//! read from the world between two steps (and from the finished run's bake) and drawn by the page
+//! over any layer; nothing is added to a step.
 
+mod deposits;
 mod editor;
 mod http;
 mod live;
 mod runs;
+mod sections;
 pub mod stage2;
+mod tiles;
+mod worldmap;
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
@@ -802,6 +810,115 @@ mod tests {
             .collect();
         assert_eq!(left, [slow.as_str(), ids[2].as_str()]);
         assert!(!runs.join(&ids[0]).exists() && !runs.join(&ids[1]).exists());
+        served.stop();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The deposits overlay's data (`GET /api/runs/<id>/deposits`): a run of the synthetic deposit
+    /// world has its sites taken from the world in memory, once, when the frame that names the
+    /// sites layer is published, and the finished run answers from its bake: the same sites either
+    /// way, each with the event that formed it in the run's event stream. A run that has placed
+    /// nothing yet says so, and the page and its script are served.
+    #[test]
+    fn the_deposits_overlay_reads_the_sites_live_and_baked() {
+        let dir = tmp("deposits");
+        let preset = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../deeptime-core/tests/presets/deposits_synthetic_4k.json"
+        ))
+        .unwrap();
+        let served = serve(&options(&dir.join("runs"), 8, LOCAL)).unwrap();
+        let addr = served.addr();
+
+        let page = String::from_utf8(get(addr, "/").1).unwrap();
+        assert!(page.contains("deposits.js") && page.contains("id=\"depbtn\""));
+        let (status, js) = get(addr, "/deposits.js");
+        assert_eq!(status, 200);
+        assert!(String::from_utf8(js).unwrap().contains("DTDeposits"));
+
+        // A run that has not started has no sites, and the answer says why.
+        served.wb.hold(true);
+        let (_, q) = post(
+            addr,
+            "/api/runs",
+            &json!({ "json": dummy(2, 0), "label": "queued" }),
+        );
+        let queued = q["id"].as_str().unwrap().to_owned();
+        let none = get_json(addr, &format!("/api/runs/{queued}/deposits"));
+        assert_eq!(none["available"], false);
+        assert!(none["reason"].as_str().unwrap().contains("not placed"));
+        assert_eq!(get(addr, "/api/runs/nope/deposits").0, 404);
+        post(addr, &format!("/api/runs/{queued}/cancel"), &json!({}));
+        served.wb.hold(false);
+
+        let (status, created) = post(
+            addr,
+            "/api/runs",
+            &json!({ "json": preset, "label": "deposits" }),
+        );
+        assert_eq!(status, 201, "{created}");
+        let id = created["id"].as_str().unwrap().to_owned();
+        served.wb.wait_idle();
+        assert_eq!(run_state(addr, &id)["state"], "done");
+        let run = served.wb.run(&id).unwrap();
+
+        // Taken while the run went on, before anything asked.
+        let (source, text) = run
+            .deposits
+            .get()
+            .expect("captured when the sites were placed");
+        assert_eq!(source, "live");
+        let live: Value = serde_json::from_slice(&text).unwrap();
+
+        // The frames name the sites layer; the run's events hold each site's forming event.
+        let state = get_json(addr, &format!("/api/runs/{id}/state.json"));
+        assert!(state["frames"].as_array().unwrap().iter().any(|f| {
+            f["layers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|l| l == "deposits/sites")
+        }));
+        let event_ids: Vec<u64> = state["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["id"].as_u64().unwrap())
+            .collect();
+
+        // The route answers from the finished run's bake (the baked deposits at the end).
+        let baked = get_json(addr, &format!("/api/runs/{id}/deposits"));
+        assert_eq!(baked["available"], true);
+        assert_eq!(baked["source"], "bake");
+        assert_eq!(baked["circumference"], 4096);
+        assert_eq!(baked["m_per_block_h"], 300.0);
+        let sites = baked["sites"].as_array().unwrap();
+        assert!(sites.len() > 3, "{} sites", sites.len());
+        assert_eq!(live["sites"], baked["sites"], "live and baked agree");
+        for s in sites {
+            assert!(
+                event_ids.contains(&s["forming_event"].as_u64().unwrap()),
+                "site {} has its forming event in the stream",
+                s["id"]
+            );
+            assert!(s["type"].as_str().unwrap().starts_with("deeptime:"));
+            let lat = s["lat"].as_f64().unwrap();
+            let lon = s["lon"].as_f64().unwrap();
+            assert!((-90.0..=90.0).contains(&lat) && (0.0..360.0).contains(&lon));
+            assert!(s["fp"]["a"].as_f64().unwrap() > 0.0 && s["fp"]["km2"].as_f64().unwrap() > 0.0);
+        }
+        // Most have something to size them by (a site may be left with nothing recorded).
+        assert!(
+            sites
+                .iter()
+                .any(|s| !s["products"].as_array().unwrap().is_empty())
+        );
+        // A restarted workbench reads the same sites back from the bake.
+        served.stop();
+        let served = serve(&options(&dir.join("runs"), 8, LOCAL)).unwrap();
+        let again = get_json(served.addr(), &format!("/api/runs/{id}/deposits"));
+        assert_eq!(again["sites"], baked["sites"]);
+        assert_eq!(again["source"], "bake");
         served.stop();
         std::fs::remove_dir_all(&dir).unwrap();
     }

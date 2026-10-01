@@ -843,6 +843,16 @@ pub struct StageOptions {
     pub common: Common,
 }
 
+/// A work folder of its own for one call that was given none: the process id and a counter, so two
+/// calls in one process (the CLI tests run in parallel threads) never share a folder: with the
+/// process id alone (`deeptime-stage-<pid>`) the call that finished first would delete the folder
+/// under the other.
+pub(crate) fn temp_work(what: &str) -> PathBuf {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    std::env::temp_dir().join(format!("deeptime-{what}-{}-{n}", std::process::id()))
+}
+
 /// `deeptime stage <name>`: one stage from a checkpoint (or from a preset, running the stages
 /// before it first), then a checkpoint after it.
 pub fn stage(o: &StageOptions) -> CliResult<()> {
@@ -852,7 +862,7 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             name.push(".work");
             out.with_file_name(name)
         }
-        None => std::env::temp_dir().join(format!("deeptime-stage-{}", std::process::id())),
+        None => temp_work("stage"),
     });
     let opts = session_options(&work, &o.common);
     let s = match (&o.input, &o.preset) {
@@ -1183,9 +1193,7 @@ pub struct BenchOptions {
 pub fn bench(o: &BenchOptions) -> CliResult<()> {
     let preset = load_preset_with(&o.preset, o.start.as_deref(), o.length_myr)?;
     let temp = o.work.is_none();
-    let work = o.work.clone().unwrap_or_else(|| {
-        std::env::temp_dir().join(format!("deeptime-bench-{}", std::process::id()))
-    });
+    let work = o.work.clone().unwrap_or_else(|| temp_work("bench"));
     let mut runs = Vec::new();
     let mut name = String::new();
     for &threads in &o.threads {

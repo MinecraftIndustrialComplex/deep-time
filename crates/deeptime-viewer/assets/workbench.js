@@ -134,7 +134,7 @@
     ['strata', 'Strata'], ['volcanoes', 'Volcanoes'], ['deposits', 'Deposits'], ['input', 'Deposit inputs']];
   const layerGroup = name => { const i = name.indexOf('/'); return i < 0 ? '' : name.slice(0, i); };
   const LAYER_WORDS = {
-    satellite: 'Satellite', elevation: 'Elevation', plates: 'Plates', crust_age: 'Crust age', regime: 'Tectonic regime', provinces: 'Geologic provinces', water_level: 'Water level',
+    satellite: 'Satellite', elevation: 'Elevation', plates: 'Plates', crust_age: 'Crust age', regime: 'Tectonic regime', provinces: 'Geologic provinces', water_level: 'Water level', rivers: 'Rivers & lakes',
     t_mean: 'Mean temperature', t_warm: 'Warmest month', t_cold: 'Coldest month', precip: 'Precipitation', koppen: 'Köppen climate',
     aridity: 'Aridity', glacier: 'Glaciers', ela: 'Snow line', temperature: 'Temperature', vegetation: 'Vegetation',
     erosion: 'Erosion', deposition: 'Deposition', sediment: 'Sediment', class: 'Surface rock', drainage: 'Drainage', regolith: 'Regolith',
@@ -151,6 +151,7 @@
     for (const [s, u] of UNIT_SUFFIX) if (base.endsWith(s) && base.length > s.length) { base = base.slice(0, -s.length); unit = u; break; }
     if (name === 'elevation') unit = 'block y';
     if (name === 'crust_age') unit = 'Myr';
+    if (name === 'rivers') unit = 'river flow, m³/s';
     return { label: LAYER_WORDS[base] || cap1(base.replace(/_/g, ' ')), unit };
   }
 
@@ -229,7 +230,19 @@
     const { label, unit } = layerLabel(layerName);
     let h = `<div class="lh"><span class="lname">${esc(label || 'No layer')}</span><span class="lraw">${esc(layerName || '')}${info && info.name !== layerName ? ` · ramp ${esc(info.name)}` : ''}</span><span class="lunit">${esc(unit)}</span></div>`;
     if (!info) return h + '<div class="note">Loading the colours…</div>';
-    if (info.cat && info.labelled && info.classes.length <= 40) {
+    if (layerName === 'rivers' && !info.cat) {
+      // Rivers & lakes (core water_view.rs): the ramp is the river's colour by discharge (log10
+      // m³/s, ticks in m³/s); the other colours are in the ramp's `keys`.
+      const keys = info.ramp.keys || {}, span = info.hi - info.lo || 1;
+      const key = (c, t) => `<div title="${esc(t)}"><i style="background:${esc(c || '#888')}"></i><span>${esc(t)}</span></div>`;
+      h += `<div class="cats">${key(keys.lake, 'Lake')}${key(keys.land, 'Land')}${key(keys.sea, 'Sea')}</div>`;
+      h += `<canvas class="bar" data-ramp="${esc(info.name)}" data-target="${target}"></canvas><div class="ticks">`;
+      h += [2, 10, 100, 1000].map((q, i) => `<span style="left:${(100 * (Math.log10(q) - info.lo) / span).toFixed(2)}%;transform:${i ? 'translateX(-50%)' : 'none'}">${fmtInt(q)}</span>`).join('');
+      h += '</div>';
+      if (info.comment) h += `<div class="note">${esc(info.comment)}</div>`;
+      return h;
+    }
+    if (info.cat && info.labelled && info.classes.length <= 64) {
       // A key: swatches with their labels, wider columns for long labels, under the ramp's group
       // headings when it has them (the satellite view's land, snow and ice, sea).
       const wide = info.classes.some(k => String(k.label ?? '').length > 11);
@@ -281,13 +294,14 @@
       this.rampOf = new Map();     // layer -> ramp name
       this.images = new Map();     // "n/li" -> Image (LRU)
       this.failed = new Map();
+      this.deposits = null; this.depFrom = -1; this.depState = '';   // the deposits overlay (below)
       this.connected = false;
       this.es = new EventSource(`api/runs/${encodeURIComponent(id)}/stream`);
       this.es.addEventListener('hello', ev => this.hello(JSON.parse(ev.data)));
       this.es.addEventListener('frame', ev => this.addFrames([JSON.parse(ev.data)]));
       this.es.addEventListener('events', ev => this.addEvents(JSON.parse(ev.data).events));
       this.es.addEventListener('progress', ev => { this.progress = JSON.parse(ev.data); changed(this); });
-      this.es.addEventListener('status', ev => { this.status = JSON.parse(ev.data); changed(this); });
+      this.es.addEventListener('status', ev => { this.status = JSON.parse(ev.data); changed(this); depStatus(this); });
       this.es.addEventListener('bye', () => { this.es.close(); this.connected = false; changed(this); });
       this.es.onerror = () => { this.connected = false; changed(this); };
     }
@@ -312,6 +326,7 @@
           if (!this.layers.includes(name)) this.layers.push(name);
           if (f.ramps && f.ramps[i] && !this.rampOf.has(name)) this.rampOf.set(name, f.ramps[i]);
         });
+        depFrame(this, f);
       }
       if (!quiet) changed(this, true);
     }
@@ -696,11 +711,14 @@
     if (!has || p.cur < 0 || !r.frames[p.cur]) { p.clock.innerHTML = ''; badge(p); drawGrid(p); p.frame.classList.remove('loading'); return; }
     const f = r.frames[p.cur];
     const dn = displayIndex(r, p.cur), fd = r.frames[dn];
-    const img = r.image(dn);
+    const dli = r.layerIndex(fd), dinfo = rampInfo(fd.ramps && fd.ramps[dli]);
+    // Rock at depth (sections.js): below the surface the bake's slice replaces the frame's image
+    // ('wait' while it loads: the previous picture stays).
+    const sl = window.DTSections ? DTSections.slice(r, dinfo && dinfo.name) : null;
+    const img = sl === 'wait' ? null : (sl || r.image(dn));
     if (ready(img)) p.drawn = img;
     p.frame.classList.toggle('loading', !ready(img));
     // Continuous layers upscale smoothly; categorical ones (plates, Köppen, rock) keep hard edges.
-    const dli = r.layerIndex(fd), dinfo = rampInfo(fd.ramps && fd.ramps[dli]);
     ctx.imageSmoothingEnabled = !!dinfo && !dinfo.cat && c.width > fd.w * 1.2;
     ctx.imageSmoothingQuality = 'high';
     if (p.drawn) ctx.drawImage(p.drawn, 0, 0, c.width, c.height);
@@ -741,6 +759,7 @@
         }
       }
     }
+    drawDeposits(p, r, f);
     if (pin && pin.pane === p.i) {
       const [x, y] = llToCanvas(p, pin.lat, pin.lon);
       ctx.beginPath(); ctx.arc(x, y, 7 * dpr, 0, 2 * Math.PI);
@@ -749,6 +768,7 @@
     }
     const box = p.drag && p.drag.box ? p.drag.box : p.boxLL;
     if (box) drawBox(p, box, !!(p.drag && p.drag.box));
+    if (window.DTSections) DTSections.draw(p, ctx, dpr);   // the section line, and the badge of a slice
     // The clock.
     const { label: ln } = layerLabel(layer);
     let sub = `${esc(stageText(f.stage))} · step ${f.n + 1}`;
@@ -853,11 +873,39 @@
     const q = (py * pix.w + px) * 4;
     const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
     if (pix.d[q + 3] === 0) return { name, rgb, nodata: true };
+    if (info && info.name === 'rivers') return { name, info, ...riversRead(pix, px, py, info) };
     return { name, rgb, info, val: valueAt(info, rgb) };
+  }
+  // The Rivers & lakes layer (core water_view.rs): a river is a pixel on the ramp (log10 of its
+  // discharge), a lake one of the ramp's lake key colour; rivers are a pixel or two wide, so the
+  // pointer reads the strongest water within a pixel of it.
+  function riversRead(pix, px, py, info) {
+    const lake = hexRgb((info.ramp.keys && info.ramp.keys.lake) || '#5cc0ea');
+    let best = null;
+    for (let k = 0; k < 9; k++) {
+      const dx = k === 0 ? 0 : [-1, 0, 1, -1, 1, -1, 0, 1][k - 1], dy = k === 0 ? 0 : [-1, -1, -1, 0, 0, 1, 1, 1][k - 1];
+      const x = (px + dx + pix.w) % pix.w, y = clamp(py + dy, 0, pix.h - 1), q = (y * pix.w + x) * 4;
+      if (pix.d[q + 3] === 0) continue;
+      const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
+      let w = null;
+      if (dist2(rgb, lake) < 150) w = { kind: 'lake', v: Infinity };
+      else { const r = valueAt(info, rgb); if (r && !r.far) w = { kind: 'river', v: r.v }; }
+      if (w && (!best || w.v > best.w.v)) best = { w, rgb };
+      if (k === 0 && w) break;   // the pixel under the pointer is water: that is the answer
+    }
+    return best ? { rgb: best.rgb, water: best.w } : { rgb: [pix.d[(py * pix.w + px) * 4], pix.d[(py * pix.w + px) * 4 + 1], pix.d[(py * pix.w + px) * 4 + 2]], water: null };
+  }
+  function riverFlowText(logq) {
+    const q = 10 ** logq;
+    if (q < 10) return q.toFixed(1);
+    if (q < 100) return String(Math.round(q));
+    const p = 10 ** (Math.floor(Math.log10(q)) - 1);
+    return fmtInt(Math.round(q / p) * p);
   }
   function valueText(s) {
     if (!s) return '';
     if (s.nodata) return 'no data';
+    if (s.water !== undefined) return s.water ? (s.water.kind === 'lake' ? 'lake' : `river (~${riverFlowText(s.water.v)} m³/s)`) : '';
     if (!s.val) return '';
     // The satellite view is true colour, so the nearest key colour is only what the spot looks like.
     if (s.val.cls && s.info && s.info.name === 'satellite') return `looks like ${(s.val.cls.label || '').toLowerCase()}`;
@@ -921,6 +969,7 @@
         Stage2.preview(r, f, { x0, z0, x1, z1 }, { north: b.north, south: b.south, west: b.west, east: b.east }, b.text);
         return;
       }
+      if (tool === 'section') { if (window.DTSections) DTSections.click(p, r, lat, lon); return; }
       if (tool === 'inspect') {
         G.lon0 = lon; G.lat0 = clamp(lat, -80, 80); G.spin = false; spinButton(); globeDirty = true;
         pin = { pane: p.i, lat, lon }; mapDirty = true;
@@ -949,6 +998,179 @@
     const cut = w > 256 || h > 256;
     return { north, south, west, east, w, h, cut, text: `${fmtInt(w)} × ${fmtInt(h)} blocks${cut ? ' → cut to 256 × 256' : ''}` };
   }
+
+  // =================================================================================================
+  // The deposits overlay (Ben, 2026-10-01): the run's coal fields and ore deposits by family, drawn
+  // over whatever layer the map shows. A view of data the run keeps: the sites the deposit stage
+  // placed (`GET api/runs/<id>/deposits`, from the world in memory while the run goes on and from
+  // the finished run's bake after) and the events the page already holds for each site's age and
+  // "why here". Drawing, hit-testing, the legend and the texts are `DTDeposits` (deposits.js); this
+  // is the wiring to the panes, the legend card and the inspector. It is an overlay, not a layer:
+  // the keyframe layers are images the core draws on the stepping thread, which cannot carry
+  // symbols to hover or click, and an overlay works over every base layer, the new ones too.
+  // =================================================================================================
+  const DEP_LAYER = 'deposits/sites';
+  let depositsOn = store.get('deposits', true);
+  let depHidden = new Set(store.get('depHidden', []));
+  // A frame names the sites layer: the deposit stage has run, and its sites are fetched once (again
+  // when the run is done, for the baked ones).
+  function depFrame(r, f) {
+    if (!f.layers.includes(DEP_LAYER)) return;
+    if (r.depFrom < 0 || f.n < r.depFrom) { r.depFrom = f.n; depDirty(); }
+    if (!r.depState) loadDeposits(r);
+  }
+  function depStatus(r) {
+    if (r.depFrom >= 0 && r.status && r.status.state === 'done' && r.depSource !== 'bake') loadDeposits(r);
+  }
+  function depDirty() { mapDirty = legendDirty = true; }
+  async function loadDeposits(r) {
+    if (r.depState === 'loading') { r.depAgain = true; return; }
+    r.depState = 'loading';
+    const res = await api(`api/runs/${encodeURIComponent(r.id)}/deposits`);
+    if (res.ok && res.body.available) {
+      r.deposits = DTDeposits.prepare(res.body); r.depSource = res.body.source; r.depState = 'ready';
+    } else r.depState = res.ok ? 'none' : 'failed';
+    depDirty(); buttons();
+    if (r.depAgain) { r.depAgain = false; loadDeposits(r); }
+  }
+  // The sites show on the frames where the deposit stage has run.
+  const depShown = (r, n) => !!r && !!r.deposits && r.depFrom >= 0 && n >= r.depFrom;
+  // The map's pixels for a lat/lon, as the event markers use them.
+  function depView(p, f) {
+    const c = p.canvas;
+    return { project: (lat, lon) => mapXY(lat, lon, f, c.width), ppdx: c.width / 360, ppdy: c.height / 180, worldW: c.width, dpr: window.devicePixelRatio || 1 };
+  }
+  // The site whose forming event the inspector shows is the selected one.
+  const depSelected = (p, r) => { const s = p.i === focus && selectedEvent ? r.deposits.byEvent.get(selectedEvent) : null; return s ? s.id : null; };
+  function drawDeposits(p, r, f) {
+    if (!depositsOn || !depShown(r, p.cur)) return;
+    DTDeposits.draw(p.ctx, r.deposits, depView(p, f), { hidden: depHidden, hover: p.depHover ?? null, selected: depSelected(p, r) });
+  }
+  const depAge = (r, s) => { const e = r.byId.get(s.forming_event); return e ? fmtT(e.t_start) : ''; };
+
+  // The toggle and the legend.
+  function depButton() {
+    const b = $('depbtn');
+    const r = P().run;
+    b.setAttribute('aria-pressed', String(depositsOn));
+    const none = !r || !r.deposits;
+    b.dataset.tip = none ? 'Deposits: coal fields and ore sites by family (they appear when the deposit stage has placed them)' : 'Deposits: coal fields and ore sites by family, over any layer';
+    b.classList.toggle('dim', none);
+  }
+  $('depbtn').addEventListener('click', () => { depositsOn = !depositsOn; store.set('deposits', depositsOn); depDirty(); buttons(); });
+  function depLegend() {
+    const box = $('deplegend'), p = P(), r = p.run;
+    if (!depositsOn || !r || !r.deposits || r.depFrom < 0) { box.hidden = true; box.dataset.key = ''; return; }
+    const pending = p.cur < r.depFrom;
+    const key = [r.id, r.depSource, r.deposits.sites.length, [...depHidden].join(), pending].join('|');
+    box.hidden = false;
+    if (box.dataset.key === key) return;
+    box.dataset.key = key;
+    const note = pending ? `The deposit stage places the sites at the end of the run; they show from step ${r.depFrom + 1}.` : undefined;
+    box.innerHTML = DTDeposits.legendHTML(r.deposits, depHidden, { note });
+  }
+  $('deplegend').addEventListener('click', ev => {
+    const note = ev.target.closest('.note');
+    if (note) { note.classList.toggle('open'); return; }
+    const b = ev.target.closest('[data-fam]');
+    if (!b) return;
+    const k = b.dataset.fam;
+    if (ev.altKey || ev.metaKey) {   // alone: hide every other family
+      const all = [...b.parentElement.children].map(x => x.dataset.fam);
+      depHidden = new Set(all.filter(x => x !== k));
+    } else if (depHidden.has(k)) depHidden.delete(k); else depHidden.add(k);
+    store.set('depHidden', [...depHidden]);
+    depDirty();
+  });
+
+  // Hover (a card with the family, size and age) and click (the inspector, "why here").
+  for (const p of panes) {
+    const at = ev => { const rect = p.canvas.getBoundingClientRect(), d = window.devicePixelRatio || 1; return [(ev.clientX - rect.left) * d, (ev.clientY - rect.top) * d, ev.clientX - rect.left, ev.clientY - rect.top]; };
+    const siteAt = ev => {
+      const r = p.run;
+      if (TV || !depositsOn || !r || p.cur < 0 || !depShown(r, p.cur) || !r.frames[p.cur]) return null;
+      const [x, y] = at(ev);
+      return DTDeposits.hit(r.deposits, depView(p, r.frames[p.cur]), x, y, { hidden: depHidden });
+    };
+    const tip = () => {
+      if (!p.depTip) { p.depTip = document.createElement('div'); p.depTip.className = 'dep-tip'; p.depTip.hidden = true; p.frame.appendChild(p.depTip); }
+      return p.depTip;
+    };
+    const leave = () => { if (p.depHover != null) { p.depHover = null; mapDirty = true; } p.canvas.style.cursor = ''; if (p.depTip) p.depTip.hidden = true; };
+    p.canvas.addEventListener('pointermove', ev => {
+      if (p.drag && p.drag.box) { leave(); return; }
+      const s = siteAt(ev);
+      if (!s) { leave(); return; }
+      if (p.depHover !== s.id) { p.depHover = s.id; mapDirty = true; }
+      p.canvas.style.cursor = tool === 'select' ? 'pointer' : '';
+      const t = tip(), [, , cx, cy] = at(ev);
+      t.innerHTML = DTDeposits.tipHTML(s, depAge(p.run, s));
+      t.hidden = false;
+      const w = t.offsetWidth, h = t.offsetHeight, fw = p.frame.clientWidth, fh = p.frame.clientHeight;
+      t.style.left = `${clamp(cx + 16 + w > fw ? cx - 16 - w : cx + 16, 4, Math.max(4, fw - w - 4))}px`;
+      t.style.top = `${clamp(cy + 16 + h > fh ? cy - 12 - h : cy + 16, 4, Math.max(4, fh - h - 4))}px`;
+    });
+    p.canvas.addEventListener('pointerleave', leave);
+    // A click with the Select tool on a deposit opens it; this runs before the map's own click
+    // (a point's values, the nearest event) and takes the click when it is a hit.
+    let down = null;
+    p.canvas.addEventListener('pointerdown', ev => { down = [ev.clientX, ev.clientY]; }, true);
+    p.canvas.addEventListener('pointerup', ev => {
+      if (tool !== 'select' || !down || Math.abs(ev.clientX - down[0]) + Math.abs(ev.clientY - down[1]) > 6) return;
+      const s = siteAt(ev);
+      if (!s) return;
+      ev.stopImmediatePropagation();
+      p.drag = null;
+      setFocus(p.i);
+      showSite(p.run, s);
+    }, true);
+  }
+
+  // A site in the inspector: its card and "why here" (the forming event and its causes, up to four
+  // links deep, as `deeptime inspect-column --why` lists them), then the forming event itself, as
+  // the Events tab shows any event. Chain links open the events; the kin links open other sites.
+  function showSite(r, s) {
+    const model = r.deposits, e = r.byId.get(s.forming_event);
+    const where = latLonText(s.lat, s.lon), age = depAge(r, s);
+    const head = `<div class="dh" style="--c:${s.family.ui || s.family.colour}"><span class="d"></span><div><h4>${esc(s.family.label)}</h4><div class="id">site ${s.id} · ${esc(s.type)}</div></div></div>`;
+    const kv = `<div class="kv">${DTDeposits.factRows(s, model, { where, age }).map(([a, b]) => `<div>${esc(a)}</div><div>${b}</div>`).join('')}</div>`;
+    const kin = [];
+    const parent = s.parent != null ? model.byId.get(s.parent) : null;
+    const kids = model.sites.filter(o => o.parent === s.id);
+    const siteBtn = o => `<button data-site="${o.id}" style="--c:${o.family.ui || o.family.colour}"><i></i>${esc(o.family.label)}<span class="t">site ${o.id}</span></button>`;
+    if (parent) kin.push(`<h5>Came from</h5><div class="chain">${siteBtn(parent)}</div>`);
+    if (kids.length) kin.push(`<h5>Led to</h5><div class="chain">${kids.map(siteBtn).join('')}</div>`);
+    let why;
+    if (e) {
+      const chain = DTDeposits.causeChain(r.byId, e.id, 4);
+      why = `<h5>Why here</h5><div class="dep-why"><div class="chain"><div class="lv"><span class="lvn">0</span>${evLink(r, e.id)}</div>` +
+        chain.map(c => `<div class="lv" style="padding-left:${(c.depth - 1) * 10}px"><span class="lvn">${c.depth}</span>${evLink(r, c.id)}</div>`).join('') +
+        `</div></div><div class="desc" style="margin-top:6px">Level 0 formed the deposit; each level below is a cause of the one above it.</div>`;
+    } else why = '<h5>Why here</h5><div class="chain"><span class="none">The forming event is not in this run’s event log.</span></div>';
+    const acts = `<div class="acts"><button class="btn btn-sm" data-sitegoto="${s.id}">${ic('target', 'ic-s')}Turn the globe here</button></div>`;
+    const card = head + kv + acts + why + kin.join('') + (e ? '<h5>Forming event</h5>' : '');
+    if (e) {
+      showEvent(r, e.id);
+      $('details').insertAdjacentHTML('afterbegin', card);
+    } else {
+      selectedEvent = null; pin = null;
+      $('details').innerHTML = card;
+      $('details').dataset.curEv = '';
+      setITab('details', true);
+      if (narrow.matches) setMTab('inspect');
+      mapDirty = true; evShownKey = ''; tickerDirty = true;
+    }
+    G.lon0 = s.lon; G.lat0 = clamp(s.lat, -80, 80); G.spin = false; spinButton(); globeDirty = true;
+  }
+  $('details').addEventListener('click', ev => {
+    const r = P().run;
+    const kin = ev.target.closest('[data-site]'), go = ev.target.closest('[data-sitegoto]');
+    if (!r || !r.deposits || (!kin && !go)) return;
+    const s = r.deposits.byId.get(Number(kin ? kin.dataset.site : go.dataset.sitegoto));
+    if (!s) return;
+    if (kin) showSite(r, s);
+    else { G.lon0 = s.lon; G.lat0 = clamp(s.lat, -80, 80); G.spin = false; spinButton(); globeDirty = true; }
+  });
 
   // =================================================================================================
   // Stage 2: the 3D block preview of an area and click-to-inspect (tools/workbench/preview.py,
@@ -1240,6 +1462,7 @@
   // Legend and layer picker
   // =================================================================================================
   function legend() {
+    depLegend();
     const p = P(), r = p.run;
     const el = $('legend');
     let name = layer, info = null;
@@ -1248,7 +1471,7 @@
       name = f.layers[li]; info = rampInfo(f.ramps && f.ramps[li]);
     } else if (r && layer) info = rampInfo(r.rampOf.get(layer));
     if (!name) { el.innerHTML = '<div class="lh"><span class="lname muted">No layer yet</span></div>'; return; }
-    const key = `${name}|${info ? info.name : ''}|${el.clientWidth}`;
+    const key = `${name}|${info ? info.name : ''}|${el.clientWidth}|${info && info.labelled ? 1 : 0}`;
     if (el.dataset.key !== key) { el.dataset.key = key; el.innerHTML = legendHTML(name, info, 'side'); paintLegendBars(el); const n = el.querySelector('.note'); if (n) n.title = 'Click to read all'; }
     if (TV) { const t = $('tv-legend'); if (t.dataset.key !== key) { t.dataset.key = key; t.innerHTML = legendHTML(name, info, 'tv'); paintLegendBars(t); } }
   }
@@ -1374,10 +1597,11 @@
     const none = !r || !r.frames.length;
     for (const id of ['rewind', 'back', 'play', 'fwd', 'livebtn', 'slower', 'faster']) $(id).disabled = none;
     if (none) { lb.classList.remove('on'); $('livetext').textContent = 'Live'; }
-    for (const t of ['select', 'inspect', 'area']) $(`tool-${t}`).setAttribute('aria-pressed', String(tool === t));
+    for (const t of ['select', 'inspect', 'area', 'section']) $(`tool-${t}`).setAttribute('aria-pressed', String(tool === t));
     for (const b of document.querySelectorAll('.s2-tool')) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
     $('markers').setAttribute('aria-pressed', String(markersOn));
     $('gridbtn').setAttribute('aria-pressed', String(gridOn));
+    depButton();
     for (const q of panes) badge(q);
   }
 
@@ -1513,7 +1737,7 @@
   let selectedEvent = null, pin = null;
   function setITab(name, reveal) {
     for (const b of document.querySelectorAll('[data-itab]')) b.setAttribute('aria-selected', String(b.dataset.itab === name));
-    for (const k of ['events', 'details', 's2', 'run']) $(`ip-${k}`).hidden = k !== name;
+    for (const k of ['events', 'details', 's2', 'section', 'run']) $(`ip-${k}`).hidden = k !== name;
     store.set('itab', name);
     // Something new to read there: bring the inspector into view on a short screen.
     if (reveal && !narrow.matches && !TV) {
@@ -1864,6 +2088,7 @@
     hint.hidden = t === 'select' || TV;
     if (t === 'inspect') hint.innerHTML = `${ic('crosshair')}Click a column to inspect it <span class="dim">· from the run's bake</span><button class="btn btn-ghost btn-sm" data-tool="select">Done <kbd>Esc</kbd></button>`;
     if (t === 'area') hint.innerHTML = `${ic('box')}Drag a box, or click for 256 × 256 blocks <span class="dim">· 1–2 min</span><button class="btn btn-ghost btn-sm" data-tool="select">Done <kbd>Esc</kbd></button>`;
+    if (window.DTSections) DTSections.tool(t, hint);   // the section tool words its own hint
     for (const p of panes) p.drag = null;
     mapDirty = true;
     buttons();
@@ -1962,11 +2187,13 @@
     else if (k === 'End' || k === 'l') setMode('live');
     else if (k === 'g') { G.spin = !G.spin; spinButton(); }
     else if (k === 'm') $('markers').click();
+    else if (k === 'd') $('depbtn').click();
     else if (k === 'c') { if (comparing) setCompare(false); else setCompare(true); }
     else if (k === 'e') toggleSidebar();
     else if (k === 'v') setTool('select');
     else if (k === 'i') setTool('inspect');
     else if (k === 'b') setTool('area');
+    else if (k === 's') setTool('section');
     else if (k === '[') setRate(-1);
     else if (k === ']') setRate(1);
     else if (k === '?') help();
@@ -2059,8 +2286,8 @@
     modal('Keyboard shortcuts', `<div class="keys">${[
       K(['Space'], 'Play or pause'), K(['←', '→'], 'One step back or forward (Shift: ten)'), K(['Home'], 'Back to the start'),
       K(['L'], 'Follow the run live (End too)'), K(['[', ']'], 'Slower, faster'), K(['1', '…', '9'], 'Layers in the order they appeared'), K(['↑', '↓'], 'Previous or next layer'),
-      K(['V'], 'Select tool: events and point values'), K(['I'], 'Inspect a column in 3D'), K(['B'], 'Preview an area in 3D'),
-      K(['C'], 'Compare two runs'), K(['M'], 'Event markers on or off'), K(['G'], 'Spin the globe'), K(['E'], 'Runs and editor'),
+      K(['V'], 'Select tool: events and point values'), K(['I'], 'Inspect a column in 3D'), K(['B'], 'Preview an area in 3D'), K(['S'], 'Cross-section: click two points'),
+      K(['C'], 'Compare two runs'), K(['M'], 'Event markers on or off'), K(['D'], 'Deposits on or off'), K(['G'], 'Spin the globe'), K(['E'], 'Runs and editor'),
       K(['F'], 'Full screen'), K(['Esc'], 'Back to Select; clear the box and pin'), K(['?'], 'This list'),
     ].join('')}</div>`, '', true);
   }
@@ -2685,6 +2912,19 @@
     runhead(); runInfo();
     for (const p of panes) paneHead(p);
   });
+  // What the add-on scripts (loaded after this file) use of the page: sections.js (rock at depth, the
+  // section tool) and worldmap.js (the "Final world" view).
+  window.DTWB = {
+    $, esc, ic, clamp, fmtInt, api, store, toast, modal, closeModal, niceTicks, rampInfo, rampOfLayer, layerLabel, latLonText,
+    latText, lonText, runName,
+    panes, blockXZ, circ, llToCanvas, mapLatLon, setTool, setITab, setMTab,
+    focused: P, layer: () => layer, tool: () => tool, narrow: () => narrow.matches,
+    redraw() { mapDirty = globeDirty = true; },
+    legend() { legendDirty = true; },
+    pane(i) { return panes[i]; },
+    focusedRun: () => P().run,
+    preview(run, box, latLon, size) { return Stage2.preview(run, run.frames[run.frames.length - 1] || { n: 0, t: 0 }, box, latLon, size); },
+  };
   buttons();
   stageEmpty();
   poll();

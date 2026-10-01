@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · P1-27 plate margins (sutures, initiation clear of trenches, arc cordilleras) + coherent provinces done on its branch (worktree-agent-ad3b417fd428c1ac2) · Updated: 2026-09-30 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · P1-27 plate margins (sutures, initiation clear of trenches, arc cordilleras) + coherent provinces done on its branch (worktree-agent-ad3b417fd428c1ac2) · Rivers & lakes on the workbench maps (view-only; satellite overlay + a `rivers` layer) done on its branch (worktree-agent-a3d4fadfe3e053b77) · Updated: 2026-10-01 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -79,8 +79,212 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | Date | Task | Question | Asked how |
 |---|---|---|---|
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
+| 2026-10-01 | bake / P1-06 | **Terrain above the build limit.** Nothing bounds the terrain to the world's height: the test planet on x86 has 2.5 % of its land above y 639 (peaks to y 969), and two of four 16k 500-Myr runs peaked at 12.4 and 13.0 km against 11.5 km; the game cuts such ground flat at y 639. Options: **(1, recommended)** bound it where it arises and guarantee it at the end: the surface stage's elevation respects `tectonics.max_elevation_m` (the plate cap's taper applied to the offset's rises), the preset check requires that cap plus the amplifier's headroom to fit under `max_y`, and the amplifier compresses whatever is still above a knee smoothly into the headroom, so no seed can clip; (2) compress only at the amplifier (a smooth remap of everything above a knee into the range below `max_y`): the simulation and its keyframes keep 13–20 km mountains the world does not have; (3) scale the whole world's vertical relief so its highest peak fits: one peak flattens every landscape and moves ore depths; (4) a taller world (`max_y` 639 → 1023, +7.7 km): every chunk costs more and 20 km still clips; (5) leave it: flat-topped mountains at y 639, now counted by the bake. | Not asked yet: for the coordinator to put to Ben (build log 2026-10-01, x86_64 gates) |
 
 ## Build log
+### 2026-10-01 — Workbench deposits overlay: coal fields and ore sites by family, hover, "why here" (agent worktree agent-aae4250c131f0cf7a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Ask.** Ben, 2026-10-01, "Deposits layer": draw coal fields and ore deposits by type on the map at every frame where the
+  deposit stage has run (and the baked deposits at the end); one symbol and colour per family, coal as footprint areas; a legend
+  with counts; hover for family, size, age; click opens the inspector with the site's event and cause chain; works over any
+  base layer; view-only (nothing added to the simulation or the bake); run time unchanged.
+- **Overlay, not a layer (why).** Keyframe layers are RGBA images the core draws on the stepping thread at keyframe time. They
+  cannot carry symbols to hover or click, a new one would be extra work on that thread for every frame, and it would only
+  exist where a stage names it. An overlay drawn on the pane's canvas from the site list works over satellite, elevation and
+  any layer the other workbench changes add, like the event markers do (same `mapXY` projection). Toggle: the Deposits button
+  in the map overlays group (key `D`, remembered); the legend sits in the Layer card.
+- **Data (nothing new is computed).** `GET /api/runs/<id>/deposits` (`watch/deposits.rs`, new): one JSON object with each site's
+  type, lat/lon, block position, depth range, footprint ellipse (the widest of its bodies, else its box), products with
+  tonnage and the forming event id. While a run goes on, the driver thread takes it once from `world.sites`/`world.bodies`
+  between two steps, when the first published frame names `deposits/sites` (`Run::capture_deposits`, 3 lines in
+  `Workbench::publish`); a done run answers from `sites/sites.dtsr` + `bodies/bodies.dtb` of its world data (the baked deposits;
+  also what a restarted workbench shows). Age and the cause chain come from the events the page already holds. `git diff
+  --stat` touches nothing in deeptime-core or deeptime-format. The overlay shows from the first frame that names the sites layer
+  on (the deposit stage and the young/amplify frames after it); earlier frames say when the sites appear.
+- **Look.** Eight families, colours = the data-viz palette's dark-mode categorical steps in slot order (blue MVT, orange
+  porphyry, aqua supergene, yellow placer, magenta SEDEX, violet petroleum, red BIF; green left out, it is the land), checked
+  with its `validate_palette.py` (all checks pass), plus shape as the second cue (hexagon, up/down triangle, star, square, drop,
+  diamond); coal is a charcoal footprint with a light outline, drawn at its real size (widest body's ellipse) but never under 7 px
+  across. A symbol's size follows its rank by tonnage inside its family. Sites that share a spot (a blanket under its porphyry)
+  are drawn side by side. Hover: card with family, size (tonnes of the primary product), footprint km2, age (formed X Myr ago),
+  grade and by-products; the site's footprint and the link to its parent or children light up. Click (Select tool): the Details
+  tab gets the site card (facts, yields), "Why here" (the forming event and its causes four links deep, breadth first as
+  `inspect-column --why` lists them, with levels), links to the deposit it came from or led to, then the forming event's own
+  detail (the Events tab row is selected). Legend rows toggle a family (Alt-click: only it), counts include zeros.
+- **Pieces.** `crates/deeptime-viewer/assets/deposits.js` (new, served as `/deposits.js`, pure functions in `DTDeposits`: families,
+  model, draw, hit-test, legend/hover/details text, cause chain), `watch/deposits.rs` (new), small hooks in `workbench.js` (one
+  section plus one-line hooks in `RunView`, `drawPane`, `legend`, `buttons`, the key handler), `workbench.html` (button, legend slot,
+  script tag), `http.rs` (two routes), `runs.rs` (cache, capture), viewer `lib.rs` (`DEPOSITS_JS`). Checks: `tools/viewer/deposits-check.js`
+  (node: the module, run on the Mac), `tools/viewer/deposits-shots.sh` + `deposits_shots.py` (private `deeptime watch` on 127.0.0.1 and
+  headless Chrome for Testing from the playwright cache, real mouse input; never port 8642).
+- **Measured / checked (Mac, before the stop).** `cargo clippy --workspace --all-targets -D warnings` and `cargo fmt --check` clean;
+  `cargo test -p deeptime-cli -p deeptime-viewer` watch tests pass, incl. new `the_deposits_overlay_reads_the_sites_live_and_baked`
+  (synthetic deposit world: the live capture and the bake agree site for site, every forming event is in the stream, a restart
+  reads the same sites) and 5 `watch::deposits` unit tests; `node tools/viewer/deposits-check.js` passes (hit-testing across the
+  seam, coal areas, co-located sites, draw counts, text, cause chain); the browser driver on the synthetic 16k deposit world
+  (135 sites, 8 families): legend counts add up, hover cards, click opens Why here, kin links, overlay over another layer, family
+  and overlay toggles, no script errors (two checks failed only on upper-case headings in the driver, fixed, not rerun).
+  Screenshots of that run (before the last legend/nudge fixes) are in `review/out/wb-deposits/` (not committed).
+- **Gates (Azure VM `deeptime-test`, branch at master 5c45b04's mac.sh).** `cargo fmt --check` and `cargo clippy --workspace
+  --all-targets -- -D warnings` clean; `cargo test --workspace` all ok (core 335 + 3 ignored, cli 37, format 51, inspect 29, viewer 7, jni 6,
+  ...; includes `watch::deposits::*` and `the_deposits_overlay_reads_the_sites_live_and_baked`); `cargo deny check licenses bans` ok;
+  `node tools/viewer/deposits-check.js` ok; `neoforge/gradlew build test` BUILD SUCCESSFUL (3 m 22 s; nothing in neoforge changed).
+  No GameTests (per the rule).
+- **Run time before/after (the gate "run time unchanged").** `earthlike_quick_16k`, scattered_continents, 500 Myr through `deeptime
+  watch --exit-when-done --threads 6 --mem-cap 8 GiB`, release binaries built on the VM, one run at a time, `/usr/bin/time -v`,
+  box shared (load 33 to 57 from other agents, so compare CPU, not wall): **before** (8dae3f2): 858 s wall, **2194 s user** +
+  38 s sys, 5.99 GB max RSS; **after** (this branch): 814 s wall, **2249 s user** + 35 s sys, 5.87 GB. Same world both times
+  (2,767 events, 253 frames, identical `surface_final` line to the last digit), so the overlay changes nothing in the run; the
+  +2.5 % user CPU is inside the noise of a loaded box (the per-stage seconds swing the other way: plates 118 vs 103 s, deposits
+  27 vs 36 s). The only addition on a run's thread is one clone of the site list between two steps (about 55 sites here).
+  (The earlier M6 baseline, 1354 s wall / 21.39e12 instructions, is not comparable: different machine, 12 threads, load 60 to 90.)
+- **Browser checks on a real run** (`tools/viewer/deposits-shots.sh`, private server on 127.0.0.1 with the page open while the run
+  went on, Chromium from nixpkgs, headless; 0 failed): the legend appears when the first frame names `deposits/sites`; while the run
+  is going the legend says the sites are as the stage placed them (live), and when it ends it switches to the baked sites with no
+  reload; 55 sites (coal 28, petroleum 5, porphyry 4, placer 9, MVT 7, SEDEX 2; supergene and BIF 0 on this planet) and the legend
+  counts add up to what the server sent; hover on a coal field and a porphyry shows family, size, footprint, age (and grade and
+  by-products); clicking opens the Details tab with the site card, "Why here" (the cause chain) and the forming event; the overlay
+  stays over the elevation layer; a legend row hides its family; the toggle hides and restores the overlay and legend; the
+  legend says when the sites appear on steps before the deposit stage; no script errors. **Draw cost** (2048 x 1024 canvas, in the
+  page): 55 sites draw in 0.2 to 0.3 ms and hit-test in 0.08 ms; ten times as many sites (550) draw in 12.9 ms (prepare 7.5 ms,
+  once per fetch). Screenshots in `review/out/wb-deposits/` (not committed): `00-live-overlay` (mid-run), `01-satellite-overlay`,
+  `02-hover-coal`, `03-click-coal-why-here`, `04-hover-porphyry_cu_mo_au`, `05-click-porphyry_cu_mo_au`, `07-elevation-overlay`,
+  `08-family-hidden`, `09-overlay-off`, `10-first-step`. Linux Chromium needs a font: `~/.config/fontconfig/fonts.conf` on the VM now
+  points at nixpkgs `dejavu_fonts` (without one the page draws no text); `deposits-shots.sh` finds Chromium on PATH or builds
+  `nixpkgs#chromium`.
+- **Merged with the other three workbench features (master e4094d6: rivers & lakes, Final world, rock at depth and sections).**
+  Conflicts in STATUS.md, `watch/http.rs` (both new routes and docs kept), `workbench.js` (the help list: S and D keys) and viewer
+  `lib.rs` (all three script constants); the script tags and `DTWB` needed nothing. Re-run on the VM: fmt, clippy `-D warnings`,
+  `cargo test --workspace` (all ok; core 351), deny, `deposits-check.js`, `gradlew build test` (ok, 2 m 5 s); the browser driver on a
+  fresh 500 Myr run (live, then baked; 0 failed) now also checks, with the overlay on: the Rivers & lakes layer shows
+  (`11-rivers-overlay`), the section tool opens and two clicks fill the Section panel (`12-section-overlay`), the Final world view
+  opens and closes with the overlay still there (`13-final-world`). Draw cost on the merged page: 55 sites 0.5 ms, 550 sites 17.8 ms.
+- **Left / not done on purpose.** Deposits on the globe, and sites at their position before the end of the run (the record holds
+  only the present position; the engine's per-frame origin maps are not kept). The supergene/BIF rows are empty on this seed, so the
+  kin links (placer to porphyry, blanket to porphyry) were checked on the synthetic 16k deposit world, not on the 500 Myr planet.
+### 2026-10-01 — Rivers & lakes on the workbench maps: view-only, on every frame, the bake's own on the last (agent worktree agent-a3d4fadfe3e053b77, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **What (Ben, 2026-10-01: "Rivers & lakes on the maps").** Rivers (width and colour by flow) and lakes are drawn over the satellite view of every terrain frame, and a new derived layer `rivers` ("Rivers & lakes") shows them on a quiet map. Nothing is added to the simulation or the bake (no new field, no stage work): like `satellite` and `provinces` it is derived when a frame is drawn.
+  1. **`core::water_view`** (`water_view.rs`, tests in `water_view/tests.rs`)
+     - **Derivation.** `derive` runs the bake's own hydrology, `hydro::network::run`, on the frame's elevation (`amplify/elevation`, else `young/elevation`, else `elevation`; a grid over 600,000 cells is averaged 2 × 2 down first, so a 32k planet's L1 and the 2048 × 1024 young/amplify frames cost what an L1 frame costs). That is: open sea (≥ 5,000 km²), Priority-Flood of the frame grid, lakes from `hydro.lake_min_area_km2` and a block deep, the climate's runoff (`climate/precip_mm`, `t_mean_c` bilinear, as the bake reads them; the zonal stand-in without a climate stage) accumulated down the steepest descent, rivers from `hydro.river_min_discharge_m3s` (2 m³/s) and `river_min_area_km2` (50 km²). The preset's `hydro` section drives it (new `ViewScale` fields: `hydro`, `m_per_block_h`, `rivers_scale`; `hydro.enabled` false = no water and no layer). The thresholds are physical, so they scale with the grid by themselves (a 4.8 km L1 cell: a stream starts where about nine cells drain into it). I used the bake's code rather than a new Priority-Flood plus `surface/drainage`: it is the same rule the bake applies (so the last frame and the others agree), already tested, and costs little (the flood is 13–26 ms of the 104–237 ms the whole derivation took on the loaded Mac, below).
+     - **Lake cells under a block deep are not drawn** on derived frames (a shallow margin of a 4.8 km flat read as streaks); the bake's `water_level` is drawn as it is.
+     - **Drawing.** A `WaterView` holds the water in the picture's pixels: river coverage (anti-aliased capsules along the network's segments, the larger coverage and discharge kept where segments meet, so a network sampled finer than the picture does not thicken), the discharge under each pixel, the lake coverage (the mean over the cells a pixel covers), and a hide factor from `climate/ice_thickness_m` (satellite only: none show under 60 m of glacier ice). Width is at least 1 px at the stream threshold, +0.5 px per tenfold of flow, and never under the real width (`w` blocks); no water on pixels a block or more below sea level. Colour is the new `rivers` ramp (`ramps.json`, log10 m³/s: `#4aa0f2` at 2 → `#0f3f95` at 3,162; its `keys` hold land `#ddd9cd`, sea `#2c4056`, lake `#5cc0ea`, checked against the constants by a test).
+     - **On the satellite view:** `overlay` blends rivers at 60 % (a stream) to 92 % (the largest), lakes at 95 %, after the hill shade. **As the layer:** `render` draws land (soft hill shade), sea, lakes and rivers hard-edged so the page reads the colour back.
+  2. **Frames.** `keyframes::render` derives the water once per frame for both layers; `DERIVED_LAYERS` and `add_derived` gain `rivers` (last layer of every frame that has the satellite view; the `add_derived` test updated). `satellite::heights_m`, `elevation_field` and `nearest` were pulled out for sharing (no behaviour change). `Session::take_keyframe` renders inside the session's pool and logs `drawn in N ms` per frame (debug level).
+  3. **The last frame is the bake's.** `Session::finalize_write` runs `bake_water_into_last_frame` right after the bake and before the frame files are listed in the manifest: `water_view::from_bake` reads `rivers/rivers.dtrv` and the `water_level` layer (any grid: L3 8192 × 4096 is averaged per pixel), `keyframes::redraw_water` redraws the last frame that has `satellite`/`rivers` (the other layers are kept) and `KeyframeStore::replace` rewrites the ring slot, `kf-N.dtk` and the index entry. A run without a bake (or `hydro.enabled` false) keeps the derived water; a failure is a WARN, not the run's.
+  4. **The workbench holds the last frame back until then** (`watch/runs.rs`: `publish` takes `held_from`; the frames of the last advance are announced after `finalize_write`), because a frame's PNG is cached for good once fetched. The page therefore shows the final frame a bake's length (30–70 s) after the last step instead of at it.
+  5. **Page** (`workbench.js`, local to the layer list, legend and hover): `rivers` is "Rivers & lakes"; its legend is Lake / Land / Sea swatches and the river colour bar with ticks 2, 10, 100, 1,000 m³/s; hover reads the pixel (and the 3 × 3 around it, rivers are 1–3 px wide) back: "river (~110 m³/s)" or "lake". `deeptime.layer.rivers` in the game's lang file. `deeptime satellite --in <checkpoint> --out x.png [--on elevation]` now writes the water too (`x-rivers.png`) and prints what the satellite picture, the derivation (per phase) and the drawing cost.
+- **Per-frame cost** (`deeptime satellite` on a 120-Myr `earthlike_quick_16k` checkpoint, L1 `elevation` frame = 1024 × 512, release build, Mac at load 50–60 from other sessions so every figure is inflated several times over an idle machine):
+  - water derived 104–237 ms (phases, ms: sea 4–8, flood 13–26, flats 8–123, receivers 8–26, lakes 1–2, discharge 18–59, rivers 7–14); drawn (overlay + layer) 4–13 ms; the satellite picture alone 92–270 ms in the same conditions. So the water costs about what the satellite picture does, within the ~0.1–0.2 s asked for.
+  - In the 500-Myr workbench run, all 253 frames' drawing (satellite + provinces + the water, load 60–100 and my own other jobs): mean 658 ms, median 530 ms (frames: `review/out/wb-rivers/log-after.txt`).
+- **Before / after, one `earthlike_quick_16k` 500-Myr run** (redone 2026-10-01 on the Azure test VM `deeptime-test`, after the M6 stop; one `deeptime watch --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --exit-when-done --mem-cap 8589934592 --verbose` per binary under `/usr/bin/time -v`, a keyframe every step, 253 frames, seed 1, baseline = master 8dae3f2 built on the VM, run back to back, VM load 40–100 from other agents so wall time and stage seconds are noisy; logs `review/out/wb-rivers-vm/log-{before,after}.txt`):
+
+  | | before (8dae3f2) | after (this branch) |
+  |---|---|---|
+  | user CPU | 2,606.7 s | 2,574.7 s (−1.2 %) |
+  | system CPU | 165.3 s | 171.2 s |
+  | wall | 781 s | 784 s |
+  | structure stage (includes drawing the 250 frames) | 251.5 s | 273.4 s (+22 s, 0.09 s a frame) |
+  | other stages (plates / climate / surface / volcanoes) | 93.2 / 86.1 / 166.2 / 36.2 s | 103.0 / 86.2 / 181.3 / 39.1 s |
+  | deposits / young / amplify | 47.9 / 8.4 / 59.6 s | 29.2 / 6.6 / 41.0 s |
+  | bake total (water part) | 31.4 s (6.6 s) | 23.3 s (5.2 s) |
+
+  The user CPU and wall times agree within 1.2 %, well inside the run-to-run noise on this shared box (the stage seconds move ±10–40 % either way, deposits and amplify faster after, structure slower): the water adds no measurable run time. Only the structure stage, which draws the frames, is slower, by about 0.09 s a frame, in line with the per-frame cost above. The after run's own log gives the whole frame draw (satellite + provinces + water) on that loaded box: mean 801 ms, median 830, p90 910, max 977 ms over 253 frames. Chromium on the VM (`nix shell nixpkgs#chromium` + a fonts.conf for DejaVu) took the screenshots.
+- **End to end** (a 60-Myr `deeptime watch` run, private port 18653, final binary): `keyframe 32 drawn again with the bake's water (5103 river chains, 16714 px of lakes) in 560 ms`; the bake wrote 672 lakes and 5,103 chains (water part 7.0 s). Screenshots of the workbench on that run, `review/out/wb-rivers/` (not committed; the final ones, of the 500-Myr after run, are in `review/out/wb-rivers-vm/`: `wb-satellite.png`, `wb-rivers.png`, `wb-rivers-hover-river.png` "river (~110 m³/s)", `wb-rivers-hover-lake.png` "lake"): `wb-satellite.png` (final frame, satellite with the water), `wb-rivers.png` (the layer with its legend), `wb-rivers-hover-river.png` ("river (~110 m³/s)"), `wb-rivers-hover-lake.png` ("lake"), `frame{5,15,28,31,32}-{satellite,rivers}.png` (derived L1 frames, the young frame derived on L2, and the bake's final frame), `ck-l1*.png`/`ck-l2*.png`/`f-l1.png` (the 120-Myr checkpoint on `elevation`, on `young/elevation`, and with the glacier-ice hiding), the logs.
+- **Gates** (all on the Mac before the stop, on this branch; nothing after the last small edit but a local rustfmt):
+  - `cargo test --workspace --no-fail-fast`: core 347 + 3 ignored, cli 31, format 51, inspect 29 + 2 + 7, jni 7, viewer 6 — all pass. 13 new core tests in `water_view` (a valley's river grows to the sea and a bowl holds a lake; thresholds follow the preset's hydrology and `enabled`; width grows with flow; overlay after the shading; the layer's colours read back from the ramp; ramps.json `keys` equal the constants; the bake's file draws the same rivers as the derivation; a river across the seam; lake coverage; a fine grid is averaged down; 1 thread = 3 threads; ice hides the water on the satellite only; one is a bare default check) and 2 in `keyframes` (the frame's layers and `redraw_water`; `KeyframeStore::replace` in ring, file and index).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: clean on the code before the ice-hiding and shallow-lake edits (the Mac stopped before a re-run). `cargo fmt`: `rustfmt --check --edition 2024` on every touched file is clean (run locally, one-off). `cargo deny check licenses bans`: ok.
+  - `./gradlew build test`: 157 tests, 0 failures. No GameTests (rule).
+- **Gates on the VM, 2026-10-01** (after merging master): `cargo clippy --workspace --all-targets -- -D warnings` clean, `cargo fmt --check` clean, `cargo test -p deeptime-core --lib -- water_view keyframes` 18/0. The full-workspace tests and `./gradlew build test` (157/0) last ran on the M6 before the ice-hiding and shallow-lake edits and were not re-run.
+- **Next.** Merge-time: `tools/remote/mac-gc.sh` (this worktree's VM copy `/Volumes/Graphide/ban/mic/mods/agent-a3d4fadfe3e053b77`). Conflicts to expect with the Deposits-layer agent: `keyframes.rs` (`DERIVED_LAYERS`, `add_derived`, `derived_field`), `workbench.js` (`LAYER_WORDS`, `legendHTML`, `valueText`), this file's header line.
+### 2026-10-01 — First gates on the x86_64 test VM: five failures traced; real-planet tests assert properties, not one planet's numbers (agent worktree agent-ac2a33b7f51fa4bf8, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Symptom.** Master bd6250e/5c45b04 on the new VM (x86_64 Linux): `cargo test --workspace` failed one CLI test
+  (`deposit_stage_reads_the_recorded_history`, main.rs:1676) and `./gametest.sh`, both profiles, failed
+  `climateConsistent`, `realPlanetHeightMatchesTheBake`, `riversHold` and `carversSpareWater`. The Mac (aarch64 macOS)
+  had passed all of it on the same simulation code.
+- **The planet differs by platform, not by thread count or run.** `deeptime run --preset planet_world_4k.json` seven
+  times on the VM (`--threads` 1, 2, 3, 6, 6, 12, and master's own GameTest bake at 6): the CRC32 of all 42 layers is
+  identical in every run (land 0.187, 56 lakes, 286 river chains). Against the Mac there is no bake to compare (the M6
+  is off limits), only its log on the same code: `carversSpareWater columns=695 highColumns=106 carvedBelow=1589` there,
+  `columns=915 highColumns=271 carvedBelow=1072` here, from the same box rule. So one preset is one planet per
+  platform. **Where it comes from:** the simulation calls the platform's libm about 280 times in non-test code (`exp`
+  63, `ln` 45, `sin`/`cos`/`sin_cos` 98, `powf` 29, `hypot` 17, `atan2` 7, …), and those functions are not correctly
+  rounded: Apple's libm, glibc, musl and the Windows CRT differ in the last bit, and 75 coupled plate steps with
+  thresholds (collisions, rifts, subduction starts) turn a last bit into another history. Rust never fuses a
+  multiply-add on its own, and the thread count changes nothing (measured above). The Linux natives link the
+  system's libm, so two Linux distributions can differ too. Ben
+  (2026-10-01, relayed by the coordinator): identical runs across machines are not a goal; speed is. So tests must
+  hold on any planet. Stored data stays exact: a baked world plays the same everywhere, and the Rust/Java parity tests
+  on baked data are unchanged.
+- **A way to test on other planets.** `DEEPTIME_TEST_PLANET_SET="seed=12" ./gametest.sh [-PwithMic]` bakes the
+  real-planet level from the same preset with `--set` overrides. Every real-planet test below was run on seeds 11–16
+  standalone and 11–14 with MIC.
+- **`realPlanetHeightMatchesTheBake` (a real defect, reported, not fixed).** Column (−892, 324) of the x86 planet has
+  H = 726.8 and the world ends at y 639. **Nothing bounds the terrain to the build range.** The plate model caps its
+  own elevation at `tectonics.max_elevation_m` (10 km = y 563), but the surface stage's elevation is the plate
+  elevation plus an offset that carries deposition and isostatic rebound, and when the plates refuse a rise at their
+  cap the remainder stays in the offset (`plates::apply_surface_feedback` clamps, `surface` subtracts only what was
+  applied). On this planet 237 L1 cells stand above 10 km at the end (offset up to +10.5 km over a plate at 9.6 km,
+  under 15–38 km of logged sediment and the 3 km ice cap), 16 km already after 10 steps; the young stage and the
+  amplifier pass it on, the bake writes it, and the game cuts it flat at y 639 (the column evaluator's `top_y` is
+  clamped to `max_y`, so strata and parity stay consistent). Baked: 8,977 L3 cells above y 639, 2.5 % of the land,
+  highest y 969. Of the six seeds two do it (seed 13: 1.0 % of land, y 801); of the four distinct 500-Myr 16k
+  runs in other agents' logs on the VM, two ended with surface peaks of 12.4 and 13.0 km (the others 9.1 and
+  9.2 km) against a build limit of 11.5 km above the sea, before the amplifier adds its own relief. The
+  bake now counts it (`notes.bake.terrain.build_limit`: cells above, share of land, highest y; `above_max_y=` on the
+  `bake` line) and the GameTest compares with the clamped top and logs `aboveBuildLimit`. What to do about it is a
+  world-shaping choice: pending question below.
+  The test's other bound changed too: "non-corner columns within 12 blocks of their own H" is a planet's number (1
+  to 10 on the seeds: it grows with the slope, the corners do not see the raster inside a cell); the property is that
+  a column between corners tops out between its cell's four corner tops ± 1 (`outsideCellCorners=0` on all ten runs).
+- **`riversHold` (the test, not the water).** The six columns are lake columns one or two blocks deep by the
+  column rule (bilinear surface 61.7–63.0, lake top 63) whose generated ground is y 63: grass at 63, dirt under it,
+  nothing drained.
+  The lake pass fills the air down to the generated ground (FORMAT.md says so), and between noise-cell corners that
+  ground can stand a block or two above the rule's bilinear `ground`; where it reaches the lake's top the column is
+  dry shore, flush with the water beside it. Banks around it are raised as if it held water, so nothing leaks
+  (`leaks=0`, `outside=0` before and after 300 ticks). The test now counts such columns apart (`dryShore`, at most 1 in
+  20 water columns; measured 6/915, 1/429 and 0 on four planets) and still fails a lake column whose top block is
+  open without water and any river column below its top. FORMAT.md's "Water columns" names the case.
+- **`carversSpareWater` (the test, not the carvers).** The same columns: the carver cut the shore's ground block at
+  y 63, and the test called air in a lake column's water range "drained". It now compares with the uncarved twin
+  level (`test_rivers`, same world data): a block that is water without carvers and air with them is drained
+  (0 on every run, over 929 to 9,458 water blocks); carved ground in that range is counted apart (`carvedShore`,
+  0 to 5). Its premise (water above sea level with cuts under it) failed on seed 14, whose lakes and mouths all sit at
+  the coast (`highColumns=28 carvedBelowHigh=0`): the test adds up to six boxes on rivers between sea level + 4 and
+  y 170 (`highSites`), and then holds everywhere (567 to 2,605 high columns).
+- **`climateConsistent` (floors read from one planet).** A 0.553 < 0.6 and Dsub 0.812 < 0.85 with no change to the
+  mapping. Ten censuses (shares, lowest–highest): A 0.553–0.944, Af 0.642–0.963, BW 0.675–0.925, BS 0.623–0.744,
+  C 0.849–0.968, D 0.984–1.0, Dsub 0.659–0.882, E 0.922–1.0, BW:desert 0.475–0.827, Af:jungle 0.515–0.774,
+  Dfc:taiga 0.563–0.822, E:snow 0.849–0.998. Floors are now 0.1 under the lowest share on any planet, the Mac's
+  earlier ones included: A 0.45, Af 0.54, BW 0.57, D 0.88, Dsub 0.55, E 0.82, BW:desert 0.37, Af:jungle 0.41; BS 0.42,
+  C 0.75, sea 0.95, Dfc:taiga 0.33, E:snow 0.72 unchanged. `MIN_COLUMNS` 20 → 40. One thing the census shows that
+  is the mapping's, not the test's: on seed 11 standalone the Aw and As columns are 63–71 % `minecraft:forest`
+  (savanna climates drawn as forest); with MIC the same planet gives A 0.761. For P1-09's owner.
+- **The CLI test: not reproduced, cause not established.** `cargo test -p deeptime-cli` 12 more times on the VM (load
+  30–65; three of them pinned to two cores with 32 test threads): 0 failures. The failed run left its folder
+  behind; replaying its last step (`deeptime stage deposits --in group.dtcp`) from that very checkpoint succeeds, so
+  the checkpoint was good and the failure was in the process at that moment (load ~100, minutes after the VM
+  booted). Ruled out by measurement: the memory cap (the test process's counted allocations peak at 1.06 GiB of the
+  4 GiB cap), a spilled history (resuming from a checkpoint whose frames are on disk works), two calls sharing the
+  temporary work folder (only this call uses it in the process; the folder is per call now anyway). If it recurs,
+  the panic's `Err(…)` text is what is needed.
+- **Also fixed.** `gametest.sh` reported `Peak server-JVM RSS: 0 MB` on the VM: `$PWD` was the symlinked path
+  while Gradle's command line has the physical one, and inside the dev shell the system `ps` fails on the shell's
+  `LD_LIBRARY_PATH`. Now 6.3–7.1 GB.
+- **Measured** (VM `deeptime-test`, x86_64 Linux, through `tools/remote/mac.sh` with its default caps,
+  `CARGO_BUILD_JOBS=8` and `RAYON_NUM_THREADS=6`; load average 27–35 during cargo and Gradle, 15–17 during the
+  GameTests): `cargo fmt --all -- --check` clean; `cargo clippy --workspace --all-targets --locked -- -D warnings`
+  clean; `cargo test --workspace --locked` all pass (469: cli 31, core 335 + 3 ignored); `cargo deny check licenses
+  bans` ok; `./gradlew build test` tests=160 failures=0 errors=0 skipped=1; `./gametest.sh` All 57 required tests
+  passed (wall 541 s, server JVM peak 7.1 GB); `tools/smoke/install.sh mic` (168 mods), `./gametest.sh -PwithMic` All
+  57 required tests passed (wall 91 s, 9.3 GB). The nine real-planet tests alone on seeds 12–16 standalone with the
+  final code: All 9 passed, five times. The MIC runs of seeds 11–14 were made before the new floors and the
+  corner-bracket check (their river tests are the final ones and passed; their censuses are in the ranges above).
+  **Verified on:** x86_64 Linux only; bakes at 1, 2, 3, 6 and 12 threads, everything else at 6. Not run on aarch64
+  macOS (the M6 is off limits): the Mac's planet is one more planet, like another seed.
+- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/x86-diag/` on the VM, deleted.
+- **Next.** Ben's choice on terrain above the build limit (pending question); then the fix and a GameTest that
+  fails on any column above `max_y` (`aboveBuildLimit` must be 0 on every seed).
+
 ### 2026-10-01 — M6 paused; batch 4 pushed with one GameTest re-run pending (session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Pause.** Ben: our test load on the M6 made graphide's ms-precision timing tests flaky; "please cease
   testing on the m6, I will be provisioning a new machine for your tests". All Deep Time jobs there were
@@ -128,6 +332,120 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Next.** On the new test machine: finish the driver runs, then calibrate (K, collision cap, cordillera 0.2 → 0.3?,
   the GDH1 floor), check one 750–1000 Myr run and the full/32k presets, re-sync built-ins, gates, plots under
   review/out/p1-17-hyps/.
+
+### 2026-10-01 — Zoomable final world: a deep-zoom map of a run's bake (WIP, stopped at Ben's request; agent worktree agent-ad5fc9991593ce7ef, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Status: built and working, not finished.** Ben stopped all Mac testing mid-task (the load broke graphide's timing tests), so the gates, the "after" run time and the final screenshot set were not done. Not merged, not pushed.
+- **What it is.** The workbench's new "Final world" view (stage bar button, key `w`; `?run=<id>&world=<layer>/<x>/<z>/<blocks per px>` opens it at a place): a canvas slippy map with no library, pan/zoom by mouse and touch (drag, wheel, double click, pinch, arrows, +/-/0), the world wrapping east-west, readout of block (x, z), lat/lon and, after a pause, the bake's terrain y, surface, Koeppen class, T and P (`api/runs/<id>/world/sample`); layers Satellite, Elevation (hill shade), Water, an optional Rivers and lakes overlay, a graticule with the seam, a scale bar, an About card, and "3D preview here", which hands the middle 256 x 256 blocks of the view (the view's own box if smaller) to the existing Area 3D preview (`DTWB.preview` -> `Stage2.preview`; a dashed square shows the box). Server: `GET /api/runs/<id>/world.json`, `/world/sample?x=&z=`, `/tiles/<layer>/<z>/<x>/<y>.png` (XYZ, geodetic 2:1: zoom 0 is two 256-px tiles, `s = C / (512 * 2^z)` blocks a pixel, last native zoom 5 at C = 16,384 and 6 at 32,768).
+- **Code (new modules, small edits elsewhere).** `crates/deeptime-cli/src/watch/worldmap.rs` (the bake as a map: tile geometry, L3 windows, mips, climate fields, rivers, the four painters, `sample`), `watch/tiles.rs` (routes, per-run disk cache with a least-recently-asked bound, at most two maps in memory), `crates/deeptime-viewer/assets/worldmap.js` (the view; injects its own CSS), `tools/workbench/tiles_bench.py`. Edits: `watch/http.rs` (one route hook and `/worldmap.js`), `watch/mod.rs` (two `mod` lines), `workbench.html` (button, container, script tag), `workbench.js` (one `window.DTWB` export at the end), `deeptime-viewer/src/lib.rs` (`WORLDMAP_JS`, `encode_png_rgb`), `deeptime-core/src/satellite.rs` (the lighting split out as `Light` / `shaded`, `box_filter`, `rock_tint`, `depth_colour` made `pub`; `hillshade` is the same arithmetic, held by a test against the formula written out). Nothing vendored: no NOTICE.md change. Nothing in the simulation or the bake changed.
+- **The true finest resolution.** The bake's finest data is the terrain height `H = E + A*N` evaluated at every block: `E` the L3 `elevation` (2 blocks a cell at 16k, bilinear), `A` the L3 `detail/amplitude` and `N` the game's sub-cell noise (32/16/8-block octaves, used up to 4 blocks a pixel). That *is* block-level amplified terrain and it costs about nothing (a 256 x 256 tile in 3-50 ms); the game then draws it between corners four blocks apart. Colour comes from L1 (16 blocks) climate and L2 (8 blocks) rock and ice grids, interpolated and lapsed to each block's height (monthly sea-level temperatures minus the lapse, the climate API's rule), so they are smooth, not block detail. The view magnifies up to 4 screen px a block past zoom 5.
+- **Colours match the frame maps.** Same `satellite::colour`, `cover`, `box_filter`, light and ramp, fed from the bake: P/PET and the equilibrium line rebuilt with the climate stage's own `thornthwaite`, `glaciers::summer` and `ela_temperature` from the baked monthly temperatures; ice from `climate/ice_cover` (blurred, then kept to ground above the equilibrium line so glaciers follow relief), rock from `surface/class_top`. Zoom 1 (16 blocks a pixel = the frame's own pixel) against the last keyframe's satellite layer: RMSE 0.073 of full scale including lakes and rivers the frame does not draw; the difference image is black over land. Sea ice is not in the bake; the proxy (annual mean sea-level temperature, none above -1 C, whole below -7 C) puts the ice edge within a few degrees of the frame's.
+- **Measured (Mac, load 55-80, private workbench on 127.0.0.1:8671, run = a 500-Myr `earthlike_quick_16k` bake, `tiles_bench.py`-style, 12 random tiles a zoom).** Cold tile (render + PNG + cache write, over HTTP): satellite 11-26 ms mean (max 48), elevation 3-20 (max 36), water 4-11 (max 17), overlay 3-10; warm 0.3-1.4 ms. First open of a run's map (mips, climate fields): 0.67 s. Tile PNGs 3-110 KB. Full pyramid at 16k (6 zooms, 2,730 tiles a layer), from the mean tile sizes: satellite ~98 MiB, elevation ~204, water ~204, overlay ~9 (about 515 MiB for all four; the hill-shaded layers compress worst, and the zoom 5 level is 85 % of it); 32k adds a zoom (about 4x). The per-run cache is capped at 384 MiB (`DEEPTIME_TILE_CACHE_MIB`), least recently asked dropped, and goes with the run's folder.
+- **Run time, before.** `deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500 --threads default` (release, master 8dae3f2, Mac load 29 -> 65): **1066.4 s** real, 1364 s user, peak 4.37 GiB (`/usr/bin/time -l`). The "after" run was not made (it is the same command with `deeptime-after`; nothing in the simulation changed, so it is expected to match within the Mac's load noise).
+- **Finished on the Azure test box (2026-10-01).** Branch = master 5c45b04 + this work.
+  - **Gates, all green:** `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets -- -D warnings` (after three fixes: two `chunks_exact(4)` -> `as_chunks::<4>()`, one `(20 - 0)`); `cargo test --workspace` (core 336 + 3 ignored, cli 39 including the 6 new `watch::worldmap` / `watch::tiles` tests and the hill-shade formula test, format 51, all ok; the three tests that failed on the M6 pass); `cargo deny check licenses bans` ok; `./gradlew build test` BUILD SUCCESSFUL. No GameTests (branch).
+  - **Run time, before/after** (`RAYON_NUM_THREADS=6 /usr/bin/time -v deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 500`, one after the other on a box at load 40-70, so wall clock is noise): before = master 5c45b04 built from `git archive`, after = this branch. **User CPU 2231 s vs 2266 s (+1.6 %, inside the noise of a shared box), system 154 s vs 197 s**; wall 11:12 vs 8:21 (the box was busier during the first); peak RSS 10.4 vs 11.7 GB; per-stage seconds of the same order (the after run is lower in every stage because the box was quieter, e.g. surface 197 s vs 161 s, amplify 65 s vs 38 s). **The bake is byte-identical**: `rasters/elevation.dtr` and `rasters/water_level.dtr` compare equal between the two runs (as expected: `satellite.rs` only had its lighting split into `Light`, and the keyframes it draws are held by a test). The tiles add nothing to a run.
+  - **Tiles, measured** (`tools/workbench/tiles_bench.py 8671 r16 16` against a private workbench on the after bake, box load 35-47; 16 random tiles a layer and zoom, cold = render + PNG + cache write over loopback HTTP): satellite 17-46 ms mean, max 51 (zoom 3 is the slowest: 4 blocks a pixel is a 2 x 2 box over the L3 cells plus the detail noise); elevation 8-34, water 7-34, overlay 5-31, max 37; warm 0.3-0.8 ms. First open of the map 0.9 s. Mean tile 3-98 KB. **Full pyramid at 16k** (2,730 tiles a layer): satellite 132 MiB, elevation 139, water 138, overlay 9, 418 MiB for all four, 75 % of it zoom 5. Cache cap 384 MiB a run.
+  - **Shots** (review/out/wb-zoom/ui/, not committed; Chromium 153 from nix on the box, DevTools-driven): 01-12 are the whole world (satellite and elevation), the biggest river mouth of the bake (x -1218, z 1640; 8, 2 and 0.5 blocks a pixel, and the water layer), the fjord (x 6016, z 3032; satellite at 3 and 1, elevation, water), the seam wrap, and the 5901/2892 cone area. **Verified by looking:** the river mouth (a channel that widens as it meets the sea, with the shelf colour round it) and the fjord at (6016, 3032) (a narrow arm between ridges with the river entering at its head and truncated spurs, ice on the high ground). **Not verified: the volcanoes.** The run's events list 20+ live stratovolcanoes, arcs and two hotspot shields (`find_places.py volcanoes` / the events), and a transect of the terrain (peak against the mean of a ring 120 blocks out) puts a cone at the listed block for several of them (x 5901, z 2892: peak 243, ring mean 52, ring max 119; x 5311, z 1061: 292 vs 90; the hotspot shield at x -955, z 1445: 302 vs 195; a seamount at x 2969, z -786: -159 vs -253), but at 1-3 blocks a pixel they read as parts of ridges and plateaus, not as cones (the elevation ramp is flat above 639, and the events' place is probably the segment's, not the cone's centre). I therefore claim no volcano shot. **Known flaw seen in the shots:** sea ice (and the ice cover over shallow water) has square edges, the 8-block cells of the bake's ice cover and the 16-block ones of the sea-ice proxy.
+  - **Flaws and left.** (1) The volcano review needs a look at the amplified cones themselves, e.g. through `deeptime volcano-view` with a checkpoint (`run --checkpoints`), which marks them on the same terrain; the map could mark volcano events (a layer from `events.jsonl`) so they can be found. (2) `find_places.py`'s fjord scan found only three arms at a weak threshold; it works but is crude. (3) Touch (pinch) was not exercised on a touch device. (4) The Mac scratch of the earlier attempt was deleted by the coordinator; mine on the box (`/data/ban/deeptime-runs/wb-zoom`) is deleted; the checkout copy `/data/ban/mic/mods/agent-ad5fc9991593ce7ef` (2.1 GB) goes with `mac-gc.sh` after the merge.
+
+### 2026-10-01 — Workbench: rock at depth and cross-sections (agent worktree agent-aa7d40b4ebf642bd7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-10-01, "Which workbench features?": Ben asked for rivers, lakes, coal, diamictite and volcano
+  shapes to be visible in the workbench; "All four", view-only, run time unchanged. This is "Rock at depth + sections".
+- **What Ben gets** (a finished run with a bake; any other run says why it cannot):
+  - *Depth control.* On a rock layer (any layer with the `rock_class` ramp: `structure/rock`, `surface/class`, …) a "Rock at
+    depth" control sits under the legend: chips Surface, −20, −50, −100, −200, Floor and a slider over 0, 10, 20, 35, 50, 75,
+    100, 150, 200, 300, 400, 600, 800 blocks and the world floor. Below the surface the map shows the bake's rock class that
+    deep under the terrain's top block (the picture sits under the map like a frame's layer, so the globe and the hover
+    readout follow it; hovering names the class); a badge on the pane says "Rock 100 blocks down · the finished world
+    (bake)", and the control's note says the time slider does not change it. The surface is still the run's own frame.
+  - *Section tool* (toolbar, key S): click two points; the line is drawn (the shorter way round the planet, across the
+    seam too) and the section opens in a dock over the map (the upper edge when the line runs along the lower one), or
+    large in a dialog: rock classes in the `rock_class` colours, the ground, water over it, sea level, an elevation axis in
+    blocks (y), distance along the line in blocks and km, the line's length, the deposit/seam/pluton bodies it crosses
+    (outlined by role; "coal seam ×8"), a key of the classes present with their share (click one to light it up: diamictite,
+    coal), a hover readout (distance, x, z, y, depth below the surface, the rock, the water, the bodies inside), a moving
+    dot on the map, "Whole column / Near the surface" and the scales ("stretched 37× vertically"). The Section tab keeps
+    the line's numbers, the key and the recent sections.
+  - *No bake:* the depth control greys out and says why (a run that has not finished: the bake is written at its end; an
+    older format: "world data is format 0.0; this workbench reads 0.2"; a stage run: no bake); a section pick says so in a
+    toast. The map keeps showing the run's frames.
+- **How.** New `crates/deeptime-cli/src/watch/sections/` (`mod.rs` routes, caching and the page's script; `world.rs` the bake
+  opened for rock views; `slice.rs`; `section.rs`; `tests.rs`), hooked in at one place in `http.rs::get`:
+  `GET /api/runs/<id>/rock` (availability, scale, depths, class names and colours), `…/rock/slice.png?depth=<blocks|floor>`
+  (1024 × 512 RGBA, a keyframe's projection) and `…/rock/section?x0&z0&x1&z1` (JSON, up to 2,048 columns). The bake's
+  strata are read whole into memory once (kept 10 minutes after the last request, one world at a time); answers are kept
+  as files in `<run>/rock/<bake stamp>/`; one slice or section computes at a time on up to 8 threads. Page: new
+  `crates/deeptime-viewer/assets/sections.js` (served at `/sections.js`) plus ~30 lines in `workbench.js` (`window.DTWB`
+  for the new file, hooks in `drawPane`, the pointer handler, `setTool`, `setITab`, the tool buttons, the S key, the 64-class
+  legend) and 4 lines of `workbench.html` (the tool button, the tab, its pane, the script tag). The rock a block has is what
+  the game's strata pass paints: the horizon stack by the column rule, then a body that names a rock class (the first by
+  id, as `StrataPass.paintBodies` leaves it).
+- **The one change outside the workbench: `strata::stack_at` is faster.** A slice asks for 524,288 columns and the old
+  function allocated 17 vectors and searched every horizon from the top for every (cell, key) pair. It now keeps its
+  working memory in a `StackScratch` (one per thread; `stack_at` makes a fresh one, so every caller is unchanged) and
+  walks each cell's horizons once up the sorted keys: the search for key s is "the first horizon whose successor starts
+  after s", true for every smaller key too, so starting from the previous answer finds the same horizon. The arithmetic
+  and its order are untouched. `strata::tests::reusing_the_scratch_and_walking_the_keys_changes_no_answer` keeps the old
+  code as a reference and compares 2,000+ random columns (random stacks, hiatuses, repeated classes) with both `stack_at`
+  and `stack_at_with` for equality; the 500-column Java parity test and the tiny-planet tests below ran on it.
+  The deposits stage's `Cover::blocks_at` (coal cover) also calls `stack_at`: same answers, fewer allocations.
+- **Measured** (Mac, load average 60–130 all afternoon: other agents' runs and servers; wall times are noisy, CPU times
+  are the figure to trust). Run: `earthlike_quick_16k`, 500 Myr, scattered continents, 12.1 horizons a cell on average
+  (K = 32 slots), baked 206 MB. *Slice* (1024 × 512): 3.4–4.0 s wall before the `stack_at` change at load 47, then 2.1–3.4 s,
+  and 1.1–1.6 s (4.4 s of CPU, 8 µs a column) at load 63; cached: 3 ms. *Section* of 2,048 columns: 25–37 ms (cached 2 ms).
+  *Opening the bake:* 0.15–0.21 s. A planet run adds nothing: the page only reads.
+  **Run time before and after** (Azure test VM, `/usr/bin/time -v deeptime run --preset earthlike_quick_16k --start
+  scattered_continents --length-myr 500 --threads 6`, release builds of master b46f512 (base) and of this branch, one run at a
+  time in the order base, branch, branch, base, load average 25–50 from other agents' jobs): **user seconds base 1,934 and
+  1,714 (mean 1,824), branch 1,866 and 1,799 (mean 1,832)**; wall 9:53 / 7:22 against 8:50 / 7:48; max RSS 6.1 / 5.1 GB
+  against 5.7 / 5.1 GB. The two builds differ by less than the spread between repeats of one build (the second run of each pair
+  was faster as the box quieted): no measurable change. The only code a run executes that this branch changed is
+  `strata::stack_at` (the deposits stage's coal cover, 42 / 23 s base against 24 / 26 s branch), bit-identical and with
+  fewer allocations.
+- **Tests.** `watch::sections::tests::rock_at_depth_and_sections_agree_with_the_column_evaluator` (a tiny baked planet,
+  through `route()` as the server calls it): 96,932 blocks of 368 sampled section columns equal `ColumnWorld::sample`'s
+  rock block for block; the water and ground equal `hydro()`; body spans equal `sample().bodies`, 93 of them through the
+  planet's plutons; four slices (surface, 60, 200, floor) equal the evaluator at every sampled pixel; PNG size and cache;
+  400, 409 (no bake, with the reason) and 404 answers; a line across the seam takes the short way. Unit tests for the
+  pixel projection, depth parsing, the seam rule and the body index (odd circumferences, bodies over the seam), and for
+  `sections.js` being served. `tools/workbench/sections_shots.py` drives the page (real mouse events, headless
+  Chromium on the Mac): depth chips, three sections, fold/close/show, the surface chip, Esc: no page errors.
+- **Pictures** (not committed): `review/out/wb-sections/` in this worktree: `rock-surface/-20/-100/-floor.png` (the map at
+  each depth), `dia-dock.png`, `dia-dock-lit.png`, `dia-big.png`, `dia-big-lit.png` (a section through a baked diamictite
+  bed: 54.9° S 72.3° E → 73.6° S 89.9° E, 350 km, the basin fill with the plum bed lit up in its key), `coal-dock.png`,
+  `coal-big.png` (coal beds and eight coal-seam bodies), `seam-dock.png` (a line across the seam), `*-tab.png`,
+  `no-bake/rock-100.png` (a run whose world data is format 0.0).
+- **Found on the way.** (1) `ColumnWorld::sample` lets the *last* body that names a rock class win where two overlap; the
+  game's strata pass keeps the *first* (a block a body painted is no longer crust or the horizon's block). The slice and
+  the section follow the game; `inspect-column` and the Java twin (`Columns.sample`) agree with each other and can
+  differ from the game at such a block (rare; none in the test planet). (2) The default 500-Myr run has diamictite in
+  0.04 % of surface pixels and 0.09 % at 50 blocks, mostly at 85–87° latitude and in a basin near 67° S; coal 0.07 % at the
+  surface, 0.2 % at 50 blocks. (3) The first slice of a run opens the strata (117 MB at 16k, about 470 MB at 32k full):
+  they stay for ten minutes. (4) A run that is still running has no bake until it ends; the page says so.
+- **Gates** (Azure test VM, this branch merged with master b46f512; `CARGO_BUILD_JOBS=8`): `cargo fmt --check` clean; `cargo clippy
+  --workspace --all-targets -D warnings` clean (it first caught a needless borrow in `stack_at_with`, fixed); `cargo test
+  --workspace` all pass (core 335 + 3 ignored, cli 38 incl. the five `watch::sections` tests, format 52 incl. the `stack_at`
+  equality test, inspect 29 + 9, jni 7, viewer 6, history_cap 1); `cargo deny check licenses bans` ok; `cd neoforge &&
+  ./gradlew build test` BUILD SUCCESSFUL, tests=160 failures=0 errors=0 skipped=1, **ColumnParityTest `columns=500 equal=500`**
+  (71 through bodies, 31 with water; lake1024 300/300) against the new `stack_at`. No GameTests (branch rule).
+- **On a real baked planet** (`tools/workbench/check-sections.sh`, a fresh 500-Myr `earthlike_quick_16k`,
+  merged master): the slice takes 1.4–2.0 s cold (load ~40, 12.1 horizons a cell), the section of 2,048 columns 0.03 s; opening the
+  bake 0.07 s; `sections_shots.py` in Chromium 153: depth chips, three sections, fold, unfold, close, show from the tab, the
+  surface chip and Esc all ok, no page errors. The pictures were first made without fonts (nixpkgs' Chromium has none);
+  `tools/workbench/sections-shots.sh` now gives it DejaVu. A section through a diamictite bed (68.1° S 207.2° E → 80.2° S,
+  165 km, `dia-big-lit.png`): a 1.8 % bed the key lights up in plum, thinning up a slope and cropping out in a fjord-like
+  trough. New diamictite coordinates differ from the first run's (master changed the planet).
+- **Merged with the rivers & lakes and final-world branches** (master 386bd14; conflicts in STATUS.md, `http.rs`, `workbench.html`,
+  `workbench.js`, `lib.rs`, all keep-both): one `window.DTWB` now serves `sections.js` and `worldmap.js`; the rock legend limit
+  (64 classes) sits beside the rivers legend branch. Re-run on the Azure VM: fmt, clippy `-D warnings`, `cargo test --workspace`
+  (core 351, cli 46, format 52), `./gradlew build test` (160/0, `ColumnParityTest columns=500 equal=500`) all green, and
+  `check-sections.sh --other-views` on a fresh baked run: the sections checks pass, the Rivers & lakes layer shows its own
+  legend (no depth control), the Final world view opens, paints and closes, the rock layer's depth control comes back, no
+  page errors (a slice 0.8–1.2 s cold with the box quieter).
+- **Next.** The coordinator merges this with the rivers, deposits and zoomable-map branches (the conflicts will be the
+  `workbench.js`/`workbench.html` hunks and this file's top); restart the live workbench on the test machine to get it
+  (`tools/viewer/mac-watch.sh`). Runs made before format 0.2 show "needs a bake" until they are run again. Scratch deleted;
+  this worktree's checkout copy `/data/ban/mic/mods/agent-aa7d40b4ebf642bd7` stays until `tools/remote/mac-gc.sh` after the merge.
 
 ### 2026-09-30 — P1-27 plate margins and coherent continents (agent worktree agent-ad3b417fd428c1ac2, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Ben (decisions log 2026-09-29, "Provinces view shows speckled, patchy continents"; 2026-09-30, "most coast lines
@@ -5458,6 +5776,16 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
+- **Terrain above the build limit (2026-10-01).** No stage bounds the terrain to `scale.max_y`: the surface
+  stage's offset (deposition, isostatic rebound) rises over the plate model's 10 km cap, and the young stage, the
+  amplifier and the bake pass it on. The game ends such ground at y 639 (flat tops); strata and parity stay
+  consistent because the column evaluator clamps `top_y`. The bake counts it (`notes.bake.terrain.build_limit`,
+  `above_max_y=` on the `bake` line) and `realPlanetHeightMatchesTheBake` logs `aboveBuildLimit`. Pending question
+  above; build log 2026-10-01 (x86_64 gates).
+- **One preset, one planet per platform (2026-10-01).** The simulation is not bit-identical across platforms (the
+  platform's libm); it is across runs and thread counts on one machine. Ben does not want it otherwise. Tests on a
+  simulated planet assert properties and floors measured over several planets (`DEEPTIME_TEST_PLANET_SET="seed=N"
+  ./gametest.sh`); an exact number belongs only to tests on baked data.
 - **P1-06 caveats.** (1) A checkpoint carries the preset it was made with, defaults included: to pick up
   a changed default of a stage that has not run, resume with `--set "amplify={}"` (or the key). (2) Tests
   that derive a small planet from a `pipeline_*` preset must remove the `young` and `amplify` sections

@@ -462,6 +462,9 @@ impl Preset {
                 sea_level_y: f64::from(p.scale.sea_level_y),
                 m_per_block_v: p.scale.m_per_block_v,
                 radius_m: p.tectonics.model_radius_km * 1000.0,
+                m_per_block_h: p.scale.m_per_block_h,
+                rivers_scale: p.scale.feature_scale.rivers,
+                hydro: p.hydro.unwrap_or_default(),
             },
             _ => crate::keyframes::ViewScale::default(),
         }

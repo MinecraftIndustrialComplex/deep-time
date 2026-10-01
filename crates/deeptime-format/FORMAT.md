@@ -675,7 +675,9 @@ width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore
 The pass: a sea column the aquifer left dry is filled from the sea's top down to the ground (the
 pass runs in every chunk with elevation cells within 17 blocks of sea level for this); a river column is cut or filled to `bed` (gravel on the bed of a channel under 6 blocks
 wide, sand on a wider one), water from bed + 1 to top, air above; a lake column fills the air from
-top down to the ground as P0-13's pass did, plugging a cave under `bed`; a bank is lowered to
+top down to the ground as P0-13's pass did, plugging a cave under `bed` (the generated ground, which
+between noise-cell corners can stand a block or two above `ground` on a steep shore: a lake column
+whose generated ground reaches `top` holds no water and is dry shore, flush with the lake); a bank is lowered to
 `max_ground` and raised to `min_ground` keeping its top block, and air from `seal_from` to
 `min_ground` is filled; where a water column's neighbour holds water higher up, the block at the
 higher top gets flowing water (level 1, resting on the water under it)
@@ -912,8 +914,9 @@ Pixel (px, py) is centred on longitude 360°·px/w (the seam is 0°, plan §5.2)
 passes the next multiple of the preset's keyframe interval (counted from the run's start) and at
 the end of each stage.
 
-Two layers are derived when a frame is drawn rather than read from one field, and are never stored
-in the world: `provinces` (geologic provinces, coloured with its ramp like any layer) and
+Three layers are derived when a frame is drawn rather than read from one field, and are never stored
+in the world: `provinces` (geologic provinces, coloured with its ramp like any layer), `rivers`
+(rivers and lakes, below) and
 `satellite`, a true-colour picture composited from the elevation, the climate's fields (land cover
 from `climate/t_mean_c`, `t_warm_c`, `t_cold_c`, `aridity`, `precip_mm` and `koppen`; snow from the
 temperatures and `climate/ela_m`; `climate/ice_thickness_m` or `glacier` as glacier ice;
@@ -925,6 +928,23 @@ are the compositor's anchor colours and the legend's key. It is the **first** la
 the plate model's group and of the young landscape's and amplification's frames, so a reader that
 opens on a frame's first layer opens on it. A frame without climate fields draws bare ground by
 geology (no plants, snow or ice).
+
+`rivers` is the water of the frame's terrain: the **last** layer of every frame that has the
+satellite view, and the same water is drawn over the satellite view (rivers blended over the land,
+lakes flat). It is RGBA8 too: a quiet base (land, sea), the lakes in one flat colour and the rivers
+in the colours of the `rivers` ramp of `ramps.json`, whose stops run over log₁₀ of the discharge in
+m³/s (a river is also drawn wider by flow), so a reader can read the discharge back from a pixel's
+colour; the ramp's `keys` hold the land, sea and lake colours (`deeptime_core::water_view` has the
+rules). The water is **derived, not stored**: the bake's own hydrology (`hydro::network`, P1-22: the
+open sea, a Priority-Flood of the frame's terrain, lakes from `hydro.lake_min_area_km2` and a block
+deep, the climate's runoff accumulated down the steepest descent, rivers from
+`hydro.river_min_discharge_m3s` and `river_min_area_km2`) is run on the frame's elevation at render
+time (a grid over 600,000 cells is averaged down first), so it adds nothing to the simulation or the
+bake; with `hydro.enabled` false there is no layer and the satellite view is dry. **The run's last
+frame that has these layers is drawn again after the bake**, from `rivers/rivers.dtrv` and the
+`water_level` layer, so the final map shows the exact rivers and lakes of the world data (the
+frame's file and its index entry are rewritten before the manifest lists them); a run without a
+bake keeps the derived water.
 
 ## The climate's ice fields (pipeline fields and history frames; not world data yet)
 

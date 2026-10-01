@@ -40,6 +40,15 @@ const BENCH_HTML: &str = include_str!("../assets/bench.html");
 const WORKBENCH_HTML: &str = include_str!("../assets/workbench.html");
 /// The workbench page's script (`deeptime watch` serves it as `workbench.js`).
 pub const WORKBENCH_JS: &str = include_str!("../assets/workbench.js");
+/// The workbench's deposits overlay (symbols, footprints, legend, hover text; `deposits.js`, served
+/// beside `workbench.js`): a module of pure functions the page calls.
+pub const DEPOSITS_JS: &str = include_str!("../assets/deposits.js");
+/// The workbench's "Rock at depth" and cross-section tool (served as `sections.js`, after
+/// `workbench.js`; it reads `/api/runs/<id>/rock…`).
+pub const SECTIONS_JS: &str = include_str!("../assets/sections.js");
+/// The workbench's "Final world" view (a zoomable map of a finished run's bake; `deeptime watch`
+/// serves it as `worldmap.js`, loaded after `workbench.js`, which it hooks into).
+pub const WORLDMAP_JS: &str = include_str!("../assets/worldmap.js");
 /// The planet editor's field catalogue, shared with the game (Gradle ships it in the jar as
 /// `deeptime/editor_fields.json` for `screen/model/EditorFields`); the workbench's form is built
 /// from it.
@@ -407,6 +416,26 @@ pub fn encode_png(w: u32, h: u32, rgba: &[u8]) -> io::Result<Vec<u8>> {
     Ok(out)
 }
 
+/// RGB8 (`w·h·3` bytes) as PNG bytes, with png's fast deflate: the workbench's map tiles, which
+/// have no transparent pixels.
+pub fn encode_png_rgb(w: u32, h: u32, rgb: &[u8]) -> io::Result<Vec<u8>> {
+    if rgb.len() as u64 != u64::from(w) * u64::from(h) * 3 {
+        return Err(io::Error::other(format!(
+            "{} bytes are not a {w}×{h} RGB image",
+            rgb.len()
+        )));
+    }
+    let mut out = Vec::with_capacity(rgb.len() / 3);
+    let mut enc = png::Encoder::new(&mut out, w, h);
+    enc.set_color(png::ColorType::Rgb);
+    enc.set_depth(png::BitDepth::Eight);
+    enc.set_compression(png::Compression::Fast);
+    let mut writer = enc.write_header().map_err(io::Error::other)?;
+    writer.write_image_data(rgb).map_err(io::Error::other)?;
+    writer.finish().map_err(io::Error::other)?;
+    Ok(out)
+}
+
 fn write_rgba_png(path: &Path, w: u32, h: u32, rgba: &[u8]) -> io::Result<()> {
     let file = io::BufWriter::new(fs::File::create(path)?);
     let mut enc = png::Encoder::new(file, w, h);
@@ -522,6 +551,7 @@ mod tests {
         assert!(page.contains("<title>live &lt;run&gt;</title>"));
         assert!(page.contains("workbench.js") && !page.contains("{{TITLE}}"));
         assert!(WORKBENCH_JS.contains("EventSource"));
+        assert!(page.contains("deposits.js") && DEPOSITS_JS.contains("DTDeposits"));
         let fields: Value = serde_json::from_str(EDITOR_FIELDS_JSON).unwrap();
         assert!(fields["fields"].as_array().unwrap().len() > 10);
         let lang: Value = serde_json::from_str(LANG_EN_US_JSON).unwrap();
