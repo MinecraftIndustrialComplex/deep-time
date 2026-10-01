@@ -192,23 +192,26 @@ fn structure_census(
         land_changed += u64::from(is_land);
         // The youngest rock is where it was (structures are older than what covers them).
         cover_kept += u64::from(bent.first() == plain.first());
-        // A bed met twice going down (its unit key repeats with other rock between).
-        let twice = bent.iter().enumerate().any(|(i, h)| {
-            !intrusive.contains(&h.1)
-                && bent[i + 1..]
-                    .iter()
-                    .skip(1)
-                    .any(|g| g.2 == h.2 && g.1 == h.1)
-        });
+        // A bed met twice going down where the plain column meets it once (a thrust carried
+        // it over itself). (Intertonguing facies repeat a bed in the plain column too.)
+        let times = |col: &[(i32, u8, u16)], h: &(i32, u8, u16)| {
+            col.iter().filter(|g| g.1 == h.1 && g.2 == h.2).count()
+        };
+        let twice = bent
+            .iter()
+            .any(|h| !intrusive.contains(&h.1) && times(&bent, h) > 1 && times(&plain, h) == 1);
         repeated += u64::from(twice);
         intruded +=
             u64::from(bent.iter().any(|h| {
                 intrusive.contains(&h.1) && !plain.iter().any(|g| g.1 == h.1 && g.2 == h.2)
             }));
-        // How far the first bed both stacks hold has moved.
+        // How far the beds both columns hold once have moved.
         let mut worst = 0i32;
-        for h in &plain[1.min(plain.len())..] {
-            if let Some(g) = bent.iter().find(|g| g.2 == h.2 && g.1 == h.1) {
+        for h in plain.iter().skip(1) {
+            if times(&plain, h) == 1
+                && times(&bent, h) == 1
+                && let Some(g) = bent.iter().find(|g| g.2 == h.2 && g.1 == h.1)
+            {
                 worst = worst.max((g.0 - h.0).abs());
             }
         }

@@ -452,9 +452,11 @@ public final class Structure {
                 int bottom = hh + 1 < cnt ? Math.max(yMin, st.tops[hh + 1] + 1 - d) : yMin;
                 if (top < bottom)
                     continue;
+                // Rock younger than the event that moved the piece: the cover's lowest bed stands in.
                 int g = hh;
-                while (st.units[g] < s.pkey[k] && g + 1 < cnt)
-                    g++;
+                if (st.units[g] < s.pkey[k])
+                    while (g + 1 < cnt && st.units[g + 1] < s.pkey[k])
+                        g++;
                 if (out.count == 0 || out.classes[out.count - 1] != st.classes[g])
                     out.push(top, st.classes[g], st.units[g]);
             }

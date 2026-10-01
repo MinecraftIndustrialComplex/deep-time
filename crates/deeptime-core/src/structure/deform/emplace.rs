@@ -344,7 +344,7 @@ pub fn emplace(
                 cause: cause(kind, bx, bz),
                 adrift: 0,
                 wear_m: 0.0,
-                half_height: 0.0,
+                rise: 0.0,
                 depth: 0.0,
                 rock: 0,
             };

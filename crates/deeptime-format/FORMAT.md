@@ -1088,13 +1088,16 @@ at a block column (integer tops T_h, classes, unit keys, top-down):
    `(y_max, its class, its key)`, appended unless the last appended has the same class): its horizon h covers
    `top = y_max` for h = 0, else `min(y_max, T_h − d)`, down to `bottom = max(y_min, T_{h+1} + 1 − d)`
    (y_min for the last); skipped when `top < bottom`. Its class and unit key are those of horizon
-   g: g = h, advanced while g's unit key is below the piece's key and g is not the last (the
-   shift reached up into rock younger than the event that moved the piece: the next horizon old
-   enough stands in). `(top, class, unit)` is appended unless the last appended has the same
+   g: g = h, and if g's unit key is below the piece's key (the shift reached up into rock younger
+   than the event that moved the piece), g is advanced while the *next* horizon's key is also
+   below the piece's key and there is a next one: the lowest bed of that cover stands in, as the
+   bed laid on the deformed surface fills its lows.
+   `(top, class, unit)` is appended unless the last appended has the same
    class.
 
 So a column no event touches reads as in 0.2; under a fold the beds older than it move up and down
-beneath a flat cover (an angular unconformity); above a fault's plane the column is the hanging
+beneath a cover whose own beds are flat and whose lowest bed fills the troughs (an angular
+unconformity); above a fault's plane the column is the hanging
 wall's, read from where it came from, so a normal fault drops beds and a thrust repeats them.
 Bodies are painted over the result where they are, undeformed.
 

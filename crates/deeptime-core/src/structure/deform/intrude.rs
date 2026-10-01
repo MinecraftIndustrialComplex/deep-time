@@ -7,8 +7,8 @@
 //!
 //! | What | Where and when | Shape | Rock |
 //! |---|---|---|---|
-//! | **stock** | in a collision belt or a continental arc while it is active (a Poisson process like the folds) | a cupola a few km across, its top from just above the ground (unroofed) to tens of blocks under it | granite in collisions, granodiorite or diorite in arcs |
-//! | **dyke** | in a continental rift while it rifts | a sheet along the rift, a block or two wide, reaching the ground at its middle | basalt |
+//! | **stock** | in a collision belt or a continental arc while it is active (a Poisson process like the folds) | a cupola a few km across rising from the world's floor, its top from just above the ground (unroofed) to tens of blocks under it | granite in collisions, granodiorite or diorite in arcs |
+//! | **dyke** | in a continental rift while it rifts | a sheet along the rift rising from the world's floor, a block or two wide, reaching the ground along its middle | basalt |
 //! | **plug** | under every extinct volcano on land still standing at the end of the run | a neck up the cone's axis | rhyolite (silicic centres), andesite (arc cones) or basalt |
 //!
 //! Stocks and dykes ride their plates like the folds (`feature::advance`); plugs are made at the
@@ -24,6 +24,12 @@ use crate::sphere::BlockFrame;
 use crate::structure::params::StructureParams;
 use crate::surface::lithology::index;
 use crate::surface::volcanoes::{Kind as VolcanoKind, Volcano};
+
+/// How far a dyke's or a plug's top would stand above the ground, as a share of the ground's
+/// height above the world's floor: the ellipsoid then cuts the ground where
+/// (a / half_along)² + (b / half_across)² < 1 − 1 / (1 + RISE)² = 0.36, the middle 60 % of its
+/// length and width, with walls that are nearly upright.
+const RISE: f32 = 0.25;
 
 /// A feature of `kind` with nothing set but where and when.
 fn blank(id: u32, kind: Kind, x: f64, z: f64, plate: u32, t_myr: f64) -> Feature {
@@ -45,7 +51,7 @@ fn blank(id: u32, kind: Kind, x: f64, z: f64, plate: u32, t_myr: f64) -> Feature
         cause: 0,
         adrift: 0,
         wear_m: 0.0,
-        half_height: 0.0,
+        rise: 0.0,
         depth: 0.0,
         rock: 0,
     }
@@ -124,8 +130,7 @@ pub fn emplace(
                 f.azimuth_deg = random_trend as f32;
                 f.half_across = radius as f32;
                 f.half_along = (radius * (1.0 + 0.6 * u[0])) as f32;
-                f.half_height = (radius * p.stock_height_ratio) as f32;
-                f.depth = (lerp(p.stock_top_depth_blocks, u[1]) + f64::from(f.half_height)) as f32;
+                f.depth = lerp(p.stock_top_depth_blocks, u[1]) as f32;
                 f.rock = if x.regime[c] as u8 == regime::COLLISION {
                     index("granite")
                 } else if u[2] < 0.5 {
@@ -142,10 +147,9 @@ pub fn emplace(
                 f.azimuth_deg = (trend + scatter).rem_euclid(360.0) as f32;
                 f.half_along = (0.5 * length) as f32;
                 f.half_across = lerp(p.dyke_half_width_blocks, u[0]) as f32;
-                f.half_height = p.dyke_half_height_blocks as f32;
                 // Its top stands above the ground at the middle, so it crops out along the
-                // middle half of its length (where rock older than itself is at the surface).
-                f.depth = 0.7 * f.half_height;
+                // middle of its length (where rock older than itself is at the surface).
+                f.rise = RISE;
                 f.rock = index("basalt");
             }
             *next_id += 1;
@@ -189,8 +193,7 @@ pub fn plugs(
         );
         f.half_along = radius as f32;
         f.half_across = radius as f32;
-        f.half_height = p.plug_half_height_blocks as f32;
-        f.depth = 0.6 * f.half_height;
+        f.rise = RISE;
         f.rock = if v.silicic || v.kind == VolcanoKind::Silicic {
             index("rhyolite")
         } else if v.kind == VolcanoKind::Strato {
@@ -243,8 +246,7 @@ mod tests {
                     assert_eq!(f.rock, index("granite"));
                     let r_km = f64::from(f.half_across) * 0.3;
                     assert!((1.99..=10.01).contains(&r_km), "{r_km}");
-                    let top = f.depth - f.half_height;
-                    assert!((-4.01..=60.01).contains(&top), "{top}");
+                    assert!((-4.01..=60.01).contains(&f.depth) && f.rise == 0.0);
                 }
                 Kind::Dyke => {
                     assert!((177..=182).contains(&i), "dyke at column {i}");
@@ -252,12 +254,12 @@ mod tests {
                     // Along the rift (north), thin, and reaching above the ground.
                     let d = f.azimuth_deg.rem_euclid(180.0);
                     assert!(d.min(180.0 - d) < 50.0, "{}", f.azimuth_deg);
-                    assert!((1.0..=2.5).contains(&f.half_across) && f.depth < f.half_height);
+                    assert!((1.0..=2.5).contains(&f.half_across) && f.rise > 0.0);
                 }
                 k => panic!("{k:?} from intrude::emplace"),
             }
-            // Baked: an ellipsoid hung from the ground.
-            let e = f.to_baked(70.0, 5000);
+            // Baked: an ellipsoid rooted on the world's floor.
+            let e = f.to_baked(70.0, 5000, -330.0);
             let Shape::Intrusion {
                 y,
                 half_height,
@@ -267,7 +269,13 @@ mod tests {
                 panic!("{e:?}")
             };
             assert_eq!(u16::from(class), f.rock);
-            assert!((y - (70.0 - f64::from(f.depth))).abs() < 1e-9 && half_height > 0.0);
+            let top = y + half_height;
+            assert_eq!(y, -330.0);
+            if f.kind == Kind::Stock {
+                assert!((top - (70.0 - f64::from(f.depth))).abs() < 1e-9);
+            } else {
+                assert!(top > 70.0 + 50.0, "a dyke stands through the ground: {top}");
+            }
         }
         // Off: none. The switch for folds and faults turns them off too.
         sp.deformation.intrusions = 0.0;

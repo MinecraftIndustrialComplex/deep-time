@@ -86,7 +86,7 @@ pub fn structural(
             Kind::StrikeSlip => 0.3,
             Kind::Stock | Kind::Dyke | Kind::Plug => continue,
         };
-        let window = f.to_baked(0.0, 0).window;
+        let window = f.to_baked(0.0, 0, 0.0).window;
         let reach = window.reach();
         let (i0, i1) = (
             ((f.x - reach - ox) / r).floor() as i64,
@@ -307,7 +307,7 @@ mod tests {
             cause: 0,
             adrift: 0,
             wear_m: 0.0,
-            half_height: 0.0,
+            rise: 0.0,
             depth: 0.0,
             rock: 0,
         };

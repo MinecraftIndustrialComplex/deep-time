@@ -111,10 +111,14 @@ pub struct Feature {
     /// How much the deep-time surface has eroded or buried the ground at its centre since it
     /// formed, m: what wears its relief off the ground (`relief_left`).
     pub wear_m: f32,
-    /// Intrusions: the vertical half-axis of the ellipsoid, blocks (its horizontal half-axes are
-    /// `half_along` and `half_across`).
-    pub half_height: f32,
-    /// Intrusions: how far its centre lies under the ground at its position, blocks.
+    /// Intrusions are rooted: the ellipsoid's centre lies on the world's floor and its
+    /// horizontal half-axes are `half_along` and `half_across`, so it has no floor of its own
+    /// and narrows upwards to its top. `rise`: how far above the ground the top would stand, as
+    /// a share of the ground's height above the floor (dykes and plugs: they reach the ground
+    /// over the middle of their plan; 0 for a stock).
+    pub rise: f32,
+    /// Intrusions: how far the top lies under the ground, blocks (stocks; negative: it crops
+    /// out).
     pub depth: f32,
     /// Intrusions: the rock class (index into the class table).
     pub rock: u16,
@@ -260,9 +264,10 @@ impl Feature {
         -(waves + f64::from(self.phase)) * wl
     }
 
-    /// The feature as a baked event of the world data (`key`: its age as a stratigraphic key).
-    /// The vectors are taken from the Noddy event's own frame, so the two agree.
-    pub fn to_baked(&self, surface_y: f64, key: u16) -> StructEvent {
+    /// The feature as a baked event of the world data (`key`: its age as a stratigraphic key;
+    /// `floor_y`: the world's floor, where intrusions are rooted). The vectors are taken from
+    /// the Noddy event's own frame, so the two agree.
+    pub fn to_baked(&self, surface_y: f64, key: u16, floor_y: f64) -> StructEvent {
         let az = f64::from(self.azimuth_deg);
         let window = Window {
             centre: [self.x, self.z],
@@ -305,8 +310,10 @@ impl Feature {
                 }
             }
             Kind::Stock | Kind::Dyke | Kind::Plug => Shape::Intrusion {
-                y: surface_y - f64::from(self.depth),
-                half_height: f64::from(self.half_height),
+                y: floor_y,
+                half_height: ((surface_y - floor_y).max(0.0) * (1.0 + f64::from(self.rise))
+                    - f64::from(self.depth))
+                .max(8.0),
                 class: self.rock as u8,
             },
         };
@@ -433,7 +440,7 @@ mod tests {
             cause: 0,
             adrift: 0,
             wear_m: 0.0,
-            half_height: 0.0,
+            rise: 0.0,
             depth: 0.0,
             rock: 0,
         }
