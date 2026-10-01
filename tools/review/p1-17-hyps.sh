@@ -47,7 +47,7 @@ run_one() {
     IFS='|' read -r f start seed sets <<< "$1"
     work="${f%.txt}.work"
     # shellcheck disable=SC2086
-    "$BIN" stage "$STAGE" --preset "$PRESET" --start "$start" --length-myr "$LEN" --threads "$T" \
+    nice -n 10 "$BIN" stage "$STAGE" --preset "$PRESET" --start "$start" --length-myr "$LEN" --threads "$T" \
         --set "seed=$seed" --work "$work" $sets > "$f.part" 2>&1 \
         && mv "$f.part" "$f" || echo "FAILED $f (see $f.part)" >&2
     rm -rf "$work"
