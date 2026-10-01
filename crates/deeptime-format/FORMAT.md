@@ -682,6 +682,16 @@ higher top gets flowing water (level 1, resting on the water under it)
 and the blocks between falling water (a waterfall). **River biomes**: the game's weirdness input is
 0 (the river valley slice) at columns whose `river_biome` is set (`WorldDataTerrain.raster`).
 
+**Carvers (game side, not part of the column rule).** Vanilla's carvers run after the pass, and the
+`#minecraft:overworld_carver_replaceables` tag lists water. When `notes.bake.water.params.
+protect_water_from_carvers` is true or absent (preset key `hydro.protect_water_from_carvers`, on by
+default), the pass puts every water block it places or keeps in a river, lake or topped-up sea
+column in the chunk's carving masks (vanilla skips masked positions), and only those: ground under
+and beside the water stays carvable, so caves run under rivers and lakes and may open into a bed.
+After the air carvers the lowest water block of each column that now has air under it is marked for
+post-processing, so vanilla's fluid tick lets it run into the cave. Set to false, the carvers cut
+through the water like any other block.
+
 ## `strata/classes.json`
 
 `{"classes": ["sandstone", "red_bed", "granite"]}` — index → rock class id (plan §5.4.1,
