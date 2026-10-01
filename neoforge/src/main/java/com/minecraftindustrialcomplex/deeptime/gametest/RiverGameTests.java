@@ -35,8 +35,12 @@ import java.util.List;
  * with a bare biome and no carvers, features or caves ({@code deeptime:test_rivers}), boxes around a
  * big river, a small stream, a river mouth in a lake and a lake outlet. At generation no water block
  * floats (air under it) and none leaks (air beside it over ground or over air); every river and
- * lake column's water top is the one {@link Water} decides; then every water block is woken with a
+ * lake column's water top is the one {@link Water} decides (a lake column whose generated ground
+ * reaches the lake's top is dry shore, see {@link #count}); then every water block is woken with a
  * fluid tick and after {@value #WAIT_TICKS} ticks no water has reached a column that should be dry.
+ *
+ * <p>The checks are properties of any planet, not one planet's numbers: the simulation is not
+ * bit-identical across platforms, so the boxes sit somewhere else on every machine.
  * {@link #riverBiomes} checks that wide channels are river biomes on the real planet's biomes.
  */
 @GameTestHolder(GameTestSupport.NS)
@@ -44,6 +48,8 @@ import java.util.List;
 public final class RiverGameTests {
 
     static final int WAIT_TICKS = 300;
+    /** At most one water column in this many may be dry shore (see {@link #count}). */
+    static final int MAX_DRY_SHORE_INV = 20;
     /** Half the side of each box, blocks. */
     static final int HALF = 20;
 
@@ -87,14 +93,52 @@ public final class RiverGameTests {
         return out;
     }
 
+    /** The most boxes {@link #highSites} adds. */
+    static final int HIGH_SITES = 6;
+    /** The highest water surface a box of {@link #highSites} is put on: the test carver starts no higher than y 180. */
+    static final int HIGH_SITE_TOP = 170;
+
+    /**
+     * Boxes on rivers well above sea level, for {@link #carversSpareWater}: only there does a carver
+     * that replaces water leave air (below sea level the cut fills with sea water). {@link #sites}
+     * picks by shape (the widest channel is usually a river's mouth, at sea level), so on a planet
+     * whose lakes and mouths all sit at the coast its boxes hold almost no water above the sea. One
+     * box per chain, at the middle of the chain's vertices between {@code sea + 4} and
+     * {@value #HIGH_SITE_TOP}, at least three half-boxes from every box already chosen.
+     */
+    static List<Site> highSites(Rivers r, int sea, List<Site> have) {
+        List<Site> out = new ArrayList<>();
+        for (int k = 0; k < r.chainCount() && out.size() < HIGH_SITES; k++) {
+            int first = -1, last = -1;
+            for (int i = r.chainFirst(k); i < r.chainFirst(k) + r.chainLength(k); i++)
+                if (r.vertexW(i) >= sea + 4 && r.vertexW(i) <= HIGH_SITE_TOP) {
+                    if (first < 0)
+                        first = i;
+                    last = i;
+                }
+            if (first < 0)
+                continue;
+            int mid = (first + last) / 2;
+            int x = Math.round(r.vertexX(mid)), z = Math.round(r.vertexZ(mid));
+            boolean near = false;
+            for (Site s : have)
+                near |= Math.abs(s.x() - x) < 3 * HALF && Math.abs(s.z() - z) < 3 * HALF;
+            for (Site s : out)
+                near |= Math.abs(s.x() - x) < 3 * HALF && Math.abs(s.z() - z) < 3 * HALF;
+            if (!near)
+                out.add(new Site("high river", x, z));
+        }
+        return out;
+    }
+
     /** Counts over the boxes. */
     static final class Tally {
-        long waterBlocks, floating, leaks, steps, topMismatch, waterColumns, outside;
+        long waterBlocks, floating, leaks, steps, topMismatch, waterColumns, outside, dryShore, lakeColumns;
         final List<BlockPos> water = new ArrayList<>();
         final StringBuilder detail = new StringBuilder();
 
         void note(String what, int x, int y, int z) {
-            if (detail.length() < 800)
+            if (detail.length() < 2400)
                 detail.append(' ').append(what).append('(').append(x).append(',').append(y).append(',').append(z).append(')');
         }
     }
@@ -103,6 +147,16 @@ public final class RiverGameTests {
         return s.getFluidState().is(FluidTags.WATER);
     }
 
+    /**
+     * Reads the boxes back. A river column holds water up to its top, always: the pass cuts or fills
+     * it to the channel. A lake column is filled from the lake's top down to the generated ground
+     * (FORMAT.md, "Water columns": "a lake column fills the air from top down to the ground"), and
+     * {@link Water}'s {@code ground} is the terrain bilinear between noise-cell corners, which the
+     * generated ground between corners can exceed by a block or two on a steep shore. Where it
+     * reaches the lake's top, the column has no room for water: {@code dryShore}, ground flush with
+     * the water beside it, not a hole. A lake column whose top block is open and holds no water is
+     * a mismatch, as is any river column below its top.
+     */
     static Tally count(ServerLevel level, WorldData wd, Water.Spec spec, List<Site> sites) {
         Tally t = new Tally();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
@@ -147,9 +201,20 @@ public final class RiverGameTests {
                     boolean wet = col.kind() == Water.Kind.RIVER || col.kind() == Water.Kind.LAKE;
                     if (wet) {
                         t.waterColumns++;
-                        if (highestWater < col.top()) {
+                        BlockState atTop = chunk.getBlockState(pos.set(x, col.top(), z));
+                        boolean lake = col.kind() == Water.Kind.LAKE;
+                        if (lake)
+                            t.lakeColumns++;
+                        if (lake && highestWater < col.top() && !atTop.isAir() && atTop.getFluidState().isEmpty()) {
+                            t.dryShore++;
+                        } else if (highestWater < col.top()) {
                             t.topMismatch++;
-                            t.note("top" + col.top() + "/" + highestWater, x, highestWater, z);
+                            StringBuilder blocks = new StringBuilder();
+                            for (int y = col.top() + 2; y >= col.top() - 2; y--)
+                                blocks.append(' ').append(BuiltInRegistries.BLOCK.getKey(chunk.getBlockState(pos.set(x, y, z)).getBlock()).getPath());
+                            t.note("top" + col.top() + "/" + highestWater + "[" + col.kind().id + " ground " + col.ground() + " surface "
+                                    + String.format(java.util.Locale.ROOT, "%.3f", col.surface()) + " level " + col.level() + " bed " + col.bed()
+                                    + " heightmap " + top + " y" + (col.top() + 2) + "↓" + blocks + "]", x, highestWater, z);
                         }
                     } else if (!col.kind().isWater() && highestWater != Integer.MIN_VALUE && highestWater > col.ground() + 1) {
                         // Water above the ground of a column that should be dry (a step's flowing
@@ -199,10 +264,10 @@ public final class RiverGameTests {
             for (LevelChunk c : chunks)
                 level.setChunkForced(c.getPos().x, c.getPos().z, false);
             DeepTime.LOGGER.info("[gametest] riversHold sites={} chunks={} waterColumns={} waterBlocks={}/{} floating={}/{} leaks={}/{} "
-                            + "steps={}/{} topMismatch={} outside={}/{} generatedFluidTicks={} chains={} vertices={}",
+                            + "steps={}/{} topMismatch={} dryShore={} of {} lake columns outside={}/{} generatedFluidTicks={} chains={} vertices={}",
                     sites.size(), chunks.size(), before.waterColumns, before.waterBlocks, after.waterBlocks, before.floating, after.floating,
-                    before.leaks, after.leaks, before.steps, after.steps, before.topMismatch, before.outside, after.outside,
-                    ticksAtGeneration, r.chainCount(), r.vertexCount());
+                    before.leaks, after.leaks, before.steps, after.steps, before.topMismatch, before.dryShore, before.lakeColumns,
+                    before.outside, after.outside, ticksAtGeneration, r.chainCount(), r.vertexCount());
             DeepTime.LOGGER.info("[gametest] riversHold sites: {}", sites);
             if (!before.detail.isEmpty() || !after.detail.isEmpty())
                 DeepTime.LOGGER.info("[gametest] riversHold detail: atGeneration{} after{}", before.detail, after.detail);
@@ -211,6 +276,10 @@ public final class RiverGameTests {
             helper.assertTrue(before.floating == 0, before.floating + " water blocks over air after generation");
             helper.assertTrue(before.leaks == 0, before.leaks + " water blocks beside open air after generation");
             helper.assertTrue(before.topMismatch == 0, before.topMismatch + " river or lake columns below their water top");
+            // Dry shore is the exception (0 to 0.7 % of the water columns on the planets measured): were the
+            // pass not filling lakes at all, every lake column over open ground would be a mismatch above.
+            helper.assertTrue(before.dryShore * MAX_DRY_SHORE_INV <= before.waterColumns, before.dryShore + " of " + before.waterColumns
+                    + " water columns are lake columns with ground at the waterline: more than 1 in " + MAX_DRY_SHORE_INV);
             helper.assertTrue(before.outside == 0, before.outside + " dry columns hold water after generation");
             helper.assertTrue(after.outside == 0, after.outside + " dry columns hold water after " + WAIT_TICKS + " ticks");
             helper.assertTrue(after.floating == 0, after.floating + " water blocks over air after " + WAIT_TICKS + " ticks");
@@ -229,10 +298,16 @@ public final class RiverGameTests {
      * {@code deeptime:test_rivers_carved}, {@code test_rivers}' world data under a biome whose only
      * carver is {@code deeptime:test_wide_caves} (a cave carver that starts in every chunk, with
      * tunnels 1.5 to 2.5 times vanilla's width, at every height from y -32 to 180), the boxes around
-     * rivers and lakes are generated, and every river and lake column is read back:
+     * rivers and lakes are generated, and every river and lake column is read back next to the same
+     * column of {@code deeptime:test_rivers}, the same world data generated without carvers:
      * <ul>
-     *   <li>no air between its bed and its top ({@code drainedBlocks}), and no column whose top water
-     *       block is air ({@code holes}): the carvers replaced none of the water;</li>
+     *   <li>no block between its bed and its top that is water without carvers and air with them
+     *       ({@code drainedBlocks}), and no column whose top water block became air ({@code holes}):
+     *       the carvers replaced none of the water. Air where the uncarved level has ground is the
+     *       carvers' right ({@code carvedShore}: a lake column's generated ground can stand in the
+     *       water's range, see {@link #count}; the ground beside and under the water stays
+     *       carvable), so it is counted apart, and {@code waterBlocks} says how much water the
+     *       comparison covered;</li>
      *   <li>the carvers did reach it: ground right under the beds is cut ({@code carvedBelow}: the
      *       pass leaves it solid, so air or fluid there is a carver's cut) and some beds opened
      *       ({@code entrances}, the bed block itself is cut): the ground under the water is still
@@ -240,7 +315,8 @@ public final class RiverGameTests {
      *   <li>the carvers cut under water above sea level ({@code highColumns}, {@code carvedBelowHigh}):
      *       this level has no aquifer, so a cut below sea level fills with sea water and a carver
      *       replacing river water there would leave water; only above sea level does it leave air,
-     *       so only there can the first check fail.</li>
+     *       so only there can the first check fail. {@link #highSites} adds boxes on rivers above
+     *       sea level, so this holds on a planet whose lakes and river mouths all sit at the coast.</li>
      * </ul>
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
@@ -261,8 +337,14 @@ public final class RiverGameTests {
             return;
         }
         helper.assertTrue(WaterBodies.protectsWater(wd), "the test planet's hydro settings do not protect the water");
+        ServerLevel plain = helper.getLevel().getServer().getLevel(GameTestSupport.TEST_RIVERS);
+        if (plain == null) {
+            helper.fail("level " + GameTestSupport.TEST_RIVERS.location() + " (the uncarved twin) does not exist");
+            return;
+        }
         Water.Spec spec = Water.Spec.of(wd, g.waterReach());
-        List<Site> sites = sites(r);
+        List<Site> sites = new ArrayList<>(sites(r));
+        sites.addAll(highSites(r, spec.seaLevel(), sites));
         List<LevelChunk> chunks = new ArrayList<>();
         for (Site s : sites)
             for (int cx = (s.x() - HALF) >> 4; cx <= (s.x() + HALF) >> 4; cx++)
@@ -272,6 +354,7 @@ public final class RiverGameTests {
                 }
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         long columns = 0, drainedBlocks = 0, drainedColumns = 0, holes = 0, carvedBelow = 0, entrances = 0, highColumns = 0, carvedBelowHigh = 0;
+        long carvedShore = 0, waterBlocks = 0;
         StringBuilder detail = new StringBuilder();
         java.util.Map<String, Integer> underBed = new java.util.TreeMap<>();
         for (Site s : sites)
@@ -282,18 +365,27 @@ public final class RiverGameTests {
                         continue;
                     int top = col.top(), bed = col.bed();
                     LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
+                    LevelChunk uncarved = plain.getChunk(x >> 4, z >> 4);
                     columns++;
                     int air = 0;
-                    for (int y = bed + 1; y <= top; y++)
-                        if (chunk.getBlockState(pos.set(x, y, z)).isAir())
-                            air++;
+                    for (int y = bed + 1; y <= top; y++) {
+                        boolean was = isWater(uncarved.getBlockState(pos.set(x, y, z)));
+                        if (was)
+                            waterBlocks++;
+                        if (chunk.getBlockState(pos).isAir()) {
+                            if (was)
+                                air++;
+                            else
+                                carvedShore++;
+                        }
+                    }
                     if (air > 0) {
                         drainedColumns++;
                         drainedBlocks += air;
                         if (detail.length() < 600)
                             detail.append(" drained(").append(x).append(',').append(top).append(',').append(z).append(")x").append(air);
                     }
-                    if (chunk.getBlockState(pos.set(x, top, z)).isAir())
+                    if (chunk.getBlockState(pos.set(x, top, z)).isAir() && isWater(uncarved.getBlockState(pos)))
                         holes++;
                     // The pass leaves solid ground under the bed, so a block there that is air or fluid was cut
                     // by a carver. Below sea level a carver's cut fills with water (this level has no aquifer:
@@ -342,17 +434,20 @@ public final class RiverGameTests {
                 carvers.toString().trim(), groundAir, groundCells, groundReplaceable, underBed, groundBlocks);
         for (LevelChunk c : chunks)
             level.setChunkForced(c.getPos().x, c.getPos().z, false);
-        DeepTime.LOGGER.info("[gametest] carversSpareWater sites={} chunks={} columns={} drainedBlocks={} drainedColumns={} holes={} "
-                        + "carvedBelow={} entrances={} highColumns={} carvedBelowHigh={}{}",
-                sites.size(), chunks.size(), columns, drainedBlocks, drainedColumns, holes, carvedBelow, entrances, highColumns,
-                carvedBelowHigh, detail.length() == 0 ? "" : " " + detail);
+        DeepTime.LOGGER.info("[gametest] carversSpareWater boxes: {}", sites);
+        DeepTime.LOGGER.info("[gametest] carversSpareWater sites={} chunks={} columns={} waterBlocks={} drainedBlocks={} drainedColumns={} holes={} "
+                        + "carvedShore={} carvedBelow={} entrances={} highColumns={} carvedBelowHigh={}{}",
+                sites.size(), chunks.size(), columns, waterBlocks, drainedBlocks, drainedColumns, holes, carvedShore, carvedBelow, entrances,
+                highColumns, carvedBelowHigh, detail.length() == 0 ? "" : " " + detail);
         helper.assertTrue(columns > 50, "only " + columns + " river or lake columns in the boxes");
+        helper.assertTrue(waterBlocks >= columns / 2, "the uncarved level holds only " + waterBlocks + " water blocks in " + columns
+                + " river or lake columns: nothing to compare with");
         helper.assertTrue(carvedBelow >= 20, "the carvers cut only " + carvedBelow + " blocks under the beds: they did not reach the water, so the check proves nothing");
         helper.assertTrue(highColumns >= 20 && carvedBelowHigh >= 20, "only " + highColumns + " columns hold water above sea level, with " + carvedBelowHigh
                 + " blocks cut under them: only there does a carver leave air, so the check proves nothing");
         helper.assertTrue(entrances > 0, "no bed was opened by a cave: the ground under the water must stay carvable");
         helper.assertTrue(drainedBlocks == 0, drainedBlocks + " water blocks in " + drainedColumns + " columns were replaced by air:" + detail);
-        helper.assertTrue(holes == 0, holes + " river or lake columns have air for their top water block");
+        helper.assertTrue(holes == 0, holes + " river or lake columns lost their top water block to air");
         helper.succeed();
     }
 
