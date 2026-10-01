@@ -95,7 +95,7 @@ def main():
     C = info.get("circumference", 16384)
     port = shot.free_port()
     profile = tempfile.mkdtemp(prefix="dt-sections-")
-    proc = subprocess.Popen([chrome(), "--disable-gpu", "--no-sandbox", "--hide-scrollbars", f"--remote-debugging-port={port}",
+    proc = subprocess.Popen([chrome(), *(["--headless=new"] if "headless" not in chrome() else []), "--disable-gpu", "--no-sandbox", "--hide-scrollbars", f"--remote-debugging-port={port}",
                              f"--user-data-dir={profile}", f"--window-size={w},{h}", "about:blank"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
