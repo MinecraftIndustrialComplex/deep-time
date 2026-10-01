@@ -147,6 +147,105 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   - **Shots** (review/out/wb-zoom/ui/, not committed; Chromium 153 from nix on the box, DevTools-driven): 01-12 are the whole world (satellite and elevation), the biggest river mouth of the bake (x -1218, z 1640; 8, 2 and 0.5 blocks a pixel, and the water layer), the fjord (x 6016, z 3032; satellite at 3 and 1, elevation, water), the seam wrap, and the 5901/2892 cone area. **Verified by looking:** the river mouth (a channel that widens as it meets the sea, with the shelf colour round it) and the fjord at (6016, 3032) (a narrow arm between ridges with the river entering at its head and truncated spurs, ice on the high ground). **Not verified: the volcanoes.** The run's events list 20+ live stratovolcanoes, arcs and two hotspot shields (`find_places.py volcanoes` / the events), and a transect of the terrain (peak against the mean of a ring 120 blocks out) puts a cone at the listed block for several of them (x 5901, z 2892: peak 243, ring mean 52, ring max 119; x 5311, z 1061: 292 vs 90; the hotspot shield at x -955, z 1445: 302 vs 195; a seamount at x 2969, z -786: -159 vs -253), but at 1-3 blocks a pixel they read as parts of ridges and plateaus, not as cones (the elevation ramp is flat above 639, and the events' place is probably the segment's, not the cone's centre). I therefore claim no volcano shot. **Known flaw seen in the shots:** sea ice (and the ice cover over shallow water) has square edges, the 8-block cells of the bake's ice cover and the 16-block ones of the sea-ice proxy.
   - **Flaws and left.** (1) The volcano review needs a look at the amplified cones themselves, e.g. through `deeptime volcano-view` with a checkpoint (`run --checkpoints`), which marks them on the same terrain; the map could mark volcano events (a layer from `events.jsonl`) so they can be found. (2) `find_places.py`'s fjord scan found only three arms at a weak threshold; it works but is crude. (3) Touch (pinch) was not exercised on a touch device. (4) The Mac scratch of the earlier attempt was deleted by the coordinator; mine on the box (`/data/ban/deeptime-runs/wb-zoom`) is deleted; the checkout copy `/data/ban/mic/mods/agent-ad5fc9991593ce7ef` (2.1 GB) goes with `mac-gc.sh` after the merge.
 
+### 2026-10-01 — Workbench: rock at depth and cross-sections (agent worktree agent-aa7d40b4ebf642bd7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Decisions log 2026-10-01, "Which workbench features?": Ben asked for rivers, lakes, coal, diamictite and volcano
+  shapes to be visible in the workbench; "All four", view-only, run time unchanged. This is "Rock at depth + sections".
+- **What Ben gets** (a finished run with a bake; any other run says why it cannot):
+  - *Depth control.* On a rock layer (any layer with the `rock_class` ramp: `structure/rock`, `surface/class`, …) a "Rock at
+    depth" control sits under the legend: chips Surface, −20, −50, −100, −200, Floor and a slider over 0, 10, 20, 35, 50, 75,
+    100, 150, 200, 300, 400, 600, 800 blocks and the world floor. Below the surface the map shows the bake's rock class that
+    deep under the terrain's top block (the picture sits under the map like a frame's layer, so the globe and the hover
+    readout follow it; hovering names the class); a badge on the pane says "Rock 100 blocks down · the finished world
+    (bake)", and the control's note says the time slider does not change it. The surface is still the run's own frame.
+  - *Section tool* (toolbar, key S): click two points; the line is drawn (the shorter way round the planet, across the
+    seam too) and the section opens in a dock over the map (the upper edge when the line runs along the lower one), or
+    large in a dialog: rock classes in the `rock_class` colours, the ground, water over it, sea level, an elevation axis in
+    blocks (y), distance along the line in blocks and km, the line's length, the deposit/seam/pluton bodies it crosses
+    (outlined by role; "coal seam ×8"), a key of the classes present with their share (click one to light it up: diamictite,
+    coal), a hover readout (distance, x, z, y, depth below the surface, the rock, the water, the bodies inside), a moving
+    dot on the map, "Whole column / Near the surface" and the scales ("stretched 37× vertically"). The Section tab keeps
+    the line's numbers, the key and the recent sections.
+  - *No bake:* the depth control greys out and says why (a run that has not finished: the bake is written at its end; an
+    older format: "world data is format 0.0; this workbench reads 0.2"; a stage run: no bake); a section pick says so in a
+    toast. The map keeps showing the run's frames.
+- **How.** New `crates/deeptime-cli/src/watch/sections/` (`mod.rs` routes, caching and the page's script; `world.rs` the bake
+  opened for rock views; `slice.rs`; `section.rs`; `tests.rs`), hooked in at one place in `http.rs::get`:
+  `GET /api/runs/<id>/rock` (availability, scale, depths, class names and colours), `…/rock/slice.png?depth=<blocks|floor>`
+  (1024 × 512 RGBA, a keyframe's projection) and `…/rock/section?x0&z0&x1&z1` (JSON, up to 2,048 columns). The bake's
+  strata are read whole into memory once (kept 10 minutes after the last request, one world at a time); answers are kept
+  as files in `<run>/rock/<bake stamp>/`; one slice or section computes at a time on up to 8 threads. Page: new
+  `crates/deeptime-viewer/assets/sections.js` (served at `/sections.js`) plus ~30 lines in `workbench.js` (`window.DTWB`
+  for the new file, hooks in `drawPane`, the pointer handler, `setTool`, `setITab`, the tool buttons, the S key, the 64-class
+  legend) and 4 lines of `workbench.html` (the tool button, the tab, its pane, the script tag). The rock a block has is what
+  the game's strata pass paints: the horizon stack by the column rule, then a body that names a rock class (the first by
+  id, as `StrataPass.paintBodies` leaves it).
+- **The one change outside the workbench: `strata::stack_at` is faster.** A slice asks for 524,288 columns and the old
+  function allocated 17 vectors and searched every horizon from the top for every (cell, key) pair. It now keeps its
+  working memory in a `StackScratch` (one per thread; `stack_at` makes a fresh one, so every caller is unchanged) and
+  walks each cell's horizons once up the sorted keys: the search for key s is "the first horizon whose successor starts
+  after s", true for every smaller key too, so starting from the previous answer finds the same horizon. The arithmetic
+  and its order are untouched. `strata::tests::reusing_the_scratch_and_walking_the_keys_changes_no_answer` keeps the old
+  code as a reference and compares 2,000+ random columns (random stacks, hiatuses, repeated classes) with both `stack_at`
+  and `stack_at_with` for equality; the 500-column Java parity test and the tiny-planet tests below ran on it.
+  The deposits stage's `Cover::blocks_at` (coal cover) also calls `stack_at`: same answers, fewer allocations.
+- **Measured** (Mac, load average 60–130 all afternoon: other agents' runs and servers; wall times are noisy, CPU times
+  are the figure to trust). Run: `earthlike_quick_16k`, 500 Myr, scattered continents, 12.1 horizons a cell on average
+  (K = 32 slots), baked 206 MB. *Slice* (1024 × 512): 3.4–4.0 s wall before the `stack_at` change at load 47, then 2.1–3.4 s,
+  and 1.1–1.6 s (4.4 s of CPU, 8 µs a column) at load 63; cached: 3 ms. *Section* of 2,048 columns: 25–37 ms (cached 2 ms).
+  *Opening the bake:* 0.15–0.21 s. A planet run adds nothing: the page only reads.
+  **Run time before and after** (Azure test VM, `/usr/bin/time -v deeptime run --preset earthlike_quick_16k --start
+  scattered_continents --length-myr 500 --threads 6`, release builds of master b46f512 (base) and of this branch, one run at a
+  time in the order base, branch, branch, base, load average 25–50 from other agents' jobs): **user seconds base 1,934 and
+  1,714 (mean 1,824), branch 1,866 and 1,799 (mean 1,832)**; wall 9:53 / 7:22 against 8:50 / 7:48; max RSS 6.1 / 5.1 GB
+  against 5.7 / 5.1 GB. The two builds differ by less than the spread between repeats of one build (the second run of each pair
+  was faster as the box quieted): no measurable change. The only code a run executes that this branch changed is
+  `strata::stack_at` (the deposits stage's coal cover, 42 / 23 s base against 24 / 26 s branch), bit-identical and with
+  fewer allocations.
+- **Tests.** `watch::sections::tests::rock_at_depth_and_sections_agree_with_the_column_evaluator` (a tiny baked planet,
+  through `route()` as the server calls it): 96,932 blocks of 368 sampled section columns equal `ColumnWorld::sample`'s
+  rock block for block; the water and ground equal `hydro()`; body spans equal `sample().bodies`, 93 of them through the
+  planet's plutons; four slices (surface, 60, 200, floor) equal the evaluator at every sampled pixel; PNG size and cache;
+  400, 409 (no bake, with the reason) and 404 answers; a line across the seam takes the short way. Unit tests for the
+  pixel projection, depth parsing, the seam rule and the body index (odd circumferences, bodies over the seam), and for
+  `sections.js` being served. `tools/workbench/sections_shots.py` drives the page (real mouse events, headless
+  Chromium on the Mac): depth chips, three sections, fold/close/show, the surface chip, Esc: no page errors.
+- **Pictures** (not committed): `review/out/wb-sections/` in this worktree: `rock-surface/-20/-100/-floor.png` (the map at
+  each depth), `dia-dock.png`, `dia-dock-lit.png`, `dia-big.png`, `dia-big-lit.png` (a section through a baked diamictite
+  bed: 54.9° S 72.3° E → 73.6° S 89.9° E, 350 km, the basin fill with the plum bed lit up in its key), `coal-dock.png`,
+  `coal-big.png` (coal beds and eight coal-seam bodies), `seam-dock.png` (a line across the seam), `*-tab.png`,
+  `no-bake/rock-100.png` (a run whose world data is format 0.0).
+- **Found on the way.** (1) `ColumnWorld::sample` lets the *last* body that names a rock class win where two overlap; the
+  game's strata pass keeps the *first* (a block a body painted is no longer crust or the horizon's block). The slice and
+  the section follow the game; `inspect-column` and the Java twin (`Columns.sample`) agree with each other and can
+  differ from the game at such a block (rare; none in the test planet). (2) The default 500-Myr run has diamictite in
+  0.04 % of surface pixels and 0.09 % at 50 blocks, mostly at 85–87° latitude and in a basin near 67° S; coal 0.07 % at the
+  surface, 0.2 % at 50 blocks. (3) The first slice of a run opens the strata (117 MB at 16k, about 470 MB at 32k full):
+  they stay for ten minutes. (4) A run that is still running has no bake until it ends; the page says so.
+- **Gates** (Azure test VM, this branch merged with master b46f512; `CARGO_BUILD_JOBS=8`): `cargo fmt --check` clean; `cargo clippy
+  --workspace --all-targets -D warnings` clean (it first caught a needless borrow in `stack_at_with`, fixed); `cargo test
+  --workspace` all pass (core 335 + 3 ignored, cli 38 incl. the five `watch::sections` tests, format 52 incl. the `stack_at`
+  equality test, inspect 29 + 9, jni 7, viewer 6, history_cap 1); `cargo deny check licenses bans` ok; `cd neoforge &&
+  ./gradlew build test` BUILD SUCCESSFUL, tests=160 failures=0 errors=0 skipped=1, **ColumnParityTest `columns=500 equal=500`**
+  (71 through bodies, 31 with water; lake1024 300/300) against the new `stack_at`. No GameTests (branch rule).
+- **On a real baked planet** (`tools/workbench/check-sections.sh`, a fresh 500-Myr `earthlike_quick_16k`,
+  merged master): the slice takes 1.4–2.0 s cold (load ~40, 12.1 horizons a cell), the section of 2,048 columns 0.03 s; opening the
+  bake 0.07 s; `sections_shots.py` in Chromium 153: depth chips, three sections, fold, unfold, close, show from the tab, the
+  surface chip and Esc all ok, no page errors. The pictures were first made without fonts (nixpkgs' Chromium has none);
+  `tools/workbench/sections-shots.sh` now gives it DejaVu. A section through a diamictite bed (68.1° S 207.2° E → 80.2° S,
+  165 km, `dia-big-lit.png`): a 1.8 % bed the key lights up in plum, thinning up a slope and cropping out in a fjord-like
+  trough. New diamictite coordinates differ from the first run's (master changed the planet).
+- **Merged with the rivers & lakes and final-world branches** (master 386bd14; conflicts in STATUS.md, `http.rs`, `workbench.html`,
+  `workbench.js`, `lib.rs`, all keep-both): one `window.DTWB` now serves `sections.js` and `worldmap.js`; the rock legend limit
+  (64 classes) sits beside the rivers legend branch. Re-run on the Azure VM: fmt, clippy `-D warnings`, `cargo test --workspace`
+  (core 351, cli 46, format 52), `./gradlew build test` (160/0, `ColumnParityTest columns=500 equal=500`) all green, and
+  `check-sections.sh --other-views` on a fresh baked run: the sections checks pass, the Rivers & lakes layer shows its own
+  legend (no depth control), the Final world view opens, paints and closes, the rock layer's depth control comes back, no
+  page errors (a slice 0.8–1.2 s cold with the box quieter).
+- **Next.** The coordinator merges this with the rivers, deposits and zoomable-map branches (the conflicts will be the
+  `workbench.js`/`workbench.html` hunks and this file's top); restart the live workbench on the test machine to get it
+  (`tools/viewer/mac-watch.sh`). Runs made before format 0.2 show "needs a bake" until they are run again. Scratch deleted;
+  this worktree's checkout copy `/data/ban/mic/mods/agent-aa7d40b4ebf642bd7` stays until `tools/remote/mac-gc.sh` after the merge.
+
 ### 2026-09-30 — P1-27 plate margins and coherent continents (agent worktree agent-ad3b417fd428c1ac2, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Why.** Ben (decisions log 2026-09-29, "Provinces view shows speckled, patchy continents"; 2026-09-30, "most coast lines
   are getting speckled with mountains"): "Investigate + fix". Workbench run 1a0f5089640 (earthlike_quick_16k,

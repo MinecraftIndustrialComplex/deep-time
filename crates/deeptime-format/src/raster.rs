@@ -433,6 +433,27 @@ impl LoadedLayer {
             out,
         );
     }
+
+    /// [`LoadedLayer::stack_at`] with its working memory given: a reader of many columns keeps one
+    /// [`StackScratch`](crate::strata::StackScratch) per thread. The same answer, bit for bit.
+    pub fn stack_at_with(
+        &self,
+        scratch: &mut crate::strata::StackScratch,
+        x: i64,
+        z: i64,
+        min_y: i32,
+        out: &mut Vec<ColumnHorizon>,
+    ) {
+        crate::strata::stack_at_with(
+            scratch,
+            &self.desc,
+            min_y,
+            |i, j, k| self.horizon(i, j, k),
+            x,
+            z,
+            out,
+        );
+    }
 }
 
 impl RasterRead for LoadedLayer {
