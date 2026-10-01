@@ -116,13 +116,29 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
   Per landscape the counts scatter around their targets (Poisson draws; scattered 2 has 20 against 13.9), the sum is
   on target. `stage deposits` 51–74 s per landscape.
-- **Gates** (Mac, the branch after merging master 0905793): `cargo fmt --check`, `clippy --workspace --all-targets
-  --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` 415 passed, 0 failed,
-  3 ignored; `cd neoforge && ./gradlew build test` → tests=151 failures=0; `./gametest.sh` → 51 PASS, 1 FAIL
-  (`climateConsistent`: BW 0.472 < 0.650, Dsub 0.822 < 0.850, BW:desert 0.423 < 0.450 — the same numbers as on
-  master, being fixed by the climate agent); `tools/smoke/install.sh mic` + `./gametest.sh -PwithMic` → 51 PASS, 1
-  FAIL (the same `climateConsistent`: BW 0.485, BS 0.513, BW:desert 0.446, Dfc:taiga 0.430).
-- **Next.** Merge into master (the parent merges when green).
+
+  **On master's new histories** (the branch after merging master bca3ff3, which brought the weathering-runoff climate fix,
+  volcanoes and glacial landforms: the six histories rebuilt with the merged binary, same command). The new climate
+  roughly doubles coal's permissive area (85,126 → 145,780 km² on scattered 1), so the USGS target is now
+  **20.41 / 25.33 / 27.87 / 10.45 / 22.58 / 26.89 = 133.5**, not 68.6:
+
+  | coal, six new histories | merged branch |
+  |---|---|
+  | counted (target Σ 133.5) | **17 / 29 / 35 / 12 / 21 / 28 = 142 (106 %)** |
+  | sites | 23 / 32 / 39 / 14 / 28 / 31 = 167 |
+  | fields that found no room (of drawn) | **28 of 647** (0 / 6 / 10 / 0 / 5 / 7) |
+  | expected sites at the placed positions vs the formula's | 165.9 vs 161.4 |
+  | no_cover / eroded | 144 / 308 |
+  | seams (max per landscape) | 1,137 (17–22) |
+
+  `stage deposits` 25–126 s per landscape (the Mac's load swung between 19 and 99 during the runs).
+- **Gates** (Mac, the branch after merging master bca3ff3, final tree): `cargo fmt --check`, `clippy --workspace
+  --all-targets --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` 444 passed,
+  0 failed, 3 ignored; `cd neoforge && ./gradlew build test` → tests=155 failures=0. GameTests are no longer a
+  branch gate (Ben, 2026-09-30: the coordinator runs both profiles once per merge batch on master). Before that
+  merge (master 0905793) they gave 51 PASS / 1 FAIL standalone and with MIC, the one failure `climateConsistent`
+  with master's own numbers (since fixed on master, 6070e9e).
+- **Next.** Merge into master (the coordinator merges when green).
 
 ### 2026-09-30 — Satellite view: a true-colour keyframe layer, the default everywhere (agent worktree agent-a7ca2a0e875263a86, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben: "Default view on the viewer is currently an elevation map, can you turn it into an actual map. (I.E.
