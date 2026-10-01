@@ -251,6 +251,8 @@
     "weathering_supply": true,
     "weathering_rock_mol_kg": 1.26,
     "weathering_min_denudation_m_myr": 2.0,
+    "weathering_supply_scale": 2.0,
+    "seafloor_weathering_share": 0.2,
     "solar_brightening": true,
     "present_age_gyr": 4.57,
     "hydro_sensitivity_per_k": 0.02,

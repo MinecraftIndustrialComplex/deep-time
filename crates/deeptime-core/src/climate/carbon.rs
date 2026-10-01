@@ -274,6 +274,18 @@ pub fn supply_limited(kin: f64, s: f64) -> f64 {
     }
 }
 
+/// Activation energy of seafloor (basalt) weathering, J/mol (Krissansen-Totton & Catling 2017).
+pub const SEAFLOOR_EA_J_MOL: f64 = 75_000.0;
+/// CO₂ dependence of seafloor weathering, (CO₂/280 ppm)^this (Krissansen-Totton & Catling 2017).
+pub const SEAFLOOR_CO2_EXPONENT: f64 = 0.23;
+
+/// Bottom-water temperature for a global mean `t_global`, °C: 2 °C today, following the surface
+/// one for one (Hansen et al. 2013, "Climate sensitivity, sea level and atmospheric carbon
+/// dioxide", Phil. Trans. R. Soc. A 371: 20120294), never below sea water's freezing point.
+pub fn deep_ocean_c(t_global: f64) -> f64 {
+    (2.0 + (t_global - 15.0)).max(-1.8)
+}
+
 /// Weathering parameters.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Weathering {
@@ -281,6 +293,8 @@ pub struct Weathering {
     pub k_t: f64,
     pub k_r: f64,
     pub beta: f64,
+    /// Seafloor weathering's share of Earth's present silicate weathering.
+    pub seafloor: f64,
 }
 
 impl Weathering {
@@ -290,14 +304,35 @@ impl Weathering {
             k_t: p.weathering_temp_per_k,
             k_r: p.runoff_temp_per_k,
             beta: p.weathering_co2_exponent,
+            seafloor: p.seafloor_weathering_share,
         }
+    }
+
+    /// Seafloor weathering, mol C/yr: the basalt of young ocean crust altered by warm, acid pore
+    /// water (Brady & Gíslason 1997; Coogan & Gillis 2013), its share of today's degassing at
+    /// Earth's spreading (`ridge_rel` × Earth's), × e^(E_a/R·(1/T₀ − 1/T)) on the bottom water
+    /// × (CO₂/280 ppm)^0.23 (Krissansen-Totton & Catling 2017, "Constraining climate sensitivity
+    /// and continental versus seafloor weathering using an inverse geological carbon cycle
+    /// model", Nat. Commun. 8: 15423). A sink that needs no land and no erosion: a land-poor
+    /// planet keeps a thermostat.
+    pub fn seafloor_flux(&self, ridge_rel: f64, t_global: f64, ppm: f64) -> f64 {
+        if self.seafloor <= 0.0 {
+            return 0.0;
+        }
+        let (t0, t) = (275.15, deep_ocean_c(t_global) + 273.15);
+        DEGASSING_EARTH_MOL_YR
+            * self.strength
+            * self.seafloor
+            * ridge_rel.max(0.0)
+            * (SEAFLOOR_EA_J_MOL / 8.314 * (1.0 / t0 - 1.0 / t)).exp()
+            * (ppm.max(1e-6) / CO2_REF_PPM).powf(SEAFLOOR_CO2_EXPONENT)
     }
 
     /// Silicate weathering, mol C/yr, of kernel `k` with each band's land at `t_land` °C and
     /// `ice` of its land under ice, at `ppm`: each band's kinetic flux, limited by its supply of
     /// fresh rock where the kernel has one (`supply_limited`).
     pub fn flux(&self, k: &Kernel, t_land: &[f64], ice: &[f64], ppm: f64) -> f64 {
-        let scale = DEGASSING_EARTH_MOL_YR * self.strength / KERNEL_EARTH
+        let scale = DEGASSING_EARTH_MOL_YR * self.strength * (1.0 - self.seafloor) / KERNEL_EARTH
             * (ppm.max(1e-6) / CO2_REF_PPM).powf(self.beta);
         k.band
             .iter()
@@ -311,7 +346,9 @@ impl Weathering {
                 let free = 1.0 - ice.get(b).copied().unwrap_or(0.0).clamp(0.0, 1.0);
                 let kin = scale * kb * climate_factor(dt, self.k_t, self.k_r) * free;
                 match k.supply.get(b) {
-                    Some(&s) => supply_limited(kin, s * free),
+                    // Fresh rock comes faster in a warmer, wetter band (soil production doubles
+                    // every 10 K, as the surface stage's weathering law has it).
+                    Some(&s) => supply_limited(kin, s * free * 2f64.powf(dt / 10.0)),
                     None => kin,
                 }
             })
@@ -408,11 +445,12 @@ mod tests {
 
     #[test]
     fn weathering_follows_temperature_ice_and_co2() {
-        let w = Weathering {
+        let mut w = Weathering {
             strength: 1.0,
             k_t: 0.09,
             k_r: 0.038,
             beta: 0.3,
+            seafloor: 0.0,
         };
         let mut k = Kernel {
             band: vec![KERNEL_EARTH * 0.5, KERNEL_EARTH * 0.5],
@@ -437,6 +475,16 @@ mod tests {
         assert!(hot < 40.0 * DEGASSING_EARTH_MOL_YR && hot > 30.0 * DEGASSING_EARTH_MOL_YR, "{hot}");
         assert_eq!(supply_limited(1.0, 0.0), 0.0);
         assert!((supply_limited(1.0e-9, 1.0) - 1.0e-9).abs() < 1e-18);
+        // Seafloor weathering: its share of today's degassing on Earth's spreading at 15 °C and
+        // 280 ppm, faster in a warm ocean, slower in a frozen one, and land weathering the rest.
+        w.seafloor = 0.2;
+        k.supply.clear();
+        let sf = w.seafloor_flux(1.0, 15.0, 280.0);
+        assert!((sf / DEGASSING_EARTH_MOL_YR - 0.2).abs() < 1e-9);
+        assert!(w.seafloor_flux(1.0, 25.0, 280.0) > 2.0 * sf);
+        assert!(w.seafloor_flux(1.0, -40.0, 280.0) > 0.5 * sf, "bottom water stays at −1.8 °C");
+        let land = w.flux(&k, &[10.0, 20.0], &[0.0, 0.0], 280.0);
+        assert!((land + sf - DEGASSING_EARTH_MOL_YR).abs() < 1e-3 * DEGASSING_EARTH_MOL_YR);
         // 1 km² eroding 50 m/Myr of rock with 1.2 mol/kg of Ca + Mg: 162,000 mol/yr.
         assert!((cell_supply(1.0, 50.0, 2.0, 1.2) - 1.62e5).abs() < 1.0);
     }

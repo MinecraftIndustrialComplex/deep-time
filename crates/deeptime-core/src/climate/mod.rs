@@ -406,7 +406,7 @@ fn kernel_of(
                     f64::from(e[c]).max(0.0),
                     p.weathering_min_denudation_m_myr,
                     p.weathering_rock_mol_kg,
-                );
+                ) * p.weathering_supply_scale;
             }
         }
     }
@@ -727,6 +727,7 @@ impl ClimateStage {
                     &self.s.clock.sheet,
                     &self.s.clock.kernel,
                     degassing,
+                    activity.ridge_km2_yr / carbon::RIDGE_EARTH_KM2_YR,
                 );
                 self.s.ebm = state;
                 ppm
@@ -808,6 +809,7 @@ impl ClimateStage {
                     .map(|b| -90.0 + (b as f64 + 0.5) * 180.0 / bands as f64)
                     .collect::<Vec<_>>(),
                 degassing,
+                ridge_rel: activity.ridge_km2_yr / carbon::RIDGE_EARTH_KM2_YR,
             };
             let mut ice_cb = |s: &clock::IceStep<'_>| -> Vec<f64> {
                 if !s.in_window {
