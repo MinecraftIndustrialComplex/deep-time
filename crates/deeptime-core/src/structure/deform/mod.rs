@@ -4,6 +4,8 @@
 //! - [`emplace`] translates each plate step's tectonics into structures: fold trains and thrusts
 //!   where the crust shortens, normal faults where a continent rifts, strike-slip faults along
 //!   oblique margins (`emplace.rs` has the table).
+//! - [`intrude`] adds the small intrusions that cut the layering: stocks in orogens, dykes along
+//!   rifts, and plugs under extinct volcanoes.
 //! - [`feature`] is a structure as the simulation carries it, riding its plate to the present.
 //! - At the end of the run [`finish`] turns the structures into the world's
 //!   [`deeptime_format::structure::Structure`]: events the generator's column rule undoes at each
@@ -24,6 +26,7 @@
 
 pub mod emplace;
 pub mod feature;
+pub mod intrude;
 pub mod lattice;
 pub mod params;
 
@@ -91,7 +94,7 @@ pub fn relief_left(f: &Feature, now_myr: f64, p: &DeformationParams, m_per_block
         Kind::Thrust | Kind::Normal => {
             f64::from(f.slip.abs()) * f64::from(f.dip_deg).to_radians().sin()
         }
-        Kind::StrikeSlip => 0.0,
+        Kind::StrikeSlip | Kind::Stock | Kind::Dyke | Kind::Plug => 0.0,
     };
     let height_m = height_blocks * m_per_block_v;
     if height_m <= 0.0 {
@@ -143,14 +146,16 @@ pub fn cause_of(
     t_years: f64,
 ) -> u64 {
     let kinds: &[&str] = match kind {
-        Kind::FoldTrain | Kind::Thrust => &[
+        Kind::FoldTrain | Kind::Thrust | Kind::Stock => &[
             "deeptime:collision",
             "deeptime:orogeny_phase",
             "deeptime:terrane_accretion",
             "deeptime:subduction_onset",
         ],
-        Kind::Normal => &["deeptime:rift_onset"],
+        Kind::Normal | Kind::Dyke => &["deeptime:rift_onset"],
         Kind::StrikeSlip => &["deeptime:subduction_onset"],
+        // A plug's cause is its volcano's.
+        Kind::Plug => return 0,
     };
     let c = f64::from(circumference);
     let mut best = (c / 8.0, 0u64);
@@ -172,6 +177,148 @@ pub fn cause_of(
         }
     }
     best.1
+}
+
+/// The source id of the structure stage's events.
+pub const SOURCE: &str = "deeptime:structure";
+
+/// One grouped entry for the event log (`EVENTS.md`, "The structures' events"): the folds and
+/// thrusts one orogeny left (`deeptime:fold_belt`), or the faults of one rift or one oblique
+/// margin (`deeptime:fault_system`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Group {
+    pub kind: &'static str,
+    /// `orogen`, `rift` or `strike_slip`.
+    pub setting: &'static str,
+    /// Years: its first and its last structure.
+    pub t_start: f64,
+    pub t_end: f64,
+    /// The centroid of its structures as they lie now.
+    pub lat: f32,
+    pub lon: f32,
+    pub magnitude: f32,
+    /// The tectonic event behind it (0: none found).
+    pub cause: u64,
+    /// Numeric params, in the order written.
+    pub params: Vec<(&'static str, f64)>,
+}
+
+/// The structures grouped for the event log (one entry per belt or system, not one per fold,
+/// as the volcanoes' events are grouped by arc and chain): by the tectonic event that made them (`Feature::cause`), and
+/// where none was found by the plate they ride. Plugs belong to their volcanoes' events.
+/// `c` is the circumference in blocks; lengths are reported in km on the block metric and
+/// heights in m.
+pub fn groups(features: &[Feature], c: f64, m_per_block_h: f64, m_per_block_v: f64) -> Vec<Group> {
+    use std::collections::BTreeMap;
+    let mut sets: BTreeMap<(u8, u64, u32), Vec<&Feature>> = BTreeMap::new();
+    for f in features {
+        let set = match f.kind {
+            Kind::FoldTrain | Kind::Thrust | Kind::Stock => 0u8,
+            Kind::Normal | Kind::Dyke => 1,
+            Kind::StrikeSlip => 2,
+            Kind::Plug => continue,
+        };
+        let plate = if f.cause == 0 { f.plate } else { 0 };
+        sets.entry((set, f.cause, plate)).or_default().push(f);
+    }
+    let km = m_per_block_h / 1000.0;
+    let mut out = Vec::new();
+    for ((set, cause, plate), fs) in sets {
+        let count = |k: Kind| fs.iter().filter(|f| f.kind == k).count() as f64;
+        let med = |k: Kind, get: &dyn Fn(&Feature) -> f64| {
+            median(fs.iter().filter(|f| f.kind == k).map(|f| get(f)).collect())
+        };
+        // The centroid: x the way round the planet, z plainly.
+        let (mut sx, mut cx, mut sz) = (0.0f64, 0.0f64, 0.0f64);
+        for f in &fs {
+            let a = std::f64::consts::TAU * f.x / c;
+            sx += a.sin();
+            cx += a.cos();
+            sz += f.z;
+        }
+        let x = sx.atan2(cx) / std::f64::consts::TAU * c;
+        let z = sz / fs.len() as f64;
+        let lon = ((x + c / 2.0) / c * 360.0).rem_euclid(360.0);
+        let lat = (-z / (c / 4.0) * 90.0).clamp(-90.0, 90.0);
+        let t0 = fs.iter().map(|f| f.t_myr).fold(f32::INFINITY, f32::min);
+        let t1 = fs.iter().map(|f| f.t_myr).fold(f32::NEG_INFINITY, f32::max);
+        let throw_m = |f: &Feature| {
+            f64::from(f.slip.abs()) * f64::from(f.dip_deg).to_radians().sin() * m_per_block_v
+        };
+        let max_throw = |k: Kind| {
+            fs.iter()
+                .filter(|f| f.kind == k)
+                .map(|f| throw_m(f))
+                .fold(0.0f64, f64::max)
+        };
+        let (kind, setting, params) = match set {
+            0 => (
+                "deeptime:fold_belt",
+                "orogen",
+                vec![
+                    ("fold_trains", count(Kind::FoldTrain)),
+                    ("thrusts", count(Kind::Thrust)),
+                    ("stocks", count(Kind::Stock)),
+                    (
+                        "fold_wavelength_km",
+                        med(Kind::FoldTrain, &|f| f64::from(f.wavelength)) * km,
+                    ),
+                    (
+                        "fold_amplitude_m",
+                        med(Kind::FoldTrain, &|f| f64::from(f.amplitude)) * m_per_block_v,
+                    ),
+                    ("max_thrust_throw_m", max_throw(Kind::Thrust)),
+                ],
+            ),
+            1 => (
+                "deeptime:fault_system",
+                "rift",
+                vec![
+                    ("faults", count(Kind::Normal)),
+                    ("dykes", count(Kind::Dyke)),
+                    (
+                        "fault_length_km",
+                        med(Kind::Normal, &|f| 2.0 * f64::from(f.half_along)) * km,
+                    ),
+                    ("max_throw_m", max_throw(Kind::Normal)),
+                ],
+            ),
+            _ => (
+                "deeptime:fault_system",
+                "strike_slip",
+                vec![
+                    ("faults", count(Kind::StrikeSlip)),
+                    (
+                        "fault_length_km",
+                        med(Kind::StrikeSlip, &|f| 2.0 * f64::from(f.half_along)) * km,
+                    ),
+                    (
+                        "max_offset_km",
+                        fs.iter()
+                            .map(|f| f64::from(f.slip.abs()))
+                            .fold(0.0f64, f64::max)
+                            * km,
+                    ),
+                ],
+            ),
+        };
+        let mut params = params;
+        if cause == 0 {
+            params.push(("plate", f64::from(plate)));
+        }
+        out.push(Group {
+            kind,
+            setting,
+            t_start: f64::from(t0) * 1.0e6,
+            t_end: f64::from(t1) * 1.0e6,
+            lat: lat as f32,
+            lon: lon as f32,
+            magnitude: (fs.len() as f32 / 50.0).min(1.0),
+            cause,
+            params,
+        });
+    }
+    out
 }
 
 /// The median of `v` (0 when empty).
@@ -231,12 +378,17 @@ pub fn report(
             "thrust": alive(Kind::Thrust),
             "normal_fault": alive(Kind::Normal),
             "strike_slip_fault": alive(Kind::StrikeSlip),
+            "stock": alive(Kind::Stock),
+            "dyke": alive(Kind::Dyke),
+            "plug": alive(Kind::Plug),
         },
         "formed": {
             "fold_train": counts.fold_trains,
             "thrust": counts.thrusts,
             "normal_fault": counts.normal_faults,
             "strike_slip_fault": counts.strike_slip_faults,
+            "stock": counts.stocks,
+            "dyke": counts.dykes,
         },
         "saturated": counts.saturated,
         "overprinted": counts.overprinted,
@@ -247,6 +399,8 @@ pub fn report(
             "fold_length_blocks": of(Kind::FoldTrain, &|f| 2.0 * f64::from(f.half_along)),
             "thrust_slip_blocks": of(Kind::Thrust, &|f| f64::from(f.slip.abs())),
             "normal_slip_blocks": of(Kind::Normal, &|f| f64::from(f.slip.abs())),
+            "stock_radius_blocks": of(Kind::Stock, &|f| f64::from(f.half_across)),
+            "dyke_length_blocks": of(Kind::Dyke, &|f| 2.0 * f64::from(f.half_along)),
             "fault_length_blocks": median(
                 features.iter().filter(|f| f.kind.is_fault()).map(|f| 2.0 * f64::from(f.half_along)).collect()
             ),
@@ -323,6 +477,12 @@ pub fn coverage(
         let (mut n, mut young) = (0u64, false);
         for &e in &cand {
             let ev = &st.events[e as usize];
+            if matches!(
+                ev.shape,
+                deeptime_format::structure::Shape::Intrusion { .. }
+            ) {
+                continue;
+            }
             let (a, b) = ev.window.local(x, z, c);
             if ev.window.weight(a, b) > 0.0 {
                 n += 1;

@@ -187,9 +187,12 @@ pub fn noddy_check(
         for &n in cand.iter().rev() {
             let y = match st.events[n as usize].shape {
                 Shape::Fault { y, .. } => y,
-                Shape::Fold { .. } => 0.0,
+                Shape::Fold { .. } | Shape::Intrusion { .. } => 0.0,
             };
-            history.push(features[n as usize].to_noddy(x, z, c, y, &profile));
+            // (An intrusion moves nothing: it has no Noddy event here.)
+            if let Some(e) = features[n as usize].to_noddy(x, z, c, y, &profile) {
+                history.push(e);
+            }
         }
         let t = Instant::now();
         for (k, &y) in heights.iter().enumerate() {

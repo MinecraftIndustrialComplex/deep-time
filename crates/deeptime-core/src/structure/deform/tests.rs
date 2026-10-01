@@ -48,6 +48,9 @@ fn scatter(n: usize, seed: u64) -> Vec<Feature> {
             cause: 0,
             adrift: 0,
             wear_m: 0.0,
+            half_height: 0.0,
+            depth: 0.0,
+            rock: 0,
         };
         match kind {
             Kind::FoldTrain => {
@@ -75,6 +78,7 @@ fn scatter(n: usize, seed: u64) -> Vec<Feature> {
                 f.half_along = (0.5 * length) as f32;
                 f.half_across = (0.4 * length) as f32;
             }
+            Kind::Stock | Kind::Dyke | Kind::Plug => unreachable!("the first four kinds"),
         }
         out.push(f);
     }
@@ -151,6 +155,9 @@ fn each_kind_moves_rock_the_way_its_name_says() {
         cause: 0,
         adrift: 0,
         wear_m: 0.0,
+        half_height: 0.0,
+        depth: 0.0,
+        rock: 0,
     };
     let column = |f: &Feature, x: f64, z: f64| {
         let st = finish(std::slice::from_ref(f), |_, _| 64.0, test_key);
@@ -208,6 +215,7 @@ fn each_kind_moves_rock_the_way_its_name_says() {
                 assert!((len - 1.0).abs() < 1e-9);
             }
             Shape::Fold { offset, .. } => assert!(offset <= -f64::from(f.half_across)),
+            Shape::Intrusion { .. } => unreachable!("no intrusions in the scatter"),
         }
     }
 }
@@ -278,5 +286,5 @@ fn a_planet_of_structures_evaluates_on_a_lattice() {
     // The history as a Noddy event list reads like any other.
     let profile = noddy::Profile::sine_table();
     let e = features[0].to_noddy(0.0, 0.0, 4096.0, 70.0, &profile);
-    assert!(matches!(e, noddy::Event::Windowed(_)));
+    assert!(matches!(e, Some(noddy::Event::Windowed(_))));
 }

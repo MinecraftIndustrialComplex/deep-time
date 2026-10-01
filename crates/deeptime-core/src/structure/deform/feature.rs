@@ -32,14 +32,23 @@ pub enum Kind {
     Normal,
     /// A strike-slip fault (oblique convergence).
     StrikeSlip,
+    /// A stock: a small granitic intrusion in an orogen, cutting its folds.
+    Stock,
+    /// A dyke: a sheet of basalt along a rift.
+    Dyke,
+    /// A plug: the solid conduit of an extinct volcano.
+    Plug,
 }
 
 impl Kind {
-    pub const ALL: [Kind; 4] = [
+    pub const ALL: [Kind; 7] = [
         Kind::FoldTrain,
         Kind::Thrust,
         Kind::Normal,
         Kind::StrikeSlip,
+        Kind::Stock,
+        Kind::Dyke,
+        Kind::Plug,
     ];
 
     pub fn name(self) -> &'static str {
@@ -48,11 +57,19 @@ impl Kind {
             Kind::Thrust => "thrust",
             Kind::Normal => "normal_fault",
             Kind::StrikeSlip => "strike_slip_fault",
+            Kind::Stock => "stock",
+            Kind::Dyke => "dyke",
+            Kind::Plug => "plug",
         }
     }
 
     pub fn is_fault(self) -> bool {
-        self != Kind::FoldTrain
+        matches!(self, Kind::Thrust | Kind::Normal | Kind::StrikeSlip)
+    }
+
+    /// An intrusion moves no rock: it replaces what is older than itself inside its ellipsoid.
+    pub fn is_intrusion(self) -> bool {
+        matches!(self, Kind::Stock | Kind::Dyke | Kind::Plug)
     }
 }
 
@@ -94,6 +111,13 @@ pub struct Feature {
     /// How much the deep-time surface has eroded or buried the ground at its centre since it
     /// formed, m: what wears its relief off the ground (`relief_left`).
     pub wear_m: f32,
+    /// Intrusions: the vertical half-axis of the ellipsoid, blocks (its horizontal half-axes are
+    /// `half_along` and `half_across`).
+    pub half_height: f32,
+    /// Intrusions: how far its centre lies under the ground at its position, blocks.
+    pub depth: f32,
+    /// Intrusions: the rock class (index into the class table).
+    pub rock: u16,
 }
 
 /// A structure that has had no continental crust under or beside it for this many plate steps is
@@ -116,6 +140,10 @@ pub struct Counts {
     pub overprinted: u64,
     /// Lost: no continental crust under them for [`LOST_AFTER_STEPS`] plate steps.
     pub subducted: u64,
+    pub stocks: u64,
+    pub dykes: u64,
+    /// Plugs are made at the end of the run from the extinct volcanoes standing then.
+    pub plugs: u64,
 }
 
 impl Counts {
@@ -125,6 +153,9 @@ impl Counts {
             Kind::Thrust => self.thrusts += 1,
             Kind::Normal => self.normal_faults += 1,
             Kind::StrikeSlip => self.strike_slip_faults += 1,
+            Kind::Stock => self.stocks += 1,
+            Kind::Dyke => self.dykes += 1,
+            Kind::Plug => self.plugs += 1,
         }
     }
 }
@@ -156,7 +187,8 @@ impl Feature {
     /// The feature as an event of the Noddy port, in a local frame whose origin is the block
     /// position (`origin_x`, `origin_z`) at height 0: Noddy x = block x − origin, y = −(block z −
     /// origin), z = block y. `surface_y` is the ground's height at the feature's centre (a
-    /// fault's trace lies there); `profile` the fold profile (the sine table).
+    /// fault's trace lies there); `profile` the fold profile (the sine table). `None` for an
+    /// intrusion, which moves nothing.
     pub fn to_noddy(
         &self,
         origin_x: f64,
@@ -164,7 +196,10 @@ impl Feature {
         c: f64,
         surface_y: f64,
         profile: &noddy::Profile,
-    ) -> noddy::Event {
+    ) -> Option<noddy::Event> {
+        if self.kind.is_intrusion() {
+            return None;
+        }
         let mut dx = self.x - origin_x;
         dx -= (dx / c + 0.5).floor() * c;
         let centre = [dx, -(self.z - origin_z)];
@@ -213,8 +248,9 @@ impl Feature {
                     noddy::Movement::HangingWall,
                 ))
             }
+            Kind::Stock | Kind::Dyke | Kind::Plug => return None,
         };
-        noddy::Event::Windowed(noddy::Windowed::new(inner, window))
+        Some(noddy::Event::Windowed(noddy::Windowed::new(inner, window)))
     }
 
     /// Folds: the across coordinate of the profile's origin relative to the centre.
@@ -268,6 +304,11 @@ impl Feature {
                     slip: [s * rev[1][0], s * rev[1][2], -s * rev[1][1]],
                 }
             }
+            Kind::Stock | Kind::Dyke | Kind::Plug => Shape::Intrusion {
+                y: surface_y - f64::from(self.depth),
+                half_height: f64::from(self.half_height),
+                class: self.rock as u8,
+            },
         };
         StructEvent {
             id: self.id,
@@ -392,6 +433,9 @@ mod tests {
             cause: 0,
             adrift: 0,
             wear_m: 0.0,
+            half_height: 0.0,
+            depth: 0.0,
+            rock: 0,
         }
     }
 

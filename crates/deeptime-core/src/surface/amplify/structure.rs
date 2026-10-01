@@ -129,6 +129,7 @@ impl Relief {
                     -self.footwall_share * w * slip[1]
                 }
             }
+            Shape::Intrusion { .. } => 0.0,
         }
     }
 

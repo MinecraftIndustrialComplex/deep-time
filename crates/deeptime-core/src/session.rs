@@ -1486,7 +1486,7 @@ mod tests {
         let v: Value = serde_json::from_str(&manifest).unwrap();
         assert_eq!(v["format_version"], "0.3");
         assert_eq!(v["layers"], json!([]));
-        assert!(manifest.contains("\"format_version\": \"0.2\""));
+        assert!(manifest.contains("\"format_version\": \"0.3\""));
         assert!(manifest.contains("\"layers\": []"));
         let on_disk = std::fs::read_to_string(dir.join("manifest.json")).unwrap();
         assert_eq!(on_disk, manifest);

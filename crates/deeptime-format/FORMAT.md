@@ -1021,8 +1021,8 @@ them. Code: `crates/deeptime-format/src/structure.rs` (`Structure`, `StructIndex
 ```text
 event record
 0    4   u32 id
-4    1   u8 kind: 0 fold, 1 fault
-5    1   u8 profile (folds: index into section 1; faults: 0)
+4    1   u8 kind: 0 fold, 1 fault, 2 intrusion
+5    1   u8 profile (folds: index into section 1; faults: 0; intrusions: their rock class index)
 6    2   u16 key: the event's age as a stratigraphic key of `strata/horizons`
 8    8   f64 t, years relative to world creation (for people; the rule reads the key)
 16   16  f64 × 2 window centre, block (x, z)
@@ -1032,10 +1032,11 @@ event record
 72   8   f64 half_across, blocks
 80   56  f64 × 7: a fold: wavelength, amplitude, offset (blocks), 0, 0, 0, 0
                   a fault: y of the plane at the centre, pole (x, y, z; y > 0), slip (x, y, z)
+                  an intrusion: y of its centre, half_height (blocks, > 0), 0, 0, 0, 0, 0
 ```
 
-All arithmetic below is IEEE-754 double `+ − × /`, comparisons, `floor` and `ceil`, in the order
-written; both sides must give equal answers (`ColumnParityTest`). TAU is the constant 6.2831853
+All arithmetic below is IEEE-754 double `+ − × /`, `√` (correctly rounded), comparisons, `floor`
+and `ceil`, in the order written; both sides must give equal answers (`ColumnParityTest`). TAU is the constant 6.2831853
 (Noddy's seven-decimal 2π, part of the contract).
 
 **Window.** `bump(t) = (1 − t²)²` for −1 < t < 1, else 0. For a block position (x, z):
@@ -1075,9 +1076,16 @@ at a block column (integer tops T_h, classes, unit keys, top-down):
      [max(cut, lo), hi) (the whole piece when `cut ≤ lo`, else split off above the rest) becomes
      the hanging wall: source position `(sx − w·slip x, sz − w·slip z)`, `dy ← dy − w·slip y`,
      `key ← e's key`, not finished, source stack S(⌊sx⌋, ⌊sz⌋) of the new position.
+   - **Intrusion:** `r² = (a / half_along)² + (b / half_across)²`. If `r² < 1`:
+     `hh = half_height · √(1 − r²)`, `l = max((y − hh) − dy, lo)`, `u = min((y + hh) − dy, hi)`;
+     if `l < u` the part [l, u) of the piece is split off as the intrusion's rock (its class, unit
+     key = e's key) and is finished; what is left of the piece below and above goes on unchanged.
+     (An intrusion moves nothing. It is read at the piece's source position, so the faults and
+     folds younger than it have moved it with the rock, and it cuts the ones older than it.)
 3. The pieces top-down. A piece holds blocks `y_min … y_max`: `y_max = min(T₀ of S₀, ⌈hi − ½⌉ − 1)`
    (T₀ of S₀ for hi = +∞), `y_min = max(min_y, ⌈lo − ½⌉)` (min_y for lo = −∞); skipped when
-   `y_max < y_min`. With `d = ⌊dy + ½⌋` and the piece's source stack: its horizon h covers
+   `y_max < y_min`. With `d = ⌊dy + ½⌋` and the piece's source stack (an intrusion's piece is instead the one horizon
+   `(y_max, its class, its key)`, appended unless the last appended has the same class): its horizon h covers
    `top = y_max` for h = 0, else `min(y_max, T_h − d)`, down to `bottom = max(y_min, T_{h+1} + 1 − d)`
    (y_min for the last); skipped when `top < bottom`. Its class and unit key are those of horizon
    g: g = h, advanced while g's unit key is below the piece's key and g is not the last (the
@@ -1092,7 +1100,8 @@ Bodies are painted over the result where they are, undeformed.
 
 **What a bake writes** (`deeptime_core::structure::deform`): fold trains (kind 0: an upright sine
 fold under a window a few wavelengths across and several long) and fault segments (kind 1: thrusts,
-normal and strike-slip faults whose slip dies out along the trace and away from it), each dated to
+normal and strike-slip faults whose slip dies out along the trace and away from it) and intrusions
+(kind 2: stocks in orogens, dykes along rifts, plugs under extinct volcanoes), each dated to
 the plate step that made it; the key is `structure::columns::key::of_age(0, age, span)`, the
 unmetamorphosed strata log's key of that age, so basement and metamorphic units (larger keys) are
 deformed by every event; a fault's `y` is the ground at its centre. `notes.bake.structure` records
