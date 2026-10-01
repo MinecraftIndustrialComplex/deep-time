@@ -856,11 +856,13 @@ fn main() -> ExitCode {
                 );
                 if let (Some(p), Some(w)) = (&r.rivers, &r.water) {
                     println!(
-                        "deeptime satellite: rivers & lakes -> {} ({} river chains, {} vertices, {:.0} px of lakes); satellite picture {:.0} ms, water derived in {:.0} ms (phases {}) and drawn in {:.0} ms",
+                        "deeptime satellite: rivers & lakes -> {} ({} river chains, {} vertices, {:.0} px of lakes, {:.0} of them frozen, {:.0} px of playa); satellite picture {:.0} ms, water derived in {:.0} ms (phases {}) and drawn in {:.0} ms",
                         p.display(),
                         w.chains,
                         w.vertices,
                         w.lake_px,
+                        w.frozen_px,
+                        w.playa_px,
                         r.satellite_ms,
                         r.derive_ms,
                         w.phases,
