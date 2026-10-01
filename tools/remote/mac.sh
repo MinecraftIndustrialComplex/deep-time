@@ -135,7 +135,10 @@ PROFILE="$CACHE/devshell-$KEY"
 # and full debuginfo most of the rest; without them a copy's target is a fraction of the size, at the
 # cost of recompiling the workspace crates (not the dependencies) on each change. Line tables keep
 # file:line in panics and backtraces.
-INNER="cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=line-tables-only && { [ -e '$PROFILE' ] || nix develop --profile '$PROFILE' -c true; } && exec nix develop '$PROFILE' -c zsh -c $(printf '%q' "$CMD")"
+# The machine is shared by every agent (32 vCPU): each job gets 8 cargo jobs and 6 Rayon threads by
+# default, or several test suites at once each take every core (2026-10-01: load 100). A command may
+# set its own values.
+INNER="cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=line-tables-only CARGO_BUILD_JOBS=\${CARGO_BUILD_JOBS:-8} RAYON_NUM_THREADS=\${RAYON_NUM_THREADS:-6} && { [ -e '$PROFILE' ] || nix develop --profile '$PROFILE' -c true; } && exec nix develop '$PROFILE' -c zsh -c $(printf '%q' "$CMD")"
 set +e
 "${SSH[@]}" "exec zsh -lc $(printf '%q' "$INNER")"
 status=$?
