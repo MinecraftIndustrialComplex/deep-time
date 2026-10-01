@@ -273,9 +273,11 @@ pub fn smooth_stride(sigma: f64) -> i64 {
     (sigma / SMOOTH_SAMPLE_SIGMA).ceil().max(1.0) as i64
 }
 
-/// The thinnest rock unit (blocks, in the smoothed mean) that fills the height of a cell
-/// standing above the mean surface (`Horizons::smoothed`).
-pub const FILL_MIN_BLOCKS: i32 = 8;
+/// How far under the mean rock surface (blocks) the smoothing looks for the unit that fills the
+/// height of a cell standing above the mean surface (`Horizons::smoothed`): the thickest unit
+/// beginning within it. The beds over that unit (thinner than this, together) rise with the
+/// ground.
+pub const RIDGE_SEARCH_BLOCKS: i32 = 16;
 
 /// The column rule's tongue parameters a preset asks for: (keys per band, minor share).
 pub fn tongue_params(p: &StructureParams) -> (u32, f64) {
@@ -326,11 +328,11 @@ impl Horizons {
     /// cell's own surface stays its first top: the regolith and the loose sediment on top
     /// (the unconsolidated classes) lie on it with their mean thickness (they follow the ground,
     /// not the mean surface), and the rock units the neighbours hold above their base pinch out
-    /// there. Where the cell stands above the mean, the first rock unit at least
-    /// [`FILL_MIN_BLOCKS`] thick fills the difference, and thinner units over it keep their
-    /// thickness and rise with the ground: a ridge 60 blocks over the mean surface is the
-    /// region's top formation, not 60 blocks of saprolite, clay or of a coal seam that happens
-    /// to be the youngest bed. The stacks
+    /// there. Where the cell stands above the mean, the thickest rock unit that begins within
+    /// [`RIDGE_SEARCH_BLOCKS`] of the mean rock surface fills the difference, and the thinner
+    /// beds over it keep their thickness and rise with the ground: a ridge 60 blocks over the
+    /// mean surface is the region's top formation, not 60 blocks of saprolite, clay or of a
+    /// coal seam that happens to be the youngest bed. The stacks
     /// are then settled again (at least a block thick, metamorphic and plutonic rock inside the
     /// stack at least `t.min_blocks` of its class, at most K). An interval takes its class from
     /// horizons that span it, and a span lies in one key domain, so a new horizon's span does
@@ -436,17 +438,18 @@ impl Horizons {
                             || t.unconsolidated.get(usize::from(win[q])) == Some(&true)
                     };
                     // The unit that fills the height of a cell standing over the mean surface:
-                    // the first rock unit at least `FILL_MIN_BLOCKS` thick in the mean (a run of
-                    // intervals of one class in one key domain), else the first rock interval.
-                    // Thinner units over it keep their thickness and rise with the ground.
-                    let (mut fill, mut first_rock) = (None, None);
+                    // the thickest rock unit (a run of intervals of one class in one key domain,
+                    // by its mean thickness) that begins within `RIDGE_SEARCH_BLOCKS` of the
+                    // mean rock surface. The thinner beds over it keep their thickness and rise
+                    // with the ground.
+                    let mut fill: Option<(usize, f64)> = None;
+                    let mut depth = 0.0f64;
                     let mut q = 0;
-                    while q + 1 < m {
+                    while q + 1 < m && depth < f64::from(16 * RIDGE_SEARCH_BLOCKS) {
                         if win[q] == NO_CLASS || loose(q) {
                             q += 1;
                             continue;
                         }
-                        first_rock.get_or_insert(q);
                         let (class, dom) = (win[q], key::domain(keys[q]));
                         let (mut e, mut th) = (q, 0.0f64);
                         while e + 1 < m
@@ -460,13 +463,13 @@ impl Horizons {
                             }
                             e += 1;
                         }
-                        if th >= f64::from(16 * FILL_MIN_BLOCKS) {
-                            fill = Some(q);
-                            break;
+                        if fill.is_none_or(|f| th > f.1) {
+                            fill = Some((q, th));
                         }
+                        depth += th;
                         q = e.max(q + 1);
                     }
-                    let fill = fill.or(first_rock);
+                    let fill = fill.map(|f| f.0);
                     // The loose cover laid on the cell's own surface so far (1/16 block), how far
                     // the cell's rock surface stands over the mean one, and whether a rock
                     // horizon has begun.
