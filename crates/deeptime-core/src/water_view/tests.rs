@@ -10,8 +10,14 @@ const H: usize = 64;
 const C: u32 = (W * 16) as u32;
 
 /// A planet 128 × 64 cells wide: land sloping south to a sea (rows 54 and on) and in towards a
-/// valley down column 64, a closed bowl five blocks deep in the north-west, a warm, moderately wet climate (700 mm, 15 °C: 160 mm of runoff).
+/// valley down column 64, a closed bowl five blocks deep in the north-west, a warm, moderately wet
+/// climate (700 mm, 15 °C: 160 mm of runoff; the bowl gets more than it evaporates, so it fills).
 fn world() -> WorldState {
+    world_in(700.0, 15.0)
+}
+
+/// [`world`] with `rain` mm a year at a mean of `t` °C.
+fn world_in(rain: f32, t: f32) -> WorldState {
     let grid = GridDesc::for_planet("L1", C, 16).unwrap();
     assert_eq!((grid.w as usize, grid.h as usize), (W, H));
     let mut world = WorldState::new(1, C, 0.0);
@@ -41,8 +47,8 @@ fn world() -> WorldState {
         );
     };
     put(&mut world, "elevation", elevation);
-    put(&mut world, T_FIELD, vec![15.0; W * H]);
-    put(&mut world, P_FIELD, vec![700.0; W * H]);
+    put(&mut world, T_FIELD, vec![t; W * H]);
+    put(&mut world, P_FIELD, vec![rain; W * H]);
     world
 }
 
@@ -236,10 +242,104 @@ fn the_ramps_json_keys_are_the_colours_drawn() {
     assert_eq!(keys["land"], hex(LAND));
     assert_eq!(keys["sea"], hex(SEA));
     assert_eq!(keys["lake"], hex(LAKE));
+    assert_eq!(keys["frozen_lake"], hex(FROZEN));
+    assert_eq!(keys["salt_flat"], hex(PLAYA));
+    // The satellite view's pointer reads the three by the same colours.
+    let sat = &v["ramps"][satellite::LAYER]["keys"];
+    assert_eq!(sat["lake"], hex(LAKE));
+    assert_eq!(sat["frozen_lake"], hex(FROZEN));
+    assert_eq!(sat["salt_flat"], hex(PLAYA_SATELLITE));
+    let salt = satellite::CLASSES.iter().position(|&c| c == "Salt flat").unwrap();
+    assert_eq!(
+        Ramps::builtin().ramps[satellite::LAYER].colour(salt as f64 + 0.5),
+        PLAYA_SATELLITE
+    );
     assert_eq!(v["layers"][LAYER], RAMP);
     // The river ramp runs over log10 of the discharge from the stream threshold (2 m³/s).
     let first = v["ramps"][RAMP]["stops"][0][0].as_f64().unwrap();
     assert!((first - 2.0f64.log10()).abs() < 0.05, "{first}");
+}
+
+#[test]
+fn a_cold_lake_is_drawn_as_ice_on_both_views() {
+    let ramps = Ramps::builtin();
+    let view = ViewScale::default();
+    // Mean −5 °C, a +10 °C summer: the bowl fills with meltwater and is frozen most of the year.
+    let mut w = world_in(700.0, -5.0);
+    let grid = w.fields["elevation"].grid.clone();
+    for (name, t) in [
+        (crate::climate::field::T_WARM, 10.0),
+        (crate::climate::field::T_COLD, -20.0),
+    ] {
+        w.fields
+            .insert(name.into(), Field::filled(grid.clone(), t));
+    }
+    let v = derive(&w, &view, SIZE).unwrap();
+    let k = at(&v, 23, 13);
+    assert_eq!((v.frozen[k], v.lake[k]), (1.0, 0.0));
+    assert!(v.info.frozen_px >= 9.0 && v.info.frozen_px == v.info.lake_px);
+    let layer = v.render(&ramps, &view).unwrap();
+    assert_eq!(&layer[k * 4..][..3], &FROZEN);
+    let grey = [120u8, 110, 90, 255];
+    let mut rgba: Vec<u8> = (0..W * H).flat_map(|_| grey).collect();
+    v.overlay(&mut rgba, &ramps);
+    for c in 0..3 {
+        let want = f32::from(grey[c]) * 0.05 + f32::from(FROZEN[c]) * 0.95;
+        assert!((f32::from(rgba[k * 4 + c]) - want).abs() <= 1.0);
+    }
+    // The freezing point is the preset's.
+    let mut hardy = ViewScale::default();
+    hardy.hydro.lake_freeze_mean_c = -10.0;
+    let open = derive(&w, &hardy, SIZE).unwrap();
+    assert_eq!((open.frozen[k], open.lake[k]), (0.0, 1.0));
+    // Where the summer never thaws, there is no water at all.
+    w.fields.insert(
+        crate::climate::field::T_WARM.into(),
+        Field::filled(grid, -3.0),
+    );
+    let never = derive(&w, &view, SIZE).unwrap();
+    assert_eq!(never.info.lake_px, 0.0);
+    assert!(never.river.iter().all(|&c| c == 0.0));
+}
+
+#[test]
+fn a_desert_bowl_is_a_salt_flat_or_dry_and_the_old_rule_fills_it() {
+    let ramps = Ramps::builtin();
+    let view = ViewScale::default();
+    // Hot (30 °C: 1,800 mm a year off open water). The wetter it is, the more lake the bowl holds;
+    // somewhere between none and a lake its catchment sends it only enough to wet its floor.
+    let runs: Vec<(f32, WaterView)> = (4..=40)
+        .map(|k| {
+            let rain = 25.0 * k as f32;
+            (rain, derive(&world_in(rain, 30.0), &view, SIZE).unwrap())
+        })
+        .collect();
+    assert!(
+        runs.windows(2)
+            .all(|p| p[1].1.info.lake_px >= p[0].1.info.lake_px),
+        "more rain never holds less lake"
+    );
+    assert_eq!(runs[0].1.info.lake_px, 0.0);
+    assert!(runs.last().unwrap().1.info.lake_px >= 9.0);
+    let (rain, v) = runs
+        .iter()
+        .find(|(_, v)| v.info.lake_px == 0.0 && v.info.playa_px >= 1.0)
+        .expect("a rainfall that leaves a playa and no lake");
+    let w = world_in(*rain, 30.0);
+    let k = (0..W * H)
+        .max_by(|&a, &b| v.playa[a].total_cmp(&v.playa[b]))
+        .unwrap();
+    assert!((21..=25).contains(&(k % W)) && (11..=15).contains(&(k / W)));
+    let layer = v.render(&ramps, &view).unwrap();
+    assert_eq!(&layer[k * 4..][..3], &PLAYA);
+    // Drier still: nothing reaches the floor.
+    let dry = derive(&world_in(60.0, 30.0), &view, SIZE).unwrap();
+    assert_eq!((dry.info.lake_px, dry.info.playa_px), (0.0, 0.0));
+    // The rule before the water balance: full to the rim whatever the climate.
+    let mut old = ViewScale::default();
+    old.hydro.lake_balance = false;
+    let full = derive(&w, &old, SIZE).unwrap();
+    assert_eq!(full.lake[at(&full, 23, 13)], 1.0);
 }
 
 #[test]

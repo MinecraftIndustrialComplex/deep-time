@@ -7,11 +7,20 @@
 //! - **Grid.** The hydrology runs on the `elevation` grid (L3) when it has at most
 //!   [`hydro::MAX_CELLS`] cells; a larger one (32k full: 134 M cells) is averaged 2 × 2 into grid
 //!   `L3h` first, and `water_level` is written on that grid (a layer names its own grid).
-//! - **Climate.** Precipitation and temperature bilinear from L1 at each cell; PET = 60 mm/°C · T
-//!   (0 below 0 °C), as the surface stage. Without a climate stage the surface stage's zonal
-//!   stand-in at sea level.
+//! - **Climate.** Precipitation and mean temperature bilinear from L1 at each cell, and the
+//!   warmest and coldest month from the twelve monthly layers (`climate/month/t_sl_c_*`: the
+//!   months' departures from their mean are the same at any height, so they are added to the
+//!   cell's mean; a folder without them takes ± 8 °C). [`hydro::HydroParams::budget`] turns them
+//!   into runoff, rain on a lake and its evaporation. Without a climate stage the surface stage's
+//!   zonal stand-in at sea level.
 //! - **water_level.** Each lake's cells hold its level (1/16 block), nodata elsewhere; the game's
-//!   shore rule carries it a noise cell past the last wet cell.
+//!   shore rule carries it a noise cell past the last wet cell. A full lake's level is its rim's
+//!   height, a terminal lake's the level of its water balance, below the rim. The layer means what
+//!   it meant: nothing in the game's reading of it changes.
+//! - **Ice.** Nothing is written for frozen lakes: the game's frozen biomes (the temperature
+//!   layer's frozen band, `bake::biomes`) ice the water with vanilla's `freeze_top_layer`.
+//!   `notes.bake.water.stats.frozen_in_frozen_band` records how much of the frozen lake area lies
+//!   in that band.
 
 use std::path::Path;
 
@@ -24,6 +33,63 @@ use crate::error::CoreError;
 use crate::hydro::{self, network};
 use crate::params::PlanetPreset;
 use crate::surface::climate::{zonal_precip, zonal_temperature};
+
+/// The warmest and the coldest month's departure from the year's mean, °C, per cell of the
+/// monthly layers' grid.
+struct Seasons {
+    grid: GridDesc,
+    warm: Vec<f32>,
+    cold: Vec<f32>,
+}
+
+impl Seasons {
+    fn of(months: &[LoadedLayer]) -> Option<Seasons> {
+        let grid = months.first()?.desc.grid.clone();
+        if months.len() != 12 || months.iter().any(|m| m.desc.grid != grid) {
+            return None;
+        }
+        let (w, h) = (grid.w, grid.h);
+        let mut warm = Vec::with_capacity(grid.cells());
+        let mut cold = Vec::with_capacity(grid.cells());
+        for j in 0..h {
+            for i in 0..w {
+                let (mut lo, mut hi, mut sum) = (f64::INFINITY, f64::NEG_INFINITY, 0.0);
+                for m in months {
+                    let t = m.desc.physical(m.raw_cell(i, j));
+                    lo = lo.min(t);
+                    hi = hi.max(t);
+                    sum += t;
+                }
+                let mean = sum / 12.0;
+                warm.push((hi - mean) as f32);
+                cold.push((lo - mean) as f32);
+            }
+        }
+        Some(Seasons { grid, warm, cold })
+    }
+
+    /// (warmest, coldest) departure at block (x, z), bilinear; NaN where the layers hold none.
+    fn at(&self, bx: f64, bz: f64) -> (f64, f64) {
+        let g = &self.grid;
+        let u = (bx - g.origin_block_x as f64) / f64::from(g.r);
+        let v = (bz - g.origin_block_z as f64) / f64::from(g.r);
+        let (fi, fj) = (u.floor(), v.floor());
+        let (fu, fv) = (u - fi, v - fj);
+        let at = |i: i64, j: i64| g.clamp_j(j) as usize * g.w as usize + g.wrap_i(i) as usize;
+        let (i0, j0) = (fi as i64, fj as i64);
+        let k = [at(i0, j0), at(i0 + 1, j0), at(i0, j0 + 1), at(i0 + 1, j0 + 1)];
+        let mix = |d: &[f32]| {
+            let a = f64::from(d[k[0]]) + f64::from(d[k[1]] - d[k[0]]) * fu;
+            let b = f64::from(d[k[2]]) + f64::from(d[k[3]] - d[k[2]]) * fu;
+            a + (b - a) * fv
+        };
+        (mix(&self.warm), mix(&self.cold))
+    }
+}
+
+/// The upper edge of the frozen band of the biome temperature input (`climate/temperature`,
+/// vanilla's parameter: `OverworldBiomeBuilder`'s first temperature band is −1 … −0.45).
+const FROZEN_BAND_TOP: f64 = -0.45;
 
 /// What the water part made, for the tests and the CLI.
 pub struct Water {
@@ -132,10 +198,20 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     };
     let t_layer = layer("climate/t_mean_c")?;
     let p_layer = layer("climate/p_mm")?;
+    let mut months = Vec::new();
+    for m in 0..12 {
+        if let Some(l) = layer(&super::climate::t_sl_month_layer(m))? {
+            months.push(l);
+        }
+    }
+    let seasons = Seasons::of(&months);
+    drop(months);
+    let band = layer("climate/temperature")?;
     let s = &p.scale;
     let c = f64::from(s.circumference_blocks);
     let from_stage = t_layer.is_some() && p_layer.is_some();
-    let climate = move |bx: i64, bz: i64| -> (f64, f64) {
+    let seasonal = seasons.is_some();
+    let climate = move |bx: i64, bz: i64| -> hydro::Climate {
         let (x, z) = (bx as f64, bz as f64);
         let (t, pr) = match (&t_layer, &p_layer) {
             (Some(t), Some(pl)) => (t.bilinear(x, z), pl.bilinear(x, z)),
@@ -144,11 +220,8 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
                 (zonal_temperature(lat), zonal_precip(lat))
             }
         };
-        let (t, pr) = (
-            if t.is_finite() { t } else { 0.0 },
-            if pr.is_finite() { pr.max(0.0) } else { 0.0 },
-        );
-        (pr, (60.0 * t).max(0.0))
+        let (warm, cold) = seasons.as_ref().map_or((f64::NAN, f64::NAN), |s| s.at(x, z));
+        hydro::Climate::of(pr, t, t + warm, t + cold)
     };
     let sea_raw = s.sea_level_y * 16;
     let result = network::run(&network::Input {
@@ -161,6 +234,31 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         width_scale: s.feature_scale.rivers,
     });
     drop(elev);
+    let mut stats = result.stats.clone();
+    // How much of the frozen lake area the game's frozen biomes cover (the temperature layer's
+    // frozen band, below its upper edge −0.45): there vanilla's `freeze_top_layer` ices the water.
+    if let Some(band) = &band {
+        let (ox, oz, r) = (grid.origin_block_x, grid.origin_block_z, i64::from(grid.r));
+        let w = grid.w as usize;
+        let (mut frozen, mut in_band, mut open_in_band, mut open) = (0u64, 0u64, 0u64, 0u64);
+        for (cell, &k) in result.kind.iter().enumerate() {
+            if k != network::kind::LAKE && k != network::kind::FROZEN {
+                continue;
+            }
+            let (x, z) = (ox + (cell % w) as i64 * r, oz + (cell / w) as i64 * r);
+            let cold = band.nearest(x as f64, z as f64) < FROZEN_BAND_TOP;
+            if k == network::kind::FROZEN {
+                frozen += 1;
+                in_band += u64::from(cold);
+            } else {
+                open += 1;
+                open_in_band += u64::from(cold);
+            }
+        }
+        let share = |a: u64, b: u64| if b > 0 { json!((a as f64 / b as f64 * 1e4).round() / 1e4) } else { Value::Null };
+        stats["frozen_in_frozen_band"] = share(in_band, frozen);
+        stats["open_in_frozen_band"] = share(open_in_band, open);
+    }
 
     // water_level: replaces the nodata layer the terrain part wrote.
     let wd = desc(
@@ -195,15 +293,16 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
 
     let note = json!({
         "enabled": true,
-        "method": "p1-22",
+        "method": "p1-22b",
         "params": params,
         "width_scale": s.feature_scale.rivers,
         "grid": grid.name,
         "halved": halved,
         "climate": if from_stage { "climate stage (L1, bilinear)" } else { "zonal stand-in" },
+        "seasons": if seasonal { "the twelve monthly layers" } else { "mean ± 8 °C" },
         "rivers_file": RIVERS_PATH,
         "rivers_bytes": bytes,
-        "stats": result.stats,
+        "stats": stats,
     });
     Ok(Water {
         note,
@@ -218,10 +317,16 @@ pub fn summary_line(v: &Value) -> String {
     }
     let s = &v["stats"];
     format!(
-        "water grid={} lakes={} lake_km2={} endorheic={} chains={} vertices={} river_km={} max_q={} widest={} bytes={}",
+        "water grid={} lakes={} lake_km2={} share_of_land={} largest_km2={} below_rim={} frozen={} playas={} dry={} endorheic={} chains={} vertices={} river_km={} max_q={} widest={} bytes={}",
         v["grid"].as_str().unwrap_or("?"),
         s["lakes"],
         s["lake_area_km2"],
+        s["lake_share_of_land"],
+        s["largest_lake_km2"],
+        s["basins"]["below_rim"],
+        s["frozen"]["lakes"],
+        s["basins"]["playa"],
+        s["basins"]["dry"],
         s["endorheic_lakes"],
         s["chains"],
         s["vertices"],
