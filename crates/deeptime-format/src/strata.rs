@@ -28,7 +28,7 @@
 //! 5. Slivers ([`drop_slivers`]): where the layer names a least thickness for a class
 //!    (`LayerDesc::min_blocks`; the bake does for metamorphic and plutonic rock), a horizon of
 //!    that class under the first horizon and over the last that is thinner is removed, and the
-//!    horizon above it reaches down in its place. A unit that ends sideways thus ends at a small
+//!    horizon under it reaches up in its place. A unit that ends sideways thus ends at a small
 //!    step instead of thinning to a sheet one block thick.
 
 use crate::raster::LayerDesc;
@@ -272,25 +272,31 @@ pub fn stack_at_with(
 
 /// Step 5 of the column rule: walking `out` from its second horizon down, a horizon that is not
 /// the last and whose class has a least thickness above one block in `min_blocks` (by class
-/// index) and that is thinner (its top less the next horizon's top, as emitted) is removed; a
+/// index) and that is thinner is removed, and its blocks go to the horizon under it (whose top
+/// becomes the removed one's, so a run of slivers gathers until a horizon is thick enough); a
 /// horizon of the class of the last one kept is removed too (it continues it). The first horizon
 /// always stays, and the last unless it continues the one kept before it.
 pub fn drop_slivers(out: &mut Vec<ColumnHorizon>, min_blocks: &[u8]) {
     let n = out.len();
-    let mut kept = 1;
+    let mut kept = n.min(1);
+    // The top handed down by the slivers removed just above.
+    let mut carried: Option<i32> = None;
     for h in 1..n {
         let (top, class, unit) = out[h];
+        let top = carried.unwrap_or(top);
         let need = i32::from(min_blocks.get(usize::from(class)).copied().unwrap_or(1));
         if h + 1 < n && need > 1 && top - out[h + 1].0 < need {
+            carried = Some(top);
             continue;
         }
+        carried = None;
         if out[kept - 1].1 == class {
             continue;
         }
         out[kept] = (top, class, unit);
         kept += 1;
     }
-    out.truncate(kept.min(n));
+    out.truncate(kept);
 }
 
 /// Keys per band of an interfingering facies change ([`interfinger`]) where the layer does not
@@ -498,10 +504,10 @@ mod tests {
             drop_slivers(&mut out, &min);
             out.into_iter().map(|(t, c, _)| (t, c)).collect::<Vec<_>>()
         };
-        // A 3-block sliver of class 5 between 1 and 3: gone, 1 reaches down.
+        // A 3-block sliver of class 5 between 1 and 3: gone, 3 reaches up.
         assert_eq!(
             run(&[(100, 1), (60, 5), (57, 3), (0, 2)]),
-            [(100, 1), (57, 3), (0, 2)]
+            [(100, 1), (60, 3), (0, 2)]
         );
         // Thick enough: kept. At the top and at the bottom of the column: kept.
         assert_eq!(
@@ -512,11 +518,18 @@ mod tests {
             run(&[(100, 5), (98, 1), (50, 5)]),
             [(100, 5), (98, 1), (50, 5)]
         );
-        // Two slivers in a row both go; the same class on both sides of one joins.
+        // Slivers in a row gather: 3 blocks of class 5 and 2 of class 6 make 5 of class 6,
+        // which is over its 4; 1 of class 6 and 4 of class 5 make 5 of class 5, still under
+        // its 8, and go on down to the next horizon.
         assert_eq!(
             run(&[(100, 1), (60, 5), (57, 6), (55, 2)]),
-            [(100, 1), (55, 2)]
+            [(100, 1), (60, 6), (55, 2)]
         );
+        assert_eq!(
+            run(&[(100, 1), (60, 6), (59, 5), (55, 2), (0, 3)]),
+            [(100, 1), (60, 2), (0, 3)]
+        );
+        // The same class on both sides of a sliver joins.
         assert_eq!(
             run(&[(100, 1), (60, 5), (57, 1), (20, 2)]),
             [(100, 1), (20, 2)]
