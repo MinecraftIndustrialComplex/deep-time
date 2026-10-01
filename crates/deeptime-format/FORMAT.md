@@ -838,14 +838,17 @@ step after the water pass). With `mH`, `mV` the metres per block, (cx, cz) the s
   blocks under the lower of that and `floor` (at most 10 deep), the ground above the surface removed,
   the conduit opening into its floor. A volcano cannot hold one when its summit is at or under sea
   level + 2, when any column of the lake or its ring holds or borders water (the sea, a lake, a river,
-  a bank), or when the surface would lie more than 12 blocks under `floor`.
+  a bank), when the surface would lie more than 12 blocks under `floor`, or when it stands beyond
+  the pole cap's line (|z| > C/4 · `pole_cap_deg`/90: nobody reaches it).
 - **Seal**: every open block (air, water) within 1.5 blocks of a chamber, two columns of a conduit or
   two columns of a lake becomes smooth basalt, so lava never touches water or hangs over a cave.
 
 `remove_lava_features` (on by default): placed features whose configuration places lava (a block or
 fluid state named `minecraft:lava`: vanilla's `lake_lava_surface`, `lake_lava_underground`,
 `spring_lava`, `spring_lava_frozen`, Terralith's `volcano/lava_lakes`, `volcano/lava_flow`,
-`volcano/spring_lava`, `cave/mantle/lava_drip`, any other mod's) are not placed in a Deep Time level
+`volcano/spring_lava`, `cave/mantle/lava_drip`, any other mod's; also Terralith's
+`cave/frostfire/lava_remover`, which turns lava sources into deepslate and would eat a chamber) are
+not placed in a Deep Time level
 (Java `worldgen/LavaFeatures`); other dimensions keep them.
 
 ## `strata/classes.json`

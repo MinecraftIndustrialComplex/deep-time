@@ -350,7 +350,8 @@ public final class LavaGameTests {
             helper.assertTrue(registry.containsKey(net.minecraft.resources.ResourceLocation.parse(id)) && !refused.contains(id),
                     id + " is refused, but places no lava");
         if (net.neoforged.fml.ModList.get().isLoaded("terralith"))
-            for (String id : List.of("terralith:volcano/lava_lakes", "terralith:volcano/spring_lava", "terralith:cave/mantle/lava_drip"))
+            for (String id : List.of("terralith:volcano/lava_lakes", "terralith:volcano/spring_lava", "terralith:cave/mantle/lava_drip",
+                    "terralith:cave/frostfire/lava_remover"))
                 helper.assertTrue(refused.contains(id), id + " is still placed in a Deep Time level");
         helper.succeed();
     }

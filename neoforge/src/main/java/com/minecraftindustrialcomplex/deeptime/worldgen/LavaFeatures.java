@@ -4,7 +4,6 @@ package com.minecraftindustrialcomplex.deeptime.worldgen;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.placement.PlacementContext;
@@ -21,9 +20,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * vanilla's {@code lake_lava_surface}, {@code lake_lava_underground}, {@code spring_lava} and
  * {@code spring_lava_frozen}, and Terralith's {@code volcano/lava_lakes}, {@code volcano/lava_flow},
  * {@code volcano/spring_lava} and {@code cave/mantle/lava_drip}; any other mod's lava lake or
- * spring is caught the same way, with no list to maintain. A feature that only names lava as
- * something to replace ({@code netherrack_replace_blobs}, Terralith's {@code lava_remover}) is not
- * one.
+ * spring is caught the same way, with no list to maintain. Terralith's
+ * {@code cave/frostfire/lava_remover} names lava as its target and is refused too: it turns every
+ * lava source within 12 blocks of 300 points per chunk into deepslate, and ate the magma chamber of
+ * a volcano standing under frostfire caves (4,226 of its 4,521 blocks).
  *
  * <p>It is decided where features are placed ({@code PlacedFeature.placeWithContext}, through
  * {@code mixin.PlacedFeatureLavaMixin}), not with a biome modifier: biome modifiers are applied
@@ -34,9 +34,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class LavaFeatures {
 
     private LavaFeatures() {}
-
-    /** Feature types whose configuration names lava without placing it. */
-    private static final Set<ResourceLocation> NOT_PLACING = Set.of(ResourceLocation.withDefaultNamespace("netherrack_replace_blobs"));
 
     private static final Map<ConfiguredFeature<?, ?>, Boolean> VERDICTS = new ConcurrentHashMap<>();
     private static final Set<String> LOGGED = ConcurrentHashMap.newKeySet();
@@ -66,9 +63,6 @@ public final class LavaFeatures {
     }
 
     private static boolean placesLava(ConfiguredFeature<?, ?> cf, PlacementContext context) {
-        ResourceLocation type = BuiltInRegistries.FEATURE.getKey(cf.feature());
-        if (type != null && NOT_PLACING.contains(type))
-            return false;
         try {
             var ops = context.getLevel().registryAccess().createSerializationContext(JsonOps.INSTANCE);
             return ConfiguredFeature.DIRECT_CODEC.encodeStart(ops, cf).result().map(LavaFeatureRule::namesLavaState).orElse(false);

@@ -40,7 +40,7 @@ class MagmaTest {
     }
 
     private static Magma one(Magma.Heights h, Magma.Wet wet, MagmaRules rules) {
-        return Magma.build(List.of(volcano(1, 100, 50, 0.9)), rules, h, wet, C, SEA, LAVA_FLOOR, MH, MV);
+        return Magma.build(List.of(volcano(1, 100, 50, 0.9)), rules, h, wet, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
     }
 
     private static final Magma.Wet DRY = (x, z) -> false;
@@ -88,7 +88,7 @@ class MagmaTest {
                 best = Math.max(best, cone(200 + 400 * i, 0, 182, 70).at(x, z));
             return best;
         };
-        Magma m = Magma.build(vs, new MagmaRules(3.0, 1.0, 0.25, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV);
+        Magma m = Magma.build(vs, new MagmaRules(3.0, 1.0, 0.25, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
         assertEquals(1, m.bodies().stream().filter(Magma.Body::lake).count(), "a quarter of four");
         Magma.Body b = m.bodies().stream().filter(Magma.Body::lake).findFirst().orElseThrow();
         assertEquals(2, b.id(), "the most active one");
@@ -109,9 +109,13 @@ class MagmaTest {
         assertEquals(Magma.Part.LAKE_SHELL, b.at(3, 3, b.lakeBottom() - 1));
         assertEquals(Magma.Part.CONDUIT, b.at(0, 0, b.lakeBottom() - 1), "the conduit opens into the lake's floor");
         assertEquals(b.lakeBottom() - 1, b.conduitTop());
+        // Nobody reaches a volcano beyond the pole cap's line: no lake there, whatever its activity.
+        Magma polar = Magma.build(vs, new MagmaRules(3.0, 1.0, 1.0, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, -1);
+        assertEquals(0, polar.bodies().stream().filter(Magma.Body::lake).count());
+        assertEquals(4, polar.bodies().stream().filter(x -> x.chamberRh() > 0).count(), "they keep their chambers");
         // Every share from none to all.
         for (double share : new double[]{0.0, 0.5, 1.0}) {
-            Magma n = Magma.build(vs, new MagmaRules(3.0, 1.0, share, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV);
+            Magma n = Magma.build(vs, new MagmaRules(3.0, 1.0, share, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
             assertEquals(Math.round(share * 4), n.bodies().stream().filter(Magma.Body::lake).count(), "share " + share);
         }
     }
@@ -193,7 +197,7 @@ class MagmaTest {
     @Test
     void bodiesAreFoundAcrossTheSeam() {
         Magma m = Magma.build(List.of(volcano(7, -C / 2 + 2, 0, 0.5)), new MagmaRules(3.0, 1.0, 0.0, true),
-                cone(-C / 2 + 2, 0, 182, 70), DRY, C, SEA, LAVA_FLOOR, MH, MV);
+                cone(-C / 2 + 2, 0, 182, 70), DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
         Magma.Body b = m.bodies().get(0);
         assertEquals(-C / 2 + 2, b.x());
         // The chunk just west of the seam (x up to C/2 − 1) holds part of the chamber.
@@ -233,6 +237,10 @@ class MagmaTest {
         // Vanilla's spring_lava_overworld: a spring whose fluid state is lava.
         assertTrue(LavaFeatureRule.namesLavaState(JsonParser.parseString("{\"type\": \"minecraft:spring_feature\", \"config\": "
                 + "{\"state\": {\"Name\": \"minecraft:lava\", \"Properties\": {\"falling\": \"true\"}}, \"valid_blocks\": [\"minecraft:stone\"]}}")));
+        // Terralith's lava_remover (lava sources into deepslate): it would eat a magma chamber.
+        assertTrue(LavaFeatureRule.namesLavaState(JsonParser.parseString("{\"type\": \"minecraft:netherrack_replace_blobs\", \"config\": "
+                + "{\"radius\": 11, \"state\": {\"Name\": \"minecraft:deepslate\"}, \"target\": {\"Name\": \"minecraft:lava\", "
+                + "\"Properties\": {\"level\": \"0\"}}}}")));
         // A water spring, and a feature that only tests for lava nearby, are not lava features.
         assertFalse(LavaFeatureRule.namesLavaState(JsonParser.parseString("{\"type\": \"minecraft:spring_feature\", \"config\": "
                 + "{\"state\": {\"Name\": \"minecraft:water\"}, \"valid_blocks\": [\"minecraft:stone\"]}}")));

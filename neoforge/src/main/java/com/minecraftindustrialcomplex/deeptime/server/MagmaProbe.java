@@ -104,8 +104,8 @@ public final class MagmaProbe {
                 continue;
             double lake = Double.POSITIVE_INFINITY, volcano = Double.POSITIVE_INFINITY;
             for (Magma.Body b : magma.bodies()) {
-                if (b.chamberRh() <= 0 || b.submerged())
-                    continue;
+                if (b.chamberRh() <= 0 || b.submerged() || Math.abs(b.z()) > zMax)
+                    continue;   // no magma, under water, or beyond the pole cap's line
                 double d = Math.hypot(magma.dx(x, b), z - b.z());
                 volcano = Math.min(volcano, d);
                 if (b.lake())
