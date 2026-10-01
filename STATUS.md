@@ -213,6 +213,21 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Decisions for Ben, answered 2026-10-01** (relayed by the coordinator): granite-type rock stays as flat basement layers
   until folds and faults ("Leave it until folds and faults"); a ridge is filled by the thickest nearby formation, as built; no
   format bump (his standing rule: no backward compatibility before a public release, so no "old bakes still load" concerns).
+- **Merged with master 94c54c2** (mountain-height stage 1, hypsometry, lakes by climate, P1-28; merge commit 6599c81; conflicts
+  in STATUS.md and `bake/strata.rs`, both sides kept: the realism note beside the build-limit counters). FORMAT.md no longer
+  speaks of older bakes (Ben's rule: no backward compatibility before a public release). VM, on the merge: `tools/dev/gates.sh`
+  → `GATES fmt=0 clippy=0 test=0 deny=0 gradle=0` (cargo: cli 52, core 371 + 3 ignored, format 53, inspect 31 + 2 + 7, jni 7,
+  viewer 6; JUnit tests=161 failures=0, `ColumnParityTest columns=500 equal=500`, lake world 300 of 300). A fresh bake
+  (`run --preset earthlike_quick_16k --start scattered_continents --length-myr 300 --set seed=7`) + `strata-check`: grade
+  inversion, metamorphic sliver, plutonic sheet and plutonic with a floor all 0 in 20,000 columns, 6,278 land columns and
+  524,288 stored stacks (`notes.bake.strata.realism.stack_rules` ok). `mac.sh --server -- ./gametest.sh` → **All 58 required
+  tests passed** (58 result lines, 0 not PASS). `tools/smoke/install.sh mic` (`--pack`) + `./gametest.sh -PwithMic` → 57 of
+  58: `firstinstalledfallback` fails with "shale: expected fallback born_in_chaos_v1:black_argillite, got minecraft:stone;
+  gneiss: expected minecraft:granite, got minecraft:deepslate[axis=y]". Not this branch: the MIC rock-tag datapack
+  (`mic/Docs/datapacks/deeptime-mic-rock-tags`, outside the repo, synced by `--pack`) had its `rock_fallback` rows for shale,
+  mudstone, slate, phyllite, schist and gneiss changed to stone and deepslate on 2026-10-01 (P1-28's MIC rows), and
+  `StrataGameTests.firstInstalledFallback` on master still expects the old MIC stand-ins under `rockTags`. The fix is two
+  expectation lines in that test, left to P1-28's owner or the coordinator.
 - **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/rock-order/` (runs, checkpoints, censuses, binaries) deleted at the end.
 - **Next.** Merge (the coordinator), run both GameTest suites on the batch, re-bake the workbench run; then Ben's answers.
 
