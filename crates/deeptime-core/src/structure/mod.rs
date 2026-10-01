@@ -718,6 +718,7 @@ impl StructureStage {
                 &all,
                 |x, z| src.surface_y(plutons::cell_of(&grid, x, z), &s),
                 |f| columns::key::of_age(0, now - f64::from(f.t_myr), span),
+                f64::from(s.min_y),
             );
             let relief: Vec<f32> = all
                 .iter()

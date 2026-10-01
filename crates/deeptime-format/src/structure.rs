@@ -469,8 +469,10 @@ impl Structure {
     ///    (the top piece up to S₀'s first top, the bottom one down to `min_y`); block y reads
     ///    source block y + ⌊dy + ½⌋ of the piece's source stack, whose first horizon reaches up
     ///    for ever; a horizon whose unit key is below the piece's key (rock younger than the
-    ///    event that moved the piece: the shift has reached up into the cover) reads as the next
-    ///    horizon down that is old enough. Equal classes in a row join.
+    ///    event that moved the piece: the shift has reached up into the cover) reads as the
+    ///    lowest horizon of that cover (the last one going down whose key is still below the
+    ///    piece's): the bed laid on the deformed surface fills its lows. Equal classes in a row
+    ///    join.
     #[allow(clippy::too_many_arguments)]
     pub fn deformed_stack(
         &self,
@@ -670,9 +672,14 @@ impl Structure {
                 if top < bottom {
                     continue;
                 }
+                // Rock younger than the event that moved the piece: the shift has reached up
+                // into the cover. The cover's lowest bed stands in (it fills the lows of the
+                // surface it was laid on).
                 let mut hh = h;
-                while s[hh].2 < p.key && hh + 1 < n {
-                    hh += 1;
+                if s[hh].2 < p.key {
+                    while hh + 1 < n && s[hh + 1].2 < p.key {
+                        hh += 1;
+                    }
                 }
                 if out.last().is_none_or(|l| l.1 != s[hh].1) {
                     out.push((top, s[hh].1, s[hh].2));
@@ -1141,13 +1148,13 @@ mod tests {
                 (lift, 4, 40000)
             ]
         );
-        // A trough: down by as much; the bed under the cover fills what the shift left open.
+        // A trough: down by as much; the cover's lowest bed fills what the shift left open.
         assert_eq!(
             deformed(&st, 75, 200, 0),
             [
                 (100, 0, 100),
                 (90, 1, 5000),
-                (60, 2, 9000),
+                (60 - lift, 2, 9000),
                 (30 - lift, 3, 20000),
                 (-lift, 4, 40000)
             ]
@@ -1169,15 +1176,20 @@ mod tests {
         let col = deformed(&st, 180, 200, 0);
         let w = bump(80.0 / 150.0);
         let drop = (w * 10.0 * 60.0f64.to_radians().sin() + 0.5).floor() as i32;
-        // Cover untouched; the hanging wall's beds lower by the throw than the foot wall's would
-        // be; below the plane the foot wall in place.
-        assert_eq!(&col[..3], &[(100, 0, 100), (90, 1, 5000), (60, 2, 9000)]);
+        // The cover's beds where they were, its lowest thicker by the throw; the hanging
+        // wall's beds lower by the throw than the foot wall's would be; below the plane the
+        // foot wall in place.
+        assert_eq!(
+            &col[..3],
+            &[(100, 0, 100), (90, 1, 5000), (60 - drop, 2, 9000)]
+        );
         assert_eq!(col[3], (30 - drop, 3, 20000), "{col:?}");
         assert_eq!(col.last().unwrap(), &(-drop, 4, 40000));
         // Nearer the trace the plane cuts the column: hanging wall over foot wall, the bed
         // under the plane where the foot wall has it.
         let col = deformed(&st, 120, 200, 0);
-        assert_eq!(col[2], (60, 2, 9000));
+        let near = (bump(20.0 / 150.0) * 10.0 * 60.0f64.to_radians().sin() + 0.5).floor() as i32;
+        assert_eq!(col[2], (60 - near, 2, 9000));
         assert_eq!(col[3], (28, 3, 20000), "{col:?}");
         assert_eq!(col.last().unwrap(), &(0, 4, 40000));
         // A thrust (the slip reversed) on beds that dip: the hanging wall carries older rock

@@ -65,16 +65,17 @@ pub fn undo_order(features: &mut [Feature]) {
 /// The world's structure from the structures the run left: `features` in [`undo_order`];
 /// `surface_y(x, z)` is the ground's height at a block position (a fault's trace lies on it) and
 /// `key(feature)` its age as a stratigraphic key of the horizon stacks
-/// (`columns::key::of_age`).
+/// (`columns::key::of_age`); `floor_y` is the world's floor (intrusions are rooted on it).
 pub fn finish(
     features: &[Feature],
     surface_y: impl Fn(f64, f64) -> f64,
     key: impl Fn(&Feature) -> u16,
+    floor_y: f64,
 ) -> Structure {
     Structure {
         events: features
             .iter()
-            .map(|f| f.to_baked(surface_y(f.x, f.z), key(f)))
+            .map(|f| f.to_baked(surface_y(f.x, f.z), key(f), floor_y))
             .collect(),
         profiles: vec![sine_profile()],
         margin: deeptime_format::structure::REACH_MARGIN,

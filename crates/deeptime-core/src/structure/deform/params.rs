@@ -135,8 +135,6 @@ pub struct DeformationParams {
     /// stock crops out over less than 100 km² (a radius under 5.6 km); larger bodies are the
     /// batholiths of `plutons.rs`.
     pub stock_radius_km: [f64; 3],
-    /// A stock's vertical half-axis over its radius, in blocks (a design value: a cupola).
-    pub stock_height_ratio: f64,
     /// How far a stock's top lies under the ground, blocks [min, max] (negative: it crops out).
     pub stock_top_depth_blocks: [f64; 2],
     /// Dykes per km² of continental rift per Myr. A design value.
@@ -147,14 +145,10 @@ pub struct DeformationParams {
     /// A dyke's half-width at its middle, blocks [min, max]. Real dykes are metres wide; a
     /// block is the least that can be drawn.
     pub dyke_half_width_blocks: [f64; 2],
-    /// A dyke's vertical half-axis, blocks.
-    pub dyke_half_height_blocks: f64,
     /// A plug's radius as a share of its volcano's basal radius, and its range in blocks
     /// [min, max]. Design values (necks are tens to hundreds of metres across).
     pub plug_radius_share: f64,
     pub plug_radius_blocks: [f64; 2],
-    /// A plug's vertical half-axis, blocks.
-    pub plug_half_height_blocks: f64,
 }
 
 impl Default for DeformationParams {
@@ -194,15 +188,12 @@ impl Default for DeformationParams {
             intrusions: 1.0,
             stock_rate_km2_myr: 2.0e-5,
             stock_radius_km: [4.0, 2.0, 10.0],
-            stock_height_ratio: 3.0,
             stock_top_depth_blocks: [-4.0, 60.0],
             dyke_rate_km2_myr: 8.0e-5,
             dyke_length_km: [15.0, 5.0, 50.0],
             dyke_half_width_blocks: [1.0, 2.5],
-            dyke_half_height_blocks: 120.0,
             plug_radius_share: 0.08,
             plug_radius_blocks: [2.5, 8.0],
-            plug_half_height_blocks: 100.0,
         }
     }
 }
@@ -333,13 +324,6 @@ impl DeformationParams {
             "intrusions",
             "must be in [0, 10]",
         )?;
-        for (v, key) in [
-            (self.stock_height_ratio, "stock_height_ratio"),
-            (self.dyke_half_height_blocks, "dyke_half_height_blocks"),
-            (self.plug_half_height_blocks, "plug_half_height_blocks"),
-        ] {
-            check(v > 0.0 && v.is_finite(), key, "must be > 0")?;
-        }
         let [a, b] = self.stock_top_depth_blocks;
         check(
             a <= b && a.is_finite() && b.is_finite(),
