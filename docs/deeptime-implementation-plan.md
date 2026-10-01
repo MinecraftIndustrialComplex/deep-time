@@ -3733,6 +3733,21 @@ on this machine.
 - **Check.** Set out in the design doc (Earth-topography comparison, Köppen shares, energy balance,
   run-time budget, downstream recalibration).
 
+#### P1-27 Plate margins and coherent continents (2026-09-30)
+- **Goal.** (1) Margins: in a 750-Myr earthlike_quick_16k run nearly every continental coast became
+  an active margin with a line of arc cones by ~200 Myr in; on Earth most continental coastline is
+  passive. Measure the active/passive share over whole runs, confirm the cause (suspected: the
+  spontaneous subduction initiation of `plates/rifting.rs` fires on any floor older than
+  `subduction_initiation_age_myr`, which always lies against the continents), retune so young
+  oceans keep passive margins for 100+ Myr (a Wilson cycle), and give continental arcs their own
+  cordillera so the cones stand on a range. (2) The coherent-continents investigation (log
+  2026-09-29): continental crust and cover came out patchy; continents should form large coherent
+  cratons with platform cover, re-checked against the USGS provinces map. Ben (log 2026-09-30):
+  "Investigate + fix".
+- **Check.** Active share of continental coastline over time against Earth's; arc relief
+  (cordillera height under the cones); provinces view coherence; downstream calibration (land
+  fraction, hypsometry, climateConsistent) re-checked.
+
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 
 - **P2-01 Noddy evaluator.** Port `unEvents.c`, `taste.c`, `matrix.c` from `noddyverse` (MIT);
