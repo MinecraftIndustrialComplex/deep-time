@@ -357,14 +357,18 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
             .copied()
             .unwrap_or(0.0)
     };
-    let (z50, z90) = (q(0.5), q(0.9));
+    let (z50, z90, z99) = (q(0.5), q(0.9), q(0.99));
     let hist = world.history.as_ref();
+    let global = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
+    let cap_share = global(deeptime_core::plates::CAP_BOUND_GLOBAL)
+        / global(deeptime_core::plates::CONTINENTAL_GLOBAL).max(1.0);
     Some(format!(
         "surface_final={} land_frac={:.3} max_elevation_m={:.0} sea_level_m={:.1} sediment_km3={:.3e} \
          eroded_km3={:.3e} fluvial_km3={:.3e} lake_km3={:.3e} marine_km3={:.3e} carbonate_km3={:.3e} \
          evaporite_km3={:.3e} to_sea_km3={:.3e} mass_residual_km3={:.3e} mean_log_layers={:.2} \
          spl_iterations_per_step={:.2} cg_iterations_per_step={:.1} sinks={} erosion_pulses={} basins={} sea_events={} frames={} \
-         history_mib={:.1} land_z_p50_m={:.0} land_z_p90_m={:.0}",
+         history_mib={:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_z_p99_m={:.0} plate_cap_bound_share={:.5} \
+         foreign_crust_cell_steps={:.0}",
         t.steps,
         land / n,
         peak,
@@ -389,6 +393,9 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         hist.map_or(0.0, |h| h.bytes() as f64 / 1048576.0),
         z50,
         z90,
+        z99,
+        cap_share,
+        global(deeptime_core::surface::FOREIGN_CRUST_GLOBAL),
     ))
 }
 

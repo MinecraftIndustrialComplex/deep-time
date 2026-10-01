@@ -67,6 +67,47 @@ pub fn bilinear(w: usize, h: usize, v: &[f32], fi: f64, fj: f64) -> f32 {
     ((v00 * (1.0 - ti) + v10 * ti) * (1.0 - tj) + (v01 * (1.0 - ti) + v11 * ti) * tj) as f32
 }
 
+/// [`bilinear`] over the corners that hold the same crust only: `same(cell)` says whether a
+/// corner cell held, before the step, the crust that is now at the destination. The weights of
+/// the corners that did are renormalised; `None` when none did (the crust is new at this place:
+/// another plate's edge arrived, and what was here before belongs to the plate it overrode).
+///
+/// Without this the offset of one plate's surface is carried onto another plate's crust wherever
+/// a boundary crosses a cell: a trench's sediment fill (plate elevation −6 km, offset +4 km)
+/// lands on the overriding margin, and a range's offset on the next range. The 20 km "mountains"
+/// of 2026-10-01 were built that way, a few km a step.
+pub fn bilinear_same(
+    w: usize,
+    h: usize,
+    v: &[f32],
+    fi: f64,
+    fj: f64,
+    same: impl Fn(usize) -> bool,
+) -> Option<f32> {
+    let fj = fj.clamp(0.0, (h - 1) as f64);
+    let i0 = fi.floor();
+    let j0 = fj.floor();
+    let (ti, tj) = (fi - i0, fj - j0);
+    let wi = |i: f64| (i as i64).rem_euclid(w as i64) as usize;
+    let j0u = j0 as usize;
+    let j1u = (j0u + 1).min(h - 1);
+    let (a, b) = (wi(i0), wi(i0 + 1.0));
+    let corners = [
+        (j0u * w + a, (1.0 - ti) * (1.0 - tj)),
+        (j0u * w + b, ti * (1.0 - tj)),
+        (j1u * w + a, (1.0 - ti) * tj),
+        (j1u * w + b, ti * tj),
+    ];
+    let (mut sum, mut weight) = (0.0f64, 0.0f64);
+    for (c, wt) in corners {
+        if wt > 0.0 && same(c) {
+            sum += wt * f64::from(v[c]);
+            weight += wt;
+        }
+    }
+    (weight > 1e-9).then(|| (sum / weight) as f32)
+}
+
 /// The nearest cell to fractional (fi, fj).
 pub fn nearest(w: usize, h: usize, fi: f64, fj: f64) -> usize {
     let i = (fi.round() as i64).rem_euclid(w as i64) as usize;
@@ -95,5 +136,13 @@ mod tests {
         let v: Vec<f32> = (0..grid.cells()).map(|k| (k % w) as f32).collect();
         assert!((bilinear(w, grid.h as usize, &v, 19.5, 10.0) - 19.5).abs() < 1e-5);
         assert_eq!(nearest(w, grid.h as usize, -0.4, 3.0), 3 * w);
+        // Only the corners of the same crust count; none of them, no value.
+        let h = grid.h as usize;
+        assert_eq!(bilinear_same(w, h, &v, 19.5, 10.0, |_| true), Some(19.5));
+        assert_eq!(bilinear_same(w, h, &v, 19.5, 10.0, |c| c % w == 19), Some(19.0));
+        assert_eq!(bilinear_same(w, h, &v, 19.5, 10.0, |c| c % w == 20), Some(20.0));
+        assert_eq!(bilinear_same(w, h, &v, 19.5, 10.0, |_| false), None);
+        // A corner with no weight does not make the crust "the same".
+        assert_eq!(bilinear_same(w, h, &v, 19.0, 10.0, |c| c % w == 20), None);
     }
 }
