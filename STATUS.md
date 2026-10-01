@@ -477,10 +477,20 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   blocks, mean |Δ| 0.16 blocks; the active shield 19366 (4,673 m, x −3668 z 658, a 38-block island in a 70-km body)
   mean |∇²| 0.919 → 0.826, the highest ground in its body (a peak 110 blocks off the vent) y 415 → 380, mean |Δ| 0.74
   blocks; the whole planet's character change 1.86 → 1.78 blocks mean. 3D previews (`preview.py run`, standalone,
-  same boxes, before/after) and shots: `review/out/p1-21/shots3/` (arc cone 256², shield 384²; the submerged shield
-  19757 for contrast: no change), copied into the bundle.
-  Also fixed here: master bd1cc0f's `deeptime-core` lib tests did not compile (the volcano shaper test's `Level` literal
-  lacked the glacial work's new `zs` field).
+  same boxes, before/after) and shots: `review/out/p1-21/shots3/` (arc cone 256²: the craggy, notched summit becomes a
+  clean cone; shield 384²: its vent is a low island and the two peaks inside its body, older ground, go from spiky to
+  rounded; the submerged active shield 19757 for contrast: no change), the arc and the emergent shield pairs copied
+  into `review/out/p1-21/bundle/` (now 19 MB, not published). This run has no emergent young shield with a clean dome
+  of its own: of the 8 standing young shields and caldera complexes, the tallest above the sea is a 38-block island.
+  Master bd1cc0f's `deeptime-core` lib tests did not compile (the volcano shaper test's `Level` literal lacked the
+  glacial work's new `zs` field); fixed here and on master the same way, so the merge of master (9d7fb4b) was clean.
+  **Gates** (the follow-ups merged with master 9d7fb4b): `cargo fmt --check`, `clippy --workspace --all-targets
+  --locked -D warnings`, `deny check licenses bans` clean; `cargo test --workspace --locked` ok (cli 31, core 319 + 3
+  ignored, history_cap 1, format 44, inspect 29 + 2 + 7, jni 7, viewer 6); `./gradlew build test` tests=155
+  failures=0 (on the tree before the master merge, which only brought docs, a probe script and the -O1 test profile).
+  GameTests not run on the branch (Ben, 2026-09-30: once per merge batch on master). The Mac rebooted mid-way
+  (~19:06); its server lock from before the reboot (owner `deep-time`, no process left) was removed so the previews
+  could run. Scratch runs under `/Volumes/Graphide/ban/deeptime-runs/p1-21/` and the old q16f/q16g runs deleted.
 - **Gates on the final tree** (master 84e2b1d and the decisions-log commits after it merged, schema 8 on the climate's
   7, with the follow-ups): `cargo fmt --check`, `clippy --workspace --all-targets --locked -D warnings`, `deny check
   licenses bans` clean; `cargo test --workspace --locked` ok (cli 30, core 290 + 3 ignored, history_cap 1, format 44,
