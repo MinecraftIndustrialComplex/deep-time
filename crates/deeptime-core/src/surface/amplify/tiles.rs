@@ -204,6 +204,8 @@ impl TileSink for MemSink {
 pub struct PackSink {
     elevation: TilePackWriter,
     amplitude: TilePackWriter,
+    /// The build-limit compression of the stored elevation; none stores it as simulated.
+    pub fit: Option<crate::params::BuildFit>,
     /// Sea level in metres and in blocks, and metres per block: y = sea_y + (z − sea)/mv.
     sea: f64,
     sea_y: f64,
@@ -245,6 +247,7 @@ impl PackSink {
             sea,
             sea_y,
             mv,
+            fit: None,
             tile: storage_tile as usize,
             tiles_x: (grid.w as usize).div_ceil(storage_tile as usize),
             gw: grid.w as usize,
@@ -252,9 +255,11 @@ impl PackSink {
         })
     }
 
-    /// The stored elevation of terrain `z_m`: round(16 · y), saturated (`synth::quantise`).
+    /// The stored elevation of terrain `z_m`: round(16 · y), saturated (`synth::quantise`), y
+    /// compressed under the build limit when the sink has a [`BuildFit`](crate::params::BuildFit).
     pub fn elevation_raw(&self, z_m: f32) -> i16 {
-        crate::synth::quantise(16.0 * (self.sea_y + (f64::from(z_m) - self.sea) / self.mv))
+        let y = self.sea_y + (f64::from(z_m) - self.sea) / self.mv;
+        crate::synth::quantise(16.0 * self.fit.map_or(y, |f| f.compress(y)))
     }
 
     /// Finishes both packs.

@@ -19,6 +19,7 @@
     "max_y": 639,
     "sea_level_y": 63,
     "pole_cap_deg": 75.0,
+    "build_limit_band_blocks": 48.0,
     "feature_scale": {
       "deposits": 1.0,
       "strata": 1.0,
