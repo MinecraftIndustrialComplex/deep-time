@@ -76,7 +76,14 @@ fn run(json: &str, threads: usize, name: &str) -> (WorldState, Value) {
     let s = Session::create(json, "", options(&dir, threads), Arc::new(NoGauge)).unwrap();
     assert_eq!(
         s.stage_names(),
-        ["plates", "climate", "surface", "structure", "deposits"]
+        [
+            "plates",
+            "climate",
+            "surface",
+            "volcanoes",
+            "structure",
+            "deposits"
+        ]
     );
     finish(&s);
     let world = s.checkpoint().unwrap().world;

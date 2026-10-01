@@ -34,6 +34,7 @@ pub fn bake(
     terrain: &Terrain,
     out: &mut Out<'_>,
 ) -> Result<Value, CoreError> {
+    let sp = p.structure.clone().unwrap_or_default();
     let mut hz = bake_horizons::bake(world, p)?;
     hz.check()
         .map_err(|e| CoreError::InvalidState(format!("the horizon bake failed its check: {e}")))?;
@@ -59,8 +60,11 @@ pub fn bake(
         "top_raise_blocks_max": max_raise,
         "top_rule": "the first horizon's top is at least the highest elevation plus the highest detail amplitude over the L3 cells within two L1 cells, plus one block",
         "smoothing": {
-            "sigma_cells": bake_horizons::SMOOTH_SIGMA_CELLS,
-            "radius_cells": bake_horizons::SMOOTH_RADIUS_CELLS,
+            "sigma_cells": sp.strata_smoothing_cells,
+            "sample_step_cells": bake_horizons::smooth_stride(sp.strata_smoothing_cells),
+            "radius_samples": bake_horizons::SMOOTH_RADIUS_SAMPLES,
+            "tongue_band_keys": bake_horizons::tongue_params(&sp).0,
+            "tongue_minor_share": sp.strata_minor_share,
             "rule": "each cell's stack is the Gaussian-weighted mean of its neighbours' height functions, cut at every key any of them has, each interval the class of the largest weighted thickness; the cell's own surface stays its first top",
         },
     }))

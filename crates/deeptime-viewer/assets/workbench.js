@@ -113,6 +113,8 @@
     collision: '#e6194b', orogeny_phase: '#b5651d', subduction_onset: '#b04adf', ridge_birth: '#4363d8',
     rift_onset: '#f58231', terrane_accretion: '#bfef45', hotspot_track: '#ff5a1f',
     large_igneous_province: '#ff1f1f', plate_birth: '#3cb44b', plate_death: '#a9a9a9',
+    volcano_arc: '#e8552d', volcano_hotspot_chain: '#f0a020', volcano_stratovolcano: '#ff3b1f', volcano_shield: '#ffc02e', volcano_caldera_complex: '#d45cff',
+    volcano_caldera: '#ff79c6', volcano_flood_basalt: '#9a8a7a',
     erosion_pulse: '#ffe119', basin_subsidence: '#42d4f4', marine_transgression: '#1e90ff',
     marine_regression: '#9ecae1', glaciation: '#e8f4ff', deposit_formation: '#ffd700',
   };
@@ -124,18 +126,22 @@
     return `hsl(${h % 360}, 70%, 60%)`;
   }
 
-  // Layers: grouped by their prefix, named for people (the raw name stays in the legend).
+  // Layers: grouped by their prefix, named for people (the raw name stays in the legend). The
+  // first of DEFAULT_LAYERS a run has is shown until someone picks another: the satellite view
+  // (true colour, core satellite.rs), else the elevation.
+  const DEFAULT_LAYERS = ['satellite', 'elevation'];
   const LAYER_GROUPS = [['', 'Planet'], ['climate', 'Climate'], ['surface', 'Surface'], ['structure', 'Structure'],
-    ['strata', 'Strata'], ['deposits', 'Deposits'], ['input', 'Deposit inputs']];
+    ['strata', 'Strata'], ['volcanoes', 'Volcanoes'], ['deposits', 'Deposits'], ['input', 'Deposit inputs']];
   const layerGroup = name => { const i = name.indexOf('/'); return i < 0 ? '' : name.slice(0, i); };
   const LAYER_WORDS = {
-    elevation: 'Elevation', plates: 'Plates', crust_age: 'Crust age', regime: 'Tectonic regime', provinces: 'Geologic provinces', water_level: 'Water level',
+    satellite: 'Satellite', elevation: 'Elevation', plates: 'Plates', crust_age: 'Crust age', regime: 'Tectonic regime', provinces: 'Geologic provinces', water_level: 'Water level',
     t_mean: 'Mean temperature', t_warm: 'Warmest month', t_cold: 'Coldest month', precip: 'Precipitation', koppen: 'Köppen climate',
     aridity: 'Aridity', glacier: 'Glaciers', ela: 'Snow line', temperature: 'Temperature', vegetation: 'Vegetation',
     erosion: 'Erosion', deposition: 'Deposition', sediment: 'Sediment', class: 'Surface rock', drainage: 'Drainage', regolith: 'Regolith',
     rock: 'Rock', log_grade: 'Metamorphic grade', trap_structure: 'Trap structures', outcrop: 'Outcrop', bedrock: 'Bedrock',
     porphyry_cu_mo_au: 'Porphyry Cu-Mo-Au', bif_fe: 'Banded iron', coal_seam: 'Coal seams', mvt_zn_pb: 'MVT Zn-Pb',
     sedex_zn_pb: 'SEDEX Zn-Pb', petroleum_trap: 'Petroleum traps', sites: 'Deposit sites', arc_magma_flux: 'Arc magma flux',
+    map: 'Volcanoes', flood_basalt: 'Flood-basalt outcrop',
     carbonate_platform: 'Carbonate platforms', euxinic_basin: 'Euxinic basins', coal_facies: 'Coal facies', erosion_rate: 'Erosion rate',
   };
   const UNIT_SUFFIX = [['_m_myr', 'm/Myr'], ['_mm', 'mm/yr'], ['_km', 'km'], ['_m', 'm'], ['_c', '°C']];
@@ -224,7 +230,17 @@
     let h = `<div class="lh"><span class="lname">${esc(label || 'No layer')}</span><span class="lraw">${esc(layerName || '')}${info && info.name !== layerName ? ` · ramp ${esc(info.name)}` : ''}</span><span class="lunit">${esc(unit)}</span></div>`;
     if (!info) return h + '<div class="note">Loading the colours…</div>';
     if (info.cat && info.labelled && info.classes.length <= 40) {
-      h += `<div class="cats">${info.classes.map(k => `<div title="${esc(k.v)}"><i style="background:${k.c}"></i><span>${esc(k.label ?? k.v)}</span></div>`).join('')}</div>`;
+      // A key: swatches with their labels, wider columns for long labels, under the ramp's group
+      // headings when it has them (the satellite view's land, snow and ice, sea).
+      const wide = info.classes.some(k => String(k.label ?? '').length > 11);
+      const cell = k => `<div title="${esc(k.label ?? k.v)}"><i style="background:${k.c}"></i><span>${esc(k.label ?? k.v)}</span></div>`;
+      const groups = Array.isArray(info.ramp.groups) ? info.ramp.groups : null;
+      if (groups) {
+        h += `<div class="cats${wide ? ' wide' : ''} grouped">${groups.map(([g, a, b]) =>
+          `<div class="cgroup">${esc(g)}</div>${info.classes.filter(k => k.v >= a && k.v <= b).map(cell).join('')}`).join('')}</div>`;
+      } else {
+        h += `<div class="cats${wide ? ' wide' : ''}">${info.classes.map(cell).join('')}</div>`;
+      }
     } else if (info.cat) {
       h += `<div class="strip">${info.classes.map(k => `<i style="background:${k.c}"></i>`).join('')}</div>`;
       h += `<div class="note" style="-webkit-line-clamp:1">${info.classes.length} classes, unlabelled</div>`;
@@ -450,7 +466,7 @@
     for (const p of panes) {
       if (p.run !== run) continue;
       if (frames) {
-        if (!layer && run.layers.length) layer = run.layers.includes('elevation') ? 'elevation' : run.layers[0];
+        if (!layer && run.layers.length) layer = DEFAULT_LAYERS.find(n => run.layers.includes(n)) || run.layers[0];
         layersDirty = true;
         if (p.i === focus && p.cur < 0 && run.frames.length) { const n = run.frames.length - 1; if (ready(run.image(displayIndex(run, n)))) show(p, n); }
       }
@@ -843,6 +859,8 @@
     if (!s) return '';
     if (s.nodata) return 'no data';
     if (!s.val) return '';
+    // The satellite view is true colour, so the nearest key colour is only what the spot looks like.
+    if (s.val.cls && s.info && s.info.name === 'satellite') return `looks like ${(s.val.cls.label || '').toLowerCase()}`;
     if (s.val.cls) return s.val.cls.label ? `${s.val.cls.label}` : `class ${s.val.cls.v}`;
     const { unit } = layerLabel(s.name);
     return `≈ ${numText(s.val.v)}${unit && unit !== 'block y' ? ` ${unit}` : ''}`;
@@ -1628,6 +1646,18 @@
         `<div class="kv">${rows([['Kind', esc(String(s.kind))], ['Yields', prods || '—']])}</div>` +
         `<div class="chain" style="margin-top:8px">${why.forming_event ? `${ev(why.forming_event)}` : `<span class="none">${esc(why.error || 'No forming event recorded.')}</span>`}` +
         `${(why.chain || []).map(ev).join('')}</div>`;
+    }
+    // Volcanoes and flood basalts whose footprint holds the column (P1-21), nearest first.
+    for (const l of (c.landforms || []).slice(0, 3)) {
+      const e = l.event || {}, p = e.params || {};
+      const facts = [['Distance', `${numText(l.distance_km)} km from its centre`]];
+      if (p.fate) facts.push(['Now', esc(String(p.fate).replace(/_/g, ' '))]);
+      if (p.peak_height_m != null) facts.push(['Height', `${numText(p.height_m)} m of ${numText(p.peak_height_m)} m at its peak`]);
+      if (p.thickness_m != null) facts.push(['Lava pile', `${numText(p.thickness_m)} m in ${numText(p.flows)} flows`]);
+      if (p.cones_built != null) facts.push(['Cones', `${numText(p.standing)} standing (${numText(p.live)} live) of ${numText(p.cones_built)} built; the tallest ${numText(p.tallest_m)} m`]);
+      if (p.volcanoes_built != null) facts.push(['Volcanoes', `${numText(p.standing)} standing (${numText(p.islands)} islands, ${numText(p.seamounts)} seamounts) of ${numText(p.volcanoes_built)} built`]);
+      h += `<h5>Why here: ${esc(prettyKind(e.kind))}</h5><div class="kv">${rows(facts)}</div>` +
+        `<div class="chain" style="margin-top:8px">${ev(e)}${(l.chain || []).map(ev).join('')}</div>`;
     }
     for (const b of bodies) if (b.site != null && !site(b.site)) { h += `<div class="desc" style="margin-top:8px">Site ${b.site} owns body ${b.id}; its box is not over this column.</div>`; break; }
     h += `<div class="callout" style="margin-top:12px">${ic('info')}<div><b>This run's own terrain.</b> What Deep Time decides for the column, read from the run's bake: it does not include what other mods' features add. The 3D preview shows the placed blocks.</div></div>` +

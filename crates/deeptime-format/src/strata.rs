@@ -155,6 +155,8 @@ pub fn stack_at(
         return;
     }
     let floor = f64::from(min_y);
+    let band_keys = d.tongue_band_keys.unwrap_or(BAND_KEYS).max(1);
+    let minor = d.tongue_minor_share.unwrap_or(MINOR_SHARE);
     let y: Vec<Vec<f64>> = corners
         .iter()
         .map(|hz| keys.iter().map(|&s| height_at(hz, s, floor, d)).collect())
@@ -209,15 +211,17 @@ pub fn stack_at(
             emit(out, top, entries[0].1, entries[0].2);
         } else if entries.len() > 1 {
             entries.sort_unstable_by_key(|e| (e.0, e.1));
-            interfinger(out, &entries, s0, s1, top, bottom);
+            interfinger(out, &entries, (s0, s1), (top, bottom), band_keys, minor);
         }
         top = bottom;
     }
 }
 
-/// Keys per band of an interfingering facies change ([`interfinger`]).
+/// Keys per band of an interfingering facies change ([`interfinger`]) where the layer does not
+/// say (`LayerDesc::tongue_band_keys`).
 pub const BAND_KEYS: u32 = 64;
-/// A class's share of an interval below which it takes no part of a band ([`interfinger`]).
+/// A class's share of an interval below which it takes no part of a band ([`interfinger`]) where
+/// the layer does not say (`LayerDesc::tongue_minor_share`).
 pub const MINOR_SHARE: f64 = 0.15;
 
 /// Emits the interval [s0, s1] (heights `top` to `bottom`, linear in the key between) where
@@ -230,10 +234,10 @@ pub const MINOR_SHARE: f64 = 0.15;
 fn interfinger(
     out: &mut Vec<ColumnHorizon>,
     entries: &[(u32, u8, u16, f64)],
-    s0: u16,
-    s1: u16,
-    top: f64,
-    bottom: f64,
+    (s0, s1): (u16, u16),
+    (top, bottom): (f64, f64),
+    band_keys: u32,
+    minor: f64,
 ) {
     let mut total = 0.0f64;
     for e in entries {
@@ -244,7 +248,7 @@ fn interfinger(
     let mut share = [0.0f64; CELLS];
     let mut kept = 0.0f64;
     for (i, e) in entries.iter().enumerate() {
-        share[i] = (e.3 / total - MINOR_SHARE).max(0.0);
+        share[i] = (e.3 / total - minor).max(0.0);
         kept += share[i];
     }
     if kept <= 0.0 {
@@ -255,9 +259,9 @@ fn interfinger(
         }
     }
     let (k0, k1) = (f64::from(s0), f64::from(s1));
-    let band = f64::from(BAND_KEYS);
-    for n in u32::from(s0) / BAND_KEYS..=(u32::from(s1) - 1) / BAND_KEYS {
-        let base = f64::from(n * BAND_KEYS);
+    let band = f64::from(band_keys);
+    for n in u32::from(s0) / band_keys..=(u32::from(s1) - 1) / band_keys {
+        let base = f64::from(n * band_keys);
         let mut sum = 0.0f64;
         for (i, e) in entries.iter().enumerate() {
             let lo = base + band * (sum / kept);

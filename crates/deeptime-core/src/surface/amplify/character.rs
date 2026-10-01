@@ -273,6 +273,24 @@ impl CharacterFields {
         }
     }
 
+    /// Scales the fold ridges down by `keep` (0–1) per L1 cell, row-major on the L1 grid: the
+    /// volcano edifices (P1-21, `amplify/volcano.rs`) keep their cones' shape instead of taking
+    /// the strike ridges of the orogen they stand on. A neutral set (no plate fields) has none.
+    pub fn suppress_folds(&mut self, keep: &[f32]) {
+        if self.neutral || keep.len() != self.fold_c2.len() {
+            return;
+        }
+        for ((c, s), &k) in self
+            .fold_c2
+            .iter_mut()
+            .zip(self.fold_s2.iter_mut())
+            .zip(keep)
+        {
+            *c *= k;
+            *s *= k;
+        }
+    }
+
     /// The youth and the fold strength per L1 cell (row-major, the plate model's L1 grid).
     pub fn maps(&self) -> (Vec<f32>, Vec<f32>) {
         let fold = self

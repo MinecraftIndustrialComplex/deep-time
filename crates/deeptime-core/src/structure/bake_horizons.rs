@@ -51,6 +51,8 @@ pub struct Horizons {
     pub classes: Vec<u8>,
     /// `keys[c·K + h]`, the horizon's stratigraphic key span [top, base] (`columns::key`).
     pub keys: Vec<[u16; 2]>,
+    /// The column rule's tongue parameters written into the layer (keys per band, minor share).
+    pub tongues: (u32, f64),
 }
 
 /// A horizon while it is baked: top (1/16 block), class, key span.
@@ -198,10 +200,24 @@ fn write_cell(hz: &[H], tops: &mut [i16], classes: &mut [u8], keys: &mut [[u16; 
     hz.len()
 }
 
-/// The lateral smoothing of the stacks (format 0.2), in L1 cells: σ of the Gaussian and the
-/// window's half-width.
-pub const SMOOTH_SIGMA_CELLS: f64 = 2.5;
-pub const SMOOTH_RADIUS_CELLS: i64 = 5;
+/// The smoothing window's half-width in samples (`Horizons::smoothed`): (2·5 + 1)² samples,
+/// `SMOOTH_SAMPLE_SIGMA` cells of σ each.
+pub const SMOOTH_RADIUS_SAMPLES: i64 = 5;
+/// σ one sample step can serve: a larger σ samples every `ceil(σ / 2.5)`-th cell.
+pub const SMOOTH_SAMPLE_SIGMA: f64 = 2.5;
+
+/// The sample step of a smoothing of σ `sigma` cells (1 up to σ 2.5).
+pub fn smooth_stride(sigma: f64) -> i64 {
+    (sigma / SMOOTH_SAMPLE_SIGMA).ceil().max(1.0) as i64
+}
+
+/// The column rule's tongue parameters a preset asks for: (keys per band, minor share).
+pub fn tongue_params(p: &StructureParams) -> (u32, f64) {
+    let band = (f64::from(deeptime_format::strata::BAND_KEYS) * p.strata_tongue_scale)
+        .round()
+        .clamp(1.0, 65_535.0) as u32;
+    (band, p.strata_minor_share)
+}
 
 impl Horizons {
     /// Cell `c`'s height (1/16 block) at stratigraphic key `s`: its horizon tops at their key
@@ -235,24 +251,28 @@ impl Horizons {
 
     /// The stacks smoothed laterally, so that neighbouring cells tell one regional story
     /// instead of each its own (the strata log is carried cell by cell and differs a lot between
-    /// neighbours): for each cell, the Gaussian-weighted mean (σ `sigma` cells over the
-    /// (2r + 1)² cells around; x wraps, z clamps) of the neighbours' height functions, cut at
-    /// every key top and base any of them has; each interval takes the class holding the largest
-    /// weighted thickness there, equal neighbours join. The cell's own surface stays its first
-    /// top (units the neighbours hold above it pinch out at it; where the cell stands above the
-    /// mean, its top unit fills the difference). The stacks are then settled again (at least a
-    /// block thick, at most K).
-    pub fn smoothed(&self, sigma: f64, r: i64) -> Horizons {
+    /// neighbours): for each cell, the Gaussian-weighted mean (σ `sigma` cells; x wraps, z clamps)
+    /// of the neighbours' height functions, cut at every key top and base any of them has; each
+    /// interval takes the class holding the largest weighted thickness there, equal neighbours
+    /// join. The neighbours are the cells on a lattice of step [`smooth_stride`] anchored to the
+    /// grid (every cell samples the same lattice, so neighbouring cells see the same data) within
+    /// [`SMOOTH_RADIUS_SAMPLES`] steps, so the cost stays (2·5 + 1)² stacks a cell for any σ. The
+    /// cell's own surface stays its first top (units the neighbours hold above it pinch out at
+    /// it; where the cell stands above the mean, its top unit fills the difference). The stacks
+    /// are then settled again (at least a block thick, at most K). σ 0 changes nothing.
+    pub fn smoothed(&self, sigma: f64) -> Horizons {
+        if sigma <= 0.0 {
+            return self.clone();
+        }
         let (w, h) = (i64::from(self.grid.w), i64::from(self.grid.h));
         let k = self.k as usize;
-        let mut kernel = Vec::new();
-        for dj in -r..=r {
-            for di in -r..=r {
-                let d2 = (di * di + dj * dj) as f64;
-                kernel.push((di, dj, (-d2 / (2.0 * sigma * sigma)).exp()));
-            }
-        }
-        let wsum: f64 = kernel.iter().map(|x| x.2).sum();
+        let step = smooth_stride(sigma);
+        let reach = step * SMOOTH_RADIUS_SAMPLES;
+        let lattice = |a: i64| -> std::ops::RangeInclusive<i64> {
+            // Lattice positions (multiples of step) within a ± reach.
+            (a - reach).div_euclid(step) + i64::from((a - reach).rem_euclid(step) != 0)
+                ..=(a + reach).div_euclid(step)
+        };
         let mut out = self.clone();
         out.tops
             .par_chunks_mut(k)
@@ -269,13 +289,23 @@ impl Horizons {
                     let (i, j) = (c as i64 % w, c as i64 / w);
                     near.clear();
                     keys.clear();
-                    for &(di, dj, g) in &kernel {
-                        let jj = (j + dj).clamp(0, h - 1);
-                        let n = (jj * w + (i + di).rem_euclid(w)) as usize;
-                        near.push((n, g / wsum));
-                        for key in self.cell(n).2 {
-                            keys.extend_from_slice(key);
+                    let mut wsum = 0.0f64;
+                    for lj in lattice(j) {
+                        let jl = lj * step;
+                        for li in lattice(i) {
+                            let il = li * step;
+                            let (di, dj) = ((il - i) as f64, (jl - j) as f64);
+                            let g = (-(di * di + dj * dj) / (2.0 * sigma * sigma)).exp();
+                            let n = (jl.clamp(0, h - 1) * w + il.rem_euclid(w)) as usize;
+                            near.push((n, g));
+                            wsum += g;
+                            for key in self.cell(n).2 {
+                                keys.extend_from_slice(key);
+                            }
                         }
+                    }
+                    for x in near.iter_mut() {
+                        x.1 /= wsum;
                     }
                     keys.sort_unstable();
                     keys.dedup();
@@ -451,6 +481,8 @@ impl Horizons {
         d.units = "block/16 top, class index, key top, key base".into();
         d.scale = 1.0 / 16.0;
         d.stack_depth = Some(self.k);
+        d.tongue_band_keys = Some(self.tongues.0);
+        d.tongue_minor_share = Some(self.tongues.1);
         LoadedLayer::new(d, bytes)
     }
 
@@ -515,8 +547,9 @@ pub fn bake_with(
         tops,
         classes,
         keys,
+        tongues: tongue_params(p),
     }
-    .smoothed(SMOOTH_SIGMA_CELLS, SMOOTH_RADIUS_CELLS)
+    .smoothed(p.strata_smoothing_cells)
 }
 
 #[cfg(test)]
@@ -609,6 +642,7 @@ mod tests {
             tops: tops.repeat(2),
             classes: classes.repeat(2),
             keys: keys.repeat(2),
+            tongues: (64, 0.15),
         };
         h.check().unwrap();
         // The soil and coal were thinner than a block and joined their neighbours.
@@ -649,6 +683,7 @@ mod tests {
             tops: tops.repeat(2),
             classes: classes.repeat(2),
             keys: keys.repeat(2),
+            tongues: (64, 0.15),
         };
         h.check().unwrap();
         // A surface below the world's floor still gets one horizon a block thick.

@@ -61,7 +61,7 @@
       r.type = 'radio'; r.name = 'layer'; r.value = l.name; r.checked = l.name === current;
       r.addEventListener('change', () => { current = l.name; legend(); draw(); });
       lab.appendChild(r);
-      lab.appendChild(document.createTextNode(' ' + l.name));
+      lab.appendChild(document.createTextNode(' ' + l.name + (l.view ? ' (true colour, the last keyframe)' : '')));
       layerBox.appendChild(lab);
     }
     if (!waterLayer) document.getElementById('water').parentElement.style.display = 'none';
@@ -71,6 +71,7 @@
       img.onload = draw;
       img.src = l.image.file;
       images[l.name] = img;
+      if (!l.values) continue;   // a view layer (the satellite picture) is an image only
       const s = document.createElement('script');
       s.src = l.values.file;
       document.body.appendChild(s);
@@ -143,7 +144,7 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       const base = B.layers.find(l => l.name === current);
       drawWrapped(images[current], base, 1);
-      if (waterLayer && document.getElementById('water').checked && current !== 'water_level') {
+      if (waterLayer && document.getElementById('water').checked && current !== 'water_level' && !base.view) {
         drawWrapped(images.water_level, waterLayer, 0.85);
       }
       if (document.getElementById('grat').checked) {
@@ -166,6 +167,20 @@
     function legend() {
       const l = B.layers.find(x => x.name === current);
       const ramp = B.ramps.ramps[l.ramp];
+      // A labelled categorical ramp (the satellite view's key) is shown as swatches.
+      const cats = document.getElementById('legendcats');
+      const labelled = !!(ramp && ramp.labels);
+      cats.hidden = !labelled;
+      document.getElementById('legendbar').hidden = labelled;
+      document.querySelector('#legend .ends').hidden = labelled;
+      if (labelled) {
+        cats.title = ramp._comment || '';
+        cats.innerHTML = ramp.labels.map((lab, k) => {
+          const stop = ramp.stops.find(s => s[0] === k);
+          return stop ? `<span><i style="background:${stop[1]}"></i>${esc(lab)}</span>` : '';
+        }).join('');
+        return;
+      }
       const bar = document.getElementById('legendbar');
       const lc = bar.getContext('2d');
       const stops = ramp.stops, lo = stops[0][0], hi = stops[stops.length - 1][0];
@@ -222,6 +237,7 @@
         ['longitude', `${lon.toFixed(3)}°  (360°·(x + C/2)/C; the seam x = ±C/2 is 0°)`],
       ];
       for (const l of B.layers) {
+        if (!l.values) continue;
         const s = sample(l, x, z);
         rows.push([l.name, esc(s.text) + (s.cell ? `<br><span class="hint">${esc(s.cell)}</span>` : '')]);
       }
@@ -398,8 +414,9 @@
     const strip = document.getElementById('strip');
     const frames = new Map();   // "<n>/<layer>" -> Image
     let idx = 0, playing = null;
-    const layerNames = K.length ? K[0].layers.map(l => l.name) : [];
-    let layer = layerNames[0];
+    const layerNames = [];
+    for (const f of K) for (const l of f.layers) if (!layerNames.includes(l.name)) layerNames.push(l.name);
+    let layer = layerNames.includes('satellite') ? 'satellite' : layerNames[0];
     for (const n of layerNames) {
       const o = document.createElement('option');
       o.value = o.textContent = n;

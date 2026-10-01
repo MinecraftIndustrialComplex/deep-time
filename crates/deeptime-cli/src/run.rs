@@ -159,7 +159,7 @@ pub fn print_census(census: &Value) {
     for t in census["types"].as_array().into_iter().flatten() {
         let f = |k: &str| t[k].as_f64().unwrap_or(0.0);
         println!(
-            "deposits {:<30} sites={:>3} counted={:>3} density={:.1} target={:>7.2} expected={:>7.2} expected_sites={:>7.2} at_positions={:>7.2} preservation={:.3} formed_expected={:>7.2} drawn={:>3} capped={} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={} seams={} seams_max={} measures_m={:.0}",
+            "deposits {:<30} sites={:>3} counted={:>3} density={:.1} target={:>7.2} expected={:>7.2} expected_sites={:>7.2} at_positions={:>7.2} preservation={:.3} formed_expected={:>7.2} drawn={:>3} capped={} tracts={:>3} permissive_km2={:>9.0} mean_F={:.3} buried={} truncated={} eroded={} too_deep={} children={} guaranteed={} dropped={} on_land={} seams={} seams_max={} measures_m={:.0} no_cover={} cover_capped={}",
             t["id"].as_str().unwrap_or("?"),
             f("sites"),
             f("counted"),
@@ -186,6 +186,8 @@ pub fn print_census(census: &Value) {
             f("seams"),
             f("seams_max"),
             f("measures_m"),
+            f("no_cover"),
+            f("cover_capped"),
         );
         if let Some(b) = t["best_cell"].as_object() {
             let g = |k: &str| b[k].as_f64().unwrap_or(0.0);
@@ -509,6 +511,16 @@ fn structure_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     Some(deeptime_core::structure::summary_line(&v))
 }
 
+/// The volcano stage's summary line (P1-21): `volcanoes_final=<steps> strato_born=… …`, when the
+/// pipeline ran it.
+fn volcanoes_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note = world
+        .notes
+        .get(deeptime_core::surface::volcanoes::STAGE_NAME)?;
+    let v: Value = serde_json::from_str(note).ok()?;
+    Some(deeptime_core::surface::volcanoes::summary_line(&v))
+}
+
 /// The glaciers' summary line: `glacial_final eroded_km3=… till_km3=… …`, when the surface had
 /// glaciers to model (a climate stage).
 fn glacial_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -573,6 +585,7 @@ pub(crate) fn timings_line(
         deeptime_core::surface::STAGE_NAME,
         deeptime_core::climate::STAGE_NAME,
         deeptime_core::structure::STAGE_NAME,
+        deeptime_core::surface::volcanoes::STAGE_NAME,
         deeptime_core::surface::young::STAGE_NAME,
     ] {
         if let Some(note) = world
@@ -657,6 +670,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
             glacial_line(world),
             climate_line(world),
             structure_line(world),
+            volcanoes_line(world),
             young_line(world),
             amplify_line(world),
         ]
@@ -849,6 +863,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         std::fs::write(path, note)?;
     }
     if let Some(line) = structure_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = volcanoes_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = young_line(&ck.world) {

@@ -11,9 +11,14 @@ import java.util.Locale;
  *
  * @param nodata     the raw cell value meaning "no data", or NaN when the layer has none
  * @param stackDepth K for {@link DType#HORIZON_STACK} layers, else 0
+ * @param tongueBandKeys  horizon stacks: keys per band of the column rule's tongues ({@code tongue_band_keys},
+ *                        default {@link Columns#BAND_KEYS})
+ * @param tongueMinorShare horizon stacks: the share below which a rock takes no part in the tongues
+ *                        ({@code tongue_minor_share}, default {@link Columns#MINOR_SHARE})
  */
 public record LayerDesc(String name, DType dtype, double scale, double offset, String units, GridDesc grid,
-                        int tile, Codec codec, double nodata, int stackDepth) {
+                        int tile, Codec codec, double nodata, int stackDepth, int tongueBandKeys,
+                        double tongueMinorShare) {
 
     /** Cell types (FORMAT.md). */
     public enum DType {
@@ -43,6 +48,8 @@ public record LayerDesc(String name, DType dtype, double scale, double offset, S
     static LayerDesc fromJson(JsonObject o) {
         JsonElement nd = o.get("nodata");
         JsonElement k = o.get("stack_depth");
+        JsonElement band = o.get("tongue_band_keys");
+        JsonElement minor = o.get("tongue_minor_share");
         LayerDesc d = new LayerDesc(
                 o.get("name").getAsString(),
                 DType.parse(o.get("dtype").getAsString()),
@@ -53,7 +60,9 @@ public record LayerDesc(String name, DType dtype, double scale, double offset, S
                 o.get("tile").getAsInt(),
                 Codec.parse(o.get("codec").getAsString()),
                 nd == null || nd.isJsonNull() ? Double.NaN : nd.getAsDouble(),
-                k == null || k.isJsonNull() ? 0 : k.getAsInt());
+                k == null || k.isJsonNull() ? 0 : k.getAsInt(),
+                band == null || band.isJsonNull() ? Columns.BAND_KEYS : band.getAsInt(),
+                minor == null || minor.isJsonNull() ? Columns.MINOR_SHARE : minor.getAsDouble());
         d.validate();
         return d;
     }
@@ -63,6 +72,9 @@ public record LayerDesc(String name, DType dtype, double scale, double offset, S
             throw new WorldDataException("layer " + name + ": empty grid or tile");
         if ((dtype == DType.HORIZON_STACK) != (stackDepth > 0))
             throw new WorldDataException("layer " + name + ": stack_depth " + stackDepth + " with dtype " + dtype);
+        if (tongueBandKeys <= 0 || !(tongueMinorShare >= 0 && tongueMinorShare < 0.5))
+            throw new WorldDataException("layer " + name + ": tongue_band_keys " + tongueBandKeys
+                    + ", tongue_minor_share " + tongueMinorShare);
     }
 
     public boolean hasNodata() {
