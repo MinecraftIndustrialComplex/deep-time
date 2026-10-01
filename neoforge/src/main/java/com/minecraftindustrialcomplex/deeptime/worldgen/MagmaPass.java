@@ -4,7 +4,10 @@ package com.minecraftindustrialcomplex.deeptime.worldgen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.CarvingMask;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.List;
@@ -22,6 +25,10 @@ import java.util.concurrent.atomic.LongAdder;
  *   <li>Shell blocks that are open (air, water) become basalt: magma is always walled in.</li>
  *   <li>The plug's solid blocks become magma blocks.</li>
  *   <li>A crater lake's blocks become lava and the ground above its surface air.</li>
+ *   <li>Every block of a body and its shell goes into the chunk's carving masks, which vanilla's
+ *       carvers skip (as {@link WaterBodies} does for water): a cave may run up to a chamber's
+ *       shell, never through it. Without it a carver left 41 lava faces of one chamber hanging
+ *       over a cave.</li>
  * </ul>
  *
  * <p>Everything is decided from the block's position and the level's {@link Magma}; only the
@@ -56,6 +63,10 @@ public final class MagmaPass {
             return 0;
         int minY = chunk.getMinBuildHeight() + 1, maxY = chunk.getMaxBuildHeight() - 1;
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        CarvingMask[] masks = chunk instanceof ProtoChunk proto
+                ? new CarvingMask[]{proto.getOrCreateCarvingMask(GenerationStep.Carving.AIR),
+                        proto.getOrCreateCarvingMask(GenerationStep.Carving.LIQUID)}
+                : new CarvingMask[0];
         int placed = 0;
         for (Magma.Body b : bodies) {
             int lo = Math.max(minY, b.minY()), hi = Math.min(maxY, b.maxY());
@@ -76,6 +87,11 @@ public final class MagmaPass {
                         if (part == Magma.Part.NONE)
                             continue;
                         BlockState here = chunk.getBlockState(pos.set(x, y, z));
+                        // Carvers skip what the masks hold: the body and its shell stay whole, so no
+                        // cave opens onto magma (a crater lake's open air above it may be carved).
+                        if (part != Magma.Part.LAKE_AIR)
+                            for (CarvingMask m : masks)
+                                m.set(lx, y, lz);
                         switch (part) {
                             case CHAMBER -> {
                                 if (y <= ground - Magma.COVER) {
