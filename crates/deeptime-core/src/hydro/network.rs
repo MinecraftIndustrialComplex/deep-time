@@ -387,7 +387,15 @@ impl Net<'_> {
             self.tally.full += 1;
             return;
         }
-        if inflow <= 0.0 {
+        // Ground a block or more below sea level holds the sea's water in the game whatever
+        // reaches it (the column rule's sea, and the aquifer), so such a basin is never dry.
+        let sea = self.inp.sea_raw;
+        let lowest = members
+            .iter()
+            .map(|&m| i32::from(elev[m as usize]))
+            .min()
+            .unwrap_or(i32::MAX);
+        if inflow <= 0.0 && lowest > sea - 16 {
             self.tally.dry += 1;
             return;
         }
@@ -429,6 +437,17 @@ impl Net<'_> {
             cells += count[k] as usize;
             evaporation += evap[k];
             k += 1;
+        }
+        // Below sea level the water stands at sea level at least (see above): the lake is what
+        // the sea's level floods of the basin, however little reaches it.
+        if floor <= sea - 16 {
+            let sea_k = ((sea - floor) as usize).min(bins - 1);
+            while k < sea_k {
+                cells += count[k] as usize;
+                evaporation += evap[k];
+                left = 0.0;
+                k += 1;
+            }
         }
         let level = (floor + k as i32) as i16;
         let wet = |i: usize| i32::from(spill[i]) < i32::from(level);
@@ -761,10 +780,7 @@ pub fn run(inp: &Input<'_>) -> Output {
         .par_iter()
         .map(|&(c, _)| {
             let cu = c as usize;
-            (inp.climate)(
-                ox + (cu % g.w) as i64 * ri,
-                oz + (cu / g.w) as i64 * ri,
-            )
+            (inp.climate)(ox + (cu % g.w) as i64 * ri, oz + (cu / g.w) as i64 * ri)
         })
         .collect();
     let mut water_level = vec![NODATA; n];

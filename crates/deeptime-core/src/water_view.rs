@@ -62,10 +62,10 @@ use deeptime_format::{GridDesc, Ramp, Ramps};
 
 use crate::bake::water::{halve, load_i16};
 use crate::error::CoreError;
+use crate::hydro::Climate;
 use crate::hydro::network::{self, NODATA, kind};
 use crate::keyframes::ViewScale;
 use crate::satellite;
-use crate::hydro::Climate;
 use crate::surface::climate::{P_FIELD, T_FIELD, zonal_precip, zonal_temperature};
 use crate::world::{Field, WorldState};
 
@@ -90,6 +90,9 @@ pub const FROZEN: [u8; 3] = [0xa9, 0xd3, 0xe6];
 pub const PLAYA: [u8; 3] = [0xf0, 0xd9, 0xa8];
 /// A playa on the satellite view: its Salt flat class's colour (`satellite.keys.salt_flat`).
 pub const PLAYA_SATELLITE: [u8; 3] = [0xe3, 0xdd, 0xd0];
+/// A frozen lake on the satellite view: snow-covered lake ice, nearly white with a blue cast, so
+/// it reads as ice beside open water and as a lake beside snow (`satellite.keys.frozen_lake`).
+pub const FROZEN_SATELLITE: [u8; 3] = [0xd0, 0xe6, 0xf0];
 
 /// The look's constants (the module docs give them in words).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -153,6 +156,9 @@ pub struct Info {
     /// The hydrology's own milliseconds per phase (`hydro::network`'s `stats.millis`: sea, flood,
     /// flats, receivers, lakes, discharge, rivers); `Null` for water read from the bake.
     pub phases: serde_json::Value,
+    /// The hydrology's statistics (`hydro::network`'s `stats`: the lakes, what became of the
+    /// basins, the lakes by climate, the largest); `Null` for water read from the bake.
+    pub stats: serde_json::Value,
 }
 
 /// The water of one frame in the picture's pixels (row 0 north, pixel (px, py) centred on the
@@ -217,7 +223,8 @@ fn climate_at<'w>(
     let cold = world.fields.get(crate::climate::field::T_COLD).filter(ok);
     move |bx, bz| {
         let (x, z) = (bx as f64, bz as f64);
-        let at = |f: Option<&Field>| f.map_or(f64::NAN, |f| f64::from(crate::bake::bilinear(f, x, z)));
+        let at =
+            |f: Option<&Field>| f.map_or(f64::NAN, |f| f64::from(crate::bake::bilinear(f, x, z)));
         match (t, p) {
             (Some(t), Some(p)) => Climate::of(
                 f64::from(crate::bake::bilinear(p, x, z)),
@@ -227,7 +234,12 @@ fn climate_at<'w>(
             ),
             _ => {
                 let lat = -360.0 * z / circumference;
-                Climate::of(zonal_precip(lat), zonal_temperature(lat), f64::NAN, f64::NAN)
+                Climate::of(
+                    zonal_precip(lat),
+                    zonal_temperature(lat),
+                    f64::NAN,
+                    f64::NAN,
+                )
             }
         }
     }
@@ -308,6 +320,7 @@ impl WaterView {
                 playa_px: 0.0,
                 millis: 0.0,
                 phases: serde_json::Value::Null,
+                stats: serde_json::Value::Null,
             },
         })
     }
@@ -410,6 +423,7 @@ impl WaterView {
             playa_px: self.playa.iter().map(|&c| f64::from(c)).sum(),
             millis: started.elapsed().as_secs_f64() * 1000.0,
             phases: serde_json::Value::Null,
+            stats: serde_json::Value::Null,
         };
     }
 
@@ -455,13 +469,21 @@ impl WaterView {
             }
             if shown > 0.0 {
                 if self.playa[k] > 0.0 {
-                    blend(px, PLAYA_SATELLITE, self.playa[k] * look.playa_alpha * shown);
+                    blend(
+                        px,
+                        PLAYA_SATELLITE,
+                        self.playa[k] * look.playa_alpha * shown,
+                    );
                 }
                 if self.lake[k] > 0.0 {
                     blend(px, LAKE, self.lake[k] * look.lake_alpha * shown);
                 }
                 if self.frozen[k] > 0.0 {
-                    blend(px, FROZEN, self.frozen[k] * look.lake_alpha * shown);
+                    blend(
+                        px,
+                        FROZEN_SATELLITE,
+                        self.frozen[k] * look.lake_alpha * shown,
+                    );
                 }
             }
         }
@@ -558,6 +580,7 @@ fn derive_with_rivers(
     out.draw_rivers(&net.rivers, view, &look);
     out.finish(&net.rivers, Source::Derived, started);
     out.info.phases = net.stats["millis"].clone();
+    out.info.stats = net.stats;
     Some((out, net.rivers))
 }
 

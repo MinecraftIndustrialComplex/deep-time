@@ -178,6 +178,7 @@
   "deeptime.editor.field.lake_min_depth": "Shallowest lake",
   "deeptime.editor.field.lake_evaporation": "Lake evaporation",
   "deeptime.editor.field.lake_balance": "Lake levels follow the climate",
+  "deeptime.editor.field.lake_evaporation_base": "Lake loss at freezing point",
   "deeptime.editor.field.lake_evaporation_factor": "Open-water evaporation",
   "deeptime.editor.field.snow_melt": "Snow melt per warm day",
   "deeptime.editor.field.lake_freeze": "Lakes freeze below",

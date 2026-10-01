@@ -30,6 +30,9 @@
 //!      lake rises over becomes part of it.
 //!    - *It is too thin.* A balance lake under the lake thresholds is a **playa** (a salt flat:
 //!      water that reaches it evaporates off the floor); with no inflow at all the basin is dry.
+//!    - *It lies below sea level.* Ground a block or more below sea level holds the sea's water
+//!      in the game whatever the climate (the column rule's sea), so a terminal basin's lake
+//!      stands at sea level at least: a basin below sea level is never dry.
 //!
 //!    An upstream lake that does not spill passes nothing on, so a chain of lakes is solved in
 //!    order. `lake_balance` false keeps every lake full, as before.
@@ -201,8 +204,13 @@ pub struct HydroParams {
     /// gets holds a smaller lake below its rim, a salt flat or nothing). False: every lake is
     /// full to its rim, as before 2026-10-01.
     pub lake_balance: bool,
-    /// Open-water evaporation as a multiple of the potential evapotranspiration of the months
-    /// above freezing (60 mm/yr per °C).
+    /// What open water loses in a year at the freezing point, mm: the evaporation of the cool
+    /// season and the sublimation of lake ice. Lakes lose more than the land's potential
+    /// evapotranspiration says in cold climates (Lake Superior about 600 mm a year at a mean of
+    /// 4 °C, Baikal 400–500 at −1 °C, high-Arctic and Antarctic lakes 150–350).
+    pub lake_evaporation_base_mm: f64,
+    /// Scales open-water evaporation: `lake_evaporation_base_mm` plus 60 mm/yr per °C of the
+    /// year's mean temperature above freezing, times this.
     pub lake_evaporation_factor: f64,
     /// Snow a degree-day above freezing melts, mm (the degree-day factor): where the year has too
     /// few of them the snow stays, and neither runs off nor feeds a lake.
@@ -238,6 +246,7 @@ impl Default for HydroParams {
             lake_min_depth_blocks: 1.0,
             lake_evaporation: true,
             lake_balance: true,
+            lake_evaporation_base_mm: 200.0,
             lake_evaporation_factor: 1.0,
             snow_melt_mm_per_degree_day: 4.0,
             lake_freeze_mean_c: 0.0,
@@ -288,6 +297,12 @@ impl HydroParams {
             "lake_min_depth_blocks",
         )?;
         within(
+            self.lake_evaporation_base_mm,
+            0.0,
+            1000.0,
+            "lake_evaporation_base_mm",
+        )?;
+        within(
             self.lake_evaporation_factor,
             0.0,
             5.0,
@@ -318,9 +333,10 @@ impl HydroParams {
     ///   not melt stays as snow and ice (the climate stage's glaciers) and is not water here.
     /// - **Runoff** = liquid − ET, ET by Fu's Budyko curve with PET = 60 mm/°C × the mean annual
     ///   temperature (0 below freezing), as the surface stage.
-    /// - **Open-water evaporation** = `lake_evaporation_factor` × 60 mm/°C × the year's mean
-    ///   temperature above freezing: a lake under ice evaporates nothing (0 when
-    ///   `lake_evaporation` is false).
+    /// - **Open-water evaporation** = `lake_evaporation_factor` × (`lake_evaporation_base_mm` +
+    ///   60 mm/°C × the year's mean temperature above freezing): 200 mm a year at the freezing
+    ///   point (the cool season and the ice's sublimation), 1,100 at 15 °C, 2,000 at 30 °C; about
+    ///   what Lake Superior, the Caspian and Lake Chad lose (0 when `lake_evaporation` is false).
     pub fn budget(&self, c: &Climate) -> Budget {
         let (above, share) = c.thaw();
         let p = c.precip_mm.max(0.0);
@@ -331,7 +347,8 @@ impl HydroParams {
             runoff_mm: (liquid - crate::surface::climate::fu_et(p, pet)).max(0.0),
             rain_mm: liquid,
             evaporation_mm: if self.lake_evaporation {
-                self.lake_evaporation_factor * PET_MM_PER_C * above
+                self.lake_evaporation_factor
+                    * (self.lake_evaporation_base_mm + PET_MM_PER_C * above)
             } else {
                 0.0
             },

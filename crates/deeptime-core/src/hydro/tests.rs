@@ -365,13 +365,17 @@ fn the_thaw_and_the_budget_follow_the_seasons() {
     assert_eq!(Climate::steady(800.0, 12.0).thaw(), (12.0, 1.0));
     let b = p.budget(&Climate::steady(800.0, 12.0));
     assert_eq!(b.rain_mm, 800.0);
-    assert_eq!(b.evaporation_mm, 720.0);
+    assert_eq!(b.evaporation_mm, p.lake_evaporation_base_mm + 720.0);
     let et = crate::surface::climate::fu_et(800.0, 720.0);
     assert!((b.runoff_mm - (800.0 - et)).abs() < 1e-9);
     // Never above freezing: nothing.
     assert_eq!(Climate::of(300.0, -20.0, -2.0, -38.0).thaw(), (0.0, 0.0));
     let b = p.budget(&Climate::of(300.0, -20.0, -2.0, -38.0));
-    assert_eq!((b.runoff_mm, b.rain_mm, b.evaporation_mm), (0.0, 0.0, 0.0));
+    // (Its ice still sublimates: the base loss.)
+    assert_eq!(
+        (b.runoff_mm, b.rain_mm, b.evaporation_mm),
+        (0.0, 0.0, p.lake_evaporation_base_mm)
+    );
     // A mean of 0 °C with ±10 °C: half the year above, 10/π °C on average.
     let (above, share) = Climate::of(500.0, 0.0, 10.0, -10.0).thaw();
     assert!((share - 0.5).abs() < 1e-12 && (above - 10.0 / std::f64::consts::PI).abs() < 1e-12);
@@ -383,10 +387,62 @@ fn the_thaw_and_the_budget_follow_the_seasons() {
         lake_evaporation: false,
         ..p
     };
-    assert_eq!(off.budget(&Climate::steady(800.0, 12.0)).evaporation_mm, 0.0);
+    assert_eq!(
+        off.budget(&Climate::steady(800.0, 12.0)).evaporation_mm,
+        0.0
+    );
     // The aridity index is P / PET.
     assert!((Climate::steady(360.0, 30.0).aridity() - 0.2).abs() < 1e-12);
     assert_eq!(Climate::of(100.0, -20.0, -2.0, -38.0).aridity(), 10.0);
+}
+
+#[test]
+fn a_basin_below_sea_level_stands_at_sea_level_however_dry() {
+    // The bowl dug to 8 blocks below sea level (the game floods such ground with the sea's water
+    // whatever the bake says), its rim well above.
+    let g = grid();
+    let (w, h) = (g.w as usize, g.h as usize);
+    let elev: Vec<i16> = (0..w * h)
+        .map(|c| {
+            let (i, j) = ((c % w) as f64, (c / w) as f64);
+            let d2 = (i - 300.0).powi(2) + (j - 100.0).powi(2);
+            let y = if d2 < 144.0 {
+                SEA - 8.0 + 20.0 * d2 / 144.0
+            } else {
+                height(c % w, c / w)
+            };
+            (y * 16.0).round() as i16
+        })
+        .collect();
+    let sea_raw = (SEA * 16.0) as i32;
+    let run = |climate: Climate| {
+        network::run(&network::Input {
+            grid: &g,
+            elev: &elev,
+            sea_raw,
+            m_per_block_h: 300.0,
+            climate: &move |_, _| climate,
+            params: &HydroParams::default(),
+            width_scale: 1.0,
+        })
+    };
+    // No rain at all: the bowl is still a lake, at sea level, below its rim.
+    let dry = run(Climate::steady(0.0, 30.0));
+    check_holds(&dry, &elev, &g);
+    assert_eq!(dry.lakes.len(), 1);
+    let lake = &dry.lakes[0];
+    assert_eq!(i32::from(lake.level), sea_raw);
+    assert!(lake.level < lake.rim && lake.endorheic && lake.outlet == u32::MAX);
+    assert_eq!(lake.depth, 8 * 16);
+    assert!(dry.rivers.chains.is_empty());
+    // A little rain: still sea level (the balance alone would stand lower).
+    let arid = run(Climate::steady(150.0, 30.0));
+    assert!(arid.lakes.iter().any(|l| i32::from(l.level) == sea_raw));
+    // Wet: it fills to its rim, above sea level.
+    let wet = run(Climate::steady(1500.0, 5.0));
+    let full = wet.lakes.iter().max_by_key(|l| l.cells).unwrap();
+    assert!(full.level == full.rim && i32::from(full.level) > sea_raw);
+    assert!(full.cells > lake.cells);
 }
 
 /// A rough planet: hash noise in four octaves on a 512 × 256 grid of 2-block cells, sea beyond
@@ -463,12 +519,24 @@ fn check_holds(out: &Output, elev: &[i16], g: &GridDesc) {
             continue;
         }
         assert!(out.kind[c] == kind::LAKE || out.kind[c] == kind::FROZEN);
-        assert!(elev[c] < wl[c], "cell {c}: ground at or above its lake's level");
+        assert!(
+            elev[c] < wl[c],
+            "cell {c}: ground at or above its lake's level"
+        );
         if let Some(&k) = by_cell.get(&(c as u32)) {
             assert_eq!(out.lakes[k].level, wl[c]);
         }
         let (i, j) = ((c % w) as i64, (c / w) as i64);
-        for (di, dj) in [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1)] {
+        for (di, dj) in [
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1),
+            (1, 1),
+            (-1, 1),
+            (1, -1),
+            (-1, -1),
+        ] {
             let nj = j + dj;
             if nj < 0 || nj >= h as i64 {
                 continue;
@@ -477,7 +545,10 @@ fn check_holds(out: &Output, elev: &[i16], g: &GridDesc) {
             if wl[n] == NODATA {
                 assert!(elev[n] >= wl[c], "the lake at cell {c} leaks into cell {n}");
             } else {
-                assert_eq!(wl[n], wl[c], "two lakes of different levels touch at {c}, {n}");
+                assert_eq!(
+                    wl[n], wl[c],
+                    "two lakes of different levels touch at {c}, {n}"
+                );
             }
         }
     }
@@ -533,7 +604,12 @@ fn rough_ground_holds_its_lakes_in_every_climate() {
             n("full") + n("below_rim"),
             "{b}"
         );
-        lakes.push((lake_cells(&out), n("full"), n("below_rim"), n("playa") + n("dry")));
+        lakes.push((
+            lake_cells(&out),
+            n("full"),
+            n("below_rim"),
+            n("playa") + n("dry"),
+        ));
     }
     // Drier climates hold less lake, fewer full basins and more that stand below their rim or dry.
     assert!(lakes.windows(2).all(|p| p[1].0 <= p[0].0), "{lakes:?}");
@@ -565,9 +641,20 @@ fn an_upstream_lake_that_does_not_spill_feeds_nothing_downstream() {
     check_holds(&split, &elev, &g);
     let terminal = split.lakes.iter().filter(|l| l.level < l.rim).count();
     assert!(terminal > 0, "the desert's basins do not fill");
-    assert!(split.lakes.iter().filter(|l| l.level < l.rim).all(|l| l.outlet == u32::MAX));
+    assert!(
+        split
+            .lakes
+            .iter()
+            .filter(|l| l.level < l.rim)
+            .all(|l| l.outlet == u32::MAX)
+    );
     let q_max = |o: &Output| o.rivers.vertices.iter().map(|v| v.q).fold(0.0f32, f32::max);
-    assert!(q_max(&split) < q_max(&wet), "{} {}", q_max(&split), q_max(&wet));
+    assert!(
+        q_max(&split) < q_max(&wet),
+        "{} {}",
+        q_max(&split),
+        q_max(&wet)
+    );
     // No chain leaves a lake that stands below its rim: a chain's first vertex is never in one.
     let w = g.w as usize;
     let cell = |x: f32, z: f32| {

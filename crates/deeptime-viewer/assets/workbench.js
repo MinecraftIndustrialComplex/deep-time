@@ -884,7 +884,7 @@
     // their key colours; it counts only where the satellite picture shows it (glacier ice hides it).
     if (info && info.name === 'satellite') {
       const body = lakeUnder(p, r, dn, f, lat, lon);
-      if (body && lakeKind(info, rgb, 2500) === body) return { name, rgb, info, body };
+      if (body && lakeKind(info, rgb, 1200) === body) return { name, rgb, info, body };
     }
     return { name, rgb, info, val: valueAt(info, rgb) };
   }
