@@ -287,6 +287,11 @@ public final class FarColumn {
      * strata cell as stored: the rule's blend between cells moves a bed's edge by less than such a
      * column is wide, and its stencil is built per strata cell, which costs a wide column (one new
      * cell each) ten times what it costs a chunk's columns (one cell for many).
+     *
+     * <p>The nearest-cell path is the one place far terrain reads the stored horizons itself
+     * instead of through {@link Columns}: a rule added to the column evaluator (folds, faults)
+     * reaches narrow columns through {@link Columns#stack} and must be added here for wide ones,
+     * or this path given a cheap entry in {@link Columns}.
      */
     public static void rock(WorldData wd, RasterSampler strata, long wx, long z, int step, Columns.Stack out) {
         rock(wd, strata, wx, z, step <= FULL_RULE_MAX_STEP, out);
