@@ -124,7 +124,12 @@ if [ "$SERVER" = 1 ]; then
 fi
 KEY="$(cat "$REPO/flake.nix" "$REPO/flake.lock" | sha256sum | cut -c1-16)"
 PROFILE="$CACHE/devshell-$KEY"
-INNER="cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac && { [ -e '$PROFILE' ] || nix develop --profile '$PROFILE' -c true; } && exec nix develop '$PROFILE' -c zsh -c $(printf '%q' "$CMD")"
+# Every worktree has its own copy and target/ on the SSD, so target size is multiplied by the number
+# of agents (2026-09-30: ~60 copies filled the SSD). Incremental caches were half of a debug target
+# and full debuginfo most of the rest; without them a copy's target is a fraction of the size, at the
+# cost of recompiling the workspace crates (not the dependencies) on each change. Line tables keep
+# file:line in panics and backtraces.
+INNER="cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=line-tables-only && { [ -e '$PROFILE' ] || nix develop --profile '$PROFILE' -c true; } && exec nix develop '$PROFILE' -c zsh -c $(printf '%q' "$CMD")"
 set +e
 "${SSH[@]}" "exec zsh -lc $(printf '%q' "$INNER")"
 status=$?

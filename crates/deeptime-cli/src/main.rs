@@ -12,6 +12,7 @@ mod run;
 mod satellite_view;
 mod structure_view;
 mod synth;
+mod volcano_view;
 mod watch;
 
 use std::net::IpAddr;
@@ -312,6 +313,19 @@ enum Command {
         #[arg(long, default_value_t = parity::DEFAULT_SEED)]
         seed: u64,
     },
+    /// Review pictures of a run's volcanoes (P1-21): the finished terrain with them marked, the
+    /// settings that made them, and close views before and after the amplifier's shaping.
+    VolcanoView {
+        /// The run's last checkpoint (`run --checkpoints` writes `<out>/checkpoints/<n>-amplify.dtcp`).
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// The run's world-data folder (its `--out`).
+        #[arg(long)]
+        world_data: PathBuf,
+        /// Folder to write the pictures, `volcanoes.json` and `index.html` into.
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// The terrain of a box of a world-data folder as a float32 NumPy array (H, E, A·N and any
     /// --layers, nearest), for review renders without a Minecraft server.
     #[command(allow_negative_numbers = true)]
@@ -341,6 +355,19 @@ enum Command {
         /// JSON file to write.
         #[arg(long)]
         out: PathBuf,
+    },
+    /// Write fields of a checkpoint's world as raw little-endian f32 files (`<dir>/<name>.f32`,
+    /// `/` in a name becomes `__`) with an `index.json` of their grids, for analysis scripts.
+    DumpFields {
+        /// Checkpoint to read.
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// Folder to write.
+        #[arg(long)]
+        out: PathBuf,
+        /// Field names (comma-separated); default every field.
+        #[arg(long, value_delimiter = ',')]
+        fields: Vec<String>,
     },
     /// Draw the geologic-provinces view layer (shield, platform, orogen, basin, LIP, extended
     /// crust, oceanic crust by age) of a checkpoint's world as a PNG and print each class's share.
@@ -655,6 +682,20 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::VolcanoView {
+            input,
+            world_data,
+            out,
+        }) => match volcano_view::run(&input, &world_data, &out) {
+            Ok(v) => {
+                println!("deeptime volcano-view: {v} -> {}", out.display());
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("deeptime volcano-view: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some(Command::Parity {
             world_data,
             out,
@@ -756,6 +797,18 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::DumpFields { input, out, fields }) => {
+            match dump::fields(&input, &out, &fields) {
+                Ok(n) => {
+                    println!("deeptime dump-fields: {n} fields -> {}", out.display());
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime dump-fields: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::Synth {
             kind,
             strata,
@@ -880,13 +933,22 @@ fn preset_command(action: PresetAction) -> run::CliResult<()> {
 }
 
 /// `inspect-column --why`: puts `why` on each of the answer's sites: the forming event and its
-/// cause chain (four links deep, as the 3D export's site cards do) from the world data's event log.
+/// cause chain (four links deep, as the 3D export's site cards do) from the world data's event log;
+/// and `landforms`: the volcanoes and flood-basalt provinces (P1-21) whose footprint holds the
+/// column, nearest first, each with its event and cause chain.
 fn attach_why(v: &mut serde_json::Value, world_data: &std::path::Path) -> Result<(), String> {
     use deeptime_format::events::{EventId, EventLog};
+    let log = EventLog::load(world_data).map_err(|e| e.to_string())?;
+    if let (Some(lat), Some(lon)) = (v["lat"].as_f64(), v["lon"].as_f64()) {
+        let m = deeptime_format::Manifest::read(world_data).map_err(|e| e.to_string())?;
+        let landforms = landforms_at(&log, lat, lon, &m.scale);
+        if !landforms.is_empty() {
+            v["landforms"] = serde_json::json!(landforms);
+        }
+    }
     let Some(sites) = v["sites"].as_array_mut().filter(|s| !s.is_empty()) else {
         return Ok(());
     };
-    let log = EventLog::load(world_data).map_err(|e| e.to_string())?;
     for site in sites {
         let formed = site["forming_event"]
             .as_u64()
@@ -900,6 +962,98 @@ fn attach_why(v: &mut serde_json::Value, world_data: &std::path::Path) -> Result
         };
     }
     Ok(())
+}
+
+/// The volcano events (`deeptime:volcano_*`) whose footprint holds the point (lat, lon): a notable
+/// volcano out to its basal radius (at least 3 km), an arc segment or hotspot chain where one of its
+/// listed cones does, a caldera to its rim, a flood-basalt province over its area; each as
+/// `{event, chain, distance_km}`, nearest first (a cone's own event before its group's).
+fn landforms_at(
+    log: &deeptime_format::events::EventLog,
+    lat: f64,
+    lon: f64,
+    scale: &deeptime_format::Scale,
+) -> Vec<serde_json::Value> {
+    use deeptime_format::{ParamValue, Place};
+    let c = f64::from(scale.circumference_blocks);
+    let km_per_block = scale.m_per_block_h / 1000.0;
+    let num = |e: &deeptime_format::Event, k: &str| match e.params.get(k) {
+        Some(ParamValue::Float(x)) => Some(*x),
+        Some(ParamValue::Int(x)) => Some(*x as f64),
+        _ => None,
+    };
+    let mut hits: Vec<(f64, serde_json::Value)> = log
+        .events()
+        .iter()
+        .filter(|e| e.source == deeptime_core::surface::volcanoes::SOURCE)
+        .filter_map(|e| {
+            let Place::Point { lat: la, lon: lo } = e.place else {
+                return None;
+            };
+            let dist = |la: f64, lo: f64| {
+                let mut dlon = (lon - lo).rem_euclid(360.0);
+                if dlon > 180.0 {
+                    dlon -= 360.0;
+                }
+                let dx = dlon / 360.0 * c * km_per_block;
+                let dz = (lat - la) / 360.0 * c * km_per_block;
+                dx.hypot(dz)
+            };
+            // An arc segment or a hotspot chain holds the column when one of its cones does.
+            if let Some(ParamValue::Str(cones)) = e.params.get("cones") {
+                let d = cones
+                    .split(';')
+                    .filter_map(|cone| {
+                        let f: Vec<f64> = cone.split(',').filter_map(|x| x.parse().ok()).collect();
+                        (f.len() >= 3)
+                            .then(|| (dist(f[0], f[1]), f[2].max(3.0)))
+                            .filter(|&(d, r)| d <= r)
+                            .map(|(d, _)| d)
+                    })
+                    .fold(f64::INFINITY, f64::min);
+                if !d.is_finite() {
+                    return None;
+                }
+                let chain: Vec<serde_json::Value> = log
+                    .cause_chain(e.id, 4)
+                    .iter()
+                    .map(|x| x.to_json())
+                    .collect();
+                let mut ev = e.to_json();
+                ev["params"]["cones"] = serde_json::json!("…");
+                return Some((
+                    d + 1.0e-3,
+                    serde_json::json!({
+                        "event": ev,
+                        "chain": chain,
+                        "distance_km": (d * 10.0).round() / 10.0,
+                    }),
+                ));
+            }
+            let d = dist(f64::from(la), f64::from(lo));
+            let reach = match num(e, "area_km2") {
+                Some(a) => (a / std::f64::consts::PI).sqrt(),
+                None => num(e, "radius_km").unwrap_or(0.0).max(3.0),
+            };
+            (d <= reach).then(|| {
+                let chain: Vec<serde_json::Value> = log
+                    .cause_chain(e.id, 4)
+                    .iter()
+                    .map(|x| x.to_json())
+                    .collect();
+                (
+                    d,
+                    serde_json::json!({
+                        "event": e.to_json(),
+                        "chain": chain,
+                        "distance_km": (d * 10.0).round() / 10.0,
+                    }),
+                )
+            })
+        })
+        .collect();
+    hits.sort_by(|a, b| a.0.total_cmp(&b.0));
+    hits.into_iter().map(|(_, v)| v).collect()
 }
 
 #[cfg(test)]
@@ -1244,7 +1398,7 @@ mod tests {
         assert_eq!(mid.next_stage_name(), Some("plates"));
         assert_eq!(
             mid.stage_names,
-            ["plates", "climate", "surface", "structure"]
+            ["plates", "climate", "surface", "volcanoes", "structure"]
         );
         assert!(mid.world.surface.is_some(), "the group steps every member");
         assert!(mid.world.fields.contains_key("climate/koppen"));
@@ -1258,7 +1412,7 @@ mod tests {
         )
         .unwrap();
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
-        assert_eq!(end.next_stage, 4);
+        assert_eq!(end.next_stage, 5);
         assert_eq!(end.world.t_years, 0.0);
         let st = end.world.surface.as_ref().unwrap();
         assert_eq!(st.totals.steps, 10);
@@ -1365,7 +1519,14 @@ mod tests {
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
         assert_eq!(
             end.stage_names,
-            ["plates", "climate", "surface", "structure", "deposits"]
+            [
+                "plates",
+                "climate",
+                "surface",
+                "volcanoes",
+                "structure",
+                "deposits"
+            ]
         );
         assert_eq!(end.next_stage_name(), None, "the run is complete");
         assert!(

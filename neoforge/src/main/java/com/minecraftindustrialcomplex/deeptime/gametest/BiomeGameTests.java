@@ -5,6 +5,11 @@ import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.climate.BiomeCensus;
 import com.minecraftindustrialcomplex.deeptime.climate.OverworldBands;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.IcePass;
+import com.minecraftindustrialcomplex.deeptime.worlddata.IceCover;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.biome.OverworldBiomeBuilder;
 import net.minecraft.core.BlockPos;
@@ -14,6 +19,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.fml.ModList;
@@ -117,10 +123,24 @@ public final class BiomeGameTests {
     // C 0.86 / 0.86, D 1.0 / 1.0, Dsub 0.969 / 0.987, E 1.0 / 1.0, sea 1.0 / 1.0, BW:desert — / 0.588,
     // Dfc:taiga — / 0.657, E:snow 1.0 / 1.0; the small planet has no A and only 17 BW columns (logged only).
     // Floors sit about 0.1 under the lower of the two.
+    //
+    // Re-set 2026-09-30 after the deep-time climate (carbon cycle, brightening sun): the 4k test planet is
+    // land-poor (~8 % land), so its weathering balances degassing only at 2,949 ppm and it ends at 23 °C
+    // instead of the fixed 280 ppm and 15.6 °C it had. Its Köppen columns moved: E 1,765 → 319, D 1,296 → 1,964,
+    // BS 274 → 792, C 279 → 521, BW 25 → 87. The mapping did not change: with the old climate pinned
+    // (carbon cycle, sun, ice window, glacio-eustasy, hydrological factor off) the same code passes, standalone
+    // and MIC. The lower shares are where the new columns sit: cold coasts whose shore biome is stony shore
+    // (ET 17 %, BWh 24 % standalone), Terralith's alpine highlands (26 %) and yellowstone (23 %) on the Dfc
+    // uplands that were ET before, moonlight valley and gravel desert on BSk. New runs (standalone / MIC):
+    // BW 0.793 / 0.931, BS 0.610 / 0.519, C 0.881 / 0.891, D 1.0 / 1.0, Dsub 0.961 / 0.970, E 1.0 / 0.991,
+    // BW:desert 0.690 / 0.816, Dfc:taiga 0.952 / 0.435, E:snow 0.824 / 0.991. The three below their floors
+    // take the same rule (0.1 under the lower); the others keep theirs, which the rule would only raise.
+    // P1-21 (volcano branch, before this re-set, not combined with it) had measured E:snow 0.899
+    // standalone with the volcano stage and EF's barren frozen ground; the lower floor above covers both.
     static final Map<String, Double> FLOORS = Map.ofEntries(
-            Map.entry("A", 0.6), Map.entry("Af", 0.6), Map.entry("BW", 0.65), Map.entry("BS", 0.6), Map.entry("C", 0.75),
+            Map.entry("A", 0.6), Map.entry("Af", 0.6), Map.entry("BW", 0.65), Map.entry("BS", 0.42), Map.entry("C", 0.75),
             Map.entry("D", 0.9), Map.entry("Dsub", 0.85), Map.entry("E", 0.9), Map.entry("sea", 0.95),
-            Map.entry("BW:desert", 0.45), Map.entry("Af:jungle", 0.5), Map.entry("Dfc:taiga", 0.5), Map.entry("E:snow", 0.9));
+            Map.entry("BW:desert", 0.45), Map.entry("Af:jungle", 0.5), Map.entry("Dfc:taiga", 0.33), Map.entry("E:snow", 0.72));
     static final int MIN_COLUMNS = 20;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
@@ -164,6 +184,157 @@ public final class BiomeGameTests {
                         r.forbiddenTotal(f.name())));
         }
         helper.assertTrue(red.isEmpty(), "families on biomes they must not have:" + red);
+        helper.succeed();
+    }
+
+    /**
+     * Ben, 2026-09-30, "Force snow/ice cover": where the bake's ice cover says so, Deep Time's own
+     * surface pass ({@code IcePass}) lays snow, packed ice and blue ice over the top of the ground
+     * whatever biome the pack drew. On the real baked planet, columns across its ice cover (one per
+     * 16 blocks, about two dozen spread over them, each in its own chunk at the surface status) have
+     * the table's blocks from the ground's top down, as many as the cover is thick.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
+    public static void iceCoverLaidOnGlaciatedGround(GameTestHelper helper) {
+        ServerLevel level = RealPlanetGameTests.level(helper);
+        var t = RealPlanetGameTests.terrain(helper, level);
+        var g = (GeologicChunkGenerator) level.getChunkSource().getGenerator();
+        WorldData wd = t.data();
+        var cover = wd.iceCover();
+        helper.assertTrue(cover.isPresent(), "the real planet has an ice cover (climate/ice_cover)");
+        IceCover ice = cover.get();
+        // (The 150 Myr test planet may have no ground above its equilibrium line at all: then only the
+        // layer and the synthetic chunk of icePassLaysTheCover are checked.)
+        int c = t.circumference(), sea = g.getSeaLevel();
+        java.util.List<int[]> columns = new java.util.ArrayList<>();
+        for (int z = -c / 4 + 8; z < c / 4; z += 16)
+            for (int x = -c / 2 + 8; x < c / 2; x += 16) {
+                int n = ice.blocks(x, z);
+                if (n > 0 && t.height(x, z) > sea + 2)
+                    columns.add(new int[] {x, z, n});
+            }
+        int stride = Math.max(1, columns.size() / 24);
+        int checked = 0, wet = 0, thick = 0;
+        StringBuilder bad = new StringBuilder();
+        java.util.Set<Long> chunks = new java.util.HashSet<>();
+        for (int k = 0; k < columns.size() && checked < 24; k += stride) {
+            int x = columns.get(k)[0], z = columns.get(k)[1], n = columns.get(k)[2];
+            if (!chunks.add(((long) (x >> 4) << 32) ^ (z >> 4)))
+                continue;
+            var chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.SURFACE, true);
+            // The ground's top: the surface heightmap's block, below a snow layer or a plant if features ran.
+            int y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z);
+            var pos = new BlockPos.MutableBlockPos();
+            var snow = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(ice.spec().blockId(IceCover.Spec.SNOW)));
+            for (int up = 0; up < 6 && y > chunk.getMinBuildHeight() && !chunk.getBlockState(pos.set(x, y, z)).is(snow); up++)
+                y--;
+            if (!chunk.getBlockState(pos.set(x, y, z)).getFluidState().isEmpty()) {
+                wet++;
+                continue;
+            }
+            checked++;
+            thick = Math.max(thick, n);
+            for (int i = 0; i < n; i++) {
+                var want = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(ice.spec().blockId(ice.spec().kind(i, n))));
+                var have = chunk.getBlockState(pos.set(x, y - i, z));
+                if (!have.is(want) && bad.length() < 400)
+                    bad.append(String.format(java.util.Locale.ROOT, " (%d,%d) depth %d of %d: %s, want %s;", x, z, i, n, have.getBlock(), want));
+            }
+        }
+        DeepTime.LOGGER.info("[gametest] iceCoverLaidOnGlaciatedGround ice columns={} checked={} underWater={} thickest={}", columns.size(), checked, wet, thick);
+        helper.assertTrue(columns.isEmpty() || checked + wet > 0, "no column of ice cover could be checked (of " + columns.size() + ")");
+        helper.assertTrue(bad.isEmpty(), "columns without their ice cover:" + bad);
+        helper.succeed();
+    }
+
+    /**
+     * The ice pass on a chunk built for it (any {@link IceCover} will do): columns 4 to 7 have a cover
+     * of 1 block, 8 to 11 of 5, 12 to 15 of 12; columns 0 to 3 have none. The top of each is ground
+     * under a dirt block; the cover replaces the top {@code n} blocks (so the ground's height is
+     * unchanged) with the table's snow on top, packed ice between and blue ice at the base of a
+     * thick one; a column under water and one that runs out of ground after two blocks are the edge
+     * cases.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
+    public static void icePassLaysTheCover(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var pos = new BlockPos.MutableBlockPos();
+        var chunk = new ProtoChunk(new net.minecraft.world.level.ChunkPos(4000, 4000), net.minecraft.world.level.chunk.UpgradeData.EMPTY, level,
+                level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME), null);
+        int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
+        int minY = chunk.getMinBuildHeight();
+        for (int lx = 0; lx < 16; lx++)
+            for (int lz = 0; lz < 16; lz++) {
+                int x = x0 + lx, z = z0 + lz;
+                if (lz == 15) {   // two blocks of ground at the bottom of the world, then air
+                    chunk.setBlockState(pos.set(x, minY, z), Blocks.STONE.defaultBlockState(), false);
+                    chunk.setBlockState(pos.set(x, minY + 1, z), Blocks.STONE.defaultBlockState(), false);
+                    continue;
+                }
+                for (int y = minY; y <= 80; y++)
+                    chunk.setBlockState(pos.set(x, y, z), Blocks.STONE.defaultBlockState(), false);
+                if (lz == 14) {   // under a lake
+                    for (int y = 81; y <= 85; y++)
+                        chunk.setBlockState(pos.set(x, y, z), Blocks.WATER.defaultBlockState(), false);
+                } else {
+                    chunk.setBlockState(pos.set(x, 81, z), Blocks.DIRT.defaultBlockState(), false);
+                }
+            }
+        Heightmap.primeHeightmaps(chunk, java.util.EnumSet.of(Heightmap.Types.WORLD_SURFACE_WG, Heightmap.Types.OCEAN_FLOOR_WG));
+        IceCover fake = new IceCover() {
+            @Override
+            public int blocks(int x, int z) {
+                int lx = x - x0;
+                return lx < 4 ? 0 : lx < 8 ? 1 : lx < 12 ? 5 : 12;
+            }
+
+            @Override
+            public Spec spec() {
+                return new Spec(160.0, 12, 3, 9, 2, "minecraft:snow_block", "minecraft:packed_ice", "minecraft:blue_ice");
+            }
+        };
+        int placed = IcePass.apply(chunk, fake);
+        var snow = Blocks.SNOW_BLOCK;
+        var packed = Blocks.PACKED_ICE;
+        var blue = Blocks.BLUE_ICE;
+        String bad = "";
+        for (int lx = 0; lx < 16; lx++)
+            for (int lz = 0; lz < 16; lz++) {
+                int x = x0 + lx, z = z0 + lz, n = fake.blocks(x, z);
+                if (lz == 15) {
+                    // Two blocks of ground: the cover takes both (snow, the top of any cover) and stops at the air.
+                    for (int i = 0; i < Math.min(n, 2); i++)
+                        if (!chunk.getBlockState(pos.set(x, minY + 1 - i, z)).is(snow))
+                            bad += " thin(" + lx + "," + i + ")";
+                    if (n == 0 && !chunk.getBlockState(pos.set(x, minY + 1, z)).is(Blocks.STONE))
+                        bad += " thinbare(" + lx + ")";
+                    continue;
+                }
+                if (lz == 14) {
+                    if (!chunk.getBlockState(pos.set(x, 80, z)).is(Blocks.STONE) || !chunk.getBlockState(pos.set(x, 85, z)).is(Blocks.WATER))
+                        bad += " lake(" + lx + ")";
+                    continue;
+                }
+                if (n == 0) {
+                    if (!chunk.getBlockState(pos.set(x, 81, z)).is(Blocks.DIRT))
+                        bad += " bare(" + lx + "," + lz + ")";
+                    continue;
+                }
+                for (int i = 0; i < n; i++) {
+                    var want = i < 3 ? snow : (n >= 9 && i >= n - 2) ? blue : packed;
+                    if (!chunk.getBlockState(pos.set(x, 81 - i, z)).is(want))
+                        bad += " (" + lx + "," + lz + ")@" + i + "of" + n;
+                }
+                // Below the cover the ground is what it was, and nothing was added above it.
+                if (!chunk.getBlockState(pos.set(x, 81 - n, z)).is(Blocks.STONE))
+                    bad += " below(" + lx + "," + lz + ")";
+                if (!chunk.getBlockState(pos.set(x, 82, z)).isAir())
+                    bad += " above(" + lx + "," + lz + ")";
+            }
+        // 14 rows of ground, 4 columns each of 1, 5 and 12 blocks; the thin row: 4 of 1 block and 8 of 2.
+        DeepTime.LOGGER.info("[gametest] icePassLaysTheCover placed={} bad={}", placed, bad);
+        helper.assertTrue(bad.isEmpty(), "the ice pass left:" + bad);
+        helper.assertTrue(placed == 14 * 4 * (1 + 5 + 12) + 4 * 1 + 8 * 2, "blocks placed: " + placed);
         helper.succeed();
     }
 
