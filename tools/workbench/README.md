@@ -113,6 +113,27 @@ A box larger than 256 x 256 is cut to its centre (the note says so). The job con
   `status_url`; otherwise a 32 x 32 preview around the column starts (about a minute).
 At most three previews are queued or running (503 beyond).
 
+## Rock at depth and sections (not stage 2)
+
+These two answer from the same bake but need neither `preview.py` nor Minecraft: `deeptime watch` reads
+`<runs>/<id>/world` itself (`crates/deeptime-cli/src/watch/sections/`), on request, view-only (nothing is
+added to a run or its bake) and keeps each answer in `<runs>/<id>/rock/`.
+
+| Route (GET) | Answer |
+|---|---|
+| `/api/runs/<id>/rock` | `{available, why, circumference, min_y, max_y, sea_level_y, m_per_block_h/v, depths, classes: [{i, name, colour, k}]}`; `available: false` with the reason for a run that has not finished or has no bake (format must equal the build's) |
+| `/api/runs/<id>/rock/slice.png?depth=<blocks\|floor>[&w=1024]` | the rock class that many blocks below the terrain's top block, over the whole map, RGBA in the `rock_class` colours (pixel (px, py) is centred on longitude 360°·px/w and latitude 90° − 180°·py/h, as a keyframe's); `409` with `why` without a bake |
+| `/api/runs/<id>/rock/section?x0=&z0=&x1=&z1=[&n=]` | JSON: the strata along the line from block (x0, z0) to (x1, z1) (the shorter way round in x), one block column per sample (up to 2,048): `columns.{x, z, ground, water, water_kind, runs, bodies}`, the class table, the bodies crossed (role, site, deposit type), the length in blocks and km |
+
+A column is the evaluator's: the slice and the section agree with `deeptime inspect-column` (a test in
+`sections/tests.rs` compares every block of the sampled columns and a slice's classes with
+`ColumnWorld::sample`), except that where two bodies that name a rock class overlap, the first by id
+wins as in the game's strata pass (`sample` takes the last). Times on the Mac at 16k quick (a planet
+with ~12 horizons a cell, load average ~60): a slice 1.1 to 1.6 s (4.4 s of CPU), a section of 2,048
+columns 30 ms. The page's side is `crates/deeptime-viewer/assets/sections.js` (the depth control under
+the legend of a rock layer, the Section tool, the dock over the map, the Section tab);
+`tools/workbench/sections_shots.py` drives it in headless Chromium on the Mac and shoots it.
+
 ## The contract (for other callers)
 
 - **In process:** `import preview` (add `tools/workbench` to `sys.path`) and route

@@ -25,6 +25,8 @@
 //!   `bye`; a comment line every 15 s), `/api/runs/<id>/state.json` (the `hello`),
 //!   `/api/runs/<id>/frames/<n>/<layer index>.png` (encoded on first request, cached in the run's
 //!   `frames/`)
+//! - `GET /api/runs/<id>/rock[/slice.png|/section]`, `/sections.js`: the rock at a depth below the
+//!   surface and cross-sections, read from the run's bake ([`super::sections`])
 //! - the final world map: `GET /api/runs/<id>/world.json`, `…/world/sample?x=&z=` and
 //!   `…/tiles/<layer>/<z>/<x>/<y>.png` ([`super::tiles`]), `/worldmap.js`
 //! - stage 2 (P1-20): with `--preview`, `POST /api/preview`, `GET /api/preview/…`,
@@ -452,6 +454,15 @@ fn query_param<'a>(query: &'a str, key: &str) -> Option<&'a str> {
 fn get(app: &App, req: &Request) -> Response {
     if let Some(r) = stage2(app, req) {
         return r;
+    }
+    // Rock at depth and sections, read from a run's bake (sections/).
+    if let Some(r) = super::sections::route(&app.wb, &req.path, &req.query) {
+        return Response {
+            status: r.status,
+            content_type: r.content_type,
+            cache: r.cache,
+            body: r.body,
+        };
     }
     let path = req.path.as_str();
     match path {
