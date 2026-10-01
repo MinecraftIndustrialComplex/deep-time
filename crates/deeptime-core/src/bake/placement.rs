@@ -89,6 +89,110 @@ struct Rule {
 struct Glaciated {
     thermal: Option<Thermal>,
     humidity: Option<usize>,
+    erosion: Option<ErosionLimit>,
+}
+
+/// Erosion limits (vanilla's erosion units) a class's land is held to: clamped into
+/// `[min, max]`. A missing bound is the end of the parameter's range.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ErosionLimit {
+    pub min: f64,
+    pub max: f64,
+}
+
+/// Which branch of the variant noise a class's land takes.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Weirdness {
+    /// The noise signs it (vanilla's variants on one branch, the other on the other).
+    Noise,
+    /// Always the positive branch.
+    Positive,
+    /// The positive branch where the cell's erosion is below `erosion` (high relief: frozen
+    /// peaks); elsewhere (flats) the negative branch, except as `flats` says.
+    PositiveBelowErosion { erosion: f64, flats: Flats },
+}
+
+/// What a class's flats take of the variant noise (the land its `positive_below_erosion` does not
+/// keep positive).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Flats {
+    /// The flats are on the positive branch where the variant noise (−1 … 1) is above this, on the
+    /// negative one elsewhere: 1 (the default) is never, 0 is the noise's own sign (about half).
+    pub positive_noise_above: f64,
+    /// The largest |weirdness| a flat takes (vanilla's units, 0.07 … 1), or none. The positive
+    /// branch's variants at a high |weirdness| include Terralith's cherry grove.
+    pub max_magnitude: Option<f64>,
+}
+
+impl Default for Flats {
+    fn default() -> Self {
+        Flats {
+            positive_noise_above: 1.0,
+            max_magnitude: None,
+        }
+    }
+}
+
+/// The ice cover the bake writes (`climate/ice_cover`) and the game's ice pass lays
+/// (`placement.json`, `ice_cover`; FORMAT.md, "The ice cover").
+#[derive(Clone, Debug, PartialEq)]
+pub struct IceCoverSpec {
+    /// Metres of land ice (or of height above the equilibrium line, without ice fields) per block
+    /// of cover after the first.
+    pub step_m: f64,
+    /// The thickest cover, blocks.
+    pub max_blocks: u8,
+    /// Snow blocks on top of a cover.
+    pub snow_blocks: u8,
+    /// Covers of at least this many blocks have a blue-ice base.
+    pub blue_ice_from_blocks: u8,
+    /// Blocks of blue ice at the base of a thick cover.
+    pub blue_ice_blocks: u8,
+    /// Block ids: the snow on top, the ice between, the ice at the base.
+    pub snow: String,
+    pub ice: String,
+    pub deep_ice: String,
+}
+
+impl Default for IceCoverSpec {
+    fn default() -> Self {
+        IceCoverSpec {
+            step_m: 160.0,
+            max_blocks: 12,
+            snow_blocks: 3,
+            blue_ice_from_blocks: 9,
+            blue_ice_blocks: 2,
+            snow: "minecraft:snow_block".to_owned(),
+            ice: "minecraft:packed_ice".to_owned(),
+            deep_ice: "minecraft:blue_ice".to_owned(),
+        }
+    }
+}
+
+impl IceCoverSpec {
+    /// Blocks of cover for `above_m` metres of ice (or of ground above its equilibrium line): 0 at
+    /// or below 0, 1 at its foot, one more per `step_m`, up to `max_blocks`.
+    pub fn blocks(&self, above_m: f64) -> u8 {
+        if above_m.is_nan() || above_m <= 0.0 {
+            return 0;
+        }
+        let n = 1.0 + (above_m / self.step_m).floor();
+        n.min(f64::from(self.max_blocks)) as u8
+    }
+
+    /// The `notes.bake.climate.ice_cover` record: what the game's ice pass reads.
+    pub fn record(&self) -> Value {
+        serde_json::json!({
+            "step_m": self.step_m,
+            "max_blocks": self.max_blocks,
+            "snow_blocks": self.snow_blocks,
+            "blue_ice_from_blocks": self.blue_ice_from_blocks,
+            "blue_ice_blocks": self.blue_ice_blocks,
+            "snow": self.snow,
+            "ice": self.ice,
+            "deep_ice": self.deep_ice,
+        })
+    }
 }
 
 /// The parsed, checked table.
@@ -102,8 +206,11 @@ pub struct Placement {
     humidity: Vec<usize>,
     /// By Köppen index 0 … 30: `Some` for a class with a `glaciated` block.
     glaciated: Vec<Option<Glaciated>>,
-    /// By Köppen index 0 … 30: the class keeps the positive branch of the variant noise (`"weirdness": "positive"`).
-    positive_weirdness: Vec<bool>,
+    /// By Köppen index 0 … 30: the class's erosion limits.
+    erosion: Vec<Option<ErosionLimit>>,
+    /// By Köppen index 0 … 30: the branch of the variant noise the class's land takes.
+    weirdness: Vec<Weirdness>,
+    ice_cover: IceCoverSpec,
     /// The table as written (without `_comment`): what `notes.bake.climate.placement` records.
     table: Value,
 }
@@ -188,6 +295,149 @@ fn rule_named(
     })
 }
 
+/// `{min, max}` erosion limits (vanilla's erosion units, -1 .. 1; at least one key).
+fn parse_erosion(v: &Value, path: &str) -> Result<ErosionLimit, CoreError> {
+    let o = object(v, path)?;
+    no_other_keys(o, &["min", "max"], path)?;
+    if o.is_empty() {
+        return Err(err(path, "needs at least one of min, max"));
+    }
+    let bound = |k: &str, default: f64| -> Result<f64, CoreError> {
+        match o.get(k) {
+            None => Ok(default),
+            Some(x) => number(x, &format!("{path}.{k}"), -1.0, 1.0),
+        }
+    };
+    let (min, max) = (bound("min", -1.0)?, bound("max", 1.0)?);
+    if min > max {
+        return Err(err(path, "min is above max"));
+    }
+    Ok(ErosionLimit { min, max })
+}
+
+/// `"positive"`, or `{"positive_below_erosion": e}`.
+fn parse_weirdness(v: &Value, path: &str) -> Result<Weirdness, CoreError> {
+    match v {
+        Value::String(s) if s == "positive" => Ok(Weirdness::Positive),
+        Value::Object(o) => {
+            no_other_keys(o, &["positive_below_erosion", "flats"], path)?;
+            let k = format!("{path}.positive_below_erosion");
+            let e = o
+                .get("positive_below_erosion")
+                .ok_or_else(|| err(&k, "missing"))?;
+            let mut flats = Flats::default();
+            if let Some(f) = o.get("flats") {
+                let fp = format!("{path}.flats");
+                let f = object(f, &fp)?;
+                no_other_keys(f, &["positive_noise_above", "max_magnitude"], &fp)?;
+                if f.is_empty() {
+                    return Err(err(
+                        &fp,
+                        "needs at least one of positive_noise_above, max_magnitude",
+                    ));
+                }
+                if let Some(x) = f.get("positive_noise_above") {
+                    flats.positive_noise_above =
+                        number(x, &format!("{fp}.positive_noise_above"), -1.0, 1.0)?;
+                }
+                if let Some(x) = f.get("max_magnitude") {
+                    flats.max_magnitude =
+                        Some(number(x, &format!("{fp}.max_magnitude"), 0.07, 1.0)?);
+                }
+            }
+            Ok(Weirdness::PositiveBelowErosion {
+                erosion: number(e, &k, -1.0, 1.0)?,
+                flats,
+            })
+        }
+        _ => Err(err(
+            path,
+            "must be \"positive\" or {\"positive_below_erosion\": erosion}",
+        )),
+    }
+}
+
+/// A block id such as `minecraft:snow_block`.
+fn block_id(id: &str) -> bool {
+    let part = |s: &str, extra: &str| {
+        !s.is_empty()
+            && s.chars().all(|c| {
+                c.is_ascii_lowercase()
+                    || c.is_ascii_digit()
+                    || "_-.".contains(c)
+                    || extra.contains(c)
+            })
+    };
+    id.split_once(':')
+        .is_some_and(|(ns, path)| part(ns, "") && part(path, "/"))
+}
+
+/// The table's `ice_cover` section (every key optional; the defaults are [`IceCoverSpec::default`]).
+fn parse_ice_cover(v: Option<&Value>) -> Result<IceCoverSpec, CoreError> {
+    let mut spec = IceCoverSpec::default();
+    let Some(v) = v else {
+        return Ok(spec);
+    };
+    let o = object(v, "ice_cover")?;
+    no_other_keys(
+        o,
+        &[
+            "step_m",
+            "max_blocks",
+            "snow_blocks",
+            "blue_ice_from_blocks",
+            "blue_ice_blocks",
+            "snow",
+            "ice",
+            "deep_ice",
+        ],
+        "ice_cover",
+    )?;
+    let int = |k: &str, lo: f64, hi: f64, into: &mut u8| -> Result<(), CoreError> {
+        if let Some(x) = o.get(k) {
+            let n = number(x, &format!("ice_cover.{k}"), lo, hi)?;
+            if n.fract() != 0.0 {
+                return Err(err(&format!("ice_cover.{k}"), "expected a whole number"));
+            }
+            *into = n as u8;
+        }
+        Ok(())
+    };
+    if let Some(x) = o.get("step_m") {
+        spec.step_m = number(x, "ice_cover.step_m", 10.0, 5000.0)?;
+    }
+    int("max_blocks", 1.0, 64.0, &mut spec.max_blocks)?;
+    int("snow_blocks", 0.0, 64.0, &mut spec.snow_blocks)?;
+    int(
+        "blue_ice_from_blocks",
+        1.0,
+        65.0,
+        &mut spec.blue_ice_from_blocks,
+    )?;
+    int("blue_ice_blocks", 0.0, 64.0, &mut spec.blue_ice_blocks)?;
+    for (k, into) in [
+        ("snow", &mut spec.snow),
+        ("ice", &mut spec.ice),
+        ("deep_ice", &mut spec.deep_ice),
+    ] {
+        if let Some(x) = o.get(k) {
+            let p = format!("ice_cover.{k}");
+            let id = string(x, &p)?;
+            if !block_id(id) {
+                return Err(err(&p, "expected a block id such as minecraft:snow_block"));
+            }
+            id.clone_into(into);
+        }
+    }
+    if spec.snow_blocks > spec.max_blocks {
+        return Err(err("ice_cover.snow_blocks", "is above max_blocks"));
+    }
+    if spec.blue_ice_blocks > spec.max_blocks {
+        return Err(err("ice_cover.blue_ice_blocks", "is above max_blocks"));
+    }
+    Ok(spec)
+}
+
 /// A class's temperature: a ramp name, or a `{when, then, else}` switch.
 fn parse_thermal(
     t: &Value,
@@ -247,6 +497,7 @@ impl Placement {
                 "temperature_ramps",
                 "humidity_rules",
                 "classes",
+                "ice_cover",
             ],
             "",
         )?;
@@ -363,7 +614,8 @@ impl Placement {
         let mut thermal: Vec<Option<Thermal>> = vec![None; land];
         let mut humidity: Vec<Option<usize>> = vec![None; land];
         let mut glaciated: Vec<Option<Glaciated>> = vec![None; land];
-        let mut positive_weirdness = vec![false; land];
+        let mut erosion: Vec<Option<ErosionLimit>> = vec![None; land];
+        let mut weirdness = vec![Weirdness::Noise; land];
         for (code, c) in classes {
             let p = format!("classes.{code}");
             let k = match koppen::index(code) {
@@ -373,15 +625,20 @@ impl Placement {
             let o = object(c, &p)?;
             no_other_keys(
                 o,
-                &["temperature", "humidity", "glaciated", "weirdness"],
+                &[
+                    "temperature",
+                    "humidity",
+                    "glaciated",
+                    "erosion",
+                    "weirdness",
+                ],
                 &p,
             )?;
             if let Some(w) = o.get("weirdness") {
-                let wp = format!("{p}.weirdness");
-                if string(w, &wp)? != "positive" {
-                    return Err(err(&wp, "must be \"positive\""));
-                }
-                positive_weirdness[k] = true;
+                weirdness[k] = parse_weirdness(w, &format!("{p}.weirdness"))?;
+            }
+            if let Some(e) = o.get("erosion") {
+                erosion[k] = Some(parse_erosion(e, &format!("{p}.erosion"))?);
             }
             let tp = format!("{p}.temperature");
             let t = o.get("temperature").ok_or_else(|| err(&tp, "missing"))?;
@@ -392,9 +649,12 @@ impl Placement {
             if let Some(g) = o.get("glaciated") {
                 let gp = format!("{p}.glaciated");
                 let g = object(g, &gp)?;
-                no_other_keys(g, &["temperature", "humidity"], &gp)?;
+                no_other_keys(g, &["temperature", "humidity", "erosion"], &gp)?;
                 if g.is_empty() {
-                    return Err(err(&gp, "needs at least one of temperature, humidity"));
+                    return Err(err(
+                        &gp,
+                        "needs at least one of temperature, humidity, erosion",
+                    ));
                 }
                 let thermal = match g.get("temperature") {
                     None => None,
@@ -404,7 +664,15 @@ impl Placement {
                     None => None,
                     Some(n) => Some(rule_named(&rule_ix, n, &format!("{gp}.humidity"))?),
                 };
-                glaciated[k] = Some(Glaciated { thermal, humidity });
+                let erosion = match g.get("erosion") {
+                    None => None,
+                    Some(e) => Some(parse_erosion(e, &format!("{gp}.erosion"))?),
+                };
+                glaciated[k] = Some(Glaciated {
+                    thermal,
+                    humidity,
+                    erosion,
+                });
             }
         }
         let missing: Vec<&str> = (0..land)
@@ -420,6 +688,7 @@ impl Placement {
                 ),
             ));
         }
+        let ice_cover = parse_ice_cover(root.get("ice_cover"))?;
         let mut table = root.clone();
         table.remove("_comment");
         Ok(Placement {
@@ -429,7 +698,9 @@ impl Placement {
             thermal: thermal.into_iter().flatten().collect(),
             humidity: humidity.into_iter().flatten().collect(),
             glaciated,
-            positive_weirdness,
+            erosion,
+            weirdness,
+            ice_cover,
             table: Value::Object(table),
         })
     }
@@ -475,14 +746,29 @@ impl Placement {
         }
     }
 
-    /// Whether class `k` keeps the positive branch of the variant noise: its land takes vanilla's
-    /// rising-weirdness biomes (frozen peaks, ice spikes) and never the falling branch's (jagged
-    /// peaks, and Terralith's scarlet mountains in their place).
-    pub fn weirdness_positive(&self, k: u8) -> bool {
-        self.positive_weirdness
+    /// The branch of the variant noise class `k`'s land takes (the positive one is vanilla's
+    /// rising-weirdness biomes: frozen peaks, never the falling branch's jagged peaks and
+    /// Terralith's scarlet mountains in their place).
+    pub fn weirdness(&self, k: u8) -> Weirdness {
+        self.weirdness
             .get(usize::from(k))
             .copied()
-            .unwrap_or(false)
+            .unwrap_or(Weirdness::Noise)
+    }
+
+    /// The erosion limits of a land cell of class `k`: where the glacier flag is set the class's
+    /// `glaciated` block's, when it has one, else the class's own; `None` for no limit.
+    pub fn erosion_limit(&self, k: u8, glacier: bool) -> Option<ErosionLimit> {
+        let own = self.erosion.get(usize::from(k)).copied().flatten();
+        if glacier && let Some(e) = self.glaciated_block(k).and_then(|g| g.erosion) {
+            return Some(e);
+        }
+        own
+    }
+
+    /// The ice cover the bake lays and the game's ice pass reads.
+    pub fn ice_cover(&self) -> &IceCoverSpec {
+        &self.ice_cover
     }
 
     /// The `glaciated` block of class `k`, if it has one.
@@ -729,20 +1015,161 @@ mod tests {
     }
 
     #[test]
-    fn only_ef_keeps_the_positive_variant_and_a_bad_value_names_its_path() {
+    fn ef_takes_its_peaks_positive_and_its_flats_mostly_negative_and_bad_values_name_their_path() {
         let p = builtin();
         for k in 0..32u8 {
-            assert_eq!(p.weirdness_positive(k), k == EF, "class {k}");
+            let want = if k == EF {
+                Weirdness::PositiveBelowErosion {
+                    erosion: -0.27,
+                    flats: Flats {
+                        positive_noise_above: 0.2,
+                        max_magnitude: Some(0.25),
+                    },
+                }
+            } else {
+                Weirdness::Noise
+            };
+            assert_eq!(p.weirdness(k), want, "class {k}");
         }
-        let et = edited(|v| v["classes"]["ET"]["weirdness"] = json!("positive")).unwrap();
-        assert!(et.weirdness_positive(koppen::index("ET").unwrap()));
-        assert_eq!(et.table()["classes"]["ET"]["weirdness"], json!("positive"));
+        let et = koppen::index("ET").unwrap();
+        let q = edited(|v| v["classes"]["ET"]["weirdness"] = json!("positive")).unwrap();
+        assert_eq!(q.weirdness(et), Weirdness::Positive);
+        assert_eq!(q.table()["classes"]["ET"]["weirdness"], json!("positive"));
+        let path = |w: Value| path_of(edited(|v| v["classes"]["EF"]["weirdness"] = w));
+        let at = "$.climate_placement.classes.EF.weirdness";
         for bad in [json!("negative"), json!(1)] {
+            assert_eq!(path(bad), at);
+        }
+        assert_eq!(path(json!({})), format!("{at}.positive_below_erosion"));
+        assert_eq!(
+            path(json!({"positive_below_erosion": 3})),
+            format!("{at}.positive_below_erosion")
+        );
+        assert_eq!(path(json!({"x": 1})), format!("{at}.x"));
+        // Without `flats` the flats are all negative and unclamped.
+        let q =
+            edited(|v| v["classes"]["EF"]["weirdness"] = json!({"positive_below_erosion": -0.3}))
+                .unwrap();
+        let ef = Weirdness::PositiveBelowErosion {
+            erosion: -0.3,
+            flats: Flats::default(),
+        };
+        assert_eq!(q.weirdness(EF), ef);
+        assert_eq!(Flats::default().positive_noise_above, 1.0);
+        let flats = |f: Value| path(json!({"positive_below_erosion": -0.3, "flats": f}));
+        assert_eq!(flats(json!({})), format!("{at}.flats"));
+        assert_eq!(flats(json!(1)), format!("{at}.flats"));
+        assert_eq!(flats(json!({"x": 1})), format!("{at}.flats.x"));
+        assert_eq!(
+            flats(json!({"positive_noise_above": 2})),
+            format!("{at}.flats.positive_noise_above")
+        );
+        assert_eq!(
+            flats(json!({"max_magnitude": 0.05})),
+            format!("{at}.flats.max_magnitude"),
+            "under the valley slice: rivers"
+        );
+    }
+
+    #[test]
+    fn erosion_limits_are_the_class_s_and_a_glaciated_block_s() {
+        let p = builtin();
+        for k in (0..32u8).filter(|&k| k != EF) {
+            assert_eq!(p.erosion_limit(k, false), None, "class {k}");
+            assert_eq!(p.erosion_limit(k, true), None, "class {k} glaciated");
+        }
+        // Barren EF is held below erosion 0.3 (off the glacial chasm); ice cap is free.
+        let own = ErosionLimit {
+            min: -1.0,
+            max: 0.3,
+        };
+        assert_eq!(p.erosion_limit(EF, false), Some(own));
+        assert_eq!(
+            p.erosion_limit(EF, true),
+            Some(ErosionLimit {
+                min: -1.0,
+                max: 1.0
+            })
+        );
+        // A glaciated block without an erosion key falls back to the class's own.
+        let q =
+            edited(|v| v["classes"]["EF"]["glaciated"] = json!({"humidity": "ice_cap"})).unwrap();
+        assert_eq!(q.erosion_limit(EF, true), Some(own));
+        // Only a min is a floor.
+        let q = edited(|v| v["classes"]["ET"]["erosion"] = json!({"min": -0.2})).unwrap();
+        let et = koppen::index("ET").unwrap();
+        assert_eq!(
+            q.erosion_limit(et, false),
+            Some(ErosionLimit {
+                min: -0.2,
+                max: 1.0
+            })
+        );
+        let at = "$.climate_placement.classes.EF";
+        for (bad, path) in [
+            (json!({}), format!("{at}.erosion")),
+            (json!({"min": 0.5, "max": 0.1}), format!("{at}.erosion")),
+            (json!({"max": 2}), format!("{at}.erosion.max")),
+            (json!({"mid": 0}), format!("{at}.erosion.mid")),
+        ] {
             assert_eq!(
-                path_of(edited(|v| v["classes"]["EF"]["weirdness"] = bad.clone())),
-                "$.climate_placement.classes.EF.weirdness"
+                path_of(edited(|v| v["classes"]["EF"]["erosion"] = bad.clone())),
+                path
             );
         }
+        assert_eq!(
+            path_of(edited(
+                |v| v["classes"]["EF"]["glaciated"]["erosion"] = json!({"max": "x"})
+            )),
+            format!("{at}.glaciated.erosion.max")
+        );
+    }
+
+    #[test]
+    fn the_ice_cover_section_has_defaults_and_names_its_bad_keys() {
+        let d = builtin().ice_cover();
+        // The jar's file says what the defaults say; a table without the section gets them.
+        assert_eq!(*d, IceCoverSpec::default());
+        let q = edited(|v| {
+            v.as_object_mut().unwrap().remove("ice_cover");
+        })
+        .unwrap();
+        assert_eq!(q.ice_cover(), d);
+        let q = edited(|v| v["ice_cover"]["snow_blocks"] = json!(1)).unwrap();
+        assert_eq!(q.ice_cover().snow_blocks, 1);
+        assert_eq!(q.ice_cover().record()["snow_blocks"], json!(1));
+        assert_eq!(
+            q.ice_cover().record()["deep_ice"],
+            json!("minecraft:blue_ice")
+        );
+        let at = "$.climate_placement.ice_cover";
+        for (key, bad) in [
+            ("step_m", json!(1.0)),
+            ("max_blocks", json!(100)),
+            ("max_blocks", json!(2.5)),
+            ("snow", json!("Snow Block")),
+            ("ice", json!(3)),
+            ("colour", json!("white")),
+        ] {
+            assert_eq!(
+                path_of(edited(|v| v["ice_cover"][key] = bad.clone())),
+                format!("{at}.{key}"),
+                "{key}"
+            );
+        }
+        // More snow than cover.
+        assert_eq!(
+            path_of(edited(|v| {
+                v["ice_cover"]["max_blocks"] = json!(2);
+                v["ice_cover"]["snow_blocks"] = json!(3);
+            })),
+            format!("{at}.snow_blocks")
+        );
+        // The cover's thickness: 1 at the line's foot, one more per step, capped.
+        assert_eq!(
+            [-5.0, 0.0, 1.0, 159.9, 160.0, 479.0, 480.0, 1.0e9].map(|m| d.blocks(m)),
+            [0, 0, 1, 1, 2, 3, 4, 12]
+        );
     }
 
     #[test]

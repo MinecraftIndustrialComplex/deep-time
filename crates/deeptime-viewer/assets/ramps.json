@@ -275,6 +275,25 @@
         [400, "#053061"]
       ]
     },
+    "volcanoes": {
+      "_comment": "Volcano map codes 1-7 (surface/volcanoes): active stratovolcano, dead stratovolcano, active shield, dead shield or seamount, silicic centre, caldera, flood basalt; NaN elsewhere.",
+      "stops": [
+        [1, "#ff3b1f"],
+        [1.999, "#ff3b1f"],
+        [2, "#b0724a"],
+        [2.999, "#b0724a"],
+        [3, "#ffc02e"],
+        [3.999, "#ffc02e"],
+        [4, "#4f8fd6"],
+        [4.999, "#4f8fd6"],
+        [5, "#d45cff"],
+        [5.999, "#d45cff"],
+        [6, "#ff79c6"],
+        [6.999, "#ff79c6"],
+        [7, "#9a8a7a"],
+        [7.999, "#9a8a7a"]
+      ]
+    },
     "regime": {
       "_comment": "Tectonic regime codes 0-9: ocean basin, ridge, trench, arc, back-arc, collision, rift, hotspot, craton, passive margin (plates/state.rs).",
       "stops": [
@@ -423,6 +442,49 @@
         [58.999, "#c0c0c8"]
       ]
     },
+    "satellite": {
+      "_comment": "True colour, as a satellite mosaic shows the planet (core satellite.rs): a view of the current state composited when a frame is drawn, not a ramp of one field (the world is not changed); these classes are its anchor colours. Sea by depth (turquoise under 8 m, shelf at 120 m, ocean at 1.5 km, deep from 5 km), whitened by annual sea-ice cover. Land with a climate: herb cover grows with the aridity index P/PET (0.05 to 0.45) and trees from 0.5 to 1.0, trees only where the warmest month passes about 10 °C; the Köppen class holds deserts bare, steppes grassy and Af/Am forested. Bare ground is sand where hot, grey-tan where cold, tinted by the surface rock (red beds reddish, basalt dark, evaporites white); herbs are khaki steppe to olive savanna, brown-grey tundra when summers are cold; forest is boreal, temperate or rainforest by the coldest month. Rock shows through on high ground from 2.5 km. Snow: perennial above the snow line or where the warmest month is below freezing; seasonal snow on cold land is a lighter tint. Glacier ice (land ice 1 m or more) is white. A frame without a climate shows bare ground by geology (no plants, snow or ice). Relief is a soft hill shade lit from the north-west. The climate's fields are smoothed over a few cells first, so its latitude bands and cell streaks do not show as stripes.",
+      "labels": ["Tropical rainforest", "Temperate forest", "Boreal forest", "Savanna and shrubland", "Grassland and steppe", "Hot desert", "Cold desert", "Tundra", "Bare rock and high mountains", "Volcanic rock", "Salt flat", "Snow", "Glacier ice", "Sea ice", "Shallow sea", "Continental shelf", "Ocean", "Deep ocean"],
+      "groups": [["Land", 0, 10], ["Snow and ice", 11, 13], ["Sea", 14, 17]],
+      "stops": [
+        [0, "#24461b"],
+        [0.999, "#24461b"],
+        [1, "#3a5a2a"],
+        [1.999, "#3a5a2a"],
+        [2, "#2a3f26"],
+        [2.999, "#2a3f26"],
+        [3, "#7a7845"],
+        [3.999, "#7a7845"],
+        [4, "#9c9460"],
+        [4.999, "#9c9460"],
+        [5, "#d4b483"],
+        [5.999, "#d4b483"],
+        [6, "#a89a7c"],
+        [6.999, "#a89a7c"],
+        [7, "#6f6a50"],
+        [7.999, "#6f6a50"],
+        [8, "#8a8070"],
+        [8.999, "#8a8070"],
+        [9, "#57514b"],
+        [9.999, "#57514b"],
+        [10, "#e3ddd0"],
+        [10.999, "#e3ddd0"],
+        [11, "#dfe5ec"],
+        [11.999, "#dfe5ec"],
+        [12, "#f4f7fb"],
+        [12.999, "#f4f7fb"],
+        [13, "#e2eaf2"],
+        [13.999, "#e2eaf2"],
+        [14, "#3fa5b5"],
+        [14.999, "#3fa5b5"],
+        [15, "#25649a"],
+        [15.999, "#25649a"],
+        [16, "#113a78"],
+        [16.999, "#113a78"],
+        [17, "#071a42"],
+        [17.999, "#071a42"]
+      ]
+    },
     "provinces": {
       "_comment": "Categorical, after the USGS map 'Geologic provinces of the world': a view of the current state, derived when a frame is drawn (core provinces.rs; the world is not changed). First rule that applies wins. Large igneous province: a mafic volcanic pile of at least a fifth of the recorded LIP thickness above the crust's own basalt. Oceanic crust by age (0-20, 20-65, over 65 Ma); a thickened island arc is an orogen. Orogen: active collision or arc, a collision belt from the last 500 Myr, or an Andean range over 1.5 km lifted in the last 50 Myr. Extended crust: rift, passive margin, or crust thinned below 20 km. Basin: over 3 km of sediment and sedimentary rock (or subsiding under over 1 km). Shield: old continental crust with basement at the surface (under 0.2 km of cover, or crystalline surface rock). Platform: the rest, under a thinner sedimentary cover. Continental classes are generalised to their neighbours' majority.",
       "labels": ["Shield", "Platform", "Orogen", "Basin", "Large igneous province", "Extended crust", "Oceanic crust 0–20 Ma", "Oceanic crust 20–65 Ma", "Oceanic crust over 65 Ma"],
@@ -553,6 +615,8 @@
     "plates": "plates",
     "crust_age": "crust_age",
     "regime": "regime",
+    "volcanoes/map": "volcanoes",
+    "volcanoes/flood_basalt": "unit",
     "surface/erosion_m_myr": "erosion",
     "surface/deposition_m_myr": "deposition",
     "surface/sediment_m": "sediment",
@@ -578,7 +642,8 @@
     "detail/amplitude": "detail",
     "surface/class_top": "rock_class",
     "meta/crust_age_myr": "crust_age",
-    "provinces": "provinces"
+    "provinces": "provinces",
+    "satellite": "satellite"
   },
   "default": "grey"
 }

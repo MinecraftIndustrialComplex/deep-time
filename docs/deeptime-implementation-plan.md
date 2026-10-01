@@ -2595,6 +2595,20 @@ something Ben can look at in a browser.
   click-to-inspect (lat/lon, block x/z, every layer value, Köppen, province, the column's rock
   stack); sites with their "Why here?" cause chain; and a globe view. No build step, no npm: plain
   JS in the page.
+- **The satellite view, the default layer (Ben, 2026-09-30: "Default view on the viewer is currently
+  an elevation map, can you turn it into an actual map … so I can see where glaciars / snow is").**
+  Every frame of the plate model's group (with or without a climate) and of the young landscape and
+  its amplification carries `satellite` as its first layer: a true-colour picture composited by
+  `core::satellite` when the frame is drawn, view only like the geologic provinces (nothing is
+  written to `WorldState`). The sea by depth and sea ice; land cover from the climate (herb and tree
+  cover from the aridity index and the warmest month, held to the Köppen map; ground by temperature
+  and surface rock; khaki steppe, olive savanna, brown-grey tundra; boreal, temperate or tropical
+  forest by the coldest month); bare rock on high ground; perennial and seasonal snow; glacier ice
+  white; a soft hill shade. A frame without a climate shows bare ground by geology. Its `ramps.json`
+  entry is the legend's key (18 classes in three groups), not a ramp applied to a field. The
+  workbench, `?tv` and the static bundle (timelapse and, from the last satellite frame, the
+  world-data map) open on it, and the game's timelapse shows it as its first layer ("Satellite");
+  `deeptime satellite --in <checkpoint> --out x.png` draws one from a checkpoint.
 
 ### 9.4 NeoForge GameTests
 
@@ -3674,6 +3688,9 @@ on this machine.
   calderas, flood-basalt plateaus from LIP events; volcanic rock in the strata; events with causes.
 - **Acceptance.** Tests on placement from arc/hotspot/LIP fields; a real planet shows volcano
   chains in the right settings; 3D previews of an arc volcano, a hotspot island chain and a caldera.
+- **As built (2026-09-30).** A coupled stage `volcanoes` after the surface (`surface/volcanoes/`) and the
+  amplifier's shaping (`surface/amplify/volcano.rs`); design, numbers and pictures in STATUS.md's build log
+  ("P1-21 volcanoes as landforms").
 
 #### P1-22 Rivers and lakes (moved from P2-03, 2026-09-29)
 - **Goal.** The core of §8.4 hydrology in v1 (Ben, decisions log 2026-09-29): river networks from the

@@ -144,6 +144,14 @@ pub fn write_bundle_with(
         }));
     }
 
+    // The satellite view (true colour, core satellite.rs) of the run's last frame that has one
+    // leads the world-data layers, so the page opens on it; it is an image only (no values).
+    if !entries.is_empty()
+        && let Some(e) = satellite_entry(dir, info.circumference, timeline)?
+    {
+        entries.insert(0, e);
+    }
+
     let mut strata_json = Value::Null;
     if let Some(st) = strata {
         let d = &st.layer.desc;
@@ -199,6 +207,40 @@ pub fn write_bundle_with(
         format!("window.DT_BUNDLE = {bundle};\n"),
     )?;
     Ok(())
+}
+
+/// The keyframe layer drawn as the world view's satellite layer.
+pub const SATELLITE_LAYER: &str = "satellite";
+
+/// Writes `layers/satellite.png` from the timeline's last frame with a satellite layer and returns
+/// its `bundle.js` entry: a keyframe's pixel (px, py) sits at block x = −C/2 + px·C/w, z = −C/4 +
+/// py·C/w, so its grid is the keyframe's own with r = C / w.
+fn satellite_entry(dir: &Path, c: u32, t: &Timeline) -> io::Result<Option<Value>> {
+    let Some((k, rgba)) = t
+        .keyframes
+        .iter()
+        .filter_map(|k| {
+            k.layers
+                .iter()
+                .find(|(n, _)| n == SATELLITE_LAYER)
+                .map(|(_, rgba)| (k, rgba))
+        })
+        .max_by_key(|(k, _)| k.n)
+    else {
+        return Ok(None);
+    };
+    let file = format!("layers/{}.png", slug(SATELLITE_LAYER));
+    write_rgba_png(&dir.join(&file), k.w, k.h, rgba)?;
+    let r = f64::from(c) / f64::from(k.w);
+    Ok(Some(json!({
+        "name": SATELLITE_LAYER, "slug": slug(SATELLITE_LAYER), "units": "", "scale": 1.0,
+        "offset": 0.0, "nodata": null, "ramp": SATELLITE_LAYER,
+        "grid": { "name": "keyframe", "w": k.w, "h": k.h, "r": r, "wraps_x": true,
+                  "origin_block_x": -i64::from(c / 2), "origin_block_z": -i64::from(c / 4) },
+        "image": { "file": file, "w": k.w, "h": k.h, "stride": 1 },
+        "values": null,
+        "view": { "n": k.n, "t": k.t, "stage": k.stage },
+    })))
 }
 
 /// Keyframe PNGs, `events.json` and `sites.json`; returns what `bundle.js` embeds.
@@ -565,6 +607,42 @@ mod tests {
         );
         write_bench_page(&dir.join("bench"), &json!({ "runs": [] })).unwrap();
         assert!(dir.join("bench/bench.js").is_file());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_last_satellite_frame_leads_the_world_layers() {
+        let dir = std::env::temp_dir().join(format!("dt-viewer-sat-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("layers")).unwrap();
+        let frame = |n: u32, name: &str| KeyframeImage {
+            n,
+            t: -1.0e7 + f64::from(n),
+            stage: "plates+climate".into(),
+            w: 8,
+            h: 4,
+            layers: vec![(name.into(), vec![n as u8; 8 * 4 * 4])],
+        };
+        let t = Timeline {
+            keyframes: vec![
+                frame(0, "satellite"),
+                frame(2, "deposits/sites"),
+                frame(1, "satellite"),
+            ],
+            ..Timeline::default()
+        };
+        let e = satellite_entry(&dir, 1024, &t).unwrap().unwrap();
+        assert_eq!(e["view"]["n"], 1, "the last frame that has one");
+        assert_eq!(e["grid"]["r"], 128.0);
+        assert_eq!(e["grid"]["origin_block_x"], -512);
+        assert_eq!(e["ramp"], "satellite");
+        assert!(e["values"].is_null());
+        assert!(dir.join("layers/satellite.png").is_file());
+        assert!(
+            satellite_entry(&dir, 1024, &Timeline::default())
+                .unwrap()
+                .is_none()
+        );
         fs::remove_dir_all(&dir).unwrap();
     }
 }

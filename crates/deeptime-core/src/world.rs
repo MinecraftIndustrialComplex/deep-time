@@ -69,6 +69,9 @@ pub struct WorldState {
     /// The deep-time surface on L1 (plan §8.2: offset, regolith, strata log), once the surface
     /// stage has started (P1-04).
     pub surface: Option<crate::surface::SurfaceState>,
+    /// The volcano catalogue (P1-21), once the volcano stage has started; the amplifier shapes
+    /// the edifices from it.
+    pub volcanoes: Option<crate::surface::volcanoes::VolcanoState>,
     /// The deposit engine's field history recorded by the history stages (P1-04 on). Not in the
     /// postcard body: a checkpoint carries its head in the body and its frames in sections of
     /// their own, streamed (`checkpoint.rs`), since frames may be on disk (P1-17).
@@ -93,6 +96,7 @@ impl WorldState {
             globals: BTreeMap::new(),
             plates: None,
             surface: None,
+            volcanoes: None,
             history: None,
             next_event_seq: 0,
             next_site_id: 0,

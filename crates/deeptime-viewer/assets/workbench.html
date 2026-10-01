@@ -526,6 +526,10 @@ input[type=range]:focus-visible { outline: none; }
 .legend .cats div { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--fg-2); min-width: 0; }
 .legend .cats div span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .legend .cats i { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; box-shadow: 0 0 0 1px rgba(255, 255, 255, .15); }
+.legend .cats.wide { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.legend .cats.grouped { max-height: 250px; }
+.legend .cats .cgroup { grid-column: 1 / -1; display: block; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--fg-4); margin-top: 5px; }
+.legend .cats .cgroup:first-child { margin-top: 0; }
 .legend .strip { display: flex; height: 12px; border-radius: 4px; overflow: hidden; margin-top: 10px; box-shadow: 0 0 0 1px var(--line-2); }
 .legend .strip i { flex: 1 1 0; }
 .legend .note { font-size: 11.5px; color: var(--fg-3); margin-top: 8px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
@@ -834,6 +838,10 @@ input[type=range]:focus-visible { outline: none; }
 .tvhud .tvlegend .legend .lunit, .tvhud .tvlegend .legend .ticks, .tvhud .tvlegend .legend .cats div { font-size: .78rem; }
 .tvhud .tvlegend .legend canvas.bar, .tvhud .tvlegend .legend .strip { height: .8rem; }
 .tvhud .tvlegend .legend .note, .tvhud .tvlegend .legend .lraw { display: none; }
+/* A key with group headings (the satellite view) is wider on the big screen: three columns, no headings. */
+.tvhud .tvlegend:has(.cats.grouped) { width: 38rem; }
+.tvhud .tvlegend .legend .cats.grouped { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: none; gap: .2rem .9rem; }
+.tvhud .tvlegend .legend .cats .cgroup { display: none; }
 .tvhud .tvlegend .legend .lh { justify-content: space-between; }
 .tvhud .tvlegend .legend .lh .lname { display: block; }
 .tvhud .tvglobe { position: absolute; right: 1.2rem; bottom: 5.2rem; width: 17rem; height: 17rem; }

@@ -74,7 +74,12 @@ EXCLUDES=(--exclude=/target/ --exclude=/smoke/ --exclude=/run/ --exclude=/run-ga
 GIT="$CACHE/git/bin/git"
 "${SSH[@]}" "exec zsh -lc $(printf '%q' "[ -x '$GIT' ] || nix build nixpkgs#git --out-link '$CACHE/git'")"
 if [ "$SYNC" = 1 ]; then
-    rsync -a --delete "${EXCLUDES[@]}" -e "ssh -o BatchMode=yes" "$REPO/" "$HOST:$REMOTE/"
+    # --checksum --no-times: copy a file only when its bytes differ, and give each copied file the
+    # Mac's current time. With plain -a the laptop's mtimes came across, so a file whose content went
+    # back to an older version (a merge, a branch switch) could be older than the build artifact made
+    # from the newer version, and Cargo kept the stale artifact (2026-09-30: release deeptime-cli
+    # failed with "no field min_y" while the sources were correct). Unchanged files keep their time.
+    rsync -rlpD --checksum --no-times --delete "${EXCLUDES[@]}" -e "ssh -o BatchMode=yes" "$REPO/" "$HOST:$REMOTE/"
     "${SSH[@]}" "cd '$REMOTE' && { [ -d .git ] || '$GIT' init -q -b master; } && '$GIT' add -A"
     # Which laptop revision this copy is (the Mac's .git has no commits, and Apple's git there is a
     # stub): tools/smoke/jarstate.py reads it into smoke/<profile>/install.json. Written after
@@ -119,7 +124,12 @@ if [ "$SERVER" = 1 ]; then
 fi
 KEY="$(cat "$REPO/flake.nix" "$REPO/flake.lock" | sha256sum | cut -c1-16)"
 PROFILE="$CACHE/devshell-$KEY"
-INNER="cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac && { [ -e '$PROFILE' ] || nix develop --profile '$PROFILE' -c true; } && exec nix develop '$PROFILE' -c zsh -c $(printf '%q' "$CMD")"
+# Every worktree has its own copy and target/ on the SSD, so target size is multiplied by the number
+# of agents (2026-09-30: ~60 copies filled the SSD). Incremental caches were half of a debug target
+# and full debuginfo most of the rest; without them a copy's target is a fraction of the size, at the
+# cost of recompiling the workspace crates (not the dependencies) on each change. Line tables keep
+# file:line in panics and backtraces.
+INNER="cd '$REMOTE' && export GRADLE_USER_HOME='$CACHE/gradle' CARGO_HOME='$CACHE/cargo' XWIN_CACHE_DIR='$CACHE/xwin' TMPDIR='$CACHE/tmp' DEEPTIME_REMOTE=mac CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=line-tables-only && { [ -e '$PROFILE' ] || nix develop --profile '$PROFILE' -c true; } && exec nix develop '$PROFILE' -c zsh -c $(printf '%q' "$CMD")"
 set +e
 "${SSH[@]}" "exec zsh -lc $(printf '%q' "$INNER")"
 status=$?
