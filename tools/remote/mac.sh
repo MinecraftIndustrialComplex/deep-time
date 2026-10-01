@@ -55,6 +55,9 @@ CMD="$*"
 
 # -n: never let ssh read (and drain) this script's stdin.
 SSH=(ssh -n -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30 "$HOST")
+# The VM's firewall follows the laptop's address (vm-access.sh): repair it before the first call.
+. "$(dirname "${BASH_SOURCE[0]}")/vm-access.sh"
+vm_access_ensure "$HOST" || { echo "$(basename "$0"): cannot reach $HOST" >&2; exit 1; }
 
 # The SSD must be mounted, or everything would silently land on the small internal disk.
 # The Mac is shared with graphide's agents: respect their "keep off Nix" markers.

@@ -114,9 +114,13 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         if (terrain() instanceof WorldDataTerrain w) {
             StrataPass.apply(chunk, w.data());
             WaterBodies.apply(chunk, w.data(), waterReach());  // lakes, rivers, banks (plan §7.9, P1-22)
+<<<<<<< HEAD
             // Magma under and in the active volcanoes, after the water so a river's cut counts as ground.
             var settings = sourceSettings.value();
             MagmaPass.apply(chunk, w.magma(waterReach(), settings.noiseSettings().minY(), settings.seaLevel()));
+=======
+            PlayaPass.apply(chunk, w.data());                  // salt on the floors of basins too dry for a lake
+>>>>>>> master
             IcePass.apply(chunk, w.data());                    // snow and ice over glaciated ground, whatever the biome
         }
     }
