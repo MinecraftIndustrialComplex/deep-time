@@ -14,8 +14,9 @@ public final class LavaFeatureRule {
 
     /**
      * Whether the JSON holds a block or fluid state of lava: an object whose {@code Name} is
-     * {@code minecraft:lava} (or the flowing fluid). A block predicate or a tag that merely
-     * mentions lava ({@code "blocks": "minecraft:lava"}) is not a state.
+     * {@code minecraft:lava} (or the flowing fluid), whether the feature places it or replaces it. A
+     * block predicate or a tag that merely mentions lava ({@code "blocks": "minecraft:lava"}) is
+     * not a state.
      */
     public static boolean namesLavaState(JsonElement e) {
         if (e.isJsonObject()) {

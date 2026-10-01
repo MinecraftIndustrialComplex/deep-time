@@ -25,8 +25,10 @@ import java.util.List;
  *       under the crater floor, under a plug of magma blocks. On land the plug reaches the
  *       surface (hot ground in the crater); under water it stops three blocks under the bed;</li>
  *   <li>at the most active volcanoes standing on dry land ({@code crater_lake_share} of them), a
- *       <b>crater lava lake</b> instead of the plug: lava filling the crater to one block under
- *       the lowest point of the rim around it, the conduit opening into its floor.</li>
+ *       <b>crater lava lake</b> instead of the plug: lava up to one block under the lowest ground
+ *       of the ring around it, the ground above its surface opened to the sky (baked summits are
+ *       seldom bowls at this scale, so the lake usually sits in a pit a few blocks deep), the
+ *       conduit opening into its floor. Volcanoes beyond the pole cap's line get none.</li>
  * </ul>
  * Every body is sealed: open space (air, cave water, the sea) within a block or two of magma
  * becomes basalt, so lava never touches water and never hangs over a cave. A volcano whose summit
@@ -212,9 +214,11 @@ public final class Magma {
      *
      * @param lavaFloorY open space below this is the lava floor ({@link LavaRules#floodY})
      * @param mH         metres per block across, {@code mV} up
+     * @param lakeMaxAbsZ crater lakes only at volcanoes with |z| up to this (the pole cap's line: nobody
+     *                   reaches a volcano beyond it)
      */
     public static Magma build(List<Volcanoes.Volcano> volcanoes, MagmaRules rules, Heights heights, Wet wet, int circumference,
-                              int seaLevel, int lavaFloorY, double mH, double mV) {
+                              int seaLevel, int lavaFloorY, double mH, double mV, int lakeMaxAbsZ) {
         if (rules.chamberSize() <= 0.0 || volcanoes.isEmpty())
             return new Magma(List.of(), circumference);
         List<Draft> drafts = new ArrayList<>();
@@ -244,7 +248,7 @@ public final class Magma {
             int r = v.craterRadiusM() > 0.0
                     ? Math.clamp(Math.round(0.5 * v.craterRadiusM() / mH), LAKE_MIN_RADIUS, LAKE_MAX_RADIUS) : LAKE_MIN_RADIUS;
             int lakeTop = Integer.MAX_VALUE;
-            boolean fits = rh > 0 && !submerged;
+            boolean fits = rh > 0 && !submerged && Math.abs(z) <= lakeMaxAbsZ;
             for (int dx = -r - 2; dx <= r + 2 && fits; dx++)
                 for (int dz = -r - 2; dz <= r + 2 && fits; dz++) {
                     int d2 = dx * dx + dz * dz;
