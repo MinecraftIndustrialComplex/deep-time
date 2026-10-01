@@ -3855,6 +3855,18 @@ on this machine.
   kimberlite diamonds, laterite nickel and bauxite, roll-front uranium, epithermal gold-silver.
 - **P2-11 Salt domes and seafloor** (Ben, 2026-09-29): salt diapirs (and their oil traps); seamounts,
   guyots and submarine canyons.
+- **P2-12 Caves follow the rock** (Ben, 2026-10-01, from docs/research/notes/geologist_youtuber_feedback.md):
+  dripstone, flowstone and other speleothems only in carbonate or evaporite caves; the vanilla
+  underground dirt, gravel and clay blobs only where geologically sensible (sinkhole fills in karst,
+  paleosols at unconformities, lenses in sedimentary strata), none in crystalline rock. With P2-04.
+- **P2-13 More cave kinds** (Ben, 2026-10-01): lava tubes in flood basalts and young basaltic shields,
+  sinkholes and cenotes over weak carbonate roofs, glacial caves under the climate's ice.
+- **P2-14 Geothermal features** (Ben, 2026-10-01): hot springs and travertine terraces, fumaroles with
+  native sulfur, cinnabar in epithermal settings, from the heat flow already modelled; a warm-ground
+  signal for mic-climate. Ties to P2-10.
+- **P2-15 Rock-aware soils and biomes** (Ben, 2026-10-01): soil and biome nudges from parent rock plus
+  climate, relief and age (calcareous grassland and karst pavement on limestone, serpentine barrens,
+  laterite on old warm wet surfaces, loess). With P2-05 and P1-10.
 - **P2-07 Per-chunk overhead**: Chunky throughput in the same smoke with a vanilla preset vs Deep
   Time.
 
