@@ -104,8 +104,16 @@ tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete m
   STATUS. Never rewrite or delete earlier log entries or other parts of the decisions file.
 - Implementation details inside a task (class names, file splits, calibrated tolerances) are yours to
   decide; record them in STATUS.md's build log.
-- Sub-agents: pass `model` explicitly. Sonnet for lookups (jars, javap, versions, licences); Opus for
-  code and design. No Fable.
+- Sub-agents: pass `model` explicitly. Sonnet 5.5 (xhigh, never max) for lookups and for
+  well-specified implementation, including follow-ups to finished work; Opus for design, hard
+  diagnosis, cross-subsystem changes, data formats and review (Ben, 2026-09-30). A resumed agent
+  keeps its model, so give a Sonnet-shaped follow-up to a fresh Sonnet agent, not a resumed Opus
+  one. No Fable.
+- **GameTests run once per merge batch** (Ben, 2026-09-30; the Mac's single server slot had ~7
+  agents queueing two runs each): an agent on a branch runs cargo (test, clippy, fmt, deny) and
+  `./gradlew build test`, not `./gametest.sh`. The coordinator merges a batch into master, then runs
+  `./gametest.sh` and `./gametest.sh -PwithMic` once and fixes failures on master. Planet probes
+  and smoke runs that a task needs for its own measurements still take `--server`.
 - Never commit smoke/, run/, run-gametest/, run-planet/, libs/, review/out/, rcon.pw or
   .spacesheep.json. Never redistribute Project Atmosphere.
 - Licence acceptances Ben made (2026-09-28): Minecraft EULA for headless test servers, BlueMap
