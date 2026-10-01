@@ -38,8 +38,13 @@ pub fn bake(
     let mut hz = bake_horizons::bake(world, p)?;
     hz.check()
         .map_err(|e| CoreError::InvalidState(format!("the horizon bake failed its check: {e}")))?;
-    let (raised, max_raise, limit) =
-        raise_tops(&mut hz, terrain, p.scale.max_y, p.scale.sea_level_y)?;
+    let (raised, max_raise, limit) = raise_tops(
+        &mut hz,
+        terrain,
+        p.scale.max_y,
+        p.scale.sea_level_y,
+        p.scale.build_fit().knee_y,
+    )?;
     hz.check().map_err(|e| {
         CoreError::InvalidState(format!(
             "the horizons failed their check after the raise: {e}"
@@ -59,7 +64,7 @@ pub fn bake(
         "mean_horizons": mean,
         "top_raised_cells": raised,
         "top_raise_blocks_max": max_raise,
-        "build_limit": limit.note(p.scale.max_y),
+        "build_limit": limit.note(p.scale.max_y, p.scale.build_fit()),
         "top_rule": "the first horizon's top is at least the highest elevation plus the highest detail amplitude over the L3 cells within two L1 cells, plus one block",
         "smoothing": {
             "sigma_cells": sp.strata_smoothing_cells,
@@ -80,6 +85,8 @@ pub fn bake(
 pub struct BuildLimit {
     /// L3 cells whose elevation is above `max_y`.
     pub cells_above: u64,
+    /// L3 cells above the compression knee: their stored elevation is not the simulated one.
+    pub cells_compressed: u64,
     /// L3 cells at or above sea level.
     pub land_cells: u64,
     /// The highest elevation, blocks (y); −∞ when no cell has a value.
@@ -89,6 +96,7 @@ pub struct BuildLimit {
 impl BuildLimit {
     const NONE: BuildLimit = BuildLimit {
         cells_above: 0,
+        cells_compressed: 0,
         land_cells: 0,
         highest_y: f64::NEG_INFINITY,
     };
@@ -96,12 +104,13 @@ impl BuildLimit {
     fn merge(self, o: BuildLimit) -> BuildLimit {
         BuildLimit {
             cells_above: self.cells_above + o.cells_above,
+            cells_compressed: self.cells_compressed + o.cells_compressed,
             land_cells: self.land_cells + o.land_cells,
             highest_y: self.highest_y.max(o.highest_y),
         }
     }
 
-    pub fn note(&self, max_y: i32) -> Value {
+    pub fn note(&self, max_y: i32, fit: crate::params::BuildFit) -> Value {
         let share = if self.land_cells == 0 {
             0.0
         } else {
@@ -110,6 +119,9 @@ impl BuildLimit {
         json!({
             "max_y": max_y,
             "cells_above": self.cells_above,
+            "knee_y": fit.knee_y,
+            "top_y": fit.top_y,
+            "cells_compressed": self.cells_compressed,
             "land_cells": self.land_cells,
             "share_of_land": share,
             "highest_y": if self.highest_y.is_finite() { json!(self.highest_y) } else { Value::Null },
@@ -126,6 +138,7 @@ fn raise_tops(
     t: &Terrain,
     max_y: i32,
     sea_level_y: i32,
+    knee_y: f64,
 ) -> Result<(u64, f64, BuildLimit), CoreError> {
     let g1 = hz.grid.clone();
     let (w1, h1) = (g1.w as usize, g1.h as usize);
@@ -170,6 +183,7 @@ fn raise_tops(
                         }
                         if v.is_finite() {
                             limit.cells_above += u64::from(v > limit_y);
+                            limit.cells_compressed += u64::from(v > knee_y);
                             limit.land_cells += u64::from(v >= sea_y);
                             limit.highest_y = limit.highest_y.max(v);
                         }
