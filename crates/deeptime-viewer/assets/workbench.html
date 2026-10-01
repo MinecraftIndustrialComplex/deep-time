@@ -975,6 +975,7 @@ input[type=range]:focus-visible { outline: none; }
         <button id="tool-select" data-tool="select" aria-pressed="true" data-tip="Select: click an event, or a point for its values" data-key="V"><svg class="ic ic-s"><use href="#i-pointer"/></svg><span class="lbl">Select</span></button>
         <button id="tool-inspect" data-tool="inspect" aria-pressed="false" data-tip="Inspect a column in 3D: click the map" data-key="I"><svg class="ic ic-s"><use href="#i-crosshair"/></svg><span class="lbl">Inspect</span></button>
         <button id="tool-area" data-tool="area" aria-pressed="false" data-tip="3D preview: drag a box, or click for 256 × 256 blocks" data-key="B"><svg class="ic ic-s"><use href="#i-box"/></svg><span class="lbl">Area 3D</span></button>
+        <button id="tool-section" data-tool="section" aria-pressed="false" data-tip="Cross-section of the strata: click two points" data-key="S"><svg class="ic ic-s"><use href="#i-section"/></svg><span class="lbl">Section</span></button>
       </div>
       <div class="seg ovl" role="group" aria-label="Map overlays">
         <button id="markers" aria-pressed="true" data-tip="Event markers" data-key="M"><svg class="ic ic-s"><use href="#i-events"/></svg><span class="lbl">Events</span></button>
@@ -1057,6 +1058,7 @@ input[type=range]:focus-visible { outline: none; }
         <button role="tab" data-itab="events" aria-selected="true">Events</button>
         <button role="tab" data-itab="details" aria-selected="false">Details</button>
         <button role="tab" data-itab="s2" aria-selected="false">3D <span class="count" id="jobcount" hidden>0</span></button>
+        <button role="tab" data-itab="section" aria-selected="false">Section</button>
         <button role="tab" data-itab="run" aria-selected="false">Run</button>
       </div>
       <div class="ipane" id="ip-events">
@@ -1075,6 +1077,7 @@ input[type=range]:focus-visible { outline: none; }
         </div>
         <div class="jobs" id="jobs"></div>
       </div>
+      <div class="ipane" id="ip-section" hidden></div>
       <div class="ipane" id="ip-run" hidden><div class="detail" id="runinfo"></div></div>
     </section>
   </aside>
@@ -1108,5 +1111,6 @@ input[type=range]:focus-visible { outline: none; }
 <div id="toasts" aria-live="polite"></div>
 <div class="modal" id="modal" hidden><div class="modal-card" id="modalcard"><div class="modal-h"><h3 id="modaltitle"></h3><span id="modalacts"></span><button class="btn btn-ghost btn-icon" id="modalclose" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button></div><div class="modal-b" id="modalbody"></div></div></div>
 <script src="workbench.js"></script>
+<script src="sections.js"></script>
 </body>
 </html>
