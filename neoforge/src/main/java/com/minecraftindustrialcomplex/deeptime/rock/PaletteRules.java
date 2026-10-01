@@ -25,17 +25,20 @@ import java.util.function.Predicate;
  *   <li>Else nothing: the class stays unclassified crust.</li>
  * </ol>
  *
- * <p>Filler: {@code minecraft:stone} and {@code minecraft:deepslate} are the unclassified crust
- * itself and are never a class's block, with one exception, {@code coal}, which may fall back to
- * stone (the decisions file: Born in Chaos black argillite, then stone). A candidate that is air or
- * filler is rejected wherever it appears and reported. (Solidity is not required: vanilla snow and
- * Project Atmosphere's dust at {@code layers=8}, the adopted {@code rock_states} example, are
- * {@code forceSolidOff} blocks.)
+ * <p>Stone and deepslate. {@code minecraft:stone} and {@code minecraft:deepslate} are the
+ * unclassified crust (the filler the router leaves and the strata pass paints over), and since P1-28
+ * (Ben, decisions log 2026-10-01: "Use stone for common rocks") they are also what the common
+ * classes without a distinctive block of their own look like: shale, mudstone, slate, gneiss and
+ * their kind carry {@code minecraft:stone} or {@code minecraft:deepslate} as their
+ * {@code vanilla_fallback} (see {@code tools/dev/gen_rock_classes.py}), so mining them drops
+ * vanilla's cobblestone and cobbled deepslate. They are ordinary candidates, in tags and states as
+ * much as in {@code vanilla_fallback}; {@link RockPalette#classesOf} reports every class that
+ * resolves to such a block, plus {@code unclassified_crust}, so nothing that must tell a class from
+ * the filler has to look at the block. Only air is rejected, wherever it appears, and reported.
+ * (Solidity is not required: vanilla snow and Project Atmosphere's dust at {@code layers=8}, the
+ * adopted {@code rock_states} example, are {@code forceSolidOff} blocks.)
  */
 public final class PaletteRules {
-
-    /** The one class allowed to resolve to filler stone. */
-    public static final String COAL = "coal";
 
     public enum Source {
         MEMBER, FALLBACK, VANILLA_FALLBACK, NONE;
@@ -45,12 +48,8 @@ public final class PaletteRules {
         }
     }
 
-    /** What a block is, for the filler rule. */
+    /** What a block is, for the rejection rule. */
     public interface Kinds<B> {
-        boolean isStone(B b);
-
-        boolean isFiller(B b);   // stone, deepslate
-
         boolean isRejected(B b); // air
     }
 
@@ -87,14 +86,10 @@ public final class PaletteRules {
     public static <B> Result<B> resolve(String rockClass, Candidates<B> c, Kinds<B> kinds, Function<B, String> describe) {
         List<String> rejected = new ArrayList<>();
         Predicate<B> ok = b -> {
-            String why = null;
-            if (kinds.isRejected(b))
-                why = "air";
-            else if (kinds.isFiller(b) && !(COAL.equals(rockClass) && kinds.isStone(b)))
-                why = "filler (stone and deepslate are unclassified crust; only coal may fall back to stone)";
-            if (why != null)
-                rejected.add(describe.apply(b) + ": " + why);
-            return why == null;
+            if (!kinds.isRejected(b))
+                return true;
+            rejected.add(describe.apply(b) + ": air");
+            return false;
         };
 
         LinkedHashSet<B> members = new LinkedHashSet<>();

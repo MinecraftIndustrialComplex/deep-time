@@ -870,7 +870,17 @@ relative multipliers the erosion and structure stages consume; their values are 
 set in P1-07 against the viewer, and each file records where its value came from.
 `vanilla_fallback` is the class's vanilla stand-in from the rock-tag README (the last entry of its
 fallback list, or its vanilla member), so a pack without any rock tags still resolves every class
-(§7.5).
+(§7.5). **Since P1-28** seven classes carry plain stone or deepslate there instead (the README's
+look-alikes stay in the MIC pack's fallback tags until its rows change, and they win over
+`vanilla_fallback`): `minecraft:stone` for the common fine-grained grey sedimentary classes
+`shale` and `mudstone` (and `coal`, Ben's older pick), `minecraft:deepslate` for the common altered
+and deep ones `slate`, `phyllite`, `schist` and `gneiss`. The table, with the reason for each class,
+is `CRUST_STAND_INS` in `tools/dev/gen_rock_classes.py`, which writes the class files, so the choice
+is data (rock_class JSON, `vanilla_fallback` with a `sources.vanilla_fallback` that says why), not
+code. Classes with a distinctive block keep it (granite, diorite, andesite, basalt, tuff,
+sandstone, calcite for limestone, marble and the evaporites, …), and so do the rare look-alike
+classes (hornfels, amphibolite, greenstone, blueschist, eclogite, quartzite, black shale), whose
+own look is worth more than their share.
 
 #### 5.4.2 Fantasy fields
 
@@ -1581,9 +1591,20 @@ them:
   and **no fallback tags**, so a pack's fallback lists (MIC's included, which use `replace: false`)
   are never pre-empted by entries from Deep Time's jar, and a pure-vanilla pack still resolves every
   class (Q15 in §14).
-- `coal` is the one class allowed to fall back to `minecraft:stone` (the decisions file: Born in
-  Chaos black argillite, then stone). The MIC datapack's `rock_fallback/coal.json` already lists
-  `born_in_chaos_v1:black_argillite` (`required: false`), then `minecraft:stone` (checked 2026-09-28).
+- `minecraft:stone` and `minecraft:deepslate` are ordinary candidates, in tags, `rock_states` and
+  `vanilla_fallback` alike (P1-28, Ben, log 2026-10-01: "Use stone for common rocks and we should be
+  chilling"). Before P1-28 they were rejected as filler (the unclassified crust) except for `coal`'s
+  stone. Now the common classes that have no distinctive block of their own use them as their
+  `vanilla_fallback` (the list is in `tools/dev/gen_rock_classes.py`, `CRUST_STAND_INS`, with the
+  reason for each; §5.4.1), so a world of shale and gneiss is mostly stone and deepslate and mining
+  it drops vanilla's cobblestone and cobbled deepslate. A pack still decides through the tags: its
+  fallback tags are read before `vanilla_fallback`, so it overrides a class by listing its own block
+  first. The strata pass paints a class that resolves to stone or deepslate exactly as any other
+  (the crust underneath becomes that block, so a shale horizon is stone even where the crust was
+  deepslate), and `RockPalette.classesOf` reports, for stone and deepslate, every class that
+  resolves to them plus `unclassified_crust`. Code that must tell a class from the filler asks the
+  world data's horizon, not the block (the background scatter's host bias does:
+  `BackgroundScatterFeature.hostClasses`).
 - A class that still resolves to nothing stays unclassified crust.
 - With several members, one member is chosen per horizon or body (hash of its id), so a layer is one
   block type, not noise; tag order sets the primary member.
@@ -2361,6 +2382,24 @@ scale by the game (`worldgen/WaterBodies`) from a per-column rule both sides imp
 (`deeptime_format::water`, Java `worlddata/Water`, FORMAT.md "Water columns"), because a 1–2 block
 stream cannot survive the density's 4-block noise-cell interpolation. HAND floodplains and
 knickpoint waterfalls stay P2-03 (steps in the water surface already fall as vanilla waterfalls).
+
+*As built (P1-22b, 2026-10-01; Ben's "Both: freeze them and size them by climate", which pulled the
+lake part of P2-03 forward):* lakes are no longer always full. Each basin's level is its **water
+balance**: the liquid runoff reaching it (rain and melt less ET; nothing where the warmest month
+stays below freezing) against the open-water evaporation of its surface. A basin that gains when
+wet to its rim is full and spills, as before; one that does not is terminal: its floor is drained to
+its lowest cell by a Priority-Flood of the basin alone (basins inside it solved first, upstream to
+downstream), and the lake stands where the basin's hypsometry makes the losses equal the inflow, a
+playa when that is under the lake thresholds, nothing when no water reaches it (but at sea level at
+least where the floor lies below sea level, which the game floods anyway). This is the
+equilibrium form of Fill–Spill–Merge's partial fills (a level per basin from its hypsometry and a
+merge when a terminal lake rises over a lake inside it), not its volume bookkeeping. **Frozen
+lakes**: where the mean annual temperature is below `hydro.lake_freeze_mean_c` (0 °C: ice for more
+than half the year) the views draw lake ice; the bake marks nothing, because the frozen biomes'
+`freeze_top_layer` already ices that water (the bake's note records how much of the frozen lake
+area lies in the frozen band). `water_level`, the rivers file and the column rule are unchanged
+(format 0.2, old bakes load as they were). Settings `lake_balance`, `lake_evaporation_base_mm`,
+`lake_evaporation_factor`, `snow_melt_mm_per_degree_day`, `lake_freeze_mean_c`; FORMAT.md "Rivers".
 
 ### 8.5 3D structure, Noddy-style — `core::structure` (Phase 1 simple, Phase 2 full)
 
@@ -3750,6 +3789,18 @@ on this machine.
   `riverBiomes`; river biomes by putting wide channels in the weirdness valley slice. STATUS.md's
   build log has the numbers.
 
+#### P1-22b Lakes sized by the climate, and frozen (2026-10-01; the lake part of P2-03)
+- **Goal.** Ben, decisions log 2026-10-01 ("Both: freeze them and size them by climate"), after a
+  lake some 2,500 km across was drawn as open water at 77°N: a lake's level follows its water
+  balance (inflow against the evaporation of its surface), so dry and polar basins hold small
+  lakes, salt flats or nothing; lakes in freezing climates are ice-covered in the views and the
+  game; the workbench's pointer names a lake a lake. No format change.
+- *As built (2026-10-01):* §8.4's second "As built"; FORMAT.md "Rivers" (how the bake builds it);
+  five `hydro` settings (`lake_balance`, `lake_evaporation_base_mm`, `lake_evaporation_factor`,
+  `snow_melt_mm_per_degree_day`, `lake_freeze_mean_c`) with editor fields; the Rivers & lakes layer's "Frozen lake" and "Salt
+  flat" legend entries; `deeptime satellite --set` to compare the view under other settings.
+  STATUS.md's build log has the numbers.
+
 #### P1-23 Grid-artifact audit (2026-09-29)
 - **Goal.** Sweep real worlds (sections, top-downs, 3D previews) for grid artifacts: staircase coasts,
   axis-aligned gullies, cell-edge seams in biomes, strata or snow; fix them with before/after renders.
@@ -3828,6 +3879,41 @@ on this machine.
     Tools: `notes.plates.margins`, `deeptime margins`, `notes.volcanoes.arc_bases`, the provinces
     coherence line, `tools/review/p1-27-*`. STATUS.md build log, 2026-09-30 (P1-27).
 
+#### P1-28 Stone crafting on rock worlds (2026-10-01)
+- **Goal.** Deep Time paints rock-specific blocks, so plain stone and deepslate, the blocks whose
+  drops (cobblestone, cobbled deepslate) vanilla's stone tools, furnaces and cobblestone recipes
+  ask for, were a few percent of the rock (0.1 % of the top 64 blocks on a baked planet). Ben
+  (log 2026-10-01) first chose hardness tiers plus river cobbles, then replaced that: "Use stone for
+  common rocks and we should be chilling". **No recipe, item tag or drop is changed**; the spawn
+  guarantee and the river, beach and till cobbles were dropped before anything of them shipped.
+- **As built.** `minecraft:stone` is the `vanilla_fallback` of `shale` and `mudstone` (the common
+  fine-grained grey sedimentary rocks; `coal` already had it), `minecraft:deepslate` of `slate`,
+  `phyllite`, `schist` and `gneiss` (the common altered and deep rocks). The table, with a reason
+  per class, is `CRUST_STAND_INS` in `tools/dev/gen_rock_classes.py`, which writes the rock class
+  files; classes with a distinctive block keep it, and so do the rare look-alikes (hornfels,
+  amphibolite, greenstone, blueschist, eclogite, quartzite, black shale). `PaletteRules` no longer
+  rejects stone and deepslate as filler (only air), so tags, `rock_states` and `vanilla_fallback`
+  may all name them; `RockPalette.classesOf` reports for them every class that resolves to them
+  plus `unclassified_crust`; the background scatter's host bias reads the horizon, not the block,
+  where the block is stone or deepslate (`BackgroundScatterFeature.hostClasses`). A pack decides
+  through its fallback tags, which are read before `vanilla_fallback`: the MIC pack's look-alike
+  tags still win until its rows change (see the STATUS entry for the rows).
+- **Measured** (earthlike_quick_16k, 500 Myr, scattered continents; the real generator on 12
+  dry-land boxes of 96 × 96, standalone profile; `tools/review/p1-28-block-share.py`): stone or
+  deepslate share of the placed rock blocks, top 64 blocks under the surface 0.0 % → 47.8 %,
+  whole column 0.0 % → 55.3 %. Over the whole planet's dry land by class
+  (`deeptime-inspect rock-census`, 49,642 land columns): top rock 0.1 % → 58.4 %, top 64 blocks
+  0.1 % → 56.2 %, whole column 0.0 % → 56.0 %. The top rock under the soil was shale on 36 % of
+  land columns (Ben's run: 39 %).
+- **Tests.** JUnit `RockDataTest` (the seven stand-ins and no others; nothing under
+  `data/minecraft` but the world preset tag), `PaletteRulesTest`; GameTests
+  `crustStandInsYieldToPackTags` (stone and deepslate for exactly those classes without a rock
+  datapack; with the MIC rock tags the pack's fallback decides), `miningTheCommonRocksDropsVanillaCobbles`
+  (stone drops cobblestone, deepslate cobbled deepslate, the other placed blocks drop what vanilla
+  gives, and no loot table, recipe or item tag comes from Deep Time's jar),
+  `vanillaOnlyResolvesEveryClass`, `everyClassInTheWorld` (a class that resolves to stone is
+  painted stone even where the crust was deepslate, exactly).
+
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 
 - **P2-01 Noddy evaluator.** Port `unEvents.c`, `taste.c`, `matrix.c` from `noddyverse` (MIT);
@@ -3836,9 +3922,10 @@ on this machine.
 - **P2-02 Metamorphic grade** from restored burial and heat; facies table (hand-built from textbook
   facies boundaries, or generated offline — see Q8).
 - **P2-03 Hydrology** (§8.4; its core moved to P1-22 on 2026-09-29, the rest stays here): routing, Fill–Spill–Merge lakes, HAND floodplains, river vectors,
-  channel carving, waterfalls, deltas; `water_level` for real. *Left after P1-22:* evaporation-limited
-  lake levels below the rim (Fill–Spill–Merge's partial fills; P1-22 keeps every lake full and flags
-  the `endorheic` ones), HAND floodplains, deltas and braided mouths, meanders beyond the smoothing,
+  channel carving, waterfalls, deltas; `water_level` for real. *Left after P1-22 and P1-22b:*
+  (evaporation-limited lake levels below the rim moved to P1-22b on 2026-10-01, Ben's "Both: freeze
+  them and size them by climate": §8.4's second "As built") a salt-flat surface in the game where a
+  basin holds a playa, HAND floodplains, deltas and braided mouths, meanders beyond the smoothing,
   knickpoint waterfalls from erodibility, and incision burned into `elevation` for the far terrain.
 - **P2-04 Geology-driven caves.** Karst in carbonates (port of `aparis69/Karst-Synthesis`, MIT) and
   cave density modulated by lithology and water table, with vanilla cave functions kept as the
