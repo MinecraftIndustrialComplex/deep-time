@@ -1790,7 +1790,7 @@ mod tests {
                     assert_eq!(a.len(), TILE * TILE * 4, "{layer:?} {z}/{tx}/{ty}");
                     assert_eq!(a, map.render(layer, &g).unwrap(), "deterministic");
                     if layer.opaque() {
-                        assert!(a.chunks_exact(4).all(|p| p[3] == 255));
+                        assert!(a.as_chunks::<4>().0.iter().all(|p| p[3] == 255));
                     }
                 }
             }
@@ -1865,7 +1865,7 @@ mod tests {
         // Zoom 2 (a block a pixel): the channel is 2 pixels wide along z = 20 for x in 10..100.
         let g = TileGeom::new(2048, 2, 4, 2).unwrap();
         let cov = set.draw(&g);
-        assert!(cov.alpha[(20 - 0) * TILE + 50] > 0.99);
+        assert!(cov.alpha[20 * TILE + 50] > 0.99);
         assert!(cov.alpha[40 * TILE + 50] == 0.0);
         assert!(cov.alpha[20 * TILE + 150] == 0.0);
         // Zoom 0 (4 blocks a pixel, a channel under a pixel wide): still a line of one pixel.
