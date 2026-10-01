@@ -201,6 +201,13 @@ enum Cmd {
         /// How many blocks below the top block count as "near the surface".
         #[arg(long, default_value_t = 64)]
         top: i32,
+        /// The classes a pack gives plain stone or deepslate (comma-separated): also report how much
+        /// of the land has none of them within --reach blocks.
+        #[arg(long, value_delimiter = ',')]
+        stone_classes: Vec<String>,
+        /// Blocks, for --stone-classes.
+        #[arg(long, default_value_t = 64)]
+        reach: i64,
     },
     /// The columns either side of x = C/2 as one strip, and their height difference.
     Seam {
@@ -497,7 +504,15 @@ fn run(cli: Cli) -> Result<()> {
             world_data,
             step,
             top,
-        } => print_json(&deeptime_inspect::census::run(&world_data, step, top)?)?,
+            stone_classes,
+            reach,
+        } => print_json(&deeptime_inspect::census::run(
+            &world_data,
+            step,
+            top,
+            &stone_classes,
+            reach,
+        )?)?,
         Cmd::WdSection {
             world_data,
             out,

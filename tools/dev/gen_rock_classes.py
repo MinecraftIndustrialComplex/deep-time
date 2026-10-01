@@ -12,7 +12,9 @@ the whole table validates.
 The vocabulary (class names, families, groups, stand-ins) is MIC's rock-tag README,
 /home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md: CLASSES follows
 its Classes table in order, GROUPS its Groups table. `vanilla_fallback` is the class's vanilla member
-there, or the last entry of its fallback list.
+there, or the last entry of its fallback list, except for the classes in CRUST_STAND_INS (P1-28,
+Ben, decisions log 2026-10-01), which use plain stone or deepslate: the common rocks should be the
+two blocks players know, and mining them drops vanilla's cobblestone and cobbled deepslate.
 
 density_kg_m3 is a typical dry bulk density (bulk density of the loose material for unconsolidated
 classes). erodibility and diffusivity are relative multipliers on the stream-power K and the hillslope

@@ -870,7 +870,17 @@ relative multipliers the erosion and structure stages consume; their values are 
 set in P1-07 against the viewer, and each file records where its value came from.
 `vanilla_fallback` is the class's vanilla stand-in from the rock-tag README (the last entry of its
 fallback list, or its vanilla member), so a pack without any rock tags still resolves every class
-(§7.5).
+(§7.5). **Since P1-28** seven classes carry plain stone or deepslate there instead (the README's
+look-alikes stay in the MIC pack's fallback tags until its rows change, and they win over
+`vanilla_fallback`): `minecraft:stone` for the common fine-grained grey sedimentary classes
+`shale` and `mudstone` (and `coal`, Ben's older pick), `minecraft:deepslate` for the common altered
+and deep ones `slate`, `phyllite`, `schist` and `gneiss`. The table, with the reason for each class,
+is `CRUST_STAND_INS` in `tools/dev/gen_rock_classes.py`, which writes the class files, so the choice
+is data (rock_class JSON, `vanilla_fallback` with a `sources.vanilla_fallback` that says why), not
+code. Classes with a distinctive block keep it (granite, diorite, andesite, basalt, tuff,
+sandstone, calcite for limestone, marble and the evaporites, …), and so do the rare look-alike
+classes (hornfels, amphibolite, greenstone, blueschist, eclogite, quartzite, black shale), whose
+own look is worth more than their share.
 
 #### 5.4.2 Fantasy fields
 

@@ -117,6 +117,12 @@ public final class StrataGameTests {
             "slate", "minecraft:deepslate", "phyllite", "minecraft:deepslate", "schist", "minecraft:deepslate",
             "gneiss", "minecraft:deepslate");
 
+    /** A block's default state as the palette prints it (deepslate is {@code deepslate[axis=y]}). */
+    static String stateOf(String block) {
+        return BlockStateParser.serialize(net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                .get(net.minecraft.resources.ResourceLocation.parse(block)).defaultBlockState());
+    }
+
     /**
      * A pure-vanilla pack resolves all 60 classes: the palette built from only the {@code minecraft:}
      * members of the member tags plus each class's {@code vanilla_fallback} gives every class a
@@ -159,7 +165,7 @@ public final class StrataGameTests {
         e.that(vanilla, "marble", Source.MEMBER, "minecraft:calcite");
         e.that(vanilla, "basalt", Source.MEMBER, "minecraft:smooth_basalt");
         e.that(vanilla, "limestone", Source.VANILLA_FALLBACK, "minecraft:calcite");
-        CRUST_STAND_INS.forEach((cls, block) -> e.that(vanilla, cls, Source.VANILLA_FALLBACK, block));
+        CRUST_STAND_INS.forEach((cls, block) -> e.that(vanilla, cls, Source.VANILLA_FALLBACK, stateOf(block)));
         e.that(vanilla, "loess", Source.VANILLA_FALLBACK, "minecraft:smooth_sandstone");
         e.that(vanilla, "peridotite", Source.VANILLA_FALLBACK, "minecraft:tuff");
         e.that(vanilla, "diamictite", Source.VANILLA_FALLBACK, "minecraft:cobbled_deepslate");
@@ -184,7 +190,7 @@ public final class StrataGameTests {
         boolean tags = rockTags(helper);
         CRUST_STAND_INS.forEach((cls, block) -> {
             if (!tags)
-                e.that(live, cls, Source.VANILLA_FALLBACK, block);
+                e.that(live, cls, Source.VANILLA_FALLBACK, stateOf(block));
             else {
                 e.checked++;
                 var r = live.result(cls).orElse(null);
@@ -296,7 +302,7 @@ public final class StrataGameTests {
             e.that(live, "gneiss", Source.FALLBACK, "minecraft:granite");
         } else {
             e.that(live, "shale", Source.VANILLA_FALLBACK, "minecraft:stone");
-            e.that(live, "gneiss", Source.VANILLA_FALLBACK, "minecraft:deepslate");
+            e.that(live, "gneiss", Source.VANILLA_FALLBACK, stateOf("minecraft:deepslate"));
         }
         DeepTime.LOGGER.info("[gametest] firstInstalledFallback test_fallback={} shale={} peridotite={} rockTags={}",
                 live.primary("test_fallback").map(StrataGameTests::id).orElse("nothing"),

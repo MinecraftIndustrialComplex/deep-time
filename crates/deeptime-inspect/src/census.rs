@@ -63,14 +63,23 @@ impl Tally {
     }
 }
 
-/// The census of the dry land of `dir` on a lattice `step` blocks apart, `top_n` blocks deep.
-pub fn run(dir: &Path, step: i64, top_n: i32) -> Result<Value> {
+/// How far down a player digs when looking for stone (blocks under the top block).
+pub const DIG_BLOCKS: i32 = 32;
+
+/// The census of the dry land of `dir` on a lattice `step` blocks apart, `top_n` blocks deep. With
+/// `stone_classes` (the classes a pack gives plain stone or deepslate) it also reports how much of
+/// the land has none of them within `reach` blocks, at the surface and within `DIG_BLOCKS` below it.
+pub fn run(dir: &Path, step: i64, top_n: i32, stone_classes: &[String], reach: i64) -> Result<Value> {
     let w = ColumnWorld::open(dir).map_err(|e| Error(e.to_string()))?;
     let c = w.c;
     let sea = w.manifest.scale.sea_level_y;
     let step = step.max(1);
     let mut t = Tally::default();
     let (mut land, mut sampled) = (0u64, 0u64);
+    let (cols, rows) = (((c / step) as usize).max(1), (((c / 2) / step) as usize).max(1));
+    // Per lattice cell: None = not dry land, else (stone class at the top block, within DIG_BLOCKS).
+    let mut cells: Vec<Option<(bool, bool)>> = vec![None; cols * rows];
+    let is_stone = |class: &Option<String>| class.as_ref().is_some_and(|c| stone_classes.contains(c));
     let mut z = -c / 4 + step / 2;
     while z < c / 4 {
         let mut x = -c / 2 + step / 2;
@@ -80,6 +89,15 @@ pub fn run(dir: &Path, step: i64, top_n: i32) -> Result<Value> {
             // Dry land: the terrain above the sea and no lake, river or sea over it.
             if col.top_y > sea && col.hydro.kind.name() == "none" {
                 land += 1;
+                let (i, j) = (((x + c / 2) / step) as usize, ((z + c / 4) / step) as usize);
+                if i < cols && j < rows {
+                    let top = col.rock.first().is_some_and(|r| is_stone(&r.2));
+                    let dig = col
+                        .rock
+                        .iter()
+                        .any(|(hi, lo, class)| is_stone(class) && *lo <= col.top_y && *hi >= col.top_y - DIG_BLOCKS + 1);
+                    cells[j * cols + i] = Some((top, dig));
+                }
                 t.add(&col.rock, col.top_y, top_n);
                 if let Some((_, _, class)) = col.rock.first() {
                     let n = t.top[&class_name(class)];
@@ -106,7 +124,51 @@ pub fn run(dir: &Path, step: i64, top_n: i32) -> Result<Value> {
             })).collect::<Vec<_>>(),
         })
     };
+    let isolation = if stone_classes.is_empty() {
+        Value::Null
+    } else {
+        // Share of dry land with no stone-class cell within `reach` blocks (wrapping in x).
+        let r = (reach / step).max(0) as i64;
+        let (mut none_top, mut none_dig, mut n) = (0u64, 0u64, 0u64);
+        for j in 0..rows as i64 {
+            for i in 0..cols as i64 {
+                if cells[j as usize * cols + i as usize].is_none() {
+                    continue;
+                }
+                n += 1;
+                let (mut top, mut dig) = (false, false);
+                for dj in -r..=r {
+                    let jj = j + dj;
+                    if jj < 0 || jj >= rows as i64 {
+                        continue;
+                    }
+                    for di in -r..=r {
+                        if di * di + dj * dj > r * r {
+                            continue;
+                        }
+                        let ii = (i + di).rem_euclid(cols as i64);
+                        if let Some((t, d)) = cells[jj as usize * cols + ii as usize] {
+                            top |= t;
+                            dig |= d;
+                        }
+                    }
+                }
+                none_top += u64::from(!top);
+                none_dig += u64::from(!dig);
+            }
+        }
+        json!({
+            "stone_classes": stone_classes,
+            "reach_blocks": reach,
+            "dig_blocks": DIG_BLOCKS,
+            "land_cells": n,
+            "no_stone_at_the_surface": if n == 0 { 0.0 } else { none_top as f64 / n as f64 },
+            "no_stone_within_dig_depth": if n == 0 { 0.0 } else { none_dig as f64 / n as f64 },
+            "definition": "share of dry land cells that have no cell of a stone class (top block) within reach blocks, and none whose rock within dig_blocks of the top block is a stone class; a start there has to walk for stone",
+        })
+    };
     Ok(json!({
+        "isolation": isolation,
         "world_data": dir.display().to_string(),
         "step_blocks": step,
         "top_blocks": top_n,

@@ -142,7 +142,9 @@ public final class OreData {
      *                         bottom of the world (1) where clusters start. The plan's "fraction of
      *                         crust thickness": the playable crust is the column below the surface
      * @param hostBias         rock class → acceptance weight (0–1; {@code "*"} for any other class,
-     *                         default 1); {@code unclassified_crust} is stone and deepslate
+     *                         default 1); {@code unclassified_crust} is stone and deepslate that no horizon
+     *                         paints as a class (a block of stone or deepslate that is a class's, say shale's or
+     *                         gneiss's since P1-28, counts as that class: {@link com.minecraftindustrialcomplex.deeptime.worldgen.BackgroundScatterFeature#hostClasses})
      */
     public record ScatterRule(ResourceLocation material, double clustersPerChunk, int size, List<Double> yWindow,
                               Map<String, Double> hostBias) {
