@@ -40,6 +40,9 @@ const BENCH_HTML: &str = include_str!("../assets/bench.html");
 const WORKBENCH_HTML: &str = include_str!("../assets/workbench.html");
 /// The workbench page's script (`deeptime watch` serves it as `workbench.js`).
 pub const WORKBENCH_JS: &str = include_str!("../assets/workbench.js");
+/// The workbench's "Rock at depth" and cross-section tool (served as `sections.js`, after
+/// `workbench.js`; it reads `/api/runs/<id>/rock…`).
+pub const SECTIONS_JS: &str = include_str!("../assets/sections.js");
 /// The planet editor's field catalogue, shared with the game (Gradle ships it in the jar as
 /// `deeptime/editor_fields.json` for `screen/model/EditorFields`); the workbench's form is built
 /// from it.

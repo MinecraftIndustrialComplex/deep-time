@@ -55,8 +55,12 @@ impl StoredHorizon {
 /// several cells give it); `StrataPass` picks a class's block member by it.
 pub type ColumnHorizon = (i32, u8, u16);
 
-/// The height of `hz` (one cell's used horizons, top-down) at key `s`.
-fn height_at(hz: &[StoredHorizon], s: u16, floor: f64, d: &LayerDesc) -> f64 {
+/// The height of `hz` (one cell's used horizons, top-down) at key `s`. `at` is the horizon the
+/// previous (smaller or equal) key stopped at, so a walk up the keys of a stack reads each
+/// horizon once: the horizon found for `s` is the first one whose successor starts after `s`, a
+/// test that holds for every smaller key too, so starting the search from an earlier answer
+/// finds the same horizon as starting from the top.
+fn height_at(hz: &[StoredHorizon], at: &mut usize, s: u16, floor: f64, d: &LayerDesc) -> f64 {
     let top = |h: &StoredHorizon| f64::from(h.top) * d.scale + d.offset;
     if hz.is_empty() {
         return floor;
@@ -64,10 +68,11 @@ fn height_at(hz: &[StoredHorizon], s: u16, floor: f64, d: &LayerDesc) -> f64 {
     if s <= hz[0].key[0] {
         return top(&hz[0]);
     }
-    let mut h = 0;
+    let mut h = *at;
     while h + 1 < hz.len() && hz[h + 1].key[0] <= s {
         h += 1;
     }
+    *at = h;
     let t = top(&hz[h]);
     let b = if h + 1 < hz.len() {
         top(&hz[h + 1])
@@ -81,15 +86,17 @@ fn height_at(hz: &[StoredHorizon], s: u16, floor: f64, d: &LayerDesc) -> f64 {
     t - (t - b) * (f64::from(s - kt) / f64::from(kb - kt))
 }
 
-/// The horizon of `hz` whose span holds the key interval [s0, s1], if any.
-fn horizon_over(hz: &[StoredHorizon], s0: u16, s1: u16) -> Option<usize> {
+/// The horizon of `hz` whose span holds the key interval [s0, s1], if any. `at` is where the
+/// search for an earlier (smaller or equal) `s0` ended, as for [`height_at`].
+fn horizon_over(hz: &[StoredHorizon], at: &mut usize, s0: u16, s1: u16) -> Option<usize> {
     if hz.is_empty() || s0 < hz[0].key[0] {
         return None;
     }
-    let mut h = 0;
+    let mut h = *at;
     while h + 1 < hz.len() && hz[h + 1].key[0] <= s0 {
         h += 1;
     }
+    *at = h;
     (s1 <= hz[h].key[1]).then_some(h)
 }
 
@@ -123,7 +130,38 @@ pub fn stack_at(
     z: i64,
     out: &mut Vec<ColumnHorizon>,
 ) {
+    stack_at_with(&mut StackScratch::default(), d, min_y, horizon, x, z, out);
+}
+
+/// Working memory of [`stack_at_with`]: the sixteen cells' horizons, the keys and the heights at
+/// them. A reader that asks for many columns (a map, a section) keeps one per thread and spares
+/// the allocations of every column.
+#[derive(Default)]
+pub struct StackScratch {
+    corners: [Vec<StoredHorizon>; CELLS],
+    keys: Vec<u16>,
+    /// The cells' heights at the keys: cell n's at key q is `y[n * m + q]`, m the keys' count.
+    y: Vec<f64>,
+    entries: Vec<(u32, u8, u16, f64)>,
+}
+
+/// [`stack_at`] with the working memory given: the same answer, bit for bit.
+pub fn stack_at_with(
+    scratch: &mut StackScratch,
+    d: &LayerDesc,
+    min_y: i32,
+    horizon: impl Fn(u32, u32, u32) -> StoredHorizon,
+    x: i64,
+    z: i64,
+    out: &mut Vec<ColumnHorizon>,
+) {
     out.clear();
+    let StackScratch {
+        corners,
+        keys,
+        y,
+        entries,
+    } = scratch;
     let g = &d.grid;
     let k = d.stack_depth.unwrap_or(0);
     let c = i64::from(g.w) * i64::from(g.r);
@@ -134,20 +172,21 @@ pub fn stack_at(
     let (bu, bv) = (bspline(u - i0 as f64), bspline(v - j0 as f64));
     // The 4 × 4 cells i0 − 1 … i0 + 2, j0 − 1 … j0 + 2, row by row; weight bu[a]·bv[b].
     let mut w = [0.0f64; CELLS];
-    let mut corners: Vec<Vec<StoredHorizon>> = Vec::with_capacity(CELLS);
     for (b, &wv) in bv.iter().enumerate() {
         for (a, &wu) in bu.iter().enumerate() {
-            w[b * 4 + a] = wu * wv;
+            let n = b * 4 + a;
+            w[n] = wu * wv;
             let (ci, cj) = (g.wrap_i(i0 - 1 + a as i64), g.clamp_j(j0 - 1 + b as i64));
-            corners.push(
+            corners[n].clear();
+            corners[n].extend(
                 (0..k)
                     .map(|h| horizon(ci, cj, h))
-                    .take_while(StoredHorizon::is_used)
-                    .collect(),
+                    .take_while(StoredHorizon::is_used),
             );
         }
     }
-    let mut keys: Vec<u16> = corners.iter().flatten().flat_map(|h| h.key).collect();
+    keys.clear();
+    keys.extend(corners.iter().flatten().flat_map(|h| h.key));
     keys.sort_unstable();
     keys.dedup();
     let m = keys.len();
@@ -157,17 +196,22 @@ pub fn stack_at(
     let floor = f64::from(min_y);
     let band_keys = d.tongue_band_keys.unwrap_or(BAND_KEYS).max(1);
     let minor = d.tongue_minor_share.unwrap_or(MINOR_SHARE);
-    let y: Vec<Vec<f64>> = corners
-        .iter()
-        .map(|hz| keys.iter().map(|&s| height_at(hz, s, floor, d)).collect())
-        .collect();
+    // Each cell's height at every key; the keys ascend, so each cell's horizons are walked once.
+    y.clear();
+    y.resize(CELLS * m, 0.0);
+    for (hz, row) in corners.iter().zip(y.chunks_mut(m)) {
+        let mut at = 0;
+        for (cell, &s) in row.iter_mut().zip(keys.iter()) {
+            *cell = height_at(hz, &mut at, s, floor, d);
+        }
+    }
     // The weighted mean as an offset from the cell (i0, j0)'s height, so that equal heights
     // give exactly that height whatever the weights' rounding.
     let height = |q: usize| {
-        let base = y[REF][q];
+        let base = y[REF * m + q];
         let mut sum = 0.0f64;
         for cn in 0..CELLS {
-            sum += w[cn] * (y[cn][q] - base);
+            sum += w[cn] * (y[cn * m + q] - base);
         }
         base + sum
     };
@@ -179,7 +223,8 @@ pub fn stack_at(
         return;
     }
     // (order, class, unit, weighted thickness) of each class an interval holds.
-    let mut entries: Vec<(u32, u8, u16, f64)> = Vec::with_capacity(4);
+    entries.clear();
+    let mut at = [0usize; CELLS];
     let mut top = height(0);
     for q in 0..m - 1 {
         let (s0, s1) = (keys[q], keys[q + 1]);
@@ -189,10 +234,10 @@ pub fn stack_at(
             if w[cn] <= 0.0 {
                 continue;
             }
-            let Some(h) = horizon_over(&corners[cn], s0, s1) else {
+            let Some(h) = horizon_over(&corners[cn], &mut at[cn], s0, s1) else {
                 continue;
             };
-            let t = w[cn] * (y[cn][q] - y[cn][q + 1]);
+            let t = w[cn] * (y[cn * m + q] - y[cn * m + q + 1]);
             if t <= 0.0 {
                 continue;
             }
@@ -433,5 +478,228 @@ mod tests {
             }
         });
         assert_eq!(at(&a, 0), at(&b, 0));
+    }
+
+    // The column rule as it was written before `StackScratch`: each horizon search from the top
+    // and every buffer allocated per call. The version that walks the keys (and `stack_at_with`,
+    // which a reader asking for many columns reuses) must give this answer exactly.
+    fn ref_height_at(hz: &[StoredHorizon], s: u16, floor: f64, d: &LayerDesc) -> f64 {
+        let top = |h: &StoredHorizon| f64::from(h.top) * d.scale + d.offset;
+        if hz.is_empty() {
+            return floor;
+        }
+        if s <= hz[0].key[0] {
+            return top(&hz[0]);
+        }
+        let mut h = 0;
+        while h + 1 < hz.len() && hz[h + 1].key[0] <= s {
+            h += 1;
+        }
+        let t = top(&hz[h]);
+        let b = if h + 1 < hz.len() {
+            top(&hz[h + 1])
+        } else {
+            floor
+        };
+        let (kt, kb) = (hz[h].key[0], hz[h].key[1]);
+        if s >= kb {
+            return b;
+        }
+        t - (t - b) * (f64::from(s - kt) / f64::from(kb - kt))
+    }
+
+    fn ref_horizon_over(hz: &[StoredHorizon], s0: u16, s1: u16) -> Option<usize> {
+        if hz.is_empty() || s0 < hz[0].key[0] {
+            return None;
+        }
+        let mut h = 0;
+        while h + 1 < hz.len() && hz[h + 1].key[0] <= s0 {
+            h += 1;
+        }
+        (s1 <= hz[h].key[1]).then_some(h)
+    }
+
+    fn ref_stack_at(l: &LoadedLayer, min_y: i32, x: i64, z: i64) -> Vec<ColumnHorizon> {
+        let d = &l.desc;
+        let mut out = Vec::new();
+        let g = &d.grid;
+        let k = d.stack_depth.unwrap_or(0);
+        let c = i64::from(g.w) * i64::from(g.r);
+        let wx = (x + c / 2).rem_euclid(c) - c / 2;
+        let u = (wx - g.origin_block_x) as f64 / f64::from(g.r);
+        let v = (z - g.origin_block_z) as f64 / f64::from(g.r);
+        let (i0, j0) = (u.floor() as i64, v.floor() as i64);
+        let (bu, bv) = (bspline(u - i0 as f64), bspline(v - j0 as f64));
+        let mut w = [0.0f64; CELLS];
+        let mut corners: Vec<Vec<StoredHorizon>> = Vec::with_capacity(CELLS);
+        for (b, &wv) in bv.iter().enumerate() {
+            for (a, &wu) in bu.iter().enumerate() {
+                w[b * 4 + a] = wu * wv;
+                let (ci, cj) = (g.wrap_i(i0 - 1 + a as i64), g.clamp_j(j0 - 1 + b as i64));
+                corners.push(
+                    (0..k)
+                        .map(|h| l.horizon(ci, cj, h))
+                        .take_while(StoredHorizon::is_used)
+                        .collect(),
+                );
+            }
+        }
+        let mut keys: Vec<u16> = corners.iter().flatten().flat_map(|h| h.key).collect();
+        keys.sort_unstable();
+        keys.dedup();
+        let m = keys.len();
+        if m == 0 {
+            return out;
+        }
+        let floor = f64::from(min_y);
+        let band_keys = d.tongue_band_keys.unwrap_or(BAND_KEYS).max(1);
+        let minor = d.tongue_minor_share.unwrap_or(MINOR_SHARE);
+        let y: Vec<Vec<f64>> = corners
+            .iter()
+            .map(|hz| {
+                keys.iter()
+                    .map(|&s| ref_height_at(hz, s, floor, d))
+                    .collect()
+            })
+            .collect();
+        let height = |q: usize| {
+            let base = y[REF][q];
+            let mut sum = 0.0f64;
+            for cn in 0..CELLS {
+                sum += w[cn] * (y[cn][q] - base);
+            }
+            base + sum
+        };
+        if m == 1 {
+            if let Some(h) = corners.iter().find_map(|hz| hz.first()) {
+                emit(&mut out, height(0), h.class, h.key[0]);
+            }
+            return out;
+        }
+        let mut entries: Vec<(u32, u8, u16, f64)> = Vec::with_capacity(4);
+        let mut top = height(0);
+        for q in 0..m - 1 {
+            let (s0, s1) = (keys[q], keys[q + 1]);
+            let bottom = height(q + 1);
+            entries.clear();
+            for cn in 0..CELLS {
+                if w[cn] <= 0.0 {
+                    continue;
+                }
+                let Some(h) = ref_horizon_over(&corners[cn], s0, s1) else {
+                    continue;
+                };
+                let t = w[cn] * (y[cn][q] - y[cn][q + 1]);
+                if t <= 0.0 {
+                    continue;
+                }
+                let s = corners[cn][h];
+                let order = u32::from(s.key[0]) + u32::from(s.key[1]);
+                match entries.iter_mut().find(|e| e.1 == s.class) {
+                    Some(e) => {
+                        e.0 = e.0.min(order);
+                        e.2 = e.2.min(s.key[0]);
+                        e.3 += t;
+                    }
+                    None => entries.push((order, s.class, s.key[0], t)),
+                }
+            }
+            if entries.len() == 1 {
+                emit(&mut out, top, entries[0].1, entries[0].2);
+            } else if entries.len() > 1 {
+                entries.sort_unstable_by_key(|e| (e.0, e.1));
+                interfinger(
+                    &mut out,
+                    &entries,
+                    (s0, s1),
+                    (top, bottom),
+                    band_keys,
+                    minor,
+                );
+            }
+            top = bottom;
+        }
+        out
+    }
+
+    /// A 24 × 8 grid of random stacks (K = 6): keys ascend down each stack with gaps (hiatuses),
+    /// tops descend, classes differ between neighbours, some cells have fewer horizons.
+    fn random_layer(seed: u64) -> LoadedLayer {
+        let mut s = seed | 1;
+        let mut next = move |n: u64| {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s % n
+        };
+        let grid = GridDesc::for_planet("L1", 24 * 16, 16).unwrap();
+        let mut d = LayerDesc::scalar(
+            "strata/horizons",
+            DType::HorizonStack,
+            grid.clone(),
+            Codec::Raw,
+        );
+        d.scale = 1.0 / 16.0;
+        d.stack_depth = Some(6);
+        let mut bytes = Vec::new();
+        for _ in 0..grid.cells() {
+            let n = 1 + next(6) as usize;
+            let (mut key, mut top) = (next(40) as u16, 300 * 16 - next(100 * 16) as i32);
+            let mut st = Vec::new();
+            for _ in 0..n {
+                let span = 1 + next(300) as u16;
+                st.push((top as i16, next(7) as u8, key, key + span));
+                key += span + next(50) as u16;
+                top -= 16 + next(60 * 16) as i32;
+            }
+            for h in 0..6 {
+                bytes.extend_from_slice(&st.get(h).map_or(i16::MIN, |t| t.0).to_le_bytes());
+            }
+            for h in 0..6 {
+                bytes.push(st.get(h).map_or(NO_CLASS, |t| t.1));
+            }
+            for h in 0..6 {
+                bytes.extend_from_slice(&st.get(h).map_or(NO_KEY, |t| t.2).to_le_bytes());
+            }
+            for h in 0..6 {
+                bytes.extend_from_slice(&st.get(h).map_or(NO_KEY, |t| t.3).to_le_bytes());
+            }
+        }
+        LoadedLayer::new(d, bytes).unwrap()
+    }
+
+    #[test]
+    fn reusing_the_scratch_and_walking_the_keys_changes_no_answer() {
+        let mut scratch = StackScratch::default();
+        let (mut out, mut total, mut tongues) = (Vec::new(), 0, 0);
+        for seed in [1u64, 7, 99, 12345] {
+            let l = random_layer(seed);
+            for z in (-64..64).step_by(3) {
+                for x in (-192..192).step_by(5) {
+                    let want = ref_stack_at(&l, -352, x, z);
+                    l.stack_at(x, z, -352, &mut out);
+                    assert_eq!(out, want, "stack_at, seed {seed} ({x}, {z})");
+                    stack_at_with(
+                        &mut scratch,
+                        &l.desc,
+                        -352,
+                        |i, j, k| l.horizon(i, j, k),
+                        x,
+                        z,
+                        &mut out,
+                    );
+                    assert_eq!(out, want, "stack_at_with, seed {seed} ({x}, {z})");
+                    total += 1;
+                    // A class that comes back lower down: a tongue, or a repeated bed.
+                    tongues += usize::from(
+                        want.iter()
+                            .enumerate()
+                            .any(|(i, h)| want[..i].iter().any(|e| e.1 == h.1)),
+                    );
+                }
+            }
+        }
+        assert!(total > 2000);
+        assert!(tongues > 0, "the random stacks do intertongue somewhere");
     }
 }
