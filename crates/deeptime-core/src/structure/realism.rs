@@ -156,7 +156,9 @@ pub fn visible(horizons: &[(i32, u8)], ground_y: i32, floor_y: i32, out: &mut Ve
     out.clear();
     for (h, &(top, class)) in horizons.iter().enumerate() {
         let top = top.min(ground_y);
-        let below = horizons.get(h + 1).map_or(floor_y - 1, |n| n.0.max(floor_y - 1));
+        let below = horizons
+            .get(h + 1)
+            .map_or(floor_y - 1, |n| n.0.max(floor_y - 1));
         let blocks = top - below;
         if blocks <= 0 {
             continue;

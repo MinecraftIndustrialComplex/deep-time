@@ -508,16 +508,32 @@ mod tests {
             run(&[(100, 1), (60, 5), (52, 3)]),
             [(100, 1), (60, 5), (52, 3)]
         );
-        assert_eq!(run(&[(100, 5), (98, 1), (50, 5)]), [(100, 5), (98, 1), (50, 5)]);
+        assert_eq!(
+            run(&[(100, 5), (98, 1), (50, 5)]),
+            [(100, 5), (98, 1), (50, 5)]
+        );
         // Two slivers in a row both go; the same class on both sides of one joins.
-        assert_eq!(run(&[(100, 1), (60, 5), (57, 6), (55, 2)]), [(100, 1), (55, 2)]);
-        assert_eq!(run(&[(100, 1), (60, 5), (57, 1), (20, 2)]), [(100, 1), (20, 2)]);
+        assert_eq!(
+            run(&[(100, 1), (60, 5), (57, 6), (55, 2)]),
+            [(100, 1), (55, 2)]
+        );
+        assert_eq!(
+            run(&[(100, 1), (60, 5), (57, 1), (20, 2)]),
+            [(100, 1), (20, 2)]
+        );
         // A layer that names nothing changes nothing.
         let mut out: Vec<ColumnHorizon> = vec![(100, 1, 0), (60, 5, 0), (57, 3, 0)];
         drop_slivers(&mut out, &[]);
         assert_eq!(out.len(), 3);
         // Through the rule: cells 0–3 hold a 3-block bed of class 5, the layer says 8.
-        let mut l = layer(|_| vec![(40, 1, 0, 10), (30, 5, 10, 12), (27, 1, 12, 20), (0, 3, 20, 30)]);
+        let mut l = layer(|_| {
+            vec![
+                (40, 1, 0, 10),
+                (30, 5, 10, 12),
+                (27, 1, 12, 20),
+                (0, 3, 20, 30),
+            ]
+        });
         assert_eq!(at(&l, 0), [(40, 1), (30, 5), (27, 1), (0, 3)]);
         l.desc.min_blocks = Some(min.to_vec());
         assert_eq!(at(&l, 0), [(40, 1), (0, 3)]);

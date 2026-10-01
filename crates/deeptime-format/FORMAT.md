@@ -529,9 +529,9 @@ carried cell by cell and neighbouring cells' stacks differ more than the rocks w
 new stack is the Gaussian-weighted mean (σ = `structure.strata_smoothing_cells` L1 cells, default
 10; x wraps, z clamps) of its neighbours' height functions, cut at every key top and base any of
 them has; each interval takes the class holding the largest weighted thickness there, equal
-neighbours of one key domain join; the cell's own surface stays its first top (neighbours' units
-above it pinch out there; where the cell stands above the mean its top unit fills the
-difference); then the stack is settled again (at least a block thick, metamorphic and plutonic
+neighbours of one key domain join; the cell's own surface stays its first top: the regolith lies
+on it with its mean thickness, neighbours' rock units above the regolith's base pinch out there,
+and where the cell stands above the mean its top rock unit fills the difference; then the stack is settled again (at least a block thick, metamorphic and plutonic
 rock inside it at least 8 and 16 blocks, at most K). The neighbours are the cells of a lattice of
 step ⌈σ / 2.5⌉ anchored at cell (0, 0) within 5 steps (11 × 11 samples whatever σ, and every cell
 samples the same lattice); σ 0 bakes each cell's own stack. `notes.bake.strata.realism` records the share of the stored

@@ -296,8 +296,11 @@ impl Horizons {
     /// join. The neighbours are the cells on a lattice of step [`smooth_stride`] anchored to the
     /// grid (every cell samples the same lattice, so neighbouring cells see the same data) within
     /// [`SMOOTH_RADIUS_SAMPLES`] steps, so the cost stays (2·5 + 1)² stacks a cell for any σ. The
-    /// cell's own surface stays its first top (units the neighbours hold above it pinch out at
-    /// it; where the cell stands above the mean, its top unit fills the difference). The stacks
+    /// cell's own surface stays its first top: the regolith lies on it with its mean thickness
+    /// (it follows the ground, not the mean surface), the rock units the neighbours hold above
+    /// the regolith's base pinch out there, and where the cell stands above the mean its top
+    /// rock unit fills the difference (not the regolith: a ridge 60 blocks over the mean surface
+    /// is rock, not 60 blocks of saprolite). The stacks
     /// are then settled again (at least a block thick, metamorphic and plutonic rock inside the
     /// stack at least `min_blocks` of its class, at most K). An interval takes its class from
     /// horizons that span it, and a span lies in one key domain, so a new horizon's span does
@@ -363,9 +366,20 @@ impl Horizons {
                     }
                     let top0 = f64::from(own.0[0]);
                     let mut hz: Vec<H> = Vec::with_capacity(k);
+                    // The regolith laid on the cell's own surface so far (1/16 block), and
+                    // whether a rock horizon has begun under it.
+                    let (mut regolith, mut rock) = (0.0f64, false);
                     for q in 0..m.saturating_sub(1) {
                         let (s0, s1) = (keys[q], keys[q + 1]);
-                        let (y0, y1) = (ys[q].min(top0), ys[q + 1].min(top0));
+                        // The regolith drapes the cell's own surface with its mean thickness,
+                        // wherever the mean surface lies; the rock starts under it.
+                        let drape = key::domain(s1) == 0;
+                        let rock_top = top0 - regolith;
+                        let (y0, y1) = if drape {
+                            (rock_top, rock_top - (ys[q] - ys[q + 1]).max(0.0))
+                        } else {
+                            (ys[q].min(rock_top), ys[q + 1].min(rock_top))
+                        };
                         if y1 >= y0 {
                             continue;
                         }
@@ -396,9 +410,17 @@ impl Horizons {
                         };
                         let top = if hz.is_empty() {
                             own.0[0].into()
+                        } else if !drape && !rock {
+                            // The first rock unit fills from the regolith's base down.
+                            rock_top.round() as i32
                         } else {
                             y0.round() as i32
                         };
+                        if drape {
+                            regolith += y0 - y1;
+                        } else {
+                            rock = true;
+                        }
                         match hz.last_mut() {
                             Some(last)
                                 if last.class == u16::from(class)
@@ -646,7 +668,11 @@ pub fn bake_with(
         classes,
         keys,
         tongues: tongue_params(p),
-        min_blocks: t.min_blocks.iter().map(|&b| b.clamp(1, 255) as u8).collect(),
+        min_blocks: t
+            .min_blocks
+            .iter()
+            .map(|&b| b.clamp(1, 255) as u8)
+            .collect(),
     }
     .smoothed(p.strata_smoothing_cells, &t.min_blocks)
 }
@@ -881,5 +907,64 @@ mod tests {
             &mut keys,
         );
         assert_eq!(n, 4, "{classes:?}");
+    }
+
+    /// The smoothing keeps the regolith on the ground: a ridge standing over the mean surface is
+    /// its top rock unit under the regolith's own two blocks, not sixty blocks of saprolite.
+    #[test]
+    fn the_regolith_follows_the_ground_through_the_smoothing() {
+        let t = Tables::get();
+        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
+        let (w, n, k) = (grid.w as usize, grid.cells(), 8);
+        let units = [
+            keyed("saprolite", 40.0, key::REGOLITH),
+            keyed("sandstone", 2000.0, [5000, 6000]),
+            keyed("granite", 20_000.0, key::pool(6, 5, 0)),
+        ];
+        let mut tops = vec![NO_TOP; n * k];
+        let mut classes = vec![NO_CLASS; n * k];
+        let mut keys = vec![[NO_KEY; 2]; n * k];
+        // A ridge three cells wide, 60 blocks over the plain.
+        let ridge = |c: usize| (30..33).contains(&(c % w));
+        for c in 0..n {
+            bake_cell(
+                &units,
+                if ridge(c) { 160.0 } else { 100.0 },
+                -352,
+                639,
+                20.0,
+                &t.min_blocks,
+                &mut tops[c * k..(c + 1) * k],
+                &mut classes[c * k..(c + 1) * k],
+                &mut keys[c * k..(c + 1) * k],
+            );
+        }
+        let h = Horizons {
+            grid,
+            k: k as u32,
+            min_y: -352,
+            tops,
+            classes,
+            keys,
+            tongues: (64, 0.15),
+            min_blocks: Vec::new(),
+        }
+        .smoothed(2.5, &t.min_blocks);
+        h.check().unwrap();
+        for c in [10 * w + 31, 10 * w + 5, 10 * w + 29] {
+            let (tops, classes, _) = h.cell(c);
+            assert_eq!(classes[0], index("saprolite") as u8, "cell {c}");
+            assert_eq!(classes[1], index("sandstone") as u8, "cell {c}");
+            assert_eq!(
+                tops[0] - tops[1],
+                2 * 16,
+                "cell {c}: the regolith's own 40 m"
+            );
+            assert_eq!(
+                i32::from(tops[0]),
+                if ridge(c) { 160 * 16 } else { 100 * 16 },
+                "cell {c}"
+            );
+        }
     }
 }
