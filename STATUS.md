@@ -160,7 +160,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   loaded. The full MIC suite was not run here. Before the merge the default suite's heap peaked at 6,134 of 6,144 MB;
   the new level held 800 of the 24,263 chunks at that peak.
 - **Also seen, not changed.**
-  - The test planet's deepest sea bed is at y −399, below the world's floor (y −352): the sea there is water down to
+  - The test planet's deepest sea bed is at y −399 (y −389 after the merge), below the world's floor (y −352): the sea there is water down to
     bedrock level. It is the mirror of terrain above the build limit (the height-limit question above).
   - In the old worlds the flooded zone also held a few hundred thousand blocks of plain deepslate and blackstone per box
     where the fixed worlds have open cave (crust 296,087 → 12,819 in the coast box): something reacting with the lava.
