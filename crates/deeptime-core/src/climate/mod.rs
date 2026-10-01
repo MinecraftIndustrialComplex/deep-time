@@ -1412,7 +1412,10 @@ impl ClimateStage {
                     let id = world.emit(e)?;
                     if !ongoing {
                         self.s.clock.last_escape = Some((t_end, Some(id)));
-                        self.s.clock.spans.push([open.t_start / 1.0e6, t_end / 1.0e6]);
+                        self.s
+                            .clock
+                            .spans
+                            .push([open.t_start / 1.0e6, t_end / 1.0e6]);
                     }
                     if ongoing {
                         self.s.clock.snowball = None;

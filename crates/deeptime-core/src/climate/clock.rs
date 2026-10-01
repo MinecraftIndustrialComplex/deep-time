@@ -633,7 +633,9 @@ mod tests {
                 started: true,
                 ..ClockState::default()
             };
-            let (ppm, ebm) = balance(&self.p, 23.4, 1.0, t, &self.land, &st.sheet, &st.kernel, d, 1.0);
+            let (ppm, ebm) = balance(
+                &self.p, 23.4, 1.0, t, &self.land, &st.sheet, &st.kernel, d, 1.0,
+            );
             st.carbon = Carbon::at_ppm(ppm);
             (st, ebm)
         }
@@ -814,7 +816,10 @@ mod tests {
         // (the slow drawdown crosses the runaway threshold a step or so apart).
         let fine = scenario(100.0, 1.0, 0.0, 60.0);
         let coarse = scenario(200.0, 1.0, 0.0, 60.0);
-        assert!(!fine.is_empty() && !coarse.is_empty(), "{fine:?} {coarse:?}");
+        assert!(
+            !fine.is_empty() && !coarse.is_empty(),
+            "{fine:?} {coarse:?}"
+        );
         let (f, c) = (fine[0], coarse[0]);
         assert!((f.0 - c.0).abs() <= 1.5, "onset {f:?} vs {c:?}");
         assert!((f.1 - c.1).abs() <= 2.0, "escape {f:?} vs {c:?}");
@@ -827,11 +832,16 @@ mod tests {
         // limited by the rock its erosion exposes (3× today's degassing, the Earth-like
         // intensity), the drawdown and the gap take far longer.
         let gap = |v: &[(f64, f64)]| -> f64 {
-            v.windows(2).map(|p| p[1].0 - p[0].1).fold(f64::MAX, f64::min)
+            v.windows(2)
+                .map(|p| p[1].0 - p[0].1)
+                .fold(f64::MAX, f64::min)
         };
         let free = scenario(200.0, 3.0, 0.0, 120.0);
         let limited = scenario(200.0, 3.0, 3.0, 120.0);
-        assert!(free.len() >= 2 && limited.len() >= 2, "{free:?} {limited:?}");
+        assert!(
+            free.len() >= 2 && limited.len() >= 2,
+            "{free:?} {limited:?}"
+        );
         let (gf, gl) = (gap(&free), gap(&limited));
         eprintln!("GAPS free {gf} limited {gl}: {free:?} {limited:?}");
         assert!(gl > 2.0 * gf && gl > 3.0, "gap {gf} → {gl} Myr");

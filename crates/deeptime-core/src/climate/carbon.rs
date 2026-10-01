@@ -285,11 +285,7 @@ pub fn supply_limited(kin: f64, s: f64) -> f64 {
         return 0.0;
     }
     let x = kin / s;
-    if x < 1.0e-6 {
-        kin
-    } else {
-        s * -(-x).exp_m1()
-    }
+    if x < 1.0e-6 { kin } else { s * -(-x).exp_m1() }
 }
 
 /// Activation energy of seafloor (basalt) weathering, J/mol (Krissansen-Totton & Catling 2017).
@@ -488,9 +484,15 @@ mod tests {
         // Supply-limited: ample supply changes little, and no warming lifts weathering past it.
         k.supply = vec![20.0 * DEGASSING_EARTH_MOL_YR, 20.0 * DEGASSING_EARTH_MOL_YR];
         let limited = w.flux(&k, &[10.0, 20.0], &[0.0, 0.0], 280.0);
-        assert!(limited < base && limited > 0.97 * base, "{limited} vs {base}");
+        assert!(
+            limited < base && limited > 0.97 * base,
+            "{limited} vs {base}"
+        );
         let hot = w.flux(&k, &[50.0, 60.0], &[0.0, 0.0], 5.0e5);
-        assert!(hot < 40.0 * DEGASSING_EARTH_MOL_YR && hot > 30.0 * DEGASSING_EARTH_MOL_YR, "{hot}");
+        assert!(
+            hot < 40.0 * DEGASSING_EARTH_MOL_YR && hot > 30.0 * DEGASSING_EARTH_MOL_YR,
+            "{hot}"
+        );
         assert_eq!(supply_limited(1.0, 0.0), 0.0);
         assert!((supply_limited(1.0e-9, 1.0) - 1.0e-9).abs() < 1e-18);
         // Seafloor weathering: its share of today's degassing on Earth's spreading at 15 °C and
@@ -500,7 +502,10 @@ mod tests {
         let sf = w.seafloor_flux(1.0, 15.0, 280.0);
         assert!((sf / DEGASSING_EARTH_MOL_YR - 0.2).abs() < 1e-9);
         assert!(w.seafloor_flux(1.0, 25.0, 280.0) > 2.0 * sf);
-        assert!(w.seafloor_flux(1.0, -40.0, 280.0) > 0.5 * sf, "bottom water stays at −1.8 °C");
+        assert!(
+            w.seafloor_flux(1.0, -40.0, 280.0) > 0.5 * sf,
+            "bottom water stays at −1.8 °C"
+        );
         let land = w.flux(&k, &[10.0, 20.0], &[0.0, 0.0], 280.0);
         assert!((land + sf - DEGASSING_EARTH_MOL_YR).abs() < 1e-3 * DEGASSING_EARTH_MOL_YR);
         // 1 km² eroding 50 m/Myr of rock with 1.2 mol/kg of Ca + Mg: 162,000 mol/yr.
