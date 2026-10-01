@@ -3720,15 +3720,18 @@ on this machine.
     adds only PA's weather to Deep Time's climate: PA's live temperature minus its own effective
     base. STATUS build log, 2026-09-30.
 
-#### P1-26 Per-cell sea ice (2026-09-30)
-- **Goal.** Sea ice from each sea cell's own monthly temperature (the cells stage's sea-level
-  temperatures, which already carry the coastal-current offsets and the land's influence), freezing
-  near −1.8 °C, with a winter maximum and a summer minimum, instead of one value per energy-balance
-  band. The edge then bends around continents and currents; the band's ice-albedo feedback keeps
-  its own band-mean cover. Ben (log 2026-09-30), after a run showed a ruler-straight sea-ice edge.
-- **Check.** A planet with an ocean bounded by continents gets an edge that varies with longitude
-  (warm-current coasts ice-free, cold-current coasts icier); the band-mean cover and the global
-  energy balance match the current model within tolerance.
+#### P1-26 Per-cell climate (2026-09-30)
+- **Goal.** Replace the banded backbone of the climate with a per-cell one (Ben, log 2026-09-30:
+  "climate in general should probably be per cell as opposed to completely banded across a single
+  lattitude"): a seasonal 2-D energy balance on a coarse grid (per-cell heat capacity, albedo and
+  sea ice, 2-D heat transport, ocean heat transport by basin) and precipitation from a moisture
+  budget (evaporation, transport by the winds, monsoon thermal lows, sinking air; the existing
+  orographic model and rain shadows kept). The fast carbon/ice clock may stay banded, calibrated to
+  the 2-D model's zonal means. Absorbs the per-cell sea ice asked for the same day.
+- **Order.** Design doc first (Opus), approved by Ben; building after the climate agent's
+  ice-sheet branch lands (same code).
+- **Check.** Set out in the design doc (Earth-topography comparison, Köppen shares, energy balance,
+  run-time budget, downstream recalibration).
 
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 
