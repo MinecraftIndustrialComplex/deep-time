@@ -311,10 +311,12 @@ pub struct TectonicParams {
     /// The elevation ageing ocean floor subsides towards, m: z(a) = z_f + (z_r − z_f)·
     /// exp(−a·ε_o/|z_f|). Cortial's model subsides towards the trench depth (−10 km, the default
     /// and the plate-only presets'), which leaves floor older than ~120 Myr deeper than any abyssal
-    /// plain. The pipeline presets use −5,600 m with ε_o 0.215 mm/yr from a −2,500 m ridge: Stein &
-    /// Stein's GDH1 (1992, Nature 359:123–129) within 0.12 km from 20 Myr on (4.2 km at 20 Myr,
-    /// 5.1 at 50, 5.5 at 100, 5.6 beyond) and 0.3–0.4 km shallow on the youngest floor (P1-17
-    /// hypsometry recalibration, 2026-10-01).
+    /// plain. −5,600 m is GDH1's old-floor depth (Stein & Stein 1992, Nature 359:123–129); with
+    /// ε_o 0.215 mm/yr from a −2,500 m ridge the law follows GDH1 within 0.12 km from 20 Myr on.
+    /// The pipeline presets use −5,600 m with ε_o 0.12 mm/yr (3.6 km at 20 Myr, 4.5 at 50, 5.2 at
+    /// 100, 5.6 beyond): at GDH1's full rate the young floor is deep enough that island arcs rarely
+    /// emerge and the continental crust shrinks from 0.39 to 0.29 of the planet in 500 Myr (P1-17
+    /// hypsometry recalibration, 2026-10-01; median sea depth 4.0 km, Earth 4.06).
     pub oceanic_floor_elevation_m: f64,
     /// ε_c (0.03 mm/yr).
     pub continental_erosion_mm_yr: f64,
