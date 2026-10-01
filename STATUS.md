@@ -486,6 +486,59 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   2. **Caves under water.** Vanilla's carver tag includes water, so with no carving mask the carvers cut through the water itself: air pockets inside lakes and rivers, and now and then a hole in a lake's surface. The game refills these with flowing water. This goes beyond cutting beneath the water. The middle option is to mask only the water blocks, so carvers still cut the beds and banks under the water but skip the water. It is a small change in `WaterBodies` (the removed mask, limited to the water); it waits for your call.
   3. A polar river near z ≈ −4020 lies inside the unplayable pole cap (cosmetic).
   4. Straight parallel streams on even slopes (D8 on a square grid) outside flats are left for P1-23.
+### 2026-10-01 — Amplify's `auto` decides on the whole path's full peak, so a long run no longer fails at the 4 GiB cap (agent worktree agent-af5b7754a329c4418, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Bug.** `deeptime run --preset earthlike_quick_16k --start supercontinent --length-myr 1000` failed in amplify at the
+  default 4 GiB cap ("needed … bytes"); `--set amplify.stream=always` finished. Reproduced on the Mac before the fix
+  (`stage amplify` log: "1565 MiB in use of the 4096 MiB cap; the last level of 8192 x 4096 cells needs 2528 MiB whole
+  and runs in memory", then `needed 4449249634 bytes, cap 4294967296 bytes`; the first report had 4,451,574,045).
+- **Cause.** `AmplifyStage::advance` asked `ctx.reserve` for the last level's buffers alone (8192 x 4096 x 79 B =
+  2,650,800,128 B) when amplify starts, with the L2 level, 2,048 x 1,024 cells, as the only level held. By the time the
+  last level reserves those buffers (`run_tiles`) the ladder holds the 4096 x 2048 level (176 MB) in place of L2 (44 MB)
+  and the preview arrays (25 MB, three f32 a cell on 2048 x 1024) are allocated: 157 MB more than at the decision.
+  `reserve` is a check against the gauge, not a hold, so nothing kept that room. The 1000 Myr history (100 frames,
+  783 MiB) is in memory at that point, `reserve` spilled 724 MiB of it so the buffers fit, with about 3 MB to spare, and
+  the later reservation went over. (With every frame spilled the full path is 4,185 MiB there, so memory was never
+  possible; streaming was.)
+- **Fix** (`surface/amplify.rs`). `whole_last_level_peak(l2_bytes, doublings, gw, gh, preview_width)` = the last level's
+  buffers + (the level before it − L2, when there are levels before the last) + the preview, and
+  `streams(mode, peak_bytes, reserve)` is the one decision: `always` true, `never` false, `auto` when `reserve(peak)` is
+  refused (so the history spill still makes room first when that is enough). `advance` asks it with the actual
+  `Level::bytes()` (new, `resample.rs`) and the preview width; the levels before the last use it with their own
+  `whole_bytes` as before (their decision is made with the gauge as it is when they start, so it was already complete).
+  The log line now also prints the full peak. `always` and `never` are unchanged.
+- **Estimate left as it was.** `amplify::estimate` still picks whole or streamed from the buffers alone under the default
+  cap. Adding the kept level and preview to it (+157 MB at 16k) pushed `pipeline_quick_16k`'s estimate over the
+  workbench's cap-less-512-MiB limit and broke four `deeptime-cli` tests (`a_run_over_its_memory_cap…`,
+  `a_tuned_code_from_the_game…`, `edits_land_where_the_core_reads_them`, `workbench_queue_editor_and_kept_runs`), because
+  `Stage::estimate` has no cap parameter and the workbench's lower cap is not seen by the pick. Not changed; a
+  follow-up is to give `Stage::estimate` the run's cap (comment at the pick in `estimate`). Consequence now: a last
+  level the estimate lists whole may run in tiles (it overstates), and one that does run whole needs ~0.15 GiB (16k)
+  more than listed.
+- **Tests** (`surface/amplify/tests.rs`). `auto_streams_when_the_whole_path_peak_would_not_fit_though_the_last_level_alone_does`
+  (the 16k numbers: held 1,643,487,517 B, the last level alone fits, the full peak needs the reported
+  4,451,574,045 and does not; `auto` streams, `never` does not, `always` does; every cap from "last level alone" to one
+  byte under the peak streams, the peak exactly keeps memory); `the_whole_path_peak_is_what_the_last_reservation_sees`
+  (runs the ladder in memory with a recording reserve and checks the formula against the last request, the level
+  the run kept and the preview it made); `the_stage_streams_under_auto_when_only_the_whole_path_peak_is_over_the_cap`
+  (the small coupled pipeline, two ×2 levels, a gauge holding a fixed amount: a cap 1 MB over the buffers alone gives
+  `mode: streamed`, a roomy cap gives `in_memory`).
+- **Measured** (Mac, release `deeptime run --preset earthlike_quick_16k --start supercontinent --length-myr N`, default
+  4 GiB cap, loaded Mac, load ~12):
+
+  | Run | Amplify decision | Amplify | Run peak (counting allocator) | Total |
+  |---|---|---|---|---|
+  | 1000 Myr, before | in memory, then failed (`needed 4449249634`) | failed | — | 481 s |
+  | 1000 Myr, after (two runs) | 2289 MiB in use, full peak 2678 MiB: tiles (`mode=streamed`, 8 tiles) | 56.7 s, then 26.6 s | 3089.3 MiB | 453 s, 376 s |
+  | 500 Myr, after | 1412 MiB in use (history spilled 249 MiB for the reservation): in memory (`mode=in_memory`) | 23.1 s | 3802.5 MiB | 239 s |
+
+  The 1000 Myr run keeps its whole history in memory now (the old rule spilled 724 MiB of it for nothing). The
+  session's `reserved_peak_mib` (4967) still counts the refused probe of the full peak; it is a probe, not an allocation.
+- **Gates** (Mac): `cargo test --workspace --locked --no-fail-fast` all ok (core 320 + 3 ignored, cli 30, format 44,
+  inspect 29 + 2 + 7, jni 7, viewer 6); `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all
+  -- --check`, `cargo deny check licenses bans` clean; `cd neoforge && ./gradlew build test` BUILD SUCCESSFUL, 155 tests,
+  0 failures. No GameTests (per the batch rule). Mac scratch (`deeptime-runs/amplify-cap`) deleted.
+- **Next.** The coordinator merges with the batch and runs `mac-gc.sh`. Optional follow-up: cap-aware `Stage::estimate`.
+
 ### 2026-09-30 — Satellite view: a true-colour keyframe layer, the default everywhere (agent worktree agent-a7ca2a0e875263a86, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** Ben: "Default view on the viewer is currently an elevation map, can you turn it into an actual map. (I.E.
   Approximately what you would see on google earth zoomed out all the way / satellite imagery.) So I can see where
