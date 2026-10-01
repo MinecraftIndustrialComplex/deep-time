@@ -34,12 +34,22 @@
 //! only when some cell stands above h_s. The plate model takes the result with the feedback.
 //!
 //! # Sources
-//! Verified against the papers' abstracts on 2026-10-01 (see NOTICE.md): England & McKenzie 1982
-//! (the thin viscous sheet: gravity limits crustal thickness contrasts); Molnar & Lyon-Caen 1988
-//! (the work against gravity limits a range's height; plateaus grow sideways); Bird 1991 (lateral
-//! extrusion of lower crust from under high topography); Royden et al. 1997 and Clark & Royden
-//! 2000 (channel flow of the lower crust; the diffusion form and the cube); Rey, Vanderhaeghe &
-//! Teyssier 2001 (gravitational collapse of thickened crust).
+//! Each checked against its publisher's record on 2026-10-01 (title, year, pages). The mechanism
+//! is theirs; the code is not a port of anyone's.
+//! - P. England & D. McKenzie 1982, "A thin viscous sheet model for continental deformation",
+//!   Geophys. J. R. Astron. Soc. 70(2):295–321 (correction 73:523, 1983): crustal thickness
+//!   contrasts are limited by the gravity acting on them.
+//! - P. Molnar & H. Lyon-Caen 1988, "Some simple physical aspects of the support, structure, and
+//!   evolution of mountain belts", GSA Special Paper 218:179–207: the work against gravity limits
+//!   a range's height, and high plateaus then grow sideways.
+//! - P. Bird 1991, "Lateral extrusion of lower crust from under high topography in the isostatic
+//!   limit", J. Geophys. Res. 96(B6):10275–10286: lower crust flows out from under high ground.
+//! - L. H. Royden et al. 1997, "Surface deformation and lower crustal flow in eastern Tibet",
+//!   Science 276:788–790, and M. K. Clark & L. H. Royden 2000, "Topographic ooze: Building the
+//!   eastern margin of Tibet by lower crustal flow", Geology 28(8):703–706: flow in a lower-crustal
+//!   channel; the diffusion form with the cube of the channel thickness.
+//! - P. Rey, O. Vanderhaeghe & C. Teyssier 2001, "Gravitational collapse of the continental crust:
+//!   definition, regimes and modes", Tectonophysics 342(3–4):435–449: collapse of thickened crust.
 
 use rayon::prelude::*;
 
