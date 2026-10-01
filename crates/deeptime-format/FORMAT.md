@@ -533,8 +533,8 @@ them has; each interval takes the class holding the largest weighted thickness t
 neighbours of one key domain join; the cell's own surface stays its first top: the regolith and
 the loose sediment on top (the unconsolidated classes) lie on it with their mean thickness,
 neighbours' rock units above their base pinch out there, and where the cell stands above the mean
-the first rock unit at least 8 blocks thick (in the mean) fills the difference, thinner units
-over it keeping their thickness; then the stack is settled again (at least a block thick, metamorphic and plutonic
+the thickest rock unit that begins within 16 blocks of the mean rock surface fills the
+difference, the thinner beds over it keeping their thickness; then the stack is settled again (at least a block thick, metamorphic and plutonic
 rock inside it at least 8 and 16 blocks, at most K). The neighbours are the cells of a lattice of
 step ⌈σ / 2.5⌉ anchored at cell (0, 0) within 5 steps (11 × 11 samples whatever σ, and every cell
 samples the same lattice); σ 0 bakes each cell's own stack. `notes.bake.strata.realism` records the share of the stored
