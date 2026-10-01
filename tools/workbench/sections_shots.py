@@ -87,6 +87,7 @@ def main():
     ap.add_argument("--section", action="append", default=[])
     ap.add_argument("--light", default="diamictite", help="a rock class to light up in the section's key")
     ap.add_argument("--size", default="1600x1000")
+    ap.add_argument("--other-views", action="store_true", help="also open the Rivers & lakes layer and the Final world view and check they still work beside this tool")
     ap.add_argument("--no-bake", action="store_true", help="the run has no bake: shoot what the page says instead of waiting for a slice")
     a = ap.parse_args()
     w, h = (int(v) for v in a.size.split("x"))
@@ -208,8 +209,41 @@ def main():
             failed = [what for what, ok in checks if not ok]
         else:
             failed = []
+        if a.other_views:
+            other = []
+            p.js("window.DTWB.setTool('select')", wait=False)
+            # Rivers & lakes: its own legend (lake, land, sea keys), and no depth control or slice badge.
+            p.js("document.querySelector('.lchip[data-layer=\"rivers\"]').click()", wait=False)
+            time.sleep(1.2)
+            other.append(("Rivers & lakes layer: legend keys", p.js("document.querySelector('#legend').textContent.includes('Lake')") is True))
+            other.append(("rivers layer: no depth control", p.js("document.querySelector('#depthctl').hidden") is True))
+            p.shoot(os.path.join(a.out, "other-rivers.png"))
+            # Final world: opens, tiles arrive, closes.
+            p.js("document.querySelector('#worldbtn').click()", wait=False)
+            try:
+                p.until("!document.querySelector('#worldview').hidden && !!document.querySelector('#wv-canvas')", "the Final world view", 30)
+                time.sleep(4.0)
+                other.append(("Final world view opens", True))
+                other.append(("Final world: canvas painted", p.js("(() => { const c = document.querySelector('#wv-canvas'); const g = c.getContext('2d'); if (!g) return true; const d = g.getImageData(c.width >> 1, c.height >> 1, 1, 1).data; return d[3] > 0; })()") is True))
+            except RuntimeError as e:
+                print(e)
+                other.append(("Final world view opens", False))
+            p.shoot(os.path.join(a.out, "other-world.png"))
+            p.js("document.querySelector('#worldbtn').click()", wait=False)
+            time.sleep(0.5)
+            other.append(("Final world view closes", p.js("document.querySelector('#worldview').hidden") is True))
+            # Back on the rock layer the depth control is there again.
+            p.js("document.querySelector('.lchip[data-layer=\"%s\"]').click()" % a.layer, wait=False)
+            time.sleep(0.8)
+            other.append(("rock layer: depth control back", p.js("document.querySelector('#depthctl').hidden") is False))
+            for what, ok in other:
+                print(f"check {what}: {'ok' if ok else 'FAILED'}")
+            failed_other = [w for w, ok in other if not ok]
+        else:
+            failed_other = []
         errs = p.js("window.__errs")
         print("page errors:", errs if errs else "none")
+        failed = failed + failed_other
         if failed or errs:
             sys.exit(f"sections_shots: failed: {failed} page errors: {errs}")
     finally:
