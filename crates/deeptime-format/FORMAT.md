@@ -414,15 +414,43 @@ Unused horizons (only after the used ones) have top −32768, class 255 and keys
 **Stratigraphic keys.** A key orders units the same way in every cell (it grows downwards, older
 and deeper); a horizon's span [key top, key base] (top < base) covers the units it stands for, and
 the spans of one stack grow downwards without overlapping (key top of k+1 ≥ key base of k). A gap
-between two spans is a hiatus: that cell has none of those units. The bake's key space
-(`deeptime_core::structure::columns::key`): regolith 0–4095; the strata log 4096 (the present) to
-32767 (the start of the run), linear in age — a layer spans the ages from the base of the layer
+between two spans is a hiatus: that cell has none of those units. The key space is the baker's
+choice (the column rule below reads any keys that grow downwards). The synthetic worlds give
+horizon h the span 4096·h … 4096·h + 4095 in every cell.
+
+**The bake's key space** (`deeptime_core::structure::columns::key`) is ordered by metamorphic
+grade first, so that any blend of neighbouring stacks by key has the grade rising downwards (no
+schist on shale; Phase 1 has no thrusts that could put it there):
+
+| keys | what |
+|---|---|
+| 0–4095 | regolith |
+| 4096–32767 | band 0 (unmetamorphosed), the strata log: 4096 the present, 32767 the start of the run, linear in age |
+| 32768–34559 | band 0, the basement pools |
+| 34560 + 4480·(b − 1) … + 2687 | band b = 1…6, the strata log, linear in age |
+| … + 2688 … + 4479 | band b, the basement pools |
+| 61440–65535 | the mantle |
+
+Bands are the formation temperatures of the regional metamorphic classes: 1 from 250 °C (slate),
+2 from 300 (quartzite, marble, greenstone), 3 from 350 (phyllite), 4 from 450 (schist), 5 from
+500 (amphibolite), 6 from 650 (gneiss). A unit's band is that of the hottest formation
+temperature at or above it in its own column (so a column's bands never decrease downwards);
+plutonic pool units (granite, granodiorite, gabbro) are always in band 6, with the gneiss: the
+crystalline basement. In a band's strata log a layer spans the ages from the base of the layer
 above it to its own base, the top layer to the present where its cell still accumulates (net
 deposition over the cell and its eight neighbours at the last step) and only its base age where
 erosion has taken an unknown part of it, and the young loose part of a layer the upper half of
-its span; the basement pools in erosion order (`plates::l1::TOP_ORDER`), 4096 keys each from
-32768, each metamorphic step 512 of them; the mantle 61440–65535. The synthetic worlds give
-horizon h the span 4096·h … 4096·h + 4095 in every cell.
+its span. In a band's pools, pool q of `plates::l1::TOP_ORDER` has the 256 keys from q·256, each
+of its metamorphic steps 64 of them (one tongue band at the default B). The parts — the regolith,
+each band's log, each band's pools, the mantle — are the **key domains**: a baked horizon's span
+lies inside one of them.
+
+A run baked before 2026-10-01 has the older key space (the strata log by age alone, 4096–32767;
+the pools 4096 keys each from 32768, 512 a metamorphic step; a merged horizon's span the union
+of its members'). It loads and reads exactly as before: the column rule did not change. Its
+columns show what the new key space removes — metamorphic rock correlated with its neighbours'
+unmetamorphosed rock of the same age, so schist over shale in more than half of the columns —
+until the world data is baked again.
 
 **The column rule** (format 0.2; Rust `deeptime_format::strata::stack_at`, Java
 `worlddata/Columns.stack`; both must give equal answers). A cell's stack is read as a height
@@ -463,25 +491,39 @@ keys that every column shares (so the tongues follow the bedding).
 **The P1-07 bake** (`deeptime_core::structure::bake_horizons`) makes stacks with these properties:
 the first horizon's top is the cell's surface (y = sea_level_y + (h − sea level)/m_per_block_v,
 clamped to [min_y + 1, max_y]); every horizon is at least one block (16 raw) thick, the last one
-down to `min_y` too; at most K are used; neighbours differ in class; every horizon carries the key
-span of the units it stands for (a merge keeps the union). A stack walks the column of
+down to `min_y` too; at most K are used; neighbours differ in class or in key domain; every
+horizon carries the key span of the units it stands for — a merge keeps the union where both
+members lie in one key domain, and the span of the member whose class it keeps where they do not
+(the other's keys become a hiatus), so no horizon's height is spread over keys that other cells
+give to other rocks. A horizon of regional-metamorphic rock under the first horizon and over the
+last is at least 8 blocks thick and one of plutonic rock at least 16 (a thinner one merges into
+its thinner neighbour like a horizon under one block): such rock is a regional body, not a sheet
+between other rocks. A stack walks the column of
 `structure::columns` from the top: regolith, the strata log (the young, shallow part of a clastic
 deposit as its `loose_equivalent`, buried loose material and palaeosols as their `lithifies_to`:
 glacial till, the deep-time glaciers', the ice ages' and a snowball Earth's alike, becomes
 `diamictite`, and young, shallow diamictite shows as `till`),
-the plate model's rock pools less the log, and peridotite below the crust. Plutons are bodies
-(role `pluton`, below), not horizons.
+the plate model's rock pools less the log, and peridotite below the crust. No unit is cooler
+than the rock above it: a sedimentary or volcanic pool under a metamorphosed log layer steps
+along its metamorphic path at least as far as that layer's formation temperature (the pools
+themselves know only today's geotherm), and a plutonic pool stays what it is (it may be younger
+than the metamorphism of its roof) but for granite turning to gneiss at the 650 °C isotherm.
+Plutons are bodies (role `pluton`, below), not horizons.
 
 **The 0.2 bake** smooths the stacks laterally before writing them, because the strata log is
 carried cell by cell and neighbouring cells' stacks differ more than the rocks would: each cell's
 new stack is the Gaussian-weighted mean (σ = `structure.strata_smoothing_cells` L1 cells, default
 10; x wraps, z clamps) of its neighbours' height functions, cut at every key top and base any of
 them has; each interval takes the class holding the largest weighted thickness there, equal
-neighbours join; the cell's own surface stays its first top (neighbours' units above it pinch out
-there; where the cell stands above the mean its top unit fills the difference); then the stack is
-settled again (at least a block thick, at most K). The neighbours are the cells of a lattice of
+neighbours of one key domain join; the cell's own surface stays its first top (neighbours' units
+above it pinch out there; where the cell stands above the mean its top unit fills the
+difference); then the stack is settled again (at least a block thick, metamorphic and plutonic
+rock inside it at least 8 and 16 blocks, at most K). The neighbours are the cells of a lattice of
 step ⌈σ / 2.5⌉ anchored at cell (0, 0) within 5 steps (11 × 11 samples whatever σ, and every cell
-samples the same lattice); σ 0 bakes each cell's own stack. `notes.bake.strata.smoothing` records
+samples the same lattice); σ 0 bakes each cell's own stack. `notes.bake.strata.realism` records the share of the stored
+stacks a geologist would object to (a grade inversion, a metamorphic sliver, a plutonic sheet,
+plutonic rock over other rock; `deeptime strata-check` measures the same on the columns of a
+world-data folder). `notes.bake.strata.smoothing` records
 σ, the step, the window and the tongue parameters.
 
 **The P1-08 bake** writes them with one change: the first horizon's top of every cell is raised,

@@ -93,6 +93,15 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     let h = bake_horizons::bake(&world, &preset).unwrap();
     h.check().unwrap();
     assert_eq!(h.k, 32);
+    // … and nothing a geologist would object to: no rock that was never as hot as the rock above
+    // it, no sliver of metamorphic or plutonic rock, in the stored stacks and in the columns the
+    // game builds from them (`realism`).
+    h.check_bake(&Tables::get().min_blocks).unwrap();
+    let cells = realism::census_of_cells(&h, &Rules::builtin(), &Limits::default(), 1);
+    assert_eq!(cells.with_inversion, 0, "{:?}", cells.to_json());
+    assert_eq!(cells.with_sliver, 0, "{:?}", cells.to_json());
+    assert_eq!(cells.with_sheet, 0, "{:?}", cells.to_json());
+    rule_columns(&h, 11, 3000);
     assert!(h.mean_horizons() > 2.0, "{}", h.mean_horizons());
     // The stack's top is the surface, and the layer round-trips through the format.
     let src = CellSource::new(&world, &preset).unwrap();
@@ -213,5 +222,292 @@ fn a_resumed_run_is_the_same_run() {
     assert_eq!(got.fields[field::ROCK].data, world.fields[field::ROCK].data);
     for d in [dir, dir2] {
         let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+// ---- What a geologist would object to (`realism`): property tests on random columns. They hold
+// for any planet: no number of one run is in them.
+
+use crate::plates::state::{CONTINENTAL, OCEANIC, OROGENY_ANDEAN, OROGENY_NONE, regime as reg};
+use crate::structure::columns::{Unit, key};
+use crate::structure::realism::{self, Findings, Limits, Rules};
+use crate::surface::lithology::index;
+use crate::surface::strata_log::{Layer, StrataLog};
+use crate::synth::SplitMix;
+
+/// One random cell: a strata log with a history (deposits, burial metamorphism, erosion), rock
+/// pools, a geotherm.
+struct RandomCell {
+    log: Vec<Layer>,
+    pools: [f32; pool::COUNT],
+    crust_type: u8,
+    regime: u8,
+    orogeny: u8,
+    orogeny_age: f32,
+    regolith_m: f32,
+    gradient_c_m: f64,
+    top_active: bool,
+}
+
+impl RandomCell {
+    fn new(rng: &mut SplitMix, paths: &Paths) -> RandomCell {
+        const DEPOSITS: [&str; 13] = [
+            "sandstone",
+            "shale",
+            "limestone",
+            "mudstone",
+            "basalt",
+            "tuff",
+            "conglomerate",
+            "gypsum",
+            "coal",
+            "soil",
+            "andesite",
+            "till",
+            "black_shale",
+        ];
+        let oceanic = rng.below(7) == 0;
+        let mut log = StrataLog::new(1, 12);
+        let mut age = -900.0f32;
+        for _ in 0..rng.below(12) {
+            match rng.below(10) {
+                0..=5 => {
+                    let class = index(DEPOSITS[rng.below(DEPOSITS.len() as u64) as usize]);
+                    log.deposit(0, age, 30.0 + rng.below(2500) as f32, class, 0);
+                    age = (age + 5.0 + rng.below(80) as f32).min(-1.0);
+                }
+                6 | 7 if !oceanic => {
+                    let th = Thermal {
+                        surface_c: 10.0,
+                        gradient_c_m: (15 + rng.below(35)) as f64 / 1000.0,
+                        burial: 1.0 + rng.below(2) as f64,
+                    };
+                    metamorphism::metamorphose(&mut log.column_mut(0), 0.0, &th, paths);
+                }
+                _ => {
+                    log.erode(0, rng.below(3000) as f64);
+                }
+            }
+        }
+        let mut pools = if oceanic {
+            crate::plates::pools::oceanic_column()
+        } else {
+            crate::plates::pools::continental_column()
+        };
+        for p in pools.iter_mut() {
+            *p = match rng.below(10) {
+                0..=2 => 0.0,
+                // A thin leftover of a pool: what made the three-block gneiss.
+                3 => 20.0 + rng.below(200) as f32,
+                _ => *p * (rng.below(200) as f32 / 100.0),
+            };
+        }
+        if !oceanic && rng.below(3) == 0 {
+            pools[pool::MAFIC_VOLCANIC] = rng.below(3000) as f32;
+        }
+        RandomCell {
+            log: log.column(0).to_vec(),
+            pools,
+            crust_type: if oceanic { OCEANIC } else { CONTINENTAL },
+            regime: [
+                reg::OCEAN_BASIN,
+                reg::ARC,
+                reg::COLLISION,
+                reg::HOTSPOT,
+                reg::BACK_ARC,
+                reg::RIFT,
+            ][rng.below(6) as usize],
+            orogeny: [OROGENY_NONE, OROGENY_ANDEAN, OROGENY_HIMALAYAN][rng.below(3) as usize],
+            orogeny_age: if rng.below(2) == 0 {
+                f32::NAN
+            } else {
+                rng.below(200) as f32
+            },
+            regolith_m: [0.0, 0.5, 3.0, 40.0][rng.below(4) as usize],
+            gradient_c_m: (15 + rng.below(34)) as f64 / 1000.0,
+            top_active: rng.below(2) == 0,
+        }
+    }
+
+    fn cell(&self) -> Cell<'_> {
+        Cell {
+            regolith_m: self.regolith_m,
+            regolith_kind: crate::surface::weathering::SOIL,
+            log: &self.log,
+            pools: self.pools,
+            crust_type: self.crust_type,
+            regime: self.regime,
+            orogeny: self.orogeny,
+            orogeny_age: self.orogeny_age,
+            depth_below_sea_m: if self.crust_type == OCEANIC {
+                3000.0
+            } else {
+                -200.0
+            },
+            surface_c: 10.0,
+            gradient_c_m: self.gradient_c_m,
+            log_span_myr: 1000.0,
+            top_active: self.top_active,
+        }
+    }
+}
+
+#[test]
+fn no_column_holds_rock_that_was_never_as_hot_as_the_rock_above_it() {
+    let tables = Tables::get();
+    let rules = Rules::builtin();
+    let p = StructureParams::default();
+    let mut rng = SplitMix(0xDEE9_71AE);
+    let (mut units, mut f) = (Vec::<Unit>::new(), Findings::default());
+    let mut metamorphic = 0;
+    for n in 0..4000 {
+        let rc = RandomCell::new(&mut rng, &tables.paths);
+        columns::build(&rc.cell(), &tables, &p, 0.0, 14_000.0, &mut units);
+        // The keys: ordered, each span inside one key domain, the grade bands never decreasing.
+        for (i, u) in units.iter().enumerate() {
+            assert!(u.key[0] < u.key[1], "cell {n} unit {i}: {units:?}");
+            assert_eq!(
+                key::domain(u.key[0]),
+                key::domain(u.key[1]),
+                "cell {n} unit {i}: {units:?}"
+            );
+            if i > 0 {
+                assert!(
+                    units[i - 1].key[1] <= u.key[0],
+                    "cell {n} unit {i}: {units:?}"
+                );
+            }
+        }
+        // The rock: every unit as a thick horizon, so only the order is judged.
+        let col: Vec<realism::Visible> = units
+            .iter()
+            .enumerate()
+            .map(|(i, u)| (-(i as i32) * 100, 100, u.class as u8))
+            .collect();
+        realism::check(&col, &rules, &Limits::default(), &mut f);
+        assert!(
+            f.inversions.is_empty(),
+            "cell {n}: {:?} in {:?} (log {:?})",
+            f.inversions,
+            units
+                .iter()
+                .map(|u| (EVERY_CLASS[usize::from(u.class)], u.thickness_m))
+                .collect::<Vec<_>>(),
+            rc.log
+        );
+        metamorphic += usize::from(col.iter().any(|v| rules.metamorphic[usize::from(v.2)]));
+    }
+    assert!(
+        metamorphic > 1000,
+        "{metamorphic} of the cells hold metamorphic rock"
+    );
+}
+
+/// A small planet's L1 grid of provinces, each a random cell (so a metamorphic belt lies beside
+/// a basin, an ocean beside a craton), baked like the bake does.
+fn random_horizons(seed: u64, sigma: f64) -> bake_horizons::Horizons {
+    let tables = Tables::get();
+    let p = StructureParams::default();
+    let grid = deeptime_format::GridDesc::for_planet("L1", 1024, 16).unwrap();
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    let mut rng = SplitMix(seed);
+    let side = 8;
+    let provinces: Vec<(RandomCell, f64)> = (0..(w / side) * (h / side))
+        .map(|_| {
+            (
+                RandomCell::new(&mut rng, &tables.paths),
+                40.0 + rng.below(300) as f64,
+            )
+        })
+        .collect();
+    let k = p.horizons as usize;
+    let n = w * h;
+    let mut tops = vec![bake_horizons::NO_TOP; n * k];
+    let mut classes = vec![bake_horizons::NO_CLASS; n * k];
+    let mut keys = vec![[bake_horizons::NO_KEY; 2]; n * k];
+    let mut units = Vec::new();
+    for c in 0..n {
+        let (i, j) = (c % w, c / w);
+        let (rc, y) = &provinces[(j / side) * (w / side) + i / side];
+        // Relief inside a province too.
+        let surface_y = y + 25.0 * ((i as f64 * 0.7).sin() + (j as f64 * 0.45).cos());
+        columns::build(&rc.cell(), &tables, &p, 0.0, 14_000.0, &mut units);
+        bake_horizons::bake_cell(
+            &units,
+            surface_y,
+            -352,
+            639,
+            20.0,
+            &tables.min_blocks,
+            &mut tops[c * k..(c + 1) * k],
+            &mut classes[c * k..(c + 1) * k],
+            &mut keys[c * k..(c + 1) * k],
+        );
+    }
+    bake_horizons::Horizons {
+        grid,
+        k: k as u32,
+        min_y: -352,
+        tops,
+        classes,
+        keys,
+        tongues: bake_horizons::tongue_params(&p),
+    }
+    .smoothed(sigma, &tables.min_blocks)
+}
+
+/// The columns the game builds from `hz` (the column rule at random blocks, each under its own
+/// first top) checked; returns (columns, columns holding metamorphic rock, the census).
+fn rule_columns(hz: &bake_horizons::Horizons, seed: u64, n: usize) -> realism::Census {
+    let rules = Rules::builtin();
+    let layer = hz.to_layer(deeptime_format::Codec::Raw).unwrap();
+    let c = i64::from(hz.grid.w) * i64::from(hz.grid.r);
+    let mut rng = SplitMix(seed);
+    let (mut stack, mut raw, mut col, mut f) =
+        (Vec::new(), Vec::new(), Vec::new(), Findings::default());
+    let mut census = realism::Census::default();
+    for _ in 0..n {
+        let x = rng.below(c as u64) as i64 - c / 2;
+        let z = rng.below((c / 2) as u64) as i64 - c / 4;
+        layer.stack_at(x, z, hz.min_y, &mut stack);
+        raw.clear();
+        raw.extend(stack.iter().map(|&(top, class, _)| (top, class)));
+        realism::visible(&raw, raw[0].0, hz.min_y, &mut col);
+        realism::check(&col, &rules, &Limits::default(), &mut f);
+        assert!(
+            f.inversions.is_empty(),
+            "column ({x}, {z}): {:?} in {:?}",
+            f.inversions,
+            col.iter()
+                .map(|v| (EVERY_CLASS[usize::from(v.2)], v.0, v.1))
+                .collect::<Vec<_>>()
+        );
+        census.add(&col, &f, &rules);
+    }
+    census
+}
+
+#[test]
+fn baked_stacks_and_blended_columns_have_no_grade_inversion_and_no_sliver() {
+    let tables = Tables::get();
+    let rules = Rules::builtin();
+    for (seed, sigma) in [(1u64, 0.0), (2, 2.5), (3, 10.0), (4, 10.0)] {
+        let hz = random_horizons(seed, sigma);
+        hz.check().unwrap();
+        hz.check_bake(&tables.min_blocks).unwrap();
+        // The stored stacks: nothing to object to.
+        let cells = realism::census_of_cells(&hz, &rules, &Limits::default(), 1);
+        assert_eq!(cells.with_inversion, 0, "seed {seed}: {:?}", cells.to_json());
+        assert_eq!(cells.with_sliver, 0, "seed {seed}: {:?}", cells.to_json());
+        assert_eq!(cells.with_sheet, 0, "seed {seed}: {:?}", cells.to_json());
+        assert!(
+            cells.with_metamorphic * 10 > cells.columns,
+            "seed {seed}: the test planet has metamorphic rock: {:?}",
+            cells.to_json()
+        );
+        // The columns the game builds (sixteen stacks blended by key): no inversion (asserted
+        // column by column in `rule_columns`).
+        let columns = rule_columns(&hz, seed ^ 0x5EED, 6000);
+        assert!(columns.with_metamorphic > 0);
     }
 }

@@ -23,6 +23,7 @@ use super::terrain::Terrain;
 use crate::error::CoreError;
 use crate::params::PlanetPreset;
 use crate::structure::bake_horizons::{self, Horizons, NO_TOP};
+use crate::structure::realism;
 use crate::world::WorldState;
 
 /// Blocks added above the highest terrain a cell's top horizon must cover.
@@ -38,6 +39,19 @@ pub fn bake(
     let mut hz = bake_horizons::bake(world, p)?;
     hz.check()
         .map_err(|e| CoreError::InvalidState(format!("the horizon bake failed its check: {e}")))?;
+    // What a geologist would object to in the stacks as written (before the top raise, which
+    // only lifts first tops): `deeptime strata-check` measures the same on the baked columns.
+    let tables = crate::structure::columns::Tables::get();
+    let census = realism::census_of_cells(
+        &hz,
+        &realism::Rules::builtin(),
+        &realism::Limits::default(),
+        1,
+    );
+    let stack_rules = match hz.check_bake(&tables.min_blocks) {
+        Ok(()) => "ok".to_owned(),
+        Err(e) => e,
+    };
     let (raised, max_raise, limit) =
         raise_tops(&mut hz, terrain, p.scale.max_y, p.scale.sea_level_y)?;
     hz.check().map_err(|e| {
@@ -60,6 +74,15 @@ pub fn bake(
         "top_raised_cells": raised,
         "top_raise_blocks_max": max_raise,
         "build_limit": limit.note(p.scale.max_y),
+        "realism": {
+            "cells": census.columns,
+            "grade_inversion": census.share(census.with_inversion),
+            "metamorphic_sliver": census.share(census.with_sliver),
+            "plutonic_sheet": census.share(census.with_sheet),
+            "plutonic_with_a_floor": census.share(census.with_floored),
+            "stack_rules": stack_rules,
+            "rule": "share of the stored stacks with a horizon that was never as hot as one above it formed at, with a metamorphic horizon under 8 blocks inside the stack, with a plutonic horizon under 16 blocks between other rocks, with plutonic rock over rock of another family; stack_rules: every key span in one key domain and no metamorphic or plutonic sliver",
+        },
         "top_rule": "the first horizon's top is at least the highest elevation plus the highest detail amplitude over the L3 cells within two L1 cells, plus one block",
         "smoothing": {
             "sigma_cells": sp.strata_smoothing_cells,
