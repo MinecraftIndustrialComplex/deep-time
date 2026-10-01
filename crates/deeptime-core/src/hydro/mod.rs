@@ -200,6 +200,13 @@ pub struct HydroParams {
     pub lake_min_depth_blocks: f64,
     /// Whether evaporation from a lake's surface reduces what flows out of it.
     pub lake_evaporation: bool,
+    /// Potential evapotranspiration per °C of biotemperature, mm/yr: Holdridge's 58.93 (L. R.
+    /// Holdridge 1967, "Life Zone Ecology", Tropical Science Center: PET = 58.93 × the mean annual
+    /// biotemperature, the year's mean of the temperature with the time below freezing counted as
+    /// 0 °C), rounded to the surface stage's 60. The land's evapotranspiration (Fu's curve) and
+    /// the lakes' evaporation both use it on the year's mean temperature above freezing, so a
+    /// cold land with a warm summer evaporates in that summer.
+    pub pet_mm_per_c: f64,
     /// Whether a lake's level follows its water balance (a basin that evaporates more than it
     /// gets holds a smaller lake below its rim, a salt flat or nothing). False: every lake is
     /// full to its rim, as before 2026-10-01.
@@ -218,8 +225,12 @@ pub struct HydroParams {
     /// Snow a degree-day above freezing melts, mm (the degree-day factor): where the year has too
     /// few of them the snow stays, and neither runs off nor feeds a lake.
     pub snow_melt_mm_per_degree_day: f64,
-    /// A lake is ice-covered where the mean annual temperature is below this, °C.
+    /// A lake is ice-covered where the mean annual temperature is below this, °C. The views draw
+    /// it so, and the game ices the lake's top block there and keeps it open elsewhere, whatever
+    /// the biome (it reads this from `notes.bake.water.params`).
     pub lake_freeze_mean_c: f64,
+    /// How many blocks of salt the game lays on a playa's floor (the `playa` layer; 0: none).
+    pub playa_blocks: f64,
     /// Channels at least this wide are river biomes, blocks.
     pub biome_min_width_blocks: f64,
     /// Banks slope up 1:1 from a channel's edge over this many blocks …
@@ -248,11 +259,13 @@ impl Default for HydroParams {
             lake_min_area_km2: 1.0,
             lake_min_depth_blocks: 1.0,
             lake_evaporation: true,
+            pet_mm_per_c: PET_MM_PER_C,
             lake_balance: true,
             lake_evaporation_base_mm: 200.0,
             lake_evaporation_factor: 1.0,
             snow_melt_mm_per_degree_day: 4.0,
             lake_freeze_mean_c: 0.0,
+            playa_blocks: 2.0,
             biome_min_width_blocks: 6.0,
             bank_zone_blocks: 1.0,
             bank_zone_ratio: 0.5,
@@ -299,6 +312,7 @@ impl HydroParams {
             64.0,
             "lake_min_depth_blocks",
         )?;
+        within(self.pet_mm_per_c, 0.0, 200.0, "pet_mm_per_c")?;
         within(
             self.lake_evaporation_base_mm,
             0.0,
@@ -318,6 +332,7 @@ impl HydroParams {
             "snow_melt_mm_per_degree_day",
         )?;
         within(self.lake_freeze_mean_c, -30.0, 10.0, "lake_freeze_mean_c")?;
+        within(self.playa_blocks, 0.0, 8.0, "playa_blocks")?;
         within(
             self.biome_min_width_blocks,
             1.0,
@@ -334,10 +349,13 @@ impl HydroParams {
     ///   as snow in the rest; the snow melts as far as the year's degree-days allow
     ///   (`snow_melt_mm_per_degree_day` × 365.25 × the mean temperature above freezing). What does
     ///   not melt stays as snow and ice (the climate stage's glaciers) and is not water here.
-    /// - **Runoff** = liquid − ET, ET by Fu's Budyko curve with PET = 60 mm/°C × the mean annual
-    ///   temperature (0 below freezing), as the surface stage.
+    /// - **Runoff** = liquid − ET, ET by Fu's Budyko curve on the liquid water with PET =
+    ///   `pet_mm_per_c` × the year's mean temperature above freezing (Holdridge's biotemperature).
+    ///   In a climate without frost that is the surface stage's 60 mm/°C × the mean temperature;
+    ///   in a cold one the land still evaporates in its summer (before 2026-10-01 a land with a
+    ///   mean below freezing evaporated nothing, and all its precipitation ran off).
     /// - **Open-water evaporation** = `lake_evaporation_factor` × (`lake_evaporation_base_mm` +
-    ///   60 mm/°C × the year's mean temperature above freezing): 200 mm a year at the freezing
+    ///   `pet_mm_per_c` × the year's mean temperature above freezing): 200 mm a year at the freezing
     ///   point (the cool season and the ice's sublimation), 1,100 at 15 °C, 2,000 at 30 °C (0
     ///   when `lake_evaporation` is false).
     pub fn budget(&self, c: &Climate) -> Budget {
@@ -345,13 +363,13 @@ impl HydroParams {
         let p = c.precip_mm.max(0.0);
         let melt = self.snow_melt_mm_per_degree_day * YEAR_DAYS * above;
         let liquid = p.min(p * share + melt);
-        let pet = PET_MM_PER_C * c.t_mean_c.max(0.0);
+        let pet = self.pet_mm_per_c * above;
         Budget {
-            runoff_mm: (liquid - crate::surface::climate::fu_et(p, pet)).max(0.0),
+            runoff_mm: (liquid - crate::surface::climate::fu_et(liquid, pet)).max(0.0),
             rain_mm: liquid,
             evaporation_mm: if self.lake_evaporation {
                 self.lake_evaporation_factor
-                    * (self.lake_evaporation_base_mm + PET_MM_PER_C * above)
+                    * (self.lake_evaporation_base_mm + self.pet_mm_per_c * above)
             } else {
                 0.0
             },

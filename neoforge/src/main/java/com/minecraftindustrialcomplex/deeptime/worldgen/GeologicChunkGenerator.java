@@ -104,6 +104,7 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         if (terrain() instanceof WorldDataTerrain w) {
             StrataPass.apply(chunk, w.data());
             WaterBodies.apply(chunk, w.data(), waterReach());  // lakes, rivers, banks (plan §7.9, P1-22)
+            PlayaPass.apply(chunk, w.data());                  // salt on the floors of basins too dry for a lake
             IcePass.apply(chunk, w.data());                    // snow and ice over glaciated ground, whatever the biome
         }
     }
