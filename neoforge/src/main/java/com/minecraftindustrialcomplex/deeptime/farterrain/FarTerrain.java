@@ -217,8 +217,12 @@ public final class FarTerrain {
 
                 int exposure = FarColumn.exposure(s.shapes, n, i, j);
                 int rockDepth = Math.min(MAX_ROCK_DEPTH, exposure + ROCK_MARGIN);
+                // The strata column rule is most of a narrow column's cost, so it is spent where
+                // rock shows: at the surface (a bare biome) or on a side that drops below the soil.
+                // A column whose rock is buried takes its nearest strata cell's stack.
+                boolean rockShows = soil.bare() || exposure >= soil.depth();
                 if (strata != null)
-                    FarColumn.rock(wd, strata, wx, z, step, s.stack);
+                    FarColumn.rock(wd, strata, wx, z, step <= FarColumn.FULL_RULE_MAX_STEP && rockShows, s.stack);
                 FarColumn.layers(levelMinY, levelMaxY, shape, s.soil, strata == null ? null : s.stack, rockDepth, cover.spec(), layers);
 
                 if (s.blocks.length < layers.count) {

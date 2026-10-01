@@ -289,7 +289,16 @@ public final class FarColumn {
      * cell each) ten times what it costs a chunk's columns (one cell for many).
      */
     public static void rock(WorldData wd, RasterSampler strata, long wx, long z, int step, Columns.Stack out) {
-        if (step <= FULL_RULE_MAX_STEP) {
+        rock(wd, strata, wx, z, step <= FULL_RULE_MAX_STEP, out);
+    }
+
+    /**
+     * As {@link #rock(WorldData, RasterSampler, long, long, int, Columns.Stack)}: the column rule
+     * when {@code rule}, else the nearest strata cell's stack. The game also takes the cheap stack
+     * for a narrow column whose rock nobody sees (soil on top, no side showing below the soil).
+     */
+    public static void rock(WorldData wd, RasterSampler strata, long wx, long z, boolean rule, Columns.Stack out) {
+        if (rule) {
             Columns.stack(wd, strata, (int) wx, (int) z, out);
             return;
         }
