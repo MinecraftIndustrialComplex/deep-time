@@ -188,6 +188,20 @@ enum Cmd {
         #[arg(long, allow_hyphen_values = true)]
         y_to: Option<i32>,
     },
+    /// How much of the planet's dry land is which rock class (P1-28), from the world data alone:
+    /// the top rock, the rock a few blocks under the soil, the top N blocks and the whole column,
+    /// per class. Prints JSON.
+    RockCensus {
+        /// The world-data folder (a run's bake, `<world>/deeptime`).
+        #[arg(long)]
+        world_data: PathBuf,
+        /// Blocks between sampled columns.
+        #[arg(long, default_value_t = 32)]
+        step: i64,
+        /// How many blocks below the top block count as "near the surface".
+        #[arg(long, default_value_t = 64)]
+        top: i32,
+    },
     /// The columns either side of x = C/2 as one strip, and their height difference.
     Seam {
         #[command(flatten)]
@@ -479,6 +493,11 @@ fn run(cli: Cli) -> Result<()> {
                 "ore_columns_outside_sites": v["ore_columns_outside_sites"]}),
             )?;
         }
+        Cmd::RockCensus {
+            world_data,
+            step,
+            top,
+        } => print_json(&deeptime_inspect::census::run(&world_data, step, top)?)?,
         Cmd::WdSection {
             world_data,
             out,

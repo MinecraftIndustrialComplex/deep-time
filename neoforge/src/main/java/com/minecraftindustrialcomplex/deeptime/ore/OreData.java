@@ -155,6 +155,13 @@ public final class OreData {
                         .forGetter(ScatterRule::hostBias)
         ).apply(i, ScatterRule::new));
 
+        /** Whether every host gets the same weight, so no block's class needs finding out. */
+        public boolean classBlind() {
+            java.util.Set<Double> weights = new java.util.HashSet<>(hostBias.values());
+            weights.add(hostBias.getOrDefault("*", 1.0));
+            return weights.size() == 1;
+        }
+
         /** The acceptance weight of a host with these classes: the largest listed, else {@code "*"}, else 1. */
         public double bias(List<String> classes) {
             double star = hostBias.getOrDefault("*", 1.0);
