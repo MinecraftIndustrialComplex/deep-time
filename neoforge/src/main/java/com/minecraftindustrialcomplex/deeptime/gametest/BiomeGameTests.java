@@ -116,8 +116,9 @@ public final class BiomeGameTests {
 
     /**
      * Floors of {@link #climateConsistent}, per Köppen family (P1-09 acceptance: recorded at the
-     * first calibrated run, standalone and MIC; see STATUS.md's P1-09 build log). A family with
-     * fewer than {@link #MIN_COLUMNS} columns on the test planet is logged, not asserted.
+     * first calibrated run, standalone and MIC; see STATUS.md's P1-09 build log; since 2026-10-01
+     * the lowest share over ten planets less 0.1, see below). A family with fewer than
+     * {@link #MIN_COLUMNS} columns on the test planet is logged, not asserted.
      */
     // First calibrated runs (2026-09-29, test_planet_real, standalone / MIC): BW 0.765 / 0.824, BS 0.738 / 0.825,
     // C 0.86 / 0.86, D 1.0 / 1.0, Dsub 0.969 / 0.987, E 1.0 / 1.0, sea 1.0 / 1.0, BW:desert — / 0.588,
@@ -137,11 +138,27 @@ public final class BiomeGameTests {
     // take the same rule (0.1 under the lower); the others keep theirs, which the rule would only raise.
     // P1-21 (volcano branch, before this re-set, not combined with it) had measured E:snow 0.899
     // standalone with the volcano stage and EF's barren frozen ground; the lower floor above covers both.
+    //
+    // Re-set 2026-10-01 over several planets instead of one. The simulation is not bit-identical across
+    // platforms (the platform's libm), so the same preset is another planet on x86_64 Linux than on the
+    // aarch64 Mac the floors above were read from, and a floor read from one planet is that planet's number,
+    // not the mapping's: the Linux planet failed A 0.553 < 0.6 (its Aw and As columns are 63–71 % forest) and
+    // Dsub 0.812 < 0.85 with no change to the mapping. Measured on x86_64 Linux with
+    // DEEPTIME_TEST_PLANET_SET="seed=N" ./gametest.sh [-PwithMic], seeds 11–16 standalone and 11–14 with MIC
+    // (ten censuses; a family counts in a census that has at least MIN_COLUMNS of its columns). Lowest and
+    // highest share:
+    //   A 0.553–0.944, Af 0.642–0.963, BW 0.675–0.925, BS 0.623–0.744, C 0.849–0.968, D 0.984–1.0,
+    //   Dsub 0.659–0.882, E 0.922–1.0, sea 1.0, BW:desert 0.475–0.827, Af:jungle 0.515–0.774,
+    //   Dfc:taiga 0.563–0.822, E:snow 0.849–0.998.
+    // A floor is 0.1 under the lowest share measured on any planet, the Mac's above included (so BS,
+    // Dfc:taiga and E:snow keep theirs); it catches a broken mapping (shares fall to the 0.1–0.3 a random
+    // biome gives), not a planet whose climate zones sit elsewhere. MIN_COLUMNS went from 20 to 40: a share
+    // of twenty columns moves by 0.05 with one column.
     static final Map<String, Double> FLOORS = Map.ofEntries(
-            Map.entry("A", 0.6), Map.entry("Af", 0.6), Map.entry("BW", 0.65), Map.entry("BS", 0.42), Map.entry("C", 0.75),
-            Map.entry("D", 0.9), Map.entry("Dsub", 0.85), Map.entry("E", 0.9), Map.entry("sea", 0.95),
-            Map.entry("BW:desert", 0.45), Map.entry("Af:jungle", 0.5), Map.entry("Dfc:taiga", 0.33), Map.entry("E:snow", 0.72));
-    static final int MIN_COLUMNS = 20;
+            Map.entry("A", 0.45), Map.entry("Af", 0.54), Map.entry("BW", 0.57), Map.entry("BS", 0.42), Map.entry("C", 0.75),
+            Map.entry("D", 0.88), Map.entry("Dsub", 0.55), Map.entry("E", 0.82), Map.entry("sea", 0.95),
+            Map.entry("BW:desert", 0.37), Map.entry("Af:jungle", 0.41), Map.entry("Dfc:taiga", 0.33), Map.entry("E:snow", 0.72));
+    static final int MIN_COLUMNS = 40;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
 
