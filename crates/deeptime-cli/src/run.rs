@@ -496,6 +496,39 @@ pub(crate) fn hypsometry_line(world: &deeptime_core::world::WorldState) -> Optio
     ))
 }
 
+/// The planet's hypsographic curve at the end of the surface (P1-17 hypsometry recalibration,
+/// 2026-10-01), true-area weighted (cos φ): the elevation above sea level, m, that 0, 1, …, 100 %
+/// of the surface stands above (the classic curve: 0 % is the highest cell, 100 % the deepest),
+/// for plotting against Earth's.
+pub(crate) fn hypsometry_curve_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    use deeptime_core::deposits::fields::cell_area_km2;
+    let st = world.surface.as_ref()?;
+    let g = &st.grid;
+    let (w, h) = (g.w as usize, g.h as usize);
+    let mut cells: Vec<(f64, f64)> = Vec::with_capacity(w * h);
+    for j in 0..h {
+        let a = cell_area_km2(g, j as u32, 1.0);
+        for i in 0..w {
+            cells.push((f64::from(st.elevation_m[j * w + i]) - st.sea_level_m, a));
+        }
+    }
+    cells.sort_by(|x, y| y.0.total_cmp(&x.0));
+    let total: f64 = cells.iter().map(|x| x.1).sum();
+    let mut out = Vec::with_capacity(101);
+    let (mut acc, mut k) = (0.0, 0usize);
+    for &(z, a) in &cells {
+        acc += a;
+        while k <= 100 && acc >= k as f64 / 100.0 * total {
+            out.push(format!("{z:.0}"));
+            k += 1;
+        }
+    }
+    while out.len() < 101 {
+        out.push(format!("{:.0}", cells.last()?.0));
+    }
+    Some(format!("hypsometry_curve pct=0..100 z_m={}", out.join("/")))
+}
+
 /// How the planet's surface evolved (P1-17 calibration), from the deposit engine's recorded frames
 /// (10-Myr means) every 50 Myr, true-area weighted: `t:land/land_z_p50_m`, land being the frame's
 /// mean elevation above the datum (the sea-level cycles move the shore by ±100 m).
@@ -944,6 +977,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = hypsometry_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = hypsometry_curve_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = evolution_line(&ck.world) {
