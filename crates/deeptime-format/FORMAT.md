@@ -460,7 +460,9 @@ clamped to [min_y + 1, max_y]); every horizon is at least one block (16 raw) thi
 down to `min_y` too; at most K are used; neighbours differ in class; every horizon carries the key
 span of the units it stands for (a merge keeps the union). A stack walks the column of
 `structure::columns` from the top: regolith, the strata log (the young, shallow part of a clastic
-deposit as its `loose_equivalent`, buried loose material and palaeosols as their `lithifies_to`),
+deposit as its `loose_equivalent`, buried loose material and palaeosols as their `lithifies_to`:
+glacial till, the deep-time glaciers', the ice ages' and a snowball Earth's alike, becomes
+`diamictite`, and young, shallow diamictite shows as `till`),
 the plate model's rock pools less the log, and peridotite below the crust. Plutons are bodies
 (role `pluton`, below), not horizons.
 
@@ -583,7 +585,9 @@ random bodies' boxes (none when the world has no bodies), the rest anywhere with
 ## `strata/classes.json`
 
 `{"classes": ["sandstone", "red_bed", "granite"]}` — index → rock class id (plan §5.4.1,
-`deeptime:rock/<class>` tags).
+`deeptime:rock/<class>` tags). The vocabulary is the rock-tag README's 60 classes (`diamictite`,
+lithified till, added 2026-09-30); a reader maps indices through this file, never through a fixed
+list, so a class added to the vocabulary changes no bytes a reader depends on.
 
 ## `spawn/candidates.json`
 
@@ -881,8 +885,8 @@ survives in, the finished folder. The manifest's `notes.run.history` reports wha
   (or the content bundle's) essentials. `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json`
   are the GameTest and smoke worlds.
 - All: a three-horizon strata placeholder on L1 (`notes.strata`); with `--strata every-class`
-  (P1-12) eight horizons 10 blocks apart holding all 59 rock classes, horizon h of L1 cell column
-  i having class (6·i + h) mod 59, so any ten neighbouring cell columns show every class at
+  (P1-12) eight horizons 10 blocks apart holding all 60 rock classes, horizon h of L1 cell column
+  i having class (6·i + h) mod 60, so any ten neighbouring cell columns show every class at
   h ≥ 2 (`notes.strata.class_rule`). Horizon h spans the keys 4096·h … 4096·h + 4095 in every
   cell, so the column rule correlates the synthetic stacks by index (and mixes the neighbouring
   cell columns' classes in as thin tongues). `--strata basin`: a readable sedimentary basin, the
