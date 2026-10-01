@@ -25,6 +25,11 @@ import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
  * density functions are bound to this generator's {@link TerrainSource}. The binding is lazy:
  * registry holders are not bound yet while the codec decodes. Everything else in the superclass
  * reads the registry settings, which differ from the bound copy only in the router.
+ *
+ * <p><b>Lava.</b> Vanilla measures its two lava heights from y 0 (everything open below y −54 is
+ * lava; cave lakes at y −10 or lower may be). This generator measures them from the world's floor:
+ * the global fluid picker is {@link LavaFluids}'s, and the router's {@code lava} function carries
+ * the {@code deeptime:lava_lakes} gate. {@link LavaRules} has the rules and their settings.
  */
 public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
 
@@ -43,6 +48,10 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         super(biomeSource, settings);
         this.sourceSettings = settings;
         this.dataRef = dataRef;
+        // Vanilla's picker floods everything below y -54 with lava, which is 298 blocks of a world
+        // whose floor is y -352 (LavaRules). The field is opened by the access transformer; it is
+        // read on first use, when the level's world data can be loaded.
+        this.globalFluidPicker = com.google.common.base.Suppliers.memoize(() -> LavaFluids.picker(settings.value(), terrain()));
     }
 
     public WorldDataRef dataRef() {

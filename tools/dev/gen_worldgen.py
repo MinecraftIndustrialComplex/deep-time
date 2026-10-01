@@ -116,11 +116,16 @@ def main():
     vr = ow["noise_router"]
     final = scale_entrances(transform(vr["final_density"]))
     router = {
-        # Aquifers as vanilla: sea level and local cave levels.
+        # Aquifers as vanilla: sea level and local cave levels. (The lava floor, vanilla's y -54,
+        # is not router data: GeologicChunkGenerator's fluid picker sets it, worldgen/LavaFluids.)
         "barrier": vr["barrier"],
         "fluid_level_floodedness": vr["fluid_level_floodedness"],
         "fluid_level_spread": vr["fluid_level_spread"],
-        "lava": vr["lava"],
+        # Lava lakes only near the world's floor: vanilla's aquifer allows them at y -10 and below
+        # whatever the floor is (worldgen/density/LavaLakesDensity; the gate is 0 or 1).
+        "lava": {"type": "minecraft:mul",
+                 "argument1": {"type": "deeptime:lava_lakes", "min_y": MIN_Y},
+                 "argument2": vr["lava"]},
         # The five 2D biome inputs come from the simulation (world data) or the analytic test
         # terrain; flat_cache because they do not vary with y.
         **{name: {"type": "minecraft:flat_cache",
