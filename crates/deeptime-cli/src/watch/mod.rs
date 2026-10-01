@@ -28,6 +28,8 @@ mod http;
 mod live;
 mod runs;
 pub mod stage2;
+mod tiles;
+mod worldmap;
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;

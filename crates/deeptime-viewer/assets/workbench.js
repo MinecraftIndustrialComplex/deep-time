@@ -2726,6 +2726,12 @@
     runhead(); runInfo();
     for (const p of panes) paneHead(p);
   });
+  // What the "Final world" view (worldmap.js, loaded after this file) uses of the page.
+  window.DTWB = {
+    api, esc, ic, fmtInt, latText, lonText, runName, toast, store,
+    focusedRun: () => P().run,
+    preview(run, box, latLon, size) { return Stage2.preview(run, run.frames[run.frames.length - 1] || { n: 0, t: 0 }, box, latLon, size); },
+  };
   buttons();
   stageEmpty();
   poll();

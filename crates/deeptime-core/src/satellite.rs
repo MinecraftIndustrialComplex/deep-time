@@ -294,7 +294,7 @@ fn mix(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
 }
 
 /// The colour bare ground of rock class `k` shows from orbit (`None`: not known).
-fn rock_tint(k: f32, pal: &Palette) -> Option<[f32; 3]> {
+pub fn rock_tint(k: f32, pal: &Palette) -> Option<[f32; 3]> {
     if !k.is_finite() || k < 0.0 {
         return None;
     }
@@ -323,7 +323,7 @@ fn rock_tint(k: f32, pal: &Palette) -> Option<[f32; 3]> {
 }
 
 /// The sea's colour at depth `d` metres.
-fn depth_colour(d: f32, pal: &Palette, look: &Look) -> [f32; 3] {
+pub fn depth_colour(d: f32, pal: &Palette, look: &Look) -> [f32; 3] {
     let [d0, d1, d2, d3] = look.depth_m;
     let stops = [
         (d0, pal.get(SHALLOW)),
@@ -546,7 +546,7 @@ pub(crate) fn nearest(f: &Field, px: usize, py: usize, w: usize, h: usize) -> f3
 /// The climate's fields carry steps a picture should not show as stripes: the orographic rain's
 /// cell-to-cell streaks, and the energy-balance model's latitude bands in the temperatures and the
 /// sea ice (whose edge would otherwise be a ruled line).
-fn box_filter(
+pub fn box_filter(
     f: &Field,
     (rx, ry): (usize, usize),
     log: bool,
@@ -645,15 +645,55 @@ fn on_grid<'a>(f: Option<&'a Field>, g: &deeptime_format::GridDesc) -> Option<&'
     f.filter(|f| f.grid == *g)
 }
 
+/// The lighting of the hill shade, worked out once from a [`Look`] and applied per pixel.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Light {
+    /// Towards the light in (east, south, up).
+    dir: [f64; 3],
+    exaggeration: f64,
+}
+
+impl Light {
+    pub fn new(look: &Look) -> Light {
+        let az = f64::from(look.light_azimuth_deg).to_radians();
+        let alt = f64::from(look.light_altitude_deg).to_radians();
+        Light {
+            dir: [az.sin() * alt.cos(), -az.cos() * alt.cos(), alt.sin()],
+            exaggeration: f64::from(look.exaggeration),
+        }
+    }
+
+    /// The factor (1 on flat ground) of a surface whose height rises `dzdx` metres per metre to
+    /// the east and `dzdy` per metre to the south. [`hillshade`] is this over a picture; the
+    /// workbench's zoomable tiles ask it with slopes taken at their own scale, so every map of
+    /// one world is lit the same way.
+    #[inline]
+    pub fn shade(&self, dzdx: f64, dzdy: f64) -> f32 {
+        self.shade_exaggerated(dzdx, dzdy, 1.0)
+    }
+
+    /// [`Light::shade`] with the look's vertical exaggeration multiplied by `boost`.
+    #[inline]
+    pub fn shade_exaggerated(&self, dzdx: f64, dzdy: f64, boost: f64) -> f32 {
+        let e = self.exaggeration * boost;
+        let n = [-e * dzdx, -e * dzdy, 1.0];
+        let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
+        let lit = ((n[0] * self.dir[0] + n[1] * self.dir[1] + n[2] * self.dir[2]) / len).max(0.0);
+        (lit / self.dir[2]) as f32
+    }
+}
+
+/// A colour under the hill shade: `shade` (from [`Light::shade`] or [`hillshade`]) applied with
+/// the `strength` [`colour`] returned (the share of its effect), as the satellite picture does.
+pub fn shaded(rgb: [f32; 3], strength: f32, shade: f32) -> [u8; 3] {
+    let f = (1.0 + strength * (shade - 1.0)).clamp(0.5, 1.35);
+    rgb.map(|v| (v * f).round().clamp(0.0, 255.0) as u8)
+}
+
 /// The hill shade's factor per pixel (1 on flat ground) of heights `z` (m) on a `w × h`
 /// equirectangular picture of a sphere of radius `radius_m`.
 pub fn hillshade(z: &[f32], w: usize, h: usize, radius_m: f64, look: &Look) -> Vec<f32> {
-    let az = f64::from(look.light_azimuth_deg).to_radians();
-    let alt = f64::from(look.light_altitude_deg).to_radians();
-    // Towards the light in (east, south, up).
-    let light = [az.sin() * alt.cos(), -az.cos() * alt.cos(), alt.sin()];
-    let flat = light[2];
-    let e = f64::from(look.exaggeration);
+    let light = Light::new(look);
     let dy = std::f64::consts::PI * radius_m / h as f64;
     let at = |i: usize, j: usize, c: f32| {
         let v = z[j * w + i];
@@ -676,10 +716,7 @@ pub fn hillshade(z: &[f32], w: usize, h: usize, radius_m: f64, look: &Look) -> V
             let (iw, ie) = ((i + w - 1) % w, (i + 1) % w);
             let dzdx = (at(ie, j, c) - at(iw, j, c)) / (2.0 * dx);
             let dzdy = (at(i, js, c) - at(i, jn, c)) / ((js - jn).max(1) as f64 * dy);
-            let n = [-e * dzdx, -e * dzdy, 1.0];
-            let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
-            let lit = ((n[0] * light[0] + n[1] * light[1] + n[2] * light[2]) / len).max(0.0);
-            out[j * w + i] = (lit / flat) as f32;
+            out[j * w + i] = light.shade(dzdx, dzdy);
         }
     }
     out
@@ -839,10 +876,7 @@ pub fn render(
                 },
             };
             let (rgb, strength) = colour(&cell, &pal, &look);
-            let f = (1.0 + strength * (shade[k] - 1.0)).clamp(0.5, 1.35);
-            for v in rgb {
-                rgba.push((v * f).round().clamp(0.0, 255.0) as u8);
-            }
+            rgba.extend_from_slice(&shaded(rgb, strength, shade[k]));
             rgba.push(255);
         }
     }
@@ -1115,5 +1149,54 @@ mod tests {
             "{}",
             gb.data[1]
         );
+    }
+
+    /// The hill shade is the arithmetic it was before `Light` was split out for the workbench's
+    /// tiles (the frame maps' pixels must not move): the lighting formula written out, bit for bit.
+    #[test]
+    fn hillshade_is_the_lighting_formula_and_light_is_shared() {
+        let (w, h) = (24usize, 12usize);
+        let mut s = 0x9E37_79B9_7F4A_7C15u64;
+        let z: Vec<f32> = (0..w * h)
+            .map(|_| {
+                s = s
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                ((s >> 40) as f32 / 16777216.0 - 0.5) * 6000.0
+            })
+            .collect();
+        let look = Look::default();
+        let got = hillshade(&z, w, h, 6.37e6, &look);
+        let az = f64::from(look.light_azimuth_deg).to_radians();
+        let alt = f64::from(look.light_altitude_deg).to_radians();
+        let light = [az.sin() * alt.cos(), -az.cos() * alt.cos(), alt.sin()];
+        let e = f64::from(look.exaggeration);
+        let dy = std::f64::consts::PI * 6.37e6 / h as f64;
+        for j in 0..h {
+            let lat = (90.0 - 180.0 * j as f64 / h as f64).to_radians();
+            let dx = 2.0 * std::f64::consts::PI * 6.37e6 * lat.cos().max(0.15) / w as f64;
+            let (jn, js) = (j.saturating_sub(1), (j + 1).min(h - 1));
+            for i in 0..w {
+                let (iw, ie) = ((i + w - 1) % w, (i + 1) % w);
+                let dzdx = (f64::from(z[j * w + ie]) - f64::from(z[j * w + iw])) / (2.0 * dx);
+                let dzdy = (f64::from(z[js * w + i]) - f64::from(z[jn * w + i]))
+                    / ((js - jn).max(1) as f64 * dy);
+                let n = [-e * dzdx, -e * dzdy, 1.0];
+                let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
+                let lit = ((n[0] * light[0] + n[1] * light[1] + n[2] * light[2]) / len).max(0.0);
+                assert_eq!(got[j * w + i], (lit / light[2]) as f32, "({i}, {j})");
+            }
+        }
+        // `Light` is that arithmetic for any slope; a boost of 1 changes nothing, and flat ground
+        // is 1 at any exaggeration.
+        let l = Light::new(&look);
+        assert_eq!(l.shade(0.0, 0.0), 1.0);
+        assert_eq!(l.shade_exaggerated(0.0, 0.0, 3.0), 1.0);
+        assert_eq!(l.shade(0.01, -0.02), l.shade_exaggerated(0.01, -0.02, 1.0));
+        assert!(l.shade_exaggerated(0.01, -0.02, 4.0) != l.shade(0.01, -0.02));
+        // And the composition: no shade is the colour itself, a shaded one is clamped.
+        assert_eq!(shaded([100.0, 150.0, 200.0], 0.6, 1.0), [100, 150, 200]);
+        assert_eq!(shaded([200.0; 3], 1.0, 9.0), [255, 255, 255]);
+        assert_eq!(shaded([200.0; 3], 1.0, 0.0), [100, 100, 100]);
     }
 }
