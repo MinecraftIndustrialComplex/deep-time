@@ -140,11 +140,11 @@ pub fn sample(
     let t = env.t_myr;
     let mesh = &geo.mesh;
     let since = (t - state.resample_myr).max(env.dt_myr);
-    let (zr, zt) = (k.ridge_elevation_m, k.trench_elevation_m);
+    let (zr, zf) = (k.ridge_elevation_m, k.oceanic_floor_elevation_m);
     let edge_z = |v: u32| {
         let s = &samples[v as usize];
         if s.kind == CONTINENTAL {
-            ocean_elevation(since, zr, zt, k.oceanic_damping_mm_yr)
+            ocean_elevation(since, zr, zf, k.oceanic_damping_mm_yr)
         } else {
             f64::from(s.elevation_m)
         }
@@ -164,7 +164,7 @@ pub fn sample(
         };
         let age = alpha * since;
         (
-            alpha * zbar + (1.0 - alpha) * ocean_elevation(age, zr, zt, k.oceanic_damping_mm_yr),
+            alpha * zbar + (1.0 - alpha) * ocean_elevation(age, zr, zf, k.oceanic_damping_mm_yr),
             age,
         )
     };
@@ -178,7 +178,7 @@ pub fn sample(
     let cells = links.len();
     // The deposit engine's inputs and the surface's basement (P1-04): the nearest sample's flags,
     // top rock pool and trench values; the rest interpolated.
-    let extra: Vec<[f32; 8]> = (0..cells)
+    let extra: Vec<[f32; 9]> = (0..cells)
         .into_par_iter()
         .map(|c| {
             let s = &samples[links[c].nearest as usize];
@@ -193,6 +193,7 @@ pub fn sample(
                     0.0,
                     super::pools::ocean_heat_flow(age) as f32,
                     7000.0,
+                    s.group as f32,
                 ];
             }
             let top = TOP_ORDER
@@ -209,6 +210,7 @@ pub fn sample(
                 s.slab_age_myr,
                 heat[c] as f32,
                 thick[c] as f32,
+                s.group as f32,
             ]
         })
         .collect();
@@ -308,7 +310,7 @@ pub fn sample(
         "plates/fold_trend_deg",
         "plates/plate_id",
     ];
-    let extra_names: [&'static str; 8] = [
+    let extra_names: [&'static str; 9] = [
         "plates/flags",
         "plates/top_pool",
         "plates/oxidation",
@@ -317,6 +319,10 @@ pub fn sample(
         "plates/slab_age_myr",
         "plates/heat_flow_mw_m2",
         "plates/thickness_m",
+        // The rigid group of the cell's nearest sample: which piece of crust is under the cell. A
+        // group keeps its number when a collision hands it to another plate, so the surface stage
+        // can tell crust that changed plate from another plate's crust arriving (`surface/advect.rs`).
+        "plates/group_id",
     ];
     names
         .iter()

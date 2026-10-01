@@ -14,15 +14,36 @@
 //!    gives every land cell its spill level F and the cell it was reached from. Each cell drains to
 //!    its steepest strictly lower neighbour on F, else (flats and lakes) to the cell it was
 //!    reached from, so every path descends to the sea, and the receivers form a forest.
-//! 2. **Lakes: fill and spill.** A connected set of cells below their F is a depression; it becomes
-//!    a lake at its spill level F when it is at least `lake_min_area_km2` and
-//!    `lake_min_depth_blocks` deep. Every lake is full to its lowest rim and spills through it (the
-//!    plan's P2 exit test, "every lake's surface equals its lowest rim"); the outflow is its inflow
-//!    less the evaporation from its surface (`lake_evaporation`), so a lake in a desert may have no
-//!    outlet river. Evaporation-limited levels below the rim (Fill–Spill–Merge's partial fills)
-//!    stay in P2-03.
-//! 3. **Discharge.** Runoff P − ET (Fu's Budyko curve, as the surface stage, from the climate
-//!    stage's temperature and precipitation) accumulated down the receivers: Q in m³/s.
+//! 2. **Lakes: a water balance** (Ben, 2026-10-01, "freeze them and size them by climate"; the
+//!    lake part of P2-03). A connected set of cells below their F is a basin; one of at least
+//!    `lake_min_area_km2` and `lake_min_depth_blocks` is a candidate lake. Its level is where what
+//!    flows in balances what its surface evaporates ([`HydroParams::budget`]):
+//!    - *It fills.* If the basin, wet to its rim, still gains water (inflow + rain on it ≥ its
+//!      evaporation), the lake is full to its lowest rim and spills the surplus through it, as
+//!      every lake did before.
+//!    - *It cannot fill.* The basin is terminal (endorheic). Its lowest cell becomes a sink, the
+//!      basin's floor is drained to it (a Priority-Flood of the basin alone, so the streams on the
+//!      exposed floor follow the real ground and the basins inside it are treated the same way,
+//!      upstream first), and the lake grows from the sink over the basin's **hypsometry** (the
+//!      loss a cell adds when it goes under, summed by height: no iteration over the grid) to the
+//!      level where the losses take the whole inflow. A lake inside the basin that the terminal
+//!      lake rises over becomes part of it.
+//!    - *It is too thin.* A balance lake under the lake thresholds is a **playa** (a salt flat:
+//!      water that reaches it evaporates off the floor); with no inflow at all the basin is dry.
+//!    - *It lies below sea level.* Ground a block or more below sea level holds the sea's water
+//!      in the game whatever the climate (the column rule's sea), so a terminal basin's lake
+//!      stands at sea level at least: a basin below sea level is never dry.
+//!
+//!    An upstream lake that does not spill passes nothing on, so a chain of lakes is solved in
+//!    order. `lake_balance` false keeps every lake full, as before.
+//! 3. **Discharge.** The liquid runoff (rain and melt less ET: Fu's Budyko curve as the surface
+//!    stage, from the climate stage's temperature and precipitation) accumulated down the
+//!    receivers: Q in m³/s. Where the warmest month stays below freezing nothing melts, so nothing
+//!    runs off: frozen ground feeds no river and no lake.
+//!
+//! **Frozen lakes.** A lake cell whose mean annual temperature is below `lake_freeze_mean_c`
+//! (0 °C: with a yearly cycle, ice for more than half the year) is ice-covered: the views draw it
+//! as ice, and in the game it lies in the frozen biomes, whose `freeze_top_layer` ices it.
 //! 4. **Rivers.** Cells carrying at least `river_min_discharge_m3s` from at least
 //!    `river_min_area_km2` are river cells. They are cut into chains at confluences (a chain
 //!    follows its largest donor), each ending in the sea, a lake or a larger river; the vertices
@@ -49,6 +70,102 @@ pub const OPEN_SEA_KM2: f64 = 5_000.0;
 
 /// The largest hydrology grid, cells; a larger L3 is averaged down by 2 in each direction.
 pub const MAX_CELLS: usize = 40_000_000;
+
+/// Potential evapotranspiration per degree of mean temperature above freezing, mm/yr/°C (the
+/// surface stage's stand-in, `surface::climate`).
+pub const PET_MM_PER_C: f64 = 60.0;
+
+/// Days in a year (for the degree-day melt).
+const YEAR_DAYS: f64 = 365.25;
+
+/// The climate of a cell, as the hydrology reads it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Climate {
+    /// Annual precipitation, mm/yr.
+    pub precip_mm: f64,
+    /// Mean annual temperature, °C.
+    pub t_mean_c: f64,
+    /// Mean temperature of the warmest and the coldest month, °C.
+    pub t_warm_c: f64,
+    pub t_cold_c: f64,
+}
+
+impl Climate {
+    /// A climate with no seasons (tests, stand-ins).
+    pub fn steady(precip_mm: f64, t_mean_c: f64) -> Climate {
+        Climate {
+            precip_mm,
+            t_mean_c,
+            t_warm_c: t_mean_c,
+            t_cold_c: t_mean_c,
+        }
+    }
+
+    /// From a mean and the warmest and coldest months, any of which may be missing (not finite):
+    /// a missing mean is 0 °C, missing months are the mean ± 8 °C (as the biome mapping assumes).
+    pub fn of(precip_mm: f64, t_mean_c: f64, t_warm_c: f64, t_cold_c: f64) -> Climate {
+        let t = if t_mean_c.is_finite() { t_mean_c } else { 0.0 };
+        Climate {
+            precip_mm: if precip_mm.is_finite() {
+                precip_mm.max(0.0)
+            } else {
+                0.0
+            },
+            t_mean_c: t,
+            t_warm_c: if t_warm_c.is_finite() {
+                t_warm_c.max(t)
+            } else {
+                t + 8.0
+            },
+            t_cold_c: if t_cold_c.is_finite() {
+                t_cold_c.min(t)
+            } else {
+                t - 8.0
+            },
+        }
+    }
+
+    /// The year's mean of the temperature above freezing, °C, and the share of the year above
+    /// freezing, for a sinusoidal year between the coldest and the warmest month (with no month
+    /// below freezing: the mean annual temperature and 1).
+    pub fn thaw(&self) -> (f64, f64) {
+        let a = 0.5 * (self.t_warm_c - self.t_cold_c).max(0.0);
+        let m = 0.5 * (self.t_warm_c + self.t_cold_c);
+        if m - a >= 0.0 {
+            (self.t_mean_c.max(0.0), 1.0)
+        } else if m + a <= 0.0 {
+            (0.0, 0.0)
+        } else {
+            // T = m + a·cos θ is above 0 for |θ| < θ0.
+            let th = (-m / a).clamp(-1.0, 1.0).acos();
+            (
+                ((m * th + a * th.sin()) / std::f64::consts::PI).max(0.0),
+                th / std::f64::consts::PI,
+            )
+        }
+    }
+
+    /// The aridity index P / PET (PET from the temperature above freezing), capped at 10.
+    pub fn aridity(&self) -> f64 {
+        let pet = PET_MM_PER_C * self.thaw().0;
+        if pet <= 0.0 {
+            10.0
+        } else {
+            (self.precip_mm / pet).min(10.0)
+        }
+    }
+}
+
+/// The water a cell gives and takes, mm/yr.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Budget {
+    /// What runs off it as land.
+    pub runoff_mm: f64,
+    /// What falls on it as open water (the liquid part of the precipitation).
+    pub rain_mm: f64,
+    /// What evaporates from it as open water.
+    pub evaporation_mm: f64,
+}
 
 /// Hydraulic geometry exponents (Leopold & Maddock 1953: width ∝ Q^0.5, depth ∝ Q^0.4).
 pub const WIDTH_EXPONENT: f64 = 0.5;
@@ -83,6 +200,26 @@ pub struct HydroParams {
     pub lake_min_depth_blocks: f64,
     /// Whether evaporation from a lake's surface reduces what flows out of it.
     pub lake_evaporation: bool,
+    /// Whether a lake's level follows its water balance (a basin that evaporates more than it
+    /// gets holds a smaller lake below its rim, a salt flat or nothing). False: every lake is
+    /// full to its rim, as before 2026-10-01.
+    pub lake_balance: bool,
+    /// What open water loses in a year at the freezing point, mm: the evaporation of the cool
+    /// season and the sublimation of lake ice. In cold climates lakes lose more than the land's
+    /// potential evapotranspiration (60 mm/°C) says. Calibration: Earth's 1.42 million lakes
+    /// evaporate 1,500 ± 150 km³ a year without the Caspian (Zhao et al. 2022, "Evaporative water
+    /// loss of 1.42 million global lakes", Nature Communications 13:3686), about 650 mm a year
+    /// over their 2.3 million km², and most of that area is in cold climates (Canada, Siberia,
+    /// Scandinavia: about 6–8 °C of mean temperature above freezing), which 200 + 60 · 7 meets.
+    pub lake_evaporation_base_mm: f64,
+    /// Scales open-water evaporation: `lake_evaporation_base_mm` plus 60 mm/yr per °C of the
+    /// year's mean temperature above freezing, times this.
+    pub lake_evaporation_factor: f64,
+    /// Snow a degree-day above freezing melts, mm (the degree-day factor): where the year has too
+    /// few of them the snow stays, and neither runs off nor feeds a lake.
+    pub snow_melt_mm_per_degree_day: f64,
+    /// A lake is ice-covered where the mean annual temperature is below this, °C.
+    pub lake_freeze_mean_c: f64,
     /// Channels at least this wide are river biomes, blocks.
     pub biome_min_width_blocks: f64,
     /// Banks slope up 1:1 from a channel's edge over this many blocks …
@@ -111,6 +248,11 @@ impl Default for HydroParams {
             lake_min_area_km2: 1.0,
             lake_min_depth_blocks: 1.0,
             lake_evaporation: true,
+            lake_balance: true,
+            lake_evaporation_base_mm: 200.0,
+            lake_evaporation_factor: 1.0,
+            snow_melt_mm_per_degree_day: 4.0,
+            lake_freeze_mean_c: 0.0,
             biome_min_width_blocks: 6.0,
             bank_zone_blocks: 1.0,
             bank_zone_ratio: 0.5,
@@ -158,6 +300,25 @@ impl HydroParams {
             "lake_min_depth_blocks",
         )?;
         within(
+            self.lake_evaporation_base_mm,
+            0.0,
+            1000.0,
+            "lake_evaporation_base_mm",
+        )?;
+        within(
+            self.lake_evaporation_factor,
+            0.0,
+            5.0,
+            "lake_evaporation_factor",
+        )?;
+        within(
+            self.snow_melt_mm_per_degree_day,
+            0.0,
+            20.0,
+            "snow_melt_mm_per_degree_day",
+        )?;
+        within(self.lake_freeze_mean_c, -30.0, 10.0, "lake_freeze_mean_c")?;
+        within(
             self.biome_min_width_blocks,
             1.0,
             1000.0,
@@ -165,6 +326,41 @@ impl HydroParams {
         )?;
         within(self.bank_zone_blocks, 0.0, 32.0, "bank_zone_blocks")?;
         within(self.bank_zone_ratio, 0.0, 4.0, "bank_zone_ratio")
+    }
+
+    /// The water budget of a cell under climate `c`.
+    ///
+    /// - **Liquid water.** Precipitation falls as rain in the share of the year above freezing and
+    ///   as snow in the rest; the snow melts as far as the year's degree-days allow
+    ///   (`snow_melt_mm_per_degree_day` × 365.25 × the mean temperature above freezing). What does
+    ///   not melt stays as snow and ice (the climate stage's glaciers) and is not water here.
+    /// - **Runoff** = liquid − ET, ET by Fu's Budyko curve with PET = 60 mm/°C × the mean annual
+    ///   temperature (0 below freezing), as the surface stage.
+    /// - **Open-water evaporation** = `lake_evaporation_factor` × (`lake_evaporation_base_mm` +
+    ///   60 mm/°C × the year's mean temperature above freezing): 200 mm a year at the freezing
+    ///   point (the cool season and the ice's sublimation), 1,100 at 15 °C, 2,000 at 30 °C (0
+    ///   when `lake_evaporation` is false).
+    pub fn budget(&self, c: &Climate) -> Budget {
+        let (above, share) = c.thaw();
+        let p = c.precip_mm.max(0.0);
+        let melt = self.snow_melt_mm_per_degree_day * YEAR_DAYS * above;
+        let liquid = p.min(p * share + melt);
+        let pet = PET_MM_PER_C * c.t_mean_c.max(0.0);
+        Budget {
+            runoff_mm: (liquid - crate::surface::climate::fu_et(p, pet)).max(0.0),
+            rain_mm: liquid,
+            evaporation_mm: if self.lake_evaporation {
+                self.lake_evaporation_factor
+                    * (self.lake_evaporation_base_mm + PET_MM_PER_C * above)
+            } else {
+                0.0
+            },
+        }
+    }
+
+    /// Whether a lake at mean annual temperature `t_mean_c` is ice-covered.
+    pub fn frozen(&self, t_mean_c: f64) -> bool {
+        t_mean_c < self.lake_freeze_mean_c
     }
 
     /// Channel width in blocks at discharge `q` (m³/s), with the rivers feature scale.

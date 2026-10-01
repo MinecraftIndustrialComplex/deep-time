@@ -329,7 +329,7 @@ pub fn summary_line(v: &Value) -> String {
     }
     let ms = |k: &str| v["millis"][k].as_f64().unwrap_or(0.0) / 1000.0;
     format!(
-        "bake layers={} bytes={:.1}MiB elevation={} above_max_y={}cells({:.2}%_of_land,highest_y={:.0}) horizons_mean={:.2} \
+        "bake layers={} bytes={:.1}MiB elevation={} above_max_y={}cells({:.2}%_of_land,highest_y={:.0}) compressed={}cells horizons_mean={:.2} \
          top_raised_cells={} provinces={} spawn_candidates={} lakes={} river_chains={} millis[terrain={:.1}s strata={:.1}s climate={:.1}s water={:.1}s surface={:.1}s meta={:.1}s total={:.1}s]",
         v["layers"].as_array().map_or(0, Vec::len),
         v["bytes"].as_f64().unwrap_or(0.0) / 1_048_576.0,
@@ -344,6 +344,9 @@ pub fn summary_line(v: &Value) -> String {
         v["terrain"]["build_limit"]["highest_y"]
             .as_f64()
             .unwrap_or(f64::NAN),
+        v["terrain"]["build_limit"]["cells_compressed"]
+            .as_u64()
+            .unwrap_or(0),
         v["strata"]["mean_horizons"].as_f64().unwrap_or(0.0),
         v["strata"]["top_raised_cells"],
         v["meta"]["provinces"]["count"],
