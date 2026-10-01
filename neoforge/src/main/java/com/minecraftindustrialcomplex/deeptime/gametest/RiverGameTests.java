@@ -468,7 +468,7 @@ public final class RiverGameTests {
         }
         var sampler = level.getChunkSource().randomState().sampler();
         var g = level.getChunkSource().getGenerator();
-        int sampled = 0, river = 0;
+        int sampled = 0, river = 0, swamp = 0;
         StringBuilder seen = new StringBuilder();
         for (int i = 0; i < r.vertexCount() && sampled < 200; i += 3) {
             int x = Math.round(r.vertexX(i)), z = Math.round(r.vertexZ(i));
@@ -478,15 +478,21 @@ public final class RiverGameTests {
             int y = (int) Math.floor(r.vertexW(i)) - 1;
             Holder<Biome> b = g.getBiomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z), sampler);
             sampled++;
+            // Vanilla's own valley slice (weirdness 0) is river except on the flattest, wettest ground
+            // (erosion 6), where it is swamp or mangrove swamp: a planet whose wide rivers cross such
+            // lowland (seed 16: 21 of 37 samples) has swamp along them, as vanilla would.
             if (b.is(BiomeTags.IS_RIVER))
                 river++;
+            else if (b.is(net.minecraft.world.level.biome.Biomes.SWAMP) || b.is(net.minecraft.world.level.biome.Biomes.MANGROVE_SWAMP))
+                swamp++;
             else if (seen.length() < 400)
                 seen.append(' ').append(b.getRegisteredName());
         }
-        DeepTime.LOGGER.info("[gametest] riverBiomes sampled={} river={} share={} others:{}", sampled, river,
-                sampled == 0 ? "n/a" : String.format("%.3f", river / (double) sampled), seen);
+        DeepTime.LOGGER.info("[gametest] riverBiomes sampled={} river={} swamp={} share={} others:{}", sampled, river, swamp,
+                sampled == 0 ? "n/a" : String.format("%.3f", (river + swamp) / (double) sampled), seen);
         if (sampled > 0)
-            helper.assertTrue(river >= sampled / 2, "only " + river + " of " + sampled + " wide-channel samples are river biomes");
+            helper.assertTrue(river + swamp >= sampled / 2, "only " + river + " river and " + swamp + " swamp of " + sampled
+                    + " wide-channel samples: the valley slice is not reaching the channels");
         helper.succeed();
     }
 }
