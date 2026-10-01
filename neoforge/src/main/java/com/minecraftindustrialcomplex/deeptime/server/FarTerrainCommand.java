@@ -297,6 +297,8 @@ public final class FarTerrainCommand {
         int spacing = 16;   // n x n chunks, four columns in each
         // 1. What Distant Horizons holds, before any chunk is generated here.
         int held = 0, equal = 0, generated = 0;
+        int[] coarser = new int[4];
+        String[] example = new String[1];
         StringBuilder why = new StringBuilder();
         if (bound != null && bound.levelWrapper() != null && DhFarTerrain.api().isPresent()) {
             DhApiBinding api = DhFarTerrain.api().get();
@@ -314,10 +316,28 @@ public final class FarTerrainCommand {
                             continue;
                         held++;
                         StringBuilder w = new StringBuilder();
-                        if (sameLayers(stored, far, x, z, w))
+                        if (sameLayers(stored, far, x, z, w)) {
                             equal++;
-                        else if (why.length() < 400)
-                            why.append(w).append("; ");
+                        } else {
+                            if (why.length() < 400)
+                                why.append(w).append("; ");
+                            // Is it another column's? One Distant Horizons merged it with (the
+                            // column at the corner of its 2, 4 or 8 block cell), or a neighbour.
+                            for (int k = 1; k <= 3; k++) {
+                                int mask = ~((1 << k) - 1);
+                                if (sameLayers(stored, far, x & mask, z & mask, new StringBuilder())) {
+                                    coarser[k]++;
+                                    break;
+                                }
+                            }
+                            if (example[0] == null) {
+                                StringBuilder sb = new StringBuilder("(" + x + ", " + z + ") stored:");
+                                stored.forEach(p -> sb.append(" ").append(p.bottomY()).append("..").append(p.topY()).append(" ")
+                                        .append(p.block() instanceof BlockState s ? id(s) : "air"));
+                                sb.append(" | far: ").append(String.join(", ", far.column(x, z).layers()));
+                                example[0] = sb.toString();
+                            }
+                        }
                     } catch (ReflectiveOperationException | RuntimeException e) {
                         if (why.length() < 400)
                             why.append(e).append("; ");
@@ -330,8 +350,13 @@ public final class FarTerrainCommand {
         stored.addProperty("skipped_loaded_chunks", generated);
         stored.addProperty("held", held);
         stored.addProperty("equal_to_far_terrain", equal);
+        stored.addProperty("equal_to_the_2_block_cell_corner", coarser[1]);
+        stored.addProperty("equal_to_the_4_block_cell_corner", coarser[2]);
+        stored.addProperty("equal_to_the_8_block_cell_corner", coarser[3]);
         if (why.length() > 0)
             stored.addProperty("differences", why.toString());
+        if (example[0] != null)
+            stored.addProperty("example", example[0]);
         o.add("stored", stored);
         // 2. Far terrain against the generated chunks.
         FarTerrainCheck.Tally tally = new FarTerrainCheck.Tally();

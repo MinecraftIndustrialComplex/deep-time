@@ -1,2 +1,10 @@
 # Jars (glob patterns) moved to server/mods-excluded/ for the dh-next profile, one per line.
 # Every exclusion is recorded in the smoke report.
+#
+# Chunky 1.4.23 with Distant Horizons 3.3.3: the server crashes while it prepares the spawn chunks,
+# "IllegalStateException: Chunky is not loaded" from org.popcraft.chunky.ChunkyProvider.get, called
+# by Distant Horizons' own ChunkyAccessor.bindOnGenerationProgressEvent in its chunk-load listener
+# (2026-10-01, smoke dh-next; Distant Horizons 3.3.3's Chunky hook runs before Chunky has started).
+# The dh profile (Distant Horizons 3.3.0) boots with Chunky. The MIC pack pins both, so a Distant
+# Horizons update there has this to settle too.
+Chunky-*.jar
