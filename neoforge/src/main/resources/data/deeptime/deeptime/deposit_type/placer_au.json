@@ -55,7 +55,8 @@
   "placer": {
     "transport_km": 5,
     "capture_fraction": 0.5,
-    "flatten_gradient_m_km": 5
+    "flatten_gradient_m_km": 5,
+    "river_reach_km": 30
   },
   "minecraft": {
     "coe_vein": "createoreexcavation:ore_vein_type/gold",
@@ -68,6 +69,6 @@
     "Sizing: USGS Bulletin 1693 (Cox & Singer eds. 1986) model 39a, Placer Au-PGE (Orris & Bliss), n = 65: tonnage 0.022 / 1.1 / 50 Mt of gravel (Fig. 196, p. 263) and Au 0.084 / 0.2 / 0.48 g/t (Fig. 197A, p. 264), figure intercepts; Ag p10 0.036 g/t, 16 of 65 deposits report Ag (p. 262); Au–tonnage r = −0.35 and Au–Ag r = 0.66 (p. 262); 2.0 t/m³, 'the average density of wet sand and gravel' (p. 262); deposits within one mile (1.6 km) are one deposit (p. 262). See crates/deeptime-core/data/usgs/placer_au.json.",
     "A child of deeptime:porphyry_cu_mo_au: a placer forms where an eroded porphyry lost gold, and holds at most capture_fraction of it.",
     "PLACEHOLDERS: density_per_1e5km2 and clustering (unused by a child; no USGS placer density found), capture_fraction 0.5 (no quantitative rule for placer concentration efficiency was found; ore_genesis_modeling.md Q5 gaps).",
-    "Design values: transport_km 5 ('a few km'; no USGS distance found), flatten_gradient_m_km 5, aspect (a long thin gravel ribbon), the pay streak at the gravel base (B1693 m39a: gold sits at the base of the gravel and in bedrock traps), size_mult_v 10 so the ribbon is at least one block thick."
+    "Design values: transport_km 5 ('a few km'; no USGS distance found), flatten_gradient_m_km 5, aspect (a long thin gravel ribbon), the pay streak at the gravel base (B1693 m39a: gold sits at the base of the gravel and in bedrock traps), size_mult_v 10 so the ribbon is at least one block thick, river_reach_km 30 (100 blocks: the bake moves the placer into the nearest river channel within it and lays it as gravel bars along the channel, from the water down to three blocks under the bed, the pay streak in the lower half; deposits/placer_channels.rs)."
   ]
 }

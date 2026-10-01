@@ -59,6 +59,7 @@ pub mod fields;
 pub mod geometry;
 pub mod ledger;
 pub mod petroleum;
+pub mod placer_channels;
 pub mod playability;
 pub mod random;
 pub mod recorded;

@@ -1659,6 +1659,15 @@ stone from its neighbours with chunk-edge bookkeeping, so a regenerated deposit 
 (`mixin/compat/excavated_variants/OreReplacerMixin`), so other levels of the pack keep it; the
 config stays untouched.)
 
+*Ore in loose hosts (2026-10-01, the deposit audit).* A placer's ore sits in gravel or sand, for
+which neither vanilla nor the `c` tags have an ore block, so it came out as the stone ore
+(`minecraft:gold_ore` in a gravel bar). Two additions: Deep Time ships EV stone configs for
+`minecraft:gravel` and `minecraft:sand` beside the four stand-ins, so with EV a placer places EV's
+gold ore in gravel; and the resolver, before the stone/deepslate step and for hosts other than
+stone and deepslate, takes a block of `#c:ores/<material>` that is also in
+`#c:ores_in_ground/<the host block's path>` (`gravel`, `sand`), so a pack can supply its own
+gold-bearing gravel without EV. Without either, the stone ore stays (decisions file, "Ore blocks").
+
 ### 7.7 Ore claiming
 
 - **Scatter removal.** A custom biome modifier type `deeptime:claim_ores` (serializer in
@@ -2598,6 +2607,17 @@ regional MVT driver"):*
   (carbonate classes, `hosts.full_at` 0.05: a ~100 m unit in the 2 km window counts fully). Windows
   are octagons of the disk's area, exact under east–west shifts. The schema gains `hosts.full_at`
   (default 1; Java ignores it).
+- **Placers settle after the bake** (2026-10-01, the deposit audit; `deposits/placer_channels.rs`).
+  Step 6 places a placer on the coarse grid's ground before the amplifier and the bake's rivers
+  exist, as one flat ribbon; in the finished world that ribbon was in the air or buried (centre
+  77–121 blocks under the real ground at the 10th percentile, 37–66 over it at the 90th, on two
+  16k planets) and more than half of the placers placed no ore. Once the folder is complete, every
+  placer is laid again from its site record: into the nearest baked river channel within the
+  type's `placer.river_reach_km` (30 km: 100 blocks) as gravel bars along the channel, from the
+  water down to three blocks under the bed, downstream through confluences; or, with no channel in
+  reach, as a bench in pieces on the finished ground (FORMAT.md, "Sites"). `deeptime hydro` settles
+  them again after re-making the channels. Nothing in the adapter changed for it: the strata pass
+  paints the gravel, the water pass cuts the channel, the deposit feature places the pay streak.
 
 ### 8.7 Fantasy processes — `core::fantasy` (Phase 3)
 

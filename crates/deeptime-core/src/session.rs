@@ -1304,8 +1304,29 @@ impl Session {
             let v: Value = serde_json::from_str(text).unwrap_or_else(|_| json!(text));
             m.notes.insert(stage.clone(), v);
         }
-        let bytes = m.to_json_bytes()?;
+        let mut bytes = m.to_json_bytes()?;
         write_atomic(&dir.join(MANIFEST), &bytes)?;
+        // Placers go where the finished world has their gravel: into the river channels the bake
+        // made, or onto its ground (deposits::placer_channels). The pass reads the folder as the
+        // game does, so it runs on the complete folder and the manifest is written again.
+        if let crate::preset::PresetBody::Planet(p) = &self.preset.body
+            && m.notes
+                .get(crate::bake::NOTES_KEY)
+                .is_some_and(|b| b["baked"] == json!(true))
+        {
+            let note = crate::deposits::placer_channels::settle_folder(dir, p, &mut m)?;
+            if note["placers"].as_u64().unwrap_or(0) > 0 {
+                self.log.push(
+                    Level::Info,
+                    format!(
+                        "placers: {} in river channels, {} on the ground as benches",
+                        note["in_channels"], note["benches"]
+                    ),
+                );
+                bytes = m.to_json_bytes()?;
+                write_atomic(&dir.join(MANIFEST), &bytes)?;
+            }
+        }
         self.state
             .store(SessionState::Finalized as u8, Ordering::Release);
         self.log.push(

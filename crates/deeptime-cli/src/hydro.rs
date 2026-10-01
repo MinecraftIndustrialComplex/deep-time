@@ -7,6 +7,7 @@
 //! preset writes; it is how the parameters are tuned without re-running the history.
 //!
 //! The spawn candidates stay as they were (they need the run's sites; a lake may now cover one).
+//! The placers settle again into the new channels (`deposits::placer_channels::settle_folder`).
 
 use std::path::Path;
 
@@ -46,5 +47,15 @@ pub fn run(world_data: &Path, set: &[String]) -> CliResult<String> {
         m.files.push(entry);
     }
     m.write(world_data)?;
+    // The placers settle into the new channels; the pass reads the folder as the game does, so
+    // the manifest is written before it and again after it.
+    let placers = deeptime_core::deposits::placer_channels::settle_folder(world_data, p, &mut m)?;
+    m.write(world_data)?;
+    let line = format!(
+        "{line}; placers: {} in channels, {} benches of {}",
+        placers["in_channels"].as_u64().unwrap_or(0),
+        placers["benches"].as_u64().unwrap_or(0),
+        placers["placers"].as_u64().unwrap_or(0)
+    );
     Ok(line)
 }
