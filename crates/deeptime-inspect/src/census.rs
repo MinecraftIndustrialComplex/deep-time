@@ -103,7 +103,7 @@ pub fn run(
                 if i < cols && j < rows {
                     let top = col.rock.first().is_some_and(|r| is_stone(&r.2));
                     let dig = col.rock.iter().any(|(hi, lo, class)| {
-                        is_stone(class) && *lo <= col.top_y && *hi >= col.top_y - DIG_BLOCKS + 1
+                        is_stone(class) && *lo <= col.top_y && *hi > col.top_y - DIG_BLOCKS
                     });
                     cells[j * cols + i] = Some((top, dig));
                 }
@@ -142,7 +142,7 @@ pub fn run(
         Value::Null
     } else {
         // Share of dry land with no stone-class cell within `reach` blocks (wrapping in x).
-        let r = (reach / step).max(0) as i64;
+        let r = (reach / step).max(0);
         let (mut none_top, mut none_dig, mut n) = (0u64, 0u64, 0u64);
         for j in 0..rows as i64 {
             for i in 0..cols as i64 {
