@@ -2305,7 +2305,8 @@ impl DepositStage {
         };
         // The same draws `materialise` makes next (dip, then yaw) for the stack's bodies.
         let dip = if t.geometry.dip_deg[1] > t.geometry.dip_deg[0] {
-            (t.geometry.dip_deg[0] + rng.uniform() * (t.geometry.dip_deg[1] - t.geometry.dip_deg[0]))
+            (t.geometry.dip_deg[0]
+                + rng.uniform() * (t.geometry.dip_deg[1] - t.geometry.dip_deg[0]))
                 .to_radians()
         } else {
             t.geometry.dip_deg[0].to_radians()
