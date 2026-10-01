@@ -493,7 +493,7 @@ impl Summary {
              ocean_younger_250={:.3} ocean_frac={:.3} largest_plate_frac={:.3} \
              plates_over_5pct={} plates_under_1pct={} rifts={} initiations={} reversals={} \
              subductions={} collisions={} sutures={} accretions={} ridges={} births={} deaths={} \
-             lips={} resamplings={}",
+             lips={} resamplings={} emerged={}",
             self.plates,
             self.ocean_age_p90_myr,
             self.ocean_age_p50_myr,
@@ -513,7 +513,8 @@ impl Summary {
             self.counters.plate_births,
             self.counters.plate_deaths,
             self.counters.lips,
-            self.counters.resamplings
+            self.counters.resamplings,
+            self.counters.emerged
         )
     }
 }
