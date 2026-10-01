@@ -133,6 +133,8 @@ pub struct ClockState {
     pub window: Vec<Vec<f32>>,
     /// Every finished snowball's onset and escape, Myr (world time).
     pub spans: Vec<[f64; 2]>,
+    /// The EBM's global mean after the last clock step, °C (seafloor weathering).
+    pub t_global: f64,
     /// Degassing and weathering of the last clock step, mol/yr.
     pub degassing: f64,
     pub weathering: f64,
@@ -178,6 +180,8 @@ pub struct Input<'a> {
     pub band_lat: &'a [f64],
     /// Degassing of the plate step before provinces, mol/yr.
     pub degassing: f64,
+    /// Sea-floor production against Earth's today (seafloor weathering).
+    pub ridge_rel: f64,
 }
 
 /// What a plate step's clock returns.
@@ -326,10 +330,12 @@ pub fn run(
                 break (d, st.carbon);
             }
             let (kernel, t_land, sheet) = (&st.kernel, &st.t_land, &st.sheet);
+            let t_global = st.t_global;
             let w_of = |ppm: f64| -> f64 {
                 let shift = lambda * (ppm.max(1e-9) / ppm_before.max(1e-9)).ln();
                 let t: Vec<f64> = t_land.iter().map(|x| x + shift).collect();
                 wp.flux(kernel, &t, sheet, ppm)
+                    + wp.seafloor_flux(inp.ridge_rel, t_global + shift, ppm)
             };
             let next = st.carbon.step(d, &w_of, 1.0 - st.sea_ice, dt);
             let change = (next.ppm().max(1e-9) / ppm_before.max(1e-9)).ln().abs();
@@ -361,7 +367,9 @@ pub fn run(
         });
         st.t_land = mean;
         // 5. Weathering and the trackers.
-        let w = wp.flux(&st.kernel, &st.t_land, &st.sheet, ppm);
+        let w = wp.flux(&st.kernel, &st.t_land, &st.sheet, ppm)
+            + wp.seafloor_flux(inp.ridge_rel, er.t_global, ppm);
+        st.t_global = er.t_global;
         st.degassing = d;
         st.weathering = w;
         let ice_frac = sea_ice_frac(&er, inp.land_frac);
@@ -522,9 +530,11 @@ pub fn weathering_at(
     er: &EbmResult,
     sheet: &[f64],
     ppm: f64,
+    ridge_rel: f64,
 ) -> f64 {
     let (mean, _) = land_temps(er);
-    Weathering::from(p).flux(k, &mean, sheet, ppm)
+    let wp = Weathering::from(p);
+    wp.flux(k, &mean, sheet, ppm) + wp.seafloor_flux(ridge_rel, er.t_global, ppm)
 }
 
 /// The CO₂ at which weathering balances degassing `d` on the warm branch: bisection on ln CO₂,
@@ -541,6 +551,7 @@ pub fn balance(
     sheet: &[f64],
     k: &Kernel,
     d: f64,
+    ridge_rel: f64,
 ) -> (f64, EbmState) {
     let (mut lo, mut hi) = (1.0f64.ln(), 1.0e6f64.ln());
     let sheet_fb: Vec<f64> = sheet.iter().map(|s| s * p.ice_sheet_feedback).collect();
@@ -549,7 +560,7 @@ pub fn balance(
         let ep = ebm_params(p, tilt, flux, ppm, t);
         let mut s = ep.initial_state();
         let er = ep.run(&mut s, land, &sheet_fb, p.ebm_spinup_years.max(40));
-        (weathering_at(p, k, &er, sheet, ppm) - d, s)
+        (weathering_at(p, k, &er, sheet, ppm, ridge_rel) - d, s)
     };
     for _ in 0..40 {
         let mid = 0.5 * (lo + hi);
@@ -622,7 +633,7 @@ mod tests {
                 started: true,
                 ..ClockState::default()
             };
-            let (ppm, ebm) = balance(&self.p, 23.4, 1.0, t, &self.land, &st.sheet, &st.kernel, d);
+            let (ppm, ebm) = balance(&self.p, 23.4, 1.0, t, &self.land, &st.sheet, &st.kernel, d, 1.0);
             st.carbon = Carbon::at_ppm(ppm);
             (st, ebm)
         }
@@ -672,6 +683,7 @@ mod tests {
                     land_frac: &self.land,
                     band_lat: &self.lat,
                     degassing: d,
+                    ridge_rel: 1.0,
                 };
                 let out = run(&inp, st, ebm, &mut ice);
                 let er = out.last.expect("the clock ran");
@@ -885,6 +897,7 @@ mod tests {
                 land_frac: &pl.land,
                 band_lat: &pl.lat,
                 degassing: 0.0,
+                ridge_rel: 1.0,
             };
             run(&inp, &mut st, &mut ebm, &mut ice);
             t = (t + 2.0e6).min(0.0);

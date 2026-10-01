@@ -186,6 +186,15 @@ pub struct ClimateParams {
     /// Denudation the supply assumes at least, m/Myr (soil production on flat, slowly eroding
     /// ground; cratons weather 2–10 m/Myr, Dixon & von Blanckenburg 2012).
     pub weathering_min_denudation_m_myr: f64,
+    /// The L1 grid's erosion against real denudation: the coarse cells smooth the relief that
+    /// erodes, so the surface stage's Earth-like planets carry ~9.5 Gt/yr of eroded rock where
+    /// Earth's rivers carried ~20 Gt/yr before people (14 Gt suspended, Syvitski et al. 2005, plus
+    /// dissolved and bed load): the supply is the grid's × this (2).
+    pub weathering_supply_scale: f64,
+    /// Seafloor weathering's share of Earth's present silicate weathering (the rest is the land's;
+    /// COPSE reloaded, Lenton et al. 2018: 3 of 15 Tmol/yr; 0: none). It needs no land, so a
+    /// land-poor planet keeps a thermostat when its weathering is supply-limited.
+    pub seafloor_weathering_share: f64,
     /// A brightening star: L(t) = L₀ / (1 + 0.4·(1 − age/`present_age_gyr`)) (Gough 1981), with the
     /// planet's age from the run's timeline (the run ends at `present_age_gyr`). Off: L₀ always.
     pub solar_brightening: bool,
@@ -326,6 +335,8 @@ impl Default for ClimateParams {
             weathering_supply: true,
             weathering_rock_mol_kg: 1.26,
             weathering_min_denudation_m_myr: 2.0,
+            weathering_supply_scale: 2.0,
+            seafloor_weathering_share: 0.2,
             solar_brightening: true,
             present_age_gyr: 4.57,
             hydro_sensitivity_per_k: 0.02,
@@ -513,6 +524,8 @@ impl ClimateParams {
                 1.0,
             ),
             (self.weathering_rock_mol_kg, "weathering_rock_mol_kg", 0.01, 10.0),
+            (self.weathering_supply_scale, "weathering_supply_scale", 0.01, 100.0),
+            (self.seafloor_weathering_share, "seafloor_weathering_share", 0.0, 0.9),
             (
                 self.weathering_min_denudation_m_myr,
                 "weathering_min_denudation_m_myr",
