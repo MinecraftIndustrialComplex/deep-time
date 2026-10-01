@@ -134,7 +134,7 @@
     ['strata', 'Strata'], ['volcanoes', 'Volcanoes'], ['deposits', 'Deposits'], ['input', 'Deposit inputs']];
   const layerGroup = name => { const i = name.indexOf('/'); return i < 0 ? '' : name.slice(0, i); };
   const LAYER_WORDS = {
-    satellite: 'Satellite', elevation: 'Elevation', plates: 'Plates', crust_age: 'Crust age', regime: 'Tectonic regime', provinces: 'Geologic provinces', water_level: 'Water level',
+    satellite: 'Satellite', elevation: 'Elevation', plates: 'Plates', crust_age: 'Crust age', regime: 'Tectonic regime', provinces: 'Geologic provinces', water_level: 'Water level', rivers: 'Rivers & lakes',
     t_mean: 'Mean temperature', t_warm: 'Warmest month', t_cold: 'Coldest month', precip: 'Precipitation', koppen: 'Köppen climate',
     aridity: 'Aridity', glacier: 'Glaciers', ela: 'Snow line', temperature: 'Temperature', vegetation: 'Vegetation',
     erosion: 'Erosion', deposition: 'Deposition', sediment: 'Sediment', class: 'Surface rock', drainage: 'Drainage', regolith: 'Regolith',
@@ -151,6 +151,7 @@
     for (const [s, u] of UNIT_SUFFIX) if (base.endsWith(s) && base.length > s.length) { base = base.slice(0, -s.length); unit = u; break; }
     if (name === 'elevation') unit = 'block y';
     if (name === 'crust_age') unit = 'Myr';
+    if (name === 'rivers') unit = 'river flow, m³/s';
     return { label: LAYER_WORDS[base] || cap1(base.replace(/_/g, ' ')), unit };
   }
 
@@ -229,7 +230,19 @@
     const { label, unit } = layerLabel(layerName);
     let h = `<div class="lh"><span class="lname">${esc(label || 'No layer')}</span><span class="lraw">${esc(layerName || '')}${info && info.name !== layerName ? ` · ramp ${esc(info.name)}` : ''}</span><span class="lunit">${esc(unit)}</span></div>`;
     if (!info) return h + '<div class="note">Loading the colours…</div>';
-    if (info.cat && info.labelled && info.classes.length <= 40) {
+    if (layerName === 'rivers' && !info.cat) {
+      // Rivers & lakes (core water_view.rs): the ramp is the river's colour by discharge (log10
+      // m³/s, ticks in m³/s); the other colours are in the ramp's `keys`.
+      const keys = info.ramp.keys || {}, span = info.hi - info.lo || 1;
+      const key = (c, t) => `<div title="${esc(t)}"><i style="background:${esc(c || '#888')}"></i><span>${esc(t)}</span></div>`;
+      h += `<div class="cats">${key(keys.lake, 'Lake')}${key(keys.land, 'Land')}${key(keys.sea, 'Sea')}</div>`;
+      h += `<canvas class="bar" data-ramp="${esc(info.name)}" data-target="${target}"></canvas><div class="ticks">`;
+      h += [2, 10, 100, 1000].map((q, i) => `<span style="left:${(100 * (Math.log10(q) - info.lo) / span).toFixed(2)}%;transform:${i ? 'translateX(-50%)' : 'none'}">${fmtInt(q)}</span>`).join('');
+      h += '</div>';
+      if (info.comment) h += `<div class="note">${esc(info.comment)}</div>`;
+      return h;
+    }
+    if (info.cat && info.labelled && info.classes.length <= 64) {
       // A key: swatches with their labels, wider columns for long labels, under the ramp's group
       // headings when it has them (the satellite view's land, snow and ice, sea).
       const wide = info.classes.some(k => String(k.label ?? '').length > 11);
@@ -698,11 +711,14 @@
     if (!has || p.cur < 0 || !r.frames[p.cur]) { p.clock.innerHTML = ''; badge(p); drawGrid(p); p.frame.classList.remove('loading'); return; }
     const f = r.frames[p.cur];
     const dn = displayIndex(r, p.cur), fd = r.frames[dn];
-    const img = r.image(dn);
+    const dli = r.layerIndex(fd), dinfo = rampInfo(fd.ramps && fd.ramps[dli]);
+    // Rock at depth (sections.js): below the surface the bake's slice replaces the frame's image
+    // ('wait' while it loads: the previous picture stays).
+    const sl = window.DTSections ? DTSections.slice(r, dinfo && dinfo.name) : null;
+    const img = sl === 'wait' ? null : (sl || r.image(dn));
     if (ready(img)) p.drawn = img;
     p.frame.classList.toggle('loading', !ready(img));
     // Continuous layers upscale smoothly; categorical ones (plates, Köppen, rock) keep hard edges.
-    const dli = r.layerIndex(fd), dinfo = rampInfo(fd.ramps && fd.ramps[dli]);
     ctx.imageSmoothingEnabled = !!dinfo && !dinfo.cat && c.width > fd.w * 1.2;
     ctx.imageSmoothingQuality = 'high';
     if (p.drawn) ctx.drawImage(p.drawn, 0, 0, c.width, c.height);
@@ -752,6 +768,7 @@
     }
     const box = p.drag && p.drag.box ? p.drag.box : p.boxLL;
     if (box) drawBox(p, box, !!(p.drag && p.drag.box));
+    if (window.DTSections) DTSections.draw(p, ctx, dpr);   // the section line, and the badge of a slice
     // The clock.
     const { label: ln } = layerLabel(layer);
     let sub = `${esc(stageText(f.stage))} · step ${f.n + 1}`;
@@ -856,11 +873,39 @@
     const q = (py * pix.w + px) * 4;
     const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
     if (pix.d[q + 3] === 0) return { name, rgb, nodata: true };
+    if (info && info.name === 'rivers') return { name, info, ...riversRead(pix, px, py, info) };
     return { name, rgb, info, val: valueAt(info, rgb) };
+  }
+  // The Rivers & lakes layer (core water_view.rs): a river is a pixel on the ramp (log10 of its
+  // discharge), a lake one of the ramp's lake key colour; rivers are a pixel or two wide, so the
+  // pointer reads the strongest water within a pixel of it.
+  function riversRead(pix, px, py, info) {
+    const lake = hexRgb((info.ramp.keys && info.ramp.keys.lake) || '#5cc0ea');
+    let best = null;
+    for (let k = 0; k < 9; k++) {
+      const dx = k === 0 ? 0 : [-1, 0, 1, -1, 1, -1, 0, 1][k - 1], dy = k === 0 ? 0 : [-1, -1, -1, 0, 0, 1, 1, 1][k - 1];
+      const x = (px + dx + pix.w) % pix.w, y = clamp(py + dy, 0, pix.h - 1), q = (y * pix.w + x) * 4;
+      if (pix.d[q + 3] === 0) continue;
+      const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
+      let w = null;
+      if (dist2(rgb, lake) < 150) w = { kind: 'lake', v: Infinity };
+      else { const r = valueAt(info, rgb); if (r && !r.far) w = { kind: 'river', v: r.v }; }
+      if (w && (!best || w.v > best.w.v)) best = { w, rgb };
+      if (k === 0 && w) break;   // the pixel under the pointer is water: that is the answer
+    }
+    return best ? { rgb: best.rgb, water: best.w } : { rgb: [pix.d[(py * pix.w + px) * 4], pix.d[(py * pix.w + px) * 4 + 1], pix.d[(py * pix.w + px) * 4 + 2]], water: null };
+  }
+  function riverFlowText(logq) {
+    const q = 10 ** logq;
+    if (q < 10) return q.toFixed(1);
+    if (q < 100) return String(Math.round(q));
+    const p = 10 ** (Math.floor(Math.log10(q)) - 1);
+    return fmtInt(Math.round(q / p) * p);
   }
   function valueText(s) {
     if (!s) return '';
     if (s.nodata) return 'no data';
+    if (s.water !== undefined) return s.water ? (s.water.kind === 'lake' ? 'lake' : `river (~${riverFlowText(s.water.v)} m³/s)`) : '';
     if (!s.val) return '';
     // The satellite view is true colour, so the nearest key colour is only what the spot looks like.
     if (s.val.cls && s.info && s.info.name === 'satellite') return `looks like ${(s.val.cls.label || '').toLowerCase()}`;
@@ -924,6 +969,7 @@
         Stage2.preview(r, f, { x0, z0, x1, z1 }, { north: b.north, south: b.south, west: b.west, east: b.east }, b.text);
         return;
       }
+      if (tool === 'section') { if (window.DTSections) DTSections.click(p, r, lat, lon); return; }
       if (tool === 'inspect') {
         G.lon0 = lon; G.lat0 = clamp(lat, -80, 80); G.spin = false; spinButton(); globeDirty = true;
         pin = { pane: p.i, lat, lon }; mapDirty = true;
@@ -1425,7 +1471,7 @@
       name = f.layers[li]; info = rampInfo(f.ramps && f.ramps[li]);
     } else if (r && layer) info = rampInfo(r.rampOf.get(layer));
     if (!name) { el.innerHTML = '<div class="lh"><span class="lname muted">No layer yet</span></div>'; return; }
-    const key = `${name}|${info ? info.name : ''}|${el.clientWidth}`;
+    const key = `${name}|${info ? info.name : ''}|${el.clientWidth}|${info && info.labelled ? 1 : 0}`;
     if (el.dataset.key !== key) { el.dataset.key = key; el.innerHTML = legendHTML(name, info, 'side'); paintLegendBars(el); const n = el.querySelector('.note'); if (n) n.title = 'Click to read all'; }
     if (TV) { const t = $('tv-legend'); if (t.dataset.key !== key) { t.dataset.key = key; t.innerHTML = legendHTML(name, info, 'tv'); paintLegendBars(t); } }
   }
@@ -1551,7 +1597,7 @@
     const none = !r || !r.frames.length;
     for (const id of ['rewind', 'back', 'play', 'fwd', 'livebtn', 'slower', 'faster']) $(id).disabled = none;
     if (none) { lb.classList.remove('on'); $('livetext').textContent = 'Live'; }
-    for (const t of ['select', 'inspect', 'area']) $(`tool-${t}`).setAttribute('aria-pressed', String(tool === t));
+    for (const t of ['select', 'inspect', 'area', 'section']) $(`tool-${t}`).setAttribute('aria-pressed', String(tool === t));
     for (const b of document.querySelectorAll('.s2-tool')) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
     $('markers').setAttribute('aria-pressed', String(markersOn));
     $('gridbtn').setAttribute('aria-pressed', String(gridOn));
@@ -1691,7 +1737,7 @@
   let selectedEvent = null, pin = null;
   function setITab(name, reveal) {
     for (const b of document.querySelectorAll('[data-itab]')) b.setAttribute('aria-selected', String(b.dataset.itab === name));
-    for (const k of ['events', 'details', 's2', 'run']) $(`ip-${k}`).hidden = k !== name;
+    for (const k of ['events', 'details', 's2', 'section', 'run']) $(`ip-${k}`).hidden = k !== name;
     store.set('itab', name);
     // Something new to read there: bring the inspector into view on a short screen.
     if (reveal && !narrow.matches && !TV) {
@@ -2042,6 +2088,7 @@
     hint.hidden = t === 'select' || TV;
     if (t === 'inspect') hint.innerHTML = `${ic('crosshair')}Click a column to inspect it <span class="dim">· from the run's bake</span><button class="btn btn-ghost btn-sm" data-tool="select">Done <kbd>Esc</kbd></button>`;
     if (t === 'area') hint.innerHTML = `${ic('box')}Drag a box, or click for 256 × 256 blocks <span class="dim">· 1–2 min</span><button class="btn btn-ghost btn-sm" data-tool="select">Done <kbd>Esc</kbd></button>`;
+    if (window.DTSections) DTSections.tool(t, hint);   // the section tool words its own hint
     for (const p of panes) p.drag = null;
     mapDirty = true;
     buttons();
@@ -2146,6 +2193,7 @@
     else if (k === 'v') setTool('select');
     else if (k === 'i') setTool('inspect');
     else if (k === 'b') setTool('area');
+    else if (k === 's') setTool('section');
     else if (k === '[') setRate(-1);
     else if (k === ']') setRate(1);
     else if (k === '?') help();
@@ -2238,7 +2286,7 @@
     modal('Keyboard shortcuts', `<div class="keys">${[
       K(['Space'], 'Play or pause'), K(['←', '→'], 'One step back or forward (Shift: ten)'), K(['Home'], 'Back to the start'),
       K(['L'], 'Follow the run live (End too)'), K(['[', ']'], 'Slower, faster'), K(['1', '…', '9'], 'Layers in the order they appeared'), K(['↑', '↓'], 'Previous or next layer'),
-      K(['V'], 'Select tool: events and point values'), K(['I'], 'Inspect a column in 3D'), K(['B'], 'Preview an area in 3D'),
+      K(['V'], 'Select tool: events and point values'), K(['I'], 'Inspect a column in 3D'), K(['B'], 'Preview an area in 3D'), K(['S'], 'Cross-section: click two points'),
       K(['C'], 'Compare two runs'), K(['M'], 'Event markers on or off'), K(['D'], 'Deposits on or off'), K(['G'], 'Spin the globe'), K(['E'], 'Runs and editor'),
       K(['F'], 'Full screen'), K(['Esc'], 'Back to Select; clear the box and pin'), K(['?'], 'This list'),
     ].join('')}</div>`, '', true);
@@ -2864,6 +2912,19 @@
     runhead(); runInfo();
     for (const p of panes) paneHead(p);
   });
+  // What the add-on scripts (loaded after this file) use of the page: sections.js (rock at depth, the
+  // section tool) and worldmap.js (the "Final world" view).
+  window.DTWB = {
+    $, esc, ic, clamp, fmtInt, api, store, toast, modal, closeModal, niceTicks, rampInfo, rampOfLayer, layerLabel, latLonText,
+    latText, lonText, runName,
+    panes, blockXZ, circ, llToCanvas, mapLatLon, setTool, setITab, setMTab,
+    focused: P, layer: () => layer, tool: () => tool, narrow: () => narrow.matches,
+    redraw() { mapDirty = globeDirty = true; },
+    legend() { legendDirty = true; },
+    pane(i) { return panes[i]; },
+    focusedRun: () => P().run,
+    preview(run, box, latLon, size) { return Stage2.preview(run, run.frames[run.frames.length - 1] || { n: 0, t: 0 }, box, latLon, size); },
+  };
   buttons();
   stageEmpty();
   poll();

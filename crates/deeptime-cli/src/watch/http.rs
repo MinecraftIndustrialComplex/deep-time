@@ -26,6 +26,10 @@
 //!   `/api/runs/<id>/frames/<n>/<layer index>.png` (encoded on first request, cached in the run's
 //!   `frames/`), `/api/runs/<id>/deposits` (the deposit sites the overlay draws, from the world in
 //!   memory while the run goes on and from the finished run's `sites/` and `bodies/`; `deposits.rs`)
+//! - `GET /api/runs/<id>/rock[/slice.png|/section]`, `/sections.js`: the rock at a depth below the
+//!   surface and cross-sections, read from the run's bake ([`super::sections`])
+//! - the final world map: `GET /api/runs/<id>/world.json`, `…/world/sample?x=&z=` and
+//!   `…/tiles/<layer>/<z>/<x>/<y>.png` ([`super::tiles`]), `/worldmap.js`
 //! - stage 2 (P1-20): with `--preview`, `POST /api/preview`, `GET /api/preview/…`,
 //!   `GET /api/inspect` and `GET /area3d/…` go to tools/workbench/preview.py ([`super::stage2`]).
 //!   Without it: `POST /api/preview` (a box of a run's world →
@@ -452,6 +456,15 @@ fn get(app: &App, req: &Request) -> Response {
     if let Some(r) = stage2(app, req) {
         return r;
     }
+    // Rock at depth and sections, read from a run's bake (sections/).
+    if let Some(r) = super::sections::route(&app.wb, &req.path, &req.query) {
+        return Response {
+            status: r.status,
+            content_type: r.content_type,
+            cache: r.cache,
+            body: r.body,
+        };
+    }
     let path = req.path.as_str();
     match path {
         "/" | "/index.html" => Response::ok(
@@ -468,6 +481,11 @@ fn get(app: &App, req: &Request) -> Response {
             "text/javascript; charset=utf-8",
             NO_CACHE,
             deeptime_viewer::DEPOSITS_JS.as_bytes().to_vec(),
+        ),
+        "/worldmap.js" => Response::ok(
+            "text/javascript; charset=utf-8",
+            NO_CACHE,
+            deeptime_viewer::WORLDMAP_JS.as_bytes().to_vec(),
         ),
         "/ramps.json" => Response::ok(
             "application/json",
@@ -513,6 +531,14 @@ fn get(app: &App, req: &Request) -> Response {
                     "no-store",
                     run.deposits_answer().to_vec(),
                 );
+            }
+            if let Some(a) = super::tiles::route(&run.dir, tail, &req.query) {
+                return Response {
+                    status: a.status,
+                    content_type: a.content_type,
+                    cache: a.cache,
+                    body: a.body,
+                };
             }
             match tail.strip_prefix("frames/") {
                 Some(f) => frame_png(&run, f),

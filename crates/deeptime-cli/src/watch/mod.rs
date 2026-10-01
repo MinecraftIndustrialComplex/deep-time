@@ -32,7 +32,10 @@ mod editor;
 mod http;
 mod live;
 mod runs;
+mod sections;
 pub mod stage2;
+mod tiles;
+mod worldmap;
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
