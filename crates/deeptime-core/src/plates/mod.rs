@@ -265,10 +265,19 @@ impl PlatesStage {
             .samples
             .par_iter()
             .filter(|s| !s.is_hidden() && s.kind == state::CONTINENTAL)
-            .fold(|| (0u64, 0u64), |(a, n), s| (a + u64::from(s.elevation_m >= cap), n + 1))
+            .fold(
+                || (0u64, 0u64),
+                |(a, n), s| (a + u64::from(s.elevation_m >= cap), n + 1),
+            )
             .reduce(|| (0, 0), |x, y| (x.0 + y.0, x.1 + y.1));
-        *world.globals.entry(CAP_BOUND_GLOBAL.to_owned()).or_insert(0.0) += at_cap as f64;
-        *world.globals.entry(CONTINENTAL_GLOBAL.to_owned()).or_insert(0.0) += continental as f64;
+        *world
+            .globals
+            .entry(CAP_BOUND_GLOBAL.to_owned())
+            .or_insert(0.0) += at_cap as f64;
+        *world
+            .globals
+            .entry(CONTINENTAL_GLOBAL.to_owned())
+            .or_insert(0.0) += continental as f64;
         let last = self.done >= self.total;
         let margin_every = (MARGIN_EVERY_MYR / env.dt_myr).round().max(1.0) as u64;
         if last || step.is_multiple_of(margin_every) {

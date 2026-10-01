@@ -228,8 +228,14 @@ mod tests {
         // Only the corners of the same crust count; none of them, no value.
         let h = grid.h as usize;
         assert_eq!(bilinear_same(w, h, &v, 19.5, 10.0, |_| true), Some(19.5));
-        assert_eq!(bilinear_same(w, h, &v, 19.5, 10.0, |c| c % w == 19), Some(19.0));
-        assert_eq!(bilinear_same(w, h, &v, 19.5, 10.0, |c| c % w == 20), Some(20.0));
+        assert_eq!(
+            bilinear_same(w, h, &v, 19.5, 10.0, |c| c % w == 19),
+            Some(19.0)
+        );
+        assert_eq!(
+            bilinear_same(w, h, &v, 19.5, 10.0, |c| c % w == 20),
+            Some(20.0)
+        );
         assert_eq!(bilinear_same(w, h, &v, 19.5, 10.0, |_| false), None);
         // A corner with no weight does not make the crust "the same".
         assert_eq!(bilinear_same(w, h, &v, 19.0, 10.0, |c| c % w == 20), None);
@@ -278,7 +284,10 @@ mod tests {
         };
         let (z, foreign) = carry(&plate, &plate, &[None, None]);
         assert_eq!(foreign, h as u64, "column 7 of every row");
-        assert_eq!(z[7], 9000.0, "the margin's own elevation, not 9 km + 4 km of fill");
+        assert_eq!(
+            z[7], 9000.0,
+            "the margin's own elevation, not 9 km + 4 km of fill"
+        );
         assert_eq!(z[6], -2000.0);
         assert_eq!(z[8], 9000.0);
         assert_eq!(z[3], -1000.0, "the same crust, lifted 1 km");
