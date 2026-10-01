@@ -241,6 +241,94 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
         .map(|st| deeptime_core::plates::stats::summary(st).line())
 }
 
+/// The continental margins over the run (P1-27, `notes.plates.margins`): the mean shares by
+/// setting over the record after the first 100 Myr (the start's own margins are not the model's),
+/// the last record, and the series of active / passive shares.
+pub(crate) fn margins_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note: Value = serde_json::from_str(world.notes.get("plates")?).ok()?;
+    let list = note["margins"].as_array()?;
+    let rec: Vec<deeptime_core::plates::stats::Margins> = list
+        .iter()
+        .filter_map(|v| serde_json::from_value(v.clone()).ok())
+        .collect();
+    let (first, last) = (rec.first()?, rec.last()?);
+    let after: Vec<_> = rec
+        .iter()
+        .filter(|m| m.t_myr - first.t_myr >= 90.0)
+        .collect();
+    let pool = if after.is_empty() {
+        rec.iter().collect()
+    } else {
+        after
+    };
+    let mean = |f: &dyn Fn(&deeptime_core::plates::stats::Margins) -> f64| {
+        pool.iter().map(|m| f(m)).sum::<f64>() / pool.len() as f64
+    };
+    let andean =
+        |m: &deeptime_core::plates::stats::Margins| f64::from(m.andean) / f64::from(m.coast.max(1));
+    let initiated = |m: &deeptime_core::plates::stats::Margins| {
+        f64::from(m.initiated) / f64::from(m.coast.max(1))
+    };
+    let ratio = |a: u32, b: u32| f64::from(a) / f64::from(b.max(1));
+    let at_boundary = mean(&|m| ratio(m.at_boundary, m.coast));
+    let front_km = mean(&|m| {
+        if m.front_km_p50.is_finite() {
+            m.front_km_p50
+        } else {
+            0.0
+        }
+    });
+    let front_cont = mean(&|m| ratio(m.front_over_continental, m.front_over));
+    let front_len = mean(&|m| f64::from(m.front_over) / f64::from(m.coast.max(1)));
+    let fragment_crust = mean(&|m| m.fragment_crust_share);
+    let fragment_coast = mean(&|m| ratio(m.fragment_coast, m.coast + m.fragment_coast));
+    let floor: Vec<f64> = pool
+        .iter()
+        .map(|m| m.passive_floor_age_p50_myr)
+        .filter(|a| a.is_finite())
+        .collect();
+    let series: Vec<String> = rec
+        .iter()
+        .map(|m| {
+            format!(
+                "{:.0}:{:.2}/{:.2}",
+                m.t_myr,
+                m.active_share(),
+                m.passive_share()
+            )
+        })
+        .collect();
+    Some(format!(
+        "margins records={} active_mean={:.3} subduction_mean={:.3} andean_mean={:.3} \
+         initiated_mean={:.3} boundary_mean={:.3} passive_mean={:.3} regime_active_mean={:.3} \
+         passive_floor_age_p50_mean={:.1} at_boundary_mean={:.3} front_km_p50_mean={:.0} \
+         front_continental_mean={:.3} front_per_coast_mean={:.3} fragment_crust_mean={:.3} \
+         fragment_coast_mean={:.3} final_landmasses={} final_active={:.3} \
+         final_passive={:.3} final_coast_km={:.0} reversals={} series(t:active/passive)={}",
+        rec.len(),
+        mean(&|m| m.active_share()),
+        mean(&|m| m.subduction_share()),
+        mean(&andean),
+        mean(&initiated),
+        mean(&|m| m.boundary_share()),
+        mean(&|m| m.passive_share()),
+        mean(&|m| m.regime_active_share()),
+        floor.iter().sum::<f64>() / floor.len().max(1) as f64,
+        at_boundary,
+        front_km,
+        front_cont,
+        front_len,
+        fragment_crust,
+        fragment_coast,
+        last.landmasses,
+        last.active_share(),
+        last.passive_share(),
+        last.coast_km,
+        last.reversals,
+        series.join(",")
+    ))
+}
+
 /// The surface's summary line (P1-04): `surface_final=<steps> land_frac=… sediment_km3=… …`,
 /// when the world has a surface.
 pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -666,6 +754,8 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
     let lines = s.with_world(|world| {
         let mut lines: Vec<String> = [
             plates_line(world),
+            margins_line(world),
+            deeptime_core::provinces::coherence_line(world),
             surface_line(world),
             glacial_line(world),
             climate_line(world),
@@ -840,6 +930,12 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
             "deeptime stage {}: {line} steps={timing} seconds={seconds:.3}",
             o.name
         );
+    }
+    if let Some(line) = margins_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = deeptime_core::provinces::coherence_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = surface_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);

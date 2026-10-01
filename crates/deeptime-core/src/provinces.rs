@@ -26,9 +26,9 @@
 //!    `plates/orogeny_age_myr`); or a range an Andean orogeny lifted to over 1.5 km within the
 //!    last 50 Myr (`surface/elevation_m`). Andean orogeny alone is not enough: the plate model
 //!    stamps every cell within the subduction distance of a trench.
-//! 4. **Extended crust**: continental crust in a rift or on a passive margin (`regime`), or
-//!    thinned below 20 km (`plates/thickness_m`): rifts, the Basin-and-Range kind of province and
-//!    the thinned margins.
+//! 4. **Extended crust**: continental crust in a rift (`regime`) or thinned below 20 km
+//!    (`plates/thickness_m`): rifts, the Basin-and-Range kind of province; and, after the rules,
+//!    the rifted margins: a band `rifted_margin_deg` wide along every quiet coast ([`rifted_margins`]).
 //! 5. **Basin**: continental crust under at least 3 km of sediment and sedimentary rock (the
 //!    strata log `surface/sediment_m` or the plate model's sediment pools, whichever is thicker),
 //!    or subsiding at over 0.03 mm/yr (`plates/uplift_mm_yr`) under at least 1 km.
@@ -39,12 +39,16 @@
 //!    basin's.
 //!
 //! The continental classes are then generalised like a printed map ([`generalise`]): a cell takes
-//! the majority class of the continental cells around it, so single-cell specks vanish.
+//! the majority class of the continental cells within half the map's smallest feature
+//! (`feature_deg`, the USGS map's 150 km), and continental patches smaller than that feature
+//! squared take the sea floor's class around them ([`drop_specks`]; island-arc specks).
 //!
 //! Continental crust has no formation age in the plate model, only its last orogeny; whatever no
 //! rule 3 caught is taken to be old (Precambrian) crust.
 
 use deeptime_format::ParamValue;
+
+use deeptime_format::GridDesc;
 
 use crate::plates::state::regime;
 use crate::world::{Field, WorldState};
@@ -101,6 +105,15 @@ pub struct Rules {
     pub andean_min_elevation_m: f32,
     /// Continental crust thinner than this is extended, m.
     pub thinned_crust_m: f32,
+    /// A passive (rifted) margin is extended crust this far in from the continent's edge,
+    /// degrees of arc (P1-27; 1.35° is 150 km on an Earth-sized sphere, the thinned crust under
+    /// the shelf and slope; the plate model's one-sample `passive_margin` regime made a dashed
+    /// line instead).
+    pub rifted_margin_deg: f32,
+    /// The smallest feature the map shows, degrees of arc (the USGS map's 150 km, 1.35°): the
+    /// generalisation looks half as far, and continental crust in a patch smaller than this
+    /// squared (an island-arc speck) takes the sea floor's class around it.
+    pub feature_deg: f32,
     /// A basin holds at least this much sediment and sedimentary rock, m …
     pub basin_cover_m: f32,
     /// … or at least [`Rules::subsiding_cover_m`] while sinking faster than this, mm/yr.
@@ -124,6 +137,8 @@ impl Default for Rules {
             andean_max_age_myr: 50.0,
             andean_min_elevation_m: 1500.0,
             thinned_crust_m: 20_000.0,
+            rifted_margin_deg: 1.35,
+            feature_deg: 1.35,
             basin_cover_m: 3_000.0,
             subsiding_mm_yr: 0.03,
             subsiding_cover_m: 1_000.0,
@@ -185,10 +200,7 @@ pub fn classify(c: &Cell, lip_min_m: Option<f32>, r: &Rules) -> u8 {
     if c.regime == regime::COLLISION || c.regime == regime::ARC || collision_belt || andean_range {
         return OROGEN;
     }
-    if c.regime == regime::RIFT
-        || c.regime == regime::PASSIVE_MARGIN
-        || c.thickness_m < r.thinned_crust_m
-    {
+    if c.regime == regime::RIFT || c.thickness_m < r.thinned_crust_m {
         return EXTENDED;
     }
     if c.cover_m >= r.basin_cover_m
@@ -259,6 +271,158 @@ pub fn lip_min_m(world: &WorldState, r: &Rules) -> Option<f32> {
 /// model's crust type, regime and age are not there yet.
 pub fn derive(world: &WorldState) -> Option<Field> {
     let r = Rules::default();
+    let (cells, lip, grid) = cells(world, &r)?;
+    let raw: Vec<f32> = cells
+        .iter()
+        .map(|c| c.map_or(f32::NAN, |c| f32::from(classify(&c, lip, &r))))
+        .collect();
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    if w * h != raw.len() {
+        return Some(Field { grid, data: raw });
+    }
+    let cell_deg = 360.0 / w as f32;
+    let regimes: Vec<u8> = cells
+        .iter()
+        .map(|c| c.map_or(u8::MAX, |c| c.regime))
+        .collect();
+    let banded = rifted_margins(
+        &raw,
+        &regimes,
+        w,
+        h,
+        (r.rifted_margin_deg / cell_deg).round() as usize,
+    );
+    let radius = ((0.5 * r.feature_deg / cell_deg).round() as usize).max(GENERALISE_CELLS);
+    let general = generalise(&banded, w, h, radius);
+    let min_cells = ((r.feature_deg / cell_deg).powi(2)).round() as usize;
+    Some(Field {
+        grid,
+        data: drop_specks(&general, w, h, min_cells),
+    })
+}
+
+/// Continental cells within `cells` (4-neighbour steps over continental cells) of the sea floor
+/// whose class is a craton's (shield, platform, basin) and whose regime is not orogenic (no arc,
+/// back-arc, collision or trench near) become extended crust: the rifted margins as a continuous
+/// band (P1-27).
+pub fn rifted_margins(
+    classes: &[f32],
+    regimes: &[u8],
+    w: usize,
+    h: usize,
+    cells: usize,
+) -> Vec<f32> {
+    let continental = |v: f32| v.is_finite() && (v as u8) <= EXTENDED;
+    let mut out = classes.to_vec();
+    if cells == 0 {
+        return out;
+    }
+    let mut dist = vec![usize::MAX; w * h];
+    let mut queue = std::collections::VecDeque::new();
+    let neighbours = |p: usize| {
+        let (i, j) = (p % w, p / w);
+        let mut nb = [usize::MAX; 4];
+        nb[0] = j * w + (i + 1) % w;
+        nb[1] = j * w + (i + w - 1) % w;
+        if j > 0 {
+            nb[2] = (j - 1) * w + i;
+        }
+        if j + 1 < h {
+            nb[3] = (j + 1) * w + i;
+        }
+        nb
+    };
+    for p in 0..w * h {
+        if continental(classes[p])
+            && neighbours(p)
+                .iter()
+                .any(|&q| q != usize::MAX && classes[q].is_finite() && !continental(classes[q]))
+        {
+            dist[p] = 1;
+            queue.push_back(p);
+        }
+    }
+    while let Some(p) = queue.pop_front() {
+        if dist[p] >= cells {
+            continue;
+        }
+        for q in neighbours(p) {
+            if q != usize::MAX && dist[q] == usize::MAX && continental(classes[q]) {
+                dist[q] = dist[p] + 1;
+                queue.push_back(q);
+            }
+        }
+    }
+    for p in 0..w * h {
+        let cratonic =
+            matches!(classes[p] as u8, SHIELD | PLATFORM | BASIN) && classes[p].is_finite();
+        let quiet = matches!(
+            regimes[p],
+            regime::CRATON | regime::PASSIVE_MARGIN | regime::RIFT | regime::HOTSPOT
+        );
+        if dist[p] <= cells && cratonic && quiet {
+            out[p] = f32::from(EXTENDED);
+        }
+    }
+    out
+}
+
+/// Continental patches (any continental class, 4-neighbour, x wraps) smaller than `min_cells`
+/// take the commonest sea-floor class along their edge: below the map's smallest feature an
+/// island-arc speck is not drawn (the USGS map generalises to 150 km).
+pub fn drop_specks(classes: &[f32], w: usize, h: usize, min_cells: usize) -> Vec<f32> {
+    let continental = |v: f32| v.is_finite() && (v as u8) <= EXTENDED;
+    let mut out = classes.to_vec();
+    let mut seen = vec![false; w * h];
+    let mut stack = Vec::new();
+    for start in 0..w * h {
+        if seen[start] || !continental(classes[start]) {
+            continue;
+        }
+        let mut members = Vec::new();
+        let mut sea = [0usize; CLASSES.len()];
+        seen[start] = true;
+        stack.push(start);
+        while let Some(p) = stack.pop() {
+            members.push(p);
+            let (i, j) = (p % w, p / w);
+            let mut nb = vec![j * w + (i + 1) % w, j * w + (i + w - 1) % w];
+            if j > 0 {
+                nb.push((j - 1) * w + i);
+            }
+            if j + 1 < h {
+                nb.push((j + 1) * w + i);
+            }
+            for q in nb {
+                let v = classes[q];
+                if continental(v) {
+                    if !seen[q] {
+                        seen[q] = true;
+                        stack.push(q);
+                    }
+                } else if v.is_finite() {
+                    sea[v as usize] += 1;
+                }
+            }
+        }
+        if members.len() >= min_cells {
+            continue;
+        }
+        if let Some(k) = (0..CLASSES.len())
+            .filter(|&k| sea[k] > 0)
+            .max_by_key(|&k| (sea[k], std::cmp::Reverse(k)))
+        {
+            for p in members {
+                out[p] = k as f32;
+            }
+        }
+    }
+    out
+}
+
+/// What the classifier reads of every L1 cell (`None` where the plate model has nothing), the
+/// pile a LIP needs and the grid.
+fn cells(world: &WorldState, r: &Rules) -> Option<(Vec<Option<Cell>>, Option<f32>, GridDesc)> {
     let regime_f = world.fields.get("regime")?;
     let n = regime_f.data.len();
     let get = |name: &str| {
@@ -285,13 +449,13 @@ pub fn derive(world: &WorldState) -> Option<Field> {
         .iter()
         .map(|c| c.source_family != 2)
         .collect();
-    let lip = lip_min_m(world, &r);
+    let lip = lip_min_m(world, r);
     let at = |v: Option<&[f32]>, c: usize| v.map_or(f32::NAN, |v| v[c]);
-    let raw: Vec<f32> = (0..n)
+    let cells: Vec<Option<Cell>> = (0..n)
         .map(|c| {
             let continental = kind[c] >= 0.5;
             if !regime_f.data[c].is_finite() || (!continental && !age[c].is_finite()) {
-                return f32::NAN;
+                return None;
             }
             let pools = at(sediment_pool, c) + at(sedimentary_pool, c);
             let cover = match (log.map(|l| l[c]), pools.is_finite()) {
@@ -327,19 +491,147 @@ pub fn derive(world: &WorldState) -> Option<Field> {
                         .flatten()
                 }),
             };
-            f32::from(classify(&cell, lip, &r))
+            Some(cell)
         })
         .collect();
-    let (w, h) = (regime_f.grid.w as usize, regime_f.grid.h as usize);
-    let data = if w * h == n {
-        generalise(&raw, w, h, GENERALISE_CELLS)
-    } else {
-        raw
-    };
-    Some(Field {
-        grid: regime_f.grid.clone(),
-        data,
-    })
+    Some((cells, lip, regime_f.grid.clone()))
+}
+
+/// Why continental cells are orogens (before the generalisation), by the first rule that makes
+/// them one: an active arc or collision (`regime`), a collision belt from the last
+/// `orogen_max_age_myr`, an Andean range; and how many continental cells there are.
+pub fn orogen_reasons(world: &WorldState) -> Option<[usize; 4]> {
+    let r = Rules::default();
+    let (cells, lip, _) = cells(world, &r)?;
+    let mut out = [0usize; 4];
+    for c in cells.iter().flatten().filter(|c| c.continental) {
+        out[3] += 1;
+        if classify(c, lip, &r) != OROGEN {
+            continue;
+        }
+        if c.regime == regime::COLLISION || c.regime == regime::ARC {
+            out[0] += 1;
+        } else if c.orogeny == HIMALAYAN && c.orogeny_age_myr < r.orogen_max_age_myr {
+            out[1] += 1;
+        } else {
+            out[2] += 1;
+        }
+    }
+    Some(out)
+}
+
+/// Same-class patches smaller than this many cells are specks (P1-27; about 40,000 km² at 1024
+/// columns on an Earth-sized planet).
+pub const SPECK_CELLS: usize = 25;
+
+/// How coherent the continental provinces are (P1-27, "large coherent cratons with platform
+/// cover"): the continental classes' shares (true area), the share of neighbouring continental
+/// cell pairs whose classes differ (edge density: low for broad provinces, high for a mosaic), and
+/// the share of continental cells in same-class patches smaller than [`SPECK_CELLS`].
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Coherence {
+    pub continental_cells: usize,
+    /// Shield, platform, orogen, basin, LIP, extended, as shares of the continental area.
+    pub shares: [f64; 6],
+    pub edge_density: f64,
+    pub speck_share: f64,
+}
+
+/// [`Coherence`] of a `provinces` layer on a W × H grid (rows from the north pole).
+pub fn coherence(classes: &[f32], w: usize, h: usize) -> Coherence {
+    let continental = |v: f32| v.is_finite() && (v as u8) <= EXTENDED;
+    let mut c = Coherence::default();
+    let mut area = 0.0;
+    let (mut pairs, mut differ) = (0usize, 0usize);
+    for j in 0..h {
+        let lat = std::f64::consts::PI * (0.5 - (j as f64 + 0.5) / h as f64);
+        let wgt = lat.cos();
+        for i in 0..w {
+            let v = classes[j * w + i];
+            if !continental(v) {
+                continue;
+            }
+            c.continental_cells += 1;
+            c.shares[v as usize] += wgt;
+            area += wgt;
+            for (ii, jj) in [((i + 1) % w, j), (i, j + 1)] {
+                if jj < h && continental(classes[jj * w + ii]) {
+                    pairs += 1;
+                    if classes[jj * w + ii] != v {
+                        differ += 1;
+                    }
+                }
+            }
+        }
+    }
+    for x in &mut c.shares {
+        *x /= area.max(1e-12);
+    }
+    c.edge_density = differ as f64 / pairs.max(1) as f64;
+    // Same-class patches (4-neighbour, x wraps).
+    let mut seen = vec![false; w * h];
+    let mut specks = 0usize;
+    let mut stack = Vec::new();
+    for start in 0..w * h {
+        if seen[start] || !continental(classes[start]) {
+            continue;
+        }
+        let k = classes[start];
+        let mut members = 0usize;
+        seen[start] = true;
+        stack.push(start);
+        while let Some(p) = stack.pop() {
+            members += 1;
+            let (i, j) = (p % w, p / w);
+            let mut nb = vec![j * w + (i + 1) % w, j * w + (i + w - 1) % w];
+            if j > 0 {
+                nb.push((j - 1) * w + i);
+            }
+            if j + 1 < h {
+                nb.push((j + 1) * w + i);
+            }
+            for q in nb {
+                if !seen[q] && classes[q] == k {
+                    seen[q] = true;
+                    stack.push(q);
+                }
+            }
+        }
+        if members < SPECK_CELLS {
+            specks += members;
+        }
+    }
+    c.speck_share = specks as f64 / c.continental_cells.max(1) as f64;
+    c
+}
+
+/// The coherence line of a world's provinces now (`None` without the plate fields).
+pub fn coherence_line(world: &WorldState) -> Option<String> {
+    let f = derive(world)?;
+    let (w, h) = (f.grid.w as usize, f.grid.h as usize);
+    if w * h != f.data.len() {
+        return None;
+    }
+    let c = coherence(&f.data, w, h);
+    let why = orogen_reasons(world).unwrap_or_default();
+    let of = |k: usize| why[k] as f64 / why[3].max(1) as f64;
+    Some(format!(
+        "provinces shield={:.3} platform={:.3} orogen={:.3} basin={:.3} lip={:.3} extended={:.3} \
+         edge_density={:.3} speck_share={:.3} continental_cells={} \
+         orogen_by(active/belt/andean)={:.3}/{:.3}/{:.3}",
+        c.shares[0],
+        c.shares[1],
+        c.shares[2],
+        c.shares[3],
+        c.shares[4],
+        c.shares[5],
+        c.edge_density,
+        c.speck_share,
+        c.continental_cells,
+        of(0),
+        of(1),
+        of(2)
+    ))
 }
 
 #[cfg(test)]
@@ -456,11 +748,13 @@ mod tests {
             ..land()
         };
         assert_eq!(k(&rift), EXTENDED);
+        // A passive-margin sample alone is no longer extended crust: the rifted margins are a
+        // band drawn after the rules (`rifted_margins`).
         let margin = Cell {
             regime: regime::PASSIVE_MARGIN,
             ..land()
         };
-        assert_eq!(k(&margin), EXTENDED);
+        assert_eq!(k(&margin), SHIELD);
         let thinned = Cell {
             thickness_m: 15_000.0,
             ..land()
@@ -587,14 +881,20 @@ mod tests {
         let before = world.clone();
         let f = derive(&world).unwrap();
         assert_eq!(world, before, "the derivation reads only");
-        assert_eq!(f.data[0], f32::from(BASIN));
+        let inland = (grid.h as usize / 2) * w + w / 4;
+        assert_eq!(f.data[inland], f32::from(BASIN));
+        assert_eq!(
+            f.data[0],
+            f32::from(BASIN),
+            "at 5.6° a cell, the 1.35° rifted margin is less than a cell"
+        );
         assert_eq!(f.data[n - 1], f32::from(OCEAN_MID));
         // A recorded LIP of 1.5 km makes 500 m of basalt on a continent, or 500 m above the
         // ordinary 2 km on the sea floor, a province; the sea floor's ordinary basalt is not.
         put(&mut world, "plates/pool/mafic_volcanic_m", 500.0, 2500.0);
         assert_eq!(
             f32::from(BASIN),
-            derive(&world).unwrap().data[0],
+            derive(&world).unwrap().data[inland],
             "no LIP event yet"
         );
         let e = world
@@ -606,7 +906,7 @@ mod tests {
             .param("thickness_m", 1500.0);
         world.emit(e).unwrap();
         let f = derive(&world).unwrap();
-        assert_eq!(f.data[0], f32::from(LIP));
+        assert_eq!(f.data[inland], f32::from(LIP));
         assert_eq!(f.data[n - 1], f32::from(LIP));
         put(&mut world, "plates/pool/mafic_volcanic_m", 0.0, 2000.0);
         assert_eq!(derive(&world).unwrap().data[n - 1], f32::from(OCEAN_MID));
@@ -631,5 +931,64 @@ mod tests {
             (0..CLASSES.len()).map(|k| ramp.rgba(k as f64)).collect();
         assert_eq!(colours.len(), CLASSES.len());
         assert_eq!(ramp.rgba(f64::NAN)[3], 0);
+    }
+
+    #[test]
+    fn rifted_margins_are_a_band_on_quiet_coasts_only() {
+        // 12 × 6: platform west of column 8, sea east of it; the northern half's coast is
+        // quiet (craton regime), the southern half's faces a trench (back-arc).
+        let (w, h) = (12, 6);
+        let mut c = vec![f32::from(OCEAN_OLD); w * h];
+        let mut reg = vec![regime::OCEAN_BASIN; w * h];
+        for j in 0..h {
+            for i in 0..8 {
+                c[j * w + i] = f32::from(PLATFORM);
+                reg[j * w + i] = if j < 3 {
+                    regime::CRATON
+                } else {
+                    regime::BACK_ARC
+                };
+            }
+            // The seam: column 0 borders column 11 (sea).
+        }
+        let b = rifted_margins(&c, &reg, w, h, 2);
+        for j in 0..3 {
+            assert_eq!(b[j * w + 7], f32::from(EXTENDED), "quiet coast, first cell");
+            assert_eq!(b[j * w + 6], f32::from(EXTENDED), "second cell");
+            assert_eq!(b[j * w + 5], f32::from(PLATFORM), "inland");
+            assert_eq!(b[j * w], f32::from(EXTENDED), "across the seam");
+        }
+        for j in 3..h {
+            assert_eq!(b[j * w + 7], f32::from(PLATFORM), "an active coast stays");
+        }
+        assert_eq!(b[11], f32::from(OCEAN_OLD), "the sea stays");
+    }
+
+    #[test]
+    fn specks_below_the_feature_size_go_to_the_sea() {
+        let (w, h) = (10, 6);
+        let mut c = vec![f32::from(OCEAN_MID); w * h];
+        // A 3-cell speck and a 12-cell landmass.
+        for p in [2 * w + 1, 2 * w + 2, 3 * w + 1] {
+            c[p] = f32::from(EXTENDED);
+        }
+        for j in 1..5 {
+            for i in 5..8 {
+                c[j * w + i] = f32::from(SHIELD);
+            }
+        }
+        let d = drop_specks(&c, w, h, 10);
+        assert_eq!(d[2 * w + 1], f32::from(OCEAN_MID));
+        assert_eq!(d[3 * w + 1], f32::from(OCEAN_MID));
+        assert_eq!(
+            d[2 * w + 6],
+            f32::from(SHIELD),
+            "a landmass at the feature size stays"
+        );
+        let co = coherence(&d, w, h);
+        assert_eq!(co.continental_cells, 12);
+        assert!((co.shares[SHIELD as usize] - 1.0).abs() < 1e-12);
+        assert_eq!(co.edge_density, 0.0);
+        assert_eq!(co.speck_share, 1.0, "12 cells is below SPECK_CELLS");
     }
 }

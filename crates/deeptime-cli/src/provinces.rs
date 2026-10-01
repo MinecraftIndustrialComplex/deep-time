@@ -43,6 +43,9 @@ pub fn run(input: &Path, out: &Path) -> Result<Vec<(String, f64)>, Box<dyn std::
         deeptime_core::keyframes::DEFAULT_SIZE,
     )
     .ok_or("nothing to draw")?;
+    if let Some(line) = provinces::coherence_line(&world) {
+        println!("{line}");
+    }
     let png = deeptime_viewer::encode_png(frame.w, frame.h, &frame.layers[0].1)?;
     std::fs::write(out, png)?;
     Ok(shares)

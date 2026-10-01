@@ -223,13 +223,13 @@ the step at which it happened unless stated.
 
 | Kind | Params | Magnitude | Causes |
 |---|---|---|---|
-| `plate_birth` | `plate`, `parent`, `origin` (`rift` or `subduction_initiation`), `area_km2`, `speed_mm_yr`; rifts add `continental_frac`, initiations `mean_ocean_age_myr` | area / average initial plate area | its `rift_onset` (rifts) |
-| `plate_death` | `plate`, `fate` (`consumed`: no crust left; `absorbed`: too small, merged), `absorbed_by` | 0 | the plate's last `subduction_onset` or the `collision` that took its crust, when known |
-| `rift_onset` | `plate` (the parent), `fragments`, `continental_frac`, `area_km2` | continental fraction | the `large_igneous_province` under the plate, when one boosted it |
+| `plate_birth` | `plate`, `parent`, `origin` (`rift` or `subduction_initiation`), `area_km2`, `speed_mm_yr`, `continental_frac` (near 0 for an initiation: it takes old oceanic crust and at most slivers stranded in it); initiations add `mean_ocean_age_myr` and `coast_split_km` (continental margin the split cut off its ocean, km) | area / average initial plate area | its `rift_onset` (rifts) |
+| `plate_death` | `plate`, `fate` (`consumed`: no crust left; `absorbed`: too small, merged; `sutured`: a continental collision welded it whole to `absorbed_by`), `absorbed_by` | 0 | the plate's last `subduction_onset` or the `collision` that took its crust, when known |
+| `rift_onset` | `plate` (the parent), `fragments`, `continental_frac`, `area_km2`, `coast_split_km` (continental margin the rift cut off its ocean, km) | continental fraction | the `large_igneous_province` under the plate, when one boosted it |
 | `ridge_birth` | `plate_a`, `plate_b`, `spreading_mm_yr`, `new_samples` (L0 samples of new crust between them) | spreading / 100 mm/yr | the `rift_onset` that separated them, if any |
 | `subduction_onset` | `subducting_plate`, `overriding_plate`, `setting` (`ocean_ocean`, `ocean_continent`, `continent_continent`), `convergence_mm_yr`, `slab_age_myr` | convergence / 100 mm/yr | — |
-| `collision` | `plate_a` (the terrane's former plate), `plate_b` (the receiving plate), `terrane_area_km2`, `uplift_m`, `radius_km`, `convergence_mm_yr` | uplift, km | the contact's `subduction_onset` |
-| `terrane_accretion` | `from_plate`, `to_plate`, `area_km2`, `samples`; without a collision also `uplift_m` | area / average initial plate area | its `collision`, or the contact's `subduction_onset` |
+| `collision` | `plate_a` (the terrane's former plate), `plate_b` (the receiving plate), `terrane_area_km2`, `uplift_m`, `radius_km`, `convergence_mm_yr`, `sutured` (1: plate_a welded whole to plate_b, which then dies `sutured`), `coast_split_km` (the terrane's margin left facing plate_a's ocean, km; 0 with a suture) | uplift, km | the contact's `subduction_onset` |
+| `terrane_accretion` | `from_plate`, `to_plate`, `area_km2`, `samples`; without a collision also `uplift_m`, `sutured`, `coast_split_km` (as for `collision`) | area / average initial plate area | its `collision`, or the contact's `subduction_onset` |
 | `orogeny_phase` | `orogeny` (`andean` or `himalayan`), `plate`; Andean: `subducting_plate`, `max_uplift_mm_yr`, `ongoing` (1 when the run ended first); Himalayan: `uplift_m`, `uplifted_samples` | uplift / u_0 (Andean), uplift in km (Himalayan) | `subduction_onset` (Andean), `collision` (Himalayan) |
 | `hotspot_track` | `hotspot`, `plates` (the plates it sat under, e.g. `"3,7,12"`), `track_km`, `uplift_mm_yr`, `ongoing` | strength relative to the preset's | its `large_igneous_province`, if it had a plume head |
 | `large_igneous_province` | `area_km2`, `volume_km3`, `thickness_m`, `plate` | lava pile, km | — |

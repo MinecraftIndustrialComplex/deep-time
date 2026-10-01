@@ -188,11 +188,14 @@ impl PlatesStage {
         let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
+        let mut sutured = false;
         for (c, seeds) in &resolved.collisions {
             let under = st.contacts[*c].under;
-            if let Some(ev) = collision::collide(st, world, &cache.geo, &pos, &env, *c, seeds)? {
+            let done = collision::collide(st, world, &cache.geo, &pos, &env, *c, seeds)?;
+            if let Some(ev) = done.event {
                 causes.insert(under, ev);
             }
+            sutured |= done.sutured;
         }
         hotspots::step(st, world, &pos, &tree, &env)?;
         surface(st, &cache.geo, &env);
@@ -235,8 +238,10 @@ impl PlatesStage {
         ridges::bury(st, world, None, &pos, &env, &causes)?;
 
         // Resample when due, and once at the end so the final crust has no gaps or hidden slabs.
+        // A suture resamples at once, so the welded plate's subducted slab is consumed (hidden
+        // crust of one plate under the same plate would surface).
         let final_step = step >= self.total;
-        if ridges::due(st, &env) || (final_step && st.resample_step != st.step) {
+        if ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step) {
             let geo = ridges::resample(st, world, &pos, &cache.geo, &env)?;
             pos = geo.points().to_vec();
             let doomed: BTreeMap<u32, EventId> = st
@@ -253,6 +258,10 @@ impl PlatesStage {
 
         self.done = step;
         let last = self.done >= self.total;
+        let margin_every = (MARGIN_EVERY_MYR / env.dt_myr).round().max(1.0) as u64;
+        if last || step.is_multiple_of(margin_every) {
+            record_margins(st, world, &pos, &env);
+        }
         let kf_every = self.preset.keyframes.every_myr * 1.0e6;
         let kf_due = world.t_years >= self.next_output_years;
         if kf_due {
@@ -393,6 +402,40 @@ impl PlatesStage {
     }
 }
 
+/// The continental margins are measured this often, Myr (P1-27; `notes.plates.margins`).
+pub const MARGIN_EVERY_MYR: f64 = 10.0;
+
+/// Appends the continental margins of now ([`stats::margins`]) to the run's note
+/// (`notes.plates.margins`, a series the CLI and the manifest report).
+fn record_margins(st: &PlateState, world: &mut WorldState, pos: &[DVec3], env: &Env<'_>) {
+    let initiated: std::collections::BTreeSet<u32> = world
+        .events
+        .iter()
+        .filter(|e| {
+            e.kind == events::PLATE_BIRTH
+                && matches!(e.params.get("origin"),
+                    Some(deeptime_format::ParamValue::Str(o)) if o == "subduction_initiation")
+        })
+        .filter_map(|e| match e.params.get("plate") {
+            Some(deeptime_format::ParamValue::Int(p)) => u32::try_from(*p).ok(),
+            _ => None,
+        })
+        .collect();
+    let m = stats::margins(st, pos, &env.norm, &|p| initiated.contains(&p));
+    let mut note: serde_json::Value = world
+        .notes
+        .get(STAGE_NAME)
+        .and_then(|s| serde_json::from_str(s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+    if !note["margins"].is_array() {
+        note["margins"] = serde_json::json!([]);
+    }
+    if let (Some(list), Ok(v)) = (note["margins"].as_array_mut(), serde_json::to_value(&m)) {
+        list.push(v);
+    }
+    world.notes.insert(STAGE_NAME.to_owned(), note.to_string());
+}
+
 /// Continental erosion, oceanic dampening, trench accretion and the rock pools (Cortial §4.5,
 /// `pools.rs`), then eroded rock moves one hop downhill as sediment (to the lowest lattice
 /// neighbour of the same rigid group).
@@ -459,8 +502,16 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
         })
         .collect();
     let dt_yr = env.dt_yr;
+    // An emerged island arc becomes continental crust once it is a mature arc (P1-27: volcano
+    // cones lift young arcs above the sea long before their crust thickens, and with subduction
+    // starting in the open ocean every such arc turned into continent).
+    let mature_m = env.k.arc_continental_m as f32;
     st.samples.par_iter_mut().enumerate().for_each(|(i, s)| {
-        if s.kind == OCEANIC && s.elevation_m > 0.0 && s.flags & ARC != 0 {
+        if s.kind == OCEANIC
+            && s.elevation_m > 0.0
+            && s.flags & ARC != 0
+            && s.arc_oceanic_m >= mature_m
+        {
             s.kind = CONTINENTAL;
             s.flags |= EMERGED;
             if s.orogeny != OROGENY_HIMALAYAN {
@@ -517,6 +568,7 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
         };
         s.thickness_m = s.pools.iter().sum();
     });
+    st.counters.emerged += st.samples.iter().filter(|s| s.flags & EMERGED != 0).count() as u32;
 }
 
 /// Table 2 of Cortial et al. 2019 (C++, i7-6700K): seconds per regular step, per oceanic crust

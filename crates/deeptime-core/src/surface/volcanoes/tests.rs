@@ -467,6 +467,22 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
     assert!(map.contains(&code::STRATO_ACTIVE));
     let note: serde_json::Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
     assert!(summary_line(&note).starts_with("volcanoes_final="));
+    // P1-27: the ground under continental arc cones, every 10 Myr of the 120.
+    let bases = note["arc_bases"].as_array().unwrap();
+    assert_eq!(bases.len(), 12, "one record every 10 Myr");
+    for b in bases {
+        let cones = b["cones"].as_u64().unwrap();
+        let low = b["low_share"].as_f64().unwrap();
+        assert!((0.0..=1.0).contains(&low));
+        if cones > 0 {
+            let (p25, p50, p75) = (
+                b["base_p25_m"].as_f64().unwrap(),
+                b["base_p50_m"].as_f64().unwrap(),
+                b["base_p75_m"].as_f64().unwrap(),
+            );
+            assert!(p25 <= p50 && p50 <= p75, "{b}");
+        }
+    }
     let _ = std::fs::remove_dir_all(dir);
 }
 

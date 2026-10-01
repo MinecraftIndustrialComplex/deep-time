@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · Updated: 2026-09-29 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · P1-27 plate margins (sutures, initiation clear of trenches, arc cordilleras) + coherent provinces done on its branch (worktree-agent-ad3b417fd428c1ac2) · Updated: 2026-09-30 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -48,7 +48,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-24 | Faster Create World (log 2026-09-29) | todo | | | After P1-17's benchmarks; options go to Ben. |
 | P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-a02882c5e6567370e, not yet merged. Format 0.2 bakes twelve monthly layers. `DeepTimeClimate` is at API version 1.<br>**Parity:** `ClimateParityTest` 500/500 blocks bit for bit, and the GameTest `climateApiOnTheRealPlanet` matches too.<br>**mic-climate `deep-time` branch** (pushed): Deep Time's climate plus Project Atmosphere's weather anomaly. Its GameTests pass 19/19, with and without Project Atmosphere, and its pack smoke passes 20/20.<br>**MIC planet probe** (earthlike_quick_16k): Af 24.5 °C, BWk 8.8/19.6 °C, Dfc −12.9/15.3 °C, ET −24.7/0.6 °C, EF plateau (4,860 m) −22.7/−46.7 °C, each pair midwinter/midsummer. Project Atmosphere read 8.6, 8.9, −0.6, 4.0 and 10.5 °C at the same places. Its simulated weather adds −2.4…+2.5 °C.<br>JUnit 150/0 and `./gametest.sh` All 52 passed after merging master 8872c91; cargo gates clean. See build log. |
 | P1-26 | Per-cell climate: 2-D energy balance, sea ice, moisture (log 2026-09-30) | doing | 2026-09-30 | | Design approved 2026-10-01 (docs/design/p1-26-per-cell-climate.md, recommended answers); tasks T1–T11 start after the climate agent's ice-sheet branch (worktree-agent-adc924860a859865c-ice) lands. |
-| P1-27 | Plate margins and coherent continents (logs 2026-09-29, 2026-09-30) | doing | 2026-09-30 | | Opus agent: active vs passive margins against Earth, subduction start-up retune, arc cordilleras under the cones, coherent cratons with platform cover. |
+| P1-27 | Plate margins and coherent continents (logs 2026-09-29, 2026-09-30) | done | 2026-09-30 | | Branch worktree-agent-ad3b417fd428c1ac2 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. Cause: a collision moved the continent alone to the overriding plate, leaving its passive margins facing an ocean that kept converging (collisions cut 295,000–455,000 km of margin off its ocean per 750-Myr run; rifts ~2,000, initiations < 300). Fixed by sutures, initiation anywhere clear of trenches (rate 0.3), arc cordilleras, collision orogen cores, arc maturity; provinces view generalised to the USGS map's 150 km. Mac, 6 pipeline runs × 400 Myr before → after: active margin 0.67 → 0.31 (Earth ~0.3, Bradley 2008), passive 0.30 → 0.63, floor beside passive margins 50 → 102 Myr, ground under arc cones 307 → 812 m, provinces orogen 0.51 → 0.40, shield+platform 0.17 → 0.29, edge density 0.078 → 0.060; land 0.398 → 0.391, median 1,350 → 1,030 m, ocean p90 108 → 194 Myr. cargo test/clippy/fmt/deny clean, JUnit 155/0; evidence review/out/p1-27/ (not committed); see build log |
 
 ## Review pages
 | Name | URL | Version label | Date |
@@ -81,6 +81,112 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 
 ## Build log
+### 2026-09-30 — P1-27 plate margins and coherent continents (agent worktree agent-ad3b417fd428c1ac2, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben (decisions log 2026-09-29, "Provinces view shows speckled, patchy continents"; 2026-09-30, "most coast lines
+  are getting speckled with mountains"): "Investigate + fix". Workbench run 1a0f5089640 (earthlike_quick_16k,
+  supercontinent, 750 Myr) at step 101 had an arc + back-arc band on nearly every continental coast and arc cones
+  about 60 km apart on all of them, on low coastal plains.
+- **Measuring margins** (new; `plates::stats::margins`, recorded every 10 Myr into `notes.plates.margins`; `stage`/`run`
+  print a `margins` line with the means after the first 100 Myr and the series; `deeptime margins --in <checkpoint>
+  --out map.png` draws the classes). The margin is the continent–ocean boundary: visible continental samples with
+  oceanic crust within 1.5 spacings, one spacing of coast each, on landmasses of at least 200,000 km² Earth-normalized
+  (smaller island-arc specks are counted apart, `fragment_coast`). Classes, first that applies: collision (regime) >
+  subduction (a confirmed, converging front within 400 km on either plate; "Andean" when the continent overrides) >
+  other plate boundary > passive. Also the regime layer's share (arc, back-arc, trench, collision at the coast) and
+  the age of the floor beside passive margins.
+- **Earth.** Present-day passive margins total 105,000 km against 53,000 km of convergent plate boundaries (Bradley
+  2008, Earth-Sci. Rev. 91:1–26); active continental margins ~45,000 km counting arcs like Japan (Lallemand, Encycl.
+  Marine Geosciences), ~28,000–32,000 km with continental overriding plates only (tallied from Schellart et al. 2008,
+  Earth-Sci. Rev. 88:118, Table 1); convergent ≈ 48 % of continental margin length counting island arcs (Mercier de
+  Lépinay et al. 2016, Tectonophysics 693). So **passive ≈ 0.7, active ≈ 0.2–0.3** (0.48 at most). Modern passive
+  margins average 104 Myr old (oldest 180); ancient ones lasted 181 Myr on average (Bradley 2008), who calls a direct
+  passive-to-subduction conversion "rare indeed"; Stern 2004 (EPSL 226:275) and Stern & Gerya 2018 (Tectonophysics
+  746:173): no Cenozoic passive-margin collapse, subduction starts at transforms/fracture zones or by polarity reversal.
+- **Before** (master's plate model with the instruments, commit 4cf2cda): plates only, 4 runs × 750 Myr (2 starts × 2
+  seeds): active 0.61–0.70 of the margin, passive 0.29–0.37, regime arc/back-arc 0.60–0.68, floor beside passive
+  margins (median) 64–72 Myr. Coupled pipeline, 6 runs × 400 Myr (`tools/review/p1-27-ensemble.sh`): active 0.67
+  [0.59–0.74], passive 0.30, regime 0.69, floor 50 Myr.
+- **The cause, measured.** Not the spontaneous initiation: it fired 0–2 times per 750-Myr run (only plates that subducted
+  nowhere qualified), and switching it off left the active share at 0.59–0.71. Nor rifting (half the rate: 0.57–0.69),
+  plate-motion noise (none: 0.59–0.68), slab pull (off: 0.56–0.66), slow slab-free plates (0.65–0.69), slow continents
+  (0.60–0.67) or fewer plates (≤ 20: 0.56–0.68). Every rift, initiation and collision now reports the continental margin
+  it cut off its own ocean (`coast_split_km`): per 750-Myr run (planet km; the whole coast is ~61,000) collisions
+  295,000–455,000, terrane accretions 89,000–130,000, rifts 1,700–2,400, initiations 40–270. **Cortial's collision
+  moved the colliding continent alone to the overriding plate and left its ocean on the old plate, which kept
+  converging: every passive margin of that continent became a plate boundary and then an Andean margin** (~10
+  collisions per 100 Myr). The regime layer adds an 800-km back-arc halo (`subduction_distance_km`), so its map showed
+  more active coast than there was. Rifted margins only become plate boundaries transiently.
+- **Changes** (all settings; pipeline/earthlike presets, editor fields with lang keys, plate-only presets at P1-03's
+  behaviour where noted):
+
+  | setting | value | what |
+  |---|---|---|
+  | `tectonics.collision_suture_frac` (new) | 0.1 | a colliding continent of at least this share of an average plate sutures its whole plate to the receiving one (plate_death `sutured`), keeping the ocean on its other coasts; the crust is resampled at once so the welded slab is consumed. Smaller terranes still transfer alone |
+  | `tectonics.subduction_initiation_clearance_km` (new) | 1,000 | old floor may start subducting wherever it lies this far from every trench (before: only on plates that subducted nowhere, so welded plates' old floor aged for ever); the split never tears a continent (slivers stranded in the old floor ride along) |
+  | `tectonics.subduction_initiation_rate` | 0.1 → 0.3 | keeps the floor recycled with sutures (ocean p90 ~190 Myr) |
+  | `tectonics.cordillera_uplift_mm_yr` / `_width_km` / `_height_m` (new) | 0.2 / 120 / 2,500 (plate-only 0) | continental crust over an arc above an oceanic slab rises in a Gaussian band round the arc axis towards the height (thickened crust spreads), with its Airy root added to the crust's felsic plutonic (0.6) and metamorphic (0.4) pools |
+  | `tectonics.collision_orogen_core` (new) | 0.5 | a collision stamps its Himalayan orogeny (folds, metamorphism) only where its surge reached half its peak; before, everything lifted by 10 m: belts up to 4,000 km wide |
+  | `tectonics.arc_continental_m` (new) | 80 (plate-only 0) | an emerged island arc becomes continental only after this much arc magma (~8 Myr of arc): volcano cones lifted young intra-oceanic arcs above the sea, and with initiation in the open ocean the continental crust grew from 0.41 to 0.56 of the planet in 750 Myr (0: 51,000 conversions; 300: crust fell to 0.20; 60: 0.44–0.48; 120: 0.30–0.37; 80 keeps it at ~0.40) |
+
+- **Cone heights do not double-count.** The volcano stage's cone relief is the height it built (`height_m`, target from
+  the arc flux), not measured from the ground; the ground only enters the summit ceiling (6.8 km above the sea). The
+  amplifier's measured relief is clamped to the built cone. A range under a cone raises the summit, not the cone.
+  The volcano stage now records the ground under active cones on continental landmasses (surface at the summit less
+  the cone's own relief) every 10 Myr (`notes.volcanoes.arc_bases`). Scale note: at 16k a cone's footprint (radius ~28
+  km with the default flank steepness 0.5) is about as wide as an Andes-wide range shrunk by the Earth normalization
+  (×0.123), so the range shows as the cones' common base more than as a separate ridge.
+- **Provinces (Part 2).** Causes of the patchwork, measured with a new coherence line (`provinces …`: class shares by
+  true area, edge density = share of neighbouring continental cells of different classes, speck share = cells in
+  same-class patches under 25 cells, and why cells are orogens): (1) the active-margin rings (arc regime and Andean
+  ranges) on every coast, gone with the margins fix; (2) collision stamps covering most of every continent (the 10-m
+  threshold over surges up to 2,000 km), fixed by `collision_orogen_core`; (3) the one-sample passive-margin regime
+  drawn as dashed "extended crust" along every coast; (4) island-arc specks in the oceans. View fixes (`provinces.rs`,
+  view-only): rifted margins are a continuous band 150 km (1.35°) wide along every quiet coast (`rifted_margin_deg`),
+  the generalisation looks half the USGS map's 150-km feature size (radius 2 cells at 1024) and continental patches
+  smaller than that feature squared (15 cells) take the sea floor's class (`feature_deg`, `drop_specks`).
+  Earth reference (CRUST 2.0 crust types, land without Antarctica, derived by a sub-agent): Precambrian basement 45 %
+  (exposed ~27 %) + Phanerozoic platform 25.5 % ≈ 71 % cratons, orogens 12 % + arcs 5 %, extended + rift 7 %.
+- **After** (this branch; `tools/review/p1-27-ensemble.sh 400 "1 2 3" "supercontinent scattered_continents"`, 6 runs
+  × 400 Myr, mean [min–max], before → after):
+  - margins: active 0.67 → **0.31** [0.29–0.35], passive 0.30 → **0.63** [0.59–0.66], regime layer 0.69 → 0.45, floor beside
+    passive margins 50 → **102** Myr; plates only (4 runs × 750 Myr): active 0.29–0.36, passive 0.59–0.65, floor 103–141 Myr;
+  - arcs: ground under continental arc cones 307 → **812** m (median of the 10-Myr records), cones on ground below 500 m
+    62 % → 41 %;
+  - provinces: shield 0.065 → 0.148, platform 0.106 → 0.143, orogen 0.513 → 0.401, basin 0.124 → 0.085, LIP 0.032 →
+    0.058, extended 0.161 → 0.165; edge density 0.078 → 0.060, specks 0.062 → 0.033;
+  - hypsometry: land 0.398 → 0.391, land median 1,350 → 1,030 m, p90 4,120 → 3,560 m, above 2 km 0.336 → 0.267,
+    continental crust 0.461 → 0.420 (dry 0.82 → 0.81); glaciated land 0.235 → 0.204; Köppen A/B/C/D/E 0.09/0.17/0.18/0.12/0.44
+    → 0.08/0.22/0.21/0.10/0.40;
+  - plates: 17.3 → 10.5 at the end, ocean p90 108 → 194 Myr [162–228], younger than 250 Myr 0.996 → 0.955, collisions 43
+    → 40, initiations 1.2 → 25.5.
+  - 750 Myr, seed 1 (`tools/review/p1-27-evidence.sh`): supercontinent active 0.67 → 0.32, floor 58 → 124 Myr, land 0.33 →
+    0.32, crust 0.40 → 0.40, ocean p90 116 → 224 Myr; scattered active 0.70 → 0.32, floor 54 → 128 Myr, land 0.38 → 0.41,
+    crust 0.44 → 0.40, ocean p90 104 → 209 Myr.
+- **Against P1-17.** Master itself has drifted from P1-17's calibration (land 0.27–0.28, median ~0.6 km at 500 Myr then;
+  0.40 and 1.35 km in the before ensemble at 400 Myr; Earth 0.29 and 0.43 km): this branch does not widen the gap
+  (median and high ground come down), but P1-17 proper needs a recalibration pass.
+- **Evidence** (pulled, not committed): review/out/p1-27/evidence/index.html (margin series chart, run summaries, the
+  same keyframes before/after of regime, elevation, satellite, provinces and volcanoes for both starts, 750 Myr, seed 1;
+  each run is also a viewer bundle), review/out/p1-27/maps/ (margin-class maps, plates only, supercontinent seed 1),
+  review/out/p1-27/diag/ and seq/ (the investigation's maps).
+- **Tests.** `plates::tests::margins_are_measured_and_add_up`, `sutures_and_initiations_keep_continents_whole` (sutured
+  plates own nothing; initiations never tear a continent; a suture leaves no coast behind), `arcs_build_a_cordillera`;
+  `geometry::tests::coast_split_counts_continental_edges_cut_off_their_ocean`; `provinces::tests::
+  rifted_margins_are_a_band_on_quiet_coasts_only`, `specks_below_the_feature_size_go_to_the_sea`; the volcano pipeline
+  test checks `arc_bases`. Fixed on the way: a subtraction overflow when an initiation split a plate whose count was
+  stale after a suture.
+- **Gates** (Mac): `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo deny check
+  licenses bans` clean; `cargo test --workspace` core 323 + 3 ignored, cli 30, …, all pass; `cargo test --release -p
+  deeptime-core plates::tests::statistics -- --ignored` passes (p90 165–200 Myr, 95.7–97.1 % < 250 Myr, 27–30 plates);
+  `./gradlew build test` tests=155 failures=0 errors=0. Re-run after merging master 4105de7 (P1-22 rivers and
+  lakes, volcano follow-ups, diamictite, coal placement): core 332 + 3 ignored, cli 31, fmt, clippy, deny clean, JUnit
+  157/0; one 400-Myr scattered run on the merged tree matches the ensemble (active 0.31, passive 0.63, floor 103 Myr,
+  orogen 0.33, cones' ground 745 m). No GameTests (coordinator).
+- **For the coordinator's GameTests.** The built-in planets change (plate model, cordillera, presets, the test planet
+  `planet_world_4k`): expect different land/biome counts in planet-world tests; climate shares on the 400-Myr ensemble
+  stay close (E 0.44 → 0.40, B 0.17 → 0.22), so `climateConsistent` floors re-based on the test planet may need the
+  same treatment as after the EF change. Checkpoints from before this branch do not resume (new state fields).
+- **Next.** Ben's decisions (final report); P1-17 recalibration of master's hypsometry; P1-10 uses the provinces.
 ### 2026-09-30 — P1-26 per-cell climate: design doc (agent worktree agent-a2104321849041969, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **What.** The design Ben asked for ("Design doc first", decisions log 2026-09-30) is
   `docs/design/p1-26-per-cell-climate.md`, awaiting his approval. No code changed. It covers:

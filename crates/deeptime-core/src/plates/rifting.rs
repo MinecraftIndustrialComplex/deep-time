@@ -21,11 +21,13 @@ use glam::DVec3;
 
 use super::Env;
 use super::events::{self, PLATE_BIRTH, RIFT_ONSET};
-use super::geometry::{Geo, connect_plates};
+use super::geometry::Tree;
+use super::geometry::{Geo, coast_split, connect_plates};
 use super::kinematics::cap_speed;
 use super::noise::fbm;
-use super::state::{CONTINENTAL, Group, Plate, PlateState, RiftLink};
+use super::state::{CONTINENTAL, Group, Plate, PlateState, RiftLink, TRENCH};
 use crate::error::CoreError;
+use crate::sphere::kdtree::angle_of_chord2;
 use crate::world::WorldState;
 
 /// Plates below this many samples never rift.
@@ -134,6 +136,7 @@ pub fn rift(
     }
     let member = membership(&members, n);
     connect_plates(geo, &mut label, |i| member[i]);
+    let split_coast = coast_split(geo, state, &members, |i| member[i], |i| label[i]);
     let mut counts = vec![0usize; fragments as usize];
     for &i in &members {
         counts[label[i as usize] as usize] += 1;
@@ -214,7 +217,11 @@ pub fn rift(
         .param("plate", i64::from(id))
         .param("fragments", order.len() as i64)
         .param("continental_frac", cont_frac)
-        .param("area_km2", area_planet);
+        .param("area_km2", area_planet)
+        .param(
+            "coast_split_km",
+            norm.planet_len_km(split_coast as f64 * norm.km(norm.spacing_rad())),
+        );
     if let Some(lip) = parent.lip_event.filter(|_| t < parent.lip_until_myr) {
         e = e.caused_by(lip);
     }
@@ -274,13 +281,18 @@ pub fn rift(
 /// Spontaneous subduction initiation at old oceanic lithosphere (design choice, beyond Cortial:
 /// without it, oceanic crust on a plate with no trench ages for ever, while Earth's ocean floor is
 /// recycled within about 200 Myr; Stern 2004, "Subduction initiation: spontaneous and induced").
-/// Per plate that subducts nowhere and step, with probability 1 − e^(−λ),
-/// λ = rate · (old oceanic area)/A_0, a fracture
-/// separates the plate's crust older than `subduction_initiation_age_myr` from the rest (a warped
-/// Voronoi split between a random old sample and the centroid of the younger crust) and the old
-/// part, a new plate, is set moving towards the young part at `subduction_initiation_speed_mm_yr`.
-/// The convergence opens a subduction zone at the fracture on the following steps, where the older
-/// crust goes down (`subduction.rs`). Emits a plate_birth with `origin` "subduction_initiation".
+/// Crust older than `subduction_initiation_age_myr` can start sinking where no subduction zone is
+/// near: farther than `subduction_initiation_clearance_km` from every trench (P1-27: before, only
+/// plates that subducted nowhere qualified, so once collisions welded plates together the old
+/// floor of any plate with a trench somewhere aged for ever). Per plate and step, with
+/// probability 1 − e^(−λ), λ = rate · (such old oceanic area)/A_0, a fracture separates the
+/// plate's old oceanic crust around a random old sample from the rest (a warped Voronoi split
+/// between that sample and the centroid of the rest; continental crust stays on the parent, so
+/// continents are never torn, except slivers stranded inside the old floor, which ride the new
+/// plate) and the old part, a new plate, is set moving towards the rest at
+/// `subduction_initiation_speed_mm_yr`. The convergence opens a subduction zone at the
+/// fracture on the following steps, where the older crust goes down (`subduction.rs`). Emits a
+/// plate_birth with `origin` "subduction_initiation".
 pub fn maybe_initiate_subduction(
     state: &mut PlateState,
     world: &mut WorldState,
@@ -294,17 +306,29 @@ pub fn maybe_initiate_subduction(
     }
     let t = env.t_myr;
     let area = env.norm.sample_area_km2();
+    let trenches: Vec<DVec3> = state
+        .samples
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.flags & TRENCH != 0)
+        .map(|(i, _)| pos[i])
+        .collect();
+    let trench_tree = (!trenches.is_empty()).then(|| Tree::over(&trenches, |_| true));
+    let clearance = env.norm.rad(k.subduction_initiation_clearance_km);
+    let clear = |i: usize| {
+        trench_tree.as_ref().is_none_or(|tr| {
+            tr.nearest(pos[i])
+                .is_none_or(|(_, d2)| angle_of_chord2(d2) > clearance)
+        })
+    };
     let mut old: Vec<Vec<u32>> = vec![Vec::new(); state.plates.len()];
     for (i, s) in state.samples.iter().enumerate() {
-        if !s.is_hidden() && s.kind != CONTINENTAL && s.age_myr(t) > k.subduction_initiation_age_myr
+        if !s.is_hidden()
+            && s.kind != CONTINENTAL
+            && s.age_myr(t) > k.subduction_initiation_age_myr
+            && clear(i)
         {
             old[state.plate_of(i) as usize].push(i as u32);
-        }
-    }
-    let mut subducting = vec![false; state.plates.len()];
-    for c in &state.contacts {
-        if c.onset_event.is_some() {
-            subducting[c.under as usize] = true;
         }
     }
     let ids: Vec<u32> = state.alive().map(|p| p.id).collect();
@@ -313,7 +337,7 @@ pub fn maybe_initiate_subduction(
             break;
         }
         let o = &old[id as usize];
-        if o.len() < 16 || subducting[id as usize] {
+        if o.len() < 16 {
             continue;
         }
         let lambda = k.subduction_initiation_rate * o.len() as f64 * area / state.a0_km2;
@@ -371,9 +395,10 @@ fn initiate(
         let p = pos[i as usize];
         let da = p.angle_between(c_old) + warp * fbm(p, 4.0, 3, noise_seed);
         let db = p.angle_between(c_young) + warp * fbm(p, 4.0, 3, noise_seed ^ 0x55);
-        label[i as usize] = u32::from(da < db);
+        label[i as usize] = u32::from(da < db && state.samples[i as usize].kind != CONTINENTAL);
     }
     connect_plates(geo, &mut label, |i| member[i]);
+    let split_coast = coast_split(geo, state, &members, |i| member[i], |i| label[i]);
     let split: Vec<u32> = members
         .iter()
         .copied()
@@ -428,7 +453,8 @@ fn initiate(
         centroid: c.to_array(),
         continental_frac: cont as f64 / count as f64,
     });
-    state.plates[id as usize].samples -= count as u32;
+    // From this split's own membership: the plate's count may be stale (a suture this step).
+    state.plates[id as usize].samples = (members.len() - count) as u32;
     let mean_age = if oceanic > 0 {
         ages / oceanic as f64
     } else {
@@ -444,7 +470,12 @@ fn initiate(
             norm.planet_area_km2(count as f64 * norm.sample_area_km2()),
         )
         .param("mean_ocean_age_myr", mean_age)
-        .param("speed_mm_yr", norm.speed_mm_yr(omega, c));
+        .param("continental_frac", cont as f64 / count as f64)
+        .param("speed_mm_yr", norm.speed_mm_yr(omega, c))
+        .param(
+            "coast_split_km",
+            norm.planet_len_km(split_coast as f64 * norm.km(norm.spacing_rad())),
+        );
     let birth = world.emit(e)?;
     state.plates[new_id as usize].birth_event = Some(birth);
     state.counters.plate_births += 1;

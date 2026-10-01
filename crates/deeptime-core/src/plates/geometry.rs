@@ -392,6 +392,35 @@ pub fn connect_plates(geo: &Geo, plate: &mut [u32], active: impl Fn(usize) -> bo
     moved
 }
 
+/// Continental margin cut off its ocean by a relabelling (a rift's or a subduction initiation's
+/// split, a collision's terrane transfer): the samples of `members` that are continental and have
+/// a lattice neighbour in `members`, of the same rigid group, that is oceanic and carries another
+/// label. Such a coast was a passive margin (crust and ocean on one plate) and is now a plate
+/// boundary. `label(i)` is the sample's new plate or fragment.
+pub fn coast_split(
+    geo: &Geo,
+    state: &PlateState,
+    members: &[u32],
+    member: impl Fn(usize) -> bool,
+    label: impl Fn(usize) -> u32,
+) -> usize {
+    use super::state::CONTINENTAL;
+    members
+        .iter()
+        .filter(|&&i| {
+            let s = &state.samples[i as usize];
+            s.kind == CONTINENTAL
+                && geo.edges(i).any(|(u, _)| {
+                    let o = &state.samples[u as usize];
+                    member(u as usize)
+                        && o.group == s.group
+                        && o.kind != CONTINENTAL
+                        && label(u as usize) != label(i as usize)
+                })
+        })
+        .count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -420,6 +449,62 @@ mod tests {
         );
         assert!(two.iter().all(|b| b[0].1 != u32::MAX && b[1].1 != u32::MAX));
         assert!(two.iter().all(|b| b[0].1 != b[1].1 && b[0].0 <= b[1].0));
+    }
+
+    #[test]
+    fn coast_split_counts_continental_edges_cut_off_their_ocean() {
+        use crate::plates::state::{CONTINENTAL, Group, PlateState, Sample};
+        let geo = Geo::build(2000, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let n = geo.points().len();
+        // Continent north of z = 0.2, one plate, one group.
+        let samples: Vec<Sample> = geo
+            .points()
+            .iter()
+            .map(|p| {
+                let mut s = Sample::blank(0);
+                if p.z > 0.2 {
+                    s.kind = CONTINENTAL;
+                }
+                s
+            })
+            .collect();
+        let state = PlateState {
+            n: n as u32,
+            lattice: [0.0, 0.0, 0.0, 1.0],
+            samples,
+            groups: vec![Group {
+                plate: 0,
+                rot: [0.0, 0.0, 0.0, 1.0],
+            }],
+            plates: Vec::new(),
+            contacts: Vec::new(),
+            hotspots: Vec::new(),
+            ridges: Vec::new(),
+            rift_links: Vec::new(),
+            rng: crate::sphere::SplitMix64::new(1),
+            step: 0,
+            t_myr: 0.0,
+            start_myr: 0.0,
+            resample_step: 0,
+            resample_myr: 0.0,
+            a0_km2: 1.0,
+            counters: Default::default(),
+        };
+        let all: Vec<u32> = (0..n as u32).collect();
+        let coast = (0..n)
+            .filter(|&i| {
+                state.samples[i].kind == CONTINENTAL
+                    && geo
+                        .edges(i as u32)
+                        .any(|(u, _)| state.samples[u as usize].kind != CONTINENTAL)
+            })
+            .count();
+        assert!(coast > 0);
+        // Ocean split off along the coast: every coastal sample counts.
+        let by_kind = |i: usize| u32::from(state.samples[i].kind == CONTINENTAL);
+        assert_eq!(coast_split(&geo, &state, &all, |_| true, by_kind), coast);
+        // One label for everything: nothing is cut.
+        assert_eq!(coast_split(&geo, &state, &all, |_| true, |_| 0), 0);
     }
 
     #[test]
