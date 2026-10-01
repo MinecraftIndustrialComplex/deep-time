@@ -89,6 +89,11 @@ pub struct HydroParams {
     pub bank_zone_blocks: f64,
     /// … plus this share of its half-width.
     pub bank_zone_ratio: f64,
+    /// Whether the game's carvers (caves, canyons) skip the water blocks Deep Time places in lakes
+    /// and rivers. The ground under the water is still carved, so caves run beneath it and may
+    /// open into a lake or river bed; only the water itself is never replaced (no air pockets in
+    /// it, no holes in a lake's surface). Read by the game from `notes.bake.water.params`.
+    pub protect_water_from_carvers: bool,
 }
 
 impl Default for HydroParams {
@@ -109,6 +114,7 @@ impl Default for HydroParams {
             biome_min_width_blocks: 6.0,
             bank_zone_blocks: 1.0,
             bank_zone_ratio: 0.5,
+            protect_water_from_carvers: true,
         }
     }
 }
