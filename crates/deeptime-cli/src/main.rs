@@ -326,6 +326,9 @@ enum Command {
         /// Write the full report (every site) as JSON.
         #[arg(long)]
         json: Option<PathBuf>,
+        /// Only the sites of this deposit type (repeatable; `placer_au` or `deeptime:placer_au`).
+        #[arg(long)]
+        only: Vec<String>,
     },
     /// Write the Java↔Rust column parity fixture (plan §9.2): columns of a world-data folder as the
     /// column evaluator answers them, for `ColumnParityTest` and the real-planet GameTest.
@@ -760,6 +763,7 @@ fn main() -> ExitCode {
             soil,
             area,
             json,
+            only,
         }) => {
             let o = deposit_audit::Options {
                 world_data,
@@ -769,6 +773,7 @@ fn main() -> ExitCode {
                 soil,
                 area: area.map(|a| [a[0], a[1], a[2], a[3]]),
                 json,
+                only,
             };
             match deposit_audit::run(&o) {
                 Ok(report) => {
