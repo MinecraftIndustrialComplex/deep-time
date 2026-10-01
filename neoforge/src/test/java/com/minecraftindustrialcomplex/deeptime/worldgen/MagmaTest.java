@@ -227,16 +227,16 @@ class MagmaTest {
     @Test
     void aLavaFeatureIsOneWhoseConfigurationPlacesLava() {
         // Vanilla's lake_lava: a lake whose fluid provider's state is lava.
-        assertTrue(LavaFeatures.namesLavaState(JsonParser.parseString("{\"type\": \"minecraft:lake\", \"config\": {\"barrier\": "
+        assertTrue(LavaFeatureRule.namesLavaState(JsonParser.parseString("{\"type\": \"minecraft:lake\", \"config\": {\"barrier\": "
                 + "{\"type\": \"minecraft:simple_state_provider\", \"state\": {\"Name\": \"minecraft:stone\"}}, \"fluid\": "
                 + "{\"type\": \"minecraft:simple_state_provider\", \"state\": {\"Name\": \"minecraft:lava\", \"Properties\": {\"level\": \"0\"}}}}}")));
         // Vanilla's spring_lava_overworld: a spring whose fluid state is lava.
-        assertTrue(LavaFeatures.namesLavaState(JsonParser.parseString("{\"type\": \"minecraft:spring_feature\", \"config\": "
+        assertTrue(LavaFeatureRule.namesLavaState(JsonParser.parseString("{\"type\": \"minecraft:spring_feature\", \"config\": "
                 + "{\"state\": {\"Name\": \"minecraft:lava\", \"Properties\": {\"falling\": \"true\"}}, \"valid_blocks\": [\"minecraft:stone\"]}}")));
         // A water spring, and a feature that only tests for lava nearby, are not lava features.
-        assertFalse(LavaFeatures.namesLavaState(JsonParser.parseString("{\"type\": \"minecraft:spring_feature\", \"config\": "
+        assertFalse(LavaFeatureRule.namesLavaState(JsonParser.parseString("{\"type\": \"minecraft:spring_feature\", \"config\": "
                 + "{\"state\": {\"Name\": \"minecraft:water\"}, \"valid_blocks\": [\"minecraft:stone\"]}}")));
-        assertFalse(LavaFeatures.namesLavaState(JsonParser.parseString("{\"type\": \"minecraft:simple_block\", \"config\": "
+        assertFalse(LavaFeatureRule.namesLavaState(JsonParser.parseString("{\"type\": \"minecraft:simple_block\", \"config\": "
                 + "{\"to_place\": {\"type\": \"minecraft:simple_state_provider\", \"state\": {\"Name\": \"minecraft:magma_block\"}}, "
                 + "\"predicate\": {\"type\": \"minecraft:matching_blocks\", \"blocks\": \"minecraft:lava\"}}}")));
     }

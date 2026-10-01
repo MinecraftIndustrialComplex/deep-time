@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -73,30 +71,9 @@ public final class LavaFeatures {
             return false;
         try {
             var ops = context.getLevel().registryAccess().createSerializationContext(JsonOps.INSTANCE);
-            return ConfiguredFeature.DIRECT_CODEC.encodeStart(ops, cf).result().map(LavaFeatures::namesLavaState).orElse(false);
+            return ConfiguredFeature.DIRECT_CODEC.encodeStart(ops, cf).result().map(LavaFeatureRule::namesLavaState).orElse(false);
         } catch (RuntimeException e) {
             return false;   // a configuration that cannot be written out is left alone
         }
-    }
-
-    /** Whether the JSON holds a block or fluid state of lava: an object whose {@code Name} is lava's. */
-    public static boolean namesLavaState(JsonElement e) {
-        if (e.isJsonObject()) {
-            JsonObject o = e.getAsJsonObject();
-            JsonElement name = o.get("Name");
-            if (name != null && name.isJsonPrimitive()) {
-                String n = name.getAsString();
-                if (n.equals("minecraft:lava") || n.equals("minecraft:flowing_lava"))
-                    return true;
-            }
-            for (var entry : o.entrySet())
-                if (namesLavaState(entry.getValue()))
-                    return true;
-        } else if (e.isJsonArray()) {
-            for (JsonElement c : e.getAsJsonArray())
-                if (namesLavaState(c))
-                    return true;
-        }
-        return false;
     }
 }
