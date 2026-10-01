@@ -12,6 +12,7 @@ mod parity;
 mod provinces;
 mod run;
 mod satellite_view;
+mod strata_check;
 mod structure_view;
 mod synth;
 mod volcano_view;
@@ -298,6 +299,34 @@ enum Command {
         /// the world data's event log) to the answer; the workbench's click-to-inspect asks for it.
         #[arg(long, conflicts_with = "parity")]
         why: bool,
+    },
+    /// How many rock columns a geologist would object to: metamorphic grade inversions (a
+    /// higher grade above rock that was never that hot), thin metamorphic slivers, and plutonic
+    /// rock lying in the pile like a bed. On a world-data folder: the columns the game builds and
+    /// the stored stacks; on a checkpoint: the stacks before and after the bake's smoothing.
+    #[command(allow_negative_numbers = true)]
+    StrataCheck {
+        /// World-data folder (a run's `--out`).
+        #[arg(long)]
+        world_data: Option<PathBuf>,
+        /// A checkpoint whose world has run the structure stage (`run --checkpoints`).
+        #[arg(long)]
+        checkpoint: Option<PathBuf>,
+        /// How many random columns of the world data.
+        #[arg(long, default_value_t = 20_000)]
+        columns: usize,
+        /// Seed of the column choice.
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        /// A metamorphic horizon thinner than this inside the pile is a sliver, blocks.
+        #[arg(long, default_value_t = 8)]
+        sliver_blocks: i32,
+        /// A plutonic horizon thinner than this between other rocks is a sheet, blocks.
+        #[arg(long, default_value_t = 16)]
+        sheet_blocks: i32,
+        /// Print this column's stack and findings instead of the census, `X,Z` (repeatable).
+        #[arg(long = "column", value_name = "X,Z", allow_hyphen_values = true)]
+        column: Vec<String>,
     },
     /// Write the Java↔Rust column parity fixture (plan §9.2): columns of a world-data folder as the
     /// column evaluator answers them, for `ColumnParityTest` and the real-planet GameTest.
@@ -724,6 +753,53 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::StrataCheck {
+            world_data,
+            checkpoint,
+            columns,
+            seed,
+            sliver_blocks,
+            sheet_blocks,
+            column,
+        }) => {
+            let at: Result<Vec<(i64, i64)>, String> = column
+                .iter()
+                .map(|s| {
+                    let bad = || format!("--column {s}: expected X,Z");
+                    let (x, z) = s.split_once(',').ok_or_else(bad)?;
+                    Ok((
+                        x.trim().parse().map_err(|_| bad())?,
+                        z.trim().parse().map_err(|_| bad())?,
+                    ))
+                })
+                .collect();
+            let answer = at.map_err(Into::into).and_then(|at| {
+                strata_check::run(&strata_check::Options {
+                    world_data: world_data.as_deref(),
+                    checkpoint: checkpoint.as_deref(),
+                    columns,
+                    seed,
+                    limits: deeptime_core::structure::realism::Limits {
+                        sliver_blocks,
+                        sheet_blocks,
+                    },
+                    at: &at,
+                })
+            });
+            match answer {
+                Ok(v) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&v).expect("a census serialises")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime strata-check: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::Parity {
             world_data,
             out,

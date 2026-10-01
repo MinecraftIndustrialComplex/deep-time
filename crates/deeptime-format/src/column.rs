@@ -184,6 +184,23 @@ impl ColumnWorld {
         (e, d)
     }
 
+    /// The `strata/horizons` layer, when the world has one (its stored stacks, cell by cell).
+    pub fn strata(&self) -> Option<&LazyLayer> {
+        self.horizons.as_ref()
+    }
+
+    /// The top block of the terrain at column (x, z) (`min_y − 1` where there is none), as
+    /// [`ColumnWorld::sample`] gives it.
+    pub fn top_y(&self, x: i64, z: i64) -> i32 {
+        let surface = self.height(x, z);
+        if surface.is_finite() {
+            ((surface.ceil() as i64) - 1).clamp(i64::from(self.min_y) - 1, i64::from(self.max_y))
+                as i32
+        } else {
+            self.min_y - 1
+        }
+    }
+
     /// The terrain height H at block (x, z).
     pub fn height(&self, x: i64, z: i64) -> f64 {
         let (e, d) = self.height_parts(x, z);
