@@ -18,23 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** P1-12: the block-resolution rules of plan §7.5 on string "blocks". */
 class PaletteRulesTest {
 
-    /** Stone and deepslate are filler; air is rejected. */
-    private static final PaletteRules.Kinds<String> KINDS = new PaletteRules.Kinds<>() {
-        @Override
-        public boolean isStone(String b) {
-            return b.equals("minecraft:stone");
-        }
-
-        @Override
-        public boolean isFiller(String b) {
-            return b.equals("minecraft:stone") || b.equals("minecraft:deepslate");
-        }
-
-        @Override
-        public boolean isRejected(String b) {
-            return b.equals("minecraft:air");
-        }
-    };
+    /** Only air is rejected: stone and deepslate are ordinary candidates (P1-28). */
+    private static final PaletteRules.Kinds<String> KINDS = b -> b.equals("minecraft:air");
 
     private static PaletteRules.Result<String> resolve(String cls, List<String> memberTag, List<String> memberStates,
                                                        List<String> fallbackTag, List<String> fallbackStates, String vanilla) {
@@ -94,27 +79,27 @@ class PaletteRulesTest {
     }
 
     @Test
-    void fillerIsRejectedExceptStoneForCoal() {
-        var shale = resolve("shale", List.of("minecraft:stone"), List.of(), List.of("minecraft:deepslate", "minecraft:polished_tuff"),
-                List.of(), null);
+    void stoneAndDeepslateAreOrdinaryCandidates() {
+        // P1-28 (Ben, 2026-10-01: "Use stone for common rocks"): a pack's fallback list may name stone or
+        // deepslate for any class, and a class's vanilla_fallback may be either; they win by list order
+        // like any other block.
+        var shale = resolve("shale", List.of(), List.of(), List.of("minecraft:stone", "minecraft:polished_tuff"), List.of(), null);
         assertEquals(Source.FALLBACK, shale.source());
-        assertEquals(List.of("minecraft:polished_tuff"), shale.blocks());
-        assertEquals(2, shale.rejected().size());
+        assertEquals(List.of("minecraft:stone"), shale.blocks());
+        assertTrue(shale.rejected().isEmpty());
 
-        // The decisions file: black argillite, then stone. Without Born in Chaos the tag holds stone only.
-        var coal = resolve("coal", List.of(), List.of(), List.of("minecraft:stone"), List.of(), "minecraft:stone");
-        assertEquals(Source.FALLBACK, coal.source());
-        assertEquals(List.of("minecraft:stone"), coal.blocks());
-        assertTrue(coal.rejected().isEmpty());
+        var slate = resolve("slate", List.of(), List.of(), List.of(), List.of(), "minecraft:deepslate");
+        assertEquals(Source.VANILLA_FALLBACK, slate.source());
+        assertEquals(List.of("minecraft:deepslate"), slate.blocks());
 
-        var coalVanilla = resolve("coal", List.of(), List.of(), List.of(), List.of(), "minecraft:stone");
-        assertEquals(Source.VANILLA_FALLBACK, coalVanilla.source());
+        // A pack that wants something else puts it first, ahead of the stone stand-in.
+        var overridden = resolve("shale", List.of(), List.of(), List.of("born_in_chaos_v1:black_argillite", "minecraft:stone"),
+                List.of(), "minecraft:stone");
+        assertEquals(List.of("born_in_chaos_v1:black_argillite"), overridden.blocks());
 
-        var coalDeepslate = resolve("coal", List.of("minecraft:deepslate"), List.of(), List.of(), List.of(), null);
-        assertEquals(Source.NONE, coalDeepslate.source());
-
-        var filler = resolve("granite", List.of(), List.of(), List.of(), List.of(), "minecraft:stone");
-        assertEquals(Source.NONE, filler.source());
+        // Members win over a stone vanilla_fallback; stone as a member is allowed too.
+        var member = resolve("mudstone", List.of("minecraft:stone"), List.of(), List.of(), List.of(), "minecraft:stone");
+        assertEquals(Source.MEMBER, member.source());
     }
 
     @Test

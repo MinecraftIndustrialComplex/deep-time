@@ -1581,9 +1581,20 @@ them:
   and **no fallback tags**, so a pack's fallback lists (MIC's included, which use `replace: false`)
   are never pre-empted by entries from Deep Time's jar, and a pure-vanilla pack still resolves every
   class (Q15 in §14).
-- `coal` is the one class allowed to fall back to `minecraft:stone` (the decisions file: Born in
-  Chaos black argillite, then stone). The MIC datapack's `rock_fallback/coal.json` already lists
-  `born_in_chaos_v1:black_argillite` (`required: false`), then `minecraft:stone` (checked 2026-09-28).
+- `minecraft:stone` and `minecraft:deepslate` are ordinary candidates, in tags, `rock_states` and
+  `vanilla_fallback` alike (P1-28, Ben, log 2026-10-01: "Use stone for common rocks and we should be
+  chilling"). Before P1-28 they were rejected as filler (the unclassified crust) except for `coal`'s
+  stone. Now the common classes that have no distinctive block of their own use them as their
+  `vanilla_fallback` (the list is in `tools/dev/gen_rock_classes.py`, `CRUST_STAND_INS`, with the
+  reason for each; §5.4.1), so a world of shale and gneiss is mostly stone and deepslate and mining
+  it drops vanilla's cobblestone and cobbled deepslate. A pack still decides through the tags: its
+  fallback tags are read before `vanilla_fallback`, so it overrides a class by listing its own block
+  first. The strata pass paints a class that resolves to stone or deepslate exactly as any other
+  (the crust underneath becomes that block, so a shale horizon is stone even where the crust was
+  deepslate), and `RockPalette.classesOf` reports, for stone and deepslate, every class that
+  resolves to them plus `unclassified_crust`. Code that must tell a class from the filler asks the
+  world data's horizon, not the block (the background scatter's host bias does:
+  `BackgroundScatterFeature.hostClasses`).
 - A class that still resolves to nothing stays unclassified crust.
 - With several members, one member is chosen per horizon or body (hash of its id), so a layer is one
   block type, not noise; tag order sets the primary member.
