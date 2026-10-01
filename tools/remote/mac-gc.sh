@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-HOST="${DEEPTIME_MAC:-ban@mac-mini}"
+HOST="${DEEPTIME_MAC:-ban@20.120.160.3}"
 MODS=/Volumes/Graphide/ban/mic/mods
 DRY=0; [ "${1:-}" = --dry-run ] && DRY=1
 SSH=(ssh -o BatchMode=yes -o ConnectTimeout=15 "$HOST")
@@ -41,7 +41,7 @@ cd "$1" || exit 1
 now=$(date +%s)
 for d in */; do
     d=${d%/}
-    t=$(/usr/bin/stat -f %m "$d/.sync-rev" 2>/dev/null || /usr/bin/stat -f %m "$d")
+    t=$(stat -c %Y "$d/.sync-rev" 2>/dev/null || stat -c %Y "$d" 2>/dev/null || /usr/bin/stat -f %m "$d/.sync-rev" 2>/dev/null || /usr/bin/stat -f %m "$d")
     echo "copy $d $(( now - t ))"
 done
 ps -axo command | sed 's/^/proc /'
