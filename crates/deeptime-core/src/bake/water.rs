@@ -17,10 +17,13 @@
 //!   shore rule carries it a noise cell past the last wet cell. A full lake's level is its rim's
 //!   height, a terminal lake's the level of its water balance, below the rim. The layer means what
 //!   it meant: nothing in the game's reading of it changes.
-//! - **Ice.** Nothing is written for frozen lakes: the game's frozen biomes (the temperature
-//!   layer's frozen band, `bake::biomes`) ice the water with vanilla's `freeze_top_layer`.
+//! - **Ice.** No layer: the game ices a lake column's top block where `climate/t_mean_c`
+//!   (bilinear at the column) is below `notes.bake.water.params.lake_freeze_mean_c`, and keeps the
+//!   other lake columns open whatever the biome (Java `worlddata/LakeIce`; FORMAT.md "Lake ice").
 //!   `notes.bake.water.stats.frozen_in_frozen_band` records how much of the frozen lake area lies
-//!   in that band.
+//!   in the biome temperature layer's frozen band, where vanilla alone would have iced it.
+//! - **playa.** Blocks of salt (`hydro.playa_blocks`) on the cells of a playa, 0 elsewhere: the
+//!   game replaces that many of the ground's top blocks with the `halite` rock class's block.
 
 use std::path::Path;
 
@@ -96,6 +99,10 @@ impl Seasons {
 /// vanilla's parameter: `OverworldBiomeBuilder`'s first temperature band is −1 … −0.45).
 const FROZEN_BAND_TOP: f64 = -0.45;
 
+/// The layer of the playas' salt (blocks; on `water_level`'s grid) and the rock class it is.
+pub const PLAYA_LAYER: &str = "playa";
+pub const PLAYA_ROCK_CLASS: &str = "halite";
+
 /// What the water part made, for the tests and the CLI.
 pub struct Water {
     pub note: Value,
@@ -156,6 +163,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
             std::fs::remove_file(&rivers_path).map_err(|e| CoreError::io(&rivers_path, e))?;
         }
         out.m.files.retain(|f| f.path != RIVERS_PATH);
+        out.m.layers.retain(|l| l.name != PLAYA_LAYER);
         // An all-nodata `water_level` on the elevation grid (a re-run over a folder that had
         // lakes clears them).
         if let Some(e) = out.m.layer("elevation") {
@@ -295,6 +303,19 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         }
     });
 
+    // playa: blocks of salt on the floor of basins too dry for a lake (0 elsewhere).
+    let salt = params.playa_blocks.round().clamp(0.0, 255.0) as u8;
+    let playa: Vec<u8> = result
+        .kind
+        .iter()
+        .map(|&k| if k == network::kind::PLAYA { salt } else { 0 })
+        .collect();
+    out.layer(
+        desc(PLAYA_LAYER, DType::U8, &grid, 1.0, "blocks", None),
+        &playa,
+    )?;
+    drop(playa);
+
     let (bytes, crc32) = write_rivers(out.dir, &result.rivers)?;
     out.m.files.retain(|f| f.path != RIVERS_PATH);
     out.m.files.push(FileEntry {
@@ -313,6 +334,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         "halved": halved,
         "climate": if from_stage { "climate stage (L1, bilinear)" } else { "zonal stand-in" },
         "seasons": if seasonal { "the twelve monthly layers" } else { "mean ± 8 °C" },
+        "playa": {"layer": PLAYA_LAYER, "rock_class": PLAYA_ROCK_CLASS, "blocks": salt},
         "rivers_file": RIVERS_PATH,
         "rivers_bytes": bytes,
         "stats": stats,

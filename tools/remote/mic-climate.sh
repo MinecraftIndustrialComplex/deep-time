@@ -49,6 +49,9 @@ NAME="$(basename "$SRC")"
 REMOTE="$SSD/mic/mods/$NAME"
 
 SSH=(ssh -n -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30 "$HOST")
+# The VM's firewall follows the laptop's address (vm-access.sh): repair it before the first call.
+. "$(dirname "${BASH_SOURCE[0]}")/vm-access.sh"
+vm_access_ensure "$HOST" || { echo "$(basename "$0"): cannot reach $HOST" >&2; exit 1; }
 RSYNC=(rsync -a -e "ssh -o BatchMode=yes")
 
 if "${SSH[@]}" 'test -e /Users/Shared/graphide-nix-maintenance -o -e /Users/Shared/graphide-nix-unhealthy'; then

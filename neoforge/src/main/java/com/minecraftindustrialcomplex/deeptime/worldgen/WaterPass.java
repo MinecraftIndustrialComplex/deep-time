@@ -26,9 +26,11 @@ import net.minecraft.world.level.chunk.ChunkAccess;
  * cell, which the bake has to guarantee (Phase 2, with Fill–Spill–Merge).
  *
  * <p>No fluid tick is scheduled and no position is marked for post-processing, so a basin stays
- * still until a neighbour changes, and then has nowhere to flow. Ice is not placed here: vanilla's
- * {@code freeze_top_layer} feature, in every overworld biome, freezes the top water block where the
- * biome is cold, and this water exists before features run. A grass-like block
+ * still until a neighbour changes, and then has nowhere to flow. Lake ice follows the climate, not
+ * the biome ({@link com.minecraftindustrialcomplex.deeptime.worlddata.LakeIce}): {@link WaterBodies}
+ * ices a frozen lake's top block, and {@link LakeFreeze} keeps vanilla's {@code freeze_top_layer}
+ * feature, which freezes the top water block wherever the biome is cold, off the lakes the climate
+ * keeps open; rivers are left to that feature. A grass-like block
  * (a {@code SpreadingSnowyDirtBlock}) left under the water by the surface rules, which ran before the
  * water existed, becomes dirt, as vanilla's rules make it under water; otherwise its random tick
  * would do so later and wake the water above it.

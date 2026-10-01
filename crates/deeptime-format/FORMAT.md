@@ -33,12 +33,11 @@ the amplified terrain ("The P1-08 bake"); and the column evaluator both sides im
   `hydro` section, and the column evaluator decides each column's water ("Water columns"; `hydro`
   in "Columns" and `parity/columns.json`). A reader treats a folder without `rivers/rivers.dtrv` as
   having no rivers (the synthetic worlds have none).
-- *Lakes sized by the climate (2026-10-01, no format change):* a bake now writes a lake's level from
+- *Lakes sized by the climate, lake ice and playas (2026-10-01):* a bake writes a lake's level from
   its water balance, so `water_level` may hold a level below the basin's rim and fewer, smaller
-  lakes in dry and frozen climates ("Rivers", how the bake builds it). The layer, the rivers file and
-  the column rule are byte-for-byte what they were: a folder baked before loads and plays exactly
-  as it did (its lakes stay full), and a reader needs no change. Frozen lakes are not stored: the
-  game's frozen biomes ice their water.
+  lakes in dry and frozen climates ("Rivers", how the bake builds it). The game ices a lake by the
+  climate's rule, read from `climate/t_mean_c` and `notes.bake.water.params.lake_freeze_mean_c`
+  ("Lake ice"), and the new layer `playa` holds the salt of basins too dry for a lake ("Playas").
 Every other file's bytes are as in 0.1.
 
 **0.3** over 0.2 (P2-01, folds and faults): every header's minor is 3. A baked planet may hold
@@ -141,6 +140,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `elevation` | L3 | i16 | 1/16, block | — | terrain y: the amplifier's, mountain character included ("The mountain character"); without the amplify stage the young landscape (L2) or the deep-time surface (L1) upsampled bilinearly |
 | `detail/amplitude` | L3 | u8 | 1/16, block | — | the detail term's A (P1-06; absent without the amplify stage) |
 | `water_level` | L3 (L3h: L3 averaged 2 × 2 when L3 has more than 40 M cells, 32k full) | i16 | 1/16, block | −32768 | each lake's cells hold its surface, nodata elsewhere (P1-22, "Rivers"): its basin's rim when the lake is full, the level of its water balance, below the rim, when it is not (2026-10-01; a reader does not tell them apart); all nodata when `hydro.enabled` is false |
+| `playa` | as `water_level` | u8 | 1, block | — | blocks of salt on a playa's floor, 0 elsewhere ("Playas"); absent when `hydro.enabled` is false |
 | `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks with key spans, smoothed ("The 0.2 bake"), the first top raised ("The P1-08 bake") |
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
@@ -706,10 +706,11 @@ else that cell; depressions (F > height) of at least `hydro.lake_min_area_km2` a
 their departures from the year's mean added to the cell's mean, ± 8 °C without them; a sinusoidal
 year between the two months gives the share of the year above freezing and its mean temperature
 above freezing T⁺; liquid = min(P, P · share + `snow_melt_mm_per_degree_day` · 365.25 · T⁺); runoff
-= liquid − ET, ET by Fu's Budyko curve with PET = 60 mm/°C · T, as the surface stage; ground whose
-warmest month is below freezing gives none). **A basin's lake level is its water balance**
+= liquid − ET, ET by Fu's Budyko curve on the liquid water with PET = `pet_mm_per_c` (60) · T⁺,
+Holdridge's biotemperature rule, which is the surface stage's 60 mm/°C · T where there is no frost;
+ground whose warmest month is below freezing gives none). **A basin's lake level is its water balance**
 (`lake_balance`, on by default): a cell under water loses its runoff as land and its evaporation
-(`lake_evaporation_factor` · (`lake_evaporation_base_mm` + 60 mm/°C · T⁺); 0 when
+(`lake_evaporation_factor` · (`lake_evaporation_base_mm` + `pet_mm_per_c` · T⁺); 0 when
 `lake_evaporation` is false) less the liquid precipitation on it. A basin that, wet to its rim, still gains (inflow ≥ those losses) is a lake at
 its spill level and spills the surplus. One that does not is terminal: its lowest cell becomes a
 sink, a Priority-Flood of the basin alone from that cell drains its floor to it (receivers and
@@ -719,7 +720,7 @@ by their spill level towards the sink) whose losses the inflow at the sink still
 one step below the rim, and at sea level at least where the basin's floor lies a block or more
 below sea level (the column rule floods such ground with the sea's water whatever the bake says, so
 the bake says the same); a lake inside the basin that this level covers becomes part of it. A
-balance lake under the lake thresholds is a playa (not stored), and a basin no water reaches is
+balance lake under the lake thresholds is a playa (the `playa` layer), and a basin no water reaches is
 dry. Basins are solved in drainage order, so a lake that does not spill passes nothing downstream.
 With `lake_balance` false every basin is a full lake, as before 2026-10-01. River cells carry ≥
 `river_min_discharge_m3s` from ≥ `river_min_area_km2`, a lake cell less than a block deep counting
@@ -777,6 +778,25 @@ whose generated ground reaches `top` holds no water and is dry shore, flush with
 higher top gets flowing water (level 1, resting on the water under it)
 and the blocks between falling water (a waterfall). **River biomes**: the game's weirdness input is
 0 (the river valley slice) at columns whose `river_biome` is set (`WorldDataTerrain.raster`).
+
+**Lake ice (game side, not part of the column rule).** A lake column is frozen when the layer
+`climate/t_mean_c`, bilinear at block (x, z), is below `notes.bake.water.params.lake_freeze_mean_c`
+(preset key `hydro.lake_freeze_mean_c`, 0 °C: with a yearly cycle, ice for more than half the year;
+NaN is not frozen). It is the rule of the bake's statistics and of the workbench's maps, which
+apply it at cell centres (`HydroParams::frozen`; Java `worlddata/LakeIce`). The pass sets the top
+water block of a frozen lake column to `minecraft:ice`, whatever the biome. A lake column that is
+not frozen stays open in a cold biome: `Biome.shouldFreeze` answers false for the block at the
+lake's top (⌈level⌉ − 1 by the shore rule), at generation (`freeze_top_layer`) and afterwards
+(snowfall). Rivers and the sea are left to the biome. A world without the threshold or the layer
+(a synthetic world, `hydro.enabled` false) has no rule.
+
+**Playas (game side).** `playa` (u8, on the `water_level` grid) holds, for the cells of a playa
+(the floor of a terminal basin whose balance lake is under the lake thresholds: "Rivers"), the
+blocks of salt to lay there (`hydro.playa_blocks`, 2; 0 elsewhere). `notes.bake.water.playa` is
+`{layer, rock_class ("halite"), blocks}`. After the water pass, in every column whose nearest cell
+holds n > 0, `worldgen/PlayaPass` replaces the top n blocks of the ground (not air, fluid or
+bedrock; not under water) with the block the rock palette resolves for `rock_class`, as a stratum
+of that class would be: the pack's rock tags decide it.
 
 **Carvers (game side, not part of the column rule).** Vanilla's carvers run after the pass, and the
 `#minecraft:overworld_carver_replaceables` tag lists water. When `notes.bake.water.params.
@@ -1160,8 +1180,7 @@ deep at the level of their water balance, the climate's liquid runoff accumulate
 time (a grid over 600,000 cells is averaged down first), so it adds nothing to the simulation or the
 bake; with `hydro.enabled` false there is no layer and the satellite view is dry. **The run's last
 frame that has these layers is drawn again after the bake**, from `rivers/rivers.dtrv` and the
-`water_level` layer (frozen where the frame's climate says so; the playas, which the bake does not
-store, are the frame's own), so the final map shows the exact rivers and lakes of the world data (the
+`water_level` layer (frozen where the frame's climate says so; the playas are the frame's own), so the final map shows the exact rivers and lakes of the world data (the
 frame's file and its index entry are rewritten before the manifest lists them); a run without a
 bake keeps the derived water.
 
