@@ -56,6 +56,7 @@
   "deeptime.editor.field.ocean_fraction": "Ocean fraction",
   "deeptime.editor.field.m_per_block_h": "Horizontal scale per block",
   "deeptime.editor.field.m_per_block_v": "Vertical scale per block",
+  "deeptime.editor.field.build_limit_band": "Height-limit squeeze band",
   "deeptime.editor.field.deposit_count": "Deposit count",
   "deeptime.editor.field.deposit_size": "Deposit size",
   "deeptime.editor.field.deposit_richness": "Deposit richness",

@@ -81,7 +81,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | Date | Task | Question | Asked how |
 |---|---|---|---|
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
-| 2026-10-01 | bake / P1-06 | **Terrain above the build limit.** Nothing bounds the terrain to the world's height: the test planet on x86 has 2.5 % of its land above y 639 (peaks to y 969), and two of four 16k 500-Myr runs peaked at 12.4 and 13.0 km against 11.5 km; the game cuts such ground flat at y 639. Options: **(1, recommended)** bound it where it arises and guarantee it at the end: the surface stage's elevation respects `tectonics.max_elevation_m` (the plate cap's taper applied to the offset's rises), the preset check requires that cap plus the amplifier's headroom to fit under `max_y`, and the amplifier compresses whatever is still above a knee smoothly into the headroom, so no seed can clip; (2) compress only at the amplifier (a smooth remap of everything above a knee into the range below `max_y`): the simulation and its keyframes keep 13–20 km mountains the world does not have; (3) scale the whole world's vertical relief so its highest peak fits: one peak flattens every landscape and moves ore depths; (4) a taller world (`max_y` 639 → 1023, +7.7 km): every chunk costs more and 20 km still clips; (5) leave it: flat-topped mountains at y 639, now counted by the bake. | Not asked yet: for the coordinator to put to Ben (build log 2026-10-01, x86_64 gates) |
+| 2026-10-01 | surface / plates | **The emergent height limit (stage 2).** Stage 1 (build log 2026-10-01, "Terrain above the build limit, stage 1") removed the bookkeeping that built 13–20 km and added the compression band; Earth-like 16k worlds now peak at 9.0–11.2 km on L1, held by the plate model's uplift ceiling, not by physics. Build stage 2 (crust over its strength spreads: σ = ρ·g·h against `crust_strength_mpa`, plateaus at about 5 km on Earth, 13 km at 0.38 g)? And inside it: drop the plate model's 10 km uplift ceiling to a 30 km guard and recalibrate uplift with the hypsometry work (recommended), or keep it and let the spreading act under it? Also: keep squeezing a world too short for its mountains (now), or raise the vertical-scale slider's minimum to 19.6 m and refuse? | Not asked yet: for the coordinator to put to Ben |
 
 ## Build log
 ### 2026-10-01 — P1-22b lakes sized by the climate, and frozen (agent worktree agent-a2195c5c858c73075, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
@@ -152,6 +152,117 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   --all-targets -D warnings`, `cargo test -p deeptime-cli -p deeptime-viewer` (52 + 6) clean.
 - **Not covered**: a real 3D preview iframe (needs the Minecraft preview server, off on this workbench): the check uses an
   iframe stand-in inside a real `.embed` card, and the iframe fills its box. Not merged or pushed (asked to leave it).
+### 2026-10-01 — Terrain above the build limit, stage 1: the surface moves with its own crust; nothing is cut flat (agent worktree agent-ac2a33b7f51fa4bf8, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben (decisions log 2026-10-01): no hard cap in the surface stage, the height limit should emerge; first
+  fix the bookkeeping that built 13–20 km "mountains", add the game-side safety net, measure. Stage 2 (the emergent
+  limit) is designed below and not built.
+- **The flaw, measured.** A trace of the surface step on the test planet (per step: plate elevation, offset, the
+  plate-side change, erosion, deposition, isostasy over the cells above 8 and 10 km). The plates refusing uplift at
+  their cap was not it (the cap bound 0.24 % of continental sample-steps on the worst planet, under 0.01 % on the
+  16k worlds). Three things were:
+  1. **The offset was added to whatever crust a cell read next.** The surface's state was the offset from the plate
+     model's elevation, advected by position. The plate model's elevation under a cell is sampled anew every step
+     from another mix of L0 samples and changed by 5–8 km in one step with its own uplift there at 0 (the cell now
+     reads the high side of a margin, or another plate's edge over a trench): a trench with −6 km of plate and +4 km
+     of fill became a 9 km margin plus the 4 km. 5 to 500 cells a step were lifted more than 1 km this way.
+  2. **The plates were told only each step's change.** What a sample did not take (the spread onto coarser samples)
+     stayed in the surface, so crust the plate model held at 2.8 km stood at 14 km and still took a full collision
+     surge (+3.7 km in a step): the uplift ceiling looked at the wrong height.
+  3. **Volcanoes rebuilt what isostasy had already given back.** A cone's height was debited the whole erosion of
+     the step and rebuilt, while about a quarter of that erosion came back as rebound; its ceiling was measured from the
+     ring round the cone, which did not rise. Cones stood on 15–25 km of their own rebuilding (seed 13).
+- **The fix** (no clamp anywhere in the surface stage):
+  1. `advect::carried_elevation`, used by the surface and the climate stage: a cell starts a step at the last
+     elevation of the same crust at its source (corner cells that held the same rigid group, the same plate, or the
+     parent of a plate born this step; new L1 field `plates/group_id`, the surface keeps `surface/crust_plate` and
+     `surface/crust_group`) plus the plate model's uplift of that crust (`plates/uplift_mm_yr`); where no corner held
+     the same crust, the plate model's elevation. The offset is an output.
+  2. `surface/feedback_m` is the whole offset, so a sample's elevation is the surface's at its scale.
+  3. A cone grows only while every cell it stands on is under the volcano ceiling (the existing
+     `volcanoes.max_elevation_km`, measured at the ground now).
+  Mass: `mass_residual_km3` stays at 1e-5 to 1e-3 km³ (it was the same before). New counters on the `surface_final`
+  line: `land_z_p99_m`, `plate_cap_bound_share` (continental sample-steps at `max_elevation_m`),
+  `foreign_crust_cell_steps` (cells that started again from the plate model's elevation).
+- **Before and after, deep-time surface on L1** (`deeptime stage volcanoes`, x86_64 VM, 2 threads; "before" is the
+  same binary with the three changes switched off, and reproduces master's 20,082 m on the test planet):
+
+  | 500 Myr `earthlike_quick_16k` | max, km | p99 land, km | median land, km | land fraction | cap bound |
+  |---|---|---|---|---|---|
+  | before: scattered seeds 1, 2, 3 | 9.2, 10.7, 9.2 | 6.7, 6.7, 6.4 | 1.45, 1.27, 1.05 | 0.28, 0.29, 0.37 | 0, 6e-5, 2e-5 |
+  | before: supercontinent 1, 2, 3 | 12.4, 9.1, 13.0 | 7.1, 6.4, 7.4 | 1.08, 1.31, 1.17 | 0.43, 0.42, 0.43 | 5e-5, 2e-5, 6e-5 |
+  | after: scattered 1, 2, 3 | 10.4, 9.1, 11.1 | 5.7, 7.1, 7.1 | 1.20, 2.03, 1.53 | 0.38, 0.50, 0.39 | 1e-5, 0, 1e-5 |
+  | after: supercontinent 1, 2, 3 | 11.2, 10.2, 9.0 | 7.5, 6.9, 7.4 | 2.07, 1.08, 1.52 | 0.47, 0.26, 0.38 | 5e-5, 3e-5, 0 |
+
+  Means over the six: max 10.6 → 10.1 km (highest 13.0 → 11.2), p99 6.8 → 7.0 km, median 1.22 → 1.57 km, land
+  fraction 0.37 → 0.40. Test planet (`planet_world_4k`, 150 Myr, seeds 11–16): max 20.1, 7.5, 16.2, 2.5, 3.3, 4.6 km →
+  4.4, 4.2, 4.5, 4.4, 3.0, 3.7 km (the 4.4 km are shield volcanoes at their ceiling); p99 15.7, 6.1, 13.1, 2.3, 2.1,
+  3.6 → 3.1, 3.6, 3.9, 3.4, 2.1, 3.0 km; median 0.49, 0.69, 0.73, 0.18, 0.59, 0.30 → 0.33, 0.58, 0.43, 0.24, 0.59,
+  0.34 km; land fraction 0.19, 0.13, 0.14, 0.06, 0.19, 0.15 → 0.18, 0.10, 0.08, 0.06, 0.18, 0.15; cap bound 0.0024,
+  0.0016, 0.0024, 0, 0, 0.0005 → 0 on all six.
+  **For the hypsometry agent:** the 16k land median rises by about 0.35 km (six runs each side, chaotic histories, so
+  ±0.3) and the p90 from 3.9 to 4.6 km: recalibrate on this base. The parameters themselves did not move.
+- **The game-side safety net.**
+  - `scale.build_limit_band_blocks` (default 48; pipeline and built-in presets, editor field `build_limit_band` in
+    Scale, lang key): the stored elevation is as simulated up to a knee at `max_y` − 16 − band (y 575, 10.24 km above
+    the sea by default) and above it y ↦ knee + B·(1 − e^(−(y − knee)/B)), which never reaches `max_y` − 16, so with
+    the detail term nothing reaches `max_y` (`params::BuildFit`; in the amplifier's sink and the bake's own
+    upsampling). Increasing, slope 1 at the knee: ridges stay ridges and drainage keeps its direction.
+  - **Preset check: not a rejection.** I first refused presets whose `tectonics.max_elevation_m` does not fit under
+    the knee; the editor's contract is that both ends of every slider are valid
+    (`every_knob_is_in_every_pipeline_preset_and_both_ends_are_valid`), and `m_per_block_v` goes down to 1. So a
+    world too short for its mountains is squeezed, and the bake says how much
+    (`notes.bake.terrain.build_limit`: `knee_y`, `top_y`, `cells_compressed`, `cells_above`; `compressed=` on the
+    `bake` line). Validation refuses only a band under 8 blocks or a knee less than 64 blocks above the sea. The
+    other choice (raise the slider's minimum to 19.6 m and refuse) is Ben's.
+  - `realPlanetHeightMatchesTheBake` fails on any sampled column above the limit and on `cells_above` > 0 or a
+    highest elevation within 16 blocks of `max_y` in the bake's note.
+- **Two more one-planet tests** (the planets changed again, as they will with every change to the simulation):
+  `realPlanetRockMatchesTheParityFixture` failed on seed 14, whose fixture columns cross coal seams: coal's stand-in
+  without a coal rock is plain stone, which `classesOf` reads as unclassified crust (now the class is asked for its
+  blocks). `climateConsistent` floors re-measured, see the test's comment.
+- **Does stage 1 alone keep Earth-like worlds near 8–10 km? Nearly, and not for the right reason.** The 16k worlds
+  peak at 9.0–11.2 km on L1 (the amplifier adds up to about a kilometre), so half of them reach into the compression
+  band above 10.24 km and none is cut. But what holds them there is still the plate model's uplift ceiling
+  (uplift × (1 − z/`max_elevation_m`)), which now sees the true height: a number, not a mechanism, and it does not
+  know gravity. The hard clamp itself almost never binds (at most 0.005 % of continental sample-steps, before and
+  after).
+- **Stage 2, designed, not built: crust too thick for its strength spreads.**
+  - *Mechanism.* Lower-crustal channel flow / gravitational collapse: where the weight of elevated crust exceeds what
+    the crust can hold, the lower crust flows out from under it and the surface relaxes sideways into a plateau
+    (Tibet, the Altiplano). As topographic diffusion with a threshold: ∂h/∂t = ∇·(D ∇h), D = D₀ · max(0, σ/S − 1)³,
+    σ = ρ_c · g · h (h above sea level, ρ_c 2,800 kg/m³, g the planet's `gravity_m_s2`). The cube is the channel
+    law (flux ∝ channel thickness³, Clark & Royden 2000); below the threshold nothing moves.
+  - *Settings.* `tectonics.crust_strength_mpa` (S, default about 140: ρ_c·g·5.1 km on Earth, the level of the high
+    plateaus) and `tectonics.crust_flow_km2_myr` (D₀ at twice the threshold, default to be calibrated, of the order
+    of 10³ km²/Myr: Clark & Royden's range is 10² for a strong, 10⁵ for a weak lower crust). Editor: Advanced ·
+    Plates.
+  - *Where.* In the surface step, on L1, after the plate model's uplift is added and before erosion; conservative
+    (Σ Δh · area = 0), so it moves crust, not surface rock: the strata log is untouched and `mass_residual` is not
+    affected; the change reaches the plate model through the feedback. Implicit, with the existing diffusion
+    solver on the cells over the threshold and a ring round them: a few per cent of the surface step.
+  - *What it changes visibly.* Collision zones stop growing upward at about S/(ρ_c·g) and grow outward: broad high
+    plateaus with steep edges instead of ever higher cores; summits are the plateau plus what erosion carves and the
+    amplifier adds (Earth: 5 km + 3–4 km). Ranges under the threshold (most of them) do not change.
+  - *Gravity.* Through σ only: the plateau level is S/(ρ_c·g): 5.1 km at 1 g, 13.4 km at 0.38 g, 2.5 km at 2 g. The
+    volcano ceiling (`volcanoes.max_elevation_km`, 6.8) should become the same comparison (an edifice's load against
+    the same strength), or Mars-gravity shields stay at 4.4 km.
+  - *The plate model's cap.* The uplift ceiling's `max_elevation_m` then has to move out of the way (30 km, a guard),
+    or the plate model keeps doing the work at 1 g and blocks taller ranges at low g. That changes how fast ranges
+    rise below the threshold, so the hypsometry calibration has to follow it: this is the part with a cost.
+  - *Erosion already rises with relief:* on the cells above 10 km the trace shows 0.3 to 1.3 km/Myr of erosion
+    (stream power on the steep flanks, the glacial pass above the snowline) against 0.02–0.1 km/Myr on the land's
+    average, and about a quarter of it returned by isostasy.
+  - *References.* England & McKenzie 1982 (thin viscous sheet; GJRAS 70:295); Molnar & Lyon-Caen 1988 (the weight of
+    a range against the forces that build it; GSA Spec. Pap. 218); Bird 1991 (lower-crustal flow under plateaus;
+    JGR 96:10275); Royden et al. 1997 and Clark & Royden 2000 (channel flow, topographic diffusion with D ∝ h³;
+    Geology 28:703); Rey, Vanderhaeghe & Teyssier 2001 (gravitational collapse; Tectonophysics 342:435); Beaumont
+    et al. 2001 (channel flow coupled to erosion; Nature 414:738).
+  - *A choice for Ben inside stage 2:* whether the plate model's uplift ceiling goes (recommended: yes, with a
+    recalibration of uplift rates by the hypsometry work) or stays at 10 km with the spreading under it (smaller
+    change, but then Earth's limit is still the number and only low-gravity planets differ).
+- **Measured** (VM `deeptime-test`, x86_64 Linux, `mac.sh` default caps; load average 10–30): `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --locked` all pass (509: cli 52, core 353 + 3 ignored); `./gradlew build test` tests=160 failures=0 errors=0 skipped=1; `./gametest.sh` All 57 required tests passed (wall 485 s) and, after `tools/smoke/install.sh mic`, `./gametest.sh -PwithMic` All 57 passed (81 s), both with `above_max_y=0cells compressed=0cells highest_y=281` on the default planet. The nine real-planet tests on other planets (`DEEPTIME_TEST_PLANET_SET="seed=N"`): seeds 12, 13, 15, 16 standalone All 9 passed; seed 14 failed two (the rock and Dsub items above), and with those fixed seed 14 standalone and seeds 13 and 14 with MIC All 9 passed. On all six seeds the bake has 0 cells above `max_y` and 0 compressed (highest y 274–287); seeds 11 and 13 had 2.5 % and 1.0 % of their land above it before. The two full `./gametest.sh` runs were made one commit before the rock-test and Dsub-floor changes (test code only); cargo, Gradle and the seed-14 and MIC seed runs are on the final code. x86_64 Linux only.
+- **Next.** Ben's go for stage 2 and his choice on the uplift ceiling; the hypsometry agent
+  (worktree-agent-aee888e01d29a40db) takes this base first.
 
 ### 2026-10-01 — Workbench deposits overlay: coal fields and ore sites by family, hover, "why here" (agent worktree agent-aae4250c131f0cf7a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Ask.** Ben, 2026-10-01, "Deposits layer": draw coal fields and ore deposits by type on the map at every frame where the
@@ -5954,12 +6065,11 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
-- **Terrain above the build limit (2026-10-01).** No stage bounds the terrain to `scale.max_y`: the surface
-  stage's offset (deposition, isostatic rebound) rises over the plate model's 10 km cap, and the young stage, the
-  amplifier and the bake pass it on. The game ends such ground at y 639 (flat tops); strata and parity stay
-  consistent because the column evaluator clamps `top_y`. The bake counts it (`notes.bake.terrain.build_limit`,
-  `above_max_y=` on the `bake` line) and `realPlanetHeightMatchesTheBake` logs `aboveBuildLimit`. Pending question
-  above; build log 2026-10-01 (x86_64 gates).
+- **Terrain above the build limit (2026-10-01): fixed in two parts, the third pending.** The 13–20 km
+  "mountains" were bookkeeping (the surface's offset added to whatever crust a cell read next; fixed, build log
+  2026-10-01 stage 1), and the stored elevation is compressed into a band under `max_y`, so nothing is cut flat
+  (`scale.build_limit_band_blocks`; the GameTest fails on any cell above the limit). The height limit itself is still
+  the plate model's uplift ceiling, not an emergent one: stage 2, pending question above.
 - **One preset, one planet per platform (2026-10-01).** The simulation is not bit-identical across platforms (the
   platform's libm); it is across runs and thread counts on one machine. Ben does not want it otherwise. Tests on a
   simulated planet assert properties and floors measured over several planets (`DEEPTIME_TEST_PLANET_SET="seed=N"

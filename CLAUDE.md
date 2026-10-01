@@ -61,6 +61,11 @@ tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete m
   (`CARGO_BUILD_JOBS=8`), simulation sweeps at most 4 runs of 2 threads at once, one Minecraft server
   at a time (`--server`). It bills by the hour while running: `az vm deallocate -g deeptime-test -n
   deeptime-test` stops the charge, `az vm start` brings it back.
+- **No backward compatibility before a public release** (Ben, 2026-10-01: "Until I have told you to
+  do a public release, you are to give absoluteley 0 shits about backwards compatability"). Old bakes,
+  checkpoints, saved runs, presets, world-data format numbers and older jars need not keep working:
+  change formats and behaviour freely, write no migrations or compatibility shims, and do not bring
+  compatibility questions to Ben. This holds until he says a public release is being made.
 - NixOS: nothing global. Run builds, tests and every `cargo` through `nix develop -c` (the profile's
   `cargo` is a bare rustup shim); one-off tools via `nix shell nixpkgs#<pkg> -c <cmd>`. Stage new files
   with `git add` before Nix reads them (flakes see only tracked files). Never `nix eval` a whole

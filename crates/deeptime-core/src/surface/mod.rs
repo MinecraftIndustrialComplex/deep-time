@@ -6,23 +6,27 @@
 //! # Coupling with the plates (plan §8 intro)
 //! The stage is interleaved with the plates stage (`Stage::coupled_to`): after every plate step it
 //! takes one step of the same length. L1 is fixed on the planet and the crust moves over it, so the
-//! surface keeps its elevation as the plate model's (`plates/elevation_m`, sampled onto L1 every
-//! step; the pipeline presets set `tectonics.l1_every_steps` = 1) plus an **offset** — valleys,
-//! basins, eroded ranges, everything the plate model's coarse L0 elevation does not carry — which
-//! moves with the plates (`advect.rs`) together with the regolith and the strata log. Uplift is
-//! therefore whatever the plate model did to the crust under a cell (subduction and collision
-//! uplift, thermal subsidence, trench accretion), exactly P1-03's `plates/uplift_mm_yr`.
+//! surface's elevation, regolith and strata log move with the plate under each cell (`advect.rs`),
+//! each with its own crust: a cell takes them from the cells that held the same crust before the
+//! step, and where another plate's crust has arrived it starts from the plate model's elevation.
+//! Uplift is what the plate model did to the crust under a cell (subduction and collision uplift,
+//! thermal subsidence, trench accretion), exactly P1-03's `plates/uplift_mm_yr`: the surface
+//! starts a step at its last elevation, carried, plus that uplift. The **offset** is what stands
+//! between it and the plate model's own elevation (`plates/elevation_m`, sampled onto L1 every
+//! step; the pipeline presets set `tectonics.l1_every_steps` = 1): valleys, basins, eroded ranges,
+//! what the coarse L0 samples do not carry. It is an output, not the state (2026-10-01: carried as
+//! the state and added to the plate model's elevation, it was added to whatever crust the cell
+//! read next, and built 13–20 km "mountains").
 //!
-//! The surface's changes flow back: the net elevation change of every cell (`surface/feedback_m`,
-//! and the material moved, `surface/material_m`) is spread onto the L0 samples at the start of the
-//! next plate step (`plates::PlatesStage`), which reports what it applied as seen from L1
-//! (`surface/feedback_applied_m`); the offset is corrected by it, so the two elevations never
-//! drift apart. The plate model's own continental erosion (Cortial's ε_c) is off in the pipeline
-//! presets — this stage does erosion.
+//! The surface flows back: the whole offset of every cell (`surface/feedback_m`, and the material
+//! moved this step, `surface/material_m`) is spread onto the L0 samples at the start of the next
+//! plate step (`plates::PlatesStage`), so a sample's elevation is the surface's at its scale and
+//! the plate model's uplift laws see the real height. The plate model's own continental erosion
+//! (Cortial's ε_c) is off in the pipeline presets — this stage does erosion.
 //!
 //! # One step (Δt = the plate step, `substeps` LEM steps inside it)
-//! 1. Advect the offset, regolith and strata log; clear them on crust born this step.
-//! 2. h = plate elevation + offset; sea level from the preset (`params::SeaLevel`), or, with a
+//! 1. Carry the elevation, regolith and strata log; clear them on crust born this step.
+//! 2. h = carried elevation + the plate model's uplift; sea level from the preset (`params::SeaLevel`), or, with a
 //!    climate stage, its eustatic sea level (the curve plus glacio-eustasy); climate
 //!    (`climate.rs`: the climate stage's fields, which it wrote just before this step on the same
 //!    ground, when the preset has a `climate` section (P1-05), else the stand-in).
@@ -106,6 +110,11 @@ pub mod field {
     pub const DEPOSITION: &str = "surface/deposition_m_myr";
     /// Thickness of the strata log, m.
     pub const SEDIMENT: &str = "surface/sediment_m";
+    /// The plate and the rigid group under each cell after the last step (`plates/plate_id`,
+    /// `plates/group_id` as the stage saw them): the next step's advection carries the offset only
+    /// from cells that held the same crust (`advect::bilinear_same`).
+    pub const CRUST_PLATE: &str = "surface/crust_plate";
+    pub const CRUST_GROUP: &str = "surface/crust_group";
     /// The surface rock class (index into `synth::EVERY_CLASS`).
     pub const CLASS: &str = "surface/class";
     /// log₁₀ of the drainage area in km² (land; NaN at sea).
@@ -282,11 +291,17 @@ impl Parts {
     }
 }
 
+/// `WorldState::globals`: cell-steps so far where another plate's crust arrived under a cell and
+/// the surface's offset started again from the plate model's elevation (`advect::bilinear_same`).
+pub const FOREIGN_CRUST_GLOBAL: &str = "surface/foreign_crust_cell_steps";
+
 /// The plate fields the stage reads each step.
 struct PlateFields {
     elevation: Vec<f32>,
     uplift: Vec<f32>,
     plate_id: Vec<f32>,
+    /// `plates/group_id`; absent in worlds built without the plate model's L1 sampling (tests).
+    group_id: Option<Vec<f32>>,
     crust_type: Vec<f32>,
     crust_age: Vec<f32>,
     regime: Vec<f32>,
@@ -321,6 +336,7 @@ impl PlateFields {
             elevation: get("plates/elevation_m")?,
             uplift: get("plates/uplift_mm_yr")?,
             plate_id: get("plates/plate_id")?,
+            group_id: get("plates/group_id").ok(),
             crust_type: get("plates/crust_type")?,
             crust_age: get("crust_age")?,
             regime: get("regime")?,
@@ -501,25 +517,16 @@ impl SurfaceStage {
         let parents: Vec<Option<u32>> = plates.plates.iter().map(|p| p.parent).collect();
         let pstep = plates.step;
         let pf = PlateFields::read(world, n)?;
-        let applied = world
-            .fields
-            .get(field::FEEDBACK_APPLIED)
-            .filter(|f| f.data.len() == n)
-            .map(|f| f.data.clone());
         let cls = self.classes;
         let p = self.p.clone();
 
         // 1. The state, carried with the plates.
         let started = Instant::now();
+        // Cells where another plate's crust arrived this step (the offset starts again there).
+        let mut foreign_cells = 0u64;
         let mut st = match world.surface.take() {
             Some(mut st) => {
                 ctx.reserve(StrataLog::bytes_per_cell(st.log.k) * n as u64 + 16 * n as u64)?;
-                let mut off = st.offset_m.clone();
-                if let Some(ap) = &applied {
-                    off.par_iter_mut()
-                        .zip(ap.par_iter())
-                        .for_each(|(o, a)| *o -= a);
-                }
                 // Plates born this step moved with their parent's Ω.
                 let omega: Vec<[f64; 3]> = (0..parents.len())
                     .map(|mut k| {
@@ -536,9 +543,36 @@ impl SurfaceStage {
                     })
                     .collect();
                 let src = advect::sources(&grid, &pf.plate_id, &omega, dt);
-                st.offset_m = src
+                // The elevation moves with its own crust and takes the plate model's uplift
+                // (`advect::carried_elevation`); the offset is what stands over the plate model's
+                // elevation here.
+                let prev_ids = |name: &str| {
+                    world
+                        .fields
+                        .get(name)
+                        .filter(|f| f.data.len() == n)
+                        .map(|f| f.data.as_slice())
+                };
+                let (carried, foreign) = advect::carried_elevation(&advect::Carry {
+                    w,
+                    h: hgt,
+                    src: &src,
+                    prev_elevation: &st.elevation_m,
+                    prev_plate: prev_ids(field::CRUST_PLATE),
+                    prev_group: prev_ids(field::CRUST_GROUP),
+                    plate: &pf.plate_id,
+                    group: pf.group_id.as_deref(),
+                    plate_elevation: &pf.elevation,
+                    uplift_mm_yr: &pf.uplift,
+                    parents: &parents,
+                    known_plates: st.omega.len(),
+                    dt_yr: dt,
+                });
+                foreign_cells = foreign;
+                st.offset_m = carried
                     .par_iter()
-                    .map(|&[fi, fj]| advect::bilinear(w, hgt, &off, fi, fj))
+                    .zip(pf.elevation.par_iter())
+                    .map(|(h, z)| h - z)
                     .collect();
                 let reg = std::mem::take(&mut st.regolith_m);
                 st.regolith_m = src
@@ -1198,7 +1232,17 @@ impl SurfaceStage {
         let elevation_y: Vec<f32> = (0..n)
             .map(|c| (sea_y + (sc.h[c] - sea) / m_per_block_v) as f32)
             .collect();
-        let feedback: Vec<f32> = (0..n).map(|c| (sc.h[c] - h_start[c]) as f32).collect();
+        // What the plate model is told: where the surface stands over the plate model's own
+        // elevation, all of it, not only this step's change. Each sample takes the mean over its
+        // cells, so its elevation is the surface's at its scale and the uplift laws that look at
+        // it (the ceiling on collision and subduction uplift, the cap) see the real height. With
+        // only the step's change handed over, whatever a sample had not taken (the spread onto
+        // coarser samples, its clamps) stayed in the surface for good and the two drifted apart:
+        // crust the plate model held at 2.8 km stood at 14 km and still took a full collision
+        // surge.
+        let feedback: Vec<f32> = (0..n)
+            .map(|c| (sc.h[c] - f64::from(pf.elevation[c])) as f32)
+            .collect();
         let material: Vec<f32> = net.iter().map(|&x| x as f32).collect();
         st.offset_m = (0..n)
             .map(|c| (sc.h[c] - f64::from(pf.elevation[c])) as f32)
@@ -1254,7 +1298,18 @@ impl SurfaceStage {
             gtot.write(&mut world.notes);
         }
         put(world, field::ICE, ice_now);
+        put(world, field::CRUST_PLATE, pf.plate_id.clone());
+        match &pf.group_id {
+            Some(g) => put(world, field::CRUST_GROUP, g.clone()),
+            None => {
+                world.fields.remove(field::CRUST_GROUP);
+            }
+        }
         put(world, field::GLACIAL_EROSION, g_rate);
+        *world
+            .globals
+            .entry(FOREIGN_CRUST_GLOBAL.to_owned())
+            .or_insert(0.0) += foreign_cells as f64;
         world.fields.remove(field::FEEDBACK_APPLIED);
         self.time("outputs", started);
 
