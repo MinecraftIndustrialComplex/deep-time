@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.zip.CRC32;
 
 /**
@@ -38,6 +39,11 @@ public final class WorldData {
     private volatile Deposits deposits;
     /** {@code strata/classes.json}, read on first use. */
     private volatile List<String> classes;
+    /** {@code rivers/rivers.dtrv} (P1-22), read on first use; {@link #NO_RIVERS} when absent. */
+    private volatile Object rivers;
+    private static final Object NO_RIVERS = new Object();
+    /** The ice cover, resolved on first use. */
+    private volatile Optional<IceCover> iceCover;
 
     private WorldData(Path folder, Manifest manifest, TileCache cache, Map<String, RasterSampler> layers) {
         this.folder = folder;
@@ -114,6 +120,21 @@ public final class WorldData {
         return d;
     }
 
+    /** The river network (P1-22), read and checked on first use; null for a world without one. */
+    public Rivers rivers() {
+        Object r = rivers;
+        if (r == null) {
+            synchronized (this) {
+                if (rivers == null) {
+                    Rivers read = Rivers.read(folder);
+                    rivers = read == null ? NO_RIVERS : read;
+                }
+                r = rivers;
+            }
+        }
+        return r == NO_RIVERS ? null : (Rivers) r;
+    }
+
     /** {@code strata/classes.json}: class index → rock class id (read once). */
     public List<String> classes() {
         List<String> c = classes;
@@ -131,6 +152,19 @@ public final class WorldData {
                     }
                 }
                 c = classes;
+            }
+        }
+        return c;
+    }
+
+    /** The world's ice cover ({@link IceCover#of}), resolved once; empty for a world without one. */
+    public Optional<IceCover> iceCover() {
+        Optional<IceCover> c = iceCover;
+        if (c == null) {
+            synchronized (this) {
+                if (iceCover == null)
+                    iceCover = IceCover.of(this);
+                c = iceCover;
             }
         }
         return c;

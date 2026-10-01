@@ -103,11 +103,29 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         super.buildSurface(region, structures, random, chunk);   // the pack's surface rules repaint the default block
         if (terrain() instanceof WorldDataTerrain w) {
             StrataPass.apply(chunk, w.data());
-            WaterPass.apply(chunk, w.data(), waterReach());    // lakes above sea level (plan §7.9)
+            WaterBodies.apply(chunk, w.data(), waterReach());  // lakes, rivers, banks (plan §7.9, P1-22)
+            IcePass.apply(chunk, w.data());                    // snow and ice over glaciated ground, whatever the biome
         }
     }
 
-    /** How far {@link WaterPass} carries a lake's level past its last wet cell: one noise cell. */
+    /**
+     * After the air carvers, wakes the water that hangs over a cave they opened into a river or lake
+     * bed ({@link WaterBodies#wake}); the carvers themselves never touch Deep Time's water, because
+     * {@link WaterBodies} put its blocks in the chunk's carving mask before they ran.
+     */
+    @Override
+    public void applyCarvers(net.minecraft.server.level.WorldGenRegion region, long seed, net.minecraft.world.level.levelgen.RandomState random,
+                             net.minecraft.world.level.biome.BiomeManager biomes, net.minecraft.world.level.StructureManager structures,
+                             net.minecraft.world.level.chunk.ChunkAccess chunk, net.minecraft.world.level.levelgen.GenerationStep.Carving step) {
+        super.applyCarvers(region, seed, random, biomes, structures, chunk, step);
+        if (step == net.minecraft.world.level.levelgen.GenerationStep.Carving.AIR && terrain() instanceof WorldDataTerrain w)
+            WaterBodies.wake(chunk, w.data(), waterReach());
+    }
+
+    /**
+     * The noise cell width: how far the shore rule carries a lake's level past its last wet cell,
+     * and the cells {@link WaterBodies} interpolates the generated surface over.
+     */
     public int waterReach() {
         return sourceSettings.value().noiseSettings().getCellWidth();
     }

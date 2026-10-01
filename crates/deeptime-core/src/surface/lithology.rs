@@ -26,7 +26,7 @@ macro_rules! class_files {
 }
 
 /// The class files, in `EVERY_CLASS` order.
-const FILES: [(&str, &str); 59] = class_files!(
+const FILES: [(&str, &str); 60] = class_files!(
     "granite",
     "granodiorite",
     "diorite",
@@ -41,6 +41,7 @@ const FILES: [(&str, &str); 59] = class_files!(
     "scoria",
     "pumice",
     "conglomerate",
+    "diamictite",
     "sandstone",
     "red_bed",
     "mudstone",
@@ -230,6 +231,7 @@ pub struct Classes {
     pub saprolite: u16,
     pub laterite: u16,
     pub bauxite: u16,
+    pub till: u16,
 }
 
 impl Classes {
@@ -258,6 +260,7 @@ impl Classes {
             saprolite: index("saprolite"),
             laterite: index("laterite"),
             bauxite: index("bauxite"),
+            till: index("till"),
         }
     }
 }
@@ -269,7 +272,16 @@ mod tests {
     #[test]
     fn the_table_is_the_rock_class_data() {
         let t = table();
-        assert_eq!(t.len(), 59);
+        assert_eq!(t.len(), 60);
+        // Buried till is diamictite (Ben, 2026-09-30), whose young, shallow part shows as till.
+        assert_eq!(
+            t[usize::from(index("till"))].lithifies_to,
+            Some(index("diamictite"))
+        );
+        assert_eq!(
+            t[usize::from(index("diamictite"))].loose_equivalent,
+            Some(index("till"))
+        );
         let g = &t[usize::from(index("granite"))];
         assert_eq!((g.erodibility, g.diffusivity), (1.0, 1.0));
         assert_eq!(g.source_family, 0);

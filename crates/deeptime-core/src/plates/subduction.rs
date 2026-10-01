@@ -28,7 +28,11 @@
 //! `arc_distance_km` from the front) adds arc magma to the rock pools and the deposit
 //! accumulators, and builds submarine overriding crust up at `arc_uplift_mm_yr` so island arcs
 //! emerge (Cortial's h(z̃) makes abyssal slabs lift an oceanic overriding plate far slower than its
-//! dampening); emerged arc crust becomes continental. Trench samples (the subducting plate's
+//! dampening); emerged arc crust becomes continental. A wider band around the arc
+//! (`cordillera_width_km`) lifts continental crust at `cordillera_uplift_mm_yr`, slowing as it nears
+//! `cordillera_height_m` (P1-27: the arc's own range, built by arc magmatism and crustal
+//! thickening, which h(z̃) of an abyssal slab leaves at a few hundredths of a mm/yr), and adds the
+//! Airy root that carries it to the crust. Trench samples (the subducting plate's
 //! visible samples next to its own hidden ones) are pulled towards z_t and receive sediment
 //! accretion (`pools.rs`). Slab pull turns the subducting plate's axis towards its fronts. Uplift
 //! of crust above sea level is scaled by the isostatic ceiling (1 − z/z_c) ([`ceiling`]).
@@ -43,6 +47,7 @@ use super::Env;
 use super::events::{self, SUBDUCTION_ONSET};
 use super::geometry::{Cover, Geo, Tree, cover, dijkstra};
 use super::kinematics::{quat, tangent, to_group, to_world};
+use super::pools::ISOSTATIC_FACTOR;
 use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
@@ -413,6 +418,9 @@ struct Source {
     z_sub: f64,
     slab_age: f64,
     sediment: f64,
+    /// The subducting crust at the front is oceanic (a continental arc's cordillera needs an
+    /// oceanic slab; continental crust forced under builds the collision's own relief).
+    oceanic_slab: bool,
 }
 
 /// Slab pull per plate, from its subduction fronts this step.
@@ -524,6 +532,7 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
                 z_sub: f64::from(su.elevation_m),
                 slab_age: su.age_myr(t_myr),
                 sediment: f64::from(su.pools[pool::SEDIMENT]),
+                oceanic_slab: su.kind != CONTINENTAL,
             });
             let under = state.contacts[c].under as usize;
             front_len[under] += front_km;
@@ -550,6 +559,7 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
     let dt_yr = env.dt_yr;
     let u0_m = k.subduction_uplift_mm_yr * 1.0e-3 * dt_yr;
     let arc_m = k.arc_uplift_mm_yr * 1.0e-3 * dt_yr;
+    let cord_m = k.cordillera_uplift_mm_yr * 1.0e-3 * dt_yr;
     let (zt, zc) = (k.trench_elevation_m, k.max_elevation_m);
     let x0 = k.subduction_peak_km / k.subduction_distance_km;
     let v0 = k.max_plate_speed_mm_yr;
@@ -583,6 +593,25 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: 
             let w_arc = (-((d_km - k.arc_distance_km) / k.arc_width_km).powi(2)).exp();
             if z < 0.0 {
                 dz += arc_m * w_arc * g;
+            }
+            // The arc's own range (P1-27): continental crust over the arc thickens by arc
+            // magmatism and shortening and stands up as a cordillera, so the cones rise from a
+            // range (the Andes, the Cascades) rather than from a coastal plain; the root that
+            // holds it up (Airy, `pools::ISOSTATIC_FACTOR` times the uplift) joins the crust.
+            if cord_m > 0.0 && s.kind == CONTINENTAL && src.oceanic_slab {
+                let w = (-((d_km - k.arc_distance_km) / k.cordillera_width_km).powi(2)).exp();
+                // Thickened arc crust spreads under its own weight: the range builds towards
+                // `cordillera_height_m` and no higher (the Altiplano and the Puna stop near 4 km).
+                let room = if z <= 0.0 {
+                    1.0
+                } else {
+                    (1.0 - z / k.cordillera_height_m).max(0.0)
+                };
+                let up = cord_m * w * g * room;
+                dz += up;
+                let root = (up * ISOSTATIC_FACTOR) as f32;
+                s.pools[pool::FELSIC_PLUTONIC] += 0.6 * root;
+                s.pools[pool::METAMORPHIC] += 0.4 * root;
             }
             s.elevation_m = (z + dz).min(zc) as f32;
             // Arc magma and the deposit accumulators.

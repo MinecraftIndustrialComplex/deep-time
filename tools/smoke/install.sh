@@ -7,7 +7,7 @@
 #   tools/smoke/install.sh <standalone|mic|mic-ev|terrablender|ev|ev-client>
 #       [--size 16384|32768]      world circumference -> level-type deeptime:planet[_32k]
 #       [--synth <kind>]          write synthetic world data before the first start (P0-09+)
-#       [--strata <kind>]         the synthetic horizons: placeholder (default) or every-class (P1-12)
+#       [--strata <kind>]         the synthetic horizons: placeholder (default), every-class (P1-12) or basin
 #       [--datapack <folder>]     copy a datapack folder into the world's datapacks/ (e.g. the MIC
 #                                 rock tags, …/mic/Docs/datapacks/deeptime-mic-rock-tags, until the
 #                                 pack ships them; P1-12)

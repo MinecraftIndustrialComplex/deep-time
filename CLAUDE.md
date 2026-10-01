@@ -47,8 +47,14 @@ tools/smoke/install.sh <standalone|mic|terrablender> [--size N] [--synth K] && p
 tools/client/mac-screenshots.sh [--name N] [--no-guidance] [--no-create]   # real client on the Mac's desktop → review/out/N/
 tools/review/publish.sh <name> <folder>                 # private spacesheep page (plan §2.6)
 tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | status   # workbench on the Mac → http://m6-mac-mini:8642/ (tailnet only)
+tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete merged worktrees' Mac copies
 
 ## Rules
+- **The M6 Mac is off limits for now** (Ben, 2026-10-01: our test load made graphide's ms-precision
+  timing tests flaky). Run nothing on m6-mac-mini: no builds, tests, runs, servers or screenshots.
+  `tools/remote/mac.sh` refuses while `/Volumes/Graphide/ban/deeptime-cache/PAUSED` exists there. A
+  dedicated test machine is being provisioned; until it is wired in (`DEEPTIME_MAC`), commit work
+  without the Mac gates and say so. Nothing heavy on the laptop either.
 - NixOS: nothing global. Run builds, tests and every `cargo` through `nix develop -c` (the profile's
   `cargo` is a bare rustup shim); one-off tools via `nix shell nixpkgs#<pkg> -c <cmd>`. Stage new files
   with `git add` before Nix reads them (flakes see only tracked files). Never `nix eval` a whole
@@ -68,6 +74,14 @@ tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | 
   `--pull`. If something must run locally: one job at a time, wrapped as
   `systemd-run --user --scope -p CPUQuota=100% nice -n 19 <cmd>`. No parallel local batches; no
   `nix develop` builds on the laptop.
+- **Mac disk hygiene** (2026-09-30: the SSD filled to 100 % with ~60 worktree copies, each with its own
+  target/; Ben: "Be more efficient about mac storage usage in the future"): after every merge run
+  `tools/remote/mac-gc.sh`, which deletes the Mac copies of merged, idle worktrees and prunes stale
+  incremental caches (`--dry-run` to preview). Scratch runs go under
+  `/Volumes/Graphide/ban/deeptime-runs/<task>/`, never inside target/; use the smallest planet and
+  fewest keyframes that answer the question, and delete them when the task lands. mac.sh builds with
+  `CARGO_INCREMENTAL=0` and line-table debuginfo to keep each copy's target/ small; do not override
+  that. Keep everything on the SSD, never the Mac's internal disk.
 - **Real-client runs** (booting a Minecraft client for screenshots) go to the Mac's logged-in desktop
   session too, never the laptop's Xvfb (Ben, 2026-09-28). That desktop is shared with graphide's
   agents: take a "drive" lease with graphide's `utilities/scripts/mactest/m6lock.sh` first.
@@ -95,8 +109,16 @@ tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | 
   STATUS. Never rewrite or delete earlier log entries or other parts of the decisions file.
 - Implementation details inside a task (class names, file splits, calibrated tolerances) are yours to
   decide; record them in STATUS.md's build log.
-- Sub-agents: pass `model` explicitly. Sonnet for lookups (jars, javap, versions, licences); Opus for
-  code and design. No Fable.
+- Sub-agents: pass `model` explicitly. Sonnet 5.5 (xhigh, never max) for lookups and for
+  well-specified implementation, including follow-ups to finished work; Opus for design, hard
+  diagnosis, cross-subsystem changes, data formats and review (Ben, 2026-09-30). A resumed agent
+  keeps its model, so give a Sonnet-shaped follow-up to a fresh Sonnet agent, not a resumed Opus
+  one. No Fable.
+- **GameTests run once per merge batch** (Ben, 2026-09-30; the Mac's single server slot had ~7
+  agents queueing two runs each): an agent on a branch runs cargo (test, clippy, fmt, deny) and
+  `./gradlew build test`, not `./gametest.sh`. The coordinator merges a batch into master, then runs
+  `./gametest.sh` and `./gametest.sh -PwithMic` once and fixes failures on master. Planet probes
+  and smoke runs that a task needs for its own measurements still take `--server`.
 - Never commit smoke/, run/, run-gametest/, run-planet/, libs/, review/out/, rcon.pw or
   .spacesheep.json. Never redistribute Project Atmosphere.
 - Licence acceptances Ben made (2026-09-28): Minecraft EULA for headless test servers, BlueMap

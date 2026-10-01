@@ -80,6 +80,23 @@ public final class GameTestSupport {
     public static final ResourceKey<Level> TEST_PLANET_REAL =
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_planet_real"));
 
+    /**
+     * The real planet's world data again (folder {@code deeptime-real}) with the lake level's bare
+     * biome, no carvers, no features and no caves (P1-22): only the generator's passes touch its
+     * rivers and lakes, so {@code RiverGameTests.riversHold} sees exactly what the water pass built.
+     */
+    public static final ResourceKey<Level> TEST_RIVERS =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_rivers"));
+
+    /**
+     * {@link #TEST_RIVERS}' world data again under a biome whose only carver is a wide cave carver
+     * that starts in every chunk ({@code deeptime:test_wide_caves}; Ben, 2026-10-01, "Protect water
+     * blocks"): {@code RiverGameTests.carversSpareWater} reads back what real carvers left of the
+     * rivers and lakes.
+     */
+    public static final ResourceKey<Level> TEST_RIVERS_CARVED =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_rivers_carved"));
+
     /** A second level over the same deposit world data, for the regeneration check. */
     public static final ResourceKey<Level> TEST_DEPOSITS_TWIN =
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_deposits_twin"));

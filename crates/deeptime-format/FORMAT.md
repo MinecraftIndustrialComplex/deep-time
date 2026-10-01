@@ -18,7 +18,7 @@ term a baked world declares ("The terrain height"); the first horizon of a baked
 the amplified terrain ("The P1-08 bake"); and the column evaluator both sides implement is specified
 ("Columns"). Nothing a 0.0 world held changed its bytes, only the minor.
 
-**0.2** over 0.1 (two changes, released together): every header's minor is 2.
+**0.2** over 0.1 (three changes, released together): every header's minor is 2.
 - *Monthly climate (P1-25):* a planet run with a climate section bakes the climate stage's twelve
   months on L1 (`climate/month/t_sl_c_01..12`, `climate/month/p_share_01..12`,
   `notes.bake.climate.monthly`), and the climate at a block that Deep Time's public climate API
@@ -28,6 +28,11 @@ the amplified terrain ("The P1-08 bake"); and the column evaluator both sides im
   keys, with B-spline weights, and intertongues facies changes, so beds run on across cells instead
   of stepping at cell edges; the bake smooths the stacks laterally ("The 0.2 bake"); a column's
   horizons carry a unit key (`[top y, class, unit]` in "Columns").
+- *Rivers and lakes (P1-22):* `water_level` holds the lakes a run's bake finds (it was all nodata),
+  the new `rivers/rivers.dtrv` (`DTRV`) holds the river network ("Rivers"), the preset gains a
+  `hydro` section, and the column evaluator decides each column's water ("Water columns"; `hydro`
+  in "Columns" and `parity/columns.json`). A reader treats a folder without `rivers/rivers.dtrv` as
+  having no rivers (the synthetic worlds have none).
 Every other file's bytes are as in 0.1.
 
 ## Folder layout
@@ -36,13 +41,15 @@ Every other file's bytes are as in 0.1.
 <world-data>/
   manifest.json                 written last (tmp + fsync + rename); present ⇒ folder complete
   rasters/elevation.dtr         L3, i16, 1/16 block
-  rasters/water_level.dtr       L3, i16, 1/16 block, nodata −32768
+  rasters/water_level.dtr       L3, i16, 1/16 block, nodata −32768 (lake surfaces; grid L3h on 32k full)
+  rivers/rivers.dtrv            optional: the river network (P1-22, "Rivers")
   rasters/detail/amplitude.dtr  L3, u8, 1/16 block: amplitude of the sub-cell detail term (P1-06)
   rasters/climate/<name>.dtr    L2, i16, vanilla parameter × 10,000
                                 (<name> ∈ temperature, vegetation, continents, erosion, ridges)
   rasters/climate/t_mean_c.dtr  L1, i16, 0.01 °C            ┐
   rasters/climate/p_mm.dtr      L1, u16, mm/yr              │ a baked planet run only
   rasters/climate/koppen.dtr    L1, u8, Köppen code index   │ (P1-08, "The bake" below)
+  rasters/climate/ice_cover.dtr L2, u8, blocks of snow/ice  │ ("The ice cover")
   rasters/climate/month/*.dtr   L1: t_sl_c_NN i16 0.01 °C,  │ the twelve months (0.2, P1-25)
                                 p_share_NN u8 1/40          │
   rasters/surface/*.dtr         L2, u8                      │
@@ -118,11 +125,12 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 |---|---|---|---|---|---|
 | `elevation` | L3 | i16 | 1/16, block | — | terrain y: the amplifier's, mountain character included ("The mountain character"); without the amplify stage the young landscape (L2) or the deep-time surface (L1) upsampled bilinearly |
 | `detail/amplitude` | L3 | u8 | 1/16, block | — | the detail term's A (P1-06; absent without the amplify stage) |
-| `water_level` | L3 | i16 | 1/16, block | −32768 | every cell nodata: lakes and rivers are Phase 2 |
+| `water_level` | L3 (L3h: L3 averaged 2 × 2 when L3 has more than 40 M cells, 32k full) | i16 | 1/16, block | −32768 | each lake's cells hold its surface, nodata elsewhere (P1-22, "Rivers"); all nodata when `hydro.enabled` is false |
 | `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks with key spans, smoothed ("The 0.2 bake"), the first top raised ("The P1-08 bake") |
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
 | `climate/koppen` | L1 | u8 | 1, code index | 255 | `notes.bake.climate.koppen_codes[i]` (31 = sea) |
+| `climate/ice_cover` | L2 | u8 | 1, blocks | — | blocks of snow and ice the surface pass lays over glaciated ground ("The ice cover"); absent without the climate stage |
 | `climate/month/t_sl_c_{01..12}` | L1 | i16 | 0.01, degC | — | each month's mean temperature at sea level (the lapse rate taken out: `+ lapse_c_per_km · max(0, h − sea)`), from the climate stage's last snapshot (0.2) |
 | `climate/month/p_share_{01..12}` | L1 | u8 | 1/40, ratio | — | each month's precipitation rate over the twelve's mean (0–6.375; they sum to 12 within the quantum) (0.2) |
 | `climate/{temperature,vegetation,continents,erosion,ridges}` | L2 | i16 | 1e-4, vanilla_param | — | the router's five biome inputs, placed against the reference bands and vanilla's land distributions (P1-09, "The climate mapping") |
@@ -132,7 +140,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `meta/crust_age_myr` | L1 | u16 | 1, Myr | 65535 | oceanic crust age; nodata on continental crust |
 | `meta/province` | L1 | u16 | 1, province id | — | contiguous geologic provinces ≥ 50,000 km² (`notes.bake.meta.provinces`) |
 
-`notes.bake`: `version` (1), `baked`, per part (`terrain`, `strata`, `climate`, `surface`, `meta`)
+`notes.bake`: `version` (1), `baked`, per part (`terrain`, `strata`, `climate`, `water`, `surface`, `meta`)
 what it did, `millis` per part, `bytes` and `layers` written, and **`detail`** — the game's detail
 term: `{"layer": "detail/amplitude", "seed": "<u64, decimal>", "salt": 1729, "octaves": 3,
 "wavelength_blocks": 32.0}` (present exactly when `detail/amplitude` is). A preset without the
@@ -218,21 +226,30 @@ jar ships it and the core compiles the same file in as the default). Band coordi
   "classes": {                           every land class Af … EF (31 of them; not "sea"), no others
     "Af":  { "temperature": "tropical", "humidity": "rainforest" },
     "EF":  { "temperature": "polar_ice", "humidity": "polar_desert",       optional "glaciated": what the class does
-             "glaciated": { "humidity": "ice_cap" } },                     where the glacier flag is set: its own
-                                                                           "temperature" and/or "humidity" (at least
-                                                                           one; each falls back to the class's own)
-                                                                           optional "weirdness": "positive"
+             "erosion": { "max": 0.3 },                                    where the glacier flag is set: its own
+             "weirdness": { "positive_below_erosion": -0.27 },             "temperature", "humidity" and/or "erosion"
+             "glaciated": { "humidity": "ice_cap",                         (at least one; each falls back to the
+                            "erosion": { "max": 1.0 } } },                 class's own); optional "erosion": the
+                                                                           class's land erosion is clamped into
+                                                                           {min, max} (−1 … 1, at least one key);
+                                                                           optional "weirdness": "positive" or
+                                                                           {"positive_below_erosion": e,
+                                                                            "flats": {positive_noise_above, max_magnitude}}
     "BSk": { "temperature": { "when": { "of": "t_cold", "above": 0.0 },   the ramp "then" where the input is above
                               "then": "temperate", "else": "boreal" },     the threshold, "else" elsewhere
              "humidity": "steppe" }
+  },
+  "ice_cover": {                         optional, every key optional (defaults as written here): "The ice cover"
+    "step_m": 160.0, "max_blocks": 12, "snow_blocks": 3, "blue_ice_from_blocks": 9, "blue_ice_blocks": 2,
+    "snow": "minecraft:snow_block", "ice": "minecraft:packed_ice", "deep_ice": "minecraft:blue_ice"
   }
 }
 ```
 
 **Glaciated land.** Without a `glaciated` block a class is held at or below `glacier_cap` wherever
 the glacier flag (`climate/glacier`, land above its equilibrium line) is set. With one, the block
-decides instead: its temperature ramp (else the class's own, uncapped) and its humidity rule (else
-the class's own). The default table gives EF one (Ben, 2026-09-29, "Ice only where there's ice"):
+decides instead: its temperature ramp (else the class's own, uncapped), its humidity rule (else
+the class's own) and its erosion limits (else the class's own). The default table gives EF one (Ben, 2026-09-29, "Ice only where there's ice"):
 EF above its equilibrium line is **ice cap** (humidity `ice_cap`, the fixed band coordinate 0.5,
 vanilla's first humidity band: ice spikes, frozen and jagged peaks, snowy slopes and plains, no
 forest) and the rest of EF is **barren frozen ground** (`polar_desert`, fixed 1.5: Terralith's gravel
@@ -242,9 +259,29 @@ Terralith splits the band at temperature −0.727 (coordinate 0.496) and puts it
 snowy badlands below it and its dry cold biomes above. Humidity for EF is fixed because P/PET says
 nothing in a freezing climate (PET is 0 below 0 °C, and the stage pins the index at 10). A rule
 with `min` = `max` is a fixed coordinate. ET is as it was (`polar`, `tundra`, capped where glaciated).
-A class may also carry `"weirdness": "positive"` (the only value): the bake then gives its land the
-positive sign of the variant noise everywhere, so its peaks are vanilla's frozen peaks and never the
-negative branch's (jagged peaks in vanilla; Terralith puts its scarlet mountains there). EF has it.
+**Erosion and weirdness (Ben, 2026-09-30, "Fix both").** A class may carry `"erosion": {min, max}`
+(vanilla's erosion units, −1 … 1; at least one key): its land's erosion is clamped into it, after the
+relief's rank and the wetlands have set it; a `glaciated` block may give its own. And it may carry
+`"weirdness"`: `"positive"` (its land takes the positive branch of the variant noise everywhere) or
+`{"positive_below_erosion": e, "flats": {"positive_noise_above": n, "max_magnitude": m}}` (the positive
+branch where the land's erosion is below `e`, the negative one above, except that the flats, the land
+above `e`, are positive where the variant noise (-1 .. 1) is above `n` (default 1: never; 0: the
+noise's own half) and their |weirdness| is at most `m` (0.07 .. 1, default none); `flats` is
+optional). The default table uses all three for EF:
+- barren EF is held below erosion 0.3, which keeps it off Terralith's `glacial_chasm` (packed ice; it
+  takes erosion from 0.4, or from 0.565 at any humidity); ice cap (`glaciated`, `max` 1) keeps the
+  chasm, the one ice biome for low-relief land;
+- its peaks (erosion below −0.27) are on the positive branch, vanilla's frozen peaks, and never on the
+  negative branch (jagged peaks in vanilla, where Terralith puts its scarlet mountains): −0.27 is a
+  little above vanilla's −0.375 edge because MIC's Tectonic router stretches erosion, and the flats
+  (erosion above it) are on the negative branch, where vanilla's and Terralith's cherry groves, which
+  are positive-branch variants, do not grow, except where the variant noise is above 0.2 (about a
+  fifth of them): those are positive, so that vanilla's ice spikes, a positive-branch variant, come
+  back on the ice cap (Ben, 2026-09-30, "Bring ice spikes back"), and their |weirdness| is held to 0.25,
+  below the magnitudes the cherry groves need (0.4 and up at mid erosion; MIC's router puts every
+  reference value from 0.3 to 0.57 there). All of it is data a pack overrides; the limits are in
+  vanilla's units, which the game then maps onto the pack's, so a pack with another router wants
+  its own numbers (MIC's tuned ones are the defaults').
 
 The default table reproduces what P1-09 first compiled in, operation for operation for every class
 but EF (a test holds the core's default to the old formulas bit for bit). A ramp is a `base`/`span` pair rather than two
@@ -276,6 +313,36 @@ continentalness map band edge to band edge; erosion maps the reference's land qu
 onto the pack's below its E6, then E6 edge to edge; weirdness maps the peaks-and-valleys
 quantiles above the valley slice on the rising branch (|w| = (PV + 1)/3). A folder without a
 P1-09 record (the synthetic worlds, older bakes) gets no file: its values are used as written.
+
+### The ice cover (Ben, 2026-09-30, "Force snow/ice cover")
+
+Terralith has no flat inland ice biome, so an ice cap's flats would read as gravel desert or cold
+shrubland whatever biome tag the pack's source picked. Deep Time's own surface pass (`worldgen/IcePass`,
+after the pack's surface rules, the strata pass and the water pass) therefore lays snow and ice over
+glaciated ground regardless of biome. The contract between the climate and that pass is the layer
+`climate/ice_cover` (L2, u8, blocks; 0 = none) and the record `notes.bake.climate.ice_cover`:
+
+- **The layer** (`deeptime_core::bake::ice`): for each L2 cell whose ground is above the sea and
+  carries ice, `1 + ⌊t / step_m⌋` blocks, at most `max_blocks`; else 0. `t` is the climate's land-ice
+  thickness (`climate/ice_thickness_m`, L1, m: the ice sheets and glaciers of the deep-time climate,
+  "The climate's ice fields"; ice of at least 1 m counts, as for `climate/glacier`) resampled
+  bilinearly to L2, so a cover thins toward an ice edge; a world whose climate has no ice fields
+  (an older run) falls back to `t` = the ground's height above its equilibrium line
+  (`climate/anomaly/ela_m`, L1, every cell: the Ohmura rule of `climate::glaciers`; the ground is the
+  young landscape's elevation the biome inputs were placed on). `notes.bake.climate.ice_cover.source`
+  names the field used. Absent when the world has no climate stage. The pass does not read the climate
+  at all: a climate that changes how it carries ice only has to keep this layer's meaning.
+- **The record** is the placement table's `ice_cover` section, defaults filled in, plus `cells` and
+  `thickest_blocks` and `source`: `step_m`, `max_blocks`, `snow_blocks`, `blue_ice_from_blocks`,
+  `blue_ice_blocks`, and the block ids `snow`, `ice`, `deep_ice`.
+- **The pass** reads the layer bilinearly (so a cover's edge is a slope of cells, not 8-block steps) and
+  rounds, giving `n` blocks for the column. The cover **replaces** the top `n` solid blocks of the
+  ground, so the terrain's height is unchanged: the top `snow_blocks` (at most `n`) are `snow`, the
+  last `blue_ice_blocks` of a cover of at least `blue_ice_from_blocks` are `deep_ice`, the blocks
+  between `ice`. A column whose surface is fluid (a lake, the sea) and air, bedrock and fluid blocks
+  are left alone. Vanilla's `freeze_top_layer` feature then lays its snow layer on the snow block.
+  The layer is not part of the column evaluator: Java alone reads it, and Rust's `inspect-column`
+  prints it with the other layers.
 
 ## Grids
 
@@ -332,6 +399,9 @@ within the tile, `cell_bytes` each, so its decoded size is `tw · th · cell_byt
 - `dtype`: `u8`, `i8`, `u16`, `i16`, `u32`, `f32` (IEEE 754 binary32), or `horizon_stack` (7K bytes a cell).
 - physical value = raw · `scale` + `offset`. `nodata` (optional) is a **raw** value.
 - `stack_depth` (only for `horizon_stack`): K.
+- `tongue_band_keys`, `tongue_minor_share` (optional, only for `horizon_stack`): the column rule's
+  band B and minor share m (below); absent: B = 64, m = 0.15. A baked run writes the preset's
+  (`structure.strata_tongue_scale` × 64, rounded; `structure.strata_minor_share`).
 - Unknown fields must be ignored by readers.
 
 ### `horizon_stack` cells (plan §5.7.4)
@@ -374,9 +444,10 @@ last); across a gap or past the last span, the next top (min_y). For block (x, z
    t = wₙ·(y_{n,q} − y_{n,q+1}) is positive gives its class: per class, the order (least key top +
    key base of its horizons), the unit (least key top) and the summed t, classes in the order cells
    first give them. One class: emit (Y_q, class, unit). Several: sort by (order, class) and
-   **intertongue**: T = Σ t; shares pᵢ = max(tᵢ/T − 0.15, 0) (if all are 0, pᵢ = tᵢ/T), P = Σ pᵢ;
-   for each band n from ⌊s_q/256⌋ to ⌊(s_{q+1} − 1)/256⌋ with base 256·n, walking the classes in
-   order with a running sum S (from 0): lo = base + 256·(S/P), S += pᵢ, hi = base + 256·(S/P),
+   **intertongue** with the layer's band B and minor share m (LayerDesc): T = Σ t; shares
+   pᵢ = max(tᵢ/T − m, 0) (if all are 0, pᵢ = tᵢ/T), P = Σ pᵢ; for each band n from ⌊s_q/B⌋ to
+   ⌊(s_{q+1} − 1)/B⌋ (integer division) with base B·n, walking the classes in order with a running
+   sum S (from 0): lo = base + B·(S/P), S += pᵢ, hi = base + B·(S/P),
    clipped to [s_q, s_{q+1}]; if lo < hi, emit (Y_q − (lo − s_q)/(s_{q+1} − s_q)·(Y_q − Y_{q+1}),
    class, unit).
 4. Emitting (top, class, unit): t = ⌊top⌋, at most the last emitted top; if it equals the last
@@ -395,18 +466,23 @@ clamped to [min_y + 1, max_y]); every horizon is at least one block (16 raw) thi
 down to `min_y` too; at most K are used; neighbours differ in class; every horizon carries the key
 span of the units it stands for (a merge keeps the union). A stack walks the column of
 `structure::columns` from the top: regolith, the strata log (the young, shallow part of a clastic
-deposit as its `loose_equivalent`, buried loose material and palaeosols as their `lithifies_to`),
+deposit as its `loose_equivalent`, buried loose material and palaeosols as their `lithifies_to`:
+glacial till, the deep-time glaciers', the ice ages' and a snowball Earth's alike, becomes
+`diamictite`, and young, shallow diamictite shows as `till`),
 the plate model's rock pools less the log, and peridotite below the crust. Plutons are bodies
 (role `pluton`, below), not horizons.
 
 **The 0.2 bake** smooths the stacks laterally before writing them, because the strata log is
 carried cell by cell and neighbouring cells' stacks differ more than the rocks would: each cell's
-new stack is the Gaussian-weighted mean (σ 2.5 cells over the 11 × 11 cells around; x wraps, z
-clamps) of its neighbours' height functions, cut at every key top and base any of them has; each
-interval takes the class holding the largest weighted thickness there, equal neighbours join; the
-cell's own surface stays its first top (neighbours' units above it pinch out there; where the cell
-stands above the mean its top unit fills the difference); then the stack is settled again (at least
-a block thick, at most K). `notes.bake.strata.smoothing` records σ and the window.
+new stack is the Gaussian-weighted mean (σ = `structure.strata_smoothing_cells` L1 cells, default
+10; x wraps, z clamps) of its neighbours' height functions, cut at every key top and base any of
+them has; each interval takes the class holding the largest weighted thickness there, equal
+neighbours join; the cell's own surface stays its first top (neighbours' units above it pinch out
+there; where the cell stands above the mean its top unit fills the difference); then the stack is
+settled again (at least a block thick, at most K). The neighbours are the cells of a lattice of
+step ⌈σ / 2.5⌉ anchored at cell (0, 0) within 5 steps (11 × 11 samples whatever σ, and every cell
+samples the same lattice); σ 0 bakes each cell's own stack. `notes.bake.strata.smoothing` records
+σ, the step, the window and the tongue parameters.
 
 **The P1-08 bake** writes them with one change: the first horizon's top of every cell is raised,
 never lowered, to ⌈max E + max A⌉ + 1 blocks (at most `max_y`), E and A the `elevation` and
@@ -504,18 +580,124 @@ answers for every column (`ColumnParityTest`):
    that holds block (wx, y, z), its `rock_class`, a zone's where one applies (the last zone that
    applies and names one); a body naming none leaves the class as it is. Runs of equal class are
    `[top y, bottom y, class or null]`.
+6. `hydro` (P1-22): the column's water as "Water columns" decides it: `{"kind", "surface", "ground",
+   "level", "top", "bed", "min_ground", "max_ground", "seal_from", "river_biome", "river"}`, `river`
+   `{"seg", "t", "d", "w", "hw", "depth"}` or null, absent values null.
 
 `parity/columns.json` (`deeptime parity --world-data <dir>`): `{"format_version", "world" (the
 manifest's source), "circumference", "min_y", "max_y", "seed" (decimal), "classes", "columns": [ … ]}`,
 each column the object above plus its `x` and `z`. Numbers are serde_json's shortest round-trip
 form: read them with a correctly rounded parser (Java's `Double.parseDouble`) and compare exactly.
 The 500 columns: 10 % within 40 blocks of the seam, 10 % near and past the poles, 20 % inside
-random bodies' boxes (none when the world has no bodies), the rest anywhere with x over two laps.
+random bodies' boxes (none when the world has no bodies), with a river network 10 % on and beside
+random river vertices and 5 % around the mouths of rivers that end in lakes, with lakes 5 % within 8
+blocks of random shore cells of `water_level` (wet beside dry), the rest anywhere with x over two laps.
+
+## Rivers (`rivers/rivers.dtrv`, P1-22)
+
+Code `crates/deeptime-format/src/rivers.rs` (Java `worlddata/Rivers`); written by the bake's water
+part (`deeptime_core::hydro`, `bake::water`; plan §8.4). `DTRV` fixed fields (48 bytes): `u32 C, u32
+tile (32), u32 tiles_x (C / tile), u32 tiles_z (C / 2 / tile), u32 V vertices, u32 K chains, u32 E
+index entries, f32 biome_min_width, f32 bank_zone, f32 bank_ratio, 8 reserved bytes`. Sections: 0 V
+vertices of 24 bytes, 1 K chains of 16 bytes, 2 `tiles_x · tiles_z + 1` u32 offsets, 3 E u32 entries.
+
+```text
+vertex                                         chain
+0   4  f32 x (block; continuous along a chain)  0   4  u32 first vertex
+4   4  f32 z (block)                            4   4  u32 vertex count (≥ 2)
+8   4  f32 w: water surface (fills y < w)       8   1  u8 mouth: 0 sea (or the polar edge row), 1 lake, 2 river
+12  4  f32 hw: half-width, blocks (> 0)         9   3  reserved, 0
+16  4  f32 depth at the centre, blocks (≥ 1)    12  4  u32 into: the lake (mouth 1) or chain (2), else u32::MAX
+20  4  f32 q: discharge, m³/s
+```
+
+Chains are consecutive in the vertex array; **segment s** is vertices (s, s + 1) when both belong to
+one chain. A chain runs downstream from a spring or a lake's outlet (whose first vertex is the lake
+cell feeding it) to its mouth: its last vertex lies in the sea, in lake `into`, or on a vertex of
+chain `into` (a confluence, where the tributary keeps its own width). w never rises along a chain.
+**The index**: tile (tx, tz) covers x ∈ [−C/2 + tx·tile, …), z ∈ [−C/4 + tz·tile, …); entries
+`offsets[t] … offsets[t+1]` of tile t = tz·tiles_x + tx are the segments, ascending, whose box grown
+by `max(hw_a, hw_b, 0.71) + bank_zone + bank_ratio · max(hw_a, hw_b) + 1` touches it (x folded).
+
+**Sampling column (x, z)** — both readers, in this order, doubles from the f32 values:
+wx = x folded; over the entries of wx's tile, for segment (a, b): `k = ⌊(ax − wx)/C + 0.5⌋`,
+`px = wx + k·C`; `e = b − a`; `t = ((px − ax)·ex + (z − az)·ez) / (ex² + ez²)` (0 when the length is
+0), clamped to [0, 1] (`t < 0 → 0`, `t > 1 → 1`); `d = √(dx² + dz²)` with `dx = px − (ax + t·ex)`,
+`dz = z − (az + t·ez)`; `hw = hw_a + (hw_b − hw_a)·t`, `hw' = max(hw, 0.71)`; likewise w, depth, q.
+If d ≤ hw' the segment **covers** the column: the hit is the covering segment with the lowest w
+(ties: the lowest segment id), and `river_biome` is set when 2·hw ≥ biome_min_width. Otherwise, if
+d ≤ hw' + bank_zone + bank_ratio·hw, it offers the **bank cap** ⌈w⌉ + ⌊d − hw'⌋; the lowest offered
+is the column's `max_ground`.
+
+**How the bake builds it** (`deeptime_core::hydro`): on the `water_level` grid, the open sea (cells at
+most one block below sea level: their top block is under the sea's; connected, ≥ 5,000 km²); Priority-Flood with the pit queue from its shores (spill level F
+and the cell each land cell was reached from); receivers the steepest strictly lower neighbour on F,
+else that cell; depressions (F > height) of at least `hydro.lake_min_area_km2` and
+`lake_min_depth_blocks` are lakes at their spill level (they are always full: "fill and spill");
+runoff P − ET (Fu's Budyko curve, PET = 60 mm/°C·T) from the L1 climate accumulated as discharge, a
+lake passing on its inflow less its surface's evaporation (`lake_evaporation`); river cells carry ≥
+`river_min_discharge_m3s` from ≥ `river_min_area_km2`, a lake cell less than a block deep counting
+as ground a river crosses; chains follow the largest donor; w = max(F − `freeboard_blocks`, the
+level of the sea or lake downstream); width `width_coef · Q^0.5 · scale.feature_scale.rivers` and
+depth `depth_coef · Q^0.4` (at least 1, at most `max_width_blocks`, `max_depth_blocks`); vertex
+positions smoothed by a Gaussian of half-width `smoothing_blocks` (ends fixed; a tributary's mouth
+on the smoothed vertex it joins). `notes.bake.water`: `enabled`, `method` ("p1-22"), `params`,
+`width_scale`, `grid`, `halved`, `climate`, `rivers_file`, `rivers_bytes`, `stats` (counts, lengths,
+largest discharge and width, milliseconds per step).
+
+## Water columns (P1-22)
+
+Code `crates/deeptime-format/src/water.rs` (Java `worlddata/Water`); the game's
+`worldgen/WaterBodies` pass makes every generated column match it (after the strata pass, before
+carvers and features). A function of (x, z) and the world data only, with the generator's noise cell
+width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore rule's `reach`:
+
+1. **surface** = H (the terrain height) bilinear between the four corners of the noise cell holding
+   the column (corners at multiples of `cell`, fractions (wx − x0)/cell, (z − z0)/cell, the corner H
+   values h00, h10, h01, h11 as `a = h00 + (h10 − h00)·fx`, `b = h01 + (h11 − h01)·fx`,
+   `a + (b − a)·fz`): the generated surface. **ground** = ⌈surface⌉ − 1 clamped to [min_y − 1,
+   max_y] (min_y − 1 when not finite).
+2. **level** = the `water_level` cell nearest the column, else the value of the nearest wet cell
+   within `reach` blocks (cells visited by column then row, first at the smallest squared distance;
+   Java `WaterLevels.levelAt`). **Lake** when level is finite and ground < top = ⌈level⌉ − 1; bed =
+   ground.
+3. Else **sea** when ground < sea level − 1 (top = sea level − 1, bed = ground): the aquifer's
+   water, which the pass tops up where the aquifer left such a column dry (it decides from its own
+   noise near the surface, and leaves coastal flats a block below sea level dry).
+4. Else **river** when a segment covers the column (the hit of "Rivers"): top = ⌈w⌉ − 1, bed =
+   min(top − 1, ⌊w − max(1, depth · (1 − (d/hw')²))⌋).
+5. Else, visiting the neighbours (x+1, z), (x−1, z), (x, z+1), (x, z−1) evaluated by 1–4: for each
+   that holds water (river, lake, sea), `min_ground` = max(top + 1 for a river, top otherwise) and
+   `seal_from` = min(bed + 1, or for the sea max(bed + 1, top − 3): only its waterline); `max_ground` = the column's bank cap. The column is a **bank** when
+   either `min_ground` or `max_ground` is set, else **none**. `river_biome` and `river` (the hit)
+   are kept whatever the kind.
+
+The pass: a sea column the aquifer left dry is filled from the sea's top down to the ground (the
+pass runs in every chunk with elevation cells within 17 blocks of sea level for this); a river column is cut or filled to `bed` (gravel on the bed of a channel under 6 blocks
+wide, sand on a wider one), water from bed + 1 to top, air above; a lake column fills the air from
+top down to the ground as P0-13's pass did, plugging a cave under `bed`; a bank is lowered to
+`max_ground` and raised to `min_ground` keeping its top block, and air from `seal_from` to
+`min_ground` is filled; where a water column's neighbour holds water higher up, the block at the
+higher top gets flowing water (level 1, resting on the water under it)
+and the blocks between falling water (a waterfall). **River biomes**: the game's weirdness input is
+0 (the river valley slice) at columns whose `river_biome` is set (`WorldDataTerrain.raster`).
+
+**Carvers (game side, not part of the column rule).** Vanilla's carvers run after the pass, and the
+`#minecraft:overworld_carver_replaceables` tag lists water. When `notes.bake.water.params.
+protect_water_from_carvers` is true or absent (preset key `hydro.protect_water_from_carvers`, on by
+default), the pass puts every water block it places or keeps in a river, lake or topped-up sea
+column in the chunk's carving masks (vanilla skips masked positions), and only those: ground under
+and beside the water stays carvable, so caves run under rivers and lakes and may open into a bed.
+After the air carvers the lowest water block of each column that now has air under it is marked for
+post-processing, so vanilla's fluid tick lets it run into the cave. Set to false, the carvers cut
+through the water like any other block.
 
 ## `strata/classes.json`
 
 `{"classes": ["sandstone", "red_bed", "granite"]}` — index → rock class id (plan §5.4.1,
-`deeptime:rock/<class>` tags).
+`deeptime:rock/<class>` tags). The vocabulary is the rock-tag README's 60 classes (`diamictite`,
+lithified till, added 2026-09-30); a reader maps indices through this file, never through a fixed
+list, so a class added to the vocabulary changes no bytes a reader depends on.
 
 ## `spawn/candidates.json`
 
@@ -562,6 +744,7 @@ tables are `u32 byte length + UTF-8 bytes`, back to back, with the count in the 
 | `DTSR` | `sites/sites.dtsr` | 16 | 3 | below |
 | `DTSI` | `sites/index.dtsi` | 32 | 2 | below |
 | `DTBD` | `bodies/bodies.dtb` | 16 | 3 | below |
+| `DTRV` | `rivers/rivers.dtrv` | 48 | 4 | "Rivers" |
 | `DTKF` | `keyframes/kf-<n>.dtk` | 24 | 1 + layers | below |
 | `DTCP` | `checkpoints/*.dtcp` | 8 | 2 | below (dev only) |
 
@@ -729,6 +912,20 @@ Pixel (px, py) is centred on longitude 360°·px/w (the seam is 0°, plan §5.2)
 passes the next multiple of the preset's keyframe interval (counted from the run's start) and at
 the end of each stage.
 
+Two layers are derived when a frame is drawn rather than read from one field, and are never stored
+in the world: `provinces` (geologic provinces, coloured with its ramp like any layer) and
+`satellite`, a true-colour picture composited from the elevation, the climate's fields (land cover
+from `climate/t_mean_c`, `t_warm_c`, `t_cold_c`, `aridity`, `precip_mm` and `koppen`; snow from the
+temperatures and `climate/ela_m`; `climate/ice_thickness_m` or `glacier` as glacier ice;
+`climate/sea_ice`), the surface rock (`surface/class`) and a hill shade (`deeptime_core::satellite`
+has the rules). It needs no layer kind of its own: it is RGBA8 like every layer, so any reader of
+these files (the viewer, the workbench, the game's timelapse) shows it unchanged. Its ramp in
+`ramps.json` (`satellite`: categorical, with `labels` and `groups`) is not applied to it: its classes
+are the compositor's anchor colours and the legend's key. It is the **first** layer of every frame of
+the plate model's group and of the young landscape's and amplification's frames, so a reader that
+opens on a frame's first layer opens on it. A frame without climate fields draws bare ground by
+geology (no plants, snow or ice).
+
 ## The climate's ice fields (pipeline fields and history frames; not world data yet)
 
 The climate stage (`crates/deeptime-core/src/climate/`, plan §8.3; deep-time climate 2026-09-29)
@@ -771,8 +968,9 @@ each: its fields' LZ4 blobs back to back in the head's order (the same record th
 holds). The next stage is always a group's lead: inside a group of coupled stages (plates + surface,
 P1-04) the saved state is the postcard `Vec<Vec<u8>>` of every member's state, in pipeline order.
 Schema 4 (P1-04) added the surface state and the recorded field history to `WorldState`; schema 6
-(P1-17) moved the history's frames out of the body into sections of their own (schema 8, 2026-09-30,
-added the climate's ice sheet, weathering supply and snowball list; schema 7, the deep-time
+(P1-17) moved the history's frames out of the body into sections of their own (schema 9, 2026-09-30,
+added the climate's ice sheet, weathering supply and snowball list; schema 8, P1-21, the world's
+volcano catalogue; schema 7, the deep-time
 climate, added `WorldState::globals` and the climate stage's carbon cycle, fine clock and ice), so a checkpoint is
 written streamed (`<path>.tmp`, fsync, rename; frames copied from memory or from the spill file, never
 held whole) and read without loading the frames (every section's CRC is checked when it is read; the
@@ -804,8 +1002,11 @@ survives in, the finished folder. The manifest's `notes.run.history` reports wha
   (or the content bundle's) essentials. `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json`
   are the GameTest and smoke worlds.
 - All: a three-horizon strata placeholder on L1 (`notes.strata`); with `--strata every-class`
-  (P1-12) eight horizons 10 blocks apart holding all 59 rock classes, horizon h of L1 cell column
-  i having class (6·i + h) mod 59, so any ten neighbouring cell columns show every class at
+  (P1-12) eight horizons 10 blocks apart holding all 60 rock classes, horizon h of L1 cell column
+  i having class (6·i + h) mod 60, so any ten neighbouring cell columns show every class at
   h ≥ 2 (`notes.strata.class_rule`). Horizon h spans the keys 4096·h … 4096·h + 4095 in every
   cell, so the column rule correlates the synthetic stacks by index (and mixes the neighbouring
-  cell columns' classes in as thin tongues).
+  cell columns' classes in as thin tongues). `--strata basin`: a readable sedimentary basin, the
+  same in every cell — sandstone, shale, sandstone, mudstone, limestone, shale, sandstone and shale
+  from the surface, 0, 8, 22, 36, 55, 75, 100 and 130 blocks down, granite from 165 blocks to the
+  floor (classes `sandstone, shale, mudstone, limestone, granite`); `deposits_world_16k` uses it.

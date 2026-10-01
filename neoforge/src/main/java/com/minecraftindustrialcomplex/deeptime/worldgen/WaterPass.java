@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
-import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.SpreadingSnowyDirtBlock;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
 /**
- * Water above sea level (plan §7.9). Vanilla places fluid only through the aquifer, so a lake whose
+ * Water above sea level (plan §7.9; since P1-22 the work is {@link WaterBodies}'s, which keeps
+ * this class's lake rules and adds rivers and banks). Vanilla places fluid only through the aquifer, so a lake whose
  * surface is above sea level needs its own pass. Runs after {@link StrataPass}, before carvers and
  * features: in every column that has a water level ({@link WaterLevels#levelAt}) above the ground,
  * the air from just below the water surface down to the first non-air block becomes water sources.
@@ -33,7 +29,7 @@ import net.minecraft.world.level.chunk.ChunkAccess;
  * still until a neighbour changes, and then has nowhere to flow. Ice is not placed here: vanilla's
  * {@code freeze_top_layer} feature, in every overworld biome, freezes the top water block where the
  * biome is cold, and this water exists before features run. A grass-like block
- * ({@link SpreadingSnowyDirtBlock}) left under the water by the surface rules, which ran before the
+ * (a {@code SpreadingSnowyDirtBlock}) left under the water by the surface rules, which ran before the
  * water existed, becomes dirt, as vanilla's rules make it under water; otherwise its random tick
  * would do so later and wake the water above it.
  */
@@ -41,39 +37,11 @@ public final class WaterPass {
 
     private WaterPass() {}
 
-    /** Fills the chunk's lakes; returns the number of water blocks placed. */
+    /**
+     * Fills the chunk's lakes (and, since P1-22, its rivers and banks: {@link WaterBodies});
+     * returns the number of water sources placed.
+     */
     public static int apply(ChunkAccess chunk, WorldData wd, int reach) {
-        if (!wd.has(WorldData.WATER_LEVEL))
-            return 0;
-        RasterSampler levels = wd.layer(WorldData.WATER_LEVEL);
-        int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
-        if (!WaterLevels.anyWet(levels, x0 - reach, z0 - reach, x0 + 15 + reach, z0 + 15 + reach))
-            return 0;
-        int minY = chunk.getMinBuildHeight();
-        int maxY = chunk.getMaxBuildHeight() - 1;
-        BlockState water = Blocks.WATER.defaultBlockState();
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        int placed = 0;
-        for (int lx = 0; lx < 16; lx++) {
-            for (int lz = 0; lz < 16; lz++) {
-                int x = x0 + lx, z = z0 + lz;
-                double level = WaterLevels.levelAt(levels, x, z, reach);
-                if (Double.isNaN(level))
-                    continue;
-                int top = Math.min(WaterLevels.topWaterBlock(level), maxY);
-                int y = top;
-                // ProtoChunk.setBlockState keeps the worldgen heightmaps current; it schedules no
-                // fluid tick and marks nothing for post-processing.
-                for (; y >= minY; y--) {
-                    if (!chunk.getBlockState(pos.set(x, y, z)).isAir())
-                        break;
-                    chunk.setBlockState(pos, water, false);
-                    placed++;
-                }
-                if (y < top && y >= minY && chunk.getBlockState(pos.set(x, y, z)).getBlock() instanceof SpreadingSnowyDirtBlock)
-                    chunk.setBlockState(pos, Blocks.DIRT.defaultBlockState(), false);
-            }
-        }
-        return placed;
+        return WaterBodies.apply(chunk, wd, reach).water();
     }
 }

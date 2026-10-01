@@ -319,7 +319,7 @@ mod tests {
         let classes: Value =
             serde_json::from_slice(&std::fs::read(dir.join("strata/classes.json")).unwrap())
                 .unwrap();
-        assert_eq!(classes["classes"].as_array().unwrap().len(), 59);
+        assert_eq!(classes["classes"].as_array().unwrap().len(), 60);
         let m = Manifest::read(&dir).unwrap();
         assert_eq!(m.notes["strata"]["kind"], "every-class");
         let s = TilePackReader::open(&dir.join("strata/horizons.dtr"))

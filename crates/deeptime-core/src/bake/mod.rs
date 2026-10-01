@@ -6,7 +6,8 @@
 //!
 //! | Part | Writes | Module |
 //! |---|---|---|
-//! | terrain | `elevation` (the amplifier's, or L2/L1 upsampled without one), `water_level` (nodata: lakes are Phase 2), `spawn/candidates.json` | [`terrain`] |
+//! | terrain | `elevation` (the amplifier's, or L2/L1 upsampled without one), `spawn/candidates.json` (after the water) | [`terrain`] |
+//! | water | `water_level` (lake surfaces), `rivers/rivers.dtrv` (the river network, P1-22) | [`water`], [`crate::hydro`] |
 //! | strata | `strata/horizons` (P1-07's stacks, the top horizon raised over the amplified terrain), `strata/classes.json` | [`strata`] |
 //! | climate | `climate/{t_mean_c, p_mm, koppen}` on L1; `climate/{temperature, vegetation, continents, erosion, ridges}` on L2 (the §7.2 mapping, [`biomes`]) | [`climate`], [`biomes`] |
 //! | surface | `surface/regolith_blocks`, `surface/class_top` on L2 | [`surface`] |
@@ -19,11 +20,13 @@
 
 pub mod biomes;
 pub mod climate;
+pub mod ice;
 pub mod meta;
 pub mod placement;
 pub mod strata;
 pub mod surface;
 pub mod terrain;
+pub mod water;
 
 #[cfg(test)]
 mod tests;
@@ -270,6 +273,18 @@ pub fn bake(
     );
     millis.insert("climate".into(), json!(ms(t)));
 
+    // Water after the climate (it drains the terrain with the climate's runoff), then the spawn
+    // candidates, which stay out of the lakes.
+    let t = Instant::now();
+    let water = water::bake(p, &mut out)?;
+    note.insert("water".into(), water.note);
+    millis.insert("water".into(), json!(ms(t)));
+    let (n, ranked) = terrain::spawn(world, p, &terrain, &mut out)?;
+    if let Some(tn) = note.get_mut("terrain") {
+        tn["spawn_candidates"] = json!(n);
+        tn["spawn_ranked_by_essentials"] = json!(ranked);
+    }
+
     let t = Instant::now();
     note.insert(
         "surface".into(),
@@ -299,7 +314,7 @@ pub fn summary_line(v: &Value) -> String {
     let ms = |k: &str| v["millis"][k].as_f64().unwrap_or(0.0) / 1000.0;
     format!(
         "bake layers={} bytes={:.1}MiB elevation={} horizons_mean={:.2} top_raised_cells={} provinces={} \
-         spawn_candidates={} millis[terrain={:.1}s strata={:.1}s climate={:.1}s surface={:.1}s meta={:.1}s total={:.1}s]",
+         spawn_candidates={} lakes={} river_chains={} millis[terrain={:.1}s strata={:.1}s climate={:.1}s water={:.1}s surface={:.1}s meta={:.1}s total={:.1}s]",
         v["layers"].as_array().map_or(0, Vec::len),
         v["bytes"].as_f64().unwrap_or(0.0) / 1_048_576.0,
         v["terrain"]["elevation"].as_str().unwrap_or("?"),
@@ -307,9 +322,12 @@ pub fn summary_line(v: &Value) -> String {
         v["strata"]["top_raised_cells"],
         v["meta"]["provinces"]["count"],
         v["terrain"]["spawn_candidates"],
+        v["water"]["stats"]["lakes"],
+        v["water"]["stats"]["chains"],
         ms("terrain"),
         ms("strata"),
         ms("climate"),
+        ms("water"),
         ms("surface"),
         ms("meta"),
         ms("total"),
