@@ -226,7 +226,10 @@ public final class RealPlanetGameTests {
                 BlockState actual = chunk.getBlockState(new BlockPos(x, y, z));
                 n[1]++;
                 boolean ok = Objects.equals(cls, javaCls)
-                        && (cls == null ? expected == null : expected == null || palette.classesOf(expected).contains(cls));
+                        && (cls == null ? expected == null : expected == null || palette.classesOf(expected).contains(cls)
+                        // A class whose stand-in is plain stone (coal without a coal rock installed): stone
+                        // reads as unclassified crust in classesOf, so ask the class for its blocks.
+                        || palette.result(cls).map(r -> r.blocks().contains(expected)).orElse(false));
                 boolean placed = expected == null ? StrataPass.isCrust(actual) : actual == expected;
                 if (!placed && !StrataPass.isCrust(actual) && palette.classesOf(actual).isEmpty()) {
                     n[3]++;   // a surface rule's block (sand, terracotta, …): not the strata pass's to paint
