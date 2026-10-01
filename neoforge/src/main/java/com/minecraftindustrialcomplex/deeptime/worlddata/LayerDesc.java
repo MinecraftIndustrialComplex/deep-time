@@ -15,10 +15,13 @@ import java.util.Locale;
  *                        default {@link Columns#BAND_KEYS})
  * @param tongueMinorShare horizon stacks: the share below which a rock takes no part in the tongues
  *                        ({@code tongue_minor_share}, default {@link Columns#MINOR_SHARE})
+ * @param minBlocks  horizon stacks: per class index, the least thickness (blocks) of a horizon of that
+ *                   class inside a column ({@code min_blocks}; the column rule's step 5 drops a
+ *                   thinner one), or null when the layer names none
  */
 public record LayerDesc(String name, DType dtype, double scale, double offset, String units, GridDesc grid,
                         int tile, Codec codec, double nodata, int stackDepth, int tongueBandKeys,
-                        double tongueMinorShare) {
+                        double tongueMinorShare, int[] minBlocks) {
 
     /** Cell types (FORMAT.md). */
     public enum DType {
@@ -50,6 +53,14 @@ public record LayerDesc(String name, DType dtype, double scale, double offset, S
         JsonElement k = o.get("stack_depth");
         JsonElement band = o.get("tongue_band_keys");
         JsonElement minor = o.get("tongue_minor_share");
+        JsonElement min = o.get("min_blocks");
+        int[] minBlocks = null;
+        if (min != null && min.isJsonArray()) {
+            var a = min.getAsJsonArray();
+            minBlocks = new int[a.size()];
+            for (int i = 0; i < minBlocks.length; i++)
+                minBlocks[i] = a.get(i).getAsInt();
+        }
         LayerDesc d = new LayerDesc(
                 o.get("name").getAsString(),
                 DType.parse(o.get("dtype").getAsString()),
@@ -62,7 +73,8 @@ public record LayerDesc(String name, DType dtype, double scale, double offset, S
                 nd == null || nd.isJsonNull() ? Double.NaN : nd.getAsDouble(),
                 k == null || k.isJsonNull() ? 0 : k.getAsInt(),
                 band == null || band.isJsonNull() ? Columns.BAND_KEYS : band.getAsInt(),
-                minor == null || minor.isJsonNull() ? Columns.MINOR_SHARE : minor.getAsDouble());
+                minor == null || minor.isJsonNull() ? Columns.MINOR_SHARE : minor.getAsDouble(),
+                minBlocks);
         d.validate();
         return d;
     }
