@@ -24,6 +24,9 @@ HOST="${DEEPTIME_MAC:-ban@20.120.160.3}"
 MODS=/Volumes/Graphide/ban/mic/mods
 DRY=0; [ "${1:-}" = --dry-run ] && DRY=1
 SSH=(ssh -o BatchMode=yes -o ConnectTimeout=15 "$HOST")
+# The VM's firewall follows the laptop's address (vm-access.sh): repair it before the first call.
+. "$(dirname "${BASH_SOURCE[0]}")/vm-access.sh"
+vm_access_ensure "$HOST" || { echo "$(basename "$0"): cannot reach $HOST" >&2; exit 1; }
 
 MAIN_NAME="$(basename "$(dirname "$(cd "$(git rev-parse --git-common-dir)" && pwd)")")"
 
