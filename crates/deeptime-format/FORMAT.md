@@ -694,6 +694,27 @@ After the air carvers the lowest water block of each column that now has air und
 post-processing, so vanilla's fluid tick lets it run into the cave. Set to false, the carvers cut
 through the water like any other block.
 
+## Lava (game side, `notes.bake.underground`)
+
+`notes.bake.underground.params` is the preset's `underground` section (its defaults when the preset
+has none): `{"lava_floor_blocks": 10, "lava_lake_blocks": 54}`. No layer holds lava; the game reads
+the two numbers when it generates chunks (Java `worldgen/LavaRules`, `LavaFluids`,
+`density/LavaLakesDensity`), and a world without the note uses the defaults. With `min_y` the floor
+of the noise settings (−352) and cover = 8:
+
+- **The lava floor.** Open space with y < `min_y + lava_floor_blocks` (never above sea level) is lava.
+  In a column whose terrain height H is that low, the limit is `min(that, ⌊H⌋ − cover)`: lava stays
+  8 blocks below a sea bed, and everything above the limit is the sea. 0: no lava floor.
+- **Lava lakes.** A cave lake (an aquifer with its own level) may be lava only when its 40-block
+  level cell `⌊y/40⌋` is centred at or below `min_y + lava_lake_blocks`; lake surfaces lie within 12
+  blocks of the cell's centre. 0: no lava lakes.
+
+Both are vanilla's rules (lava below y −54, lava lakes at y −10 and lower, in a world whose floor is
+y −64) measured from the floor instead of from y 0. Vanilla's own constants flood the lowest 298
+blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −352.
+Lava that features and carvers place (lava lakes and springs of the pack's biomes, carver lava in
+the bottom eight blocks) is not covered by these rules.
+
 ## `strata/classes.json`
 
 `{"classes": ["sandstone", "red_bed", "granite"]}` — index → rock class id (plan §5.4.1,
