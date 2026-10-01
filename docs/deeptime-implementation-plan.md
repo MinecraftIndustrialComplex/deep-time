@@ -3850,13 +3850,39 @@ on this machine.
     coherence line, `tools/review/p1-27-*`. STATUS.md build log, 2026-09-30 (P1-27).
 
 #### P1-28 Stone crafting on rock worlds (2026-10-01)
-- **Goal.** Deep Time paints rock-specific blocks, so cobblestone-type blocks (vanilla's only inputs
-  for stone tools, furnaces and stone recipes) are rare. Ben (log 2026-10-01): hardness tiers plus
-  river cobbles. (1) Stone tools from hard, tough rock only (`minecraft:stone_tool_materials`);
-  (2) furnaces and stone recipes from any solid rock (`minecraft:stone_crafting_materials`), soft or
-  soluble rock excluded; both lists generated from the rock classes' data and pack-overridable;
-  (3) tool-grade rock guaranteed near spawn (§7.8 essentials); (4) cobbles where nature puts them:
-  cobblestone in river beds, on beaches and in glacial debris.
+- **Goal.** Deep Time paints rock-specific blocks, so plain stone and deepslate, the blocks whose
+  drops (cobblestone, cobbled deepslate) vanilla's stone tools, furnaces and cobblestone recipes
+  ask for, were a few percent of the rock (0.1 % of the top 64 blocks on a baked planet). Ben
+  (log 2026-10-01) first chose hardness tiers plus river cobbles, then replaced that: "Use stone for
+  common rocks and we should be chilling". **No recipe, item tag or drop is changed**; the spawn
+  guarantee and the river, beach and till cobbles were dropped before anything of them shipped.
+- **As built.** `minecraft:stone` is the `vanilla_fallback` of `shale` and `mudstone` (the common
+  fine-grained grey sedimentary rocks; `coal` already had it), `minecraft:deepslate` of `slate`,
+  `phyllite`, `schist` and `gneiss` (the common altered and deep rocks). The table, with a reason
+  per class, is `CRUST_STAND_INS` in `tools/dev/gen_rock_classes.py`, which writes the rock class
+  files; classes with a distinctive block keep it, and so do the rare look-alikes (hornfels,
+  amphibolite, greenstone, blueschist, eclogite, quartzite, black shale). `PaletteRules` no longer
+  rejects stone and deepslate as filler (only air), so tags, `rock_states` and `vanilla_fallback`
+  may all name them; `RockPalette.classesOf` reports for them every class that resolves to them
+  plus `unclassified_crust`; the background scatter's host bias reads the horizon, not the block,
+  where the block is stone or deepslate (`BackgroundScatterFeature.hostClasses`). A pack decides
+  through its fallback tags, which are read before `vanilla_fallback`: the MIC pack's look-alike
+  tags still win until its rows change (see the STATUS entry for the rows).
+- **Measured** (earthlike_quick_16k, 500 Myr, scattered continents; the real generator on 12
+  dry-land boxes of 96 × 96, standalone profile; `tools/review/p1-28-block-share.py`): stone or
+  deepslate share of the placed rock blocks, top 64 blocks under the surface 0.0 % → 47.8 %,
+  whole column 0.0 % → 55.3 %. Over the whole planet's dry land by class
+  (`deeptime-inspect rock-census`, 49,642 land columns): top rock 0.1 % → 58.4 %, top 64 blocks
+  0.1 % → 56.2 %, whole column 0.0 % → 56.0 %. The top rock under the soil was shale on 36 % of
+  land columns (Ben's run: 39 %).
+- **Tests.** JUnit `RockDataTest` (the seven stand-ins and no others; nothing under
+  `data/minecraft` but the world preset tag), `PaletteRulesTest`; GameTests
+  `crustStandInsYieldToPackTags` (stone and deepslate for exactly those classes without a rock
+  datapack; with the MIC rock tags the pack's fallback decides), `miningTheCommonRocksDropsVanillaCobbles`
+  (stone drops cobblestone, deepslate cobbled deepslate, the other placed blocks drop what vanilla
+  gives, and no loot table, recipe or item tag comes from Deep Time's jar),
+  `vanillaOnlyResolvesEveryClass`, `everyClassInTheWorld` (a class that resolves to stone is
+  painted stone even where the crust was deepslate, exactly).
 
 ### 10.4 Phase 2 — 3D rock, rivers, lakes and caves (coarse)
 

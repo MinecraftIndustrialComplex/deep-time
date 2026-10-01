@@ -99,6 +99,11 @@ pub fn run(dir: &Path, step: i64, top_n: i32, stone_classes: &[String], reach: i
                     cells[j * cols + i] = Some((top, dig));
                 }
                 t.add(&col.rock, col.top_y, top_n);
+                // Every 4,000th dry-land column away from the poles, for review boxes that are
+                // not picked by class (the per-class examples are biased towards rare rock).
+                if land % 4000 == 1 && z.abs() < c / 4 * 4 / 5 {
+                    t.examples.entry("*land*".into()).or_default().push((x, z));
+                }
                 if let Some((_, _, class)) = col.rock.first() {
                     let n = t.top[&class_name(class)];
                     let e = t.examples.entry(class_name(class)).or_default();
