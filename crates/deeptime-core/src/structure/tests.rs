@@ -456,7 +456,7 @@ fn random_horizons(seed: u64, sigma: f64) -> bake_horizons::Horizons {
         tongues: bake_horizons::tongue_params(&p),
         min_blocks: tables.min_blocks.iter().map(|&b| b as u8).collect(),
     }
-    .smoothed(sigma, &tables.min_blocks)
+    .smoothed(sigma, &tables)
 }
 
 /// The columns the game builds from `hz` (the column rule at random blocks, each under its own
