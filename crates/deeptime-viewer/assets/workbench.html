@@ -975,12 +975,14 @@ input[type=range]:focus-visible { outline: none; }
         <button id="tool-select" data-tool="select" aria-pressed="true" data-tip="Select: click an event, or a point for its values" data-key="V"><svg class="ic ic-s"><use href="#i-pointer"/></svg><span class="lbl">Select</span></button>
         <button id="tool-inspect" data-tool="inspect" aria-pressed="false" data-tip="Inspect a column in 3D: click the map" data-key="I"><svg class="ic ic-s"><use href="#i-crosshair"/></svg><span class="lbl">Inspect</span></button>
         <button id="tool-area" data-tool="area" aria-pressed="false" data-tip="3D preview: drag a box, or click for 256 × 256 blocks" data-key="B"><svg class="ic ic-s"><use href="#i-box"/></svg><span class="lbl">Area 3D</span></button>
+        <button id="tool-section" data-tool="section" aria-pressed="false" data-tip="Cross-section of the strata: click two points" data-key="S"><svg class="ic ic-s"><use href="#i-section"/></svg><span class="lbl">Section</span></button>
       </div>
       <div class="seg ovl" role="group" aria-label="Map overlays">
         <button id="markers" aria-pressed="true" data-tip="Event markers" data-key="M"><svg class="ic ic-s"><use href="#i-events"/></svg><span class="lbl">Events</span></button>
         <button id="depbtn" aria-pressed="true" data-tip="Deposits: coal fields and ore sites by family, over any layer" data-key="D"><svg class="ic ic-s" viewBox="0 0 24 24"><path d="M6.6 4.5h10.8l3.1 4.4L12 19.6 3.5 8.9z"/><path d="M3.5 8.9h17M9.6 4.5L8.1 8.9l3.9 10.7M14.4 4.5l1.5 4.4-3.9 10.7"/></svg><span class="lbl">Deposits</span></button>
         <button id="gridbtn" aria-pressed="true" data-tip="Graticule and seam"><svg class="ic ic-s"><use href="#i-grid"/></svg><span class="lbl">Grid</span></button>
       </div>
+      <div class="seg worldseg" role="group" aria-label="Final world"><button id="worldbtn" aria-pressed="false" data-tip="Final world: a zoomable map of the finished run's baked terrain, down to single blocks" data-key="W"><svg class="ic ic-s"><use href="#i-globe"/></svg><span class="lbl">Final world</span></button></div>
       <span class="grow"></span>
       <div class="bpick" id="bpick" hidden>
         <select class="input" id="bselect" aria-label="Run B"></select>
@@ -1023,6 +1025,7 @@ input[type=range]:focus-visible { outline: none; }
       <div class="maphint" id="maphint" hidden></div>
       <div class="stage-empty" id="stageempty" hidden></div>
     </div>
+    <div class="worldview" id="worldview" hidden></div>
     <div class="tvhud" id="tvhud" aria-hidden="true">
       <div class="scrim-t"></div><div class="scrim-b"></div>
       <div class="title"><div class="brandline"><svg><use href="#i-logo"/></svg>Deep Time</div><div class="name" id="tv-name"></div><div class="when" id="tv-when"></div><span class="stage" id="tv-stage"></span></div>
@@ -1059,6 +1062,7 @@ input[type=range]:focus-visible { outline: none; }
         <button role="tab" data-itab="events" aria-selected="true">Events</button>
         <button role="tab" data-itab="details" aria-selected="false">Details</button>
         <button role="tab" data-itab="s2" aria-selected="false">3D <span class="count" id="jobcount" hidden>0</span></button>
+        <button role="tab" data-itab="section" aria-selected="false">Section</button>
         <button role="tab" data-itab="run" aria-selected="false">Run</button>
       </div>
       <div class="ipane" id="ip-events">
@@ -1077,6 +1081,7 @@ input[type=range]:focus-visible { outline: none; }
         </div>
         <div class="jobs" id="jobs"></div>
       </div>
+      <div class="ipane" id="ip-section" hidden></div>
       <div class="ipane" id="ip-run" hidden><div class="detail" id="runinfo"></div></div>
     </section>
   </aside>
@@ -1111,5 +1116,7 @@ input[type=range]:focus-visible { outline: none; }
 <div class="modal" id="modal" hidden><div class="modal-card" id="modalcard"><div class="modal-h"><h3 id="modaltitle"></h3><span id="modalacts"></span><button class="btn btn-ghost btn-icon" id="modalclose" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button></div><div class="modal-b" id="modalbody"></div></div></div>
 <script src="deposits.js"></script>
 <script src="workbench.js"></script>
+<script src="sections.js"></script>
+<script src="worldmap.js"></script>
 </body>
 </html>

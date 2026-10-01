@@ -587,23 +587,33 @@ impl Workbench {
                 .open(run.dir.join("events.jsonl"))?,
         ));
         let mut published = Published::default();
+        // The frames the last advance draws are held back until the bake has written the water:
+        // `finalize_write` draws the last frame again from the bake's rivers and lakes
+        // (`water_view`), and a page that had fetched its image would keep the first drawing
+        // (a frame's image is cached for good).
+        let mut held_from = u32::MAX;
         loop {
             if run.cancel.load(Ordering::Acquire) {
                 s.cancel();
             }
+            let before = s.keyframe_count();
             // A zero budget runs exactly one step.
             let status = s.advance(Duration::ZERO);
             forward_log(&s, self.common.verbose);
-            self.publish(run, &s, &mut published, false)?;
+            if matches!(status, Ok(AdvanceStatus::Done)) {
+                held_from = before;
+            }
+            self.publish(run, &s, &mut published, false, held_from)?;
             match status? {
                 AdvanceStatus::Done => break,
                 AdvanceStatus::Cancelled => return Err("cancelled".into()),
                 AdvanceStatus::Running | AdvanceStatus::StageDone => {}
             }
         }
-        self.publish(run, &s, &mut published, true)?;
+        self.publish(run, &s, &mut published, true, held_from)?;
         run.live.set_status(json!({ "state": "finalizing" }));
         s.finalize_write()?;
+        self.publish(run, &s, &mut published, true, u32::MAX)?;
         forward_log(&s, self.common.verbose);
         let p = s.progress();
         let mut lines = vec![format!(
@@ -633,10 +643,18 @@ impl Workbench {
     }
 
     /// New frames and events since the last call, and the progress (at most every
-    /// [`PROGRESS_EVERY`] unless something else changed or `force`).
-    fn publish(&self, run: &Run, s: &Session, p: &mut Published, force: bool) -> CliResult<()> {
+    /// [`PROGRESS_EVERY`] unless something else changed or `force`). Frames from number
+    /// `held_from` on are not announced yet (`u32::MAX`: none are held).
+    fn publish(
+        &self,
+        run: &Run,
+        s: &Session,
+        p: &mut Published,
+        force: bool,
+        held_from: u32,
+    ) -> CliResult<()> {
         let mut frames = Vec::new();
-        let count = s.keyframe_count();
+        let count = s.keyframe_count().min(held_from);
         while p.frames < count {
             let info: Value = serde_json::from_str(&s.keyframe_info(p.frames)?)?;
             let layers: Vec<String> = info["layers"]

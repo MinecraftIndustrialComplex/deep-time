@@ -403,7 +403,8 @@ enum Command {
         out: PathBuf,
     },
     /// Draw the satellite view layer (true colour: land cover from the climate, snow and glacier
-    /// ice, the sea by depth, sea ice, hill shading) of a checkpoint's world as a PNG.
+    /// ice, the sea by depth, sea ice, hill shading, the rivers and lakes of the terrain) of a
+    /// checkpoint's world as a PNG, and the rivers & lakes layer beside it (`<out>-rivers.png`).
     Satellite {
         /// A checkpoint written by `stage --out` or `run --checkpoints`.
         #[arg(long = "in")]
@@ -414,6 +415,10 @@ enum Command {
         /// Width in pixels (the height is half of it).
         #[arg(long, default_value_t = 1024)]
         width: u32,
+        /// Draw on this elevation field only (`elevation`: the deep-time surface's L1 frame;
+        /// `young/elevation`; `amplify/elevation`), not the finest the world has.
+        #[arg(long)]
+        on: Option<String>,
     },
 }
 
@@ -836,22 +841,39 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
-        Some(Command::Satellite { input, out, width }) => {
-            match satellite_view::run(&input, &out, width) {
-                Ok((t, elevation)) => {
+        Some(Command::Satellite {
+            input,
+            out,
+            width,
+            on,
+        }) => match satellite_view::run(&input, &out, width, on.as_deref()) {
+            Ok(r) => {
+                println!(
+                    "deeptime satellite: t = {:.1} Myr, drawn on {} -> {}",
+                    r.t_years / 1.0e6,
+                    r.elevation,
+                    out.display()
+                );
+                if let (Some(p), Some(w)) = (&r.rivers, &r.water) {
                     println!(
-                        "deeptime satellite: t = {:.1} Myr, drawn on {elevation} -> {}",
-                        t / 1.0e6,
-                        out.display()
+                        "deeptime satellite: rivers & lakes -> {} ({} river chains, {} vertices, {:.0} px of lakes); satellite picture {:.0} ms, water derived in {:.0} ms (phases {}) and drawn in {:.0} ms",
+                        p.display(),
+                        w.chains,
+                        w.vertices,
+                        w.lake_px,
+                        r.satellite_ms,
+                        r.derive_ms,
+                        w.phases,
+                        r.draw_ms
                     );
-                    ExitCode::SUCCESS
                 }
-                Err(e) => {
-                    eprintln!("deeptime satellite: {e}");
-                    ExitCode::FAILURE
-                }
+                ExitCode::SUCCESS
             }
-        }
+            Err(e) => {
+                eprintln!("deeptime satellite: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some(Command::DumpDeposits { world, out }) => match dump::run(&world, &out) {
             Ok((sites, bodies, inside)) => {
                 println!(
@@ -1711,6 +1733,15 @@ mod tests {
         let m = deeptime_format::Manifest::read(&dir.join("world")).unwrap();
         assert_eq!(m.format_version, "0.2");
         assert_eq!(m.notes["bake"]["baked"], true);
+        // The bake says how much of its terrain stands above the build limit (whatever the planet).
+        let limit = &m.notes["bake"]["terrain"]["build_limit"];
+        assert_eq!(limit["max_y"], 639);
+        assert!(limit["land_cells"].as_u64().is_some_and(|n| n > 0));
+        assert!(limit["cells_above"].as_u64().unwrap() <= limit["land_cells"].as_u64().unwrap());
+        assert_eq!(
+            limit["cells_above"].as_u64().unwrap() > 0,
+            limit["highest_y"].as_f64().unwrap() > 639.0
+        );
         let out = dir.join("world/parity/columns.json");
         let (n, _) = super::parity::run(&dir.join("world"), &out, 60, 7).unwrap();
         assert_eq!(n, 60);
