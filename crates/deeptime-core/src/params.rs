@@ -880,7 +880,9 @@ impl PlanetPreset {
             "need uplift_reference_m > 0 and uplift_ceiling_m >= 0 (0 = no ceiling)",
         )?;
         check(
-            k.crust_strength_mpa > 0.0 && k.crust_flow_km2_myr >= 0.0 && k.crust_flow_km2_myr.is_finite(),
+            k.crust_strength_mpa > 0.0
+                && k.crust_flow_km2_myr >= 0.0
+                && k.crust_flow_km2_myr.is_finite(),
             "$.tectonics.crust_strength_mpa",
             "need crust_strength_mpa > 0 and crust_flow_km2_myr >= 0",
         )?;

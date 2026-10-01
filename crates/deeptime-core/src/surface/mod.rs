@@ -1200,8 +1200,14 @@ impl SurfaceStage {
             dt,
         );
         if flow.cells > 0 {
-            *world.globals.entry(spread::CELLS_GLOBAL.to_owned()).or_insert(0.0) += flow.cells as f64;
-            *world.globals.entry(spread::MOVED_GLOBAL.to_owned()).or_insert(0.0) += flow.moved_m * a / 1.0e9;
+            *world
+                .globals
+                .entry(spread::CELLS_GLOBAL.to_owned())
+                .or_insert(0.0) += flow.cells as f64;
+            *world
+                .globals
+                .entry(spread::MOVED_GLOBAL.to_owned())
+                .or_insert(0.0) += flow.moved_m * a / 1.0e9;
         }
         self.time("spread", started);
 
