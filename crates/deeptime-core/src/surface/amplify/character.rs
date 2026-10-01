@@ -1108,9 +1108,20 @@ mod tests {
         let (y_rms, y_z) = change(&young, 0.8, 1.0);
         let (v_rms, v_z) = change(&volcano, 0.8, 1.0);
         let lift = |z: &[f32]| f64::from(z[top] - before[top]) / MV;
-        assert!(lift(&y_z) > 2.0, "young ground sharpens the summit: {}", lift(&y_z));
-        assert!(lift(&v_z).abs() < 0.5 * lift(&y_z), "a young volcano's summit: {}", lift(&v_z));
-        assert!(v_rms < y_rms, "flanks: volcano {v_rms} vs young ground {y_rms}");
+        assert!(
+            lift(&y_z) > 2.0,
+            "young ground sharpens the summit: {}",
+            lift(&y_z)
+        );
+        assert!(
+            lift(&v_z).abs() < 0.5 * lift(&y_z),
+            "a young volcano's summit: {}",
+            lift(&v_z)
+        );
+        assert!(
+            v_rms < y_rms,
+            "flanks: volcano {v_rms} vs young ground {y_rms}"
+        );
         let mut dead = young.clone();
         dead.calm_volcanoes(&[1.0; 16]);
         assert_eq!(change(&dead, 0.8, 1.0).0, y_rms);

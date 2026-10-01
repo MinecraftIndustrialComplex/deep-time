@@ -1640,7 +1640,10 @@ impl VolcanoStage {
                     e.params
                         .insert("volcano_cones".into(), ParamValue::Str(all_cones));
                 }
-                for v in all.iter().filter(|v| v.kind == Kind::Strato && v.segment == *key) {
+                for v in all
+                    .iter()
+                    .filter(|v| v.kind == Kind::Strato && v.segment == *key)
+                {
                     group_event.insert(v.id, onset);
                 }
                 if let Some(top) = members.first().filter(|v| v.height_m >= 1500.0 * size) {

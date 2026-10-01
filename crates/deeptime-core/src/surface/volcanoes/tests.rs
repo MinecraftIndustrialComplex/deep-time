@@ -399,7 +399,10 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
             kind::STRATOVOLCANO => {
                 strato_events += 1;
                 assert!(
-                    matches!(cause.as_deref(), Some(kind::ARC | "deeptime:subduction_onset")),
+                    matches!(
+                        cause.as_deref(),
+                        Some(kind::ARC | "deeptime:subduction_onset")
+                    ),
                     "{cause:?}"
                 );
             }
@@ -416,10 +419,16 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         .arcs
         .values()
         .filter(|g| {
-            g.born < SMALL_SEGMENT && g.cause.is_some_and(|c| world.events.iter().any(|e| e.id == c))
+            g.born < SMALL_SEGMENT
+                && g.cause
+                    .is_some_and(|c| world.events.iter().any(|e| e.id == c))
         })
         .count();
-    assert_eq!(arcs + small, st.arcs.len(), "one event per segment or a count on its onset");
+    assert_eq!(
+        arcs + small,
+        st.arcs.len(),
+        "one event per segment or a count on its onset"
+    );
     assert_eq!(st.counts.small_arc_segments as usize, small);
     assert!(
         strato_events <= st.arcs.len(),
