@@ -996,4 +996,164 @@ mod tests {
         }
         assert!((profile_at(&t, std::f64::consts::FRAC_PI_2) - 1.0).abs() < 1e-4);
     }
+
+    /// Soil over young cover over three older beds, the same in every column; `step` blocks
+    /// lower for every eight blocks eastwards when it is not zero.
+    fn cake(step: i32) -> impl FnMut(i64, i64, &mut Vec<ColumnHorizon>) {
+        move |x, _z, out| {
+            let d = step * (x as i32).div_euclid(8);
+            out.clear();
+            out.extend_from_slice(&[
+                (100 - d, 0, 100),
+                (90 - d, 1, 5000),
+                (60 - d, 2, 9000),
+                (30 - d, 3, 20000),
+                (-d, 4, 40000),
+            ]);
+        }
+    }
+
+    fn deformed(st: &Structure, x: i64, z: i64, step: i32) -> Vec<ColumnHorizon> {
+        let index = StructIndex::new(st, 4096);
+        let mut out = Vec::new();
+        st.deformed_stack(
+            &index,
+            x,
+            z,
+            -64,
+            &mut cake(step),
+            &mut DeformScratch::default(),
+            &mut out,
+        );
+        out
+    }
+
+    fn world(events: Vec<StructEvent>) -> Structure {
+        Structure {
+            events,
+            profiles: vec![sine()],
+            margin: REACH_MARGIN,
+        }
+    }
+
+    #[test]
+    fn a_column_no_event_touches_is_the_plain_stack() {
+        let st = world(vec![fold(), fault()]);
+        let mut plain = Vec::new();
+        cake(0)(900, 200, &mut plain);
+        assert_eq!(deformed(&st, 900, 200, 0), plain);
+        assert_eq!(deformed(&world(Vec::new()), 125, 200, 0), plain);
+    }
+
+    #[test]
+    fn a_fold_bends_the_rock_older_than_itself_under_flat_cover() {
+        // The fold's key (9000) is the third bed's: soil and cover (keys 100, 5000) are younger.
+        let st = world(vec![fold()]);
+        let w = bump(25.0 / 150.0);
+        let lift = (w * 12.0 + 0.5).floor() as i32;
+        // A crest (a quarter wavelength east of the centre): the old beds are up by the
+        // amplitude, the cover and its base where they were (an angular unconformity).
+        assert_eq!(
+            deformed(&st, 125, 200, 0),
+            [
+                (100, 0, 100),
+                (90, 1, 5000),
+                (60, 2, 9000),
+                (30 + lift, 3, 20000),
+                (lift, 4, 40000)
+            ]
+        );
+        // A trough: down by as much; the bed under the cover fills what the shift left open.
+        assert_eq!(
+            deformed(&st, 75, 200, 0),
+            [
+                (100, 0, 100),
+                (90, 1, 5000),
+                (60, 2, 9000),
+                (30 - lift, 3, 20000),
+                (-lift, 4, 40000)
+            ]
+        );
+        // A fold younger than the cover bends the cover too, but never the soil.
+        let mut young = fold();
+        young.key = 4500;
+        let col = deformed(&world(vec![young]), 125, 200, 0);
+        assert_eq!(col[0], (100, 0, 100));
+        assert_eq!(col[1], (90, 1, 5000));
+        assert_eq!(col[2].0, 60 + lift);
+    }
+
+    #[test]
+    fn a_normal_fault_drops_its_hanging_wall_and_a_thrust_repeats_the_section() {
+        // The fault of `fault()` (key 7000: younger than the three old beds, older than the
+        // cover), 80 blocks into its hanging wall, where the plane is under the world's floor.
+        let st = world(vec![fault()]);
+        let col = deformed(&st, 180, 200, 0);
+        let w = bump(80.0 / 150.0);
+        let drop = (w * 10.0 * 60.0f64.to_radians().sin() + 0.5).floor() as i32;
+        // Cover untouched; the hanging wall's beds lower by the throw than the foot wall's would
+        // be; below the plane the foot wall in place.
+        assert_eq!(&col[..3], &[(100, 0, 100), (90, 1, 5000), (60, 2, 9000)]);
+        assert_eq!(col[3], (30 - drop, 3, 20000), "{col:?}");
+        assert_eq!(col.last().unwrap(), &(-drop, 4, 40000));
+        // Nearer the trace the plane cuts the column: hanging wall over foot wall, the bed
+        // under the plane where the foot wall has it.
+        let col = deformed(&st, 120, 200, 0);
+        assert_eq!(col[2], (60, 2, 9000));
+        assert_eq!(col[3], (28, 3, 20000), "{col:?}");
+        assert_eq!(col.last().unwrap(), &(0, 4, 40000));
+        // A thrust (the slip reversed) on beds that dip: the hanging wall carries older rock
+        // over younger, so a bed is met twice going down.
+        let mut thrust = fault();
+        if let Shape::Fault { slip, .. } = &mut thrust.shape {
+            *slip = [-slip[0] * 4.0, -slip[1] * 4.0, 0.0];
+        }
+        thrust.key = 4200;
+        let col = deformed(&world(vec![thrust]), 120, 200, 0);
+        let classes: Vec<u8> = col.iter().map(|h| h.1).collect();
+        let twice = (1..5u8).any(|k| classes.iter().filter(|&&c| c == k).count() > 1);
+        assert!(twice, "a repeated bed in {col:?}");
+        // Tops strictly descend and no two neighbours share a class, whatever the events.
+        for step in [0, 1] {
+            for x in [60, 90, 101, 120, 160, 240] {
+                let col = deformed(&world(vec![fault(), fold()]), x, 150, step);
+                assert!(
+                    col.windows(2).all(|w| w[0].0 > w[1].0 && w[0].1 != w[1].1),
+                    "{col:?}"
+                );
+                let mut plain = Vec::new();
+                cake(step)(x, 150, &mut plain);
+                assert_eq!(col[0], plain[0], "the first top is the column's own");
+            }
+        }
+    }
+
+    #[test]
+    fn the_structure_file_round_trips() {
+        let mut st = world(vec![fault(), fold()]);
+        st.margin = 109.0;
+        let bytes = encode_structure(&st).unwrap();
+        assert_eq!(
+            decode_structure(Path::new("events.dtst"), &bytes).unwrap(),
+            st
+        );
+        // Events out of order, a pole pointing down and a truncated file are refused.
+        let mut bad = st.clone();
+        bad.events.swap(0, 1);
+        let b = encode_structure(&bad).unwrap();
+        assert!(decode_structure(Path::new("e"), &b).is_err());
+        let mut bad = st.clone();
+        if let Shape::Fault { pole, .. } = &mut bad.events[0].shape {
+            pole[1] = -0.5;
+        }
+        let b = encode_structure(&bad).unwrap();
+        assert!(decode_structure(Path::new("e"), &b).is_err());
+        assert!(decode_structure(Path::new("e"), &bytes[..bytes.len() - 9]).is_err());
+        let dir = std::env::temp_dir().join(format!("dt-structure-{}", std::process::id()));
+        write_structure(&dir, &st).unwrap();
+        assert_eq!(read_structure(&dir).unwrap().unwrap(), st);
+        assert!(Deformer::read(&dir, 4096).unwrap().is_some());
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(read_structure(&dir).unwrap().is_none());
+    }
 }
