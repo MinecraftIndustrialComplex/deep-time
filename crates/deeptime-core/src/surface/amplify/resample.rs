@@ -45,6 +45,15 @@ pub struct Level {
     pub zs: Vec<f32>,
 }
 
+impl Level {
+    /// Bytes the arrays hold.
+    pub fn bytes(&self) -> u64 {
+        4 * (self.z.len() + self.area.len() + self.wgt.len() + self.kfac.len() + self.zs.len())
+            as u64
+            + self.lake.len() as u64
+    }
+}
+
 /// The fine values of a window (see [`Level::sample`]).
 #[derive(Clone, Debug, Default)]
 pub struct Fine {
