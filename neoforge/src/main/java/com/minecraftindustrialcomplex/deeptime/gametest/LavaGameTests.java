@@ -3,7 +3,9 @@ package com.minecraftindustrialcomplex.deeptime.gametest;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.LavaFeatures;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LavaRules;
+import com.minecraftindustrialcomplex.deeptime.worldgen.Magma;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -157,5 +159,200 @@ public final class LavaGameTests {
             helper.assertTrue(n[4] == 0, n[4] + " of " + n[3] + " open blocks below the lava floor (y " + flood + ") are not lava");
             helper.succeed();
         });
+    }
+
+    /** What was read back around one body. */
+    private static final class Tally {
+        long expected, lava, stray, wetFaces, airFaces, skippedFaces;
+        final StringBuilder detail = new StringBuilder();
+    }
+
+    private static final int[][] N6 = {{1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}};
+
+    /** One chunk to read for one body. */
+    private record Job(Magma.Body body, int cx, int cz) {}
+
+    /**
+     * Lava is where the simulation has it (Ben, decisions log 2026-10-01, "Volcanoes is a go ahead"):
+     * under and in the planet's active volcanoes ({@link Magma}, {@code MagmaPass}), on the level
+     * with caves and aquifers. Up to four bodies are generated to the surface step, whichever the
+     * planet has of: one with a crater lake, one under water, one on land with a plug, and the
+     * largest. Every block of their boxes is read back:
+     * <ul>
+     *   <li>{@code lava}: the chamber, conduit and lake hold lava (at least half of the blocks
+     *       {@link Magma} calls molten; the rest is the cover kept under low ground);</li>
+     *   <li>{@code stray}: no lava above the lava-lake zone that is not part of a body;</li>
+     *   <li>{@code wetFaces}, {@code airFaces}: no lava block of a body touches water, and none
+     *       touches air except a lake's surface: the bodies are sealed, in a sea, a lake, a river
+     *       or a cave alike;</li>
+     *   <li>a body with a crater lake has lava at the lake's surface under open air.</li>
+     * </ul>
+     * A planet with no active volcano passes with a line saying so: the geometry itself is
+     * {@code MagmaTest}'s, on cones built in closed form.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
+    public static void magmaUnderActiveVolcanoes(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel().getServer().getLevel(GameTestSupport.TEST_PLANET_CAVES);
+        if (level == null) {
+            helper.fail("level " + GameTestSupport.TEST_PLANET_CAVES.location() + " does not exist");
+            return;
+        }
+        if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g && g.terrain() instanceof WorldDataTerrain t)) {
+            helper.fail("test_planet_caves is not generating from world data");
+            return;
+        }
+        var settings = g.generatorSettings().value();
+        int minY = settings.noiseSettings().minY(), sea = settings.seaLevel();
+        Magma magma = t.magma(g.waterReach(), minY, sea);
+        int lakeZoneTop = Math.max(t.lava().highestLakeY(minY), t.lava().floodY(minY, sea));
+        List<Magma.Body> all = magma.bodies().stream().filter(b -> b.chamberRh() > 0).toList();
+        long lakes = all.stream().filter(Magma.Body::lake).count(), submerged = all.stream().filter(Magma.Body::submerged).count();
+        if (all.isEmpty()) {
+            DeepTime.LOGGER.info("[gametest] magmaUnderActiveVolcanoes activeVolcanoes={} withMagma=0: this planet has no active "
+                    + "volcano with room for a chamber; nothing to read back", t.data().volcanoes().list().size());
+            helper.succeed();
+            return;
+        }
+        List<Magma.Body> picked = new ArrayList<>();
+        all.stream().filter(Magma.Body::lake).findFirst().ifPresent(picked::add);
+        all.stream().filter(Magma.Body::submerged).findFirst().ifPresent(picked::add);
+        all.stream().filter(b -> !b.lake() && !b.submerged()).findFirst().ifPresent(picked::add);
+        all.stream().max(java.util.Comparator.comparingInt(Magma.Body::reach)).filter(b -> !picked.contains(b)).ifPresent(picked::add);
+        List<Job> jobs = new ArrayList<>();
+        java.util.Map<Magma.Body, Tally> tallies = new java.util.LinkedHashMap<>();
+        for (Magma.Body b : picked) {
+            tallies.put(b, new Tally());
+            for (int cx = (b.x() - b.reach() - 1) >> 4; cx <= (b.x() + b.reach() + 1) >> 4; cx++)
+                for (int cz = (b.z() - b.reach() - 1) >> 4; cz <= (b.z() + b.reach() + 1) >> 4; cz++)
+                    jobs.add(new Job(b, cx, cz));
+        }
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        int lo0 = level.getMinBuildHeight(), hi0 = level.getMaxBuildHeight() - 1;
+        ChunkSampling.forEach(helper, jobs.size(), i -> {
+            Job job = jobs.get(i);
+            Magma.Body b = job.body();
+            Tally n = tallies.get(b);
+            ChunkAccess chunk = level.getChunkSource().getChunk(job.cx(), job.cz(), ChunkStatus.SURFACE, true);
+            int x0 = job.cx() << 4, z0 = job.cz() << 4;
+            int lo = Math.max(lo0, b.minY() - 1), hi = Math.min(hi0, b.maxY() + 1);
+            for (int lx = 0; lx < 16; lx++)
+                for (int lz = 0; lz < 16; lz++) {
+                    int x = x0 + lx, z = z0 + lz, dx = magma.dx(x, b), dz = z - b.z();
+                    if (Math.abs(dx) > b.reach() + 1 || Math.abs(dz) > b.reach() + 1)
+                        continue;
+                    for (int y = lo; y <= hi; y++) {
+                        Magma.Part part = b.at(dx, dz, y);
+                        boolean lava = chunk.getBlockState(pos.set(x, y, z)).is(Blocks.LAVA);
+                        if (part.molten())
+                            n.expected++;
+                        if (!lava)
+                            continue;
+                        if (!part.molten()) {
+                            if (y > lakeZoneTop && !magma.at(x, y, z).molten()) {
+                                n.stray++;
+                                if (n.detail.length() < 300)
+                                    n.detail.append(" stray(").append(x).append(',').append(y).append(',').append(z).append(')');
+                            }
+                            continue;
+                        }
+                        n.lava++;
+                        for (int[] d : N6) {
+                            int nx = lx + d[0], ny = y + d[1], nz = lz + d[2];
+                            if (nx < 0 || nx > 15 || nz < 0 || nz > 15 || ny < lo0 || ny > hi0) {
+                                n.skippedFaces++;
+                                continue;
+                            }
+                            BlockState s = chunk.getBlockState(pos.set(x0 + nx, ny, z0 + nz));
+                            if (!s.getFluidState().isEmpty() && !s.is(Blocks.LAVA)) {
+                                n.wetFaces++;
+                                if (n.detail.length() < 300)
+                                    n.detail.append(" wet(").append(x).append(',').append(y).append(',').append(z).append(')');
+                            } else if (s.isAir() && !(part == Magma.Part.LAKE && d[1] == 1)) {
+                                n.airFaces++;
+                                if (n.detail.length() < 300)
+                                    n.detail.append(" air(").append(x).append(',').append(y).append(',').append(z).append(')');
+                            }
+                        }
+                    }
+                }
+            return true;
+        }, () -> {
+            StringBuilder line = new StringBuilder();
+            String failure = null;
+            for (var e : tallies.entrySet()) {
+                Magma.Body b = e.getKey();
+                Tally n = e.getValue();
+                String lake = "-";
+                if (b.lake()) {
+                    ChunkAccess c = level.getChunkSource().getChunk(b.x() >> 4, b.z() >> 4, ChunkStatus.SURFACE, true);
+                    boolean top = c.getBlockState(pos.set(b.x(), b.lakeTop(), b.z())).is(Blocks.LAVA);
+                    boolean sky = true;
+                    for (int y = b.lakeTop() + 1; y <= Math.min(hi0, b.lakeTop() + Magma.LAKE_CLEAR); y++)
+                        sky &= c.getBlockState(pos.set(b.x(), y, b.z())).isAir();
+                    lake = "y" + b.lakeTop() + (top ? " lava" : " NOT LAVA") + (sky ? " open" : " COVERED");
+                    if (!top || !sky)
+                        failure = "volcano " + b.id() + ": its crater lake is " + lake;
+                }
+                line.append(String.format(" [id=%d %s at (%d, %d) floorY=%d chamber y=%d rh=%d rv=%d %s lake=%s molten=%d lava=%d stray=%d "
+                                + "wetFaces=%d airFaces=%d%s]", b.id(), b.kind(), b.x(), b.z(), b.floorY(), b.chamberY(), b.chamberRh(),
+                        b.chamberRv(), b.submerged() ? "under water" : "on land", lake, n.expected, n.lava, n.stray, n.wetFaces,
+                        n.airFaces, n.detail));
+                if (failure == null && n.lava * 2 < n.expected)
+                    failure = "volcano " + b.id() + ": only " + n.lava + " of " + n.expected + " molten blocks are lava";
+                if (failure == null && n.stray > 0)
+                    failure = "volcano " + b.id() + ": " + n.stray + " lava blocks outside its body above y " + lakeZoneTop + ":" + n.detail;
+                if (failure == null && n.wetFaces + n.airFaces > 0)
+                    failure = "volcano " + b.id() + ": lava touches water on " + n.wetFaces + " faces and air on " + n.airFaces + ":" + n.detail;
+            }
+            DeepTime.LOGGER.info("[gametest] magmaUnderActiveVolcanoes rules={} activeVolcanoes={} withMagma={} craterLakes={} "
+                            + "underWater={} read={} chunks={}{}", t.magmaRules(), t.data().volcanoes().list().size(), all.size(), lakes,
+                    submerged, picked.size(), jobs.size(), line);
+            if (failure != null)
+                helper.fail(failure);
+            helper.succeed();
+        });
+    }
+
+    /**
+     * The biomes' random lava stays out of a Deep Time level ({@link LavaFeatures},
+     * {@code underground.remove_lava_features}): vanilla's lava lakes and lava springs are refused
+     * for the level's generator and placed as ever for any other; water springs, ores and trees are
+     * not touched. Every placed feature the server knows is asked, and the ones refused are logged:
+     * with a pack, that line is the list of what it would have scattered.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE)
+    public static void lavaFeaturesStayOut(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel().getServer().getLevel(GameTestSupport.TEST_PLANET_CAVES);
+        if (level == null || !(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g)) {
+            helper.fail("test_planet_caves is not a Deep Time level");
+            return;
+        }
+        helper.assertTrue(g.removesLavaFeatures(), "the test planet keeps the default (remove_lava_features on)");
+        var registry = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.PLACED_FEATURE);
+        var here = new net.minecraft.world.level.levelgen.placement.PlacementContext(level, g, java.util.Optional.empty());
+        ServerLevel overworld = helper.getLevel().getServer().overworld();
+        var elsewhere = new net.minecraft.world.level.levelgen.placement.PlacementContext(overworld,
+                overworld.getChunkSource().getGenerator(), java.util.Optional.empty());
+        List<String> refused = new ArrayList<>();
+        registry.entrySet().forEach(e -> {
+            if (LavaFeatures.removed(e.getValue(), here))
+                refused.add(e.getKey().location().toString());
+        });
+        java.util.Collections.sort(refused);
+        DeepTime.LOGGER.info("[gametest] lavaFeaturesStayOut placedFeatures={} refused={} {}", registry.size(), refused.size(), refused);
+        for (String id : List.of("minecraft:lake_lava_surface", "minecraft:lake_lava_underground", "minecraft:spring_lava",
+                "minecraft:spring_lava_frozen")) {
+            helper.assertTrue(refused.contains(id), id + " is still placed in a Deep Time level");
+            var f = registry.get(net.minecraft.resources.ResourceLocation.parse(id));
+            helper.assertTrue(f != null && !LavaFeatures.removed(f, elsewhere), id + " is refused in a level that is not Deep Time's");
+        }
+        for (String id : List.of("minecraft:spring_water", "minecraft:ore_dirt", "minecraft:trees_plains", "minecraft:freeze_top_layer"))
+            helper.assertTrue(registry.containsKey(net.minecraft.resources.ResourceLocation.parse(id)) && !refused.contains(id),
+                    id + " is refused, but places no lava");
+        if (net.neoforged.fml.ModList.get().isLoaded("terralith"))
+            for (String id : List.of("terralith:volcano/lava_lakes", "terralith:volcano/spring_lava", "terralith:cave/mantle/lava_drip",
+                    "terralith:cave/frostfire/lava_remover"))
+                helper.assertTrue(refused.contains(id), id + " is still placed in a Deep Time level");
+        helper.succeed();
     }
 }

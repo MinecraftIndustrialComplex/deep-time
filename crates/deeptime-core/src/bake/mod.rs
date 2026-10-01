@@ -12,7 +12,7 @@
 //! | climate | `climate/{t_mean_c, p_mm, koppen}` on L1; `climate/{temperature, vegetation, continents, erosion, ridges}` on L2 (the §7.2 mapping, [`biomes`]) | [`climate`], [`biomes`] |
 //! | surface | `surface/regolith_blocks`, `surface/class_top` on L2 | [`surface`] |
 //! | meta | `meta/{plate_id, crust_age_myr, province}` on L1 | [`meta`] |
-//! | underground | nothing; `notes.bake.underground.params` (the lava floor and lava lakes) | [`crate::underground`] |
+//! | underground | `volcanoes/active.json` (the volcanoes active at the present) and `notes.bake.underground.params` (the lava floor, lava lakes, magma chambers) | [`crate::underground`] |
 //!
 //! The record goes to `manifest.json` `notes.bake`: the detail term the game adds
 //! (`deeptime_format::DetailSpec`), what each part did and how long it took, the bytes written.
@@ -305,12 +305,16 @@ pub fn bake(
     note.insert("meta".into(), meta::bake(world, p, surface, &mut out)?);
     millis.insert("meta".into(), json!(ms(t)));
 
-    // Not baked into any layer: the game reads these when it generates chunks (the lava floor and
-    // lava lakes, `crate::underground`).
-    note.insert(
-        "underground".into(),
-        json!({"params": p.underground.unwrap_or_default()}),
-    );
+    // Lava: the settings the game reads when it generates chunks (the lava floor, lava lakes, the
+    // magma under volcanoes) and the volcanoes active at the present (`crate::underground`).
+    let mut underground = json!({"params": p.underground.unwrap_or_default()});
+    if let Some(st) = world.volcanoes.as_ref() {
+        let list = crate::underground::active_volcanoes(st);
+        underground["active_volcanoes"] = json!(list["volcanoes"].as_array().map_or(0, Vec::len));
+        underground["volcanoes_file"] = json!(crate::underground::VOLCANOES_PATH);
+        out.json(crate::underground::VOLCANOES_PATH, &list)?;
+    }
+    note.insert("underground".into(), underground);
 
     millis.insert("total".into(), json!(ms(started)));
     note.insert("millis".into(), Value::Object(millis));
