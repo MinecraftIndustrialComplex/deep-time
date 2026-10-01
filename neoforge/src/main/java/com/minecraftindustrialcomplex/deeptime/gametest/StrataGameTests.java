@@ -107,7 +107,7 @@ public final class StrataGameTests {
     }
 
     /**
-     * A pure-vanilla pack resolves all 59 classes: the palette built from only the {@code minecraft:}
+     * A pure-vanilla pack resolves all 60 classes: the palette built from only the {@code minecraft:}
      * members of the member tags plus each class's {@code vanilla_fallback} gives every class a
      * vanilla block, never stone or deepslate except coal's stone, and rejects nothing. Without a
      * rock datapack the live palette is exactly that view.
@@ -119,8 +119,8 @@ public final class StrataGameTests {
         RockPalette live = RockPalette.get();
         List<String> ours = deepTimeClasses(helper);
         Expect e = new Expect();
-        if (ours.size() != 59)
-            e.wrong.add("Deep Time ships " + ours.size() + " rock classes, not 59");
+        if (ours.size() != 60)
+            e.wrong.add("Deep Time ships " + ours.size() + " rock classes, not 60");
         Map<String, Integer> bySource = new TreeMap<>();
         for (String cls : ours) {
             e.checked++;
@@ -151,6 +151,7 @@ public final class StrataGameTests {
         e.that(vanilla, "loess", Source.VANILLA_FALLBACK, "minecraft:smooth_sandstone");
         e.that(vanilla, "peridotite", Source.VANILLA_FALLBACK, "minecraft:tuff");
         e.that(vanilla, "coal", Source.VANILLA_FALLBACK, "minecraft:stone");
+        e.that(vanilla, "diamictite", Source.VANILLA_FALLBACK, "minecraft:cobbled_deepslate");
         DeepTime.LOGGER.info("[gametest] vanillaOnlyResolvesEveryClass classes={} sources={} rockTags={}", ours.size(), bySource, rockTags(helper));
         e.done(helper, "vanillaOnlyResolvesEveryClass");
     }
@@ -260,6 +261,17 @@ public final class StrataGameTests {
         boolean bic = tags && loaded(BIC), iaf = tags && loaded(ICE_AND_FIRE);
         e.that(live, "black_shale", bic ? modded : standIn, bic ? "born_in_chaos_v1:black_argillite" : "minecraft:smooth_basalt");
         e.that(live, "volcanic_ash", iaf ? modded : standIn, iaf ? "iceandfire:ash" : "minecraft:tuff");
+        // Diamictite (lithified till, 2026-09-30) is newer than the MIC rock tags: until a pack names
+        // it, its own stand-in holds; a pack fallback tag of the same block is just as right.
+        e.checked++;
+        var diamictite = live.result("diamictite").orElse(null);
+        List<String> diamictiteBlocks = diamictite == null ? List.of() : diamictite.blocks().stream().map(StrataGameTests::id).toList();
+        boolean standInHolds = diamictite != null && diamictite.source() == Source.VANILLA_FALLBACK
+                && diamictiteBlocks.equals(List.of("minecraft:cobbled_deepslate"));
+        boolean packNamesIt = tags && diamictite != null && diamictite.source() != Source.VANILLA_FALLBACK
+                && diamictite.source() != Source.NONE;
+        if (!standInHolds && !packNamesIt)
+            e.wrong.add("diamictite: " + (diamictite == null ? "no such class" : diamictite.source().id() + " " + diamictiteBlocks));
         if (!tags) {
             for (String cls : live.classes()) {
                 e.checked++;
@@ -280,7 +292,7 @@ public final class StrataGameTests {
     /**
      * The strata pass paints every class into the world: {@code test_planet_data} carries the
      * every-class strata ({@code deeptime synth --strata every-class}), where any ten neighbouring
-     * 16-block cell columns hold all 59 classes 20 or more blocks below the surface. In ten cell
+     * 16-block cell columns hold all 60 classes 20 or more blocks below the surface. In ten cell
      * columns on two rows, at SURFACE status, every horizon from the third down holds its class's
      * block (the member its key picks) at two depths, and a class that resolves to nothing, or to
      * stone, leaves the crust.
@@ -326,7 +338,7 @@ public final class StrataGameTests {
                 }
             }
         }
-        if (classes.size() != 59)
+        if (classes.size() != 60)
             e.wrong.add("test_planet_data has " + classes.size() + " classes; gametest.sh must write it with --strata every-class");
         TreeSet<String> missing = new TreeSet<>(classes);
         missing.removeAll(seen);
@@ -345,7 +357,7 @@ public final class StrataGameTests {
         int count = json.get("count").getAsInt(), resolved = json.get("resolved").getAsInt();
         DeepTime.LOGGER.info("[gametest] probePalette count={} resolved={} sources={} unresolved={} problems={} rockTags={}",
                 count, resolved, json.get("sources"), json.get("unresolved"), json.getAsJsonObject("problems").keySet(), rockTags(helper));
-        helper.assertTrue(count >= 59, "the palette lists " + count + " classes");
+        helper.assertTrue(count >= 60, "the palette lists " + count + " classes");
         helper.assertTrue(resolved == count, (count - resolved) + " classes unresolved: " + json.get("unresolved"));
         helper.assertTrue(DeepTimeCommands.PROBE_PREFIX.startsWith("[deeptime-probe]"), "probe prefix");
         helper.succeed();
