@@ -7,6 +7,7 @@ mod climate_dem;
 mod dump;
 mod heightmap;
 mod hydro;
+mod margins_view;
 mod parity;
 mod provinces;
 mod run;
@@ -379,6 +380,17 @@ enum Command {
         /// Field names (comma-separated); default every field.
         #[arg(long, value_delimiter = ',')]
         fields: Vec<String>,
+    },
+    /// Draw the continental margins of a checkpoint's plate model by tectonic setting (P1-27:
+    /// passive, Andean, subducting, collision, other plate boundary) over the sea floor by age,
+    /// with plate boundaries and subduction fronts, as a PNG, and print the margin shares.
+    Margins {
+        /// A checkpoint written by `stage --out` or `run --checkpoints`.
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// PNG to write.
+        #[arg(long)]
+        out: PathBuf,
     },
     /// Draw the geologic-provinces view layer (shield, platform, orogen, basin, LIP, extended
     /// crust, oceanic crust by age) of a checkpoint's world as a PNG and print each class's share.
@@ -782,6 +794,35 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Some(Command::Margins { input, out }) => match margins_view::run(&input, &out) {
+            Ok(m) => {
+                println!(
+                    "deeptime margins: t_myr={:.0} coast_km={:.0} active={:.3} subduction={:.3} \
+                     andean={:.3} boundary={:.3} passive={:.3} regime_active={:.3} \
+                     passive_floor_age_p50_myr={:.1} front_km_p50={:.0} landmasses={} \
+                     fragment_crust={:.3} fragment_coast_km={:.0} -> {}",
+                    m.t_myr,
+                    m.coast_km,
+                    m.active_share(),
+                    m.subduction_share(),
+                    f64::from(m.andean) / f64::from(m.coast.max(1)),
+                    m.boundary_share(),
+                    m.passive_share(),
+                    m.regime_active_share(),
+                    m.passive_floor_age_p50_myr,
+                    m.front_km_p50,
+                    m.landmasses,
+                    m.fragment_crust_share,
+                    m.coast_km * f64::from(m.fragment_coast) / f64::from(m.coast.max(1)),
+                    out.display()
+                );
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("deeptime margins: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some(Command::Provinces { input, out }) => match provinces::run(&input, &out) {
             Ok(shares) => {
                 for (name, pct) in shares {
