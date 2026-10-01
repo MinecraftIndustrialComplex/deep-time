@@ -123,7 +123,9 @@ Stage A is the part with no dependence on other branches; stage B puts it into t
   an upright fold shifts the column vertically by Noddy's sine profile; a fault moves what is above its plane by
   one vector), so a deformed column is a few `Segment`s, each a shifted copy of part of an undeformed column.
   `Structure::column` returns them; `StructIndex` says which events a column asks (those whose window reach plus
-  64 blocks holds it: a rule, not only a shortcut, so both sides will agree). Arithmetic: `+ − × /`, `floor`, and
+  the structure's `margin` holds it: a rule, not only a shortcut, so both sides will agree; the margin is at
+  least 64 blocks and is raised at the end of a run until it holds the furthest sideways shift any chain of
+  faults makes, with a quarter to spare, `deform::settle_margin`). Arithmetic: `+ − × /`, `floor`, and
   a stored 629-sample profile table. `structure/deform/tests.rs`: 120 random structures of every kind, 397,600
   lattice points with 22.7 events each: the column rule and the Noddy `History` of windowed events agree to
   2.3e-7 block.
@@ -166,11 +168,18 @@ Stage A is the part with no dependence on other branches; stage B puts it into t
   column rule on the same points: 6.6 ns a point. Agreement: worst 9.8e-6 block, no side flips. Memory: the
   structures and events are 1.4 MB; nothing is stored per lattice point. Peak RSS of the run 8.2 GB (7.9 to
   9.7 GB over seven runs of this planet today; a run without structures was not measured).
+- **A second planet** (`start q16s2 500 supercontinent`): 1,101 fold trains, 3,988 thrusts, 1,311 normal and 173
+  strike-slip faults; collision cells 0.90 covered, craton 0.72, rift 0.83, passive margin 0.76; largest shift
+  75 blocks, largest sideways 72, so the margin settled at 109 blocks (11.5 candidates a column on average, 119
+  at most, at most 25 segments); lattice 0.11 s for its two passes; Noddy agreement 9.5e-6 block, 154 ns a
+  point; 10.7 s of translation in a 341 s run.
 - **Gates** (test VM, after merging master 224f00c): `cargo fmt --all --check`, `cargo clippy --workspace
   --all-targets -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --no-fail-fast`
   all ok (core 384 + 3 ignored, cli 52 + 1, format 57, inspect 31, jni 7 + 7, noddy 16 + 11 + 2, viewer 6);
   `cd neoforge && ./gradlew build test` BUILD SUCCESSFUL, JUnit 168/0 (1 skipped). No GameTests: no baked data
   the game reads has changed yet.
+- **Scratch**: /Volumes/Graphide/ban/deeptime-runs/p2-01/ (nine runs, 7.7 GB) deleted after the last one;
+  `tools/review/p2-01-planet.sh start <name> 500` remakes a run in five minutes.
 - **What stage A leaves out.** Rock younger than a structure is not deformed by it (unconformities): the rule
   needs the stacks' key at the event's age, stage B. Dykes, plugs and discordant plutons: bodies, stage B. The
   events are in `WorldState::structure` and the run summary only; the bake does not write them and the game
@@ -187,11 +196,12 @@ Stage A is the part with no dependence on other branches; stage B puts it into t
 - **Decisions for Ben**: in the hand-back report (how structure is evaluated; default strength, count and size;
   whether old belts keep their structures; whether the ground shows fault scarps).
 - **Next step (stage B)**: (1) `structure/events` in the world data (a sectioned file: the events and the
-  profile table) and FORMAT.md, format 0.3; (2) `ColumnWorld::sample` and Java `Columns`/`StrataPass` restore
+  profile table and the margin) and FORMAT.md, format 0.3; (2) `ColumnWorld::sample` and Java `Columns`/`StrataPass` restore
   the column first, reading each segment's rock from the stack at its source column, with the unconformity rule
   (the height of the stack at the key of the event's age: above it the rock is younger and is not moved); Java
-  twin `worlddata/Structure.java`; `ColumnParityTest` over deformed columns; (3) the bake checks the largest
-  sideways shift against the 64-block margin; (4) the basement's granite as discordant bodies, dykes and plugs
+  twin `worlddata/Structure.java`; `ColumnParityTest` over deformed columns; (3) the per-chunk cost of the
+  rule in the game (the strata pass asks for a stack at every segment's source column); (4) the basement's
+  granite as discordant bodies, dykes and plugs
   as bodies; (5) trap structure from the real folds and faults, deposits otherwise untouched; (6) `deeptime
   strata-check` and the workbench sections before and after through a collision belt, an arc and a rift; grouped
   `deeptime:fold_belt` and `deeptime:fault_system` events.

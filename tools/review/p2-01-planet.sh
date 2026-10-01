@@ -34,7 +34,7 @@ detach() { # <log> <command…>
 # test machine: it loads the system libc under the Nix libsystemd.)
 mine() {
     for d in /proc/[0-9]*; do
-        c="$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null || true)"
+        c="$({ tr '\0' ' ' < "$d/cmdline"; } 2>/dev/null || true)"
         case "$c" in
             "$RUNS/deeptime-"*) echo "${d#/proc/} $c" ;;
         esac

@@ -68,7 +68,34 @@ pub fn finish(features: &[Feature], surface_y: impl Fn(f64, f64) -> f64) -> Stru
             .map(|f| f.to_baked(surface_y(f.x, f.z)))
             .collect(),
         profiles: vec![sine_profile()],
+        margin: deeptime_format::structure::REACH_MARGIN,
     }
+}
+
+/// Makes sure the structure's margin covers the furthest any chain of faults moves rock sideways:
+/// the column rule is run over `grid` (L2), and while the largest sideways shift it finds, with a
+/// quarter to spare, is over the margin, the margin is raised to one and a half times the shift
+/// and the lattice run again (a wider margin brings more candidate events to a column, which can
+/// lengthen a chain). Returns the last lattice's statistics.
+pub fn settle_margin(
+    st: &mut Structure,
+    circumference: u32,
+    grid: &deeptime_format::GridDesc,
+    min_y: f64,
+    max_y: f64,
+) -> lattice::ColumnStats {
+    let mut stats = lattice::ColumnStats::default();
+    for _ in 0..6 {
+        let index = deeptime_format::structure::StructIndex::new(st, circumference);
+        let seconds = stats.seconds;
+        stats = lattice::columns(st, &index, grid, min_y, max_y);
+        stats.seconds += seconds;
+        if stats.max_heave * 1.25 <= st.margin {
+            break;
+        }
+        st.margin = (stats.max_heave * 1.5).ceil();
+    }
+    stats
 }
 
 /// The tectonic event behind a structure of `kind` started at block position (x, z) at
@@ -130,7 +157,7 @@ fn median(mut v: Vec<f64>) -> f64 {
 /// the Noddy port against the column rule on a sample of those columns.
 pub fn report(
     features: &[Feature],
-    st: &Structure,
+    st: &mut Structure,
     preset: &crate::params::PlanetPreset,
     counts: &Counts,
     regime: &[f32],
@@ -140,13 +167,14 @@ pub fn report(
     use serde_json::json;
 
     let c = preset.scale.circumference_blocks;
-    let index = StructIndex::new(st, c);
     let l2 = deeptime_format::GridDesc::for_planet("L2", c, preset.resolution.l2_r)?;
     let (min_y, max_y) = (
         f64::from(preset.scale.min_y),
         f64::from(preset.scale.max_y) + 1.0,
     );
-    let cols = lattice::columns(st, &index, &l2, min_y, max_y);
+    let cols = settle_margin(st, c, &l2, min_y, max_y);
+    let st: &Structure = st;
+    let index = StructIndex::new(st, c);
     // Every 53rd L2 column (53 is prime to the grid's width, so the sample covers the planet).
     let sample: Vec<(f64, f64)> = (0..l2.cells())
         .step_by(53)
@@ -202,6 +230,7 @@ pub fn report(
             "max_segments": cols.max_segments,
             "max_shift_blocks": cols.max_shift,
             "max_heave_blocks": cols.max_heave,
+            "margin_blocks": st.margin,
             "points_at_4_blocks": voxels,
         },
         "noddy_check": {

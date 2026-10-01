@@ -677,12 +677,12 @@ impl StructureStage {
         let structure = if last {
             let started = Instant::now();
             deform::undo_order(&mut self.st.features);
-            let st = deform::finish(&self.st.features, |x, z| {
+            let mut st = deform::finish(&self.st.features, |x, z| {
                 src.surface_y(plutons::cell_of(&grid, x, z), &s)
             });
             let report = deform::report(
                 &self.st.features,
-                &st,
+                &mut st,
                 &self.preset,
                 &self.st.deform_counts,
                 src.regime,
