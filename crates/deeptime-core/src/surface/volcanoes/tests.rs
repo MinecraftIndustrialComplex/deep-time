@@ -298,7 +298,7 @@ fn island_subsidence_defaults_to_nothing_and_the_setting_still_works() {
     assert_eq!(vs[0].sunk_m, p.island_subsidence_max_m);
     assert_eq!(vs[1].sunk_m, 0.0);
     let deepest = delta.iter().fold(0.0f32, |m, &d| m.min(d));
-    assert!(deepest < -1000.0 && deepest >= -1500.0, "{deepest}");
+    assert!((-1500.0..=-1000.0).contains(&deepest), "{deepest}");
 }
 
 fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
