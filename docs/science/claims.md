@@ -13,7 +13,7 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,097 rows.
+2,098 rows.
 
 | Ledger | Subject | Rows | `cited-unverified` | `from-memory` | `abstract-only` | `calibrated` | `game-choice` | `uncited` | of which `pending-rewrite` | of which `not-yet-coded` |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -22,7 +22,7 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 76 | 20 | 0 | 0 | 0 | 10 | 46 | 76 | 0 |
 | [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 |
 | [ERO](ledger/ERO.md) | erosion, sediment, facies | 167 | 86 | 2 | 3 | 6 | 6 | 64 | 0 | 0 |
-| [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 67 | 8 | 0 | 6 | 6 | 14 | 30 | 0 | 0 |
+| [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 68 | 8 | 0 | 6 | 6 | 15 | 30 | 0 | 0 |
 | [HYP](ledger/HYP.md) | hypsometry and calibration targets | 34 | 10 | 0 | 1 | 18 | 1 | 4 | 0 | 0 |
 | [HYD](ledger/HYD.md) | rivers, lakes, runoff | 76 | 14 | 3 | 0 | 1 | 36 | 22 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 21 | 1 | 0 | 0 | 0 | 9 | 11 | 0 | 0 |
@@ -41,7 +41,7 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 | [BAK](ledger/BAK.md) | the bake, satellite view | 40 | 0 | 0 | 0 | 1 | 34 | 5 | 0 | 0 |
 | [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 |
 | [GEO](ledger/GEO.md) | geothermal features | 0 | – | – | – | – | – | – | – | – |
-| **all** | | **2,097** | **522** | **53** | **66** | **76** | **731** | **646** | **377** | **57** |
+| **all** | | **2,098** | **522** | **53** | **66** | **76** | **732** | **646** | **377** | **57** |
 
 Three rows are `verified` (ISO-041, ISO-042, ISO-048, added with the flexure feature on 2026-10-02; the table has no column for them). The percentages below are those of stage 1's 2,069 rows. In plain terms: 723 rows (35 %) are deliberate game or implementation
 choices; 635 (31 %) state something about the physical world with no source at all; 522 (25 %)
