@@ -91,9 +91,9 @@ impl Default for UndergroundParams {
             magma_chamber_size: 1.0,
             crater_lake_share: 0.25,
             remove_lava_features: true,
-            geothermal_density: 1.0,           // ledger: GEO-001 (game-choice)
-            geothermal_reach: 1.0,            // ledger: GEO-003 (game-choice)
-            geothermal_size: 1.0,             // ledger: GEO-005 (game-choice)
+            geothermal_density: 1.0, // ledger: GEO-001 (game-choice)
+            geothermal_reach: 1.0,   // ledger: GEO-003 (game-choice)
+            geothermal_size: 1.0,    // ledger: GEO-005 (game-choice)
             geothermal_spring_min_precip_mm: 400.0, // ledger: GEO-007 (game-choice)
         }
     }
