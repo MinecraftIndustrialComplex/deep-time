@@ -36,6 +36,9 @@ pub use deeptime_format::ramps::RAMPS_JSON;
 
 const INDEX_HTML: &str = include_str!("../assets/index.html");
 const VIEWER_JS: &str = include_str!("../assets/viewer.js");
+/// The pages' map projection (`window.DTProj`, the twin of `deeptime_format::projection`), loaded
+/// before every other script of the viewer bundle and the workbench.
+pub const PROJECTION_JS: &str = include_str!("../assets/projection.js");
 const BENCH_HTML: &str = include_str!("../assets/bench.html");
 const WORKBENCH_HTML: &str = include_str!("../assets/workbench.html");
 /// The workbench page's script (`deeptime watch` serves it as `workbench.js`).
@@ -132,6 +135,7 @@ pub fn write_bundle_with(
         INDEX_HTML.replace("{{TITLE}}", &html_escape(&info.title)),
     )?;
     fs::write(dir.join("viewer.js"), VIEWER_JS)?;
+    fs::write(dir.join("projection.js"), PROJECTION_JS)?;
     fs::write(dir.join("ramps.json"), RAMPS_JSON)?;
 
     let mut entries = Vec::new();

@@ -477,6 +477,11 @@ fn get(app: &App, req: &Request) -> Response {
             NO_CACHE,
             deeptime_viewer::WORKBENCH_JS.as_bytes().to_vec(),
         ),
+        "/projection.js" => Response::ok(
+            "text/javascript; charset=utf-8",
+            NO_CACHE,
+            deeptime_viewer::PROJECTION_JS.as_bytes().to_vec(),
+        ),
         "/deposits.js" => Response::ok(
             "text/javascript; charset=utf-8",
             NO_CACHE,

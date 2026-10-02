@@ -40,7 +40,7 @@ class MagmaTest {
     }
 
     private static Magma one(Magma.Heights h, Magma.Wet wet, MagmaRules rules) {
-        return Magma.build(List.of(volcano(1, 100, 50, 0.9)), rules, h, wet, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
+        return Magma.build(List.of(volcano(1, 100, 50, 0.9)), rules, h, wet, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
     }
 
     private static final Magma.Wet DRY = (x, z) -> false;
@@ -88,7 +88,7 @@ class MagmaTest {
                 best = Math.max(best, cone(200 + 400 * i, 0, 182, 70).at(x, z));
             return best;
         };
-        Magma m = Magma.build(vs, new MagmaRules(3.0, 1.0, 0.25, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
+        Magma m = Magma.build(vs, new MagmaRules(3.0, 1.0, 0.25, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
         assertEquals(1, m.bodies().stream().filter(Magma.Body::lake).count(), "a quarter of four");
         Magma.Body b = m.bodies().stream().filter(Magma.Body::lake).findFirst().orElseThrow();
         assertEquals(2, b.id(), "the most active one");
@@ -115,7 +115,7 @@ class MagmaTest {
         assertEquals(4, polar.bodies().stream().filter(x -> x.chamberRh() > 0).count(), "they keep their chambers");
         // Every share from none to all.
         for (double share : new double[]{0.0, 0.5, 1.0}) {
-            Magma n = Magma.build(vs, new MagmaRules(3.0, 1.0, share, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
+            Magma n = Magma.build(vs, new MagmaRules(3.0, 1.0, share, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
             assertEquals(Math.round(share * 4), n.bodies().stream().filter(Magma.Body::lake).count(), "share " + share);
         }
     }
@@ -197,7 +197,7 @@ class MagmaTest {
     @Test
     void bodiesAreFoundAcrossTheSeam() {
         Magma m = Magma.build(List.of(volcano(7, -C / 2 + 2, 0, 0.5)), new MagmaRules(3.0, 1.0, 0.0, true),
-                cone(-C / 2 + 2, 0, 182, 70), DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
+                cone(-C / 2 + 2, 0, 182, 70), DRY, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
         Magma.Body b = m.bodies().get(0);
         assertEquals(-C / 2 + 2, b.x());
         // The chunk just west of the seam (x up to C/2 − 1) holds part of the chamber.

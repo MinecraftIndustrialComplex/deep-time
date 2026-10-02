@@ -33,7 +33,7 @@ import java.util.function.BiFunction;
  */
 public final class ReviewModel {
 
-    public static final int MAP_W = 512, MAP_H = 256;
+    public static final int MAP_W = 512, MAP_H = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureHeight(MAP_W);
 
     /** The final map. {@code source} is {@code world_data} or {@code keyframe}. */
     public record MapImage(int w, int h, int[] abgr, String source) {}
@@ -96,7 +96,7 @@ public final class ReviewModel {
         int[] px = new int[MAP_W * MAP_H];
         double[] b = new double[2];
         for (int y = 0; y < MAP_H; y++) {
-            double lat = 90.0 - 180.0 * y / MAP_H;
+            double lat = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureLatitudeDeg(y, MAP_H);
             for (int x = 0; x < MAP_W; x++) {
                 double lon = 360.0 * x / MAP_W;
                 GlobeProjection.block(lat, lon, circumference, b);

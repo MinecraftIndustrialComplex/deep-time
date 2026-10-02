@@ -171,6 +171,33 @@ class ColumnParityTest {
         }
     }
 
+    /**
+     * The projection (design note {@code docs/design/equal-area-projection.md} §2): Java's {@link
+     * Projection} gives the latitude and longitude Rust's {@code deeptime_format::projection} gave for
+     * every column of the fixture, and the same z for every 5° of latitude (to 1e-9: trigonometric
+     * functions are not bitwise portable between the two runtimes).
+     */
+    @Test
+    void theProjectionIsRusts() throws IOException {
+        JsonObject doc = fixture();
+        JsonObject p = doc.getAsJsonObject("projection");
+        int c = doc.get("circumference").getAsInt();
+        assertEquals(p.get("pole_z").getAsDouble(), Projection.poleZ(c), 1e-9, "the z of the poles");
+        JsonArray points = p.getAsJsonArray("points");
+        assertTrue(points.size() >= 100, points.size() + " points");
+        for (JsonElement e : points) {
+            JsonArray q = e.getAsJsonArray();
+            double x = q.get(0).getAsDouble(), z = q.get(1).getAsDouble();
+            assertEquals(q.get(2).getAsDouble(), Projection.latitudeDeg(c, z), 1e-9, "latitude at " + q);
+            double dl = Math.abs(q.get(3).getAsDouble() - Projection.longitudeDeg(c, x));
+            assertTrue(Math.min(dl, 360 - dl) < 1e-9, "longitude at " + q + ": " + Projection.longitudeDeg(c, x));
+        }
+        for (JsonElement e : p.getAsJsonArray("latitudes")) {
+            JsonArray q = e.getAsJsonArray();
+            assertEquals(q.get(1).getAsDouble(), Projection.zOfLatitude(c, q.get(0).getAsDouble()), 1e-9, "z of " + q);
+        }
+    }
+
     @Test
     void everyColumnOfTheFixtureIsEqual() throws IOException {
         JsonObject doc = fixture();
