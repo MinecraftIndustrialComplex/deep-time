@@ -31,7 +31,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [ERO](ledger/ERO.md) | erosion, sediment, facies | 156 | 0 | 83 | 2 | 3 | 6 | 4 | 58 | 0 | 0 | 11 |
 | [GEO](ledger/GEO.md) | geothermal features | 51 | 1 | 0 | 0 | 0 | 0 | 47 | 3 | 0 | 1 | 0 |
 | [GLA](ledger/GLA.md) | glacial erosion and landforms | 64 | 0 | 20 | 1 | 0 | 1 | 25 | 17 | 0 | 0 | 2 |
-| [HNT](ledger/HNT.md) | editor hint texts | 84 | 11 | 12 | 2 | 2 | 6 | 36 | 15 | 0 | 0 | 0 |
+| [HNT](ledger/HNT.md) | editor hint texts | 88 | 13 | 12 | 2 | 2 | 6 | 38 | 15 | 0 | 0 | 0 |
 | [HYD](ledger/HYD.md) | rivers, lakes, runoff | 75 | 0 | 14 | 3 | 0 | 1 | 36 | 21 | 0 | 0 | 1 |
 | [HYP](ledger/HYP.md) | hypsometry and calibration targets | 34 | 0 | 10 | 0 | 1 | 18 | 1 | 4 | 0 | 0 | 0 |
 | [IMP](ledger/IMP.md) | meteor impacts | 135 | 0 | 14 | 34 | 3 | 0 | 42 | 42 | 0 | 0 | 6 |
@@ -46,9 +46,9 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 73 | 0 | 16 | 0 | 0 | 1 | 24 | 32 | 0 | 0 | 11 |
 | [SCL](ledger/SCL.md) | world scale, planet constants | 50 | 0 | 6 | 0 | 0 | 1 | 37 | 6 | 0 | 0 | 1 |
 | [STR](ledger/STR.md) | strata, traps, hosts | 44 | 0 | 4 | 0 | 0 | 2 | 34 | 4 | 0 | 0 | 4 |
-| [VOL](ledger/VOL.md) | volcanoes | 73 | 0 | 0 | 0 | 1 | 1 | 44 | 27 | 0 | 0 | 0 |
+| [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
-| **all** | | **2,220** | **53** | **491** | **54** | **67** | **78** | **870** | **607** | **359** | **58** | **193** |
+| **all** | | **2,225** | **55** | **491** | **54** | **67** | **79** | **875** | **604** | **359** | **58** | **193** |
 
 53 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, and WP-13a): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and eleven HNT rows (WP-15, WP-16, WP-2),
@@ -221,7 +221,7 @@ code). "Evidence" says how strong the finding is.
 | 9 | IMP-018 | Editor hint: "one crater of 20 km or more per 180 million km² per year". The coded rate is one per 1.8 × 10¹⁴ km² per year: a factor of a million. | arithmetic |
 | 10 | IMP-038, IMP-054, IMP-062 | Equation numbers of Collins et al. 2005 cited in comments are wrong (rim height is eq. 48, ejecta eq. 47, melt eq. 30). Values are right. | primary full text (sub-agent) |
 | 11 | VOL-039 | The 60 km spacing of arc volcanoes cites de Bremond d'Ars et al. 1995, whose abstract says spacing is random with no characteristic value. | primary abstract **Settled in WP-2 (2026-10-02):** the citation now quotes the abstract; the mean spacings are from Hildreth 2007 (27 to 87 km); 60 km is labelled a game choice. |
-| 12 | VOL-016, VOL-026, VOL-029, VOL-048 | Comments disagree with the code they sit on (flank angle, crater size, caldera "across" against radius, subsidence rate). | arithmetic by the extraction agent **Settled in WP-2 (2026-10-02):** comments rewritten from the arithmetic and the sources read; the caldera comment's numbers were radii, so flag 4's reading was wrong; the subsidence rate itself is a question for Ben (it now counts flexure and cooling twice). |
+| 12 | VOL-016, VOL-026, VOL-029, VOL-048 | Comments disagree with the code they sit on (flank angle, crater size, caldera "across" against radius, subsidence rate). | arithmetic by the extraction agent **Settled in WP-2 (2026-10-02):** comments rewritten from the arithmetic and the sources read; the caldera comment's numbers were radii, so flag 4's reading was wrong; the subsidence rate was a question for Ben, answered 2026-10-02: the default is now 0 (it counted flexure and cooling twice). |
 | 13 | DEF-016 to DEF-018 | Fault slip ratios are coded 0.05, 0.08, 0.05 beside a cited 0.03. | secondary (a review quoting Schlische) |
 | 14 | DEF-019, DEF-020 | Fault dips from Anderson 1951 are applied in block space, which is stretched 15 times vertically: real dips become about 6.6° and 2.2°. A design question, not a typo. | arithmetic from the build log's own formula |
 | 15 | DEF-042, RCK-061 | A "stock" is coded larger than the definition quoted beside it; the pluton thickness law cited to Cruden 1998 is not in that paper's abstract. | secondary; primary abstract |
@@ -262,7 +262,7 @@ Read from code and documents by the extraction agents; nothing here was checked 
 | 43 | CRE-034 | The plan says the column rule and the Noddy port agree to 1e-5 block; the code counts a point as a side flip above 1e-3 block when it lies within 1e-6 of a fault plane and leaves flipped points out of the worst case. | plan against code |
 | 44 | GEO-014, GEO-048 to GEO-050, GEO-017, GEO-035, GEO-046 | Geothermal hints and format notes disagree with the code: "one to four" fields per volcano against a formula that gives 0 to 7; "2 to 5 blocks across" is the pool radius (4 to 10 across); FORMAT.md says a tenth of a terrace is stained (code: 7 %) and a field is drawn from 3 blocks above sea level (code: 5). | code against documents **Fixed in WP-16: hints, FORMAT.md and comments now agree with the code.** |
 | 45 | GEO-012, GEO-026, GEO-040, GEO-041 | The plan says heat comes "from the heat flow already modelled"; the code uses only active volcanoes. Nothing in code, hints or decisions mentions geysers, boiling or temperatures, and spring water is plain water; the plan's epithermal cinnabar is a 6 % stain. | code against plan **Part fixed in WP-16: geysers, heat sources and cinnabar are now stated plainly in the hints, FORMAT.md and the page; the plan's wording is a decision for Ben (Pending).** |
-| 46 | GEO-007, GEO-019, GEO-020 | The 400 mm rainfall threshold has no source; the 3 degC rule is a vanilla freezing rule, not geology. | none cited **Part fixed in WP-16: the 400 mm and 3 degC rules are marked `game-choice` with the qualitative sources found (NPS, Paulson and Ingebritsen 1991); no source gives either number.** |
+| 46 | GEO-007, GEO-019, GEO-020 | The 400 mm rainfall threshold has no source; the 3 degC rule is a vanilla freezing rule, not geology. | none cited **Part fixed in WP-16: the 400 mm and 3 degC rules are marked `game-choice` with the qualitative sources found (NPS, Paulson and Ingebritsen 1991); no source gives either number.** **Ben, 2026-10-02 (decisions log, "Keep all three"): the 400 mm rain test, no pools under 3 degC and pools of 4 to 10 blocks stay as owner-confirmed game choices.** |
 | 47 | SCL-009 (absorbing ISO-030) | Sea level 63 is called an agent choice in SCL-009 and Ben's design choice in the retired ISO-030, whose text SCL-009 now carries. | ledger rows |
 | 48 | master `STATUS.md` | The P2-14 build-log entry lost its heading and first paragraphs in the merge to master; its remaining bullets sit at the end of the P1-10 entry. | read by the GEO extraction agent **Fixed in WP-16: the heading and first bullets are restored (reconstructed; the original text survives nowhere in the history).** |
 
