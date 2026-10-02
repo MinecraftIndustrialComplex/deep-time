@@ -68,8 +68,8 @@
 //! collision's first step and not from the contact's onset, which is `contact_onset_myr`).
 //! `peak_uplift_m` is the most any ground rose by it (the step's largest uplift, summed over its
 //! steps: the uplift at the front), `shortening_km` the convergence across the front integrated,
-//! `belt` the extent of everything it raised (belt and wedge, weighted by the uplift, in the
-//! overriding plate's frame, so a belt that rode with its plate is not smeared along its path),
+//! `belt` the extent of everything it raised (its width from where the belt and wedge rose across
+//! the front, weighted by the uplift; its length the front's: `belts::footprint`),
 //! and `lifted10`, `lifted100` and `emerged` the most samples one step raised by more than 10 m,
 //! by more than 100 m and from below the sea datum to above it (their extents are not kept). A
 //! collision state that ends without a transfer or weld (the plates part, the contact reverses or
@@ -326,8 +326,8 @@ pub struct BeltRec {
     /// The belt's highest mean height above the sea within half its width of the front, m.
     #[serde(default)]
     pub peak_height_m: Option<f64>,
-    /// Width and length of everything the collision raised (belt and wedge, weighted by the
-    /// uplift, in the overriding plate's frame), km.
+    /// Width and length of everything the collision raised, km (`belts::footprint`: the spread of
+    /// the belt and wedge's uplift across the front, and the front's longest length).
     #[serde(default)]
     pub belt_width_km: Option<f64>,
     #[serde(default)]
