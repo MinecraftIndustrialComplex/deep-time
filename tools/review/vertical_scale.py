@@ -690,8 +690,7 @@ def render(a):
         hi = ndimage.maximum_filter(v, size=(17, 17))
         cliff = land & near_sea & (hi - 62 >= 16)
         cells = block_sum(cliff, k).astype(np.float64)
-        cells[:e] = cells[-e:] = 0
-        cells[:, :e] = cells[:, -e:] = 0
+        cells[~inside] = 0
         i = np.unravel_index(np.argmax(cells), cells.shape)
         picks.append(("coast", "its steepest coast", i[0] * k + k // 2, i[1] * k + k // 2))
         for pk, what, r, c in picks:
