@@ -16,6 +16,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -98,7 +99,7 @@ public final class LakeGameTests {
         }
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         StringBuilder detail = new StringBuilder();
-        int wrong = 0, frozenWarm = 0, openCold = 0, frozenRead = 0, openRead = 0, saltRead = 0;
+        int wrong = 0, frozenWarm = 0, openCold = 0, frozenRead = 0, openRead = 0, saltRead = 0, overhung = 0;
         for (Spot s : frozen) {
             BlockState top = level.getChunk(s.x() >> 4, s.z() >> 4).getBlockState(pos.set(s.x(), s.top(), s.z()));
             boolean cold = level.getBiome(pos).value().coldEnoughToSnow(pos);
@@ -127,11 +128,26 @@ public final class LakeGameTests {
         BlockState saltBlock = found.length == 0 || found[0] == null ? null : found[0].pick(0L);
         for (Spot s : salt) {
             LevelChunk chunk = level.getChunk(s.x() >> 4, s.z() >> 4);
-            // The ground's top block: under air, plants and a snow layer.
+            // The ground's top block: under air, plants, a snow layer and any tree (leaves and logs: a neighbour's
+            // canopy overhangs a column it does not stand in, and the salt is what lies under it). A trunk standing
+            // on the flat is a tree growing on salt, which is a violation of its own (a playa grows no trees).
             int y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, s.x() & 15, s.z() & 15);
             BlockState b = chunk.getBlockState(pos.set(s.x(), y, s.z()));
-            while (y > level.getMinBuildHeight() && (b.isAir() || !b.isCollisionShapeFullBlock(level, pos)) && b.getFluidState().isEmpty())
+            BlockState above = Blocks.AIR.defaultBlockState();
+            boolean canopy = false;
+            while (y > level.getMinBuildHeight() && b.getFluidState().isEmpty()
+                    && (b.isAir() || !b.isCollisionShapeFullBlock(level, pos) || b.is(BlockTags.LEAVES) || b.is(BlockTags.LOGS))) {
+                above = b;
+                canopy |= b.is(BlockTags.LEAVES);
                 b = chunk.getBlockState(pos.set(s.x(), --y, s.z()));
+            }
+            if (canopy)
+                overhung++;
+            if (above.is(BlockTags.LOGS)) {
+                wrong++;
+                detail.append(" tree-on-salt(").append(s.x()).append(',').append(y + 1).append(',').append(s.z()).append(' ')
+                        .append(BuiltInRegistries.BLOCK.getKey(above.getBlock())).append(')');
+            }
             if (!b.getFluidState().isEmpty() || b.is(Blocks.SNOW_BLOCK) || b.is(Blocks.PACKED_ICE) || b.is(Blocks.BLUE_ICE))
                 continue;   // under water or under the ice cover: not this pass's surface
             saltRead++;
@@ -142,8 +158,8 @@ public final class LakeGameTests {
             }
         }
         DeepTime.LOGGER.info("[gametest] lakeIceAndSaltFollowTheClimate lakeCells={} playaCells={} frozenLakeColumns={} (iceRead={} inWarmBiome={}) "
-                        + "openLakeColumns={} (waterRead={} inColdBiome={}) playaColumns={} (saltRead={} salt={}) threshold={} wrong={}{}",
-                lakeCells, playaCells, frozen.size(), frozenRead, frozenWarm, open.size(), openRead, openCold, salt.size(), saltRead,
+                        + "openLakeColumns={} (waterRead={} inColdBiome={}) playaColumns={} (saltRead={} underCanopy={} salt={}) threshold={} wrong={}{}",
+                lakeCells, playaCells, frozen.size(), frozenRead, frozenWarm, open.size(), openRead, openCold, salt.size(), saltRead, overhung,
                 saltBlock == null ? "none" : BuiltInRegistries.BLOCK.getKey(saltBlock.getBlock()), ice.threshold(), wrong, detail);
         helper.assertTrue(wrong == 0, wrong + " columns break the lake-ice or salt rule:" + detail);
         helper.succeed();
