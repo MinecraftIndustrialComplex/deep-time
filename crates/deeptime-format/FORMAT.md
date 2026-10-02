@@ -268,8 +268,14 @@ jar ships it and the core compiles the same file in as the default). Band coordi
                                                                            {"positive_below_erosion": e,
                                                                             "flats": {positive_noise_above, max_magnitude}}
     "BSk": { "temperature": { "when": { "of": "t_cold", "above": 0.0 },   the ramp "then" where the input is above
-                              "then": "temperate", "else": "boreal" },     the threshold, "else" elsewhere
-             "humidity": "steppe" }
+                              "then": "temperate", "else": "boreal" },     the threshold, "else" elsewhere; "then" and
+             "humidity": "steppe" },                                       "else" may themselves be switches (4 deep)
+    "BWk": { "temperature": { "when": { "of": "t_mean", "above": 10.0 }, "then": "desert",
+                              "else": { "when": { "of": "t_mean", "above": 0.0 },
+                                        "then": "cold_desert", "else": "polar_ice" } },
+             "humidity": { "when": { "of": "t_mean", "above": 10.0 }, "then": "desert",     the humidity may switch on
+                           "else": { "when": { "of": "t_mean", "above": 0.0 },               a temperature the same way
+                                     "then": "cold_desert", "else": "polar_desert" } } }
   },
   "ice_cover": {                         optional, every key optional (defaults as written here): "The ice cover"
     "step_m": 160.0, "max_blocks": 12, "snow_blocks": 3, "blue_ice_from_blocks": 9, "blue_ice_blocks": 2,
@@ -315,8 +321,22 @@ optional). The default table uses all three for EF:
   vanilla's units, which the game then maps onto the pack's, so a pack with another router wants
   its own numbers (MIC's tuned ones are the defaults').
 
+**Cold deserts (Ben, 2026-10-02).** Vanilla has no cold desert, and P1-09's BWk was the hot
+desert's ramp from a mean of 5 °C up, so a BWk in the tundra's climate was drawn as sand. The
+default table splits BWk by its mean annual temperature (a switch on `t_mean`): above 10 °C it is
+the hot desert as before (`desert` ramp and rule: sand, badlands on plateaus); from 0 to 10 °C it
+is `cold_desert` (temperature 1.05 … 1.95 by the mean, the cold band; humidity at most 0.6, the
+driest band: vanilla's plains and meadow, Terralith's steppe, cold shrubland and temperate
+highlands, and any biome mod's own cold-desert or cold-steppe biome that its parameter list puts
+there); at or below 0 °C it is barren frozen ground like EF's (`polar_ice`, `polar_desert`: snowy
+plains in vanilla, gravel desert and cold shrubland in Terralith). A pack with its own biomes
+overrides the table where its cold-desert biome sits on other coordinates. BSk is unchanged: it
+was already cold (its D ramp below a coldest month of 0 °C, its C ramp above), semi-arid
+(humidity 1.05 … 1.95), so vanilla draws plains or snowy plains and Terralith its steppe and
+cold shrubland.
+
 The default table reproduces what P1-09 first compiled in, operation for operation for every class
-but EF (a test holds the core's default to the old formulas bit for bit). A ramp is a `base`/`span` pair rather than two
+but EF and BWk (a test holds the core's default to the old formulas bit for bit). A ramp is a `base`/`span` pair rather than two
 end points so that the coordinates the default writes are exactly the ones P1-09 computed.
 The sea's own temperature curve, the aridity → humidity anchors and the depth anchors of the sea
 stay in the core.

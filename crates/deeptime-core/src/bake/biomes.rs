@@ -26,7 +26,9 @@
 //! | D | 0.75 … 2 by the warmest (10 → 22 °C, weight 0.65) and coldest month (−30 → 0 °C) | snowy taiga (Dfc's cold edge), taiga, plains, forest |
 //! | C | 2 … 2.95 by the coldest month (0 → 18 °C) | plains, forest, birch, dark forest |
 //! | A, BSh | 3 … 3.9 (coldest month 18 → 28 °C; BSh by the mean 18 → 30 °C) | savanna, forest, jungle |
-//! | BW | 4.05 … 4.95 by the mean (5 → 30 °C) | desert (badlands on plateaus) |
+//! | BWh, BWk with a mean above 10 °C | 4.05 … 4.95 by the mean (5 → 30 °C) | desert (badlands on plateaus) |
+//! | BWk, mean 0 … 10 °C | 1.05 … 1.95 by the mean (0 → 10 °C), humidity ≤ 0.6 | the driest cold land: plains, meadow; Terralith's steppe, cold shrubland |
+//! | BWk, mean at or below 0 °C | 0.6 … 0.8 by the warmest month, humidity 1.5 (like barren EF) | snowy plains; Terralith's gravel desert, cold shrubland |
 //! | BSk | as C or D by its coldest month | plains, meadow |
 //!
 //! Land above its equilibrium line (`climate/glacier`) is capped at 0.35 (ice), except a class with a
@@ -41,7 +43,8 @@
 //! 0 … 5 on a log scale — held inside each class's range. The first three anchors are UNEP's limits
 //! of hyper-arid | arid | semi-arid (Zomer et al. 2022, Table 1, quoting UNEP 1997; ledger BIO-038).
 //! UNEP's dry sub-humid | humid limit is 0.65, which is not an anchor; the anchors 1, 2 and 5 are
-//! this mapping's own (a game choice, ledger BIO-100). The ranges: BW ≤ 0.95 (the driest band),
+//! this mapping's own (a game choice, ledger BIO-100). The ranges: BW ≤ 0.95 (the driest band; a cool
+//! BWk ≤ 0.6, a freezing one a fixed 1.5, ledger BIO-101 to BIO-103),
 //! BS 1.05 … 1.95, Af ≥ 4.1 (jungle), Am ≥ 3.2, Aw/As squeezed into 1.05 … 2.55 and Cs into
 //! 1.05 … 2.5 (savanna, plains, open forest), the
 //! subarctic D (Dsc, Dsd, Dwc, Dwd, Dfc, Dfd) ≥ 3.05 (taiga), other C/D ≥ 2.05, ET ≤ 1.95 (no
@@ -744,7 +747,7 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         let ai = at(c.aridity, k).unwrap_or(1.0);
         let glacier = at(c.glacier, k).is_some_and(|g| g >= 0.5);
         let th = placement.thermal_land(class, tm, tw, tc, glacier);
-        let hu = placement.humidity_land(class, ai, glacier);
+        let hu = placement.humidity_land(class, ai, tm, tw, tc, glacier);
         t_land[k] = th as f32;
         h_land[k] = hu as f32;
         let lim = placement.erosion_limit(class, glacier);
@@ -1087,7 +1090,7 @@ mod tests {
     fn middle(class: &str, t_mean: f64, t_warm: f64, t_cold: f64, aridity: f64) -> &'static str {
         let k = koppen::index(class).unwrap();
         let t = placement::builtin().thermal_land(k, t_mean, t_warm, t_cold, false);
-        let hu = placement::builtin().humidity_land(k, aridity, false);
+        let hu = placement::builtin().humidity_land(k, aridity, t_mean, t_warm, t_cold, false);
         MIDDLE[(t.floor() as usize).min(4)][(hu.floor() as usize).min(4)]
     }
 
@@ -1121,7 +1124,16 @@ mod tests {
         assert_eq!(middle("Am", 26.0, 28.0, 24.0, 1.4), "jungle");
         assert_eq!(middle("Aw", 25.0, 27.0, 22.0, 0.9), "savanna");
         assert_eq!(middle("BWh", 26.0, 36.0, 14.0, 0.02), "desert");
-        assert_eq!(middle("BWk", 8.0, 24.0, -10.0, 0.1), "desert");
+        // Cold deserts (Ben, 2026-10-02): vanilla has no cold desert, so a cool one (mean 0 to 10 degC)
+        // is the driest land of the cold band (plains), a freezing one is barren frozen ground
+        // (snowy plains) like EF's, and only a desert with a mean above 10 degC is sand.
+        assert_eq!(middle("BWk", 8.0, 24.0, -10.0, 0.1), "plains");
+        assert_eq!(middle("BWk", 2.0, 18.0, -14.0, 0.1), "plains");
+        assert_eq!(middle("BWk", -6.0, 12.0, -22.0, 0.1), "snowy_plains");
+        assert_eq!(middle("BWk", 16.0, 30.0, 2.0, 0.1), "desert");
+        // Cold steppes were never sand: BSk with a freezing winter is plains or snowy plains.
+        assert_eq!(middle("BSk", 3.0, 20.0, -10.0, 0.35), "plains");
+        assert_eq!(middle("BSk", -4.0, 10.0, -20.0, 0.35), "snowy_plains");
         assert_eq!(middle("BSh", 24.0, 30.0, 18.0, 0.35), "savanna");
         let cfb = middle("Cfb", 11.0, 18.7, 5.0, 1.3);
         assert!(cfb.ends_with("forest"), "Cfb gives {cfb}");
@@ -1131,12 +1143,12 @@ mod tests {
         assert!(dfc_cold.contains("taiga"), "a cold Dfc gives {dfc_cold}");
         assert_eq!(middle("ET", -6.0, 6.0, -15.0, 1.5), "snowy_plains");
         // A wet ET stays below the humidity band whose variant is snowy taiga.
-        assert!(placement::builtin().humidity_land(29, 5.0, false) < 2.0);
+        assert!(placement::builtin().humidity_land(29, 5.0, 10.0, 20.0, 0.0, false) < 2.0);
         assert_eq!(middle("EF", -55.0, -30.0, -70.0, 0.5), "snowy_plains");
         // Ice cap (glaciated EF) is humidity band 0, whatever the aridity index says.
         let (ef, p) = (koppen::index("EF").unwrap(), placement::builtin());
         let ice = p.thermal_land(ef, -55.0, -30.0, -70.0, true);
-        let ice_h = p.humidity_land(ef, 10.0, true);
+        let ice_h = p.humidity_land(ef, 10.0, 10.0, 20.0, 0.0, true);
         assert_eq!(
             MIDDLE[ice.floor() as usize][ice_h.floor() as usize],
             "snowy_plains"
