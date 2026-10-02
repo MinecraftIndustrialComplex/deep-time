@@ -115,6 +115,7 @@
     large_igneous_province: '#ff1f1f', plate_birth: '#3cb44b', plate_death: '#a9a9a9',
     volcano_arc: '#e8552d', volcano_hotspot_chain: '#f0a020', volcano_stratovolcano: '#ff3b1f', volcano_shield: '#ffc02e', volcano_caldera_complex: '#d45cff',
     volcano_caldera: '#ff79c6', volcano_flood_basalt: '#9a8a7a',
+    impact_crater: '#7df9ff', impact_ocean: '#5aa9c9',
     erosion_pulse: '#ffe119', basin_subsidence: '#42d4f4', marine_transgression: '#1e90ff',
     marine_regression: '#9ecae1', glaciation: '#e8f4ff', deposit_formation: '#ffd700',
   };
@@ -131,7 +132,7 @@
   // (true colour, core satellite.rs), else the elevation.
   const DEFAULT_LAYERS = ['satellite', 'elevation'];
   const LAYER_GROUPS = [['', 'Planet'], ['climate', 'Climate'], ['surface', 'Surface'], ['structure', 'Structure'],
-    ['strata', 'Strata'], ['volcanoes', 'Volcanoes'], ['deposits', 'Deposits'], ['input', 'Deposit inputs']];
+    ['strata', 'Strata'], ['volcanoes', 'Volcanoes'], ['impacts', 'Impacts'], ['deposits', 'Deposits'], ['input', 'Deposit inputs']];
   const layerGroup = name => { const i = name.indexOf('/'); return i < 0 ? '' : name.slice(0, i); };
   const LAYER_WORDS = {
     satellite: 'Satellite', elevation: 'Elevation', plates: 'Plates', crust_age: 'Crust age', regime: 'Tectonic regime', provinces: 'Geologic provinces', water_level: 'Water level', rivers: 'Rivers & lakes',
@@ -141,7 +142,9 @@
     rock: 'Rock', log_grade: 'Metamorphic grade', trap_structure: 'Trap structures', outcrop: 'Outcrop', bedrock: 'Bedrock',
     porphyry_cu_mo_au: 'Porphyry Cu-Mo-Au', bif_fe: 'Banded iron', coal_seam: 'Coal seams', mvt_zn_pb: 'MVT Zn-Pb',
     sedex_zn_pb: 'SEDEX Zn-Pb', petroleum_trap: 'Petroleum traps', sites: 'Deposit sites', arc_magma_flux: 'Arc magma flux',
-    map: 'Volcanoes', flood_basalt: 'Flood-basalt outcrop',
+    map: 'Volcanoes', flood_basalt: 'Flood-basalt outcrop', craters: 'Impact craters', trap: 'Crater closure',
+    impact_ni_cu_pge: 'Impact Ni-Cu-PGE', impact_hydrothermal_cu_zn_au: 'Impact hydrothermal Cu-Zn-Au', impact_diamond: 'Impact diamonds', impact_basin_u: 'Crater-basin uranium',
+    impact_melt: 'Impact melt sheets', impact_hydrothermal: 'Impact hydrothermal systems', impact_shock: 'Impact shock', impact_basin: 'Impact basins',
     carbonate_platform: 'Carbonate platforms', euxinic_basin: 'Euxinic basins', coal_facies: 'Coal facies', erosion_rate: 'Erosion rate',
   };
   const UNIT_SUFFIX = [['_m_myr', 'm/Myr'], ['_mm', 'mm/yr'], ['_km', 'km'], ['_m', 'm'], ['_c', '°C']];
@@ -1959,6 +1962,8 @@
       if (p.peak_height_m != null) facts.push(['Height', `${numText(p.height_m)} m of ${numText(p.peak_height_m)} m at its peak`]);
       if (p.thickness_m != null) facts.push(['Lava pile', `${numText(p.thickness_m)} m in ${numText(p.flows)} flows`]);
       if (p.cones_built != null) facts.push(['Cones', `${numText(p.standing)} standing (${numText(p.live)} live) of ${numText(p.cones_built)} built; the tallest ${numText(p.tallest_m)} m`]);
+      if (p.diameter_km != null) facts.push(['Crater', `${numText(p.diameter_km)} km across, ${esc(String(p.morphology || '').replace(/_/g, ' '))}; ${numText(p.relief_m)} m of its ${numText(p.depth_m)} m of relief left`]);
+      if (p.impactor_m != null) facts.push(['Impactor', `${numText(p.impactor_m)} m across, ${numText(p.energy_mt)} Mt of TNT`]);
       if (p.volcanoes_built != null) facts.push(['Volcanoes', `${numText(p.standing)} standing (${numText(p.islands)} islands, ${numText(p.seamounts)} seamounts) of ${numText(p.volcanoes_built)} built`]);
       h += `<h5>Why here: ${esc(prettyKind(e.kind))}</h5><div class="kv">${rows(facts)}</div>` +
         `<div class="chain" style="margin-top:8px">${ev(e)}${(l.chain || []).map(ev).join('')}</div>`;

@@ -68,6 +68,10 @@ public final class RealPlanetGameTests {
      * hold such terrain: the amplifier compresses what would stand above a knee into a band under
      * the limit ({@code scale.build_limit_band_blocks}), so the test fails on any sampled column
      * above the limit and on any cell the bake counted above {@code max_y}.
+     *
+     * <p>A column whose chunk another test has already generated past the noise step is skipped and
+     * counted: its heightmap then holds what the surface step and the features put on the terrain
+     * (the ice cover, a tree), not the terrain. Which columns those are depends on the planet.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void realPlanetHeightMatchesTheBake(GameTestHelper helper) {
@@ -80,6 +84,7 @@ public final class RealPlanetGameTests {
         int limit = Math.min(level.getMaxBuildHeight() - 1, wd.manifest().maxY());
         int[] clipped = {0, Integer.MIN_VALUE};   // columns whose baked top is above the build limit, the highest of them
         int[] outside = {0};                      // columns between corners whose top is outside their cell's corner tops
+        int[] further = {0};                      // columns in chunks already generated past the noise step
         StringBuilder outsideDetail = new StringBuilder();
         ChunkSampling.HeightTally tally = new ChunkSampling.HeightTally();
         ChunkSampling.forEach(helper, 96, i -> {
@@ -102,8 +107,12 @@ public final class RealPlanetGameTests {
                 clipped[0]++;
                 clipped[1] = Math.max(clipped[1], unclipped);
             }
-            int actual = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.NOISE, true)
-                    .getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z);
+            var chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.NOISE, true);
+            if (chunk.getPersistedStatus().isAfter(ChunkStatus.NOISE)) {
+                further[0]++;
+                return true;
+            }
+            int actual = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z);
             tally.add(x, z, corner, expected, actual, t.height(x, z));
             if (!corner) {
                 int x0 = Math.floorDiv(x, 4) * 4, z0 = Math.floorDiv(z, 4) * 4;
@@ -125,8 +134,9 @@ public final class RealPlanetGameTests {
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] realPlanetHeightMatchesTheBake columns={} cornerColumns={} cornerMaxAbsDiff={} "
-                    + "maxAbsDiff={} outsideCellCorners={} withDetail={} aboveBuildLimit={} (limit y {}, highest baked top {}) worst={}",
-                    tally.checked, tally.corners, tally.cornerMax, tally.maxDiff, outside[0], detailed[0], clipped[0], limit,
+                    + "maxAbsDiff={} outsideCellCorners={} generatedFurther={} withDetail={} aboveBuildLimit={} (limit y {}, "
+                    + "highest baked top {}) worst={}",
+                    tally.checked, tally.corners, tally.cornerMax, tally.maxDiff, outside[0], further[0], detailed[0], clipped[0], limit,
                     clipped[0] == 0 ? "-" : clipped[1], tally.worst);
             helper.assertTrue(tally.corners >= 24, "only " + tally.corners + " corner columns above the floor band");
             helper.assertTrue(tally.cornerMax == 0, "corner columns differ by up to " + tally.cornerMax + ": " + tally.worst);

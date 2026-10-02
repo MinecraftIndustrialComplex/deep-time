@@ -47,6 +47,8 @@ public final class WorldData {
     private static final Object NO_RIVERS = new Object();
     /** {@code volcanoes/active.json}, read on first use. */
     private volatile Volcanoes volcanoes;
+    /** {@code impacts/craters.json}, read on first use. */
+    private volatile Craters craters;
     /** The ice cover, resolved on first use. */
     private volatile Optional<IceCover> iceCover;
 
@@ -166,6 +168,19 @@ public final class WorldData {
             }
         }
         return v;
+    }
+
+    /** The impact craters at the present ({@code impacts/craters.json}); none for a world without the file. */
+    public Craters craters() {
+        Craters k = craters;
+        if (k == null) {
+            synchronized (this) {
+                if (craters == null)
+                    craters = Craters.read(folder);
+                k = craters;
+            }
+        }
+        return k;
     }
 
     /** {@code strata/classes.json}: class index → rock class id (read once). */

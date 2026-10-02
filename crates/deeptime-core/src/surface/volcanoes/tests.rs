@@ -137,7 +137,8 @@ fn pipeline_json(n: u32, myr: f64, seed: u64) -> String {
     v["tectonics"]["hotspot_births_per_100myr"] = serde_json::json!(12.0);
     v["tectonics"]["lip_probability"] = serde_json::json!(1.0);
     v["volcanoes"] = serde_json::json!({});
-    for k in ["deposits", "young", "amplify"] {
+    // (The impact stage has its own tests; these are the volcanoes'.)
+    for k in ["deposits", "young", "amplify", "impacts"] {
         v.as_object_mut().unwrap().remove(k);
     }
     v.to_string()

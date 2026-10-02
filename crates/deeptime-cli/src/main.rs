@@ -586,7 +586,7 @@ impl CommonArgs {
 enum StrataArg {
     /// Three horizons: sandstone, red beds from 6 blocks down, granite from 40 (P0-09).
     Placeholder,
-    /// All 60 rock classes: 8 horizons 10 blocks apart; any ten neighbouring 16-block cell
+    /// All 62 rock classes: 8 horizons 10 blocks apart; any eleven neighbouring 16-block cell
     /// columns hold every class 20 or more blocks below the surface (P1-12's GameTests).
     EveryClass,
     /// A readable sedimentary basin, the same in every cell: eight beds over granite from 165
@@ -1270,8 +1270,8 @@ fn preset_command(action: PresetAction) -> run::CliResult<()> {
 
 /// `inspect-column --why`: puts `why` on each of the answer's sites: the forming event and its
 /// cause chain (four links deep, as the 3D export's site cards do) from the world data's event log;
-/// and `landforms`: the volcanoes and flood-basalt provinces (P1-21) whose footprint holds the
-/// column, nearest first, each with its event and cause chain.
+/// and `landforms`: the volcanoes and flood-basalt provinces (P1-21) and the impact craters
+/// (P2-08) whose footprint holds the column, nearest first, each with its event and cause chain.
 fn attach_why(v: &mut serde_json::Value, world_data: &std::path::Path) -> Result<(), String> {
     use deeptime_format::events::{EventId, EventLog};
     let log = EventLog::load(world_data).map_err(|e| e.to_string())?;
@@ -1302,7 +1302,8 @@ fn attach_why(v: &mut serde_json::Value, world_data: &std::path::Path) -> Result
 
 /// The volcano events (`deeptime:volcano_*`) whose footprint holds the point (lat, lon): a notable
 /// volcano out to its basal radius (at least 3 km), an arc segment or hotspot chain where one of its
-/// listed cones does, a caldera to its rim, a flood-basalt province over its area; each as
+/// listed cones does, a caldera to its rim, a flood-basalt province over its area; and the impact
+/// craters (`deeptime:impact_crater`) still in the catalogue, out to their rims; each as
 /// `{event, chain, distance_km}`, nearest first (a cone's own event before its group's).
 fn landforms_at(
     log: &deeptime_format::events::EventLog,
@@ -1324,6 +1325,8 @@ fn landforms_at(
         .filter(|e| {
             e.source == deeptime_core::surface::volcanoes::SOURCE
                 || e.params.contains_key("volcano_cones")
+                || (e.kind == deeptime_core::surface::impacts::kind::CRATER
+                    && e.params.get("standing") == Some(&ParamValue::Int(1)))
         })
         .filter_map(|e| {
             let dist = |la: f64, lo: f64| {
@@ -1778,7 +1781,14 @@ mod tests {
         assert_eq!(mid.next_stage_name(), Some("plates"));
         assert_eq!(
             mid.stage_names,
-            ["plates", "climate", "surface", "volcanoes", "structure"]
+            [
+                "plates",
+                "climate",
+                "surface",
+                "volcanoes",
+                "impacts",
+                "structure"
+            ]
         );
         assert!(mid.world.surface.is_some(), "the group steps every member");
         assert!(mid.world.fields.contains_key("climate/koppen"));
@@ -1792,7 +1802,7 @@ mod tests {
         )
         .unwrap();
         let end = deeptime_core::checkpoint::Checkpoint::read(&dir.join("end.dtcp")).unwrap();
-        assert_eq!(end.next_stage, 5);
+        assert_eq!(end.next_stage, 6);
         assert_eq!(end.world.t_years, 0.0);
         let st = end.world.surface.as_ref().unwrap();
         assert_eq!(st.totals.steps, 10);
@@ -1904,6 +1914,7 @@ mod tests {
                 "climate",
                 "surface",
                 "volcanoes",
+                "impacts",
                 "structure",
                 "deposits"
             ]
