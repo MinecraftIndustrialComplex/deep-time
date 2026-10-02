@@ -45,7 +45,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-21 | Volcanoes as landforms (log 2026-09-29) | done | 2026-09-30 | | Branch worktree-agent-a348bd3bf6e50dd72 (session f981c0d3-5144-49ec-8686-2946d755872c): coupled `volcanoes` stage (arc stratovolcanoes on the volcanic front ~60 km apart, hotspot shields and island chains that age and subside, calderas, flood-basalt plateaus from LIPs), volcanic rock in the strata log, `deeptime:volcano_*` events with causes (workbench, `inspect-column --why` landforms, porphyry pathway), block-scale cones/craters/calderas/terraces in amplify, every knob a setting. Mac: earthlike_quick_16k 500 Myr 418 s (volcanoes 14.1 s), 203 live arc cones, 8 standing shields, 295 calderas, 9 flood basalts, 1,468 events; cargo test/clippy -D warnings/fmt/deny clean; gradlew build test 146/0; `mac.sh --server -- ./gametest.sh` All 50 required tests passed; bundle review/out/p1-21/bundle (11 MB, not published); follow-ups (log 2026-09-30): flank steepness setting (default 0.5), one event per arc segment / hotspot chain, segments under 3 cones counted on their subduction onset, young volcanoes exempt from the mountain pass's unsharp mask; see build log |
 | P1-22 | Rivers and lakes (moved from P2-03, log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-ad204cf8d55ef26f5, not yet merged. core::hydro in the bake (lakes full to their spill level; river network `rivers/rivers.dtrv`, format 0.2), the column rule on both sides, the WaterBodies pass, river biomes, `hydro` settings. <br>**Real 16k 500 Myr planet:** 27 lakes (68,139 km²), 4,489 rivers, 119,813 km, widest 36.7 blocks; water part 4.9 s. <br>**Parity:** 500/500 and lake1024 300/300. <br>**GameTests:** `./gametest.sh` and `-PwithMic` 53/54 each on master 0905793 (riversHold 0 floating, 0 leaks; the one failure was master's climateConsistent, fixed on master since); `./gametest-planet.sh` PASS; the last merge (5d4147b) got cargo and Gradle only (157/0), per the new rule. <br>**Previews:** 0 floating and 0 river/lake leaks in 3 of 4 boxes, 1 on a boulder in the 4th; the whole lake's rim − surface = 0. <br>**Chunk time:** the pass costs 0.3 ms a chunk. <br>Review bundle review/out/p1-22 (not published); see the build log |
 | P1-22b | Climate-sized and frozen lakes (log 2026-10-01; the lake part of P2-03 pulled forward) | done | 2026-10-01 | — | On branch worktree-agent-a2195c5c858c73075, not yet merged. Lake levels from a per-basin water balance (full, below the rim, playa or dry), frozen lakes, pointer text, 5 `hydro` settings; no format change. <br>Bake B: lakes 4.51 % → 2.46 % of land, largest 74,262 → 9,995 km². <br>Gates: cargo, Gradle 160/0, GameTests 57/57, browser check 11/11. See the build log. |
-| P1-23 | Grid-artifact audit (log 2026-09-29) | doing | 2026-10-01 | | Sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c, branch worktree-agent-a851cf286456a3901. |
+| P1-23 | Grid-artifact audit (log 2026-09-29) | done | 2026-10-01 | — | Branch worktree-agent-a851cf286456a3901 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), not merged. Audit: docs/research/notes/grid-artifact-audit.md. <br>**Clean:** the seam, the mesh, slope directions (within 2° of an axis 4.8 % against 4.4 %), cones, deposits. <br>**Shows, worst first:** straight sediment dams and lake shores on plains (3–8 blocks high, up to 1,000 blocks long); rivers in dead-straight reaches (10.2 % of their length within 0.5° of an eight-direction heading against 2.2 %); biome borders in 16-block steps (24 % of the temperature input's change faces along an axis against 4.4 %). <br>**Fixed, each with a property test:** rock erodibility interpolated between L1 cells (its steps were 7 × larger at cell edges, now 1.02 ×), the strata smoothing's lattice (thickness phase 15 % → 7 %), the distance to the sea (inland a8 −0.39 → 0.00). <br>**Gates:** cargo fmt/clippy/deny clean, cargo test 546 passed, JUnit 199/0, `./gametest.sh` and `-PwithMic` (168 mods) All 65 required tests passed each. <br>Four design questions for Ben in the note and the build log. |
 | P1-24 | Faster Create World (log 2026-09-29) | todo | | | After P1-17's benchmarks; options go to Ben. |
 | P1-25 | Climate API for mic-climate and Project Atmosphere (log 2026-09-29) | done | 2026-09-30 | — | On branch worktree-agent-a02882c5e6567370e, not yet merged. Format 0.2 bakes twelve monthly layers. `DeepTimeClimate` is at API version 1.<br>**Parity:** `ClimateParityTest` 500/500 blocks bit for bit, and the GameTest `climateApiOnTheRealPlanet` matches too.<br>**mic-climate `deep-time` branch** (pushed): Deep Time's climate plus Project Atmosphere's weather anomaly. Its GameTests pass 19/19, with and without Project Atmosphere, and its pack smoke passes 20/20.<br>**MIC planet probe** (earthlike_quick_16k): Af 24.5 °C, BWk 8.8/19.6 °C, Dfc −12.9/15.3 °C, ET −24.7/0.6 °C, EF plateau (4,860 m) −22.7/−46.7 °C, each pair midwinter/midsummer. Project Atmosphere read 8.6, 8.9, −0.6, 4.0 and 10.5 °C at the same places. Its simulated weather adds −2.4…+2.5 °C.<br>JUnit 150/0 and `./gametest.sh` All 52 passed after merging master 8872c91; cargo gates clean. See build log. |
 | P1-26 | Per-cell climate: 2-D energy balance, sea ice, moisture (log 2026-09-30) | doing | 2026-09-30 | | Design approved 2026-10-01 (docs/design/p1-26-per-cell-climate.md, recommended answers); tasks T1–T11 start after the climate agent's ice-sheet branch (worktree-agent-adc924860a859865c-ice) lands. |
@@ -82,6 +82,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | Date | Task | Question | Asked how |
 |---|---|---|---|
 | 2026-10-01 | deposit audit | **How rich should deposits be, against scatter and vanilla?** Three options with settings and numbers per family (A deposits clearly beat scatter, recommended; B deposits are the only real source; C realistic grades with strong multipliers), in the sub-agent's report and the build log entry "Deposit audit". Also: **a gold-bearing gravel block of Deep Time's own** for packs without Excavated Variants (it would be the mod's first block), or keep `minecraft:gold_ore` in the gravel bed there? No default changes until answered. | to be asked by the coordinator (the sub-agent has no AskUserQuestion) |
+| 2026-10-01 | P1-23 | **Four grid artifacts that need a design change** (build log 2026-10-01, "P1-23 grid-artifact audit"; docs/research/notes/grid-artifact-audit.md, "What is left"). **(1) Lake sediment** builds straight dams across lake plains: fill each lake level, deepest first (recommended, 2–3 days), a delta from each inlet, or hide it in the amplifier? **(2) Rivers and valleys run along eight directions**: route by a direction not bound to eight in the amplifier and the river network (recommended, about 3 days, changes every valley), meander the river lines only (a day), or leave for Phase 2? **(3) Biome borders step with the L1 cells**: decide the Köppen class on L2 inside P1-26 (recommended), jitter the lookup now (half a day), or leave? **(4) The detail noise's octaves share one lattice** (5 % of the block-scale relief): offset each octave when the format next changes (recommended), gradient noise, or leave? | Not asked yet: for the coordinator to put to Ben |
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
 | 2026-10-01 | world height / mountains | After stage 2 (build log 2026-10-01, "The height limit, stage 2"): **(1) the bottom:** default trenches reach y −412 to −472 against `min_y` −352: lower `min_y` to −512 (+16 % sections; recommended), squeeze the bottom band only, or leave flat trench floors? **(2) summits:** Earth-like worlds top out at 6.0–6.9 km (plateaus at 5–5.7 km, little summit relief above them): give the amplifier summit relief over plateaus (recommended) or raise `crust_strength_mpa` to ~190? **(3) light planets** get taller volcanoes but not taller fold belts, since erosion and uplift do not know gravity: leave, or make them? **(4) the top** stays at y 639 (default worlds end 166 blocks under the compression knee) unless Mars-like worlds matter now (then `max_y` 1023, +39 % sections). | Not asked yet: for the coordinator to put to Ben |
 | 2026-10-01 | lava | **How far a player is from lava** (build log 2026-10-01, "Magma under active volcanoes"). With lava only at active volcanoes and the world's floor, on the 16k quick planet measured (123 active volcanoes, 100 on land, 16 crater lakes) a land point is a median 658 blocks (p90 1,309) from the nearest active volcano on land, where lava lies six blocks under the crater's magma plug, a median 1,178 blocks (p90 2,251) from the nearest open crater lake, and 438 blocks (p90 510) straight down from the lava floor. Vanilla has lava within about 100 blocks of anywhere. Options: **(1, recommended)** keep it: lava is a place to travel to, which is what the decision asked for (what MIC's early recipes need lava for was not checked); **(2)** a crater lake at every active volcano on land (`crater_lake_share` 1: about 62 of the 100 can hold one, four times today's 16); **(3)** a second, shallower source: lava in the deep cave aquifers again (`lava_lake_blocks` raised, e.g. 150: lava lakes in caves below about y -200); **(4)** keep the biomes' random lava (`remove_lava_features` off): vanilla's amount, geologically arbitrary. Also open: **the lava floor** at the bottom of the world (`lava_floor_blocks` 10; Ben has not decided whether to keep it), and **spreading ridges and rifts**, which the bake does not export (no lava there yet). | Not asked yet: for the coordinator to put to Ben |
@@ -91,6 +92,73 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P3-04 | **The switch.** Far terrain is on whenever Distant Horizons is installed; off with `-Ddeeptime.dh=false`. Make it a setting (server config or the editor), and on or off by default? Recommended: on by default, a server config key when the config file next changes. | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-01 — P1-23 grid-artifact audit (agent worktree agent-a851cf286456a3901, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Ask.** Ben, decisions log 2026-09-29: the finished world must not show the grid it was computed on. Branch
+  `worktree-agent-a851cf286456a3901`, master e8668ca merged in, not merged to master, not pushed. The audit is
+  `docs/research/notes/grid-artifact-audit.md` (method, every number, the pictures by path, options).
+- **How.** One planet: `earthlike_quick_16k`, scattered continents, 500 Myr, seed 1 (333 s on the VM). New tooling:
+  `tools/review/grid-audit.sh` (bake, dump, boxes, analyse, gates, clean), `tools/review/grid_audit.py` (the tests),
+  `deeptime heightmap --columns` (rock at four depths, horizon count, second top, water kind per column; each thread
+  opens the folder itself, because eight threads through one `LazyLayer` cache ran at 129 % CPU). Tests: gradient
+  orientation (a4, a8, share within 2° of an axis), the phase of steps and curvature inside coarser cells with
+  no-grid periods as control, the directional spectrum, a column/row outlier scan for seams, straight runs of class
+  boundaries against a random map, the same on the terrain of each stage. Pictures in `review/out/grid-audit/`.
+- **Clean (measured).** Seam: elevation step across it 0.95 block against 1.07 between interior columns. Slopes on land:
+  a4 +0.017, within 2° of an axis 4.8 % (isotropic 4.4 %). Land/sea map: 12.6 % of edges in straight runs of 8+
+  (random map 14.8 %, nearest-copied map 72 %). Rock every 8th block: 0.8–2.8 % (random 9–13 %). Cones: harmonics 4 and
+  8 hold 2.0 % and 0.3 % of the variance round a cone (even share 8.3 %). Deposit sites and bodies are on no grid.
+  Tile edges: none exist at 16k (`mode=in_memory tiles=1`); the streamed 32k amplifier was **not** tested.
+- **Shows, worst first.**
+  1. **Dams and straight lake shores on plains.** Ridges 3–8 blocks high and 150 to over 1,000 blocks long along the
+     axes and diagonals, with lakes behind them. Already in the deep-time surface (L1). Read from `surface/spl.rs`: a
+     lake cell traps sediment only from the flow routed through it, so the trunk path across a lake fills first. Open.
+  2. **Straight rivers.** 10.2 % of the river length within 0.5° of an eight-direction heading (isotropic 2.2 %); 6.5 %
+     in dead-straight reaches of 32+ blocks, longest 274; median sinuosity 1.035. D8 in the amplifier and
+     `hydro::network`. Open.
+  3. **Biome borders in 16-block steps.** Temperature input: 24 % of its change faces within 2° of an axis (4.4 %),
+     N–S lines alone 9.3 % (2.2 %); vegetation 31 %. The band coordinates are set per L1 cell from its Köppen class.
+     The east–west share on top is P1-26's latitude banding. Open, belongs with P1-26.
+  4. **Square pits and benches where the rock changes.** Fixed (below).
+  5. Coast pieces of 30–60 blocks along the axes twice as often as chance (4.3–4.8 % per axis against 2.2 % below 30°).
+  6. Rock: the smoothing lattice (fixed); steps in the top unit's base along axes and diagonals (20.6 % within 2° of an
+     axis where it drops 30+ blocks in 16; cause not found); boundaries on L1 lines in one flat box (cause not found).
+  7. Octagonal inland bands of continentalness. Fixed.
+  8. Curvature 19–24 % higher on every L2 and L1 line of the terrain (controls under 1.3 %); spectrum a8 +0.12 to
+     +0.14 ± 0.03 at 4–32 blocks. Low.
+  9. The detail noise: its three octaves share one lattice, so it changes 3.2 × less across lines 32 blocks apart; it is
+     4.6 % of the block-scale relief. Low.
+  10. East–west stretch towards the poles (slope energy x over z 0.54 at 60–75°): the projection, not a grid.
+- **Fixed** (each with a property test that fails on the old code; both strata tests were run against the old weights
+  and failed).
+  - `surface/young.rs` `rock_property`: erodibility and diffusivity interpolated linearly from the L1 cells (they were
+    looked up through `young/class`, L1's class copied into every L2 cell). `young/erodibility` steps across an L1 cell
+    edge against inside the cell: 7.0 × → 1.02 ×. The crisp rectangles in `boxes/seam-terrain.png` become faint.
+  - `structure/bake_horizons.rs` `smooth_axis_weight`: per axis a Gaussian of 1.5 σ less its value at the window's edge
+    (it was a Gaussian of σ cut off at 2σ, 0.135 of its peak: the samples' mean position swung ±0.23 cells with the
+    64-block lattice). Top unit's thickness, phase excess at 64 blocks: 15 % → 7 % (controls 2–6 %). Effective width
+    0.85 σ (was 0.89 σ). FORMAT.md says so.
+  - `bake/biomes.rs` `distance_cells`: exact Euclidean distance to the sea (was a 3 × 3 chamfer, 8 % out at 22.5°).
+    Continentalness beyond 96 blocks from the sea: a8 −0.39 → 0.00.
+  - Same planet before → after: land 27.7 % → 27.7 %, median land 715 → 715 m, highest 6,609 → 6,614 m, lakes
+    997 → 1,025, river chains 2,369 → 2,345.
+- **Gates** (VM, `tools/review/grid-audit.sh gates`): `cargo fmt --check`, `clippy -D warnings`, `deny` clean;
+  `cargo test --workspace` 546 passed, 3 ignored; `./gradlew build test` tests=199 failures=0 skipped=1;
+  `mac.sh --server -- ./gametest.sh` All 65 required tests passed; `tools/smoke/install.sh mic` (168 mods) and
+  `./gametest.sh -PwithMic` All 65 required tests passed on the second run (the first never reached the tests: the
+  known mod-loading race in Artifacts, "unbound value artifacts:generic.attack_burning_duration", outside Deep Time).
+- **For Ben** (options and reasons in the note; not asked, the sub-agent has no AskUserQuestion).
+  1. **Lake sediment**: fill each lake level, deepest first (recommended, 2–3 days); a delta from each inlet; or hide it
+     in the amplifier.
+  2. **Rivers and valleys**: route by a direction not bound to eight, in the amplifier and the river network
+     (recommended, about 3 days, changes every valley); meander the river lines only (a day); or leave for Phase 2.
+  3. **Köppen class**: decide it on L2 inside P1-26 (recommended); jitter the L1 lookup now (half a day); or leave.
+  4. **Detail noise**: offset each octave's lattice when the format next changes (recommended); gradient noise; or leave.
+- **Not verified.** Nothing was seen in the game (no client). One planet and seed. The 32k streamed amplifier, sea ice,
+  MIC's biome mapping and Distant Horizons were not looked at. The cause of finding 1 is read from the code and the
+  stage pictures, not proven by a run with the rule changed.
+- **Housekeeping.** VM scratch `/Volumes/Graphide/ban/deeptime-runs/p1-23-grid` deleted. The workbench was not touched.
+- **Next step.** The coordinator puts the four questions to Ben; finding 6's two open causes want an hour with
+  `inspect-column` on the plain box (x 5632…6144, z −1536…−1024).
 ### 2026-10-01 — Magma under active volcanoes; the biomes' random lava removed (agent worktree agent-a04fab824846efbfc, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Ask.** Ben, decisions log 2026-10-01, "Volcanoes is a go ahead": lava where the simulation has it. Branch
   `worktree-agent-a04fab824846efbfc`, master merged in, not merged to master, not pushed.

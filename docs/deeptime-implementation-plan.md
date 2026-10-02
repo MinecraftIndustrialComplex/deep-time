@@ -3829,6 +3829,11 @@ on this machine.
 #### P1-23 Grid-artifact audit (2026-09-29)
 - **Goal.** Sweep real worlds (sections, top-downs, 3D previews) for grid artifacts: staircase coasts,
   axis-aligned gullies, cell-edge seams in biomes, strata or snow; fix them with before/after renders.
+- **As built (2026-10-01).** Measured, not eyeballed: `docs/research/notes/grid-artifact-audit.md`
+  (method, numbers, ranked findings, options) and `tools/review/grid-audit.sh`. Three imprints fixed
+  (rock erodibility per L1 cell, the strata smoothing's lattice, the chamfer distance to the sea);
+  lake sediment dams, D8 rivers, per-cell Köppen borders and the detail noise's lattice are design
+  questions for Ben (STATUS.md, pending questions).
 
 #### P1-24 Faster Create World (2026-09-29)
 - **Goal.** Measure player-side generation on a mid-range PC profile, then choose (Ben) among a faster
