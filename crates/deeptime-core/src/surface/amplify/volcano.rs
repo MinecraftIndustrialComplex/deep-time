@@ -84,21 +84,21 @@ impl Shaper {
         let items = st
             .volcanoes
             .iter()
-            .filter(|v| v.height_m >= 30.0)
+            .filter(|v| v.height_m >= 30.0) // ledger: VOL-064
             .map(|v| {
                 let age = v.extinct_myr.map_or(0.0, |e| (st.t_myr - e).max(0.0));
-                let sharp = (-age / (3.0 * fade)).exp();
+                let sharp = (-age / (3.0 * fade)).exp(); // ledger: VOL-065
                 let dep = (-age / fade).exp();
                 // What the volcano stage says the edifice stands (never more than it was built
                 // to), and the shape it has.
-                let a = v.height_m.min(1.25 * v.target_m);
+                let a = v.height_m.min(1.25 * v.target_m); // ledger: VOL-064
                 let s = v.shape();
                 let body = |r: f64| s.body(r);
                 let r = v.radius_m;
                 // The bump the young landscape holds of it: the body blurred by the deep-time
                 // grid (cell-averaged rendering, bilinear advection, the interpolation to L2:
                 // about a tent 1.5 L1 cells wide), and its measured relief there.
-                let coarse = shape::blurred(&body, 1.5 * dx1 / r);
+                let coarse = shape::blurred(&body, 1.5 * dx1 / r); // ledger: VOL-063
                 let e0 = coarse.at(0.0).max(1e-3);
                 let expected = a * e0;
                 let held = young.map_or(expected, |f| {
@@ -185,7 +185,7 @@ impl Shaper {
         for it in &self.items {
             vol::for_cells(grid, self.mh, it.x, it.z, 1.3 * it.radius_m, |c, dx, dz| {
                 let rho = dx.hypot(dz) / it.radius_m;
-                let k = smooth(0.9, 1.3, rho) as f32;
+                let k = smooth(0.9, 1.3, rho) as f32; // ledger: VOL-067
                 keep[c] = keep[c].min(k);
             });
         }
@@ -200,7 +200,7 @@ impl Shaper {
         let mut keep = vec![1.0f32; grid.cells()];
         for it in self.items.iter().filter(|it| it.young > 0.01) {
             vol::for_cells(grid, self.mh, it.x, it.z, 1.3 * it.radius_m, |c, dx, dz| {
-                let inside = 1.0 - smooth(0.9, 1.3, dx.hypot(dz) / it.radius_m);
+                let inside = 1.0 - smooth(0.9, 1.3, dx.hypot(dz) / it.radius_m); // ledger: VOL-068
                 let k = (1.0 - it.young * inside) as f32;
                 keep[c] = keep[c].min(k);
             });
@@ -250,10 +250,10 @@ impl Shaper {
             let dx = frame.wrap_x(bx - it.x) * self.mh;
             let dz = (bz - it.z) * self.mh;
             let th = dz.atan2(dx);
-            let rim = rc * (1.0 + 0.1 * (2.0 * th + p2).sin() + 0.05 * (3.0 * th + p3).sin());
+            let rim = rc * (1.0 + 0.1 * (2.0 * th + p2).sin() + 0.05 * (3.0 * th + p3).sin()); // ledger: VOL-066
             let x = dx.hypot(dz) / it.radius_m / rim;
             if x < 1.0 {
-                let inside = 1.0 - smooth(0.78, 1.0, x);
+                let inside = 1.0 - smooth(0.78, 1.0, x); // ledger: VOL-066
                 out = out.min(out + (floor - out) * inside);
             }
         }
@@ -275,7 +275,7 @@ impl Shaper {
                 let k = q.floor();
                 let f = q - k;
                 // Treads over 70 % of each step, a steep riser over the rest.
-                let stepped = self.sea + self.step_m * (k + smooth(0.7, 1.0, f));
+                let stepped = self.sea + self.step_m * (k + smooth(0.7, 1.0, f)); // ledger: VOL-036
                 out += wgt.min(1.0) * (stepped - out);
             }
         }

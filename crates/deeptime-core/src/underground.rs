@@ -49,17 +49,20 @@ pub struct UndergroundParams {
     /// lakes.
     pub lava_lake_blocks: u32,
     /// Depth of the top of an active volcano's magma chamber below its crater floor, km. Real
-    /// shallow chambers sit 2–6 km under the summit (Kīlauea's about 2–4 km, Mount St Helens'
-    /// from 5 km, Vesuvius' shallow one about 4–5 km). At 20 m per block 3 km is 150 blocks. The
-    /// game raises a chamber that would reach the lava floor.
+    /// shallow reservoirs lie 1–7 km down under Hawaiian shields (Clague & Sherrod 2014, USGS PP
+    /// 1801 ch. 3), 1–2 km under Kīlauea's caldera and 2–4 km under its south part (Poland et al.
+    /// 2014, PP 1801 ch. 5); under arc volcanoes geophysics finds them at 6 ± 3 km (Rasmussen et
+    /// al. 2022, abstract). At 20 m per block 3 km is 150 blocks. The game raises a chamber that
+    /// would reach the lava floor. Ledger MAG-002.
     pub magma_chamber_depth_km: f64,
     /// Multiplies every magma chamber's size (its radius is a tenth of the volcano's basal
     /// radius, between 1.2 and 4.5 km, and its half-height a fifth of that radius). 0: no magma
-    /// under volcanoes at all (no chambers, conduits or crater lakes).
+    /// under volcanoes at all (no chambers, conduits or crater lakes). Ledger MAG-006.
     pub magma_chamber_size: f64,
     /// The share of the active volcanoes standing on land that hold a crater lava lake, the most
-    /// active first. Persistent lava lakes are rare on Earth (about eight of some 1,400 active
-    /// volcanoes); the default is far above that, because a player should be able to find one.
+    /// active first. Persistent lava lakes are rare on Earth: a handful of volcanoes (eight in a
+    /// secondary list) against about 1,350 potentially active ones (USGS); the default is far
+    /// above that, because a player should be able to find one. Ledger MAG-019, MAG-020.
     pub crater_lake_share: f64,
     /// Whether the random lava lakes and lava springs of vanilla's and the pack's biomes are taken
     /// out of a Deep Time world, so lava is found at the volcanoes and at the world's floor only.
@@ -84,12 +87,12 @@ pub struct UndergroundParams {
 impl Default for UndergroundParams {
     fn default() -> Self {
         UndergroundParams {
-            lava_floor_blocks: 10,
-            lava_lake_blocks: 54,
-            magma_chamber_depth_km: 3.0,
-            magma_chamber_size: 1.0,
-            crater_lake_share: 0.25,
-            remove_lava_features: true,
+            lava_floor_blocks: 10,       // ledger: MAG-027
+            lava_lake_blocks: 54,        // ledger: MAG-030
+            magma_chamber_depth_km: 3.0, // ledger: MAG-002
+            magma_chamber_size: 1.0,     // ledger: MAG-006
+            crater_lake_share: 0.25,     // ledger: MAG-019
+            remove_lava_features: true,  // ledger: MAG-034
             geothermal_density: 1.0,
             geothermal_reach: 1.0,
             geothermal_size: 1.0,
