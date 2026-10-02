@@ -376,6 +376,7 @@ pub fn to_body(
             v: [0.0, 1.0],
             grade: 0.0,
             density: 0.0,
+            raw: 0.0,
         });
     }
     Some(body)

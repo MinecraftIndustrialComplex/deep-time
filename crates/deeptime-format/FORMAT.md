@@ -1189,7 +1189,7 @@ body record                                      zone record
 10   2  reserved, 0                              20  8  f32 × 2 v range [v0, v1)
 12   4  u32 role (string: ore, lithocap, …)      28  4  f32 grade (mass fraction of material)
 16   24 f64 × 3 centre (block x, y, z)           32  4  f32 density (P(host block → ore), 0–1)
-40   12 f32 × 3 semi-axes a, b, c (blocks)       36  4  reserved, 0
+40   12 f32 × 3 semi-axes a, b, c (blocks)       36  4  f32 raw (share of its ore → raw block)
 52   4  f32 yaw (radians about +y, +x → +z)
 56   4  f32 dip (radians about the local x axis)
 60   4  i32 clip_top_y (i32::MAX = none)
@@ -1222,7 +1222,11 @@ In the game (P1-15; `neoforge/…/worlddata/Body.java` is this evaluation, check
 horizon rock inside it, and the deposit feature turns a host block into ore where one uniform draw
 per block, a hash of the canonical block position and the body id, falls below the running sum of
 the densities of the zones with a material that apply there, in zone order (so overlapping zones
-share the block's probability, capped at 1).
+share the block's probability, capped at 1). An ore block of a zone with `raw` > 0 is the
+material's raw-ore block instead (`#c:storage_blocks/raw_<material>`, else vanilla's
+`raw_iron_block`, `raw_copper_block` or `raw_gold_block`; none: it stays ore) where a second draw,
+the same hash with the body id XOR `0x52415721`, falls below `raw`: vanilla's ore veins carry raw
+blocks among their ore the same way (Ben, 2026-10-02).
 
 **Plutons** (P1-07, `structure::plutons`): ellipsoid bodies with no site, role `pluton`, the
 body's `rock_class` its intrusion (granodiorite, granite or diorite), and, where the roof's host
@@ -1234,7 +1238,7 @@ pluton paints first.
 The AABB is conservative: the world extent along axis i is `Σ_j |R_ji|·h_j` around the centre
 (R the rotation above, h the semi-axes), clipped at `clip_top_y`. The viewer's `report.js` carries
 each body as JSON: `id, site, shape, metric, role, center, axes, yaw, dip, clip_top_y (null = none),
-aabb, rock_class, zones [{name, material, rock_class, d, v, grade, density}]`.
+aabb, rock_class, zones [{name, material, rock_class, d, v, grade, density, raw}]`.
 
 `manifest.json` `notes.deposits` (runs with the deposit stage) is the stage's census: per type
 `id, sites, target (the survivors the density asks for: count_mult · ρ · Σ permissive area, plan
@@ -1242,7 +1246,7 @@ aabb, rock_class, zones [{name, material, rock_class, d, v, grade, density}]`.
 expected_formed, expected (the survivors expected; = target unless capped), drawn (deposits
 formed), tracts, permissive_km2, mean_f, buried, truncated, eroded, too_deep, children, guaranteed,
 dropped_separation`, plus `province`, `provinces`, `count_mult`, `max_formed_per_survivor`,
-`brine_flow_km`, `sites`, `bodies`. A forming event's `p_survive` is its cell's survival chance.
+`brine_flow_km`, `sites`, `bodies`, `richness_mult`, `scatter_mult` (the game multiplies every background-scatter rule by it), `inherited_bif_share`, `bif_basin_km2`, and `bif_basins`, `bif_basin_share` (the inherited iron-formation basins the surface stage dealt). A forming event's `p_survive` is its cell's survival chance.
 
 ## Structural events (`structure/events.dtst`, P2-01, format 0.3)
 

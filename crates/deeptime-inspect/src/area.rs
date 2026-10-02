@@ -408,7 +408,7 @@ fn body_json(b: &Body) -> Value {
         "rock_class": b.rock_class,
         "zones": b.zones.iter().map(|z| json!({
             "name": z.name, "material": z.material, "rock_class": z.rock_class,
-            "d": z.d, "v": z.v, "grade": z.grade, "density": z.density,
+            "d": z.d, "v": z.v, "grade": z.grade, "density": z.density, "raw": z.raw,
         })).collect::<Vec<_>>(),
     })
 }
@@ -1441,6 +1441,7 @@ mod tests {
             v: [0.0, 1.0],
             grade: 0.01,
             density: 0.5,
+            raw: 0.0,
         });
         let bodies = vec![b];
         let bx = AreaBox::new(56, 0, 72, 16, 0, 31).normalised(c);
