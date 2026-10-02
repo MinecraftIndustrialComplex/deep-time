@@ -32,8 +32,8 @@
 //! into six kilometres of basement schist gave the schist the regolith's and the whole strata
 //! log's keys, and the smoothing then laid a share of it over the neighbours' shale.
 //!
-//! Plutons stay bodies (`plutons.rs`); P1-08 writes this layer and the bodies into the world data
-//! (this task produces the stacks for the viewer and the tests).
+//! Plutons stay bodies (`plutons.rs`); the bake (`crate::bake::strata`) writes this layer and the
+//! bodies into the world data.
 
 use deeptime_format::{Codec, DType, FormatError, GridDesc, LayerDesc, LoadedLayer};
 use rayon::prelude::*;
@@ -266,6 +266,7 @@ fn write_cell(hz: &[H], tops: &mut [i16], classes: &mut [u8], keys: &mut [[u16; 
 /// `SMOOTH_SAMPLE_SIGMA` cells of σ each.
 pub const SMOOTH_RADIUS_SAMPLES: i64 = 5;
 /// σ one sample step can serve: a larger σ samples every `ceil(σ / 2.5)`-th cell.
+// ledger: STR-013 (game choice)
 pub const SMOOTH_SAMPLE_SIGMA: f64 = 2.5;
 
 /// The sample step of a smoothing of σ `sigma` cells (1 up to σ 2.5).
@@ -274,6 +275,7 @@ pub fn smooth_stride(sigma: f64) -> i64 {
 }
 
 /// The Gaussian the window's weights are cut from is this many σ wide ([`smooth_axis_weight`]).
+// ledger: STR-012 (calibrated to remove a lattice artefact)
 pub const SMOOTH_TAPER_WIDEN: f64 = 1.5;
 
 /// The weight, along one axis, of a lattice sample `d` cells from the cell being smoothed
@@ -299,6 +301,7 @@ pub fn smooth_axis_weight(d: f64, sigma: f64) -> f64 {
 /// height of a cell standing above the mean surface (`Horizons::smoothed`): the thickest unit
 /// beginning within it. The beds over that unit (thinner than this, together) rise with the
 /// ground.
+// ledger: STR-014 (game choice)
 pub const RIDGE_SEARCH_BLOCKS: i32 = 16;
 
 /// The column rule's tongue parameters a preset asks for: (keys per band, minor share).

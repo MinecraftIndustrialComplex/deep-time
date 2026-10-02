@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! What a geologist would object to in a rock column, as a check (`deeptime strata-check`, and
-//! the property tests on baked columns). Phase 1 has no thrusts and no folds (P2-01), so a column
-//! is a conformable pile cut by unconformities, and three things cannot happen in it:
+//! the property tests on baked columns). The rules below hold for a conformable pile cut by
+//! unconformities, which is what the strata log and the basement pools make; folds, thrusts and
+//! intrusions (P2-01, `deform/`) are measured against the same columns by `strata-check structure`.
+//! The three rules are rules of the game's look (ledger STR-044 to STR-048, game choices), not laws
+//! of geology: Barrovian grade does rise with structural depth, but inverted metamorphic sequences
+//! occur in thrust zones, ophiolite soles and the Himalaya (Mottram et al. 2014), and metamorphic
+//! bodies a few hundred metres thick are real (an ophiolite sole is about 200 m, Hacker's lecture
+//! notes). Three things cannot happen in a pile:
 //!
 //! 1. **A metamorphic grade inversion.** Every regional-metamorphic class records the least
 //!    temperature it formed at ([`metamorphism::formation_temp_c`]), and every class with a
@@ -32,7 +38,9 @@ use super::metamorphism::{self, Paths};
 use crate::surface::lithology;
 use crate::synth::EVERY_CLASS;
 
-/// Path steps colder than this are diagenesis (gypsum → anhydrite at 50 °C), not metamorphism.
+/// Path steps colder than this are diagenesis (gypsum → anhydrite at 50 °C), not metamorphism:
+/// diagenesis is "below 200 °C and 300 MPa" (Nelson, Tulane EENS 212, secondary lecture notes).
+// ledger: RCK-049
 pub const METAMORPHIC_FROM_C: f64 = 200.0;
 
 /// What the check needs to know of each class of a world's class list.
