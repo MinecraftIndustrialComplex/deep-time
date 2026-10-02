@@ -53,7 +53,7 @@ them in from [_template.md](_template.md).
 | Page | State | Ledgers |
 |---|---|---|
 | [impacts.md](impacts.md) | written (stage 1) | IMP |
-| [volcanoes-and-magma.md](volcanoes-and-magma.md) | written (stage 1) | VOL, MAG |
+| [volcanoes-and-magma.md](volcanoes-and-magma.md) | checked against sources (stage 2, WP-2, 2026-10-02) | VOL, MAG |
 | [plates.md](plates.md) | stub; model about to be rewritten | PLT |
 | [climate.md](climate.md) | stub; model about to be rewritten | CLM, MOI |
 | [biomes.md](biomes.md) | stub | BIO |
