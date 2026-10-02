@@ -188,6 +188,13 @@ million km² of stable continental interior becomes permissive, and its target o
 capped because only 2.1 % of what forms survives within 1 km), and **coal** loses the first 581
 Myr of the run: its permissive area falls by a third and its target from 59 to 38 fields.
 
+The run above had inherited BIF in every stable interior (the setting at 1). The built-in presets
+now ship `deposits.inherited_bif_share` at 0 (ORE-261). The same command on the branch with that
+default (a8b90db, 2026-10-02) gives: porphyry 8 sites (3 counted, target 5.3, capped), supergene 1,
+placer 40, **banded iron formation 0**, coal 76 (54 counted, target 46.0, permissive 328,344 km²),
+MVT 87 (35 counted), sedex 2, petroleum 9, impact types 0, 16, 0 and 8. Coal still forms only after
+419 Ma; the differences from the two runs above are run-to-run variation.
+
 **Earth figures read in stage 2**, for comparison with what a planet holds:
 
 | Quantity | Earth | Source of the Earth figure |
@@ -252,10 +259,12 @@ Myr of the run: its permissive area falls by a third and its target from 59 to 3
 
 ## Open questions
 
-- **How much banded iron formation.** With inherited iron formation in every stable interior, the
-  1,000 Myr run above forms 412 banded iron formation sites (165 counted within 1 km), against 17 porphyries. Whether to keep the whole stable
-  interior as permissive, limit it, or wait for a plate model that dates crust is an owner
-  question (STATUS.md, "Pending questions").
+- **How much banded iron formation.** With inherited iron formation in every stable interior (the
+  setting at 1), the 1,000 Myr run above forms 412 banded iron formation sites (165 counted within
+  1 km), against 17 porphyries. Until the owner decides, the built-in presets set the share to 0
+  (no inherited BIF; coordinator for the owner, 2026-10-02). The recommended answer is a limited
+  share like Earth's Paleoproterozoic iron-formation basins; the alternatives are every stable
+  interior, or none until the plate model dates crust (STATUS.md, "Pending questions").
 - **The richness setting** does not reach the blocks (owner question pending since 2026-10-01).
 - **Supergene enrichment** is allowed only with at least 100 mm/yr of rain, taken from one stage of
   the central Andes; the same source says enrichment happens from tropical to hyper-arid climates.
