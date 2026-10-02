@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [deposits.md](../deposits.md). Extraction notes with flags: [extraction-notes/ORE.md](../extraction-notes/ORE.md).
 
-Rows: 257. By status: `cited-unverified` 82, `from-memory` 2, `abstract-only` 10, `game-choice` 57, `uncited` 106.
+Rows: 182 (75 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `cited-unverified` 59, `from-memory` 2, `abstract-only` 10, `game-choice` 40, `uncited` 71.
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
 

@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks).
 
-Rows: 84. By status: `cited-unverified` 14, `from-memory` 2, `calibrated` 6, `game-choice` 33, `uncited` 29
+Rows: 84. By status: `cited-unverified` 14, `from-memory` 2, `calibrated` 6, `game-choice` 33, `uncited` 29.
 
 Added in stage 2, package WP-0 (2026-10-02), by reading the code as it stood on master 1aa0579 (stage 1 had not
 covered it). Nothing here has been checked against its source. Paths are relative to the repository root; line

@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [deposits.md](../deposits.md). Extraction notes with flags: [extraction-notes/DEP.md](../extraction-notes/DEP.md).
 
-Rows: 204. By status: `cited-unverified` 88, `abstract-only` 23, `game-choice` 61, `uncited` 32.
+Rows: 164 (40 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `cited-unverified` 74, `abstract-only` 15, `game-choice` 49, `uncited` 26.
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
 

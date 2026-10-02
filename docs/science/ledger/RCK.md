@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [rock-and-metamorphism.md](../rock-and-metamorphism.md). Extraction notes with flags: [extraction-notes/RCK.md](../extraction-notes/RCK.md).
 
-Rows: 84. By status: `cited-unverified` 18, `calibrated` 1, `game-choice` 26, `uncited` 39.
+Rows: 73 (11 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `cited-unverified` 16, `calibrated` 1, `game-choice` 24, `uncited` 32.
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
 

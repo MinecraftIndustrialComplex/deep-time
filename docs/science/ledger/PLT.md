@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [plates.md](../plates.md). Extraction notes with flags: [extraction-notes/PLT.md](../extraction-notes/PLT.md).
 
-Rows: 212. By status: `cited-unverified` 51, `from-memory` 6, `abstract-only` 20, `calibrated` 19, `game-choice` 63, `uncited` 53. `pending-rewrite` 183. `not-yet-coded` 29.
+Rows: 192 (20 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `cited-unverified` 45, `from-memory` 6, `abstract-only` 20, `calibrated` 11, `game-choice` 59, `uncited` 51.
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
 

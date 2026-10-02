@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [rivers-and-lakes.md](../rivers-and-lakes.md). Extraction notes with flags: [extraction-notes/HYD.md](../extraction-notes/HYD.md).
 
-Rows: 76. By status: `cited-unverified` 14, `from-memory` 3, `calibrated` 1, `game-choice` 36, `uncited` 22.
+Rows: 75 (1 further rows are `merged` into other rows and not counted: see the status table in claims.md). By status: `cited-unverified` 14, `from-memory` 3, `calibrated` 1, `game-choice` 36, `uncited` 21.
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
 

@@ -13,40 +13,46 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,069 rows.
+2,177 active rows in 28 ledgers. The ledgers hold 2,370 ids: stage 1 left 2,069 rows; stage 2 package WP-0
+(2026-10-02) retired 193 of them as duplicates (`merged`, not counted) and added 301 rows for code stage 1
+had not covered (51 in GEO, 74 in PRS, 84 in HNT, 35 in CRE, 57 in CHK).
 
-| Ledger | Subject | Rows | `cited-unverified` | `from-memory` | `abstract-only` | `calibrated` | `game-choice` | `uncited` | of which `pending-rewrite` | of which `not-yet-coded` |
-|---|---|---|---|---|---|---|---|---|---|---|
-| [PLT](ledger/PLT.md) | plate tectonics | 212 | 51 | 6 | 20 | 19 | 63 | 53 | 183 | 29 |
-| [CLM](ledger/CLM.md) | climate physics | 146 | 43 | 5 | 0 | 13 | 23 | 62 | 118 | 28 |
-| [MOI](ledger/MOI.md) | moisture, winds, seasons | 76 | 20 | 0 | 0 | 0 | 10 | 46 | 76 | 0 |
-| [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 |
-| [ERO](ledger/ERO.md) | erosion, sediment, facies | 167 | 86 | 2 | 3 | 6 | 6 | 64 | 0 | 0 |
-| [ISO](ledger/ISO.md) | isostasy, subsidence, height limit, sea level | 39 | 8 | 0 | 0 | 6 | 6 | 19 | 0 | 0 |
-| [HYP](ledger/HYP.md) | hypsometry and calibration targets | 34 | 10 | 0 | 1 | 18 | 1 | 4 | 0 | 0 |
-| [HYD](ledger/HYD.md) | rivers, lakes, runoff | 76 | 14 | 3 | 0 | 1 | 36 | 22 | 0 | 0 |
-| [YNG](ledger/YNG.md) | the young landscape | 21 | 1 | 0 | 0 | 0 | 9 | 11 | 0 | 0 |
-| [AMP](ledger/AMP.md) | the amplifier | 71 | 8 | 0 | 0 | 1 | 53 | 9 | 0 | 0 |
-| [GLA](ledger/GLA.md) | glacial erosion and landforms | 66 | 20 | 1 | 0 | 1 | 26 | 18 | 0 | 0 |
-| [VOL](ledger/VOL.md) | volcanoes | 73 | 1 | 0 | 0 | 1 | 16 | 55 | 0 | 0 |
-| [MAG](ledger/MAG.md) | magma and lava | 42 | 3 | 0 | 0 | 0 | 31 | 8 | 0 | 0 |
-| [IMP](ledger/IMP.md) | meteor impacts | 141 | 14 | 34 | 3 | 0 | 47 | 43 | 0 | 0 |
-| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 84 | 18 | 0 | 0 | 1 | 26 | 39 | 0 | 0 |
-| [STR](ledger/STR.md) | strata, traps, hosts | 48 | 4 | 0 | 0 | 2 | 37 | 5 | 0 | 0 |
-| [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 16 | 0 | 0 | 0 | 54 | 4 | 0 | 0 |
-| [DEP](ledger/DEP.md) | deposit models, counts, sizes | 204 | 88 | 0 | 23 | 0 | 61 | 32 | 0 | 0 |
-| [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 257 | 82 | 2 | 10 | 0 | 57 | 106 | 0 | 0 |
-| [PRV](ledger/PRV.md) | geologic provinces | 27 | 5 | 0 | 0 | 4 | 6 | 12 | 0 | 0 |
-| [SCL](ledger/SCL.md) | world scale, planet constants | 51 | 6 | 0 | 0 | 1 | 37 | 7 | 0 | 0 |
-| [BAK](ledger/BAK.md) | the bake, satellite view | 40 | 0 | 0 | 0 | 1 | 34 | 5 | 0 | 0 |
-| [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 |
-| [GEO](ledger/GEO.md) | geothermal features | 0 | – | – | – | – | – | – | – | – |
-| **all** | | **2,069** | **522** | **53** | **60** | **76** | **723** | **635** | **377** | **57** |
+| Ledger | Subject | Rows | `cited-unverified` | `from-memory` | `abstract-only` | `calibrated` | `game-choice` | `uncited` | of which `pending-rewrite` | of which `not-yet-coded` | `merged` (not counted) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| [PLT](ledger/PLT.md) | plate tectonics | 192 | 45 | 6 | 20 | 11 | 59 | 51 | 163 | 29 | 20 |
+| [CLM](ledger/CLM.md) | climate physics | 134 | 40 | 5 | 0 | 13 | 21 | 55 | 106 | 28 | 12 |
+| [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
+| [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 | 0 |
+| [ERO](ledger/ERO.md) | erosion, sediment, facies | 156 | 83 | 2 | 3 | 6 | 4 | 58 | 0 | 0 | 11 |
+| [ISO](ledger/ISO.md) | isostasy, subsidence, height limit, sea level | 37 | 8 | 0 | 0 | 6 | 4 | 19 | 0 | 0 | 2 |
+| [HYP](ledger/HYP.md) | hypsometry and calibration targets | 34 | 10 | 0 | 1 | 18 | 1 | 4 | 0 | 0 | 0 |
+| [HYD](ledger/HYD.md) | rivers, lakes, runoff | 75 | 14 | 3 | 0 | 1 | 36 | 21 | 0 | 0 | 1 |
+| [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
+| [AMP](ledger/AMP.md) | the amplifier | 71 | 8 | 0 | 0 | 1 | 53 | 9 | 0 | 0 | 0 |
+| [GLA](ledger/GLA.md) | glacial erosion and landforms | 64 | 20 | 1 | 0 | 1 | 25 | 17 | 0 | 0 | 2 |
+| [VOL](ledger/VOL.md) | volcanoes | 73 | 1 | 0 | 0 | 1 | 16 | 55 | 0 | 0 | 0 |
+| [MAG](ledger/MAG.md) | magma and lava | 42 | 3 | 0 | 0 | 0 | 31 | 8 | 0 | 0 | 0 |
+| [IMP](ledger/IMP.md) | meteor impacts | 135 | 14 | 34 | 3 | 0 | 42 | 42 | 0 | 0 | 6 |
+| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 73 | 16 | 0 | 0 | 1 | 24 | 32 | 0 | 0 | 11 |
+| [STR](ledger/STR.md) | strata, traps, hosts | 44 | 4 | 0 | 0 | 2 | 34 | 4 | 0 | 0 | 4 |
+| [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 16 | 0 | 0 | 0 | 54 | 4 | 0 | 0 | 0 |
+| [DEP](ledger/DEP.md) | deposit models, counts, sizes | 164 | 74 | 0 | 15 | 0 | 49 | 26 | 0 | 0 | 40 |
+| [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 182 | 59 | 2 | 10 | 0 | 40 | 71 | 0 | 0 | 75 |
+| [PRV](ledger/PRV.md) | geologic provinces | 27 | 5 | 0 | 0 | 4 | 6 | 12 | 0 | 0 | 0 |
+| [SCL](ledger/SCL.md) | world scale, planet constants | 50 | 6 | 0 | 0 | 1 | 37 | 6 | 0 | 0 | 1 |
+| [BAK](ledger/BAK.md) | the bake, satellite view | 40 | 0 | 0 | 0 | 1 | 34 | 5 | 0 | 0 | 0 |
+| [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 | 0 |
+| [GEO](ledger/GEO.md) | geothermal features | 51 | 0 | 0 | 0 | 0 | 40 | 11 | 0 | 1 | 0 |
+| [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 74 | 9 | 0 | 0 | 2 | 54 | 9 | 16 | 0 | 0 |
+| [HNT](ledger/HNT.md) | editor hint texts | 84 | 14 | 2 | 0 | 6 | 33 | 29 | 0 | 0 | 0 |
+| [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
+| [CHK](ledger/CHK.md) | plate-check target ranges | 57 | 10 | 2 | 7 | 0 | 9 | 29 | 3 | 4 | 0 |
+| **all** | | **2,177** | **508** | **57** | **59** | **76** | **807** | **670** | **359** | **62** | **193** |
 
-No row is `verified`. In plain terms: 723 rows (35 %) are deliberate game or implementation
-choices; 635 (31 %) state something about the physical world with no source at all; 522 (25 %)
-name a source that nobody is recorded as having read; 113 (5 %) were written from memory or from
-an abstract and say so; 76 (4 %) were tuned to a target.
+No row is `verified`. In plain terms: 807 rows (37 %) are deliberate game or implementation
+choices; 670 (31 %) state something about the physical world with no source at all; 508 (23 %)
+name a source that nobody is recorded as having read; 116 (5 %) were written from memory or from
+an abstract and say so; 76 (3 %) were tuned to a target.
 
 A low `from-memory` count does not mean a subsystem was written with its sources open. It means
 its agent did not say. The impacts agent was candid, and so has 34 such rows; most `cited-unverified`
@@ -75,8 +81,18 @@ and `uncited` rows elsewhere were very probably written the same way.
 | `calibrated` | Tuned until a run matched a target. The row names the target and the source of the target's Earth figure. |
 | `game-choice` | Deliberately not physical. The row says why and who decided: Ben (with the date in `docs/deeptime-design-decisions.md`) or an agent (with the build-log entry). |
 | `uncited` | No source anywhere. |
+| `merged` | Retired in stage 2 (WP-0) as a duplicate of another row. The row keeps its id and its `where`, says which row owns the claim, and is not counted. Verify the owner, not the retired row. |
 | `pending-rewrite` | Added to rows of today's plate motion and today's banded climate, which are about to be replaced. Stage 2 does not verify these. |
 | `not-yet-coded` | The constant exists only in an approved design. Verify it before it is built. |
+
+Rules for duplicates (WP-0). One claim, one row: when two rows state the same parameter, law or threshold
+at the same place in the code or data, one row owns it and the other is retired with `merged` and a pointer.
+The owner is the row that states the claim most completely; a composite row that only lists parameters with
+their own rows is retired into those rows; a `pending-rewrite` row never owns a claim that a non-pending row
+also states; ties go to the lower id number. Ids are never renumbered or reused. A retired row's extra
+information (a citation, a flag) is added to the owner's text, marked "Absorbed in stage 2". Statuses were
+not changed by merging; where the two rows disagreed, the disagreement is listed under "Duplicate rows
+merged in WP-0" below for the verifying package to settle.
 
 Rules for changing the ledger (see `CLAUDE.md`, "Science documentation is part of done"):
 
