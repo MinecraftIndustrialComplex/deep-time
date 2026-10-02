@@ -101,6 +101,7 @@
   "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 1.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
+    "RICHNESS (owner, decisions log 2026-10-02, \"Rich Deposits, Thinner Scatter, Also make deposits use some of the vanilla ore vein features\"): the zone densities were raised and the richest zone carries raw-ore blocks (raw_share: that share of its ore blocks is the raw-ore block, as vanilla's ore veins carry 2 %); game-choice, ledger ORE-266; the richness settings scale both in the world (ORE-262). Measured in docs/science/deposits.md.",
     "Sizing: USGS OFR 2008-1155 (Singer, Berger & Moring 2008), Table 1 (PDF p. 9): all porphyry Cu deposits, n = 422; by-product percentiles count unreported grades as zero; presence = n_reported / 422 from the report's data file PorCuTX2008.txt; correlations (Pearson r of log10) from the text, PDF p. 8. See crates/deeptime-core/data/usgs/porphyry_cu.json.",
     "Deposit density 4 / 15 / 35 per 100,000 km² and the 2 km same-deposit rule: Singer, Berger & Menzie 2005 (USGS authors; Pubs Warehouse record 70197200) and OFR 2008-1155 PDF p. 4.",
     "PLACEHOLDER: ore_density_t_m3 2.7 (no USGS value found; generic intermediate-felsic intrusive rock).",
