@@ -69,7 +69,11 @@ use crate::surface::{basement_class, weathering};
 use super::metamorphism::Paths;
 use super::params::StructureParams;
 
-/// Depth of the carbonate compensation depth, m below sea level (4.5–5 km in today's oceans).
+/// Depth of the carbonate compensation depth, m below sea level. Game choice: one value for every
+/// ocean. Today's CCD is about 4.2–4.5 km in the Pacific (about 5 km under the equatorial
+/// upwelling), about 4.3 km in the Indian Ocean and 5–6 km in the Atlantic (secondary sources:
+/// Wikipedia, SEPM Strata, LibreTexts), so 4,500 m is the Pacific figure.
+// ledger: RCK-015 (game choice)
 pub const CCD_M: f64 = 4500.0;
 
 /// Where a unit comes from.
@@ -91,6 +95,7 @@ pub mod key {
     /// anything above them in their column) is at least `BAND_FROM_C[b]` and below the next
     /// (`metamorphism::formation_temp_c`: slate 250, quartzite, marble and greenstone 300,
     /// phyllite 350, schist 450, amphibolite 500, gneiss 650 °C).
+    // ledger: RCK-052, STR-018, STR-019 (game choice)
     pub const BAND_FROM_C: [f64; BANDS] = [0.0, 250.0, 300.0, 350.0, 450.0, 500.0, 650.0];
     pub const BANDS: usize = 7;
     /// Band 0's strata log: key `LOG_TOP` is the present, `LOG_BASE` the oldest age of the run.
@@ -225,9 +230,14 @@ pub struct Tables {
 }
 
 /// The thinnest horizon of regional-metamorphic rock inside a stack, blocks: metamorphic rock
-/// is a regional body, not a sheet between other rocks.
+/// is a regional body, not a sheet between other rocks. Game choice. Real thin bodies exist
+/// (an ophiolite's metamorphic sole is about 200 m thick, Hacker's lecture notes; skarn zones
+/// run from 3 cm to 15 m, Nelson), and inverted sequences occur in thrust zones (Mottram et al.
+/// 2014); eight blocks (160 m) keeps the look of a regional grade.
+// ledger: STR-006, STR-045 (game choice)
 pub const METAMORPHIC_MIN_BLOCKS: i32 = 8;
 /// The thinnest horizon of plutonic rock inside a stack, blocks.
+// ledger: STR-007, STR-046 (game choice)
 pub const PLUTONIC_MIN_BLOCKS: i32 = 16;
 
 impl Tables {
@@ -347,7 +357,8 @@ pub struct Cell<'a> {
     pub top_active: bool,
 }
 
-/// The class of pool `p` below the top of the basement.
+/// The class of pool `p` below the top of the basement (ledger RCK-016 to RCK-019: the pool →
+/// class table is a game choice; the age gates 30 and 100 Myr are the plate model's orogeny clocks).
 pub fn pool_class(t: &Tables, cell: &Cell<'_>, p: usize) -> u16 {
     let c = &t.cls;
     let oceanic = cell.crust_type == OCEANIC;

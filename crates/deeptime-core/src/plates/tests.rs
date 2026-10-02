@@ -801,6 +801,7 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
     let (mut arc_cells_seen, mut mix_seen) = (0u64, 0.0f64);
+    let (mut balance_steps, mut longest_slab) = (0u64, 0.0f64);
     let mut deaths_before = 0;
     let mut prev_omega: BTreeMap<u32, glam::DVec3> = BTreeMap::new();
     let with = run_stage(&p, |stage, _, st| {
@@ -909,9 +910,35 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         }
         arc_cells_seen += u64::from(step.arc_oceanic.cells + step.arc_continental.cells);
         mix_seen += step.mix_km.iter().sum::<f64>();
+        // The force balance (task 5): one answer per plate in it, finite; slabs within their
+        // depth. (A plate that died later in the step may have an answer and no plate record.)
+        let mut ids: Vec<u32> = step.forces.iter().map(|f| f.id).collect();
+        ids.dedup();
+        assert_eq!(ids.len(), step.forces.len());
+        for f in &step.forces {
+            let torques = [
+                f.slab_pull,
+                f.slab_suction,
+                f.edge_energy,
+                f.mantle_flow,
+                f.basal_drag,
+                f.slab_resistance,
+                f.boundary_resistance,
+                f.collision_resistance,
+            ];
+            assert!(torques.iter().all(|t| t.is_finite() && *t >= 0.0), "{f:?}");
+            assert!(f.stress_mpa.is_finite() && f.speed_mm_yr >= 0.0 && f.rms_mm_yr >= 0.0);
+        }
+        balance_steps += u64::from(!step.forces.is_empty());
+        for &km in &step.slabs_km {
+            assert!((0.0..=p.tectonics.slab_depth_km).contains(&km), "{km}");
+            longest_slab = longest_slab.max(km);
+        }
         checked += 1;
     });
     assert_eq!(checked, total);
+    assert_eq!(balance_steps, total, "a balance every step");
+    assert!(longest_slab > 0.0, "no slab grew in 300 Myr");
     assert!(mix_seen > 0.0, "no plate boundary recorded in 300 Myr");
     assert!(arc_cells_seen > 0, "no arc cell recorded in 300 Myr");
     let st = with.plates.as_ref().unwrap();
