@@ -20,8 +20,10 @@
 //! **Inherited BIF** ([`inherited_bif_share`]): when the run starts after (part of) the acme, the
 //! stable continental interiors inherit banded iron formation in their basement (plan §8.6 item 7:
 //! "inherited cratonic basement where the timeline starts after the acme"). The share is the part
-//! of the acme window that lies before the run's start; `surface::fields` multiplies it by the
-//! frame's craton share, and `structure` lets the basement count as the BIF host where it is.
+//! of the acme window that lies before the run's start, times the preset's
+//! `deposits.inherited_bif_share` (0 in the built-in presets until the owner decides how much of a
+//! stable interior holds it; ledger ORE-261); `surface::fields` multiplies it by the frame's craton
+//! share, and `structure` lets the basement count as the BIF host where it is.
 
 /// Earth's age today, Gyr (the planet's age at which a clock's "Ga before present" is today).
 pub const EARTH_AGE_GYR: f64 = 4.57; // ledger: ORE-258
@@ -44,6 +46,8 @@ pub struct Epoch {
     pub present_age_gyr: f64,
     /// The run's first instant, years (negative).
     pub run_start_years: f64,
+    /// The preset's `deposits.inherited_bif_share` (0–1).
+    pub inherited_bif: f64,
 }
 
 impl Epoch {
@@ -56,6 +60,7 @@ impl Epoch {
                 |c| c.present_age_gyr,
             ),
             run_start_years: p.t_start_years(),
+            inherited_bif: p.deposits.as_ref().map_or(0.0, |d| d.inherited_bif_share),
         }
     }
 
@@ -88,13 +93,14 @@ impl Epoch {
         ]
     }
 
-    /// The share of the BIF acme that lies before the run's start: 1 when the run starts after the
-    /// acme, 0 when it starts before it (the run then has the acme in its own clock).
+    /// The share of the BIF acme that lies before the run's start (1 when the run starts after the
+    /// acme, 0 when it starts before it: the run then has the acme in its own clock), times the
+    /// preset's inherited-BIF setting.
     pub fn inherited_bif_share(&self) -> f64 {
         // ledger: ORE-020
         let start = self.ga(self.run_start_years);
         let (old, young) = BIF_ACME_GA;
-        ((old - start.max(young)).max(0.0) / (old - young)).min(1.0)
+        ((old - start.max(young)).max(0.0) / (old - young)).min(1.0) * self.inherited_bif
     }
 }
 
@@ -104,6 +110,7 @@ impl Default for Epoch {
         Epoch {
             present_age_gyr: EARTH_AGE_GYR,
             run_start_years: 0.0,
+            inherited_bif: 0.0,
         }
     }
 }
@@ -116,6 +123,7 @@ mod tests {
         Epoch {
             present_age_gyr: EARTH_AGE_GYR,
             run_start_years: -start_myr * 1.0e6,
+            inherited_bif: 1.0,
         }
     }
 
@@ -154,6 +162,7 @@ mod tests {
         let e = Epoch {
             present_age_gyr: 2.57,
             run_start_years: -500.0e6,
+            inherited_bif: 1.0,
         };
         assert!((e.ga(0.0) - 2.0).abs() < 1e-12);
         assert_eq!(clock(&e, -10.0, 0.0, OXYGENATED_OCEANS), 1.0);
@@ -171,6 +180,17 @@ mod tests {
         assert_eq!(earth(3000.0).inherited_bif_share(), 0.0);
         // A run that starts at 2.225 Ga inherits the older half.
         assert!((earth(2225.0).inherited_bif_share() - 0.5).abs() < 1e-9);
+        // The built-in presets' interim setting 0 inherits none.
+        let none = Epoch {
+            inherited_bif: 0.0,
+            ..earth(1000.0)
+        };
+        assert_eq!(none.inherited_bif_share(), 0.0);
+        let half = Epoch {
+            inherited_bif: 0.5,
+            ..earth(1000.0)
+        };
+        assert_eq!(half.inherited_bif_share(), 0.5);
         assert!(earth(100.0).land_plants_at(-100.0e6));
         assert!(!earth(1000.0).land_plants_at(-1000.0e6));
     }

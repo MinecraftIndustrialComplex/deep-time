@@ -72,16 +72,6 @@ fn preset() -> String {
     v["keyframes"]["every_myr"] = json!(20.0);
     v["seed"] = json!(5);
     v["deposits"]["count_mult"] = json!(40.0);
-    // Every type but banded iron formation: since stage 2 (WP-9/10) inherited BIF fills every
-    // stable interior, and at count_mult 40 its sites would outweigh the history this test needs
-    // to be the larger part of the peak.
-    let types: Vec<String> = deeptime_core::deposits::types::builtin()
-        .unwrap()
-        .into_iter()
-        .map(|t| t.id)
-        .filter(|id| id != "deeptime:bif_fe")
-        .collect();
-    v["deposits"]["types"] = json!(types);
     v["surface"]["frame_every_myr"] = json!(2.0);
     v["surface"]["log_layers"] = json!(8);
     v.as_object_mut().unwrap().remove("young");
