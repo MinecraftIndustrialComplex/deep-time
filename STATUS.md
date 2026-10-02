@@ -88,9 +88,46 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P3-04 | **Toroidal World refuses Deep Time's Distant Horizons generator from DH 3.3.1 on** (it works with MIC's 3.3.0 only because TW's DH mixins miss that jar's renamed classes). (a) Keep MIC on DH 3.3.0 for now and ask TW's author for a way to declare a seam-aware generator before any DH update (recommended); (b) a Deep Time mixin into TW's `DhGenerators.requireOwn` that lets our generator through (works today, breaks when TW changes, and overrides a guard TW put there on purpose); (c) accept that a DH update turns far terrain off and DH generates from real chunks. | Not asked yet (sub-agent report) |
 | 2026-10-01 | P3-04 | **Far terrain's top blocks.** A table by biome gives 85–96 % of ground blocks right on vanilla biomes and 55 % in MIC (Terralith). (a) A MIC table for Terralith's biomes on the pack's deep-time branch, measured with `probe dh check` (recommended: cheap, pack-side); (b) run the pack's real surface rules over a throwaway chunk per far chunk (exact soil, est. 5–15 ms more a section, touches vanilla chunk classes other mods mix into); (c) leave it. | Not asked yet (sub-agent report) |
 | 2026-10-01 | P3-04 | **Trees in far terrain.** Far terrain has none, so a forest reads as grass until real chunks replace the LODs. (a) Leave it until a client can show how it looks (recommended); (b) add a canopy layer by biome (leaf block, cover share and height in the surface table). | Not asked yet (sub-agent report) |
+| 2026-10-01 | plate collisions and welding (design) | Design: docs/design/plate-collisions-and-welding.md (build log 2026-10-01, "Plate collisions and welding: design"). **(1) How far should the motion model go?** (a, recommended) collision resistance inside the present speed law, with plates welding only once convergence has stalled; (b) full force-balance plate motion now (its own design, every plate calibration redone); (c) only the real-shortening counter and a longer threshold. **(2) If one plate is still above half the planet in more than 10 % of steps after the fix:** (a, recommended) add a rift term that grows under a long-assembled supercontinent; (b) accept a looser target (25 %). **(3) Which side of the suture rises:** (a, recommended) the overriding plate only for now; (b) both sides with a foreland basin, with the folds-and-faults work. **(4) The start-up land jump** (4–6 % of the planet in the first 4 Myr, no collision): (a, recommended) a separate small task afterwards; (b) fold it into the recalibration; (c) leave it. Nothing is built until answered. | Not asked yet: for the coordinator to put to Ben |
 | 2026-10-01 | P3-04 | **The switch.** Far terrain is on whenever Distant Horizons is installed; off with `-Ddeeptime.dh=false`. Make it a setting (server config or the editor), and on or off by default? Recommended: on by default, a server config key when the config file next changes. | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-01 — Plate collisions and welding: design (agent worktree agent-a4560e6e131ce6cbd, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; design only, nothing built)
+- **Why.** The run review (docs/research/notes/run-review-1a0f969d358.md) found three plate-stage faults: land
+  popping up at collisions, no Wilson cycle, a mega-plate. Ben: "Design, then fix".
+- **Document.** docs/design/plate-collisions-and-welding.md: diagnosis, what Earth does (with sources), options,
+  settings, acceptance targets, a seven-task build plan, four questions (under "Pending questions").
+- **Measured** (test VM, master e8668ca, `earthlike_quick_16k`, supercontinent, 1000 Myr, `deeptime stage volcanoes`,
+  2 threads, 1,030–1,120 s a run; `tools/review/plate-dynamics.sh 1000 1,2,3,4 supercontinent base` on a binary built
+  with `tools/review/plate-dynamics-trace.patch`; mean of seeds 1–4 [range]):
+  - one plate above half the planet in 59 % of steps [50–69], median largest share 0.58, worst 0.90; 3.75 plates
+    above 5 %;
+  - median plate lifetime 45 Myr [38–56]; rift-born plates 16–22 Myr, 19 % alive after 50 Myr; 100 welds per run, in
+    half of them the dying plate is the larger one; about 40 % of rift-born plates are welded back into the plate
+    family they left; after a rift splits a plate above half the planet, one plate is above half again in 17 Myr;
+  - most land gained in a step 3.8 % of the planet [2.6–4.6]; one collision lifts up to 23 % of the planet [15–28] by
+    more than 10 m and raises up to 4.5 % as land; every collision 1,400 m; lifted area 7,100 × 2,800 km, elongation 2.2;
+  - a collision fires after a median 8 Myr of contact, when the counter reads 350 km and the real shortening is a
+    median 87 km (seed 1).
+- **Crust spreading did not change the three findings** (it and the ×0.7 uplift lowered the surge from 2,000 to
+  1,400 m; areas, plate sizes and lifetimes are as the review found them).
+- **Causes** (code). The collision counter in `plates/subduction.rs` `resolve()` adds relative speed × time, not
+  shortening; `plates/collision.rs` then welds whole plates at once and applies a capped, 2,000-km-wide surge in that
+  step.
+- **Variants** (seed 1, one run each, `--set`): no welding (`collision_suture_frac=1e9`): one plate above half in 19 %
+  of steps, plate lifetime 180 Myr, but P1-27's fault returns (active margins 0.67, land 0.46). Threshold 1,500 km:
+  above half in 4 % of steps, rift-born lifetime 85 Myr, active margins 0.37, but continental crust falls to 0.29 of
+  the planet (nothing resists a collision). Surge radius 500 km: land per collision at most 0.9 %, but the world ends
+  with land 0.15: the wide surges build much of today's land, so the fix needs a hypsometry recalibration.
+- **Recommended.** Uplift from the crust shortened each step, in a belt behind the front; a resistance that grows with
+  the belt's height; plates weld once convergence has stalled after real shortening; the larger plate keeps its id. A
+  supercontinent-heating rift term only if the mega-plate target is still missed.
+- **Also found.** The first 4 Myr of a run add 4–6 % land with no collision (start-up). At 1000 Myr master's land
+  share is 0.19–0.26 (the hypsometry targets are checked at 500 Myr).
+- **Housekeeping.** No code changed. The trace is a patch file, applied only on the VM copy. Scratch folder
+  `/Volumes/Graphide/ban/deeptime-runs/plate-collisions-design/` deleted. One mistake: two duplicate runs started
+  with `STAGE=plates` (which runs the whole coupled group on this preset) were killed by PID after three minutes.
+- **Next.** Ben's answers; then task 1 of the plan (`deeptime plate-check`, Sonnet).
 ### 2026-10-01 — Magma under active volcanoes; the biomes' random lava removed (agent worktree agent-a04fab824846efbfc, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Ask.** Ben, decisions log 2026-10-01, "Volcanoes is a go ahead": lava where the simulation has it. Branch
   `worktree-agent-a04fab824846efbfc`, master merged in, not merged to master, not pushed.
