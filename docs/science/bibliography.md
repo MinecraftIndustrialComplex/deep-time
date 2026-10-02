@@ -106,6 +106,7 @@ Citations that could not be resolved to a real reference:
 - Access: open copy at the Spiral URL above.
 - Read so far (by the project): from memory ("the paper could not be fetched").
 - Read in this pass: full text fetched (all 24 pages; read in detail: Introduction, "Crater dimensions and melt production" pp. 822-825, "Ejecta deposit" pp. 828-829, the worked example and Table 6, the reference list).
+- Read in stage 2 (WP-1, 2026-10-02): full text read again by the stage 2 agent (text extracted from the open copy): every equation the code uses was read: eq. 1, 21, 22, 23, 24, 25, 26, 27, 28 (d_fr = 0.4 D_fr^0.3 km, from Herrick et al. 1997), 29, 30, 31, 43-48, Table 6 (final craters 1.2, 23.7 and 186 km; energies 1.3e16, 1.5e21, 1.65e24 J) and the target densities and speeds of pp. 818-819. Confirmed: the stage 1 findings (eq. 28 is 0.4 D^0.3, not 0.294 D^0.301; eq. numbers 48, 47, 30 for rim, ejecta, melt). The code now reproduces Table 6 in a test.
 - Reference check: authors, year, venue, volume(issue) and pages are right. Equation numbering in the paper marks the equations the program implements with an asterisk. Of the numbers the code cites: eqs. 21, 22, 24, 26, 27, 28, 31 are right (but see the value MISMATCH for eq. 28); the melt law is eq. 30 (code says 12; paper eq. 12 is in the atmospheric-entry section); the rim height is eq. 48 (code says 25; paper eq. 25 is transient depth d_tc = D_tc/(2 sqrt 2)); the ejecta thickness is eq. 47 (code says 32; paper eq. 32 is the fireball radius); V_br = 0.032 D^3 is eq. 23 (code groups it under "eqs. 24 and 26"). The complex-crater depth law in eq. 28 is 0.4 D^0.3, not 0.294 D^0.301 (Part 2, IMP-042). The paper credits its eq. 21 to Holsapple & Schmidt 1982, Schmidt & Housen 1987 and Gault 1974, not to Gault & Wedekind 1978 or Chapman & McKinnon 1986, and it has no default impact speed (Part 2, IMP-020).
 
 ### GrieveShoemaker1994
@@ -116,6 +117,7 @@ Citations that could not be resolved to a real reference:
 - Access: book (not online); lending copy at archive.org was not readable (403 on the search-inside service, djvu text withheld).
 - Read so far (by the project): secondary ("checked against the literature by a search"); the scaling.rs header says "as remembered".
 - Read in this pass: not fetched (tried archive.org; no text obtained).
+- Read in stage 2 (WP-1, 2026-10-02): still not fetched (a book). Its value 5.6 +/- 2.8e-15 per km2 per year for D >= 20 km was read as quoted in Hughes 2000, p. 434 (see Hughes2000). Not available online in any copy tried (archive.org lending copy, no text).
 - Reference check: pages 417-462 and title match the reference list of Davison & Collins 2007, which dates the chapter 1995; Collins et al. 2005 date the same volume 1994 (Bottke et al. 1994 in it). The book is 1994 (archive.org). The value 5.6 +/- 2.8 was NOT found in any text I could read; the older figure 5.4 +/- 2.7 x 10^-15 km^-2 yr^-1 (D >= 20 km, N = 7, Grieve 1984) is quoted in Grieve 1987 (see Grieve1987).
 
 ### Neukum2001
@@ -126,6 +128,7 @@ Citations that could not be resolved to a real reference:
 - Access: paywalled (Springer; only Crossref metadata seen)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched (metadata only)
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (Springer 403, ADS refused). The constancy of the rate was read as reported by Hughes 2000, p. 429, from Neukum & Ivanov 1994: 'very nearly constant for about the last 2000 Myr'.
 - Reference check: authors, year, venue, volume and pages match the real paper. Whether it says the rate was "constant within a factor of two for the last ~3 Gyr" is not checked.
 
 ### Bland2006
@@ -136,6 +139,7 @@ Citations that could not be resolved to a real reference:
 - Access: paywalled (Wiley; metadata only)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched (metadata only)
+- Read in stage 2 (WP-1, 2026-10-02): read through OCR of the open ADS scan (25 pages): abstract (iron meteorites; 1 km craters on land every 50,000 years); p. 608 Fig. 1 caption ('departure from the expected size-frequency distribution in the terrestrial crater data is evident in craters <10-20 km in diameter'); p. 611 (18 km/s and 45 degrees, citing Gilbert 1893 and Shoemaker 1962); p. 617 and p. 624 (16 of 17 craters under 1.5 km with a known impactor are iron; the proportion of stones returns above 10 km); p. 625 (Meteor Crater-sized craters every 20,000 years on the whole Earth). Confirms IMP-014 and supports IMP-004.
 - Reference check: authors, year, venue, volume and pages match. The topic (small impactors broken up by the atmosphere) fits the claim; Davison & Collins 2007 cite it and say impactors "much smaller than 100 m ... are significantly affected by atmospheric entry" (full text read). The actual statement about stony bodies is not checked.
 
 ### LeFeuvre2011
@@ -146,6 +150,7 @@ Citations that could not be resolved to a real reference:
 - Access: open copy (HAL, green) at https://hal.science/hal-00768797
 - Read so far (by the project): from memory
 - Read in this pass: not fetched (HAL access denied)
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (HAL access denied, 2026-10-02; Unpaywall lists the HAL copy as the only open one).
 - Reference check: authors, year, venue, volume and pages match. Whether it gives 20 km/s as the Earth mean for asteroids is not checked.
 
 ### Gilbert1893
@@ -176,6 +181,7 @@ Citations that could not be resolved to a real reference:
 - Access: paywalled (metadata only)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): not fetched. Davison & Collins 2007 (full text) use its pi-group scaling to derive their eq. 2 and give its constants as 'beta = 0.22 for solid rock in the gravity regime'.
 - Reference check: matches. Collins et al. 2005 name it (with Holsapple & Schmidt 1982, JGR 87:1849-1870, and Gault 1974) as the basis of eq. 21 and as the source of the water constant 1.365.
 
 ### GaultWedekind1978
@@ -236,6 +242,7 @@ Citations that could not be resolved to a real reference:
 - Access: open copy (scan) at the WIPP URL above
 - Read so far (by the project): from memory
 - Read in this pass: full text fetched (OCR layer; read the morphology section, the cratering-rate section and the size-frequency section)
+- Read in stage 2 (WP-1, 2026-10-02): full text read again through the OCR layer (stage 2): pp. 247-248 (morphology; simple d_t = 0.29 D^0.98 and d_a = 0.14 D^1.02 km, complex d_a = 0.27 D^0.16 km, transition about 2 km in sedimentary and 4 km in crystalline targets), p. 253 (melt sheets 'up to several hundred meters thick'), the section on the known record (N proportional to D^-1.8 for large diameters; largest ~140 km) and 'Cratering Rate Estimates' (5.4 +/- 2.7e-15 per km2 per year for D >= 20 km, n = 7, Grieve 1984; 2.2 +/- 1.1e-14 for D >= 10 km, Shoemaker 1977). No 3.2 km here.
 - Reference check: venue, volume and pages match. It supports the 2 km / 4 km split (IMP-035) but I found no 3.2 km in its OCR text, so it is not the source of the 3.2 km figure (IMP-034); Collins et al. give 3.2 km, classified by Dence 1965. It also contains the older rate figure used as a secondary check on IMP-001.
 
 ### Pike1980
@@ -246,6 +253,7 @@ Citations that could not be resolved to a real reference:
 - Access: not found (an ADS scan probably exists; not fetched. The ADS scan of Pike 1985 had no text layer, so this one likely has none either)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): fetched (open ADS scan, 31 pages) and read by OCR: p. 2165 (mean transition diameters 3.1 km for Earth and 18.7 km for the Moon, 'exactly the ratio of their values of g'; log D_t = log 3300 - 1.00 log g; Mars 6 km and Mercury 16 km deviate; complex craters six times deeper on the Moon, depth 'could well scale inversely with g'), Table 2 (Earth simple d = 0.137 D^1.02, complex d = 0.23 D^0.24 km), Fig. 4 (transition 2.25 km sedimentary, 4.75 km crystalline).
 - Reference check: title and series fit the claim (gravity control of the transition). Collins et al. cite it only for terrestrial complex-crater depth data. Page end differs between the code's source list (2189) and Collins et al. (2190).
 
 ### AlexopoulosMcKinnon1994
@@ -256,6 +264,7 @@ Citations that could not be resolved to a real reference:
 - Access: paywalled (not even an abstract seen)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched (403)
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (GeoScienceWorld 403). Not supported by what was read about peak-ring onsets elsewhere (see WoodHead1976).
 - Reference check: title, authors, volume and pages match. Whether it gives about 40 km for the onset of peak rings on Venus is unchecked. The editors and the year 1994 for SP 293 are from my recollection plus the code's own year; Crossref's 1992 is a discrepancy to settle.
 
 ### WoodHead1976
@@ -266,6 +275,7 @@ Citations that could not be resolved to a real reference:
 - Access: not found (not searched)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): fetched (open ADS scan) and read by OCR: Table 5, onset diameters of central-peak and peak-ring basins (peak ring: Mercury 120, Mars 145, Moon 175 km) and the discussion that gravity is not the dominant control. Does not give the ring-to-rim diameter ratio.
 - Reference check: unverified.
 
 ### PikeSpudis1987
@@ -276,6 +286,7 @@ Citations that could not be resolved to a real reference:
 - Access: paywalled (metadata only)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): not fetched. The ratio of a ring's diameter to the rim's was read instead in Pike 1985.
 - Reference check: real paper. It concerns multi-ring basins; the claim "ring diameter about half the rim's" for peak-ring craters is unchecked.
 
 ### Pike1985
@@ -286,6 +297,7 @@ Citations that could not be resolved to a real reference:
 - Access: open copy (scan only) at the ADS URL
 - Read so far (by the project): from memory
 - Read in this pass: fetched but unreadable (image-only scan)
+- Read in stage 2 (WP-1, 2026-10-02): fetched (open ADS scan, image only) and read by OCR (20 pages): abstract and Table 1. Central-peak base is 20-25 % of the rim diameter in small complex craters (half that in ringed ones); the inner ring of a two-ring crater without a peak is half the outer's diameter (0.5, not the planets' 0.4, when there is a peak); Vredefort 150 +/- 10 km.
 - Reference check: venue, volume and pages match; title found by Crossref.
 
 ### Pike1977
@@ -306,6 +318,7 @@ Citations that could not be resolved to a real reference:
 - Access: paywalled (metadata only)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched; Collins et al. (full text) cite it: "The power of 3 is a good approximation of data from explosion experiments (McGetchin et al. 1973)... the power can vary between 2.5 and 3.5."
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (ADS refused). Read as cited by Collins et al. 2005, p. 828: 'the power of -3 is a good approximation of data from explosion experiments (McGetchin et al. 1973)'.
 - Reference check: matches. Collins et al. eq. 47 is not "McGetchin" itself but their own volume-conservation model using the r^-3 falloff.
 
 ### Moore1974
@@ -316,6 +329,7 @@ Citations that could not be resolved to a real reference:
 - Access: not found (not searched)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): fetched (open ADS scan) and read by OCR: p. 83, eq. 1: the radius of continuous ejecta R_ce = 2.348 R_c for lunar craters of 0.65-218 km across (the 2.3 of the code).
 - Reference check: unverified; flag for stage 2.
 
 ### GrieveCintala1992
@@ -326,6 +340,7 @@ Citations that could not be resolved to a real reference:
 - Access: not found (not looked up)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched; Collins et al. cite it (with Pierazzo et al. 1997 and Pierazzo & Melosh 2000) as support for the melt volume.
+- Read in stage 2 (WP-1, 2026-10-02): fetched (open ADS scan) and its abstract read by OCR; the body of the scan was not read for numbers. It confirms that melt volume rises faster than the transient cavity's with event size.
 - Reference check: venue, volume and pages as in Collins et al.'s list.
 
 ### PierazzoVickery1997
@@ -346,7 +361,18 @@ Citations that could not be resolved to a real reference:
 - Access: open copy at the Spiral URL
 - Read so far (by the project): abstract only
 - Read in this pass: full text fetched (abstract, introduction, method, results, Table 2, discussion)
+- Read in stage 2 (WP-1, 2026-10-02): full text read again (stage 2): Table 1 (iSALE model parameters), eq. 1-3 (eq. 3: D_f,wet / D_f,dry = 1 - 0.14 R), Table 2 (the runs), p. 1922 (3.2 km and R = 3.5 resurge rule), p. 1925 (no crater above R = 8), eq. 4-8 and Table 3. The code's ocean rule is now their eq. 3 and regime limits.
 - Reference check: the citation is right. The code's note that it fits "three numbers" is accurate for the abstract. The paper's own cutoff is not 6.3 (Part 2).
+
+### Hughes2000
+- Reference: Hughes, D. W. (2000). A new approach to the calculation of the cratering rate of the Earth over the last 125 +/- 20 Myr. Monthly Notices of the Royal Astronomical Society 317(2):429-437.
+- DOI or URL: DOI not checked. Open ADS scan with a text layer (bibcode 2000MNRAS.317..429H, https://articles.adsabs.harvard.edu/pdf/2000MNRAS.317..429H).
+- Cited as: not cited in the code before stage 2; now cited in scaling.rs for the shape of the production function below 20 km and for the quotation of the Grieve & Shoemaker rate.
+- Ledger ids: IMP-001, IMP-002, IMP-003, IMP-004, IMP-005
+- Access: open copy (ADS scan, 9 pages)
+- Read so far (by the project): not used before stage 2.
+- Read in stage 2 (WP-1, 2026-10-02): full text read. Abstract: rates of craters larger than D over the last 125 +/- 20 Myr on the stable continents: 12.0 +/- 0.7 (D > 2.4 km), 9.5 +/- 0.6 (5 km), 6.5 +/- 0.5 (12 km), 3.0 +/- 0.3 (22 km) x 1e-15 per km2 per year, and 3.46 +/- 0.30 for D > 20 km; 'previous researchers have considerably overestimated the rate at which small 2.4 < D < 20 km craters are being produced'; 'the relationship between crater production rate and crater diameter is not a simple power law in the 2.4 < D < 40 km diameter range'. p. 434: earlier D > 20 km rates 'Hughes (1981) 2.6 +/- 0.9, Grieve & Dence (1979) 3.5 +/- 1.3, Grieve (1984) 5.4 +/- 2.7 and Grieve & Shoemaker (1994) 5.6 +/- 2.8 x 1e-15 km-2 yr-1'. Table 2: the full rate table. p. 429: the lunar rate (Neukum & Ivanov 1994) 'very nearly constant for about the last 2000 Myr'.
+- Reference check: matches. His figures are for craters surviving on stable cratons; he argues the completeness is near 1 so they are production rates, but they could be lower limits.
 
 ### Culling1960
 - Reference: Culling, W. E. H. (1960). Analytical theory of erosion. The Journal of Geology 68(3):336-344.
@@ -356,6 +382,7 @@ Citations that could not be resolved to a real reference:
 - Access: paywalled (metadata only)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (paywalled).
 - Reference check: matches (title found by Crossref). The paper is general erosion theory; it gives no crater-specific diffusivity.
 
 ### Soderblom1970
@@ -366,6 +393,7 @@ Citations that could not be resolved to a real reference:
 - Access: paywalled (metadata only)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (Wiley 403).
 - Reference check: matches. Its title says the diffusion comes from small impacts on the Moon, not soil creep.
 
 ### FassettThomson2014
@@ -376,6 +404,7 @@ Citations that could not be resolved to a real reference:
 - Access: paywalled (abstract only, via OpenAlex)
 - Read so far (by the project): from memory
 - Read in this pass: abstract fetched (OpenAlex reconstruction of the abstract; wording has gaps)
+- Read in stage 2 (WP-1, 2026-10-02): abstract only (OpenAlex), unchanged; the paper is paywalled (Unpaywall: not open).
 - Reference check: matches. It is a LUNAR study (diffusivity about 5.5 m^2/Myr), not an Earth hillslope value (Part 2, IMP-083).
 
 ### Fernandes1997
@@ -386,6 +415,7 @@ Citations that could not be resolved to a real reference:
 - Access: paywalled (metadata only)
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): not fetched. Unpaywall lists an open copy at the publisher (Wiley), but a script is refused (403, 2026-10-02) and so is the web fetch tool.
 - Reference check: matches. Whether it gives the 0.003-0.05 m^2/yr range is unchecked.
 
 ### Roering1999
@@ -396,6 +426,7 @@ Citations that could not be resolved to a real reference:
 - Access: paywalled (metadata only)
 - Read so far (by the project): from memory (params.rs); judgment framework (rock-class JSON)
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): not fetched. Unpaywall lists an open copy at the publisher (Wiley), but a script is refused (403, 2026-10-02) and so is the web fetch tool.
 - Reference check: matches the rock-class JSON (WRR 35(3):853-870). Note this paper's point is NONLINEAR diffusion, while the code uses linear diffusion.
 
 ### Sklar2001
