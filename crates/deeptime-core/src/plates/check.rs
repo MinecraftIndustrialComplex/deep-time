@@ -199,7 +199,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "active_margin_mean",
-        "Active share of the continental margin (after the first 100 Myr)",
+        "Active share of the continental margin (after the first 90 Myr of the record)",
         "share",
         Some(0.25),
         Some(0.40),
@@ -213,11 +213,14 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     // Task 1b: the force-balance design's section 7 targets that today's model can be measured on.
     m(
+        // ledger: CHK-020. Earth: about 47 mm/yr today (area-weighted, Forsyth & Uyeda 1975
+        // Table 1) and 50-100 over the last 200 Myr (global RMS, Zahirovic et al. 2015 §3.2).
+        // Was 35-55, which left out every Earth value of the last 200 Myr (WP-13a).
         "speed_rms_mm_yr",
         "Plate speed, area-weighted RMS (mean over steps)",
         "mm/yr",
-        Some(35.0),
-        Some(55.0),
+        Some(40.0),
+        Some(100.0),
     ),
     m(
         "speed_big_p10_mm_yr",
@@ -325,11 +328,14 @@ pub const MEASURES: &[MeasureDef] = &[
         Some(300.0),
     ),
     m(
+        // ledger: CHK-036. Earth: a cycle "often considered to last 400-800" Myr, about 600 Myr
+        // dominant (Mitchell et al. 2021); "intervals of ca. 500 m.y." (Nance 2022). Was 300-600,
+        // from an Earth range of 300-500 that neither source gives (WP-13a).
         "supercontinent_period_myr",
         "Assembly-to-assembly period, median",
         "Myr",
-        Some(300.0),
-        Some(600.0),
+        Some(400.0),
+        Some(800.0),
     ),
     // The boundary mix and arc heights (dynamics version 3), judged against Earth: each range
     // carries its ledger id (docs/science/ledger/PLT.md, PLT-213 to PLT-221). Runs recorded
@@ -3605,5 +3611,74 @@ mod tests {
                 .count()
                 >= 5
         );
+    }
+
+    /// Earth's own figures, as read in the sources (docs/science/ledger/CHK.md and PLT.md, WP-13a),
+    /// must pass the built-in ranges they anchor: a target that fails Earth is a wrong target.
+    #[test]
+    fn earth_figures_pass_their_targets() {
+        let t = Targets::builtin();
+        let earth: &[(&str, f64, &str)] = &[
+            // Area-weighted RMS: today, from Forsyth & Uyeda 1975 Table 1; the last 200 Myr's
+            // range of global RMS, Zahirovic et al. 2015 §3.2.
+            ("speed_rms_mm_yr", 47.1, "Forsyth & Uyeda 1975 Table 1"),
+            (
+                "speed_rms_mm_yr",
+                50.0,
+                "Zahirovic et al. 2015 §3.2, low end",
+            ),
+            (
+                "speed_rms_mm_yr",
+                100.0,
+                "Zahirovic et al. 2015 §3.2, high end",
+            ),
+            ("speed_big_p10_mm_yr", 11.0, "Forsyth & Uyeda 1975 Table 1"),
+            ("speed_big_p50_mm_yr", 42.0, "Zahirovic et al. 2015 §3.5"),
+            ("speed_big_p90_mm_yr", 80.0, "Forsyth & Uyeda 1975 Table 1"),
+            (
+                "speed_oceanic_over_continental",
+                2.9,
+                "Zahirovic et al. 2015 §3.5",
+            ),
+            ("speed_slab_over_free", 3.0, "Zahirovic et al. 2015 §3.5"),
+            (
+                "speed_slab_over_free",
+                4.0,
+                "Conrad & Lithgow-Bertelloni 2004",
+            ),
+            ("speed_slab_rank_corr", 0.71, "Forsyth & Uyeda 1975 Table 1"),
+            (
+                "speed_area_rank_corr",
+                -0.34,
+                "Forsyth & Uyeda 1975 Table 1",
+            ),
+            ("ocean_age_p50_myr", 55.4, "Seton et al. 2020 grid"),
+            ("ocean_age_p90_mean_myr", 133.0, "Seton et al. 2020 grid"),
+            ("ocean_old180_pct", 0.61, "Seton et al. 2020 grid"),
+            ("ocean_old250_pct", 0.06, "Seton et al. 2020 grid"),
+            ("supercontinent_tenure_myr", 100.0, "Mitchell et al. 2021"),
+            ("supercontinent_tenure_myr", 300.0, "Mitchell et al. 2021"),
+            ("supercontinent_period_myr", 400.0, "Mitchell et al. 2021"),
+            ("supercontinent_period_myr", 500.0, "Nance 2022"),
+            ("supercontinent_period_myr", 600.0, "Mitchell et al. 2021"),
+            ("supercontinent_period_myr", 800.0, "Mitchell et al. 2021"),
+            ("largest_share_p50", 0.205, "Bird 2003 Table 1"),
+            ("plates_over_5pct_p50", 7.0, "Bird 2003 Table 1"),
+            ("boundary_subduction_pct", 19.7, "Bird 2003 Table 3"),
+            (
+                "collision_convergence_ratio_20myr",
+                0.27,
+                "Copley et al. 2010",
+            ),
+        ];
+        for &(key, v, src) in earth {
+            assert!(MEASURES.iter().any(|d| d.key == key), "{key}");
+            let (lo, hi) = t.range(key);
+            assert!(
+                lo.is_none_or(|lo| v >= lo) && hi.is_none_or(|hi| v <= hi),
+                "{key}: Earth {v} ({src}) is outside {}",
+                range_text(lo, hi)
+            );
+        }
     }
 }
