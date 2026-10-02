@@ -26,6 +26,11 @@
 //!
 //! The deposit engine records when a cell's closure first passed its type's threshold
 //! (`petroleum.rs`), so a trap formed during an orogeny stays a trap after it.
+//!
+//! Ledger STR-025 to STR-040. Every weight and shape above (0.8, 0.6, 0.3, 0.1, the fade at a
+//! structure's edge) is a game choice; trap types are standard (anticlines, faults, tilted fault
+//! blocks and salt domes; Wikipedia "Petroleum trap", secondary), but "drape over basement relief"
+//! as a trap was not found in a source read. The thresholds are in `params.rs`.
 
 use crate::plates::state::{ARC, CONTINENTAL, regime};
 use crate::surface::fields::dist_to_edge;

@@ -565,6 +565,39 @@ pub struct TectonicParams {
     pub collision_orogeny_myr: f64,
     /// Sample L1 every this many steps (0 = only for keyframes and at the end).
     pub l1_every_steps: u32,
+    // The force balance (`plates::forces`, docs/design/plate-force-balance.md §3 and §6). **Not
+    // active yet**: the balance is computed and recorded each step (the dynamics record), but
+    // plates still move by the speed rules above until the switch (the design's task 7).
+    /// The overall speed scale of the balance, mm/yr: a reference oceanic plate (the average
+    /// starting plate's area, a 3,000 km trench of a full-length 80-Myr slab, its neighbours at
+    /// rest) moves at this speed. Sets the basal drag coefficient. Ledger PLT-181.
+    pub plate_speed_scale_mm_yr: f64,
+    /// Slab pull, relative strength (1 = the reference pull, `forces::SLAB_PULL_N_M`). PLT-182.
+    pub slab_pull: f64,
+    /// Slab length at which a slab pulls in full (the upper mantle), km. PLT-184.
+    pub slab_depth_km: f64,
+    /// A slab breaks off after continental crust has blocked its trench this long, Myr. PLT-184.
+    pub slab_breakoff_myr: f64,
+    /// Resistance of the mantle to a slab's sinking, against the basal drag of the reference
+    /// plate (per 3,000 km of trench). PLT-185.
+    pub slab_resistance: f64,
+    /// Slab suction on the overriding plate, as a share of the slab's pull. PLT-186.
+    pub slab_suction_share: f64,
+    /// Edge energy (ridge push and the weight of high ground), relative to its physical size:
+    /// 0.1 is the gravitational potential energy as computed (a ridge's push is then about 0.1 of
+    /// the reference slab pull). PLT-187.
+    pub edge_energy: f64,
+    /// Basal drag under continental crust, as a multiple of that under oceanic crust. PLT-188.
+    pub keel_drag: f64,
+    /// Resistance along plate boundaries to relative motion, against the basal drag of the
+    /// reference plate (per its perimeter). PLT-189.
+    pub boundary_resistance: f64,
+    /// Peak speed of the weak, slow mantle flow that drags plates with no slab, mm/yr (a degree-2
+    /// stand-in for convection). PLT-190.
+    pub mantle_flow_mm_yr: f64,
+    /// Relaxation time of a plate's rotation towards the balance, Myr (used from the switch on).
+    /// PLT-191.
+    pub motion_relax_myr: f64,
 }
 
 impl Default for TectonicParams {
@@ -647,6 +680,17 @@ impl Default for TectonicParams {
             contact_timeout_steps: 12,
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
+            plate_speed_scale_mm_yr: 45.0, // ledger: PLT-181
+            slab_pull: 1.0,                // ledger: PLT-182
+            slab_depth_km: 700.0,          // ledger: PLT-184
+            slab_breakoff_myr: 10.0,       // ledger: PLT-184
+            slab_resistance: 3.0,          // ledger: PLT-185
+            slab_suction_share: 0.3,       // ledger: PLT-186
+            edge_energy: 0.1,              // ledger: PLT-187
+            keel_drag: 3.0,                // ledger: PLT-188
+            boundary_resistance: 3.0,      // ledger: PLT-189
+            mantle_flow_mm_yr: 5.0,        // ledger: PLT-190
+            motion_relax_myr: 6.0,         // ledger: PLT-191
         }
     }
 }
@@ -886,6 +930,25 @@ impl PlanetPreset {
         )?;
         pos(k.slab_pull_relax_myr, "$.tectonics.slab_pull_relax_myr")?;
         pos(k.slab_pull_front_km, "$.tectonics.slab_pull_front_km")?;
+        // The force balance (recorded, not applied yet).
+        pos(
+            k.plate_speed_scale_mm_yr,
+            "$.tectonics.plate_speed_scale_mm_yr",
+        )?;
+        pos(k.slab_depth_km, "$.tectonics.slab_depth_km")?;
+        pos(k.slab_breakoff_myr, "$.tectonics.slab_breakoff_myr")?;
+        pos(k.keel_drag, "$.tectonics.keel_drag")?;
+        pos(k.motion_relax_myr, "$.tectonics.motion_relax_myr")?;
+        for (v, key) in [
+            (k.slab_pull, "$.tectonics.slab_pull"),
+            (k.slab_resistance, "$.tectonics.slab_resistance"),
+            (k.slab_suction_share, "$.tectonics.slab_suction_share"),
+            (k.edge_energy, "$.tectonics.edge_energy"),
+            (k.boundary_resistance, "$.tectonics.boundary_resistance"),
+            (k.mantle_flow_mm_yr, "$.tectonics.mantle_flow_mm_yr"),
+        ] {
+            check(v.is_finite() && v >= 0.0, key, "must be >= 0")?;
+        }
         check(
             k.subduction_peak_km > 0.0 && k.subduction_peak_km < k.subduction_distance_km,
             "$.tectonics.subduction_peak_km",
