@@ -184,6 +184,7 @@
   "deeptime.editor.field.island_subsidence": "Island subsidence",
   "deeptime.editor.field.island_subsidence_max": "Island subsidence, most",
   "deeptime.editor.field.caldera_rate": "Caldera eruptions",
+  "deeptime.editor.field.hotspot_caldera_rate": "Continental hotspot calderas",
   "deeptime.editor.field.caldera_radius_min": "Caldera radius, smallest",
   "deeptime.editor.field.caldera_radius_max": "Caldera radius, largest",
   "deeptime.editor.field.silicic_crust": "Silicic crust",
