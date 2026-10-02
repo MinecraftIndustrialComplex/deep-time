@@ -401,8 +401,8 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
        spawn and stores them in its database; no player and no client is involved.
     3. `/deeptime probe dh check`: what Distant Horizons then holds is far terrain's surface, and far
        terrain agrees with the chunks generated afterwards at the same columns.
-    4. The seam: 2 and 3 again with the pregeneration centred on x = C/2 (Toroidal World folds the
-       sections past it into the lap), checked on 160 blocks either side of the seam.
+    4. The seam: 2 and 3 again with a pregeneration on each side of x = C/2, inside the lap (DH asked
+       nothing for a square past the seam), checked on 160 blocks either side of the seam.
     5. `/deeptime probe far bench`: the time a section takes without Distant Horizons' storing.
     """
     st, out = probe_json(server, rcon, "deeptime probe dh")
@@ -434,8 +434,15 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     # Of eight places around it, the one with the most land (far terrain says, generating nothing).
     spawn = st.get("spawn") or [0, 0]
     best = None
+    # Inside the planet's lap: Distant Horizons' /dh pregen asked nothing of any generator for a square
+    # past the seam (2026-10-02, centre x -9088 on C 16384: no section requested, no PregenManager line),
+    # so the square is kept in [-C/2, C/2), 512 blocks (its radius) clear of the seam.
+    lap = circumference or 0
     for dx, dz in ((768, 0), (-768, 0), (0, 768), (0, -768), (1536, 0), (-1536, 0), (0, 1536), (0, -1536)):
-        x, z = (spawn[0] + dx) // 64 * 64, (spawn[1] + dz) // 64 * 64
+        x, z = spawn[0] + dx, (spawn[1] + dz) // 64 * 64
+        if lap:
+            x = max(-lap // 2 + 512, min(lap // 2 - 512, (x + lap // 2) % lap - lap // 2))
+        x = x // 64 * 64
         land, _ = probe_json(server, rcon, f"deeptime probe far land {x} {z}", wait=0.5)
         share = (land or {}).get("land_share", 0.0)
         if best is None or share > best[0]:
@@ -460,10 +467,10 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     side = 10   # chunks a side, four columns in each; every one is generated in full on the server thread
     dh_area_check(steps, server, rcon, smoke, cx - 192, cz - 192, side, "", "dh-check.json", st)
 
-    # The seam (x = C/2): Distant Horizons' pregeneration centred on it, so Toroidal World folds the
-    # sections past it into the planet's lap, then what DH holds and the chunks generated afterwards
-    # on each side: the 160 blocks west of the seam, and the 160 blocks east of it (x = -C/2 on,
-    # the planet's westernmost columns, as Toroidal World stores them).
+    # The seam (x = C/2): Distant Horizons' pregeneration on each side of it, inside the lap (a
+    # square ending at the seam on the west, one starting at x = -C/2 on the east, the planet's
+    # westernmost columns, which lie east of the seam), then what DH holds and the chunks generated
+    # afterwards on the 160 blocks either side of the seam.
     if not circumference:
         steps.check("dh seam: the circumference is known", "C", circumference, False)
         return
@@ -483,9 +490,10 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     seam_land, sz = best
     radius_seam = 32   # /dh pregen takes at least 32 chunks
     steps.record("dh seam: area checked", f"x = {half} (C = {circumference}), z = {sz} ({100 * seam_land:.0f} % land either side), "
-                                          f"pregen radius {radius_seam} chunks centred on the seam")
+                                          f"pregen radius {radius_seam} chunks on each side, inside the lap")
     before = sections
-    dh_pregen(steps, rcon, half, sz, radius_seam, "seam ")
+    dh_pregen(steps, rcon, half - 16 * radius_seam, sz, radius_seam, "seam west ")
+    dh_pregen(steps, rcon, -half + 16 * radius_seam, sz, radius_seam, "seam east ")
     st, out = probe_json(server, rcon, "deeptime probe dh")
     level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
     steps.check("dh seam: Distant Horizons asked the override for the seam's sections", "> 0 more",

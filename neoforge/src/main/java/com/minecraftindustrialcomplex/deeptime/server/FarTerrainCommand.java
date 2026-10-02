@@ -354,15 +354,37 @@ public final class FarTerrainCommand {
         StringBuilder why = new StringBuilder();
         if (bound != null && bound.levelWrapper() != null && DhFarTerrain.api().isPresent()) {
             DhApiBinding api = DhFarTerrain.api().get();
-            for (int j = 0; j < n; j++) {
-                for (int i = 0; i < 4 * n; i++) {
+            // Distant Horizons answers a column it does not hold by waiting for its section
+            // (DhApiTerrainDataRepo: getAsync(..).get()), which can wait on this server thread: each
+            // lookup runs on a thread of its own with a time limit, and the first that runs out ends
+            // the lookups (recorded, so the check fails instead of the server hanging).
+            java.util.concurrent.ExecutorService lookups = java.util.concurrent.Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r, "deeptime-dh-check");
+                t.setDaemon(true);
+                return t;
+            });
+            boolean timedOut = false;
+            for (int j = 0; j < n && !timedOut; j++) {
+                for (int i = 0; i < 4 * n && !timedOut; i++) {
                     int x = x0 + (i / 4) * spacing + OFFSETS[i % 4][0], z = z0 + j * spacing + OFFSETS[i % 4][1];
                     if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) != null) {
                         generated++;   // a loaded chunk: Distant Horizons holds the chunk's own column there
                         continue;
                     }
                     try {
-                        List<DhApiBinding.StoredPoint> stored = api.storedColumn(bound.levelWrapper(), x, z);
+                        java.util.concurrent.Future<List<DhApiBinding.StoredPoint>> lookup =
+                                lookups.submit(() -> api.storedColumn(bound.levelWrapper(), x, z));
+                        List<DhApiBinding.StoredPoint> stored;
+                        try {
+                            stored = lookup.get(10, java.util.concurrent.TimeUnit.SECONDS);
+                        } catch (java.util.concurrent.TimeoutException e) {
+                            lookup.cancel(true);
+                            timedOut = true;
+                            o.addProperty("lookup_timed_out_at", x + ", " + z);
+                            continue;
+                        } catch (java.util.concurrent.ExecutionException | InterruptedException e) {
+                            throw new RuntimeException(e.getCause() == null ? e : e.getCause());
+                        }
                         if (stored == null || stored.isEmpty()
                                 || stored.stream().allMatch(p -> p.block() instanceof BlockState s && s.is(Blocks.AIR) || p.block() == null))
                             continue;
@@ -395,12 +417,13 @@ public final class FarTerrainCommand {
                                 example[0] = sb.toString();
                             }
                         }
-                    } catch (ReflectiveOperationException | RuntimeException e) {
+                    } catch (RuntimeException e) {
                         if (why.length() < 400)
                             why.append(e).append("; ");
                     }
                 }
             }
+            lookups.shutdownNow();
         }
         JsonObject stored = new JsonObject();
         stored.addProperty("asked", 4 * n * n - generated);
