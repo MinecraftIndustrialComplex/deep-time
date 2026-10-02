@@ -126,8 +126,8 @@ public final class GeothermalGameTests {
                         continue;   // another site's column, or none
                     int dx = geo.dx(x, s), dz = z - s.z();
                     Geothermal.Part part = s.part(dx, dz);
-                    int top = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, lx, lz) - 1;
-                    int surface = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, lx, lz) - 1;
+                    int top = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, lx, lz);
+                    int surface = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, lx, lz);
                     if (part.pool()) {
                         int depth = part.depth();
                         for (int y = s.level(); y > s.level() - depth; y--) {
