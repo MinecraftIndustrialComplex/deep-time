@@ -11,6 +11,10 @@ That is the point of a baseline: it is what tasks 2-5 must move. The recording c
 run computes (a test shows it), and the plates are exactly those of the first baseline (fa09e8b):
 every figure of the first table below that did not change its definition is the same to the digit.
 
+**Update 2026-10-02:** the section "Added 2026-10-02: the boundary mix and the arc heights" below
+adds five judged and many reported rows, and says how the rows above moved on master 1eac09f (general
+flexure on). The tables above are the baseline as first measured (master 38ca6b0).
+
 Reproduce (about 20 minutes a run at 2 threads on the test VM, two runs at a time):
 
     tools/remote/mac.sh -- tools/remote/detach.sh start pc tools/review/plate-check.sh 1000 2,3,4 supercontinent base
@@ -143,7 +147,7 @@ judged on):
 | Ocean floor, 90th percentile age, last step | 235 Myr | 228 269 233 208 | 208-269 |
 | Plate speed, median over all plates and steps | 72.6 mm/yr | 72.7 73.5 72.3 71.8 | |
 | Mean speed of plates with a slab on 20 % or more of their boundary / on less | 72.2 / 51.3 mm/yr | 71.9 72.7 72.9 71.4 / 49.9 52.8 48.7 53.8 | |
-| Slab-attached / other plate speed (mean speeds) | 1.41 | 1.44 1.38 1.50 1.33 | Earth: 3 to 4 (Forsyth and Uyeda) |
+| Slab-attached / other plate speed (mean speeds) | 1.41 | 1.44 1.38 1.50 1.33 | Earth: 3 to 4 (3.8 by means from Forsyth & Uyeda 1975 Table 1; "~4 times" Conrad & Lithgow-Bertelloni 2004; 3.0 Zahirovic et al. 2015; WP-13a) |
 | Correlation (Pearson) of plate speed with slab share of the boundary | 0.48 | 0.48 0.44 0.55 0.43 | |
 | Slab share of the boundary, mean over plates and steps | 0.47 | 0.46 0.51 0.48 0.45 | |
 | Mean speed of mostly oceanic / mostly continental plates | 70.6 / 47.1 mm/yr | 70.5 71.6 70.9 69.5 / 44.7 47.9 45.3 50.4 | |
@@ -158,6 +162,121 @@ judged on):
 | A plate above 40 %: time above it until a rift splits it, median | 17.8 Myr | 21 19 17 14 | |
 | Of those rifts: fragments all still separate 50 Myr later (strict) | 6.2 % | 6.3 11.8 6.7 0 | |
 | Of those rifts: two plates or more still hold the crust 50 Myr later (not healed whole) | 9.4 % | 0 17.6 20 0 | |
+
+## Added 2026-10-02: the boundary mix and the arc heights
+
+Two measures Ben asked for after a workbench run showed, 28 Myr after a supercontinent start,
+nearly every boundary between ocean plates as a subduction zone with a continuous high volcanic arc
+("Measure now, fix in the plate track", decisions log 2026-10-02). They are measurement only
+(`plates/dynamics.rs`, record version 3: `StepRec::mix_km`, `arc_oceanic`, `arc_continental`); the
+plate work (force-balance motion, the belts) is to be judged on them. Definitions: ledger PLT-220
+and PLT-221, science page `docs/science/plates.md`. Run on master 1eac09f plus this task, the same
+setup as above (`earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1-4, `stage volcanoes`;
+seed 1 again with `structure.deformation.density=0` for the structure-stage panic, which cannot
+change the plate record). Values are the mean of the four runs; "runs" are seeds 1, 2, 3, 4.
+Reproduce:
+
+    tools/remote/mac.sh -- tools/remote/detach.sh start m1 env R=<scratch> tools/review/plate-check.sh 1000 1 supercontinent base:structure.deformation.density=0
+    tools/remote/mac.sh --no-sync -- tools/remote/detach.sh start m2 env R=<scratch> tools/review/plate-check.sh 1000 2 supercontinent base
+    (then seeds 3 and 4 the same way, two runs at a time; a last call with seeds 1,2,3,4 prints the mean table)
+
+**What is counted.** Boundary length is one sample spacing (about 70-80 km on the Earth-normalized
+sphere) per boundary sample: a subduction front counts a whole spacing, once (the overriding side,
+as `PlateStep::front_km` does), a spreading or other boundary half a spacing from each side. Kinds:
+subducting (an oceanic slab under oceanic crust, "ocean-ocean", or under continental crust,
+"ocean-continent"), collision (continental crust on the subducting side), spreading (ridge, and rift
+when a side is continental), other (transform, or converging with no contact yet). Arc cells are the
+visible samples that received arc magma in the step (the code's own `ARC` flag); an oceanic arc is
+one whose arc crust was oceanic when the magma came, a continental arc the rest. Elevations are the
+plate model's, m above its sea datum, before the later stages (the volcano stage's cones and the
+surface stage's amplification are not in them).
+
+### Judged against Earth
+
+| Measure | Value | Runs | Earth and source | Target | Result |
+|---|---|---|---|---|---|
+| Subducting share of the boundary length, mean over the run after the first 100 Myr | 55.9 % | 55.5 54.9 56.9 56.4 | 19.7 %: subduction zones 51,310 km of 260,487 km (Bird 2003, Table 3; PLT-213) | 15-25 % (PLT-214) | FAIL |
+| Oceanic arc cells above sea level, share of the arc cells | 14.4 % | 13.6 12.4 17.5 14.3 | 23 % of the active Mariana arc centres (6 of 26; Baker et al. 2008, abstract), at least 30 % of 696 arc volcanoes submarine (de Ronde et al. 2003, abstract); PLT-215 | 10-35 % | pass |
+| Oceanic arc crest (90th percentile elevation) | 312 m | 248 153 523 324 | submarine arc summits and vents 250-1,660 m down (de Ronde et al. 2003; PLT-216), highest island-arc cones about 1 km (from memory; PLT-217) | -1,700 to 1,000 m | pass |
+| Continental arc cells, median elevation | 1,670 m | 1,650 1,574 1,760 1,696 | Cascades basement 1.2-2 km (Hildreth 2007); Andean arc on a 4.5 km plateau (Gregory-Wodzicki 2000); PLT-218 | 1,200-4,500 m | pass |
+| Continental arc crest (90th percentile elevation) | 2,874 m | 2,881 2,770 2,958 2,889 | a dozen Cascade cones above 3 km, two above 4 km (Hildreth 2007); Andean stratovolcanoes above 6 km (from memory); PLT-219 | 2,000-6,000 m | pass |
+
+The check now meets 13 of its 41 ranged targets (above: 10 of 36). Of the 5 new ones, 4 pass; the
+one that fails is the boundary mix. The ranges are the agent's choice around the Earth anchors
+(ledger rows say which part of each is read, abstract-only or from memory); the Earth anchors for
+the oceanic arc are counts of volcanoes and vent depths, the model's are cells and elevations, so
+the comparison is loose.
+
+### Reported, not judged
+
+| Measure | Value | Runs | Earth (Bird 2003, Table 3) |
+|---|---|---|---|
+| Plate boundary, total length per step | 340,885 km | 344,218 339,321 342,808 337,195 | 260,487 km |
+| Subducting length per step | 191,174 km | 191,474 185,715 195,389 192,117 | 51,310 km |
+| Spreading (ridge and rift), share of the length | 39.5 % | 39.6 40.2 38.6 39.6 | 36.4 % (OSR 25.8 + CRB 10.5) |
+| Collision (continental crust on the subducting side), share | 3.25 % | 3.53 3.38 3.46 2.62 | 8.8 % (continental convergent) |
+| Transform or converging with no contact yet, share | 1.32 % | 1.35 1.56 1.05 1.33 | 28.4 % transform (OTF + CTF), 6.7 % oceanic convergent without arc |
+| Ocean-ocean share of the subducting length | 50.1 % | 47.6 51.3 49.1 52.3 | not split by Bird |
+| Oceanic arc cells, median elevation | -2,146 m | -2,298 -2,301 -1,822 -2,162 | (the band includes flanks, so not judged) |
+| Oceanic and continental arc cells per step, mean | 3,000 and 2,571 | 2,925 3,078 2,927 3,072 and 2,651 2,407 2,754 2,473 | |
+
+**The first 50 Myr after the start** (the window in which the run Ben looked at showed the
+problem), mean of the four runs; runs in brackets:
+
+| Measure | First 50 Myr | After the first 100 Myr |
+|---|---|---|
+| Subducting share of the boundary | 49.9 % (48.7 52.3 47.2 51.4) | 55.9 % |
+| Ocean-ocean share of the subducting length | 63.4 % (60.9 61.8 62.7 68.1) | 50.1 % |
+| Spreading share | 48.0 % (48.8 46.3 50.3 46.5) | 39.5 % |
+| Collision share | 0.73 % (0.84 0.63 0.69 0.76) | 3.25 % |
+| Other share | 1.39 % (1.64 0.70 1.85 1.39) | 1.32 % |
+| Oceanic arc cells above sea level | 23.6 % (22.2 28.2 22.8 21.2) | 14.4 % |
+| Oceanic arc crest | 743 m (722 875 764 609) | 312 m |
+| Continental arc crest | 2,719 m (2,694 2,765 2,794 2,624) | 2,874 m |
+
+**What the numbers say.**
+
+- The model's boundary is dominated by subduction: 56 % of its length against Earth's 20 %, and in
+  kilometres 191,000 against 51,000 (3.7 times Earth) on a boundary that is only 1.3 times Earth's
+  total. Its spreading share is close to Earth's (39.5 against 36.4 %), so the surplus of subduction
+  stands where Earth has transform and oceanic-convergent boundaries (35 %); the model has almost no
+  "other" (1.3 %). One cause is in the classification: the model's tests are signs only (a sample is
+  divergent or converging), with no azimuth tolerance like Bird's +-20 degrees for strike-slip, so
+  strike-slip and oblique boundaries become fronts or spreading. How much of the surplus is that and
+  how much is real over-subduction was not separated.
+- In the first 50 Myr the subducting share is already 50 %, 63 % of it ocean-ocean, so the ocean-ocean
+  subduction Ben saw is in the record.
+- The arc heights do not show snow-capped arcs between ocean plates in the plate model's own
+  elevation: oceanic arcs are mostly submarine (14 % of cells emerge, 24 % in the first 50 Myr, a
+  crest of 312 m, 743 m early) and continental arcs stand at 1.7 km median, 2.9 km crest. They are
+  inside the Earth ranges above. What Ben saw may therefore come from stages that add to the plate
+  elevation (the volcano stage's cones, the surface stage's amplification). That was not checked
+  here.
+
+### Other rows moved: master now has general flexure on
+
+The baseline above (master 38ca6b0 plus tasks 1 and 1b) is not reproduced by master 1eac09f: the
+flexure feature (on in the built-in presets) and other merges changed the plate runs themselves
+(elevation feeds back into the plates). Not this task's doing. The rows that moved most, mean of
+seeds 1-4, before then after: largest plate, median share 0.58 then 0.45; steps with one plate above
+50 % 58.7 then 40.8 %; plates above 5 % 3.75 then 4.25; median plate lifetime 45 then 41.5 Myr;
+rift-born plates alive after 50 Myr 18.7 then 24.1 %; welded back within 50 Myr 41.9 then 31.8 %;
+land raised by one collision in one step 4.47 then 2.37 %; most land gained in a step 3.75 then
+2.34 %; collisions per 100 Myr 10.0 then 11.3; continental crust, lowest step 0.40 then 0.29 (the
+target of at least 0.37 now fails), highest step 0.48 then 0.45; land, median share 0.31 then 0.29;
+supercontinent tenure 44.8 then 33.5 Myr; assembly period 76 then 69 Myr; plate speed RMS 57.0 then
+59.6 mm/yr; sea floor older than 180 Myr 13.2 then 12.5 %, older than 250 Myr 5.1 then 4.2 %;
+steps on which the speed guard binds 369 then 375. The old rows' targets met: 9 of 36 (10 before).
+The earlier tables' wording and figures above are left as they were measured.
+
+### Cost
+
+The same 300 Myr plates run with and without the whole record (`DEEPTIME_NO_PLATE_DYNAMICS=1`),
+both at once on the test VM, plates-stage seconds for 150 steps: seed 1 80.1 against 78.8 s (+1.6 %),
+seed 2 91.5 against 89.2 s (+2.6 %). Task 1b's recording alone measured within 0.5 %, so the two
+new measures cost about 1-2 % of the plates stage (10-15 ms a step at 16k samples; about 0.5 % of
+a whole run, the plates stage being a quarter of it). The record grows by 16 numbers a step (`mix_km`,
+two arrays of 5), about 50 KB of JSON per 1000 Myr run (seed 1: 1.05 MB in all).
 
 ## Does it agree with the designs?
 

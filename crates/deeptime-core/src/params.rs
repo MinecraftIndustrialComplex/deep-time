@@ -547,7 +547,7 @@ pub struct TectonicParams {
     /// `docs/design/plate-force-balance.md`): with it off the planets are master's, and with it on
     /// the plate-check measures move both ways (docs/design/plate-check-baseline.md, task 2).
     /// Task 4 removes it.
-    // ledger: PLT-218 (game-choice, interim; the agent of plate-motion task 2, 2026-10-02).
+    // ledger: PLT-227 (game-choice, interim; the agent of plate-motion task 2, 2026-10-02).
     pub collision_on_shortening: bool,
     /// Oceanic crust older than this, on a plate that subducts nowhere, can start subducting on
     /// its own (Wilson cycle), Myr.

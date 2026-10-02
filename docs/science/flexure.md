@@ -5,7 +5,7 @@ their sources (ISO-041, ISO-042, ISO-048); the rest are marked in the ledger as 
 uncited, or game choices. The measurements are from small ensembles of four runs; two of them
 were made before the last change of one constant (see "Earth against the mod").
 
-Ledger ids on this page: `ISO-040` to `ISO-067` (see [ledger/ISO.md](ledger/ISO.md)).
+Ledger ids on this page: `ISO-040` to `ISO-069` (see [ledger/ISO.md](ledger/ISO.md)).
 
 ## What you see in the world
 
@@ -38,15 +38,20 @@ and the spreading of over-thick crust.
    shell is. Ocean floor stiffens with age. Continental crust is weak just after mountain
    building and stiffens over a few hundred million years. Volcanic arcs and rifts are weak. The
    boundary between two plates is a break: one plate does not hold the other up.
-3. **The solve.** The shell is treated as a thin elastic plate floating on a fluid. The stage
-   solves for how far it sinks under the whole load.
+3. **The solve.** The shell is treated as a thin elastic plate floating on a fluid. The plate
+   carried from the last step is in balance with the load it carries; the stage solves only for
+   how far it sinks or rises under this step's change of load. The plate model's uplift counts
+   only as far as the plate model resolves it: its samples are about 71 km apart (in the plate
+   model's Earth-sized kilometres), and what changes from cell to cell below that is left to float
+   on its own, as the plate model made it.
 4. **The result.** The ground is moved by the difference between that sinking and the sinking
    already built into it. The plate model raises ground as if every load floated on its own, so
    that part is already there; erosion, deposition, cones, water and ice have nothing built in.
 
 When the stiffness is set to nothing, step 4 gives exactly the local floating the model had
 before. When crust cools and stiffens, the plate keeps the shape it has; only loads added later
-meet the stiffer plate.
+meet the stiffer plate. When it weakens (reheated, or becoming a plate's broken edge) its bending
+stress is released and the ground moves to the new balance.
 
 The plate model then reads the surface's new heights, as it does for erosion.
 
@@ -78,8 +83,10 @@ The plate equation, as coded (ISO-040):
 | ISO-051 | Continental recovery | `80 × (1 − e^(−t/300 Myr))` | km | form after Lu et al. 2024; the numbers are the agent's | `uncited` |
 | ISO-052 | Lowest `Te` | 5 | km | Lu et al. 2024 | `abstract-only` |
 | ISO-053 | Arcs and rifts | at the lowest `Te` | km | none | `uncited` |
-| ISO-055 | Plate boundaries | at the lowest `Te`, the next row half way | km | none | `uncited` |
-| ISO-056 | Stiffening | new rigidity joins at the plate's present shape | – | principle: Watts 1978 | `abstract-only` |
+| ISO-055 | Plate boundaries | at the lowest `Te`; the boundary cells blurred, the share of stiffness kept `1 − 2.5 × blur` (0, then 0.17 and 0.72 on a straight boundary) | km | none | `uncited` |
+| ISO-056 | Stiffening and weakening | the plate carries its bending moment; gained rigidity joins stress-free, lost rigidity releases the moment in proportion | – | principle: Watts 1978 | `abstract-only` |
+| ISO-068 | Increments | each step solves for the step's loads only; the carried plate is in balance; a solve's unfinished part is carried | – | none | `game-choice` (numerical) |
+| ISO-069 | The plate model's resolution | its root bends the plate only low-passed at its sample spacing (two binomial passes on the quick presets) | – | none | `game-choice` (numerical) |
 | ISO-061 to ISO-064 | What counts as a load | see the ledger | | none | `uncited`, one `game-choice` |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
@@ -93,10 +100,10 @@ ISO-054 and ISO-057 to ISO-060, all `game-choice`.
 | Sinking under a point load | `P l² / 8D` | Brotchie & Silvester 1969, as quoted by Wickert 2016 | within 3 % | unit test `a_point_load_sinks_by_the_analytic_depth` |
 | Volcanic island on old ocean floor | Hawaii: about 5 km of sinking under Oahu (Bianco et al. 2005, quoting Watts & ten Brink 1989; secondary) | secondary | an island held up by 600 m with a ring up to 480 m low round it | `earthlike_quick_16k`, scattered start, 500 Myr, seed 1, 2026-10-02, oceanic law 3.0 km/√Myr |
 | Foredeep in front of a collision belt | 100–300 km wide, 2–8 km of fill | DeCelles & Giles 1996, full text | bands of about 100 m beside the largest belt: none of Earth's size | the same run |
-| Median sea depth | 4,062 m | GMT earth_relief (build log, P1-17) | 3,408 m without flexure, 3,843 m with (4 runs each) | `earthlike_quick_16k`, 500 Myr, seeds 1–2, both starts, 2026-10-02, `tools/review/p1-17-hyps.sh`, oceanic law 2.7 |
+| Median sea depth | 4,062 m | GMT earth_relief (build log, P1-17) | 3,408 m without flexure, 4,053 m with (4 runs each) | `earthlike_quick_16k`, 500 Myr, seeds 1–2, both starts, 2026-10-02, `tools/review/p1-17-hyps.sh`, oceanic law 2.7, after the artifact fixes |
 
-The island and foredeep rows are from a run made with the oceanic law at 3.0 km/√Myr, before
-the code was set to the measured 2.7 of ISO-048; the sea-depth row is from the ensemble after it.
+The island and foredeep rows are from a run of the first build (oceanic law 3.0 km/√Myr, before
+the artifact fixes); the sea-depth row is from the final code (law 2.7, after the fixes).
 
 ## Simplifications and limits
 
@@ -111,8 +118,12 @@ the code was set to the measured 2.7 of ISO-048; the sea-depth row is from the e
 - On the quick presets a flexural feature is 2 to 8 cells wide.
 - Trenches and the ocean floor's deepening with age are not flexure in the model; they are
   prescribed by the plate model.
-- Along active margins the result alternates from cell to cell, and the land's cell-to-cell
-  roughness is higher than without flexure (99th percentile 294 → 391 m in one pair of runs).
+- Along active margins the ground still zigzags from cell to cell somewhat more than without
+  flexure: narrow loads that are real at this resolution (marine fill of kilometres in trench
+  cells) and the release of bending stress where a plate boundary moves through cells. The first
+  build zigzagged far more, for three numerical reasons now fixed (build log 2026-10-02, the
+  flexure follow-up; design note section 13): the carried state acting as a force, a stair-stepped
+  plate boundary, and the plate model's sample lattice treated as a load.
 
 ## Game choices
 
