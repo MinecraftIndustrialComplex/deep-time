@@ -321,6 +321,17 @@ essentials (`deeptime:essentials`) still guarantee an exposed iron and coal depo
 4,096-block region and within 2,048 blocks of the spawn. The probe assumes every block in the
 square is found, so it compares worlds; it is not a mining time.
 
+**Deposits within reach.** Of the 269 sites of the measured planet 196 lie under the sea (land is
+0.197 of it). Counting the sites not under the sea that hold at least 64 ore-equivalent, and
+taking the mean distance from a land point to the nearest as 0.5 / √(sites per land area) (an
+estimate from the site list, not a probe): coal 26 → 25 deposits, about 430 → 440 blocks; copper
+one porphyry before and after, about 2,200 blocks; iron none before and none after (the one
+iron-formation site is under the sea; at a basin share of 0.05, 6 land deposits, about 900
+blocks). The measured runs carry no essentials (the built-in presets list none; a world made in
+the game takes `deeptime:essentials`: a site of iron and of coal in every 4,096-block land
+region, of copper in every 8,192-block one), so a game world's nearest iron and copper deposit is closer
+than these figures; that was not measured.
+
 ## Simplifications and limits
 
 - **One density per type, flat over the tract.** Singer et al. 2005 found porphyry density falls
