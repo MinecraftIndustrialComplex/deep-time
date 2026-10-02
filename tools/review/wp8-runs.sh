@@ -12,6 +12,9 @@
 #       WP8_LENGTH override the scratch folder, the start and the length (the vertical-scale task:
 #       WP8_RUNS=…/def-scale WP8_START=supercontinent WP8_LENGTH=1000).
 #   tools/remote/mac.sh -- tools/review/wp8-runs.sh gates     (fmt, clippy, deny, cargo test, gradlew)
+#   tools/remote/mac.sh --server --pack -- tools/review/wp8-runs.sh gametest
+#       ./gametest.sh, tools/smoke/install.sh mic, ./gametest.sh -PwithMic under one hold of the
+#       server lock; full outputs in $WP8_RUNS/gt-standalone.out, install-mic.out and gt-mic.out
 #   tools/remote/mac.sh --no-sync -- tools/review/wp8-runs.sh status
 #   tools/remote/mac.sh --no-sync -- tools/review/wp8-runs.sh clean
 set -euo pipefail
@@ -49,6 +52,17 @@ case "${1:-}" in
         cargo test --workspace --no-fail-fast 2>&1 | grep -E "^test result|FAILED|panicked"; echo "test=${PIPESTATUS[0]}"
         (cd neoforge && ./gradlew build test -q 2>&1 | tail -5; echo "gradle=${PIPESTATUS[0]}"; \
             python3 ../tools/ci/junit-summary.py build/test-results/test 2>&1 | tail -3)
+        ;;
+    gametest)
+        # Both GameTest gates, in the foreground (the caller holds the server lock).
+        set +e
+        ./gametest.sh > "$RUNS/gt-standalone.out" 2>&1; echo "gametest=$?"
+        tail -n 4 "$RUNS/gt-standalone.out"
+        grep -E "GAME TESTS COMPLETE|required tests (failed|passed)" neoforge/build/gametest.log | tail -3
+        tools/smoke/install.sh mic > "$RUNS/install-mic.out" 2>&1; echo "install_mic=$?"
+        ./gametest.sh -PwithMic > "$RUNS/gt-mic.out" 2>&1; echo "gametest_mic=$?"
+        tail -n 4 "$RUNS/gt-mic.out"
+        grep -E "GAME TESTS COMPLETE|required tests (failed|passed)" neoforge/build/gametest.log | tail -3
         ;;
     status)
         for f in "$RUNS"/*.log; do
