@@ -3,7 +3,7 @@
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02, package WP-2)`.
 
 Ledger ids on this page: `VOL-001` to `VOL-074` ([ledger/VOL.md](ledger/VOL.md)) and `MAG-001` to
-`MAG-056` ([ledger/MAG.md](ledger/MAG.md)). Of these 130 rows (the 14 rows MAG-043 to MAG-056 of 2026-10-02 are all `game-choice`; the tallies in the next sentence are those of the first 116), 84 are `game-choice`, 25 `uncited`,
+`MAG-057` ([ledger/MAG.md](ledger/MAG.md)). Of these 131 rows (the 15 rows MAG-043 to MAG-057 of 2026-10-02 are all `game-choice`; the tallies in the next sentence are those of the first 116), 84 are `game-choice`, 25 `uncited`,
 2 `verified`, 2 `abstract-only`, 1 `cited-unverified` and 2 `calibrated` (after stage 2: 81 `game-choice`, 28
 `uncited`, 1 `calibrated`; stage 1: 47 `game-choice`, 63 `uncited`, 4 `cited-unverified`, 1 `calibrated`).
 Ben's decisions of 2026-10-02 changed three defaults and added one setting (see "Decisions of 2026-10-02").
@@ -374,6 +374,7 @@ What these runs show:
 | A crust-deep column of stacked lava lenses in altered hot rock under every active volcano (MAG-043 to MAG-056) | "the amount of lava inside of them is truly pathetic": the old system stopped 150 blocks down; real arc systems are vertically extensive and stacked (Edmonds et al. 2019; Cashman et al. 2017, not opened) | Ben, decisions log 2026-10-02 ("Crust-deep magma system (Recommended)") |
 | One chamber shape at one depth, 3 km (MAG-002 to MAG-005) | a body a player can find under every active volcano; 3 km lies inside Earth's range | agent, build log 2026-10-01, under Ben's "Volcanoes is a go ahead" |
 | A quarter of able volcanoes have an open lava lake (MAG-019), though persistent lava lakes are rare on Earth | "a player should be able to find one" | agent, build log 2026-10-01 |
+| Vanilla's cave carvers are kept 6 blocks from the underwater face of a sea cliff (MAG-057) | the carvers cut arches into the underwater base of the sea cliffs beside a volcano; the arches are an artefact of the carvers, not geology | Ben's report, 2026-10-02 (the setting is `sea_cliff_skin_blocks`; 0 gives vanilla's carving) |
 | Lava is sealed in smooth basalt and never touches water (MAG-010, MAG-011, MAG-041) | lava pools were found overlapping the ocean | agent, build log 2026-10-01, after Ben's report |
 | Arc volcanoes at least 60 km apart (VOL-039) | keeps the doubled cones apart; one cone stands for a large long-lived centre | agent, build log 2026-09-30; reviewed WP-2 2026-10-02 |
 | Summit crater at least 2 km across (VOL-026) | a real crater would be under three blocks wide | agent, build log 2026-09-30 |
