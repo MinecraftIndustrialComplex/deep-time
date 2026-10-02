@@ -1548,6 +1548,8 @@ contiguous provinces); Java maps province id → region index by a deterministic
 TerraBlender's registered regions and their weights, stored in `climate_mapping.json`. One Biomes
 O' Plenty region therefore covers whole provinces rather than TerraBlender's own tessellation.
 MIC has no TerraBlender, so this is tested in the `-PwithTerraBlender` profile (P1-10).
+*(As built, 2026-10-01: TerraBlender 4.1.0.8 has no `uniqueness` density function, so the four mixins
+above reduce to one on `MultiNoiseBiomeSource.getNoiseBiome`; see P1-10's "As built" in §10.)*
 Lithostitched's own `region` registry (used by Regions Unexplored, not in MIC) is out of scope.
 
 ### 7.4 Steering mod sky biomes onto simulated sky islands (Phase 3)
@@ -3659,6 +3661,35 @@ a smoke benchmark and again at the end.
   points in one province share a region index; points below the fallback depth use TerraBlender's
   own index).
 - **Ben reviews.** A viewer layer of provinces coloured by TerraBlender region.
+- *As built (P1-10):* **TerraBlender 4.1.0.8 has no `uniqueness` density function and no per-sampler
+  uniqueness**, so §7.3's four ReTerraForged mixins and `RegionIndexDensity` were not needed (nothing of
+  ReTerraForged is used; `NOTICE.md` unchanged). TerraBlender picks a region in
+  `MixinMultiNoiseBiomeSource.getNoiseBiome` (HEAD, cancellable) from `IExtendedParameterList.
+  getUniqueness(x, y, z)`, a layered noise of (x, z) alone, on a parameter list that every level on the
+  overworld preset shares. Deep Time's mixin `mixin/compat/terrablender/RegionBiomeSourceMixin`
+  (priority 900, so its handler runs before TerraBlender's), answers first for a Deep Time level's
+  sampler only: the noise settings the generator binds (`GeologicChunkGenerator.bindSettings`) carry a
+  `worldgen/RegionSpawnTarget`, a list wrapping the real spawn target and the level's
+  `worldgen/RegionSource` (baked province at the column → region index), and `Climate.Sampler.
+  spawnTarget()` is the one thing a biome query is given that is per level. It searches the region's
+  tree (`compat/terrablender/RegionTrees`, the body of TerraBlender's `findValuePositional`); anything
+  else falls through. **There is no fallback depth**: TerraBlender's uniqueness ignores y, so a province
+  holds its region at every depth (plan: "points below the fallback depth use TerraBlender's own
+  index"), and cave biomes come from the region's tree as in TerraBlender. Province → region is
+  `climate/ProvinceRegions` (stratified by weight, stored by region name in `climate_mapping.json`
+  `regions`; FORMAT.md, "The geologic provinces and TerraBlender's regions"). **The bake's provinces are
+  the USGS classes** (decisions log 2026-09-29): `bake/meta.rs` runs `provinces::derive_with` and cuts
+  the classes into contiguous provinces; the preset's `provinces` section (editor: Advanced · Biome
+  placement and regions) holds `min_area_km2` (50,000) and the three orogen thresholds. The classified
+  orogen share is 0.42 of the continents on `earthlike_quick_16k` (Earth ~0.17): a third of it is the
+  plate model's active collision and arc regime (0.125), which no threshold moves; the thresholds only
+  take it to ~0.24–0.33 (STATUS, P1-10 build log). The test is `TerraBlenderGameTests.
+  regionsFollowProvinces` (+ `TerraBlenderChecks`); `/deeptime probe regions [step]` writes the grid for
+  `tools/review/region_map.py` (smoke: `tools/review/p1-10-smoke.sh`). A second mixin, `RegionChunkBiomesMixin`,
+  hands the bound spawn-target list to the sampler a *generated chunk* builds: `NoiseBasedChunkGenerator.
+  doCreateBiomes` passes `this.settings.value().spawnTarget()`, the registry's list, so without it chunks
+  were still drawn from TerraBlender's own regions while queries and far terrain followed the provinces
+  (`regionsFollowProvinces` reads the stored biomes of 64 generated chunks).
 
 #### P1-11 Customize editor, timelapse and staging
 - **Goal.** §7.12's screens, backed by a client-free model that GameTests can drive.

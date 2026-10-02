@@ -69,8 +69,9 @@ pub struct UndergroundParams {
     pub remove_lava_features: bool,
     /// How many geothermal fields (hot springs, sinter and travertine terraces, fumaroles,
     /// altered ground) each active volcano gets, as a multiple of the default (P2-14): the
-    /// default is one to four fields, more at the more active and larger volcanoes. 0: no
-    /// geothermal features anywhere.
+    /// count is floor(density × (0.7 + 2.3 activity) × clamp(sqrt(R / 45), 0.6, 2.2) + u), from none
+    /// at a small, quiet volcano to seven at a large, active one, more at the more active and
+    /// larger volcanoes (ledger: GEO-001, GEO-014). 0: no geothermal features anywhere.
     pub geothermal_density: f64,
     /// How far from a volcano's summit its fields may lie, in basal radii. The fields cluster
     /// toward the summit and the lower flanks; 1 keeps them on the edifice.
@@ -79,8 +80,8 @@ pub struct UndergroundParams {
     /// a fumarole's field of altered ground).
     pub geothermal_size: f64,
     /// A field is a field of hot springs only where the year's rain (mm, from the baked
-    /// climate) reaches this much and the mean temperature stays above freezing; drier or colder
-    /// ground gets fumaroles and bare altered ground instead.
+    /// climate) reaches this much and the mean temperature is at least 3 °C; drier or colder ground gets
+    /// fumaroles and bare altered ground instead. 400 mm is a game choice (ledger: GEO-007).
     pub geothermal_spring_min_precip_mm: f64,
 }
 
@@ -93,10 +94,10 @@ impl Default for UndergroundParams {
             magma_chamber_size: 1.0,     // ledger: MAG-006
             crater_lake_share: 0.25,     // ledger: MAG-019
             remove_lava_features: true,  // ledger: MAG-034
-            geothermal_density: 1.0,
-            geothermal_reach: 1.0,
-            geothermal_size: 1.0,
-            geothermal_spring_min_precip_mm: 400.0,
+            geothermal_density: 1.0, // ledger: GEO-001 (game-choice)
+            geothermal_reach: 1.0,   // ledger: GEO-003 (game-choice)
+            geothermal_size: 1.0,    // ledger: GEO-005 (game-choice)
+            geothermal_spring_min_precip_mm: 400.0, // ledger: GEO-007 (game-choice)
         }
     }
 }

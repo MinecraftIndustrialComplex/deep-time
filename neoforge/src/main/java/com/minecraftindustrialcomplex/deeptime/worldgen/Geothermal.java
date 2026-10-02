@@ -27,7 +27,7 @@ import java.util.SplittableRandom;
  * <p><b>What.</b> The setting at a field decides its kind:
  * <ul>
  *   <li>near the summit, or where the year's rain is under {@code geothermal_spring_min_precip_mm}, or
- *       where the mean temperature is near freezing: a <b>fumarole field</b>: vents (hot ground,
+ *       where the mean temperature is under 3 °C ({@link #POOL_MIN_C}): a <b>fumarole field</b>: vents (hot ground,
  *       a crust of native sulfur around each) in discs of bleached and stained altered ground;</li>
  *   <li>elsewhere, where groundwater is plentiful and the ground does not freeze: a <b>hot-spring
  *       field</b>: a main pool and one to three smaller ones, in a chain down the slope where there
@@ -50,17 +50,30 @@ import java.util.SplittableRandom;
 public final class Geothermal {
 
     /** The most ground a pool may cut away uphill to sit level, blocks, and the most dam its rim and bed may build downhill. */
-    public static final int CUT = 6, DAM = 6;
+    public static final int CUT = 6, DAM = 6; // ledger: GEO-034 (game-choice)
     /** Ground under this many blocks above the sea takes no site (coast, flood plain, tidal reach). */
-    public static final int MIN_ABOVE_SEA = 3;
-    /** A mean temperature under this, °C, freezes standing water: such a field has no pools. */
+    public static final int MIN_ABOVE_SEA = 3; // ledger: GEO-017 (game-choice)
+    /**
+     * A field whose annual mean temperature is under this, °C, has no pools. Not physics: real hot
+     * springs do not freeze at a 3 °C mean. It is a game rule, because vanilla's top-layer freezing
+     * would put ice on a hot pool (ledger: GEO-020, game-choice).
+     */
     public static final double POOL_MIN_C = 3.0;
-    /** Fields nearer the summit than this share of the basal radius are fumarolic whatever the rain. */
+    /**
+     * Fields nearer the summit than this share of the basal radius are fumarolic whatever the rain.
+     * The pattern (steam vents and acid-sulfate ground near the summit, neutral-chloride springs
+     * lower down) is read in Paulson and Ingebritsen 1991 (USGS WRI 90-4201); the 0.35 is a game
+     * choice (ledger: GEO-018).
+     */
     public static final double SUMMIT_ZONE = 0.35;
     /** The rock window checked for carbonate under a field, blocks under the ground. */
-    public static final int CARBONATE_WINDOW = 150;
+    public static final int CARBONATE_WINDOW = 150; // ledger: GEO-023 (game-choice)
 
-    /** Peak warming over the climate, K, at the heart of each kind of site (the warm-ground signal). */
+    /**
+     * Peak warming over the climate, K, at the heart of each kind of site (the warm-ground signal).
+     * Capped far below a real vent (Yellowstone's fumaroles reach 138 °C) so that the temperature
+     * stays playable (ledger: GEO-044, game-choice).
+     */
     public static final double WARM_POOL = 10.0, WARM_VENT = 12.0, WARM_PATCH = 6.0;
     /** The warm-ground signal reaches this far (blocks) beyond a site's altered ground, falling linearly. */
     public static final int WARM_FADE = 4;

@@ -13,7 +13,9 @@
     "compat.createoreexcavation.OreVeinGeneratorMixin",
     "compat.createoreexcavation.OreDataMixin",
     "compat.createoreexcavation.RandomSpreadGeneratorMixin",
-    "compat.createdieselgenerators.OilChunksSavedDataMixin"
+    "compat.createdieselgenerators.OilChunksSavedDataMixin",
+    "compat.terrablender.RegionBiomeSourceMixin",
+    "compat.terrablender.RegionChunkBiomesMixin"
   ],
   "server": [
     "DedicatedServerFirstStartMixin"
