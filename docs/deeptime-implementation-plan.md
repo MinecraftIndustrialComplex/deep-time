@@ -3978,7 +3978,10 @@ on this machine.
   orographic model and rain shadows kept). The fast carbon/ice clock may stay banded, calibrated to
   the 2-D model's zonal means. Absorbs the per-cell sea ice asked for the same day.
 - **Order.** Design doc first (Opus), approved by Ben; building after the climate agent's
-  ice-sheet branch lands (same code).
+  ice-sheet branch lands (same code). The ice branch is merged with the flowing ice sheets off by
+  default (decisions log 2026-10-02, "Merge with ice sheets off"; STATUS build log 2026-10-02),
+  so P1-26 can start; turning the sheets on (`climate.ice_dynamics`) once the per-cell climate
+  has fixed the cold bias is part of P1-26's calibration.
 - **Check.** Set out in the design doc (Earth-topography comparison, Köppen shares, energy balance,
   run-time budget, downstream recalibration).
 - **Design** (2026-09-30, awaiting Ben's approval): `docs/design/p1-26-per-cell-climate.md`. It
