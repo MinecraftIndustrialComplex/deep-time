@@ -39,6 +39,7 @@ pub mod check;
 pub mod collision;
 pub mod dynamics;
 pub mod events;
+pub mod forces;
 pub mod geometry;
 pub mod hotspots;
 pub mod init;
@@ -200,6 +201,15 @@ impl PlatesStage {
         let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
         let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
+        // The force balance, recorded and not applied (`forces.rs`; nothing when the record is
+        // off).
+        let balance = forces::record(
+            st,
+            &cache.geo,
+            &pos,
+            &env,
+            forces::flow_axis(self.preset.seed),
+        );
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
         let mut sutured = false;
         for (c, seeds) in &resolved.collisions {
@@ -281,6 +291,7 @@ impl PlatesStage {
                 front_km: &pull.front_km,
                 mix_km,
                 arcs,
+                forces: balance.as_ref(),
             },
         );
         self.done = step;

@@ -135,7 +135,18 @@
     ],
     "contact_timeout_steps": 12,
     "collision_orogeny_myr": 30.0,
-    "l1_every_steps": 1
+    "l1_every_steps": 1,
+    "plate_speed_scale_mm_yr": 45.0,
+    "slab_pull": 1.0,
+    "slab_depth_km": 700.0,
+    "slab_breakoff_myr": 10.0,
+    "slab_resistance": 3.0,
+    "slab_suction_share": 0.3,
+    "edge_energy": 0.1,
+    "keel_drag": 3.0,
+    "boundary_resistance": 3.0,
+    "mantle_flow_mm_yr": 5.0,
+    "motion_relax_myr": 6.0
   },
   "surface": {
     "k_spl": 2e-09,

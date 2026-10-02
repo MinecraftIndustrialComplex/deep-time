@@ -19,7 +19,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
 
-use super::dynamics::{BeltRec, Dynamics, MIX_CLASSES, PlateLife, PlateStep, StepRec};
+use super::dynamics::{
+    BeltRec, Dynamics, MIX_CLASSES, PlateForces, PlateLife, PlateStep, StepRec,
+};
 use super::stats::Margins;
 
 /// One measure: its key, label, unit, range (inclusive; `None` is open) and how it is taken.
@@ -72,7 +74,7 @@ const fn waits(
 }
 
 const WAITS_COLLISION: &str = "the collision state and belts (design tasks 2-3)";
-const WAITS_FORCES: &str = "the force balance (design task 5)";
+const WAITS_FORCES: &str = "a run recorded with the force balance (dynamics version 4)";
 const WAITS_MIX: &str = "a run recorded with the boundary mix and arc heights (dynamics version 3)";
 
 /// The measures in table order: first the ones with the design's §6 ranges, then the ones only
@@ -844,9 +846,12 @@ pub const MEASURES: &[MeasureDef] = &[
         None,
         None,
     ),
+    // The force balance (design task 5): recorded, not applied, so these say what the balance
+    // would do on today's geometry (open loop), against today's motion. Reported only: the
+    // design's section 7 targets judge the motion after the switch (task 7).
     waits(
         "force_slab_pull_share_p50",
-        "Share of a plate's driving torque that is slab pull, median (needs the force budget)",
+        "Share of a plate's driving torque that is slab pull (by size, of pull, suction, edge energy and mantle flow), median over plates of 30+ samples",
         "share",
         None,
         None,
@@ -854,7 +859,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "megaplate_stress_mpa_p50",
-        "Mean in-plane stress of a plate above 40 %, median; tension positive (needs the force budget)",
+        "Mean in-plane stress of a plate above 40 %, median; tension positive",
         "MPa",
         None,
         None,
@@ -862,7 +867,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "megaplate_tension_pct",
-        "Steps in which a plate above 40 % is in tension (needs the force budget)",
+        "Steps in which a plate above 40 % is in tension",
         "%",
         None,
         None,
@@ -870,8 +875,152 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "slab_length_km_p50",
-        "Slab length per contact, median (needs slab tracking)",
+        "Slab length per subducting contact, median over contact-steps",
         "km",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "slab_breakoffs_per_100myr",
+        "Slab break-offs (continental crust held the trench for slab_breakoff_myr), per 100 Myr",
+        "per 100 Myr",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_rms_mm_yr",
+        "Balance (not applied): plate speed, area-weighted RMS, mean over steps (design target 35-55)",
+        "mm/yr",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_p10_mm_yr",
+        "Balance: plate speed, 10th percentile of plate-steps (target at most 20)",
+        "mm/yr",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_p50_mm_yr",
+        "Balance: plate speed, median of plate-steps (target 30-60)",
+        "mm/yr",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_p90_mm_yr",
+        "Balance: plate speed, 90th percentile of plate-steps (target 70-110)",
+        "mm/yr",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_norm_p10_mm_yr",
+        "Balance scaled each step to an RMS of 45 mm/yr (the design's open-loop test): speed, 10th percentile (design: 27-31)",
+        "mm/yr",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_norm_p50_mm_yr",
+        "Balance scaled to an RMS of 45 mm/yr: speed, median (design: 62-68)",
+        "mm/yr",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_norm_p90_mm_yr",
+        "Balance scaled to an RMS of 45 mm/yr: speed, 90th percentile (design: 95-109)",
+        "mm/yr",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_over_150_pct",
+        "Balance: plate-steps above 150 mm/yr (target at most 0.5)",
+        "%",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_over_250_pct",
+        "Balance: plate-steps above 250 mm/yr, where the guard of the switch would bind (target 0)",
+        "%",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_oceanic_over_continental",
+        "Balance: median speed, plates under 20 % continental / plates over 50 % (target at least 2)",
+        "ratio",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_slab_over_free",
+        "Balance: median speed, plates with 20 % or more of the edge on slab / under 5 % (target at least 2.5)",
+        "ratio",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_slab_rank_corr",
+        "Balance: speed against slab share of the edge, rank correlation (target at least 0.65)",
+        "rho",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_area_rank_corr",
+        "Balance: speed against plate area, rank correlation (target -0.4 to 0.2)",
+        "rho",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_rot_change_p50_pct",
+        "Balance: change of a plate's rotation per step, median (target at most 8)",
+        "%",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_rot_change_p90_pct",
+        "Balance: change of a plate's rotation per step, 90th percentile (target at most 20)",
+        "%",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_vs_motion_rank_corr",
+        "Balance against today's motion: rank correlation of the two speeds over plate-steps",
+        "rho",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "balance_over_motion_p50",
+        "Balance against today's motion: median of balance speed / today's speed over plate-steps",
+        "ratio",
         None,
         None,
         WAITS_FORCES,
@@ -907,6 +1056,11 @@ pub struct Params {
     pub rift_window_myr: f64,
     /// The boundary mix and the arc heights are also reported for the first this many Myr.
     pub early_myr: f64,
+    /// The RMS speed the balance's answers are scaled to, step by step, for the comparison with
+    /// the design's open-loop test (its `plate_speed_scale`), mm/yr.
+    pub balance_rms_mm_yr: f64,
+    /// The speed guard of the switch (the design raises `max_plate_speed_mm_yr` to it), mm/yr.
+    pub balance_guard_mm_yr: f64,
 }
 
 impl Default for Params {
@@ -922,6 +1076,8 @@ impl Default for Params {
             min_piece_share: 0.01,
             rift_window_myr: 50.0,
             early_myr: 50.0,
+            balance_rms_mm_yr: 45.0,    // ledger: CHK-058
+            balance_guard_mm_yr: 250.0, // ledger: CHK-059
         }
     }
 }
@@ -939,6 +1095,8 @@ impl Params {
         "min_piece_share",
         "rift_window_myr",
         "early_myr",
+        "balance_rms_mm_yr",
+        "balance_guard_mm_yr",
     ];
 
     /// Sets one parameter by name.
@@ -957,6 +1115,8 @@ impl Params {
             "min_piece_share" => self.min_piece_share = value,
             "rift_window_myr" => self.rift_window_myr = value,
             "early_myr" => self.early_myr = value,
+            "balance_rms_mm_yr" => self.balance_rms_mm_yr = value,
+            "balance_guard_mm_yr" => self.balance_guard_mm_yr = value,
             _ => {
                 return Err(format!(
                     "no parameter {key:?} (names: {})",
@@ -2139,11 +2299,15 @@ fn pending_physics(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static 
     let pull_share: Vec<f64> = d
         .steps
         .iter()
-        .flat_map(|s| s.forces.iter())
-        .filter_map(|f| {
-            let driving = f.slab_pull + f.slab_suction + f.edge_energy;
-            (driving > 0.0).then(|| f.slab_pull / driving)
+        .flat_map(|s| {
+            s.forces.iter().filter(|f| {
+                s.plates
+                    .iter()
+                    .find(|p| p.id == f.id)
+                    .is_some_and(|p| f64::from(p.visible) >= params.min_plate_samples)
+            })
         })
+        .filter_map(PlateForces::pull_share)
         .collect();
     put("force_slab_pull_share_p50", median(&pull_share));
     // The stress of a plate above the mega-plate share: the plates' forces are matched to their
@@ -2175,6 +2339,111 @@ fn pending_physics(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static 
         .flat_map(|s| s.slabs_km.iter().copied())
         .collect();
     put("slab_length_km_p50", median(&slabs));
+    let span = d.steps.last().map_or(0.0, |s| s.t) - d.t0_myr;
+    let breaks: f64 = d.steps.iter().map(|s| f64::from(s.breakoffs)).sum();
+    let recorded = d.steps.iter().any(|s| !s.forces.is_empty());
+    put(
+        "slab_breakoffs_per_100myr",
+        if recorded && span > 0.0 {
+            100.0 * breaks / span
+        } else {
+            f64::NAN
+        },
+    );
+    balance(d, params, put);
+}
+
+/// The force balance's answer (recorded, not applied) against today's motion: the plates of
+/// `params.min_plate_samples` or more, each balance answer matched with the same plate's record
+/// in the same step.
+fn balance(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, f64)) {
+    let mut pairs: Vec<(&PlateStep, &PlateForces)> = Vec::new();
+    let mut rms = Vec::new();
+    let mut norm_speeds = Vec::new();
+    for s in &d.steps {
+        if s.forces.is_empty() {
+            continue;
+        }
+        let (mut sq, mut area) = (0.0, 0.0);
+        let mut step_pairs = Vec::new();
+        for f in &s.forces {
+            let Some(p) = s.plates.iter().find(|p| p.id == f.id) else {
+                continue;
+            };
+            let a = f64::from(p.visible);
+            sq += a * f.rms_mm_yr * f.rms_mm_yr;
+            area += a;
+            if a >= params.min_plate_samples {
+                step_pairs.push((p, f));
+            }
+        }
+        if area > 0.0 && sq > 0.0 {
+            let r = (sq / area).sqrt();
+            rms.push(r);
+            let scale = params.balance_rms_mm_yr / r;
+            norm_speeds.extend(step_pairs.iter().map(|(_, f)| f.speed_mm_yr * scale));
+        }
+        pairs.extend(step_pairs);
+    }
+    put("balance_rms_mm_yr", mean(rms));
+    let speeds: Vec<f64> = pairs.iter().map(|(_, f)| f.speed_mm_yr).collect();
+    put("balance_p10_mm_yr", pct(&speeds, 0.1));
+    put("balance_p50_mm_yr", pct(&speeds, 0.5));
+    put("balance_p90_mm_yr", pct(&speeds, 0.9));
+    put("balance_norm_p10_mm_yr", pct(&norm_speeds, 0.1));
+    put("balance_norm_p50_mm_yr", pct(&norm_speeds, 0.5));
+    put("balance_norm_p90_mm_yr", pct(&norm_speeds, 0.9));
+    let share_over = |limit: f64| {
+        if speeds.is_empty() {
+            f64::NAN
+        } else {
+            100.0 * speeds.iter().filter(|&&v| v > limit).count() as f64 / speeds.len() as f64
+        }
+    };
+    put("balance_over_150_pct", share_over(params.fast_mm_yr));
+    put("balance_over_250_pct", share_over(params.balance_guard_mm_yr));
+    let med = |sel: &dyn Fn(&PlateStep) -> bool| {
+        median(
+            &pairs
+                .iter()
+                .filter(|(p, _)| sel(p))
+                .map(|(_, f)| f.speed_mm_yr)
+                .collect::<Vec<_>>(),
+        )
+    };
+    put(
+        "balance_oceanic_over_continental",
+        ratio(
+            med(&|p| p.continental_share() < 0.2),
+            med(&|p| p.continental_share() > 0.5),
+        ),
+    );
+    put(
+        "balance_slab_over_free",
+        ratio(
+            med(&|p| p.slab_share() >= 0.2),
+            med(&|p| p.slab_share() < 0.05),
+        ),
+    );
+    let slab: Vec<f64> = pairs.iter().map(|(p, _)| p.slab_share()).collect();
+    put("balance_slab_rank_corr", spearman(&slab, &speeds));
+    let area: Vec<f64> = pairs.iter().map(|(p, _)| f64::from(p.visible)).collect();
+    put("balance_area_rank_corr", spearman(&area, &speeds));
+    let change: Vec<f64> = pairs
+        .iter()
+        .filter(|(_, f)| f.rot_known)
+        .map(|(_, f)| 100.0 * f.rot_change)
+        .collect();
+    put("balance_rot_change_p50_pct", pct(&change, 0.5));
+    put("balance_rot_change_p90_pct", pct(&change, 0.9));
+    let today: Vec<f64> = pairs.iter().map(|(p, _)| p.speed_mm_yr).collect();
+    put("balance_vs_motion_rank_corr", spearman(&today, &speeds));
+    let over: Vec<f64> = pairs
+        .iter()
+        .filter(|(p, _)| p.speed_mm_yr > 0.0)
+        .map(|(p, f)| f.speed_mm_yr / p.speed_mm_yr)
+        .collect();
+    put("balance_over_motion_p50", median(&over));
 }
 
 /// A run's data for the check.
