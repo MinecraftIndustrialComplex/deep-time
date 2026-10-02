@@ -9,8 +9,8 @@
 //! | clock | value | Earth's dates |
 //! |---|---|---|
 //! | `oxygenated_oceans` | 1 after [`ZN_PB_GA`] | sediment-hosted Zn–Pb (MVT and clastic-dominated) first appear at 2.02 Ga (Leach et al. 2010, Econ. Geol. 105: 593) |
-//! | `land_plants` | 1 after [`LAND_PLANTS_GA`] | coal occurs by the Early Devonian (Nelsen et al. 2016, PNAS 113: 2442); the base of the Devonian is 419 Ma |
-//! | `bif_acme` | 1 inside [`BIF_ACME_GA`] | the 2.65–1.85 Ga acme of banded iron formation (Bekker et al. 2010, Econ. Geol. 105: 467) |
+//! | `land_plants` | 1 after [`LAND_PLANTS_GA`] | coal occurs by the Early Devonian (Nelsen et al. 2016, PNAS 113: 2442); the base of the Devonian is 419.2 ± 3.2 Ma (ICS chart 2023/09) |
+//! | `bif_acme` | 1 inside [`BIF_ACME_GA`] | Superior-type BIF first appears ca. 2.6 Ga and iron formations disappear at ca. 1.85 Ga (Bekker et al. 2010, Econ. Geol. 105: 467, abstract) |
 //!
 //! A frame's clock is the share of its span inside the window (frames are time averages), so a
 //! frame that straddles a date carries a fraction. Before stage 2 (WP-9/10, 2026-10-02) the
@@ -30,7 +30,7 @@ pub const ZN_PB_GA: f64 = 2.02; // ledger: ORE-014
 /// Coal-forming land plants exist after this, Ga (the base of the Devonian).
 pub const LAND_PLANTS_GA: f64 = 0.419; // ledger: ORE-015
 /// The banded-iron-formation acme, Ga (older, younger).
-pub const BIF_ACME_GA: (f64, f64) = (2.65, 1.85); // ledger: ORE-016
+pub const BIF_ACME_GA: (f64, f64) = (2.6, 1.85); // ledger: ORE-016
 
 /// Clock names, as `fields::CLOCKS` lists them.
 pub const OXYGENATED_OCEANS: &str = "deeptime:clock/oxygenated_oceans";
@@ -125,7 +125,7 @@ mod tests {
     }
 
     /// Earth's dates: no coal-forming plants before the Devonian, no sediment-hosted Zn–Pb before
-    /// 2.02 Ga, BIF only inside 2.65–1.85 Ga. The old stand-ins (1, 1, 0 at every frame) fail all
+    /// 2.02 Ga, BIF only inside 2.6–1.85 Ga. The old stand-ins (1, 1, 0 at every frame) fail all
     /// three tests below.
     #[test]
     fn the_clocks_follow_earths_dates() {
@@ -166,8 +166,8 @@ mod tests {
         assert_eq!(earth(500.0).inherited_bif_share(), 1.0);
         // A run that starts at 3 Ga holds the acme itself.
         assert_eq!(earth(3000.0).inherited_bif_share(), 0.0);
-        // A run that starts at 2.25 Ga inherits the older half.
-        assert!((earth(2250.0).inherited_bif_share() - 0.5).abs() < 1e-9);
+        // A run that starts at 2.225 Ga inherits the older half.
+        assert!((earth(2225.0).inherited_bif_share() - 0.5).abs() < 1e-9);
         assert!(earth(100.0).land_plants_at(-100.0e6));
         assert!(!earth(1000.0).land_plants_at(-1000.0e6));
     }

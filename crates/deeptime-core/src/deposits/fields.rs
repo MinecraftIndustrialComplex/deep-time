@@ -315,7 +315,7 @@ pub const CLOCKS: &[FieldSpec] = &[
         units: "0–1",
         range: (0.0, 1.0),
         provider: "the timeline and climate.present_age_gyr (deposits::clocks)",
-        meaning: "the 2.65–1.85 Ga banded-iron-formation acme (Bekker et al. 2010)",
+        meaning: "the 2.6–1.85 Ga banded-iron-formation acme (Bekker et al. 2010)",
     },
 ];
 
