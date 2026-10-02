@@ -21,10 +21,11 @@ import java.util.Optional;
  * {@code minecraft:stone} and {@code minecraft:deepslate} are replaced, so soil, sand, water, ore and
  * anything a surface rule placed stay.
  *
- * <p><b>Columns.</b> Each column reads the horizon stack by the column rule of world data 0.2
+ * <p><b>Columns.</b> Each column reads the horizon stack by the column rule of the world data
  * ({@link Columns#stack}): the 4 × 4 strata cells around it, their stacks correlated by
  * stratigraphic key, so beds run on across cells, thin out where a cell lacks them and
- * intertongue where the rock changes. With integer tops T_h, horizon h fills the blocks
+ * intertongue where the rock changes; then through the world's folds and faults
+ * ({@link Columns#deformedStack}, P2-01), which bend and offset the rock older than themselves. With integer tops T_h, horizon h fills the blocks
  * T_{h+1} &lt; y ≤ T_h, the last one down to the bottom of the world.
  *
  * <p><b>Blocks.</b> {@link RockPalette} resolves each class; a class with several members uses one
@@ -81,12 +82,17 @@ public final class StrataPass {
         return c;
     });
 
+    /** Per thread: the deformed column rule's working memory (P2-01). */
+    private static final ThreadLocal<com.minecraftindustrialcomplex.deeptime.worlddata.Structure.Scratch> DEFORM =
+            ThreadLocal.withInitial(com.minecraftindustrialcomplex.deeptime.worlddata.Structure.Scratch::new);
+
     /**
      * Fills {@code out} with the stack at block (x, z): the column rule of the world-data contract
-     * ({@link Columns#stack}, which Rust's {@code stack_at} mirrors).
+     * read through the world's folds and faults ({@link Columns#deformedStack}, which Rust's
+     * {@code ColumnWorld::stack} mirrors).
      */
     public static void column(WorldData wd, RasterSampler strata, int x, int z, Column out) {
-        Columns.stack(wd, strata, x, z, out);
+        Columns.deformedStack(wd, strata, x, z, out, DEFORM.get());
     }
 
     public static void apply(ChunkAccess chunk, WorldData wd) {

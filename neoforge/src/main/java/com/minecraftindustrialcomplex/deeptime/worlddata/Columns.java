@@ -72,6 +72,19 @@ public final class Columns {
             return h;
         }
 
+        /** Appends a horizon as it is (the deformed column rule's runs, {@link Structure#deformedStack}). */
+        void push(int top, int cls, int unit) {
+            if (count == tops.length) {
+                tops = java.util.Arrays.copyOf(tops, Math.max(8, 2 * count));
+                classes = java.util.Arrays.copyOf(classes, Math.max(8, 2 * count));
+                units = java.util.Arrays.copyOf(units, Math.max(8, 2 * count));
+            }
+            tops[count] = top;
+            classes[count] = cls;
+            units[count] = unit;
+            count++;
+        }
+
         /** Rust {@code strata::emit}. */
         void emit(double top, int cls, int unit) {
             int t = (int) Math.floor(top);
@@ -369,6 +382,20 @@ public final class Columns {
         out.fill(wd, strata, x, z);
     }
 
+    /**
+     * The stack at block (x, z) as the strata pass paints it: the column rule ({@link #stack}) read
+     * through the world's folds and faults where it has any ({@link Structure#deformedStack}; Rust
+     * {@code ColumnWorld::stack}). {@code out} must not be one of {@code scratch}'s own stacks.
+     */
+    public static void deformedStack(WorldData wd, RasterSampler strata, int x, int z, Stack out,
+                                     Structure.Scratch scratch) {
+        Structure st = wd.structure();
+        if (st == null)
+            out.fill(wd, strata, x, z);
+        else
+            st.deformedStack(wd, strata, x, z, out, scratch);
+    }
+
     /** A run of blocks, top y down to bottom y (inclusive), of one rock class (null = unclassified crust). */
     public record Run(int top, int bottom, String rockClass) {}
 
@@ -420,7 +447,7 @@ public final class Columns {
         if (wd.has(WorldData.HORIZONS)) {
             RasterSampler strata = wd.layer(WorldData.HORIZONS);
             st = new Stack(strata.stackDepth());
-            stack(wd, strata, x, z, st);
+            deformedStack(wd, strata, x, z, st, new Structure.Scratch());
         } else {
             st = new Stack(0);
         }

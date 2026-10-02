@@ -21,6 +21,8 @@ pub struct StructureView {
     /// `elevation` (block y), `strata/outcrop` and `strata/bedrock` (class index), on L1.
     pub layers: Vec<LoadedLayer>,
     pub sections: Vec<Section>,
+    /// The folds and faults the sections are read through (P2-01).
+    pub structure: Option<deeptime_format::structure::Deformer>,
     pub bodies: Vec<Body>,
     pub summary: String,
     pub circumference: u32,
@@ -235,8 +237,14 @@ pub fn build(world: &WorldState, preset_json: &str) -> CliResult<Option<Structur
         grid.h,
         grid.r
     );
+    let structure = world
+        .structure
+        .clone()
+        .filter(|st| !st.events.is_empty())
+        .map(|st| deeptime_format::structure::Deformer::new(st, s.circumference_blocks));
     Ok(Some(StructureView {
         strata,
+        structure,
         classes: EVERY_CLASS.iter().map(|s| (*s).to_owned()).collect(),
         layers,
         sections,
@@ -255,6 +263,7 @@ pub fn write(dir: &std::path::Path, v: &StructureView) -> CliResult<Value> {
     let sections = section::write_sections(
         dir,
         &v.strata,
+        v.structure.as_ref(),
         &v.bodies,
         &v.classes,
         v.circumference,

@@ -1,0 +1,12 @@
+[package]
+name = "deeptime-noddy"
+description = "Kinematic structural-geology events (folds, faults, unconformities, dykes, plugs, tilts, strain) evaluated by inverse kinematics; a Rust port of Noddy's event engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+# No dependencies: plain f64 arithmetic, no Minecraft, no world data, no threads.
+[dependencies]

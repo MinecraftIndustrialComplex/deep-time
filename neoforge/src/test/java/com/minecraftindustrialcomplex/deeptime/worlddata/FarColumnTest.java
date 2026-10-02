@@ -319,19 +319,23 @@ class FarColumnTest {
 
     /**
      * A wide column's rock is its nearest strata cell's stack as stored; a column up to
-     * {@link FarColumn#FULL_RULE_MAX_STEP} blocks wide gets the column rule itself.
+     * {@link FarColumn#FULL_RULE_MAX_STEP} blocks wide gets the column rule itself. Both are read
+     * through the world's folds and faults (P2-01): a narrow column is the strata pass's column, a
+     * wide one the cell's stack where no structure touches it and a well-formed stack under the
+     * column's own first top where one does.
      */
     @Test
     void wideColumnsTakeTheNearestCellsStack() {
         RasterSampler strata = planet.layer(WorldData.HORIZONS);
         GridDesc g = strata.desc().grid();
-        Columns.Stack got = new Columns.Stack(8), rule = new Columns.Stack(8);
-        int c = planet.circumference(), checked = 0;
+        Columns.Stack got = new Columns.Stack(8), rule = new Columns.Stack(8), cell = new Columns.Stack(8);
+        Structure.Scratch scratch = new Structure.Scratch();
+        int c = planet.circumference(), checked = 0, untouched = 0;
         for (int n = 0; n < 400; n++) {
             long x = -c / 2 + (n * 97L) % c, z = -c / 4 + (n * 61L) % (c / 2);
             for (int step : new int[]{1, 2}) {
                 FarColumn.rock(planet, strata, x, z, step, got);
-                Columns.stack(planet, strata, (int) x, (int) z, rule);
+                Columns.deformedStack(planet, strata, (int) x, (int) z, rule, scratch);
                 assertEquals(rule.count, got.count, "step " + step + " column " + x + ", " + z);
                 for (int h = 0; h < rule.count; h++) {
                     assertEquals(rule.tops[h], got.tops[h]);
@@ -344,10 +348,18 @@ class FarColumnTest {
             long j = Math.round(Math.floor((double) (z - g.originBlockZ()) / g.r() + 0.5));
             assertTrue(got.count > 0, "no rock at column " + x + ", " + z);
             // Top-down, strictly descending tops, and every class is one the cell stores, in its order.
+            FarColumn.cellStack(strata, x, z, cell);
+            boolean same = cell.count == got.count;
+            for (int q = 0; same && q < got.count; q++)
+                same = cell.tops[q] == got.tops[q] && cell.classes[q] == got.classes[q];
+            if (same)
+                untouched++;
             int h = 0;
             for (int q = 0; q < got.count; q++) {
                 if (q > 0)
                     assertTrue(got.tops[q] < got.tops[q - 1], "tops descend at column " + x + ", " + z);
+                if (!same)
+                    continue;   // a fold, a fault or an intrusion: rock from elsewhere, or shifted
                 while (h < strata.stackDepth() && strata.horizonClass(i, j, h) != got.classes[q])
                     h++;
                 assertTrue(h < strata.stackDepth(), "class " + got.classes[q] + " is not in the nearest cell's stack, in order");
@@ -356,6 +368,7 @@ class FarColumnTest {
             checked++;
         }
         assertEquals(400, checked);
+        assertTrue(untouched > 100, "only " + untouched + " of 400 wide columns are the cell's own stack");
     }
 
     // ---- The layer rules, on hand-made columns ----
