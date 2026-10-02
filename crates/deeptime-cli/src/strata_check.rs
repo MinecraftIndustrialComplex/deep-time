@@ -9,6 +9,12 @@
 //! - `--checkpoint <file>`: the stacks the bake would write from a checkpoint's world, before the
 //!   lateral smoothing and after it (which stage makes a finding).
 //!
+//! A world with folds and faults (P2-01) also gets `structure`: how many of the sampled columns
+//! the structures change, how far they move a bed, how many columns meet a bed twice (a thrust's
+//! repetition), how many hold an intrusion, that no column is malformed (tops descend, neighbours
+//! differ, the first top is the column's own), and the findings of the same columns read without
+//! the structures (`plain_columns`), so what the structures add to the census is on the page.
+//!
 //! `--column X,Z` (repeatable) prints those columns' stacks instead of the census.
 
 use std::path::Path;
@@ -57,12 +63,13 @@ fn world_data(dir: &Path, o: &Options<'_>) -> CliResult<Value> {
     let layer = w
         .strata()
         .ok_or_else(|| format!("{}: no strata/horizons layer", dir.display()))?;
+    let mut deform = deeptime_format::structure::DeformScratch::default();
     let rules = Rules::for_classes(&w.classes);
     let sea = w.manifest.scale.sea_level_y;
     let (mut stack, mut raw, mut col, mut f) =
         (Vec::new(), Vec::new(), Vec::new(), Findings::default());
     let mut column = |x: i64, z: i64, col: &mut Vec<realism::Visible>, f: &mut Findings| -> i32 {
-        layer.stack_at(x, z, w.min_y, &mut stack);
+        w.stack(x, z, &mut deform, &mut stack);
         raw.clear();
         raw.extend(stack.iter().map(|&(top, class, _)| (top, class)));
         let ground = w.top_y(x, z);
@@ -84,15 +91,18 @@ fn world_data(dir: &Path, o: &Options<'_>) -> CliResult<Value> {
     }
     let (mut all, mut land) = (Census::default(), Census::default());
     let mut rng = SplitMix(o.seed);
+    let mut picks = Vec::with_capacity(o.columns);
     for _ in 0..o.columns {
         let x = rng.below(w.c as u64) as i64 - w.c / 2;
         let z = rng.below((w.c / 2) as u64) as i64 - w.c / 4;
+        picks.push((x, z));
         let ground = column(x, z, &mut col, &mut f);
         all.add(&col, &f, &rules);
         if ground >= sea {
             land.add(&col, &f, &rules);
         }
     }
+    let structure = structure_census(&w, &picks, &rules, &o.limits);
     // The stored stacks, each under its own first top (which the bake raised over the terrain).
     let d = layer.desc().clone();
     let k = d.stack_depth.unwrap_or(0);
@@ -126,7 +136,108 @@ fn world_data(dir: &Path, o: &Options<'_>) -> CliResult<Value> {
         "columns": all.to_json(),
         "land_columns": land.to_json(),
         "stored_cells": cells.to_json(),
+        "structure": structure,
     }))
+}
+
+/// What the world's folds, faults and intrusions do to the columns at `picks` (`Null` for a
+/// world without any).
+fn structure_census(
+    w: &ColumnWorld,
+    picks: &[(i64, i64)],
+    rules: &Rules,
+    limits: &realism::Limits,
+) -> Value {
+    use deeptime_format::structure::Shape;
+    let Some(d) = w.structure() else {
+        return Value::Null;
+    };
+    let intrusive: std::collections::BTreeSet<u8> = d
+        .structure
+        .events
+        .iter()
+        .filter_map(|e| match e.shape {
+            Shape::Intrusion { class, .. } => Some(class),
+            _ => None,
+        })
+        .collect();
+    let mut scratch = deeptime_format::structure::DeformScratch::default();
+    let (mut plain, mut bent) = (Vec::new(), Vec::new());
+    let (mut raw, mut col, mut f) = (Vec::new(), Vec::new(), Findings::default());
+    let mut plain_census = Census::default();
+    let (mut changed, mut land, mut land_changed) = (0u64, 0u64, 0u64);
+    let (mut repeated, mut intruded, mut malformed, mut cover_kept) = (0u64, 0u64, 0u64, 0u64);
+    let mut max_offset = 0i32;
+    let mut offsets: Vec<i32> = Vec::new();
+    for &(x, z) in picks {
+        w.plain_stack(x, z, &mut plain);
+        w.stack(x, z, &mut scratch, &mut bent);
+        let ground = w.top_y(x, z);
+        raw.clear();
+        raw.extend(plain.iter().map(|&(top, class, _)| (top, class)));
+        realism::visible(&raw, ground, w.min_y, &mut col);
+        realism::check(&col, rules, limits, &mut f);
+        plain_census.add(&col, &f, rules);
+        let is_land = ground >= w.manifest.scale.sea_level_y;
+        land += u64::from(is_land);
+        // Well-formed whatever the events: tops descend, neighbours differ in class, and the
+        // first top is the column's own.
+        let ok = bent.windows(2).all(|p| p[0].0 > p[1].0 && p[0].1 != p[1].1)
+            && bent.first().map(|h| h.0) == plain.first().map(|h| h.0);
+        malformed += u64::from(!ok);
+        if bent == plain {
+            continue;
+        }
+        changed += 1;
+        land_changed += u64::from(is_land);
+        // The youngest rock is where it was (structures are older than what covers them).
+        cover_kept += u64::from(bent.first() == plain.first());
+        // A bed met twice going down where the plain column meets it once (a thrust carried
+        // it over itself). (Intertonguing facies repeat a bed in the plain column too.)
+        let times = |col: &[(i32, u8, u16)], h: &(i32, u8, u16)| {
+            col.iter().filter(|g| g.1 == h.1 && g.2 == h.2).count()
+        };
+        let twice = bent
+            .iter()
+            .any(|h| !intrusive.contains(&h.1) && times(&bent, h) > 1 && times(&plain, h) == 1);
+        repeated += u64::from(twice);
+        intruded +=
+            u64::from(bent.iter().any(|h| {
+                intrusive.contains(&h.1) && !plain.iter().any(|g| g.1 == h.1 && g.2 == h.2)
+            }));
+        // How far the beds both columns hold once have moved.
+        let mut worst = 0i32;
+        for h in plain.iter().skip(1) {
+            if times(&plain, h) == 1
+                && times(&bent, h) == 1
+                && let Some(g) = bent.iter().find(|g| g.2 == h.2 && g.1 == h.1)
+            {
+                worst = worst.max((g.0 - h.0).abs());
+            }
+        }
+        max_offset = max_offset.max(worst);
+        offsets.push(worst);
+    }
+    offsets.sort_unstable();
+    let n = picks.len().max(1) as f64;
+    let pct = |q: f64| {
+        offsets
+            .get(((offsets.len() as f64 - 1.0) * q) as usize)
+            .copied()
+            .unwrap_or(0)
+    };
+    json!({
+        "events": d.structure.events.len(),
+        "margin_blocks": d.structure.margin,
+        "changed_share": changed as f64 / n,
+        "land_changed_share": land_changed as f64 / land.max(1) as f64,
+        "malformed_columns": malformed,
+        "cover_kept_share": cover_kept as f64 / changed.max(1) as f64,
+        "bed_repeated_columns": repeated,
+        "intruded_columns": intruded,
+        "bed_offset_blocks": {"median": pct(0.5), "p90": pct(0.9), "max": max_offset},
+        "plain_columns": plain_census.to_json(),
+    })
 }
 
 fn checkpoint(file: &Path, o: &Options<'_>) -> CliResult<Value> {
