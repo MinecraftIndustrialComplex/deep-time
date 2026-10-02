@@ -52,7 +52,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-27 | Plate margins and coherent continents (logs 2026-09-29, 2026-09-30) | done | 2026-09-30 | | Branch worktree-agent-ad3b417fd428c1ac2 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. Cause: a collision moved the continent alone to the overriding plate, leaving its passive margins facing an ocean that kept converging (collisions cut 295,000–455,000 km of margin off its ocean per 750-Myr run; rifts ~2,000, initiations < 300). Fixed by sutures, initiation anywhere clear of trenches (rate 0.3), arc cordilleras, collision orogen cores, arc maturity; provinces view generalised to the USGS map's 150 km. Mac, 6 pipeline runs × 400 Myr before → after: active margin 0.67 → 0.31 (Earth ~0.3, Bradley 2008), passive 0.30 → 0.63, floor beside passive margins 50 → 102 Myr, ground under arc cones 307 → 812 m, provinces orogen 0.51 → 0.40, shield+platform 0.17 → 0.29, edge density 0.078 → 0.060; land 0.398 → 0.391, median 1,350 → 1,030 m, ocean p90 108 → 194 Myr. cargo test/clippy/fmt/deny clean, JUnit 155/0; evidence review/out/p1-27/ (not committed); see build log |
 | P1-28 | Stone and deepslate for the common rocks (log 2026-10-01; first the hardness tiers, replaced the same day) | done | 2026-10-01 | | Branch worktree-agent-a72907749021691b5 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. `minecraft:stone` is the `vanilla_fallback` of shale and mudstone, `minecraft:deepslate` of slate, phyllite, schist and gneiss (`CRUST_STAND_INS` in `tools/dev/gen_rock_classes.py`); no recipe, item tag or drop touched. Stone or deepslate share of the placed rock, top 64 blocks / whole column: 0.0 % → 47.8 % / 55.3 % (12 generated boxes, standalone), census of the whole planet 0.1 % → 56.2 % / 0.0 % → 56.0 %. Gates: cargo fmt/clippy/test/deny clean, gradlew build test 161/0, `./gametest.sh` and `-PwithMic` All 58 passed. MIC rows are in the build log; see the entry. |
 
-| P2-01 | Fold-and-fault engine (Noddy evaluator; pulled forward, log 2026-10-01) | doing | 2026-10-01 | | Branch worktree-agent-a49703993341aa701 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), not merged. **Stage A done** (standalone): `crates/deeptime-noddy` (the port; 6,360 points of 159 random events and histories restored exactly as the original C does, worst difference 0 on the test machine), the plate model's regimes translated into fold trains, thrusts, normal and strike-slip faults that ride their plates (`structure/deform`), the world's structural events and the per-column rule that undoes them (`deeptime_format::structure`), settings `structure.deformation.*` in the presets, the editor and the lang file. `earthlike_quick_16k`, 500 Myr: 6,446 structures (1,081 fold trains, 3,848 thrusts, 1,256 normal and 261 strike-slip faults), over 89 % of collision-zone cells and 70 % of craton cells (23 % with one younger than 50 Myr); the column rule over all 2.1 M L2 columns in 0.05 s; the Noddy port agrees with it to 1e-5 block on 7.7 M lattice points. cargo fmt, clippy -D warnings, test --workspace, deny and `gradlew build test` clean after merging master 224f00c (rock order in). **Stage B next** (the events in the world data and the Java column readers, unconformities, discordant plutons, sections); see the build log. |
+| P2-01 | Fold-and-fault engine (Noddy evaluator; pulled forward, log 2026-10-01) | doing | 2026-10-01 | | Branch worktree-agent-a49703993341aa701 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), **not merged: waits for the coordinator's merge and GameTest batch**. Stage A (the port, bit-exact against the original C) and **stage B** are built: format 0.3 with `structure/events.dtst`, the deformed column rule in Rust and Java (`ColumnParityTest` over deformed columns, 173 JUnit tests, 0 failures), unconformities by age key, stocks, dykes and plugs as intrusion events, traps from the world's own structures, fault scarps and rift valleys in the amplifier, grouped `fold_belt` / `fault_system` events, `deeptime structure-sections` and the structure census of `strata-check`. `earthlike_quick_16k`, 500 Myr: 12,657 events (1,081 fold trains, 3,848 thrusts, 1,256 normal and 261 strike-slip faults, 2,760 stocks, 2,647 dykes, 804 plugs); they change 52 % of land columns, none of 20,000 malformed; the column rule costs 0.60 ms a chunk through them against 0.44 without (Java, one thread); land share 0.2770 with the relief and without, land median 661.1 m against 661.0. cargo fmt, clippy -D warnings, test --workspace, deny and `gradlew build test` clean after merging master 84163c3. GameTests on the branch (allowed for this task): `./gametest.sh` and `./gametest.sh -PwithMic` (168 MIC mods): all 60 required tests passed in each. See the build log. |
 ## Review pages
 | Name | URL | Version label | Date |
 |---|---|---|---|
@@ -86,6 +86,97 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | lava | **Where lava should be, beyond the fix** (build log 2026-10-01, "Lava floods"). The fix makes the generator's own lava vanilla's, measured from the world's floor: a lava floor in the lowest 10 blocks and lava cave lakes below about y −288. What is left above that is the pack's and vanilla's **lava-lake features** (80 to 140 blocks each, anywhere from deep caves to a mountain's flank: 3 in the coast box, 7 to 9 in the mountain box, standalone and MIC alike) and single-block lava springs. Options: **(1, recommended)** keep the fix as the default and take the random lava-lake features and springs out of Deep Time worlds (a biome modifier like `deeptime:claim_ores`, with a setting), then put lava back where the simulation says it belongs: crater lakes and shallow magma under the volcanoes the run marks active (101 in Ben's run), which needs the bake to write the active volcanoes for the game, so it is its own task; (2) keep the fix and leave the features alone: vanilla's amount of lava, a few small lakes per 256 × 256 blocks at any depth; (3) no lava from the generator at all (`underground.lava_floor_blocks` and `lava_lake_blocks` 0) until the volcano task exists; (4) a deeper or shallower lava zone (the two settings; each default is vanilla's distance from the floor). | Not asked yet: for the coordinator to put to Ben |
 
 ## Build log
+### 2026-10-01 — P2-01 stage B: folds, faults and intrusions in the game's columns, and on the ground (agent worktree agent-a49703993341aa701, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+Ben (decisions log 2026-10-01): approach "Store structures, bend per column", defaults "Accept, judge from sections",
+terrain "Terrain too". Not merged: the branch waits for the coordinator.
+- **World data 0.3: `structure/events.dtst`** (`deeptime_format::structure`, FORMAT.md "Structural events"): the events
+  youngest first, 136 bytes each (kind fold, fault or intrusion; window; age as a stratigraphic key), the fold profile
+  table, and the candidate margin the bake measured. No compatibility with 0.2 (the standing rule).
+- **The deformed column rule** (`Structure::deformed_stack`, Java `worlddata/Structure.java`): a column is cut into
+  pieces as its candidate events are undone, youngest first. Per event and piece: the rock above the first horizon whose
+  unit key is at least the event's key is *finished* (younger than the event: the unconformity, with no event of its
+  own); a fold shifts the rest; a fault cuts it at its plane and the hanging wall reads the column it came from; an
+  intrusion takes the part inside its ellipsoid. Writing the pieces out, a block that reads rock younger than the
+  event that moved its piece shows the cover's lowest bed, so that bed fills the troughs of the folded surface it was
+  laid on. (First version: the first bed *under* the cover stood in. Sections showed thin evaporite beds blown up into
+  striped walls a hundred blocks tall; changed after looking.) Arithmetic `+ − × / √ floor ceil` only;
+  `ColumnParityTest` compares 500 columns of the test planet, a quarter of them inside event windows, and the count
+  of columns the events change. Readers switched: the strata pass, `Columns.sample`, `inspect-column`, the parity
+  fixture, the workbench's sections, `strata-check`, the viewer's sections, `deeptime-inspect`.
+- **Intrusions** (`deform/intrude.rs`): stocks in collision belts (granite) and arcs (granodiorite, diorite), basalt
+  dykes along continental rifts, and a plug under every extinct volcano on land (rhyolite, andesite or basalt by the
+  volcano). Each is an ellipsoid rooted on the world's floor (first version: a free ellipsoid; `strata-check` then
+  found 1.1 % of columns with "plutonic rock with a floor", so they were rooted), dated like a fold: it cuts older
+  folds, younger faults offset it, younger cover seals it. Stocks and dykes ride their plates; plugs are made at the
+  end from the volcano catalogue. The batholiths of P1-07 stay bodies.
+- **Traps** (`traps::structural`): closure comes from the world's own structures (a tight fold train up to 1, a
+  thrust's hanging wall 0.8, a tilted fault block 0.6, a strike-slip fault 0.3, fading to the structure's edge), where
+  there is the minimum sediment. **`fold_belt_km` was mis-scaled**: it is documented in Earth km (the Zagros) but was
+  compared with a distance in km on the block metric, eight times too wide on a 16k planet. It is now compared on the
+  plate model's sphere; the rule it belongs to is used only when deformation is off. Measured on the planet below, the
+  share of continental cells with closure ≥ 0.5 (`notes.structure.deformation.traps`): 28.9 % from the world's
+  structures, 29.2 % by Phase 1's rule as it was, 26.1 % by that rule with the width corrected. `petroleum_trap`: 421
+  tracts, 29,938 km² permissive, 4 sites.
+- **Terrain** (`surface/amplify/structure.rs`; the module comment says why there): on L2 before the amplifier's
+  erosion passes, each young structure moves the ground as it moved the rock (a fault's hanging wall by the vertical
+  slip, its foot wall the other way by `footwall_share`; a fold train by `fold_relief` of its shift), times what is
+  left of its relief: 1 − age / `relief_age_myr` (10), times 1 − wear / (`relief_wear` (5) × its own height), wear
+  being the |erosion or deposition| the deep-time surface did at its centre since it formed. Only land outside lakes,
+  never below 1 m above the sea. One switch: `structure.deformation.relief` (0 = off). Rivers and lakes are the
+  bake's, routed on the amplifier's output as before (sinks 0 with and without).
+- **Event log**: one `deeptime:fold_belt` (folds, thrusts and stocks of one orogeny) or `deeptime:fault_system` (a
+  rift's faults and dykes, or an oblique margin's strike-slip faults) per tectonic cause, with counts, median sizes,
+  and its strongest structure's place and azimuth (EVENTS.md).
+- **Settings**: `structure.deformation.relief`, `relief_age_myr`, `relief_wear`, `fold_relief`, `footwall_share`,
+  `intrusions`, `stock_rate_km2_myr`, `stock_radius_km`, `stock_top_depth_blocks`, `dyke_rate_km2_myr`,
+  `dyke_length_km`, `dyke_half_width_blocks`, `plug_radius_share`, `plug_radius_blocks`; ten of them in the editor
+  ("Fault scarps and rift valleys" and "Stocks, dykes and plugs" among the multipliers), the lang file and the presets.
+- **Review tools**: `deeptime structure-sections --world-data W --out D` (the largest collision belt, arc and rift of
+  the event log, each cut across its strongest structure, drawn as laid down and with the structures, fault planes
+  in red); `strata-check` gains `structure` (share of columns changed, malformed columns, bed offsets, repeated beds,
+  intruded columns, and the same columns' findings without the structures); `tools/review/p2-01-planet.sh world`,
+  `p2-01-report.sh` (numbers, hypsometry with and without the relief, a hillshade pair) and `p2-01-page.py`.
+- **A cache fault found on the way** (not P2-01's, but it decided the cost): `TileCache` split its 256 MiB over one
+  Guava segment per processor, so on a 32-processor machine a segment held 8 MiB and a decoded tile of horizon stacks
+  (14.7 MiB) was dropped as soon as it was loaded; every chunk on a tile's edge decoded tiles again and again
+  (`RasterSampler` kept one tile per thread). Now at most one segment per 64 MiB, and two tiles per thread. Plain
+  column rule on the 16k planet: 1.52 → 0.44 ms a chunk on the test machine.
+- **Measured** (test machine; `tools/remote/mac.sh -- tools/review/p2-01-planet.sh world on earthlike_quick_16k
+  scattered_continents 500`, the same with `--set structure.deformation.relief=0` as `off`, then
+  `tools/review/p2-01-report.sh on off`):
+  - run: 9 min 13 s on 3 threads, 4.7 GB peak; the structure stage 72.7 s of it, the deformation steps 9.9 s and the
+    end-of-run lattice and Noddy check 1.4 s;
+  - kept: 1,081 fold trains, 3,848 thrusts, 1,256 normal faults, 261 strike-slip faults, 2,760 stocks, 2,647 dykes,
+    804 plugs (12,657 events, 1.7 MB); 796 grouped events; Noddy port against the column rule on 7.8 M points: worst
+    9.8e-6 block, 0 side flips;
+  - lattice (L2): a structure acts on 51.9 % of columns, a fault plane crosses 37.1 %; 9.1 candidates a column on
+    average, 106 at most; largest shift 47 blocks, largest sideways move 49 (margin 64);
+  - where: 89 % of collision cells, 87 % of arc and rift cells, 70 % of craton cells and 73 % of passive-margin
+    cells lie under a structure (52 %, 54 %, 51 %, 23 %, 28 % under one younger than 50 Myr);
+  - `strata-check`, 20,000 columns: 32.0 % changed (51.9 % of land columns), 0 malformed; a bed's offset median 2
+    blocks, p90 7; 70 columns meet a bed twice; 545 hold an intrusion. Findings with the structures against the
+    same columns without: grade inversions 0.095 % against 0 (gneiss or schist over basalt and andesite: dykes and
+    plugs under metamorphic rock, and thrust sheets), metamorphic slivers 0.175 % against 0, plutonic sheets 0.025 %
+    against 0, plutonic rock with a floor 0.055 % against 0.015 %;
+  - **cost in the game** (`ColumnRuleBenchTest`, Java, one thread, the 256 columns of a chunk; `DEEPTIME_BENCH_WORLD`
+    points it at a planet): 16k planet, 12,657 events: 0.437 ms a chunk without the structures, 0.603 ms through them
+    (+0.17 ms), slowest chunk 22 ms; 4k test planet, 328 events: 0.486 and 0.561 ms;
+  - **terrain**: 268 structures have relief left. On L2 before the erosion passes 81,722 of 585,704 land cells move,
+    by 12.8 m on average, at most 314 m down and 224 m up (`notes.amplify.structure_relief`). Baked terrain with the
+    relief against without (cos-latitude weighted, 8 blocks a sample): land share 0.27698 against 0.27697; land
+    median 661.1 m against 661.0; p10 90.7 both; p90 2,277 against 2,276; p99 4,368 both; mean 959.2 against 958.8;
+    3.6 % of land differs by a block or more (56 m on average there); 104 cells of 583,476 became sea and 127 became
+    land (the erosion passes after the term). Lakes 1,350 against 1,344, river chains 4,263 against 4,250, sinks 0.
+- **Gates**: cargo fmt, clippy -D warnings, `cargo test --workspace` (0 failed in every crate; core 390, format 63),
+  `cargo deny check licenses bans` ok, `./gradlew build test` 173 tests, 0 failures. GameTests on the branch (allowed for this task): `./gametest.sh` and `./gametest.sh -PwithMic` (168 MIC mods): all 60 required tests passed in each.
+- **Left open** (none blocks the merge): bodies (batholiths, ore bodies) are painted where they are, so a fault
+  younger than a body does not offset it, and the deposit engine's cover depth (`structure::Cover`) reads the
+  undeformed stack; 70 % of craton cells lie under some old structure (stage A's number, accepted with "judge from
+  sections"); stocks are slender spires in section where the world is deep (13 blocks of radius under 400 of height);
+  the review page is built (`review/out/p2-01-page/`) but not published: `tools/review/publish.sh` was refused to
+  this sub-agent.
+- **Next step**: the coordinator merges the branch and runs the GameTest batch; then Ben judges the sections.
+
 ### 2026-10-01 — P2-01 stage A: the fold-and-fault engine, standalone (agent worktree agent-a49703993341aa701, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 Ben (decisions log 2026-10-01): "can you start folds & faults rn (only do if it can be parellized with everything else)".
 Stage A is the part with no dependence on other branches; stage B puts it into the baked columns.
