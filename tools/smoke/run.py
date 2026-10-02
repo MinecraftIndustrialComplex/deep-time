@@ -498,14 +498,15 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     steps.record("dh seam: area checked", f"x = {half} (C = {circumference}), z = {sz} ({100 * seam_land:.0f} % land either side), "
                                           f"pregen radius {radius_seam} chunks on each side, inside the lap")
     before = sections
-    # /dh pregen walks a spiral of 64-block sections, 8 either side of the centre's section for a
+    # /dh pregen walks a spiral of 64-block sections, about 8 either side of the centre's section for a
     # radius of 32 chunks (PregenManager: ceil(r / 4 * 2)^2 sections). A section past the seam stalls
     # it: DH files the section under its raw position, Toroidal World answers it under the folded
     # one, and the raw entry is never cleared (seen 2026-10-02: section 6*128 folded to 6*-128, no
     # progress after). So the west square's last section ends at the seam and the east square's
-    # first starts there: centre sections C/128 - 9 and -C/128 + 8.
+    # first starts there. The spiral reaches 7 sections below the centre's and 8 above (seen: east
+    # centre -C/128 + 8 left the first 64 blocks unasked), so the centres are C/128 - 9 and -C/128 + 7.
     dh_pregen(steps, rcon, half - 9 * 64, sz, radius_seam, "seam west ")
-    dh_pregen(steps, rcon, -half + 8 * 64, sz, radius_seam, "seam east ")
+    dh_pregen(steps, rcon, -half + 7 * 64, sz, radius_seam, "seam east ")
     st, out = probe_json(server, rcon, "deeptime probe dh")
     level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
     steps.check("dh seam: Distant Horizons asked the override for the seam's sections", "> 0 more",
