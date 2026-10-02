@@ -13,7 +13,7 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,097 rows.
+2,101 rows.
 
 | Ledger | Subject | Rows | `cited-unverified` | `from-memory` | `abstract-only` | `calibrated` | `game-choice` | `uncited` | of which `pending-rewrite` | of which `not-yet-coded` |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -36,12 +36,12 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 | [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 16 | 0 | 0 | 0 | 54 | 4 | 0 | 0 |
 | [DEP](ledger/DEP.md) | deposit models, counts, sizes | 204 | 88 | 0 | 23 | 0 | 61 | 32 | 0 | 0 |
 | [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 257 | 82 | 2 | 10 | 0 | 57 | 106 | 0 | 0 |
-| [PRV](ledger/PRV.md) | geologic provinces | 27 | 5 | 0 | 0 | 4 | 6 | 12 | 0 | 0 |
+| [PRV](ledger/PRV.md) | geologic provinces | 31 | 0 | 0 | 5 | 4 | 10 | 12 | 0 | 0 |
 | [SCL](ledger/SCL.md) | world scale, planet constants | 51 | 6 | 0 | 0 | 1 | 37 | 7 | 0 | 0 |
 | [BAK](ledger/BAK.md) | the bake, satellite view | 40 | 0 | 0 | 0 | 1 | 34 | 5 | 0 | 0 |
 | [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 |
 | [GEO](ledger/GEO.md) | geothermal features | 0 | – | – | – | – | – | – | – | – |
-| **all** | | **2,097** | **522** | **53** | **66** | **76** | **731** | **646** | **377** | **57** |
+| **all** | | **2,101** | **517** | **53** | **71** | **76** | **735** | **646** | **377** | **57** |
 
 Three rows are `verified` (ISO-041, ISO-042, ISO-048, added with the flexure feature on 2026-10-02; the table has no column for them). The percentages below are those of stage 1's 2,069 rows. In plain terms: 723 rows (35 %) are deliberate game or implementation
 choices; 635 (31 %) state something about the physical world with no source at all; 522 (25 %)

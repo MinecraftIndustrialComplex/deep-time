@@ -26,7 +26,7 @@ use crate::surface::SurfaceState;
 use crate::world::WorldState;
 
 /// The class code of a cell the plate model has nothing for.
-pub const UNCLASSIFIED: u8 = CLASSES.len() as u8;
+pub const UNCLASSIFIED: u8 = CLASSES.len() as u8; // ledger: PRV-031 (game-choice)
 
 /// The name of a class code.
 pub fn class_name(code: u8) -> &'static str {
