@@ -144,6 +144,12 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     let bake = &m.notes["bake"];
     assert_eq!(bake["baked"], true);
     assert_eq!(bake["terrain"]["elevation"], "amplify");
+    // The world's floor is y -512 and nothing of this planet's sea floor is cut by it
+    // (2026-10-02; trenches reach y -437 at the default scale).
+    let floor = &bake["terrain"]["build_limit"];
+    assert_eq!(floor["min_y"], -512);
+    assert_eq!(floor["cells_below_min_y"], 0, "sea floor below the world's floor: {floor}");
+    assert!(floor["lowest_y"].as_f64().unwrap() >= -512.0, "{floor}");
     // The ice cover the game's surface pass lays is recorded with the table's section.
     assert_eq!(bake["climate"]["ice_cover"]["max_blocks"], 12);
     assert_eq!(bake["climate"]["ice_cover"]["snow"], "minecraft:snow_block");

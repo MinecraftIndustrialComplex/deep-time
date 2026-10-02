@@ -27,4 +27,4 @@ Rows by status (67 active, 2 `merged`): `verified` 3, `cited-unverified` 8, `abs
 
 - Three different crust densities are in use (2,650, 2,700 and 2,800 kg/m3) in different places, none cited (extraction notes ERO, flag 9).
 - The shipped ocean floor is 0.3 to 0.6 km shallower than the GDH1 age-depth curve it is named after (flag 5).
-- The sea floor can reach below the world's bottom (y -412 to -472 against a floor of y -352); what to do is an open question for Ben.
+- The sea floor could reach below the world's bottom (y -412 to -472 against a floor of y -352). Settled by Ben on 2026-10-02 ("Lower min_y to -512 (Recommended)"): the floor is y -512, under every default trench (y -437 at the default scale; 75 blocks clear of the floor, 51 of the bottom density slide). The bake records `lowest_y`, `cells_below_min_y` and `cells_in_floor_slide`. A bottom squeeze for settings deeper than the floor (the recommended option's net) is not built; it is a pending question.

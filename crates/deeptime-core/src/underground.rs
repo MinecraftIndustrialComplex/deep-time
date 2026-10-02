@@ -5,8 +5,8 @@
 //!
 //! **The lava floor and lava lakes.** Vanilla fills every open block below y −54 with lava and
 //! lets a cave lake at y −10 or lower be lava. Both heights are hard-coded for a world whose floor
-//! is y −64: they are floor + 10 and floor + 54. In a Deep Time world (floor y −352 by default)
-//! they would flood the lowest 298 blocks of every cave and of every stretch of sea deeper than
+//! is y −64: they are floor + 10 and floor + 54. In a Deep Time world (floor y −512 by default)
+//! they would flood the lowest 458 blocks of every cave and of every stretch of sea deeper than
 //! 117 blocks, so the two distances are settings here and the game measures them from the world's
 //! floor.
 //!
@@ -28,8 +28,8 @@ use serde_json::{Value, json};
 use crate::error::CoreError;
 use crate::surface::volcanoes::VolcanoState;
 
-/// The largest distance accepted, blocks (the default build range is 992 blocks tall).
-pub const MAX_BLOCKS: u32 = 992;
+/// The largest distance accepted, blocks (the default build range is 1,152 blocks tall).
+pub const MAX_BLOCKS: u32 = 1152;
 
 /// The world-data file of the active volcanoes.
 pub const VOLCANOES_PATH: &str = "volcanoes/active.json";

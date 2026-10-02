@@ -680,7 +680,7 @@ pub struct ScaleParams {
     pub circumference_blocks: u32,   // 16_384 (singleplayer) or 32_768 (server)
     pub m_per_block_h: f64,          // 300.0  (≈1:300)
     pub m_per_block_v: f64,          // 20.0
-    pub min_y: i32, pub max_y: i32,  // -352, 639 (fixed by the dimension type in v1)
+    pub min_y: i32, pub max_y: i32,  // -352, 639 (fixed by the dimension type in v1; min_y is -512 since decisions log 2026-10-02)
     pub sea_level_y: i32,            // 63
     pub pole_cap_deg: f64,           // 75.0 (soft cap starts); 80.0 = hard pushback
     pub feature_scale: FeatureScale, // per-feature multipliers: deposits, rivers, canyons, strata

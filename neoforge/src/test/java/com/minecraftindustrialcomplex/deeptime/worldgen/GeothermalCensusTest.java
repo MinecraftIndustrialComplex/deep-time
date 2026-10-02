@@ -25,7 +25,7 @@ class GeothermalCensusTest {
     @EnabledIfEnvironmentVariable(named = "DEEPTIME_CENSUS_WORLD", matches = ".+")
     void census() {
         WorldData wd = WorldData.open(Path.of(System.getenv("DEEPTIME_CENSUS_WORLD")));
-        int sea = 63, minY = Integer.getInteger("deeptime.minY", -352), cell = 4;
+        int sea = 63, minY = Integer.getInteger("deeptime.minY", -512), cell = 4;
         GeothermalRules rules = GeothermalRules.of(wd.manifest().notes());
         var spec = Water.Spec.of(wd, cell);
         var none = Water.Kind.NONE;
