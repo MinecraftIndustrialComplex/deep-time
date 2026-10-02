@@ -87,13 +87,18 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-02 | plate tasks 3 and 4 | **Collisions stop within 20 Myr** (slowdown ratio 0.06 against 0.2–0.6; build log 2026-10-02, "Plate tasks 3 and 4"). `collision_resistance_mm_yr` is 200: at the design's 100, collisions consumed continents whole. (a) Keep 200 until the force balance replaces the speed law (recommended, and what is built: the fallback state must not eat its continents); (b) lower it towards 100 and accept less continental crust for slower, longer collisions. | Recorded for Ben, overnight autonomous work; proceeded with (a) |
+| 2026-10-02 | plate tasks 3 and 4 | **No wedge and no foreland basin on the quick preset** (wedge median 0 km, foredeep 9 m). At 1.5° a wedge under a 2 km belt is narrower than one 71 km plate sample, and with no wedge nothing loads the incoming plate. (a) Leave it for the force balance and judge the two targets on a full preset (45 km samples), which was not run (recommended); (b) let the belt's own load cross the collision front in the flexure (the boundary is a break until the weld), which gives basins now but is a change to the flexure rule; (c) a gentler wedge slope, against the Himalayan 1–1.6°. | Recorded for Ben; proceeded with (a) |
+| 2026-10-02 | plate tasks 3 and 4 | **Share of shortened crust that stays in the belt** (`collision_stacking_share`, PLT-229). The design's 0.5 has no source; the library has none either (Zagros: 75 % of the shortening by underplating, Mouthereau et al. 2007). The pipeline presets now use 0.8, calibrated against the hypsometry with the surge gone. (a) Keep 0.8 until the full calibration after the switch (recommended); (b) look for a measured crustal budget (Himalaya–Tibet) first. | Recorded for Ben; proceeded with (a) |
+| 2026-10-02 | plate tasks 3 and 4 | **Active margins rose to 0.40–0.42 of the continental margin** (target 0.25–0.40, master 0.31): with fewer welds more continents sit on plates of their own. (a) Leave it for the calibration after the switch (recommended); (b) retune `subduction_initiation_rate` now. | Recorded for Ben; proceeded with (a) |
+| 2026-10-02 | plate tasks 3 and 4 (found) | **A trench below the world floor** reads `gabbro` in the workbench's rock slice and nothing in the column evaluator (`watch/sections` test on the test planet with the calibrated plate values; the test planet keeps the old values so the test passes). Who fixes the slice? | Recorded for the coordinator |
 | 2026-10-02 | science WP-7 | **Pluton shape, depth, rock shares and collision rate** (RCK-058, RCK-062 to RCK-065; docs/science/rock-and-metamorphism.md, "Open questions" 2). Real data sit elsewhere than the code: large Sierra plutons are 0.17 to 0.4 as wide as long (Mount Givens 80 x 17 km, Lamarck over 60 x 10 km), the code draws 0.5 to 1; the Sierra was emplaced at 3.5 to 7 km and the Tuolumne suite at 6 to 10 km, the code at 2 to 6 km; Cordilleran batholiths are mostly tonalite and granodiorite with under 3 % mafic rock, no source gives the code's 70/20/10 or 60/40; the collision-granite rate 0.3 of the arc rate fits an island arc, not a continental one (about 6 times too high). (a) Keep all of them as labelled game choices (recommended: they change only how the granite bodies look, and any change re-opens the pluton-rate calibration); (b) width ratio 0.25 to 1 and roof 3 to 8 km, with a recalibration run. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-7 | **Schist at 450 degC** (RCK-042). The Barrovian type locality grew garnet at 500 to 550 degC and reached sillimanite at 650 to 700 degC (Baxter et al. 2002); the code's schist (450) and amphibolite (500) lie 50 to 100 degC cooler than the garnet zone the stage-1 comment named. No source read gives a temperature for schist itself (a texture). (a) Keep 450 and call it mica-schist grade (recommended: done in the comment; moving the band edges re-keys every column and shifts the share of schist and gneiss at the surface, which needs a recalibration look); (b) raise schist to 500 and amphibolite to 550. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-7 | **Compaction and the lithification depth** (STR-049, RCK-022). Layers keep their deposited thickness (a shale layer would be 60 % as thick at 1 km, 43 % at 3 km) and young beds turn from sand and mud to rock at 150 m (real ones stay soft for 1 to 3 km). (a) Keep both: the strata are drawn 15 times tall and the 150 m rule is a ground-look rule (recommended); (b) add a compaction step using the Sclater and Christie porosity curves, which thins buried sediment and changes the sediment-to-basement proportions; (c) raise `loose_depth_m` to about 1,000 m so more young mud and sand shows as soft ground. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-7 | **Rock densities the sources disagree with** (RCK-087). Nothing in the simulation or the game reads a class's density today (grep), so this is a data-quality question. Fresh peridotite is 3152 to 3276 (code 3300); ore-grade ironstone and iron formation are 3.5 to 4.5 g/cm3 (code 3000 and 3400); phosphorite 2.91 (code 2700); a kimberlite paper says it is lighter than granite (code 2800). (a) Leave as labelled judgment (recommended: no effect); (b) set peridotite to 3240 (Daly's mean for fresh peridotite) and phosphorite to 2900, and leave ironstone and iron formation until a source gives a bulk density for lean, banded rock (the 3.5 to 4.5 read is for ore). | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-8 | **Folds and faults in blocks or in metres?** (DEF-011, DEF-019, DEF-020; docs/science/folds-faults-intrusions.md "Open questions" 1; pictures: `review/out/wp8/index.html`, three sections each drawn three ways, not committed.) The strata, plutons and terrain are true metres at 20 m a block up and 300 m across (15× vertical stretch); folds and faults alone are drawn undistorted in blocks, so in metres they are 15 times too low: Anderson's 60° and 30° dips are 6.6° and 2.2°, folds 100 m high where Zagros folds of the same 16 km wavelength are 500–1,000 m, a 38 km normal fault throws beds 120 m where a real one throws them about 1 km. Same world (quick 16k, 500 Myr, seed 1) with only this changed: today (stretch 1) bed offsets median 2 blocks (p90 7), grade inversions 0.07 % of columns; stretch 4: offsets 7 (p90 26), folds 21 blocks, normal faults 80–85° and thrusts 56–74° in blocks, inversions 0.33 %; true metres (15): offsets 22 (p90 91), folds 77 blocks, faults near vertical, inversions 0.78 %, granite basement pulled up through thin cover in arcs, and the scarp term (made for small throws) lifts ground up to 5.1 km. Physics says true metres, but only together with fold wavelengths taken from the thickness of the layers being folded (Biot: wavelength 2–16 times the layer, mean 6.5), which is not built. (a, recommended) A `structure.deformation.vertical_scale` setting (1 = today's shapes, 15 = true metres) with default 4 now and the scarp term lowered to match, then a design task for wavelengths from layer thickness, after which the default can move to true metres; (b) true metres now; (c) keep today's shapes as a labelled game choice. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-8 | **Intrusions larger than life** (DEF-048, DEF-049). Dykes are 2–5 blocks wide (600–1,500 m) where real ones are 1–150 m (Ship Rock's 2.3 m, the Mackenzie swarm's mean 30 m), although the comment says a block is the least that can be drawn; plugs are 5–16 blocks (1.5–4.8 km) across where Ship Rock, the type volcanic neck, is 500 m. (a, recommended) the narrowest drawable: `dyke_half_width_blocks` [0.5, 1.0] (1–2 blocks wide) and `plug_radius_blocks` [1, 3] (0.6–1.8 km across); (b) keep, labelled as game choices for visibility (now done in the ledger). | Not asked yet (sub-agent; for the coordinator) |
-| 2026-10-02 | plate-motion task 2 | **Turn real shortening on before tasks 3–4?** `tectonics.collision_on_shortening` is off in every preset, so the planets are master's (build log 2026-10-02, "Plate-motion task 2"). On, on master with flexure (2 seeds): continental crust 0.29 → 0.36 of the planet, collisions per 100 Myr 11.3 → 7.4, plate lifetime 41 → 63 Myr, but one plate above half the planet in 45 % of steps against 41 %, and every collision still ends in the one-step surge. (a, recommended) Keep it off until tasks 3 and 4 land together and remove it; (b) turn it on now as a light interim gain on the crust and collision counts. Not asked through AskUserQuestion (sub-agent); for the coordinator to put to Ben. | coordinator |
+| 2026-10-02 | plate-motion task 2 | **(Overtaken by plate tasks 3 and 4, 2026-10-02: the switch is removed, transfers and welds run on real shortening and on stall.)** **Turn real shortening on before tasks 3–4?** `tectonics.collision_on_shortening` is off in every preset, so the planets are master's (build log 2026-10-02, "Plate-motion task 2"). On, on master with flexure (2 seeds): continental crust 0.29 → 0.36 of the planet, collisions per 100 Myr 11.3 → 7.4, plate lifetime 41 → 63 Myr, but one plate above half the planet in 45 % of steps against 41 %, and every collision still ends in the one-step surge. (a, recommended) Keep it off until tasks 3 and 4 land together and remove it; (b) turn it on now as a light interim gain on the crust and collision counts. Not asked through AskUserQuestion (sub-agent); for the coordinator to put to Ben. | coordinator |
 | 2026-10-02 | plate-motion task 2 (found), bisected | **The flexure merge (5ce5af4a) cuts the continental crust to 0.25-0.27 of the planet** (build log 2026-10-02, "Continental crust bisect"). Nothing before it does; `surface.flexure.strength=0` on the same commit gives 0.39-0.40. It is a model consequence, not a bug: the surface stage's flexed heights go back to the plate model, the mature island arcs stand 260 m lower, fewer cross the sea-level test that turns them into continental crust (-10 %), and more continental samples are lost at resampling (+5 %); the two are each about as large as the whole crust, so a 10 % shift moves the share by 0.12. Options: (a) accept it and recalibrate the arc and resampling terms inside the belt calibration (task 3); (b) hand the plate model the height without the flexural part (measured: 0.34 and 0.36, a partial fix, and it makes the plate model blind to what the surface did); (c) decide arc emergence on the plate model's own arc thickness (`arc_oceanic_m`) instead of the momentary height, so the crust budget no longer depends on the surface stage (not tried); (d) first find why resampling loses about 500 continental samples each time (as large as the arc gain, unexplained). Recommended: (c) with (d) looked at first, before the belt calibration, because every task-3 number is read against this crust budget. | coordinator |
 | 2026-10-02 | science WP-13a | **Slab suction share** (PLT-186; docs/design/plate-force-balance.md section 6 note). The design's `slab_suction_share` 0.3 pulls only the overriding plate; Conrad & Lithgow-Bertelloni 2002 and 2004 (abstracts) have suction act on both plates, at 40 % of the forces against pull's 60 % (30 % with a weak asthenosphere), so their suction ÷ pull is 0.43–0.67. (a) Keep 0.3 as the open-loop starting value and calibrate it in task 8, with 0.43–0.67 noted as the sources' range (recommended: task 5 records forces read-only and the term's meaning differs anyway); (b) set 0.5 now, before task 7; (c) change the design so suction acts on both plates, as in the sources. | not asked (overnight; recorded by the WP-13a agent) |
 | 2026-10-02 | force balance task 5 | **Two implementation choices that outlive the task** (docs/design/plate-force-balance.md section 13). (1) The balance has a fixed scale: `plate_speed_scale_mm_yr` sets the basal drag through a reference plate, instead of renormalising each step's answer to an RMS (section 4's method), so a planet that loses its slabs slows down. (2) The reference slab pull is 3 × 10¹³ N/m, about twice WP-13a's 1.4 × 10¹³ (Faccenna et al.), so that a ridge pushes with 0.1 of it as the design says; speeds do not depend on it, stresses and the ridge share do. Recommended and built: keep both; revisit (2) with the suction share at task 8. | not asked (Ben asleep; proceeding with the recommendation) |
@@ -124,6 +129,126 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-02 — Plate tasks 3 and 4: collision belts, the wedge, resistance in the speed law and the weld on stall (agent worktree agent-a3b78040bb96d9aad, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What it is.** Stage 1 of the force-balance plan (the fallback state): the review's three plate
+  faults fixed on today's motion law. Design: `docs/design/plate-force-balance.md` section 3.5 and
+  "As built: tasks 3 and 4"; science: `docs/science/plates.md`, "Collision belts, the wedge and the
+  weld"; ledger PLT-228 to PLT-240; tables: `docs/design/plate-check-baseline.md`, "Tasks 3 and 4".
+- **Built.** `plates/belts.rs` (new): each step the continental crust that crossed a collision
+  front (task 2's real shortening × the front's length × the incoming crust's own thickness ×
+  `collision_stacking_share`) is stacked by Airy into a wedge on the incoming plate (profile at
+  `wedge_slope_deg` up to the overriding edge, filled first) and a belt `collision_belt_km` wide
+  on the overriding plate (profile 1 − (d/W)²), with the consumed crust's own rock, its sediments
+  metamorphosed; both stamped as a collision orogeny (the `collision` regime). The belt resists
+  the convergence inside the speed law (`belts::resist`, a plastic cut over the law's own
+  relaxation, shared by area). `shortening.rs`: a stall clock; a contact is handed over when it
+  has stalled (`weld_speed_mm_yr` for `weld_after_myr`) or, for terranes under
+  `collision_suture_frac`, shortened by `collision_threshold_km`. `collision.rs`: no surge; a
+  continent welds only once stalled, the larger plate keeps its id; small terranes move alone.
+  The foreland basin is the surface stage's flexure under the belt's load; the record reads it
+  back from `surface/flexure_m`.
+- **Removed.** The one-step surge; `collision_uplift_max_m`, `collision_coefficient_per_km`,
+  `collision_orogen_core`, `collision_distance_km` (presets, editor field repointed, lang keys);
+  the `collision_on_shortening` switch and `Contact::speed_count_km` (and `counted_km` in the
+  record and the check). New settings, each in the 12 built-in presets and the test planet, with an
+  editor field and a lang key: `collision_belt_km` 400, `collision_stacking_share`,
+  `wedge_slope_deg` 1.5, `collision_resistance_mm_yr`, `weld_speed_mm_yr` 5, `weld_after_myr` 10.
+- **Departures from the design, each measured** (the as-built note has the detail): (1) the
+  resistance's front-length factor is against the incoming plate's own slab front, capped at
+  `slab_pull_front_km`, not against 3,000 km alone (collision fronts are a median 400 km long;
+  with the design's factor a plate with no other slab needed a belt tens of km high to stop);
+  (2) the resistance reads the belt's height above the sea or its relief over the ground it was
+  built on; (3) only oceanic slabs pull (the design's 3.3, brought forward) and the plate model's
+  trench pull-down no longer drags continental crust at a collision front; (4) Cortial's
+  subduction uplift acts at oceanic slabs only; (5) a collision's own stamped belt is not
+  "locked" against it, a colliding contact is kept while its front lives, and a subduction
+  initiation no longer splits off old floor that is mostly an enclosed continent; (6) belt width
+  is measured across the front (the 3-D moments read a long curved front's sagitta as width).
+- **Light calibration** (owner: light now, full after the switch). `collision_resistance_mm_yr`
+  100 → 200 and `collision_threshold_km` 300 → 100 for the plate measures (with the design's
+  defaults one 1000 Myr run consumed 0.53 of the sphere's area in continental crust at collision
+  fronts and fell to 0.18–0.25 crust; now 0.25–0.40 crosses fronts, master about 0.21);
+  `collision_stacking_share` 0.5 → 0.8 and `subduction_uplift_mm_yr` 0.42 → 0.55 (quick presets;
+  0.34 → 0.45 on the full presets by the same factor, not re-measured) for the hypsometry. The
+  plate-only presets and the test planet keep 0.5 and their own uplift. `arc_continental_m` was
+  not touched (the crust regression is being repaired at its source).
+- **Measured: plate-check**, `earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1–4, every run
+  with `structure.deformation.density=0`; before = master 2c60ca3f (the master the branch was
+  measured on; 750fc2cd is in the baseline doc too), after = this branch before merging 5c4d2ed3
+  (task 5 records only). `R=<scratch> BIN=<binary> tools/review/plate-check.sh 1000 1,2,3,4
+  supercontinent base:structure.deformation.density=0`. Targets met: **28 of 45** (master 14 of 42).
+
+  | Measure | Master | After | Target | |
+  |---|---|---|---|---|
+  | Largest plate, median share | 0.47 | 0.28 | 0.15–0.35 | met |
+  | Steps with one plate above half | 44 % | 7.5 % (16 0.8 7.4 5.8) | ≤ 10 | met |
+  | Plates above 5 % | 3.75 | 6 | 5–9 | met |
+  | Median plate lifetime | 49 Myr | 96 Myr | ≥ 80 | met |
+  | Plates dead within 20 Myr | 30 % | 6.8 % | ≤ 15 | met |
+  | Rift-born plates alive after 50 Myr | 24 % | 70 % | ≥ 60 | met |
+  | Rift-born welded back to their family within 50 Myr | 30 % | 6.1 % | ≤ 10 | met |
+  | Land raised by one collision in one step | 3.0 % | 0.10 % | ≤ 0.5 | met |
+  | Most land gained in any step | 2.2 % | 1.06 % | ≤ 1.5 | met |
+  | Belt width, elongation | 2,470 km, 2.1 | 378 km, 6.2 | ≤ 800, ≥ 4 | met |
+  | Collision length, median / 90th pct | 6 / 12 Myr | 28 / 51 Myr | 15–50 / ≤ 120 | met |
+  | Peak uplift spread | 1 | 15 | ≥ 2 | met |
+  | Collisions per 100 Myr | 10.9 | 4.9 | 2–6 | met |
+  | Convergence 20 Myr after onset ÷ at onset | no meaning | 0.06 | 0.2–0.6 | **not met** |
+  | Wedge width, median | none | 0 km | 100–350 | **not met** |
+  | Foredeep width and depth, median | none | 0 km, 9 m | 150–450 km, 2–7 km | **not met** |
+  | Continental crust, lowest step | 0.33 (0.31 0.28 0.40 0.34) | 0.35 (0.36 0.34 0.39 0.32) | ≥ 0.37 | not met (as master) |
+  | Continental crust, highest step | 0.454 | 0.451 | ≤ 0.45 | not met (as master) |
+  | Active share of the continental margin | 0.31 | 0.40 (0.42 0.39 0.38 0.41) | 0.25–0.40 | met, at the edge |
+  | Speeds, boundary mix (56 % subducting), supercontinent tenure, old sea floor | | unchanged within noise | | not met (the speed law's) |
+
+- **Measured: hypsometry**, 500 Myr, seeds 1–3 × both starts (`tools/review/p1-17-hyps.sh`), mean
+  [min, max]:
+
+  | Measure | Master 2c60ca3f | After | Target |
+  |---|---|---|---|
+  | Land share | 0.300 [0.252, 0.364] | 0.284 [0.252, 0.307] | 0.27–0.30 |
+  | Median land height | 605 m [435, 799] | 515 m [398, 571] | 430–640 m |
+  | Land above 2 km | 0.088 [0.052, 0.119] | 0.118 [0.094, 0.144] | 0.10–0.13 |
+  | Highest L1 cell | 4.6 km [3.7, 5.6] | 6.6 km [5.4, 9.8] | 5.5–7 km |
+  | 99th percentile of land | 3.2 km | 4.1 km [3.4, 4.5] | 4.2–5.5 km |
+  | Continental crust | 0.418 | 0.413 | – |
+  | Elevation guard | 0 | 0 | 0 |
+
+  Master 750fc2cd for reference: land 0.304, median 746 m, above 2 km 0.118, highest cell 4.8 km.
+  Plates stage time unchanged (132 s against 141 s per 250 steps on a loaded machine); the plateau
+  flow now moves 190,000–680,000 km³ a run (35–10,300 on master): belts spread into plateaus.
+- **What is not fixed, plainly.** (1) Collisions stop too fast (slowdown ratio 0.06): the resistance
+  has to overcome a base speed with no physical cause, and at half the strength continents were
+  consumed whole; the force balance is what gives a middle. (2) No wedge and no foreland basin on
+  the quick preset: belts peak at a median 1.6–2.3 km, a wedge at 1.5° is then narrower than a
+  71 km sample, and with no wedge nothing loads the incoming plate (the plate boundary is a break
+  in the flexure until the weld). The flexure does bend a basin under a resolved wedge
+  (`a_collision_wedge_bends_a_foreland_basin_on_the_incoming_plate`). (3) The active margin share
+  rose from 0.31 to 0.40–0.42. (4) Crust is at master's level, under 0.37.
+- **Structure stage (for task 6).** It reads the belt and wedge as the `collision` regime with no
+  change (they are stamped each step they rise by 5 m/Myr or more). Not read yet: shortening
+  strength from the step's convergence, fold tightness from the real shortening, the foreland from
+  `surface/flexure_m` instead of `foreland_km` all round.
+- **Found, not fixed.** With the calibrated values on the test planet `planet_world_4k`,
+  `watch::sections::tests::rock_at_depth_and_sections_agree_with_the_column_evaluator` fails: a
+  trench column whose top lies below the world floor (y −352) reads `gabbro` in the slice and
+  nothing in the column evaluator. The test planet keeps the uncalibrated values; the mismatch is
+  in the workbench's rock slice, not in the plates.
+- **Tests.** Properties (`plates/belts.rs`, `shortening.rs`, `surface/flexure.rs`, `plates/tests.rs`):
+  a head-on collision builds its belt over many steps, long along the front and narrow across it,
+  with a wedge at the set slope; the crust stacked is the crust that crossed times the share, with
+  its own rock; a strike-slip contact builds nothing; convergence falls as the belt grows and the
+  hand-over comes 10 Myr after the stall; a continent welds only once stalled and the larger plate
+  keeps its id; the stall clock; the foredeep reading; a belt and wedge across a plate boundary
+  bend a foreland basin on the incoming plate; on a 300 Myr planet every weld was stalled, the
+  smaller plate died, and transfers shortened by the threshold.
+- **Gates** (test VM, tree merged with master 5c4d2ed3): cargo fmt --check clean; clippy -D warnings
+  clean; cargo deny licenses and bans ok; `cargo test --workspace --no-fail-fast` 733 passed, 0
+  failed, 3 ignored; `./gradlew build test` 226 tests, 0 failures, 1 skipped (the share-code
+  fixture regenerated with `tools/dev/share_code_fixture.py`). GAMETESTS
+- **Scratch.** `/Volumes/Graphide/ban/deeptime-runs/belts34` on the test VM, deleted after the report.
+- **Next.** Task 6 (structure stage reads shortening and the basin), task 7 (the switch), which
+  removes `collision_resistance_mm_yr` and the speed law this stands on; the full calibration then.
 ### 2026-10-02 — Continental crust bisect: the flexure merge cuts the crust (agent worktree agent-aee75761ddffd745f, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; measurement only, nothing fixed, no code committed)
 - **Question.** `deeptime plate-check` on `earthlike_quick_16k`, supercontinent start, 1000 Myr: continental
   crust at the end 0.42 on 38ca6b0 (baseline doc, mean of seeds 1-4) and 0.29 on 1eac09f.

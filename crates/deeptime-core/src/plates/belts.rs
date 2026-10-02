@@ -27,9 +27,9 @@
 //!    it and under the front: a critical wedge "continu[es] to grow at constant taper as additional
 //!    material is encountered at the toe" (Davis, Suppe & Dahlen 1983).
 //! 2. **The belt** on the overriding plate takes the rest, over `collision_belt_km` behind the
-//!    front with the profile `1 − (d/W)²` (highest at the front). Where the overriding plate is
-//!    narrower than the belt (a sliver, an island arc), each sample takes what a full belt would
-//!    give it and the rest goes down with the slab. Nothing caps it: crust above the
+//!    front with the profile `1 − (d/W)²` (highest at the front). Where the overriding plate
+//!    offers less than half a full belt's area (a sliver, an island arc), each sample takes what
+//!    half a belt would give it and the rest goes down with the slab. Nothing caps it: crust above the
 //!    strength height spreads in the surface stage (`surface::spread`) and widens it into a
 //!    plateau, and erosion wears it down. (The plate-only presets keep their isostatic ceiling,
 //!    `uplift_ceiling_m`.)
@@ -50,15 +50,18 @@
 //!   r = collision_resistance_mm_yr × (h_belt / h_s) × min(1, L / L_drive),
 //!   L_drive = min(F, slab_pull_front_km),
 //!
-//! `h_belt` the belt's height (its mean above sea level within half its width of the front), `h_s`
-//! the strength height the crust spreading uses (`crust_strength_mpa / (ρ_c g)`, so gravity and
-//! crust strength enter here too), `L` the front's length and `F` the subduction front the speed
-//! law pulls the incoming plate by this step (`subduction::Pull::front_km`, the collision's own
-//! front included). The collisions design wrote `min(1, L / slab_pull_front_km)`, which holds for
-//! a plate pulled by a full slab; measured, collision fronts are a median 400 km long, so a plate
-//! with no other slab would need a belt tens of km high to stop. Against the plate's own drive, a
-//! plate with no slab elsewhere stalls once its belt is about 2 km high (the Alps, the Urals) and
-//! one pulled by a long slab keeps converging (India), as the design describes. It acts like the speed law's own
+//! `h_belt` the belt's height (its mean above sea level within half its width of the front, or
+//! its relief over the ground it was built on where that is more: a belt raised from a submarine
+//! edge), `h_s` the strength height the crust spreading uses (`crust_strength_mpa / (ρ_c g)`, so
+//! gravity and crust strength enter here too), `L` the front's length and `F` the oceanic slab
+//! front the speed law pulls the incoming plate by this step (`subduction::Pull::front_km`; with
+//! none, the factor is 1). The collisions design wrote `min(1, L / slab_pull_front_km)`, which
+//! holds for a plate pulled by a full slab; measured, collision fronts are a median 400 km long,
+//! so a plate with no other slab would need a belt tens of km high to stop. Against the plate's
+//! own drive, a plate with no slab elsewhere stalls once its belt stands 1 to 2 km high (the
+//! Alps, the Urals) and one pulled by a long slab keeps converging (India), as the design
+//! describes. `collision_resistance_mm_yr` is 200 in the presets (the design's 100 let collisions
+//! consume whole continents before they stopped). It acts like the speed law's own
 //! relaxation: each step the convergence across the front loses `relax · r` (`relax` the speed
 //! law's `1 − e^(−δt/τ)`, τ = `slab_pull_relax_myr`), never more than it has. Against the speed
 //! law's pull back towards each plate's target speed this settles at a convergence of
