@@ -143,6 +143,11 @@ pub struct Zone {
     pub grade: f32,
     /// Probability (0–1) that a host block in the zone becomes ore.
     pub density: f32,
+    /// Of the ore blocks the zone places, the share (0–1) that are the material's raw-ore block
+    /// (`raw_iron_block`, …: vanilla's ore veins, Ben 2026-10-02); 0 = none. A second draw,
+    /// independent of the ore draw (FORMAT.md).
+    #[serde(default)]
+    pub raw: f32,
 }
 
 impl Zone {
@@ -320,8 +325,16 @@ impl Body {
         }
         for z in &self.zones {
             let ok = |r: [f32; 2]| r[0].is_finite() && r[1].is_finite() && r[0] <= r[1];
-            if !ok(z.d) || !ok(z.v) || !(0.0..=1.0).contains(&z.density) || !z.grade.is_finite() {
-                return bad(format!("zone {} has a bad range, grade or density", z.name));
+            if !ok(z.d)
+                || !ok(z.v)
+                || !(0.0..=1.0).contains(&z.density)
+                || !(0.0..=1.0).contains(&z.raw)
+                || !z.grade.is_finite()
+            {
+                return bad(format!(
+                    "zone {} has a bad range, grade, density or raw share",
+                    z.name
+                ));
             }
         }
         Ok(())
@@ -344,7 +357,7 @@ impl Body {
             "rock_class": self.rock_class,
             "zones": self.zones.iter().map(|z| json!({
                 "name": z.name, "material": z.material, "rock_class": z.rock_class,
-                "d": z.d, "v": z.v, "grade": z.grade, "density": z.density,
+                "d": z.d, "v": z.v, "grade": z.grade, "density": z.density, "raw": z.raw,
             })).collect::<Vec<_>>(),
         })
     }
@@ -376,10 +389,9 @@ pub fn encode_bodies(bodies: &[Body]) -> Result<Vec<u8>> {
             zones.extend_from_slice(&strings.intern(&z.name).to_le_bytes());
             zones.extend_from_slice(&opt_string(&mut strings, &z.material).to_le_bytes());
             zones.extend_from_slice(&opt_string(&mut strings, &z.rock_class).to_le_bytes());
-            for v in [z.d[0], z.d[1], z.v[0], z.v[1], z.grade, z.density] {
+            for v in [z.d[0], z.d[1], z.v[0], z.v[1], z.grade, z.density, z.raw] {
                 zones.extend_from_slice(&v.to_le_bytes());
             }
-            zones.extend_from_slice(&0u32.to_le_bytes());
         }
         let start = records.len();
         records.extend_from_slice(&b.id.to_le_bytes());
@@ -457,6 +469,7 @@ pub fn decode_bodies(path: &Path, b: &[u8]) -> Result<Vec<Body>> {
                 v: [f32_at(e, 20), f32_at(e, 24)],
                 grade: f32_at(e, 28),
                 density: f32_at(e, 32),
+                raw: f32_at(e, 36),
             });
         }
         let i3 = |at: usize| [i32_at(rec, at), i32_at(rec, at + 4), i32_at(rec, at + 8)];
@@ -523,6 +536,7 @@ mod tests {
                 v: [0.0, 1.0],
                 grade: 0.006,
                 density: 0.5,
+                raw: 0.04,
             },
             Zone {
                 name: "propylitic_halo".into(),
@@ -532,6 +546,7 @@ mod tests {
                 v: [0.0, 1.0],
                 grade: 0.0,
                 density: 0.0,
+                raw: 0.0,
             },
         ];
         b
