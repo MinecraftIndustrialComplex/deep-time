@@ -96,8 +96,8 @@ public final class GeothermalPass {
                 }
                 if (site == null)
                     continue;
-                int top = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, lx, lz) - 1;      // the highest solid block
-                int surface = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, lx, lz) - 1;  // the highest block that is not air
+                int top = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, lx, lz);      // the highest solid block (ChunkAccess.getHeight is its y)
+                int surface = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, lx, lz);  // the highest block that is not air
                 if (part.pool() || part == Geothermal.Part.RIM) {
                     placePool(chunk, masks, pos, palette, site, part, sdx, sdz, lx, lz, x, z, top, minY, maxY);
                     pools++;
