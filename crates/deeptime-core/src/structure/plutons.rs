@@ -12,14 +12,22 @@
 //!   `collision_pluton_factor` on continental crust in the collision regime (crustal-melt
 //!   granites).
 //! - **What.** Continental arcs: granodiorite (0.7), granite (0.2), diorite (0.1); island arcs:
-//!   diorite (0.6), granodiorite (0.4, the class holds tonalite); collision zones: granite. Design
-//!   shares after the dominance of tonalite–granodiorite in Cordilleran batholiths.
-//! - **Size.** Length L lognormal (`pluton_length_km` median and bounds, `pluton_length_sigma`),
-//!   width 0.5–1 × L, thickness T = 0.6·L^0.6 km (Cruden 1998), a random strike. The roof is
-//!   emplaced `pluton_roof_km` below the surface of the time.
+//!   diorite (0.6), granodiorite (0.4, the class holds tonalite); collision zones: granite. The
+//!   shares are game choices (ledger RCK-064, RCK-065). The qualitative picture is right: the
+//!   central Sierra Nevada is tonalite and granodiorite with granite less common and under 3 %
+//!   mafic rock (Bateman 1992; Ducea 2001), and the Peruvian Coastal Batholith is two-thirds
+//!   Santa Rosa tonalite; no source read gives percentages like these.
+//! - **Size.** Length L (the long axis) lognormal (`pluton_length_km` median and bounds,
+//!   `pluton_length_sigma`), width 0.5–1 × L, a random strike. Thickness is the power law
+//!   T = 0.6·D^0.6 km of Cruden & McCaffrey (2001; read in Cruden 2008, SKB R-08-138, eq. 1, fitted
+//!   to 66 plutons) with D the diameter of the circle of the pluton's area, √(L·width), as in the
+//!   fit ([`thickness_km`]; ledger RCK-061). The roof is emplaced `pluton_roof_km` below the
+//!   surface of the time.
 //! - **Contact aureole.** The outer `aureole_shell` of the body (normalised distance) is a zone
 //!   whose rock class is the aureole's: skarn where the roof's host rock is a carbonate, hornfels
-//!   where it is any other non-crystalline rock, none in crystalline hosts.
+//!   where it is any other non-crystalline rock, none in crystalline hosts (RCK-053, RCK-054).
+//!   Skarn is calc-silicate rock from carbonate (Meinert 1992), the fine-grained rock baked
+//!   from other hosts is hornfels (Nelson, Tulane).
 //! - **Motion.** Each step a pluton turns with the Ω of the plate it sat on (the plate model's
 //!   finite rotation, as `surface::advect`), takes the plate now under it (terrane transfer), or is
 //!   lost when oceanic crust carrying it went under another plate. Its roof depth follows the
@@ -41,6 +49,17 @@ use crate::synth::EVERY_CLASS;
 
 use super::columns::{self, Tables};
 use super::params::StructureParams;
+
+/// Thickness (km) of a tabular pluton whose map outline is `length_km` long and `width_km` wide:
+/// T = b·D^a with b = 0.6, a = 0.6 and D, the circle-equivalent diameter √(length × width), in km.
+/// Cruden & McCaffrey (2001) fitted this to 66 plutons, 4.5 to 600 km across (b ±0.15, a ±0.1;
+/// read in Cruden 2008, SKB R-08-138, section 2.1.7, eq. 1); the scatter is large (the 56-km
+/// Lucerne granite is 4.5 km thick against 6.7 km predicted). The Cruden (1998) paper that the
+/// code used to cite gives no equation, only "about 3 km" for plutons 10 to 100 km wide.
+// ledger: RCK-061
+pub fn thickness_km(length_km: f64, width_km: f64) -> f64 {
+    0.6 * (length_km * width_km).sqrt().powf(0.6)
+}
 
 /// No aureole.
 pub const NO_AUREOLE: u16 = u16::MAX;
@@ -96,7 +115,8 @@ pub struct ArcInputs<'a> {
     pub plate_id: &'a [f32],
 }
 
-/// The emplacement intensity of cell `c` (0–1).
+/// The emplacement intensity of cell `c` (0–1). The 80 mm/yr convergence scale and the 0.7 for
+/// island arcs are game choices (ledger RCK-059).
 pub fn intensity(x: &ArcInputs<'_>, c: usize, p: &StructureParams) -> f64 {
     let cont = x.crust_type[c] as u8 == CONTINENTAL;
     let flags = x.flags[c] as u32 as u8;
@@ -155,6 +175,7 @@ pub fn emplace(
         let oceanic = x.crust_type[c] as u8 != CONTINENTAL;
         let collision = !oceanic && x.flags[c] as u32 as u8 & ARC == 0;
         let u = rng.uniform();
+        // ledger: RCK-064, RCK-065 (game choice)
         let class = if collision {
             granite
         } else if oceanic {
@@ -168,9 +189,13 @@ pub fn emplace(
         };
         let [median, lo, hi] = p.pluton_length_km;
         let length_km = (median * (p.pluton_length_sigma * rng.normal()).exp()).clamp(lo, hi);
-        let thick_km = 0.6 * length_km.powf(0.6);
+        // Width 0.5 to 1 of the length (RCK-062, game choice): the large Sierra plutons are
+        // narrower, Mount Givens 80 x 17 km and Lamarck over 60 x 10 km (Bateman 1992), while small
+        // leucocratic plutons are "subcircular".
         let a_m = 500.0 * length_km;
         let c_m = a_m * (0.5 + 0.5 * rng.uniform());
+        // a_m and c_m are the half length and half width in metres: 500 m per km of outline.
+        let thick_km = thickness_km(a_m / 500.0, c_m / 500.0);
         let b_m = 500.0 * thick_km;
         let roof_km =
             p.pluton_roof_km[0] + rng.uniform() * (p.pluton_roof_km[1] - p.pluton_roof_km[0]);
@@ -381,6 +406,68 @@ mod tests {
             class: index("granodiorite"),
             aureole: index("hornfels"),
             t_myr: -10.0,
+        }
+    }
+
+    #[test]
+    fn thickness_follows_the_published_power_law_of_the_circle_equivalent_diameter() {
+        // Cruden & McCaffrey 2001 as restated in Cruden 2008 (SKB R-08-138): T = 0.6 D^0.6 (km).
+        // Checks worked from that equation: a round 4.5-km pluton (their Gasborn granite, observed
+        // 1.6 km) comes to 1.48 km, a round 56-km one (Lucerne, observed 4.5 km) to 6.7 km.
+        assert!((thickness_km(4.5, 4.5) - 1.48).abs() < 0.01);
+        assert!((thickness_km(56.0, 56.0) - 6.7).abs() < 0.05);
+        // The fit is to the diameter of the circle of equal area, so an elongate body is as thick
+        // as the circle of its area: 100 x 25 km has the area of a circle 50 km across.
+        assert!((thickness_km(100.0, 25.0) - thickness_km(50.0, 50.0)).abs() < 1e-9);
+        // Doubling the diameter multiplies the thickness by 2^0.6.
+        let r = thickness_km(40.0, 40.0) / thickness_km(20.0, 20.0);
+        assert!((r - 2.0f64.powf(0.6)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn emplaced_plutons_are_as_thick_as_their_area_says() {
+        let grid = GridDesc::for_planet("L1", 4096, 16).unwrap();
+        let n = grid.cells();
+        let flags = vec![f32::from(ARC); n];
+        let convergence = vec![80.0f32; n];
+        let crust = vec![f32::from(CONTINENTAL); n];
+        let regime_f = vec![0.0f32; n];
+        let plate = vec![0.0f32; n];
+        let x = ArcInputs {
+            flags: &flags,
+            convergence: &convergence,
+            crust_type: &crust,
+            regime: &regime_f,
+            plate_id: &plate,
+        };
+        let p = StructureParams {
+            pluton_rate_km2_myr: 1.0e-4,
+            ..StructureParams::default()
+        };
+        let t = Tables::get();
+        let (mut rng, mut next) = (Rng::new(7), 0u32);
+        let out = emplace(
+            &grid,
+            300.0,
+            &x,
+            &p,
+            &t,
+            1.0,
+            0.0,
+            &mut rng,
+            &mut next,
+            |_, _| None,
+        );
+        assert!(out.len() > 20, "{} plutons", out.len());
+        for pl in &out {
+            // Semi-axes a, c and half-height b are 500 m per km of length, width and thickness.
+            let (len, wid, thick) = (
+                f64::from(pl.a_m) / 500.0,
+                f64::from(pl.c_m) / 500.0,
+                f64::from(pl.b_m) / 500.0,
+            );
+            let want = 0.6 * (len * wid).sqrt().powf(0.6);
+            assert!((thick - want).abs() < 1e-3 * want, "{thick} against {want}");
         }
     }
 

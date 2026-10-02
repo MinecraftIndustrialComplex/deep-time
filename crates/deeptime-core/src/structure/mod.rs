@@ -143,6 +143,7 @@ impl Cover {
 }
 
 /// The thinnest horizon of another rock that ends the sedimentary cover ([`Cover::blocks_at`]).
+// ledger: STR-009 (game choice)
 pub const COVER_MIN_BLOCKS: i32 = 3;
 
 /// The stage's name in a pipeline (`deeptime stage structure`).

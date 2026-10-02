@@ -13,6 +13,8 @@
 //!    subducting plate's crust inside the overriding one;
 //! 2. uplifts the overriding plate within r_s of its fronts (Cortial's u_0·f(d)·g(v)·h(z̃)), builds
 //!    arcs, trenches and the deposit accumulators, and turns subducting plates by slab pull;
+//!    With the dynamics record on, it then sums the forces on every plate and solves their
+//!    torque balance, which is recorded and not applied (`forces.rs`);
 //! 3. keeps each contact's collision state and real shortening (`shortening.rs`) and fires a
 //!    collision where the shortening has reached the threshold, moving the terrane to the other
 //!    plate with a surge of uplift (`collision.rs`);
@@ -40,6 +42,7 @@ pub mod check;
 pub mod collision;
 pub mod dynamics;
 pub mod events;
+pub mod forces;
 pub mod geometry;
 pub mod hotspots;
 pub mod init;
@@ -203,6 +206,15 @@ impl PlatesStage {
         let fired = shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
         let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
+        // The force balance, recorded and not applied (`forces.rs`; nothing when the record is
+        // off).
+        let balance = forces::record(
+            st,
+            &cache.geo,
+            &pos,
+            &env,
+            forces::flow_axis(self.preset.seed),
+        );
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
         let mut sutured = false;
         for (c, seeds) in &fired {
@@ -284,6 +296,7 @@ impl PlatesStage {
                 front_km: &pull.front_km,
                 mix_km,
                 arcs,
+                forces: balance.as_ref(),
             },
         );
         self.done = step;
