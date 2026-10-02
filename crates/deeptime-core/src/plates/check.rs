@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
 
-use super::dynamics::{Dynamics, PlateLife, PlateStep};
+use super::dynamics::{BeltRec, Dynamics, PlateLife, PlateStep, StepRec};
 use super::stats::Margins;
 
 /// One measure: its key, label, unit, range (inclusive; `None` is open) and how it is taken.
@@ -30,6 +30,9 @@ pub struct MeasureDef {
     pub unit: &'static str,
     pub lo: Option<f64>,
     pub hi: Option<f64>,
+    /// Set for a measure that needs physics not built yet: what it waits for. Without data it is
+    /// reported as "no data" and does not fail the check.
+    pub pending: Option<&'static str>,
 }
 
 const fn m(
@@ -45,8 +48,31 @@ const fn m(
         unit,
         lo,
         hi,
+        pending: None,
     }
 }
+
+/// A measure that waits for physics not built yet (`why` names the design task).
+const fn waits(
+    key: &'static str,
+    label: &'static str,
+    unit: &'static str,
+    lo: Option<f64>,
+    hi: Option<f64>,
+    why: &'static str,
+) -> MeasureDef {
+    MeasureDef {
+        key,
+        label,
+        unit,
+        lo,
+        hi,
+        pending: Some(why),
+    }
+}
+
+const WAITS_COLLISION: &str = "the collision state and belts (design tasks 2-3)";
+const WAITS_FORCES: &str = "the force balance (design task 5)";
 
 /// The measures in table order: first the ones with the design's §6 ranges, then the ones only
 /// reported (the design's §2.2 figures and what a force-balance plate model will be judged on).
@@ -130,14 +156,14 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "collision_length_p50_myr",
-        "Collision length, onset to weld or parting, median",
+        "Collision length, first to last step of the collision, median",
         "Myr",
         Some(15.0),
         Some(50.0),
     ),
     m(
         "collision_length_p90_myr",
-        "Collision length, 90th percentile",
+        "Collision length, first to last step, 90th percentile",
         "Myr",
         None,
         Some(120.0),
@@ -158,14 +184,14 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "continental_min",
-        "Continental crust, share of the planet, lowest step",
+        "Continental crust, share of the planet, lowest step (after the first 10 Myr)",
         "share",
         Some(0.37),
         None,
     ),
     m(
         "continental_max",
-        "Continental crust, share of the planet, highest step",
+        "Continental crust, share of the planet, highest step (after the first 10 Myr)",
         "share",
         None,
         Some(0.45),
@@ -178,11 +204,164 @@ pub const MEASURES: &[MeasureDef] = &[
         Some(0.40),
     ),
     m(
-        "ocean_age_p90_myr",
-        "Ocean floor, 90th percentile age, end of the run",
+        "ocean_age_p90_mean_myr",
+        "Ocean floor, 90th percentile age, mean over the run after the first 100 Myr",
         "Myr",
         None,
         Some(230.0),
+    ),
+    // Task 1b: the force-balance design's section 7 targets that today's model can be measured on.
+    m(
+        "speed_rms_mm_yr",
+        "Plate speed, area-weighted RMS (mean over steps)",
+        "mm/yr",
+        Some(35.0),
+        Some(55.0),
+    ),
+    m(
+        "speed_big_p10_mm_yr",
+        "Plate speed, 10th percentile of plate-steps (plates of 30 samples or more)",
+        "mm/yr",
+        None,
+        Some(20.0),
+    ),
+    m(
+        "speed_big_p50_mm_yr",
+        "Plate speed, median of plate-steps (plates of 30 samples or more)",
+        "mm/yr",
+        Some(30.0),
+        Some(60.0),
+    ),
+    m(
+        "speed_big_p90_mm_yr",
+        "Plate speed, 90th percentile of plate-steps (plates of 30 samples or more)",
+        "mm/yr",
+        Some(70.0),
+        Some(110.0),
+    ),
+    m(
+        "speed_oceanic_over_continental",
+        "Median speed of plates under 20 % continental ÷ of plates over 50 %",
+        "ratio",
+        Some(2.0),
+        None,
+    ),
+    m(
+        "speed_slab_over_free",
+        "Median speed of plates with 20 % or more of their edge on slab ÷ of plates under 5 %",
+        "ratio",
+        Some(2.5),
+        None,
+    ),
+    m(
+        "speed_slab_rank_corr",
+        "Speed against slab share of the edge, rank correlation",
+        "rho",
+        Some(0.65),
+        None,
+    ),
+    m(
+        "speed_area_rank_corr",
+        "Speed against plate area, rank correlation",
+        "rho",
+        Some(-0.4),
+        Some(0.2),
+    ),
+    m(
+        "speed_over_150_pct",
+        "Plate-steps above 150 mm/yr",
+        "%",
+        None,
+        Some(0.5),
+    ),
+    m(
+        "guard_bind_steps",
+        "Steps on which the speed guard binds",
+        "steps",
+        None,
+        Some(0.0),
+    ),
+    m(
+        "rot_change_p50_pct",
+        "Change of a plate's rotation per step, median",
+        "%",
+        None,
+        Some(8.0),
+    ),
+    m(
+        "rot_change_p90_pct",
+        "Change of a plate's rotation per step, 90th percentile",
+        "%",
+        None,
+        Some(20.0),
+    ),
+    m(
+        "ocean_age_p50_myr",
+        "Ocean floor, median age (mean over the run after the first 100 Myr)",
+        "Myr",
+        Some(50.0),
+        Some(80.0),
+    ),
+    m(
+        "ocean_old180_pct",
+        "Ocean floor older than 180 Myr (mean over the run after the first 100 Myr)",
+        "% of sea floor",
+        None,
+        Some(10.0),
+    ),
+    m(
+        "ocean_old250_pct",
+        "Ocean floor older than 250 Myr (mean over the run after the first 100 Myr)",
+        "% of sea floor",
+        None,
+        Some(3.0),
+    ),
+    m(
+        "supercontinent_tenure_myr",
+        "Supercontinent tenure (largest continent from assembled to dispersed), median",
+        "Myr",
+        Some(100.0),
+        Some(300.0),
+    ),
+    m(
+        "supercontinent_period_myr",
+        "Assembly-to-assembly period, median",
+        "Myr",
+        Some(300.0),
+        Some(600.0),
+    ),
+    // Waiting for physics: reported as "no data" until the record is filled (see `waits`).
+    waits(
+        "collision_convergence_ratio_20myr",
+        "Convergence 20 Myr after a collision's onset ÷ at onset, median (needs the collision state)",
+        "ratio",
+        Some(0.2),
+        Some(0.6),
+        WAITS_COLLISION,
+    ),
+    waits(
+        "wedge_width_km_p50",
+        "Wedge on the incoming side, width, median (needs the belts)",
+        "km",
+        Some(100.0),
+        Some(350.0),
+        WAITS_COLLISION,
+    ),
+    waits(
+        "foredeep_width_km_p50",
+        "Foredeep width, median (needs the belts)",
+        "km",
+        Some(150.0),
+        Some(450.0),
+        WAITS_COLLISION,
+    ),
+    waits(
+        "foredeep_depth_m_p50",
+        "Foredeep depth of fill, median (needs the belts)",
+        "m",
+        Some(2000.0),
+        Some(7000.0),
+        WAITS_COLLISION,
     ),
     // Reported only: the design's §2.2 figures.
     m(
@@ -326,9 +505,23 @@ pub const MEASURES: &[MeasureDef] = &[
         None,
     ),
     m(
-        "ocean_age_p90_mean_myr",
-        "Ocean floor, 90th percentile age, mean after the first 100 Myr",
+        "ocean_age_p90_myr",
+        "Ocean floor, 90th percentile age, last step",
         "Myr",
+        None,
+        None,
+    ),
+    m(
+        "continental_min_all",
+        "Continental crust, share of the planet, lowest step (all steps)",
+        "share",
+        None,
+        None,
+    ),
+    m(
+        "continental_max_all",
+        "Continental crust, share of the planet, highest step (all steps)",
+        "share",
         None,
         None,
     ),
@@ -389,19 +582,246 @@ pub const MEASURES: &[MeasureDef] = &[
         None,
         None,
     ),
+    // Task 1b, reported only: what the force-balance design asks to see.
+    m(
+        "speed_over_150_plate_steps",
+        "Plate-steps above 150 mm/yr, count",
+        "plate-steps",
+        None,
+        None,
+    ),
+    m(
+        "guard_bind_plate_steps",
+        "Plate-steps on which the speed guard binds",
+        "plate-steps",
+        None,
+        None,
+    ),
+    m(
+        "pole_inside_pct",
+        "Plate-steps turning about a pole on the plate itself",
+        "%",
+        None,
+        None,
+    ),
+    m(
+        "continent_pieces_p50",
+        "Connected pieces of continental crust (of 1 % or more of it), median over steps",
+        "pieces",
+        None,
+        None,
+    ),
+    m(
+        "continent_largest_share_p50",
+        "Largest continental piece, share of the continental crust, median over steps",
+        "share",
+        None,
+        None,
+    ),
+    m(
+        "continent_largest_share_min",
+        "Largest continental piece, share of the continental crust, lowest step",
+        "share",
+        None,
+        None,
+    ),
+    m(
+        "supercontinent_episodes",
+        "Supercontinent assemblies in the run (one at the start counts)",
+        "episodes",
+        None,
+        None,
+    ),
+    m(
+        "supercontinent_time_pct",
+        "Steps with a supercontinent assembled",
+        "%",
+        None,
+        None,
+    ),
+    m(
+        "megaplate_rifts",
+        "Rifts of a plate above 40 % of the planet, per run",
+        "rifts",
+        None,
+        None,
+    ),
+    m(
+        "megaplate_tenure_p50_myr",
+        "A plate above 40 % of the planet: time above it until a rift splits it, median",
+        "Myr",
+        None,
+        None,
+    ),
+    m(
+        "megaplate_rift_apart_50_pct",
+        "Rifts of such a plate whose fragments are all still separate 50 Myr later",
+        "%",
+        None,
+        None,
+    ),
+    waits(
+        "force_slab_pull_share_p50",
+        "Share of a plate's driving torque that is slab pull, median (needs the force budget)",
+        "share",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "megaplate_stress_mpa_p50",
+        "Mean in-plane stress of a plate above 40 %, median; tension positive (needs the force budget)",
+        "MPa",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "megaplate_tension_pct",
+        "Steps in which a plate above 40 % is in tension (needs the force budget)",
+        "%",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
+    waits(
+        "slab_length_km_p50",
+        "Slab length per contact, median (needs slab tracking)",
+        "km",
+        None,
+        None,
+        WAITS_FORCES,
+    ),
 ];
 
-/// Target ranges by measure key: the built-in ones, with any overrides applied.
+/// What the measures take besides target ranges: definitions the design leaves to the check.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Params {
+    /// A supercontinent is assembled when the largest connected piece of continental crust holds
+    /// this share of the continental crust or more (the force-balance design's "70 % or more")...
+    pub assembled_share: f64,
+    /// ... and stays so until it holds less than this ("until it holds under 50 %"): a plain
+    /// threshold would count every flicker around it as a break-up.
+    pub dispersed_share: f64,
+    /// A plate is a mega-plate while it holds more than this share of the visible planet.
+    pub mega_plate_share: f64,
+    /// Speeds, rotation changes and the pole test count plates of at least this many visible
+    /// samples (the design's trace: "plates of at least 30 samples").
+    pub min_plate_samples: f64,
+    /// Plate speed above which a plate-step counts as fast, mm/yr.
+    pub fast_mm_yr: f64,
+    /// The sea-floor measures leave out this many Myr from the start of the run (the starting
+    /// ocean's ages are drawn, not made by the model).
+    pub warmup_myr: f64,
+    /// The continental crust's lowest and highest step leave out this many Myr from the start
+    /// (the same start-up as the land gain's).
+    pub start_up_myr: f64,
+    /// A piece of continental crust counts in the piece count when it holds at least this share
+    /// of the continental crust.
+    pub min_piece_share: f64,
+    /// How long after a rift its fragments must still be separate, Myr.
+    pub rift_window_myr: f64,
+}
+
+impl Default for Params {
+    fn default() -> Params {
+        Params {
+            assembled_share: 0.70,
+            dispersed_share: 0.50,
+            mega_plate_share: 0.40,
+            min_plate_samples: 30.0,
+            fast_mm_yr: 150.0,
+            warmup_myr: 100.0,
+            start_up_myr: 10.0,
+            min_piece_share: 0.01,
+            rift_window_myr: 50.0,
+        }
+    }
+}
+
+impl Params {
+    /// The names `set` takes.
+    pub const KEYS: &'static [&'static str] = &[
+        "assembled_share",
+        "dispersed_share",
+        "mega_plate_share",
+        "min_plate_samples",
+        "fast_mm_yr",
+        "warmup_myr",
+        "start_up_myr",
+        "min_piece_share",
+        "rift_window_myr",
+    ];
+
+    /// Sets one parameter by name.
+    pub fn set(&mut self, key: &str, value: f64) -> Result<(), String> {
+        if !value.is_finite() {
+            return Err(format!("parameter {key}: {value} is not a finite number"));
+        }
+        match key {
+            "assembled_share" => self.assembled_share = value,
+            "dispersed_share" => self.dispersed_share = value,
+            "mega_plate_share" => self.mega_plate_share = value,
+            "min_plate_samples" => self.min_plate_samples = value,
+            "fast_mm_yr" => self.fast_mm_yr = value,
+            "warmup_myr" => self.warmup_myr = value,
+            "start_up_myr" => self.start_up_myr = value,
+            "min_piece_share" => self.min_piece_share = value,
+            "rift_window_myr" => self.rift_window_myr = value,
+            _ => {
+                return Err(format!(
+                    "no parameter {key:?} (names: {})",
+                    Self::KEYS.join(", ")
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// `name=value` as the command line gives it.
+    pub fn set_text(&mut self, text: &str) -> Result<(), String> {
+        let (k, v) = text
+            .split_once('=')
+            .ok_or_else(|| format!("parameter {text:?}: expected name=value"))?;
+        let v: f64 = v
+            .trim()
+            .parse()
+            .map_err(|_| format!("parameter {k}: {v:?} is not a number"))?;
+        self.set(k.trim(), v)
+    }
+
+    /// One line for the table's header.
+    pub fn describe(&self) -> String {
+        format!(
+            "supercontinent assembled at {:.0} % of the continental crust in one piece, dispersed \
+             under {:.0} %; mega-plate above {:.0} % of the planet; speeds of plates of {:.0}+ \
+             samples; sea floor after the first {:.0} Myr; continental extremes after the first \
+             {:.0} Myr; rift fragments apart after {:.0} Myr",
+            100.0 * self.assembled_share,
+            100.0 * self.dispersed_share,
+            100.0 * self.mega_plate_share,
+            self.min_plate_samples,
+            self.warmup_myr,
+            self.start_up_myr,
+            self.rift_window_myr
+        )
+    }
+}
+
+/// Target ranges by measure key and the check's parameters: the built-in ones, with any overrides
+/// applied.
 #[derive(Clone, Debug)]
 pub struct Targets {
     ranges: BTreeMap<&'static str, (Option<f64>, Option<f64>)>,
+    pub params: Params,
 }
 
 impl Targets {
-    /// The design's §6 ranges ([`MEASURES`]).
+    /// The design's §6 ranges ([`MEASURES`]) and the default [`Params`].
     pub fn builtin() -> Targets {
         Targets {
             ranges: MEASURES.iter().map(|d| (d.key, (d.lo, d.hi))).collect(),
+            params: Params::default(),
         }
     }
 
@@ -411,13 +831,26 @@ impl Targets {
     }
 
     /// Overrides from a JSON object `{"key": [lo, hi], …}`; `null` leaves an end open (and
-    /// `"key": null` turns the measure into a reported one). Unknown keys are an error.
+    /// `"key": null` turns the measure into a reported one). The key `"params"` holds an object of
+    /// [`Params`] values. Unknown keys are an error.
     pub fn apply_json(&mut self, text: &str) -> Result<(), String> {
         let v: Value = serde_json::from_str(text).map_err(|e| format!("targets file: {e}"))?;
         let obj = v
             .as_object()
             .ok_or("targets file: expected an object of measure -> [lo, hi]")?;
         for (key, range) in obj {
+            if key == "params" {
+                let o = range
+                    .as_object()
+                    .ok_or("targets file: params: expected an object of name -> number")?;
+                for (name, v) in o {
+                    let x = v
+                        .as_f64()
+                        .ok_or_else(|| format!("targets file: params.{name}: not a number"))?;
+                    self.params.set(name, x)?;
+                }
+                continue;
+            }
             let Some(slot) = self.ranges.get_mut(key.as_str()) else {
                 return Err(format!(
                     "targets file: no measure {key:?} (keys: {})",
@@ -598,8 +1031,18 @@ fn pearson(x: &[f64], y: &[f64]) -> f64 {
     }
 }
 
-/// Every measure of one run, by key (NaN where the run cannot give it).
+/// Every measure of one run, by key (NaN where the run cannot give it), with the default
+/// [`Params`].
 pub fn measures(d: &Dynamics, margins: &[Margins]) -> BTreeMap<&'static str, f64> {
+    measures_with(d, margins, &Params::default())
+}
+
+/// Every measure of one run, by key (NaN where the run cannot give it).
+pub fn measures_with(
+    d: &Dynamics,
+    margins: &[Margins],
+    params: &Params,
+) -> BTreeMap<&'static str, f64> {
     let mut out: BTreeMap<&'static str, f64> = BTreeMap::new();
     let mut put = |k: &'static str, v: f64| {
         out.insert(k, v);
@@ -732,12 +1175,29 @@ pub fn measures(d: &Dynamics, margins: &[Margins]) -> BTreeMap<&'static str, f64
         .iter()
         .map(|s| f64::from(s.continental) / n)
         .collect();
+    // The judged extremes leave out the start-up (the first `start_up_myr`), which is not the
+    // model's doing; the extremes over every step are reported beside them.
+    let settled: Vec<f64> = d
+        .steps
+        .iter()
+        .filter(|s| s.t - d.t0_myr > params.start_up_myr)
+        .map(|s| f64::from(s.continental) / n)
+        .collect();
+    let settled = if settled.is_empty() { &cont } else { &settled };
     put(
         "continental_min",
-        cont.iter().copied().fold(f64::NAN, f64::min),
+        settled.iter().copied().fold(f64::NAN, f64::min),
     );
     put(
         "continental_max",
+        settled.iter().copied().fold(f64::NAN, f64::max),
+    );
+    put(
+        "continental_min_all",
+        cont.iter().copied().fold(f64::NAN, f64::min),
+    );
+    put(
+        "continental_max_all",
         cont.iter().copied().fold(f64::NAN, f64::max),
     );
     put("continental_end", cont.last().copied().unwrap_or(f64::NAN));
@@ -827,14 +1287,31 @@ pub fn measures(d: &Dynamics, margins: &[Margins]) -> BTreeMap<&'static str, f64
         "ocean_age_p90_myr",
         d.ages.last().map_or(f64::NAN, |a| a.p90_myr),
     );
-    let first_age_t = d.ages.first().map_or(0.0, |a| a.t);
-    let late: Vec<f64> = d
-        .ages
+    // The sea floor over the run, from the per-step record, after the warm-up (all steps when the
+    // run is shorter than it).
+    let late: Vec<&StepRec> = d
+        .steps
         .iter()
-        .filter(|a| a.t - first_age_t >= 90.0)
-        .map(|a| a.p90_myr)
+        .filter(|s| s.t - d.t0_myr >= params.warmup_myr && s.ocean > 0)
         .collect();
-    put("ocean_age_p90_mean_myr", mean(late));
+    let late = if late.is_empty() {
+        d.steps.iter().filter(|s| s.ocean > 0).collect()
+    } else {
+        late
+    };
+    put(
+        "ocean_age_p90_mean_myr",
+        mean(late.iter().map(|s| s.age_p90)),
+    );
+    put("ocean_age_p50_myr", mean(late.iter().map(|s| s.age_p50)));
+    let share = |f: fn(&StepRec) -> u32| {
+        mean(
+            late.iter()
+                .map(|s| 100.0 * f64::from(f(s)) / f64::from(s.ocean)),
+        )
+    };
+    put("ocean_old180_pct", share(|s| s.old180));
+    put("ocean_old250_pct", share(|s| s.old250));
 
     // What a force-balance plate model is judged on: speeds against slabs and crust type.
     let all: Vec<&PlateStep> = d.steps.iter().flat_map(|s| s.plates.iter()).collect();
@@ -869,7 +1346,481 @@ pub fn measures(d: &Dynamics, margins: &[Margins]) -> BTreeMap<&'static str, f64
         "speed_continental_mm_yr",
         speed(&|p| p.continental_share() >= 0.5),
     );
+
+    // Task 1b: speeds, rotation changes, the speed guard, continents and mega-plates.
+    plate_motion(d, params, &mut put);
+    continents(d, params, &mut put);
+    megaplates(d, params, &mut put);
+    pending_physics(d, params, &mut put);
     out
+}
+
+/// The plates the speed measures count: those of `params.min_plate_samples` visible samples or
+/// more (a handful of samples is a sliver, and its speed says nothing about the balance).
+fn big_plates<'a>(d: &'a Dynamics, params: &Params) -> Vec<&'a PlateStep> {
+    d.steps
+        .iter()
+        .flat_map(|s| s.plates.iter())
+        .filter(|p| f64::from(p.visible) >= params.min_plate_samples)
+        .collect()
+}
+
+fn ratio(a: f64, b: f64) -> f64 {
+    if a.is_finite() && b.is_finite() && b > 0.0 {
+        a / b
+    } else {
+        f64::NAN
+    }
+}
+
+fn median_of(
+    plates: &[&PlateStep],
+    sel: impl Fn(&PlateStep) -> bool,
+    val: impl Fn(&PlateStep) -> f64,
+) -> f64 {
+    median(
+        &plates
+            .iter()
+            .filter(|p| sel(p))
+            .map(|p| val(p))
+            .collect::<Vec<_>>(),
+    )
+}
+
+/// Ranks from 1, ties sharing the mean of their ranks.
+fn ranks(x: &[f64]) -> Vec<f64> {
+    let mut order: Vec<usize> = (0..x.len()).collect();
+    order.sort_by(|&a, &b| x[a].total_cmp(&x[b]));
+    let mut r = vec![0.0; x.len()];
+    let mut i = 0;
+    while i < order.len() {
+        let mut j = i;
+        while j + 1 < order.len() && x[order[j + 1]] == x[order[i]] {
+            j += 1;
+        }
+        let mid = 0.5 * (i + j) as f64 + 1.0;
+        for &k in &order[i..=j] {
+            r[k] = mid;
+        }
+        i = j + 1;
+    }
+    r
+}
+
+/// Spearman's rank correlation (NaN when either series is constant or has under 3 points).
+fn spearman(x: &[f64], y: &[f64]) -> f64 {
+    pearson(&ranks(x), &ranks(y))
+}
+
+/// Speeds of plates and how they move from step to step.
+fn plate_motion(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, f64)) {
+    // Area-weighted RMS speed of each step's plates, averaged over the steps.
+    let rms: Vec<f64> = d
+        .steps
+        .iter()
+        .filter_map(|s| {
+            let area: f64 = s.plates.iter().map(|p| f64::from(p.visible)).sum();
+            (area > 0.0).then(|| {
+                let sq: f64 = s
+                    .plates
+                    .iter()
+                    .map(|p| f64::from(p.visible) * p.speed_mm_yr * p.speed_mm_yr)
+                    .sum();
+                (sq / area).sqrt()
+            })
+        })
+        .collect();
+    put("speed_rms_mm_yr", mean(rms));
+
+    let big = big_plates(d, params);
+    let speeds: Vec<f64> = big.iter().map(|p| p.speed_mm_yr).collect();
+    put("speed_big_p10_mm_yr", pct(&speeds, 0.1));
+    put("speed_big_p50_mm_yr", pct(&speeds, 0.5));
+    put("speed_big_p90_mm_yr", pct(&speeds, 0.9));
+    put(
+        "speed_oceanic_over_continental",
+        ratio(
+            median_of(&big, |p| p.continental_share() < 0.2, |p| p.speed_mm_yr),
+            median_of(&big, |p| p.continental_share() > 0.5, |p| p.speed_mm_yr),
+        ),
+    );
+    put(
+        "speed_slab_over_free",
+        ratio(
+            median_of(&big, |p| p.slab_share() >= 0.2, |p| p.speed_mm_yr),
+            median_of(&big, |p| p.slab_share() < 0.05, |p| p.speed_mm_yr),
+        ),
+    );
+    let slab: Vec<f64> = big.iter().map(|p| p.slab_share()).collect();
+    put("speed_slab_rank_corr", spearman(&slab, &speeds));
+    let area: Vec<f64> = big.iter().map(|p| f64::from(p.visible)).collect();
+    put("speed_area_rank_corr", spearman(&area, &speeds));
+    let fast = big
+        .iter()
+        .filter(|p| p.speed_mm_yr > params.fast_mm_yr)
+        .count();
+    put(
+        "speed_over_150_pct",
+        if big.is_empty() {
+            f64::NAN
+        } else {
+            100.0 * fast as f64 / big.len() as f64
+        },
+    );
+    put("speed_over_150_plate_steps", fast as f64);
+
+    // The speed guard counts every plate, however small: it is the guard of all of them.
+    let guard_steps = d
+        .steps
+        .iter()
+        .filter(|s| s.plates.iter().any(|p| p.guard))
+        .count();
+    let guard_plate_steps: usize = d
+        .steps
+        .iter()
+        .map(|s| s.plates.iter().filter(|p| p.guard).count())
+        .sum();
+    put(
+        "guard_bind_steps",
+        if d.steps.is_empty() {
+            f64::NAN
+        } else {
+            guard_steps as f64
+        },
+    );
+    put("guard_bind_plate_steps", guard_plate_steps as f64);
+
+    let change: Vec<f64> = big
+        .iter()
+        .filter(|p| p.rot_known)
+        .map(|p| 100.0 * p.rot_change)
+        .collect();
+    put("rot_change_p50_pct", pct(&change, 0.5));
+    put("rot_change_p90_pct", pct(&change, 0.9));
+    put(
+        "pole_inside_pct",
+        if big.is_empty() {
+            f64::NAN
+        } else {
+            100.0 * big.iter().filter(|p| p.pole_inside).count() as f64 / big.len() as f64
+        },
+    );
+}
+
+/// A supercontinent's stay: from the step the largest piece first holds `assemble` of the
+/// continental crust to the first step it holds under `disperse` (hysteresis: in between it keeps
+/// whatever state it had).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Assembly {
+    pub start_myr: f64,
+    /// `None` while it still holds at the end of the run (cut off by it).
+    pub end_myr: Option<f64>,
+}
+
+/// The assemblies in a series of `(time at the end of a step, largest piece's share)`. A run that
+/// begins assembled has an assembly starting at `t0_myr`, the time before its first step.
+pub fn assemblies(
+    shares: &[(f64, f64)],
+    t0_myr: f64,
+    assemble: f64,
+    disperse: f64,
+) -> Vec<Assembly> {
+    let mut out: Vec<Assembly> = Vec::new();
+    let mut open = false;
+    for (i, &(t, share)) in shares.iter().enumerate() {
+        let share = if share.is_finite() { share } else { 0.0 };
+        if !open && share >= assemble {
+            out.push(Assembly {
+                start_myr: if i == 0 { t0_myr } else { t },
+                end_myr: None,
+            });
+            open = true;
+        } else if open && share < disperse {
+            if let Some(a) = out.last_mut() {
+                a.end_myr = Some(t);
+            }
+            open = false;
+        }
+    }
+    out
+}
+
+/// Connected pieces of continental crust and the supercontinent measures.
+fn continents(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, f64)) {
+    // Per step: the largest piece's share of the continental crust, and how many pieces hold at
+    // least `min_piece_share` of it (of the largest kept: a step keeps `PIECES_KEPT`).
+    let series: Vec<(f64, f64, f64)> = d
+        .steps
+        .iter()
+        .filter(|s| s.continental > 0)
+        .map(|s| {
+            let total = f64::from(s.continental);
+            let largest = s.pieces.first().map_or(0.0, |&x| f64::from(x)) / total;
+            let count = s
+                .pieces
+                .iter()
+                .filter(|&&x| f64::from(x) >= params.min_piece_share * total)
+                .count();
+            (s.t, largest, count as f64)
+        })
+        .collect();
+    let shares: Vec<f64> = series.iter().map(|x| x.1).collect();
+    put(
+        "continent_pieces_p50",
+        median(&series.iter().map(|x| x.2).collect::<Vec<_>>()),
+    );
+    put("continent_largest_share_p50", median(&shares));
+    put(
+        "continent_largest_share_min",
+        shares.iter().copied().fold(f64::NAN, f64::min),
+    );
+
+    // A step with no continental crust has a largest share of 0 (nothing is assembled).
+    let all: Vec<(f64, f64)> = d
+        .steps
+        .iter()
+        .map(|s| {
+            let share = if s.continental > 0 {
+                s.pieces.first().map_or(0.0, |&x| f64::from(x)) / f64::from(s.continental)
+            } else {
+                0.0
+            };
+            (s.t, share)
+        })
+        .collect();
+    let eps = assemblies(
+        &all,
+        d.t0_myr,
+        params.assembled_share,
+        params.dispersed_share,
+    );
+    if d.steps.is_empty() || d.steps.iter().all(|s| s.pieces.is_empty()) {
+        // Not recorded: no data, not "no supercontinent".
+        for k in [
+            "supercontinent_tenure_myr",
+            "supercontinent_period_myr",
+            "supercontinent_episodes",
+            "supercontinent_time_pct",
+        ] {
+            put(k, f64::NAN);
+        }
+        return;
+    }
+    let tenures: Vec<f64> = eps
+        .iter()
+        .filter_map(|a| a.end_myr.map(|e| e - a.start_myr))
+        .collect();
+    put("supercontinent_tenure_myr", median(&tenures));
+    let gaps: Vec<f64> = eps
+        .windows(2)
+        .map(|w| w[1].start_myr - w[0].start_myr)
+        .collect();
+    put("supercontinent_period_myr", median(&gaps));
+    put("supercontinent_episodes", eps.len() as f64);
+    let held = all
+        .iter()
+        .filter(|&&(t, _)| {
+            eps.iter()
+                .any(|a| t >= a.start_myr && a.end_myr.is_none_or(|e| t < e))
+        })
+        .count();
+    put(
+        "supercontinent_time_pct",
+        100.0 * held as f64 / all.len() as f64,
+    );
+}
+
+/// A rift of a plate that was above the mega-plate share.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MegaRift {
+    /// The plate that split.
+    pub parent: u32,
+    /// When it split, Myr.
+    pub t_myr: f64,
+    /// How long it had been above the share, Myr (from the start of the first step above it, or
+    /// of the run, to the rift).
+    pub held_myr: f64,
+    /// Whether its fragments were all still separate `window_myr` later (`None`: the run ends
+    /// before that).
+    pub apart: Option<bool>,
+}
+
+/// The rifts of plates above `mega_share` of the visible planet, with how long each plate had
+/// been above it and whether the rift held. The plate that split is the plate the new plates'
+/// `parent` names, above the share at the step before.
+pub fn mega_rifts(d: &Dynamics, mega_share: f64, window_myr: f64) -> Vec<MegaRift> {
+    let share_at = |i: usize, id: u32| -> f64 {
+        let s = &d.steps[i];
+        let total: u32 = s.plates.iter().map(|p| p.visible).sum();
+        s.plates
+            .iter()
+            .find(|p| p.id == id)
+            .map_or(0.0, |p| f64::from(p.visible) / f64::from(total.max(1)))
+    };
+    let lives: BTreeMap<u32, &PlateLife> = d.plates.iter().map(|p| (p.id, p)).collect();
+    // The plate that holds `id`'s crust at time `t`: follow the welds that had happened by then.
+    let holder_at = |mut id: u32, t: f64| -> u32 {
+        for _ in 0..10_000 {
+            match lives.get(&id) {
+                Some(l) if l.died_myr.is_some_and(|died| died <= t) && l.into.is_some() => {
+                    id = l.into.unwrap_or(id);
+                }
+                _ => break,
+            }
+        }
+        id
+    };
+    let end_t = d.steps.last().map_or(d.t0_myr, |s| s.t);
+    let mut out = Vec::new();
+    for i in 1..d.steps.len() {
+        let t = d.steps[i].t;
+        let mut parents: Vec<u32> = d
+            .plates
+            .iter()
+            .filter(|p| p.origin == "rift" && (p.born_myr - t).abs() < 1e-6)
+            .filter_map(|p| p.parent)
+            .collect();
+        parents.sort_unstable();
+        parents.dedup();
+        for x in parents {
+            if share_at(i - 1, x) <= mega_share {
+                continue;
+            }
+            let mut first = i - 1;
+            while first > 0 && share_at(first - 1, x) > mega_share {
+                first -= 1;
+            }
+            let held = t - (d.steps[first].t - d.dt_myr);
+            let family: Vec<u32> = std::iter::once(x)
+                .chain(
+                    d.plates
+                        .iter()
+                        .filter(|p| {
+                            p.origin == "rift"
+                                && p.parent == Some(x)
+                                && (p.born_myr - t).abs() < 1e-6
+                        })
+                        .map(|p| p.id),
+                )
+                .collect();
+            let apart = (t + window_myr <= end_t + 1e-9).then(|| {
+                // Rejoined: a member died within the window into a plate that holds another
+                // member's crust.
+                !family.iter().any(|&m| {
+                    lives.get(&m).is_some_and(|l| {
+                        l.died_myr.is_some_and(|died| died <= t + window_myr)
+                            && l.into.is_some_and(|into| {
+                                let died = l.died_myr.unwrap_or(t);
+                                let to = holder_at(into, died);
+                                family.iter().any(|&o| o != m && holder_at(o, died) == to)
+                            })
+                    })
+                })
+            });
+            out.push(MegaRift {
+                parent: x,
+                t_myr: t,
+                held_myr: held,
+                apart,
+            });
+        }
+    }
+    out
+}
+
+fn megaplates(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, f64)) {
+    if d.steps.is_empty() {
+        for k in [
+            "megaplate_rifts",
+            "megaplate_tenure_p50_myr",
+            "megaplate_rift_apart_50_pct",
+        ] {
+            put(k, f64::NAN);
+        }
+        return;
+    }
+    let rifts = mega_rifts(d, params.mega_plate_share, params.rift_window_myr);
+    put("megaplate_rifts", rifts.len() as f64);
+    put(
+        "megaplate_tenure_p50_myr",
+        median(&rifts.iter().map(|r| r.held_myr).collect::<Vec<_>>()),
+    );
+    let judged: Vec<bool> = rifts.iter().filter_map(|r| r.apart).collect();
+    put(
+        "megaplate_rift_apart_50_pct",
+        if judged.is_empty() {
+            f64::NAN
+        } else {
+            100.0 * judged.iter().filter(|&&a| a).count() as f64 / judged.len() as f64
+        },
+    );
+}
+
+/// The measures that wait for physics: read from the record's empty-for-now fields, so the task
+/// that fills them lights the rows up.
+fn pending_physics(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, f64)) {
+    let belts: &[BeltRec] = &d.belts;
+    let col =
+        |f: &dyn Fn(&BeltRec) -> Option<f64>| -> Vec<f64> { belts.iter().filter_map(f).collect() };
+    let ratios: Vec<f64> = belts
+        .iter()
+        .filter_map(
+            |b| match (b.convergence_onset_mm_yr, b.convergence_20myr_mm_yr) {
+                (Some(a), Some(c)) if a > 0.0 => Some(c / a),
+                _ => None,
+            },
+        )
+        .collect();
+    put("collision_convergence_ratio_20myr", median(&ratios));
+    put("wedge_width_km_p50", median(&col(&|b| b.wedge_width_km)));
+    put(
+        "foredeep_width_km_p50",
+        median(&col(&|b| b.foredeep_width_km)),
+    );
+    put(
+        "foredeep_depth_m_p50",
+        median(&col(&|b| b.foredeep_depth_m)),
+    );
+
+    let pull_share: Vec<f64> = d
+        .steps
+        .iter()
+        .flat_map(|s| s.forces.iter())
+        .filter_map(|f| {
+            let driving = f.slab_pull + f.slab_suction + f.edge_energy;
+            (driving > 0.0).then(|| f.slab_pull / driving)
+        })
+        .collect();
+    put("force_slab_pull_share_p50", median(&pull_share));
+    // The stress of a plate above the mega-plate share: the plates' forces are matched to their
+    // size in the same step.
+    let mut stress = Vec::new();
+    for s in &d.steps {
+        let total: u32 = s.plates.iter().map(|p| p.visible).sum();
+        for f in &s.forces {
+            let big = s.plates.iter().find(|p| p.id == f.id).is_some_and(|p| {
+                f64::from(p.visible) / f64::from(total.max(1)) > params.mega_plate_share
+            });
+            if big {
+                stress.push(f.stress_mpa);
+            }
+        }
+    }
+    put("megaplate_stress_mpa_p50", median(&stress));
+    put(
+        "megaplate_tension_pct",
+        if stress.is_empty() {
+            f64::NAN
+        } else {
+            100.0 * stress.iter().filter(|&&x| x > 0.0).count() as f64 / stress.len() as f64
+        },
+    );
+    let slabs: Vec<f64> = d
+        .steps
+        .iter()
+        .flat_map(|s| s.slabs_km.iter().copied())
+        .collect();
+    put("slab_length_km_p50", median(&slabs));
 }
 
 /// A run's data for the check.
@@ -889,6 +1840,9 @@ pub enum Status {
     NoData,
     /// No range: reported only.
     Reported,
+    /// The measure waits for physics not built yet and the record that feeds it is empty: it
+    /// reports "no data" and does not fail.
+    Pending,
 }
 
 impl Status {
@@ -898,6 +1852,7 @@ impl Status {
             Status::Fail => "FAIL",
             Status::NoData => "NO DATA",
             Status::Reported => "-",
+            Status::Pending => "no data",
         }
     }
 
@@ -939,7 +1894,7 @@ pub fn judge(value: f64, lo: Option<f64>, hi: Option<f64>) -> Status {
 pub fn evaluate(runs: &[RunData], targets: &Targets) -> Vec<Row> {
     let per_run: Vec<BTreeMap<&'static str, f64>> = runs
         .iter()
-        .map(|r| measures(&r.dynamics, &r.margins))
+        .map(|r| measures_with(&r.dynamics, &r.margins, &targets.params))
         .collect();
     MEASURES
         .iter()
@@ -956,7 +1911,11 @@ pub fn evaluate(runs: &[RunData], targets: &Targets) -> Vec<Row> {
                 hi,
                 value,
                 runs: values,
-                status: judge(value, lo, hi),
+                status: if def.pending.is_some() && !value.is_finite() {
+                    Status::Pending
+                } else {
+                    judge(value, lo, hi)
+                },
             }
         })
         .collect()
@@ -1030,7 +1989,7 @@ pub fn render(rows: &[Row]) -> String {
 }
 
 /// The rows as JSON (the check's `--json` file).
-pub fn to_json(rows: &[Row], names: &[String]) -> Value {
+pub fn to_json(rows: &[Row], names: &[String], params: &Params) -> Value {
     let any_failed = failed(rows);
     let measures: Vec<Value> = rows
         .iter()
@@ -1050,6 +2009,7 @@ pub fn to_json(rows: &[Row], names: &[String]) -> Value {
     json!({
         "runs": names,
         "failed": any_failed,
+        "params": params.describe(),
         "measures": measures,
     })
 }
@@ -1057,7 +2017,7 @@ pub fn to_json(rows: &[Row], names: &[String]) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plates::dynamics::{AgeRec, CollisionRec, Footprint, StepRec};
+    use crate::plates::dynamics::{AgeRec, CollisionRec, Footprint, PlateForces};
 
     const N: u32 = 1000;
 
@@ -1076,6 +2036,7 @@ mod tests {
             speed_mm_yr: speed,
             front_km: front,
             boundary_km: bnd,
+            ..PlateStep::default()
         }
     }
 
@@ -1376,6 +2337,16 @@ mod tests {
             ..AgeRec::default()
         };
         d.ages = vec![age(10.0, 100.0), age(120.0, 180.0), age(200.0, 220.0)];
+        // The per-step record: the mean over the run leaves out the first 100 Myr.
+        d.t0_myr = 0.0;
+        d.steps = [(50.0, 300.0), (120.0, 180.0), (200.0, 220.0)]
+            .iter()
+            .map(|&(t, p90)| StepRec {
+                ocean: 100,
+                age_p90: p90,
+                ..step(t, 0, 0, &[1000])
+            })
+            .collect();
         let margin = |t: f64, subduction: u32, collision: u32| Margins {
             t_myr: t,
             coast: 100,
@@ -1472,7 +2443,7 @@ mod tests {
         let text = render(&rows);
         assert!(text.contains("FAIL") && text.contains("0.15-0.35"));
         assert_eq!(text.lines().count(), MEASURES.len() + 1);
-        let v = to_json(&rows, &["r".to_owned()]);
+        let v = to_json(&rows, &["r".to_owned()], &Params::default());
         assert_eq!(v["failed"], true);
         assert_eq!(v["measures"].as_array().unwrap().len(), MEASURES.len());
     }
@@ -1504,5 +2475,596 @@ mod tests {
         assert!(pct(&[f64::NAN], 0.5).is_nan());
         assert!(pearson(&[1.0, 1.0, 1.0], &[1.0, 2.0, 3.0]).is_nan());
         assert!((pearson(&[1.0, 2.0, 3.0], &[2.0, 4.0, 6.0]) - 1.0).abs() < 1e-12);
+    }
+
+    // ---- Task 1b: speeds, rotation, the guard, the sea floor, continents, mega-plates ----
+
+    /// A plate with its 1b fields.
+    fn moving(id: u32, visible: u32, continental: u32, speed: f64, front: f64) -> PlateStep {
+        plate(id, visible, continental, speed, front, 1000.0)
+    }
+
+    /// A step holding exactly these plates.
+    fn step_of(t: f64, plates: Vec<PlateStep>) -> StepRec {
+        StepRec {
+            t,
+            visible: plates.iter().map(|p| p.visible).sum(),
+            plates,
+            ..StepRec::default()
+        }
+    }
+
+    fn near(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-9
+    }
+
+    #[test]
+    fn plate_speeds_by_slab_crust_and_area() {
+        // Plate 0 on slab and oceanic, 1 on slab, 2 continental and free, 3 a 5-sample sliver.
+        let mk = |t: f64| {
+            step_of(
+                t,
+                vec![
+                    moving(0, 400, 0, 80.0, 500.0),
+                    moving(1, 300, 0, 60.0, 300.0),
+                    moving(2, 200, 150, 30.0, 0.0),
+                    moving(3, 5, 0, 2000.0, 0.0),
+                ],
+            )
+        };
+        let d = dynamics(vec![mk(2.0), mk(4.0), mk(6.0)]);
+        let m = measures(&d, &[]);
+        // The RMS counts every plate by area, the sliver too.
+        let sq: f64 = 400.0 * 6400.0 + 300.0 * 3600.0 + 200.0 * 900.0 + 5.0 * 4.0e6;
+        assert!(near(get(&m, "speed_rms_mm_yr"), (sq / 905.0).sqrt()));
+        // The percentiles do not: 30, 60 and 80, three steps each.
+        assert_eq!(get(&m, "speed_big_p10_mm_yr"), 30.0);
+        assert_eq!(get(&m, "speed_big_p50_mm_yr"), 60.0);
+        assert_eq!(get(&m, "speed_big_p90_mm_yr"), 80.0);
+        // Oceanic (0, 1: median 70) over continental (2: 30); on slab (0, 1) over free (2).
+        assert!(near(get(&m, "speed_oceanic_over_continental"), 70.0 / 30.0));
+        assert!(near(get(&m, "speed_slab_over_free"), 70.0 / 30.0));
+        // Speed rises with slab share and with area, without exception.
+        assert!(near(get(&m, "speed_slab_rank_corr"), 1.0));
+        assert!(near(get(&m, "speed_area_rank_corr"), 1.0));
+        assert_eq!(get(&m, "speed_over_150_pct"), 0.0);
+        assert_eq!(get(&m, "speed_over_150_plate_steps"), 0.0);
+    }
+
+    #[test]
+    fn fast_plate_steps_are_counted_among_plates_of_30_samples_or_more() {
+        let mk = |t: f64, fast: f64| {
+            step_of(
+                t,
+                vec![
+                    moving(0, 500, 0, fast, 0.0),
+                    moving(1, 400, 0, 50.0, 0.0),
+                    moving(2, 29, 0, 900.0, 0.0),
+                ],
+            )
+        };
+        let d = dynamics(vec![
+            mk(2.0, 200.0),
+            mk(4.0, 60.0),
+            mk(6.0, 150.0),
+            mk(8.0, 70.0),
+        ]);
+        let m = measures(&d, &[]);
+        // Of 8 plate-steps, one is above 150 (200); 150 itself is not, the 29-sample plate is
+        // out.
+        assert_eq!(get(&m, "speed_over_150_plate_steps"), 1.0);
+        assert!(near(get(&m, "speed_over_150_pct"), 12.5));
+        // The same with another threshold and another size limit.
+        let p = Params {
+            fast_mm_yr: 60.0,
+            min_plate_samples: 10.0,
+            ..Params::default()
+        };
+        let m = measures_with(&d, &[], &p);
+        assert_eq!(get(&m, "speed_over_150_plate_steps"), 3.0 + 4.0);
+    }
+
+    #[test]
+    fn rank_correlation_shares_ranks_between_ties() {
+        assert_eq!(ranks(&[10.0, 30.0, 20.0, 20.0]), vec![1.0, 4.0, 2.5, 2.5]);
+        assert!(near(
+            spearman(&[1.0, 2.0, 3.0, 4.0], &[1.0, 8.0, 27.0, 64.0]),
+            1.0
+        ));
+        assert!(near(
+            spearman(&[1.0, 2.0, 3.0, 4.0], &[9.0, 7.0, 4.0, 1.0]),
+            -1.0
+        ));
+        // A monotone but very nonlinear relation: rank 1, Pearson below it.
+        let (x, y) = ([1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 1000.0]);
+        assert!(near(spearman(&x, &y), 1.0) && pearson(&x, &y) < 0.9);
+        assert!(spearman(&[1.0, 1.0, 1.0], &[1.0, 2.0, 3.0]).is_nan());
+    }
+
+    #[test]
+    fn the_guard_counts_steps_and_plate_steps_and_fails_when_it_binds() {
+        let mk = |t: f64, bound: &[bool]| {
+            step_of(
+                t,
+                bound
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &g)| PlateStep {
+                        guard: g,
+                        ..moving(i as u32, 100, 0, 50.0, 0.0)
+                    })
+                    .collect(),
+            )
+        };
+        let quiet = dynamics(vec![mk(2.0, &[false, false]), mk(4.0, &[false, false])]);
+        let m = measures(&quiet, &[]);
+        assert_eq!(get(&m, "guard_bind_steps"), 0.0);
+        assert_eq!(get(&m, "guard_bind_plate_steps"), 0.0);
+        let busy = dynamics(vec![
+            mk(2.0, &[true, true]),
+            mk(4.0, &[false, false]),
+            mk(6.0, &[false, true]),
+        ]);
+        let m = measures(&busy, &[]);
+        assert_eq!(get(&m, "guard_bind_steps"), 2.0);
+        assert_eq!(get(&m, "guard_bind_plate_steps"), 3.0);
+        // Target 0: one binding step in one run fails the check, and none passes it.
+        let run = |d: Dynamics| {
+            let rows = evaluate(
+                &[RunData {
+                    name: "r".into(),
+                    dynamics: d,
+                    margins: vec![],
+                }],
+                &Targets::builtin(),
+            );
+            row(&rows, "guard_bind_steps").status
+        };
+        assert_eq!(run(quiet), Status::Pass);
+        assert_eq!(run(busy), Status::Fail);
+    }
+
+    #[test]
+    fn rotation_change_and_pole_are_measured_on_plates_with_a_previous_step() {
+        // Changes of 4, 8, 12 % (known) and one plate with no previous step (not counted).
+        let mk = |t: f64, change: f64, known: bool, inside: bool| {
+            step_of(
+                t,
+                vec![PlateStep {
+                    rot_change: change,
+                    rot_known: known,
+                    pole_inside: inside,
+                    ..moving(0, 100, 0, 50.0, 0.0)
+                }],
+            )
+        };
+        let d = dynamics(vec![
+            mk(2.0, 0.0, false, true),
+            mk(4.0, 0.04, true, false),
+            mk(6.0, 0.08, true, false),
+            mk(8.0, 0.12, true, true),
+        ]);
+        let m = measures(&d, &[]);
+        assert!(near(get(&m, "rot_change_p50_pct"), 8.0));
+        assert!(near(get(&m, "rot_change_p90_pct"), 11.2));
+        // Two of the four plate-steps have the pole on the plate.
+        assert!(near(get(&m, "pole_inside_pct"), 50.0));
+        // Nothing known: no data.
+        let first = dynamics(vec![mk(2.0, 0.0, false, false)]);
+        assert!(get(&measures(&first, &[]), "rot_change_p50_pct").is_nan());
+    }
+
+    #[test]
+    fn the_sea_floor_is_judged_on_the_run_after_the_warm_up() {
+        // t0 = 0: the step at 50 Myr is warm-up. After it: medians 60 and 40, 90th percentiles
+        // 200 and 220, 12 % and 8 % older than 180 Myr, 4 % and 2 % older than 250.
+        let mk = |t: f64, p50: f64, p90: f64, o180: u32, o250: u32| StepRec {
+            ocean: 1000,
+            age_p50: p50,
+            age_p90: p90,
+            old180: o180,
+            old250: o250,
+            ..step(t, 0, 0, &[1000])
+        };
+        let mut d = dynamics(vec![
+            mk(50.0, 100.0, 300.0, 400, 300),
+            mk(150.0, 60.0, 200.0, 120, 40),
+            mk(250.0, 40.0, 220.0, 80, 20),
+        ]);
+        d.t0_myr = 0.0;
+        let m = measures(&d, &[]);
+        assert!(near(get(&m, "ocean_age_p50_myr"), 50.0));
+        assert!(near(get(&m, "ocean_age_p90_mean_myr"), 210.0));
+        assert!(near(get(&m, "ocean_old180_pct"), 10.0));
+        assert!(near(get(&m, "ocean_old250_pct"), 3.0));
+        // The warm-up is a parameter; a run shorter than it uses every step.
+        let p = Params {
+            warmup_myr: 0.0,
+            ..Params::default()
+        };
+        assert!(near(
+            get(&measures_with(&d, &[], &p), "ocean_age_p50_myr"),
+            200.0 / 3.0
+        ));
+        let p = Params {
+            warmup_myr: 1000.0,
+            ..Params::default()
+        };
+        assert!(near(
+            get(&measures_with(&d, &[], &p), "ocean_age_p50_myr"),
+            200.0 / 3.0
+        ));
+        // No sea floor recorded: no data.
+        let bare = dynamics(vec![step(2.0, 0, 0, &[1000])]);
+        assert!(get(&measures(&bare, &[]), "ocean_old180_pct").is_nan());
+    }
+
+    #[test]
+    fn continental_extremes_leave_out_the_start_up_and_all_steps_are_reported() {
+        // t0 = 0 and a 10 Myr start-up: 0.49 at 2 Myr is the start-up.
+        let d = dynamics(vec![
+            step(2.0, 0, 490, &[1000]),
+            step(12.0, 0, 400, &[1000]),
+            step(14.0, 0, 430, &[1000]),
+            step(16.0, 0, 380, &[1000]),
+        ]);
+        let m = measures(&d, &[]);
+        assert!(near(get(&m, "continental_max"), 0.43));
+        assert!(near(get(&m, "continental_min"), 0.38));
+        assert!(near(get(&m, "continental_max_all"), 0.49));
+        assert!(near(get(&m, "continental_min_all"), 0.38));
+        let p = Params {
+            start_up_myr: 0.0,
+            ..Params::default()
+        };
+        assert!(near(
+            get(&measures_with(&d, &[], &p), "continental_max"),
+            0.49
+        ));
+    }
+
+    /// A step with `continental` samples of continental crust in these pieces.
+    fn with_pieces(t: f64, continental: u32, pieces: &[u32]) -> StepRec {
+        StepRec {
+            continental,
+            pieces: pieces.to_vec(),
+            ..step(t, 0, continental, &[1000])
+        }
+    }
+
+    #[test]
+    fn continental_pieces_and_their_largest_share() {
+        // 400 continental samples: 360 + 20 + 10 + 2 (the 2 is under 1 % of 400); then one piece.
+        let d = dynamics(vec![
+            with_pieces(2.0, 400, &[360, 20, 10, 2]),
+            with_pieces(4.0, 400, &[200, 200]),
+            with_pieces(6.0, 400, &[400]),
+        ]);
+        let m = measures(&d, &[]);
+        assert_eq!(get(&m, "continent_pieces_p50"), 2.0);
+        assert!(near(get(&m, "continent_largest_share_p50"), 0.9));
+        assert!(near(get(&m, "continent_largest_share_min"), 0.5));
+        let p = Params {
+            min_piece_share: 0.0,
+            ..Params::default()
+        };
+        assert_eq!(
+            get(&measures_with(&d, &[], &p), "continent_pieces_p50"),
+            2.0
+        );
+    }
+
+    #[test]
+    fn supercontinent_assemblies_have_hysteresis() {
+        let shares = [
+            (2.0, 0.8),
+            (4.0, 0.75),
+            (6.0, 0.6),
+            (8.0, 0.45),
+            (10.0, 0.55),
+            (12.0, 0.72),
+            (14.0, 0.9),
+            (16.0, 0.4),
+            (18.0, 0.3),
+            (20.0, 0.71),
+        ];
+        let eps = assemblies(&shares, 0.0, 0.7, 0.5);
+        // Assembled at the start (time 0), dispersed at 8; 12 to 16; 20 and still.
+        assert_eq!(
+            eps,
+            vec![
+                Assembly {
+                    start_myr: 0.0,
+                    end_myr: Some(8.0)
+                },
+                Assembly {
+                    start_myr: 12.0,
+                    end_myr: Some(16.0)
+                },
+                Assembly {
+                    start_myr: 20.0,
+                    end_myr: None
+                },
+            ]
+        );
+        // No hysteresis: the first break-up comes at 6 Myr (60 %), not at 8 (45 %).
+        let flat = assemblies(&shares, 0.0, 0.7, 0.7);
+        assert_eq!(flat.len(), 3);
+        assert_eq!(flat[0].end_myr, Some(6.0));
+        // Never assembled; a missing share is a zero.
+        assert!(assemblies(&[(2.0, 0.6), (4.0, f64::NAN)], 0.0, 0.7, 0.5).is_empty());
+        // A run that starts dispersed has its first assembly at the step it forms.
+        let late = assemblies(&[(2.0, 0.3), (4.0, 0.8)], 0.0, 0.7, 0.5);
+        assert_eq!(late[0].start_myr, 4.0);
+    }
+
+    #[test]
+    fn supercontinent_tenure_period_and_time_come_from_the_largest_piece() {
+        // 100 continental samples throughout; the largest piece is the series above.
+        let largest = [80, 75, 60, 45, 55, 72, 90, 40, 30, 71];
+        let steps: Vec<StepRec> = largest
+            .iter()
+            .enumerate()
+            .map(|(i, &l)| with_pieces(2.0 * (i + 1) as f64, 100, &[l]))
+            .collect();
+        let d = dynamics(steps);
+        let m = measures(&d, &[]);
+        // Tenures 8 and 4 (the third assembly is cut off by the run's end): median 6. Starts at
+        // 0, 12 and 20: gaps 12 and 8, median 10. Held at 2, 4, 6, 12, 14 and 20: 60 %.
+        assert_eq!(get(&m, "supercontinent_tenure_myr"), 6.0);
+        assert_eq!(get(&m, "supercontinent_period_myr"), 10.0);
+        assert_eq!(get(&m, "supercontinent_episodes"), 3.0);
+        assert!(near(get(&m, "supercontinent_time_pct"), 60.0));
+        // A looser definition: assembled from 55 %, dispersed under 50 %.
+        let p = Params {
+            assembled_share: 0.55,
+            ..Params::default()
+        };
+        let m = measures_with(&d, &[], &p);
+        assert_eq!(get(&m, "supercontinent_episodes"), 3.0);
+        assert_eq!(get(&m, "supercontinent_tenure_myr"), 7.0);
+        // Not recorded (no pieces): no data, not "no supercontinent".
+        let bare = dynamics(vec![step(2.0, 0, 100, &[1000]), step(4.0, 0, 100, &[1000])]);
+        let m = measures(&bare, &[]);
+        assert!(get(&m, "supercontinent_tenure_myr").is_nan());
+        assert!(get(&m, "supercontinent_episodes").is_nan());
+        // One assembly that never ends: a count, no tenure and no period.
+        let held = dynamics(vec![
+            with_pieces(2.0, 100, &[90]),
+            with_pieces(4.0, 100, &[95]),
+        ]);
+        let m = measures(&held, &[]);
+        assert_eq!(get(&m, "supercontinent_episodes"), 1.0);
+        assert!(get(&m, "supercontinent_tenure_myr").is_nan());
+        assert!(get(&m, "supercontinent_period_myr").is_nan());
+    }
+
+    /// Steps `t` = 2, 4, 6 with plates [600, 400], then a rift of plate 0 at 8 (fragment 2),
+    /// and steps up to 100.
+    fn megaplate_run(extra: Vec<PlateLife>) -> Dynamics {
+        let mut steps = vec![
+            step(2.0, 0, 0, &[600, 400]),
+            step(4.0, 0, 0, &[600, 400]),
+            step(6.0, 0, 0, &[600, 400]),
+            step(8.0, 0, 0, &[300, 400, 300]),
+        ];
+        steps.push(step(100.0, 0, 0, &[300, 400, 300]));
+        let mut d = dynamics(steps);
+        d.plates = vec![
+            life(0, None, "initial", 0.0),
+            life(1, None, "initial", 0.0),
+            life(2, Some(0), "rift", 8.0),
+        ];
+        d.plates.extend(extra);
+        d
+    }
+
+    #[test]
+    fn a_rift_of_a_megaplate_is_timed_and_judged_after_50_myr() {
+        let d = megaplate_run(vec![]);
+        let rifts = mega_rifts(&d, 0.4, 50.0);
+        // Plate 0 stood above 40 % from the start (time 0) to the rift at 8: four steps. Plate 1
+        // holds exactly 40 %, which is not above it.
+        assert_eq!(
+            rifts,
+            vec![MegaRift {
+                parent: 0,
+                t_myr: 8.0,
+                held_myr: 8.0,
+                apart: Some(true)
+            }]
+        );
+        let m = measures(&d, &[]);
+        assert_eq!(get(&m, "megaplate_rifts"), 1.0);
+        assert_eq!(get(&m, "megaplate_tenure_p50_myr"), 8.0);
+        assert_eq!(get(&m, "megaplate_rift_apart_50_pct"), 100.0);
+        // The share is a parameter: above 35 % plate 1 counts too, but it did not rift.
+        assert_eq!(mega_rifts(&d, 0.35, 50.0).len(), 1);
+        // And above 70 % nothing is a mega-plate: no rifts, no data.
+        let m = measures_with(
+            &d,
+            &[],
+            &Params {
+                mega_plate_share: 0.7,
+                ..Params::default()
+            },
+        );
+        assert_eq!(get(&m, "megaplate_rifts"), 0.0);
+        assert!(get(&m, "megaplate_tenure_p50_myr").is_nan());
+        assert!(get(&m, "megaplate_rift_apart_50_pct").is_nan());
+    }
+
+    #[test]
+    fn a_rift_that_heals_is_not_apart() {
+        // The fragment welds back into its parent after 20 Myr.
+        let mut d = megaplate_run(vec![]);
+        d.plates[2] = dies(life(2, Some(0), "rift", 8.0), 28.0, "sutured", Some(0));
+        assert_eq!(mega_rifts(&d, 0.4, 50.0)[0].apart, Some(false));
+        // After the window it is apart.
+        d.plates[2] = dies(life(2, Some(0), "rift", 8.0), 80.0, "sutured", Some(0));
+        assert_eq!(mega_rifts(&d, 0.4, 50.0)[0].apart, Some(true));
+        // Into a stranger within the window: the rift still holds.
+        d.plates[2] = dies(life(2, Some(0), "rift", 8.0), 28.0, "sutured", Some(1));
+        assert_eq!(mega_rifts(&d, 0.4, 50.0)[0].apart, Some(true));
+        // Into a plate that took the parent's crust earlier: healed through the chain.
+        d.plates[0] = dies(life(0, None, "initial", 0.0), 20.0, "sutured", Some(5));
+        d.plates[2] = dies(life(2, Some(0), "rift", 8.0), 30.0, "sutured", Some(5));
+        d.plates.push(life(5, None, "initial", 0.0));
+        assert_eq!(mega_rifts(&d, 0.4, 50.0)[0].apart, Some(false));
+        // A rift too close to the end of the run to judge: no verdict, and no data.
+        let mut short = megaplate_run(vec![]);
+        short.steps.pop();
+        assert_eq!(mega_rifts(&short, 0.4, 50.0)[0].apart, None);
+        assert!(get(&measures(&short, &[]), "megaplate_rift_apart_50_pct").is_nan());
+    }
+
+    #[test]
+    fn rifts_of_a_plate_that_was_not_a_megaplate_do_not_count() {
+        // Plate 0 rifts while at 40 %, then again from above 40 % (a second rift).
+        let mut d = dynamics(vec![
+            step(2.0, 0, 0, &[400, 600]),
+            step(4.0, 0, 0, &[200, 600, 200]),
+            step(6.0, 0, 0, &[200, 600, 200]),
+        ]);
+        d.plates = vec![
+            life(0, None, "initial", 0.0),
+            life(1, None, "initial", 0.0),
+            life(2, Some(0), "rift", 4.0),
+            life(3, Some(1), "rift", 6.0),
+        ];
+        let rifts = mega_rifts(&d, 0.4, 50.0);
+        // Only plate 1 (60 % before its rift); plate 0 stood at exactly 40 %.
+        assert_eq!(rifts.len(), 1);
+        assert_eq!(rifts[0].parent, 1);
+        assert_eq!(rifts[0].t_myr, 6.0);
+        // It had been above 40 % since the start (steps at 2, 4, 6: 6 Myr).
+        assert_eq!(rifts[0].held_myr, 6.0);
+    }
+
+    #[test]
+    fn measures_that_wait_for_physics_say_no_data_and_do_not_fail() {
+        let pending: Vec<&MeasureDef> = MEASURES.iter().filter(|d| d.pending.is_some()).collect();
+        assert!(pending.len() >= 8, "{}", pending.len());
+        let run = RunData {
+            name: "r".into(),
+            dynamics: dynamics(vec![step(2.0, 0, 0, &[1000])]),
+            margins: vec![],
+        };
+        let rows = evaluate(std::slice::from_ref(&run), &Targets::builtin());
+        for d in &pending {
+            let r = row(&rows, d.key);
+            assert_eq!(r.status, Status::Pending, "{}", d.key);
+            assert!(!r.status.failed());
+        }
+        let text = render(&rows);
+        assert!(text.contains("no data"));
+        // The ones with a range among them do not fail the check.
+        let ranged_waiting = pending
+            .iter()
+            .filter(|d| d.lo.is_some() || d.hi.is_some())
+            .count();
+        assert!(ranged_waiting >= 4);
+        assert!(
+            !rows
+                .iter()
+                .any(|r| r.def.pending.is_some() && r.status.failed())
+        );
+        // A measure that is not waiting and has no data still fails.
+        assert_eq!(
+            row(&rows, "supercontinent_tenure_myr").status,
+            Status::NoData
+        );
+    }
+
+    #[test]
+    fn filling_the_record_lights_the_waiting_rows_up() {
+        let mut d = dynamics(vec![
+            step(2.0, 0, 0, &[600, 400]),
+            step(4.0, 0, 0, &[600, 400]),
+        ]);
+        let belt = |onset: f64, later: Option<f64>| BeltRec {
+            convergence_onset_mm_yr: Some(onset),
+            convergence_20myr_mm_yr: later,
+            wedge_width_km: Some(200.0),
+            foredeep_width_km: Some(300.0),
+            foredeep_depth_m: Some(4000.0),
+            ..BeltRec::default()
+        };
+        // Ratios 0.3 and 0.5 (the third has not lasted 20 Myr).
+        d.belts = vec![
+            belt(100.0, Some(30.0)),
+            belt(60.0, Some(30.0)),
+            belt(80.0, None),
+        ];
+        d.steps[1].forces = vec![
+            PlateForces {
+                id: 0,
+                slab_pull: 6.0,
+                slab_suction: 1.0,
+                edge_energy: 1.0,
+                stress_mpa: -20.0,
+                ..PlateForces::default()
+            },
+            PlateForces {
+                id: 1,
+                slab_pull: 1.0,
+                slab_suction: 1.0,
+                edge_energy: 0.0,
+                stress_mpa: 30.0,
+                ..PlateForces::default()
+            },
+        ];
+        d.steps[1].slabs_km = vec![300.0, 500.0, 700.0];
+        let m = measures(&d, &[]);
+        assert!(near(get(&m, "collision_convergence_ratio_20myr"), 0.4));
+        assert_eq!(get(&m, "wedge_width_km_p50"), 200.0);
+        assert_eq!(get(&m, "foredeep_width_km_p50"), 300.0);
+        assert_eq!(get(&m, "foredeep_depth_m_p50"), 4000.0);
+        assert_eq!(get(&m, "slab_length_km_p50"), 500.0);
+        // Pull shares 0.75 and 0.5.
+        assert!(near(get(&m, "force_slab_pull_share_p50"), 0.625));
+        // Only plate 0 (60 %) is a mega-plate: in compression.
+        assert_eq!(get(&m, "megaplate_stress_mpa_p50"), -20.0);
+        assert_eq!(get(&m, "megaplate_tension_pct"), 0.0);
+        // They now have values, so the ranged ones are judged (ratio 0.4 is inside 0.2-0.6).
+        let rows = evaluate(
+            &[RunData {
+                name: "r".into(),
+                dynamics: d,
+                margins: vec![],
+            }],
+            &Targets::builtin(),
+        );
+        assert_eq!(
+            row(&rows, "collision_convergence_ratio_20myr").status,
+            Status::Pass
+        );
+        assert_eq!(row(&rows, "wedge_width_km_p50").status, Status::Pass);
+        assert_eq!(row(&rows, "foredeep_depth_m_p50").status, Status::Pass);
+    }
+
+    #[test]
+    fn the_definitions_can_be_set_by_name_and_from_the_targets_file() {
+        let mut p = Params::default();
+        assert_eq!(p.assembled_share, 0.7);
+        p.set_text("assembled_share=0.8").unwrap();
+        p.set_text(" mega_plate_share = 0.35 ").unwrap();
+        assert_eq!((p.assembled_share, p.mega_plate_share), (0.8, 0.35));
+        assert!(p.set_text("assembled_share").is_err());
+        assert!(p.set_text("assembled_share=much").is_err());
+        assert!(p.set_text("no_such=1").is_err());
+        assert!(p.set("warmup_myr", f64::NAN).is_err());
+        for k in Params::KEYS {
+            assert!(Params::default().set(k, 1.0).is_ok(), "{k}");
+        }
+        let mut t = Targets::builtin();
+        t.apply_json(r#"{"params": {"dispersed_share": 0.4}, "speed_rms_mm_yr": [null, 50]}"#)
+            .unwrap();
+        assert_eq!(t.params.dispersed_share, 0.4);
+        assert_eq!(t.range("speed_rms_mm_yr"), (None, Some(50.0)));
+        assert!(t.apply_json(r#"{"params": {"nope": 1}}"#).is_err());
+        assert!(t.apply_json(r#"{"params": {"warmup_myr": "x"}}"#).is_err());
+        assert!(t.apply_json(r#"{"params": 3}"#).is_err());
+        assert!(Params::default().describe().contains("70 %"));
     }
 }

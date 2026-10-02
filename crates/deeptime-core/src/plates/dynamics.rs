@@ -21,10 +21,17 @@
 //! | `version` | [`VERSION`] |
 //! | `t0_myr`, `dt_myr` | time before the first step, step length |
 //! | `samples` | L0 samples, `n`: every share below is of this unless it says "visible" |
-//! | `steps` | one [`StepRec`] per step |
+//! | `steps` | one [`StepRec`] per step: the plates ([`PlateStep`]), land, crust, the sea floor's age percentiles, the largest continental pieces |
 //! | `plates` | one [`PlateLife`] per plate that ever lived: parent, origin, death and its cause |
 //! | `collisions` | one [`CollisionRec`] per terrane transfer, collisions included |
 //! | `ages` | the sea-floor age distribution every [`AGE_EVERY_MYR`] ([`AgeRec`]) |
+//! | `prev_omega` | each plate's rotation vector after the last step (for the next step's change) |
+//! | `belts` | one [`BeltRec`] per collision belt: empty until the belt physics exists |
+//!
+//! Left empty by today's model, to be filled by the tasks that add the physics (the check reads
+//! them and reports "no data" while they are empty): `StepRec::forces` (the force budget and mean
+//! stress per plate, [`PlateForces`]), `StepRec::slabs_km` (slab length per contact) and
+//! `Dynamics::belts` (convergence 20 Myr after onset, wedge and foredeep, [`BeltRec`]).
 //!
 //! Lengths are Earth-normalized km (the plate model's sphere, `model_radius_km`), speeds mm/yr,
 //! times Myr relative to world creation. "Visible" samples are those not hidden under another
@@ -32,11 +39,30 @@
 //!
 //! # What each collision must keep meaning
 //! Tasks 2–4 of the design turn a collision from a one-step event into a state of a contact. The
-//! record keeps its fields' meanings across that change: `start_myr` and `end_myr` are the first
-//! and last step of the collision (equal today), `peak_uplift_m` the largest uplift it produced
+//! record keeps its fields' meanings across that change: `start_myr` and `end_myr` are the **first
+//! and last step** of the collision (equal today; the check's length is `end − start + dt`, so a
+//! one-step collision is one step long, counted from the collision's first step and not from the
+//! contact's onset, which is `contact_onset_myr`), `peak_uplift_m` the largest uplift it produced
 //! anywhere, `shortening_km` the continental crust that went under over the front's length,
 //! `lifted10`/`lifted100` the ground it raised by more than 10 and 100 m over its life, and
 //! `emerged` the ground that rose from below the sea to above it.
+//!
+//! # Per plate and step (task 1b)
+//! `rot_change` is the size of the change of the plate's rotation vector since the previous step
+//! over the size of the previous one (`|Ω − Ω_prev| / |Ω_prev|`: direction and rate together); it
+//! is known only when the plate existed at the previous step. `pole_inside` is whether the
+//! plate's rotation pole (either end of its axis) lies on the plate: the visible sample nearest to
+//! it belongs to the plate. `guard` is whether the speed guard (`max_plate_speed_mm_yr`) holds the
+//! plate: its rotation is at the cap, which is where every clamp leaves it. A clamp that a later
+//! one in the same step overwrote is not seen; the measure is the plate's state after the step.
+//!
+//! # Per step (task 1b)
+//! The sea floor's median and 90th-percentile age and the counts older than 180 and 250 Myr are
+//! recorded every step (one sort of the oceanic samples' ages). The histogram stays at the
+//! [`AGE_EVERY_MYR`] cadence. `pieces` are the sizes, in visible samples, of the largest connected
+//! pieces of continental crust, largest first (at most [`PIECES_KEPT`]); samples are joined along
+//! lattice edges whose ends are less than [`PIECE_LINK_SPACINGS`] sample spacings apart now, so
+//! two continents that a rift has pulled apart since the last resampling are not joined.
 
 use std::collections::BTreeMap;
 
@@ -53,13 +79,24 @@ use crate::world::WorldState;
 /// Set this environment variable and the stage records nothing (to time what recording costs).
 pub const OFF_ENV: &str = "DEEPTIME_NO_PLATE_DYNAMICS";
 /// The record's format version (`notes.plates.dynamics.version`).
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
 /// The sea-floor ages are recorded this often, Myr.
 pub const AGE_EVERY_MYR: f64 = 10.0;
 /// Width of an age bin, Myr.
 pub const AGE_BIN_MYR: f64 = 10.0;
 /// Age bins: 0–10, 10–20, … and the last one holds everything older than `(AGE_BINS − 1)` bins.
 pub const AGE_BINS: usize = 41;
+/// The two ages whose share of the sea floor is recorded every step, Myr.
+pub const OLD_AGES_MYR: [f64; 2] = [180.0, 250.0];
+/// How many of the largest continental pieces a step keeps.
+pub const PIECES_KEPT: usize = 16;
+/// Two continental samples joined by a lattice edge are one piece only while they are closer than
+/// this many sample spacings.
+pub const PIECE_LINK_SPACINGS: f64 = 2.0;
+/// Bits of a [`PlateStep`]'s flags in its array form.
+const POLE_INSIDE: u8 = 1;
+const GUARD_BOUND: u8 = 2;
+const ROT_KNOWN: u8 = 4;
 
 /// The dynamics of a run, from the first step to the latest.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -77,6 +114,11 @@ pub struct Dynamics {
     pub ages: Vec<AgeRec>,
     /// How many of the world's events have been read (births and deaths come from them).
     pub events_seen: usize,
+    /// Each plate's rotation vector after the last step, for the next step's `rot_change`.
+    pub prev_omega: Vec<(u32, [f64; 3])>,
+    /// Collision belts: convergence history, wedge and foredeep. Empty until the belt physics
+    /// (design tasks 2-3) writes it.
+    pub belts: Vec<BeltRec>,
 }
 
 /// One step's state of the planet and its plates.
@@ -96,12 +138,64 @@ pub struct StepRec {
     pub transfers: u16,
     /// The plates alive at the end of the step.
     pub plates: Vec<PlateStep>,
+    /// Visible oceanic samples, the median and 90th-percentile age of their crust (Myr) and how
+    /// many are older than [`OLD_AGES_MYR`]`[0]` and `[1]`.
+    pub ocean: u32,
+    pub age_p50: f64,
+    pub age_p90: f64,
+    pub old180: u32,
+    pub old250: u32,
+    /// Sizes of the largest connected pieces of continental crust, in visible samples, largest
+    /// first (see the module docs).
+    pub pieces: Vec<u32>,
+    /// Per-plate force budget and stress. Empty until the force balance (design task 5) writes it.
+    pub forces: Vec<PlateForces>,
+    /// Slab length of each contact, km. Empty until slab length is tracked (design task 5).
+    pub slabs_km: Vec<f64>,
+}
+
+/// One plate's force budget in a step: the size of each torque term and the mean in-plane
+/// stress. Nothing writes it yet (the force balance, design task 5); the check reads it.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PlateForces {
+    pub id: u32,
+    /// Torque magnitudes by term, in the balance's own unit (only ratios mean anything).
+    pub slab_pull: f64,
+    pub slab_suction: f64,
+    pub edge_energy: f64,
+    pub basal_drag: f64,
+    pub slab_resistance: f64,
+    pub boundary_resistance: f64,
+    pub collision_resistance: f64,
+    /// Mean in-plane stress from the edge forces, MPa: positive in tension, negative in
+    /// compression.
+    pub stress_mpa: f64,
+}
+
+/// A collision belt's later history and shape. Nothing writes it yet (design tasks 2-3); the
+/// check reads it. `None` is "not measured".
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct BeltRec {
+    /// The collision's `start_myr` and its two plates, to find its `CollisionRec`.
+    pub start_myr: f64,
+    pub under: u32,
+    pub over: u32,
+    /// Convergence across the front at the collision's onset, and 20 Myr later (`None` while the
+    /// collision has not lasted that long), mm/yr.
+    pub convergence_onset_mm_yr: Option<f64>,
+    pub convergence_20myr_mm_yr: Option<f64>,
+    /// Width of the wedge on the incoming side, km.
+    pub wedge_width_km: Option<f64>,
+    /// Width, km, and depth of fill, m, of the foreland basin in front of the wedge.
+    pub foredeep_width_km: Option<f64>,
+    pub foredeep_depth_m: Option<f64>,
 }
 
 /// A plate in a step. Serialised as the array `[id, visible, continental, speed_mm_yr, front_km,
-/// boundary_km]`.
+/// boundary_km, rot_change, flags]` (flags: 1 pole inside, 2 speed guard bound, 4 `rot_change`
+/// known).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(from = "[f64; 6]", into = "[f64; 6]")]
+#[serde(from = "[f64; 8]", into = "[f64; 8]")]
 pub struct PlateStep {
     pub id: u32,
     /// Visible samples (its area, in samples), and of them the continental ones.
@@ -116,6 +210,14 @@ pub struct PlateStep {
     /// another plate or one hidden under another plate (so a slab's trench side counts). An
     /// estimate, in the same unit as `front_km`.
     pub boundary_km: f64,
+    /// `|Ω − Ω_prev| / |Ω_prev|` since the previous step (0 when `rot_known` is false).
+    pub rot_change: f64,
+    /// Whether the plate existed at the previous step, so `rot_change` is a measurement.
+    pub rot_known: bool,
+    /// Whether the plate's rotation pole lies on the plate.
+    pub pole_inside: bool,
+    /// Whether the speed guard holds the plate's rotation at its cap.
+    pub guard: bool,
 }
 
 impl PlateStep {
@@ -134,8 +236,9 @@ impl PlateStep {
     }
 }
 
-impl From<[f64; 6]> for PlateStep {
-    fn from(a: [f64; 6]) -> Self {
+impl From<[f64; 8]> for PlateStep {
+    fn from(a: [f64; 8]) -> Self {
+        let flags = a[7] as u8;
         PlateStep {
             id: a[0] as u32,
             visible: a[1] as u32,
@@ -143,12 +246,20 @@ impl From<[f64; 6]> for PlateStep {
             speed_mm_yr: a[3],
             front_km: a[4],
             boundary_km: a[5],
+            rot_change: a[6],
+            rot_known: flags & ROT_KNOWN != 0,
+            pole_inside: flags & POLE_INSIDE != 0,
+            guard: flags & GUARD_BOUND != 0,
         }
     }
 }
 
-impl From<PlateStep> for [f64; 6] {
+impl From<PlateStep> for [f64; 8] {
     fn from(p: PlateStep) -> Self {
+        let flag = |on: bool, bit: u8| if on { bit } else { 0 };
+        let flags = flag(p.pole_inside, POLE_INSIDE)
+            | flag(p.guard, GUARD_BOUND)
+            | flag(p.rot_known, ROT_KNOWN);
         [
             f64::from(p.id),
             f64::from(p.visible),
@@ -156,6 +267,8 @@ impl From<PlateStep> for [f64; 6] {
             p.speed_mm_yr,
             p.front_km,
             p.boundary_km,
+            p.rot_change,
+            f64::from(flags),
         ]
     }
 }
@@ -374,13 +487,104 @@ pub fn age_bin(age_myr: f64) -> usize {
     ((age_myr / AGE_BIN_MYR).floor().max(0.0) as usize).min(AGE_BINS - 1)
 }
 
+/// For each of some points, the plate of the nearest sample offered (a brute-force nearest
+/// neighbour: a few dozen points over the samples costs less than one tree build).
+#[derive(Clone, Debug)]
+pub struct NearestPlate {
+    points: Vec<DVec3>,
+    best: Vec<(f64, u32)>,
+}
+
+impl NearestPlate {
+    pub fn new(points: Vec<DVec3>) -> NearestPlate {
+        let best = vec![(f64::NEG_INFINITY, u32::MAX); points.len()];
+        NearestPlate { points, best }
+    }
+
+    /// Offers a sample at unit vector `p` of `plate`.
+    pub fn offer(&mut self, p: DVec3, plate: u32) {
+        for (q, b) in self.points.iter().zip(self.best.iter_mut()) {
+            let d = p.dot(*q);
+            if d > b.0 {
+                *b = (d, plate);
+            }
+        }
+    }
+
+    /// The plate nearest to point `k` (`u32::MAX` when nothing was offered).
+    pub fn plate(&self, k: usize) -> u32 {
+        self.best[k].1
+    }
+}
+
+/// The relative change of a rotation vector, `|now − prev| / |prev|` (`None` when `prev` is 0).
+pub fn rotation_change(prev: DVec3, now: DVec3) -> Option<f64> {
+    let n = prev.length();
+    (n > 0.0).then(|| (now - prev).length() / n)
+}
+
+/// Sizes of the connected sets of members, largest first. `neighbours(i, buf)` pushes the samples
+/// joined to member `i` into `buf`; only members are walked.
+pub fn piece_sizes(
+    n: usize,
+    member: impl Fn(usize) -> bool,
+    neighbours: impl Fn(usize, &mut Vec<u32>),
+) -> Vec<u32> {
+    let mut seen = vec![false; n];
+    let (mut stack, mut buf, mut sizes) = (Vec::new(), Vec::new(), Vec::new());
+    for s in 0..n {
+        if seen[s] || !member(s) {
+            continue;
+        }
+        seen[s] = true;
+        stack.push(s as u32);
+        let mut size = 0u32;
+        while let Some(v) = stack.pop() {
+            size += 1;
+            buf.clear();
+            neighbours(v as usize, &mut buf);
+            for &u in &buf {
+                if !seen[u as usize] && member(u as usize) {
+                    seen[u as usize] = true;
+                    stack.push(u);
+                }
+            }
+        }
+        sizes.push(size);
+    }
+    sizes.sort_unstable_by(|a, b| b.cmp(a));
+    sizes
+}
+
+/// The sea-floor ages of the visible oceanic samples at `t`, sorted.
+pub fn ocean_ages(st: &PlateState, t: f64) -> Vec<f64> {
+    let mut ages: Vec<f64> = st
+        .samples
+        .iter()
+        .filter(|s| !s.is_hidden() && s.kind == OCEANIC)
+        .map(|s| s.age_myr(t))
+        .collect();
+    ages.sort_by(f64::total_cmp);
+    ages
+}
+
+/// The `q` quantile of sorted ages (nearest rank; 0 of nothing).
+fn quantile(sorted: &[f64], q: f64) -> f64 {
+    if sorted.is_empty() {
+        0.0
+    } else {
+        sorted[(((sorted.len() - 1) as f64 * q).round() as usize).min(sorted.len() - 1)]
+    }
+}
+
 /// Appends this step's record. `front_km` is each plate's subduction front length this step
-/// (`subduction::Pull::front_km`), `last` whether the run's final step has been taken. Reads the
-/// state and the world's new events, changes only the record.
+/// (`subduction::Pull::front_km`), `pos` the samples' current positions, `last` whether the run's
+/// final step has been taken. Reads the state and the world's new events, changes only the record.
 pub fn record_step(
     st: &mut PlateState,
     world: &WorldState,
     geo: &Geo,
+    pos: &[DVec3],
     front_km: &[f64],
     env: &Env<'_>,
     last: bool,
@@ -391,11 +595,24 @@ pub fn record_step(
     let np = st.plates.len();
     let (mut vis, mut cont, mut bnd) = (vec![0u32; np], vec![0u32; np], vec![0u32; np]);
     let (mut visible, mut land, mut continental) = (0u32, 0u32, 0u32);
+    // Each plate's rotation pole, both ends of its axis: which plate holds the nearest sample.
+    let mut pole_of: Vec<Option<usize>> = vec![None; np];
+    let mut poles = Vec::new();
+    for p in st.alive() {
+        let w = DVec3::from_array(p.omega);
+        if w.length() > 0.0 {
+            pole_of[p.id as usize] = Some(poles.len() / 2);
+            poles.push(w.normalize());
+            poles.push(-w.normalize());
+        }
+    }
+    let mut nearest = NearestPlate::new(poles);
     for (i, s) in st.samples.iter().enumerate() {
         if s.is_hidden() {
             continue;
         }
         let p = st.plate_of(i);
+        nearest.offer(pos[i], p);
         vis[p as usize] += 1;
         visible += 1;
         if s.kind == CONTINENTAL {
@@ -416,24 +633,58 @@ pub fn record_step(
     }
     let spacing_km = env.norm.km(env.norm.spacing_rad());
     let round = |x: f64, scale: f64| (x * scale).round() / scale;
+    let cap = env.norm.omega_of_speed(env.k.max_plate_speed_mm_yr);
+    let prev: BTreeMap<u32, DVec3> = d
+        .prev_omega
+        .iter()
+        .map(|&(id, w)| (id, DVec3::from_array(w)))
+        .collect();
     let plates: Vec<PlateStep> = st
         .alive()
         .map(|p| {
             let k = p.id as usize;
+            let w = DVec3::from_array(p.omega);
+            let change = prev.get(&p.id).and_then(|&w0| rotation_change(w0, w));
             PlateStep {
                 id: p.id,
                 visible: vis[k],
                 continental: cont[k],
-                speed_mm_yr: round(
-                    env.norm
-                        .speed_mm_yr(DVec3::from_array(p.omega), DVec3::from_array(p.centroid)),
-                    10.0,
-                ),
+                speed_mm_yr: round(env.norm.speed_mm_yr(w, DVec3::from_array(p.centroid)), 10.0),
                 front_km: round(front_km.get(k).copied().unwrap_or(0.0), 1.0),
                 boundary_km: round(f64::from(bnd[k]) * spacing_km, 1.0),
+                rot_change: round(change.unwrap_or(0.0), 1.0e4),
+                rot_known: change.is_some(),
+                pole_inside: pole_of[k].is_some_and(|j| {
+                    nearest.plate(2 * j) == p.id || nearest.plate(2 * j + 1) == p.id
+                }),
+                guard: cap > 0.0 && w.length() >= cap * (1.0 - 1.0e-9),
             }
         })
         .collect();
+    d.prev_omega = st.alive().map(|p| (p.id, p.omega)).collect();
+
+    // Connected pieces of continental crust: continental samples joined along lattice edges
+    // whose ends are still close (a rift since the last resampling pulls them apart).
+    let link = (PIECE_LINK_SPACINGS * env.norm.spacing_rad()).cos();
+    let mut pieces = piece_sizes(
+        st.samples.len(),
+        |i| {
+            let s = &st.samples[i];
+            !s.is_hidden() && s.kind == CONTINENTAL
+        },
+        |i, out| {
+            out.extend(
+                geo.edges(i as u32)
+                    .filter(|&(u, _)| pos[i].dot(pos[u as usize]) >= link)
+                    .map(|(u, _)| u),
+            );
+        },
+    );
+    pieces.truncate(PIECES_KEPT);
+
+    // The sea floor's age, every step.
+    let ages = ocean_ages(st, env.t_myr);
+    let older = |limit: f64| ages.len() - ages.partition_point(|&a| a <= limit);
 
     // Births and deaths: from the events this step wrote.
     let last_shares: BTreeMap<u32, f64> = d
@@ -492,40 +743,38 @@ pub fn record_step(
         collisions: big,
         transfers: small,
         plates,
+        ocean: ages.len() as u32,
+        age_p50: round(quantile(&ages, 0.5), 10.0),
+        age_p90: round(quantile(&ages, 0.9), 10.0),
+        old180: older(OLD_AGES_MYR[0]) as u32,
+        old250: older(OLD_AGES_MYR[1]) as u32,
+        pieces,
+        ..StepRec::default()
     });
 
     let every = (AGE_EVERY_MYR / env.dt_myr).round().max(1.0) as u64;
     if last || env.step.is_multiple_of(every) {
-        d.ages.push(age_record(st, t));
+        d.ages.push(age_record_of(&ages, t));
     }
     st.dynamics = Some(d);
 }
 
 /// The sea-floor age distribution of the visible oceanic samples at `t`.
 pub fn age_record(st: &PlateState, t: f64) -> AgeRec {
-    let mut ages: Vec<f64> = st
-        .samples
-        .iter()
-        .filter(|s| !s.is_hidden() && s.kind == OCEANIC)
-        .map(|s| s.age_myr(t))
-        .collect();
-    ages.sort_by(f64::total_cmp);
+    age_record_of(&ocean_ages(st, t), t)
+}
+
+/// The distribution of `ages` (sorted).
+pub fn age_record_of(ages: &[f64], t: f64) -> AgeRec {
     let mut hist = vec![0u32; AGE_BINS];
-    for &a in &ages {
+    for &a in ages {
         hist[age_bin(a)] += 1;
     }
-    let pick = |q: f64| {
-        if ages.is_empty() {
-            0.0
-        } else {
-            ages[(((ages.len() - 1) as f64 * q).round() as usize).min(ages.len() - 1)]
-        }
-    };
     AgeRec {
         t,
         samples: ages.len() as u32,
-        p50_myr: pick(0.5),
-        p90_myr: pick(0.9),
+        p50_myr: quantile(ages, 0.5),
+        p90_myr: quantile(ages, 0.9),
         max_myr: ages.last().copied().unwrap_or(0.0),
         hist,
     }
@@ -612,7 +861,12 @@ mod tests {
                 speed_mm_yr: 41.5,
                 front_km: 300.0,
                 boundary_km: 900.0,
+                rot_change: 0.0625,
+                rot_known: true,
+                pole_inside: true,
+                guard: false,
             }],
+            pieces: vec![40, 7],
             ..StepRec::default()
         });
         d.plates.push(PlateLife {
@@ -625,8 +879,12 @@ mod tests {
         let v = serde_json::to_value(&d).unwrap();
         assert_eq!(
             v["steps"][0]["plates"][0],
-            serde_json::json!([3.0, 60.0, 20.0, 41.5, 300.0, 900.0])
+            serde_json::json!([3.0, 60.0, 20.0, 41.5, 300.0, 900.0, 0.0625, 5.0])
         );
+        // The physics-to-come fields are there, empty (the checkpoint's postcard has no optional
+        // fields).
+        assert_eq!(v["steps"][0]["forces"], serde_json::json!([]));
+        assert_eq!(v["belts"], serde_json::json!([]));
         let back: Dynamics = serde_json::from_value(v).unwrap();
         assert_eq!(back, d);
         let p = &d.steps[0].plates[0];
@@ -654,5 +912,72 @@ mod tests {
         assert_eq!(age_bin(400.0), AGE_BINS - 1);
         assert_eq!(age_bin(5000.0), AGE_BINS - 1);
         assert_eq!(age_bin(-3.0), 0);
+    }
+
+    #[test]
+    fn a_rotation_changes_by_its_relative_difference() {
+        let w = DVec3::new(0.0, 0.0, 2.0);
+        assert_eq!(rotation_change(w, w), Some(0.0));
+        // Twice as fast about the same axis: a change of 100 %.
+        assert!((rotation_change(w, 2.0 * w).unwrap() - 1.0).abs() < 1e-12);
+        // The same rate about a perpendicular axis: |Δ| = 2√2 over 2.
+        let turned = DVec3::new(2.0, 0.0, 0.0);
+        assert!((rotation_change(w, turned).unwrap() - 2.0_f64.sqrt()).abs() < 1e-12);
+        // A plate at rest has no relative change.
+        assert_eq!(rotation_change(DVec3::ZERO, w), None);
+    }
+
+    #[test]
+    fn a_pole_belongs_to_the_plate_of_the_nearest_sample() {
+        let poles = vec![on_sphere(0.0, 90.0), on_sphere(0.0, -90.0)];
+        let mut n = NearestPlate::new(poles);
+        assert_eq!(n.plate(0), u32::MAX);
+        // Plate 1 holds the northern cap, plate 2 the rest.
+        for (lon, lat, plate) in [(0.0, 80.0, 1), (90.0, 60.0, 2), (10.0, -30.0, 2)] {
+            n.offer(on_sphere(lon, lat), plate);
+        }
+        assert_eq!(n.plate(0), 1);
+        assert_eq!(n.plate(1), 2);
+    }
+
+    /// A ring of `n` samples (each joined to its two neighbours), `members` of them in the set.
+    fn ring_pieces(n: usize, members: &[usize]) -> Vec<u32> {
+        piece_sizes(
+            n,
+            |i| members.contains(&i),
+            |i, out| {
+                out.push(((i + 1) % n) as u32);
+                out.push(((i + n - 1) % n) as u32);
+            },
+        )
+    }
+
+    #[test]
+    fn connected_pieces_are_counted_and_sorted_largest_first() {
+        // Samples 0-2 | 4 | 6-9 on a ring of 12: three pieces; 11 and 0 are neighbours, so 11 joins
+        // the first.
+        assert_eq!(
+            ring_pieces(12, &[0, 1, 2, 4, 6, 7, 8, 9, 11]),
+            vec![4, 4, 1]
+        );
+        assert_eq!(ring_pieces(12, &[3, 5]), vec![1, 1]);
+        assert_eq!(ring_pieces(12, &(0..12).collect::<Vec<_>>()), vec![12]);
+        assert!(ring_pieces(12, &[]).is_empty());
+    }
+
+    #[test]
+    fn quantiles_of_sorted_ages_and_the_distribution_agree() {
+        let ages: Vec<f64> = (0..=100).map(f64::from).collect();
+        assert_eq!(quantile(&ages, 0.5), 50.0);
+        assert_eq!(quantile(&ages, 0.9), 90.0);
+        assert_eq!(quantile(&[], 0.5), 0.0);
+        let rec = age_record_of(&ages, 7.0);
+        assert_eq!((rec.p50_myr, rec.p90_myr, rec.max_myr), (50.0, 90.0, 100.0));
+        assert_eq!(rec.samples, 101);
+        assert_eq!(rec.hist.iter().sum::<u32>(), 101);
+        // Samples older than a limit, as the step record counts them.
+        let older = |limit: f64| ages.len() - ages.partition_point(|&a| a <= limit);
+        assert_eq!(older(90.0), 10);
+        assert_eq!(older(100.0), 0);
     }
 }
