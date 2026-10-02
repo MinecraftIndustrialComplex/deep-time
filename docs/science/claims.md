@@ -13,7 +13,7 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,226 active rows in 28 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02; plate-motion task 2 added PLT-222 to PLT-227 the same day). The ledgers hold 2,404 ids: stage 1 left 2,069 rows; stage 2 package WP-0
+2,275 active rows in 29 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02; plate-motion task 2 added PLT-222 to PLT-227 the same day; force-balance task 5 added the ledger FRC, 27 rows, and CHK-058 and CHK-059; the table is recounted by tools/review/claims_counts.py and the prose further down may lag it). The ledgers hold 2,433 ids: stage 1 left 2,069 rows; stage 2 package WP-0
 (2026-10-02) retired 193 of them as duplicates (`merged`, not counted) and added 301 rows for code stage 1
 had not covered (51 in GEO, 74 in PRS, 84 in HNT, 35 in CRE, 57 in CHK). The flexure feature (ISO-040 to
 ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 from its follow-up) is included.
@@ -22,13 +22,14 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | [AMP](ledger/AMP.md) | the amplifier | 71 | 0 | 8 | 0 | 0 | 1 | 53 | 9 | 0 | 0 | 0 |
 | [BAK](ledger/BAK.md) | the bake, satellite view | 40 | 0 | 0 | 0 | 0 | 1 | 34 | 5 | 0 | 0 | 0 |
-| [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 0 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 | 0 |
-| [CHK](ledger/CHK.md) | plate-check target ranges | 57 | 19 | 3 | 1 | 7 | 0 | 9 | 18 | 3 | 1 | 0 |
+| [BIO](ledger/BIO.md) | Köppen classes and biomes | 100 | 24 | 2 | 0 | 3 | 1 | 69 | 1 | 0 | 0 | 0 |
+| [CHK](ledger/CHK.md) | plate-check target ranges | 59 | 19 | 3 | 1 | 7 | 0 | 11 | 18 | 3 | 1 | 0 |
 | [CLM](ledger/CLM.md) | climate physics | 134 | 0 | 40 | 5 | 0 | 13 | 21 | 55 | 106 | 28 | 12 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
 | [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 17 | 0 | 0 | 1 | 0 | 56 | 0 | 0 | 0 | 0 |
 | [DEP](ledger/DEP.md) | deposit models, counts, sizes | 165 | 53 | 3 | 0 | 20 | 0 | 62 | 27 | 0 | 0 | 40 |
 | [ERO](ledger/ERO.md) | erosion, sediment, facies | 156 | 0 | 83 | 2 | 3 | 6 | 4 | 58 | 0 | 0 | 11 |
+| [FRC](ledger/FRC.md) | plate forces (the force balance, recorded) | 27 | 3 | 0 | 10 | 1 | 0 | 13 | 0 | 0 | 0 | 0 |
 | [GEO](ledger/GEO.md) | geothermal features | 51 | 1 | 0 | 0 | 0 | 0 | 47 | 3 | 0 | 1 | 0 |
 | [GLA](ledger/GLA.md) | glacial erosion and landforms | 64 | 0 | 20 | 1 | 0 | 1 | 25 | 17 | 0 | 0 | 2 |
 | [HNT](ledger/HNT.md) | editor hint texts | 89 | 13 | 12 | 2 | 2 | 6 | 39 | 15 | 0 | 0 | 0 |
@@ -39,16 +40,16 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [MAG](ledger/MAG.md) | magma and lava | 42 | 2 | 1 | 0 | 1 | 0 | 37 | 1 | 0 | 0 | 0 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 0 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
 | [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 186 | 24 | 17 | 0 | 17 | 0 | 59 | 69 | 0 | 0 | 75 |
-| [PLT](ledger/PLT.md) | plate tectonics | 207 | 17 | 41 | 4 | 16 | 14 | 73 | 42 | 152 | 18 | 33 |
+| [PLT](ledger/PLT.md) | plate tectonics | 207 | 17 | 41 | 4 | 16 | 14 | 73 | 42 | 152 | 8 | 33 |
 | [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 | 0 |
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 71 | 0 | 8 | 0 | 0 | 2 | 53 | 8 | 14 | 0 | 3 |
 | [PRV](ledger/PRV.md) | geologic provinces | 31 | 0 | 0 | 0 | 5 | 4 | 10 | 12 | 0 | 0 | 0 |
-| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 73 | 0 | 16 | 0 | 0 | 1 | 24 | 32 | 0 | 0 | 11 |
+| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 79 | 11 | 9 | 0 | 1 | 1 | 54 | 3 | 0 | 0 | 11 |
 | [SCL](ledger/SCL.md) | world scale, planet constants | 50 | 0 | 6 | 0 | 0 | 1 | 37 | 6 | 0 | 0 | 1 |
-| [STR](ledger/STR.md) | strata, traps, hosts | 44 | 0 | 4 | 0 | 0 | 2 | 34 | 4 | 0 | 0 | 4 |
+| [STR](ledger/STR.md) | strata, traps, hosts | 46 | 1 | 0 | 0 | 1 | 2 | 42 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
-| **all** | | **2,233** | **192** | **352** | **24** | **86** | **79** | **932** | **568** | **346** | **48** | **210** |
+| **all** | | **2,271** | **231** | **319** | **34** | **92** | **79** | **988** | **528** | **346** | **38** | **210** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),
@@ -214,7 +215,7 @@ code). "Evidence" says how strong the finding is.
 | 1 | IMP-042 | Complex crater depth is coded 0.294 D^0.301 km and cites Collins et al. 2005, eq. 28. That equation is 0.4 D^0.3 km. Craters over 3.2 km are about 27 % too shallow. | primary full text, re-read by the stage 1 lead **Fixed in stage 2 (WP-1, 2026-10-02):** code, comment or hint corrected, with a test where a value changed; see [ledger/IMP.md](ledger/IMP.md). |
 | 2 | ORE-001 and following; `surface/fields.rs`, `surface/mod.rs` | The time windows are not applied on real histories: the banded-iron, oxygenated-ocean and land-plant clocks are hard-coded. No BIF ever forms; coal and sediment-hosted zinc-lead are not limited in time. | code reading by the extraction agent; the deposit audit found no BIF on either planet |
 | 3 | DEP (the `richness_mult` setting) | The richness setting is documented as scaling grade, and grade never reaches a block. | deposit audit, build log 2026-10-01 |
-| 4 | BIO-002 | Köppen: the code tests the polar group before the dry group. Peel et al. 2007 says "the B climates must be identified first". Cold dry land is classed tundra or ice cap instead of desert or steppe. | primary full text (sub-agent) |
+| 4 | BIO-002 | Köppen: the code tests the polar group before the dry group. Peel et al. 2007 says "the B climates must be identified first". Cold dry land is classed tundra or ice cap instead of desert or steppe. **FIXED in WP-11 (2026-10-02), with a test.** | primary full text (sub-agent) |
 | 5 | HYD-030 | Holdridge biotemperature counts temperatures above 30 °C as zero as well as those below 0 °C. The code applies only the lower limit, with Holdridge's coefficient. Evaporation is overestimated in hot deserts. | primary full text, scan (sub-agent) |
 | 6 | ERO-070 | Soil production depth scale is 5 m. Secondary sources give 0.25 to 0.5 m for Heimsath's law. A possible factor of 10 to 20. | secondary only; Heimsath et al. 1997 not readable |
 | 7 | ERO-022, ERO-049 | The comment says diffusivity between two cells is averaged "as Landlab's LinearDiffuser". Landlab takes the maximum. | Landlab source (sub-agent) |
@@ -225,7 +226,7 @@ code). "Evidence" says how strong the finding is.
 | 12 | VOL-016, VOL-026, VOL-029, VOL-048 | Comments disagree with the code they sit on (flank angle, crater size, caldera "across" against radius, subsidence rate). | arithmetic by the extraction agent **Settled in WP-2 (2026-10-02):** comments rewritten from the arithmetic and the sources read; the caldera comment's numbers were radii, so flag 4's reading was wrong; the subsidence rate was a question for Ben, answered 2026-10-02: the default is now 0 (it counted flexure and cooling twice). |
 | 13 | DEF-016 to DEF-018 | Fault slip ratios are coded 0.05, 0.08, 0.05 beside a cited 0.03. | secondary (a review quoting Schlische) **Settled in WP-8 (2026-10-02):** not an error. The ratios are slips along the dip in block space; their horizontal part is true in metres, so in metres the displacements are 0.017 to 0.029 of the length for normal faults and 0.031 to 0.075 for thrusts, against 0.03 (Schlische, via Lathrop et al. 2022, read in full) and 7 % (Elliott 1976, read in full). What is short is the throw, which is flag 14's question. |
 | 14 | DEF-019, DEF-020 | Fault dips from Anderson 1951 are applied in block space, which is stretched 15 times vertically: real dips become about 6.6° and 2.2°. A design question, not a typo. | arithmetic from the build log's own formula **WP-8 (2026-10-02):** the angles are verified (Anderson 1905, read in full; Collettini & Sibson 2001, abstract). Not a units error: the code says on purpose that folds and faults are drawn undistorted in blocks (DEF-011). Physics favours true metres; put to Ben with sections drawn three ways (STATUS.md "Pending questions"). |
-| 15 | DEF-042, RCK-061 | A "stock" is coded larger than the definition quoted beside it; the pluton thickness law cited to Cruden 1998 is not in that paper's abstract. | secondary; primary abstract **DEF-042 settled in WP-8 (2026-10-02):** no contradiction. The definition is about the exposed area (Earle 2019, read); the coded radius is the body's half-width at the world's floor, and a stock's outcrop is only its cupola, a few per cent of that. The comment is corrected; no value changed. RCK-061 is WP-7's. |
+| 15 | DEF-042, RCK-061 | A "stock" is coded larger than the definition quoted beside it; the pluton thickness law cited to Cruden 1998 is not in that paper's abstract. | secondary; primary abstract **DEF-042 settled in WP-8 (2026-10-02):** no contradiction. The definition is about the exposed area (Earle 2019, read); the coded radius is the body's half-width at the world's floor, and a stock's outcrop is only its cupola, a few per cent of that. The comment is corrected; no value changed. RCK-061 is WP-7's. **RCK-061 settled in WP-7 (2026-10-02):** T = 0.6 D^0.6 km is the fit of Cruden and McCaffrey 2001 (read in Cruden 2008, SKB R-08-138), with D the diameter of the circle of equal area; Cruden 1998 gives no equation. The code now uses D instead of the long axis. |
 | 16 | HYP-010 | The ocean's most common depth is stated as 3 to 4 km; NOAA gives about 4.3 km and the project's own Earth table peaks in the 4 to 5 km band. | agency page (sub-agent) |
 | 17 | CLM (ice thickness) | Land ice uses a hard-coded gravity of 9.81 m/s² and ignores the planet's gravity setting. In code that is `pending-rewrite`; carry the fix into the new climate. | code reading |
 | 18 | PLT, plate-check and the force-balance design | "Slab-attached plates move 3 to 4 times faster" is attributed to Forsyth & Uyeda 1975; the statement found is in Conrad & Lithgow-Bertelloni 2004. Correct the attribution before the force balance is calibrated to it. | primary abstracts **Settled in WP-13a (2026-10-02):** Forsyth & Uyeda 1975 was read in full. They give slab-attached plates at 6-9 cm/yr and the others at 0-4 cm/yr (p. 178), and their Table 1 gives a ratio of means of 3.8; the words "~4 times faster" are Conrad & Lithgow-Bertelloni 2004's. The designs, PLT-162 and CHK-056 now say so. |
@@ -345,7 +346,7 @@ well-specified checking and fixing, Opus where a wrong value forces a design or 
 | WP-8 | DEF | 74 | 6 / 0 | 13 | Opus | **Done** (2026-10-02): 17 rows `verified`, 1 `abstract-only`, 56 `game-choice`; flags 13 and 15 (DEF part) settled without a code change; flag 14 put to Ben with pictures; no value in the code changed. |
 | WP-9 | DEP | 164 | 24 / 0 | 34 | Sonnet 5.5 | Fix 3. Tables are open but are PDFs: the library now holds them as text. DEP and ORE kept the granular rows; check which of the two owns a row before verifying it. |
 | WP-10 | ORE | 182 | 19 / 0 | 43 | Opus | Fix 2 (a real bug). Redo the coal size and density derivation from sources. Same code directory as WP-9: run them one after the other or as one agent. |
-| WP-11 | BIO | 99 | 6 / 0 | 3 | Sonnet 5.5 | Fix 4. Mostly `game-choice` rows to confirm. |
+| WP-11 | BIO | 100 | 6 / 0 | 3 | Sonnet 5.5 | **Done** (2026-10-02, branch worktree-agent-ab02ca251f753b0a4): fix 4 made, plus the Cs/Cw tie rule and Tmon10; see biomes.md. Holdridge's 30 degC cut-off (fix 5) confirmed in the source and left to WP-5. |
 | WP-12 | SCL, BAK, PRV, POL, PRS | 212 | 4 / 0 | 10 | Sonnet 5.5 | Fix 19, 20, 34, 35, 36, 37. Identify the province map properly or drop the citation. PRS (presets other than the default, test and world presets) is new here. |
 | WP-13a | PLT `not-yet-coded`, CHK | 86 | 5 / 0 | 27 | Opus | **Before the force balance is built.** Fix 18, 38 to 41. Confirm slab pull, continental drag, wedge taper, suction share. CHK (the plate-check target ranges) is new here. |
 | WP-13b | PLT rest, CRE | 198 | 3 / 0 | 23 | Sonnet 5.5 | **Deferred** until the plate rewrite lands; then ledger the new code and verify. CRE (geometry, noise, plate state, deformation lattice) is new; `plates/dynamics.rs` is still not covered. |

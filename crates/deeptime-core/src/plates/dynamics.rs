@@ -29,10 +29,16 @@
 //! | `steps[].mix_km`, `arc_oceanic`, `arc_continental` | version 3: the boundary mix and the arc cells' heights (below) |
 //! | `prev_omega` | each plate's rotation vector after the last step (for the next step's change) |
 //! | `belts` | one [`BeltRec`] per collision (a terrane of `collision_min_frac` or more) that ended in a transfer or weld: its belt, wedge, foredeep and slowdown |
+//! | `steps[].forces`, `slabs_km`, `breakoffs`; `slabs`, `prev_balance` | version 4: the force balance (below) |
 //!
-//! Left empty by today's model, to be filled by the tasks that add the physics (the check reads
-//! them and reports "no data" while they are empty): `StepRec::forces` (the force budget and mean
-//! stress per plate, [`PlateForces`]) and `StepRec::slabs_km` (slab length per contact).
+//! # The force balance (version 4)
+//! `forces.rs` sums each plate's driving and resisting forces every step, solves the torque
+//! balance for every plate's rotation and records it here without applying it (design
+//! `docs/design/plate-force-balance.md`, task 5): `StepRec::forces` ([`PlateForces`]: the torque
+//! of each term, the mean in-plane stress, the answer's speed and its change since the last
+//! step), `StepRec::slabs_km` (the slab length of each subducting contact) and
+//! `StepRec::breakoffs`; `Dynamics::slabs` ([`SlabTrack`]) and `prev_balance` carry the state
+//! from step to step. It is taken right after the step's fronts are found, as the boundary mix.
 //!
 //! # Boundary mix and arc heights (version 3)
 //! Two more measures for `plate-check`, measurement only (nothing a plate rule reads):
@@ -105,7 +111,7 @@ use crate::world::WorldState;
 /// Set this environment variable and the stage records nothing (to time what recording costs).
 pub const OFF_ENV: &str = "DEEPTIME_NO_PLATE_DYNAMICS";
 /// The record's format version (`notes.plates.dynamics.version`).
-pub const VERSION: u32 = 3;
+pub const VERSION: u32 = 4;
 /// The sea-floor ages are recorded this often, Myr.
 pub const AGE_EVERY_MYR: f64 = 10.0;
 /// Width of an age bin, Myr.
@@ -151,6 +157,12 @@ pub struct Dynamics {
     pub prev_omega: Vec<(u32, [f64; 3])>,
     /// Collision belts: convergence history, belt, wedge and foredeep (`belts.rs`).
     pub belts: Vec<BeltRec>,
+    /// Version 4 (`forces.rs`): the slab of every contact, and each plate's balance rotation
+    /// after the last step (rad/yr, for the next step's `PlateForces::rot_change`).
+    #[serde(default)]
+    pub slabs: Vec<SlabTrack>,
+    #[serde(default)]
+    pub prev_balance: Vec<(u32, [f64; 3])>,
 }
 
 /// One step's state of the planet and its plates.
@@ -180,10 +192,14 @@ pub struct StepRec {
     /// Sizes of the largest connected pieces of continental crust, in visible samples, largest
     /// first (see the module docs).
     pub pieces: Vec<u32>,
-    /// Per-plate force budget and stress. Empty until the force balance (design task 5) writes it.
+    /// Per-plate force budget, stress and balance answer (`forces.rs`; version 4), for the plates
+    /// in the balance (alive, with visible samples, when the forces were summed).
     pub forces: Vec<PlateForces>,
-    /// Slab length of each contact, km. Empty until slab length is tracked (design task 5).
+    /// Slab length of each contact with an oceanic front this step, km (version 4).
     pub slabs_km: Vec<f64>,
+    /// Slabs that broke off this step (version 4).
+    #[serde(default)]
+    pub breakoffs: u16,
     /// Length of plate boundary by kind, km, indexed by [`mix`] (all 0 in a record without it).
     #[serde(default)]
     pub mix_km: [f64; MIX_CLASSES],
@@ -194,22 +210,99 @@ pub struct StepRec {
     pub arc_continental: ArcStat,
 }
 
-/// One plate's force budget in a step: the size of each torque term and the mean in-plane
-/// stress. Nothing writes it yet (the force balance, design task 5); the check reads it.
+/// One plate's force budget in a step (`forces.rs`, version 4): the size of each torque term,
+/// the mean in-plane stress, and the rotation at which the torques balance, which is recorded,
+/// not applied. Serialised as the array `[id, slab_pull, slab_suction, edge_energy, mantle_flow,
+/// basal_drag, slab_resistance, boundary_resistance, collision_resistance, stress_mpa,
+/// speed_mm_yr, rms_mm_yr, rot_change, flags]` (flags: 1 `rot_change` known).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(from = "[f64; 14]", into = "[f64; 14]")]
 pub struct PlateForces {
     pub id: u32,
-    /// Torque magnitudes by term, in the balance's own unit (only ratios mean anything).
+    /// Torque magnitudes by term, 10²⁴ N m (`forces::TORQUE_UNIT_N_M`), four significant
+    /// digits. The driving terms (pull, suction, edge energy, the mantle flow's drag) do not
+    /// depend on speed; the resisting ones are taken at the balance's answer. The edge energy
+    /// drives at ridges and resists at high ground.
     pub slab_pull: f64,
     pub slab_suction: f64,
     pub edge_energy: f64,
+    pub mantle_flow: f64,
     pub basal_drag: f64,
     pub slab_resistance: f64,
     pub boundary_resistance: f64,
     pub collision_resistance: f64,
-    /// Mean in-plane stress from the edge forces, MPa: positive in tension, negative in
-    /// compression.
+    /// Mean in-plane stress from the edge forces and the basal drag at the answer, MPa: positive
+    /// in tension, negative in compression.
     pub stress_mpa: f64,
+    /// The balance's answer: its speed at the plate's centroid and its RMS over the plate, mm/yr.
+    pub speed_mm_yr: f64,
+    pub rms_mm_yr: f64,
+    /// `|Ω − Ω_prev| / |Ω_prev|` of the answer since the previous step (0 when not known).
+    pub rot_change: f64,
+    pub rot_known: bool,
+}
+
+impl PlateForces {
+    /// Share of the driving torque that is slab pull (by size: pull over the sum of the sizes of
+    /// pull, suction, edge energy and the mantle flow; `None` with no driving torque).
+    pub fn pull_share(&self) -> Option<f64> {
+        let driving = self.slab_pull + self.slab_suction + self.edge_energy + self.mantle_flow; // ledger: FRC-023
+        (driving > 0.0).then(|| self.slab_pull / driving)
+    }
+}
+
+impl From<[f64; 14]> for PlateForces {
+    fn from(a: [f64; 14]) -> Self {
+        PlateForces {
+            id: a[0] as u32,
+            slab_pull: a[1],
+            slab_suction: a[2],
+            edge_energy: a[3],
+            mantle_flow: a[4],
+            basal_drag: a[5],
+            slab_resistance: a[6],
+            boundary_resistance: a[7],
+            collision_resistance: a[8],
+            stress_mpa: a[9],
+            speed_mm_yr: a[10],
+            rms_mm_yr: a[11],
+            rot_change: a[12],
+            rot_known: a[13] as u8 & 1 != 0,
+        }
+    }
+}
+
+impl From<PlateForces> for [f64; 14] {
+    fn from(f: PlateForces) -> Self {
+        [
+            f64::from(f.id),
+            f.slab_pull,
+            f.slab_suction,
+            f.edge_energy,
+            f.mantle_flow,
+            f.basal_drag,
+            f.slab_resistance,
+            f.boundary_resistance,
+            f.collision_resistance,
+            f.stress_mpa,
+            f.speed_mm_yr,
+            f.rms_mm_yr,
+            f.rot_change,
+            f64::from(u8::from(f.rot_known)),
+        ]
+    }
+}
+
+/// The slab hanging from one subducting contact (`forces.rs`, design §3.3): its length, km, and
+/// how long continental crust has held at least half of its front, Myr. The contact is known by
+/// its plates and the step it began (a reversed contact begins again, with a new slab).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct SlabTrack {
+    pub under: u32,
+    pub over: u32,
+    pub onset_step: u64,
+    pub km: f64,
+    pub blocked_myr: f64,
 }
 
 /// A collision belt's history and shape (`belts.rs`); the check reads it. `None` is "not
@@ -988,7 +1081,8 @@ pub fn arc_heights(st: &PlateState) -> [ArcStat; 2] {
 }
 
 /// What a step measured before `record_step` sees its end state: the fronts' lengths, the boundary
-/// mix and the arc heights, taken where the flags are fresh ([`boundary_mix`], [`arc_heights`]).
+/// mix and the arc heights, taken where the flags are fresh ([`boundary_mix`], [`arc_heights`]),
+/// and the force balance (`forces::record`).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Observed<'a> {
     /// Each plate's subduction front length this step (`subduction::Pull::front_km`).
@@ -996,6 +1090,8 @@ pub struct Observed<'a> {
     pub mix_km: [f64; MIX_CLASSES],
     /// Oceanic, continental.
     pub arcs: [ArcStat; 2],
+    /// The force balance (`None` when it was not taken).
+    pub forces: Option<&'a super::forces::Recorded>,
 }
 
 /// Appends this step's record. `seen` is what the step measured (the fronts' lengths per plate,
@@ -1176,7 +1272,9 @@ pub fn record_step(
         mix_km: seen.mix_km,
         arc_oceanic: seen.arcs[0],
         arc_continental: seen.arcs[1],
-        ..StepRec::default()
+        forces: seen.forces.map(|f| f.forces.clone()).unwrap_or_default(),
+        slabs_km: seen.forces.map(|f| f.slabs_km.clone()).unwrap_or_default(),
+        breakoffs: seen.forces.map_or(0, |f| f.breakoffs),
     });
 
     let every = (AGE_EVERY_MYR / env.dt_myr).round().max(1.0) as u64;
