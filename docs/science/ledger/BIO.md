@@ -2,9 +2,9 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [biomes.md](../biomes.md). Extraction notes with flags: [extraction-notes/MOI.md](../extraction-notes/MOI.md).
 
-Rows: 99. By status: `cited-unverified` 24, `calibrated` 1, `game-choice` 66, `uncited` 8.
+Rows: 100 (BIO-100 added in WP-11). By status: `verified` 24, `abstract-only` 3, `cited-unverified` 2, `calibrated` 1, `game-choice` 69, `uncited` 1.
 
-Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
+Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent; checked against sources in stage 2, work package WP-11 (2026-10-02): the Koppen rows and the vanilla band edges were read in their sources, and two Koppen departures were fixed (BIO-002, BIO-013; BIO-015 made literal). Paths are relative to the repository root; line numbers are left out on purpose.
 
 No row is pending a rewrite. Abbreviations: W = the repo root; Thot/Tcold = warmest/coldest month mean (degC); MAT = mean annual temperature; MAP = mean annual precipitation (mm); Pdry = driest month; band coordinate = a value on 0..5 across vanilla's five temperature or humidity bands (b = 2.5 is the middle of the third band). The Koppen rules are written as coded; the scheme the code names is Peel, Finlayson & McMahon 2007 (Table 1) plus an As/Aw split (koppen.rs header).
 

@@ -1013,6 +1013,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read in this pass: (ERO, ISO, HYP) abstract fetched; PDF text partly extracted (title page, abstract, methods, Africa section). The page with global main-group shares was not located. (HYD, YNG) full text fetched (Table 1 with notes, the paragraphs on test order and on the Cs/Cw tie rule, the discussion with land shares) (MOI, BIO) full text fetched (decoded PDF text layer: Table 1 with its notes, the paragraphs on test order and on the Cs/Cw tie rule, the discussion with the land shares) (SCL, PRV, POL, BAK) abstract fetched (landing page); PDF returned as binary so Table 1 not read; criteria were taken from Wikipedia's Koppen article instead (secondary) (CLM) full text fetched (section 4 conclusions)
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 11, issue 5, pages 1633-1644. The abstract in the HTML page says "BWh (14.2%, Hot desert) followed by Aw (11.5%, Tropical savannah)"; the build log's shares B 30.2 / D 24.6 / A 19.0 / C 13.4 / E 12.8 % were not found in the text read (S19). (HYD, YNG) matches. See the MOI file for the full Table 1 check. (MOI, BIO) authors, year, journal, volume, pages match. Table 1 is the table the code cites. The research note's source (Wikipedia) differs from the paper in the B threshold's form only (20 x MAT + 280/140/0 against 10 x (2 x MAT + 28/14/0), the same numbers) and in listing a "-3 degC" option the paper does not have. Details in Part 2. (SCL, PRV, POL, BAK) the code names no source. Peel et al. 2007 and Kottek et al. 2006 are the standard references per Wikipedia. (CLM) matches.
 - Cited as (HYD): "Koppen's E (polar climate: warmest month below 10 degC)", no paper named
+- Stage 2 read (WP-11, 2026-10-02, Peel2007.txt): full text. Table 1 and its notes, the text on test order (p. 1637), the Cs/Cw tie rule (p. 1639), Table 2 (Herberton Post Office) and the world shares (p. 1642). All BIO-001 to BIO-017 rows checked; BIO-002 and BIO-013 contradicted the code and were fixed.
 
 ### CharetteSmith2010
 - Reference: Charette, M. A. and Smith, W. H. F. (2010). The volume of Earth's ocean. Oceanography 23(2):112-114.
@@ -1328,6 +1329,7 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Read so far (by the project): n/a
 - Read in this pass: full text fetched (PMC, summariser: the class table and the definition AI = MA_Prec/MA_ET0)
 - Reference check: n/a (article number 409 is from my memory of the record, not seen; Crossref/EuropePMC gave volume 9 and year 2022). (from the joint entry MiddletonThomas1997 and Zomer2022: UNIDENTIFIED in the code; identified here as UNEP 1992 or 1997. Class limits differ between the two editions: see Part 2, BIO-038.)
+- Stage 2 read (WP-11, 2026-10-02, Zomer2022.txt): full text. The class table (<0.03, 0.03-0.2, 0.2-0.5, 0.5-0.65, >0.65) given 'as a general reference' from UNEP; BIO-038 split into BIO-038 (verified) and BIO-100 (the mapping's own anchors).
 
 ### Porter1989
 - Reference: Porter, Stephen C. 1989. Some geological implications of average Quaternary glacial conditions. Quaternary Research 32(3):245-261.
@@ -3212,6 +3214,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): nothing stated
 - Read in this pass: WorldClim page fetched: "BIO15 = Precipitation Seasonality (Coefficient of Variation)"; the USGS landing page did not define BIO15 on the page I got
 - Reference check: the variable name matches; the exact formula (n or n-1 in the standard deviation) is not on the pages I read.
+- Stage 2 read (WP-11, 2026-10-02, ODonnell2012.txt): full text. Bio 15 is the coefficient of variation of the twelve monthly totals; eq. 16 divides by 1 + Bio12/12. n or n-1 is not stated.
 
 ### Minder2010
 - Reference: Minder, Justin R.; Mote, Philip W.; Lundquist, Jessica D. 2010. Surface temperature lapse rates over complex terrain: lessons from the Cascade Mountains. Journal of Geophysical Research: Atmospheres 115(D14), D14122.
@@ -4716,3 +4719,12 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: relaxation times "close to 3-5 kyr".
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct.
+
+### MinecraftSrc1211
+- Reference: Mojang Studios. Minecraft 1.21.1, `net.minecraft.world.level.biome.OverworldBiomeBuilder`, as decompiled and published in the NeoForge 21.1.249 sources jar.
+- DOI or URL: none (the jar is built by the project's Gradle setup, `neoforge-21.1.249-sources.jar`)
+- Cited as: "OverworldBiomeBuilder, Minecraft 1.21.1" (default.json, OverworldBands.java)
+- Ledger ids: BIO-021 to BIO-024
+- Access: game source, not redistributed
+- Library (the project's source library, not distributed): the one class, text file MinecraftSrc1211/OverworldBiomeBuilder.java.
+- Stage 2 read (WP-11, 2026-10-02): the temperature, humidity, continentalness, erosion and weirdness constants; all equal the bake's reference bands.
