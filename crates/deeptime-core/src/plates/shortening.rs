@@ -77,19 +77,24 @@ use super::state::{CONTINENTAL, Collision, PlateState};
 use super::subduction::{MIN_CONTACT, locked};
 
 /// A collision lives through this many steps without a front before it counts as parted.
+// ledger: PLT-216 (game-choice: long enough for an overlap to come back after a resampling).
 pub const GRACE_STEPS: u64 = 3;
 /// Samples looked at around a front sample for the crust that stands at it.
+// ledger: PLT-214 (game-choice: a numerical rule).
 const K_FRONT: usize = 12;
 /// Crust of another plate stands at an edge sample when it is within this many sample spacings.
+// ledger: PLT-214 (game-choice: a numerical rule).
 pub const ADJACENT_SPACINGS: f64 = 1.75;
 /// A collision records its convergence this long after its onset, Myr (the design's measure of
 /// a collision's slowdown: convergence 20 Myr after the onset over convergence at the onset).
+// ledger: PLT-217 (the measure's definition, design `plate-force-balance.md` §7).
 pub const SLOWDOWN_AFTER_MYR: f64 = 20.0;
 
 /// Convergence across a boundary, in the units of `rel`: the component of the incoming plate's
 /// velocity relative to the overriding plate (`rel`) along the boundary's inward normal. `out` is
 /// the unit normal pointing out of the overriding plate. Positive: converging; negative: parting;
 /// zero for motion along the boundary.
+// ledger: PLT-213 (with `fronts` and `voronoi_edge_rad`: geometry, no outside source).
 pub fn normal_convergence(rel: DVec3, out: DVec3) -> f64 {
     -rel.dot(out)
 }
@@ -310,6 +315,7 @@ pub fn step_collision(
     live: bool,
     clock: StepClock,
 ) -> Change {
+    // ledger: PLT-215 (when a collision begins and what it accumulates).
     let front = front.filter(|f| f.samples >= MIN_CONTACT);
     let Some(f) = front else {
         return match collision {
@@ -415,6 +421,7 @@ pub fn advance(
         // mm/yr × Myr = km.
         state.contacts[k].speed_count_km += speed * env.dt_myr;
     }
+    // ledger: PLT-068 (the threshold and the pre-task-2 count), PLT-218 (which count fires).
     let threshold = env.k.collision_threshold_km;
     let mut fired = Vec::new();
     if !env.k.collision_on_shortening {
