@@ -57,7 +57,7 @@ library was used. Nothing in the library is checked against the printed version.
 
 ## Counts
 
-385 works. Stage 1 listed 475 entries and the flexure feature added 13; 103 entries were merged into 385 works (the merged keys are listed below).
+387 works. Stage 1 listed 475 entries, the flexure feature added 13 and the force balance (task 5, 2026-10-02) 2 (Cloos1993, Coblentz1994, both from memory); 103 entries were merged into 385 works (the merged keys are listed below).
 
 By access, as recorded for the work (the most open access class among its merged entries):
 
@@ -971,7 +971,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Molnar, P. and Lyon-Caen, H. (1988). Some simple physical aspects of the support, structure, and evolution of mountain belts. In: Clark, S. P., Burchfiel, B. C. and Suppe, J. (eds), Processes in Continental Lithospheric Deformation, Geological Society of America Special Paper 218, pp. 179-208.
 - DOI or URL: 10.1130/SPE218-p179.
 - Cited as: (ERO, ISO, HYP) "Molnar & Lyon-Caen 1988, GSA Special Paper 218:179-207". (PLT) "Molnar & Lyon-Caen 1988 (GSA Spec. Pap. 218)", "pages 179-207" in the force-balance design (Tibet 6-7e12 N/m).
-- Ledger ids: ISO-019, ISO-020, PLT-187
+- Ledger ids: ISO-019, ISO-020, PLT-187, FRC-014
 - Access: book (not online); paywalled chapter. [other sections: book chapter (abstract visible via OpenAlex; full text not online).]
 - Library (the project's source library, not distributed): not fetched. Reason: book, no open copy named.
 - Merged keys: Molnar1988
@@ -3406,7 +3406,7 @@ Vanilla's OverworldBiomeBuilder, Terralith, Tectonic (game and mod data), rustff
 - Reference: Coltice, N., Husson, L., Faccenna, C., Arnould, M., 2019. What drives tectonic plates? Science Advances 5(10): eaax4295.
 - DOI or URL: (SCL, PRV, POL, BAK) 10.1126/sciadv.aax4295 ; open access, Europe PMC PMC6821462 (PLT) 10.1126/sciadv.aax4295; https://pmc.ncbi.nlm.nih.gov/articles/PMC6821462/ (open access).
 - Cited as: (SCL, PRV, POL, BAK) "Coltice (run used a Pangea-like start)" (no year or title in the report; the research note tectonics_engines.md names "Coltice et al. 2019, What drives tectonic plates?") (PLT) "Coltice, Husson, Faccenna & Arnould 2019, Sci. Adv. 5:eaax4295".
-- Ledger ids: PLT-188, SCL-041
+- Ledger ids: PLT-188, SCL-041 (the force-balance page, plate-forces.md, quotes its abstract)
 - Access: open access
 - Library (the project's source library, not distributed): fetched (full-text XML from Europe PMC, 41,153 characters of text). From: epmcxml:PMC6821462. Text file: Coltice2019.txt.
 - Read so far (by the project): (SCL, PRV, POL, BAK) not stated for this claim (PLT) link given.
@@ -3501,11 +3501,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Forsyth, D., Uyeda, S. (1975). On the relative importance of the driving forces of plate motion. Geophysical Journal of the Royal Astronomical Society 43(1):163-200.
 - DOI or URL: 10.1111/j.1365-246X.1975.tb00631.x; https://academic.oup.com/gji/article/43/1/163/586101 (abstract page; PDF returns 403).
 - Cited as: "Forsyth & Uyeda 1975, Geophys. J. R. Astron. Soc. 43:163-200".
-- Ledger ids: PLT-023, PLT-030, PLT-162, PLT-182, PLT-185, PLT-189, PLT-199
+- Ledger ids: PLT-023, PLT-030, PLT-162, PLT-182, PLT-185, PLT-189, PLT-199, FRC-010, FRC-012, FRC-016, FRC-017
 - Access: paywalled (abstract only).
-- Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
+- Library (the project's source library, not distributed): fetched since WP-0 (PDF and text extraction ForsythUyeda1975.txt, 1,855 lines).
 - Substitute: none found.
-- Read so far (by the project): abstract only / secondary pages.
+- Read so far (by the project): abstract only / secondary pages. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent with line numbers: slab forces "an order of magnitude stronger than any other force" and the "terminal velocity" (Summary, lines 27-35; 716-727; 7.0 cm/yr at 1237-1239); continental drag "approximately eight times" the oceanic (1238-1241, a result of their inverse fit); slab-attached plates 6-9 cm/yr, others 0-4 cm/yr (699-704); ridge push of McKenzie 1972 "of the order of 300 bars" (1441-1450); their lithosphere 80 km.
 - Read in this pass: abstract fetched (publisher page).
 - Reference check: citation correct. The journal title "Geophysical Journal of the Royal Astronomical Society" is the 1975 name (now Geophysical Journal International). The abstract does NOT contain the "3 to 4" speed ratio or any factor of 8 (see Part 2); those must come from the body or from another paper.
 
@@ -3842,10 +3842,10 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Conrad, C. P., Lithgow-Bertelloni, C. (2006). Influence of continental roots and asthenosphere on plate-mantle coupling. Geophysical Research Letters 33(5):L05312.
 - DOI or URL: 10.1029/2005GL025621 (bronze open access at Wiley; PDF returns 403 to scripts).
 - Cited as: "Conrad & Lithgow-Bertelloni 2006, GRL 33:L05312".
-- Ledger ids: PLT-188
+- Ledger ids: PLT-188, FRC-010, FRC-027
 - Access: open copy at Wiley (bronze), abstract read here.
-- Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
-- Read so far (by the project): from abstract.
+- Library (the project's source library, not distributed): fetched since WP-0 (PDF and text extraction ConradLB2006.txt).
+- Read so far (by the project): from abstract. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent: roots "increase traction magnitudes by a factor of 2-5 compared to 100 km thick lithosphere" (abstract, lines 19-21), "about three times larger on average" (165-169); reference lithosphere 100 km (97-98).
 - Read in this pass: abstract fetched.
 - Reference check: correct.
 
@@ -3853,11 +3853,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Lithgow-Bertelloni, C., Richards, M. A. (1998). The dynamics of Cenozoic and Mesozoic plate motions. Reviews of Geophysics 36(1):27-78.
 - DOI or URL: 10.1029/97RG02282.
 - Cited as: "Lithgow-Bertelloni & Richards 1998, Rev. Geophys. 36:27-78".
-- Ledger ids: PLT-187
+- Ledger ids: PLT-187, FRC-009, FRC-016
 - Access: paywalled (abstract).
-- Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
+- Library (the project's source library, not distributed): fetched since WP-0 (PDF and text extraction LithgowBertelloniRichards1998.txt).
 - Substitute: none found.
-- Read so far (by the project): from abstract.
+- Read so far (by the project): from abstract. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent: ">90%" slabs, "<10%" lithospheric effects (abstract, lines 15-17; 2386-2388; 3019); upper mantle 4-5 x 10^20 Pa s (2198-2200), a weak asthenosphere "of the order of 10^19 Pa s" (2467-2475); they give no ridge push or slab pull in N/m.
 - Read in this pass: abstract fetched (Crossref JSON).
 - Reference check: correct. (The 1995 GRL paper 22:1317-1320, same authors, has the same ">90 % slabs, <10 % lithospheric thickening" statement.)
 
@@ -3877,7 +3877,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Parsons, B., Richter, F. M. (1980). A relation between the driving force and geoid anomaly associated with mid-ocean ridges. Earth and Planetary Science Letters 51(2):445-450.
 - DOI or URL: 10.1016/0012-821X(80)90223-X.
 - Cited as: "Parsons & Richter 1980, EPSL 51:445-450".
-- Ledger ids: PLT-187
+- Ledger ids: PLT-187, FRC-012 (not read: the library has no copy)
 - Access: paywalled (no abstract in OpenAlex).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -3889,7 +3889,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: van Hunen, J., Allen, M. B. (2011). Continental collision and slab break-off: a comparison of 3-D numerical models with observations. Earth and Planetary Science Letters 302(1-2):27-37.
 - DOI or URL: 10.1016/j.epsl.2010.11.035.
 - Cited as: "van Hunen & Allen 2011, EPSL 302:27-37" (10-25 Myr).
-- Ledger ids: PLT-184
+- Ledger ids: PLT-184, FRC-026
 - Access: paywalled.
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Substitute: none found.
@@ -3901,10 +3901,10 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Zahirovic, S., Müller, R. D., Seton, M., Flament, N. (2015). Tectonic speed limits from plate kinematic reconstructions. Earth and Planetary Science Letters 418:40-52.
 - DOI or URL: 10.1016/j.epsl.2015.02.037; the EarthByte summary page https://www.earthbyte.org/tectonic-speed-limits-from-plate-kinematic-reconstructions/ returned HTTP 500 / timeouts in this pass.
 - Cited as: "Zahirovic et al. 2015, EPSL 418:40-52".
-- Ledger ids: PLT-025, PLT-198
+- Ledger ids: PLT-025, PLT-198, PLT-181, FRC-024
 - Access: paywalled (closed; OpenAlex has no open URL and no abstract).
-- Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://www.earthbyte.org/tectonic-speed-limits-from-plate-kinematic-reconstructions/. File: Zahirovic2015.txt.
-- Read so far (by the project): link given.
+- Library (the project's source library, not distributed): full text fetched since WP-0 (PDF and text extraction Zahirovic2015.txt, 1,646 lines; the landing page as before).
+- Read so far (by the project): link given. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent: "a median RMS plate speed of ~4 cm/yr over 200 Myr" (lines 123-125); fastest plates ~8.5 cm/yr RMS, slowest ~2.6-2.8; oceanic plates 2-3 times faster than continental; plates with more than 25 % of their perimeter subducting median 7.9 cm/yr, without subduction 2.6 (652-662).
 - Read in this pass: metadata only (Crossref). Speed numbers could not be read.
 - Reference check: correct.
 
@@ -3924,7 +3924,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Turcotte, D. L., Schubert, G. Geodynamics. Cambridge University Press (editions 1982, 2002, 2014).
 - DOI or URL: none; Internet Archive copy (geodynamics0000turc) is lending-only (HTTP 401).
 - Cited as: "Turcotte & Schubert, Geodynamics" (flexure; gross slab pull "not confirmed").
-- Ledger ids: ISO-040 to ISO-042, ISO-067, PLT-183, PLT-193
+- Ledger ids: ISO-040 to ISO-042, ISO-067, PLT-183, PLT-193, FRC-002, FRC-004, FRC-008, FRC-012 (ridge push from memory; not read)
 - Access: book (not online).
 - Library (the project's source library, not distributed): not fetched. Reason: book, no open copy named.
 - Read so far (by the project): not read; gross slab pull "not confirmed in Turcotte & Schubert itself". For the flexure feature (2026-10-02) a sub-agent read chapter 3 as a PDF (https://sseh.uchicago.edu/doc/Geodynamics_Turcotte_Schubert_ch_3.pdf: E = 70 GPa and ν = 0.25 in the periodic-loading example, 100 GPa elsewhere) and the flexure formulas in lecture notes on the chapter (https://topex.ucsd.edu/geodynamics/12flexure.pdf); the edition of that PDF was not recorded.
@@ -3984,9 +3984,27 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Ledger ids: PLT-196
 - Access: open copy at par.nsf.gov.
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://par.nsf.gov/biblio/10127684. File: Huang2019.txt.
-- Read so far (by the project): from abstract.
+- Read so far (by the project): from abstract. Force-balance task 5 (2026-10-02): the abstract again (the library holds the landing page only): "extensional stress of 20-50 MPa in its interior" for a homogeneous supercontinent; the thickness it is averaged over is not in the abstract.
 - Read in this pass: abstract fetched (Crossref).
 - Reference check: correct. The abstract does give "extensional stress of 20-50 MPa in its interior" for a homogeneous supercontinent, matching the design.
+
+### Cloos1993
+- Reference: Cloos, M. (1993). Lithospheric buoyancy and collisional orogenesis: subduction of oceanic plateaus, continental margins, island arcs, spreading ridges, and seamounts. Geological Society of America Bulletin 105(6):715-737.
+- DOI or URL: 10.1130/0016-7606(1993)105<0715:LBACOS>2.3.CO;2.
+- Cited as: in ledger FRC-005 as the usual source for oceanic lithosphere becoming denser than the mantle after about 10 Myr.
+- Ledger ids: FRC-005
+- Access: paywalled.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): from memory (force-balance task 5, 2026-10-02); reference written from memory, not checked against Crossref.
+
+### Coblentz1994
+- Reference: Coblentz, D. D., Richardson, R. M., Sandiford, M. (1994). On the gravitational potential of the Earth's lithosphere. Tectonics 13(4):929-945.
+- DOI or URL: 10.1029/94TC00033.
+- Cited as: in ledger FRC-013 as the usual source for a mid-ocean ridge and continental lithosphere near sea level having about the same gravitational potential energy.
+- Ledger ids: FRC-013
+- Access: paywalled.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): from memory (force-balance task 5, 2026-10-02); reference written from memory, not checked against Crossref.
 
 ### DavisSuppeDahlen1983
 - Reference: Davis, D., Suppe, J., Dahlen, F. A. (1983). Mechanics of fold-and-thrust belts and accretionary wedges. Journal of Geophysical Research 88(B2):1153-1172.

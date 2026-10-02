@@ -147,7 +147,7 @@ pub fn ridge_coefficient(gravity: f64) -> f64 {
 ///   6.7 × 10¹² N/m (Tibet is quoted at 6–7 × 10¹²).
 pub fn column_energy(z_m: f64, continental: bool, ridge_m: f64, floor_m: f64, g: f64) -> f64 {
     if continental {
-        let rho = if z_m >= 0.0 {
+        let rho = if z_m >= 0.0 { // ledger: FRC-006, FRC-014
             RHO_CRUST
         } else {
             RHO_CRUST - RHO_WATER
@@ -155,7 +155,7 @@ pub fn column_energy(z_m: f64, continental: bool, ridge_m: f64, floor_m: f64, g:
         let root = 1.0 + rho / (RHO_MANTLE - RHO_CRUST);
         rho * g * z_m * (CRUST_KM * 1000.0 + 0.5 * z_m * root)
     } else {
-        let d = (ridge_m - z_m).clamp(0.0, (ridge_m - floor_m).max(0.0));
+        let d = (ridge_m - z_m).clamp(0.0, (ridge_m - floor_m).max(0.0)); // ledger: FRC-012, FRC-021
         -ridge_coefficient(g) * d * d
     }
 }
@@ -171,7 +171,7 @@ pub fn flow_axis(seed: u64) -> DVec3 {
 /// degree-2 harmonic; its largest size, 1, is 45° from the axis). Ledger FRC-015.
 pub fn flow_velocity(axis: DVec3, x: DVec3) -> DVec3 {
     let c = x.dot(axis);
-    -2.0 * c * (axis - c * x)
+    -2.0 * c * (axis - c * x) // ledger: FRC-015
 }
 
 /// The balance's coefficients in SI.
@@ -227,7 +227,7 @@ impl Coeffs {
         let trench = REF_TRENCH_KM * 1000.0;
         let perimeter = 2.0 * (std::f64::consts::PI * area).sqrt();
         let v = k.plate_speed_scale_mm_yr * 1.0e-3 / YEAR_S;
-        let drag = f_ref * trench / ((1.0 + k.slab_resistance + k.boundary_resistance) * area * v);
+        let drag = f_ref * trench / ((1.0 + k.slab_resistance + k.boundary_resistance) * area * v); // ledger: FRC-016
         Coeffs {
             radius_m,
             sample_m2,
@@ -237,8 +237,8 @@ impl Coeffs {
             edge_scale: k.edge_energy / EDGE_ENERGY_PHYSICAL,
             drag,
             keel: k.keel_drag,
-            slab_res: k.slab_resistance * drag * area / trench,
-            boundary_res: k.boundary_resistance * drag * area / perimeter,
+            slab_res: k.slab_resistance * drag * area / trench, // ledger: FRC-017
+            boundary_res: k.boundary_resistance * drag * area / perimeter, // ledger: FRC-017
             slab_depth_km: k.slab_depth_km,
             flow_m_s: k.mantle_flow_mm_yr * 1.0e-3 / YEAR_S,
             flow_axis,
@@ -560,7 +560,7 @@ impl Balance {
                     slab_resistance: t_slab[p].length(),
                     boundary_resistance: t_bnd[p].length(),
                     collision_resistance: t_col[p].length(),
-                    stress_mpa: (moment[p] + body) / (2.0 * a.area * h) * 1.0e-6,
+                    stress_mpa: (moment[p] + body) / (2.0 * a.area * h) * 1.0e-6, // ledger: FRC-010, FRC-022
                     speed_mm_yr: wp.cross(a.centroid).length() * r * 1.0e3 * YEAR_S,
                     rms_mm_yr: rms * 1.0e3 * YEAR_S,
                     residual: if largest > 0.0 {
@@ -664,9 +664,9 @@ pub fn grow_slab(
 ) -> bool {
     if f.oceanic > 0 {
         let conv = f.conv_sum / f64::from(f.oceanic);
-        s.km = (s.km + conv * dt_myr).min(depth_km);
+        s.km = (s.km + conv * dt_myr).min(depth_km); // ledger: FRC-020
     }
-    if f.continental > 0 && f.continental >= f.oceanic {
+    if f.continental > 0 && f.continental >= f.oceanic { // ledger: FRC-019
         s.blocked_myr += dt_myr;
         if s.blocked_myr >= breakoff_myr - 1e-9 {
             s.km = 0.0;
@@ -916,7 +916,7 @@ fn balance_step(
                 collision = true;
                 let du = c.energy(f64::from(sv.elevation_m), sv.kind == CONTINENTAL)
                     - c.energy(f64::from(su.elevation_m), true);
-                let force = c.edge_scale * du.max(0.0) * ell;
+                let force = c.edge_scale * du.max(0.0) * ell; // ledger: FRC-018
                 let speed = conv.max(floor) * 1.0e-3 / YEAR_S;
                 if force > 0.0 {
                     bal.add_link(Link {

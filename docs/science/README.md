@@ -55,6 +55,7 @@ them in from [_template.md](_template.md).
 | [impacts.md](impacts.md) | written (stage 1) | IMP |
 | [volcanoes-and-magma.md](volcanoes-and-magma.md) | checked against sources (stage 2, WP-2, 2026-10-02) | VOL, MAG |
 | [plates.md](plates.md) | stub; model about to be rewritten | PLT |
+| [plate-forces.md](plate-forces.md) | written with the feature (2026-10-02): the force balance, recorded and not yet applied | FRC; PLT-181 to PLT-191 |
 | [climate.md](climate.md) | stub; model about to be rewritten | CLM, MOI |
 | [biomes.md](biomes.md) | stub | BIO |
 | [erosion-and-sediment.md](erosion-and-sediment.md) | stub | ERO |

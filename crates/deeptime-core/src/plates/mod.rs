@@ -13,6 +13,8 @@
 //!    subducting plate's crust inside the overriding one;
 //! 2. uplifts the overriding plate within r_s of its fronts (Cortial's u_0·f(d)·g(v)·h(z̃)), builds
 //!    arcs, trenches and the deposit accumulators, and turns subducting plates by slab pull;
+//!    With the dynamics record on, it then sums the forces on every plate and solves their
+//!    torque balance, which is recorded and not applied (`forces.rs`);
 //! 3. fires collisions where continental crust has been forced 300 km under another plate,
 //!    moving the terrane to the other plate with a surge of uplift (`collision.rs`);
 //! 4. runs hotspots and large igneous provinces (`hotspots.rs`);
