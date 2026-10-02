@@ -52,7 +52,7 @@ them in from [_template.md](_template.md).
 
 | Page | State | Ledgers |
 |---|---|---|
-| [impacts.md](impacts.md) | written (stage 1) | IMP |
+| [impacts.md](impacts.md) | written, checked against sources (stage 2, 2026-10-02) | IMP |
 | [volcanoes-and-magma.md](volcanoes-and-magma.md) | checked against sources (stage 2, WP-2, 2026-10-02) | VOL, MAG |
 | [plates.md](plates.md) | stub; model about to be rewritten | PLT |
 | [plate-forces.md](plate-forces.md) | written with the feature (2026-10-02): the force balance, recorded and not yet applied | FRC; PLT-181 to PLT-191 |
@@ -60,15 +60,15 @@ them in from [_template.md](_template.md).
 | [biomes.md](biomes.md) | stub | BIO |
 | [erosion-and-sediment.md](erosion-and-sediment.md) | stub | ERO |
 | [isostasy-and-height-limit.md](isostasy-and-height-limit.md) | stub | ISO |
-| [flexure.md](flexure.md) | written with the feature (2026-10-02) | ISO-040 to ISO-067 |
+| [flexure.md](flexure.md) | written with the feature (2026-10-02) | ISO-040 to ISO-069 |
 | [hypsometry-and-calibration.md](hypsometry-and-calibration.md) | stub | HYP |
 | [rivers-and-lakes.md](rivers-and-lakes.md) | stub | HYD |
 | [young-landscape-and-amplifier.md](young-landscape-and-amplifier.md) | stub | YNG, AMP |
 | [glacial-landforms.md](glacial-landforms.md) | stub | GLA |
 | [rock-and-metamorphism.md](rock-and-metamorphism.md) | stub | RCK |
 | [strata.md](strata.md) | stub | STR |
-| [folds-faults-intrusions.md](folds-faults-intrusions.md) | stub | DEF |
-| [deposits.md](deposits.md) | stub | DEP, ORE |
+| [folds-faults-intrusions.md](folds-faults-intrusions.md) | checked against sources (stage 2, WP-8, 2026-10-02) | DEF |
+| [deposits.md](deposits.md) | stage 2 (checked against sources 2026-10-02) | DEP, ORE |
 | [provinces.md](provinces.md) | written with P1-10 (2026-10-02) | PRV |
 | [world-scale-and-bake.md](world-scale-and-bake.md) | stub | SCL, BAK |
 | [pole-cap.md](pole-cap.md) | stub | POL |

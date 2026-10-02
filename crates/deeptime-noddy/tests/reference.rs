@@ -17,7 +17,7 @@ const REFERENCE: &str = include_str!("data/reference.txt");
 /// 0). Another `libm` may differ in the last bit of a sine or cosine, and `rotset` takes `acos`
 /// of values at or next to 1, where one bit turns a frame by about 1e-8 rad: 4e-5 units at 4,000
 /// from the event. The tolerance leaves room for that and is still far below any real slip.
-const TOLERANCE: f64 = 1e-3;
+const TOLERANCE: f64 = 1e-3; // ledger: DEF-071
 
 struct Point {
     input: [f64; 3],

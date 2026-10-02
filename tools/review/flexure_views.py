@@ -154,6 +154,50 @@ def main() -> int:
                        args.out / "belt.png")
         numbers["belt"] = {"cell": [int(i), int(j)], "peak_m": float(z[j, i]),
                            "deepest_basin_m": float(window(flex, j, i, half).min()), **sec}
+    # The worst margin: the window along a plate boundary with the most cells that zigzag (the
+    # flexure follow-up, tools/review/flexure_artifacts.py), ground and flexure with sections.
+    if "plates/plate_id" in f:
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from flexure_artifacts import zigzag  # noqa: E402
+        pid = f["plates/plate_id"]
+        edge = (pid != np.roll(pid, 1, 1)) | (pid != np.roll(pid, -1, 1))
+        edge[1:] |= pid[1:] != pid[:-1]
+        zz = (zigzag(z) & ~np.repeat((np.abs(lat) > 70)[:, None], w, 1)).astype(float)
+        dens = zz.copy()
+        for _ in range(9):
+            dens = (dens + np.roll(dens, 1, 1) + np.roll(dens, -1, 1)) / 3
+            dens[1:-1] = (dens[:-2] + dens[1:-1] + dens[2:]) / 3
+        dens[~edge] = 0
+        j, i = np.unravel_index(int(np.argmax(dens)), dens.shape)
+        half = 9
+        sec = close_up(f, z, j, i, half, km, f"{args.label} The margin with the most cell-scale zigzag (cell {i}, {j})",
+                       args.out / "margin.png")
+        numbers["margin"] = {"cell": [int(i), int(j)], "zigzag_cells_in_window": int(window(zz, j, i, half).sum()),
+                             **sec}
+    # The north polar band: ground and flexure, and a section along the meridian through the
+    # strongest flexure there (the stripes of the first build ran east-west near the pole).
+    band = int(h * 20 / 180)
+    fig, ax = plt.subplots(3, 1, figsize=(14, 11))
+    ext = [-180, 180, 90 - 180 * band / h, 90]
+    ax[0].imshow(relief(z[:band]), extent=ext, aspect="auto", interpolation="nearest")
+    ax[0].set_title(f"{args.label} north of 70°: ground", color=INK)
+    span = max(50.0, float(np.percentile(np.abs(flex[:band]), 99.5)))
+    im = ax[1].imshow(flex[:band], extent=ext, aspect="auto", cmap=DIVERGING, norm=TwoSlopeNorm(0, -span, span),
+                      interpolation="nearest")
+    fig.colorbar(im, ax=ax[1], shrink=0.8, label="m above (+) or below (−) local isostasy")
+    ax[1].set_title("north of 70°: flexure", color=INK)
+    ip = int(np.argmax(np.abs(flex[:band]).max(axis=0)))
+    ax[2].plot(lat[:band], z[:band, ip], color="#8c5a2b", linewidth=2, label="ground")
+    ax[2].plot(lat[:band], flex[:band, ip], color="#1f4e8c", linewidth=1.5, label="flexure")
+    ax[2].set_xlabel("latitude, °")
+    ax[2].set_ylabel("m")
+    ax[2].set_title(f"meridian section at column {ip}", color=INK)
+    ax[2].grid(color="#e6e6e6", linewidth=0.6)
+    ax[2].legend(frameon=False)
+    fig.tight_layout()
+    fig.savefig(args.out / "pole.png", dpi=90)
+    plt.close(fig)
     # Roughness of the ground: how far a cell stands from the mean of its four neighbours.
     mean4 = (np.roll(z, 1, 1) + np.roll(z, -1, 1) + np.vstack([z[:1], z[:-1]]) + np.vstack([z[1:], z[-1:]])) / 4
     dev = np.abs(z - mean4)
@@ -168,7 +212,7 @@ def main() -> int:
     numbers["flexure_min_m"], numbers["flexure_max_m"] = float(flex.min()), float(flex.max())
     (args.out / "numbers.json").write_text(json.dumps(numbers, indent=1))
     print(json.dumps({k: v for k, v in numbers.items() if not isinstance(v, dict)}))
-    for k in ("moat", "belt"):
+    for k in ("moat", "belt", "margin"):
         if k in numbers:
             print(k, {a: b for a, b in numbers[k].items() if not isinstance(b, list)})
     return 0

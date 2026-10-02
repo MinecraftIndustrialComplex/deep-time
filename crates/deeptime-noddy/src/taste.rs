@@ -32,7 +32,7 @@ pub enum Code {
 }
 
 /// `ARRAY_LENGTH_OF_STRAT_CODE` × `NUM_STRAT_CODE_IN_BYTE`: events a sequence can hold.
-pub const MAX_EVENTS: usize = 128;
+pub const MAX_EVENTS: usize = 128; // ledger: DEF-068
 
 const FAULT1: u8 = Code::Fault1 as u8;
 const FAULT2: u8 = Code::Fault2 as u8;

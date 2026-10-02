@@ -44,14 +44,19 @@ pub struct VolcanoParams {
     /// Arc magma flux (the deposit engine's `arc_magma_flux`, 0–1) below which no stratovolcano
     /// forms. Ledger VOL-002.
     pub arc_min_flux: f64,
-    /// Relief of a stratovolcano at the lowest and the highest arc flux, km. A design range, taller
-    /// than most of Earth's: the 512 subaerial stratovolcanoes measured by Grosse et al. (2014,
-    /// Bull. Volcanol. 76:784, table 1) stand 0.17–4.57 km above their bases, median 1.02 km,
-    /// mean 1.13 ± 0.55 km. Ledger VOL-019.
+    /// Relief of a stratovolcano at the lowest and the highest arc flux, km. Lowered to Earth's range
+    /// on 2026-10-02 (Ben: "Lower to Earth's range"; was 1.2–3.0): the 512 subaerial
+    /// stratovolcanoes measured by Grosse et al. (2014, Bull. Volcanol. 76:784, table 1) stand
+    /// 0.17–4.57 km above their bases, median 1.02 km, mean 1.13 ± 0.55 km. Most arcs reach full
+    /// flux (VOL-003), so most cones aim at the top of the range, and a cone's standing height
+    /// is its target less erosion: the range is set so that the standing median lands near
+    /// Earth's. Ledger VOL-019.
     pub arc_height_km: [f64; 2],
     /// Basal radius of a stratovolcano at the top of the height range, km; a lower cone is narrower
-    /// (R ∝ H^0.8, uncited). At 3 km over 14 km the height is 0.11 of the basal width (Earth's
-    /// stratovolcanoes: median 0.13, range 0.02–0.30; Grosse et al. 2014, table 1). Ledger VOL-020.
+    /// (R ∝ H^0.8, uncited). Lowered from 14 to 10 km on 2026-10-02 together with the height
+    /// range (Ben), which keeps the proportions: at 2 km over 10 km the height is 0.10 of the
+    /// basal width (Earth's stratovolcanoes: median 0.13, range 0.02–0.30; Grosse et al. 2014,
+    /// table 1). Ledger VOL-020.
     pub arc_radius_km: f64,
     /// How long a stratovolcano stays active, Myr [min, max] (uniform). Longer than a real cone's:
     /// most large Cascade centres lived 0.1–1 Myr (Hildreth 2007, USGS PP 1744, p. 64). A centre
@@ -73,21 +78,31 @@ pub struct VolcanoParams {
     /// River Plain beside it (Christiansen 2001, USGS PP 729-G, p. G6). Ledger VOL-023.
     pub silicic_height_km: f64,
     pub silicic_radius_km: f64,
-    /// Extinct volcanoes on oceanic crust subside by this much per Myr, m/Myr, … Not a measured
-    /// rate: Hawaiian volcanoes sink more than 1 km in about 1 Myr under their own load while they
-    /// grow, and then about 10 m/Myr as the plate under them cools (Clague & Sherrod 2014, USGS PP
-    /// 1801 ch. 3, p. 130). The load part is now the surface stage's flexure (cones are loads) and
-    /// the cooling part the plate model's ocean floor, so this counts both twice; a question for
-    /// Ben. Ledger VOL-048.
+    /// Extinct volcanoes on oceanic crust subside by this much per Myr, m/Myr, … Default 0 since
+    /// 2026-10-02 (Ben: "Set it to 0, keep the setting"; was 25): Hawaiian volcanoes sink more
+    /// than 1 km in about 1 Myr under their own load while they grow, and then about 10 m/Myr as
+    /// the plate under them cools (Clague & Sherrod 2014, USGS PP 1801 ch. 3, p. 130). The load
+    /// part is the surface stage's flexure (cones are loads) and the cooling part the plate
+    /// model's ocean floor, so a further fixed rate would count both twice. A setting for a
+    /// player who wants islands to drown sooner. Ledger VOL-048.
     pub island_subsidence_m_myr: f64,
-    /// … up to this much in all, m. Ledger VOL-048.
+    /// … up to this much in all, m (only matters when the rate is above 0). Ledger VOL-048.
     pub island_subsidence_max_m: f64,
     /// Caldera-forming eruptions per Myr of a silicic volcano (a stratovolcano on continental
-    /// crust at least `silicic_crust_km` thick); continental hotspot centres collapse three times
-    /// as often, and a shield grown past 4 km opens a summit caldera at this rate. Uncited;
-    /// Yellowstone had three caldera-forming eruptions between 2.1 and 0.64 Ma (Christiansen
-    /// 2001). Ledger VOL-045.
+    /// crust at least `silicic_crust_km` thick), and the rate at which a shield grown past 4 km
+    /// opens a summit caldera. Not checked against a source (arc calderas; Ben left the rate
+    /// unchanged on 2026-10-02). A continental hotspot's centre has its own rate below. Ledger
+    /// VOL-045.
     pub caldera_rate_per_myr: f64,
+    /// Caldera-forming eruptions per Myr of a continental hotspot's silicic centre while it is
+    /// active (Ben, 2026-10-02: "About 1 per Myr"; before, 3 × `caldera_rate_per_myr` = 0.12).
+    /// Yellowstone had three caldera-forming eruptions in about 1.5 Myr (the Huckleberry Ridge,
+    /// Mesa Falls and Lava Creek tuffs, 2.1, 1.3 and 0.64 Ma: Christiansen 2001, USGS PP 729-G,
+    /// pp. G1–G2), about 2 per Myr; 1 per Myr is the owner's rounder figure. It is a chance per
+    /// Myr that an active centre collapses, 1 − exp(−rate · Δt) a step; a collapse ends the centre
+    /// (the hotspot then builds a new one once the old has drifted `hotspot_spacing_km` away), so
+    /// a track makes about one caldera per centre-life of a Myr or so. Ledger VOL-045.
+    pub hotspot_caldera_rate_per_myr: f64,
     /// Caldera radius, km [min, max]: Crater Lake's is 4–5 (8 × 10 km across), Long Valley's
     /// 8–16 (16 × 32 km: USGS), Yellowstone's 22–43 (45 × 85 km: Christiansen 2001). The default
     /// spans Crater Lake to Long Valley's short axis and leaves out the largest. Ledger VOL-029.
@@ -117,29 +132,30 @@ pub struct VolcanoParams {
 impl Default for VolcanoParams {
     fn default() -> Self {
         VolcanoParams {
-            density: 1.0,                    // ledger: VOL-012
-            size: 1.0,                       // ledger: VOL-025
-            flank_steepness: 0.5,            // ledger: VOL-024
-            arc_spacing_km: 60.0,            // ledger: VOL-039
-            arc_min_flux: 0.25,              // ledger: VOL-002
-            arc_height_km: [1.2, 3.0],       // ledger: VOL-019
-            arc_radius_km: 14.0,             // ledger: VOL-020
-            arc_lifetime_myr: [2.0, 8.0],    // ledger: VOL-038
-            hotspot_spacing_km: 70.0,        // ledger: VOL-007
-            shield_height_km: [3.5, 6.5],    // ledger: VOL-021
-            shield_radius_km: 40.0,          // ledger: VOL-022
-            silicic_height_km: 0.9,          // ledger: VOL-023
-            silicic_radius_km: 35.0,         // ledger: VOL-023
-            island_subsidence_m_myr: 25.0,   // ledger: VOL-048
-            island_subsidence_max_m: 1500.0, // ledger: VOL-048
-            caldera_rate_per_myr: 0.04,      // ledger: VOL-045
-            caldera_radius_km: [3.0, 9.0],   // ledger: VOL-029
-            silicic_crust_km: 42.0,          // ledger: VOL-005
-            flood_basalt_flows: 8,           // ledger: VOL-052
-            flood_basalt_step_m: 80.0,       // ledger: VOL-036
-            build_myr: 1.0,                  // ledger: VOL-041
-            fade_myr: 5.0,                   // ledger: VOL-065
-            max_elevation_km: 6.8,           // ledger: VOL-032
+            density: 1.0,                      // ledger: VOL-012
+            size: 1.0,                         // ledger: VOL-025
+            flank_steepness: 0.5,              // ledger: VOL-024
+            arc_spacing_km: 60.0,              // ledger: VOL-039
+            arc_min_flux: 0.25,                // ledger: VOL-002
+            arc_height_km: [0.6, 2.0],         // ledger: VOL-019
+            arc_radius_km: 10.0,               // ledger: VOL-020
+            arc_lifetime_myr: [2.0, 8.0],      // ledger: VOL-038
+            hotspot_spacing_km: 70.0,          // ledger: VOL-007
+            shield_height_km: [3.5, 6.5],      // ledger: VOL-021
+            shield_radius_km: 40.0,            // ledger: VOL-022
+            silicic_height_km: 0.9,            // ledger: VOL-023
+            silicic_radius_km: 35.0,           // ledger: VOL-023
+            island_subsidence_m_myr: 0.0,      // ledger: VOL-048
+            island_subsidence_max_m: 1500.0,   // ledger: VOL-048
+            caldera_rate_per_myr: 0.04,        // ledger: VOL-045
+            hotspot_caldera_rate_per_myr: 1.0, // ledger: VOL-045
+            caldera_radius_km: [3.0, 9.0],     // ledger: VOL-029
+            silicic_crust_km: 42.0,            // ledger: VOL-005
+            flood_basalt_flows: 8,             // ledger: VOL-052
+            flood_basalt_step_m: 80.0,         // ledger: VOL-036
+            build_myr: 1.0,                    // ledger: VOL-041
+            fade_myr: 5.0,                     // ledger: VOL-065
+            max_elevation_km: 6.8,             // ledger: VOL-032
         }
     }
 }
@@ -191,6 +207,12 @@ impl VolcanoParams {
             "island_subsidence_max_m",
         )?;
         range(self.caldera_rate_per_myr, 0.0, 10.0, "caldera_rate_per_myr")?;
+        range(
+            self.hotspot_caldera_rate_per_myr,
+            0.0,
+            10.0,
+            "hotspot_caldera_rate_per_myr",
+        )?;
         pair(self.caldera_radius_km, 0.5, 60.0, "caldera_radius_km")?;
         range(self.silicic_crust_km, 0.0, 100.0, "silicic_crust_km")?;
         if self.flood_basalt_flows == 0 || self.flood_basalt_flows > 12 {

@@ -199,7 +199,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "active_margin_mean",
-        "Active share of the continental margin (after the first 100 Myr)",
+        "Active share of the continental margin (after the first 90 Myr of the record)",
         "share",
         Some(0.25),
         Some(0.40),
@@ -213,11 +213,14 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     // Task 1b: the force-balance design's section 7 targets that today's model can be measured on.
     m(
+        // ledger: CHK-020. Earth: about 47 mm/yr today (area-weighted, Forsyth & Uyeda 1975
+        // Table 1) and 50-100 over the last 200 Myr (global RMS, Zahirovic et al. 2015 §3.2).
+        // Was 35-55, which left out every Earth value of the last 200 Myr (WP-13a).
         "speed_rms_mm_yr",
         "Plate speed, area-weighted RMS (mean over steps)",
         "mm/yr",
-        Some(35.0),
-        Some(55.0),
+        Some(40.0),
+        Some(100.0),
     ),
     m(
         "speed_big_p10_mm_yr",
@@ -325,11 +328,14 @@ pub const MEASURES: &[MeasureDef] = &[
         Some(300.0),
     ),
     m(
+        // ledger: CHK-036. Earth: a cycle "often considered to last 400-800" Myr, about 600 Myr
+        // dominant (Mitchell et al. 2021); "intervals of ca. 500 m.y." (Nance 2022). Was 300-600,
+        // from an Earth range of 300-500 that neither source gives (WP-13a).
         "supercontinent_period_myr",
         "Assembly-to-assembly period, median",
         "Myr",
-        Some(300.0),
-        Some(600.0),
+        Some(400.0),
+        Some(800.0),
     ),
     // The boundary mix and arc heights (dynamics version 3), judged against Earth: each range
     // carries its ledger id (docs/science/ledger/PLT.md, PLT-213 to PLT-221). Runs recorded
@@ -520,36 +526,121 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "contact_age_p50_myr",
-        "Contact age at the collision, median",
+        "Contact age when the collision began, median",
         "Myr",
         None,
         None,
     ),
     m(
         "contact_age_p90_myr",
-        "Contact age at the collision, 90th percentile",
+        "Contact age when the collision began, 90th percentile",
         "Myr",
         None,
         None,
     ),
     m(
         "counted_km_p50",
-        "What the collision counter read, median",
+        "What the pre-task-2 count read at the transfer or weld (relative speed × time), median",
         "km",
         None,
         None,
     ),
     m(
         "shortening_km_p50",
-        "Real shortening at the collision, median",
+        "Continental crust gone under at the collision, over the front's length, median",
         "km",
         None,
         None,
     ),
     m(
         "shortening_km_p90",
-        "Real shortening at the collision, 90th percentile",
+        "Continental crust gone under at the collision, 90th percentile",
         "km",
+        None,
+        None,
+    ),
+    m(
+        "front_shortening_km_p50",
+        "Shortening across the front at the transfer or weld (convergence integrated), median",
+        "km",
+        None,
+        None,
+    ),
+    m(
+        "front_shortening_km_p90",
+        "Shortening across the front at the transfer or weld, 90th percentile",
+        "km",
+        None,
+        None,
+    ),
+    m(
+        "collisions_without_state_pct",
+        "Collisions that fired with no collision state (no converging continental front)",
+        "%",
+        None,
+        None,
+    ),
+    // Collision states that ended with no transfer or weld (`dynamics::PartingRec`).
+    m(
+        "partings_per_100myr",
+        "Collision states that ended with no transfer or weld",
+        "per 100 Myr",
+        None,
+        None,
+    ),
+    m(
+        "partings_parted_per_100myr",
+        "Of them: the continental crust left the front",
+        "per 100 Myr",
+        None,
+        None,
+    ),
+    m(
+        "partings_reversed_per_100myr",
+        "Of them: the contact reversed",
+        "per 100 Myr",
+        None,
+        None,
+    ),
+    m(
+        "partings_closed_per_100myr",
+        "Of them: the contact closed or a plate died",
+        "per 100 Myr",
+        None,
+        None,
+    ),
+    m(
+        "parting_length_p50_myr",
+        "Their length, median",
+        "Myr",
+        None,
+        None,
+    ),
+    m(
+        "parting_shortening_km_p50",
+        "Their shortening, median",
+        "km",
+        None,
+        None,
+    ),
+    m(
+        "parting_shortening_km_p90",
+        "Their shortening, 90th percentile",
+        "km",
+        None,
+        None,
+    ),
+    m(
+        "parting_area_mkm2_per_100myr",
+        "Continental crust that crossed their fronts",
+        "million km² per 100 Myr",
+        None,
+        None,
+    ),
+    m(
+        "collision_area_mkm2_per_100myr",
+        "Continental crust that crossed the fronts of transfers and welds",
+        "million km² per 100 Myr",
         None,
         None,
     ),
@@ -889,7 +980,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "balance_rms_mm_yr",
-        "Balance (not applied): plate speed, area-weighted RMS, mean over steps (design target 35-55)",
+        "Balance (not applied): plate speed, area-weighted RMS, mean over steps (target 40-100, CHK-020)",
         "mm/yr",
         None,
         None,
@@ -1627,6 +1718,74 @@ pub fn measures_with(
         .collect();
     put("shortening_km_p50", median(&short));
     put("shortening_km_p90", pct(&short, 0.9));
+    let front_short = pick(&|c| c.front_shortening_km);
+    put("front_shortening_km_p50", median(&front_short));
+    put("front_shortening_km_p90", pct(&front_short, 0.9));
+    put(
+        "collisions_without_state_pct",
+        if col.is_empty() {
+            f64::NAN
+        } else {
+            100.0
+                * col
+                    .iter()
+                    .filter(|c| c.onset_convergence_mm_yr.is_none())
+                    .count() as f64
+                / col.len() as f64
+        },
+    );
+    put(
+        "partings_per_100myr",
+        if span > 0.0 {
+            100.0 * d.partings.len() as f64 / span
+        } else {
+            f64::NAN
+        },
+    );
+    let per_100 = |n: f64| {
+        if span > 0.0 {
+            100.0 * n / span
+        } else {
+            f64::NAN
+        }
+    };
+    let why = |reasons: &[&str]| {
+        per_100(
+            d.partings
+                .iter()
+                .filter(|p| reasons.contains(&p.reason.as_str()))
+                .count() as f64,
+        )
+    };
+    put(
+        "partings_parted_per_100myr",
+        why(&[super::dynamics::PARTED]),
+    );
+    put(
+        "partings_reversed_per_100myr",
+        why(&[super::dynamics::REVERSED]),
+    );
+    put(
+        "partings_closed_per_100myr",
+        why(&[super::dynamics::CLOSED, super::dynamics::EMPTIED]),
+    );
+    put(
+        "parting_area_mkm2_per_100myr",
+        per_100(d.partings.iter().map(|p| p.area_km2).sum::<f64>() / 1.0e6),
+    );
+    put(
+        "collision_area_mkm2_per_100myr",
+        per_100(d.collisions.iter().map(|c| c.area_km2).sum::<f64>() / 1.0e6),
+    );
+    let parted_length: Vec<f64> = d
+        .partings
+        .iter()
+        .map(|p| p.end_myr - p.start_myr + d.dt_myr)
+        .collect();
+    put("parting_length_p50_myr", median(&parted_length));
+    let parted: Vec<f64> = d.partings.iter().map(|p| p.shortening_km).collect();
+    put("parting_shortening_km_p50", median(&parted));
+    put("parting_shortening_km_p90", pct(&parted, 0.9));
 
     // Margins and the sea floor.
     put("active_margin_mean", active_margin_mean(margins));
@@ -3938,5 +4097,74 @@ mod tests {
                 .count()
                 >= 5
         );
+    }
+
+    /// Earth's own figures, as read in the sources (docs/science/ledger/CHK.md and PLT.md, WP-13a),
+    /// must pass the built-in ranges they anchor: a target that fails Earth is a wrong target.
+    #[test]
+    fn earth_figures_pass_their_targets() {
+        let t = Targets::builtin();
+        let earth: &[(&str, f64, &str)] = &[
+            // Area-weighted RMS: today, from Forsyth & Uyeda 1975 Table 1; the last 200 Myr's
+            // range of global RMS, Zahirovic et al. 2015 §3.2.
+            ("speed_rms_mm_yr", 47.1, "Forsyth & Uyeda 1975 Table 1"),
+            (
+                "speed_rms_mm_yr",
+                50.0,
+                "Zahirovic et al. 2015 §3.2, low end",
+            ),
+            (
+                "speed_rms_mm_yr",
+                100.0,
+                "Zahirovic et al. 2015 §3.2, high end",
+            ),
+            ("speed_big_p10_mm_yr", 11.0, "Forsyth & Uyeda 1975 Table 1"),
+            ("speed_big_p50_mm_yr", 42.0, "Zahirovic et al. 2015 §3.5"),
+            ("speed_big_p90_mm_yr", 80.0, "Forsyth & Uyeda 1975 Table 1"),
+            (
+                "speed_oceanic_over_continental",
+                2.9,
+                "Zahirovic et al. 2015 §3.5",
+            ),
+            ("speed_slab_over_free", 3.0, "Zahirovic et al. 2015 §3.5"),
+            (
+                "speed_slab_over_free",
+                4.0,
+                "Conrad & Lithgow-Bertelloni 2004",
+            ),
+            ("speed_slab_rank_corr", 0.71, "Forsyth & Uyeda 1975 Table 1"),
+            (
+                "speed_area_rank_corr",
+                -0.34,
+                "Forsyth & Uyeda 1975 Table 1",
+            ),
+            ("ocean_age_p50_myr", 55.4, "Seton et al. 2020 grid"),
+            ("ocean_age_p90_mean_myr", 133.0, "Seton et al. 2020 grid"),
+            ("ocean_old180_pct", 0.61, "Seton et al. 2020 grid"),
+            ("ocean_old250_pct", 0.06, "Seton et al. 2020 grid"),
+            ("supercontinent_tenure_myr", 100.0, "Mitchell et al. 2021"),
+            ("supercontinent_tenure_myr", 300.0, "Mitchell et al. 2021"),
+            ("supercontinent_period_myr", 400.0, "Mitchell et al. 2021"),
+            ("supercontinent_period_myr", 500.0, "Nance 2022"),
+            ("supercontinent_period_myr", 600.0, "Mitchell et al. 2021"),
+            ("supercontinent_period_myr", 800.0, "Mitchell et al. 2021"),
+            ("largest_share_p50", 0.205, "Bird 2003 Table 1"),
+            ("plates_over_5pct_p50", 7.0, "Bird 2003 Table 1"),
+            ("boundary_subduction_pct", 19.7, "Bird 2003 Table 3"),
+            (
+                "collision_convergence_ratio_20myr",
+                0.27,
+                "Copley et al. 2010",
+            ),
+        ];
+        for &(key, v, src) in earth {
+            assert!(MEASURES.iter().any(|d| d.key == key), "{key}");
+            let (lo, hi) = t.range(key);
+            assert!(
+                lo.is_none_or(|lo| v >= lo) && hi.is_none_or(|hi| v <= hi),
+                "{key}: Earth {v} ({src}) is outside {}",
+                range_text(lo, hi)
+            );
+        }
     }
 }
