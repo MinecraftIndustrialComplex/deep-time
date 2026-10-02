@@ -163,7 +163,7 @@ public final class LavaGameTests {
 
     /** What was read back around one body. */
     private static final class Tally {
-        long expected, lava, stray, wetFaces, airFaces, skippedFaces;
+        long expected, lava, stray, wetFaces, airFaces, skippedFaces, lensExpected, lensLava, mushBlocks, mushLava, mushOpen;
         final StringBuilder detail = new StringBuilder();
     }
 
@@ -217,6 +217,7 @@ public final class LavaGameTests {
         all.stream().filter(Magma.Body::lake).findFirst().ifPresent(picked::add);
         all.stream().filter(Magma.Body::submerged).findFirst().ifPresent(picked::add);
         all.stream().filter(b -> !b.lake() && !b.submerged()).findFirst().ifPresent(picked::add);
+        all.stream().filter(b -> "shield".equals(b.kind()) && !picked.contains(b)).findFirst().ifPresent(picked::add);
         all.stream().max(java.util.Comparator.comparingInt(Magma.Body::reach)).filter(b -> !picked.contains(b)).ifPresent(picked::add);
         List<Job> jobs = new ArrayList<>();
         java.util.Map<Magma.Body, Tally> tallies = new java.util.LinkedHashMap<>();
@@ -245,6 +246,19 @@ public final class LavaGameTests {
                         boolean lava = chunk.getBlockState(pos.set(x, y, z)).is(Blocks.LAVA);
                         if (part.molten())
                             n.expected++;
+                        if (part == Magma.Part.LENS)
+                            n.lensExpected++;
+                        if (part == Magma.Part.NONE && b.mush(dx, dz, y)) {
+                            BlockState ms = chunk.getBlockState(pos);
+                            if (lava && y > lakeZoneTop && !magma.at(x, y, z).molten())
+                                n.mushLava++;       // lava in the altered rock outside a lens: stray
+                            else if (ms.isAir() || !ms.getFluidState().isEmpty())
+                                n.mushOpen++;       // the mush leaves no cave or water inside it
+                            else
+                                n.mushBlocks++;
+                        }
+                        if (part == Magma.Part.LENS && lava)
+                            n.lensLava++;
                         if (!lava)
                             continue;
                         if (!part.molten()) {
@@ -294,9 +308,17 @@ public final class LavaGameTests {
                         failure = "volcano " + b.id() + ": its crater lake is " + lake;
                 }
                 line.append(String.format(" [id=%d %s at (%d, %d) floorY=%d chamber y=%d rh=%d rv=%d %s lake=%s molten=%d lava=%d stray=%d "
-                                + "wetFaces=%d airFaces=%d%s]", b.id(), b.kind(), b.x(), b.z(), b.floorY(), b.chamberY(), b.chamberRh(),
+                                + "wetFaces=%d airFaces=%d lenses=%d lensMolten=%d lensLava=%d mush=%d mushOpen=%d mushLava=%d column y %d..%d%s]",
+                        b.id(), b.kind(), b.x(), b.z(), b.floorY(), b.chamberY(), b.chamberRh(),
                         b.chamberRv(), b.submerged() ? "under water" : "on land", lake, n.expected, n.lava, n.stray, n.wetFaces,
-                        n.airFaces, n.detail));
+                        n.airFaces, b.lensCount(), n.lensExpected, n.lensLava, n.mushBlocks, n.mushOpen, n.mushLava, b.minY(), b.maxY(),
+                        n.detail));
+                if (failure == null && b.lensCount() > 0 && n.lensExpected > 0 && n.lensLava * 2 < n.lensExpected)
+                    failure = "volcano " + b.id() + ": only " + n.lensLava + " of " + n.lensExpected + " lens blocks are lava";
+                if (failure == null && b.lensCount() > 0 && n.mushBlocks == 0 && b.mush(0, 0, b.chamberY() - b.chamberRv() - 10))
+                    failure = "volcano " + b.id() + ": no altered hot rock was placed around its column";
+                if (failure == null && n.mushLava > 0)
+                    failure = "volcano " + b.id() + ": " + n.mushLava + " lava blocks in its altered rock outside any lens";
                 if (failure == null && n.lava * 2 < n.expected)
                     failure = "volcano " + b.id() + ": only " + n.lava + " of " + n.expected + " molten blocks are lava";
                 if (failure == null && n.stray > 0)
