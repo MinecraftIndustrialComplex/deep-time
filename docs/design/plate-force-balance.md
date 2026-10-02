@@ -704,13 +704,22 @@ balance". Where it differs from or adds to sections 3 and 6:
   `boundary_resistance`, `mantle_flow_mm_yr`, `motion_relax_myr`) are in every built-in preset and
   the test planet, in the editor (Advanced, Plates and crust; each hint says it is not active yet)
   with lang keys. `motion_relax_myr` is read by nothing until the switch.
-- **Cost.** Not measurable against the plates stage on the shared test VM (build log 2026-10-02);
+- **Cost.** 0-2 % of the plates stage, nothing measurable of a run (baseline doc, "Cost");
   the record grows from about 1.05 to 1.7-2.0 MB of JSON per 1000 Myr run.
 
-What the open-loop numbers say against section 4: the spread of speeds and both contrasts land inside
-the section 7 targets at the default settings (RMS 38 mm/yr, percentiles 11 / 48 / 94, oceanic over
-continental 3.9, slab over free 3.2, no plate-step above 250 mm/yr); the speed follows the slab share
-less (rank correlation 0.44 against 0.69-0.77) and the answer is noisier (rotation change 26 % / 85 %
-against 16-18 % / 62-70 %); a plate above 40 % of the planet is near neutral (median -0.5 MPa,
-tension in 46 % of its steps).
+What the open-loop numbers say against section 4 (four seeds on master 2c60ca3f): the spread of
+speeds and both contrasts land inside the section 7 targets at the default settings (percentiles 11
+/ 49 / 93 mm/yr, oceanic over continental 3.7, slab over free 3.1, no plate-step above 250 mm/yr);
+the RMS, 37 mm/yr, is just under the corrected 40-100. The speed follows the slab share less (rank
+correlation 0.43 against 0.69-0.77) and the answer is noisier (rotation change 25 % / 84 % against
+16-18 % / 62-70 %); a plate above 40 % of the planet is near neutral (median -0.3 MPa, tension in 46 %
+of its steps).
 
+**For task 7.** Variants on one seed (baseline doc, "four variants") show that the slab tracking is
+the main source of the noise, not its cure: with slabs pulling in full at once the rotation change
+halves (12 % against 23 %) and the slab correlation rises to 0.57, because a contact's slab restarts
+from zero whenever the contact is new, reversed or reopened, and today's contacts flicker. Keep a
+slab across that flicker (key it to the trench, or let a reopened contact inherit its slab). Without
+boundary resistance small plates run away (1 % of plate-steps above 250 mm/yr); the mantle flow at 5
+mm/yr changes nothing measurable. The reference slab pull (3 × 10¹³ N/m) is about twice WP-13a's 1.4
+× 10¹³; speeds do not depend on it, the ridge push's share and the stresses do.

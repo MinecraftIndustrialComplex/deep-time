@@ -91,6 +91,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-02 | plate-motion task 2 | **Turn real shortening on before tasks 3–4?** `tectonics.collision_on_shortening` is off in every preset, so the planets are master's (build log 2026-10-02, "Plate-motion task 2"). On, on master with flexure (2 seeds): continental crust 0.29 → 0.36 of the planet, collisions per 100 Myr 11.3 → 7.4, plate lifetime 41 → 63 Myr, but one plate above half the planet in 45 % of steps against 41 %, and every collision still ends in the one-step surge. (a, recommended) Keep it off until tasks 3 and 4 land together and remove it; (b) turn it on now as a light interim gain on the crust and collision counts. Not asked through AskUserQuestion (sub-agent); for the coordinator to put to Ben. | coordinator |
 | 2026-10-02 | plate-motion task 2 (found) | **Continental crust on master with flexure:** 1000 Myr `earthlike_quick_16k` runs on 1eac09f end with 0.29 of the planet continental (lowest step 0.28, plate-check target ≥ 0.37); on 38ca6b0 the same runs gave 0.42 (0.40). Not isolated between those commits (flexure, impacts, plate-check 1b). Recommended: bisect with 1–2 seeds before the belt calibration of task 3. | coordinator |
 | 2026-10-02 | science WP-13a | **Slab suction share** (PLT-186; docs/design/plate-force-balance.md section 6 note). The design's `slab_suction_share` 0.3 pulls only the overriding plate; Conrad & Lithgow-Bertelloni 2002 and 2004 (abstracts) have suction act on both plates, at 40 % of the forces against pull's 60 % (30 % with a weak asthenosphere), so their suction ÷ pull is 0.43–0.67. (a) Keep 0.3 as the open-loop starting value and calibrate it in task 8, with 0.43–0.67 noted as the sources' range (recommended: task 5 records forces read-only and the term's meaning differs anyway); (b) set 0.5 now, before task 7; (c) change the design so suction acts on both plates, as in the sources. | not asked (overnight; recorded by the WP-13a agent) |
+| 2026-10-02 | force balance task 5 | **Two implementation choices that outlive the task** (docs/design/plate-force-balance.md section 13). (1) The balance has a fixed scale: `plate_speed_scale_mm_yr` sets the basal drag through a reference plate, instead of renormalising each step's answer to an RMS (section 4's method), so a planet that loses its slabs slows down. (2) The reference slab pull is 3 × 10¹³ N/m, about twice WP-13a's 1.4 × 10¹³ (Faccenna et al.), so that a ridge pushes with 0.1 of it as the design says; speeds do not depend on it, stresses and the ridge share do. Recommended and built: keep both; revisit (2) with the suction share at task 8. | not asked (Ben asleep; proceeding with the recommendation) |
 | 2026-10-02 | science WP-13a | **The overall speed scale** (PLT-181). `plate_speed_scale` 45 mm/yr was set to "Earth about 40", which is the median of plate-samples. Earth's area-weighted RMS is about 47 mm/yr today and 50–100 over the last 200 Myr (Forsyth & Uyeda 1975 Table 1; Zahirovic et al. 2015); the plate-check target is now 40–100. (a) Keep 45 for task 5 and calibrate it in task 8 against the new target (recommended); (b) raise it to 60 now. | not asked (overnight; recorded by the WP-13a agent) |
 | 2026-10-02 | science WP-13a | **Sea-floor age ceiling** (CHK-019, PLT-161). Today's ocean floor has a 90th percentile age of 133 Myr (Seton et al. 2020 grid, area-weighted); the plate-check ceiling is 230 Myr (master measures 208–269). (a) Keep 230 until the rewrite is measured, then tighten to about 180 in task 8 (recommended); (b) tighten to 180 now (master fails it); (c) keep 230 for good, as a cycle-long allowance. | not asked (overnight; recorded by the WP-13a agent) |
 | 2026-10-02 | science WP-13a | **Collision length target** (CHK-012, PLT-154). The target median is 15–50 Myr; Earth's examples are longer: India–Asia 50 Myr and continuing, the Alleghanian 65 Myr, the Uralian 70–140 Myr (Wikipedia; no statistic exists). (a) Keep 15–50 until the rewrite's collisions are measured, then decide with numbers (recommended: the model's collisions include small terranes); (b) raise the top to 100 Myr now. | not asked (overnight; recorded by the WP-13a agent) |
@@ -117,6 +118,64 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-02 — Force-balance task 5: the forces computed and recorded, not applied; slab length on contacts (agent worktree agent-a48d34ca4617223c6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What.** New `plates/forces.rs`: each step, right after the fronts are found and only while the dynamics record is on,
+  every plate's slab pull (trench length × √age × slab length / `slab_depth_km`), slab suction, edge energy (ridge push and
+  belt weight from the columns' gravitational potential energy), basal drag with continental keels, the drag of a weak
+  degree-2 mantle flow, slab resistance, boundary resistance against the real neighbour and collision resistance from the
+  belt's energy; one SPD system over all plates (3 unknowns a plate) solved by Cholesky; per plate the torque of each term,
+  the mean in-plane stress and the answer's speed and rotation change are recorded (dynamics record version 4:
+  `StepRec::forces` as 14-number arrays, `slabs_km`, `breakoffs`; state `Dynamics::slabs`, `prev_balance`). Not applied:
+  the old speed rules still move the plates. Slab length per subducting contact (keyed by its plates and onset step, kept in
+  the record so `subduction.rs` stays untouched) grows by the oceanic front's convergence and breaks off after continental
+  crust has held half its front for `slab_breakoff_myr`. `DEEPTIME_NO_PLATE_FORCES` leaves the balance out (for timing).
+  `plate-check`: the four waiting force rows now fill (pull share, mega-plate stress and tension, slab length) plus 18
+  reported rows: break-offs, the balance's RMS, percentiles raw and scaled per step to 45 mm/yr, above 150/250, oceanic/
+  continental and slab/free ratios, slab and area rank correlations, rotation change, and its rank correlation and median
+  ratio against today's speed; new definitions `balance_rms_mm_yr` 45, `balance_guard_mm_yr` 250 (CHK-058, CHK-059).
+  Settings `plate_speed_scale_mm_yr` 45, `slab_pull` 1, `slab_depth_km` 700, `slab_breakoff_myr` 10, `slab_resistance` 3,
+  `slab_suction_share` 0.3, `edge_energy` 0.1, `keel_drag` 3, `boundary_resistance` 3, `mantle_flow_mm_yr` 5,
+  `motion_relax_myr` 6: validated, in all 12 built-in presets and the test planet, editor fields (Advanced, plates; hints say
+  "Not active yet") and lang keys.
+- **Implementation choices** (design section 13, "As built"): the balance is in SI with a fixed scale (the basal drag is set
+  so a reference plate, the average starting plate with a 3,000 km trench of full-length 80-Myr slab, moves at
+  `plate_speed_scale_mm_yr`), not renormalised each step; the sea floor's potential energy is Turcotte & Schubert's ridge push
+  in terms of subsidence (the design's "Airy column from its depth" gives a ridge push five times too small), trenches take
+  the old floor's energy; edge energy and collision resistance are one term (at a collision front the belt's energy is a
+  linearised drag, floor 5 mm/yr, no push); mantle flow away from two antipodal upwellings, axis from the seed, fixed; the
+  mean stress is the mean-stress theorem on a flat plate over 100 km.
+- **Sources** (library on the VM, read by a Sonnet sub-agent with line numbers): Forsyth & Uyeda 1975 (slab forces an order
+  of magnitude above the rest, terminal velocity 7.0 cm/yr, continental drag about 8 times, slab-attached 6-9 against 0-4
+  cm/yr), Lithgow-Bertelloni & Richards 1998 (>90 % slabs, <10 % lithospheric), Conrad & Lithgow-Bertelloni 2006 (roots
+  2-5 times, about 3 on average; 100 km reference lithosphere), Zahirovic et al. 2015 (speeds), Huang et al. 2019 (abstract).
+  Not in the library: Turcotte & Schubert, Parsons & Richter, Molnar & Lyon-Caen, Schellart, Cloos, Coblentz (`from-memory`).
+  New ledger FRC (27 rows: 3 verified, 10 from-memory, 1 abstract-only, 13 game-choice); PLT-181 to PLT-191 keep WP-13a's
+  statuses and say where they are coded; page `docs/science/plate-forces.md`; bibliography Cloos1993, Coblentz1994 added;
+  claims table recounted with `tools/review/claims_counts.py`.
+- **Measured** (test VM, master 2c60ca3f with task 2 merged plus this branch, `earthlike_quick_16k`, supercontinent, 1000 Myr,
+  seeds 1-4, `tools/review/plate-check.sh`; tables in `docs/design/plate-check-baseline.md`): the balance's RMS **37.1** mm/yr
+  (today 59.2; Earth 47, target 40-100), percentiles **11 / 49 / 93** (today 41 / 72 / 86; targets ≤20 / 30-60 / 70-110),
+  oceanic/continental **3.7** (1.6), slab/free **3.1** (1.5), slab rank correlation **0.43** (0.41; target 0.65), area -0.34,
+  0.04 % of plate-steps above 150 mm/yr and none above 250, rotation change **25 % / 84 %** (today 5 / 9 %; target 8 / 20),
+  rank correlation with today's speed 0.38, median ratio 0.72; slab pull 0.86 of the driving torque; a plate above 40 %:
+  median stress -0.3 MPa, in tension 46 % of its steps; slab length median 636 km; 0.55 break-offs per 100 Myr. On master
+  9e84fcf the same four runs reproduced every earlier baseline row to the digit (the record changes nothing).
+- **Variants** (300 Myr, seed 2, settings only, same geometry): no boundary resistance → 0.9 % of plate-steps above 250 mm/yr,
+  slab correlation -0.04; slabs at full pull at once → rotation change 12 % (23 % with tracking), slab correlation 0.57 (0.37);
+  no mantle flow → no change. The slab tracking makes the noise: a slab restarts from zero when its contact is new,
+  reversed or reopened, and contacts flicker. For task 7: keep a slab across the flicker.
+- **Cost.** Pairs with and without the balance run together (300 Myr): plates stage 78.3/78.3 s, 79.8/79.4 s (seed 1),
+  85.0/77.6 s (a slow run: every stage 5-8 % slower), 90.2/88.2 s (seed 2); user CPU 623.2/624.1 and 757.2/756.5 s. 0-2 % of
+  the plates stage, nothing measurable of a run. Record 1.7-2.0 MB of JSON per 1000 Myr (was 1.05).
+- **Gates** (VM, after merging master 2c60ca3f): cargo fmt --check clean, clippy -D warnings clean, `cargo test --workspace`
+  719 passed / 0 failed / 3 ignored (new: torque direction and size for one plate with one slab, a plate ringed by trenches
+  in tension and at rest, the solve finite and balanced from the weakest to the stiffest settings, slab growth and break-off,
+  column energies against the design's figures, the flow field, the check's balance rows; the no-change test now also checks
+  a balance every step and a growing slab), `cargo deny check licenses bans` ok, `./gradlew build test` JUnit tests=226
+  failures=0 skipped=1. No GameTests.
+- **Next.** Task 7 (the switch) on these numbers: persistent slabs first, then relaxation, then calibrate the scale (RMS 37
+  against 40-100). Scratch `/Volumes/Graphide/ban/deeptime-runs/force-balance-t5/` to delete when this lands.
+
 ### 2026-10-02 — Science stage 2, WP-8: folds, faults and intrusions checked against sources (agent worktree agent-a5a641d341ccfe59e, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Ledger DEF** (74 rows): `verified` 17, `abstract-only` 1, `game-choice` 56 (was `cited-unverified` 16, `game-choice` 54, `uncited` 4). Every row says what was read, where, and in which library file. **No value in the code changed**; comments now carry `// ledger: DEF-0nn` ids (deform/, the Noddy crate, the format's column rule, the Java twin) and say what was read.
 - **Read in full** (library, test machine): Mouthereau et al. 2007 (HAL copy: 15.8 ± 5.3 km wavelengths, 500–1,000 m amplitudes, 200 km belt), Alavi 2007 (200–300 km belt, 16–30 % shortening, anticlines to 150–200 km, foreland vergence), Schmalholz & Mancktelow 2016 (Biot–Ramberg dominant wavelength, natural wavelength/thickness 2–16), Lathrop et al. 2022 (D = 0.03 L^1.06 after Schlische), Elliott 1976 (thrusts K ≈ 7 %), Anderson 1905 (the theory; 45° ± 15° at μ = 0.577; wrench planes vertical), Waldron & Snyder 2020, Delaney & Pollard 1981, Krumbholz et al. 2014, Bunger et al. 2013, Earle 2019 §3.5, Jessell 1981, Jessell et al. 2022, and the noddyverse source at the pinned commit. Abstracts only: McQuarrie 2004, Schlische et al. 1996, Collettini & Sibson 2001. Not obtained: Anderson 1951, Biot 1961, Sherwin & Chapple 1968, Blanc et al. 2003, Cowie & Scholz 1992, Kim & Sanderson 2005, Gawthorpe & Leeder 2000, Jessell & Valenta 1996.
