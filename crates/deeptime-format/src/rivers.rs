@@ -269,12 +269,8 @@ impl Rivers {
     pub fn tile_of(&self, wx: i64, z: i64) -> usize {
         let (ox, oz) = Projection::new(self.c).index_origin_blocks();
         let t = i64::from(self.tile);
-        let tx = (wx - ox)
-            .div_euclid(t)
-            .rem_euclid(i64::from(self.tiles_x));
-        let tz = (z - oz)
-            .div_euclid(t)
-            .clamp(0, i64::from(self.tiles_z) - 1);
+        let tx = (wx - ox).div_euclid(t).rem_euclid(i64::from(self.tiles_x));
+        let tz = (z - oz).div_euclid(t).clamp(0, i64::from(self.tiles_z) - 1);
         (tz * i64::from(self.tiles_x) + tx) as usize
     }
 

@@ -499,11 +499,12 @@ mod tests {
             }
             assert_eq!(p.north(0.0, 0.0), (0.0, -1.0));
             // Bands: the middle of band j is half a row past row j.
-            assert_eq!(Projection::band_lat_deg(0, grid.h), Projection::picture_lat_deg(0.5, grid.h));
-            assert_eq!(grid.band_lat_deg(3), Projection::band_lat_deg(3, grid.h));
-            assert!(
-                (grid.band_weight(3) - grid.band_lat_deg(3).to_radians().cos()).abs() < 1e-12
+            assert_eq!(
+                Projection::band_lat_deg(0, grid.h),
+                Projection::picture_lat_deg(0.5, grid.h)
             );
+            assert_eq!(grid.band_lat_deg(3), Projection::band_lat_deg(3, grid.h));
+            assert!((grid.band_weight(3) - grid.band_lat_deg(3).to_radians().cos()).abs() < 1e-12);
         }
         assert_eq!(Projection::picture_lon_deg(256.0, 1024), 90.0);
         assert_eq!(Projection::picture_x_of_lon(450.0, 1024), 256.0);
