@@ -5,6 +5,7 @@ import com.minecraftindustrialcomplex.deeptime.ore.OreBlockResolver;
 import com.minecraftindustrialcomplex.deeptime.ore.OreData;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
+import com.google.gson.JsonObject;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.RegistryAccess;
@@ -27,8 +28,8 @@ import java.util.WeakHashMap;
  * nobody searches for hours and finds nothing (IE #2229, COE #85). The rules are the
  * {@code deeptime:scatter} registry ({@link OreData.ScatterRule}).
  *
- * <p>Per chunk and rule, the number of clusters is ⌊clusters_per_chunk⌋ plus one with the
- * fractional chance; each cluster starts at a random column of the chunk at a depth drawn from
+ * <p>Per chunk and rule, the number of clusters is ⌊n⌋ plus one with the fractional chance, n the
+ * rule's {@code clusters_per_chunk} × the world's {@link #scatterMult}; each cluster starts at a random column of the chunk at a depth drawn from
  * {@code y_window} (a fraction of the column from the world data's surface down to the bottom of
  * the world) and random-walks {@code size} steps inside the chunk. A visited block becomes ore when
  * it is bedrock host ({@link RockPalette.Host#ROCK}; loose rock never hosts scatter) and a draw
@@ -43,6 +44,23 @@ public final class BackgroundScatterFeature extends Feature<NoneFeatureConfigura
 
     public BackgroundScatterFeature(Codec<NoneFeatureConfiguration> codec) {
         super(codec);
+    }
+
+    private static final Map<WorldData, Double> MULT = Collections.synchronizedMap(new WeakHashMap<>());
+
+    /**
+     * The world's background-scatter multiplier: the preset's {@code deposits.scatter_mult}, which
+     * the deposit stage writes to {@code notes.deposits.scatter_mult} of the manifest (Ben,
+     * 2026-10-02, "Rich Deposits, Thinner Scatter"); it multiplies every rule's
+     * {@code clusters_per_chunk}. 1 for a world without it (a synthetic or test world).
+     */
+    public static double scatterMult(WorldData wd) {
+        return MULT.computeIfAbsent(wd, w -> scatterMult(w.manifest().notes()));
+    }
+
+    /** {@link #scatterMult(WorldData)} from the manifest's notes ({@link OreDraws#scatterMult}). */
+    public static double scatterMult(JsonObject notes) {
+        return OreDraws.scatterMult(notes);
     }
 
     /** The scatter rules of a server's registries, ordered by id. */
@@ -120,7 +138,7 @@ public final class BackgroundScatterFeature extends Feature<NoneFeatureConfigura
         int salt = rule.material().toString().hashCode();
         int c = wd.circumference();
         int kx = Math.floorMod(cx, c >> 4);
-        double count = rule.clustersPerChunk();
+        double count = rule.clustersPerChunk() * scatterMult(wd);
         int n = (int) Math.floor(count);
         if (DepositFeature.unit(kx, cz, -1, salt) < count - n)
             n++;

@@ -200,6 +200,10 @@ pub struct SurfaceState {
     pub sea_level_m: f64,
     /// The plate's load and deflection (`flexure.rs`); None while `flexure.strength` is 0.
     pub flexure: Option<flexure::FlexState>,
+    /// Inherited iron-formation basins (`deposits::bif_basins`): 1 in a basin, per cell, carried
+    /// with the crust; empty until dealt at the first step of a run that inherits them.
+    #[serde(default)]
+    pub bif_basin: Vec<f32>,
 }
 
 /// Working arrays (rebuilt after a resume, never saved).
@@ -306,6 +310,10 @@ impl Parts {
 /// `WorldState::globals`: cell-steps so far where another plate's crust arrived under a cell and
 /// the surface's offset started again from the plate model's elevation (`advect::bilinear_same`).
 pub const FOREIGN_CRUST_GLOBAL: &str = "surface/foreign_crust_cell_steps";
+/// The inherited iron-formation basins dealt at the first step (`deposits::bif_basins`), and the
+/// share of the stable continental interiors they cover.
+pub const BIF_BASINS_GLOBAL: &str = "surface/bif_basins";
+pub const BIF_BASIN_SHARE_GLOBAL: &str = "surface/bif_basin_share";
 
 /// The plate fields the stage reads each step.
 struct PlateFields {
@@ -616,6 +624,10 @@ impl SurfaceStage {
                     .collect();
                 let kinds = std::mem::take(&mut st.regolith_kind);
                 st.regolith_kind = nearest.par_iter().map(|&s| kinds[s]).collect();
+                if st.bif_basin.len() == n {
+                    let basin = std::mem::take(&mut st.bif_basin);
+                    st.bif_basin = nearest.par_iter().map(|&s| basin[s]).collect();
+                }
                 let k = st.log.k as usize;
                 let old = std::mem::take(&mut st.log);
                 let mut log = StrataLog::new(n, old.k);
@@ -638,6 +650,9 @@ impl SurfaceStage {
                         st.regolith_m[c] = 0.0;
                         st.regolith_kind[c] = weathering::SOIL;
                         st.log.clear(c);
+                        if let Some(b) = st.bif_basin.get_mut(c) {
+                            *b = 0.0;
+                        }
                         *born = true;
                     }
                 }
@@ -668,6 +683,7 @@ impl SurfaceStage {
                     totals: Totals::default(),
                     sea_level_m: p.sea_level.at(t_end_myr - dt_myr),
                     flexure: None,
+                    bif_basin: Vec::new(),
                 }
             }
         };
@@ -1488,6 +1504,48 @@ impl SurfaceStage {
         );
         for (name, v) in fields::STEP_FIELDS.iter().zip(&step_fields) {
             st.acc.add(name, v, dt);
+        }
+        // Inherited iron-formation basins (`deposits::bif_basins`; Ben, 2026-10-02): dealt once,
+        // over the stable continental interiors of the first step, then carried with the crust;
+        // the frames see them where the crust is a stable interior.
+        let epoch = self.epoch();
+        if st.bif_basin.len() != n && epoch.inherits_bif() {
+            let dp = self.preset.deposits.clone().unwrap_or_default();
+            let eligible: Vec<bool> = (0..n)
+                .map(|c| {
+                    pf.crust_type[c] as u8 == crate::plates::state::CONTINENTAL
+                        && pf.regime[c] as u8 == crate::plates::state::regime::CRATON
+                })
+                .collect();
+            let b = crate::deposits::bif_basins::deal(
+                &d,
+                &eligible,
+                dp.inherited_bif_share,
+                dp.bif_basin_km2,
+                self.preset.seed,
+            );
+            world
+                .globals
+                .insert(BIF_BASINS_GLOBAL.to_owned(), b.count as f64);
+            world
+                .globals
+                .insert(BIF_BASIN_SHARE_GLOBAL.to_owned(), b.share);
+            st.bif_basin = b.mask;
+        }
+        if st.bif_basin.len() == n {
+            let v: Vec<f32> = st
+                .bif_basin
+                .par_iter()
+                .zip(pf.regime.par_iter())
+                .map(|(&b, &r)| {
+                    if r as u8 == crate::plates::state::regime::CRATON {
+                        b
+                    } else {
+                        0.0
+                    }
+                })
+                .collect();
+            st.acc.add(fields::BIF_BASIN_STEP, &v, dt);
         }
         // The climate's ice as frame means (FORMAT.md "The climate's ice fields").
         for (name, from) in [

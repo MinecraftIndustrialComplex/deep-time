@@ -63,10 +63,10 @@
     "dip_deg": [0, 10],
     "rock_class": "black_shale",
     "zoning": [
-      {"zone": "feeder_cu", "d": [0.0, 0.25], "material": "c:copper", "grade_mult": 1.0, "density": 0.08},
-      {"zone": "proximal_pb", "d": [0.1, 0.55], "material": "c:lead", "grade_mult": 1.3, "density": 0.2},
+      {"zone": "feeder_cu", "d": [0.0, 0.25], "material": "c:copper", "grade_mult": 1.0, "density": 0.15},
+      {"zone": "proximal_pb", "d": [0.1, 0.55], "material": "c:lead", "grade_mult": 1.3, "density": 0.3},
       {"zone": "proximal_ag", "d": [0.1, 0.55], "material": "c:silver", "grade_mult": 1.0, "density": 0.02},
-      {"zone": "distal_zn", "d": [0.3, 1.0], "material": "c:zinc", "grade_mult": 1.1, "density": 0.35}
+      {"zone": "distal_zn", "d": [0.3, 1.0], "material": "c:zinc", "grade_mult": 1.1, "density": 0.55, "raw_share": 0.03}
     ],
     "extra_bodies": [],
     "children": []
@@ -85,6 +85,7 @@
   "balance": {"count_mult": 1.0, "size_mult_h": 12.0, "size_mult_v": 4.0, "richness_mult": 1.0},
   "requires_fields": {},
   "notes": [
+    "RICHNESS (owner, decisions log 2026-10-02, \"Rich Deposits, Thinner Scatter, Also make deposits use some of the vanilla ore vein features\"): the zone densities were raised and the richest zone carries raw-ore blocks (raw_share: that share of its ore blocks is the raw-ore block, as vanilla's ore veins carry 2 %); game-choice, ledger ORE-266; the richness settings scale both in the world (ORE-262). Measured in docs/science/deposits.md.",
     "Sizing: USGS OFR 2009-1252 (Singer, Berger & Moring 2009), model SHam (shale-hosted, amagmatic), n = 25, Table 2 p. 10: tonnage 5 / 25 / 300 Mt, Zn 2.3 / 8 / 14 %, Pb 0.88 / 2.1 / 5.3 %, Ag 0 / 21 / 71 g/t, Cu 0 / 0 / 1.0 % (unreported grades counted as zero); Zn–Pb r = 0.72 (text); 2 km same-deposit rule (p. 2). All 25 SHam deposits are labelled SEDEX (they are 25 of the report's 179 SEDEX-labelled deposits). presence = n_reported / 25 from the report's database. Bulletin 1693 model 31a (n = 45) is in data/usgs/sedex_zn_pb.json extra. Au (4 of 25) is left out.",
     "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 3.2 (sulfide-rich shale), formation_depth_m 100 (syn-sedimentary to early diagenetic).",
     "Geometry: stratiform sheet; aspect 0.03 from the database's median ore area 0.86 km² and ore bodies up to a few tens of metres thick (B1693 m31a); the Cu → Pb → Zn lateral zoning away from the feeder (Leach et al. 2010).",
