@@ -479,11 +479,14 @@ departs from the plan above and from the collisions design's task 2:
   convergence at onset and 20 Myr later; task 3 adds the wedge and foredeep to it.
 - **The interim trigger.** The plan said "welding still at the threshold in this task, so its
   effect is measured alone". Measured on `earthlike_quick_16k` (supercontinent, 1000 Myr) with real
-  shortening at 300 km: one plate above half the planet in 24 % of steps instead of 59 %, rift-born
-  plates welded back 28 % instead of 42 %, but continental crust ends at 0.37 of the planet instead
-  of 0.42 and its lowest step is 0.34 (target at least 0.37), because a collision now lasts 10 Myr
-  instead of one step and nothing stacks or resists. Thresholds of 100–250 km do not help the
-  mega-plate (53–72 % of steps). So the trigger is a setting, `tectonics.collision_on_shortening`,
+  shortening at 300 km. On master before flexure (38ca6b0, 4 seeds): one plate above half the
+  planet in 32 % of steps instead of 59 %, rift-born plates welded back 26 % instead of 42 %, but
+  continental crust ends at 0.38 of the planet instead of 0.42. On master with flexure (1eac09f,
+  2 seeds) the mega-plate share does not improve (45 % against 41 %), while crust (0.36 against
+  0.29), collisions per 100 Myr (7.4 against 11.3) and the largest land jump (1.5 % against 2.3 %)
+  do. Thresholds of 100–250 km (before flexure) do not help the mega-plate (53–72 % of steps).
+  Every collision still ends in the one-step surge. Mixed results with nothing stacking or
+  resisting are not a state to land. So the trigger is a setting, `tectonics.collision_on_shortening`,
   **off in every built-in preset**: the old count (relative speed × time, kept exactly as
   `Contact::speed_count_km`) fires transfers and welds and the planets are those of master; the
   collision state runs beside it and is recorded. Task 4 removes the setting and the old count.

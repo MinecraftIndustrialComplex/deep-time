@@ -544,8 +544,9 @@ pub struct TectonicParams {
     /// speed × time over the steps with three or more continental samples in the overlap, which
     /// also counts plates sliding past each other. An interim setting: `false` in every built-in
     /// preset until the belt and the weld on stalled convergence land (tasks 3 and 4 of
-    /// `docs/design/plate-force-balance.md`), because real shortening alone costs about 0.05 of
-    /// the planet in continental crust (STATUS.md, 2026-10-02). Task 4 removes it.
+    /// `docs/design/plate-force-balance.md`): with it off the planets are master's, and with it on
+    /// the plate-check measures move both ways (docs/design/plate-check-baseline.md, task 2).
+    /// Task 4 removes it.
     // ledger: PLT-218 (game-choice, interim; the agent of plate-motion task 2, 2026-10-02).
     pub collision_on_shortening: bool,
     /// Oceanic crust older than this, on a plate that subducts nowhere, can start subducting on
