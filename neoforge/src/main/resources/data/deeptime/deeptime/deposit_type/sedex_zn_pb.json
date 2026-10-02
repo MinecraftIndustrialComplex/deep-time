@@ -63,10 +63,10 @@
     "dip_deg": [0, 10],
     "rock_class": "black_shale",
     "zoning": [
-      {"zone": "feeder_cu", "d": [0.0, 0.25], "material": "c:copper", "grade_mult": 1.0, "density": 0.08},
-      {"zone": "proximal_pb", "d": [0.1, 0.55], "material": "c:lead", "grade_mult": 1.3, "density": 0.2},
+      {"zone": "feeder_cu", "d": [0.0, 0.25], "material": "c:copper", "grade_mult": 1.0, "density": 0.15},
+      {"zone": "proximal_pb", "d": [0.1, 0.55], "material": "c:lead", "grade_mult": 1.3, "density": 0.3},
       {"zone": "proximal_ag", "d": [0.1, 0.55], "material": "c:silver", "grade_mult": 1.0, "density": 0.02},
-      {"zone": "distal_zn", "d": [0.3, 1.0], "material": "c:zinc", "grade_mult": 1.1, "density": 0.35}
+      {"zone": "distal_zn", "d": [0.3, 1.0], "material": "c:zinc", "grade_mult": 1.1, "density": 0.55, "raw_share": 0.03}
     ],
     "extra_bodies": [],
     "children": []
