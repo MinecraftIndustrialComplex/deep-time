@@ -5501,3 +5501,12 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Access: open.
 - Library (the project's source library, not distributed): fetched 2026-10-02 (publisher PDF). Text file: `TetreaultBuiter2014/TetreaultBuiter2014.txt`.
 - Read so far (by the project): full text, 2026-10-02. Abstract: "Island arcs have an average crustal thickness of 26 km, average bulk crustal density of 2.79 g cm-3"; section 3.1: "Cloos (1993) estimated that island arcs greater than 15 km in thickness are buoyant enough to collide with continental crust; however, the paucity of whole crustal sections of island arcs in the geologic record does not agree with this hypothesis (Condie and Kroner, 2013)."
+
+### JichaJagoutz2015
+- Reference: Jicha, B. R. and Jagoutz, O. (2015). Magma production rates for intraoceanic arcs. Elements 11(2):105-111.
+- DOI or URL: 10.2113/gselements.11.2.105
+- Cited as: not cited in the code; named in the task for the continental crust fix as a source for arc crust growth.
+- Ledger ids: PLT-045 (comparison, no value taken)
+- Access: paywalled (OpenAlex lists no open copy, 2026-10-02).
+- Library (the project's source library, not distributed): abstract only, 2026-10-02 (OpenAlex record of the GSW page): `JichaJagoutz2015/openalex.json`, text `JichaJagoutz2015/abstract.txt`.
+- Read so far (by the project): abstract, 2026-10-02. It gives no numbers: "Our revised magma production rates for active intraoceanic arcs are consistent with those calculated for mid-ocean ridge segments that have slow to moderate spreading rates. This is surprising because magma production at intraoceanic arcs has traditionally been assumed to be significantly less than that at mid-ocean ridges." No value in the code or the ledger rests on it; the rates PLT-045 is compared with are Stern 2010's and Stern & Scholl 2010's.
