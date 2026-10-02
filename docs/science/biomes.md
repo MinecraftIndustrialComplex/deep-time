@@ -99,7 +99,26 @@ Cwa and its dryness threshold is 678 mm (unit tests `herberton_is_dry_winter_not
 
 ### What the fixes changed in the game
 
-GAMETEST_PLACEHOLDER
+After the fixes, `./gametest.sh` and `./gametest.sh -PwithMic` each pass all 68 required tests,
+and every Köppen family is above its `climateConsistent` floor, so no floor was changed. The shares
+below are the share of a family's columns whose biome carries a matching tag, on the 4k test planet
+(`test_planet_real`, default seed, 2026-10-02):
+
+| Family | Columns (standalone / MIC) | Share standalone | Share MIC | Floor |
+|---|---|---|---|---|
+| A | 368 / 350 | 0.707 | 0.789 | 0.45 |
+| BW (dry tags) | 189 / 175 | 0.820 | 0.903 | 0.57 |
+| BS | 255 / 286 | 0.686 | 0.647 | 0.42 |
+| BW desert or badlands | 189 / 175 | 0.651 | 0.760 | 0.37 |
+| E | 2,105 / 2,199 | 0.998 | 0.999 | 0.82 |
+
+No GameTest was run on master before the change, so there is no paired "before" for these shares.
+The paired before-and-after measurement is the bake-level one in the table above (the 16k planet,
+same climate, only the classifier differs): 2.0 % of land cells changed class, all by the dry-before-polar
+rule apart from 19 by the Cs/Cw rule. On the test planet BW has 189 columns (standalone), of which
+the share of BW columns with a desert or badlands biome is 0.651, against 0.475 to 0.827 measured
+over ten planets before (floor comment in `BiomeGameTests`), so the cold deserts did not pull it
+outside the earlier range.
 
 ## Simplifications and limits
 
