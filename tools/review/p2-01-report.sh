@@ -13,7 +13,7 @@ cd "$REPO"
 OUT=review/out/p2-01
 mkdir -p "$OUT"
 PY=(nix shell --impure --expr
-    '(builtins.getFlake "nixpkgs").legacyPackages.${builtins.currentSystem}.python3.withPackages (p: [p.numpy])'
+    '(builtins.getFlake "nixpkgs").legacyPackages.${builtins.currentSystem}.python3.withPackages (p: [p.numpy p.matplotlib])'
     -c python3)
 "${PY[@]}" tools/review/p2-01-report.py "$RUNS" "$@" | tee "$OUT/report.txt"
 rm -rf "$OUT/sections"

@@ -2471,8 +2471,33 @@ summers no longer send all their precipitation to the rivers. Settings `pet_mm_p
   km on the horizontal block scale, amplitudes and slips by shape ratios (A/λ = √e/π from the
   shortening e; slip = γ·length), not metres at the vertical scale. Settings:
   `structure.deformation.*` (strength, density, size, wavelengths, lengths, slip ratios, rates,
-  foreland width, overlap), in the editor and the workbench. Plugs, dykes, discordant plutons and
-  the column rule in the game are stage B.
+  foreland width, overlap), in the editor and the workbench.
+  *As built in P2-01, stage B (2026-10-01; decisions log 2026-10-01: "Store structures, bend per
+  column", "Accept, judge from sections", "Terrain too"; STATUS.md has the measurements).*
+  **In the world data** (format 0.3): `structure/events.dtst` holds the events youngest first
+  (folds, faults and intrusions; FORMAT.md "Structural events"), and the horizon stack of a
+  column is the 0.2 column rule's stack read through them: **the deformed column rule**
+  (`Structure::deformed_stack`; Java `worlddata/Structure.java`, bit for bit, `ColumnParityTest`).
+  Every reader goes through it: the strata pass, `inspect-column`, the parity fixture, the
+  workbench's sections, `strata-check`, the viewer, `deeptime-inspect`. **Unconformities need no
+  event:** each event carries its age as a stratigraphic key, and in each column the rock above
+  the first horizon old enough is finished before the event is undone, so cover younger than a
+  structure lies undisturbed across it and its lowest bed fills the troughs of the surface it
+  was laid on. **Intrusions** are events too (kind 2: an ellipsoid rooted on the world's floor
+  that replaces the rock older than itself, read at the source position, so younger faults
+  offset it and it cuts older folds): stocks in collision belts and arcs, basalt dykes along
+  rifts, and the plugs of extinct volcanoes (`deform/intrude.rs`). The batholiths of P1-07 stay
+  bodies, painted over the result where they are; so do ore bodies. **Traps** read the world's
+  own folds and faults (`traps::structural`); the regime rule stands in only when deformation
+  is off, with `fold_belt_km` on the plate model's Earth-sized sphere (it was read as km on the
+  block metric, eight times too wide on a 16k planet). **Terrain** (decided "Terrain too"):
+  young structures move the ground as they moved the rock, in the amplifier on L2 before its
+  erosion passes (`surface/amplify/structure.rs`, which says why there), fading with age and
+  with the erosion the deep-time surface has done there; one term, one switch
+  (`structure.deformation.relief`). **The event log** gets one `deeptime:fold_belt` or
+  `deeptime:fault_system` per belt, rift or oblique margin (EVENTS.md). **Review:**
+  `deeptime structure-sections` cuts the world across its largest collision belt, arc and
+  rift, before and after; `strata-check` adds a structure census.
 - **Check.** The P2 exit review compares cliffs in BlueMap renders and cross-sections (§9.7) with
   the event log's folds and faults.
 
@@ -3964,10 +3989,16 @@ on this machine.
   plates (`core::structure::deform`), the world's structural events and the per-column rule that
   undoes them (`deeptime_format::structure`, replacing "fit to horizons": §8.5 says why), and a
   lattice evaluation of the planet at the end of every run with a point-by-point check of the
-  column rule against the port. *Stage B (after the rock-order fix lands):* the events in the world
-  data and in the Java column readers and the strata pass, rock younger than an event left
-  undeformed (unconformities), discordant plutons, dykes and plugs as bodies, trap structure from
-  the real folds and faults, sections and the realism check.
+  column rule against the port. *As built, stage B:* the events in the world data (format 0.3,
+  `structure/events.dtst`) and in the Java column readers and the strata pass, rock younger than
+  an event left undeformed (unconformities), stocks, dykes and plugs as intrusion events,
+  trap structure from the real folds and faults, fault scarps, rift valleys and fold ridges on
+  the terrain (the amplifier's `structure_relief` term), grouped `fold_belt` and `fault_system`
+  events, `deeptime structure-sections` and the structure census of `strata-check` (§8.5's second
+  "As built"). Left for later: bodies (batholiths, ore bodies) are not displaced by faults that
+  are younger than they are; a fold's wavelength is drawn, not derived from the strata's stiff
+  layers; no ductile shear zones, kinks or salt diapirs (the port has them; nothing emplaces
+  them yet).
 - **P2-02 Metamorphic grade** from restored burial and heat; facies table (hand-built from textbook
   facies boundaries, or generated offline — see Q8).
 - **P2-03 Hydrology** (§8.4; its core moved to P1-22 on 2026-09-29, the rest stays here): routing, Fill–Spill–Merge lakes, HAND floodplains, river vectors,

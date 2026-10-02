@@ -62,7 +62,7 @@ case "${1:-}" in
             && /usr/bin/time -v '$RUNS/deeptime-$name' run --preset '$preset' --start '$start' --length-myr '$length' --threads 3 \
                --out '$RUNS/$name-world' $sets \
             && '$RUNS/deeptime-$name' strata-check --world-data '$RUNS/$name-world' > '$RUNS/$name-strata.json' \
-            && '$RUNS/deeptime-$name' structure-sections --world-data '$RUNS/$name-world' --out '$RUNS/$name-sections' \
+            && '$RUNS/deeptime-$name' structure-sections --world-data '$RUNS/$name-world' --out '$RUNS/$name-sections' --half 300 --px 2 \
             && '$RUNS/deeptime-$name' parity --world-data '$RUNS/$name-world' --columns 2000"
         ;;
     tests)
