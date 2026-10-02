@@ -1,0 +1,176 @@
+{
+  "id": "deeptime:impact_basin_u",
+  "family": "impact",
+  "site_kind": "deposit",
+  "description": "Crater-basin uranium: uranium carried by oxidised groundwater and fixed in the reduced, organic-rich sediments and breccias that fill an impact structure.",
+  "products": [
+    {
+      "material": "c:uranium",
+      "grade_key": "u_pct",
+      "role": "primary"
+    }
+  ],
+  "components": {
+    "combine": "product",
+    "source": [
+      {
+        "field": "deeptime:impact_basin",
+        "curve": [
+          [
+            0.5,
+            0
+          ],
+          [
+            1.0,
+            1
+          ]
+        ],
+        "note": "inside the rim of an impact structure at least 5 km across: a closed basin with fractured, permeable rock under it"
+      }
+    ],
+    "driver": [
+      {
+        "field": "deeptime:deposition_rate_m_myr",
+        "curve": [
+          [
+            0,
+            0
+          ],
+          [
+            5,
+            1
+          ]
+        ],
+        "note": "the basin is filling with sediment (lake beds, reworked ejecta); design thresholds"
+      }
+    ],
+    "pathway": [],
+    "trap": [
+      {
+        "field": "deeptime:reservoir_quality",
+        "curve": [
+          [
+            0,
+            0.3
+          ],
+          [
+            0.5,
+            1
+          ]
+        ],
+        "note": "porous beds for the groundwater to move through (design)"
+      }
+    ]
+  },
+  "clock_gates": [
+    "deeptime:clock/oxygenated_oceans"
+  ],
+  "integration_myr": 20,
+  "formation_time": "peak",
+  "hosts": {
+    "any_of": [
+      "sandstone",
+      "conglomerate",
+      "mudstone",
+      "shale",
+      "black_shale",
+      "impact_breccia"
+    ],
+    "full_at": 0.05
+  },
+  "causes": {
+    "source": [
+      "deeptime:impact_crater"
+    ],
+    "driver": [
+      "deeptime:basin_subsidence"
+    ],
+    "trap": [
+      "deeptime:impact_crater"
+    ],
+    "preservation": [
+      "deeptime:erosion_pulse"
+    ]
+  },
+  "cause_radius_km": 150,
+  "sizing": {
+    "grade_tonnage": "impact_structures",
+    "tonnage_mt": {
+      "p90": 0.3,
+      "p50": 2.0,
+      "p10": 15.0
+    },
+    "grades": {
+      "u_pct": {
+        "p90": 0.05,
+        "p50": 0.1,
+        "p10": 0.3,
+        "presence": 1.0
+      }
+    },
+    "correlations": [],
+    "ore_density_t_m3": 2.4,
+    "density_per_1e5km2": {
+      "p90": 15,
+      "p50": 50,
+      "p10": 150
+    },
+    "density_basis": "estimate",
+    "min_separation_m": 2000,
+    "tract_threshold": 0.2,
+    "clustering": {
+      "model": "thomas",
+      "camp_spacing_km": 15,
+      "cluster_radius_km": 5
+    }
+  },
+  "geometry": {
+    "shape": "lens",
+    "aspect": [
+      1.0,
+      0.05,
+      0.4
+    ],
+    "dip_deg": [
+      0,
+      10
+    ],
+    "zoning": [
+      {
+        "zone": "roll_front",
+        "d": [
+          0.0,
+          1.0
+        ],
+        "material": "c:uranium",
+        "grade_mult": 1.0,
+        "density": 0.2
+      }
+    ],
+    "extra_bodies": [],
+    "children": []
+  },
+  "preservation": {
+    "formation_depth_m": 100,
+    "vertical_extent_m": 20,
+    "erosion_behavior": "truncate",
+    "resistates": []
+  },
+  "minecraft": {
+    "coe_vein": null,
+    "cdg_reservoir": false,
+    "ore_block_policy": "ev_then_vanilla"
+  },
+  "balance": {
+    "count_mult": 1.0,
+    "size_mult_h": 12.0,
+    "size_mult_v": 4.0,
+    "richness_mult": 1.0
+  },
+  "requires_fields": {},
+  "notes": [
+    "P2-08 (meteor impacts). Uranium in impact structures: the Cluff Lake deposits in the Carswell structure, Saskatchewan (39 km; unconformity-type ore brought up and reworked by the central uplift), and uranium in the crater-fill and breccias of other structures (Grieve & Masaitis 1994 (The economic potential of terrestrial impact craters, Int. Geol. Rev. 36(2):105-151); Grieve 2005, Geol. Soc. London Spec. Publ. 248:1-29). Uranium moves only in oxidised water, hence the clock.",
+    "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, deposit density, separation, clustering, geometry and the curves' thresholds.",
+    "Crater-basin oil is not a type of its own: the impact stage adds the closure of crater rims and central uplifts to deeptime:trap_structure, impact breccia is a reservoir rock, and deeptime:petroleum_trap names the impact among its trap causes."
+  ]
+}

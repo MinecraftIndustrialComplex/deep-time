@@ -80,7 +80,14 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     let s = session(&json, &dir, 2);
     assert_eq!(
         s.stage_names(),
-        ["plates", "climate", "surface", "volcanoes", "structure"]
+        [
+            "plates",
+            "climate",
+            "surface",
+            "volcanoes",
+            "impacts",
+            "structure"
+        ]
     );
     finish(&s);
     let world = s.checkpoint().unwrap().world;
@@ -168,9 +175,17 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
     let note: serde_json::Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
     assert!(note["plutons"]["emplaced"].as_u64().unwrap() > 0, "{note}");
     let bodies = note["plutons"]["bodies"].as_u64().unwrap();
-    assert_eq!(world.bodies.len() as u64, bodies);
-    for b in &world.bodies {
-        assert_eq!(b.role, "pluton");
+    // (The other bodies of the coupled group are the impact stage's breccia lenses, P2-08.)
+    let plutons: Vec<&deeptime_format::Body> =
+        world.bodies.iter().filter(|b| b.role == "pluton").collect();
+    assert_eq!(plutons.len() as u64, bodies);
+    assert!(
+        world
+            .bodies
+            .iter()
+            .all(|b| b.role == "pluton" || b.role == "impact_breccia")
+    );
+    for b in plutons {
         let class = b.rock_class.as_deref().unwrap();
         assert!(
             ["granodiorite", "granite", "diorite"].contains(&class),

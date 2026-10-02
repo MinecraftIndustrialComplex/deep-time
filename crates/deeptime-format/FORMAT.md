@@ -64,6 +64,7 @@ Every other file's bytes are as in 0.1.
   strata/classes.json           class index → rock class name
   spawn/candidates.json         land cells for spawn selection
   volcanoes/active.json         the volcanoes active at the present ("Lava")
+  impacts/craters.json          the impact craters at the present ("Impact craters")
   climate_mapping.json          written by the game at the world's first start (P1-09, plan §7.2; not listed
                                 in the manifest): the tables from the baked biome inputs to the pack's
                                 (see "The climate mapping")
@@ -819,6 +820,32 @@ Both are vanilla's rules (lava below y −54, lava lakes at y −10 and lower, i
 y −64) measured from the floor instead of from y 0. Vanilla's own constants flood the lowest 298
 blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −352.
 Carver lava in the bottom eight blocks is vanilla's and not covered by these rules.
+
+### Impact craters (`impacts/craters.json`)
+
+The bake lists the craters the impact stage (P2-08, `surface/impacts`) leaves in its catalogue at the
+present: those that still show, the buried ones and the eroded roots (craters worn through their
+breccia, subducted or overprinted are not listed; a world without the impact stage has no file):
+
+```json
+{"version": 1, "t_myr": 0.0, "craters": [
+  {"id": 73, "x": 2410.5, "z": -1033.0, "diameter_m": 6300, "morphology": "complex", "age_myr": 12.4,
+   "depth_m": 255, "rim_m": 91, "relief_m": 180, "fate": "degraded", "breccia_m": 255, "melt_m": 0,
+   "cover_m": 12, "in_surface": false}]}
+```
+
+`x`, `z` are the centre's block position (x in [−C/2, C/2)); `diameter_m` is rim to rim; `morphology`
+is `simple`, `complex` or `peak_ring`; `depth_m` (rim crest to floor) and `rim_m` (rim above the
+ground it struck) are the fresh crater's in game metres (the physical ones × `impacts.depth_scale`),
+and `relief_m` is what erosion, burial and soil creep have left of `depth_m`; `fate` is `fresh`,
+`degraded`, `buried` or `eroded_to_roots`; `breccia_m` and `melt_m` are the thickness of the breccia
+lens and the melt sheet; `cover_m` the sediment over the floor; `in_surface` says the crater was large
+enough (two L1 cells) to be cut into the deep-time surface and laid in the strata log, rather than
+drawn by the amplifier and given a body. `notes.bake.impacts` records `craters` (the count) and
+`craters_file`. The game does not read the file to build anything: the craters are in `elevation`,
+their rock in the horizon stacks and in bodies of role `impact_breccia` (rock class `impact_breccia`,
+with a zone `melt_sheet` of rock class `impact_melt` on the floor of a crater that has one). It is
+there for tools, and Java's `worlddata/Craters` reads it for the GameTest that checks a crater in the placed world.
 
 ### Active volcanoes (`volcanoes/active.json`) and their magma
 

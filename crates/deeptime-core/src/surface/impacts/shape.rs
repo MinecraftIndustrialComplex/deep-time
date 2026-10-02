@@ -190,7 +190,10 @@ mod tests {
         assert!((c.at_rim_radii(0.0) - (floor + 400.0)).abs() < 1e-9, "peak");
         assert!((c.at_rim_radii(1.0) - 200.0).abs() < 1e-9);
         let r = complex(Morphology::PeakRing);
-        assert!((r.at_rim_radii(0.0) - floor).abs() < 1e-9, "no central peak");
+        assert!(
+            (r.at_rim_radii(0.0) - floor).abs() < 1e-9,
+            "no central peak"
+        );
         assert!((r.at_rim_radii(0.5) - (floor + 400.0)).abs() < 1e-9, "ring");
         assert!((r.at_rim_radii(0.3) - floor).abs() < 1.0);
     }

@@ -3963,6 +3963,20 @@ on this machine.
   buried by the surface stage; breccia and impact-melt units in the strata; impact deposit types
   in the deposit engine (Sudbury-type Ni-Cu-PGE melt-sheet sulphides, impact-hydrothermal
   Cu-Zn-Au, impact diamonds, crater-basin oil/uranium traps) with "why here" chains to the impact.
+  *As built (2026-10-01, branch; STATUS.md build log "Meteor impacts"):* a coupled `impacts` stage
+  after the volcanoes (`crates/deeptime-core/src/surface/impacts/`): Poisson impactors at Grieve &
+  Shoemaker's rate (5.6 × 10⁻¹⁵ craters ≥ 20 km per km² per year, N ∝ D⁻¹·⁸) × `impacts.flux` on
+  the planet's own area; crater size, depth, rim, breccia lens and melt sheet from Collins, Melosh &
+  Marcus 2005's scaling with the simple-to-complex transition (3.2 km on Earth) and the peak-ring
+  onset ∝ 1/g; the sea stops small impactors (Davison & Collins 2007). Craters ride their plates,
+  are worn by the surface stage's own erosion and deposition and by hillslope diffusion, are buried,
+  eroded to their roots, overprinted or subducted. Craters at least two L1 cells across are cut into
+  the deep-time surface and the strata log; smaller ones are drawn by the amplifier from the
+  catalogue, aged, and leave bodies. Two rock classes (`impact_breccia`, `impact_melt`: 62 in all),
+  four deposit types (`impact_ni_cu_pge`, `impact_hydrothermal_cu_zn_au`, `impact_diamond`,
+  `impact_basin_u`) on four new history fields, crater closure in `trap_structure` for oil, events
+  `impact_crater` and `impact_ocean`, `impacts/craters.json`, the `impacts` preset section (eleven
+  settings; `flux` 0 = none).
 - **P2-09 Surface landforms** (Ben, 2026-09-29): coral reefs, atolls and barrier islands; desert dunes
   (ergs) and loess; surface rift valleys, grabens and fault scarps; plateau canyons, mesas and buttes.
 - **P2-10 More ore families** (Ben, 2026-09-29): volcanogenic massive sulphides, orogenic gold,

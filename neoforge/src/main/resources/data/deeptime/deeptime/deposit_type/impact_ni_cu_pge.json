@@ -1,0 +1,197 @@
+{
+  "id": "deeptime:impact_ni_cu_pge",
+  "family": "impact",
+  "site_kind": "deposit",
+  "description": "Sudbury-type nickel-copper-platinum-group sulphides: immiscible sulphide liquid that settled to the base of a thick, slowly cooled impact melt sheet and into the embayments and dykes of the crater floor.",
+  "products": [
+    {
+      "material": "c:nickel",
+      "grade_key": "ni_pct",
+      "role": "primary"
+    },
+    {
+      "material": "c:copper",
+      "grade_key": "cu_pct",
+      "role": "coproduct"
+    },
+    {
+      "material": "c:platinum",
+      "grade_key": "pge_gpt",
+      "role": "byproduct"
+    }
+  ],
+  "components": {
+    "combine": "product",
+    "source": [
+      {
+        "field": "deeptime:impact_melt_m",
+        "curve": [
+          [
+            500,
+            0
+          ],
+          [
+            1500,
+            1
+          ]
+        ],
+        "note": "a melt sheet thick enough to stay liquid, differentiate and drop its sulphide: Sudbury's was 2.5-3 km thick; the kilometre-thick sheets of Manicouagan and Morokweng made no ore (Grieve & Masaitis 1994; Naldrett 2004). Thresholds are design."
+      }
+    ],
+    "driver": [],
+    "pathway": [],
+    "trap": [
+      {
+        "field": "deeptime:crust_thickness_km",
+        "curve": [
+          [
+            10,
+            0.3
+          ],
+          [
+            30,
+            1
+          ]
+        ],
+        "note": "continental crust: its melt is siliceous and sulphur-bearing enough to reach sulphide saturation (Sudbury's melt is the bulk crust: Lightfoot 2016, Nickel Sulfide Ores and Impact Melts). Design shape."
+      }
+    ]
+  },
+  "clock_gates": [],
+  "integration_myr": 1,
+  "formation_time": "peak",
+  "hosts": {
+    "any_of": [
+      "impact_melt",
+      "impact_breccia"
+    ],
+    "full_at": 0.1
+  },
+  "causes": {
+    "source": [
+      "deeptime:impact_crater"
+    ],
+    "trap": [
+      "deeptime:impact_crater"
+    ],
+    "preservation": [
+      "deeptime:erosion_pulse",
+      "deeptime:orogeny_phase"
+    ]
+  },
+  "cause_radius_km": 300,
+  "sizing": {
+    "grade_tonnage": "impact_structures",
+    "tonnage_mt": {
+      "p90": 5,
+      "p50": 30,
+      "p10": 200
+    },
+    "grades": {
+      "ni_pct": {
+        "p90": 0.8,
+        "p50": 1.2,
+        "p10": 2.0,
+        "presence": 1.0
+      },
+      "cu_pct": {
+        "p90": 0.6,
+        "p50": 1.1,
+        "p10": 2.5,
+        "presence": 1.0
+      },
+      "pge_gpt": {
+        "p90": 0.0,
+        "p50": 0.8,
+        "p10": 3.0,
+        "presence": 0.8
+      }
+    },
+    "correlations": [],
+    "ore_density_t_m3": 3.5,
+    "density_per_1e5km2": {
+      "p90": 30,
+      "p50": 100,
+      "p10": 300
+    },
+    "density_basis": "estimate",
+    "min_separation_m": 2000,
+    "tract_threshold": 0.2,
+    "clustering": {
+      "model": "thomas",
+      "camp_spacing_km": 30,
+      "cluster_radius_km": 10
+    }
+  },
+  "geometry": {
+    "shape": "lens",
+    "aspect": [
+      1.0,
+      0.25,
+      0.6
+    ],
+    "dip_deg": [
+      20,
+      60
+    ],
+    "rock_class": "gabbro",
+    "zoning": [
+      {
+        "zone": "contact_ni",
+        "d": [
+          0.0,
+          0.7
+        ],
+        "material": "c:nickel",
+        "grade_mult": 1.2,
+        "density": 0.3
+      },
+      {
+        "zone": "footwall_cu",
+        "d": [
+          0.3,
+          1.0
+        ],
+        "material": "c:copper",
+        "grade_mult": 1.2,
+        "density": 0.25
+      },
+      {
+        "zone": "footwall_pge",
+        "d": [
+          0.6,
+          1.0
+        ],
+        "material": "c:platinum",
+        "grade_mult": 1.5,
+        "density": 0.03
+      }
+    ],
+    "extra_bodies": [],
+    "children": []
+  },
+  "preservation": {
+    "formation_depth_m": 800,
+    "vertical_extent_m": 200,
+    "erosion_behavior": "truncate",
+    "resistates": []
+  },
+  "minecraft": {
+    "coe_vein": null,
+    "cdg_reservoir": false,
+    "ore_block_policy": "ev_then_vanilla"
+  },
+  "balance": {
+    "count_mult": 1.0,
+    "size_mult_h": 12.0,
+    "size_mult_v": 4.0,
+    "richness_mult": 1.0
+  },
+  "requires_fields": {},
+  "notes": [
+    "P2-08 (meteor impacts). The only known example is the Sudbury Igneous Complex (1.85 Gyr; a 200-250 km crater): about 1,650 Mt of ore at ~1.2 % Ni, ~1.1 % Cu and ~0.8 g/t Pt + Pd in some ninety deposits along the base of the melt sheet (contact and sublayer ores), in its footwall (Cu-PGE veins) and in the offset dykes (Naldrett 2004, Magmatic Sulfide Deposits; Lightfoot 2016; Grieve & Masaitis 1994 (The economic potential of terrestrial impact craters, Int. Geol. Rev. 36(2):105-151)).",
+    "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, deposit density, separation, clustering, geometry and the curves' thresholds.",
+    "The ore body's host becomes gabbro (the norite sublayer). Nickel and platinum have no ore block in every pack: the ore-block resolver places nothing for a material the pack does not have.",
+    "Rarity is the point: on a 16,384-block planet at Earth's rate a crater large enough (about 170 km and more) forms once in a few hundred Myr and must survive; impacts.flux raises the odds."
+  ]
+}
