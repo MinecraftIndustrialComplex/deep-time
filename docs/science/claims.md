@@ -334,17 +334,17 @@ well-specified checking and fixing, Opus where a wrong value forces a design or 
 | WP-3 | ERO | 156 | 3 / 0 | 11 | Opus | Fix 6, 7, 8. Any change needs recalibration: run with WP-4, after the surface-stage work now in flight lands. ERO now owns the rock-class erodibility rows that RCK also stated. |
 | WP-4 | ISO, HYP | 99 | 7 / 0 | 26 | Opus | Fix 16. Settle one crust density. Re-derive Earth's hypsometry figures from one named dataset. ISO now owns the ocean age-depth law that PLT also stated. |
 | WP-5 | HYD, YNG | 94 | 12 / 0 | 8 | Sonnet 5.5 | Fix 5. Unify the two runoff laws. Replace the from-memory sinuosity figure. |
-| WP-6 | AMP, GLA | 135 | 9 / 0 | 16 | Sonnet 5.5 | AMP is mostly `game-choice`: confirm each is labelled so. GLA: the erosion law's constant and exponent (fix 25). GLA now owns the equilibrium-line rule that CLM also stated. |
+| WP-6 | AMP, GLA | 135 | 8 / 0 | 17 | Sonnet 5.5 | AMP is mostly `game-choice`: confirm each is labelled so. GLA: the erosion law's constant and exponent (fix 25). GLA now owns the equilibrium-line rule that CLM also stated. |
 | WP-7 | RCK, STR | 117 | 1 / 0 | 16 | Sonnet 5.5 | Fix 15. 41 rock densities and all erodibilities are unsourced judgement: label them. STR now owns the trap closure scores that ORE also stated. |
 | WP-8 | DEF | 74 | 6 / 0 | 13 | Opus | Fix 13, 14. The vertical-stretch question for dips and amplitudes is a design decision for Ben. |
 | WP-9 | DEP | 164 | 24 / 0 | 34 | Sonnet 5.5 | Fix 3. Tables are open but are PDFs: the library now holds them as text. DEP and ORE kept the granular rows; check which of the two owns a row before verifying it. |
 | WP-10 | ORE | 182 | 19 / 0 | 43 | Opus | Fix 2 (a real bug). Redo the coal size and density derivation from sources. Same code directory as WP-9: run them one after the other or as one agent. |
 | WP-11 | BIO | 99 | 6 / 0 | 3 | Sonnet 5.5 | Fix 4. Mostly `game-choice` rows to confirm. |
-| WP-12 | SCL, BAK, PRV, POL, PRS | 212 | 5 / 0 | 9 | Sonnet 5.5 | Fix 19, 20, 34, 35, 36, 37. Identify the province map properly or drop the citation. PRS (presets other than the default, test and world presets) is new here. |
-| WP-13a | PLT `not-yet-coded`, CHK | 86 | 7 / 0 | 25 | Opus | **Before the force balance is built.** Fix 18, 38 to 41. Confirm slab pull, continental drag, wedge taper, suction share. CHK (the plate-check target ranges) is new here. |
-| WP-13b | PLT rest, CRE | 198 | 5 / 0 | 21 | Sonnet 5.5 | **Deferred** until the plate rewrite lands; then ledger the new code and verify. CRE (geometry, noise, plate state, deformation lattice) is new; `plates/dynamics.rs` is still not covered. |
+| WP-12 | SCL, BAK, PRV, POL, PRS | 212 | 4 / 0 | 10 | Sonnet 5.5 | Fix 19, 20, 34, 35, 36, 37. Identify the province map properly or drop the citation. PRS (presets other than the default, test and world presets) is new here. |
+| WP-13a | PLT `not-yet-coded`, CHK | 86 | 5 / 0 | 27 | Opus | **Before the force balance is built.** Fix 18, 38 to 41. Confirm slab pull, continental drag, wedge taper, suction share. CHK (the plate-check target ranges) is new here. |
+| WP-13b | PLT rest, CRE | 198 | 3 / 0 | 23 | Sonnet 5.5 | **Deferred** until the plate rewrite lands; then ledger the new code and verify. CRE (geometry, noise, plate state, deformation lattice) is new; `plates/dynamics.rs` is still not covered. |
 | WP-14a | CLM `not-yet-coded` | 28 | 4 / 0 | 11 | Opus | **Before the per-cell climate is built.** Fix 17 in the new code. |
-| WP-14b | CLM rest, MOI | 176 | 14 / 0 | 18 | Sonnet 5.5 | **Deferred** until the climate rewrite lands. |
+| WP-14b | CLM rest, MOI | 176 | 13 / 0 | 19 | Sonnet 5.5 | **Deferred** until the climate rewrite lands. |
 | WP-15 | HNT (and the hint rows in PLT, HYD, IMP) | 84 | 0 / 0 | 0 | Sonnet 5.5 | The hint texts are now ledgered (HNT, 84 rows). Remaining: one table of Earth figures with one source each; fix 27 to 33. |
 | WP-16 | GEO | 51 | 0 / 0 | 0 | Sonnet 5.5 | New. The geothermal features (51 rows, all `game-choice` or `uncited`): find sources for the rainfall threshold and decide what is a game choice; fix 44 to 46. |
 
@@ -392,8 +392,8 @@ Produced by WP-0 (2026-10-02). The library is a folder on the test machine with 
 
 #### WP-6: 135 rows; 25 sources
 
-- **Readable in the library** (text file names are in the folder named by the key): `Alley1998` (Alley1998.txt); `Barnes2014` (Barnes2014.txt); `Hergarten2021` (Hergarten2021.txt); `Humphrey1994` (Humphrey1994.txt); `Ohmura1992` (Ohmura1992.txt); `Porter1989` (Porter1989.txt); `Sugden1978` (Sugden1978.txt); `Tzathas2024` (Tzathas2024.txt); `WorldbuildingPasta` (WorldbuildingPasta.txt).
-- **Landing page only** (the paper itself was not obtained): `goSPL` (other); `Schott2024` (open copy); `Svensson1959` (open access).
+- **Readable in the library** (text file names are in the folder named by the key): `Alley1998` (Alley1998.txt); `Barnes2014` (Barnes2014.txt); `Hergarten2021` (Hergarten2021.txt); `Humphrey1994` (Humphrey1994.txt); `Ohmura1992` (Ohmura1992.txt); `Sugden1978` (Sugden1978.txt); `Tzathas2024` (Tzathas2024.txt); `WorldbuildingPasta` (WorldbuildingPasta.txt).
+- **Landing page only** (the paper itself was not obtained): `goSPL` (other); `Porter1989` (other); `Schott2024` (open copy); `Svensson1959` (open access).
 - **Not readable** : `Alley2003` (paywalled, no substitute found); `Cuffey2010` (book); `Egholm2009` (paywalled, no substitute found); `gosplDocs` (open access); `Hallet1996` (paywalled, no substitute found); `Harbor1992` (paywalled, no substitute found); `ICAO1993` (not found); `Minder2010` (other); `Mitchell2015` (paywalled, no substitute found); `Oerlemans2011` (book); `Porter2001` (paywalled, no substitute found); `Rolland2003` (other); `Sugden1976` (book).
 
 #### WP-7: 117 rows; 17 sources
@@ -427,20 +427,20 @@ Produced by WP-0 (2026-10-02). The library is a folder on the test machine with 
 
 #### WP-12: 212 rows; 14 sources
 
-- **Readable in the library** (text file names are in the folder named by the key): `Coltice2019` (Coltice2019.txt); `Cortial2019` (Cortial2019.txt); `Gonzalez2010` (Gonzalez2010.txt); `Mallard2016` (Mallard2016.txt); `Peel2007` (Peel2007.txt).
-- **Landing page only** (the paper itself was not obtained): `USGS-geologic-provinces-map (no author, no year; key: USGSprov)` (open copy).
+- **Readable in the library** (text file names are in the folder named by the key): `Coltice2019` (Coltice2019.txt); `Cortial2019` (Cortial2019.txt); `Gonzalez2010` (Gonzalez2010.txt); `Peel2007` (Peel2007.txt).
+- **Landing page only** (the paper itself was not obtained): `Mallard2016` (paywalled); `USGS-geologic-provinces-map (no author, no year; key: USGSprov)` (open copy).
 - **Not readable** : `Connelly2012 (age of the solar system)` (other); `Gough1981` (open copy); `Keinert2015` (paywalled, no substitute found); `Kesler2008` (paywalled, no substitute found); `Koerner2004 (treeline)` (other); `NASA-EarthFactSheet` (open access); `Swinbank2006` (other); `UNEP1992 (aridity classes)` (book).
 
 #### WP-13a: 86 rows; 32 sources
 
-- **Readable in the library** (text file names are in the folder named by the key): `Coltice2019` (Coltice2019.txt); `DeCellesGiles1996` (DeCellesGiles1996.txt); `Huang2019` (Huang2019.txt); `Nance2022` (Nance2022.txt); `Nocquet2016` (Nocquet2016.txt); `Tremblay2015` (Tremblay2015.txt); `Zahirovic2015` (Zahirovic2015.txt).
-- **Landing page only** (the paper itself was not obtained): `Mitchell2021` (paywalled).
+- **Readable in the library** (text file names are in the folder named by the key): `Coltice2019` (Coltice2019.txt); `DeCellesGiles1996` (DeCellesGiles1996.txt); `Nance2022` (Nance2022.txt); `Nocquet2016` (Nocquet2016.txt); `Tremblay2015` (Tremblay2015.txt).
+- **Landing page only** (the paper itself was not obtained): `Huang2019` (open copy); `Mitchell2021` (paywalled); `Zahirovic2015` (paywalled).
 - **Not readable** : `BercoviciLong2014` (paywalled, no substitute found); `Bialas2010` (paywalled, no substitute found); `Buck2004` (book); `Carlson1983` (paywalled, no substitute found); `Coltice2007` (paywalled, no substitute found); `ConradLB2002` (paywalled, no substitute found); `ConradLB2004` (paywalled, no substitute found); `ConradLB2006` (open copy); `Copley2010` (paywalled, no substitute found); `DalZilio2018` (paywalled, no substitute found); `DaviesvonBlanckenburg1995` (paywalled, no substitute found); `DavisSuppeDahlen1983` (paywalled, no substitute found); `ForsythUyeda1975` (paywalled, no substitute found); `Gurnis1988` (paywalled, no substitute found); `HeronLowman2011` (paywalled, no substitute found); `Lenardic2011` (paywalled, no substitute found); `LithgowBertelloniRichards1998` (paywalled, no substitute found); `MolnarLyonCaen1988` (book); `ParsonsRichter1980` (paywalled, no substitute found); `RoyerGordon1997` (paywalled, no substitute found); `Schellart2004` (paywalled, no substitute found); `TurcotteSchubert_Geodynamics` (book); `vanHunenAllen2011` (paywalled, no substitute found); `Zhang2018` (open access).
 
 #### WP-13b: 198 rows; 26 sources
 
-- **Readable in the library** (text file names are in the folder named by the key): `CharetteSmith2010` (CharetteSmith2010.txt); `Cortial2019` (Cortial2019.txt); `Mallard2016` (Mallard2016.txt); `Nance2022` (Nance2022.txt); `Zahirovic2015` (Zahirovic2015.txt).
-- **Landing page only** (the paper itself was not obtained): `Mitchell2021` (paywalled).
+- **Readable in the library** (text file names are in the folder named by the key): `CharetteSmith2010` (CharetteSmith2010.txt); `Cortial2019` (Cortial2019.txt); `Nance2022` (Nance2022.txt).
+- **Landing page only** (the paper itself was not obtained): `Mallard2016` (paywalled); `Mitchell2021` (paywalled); `Zahirovic2015` (paywalled).
 - **Not readable** : `Bird2003` (open access); `Bradley2008` (paywalled, no substitute found); `Cogley1984` (paywalled, no substitute found); `Copley2010` (paywalled, no substitute found); `Davidson_tectonicsjs` (other); `ForsythUyeda1975` (paywalled, no substitute found); `Lallemand_EncMarineGeosciences` (not found); `Lonsdale2005` (paywalled, no substitute found); `MercierdeLepinay2016` (paywalled, no substitute found); `Morra2013` (paywalled, no substitute found); `ParsonsSclater1977` (paywalled, no substitute found); `Schellart2008` (paywalled, no substitute found); `Shepard1963` (book); `Shoemake1992` (book); `SteinStein1992` (paywalled, no substitute found); `Stern2002` (paywalled, no substitute found); `Stern2004` (paywalled, no substitute found); `SternGerya2018` (paywalled, no substitute found); `Tozer2019` (open access); `Wilson1966` (paywalled, no substitute found).
 
 #### WP-14a: 28 rows; 15 sources
@@ -450,8 +450,8 @@ Produced by WP-0 (2026-10-02). The library is a folder on the test machine with 
 
 #### WP-14b: 176 rows; 32 sources
 
-- **Readable in the library** (text file names are in the folder named by the key): `Archer2009` (Archer2009.txt); `Bergman2004` (Bergman2004.txt); `BernerKothavala2001` (BernerKothavala2001.txt); `Byrne2014` (Byrne2014.txt); `Felzenszwalb2012` (Felzenszwalb2012.txt); `Fretwell2013` (Fretwell2013.txt); `HeldSoden2006` (HeldSoden2006.txt); `Hoffman2017` (Hoffman2017.txt); `Morlighem2017` (Morlighem2017.txt); `North1981` (North1981.txt); `Nye1952` (Nye1952.txt); `Rohde2020` (Rohde2020.txt); `Rose2018` (Rose2018.txt); `WorldbuildingPasta` (WorldbuildingPasta.txt).
-- **Landing page only** (the paper itself was not obtained): `FastscapeLEM` (open access).
+- **Readable in the library** (text file names are in the folder named by the key): `Bergman2004` (Bergman2004.txt); `BernerKothavala2001` (BernerKothavala2001.txt); `Byrne2014` (Byrne2014.txt); `Felzenszwalb2012` (Felzenszwalb2012.txt); `Fretwell2013` (Fretwell2013.txt); `HeldSoden2006` (HeldSoden2006.txt); `Hoffman2017` (Hoffman2017.txt); `Morlighem2017` (Morlighem2017.txt); `North1981` (North1981.txt); `Nye1952` (Nye1952.txt); `Rohde2020` (Rohde2020.txt); `Rose2018` (Rose2018.txt); `WorldbuildingPasta` (WorldbuildingPasta.txt).
+- **Landing page only** (the paper itself was not obtained): `Archer2009` (open copy); `FastscapeLEM` (open access).
 - **Not readable** : `Berger1978` (paywalled, no substitute found); `Berner1994` (open access); `Bird2003` (open access); `Cuffey2010` (book); `Gough1981` (open copy); `Hoffman1998` (paywalled, no substitute found); `ICAO1993` (not found); `Imbrie1980` (paywalled, no substitute found); `Kopp2011` (paywalled, no substitute found); `Laskar2004` (open access); `Myhre1998` (paywalled, no substitute found); `Rowley2002` (paywalled, no substitute found); `Self2006` (open copy); `SmithBarstad2004` (other); `Thornthwaite1948` (paywalled, no substitute found); `Walker1981` (paywalled, no substitute found); `Willmott1985` (paywalled, no substitute found).
 
 #### WP-15: 84 rows; 0 sources
