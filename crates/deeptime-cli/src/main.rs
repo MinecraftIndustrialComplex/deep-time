@@ -436,6 +436,10 @@ enum Command {
         /// More layers to sample (nearest), comma-separated.
         #[arg(long, value_delimiter = ',')]
         layers: Vec<String>,
+        /// Also what the column evaluator decides: rock classes at four depths, the horizon
+        /// count, the second horizon's top and the water kind.
+        #[arg(long)]
+        columns: bool,
         /// The .npy file to write (and <out>.json).
         #[arg(long)]
         out: PathBuf,
@@ -990,6 +994,7 @@ fn main() -> ExitCode {
             area,
             step,
             layers,
+            columns,
             out,
         }) => {
             let b = heightmap::Box2 {
@@ -998,7 +1003,7 @@ fn main() -> ExitCode {
                 x1: area[2],
                 z1: area[3],
             };
-            match heightmap::run(&world_data, &b, step, &layers, &out) {
+            match heightmap::run(&world_data, &b, step, &layers, columns, &out) {
                 Ok((rows, cols)) => {
                     println!("deeptime heightmap: {rows} x {cols} -> {}", out.display());
                     ExitCode::SUCCESS
