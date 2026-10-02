@@ -273,6 +273,28 @@ pub fn smooth_stride(sigma: f64) -> i64 {
     (sigma / SMOOTH_SAMPLE_SIGMA).ceil().max(1.0) as i64
 }
 
+/// The Gaussian the window's weights are cut from is this many σ wide ([`smooth_axis_weight`]).
+pub const SMOOTH_TAPER_WIDEN: f64 = 1.5;
+
+/// The weight, along one axis, of a lattice sample `d` cells from the cell being smoothed
+/// (`Horizons::smoothed`; a sample's weight is the product of its two axes'): a Gaussian of
+/// [`SMOOTH_TAPER_WIDEN`]·σ lowered by its own value at the window's edge, so that it reaches
+/// zero there, and zero beyond.
+///
+/// P1-23. The weights were a plain Gaussian of σ cut off at the window's edge (2σ, where it
+/// still holds 0.135 of its peak). A cell's samples are the lattice points inside its window, so
+/// as the cell moved by one a row of samples dropped out at full weight and another came in:
+/// the weighted mean position of the samples swung ±0.23 cells round the cell with the lattice's
+/// period (four L1 cells, 64 blocks, at the default σ 10; ±0.68 cells at σ 20), which printed
+/// that lattice on every smoothed horizon. A weight that is zero at the edge lets samples come
+/// and go unnoticed: the swing is under 0.01 cells. The effective width is 0.85σ (the cut-off
+/// Gaussian's was 0.89σ).
+pub fn smooth_axis_weight(d: f64, sigma: f64) -> f64 {
+    let reach = (smooth_stride(sigma) * SMOOTH_RADIUS_SAMPLES) as f64;
+    let s2 = 2.0 * (SMOOTH_TAPER_WIDEN * sigma) * (SMOOTH_TAPER_WIDEN * sigma);
+    ((-(d * d) / s2).exp() - (-(reach * reach) / s2).exp()).max(0.0)
+}
+
 /// How far under the mean rock surface (blocks) the smoothing looks for the unit that fills the
 /// height of a cell standing above the mean surface (`Horizons::smoothed`): the thickest unit
 /// beginning within it. The beds over that unit (thinner than this, together) rise with the
@@ -320,7 +342,8 @@ impl Horizons {
     /// The stacks smoothed laterally, so that neighbouring cells tell one regional story
     /// instead of each its own (the strata log is carried cell by cell and differs a lot between
     /// neighbours): for each cell, the Gaussian-weighted mean (σ `sigma` cells; x wraps, z clamps)
-    /// of the neighbours' height functions, cut at every key top and base any of them has; each
+    /// of the neighbours' height functions (weights that reach zero at the window's edge,
+    /// [`smooth_axis_weight`]), cut at every key top and base any of them has; each
     /// interval takes the class holding the largest weighted thickness there, equal neighbours
     /// join. The neighbours are the cells on a lattice of step [`smooth_stride`] anchored to the
     /// grid (every cell samples the same lattice, so neighbouring cells see the same data) within
@@ -373,7 +396,10 @@ impl Horizons {
                         for li in lattice(i) {
                             let il = li * step;
                             let (di, dj) = ((il - i) as f64, (jl - j) as f64);
-                            let g = (-(di * di + dj * dj) / (2.0 * sigma * sigma)).exp();
+                            let g = smooth_axis_weight(di, sigma) * smooth_axis_weight(dj, sigma);
+                            if g <= 0.0 {
+                                continue;
+                            }
                             let n = (jl.clamp(0, h - 1) * w + il.rem_euclid(w)) as usize;
                             near.push((n, g));
                             wsum += g;

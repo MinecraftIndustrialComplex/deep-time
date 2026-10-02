@@ -45,7 +45,6 @@ pub fn run(
     columns: bool,
     out: &Path,
 ) -> Result<(usize, usize), FormatError> {
-    let w = ColumnWorld::open(world)?;
     // Every thread opens the folder itself (below): a lazy layer's tile cache is behind one lock,
     // and threads reading stacks through one reader spend their time waiting for each other.
     let open = || -> Result<(ColumnWorld, Vec<LazyLayer>), FormatError> {
