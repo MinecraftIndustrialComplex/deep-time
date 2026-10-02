@@ -219,7 +219,7 @@ class DhApiBindingTest {
                             }
                             assertEquals(1152, last, "the column reaches the level's top");
                             Object soil = points.get(1);
-                            assertEquals(ground + 1 + 352, pointType.getField("topYBlockPos").getInt(soil), "the ground, counted from the bottom");
+                            assertEquals(ground + 1 + 512, pointType.getField("topYBlockPos").getInt(soil), "the ground, counted from the bottom");
                             assertEquals(15, pointType.getField("skyLightLevel").getInt(soil));
                             assertEquals("block soil", String.valueOf(pointType.getField("blockStateWrapper").get(soil)));
                             assertEquals("biome plains", String.valueOf(pointType.getField("biomeWrapper").get(soil)));
