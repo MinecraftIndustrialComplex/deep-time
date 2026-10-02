@@ -871,11 +871,13 @@ impl Solver {
 fn binomial(v: &mut [f64], w: usize, h: usize, passes: usize) {
     let mut tmp = vec![0.0; v.len()];
     for _ in 0..passes {
-        tmp.par_chunks_mut(w).zip(v.par_chunks(w)).for_each(|(out, row)| {
-            for i in 0..w {
-                out[i] = 0.25 * row[(i + w - 1) % w] + 0.5 * row[i] + 0.25 * row[(i + 1) % w];
-            }
-        });
+        tmp.par_chunks_mut(w)
+            .zip(v.par_chunks(w))
+            .for_each(|(out, row)| {
+                for i in 0..w {
+                    out[i] = 0.25 * row[(i + w - 1) % w] + 0.5 * row[i] + 0.25 * row[(i + 1) % w];
+                }
+            });
         v.par_chunks_mut(w).enumerate().for_each(|(j, out)| {
             let (n, s) = (j.saturating_sub(1), (j + 1).min(h - 1));
             for i in 0..w {
@@ -1193,11 +1195,7 @@ pub fn step(
         .map(|&t| rigidity_per_g(t, x.gravity_m_s2))
         .collect();
     let carried = |c: usize, v: &[f32]| {
-        if cells[c].fresh {
-            0.0
-        } else {
-            f64::from(v[c])
-        }
+        if cells[c].fresh { 0.0 } else { f64::from(v[c]) }
     };
     let dq = pick(&|c| cells[c].dq + carried(c, &st.unsolved_m));
     let root = pick(&|c| cells[c].root);
@@ -1999,7 +1997,10 @@ mod tests {
         let mut last = StepOut::default();
         for t in 1..=steps {
             let plate = plate_at(t);
-            let crust: Vec<f32> = plate.iter().map(|&q| if q == 1.0 { 1.0 } else { 0.0 }).collect();
+            let crust: Vec<f32> = plate
+                .iter()
+                .map(|&q| if q == 1.0 { 1.0 } else { 0.0 })
+                .collect();
             let edge = |c: usize| edge_at(t, c / w);
             let age: Vec<f32> = (0..n)
                 .map(|c| match plate[c] as i32 {
@@ -2024,7 +2025,11 @@ mod tests {
             let uplift: Vec<f32> = (0..n)
                 .map(|c| {
                     let x = (col(c) as f64 - edge(c) - 4.0) as f32;
-                    if plate[c] == 1.0 { 0.02 * (-(x / 3.0) * (x / 3.0)).exp() } else { 0.0 }
+                    if plate[c] == 1.0 {
+                        0.02 * (-(x / 3.0) * (x / 3.0)).exp()
+                    } else {
+                        0.0
+                    }
                 })
                 .collect();
             let plate_elev: Vec<f32> = (0..n).map(|c| base(c, plate[c])).collect();
@@ -2062,7 +2067,11 @@ mod tests {
             let h_eroded: Vec<f64> = (0..n)
                 .map(|c| {
                     let x = col(c) as f64 - 45.0;
-                    let fan = if plate[c] == 0.0 { 50.0 * (-(x / 5.0) * (x / 5.0)).exp() } else { 0.0 };
+                    let fan = if plate[c] == 0.0 {
+                        50.0 * (-(x / 5.0) * (x / 5.0)).exp()
+                    } else {
+                        0.0
+                    };
                     h_start[c] + fan
                 })
                 .collect();
@@ -2122,8 +2131,11 @@ mod tests {
             for c in 0..w * h {
                 if away(c) && cell_scale_zigzag(v, w, h, t, |k| k == c) > 0.0 {
                     let (i, j) = (c % w, c / w);
-                    let col: Vec<String> = (0..h).map(|jj| format!("{:.0}", v[jj * w + i])).collect();
-                    let pl: String = (0..h).map(|jj| format!("{:.0}", plate[jj * w + i])).collect();
+                    let col: Vec<String> =
+                        (0..h).map(|jj| format!("{:.0}", v[jj * w + i])).collect();
+                    let pl: String = (0..h)
+                        .map(|jj| format!("{:.0}", plate[jj * w + i]))
+                        .collect();
                     out.push(format!("({i},{j}) [{}] plates {pl}", col.join(" ")));
                 }
             }
@@ -2253,4 +2265,3 @@ mod tests {
         assert!(raw > 1500.0, "unfiltered the thickening shows: {raw} m");
     }
 }
-
