@@ -67,14 +67,14 @@ use crate::plates::pools::ISOSTATIC_FACTOR;
 use crate::plates::state::{OCEANIC, regime};
 
 /// Mantle, sea water and ice, kg/m³.
-pub const RHO_MANTLE: f64 = 3300.0;
-pub const RHO_WATER: f64 = 1030.0;
-pub const RHO_ICE: f64 = 917.0;
+pub const RHO_MANTLE: f64 = 3300.0; // ledger: ISO-043
+pub const RHO_WATER: f64 = 1030.0; // ledger: ISO-044
+pub const RHO_ICE: f64 = 917.0; // ledger: ISO-045
 /// Young's modulus, Pa, and Poisson's ratio (Turcotte & Schubert, *Geodynamics*).
-pub const YOUNG_PA: f64 = 70.0e9;
-pub const POISSON: f64 = 0.25;
+pub const YOUNG_PA: f64 = 70.0e9; // ledger: ISO-041
+pub const POISSON: f64 = 0.25; // ledger: ISO-042
 /// The coarsest solve cell, Earth-normalized metres: finer L1 grids are coarsened towards it.
-pub const SOLVE_CELL_M: f64 = 45_000.0;
+pub const SOLVE_CELL_M: f64 = 45_000.0; // ledger: ISO-058 (game-choice: numerical)
 
 /// Fields the surface stage writes each step when flexure is on.
 pub mod field {
@@ -103,16 +103,18 @@ pub struct FlexureParams {
     pub strength: f64,
     /// Multiplier on the elastic thickness everywhere (the editor's "Plate stiffness").
     pub elastic_thickness_scale: f64,
-    /// Oceanic Te = this × √(age in Myr), km: the depth of the ~450 °C isotherm of the cooling
-    /// plate (Watts 1978; Calmant et al. 1990: 2.7 ± 0.15).
+    /// Oceanic Te = this × √(age in Myr), km: 2.7 ± 0.15 measured under 38 seamounts (Calmant,
+    /// Francheteau & Cazenave 1990, full text), near the 450 ± 150 °C isotherm of the cooling plate
+    /// (Watts 1978, abstract).
     pub te_ocean_km_sqrt_myr: f64,
-    /// … and at most this, km.
+    /// … and at most this, km (Hawaii, on 80 Myr floor: 40 km, Watts & ten Brink 1989, abstract).
     pub te_ocean_max_km: f64,
     /// Continental Te long after the last orogeny, km (cratons: 70–90 km, Burov & Diament 1995).
     pub te_craton_km: f64,
     /// Continental Te recovers as 1 − e^(−t / this), t the time since the last orogeny, Myr.
     pub te_recovery_myr: f64,
-    /// Te of arcs, rifts and everything else at least, km.
+    /// Te of arcs, rifts and everything else at least, km (the low end of continental Te: 5 km,
+    /// Lu et al. 2024, abstract).
     pub te_min_km: f64,
     /// Solve every this many plate steps (loads in between wait for the next solve).
     pub every_steps: u32,
@@ -125,16 +127,16 @@ pub struct FlexureParams {
 impl Default for FlexureParams {
     fn default() -> Self {
         FlexureParams {
-            strength: 0.0,
-            elastic_thickness_scale: 1.0,
-            te_ocean_km_sqrt_myr: 3.0,
-            te_ocean_max_km: 40.0,
-            te_craton_km: 80.0,
-            te_recovery_myr: 300.0,
-            te_min_km: 5.0,
-            every_steps: 1,
-            tolerance_m: 2.0,
-            max_iterations: 60,
+            strength: 0.0, // ledger: ISO-065 (game-choice: off unless a preset turns it on)
+            elastic_thickness_scale: 1.0, // ledger: ISO-066
+            te_ocean_km_sqrt_myr: 2.7, // ledger: ISO-048
+            te_ocean_max_km: 40.0, // ledger: ISO-049
+            te_craton_km: 80.0, // ledger: ISO-050
+            te_recovery_myr: 300.0, // ledger: ISO-051 (uncited: this agent's choice)
+            te_min_km: 5.0, // ledger: ISO-052
+            every_steps: 1, // ledger: ISO-059 (game-choice: numerical)
+            tolerance_m: 2.0, // ledger: ISO-059
+            max_iterations: 60, // ledger: ISO-059
         }
     }
 }
@@ -231,6 +233,7 @@ pub fn flexural_parameter_m(d_per_g: f64) -> f64 {
 }
 
 /// Airy share of crust under air and under water: a thickening T sinks k·T.
+// ledger: ISO-046
 fn airy_shares() -> (f64, f64) {
     let rho_c = RHO_MANTLE * (1.0 - 1.0 / ISOSTATIC_FACTOR);
     (
@@ -526,7 +529,7 @@ impl Bank {
         let c_ref = c.iter().sum::<f64>() / n.max(1) as f64;
         let node_d = |ln_a: f64| RHO_MANTLE * (ln_a.exp() * dx).powi(4) / 4.0;
         // A plate softer than this is local at the grid's scale whatever its rigidity.
-        let floor = 0.4f64.ln();
+        let floor = 0.4f64.ln(); // ledger: ISO-060 (game-choice: numerical)
         if hi - lo < 0.05 || hi <= floor {
             return Bank {
                 d: vec![node_d(0.5 * (lo + hi))],
@@ -946,7 +949,7 @@ pub fn step(
     let ice_share = RHO_ICE / RHO_MANTLE;
     // Sediment under water: the density today's 0.7 factor implies (docs/design/flexure.md 3.2).
     let rock_land = x.rock_share;
-    let rock_sea = water_share + 0.7 * x.rock_share * (1.0 - water_share);
+    let rock_sea = water_share + 0.7 * x.rock_share * (1.0 - water_share); // ledger: ISO-047
 
     // 1. The loads of the step, and the roots already in the elevation.
     struct Cell {
@@ -974,6 +977,7 @@ pub fn step(
                 )
             };
             let mut root = 0.0;
+            // ledger: ISO-061
             // Crust the plate model thickened: orogens, arcs and hotspot volcanism. Subsidence
             // (the ocean floor cooling, a sample pulled to trench depth) is not a load.
             let u = f64::from(x.uplift_mm_yr[c]) * lift;
@@ -1028,7 +1032,8 @@ pub fn step(
         .collect();
     let mut te = restrict(&te_fine, w, f);
     let ds = Dims::new(ws, hs, dxs, x.dims.wrap_x);
-    box_blur(&ds, &mut te, 2, 2);
+    box_blur(&ds, &mut te, 2, 2); // ledger: ISO-054 (game-choice: numerical)
+    // ledger: ISO-055
     // A plate boundary is a break: a trench's subducting plate does not hold up the arc beside
     // it. The cells along a boundary are at the floor, the next row half way to it.
     let neighbours = |c: usize| {
@@ -1134,6 +1139,7 @@ pub fn step(
             ));
         }
         out.solve = Some(report);
+        // ledger: ISO-056
         // Rigidity gained this step joins stress-free at the new shape.
         let w_new: Vec<f64> = w0.iter().zip(&dw).map(|(a, b)| a + b).collect();
         let mut curv = vec![0.0; ws * hs];
@@ -1407,7 +1413,7 @@ mod tests {
     fn the_elastic_thickness_follows_the_crusts_thermal_state() {
         let p = FlexureParams::default();
         assert_eq!(p.elastic_thickness_km(true, 0.0, f64::NAN, false), 5.0);
-        assert!((p.elastic_thickness_km(true, 100.0, f64::NAN, false) - 30.0).abs() < 1e-9);
+        assert!((p.elastic_thickness_km(true, 100.0, f64::NAN, false) - 27.0).abs() < 1e-9);
         assert_eq!(p.elastic_thickness_km(true, 400.0, f64::NAN, false), 40.0);
         assert_eq!(p.elastic_thickness_km(false, -1.0, f64::NAN, false), 80.0);
         assert_eq!(p.elastic_thickness_km(false, -1.0, 0.0, false), 5.0);

@@ -120,7 +120,7 @@ From the plate model's own thermal state, on L1 each step:
 
 | Crust | Law | Values |
 |---|---|---|
-| Oceanic | `Te = te_ocean_km_sqrt_myr × √age`, at most `te_ocean_max_km` | 3.0 km/√Myr, 40 km: 9.5 km at 10 Myr, 30 km at 100 Myr |
+| Oceanic | `Te = te_ocean_km_sqrt_myr × √age`, at most `te_ocean_max_km` | 2.7 km/√Myr, 40 km: 8.5 km at 10 Myr, 27 km at 100 Myr |
 | Continental | `Te = te_craton_km × (1 − e^(−t/te_recovery_myr))`, `t` the time since the last orogeny there (never: a craton) | 80 km, 300 Myr: 23 km at 100 Myr, 51 at 300, 77 at 1,000 |
 | Arcs and rifts (the `regime` field), and everything else at least | `te_min_km` | 5 km |
 
@@ -251,7 +251,7 @@ Task 3 of the force-balance design planned `plates/foreland_m` from a line-load 
 |---|---|---|
 | `strength`: 0 = local isostasy as before, 1 = the solve, between: a blend of the two corrections | 0 in the struct, 1 in the pipeline presets | `flexure` (Advanced · Surface) |
 | `elastic_thickness_scale` | 1 | `plate_stiffness`, 0.25–3 |
-| `te_ocean_km_sqrt_myr`, `te_ocean_max_km`, `te_craton_km`, `te_recovery_myr`, `te_min_km` | 3, 40, 80, 300, 5 | preset only |
+| `te_ocean_km_sqrt_myr`, `te_ocean_max_km`, `te_craton_km`, `te_recovery_myr`, `te_min_km` | 2.7, 40, 80, 300, 5 | preset only |
 | `every_steps`, `tolerance_m`, `max_iterations` | 1, 2, 60 | preset only |
 
 Tests (properties, not planets):
@@ -306,7 +306,8 @@ abstract; "full text" where the paper itself was read. Figures quoted are from t
   450 ± 150 °C isotherm" at the time of loading; 20–30 km along the chain.
 - S. Calmant, J. Francheteau & A. Cazenave 1990, "Elastic layer thickening with age of the oceanic
   lithosphere", *Geophys. J. Int.* 100(1):59–67 (full text): `Te (km) = (2.7 ± 0.15) √t (Ma)` from
-  38 seamounts; olivine rheology predicts 3.3–4.3. The default 3.0 lies between.
+  38 seamounts; olivine rheology predicts 3.3–4.3. The default is the measured 2.7 (the design
+  first had 3.0; the runs of section 12 say which they used).
 - A. B. Watts & U. S. ten Brink 1989, *J. Geophys. Res.* 94(B8):10473–10500: `Te` 40 km under
   Hawaii; P. Wessel 1993, *J. Geophys. Res.* 98(B7):12177–12190: 25–35 km. A sinking of about 5 km
   under Oahu is quoted from these by Bianco et al. 2005. The arch's distance and height were not
@@ -358,22 +359,29 @@ build log entry.
   following steps); a solve every second step halves it.
 - What would cut it properly: single-precision transforms (about a quarter), or a real multigrid.
 
-**Hypsometry** (seeds 1, 2 × both starts; mean [min, max]; not recalibrated):
+**Hypsometry** (seeds 1, 2 × both starts; mean [min, max]; not recalibrated). The final tree
+(this branch merged with master 1aa0579, oceanic law 2.7 km/√Myr):
 
 | | land | median, m | p90, m | above 2 km | above 3 km | sea median, m | shelf share of the sea |
 |---|---|---|---|---|---|---|---|
 | Earth | 0.289 | 427 | 2,022 | 0.102 | | 4,062 | |
-| without | 0.274 [0.261, 0.295] | 578 [439, 701] | 2,159 [1,789, 2,392] | 0.122 [0.085, 0.152] | 0.045 [0.035, 0.052] | 3,437 [3,248, 3,654] | 0.108 [0.089, 0.130] |
-| with | 0.266 [0.257, 0.282] | 774 [738, 819] | 2,164 [2,021, 2,344] | 0.126 [0.103, 0.159] | 0.028 [0.018, 0.035] | 4,096 [3,385, 4,562] | 0.058 [0.040, 0.068] |
+| without | 0.299 [0.271, 0.340] | 578 [409, 724] | 1,927 [1,637, 2,377] | 0.097 [0.068, 0.142] | 0.035 [0.025, 0.057] | 3,408 [3,217, 3,925] | 0.115 [0.087, 0.133] |
+| with | 0.287 [0.252, 0.315] | 676 [569, 753] | 2,219 [1,925, 2,392] | 0.130 [0.092, 0.149] | 0.030 [0.018, 0.042] | 3,843 [3,654, 4,175] | 0.061 [0.049, 0.066] |
 
-- An earlier build of the same day (loads read from the plate flags, which are empty on a fifth of
-  the steps; same solver) gave land 0.297, median 638 m, p90 2,001 m, above 2 km 0.102, sea
-  3,798 m. Four chaotic runs move a mean by about ±0.02 and ±100 m, so of the land figures only
-  the median's rise (60–200 m) is outside the noise.
-- Clear changes: the sea is 360–660 m deeper and the shelves half as wide; land above 3 km is
-  about half; the highest 1 % of land cells is at 3.3–3.8 km instead of 4.4–5.3 km; the plateau
-  spreading moves 5–10 thousand km³ a run instead of 190–400 thousand. The highest cell is
-  4.9–6.8 km (5.7–6.8 km without).
+- Two earlier ensembles of the same day, before the merge and with the oceanic law at 3.0: with
+  flexure, land 0.266 and 0.297, median 774 and 638 m, p90 2,164 and 2,001 m, above 2 km 0.126 and
+  0.102, sea 4,096 and 3,798 m (the second read its loads from the plate flags, which are empty on
+  a fifth of the steps); without, land 0.274, median 578 m, p90 2,159 m, above 2 km 0.122, sea
+  3,437 m. Four chaotic runs move a mean by about ±0.02 and ±100 m.
+- So: the land share does not move outside the noise. The median rises by 60–200 m in every
+  comparison. The p90 and the share above 2 km move either way.
+- Clear in every comparison: the sea is 360–690 m deeper and the shelves about half as wide; the
+  highest 1 % of land cells is at 3.1–3.8 km instead of 4.0–5.3 km; the plateau spreading moves
+  5–10 thousand km³ a run instead of 160–400 thousand. The highest cell is 4.7–6.8 km (5.7–6.8 km
+  without).
+- 1,000 Myr, supercontinent, seed 1, one pair (law 3.0): land 0.225 → 0.305, median 502 → 774 m,
+  p90 2,019 → 2,225 m, above 2 km 0.102 → 0.136, sea 2,998 → 3,751 m; run time 1,177 → 1,295 s
+  (+10 %).
 - Why, as far as it was looked at (not isolated by experiment): rebound from erosion is local in
   weak belts instead of spread over 400 plate km; volcano cones now sink; the shelf's sediment and
   the sea's own weight load the margins.

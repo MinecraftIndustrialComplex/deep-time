@@ -34,7 +34,7 @@ history; the rest run once at the end.
 |---|---|---|
 | Plates | Moves the plates; makes and destroys ocean floor; raises mountains at collisions and arcs above subduction zones; places hotspots. | [plates.md](plates.md) |
 | Climate | Temperature, rain, ice and sea level for the geography of the time; a carbon cycle and orbital cycles over deep time. | [climate.md](climate.md) |
-| Surface | Rivers erode, hillsides creep, sediment is carried and laid down as layers; the crust rises and sinks under the changing load. | [erosion-and-sediment.md](erosion-and-sediment.md), [isostasy-and-height-limit.md](isostasy-and-height-limit.md) |
+| Surface | Rivers erode, hillsides creep, sediment is carried and laid down as layers; the crust rises and sinks under the changing load. | [erosion-and-sediment.md](erosion-and-sediment.md), [isostasy-and-height-limit.md](isostasy-and-height-limit.md), [flexure.md](flexure.md) |
 | Volcanoes | Volcanoes are born at arcs and hotspots, grow, die and erode; flood basalts cover provinces. | [volcanoes-and-magma.md](volcanoes-and-magma.md) |
 | Impacts | Meteors strike at Earth's rate; craters form, age and are buried. | [impacts.md](impacts.md) |
 | Structure | Turns the recorded history into rock columns: layers, metamorphism, granite bodies, folds and faults. | [rock-and-metamorphism.md](rock-and-metamorphism.md), [strata.md](strata.md), [folds-faults-intrusions.md](folds-faults-intrusions.md) |
@@ -59,6 +59,7 @@ them in from [_template.md](_template.md).
 | [biomes.md](biomes.md) | stub | BIO |
 | [erosion-and-sediment.md](erosion-and-sediment.md) | stub | ERO |
 | [isostasy-and-height-limit.md](isostasy-and-height-limit.md) | stub | ISO |
+| [flexure.md](flexure.md) | written with the feature (2026-10-02) | ISO-040 to ISO-067 |
 | [hypsometry-and-calibration.md](hypsometry-and-calibration.md) | stub | HYP |
 | [rivers-and-lakes.md](rivers-and-lakes.md) | stub | HYD |
 | [young-landscape-and-amplifier.md](young-landscape-and-amplifier.md) | stub | YNG, AMP |
