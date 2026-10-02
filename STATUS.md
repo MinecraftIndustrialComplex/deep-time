@@ -88,6 +88,10 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 | 2026-10-02 | plate-motion task 2 | **Turn real shortening on before tasks 3–4?** `tectonics.collision_on_shortening` is off in every preset, so the planets are master's (build log 2026-10-02, "Plate-motion task 2"). On, on master with flexure (2 seeds): continental crust 0.29 → 0.36 of the planet, collisions per 100 Myr 11.3 → 7.4, plate lifetime 41 → 63 Myr, but one plate above half the planet in 45 % of steps against 41 %, and every collision still ends in the one-step surge. (a, recommended) Keep it off until tasks 3 and 4 land together and remove it; (b) turn it on now as a light interim gain on the crust and collision counts. Not asked through AskUserQuestion (sub-agent); for the coordinator to put to Ben. | coordinator |
 | 2026-10-02 | plate-motion task 2 (found) | **Continental crust on master with flexure:** 1000 Myr `earthlike_quick_16k` runs on 1eac09f end with 0.29 of the planet continental (lowest step 0.28, plate-check target ≥ 0.37); on 38ca6b0 the same runs gave 0.42 (0.40). Not isolated between those commits (flexure, impacts, plate-check 1b). Recommended: bisect with 1–2 seeds before the belt calibration of task 3. | coordinator |
+| 2026-10-02 | science WP-13a | **Slab suction share** (PLT-186; docs/design/plate-force-balance.md section 6 note). The design's `slab_suction_share` 0.3 pulls only the overriding plate; Conrad & Lithgow-Bertelloni 2002 and 2004 (abstracts) have suction act on both plates, at 40 % of the forces against pull's 60 % (30 % with a weak asthenosphere), so their suction ÷ pull is 0.43–0.67. (a) Keep 0.3 as the open-loop starting value and calibrate it in task 8, with 0.43–0.67 noted as the sources' range (recommended: task 5 records forces read-only and the term's meaning differs anyway); (b) set 0.5 now, before task 7; (c) change the design so suction acts on both plates, as in the sources. | not asked (overnight; recorded by the WP-13a agent) |
+| 2026-10-02 | science WP-13a | **The overall speed scale** (PLT-181). `plate_speed_scale` 45 mm/yr was set to "Earth about 40", which is the median of plate-samples. Earth's area-weighted RMS is about 47 mm/yr today and 50–100 over the last 200 Myr (Forsyth & Uyeda 1975 Table 1; Zahirovic et al. 2015); the plate-check target is now 40–100. (a) Keep 45 for task 5 and calibrate it in task 8 against the new target (recommended); (b) raise it to 60 now. | not asked (overnight; recorded by the WP-13a agent) |
+| 2026-10-02 | science WP-13a | **Sea-floor age ceiling** (CHK-019, PLT-161). Today's ocean floor has a 90th percentile age of 133 Myr (Seton et al. 2020 grid, area-weighted); the plate-check ceiling is 230 Myr (master measures 208–269). (a) Keep 230 until the rewrite is measured, then tighten to about 180 in task 8 (recommended); (b) tighten to 180 now (master fails it); (c) keep 230 for good, as a cycle-long allowance. | not asked (overnight; recorded by the WP-13a agent) |
+| 2026-10-02 | science WP-13a | **Collision length target** (CHK-012, PLT-154). The target median is 15–50 Myr; Earth's examples are longer: India–Asia 50 Myr and continuing, the Alleghanian 65 Myr, the Uralian 70–140 Myr (Wikipedia; no statistic exists). (a) Keep 15–50 until the rewrite's collisions are measured, then decide with numbers (recommended: the model's collisions include small terranes); (b) raise the top to 100 Myr now. | not asked (overnight; recorded by the WP-13a agent) |
 | 2026-10-02 | science WP-2 | **Stratovolcano heights** (VOL-019; docs/science/volcanoes-and-magma.md, "Open questions" 1). Earth's 512 stratovolcanoes stand a median 1.02 km above their bases (Grosse et al. 2014, read in full); the default range 1.2–3.0 km gives standing cones a median 1.5 km and live ones 1.8–1.9 km (two 500 Myr runs). With 0.6–2.0 km the standing median is 0.91–0.93 km and the land above 2 km does not change measurably. (a) Lower the range to 0.6–2.0 km and `arc_radius_km` 14 → 10 km, keeping today's proportions (recommended); (b) keep 1.2–3.0 km as a game choice and say so in the hint. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-2 | **Island subsidence counted twice** (VOL-048). Since cones are flexure loads (log 2026-10-02) and the plate model deepens old ocean floor, the extra 25 m/Myr (to 1.5 km) for dead ocean volcanoes repeats both; Clague & Sherrod 2014 give >1 km in ~1 Myr under the load, then ~10 m/Myr. Setting it to 0 changed neither the hypsometry nor the standing shields measurably. (a) Default 0, keep the setting (recommended); (b) keep 25 m/Myr as a game choice. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-2 | **Continental hotspot calderas** (VOL-045). Yellowstone collapsed three times in 1.5 Myr (Christiansen 2001); at 3 × 0.04 = 0.12 per Myr a continental hotspot centre has a 10–30 % chance of one caldera in its life. (a) Give continental hotspot centres about 1 per Myr, arc volcanoes unchanged (recommended; a few places per planet, no hypsometry effect); (b) keep. | Not asked yet (sub-agent; for the coordinator) |
@@ -204,7 +208,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   0.42 (lowest 0.40). The cause is not isolated between those commits (flexure, impacts, plate-check 1b); flexure
   lowering young arcs below the sea before they turn continental is a guess. The switch at `true` keeps 0.36.
   Separately, the structure stage's Noddy-check panic on seed 1 is fixed on master (my own guard was dropped).
-- **Ledger**: PLT-068 rewritten; PLT-213 to PLT-218 new (flux convergence, front rule, state, grace steps, 20-Myr
+- **Ledger**: PLT-068 rewritten; PLT-222 to PLT-227 new (flux convergence, front rule, state, grace steps, 20-Myr
   measure, the switch); ids beside the constants; claims.md and plates.md counts.
 - **Gates** (VM, branch at 826b912 with master 412d517): cargo fmt --check clean, clippy -D warnings clean,
   `cargo test --workspace` 689 passed / 0 failed / 3 ignored, `cargo deny check licenses bans` ok, `./gradlew build
@@ -224,6 +228,128 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   along its `normal`, on both plates, and fills `BeltRec`'s wedge and foredeep. Task 4 replaces `shortening::advance`'s
   trigger with welding on stalled convergence (`Collision::convergence_mm_yr`) and removes `collision_on_shortening`
   and `speed_count_km`. Task 5 starts break-off at `onset_myr`.
+### 2026-10-02 — Flexure follow-up: the margin zigzag and the polar stripes, causes and fixes (agent worktree agent-afae960b6db068f94, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Asked.** The coordinator, after flexure landed (5ce5af4): find the cause of the cell-to-cell alternation along
+  active margins and the rise in land roughness (99th percentile 294 → 391 m in one pair), and of the stripes near
+  the poles, show each with a controlled test, fix it there, re-measure on the merged tree. Ben's answers to the
+  five flexure questions are in the decisions log (2026-10-02, logged in 4918af3).
+- **Measured how.** A temporary diagnostic split each step's flexure response linearly by source (solving the same
+  operator for each part of the residual) and counted cell-scale zigzags (a cell and its next neighbour both strict
+  extrema of opposite kind, by more than 5 m a step) at margins (within three cells of a plate boundary) and
+  elsewhere; `tools/review/flexure_artifacts.py` does the same on a run's final fields (20 m threshold, margins,
+  interiors, poleward of 70°). Design note `docs/design/flexure.md` section 13 has the whole account.
+- **Cause 1, the main one: the carried state acted as a force.** Every step re-solved the whole load against the
+  deflection and frozen moment carried from the last step. Carrying them on the raster interpolates them (near the
+  pole a plate's rotation shifts rows by many cells); new crust and arriving crust restart at zero beside cells that
+  carry kilometres. In a whole-load solve that mismatch is a residual, and the solve moved the ground to remove it:
+  **up to 4.6–6.2 km in a step from the carried state alone** (200 Myr, scattered seed 1), split about equally
+  between restarted crust, cells whose stiffness jumped fourfold, and interpolation. Controlled test
+  `carrying_a_bent_plate_moves_nothing`: the old formulation moves a carried, unloaded bent plate by 1.15 m a step,
+  the new one by under 1 cm. **Fix:** each step solves only for the step's load increments; the carried plate is in
+  equilibrium; the solve's unfinished residual is carried and solved with the next step; the plate carries its
+  bending moment (kept when it stiffens, released as a force when it weakens). Ledger ISO-068, ISO-056 changed.
+- **Cause 2: the plate-boundary break was a staircase.** Applied after the stiffness smoothing, it stepped with the
+  raster. Controlled test `a_moving_margin_bends_smoothly` (an ocean plate moving 0.37 cells a step under a craton
+  advancing 0.23 cells a step along a wavy boundary, a sediment fan, an arc): with the staircase the deflection
+  zigzags beside the boundary by 3–70 m; fixed, nowhere by more than 10 m. It was the polar artifact: polar-band
+  zigzag 3.5 % [1.4, 5.0] with the staircase, 0.87 % [0.49, 1.27] fixed, 1.48 % with flexure off (four planets).
+  **Fix:** the boundary cells are blurred and the stiffness share taken from that (0 on the boundary rows, then 0.17,
+  0.72). Ledger ISO-055 changed.
+- **Cause 3: the plate model's sample lattice reached the ground.** Its uplift is interpolated from samples 71
+  Earth-normalized km apart onto 39 km cells; the uplift field itself zigzags in 4.8 % of margin cells by more than
+  5 m a step (aliasing). Local isostasy passed that at its own height; a stiff plate passed the thickening behind
+  it, 5.5 times higher. Controlled test `the_plate_models_sample_lattice_is_not_a_load`: a 500 m column-by-column
+  uplift on a craton now steps the ground by 500 m (over 1,500 m unfiltered). **Fix:** only the part of the plate
+  model's root that it resolves bends the plate (binomial (1,2,1)/4 passes set by the sample spacing, two on the
+  quick presets); erosion, deposition and spreading are not filtered. Per step, the uplift part's margin zigzag fell
+  from 4.2–6.0 % to 1.3–3.6 %. Ledger ISO-069 (new), `StepIn::plate_spacing_m`.
+- **Ruled out:** the preconditioner's leftover residual (its response zigzags in under 0.1 % of cells); latitude
+  terms in the operator or preconditioner (none: block metric throughout; a ring load bends the plate the same at
+  every longitude, tested). The regime field is populated on resampling steps, unlike `plates/flags`.
+- **What remains at margins** (per step, final code): erosion and deposition 1.6–4.1 % of margin cells (marine
+  fill of kilometres in trench cells: real at this resolution), uplift with water and ice 1.3–3.6 %, moment released
+  where a moving boundary weakens the plate 1.0–3.1 %. On the final fields the worst margin window of each planet,
+  with and without flexure, is old ocean floor whose own local-isostatic level wiggles by ±50 m.
+- **Re-measured on the merged tree** (master 412d517; quick preset, test VM):
+  - Artifacts, 200 Myr, seeds 1–2 × both starts: elevation zigzag at margins 11.1 % off, 13.1 % final (first build,
+    one planet, 19.3 % against 10.8 % off); polar band 1.48 % off, 0.87 % final; land roughness p99 237 m off,
+    274 m final.
+  - **Roughness:** on the pair of the first complaint (500 Myr, supercontinent seed 1) land p99 289 → 372 m, but land
+    away from coasts gets smoother (271 → 225 m; at margins 563 → 451 m). The rise is coast: coast cells at plate
+    boundaries double (1,378 → 2,830) because arcs held up by the stiff plate edge emerge as islands; 85 % of the
+    roughest 1 % of land cells lie at margins (19 % without), a tenth of them zigzag.
+  - **Run time** (that pair, side by side): 557 → 576 s, **+3.3 %**; flexure step 56 s, 9.3 iterations a solve (was
+    85–107 s, 20–24), none at the limit.
+  - **Hypsometry** (500 Myr, seeds 1–2 × both starts, `tools/review/p1-17-hyps.sh`): without / with: land 0.299 /
+    0.290, median 578 / 636 m, p90 1,927 / 1,997 m, above 2 km 0.097 / 0.102, sea median 3,408 / 4,053 m (Earth
+    4,062), shelf share of the sea 0.115 / 0.059, highest 1 % of land 4.0–4.8 / 3.0–3.4 km, highest cell 6.8 /
+    5.0–5.3 km. Not recalibrated.
+- **Which oceanic law:** every measurement in this entry used 2.7 km/√Myr (ISO-048, verified). The first build's
+  timing pairs, the 1,000 Myr pair and its island and foredeep pictures used 3.0; its final hypsometry ensemble 2.7.
+- **Not explained:** a few cells per planet stand kilometres below their local-isostatic level (−11.8 km at one
+  polar trench in the final build; −6.2 and −8.8 km on the first build's planets); share of the planet more than
+  500 m below: 0.55 % final, 0.71 % first build.
+- **Pictures** (`review/out/flexure/`, not committed; `tools/review/flexure-views.sh`): `scattered-200-old` (first
+  build) and `scattered-200-final`, `super-500-on` and `super-500-off`, each with `planet`, `pole`, `margin`
+  (the window with most zigzag cells along a plate boundary), `moat`, `belt` and `numbers.json`. The first build's
+  pole shows swept arcs of ±50–100 m across the polar continent (the carried state rotating about the pole); the
+  final one has none, only bands along coasts and trenches.
+- **Tools:** `tools/review/flexure_artifacts.py`, `flexure-compare.sh`, `flexure-ensemble.sh`; `flexure_views.py` gains
+  `pole.png` and `margin.png`.
+- **Gates** (VM, the merged tree): `cargo fmt --all -- --check` (after formatting), `cargo clippy --workspace
+  --all-targets -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --no-fail-fast` all
+  pass (core 481 + 3 ignored, cli 54); `./gradlew build test` tests=226 failures=0 skipped=1. No GameTests.
+- **Next.** The calibration task after the plate work (hypsometry moved as above). The deep negative cells at
+  trenches, if they matter in the game.
+
+### 2026-10-02 — `plate-check`: the boundary mix and the arc heights (agent worktree agent-a8f59d60569b27473, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Why.** Ben saw, 28 Myr after a supercontinent start, nearly every boundary between ocean plates as subduction with a
+  continuous high arc; chose "Measure now, fix in the plate track" (decisions log 2026-10-02). Measurement only: no plate,
+  collision, surface or volcano rule changed; `subduction.rs` and `collision.rs` not touched.
+- **What.** `plates/dynamics.rs` (record version 3): per step `StepRec::mix_km` (boundary length by kind, km:
+  ocean-ocean and ocean-continent subduction, collision, ridge, rift, other; `classify_boundary`, `boundary_mix`) and
+  `arc_oceanic`/`arc_continental` (`ArcStat` `[cells, emergent, p50, p90, max]` of the elevation of the `ARC`-flag cells,
+  `arc_stats`). The mix repeats `fronts_and_uplift`'s relative-motion test, called right after it (the sample flags are
+  cleared by a resampling, so they cannot be read at the end of the step); arcs are read after `finish_samples`.
+  `record_step` now takes an `Observed` (fronts, mix, arcs) so `mod.rs` passes three more values. `plates/check.rs`: 5 judged
+  rows (`waits`-style, so a run without the data says "no data" and does not fail): subducting share 15-25 %, oceanic arc
+  cells above sea level 10-35 %, oceanic arc crest -1,700 to 1,000 m, continental arc median 1,200-4,500 m and crest
+  2,000-6,000 m; 23 reported rows (the rest of the mix, the first 50 Myr, lengths in km against Bird's, cells per step);
+  new definition `early_myr` (50). Ledger PLT-213 to PLT-221, bibliography section "Plate-check boundary mix and arc
+  heights", page `docs/science/plates.md`, baseline `docs/design/plate-check-baseline.md`.
+- **Earth sources, as read.** Bird 2003 Table 3 (full text PDF, read): subduction 51,310 of 260,487 km = 19.7 %, spreading
+  36.4 %, transform 28.4 %, continental convergent 8.8 %, oceanic convergent 6.7 % (PLT-213 `verified`). Hildreth 2007 p. 3
+  and Gregory-Wodzicki 2000 (full texts, read): Cascade basement 1.2-2 km, a dozen cones above 3 km; Andean arc on a 4.5 km
+  plateau (PLT-218 `verified`). Baker et al. 2008, de Ronde et al. 2003, Baker et al. 2003: abstracts only (PLT-215, -216
+  `abstract-only`). `from-memory`: the 1 km crest of island arcs (PLT-217) and the 6 km Andean crest (PLT-219). Range widths
+  are the agent's (`game-choice`, PLT-214).
+- **Measured** (test VM, master 1eac09f + this branch, `earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1-4; seed 1 with
+  `structure.deformation.density=0` for the structure-stage panic): subducting share **55.9 %** (55.5 54.9 56.9 56.4) against
+  Earth's 19.7 %: FAIL; 191,000 km a step against 51,310 (total boundary 341,000 against 260,487 km); ocean-ocean 50 % of it
+  (63 % in the first 50 Myr, when the subducting share is already 50 %); spreading 39.5 % (Earth 36.4), collision 3.2 %
+  (8.8), other 1.3 % (transform 28.4 + oceanic convergent 6.7: the model's sign-only tests leave no strike-slip class).
+  Oceanic arc cells above sea level 14.4 % (pass), crest 312 m (pass), median -2,146 m (reported); continental arc median
+  1,670 m and crest 2,874 m (pass). So in the plate model's own elevation the arcs are inside Earth's ranges; the snow-high
+  arcs Ben saw are not in this record (perhaps the volcano stage's cones or the surface stage's amplification; not
+  checked). The check now meets 13 of 41 ranged targets. The old rows moved because master now has general flexure on
+  (largest plate median 0.58 to 0.45, continental crust lowest step 0.40 to 0.29 so that target now fails, tenure 45 to 34
+  Myr, collisions per 100 Myr 10.0 to 11.3, ...; list in the baseline doc): not this branch's doing.
+- **Cost** (same 300 Myr plates run with and without the whole record, at once): +1.6 % (seed 1: 80.1 vs 78.8 s) and +2.6 %
+  (seed 2: 91.5 vs 89.2 s) of the plates stage; task 1b's record alone was within 0.5 %, so the new measures are about 1-2 %
+  of the plates stage (10-15 ms a step), about 0.5 % of a run. Record +16 numbers a step (about 50 KB of JSON; seed 1 1.05 MB).
+- **Gates** (VM): cargo fmt --check clean, clippy --workspace --all-targets -D warnings clean, `cargo test --workspace`
+  678 passed / 0 failed / 3 ignored (deeptime-core 478; new: boundary classification, arc statistics, record round trip, the
+  mix and arcs in `plate-check` and the mix compared with the recorded fronts on a 300 Myr run, plus the existing test that
+  recording does not change the world), `cargo deny check licenses bans` ok, `./gradlew build test` BUILD SUCCESSFUL, JUnit
+  tests=217 failures=0 skipped=1. No GameTests (nothing the game reads changed except the size of `notes.plates.dynamics`).
+- **Not verified.** The boundary mix is a count of lattice samples, not a surveyed length, and it repeats rather than shares
+  the fronts' code (a test ties its fronts to the recorded `front_km` except in steps where a plate died). How much of the
+  subduction surplus is the missing strike-slip tolerance (Bird: +-20 degrees) and how much real was not separated. The
+  oceanic/continental arc split by the arc accumulators (PLT-220) was not compared with a split by the overriding plate's
+  crust. Earth's island-arc emergent share rests on abstracts and on volcano counts, not on arc area. Full presets were not
+  run (the mix is one more pass over the lattice edges, like the fronts').
+- **Next.** The force-balance and belt tasks are judged on `boundary_subduction_pct` (and the arc rows). A strike-slip
+  tolerance for the mix (the +-20 degree rule) would make the transform row comparable with Bird's.
 ### 2026-10-02 — Science documentation, stage 2, WP-2: volcanoes and magma checked against sources (agent worktree agent-a44828926d2eaecb7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What.** Every VOL and MAG row's source and status revised (`docs/science/ledger/VOL.md`, `MAG.md`); the page
   `docs/science/volcanoes-and-magma.md` rewritten for stage 2; ten volcano and magma hints corrected

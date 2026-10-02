@@ -105,28 +105,37 @@ ratios between the terms and one overall scale matter; section 6 lists the setti
 
 | Term | Law | Acts on | Notes and sources |
 |---|---|---|---|
-| **Slab pull** (drives) | Per length of trench: `slab_pull × thickness(age) × slab length ÷ slab_depth_km`, towards the trench. Thickness ∝ √age, zero for crust younger than about 10 Myr. Continental crust in the trench pulls nothing. | The subducting plate | The dominant force; an order of magnitude above the rest (Forsyth & Uyeda 1975, abstract). Only 8–12 % of a slab's weight reaches the plate, up to twice ridge push (Schellart 2004, *GRL* 31:L07611). Speed follows slab age at the trench (Carlson, Hilde & Uyeda 1983, *GRL* 10:297). |
-| **Slab resistance** (resists) | Per length of trench, proportional to the speed towards it | The subducting plate | Gives slab-attached plates a "terminal velocity" (Forsyth & Uyeda). Replaces the speed cap. |
-| **Slab suction** (drives) | Per length of trench, `slab_suction_share` of the pull, towards the trench | The overriding plate | Pull and suction together explain why subducting plates are about four times faster than the others (Conrad & Lithgow-Bertelloni 2002, *Science* 298:207; 2004, *JGR* 109:B10407; from abstracts). |
-| **Edge energy: ridge push and belt weight** (drives or resists) | Per length of edge, `U(edge) − U(plate interior)`, pushing the plate away from high ground. `U` is the gravitational potential energy of an isostatic column at that elevation: `ρ g h (H + h (1 + ρ_c/(ρ_m − ρ_c)) / 2)` on land; for sea floor the same from its depth. | Every plate, at every edge | A ridge stands high, so it pushes: about 3 × 10¹² N/m for old plates (Parsons & Richter 1980, *EPSL* 51:445). A 5 km belt on 35 km crust gives 6.7 × 10¹² N/m by this formula; Tibet is quoted at 6–7 × 10¹² (Molnar & Lyon-Caen 1988, GSA Spec. Pap. 218). Ridge push is under 10 % of the driving force (Lithgow-Bertelloni & Richards 1998, *Rev. Geophys.* 36:27). |
-| **Collision resistance** (resists) | Along a collision front, a resistance to convergence whose strength is the belt's edge energy; see 3.4 | Both plates, on their relative motion | India slowed from 150 to 40 mm/yr as Tibet thickened (Copley, Avouac & Royer 2010). |
-| **Basal drag** (resists) | Per area, proportional to speed; `keel_drag` times more under continental crust | Every plate | Continental roots raise the traction 2–5 times (Conrad & Lithgow-Bertelloni 2006, *GRL* 33:L05312, abstract). A factor of 8 is often attributed to Forsyth & Uyeda; not confirmed. |
-| **Boundary resistance** (resists) | Per length of any plate boundary, proportional to the relative speed across and along it | Both plates | Forsyth & Uyeda's transform resistance. Small for large plates. Needed for small ones (section 4). |
+| **Slab pull** (drives) | Per length of trench: `slab_pull × thickness(age) × slab length ÷ slab_depth_km`, towards the trench. Thickness ∝ √age, zero for crust younger than about 10 Myr. Continental crust in the trench pulls nothing. | The subducting plate | Slab pull and slab resistance are "an order of magnitude more important than the other forces" (Forsyth & Uyeda 1975, p. 189 and Table 6, full text, WP-13a). The law is the one Faccenna et al. 2012 (*GRL* 39:L03305, eq. 1, full text) use after Turcotte & Schubert 1982: force per length ∝ Δρ g × slab length × 2.32 √(κ × age). Only 8–12 % of a slab's weight reaches the plate, up to twice ridge push (Schellart 2004, *GRL* 31:L07611, abstract). Speed follows slab age at the trench (Carlson, Hilde & Uyeda 1983, *GRL* 10:297, abstract). The 10 Myr cut-off has no source. |
+| **Slab resistance** (resists) | Per length of trench, proportional to the speed towards it | The subducting plate | Slab-attached plates move at a "terminal velocity" of 6–9 cm/yr at which slab pull and the resistance on the slab nearly balance (Forsyth & Uyeda 1975, p. 178, full text). Replaces the speed cap. |
+| **Slab suction** (drives) | Per length of trench, `slab_suction_share` of the pull, towards the trench | The overriding plate | Slab pull from upper-mantle slabs and suction from lower-mantle slabs explain why subducting plates "currently move ∼4 times faster than nonsubducting plates"; suction and pull are "about 40 and 60 %" of the forces on plates, suction "only ∼30 %" with a low-viscosity asthenosphere (Conrad & Lithgow-Bertelloni 2004, *JGR* 109:B10407, abstract; 2002, *Science* 298:207, abstract: upper-mantle slab pull "about half of the total driving force"). Their suction acts on both plates; here it acts on the overriding plate only, so `slab_suction_share` is not their ratio. Their suction ÷ pull is 0.43–0.67 (WP-13a; see the note under section 6). |
+| **Edge energy: ridge push and belt weight** (drives or resists) | Per length of edge, `U(edge) − U(plate interior)`, pushing the plate away from high ground. `U` is the gravitational potential energy of an isostatic column at that elevation: `ρ g h (H + h (1 + ρ_c/(ρ_m − ρ_c)) / 2)` on land; for sea floor the same from its depth. | Every plate, at every edge | A ridge stands high, so it pushes: about 2.5 × 10¹² N/m (Copley, Avouac & Royer 2010, *JGR* 115:B03410, abstract); Parsons & Richter 1980 (*EPSL* 51:445, about 3 × 10¹² for old plates) was not read. A 5 km belt on 35 km crust gives 6.5–7.1 × 10¹² N/m by this formula (ρ_c 2,700–2,800, ρ_m 3,300); the Himalaya–Tibet resists India with 5–6 × 10¹² (Copley et al. 2010, abstract), and Molnar & Lyon-Caen 1988 give about 7 × 10¹² (as cited by Schmalholz & Mancktelow 2016, *Solid Earth* 7:1417, full text). Slabs supply over 90 % of the driving force and lithospheric thickening (ridge push) under 10 % (Lithgow-Bertelloni & Richards 1998, *Rev. Geophys.* 36:27, abstract and conclusions, full text). Per unit length Forsyth & Uyeda's ridge push is 0.36 against slab pull's 6.43 (Table 6): 0.06 of it. |
+| **Collision resistance** (resists) | Along a collision front, a resistance to convergence whose strength is the belt's edge energy; see 3.4 | Both plates, on their relative motion | India–Asia convergence fell from about 15 to about 4 cm/yr between 50 and 35 Ma, and crustal thickening in Tibet "was the dominant cause" (Copley, Avouac & Royer 2010, abstract). |
+| **Basal drag** (resists) | Per area, proportional to speed; `keel_drag` times more under continental crust | Every plate | Forsyth & Uyeda 1975 (p. 189, full text, WP-13a): drag under the continents "is approximately eight times as strong as the mantle drag under the oceanic portion of the plates" (Table 6: 5.65 ± 2.22 against 0.82 ± 0.30), and the viscosity under continents "about eight times larger" (p. 194). Continental roots raise the traction "by a factor of 2–5 compared to 100 km thick lithosphere" (Conrad & Lithgow-Bertelloni 2006, *GRL* 33:L05312, abstract and §3, full text). The default 3 lies in the second range and below the first. |
+| **Boundary resistance** (resists) | Per length of any plate boundary, proportional to the relative speed across and along it | Both plates | Forsyth & Uyeda's transform-fault resistance (Table 6: 0.36 per unit length, the same as ridge push); their Fig. 9 shows no relation between speed and transform length, so it is "not strong enough to be the primary control" (p. 178). Small for large plates. Needed for small ones (section 4). |
 | **Mantle flow** (drives, weak) | The basal drag acts on the speed relative to a slow, smooth, slowly changing flow of `mantle_flow_mm_yr` | Every plate | A stand-in for convection the model does not have. It replaces the random walk and starts a planet with no slabs (question 1). |
 
-Known sizes, for orientation: slab pull about 1–3 × 10¹³ N/m gross, ridge push 2–3.5 × 10¹² N/m,
-a high plateau 6–7 × 10¹² N/m. Gross slab pull is from textbook examples and was not confirmed in
-Turcotte & Schubert itself.
+Known sizes, for orientation (checked in WP-13a, 2026-10-02): slab pull of order 10¹³ N/m. By
+Faccenna et al.'s eq. 1 (slab 700 km long, Δρ 70 kg/m³ as their text gives it, g 10 m/s²,
+κ 10⁻⁶ m²/s, their factor 0.25 for the slab's heating), floor 80 Myr old at the trench pulls
+1.4 × 10¹³ N/m, and 20 to 150 Myr old floor 0.7–2.0 × 10¹³ (computed). Ridge push about
+2.5 × 10¹² N/m, a high plateau 5–7 × 10¹² N/m (Copley et al. 2010; Molnar & Lyon-Caen 1988 as
+cited). Turcotte & Schubert itself was not read.
 
 ### 3.3 Slabs
 
 A contact keeps one number: the length of slab hanging from it.
 
-- It grows by the convergence each step, up to `slab_depth_km` (700: the upper mantle).
+- It grows by the convergence each step, up to `slab_depth_km` (700). Despite its name this is a
+  slab *length*: Faccenna et al. 2012 take every slab as 700 km long, "considering the present
+  mean slab dip of 55°" (eq. 1, full text). The upper mantle ends near 660 km (van Hunen,
+  Faccenna & Allen 2011, EGU abstract), which a 700 km slab at 55° does not reach (WP-13a).
 - A new subduction zone therefore starts weak and gains pull over about 10 Myr.
 - When continental crust enters the trench along a stretch, that stretch pulls nothing. When it
-  has done so for `slab_breakoff_myr` (10; van Hunen & Allen 2011: 10–25 Myr), the slab there is
-  gone and the length restarts from zero.
+  has done so for `slab_breakoff_myr` (10), the slab there is gone and the length restarts from
+  zero. In 3-D models an old, strong slab breaks off 20–25 Myr after collision starts, a young or
+  weak one after 10 Myr (van Hunen, Faccenna & Allen 2011, EGU2011-6298, abstract read; the same
+  figures are reported from van Hunen & Allen 2011, *EPSL* 302:27, whose text was not read). The
+  default is the young-slab end.
 - Subduction initiation no longer hands out a speed. It plants a slab of a starting length on the
   old floor, and the balance moves the plate.
 
@@ -159,21 +168,33 @@ This replaces section 4.1, option 1C, of the collisions design.
   surface slope, `wedge_taper_deg` (1.5°), up to the height of the belt at the front. So the
   wedge's width is the belt's height over that slope: 190 km for a 5 km belt. Crust moves through
   the wedge and under the front; the wedge stays at the front. What the wedge takes is subtracted
-  from the overriding side's budget. Source for a fixed taper: Davis, Suppe & Dahlen 1983, *JGR*
-  88:1153 (from memory).
-- **Foreland basin.** The belt and wedge are a load on the incoming plate. Beyond the wedge's toe
+  from the overriding side's budget. Source for a fixed shape: once a wedge reaches its critical
+  taper it "slides stably, continuing to grow at constant taper as additional material is
+  encountered at the toe" (Davis, Suppe & Dahlen 1983, *JGR* 88:1153, abstract, WP-13a).
+- **The 1.5° is a surface slope, not a taper** (WP-13a). In critical-taper theory the taper is the
+  surface slope α plus the dip β of the basal décollement. In the Nepal Himalaya the Lesser
+  Himalayan wedge has α of 1–1.6° and a total taper of 6–7.5°; the undeformed foredeep in front
+  of it 2.6–3.1° of total taper; the Greater Himalaya α of 5–16° (DeCelles & Carrapa 2021,
+  *JGR* 126:e2020JB021256, §2.4.1 and conclusions, full text). The 1.5° fits the frontal
+  wedge's α; the "tapers from 2.5°" of a secondary summary are total tapers. The name
+  `wedge_taper_deg` should read `wedge_slope_deg` when it is built.
+- **Foreland basin.** *Superseded (decisions log 2026-10-02, "General flexure everywhere";
+  `docs/design/flexure.md`): the general flexure solve bends the plate under the belt and wedge,
+  and `foreland_elastic_km` and the line-load profile below will not be built.* The belt and wedge are a load on the incoming plate. Beyond the wedge's toe
   the plate bends down by the line-load flexure profile
   `w(x) = w₀ e^(−x/α) (cos(x/α) + sin(x/α))`, with `α = (4D / (Δρ g))^¼` and `D` from the elastic
-  thickness (Turcotte & Schubert). For `foreland_elastic_km` 30–70, α is 93–176 km (computed), a
-  foredeep 200–400 km wide and a low forebulge beyond it. `w₀` follows from the load per length of
+  thickness (Turcotte & Schubert). For `foreland_elastic_km` 30–70, α is 93–176 km (computed;
+  reproduced in WP-13a with E 70 GPa, ν 0.25, Δρ 900 kg/m³ for sediment of 2,400 on mantle of
+  3,300, g 9.81), a foredeep 200–400 km wide and a low forebulge beyond it. `w₀` follows from the load per length of
   front, so a higher belt has a deeper basin, and lower gravity a wider one.
 - **Fill.** The subsidence reaches the surface stage as negative uplift. Its rivers and marine
   deposition fill the basin from the belt. The deflection is tracked per sample and follows the
   load, so the basin rebounds as the belt wears down.
 - Earth, for the test: the Himalayan foreland is about 450 km wide and 3 to over 7 km deep
-  (<https://en.wikipedia.org/wiki/Himalayan_foreland_basin>). Foredeeps of 100–300 km and 2–8 km,
-  forebulges tens to a few hundred metres high (DeCelles & Giles 1996, *Basin Res.* 8:105; via a
-  secondary source).
+  (<https://en.wikipedia.org/wiki/Himalayan_foreland_basin>, read 2026-10-02). "Foredeep depozones
+  are typically 100–300 km wide and 2–8 km thick"; forebulges, by flexure theory, "of the order of
+  60–470 km wide" and a few tens to a few hundred metres high (DeCelles & Giles 1996, *Basin Res.*
+  8:105, full text, read for the flexure feature and again in WP-13a).
 
 **Feeding folds and faults (P2-01 stage B).** `structure/deform/emplace.rs` reads L1 fields each
 step: the collision regime (full shortening), a foreland within `foreland_km` of any active orogen
@@ -316,8 +337,29 @@ in `editor_fields.json` and a lang key `deeptime.editor.field.<id>`).
 | `mantle_flow_mm_yr` | 5 | `mantle_flow` |
 | `motion_relax_myr` | 6 | `motion_relax` |
 | `wedge_taper_deg` | 1.5 | `wedge_taper` |
-| `foreland_elastic_km` | 50 | `foreland_stiffness` |
+| ~~`foreland_elastic_km`~~ | ~~50~~ | superseded by the general flexure (decisions log 2026-10-02; `docs/design/flexure.md`) |
 | `weld_speed_mm_yr`, `weld_after_myr`, `collision_belt_km`, `collision_stacking_share` | as the collisions design | as there |
+
+**Checked against sources (WP-13a, 2026-10-02).** No default above was changed. Each setting's
+row in `docs/science/ledger/PLT.md` (PLT-174 to PLT-202) says what was read.
+
+- `slab_pull`: the law (length × √age) is Faccenna et al. 2012's eq. 1; the 10 Myr cut-off has no
+  source.
+- `slab_depth_km` 700: a slab length, as Faccenna et al. 2012 use; not the depth of the upper
+  mantle (660 km).
+- `slab_breakoff_myr` 10: the young-slab end of 10 to 20–25 Myr.
+- `keel_drag` 3: inside Conrad & Lithgow-Bertelloni 2006's 2–5 and below Forsyth & Uyeda's
+  "approximately eight times", which their body does state.
+- `slab_suction_share` 0.3: not the sources' quantity. Their suction acts on both plates and is
+  0.43–0.67 of the pull (Conrad & Lithgow-Bertelloni 2004, abstract). The 0.3 is the open-loop
+  test's value, to be calibrated in task 8 (question in STATUS.md).
+- `edge_energy` 0.1: Forsyth & Uyeda's ridge push per unit length is 0.06 of slab pull (Table 6);
+  2.5 × 10¹² against 0.7–2 × 10¹³ N/m gives 0.12–0.36. A tuning value inside that spread.
+- `plate_speed_scale` 45: Earth's area-weighted RMS is about 47 mm/yr today (computed from
+  Forsyth & Uyeda's Table 1) and 50–100 over the last 200 Myr (Zahirovic et al. 2015). "Earth
+  about 40" was the median of plate-steps, a different statistic. Calibrated in task 8 against
+  the corrected target of section 7.
+- `wedge_taper_deg` 1.5: a surface slope, which fits the Himalayan frontal wedge (3.5).
 
 | Removed | Why |
 |---|---|
@@ -348,24 +390,27 @@ The table of the collisions design (its section 6) stands. Added, on `earthlike_
 
 | Measure | Now | Target | Earth |
 |---|---|---|---|
-| Plate speed, area-weighted RMS | about 65 mm/yr | 35–55 | about 40 |
-| Plate speed, 10th / 50th / 90th percentile of plate-steps | 41 / 71 / 83 | at most 20 / 30–60 / 70–110 | slowest group 26–28, median 40, fastest 85 |
-| Oceanic plates ÷ continental plates, median speed | 1.6 | at least 2 | about 3 |
-| Plates with 20 % or more of their edge on slab ÷ plates with under 5 %, median speed | 1.6 | at least 2.5 | 3–4 |
-| Speed against slab share of the edge, rank correlation | 0.47–0.59 | at least 0.65 | the Forsyth & Uyeda result |
-| Speed against plate area, rank correlation | −0.36 to −0.46 | between −0.4 and +0.2 | none (Forsyth & Uyeda) |
+| Plate speed, area-weighted RMS | about 65 mm/yr | 40–100 (was 35–55; WP-13a) | about 47 today (computed from Forsyth & Uyeda 1975 Table 1); 50–100 over the last 200 Myr (Zahirovic et al. 2015 §3.2) |
+| Plate speed, 10th / 50th / 90th percentile of plate-steps | 41 / 71 / 83 | at most 20 / 30–60 / 70–110 | today's 12 plates 11 / 33 / 80 (Forsyth & Uyeda Table 1); median of 3,952 plate-samples 42 over 200 Myr; slowest categories' medians 26–28, fastest 79–85 (Zahirovic et al. 2015 §3.5) |
+| Oceanic plates ÷ continental plates, median speed | 1.6 | at least 2 | 2–3 (Zahirovic et al. 2015, abstract; 8.1 ÷ 2.8 = 2.9 for plates under 25 % and over 50 % continental, §3.5) |
+| Plates with 20 % or more of their edge on slab ÷ plates with under 5 %, median speed | 1.6 | at least 2.5 | 3.0 (Zahirovic et al. 2015 §3.5: over 25 % subducting 7.9, none 2.6 cm/yr); about 4 (Conrad & Lithgow-Bertelloni 2004, abstract); 3.8 by means (Forsyth & Uyeda Table 1) |
+| Speed against slab share of the edge, rank correlation | 0.47–0.59 | at least 0.65 | 0.71 for 12 plates (computed from Forsyth & Uyeda Table 1; the paper gives no coefficient, only "the most striking correlation", Fig. 8) |
+| Speed against plate area, rank correlation | −0.36 to −0.46 | between −0.4 and +0.2 | −0.34 for 12 plates (computed from Table 1); "no obvious relation between velocity and area" (Forsyth & Uyeda, Fig. 5) |
 | Plate-steps above 150 mm/yr | 0 (capped) | at most 0.5 % | rare, short |
 | Steps on which the speed guard binds | not counted | 0 | |
 | Change of a plate's rotation per step, median / 90th pct | 5 % / 9 % | at most 8 % / 20 % | |
-| Convergence 20 Myr after a collision's onset ÷ at onset, median | 0 (welded) | 0.2–0.6 | India: 0.27 in 15 Myr |
-| Sea-floor age, median | 56–100 Myr | 50–80 | 64 |
-| Sea floor older than 180 Myr / older than 250 Myr | 12 % (the review) / 5–12 % | at most 10 % / 3 % | close to none / one small basin |
-| Supercontinent tenure (largest connected continent holds 70 % or more of the continental crust, until it holds under 50 %) | about 360 Myr from the start (the review's run) | 100–300 Myr | 100–300 Myr |
-| Assembly-to-assembly period | about 650 Myr (the review's run) | 300–600 Myr | 300–500 Myr |
-| Foredeep width and depth in front of a belt above 3 km, median | none | 150–450 km, 2–7 km of fill | 100–450 km, 2–8 km |
-| Wedge on the incoming side: width, median | none | 100–350 km | Himalaya 150–350 km |
+| Convergence 20 Myr after a collision's onset ÷ at onset, median | 0 (welded) | 0.2–0.6 | India: about 15 to about 4 cm/yr between 50 and 35 Ma, 0.27 in 15 Myr (Copley et al. 2010, abstract) |
+| Sea-floor age, median | 56–100 Myr | 50–80 | 55 (area-weighted median; 64 is the mean; Seton et al. 2020 age grid, computed in WP-13a) |
+| Sea floor older than 180 Myr / older than 250 Myr | 12 % (the review) / 5–12 % | at most 10 % / 3 % | 0.6 % / 0.06 %, oldest 339 Myr (Seton et al. 2020 grid, computed) |
+| Supercontinent tenure (largest connected continent holds 70 % or more of the continental crust, until it holds under 50 %) | about 360 Myr from the start (the review's run) | 100–300 Myr | 100–300 Myr (Mitchell et al. 2021, read) |
+| Assembly-to-assembly period | about 650 Myr (the review's run) | 400–800 Myr (was 300–600; WP-13a) | "often considered to last 400–800" Myr, about 600 dominant (Mitchell et al. 2021); about 500 (Nance 2022); 300–500 is the Wikipedia page's figure |
+| Foredeep width and depth in front of a belt above 3 km, median | none | 150–450 km, 2–7 km of fill | foredeeps typically 100–300 km and 2–8 km (DeCelles & Giles 1996, read); the Himalayan foreland 450 km and 3 to over 7 km (Wikipedia) |
+| Wedge on the incoming side: width, median | none | 100–350 km | the Himalaya, the orogenic wedge itself, 151–350 km wide (Wikipedia) |
 
 Notes:
+- The Earth column was checked in WP-13a (2026-10-02); `docs/science/ledger/CHK.md` gives what was
+  read for each row. The model's own sea-floor 90th percentile target (collisions design,
+  section 6: at most 230 Myr) compares with Earth's 133 Myr.
 - "Now" for the RMS is an estimate from the percentiles; `plate-check` will give it.
 - The area correlation is negative today and in the open-loop test because of the small plates.
   The target says the balance must not make large plates slow merely for being large.
@@ -567,6 +612,26 @@ Checked online on 2026-10-02 by a sub-agent; most papers are paywalled, so figur
 abstracts or secondary pages unless a link is given. Items it could not confirm are marked in the
 text.
 
+**Re-checked in WP-13a (2026-10-02).** How each was read; `docs/science/bibliography.md` has the
+entries and the project's source library the copies.
+
+- Full text read: Forsyth & Uyeda 1975 (publisher's free PDF); Lithgow-Bertelloni & Richards 1998
+  (UCL Discovery); Conrad & Lithgow-Bertelloni 2006 (UCL Discovery); Zahirovic et al. 2015
+  (accepted manuscript, University of Wollongong); Mitchell et al. 2021 (accepted manuscript,
+  Curtin University); Nance 2022 (PMC); Bird 2003 (author's site); DeCelles & Giles 1996;
+  Faccenna, Becker, Lallemand & Steinberger 2012, *Geophys. Res. Lett.* 39:L03305 (author's
+  preprint); DeCelles & Carrapa 2021, *J. Geophys. Res.* 126:e2020JB021256 (NSF public access
+  copy); Schmalholz & Mancktelow 2016, *Solid Earth* 7:1417 (open access).
+- Abstract only: Schellart 2004; Conrad & Lithgow-Bertelloni 2002 and 2004; Carlson, Hilde &
+  Uyeda 1983; Davis, Suppe & Dahlen 1983 (the reference is right; it is no longer "from memory");
+  Copley, Avouac & Royer 2010; van Hunen, Faccenna & Allen 2011 (EGU General Assembly abstract
+  EGU2011-6298, which carries the break-off times).
+- Data: the present sea-floor ages are Seton et al. 2020 (*Geochem. Geophys. Geosyst.*
+  21:e2020GC009214) as the GMT server's `earth_age_06m_p` grid; the statistics in section 7 were
+  computed from it, weighted by area.
+- Not read: Parsons & Richter 1980; Molnar & Lyon-Caen 1988 (its 7 × 10¹² N/m only as cited by
+  Schmalholz & Mancktelow 2016); van Hunen & Allen 2011's text; Turcotte & Schubert; Dahlen 1990.
+
 - Forsyth & Uyeda 1975, *Geophys. J. R. Astron. Soc.* 43:163–200,
   <https://academic.oup.com/gji/article/43/1/163/586101>.
 - Schellart 2004, *Geophys. Res. Lett.* 31:L07611 (abstract read in full).
@@ -591,4 +656,4 @@ text.
   <https://par.nsf.gov/biblio/10127684-modeling-inception-supercontinent-breakup-stress-state-importance-orogens>.
 - Buck 2004, in Karner et al. (eds), *Rheology and Deformation of the Lithosphere at Continental
   Margins*, 1–30; Bialas, Buck & Qin 2010, *Earth Planet. Sci. Lett.* (volume not confirmed).
-- From memory, not checked: Davis, Suppe & Dahlen 1983, *J. Geophys. Res.* 88:1153–1172.
+- Davis, Suppe & Dahlen 1983, *J. Geophys. Res.* 88:1153–1172 (abstract read in WP-13a).

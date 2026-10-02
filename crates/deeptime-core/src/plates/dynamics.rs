@@ -26,6 +26,7 @@
 //! | `collisions` | one [`CollisionRec`] per terrane transfer, collisions included |
 //! | `partings` | one [`PartingRec`] per collision state that ended with no transfer or weld |
 //! | `ages` | the sea-floor age distribution every [`AGE_EVERY_MYR`] ([`AgeRec`]) |
+//! | `steps[].mix_km`, `arc_oceanic`, `arc_continental` | version 3: the boundary mix and the arc cells' heights (below) |
 //! | `prev_omega` | each plate's rotation vector after the last step (for the next step's change) |
 //! | `belts` | one [`BeltRec`] per collision belt: empty until the belt physics exists |
 //!
@@ -33,6 +34,22 @@
 //! them and reports "no data" while they are empty): `StepRec::forces` (the force budget and mean
 //! stress per plate, [`PlateForces`]), `StepRec::slabs_km` (slab length per contact) and
 //! `Dynamics::belts` (convergence 20 Myr after onset, wedge and foredeep, [`BeltRec`]).
+//!
+//! # Boundary mix and arc heights (version 3)
+//! Two more measures for `plate-check`, measurement only (nothing a plate rule reads):
+//! - `StepRec::mix_km`: the length of plate boundary by kind, km (one sample spacing per boundary
+//!   sample, see [`classify_boundary`]): [`mix`]`::OCEAN_OCEAN`, `OCEAN_CONTINENT` (an oceanic
+//!   slab going under an overriding plate's oceanic or continental crust), `COLLISION` (continental
+//!   crust at the subducting side), `RIDGE`, `RIFT` and `OTHER` (transform, or converging with no
+//!   contact yet). The subducting length is the first two. It is taken right after the step's
+//!   fronts are found, with the same relative-motion test the fronts use
+//!   (`subduction::fronts_and_uplift`), because the sample flags are cleared by a resampling.
+//! - `StepRec::arc_oceanic` and `arc_continental` ([`ArcStat`]): the elevation, m above the plate
+//!   model's sea datum, of the samples that received arc magma this step (flag `ARC`, the code's
+//!   own arc cells: within `arc_width_km` of the arc distance from a front). An *oceanic arc* is
+//!   one whose arc crust was oceanic when the magma came ([`is_island_arc`]); an island arc that
+//!   emerged and matured into continental crust (`finish_samples`) is still an oceanic arc here.
+//!   Taken after the step's surface and uplift are final.
 //!
 //! Lengths are Earth-normalized km (the plate model's sphere, `model_radius_km`), speeds mm/yr,
 //! times Myr relative to world creation. "Visible" samples are those not hidden under another
@@ -72,22 +89,24 @@
 //! lattice edges whose ends are less than [`PIECE_LINK_SPACINGS`] sample spacings apart now, so
 //! two continents that a rift has pulled apart since the last resampling are not joined.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use deeptime_format::ParamValue;
 use glam::DVec3;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::Env;
 use super::events::{PLATE_BIRTH, PLATE_DEATH};
 use super::geometry::Geo;
-use super::state::{CONTINENTAL, OCEANIC, PlateState};
+use super::kinematics::{quat, tangent};
+use super::state::{ARC, CONTINENTAL, OCEANIC, PlateState, Sample};
 use crate::world::WorldState;
 
 /// Set this environment variable and the stage records nothing (to time what recording costs).
 pub const OFF_ENV: &str = "DEEPTIME_NO_PLATE_DYNAMICS";
 /// The record's format version (`notes.plates.dynamics.version`).
-pub const VERSION: u32 = 2;
+pub const VERSION: u32 = 3;
 /// The sea-floor ages are recorded this often, Myr.
 pub const AGE_EVERY_MYR: f64 = 10.0;
 /// Width of an age bin, Myr.
@@ -167,6 +186,14 @@ pub struct StepRec {
     pub forces: Vec<PlateForces>,
     /// Slab length of each contact, km. Empty until slab length is tracked (design task 5).
     pub slabs_km: Vec<f64>,
+    /// Length of plate boundary by kind, km, indexed by [`mix`] (all 0 in a record without it).
+    #[serde(default)]
+    pub mix_km: [f64; MIX_CLASSES],
+    /// Elevation of the oceanic and continental arc cells of the step ([`ArcStat`]).
+    #[serde(default)]
+    pub arc_oceanic: ArcStat,
+    #[serde(default)]
+    pub arc_continental: ArcStat,
 }
 
 /// One plate's force budget in a step: the size of each torque term and the mean in-plane
@@ -671,17 +698,293 @@ fn quantile(sorted: &[f64], q: f64) -> f64 {
     }
 }
 
-/// Appends this step's record. `front_km` is each plate's subduction front length this step
-/// (`subduction::Pull::front_km`), `pos` the samples' current positions, `last` whether the run's
+/// Kinds of plate boundary in [`StepRec::mix_km`].
+pub mod mix {
+    /// An oceanic slab under an overriding plate's oceanic crust.
+    pub const OCEAN_OCEAN: usize = 0;
+    /// An oceanic slab under an overriding plate's continental crust.
+    pub const OCEAN_CONTINENT: usize = 1;
+    /// Continental crust at the subducting side of a front (a collision or its approach).
+    pub const COLLISION: usize = 2;
+    /// A spreading boundary between oceanic crust.
+    pub const RIDGE: usize = 3;
+    /// A spreading boundary with continental crust on a side (a rift).
+    pub const RIFT: usize = 4;
+    /// Transform, or converging with no contact established yet.
+    pub const OTHER: usize = 5;
+    pub const NAMES: [&str; 6] = [
+        "ocean_ocean",
+        "ocean_continent",
+        "collision",
+        "ridge",
+        "rift",
+        "other",
+    ];
+}
+/// Number of boundary kinds ([`mix`]).
+pub const MIX_CLASSES: usize = 6;
+
+/// Which side of an active subduction contact a sample is on, towards one neighbour.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Side {
+    /// No active contact between the two plates.
+    None,
+    /// The sample is on the overriding plate and the neighbour on the subducting one.
+    Over,
+    /// The sample is on the subducting plate.
+    Under,
+}
+
+/// One lattice neighbour of a boundary sample that belongs to another plate.
+#[derive(Clone, Copy, Debug)]
+pub struct Neighbour {
+    /// The neighbour's velocity relative to the sample's plate, along the direction from the sample
+    /// to the neighbour, mm/yr: positive is moving apart, negative converging.
+    pub along: f64,
+    /// The neighbour's crust ([`OCEANIC`] or [`CONTINENTAL`]).
+    pub kind: u8,
+    pub side: Side,
+}
+
+/// What kind of boundary a visible sample is on (ledger: PLT-221), from its other-plate neighbours, and how much of
+/// the boundary it stands for in half sample spacings (2 or 1): `None` when it is on no boundary
+/// or on the subducting side of a front (the overriding side counts that front). The tests are
+/// those of `subduction::fronts_and_uplift`: a front is the fastest-converging neighbour of a
+/// sample on the overriding side of an active contact; a sample with any neighbour moving apart is
+/// divergent. A front counts one sample spacing (one plate's side of the boundary, as
+/// `PlateStep::front_km` does); the others count half a spacing from each of their two sides.
+pub fn classify_boundary(v_kind: u8, nbrs: &[Neighbour]) -> Option<(usize, u32)> {
+    if nbrs.is_empty() {
+        return None;
+    }
+    let mut best = 0.0;
+    let mut front: Option<&Neighbour> = None;
+    for n in nbrs {
+        if n.along < 0.0 && n.side == Side::Over && -n.along > best {
+            best = -n.along;
+            front = Some(n);
+        }
+    }
+    if let Some(n) = front {
+        let class = if n.kind == CONTINENTAL {
+            mix::COLLISION
+        } else if v_kind == CONTINENTAL {
+            mix::OCEAN_CONTINENT
+        } else {
+            mix::OCEAN_OCEAN
+        };
+        return Some((class, 2));
+    }
+    if nbrs.iter().any(|n| n.along > 0.0) {
+        let continental =
+            v_kind == CONTINENTAL || nbrs.iter().any(|n| n.along > 0.0 && n.kind == CONTINENTAL);
+        let class = if continental { mix::RIFT } else { mix::RIDGE };
+        return Some((class, 1));
+    }
+    if nbrs.iter().any(|n| n.along < 0.0 && n.side == Side::Under) {
+        return None;
+    }
+    Some((mix::OTHER, 1))
+}
+
+/// The length of plate boundary by kind, km ([`mix`]), at the plates' positions `pos` and the
+/// motion the step's fronts were found with (call it after `fronts_and_uplift`, before the
+/// motion is updated). All zeros when the record is off.
+pub fn boundary_mix(
+    st: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    env: &Env<'_>,
+) -> [f64; MIX_CLASSES] {
+    if st.dynamics.is_none() {
+        return [0.0; MIX_CLASSES];
+    }
+    let samples = &st.samples;
+    let plate_of: Vec<u32> = (0..samples.len()).map(|i| st.plate_of(i)).collect();
+    let omega: Vec<DVec3> = st
+        .plates
+        .iter()
+        .map(|p| DVec3::from_array(p.omega))
+        .collect();
+    let rots: Vec<_> = st.groups.iter().map(|g| quat(g.rot)).collect();
+    let pts = geo.points();
+    let active: BTreeSet<(u32, u32)> = st
+        .contacts
+        .iter()
+        .filter(|c| c.last_step == env.step)
+        .map(|c| (c.under, c.over))
+        .collect();
+    let norm = env.norm;
+    let units = (0..samples.len())
+        .into_par_iter()
+        .fold(
+            || [0u64; MIX_CLASSES],
+            |mut acc, v| {
+                let sv = &samples[v];
+                if sv.is_hidden() {
+                    return acc;
+                }
+                let pv = plate_of[v];
+                let x = pos[v];
+                let rot = rots[sv.group as usize];
+                let mut buf = [Neighbour {
+                    along: 0.0,
+                    kind: OCEANIC,
+                    side: Side::None,
+                }; 16];
+                let mut n = 0;
+                for (u, _) in geo.edges(v as u32) {
+                    let pu = plate_of[u as usize];
+                    if pu == pv || n == buf.len() {
+                        continue;
+                    }
+                    let out = tangent(x, rot * (pts[u as usize] - pts[v])).normalize_or_zero();
+                    let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
+                    buf[n] = Neighbour {
+                        along: rel.dot(out),
+                        kind: samples[u as usize].kind,
+                        side: if active.contains(&(pu, pv)) {
+                            Side::Over
+                        } else if active.contains(&(pv, pu)) {
+                            Side::Under
+                        } else {
+                            Side::None
+                        },
+                    };
+                    n += 1;
+                }
+                if let Some((class, half)) = classify_boundary(sv.kind, &buf[..n]) {
+                    acc[class] += u64::from(half);
+                }
+                acc
+            },
+        )
+        .reduce(
+            || [0; MIX_CLASSES],
+            |mut a, b| {
+                for (x, y) in a.iter_mut().zip(b) {
+                    *x += y;
+                }
+                a
+            },
+        );
+    let spacing_km = norm.km(norm.spacing_rad());
+    units.map(|u| (u as f64 * 0.5 * spacing_km).round())
+}
+
+/// The elevations of the arc cells of one kind in one step: how many, how many stand above the
+/// model's sea datum, and the median, 90th percentile and highest, m. Serialised as the array
+/// `[cells, emergent, p50, p90, max]`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(from = "[f64; 5]", into = "[f64; 5]")]
+pub struct ArcStat {
+    pub cells: u32,
+    pub emergent: u32,
+    pub p50_m: f64,
+    pub p90_m: f64,
+    pub max_m: f64,
+}
+
+impl From<[f64; 5]> for ArcStat {
+    fn from(a: [f64; 5]) -> Self {
+        ArcStat {
+            cells: a[0] as u32,
+            emergent: a[1] as u32,
+            p50_m: a[2],
+            p90_m: a[3],
+            max_m: a[4],
+        }
+    }
+}
+
+impl From<ArcStat> for [f64; 5] {
+    fn from(a: ArcStat) -> Self {
+        [
+            f64::from(a.cells),
+            f64::from(a.emergent),
+            a.p50_m,
+            a.p90_m,
+            a.max_m,
+        ]
+    }
+}
+
+impl ArcStat {
+    /// The statistics of a set of elevations (m).
+    pub fn of(mut z: Vec<f64>) -> ArcStat {
+        if z.is_empty() {
+            return ArcStat::default();
+        }
+        z.sort_by(f64::total_cmp);
+        ArcStat {
+            cells: z.len() as u32,
+            emergent: (z.len() - z.partition_point(|&e| e <= 0.0)) as u32,
+            p50_m: quantile(&z, 0.5).round(),
+            p90_m: quantile(&z, 0.9).round(),
+            max_m: z[z.len() - 1].round(),
+        }
+    }
+
+    /// Share of the cells above the sea datum (0 of none).
+    pub fn emergent_share(&self) -> f64 {
+        f64::from(self.emergent) / f64::from(self.cells.max(1))
+    }
+}
+
+/// Whether an arc cell is part of an island arc (ledger: PLT-220) (its arc crust was oceanic when the magma came):
+/// oceanic crust, or crust whose arc magma is mostly of the oceanic accumulator (an island arc that
+/// emerged and matured into continental crust).
+pub fn is_island_arc(s: &Sample) -> bool {
+    s.kind == OCEANIC || s.arc_oceanic_m > s.arc_continental_m
+}
+
+/// The oceanic and the continental arcs' elevations ([`ArcStat`]) among `samples`.
+pub fn arc_stats(samples: &[Sample]) -> [ArcStat; 2] {
+    let (mut oc, mut cont) = (Vec::new(), Vec::new());
+    for s in samples {
+        if s.is_hidden() || s.flags & ARC == 0 {
+            continue;
+        }
+        let z = f64::from(s.elevation_m);
+        if is_island_arc(s) {
+            oc.push(z);
+        } else {
+            cont.push(z);
+        }
+    }
+    [ArcStat::of(oc), ArcStat::of(cont)]
+}
+
+/// The arcs of the step ([`arc_stats`]); empty when the record is off.
+pub fn arc_heights(st: &PlateState) -> [ArcStat; 2] {
+    if st.dynamics.is_none() {
+        return [ArcStat::default(); 2];
+    }
+    arc_stats(&st.samples)
+}
+
+/// What a step measured before `record_step` sees its end state: the fronts' lengths, the boundary
+/// mix and the arc heights, taken where the flags are fresh ([`boundary_mix`], [`arc_heights`]).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Observed<'a> {
+    /// Each plate's subduction front length this step (`subduction::Pull::front_km`).
+    pub front_km: &'a [f64],
+    pub mix_km: [f64; MIX_CLASSES],
+    /// Oceanic, continental.
+    pub arcs: [ArcStat; 2],
+}
+
+/// Appends this step's record. `seen` is what the step measured (the fronts' lengths per plate,
+/// the boundary mix, the arcs), `pos` the samples' current positions, `last` whether the run's
 /// final step has been taken. Reads the state and the world's new events, changes only the record.
 pub fn record_step(
     st: &mut PlateState,
     world: &WorldState,
     geo: &Geo,
     pos: &[DVec3],
-    front_km: &[f64],
     env: &Env<'_>,
     last: bool,
+    seen: Observed<'_>,
 ) {
     let Some(mut d) = st.dynamics.take() else {
         return;
@@ -745,7 +1048,7 @@ pub fn record_step(
                 visible: vis[k],
                 continental: cont[k],
                 speed_mm_yr: round(env.norm.speed_mm_yr(w, DVec3::from_array(p.centroid)), 10.0),
-                front_km: round(front_km.get(k).copied().unwrap_or(0.0), 1.0),
+                front_km: round(seen.front_km.get(k).copied().unwrap_or(0.0), 1.0),
                 boundary_km: round(f64::from(bnd[k]) * spacing_km, 1.0),
                 rot_change: round(change.unwrap_or(0.0), 1.0e4),
                 rot_known: change.is_some(),
@@ -846,6 +1149,9 @@ pub fn record_step(
         old180: older(OLD_AGES_MYR[0]) as u32,
         old250: older(OLD_AGES_MYR[1]) as u32,
         pieces,
+        mix_km: seen.mix_km,
+        arc_oceanic: seen.arcs[0],
+        arc_continental: seen.arcs[1],
         ..StepRec::default()
     });
 
@@ -999,6 +1305,158 @@ mod tests {
             ..p.clone()
         };
         assert_eq!(over.slab_share(), 1.0);
+    }
+
+    fn nb(along: f64, kind: u8, side: Side) -> Neighbour {
+        Neighbour { along, kind, side }
+    }
+
+    #[test]
+    fn boundary_samples_are_classified_by_their_neighbours() {
+        use mix::*;
+        // A front: the fastest-converging neighbour on an active contact decides, by crust.
+        let slab_oc = [
+            nb(-10.0, OCEANIC, Side::Over),
+            nb(-30.0, OCEANIC, Side::Over),
+        ];
+        assert_eq!(classify_boundary(OCEANIC, &slab_oc), Some((OCEAN_OCEAN, 2)));
+        assert_eq!(
+            classify_boundary(CONTINENTAL, &slab_oc),
+            Some((OCEAN_CONTINENT, 2))
+        );
+        // The fastest one is continental: a collision, whichever crust the sample is.
+        let cont = [
+            nb(-10.0, OCEANIC, Side::Over),
+            nb(-30.0, CONTINENTAL, Side::Over),
+        ];
+        assert_eq!(classify_boundary(OCEANIC, &cont), Some((COLLISION, 2)));
+        assert_eq!(classify_boundary(CONTINENTAL, &cont), Some((COLLISION, 2)));
+        // A front beats a neighbour moving apart on the same sample.
+        let both = [nb(5.0, OCEANIC, Side::None), nb(-1.0, OCEANIC, Side::Over)];
+        assert_eq!(classify_boundary(OCEANIC, &both), Some((OCEAN_OCEAN, 2)));
+        // Divergent: ridge between oceanic crust, rift when either side is continental; half a
+        // spacing from this side.
+        let apart = [nb(8.0, OCEANIC, Side::None), nb(-2.0, OCEANIC, Side::None)];
+        assert_eq!(classify_boundary(OCEANIC, &apart), Some((RIDGE, 1)));
+        assert_eq!(classify_boundary(CONTINENTAL, &apart), Some((RIFT, 1)));
+        let apart_c = [nb(8.0, CONTINENTAL, Side::None)];
+        assert_eq!(classify_boundary(OCEANIC, &apart_c), Some((RIFT, 1)));
+        // Converging but not on a contact, and sliding past: other.
+        assert_eq!(
+            classify_boundary(OCEANIC, &[nb(-4.0, OCEANIC, Side::None)]),
+            Some((OTHER, 1))
+        );
+        assert_eq!(
+            classify_boundary(OCEANIC, &[nb(0.0, OCEANIC, Side::None)]),
+            Some((OTHER, 1))
+        );
+        // The subducting side of a front is not counted (the overriding side counts it); a
+        // converging neighbour on an active contact the other way round, and no neighbour at all.
+        assert_eq!(
+            classify_boundary(OCEANIC, &[nb(-4.0, OCEANIC, Side::Under)]),
+            None
+        );
+        assert_eq!(classify_boundary(OCEANIC, &[]), None);
+        // A converging contact the sample overrides at no speed is not a front.
+        assert_eq!(
+            classify_boundary(OCEANIC, &[nb(0.0, OCEANIC, Side::Over)]),
+            Some((OTHER, 1))
+        );
+    }
+
+    fn arc_cell(kind: u8, z: f32, oceanic_m: f32, continental_m: f32, flags: u8) -> Sample {
+        Sample {
+            kind,
+            elevation_m: z,
+            arc_oceanic_m: oceanic_m,
+            arc_continental_m: continental_m,
+            flags,
+            ..Sample::blank(0)
+        }
+    }
+
+    #[test]
+    fn arc_cells_are_split_by_the_crust_the_magma_came_through_and_summarised() {
+        use crate::plates::state::{HIDDEN, TRENCH};
+        let mut cells = Vec::new();
+        // Oceanic arc: ten cells at -1000 ... -100 m and three above the sea.
+        for i in 0..10 {
+            cells.push(arc_cell(
+                OCEANIC,
+                -1000.0 + 100.0 * i as f32,
+                50.0,
+                0.0,
+                ARC,
+            ));
+        }
+        for z in [50.0, 400.0, 900.0] {
+            cells.push(arc_cell(OCEANIC, z, 80.0, 0.0, ARC));
+        }
+        // An island arc that matured into continental crust is still an oceanic arc.
+        cells.push(arc_cell(CONTINENTAL, 1200.0, 300.0, 40.0, ARC));
+        // Continental arc.
+        for z in [1500.0, 2500.0, 3500.0, 4500.0, 5500.0] {
+            cells.push(arc_cell(CONTINENTAL, z, 0.0, 200.0, ARC));
+        }
+        // Not arc cells: no flag, hidden, another flag.
+        cells.push(arc_cell(OCEANIC, 3000.0, 0.0, 0.0, 0));
+        cells.push(arc_cell(CONTINENTAL, 3000.0, 0.0, 9.0, ARC | HIDDEN));
+        cells.push(arc_cell(CONTINENTAL, 3000.0, 0.0, 9.0, TRENCH));
+        let [oc, cont] = arc_stats(&cells);
+        assert_eq!((oc.cells, oc.emergent), (14, 4));
+        assert!((oc.emergent_share() - 4.0 / 14.0).abs() < 1e-12);
+        assert_eq!(oc.max_m, 1200.0);
+        // Sorted: -1000 ... -100 (10), 50, 400, 900, 1200: the median is between -100 and 50 at
+        // rank 6.5 -> nearest rank 7 (-300 + ...); just check the order and that it is below 0.
+        assert!(oc.p50_m < 0.0 && oc.p90_m >= 400.0 && oc.p90_m <= oc.max_m);
+        assert_eq!((cont.cells, cont.emergent), (5, 5));
+        assert_eq!(
+            (cont.p50_m, cont.p90_m, cont.max_m),
+            (3500.0, 5500.0, 5500.0)
+        );
+        // No arc cells: an empty summary, not a NaN.
+        let none = arc_stats(&[arc_cell(OCEANIC, 5.0, 0.0, 0.0, 0)]);
+        assert_eq!(none[0], ArcStat::default());
+        assert_eq!(none[0].emergent_share(), 0.0);
+        // A sea-level cell is not emergent.
+        assert_eq!(ArcStat::of(vec![0.0, 0.0, 1.0]).emergent, 1);
+    }
+
+    #[test]
+    fn the_mix_and_the_arcs_travel_in_the_record() {
+        let mut d = Dynamics {
+            version: VERSION,
+            dt_myr: 2.0,
+            samples: 100,
+            ..Dynamics::default()
+        };
+        d.steps.push(StepRec {
+            t: 2.0,
+            mix_km: [120.0, 80.0, 30.0, 400.0, 20.0, 150.0],
+            arc_oceanic: ArcStat::of(vec![-500.0, -100.0, 300.0]),
+            arc_continental: ArcStat::of(vec![2000.0, 3000.0]),
+            ..StepRec::default()
+        });
+        let v = serde_json::to_value(&d).unwrap();
+        assert_eq!(
+            v["steps"][0]["mix_km"],
+            serde_json::json!([120.0, 80.0, 30.0, 400.0, 20.0, 150.0])
+        );
+        // [cells, emergent, p50, p90, max]
+        assert_eq!(
+            v["steps"][0]["arc_continental"],
+            serde_json::json!([2.0, 2.0, 3000.0, 3000.0, 3000.0])
+        );
+        let back: Dynamics = serde_json::from_value(v.clone()).unwrap();
+        assert_eq!(back, d);
+        // A record without them reads as zeros (no data), not as an error.
+        let mut old = v;
+        for k in ["mix_km", "arc_oceanic", "arc_continental"] {
+            old["steps"][0].as_object_mut().unwrap().remove(k);
+        }
+        let back: Dynamics = serde_json::from_value(old).unwrap();
+        assert_eq!(back.steps[0].mix_km, [0.0; MIX_CLASSES]);
+        assert_eq!(back.steps[0].arc_oceanic, ArcStat::default());
     }
 
     #[test]
