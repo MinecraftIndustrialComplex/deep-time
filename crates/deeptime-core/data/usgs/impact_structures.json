@@ -1,0 +1,44 @@
+{
+  "id": "impact_structures",
+  "title": "Deposits of impact structures (design values: no USGS model exists)",
+  "percentile_convention": "USGS: p90 is the value that 90% of deposits equal or exceed (the small end); p10 the large end",
+  "sources": [
+    {
+      "key": "grieve-masaitis-1994",
+      "citation": "Grieve, R.A.F., and Masaitis, V.L., 1994, The economic potential of terrestrial impact craters: International Geology Review, v. 36, no. 2, p. 105-151 (not a USGS source; descriptive, no grade-tonnage model)"
+    },
+    {
+      "key": "design",
+      "citation": "Deep Time design values (P2-08, 2026-10-01): no USGS grade-tonnage or deposit-density model covers deposits of impact structures; each impact deposit type states its own tonnage, grades and density as placeholders in its notes"
+    }
+  ],
+  "tonnage_mt": {
+    "p90": 1.0,
+    "p50": 10.0,
+    "p10": 100.0,
+    "source": "design",
+    "method": "placeholder",
+    "note": "Not used: every impact type carries its own tonnage percentiles."
+  },
+  "grades": {},
+  "correlations": [],
+  "ore_density_t_m3": {
+    "value": 3.0,
+    "source": "design",
+    "method": "placeholder"
+  },
+  "deposits_per_1e5_km2": {
+    "p90": 10,
+    "p50": 50,
+    "p10": 150,
+    "source": "design",
+    "method": "placeholder",
+    "note": "Per 100,000 km² of crater floor, not of a geologic province: the permissive tract of an impact type is the inside of a crater."
+  },
+  "min_separation_m": {
+    "value": 2000,
+    "source": "design",
+    "method": "placeholder"
+  },
+  "extra": {}
+}

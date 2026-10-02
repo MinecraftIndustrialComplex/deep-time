@@ -81,6 +81,7 @@ fn run(json: &str, threads: usize, name: &str) -> (WorldState, Value) {
             "climate",
             "surface",
             "volcanoes",
+            "impacts",
             "structure",
             "deposits"
         ]

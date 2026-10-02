@@ -656,6 +656,16 @@ fn volcanoes_line(world: &deeptime_core::world::WorldState) -> Option<String> {
     Some(deeptime_core::surface::volcanoes::summary_line(&v))
 }
 
+/// The impact stage's summary line (P2-08): `impacts_final=<steps> impactors=… …`, when the
+/// pipeline ran it.
+fn impacts_line(world: &deeptime_core::world::WorldState) -> Option<String> {
+    let note = world
+        .notes
+        .get(deeptime_core::surface::impacts::STAGE_NAME)?;
+    let v: Value = serde_json::from_str(note).ok()?;
+    Some(deeptime_core::surface::impacts::summary_line(&v))
+}
+
 /// The glaciers' summary line: `glacial_final eroded_km3=… till_km3=… …`, when the surface had
 /// glaciers to model (a climate stage).
 fn glacial_line(world: &deeptime_core::world::WorldState) -> Option<String> {
@@ -721,6 +731,7 @@ pub(crate) fn timings_line(
         deeptime_core::climate::STAGE_NAME,
         deeptime_core::structure::STAGE_NAME,
         deeptime_core::surface::volcanoes::STAGE_NAME,
+        deeptime_core::surface::impacts::STAGE_NAME,
         deeptime_core::surface::young::STAGE_NAME,
     ] {
         if let Some(note) = world
@@ -808,6 +819,7 @@ pub fn run(o: &RunOptions) -> CliResult<()> {
             climate_line(world),
             structure_line(world),
             volcanoes_line(world),
+            impacts_line(world),
             young_line(world),
             amplify_line(world),
         ]
@@ -1022,6 +1034,9 @@ pub fn stage(o: &StageOptions) -> CliResult<()> {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = volcanoes_line(&ck.world) {
+        println!("deeptime stage {}: {line}", o.name);
+    }
+    if let Some(line) = impacts_line(&ck.world) {
         println!("deeptime stage {}: {line}", o.name);
     }
     if let Some(line) = young_line(&ck.world) {

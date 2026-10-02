@@ -667,6 +667,7 @@ fn the_coupled_pipeline_amplifies_on_any_thread_count_and_registers_its_layers()
             "climate",
             "surface",
             "volcanoes",
+            "impacts",
             "structure",
             "young",
             "amplify"

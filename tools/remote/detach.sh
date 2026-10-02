@@ -41,7 +41,10 @@ case "$verb" in
     start)
         : > "$log"
         cd "$dir" || exit 2
-        setsid nohup bash -c "$cmd; echo EXIT=\$?" >> "$log" 2>&1 < /dev/null &
+        # Close every inherited descriptor above 2 (the nix sentry lock, a daemon socket): ssh
+        # keeps the calling mac.sh waiting until nothing holds the session's descriptors, and the
+        # job inherited those (2026-10-02: the call returned only when the job ended).
+        setsid nohup bash -c "for n in 3 4 5 6 7 8 9; do eval \"exec \$n>&-\"; done; $cmd; echo EXIT=\$?" >> "$log" 2>&1 < /dev/null &
         echo "detach.sh: started '$name' (pid $!), log $log"
         ;;
     run)

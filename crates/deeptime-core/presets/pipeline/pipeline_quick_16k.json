@@ -434,5 +434,18 @@
     "magma_chamber_size": 1.0,
     "crater_lake_share": 0.25,
     "remove_lava_features": true
+  },
+  "impacts": {
+    "flux": 1.0,
+    "size_slope": 1.8,
+    "min_crater_km": 2.0,
+    "max_crater_km": 300.0,
+    "speed_km_s": 20.0,
+    "impactor_density_kg_m3": 3000.0,
+    "depth_scale": 0.5,
+    "ejecta_radii": 3.0,
+    "sea_cutoff_ratio": 6.3,
+    "diffusivity_m2_yr": 0.01,
+    "degradation": 1.0
   }
 }

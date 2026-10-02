@@ -183,6 +183,7 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
             "climate",
             "surface",
             "volcanoes",
+            "impacts",
             "structure",
             "deposits"
         ]
