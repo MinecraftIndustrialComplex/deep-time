@@ -411,7 +411,8 @@ pub struct TectonicParams {
     pub sediment_accretion_mm_yr: f64,
     /// u_0 (0.6 mm/yr).
     pub subduction_uplift_mm_yr: f64,
-    /// Interpenetration that triggers a collision (Cortial §6: 300 km).
+    /// What a contact's collision count must reach to transfer its terrane or weld its plates
+    /// (Cortial §6: 300 km of interpenetration). What is counted is `collision_on_shortening`.
     pub collision_threshold_km: f64,
 
     /// Where the subduction distance transfer f(d) peaks (design choice).
@@ -537,6 +538,17 @@ pub struct TectonicParams {
     /// left its passive margins facing an ocean that kept converging, so they all turned
     /// active); a smaller terrane moves alone (an island arc or microcontinent accretes).
     pub collision_suture_frac: f64,
+    /// What `collision_threshold_km` is compared with (`plates/shortening.rs`). `true`: the
+    /// collision's real shortening, the convergence across its front integrated since continental
+    /// crust first converged there. `false`: the count used before plate-motion task 2, relative
+    /// speed × time over the steps with three or more continental samples in the overlap, which
+    /// also counts plates sliding past each other. An interim setting: `false` in every built-in
+    /// preset until the belt and the weld on stalled convergence land (tasks 3 and 4 of
+    /// `docs/design/plate-force-balance.md`): with it off the planets are master's, and with it on
+    /// the plate-check measures move both ways (docs/design/plate-check-baseline.md, task 2).
+    /// Task 4 removes it.
+    // ledger: PLT-227 (game-choice, interim; the agent of plate-motion task 2, 2026-10-02).
+    pub collision_on_shortening: bool,
     /// Oceanic crust older than this, on a plate that subducts nowhere, can start subducting on
     /// its own (Wilson cycle), Myr.
     pub subduction_initiation_age_myr: f64,
@@ -660,6 +672,7 @@ impl Default for TectonicParams {
             terrane_event_min_frac: 0.005,
             collision_min_frac: 0.1,
             collision_suture_frac: 0.1,
+            collision_on_shortening: false,
             subduction_initiation_age_myr: 150.0,
             subduction_initiation_rate: 0.3,
             subduction_initiation_clearance_km: 1000.0,

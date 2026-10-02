@@ -24,6 +24,7 @@
 //! | `steps` | one [`StepRec`] per step: the plates ([`PlateStep`]), land, crust, the sea floor's age percentiles, the largest continental pieces |
 //! | `plates` | one [`PlateLife`] per plate that ever lived: parent, origin, death and its cause |
 //! | `collisions` | one [`CollisionRec`] per terrane transfer, collisions included |
+//! | `partings` | one [`PartingRec`] per collision state that ended with no transfer or weld |
 //! | `ages` | the sea-floor age distribution every [`AGE_EVERY_MYR`] ([`AgeRec`]) |
 //! | `steps[].mix_km`, `arc_oceanic`, `arc_continental` | version 3: the boundary mix and the arc cells' heights (below) |
 //! | `prev_omega` | each plate's rotation vector after the last step (for the next step's change) |
@@ -64,14 +65,19 @@
 //! plate. The active margin share is not repeated here: `notes.plates.margins` has it.
 //!
 //! # What each collision must keep meaning
-//! Tasks 2–4 of the design turn a collision from a one-step event into a state of a contact. The
-//! record keeps its fields' meanings across that change: `start_myr` and `end_myr` are the **first
-//! and last step** of the collision (equal today; the check's length is `end − start + dt`, so a
-//! one-step collision is one step long, counted from the collision's first step and not from the
-//! contact's onset, which is `contact_onset_myr`), `peak_uplift_m` the largest uplift it produced
-//! anywhere, `shortening_km` the continental crust that went under over the front's length,
+//! Tasks 2–4 of the design turn a collision from a one-step event into a state of a contact
+//! (`state::Collision`, `shortening.rs`; the state exists since task 2). The record keeps its
+//! fields' meanings across that change: `start_myr` and `end_myr` are the **first and last step**
+//! of the collision state (the step continental crust first converged at the front, and the step
+//! of the transfer or weld; the check's length is `end − start + dt`, so a one-step collision is
+//! one step long, counted from the collision's first step and not from the contact's onset, which
+//! is `contact_onset_myr`), `peak_uplift_m` the largest uplift it produced anywhere,
+//! `shortening_km` the continental crust that went under over the front's length,
 //! `lifted10`/`lifted100` the ground it raised by more than 10 and 100 m over its life, and
-//! `emerged` the ground that rose from below the sea to above it.
+//! `emerged` the ground that rose from below the sea to above it. Until task 3 the uplift is still
+//! the one-step surge at the end, so the footprints are that step's. A collision state that ends
+//! without a transfer or weld (the plates part, the contact reverses or closes, the run ends) is a
+//! [`PartingRec`].
 //!
 //! # Per plate and step (task 1b)
 //! `rot_change` is the size of the change of the plate's rotation vector since the previous step
@@ -145,6 +151,9 @@ pub struct Dynamics {
     pub steps: Vec<StepRec>,
     pub plates: Vec<PlateLife>,
     pub collisions: Vec<CollisionRec>,
+    /// Collision states that ended with no transfer or weld.
+    #[serde(default)]
+    pub partings: Vec<PartingRec>,
     pub ages: Vec<AgeRec>,
     /// How many of the world's events have been read (births and deaths come from them).
     pub events_seen: usize,
@@ -301,8 +310,9 @@ pub struct SlabTrack {
     pub blocked_myr: f64,
 }
 
-/// A collision belt's later history and shape. Nothing writes it yet (design tasks 2-3); the
-/// check reads it. `None` is "not measured".
+/// A collision belt's later history and shape; the check reads it. `None` is "not measured".
+/// Since task 2 `collision::collide` writes one per collision that had a collision state, with
+/// the convergence at its onset and 20 Myr later; the wedge and foredeep wait for task 3.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct BeltRec {
     /// The collision's `start_myr` and its two plates, to find its `CollisionRec`.
@@ -519,7 +529,8 @@ pub fn eigenvalues(m: [f64; 6]) -> [f64; 3] {
     [l1, 3.0 * q - l1 - l3, l3]
 }
 
-/// One terrane transfer or collision (today a one-step event, see the module docs).
+/// One terrane transfer or collision: a collision state that ended in a transfer or weld (see the
+/// module docs).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct CollisionRec {
     /// Collision: the terrane is at least `collision_min_frac` of an average plate (a `collision`
@@ -527,7 +538,8 @@ pub struct CollisionRec {
     pub collision: bool,
     /// The plate welded whole to the receiving one.
     pub sutured: bool,
-    /// First and last step of the collision, Myr.
+    /// First and last step of the collision state, Myr: when continental crust first converged
+    /// at the front, and when the terrane was transferred or the plates welded.
     pub start_myr: f64,
     pub end_myr: f64,
     /// When the contact began, Myr.
@@ -543,9 +555,23 @@ pub struct CollisionRec {
     pub frac: f64,
     /// Convergence at the contact, mm/yr.
     pub convergence_mm_yr: f64,
-    /// What the contact's counter read (relative speed × time, km): the quantity that fires the
-    /// collision today, which is not shortening.
+    /// What the contact's pre-task-2 count read (relative speed × time, km;
+    /// `state::Contact::speed_count_km`): it fires the transfer or weld while
+    /// `tectonics.collision_on_shortening` is off, and it is not shortening.
     pub counted_km: f64,
+    /// The collision state's shortening, km: the convergence across the front integrated over
+    /// the collision (`state::Collision::shortening_km`). It fires the transfer or weld when
+    /// `tectonics.collision_on_shortening` is on. 0 when the contact fired with no collision state.
+    #[serde(default)]
+    pub front_shortening_km: f64,
+    /// Crust that crossed the front over the collision state, km² (Earth-normalized): each
+    /// step's shortening times its front length (`state::Collision::area_km2`).
+    #[serde(default)]
+    pub area_km2: f64,
+    /// Convergence across the front when the collision state began, mm/yr; `None` when the
+    /// contact fired with no collision state (possible while the pre-task-2 count fires).
+    #[serde(default)]
+    pub onset_convergence_mm_yr: Option<f64>,
     /// Continental samples of the subducting plate that went under since the contact began (or
     /// since its last collision), each counted once.
     pub cont_in: u32,
@@ -563,6 +589,64 @@ pub struct CollisionRec {
     /// Birth of the terrane's plate and its parent.
     pub under_born_myr: f64,
     pub under_parent: Option<u32>,
+}
+
+/// Why a collision state ended with no transfer or weld ([`PartingRec::reason`]): no continental
+/// crust at the front for more than `shortening::GRACE_STEPS` steps …
+pub const PARTED: &str = "parted";
+/// … the contact reversed its polarity …
+pub const REVERSED: &str = "reversed";
+/// … the contact closed (no overlap for `contact_timeout_steps`, or one of its plates died) …
+pub const CLOSED: &str = "closed";
+/// … its terrane was gone when the transfer fired (another collision of the step took it) …
+pub const EMPTIED: &str = "emptied";
+/// … or the run ended with the collision under way.
+pub const OPEN: &str = "open";
+
+/// A collision state that ended with no transfer or weld (`shortening.rs`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartingRec {
+    /// First step of the collision state and the last step continental crust stood at its
+    /// front, Myr.
+    pub start_myr: f64,
+    pub end_myr: f64,
+    /// When the contact began, Myr.
+    pub contact_onset_myr: f64,
+    /// The subducting and the overriding plate.
+    pub under: u32,
+    pub over: u32,
+    /// Shortening it reached, km, and the crust that crossed the front, km².
+    pub shortening_km: f64,
+    pub area_km2: f64,
+    /// The longest its front was, km, and its fastest convergence across it, mm/yr.
+    pub front_km: f64,
+    pub peak_convergence_mm_yr: f64,
+    /// [`PARTED`], [`REVERSED`], [`CLOSED`], [`EMPTIED`] or [`OPEN`].
+    pub reason: String,
+}
+
+/// Records the end of `contact`'s collision state `col` with no transfer or weld. Measurement
+/// only: changes the record alone (nothing when recording is off).
+pub fn record_parting(
+    dynamics: &mut Option<Dynamics>,
+    contact: &super::state::Contact,
+    col: &super::state::Collision,
+    reason: &str,
+) {
+    if let Some(d) = dynamics.as_mut() {
+        d.partings.push(PartingRec {
+            start_myr: col.onset_myr,
+            end_myr: col.last_myr,
+            contact_onset_myr: contact.onset_myr,
+            under: contact.under,
+            over: contact.over,
+            shortening_km: col.shortening_km,
+            area_km2: col.area_km2,
+            front_km: col.peak_front_km,
+            peak_convergence_mm_yr: col.peak_convergence_mm_yr,
+            reason: reason.to_owned(),
+        });
+    }
 }
 
 /// The sea-floor age distribution at one moment (visible oceanic samples).

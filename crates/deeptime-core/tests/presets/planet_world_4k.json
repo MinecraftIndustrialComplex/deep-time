@@ -126,6 +126,7 @@
     "terrane_event_min_frac": 0.005,
     "collision_min_frac": 0.1,
     "collision_suture_frac": 0.1,
+    "collision_on_shortening": false,
     "subduction_initiation_age_myr": 150.0,
     "subduction_initiation_rate": 0.3,
     "subduction_initiation_clearance_km": 1000.0,
@@ -268,10 +269,10 @@
     "arc_spacing_km": 60.0,
     "arc_min_flux": 0.25,
     "arc_height_km": [
-      1.2,
-      3.0
+      0.6,
+      2.0
     ],
-    "arc_radius_km": 14.0,
+    "arc_radius_km": 10.0,
     "arc_lifetime_myr": [
       2.0,
       8.0
@@ -284,9 +285,10 @@
     "shield_radius_km": 40.0,
     "silicic_height_km": 0.9,
     "silicic_radius_km": 35.0,
-    "island_subsidence_m_myr": 25.0,
+    "island_subsidence_m_myr": 0.0,
     "island_subsidence_max_m": 1500.0,
     "caldera_rate_per_myr": 0.04,
+    "hotspot_caldera_rate_per_myr": 1.0,
     "caldera_radius_km": [
       3.0,
       9.0
@@ -302,7 +304,7 @@
     "min_area_km2": 1500.0
   },
   "impacts": {
-    "flux": 40.0,
+    "flux": 700.0,
     "size_slope": 1.8,
     "min_crater_km": 2.0,
     "max_crater_km": 40.0,
@@ -310,7 +312,7 @@
     "impactor_density_kg_m3": 3000.0,
     "depth_scale": 0.5,
     "ejecta_radii": 3.0,
-    "sea_cutoff_ratio": 6.3,
+    "sea_cutoff_ratio": 8.0,
     "diffusivity_m2_yr": 0.01,
     "degradation": 1.0
   }

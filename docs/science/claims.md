@@ -13,50 +13,52 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,247 active rows in 29 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02; the force balance, task 5 of the force-balance design, added the ledger FRC with 27 rows and CHK-058 and CHK-059, and rewrote PLT-181 to PLT-191, 2026-10-02). The ledgers hold 2,427 ids: stage 1 left 2,069 rows; stage 2 package WP-0
+2,266 active rows in 29 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02; plate-motion task 2 added PLT-222 to PLT-227 the same day; force-balance task 5 added the ledger FRC, 27 rows, and CHK-058 and CHK-059; the table is recounted by tools/review/claims_counts.py and the prose further down may lag it). The ledgers hold 2,433 ids: stage 1 left 2,069 rows; stage 2 package WP-0
 (2026-10-02) retired 193 of them as duplicates (`merged`, not counted) and added 301 rows for code stage 1
 had not covered (51 in GEO, 74 in PRS, 84 in HNT, 35 in CRE, 57 in CHK). The flexure feature (ISO-040 to
-ISO-067, added to master the same day by its own agent) is included.
+ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 from its follow-up) is included.
 
 | Ledger | Subject | Rows | `verified` | `cited-unverified` | `from-memory` | `abstract-only` | `calibrated` | `game-choice` | `uncited` | of which `pending-rewrite` | of which `not-yet-coded` | `merged` (not counted) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| [PLT](ledger/PLT.md) | plate tectonics | 201 | 4 | 45 | 8 | 18 | 11 | 65 | 50 | 163 | 19 | 20 |
-| [FRC](ledger/FRC.md) | plate forces (the force balance, recorded) | 27 | 3 | 0 | 10 | 1 | 0 | 13 | 0 | 0 | 0 | 0 |
-| [CLM](ledger/CLM.md) | climate physics | 134 | 0 | 40 | 5 | 0 | 13 | 21 | 55 | 106 | 28 | 12 |
-| [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 0 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
-| [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 0 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 | 0 |
-| [ERO](ledger/ERO.md) | erosion, sediment, facies | 156 | 0 | 83 | 2 | 3 | 6 | 4 | 58 | 0 | 0 | 11 |
-| [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 65 | 3 | 8 | 0 | 6 | 6 | 12 | 30 | 0 | 0 | 2 |
-| [HYP](ledger/HYP.md) | hypsometry and calibration targets | 34 | 0 | 10 | 0 | 1 | 18 | 1 | 4 | 0 | 0 | 0 |
-| [HYD](ledger/HYD.md) | rivers, lakes, runoff | 75 | 0 | 14 | 3 | 0 | 1 | 36 | 21 | 0 | 0 | 1 |
-| [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
 | [AMP](ledger/AMP.md) | the amplifier | 71 | 0 | 8 | 0 | 0 | 1 | 53 | 9 | 0 | 0 | 0 |
-| [GLA](ledger/GLA.md) | glacial erosion and landforms | 64 | 0 | 20 | 1 | 0 | 1 | 25 | 17 | 0 | 0 | 2 |
-| [VOL](ledger/VOL.md) | volcanoes | 73 | 0 | 0 | 0 | 1 | 1 | 44 | 27 | 0 | 0 | 0 |
-| [MAG](ledger/MAG.md) | magma and lava | 42 | 2 | 1 | 0 | 1 | 0 | 37 | 1 | 0 | 0 | 0 |
-| [IMP](ledger/IMP.md) | meteor impacts | 135 | 0 | 14 | 34 | 3 | 0 | 42 | 42 | 0 | 0 | 6 |
-| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 73 | 0 | 16 | 0 | 0 | 1 | 24 | 32 | 0 | 0 | 11 |
-| [STR](ledger/STR.md) | strata, traps, hosts | 44 | 0 | 4 | 0 | 0 | 2 | 34 | 4 | 0 | 0 | 4 |
-| [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 0 | 16 | 0 | 0 | 0 | 54 | 4 | 0 | 0 | 0 |
-| [DEP](ledger/DEP.md) | deposit models, counts, sizes | 164 | 0 | 74 | 0 | 15 | 0 | 49 | 26 | 0 | 0 | 40 |
-| [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 182 | 0 | 59 | 2 | 10 | 0 | 40 | 71 | 0 | 0 | 75 |
-| [PRV](ledger/PRV.md) | geologic provinces | 31 | 0 | 0 | 0 | 5 | 4 | 10 | 12 | 0 | 0 | 0 |
-| [SCL](ledger/SCL.md) | world scale, planet constants | 50 | 0 | 6 | 0 | 0 | 1 | 37 | 6 | 0 | 0 | 1 |
 | [BAK](ledger/BAK.md) | the bake, satellite view | 40 | 0 | 0 | 0 | 0 | 1 | 34 | 5 | 0 | 0 | 0 |
-| [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 | 0 |
-| [GEO](ledger/GEO.md) | geothermal features | 51 | 1 | 0 | 0 | 0 | 0 | 47 | 3 | 0 | 1 | 0 |
-| [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 74 | 0 | 9 | 0 | 0 | 2 | 54 | 9 | 16 | 0 | 0 |
-| [HNT](ledger/HNT.md) | editor hint texts | 84 | 11 | 12 | 2 | 2 | 6 | 36 | 15 | 0 | 0 | 0 |
+| [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 0 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 | 0 |
+| [CHK](ledger/CHK.md) | plate-check target ranges | 59 | 19 | 3 | 1 | 7 | 0 | 11 | 18 | 3 | 4 | 0 |
+| [CLM](ledger/CLM.md) | climate physics | 134 | 0 | 40 | 5 | 0 | 13 | 21 | 55 | 106 | 28 | 12 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
-| [CHK](ledger/CHK.md) | plate-check target ranges | 59 | 0 | 10 | 2 | 7 | 0 | 11 | 29 | 3 | 4 | 0 |
-| **all** | | **2,247** | **24** | **498** | **69** | **73** | **76** | **884** | **623** | **359** | **52** | **193** |
+| [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 17 | 0 | 0 | 1 | 0 | 56 | 0 | 0 | 0 | 0 |
+| [DEP](ledger/DEP.md) | deposit models, counts, sizes | 165 | 53 | 3 | 0 | 20 | 0 | 62 | 27 | 0 | 0 | 40 |
+| [ERO](ledger/ERO.md) | erosion, sediment, facies | 156 | 0 | 83 | 2 | 3 | 6 | 4 | 58 | 0 | 0 | 11 |
+| [FRC](ledger/FRC.md) | plate forces (the force balance, recorded) | 27 | 3 | 0 | 10 | 1 | 0 | 13 | 0 | 0 | 0 | 0 |
+| [GEO](ledger/GEO.md) | geothermal features | 51 | 1 | 0 | 0 | 0 | 0 | 47 | 3 | 0 | 1 | 0 |
+| [GLA](ledger/GLA.md) | glacial erosion and landforms | 64 | 0 | 20 | 1 | 0 | 1 | 25 | 17 | 0 | 0 | 2 |
+| [HNT](ledger/HNT.md) | editor hint texts | 89 | 13 | 12 | 2 | 2 | 6 | 39 | 15 | 0 | 0 | 0 |
+| [HYD](ledger/HYD.md) | rivers, lakes, runoff | 75 | 0 | 14 | 3 | 0 | 1 | 36 | 21 | 0 | 0 | 1 |
+| [HYP](ledger/HYP.md) | hypsometry and calibration targets | 34 | 0 | 10 | 0 | 1 | 18 | 1 | 4 | 0 | 0 | 0 |
+| [IMP](ledger/IMP.md) | meteor impacts | 135 | 43 | 9 | 6 | 6 | 0 | 56 | 15 | 0 | 0 | 6 |
+| [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 67 | 3 | 8 | 0 | 6 | 6 | 14 | 30 | 0 | 0 | 2 |
+| [MAG](ledger/MAG.md) | magma and lava | 42 | 2 | 1 | 0 | 1 | 0 | 37 | 1 | 0 | 0 | 0 |
+| [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 0 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
+| [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 186 | 24 | 17 | 0 | 17 | 0 | 59 | 69 | 0 | 0 | 75 |
+| [PLT](ledger/PLT.md) | plate tectonics | 207 | 17 | 45 | 4 | 14 | 13 | 68 | 46 | 163 | 15 | 20 |
+| [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 | 0 |
+| [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 74 | 0 | 9 | 0 | 0 | 2 | 54 | 9 | 16 | 0 | 0 |
+| [PRV](ledger/PRV.md) | geologic provinces | 31 | 0 | 0 | 0 | 5 | 4 | 10 | 12 | 0 | 0 | 0 |
+| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 73 | 0 | 16 | 0 | 0 | 1 | 24 | 32 | 0 | 0 | 11 |
+| [SCL](ledger/SCL.md) | world scale, planet constants | 50 | 0 | 6 | 0 | 0 | 1 | 37 | 6 | 0 | 0 | 1 |
+| [STR](ledger/STR.md) | strata, traps, hosts | 44 | 0 | 4 | 0 | 0 | 2 | 34 | 4 | 0 | 0 | 4 |
+| [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
+| [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
+| **all** | | **2,266** | **195** | **357** | **34** | **85** | **79** | **943** | **573** | **359** | **48** | **193** |
 
-24 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, and the force balance, task 5, the same day): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), PLT-187 and PLT-188 and FRC-010, FRC-024 and FRC-027 (the force balance), ISO-041, ISO-042
-and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and eleven HNT rows (WP-15, WP-16, WP-2).
-In plain terms, of the 2,247 active rows: 884 (39 %) are deliberate game or implementation choices; 623 (28 %)
-state something about the physical world with no source at all; 498 (23 %) name a source that nobody is recorded
-as having read; 142 (6 %) were written from memory or from an abstract and say so; 76 (3 %) were tuned to a target;
-24 (1 %) were read in their sources.
+72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
+and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),
+15 PLT and 19 CHK rows (WP-13a: the force-balance constants and the plate-check targets) and 17 DEF rows (WP-8: folds,
+faults and the Noddy port).
+In plain terms, of the 2,231 active rows: 881 (39 %) are deliberate game or implementation choices; 601 (27 %)
+state something about the physical world with no source at all; 475 (21 %) name a source that nobody is recorded
+as having read; 123 (6 %) were written from memory or from an abstract and say so; 79 (4 %) were tuned to a target;
+72 (3 %) were read in their sources.
 
 A low `from-memory` count does not mean a subsystem was written with its sources open. It means
 its agent did not say. The impacts agent was candid, and so has 34 such rows; most `cited-unverified`
@@ -210,7 +212,7 @@ code). "Evidence" says how strong the finding is.
 
 | # | Ledger | What is wrong | Evidence |
 |---|---|---|---|
-| 1 | IMP-042 | Complex crater depth is coded 0.294 D^0.301 km and cites Collins et al. 2005, eq. 28. That equation is 0.4 D^0.3 km. Craters over 3.2 km are about 27 % too shallow. | primary full text, re-read by the stage 1 lead |
+| 1 | IMP-042 | Complex crater depth is coded 0.294 D^0.301 km and cites Collins et al. 2005, eq. 28. That equation is 0.4 D^0.3 km. Craters over 3.2 km are about 27 % too shallow. | primary full text, re-read by the stage 1 lead **Fixed in stage 2 (WP-1, 2026-10-02):** code, comment or hint corrected, with a test where a value changed; see [ledger/IMP.md](ledger/IMP.md). |
 | 2 | ORE-001 and following; `surface/fields.rs`, `surface/mod.rs` | The time windows are not applied on real histories: the banded-iron, oxygenated-ocean and land-plant clocks are hard-coded. No BIF ever forms; coal and sediment-hosted zinc-lead are not limited in time. | code reading by the extraction agent; the deposit audit found no BIF on either planet |
 | 3 | DEP (the `richness_mult` setting) | The richness setting is documented as scaling grade, and grade never reaches a block. | deposit audit, build log 2026-10-01 |
 | 4 | BIO-002 | Köppen: the code tests the polar group before the dry group. Peel et al. 2007 says "the B climates must be identified first". Cold dry land is classed tundra or ice cap instead of desert or steppe. | primary full text (sub-agent) |
@@ -218,21 +220,21 @@ code). "Evidence" says how strong the finding is.
 | 6 | ERO-070 | Soil production depth scale is 5 m. Secondary sources give 0.25 to 0.5 m for Heimsath's law. A possible factor of 10 to 20. | secondary only; Heimsath et al. 1997 not readable |
 | 7 | ERO-022, ERO-049 | The comment says diffusivity between two cells is averaged "as Landlab's LinearDiffuser". Landlab takes the maximum. | Landlab source (sub-agent) |
 | 8 | ERO-003; `SurfaceParams::default` | `k_spl` is 2e-9 in the Rust default and its comment, 3e-9 in all eight presets. | code reading |
-| 9 | IMP-018 | Editor hint: "one crater of 20 km or more per 180 million km² per year". The coded rate is one per 1.8 × 10¹⁴ km² per year: a factor of a million. | arithmetic |
-| 10 | IMP-038, IMP-054, IMP-062 | Equation numbers of Collins et al. 2005 cited in comments are wrong (rim height is eq. 48, ejecta eq. 47, melt eq. 30). Values are right. | primary full text (sub-agent) |
+| 9 | IMP-018 | Editor hint: "one crater of 20 km or more per 180 million km² per year". The coded rate is one per 1.8 × 10¹⁴ km² per year: a factor of a million. | arithmetic **Fixed in stage 2 (WP-1, 2026-10-02):** code, comment or hint corrected, with a test where a value changed; see [ledger/IMP.md](ledger/IMP.md). |
+| 10 | IMP-038, IMP-054, IMP-062 | Equation numbers of Collins et al. 2005 cited in comments are wrong (rim height is eq. 48, ejecta eq. 47, melt eq. 30). Values are right. | primary full text (sub-agent) **Fixed in stage 2 (WP-1, 2026-10-02):** code, comment or hint corrected, with a test where a value changed; see [ledger/IMP.md](ledger/IMP.md). |
 | 11 | VOL-039 | The 60 km spacing of arc volcanoes cites de Bremond d'Ars et al. 1995, whose abstract says spacing is random with no characteristic value. | primary abstract **Settled in WP-2 (2026-10-02):** the citation now quotes the abstract; the mean spacings are from Hildreth 2007 (27 to 87 km); 60 km is labelled a game choice. |
-| 12 | VOL-016, VOL-026, VOL-029, VOL-048 | Comments disagree with the code they sit on (flank angle, crater size, caldera "across" against radius, subsidence rate). | arithmetic by the extraction agent **Settled in WP-2 (2026-10-02):** comments rewritten from the arithmetic and the sources read; the caldera comment's numbers were radii, so flag 4's reading was wrong; the subsidence rate itself is a question for Ben (it now counts flexure and cooling twice). |
-| 13 | DEF-016 to DEF-018 | Fault slip ratios are coded 0.05, 0.08, 0.05 beside a cited 0.03. | secondary (a review quoting Schlische) |
-| 14 | DEF-019, DEF-020 | Fault dips from Anderson 1951 are applied in block space, which is stretched 15 times vertically: real dips become about 6.6° and 2.2°. A design question, not a typo. | arithmetic from the build log's own formula |
-| 15 | DEF-042, RCK-061 | A "stock" is coded larger than the definition quoted beside it; the pluton thickness law cited to Cruden 1998 is not in that paper's abstract. | secondary; primary abstract |
+| 12 | VOL-016, VOL-026, VOL-029, VOL-048 | Comments disagree with the code they sit on (flank angle, crater size, caldera "across" against radius, subsidence rate). | arithmetic by the extraction agent **Settled in WP-2 (2026-10-02):** comments rewritten from the arithmetic and the sources read; the caldera comment's numbers were radii, so flag 4's reading was wrong; the subsidence rate was a question for Ben, answered 2026-10-02: the default is now 0 (it counted flexure and cooling twice). |
+| 13 | DEF-016 to DEF-018 | Fault slip ratios are coded 0.05, 0.08, 0.05 beside a cited 0.03. | secondary (a review quoting Schlische) **Settled in WP-8 (2026-10-02):** not an error. The ratios are slips along the dip in block space; their horizontal part is true in metres, so in metres the displacements are 0.017 to 0.029 of the length for normal faults and 0.031 to 0.075 for thrusts, against 0.03 (Schlische, via Lathrop et al. 2022, read in full) and 7 % (Elliott 1976, read in full). What is short is the throw, which is flag 14's question. |
+| 14 | DEF-019, DEF-020 | Fault dips from Anderson 1951 are applied in block space, which is stretched 15 times vertically: real dips become about 6.6° and 2.2°. A design question, not a typo. | arithmetic from the build log's own formula **WP-8 (2026-10-02):** the angles are verified (Anderson 1905, read in full; Collettini & Sibson 2001, abstract). Not a units error: the code says on purpose that folds and faults are drawn undistorted in blocks (DEF-011). Physics favours true metres; put to Ben with sections drawn three ways (STATUS.md "Pending questions"). |
+| 15 | DEF-042, RCK-061 | A "stock" is coded larger than the definition quoted beside it; the pluton thickness law cited to Cruden 1998 is not in that paper's abstract. | secondary; primary abstract **DEF-042 settled in WP-8 (2026-10-02):** no contradiction. The definition is about the exposed area (Earle 2019, read); the coded radius is the body's half-width at the world's floor, and a stock's outcrop is only its cupola, a few per cent of that. The comment is corrected; no value changed. RCK-061 is WP-7's. |
 | 16 | HYP-010 | The ocean's most common depth is stated as 3 to 4 km; NOAA gives about 4.3 km and the project's own Earth table peaks in the 4 to 5 km band. | agency page (sub-agent) |
 | 17 | CLM (ice thickness) | Land ice uses a hard-coded gravity of 9.81 m/s² and ignores the planet's gravity setting. In code that is `pending-rewrite`; carry the fix into the new climate. | code reading |
-| 18 | PLT, plate-check and the force-balance design | "Slab-attached plates move 3 to 4 times faster" is attributed to Forsyth & Uyeda 1975; the statement found is in Conrad & Lithgow-Bertelloni 2004. Correct the attribution before the force balance is calibrated to it. | primary abstracts |
+| 18 | PLT, plate-check and the force-balance design | "Slab-attached plates move 3 to 4 times faster" is attributed to Forsyth & Uyeda 1975; the statement found is in Conrad & Lithgow-Bertelloni 2004. Correct the attribution before the force balance is calibrated to it. | primary abstracts **Settled in WP-13a (2026-10-02):** Forsyth & Uyeda 1975 was read in full. They give slab-attached plates at 6-9 cm/yr and the others at 0-4 cm/yr (p. 178), and their Table 1 gives a ratio of means of 3.8; the words "~4 times faster" are Conrad & Lithgow-Bertelloni 2004's. The designs, PLT-162 and CHK-056 now say so. |
 | 19 | SCL (`pole_cap_deg`), preset | The preset's pole-cap latitude is read by nothing; the game uses its own value from the world preset file. | code reading |
 | 20 | SCL-039 and the timeline range | A run may be 4,600 Myr long while the planet's age defaults to 4.57 Gyr. | arithmetic |
-| 21 | DEP (MVT and sedex time gate) | The 2.02 Ga limit comes from Leach et al. 2010 in Economic Geology, not from the USGS report of the same authors and year that is also cited; that paper does not support putting MVT deposits on the same clock as sedex. Moot until fix 2. | primary abstract |
-| 22 | DEP (supergene copper) | The data file says Sillitoe 2005's "3 to 9 Myr" was not found; the abstract has it ("at least 0.5 m.y. but typically minima of 3 to 9 m.y."). The engine uses only the 0.5. The 100 mm/yr rainfall floor is stricter than the sources. | primary abstract |
-| 23 | DEP ("Circular 1178 p. 15") | The 1 km assessment depth is on printed page 5. The rule itself is right. | primary full text (sub-agent) |
+| 21 | DEP (MVT and sedex time gate) | The 2.02 Ga limit comes from Leach et al. 2010 in Economic Geology, not from the USGS report of the same authors and year that is also cited; that paper does not support putting MVT deposits on the same clock as sedex. Moot until fix 2. | primary abstract; **Stage 2 (WP-9/10):** the ledger now names the Economic Geology paper (ORE-014); the shared gate is unchanged and listed as an open question. |
+| 22 | DEP (supergene copper) | The data file says Sillitoe 2005's "3 to 9 Myr" was not found; the abstract has it ("at least 0.5 m.y. but typically minima of 3 to 9 m.y."). The engine uses only the 0.5. The 100 mm/yr rainfall floor is stricter than the sources. | primary abstract; **Stage 2 (WP-9/10): data note corrected**; the 100 mm/yr floor and the 0.5 Myr minimum are open questions on [deposits.md](deposits.md). |
+| 23 | DEP ("Circular 1178 p. 15") | The 1 km assessment depth is on printed page 5. The rule itself is right. | primary full text (sub-agent); **Stage 2 (WP-9/10): corrected** in the porphyry type note and the ledger. |
 | 24 | MOI-073, CLM (weathering) | The runoff sensitivity 0.038 per K is GEOCARB II's (Berner 1994); the cited Berner & Kothavala 2001 uses 0.045 and 0.025. | primary full text (sub-agent) |
 | 25 | GLA-002 | Glacial erosion constant 1e-5 with exponent 1; the published pairs are 1e-4 with exponent 1 and 1e-5 with exponent 2. Glacial erosion may be ten times too slow, or the exponent wrong. | primary abstract and a citing paper |
 | 26 | AMP-034, AMP-038 | The thermal slope values attributed to Schott et al. are read differently from Schott's shader: 0.9 and 1.4 there are absolute tangents, not multipliers of 0.57. | Schott's shader source (sub-agent) |
@@ -254,15 +256,15 @@ Read from code and documents by the extraction agents; nothing here was checked 
 | 35 | PRS-001 to PRS-003, HYP-019 | The full presets take uplift times 0.8 on top of the quick presets' times 0.7; HYP-019 describes one factor of 0.7. The 32k presets reuse the 16k tuning; only `quick_32k` was run, once. | preset diff; build log |
 | 36 | PRS-057 to PRS-059 | The four shipped essentials files (`neoforge/src/main/resources/data/deeptime/essentials/*.json`: iron, coal, copper, gold) have no ledger row, and the test essentials differ from them in region size, exposure and spawn limit. | grep of the ledgers |
 | 37 | PRS-063, PRS-067 to PRS-069 | The circumference, the floor (-352), the top density slide (624 to 640), the lava-lake anchor and height are written as literals in the world preset, the noise settings, the dimension type and the Rust `scale`; no check ties the copies together. | code reading |
-| 38 | CHK-056, CHK-025 to CHK-027 | The plate-check text says "Earth: 3 to 4" for slab-attached plates with no author; the baseline design adds Forsyth and Uyeda; the force-balance design itself attributes "about four times" to Conrad and Lithgow-Bertelloni 2002 and 2004. This is fix 18 seen from the check. | design documents |
-| 39 | CHK (rift window, land gain, active-margin mean) | Hard-coded literals disagree with the labels: the rift-born plate measures use 50.0 instead of `rift_window_myr`; the land gain uses 10.0 instead of `start_up_myr`; the active-margin mean uses 90.0 under a label that says 100 Myr (also PLT-160). | code reading |
-| 40 | CHK-019, CHK-055, CHK-021, CHK-036, CHK-037, CHK-039, CHK-040 | Targets that do not match their Earth figure: a 230 Myr ceiling written for the end-of-run ocean-floor age is applied to a run mean of per-step 90th percentiles; "at most 20 mm/yr" for the 10th percentile is below the 26 to 28 mm/yr the design gives for the slowest group; a period ceiling of 600 Myr beside an Earth range of 300 to 500; a target defined at 20 Myr after onset on an Earth figure "in 15 Myr"; two targets restricted in the design to "a belt above 3 km" carry no such condition. | design against code |
-| 41 | PLT-143 to PLT-161, CHK-001 to CHK-019 | The collision targets are all marked `pending-rewrite`, but the force-balance design (section 7) says they stand as the acceptance test of the rewrite. | design against ledger |
+| 38 | CHK-056, CHK-025 to CHK-027 | The plate-check text says "Earth: 3 to 4" for slab-attached plates with no author; the baseline design adds Forsyth and Uyeda; the force-balance design itself attributes "about four times" to Conrad and Lithgow-Bertelloni 2002 and 2004. This is fix 18 seen from the check. | design documents **Settled in WP-13a:** as fix 18; CHK-025 to CHK-027 now carry Earth figures read or computed from the sources (3.0 to 4; 0.71; -0.34). |
+| 39 | CHK (rift window, land gain, active-margin mean) | Hard-coded literals disagree with the labels: the rift-born plate measures use 50.0 instead of `rift_window_myr`; the land gain uses 10.0 instead of `start_up_myr`; the active-margin mean uses 90.0 under a label that says 100 Myr (also PLT-160). | code reading **Part settled in WP-13a:** the active-margin label now says 90 Myr, as the code and its doc comment do. The two literals (50.0 for `rift_window_myr` in `rift_alive_50_pct` and `rift_welded_back`; 10.0 for `start_up_myr` in the land gain) equal their parameters' defaults and were left: changing them only matters under `--param`, and the force-balance task 5 is editing the same file. Open for that task or a follow-up. |
+| 40 | CHK-019, CHK-055, CHK-021, CHK-036, CHK-037, CHK-039, CHK-040 | Targets that do not match their Earth figure: a 230 Myr ceiling written for the end-of-run ocean-floor age is applied to a run mean of per-step 90th percentiles; "at most 20 mm/yr" for the 10th percentile is below the 26 to 28 mm/yr the design gives for the slowest group; a period ceiling of 600 Myr beside an Earth range of 300 to 500; a target defined at 20 Myr after onset on an Earth figure "in 15 Myr"; two targets restricted in the design to "a belt above 3 km" carry no such condition. | design against code **WP-13a:** CHK-021 settled (today's plates' 10th percentile is 11 mm/yr; the 26-28 were category medians); CHK-036 changed to 400-800 Myr (Mitchell et al. 2021); CHK-037 settled (0.27 over 15 Myr, and India's rate has stayed low since); CHK-019 and CHK-055 stand (Earth's 90th percentile is 133 Myr, the ceiling 230: question in STATUS.md); CHK-039 and CHK-040's "belt above 3 km" is for task 3 to build into the measure. |
+| 41 | PLT-143 to PLT-161, CHK-001 to CHK-019 | The collision targets are all marked `pending-rewrite`, but the force-balance design (section 7) says they stand as the acceptance test of the rewrite. | design against ledger **Settled in WP-13a:** `pending-rewrite` removed from PLT-143 to PLT-161. |
 | 42 | CRE-014 | `pool::CONSERVED = 5` is documented as the "felsic-family" pools but covers pools 0 to 4, which include sediment, sedimentary and metamorphic rock. | code reading |
 | 43 | CRE-034 | The plan says the column rule and the Noddy port agree to 1e-5 block; the code counts a point as a side flip above 1e-3 block when it lies within 1e-6 of a fault plane and leaves flipped points out of the worst case. | plan against code |
 | 44 | GEO-014, GEO-048 to GEO-050, GEO-017, GEO-035, GEO-046 | Geothermal hints and format notes disagree with the code: "one to four" fields per volcano against a formula that gives 0 to 7; "2 to 5 blocks across" is the pool radius (4 to 10 across); FORMAT.md says a tenth of a terrace is stained (code: 7 %) and a field is drawn from 3 blocks above sea level (code: 5). | code against documents **Fixed in WP-16: hints, FORMAT.md and comments now agree with the code.** |
 | 45 | GEO-012, GEO-026, GEO-040, GEO-041 | The plan says heat comes "from the heat flow already modelled"; the code uses only active volcanoes. Nothing in code, hints or decisions mentions geysers, boiling or temperatures, and spring water is plain water; the plan's epithermal cinnabar is a 6 % stain. | code against plan **Part fixed in WP-16: geysers, heat sources and cinnabar are now stated plainly in the hints, FORMAT.md and the page; the plan's wording is a decision for Ben (Pending).** |
-| 46 | GEO-007, GEO-019, GEO-020 | The 400 mm rainfall threshold has no source; the 3 degC rule is a vanilla freezing rule, not geology. | none cited **Part fixed in WP-16: the 400 mm and 3 degC rules are marked `game-choice` with the qualitative sources found (NPS, Paulson and Ingebritsen 1991); no source gives either number.** |
+| 46 | GEO-007, GEO-019, GEO-020 | The 400 mm rainfall threshold has no source; the 3 degC rule is a vanilla freezing rule, not geology. | none cited **Part fixed in WP-16: the 400 mm and 3 degC rules are marked `game-choice` with the qualitative sources found (NPS, Paulson and Ingebritsen 1991); no source gives either number.** **Ben, 2026-10-02 (decisions log, "Keep all three"): the 400 mm rain test, no pools under 3 degC and pools of 4 to 10 blocks stay as owner-confirmed game choices.** |
 | 47 | SCL-009 (absorbing ISO-030) | Sea level 63 is called an agent choice in SCL-009 and Ben's design choice in the retired ISO-030, whose text SCL-009 now carries. | ledger rows |
 | 48 | master `STATUS.md` | The P2-14 build-log entry lost its heading and first paragraphs in the merge to master; its remaining bullets sit at the end of the P1-10 entry. | read by the GEO extraction agent **Fixed in WP-16: the heading and first bullets are restored (reconstructed; the original text survives nowhere in the history).** |
 
@@ -276,9 +278,9 @@ further flags are in `extraction-notes/`.
 | The impacts agent wrote the Collins, Melosh & Marcus 2005 constants from memory | The paper was read. Ten constants match; the complex-crater depth law does not (fix 1); three equation numbers are wrong (fix 10). 34 IMP rows stay `from-memory` until stage 2 confirms each. |
 | It doubted the complex-crater depth law (0.294 D^0.301 km against 0.4 D^0.3) | The doubt was right: the paper has 0.4 D^0.3. |
 | It fitted the ocean rule to an abstract | Davison & Collins 2007 was read in full. The three numbers match; the paper's own limit is a depth-to-diameter ratio of about 8, against the code's fitted 6.3 (IMP-065 to IMP-067 stay `abstract-only`). |
-| The force-balance design could not confirm the gross size of slab pull | Still unconfirmed. Supported only as "of order 10¹³ N/m" by a 2024 paper citing Turcotte & Schubert; the book was not read (WP-13a). |
-| ... a factor of 8 for continental drag | Not in Forsyth & Uyeda's abstract, which says only that drag is "stronger under the continents". The paper's body was not readable (WP-13a). |
-| ... a wedge-taper reference | Davis, Suppe & Dahlen 1983 exists and the reference is right; no angle is in its abstract. A secondary summary gives tapers from 2.5°, so the design's 1.5° is doubtful (WP-13a). |
+| The force-balance design could not confirm the gross size of slab pull | **WP-13a:** of order 10¹³ N/m. Faccenna et al. 2012's eq. 1 (the Turcotte & Schubert law with Carlson et al.'s heating factor, read in full) gives 1.4 × 10¹³ N/m for 80 Myr floor and 0.7–2.0 × 10¹³ for 20–150 Myr (computed); the design's "1–3 × 10¹³ gross" was from memory and is replaced (PLT-183). Turcotte & Schubert itself was not read. |
+| ... a factor of 8 for continental drag | **WP-13a:** confirmed in the body, which is free on the publisher's site: drag under the continents "is approximately eight times as strong as the mantle drag under the oceanic portion of the plates" (p. 189, Table 6). The design's `keel_drag` 3 follows Conrad & Lithgow-Bertelloni 2006's 2–5 (read in full) and is unchanged (PLT-188). |
+| ... a wedge-taper reference | **WP-13a:** the 1.5° is the wedge's surface slope, not its taper (surface slope plus basal dip). The Nepal Himalaya's frontal (Lesser Himalayan) wedge has surface slopes of 1–1.6° and a total taper of 6–7.5° (DeCelles & Carrapa 2021, read in full); the secondary "tapers from 2.5°" are total tapers. Davis, Suppe & Dahlen 1983's abstract supports a wedge that grows at constant taper. The value stands; the setting should be named a slope (PLT-192). |
 | A river-sinuosity comparison in the grid audit is from memory | Still unsourced. Leopold & Wolman 1957 give 1.5 as the conventional threshold for a meandering river; nothing read supports "commonly 1.1 to 1.5 and over" (HYD-027, WP-5). |
 | The accuracy review marks some Earth figures as from memory | Its list is quoted in [extraction-notes/DOC.md](extraction-notes/DOC.md). Checked so far: continental crust about 41 % of area (Cogley 1984, abstract: matches); Hawaii–Emperor 6,200 km and 81 Myr (secondary: matches); mean land height about 800 m (the older figure; unresolved); the others unread (WP-15). |
 
@@ -322,7 +324,9 @@ In code about to be rewritten, to be carried into the new designs: the CO₂ for
 hundred times beyond its stated range; snowball escape at 0.55 bar against a published 0.01 to
 0.1 bar; the energy-balance constants as a mix of two climlab classes and a paper that could not be
 read; the weathering runoff coefficient from an older GEOCARB than the one cited. And in the plate
-design: gross slab pull, the factor of 8 for continental drag, and the wedge taper, none confirmed.
+design: gross slab pull, the factor of 8 for continental drag, and the wedge taper, none confirmed
+until WP-13a, which settled all three (see the flags above); its open item is the slab suction share,
+which is not the quantity its sources give.
 
 ### Work packages
 
@@ -339,7 +343,7 @@ well-specified checking and fixing, Opus where a wrong value forces a design or 
 | WP-5 | HYD, YNG | 94 | 12 / 0 | 8 | Sonnet 5.5 | Fix 5. Unify the two runoff laws. Replace the from-memory sinuosity figure. |
 | WP-6 | AMP, GLA | 135 | 8 / 0 | 17 | Sonnet 5.5 | AMP is mostly `game-choice`: confirm each is labelled so. GLA: the erosion law's constant and exponent (fix 25). GLA now owns the equilibrium-line rule that CLM also stated. |
 | WP-7 | RCK, STR | 117 | 1 / 0 | 16 | Sonnet 5.5 | Fix 15. 41 rock densities and all erodibilities are unsourced judgement: label them. STR now owns the trap closure scores that ORE also stated. |
-| WP-8 | DEF | 74 | 6 / 0 | 13 | Opus | Fix 13, 14. The vertical-stretch question for dips and amplitudes is a design decision for Ben. |
+| WP-8 | DEF | 74 | 6 / 0 | 13 | Opus | **Done** (2026-10-02): 17 rows `verified`, 1 `abstract-only`, 56 `game-choice`; flags 13 and 15 (DEF part) settled without a code change; flag 14 put to Ben with pictures; no value in the code changed. |
 | WP-9 | DEP | 164 | 24 / 0 | 34 | Sonnet 5.5 | Fix 3. Tables are open but are PDFs: the library now holds them as text. DEP and ORE kept the granular rows; check which of the two owns a row before verifying it. |
 | WP-10 | ORE | 182 | 19 / 0 | 43 | Opus | Fix 2 (a real bug). Redo the coal size and density derivation from sources. Same code directory as WP-9: run them one after the other or as one agent. |
 | WP-11 | BIO | 99 | 6 / 0 | 3 | Sonnet 5.5 | Fix 4. Mostly `game-choice` rows to confirm. |
@@ -411,6 +415,7 @@ Produced by WP-0 (2026-10-02). The library is a folder on the test machine with 
 - **Readable in the library** (text file names are in the folder named by the key): `Alavi2007` (Alavi2007.txt); `Jessell1981` (Jessell1981.txt); `Jessell2022` (Jessell2022.txt); `Lathrop2022` (Lathrop2022.txt); `NoddyOriginal (software, other releases)` (NoddyOriginal_software_other_releases.txt); `Wellmann2016` (Wellmann2016.txt).
 - **Landing page only** (the paper itself was not obtained): `Jessell1996` (open copy); `Noddyverse (software)` (open access).
 - **Not readable** : `Anderson1951` (book); `Biot1961` (paywalled, no substitute found); `Blanc2003` (paywalled, no substitute found); `Cowie1992a` (paywalled, no substitute found); `Gawthorpe2000` (open access); `Kim2005` (paywalled, no substitute found); `McQuarrie2004` (open copy); `Mouthereau2007` (paywalled, no substitute found); `Schlische1996` (paywalled, no substitute found); `Sherwin1968` (paywalled, no substitute found); `Weissel1989` (paywalled, no substitute found).
+- **Added and read in WP-8 (2026-10-02)** (text files in the folder named by the key): `Mouthereau2007` (Mouthereau2007_raw.txt, HAL copy); `Schmalholz2016`; `Elliott1976`; `Anderson1905` (OCR of a scan); `WaldronSnyder2020`; `DelaneyPollard1981`; `Krumbholz2014`; `Bunger2013` (author manuscript); `Herail1990` (poor OCR); `Latutrie2020`; `Earle2019` (chapter pages); `NMT_Shiprock` and `WikipediaCraton` (web pages); and, already in the library, `Alavi2007`, `Lathrop2022` (Lathrop2022_raw.txt), `Jessell1981`, `Jessell2022`. Abstracts only: `McQuarrie2004`, `Schlische1996`, `CollettiniSibson2001`. Not obtained: `Anderson1951`, `Biot1961`, `Sherwin1968`, `Blanc2003`, `Cowie1992a`, `Kim2005`, `Gawthorpe2000`, `Jessell1996`, `Weissel1989`. The Noddy source was read at the pinned commit from a tarball on the test machine.
 
 #### WP-9: 164 rows; 58 sources
 
@@ -438,6 +443,7 @@ Produced by WP-0 (2026-10-02). The library is a folder on the test machine with 
 #### WP-13a: 86 rows; 32 sources
 
 - **Readable in the library** (text file names are in the folder named by the key): `Coltice2019` (Coltice2019.txt); `DeCellesGiles1996` (DeCellesGiles1996.txt); `Nance2022` (Nance2022.txt); `Nocquet2016` (Nocquet2016.txt); `Tremblay2015` (Tremblay2015.txt).
+- **Added in WP-13a** (2026-10-02, lawful open copies): `ForsythUyeda1975` (publisher's free PDF); `LithgowBertelloniRichards1998` and `ConradLB2006` (UCL Discovery); `Zahirovic2015` (accepted manuscript, Wollongong; the landing page kept as Zahirovic2015_landing.txt); `Mitchell2021` (accepted manuscript, Curtin; landing page kept as Mitchell2021_landing.txt); `Bird2003` (author's site); `FaccennaBecker2012` (author's preprint); `DeCellesCarrapa2021` (NSF public access copy); `vanHunen2011EGU` (EGU abstract); `Seton2020_earth_age` (the GMT server's 6 arc-minute sea-floor age grid). Still not readable: Schellart 2004, Conrad & Lithgow-Bertelloni 2002 and 2004, Davis, Suppe & Dahlen 1983, Dahlen 1990, Carlson et al. 1983, Copley et al. 2010 (Wiley and Durham refuse scripted access), van Hunen & Allen 2011, Parsons & Richter 1980, Turcotte & Schubert.
 - **Landing page only** (the paper itself was not obtained): `Huang2019` (open copy); `Mitchell2021` (paywalled); `Zahirovic2015` (paywalled).
 - **Not readable** : `BercoviciLong2014` (paywalled, no substitute found); `Bialas2010` (paywalled, no substitute found); `Buck2004` (book); `Carlson1983` (paywalled, no substitute found); `Coltice2007` (paywalled, no substitute found); `ConradLB2002` (paywalled, no substitute found); `ConradLB2004` (paywalled, no substitute found); `ConradLB2006` (open copy); `Copley2010` (paywalled, no substitute found); `DalZilio2018` (paywalled, no substitute found); `DaviesvonBlanckenburg1995` (paywalled, no substitute found); `DavisSuppeDahlen1983` (paywalled, no substitute found); `ForsythUyeda1975` (paywalled, no substitute found); `Gurnis1988` (paywalled, no substitute found); `HeronLowman2011` (paywalled, no substitute found); `Lenardic2011` (paywalled, no substitute found); `LithgowBertelloniRichards1998` (paywalled, no substitute found); `MolnarLyonCaen1988` (book); `ParsonsRichter1980` (paywalled, no substitute found); `RoyerGordon1997` (paywalled, no substitute found); `Schellart2004` (paywalled, no substitute found); `TurcotteSchubert_Geodynamics` (book); `vanHunenAllen2011` (paywalled, no substitute found); `Zhang2018` (open access).
 

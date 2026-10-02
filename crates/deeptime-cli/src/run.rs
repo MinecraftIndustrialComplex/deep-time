@@ -131,7 +131,7 @@ fn drive(
 /// Prints the deposit stage's census: sites per type next to the plan §8.6 expectation.
 pub fn print_census(census: &Value) {
     println!(
-        "deposits: province={} ({} provinces) count_mult={} max_formed_per_survivor={} brine_flow_km={} — target(§8.6) = count_mult · ρ_p50/1e5 · Σ_tracts A_km2 survivors; formed = target / preservation",
+        "deposits: province={} ({} provinces) count_mult={} max_formed_per_survivor={} brine_flow_km={} — target(§8.6) = count_mult · ρ/1e5 · Σ_tracts A_km2 survivors (ρ the mean of a measured density, else its p50); formed = target / preservation",
         census["province"].as_str().unwrap_or("?"),
         census["provinces"],
         census["count_mult"],

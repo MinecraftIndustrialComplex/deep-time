@@ -161,6 +161,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Library (the project's source library, not distributed): fetched (PDF, 24 pages, text layer). From: https://spiral.imperial.ac.uk/bitstreams/8065368c-096c-4787-aab7-cbaf1a7d7277/download. Text file: collins2005.txt.
 - Read so far (by the project): from memory ("the paper could not be fetched").
 - Read in this pass: full text fetched (all 24 pages; read in detail: Introduction, "Crater dimensions and melt production" pp. 822-825, "Ejecta deposit" pp. 828-829, the worked example and Table 6, the reference list).
+- Read in stage 2 (WP-1, 2026-10-02): full text read again by the stage 2 agent (text extracted from the open copy): every equation the code uses was read: eq. 1, 21, 22, 23, 24, 25, 26, 27, 28 (d_fr = 0.4 D_fr^0.3 km, from Herrick et al. 1997), 29, 30, 31, 43-48, Table 6 (final craters 1.2, 23.7 and 186 km; energies 1.3e16, 1.5e21, 1.65e24 J) and the target densities and speeds of pp. 818-819. Confirmed: the stage 1 findings (eq. 28 is 0.4 D^0.3, not 0.294 D^0.301; eq. numbers 48, 47, 30 for rim, ejecta, melt). The code now reproduces Table 6 in a test.
 - Reference check: authors, year, venue, volume(issue) and pages are right. Equation numbering in the paper marks the equations the program implements with an asterisk. Of the numbers the code cites: eqs. 21, 22, 24, 26, 27, 28, 31 are right (but see the value MISMATCH for eq. 28); the melt law is eq. 30 (code says 12; paper eq. 12 is in the atmospheric-entry section); the rim height is eq. 48 (code says 25; paper eq. 25 is transient depth d_tc = D_tc/(2 sqrt 2)); the ejecta thickness is eq. 47 (code says 32; paper eq. 32 is the fireball radius); V_br = 0.032 D^3 is eq. 23 (code groups it under "eqs. 24 and 26"). The complex-crater depth law in eq. 28 is 0.4 D^0.3, not 0.294 D^0.301 (Part 2, IMP-042). The paper credits its eq. 21 to Holsapple & Schmidt 1982, Schmidt & Housen 1987 and Gault 1974, not to Gault & Wedekind 1978 or Chapman & McKinnon 1986, and it has no default impact speed (Part 2, IMP-020).
 
 ### GrieveShoemaker1994
@@ -172,6 +173,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://archive.org/details/hazardsduetocome0000unse. File: GrieveShoemaker1994.txt.
 - Read so far (by the project): secondary ("checked against the literature by a search"); the scaling.rs header says "as remembered".
 - Read in this pass: not fetched (tried archive.org; no text obtained).
+- Read in stage 2 (WP-1, 2026-10-02): still not fetched (a book). Its value 5.6 +/- 2.8e-15 per km2 per year for D >= 20 km was read as quoted in Hughes 2000, p. 434 (see Hughes2000). Not available online in any copy tried (archive.org lending copy, no text).
 - Reference check: pages 417-462 and title match the reference list of Davison & Collins 2007, which dates the chapter 1995; Collins et al. 2005 date the same volume 1994 (Bottke et al. 1994 in it). The book is 1994 (archive.org). The value 5.6 +/- 2.8 was NOT found in any text I could read; the older figure 5.4 +/- 2.7 x 10^-15 km^-2 yr^-1 (D >= 20 km, N = 7, Grieve 1984) is quoted in Grieve 1987 (see Grieve1987).
 
 ### Neukum2001
@@ -184,6 +186,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Substitute: none found.
 - Read so far (by the project): from memory
 - Read in this pass: not fetched (metadata only)
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (Springer 403, ADS refused). The constancy of the rate was read as reported by Hughes 2000, p. 429, from Neukum & Ivanov 1994: 'very nearly constant for about the last 2000 Myr'.
 - Reference check: authors, year, venue, volume and pages match the real paper. Whether it says the rate was "constant within a factor of two for the last ~3 Gyr" is not checked.
 
 ### Bland2006
@@ -196,6 +199,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Substitute: none found.
 - Read so far (by the project): from memory
 - Read in this pass: not fetched (metadata only)
+- Read in stage 2 (WP-1, 2026-10-02): read through OCR of the open ADS scan (25 pages): abstract (iron meteorites; 1 km craters on land every 50,000 years); p. 608 Fig. 1 caption ('departure from the expected size-frequency distribution in the terrestrial crater data is evident in craters <10-20 km in diameter'); p. 611 (18 km/s and 45 degrees, citing Gilbert 1893 and Shoemaker 1962); p. 617 and p. 624 (16 of 17 craters under 1.5 km with a known impactor are iron; the proportion of stones returns above 10 km); p. 625 (Meteor Crater-sized craters every 20,000 years on the whole Earth). Confirms IMP-014 and supports IMP-004.
 - Reference check: authors, year, venue, volume and pages match. The topic (small impactors broken up by the atmosphere) fits the claim; Davison & Collins 2007 cite it and say impactors "much smaller than 100 m ... are significantly affected by atmospheric entry" (full text read). The actual statement about stony bodies is not checked.
 
 ### LeFeuvre2011
@@ -207,6 +211,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): from memory
 - Read in this pass: not fetched (HAL access denied)
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (HAL access denied, 2026-10-02; Unpaywall lists the HAL copy as the only open one).
 - Reference check: authors, year, venue, volume and pages match. Whether it gives 20 km/s as the Earth mean for asteroids is not checked.
 
 ### Gilbert1893
@@ -243,6 +248,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Substitute: none found.
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): not fetched. Davison & Collins 2007 (full text) use its pi-group scaling to derive their eq. 2 and give its constants as 'beta = 0.22 for solid rock in the gravity regime'.
 - Reference check: matches. Collins et al. 2005 name it (with Holsapple & Schmidt 1982, JGR 87:1849-1870, and Gault 1974) as the basis of eq. 21 and as the source of the water constant 1.365.
 
 ### GaultWedekind1978
@@ -311,6 +317,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Library (the project's source library, not distributed): fetched (PDF, 26 pages, text layer). From: https://www.wipp.energy.gov/library/cra/2009_cra/references/Others/Grieve_1987_Terrestrial_Impact_Structures_ERMS241228.pdf. Text file: grieve1987.txt.
 - Read so far (by the project): from memory
 - Read in this pass: full text fetched (OCR layer; read the morphology section, the cratering-rate section and the size-frequency section)
+- Read in stage 2 (WP-1, 2026-10-02): full text read again through the OCR layer (stage 2): pp. 247-248 (morphology; simple d_t = 0.29 D^0.98 and d_a = 0.14 D^1.02 km, complex d_a = 0.27 D^0.16 km, transition about 2 km in sedimentary and 4 km in crystalline targets), p. 253 (melt sheets 'up to several hundred meters thick'), the section on the known record (N proportional to D^-1.8 for large diameters; largest ~140 km) and 'Cratering Rate Estimates' (5.4 +/- 2.7e-15 per km2 per year for D >= 20 km, n = 7, Grieve 1984; 2.2 +/- 1.1e-14 for D >= 10 km, Shoemaker 1977). No 3.2 km here.
 - Reference check: venue, volume and pages match. It supports the 2 km / 4 km split (IMP-035) but I found no 3.2 km in its OCR text, so it is not the source of the 3.2 km figure (IMP-034); Collins et al. give 3.2 km, classified by Dence 1965. It also contains the older rate figure used as a secondary check on IMP-001.
 
 ### Pike1980
@@ -323,6 +330,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Identification (stage 2, WP-0): Retrieved from the NASA ADS page scans (proceedings paper; OCR text in the library).
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): fetched (open ADS scan, 31 pages) and read by OCR: p. 2165 (mean transition diameters 3.1 km for Earth and 18.7 km for the Moon, 'exactly the ratio of their values of g'; log D_t = log 3300 - 1.00 log g; Mars 6 km and Mercury 16 km deviate; complex craters six times deeper on the Moon, depth 'could well scale inversely with g'), Table 2 (Earth simple d = 0.137 D^1.02, complex d = 0.23 D^0.24 km), Fig. 4 (transition 2.25 km sedimentary, 4.75 km crystalline).
 - Reference check: title and series fit the claim (gravity control of the transition). Collins et al. cite it only for terrestrial complex-crater depth data. Page end differs between the code's source list (2189) and Collins et al. (2190).
 
 ### AlexopoulosMcKinnon1994
@@ -335,6 +343,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Substitute: none found.
 - Read so far (by the project): from memory
 - Read in this pass: not fetched (403)
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (GeoScienceWorld 403). Not supported by what was read about peak-ring onsets elsewhere (see WoodHead1976).
 - Reference check: title, authors, volume and pages match. Whether it gives about 40 km for the onset of peak rings on Venus is unchecked. The editors and the year 1994 for SP 293 are from my recollection plus the code's own year; Crossref's 1992 is a discrepancy to settle.
 
 ### WoodHead1976
@@ -347,6 +356,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Identification (stage 2, WP-0): Retrieved from the NASA ADS page scans (proceedings paper; OCR text in the library).
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): fetched (open ADS scan) and read by OCR: Table 5, onset diameters of central-peak and peak-ring basins (peak ring: Mercury 120, Mars 145, Moon 175 km) and the discussion that gravity is not the dominant control. Does not give the ring-to-rim diameter ratio.
 - Reference check: unverified.
 
 ### PikeSpudis1987
@@ -359,6 +369,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Substitute: none found.
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): not fetched. The ratio of a ring's diameter to the rim's was read instead in Pike 1985.
 - Reference check: real paper. It concerns multi-ring basins; the claim "ring diameter about half the rim's" for peak-ring craters is unchecked.
 
 ### Pike1985
@@ -370,6 +381,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Library (the project's source library, not distributed): fetched (PDF, 20 pages, no text layer: scan). From: https://articles.adsabs.harvard.edu/pdf/1985Metic..20...49P. Text file: pike1985.txt. OCR text (machine-read, errors likely): pike1985.ocr.txt.
 - Read so far (by the project): from memory
 - Read in this pass: fetched but unreadable (image-only scan)
+- Read in stage 2 (WP-1, 2026-10-02): fetched (open ADS scan, image only) and read by OCR (20 pages): abstract and Table 1. Central-peak base is 20-25 % of the rim diameter in small complex craters (half that in ringed ones); the inner ring of a two-ring crater without a peak is half the outer's diameter (0.5, not the planets' 0.4, when there is a peak); Vredefort 150 +/- 10 km.
 - Reference check: venue, volume and pages match; title found by Crossref.
 
 ### Pike1977
@@ -393,6 +405,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Substitute: none found.
 - Read so far (by the project): from memory
 - Read in this pass: not fetched; Collins et al. (full text) cite it: "The power of 3 is a good approximation of data from explosion experiments (McGetchin et al. 1973)... the power can vary between 2.5 and 3.5."
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (ADS refused). Read as cited by Collins et al. 2005, p. 828: 'the power of -3 is a good approximation of data from explosion experiments (McGetchin et al. 1973)'.
 - Reference check: matches. Collins et al. eq. 47 is not "McGetchin" itself but their own volume-conservation model using the r^-3 falloff.
 
 ### Moore1974
@@ -405,6 +418,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Identification (stage 2, WP-0): Retrieved from the NASA ADS page scans (proceedings paper; OCR text in the library).
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): fetched (open ADS scan) and read by OCR: p. 83, eq. 1: the radius of continuous ejecta R_ce = 2.348 R_c for lunar craters of 0.65-218 km across (the 2.3 of the code).
 - Reference check: unverified; flag for stage 2.
 
 ### GrieveCintala1992
@@ -417,6 +431,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Identification (stage 2, WP-0): Identified: Meteoritics 27(5):526-538, DOI 10.1111/j.1945-5100.1992.tb01074.x (Crossref, 2026-10-02). No copy was obtained: the ADS download returned an anti-robot page and the Wiley page refuses scripted access.
 - Read so far (by the project): from memory
 - Read in this pass: not fetched; Collins et al. cite it (with Pierazzo et al. 1997 and Pierazzo & Melosh 2000) as support for the melt volume.
+- Read in stage 2 (WP-1, 2026-10-02): fetched (open ADS scan) and its abstract read by OCR; the body of the scan was not read for numbers. It confirms that melt volume rises faster than the transient cavity's with event size.
 - Reference check: venue, volume and pages as in Collins et al.'s list.
 
 ### PierazzoVickery1997
@@ -440,7 +455,18 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Library (the project's source library, not distributed): fetched (PDF, 13 pages, text layer). From: https://spiral.imperial.ac.uk/server/api/core/bitstreams/ba3d1b52-99e7-4439-926d-7a38cdfb3e7c/content. Text file: dc2007.txt.
 - Read so far (by the project): abstract only
 - Read in this pass: full text fetched (abstract, introduction, method, results, Table 2, discussion)
+- Read in stage 2 (WP-1, 2026-10-02): full text read again (stage 2): Table 1 (iSALE model parameters), eq. 1-3 (eq. 3: D_f,wet / D_f,dry = 1 - 0.14 R), Table 2 (the runs), p. 1922 (3.2 km and R = 3.5 resurge rule), p. 1925 (no crater above R = 8), eq. 4-8 and Table 3. The code's ocean rule is now their eq. 3 and regime limits.
 - Reference check: the citation is right. The code's note that it fits "three numbers" is accurate for the abstract. The paper's own cutoff is not 6.3 (Part 2).
+
+### Hughes2000
+- Reference: Hughes, D. W. (2000). A new approach to the calculation of the cratering rate of the Earth over the last 125 +/- 20 Myr. Monthly Notices of the Royal Astronomical Society 317(2):429-437.
+- DOI or URL: DOI not checked. Open ADS scan with a text layer (bibcode 2000MNRAS.317..429H, https://articles.adsabs.harvard.edu/pdf/2000MNRAS.317..429H).
+- Cited as: not cited in the code before stage 2; now cited in scaling.rs for the shape of the production function below 20 km and for the quotation of the Grieve & Shoemaker rate.
+- Ledger ids: IMP-001, IMP-002, IMP-003, IMP-004, IMP-005
+- Access: open copy (ADS scan, 9 pages)
+- Read so far (by the project): not used before stage 2.
+- Read in stage 2 (WP-1, 2026-10-02): full text read. Abstract: rates of craters larger than D over the last 125 +/- 20 Myr on the stable continents: 12.0 +/- 0.7 (D > 2.4 km), 9.5 +/- 0.6 (5 km), 6.5 +/- 0.5 (12 km), 3.0 +/- 0.3 (22 km) x 1e-15 per km2 per year, and 3.46 +/- 0.30 for D > 20 km; 'previous researchers have considerably overestimated the rate at which small 2.4 < D < 20 km craters are being produced'; 'the relationship between crater production rate and crater diameter is not a simple power law in the 2.4 < D < 40 km diameter range'. p. 434: earlier D > 20 km rates 'Hughes (1981) 2.6 +/- 0.9, Grieve & Dence (1979) 3.5 +/- 1.3, Grieve (1984) 5.4 +/- 2.7 and Grieve & Shoemaker (1994) 5.6 +/- 2.8 x 1e-15 km-2 yr-1'. Table 2: the full rate table. p. 429: the lunar rate (Neukum & Ivanov 1994) 'very nearly constant for about the last 2000 Myr'.
+- Reference check: matches. His figures are for craters surviving on stable cratons; he argues the completeness is near 1 so they are production rates, but they could be lower limits.
 
 ### Culling1960
 - Reference: Culling, W. E. H. (1960). Analytical theory of erosion. The Journal of Geology 68(3):336-344.
@@ -452,6 +478,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Substitute: none found.
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (paywalled).
 - Reference check: matches (title found by Crossref). The paper is general erosion theory; it gives no crater-specific diffusivity.
 
 ### Soderblom1970
@@ -464,6 +491,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Substitute: none found.
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): not fetched (Wiley 403).
 - Reference check: matches. Its title says the diffusion comes from small impacts on the Moon, not soil creep.
 
 ### FassettThomson2014
@@ -476,6 +504,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Substitute: none found.
 - Read so far (by the project): from memory
 - Read in this pass: abstract fetched (OpenAlex reconstruction of the abstract; wording has gaps)
+- Read in stage 2 (WP-1, 2026-10-02): abstract only (OpenAlex), unchanged; the paper is paywalled (Unpaywall: not open).
 - Reference check: matches. It is a LUNAR study (diffusivity about 5.5 m^2/Myr), not an Earth hillslope value (Part 2, IMP-083).
 
 ### Fernandes1997
@@ -488,6 +517,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Substitute: none found.
 - Read so far (by the project): from memory
 - Read in this pass: not fetched
+- Read in stage 2 (WP-1, 2026-10-02): not fetched. Unpaywall lists an open copy at the publisher (Wiley), but a script is refused (403, 2026-10-02) and so is the web fetch tool.
 - Reference check: matches. Whether it gives the 0.003-0.05 m^2/yr range is unchecked.
 
 ### Roering1999
@@ -500,6 +530,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Substitute: none found.
 - Read so far (by the project): (IMP) from memory (params.rs); judgment framework (rock-class JSON) (ERO, ISO, HYP) no record. (RCK, STR, DEF) not stated
 - Read in this pass: (IMP) not fetched (ERO, ISO, HYP) not fetched (403 / no open copy). (RCK, STR, DEF) abstract fetched (OpenAlex)
+- Read in stage 2 (WP-1, 2026-10-02): not fetched. Unpaywall lists an open copy at the publisher (Wiley), but a script is refused (403, 2026-10-02) and so is the web fetch tool.
 - Reference check: (IMP) matches the rock-class JSON (WRR 35(3):853-870). Note this paper's point is NONLINEAR diffusion, while the code uses linear diffusion. (ERO, ISO, HYP) Crossref matches. The title says "nonlinear" transport. The JSON text uses it as "a linear creep multiplier", which is a use of its linear coefficient D, whereas the paper's contribution is a nonlinear law with a critical slope; the code's linear diffusion is the small-slope limit. The paper's numeric D values were not read. (RCK, STR, DEF) authors, year, volume, issue, pages match. The paper's finding is a nonlinear (gradient-dependent) transport law, not a lithology-dependent linear coefficient; it is cited only for the idea of a creep coefficient D.
 
 ### Sklar2001
@@ -594,6 +625,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Read so far (by the project): (IMP) no statement (ORE) not stated.
 - Read in this pass: (IMP) not fetched (ORE) not fetched (Crossref metadata only).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Osinski2013/Osinski2013.txt, the paragraph on the duration of impact hydrothermal systems.
 
 ### Masaitis1998
 - Reference: Masaitis, V. L. (1998). Popigai crater: Origin and distribution of diamond-bearing impactites. Meteoritics & Planetary Science 33(2):349-359.
@@ -755,7 +787,8 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Grosse, P., Euillades, P. A., Euillades, L. D. and van Wyk de Vries, B. (2014). A global database of composite volcano morphometry. Bulletin of Volcanology 76: 784 (16 pages; online 2013).
 - DOI or URL: 10.1007/s00445-013-0784-4
 - Cited as: "Grosse et al. 2014" (added by WP-2 in comments of `volcanoes/params.rs`, `volcanoes/shape.rs` and `volcanoes/mod.rs`)
-- Ledger ids: VOL-016, VOL-017, VOL-019, VOL-020, VOL-026, VOL-029, VOL-030; HNT-016
+- Ledger ids: VOL-016, VOL-017, VOL-019, VOL-020, VOL-026, VOL-029, VOL-030; HNT-016, HNT-085, HNT-086
+- Also used 2026-10-02 (volcano decisions): table 1 re-read for the target of VOL-019 (stratovolcano height median 1.02 km, mean 1.13, s.d. 0.55, range 0.17-4.57) and VOL-020 (height/basal width median 0.13, range 0.02-0.30; basal width median 7.9 km).
 - Access: free to read at the publisher (bronze); the publisher returned a page, not the PDF; the authors' submitted version is in the CONICET repository
 - Library (the project's source library, not distributed): fetched WP-2 2026-10-02 (PDF, 23 pages, text layer). From: https://ri.conicet.gov.ar/handle/11336/7280 (submitted version; the pages carry the journal's running heads). Text file: Grosse2014.txt.
 - Read in WP-2 (2026-10-02), full text: 759 composite volcanoes from the 90-m SRTM model (those of the Global Volcanism Program list it covers, with a basal width over 2 km). Table 1 (p. 7): stratovolcanoes (n = 512): basal width median 7.9 km (range 2.0-65.9), height median 1.02 km, mean 1.13, s.d. 0.55 (range 0.17-4.57), height/basal width median 0.13 (0.02-0.30), mean flank slope 17.7 degrees, main flank 21.5, steepest average slope 27.7 degrees at 0.79 of the height; shields (n = 89): basal width median 15.3 km, height 0.81 km, height/width 0.06, flank slope 8.1 degrees. p. 8: crater and caldera data only for 104 large ones: 0.6-11 km across, median 2.2 km; depth under 100 to 860 m, median 240 m. Subaerial parts only.
@@ -764,7 +797,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Clague, D. A. and Sherrod, D. R. (2014). Growth and degradation of Hawaiian volcanoes. Chapter 3 in Poland, M. P., Takahashi, T. J. and Landowski, C. M. (eds), Characteristics of Hawaiian Volcanoes, U.S. Geological Survey Professional Paper 1801, pp. 97-146.
 - DOI or URL: 10.3133/pp18013; https://pubs.usgs.gov/pp/1801/downloads/pp1801_Chap3_Clague.pdf
 - Cited as: "Clague & Sherrod 2014" (added by WP-2 in comments)
-- Ledger ids: VOL-007, VOL-009, VOL-017, VOL-021, VOL-041, VOL-048, VOL-058, MAG-002
+- Ledger ids: VOL-007, VOL-009, VOL-017, VOL-021, VOL-041, VOL-048, VOL-058, MAG-002; HNT-087
 - Access: open access (agency report)
 - Library: fetched WP-2 2026-10-02 (PDF, text layer, 343,082 characters). Text file: ClagueSherrod2014.txt.
 - Read in WP-2 (2026-10-02), full text: abstract (p. 97): "Principal growth occurs in the first 1-2 million years"; "Shallow magma reservoirs (1-7-km depth)" of shield-stage volcanoes, "smaller reservoirs at 20-30-km depth persist". p. 99: "The sizes and spacing of the volcanoes are nonuniform"; only eight volcanoes northwest of the main islands grew to 1,500 m or more above sea level. p. 114: lava flows on a shield dip 2-10 degrees, submarine slopes are steeper. pp. 130-131: subsidence under the growing volcano's load "lasts perhaps 1 m.y." and sinks shorelines "by more than 1 km" (2.6 m/kyr off the Island of Hawaii); thermal subsidence of the plate along much of the chain "~0.01 m/k.y."; reefs drown about 33 Myr after their volcano formed. Mauna Loa's summit 4,169 m.
@@ -773,7 +806,8 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Christiansen, R. L. (2001). The Quaternary and Pliocene Yellowstone Plateau volcanic field of Wyoming, Idaho, and Montana. U.S. Geological Survey Professional Paper 729-G.
 - DOI or URL: 10.3133/pp729G; https://pubs.usgs.gov/pp/pp729g/pp729g.pdf
 - Cited as: "Christiansen 2001" (added by WP-2 in comments and hints)
-- Ledger ids: VOL-006, VOL-023, VOL-027, VOL-029, VOL-045, VOL-046; HNT-060, HNT-063
+- Ledger ids: VOL-006, VOL-023, VOL-027, VOL-029, VOL-045, VOL-046, VOL-074; HNT-060, HNT-063, HNT-088
+- Also read 2026-10-02 (volcano decisions), the summary and the first sections: the field has three volcanic cycles, each climaxed by a caldera-forming ash-flow eruption: the Huckleberry Ridge Tuff at 2.1 Ma (more than 2,450 km3 over 15,500 km2, a caldera more than 75 km long), the Mesa Falls Tuff at 1.3 Ma (more than 280 km3, a caldera about 16 km across) and the Lava Creek Tuff at 640 ka (more than 1,000 km3, the Yellowstone caldera): three in about 1.5 Myr (VOL-074).
 - Access: open access (agency report)
 - Library: fetched WP-2 2026-10-02 (PDF, 37.7 MB, text layer, 1.13 million characters). Text file: Christiansen2001.txt.
 - Read in WP-2 (2026-10-02), the summary (pp. G1-G2), physiography (p. G6) and the cycle chronology: caldera-forming eruptions at 2.1 Ma (Huckleberry Ridge Tuff, more than 2,450 km3 over 15,500 km2, caldera more than 75 km long), 1.3 Ma (Mesa Falls Tuff, more than 280 km3) and 0.64 Ma (Lava Creek Tuff, more than 1,000 km3 over more than 7,500 km2); the Yellowstone caldera is a basin 85 by 45 km. The plateau's average elevation is about 2,400 m; Island Park and the eastern Snake River Plain lie at about 1,600-1,900 m.
@@ -1741,6 +1775,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated (the quoted phrase is in quotation marks in the comment)
 - Read in this pass: abstract fetched (OpenAlex, full abstract)
 - Reference check: author list, year, journal, volume and issue match; "TC5006" article number is not shown in the OpenAlex record (not verified). The abstract contains both numbers the code attributes to it (see spot checks DEF-001, DEF-005).
+- Read in WP-8 (2026-10-02): full text, fetched from the HAL open copy (hal-00634887) through the web archive; library Mouthereau2007.pdf, Mouthereau2007_raw.txt (article page = PDF page - 1). Fig. 5 caption: 149 anticlines, "Zagros folds have a dominant wavelength of 15.8 ± 5.3 km"; §[55]: 11 km near the Surmeh fault to 30 km in the High Zagros; art. p. 5: maximum fold amplitudes 500-1,000 m; §[7]: "a 200-kmwide arcuate folded belt", sedimentary pile up to 12 km, axial lengths often over 100 km; abstract and §[18]: 65-78 km (16-19 %) across the whole Zagros, only about 15 km of it across the Folded Belt (§[70]); §[53]-[54]: buckling, 2πH(ηl/6ηm)^(1/3) with a 2 km layer (DEF-001, DEF-002, DEF-004, DEF-005, DEF-007, DEF-027).
 
 ### Biot1961
 - Reference: Biot, M. A. (1961). Theory of folding of stratified viscoelastic media and its implications in tectonics and orogenesis. Geological Society of America Bulletin 72(11):1595-1620.
@@ -1753,6 +1788,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: metadata only
 - Reference check: authors, year, volume, issue, pages match.
+- WP-8 (2026-10-02): not obtained. The dominant-wavelength relation is now cited to Schmalholz & Mancktelow 2016 (eq. 13), which credits Biot 1957 and Ramberg 1962 (DEF-002).
 
 ### Sherwin1968
 - Reference: Sherwin, J.-A. & Chapple, W. M. (1968). Wavelengths of single layer folds: a comparison between theory and observation. American Journal of Science 266(3):167-179.
@@ -1765,6 +1801,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex summary)
 - Reference check: authors, year, volume, pages match. The paper compares Biot's theory with 818 fold wavelengths from six sites (quartz veins in slate and phyllite), so "tested on natural folds" is correct; it found the viscosity ratios needed were low and Biot's theory could not be applied directly.
+- WP-8 (2026-10-02): not obtained; no longer cited by the code as read (DEF-002).
 
 ### Blanc2003
 - Reference: Blanc, E. J.-P., Allen, M. B., Inger, S. & Hassani, H. (2003). Structural styles in the Zagros Simple Folded Zone, Iran. Journal of the Geological Society 160(3):401-412.
@@ -1777,6 +1814,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex summary)
 - Reference check: authors, year, volume, issue, pages match. The abstract is about a balanced cross-section with about 49 km of shortening over 5 Myr and several decollement horizons; it gives no fold length-to-wavelength ratio.
+- WP-8 (2026-10-02): not obtained; the code now cites Alavi 2007 (read in full) for the fold length ratio (DEF-004).
 
 ### McQuarrie2004
 - Reference: McQuarrie, N. (2004). Crustal scale geometry of the Zagros fold-thrust belt, Iran. Journal of Structural Geology 26(3):519-535.
@@ -1788,6 +1826,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: metadata only (OpenAlex dates it 15 Oct 2003 online; volume 26 is 2004)
 - Reference check: title, journal, volume, pages match. The title the code gives is only "McQuarrie 2004" (no title). The "about 20 %" figure is not confirmed.
+- WP-8 (2026-10-02): the Caltech Authors record (1k507-wsf19) holds metadata only, files restricted; abstract read (McQuarrie2004_abstract_only.txt): "Total shortening in the Zagros fold–thrust belt is 70±20 km, which corresponds to ~20% shortening of the Arabian block" (DEF-005, abstract only).
 
 ### Gawthorpe2000
 - Reference: Gawthorpe, R. L. & Leeder, M. R. (2000). Tectono-sedimentary evolution of active extensional basins. Basin Research 12(3-4):195-218.
@@ -1799,6 +1838,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: metadata only
 - Reference check: authors, year, volume, issue, pages match. "Segments of some tens of km" is unconfirmed.
+- WP-8 (2026-10-02): not obtained (the publisher refuses scripted access; the UEA record 32628 has no full text; no archived copy). DEF-013 is labelled a design value and the comment says the source was not read.
 
 ### Cowie1992a
 - Reference: Cowie, P. A. & Scholz, C. H. (1992). Displacement-length scaling relationship for faults: data synthesis and discussion. Journal of Structural Geology 14(10):1149-1156.
@@ -1811,6 +1851,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex)
 - Reference check: the pages 1149-1156 are the "data synthesis and discussion" paper, and it is the right one for a data-compilation citation. A companion paper by the same authors (Cowie & Scholz 1992, "Physical explanation for the displacement-length relationship of faults using a post-yield fracture mechanics model", JSG 14(10):1133-1148, DOI 10.1016/0191-8141(92)90065-5) is the theoretical one; the code does not cite it. The abstract of the cited paper gives no value of gamma.
+- WP-8 (2026-10-02): not obtained; no longer cited by the code (DEF-015 cites Schlische et al. 1996 through Lathrop et al. 2022).
 
 ### Schlische1996
 - Reference: Schlische, R. W., Young, S. S., Ackermann, R. V. & Gupta, A. (1996). Geometry and scaling relations of a population of very small rift-related normal faults. Geology 24(8):683-686.
@@ -1823,6 +1864,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex summary); the 0.03 comes from a secondary review (Lathrop2022)
 - Reference check: authors, year, volume, pages match. The abstract says displacement scales linearly with length across eight orders of magnitude and gives no number; the review below quotes the paper's best fit as D = 0.03 L^1.06.
+- WP-8 (2026-10-02): abstract read from an archived journal page (Schlische1996_abstract_page.txt): "the maximum observed displacement scales linearly with fault length ... no significant change in displacement geometry and the linear length-displacement scaling relation between small and large faults". The 0.03 is read in Lathrop et al. 2022 (DEF-015).
 
 ### Lathrop2022
 - Reference: Lathrop, B. A., Jackson, C. A.-L., Bell, R. E. & Rotevatn, A. (2022). Displacement/length scaling relationships for normal faults; a review, critique, and revised compilation. Frontiers in Earth Science 10:907543.
@@ -1834,6 +1876,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not applicable
 - Read in this pass: full text fetched (via WebFetch summary of the full page; passages on Schlische 1996, Cowie & Scholz 1992a and the typical gamma range)
 - Reference check: not applicable.
+- Read in WP-8 (2026-10-02): full text (new reading-order extraction Lathrop2022_raw.txt). p. 2: c "typically fall[s] between 0.001 and 0.1"; p. 4: strike-slip D/L "as high as 1:1", normal faults at most 1:2 (citing Kim & Sanderson 2005); p. 7: Schlische et al. 1996 "D = 0.03L1.06" from 201 Dan River faults and 346 others; p. 6 and table 1: the review's own fit Dmax = 0.03 L^0.92. No separate value for reverse or strike-slip faults (DEF-015 to DEF-018).
 
 ### Kim2005
 - Reference: Kim, Y.-S. & Sanderson, D. J. (2005). The relationship between displacement and length of faults: a review. Earth-Science Reviews 68(3-4):317-334.
@@ -1846,6 +1889,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: metadata only
 - Reference check: authors, volume, issue, pages match. OpenAlex dates it 2004 (online); the issue is January 2005 per my recall, so "2005" is acceptable but may be cited as 2004 elsewhere. The "order-of-magnitude spread" is not confirmed from this paper.
+- WP-8 (2026-10-02): not obtained (Southampton eprints 52991 has no PDF; no archived copy). Its findings are cited only as Lathrop et al. 2022 report them.
 
 ### Anderson1951
 - Reference: Anderson, E. M. (1951). The Dynamics of Faulting and Dyke Formation with Applications to Britain, 2nd ed., revised. Oliver and Boyd, Edinburgh. 206 pp.
@@ -1857,6 +1901,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: not fetched (secondary sources only)
 - Reference check: the code's title is shortened; the full title includes "and Dyke Formation with Applications to Britain". The edition (2nd, 1951) matches. The first edition is 1942 (Wikipedia gives 1905 for the theory's first publication).
+- WP-8 (2026-10-02): the book was not obtained; the code now cites Anderson 1905 (read in full), the paper that first set out the theory (DEF-019 to DEF-021).
 
 ### Weissel1989
 - Reference: Weissel, J. K. & Karner, G. D. (1989). Flexural uplift of rift flanks due to mechanical unloading of the lithosphere during extension. Journal of Geophysical Research 94(B10):13919-13950.
@@ -1869,7 +1914,125 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex summary)
 - Reference check: authors, year, volume, pages match.
+- WP-8 (2026-10-02): not obtained; DEF-059 stays `abstract-only` on stage 1's abstract.
 
+
+### Schmalholz2016
+- Reference: Schmalholz, S. M. & Mancktelow, N. S. (2016). Folding and necking across the scales: a review of theoretical and experimental results and their applications. Solid Earth 7:1417-1465.
+- DOI or URL: 10.5194/se-7-1417-2016 (open access)
+- Cited as: "Schmalholz & Mancktelow 2016, Solid Earth 7:1417-1465, eq. 13" (added to the code in WP-8)
+- Ledger ids: DEF-002
+- Access: open access
+- Library: fetched WP-8 2026-10-02 (PDF, 49 pages, text layer). Text files: Schmalholz2016.txt, Schmalholz2016_raw.txt (printed page = PDF page + 1416).
+- Read in WP-8 (2026-10-02): full text for the passages used. Eq. (13), p. 1422: "Ld = 2π H (R/6)^(1/3) ... the dominant wavelength is directly proportional to the layer thickness ... first derived by Biot (1957)", Ramberg 1962 identical (p. 1423); p. 1425: lower limit of wavelength to thickness about 4; p. 1442: "common wavelength to thickness ratios are between 2 and 16 with a mean value at ∼ 6.5 (e.g. Hudleston and Treagus, 2010)"; p. 1434: a multilayer of m equal layers raises the wavelength by m^(1/3) (Biot 1961); eq. (32), p. 1436: Ld = 1.9 √(H Htot); pp. 1430-1433: linear theory good to about 20 % shortening and 25° limbs.
+
+### Elliott1976
+- Reference: Elliott, D. (1976). The energy balance and deformation mechanisms of thrust sheets. Philosophical Transactions of the Royal Society of London A 283:289-312.
+- DOI or URL: 10.1098/rsta.1976.0086
+- Cited as: "Elliott 1976, Phil. Trans. R. Soc. A 283:289-312, p. 297" (added to the code in WP-8)
+- Ledger ids: DEF-013, DEF-015, DEF-017
+- Access: free to read at the publisher (fetched through the web archive; the live site refuses scripted access)
+- Library: fetched WP-8 2026-10-02 (PDF, 26 pages, text layer). Text files: Elliott1976.txt, Elliott1976_raw.txt (printed page = PDF page + 288).
+- Read in WP-8 (2026-10-02): p. 297 and fig. 3: for 20 thrusts of the Canadian Rockies foothills and front ranges "a roughly linear relation between strike length l on the map and displacement u = Kl (9) where K ~ 7 %" (the "=" read through OCR); fig. 4, p. 298: the McConnell thrust "has a strike length of 410 km".
+
+### Anderson1905
+- Reference: Anderson, E. M. (1905). The dynamics of faulting. Transactions of the Edinburgh Geological Society 8:387-402.
+- DOI or URL: open scan at Zenodo record 1650397 (CC0), https://zenodo.org/records/1650397
+- Cited as: "Anderson 1905, Trans. Edinb. Geol. Soc. 8:387-402, pp. 389 and 402" (added to the code in WP-8)
+- Ledger ids: DEF-019, DEF-020, DEF-021, DEF-024
+- Access: open (public domain by age; CC0 scan)
+- Library: fetched WP-8 2026-10-02 (PDF scan with OCR, 16 pages). Text files: Anderson1905.txt, Anderson1905_raw.txt (printed page = PDF page + 386; letter-spaced OCR).
+- Read in WP-8 (2026-10-02): p. 389: tan 2θ = 1/μ, "θ = 45° for μ = 0; θ = 30° for μ = 1/√3 or ·577; θ = 22½° for μ = 1", θ the angle between the fault plane and the greatest pressure; p. 402 (summary): thrusts form when the greatest pressure is horizontal and the least vertical and "dip ... at angles of less than 45°"; normal faults when the greatest pressure is vertical, "at angles of more than 45°"; wrench planes when the greatest and least are horizontal, "their hade is theoretically vertical". Anderson does not state 60° and 30° as such.
+
+### WaldronSnyder2020
+- Reference: Waldron, J. W. F. & Snyder, M. (2020). Geological Structures: a Practical Introduction. University of Alberta, open textbook (CC BY-NC).
+- DOI or URL: https://pressbooks.openeducationalberta.ca/introductorystructuralgeology/
+- Cited as: in the ledger and the page only (WP-8)
+- Ledger ids: DEF-019, DEF-021, DEF-024, DEF-031
+- Access: open access
+- Library: fetched WP-8 2026-10-02 (PDF, 225 pages, text layer). Text files: WaldronSnyder2020.txt, WaldronSnyder2020_raw.txt (printed page = PDF page - 12).
+- Read in WP-8 (2026-10-02): p. 151: Anderson's gravity, thrust and wrench regimes; p. 152: normal faults "dipping towards and away from each other with dips around 60°, at least near the surface"; p. 158: "Most major strike-slip faults are found to dip steeply, confirming Anderson's prediction".
+
+### CollettiniSibson2001
+- Reference: Collettini, C. & Sibson, R. H. (2001). Normal faults, normal friction? Geology 29(10):927-930.
+- DOI or URL: 10.1130/0091-7613(2001)029<0927:NFNF>2.0.CO;2
+- Cited as: "Collettini & Sibson 2001, Geology 29:927-930, abstract" (added to the code in WP-8)
+- Ledger ids: DEF-019, DEF-020
+- Access: paywalled (abstract only)
+- Library: archived abstract page, CollettiniSibson2001_abstract_page.txt (WP-8 2026-10-02).
+- Read in WP-8 (2026-10-02): abstract only: normal-slip earthquake ruptures (n = 25) dip from 65° to 30°; reverse ruptures (n = 33) show "a dominant 30° ± 5° peak"; both consistent with a friction coefficient of about 0.6.
+
+### Herail1990
+- Reference: Hérail, G., Baby, P., López, M., Oller, J., López, O., Salinas, R., Sempéré, T., Beccar, G. & Toledo, H. Structure and kinematic evolution of Subandean thrust system of Bolivia. ORSTOM symposium paper (IRD Horizon document 31021). The year is the library key, not read on the scan.
+- DOI or URL: https://horizon.documentation.ird.fr/exl-doc/pleins_textes/pleins_textes_4/colloques/31021.pdf
+- Cited as: "Hérail et al., ORSTOM symposium paper, pp. 179-180, a poor scan" (added to the code in WP-8)
+- Ledger ids: DEF-027
+- Access: open (institutional repository)
+- Library: fetched WP-8 2026-10-02 (PDF scan with poor OCR). Text file: Herail1990.txt.
+- Read in WP-8 (2026-10-02): pp. 179-180: the northern Subandean zone is "60 to GO. km-wide" (second figure unreadable), shortening 136 km (51 %); the southern zone "100 to 140 km-wide", shortening 70 km (33 %) to 139 km (53 %).
+
+### DelaneyPollard1981
+- Reference: Delaney, P. T. & Pollard, D. D. (1981). Deformation of host rocks and flow of magma during growth of minette dikes and breccia-bearing intrusions near Ship Rock, New Mexico. U.S. Geological Survey Professional Paper 1202.
+- DOI or URL: https://pubs.usgs.gov/pp/1202/report.pdf
+- Cited as: "Delaney & Pollard 1981, USGS PP 1202" (added to the code in WP-8)
+- Ledger ids: DEF-047, DEF-048, DEF-049
+- Access: open (government report)
+- Library: fetched WP-8 2026-10-02 (PDF, 69 pages, text layer). Text files: DelaneyPollard1981.txt, DelaneyPollard1981_raw.txt.
+- Read in WP-8 (2026-10-02): abstract (PDF p. 6): seven dikes radiate from Ship Rock; the northeastern dike is about 2,900 m long, "an average thickness of 2.3 m, and a maximum thickness of 7.2 m", in 35 segments; three plugs "smaller than 30 m in diameter"; PDF p. 12: "The largest of these dikes are 9, 4, and 3 km long"; PDF p. 15: segments 0.6 to 4.6 m in average thickness.
+
+### Krumbholz2014
+- Reference: Krumbholz, M., Hieronymus, C. F., Burchardt, S., Troll, V. R., Tanner, D. C. & Friese, N. (2014). Weibull-distributed dyke thickness reflects probabilistic character of host-rock strength. Nature Communications 5:3272.
+- DOI or URL: 10.1038/ncomms4272 (open access)
+- Cited as: in the ledger and the page only (WP-8)
+- Ledger ids: DEF-047, DEF-048
+- Access: open access
+- Library: fetched WP-8 2026-10-02 (PDF, 7 pages, text layer). Text files: Krumbholz2014.txt, Krumbholz2014_raw.txt.
+- Read in WP-8 (2026-10-02): p. 2: dykes are penny-shaped "with a thickness-to-length ratio of 0.01–0.0001", their "thickness in nature ranges from centimetres to hundreds of metres"; fig. 1: 487 to 1,918 thickness measurements per locality in Iceland and the Canary Islands. The summary statistics are in the supplement, not read.
+
+### Bunger2013
+- Reference: Bunger, A. P., Menand, T., Cruden, A. R., Zhang, X. & Halls, H. (2013). Analytical predictions for a natural spacing within dyke swarms. Earth and Planetary Science Letters 375:270-279.
+- DOI or URL: 10.1016/j.epsl.2013.05.044; author manuscript HAL hal-00855272
+- Cited as: "Bunger, Menand, Cruden, Zhang & Halls 2013, Earth Planet. Sci. Lett. 375:270-279" (added to the code in WP-8)
+- Ledger ids: DEF-046, DEF-047, DEF-048
+- Access: open copy (author manuscript, fetched through the web archive)
+- Library: fetched WP-8 2026-10-02 (manuscript PDF, 50 pages, text layer). Text files: Bunger2013.txt, Bunger2013_raw.txt.
+- Read in WP-8 (2026-10-02): fig. 1 caption: the Mackenzie dykes "extend over more than 2,000 km with an average thickness of 30 m"; manuscript lines 523-542: thickness 1 to 150 m, mean 30 m; mean spacing about 6.7 km 500 km from the centre to about 25 km 2,100 km out, the most continuous distal dykes 35 to 65 km apart; lines 555-573: Matachewan dykes 10 to 20 m on average.
+
+### NMT_Shiprock
+- Reference: New Mexico Bureau of Geology and Mineral Resources. Ship Rock (Virtual Geologic Tour of New Mexico), web page.
+- DOI or URL: https://geoinfo.nmt.edu/tour/landmarks/shiprock/home.html
+- Cited as: "Ship Rock 500 m, New Mexico Bureau of Geology" (added to the code in WP-8)
+- Ledger ids: DEF-049
+- Access: open (agency page)
+- Library: saved page, NMT_Shiprock (WP-8 2026-10-02).
+- Read in WP-8 (2026-10-02): "The main part of the landform is 600 meters high, and 500 meters in diameter ... Ship Rock ... is a volcanic neck, or the central feeder pipe".
+
+### Latutrie2020
+- Reference: Latutrie, B. (2020). Volcanology of two maar-diatremes: Round Butte and Twin Peaks, Hopi Buttes volcanic field, Navajo Nation, Arizona. PhD thesis, Institut national de la recherche scientifique (INRS), Centre Eau Terre Environnement, Québec.
+- DOI or URL: https://espace.inrs.ca/id/eprint/10410/1/T956.pdf
+- Cited as: in the ledger only (WP-8)
+- Ledger ids: DEF-049
+- Access: open (institutional repository)
+- Library: fetched WP-8 2026-10-02 (PDF, 231 pages, text layer). Text files: Latutrie2020.txt, Latutrie2020_raw.txt.
+- Read in WP-8 (2026-10-02): PDF p. 49: Round Butte, "a diatreme 170-190 m in diameter".
+
+### Earle2019
+- Reference: Earle, S. (2019). Physical Geology, 2nd edition. BCcampus Open Education, Victoria, B.C. (CC BY).
+- DOI or URL: https://opentextbc.ca/physicalgeology2ed/ (chapter pages read through the web archive)
+- Cited as: "Earle 2019, Physical Geology 2nd ed., §3.5" (added to the code in WP-8)
+- Ledger ids: DEF-042; the page's craton comparison
+- Access: open access
+- Library: saved chapter pages §3.5, §21.1, §21.2 (Earle2019*.txt), WP-8 2026-10-02.
+- Read in WP-8 (2026-10-02): §3.5: "if the body has an exposed surface area greater than 100 square kilometres (km2), then it's a batholith; smaller than 100 km2 and it's a stock. Batholiths are typically formed only when a number of stocks coalesce beneath the surface"; §21.1-21.2: the Canadian Shield is where the ancient rocks of the craton are exposed, "typically strongly metamorphosed", elsewhere "covered with younger rocks".
+
+### WikipediaCraton
+- Reference: Wikipedia, "Craton" (secondary source).
+- DOI or URL: https://en.wikipedia.org/wiki/Craton
+- Cited as: in the page only (WP-8)
+- Ledger ids: none (the page's craton comparison)
+- Access: open (encyclopedia)
+- Library: saved page, WikipediaCraton (WP-8 2026-10-02).
+- Read in WP-8 (2026-10-02): cratons have "the cratonic basement of metamorphosed crystalline and metamorphic rocks and the platform, which is a younger, weakly deformed sedimentary cover".
 ### Jessell1981
 - Reference: Jessell, M. W. (1981). "Noddy": an interactive map creation package. Unpublished MSc thesis, Imperial College of Science and Technology, University of London (Royal School of Mines, Department of Geology), September 1981.
 - DOI or URL: https://tectonique.net/noddy/jessell_msc_1981.pdf (open copy; listed in a search result, not fetched or read)
@@ -1880,6 +2043,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: search result snippet only
 - Reference check: tectonique.net states "For publications using Noddy, the foundational reference is: Jessell, M., 1981. NODDY - An interactive map creation package".
+- Read in WP-8 (2026-10-02): full text (Jessell1981.txt). §3 preamble: the pitch convention ("zero results in a plunge direction of the dip direction of the plane minus 90 degrees, with positive amplitudes resulting in displacements in the direction of the pitch"); §3.2: the fold W' = W + A Fr(U) Fe(V), the profile normalised to 2π, Fe equal to 0.5 at V = n (so 0.693147 is ln 2), the amplitude "the largest positive digitised amplitude"; §3.6: the translation fault X' = X + αS (DEF-010, DEF-038, DEF-066).
 
 ### Jessell1996
 - Reference: Jessell, M. W. & Valenta, R. K. (1996). Structural geophysics: integrated structural and geophysical modelling. In: De Paor, D. G. (ed.), Structural Geology and Personal Computers, Computer Methods in the Geosciences 15. Pergamon, Oxford, pp. 303-324.
@@ -1891,6 +2055,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: search result snippet only
 - Reference check: a search snippet gives "Computer Methods in the Geosciences, volume 15, pages 303-324, 1996", consistent with the code. Whether the fold sine table (629 values) or fault geometry is described in this chapter is not checked.
+- WP-8 (2026-10-02): not obtained (no lawful full text found); the conventions it would document are read in Jessell 1981 and the source code.
 
 ### Jessell2022
 - Reference: Jessell, M., Guo, J., Li, Y., Lindsay, M., Scalzo, R., Giraud, J., Pirot, G., Cripps, E. & Ogarko, V. (2022). Into the Noddyverse: a massive data store of 3D geological models for machine learning and inversion applications. Earth System Science Data 14(1):381-392.
@@ -1902,6 +2067,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: full text fetched (via WebFetch of the article page; passages on timing and code licence)
 - Reference check: year, journal, volume, pages match. Authors and title now supplied in full. The code's "Jessell et al. 2022" is correct.
+- Read in WP-8 (2026-10-02): full text (Jessell2022.txt). p. 383: Noddy unravels the kinematics point by point, "taking under 15 s to generate 200 × 200 × 200 voxel models with both geological and geophysical representations combined using an Intel® Xeon® Gold 6254 CPU"; p. 390: "All codes and data are released under the MIT License" and the 4 km model dimensions (DEF-063, DEF-070, DEF-073).
 
 ### Wellmann2016
 - Reference: Wellmann, J. F., Thiele, S. T., Lindsay, M. D. & Jessell, M. W. (2016). pynoddy 1.0: an experimental platform for automated 3-D kinematic and potential field modelling. Geoscientific Model Development 9(3):1019-1035.
@@ -1924,6 +2090,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): licence "checked in its LICENSE" (STATUS.md)
 - Read in this pass: full text fetched (LICENSE file, repo front page, src/ listing, unEvents.c first 40 lines)
 - Reference check: licence matches what the code says, see spot check DEF-063. The LICENSE title line is "MIT License", copyright line "Copyright (c) 2021 Loop3D". The fetched unEvents.c header has no copyright or licence comment. The repository carries a src/Licence.h that is a registration-ID stub (not a licence text). Other published releases of the same program carry different licences, see Noddy licence history under spot check DEF-063.
+- Read in WP-8 (2026-10-02): the source tree at commit 6a21b2374516f8506c19cabcbe3ead00be9cc45d, downloaded as that commit's tarball onto the test machine (scratch, deleted with the package; not in the library). Read: unEvents.c (TOLERANCE 0.001, the constants 0.693147, 6.2831853 and 3.1415927, unbiot's commented-out call), utils.c (TOLERANCE 0.01, rotset and its clamp, 3.1415926535), getEvent.c (dip 90 stored as 89.999), nodStruc.h (X_PROFILE_RESOLUTION 628, Y_PROFILE_RESOLUTION 100, ARRAY_LENGTH_OF_STRAT_CODE 64), proflib.c (calcProfile, getArrayForProfile), nodLib3.c (initGraphPoints: the default sine profile of 21 points), matrix.c (rotateX), taste.c and which.c (the functions DEF-064 names) (DEF-010, DEF-063 to DEF-069).
 
 ### NoddyOriginal (software, other releases)
 - Reference: Noddy, Jessell, M. W. (Imperial College 1981-82; Monash University 1994; University of Western Australia). Distributions: tectonique.net Windows release and GitHub; SourceForge project "Noddy"; pynoddy (Wellmann et al.).
@@ -1982,6 +2149,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not applicable
 - Read in this pass: abstract fetched (OpenAlex)
 - Reference check: not applicable.
+- Read in WP-8 (2026-10-02): full text (Alavi2007.txt). Abstract (p. 1064): cover 7-12 km thick, "a ⬃200 to 300 km-wide zone", minimum shortening 16-30 %; p. 1068: average width about 300 km, anticlines "long (up to ⬃150 –200 km)"; p. 1077: SW-verging (foreland-verging) asymmetric folds, interlimb angles 0-70° in the NE, 110-140° further SW, about 170° at the front, aspect ratios (axial length to half wavelength) typically over 10; table 1 (p. 1084): shortening 16.1 to 30.2 % on six sections (DEF-004, DEF-005, DEF-027, DEF-030).
 
 ### Pollack1993
 - Reference: Pollack, H. N., Hurter, S. J. & Johnson, J. R. (1993). Heat flow from the Earth's interior: analysis of the global data set. Reviews of Geophysics 31(3):267-280.
@@ -2013,6 +2181,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) in full (table, figure and PDF page of each number recorded in data file); figure intercepts read from rendered pages; data file counted. (ORE) "Fig. 24, digitised".
 - Read in this pass: (DEP) full text fetched (whole 45 p. text layer, including Table 1, the text labels of Figs. 1-26, rules, correlations); companion data file fetched and recounted (see spot check S3). (ORE) abstract fetched (the 2 km same-deposit rule is not in the abstract).
 - Reference check: (DEP) matches (authors, year, series, title). The PDF page numbers in the ledger run one lower than the order of text streams I extracted (Table 1 is on the page after the correlation paragraph); that is a page-count convention, not a content problem. Note the data file I downloaded has 427 records with a tonnage, the report says 422. (ORE) matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Singer2008a/of1155.txt: rules (PDF pp. 3-6), Table 1 (PDF p. 9), correlations (p. 8), the text layer of Figs. 1-26 (every intercept label), and the companion database PorCuTX2008.txt parsed to recount presence counts, subtypes, correlations, areas and the sulfide-area regression (all reproduced). Rows verified: DEP-001 to DEP-009, DEP-013, DEP-017, DEP-029 to DEP-032 and others.
 
 ### Singer2005
 - Reference: Singer, D.A., Berger, V.I., Menzie, W.D., and Berger, B.R., 2005, Porphyry copper deposit density: Economic Geology 100(3):491-514.
@@ -2024,6 +2193,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract only. (ORE) via the USGS record, not stated whether full text.
 - Read in this pass: (DEP) abstract fetched (full abstract from the USGS Publications Warehouse API). Full text not obtainable (GeoScienceWorld 403). (ORE) not fetched (Crossref metadata only).
 - Reference check: (DEP) matches. Crossref lists the issue date as 2005-05-01 (issue 3 is May 2005). Important content point: the abstract defines the densities as deposits AND prospects (286) per 100,000 km2 of EXPOSED permissive rock in 19 control areas, and says density is inversely related to exposed permissive area (regression given for estimating the number in a tract). The code's "17.8 mean" is not in the paper (see S10). (ORE) the code drops the fourth author (B. R. Berger).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the USGS record abstract only (Singer2005/Singer2005.txt): 4 / 15 / 35 per 100,000 km2 of exposed permissive rock, range 2 to 128, 286 deposits and prospects, 19 control areas, density inversely related to permissive area. Full text paywalled.
 
 ### Singer2008b
 - Reference: Singer, D.A., 2008, Mineral deposit densities for estimating mineral resources: Mathematical Geosciences 40(1):33-46.
@@ -2035,6 +2205,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): not stated (not cited).
 - Read in this pass: abstract fetched; a search-result snippet gave "deposit densities of 0.14 Area^-0.61 for porphyry copper" (equation not seen in the fetched abstract; units not seen).
 - Reference check: n/a.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the USGS record abstract only (Singer2008b/Singer2008b.txt): tract size predicts the number of deposits; the equation is not in the abstract.
 
 ### SingerMenzie2010
 - Reference: Singer, D.A., and Menzie, W.D., 2010, Quantitative mineral resource assessments: an integrated approach: New York, Oxford University Press (chapter "Estimating the Number of Undiscovered Deposits", doi 10.1093/oso/9780195399592.003.0011).
@@ -2057,6 +2228,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) printed pages cited (pp. 4, 25, 28, 65-68, 120); text searched for density with no numeric value found. (ORE) page numbers cited (PDF opened).
 - Read in this pass: (DEP) full text fetched (text layer; searched for every number in the ledger rows; Table E1 itself not extracted, its summary sentences were). (ORE) abstract fetched (USGS page; two different fetches listed the authors in different orders; the series page lists David A. John first as editor).
 - Reference check: (DEP) the USGS catalogue lists David A. John as editor and Ayuso et al. as chapter authors; "John et al. 2010" is the usual short form but strictly John is the series editor. (ORE) matches "John et al. 2010". The report is a descriptive model; the median ore area 0.6 km2 and the 1-1.5 km height could not be read.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): John2010/sir5070b.txt printed pp. 4, 25, 28 (Table E1), 65-68, 120: ore and alteration areas, hypogene ore height, supergene thicknesses, grades and enrichment factors, the 10 cm/yr passage and its context.
 
 ### SillitoeMcKee1996
 - Reference: Sillitoe, R.H., and McKee, E.H., 1996, Age of supergene oxidation and enrichment in the Chilean porphyry copper province: Economic Geology 91(1):164-179.
@@ -2070,6 +2242,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract only. (ORE) via the USGS record, not stated whether full text.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) not fetched (Crossref metadata only).
 - Reference check: (DEP) matches. (ORE) matches. This paper concerns the Chilean province only.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): USGS Publications Warehouse record 70018070 abstract, new library folder SillitoeMcKee1996/ (abstract only).
 
 ### OrrisBliss1986
 - Reference: Orris, G.J., and Bliss, J.D., 1986, Grade and tonnage model of placer Au-PGE (model 39a), in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 261-264 (with descriptive model by Yeend, W.E., p. 261).
@@ -2081,6 +2254,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): figure intercepts read at 400 dpi, text pp. 261-262.
 - Read in this pass: full text fetched (text layer for pp. 261-262; Figs. 196 and 197 decoded from the scan and read).
 - Reference check: matches (Bulletin text says "By Greta J. Orris and James D. Bliss", reference to Orris and Bliss 1985). Figure numbers and pages match (Fig. 196 p. 263, Fig. 197 p. 264).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the same file as Cox1986 (same md5); see Cox1986.
 
 ### OrrisBliss1985
 - Reference: Orris, G.J., and Bliss, J.D., 1985, Geologic and grade-volume data on 330 gold placer deposits: U.S. Geological Survey Open-File Report 85-213, 172 p.
@@ -2092,6 +2266,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): caveat 1 p. 2 cited.
 - Read in this pass: not fetched (catalogue record only; the USGS catalogue says 173 p.).
 - Reference check: matches Bulletin 1693's own reference list entry.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): OrrisBliss1985.txt printed p. 2 (caveat 1).
 
 ### Bliss1992
 - Reference: Bliss, J.D., ed., 1992, Developments in mineral deposit modeling: U.S. Geological Survey Bulletin 2004, 168 p.
@@ -2103,6 +2278,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): p. 2 overview paragraph.
 - Read in this pass: not fetched. Title and 168 p. confirmed only from the reference list of OFR 2008-1155 ("Developments in deposit modeling").
 - Reference check: OFR 2008-1155 lists the title as "Developments in deposit modeling"; the project writes "Developments in mineral deposit modeling". Minor title difference; check against the Bulletin cover.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): new library folder Bliss1992/ (USGS Bulletin 2004, b2004.pdf and b2004.txt); printed p. 2 read.
 
 ### Schmidt2007
 - Reference: Schmidt, J.M., Light, T.D., Drew, L.J., Wilson, F.H., Miller, M.L., and Saltus, R.W., 2007, Undiscovered locatable mineral resources in the Bay Resource Management Plan Area, southwestern Alaska: a probabilistic assessment: U.S. Geological Survey Scientific Investigations Report 2007-5039, vi + 50 p.
@@ -2114,6 +2290,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): p. 28 and Table 1.
 - Read in this pass: full text fetched (tract table row for PLACER1 read, see S29).
 - Reference check: matches. The USGS catalogue gives authors as Schmidt, Light, Drew, Wilson, Miller, Saltus.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Schmidt2007/sir5039.txt printed p. 28 and Table 1 (PLACER1 tract, 55,350 km2, 1 / 2 / 7 deposits).
 
 ### MosierSinger1986
 - Reference: Mosier, D.L., and Singer, D.A., 1986, Grade and tonnage model of Superior Fe and Algoma Fe deposits (model 34a), in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 228-230.
@@ -2125,6 +2302,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): figure intercepts read from the printed arrows at 300 dpi.
 - Read in this pass: full text fetched (Figs. 172-174 decoded from the scan and read).
 - Reference check: matches. The Bulletin says Algoma and Superior are combined "because they are not significantly different in tonnage or grades" (Algoma has its own descriptive model 28b, Superior 34a).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the same file as Cox1986 (byte-identical); see Cox1986.
 
 ### Cannon1986
 - Reference: Cannon, W.F., 1986, Descriptive model of Superior Fe (model 34a, p. 228) and of Algoma Fe (model 28b, p. 198), in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693.
@@ -2136,6 +2314,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): not stated.
 - Read in this pass: full text fetched (model headings only: "Model 28b DESCRIPTIVE MODEL OF ALGOMA Fe By William F. Cannon", "Model 34a DESCRIPTIVE MODEL OF SUPERIOR Fe By William F. Cannon").
 - Reference check: matches (model numbers 28b and 34a confirmed).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the same file as Cox1986 (byte-identical); see Cox1986.
 
 ### Cannon1995
 - Reference: Cannon, W.F., Hadley, D.G., and Horton, R.J., 1995, Superior Fe deposits (model 34a) and Algoma Fe deposits (model 28b), in du Bray, E.A., ed., Preliminary compilation of descriptive geoenvironmental mineral deposit models: U.S. Geological Survey Open-File Report 95-831, 272 p.
@@ -2147,6 +2326,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): pp. 209-212, 252-255.
 - Read in this pass: full text fetched (searched for deposit size statements; see S20, S25).
 - Reference check: not checked author list of the two chapters (the PDF text I searched did not expose the chapter by-lines).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): ofr95831.txt (identical to duBray1995): Superior Fe printed pp. 252-254, Algoma Fe pp. 209-210.
 
 ### Singer2009
 - Reference: Singer, D.A., Berger, V.I., and Moring, B.C., 2009, Sediment-hosted zinc-lead deposits of the world: database and grade and tonnage models: U.S. Geological Survey Open-File Report 2009-1252, v + 62 p.
@@ -2158,6 +2338,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) Table 2 (printed pp. 9-10), text p. 8, p. 2; n_reported counted from the database. (ORE) page cited.
 - Read in this pass: (DEP) full text fetched (Table 2, correlation paragraph, two-kilometer rule). (ORE) abstract fetched (the 2 km rule is not in the abstract).
 - Reference check: (DEP) matches the project's citation; the task prompt's "Mosier, Berger & Singer" is a misattribution. (ORE) matches. The report mixes MVT and sedex under "sediment-hosted zinc-lead".
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Singer2009/of1252.txt: spatial rules (p. 2), deposit types (pp. 3-5), Tables 2 and 3 (pp. 9-11); the report's database SedZn-PbTX.txt and its metadata were added to the folder and reproduce the presence counts and correlations.
 
 ### Leach2010a
 - Reference: Leach, D.L., Taylor, R.D., Fey, D.L., Diehl, S.F., and Saltus, R.W., 2010, A deposit model for Mississippi Valley-type lead-zinc ores, chap. A of Mineral deposit models for resource assessment: U.S. Geological Survey Scientific Investigations Report 2010-5070-A, viii + 43 p.
@@ -2169,6 +2350,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) printed pp. 3-5, 8, 19, 27. (ORE) not stated; quoted as a phrase.
 - Read in this pass: (DEP) full text fetched (Table 1, vertical extent, fluid temperature and salinity, the 600 km criterion, district areas). (ORE) abstract fetched (USGS page). The PDF is COULD NOT READ.
 - Reference check: (DEP) matches. "Leach et al. 2010" in the code is used for two different papers (this one and Leach2010b); the 2.02 Ga claim belongs to Leach2010b. (ORE) matches. Important: the code uses "Leach et al. 2010" for two different papers (this report, and Leach2010b below, Economic Geology 105:593). The authors differ.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Leach2010a/sir5070a.txt: Table 1 (printed p. 4) and text pp. 3, 5-8, 10-11, 19, 25, 27 (600 km tract guide, fluid temperatures and salinities, Pine Point, ore-event durations). It has no 2.02 Ga statement: that is Leach2010b.
 
 ### MosierBriskey1986
 - Reference: Mosier, D.L., and Briskey, J.A., 1986, Grade and tonnage model of southeast Missouri Pb-Zn and Appalachian Zn deposits (models 32a and 32b), in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 224-226.
@@ -2180,6 +2362,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): figure intercepts.
 - Read in this pass: full text fetched (Figs. 168-171 decoded from the scan and read).
 - Reference check: matches (Bulletin contents: "Grade and tonnage model of southeast Missouri Pb-Zn and Appalachian Zn deposits, by Dan L. Mosier and Joseph A. Briskey").
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the same file as Cox1986 (byte-identical); see Cox1986.
 
 ### Emsbo2016
 - Reference: Emsbo, P., Seal, R.R., Breit, G.N., Diehl, S.F., and Shah, A.K., 2016, Sedimentary exhalative (sedex) zinc-lead-silver deposit model: U.S. Geological Survey Scientific Investigations Report 2010-5070-N, 57 p.
@@ -2191,6 +2374,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) printed pp. 2, 27, 28, 36, 39. (ORE) in full (printed pp. 2, 28 cited).
 - Read in this pass: (DEP) full text fetched (searched for each number in the ledger rows). (ORE) abstract fetched (USGS page; no temperatures or gradients in it).
 - Reference check: (DEP) matches (chapter N published 2016 in a 2010 series). (ORE) matches exactly (authors, year, title, report number, 57 p.).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Emsbo2016/sir5070n.txt printed pp. 2, 8, 27, 28, 30, 32, 37, 39 (brine temperatures and salinities, 'absence of deposits older than 1.8 Ga', basin fill, sandstone density).
 
 ### MenzieMosier1986
 - Reference: Menzie, W.D., and Mosier, D.L., 1986, Grade and tonnage model of sedimentary exhalative Zn-Pb (model 31a), in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 212-215; descriptive model by Briskey, J.A., 1986, p. 211-212.
@@ -2202,6 +2386,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): figure intercepts Figs. 159-163.
 - Read in this pass: full text fetched (Figs. 159-163 decoded from the scan and read).
 - Reference check: matches (Fig. 159 p. 213, Figs. 160-161 p. 214, Figs. 162-163 p. 215; "by W. David Menzie and Dan L. Mosier").
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the same file as Cox1986 (byte-identical); see Cox1986.
 
 ### duBray1995
 - Reference: du Bray, E.A., ed., 1995, Preliminary compilation of descriptive geoenvironmental mineral deposit models: U.S. Geological Survey Open-File Report 95-831, ii + 272 p.
@@ -2213,6 +2398,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): see Cannon1995.
 - Read in this pass: full text fetched; it also restates Menzie and Mosier 1986 (sedex "1.7 (90th percentile) to 130 (10th percentile) million tons; median ... 15") and Mosier and Singer 1986 (median 170 Mt).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): identical file to Cannon1995; see there.
 
 ### Singer2001
 - Reference: Singer, D.A., Menzie, W.D., Sutphin, D.M., Mosier, D.L., and Bliss, J.D., 2001, Mineral deposit density: an update, in Singer, D.A., ed., Contributions to global mineral resource assessment research: U.S. Geological Survey Professional Paper 1640, chap. A, p. A1-A13.
@@ -2224,6 +2410,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): Table 1 (13 deposit types, no Zn-Pb, no iron formation) searched.
 - Read in this pass: full text fetched (abstract and contents; Table 1 body not extracted, abstract lists its densities).
 - Reference check: the PDF title page reads "By Donald A. Singer, W. David Menzie, David M. Sutphin, Dan L. Mosier, and James D. Bliss", which matches the project. The USGS catalogue and Crossref list different authors for this DOI (Menzie, Sutphin, Mosier, Bliss, Schulz; editor Singer). Cataloguing discrepancy; follow the PDF.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Singer2001/pp1640a.txt: abstract (printed p. A1), Table 1 and the porphyry copper passage (printed p. A8): Nevada 0.00015 and Arizona 0.00071 and 0.0012 deposits per km2; no Zn-Pb, sedex or iron-formation density.
 
 ### USGS2000a
 - Reference: U.S. Geological Survey National Mineral Resource Assessment Team, 2000, 1998 assessment of undiscovered deposits of gold, silver, copper, lead, and zinc in the United States: U.S. Geological Survey Circular 1178, 21 p. plus CD-ROM.
@@ -2236,6 +2423,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): not read (page cited from memory of an agent; no data file records it).
 - Read in this pass: full text fetched (the 1 km rule located; see S12).
 - Reference check: the content is right but the page is wrong: the rule is on printed p. 5 (and the 1 km definition in the introduction), not p. 15.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): USGS2000a/c1178.txt printed p. 5 (PDF p. 11): the 1 km assessment depth and the whole-deposit rule (the code cited p. 15; corrected).
 
 ### NMRA1998data
 - Reference: U.S. Geological Survey, National Mineral Resource Assessment 1998, permissive tract shapefiles and attributes (tracts with estimated numbers of undiscovered deposits at 90, 50 and 10 percent): USGS Mineral Resources Online Spatial Data.
@@ -2247,6 +2435,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): research by a Sonnet sub-agent, no read statement.
 - Read in this pass: dataset fetched (three sedex shapefile attribute tables parsed; see S28).
 - Reference check: n/a (dataset).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the three sedex shapefile attribute tables in nmra.zip parsed on the test machine: 12 tracts with estimates, 207,508 km2, sums 2 / 10 / 26 (DEP-107 reproduced).
 
 ### Wood1983
 - Reference: Wood, G.H., Jr., Kehn, T.M., Carter, M.D., and Culbertson, W.C., 1983, Coal resource classification system of the U.S. Geological Survey: U.S. Geological Survey Circular 891, vii + 65 p.
@@ -2258,6 +2447,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) Table 2 p. 22, Table 3 p. 24, text pp. 25-27 (lignite row read from the rendered page). (ORE) in full (page-level quotations; lignite row read from the rendered page).
 - Read in this pass: (DEP) full text fetched (Tables 2 and 3, reliability definitions). (ORE) not fetched (citation page only; the USGS record prints the third and fourth authors as "Carter, M.D., and Culbertson, W.").
 - Reference check: (DEP) matches. coal_seam.json says "Table 3 p. 14" in one note; the report's own list of tables puts Table 3 on p. 24. (ORE) matches. Arithmetic only: 6,000 ft is 1,828.8 m (the circular's "(1,800 m)" is a rounding); 1,800 short tons per acre-foot is 1.324 t/m3.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Wood1983/circ891.txt: glossary (printed p. 8: coal field, region, province), Table 1 (p. 17), Table 2 (p. 22, re-extracted with layout), Table 3 (p. 24), text pp. 24-27 (reliability radii).
 
 ### Ellis1999
 - Reference: Ellis, M.S., Gunther, G.L., Ochs, A.M., Roberts, S.B., Wilde, E.M., Schuenemeyer, J.H., Power, H.C., Stricker, G.D., and Blake, D., 1999, Coal resources, Powder River Basin, chap. PN; Ellis, M.S., Flores, R.M., Ochs, A.M., Stricker, G.D., Gunther, G.L., Rossi, G.S., Bader, L.R., Schuenemeyer, J.H., and Power, H.C., 1999, Gillette coalfield, Powder River Basin: geology, coal quality, and coal resources, chap. PG; both in Fort Union Coal Assessment Team, 1999 resource assessment of selected Tertiary coal beds and zones in the northern Rocky Mountains and Great Plains region: U.S. Geological Survey Professional Paper 1625-A. Chapter PS (Fort Union, Powder River) also used.
@@ -2269,6 +2459,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) tables PN-1, PG-2 cited. (ORE) in full (chapter PDFs, PDF pages quoted).
 - Read in this pass: (DEP) full text fetched for PN, PG, PS (three numbers checked, S41). (ORE) not fetched (chapter list read; PDFs unreadable).
 - Reference check: (DEP) the by-lines come from the project's data file; the catalogue lists the volume's author as "Fort Union Coal Assessment Team and USGS Energy Resources Team". I did not see the by-lines of the PDFs. (ORE) MISMATCH in attribution. "Ellis et al. 1999" is right for PN and PG only. Chapter PS (the Fort Union 22,000 mi2 figure) is Flores and Bader, not Ellis et al. The volume is credited to the Fort Union Coal Assessment Team.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): chapter PS (by-line Flores and Bader: Fort Union 22,000 mi2, PS-3; named coal fields), chapter PN (Wyodak-Anderson resource area 21,911 km2, Tables PN-1 and PN-6), chapter PG (Gillette study area 1,026,000 acres, PG-16; Table PG-2).
 
 ### Nuccio1994
 - Reference: Nuccio, V.F., 1994, Vitrinite reflectance data for the Paleocene Fort Union and Eocene Wind River Formations, and burial history of a drill hole located in central Wind River Basin, Wyoming: U.S. Geological Survey Open-File Report 94-220, 43 p.
@@ -2280,6 +2471,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) Methods PDF p. 2 (Waples 1985 thresholds as cited there). (ORE) in full (PDF p. 2 and Fig. 2 cited).
 - Read in this pass: (DEP) not fetched (catalogue record only). (ORE) not fetched (PDF unreadable by WebFetch; citation page only).
 - Reference check: (DEP) title matches. (ORE) matches (the USGS page prints the author as "Nuccio, V.").
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Nuccio1994/Nuccio1994.txt, Methods (PDF p. 2).
 
 ### Higley2005
 - Reference: Higley, D.K., and Cox, D.O., 2005, Oil and gas exploration and development along the Front Range in the Denver Basin of Colorado, Nebraska, and Wyoming, chap. B of Energy resource studies, northern Front Range, Colorado: U.S. Geological Survey Professional Paper 1698 (162 p.).
@@ -2291,6 +2483,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) pages cited in the data file (pp. 22, 26). (ORE) in full (PDF cited by page).
 - Read in this pass: (DEP) not fetched (only the series record resolved; chapter B record not found by search). (ORE) not fetched (the USGS page gave the volume citation only; chapter title and authors taken from the project's sources file, not confirmed).
 - Reference check: (DEP) full title taken from the project's data file; not independently confirmed. (ORE) volume and editor confirmed; chapter B authorship and title not confirmed.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): new library folder Higley2005/ (USGS PP 1698, P1698.pdf and text); printed pp. 22 and 26 read (TTI 10 onset, Ro 1.35 after Waples 1980).
 
 ### Spencer1988
 - Reference: Spencer, C.W., and Wilson, R.J., 1988, Petroleum geology and principal exploration plays in the Uinta-Piceance-Eagle Basins Province, Utah and Colorado: U.S. Geological Survey Open-File Report 88-450-G, 35 p.
@@ -2302,6 +2495,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) PDF p. 10. (ORE) in full (PDF pages cited).
 - Read in this pass: (DEP) not fetched (catalogue record confirms title and authors). (ORE) not fetched (citation page only; no abstract on it).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Spencer1988/Spencer1988.txt, 'Thermal maturation and burial history' (printed p. 10).
 
 ### Nuccio2003
 - Reference: Nuccio, V.F., and Roberts, L.N.R., 2003, Thermal maturity and oil and gas generation history of petroleum systems in the Uinta-Piceance Province, Utah and Colorado, chap. 4 of USGS Uinta-Piceance Assessment Team, Petroleum systems and geologic assessment of oil and gas in the Uinta-Piceance Province, Utah and Colorado: U.S. Geological Survey Digital Data Series DDS-69-B.
@@ -2313,6 +2507,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) p. 6. (ORE) in full (printed p. 6 cited).
 - Read in this pass: (DEP) not fetched. (ORE) not fetched (volume page only; chapter title and chapter-author pairing not confirmed).
 - Reference check: (DEP) not checked (title from the project's data file). (ORE) volume title and series confirmed; chapter pairing unconfirmed.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the folder Nuccio2003 holds a different item (a well-log plate); chapter 4 of DDS-69-B was fetched into a new folder Nuccio2003_DDS69B_ch4/ and printed p. 6 read (Ro thresholds).
 
 ### Dubiel2003
 - Reference: Dubiel, R.F., 2003, Geology, depositional models, and oil and gas assessment of the Green River Total Petroleum System, Uinta-Piceance Province, eastern Utah and western Colorado, chap. 5 of U.S. Geological Survey Digital Data Series DDS-69-B.
@@ -2324,6 +2519,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) p. 36. (ORE) in full (Appendix B printed p. 36 cited).
 - Read in this pass: (DEP) not fetched. (ORE) not fetched (volume page only).
 - Reference check: (DEP) not checked. (ORE) volume confirmed; chapter pairing unconfirmed. #### Coal
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the folder Dubiel2003 holds chapter 14 (Nelson), not chapter 5; chapter 5 was fetched into a new folder Dubiel2003_DDS69B_ch5/ and its Appendix B data form (printed p. 36) and p. 27 read.
 
 ### Moore2003
 - Reference: Moore, T.E., and Potter, C.J., 2003, Structural plays in Ellesmerian sequence and correlative strata of the National Petroleum Reserve, Alaska: U.S. Geological Survey Open-File Report 2003-253, 40 p.
@@ -2335,6 +2531,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) p. 8. (ORE) in full (printed p. 8 cited).
 - Read in this pass: (DEP) full text fetched (oil window sentence located, S46). (ORE) abstract fetched (USGS page). The abstract says hydrocarbon generation and migration "occurred primarily by sedimentary burial principally between 100-90 Ma"; it does not state an 80-120 degC oil window.
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Moore2003/ofr03253.txt, executive summary (printed p. 8: oil window 80-120 C at about 30 C/km) and the TOC passages.
 
 ### Tuttle2000
 - Reference: Tuttle, M.L., Brownfield, M.E., and Charpentier, R.R. (assessment geologists), 2000, Agbada Reservoirs, assessment unit 71920101 (Niger Delta Province 7192), assessment-unit summary and data form, in U.S. Geological Survey World Energy Assessment Team, U.S. Geological Survey World Petroleum Assessment 2000: description and results: U.S. Geological Survey Digital Data Series DDS-60 (file reg7/P7/tps/AU/au719211.pdf in regions/reg7.zip). Related chapters: Ahlbrandt et al. (AR), Charpentier and Klett (MC), Schmoker and Klett (AM, also Bulletin 2165), Klett et al. (GL), all 2000.
@@ -2346,6 +2543,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) data form p50 printed; p90 and p10 measured off the histogram at 250 dpi. (ORE) in full (data form read, histogram digitised by the project).
 - Read in this pass: (DEP) data form fetched and text read (size and number tables, assessment geologists); histogram bar heights not readable from the text layer. (ORE) not fetched. The authors on the AU form could not be confirmed (the DDS-60 index lists only the chapter authors).
 - Reference check: (DEP) matches (assessment geologists "M.L. Tuttle, M.E. Brownfield and R.R. Charpentier", date 5/28/98). (ORE) authorship of the AU form unconfirmed; the three-name author list may belong to the Niger Delta Province geology report rather than the AU form.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Tuttle2000/au719211.txt, the whole data form (median 12 MMBO, min 1, max 1500; field counts) and the field-size bar chart re-measured from the PDF's vector geometry: p90 2.36, p50 12.04, p10 89.6 MMBO by log-linear interpolation (a figure reading, no printed percentile).
 
 ### Ofr9950H
 - Reference: Tuttle, M.L., Charpentier, R.R., and Brownfield, M.E., 1999 (catalogue form of the names), The Niger Delta petroleum system: Niger Delta Province, Nigeria, Cameroon, and Equatorial Guinea, Africa: U.S. Geological Survey Open-File Report 99-50-H, 65 p.
@@ -2357,6 +2555,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): not stated.
 - Read in this pass: catalogue record only.
 - Reference check: n/a.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Ofr9950H/Ofr9950H.txt: 'Mean API used = 35 (0.85 g/cm3)' for Niger Delta oil (corroborates the 0.85 t/m3 crude density; not cited by the code).
 
 ### Waples1980
 - Reference: Waples, D.W., 1980, Time and temperature in petroleum formation: application of Lopatin's method to petroleum exploration: AAPG Bulletin 64(6):916-926.
@@ -2368,6 +2567,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract via OSTI 6845191. (ORE) abstract only (OSTI record).
 - Read in this pass: (DEP) abstract fetched (OSTI API record, full abstract). (ORE) abstract fetched (OSTI, quoted verbatim in spot checks below). Full text not fetched (AAPG/Datapages returned 403).
 - Reference check: (DEP) matches. (ORE) matches (author, year, volume, issue, pages). The abstract contains the three oil-window thresholds, the doubling rule and the four preservation deadlines. It contains no TTI-to-Ro table and no statement of the temperature interval at which n = 0. The abstract is written "approx. 500 40 degree oil preservation deadline" with the degree sign garbled as "40/sup 0/", which the project read as API gravity; the abstract itself does not say "API".
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the OSTI abstract only (Waples1980/Waples1980.txt): TTI 15 / 75 / 160 and the preservation deadlines.
 
 ### Newell1997
 - Reference: Newell, K.D., 1997 (web version 1998), Comparison of maturation data and fluid-inclusion homogenization temperatures to simple thermal models: implications for thermal history and fluid flow in the midcontinent, part 3 "TTI modeling for localities in central Kansas", Table 1: Kansas Geological Survey, Current Research in Earth Sciences, Bulletin 240, part 2.
@@ -2379,6 +2579,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) web page; Waples' own table not opened. (ORE) secondary source (web page, flagged non-USGS).
 - Read in this pass: (DEP) full text fetched (Table 1 read, S45). Author is K. David Newell (part 1 of the same article gives the by-line); the project wrote "initials not shown". (ORE) full text fetched (the section page: Table 1 rows and the doubling sentence; article front page for title and author). The page does not print a reference list, so what "Waples 1981" is cannot be read from it. The text says "Waples (1980, 1981)".
 - Reference check: (DEP) Table 1 is attributed to Waples (1981) for TTI to Ro, so it is not Waples 1980. (ORE) author is K. David Newell (the sources file lacked the initials). Title and the "1997" year: the URL path says 1997, web version dated 1998-03-16. The "Waples 1981" it credits is probably Waples's 1981 book (Organic Geochemistry for Exploration Geologists), but I could not confirm that from the page; treat as unidentified.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Newell1997/Newell1997.txt, the procedure paragraph and Table 1 (TTI to Ro after Waples 1981).
 
 ### Dyman2002
 - Reference: Dyman, T.S., Crovelli, R.A., Bartberger, C.E., and Takahashi, K.I., 2002, Worldwide estimates of deep natural gas resources based on the U.S. Geological Survey World Petroleum Assessment 2000: Natural Resources Research 11(3):207-218.
@@ -2403,6 +2604,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) OpenAlex/Semantic Scholar abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) not fetched (Crossref metadata only).
 - Reference check: (DEP) matches. It is a 4-page paper (919-922). (ORE) matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only (167 / 158 / 63 m per Myr).
 
 ### Kesler2008
 - Reference: Kesler, S.E., and Wilkinson, B.H., 2008, Earth's copper resources estimated from tectonic diffusion of porphyry copper deposits: Geology 36(3):255-258.
@@ -2415,6 +2617,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract-level. (ORE) not stated. (SCL, PRV, POL, BAK) not stated; DOI linked
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) not fetched (Crossref metadata only; last page 258 from the usual form, not confirmed). (SCL, PRV, POL, BAK) abstract fetched (OpenAlex record; the abstract text is the tool's reconstruction from the index)
 - Reference check: (DEP) matches. (ORE) probable match for "2008"; the code's phrasing "(exhumation)" fits the 2006 paper better than this one. #### Found in this pass, not cited by the code (SCL, PRV, POL, BAK) citation matches. What it is cited for ("deposits above 3.3 km are within mining reach") is NOT in the abstract; the abstract is about estimating the number of porphyry copper deposits formed (about 125,895 in the Phanerozoic), preserved (about 47,789), and total copper (about 1.7 x 10^11 t in preserved porphyry deposits, 3 x 10^11 t all resources). The 3.3 km figure may be in the body; unverified.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only (125,895 formed, 47,789 remain, 3.3 km).
 
 ### Singer1993
 - Reference: Singer, D.A., 1993, Basic concepts in three-part quantitative assessments of undiscovered mineral resources: Nonrenewable Resources 2(2):69-81.
@@ -2426,6 +2629,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract in the research note.
 - Read in this pass: abstract fetched (USGS record, full abstract).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the USGS record abstract (Singer1993/Singer1993.txt): three-part method; permissive boundaries leave 'less than 1 in 100,000 to 1,000,000' outside.
 
 ### Root1992
 - Reference: Root, D.H., Menzie, W.D., and Scott, W.A., 1992, Computer Monte Carlo simulation in quantitative resource estimation: Nonrenewable Resources 1(2):125-138.
@@ -2438,6 +2642,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): no read statement.
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: title and venue found by search; the project gave only a parenthetical description.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): not readable: no abstract in OpenAlex, paywalled.
 
 ### Skirrow2019
 - Reference: Skirrow, R.G., Murr, J., Schofield, A., Huston, D.L., van der Wielen, S., Czarnota, K., and others, 2019, Mapping iron oxide Cu-Au (IOCG) mineral potential in Australia using a knowledge-driven mineral systems-based approach: Ore Geology Reviews 113:103011.
@@ -2450,6 +2655,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: probable identification (the project gives no title). It is an IOCG case study, so it is a weak authority for a general "components are multiplied" rule.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only.
 
 ### McCuaig2010
 - Reference: McCuaig, T.C., Beresford, S., and Hronsky, J., 2010, Translating the mineral systems approach into an effective exploration targeting system: Ore Geology Reviews 38(3):128-138.
@@ -2462,6 +2668,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only.
 
 ### Hronsky2008
 - Reference: Hronsky, J.M.A., and Groves, D.I., 2008, Science of targeting: definition, strategies, targeting and performance measurement: Australian Journal of Earth Sciences 55(1):3-12.
@@ -2474,6 +2681,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only.
 
 ### Agterberg1995
 - Reference: Agterberg, F.P., 1995, Multifractal modeling of the sizes and grades of giant and supergiant deposits: International Geology Review 37(1):1-8.
@@ -2486,6 +2694,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: probable identification (project gives only author and year); title concerns multifractal, not "lognormal with Pareto tail" per se.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only (lognormal body, hyperbolic tail).
 
 ### Singer1995
 - Reference: Singer, D.A., 1995, World class base and precious metal deposits: a quantitative analysis: Economic Geology 90(1):88-104.
@@ -2498,6 +2707,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: abstract fetched (USGS record).
 - Reference check: matches ("between 47 and 79 percent of metal contained in the largest 10 percent of deposits").
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only (47 to 79 % of each metal in the largest 10 % of deposits).
 
 ### Robert2005
 - Reference: Robert, F., Poulsen, K.H., Cassidy, K.F., and Hodgson, C.J., 2005, Gold metallogeny of the Superior and Yilgarn cratons, in One Hundredth Anniversary Volume (Economic Geology): Society of Economic Geologists, p. 1001-1033.
@@ -2510,6 +2720,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) not fetched (Crossref metadata only; the 30-50 km figure could not be checked). (ORE) not fetched (Crossref metadata only).
 - Reference check: (DEP) probable identification (project gives only author and year). (ORE) identified; the 30-50 km spacing is unverified. The paper is about the Superior and Yilgarn cratons.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Crossref abstract, new library folder Robert2005/ (abstract only).
 
 ### Butterworth2016
 - Reference: Butterworth, N.P., Steinberg, D., Müller, R.D., Williams, S.E., Merdith, A.S., and Hardy, S., 2016, Tectonic environments of South American porphyry copper magmatism through time revealed by spatiotemporal data mining: Tectonics 35(12):2847-2862.
@@ -2522,6 +2733,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) not fetched (OpenAlex metadata only).
 - Reference check: (DEP) matches. (ORE) matches. The paper covers South American porphyry copper only; the code applies its convergence-rate, obliquity and slab-age peaks to all porphyries.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): only a web-search summary of the abstract (the publisher page refused the fetch); rows ORE-032 to ORE-034 say so.
 
 ### Richards2003
 - Reference: Richards, J.P., 2003, Tectono-magmatic precursors for porphyry Cu-(Mo-Au) deposit formation: Economic Geology 98(8):1515-1533.
@@ -2534,6 +2746,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) not fetched (OpenAlex metadata only).
 - Reference check: (DEP) matches (abstract covers oxidised, hydrous magmas and fault-controlled ascent). (ORE) matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): OpenAlex abstract, new library folder Richards2003/ (abstract only).
 
 ### Cooke2005
 - Reference: Cooke, D.R., Hollings, P., and Walshe, J.L., 2005, Giant porphyry deposits: characteristics, distribution, and tectonic controls: Economic Geology 100(5):801-818.
@@ -2545,6 +2758,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex); the figshare copy was not opened. (ORE) not fetched (OpenAlex metadata only).
 - Reference check: (DEP) matches ("compressive tectonic environments, thickened continental crust"). (ORE) matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the author's copy deposited on figshare, added to Cooke2005/ as Cooke2005.pdf and Cooke2005_fulltext.txt; abstract and the compression and crustal-thickening passages read (PDF pp. 1, 8-10, 15).
 
 ### Bekker2010
 - Reference: Bekker, A., Slack, J.F., Planavsky, N., Krapež, B., Hofmann, A., Konhauser, K.O., and Rouxel, O.J., 2010, Iron formation: the sedimentary product of a complex interplay among mantle, tectonic, oceanic, and biospheric processes: Economic Geology 105(3):467-508.
@@ -2557,6 +2771,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched but cut off before the age statement (OpenAlex); the 2.65-1.85 Ga window not seen. (ORE) abstract fetched in part (OpenAlex; the stored index ends at "Secular changes in deposition, identified more than 20 years ago,", so the dates are cut off).
 - Reference check: (DEP) title and journal match; age window unverified. (ORE) matches (authors, year, volume, pages).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract only (University of Johannesburg repository page), new library folder Bekker2010/: Superior-type BIF first appeared 'ca. 2.6 Ga', giant BIF 2.6-2.4 Ga, iron formations 'generally disappeared at ca. 1.85 Ga'. No open full text found. The code's acme was changed from 2.65 to 2.6 Ga on this reading.
 
 ### Bohacs1997
 - Reference: Bohacs, K., and Suter, J., 1997, Sequence stratigraphic distribution of coaly rocks: fundamental controls and paralic examples: AAPG Bulletin 81(10):1612-1639.
@@ -2569,6 +2784,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) abstract fetched (Crossref abstract, verbatim).
 - Reference check: (DEP) matches ("significant volumes of terrigenous organic matter can be preserved to form coals only when and where the overall increase in accommodation approximately equals the production rate of peat"). (ORE) matches (authors, year, volume, issue, pages, DOI).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Crossref abstract only, new library folder BohacsSuter1997/.
 
 ### Nelsen2016
 - Reference: Nelsen, M.P., DiMichele, W.A., Peters, S.E., and Boyce, C.K., 2016, Delayed fungal evolution did not cause the Paleozoic peak in coal production: Proceedings of the National Academy of Sciences 113(9):2442-2447.
@@ -2580,6 +2796,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) not fetched (Crossref metadata only). (ORE) full text fetched (PMC; the introduction's statement on the first appearance of coal and the Carboniferous-Permian peak).
 - Reference check: (DEP) probable identification only: the project gives author and year, and this is the 2016 Nelsen et al. paper on coal production. (ORE) the DOI and authors are right, but the paper is about the Carboniferous-Permian coal peak and fungi, not about when coal formation began. It does contain the sentence "Coal deposits occur by the Early Devonian", so it supports the code's land-plant gate only indirectly. #### Ore genesis and drivers
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): full text (PMC4780611), new library folder Nelsen2016/ (html and text): Introduction 'Coal deposits occur by the Early Devonian'; Discussion lignin origin '~420 Ma'.
 
 ### Hoggard2020
 - Reference: Hoggard, M.J., Czarnota, K., Richards, F.D., Huston, D.L., Jaques, A.L., and Ghelichkhan, S., 2020, Global distribution of sediment-hosted metals controlled by craton edge stability: Nature Geoscience 13(7):504-510.
@@ -2591,6 +2808,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (Semantic Scholar). (ORE) abstract fetched (OSF API record of the preprint).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Hoggard2020/Hoggard2020.txt, the abstract only (85 % within 200 km of the thick-thin transition).
 
 ### Leach2001
 - Reference: Leach, D.L., Bradley, D.C., Lewchuk, M.T., Symons, D.T.A., de Marsily, G., and Brannon, J., 2001, Mississippi Valley-type lead-zinc deposits through geological time: implications from recent age-dating research: Mineralium Deposita 36(8):711-740.
@@ -2639,6 +2857,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) not stated; probably via the research note. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) abstract fetched (OpenAlex inverted index; the rebuilt text is word-order scrambled in places, so quote only the intact phrases).
 - Reference check: (DEP) this is the paper that carries the 2.02 Ga statement (see S33). The project has conflated it with Leach2010a. (ORE) matches (authors, year, volume, pages). The abstract divides the deposits into clastic-dominated (which includes what were called SEDEX) and MVT; the code applies the 2.02 Ga gate to both.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract only (OpenAlex), new library folder Leach2010b/: clastic-dominated and MVT deposits first appear at 2.02 Ga; only clastic-dominated deposits were important until the late Neoproterozoic.
 
 ### Garven1984
 - Reference: Garven, G., and Freeze, R.A., 1984, Theoretical analysis of the role of groundwater flow in the genesis of stratabound ore deposits: 1. Mathematical and numerical model, American Journal of Science 284(10):1085-1124; 2. Quantitative results, American Journal of Science 284(10):1125-1174.
@@ -2651,6 +2870,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) no read statement. (ORE) not stated.
 - Read in this pass: (DEP) abstracts of both parts fetched (OpenAlex); the base case numbers are not in either abstract. (ORE) abstract fetched (OpenAlex, both parts). Neither abstract mentions the 1 km over 300 km base case.
 - Reference check: (DEP) the paper is two parts; the code does not say which. The base case is probably in part 2. (ORE) the code does not say which part; the base case is most likely in part 2 (quantitative results). Unconfirmed.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract of part 1 only (OpenAlex), new library folder GarvenFreeze1984/; the base case (1 km over 300 km) is not in it; part 2 not obtained.
 
 ### Garven1985
 - Reference: Garven, G., 1985, The role of regional fluid flow in the genesis of the Pine Point deposit, Western Canada sedimentary basin: Economic Geology 80(2):307-324.
@@ -2663,6 +2883,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract (research note). (ORE) not stated.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: (DEP) matches. (ORE) matches. The abstract contains both the 60-100 degC and the 0.5-5.0 Myr values.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract only (OpenAlex), new library folder Garven1985/: Pine Point model 60-100 C, 0.5-5.0 Myr.
 
 ### Bethke1990
 - Reference: Bethke, C.M., and Marshak, S., 1990, Brine migrations across North America: the plate tectonics of groundwater: Annual Review of Earth and Planetary Sciences 18:287-315.
@@ -2699,6 +2920,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract in the research note; the data file says "typically 3-9 Myr" was not found in any USGS document. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (Crossref, full abstract). (ORE) not fetched (Crossref metadata only).
 - Reference check: (DEP) matches. The abstract itself contains both "at least 0.5 m.y." and "typically minima of 3 to 9 m.y." (S13). (ORE) matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Crossref abstract (full), new library folder Sillitoe2005/Sillitoe2005.txt (abstract only; chapter paywalled): 'at least 0.5 m.y. but typically minima of 3 to 9 m.y.'; 'two or three times the hypogene tenor'.
 
 ### Titley1995
 - Reference: Titley, S.R., and Marozas, D.C., 1995, Processes and products of supergene copper enrichment, in Pierce, F.W., and Bolm, J.G., eds., Porphyry copper deposits of the American Cordillera: Arizona Geological Society Digest 20, p. 156-168.
@@ -2746,6 +2968,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: matches (abstract says stocks "vertically elongate (>3 km)", pluton paleodepths 5 to 15 km, life spans ~100,000 to several million years).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only.
 
 ### Seedorff2005
 - Reference: Seedorff, E., Dilles, J.H., Proffett, J.M., Einaudi, M.T., Zurcher, L., Stavast, W.J.A., and others, 2005, Porphyry deposits: characteristics and origin of hypogene features, in One Hundredth Anniversary Volume (Economic Geology): Society of Economic Geologists, p. 251-298.
@@ -2758,6 +2981,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: not fetched (Crossref metadata only; the Crossref listing shows the first six authors; the full author list was not retrieved).
 - Reference check: probable identification.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only (first 2,500 characters).
 
 ### Heckel1986
 - Reference: Heckel, P.H., 1986, Sea-level curve for Pennsylvanian eustatic marine transgressive-regressive depositional cycles along midcontinent outcrop belt, North America: Geology 14(4):330 (end page not seen).
@@ -2793,6 +3017,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): "the constants of the paper".
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Blackman2021/Blackman2021.txt (arXiv v3): Fig. 4 (xoshiro256 code), Tables 2 and 3, the SplitMix seeding advice.
 
 ### Marsaglia1964
 - Reference: Marsaglia, G., and Bray, T.A., 1964, A convenient method for generating normal variables: SIAM Review 6(3):260-264.
@@ -2817,6 +3042,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): "the constants of the paper".
 - Read in this pass: not fetched; the constants were checked against NumPy's implementation of the algorithm (S50).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the library file is Hormann's April 1992 preprint of the same method; Algorithm PTRS and its constants read on rendered pages (printed pp. 6-7); they match the code. The 1993 journal article remains unread.
 
 ### AbramowitzStegun1964
 - Reference: Abramowitz, M., and Stegun, I.A., eds., 1964, Handbook of mathematical functions with formulas, graphs, and mathematical tables: National Bureau of Standards Applied Mathematics Series 55, formula 7.1.26.
@@ -2828,6 +3054,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): no read statement.
 - Read in this pass: not fetched.
 - Reference check: the edition year (1964) is the standard first edition; not checked here.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): new library folder AbramowitzStegun1964/ (scanned, no text layer); formulas 7.1.25 to 7.1.28, printed p. 299, read on a rendered page.
 
 ### Acklam
 - Reference: Acklam, P.J., An algorithm for computing the inverse normal cumulative distribution function (web note, undated, around 2000-2003).
@@ -2839,6 +3066,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): no read statement.
 - Read in this pass: full text fetched (relative error and the 0.02425 split read, S50).
 - Reference check: matches the algorithm; undated web note, not a publication.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Acklam/acklam3.txt, the coefficient listing, break-points and error statement (all match the code).
 
 ### Software
 - Reference: Ellefsen, K.J., 2017, User's guide for MapMark4: an R package for the probability calculations in three-part mineral resource assessments: U.S. Geological Survey Techniques and Methods, book 7, chap. C14 (doi 10.3133/tm7c14); Duval, J.S., 2012, Version 3.0 of EMINERS, Economic Mineral Resource Simulator: U.S. Geological Survey Open-File Report 2004-1344 (doi 10.3133/ofr20041344); EIS Toolkit (EUPL-1.2, offline calibration only): Reference: UNIDENTIFIED (no citation given; not searched).
@@ -2905,6 +3133,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): in full (pages cited).
 - Read in this pass: not fetched (index page only; PDFs unreadable). The Bulletin 2165 page https://pubs.usgs.gov/bul/2165/ returned 404.
 - Reference check: chapter titles and authors match the project's description; the 1,000-1,500 MMBO and 6,000 cf/bbl values were not checked.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the folder held only the landing page; chapters AM, AR, MC and GL of DDS-60 were fetched into a new folder USGS2000b_DDS60chapters/ and the minimum-field-size and fractile passages read.
 
 ### Averitt1975
 - Reference: Averitt, Paul, 1975, Coal resources of the United States, January 1, 1974: U.S. Geological Survey Bulletin 1412, vi, 131 p.
@@ -2916,6 +3145,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): not stated beyond the research sub-agent.
 - Read in this pass: not fetched (citation page only).
 - Reference check: matches. The "458,600 mi2 = 13 %" and Mammoth bed figures were not checked.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Averitt1975/Averitt1975.txt: Table 1 (printed p. 7, coal-bearing area by state), the number-of-beds table (p. 8), Tables 2 and 6, the Mammoth zone (pp. 63-64), the No. 5 and Herrin beds (pp. 68-69).
 
 ### Trippi2011
 - Reference: Trippi, Michael H., and Tewalt, Susan J., 2011, Geographic information system (GIS) representation of coal-bearing areas in India and Bangladesh: U.S. Geological Survey Open-File Report 2011-1296, iii, 23 p.
@@ -2927,6 +3157,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): not stated.
 - Read in this pass: abstract fetched (shapefiles of coalfields; no counts or areas in it).
 - Reference check: authors were not given in the project's citation; now resolved. The "113 coalfields" and "34.7 thousand km2" were not checked.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the full report added to Trippi2011/ (OFR2011-1296.pdf and text); printed pp. 1-14 read: 34.7 thousand km2 of coalfield in 3.29 million km2 of land; Table 1 lists about 150 coalfield and lignite names and no per-field areas.
 
 ### BAP2018
 - Reference: Bioregional Assessments Programme, 2018 (finalised), Context statement for the Sydney Basin bioregion (Product 1.1), Australian Government.
@@ -2938,6 +3169,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): not stated.
 - Read in this pass: full text fetched in part (landing page; two targeted questions). See ORE-121 spot check: the page gives different numbers from the ledger.
 - Reference check: no authors printed; date from page footer.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): nine context-statement and resource-assessment pages added to BAP2018/ (Commonwealth open content) and read: 36,000 km2 onshore basin, five coalfields named by the Coalfield Geology Council of NSW, Southern Coalfield seam thicknesses.
 
 ### Hatch2002
 - Reference: Hatch, Joseph R., and Affolter, Ronald H., 2002, Resource assessment of the Springfield, Herrin, Danville, and Baker coals in the Illinois Basin: U.S. Geological Survey Professional Paper 1625-D.
@@ -2949,6 +3181,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): "several are the research's own arithmetic".
 - Read in this pass: not fetched (USGS page only).
 - Reference check: identified from the report number. This is the Illinois Basin volume and is the likely home of any Illinois Basin coal-area figure.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Hatch2002/Hatch2002.txt, Executive Summary pp. A1-A5, Introduction p. B1, p. D9: the Illinois Basin's coal-bearing area is 36,800 mi2 in Illinois, 6,500 in Indiana and 6,400 in western Kentucky (the 36,800 used by the coal type before stage 2 is Illinois alone).
 
 ### Ruppert2014
 - Reference: Ruppert, Leslie F., and Ryder, Robert T., eds., 2014, Coal and petroleum resources in the Appalachian basin: distribution, geologic framework, and geochemical character: U.S. Geological Survey Professional Paper 1708. Chapter D.1: Coal and coalbed-methane resources in the Appalachian and Black Warrior basins: maps showing the distribution of coal fields, coal beds, and coalbed-methane fields.
@@ -2960,6 +3193,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): research's own arithmetic in part.
 - Read in this pass: not fetched (USGS page only; chapter authors not shown).
 - Reference check: identified from the report number.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Ruppert2014/Ruppert2014.txt, 'Coal Regions and Fields' (p. 1): 23 named Appalachian coal fields; no thickness or area tables.
 
 ### NMET-Jharia
 - Reference: UNIDENTIFIED. "NMET Jharia proposal" (National Mineral Exploration Trust, India). I did not search for it (no search tool); no bibliographic form was available.
@@ -2984,6 +3218,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): listed as NOT verified.
 - Read in this pass: not fetched.
 - Reference check: cannot identify.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): SAIMM-coalfields/SAIMM-coalfields.txt: p. 95 ('19 coalfields'), Tables I and III. No coalfield areas.
 
 ### Hampson1999
 - Reference: probable identification: Hampson, Gary, Stollhofen, Harald, and Flint, Steve, 1999, A sequence stratigraphic model for the Lower Coal Measures (Upper Carboniferous) of the Ruhr district, north-west Germany: Sedimentology, v. 46, no. 6, p. 1199-1231. The code gives only "Hampson 1999"; this is the only 1999 Hampson paper on coal cycles I found by Crossref.
@@ -3031,6 +3266,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): listed as NOT verified.
 - Read in this pass: full text fetched (the area sentence).
 - Reference check: page found and the figure matches (see ORE-126 spot check).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): GABowen/GABowen.txt: the Bowen Basin occupies about 160,000 km2, its southern half under the Surat Basin; no coalfield list.
 
 ### Ryer1980
 - Reference: Ryer, Thomas A., and Langer, Anna W., 1980, Thickness change involved in the peat-to-coal transformation for a bituminous coal of Cretaceous age in central Utah: Journal of Sedimentary Petrology, v. 50, no. 3, p. 987-992 (OpenAlex names the journal Journal of Sedimentary Research, the same SEPM journal).
@@ -3043,6 +3279,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): not stated; not used by the code.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: matches. The paper is a single Utah case; the abstract says "approximately 11:1".
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Crossref abstract only, new library folder RyerLanger1980/ (peat:coal about 11:1 for one Cretaceous bed).
 
 ### Cox1986
 - Reference: Cox, Dennis P., and Singer, Donald A., eds., 1986, Mineral deposit models: U.S. Geological Survey Bulletin 1693, xiii, 379 p. (DEP covers the grade-tonnage models.) Descriptive models used: 39a placer Au-PGE (Warren E. Yeend); sedimentary exhalative Zn-Pb; alluvial placer Sn; diamond placers.
@@ -3054,6 +3291,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): "figure intercepts and page numbers cited".
 - Read in this pass: full text fetched (the five HTML pages above).
 - Reference check: matches. Notes: the USGS series page prints "Originally published 1996; Version 1.0 posted 1998" (the print volume is 1986). The HTML pages do not print the model numbers 31a, 39d, 39e in the text I received, so the mapping of those numbers to sedex, alluvial tin and diamond placers rests on the ledger. The p. 262 page number for the gravel density could not be checked.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Cox1986/b1693.txt (MosierSinger1986, MenzieMosier1986, MosierBriskey1986, Cannon1986 and OrrisBliss1986 are byte-identical copies of this file): models 39a (placer Au), 34a (Superior Fe), 28b (Algoma Fe), 32a/32b (MVT), 31a (sedex) text; the grade-tonnage arrow labels are not in the OCR layer and were read on rendered page images (PDF page = printed + 16).
 
 ### Thomas1949
 - Reference: Thomas, Marjorie, 1949, A generalization of Poisson's binomial limit for use in ecology: Biometrika, v. 36, no. 1-2, p. 18-25.
@@ -3078,6 +3316,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): not read; the note says full text is needed.
 - Read in this pass: not fetched (OpenAlex metadata only).
 - Reference check: identified. This is the review that would carry any placer-efficiency or transport-distance figures; it is the first paper to get through a library.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Crossref abstract, new library folder Garnett2005/ (abstract only): transport 'from less than a kilometer to hundreds of kilometers'.
 
 ### Lehmann2020
 - Reference: Lehmann, Bernd, 2021 (online 2020), Formation of tin ore deposits: a reassessment: Lithos, v. 402-403, article 105756.
@@ -3115,6 +3354,34 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Reference check: n/a. Not bibliographic: Excavated Variants; Create Ore Excavation (COE); Create: Diesel Generators (CDG) and its default thresholds; Create ore stones; vanilla 1.21.1 ore-density measurement (tools/review/deposit-audit.sh); deposit audit tool; project documents (docs/deeptime-design-decisions.md, docs/research/notes/ore_genesis_modeling.md, plan sections, surface_processes_climate.md section 4, build log STATUS.md); Wikipedia pages (Upper Silesia, Indian field areas, Bowen Basin), listed in the project as weak secondary sources.
 
 ---
+
+
+### Smolinski2014
+- Reference: Smolinski, A., Rompalski, P., Cybulski, K., Checko, J., and Howaniec, N., 2014, Chemometric study of trace elements in hard coals of the Upper Silesian Coal Basin, Poland: The Scientific World Journal 2014, article 234204.
+- DOI or URL: 10.1155/2014/234204 ; https://pmc.ncbi.nlm.nih.gov/articles/PMC4055605/
+- Cited as: (stage 2) the Upper Silesian Coal Basin's area and documented deposits in the coal type's notes.
+- Ledger ids: ORE-122
+- Access: open access (CC BY).
+- Library (the project's source library, not distributed): fetched in stage 2 (Europe PMC full-text XML), folder Smolinski2014/, text file Smolinski2014.txt.
+- Read in stage 2 (WP-9/10, 2026-10-02): the geological setting: basin 5,600 km2, documented area 3,295 km2, 120 documented deposits; the coal series and their seam counts.
+
+### Hancox2014
+- Reference: Hancox, P.J., and Götz, A.E., 2014, South Africa's coalfields - a 2014 perspective: International Journal of Coal Geology 132:170-254.
+- DOI or URL: 10.1016/j.coal.2014.06.019 ; author-accepted manuscript at https://repository.up.ac.za/bitstream/handle/2263/58453/Hancox_South_2014.pdf
+- Cited as: (stage 2) the South African coalfield areas in the coal type's notes.
+- Ledger ids: ORE-126
+- Access: paywalled; author-accepted manuscript in the University of Pretoria repository.
+- Library (the project's source library, not distributed): fetched in stage 2, folder Hancox2014/, text file Hancox2014.txt (some digits garbled in the text layer; those statements are not relied on).
+- Read in stage 2 (WP-9/10, 2026-10-02): section 4, the coalfield location paragraphs: 19 coalfields over some 9.7 million ha; Witbank over 568,000 ha, Highveld about 700,000 ha, Waterberg about 360,000 ha.
+
+### ICS2023
+- Reference: International Commission on Stratigraphy, 2023, International Chronostratigraphic Chart, v2023/09.
+- DOI or URL: https://stratigraphy.org/ICSchart/ChronostratChart2023-09.pdf
+- Cited as: (stage 2) the base of the Devonian, 419.2 +/- 3.2 Ma, for the land-plants clock (deposits/clocks.rs LAND_PLANTS_GA).
+- Ledger ids: ORE-015
+- Access: open.
+- Library (the project's source library, not distributed): fetched in stage 2, folder ICS2023/, text file ChronostratChart2023-09.txt.
+- Read in stage 2 (WP-9/10, 2026-10-02): the Devonian base, '419.2 +/-3.2' Ma, read by the WP-9/10 agent.
 
 ## Moisture, Köppen classes and biomes (MOI, BIO)
 
@@ -3503,11 +3770,12 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Forsyth & Uyeda 1975, Geophys. J. R. Astron. Soc. 43:163-200".
 - Ledger ids: PLT-023, PLT-030, PLT-162, PLT-182, PLT-185, PLT-189, PLT-199, FRC-010, FRC-012, FRC-016, FRC-017
 - Access: paywalled (abstract only).
-- Library (the project's source library, not distributed): fetched since WP-0 (PDF and text extraction ForsythUyeda1975.txt, 1,855 lines).
+- Library (the project's source library, not distributed): fetched in WP-13a (publisher's free PDF, 38 pages, text layer). From: https://academic.oup.com/gji/article-pdf/43/1/163/1576393/43-1-163.pdf. Text file: ForsythUyeda1975.txt.
 - Substitute: none found.
 - Read so far (by the project): abstract only / secondary pages. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent with line numbers: slab forces "an order of magnitude stronger than any other force" and the "terminal velocity" (Summary, lines 27-35; 716-727; 7.0 cm/yr at 1237-1239); continental drag "approximately eight times" the oceanic (1238-1241, a result of their inverse fit); slab-attached plates 6-9 cm/yr, others 0-4 cm/yr (699-704); ridge push of McKenzie 1972 "of the order of 300 bars" (1441-1450); their lithosphere 80 km.
 - Read in this pass: abstract fetched (publisher page).
 - Reference check: citation correct. The journal title "Geophysical Journal of the Royal Astronomical Society" is the 1975 name (now Geophysical Journal International). The abstract does NOT contain the "3 to 4" speed ratio or any factor of 8 (see Part 2); those must come from the body or from another paper.
+- Read in WP-13a (2026-10-02): full text. Slab-attached plates 6-9 cm/yr, others 0-4 cm/yr, terminal velocity (p. 178); "no obvious relation between velocity and area" (p. 177, Fig. 5); slab pull and resistance an order of magnitude above the rest, drag under continents "approximately eight times" that under oceans (p. 189, Tables 5 and 6); continental viscosity "about eight times larger" (p. 194); Table 1 (areas, speeds, trench lengths) used to compute Earth statistics. Ledger: PLT-162, PLT-181 to PLT-189, PLT-197 to PLT-199, CHK-020 to CHK-027, CHK-056. The "3 to 4" is not a sentence of the paper (fix 18).
 
 ### Shepard1963
 - Reference: Shepard, F. P. (1963). Submarine Geology, 2nd ed. Harper & Row, New York.
@@ -3621,10 +3889,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: (PLT) "Bird 2003, G3 4(3):1027" (52 plates; Pacific 103.3 million km2; seven largest about 92 percent); editor hint "Earth: about 14". (CLM) "Bird 2003" (no title or journal in the code; I assigned this paper because the claim concerns subduction-zone length and rate)
 - Ledger ids: CLM-054, PLT-143, PLT-145, PLT-203
 - Access: open access (G3 is open), not fetched as full text here. [other sections: paywalled (Unpaywall closed)]
-- Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
+- Library (the project's source library, not distributed): fetched in WP-13a (full text PDF, author's site). From: http://peterbird.name/publications/2003_PB2002/2001GC000252.pdf. Text file: Bird2003.txt.
 - Read so far (by the project): (PLT) "confirmed from abstract or secondary pages"; areas from Wikipedia. (CLM) not stated; no title or journal given
 - Read in this pass: (PLT) abstract fetched (OpenAlex reconstruction). (CLM) search result snippet only (the citing passages returned were about regional plate boundaries and did not mention 51,000 km or 62 mm/yr)
 - Reference check: (PLT) correct. The abstract gives "14 large plates ... plus 38 small plates ... for a total of 52 plates". The area numbers and "seven largest 92 percent" are not in the abstract. (CLM) IDENTIFICATION UNCERTAIN. Bird 2003 is the PB2002 plate-boundary model; a total subduction length of 51,000 km at 62 mm/yr is plausible from it but I could not confirm it is in that paper.
+- Read in WP-13a (2026-10-02): Table 1 (areas in steradians): Pacific 2.57685 sr, 20.5 % of the sphere; seven plates above 5 %, together 81 % (not 92 %); Table 3 re-read: subduction 51,310 of 260,487 km (19.7 %). PLT-143, PLT-145, PLT-213, CHK-001, CHK-003.
 
 ### Morra2013
 - Reference: Morra, G., Seton, M., Quevedo, L., Müller, R. D. (2013). Organization of the tectonic plates in the last 200 Myr. Earth and Planetary Science Letters 373:93-101.
@@ -3672,6 +3941,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): abstract-only status in the ledger.
 - Read in this pass: full text fetched (targeted at cycle length and supercontinent dates).
 - Reference check: title/author/journal not named in the code; now identified.
+- Read in WP-13a (2026-10-02): full text again: "intervals of ca. 500 m.y."; Pangea c. 325-200 Ma, Rodinia c. 950-800 Ma, Pannotia c. 620-580 Ma. PLT-201, CHK-036.
 
 ### Mitchell2021
 - Reference: Mitchell, R. N., Zhang, N., Salminen, J., Liu, Y., Spencer, C. J., Steinberger, B., Murphy, J. B., Li, Z.-X. (2021). The supercontinent cycle. Nature Reviews Earth & Environment 2(5):358-374.
@@ -3679,10 +3949,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Mitchell et al. 2021, Nat. Rev. Earth Environ. 2:358-374".
 - Ledger ids: PLT-148, PLT-201
 - Access: paywalled.
-- Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://gfzpublic.gfz-potsdam.de/pubman/item/item_5006495. File: Mitchell2021.txt.
+- Library (the project's source library, not distributed): fetched in WP-13a (accepted manuscript, Curtin University; the landing page is kept as Mitchell2021_landing.txt). From: https://curate.curtin.edu.au/ndownloader/files/62792113. Text file: Mitchell2021.txt.
 - Read so far (by the project): abstract-only status.
 - Read in this pass: metadata only.
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): full text (accepted manuscript): a cycle "often considered to last 400-800 million years", ~600 Myr dominant; tenures "between 100 and 300 Myr". PLT-201, CHK-035, CHK-036.
 
 ### Copley2010
 - Reference: Copley, A., Avouac, J.-P., Royer, J.-Y. (2010). India-Asia collision and the Cenozoic slowdown of the Indian plate: implications for the forces driving plate motions. Journal of Geophysical Research 115(B3):B03410.
@@ -3695,6 +3966,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): not stated beyond section 3 remark.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: correct, and the abstract also contains the force magnitudes used elsewhere in the designs (Part 2).
+- Read in WP-13a (2026-10-02): abstract again: convergence "dropping from ~15 to ~4 cm/yr" between 50 and 35 Ma; Himalaya-Tibet resistance ~5-6 x 10^12 N/m; ridge push ~2.5 x 10^12 N/m; crustal thickening "the dominant cause". The Cambridge and HAL copies were not reachable or hold no file. PLT-154, PLT-177, PLT-187, PLT-200, CHK-037.
 
 ### DaviesvonBlanckenburg1995
 - Reference: Davies, J. H., von Blanckenburg, F. (1995). Slab breakoff: a model of lithosphere detachment and its test in the magmatism and deformation of collisional orogens. Earth and Planetary Science Letters 129(1-4):85-102.
@@ -3790,6 +4062,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): abstract-only status.
 - Read in this pass: abstract fetched (Crossref).
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): full text: uplift "reaching ~2.5 mm/yr in the northwestern Alps" (abstract); nothing on the Himalaya. PLT-180.
 
 ### Tremblay2015
 - Reference: Tremblay, M. M., Fox, M., Schmidt, J. L., Tripathy-Lang, A., Wielicki, M. M., Harrison, T. M., Zeitler, P. K., Shuster, D. L. (2015). Erosion in southern Tibet shut down at ~10 Ma due to enhanced rock uplift within the Himalaya. Proceedings of the National Academy of Sciences 112(39):12030-12035.
@@ -3801,6 +4074,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): abstract-only status.
 - Read in this pass: abstract fetched.
 - Reference check: identified by volume and first page; the paper is about erosion rates falling, while the design cites it for "exhumation above 1 mm/yr at 17-12 Ma" (not verifiable from the abstract).
+- Read in WP-13a (2026-10-02): full text: "rapid exhumation exceeding 1 km/Ma from 17-16 to 12-11 Ma" in southern Tibet. PLT-180.
 
 ### Schellart2004
 - Reference: Schellart, W. P. (2004). Quantifying the net slab pull force as a driving mechanism for plate tectonics. Geophysical Research Letters 31(7):L07611.
@@ -3813,6 +4087,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): abstract in full.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): abstract again (OpenAlex): net slab pull up to ~8-12 % of the slab's buoyancy, "up to twice as large as the ridge push force". Full text not obtainable (Wiley refuses scripts; the ANU record holds only a deposit record). PLT-182.
 
 ### ConradLB2002
 - Reference: Conrad, C. P., Lithgow-Bertelloni, C. (2002). How mantle slabs drive plate tectonics. Science 298(5591):207-209.
@@ -3825,6 +4100,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract.
 - Read in this pass: abstract fetched.
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): abstract again: upper-mantle slab pull "about half of the total driving force". No open copy found (UCL Discovery records 404, the lab page has no file). PLT-186.
 
 ### ConradLB2004
 - Reference: Conrad, C. P., Lithgow-Bertelloni, C. (2004). The temporal evolution of plate driving forces: importance of "slab suction" versus "slab pull" during the Cenozoic. Journal of Geophysical Research 109(B10):B10407.
@@ -3837,6 +4113,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract.
 - Read in this pass: abstract fetched (OpenAlex; reconstruction partly garbled, key sentence legible).
 - Reference check: correct. This abstract, not Forsyth & Uyeda, contains the "about 4 times faster" statement (Part 2).
+- Read in WP-13a (2026-10-02): abstract again: subducting plates "currently move ~4 times faster"; suction and pull about 40 and 60 % of the forces, suction ~30 % with a low-viscosity asthenosphere. Full text not obtainable (Wiley; Deep Blue refuses scripts). PLT-162, PLT-186, CHK-025, CHK-056.
 
 ### ConradLB2006
 - Reference: Conrad, C. P., Lithgow-Bertelloni, C. (2006). Influence of continental roots and asthenosphere on plate-mantle coupling. Geophysical Research Letters 33(5):L05312.
@@ -3844,10 +4121,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Conrad & Lithgow-Bertelloni 2006, GRL 33:L05312".
 - Ledger ids: PLT-188, FRC-010, FRC-027
 - Access: open copy at Wiley (bronze), abstract read here.
-- Library (the project's source library, not distributed): fetched since WP-0 (PDF and text extraction ConradLB2006.txt).
+- Library (the project's source library, not distributed): fetched in WP-13a (4 pages, text layer). From: https://discovery.ucl.ac.uk/id/eprint/146995/1/2005GL025621.pdf. Text file: ConradLB2006.txt.
 - Read so far (by the project): from abstract. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent: roots "increase traction magnitudes by a factor of 2-5 compared to 100 km thick lithosphere" (abstract, lines 19-21), "about three times larger on average" (165-169); reference lithosphere 100 km (97-98).
 - Read in this pass: abstract fetched.
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): full text: continental roots "increase traction magnitudes by a factor of 2-5 compared to 100 km thick lithosphere" (abstract and section 3). PLT-188 verified.
 
 ### LithgowBertelloniRichards1998
 - Reference: Lithgow-Bertelloni, C., Richards, M. A. (1998). The dynamics of Cenozoic and Mesozoic plate motions. Reviews of Geophysics 36(1):27-78.
@@ -3855,11 +4133,12 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Lithgow-Bertelloni & Richards 1998, Rev. Geophys. 36:27-78".
 - Ledger ids: PLT-187, FRC-009, FRC-016
 - Access: paywalled (abstract).
-- Library (the project's source library, not distributed): fetched since WP-0 (PDF and text extraction LithgowBertelloniRichards1998.txt).
+- Library (the project's source library, not distributed): fetched in WP-13a (52 pages, text layer). From: https://discovery.ucl.ac.uk/id/eprint/125253/1/97RG02282.pdf. Text file: LithgowBertelloniRichards1998.txt.
 - Substitute: none found.
 - Read so far (by the project): from abstract. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent: ">90%" slabs, "<10%" lithospheric effects (abstract, lines 15-17; 2386-2388; 3019); upper mantle 4-5 x 10^20 Pa s (2198-2200), a weak asthenosphere "of the order of 10^19 Pa s" (2467-2475); they give no ridge push or slab pull in N/m.
 - Read in this pass: abstract fetched (Crossref JSON).
 - Reference check: correct. (The 1995 GRL paper 22:1317-1320, same authors, has the same ">90 % slabs, <10 % lithospheric thickening" statement.)
+- Read in WP-13a (2026-10-02): full text: slabs "in excess of 90 %" of the driving forces, lithospheric thickening "of the order of 10 %" (abstract and conclusions). PLT-187.
 
 ### Carlson1983
 - Reference: Carlson, R. L., Hilde, T. W. C., Uyeda, S. (1983). The driving mechanism of plate tectonics: relation to age of the lithosphere at trenches. Geophysical Research Letters 10(4):297-300.
@@ -3872,6 +4151,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract.
 - Read in this pass: abstract fetched (Crossref).
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): abstract again (OpenAlex): speed against age at the trench, r^2 0.98 over 15 trenches; ridge push "just sufficient to overcome drag". Full text not obtainable. PLT-182.
 
 ### ParsonsRichter1980
 - Reference: Parsons, B., Richter, F. M. (1980). A relation between the driving force and geoid anomaly associated with mid-ocean ridges. Earth and Planetary Science Letters 51(2):445-450.
@@ -3884,6 +4164,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract.
 - Read in this pass: metadata only.
 - Reference check: title now identified; correct.
+- Read in WP-13a (2026-10-02): not obtainable (no abstract, no open copy). Its 3 x 10^12 N/m stays unread; Copley et al. 2010's abstract gives ridge push ~2.5 x 10^12 N/m (PLT-187).
 
 ### vanHunenAllen2011
 - Reference: van Hunen, J., Allen, M. B. (2011). Continental collision and slab break-off: a comparison of 3-D numerical models with observations. Earth and Planetary Science Letters 302(1-2):27-37.
@@ -3896,6 +4177,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract.
 - Read in this pass: metadata only.
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): text not obtainable (Durham's repository refuses scripts). The break-off times are read in the same group's EGU 2011 abstract (vanHunen2011EGU, below). PLT-184.
 
 ### Zahirovic2015
 - Reference: Zahirovic, S., Müller, R. D., Seton, M., Flament, N. (2015). Tectonic speed limits from plate kinematic reconstructions. Earth and Planetary Science Letters 418:40-52.
@@ -3903,10 +4185,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Zahirovic et al. 2015, EPSL 418:40-52".
 - Ledger ids: PLT-025, PLT-198, PLT-181, FRC-024
 - Access: paywalled (closed; OpenAlex has no open URL and no abstract).
-- Library (the project's source library, not distributed): full text fetched since WP-0 (PDF and text extraction Zahirovic2015.txt, 1,646 lines; the landing page as before).
+- Library (the project's source library, not distributed): fetched in WP-13a (accepted manuscript, 39 pages, text layer; the landing page is kept as Zahirovic2015_landing.txt). From: https://ro.uow.edu.au/ndownloader/files/50501994. Text file: Zahirovic2015.txt.
 - Read so far (by the project): link given. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent: "a median RMS plate speed of ~4 cm/yr over 200 Myr" (lines 123-125); fastest plates ~8.5 cm/yr RMS, slowest ~2.6-2.8; oceanic plates 2-3 times faster than continental; plates with more than 25 % of their perimeter subducting median 7.9 cm/yr, without subduction 2.6 (652-662).
 - Read in this pass: metadata only (Crossref). Speed numbers could not be read.
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): full text (accepted manuscript): median RMS plate speed ~4 cm/yr over 200 Myr, 4.2 over 3,952 samples; global RMS ~5-10 cm/yr (section 3.2); category medians: no subduction 2.6, over 25 % subducting 7.9, over 50 % continental 2.8, under 25 % continental 8.1 cm/yr (section 3.5); oceanic plates "2-3 times faster" (abstract); present RMS Antarctica 1.1, Africa 2.0, Pacific 7.9 cm/yr. PLT-181, PLT-190, PLT-197 to PLT-199, CHK-020 to CHK-025.
 
 ### DeCellesGiles1996
 - Reference: DeCelles, P. G., Giles, K. A. (1996). Foreland basin systems. Basin Research 8(2):105-123.
@@ -3919,6 +4202,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): (PLT) via a secondary source. (ISO) full text by a Sonnet sub-agent of the flexure agent on 2026-10-02: "Foredeep depozones are typically 100-300 km wide and 2-8 km thick"; forebulges 60-470 km wide and a few tens to a few hundred metres high, as a flexural prediction.
 - Read in this pass: (PLT) abstract fetched (Crossref, first part). (ISO) not part of stage 1; see "Read so far".
 - Reference check: (PLT) correct. The visible part of the abstract defines depozones; the 100-300 km and 2-8 km figures were not seen. (ISO) correct; this settles what stage 1 could not see.
+- Read in WP-13a (2026-10-02): full text again: foredeeps "typically 100-300 km wide and 2-8 km thick"; forebulges "of the order of 60-470 km wide". PLT-194, CHK-039, CHK-040.
 
 ### TurcotteSchubert_Geodynamics
 - Reference: Turcotte, D. L., Schubert, G. Geodynamics. Cambridge University Press (editions 1982, 2002, 2014).
@@ -3930,6 +4214,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): not read; gross slab pull "not confirmed in Turcotte & Schubert itself". For the flexure feature (2026-10-02) a sub-agent read chapter 3 as a PDF (https://sseh.uchicago.edu/doc/Geodynamics_Turcotte_Schubert_ch_3.pdf: E = 70 GPa and ν = 0.25 in the periodic-loading example, 100 GPa elsewhere) and the flexure formulas in lecture notes on the chapter (https://topex.ucsd.edu/geodynamics/12flexure.pdf); the edition of that PDF was not recorded.
 - Read in this pass: not fetched; a 2024 paper that cites it was read (see Li2024).
 - Reference check: edition not stated anywhere in the code or designs; the numbers depend on the edition and chapter.
+- Read in WP-13a (2026-10-02): not read. Its slab-pull law is read as Faccenna et al. 2012's eq. 1, which follows Turcotte & Schubert 1982 (PLT-182, PLT-183). A course directory's copy of a chapter was found and not used: it is not an author's or publisher's copy.
 
 ### Buck2004
 - Reference: Buck, W. R. (2004). Consequences of asthenospheric variability on continental rifting. In: Karner, G. D., Taylor, B., Driscoll, N. W., Kohlstedt, D. L. (eds.), Rheology and Deformation of the Lithosphere at Continental Margins, Columbia University Press, pp. 1-30.
@@ -3987,6 +4272,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract. Force-balance task 5 (2026-10-02): the abstract again (the library holds the landing page only): "extensional stress of 20-50 MPa in its interior" for a homogeneous supercontinent; the thickness it is averaged over is not in the abstract.
 - Read in this pass: abstract fetched (Crossref).
 - Reference check: correct. The abstract does give "extensional stress of 20-50 MPa in its interior" for a homogeneous supercontinent, matching the design.
+- Read in WP-13a (2026-10-02): no full text (the Curtin record has no file; Wiley refuses scripts). PLT-196 stays abstract-only.
 
 ### Cloos1993
 - Reference: Cloos, M. (1993). Lithospheric buoyancy and collisional orogenesis: subduction of oceanic plateaus, continental margins, island arcs, spreading ridges, and seamounts. Geological Society of America Bulletin 105(6):715-737.
@@ -4017,6 +4303,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from memory, not checked.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: the citation is correct (authors, year, volume, pages; issue B2). The paper's title was missing in the design. The abstract concerns critical taper and gives no taper angle in degrees.
+- Read in WP-13a (2026-10-02): abstract (OpenAlex): a critical wedge "slides stably, continuing to grow at constant taper"; Taiwan's surface slope and basal dip are in the body, not read (Wiley). Dahlen 1990 (Annu. Rev. Earth Planet. Sci. 18:55-99) is closed too. The Himalayan figures come from DeCelles & Carrapa 2021 instead. PLT-192.
 
 ### Christensen_Mooney1995
 - Reference: Christensen, N. I., Mooney, W. D. (1995). Seismic velocity structure and composition of the continental crust: a global view. Journal of Geophysical Research 100(B6):9761-9788.
@@ -4036,10 +4323,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: not cited by the project; the earth file's "mean 64 Myr" for sea-floor age needs a source.
 - Ledger ids: (supports 201 and the run review); notes: supports 201 and the run review
 - Access: open access.
-- Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
+- Library (the project's source library, not distributed): fetched in WP-13a as data: the GMT remote server's grid earth_age_06m_p.grd (6 arc-minute, "EarthByte Earth Seafloor Age [Seton et al., 2020]") with the server's listing earth_age_server.txt. From: https://oceania.generic-mapping-tools.org/server/earth/earth_age/. Folder: Seton2020_earth_age.
 - Read so far (by the project): not read.
 - Read in this pass: abstract fetched (Crossref, full).
 - Reference check: n/a.
+- Read in WP-13a (2026-10-02): the grid, area-weighted by cos(latitude) over the 58 % of the sphere it covers (computed): median 55.4 Myr, mean 64.1, 90th percentile 133, 99th 173, oldest 339 Myr; 0.61 % older than 180 Myr and 0.06 % older than 250. Ledger: PLT-161, PLT-201, CHK-019, CHK-032 to CHK-034. The paper itself was not read.
 
 ### SyracuseAbers2006
 - Reference: Syracuse, E. M., Abers, G. A. (2006). Global compilation of variations in slab depth beneath arc volcanoes and implications. Geochemistry, Geophysics, Geosystems 7(5):Q05017.
@@ -4820,6 +5108,41 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read so far (by the project): full text by a Sonnet sub-agent of the flexure agent on 2026-10-02: "Foredeep depozones are typically 100-300 km wide and 2-8 km thick"; forebulges 60-470 km wide and a few tens to a few hundred metres high, as a flexural prediction.
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct; this settles what stage 1 could not see.
+
+
+## Force-balance plate motion: sources added in WP-13a (2026-10-02)
+
+### FaccennaBecker2012
+- Reference: Faccenna, C., Becker, T. W., Lallemand, S., Steinberger, B. (2012). On the role of slab pull in the Cenozoic motion of the Pacific plate. Geophysical Research Letters 39(3):L03305.
+- DOI or URL: 10.1029/2011GL050155; author's preprint https://twb.ig.utexas.edu/preprints/fbls11.pdf.
+- Ledger ids: PLT-182, PLT-183, PLT-184.
+- Access: open copy (author's preprint, the published layout).
+- Library (the project's source library, not distributed): fetched (PDF, text layer). Text file: FaccennaBecker2012.txt.
+- Read in WP-13a (2026-10-02): eq. 1, F_sp = 0.25 drho g l 2.32 (kappa A)^(1/2) "following Turcotte and Schubert [1982]", slab length l "assumed constant at 700 km", drho 70 kg/m3, g about 10 m/s2, kappa 1e-6 m2/s, the 0.25 for the slab's heating after Carlson et al. 1983.
+
+### DeCellesCarrapa2021
+- Reference: DeCelles, P. G., Carrapa, B. (2021). Coupled rapid erosion and foreland sedimentation control orogenic wedge kinematics in the Himalayan thrust belt of central Nepal. Journal of Geophysical Research: Solid Earth 126(5):e2020JB021256.
+- DOI or URL: 10.1029/2020JB021256; NSF public access copy https://par.nsf.gov/servlets/purl/10229963.
+- Ledger ids: PLT-192.
+- Access: open copy (NSF Public Access Repository).
+- Library (the project's source library, not distributed): fetched (PDF, text layer). Text file: DeCellesCarrapa2021.txt.
+- Read in WP-13a (2026-10-02): section 2.4.1 and the conclusions: Lesser Himalayan surface slopes about 0.4-1.6 deg, total taper 6-7.5 deg; foredeep total taper 2.6-3.1 deg; Greater Himalaya surface slopes 5.3-15.8 deg.
+
+### vanHunen2011EGU
+- Reference: van Hunen, J., Faccenna, C., Allen, M. (2011). Slab break-off and applications to Tethys subduction. Geophysical Research Abstracts 13, EGU2011-6298 (EGU General Assembly 2011).
+- DOI or URL: https://meetingorganizer.copernicus.org/EGU2011/EGU2011-6298.pdf.
+- Ledger ids: PLT-184.
+- Access: open (conference abstract).
+- Library (the project's source library, not distributed): fetched (PDF, text layer). Text file: vanHunen2011EGU.txt.
+- Read in WP-13a (2026-10-02): the whole abstract: an old, strong slab breaks off "at 20-25 Myr after the first onset of continental collision", young or weak slabs "already 10 Myr after"; slabs rest on the mantle's "viscosity increase across 660 km". It stands in for van Hunen & Allen 2011 (EPSL), whose text could not be obtained.
+
+### SchmalholzMancktelow2016
+- Reference: Schmalholz, S. M., Mancktelow, N. S. (2016). Folding and necking across the scales: a review of theoretical and experimental results and their applications. Solid Earth 7:1417-1465.
+- DOI or URL: 10.5194/se-7-1417-2016 (open access, CC BY 3.0).
+- Ledger ids: PLT-187 (secondary for Molnar & Lyon-Caen 1988).
+- Access: open access.
+- Library (the project's source library, not distributed): already present under the key Schmalholz2016 (added by another package). Text file: Schmalholz2016.txt.
+- Read in WP-13a (2026-10-02): the passage citing Molnar & Lyon-Caen 1988 for a horizontal driving force "of ~7 x 10^12 N m-1" in Tibet.
 
 ## Plate-check boundary mix and arc heights (PLT-213 to PLT-221)
 

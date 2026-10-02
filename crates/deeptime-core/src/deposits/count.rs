@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! Counts (plan §8.6 step 2, the USGS three-part method's third part): per permissive tract
 //! N ~ Poisson(λ), λ = ρ · A_tract · mean F · count_mult · E, with ρ the type's deposit density
-//! (deposits per 100,000 km², its p50), A the tract's true area, mean F its area-weighted mean
+//! (deposits per 100,000 km²: the mean of a measured distribution, else its p50;
+//! `Sizing::density_target`), A the tract's true area, mean F its area-weighted mean
 //! favourability and E the tract's metallogenic-province endowment.
 //!
 //! **Provinces** (decisions file: regional specialisation configurable, default strong): the
