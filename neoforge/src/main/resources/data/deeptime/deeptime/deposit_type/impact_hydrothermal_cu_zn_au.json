@@ -162,7 +162,8 @@
   "minecraft": {
     "coe_vein": "createoreexcavation:ore_vein_type/zinc",
     "cdg_reservoir": false,
-    "ore_block_policy": "ev_then_vanilla"
+    "ore_block_policy": "ev_then_vanilla",
+    "claims_scatter": false
   },
   "balance": {
     "count_mult": 1.0,
@@ -174,6 +175,7 @@
   "notes": [
     "P2-08 (meteor impacts). Examples: the Errington and Vermilion Zn-Cu-Pb deposits in the crater fill of the Sudbury structure (Ames, Watkinson & Parrish 1998, Geology 26:447-450), the sulphide and carbonate veins of Haughton and the Ries (Osinski et al. 2013, Icarus 224:347-363); Grieve & Masaitis 1994 (The economic potential of terrestrial impact craters, Int. Geol. Rev. 36(2):105-151).",
     "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, deposit density, separation, clustering, geometry and the curves' thresholds.",
-    "The hosts are the crater's own breccia and melt rock in the strata log, so the type forms in craters cut into the deep-time surface (at least two L1 cells across)."
+    "The hosts are the crater's own breccia and melt rock in the strata log, so the type forms in craters cut into the deep-time surface (at least two L1 cells across).",
+    "minecraft.claims_scatter is false: impact deposits are too rare to be a world's only source of their products, so the game leaves the pack's own scatter of these materials in place (a material another type claims, such as copper, zinc or gold, stays claimed)."
   ]
 }

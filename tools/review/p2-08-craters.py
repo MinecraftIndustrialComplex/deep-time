@@ -36,8 +36,8 @@ def heightmap(deeptime: str, world: Path, box: list[int]) -> np.ndarray:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "h.npy"
         subprocess.run(
-            [deeptime, "heightmap", "--world-data", str(world), "--box",
-             ",".join(str(v) for v in box), "--layers", "water_level", "--out", str(out)],
+            [deeptime, "heightmap", "--world-data", str(world),
+             "--box=" + ",".join(str(v) for v in box), "--layers", "water_level", "--out", str(out)],
             check=True, stdout=subprocess.DEVNULL)
         return np.load(out)
 

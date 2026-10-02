@@ -11,7 +11,7 @@
 //! grade–tonnage values, deposit density and same-deposit separation, copied from
 //! `crates/deeptime-core/data/usgs/<grade_tonnage>.json`, which a test checks); `geometry` and
 //! zoning with children; `preservation`; the child rules (`weathering` for supergene blankets,
-//! `placer`, `petroleum`, `coal`); `minecraft` (`coe_vein`, `cdg_reservoir`, `cdg_scale`, `ore_block_policy`);
+//! `placer`, `petroleum`, `coal`); `minecraft` (`coe_vein`, `cdg_reservoir`, `cdg_scale`, `ore_block_policy`, `claims_scatter`);
 //! and `balance`.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -624,6 +624,21 @@ pub struct MinecraftMapping {
     /// `ev_then_vanilla` (decisions file: Excavated Variants, else stone/deepslate ores) or
     /// `none` (fluids).
     pub ore_block_policy: String,
+    /// Whether the type's products are claimed: the game removes the scattered ore features of a
+    /// claimed material from a Deep Time world (plan §7.7), so that deposits are its source. A
+    /// type too rare to be a pack's only source of its products leaves them unclaimed (the impact
+    /// types, P2-08: diamonds, nickel, platinum and uranium keep whatever scatter the pack has).
+    /// Read by the Java claim rules only.
+    #[serde(default = "yes", skip_serializing_if = "is_yes")]
+    pub claims_scatter: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+fn is_yes(x: &bool) -> bool {
+    *x
 }
 
 /// Regional specialisation strength (decisions file: configurable, default strong).
@@ -1186,6 +1201,40 @@ mod tests {
         let porphyry = &types[0];
         assert_eq!(porphyry.short(), "porphyry_cu_mo_au");
         assert!(porphyry.fields().contains("deeptime:arc_magma_flux"));
+        // The impact types (P2-08) read the impact stage's fields, cite the crater as a cause
+        // and, being rare, do not claim their products; every other type claims its own.
+        let mut impact = 0;
+        for t in &types {
+            let is_impact = t.family == "impact";
+            assert_eq!(t.minecraft.claims_scatter, !is_impact, "{}", t.id);
+            if is_impact {
+                impact += 1;
+                assert!(
+                    t.fields().iter().any(|f| f.starts_with("deeptime:impact_")),
+                    "{}",
+                    t.id
+                );
+                assert!(
+                    t.causes
+                        .source
+                        .iter()
+                        .any(|k| k == "deeptime:impact_crater"),
+                    "{}",
+                    t.id
+                );
+            }
+        }
+        assert_eq!(impact, 4);
+        let oil = types
+            .iter()
+            .find(|t| t.id == "deeptime:petroleum_trap")
+            .unwrap();
+        assert!(
+            oil.causes
+                .trap
+                .iter()
+                .any(|k| k == "deeptime:impact_crater")
+        );
     }
 
     #[test]
