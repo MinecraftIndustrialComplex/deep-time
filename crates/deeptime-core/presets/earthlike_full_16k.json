@@ -449,7 +449,7 @@
     "andean_min_elevation_m": 1500.0
   },
   "impacts": {
-    "flux": 1.0,
+    "flux": 3.0,
     "size_slope": 1.8,
     "min_crater_km": 2.0,
     "max_crater_km": 300.0,
