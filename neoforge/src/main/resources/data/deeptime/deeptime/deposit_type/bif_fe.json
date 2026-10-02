@@ -2,7 +2,7 @@
   "id": "deeptime:bif_fe",
   "family": "sedimentary_chemical",
   "site_kind": "deposit",
-  "description": "Banded iron formation (Superior and Algoma types): chert–iron-oxide sheets of the 2.65–1.85 Ga acme, inherited in cratonic basement when the timeline starts after it.",
+  "description": "Banded iron formation (Superior and Algoma types): chert–iron-oxide sheets of the 2.6–1.85 Ga acme, inherited in cratonic basement when the timeline starts after it.",
   "products": [
     {"material": "c:iron", "grade_key": "fe_pct", "role": "primary"}
   ],
@@ -11,7 +11,7 @@
     "source": [
       {"any_of": [
         {"field": "deeptime:inherited_bif", "curve": [[0.1, 0], [0.5, 1]], "note": "inherited Paleoproterozoic BIF in the basement (plan §8.6)"},
-        {"field": "deeptime:clock/bif_acme", "curve": [[0, 0], [1, 1]], "note": "the 2.65–1.85 Ga acme (Bekker et al. 2010)"}
+        {"field": "deeptime:clock/bif_acme", "curve": [[0, 0], [1, 1]], "note": "the 2.6–1.85 Ga acme (Bekker et al. 2010)"}
       ]}
     ],
     "trap": [
