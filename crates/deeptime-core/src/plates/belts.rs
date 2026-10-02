@@ -245,7 +245,8 @@ fn stack_front(
     // ledger: PLT-192 (the wedge's surface slope), PLT-231 (the wedge's rule).
     let tan = k.wedge_slope_deg.to_radians().tan();
     let samples = &state.samples;
-    let visible_of = |p: u32| move |v: u32| plate_of[v as usize] == p && !samples[v as usize].is_hidden();
+    let visible_of =
+        |p: u32| move |v: u32| plate_of[v as usize] == p && !samples[v as usize].is_hidden();
 
     // The overriding plate behind the front: distance from its edge on the front.
     let over_ok = visible_of(side.over);
@@ -271,7 +272,12 @@ fn stack_front(
         // beyond the basin's reach.
         belt_km + FOREDEEP_REACH_KM,
     );
-    let reach_km = wedge_reach_km + if flexure.is_some() { FOREDEEP_REACH_KM } else { 0.0 };
+    let reach_km = wedge_reach_km
+        + if flexure.is_some() {
+            FOREDEEP_REACH_KM
+        } else {
+            0.0
+        };
     let src: Vec<(u32, f64, u32)> = f.crust.iter().map(|&v| (v, 0.0, 0)).collect();
     let (d_under, _) = dijkstra(geo, &src, |_, b| under_ok(b), norm.rad(reach_km));
 
@@ -308,8 +314,7 @@ fn stack_front(
             / f.crust.len() as f64
     };
     // ledger: PLT-229 (the share), PLT-121 (Airy, ISOSTATIC_FACTOR).
-    let rise_km2_m =
-        k.collision_stacking_share * crossed_km2 * thickness_m / ISOSTATIC_FACTOR;
+    let rise_km2_m = k.collision_stacking_share * crossed_km2 * thickness_m / ISOSTATIC_FACTOR;
     let fill = if deficit_km2_m > 0.0 {
         (rise_km2_m / deficit_km2_m).min(1.0)
     } else {
@@ -351,10 +356,8 @@ fn stack_front(
         mix[pool::METAMORPHIC] = 1.0;
     }
 
-    let mut rises: Vec<(usize, f64, bool)> = wedge
-        .iter()
-        .map(|&(i, x)| (i, fill * x, true))
-        .collect();
+    let mut rises: Vec<(usize, f64, bool)> =
+        wedge.iter().map(|&(i, x)| (i, fill * x, true)).collect();
     if belt_weight > 0.0 && belt_rise_km2_m > 0.0 {
         rises.extend(
             belt.iter()
@@ -412,7 +415,14 @@ fn stack_front(
         for a in 0..3 {
             out.sum[a] += dz * p[a];
         }
-        let q = [p.x * p.x, p.y * p.y, p.z * p.z, p.x * p.y, p.x * p.z, p.y * p.z];
+        let q = [
+            p.x * p.x,
+            p.y * p.y,
+            p.z * p.z,
+            p.x * p.y,
+            p.x * p.z,
+            p.y * p.z,
+        ];
         for a in 0..6 {
             out.second[a] += dz * q[a];
         }
@@ -474,7 +484,8 @@ fn foredeep(d_rad: &[f64], flexure: &[f64], wedge_km: f64, bins: &Bins) -> Fored
         .flatten()
         .copied()
         .fold(0.0f64, f64::min);
-    let Some(first) = (toe..(toe + 3).min(count)).find(|&b| mean[b].is_some_and(|x| x < FOREDEEP_M))
+    let Some(first) =
+        (toe..(toe + 3).min(count)).find(|&b| mean[b].is_some_and(|x| x < FOREDEEP_M))
     else {
         return Foredeep {
             width_km: 0.0,
@@ -526,7 +537,10 @@ pub fn resist(state: &PlateState, omega: &mut [DVec3], env: &Env, relax: f64, fr
             1.0
         };
         let r = k.collision_resistance_mm_yr * (col.belt.height_m.max(0.0) / h_s) * reach;
-        let (at, normal) = (DVec3::from_array(col.centroid), DVec3::from_array(col.normal));
+        let (at, normal) = (
+            DVec3::from_array(col.centroid),
+            DVec3::from_array(col.normal),
+        );
         if r <= 0.0 || normal == DVec3::ZERO {
             continue;
         }
@@ -828,12 +842,18 @@ mod tests {
             if x >= 0.0 {
                 // Incoming: the wedge, and nothing beyond its toe.
                 if x > belt.wedge_km + 2.0 * spacing {
-                    assert!(dz.abs() < 1e-3, "ground beyond the wedge rose {dz} at {x} km");
+                    assert!(
+                        dz.abs() < 1e-3,
+                        "ground beyond the wedge rose {dz} at {x} km"
+                    );
                 } else {
                     wedge_rise = wedge_rise.max(dz);
                 }
             } else if -x > fx.preset.tectonics.collision_belt_km + 2.0 * spacing {
-                assert!(dz.abs() < 1e-3, "ground behind the belt rose {dz} at {x} km");
+                assert!(
+                    dz.abs() < 1e-3,
+                    "ground behind the belt rose {dz} at {x} km"
+                );
             }
         }
         assert!(wedge_rise > 100.0, "the wedge rose {wedge_rise} m");
@@ -870,7 +890,8 @@ mod tests {
             let pool_sum = |st: &PlateState, p: usize| -> f64 {
                 st.samples.iter().map(|s| f64::from(s.pools[p])).sum()
             };
-            let sediments = |st: &PlateState| pool_sum(st, pool::SEDIMENT) + pool_sum(st, pool::SEDIMENTARY);
+            let sediments =
+                |st: &PlateState| pool_sum(st, pool::SEDIMENT) + pool_sum(st, pool::SEDIMENTARY);
             let (sed0, meta0) = (sediments(&st), pool_sum(&st, pool::METAMORPHIC));
             for step in 1..=6 {
                 let before = crust_km2_m(&st, area);
@@ -954,7 +975,10 @@ mod tests {
                 .map(|p| DVec3::from_array(p.omega))
                 .collect();
             // The plate's only front is the collision's.
-            let front = st.contacts[0].collision.as_ref().map_or(0.0, |c| c.front_km);
+            let front = st.contacts[0]
+                .collision
+                .as_ref()
+                .map_or(0.0, |c| c.front_km);
             resist(&st, &mut omega, &fx.env(step), relax, &[0.0, front]);
             for (p, w) in st.plates.iter_mut().zip(omega) {
                 p.omega = w.to_array();
