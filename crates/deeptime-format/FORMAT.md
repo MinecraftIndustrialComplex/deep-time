@@ -890,16 +890,18 @@ With R the volcano's basal radius in blocks (`radius_m` / `m_per_block_h`, at le
 (0.05 to 1), a volcano gets ⌊d · (0.7 + 2.3 a) · clamp(√(R / 45), 0.6, 2.2) + u⌋ **fields** (d =
 `geothermal_density`, u a uniform draw from the volcano's own seed, a hash of its id and position).
 The first field lies 0.08 to 0.35 R · `geothermal_reach` from the summit, the others 0.25 to 1.0 R ·
-`geothermal_reach`, in any direction. A field is **hot springs** when it is at least 0.35 R from the summit,
+`geothermal_reach`, in any direction, on the first of twelve draws that is dry land (3 blocks above
+the sea, no water column, no ice cover). A field is **hot springs** when it is at least 0.35 R from the summit,
 the baked `climate/p_mm` there reaches `geothermal_spring_min_precip_mm`, and `climate/t_mean_c` is at
 least 3 °C (a world without those layers counts as warm and wet); else it is a **fumarole field**.
 
-- A hot-spring field has a main pool (mean radius 2 to 9 blocks, 2.4 to 4.6 times `geothermal_size`),
-  one to three smaller ones (2 to 6), in a chain down the slope half the time (a terrace), and now
-  and then a vent or a patch of altered ground. A pool's outline wobbles (`1 + 0.16 sin 3θ + 0.09 sin 5θ`).
-  Its **level** is the lowest ground top (⌈H⌉ − 1) of its pool and rim columns, and a pool is refused where the
-  highest is more than 3 blocks above it. Water fills the level and, in the middle 75 % of the radius,
-  the block under it; the bed below is sinter (the site's terrace rock) in the heart (45 % of the radius), yellow
+- A hot-spring field has a main pool (mean radius round((2.4 + 2.2 u) · `geothermal_size`), 2 to 9
+  blocks), one to three smaller ones (1.6 to 3 times the size, 2 to 6), in a chain down the slope half
+  the time (a terrace), and now and then a vent or a patch of altered ground. A pool's outline wobbles
+  (`1 + 0.16 sin 3θ + 0.09 sin 5θ`). Its **level** is the mean ground top (⌈H⌉ − 1) of its pool and rim
+  columns; it is refused where any column's ground is more than 6 blocks above the level (cut away) or
+  more than 6 below it (built up as a dam: rim and bed fill down to the ground). Water fills the level
+  and, in the middle 75 % of the radius, the block under it; the bed below is sinter (the site's terrace rock) in the heart (45 % of the radius), yellow
   mat, then orange mat towards the edge; the ground above the level is cut to air. The **rim** (every
   column that touches the pool, else out to 1.5 blocks) is solid at the level and one block under it. The
   **apron** around it, out to the site's `apron` radius, wears the terrace rock on its top block (a
