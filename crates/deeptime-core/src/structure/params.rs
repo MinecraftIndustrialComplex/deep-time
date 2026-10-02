@@ -15,68 +15,117 @@ use crate::error::CoreError;
 #[serde(deny_unknown_fields, default)]
 pub struct StructureParams {
     /// K, horizons per strata-grid cell (plan §5.7.4: 32 in the built-in presets).
+    // ledger: STR-001 (game choice)
     pub horizons: u32,
     /// Surface temperature of the geotherm where no climate stage wrote `climate/t_mean_c`, °C.
     pub surface_temp_c: f64,
     /// Thermal conductivity of the linear geotherm T(z) = T_s + q·z/k, W/(m·K) (the surface's
-    /// burial temperature uses the same 2.5, a typical upper-crust value).
+    /// burial temperature uses the same 2.5). Dense crystalline rocks at 300 K measure 2.1 to
+    /// 3.0 (gneiss across the foliation) up to 4.5 (along it), marble 2.8–2.9, amphibolite 2.9
+    /// (Robertson 1988, USGS OFR 88-441, table 2); a crust-average table was not read.
+    // ledger: RCK-029, RCK-028 (Fourier's law)
     pub conductivity_w_mk: f64,
     /// Heat flow above this is not used for the geotherm, mW/m² (the plate model's proxy reaches
-    /// 300 near ridges and arcs, where advection, not conduction, carries the heat; continental
-    /// surface heat flow rarely exceeds ~120 outside active volcanic centres).
+    /// 300 near ridges and arcs). A clamp, not a physical limit: 120 mW/m² at k = 2.5 is
+    /// 48 °C/km, the gradient of rifts and arcs (about 50 K/km, Hacker's lecture notes), while
+    /// measured values run above 150 mW/m² (Salton Trough, Sass et al. 1994) and the young
+    /// ocean averages 128 (Davies & Davies 2010).
+    // ledger: RCK-030 (game choice)
     pub max_heat_flow_mw_m2: f64,
     /// Thickness of normal continental crust, m: the plate model's initial column (35 km,
-    /// `plates::pools::continental_column`), the reference of the collision burial factor.
+    /// `plates::pools::continental_column`), the reference of the collision burial factor. The
+    /// global mean is 41.1 km (extended crust 30.5, orogens 46.3; Christensen & Mooney 1995,
+    /// abstract).
+    // ledger: RCK-033
     pub reference_crust_m: f64,
     /// Largest collision burial factor β (depths below the surface scale by β = e/e₀ while the
-    /// crust under a collision zone is thickened, homogeneous pure shear).
+    /// crust under a collision zone is thickened, homogeneous pure shear). A doubling of 35 km
+    /// reaches 70 km; continental crust is "never thicker than ~75 km" (Hacker's lecture notes).
+    // ledger: RCK-032, RCK-034 (game choice)
     pub max_burial_factor: f64,
     /// Lithification: the part of a young deposit within this depth of the surface is shown as its
-    /// loose equivalent, m. Design value: tectonics.js lithifies sediment under 2.2 MPa of
-    /// overburden, about 150 m (`plates::pools`, the same threshold the plate model uses).
+    /// loose equivalent, m. Game choice: tectonics.js lithifies sediment under 2.2 MPa of
+    /// overburden (150 m of sediment at 1,500 kg/m³; its comment cites the AAPG wiki page on
+    /// sandstone diagenesis for "500 ft", which the page does not state), and the plate model
+    /// uses the same threshold (`plates::pools`). Real mud and sand are still 47 to 58 % pore
+    /// space at 150 m and stiffen over 1 to 3 km (Sclater & Christie 1980 curves via the
+    /// pyBacktrack tables; Bjørlykke et al. 2009), so this is a look-of-the-ground rule, not
+    /// diagenesis.
+    // ledger: RCK-022 (game choice)
     pub loose_depth_m: f64,
-    /// … and "young" means a base age within this many Myr of the present. Design value:
+    /// … and "young" means a base age within this many Myr of the present. Game choice:
     /// Neogene clastics are commonly still unconsolidated at shallow depth.
+    // ledger: RCK-022
     pub loose_age_myr: f64,
-    /// The ore window the host-rock fractions cover, from the surface down, m. Design value:
+    /// The ore window the host-rock fractions cover, from the surface down, m. Game choice:
     /// porphyry stocks are emplaced within a few km of the palaeosurface and sediment-hosted
     /// Zn–Pb, coal and petroleum reservoirs sit in the top ~2 km of their basins.
+    // ledger: STR-041 (game choice)
     pub host_window_m: f64,
-    /// Plutons emplaced per km² of full-intensity arc per Myr. Each pluton stands for an
-    /// intrusive suite (P1-17): the increments of a batholith merge at 300 m per block, and the
-    /// Coastal Batholith of Peru's roughly thousand plutons in a 1,600 × 60 km arc over some
-    /// 60 Myr (~1e-4 per km² per Myr at ~10 km, P1-07's first rate) group into a few dozen
-    /// super-units. The rate is P1-07's scaled by (10/25)^2.6 = 0.09 (rounded to 1e-5), the
-    /// volume ratio of a median 10-km and a median 25-km pluton (V ∝ L²·T ∝ L^2.6), so arcs
-    /// emplace about the same volume in a tenth as many bodies.
+    /// Plutons emplaced per km² of full-intensity arc per Myr. Calibrated, not measured. Each
+    /// pluton stands for an intrusive suite (P1-17): the increments of a batholith merge at 300 m
+    /// per block. P1-07's first rate, ~1e-4 per km² per Myr at a median 10 km, was set from the
+    /// Coastal Batholith of Peru: "up to" 1,000 plutons along 1,600 km, active about 100 to
+    /// 37 Ma (secondary sources; Haederle & Atherton 2002 and Mukasa 1986 not read; no source
+    /// gave the 60-km width assumed here, and 1,000 / (1,600 × 60 km² × 60 Myr) is 1.7e-4, not
+    /// 1e-4). The rate is that figure scaled by (10/25)^2.6 = 0.09 (rounded to 1e-5), the volume
+    /// ratio of a median 10-km and a median 25-km pluton (V ∝ D²·T ∝ D^2.6, from the 0.6
+    /// exponent of `plutons::thickness_km`), so arcs emplace about the same volume in a tenth
+    /// as many bodies.
+    // ledger: RCK-056 (calibrated), RCK-057
     pub pluton_rate_km2_myr: f64,
     /// Collision (S-type, crustal-melt) granites per km² of collision zone, relative to the arc
-    /// rate.
+    /// rate. Game choice. Himalayan leucogranites are produced at under 10 km³ per km per Myr,
+    /// island arcs at 20 to 40 and the Peruvian and Canadian Coastal batholiths at about 200
+    /// (Vigneresse & Burg 2003), so 0.3 fits an island arc, not a continental arc.
+    // ledger: RCK-058 (game choice)
     pub collision_pluton_factor: f64,
     /// Pluton length L (the long horizontal axis), km: [median, min, max] of a lognormal with
-    /// `pluton_length_sigma`. Thickness T = 0.6·L^0.6 km (the tabular-pluton scaling of Cruden
-    /// 1998, J. Geol. Soc. 155:853–862). Median 25 km (P1-17; P1-07 had 10): an intrusive suite
-    /// such as the Sierra Nevada's Tuolumne (~1,100 km², ~45 × 25 km; Bateman & Chappell 1979).
+    /// `pluton_length_sigma`. Game choice, median 25 km (P1-17; P1-07 had 10): the size of an
+    /// intrusive suite such as the Sierra Nevada's Tuolumne, ~1,100 km² (Frontiers in Earth
+    /// Science 8:190, 2020; its 45 × 25 km outline was not found in any source read); central
+    /// Sierra plutons range from under 1 to over 1,000 km² (Bateman 1992, USGS PP 1483).
+    /// Thickness follows `plutons::thickness_km` (Cruden & McCaffrey 2001).
+    // ledger: RCK-060 (game choice), RCK-061
     pub pluton_length_km: [f64; 3],
     pub pluton_length_sigma: f64,
     /// Depth of a pluton's roof below the surface when it is emplaced, km [min, max] (epizonal to
-    /// mesozonal emplacement, Buddington 1959).
+    /// mesozonal emplacement, Buddington 1959, not read; secondary sources put the epizone at 0 to
+    /// ~5–6 km and the mesozone to ~11–12 km). The central Sierra Nevada was emplaced at 3.5 to
+    /// 7 km (Bateman 1992) and the Tuolumne suite at 6 to 10 km, so 2 to 6 km is shallow.
+    // ledger: RCK-063
     pub pluton_roof_km: [f64; 2],
     /// Share of a pluton's normalised radius its contact aureole (hornfels or skarn) takes, as
-    /// the outer shell of the body (0 turns aureoles off).
+    /// the outer shell of the body (0 turns aureoles off). Game choice. Aureole thickness scales
+    /// with the intrusion's thickness, but measured aureoles run from a few per cent of it
+    /// (Manaslu, ~100 m round a several-km sheet) to ~30 % (Adamello, 1.7 km round 5.5 km): Annen
+    /// 2017.
+    // ledger: RCK-053 (game choice)
     pub aureole_shell: f64,
-    /// Fold-thrust belts reach this far into the foreland of an orogen, km (the Zagros Simply
-    /// Folded Belt is ~250 km wide; the Subandean belt 100–200 km).
+    /// Fold-thrust belts reach this far into the foreland of an orogen, km: the Zagros fold-thrust
+    /// belt has "an average width of ~300 km" in a 200–300 km wide zone of deformation (Alavi
+    /// 2007, Am. J. Sci. 307, read in full); the Subandean belt was not read.
+    // ledger: STR-030
     pub fold_belt_km: f64,
-    /// Sediment a fold, fault-block or growth-fault closure needs, m.
+    /// Sediment a fold, fault-block or growth-fault closure needs, m. Game choice.
+    // ledger: STR-025 (game choice)
     pub trap_min_sediment_m: f64,
-    /// Salt domes: halite at least this thick …
+    /// Salt domes: halite at least this thick … Game choice; no minimum thickness was found in a
+    /// source read.
+    // ledger: STR-026 (game choice)
     pub salt_min_m: f64,
-    /// … under at least this overburden, m (salt rises once the overburden is dense enough to
-    /// drive it: Hudec & Jackson 2007, Earth-Sci. Rev. 82:1–28).
+    /// … under at least this overburden, m. Game choice. Salt (2,160 kg/m³) rises through
+    /// sediment that compacts past it (from 2,000 to 2,500 kg/m³ with burial), but roofs
+    /// "of more than several hundred meters" are not deformed by salt without regional extension
+    /// or shortening (Hudec & Jackson 2007 as quoted by the EGU TS blog; the review itself was
+    /// not read).
+    // ledger: STR-026, STR-027 (game choice)
     pub salt_overburden_m: f64,
-    /// Growth faults and rollover anticlines in sediment wedges thicker than this, m (deltas such
-    /// as the Niger's, Doust & Omatsola 1990, AAPG Memoir 48).
+    /// Growth faults and rollover anticlines in sediment wedges thicker than this, m. Game
+    /// choice. The Niger Delta, the model delta, is a 12-km clastic wedge detached on overpressured
+    /// shale (Sanuade & Kaka 2017, review of Doust & Omatsola 1990, not read); the 1,500 m
+    /// threshold has no source.
+    // ledger: STR-028, STR-029 (game choice)
     pub growth_fault_sediment_m: f64,
     /// How far the bake smooths the rock layers sideways: σ of the Gaussian, in L1 cells (0 = each
     /// cell's own stack). Larger values give gentler dips (`bake_horizons::Horizons::smoothed`).
