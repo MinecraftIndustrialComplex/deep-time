@@ -1,0 +1,142 @@
+{
+  "id": "deeptime:impact_diamond",
+  "family": "impact",
+  "site_kind": "deposit",
+  "description": "Impact diamonds: graphite or coal in the target turned to diamond by the shock wave and scattered through the crater's melt rock and suevite.",
+  "products": [
+    {
+      "material": "c:diamond",
+      "grade_key": "dia_gpt",
+      "role": "primary"
+    }
+  ],
+  "components": {
+    "combine": "product",
+    "source": [
+      {
+        "field": "deeptime:impact_shock",
+        "curve": [
+          [
+            0.3,
+            0
+          ],
+          [
+            1.0,
+            1
+          ]
+        ],
+        "note": "shock pressures above ~35 GPa over a large volume of target: craters from about 30 km, full at 100 km (Popigai). Thresholds are design."
+      }
+    ],
+    "driver": [],
+    "pathway": [],
+    "trap": []
+  },
+  "clock_gates": [],
+  "integration_myr": 1,
+  "formation_time": "peak",
+  "hosts": {
+    "any_of": [
+      "gneiss",
+      "schist",
+      "black_shale",
+      "coal"
+    ],
+    "full_at": 0.2
+  },
+  "causes": {
+    "source": [
+      "deeptime:impact_crater"
+    ],
+    "preservation": [
+      "deeptime:erosion_pulse",
+      "deeptime:orogeny_phase"
+    ]
+  },
+  "cause_radius_km": 200,
+  "sizing": {
+    "grade_tonnage": "impact_structures",
+    "tonnage_mt": {
+      "p90": 20,
+      "p50": 100,
+      "p10": 600
+    },
+    "grades": {
+      "dia_gpt": {
+        "p90": 0.4,
+        "p50": 2.0,
+        "p10": 6.0,
+        "presence": 1.0
+      }
+    },
+    "correlations": [],
+    "ore_density_t_m3": 2.5,
+    "density_per_1e5km2": {
+      "p90": 6,
+      "p50": 20,
+      "p10": 60
+    },
+    "density_basis": "estimate",
+    "min_separation_m": 5000,
+    "tract_threshold": 0.2,
+    "clustering": {
+      "model": "thomas",
+      "camp_spacing_km": 30,
+      "cluster_radius_km": 10
+    }
+  },
+  "geometry": {
+    "shape": "blanket",
+    "aspect": [
+      1.0,
+      0.05,
+      1.0
+    ],
+    "dip_deg": [
+      0,
+      0
+    ],
+    "rock_class": "impact_melt",
+    "zoning": [
+      {
+        "zone": "diamondiferous_melt_rock",
+        "d": [
+          0.0,
+          1.0
+        ],
+        "material": "c:diamond",
+        "grade_mult": 1.0,
+        "density": 0.04
+      }
+    ],
+    "extra_bodies": [],
+    "children": []
+  },
+  "preservation": {
+    "formation_depth_m": 100,
+    "vertical_extent_m": 100,
+    "erosion_behavior": "truncate",
+    "resistates": [
+      "c:diamond"
+    ]
+  },
+  "minecraft": {
+    "coe_vein": null,
+    "cdg_reservoir": false,
+    "ore_block_policy": "ev_then_vanilla",
+    "claims_scatter": false
+  },
+  "balance": {
+    "count_mult": 1.0,
+    "size_mult_h": 6.0,
+    "size_mult_v": 4.0,
+    "richness_mult": 1.0
+  },
+  "requires_fields": {},
+  "notes": [
+    "P2-08 (meteor impacts). Popigai (100 km, 36 Myr; graphite-bearing gneiss) holds impact diamonds through its tagamite (melt rock) and suevite at grades of a few to some tens of carats per tonne (1 carat = 0.2 g, so 10 ct/t = 2 g/t), and the Ries, Kara and Puchezh-Katunki structures smaller amounts (Masaitis 1998, Meteoritics & Planet. Sci. 33:349-359; Grieve & Masaitis 1994 (The economic potential of terrestrial impact craters, Int. Geol. Rev. 36(2):105-151)).",
+    "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, deposit density, separation, clustering, geometry and the curves' thresholds.",
+    "The host condition is the carbon in the target: graphitic gneiss and schist, black shale or coal in the top of the column when the crater forms. The ore body's host becomes impact melt rock.",
+    "minecraft.claims_scatter is false: impact deposits are too rare to be a world's only source of their products, so the game leaves the pack's own scatter of these materials in place (a material another type claims, such as copper, zinc or gold, stays claimed)."
+  ]
+}

@@ -43,7 +43,7 @@ pub const STRATA_CLASSES: [&str; 3] = ["sandstone", "red_bed", "granite"];
 /// (`/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md`). The
 /// definitions are Deep Time's `rock_class` data (`neoforge/src/main/resources/data/deeptime/
 /// deeptime/rock_class/`); a unit test keeps the two lists equal.
-pub const EVERY_CLASS: [&str; 60] = [
+pub const EVERY_CLASS: [&str; 62] = [
     "granite",
     "granodiorite",
     "diorite",
@@ -93,6 +93,8 @@ pub const EVERY_CLASS: [&str; 60] = [
     "carbonatite",
     "pegmatite",
     "greisen",
+    "impact_breccia",
+    "impact_melt",
     "soil",
     "saprolite",
     "laterite",
@@ -116,9 +118,10 @@ pub enum Strata {
     /// blocks down to the bottom of the world (P0-09).
     Placeholder,
     /// Every rock class (P1-12): eight horizons 10 blocks apart from the surface down; horizon
-    /// h of L1 cell column i has class (6·i + h) mod 60 of [`EVERY_CLASS`], so any ten
+    /// h of L1 cell column i has class (6·i + h) mod 62 of [`EVERY_CLASS`], so any eleven
     /// neighbouring cell columns hold every class at h ≥ 2 (20 blocks or more below the surface,
-    /// under whatever the surface rules paint). The last horizon reaches down to min_y.
+    /// under whatever the surface rules paint; each column holds six consecutive classes there,
+    /// and 11 × 6 = 66 ≥ 62). The last horizon reaches down to min_y.
     EveryClass,
     /// A readable sedimentary basin, the same in every cell: sandstone, shale, sandstone,
     /// mudstone, limestone, shale, sandstone and shale beds from the surface down to 165 blocks,
@@ -499,7 +502,7 @@ fn strata_notes(kind: Strata) -> Value {
             "kind": kind.name(),
             "grid": "L1",
             "horizons": "8 per cell; horizon h's top is the surface (the L3 elevation at the cell's block) − 10·h blocks; the last reaches down to min_y",
-            "class_rule": "horizon h of L1 cell column i has class index (6·i + h) mod 60, so any ten neighbouring cell columns hold every class at h ≥ 2"
+            "class_rule": "horizon h of L1 cell column i has class index (6·i + h) mod 62, so any eleven neighbouring cell columns hold every class at h ≥ 2"
         }),
         Strata::Basin => json!({
             "placeholder": true,
@@ -621,16 +624,20 @@ mod tests {
     }
 
     #[test]
-    fn any_ten_columns_hold_every_class_below_the_soil() {
+    fn any_eleven_columns_hold_every_class_below_the_soil() {
         let k = Strata::EveryClass.depths().len();
+        // Horizons 2..k of a column are k − 2 = 6 consecutive classes; the documented eleven
+        // columns are the least that cover the whole list (11 × 6 = 66 ≥ 62 > 10 × 6).
+        assert_eq!(k - 2, 6);
+        assert_eq!(EVERY_CLASS.len().div_ceil(k - 2), 11);
         for i0 in [0u32, 7, 58, 1000] {
             let mut seen = [false; EVERY_CLASS.len()];
-            for i in i0..i0 + 10 {
+            for i in i0..i0 + 11 {
                 for h in 2..k {
                     seen[usize::from(Strata::EveryClass.class_index(i, h))] = true;
                 }
             }
-            assert!(seen.iter().all(|&s| s), "columns {i0}..{}", i0 + 10);
+            assert!(seen.iter().all(|&s| s), "columns {i0}..{}", i0 + 11);
         }
     }
 

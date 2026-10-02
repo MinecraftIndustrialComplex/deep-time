@@ -631,7 +631,8 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     let p = preset(8000, 300.0, "supercontinent", 21);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
-    let with = run_stage(&p, |_, _, st| {
+    let mut prev_omega: BTreeMap<u32, glam::DVec3> = BTreeMap::new();
+    let with = run_stage(&p, |stage, _, st| {
         let d = st.dynamics.as_ref().expect("recording is on by default");
         let step = d.steps.last().expect("a record per step");
         assert_eq!(d.steps.len() as u64, st.step);
@@ -649,6 +650,59 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
             assert!((0.0..=1.0).contains(&q.slab_share()), "{q:?}");
             assert!(q.speed_mm_yr >= 0.0 && q.boundary_km >= 0.0 && q.front_km >= 0.0);
         }
+        // Task 1b. Rotation change: the vector change since the previous step, for the plates that
+        // were there; the guard: rotation at the cap; the pole: on some plate.
+        let cap = stage
+            .norm()
+            .omega_of_speed(p.tectonics.max_plate_speed_mm_yr);
+        for q in &step.plates {
+            let w = glam::DVec3::from_array(st.plates[q.id as usize].omega);
+            assert_eq!(q.rot_known, prev_omega.contains_key(&q.id), "{q:?}");
+            match prev_omega.get(&q.id) {
+                Some(w0) if w0.length() > 0.0 => {
+                    assert!(
+                        (q.rot_change - (w - *w0).length() / w0.length()).abs() < 1e-4,
+                        "{q:?}"
+                    );
+                }
+                _ => assert_eq!(q.rot_change, 0.0),
+            }
+            assert_eq!(q.guard, w.length() >= cap * (1.0 - 1e-9), "{q:?}");
+            let c = glam::DVec3::from_array(st.plates[q.id as usize].centroid);
+            assert_eq!(
+                q.spinning,
+                w.length() > 0.0
+                    && w.normalize().dot(c).abs() >= dynamics::SPIN_ANGLE_DEG.to_radians().cos(),
+                "{q:?}"
+            );
+        }
+        prev_omega = st
+            .alive()
+            .map(|q| (q.id, glam::DVec3::from_array(q.omega)))
+            .collect();
+        // The sea floor: its count is the visible oceanic samples', the percentiles ordered.
+        let ocean = st
+            .samples
+            .iter()
+            .filter(|s| !s.is_hidden() && s.kind == state::OCEANIC)
+            .count();
+        assert_eq!(step.ocean as usize, ocean);
+        assert!(step.age_p50 <= step.age_p90 && step.old250 <= step.old180);
+        assert!(step.old180 <= step.ocean);
+        // The pieces of continental crust: largest first, within the crust, and no larger than
+        // the pieces joined along every lattice edge (the record also needs the ends to be close).
+        assert!(step.pieces.windows(2).all(|w| w[0] >= w[1]));
+        assert!(step.pieces.len() <= dynamics::PIECES_KEPT);
+        assert!(step.pieces.iter().sum::<u32>() <= step.continental);
+        assert_eq!(step.continental > 0, !step.pieces.is_empty());
+        let geo = &stage.cache.as_ref().expect("built").geo;
+        let loose = dynamics::piece_sizes(
+            st.samples.len(),
+            |i| !st.samples[i].is_hidden() && st.samples[i].kind == state::CONTINENTAL,
+            |i, out| out.extend(geo.edges(i as u32).map(|(u, _)| u)),
+        );
+        assert!(step.pieces.first().copied().unwrap_or(0) <= loose.first().copied().unwrap_or(0));
+        assert!(step.pieces.len() >= loose.len().min(dynamics::PIECES_KEPT));
         checked += 1;
     });
     assert_eq!(checked, total);

@@ -304,9 +304,8 @@ pub fn rock_tint(k: f32, pal: &Palette) -> Option<[f32; 3]> {
         | "anorthosite" => [178.0, 160.0, 142.0],
         "diorite" | "andesite" | "tuff" | "volcanic_ash" => [140.0, 132.0, 122.0],
         "gabbro" | "basalt" | "scoria" | "obsidian" | "peridotite" | "kimberlite"
-        | "serpentinite" | "greenstone" | "amphibolite" | "eclogite" | "blueschist" => {
-            pal.get(VOLCANIC)
-        }
+        | "serpentinite" | "greenstone" | "amphibolite" | "eclogite" | "blueschist"
+        | "impact_melt" => pal.get(VOLCANIC),
         "conglomerate" | "sandstone" | "gravel" | "sand" | "quartzite" | "loess" => {
             [214.0, 186.0, 136.0]
         }
@@ -316,7 +315,9 @@ pub fn rock_tint(k: f32, pal: &Palette) -> Option<[f32; 3]> {
         "limestone" | "dolostone" | "chalk" | "chert" | "travertine" | "marble" | "carbonatite"
         | "phosphorite" => [214.0, 204.0, 180.0],
         "halite" | "gypsum" | "anhydrite" => pal.get(SALT),
-        "schist" | "gneiss" | "hornfels" | "skarn" | "diamictite" => [150.0, 138.0, 120.0],
+        "schist" | "gneiss" | "hornfels" | "skarn" | "diamictite" | "impact_breccia" => {
+            [150.0, 138.0, 120.0]
+        }
         // Mudrocks, slate, soils, till, coal.
         _ => [140.0, 124.0, 102.0],
     })

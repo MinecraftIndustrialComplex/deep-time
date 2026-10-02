@@ -114,7 +114,8 @@ they are until P0-01; afterwards use the §1.2 table.
     hydrology), `ore_genesis_modeling.md` (deposits, sizing, schema), `runtime_packaging_options.md`
     (natives, determinism, servers), `player_demand_prior_art.md` (market context only).
 12. `/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md` — the rock
-    classes (59 there; Deep Time ships 60 since `diamictite`, decisions log 2026-09-30), the tag
+    classes (60 there; Deep Time ships 62: `impact_breccia` and `impact_melt` were added for P2-08 on
+    2026-10-01), the tag
     vocabulary and the `rock_states` format.
 
 Items 6–9 and 11 are research notes, in `/home/greencheetah/Projects/mic/Docs/research_notes/Geologic
@@ -132,7 +133,7 @@ history worldgen mod/` until P0-01 and in `docs/research/notes/` after it.
 | **Staging** | `<gamedir>/deeptime/staging/<session-uuid>/`, where the Create World screen writes world data before the world folder exists (§7.12). |
 | **Event log** | The shared, append-only record of what happened, where, when and why (§5.5). Feeds the timelapse, "Why here?" and a later legends view; the civ module appends to it. |
 | **Site / site registry** | A site is one fixed-by-generation resource location (deposit, reservoir, placer) with extent, grade, type and forming event. The registry is the list plus a spatial index and a Java API (§5.6). |
-| **Rock class** | One of the 60 lithologies in the rock-tag vocabulary (`diamictite`, lithified till, joined on 2026-09-30), e.g. `granodiorite`, `black_shale`. The simulation decides classes; tags decide blocks (§5.4). |
+| **Rock class** | One of the 62 lithologies in the rock-tag vocabulary (`diamictite`, lithified till, joined on 2026-09-30; `impact_breccia` and `impact_melt`, the rocks of meteorite impacts, on 2026-10-01 for P2-08), e.g. `granodiorite`, `black_shale`. The simulation decides classes; tags decide blocks (§5.4). |
 | **Rock group** | A union tag of classes, e.g. `deeptime:rock/carbonate`. |
 | **Stand-in / fallback** | A look-alike block used when a class has no member block: the first *installed* entry of `deeptime:rock_fallback/<class>` (never a random one). |
 | **Unclassified crust** | `minecraft:stone` and `minecraft:deepslate`, used where the simulation has no lithology opinion. Not a class. |
@@ -862,8 +863,8 @@ serialises the registries' contents through their codecs into one JSON document 
 }
 ```
 
-Deep Time ships definitions for all 60 classes of the vocabulary (59, plus `diamictite` for lithified
-till: decisions log 2026-09-30) in
+Deep Time ships definitions for all 62 classes of the vocabulary (59, plus `diamictite` for lithified
+till: decisions log 2026-09-30, and `impact_breccia` and `impact_melt` for P2-08, 2026-10-01) in
 `/home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md` in its own jar
 (`neoforge/src/main/resources/data/deeptime/deeptime/rock_class/`). The numeric properties are
 relative multipliers the erosion and structure stages consume; their values are tuning parameters
@@ -4042,6 +4043,20 @@ on this machine.
   buried by the surface stage; breccia and impact-melt units in the strata; impact deposit types
   in the deposit engine (Sudbury-type Ni-Cu-PGE melt-sheet sulphides, impact-hydrothermal
   Cu-Zn-Au, impact diamonds, crater-basin oil/uranium traps) with "why here" chains to the impact.
+  *As built (2026-10-01, branch; STATUS.md build log "Meteor impacts"):* a coupled `impacts` stage
+  after the volcanoes (`crates/deeptime-core/src/surface/impacts/`): Poisson impactors at Grieve &
+  Shoemaker's rate (5.6 × 10⁻¹⁵ craters ≥ 20 km per km² per year, N ∝ D⁻¹·⁸) × `impacts.flux` on
+  the planet's own area; crater size, depth, rim, breccia lens and melt sheet from Collins, Melosh &
+  Marcus 2005's scaling with the simple-to-complex transition (3.2 km on Earth) and the peak-ring
+  onset ∝ 1/g; the sea stops small impactors (Davison & Collins 2007). Craters ride their plates,
+  are worn by the surface stage's own erosion and deposition and by hillslope diffusion, are buried,
+  eroded to their roots, overprinted or subducted. Craters at least two L1 cells across are cut into
+  the deep-time surface and the strata log; smaller ones are drawn by the amplifier from the
+  catalogue, aged, and leave bodies. Two rock classes (`impact_breccia`, `impact_melt`: 62 in all),
+  four deposit types (`impact_ni_cu_pge`, `impact_hydrothermal_cu_zn_au`, `impact_diamond`,
+  `impact_basin_u`) on four new history fields, crater closure in `trap_structure` for oil, events
+  `impact_crater` and `impact_ocean`, `impacts/craters.json`, the `impacts` preset section (eleven
+  settings; `flux` 0 = none).
 - **P2-09 Surface landforms** (Ben, 2026-09-29): coral reefs, atolls and barrier islands; desert dunes
   (ergs) and loess; surface rift valleys, grabens and fault scarps; plateau canyons, mesas and buttes.
 - **P2-10 More ore families** (Ben, 2026-09-29): volcanogenic massive sulphides, orogenic gold,
