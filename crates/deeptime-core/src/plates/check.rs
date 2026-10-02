@@ -3620,6 +3620,65 @@ mod tests {
     }
 
     #[test]
+    fn the_balance_is_measured_against_todays_motion() {
+        let answer = |id: u32, speed: f64, rot: Option<f64>| PlateForces {
+            id,
+            slab_pull: 1.0,
+            speed_mm_yr: speed,
+            rms_mm_yr: speed,
+            rot_change: rot.unwrap_or(0.0),
+            rot_known: rot.is_some(),
+            ..PlateForces::default()
+        };
+        // Plate 0 oceanic on slab, 1 continental and free, 2 oceanic and nearly free, 3 a sliver.
+        let plates = vec![
+            moving(0, 400, 0, 80.0, 400.0),
+            moving(1, 300, 200, 40.0, 0.0),
+            moving(2, 300, 0, 60.0, 30.0),
+            moving(3, 5, 0, 10.0, 0.0),
+        ];
+        let mut a = step_of(2.0, plates.clone());
+        a.forces = vec![
+            answer(0, 90.0, None),
+            answer(1, 20.0, None),
+            answer(2, 40.0, None),
+            answer(3, 0.0, None),
+        ];
+        a.slabs_km = vec![100.0];
+        a.breakoffs = 1;
+        let mut b = step_of(4.0, plates);
+        b.forces = vec![
+            answer(0, 90.0, Some(0.1)),
+            answer(1, 20.0, Some(0.2)),
+            answer(2, 40.0, Some(0.3)),
+            answer(3, 0.0, Some(0.9)),
+        ];
+        let d = dynamics(vec![a, b]);
+        let m = measures(&d, &[]);
+        // RMS over the plates' areas: √((400·90² + 300·20² + 300·40²) / 1005).
+        let rms = (3_840_000.0f64 / 1005.0).sqrt();
+        assert!(near(get(&m, "balance_rms_mm_yr"), rms));
+        // Pooled over both steps, the sliver left out: 20, 20, 40, 40, 90, 90.
+        assert!(near(get(&m, "balance_p50_mm_yr"), 40.0));
+        assert!(near(get(&m, "balance_norm_p50_mm_yr"), 40.0 * 45.0 / rms));
+        assert_eq!(get(&m, "balance_over_150_pct"), 0.0);
+        // Oceanic (0, 2: median 65) over continental (1: 20); slab (0: 90) over free (2: 40).
+        assert!(near(get(&m, "balance_oceanic_over_continental"), 3.25));
+        assert!(near(get(&m, "balance_slab_over_free"), 2.25));
+        assert!(near(get(&m, "balance_slab_rank_corr"), 1.0));
+        assert!(near(get(&m, "balance_vs_motion_rank_corr"), 1.0));
+        assert!(near(get(&m, "balance_over_motion_p50"), 40.0 / 60.0));
+        assert!(near(get(&m, "balance_rot_change_p50_pct"), 20.0));
+        // One break-off in 4 Myr.
+        assert!(near(get(&m, "slab_breakoffs_per_100myr"), 25.0));
+        assert_eq!(get(&m, "slab_length_km_p50"), 100.0);
+        // A record without the balance has no data, and the rows wait.
+        let none = measures(&dynamics(vec![step_of(2.0, vec![moving(0, 400, 0, 80.0, 0.0)])]), &[]);
+        assert!(get(&none, "balance_p50_mm_yr").is_nan());
+        assert!(get(&none, "slab_breakoffs_per_100myr").is_nan());
+    }
+
+    #[test]
     fn filling_the_record_lights_the_waiting_rows_up() {
         let mut d = dynamics(vec![
             step(2.0, 0, 0, &[600, 400]),
