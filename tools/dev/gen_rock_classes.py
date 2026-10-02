@@ -118,8 +118,10 @@ REFERENCE_CLASSES = {"granite", "gneiss"}
 
 TUNED = ("set in P1-12; reviewed in P1-07 against the rock map and meridian cross-sections of "
          "pipeline_quick_16k and kept (STATUS.md, P1-07)")
-DENSITY_TYPICAL = ("typical value, cf. the rock-density tables of Telford, Geldart & Sheriff 1990 "
-                   "(Applied Geophysics, 2nd ed.) and Schön 2015 (Physical Properties of Rocks, 2nd ed.)")
+DENSITY_TYPICAL = ("typical value (ledger RCK-001, RCK-086): where the primary tables list the rock, Daly, "
+                   "Manger & Clark 1966 (GSA Memoir 97, Density of rocks) and Manger 1963 (USGS Bulletin 1144-E), "
+                   "the value lies in their measured range; the Telford, Geldart & Sheriff 1990 and Schön 2015 "
+                   "tables cited at stage 1 were not read")
 K_BEDROCK = ("bedrock ranked by rock strength: river incision scales roughly with tensile strength^-2 "
              "(Sklar & Dietrich 2001, Geology 29(12):1087–1090) and lithologic K contrasts span orders of "
              "magnitude (Stock & Montgomery 1999, JGR 104(B3):4983–4993); the strength-based contrast is "
@@ -361,7 +363,7 @@ CLASSES = [
                "to; flows and rises in diapirs at depth."),
     dict(name="gypsum", family="chemical_sedimentary", rho=2310,
          rho_src="mineral density of gypsum",
-         k=3.5, k_why="soft (Mohs 2) and soluble",
+         k=3.5, k_why="soft (Mohs 1.5-2, Handbook of Mineralogy) and soluble",
          d=1.6, d_why="soft and soluble",
          path=["anhydrite"], wx=None, facies="evaporite_basin", tags=["soluble", "seal"],
          vf="minecraft:calcite", vf_from="fallback",
