@@ -371,7 +371,7 @@ Produced by WP-0 (2026-10-02). The library is a folder on the test machine with 
 #### WP-2: 115 rows; 1 source
 
 - **Not readable** : `Bremond1995` (paywalled, no substitute found).
-- **Added and read in WP-2 (2026-10-02)** (text files in the folder named by the key): `Grosse2014` (Grosse2014.txt); `ClagueSherrod2014` (ClagueSherrod2014.txt); `Christiansen2001` (Christiansen2001.txt); `USGS-MaunaLoa` (USGS-MaunaLoa.txt); `USGS-ActiveVolcanoesFAQ` (USGS-ActiveVolcanoesFAQ.txt); and from other packages' folders `Hildreth2007`, `Poland2014`, `Courtillot2003a`. Abstracts only: `Bremond1995` (free to read, refused to scripts), `Rasmussen2022`, `ChaussardAmelung2014`, `TenBrink1991`. Not obtained: `Lev2019`; `ClagueDalrymple1987` was fetched but is a scan without text.
+- **Added and read in WP-2 (2026-10-02)** (text files in the folder named by the key): `Grosse2014` (Grosse2014.txt); `ClagueSherrod2014` (ClagueSherrod2014.txt); `Christiansen2001` (Christiansen2001.txt); `USGS-MaunaLoa` (USGS-MaunaLoa.txt); `USGS-ActiveVolcanoesFAQ` (USGS-ActiveVolcanoesFAQ.txt); and, already in the library, `Hildreth2007`, `Poland2014`, `Courtillot2003a`. Abstracts only: `Bremond1995` (free to read, refused to scripts), `Rasmussen2022`, `ChaussardAmelung2014`, `TenBrink1991`. Not obtained: `Lev2019`; `ClagueDalrymple1987` was fetched but is a scan without text.
 
 #### WP-3: 156 rows; 14 sources
 
