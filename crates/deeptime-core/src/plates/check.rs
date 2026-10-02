@@ -526,36 +526,121 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "contact_age_p50_myr",
-        "Contact age at the collision, median",
+        "Contact age when the collision began, median",
         "Myr",
         None,
         None,
     ),
     m(
         "contact_age_p90_myr",
-        "Contact age at the collision, 90th percentile",
+        "Contact age when the collision began, 90th percentile",
         "Myr",
         None,
         None,
     ),
     m(
         "counted_km_p50",
-        "What the collision counter read, median",
+        "What the pre-task-2 count read at the transfer or weld (relative speed × time), median",
         "km",
         None,
         None,
     ),
     m(
         "shortening_km_p50",
-        "Real shortening at the collision, median",
+        "Continental crust gone under at the collision, over the front's length, median",
         "km",
         None,
         None,
     ),
     m(
         "shortening_km_p90",
-        "Real shortening at the collision, 90th percentile",
+        "Continental crust gone under at the collision, 90th percentile",
         "km",
+        None,
+        None,
+    ),
+    m(
+        "front_shortening_km_p50",
+        "Shortening across the front at the transfer or weld (convergence integrated), median",
+        "km",
+        None,
+        None,
+    ),
+    m(
+        "front_shortening_km_p90",
+        "Shortening across the front at the transfer or weld, 90th percentile",
+        "km",
+        None,
+        None,
+    ),
+    m(
+        "collisions_without_state_pct",
+        "Collisions that fired with no collision state (no converging continental front)",
+        "%",
+        None,
+        None,
+    ),
+    // Collision states that ended with no transfer or weld (`dynamics::PartingRec`).
+    m(
+        "partings_per_100myr",
+        "Collision states that ended with no transfer or weld",
+        "per 100 Myr",
+        None,
+        None,
+    ),
+    m(
+        "partings_parted_per_100myr",
+        "Of them: the continental crust left the front",
+        "per 100 Myr",
+        None,
+        None,
+    ),
+    m(
+        "partings_reversed_per_100myr",
+        "Of them: the contact reversed",
+        "per 100 Myr",
+        None,
+        None,
+    ),
+    m(
+        "partings_closed_per_100myr",
+        "Of them: the contact closed or a plate died",
+        "per 100 Myr",
+        None,
+        None,
+    ),
+    m(
+        "parting_length_p50_myr",
+        "Their length, median",
+        "Myr",
+        None,
+        None,
+    ),
+    m(
+        "parting_shortening_km_p50",
+        "Their shortening, median",
+        "km",
+        None,
+        None,
+    ),
+    m(
+        "parting_shortening_km_p90",
+        "Their shortening, 90th percentile",
+        "km",
+        None,
+        None,
+    ),
+    m(
+        "parting_area_mkm2_per_100myr",
+        "Continental crust that crossed their fronts",
+        "million km² per 100 Myr",
+        None,
+        None,
+    ),
+    m(
+        "collision_area_mkm2_per_100myr",
+        "Continental crust that crossed the fronts of transfers and welds",
+        "million km² per 100 Myr",
         None,
         None,
     ),
@@ -1475,6 +1560,74 @@ pub fn measures_with(
         .collect();
     put("shortening_km_p50", median(&short));
     put("shortening_km_p90", pct(&short, 0.9));
+    let front_short = pick(&|c| c.front_shortening_km);
+    put("front_shortening_km_p50", median(&front_short));
+    put("front_shortening_km_p90", pct(&front_short, 0.9));
+    put(
+        "collisions_without_state_pct",
+        if col.is_empty() {
+            f64::NAN
+        } else {
+            100.0
+                * col
+                    .iter()
+                    .filter(|c| c.onset_convergence_mm_yr.is_none())
+                    .count() as f64
+                / col.len() as f64
+        },
+    );
+    put(
+        "partings_per_100myr",
+        if span > 0.0 {
+            100.0 * d.partings.len() as f64 / span
+        } else {
+            f64::NAN
+        },
+    );
+    let per_100 = |n: f64| {
+        if span > 0.0 {
+            100.0 * n / span
+        } else {
+            f64::NAN
+        }
+    };
+    let why = |reasons: &[&str]| {
+        per_100(
+            d.partings
+                .iter()
+                .filter(|p| reasons.contains(&p.reason.as_str()))
+                .count() as f64,
+        )
+    };
+    put(
+        "partings_parted_per_100myr",
+        why(&[super::dynamics::PARTED]),
+    );
+    put(
+        "partings_reversed_per_100myr",
+        why(&[super::dynamics::REVERSED]),
+    );
+    put(
+        "partings_closed_per_100myr",
+        why(&[super::dynamics::CLOSED, super::dynamics::EMPTIED]),
+    );
+    put(
+        "parting_area_mkm2_per_100myr",
+        per_100(d.partings.iter().map(|p| p.area_km2).sum::<f64>() / 1.0e6),
+    );
+    put(
+        "collision_area_mkm2_per_100myr",
+        per_100(d.collisions.iter().map(|c| c.area_km2).sum::<f64>() / 1.0e6),
+    );
+    let parted_length: Vec<f64> = d
+        .partings
+        .iter()
+        .map(|p| p.end_myr - p.start_myr + d.dt_myr)
+        .collect();
+    put("parting_length_p50_myr", median(&parted_length));
+    let parted: Vec<f64> = d.partings.iter().map(|p| p.shortening_km).collect();
+    put("parting_shortening_km_p50", median(&parted));
+    put("parting_shortening_km_p90", pct(&parted, 0.9));
 
     // Margins and the sea floor.
     put("active_margin_mean", active_margin_mean(margins));

@@ -13,8 +13,9 @@
 //!    subducting plate's crust inside the overriding one;
 //! 2. uplifts the overriding plate within r_s of its fronts (Cortial's u_0·f(d)·g(v)·h(z̃)), builds
 //!    arcs, trenches and the deposit accumulators, and turns subducting plates by slab pull;
-//! 3. fires collisions where continental crust has been forced 300 km under another plate,
-//!    moving the terrane to the other plate with a surge of uplift (`collision.rs`);
+//! 3. keeps each contact's collision state and real shortening (`shortening.rs`) and fires a
+//!    collision where the shortening has reached the threshold, moving the terrane to the other
+//!    plate with a surge of uplift (`collision.rs`);
 //! 4. runs hotspots and large igneous provinces (`hotspots.rs`);
 //! 5. applies continental erosion, oceanic dampening and trench accretion, and the rock-pool
 //!    processes (`pools.rs`);
@@ -49,6 +50,7 @@ pub mod normalise;
 pub mod pools;
 pub mod ridges;
 pub mod rifting;
+pub mod shortening;
 pub mod state;
 pub mod stats;
 pub mod subduction;
@@ -198,11 +200,12 @@ impl PlatesStage {
         let tree = Tree::over(&pos, |_| true);
         let overlaps = subduction::detect(st, &cache.geo, &pos, &tree);
         let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
+        let fired = shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
         let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
         let mut sutured = false;
-        for (c, seeds) in &resolved.collisions {
+        for (c, seeds) in &fired {
             let under = st.contacts[*c].under;
             let done = collision::collide(st, world, &cache.geo, &pos, &env, *c, seeds)?;
             if let Some(ev) = done.event {
@@ -328,6 +331,8 @@ impl PlatesStage {
                     hotspots::close(st, world, &env, h, true)?;
                 }
             }
+            // Closing the contacts ended the collisions still under way: the note gets them.
+            note_dynamics(st, world);
         }
         Ok(())
     }
@@ -488,10 +493,23 @@ fn record_margins(st: &PlateState, world: &mut WorldState, pos: &[DVec3], env: &
     if let (Some(list), Ok(v)) = (note["margins"].as_array_mut(), serde_json::to_value(&m)) {
         list.push(v);
     }
+    world.notes.insert(STAGE_NAME.to_owned(), note.to_string());
     // The dynamics record goes into the same note (`dynamics.rs`), as of now.
-    if let Some(d) = &st.dynamics
-        && let Ok(v) = serde_json::to_value(d)
-    {
+    note_dynamics(st, world);
+}
+
+/// Writes the dynamics record (`dynamics.rs`), as of now, into the run's note
+/// (`notes.plates.dynamics`). Nothing when recording is off.
+fn note_dynamics(st: &PlateState, world: &mut WorldState) {
+    let Some(d) = &st.dynamics else {
+        return;
+    };
+    let mut note: serde_json::Value = world
+        .notes
+        .get(STAGE_NAME)
+        .and_then(|s| serde_json::from_str(s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+    if let Ok(v) = serde_json::to_value(d) {
         note["dynamics"] = v;
     }
     world.notes.insert(STAGE_NAME.to_owned(), note.to_string());

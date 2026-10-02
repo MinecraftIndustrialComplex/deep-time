@@ -23,12 +23,14 @@
 //!    base). A crater worn through its whole depth and its breccia lens is gone (eroded).
 //! 3. **Impacts.** The number of impactors of the step is a Poisson draw with mean
 //!    rate(≥ `min_crater_km`) × `flux` × the planet's area × Δt; each strikes a point drawn
-//!    uniformly on the sphere, with a size drawn from the production function N(≥ D) ∝ D^−b
-//!    between `min_crater_km` and `max_crater_km` (the crater it would make on Earth's land,
-//!    which fixes the impactor: `scaling.rs`). The crater it makes here follows from this planet's
-//!    gravity and the depth of the sea where it lands: deep water stops a small impactor (no
-//!    crater at all) and shrinks the crater of a larger one. A new crater destroys the smaller
-//!    ones inside it.
+//!    uniformly on the sphere, with a size drawn from the production function (N(≥ D) ∝ D^−b above
+//!    20 km, the observed record's flatter rise below it) between `min_crater_km` and
+//!    `max_crater_km` (the crater it would make on Earth's land, which fixes the impactor:
+//!    `scaling.rs`). The crater it makes here follows from this planet's gravity and the depth of
+//!    the sea where it lands (Davison & Collins 2007): deep water leaves no crater at all, a body
+//!    that would dig a complex crater on land leaves only a resurge feature in water deeper than
+//!    3.5 of its diameters, and shallower water shrinks the crater. A new crater destroys the
+//!    smaller ones inside it.
 //! 4. **Landform.** A crater at least two L1 cells across is cut into the deep-time surface
 //!    (the surface's elevation and offset, and the plate feedback, as the volcanoes do), so rivers,
 //!    lakes and sediment see it and the surface stage erodes and fills it like any other basin;
@@ -127,18 +129,19 @@ pub mod code {
 }
 
 /// Craters at least this wide get an event when they form, km.
-pub const EVENT_MIN_KM: f64 = 5.0;
+pub const EVENT_MIN_KM: f64 = 5.0; // ledger: IMP-137 (game choice)
 /// An impactor the sea stopped gets an event when its crater on land would have been at least
 /// this wide, km.
-pub const OCEAN_EVENT_MIN_KM: f64 = 20.0;
+pub const OCEAN_EVENT_MIN_KM: f64 = 20.0; // ledger: IMP-070 (game choice)
 /// A crater shows in the finished terrain while its relief is at least this (two blocks at 20 m
 /// per block), m.
-pub const VISIBLE_RELIEF_M: f64 = 40.0;
+pub const VISIBLE_RELIEF_M: f64 = 40.0; // ledger: IMP-081 (game choice)
 /// Diffusion works above this depth below the sea (the surface stage's wave base), m.
-pub const WAVE_BASE_M: f64 = 60.0;
-/// Target (crust) density of the crater scaling, kg/m³ (2,500–2,750 for sedimentary to
-/// crystalline rock: Collins, Melosh & Marcus 2005).
-pub const TARGET_DENSITY_KG_M3: f64 = 2700.0;
+pub const WAVE_BASE_M: f64 = 60.0; // ledger: IMP-076 (the surface stage's value; uncited)
+/// Target (crust) density of the crater scaling, kg/m³. CMM05 (p. 818) uses 2,500 for sedimentary
+/// and 2,750 for crystalline land targets and 2,700 for the rock under water and in the melt
+/// formula; this takes 2,700 for all (ledger IMP-023).
+pub const TARGET_DENSITY_KG_M3: f64 = 2700.0; // ledger: IMP-023
 /// Lower edges of the size classes of the summary, km (final diameter); the first class is
 /// everything smaller than the second edge.
 pub const SIZE_EDGES_KM: [f64; 6] = [0.0, 5.0, 10.0, 20.0, 50.0, 100.0];
