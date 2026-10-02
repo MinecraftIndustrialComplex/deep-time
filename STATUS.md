@@ -124,6 +124,48 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-02 — The projection-neutral refactor: one projection module per language, equirectangular kept, output bit-identical (agent worktree agent-a3186d42ee9449d3d, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Ask.** The coordinator, after Ben reopened the projection choice (Lambert, or a square tiling map; research note
+  `docs/research/notes/world-projection-options.md`): build step 1 of `docs/design/equal-area-projection.md` §8 now, so
+  that whichever projection Ben picks is a module change plus its family's work. Equirectangular stays the only
+  projection; nothing may change in any output; world-data format unchanged (0.3).
+- **Built.**
+  - Rust `deeptime_format::projection::Projection`: `lat_deg`, `lon_deg`, `z_of_lat`, `x_of_lon`, `block_of`,
+    `lat_lon`, `unit`, `cos_lat`, `scale_ew`/`scale_ns` (the metric), `great_circle_blocks`, `pole_z`,
+    `grid_origin_z`/`grid_rows` (the grids' extent), `picture_z`/`picture_y`/`picture_lat_deg`/`picture_y_of_lat`/
+    `picture_height` (map pictures). `GridDesc` gained `projection`, `row_of_z`, `z_of_row`, `lat_of_row`,
+    `cell_area_km2`, `band_weight`/`band_lat_deg`/`row_weights` (area weights of row bands), `true_cell_m`,
+    `picture_row`/`picture_cell`; `for_planet` takes its extent from the projection. Core's `BlockFrame` wraps it;
+    `deposits::fields::{lat_of_row, cell_area_km2}`, `deposits::sites::{block_of, lat_lon_of}` and
+    `WorldState::block_of` delegate. About 50 Rust sites (core, CLI, inspect, viewer) call it instead of `c / 4`,
+    `90 − 180·j/h` or `−360·z/C`: provinces' coherence and the meta shares now take row weights, `lake_cover` takes
+    the grid, the climate's geometry takes `true_cell_m`.
+  - Java `worlddata/Projection` (the twin): `PoleCapCurve`, `DeepTimeClimate.latitudeDeg` (now clamped to ±90° past the
+    poles, as Rust's always was), `BeyondPoleDensity`, the crater-lake line, both probes, both censuses,
+    `GlobeProjection`, `MapWidget`, `ReviewModel` and the GameTests that place things by the pole call it.
+  - The pages: `crates/deeptime-viewer/assets/projection.js` (`window.DTProj`, loaded first by the workbench and the
+    viewer bundle, served at `/projection.js`); `workbench.js`, `worldmap.js`, `sections.js`, `deposits.js` and
+    `viewer.js` convert through it. `tools/workbench/preview.py` has `pole_z`.
+  - Left as they were, on purpose (the module's doc says why): the spatial-index frames from z = −C/4 (river tiles,
+    structure buckets, site index, playability regions; lookups, not geography, and they cover any projection whose
+    poles lie within ±C/4), and the synthetic test terrain's analytic latitude (its own formula, twinned in Java).
+  - Parity: `deeptime parity` writes a `projection` block (each picked column's latitude and longitude, the z of every
+    5° of latitude); JUnit `ColumnParityTest.theProjectionIsRusts` checks Java against it (1e-9).
+- **Identity, measured.** `tools/review/projection-identity.sh <binary> <dir>` runs a build over the JUnit fixtures'
+  worlds (wrap-test and lake-test synth at C 1,024 with sample dumps and lake parity, the real test planet
+  planet_world_4k: run, bake, viewer bundle with keyframes, column and climate parity fixtures, a satellite picture of
+  its last checkpoint; the deposit world and its dump) and hashes every output file (JSON without the run's clock,
+  timings and memory peaks; the viewer's own code files left out; the parity block above left out). Master 429b6531's
+  binary against this branch's: **355 of 355 files identical**; master run twice: identical (the check is
+  deterministic). Folder `/Volumes/Graphide/ban/deeptime-runs/projection-refactor/` on the VM.
+- **Gates** (VM): `cargo fmt --check`, `clippy --workspace --all-targets -D warnings`, `cargo deny check licenses bans`
+  clean; `cargo test --workspace` 733 passed, 0 failed, 3 ignored; `./gradlew build test` tests=227 failures=0
+  skipped=1. GameTests: running (detached, behind the shared server lock).
+- **Docs.** FORMAT.md "Grids" names the module; `docs/science/world-scale-and-bake.md` and ledger SCL-049 point at it;
+  the design note marks §8 step 1 built.
+- **Next.** Ben's pick (Lambert, or a square/torus map, the research note): the family-specific work of the design note
+  §8 steps 2–3. For Lambert, branch `projection-lambert-wip` (6529b910) holds a first build of the module's bodies to
+  port onto this interface.
 ### 2026-10-02 — Continental crust bisect: the flexure merge cuts the crust (agent worktree agent-aee75761ddffd745f, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; measurement only, nothing fixed, no code committed)
 - **Question.** `deeptime plate-check` on `earthlike_quick_16k`, supercontinent start, 1000 Myr: continental
   crust at the end 0.42 on 38ca6b0 (baseline doc, mean of seeds 1-4) and 0.29 on 1eac09f.
