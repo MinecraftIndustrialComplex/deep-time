@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
 
-use super::dynamics::{BeltRec, Dynamics, PlateLife, PlateStep, StepRec};
+use super::dynamics::{BeltRec, Dynamics, MIX_CLASSES, PlateLife, PlateStep, StepRec};
 use super::stats::Margins;
 
 /// One measure: its key, label, unit, range (inclusive; `None` is open) and how it is taken.
@@ -73,6 +73,7 @@ const fn waits(
 
 const WAITS_COLLISION: &str = "the collision state and belts (design tasks 2-3)";
 const WAITS_FORCES: &str = "the force balance (design task 5)";
+const WAITS_MIX: &str = "a run recorded with the boundary mix and arc heights (dynamics version 3)";
 
 /// The measures in table order: first the ones with the design's §6 ranges, then the ones only
 /// reported (the design's §2.2 figures and what a force-balance plate model will be judged on).
@@ -198,7 +199,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "active_margin_mean",
-        "Active share of the continental margin (after the first 100 Myr)",
+        "Active share of the continental margin (after the first 90 Myr of the record)",
         "share",
         Some(0.25),
         Some(0.40),
@@ -212,11 +213,14 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     // Task 1b: the force-balance design's section 7 targets that today's model can be measured on.
     m(
+        // ledger: CHK-020. Earth: about 47 mm/yr today (area-weighted, Forsyth & Uyeda 1975
+        // Table 1) and 50-100 over the last 200 Myr (global RMS, Zahirovic et al. 2015 §3.2).
+        // Was 35-55, which left out every Earth value of the last 200 Myr (WP-13a).
         "speed_rms_mm_yr",
         "Plate speed, area-weighted RMS (mean over steps)",
         "mm/yr",
-        Some(35.0),
-        Some(55.0),
+        Some(40.0),
+        Some(100.0),
     ),
     m(
         "speed_big_p10_mm_yr",
@@ -324,11 +328,62 @@ pub const MEASURES: &[MeasureDef] = &[
         Some(300.0),
     ),
     m(
+        // ledger: CHK-036. Earth: a cycle "often considered to last 400-800" Myr, about 600 Myr
+        // dominant (Mitchell et al. 2021); "intervals of ca. 500 m.y." (Nance 2022). Was 300-600,
+        // from an Earth range of 300-500 that neither source gives (WP-13a).
         "supercontinent_period_myr",
         "Assembly-to-assembly period, median",
         "Myr",
-        Some(300.0),
-        Some(600.0),
+        Some(400.0),
+        Some(800.0),
+    ),
+    // The boundary mix and arc heights (dynamics version 3), judged against Earth: each range
+    // carries its ledger id (docs/science/ledger/PLT.md, PLT-213 to PLT-221). Runs recorded
+    // without them say "no data".
+    waits(
+        // ledger: PLT-213 (Earth 19.7 %, Bird 2003), PLT-214 (the range)
+        "boundary_subduction_pct",
+        "Plate boundary that is subducting (ocean-ocean and ocean-continent), share of the total length, mean over the run after the first 100 Myr",
+        "% of boundary",
+        Some(15.0),
+        Some(25.0),
+        WAITS_MIX,
+    ),
+    waits(
+        // ledger: PLT-215
+        "arc_oceanic_emergent_pct",
+        "Oceanic (island) arc cells above sea level, share of the arc cells, over the run after the first 100 Myr",
+        "% of arc cells",
+        Some(10.0),
+        Some(35.0),
+        WAITS_MIX,
+    ),
+    waits(
+        // ledger: PLT-216 (lo, abstract-only), PLT-217 (hi, from-memory)
+        "arc_oceanic_p90_m",
+        "Oceanic arc cells, 90th percentile elevation (the crest; mean over the run after the first 100 Myr)",
+        "m",
+        Some(-1700.0),
+        Some(1000.0),
+        WAITS_MIX,
+    ),
+    waits(
+        // ledger: PLT-218
+        "arc_continental_p50_m",
+        "Continental arc cells, median elevation (mean over the run after the first 100 Myr)",
+        "m",
+        Some(1200.0),
+        Some(4500.0),
+        WAITS_MIX,
+    ),
+    waits(
+        // ledger: PLT-219 (from-memory)
+        "arc_continental_p90_m",
+        "Continental arc cells, 90th percentile elevation (the crest; mean over the run after the first 100 Myr)",
+        "m",
+        Some(2000.0),
+        Some(6000.0),
+        WAITS_MIX,
     ),
     // Waiting for physics: reported as "no data" until the record is filled (see `waits`).
     waits(
@@ -674,6 +729,127 @@ pub const MEASURES: &[MeasureDef] = &[
         None,
         None,
     ),
+    // Reported only: the boundary mix beyond its judged share (Earth, Bird 2003: spreading 36 %,
+    // transform 28 %, continental convergent 9 %, other convergent 7 %, subduction 20 %).
+    m(
+        "boundary_total_km",
+        "Plate boundary, total length per step, mean (after the first 100 Myr; Earth: 260,487 km, Bird 2003)",
+        "km",
+        None,
+        None,
+    ),
+    m(
+        "boundary_subduction_km",
+        "Subducting plate boundary, length per step, mean (after the first 100 Myr; Earth: 51,310 km, Bird 2003)",
+        "km",
+        None,
+        None,
+    ),
+    m(
+        "arc_oceanic_p50_m",
+        "Oceanic arc cells, median elevation (mean over the run after the first 100 Myr; band cells include the flanks, not only summits)",
+        "m",
+        None,
+        None,
+    ),
+    m(
+        "boundary_oo_of_subduction_pct",
+        "Subducting boundary that is ocean-ocean, share of the subducting length (after the first 100 Myr)",
+        "% of subduction",
+        None,
+        None,
+    ),
+    m(
+        "boundary_spreading_pct",
+        "Plate boundary that is spreading (ridge and rift), share of the total length (after the first 100 Myr)",
+        "% of boundary",
+        None,
+        None,
+    ),
+    m(
+        "boundary_collision_pct",
+        "Plate boundary at a collision (continental crust at the subducting side), share of the total length (after the first 100 Myr)",
+        "% of boundary",
+        None,
+        None,
+    ),
+    m(
+        "boundary_other_pct",
+        "Plate boundary that is transform or converging with no contact yet, share of the total length (after the first 100 Myr)",
+        "% of boundary",
+        None,
+        None,
+    ),
+    m(
+        "boundary_subduction_pct_early",
+        "Plate boundary that is subducting, share of the total length, first 50 Myr",
+        "% of boundary",
+        None,
+        None,
+    ),
+    m(
+        "boundary_oo_of_subduction_pct_early",
+        "Subducting boundary that is ocean-ocean, share of the subducting length, first 50 Myr",
+        "% of subduction",
+        None,
+        None,
+    ),
+    m(
+        "boundary_spreading_pct_early",
+        "Plate boundary that is spreading, share of the total length, first 50 Myr",
+        "% of boundary",
+        None,
+        None,
+    ),
+    m(
+        "boundary_collision_pct_early",
+        "Plate boundary at a collision, share of the total length, first 50 Myr",
+        "% of boundary",
+        None,
+        None,
+    ),
+    m(
+        "boundary_other_pct_early",
+        "Plate boundary that is transform or converging with no contact yet, share of the total length, first 50 Myr",
+        "% of boundary",
+        None,
+        None,
+    ),
+    m(
+        "arc_oceanic_cells_mean",
+        "Oceanic arc cells per step, mean (after the first 100 Myr)",
+        "cells",
+        None,
+        None,
+    ),
+    m(
+        "arc_continental_cells_mean",
+        "Continental arc cells per step, mean (after the first 100 Myr)",
+        "cells",
+        None,
+        None,
+    ),
+    m(
+        "arc_oceanic_emergent_pct_early",
+        "Oceanic arc cells above sea level, share, first 50 Myr",
+        "% of arc cells",
+        None,
+        None,
+    ),
+    m(
+        "arc_oceanic_p90_m_early",
+        "Oceanic arc cells, 90th percentile elevation, first 50 Myr",
+        "m",
+        None,
+        None,
+    ),
+    m(
+        "arc_continental_p90_m_early",
+        "Continental arc cells, 90th percentile elevation, first 50 Myr",
+        "m",
+        None,
+        None,
+    ),
     waits(
         "force_slab_pull_share_p50",
         "Share of a plate's driving torque that is slab pull, median (needs the force budget)",
@@ -735,6 +911,8 @@ pub struct Params {
     pub min_piece_share: f64,
     /// How long after a rift its fragments must still be separate, Myr.
     pub rift_window_myr: f64,
+    /// The boundary mix and the arc heights are also reported for the first this many Myr.
+    pub early_myr: f64,
 }
 
 impl Default for Params {
@@ -749,6 +927,7 @@ impl Default for Params {
             start_up_myr: 10.0,
             min_piece_share: 0.01,
             rift_window_myr: 50.0,
+            early_myr: 50.0,
         }
     }
 }
@@ -765,6 +944,7 @@ impl Params {
         "start_up_myr",
         "min_piece_share",
         "rift_window_myr",
+        "early_myr",
     ];
 
     /// Sets one parameter by name.
@@ -782,6 +962,7 @@ impl Params {
             "start_up_myr" => self.start_up_myr = value,
             "min_piece_share" => self.min_piece_share = value,
             "rift_window_myr" => self.rift_window_myr = value,
+            "early_myr" => self.early_myr = value,
             _ => {
                 return Err(format!(
                     "no parameter {key:?} (names: {})",
@@ -1365,6 +1546,7 @@ pub fn measures_with(
     plate_motion(d, params, &mut put);
     continents(d, params, &mut put);
     megaplates(d, params, &mut put);
+    boundary_and_arcs(d, params, &mut put);
     pending_physics(d, params, &mut put);
     out
 }
@@ -1802,6 +1984,136 @@ fn megaplates(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, 
         "megaplate_rift_split_50_pct",
         share_of(rifts.iter().filter_map(|r| r.split).collect()),
     );
+}
+
+/// The steps a boundary or arc measure covers: those after `params.warmup_myr` of the run (all
+/// when the run is shorter), and those of its first `params.early_myr`.
+fn windows<'a>(d: &'a Dynamics, params: &Params) -> (Vec<&'a StepRec>, Vec<&'a StepRec>) {
+    let late: Vec<&StepRec> = d
+        .steps
+        .iter()
+        .filter(|s| s.t - d.t0_myr >= params.warmup_myr)
+        .collect();
+    let late = if late.is_empty() {
+        d.steps.iter().collect()
+    } else {
+        late
+    };
+    let early = d
+        .steps
+        .iter()
+        .filter(|s| s.t - d.t0_myr <= params.early_myr + 1e-9)
+        .collect();
+    (late, early)
+}
+
+/// The boundary mix of `steps` (steps with no boundary recorded are skipped): the mean over the
+/// steps of the subducting, spreading, collision and other shares of the boundary's length, and
+/// the ocean-ocean share of the subducting length summed over the steps (NaN where there is none).
+/// Returns `[subduction %, spreading %, collision %, other %, ocean-ocean % of subduction]`.
+pub fn boundary_shares(steps: &[&StepRec]) -> [f64; 5] {
+    use super::dynamics::mix::*;
+    let mut shares: [Vec<f64>; 4] = Default::default();
+    let (mut oo, mut sub) = (0.0, 0.0);
+    for s in steps {
+        let m = &s.mix_km;
+        let total: f64 = m.iter().sum();
+        if total <= 0.0 {
+            continue;
+        }
+        let pct = |x: f64| 100.0 * x / total;
+        shares[0].push(pct(m[OCEAN_OCEAN] + m[OCEAN_CONTINENT]));
+        shares[1].push(pct(m[RIDGE] + m[RIFT]));
+        shares[2].push(pct(m[COLLISION]));
+        shares[3].push(pct(m[OTHER]));
+        oo += m[OCEAN_OCEAN];
+        sub += m[OCEAN_OCEAN] + m[OCEAN_CONTINENT];
+    }
+    let [a, b, c, e] = shares.map(mean);
+    [
+        a,
+        b,
+        c,
+        e,
+        if sub > 0.0 {
+            100.0 * oo / sub
+        } else {
+            f64::NAN
+        },
+    ]
+}
+
+/// The arcs of `steps`: for the oceanic or continental arc, the share of its cells above the sea
+/// datum (cells summed over the steps), and the cell-weighted mean over the steps of its median
+/// and 90th percentile elevation (m), and its mean cells per step. NaN where no step has a cell.
+/// Returns `[emergent %, p50, p90, cells per step]`.
+pub fn arc_summary(
+    steps: &[&StepRec],
+    pick: impl Fn(&StepRec) -> super::dynamics::ArcStat,
+) -> [f64; 4] {
+    let (mut cells, mut emergent, mut p50, mut p90) = (0.0, 0.0, 0.0, 0.0);
+    for s in steps {
+        let a = pick(s);
+        let n = f64::from(a.cells);
+        cells += n;
+        emergent += f64::from(a.emergent);
+        p50 += n * a.p50_m;
+        p90 += n * a.p90_m;
+    }
+    if cells <= 0.0 {
+        return [f64::NAN; 4];
+    }
+    [
+        100.0 * emergent / cells,
+        p50 / cells,
+        p90 / cells,
+        cells / steps.len() as f64,
+    ]
+}
+
+/// The boundary mix and the arc heights (dynamics version 3).
+fn boundary_and_arcs(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, f64)) {
+    let (late, early) = windows(d, params);
+    let [sub, spread, collision, other, oo] = boundary_shares(&late);
+    put("boundary_subduction_pct", sub);
+    put("boundary_spreading_pct", spread);
+    put("boundary_collision_pct", collision);
+    put("boundary_other_pct", other);
+    put("boundary_oo_of_subduction_pct", oo);
+    // Mean per step over the steps that have a boundary recorded.
+    let km = |f: fn(&[f64; MIX_CLASSES]) -> f64| {
+        mean(
+            late.iter()
+                .filter(|s| s.mix_km.iter().sum::<f64>() > 0.0)
+                .map(|s| f(&s.mix_km)),
+        )
+    };
+    put("boundary_total_km", km(|m| m.iter().sum()));
+    put(
+        "boundary_subduction_km",
+        km(|m| m[super::dynamics::mix::OCEAN_OCEAN] + m[super::dynamics::mix::OCEAN_CONTINENT]),
+    );
+    let [sub, spread, collision, other, oo] = boundary_shares(&early);
+    put("boundary_subduction_pct_early", sub);
+    put("boundary_spreading_pct_early", spread);
+    put("boundary_collision_pct_early", collision);
+    put("boundary_other_pct_early", other);
+    put("boundary_oo_of_subduction_pct_early", oo);
+
+    let [emergent, p50, p90, cells] = arc_summary(&late, |s| s.arc_oceanic);
+    put("arc_oceanic_emergent_pct", emergent);
+    put("arc_oceanic_p50_m", p50);
+    put("arc_oceanic_p90_m", p90);
+    put("arc_oceanic_cells_mean", cells);
+    let [_, p50, p90, cells] = arc_summary(&late, |s| s.arc_continental);
+    put("arc_continental_p50_m", p50);
+    put("arc_continental_p90_m", p90);
+    put("arc_continental_cells_mean", cells);
+    let [emergent, _, p90, _] = arc_summary(&early, |s| s.arc_oceanic);
+    put("arc_oceanic_emergent_pct_early", emergent);
+    put("arc_oceanic_p90_m_early", p90);
+    let [_, _, p90, _] = arc_summary(&early, |s| s.arc_continental);
+    put("arc_continental_p90_m_early", p90);
 }
 
 /// The measures that wait for physics: read from the record's empty-for-now fields, so the task
@@ -3134,5 +3446,239 @@ mod tests {
         assert!(t.apply_json(r#"{"params": {"warmup_myr": "x"}}"#).is_err());
         assert!(t.apply_json(r#"{"params": 3}"#).is_err());
         assert!(Params::default().describe().contains("70 %"));
+    }
+
+    #[test]
+    fn the_boundary_mix_is_a_share_of_the_length_after_the_warm_up() {
+        use crate::plates::dynamics::mix::*;
+        let mk = |t: f64, m: [f64; MIX_CLASSES]| StepRec {
+            mix_km: m,
+            ..step(t, 0, 0, &[1000])
+        };
+        let mut v = [0.0; MIX_CLASSES];
+        // The warm-up step (50 Myr): nothing but ridge. Two later steps: 20 % and 30 % subducting
+        // (oo : oc = 3 : 1 and 1 : 1), the rest spreading, collision and other.
+        v[RIDGE] = 100.0;
+        let early = mk(50.0, v);
+        let mut a = [0.0; MIX_CLASSES];
+        a[OCEAN_OCEAN] = 150.0;
+        a[OCEAN_CONTINENT] = 50.0;
+        a[RIDGE] = 300.0;
+        a[RIFT] = 100.0;
+        a[COLLISION] = 100.0;
+        a[OTHER] = 300.0;
+        let mut b = [0.0; MIX_CLASSES];
+        b[OCEAN_OCEAN] = 150.0;
+        b[OCEAN_CONTINENT] = 150.0;
+        b[RIDGE] = 400.0;
+        b[OTHER] = 300.0;
+        let mut d = dynamics(vec![early, mk(150.0, a), mk(250.0, b)]);
+        d.t0_myr = 0.0;
+        let m = measures(&d, &[]);
+        // (20 + 30) / 2; spreading (40 + 40) / 2; collision (10 + 0) / 2; other (30 + 30) / 2.
+        assert!(near(get(&m, "boundary_subduction_pct"), 25.0));
+        assert!(near(get(&m, "boundary_spreading_pct"), 40.0));
+        assert!(near(get(&m, "boundary_collision_pct"), 5.0));
+        assert!(near(get(&m, "boundary_other_pct"), 30.0));
+        // Lengths: 1,000 km a step; 250 km of it subducting on average.
+        assert!(near(get(&m, "boundary_total_km"), 1000.0));
+        assert!(near(get(&m, "boundary_subduction_km"), 250.0));
+        // Ocean-ocean: 300 of 500 km of subduction, summed over the steps.
+        assert!(near(get(&m, "boundary_oo_of_subduction_pct"), 60.0));
+        // The first 50 Myr is the first step alone (t = 50): all ridge, nothing subducting.
+        assert!(near(get(&m, "boundary_subduction_pct_early"), 0.0));
+        assert!(near(get(&m, "boundary_spreading_pct_early"), 100.0));
+        assert!(get(&m, "boundary_oo_of_subduction_pct_early").is_nan());
+        // 25 % is inside 15-25 (both ends included); 26 would not be.
+        let rows = evaluate(
+            &[RunData {
+                name: "r".into(),
+                dynamics: d,
+                margins: vec![],
+            }],
+            &Targets::builtin(),
+        );
+        assert_eq!(row(&rows, "boundary_subduction_pct").status, Status::Pass);
+        // A boundary-less step is skipped, not counted as 0 %.
+        let bare = dynamics(vec![step(150.0, 0, 0, &[1000])]);
+        assert!(get(&measures(&bare, &[]), "boundary_subduction_pct").is_nan());
+    }
+
+    #[test]
+    fn arc_heights_are_judged_per_kind_and_a_run_without_them_has_no_data() {
+        use crate::plates::dynamics::ArcStat;
+        // Oceanic arc: 10 cells (2 emergent), median -400, p90 300; then 30 cells (3 emergent),
+        // median -200, p90 500. Continental arc: 20 cells, median 2000, p90 4000, in the second
+        // step only.
+        let mk = |t: f64, oc: ArcStat, cont: ArcStat| StepRec {
+            arc_oceanic: oc,
+            arc_continental: cont,
+            ..step(t, 0, 0, &[1000])
+        };
+        let stat = |cells, emergent, p50, p90| ArcStat {
+            cells,
+            emergent,
+            p50_m: p50,
+            p90_m: p90,
+            max_m: p90 + 100.0,
+        };
+        let mut d = dynamics(vec![
+            // Warm-up: left out.
+            mk(
+                50.0,
+                stat(100, 100, 3000.0, 4000.0),
+                stat(100, 100, 9000.0, 9000.0),
+            ),
+            mk(150.0, stat(10, 2, -400.0, 300.0), ArcStat::default()),
+            mk(
+                250.0,
+                stat(30, 3, -200.0, 500.0),
+                stat(20, 20, 2000.0, 4000.0),
+            ),
+        ]);
+        d.t0_myr = 0.0;
+        let m = measures(&d, &[]);
+        // Emergent: 5 of 40 cells. The medians and percentiles are weighted by cells.
+        assert!(near(get(&m, "arc_oceanic_emergent_pct"), 12.5));
+        assert!(near(
+            get(&m, "arc_oceanic_p50_m"),
+            (10.0 * -400.0 + 30.0 * -200.0) / 40.0
+        ));
+        assert!(near(
+            get(&m, "arc_oceanic_p90_m"),
+            (10.0 * 300.0 + 30.0 * 500.0) / 40.0
+        ));
+        assert!(near(get(&m, "arc_oceanic_cells_mean"), 20.0));
+        assert!(near(get(&m, "arc_continental_p50_m"), 2000.0));
+        assert!(near(get(&m, "arc_continental_p90_m"), 4000.0));
+        assert!(near(get(&m, "arc_continental_cells_mean"), 10.0));
+        // The first 50 Myr is the step at 50.
+        assert!(near(get(&m, "arc_oceanic_emergent_pct_early"), 100.0));
+        assert!(near(get(&m, "arc_continental_p90_m_early"), 9000.0));
+        // Judged: crest 450 is inside the oceanic range (the median is only reported); 12.5 % is
+        // inside 10-35.
+        let rows = evaluate(
+            &[RunData {
+                name: "r".into(),
+                dynamics: d,
+                margins: vec![],
+            }],
+            &Targets::builtin(),
+        );
+        for k in [
+            "arc_oceanic_emergent_pct",
+            "arc_oceanic_p90_m",
+            "arc_continental_p50_m",
+            "arc_continental_p90_m",
+        ] {
+            assert_eq!(row(&rows, k).status, Status::Pass, "{k}");
+        }
+        // A high island arc fails its crest.
+        let mut hi = dynamics(vec![mk(
+            150.0,
+            stat(10, 9, 600.0, 3000.0),
+            ArcStat::default(),
+        )]);
+        hi.t0_myr = 0.0;
+        let rows = evaluate(
+            &[RunData {
+                name: "hi".into(),
+                dynamics: hi,
+                margins: vec![],
+            }],
+            &Targets::builtin(),
+        );
+        assert_eq!(row(&rows, "arc_oceanic_p90_m").status, Status::Fail);
+        assert_eq!(row(&rows, "arc_oceanic_p50_m").status, Status::Reported);
+        assert_eq!(row(&rows, "arc_oceanic_emergent_pct").status, Status::Fail);
+        // No continental arc recorded: no data, which does not fail (the run predates the record,
+        // or the arcs never formed).
+        assert_eq!(row(&rows, "arc_continental_p90_m").status, Status::Pending);
+        assert!(!row(&rows, "arc_continental_p90_m").status.failed());
+        // A record without any of it: every new judged row says "no data" and none fails.
+        let old = RunData {
+            name: "old".into(),
+            dynamics: dynamics(vec![step(150.0, 0, 0, &[1000])]),
+            margins: vec![],
+        };
+        let rows = evaluate(&[old], &Targets::builtin());
+        for r in rows.iter().filter(|r| r.def.pending == Some(WAITS_MIX)) {
+            assert_eq!(r.status, Status::Pending, "{}", r.def.key);
+        }
+        assert!(
+            rows.iter()
+                .filter(|r| r.def.pending == Some(WAITS_MIX))
+                .count()
+                >= 5
+        );
+    }
+
+    /// Earth's own figures, as read in the sources (docs/science/ledger/CHK.md and PLT.md, WP-13a),
+    /// must pass the built-in ranges they anchor: a target that fails Earth is a wrong target.
+    #[test]
+    fn earth_figures_pass_their_targets() {
+        let t = Targets::builtin();
+        let earth: &[(&str, f64, &str)] = &[
+            // Area-weighted RMS: today, from Forsyth & Uyeda 1975 Table 1; the last 200 Myr's
+            // range of global RMS, Zahirovic et al. 2015 §3.2.
+            ("speed_rms_mm_yr", 47.1, "Forsyth & Uyeda 1975 Table 1"),
+            (
+                "speed_rms_mm_yr",
+                50.0,
+                "Zahirovic et al. 2015 §3.2, low end",
+            ),
+            (
+                "speed_rms_mm_yr",
+                100.0,
+                "Zahirovic et al. 2015 §3.2, high end",
+            ),
+            ("speed_big_p10_mm_yr", 11.0, "Forsyth & Uyeda 1975 Table 1"),
+            ("speed_big_p50_mm_yr", 42.0, "Zahirovic et al. 2015 §3.5"),
+            ("speed_big_p90_mm_yr", 80.0, "Forsyth & Uyeda 1975 Table 1"),
+            (
+                "speed_oceanic_over_continental",
+                2.9,
+                "Zahirovic et al. 2015 §3.5",
+            ),
+            ("speed_slab_over_free", 3.0, "Zahirovic et al. 2015 §3.5"),
+            (
+                "speed_slab_over_free",
+                4.0,
+                "Conrad & Lithgow-Bertelloni 2004",
+            ),
+            ("speed_slab_rank_corr", 0.71, "Forsyth & Uyeda 1975 Table 1"),
+            (
+                "speed_area_rank_corr",
+                -0.34,
+                "Forsyth & Uyeda 1975 Table 1",
+            ),
+            ("ocean_age_p50_myr", 55.4, "Seton et al. 2020 grid"),
+            ("ocean_age_p90_mean_myr", 133.0, "Seton et al. 2020 grid"),
+            ("ocean_old180_pct", 0.61, "Seton et al. 2020 grid"),
+            ("ocean_old250_pct", 0.06, "Seton et al. 2020 grid"),
+            ("supercontinent_tenure_myr", 100.0, "Mitchell et al. 2021"),
+            ("supercontinent_tenure_myr", 300.0, "Mitchell et al. 2021"),
+            ("supercontinent_period_myr", 400.0, "Mitchell et al. 2021"),
+            ("supercontinent_period_myr", 500.0, "Nance 2022"),
+            ("supercontinent_period_myr", 600.0, "Mitchell et al. 2021"),
+            ("supercontinent_period_myr", 800.0, "Mitchell et al. 2021"),
+            ("largest_share_p50", 0.205, "Bird 2003 Table 1"),
+            ("plates_over_5pct_p50", 7.0, "Bird 2003 Table 1"),
+            ("boundary_subduction_pct", 19.7, "Bird 2003 Table 3"),
+            (
+                "collision_convergence_ratio_20myr",
+                0.27,
+                "Copley et al. 2010",
+            ),
+        ];
+        for &(key, v, src) in earth {
+            assert!(MEASURES.iter().any(|d| d.key == key), "{key}");
+            let (lo, hi) = t.range(key);
+            assert!(
+                lo.is_none_or(|lo| v >= lo) && hi.is_none_or(|hi| v <= hi),
+                "{key}: Earth {v} ({src}) is outside {}",
+                range_text(lo, hi)
+            );
+        }
     }
 }
