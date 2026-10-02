@@ -146,7 +146,8 @@ impl GridDesc {
     /// r × r block square times the projection's area scale at the row's point sample.
     pub fn cell_area_km2(&self, j: u32, m_per_block: f64) -> f64 {
         let side_km = f64::from(self.r) * m_per_block / 1000.0;
-        side_km * side_km
+        side_km
+            * side_km
             * self
                 .projection()
                 .area_scale(self.block_z(i64::from(j)) as f64)

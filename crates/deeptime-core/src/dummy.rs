@@ -409,8 +409,7 @@ impl DummyStage {
                     let lat = deeptime_format::Projection::picture_lat_deg(j as f64, gh as u32);
                     for (i, v) in row.iter_mut().enumerate() {
                         // The seam is 0°.
-                        let lon =
-                            deeptime_format::Projection::picture_lon_deg(i as f64, gw as u32);
+                        let lon = deeptime_format::Projection::picture_lon_deg(i as f64, gw as u32);
                         *v = continent.elevation(lat, lon) as f32;
                     }
                 });
