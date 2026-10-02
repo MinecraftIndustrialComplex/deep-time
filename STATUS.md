@@ -130,7 +130,14 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   for the default, 0.014 kept in the row as the reference); `docs/science/deposits.md`; claims counts regenerated. Left alone:
   `clocks.rs` test fixture `inherited_bif: 0.014` (a hand-built Epoch, not the setting) and the `bif_basins.rs` test that deals at
   0.014 (it checks the basin dealing against Earth's share arithmetic).
-- **Evidence.** MEASURE_PLACEHOLDER
+- **Evidence** (`deposit-richness-runs.sh world`, `earthlike_quick_16k`, `scattered_continents`, 1,000 Myr, seed 1, 4 threads, this
+  tree; "before" is the same tree with `--set deposits.inherited_bif_share=0.014`). Iron-formation (`bif_fe`) sites, total / counted /
+  dry land at the present / under the sea: **before (0.014) 1 / 0 / 0 / 1** (permissive 8,405 km², expected sites 0.60, preservation
+  0.9 %); **after (0.05) 15 / 6 / 7 / 8** (permissive 63,887 km², expected sites 4.02, preservation 1.2 %; 5 of the 7 land sites hold
+  1,000 iron ore blocks or more). Matches the figures of the earlier agent's `--set` run (1 and 15 sites, 6 counted).
+- **Gates** (VM, this branch): `cargo fmt --check`, clippy `-D warnings`, `cargo test --workspace` (731 passed, 0 failed, 3 ignored),
+  `cargo deny check licenses bans` (ok), `./gradlew build test` (BUILD SUCCESSFUL; 229 tests, 0 failures, 1 skipped).
+  GAMETEST_PLACEHOLDER
 ### 2026-10-02 — Deposits: richer, thinner scatter, raw-ore cores; inherited iron formation in Earth-like basins; supergene and coal judgement items (agent worktree agent-af40434ae4920f5c9, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Ask.** Ben's three answers of 2026-10-02 on deposits: "Earth-like patch field" (inherited BIF), "Apply all" (supergene rain
   floor 0, coal field P10 about 6,000 km², supergene minimum time and flat porphyry density kept), "Rich Deposits, Thinner
