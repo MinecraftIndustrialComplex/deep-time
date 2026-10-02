@@ -13,7 +13,8 @@ import java.util.OptionalDouble;
  *
  * <p>A Deep Time world is generated from a simulated planet whose climate (an energy-balance model
  * with seasons, wind belts, continentality, rain shadows and orographic rain; plan §8.3) was
- * computed for every 16-block cell. Minecraft's biomes only carry a coarse band of that climate;
+ * computed once per climate cell (16 blocks wide on a 16,384-block planet, 32 on a 32,768-block one:
+ * the planet's circumference over 1,024 columns; ledger BIO-097). Minecraft's biomes only carry a coarse band of that climate;
  * this interface hands out the numbers themselves, read from the world data's bake: per block, the
  * twelve monthly mean temperatures at the block's height (the simulation's lapse rate applied over
  * the block's height above the sea), the annual mean, the warmest and coldest month, annual and

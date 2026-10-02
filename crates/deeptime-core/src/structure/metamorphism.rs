@@ -8,7 +8,8 @@
 //! **Where.** On continental crust (sediment on oceanic crust is subducted, or accreted and then
 //! continental, before it is buried deep enough).
 //!
-//! **Temperature.** A linear geotherm T(z) = T_s + (q / k)·z_eff, with q the plate model's heat
+//! **Temperature** (ledger RCK-028 to RCK-038). A linear geotherm T(z) = T_s + (q / k)·z_eff,
+//! Fourier's law with no heat production or temperature-dependent k, with q the plate model's heat
 //! flow proxy (`plates/heat_flow_mw_m2`, at most `max_heat_flow_mw_m2`), k = `conductivity_w_mk`
 //! and T_s the climate's mean temperature (or `surface_temp_c`). **Regime history** enters through z_eff: under an active
 //! collision (the `collision` regime, or a Himalayan orogeny younger than 30 Myr) the crust is being
@@ -20,20 +21,29 @@
 //! high-pressure series) is Phase 2's (P2-02, open question Q8), so blueschist and eclogite are not
 //! formed here, nor contact metamorphism (the plutons' aureoles, `plutons.rs`).
 //!
-//! **Formation temperatures** (°C; the regional sequence's textbook boundaries, rounded — Winter
-//! 2010, *Principles of Igneous and Metamorphic Petrology*, 2nd ed., ch. 21 and 25; Yardley 1989,
-//! *An Introduction to Metamorphic Petrology*, ch. 3): slate 250 (the anchizone–epizone,
+//! **Formation temperatures** (°C; ledger RCK-039 to RCK-045). They are rounded values in the
+//! range of the regional sequence, cited since stage 1 to Winter 2010 (*Principles of Igneous and
+//! Metamorphic Petrology*, 2nd ed.) and Yardley 1989, neither of which has been read. What stage 2
+//! did read (secondary lecture notes and case studies; no source gives a clean table):
+//! the greenschist facies starts above about 275 °C (Greenwood & Berman, Canadian Encyclopedia),
+//! quartz recrystallises from about 280 °C and calcite from about 250 °C (Stipp et al. 2002;
+//! Ferrill et al. 2004), diagenesis ends at 200 °C and 300 MPa (Nelson, Tulane), and at the
+//! Barrovian type locality the garnet zone grew at 500–550 °C and the sillimanite zone peaked at
+//! 650–700 °C and about 6 kbar (Baxter et al. 2002). So: slate 250 (the anchizone–epizone,
 //! lowest greenschist), phyllite 350, quartzite, marble and greenstone 300 (greenschist facies),
-//! schist 450 (upper greenschist to lower amphibolite, the garnet zone), amphibolite 500, gneiss
-//! 650 (upper amphibolite, the sillimanite zone and migmatites). Gypsum → anhydrite at 50 °C, the
-//! dehydration of buried gypsum within about the first kilometre (Warren 2016, *Evaporites*, 2nd
-//! ed., ch. 7). A path element without a temperature (serpentinite, eclogite) is never reached.
+//! schist 450 (the mica-schist grade; 50–100 °C below the garnet zone of the type locality),
+//! amphibolite 500, gneiss 650 (upper amphibolite, the sillimanite zone and the onset of
+//! melting). "Gneiss" and "schist" name textures, not facies. Gypsum → anhydrite at 50 °C is
+//! diagenesis: about 50 °C, 450–500 m deep, where clastic or carbonate rock accompanies the
+//! sulphate (Ortí et al. 2012); the pure-water equilibrium is 58 ± 2 °C (Hardie 1967). A path
+//! element without a temperature (serpentinite, eclogite) is never reached.
 
 use crate::surface::lithology;
 use crate::surface::strata_log::{ColumnMut, Layer};
 
 /// The temperature (°C) at which `name` forms from the class before it in a metamorphic path.
 pub fn formation_temp_c(name: &str) -> Option<f64> {
+    // ledger: RCK-039 to RCK-045 (the module docs say what each was checked against)
     Some(match name {
         "anhydrite" => 50.0,
         "slate" => 250.0,
@@ -48,7 +58,8 @@ pub fn formation_temp_c(name: &str) -> Option<f64> {
 
 /// A class's metamorphic grade for maps: 0 none, 1 very low (slate), 2 low (phyllite,
 /// greenschist-facies quartzite, marble, greenstone, serpentinite, contact rocks), 3 medium
-/// (schist, amphibolite, blueschist), 4 high (gneiss, eclogite).
+/// (schist, amphibolite, blueschist), 4 high (gneiss, eclogite). A map index, not a facies
+/// (ledger RCK-047, game choice).
 pub fn grade(name: &str) -> u8 {
     match name {
         "slate" => 1,
@@ -121,7 +132,8 @@ impl Thermal {
     }
 }
 
-/// Steps the column's layers along their paths (`above_m` of regolith on top); merges
+/// Steps the column's layers along their paths (`above_m` of regolith on top; each layer is
+/// tested at its mid-depth, RCK-037); merges
 /// neighbouring layers that end up in one class (the older base age, the thicker one's
 /// provenance). Returns the thickness that changed class, m.
 pub fn metamorphose(col: &mut ColumnMut<'_>, above_m: f64, th: &Thermal, paths: &Paths) -> f64 {
