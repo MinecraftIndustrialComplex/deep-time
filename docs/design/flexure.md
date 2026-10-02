@@ -1,7 +1,8 @@
 # Lithospheric flexure in the surface stage: design
 
 Status: **built** (2026-10-02; sections 1–11 are the design as written before the code, corrected
-where the build changed it; section 12 is what was measured). Ben's decision of 2026-10-02 (decisions
+where the build changed it; section 12 is what was measured; section 13 the artifacts found after
+merging, their causes and fixes). Ben's decision of 2026-10-02 (decisions
 log): "General flexure everywhere": every load bends the crust, not only collision belts. This note
 replaces option 5.6 (a) of `docs/design/plate-force-balance.md` (the line-load profile in the plate
 model) and is what its task 3 (the two-sided belt) relies on for the foreland basin.
@@ -96,19 +97,22 @@ in them. Flexure is a correction to where the sinking happens. Per step:
   isostasy exactly (without the blur), and plate uplift is unchanged.
 - Each kilogram is in `Q` once, and each metre of sinking is applied once: by the plate model
   (`a`) or by the solve (`δw − a`).
-- The deflection is solved for the whole load every step, not accumulated from increments, so
-  nothing drifts: when a belt wears down or ice melts, the load is gone from `Q` and the plate
-  comes back.
+- **As built after the follow-up (section 13):** each step solves only for the step's load
+  increments; the carried plate is taken to be in equilibrium. The design first re-solved the
+  whole load every step so that "nothing drifts"; the carried state's interpolation error then
+  acted as a force. What a solve leaves unfinished is carried with the crust and solved with the
+  next step's loads, so nothing is dropped either. When a belt wears down or ice melts the
+  negative increment brings the plate back.
 - The plate model learns the result through the existing feedback (the surface's elevation over
   its own).
 
 **A plate that stiffens keeps its shape.** A belt built on hot, weak crust has a local root. When
 that crust cools and stiffens, nothing should move: the new stiffness is added stress-free at the
 shape the plate has. Without this, every old belt would slowly rise as its root is "spread".
-The model: per cell, the rigidity `D` and a frozen bending moment `M₀` are kept with the crust.
-The bending moment is `D ∇²w − M₀`. When `D` grows, the step is solved with the old `D` and then
-`M₀ += ΔD · ∇²w`; when it falls (reheating), `M₀` shrinks in proportion. Loads applied after the
-stiffening meet the stiff plate. This is the observed rule that a load records the plate's
+The model (as built after section 13): the plate carries its bending moment `m = D ∇²w`, built
+up step by step. When `D` grows, `m` stays and later loads meet the stiffer plate; when it falls
+(reheating, a cell becoming a plate's broken edge), `m` shrinks in proportion and the released
+moment is a force. (The first build kept a frozen moment `M₀` and re-solved the whole load.) This is the observed rule that a load records the plate's
 strength at the time of loading (Watts 1978: seamounts built on young floor keep a low `Te`).
 
 **Water** is a load that depends on the answer (a basin that sinks takes more water). The solve
@@ -127,7 +131,9 @@ From the plate model's own thermal state, on L1 each step:
 - Then smoothed over about 80 km (two box passes of two solve cells): heat spreads sideways, and
   the solver converges far better on a smooth field (measured, section 5).
 - **A plate boundary is a break** (added while building). Cells along a boundary between two
-  plates are at `te_min_km`, the next row half way to it. Without it the first runs had the old,
+  plates are at `te_min_km`. As built after section 13 the boundary cells are blurred and the
+  share of stiffness kept is `1 − 2.5 × blur` (0 on the boundary rows, then 0.17 and 0.72); the
+  first build had the next row half way, a staircase on the raster. Without it the first runs had the old,
   stiff subducting plate holding up the arc across the trench: arcs 10 km above their isostatic
   level, a 5 km hole on the other side (measured). A collision front between two plates is a
   break too, until the plates weld; then the basin forms through the continuous plate.
@@ -405,4 +411,107 @@ build log entry.
 code path, and a test holds it equal to a preset without the section; no run of the old binary was
 compared). The full presets (the coarsened solve is unit-tested only). Other gravities and
 `strength` between 0 and 1 on a planet. GameTests.
+
+## 13. Artifacts after merging: causes and fixes (2026-10-02, follow-up)
+
+Two artifacts shipped with the first build: the ground zigzagged from cell to cell along active
+margins (land roughness, 99th percentile, 294 → 391 m in one pair of runs), and stripes ran across
+the polar regions. A zigzag is measured as the share of cells where a cell and its next neighbour
+(along x or y) are both strict extrema of opposite kind by more than 20 m (`tools/review/
+flexure_artifacts.py`), over margin cells (within three cells of a plate boundary), plate
+interiors, and the band poleward of 70°.
+
+**Three causes, found in this order** (each with a planet measurement and a controlled test):
+
+1. **The carried state acted as a force** (the main cause of both). Each step re-solved the whole
+   load against the deflection and frozen moment carried from the last step. Carrying them with
+   the crust on the raster interpolates them (bilinear, and near the pole a plate's rotation
+   shifts each row by many cells); new crust and crust arriving from another plate restart from
+   zero next to cells that carry kilometres. None of that is a load, but in a whole-load solve the
+   mismatch is a residual, and the solve moved the ground to remove it. Measured on a 200 Myr
+   planet with the response split linearly by source (a temporary diagnostic): **the carried
+   state's residual alone moved the ground by up to 4.6–6.2 km in a step**, with a mean cell-scale
+   energy of 10–25 m, about equally near restarted crust, near cells whose stiffness jumped more
+   than fourfold in the step, and elsewhere (interpolation of the moment and deflection).
+   Controlled test `carrying_a_bent_plate_moves_nothing` (a bent craton sheared row by row as
+   rotation about the pole shears it, no new load): the old formulation moves the ground by
+   1.15 m in a step; the new one by under 1 cm.
+   **Fix:** solve only for the step's load increments. The carried plate is taken to be in
+   equilibrium, as the real plate is; the solve's own unfinished residual is carried with the
+   crust and added to the next step; the plate carries its bending moment, which stays when the
+   plate stiffens and is released, as a force, when it weakens.
+2. **The plate boundary was a staircase.** The break (boundary cells at the floor, the next row
+   half way) was applied after the stiffness was smoothed, so it stepped from row to row with the
+   raster. Controlled test `a_moving_margin_bends_smoothly` (an ocean plate moving 0.37 cells a
+   step under a craton that advances 0.23 cells a step along a smoothly wavy boundary, a sediment
+   fan and an arc): with the staircase the deflection zigzags beside the boundary (3–70 m); with
+   the boundary cells blurred before the stiffness share is taken, nowhere by more than 10 m.
+   On the planet the staircase was the polar problem: the polar band's elevation zigzag was 3.5 %
+   [1.4, 5.0] with it and 1.3 % [0.9, 1.9] without it (flexure off: 1.5 %), over four planets.
+3. **The plate model's sample lattice reached the ground as relief.** The plate model's uplift is
+   interpolated onto L1 from samples about 71 Earth-normalized km apart; L1 cells are 39 km. A
+   two-cell wave in it is beyond what the plate model resolves: aliasing. Measured: the uplift
+   field itself zigzags in 4.8 % of margin cells by more than 5 m a step (2.5 % by more than
+   20 m). Local isostasy passed it to the ground at its own height; a stiff plate passed the whole
+   thickening behind it, 5.5 times higher. Controlled test
+   `the_plate_models_sample_lattice_is_not_a_load` (uplift alternating column by column on a
+   craton): the ground steps by 500 m between columns for a 500 m uplift, against more than
+   1,500 m unfiltered. **Fix:** only the part of the plate model's root the plate model resolves
+   bends the plate (binomial passes, `(1, 2, 1)/4`, set by the sample spacing: two on the quick
+   presets, zero response to the two-cell wave); the rest stays locally compensated, as the plate
+   model made it. Erosion, deposition and spreading are computed on L1 and are not filtered.
+
+**What remains** (the final code's per-step response split by source, margin cells, 200 Myr): the
+step's erosion and deposition (marine fill of kilometres in trench and margin cells) 1.6–4.1 % of
+margin cells zigzag by more than 5 m, plate uplift with water and ice 1.3–3.6 %, the moment
+released where a moving boundary weakens the plate 1.0–3.1 %, the carried unfinished residual
+under 0.1 %. Deposition is computed at this resolution and is a real narrow load; the released
+moment follows the plate boundaries' own cell-scale steps from the plate model.
+
+**Ruled out:** the spectral-blend preconditioner leaving a high-frequency residual (the carried
+unfinished residual's response zigzags in under 0.1 % of cells); latitude-dependent terms in the
+operator or the preconditioner (there are none: the raster is in block metric, the same metric as
+every surface process, and a ring load bends the plate the same at every longitude, tested).
+Regime: unlike `plates/flags`, the regime field is populated on the last step of a run, which is
+a resampling step (checked on a checkpoint); along margins its code changes in a cell-scale
+zigzag in about 1 % of cells. Its flicker from step to step was not measured on its own; a
+stiffness that drops shows in the released-moment share above.
+
+**Measured on the merged tree** (this branch merged with master 412d517; `earthlike_quick_16k`,
+test VM, 2 threads).
+
+Artifacts, 200 Myr, seeds 1–2 × both starts, mean [min, max] (`S=… LEN=200 tools/review/
+flexure-ensemble.sh off=…:surface.flexure.strength=0 fin=…`):
+
+| | elevation zigzag at margins | interior | polar band | land roughness p99 | sea roughness p99 |
+|---|---|---|---|---|---|
+| flexure off | 11.1 % [8.5, 12.9] | 1.15 % | 1.48 % [1.16, 1.77] | 237 m [177, 332] | 1,507 m |
+| first build (one planet; off there: 10.8 %, 1.50 %) | 19.3 % | 2.2 % | 1.57 % | 308 m | 2,109 m |
+| fixes 1 only (incremental), same ensemble | 12.8 % [10.4, 13.7] | 1.6 % | 3.45 % [1.43, 5.04] | 250 m | 1,796 m |
+| final (fixes 1–3) | 13.1 % [10.4, 15.0] | 1.54 % | 0.87 % [0.49, 1.27] | 274 m [123, 338] | 1,636 m |
+
+**The roughness, explained** (the 500 Myr pair below, the planet of the first complaint, 294 →
+391 m then): land roughness p99 289 m without, 372 m with. Away from coasts flexure makes the land
+smoother: land whose four neighbours are land has p99 271 m without and 225 m with (at margins
+563 → 451 m). The rise is all coast: coast cells within three cells of a plate boundary double
+(1,378 → 2,830), because arcs held up by the stiff plate's edge emerge as islands, and an island
+cell beside deep water reads as rough. 85 % of the roughest 1 % of land cells lie at margins with
+flexure (19 % without); a tenth of them zigzag. That is a change in where land is, not noise.
+
+**Run time**, the same planet with and without, side by side (500 Myr, supercontinent, seed 1):
+557 → 576 s, **+3.3 %**. The flexure step is 56 s (10 % of the run without it; 85–107 s before
+the fixes), 9.3 iterations a solve (20–24 before), none at the limit; the old isostasy (6 s) and
+most of the spreading solve (24 → 4 s) fall away.
+
+**Hypsometry**, 500 Myr, seeds 1–2 × both starts (`tools/review/p1-17-hyps.sh`), not recalibrated:
+
+| | land | median, m | p90, m | above 2 km | sea median, m | shelf share of sea | highest 1 % of land | highest cell |
+|---|---|---|---|---|---|---|---|---|
+| Earth | 0.289 | 427 | 2,022 | 0.102 | 4,062 | | | |
+| without | 0.299 [0.271, 0.340] | 578 [409, 724] | 1,927 | 0.097 | 3,408 [3,217, 3,925] | 0.115 | 4.0–4.8 km | 6.8 km |
+| with | 0.290 [0.252, 0.331] | 636 [598, 712] | 1,997 | 0.102 | 4,053 [3,755, 4,718] | 0.059 | 3.0–3.4 km | 5.0–5.3 km |
+
+**Not explained:** a few cells per planet stand far below their local-isostatic level (−11.8 km
+at one polar trench in the final build; the first build had −6.2 and −8.8 km on its planets). The
+share of the planet more than 500 m below is 0.55 % (first build 0.71 %).
 
