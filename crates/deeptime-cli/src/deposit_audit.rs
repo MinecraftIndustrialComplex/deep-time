@@ -899,7 +899,7 @@ fn access_probe(
                             continue;
                         }
                         let (cx, cz) = ((pcx + dx + nc / 2).rem_euclid(nc) - nc / 2, pcz + dz);
-                        if cz.abs() * 16 > c / 4 {
+                        if !deeptime_format::Projection::of(c as f64).on_planet(0.0, (cz * 16) as f64) {
                             continue;
                         }
                         let key = (mat.to_owned(), cx, cz);
