@@ -631,6 +631,8 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     let p = preset(8000, 300.0, "supercontinent", 21);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
+    let (mut arc_cells_seen, mut mix_seen) = (0u64, 0.0f64);
+    let mut deaths_before = 0;
     let mut prev_omega: BTreeMap<u32, glam::DVec3> = BTreeMap::new();
     let with = run_stage(&p, |stage, _, st| {
         let d = st.dynamics.as_ref().expect("recording is on by default");
@@ -703,9 +705,44 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         );
         assert!(step.pieces.first().copied().unwrap_or(0) <= loose.first().copied().unwrap_or(0));
         assert!(step.pieces.len() >= loose.len().min(dynamics::PIECES_KEPT));
+        // The boundary mix: every kind is a length; the fronts (the first three kinds) are the
+        // same fronts whose lengths the plates record, to the rounding of a km a plate.
+        assert!(step.mix_km.iter().all(|&x| x.is_finite() && x >= 0.0));
+        let fronts: f64 = step.mix_km[..3].iter().sum();
+        let recorded: f64 = step.plates.iter().map(|q| q.front_km).sum();
+        // (A plate that died in the step, welded or absorbed, has no plate record: its fronts are
+        // in the mix only.)
+        let tol = 0.5 * step.plates.len() as f64 + 1.0;
+        if st.counters.plate_deaths == deaths_before {
+            assert!(
+                (fronts - recorded).abs() <= tol,
+                "step {}: mix fronts {fronts} km, plates' fronts {recorded} km",
+                st.step
+            );
+        } else {
+            assert!(
+                fronts >= recorded - tol,
+                "step {}: {fronts} < {recorded}",
+                st.step
+            );
+        }
+        deaths_before = st.counters.plate_deaths;
+        // The arcs: emergent cells are cells, the percentiles ordered, nothing above the cap.
+        for arc in [&step.arc_oceanic, &step.arc_continental] {
+            assert!(arc.emergent <= arc.cells && arc.cells <= step.visible);
+            if arc.cells > 0 {
+                assert!(arc.p50_m <= arc.p90_m && arc.p90_m <= arc.max_m, "{arc:?}");
+            } else {
+                assert_eq!(*arc, dynamics::ArcStat::default());
+            }
+        }
+        arc_cells_seen += u64::from(step.arc_oceanic.cells + step.arc_continental.cells);
+        mix_seen += step.mix_km.iter().sum::<f64>();
         checked += 1;
     });
     assert_eq!(checked, total);
+    assert!(mix_seen > 0.0, "no plate boundary recorded in 300 Myr");
+    assert!(arc_cells_seen > 0, "no arc cell recorded in 300 Myr");
     let st = with.plates.as_ref().unwrap();
     let d = st.dynamics.as_ref().unwrap();
     assert_eq!(d.steps.len() as u64, total);
