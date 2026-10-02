@@ -286,5 +286,8 @@
     "build_myr": 1.0,
     "fade_myr": 5.0,
     "max_elevation_km": 6.8
+  },
+  "provinces": {
+    "min_area_km2": 1500.0
   }
 }

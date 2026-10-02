@@ -2,7 +2,9 @@
 package com.minecraftindustrialcomplex.deeptime.climate;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.compat.terrablender.RegionCatalog;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
@@ -152,6 +154,64 @@ public final class ClimateMappingBuilder {
      * synthetic worlds carry vanilla values directly).
      */
     public static ClimateMapping forWorld(WorldData wd, RegistryAccess access, ResourceManager resources) {
+        return withRegions(tables(wd, access, resources), wd);
+    }
+
+    /** The baked count of geologic provinces ({@code notes.bake.meta.provinces.count}), or 0. */
+    static int provinceCount(WorldData wd) {
+        JsonObject n = wd.manifest().notes();
+        for (String k : new String[]{"bake", "meta", "provinces"}) {
+            if (n == null || !n.has(k) || !n.get(k).isJsonObject())
+                return 0;
+            n = n.getAsJsonObject(k);
+        }
+        return n.has("count") ? n.get("count").getAsInt() : 0;
+    }
+
+    /** The assignment's salt: the preset's seed (from the world data's {@code preset.json}), else 0. */
+    static long regionSalt(WorldData wd) {
+        try {
+            JsonObject p = JsonParser.parseString(Files.readString(wd.folder().resolve("preset.json"))).getAsJsonObject();
+            return p.has("seed") ? p.get("seed").getAsLong() * 0x9E3779B97F4A7C15L : 0L;
+        } catch (IOException | RuntimeException e) {
+            return 0L;
+        }
+    }
+
+    /**
+     * Gives the world's geologic provinces their TerraBlender regions (plan §7.3, P1-10), once: when
+     * TerraBlender is installed, the world has baked provinces and its mapping has no table yet, the
+     * table is dealt out over TerraBlender's registered regions by weight
+     * ({@link ProvinceRegions#assign}) and written into {@value ClimateMapping#FILE}. A table that
+     * exists is kept as it is, so a biome mod installed or removed later never moves the regions of
+     * explored chunks.
+     */
+    public static ClimateMapping withRegions(ClimateMapping m, WorldData wd) {
+        if (m.regions() != null || m.isIdentity())
+            return m;
+        int provinces = provinceCount(wd);
+        if (provinces <= 0)
+            return m;
+        var catalog = RegionCatalog.load();
+        if (catalog.isEmpty())
+            return m;
+        ClimateMapping out;
+        try {
+            out = m.withRegions(ProvinceRegions.assign(provinces, catalog.get().overworldRegions(), regionSalt(wd)));
+        } catch (IllegalArgumentException e) {
+            DeepTime.LOGGER.warn("TerraBlender regions of {}: {}", wd.folder(), e.getMessage());
+            return m;
+        }
+        try {
+            out.write(wd.folder().resolve(ClimateMapping.FILE));
+        } catch (IOException e) {
+            DeepTime.LOGGER.error("Cannot write {} ({}): the regions hold for this start only", ClimateMapping.FILE, e.getMessage());
+        }
+        DeepTime.LOGGER.info("TerraBlender regions of {}: {} provinces dealt out over {}", wd.folder(), provinces, out.regions().counts());
+        return out;
+    }
+
+    private static ClimateMapping tables(WorldData wd, RegistryAccess access, ResourceManager resources) {
         Path file = wd.folder().resolve(ClimateMapping.FILE);
         if (Files.isRegularFile(file)) {
             try {

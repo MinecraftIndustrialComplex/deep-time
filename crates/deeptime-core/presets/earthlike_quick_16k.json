@@ -383,5 +383,11 @@
     "magma_chamber_size": 1.0,
     "crater_lake_share": 0.25,
     "remove_lava_features": true
+  },
+  "provinces": {
+    "min_area_km2": 50000.0,
+    "orogen_max_age_myr": 500.0,
+    "andean_max_age_myr": 50.0,
+    "andean_min_elevation_m": 1500.0
   }
 }

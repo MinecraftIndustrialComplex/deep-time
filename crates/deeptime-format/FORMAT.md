@@ -66,7 +66,8 @@ Every other file's bytes are as in 0.1.
   volcanoes/active.json         the volcanoes active at the present ("Lava")
   climate_mapping.json          written by the game at the world's first start (P1-09, plan §7.2; not listed
                                 in the manifest): the tables from the baked biome inputs to the pack's
-                                (see "The climate mapping")
+                                (see "The climate mapping"), and, with TerraBlender, each province's biome
+                                region ("The geologic provinces and TerraBlender's regions")
   parity/columns.json           optional: the column evaluator on 500 columns (`deeptime parity`; not listed
                                 in the manifest, never read by the game)
   preset.json                   the exact preset of a run (canonical JSON; `deeptime run`, the game)
@@ -145,7 +146,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `surface/class_top` | L2 | u8 | 1, class index | 255 | the rock class at the surface (`strata/classes.json`) |
 | `meta/plate_id` | L1 | u16 | 1, plate id | 65535 | the plate |
 | `meta/crust_age_myr` | L1 | u16 | 1, Myr | 65535 | oceanic crust age; nodata on continental crust |
-| `meta/province` | L1 | u16 | 1, province id | — | contiguous geologic provinces ≥ 50,000 km² (`notes.bake.meta.provinces`) |
+| `meta/province` | L1 | u16 | 1, province id | — | geologic provinces (P1-10, "The geologic provinces"): contiguous areas of one USGS-style class, each at least the preset's `provinces.min_area_km2` (50,000 km² by default); `notes.bake.meta.provinces` lists them. With TerraBlender installed the game gives every province one biome region |
 
 `notes.bake`: `version` (1), `baked`, per part (`terrain`, `strata`, `climate`, `water`, `surface`, `meta`)
 what it did, `millis` per part, `bytes` and `layers` written, and **`detail`** — the game's detail
@@ -320,6 +321,36 @@ continentalness map band edge to band edge; erosion maps the reference's land qu
 onto the pack's below its E6, then E6 edge to edge; weirdness maps the peaks-and-valleys
 quantiles above the valley slice on the rising branch (|w| = (PV + 1)/3). A folder without a
 P1-09 record (the synthetic worlds, older bakes) gets no file: its values are used as written.
+
+### The geologic provinces and TerraBlender's regions (P1-10)
+
+`meta/province` (L1, u16) is the planet cut into **provinces**: the USGS-style class of every cell
+(the `provinces` view layer's rules: shield, platform, orogen, basin, large igneous province,
+extended crust, oceanic crust of 0–20, 20–65 and over 65 Myr; `Unclassified` where the plate model
+has nothing) is split into connected regions of one class (4-neighbours, x wraps), and regions
+smaller than `min_area_km2` are absorbed by the nearest larger one, so provinces are contiguous and
+at least that large. Ids count from 0 in the order of each province's first cell (row-major). The
+preset's `provinces` section sets `min_area_km2` (default 50,000), `orogen_max_age_myr` (500: a
+collision belt stays an orogen this long), `andean_max_age_myr` (50) and `andean_min_elevation_m`
+(1,500); all four are recorded in `notes.bake.meta.provinces.params`. The notes also hold
+`classes` (the class names), `rule`, `count`, `province` (per id: `class`, `cells`, `km2`) and
+`shares`: `classified` and `provinces`, each with `planet` and `continental` (each class's share by
+true area as the rules classed the cells, and as the provinces hold them after the small regions
+were absorbed), and `absorbed_cells` (how many cells changed class by it). The classified share is
+the one to set against Earth's (orogens and arcs about 0.17 of the continents); absorption thins
+belts (orogens, the young sea-floor bands) and fattens the coastal extended-crust ring.
+
+The game gives every province one TerraBlender region (plan §7.3) when TerraBlender is installed.
+The first start with TerraBlender deals the provinces out to its registered overworld regions in
+proportion to their weights and stores the result in `climate_mapping.json` under `regions`:
+`{"names": ["minecraft:overworld", "biomesoplenty:overworld_primary", …], "by_province": [i₀, i₁, …]}`
+(`by_province[p]` indexes `names`). The deal is stratified, not independent: a pseudo-random rank
+per province (a hash of its id and the preset's seed), and the ranks dealt out over the regions by
+cumulative weight, so a light region still gets its share of a small planet's provinces. Regions
+are stored by name, so installing or removing a biome mod later does not move the provinces that
+already have one; a name that is no longer registered falls back to the default overworld region.
+A world whose mapping has no `regions` (TerraBlender was absent at its first start) gets them at
+the first start that has TerraBlender.
 
 ### The ice cover (Ben, 2026-09-30, "Force snow/ice cover")
 
