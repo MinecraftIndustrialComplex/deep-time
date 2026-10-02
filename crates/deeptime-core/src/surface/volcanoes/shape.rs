@@ -6,11 +6,17 @@
 //! volcano is round in the world whatever its latitude, like the plutons (`structure/plutons.rs`).
 //!
 //! **Profiles** (ρ = r / R, R the basal radius; the body is 1 at the summit and 0 at the foot):
-//! - stratovolcano: (1 − ρ)^1.5, a concave cone (Fuji: a third of its relief at 0.55 of its radius;
-//!   upper flanks ~20° at 2.5 km over R = 14 km, steep in the world, which is 15 times taller than
-//!   wide at 300 by 20 m per block);
-//! - shield: (1 − ρ²)^1.5, broad and convex with flanks under ~10°;
-//! - silicic centre (a continental hotspot): (1 − ρ²)², low and broad.
+//! - stratovolcano: (1 − ρ)^1.5, a concave cone, steepest at the summit (1.5 H/R: 18° for 3 km
+//!   over R = 14 km, 9° at the default doubled radius; its mean slope is 0.8 H/R). Ledger VOL-016,
+//!   uncited: Earth's stratovolcanoes have mean flank slopes of 17.7° and steepest average slopes
+//!   of 27.7° (medians of 512; Grosse et al. 2014, Bull. Volcanol. 76:784, table 1), reached at
+//!   0.77 of the height, below the summit. In blocks every slope is drawn 15 times steeper
+//!   (300 m across, 20 m up a block);
+//! - shield: (1 − ρ²)^1.5, broad and convex, steepest (1.5 H/R) at ρ = 0.71: 14° for 6.5 km over
+//!   40 km, 7° at the default doubled radius. Ledger VOL-017, uncited: Hawaiian shield lava flows
+//!   dip 2°–10° (Clague & Sherrod 2014, USGS PP 1801 ch. 3), Earth's subaerial shields have mean
+//!   flank slopes of 8.1° (median of 89; Grosse et al. 2014, table 1);
+//! - silicic centre (a continental hotspot): (1 − ρ²)², low and broad. Ledger VOL-018, uncited.
 //!
 //! A **depression** (a summit crater, or a caldera once the edifice collapsed) truncates the body
 //! at the rim level (the body becomes flat-topped inside the rim) and is subtracted as a bowl:
@@ -77,9 +83,9 @@ impl Shape {
             return if rho < 0.0 { 1.0 } else { 0.0 };
         }
         match kind {
-            Kind::Strato => (1.0 - rho).powf(1.5),
-            Kind::Shield => (1.0 - rho * rho).powf(1.5),
-            Kind::Silicic => (1.0 - rho * rho).powi(2),
+            Kind::Strato => (1.0 - rho).powf(1.5), // ledger: VOL-016
+            Kind::Shield => (1.0 - rho * rho).powf(1.5), // ledger: VOL-017
+            Kind::Silicic => (1.0 - rho * rho).powi(2), // ledger: VOL-018
         }
     }
 
@@ -102,9 +108,9 @@ impl Shape {
         }
         let x = rho / d.rho;
         if d.caldera {
-            d.depth * (1.0 - smoothstep(0.78, 1.0, x))
+            d.depth * (1.0 - smoothstep(0.78, 1.0, x)) // ledger: VOL-027
         } else {
-            d.depth * (1.0 - x * x).sqrt()
+            d.depth * (1.0 - x * x).sqrt() // ledger: VOL-027
         }
     }
 
