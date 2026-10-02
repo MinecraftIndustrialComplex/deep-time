@@ -423,8 +423,8 @@ fn stack_front(
             p.x * p.z,
             p.y * p.z,
         ];
-        for a in 0..6 {
-            out.second[a] += dz * q[a];
+        for (s, x) in out.second.iter_mut().zip(q) {
+            *s += dz * x;
         }
     }
 

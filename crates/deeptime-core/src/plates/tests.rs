@@ -746,7 +746,7 @@ impl CollisionLives {
 /// has shortened by the threshold; the states' life cycle holds; and collisions still happen.
 #[test]
 fn collisions_weld_on_stall_and_transfer_on_shortening() {
-    let p = preset(8000, 300.0, "supercontinent", 21);
+    let p = preset(8000, 300.0, "scattered_continents", 23);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -796,7 +796,7 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
 /// the run's own counters and events.
 #[test]
 fn recording_does_not_change_the_world_and_matches_the_run() {
-    let p = preset(8000, 300.0, "supercontinent", 21);
+    let p = preset(8000, 300.0, "scattered_continents", 23);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
