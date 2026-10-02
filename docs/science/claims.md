@@ -29,7 +29,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 17 | 0 | 0 | 1 | 0 | 56 | 0 | 0 | 0 | 0 |
 | [DEP](ledger/DEP.md) | deposit models, counts, sizes | 165 | 53 | 3 | 0 | 20 | 0 | 62 | 27 | 0 | 0 | 40 |
 | [ERO](ledger/ERO.md) | erosion, sediment, facies | 156 | 0 | 83 | 2 | 3 | 6 | 4 | 58 | 0 | 0 | 11 |
-| [GEO](ledger/GEO.md) | geothermal features | 51 | 1 | 0 | 0 | 0 | 0 | 47 | 3 | 0 | 1 | 0 |
+| [GEO](ledger/GEO.md) | geothermal features | 61 | 4 | 0 | 0 | 0 | 0 | 54 | 3 | 0 | 0 | 0 |
 | [GLA](ledger/GLA.md) | glacial erosion and landforms | 64 | 0 | 20 | 1 | 0 | 1 | 25 | 17 | 0 | 0 | 2 |
 | [HNT](ledger/HNT.md) | editor hint texts | 89 | 13 | 12 | 2 | 2 | 6 | 39 | 15 | 0 | 0 | 0 |
 | [HYD](ledger/HYD.md) | rivers, lakes, runoff | 75 | 0 | 14 | 3 | 0 | 1 | 36 | 21 | 0 | 0 | 1 |
@@ -48,7 +48,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [STR](ledger/STR.md) | strata, traps, hosts | 44 | 0 | 4 | 0 | 0 | 2 | 34 | 4 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
-| **all** | | **2,237** | **192** | **357** | **24** | **84** | **79** | **928** | **573** | **359** | **58** | **193** |
+| **all** | | **2,247** | **195** | **357** | **24** | **84** | **79** | **935** | **573** | **359** | **57** | **193** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),
@@ -262,7 +262,7 @@ Read from code and documents by the extraction agents; nothing here was checked 
 | 42 | CRE-014 | `pool::CONSERVED = 5` is documented as the "felsic-family" pools but covers pools 0 to 4, which include sediment, sedimentary and metamorphic rock. | code reading |
 | 43 | CRE-034 | The plan says the column rule and the Noddy port agree to 1e-5 block; the code counts a point as a side flip above 1e-3 block when it lies within 1e-6 of a fault plane and leaves flipped points out of the worst case. | plan against code |
 | 44 | GEO-014, GEO-048 to GEO-050, GEO-017, GEO-035, GEO-046 | Geothermal hints and format notes disagree with the code: "one to four" fields per volcano against a formula that gives 0 to 7; "2 to 5 blocks across" is the pool radius (4 to 10 across); FORMAT.md says a tenth of a terrace is stained (code: 7 %) and a field is drawn from 3 blocks above sea level (code: 5). | code against documents **Fixed in WP-16: hints, FORMAT.md and comments now agree with the code.** |
-| 45 | GEO-012, GEO-026, GEO-040, GEO-041 | The plan says heat comes "from the heat flow already modelled"; the code uses only active volcanoes. Nothing in code, hints or decisions mentions geysers, boiling or temperatures, and spring water is plain water; the plan's epithermal cinnabar is a 6 % stain. | code against plan **Part fixed in WP-16: geysers, heat sources and cinnabar are now stated plainly in the hints, FORMAT.md and the page; the plan's wording is a decision for Ben (Pending).** |
+| 45 | GEO-012, GEO-026, GEO-040, GEO-041 | The plan says heat comes "from the heat flow already modelled"; the code uses only active volcanoes. Nothing in code, hints or decisions mentions geysers, boiling or temperatures, and spring water is plain water; the plan's epithermal cinnabar is a 6 % stain. | code against plan **Part fixed in WP-16: geysers, heat sources and cinnabar are now stated plainly in the hints, FORMAT.md and the page; the plan's wording is a decision for Ben (Pending).** **Ben, 2026-10-02 (decisions log, "Export heat flow"): the bake now exports the plate model's heat flow and fields also stand on hot continental ground (GEO-052 to GEO-056).** |
 | 46 | GEO-007, GEO-019, GEO-020 | The 400 mm rainfall threshold has no source; the 3 degC rule is a vanilla freezing rule, not geology. | none cited **Part fixed in WP-16: the 400 mm and 3 degC rules are marked `game-choice` with the qualitative sources found (NPS, Paulson and Ingebritsen 1991); no source gives either number.** **Ben, 2026-10-02 (decisions log, "Keep all three"): the 400 mm rain test, no pools under 3 degC and pools of 4 to 10 blocks stay as owner-confirmed game choices.** |
 | 47 | SCL-009 (absorbing ISO-030) | Sea level 63 is called an agent choice in SCL-009 and Ben's design choice in the retired ISO-030, whose text SCL-009 now carries. | ledger rows |
 | 48 | master `STATUS.md` | The P2-14 build-log entry lost its heading and first paragraphs in the merge to master; its remaining bullets sit at the end of the P1-10 entry. | read by the GEO extraction agent **Fixed in WP-16: the heading and first bullets are restored (reconstructed; the original text survives nowhere in the history).** |

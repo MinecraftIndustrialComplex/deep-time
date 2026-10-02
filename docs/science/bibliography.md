@@ -5222,6 +5222,13 @@ Works read for the geothermal page and the hint figure table (2026-10-02). Not c
 - Library: `WEC2013_Geothermal/wec.pdf` and `wec.txt`.
 - Read in this pass: the passage saying high-temperature fields (above 180 degC) lie along plate boundaries (the Pacific ring of fire, Iceland on the Mid-Atlantic Ridge, the East African Rift Valley) and at hotspots such as Hawaii and Yellowstone.
 
+### Davies2010
+- Reference: Davies, J.H. and Davies, D.R. 2010. Earth's surface heat flux. Solid Earth 1:5-24, doi 10.5194/se-1-5-2010 (Creative Commons Attribution 3.0).
+- Ledger ids: GEO-052, GEO-057, GEO-059, GEO-060
+- Access: open.
+- Library: `Davies2010/Davies2010.pdf` and `Davies2010.txt`.
+- Read in this pass (GEO heat flow, 2026-10-02): full text of Tables 3 and 7 and Eq. 2. Continents (2.073e14 m2): 14.7 TW, mean 70.9 mW/m2; oceans 105.4; global 91.6. Mean heat flow by geology: Cenozoic extensional 102.4 (16 observations), Quaternary 82.0, Tertiary 77.3, continental and island arc margins 73.8, Precambrian 59.9. The empirical continental fit q = 102 - 2.25 sqrt(t) (t in Myr, Precambrian excluded; R squared 0.75 for the category means).
+
 ### NASAEarthFactSheet
 - Reference: NASA Space Science Data Coordinated Archive, Earth Fact Sheet. https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
 - Ledger ids: HNT-001, HNT-002, HNT-003, HNT-004

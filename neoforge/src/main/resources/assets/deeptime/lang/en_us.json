@@ -250,6 +250,8 @@
   "deeptime.editor.field.geothermal_reach": "Geothermal reach from the summit",
   "deeptime.editor.field.geothermal_size": "Geothermal feature size",
   "deeptime.editor.field.geothermal_springs": "Rain needed for hot springs",
+  "deeptime.editor.field.geothermal_heat_flow": "Heat flow for fields away from volcanoes",
+  "deeptime.editor.field.geothermal_heat_density": "Fields on hot ground",
   "deeptime.editor.option.province_strength.off": "Off",
   "deeptime.editor.option.province_strength.weak": "Weak",
   "deeptime.editor.option.province_strength.medium": "Medium",
