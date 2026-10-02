@@ -86,6 +86,10 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-02 | science WP-7 | **Pluton shape, depth, rock shares and collision rate** (RCK-058, RCK-062 to RCK-065; docs/science/rock-and-metamorphism.md, "Open questions" 2). Real data sit elsewhere than the code: large Sierra plutons are 0.17 to 0.4 as wide as long (Mount Givens 80 x 17 km, Lamarck over 60 x 10 km), the code draws 0.5 to 1; the Sierra was emplaced at 3.5 to 7 km and the Tuolumne suite at 6 to 10 km, the code at 2 to 6 km; Cordilleran batholiths are mostly tonalite and granodiorite with under 3 % mafic rock, no source gives the code's 70/20/10 or 60/40; the collision-granite rate 0.3 of the arc rate fits an island arc, not a continental one (about 6 times too high). (a) Keep all of them as labelled game choices (recommended: they change only how the granite bodies look, and any change re-opens the pluton-rate calibration); (b) width ratio 0.25 to 1 and roof 3 to 8 km, with a recalibration run. | Not asked yet (sub-agent; for the coordinator) |
+| 2026-10-02 | science WP-7 | **Schist at 450 degC** (RCK-042). The Barrovian type locality grew garnet at 500 to 550 degC and reached sillimanite at 650 to 700 degC (Baxter et al. 2002); the code's schist (450) and amphibolite (500) lie 50 to 100 degC cooler than the garnet zone the stage-1 comment named. No source read gives a temperature for schist itself (a texture). (a) Keep 450 and call it mica-schist grade (recommended: done in the comment; moving the band edges re-keys every column and shifts the share of schist and gneiss at the surface, which needs a recalibration look); (b) raise schist to 500 and amphibolite to 550. | Not asked yet (sub-agent; for the coordinator) |
+| 2026-10-02 | science WP-7 | **Compaction and the lithification depth** (STR-049, RCK-022). Layers keep their deposited thickness (a shale layer would be 60 % as thick at 1 km, 43 % at 3 km) and young beds turn from sand and mud to rock at 150 m (real ones stay soft for 1 to 3 km). (a) Keep both: the strata are drawn 15 times tall and the 150 m rule is a ground-look rule (recommended); (b) add a compaction step using the Sclater and Christie porosity curves, which thins buried sediment and changes the sediment-to-basement proportions; (c) raise `loose_depth_m` to about 1,000 m so more young mud and sand shows as soft ground. | Not asked yet (sub-agent; for the coordinator) |
+| 2026-10-02 | science WP-7 | **Rock densities the sources disagree with** (RCK-087). Nothing in the simulation or the game reads a class's density today (grep), so this is a data-quality question. Fresh peridotite is 3152 to 3276 (code 3300); ore-grade ironstone and iron formation are 3.5 to 4.5 g/cm3 (code 3000 and 3400); phosphorite 2.91 (code 2700); a kimberlite paper says it is lighter than granite (code 2800). (a) Leave as labelled judgment (recommended: no effect); (b) set peridotite to 3240 (Daly's mean for fresh peridotite) and phosphorite to 2900, and leave ironstone and iron formation until a source gives a bulk density for lean, banded rock (the 3.5 to 4.5 read is for ore). | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-13a | **Slab suction share** (PLT-186; docs/design/plate-force-balance.md section 6 note). The design's `slab_suction_share` 0.3 pulls only the overriding plate; Conrad & Lithgow-Bertelloni 2002 and 2004 (abstracts) have suction act on both plates, at 40 % of the forces against pull's 60 % (30 % with a weak asthenosphere), so their suction ÷ pull is 0.43–0.67. (a) Keep 0.3 as the open-loop starting value and calibrate it in task 8, with 0.43–0.67 noted as the sources' range (recommended: task 5 records forces read-only and the term's meaning differs anyway); (b) set 0.5 now, before task 7; (c) change the design so suction acts on both plates, as in the sources. | not asked (overnight; recorded by the WP-13a agent) |
 | 2026-10-02 | science WP-13a | **The overall speed scale** (PLT-181). `plate_speed_scale` 45 mm/yr was set to "Earth about 40", which is the median of plate-samples. Earth's area-weighted RMS is about 47 mm/yr today and 50–100 over the last 200 Myr (Forsyth & Uyeda 1975 Table 1; Zahirovic et al. 2015); the plate-check target is now 40–100. (a) Keep 45 for task 5 and calibrate it in task 8 against the new target (recommended); (b) raise it to 60 now. | not asked (overnight; recorded by the WP-13a agent) |
 | 2026-10-02 | science WP-13a | **Sea-floor age ceiling** (CHK-019, PLT-161). Today's ocean floor has a 90th percentile age of 133 Myr (Seton et al. 2020 grid, area-weighted); the plate-check ceiling is 230 Myr (master measures 208–269). (a) Keep 230 until the rewrite is measured, then tighten to about 180 in task 8 (recommended); (b) tighten to 180 now (master fails it); (c) keep 230 for good, as a cycle-long allowance. | not asked (overnight; recorded by the WP-13a agent) |
@@ -116,6 +120,56 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 ## Build log
 <<<<<<< HEAD
+### 2026-10-02 — Science documentation, stage 2, WP-7: rock classes, metamorphism, plutons and strata checked against sources (agent worktree agent-aaa29a70b2b182869, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What.** The RCK and STR ledgers revised row by row (RCK 73 → 79 active rows, STR 44 → 46); the pages
+  `docs/science/rock-and-metamorphism.md` and `docs/science/strata.md` written in full; 29 bibliography entries added
+  and 15 annotated; `// ledger:` ids and source notes in `structure/{params,metamorphism,columns,plutons,realism,traps,
+  bake_horizons,mod}.rs` and in `tools/dev/gen_rock_classes.py` (rock-class JSONs regenerated: the density source text
+  now says what was read). Stale comments fixed (`realism.rs` said there were no folds; `bake_horizons.rs` said P1-08 was
+  to write the layer). New `tools/review/wp7-planet.sh` (one quick 16k run plus `strata-check`, detached, for before and after).
+- **One code value changed.** Pluton thickness (RCK-061): the code used T = 0.6 L^0.6 km with L the long axis and cited
+  Cruden 1998. The law is the fit of Cruden and McCaffrey 2001 (b = 0.6 +/- 0.15, a = 0.6 +/- 0.1, 66 plutons), read in the
+  same author's SKB R-08-138 section 2.1.7 (eq. 1, library `Cruden2008_SKB`), and its L is the circle-equivalent diameter
+  of the pluton's area. Cruden 1998 gives no equation. The code now uses D = sqrt(length x width) (`plutons::thickness_km`).
+  For the code's width ratio of 0.5 to 1 plutons come out 9 % thinner on average (up to 23 %). Tests: `thickness_km`
+  reproduces the equation's worked values (1.48 km at 4.5 km, 6.7 km at 56 km) and the area-equivalence, and
+  `emplaced_plutons_are_as_thick_as_their_area_says` fails on the old formula. **In worlds:** on the 16k quick planet
+  (`earthlike_quick_16k`, scattered, 500 Myr, default seed, 2 threads; before master 9e84fcf, after 5cb328c3): pluton
+  bodies alive at the end 314 → 302, kept as world-data bodies 230 → 218, eroded away 616 → 628, emplaced 1,034 and
+  subducted 104 unchanged; `strata-check` (20,000 columns) identical to the digit (inversions 0.07 %, thin metamorphic
+  slivers 0.25 %, plutonic sheets 0.045 %); nothing else in the run moved.
+- **Rows by status (RCK / STR).** Before: `cited-unverified` 16 / 4, `calibrated` 1 / 2, `game-choice` 24 / 34, `uncited` 32 / 4.
+  After: `verified` 11 / 1, `abstract-only` 1 / 1, `cited-unverified` 9 / 0, `calibrated` 1 / 2, `game-choice` 54 / 42,
+  `uncited` 3 / 0. The 11 verified RCK rows: densities of 26 classes inside the measured ranges (RCK-001), evaporite
+  densities (RCK-085), gypsum to anhydrite 50 degC (RCK-045), diagenesis below 200 degC (RCK-049), skarn and hornfels hosts
+  (RCK-054), the pluton exponent (RCK-057) and thickness law (RCK-061), vanilla's lava levels (RCK-072, via MAG), mineral
+  hardness and density quotes (RCK-088), the impact-rock definitions (RCK-090). STR-030 (Zagros fold belt about 300 km, Alavi
+  2007) is the verified STR row. Most stage-1 `uncited` rows became honest `game-choice` rows.
+- **Findings.** (1) Pluton thickness: wrong paper and wrong L, fixed. (2) The stage-1 comment for the fold belt said the
+  Zagros is 250 km wide; Alavi says an average of about 300 km, which is the coded value. (3) Lithification at 150 m comes from
+  tectonics.js, whose own comment cites an AAPG wiki page that does not give it; real mud and sand stay soft for 1 to 3 km.
+  (4) Nothing compacts buried layers (the stub said it did). (5) The schist temperature 450 degC is 50 to 100 degC under the
+  Barrovian garnet zone (Baxter et al. 2002); gneiss 650 degC and amphibolite, greenschist and slate values are inside the
+  secondary ranges read. (6) Pluton aspect ratio, roof depth, rock shares and collision rate differ from the Sierra Nevada and
+  Peru data. (7) The Coastal Batholith calibration target is unsourced and its arithmetic is 1.7e-4, not 1e-4 per km2 per Myr.
+  (8) Nothing reads a rock class's density. (9) French 1998: suevite has not been found in carbonate-target craters; the impact
+  stage should be asked if it makes impact_breccia from limestone (IMP). (10) The design decisions file still says 59 rock
+  classes; the data has 62. Four questions under "Pending questions".
+- **Sources.** Read in full or in the relevant part: Cruden 2008 (SKB R-08-138), Daly, Manger and Clark 1966, Manger 1963,
+  the Handbook of Mineralogy, French 1998, Stoeffler and Grieve 2007, Hardie 1967, Orti et al. 2012, Davies and Davies 2010,
+  Meinert 1992, Robertson 1988, Baxter et al. 2002, Stipp et al. 2002, Ferrill et al. 2004, Annen 2017, Mottram et al. 2014,
+  Sass et al. 1994, Bateman 1992, Ducea 2001, Glazner et al. 2004, Greene et al. 2006, Dietl and Koyi 2008, Vigneresse and Burg 2003,
+  Ardill et al. 2020, Alavi 2007, tectonics.js `Crust.js`. Closed and not read: Winter 2010, Yardley 1989, Spear 1993,
+  Bucher and Grapes 2011, Telford 1990, Schon 2015, Cruden 1998, McCaffrey and Petford 1997, Cruden and McCaffrey 2001,
+  Buddington 1959, Haederle and Atherton 2002, Mukasa 1986, Hudec and Jackson 2007, Doust and Omatsola 1990. Three reading sub-agents
+  (Sonnet) did the fetching; their extracts were spot-checked against the library text (Cruden eq. 1, Daly table 4-1).
+- **Gates** (test VM): `cargo fmt --check` clean; clippy `-D warnings` clean; `cargo test --workspace` all suites ok, 0
+  failed (core lib 489 passed, 3 ignored); `cargo deny check licenses bans` ok; `./gradlew build test` 226 tests, 0 failures,
+  1 skipped. GameTests (the task asked for them because pluton bodies changed): `./gametest.sh` all 68 required tests passed (481 s); MICGT
+- **Next step.** Ben's answers to the four questions; then the value changes (each re-opens a calibration) in one small branch.
+  Left for others: WP-3 owns the per-class erodibility and diffusivity (RCK-010); the IMP owner should look at the suevite
+  caveat; DEF-042 (stock radius) is WP-8's.
+
 ### 2026-10-02 — Flexure follow-up: the margin zigzag and the polar stripes, causes and fixes (agent worktree agent-afae960b6db068f94, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Asked.** The coordinator, after flexure landed (5ce5af4): find the cause of the cell-to-cell alternation along
   active margins and the rise in land roughness (99th percentile 294 → 391 m in one pair), and of the stripes near
