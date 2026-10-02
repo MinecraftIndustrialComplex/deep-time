@@ -5,6 +5,7 @@ import com.minecraftindustrialcomplex.deeptime.net.ClientPlanetState;
 import com.minecraftindustrialcomplex.deeptime.worlddata.ClimateLayers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.Geothermal;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -14,6 +15,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.WeakHashMap;
+import java.util.function.Supplier;
 
 /**
  * {@link DeepTimeClimate} over a level's world data: one per world data, kept while the world data
@@ -22,16 +24,18 @@ import java.util.WeakHashMap;
 final class LevelClimate implements DeepTimeClimate {
 
     private static final Map<WorldData, LevelClimate> BY_DATA = Collections.synchronizedMap(new WeakHashMap<>());
-    private static final LevelClimate NONE = new LevelClimate(false, null, 63);
+    private static final LevelClimate NONE = new LevelClimate(false, null, 63, null);
 
     private final boolean deepTime;
     private final ClimateColumns columns;
     private final int seaLevelY;
+    private final Supplier<Geothermal> geothermal;
 
-    private LevelClimate(boolean deepTime, ClimateColumns columns, int seaLevelY) {
+    private LevelClimate(boolean deepTime, ClimateColumns columns, int seaLevelY, Supplier<Geothermal> geothermal) {
         this.deepTime = deepTime;
         this.columns = columns;
         this.seaLevelY = seaLevelY;
+        this.geothermal = geothermal;
     }
 
     static DeepTimeClimate of(Level level) {
@@ -39,10 +43,11 @@ final class LevelClimate implements DeepTimeClimate {
                 || !(server.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g))
             return NONE;
         if (!(g.terrain() instanceof WorldDataTerrain t))
-            return new LevelClimate(true, null, g.getSeaLevel());
+            return new LevelClimate(true, null, g.getSeaLevel(), null);
         return BY_DATA.computeIfAbsent(t.data(), d -> {
             ClimateLayers l = ClimateLayers.of(d);
-            return new LevelClimate(true, l == null ? null : new ClimateColumns(l), d.manifest().seaLevelY());
+            return new LevelClimate(true, l == null ? null : new ClimateColumns(l), d.manifest().seaLevelY(),
+                    () -> t.geothermal(g.waterReach(), g.generatorSettings().value().noiseSettings().minY(), g.getSeaLevel()));
         });
     }
 
@@ -78,6 +83,11 @@ final class LevelClimate implements DeepTimeClimate {
     @Override
     public Optional<ClimateSample> at(int x, int y, int z) {
         return columns == null ? Optional.empty() : Optional.of(columns.sample(x, y, z));
+    }
+
+    @Override
+    public double geothermalWarmthC(int x, int y, int z) {
+        return geothermal == null ? 0.0 : geothermal.get().warmthC(x, y, z);   // folds x across the seam itself
     }
 
     @Override

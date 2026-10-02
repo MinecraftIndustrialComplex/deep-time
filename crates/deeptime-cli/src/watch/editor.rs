@@ -867,7 +867,7 @@ mod tests {
             .iter()
             .map(|s| s.as_str().unwrap())
             .collect();
-        assert_eq!(adv.len(), 10);
+        assert_eq!(adv.len(), 11);
         let fields = j["fields"].as_array().unwrap();
         let sections: Vec<&str> = fields
             .iter()

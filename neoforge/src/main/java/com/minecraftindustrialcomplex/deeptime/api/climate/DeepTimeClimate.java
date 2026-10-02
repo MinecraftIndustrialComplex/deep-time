@@ -51,11 +51,12 @@ public interface DeepTimeClimate {
 
     /**
      * This interface's version: 1 = P1-25; 2 adds the planet's geometry on both sides
-     * ({@link #circumferenceBlocks(Level)}, {@link #latitudeDeg}). A caller compiled against a newer
+     * ({@link #circumferenceBlocks(Level)}, {@link #latitudeDeg}); 3 adds the warm-ground signal of the
+     * geothermal features ({@link #geothermalWarmthC}). A caller compiled against a newer
      * version than the installed Deep Time gets a {@link NoSuchMethodError} from a newer method; read
      * this field reflectively (javac inlines it) or catch that error.
      */
-    int API_VERSION = 2;
+    int API_VERSION = 3;
 
     /** Months in the simulated year. */
     int MONTHS = 12;
@@ -120,6 +121,20 @@ public interface DeepTimeClimate {
     /** Mean temperature at the block at year fraction {@code yearFraction} (°C), if any. */
     default OptionalDouble temperatureC(BlockPos pos, double yearFraction) {
         return at(pos).map(c -> OptionalDouble.of(c.temperatureC(yearFraction))).orElse(OptionalDouble.empty());
+    }
+
+    /**
+     * The warm-ground signal of the planet's geothermal features (API 3, P2-14): how many kelvin
+     * warmer than {@link #at}'s temperature the block at (x, y, z) is because it lies in or beside a
+     * hot spring, a fumarole or a field of altered ground; 0 everywhere else, on a level without
+     * geothermal features (a density of 0, a planet without active volcanoes) and on any level that
+     * is not a Deep Time planet. At most 12 K, at the heart of a vent, falling off linearly to 0 a
+     * few blocks beyond the feature's altered ground, within a few blocks of the ground's height.
+     * Deterministic and constant for the life of the world, like the rest of this interface; the
+     * caller decides what, if anything, it does with it.
+     */
+    default double geothermalWarmthC(int x, int y, int z) {
+        return 0.0;
     }
 
     /** The simulation's lapse rate, °C per km (NaN without a climate). */
