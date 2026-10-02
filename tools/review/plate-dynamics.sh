@@ -11,6 +11,7 @@
 #   tools/review/plate-dynamics.sh <length Myr> "<seeds>" "<starts>" label[:path=value;path=value...] ...
 #
 # (seeds and starts may also be separated by commas, which survive mac.sh's word joining.)
+# The same trace feeds tools/review/plate-forces.py (docs/design/plate-force-balance.md).
 # The trace needs a binary built with tools/review/plate-dynamics-trace.patch applied (a throwaway
 # instrument: `git apply` it, build, `git apply -R` it); the design proposes `deeptime plate-check`
 # in its place. Environment: R (output folder), PRESET (default earthlike_quick_16k), STAGE

@@ -89,10 +89,38 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P3-04 | **Toroidal World refuses Deep Time's Distant Horizons generator from DH 3.3.1 on** (it works with MIC's 3.3.0 only because TW's DH mixins miss that jar's renamed classes). (a) Keep MIC on DH 3.3.0 for now and ask TW's author for a way to declare a seam-aware generator before any DH update (recommended); (b) a Deep Time mixin into TW's `DhGenerators.requireOwn` that lets our generator through (works today, breaks when TW changes, and overrides a guard TW put there on purpose); (c) accept that a DH update turns far terrain off and DH generates from real chunks. | Not asked yet (sub-agent report) |
 | 2026-10-01 | P3-04 | **Far terrain's top blocks.** A table by biome gives 85–96 % of ground blocks right on vanilla biomes and 55 % in MIC (Terralith). (a) A MIC table for Terralith's biomes on the pack's deep-time branch, measured with `probe dh check` (recommended: cheap, pack-side); (b) run the pack's real surface rules over a throwaway chunk per far chunk (exact soil, est. 5–15 ms more a section, touches vanilla chunk classes other mods mix into); (c) leave it. | Not asked yet (sub-agent report) |
 | 2026-10-01 | P3-04 | **Trees in far terrain.** Far terrain has none, so a forest reads as grass until real chunks replace the LODs. (a) Leave it until a client can show how it looks (recommended); (b) add a canopy layer by biome (leaf block, cover share and height in the surface table). | Not asked yet (sub-agent report) |
-| 2026-10-01 | plate collisions and welding (design) | Design: docs/design/plate-collisions-and-welding.md (build log 2026-10-01, "Plate collisions and welding: design"). **(1) How far should the motion model go?** (a, recommended) collision resistance inside the present speed law, with plates welding only once convergence has stalled; (b) full force-balance plate motion now (its own design, every plate calibration redone); (c) only the real-shortening counter and a longer threshold. **(2) If one plate is still above half the planet in more than 10 % of steps after the fix:** (a, recommended) add a rift term that grows under a long-assembled supercontinent; (b) accept a looser target (25 %). **(3) Which side of the suture rises:** (a, recommended) the overriding plate only for now; (b) both sides with a foreland basin, with the folds-and-faults work. **(4) The start-up land jump** (4–6 % of the planet in the first 4 Myr, no collision): (a, recommended) a separate small task afterwards; (b) fold it into the recalibration; (c) leave it. Nothing is built until answered. | Not asked yet: for the coordinator to put to Ben |
+| 2026-10-02 | force-balance plate motion (design) | Design: docs/design/plate-force-balance.md (build log 2026-10-02, "Force-balance plate motion: design"); the four questions of the collisions design were answered on 2026-10-02 (decisions log). **(1) What moves a plate nothing pulls, and a planet that starts with no slabs?** (a, recommended) ridge push, suction and neighbours plus a weak mantle flow (5 mm/yr, a setting, a stand-in) and slabs planted by subduction initiation; (b) no mantle flow: such plates stand still; (c) keep a base speed. **(2) The speed guard:** (a, recommended) keep `max_plate_speed_mm_yr` at 250 as a reported guard that must never bind; (b) remove it. **(3) How the work lands:** (a, recommended) two stages: collisions and belts on the present speed law first (a usable state and the fallback), then the switch to the balance; (b) one stage, no fallback, two days saved. **(4) Flexure:** (a, recommended) the line-load profile in front of collision wedges only; (b) a general flexure solve in the surface stage now (5–10 % of run time, 3–4 more days). **(5) Calibration:** (a, recommended) the built-in planets change twice, with a light calibration at the first; (b) full calibration at both points (3 more days); (c) hold everything on a branch until calibrated. Nothing is built beyond task 1 (`plate-check`) until answered. | Not asked yet: for the coordinator to put to Ben |
 | 2026-10-01 | P3-04 | **The switch.** Far terrain is on whenever Distant Horizons is installed; off with `-Ddeeptime.dh=false`. Make it a setting (server config or the editor), and on or off by default? Recommended: on by default, a server config key when the config file next changes. | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-02 — Force-balance plate motion: design (agent worktree agent-a4560e6e131ce6cbd, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; design only, nothing built)
+- **Why.** Ben's decisions of 2026-10-02 on the collisions design: full force-balance motion; nothing designed for the
+  mega-plate yet; both sides of a suture rise, with a foreland basin; the start-up land jump is a separate task.
+- **Document.** docs/design/plate-force-balance.md (the collisions design now points to it and says which of its
+  sections it supersedes): how plates move today, the force model with sources, an open-loop test, options, what is
+  replaced, acceptance targets, the mega-plate physics, a nine-task plan, risks and fallback, five questions.
+- **Measured** (test VM; `earthlike_quick_16k`, 1000 Myr, supercontinent and scattered starts, seeds 1 and 2;
+  `R=… BIN=… tools/review/plate-dynamics.sh 1000 1,2 supercontinent,scattered_continents base` on a binary with the
+  extended `tools/review/plate-dynamics-trace.patch`, then `tools/review/plate-forces.py <runs>`). The balance is
+  solved on the present model's geometry each step, without changing the run (open loop); range over the four runs:
+  - present model: plate speed 41 / 71 / 83 mm/yr (10th / 50th / 90th percentile), oceanic 73 against continental
+    42–49, rank correlation of speed with the slab share of the edge 0.47–0.59, rotation change per step 5 % / 9 %
+    (median / 90th percentile);
+  - balance with basal drag only: correlation 0.76–0.84, but 13–19 % of plate-steps above 150 mm/yr (up to 2,500)
+    and continental plates at 0–5 mm/yr;
+  - with slab resistance and boundary resistance: 27–31 / 62–68 / 95–109 mm/yr, 1.3–3.1 % above 150, oceanic 66–72
+    against continental 27–33, correlation 0.69–0.77; rotation change per step 16–18 % / 62–70 %; 13–17 % of
+    plate-steps turn about a pole near themselves.
+  So the pattern Earth shows comes out of a balance, small plates are the stability problem, boundary resistance is
+  needed, and the raw answer needs smoothing (slab-length tracking, a relaxation time).
+- **The scattered start has the same faults as the supercontinent start** (one plate above half the planet in 52–69 %
+  of steps over the four runs).
+- **Not tested:** the closed loop (the balance driving the geometry). The plan keeps a fallback: collisions and belts
+  land first on the present speed law, the balance replaces the speed law last.
+- **Estimate.** 19–21 agent-days beyond task 1, 13.5–15.5 on the critical path; a quarter is recalibration.
+- **Housekeeping.** No simulation code changed. Scratch folder `/Volumes/Graphide/ban/deeptime-runs/plate-force-design/`
+  deleted. Earth figures checked online by a Sonnet sub-agent; most papers were read from abstracts only.
+- **Next.** Ben's answers (pending questions); `plate-check` additions (design section 7) for the agent on task 1.
 ### 2026-10-01 — Plate collisions and welding: design (agent worktree agent-a4560e6e131ce6cbd, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; design only, nothing built)
 - **Why.** The run review (docs/research/notes/run-review-1a0f969d358.md) found three plate-stage faults: land
   popping up at collisions, no Wilson cycle, a mega-plate. Ben: "Design, then fix".
