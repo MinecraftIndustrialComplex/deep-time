@@ -15,9 +15,10 @@
                                   seam (x = C/2), z in [-64, 80), inside the canonical span
                                   (deeptime-inspect seam, plan §9.7)
         [--dh]                    Distant Horizons far terrain (P3-04; profile dh, dh-next or mic): the
-                                  override registers (or Toroidal World refuses it, recorded), DH's own
+                                  override registers through Toroidal World's guard, DH's own
                                   `/dh pregen` is fed from the world data on the server alone, and what
-                                  DH stores agrees with the chunks generated afterwards (dh_checks)
+                                  DH stores agrees with the chunks generated afterwards, beside the
+                                  spawn and on both sides of the seam (dh_checks)
         [--restart]               stop, start again and confirm the world data was not regenerated
         [--scenario <name>]       a first-start stop scenario instead of a normal boot (P1-13):
                                   first_start_no_config, first_start_circumference_mismatch or
@@ -82,7 +83,9 @@ MAX_PROGRESS_GAP_S = 5.75
 # recorded only: many of its mixins target classes an idle server never loads (villager AI,
 # dragon phases, raids), and Mixin applies a mixin when its target class loads.
 REQUIRED_CONFIGS = ["deeptime.mixins.json"]
-RECORDED_CONFIGS = ["toroidal_world.mixins.json", "toroidal_world.shape.mixins.json"]
+RECORDED_CONFIGS = ["toroidal_world.mixins.json", "toroidal_world.shape.mixins.json",
+                    # Deep Time's patch to TW's DH guard applies when TW first loads that guard (DH binds a generator).
+                    "deeptime.tw_dh.mixins.json"]
 
 
 def load_env(path):
@@ -322,19 +325,85 @@ def probe_json(server, rcon, command, wait=1.0):
         return None, out
 
 
+def dh_pregen(steps, rcon, cx, cz, radius_chunks, label):
+    """Distant Horizons' own server-side pregeneration of the square around (cx, cz); returns its wall time."""
+    out = rcon(f"dh pregen start minecraft:overworld {cx} {cz} {radius_chunks}", check=False)
+    print(f"   dh pregen start: {out[:160]}", flush=True)
+    t0 = time.time()
+    deadline = t0 + 900
+    seen = 0
+    while time.time() < deadline:
+        time.sleep(5)
+        status = rcon("dh pregen status", check=False)
+        if "not running" in status.lower():
+            break
+        seen += 1
+        if seen % 6 == 0:
+            print(f"   dh pregen status: {status[:160]}", flush=True)
+    pregen_s = time.time() - t0
+    finished = time.time() < deadline
+    steps.check((f"dh {label.strip()}: " if label.strip() else "dh: ") + "Distant Horizons' pregeneration finished", "finished",
+                f"{pregen_s:.0f} s" if finished else "timeout", finished)
+    time.sleep(5)   # let DH flush the last sections to its store
+    return pregen_s
+
+
+def dh_area_check(steps, server, rcon, smoke, x0, z0, side, label, fname, status):
+    """`/deeptime probe dh check` over side x side chunks from block (x0, z0): what Distant Horizons
+    holds is far terrain's surface, and far terrain agrees with the chunks generated afterwards."""
+    name = lambda s: f"dh {label.strip()}: {s}" if label.strip() else f"dh: {s}"
+    chk, out = probe_json(server, rcon, f"deeptime probe dh check {x0} {z0} {side}", wait=3.0)
+    if not steps.check(name("/deeptime probe dh check answers"), "[deeptime-probe] JSON", "ok" if chk else out[:200], chk is not None):
+        return
+    with open(os.path.join(smoke, fname), "w") as f:
+        json.dump({"status": status, "check": chk, "x0": x0, "z0": z0, "side_chunks": side}, f, indent=1)
+    stored, vs = chk.get("stored", {}), chk.get("vs_real", {})
+    asked, held, equal = stored.get("asked", 0), stored.get("held", 0), stored.get("equal_to_far_terrain", 0)
+    steps.check(name("Distant Horizons holds the columns it was given"), f">= 90 % of {asked}", held, asked > 0 and held >= 0.9 * asked,
+                note=f"x {x0}..{x0 + 16 * side - 1}, z {z0}..{z0 + 16 * side - 1}; {stored.get('skipped_loaded_chunks', 0)} columns in loaded chunks skipped")
+    # Distant Horizons' default world compression (VISUALLY_EQUAL) merges blocks no side shows (the
+    # dirt under grass) when it saves a section, so the surface is compared, and the columns that
+    # are far terrain's layer for layer are only recorded.
+    surface = stored.get("same_surface_as_far_terrain", 0)
+    steps.check(name("what it holds is far terrain's surface (top block, ground and water heights)"), f"{held} of {held}",
+                f"{surface} of {held}", held > 0 and surface == held, note=stored.get("surface_differences", "")[:400])
+    steps.record(name("columns stored layer for layer (the rest had buried blocks merged by Distant Horizons)"), f"{equal} of {held}",
+                 note=stored.get("example", "")[:300])
+    n = vs.get("columns", 0)
+    share = lambda k: f"{vs.get(k, 0)} of {n} ({100.0 * vs.get(k, 0) / n:.1f} %)" if n else "no columns"
+    # Caves, carvers and features open or raise the ground of a real chunk (this set has vanilla's
+    # caves); far terrain has none. The GameTest asserts 90 % within one block on the cave-free level.
+    # Three runs of this set on three planets gave 78, 89 and 96 % within two blocks around a
+    # mountain spawn, so here it is a floor against gross error, and the numbers are recorded.
+    steps.check(name("ground within 2 blocks of the generated chunk"), ">= 60 %", share("height_within_2"),
+                n > 0 and vs.get("height_within_2", 0) >= 0.6 * n, note=f"max {vs.get('height_max_abs')}: {vs.get('height_worst')}")
+    steps.record(name("ground within 1 block"), share("height_within_1"))
+    steps.record(name("land columns, and their ground block as in the generated chunk"),
+                 f"{vs.get('land_ground_block_same', 0)} of {vs.get('land', 0)}")
+    steps.check(name("water or dry as in the generated chunk"), ">= 95 %", share("water_agree"), n > 0 and vs.get("water_agree", 0) >= 0.95 * n)
+    steps.check(name("biome as in the generated chunk"), ">= 95 %", share("biome_same"), n > 0 and vs.get("biome_same", 0) >= 0.95 * n,
+                note="; ".join(vs.get("biome_differences", [])))
+    steps.record(name("ground exact"), share("height_exact"))
+    steps.record(name("ground block as in the generated chunk"), share("ground_block_same"),
+                 note="; ".join(vs.get("ground_block_differences", []))[:400])
+    steps.record(name("snow layer as in the generated chunk"), share("snow_layer_agree"))
+
+
 def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     """Distant Horizons far terrain (P3-04, plan §10.5), on a set that has Distant Horizons.
 
-    1. `/deeptime probe dh`: the API bound, and the override for the overworld either registered or
-       was refused by Toroidal World (TW 0.19.3 refuses foreign generators on wrapped levels once
-       its Distant Horizons mixins apply, which they do from DH 3.3.1). A refusal is recorded, with
-       TW's message, and ends the DH checks: Distant Horizons then generates from real chunks.
-    2. `/dh pregen start minecraft:overworld 0 0 <radius>`: Distant Horizons' own server-side
-       pregeneration asks the registered generator for the sections around the origin and stores
-       them in its database; no player and no client is involved.
-    3. `/deeptime probe dh check`: what Distant Horizons then holds is far terrain layer for layer,
-       and far terrain agrees with the chunks generated afterwards at the same columns.
-    4. `/deeptime probe far bench`: the time a section takes without Distant Horizons' storing.
+    1. `/deeptime probe dh`: the API bound, and the override for the overworld registered. Toroidal
+       World 0.19.3 refuses foreign generators on wrapped levels once its Distant Horizons mixins
+       apply (from DH 3.3.1); Deep Time's patch to that guard (compat/dh/TwDhGuard) lets this one
+       through, so a refusal fails the run (with TW's message) and ends the DH checks.
+    2. `/dh pregen start minecraft:overworld <x> <z> <radius>`: Distant Horizons' own server-side
+       pregeneration asks the registered generator for the sections around a land area beside the
+       spawn and stores them in its database; no player and no client is involved.
+    3. `/deeptime probe dh check`: what Distant Horizons then holds is far terrain's surface, and far
+       terrain agrees with the chunks generated afterwards at the same columns.
+    4. The seam: 2 and 3 again with the pregeneration centred on x = C/2 (Toroidal World folds the
+       sections past it into the lap), checked on 160 blocks either side of the seam.
+    5. `/deeptime probe far bench`: the time a section takes without Distant Horizons' storing.
     """
     st, out = probe_json(server, rcon, "deeptime probe dh")
     if not steps.check("dh: /deeptime probe dh answers", "[deeptime-probe] JSON", "ok" if st else out[:200], st is not None):
@@ -348,13 +417,17 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     level = next((l for l in st.get("levels", []) if l.get("level") == "minecraft:overworld"), None)
     if not steps.check("dh: the overworld was offered to Distant Horizons", "a levels entry", json.dumps(level)[:200], level is not None):
         return
-    refused_by_tw = not level["registered"] and "Toroidal World" in (level.get("message") or "")
-    steps.check("dh: the override registered, or Toroidal World refused it", "registered | refused by Toroidal World",
-                "registered" if level["registered"] else f"refused: {level.get('message')}", level["registered"] or refused_by_tw)
+    # Toroidal World refuses foreign generators on its levels from DH 3.3.1 on; Deep Time's patch to
+    # that guard (Ben, 2026-10-02, "Mixin around TW's guard"; compat/dh/TwDhGuard) lets this one through.
+    steps.record("dh: Deep Time's patch to Toroidal World's guard", st.get("tw_guard_patch"))
+    steps.record("dh: Toroidal World's guard on the overworld", level.get("tw_guard"), note=level.get("tw_guard_reason", ""))
+    steps.check("dh: the override registered (Toroidal World's guard let it through)", "registered",
+                "registered" if level["registered"] else f"refused: {level.get('message')}", level["registered"])
     steps.record("dh: far terrain override", "registered: Distant Horizons' LODs come from the world data" if level["registered"]
-                 else "REFUSED by Toroidal World: Distant Horizons generates its LODs from real chunks")
+                 else "REFUSED: Distant Horizons generates its LODs from real chunks")
     if not level["registered"]:
         return
+    circumference = level.get("circumference")
 
     # Beside the spawn (land, by the spawn rule) but clear of the spawn chunks, which exist already:
     # Distant Horizons holds a generated chunk's own columns, not the generator's.
@@ -372,23 +445,7 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     land_share, cx, cz = best
     steps.record("dh: area checked", f"centre {cx}, {cz} (spawn {spawn[0]}, {spawn[1]}; {100 * land_share:.0f} % land), "
                                      f"pregen radius {radius_chunks} chunks")
-    out = rcon(f"dh pregen start minecraft:overworld {cx} {cz} {radius_chunks}", check=False)
-    print(f"   dh pregen start: {out[:160]}", flush=True)
-    t0 = time.time()
-    deadline = t0 + 900
-    seen = 0
-    while time.time() < deadline:
-        time.sleep(5)
-        status = rcon("dh pregen status", check=False)
-        if "not running" in status.lower():
-            break
-        seen += 1
-        if seen % 6 == 0:
-            print(f"   dh pregen status: {status[:160]}", flush=True)
-    pregen_s = time.time() - t0
-    finished = time.time() < deadline
-    steps.check("dh: Distant Horizons' pregeneration finished", "finished", f"{pregen_s:.0f} s" if finished else "timeout", finished)
-    time.sleep(5)   # let DH flush the last sections to its store
+    pregen_s = dh_pregen(steps, rcon, cx, cz, radius_chunks, "")
 
     st, out = probe_json(server, rcon, "deeptime probe dh")
     level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
@@ -401,40 +458,42 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
                       f"{level.get('points_per_column')} data points a column")
 
     side = 10   # chunks a side, four columns in each; every one is generated in full on the server thread
-    chk, out = probe_json(server, rcon, f"deeptime probe dh check {cx - 192} {cz - 192} {side}", wait=3.0)
-    if not steps.check("dh: /deeptime probe dh check answers", "[deeptime-probe] JSON", "ok" if chk else out[:200], chk is not None):
+    dh_area_check(steps, server, rcon, smoke, cx - 192, cz - 192, side, "", "dh-check.json", st)
+
+    # The seam (x = C/2): Distant Horizons' pregeneration centred on it, so Toroidal World folds the
+    # sections past it into the planet's lap, then what DH holds and the chunks generated afterwards
+    # on each side: the 160 blocks west of the seam, and the 160 blocks east of it (x = -C/2 on,
+    # the planet's westernmost columns, as Toroidal World stores them).
+    if not circumference:
+        steps.check("dh seam: the circumference is known", "C", circumference, False)
         return
-    with open(os.path.join(smoke, "dh-check.json"), "w") as f:
-        json.dump({"status": st, "check": chk}, f, indent=1)
-    stored, vs = chk.get("stored", {}), chk.get("vs_real", {})
-    asked, held, equal = stored.get("asked", 0), stored.get("held", 0), stored.get("equal_to_far_terrain", 0)
-    steps.check("dh: Distant Horizons holds the columns it was given", f">= 90 % of {asked}", held, asked > 0 and held >= 0.9 * asked)
-    # Distant Horizons' default world compression (VISUALLY_EQUAL) merges blocks no side shows (the
-    # dirt under grass) when it saves a section, so the surface is compared, and the columns that
-    # are far terrain's layer for layer are only recorded.
-    surface = stored.get("same_surface_as_far_terrain", 0)
-    steps.check("dh: what it holds is far terrain's surface (top block, ground and water heights)", f"{held} of {held}",
-                f"{surface} of {held}", held > 0 and surface == held, note=stored.get("surface_differences", "")[:400])
-    steps.record("dh: columns stored layer for layer (the rest had buried blocks merged by Distant Horizons)", f"{equal} of {held}",
-                 note=stored.get("example", "")[:300])
-    n = vs.get("columns", 0)
-    share = lambda k: f"{vs.get(k, 0)} of {n} ({100.0 * vs.get(k, 0) / n:.1f} %)" if n else "no columns"
-    # Caves, carvers and features open or raise the ground of a real chunk (this set has vanilla's
-    # caves); far terrain has none. The GameTest asserts 90 % within one block on the cave-free level.
-    # Three runs of this set on three planets gave 78, 89 and 96 % within two blocks around a
-    # mountain spawn, so here it is a floor against gross error, and the numbers are recorded.
-    steps.check("dh: ground within 2 blocks of the generated chunk", ">= 60 %", share("height_within_2"),
-                n > 0 and vs.get("height_within_2", 0) >= 0.6 * n, note=f"max {vs.get('height_max_abs')}: {vs.get('height_worst')}")
-    steps.record("dh: ground within 1 block", share("height_within_1"))
-    steps.record("dh: land columns, and their ground block as in the generated chunk",
-                 f"{vs.get('land_ground_block_same', 0)} of {vs.get('land', 0)}")
-    steps.check("dh: water or dry as in the generated chunk", ">= 95 %", share("water_agree"), n > 0 and vs.get("water_agree", 0) >= 0.95 * n)
-    steps.check("dh: biome as in the generated chunk", ">= 95 %", share("biome_same"), n > 0 and vs.get("biome_same", 0) >= 0.95 * n,
-                note="; ".join(vs.get("biome_differences", [])))
-    steps.record("dh: ground exact", share("height_exact"))
-    steps.record("dh: ground block as in the generated chunk", share("ground_block_same"),
-                 note="; ".join(vs.get("ground_block_differences", []))[:400])
-    steps.record("dh: snow layer as in the generated chunk", share("snow_layer_agree"))
+    half = circumference // 2
+    best = None
+    for z in (0, 768, -768, 1536, -1536):
+        zz = z // 64 * 64
+        shares = []
+        for x in (half - 128, -half + 64):
+            land, _ = probe_json(server, rcon, f"deeptime probe far land {x // 64 * 64} {zz}", wait=0.5)
+            shares.append((land or {}).get("land_share", 0.0))
+        share = sum(shares) / len(shares)
+        if best is None or share > best[0]:
+            best = (share, zz)
+        if share >= 0.95:
+            break
+    seam_land, sz = best
+    radius_seam = 16
+    steps.record("dh seam: area checked", f"x = {half} (C = {circumference}), z = {sz} ({100 * seam_land:.0f} % land either side), "
+                                          f"pregen radius {radius_seam} chunks centred on the seam")
+    before = sections
+    dh_pregen(steps, rcon, half, sz, radius_seam, "seam ")
+    st, out = probe_json(server, rcon, "deeptime probe dh")
+    level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
+    steps.check("dh seam: Distant Horizons asked the override for the seam's sections", "> 0 more",
+                level.get("sections", 0) - before, level.get("sections", 0) > before)
+    steps.check("dh seam: no section failed", "0", level.get("failures"), level.get("failures") == 0)
+    seam_side = 10   # 160 blocks: 4 columns in each of 10 x 10 chunks
+    dh_area_check(steps, server, rcon, smoke, half - 16 * seam_side, sz - 80, seam_side, "seam west ", "dh-check-seam-west.json", st)
+    dh_area_check(steps, server, rcon, smoke, -half, sz - 80, seam_side, "seam east ", "dh-check-seam-east.json", st)
 
     for detail in (0, 3, 6):
         b, out = probe_json(server, rcon, f"deeptime probe far bench {cx} {cz} {detail} 64", wait=2.0)
