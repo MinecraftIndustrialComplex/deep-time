@@ -499,76 +499,111 @@ driving and resisting forces, solves the torque balance for every plate's rotati
 without applying it (`plates/forces.rs`; dynamics record version 4: `StepRec::forces`, `slabs_km`,
 `breakoffs`; science page `docs/science/plate-forces.md`, ledger FRC and PLT-181 to PLT-191). The
 plates still move by today's rules, so this is the design's open-loop test (its section 4) made in
-production code, on the same four runs: `earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1-4,
-`stage volcanoes`, seed 1 with `structure.deformation.density=0` as before; master 9e84fcf plus
-this task. Every row of the tables above is reproduced to the digit by these runs (the boundary-mix
-rows, the arcs and the rows of "Other rows moved" alike): the record changes nothing a run computes
-(the test `recording_does_not_change_the_world_and_matches_the_run` checks it bit for bit). Reproduce:
+production code: `earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1-4, `stage volcanoes`, seed 1
+with `structure.deformation.density=0` as before, on master 2c60ca3f (task 2 merged, its switch off)
+plus this task. The record changes nothing a run computes (the test
+`recording_does_not_change_the_world_and_matches_the_run` checks it bit for bit, and a first set of
+the same four runs on master 9e84fcf reproduced every row of the earlier tables to the digit).
+Reproduce:
 
     tools/remote/mac.sh -- tools/remote/detach.sh start fb1 env R=<scratch> J=1 tools/review/plate-check.sh 1000 1 supercontinent base:structure.deformation.density=0
     tools/remote/mac.sh --no-sync -- tools/remote/detach.sh start fb2 env R=<scratch> J=1 tools/review/plate-check.sh 1000 2 supercontinent base
     (then seeds 3 and 4 the same way; deeptime plate-check --run <ck> x 4 prints the mean table)
 
-All rows are reported, not judged: the design's section 7 targets judge the motion after the switch
-(task 7). The targets are quoted beside the balance's rows so the switch has them in view.
+All rows are reported, not judged: the design's section 7 targets (as WP-13a corrected them) judge
+the motion after the switch (task 7). They are quoted beside the balance's rows so the switch has
+them in view.
 
 ### The balance against today's motion
 
 Values are the mean of the four runs; runs are seeds 1, 2, 3, 4. Plates of 30 samples or more, as
-the speed rows above; "today" is the same runs' own motion (the tables above).
+the speed rows above; "today" is the same runs' own motion.
 
-| Measure | Balance | Runs | Today | Design target (section 7) | Design's open-loop test (section 4, last column) |
+| Measure | Balance | Runs | Today | Target (section 7, CHK) | Design's open-loop test (section 4, last column) |
 |---|---|---|---|---|---|
-| Plate speed, area-weighted RMS (mean over steps), mm/yr | 38.0 | 37.4 36.1 36.8 41.6 | 59.6 | 35-55 | scaled to 45 |
-| Plate speed, 10th / 50th / 90th percentile of plate-steps, mm/yr | 10.6 / 48.1 / 94.1 | 10.1 10.2 11.1 11.0 / 47.6 43.6 51.7 49.6 / 94.9 92.4 93.7 95.6 | 41.5 / 72.3 / 85.6 | at most 20 / 30-60 / 70-110 | |
-| The same, each step scaled to an RMS of 45 mm/yr (the design's normalisation), mm/yr | 14.4 / 57.6 / 107 | 13.7 14.3 15.6 14.1 / 58.5 54.7 62.9 54.1 / 114 110 108 95.0 | | | 27-31 / 62-68 / 95-109 |
-| Plate-steps above 150 mm/yr; above 250 (where the switch's guard would bind) | 0.02 %; 0 | 0 0 0 0.08; 0 0 0 0 | 0 (capped at 100) | at most 0.5 %; 0 | 1.3-3.1 % |
-| Median speed, plates under 20 % continental / over 50 % | 3.93 | 3.79 3.80 4.38 3.73 | 1.59 | at least 2 (Earth about 3) | 66-72 / 27-33 |
-| Median speed, plates with 20 % or more of the edge on slab / under 5 % | 3.16 | 3.04 2.78 3.54 3.29 | 1.54 | at least 2.5 (Earth 3-4) | |
-| Speed against slab share of the edge, rank correlation | 0.44 | 0.42 0.45 0.46 0.45 | 0.44 | at least 0.65 | 0.69-0.77 |
-| Speed against plate area, rank correlation | -0.36 | -0.38 -0.33 -0.38 -0.35 | -0.28 | -0.4 to 0.2 | |
-| Change of a plate's rotation per step, median / 90th percentile | 25.6 % / 84.9 % | 25.7 27.7 24.7 24.1 / 86.4 88.0 82.0 83.0 | 4.9 % / 9.1 % | at most 8 % / 20 % | 16-18 % / 62-70 % |
-| Balance speed against today's speed: rank correlation; median of their ratio | 0.40; 0.70 | 0.47 0.36 0.37 0.37; 0.71 0.64 0.74 0.72 | | | |
+| Plate speed, area-weighted RMS (mean over steps), mm/yr | 37.1 | 36.7 37.9 38.2 35.5 | 59.2 | 40-100 (CHK-020) | scaled to 45 |
+| Plate speed, 10th / 50th / 90th percentile of plate-steps, mm/yr | 11.2 / 48.9 / 92.9 | 10.6 11.5 11.4 11.3 / 48.1 46.1 55.2 46.1 / 92.7 90.6 97.6 90.8 | 40.6 / 72.1 / 85.7 | at most 20 / 30-60 / 70-110 | |
+| The same, each step scaled to an RMS of 45 mm/yr (the design's normalisation), mm/yr | 15.7 / 58.4 / 110 | 15.6 15.4 15.6 16.5 / 56.2 53.9 63.2 60.2 / 108 109 109 115 | | | 27-31 / 62-68 / 95-109 |
+| Plate-steps above 150 mm/yr; above 250 (where the switch's guard would bind) | 0.04 %; 0 | 0.06 0.03 0.02 0.04; 0 0 0 0 | 0 (capped at 100) | at most 0.5 %; 0 | 1.3-3.1 % |
+| Median speed, plates under 20 % continental / over 50 % | 3.66 | 3.42 3.32 4.55 3.36 | 1.59 | at least 2 (Earth 2-3) | 66-72 / 27-33 |
+| Median speed, plates with 20 % or more of the edge on slab / under 5 % | 3.11 | 2.96 2.70 3.88 2.89 | 1.52 | at least 2.5 (Earth 3-4) | |
+| Speed against slab share of the edge, rank correlation | 0.43 | 0.44 0.43 0.46 0.38 | 0.41 | at least 0.65 | 0.69-0.77 |
+| Speed against plate area, rank correlation | -0.34 | -0.35 -0.35 -0.35 -0.33 | -0.28 | -0.4 to 0.2 | |
+| Change of a plate's rotation per step, median / 90th percentile | 24.6 % / 83.6 % | 25.1 26.2 21.0 26.1 / 86.9 85.6 76.1 85.9 | 4.95 % / 8.99 % | at most 8 % / 20 % | 16-18 % / 62-70 % |
+| Balance speed against today's speed: rank correlation; median of their ratio | 0.38; 0.72 | 0.34 0.38 0.48 0.32; 0.71 0.70 0.79 0.69 | | | |
 
 ### The forces and the slabs
 
 | Measure | Value | Runs |
 |---|---|---|
-| Share of a plate's driving torque that is slab pull (by size, of pull, suction, edge energy, mantle flow), median | 0.85 | 0.83 0.83 0.89 0.87 |
-| Mean in-plane stress of a plate above 40 % of the planet, median (tension positive) | -0.47 MPa | -0.44 -1.33 0.22 -0.32 |
-| Steps in which a plate above 40 % is in tension | 46.3 % | 42.2 39.7 54.9 48.2 |
-| Slab length per subducting contact, median over contact-steps | 615 km | 612 496 700 652 |
-| Slab break-offs per 100 Myr | 0.90 | 0.50 0.60 1.70 0.80 |
+| Share of a plate's driving torque that is slab pull (by size, of pull, suction, edge energy, mantle flow), median | 0.86 | 0.86 0.84 0.89 0.83 |
+| Mean in-plane stress of a plate above 40 % of the planet, median (tension positive) | -0.30 MPa | 0.01 -0.43 -0.08 -0.71 |
+| Steps in which a plate above 40 % is in tension | 46.2 % | 50.2 47.2 49.0 38.3 |
+| Slab length per subducting contact, median over contact-steps | 636 km | 618 574 700 652 |
+| Slab break-offs per 100 Myr | 0.55 | 0.20 0.50 1.10 0.40 |
+
+### What drives the slab correlation and the noise: four variants
+
+The force settings change nothing a run computes, so variants of them run on the same geometry and
+differ only in the balance. `earthlike_quick_16k`, supercontinent, 300 Myr, seed 2, on master 9e84fcf
+plus this task (before the merge; the comparison is within the set):
+
+| Variant | RMS | 10th / 50th / 90th pct | above 150 / 250 mm/yr | oceanic / continental | slab / free | slab rank corr. | rotation change p50 / p90 |
+|---|---|---|---|---|---|---|---|
+| defaults | 40.1 | 8.5 / 45.2 / 88.2 | 0 / 0 % | 3.02 | 2.59 | 0.37 | 22.9 / 80.7 % |
+| no boundary resistance (`boundary_resistance` 0) | 54.0 | 8.8 / 43.0 / 83.6 | 3.2 / 0.9 % | 1.84 | 0.95 | -0.04 | 21.8 / 92.3 % |
+| slabs pull in full at once (`slab_depth_km` 1) | 50.5 | 18.8 / 62.2 / 101 | 0 / 0 % | 2.72 | 2.57 | 0.57 | 11.9 / 63.0 % |
+| no mantle flow (`mantle_flow_mm_yr` 0) | 40.1 | 8.8 / 45.2 / 88.3 | 0 / 0 % | 2.99 | 2.59 | 0.37 | 22.7 / 81.2 % |
+| all three | 67.4 | 22.5 / 57.2 / 96.6 | 4.2 / 1.1 % | 1.65 | 0.85 | 0.00 | 10.5 / 73.6 % |
+
+- Boundary resistance against the real neighbour is what makes the answer usable: without it small
+  plates spin and run (3 % of plate-steps above 150 mm/yr, 1 % above 250) and the slab contrast
+  disappears. This is the design's section 4 finding, now with real neighbours.
+- **Slab-length tracking is the largest source of the noise, not a cure for it.** With slabs pulling
+  in full from the start, the rotation change halves (median 12 % against 23 %) and the slab
+  correlation rises to 0.57. A contact's slab starts again from zero whenever the contact is new,
+  reversed, or closed and reopened after `contact_timeout_steps`, and today's contacts flicker; the
+  design expected the tracking to smooth the pull (section 4, point 4). Task 7 should key slabs to
+  the trench more persistently, or start a reopened contact with the slab it had.
+- The mantle flow at 5 mm/yr changes nothing measurable.
 
 ### What the numbers say
 
-- **The balance gives Earth's speeds and contrasts that today's rules do not.** Its RMS (38 mm/yr),
-  its percentiles (11 / 48 / 94) and its two contrasts (oceanic over continental 3.9, slab over
-  free 3.2) are inside every section 7 target they are measured against, at the default settings
-  and with nothing tuned; today's motion meets none of them (RMS 60, 42 / 72 / 86, 1.6 and 1.5).
-  Earth (Zahirovic et al. 2015, read in the library 2026-10-02): median RMS about 40 mm/yr, plates
-  under 25 % continental 81 against 28 mm/yr over 50 %, more than 25 % of the perimeter subducting
-  79 against 26 without subduction. Nothing runs away: 0.02 % of plate-steps are above 150 mm/yr
-  (one plate-step in seed 4), none above 250.
-- **It is noisy from step to step.** A plate's balance rotation changes by a median 26 % a step
-  (90th percentile 85 %), more than in the design's test (16-18 %, 62-70 %) and far above the
-  target (8 %, 20 %). Boundaries are found per sample and torques jump as samples cross; the
-  slab-length tracking does not smooth it enough. The design's answer is the relaxation at the
-  switch (`motion_relax_myr` 6 Myr); a relaxation of 6 Myr over 2-Myr steps damps a step's jump to
-  about 28 % of itself, so the median would land near 7 %, if the jumps are uncorrelated (not
-  measured).
-- **Its speed follows the slab share less than the design's test found** (rank correlation 0.44,
-  the same as today's motion, against 0.69-0.77), although the slab-over-free ratio (3.2) passes.
-  See the variants below for what moves it.
-- **It agrees with today's motion only loosely** (rank correlation of the two speeds 0.40) and is
-  slower (median ratio 0.70): the switch will change every plate's speed.
+- **The balance gives Earth's spread of speeds and its contrasts, which today's rules do not.**
+  Its percentiles (11 / 49 / 93 mm/yr) and both contrasts (oceanic over continental 3.7, slab over
+  free 3.1) are inside the section 7 targets at the default settings, with nothing tuned; today's
+  motion meets the 90th percentile only (41 / 72 / 86; 1.6 and 1.5). Its RMS, 37 mm/yr, is just
+  under the corrected target of 40-100 (Earth's area-weighted RMS is about 47 mm/yr today and 50-100
+  over the last 200 Myr, WP-13a): the speed scale is to be calibrated at task 8. Nothing runs away:
+  0.04 % of plate-steps are above 150 mm/yr, none above 250.
+- **It is noisy from step to step.** A plate's balance rotation changes by a median 25 % a step
+  (90th percentile 84 %), above the design's test (16-18 %, 62-70 %) and far above the target
+  (8 %, 20 %); the variants show the slab tracking doubles it. The relaxation at the switch
+  (`motion_relax_myr` 6 Myr over 2-Myr steps) damps uncorrelated jumps to roughly a quarter, which
+  would put the median near 6 % (not measured).
+- **Its speed follows the slab share less than the design's test found** (rank correlation 0.43,
+  the same as today's motion, against 0.69-0.77; Earth 0.71 from Forsyth & Uyeda's twelve plates,
+  WP-13a), although the slab-over-free ratio passes. With slabs at full pull it is 0.57.
+- **It agrees with today's motion only loosely** (rank correlation of the two speeds 0.38) and is
+  slower (median ratio 0.72): the switch will change every plate's speed.
 - **The mega-plate is near neutral.** A plate above 40 % of the planet has a median mean stress of
-  -0.5 MPa and is in tension in 46 % of its steps. The design's section 8 asked whether a
-  mega-plate sits in tension waiting for a rift: in today's geometry it does not, or not strongly
+  -0.3 MPa and is in tension in 46 % of its steps. The design's section 8 asked whether a mega-plate
+  sits in tension waiting for a rift: in today's geometry it does not, or not strongly
   (supercontinent models put 20-50 MPa of extension in the interior, Huang et al. 2019, abstract).
-  The model's mega-plates have ridges as well as trenches on their rims, and their push nearly
+  The model's mega-plates have ridges as well as trenches on their rims, and the ridges' push nearly
   cancels the suction.
-- **Slabs.** The median slab is 615 km long (700 is full length): most contacts live long enough
-  to pull in full. Break-offs are rare (0.9 per 100 Myr) because today's collisions move the
-  continent to the other plate within a step or two; with the collision state of task 2 the block
-  will last and break-offs will become common.
+- **Slabs.** The median slab is 636 km long (700 is full length). Break-offs are rare (0.55 per
+  100 Myr) because today's collisions move the continent to the other plate within a step or two;
+  with task 2's collision state switched on, the block will last and break-offs will become common.
+
+### Cost
+
+The same 300 Myr run with the balance and without it (`DEEPTIME_NO_PLATE_FORCES=1`, which leaves the
+rest of the record on), both at once on the test VM, `stage volcanoes`, supercontinent, before the
+merge: plates stage 78.3 against 78.3 s (seed 1) and 85.0 against 77.6 s (seed 2, every stage of
+that run was 5-8 % slower: the shared machine); repeated with `/usr/bin/time`: plates 79.8 against
+79.4 s, user CPU 623.2 against 624.1 s, wall 387.1 against 387.7 s (seed 1); plates 90.2 against
+88.2 s, user CPU 757.2 against 756.5 s, wall 466.9 against 471.7 s (seed 2). The balance costs 0-2 %
+of the plates stage (at most about 10 ms of a 0.5 s step) and nothing measurable of a run. The
+record grows from 236 to 416 KB per 300 Myr and from about 1.05 to 1.7-2.0 MB per 1000 Myr (1.94 MB
+for seed 1 on the merged tree): the per-plate force budget is 14 numbers a plate-step.

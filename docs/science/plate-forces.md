@@ -87,13 +87,13 @@ plate's centroid, f the edge forces at the balance's answer, b the basal drag, h
 
 | Ledger id | Quantity | As coded | Units | Source | Status |
 |---|---|---|---|---|---|
-| PLT-181 | Speed scale: the reference plate's speed | 45 | mm/yr | Zahirovic et al. 2015 for Earth's median RMS, ~40 (read) | `game-choice` |
-| FRC-002, PLT-183 | Reference slab pull F_sp (at Earth's gravity) | 3.0 × 10¹³ | N/m | textbook figure, not confirmed | `from-memory` |
-| PLT-182 | Slab pull strength `slab_pull` | 1 | relative | Forsyth & Uyeda 1975 (read: slab forces dominate) | `from-memory` (the law) |
-| FRC-004 | Slab thickness factor s(a) | √(min(a, 180)/80) | — | half-space cooling (Turcotte & Schubert, not read) | `from-memory` |
+| PLT-181 | Speed scale: the reference plate's speed | 45 | mm/yr | Earth's area-weighted RMS about 47 mm/yr today (WP-13a) | see the ledger |
+| FRC-002, PLT-183 | Reference slab pull F_sp (at Earth's gravity) | 3.0 × 10¹³ | N/m | design's gross figure; Faccenna et al. 2012 give 1.4 × 10¹³ for 80-Myr floor (WP-13a) | `from-memory` |
+| PLT-182 | Slab pull strength `slab_pull` | 1 | relative | Faccenna et al. 2012 eq. 1, slab length × √age (WP-13a, read); Forsyth & Uyeda 1975 (read: slab forces dominate) | `verified` (the law; the 10 Myr cut-off unsourced) |
+| FRC-004 | Slab thickness factor s(a) | √(min(a, 180)/80) | — | √age: Faccenna et al. 2012 (WP-13a, read); the 80 and 180 Myr: the design's trace | `from-memory` |
 | FRC-005 | No pull below this crust age | 10 | Myr | Cloos 1993 (not read) | `from-memory` |
 | PLT-184 | Slab depth, break-off time | 700, 10 | km, Myr | van Hunen & Allen 2011 (abstract) | `abstract-only` |
-| PLT-185 | Slab resistance | 3 × the reference plate's drag per 3,000 km | — | Forsyth & Uyeda 1975 (read: the terminal velocity) | `game-choice` |
+| PLT-185 | Slab resistance | 3 × the reference plate's drag per 3,000 km | — | Forsyth & Uyeda 1975 (read: the terminal velocity) | `calibrated` (by the design's open-loop test) |
 | PLT-186 | Slab suction | 0.3 of the pull | share | Conrad & Lithgow-Bertelloni 2002, 2004 (abstracts) | `abstract-only` |
 | PLT-187, FRC-009 | Edge energy | 0.1 (the energy as computed) | — | Lithgow-Bertelloni & Richards 1998 (read: <10 % of the driving force) | `verified` (the share) |
 | FRC-006 | ρ_c, ρ_m, ρ_w | 2750, 3300, 1000 | kg/m³ | typical values | `from-memory` |
@@ -103,12 +103,12 @@ plate's centroid, f the edge forces at the balance's answer, b the basal drag, h
 | FRC-013 | Ridge crest = continent at sea level | U = 0 for both | — | Coblentz et al. 1994 (not read) | `from-memory` |
 | FRC-014 | Land column energy | 6.7 × 10¹² N/m for a 5 km belt on 35 km crust | N/m | Molnar & Lyon-Caen 1988 (not in the library) | `from-memory` |
 | PLT-188 | Keel drag | 3 | × | Conrad & Lithgow-Bertelloni 2006 (read: 2-5, about 3 on average) | `verified` |
-| PLT-189 | Boundary resistance | 3 × the reference plate's drag per its perimeter | — | Forsyth & Uyeda 1975 (read: transform resistance) | `game-choice` |
+| PLT-189 | Boundary resistance | 3 × the reference plate's drag per its perimeter | — | Forsyth & Uyeda 1975 (read: transform resistance) | `calibrated` (by the design's open-loop test) |
 | PLT-190, FRC-015 | Mantle flow: degree-2, from two antipodal upwellings | 5 | mm/yr | Ben, decisions log 2026-10-02 | `game-choice` |
 | FRC-016 | Basal drag coefficient c_b (defaults) | 2.5 × 10¹⁴ | Pa s/m | defined by the speed scale | `game-choice` |
 | FRC-010 | Lithosphere thickness for the stress | 100 | km | Conrad & Lithgow-Bertelloni 2006's reference (read) | `verified` |
 | FRC-011 | Collision drag's speed floor | 5 | mm/yr | stand-in for the collisions design's weld speed | `game-choice` |
-| PLT-191 | Relaxation time (used from the switch on) | 6 | Myr | — | `uncited` |
+| PLT-191 | Relaxation time (used from the switch on) | 6 | Myr | the design | `game-choice` |
 
 Two checks of the formulas against the design's figures (unit test
 `the_column_energy_gives_ridge_push_and_plateau_weight_of_earths_size`): a ridge crest 3.5 km above
@@ -122,26 +122,29 @@ order of 10^19 Pa s", and Forsyth & Uyeda 1975 found "drag at 8 cm/yr roughly 5 
 ## Earth against the mod
 
 The balance as it would move the plates of today's model (open loop: the plates kept moving by the
-old rules), `earthlike_quick_16k`, supercontinent start, 1000 Myr, seeds 1-4, 2026-10-02,
-`tools/review/plate-check.sh` (mean of the four runs; full table in
+old rules), `earthlike_quick_16k`, supercontinent start, 1000 Myr, seeds 1-4, 2026-10-02, master
+2c60ca3f plus this feature, `tools/review/plate-check.sh` (mean of the four runs; full table in
 `docs/design/plate-check-baseline.md`, "Added 2026-10-02: the force balance").
 
 | Quantity | Earth | Source of the Earth figure | The balance | Today's motion (same runs) |
 |---|---|---|---|---|
-| Plate speed, RMS | ~40 mm/yr (median RMS over 200 Myr) | Zahirovic et al. 2015, read | 38.0 mm/yr | 59.6 |
-| Fastest and slowest plates | fastest ~85 mm/yr RMS, slowest 26-28 | Zahirovic et al. 2015, read | 90th pct 94, 10th pct 11 mm/yr | 86, 42 |
-| Oceanic over continental plates, median speed | "2-3 times faster"; 81 over 28 mm/yr for under 25 % against over 50 % continental | Zahirovic et al. 2015, read | 3.9 | 1.6 |
-| Slab-attached over slab-free plates | 6-9 cm/yr against 0-4 cm/yr; 79 against 26 mm/yr (more than 25 % of the perimeter subducting against none) | Forsyth & Uyeda 1975, read; Zahirovic et al. 2015, read | 3.2 | 1.5 |
-| Share of the driving force from slabs | ">90%" | Lithgow-Bertelloni & Richards 1998, read | slab pull 0.85 of the driving torque (median, by size) | — |
-| Interior stress of a supercontinent | 20-50 MPa extension (a model, homogeneous supercontinent) | Huang et al. 2019, abstract | median -0.5 MPa; in tension in 46 % of the steps a plate holds over 40 % of the planet | — |
+| Plate speed, area-weighted RMS | about 47 mm/yr today; 50-100 over the last 200 Myr | Forsyth & Uyeda 1975 Table 1 (computed) and Zahirovic et al. 2015 §3.2, read (WP-13a) | 37.1 mm/yr | 59.2 |
+| Plate speeds, 10th / 50th / 90th percentile | 11 / 33 / 80 mm/yr (today's 12 plates) | Forsyth & Uyeda 1975 Table 1, computed (WP-13a) | 11 / 49 / 93 mm/yr | 41 / 72 / 86 |
+| Oceanic over continental plates, median speed | 2-3; 81 against 28 mm/yr for under 25 % against over 50 % continental | Zahirovic et al. 2015, read | 3.7 | 1.6 |
+| Slab-attached over slab-free plates | 6-9 cm/yr against 0-4 cm/yr; 79 against 26 mm/yr (more than 25 % of the perimeter subducting against none) | Forsyth & Uyeda 1975, read; Zahirovic et al. 2015, read | 3.1 | 1.5 |
+| Speed against slab share, rank correlation | 0.71 (12 plates) | Forsyth & Uyeda 1975 Table 1, computed (WP-13a) | 0.43 | 0.41 |
+| Share of the driving force from slabs | ">90%" | Lithgow-Bertelloni & Richards 1998, read | slab pull 0.86 of the driving torque (median, by size) | — |
+| Interior stress of a supercontinent | 20-50 MPa extension (a model, homogeneous supercontinent) | Huang et al. 2019, abstract | median -0.3 MPa; in tension in 46 % of the steps a plate holds over 40 % of the planet | — |
 
 What it says: the balance gives Earth's spread of speeds and its contrasts (oceanic against
-continental, slab against no slab) that today's rules do not, with nothing put in for them. It is
-noisy: a plate's balance rotation changes by a median 26 % from one step to the next (90th
-percentile 85 %), against 5 % and 9 % today; the design meets this with a relaxation time
-(`motion_relax_myr`) at the switch. Its speed is less tied to the slab share of a plate's edge than
-the design's own open-loop test found (rank correlation 0.44 against 0.69-0.77). The mega-plate is
-close to neutral, not in the strong tension the supercontinent models find.
+continental, slab against no slab) that today's rules do not, with nothing put in for them; its
+RMS is a little under Earth's (the speed scale is calibrated later). It is noisy: a plate's balance
+rotation changes by a median 25 % from one step to the next (90th percentile 84 %), against 5 % and
+9 % today. A variant with slabs pulling in full from the start halves that noise and lifts the slab
+correlation from 0.37 to 0.57 (300 Myr, seed 2): slabs restart from zero whenever their contact is
+new, reversed or reopened, and today's contacts flicker. Without boundary resistance small plates
+run away (1 % of plate-steps above 250 mm/yr). The mega-plate is close to neutral, not in the strong
+tension the supercontinent models find. The balance costs 0-2 % of the plates stage.
 
 ## Simplifications and limits
 
@@ -173,9 +176,12 @@ close to neutral, not in the strong tension the supercontinent models find.
   has neither Turcotte & Schubert nor Schellart 2004.
 - Forsyth & Uyeda's own fit has suction at about 0.08 of slab pull per length (Table 6); the code
   uses the design's 0.3 (Conrad & Lithgow-Bertelloni, from abstracts).
-- Why the balance's speed follows the slab share less closely than the design's test: the coupling
-  to real neighbours, the slab length and the mantle flow are all new here (the variants in the
-  build log 2026-10-02 separate them).
+- Slab tracking restarts a slab at zero when its contact is new, reversed or reopened; that is the
+  main source of the step-to-step noise and of the weaker slab correlation (variants in
+  `docs/design/plate-check-baseline.md`). Task 7 should keep a slab across a contact's flicker.
+- The reference slab pull, 3 × 10¹³ N/m, is about twice the 1.4 × 10¹³ that WP-13a computed from
+  Faccenna et al. 2012 for 80-Myr floor. Speeds do not depend on it (the drag is scaled with it);
+  the stresses and the ridge push's share do. Kept so that a ridge pushes with about 0.1 of the pull.
 
 ## Sources
 
