@@ -264,7 +264,8 @@ public final class BiomeGameTests {
         // layer and the synthetic chunk of icePassLaysTheCover are checked.)
         int c = t.circumference(), sea = g.getSeaLevel();
         java.util.List<int[]> columns = new java.util.ArrayList<>();
-        for (int z = -c / 4 + 8; z < c / 4; z += 16)
+        int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);   // the poles (the planet's projection)
+        for (int z = -zp + 8; z < zp; z += 16)
             for (int x = -c / 2 + 8; x < c / 2; x += 16) {
                 int n = ice.blocks(x, z);
                 if (n > 0 && t.height(x, z) > sea + 2)

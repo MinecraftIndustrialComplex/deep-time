@@ -77,7 +77,8 @@ public final class LavaGameTests {
         // Sites from the world data: the deepest sea, a sea about 150 blocks deep, a coast, high ground.
         int c = t.circumference();
         Site deepest = null, deep = null, coast = null, high = null;
-        for (int z = -c / 4 + 64; z < c / 4 - 64; z += 16)
+        int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);   // the poles (the planet's projection)
+        for (int z = -zp + 64; z < zp - 64; z += 16)
             for (int x = -c / 2; x < c / 2; x += 16) {
                 double h = t.height(x, z);
                 if (deepest == null || h < deepest.h)

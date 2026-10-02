@@ -8,6 +8,8 @@
 (function () {
   const B = window.DT_BUNDLE;
   const C = B.circumference;
+  const proj = window.DTProj;   // the planet's projection (projection.js)
+  const PZ = proj.poleZ(C);     // |z| of the poles
   const values = {};   // layer name -> {w, h, stride, view: DataView, type}
   let strata = null;
   const images = {};   // layer name -> HTMLImageElement
@@ -123,11 +125,11 @@
       for (let n = Math.floor((left - x) / C); n <= Math.ceil((right - x) / C); n++) {
         const sx = Math.round(toScreenX(x + n * C)) + 0.5;
         ctx.strokeStyle = colour; ctx.setLineDash(dash); ctx.lineWidth = Math.max(1, (window.devicePixelRatio || 1));
-        ctx.beginPath(); ctx.moveTo(sx, toScreenZ(-C / 4)); ctx.lineTo(sx, toScreenZ(C / 4)); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sx, toScreenZ(-PZ)); ctx.lineTo(sx, toScreenZ(PZ)); ctx.stroke();
         if (label) {
           ctx.setLineDash([]); ctx.fillStyle = colour;
           ctx.font = `${12 * (window.devicePixelRatio || 1)}px system-ui, sans-serif`;
-          ctx.fillText(label, sx + 4, Math.max(14, toScreenZ(-C / 4) + 14));
+          ctx.fillText(label, sx + 4, Math.max(14, toScreenZ(-PZ) + 14));
         }
       }
       ctx.setLineDash([]);
@@ -150,8 +152,8 @@
         drawWrapped(images.water_level, waterLayer, 0.85);
       }
       if (document.getElementById('grat').checked) {
-        for (let lon = 30; lon < 360; lon += 30) vline(lon / 360 * C - C / 2, 'rgba(255,255,255,0.35)', [2, 4], null);   // meridians every 30° (plan §5.2 longitude)
-        for (let lat = -60; lat <= 60; lat += 30) hline(-lat / 90 * C / 4, 'rgba(255,255,255,0.35)');
+        for (let lon = 30; lon < 360; lon += 30) vline(proj.xOfLon(C, lon), 'rgba(255,255,255,0.35)', [2, 4], null);   // meridians every 30°
+        for (let lat = -60; lat <= 60; lat += 30) hline(proj.zOfLat(C, lat), 'rgba(255,255,255,0.35)');
       }
       if (document.getElementById('seam').checked) {
         vline(-C / 2, '#ff3b30', [8, 5], `seam x = ±${C / 2}`);
@@ -232,7 +234,7 @@
 
     function inspect(x, z) {
       lastClick = { x, z };
-      const lat = -z / (C / 4) * 90, lon = (x + C / 2) / C * 360;   // plan §5.2: the seam is 0°
+      const lat = proj.latOfZ(C, z), lon = proj.lonOfX(C, x);   // the projection: the seam is 0°
       const rows = [
         ['block x, z', `${Math.floor(x)}, ${Math.floor(z)}`],
         ['latitude', `${Math.abs(lat).toFixed(3)}° ${lat >= 0 ? 'N' : 'S'}  (north is −z)`],
@@ -262,7 +264,7 @@
       const dx = (e.clientX - drag.x) * dpr(), dy = (e.clientY - drag.y) * dpr();
       if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
       cx = wrapX(drag.cx - dx / k);
-      cz = Math.max(-C / 4, Math.min(C / 4, drag.cz - dy / k));
+      cz = Math.max(-PZ, Math.min(PZ, drag.cz - dy / k));
       draw();
     });
     canvas.addEventListener('pointerup', e => {
@@ -270,7 +272,7 @@
         const r = canvas.getBoundingClientRect();
         const sx = (e.clientX - r.left) * dpr(), sz = (e.clientY - r.top) * dpr();
         const x = wrapX(toWorldX(sx)), z = toWorldZ(sz);
-        if (z >= -C / 4 && z < C / 4) inspect(x, z);
+        if (z >= -PZ && z < PZ) inspect(x, z);
       }
       drag = null;
     });
@@ -281,7 +283,7 @@
       const wx = toWorldX(sx), wz = toWorldZ(sz);
       const nk = Math.max(fitK(), Math.min(16, k * Math.pow(1.0015, -e.deltaY)));
       cx = wrapX(wx - (sx - canvas.width / 2) / nk);
-      cz = Math.max(-C / 4, Math.min(C / 4, wz - (sz - canvas.height / 2) / nk));
+      cz = Math.max(-PZ, Math.min(PZ, wz - (sz - canvas.height / 2) / nk));
       k = nk;
       draw();
     }, { passive: false });
@@ -450,12 +452,12 @@
       return frames.get(key);
     }
 
-    // Pixel (px, py) of a keyframe is centred on lon 360°·px/w (plan §5.2: the seam is 0°) and
-    // lat 90° − 180°·py/h.
+    // Pixel (px, py) of a keyframe is centred on lon 360°·px/w (the seam is 0°) and on the
+    // latitude the projection gives row py (proj.yOfLat).
     function toCanvas(lat, lon, f) {
       const s = canvas.width / f.w;
       const px = ((lon % 360) + 360) % 360 / 360 * f.w;
-      const py = (90 - lat) / 180 * f.h;
+      const py = proj.yOfLat(lat, f.h);
       return [(px + 0.5) * s, (py + 0.5) * s];
     }
     function placeLatLon(e) {

@@ -12,6 +12,9 @@
 //! without bodies gets random columns instead. A world with a river network (P1-22) also gets 10 %
 //! on and beside random river vertices (channel, banks) and 5 % around the mouths of rivers that end
 //! in lakes; a world with lakes 5 % around random shore cells of `water_level` (lake water, shores, banks).
+//! The fixture also holds the projection (`deeptime_format::projection`): each column's latitude
+//! and longitude and the z of every 5° of latitude, which `ColumnParityTest` checks against Java's
+//! `worlddata/Projection`.
 //! A world with folds and faults (P2-01) gets 25 % inside the windows of random structural events,
 //! half of them within a few blocks of the event's centre line (a fault's trace), and the
 //! fixture says how many of its columns the events change (`deformed_columns`).
@@ -171,6 +174,22 @@ pub fn run(world: &Path, out: &Path, n: usize, seed: u64) -> Result<(usize, usiz
         .iter()
         .filter(|c| c["bodies"].as_array().is_some_and(|b| !b.is_empty()))
         .count();
+    // The projection (`deeptime_format::projection`): latitude and longitude of every picked
+    // column, and the z of every 5° of latitude, for the Java twin (`worlddata/Projection`).
+    let proj = deeptime_format::Projection::of(w.c as f64);
+    let points: Vec<Value> = pick(&w, n, seed)
+        .into_iter()
+        .map(|(x, z)| {
+            let (lat, lon) = proj.lat_lon(x as f64, z as f64);
+            json!([x, z, lat, lon])
+        })
+        .collect();
+    let lats: Vec<Value> = (0..=36)
+        .map(|k| {
+            let lat = -90.0 + 5.0 * f64::from(k);
+            json!([lat, proj.z_of_lat(lat)])
+        })
+        .collect();
     let doc = json!({
         "format_version": w.manifest.format_version,
         "world": w.manifest.source,
@@ -182,6 +201,7 @@ pub fn run(world: &Path, out: &Path, n: usize, seed: u64) -> Result<(usize, usiz
         "structure_events": w.structure().map_or(0, |d| d.structure.events.len()),
         "deformed_columns": deformed,
         "columns": columns,
+        "projection": { "pole_z": proj.pole_z(), "points": points, "latitudes": lats },
     });
     let bytes = serde_json::to_vec(&doc).map_err(|e| FormatError::Invalid(e.to_string()))?;
     if let Some(parent) = out.parent() {
