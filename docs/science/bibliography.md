@@ -728,6 +728,33 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read in this pass: abstract fetched
 - Used for: island subsidence rate (VOL-048).
 
+### Edmonds2019
+- Reference: Edmonds, M., Cashman, K. V., Holness, M. and Jackson, M. (2019). Architecture and dynamics of magma reservoirs. Philosophical Transactions of the Royal Society A 377(2139): 20180298.
+- DOI or URL: 10.1098/rsta.2018.0298; https://pmc.ncbi.nlm.nih.gov/articles/PMC6335485/
+- Access: open copy on PubMed Central; the publisher PDF returned 403 to scripted access.
+- Library (the project's source library, not distributed): not fetched as a file (the PDF endpoints returned HTTP 403 or an HTML page; the PMC XML endpoint returned a server error).
+- Read in this pass (2026-10-02): the PMC page through a page-fetch tool that returns a model's answer to a question, not the text; quotes recorded in the ledger are from that answer and were not checked against the PDF: "vertical extent of the crust ... 'trans-crustal mush system'"; "water-rich arc magmatic systems are typically vertically extensive and dominated by mushy super-solidus conditions"; sill thicknesses "must be less than 10 m thick"; "multiple, 'stacked' storage areas for magma...separated by subsolidus material"; "5-15% melt" in upper crustal reservoirs.
+- Ledger ids: MAG-043, MAG-044, MAG-047, MAG-054
+- Used for: the architecture of the crust-deep column.
+
+### Cashman2017
+- Reference: Cashman, K. V., Sparks, R. S. J. and Blundy, J. D. (2017). Vertically extensive and unstable magmatic systems: a unified view of igneous processes. Science 355(6331): eaag3055.
+- DOI or URL: 10.1126/science.aag3055
+- Access: paywalled; no open copy reached.
+- Library (the project's source library, not distributed): not fetched.
+- Read in this pass: nothing; named in Ben's decision (2026-10-02) and in the ledger as the picture followed. Not cited for any number.
+- Ledger ids: MAG-043
+- Used for: the idea of a vertically extensive system.
+
+### Sparks2019
+- Reference: Sparks, R. S. J., Annen, C., Blundy, J. D., Cashman, K. V., Rust, A. C. and Jackson, M. D. (2019). Formation and dynamics of magma reservoirs. Philosophical Transactions of the Royal Society A 377(2139): 20180019.
+- DOI or URL: 10.1098/rsta.2018.0019
+- Access: not open on PubMed Central (Europe PMC flags it not open access).
+- Library (the project's source library, not distributed): not fetched.
+- Read in this pass: nothing; named in Ben's decision.
+- Ledger ids: MAG-043
+- Used for: the idea of a vertically extensive system.
+
 ### Poland2014
 - Reference: Poland, M. P., Miklius, A. and Montgomery-Brown, E. K. (2014). Magma supply, storage, and transport at shield-stage Hawaiian volcanoes. Chapter 5 in Characteristics of Hawaiian Volcanoes, U.S. Geological Survey Professional Paper 1801.
 - DOI or URL: 10.3133/pp18015; PDF https://pubs.usgs.gov/pp/1801/downloads/pp1801_Chap5_Poland.pdf (open, but came back as unreadable binary).

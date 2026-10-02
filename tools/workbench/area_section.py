@@ -79,6 +79,7 @@ def main():
     ap.add_argument("--x", type=int)
     ap.add_argument("--y", default=None)
     ap.add_argument("--scale", type=int, default=3)
+    ap.add_argument("--span", default=None, help="lo,hi: crop the section to these x (or z) values")
     ap.add_argument("--out")
     ap.add_argument("--census", action="store_true")
     ap.add_argument("--json")
@@ -127,6 +128,10 @@ def main():
         cols = [z * w + xx for z in range(dep)]
     else:
         sys.exit("give --z or --x or --census")
+    if a.span:
+        base = bx if a.z is not None else bz
+        lo_s, hi_s = (int(v) - base for v in a.span.split(","))
+        cols = cols[max(0, lo_s):hi_s + 1]
     n = len(cols)
     s = a.scale
     grid = [[None] * (hi - lo + 1) for _ in range(n)]
