@@ -20,7 +20,7 @@ if [ -f "$LOG" ]; then
 fi
 FIELDS=${CKPT%.dtcp}.fields
 "$BIN" dump-fields --in "$CKPT" --out "$FIELDS" --fields \
-    surface/elevation_m,surface/flexure_m,surface/deflection_m,surface/elastic_thickness_km,plates/crust_type,regime,plates/flags
+    surface/elevation_m,surface/flexure_m,surface/deflection_m,surface/elastic_thickness_km,plates/crust_type,regime,plates/flags,plates/plate_id
 nix shell --impure --expr \
     '(builtins.getFlake "nixpkgs").legacyPackages.${builtins.currentSystem}.python3.withPackages (p: [p.numpy p.matplotlib])' \
     -c python3 "$(dirname "$0")/flexure_views.py" --fields "$FIELDS" --sea "$SEA" \
