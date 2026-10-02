@@ -14,8 +14,8 @@ was found or the source read does not give the number. No volcano size in the co
 measurement of Earth's volcanoes. Where a source was read, this page says how the code compares
 with it. The one paper the code cited, for the spacing of arc volcanoes, says in its abstract that
 there is no characteristic spacing; the citation is corrected. Two departures from Earth that shape
-worlds are questions for Ben (see "Open questions"): stratovolcanoes are aimed at about three
-times the height of Earth's typical one, and dead ocean volcanoes are sunk twice now that the
+worlds are questions for Ben (see "Open questions"): stratovolcanoes stand about one and a half times
+the height of Earth's typical one, and dead ocean volcanoes are sunk twice now that the
 crust bends under them.
 
 Scale used throughout: one block is 300 m across and 20 m up, so 1 km is 3.3 blocks across and
@@ -25,7 +25,8 @@ Scale used throughout: one block is 300 m across and 20 m up, so 1 km is 3.3 blo
 
 **Arc volcanoes.** Lines of cones stand along the landward side of ocean trenches, where one plate
 sinks under another, at least about 60 km (200 blocks) apart. They occur on continents and as island
-chains. A cone is 1.2 to 3 km tall (60 to 150 blocks), most of them near 3 km, with a concave
+chains. A cone is planned at 1.2 to 3 km tall (60 to 150 blocks); in the runs measured, live cones stood
+a median 1.8 to 1.9 km and all standing cones 1.5 km (Earth's median: 1.0 km). It has a concave
 profile that steepens toward the top. At the default setting it is 13 to 28 km in radius (45 to 93
 blocks), twice as wide as its physical shape, so that it does not read as a spike. It has a summit
 crater at least 2 km (7 blocks) across. Its rock is andesite over tuff (volcanic ash turned to
@@ -173,7 +174,7 @@ Earth, from the sources read in stage 2:
 
 | Quantity | Earth | Source and how it was read | The code |
 |---|---|---|---|
-| Height of stratovolcanoes | median 1.02 km, mean 1.13 km, s.d. 0.55 km, range 0.17–4.57 km (512 subaerial stratovolcanoes) | Grosse et al. 2014, table 1, full text | aimed at 1.2–3.0 km, most near 3 km |
+| Height of stratovolcanoes | median 1.02 km, mean 1.13 km, s.d. 0.55 km, range 0.17–4.57 km (512 subaerial stratovolcanoes) | Grosse et al. 2014, table 1, full text | aimed at 1.2–3.0 km; standing cones measured at a median 1.5 km, live ones 1.8–1.9 km (runs below) |
 | Height to basal width of stratovolcanoes | median 0.13, range 0.02–0.30; 0.11 or less over 20 km wide | Grosse et al. 2014, table 1 and p. 7 | 0.09–0.11 at the physical radius, 0.045–0.054 at the default |
 | Basal width of stratovolcanoes | median 7.9 km, range 2–66 km | Grosse et al. 2014, table 1 | 13–28 km physical, 27–56 km at the default |
 | Flank slopes of stratovolcanoes | mean flank 17.7°, steepest average 27.7° at 0.79 of the height (medians) | Grosse et al. 2014, table 1 | 10° mean and 18° at the summit for 3 km over 14 km; half that at the default |
@@ -210,7 +211,44 @@ described under them.
 | Distance from a land point to the nearest active volcano on land | median 658 blocks (10th percentile 169, 90th 1,309) | same; 4,000 points |
 | Effect on land height | with volcanoes off, land above 2 km falls from 0.307 to 0.170 of the land (Earth: 0.102) | hypsometry runs, `earthlike_quick_16k`, 500 Myr, 2026-10-01 (before flexure) |
 
-MEASURED_TABLE
+Stage 2 runs (WP-2, 2026-10-02): `earthlike_quick_16k`, 500 Myr, seed 1, both starts (scattered
+continents / supercontinent), `deeptime stage volcanoes`, two threads, on the test VM, built from
+master 29d493f plus a report of cone heights (commit 360b2ed; nothing else in the simulation
+differs from master, flexure on as in the preset). Command: `tools/review/p1-17-hyps.sh 500 "1"
+"scattered_continents supercontinent" base "h:volcanoes.arc_height_km=[0.6,2.0]"
+"sub0:volcanoes.island_subsidence_m_myr=0"`. Heights of cones are the 10th, 50th and 90th
+percentiles at the end of the run; "standing" cones are live or dead ones still at a quarter of
+their peak and at least 300 m. One run per start, and single runs scatter widely: four runs of
+the same settings in the flexure build log (2026-10-02) gave land above 2 km from 0.092 to 0.149,
+so only large differences mean anything.
+
+| Quantity | Earth | Master defaults | Arc cones 0.6–2.0 km (radius unchanged) | No extra island subsidence |
+|---|---|---|---|---|
+| Land share | 0.289 | 0.252 / 0.284 | 0.246 / 0.266 | 0.285 / 0.280 |
+| Median land height, m | 427 | 569 / 650 | 547 / 787 | 694 / 872 |
+| Land above 2 km | 0.102 | 0.092 / 0.149 | 0.079 / 0.156 | 0.091 / 0.134 |
+| Land above 3 km | | 0.018 / 0.042 | 0.011 / 0.025 | 0.014 / 0.018 |
+| Active stratovolcanoes at the end | | 115 / 168 | 8 / 128 | 46 / 203 |
+| Their heights, p10 / p50 / p90, m | median 1,020 (all stratovolcanoes, Grosse et al. 2014) | 1,345 / 1,869 / 2,814; 1,437 / 1,831 / 2,908 | 979 / 1,433 / 1,900; 826 / 1,226 / 1,890 | 1,274 / 1,947 / 2,789; 1,389 / 1,995 / 2,834 |
+| Standing stratovolcanoes | | 974 / 920 | 482 / 732 | 741 / 1,382 |
+| Their heights, p10 / p50 / p90, m | median 1,020, mean 1,130 | 634 / 1,471 / 2,338; 823 / 1,524 / 2,588 | 514 / 929 / 1,682; 582 / 914 / 1,540 | 668 / 1,318 / 2,079; 853 / 1,486 / 2,325 |
+| Standing shields (heights p50, m) | | 5 (2,824) / 14 (2,669) | 8 (2,755) / 3 (3,130) | 7 (1,976) / 11 (3,465) |
+| Calderas formed (and summit calderas) | | 545 (22) / 524 (26) | 552 (23) / 512 (20) | 492 (15) / 510 (16) |
+| Tallest volcano, m | 4,570 (subaerial, Grosse et al. 2014) | 4,360 / 4,461 | 4,424 / 5,694 | 4,348 / 4,661 |
+| Relief built by volcanoes, km³ (block metric) | | 2.4 × 10⁷ / 2.5 × 10⁷ | 2.2 × 10⁷ / 1.8 × 10⁷ | 2.1 × 10⁷ / 2.7 × 10⁷ |
+
+What the runs show:
+
+- **The cones are taller than Earth's.** At the defaults, standing stratovolcanoes have a median
+  height of 1.5 km and active ones 1.8–1.9 km, against Earth's 1.02 km. With the range lowered to
+  0.6–2.0 km the standing cones' median is 0.91–0.93 km, Earth's figure.
+- **Lower cones did not measurably lower the land above 2 km** in this pair of runs (0.092 →
+  0.079 on one start, 0.149 → 0.156 on the other): the change is inside the run-to-run scatter.
+  The build log's earlier figure (land above 2 km 0.307 with volcanoes, 0.170 without, before the
+  hypsometry recalibration and before flexure) is no longer the state of master: with flexure the
+  defaults give 0.092 and 0.149.
+- **The extra island subsidence makes no measurable difference** to the hypsometry or to how many
+  shields stand at the end.
 
 ## Simplifications and limits
 
@@ -270,12 +308,19 @@ Questions for Ben (STATUS.md, pending questions, 2026-10-02), recommendation fir
 
 1. **Stratovolcano heights** (VOL-019, VOL-003). Earth's median stratovolcano stands 1.0 km above
    its base (Grosse et al. 2014); the code aims at 1.2 to 3.0 km and, because most arcs reach full
-   flux, most cones aim at 3 km. See the measured table for what a lower range does to the land
-   above 2 km. QUESTION1_DETAIL
+   flux, most cones aim at 3 km. In the runs above, active cones stand a median 1.8–1.9 km and standing ones 1.5 km;
+   with 0.6–2.0 km the standing cones' median is 0.91–0.93 km and the land above 2 km does not
+   change measurably. Recommended: lower the default range to 0.6–2.0 km and the radius at its top
+   (`arc_radius_km`) from 14 to 10 km, which keeps today's proportions, so the typical cone is
+   Earth's (arcs of lower cones; shields, calderas and the ceiling unchanged). The measured
+   variant kept the 14 km radius, so its cones were flatter and larger in volume than this. Alternative: keep 1.2–3.0 km as a game choice (taller cones read better at
+   15 times vertical exaggeration) and say so in the hint.
 2. **Island subsidence counted twice** (VOL-048). Since cones are flexure loads (decisions log
    2026-10-02), the crust sinks under a growing volcano, and the plate model deepens old ocean
    floor under it. The extra 25 m/Myr for dead ocean volcanoes repeats both. Recommended: set it to
-   0 by default and keep the setting. QUESTION2_DETAIL
+   0 by default and keep the setting. The runs above show no measurable effect on the
+   hypsometry or on the number of standing shields; the setting changes how deep old seamounts lie
+   (by up to 1.5 km), which a player meets only under the sea.
 3. **Continental hotspot calderas** (VOL-045). Yellowstone collapsed three times in 1.5 Myr
    (Christiansen 2001); the code gives a continental hotspot centre a 10 to 30 % chance of one
    caldera in its life. Recommended: raise the continental hotspot's rate to about 1 per Myr (the
