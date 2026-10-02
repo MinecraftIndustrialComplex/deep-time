@@ -13,10 +13,10 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,218 active rows in 28 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02). The ledgers hold 2,398 ids: stage 1 left 2,069 rows; stage 2 package WP-0
+2,220 active rows in 28 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02). The ledgers hold 2,398 ids: stage 1 left 2,069 rows; stage 2 package WP-0
 (2026-10-02) retired 193 of them as duplicates (`merged`, not counted) and added 301 rows for code stage 1
 had not covered (51 in GEO, 74 in PRS, 84 in HNT, 35 in CRE, 57 in CHK). The flexure feature (ISO-040 to
-ISO-067, added to master the same day by its own agent) is included.
+ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 from its follow-up) is included.
 
 | Ledger | Subject | Rows | `verified` | `cited-unverified` | `from-memory` | `abstract-only` | `calibrated` | `game-choice` | `uncited` | of which `pending-rewrite` | of which `not-yet-coded` | `merged` (not counted) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -25,7 +25,7 @@ ISO-067, added to master the same day by its own agent) is included.
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 0 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
 | [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 0 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 | 0 |
 | [ERO](ledger/ERO.md) | erosion, sediment, facies | 156 | 0 | 83 | 2 | 3 | 6 | 4 | 58 | 0 | 0 | 11 |
-| [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 65 | 3 | 8 | 0 | 6 | 6 | 12 | 30 | 0 | 0 | 2 |
+| [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 67 | 3 | 8 | 0 | 6 | 6 | 14 | 30 | 0 | 0 | 2 |
 | [HYP](ledger/HYP.md) | hypsometry and calibration targets | 34 | 0 | 10 | 0 | 1 | 18 | 1 | 4 | 0 | 0 | 0 |
 | [HYD](ledger/HYD.md) | rivers, lakes, runoff | 75 | 0 | 14 | 3 | 0 | 1 | 36 | 21 | 0 | 0 | 1 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
@@ -48,11 +48,11 @@ ISO-067, added to master the same day by its own agent) is included.
 | [HNT](ledger/HNT.md) | editor hint texts | 84 | 11 | 12 | 2 | 2 | 6 | 36 | 15 | 0 | 0 | 0 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
 | [CHK](ledger/CHK.md) | plate-check target ranges | 57 | 0 | 10 | 2 | 7 | 0 | 9 | 29 | 3 | 4 | 0 |
-| **all** | | **2,218** | **19** | **498** | **59** | **76** | **76** | **866** | **624** | **359** | **62** | **193** |
+| **all** | | **2,220** | **19** | **498** | **59** | **76** | **76** | **868** | **624** | **359** | **62** | **193** |
 
 19 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and eleven HNT rows (WP-15, WP-16, WP-2).
-In plain terms, of the 2,218 active rows: 866 (39 %) are deliberate game or implementation choices; 624 (28 %)
+In plain terms, of the 2,220 active rows: 868 (39 %) are deliberate game or implementation choices; 624 (28 %)
 state something about the physical world with no source at all; 498 (23 %) name a source that nobody is recorded
 as having read; 135 (6 %) were written from memory or from an abstract and say so; 76 (3 %) were tuned to a target;
 19 (1 %) were read in their sources.
