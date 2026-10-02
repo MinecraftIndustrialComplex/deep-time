@@ -94,7 +94,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-02 | science WP-8 | **Folds and faults in blocks or in metres?** (DEF-011, DEF-019, DEF-020; docs/science/folds-faults-intrusions.md "Open questions" 1; pictures: `review/out/wp8/index.html`, three sections each drawn three ways, not committed.) The strata, plutons and terrain are true metres at 20 m a block up and 300 m across (15× vertical stretch); folds and faults alone are drawn undistorted in blocks, so in metres they are 15 times too low: Anderson's 60° and 30° dips are 6.6° and 2.2°, folds 100 m high where Zagros folds of the same 16 km wavelength are 500–1,000 m, a 38 km normal fault throws beds 120 m where a real one throws them about 1 km. Same world (quick 16k, 500 Myr, seed 1) with only this changed: today (stretch 1) bed offsets median 2 blocks (p90 7), grade inversions 0.07 % of columns; stretch 4: offsets 7 (p90 26), folds 21 blocks, normal faults 80–85° and thrusts 56–74° in blocks, inversions 0.33 %; true metres (15): offsets 22 (p90 91), folds 77 blocks, faults near vertical, inversions 0.78 %, granite basement pulled up through thin cover in arcs, and the scarp term (made for small throws) lifts ground up to 5.1 km. Physics says true metres, but only together with fold wavelengths taken from the thickness of the layers being folded (Biot: wavelength 2–16 times the layer, mean 6.5), which is not built. (a, recommended) A `structure.deformation.vertical_scale` setting (1 = today's shapes, 15 = true metres) with default 4 now and the scarp term lowered to match, then a design task for wavelengths from layer thickness, after which the default can move to true metres; (b) true metres now; (c) keep today's shapes as a labelled game choice. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-8 | **Intrusions larger than life** (DEF-048, DEF-049). Dykes are 2–5 blocks wide (600–1,500 m) where real ones are 1–150 m (Ship Rock's 2.3 m, the Mackenzie swarm's mean 30 m), although the comment says a block is the least that can be drawn; plugs are 5–16 blocks (1.5–4.8 km) across where Ship Rock, the type volcanic neck, is 500 m. (a, recommended) the narrowest drawable: `dyke_half_width_blocks` [0.5, 1.0] (1–2 blocks wide) and `plug_radius_blocks` [1, 3] (0.6–1.8 km across); (b) keep, labelled as game choices for visibility (now done in the ledger). | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | plate-motion task 2 | **Turn real shortening on before tasks 3–4?** `tectonics.collision_on_shortening` is off in every preset, so the planets are master's (build log 2026-10-02, "Plate-motion task 2"). On, on master with flexure (2 seeds): continental crust 0.29 → 0.36 of the planet, collisions per 100 Myr 11.3 → 7.4, plate lifetime 41 → 63 Myr, but one plate above half the planet in 45 % of steps against 41 %, and every collision still ends in the one-step surge. (a, recommended) Keep it off until tasks 3 and 4 land together and remove it; (b) turn it on now as a light interim gain on the crust and collision counts. Not asked through AskUserQuestion (sub-agent); for the coordinator to put to Ben. | coordinator |
-| 2026-10-02 | plate-motion task 2 (found) | **Continental crust on master with flexure:** 1000 Myr `earthlike_quick_16k` runs on 1eac09f end with 0.29 of the planet continental (lowest step 0.28, plate-check target ≥ 0.37); on 38ca6b0 the same runs gave 0.42 (0.40). Not isolated between those commits (flexure, impacts, plate-check 1b). Recommended: bisect with 1–2 seeds before the belt calibration of task 3. | coordinator |
+| 2026-10-02 | plate-motion task 2 (found), bisected | **The flexure merge (5ce5af4a) cuts the continental crust to 0.25-0.27 of the planet** (build log 2026-10-02, "Continental crust bisect"). Nothing before it does; `surface.flexure.strength=0` on the same commit gives 0.39-0.40. It is a model consequence, not a bug: the surface stage's flexed heights go back to the plate model, the mature island arcs stand 260 m lower, fewer cross the sea-level test that turns them into continental crust (-10 %), and more continental samples are lost at resampling (+5 %); the two are each about as large as the whole crust, so a 10 % shift moves the share by 0.12. Options: (a) accept it and recalibrate the arc and resampling terms inside the belt calibration (task 3); (b) hand the plate model the height without the flexural part (measured: 0.34 and 0.36, a partial fix, and it makes the plate model blind to what the surface did); (c) decide arc emergence on the plate model's own arc thickness (`arc_oceanic_m`) instead of the momentary height, so the crust budget no longer depends on the surface stage (not tried); (d) first find why resampling loses about 500 continental samples each time (a fifth of the churn, unexplained). Recommended: (c) with (d) looked at first, before the belt calibration, because every task-3 number is read against this crust budget. | coordinator |
 | 2026-10-02 | science WP-13a | **Slab suction share** (PLT-186; docs/design/plate-force-balance.md section 6 note). The design's `slab_suction_share` 0.3 pulls only the overriding plate; Conrad & Lithgow-Bertelloni 2002 and 2004 (abstracts) have suction act on both plates, at 40 % of the forces against pull's 60 % (30 % with a weak asthenosphere), so their suction ÷ pull is 0.43–0.67. (a) Keep 0.3 as the open-loop starting value and calibrate it in task 8, with 0.43–0.67 noted as the sources' range (recommended: task 5 records forces read-only and the term's meaning differs anyway); (b) set 0.5 now, before task 7; (c) change the design so suction acts on both plates, as in the sources. | not asked (overnight; recorded by the WP-13a agent) |
 | 2026-10-02 | force balance task 5 | **Two implementation choices that outlive the task** (docs/design/plate-force-balance.md section 13). (1) The balance has a fixed scale: `plate_speed_scale_mm_yr` sets the basal drag through a reference plate, instead of renormalising each step's answer to an RMS (section 4's method), so a planet that loses its slabs slows down. (2) The reference slab pull is 3 × 10¹³ N/m, about twice WP-13a's 1.4 × 10¹³ (Faccenna et al.), so that a ridge pushes with 0.1 of it as the design says; speeds do not depend on it, stresses and the ridge share do. Recommended and built: keep both; revisit (2) with the suction share at task 8. | not asked (Ben asleep; proceeding with the recommendation) |
 | 2026-10-02 | science WP-13a | **The overall speed scale** (PLT-181). `plate_speed_scale` 45 mm/yr was set to "Earth about 40", which is the median of plate-samples. Earth's area-weighted RMS is about 47 mm/yr today and 50–100 over the last 200 Myr (Forsyth & Uyeda 1975 Table 1; Zahirovic et al. 2015); the plate-check target is now 40–100. (a) Keep 45 for task 5 and calibrate it in task 8 against the new target (recommended); (b) raise it to 60 now. | not asked (overnight; recorded by the WP-13a agent) |
@@ -124,6 +124,64 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-02 — Continental crust bisect: the flexure merge cuts the crust (agent worktree agent-aee75761ddffd745f, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; measurement only, nothing fixed, no code committed)
+- **Question.** `deeptime plate-check` on `earthlike_quick_16k`, supercontinent start, 1000 Myr: continental
+  crust at the end 0.42 on 38ca6b0 (baseline doc, mean of seeds 1-4) and 0.29 on 1eac09f.
+- **Commit.** The flexure merge, 5ce5af4a (1eac09f differs from it in STATUS.md and the decisions file only).
+  Of the seven first-parent merges between, the code of 60fc3418 and 1aa0579a is docs, aa78aadc touches only
+  `plates/check.rs`, `plates/dynamics.rs` (the recording) and the CLI, and e057a041 adds geothermal features
+  after the plates. Built and run on the test VM with `tools/review/plate-check.sh 1000 <seed> supercontinent
+  base:structure.deformation.density=0`, `density=0` on every run because seed 2 as well as seed 1 now panics
+  in the structure stage on e057a041 and 5ce5af4a (history limit, fixed after 1eac09f in 38e0102a; the stage
+  reads the plates and writes nothing they read):
+
+  | Commit | Seed | Crust at the end | Lowest step | Highest step | Land, median |
+  |---|---|---|---|---|---|
+  | 38ca6b0 + recording (baseline doc) | 1 / 2 | 0.44 / 0.42 | 0.39 / 0.40 | 0.45 / 0.49 | 0.30 / 0.29 |
+  | e057a041 (impacts, 1b, geothermal; before flexure) | 1 | 0.39 | 0.39 | 0.47 | 0.31 |
+  | 5ce5af4a = 1eac09f (flexure on) | 1 / 2 | 0.27 / 0.25 | 0.27 / 0.25 | 0.44 / 0.45 | 0.29 / 0.29 |
+  | 5ce5af4a, `surface.flexure.strength=0` | 1 / 2 | 0.39 / 0.40 | 0.39 / 0.40 | 0.47 / 0.49 | 0.31 / 0.33 |
+
+  e057a041 seed 2 was not run (it panicked and the figures above already separate the cause). The flexure-off
+  run of seed 1 equals e057a041's to the digit on every figure above, so the impacts, plate-check and geothermal
+  merges change nothing here. Seed 1 ends at 0.39 against the baseline's 0.44 with or without flexure: the
+  baseline's four seeds span 0.38-0.45, so that is seed noise from the impacts stage, not examined further. The
+  plate-check "land at the end" is not a measure it prints; the median land share is given.
+- **Confirming run.** Switching flexure off on the bad commit returns 0.39 and 0.40 (table above).
+- **Mechanism (seed 1, per-step counters of the visible continental samples, scratch patch on 5ce5af4a not
+  committed; runs are deterministic, two builds gave the same figures).** The plate model's continental crust is
+  a near-cancellation of two churns, each as large as the crust (about 44,000 samples at the start):
+
+  | Over 500 steps | flexure on | flexure off |
+  |---|---|---|
+  | arc samples turned continental (`finish_samples`, `plates/mod.rs`: oceanic, ARC, `arc_oceanic_m` at least `arc_continental_m` = 80 m, and elevation > 0) | 49,350 | 55,110 |
+  | continental samples lost at resampling (`ridges::resample`, 110 / 105 resamplings) | -56,578 | -51,488 |
+  | continental samples hidden under another plate (`subduction::resolve`) | -22,126 | -20,802 |
+  | continental samples welded in collisions (`collision::collide`) | +14,347 | +14,085 |
+  | net / visible continental samples at the end | -15,007 / 27,247 | -3,095 / 39,159 |
+  | mean height of mature oceanic arc samples | -1,788 m | -1,525 m |
+  | continental pieces of 1 % or more, median / largest piece's share | 7 / 0.46 | 3 / 0.67 |
+
+  The channel is the surface feedback: `surface/mod.rs` hands the plate model the whole height of the ground
+  (`feedback = sc.h - pf.elevation`, the flexed height with `flexure.strength` 1), and
+  `PlatesStage::apply_surface_feedback` (`plates/mod.rs`) writes it into the samples. Flexure replaces the local
+  isostasy blur and bends the plate under every load, which puts the arcs about 260 m lower, so about 10 % fewer
+  mature arcs rise above the sea in time to become continental crust, and the resampling loses 5 % more. Flexure
+  also leaves the continental crust in more, smaller pieces. Ablation: flexure on, but the plate model fed
+  `feedback - surface/flexure_m` (the flexural part removed): crust at the end 0.34 (seed 1) and 0.36 (seed 2),
+  lowest step 0.34 and 0.35: about 60-70 % of the loss comes back, the rest is the different heights the
+  surface itself reaches without the old blur.
+- **Bug or model?** No sign, unit or double-count error found: the flexure code only changes heights, and the
+  heights are what the plate model's emergence rule reads. It is a coupling consequence. Not explained: why
+  `ridges::resample` loses about 500 continental samples at every resampling in both runs (it is as large as the
+  arc gain), nor why flexure raises it; a decomposition of that loss was not made.
+- **Limits.** Two seeds, one per mechanism run; single trajectories diverge after about step 100, so the counter
+  table is an example, not a mean. The early merges were not each built (code reading and the e057a041 run
+  stand in).
+- **Housekeeping.** VM scratch (`crust-bisect` runs, the five `bis-*` copies) and the scratch worktrees removed.
+  My worktree was removed while the session was cut off; this entry is on a new branch of the same name.
+- **Next step.** Ben answers the pending question (row "plate-motion task 2 (found), bisected").
+
 ### 2026-10-02 — Force-balance task 5: the forces computed and recorded, not applied; slab length on contacts (agent worktree agent-a48d34ca4617223c6, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What.** New `plates/forces.rs`: each step, right after the fronts are found and only while the dynamics record is on,
   every plate's slab pull (trench length × √age × slab length / `slab_depth_km`), slab suction, edge energy (ridge push and
