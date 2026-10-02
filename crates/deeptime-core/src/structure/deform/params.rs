@@ -7,22 +7,26 @@
 //! "structure": {"deformation": {"strength": 1.0, "density": 1.0, "fold_wavelength_km": [16, 8, 32]}}
 //! ```
 //!
-//! **Heights are drawn `vertical_scale` times taller than in block space** (ledger: DEF-011;
-//! Ben, decisions log 2026-10-02: "Setting, default 4x"). A fold's wavelength and a fault's length
-//! are given in km on the planet's horizontal block scale (300 m a block in the built-in presets),
-//! and amplitudes and slips are first that many *blocks* times the shape's own ratio (amplitude
-//! over wavelength, slip over length): the shape a geologist would draw in a cross-section at 1:1
-//! in blocks. `vertical_scale` X then stretches every structure upwards: a fold's amplitude is
-//! multiplied by X, and a fault of dip d and slip s keeps its heave (the horizontal part,
-//! s cos d) while its throw (the vertical part, s sin d) is multiplied by X, so its dip in blocks
-//! becomes atan(X tan d) and its slip s √(cos² d + X² sin² d). Heights in the world are stretched
-//! 15 times against widths (20 m against 300 m a block), so X = 1 draws every structure 15 times
-//! lower in metres than it is wide, X = 15 draws it in true metres (Anderson's 60° and 30° faults
-//! dip 60° and 30° in metres, fold amplitudes are Zagros-sized), and the default 4 lies between:
-//! in metres a 60° normal fault dips 25° and a 30° thrust 8.8°, fold amplitudes and throws are 4/15
-//! of true. True metres wait for fold wavelengths taken from the thickness of the layers being
-//! folded (Biot; docs/science/folds-faults-intrusions.md, "Open questions"): with every fold 16 km
-//! long whatever lies under it, true heights pull the basement up through thin cover in keels.
+//! **Heights are drawn at `true_height_share` of their true height in metres** (ledger: DEF-011;
+//! Ben, decisions log 2026-10-02: "Setting, default 4x"; made independent of the world's vertical
+//! scale the same day). A fold's wavelength and a fault's length are given in km on the planet's
+//! horizontal block scale (`scale.m_per_block_h`), and amplitudes and slips are first that many
+//! *blocks* times the shape's own ratio (amplitude over wavelength, slip over length): the shape a
+//! geologist would draw in a cross-section at 1:1 in blocks. A world whose blocks are
+//! `m_per_block_h` across and `m_per_block_v` high is stretched E = h / v times upwards, so that
+//! shape is 1/E of its true height in metres. Every structure is then stretched upwards by
+//! X = `true_height_share` × E ([`DeformationParams::block_stretch`]): a fold's amplitude is
+//! multiplied by X, and a fault of dip d and slip s keeps its heave (the horizontal part, s cos d)
+//! while its throw (the vertical part, s sin d) is multiplied by X, so its dip in blocks becomes
+//! atan(X tan d) and its slip s √(cos² d + X² sin² d). A share of 1 draws structures in true metres
+//! (Anderson's 60° and 30° faults dip 60° and 30° in metres, fold amplitudes are Zagros-sized), a
+//! share of 1/E the shape at 1:1 in blocks. The default 4/15 is what Ben approved on the
+//! 300 m × 20 m world (X = 4 there); at any other vertical scale the same share keeps structures at
+//! the same fraction of their true height (X = 2.29 at 35 m a block). In metres a 60° normal fault
+//! then dips 25° and a 30° thrust 8.8°, whatever the block size. True metres wait for fold
+//! wavelengths taken from the thickness of the layers being folded (Biot;
+//! docs/science/folds-faults-intrusions.md, "Open questions"): with every fold 16 km long whatever
+//! lies under it, true heights pull the basement up through thin cover in keels.
 
 use serde::{Deserialize, Serialize};
 
@@ -40,11 +44,12 @@ pub struct DeformationParams {
     /// Multiplies every length (wavelengths, fault lengths, and with them amplitudes and slips):
     /// the size structures are drawn at, like `scale.feature_scale`.
     pub size: f64,
-    /// How many times taller than in block space folds and faults are drawn (module doc): fold
-    /// amplitudes and fault throws times this, fault heaves unchanged. 1 is the shape at 1:1 in
-    /// blocks, 15 true metres at the built-in 300 m by 20 m block. A game choice (Ben, decisions
-    /// log 2026-10-02). ledger: DEF-011
-    pub vertical_scale: f64,
+    /// The share of their true height in metres that folds and faults are drawn at (module doc):
+    /// 1 is true metres; fold amplitudes and fault throws are [`Self::block_stretch`] times their
+    /// shape at 1:1 in blocks, fault heaves unchanged. The default 4/15 draws them 4 times taller
+    /// than at 1:1 on a 300 m by 20 m block and keeps that look at any `scale.m_per_block_v`. A game
+    /// choice (Ben, decisions log 2026-10-02). ledger: DEF-011
+    pub true_height_share: f64,
 
     /// Fold wavelength, km: [median, min, max] of a lognormal with `fold_wavelength_sigma`.
     /// Median 16 km: the folds of the Zagros Folded Belt have "homogeneous fold wavelengths
@@ -100,7 +105,7 @@ pub struct DeformationParams {
     /// Their heave (the horizontal part) is true in metres, so in metres a normal fault's
     /// displacement is 0.017 to 0.029 of its length and a thrust's 0.031 to 0.075, inside the
     /// ranges read; their throw (the vertical part) is a fifteenth of the same slip's in metres
-    /// (see the module doc); `vertical_scale` multiplies the throw. ledger: DEF-015 to DEF-018
+    /// (see the module doc); the stretch (`true_height_share`) multiplies the throw. ledger: DEF-015 to DEF-018
     pub normal_slip_ratio: f64,
     pub thrust_slip_ratio: f64,
     pub strike_slip_ratio: f64,
@@ -109,9 +114,9 @@ pub struct DeformationParams {
     /// 0.577 (Anderson 1905, Trans. Edinb. Geol. Soc. 8:387–402, pp. 389 and 402; the theory of
     /// Anderson 1951, The Dynamics of Faulting, 2nd ed.); active normal faults rupture at 30° to
     /// 65° and reverse faults peak at 30° ± 5° (Collettini & Sibson 2001, Geology 29:927–930,
-    /// abstract). Applied in block space before `vertical_scale` steepens them (module doc): at
-    /// the default 4, normal faults dip 80° to 85° in blocks (21° to 36° in metres) and thrusts
-    /// 55° to 73° in blocks (5.5° to 12.6° in metres). ledger: DEF-019, DEF-020
+    /// abstract). Applied in block space before the stretch steepens them (module doc): at the
+    /// default share, normal faults dip 21° to 36° in metres and thrusts 5.5° to 12.6° at any
+    /// block size (80° to 85° and 55° to 73° in blocks on a 300 m by 20 m block). ledger: DEF-019, DEF-020
     pub normal_dip_deg: [f64; 2],
     pub thrust_dip_deg: [f64; 2],
     /// Faults per km² of full-strength regime per Myr: thrusts where the crust shortens, normal
@@ -144,11 +149,13 @@ pub struct DeformationParams {
 
     /// How much of their relief young structures put on the ground (fault scarps, rift valleys,
     /// fold ridges; `surface::amplify::structure`): 0 leaves the terrain as it was, 1 moves the
-    /// ground of a structure made in the last plate step as far as its rock moved (as drawn,
-    /// `vertical_scale` included). The default 0.25 is 1 / the default `vertical_scale`: the
-    /// ground moves as far as it did before the vertical scale existed (up to about 340 m on a
-    /// 500 Myr quick world), where 1 would put 4 times that on the ground and true metres at 1
-    /// would raise it by up to 5.1 km (science package WP-8). A game choice (decisions log
+    /// ground of a structure made in the last plate step as far as its rock moved (as drawn, the
+    /// stretch included). In metres the ground moves `relief` × `true_height_share` ×
+    /// `m_per_block_h` per block of the 1:1 shape, which does not depend on the vertical scale.
+    /// The default 0.25 puts on the ground exactly what the structures put there before they were
+    /// stretched, on the 300 m by 20 m world (up to about 340 m on a quick world), at any vertical
+    /// scale; 1 would put 4 times that, and true metres at 1 would raise it by up to 5.1 km
+    /// (science package WP-8). A game choice (decisions log
     /// 2026-10-02: "the scarp term lowered"). ledger: DEF-054
     pub relief: f64,
     /// A structure's relief fades to nothing over this long, Myr. Design value: metre-scale
@@ -216,7 +223,7 @@ impl Default for DeformationParams {
             strength: 1.0,                         // ledger: DEF-012
             density: 1.0,                          // ledger: DEF-012
             size: 1.0,                             // ledger: DEF-012
-            vertical_scale: 4.0,                   // ledger: DEF-011
+            true_height_share: 4.0 / 15.0,         // ledger: DEF-011
             fold_wavelength_km: [16.0, 8.0, 32.0], // ledger: DEF-001
             fold_wavelength_sigma: 0.35,           // ledger: DEF-001
             fold_train_waves: [2.0, 5.0],          // ledger: DEF-003
@@ -275,6 +282,14 @@ impl DeformationParams {
         self.strength > 0.0 && self.density > 0.0
     }
 
+    /// How many times taller than their shape at 1:1 in blocks folds and faults are drawn on a
+    /// world of blocks `m_per_block_h` across and `m_per_block_v` high: `true_height_share`
+    /// times the world's vertical exaggeration h / v (4 at the default share on a 300 m by 20 m
+    /// block, 2.29 on a 300 m by 35 m one). ledger: DEF-011
+    pub fn block_stretch(&self, m_per_block_h: f64, m_per_block_v: f64) -> f64 {
+        self.true_height_share * m_per_block_h / m_per_block_v
+    }
+
     /// Range checks, each naming its key.
     pub fn validate(&self) -> Result<(), CoreError> {
         check(
@@ -293,9 +308,9 @@ impl DeformationParams {
             "must be in [0.1, 10]",
         )?;
         check(
-            (1.0..=30.0).contains(&self.vertical_scale),
-            "vertical_scale",
-            "must be in [1, 30]",
+            (0.01..=2.0).contains(&self.true_height_share),
+            "true_height_share",
+            "must be in [0.01, 2]",
         )?;
         for (v, key) in [
             (self.fold_wavelength_km, "fold_wavelength_km"),

@@ -39,6 +39,9 @@ use crate::structure::params::StructureParams;
 pub struct Inputs<'a> {
     pub grid: &'a GridDesc,
     pub m_per_block_h: f64,
+    /// Metres a block is high (`scale.m_per_block_v`): with `m_per_block_h`, how far structures
+    /// are stretched upwards (`DeformationParams::block_stretch`).
+    pub m_per_block_v: f64,
     pub regime: &'a [f32],
     pub crust_type: &'a [f32],
     pub flags: &'a [f32],
@@ -221,13 +224,13 @@ pub(super) fn length_blocks(v: [f64; 3], sigma: f64, km_to_blocks: f64, rng: &mu
     (median * (sigma * rng.normal()).exp()).clamp(lo, hi) * km_to_blocks
 }
 
-/// A dip-slip fault of dip `dip_deg` and slip `slip` along its dip (block space, 1:1) drawn
-/// `vertical_scale` times taller: the heave (`slip · cos dip`) is kept and the throw
-/// (`slip · sin dip`) multiplied, so the dip becomes atan(X tan d) and the slip
+/// A dip-slip fault of dip `dip_deg` and slip `slip` along its dip (block space, 1:1) drawn `x`
+/// times taller (`DeformationParams::block_stretch`): the heave (`slip · cos dip`) is kept and the
+/// throw (`slip · sin dip`) multiplied, so the dip becomes atan(X tan d) and the slip
 /// slip · √(cos² d + X² sin² d). Returns (dip in degrees, slip). ledger: DEF-011
-pub fn stretch(dip_deg: f64, slip: f64, vertical_scale: f64) -> (f64, f64) {
+pub fn stretch(dip_deg: f64, slip: f64, x: f64) -> (f64, f64) {
     let (sin, cos) = dip_deg.to_radians().sin_cos();
-    let (heave, throw) = (cos, sin * vertical_scale);
+    let (heave, throw) = (cos, sin * x);
     (throw.atan2(heave).to_degrees(), slip * heave.hypot(throw))
 }
 
@@ -258,6 +261,7 @@ pub fn emplace(
     let frame = BlockFrame::new(grid.circumference() as u32);
     let r = f64::from(grid.r);
     let km_to_blocks = 1000.0 / x.m_per_block_h * p.size;
+    let stretch_x = p.block_stretch(x.m_per_block_h, x.m_per_block_v); // ledger: DEF-011
 
     // Cumulative strain × area per kind of strain.
     let mut cum = [
@@ -372,7 +376,7 @@ pub fn emplace(
                     f.azimuth_deg = (trend + scatter).rem_euclid(360.0) as f32;
                     f.wavelength = wavelength as f32;
                     // ledger: DEF-007, DEF-011
-                    f.amplitude = (p.vertical_scale * p.strength * wavelength * e.sqrt()
+                    f.amplitude = (stretch_x * p.strength * wavelength * e.sqrt()
                         / std::f64::consts::PI) as f32;
                     f.half_across = (0.5 * lerp(p.fold_train_waves, u[0]) * wavelength) as f32;
                     f.half_along = (0.5 * lerp(p.fold_length_ratio, u[1]) * wavelength) as f32;
@@ -403,7 +407,7 @@ pub fn emplace(
                     let (dip, slip) = stretch(
                         lerp(p.thrust_dip_deg, u[0]),
                         p.strength * p.thrust_slip_ratio * length * grow,
-                        p.vertical_scale,
+                        stretch_x,
                     );
                     f.dip_deg = dip as f32;
                     f.slip = -slip as f32;
@@ -433,7 +437,7 @@ pub fn emplace(
                     let (dip, slip) = stretch(
                         lerp(p.normal_dip_deg, u[0]),
                         p.strength * p.normal_slip_ratio * length,
-                        p.vertical_scale,
+                        stretch_x,
                     );
                     f.dip_deg = dip as f32;
                     f.slip = slip as f32;
@@ -478,6 +482,8 @@ pub(crate) mod tests {
         pub uplift: Vec<f32>,
         pub elevation: Vec<f32>,
         pub orogen_km: Vec<f32>,
+        /// Metres a block is high (300 m across).
+        pub m_per_block_v: f64,
     }
 
     impl Planet {
@@ -498,6 +504,7 @@ pub(crate) mod tests {
                 uplift: vec![0.0; n],
                 elevation: vec![300.0; n],
                 orogen_km: vec![3000.0; n],
+                m_per_block_v: 20.0,
             };
             for c in 0..n {
                 let (i, j) = (c % w, c / w);
@@ -529,6 +536,7 @@ pub(crate) mod tests {
             Inputs {
                 grid: &self.grid,
                 m_per_block_h: 300.0,
+                m_per_block_v: self.m_per_block_v,
                 regime: &self.regime,
                 crust_type: &self.crust,
                 flags: &self.flags,
@@ -637,7 +645,7 @@ pub(crate) mod tests {
                     assert!((177..=182).contains(&i), "normal fault at column {i}");
                     assert!(off_axis(f.azimuth_deg, 0.0) < 50.0, "{}", f.azimuth_deg);
                     // Anderson's 55° to 70°, steepened by the vertical scale.
-                    let x = sp.deformation.vertical_scale;
+                    let x = sp.deformation.block_stretch(300.0, p.m_per_block_v);
                     let (lo, hi) = (stretch(55.0, 1.0, x).0, stretch(70.0, 1.0, x).0);
                     let dip = f64::from(f.dip_deg);
                     assert!(
@@ -672,7 +680,7 @@ pub(crate) mod tests {
         assert!(right > 10 && wrong == 0, "{right} right, {wrong} wrong");
         // Folds are tighter in the thickened core than in the foreland (amplitude over
         // wavelength before the vertical scale).
-        let x = sp.deformation.vertical_scale as f32;
+        let x = sp.deformation.block_stretch(300.0, p.m_per_block_v) as f32;
         let ratio = |f: &Feature| f.amplitude / f.wavelength / x;
         let mean = |v: Vec<f32>| v.iter().sum::<f32>() / v.len().max(1) as f32;
         let core = mean(
@@ -758,15 +766,17 @@ pub(crate) mod tests {
         assert_eq!(p.run(&sp, 25, 3).0, base);
     }
 
-    /// `vertical_scale` stretches structures upwards and nothing else: the same structures (the
+    /// The stretch (`true_height_share`, here as X times the 1:1 shape on a 300 m by 20 m block)
+    /// raises structures and nothing else: the same structures (the
     /// same draws), fold amplitudes and fault throws times the scale, fault heaves unchanged,
     /// dips steepened to atan(X tan d), and the baked slip vector's vertical part times the
     /// scale with its horizontal part unchanged (what every reader of the column rule sees).
     #[test]
-    fn vertical_scale_stretches_heights_only() {
+    fn the_stretch_raises_heights_only() {
         let p = Planet::new();
         let mut one = StructureParams::default();
-        one.deformation.vertical_scale = 1.0;
+        // A share of 20 / 300 of true metres is the shape at 1:1 on a 300 m by 20 m block.
+        one.deformation.true_height_share = 20.0 / 300.0;
         let (base, _) = p.run(&one, 25, 3);
         assert!(base.iter().any(|f| f.kind == Kind::Normal));
         assert!(base.iter().any(|f| f.kind == Kind::Thrust));
@@ -782,7 +792,7 @@ pub(crate) mod tests {
         }
         for x in [4.0, 15.0] {
             let mut tall = one.clone();
-            tall.deformation.vertical_scale = x;
+            tall.deformation.true_height_share = x * 20.0 / 300.0;
             let (stretched, _) = p.run(&tall, 25, 3);
             assert_eq!(base.len(), stretched.len());
             for (a, b) in base.iter().zip(&stretched) {
@@ -834,6 +844,45 @@ pub(crate) mod tests {
                 }
             }
         }
+    }
+
+    /// The share of true metres holds at any vertical scale: on blocks 35 m high instead of 20 m
+    /// the same structures are drawn 20/35 as many blocks tall, so as many metres tall, with the
+    /// same heaves (the world at 35 m a block, decisions log 2026-10-02).
+    #[test]
+    fn the_true_height_share_holds_at_any_block_height() {
+        let sp = StructureParams::default();
+        assert_eq!(sp.deformation.block_stretch(300.0, 20.0), 4.0);
+        let mut p35 = Planet::new();
+        p35.m_per_block_v = 35.0;
+        let (a, _) = Planet::new().run(&sp, 25, 3);
+        let (b, _) = p35.run(&sp, 25, 3);
+        assert_eq!(a.len(), b.len());
+        let close = |u: f64, v: f64| (u - v).abs() <= 1e-4 * v.abs().max(1.0);
+        let (mut folds, mut faults) = (0, 0);
+        for (a, b) in a.iter().zip(&b) {
+            assert_eq!((a.x, a.z, a.kind, a.wavelength), (b.x, b.z, b.kind, b.wavelength));
+            match a.kind {
+                Kind::FoldTrain => {
+                    folds += 1;
+                    let (m20, m35) = (20.0 * f64::from(a.amplitude), 35.0 * f64::from(b.amplitude));
+                    assert!(close(m35, m20), "fold {m35} m vs {m20} m");
+                }
+                Kind::Thrust | Kind::Normal => {
+                    faults += 1;
+                    // (heave, throw) in metres.
+                    let metres = |f: &Feature, v: f64| {
+                        let (s, c) = f64::from(f.dip_deg).to_radians().sin_cos();
+                        (300.0 * f64::from(f.slip) * c, v * f64::from(f.slip) * s)
+                    };
+                    let ((h20, t20), (h35, t35)) = (metres(a, 20.0), metres(b, 35.0));
+                    assert!(close(h35, h20), "heave {h35} m vs {h20} m");
+                    assert!(close(t35, t20), "throw {t35} m vs {t20} m");
+                }
+                _ => {}
+            }
+        }
+        assert!(folds > 0 && faults > 0);
     }
 
     #[test]

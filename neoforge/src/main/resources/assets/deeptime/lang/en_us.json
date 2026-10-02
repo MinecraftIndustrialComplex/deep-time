@@ -156,7 +156,7 @@
   "deeptime.editor.field.strata_tongues": "Rock tongue size",
   "deeptime.editor.field.strata_minor_rock": "Minor rock cutoff",
   "deeptime.editor.field.deform_size": "Fold and fault size",
-  "deeptime.editor.field.deform_vertical_scale": "Fold and fault vertical scale",
+  "deeptime.editor.field.deform_true_height": "Fold and fault height",
   "deeptime.editor.field.fold_wavelength": "Fold wavelength",
   "deeptime.editor.field.fold_tightness": "Tightest folding",
   "deeptime.editor.field.fold_rate": "Fold frequency",
