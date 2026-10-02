@@ -389,9 +389,9 @@ enum Command {
         /// Blocks under the top solid block the access probe counts ore in.
         #[arg(long, default_value_t = 48)]
         access_depth: i32,
-        /// Ore-equivalent (a raw block counts 9) a chunk needs within that depth to be usable.
-        #[arg(long, default_value_t = 8.0)]
-        access_min: f64,
+        /// Ore-equivalent (a raw block counts 9) the access probe gathers.
+        #[arg(long, default_value_t = 24.0)]
+        access_need: f64,
         /// How far the access probe looks, in chunks.
         #[arg(long, default_value_t = 96)]
         access_radius: i64,
@@ -952,14 +952,14 @@ fn main() -> ExitCode {
             scatter_mult,
             access_points,
             access_depth,
-            access_min,
+            access_need,
             access_radius,
         }) => {
             let o = deposit_audit::Options {
                 scatter_mult,
                 access_points,
                 access_depth,
-                access_min,
+                access_need,
                 access_radius,
                 world_data,
                 scatter_dir,

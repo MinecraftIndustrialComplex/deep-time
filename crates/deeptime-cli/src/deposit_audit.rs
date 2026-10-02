@@ -25,10 +25,10 @@
 //! **Scatter multiplier**: the rules' clusters per chunk × the world's `notes.deposits.scatter_mult`
 //! (`BackgroundScatterFeature.scatterMult`; 1 when absent), or `--scatter-mult`.
 //!
-//! **Early-game access** (`--access-points`): from random land points, the distance (blocks) to the
-//! nearest chunk holding at least `--access-min` ore-equivalent of a material, deposit or scatter,
-//! within `--access-depth` blocks under the top solid block: how far a player is from usable iron,
-//! copper and coal (the model of the magma work's lava-distance probe).
+//! **Early-game access** (`--access-points`): from random land points, how far (blocks) a player
+//! must range to gather `--access-need` ore-equivalent of a material, deposit or scatter, from the
+//! top `--access-depth` blocks under the ground: how far a player is from usable iron, copper and
+//! coal (the model of the magma work's lava-distance probe).
 //!
 //! The output is a table per deposit type (sites, body volume, ore blocks per site, ore per chunk
 //! in the body, what the same material's scatter gives per chunk, vanilla's figure) and, with
@@ -104,8 +104,8 @@ pub struct Options {
     pub access_points: usize,
     /// Blocks under the top solid block the probe counts ore in.
     pub access_depth: i32,
-    /// Ore-equivalent a chunk needs within that depth to count as usable.
-    pub access_min: f64,
+    /// Ore-equivalent the probe gathers.
+    pub access_need: f64,
     /// The probe looks no farther than this many chunks.
     pub access_radius: i64,
 }
@@ -843,11 +843,14 @@ pub fn world_scatter_mult(notes: &BTreeMap<String, Value>) -> f64 {
         .unwrap_or(1.0)
 }
 
-/// The early-game access probe: from `o.access_points` random land points (between the caps), the
-/// distance in blocks to the centre of the nearest chunk with at least `o.access_min`
-/// ore-equivalent of each of [`ACCESS_MATERIALS`] within `o.access_depth` blocks of the top solid
-/// block, deposits (`shallow`) and scatter together; and the same for scatter alone. Rings of
-/// chunks outwards to `o.access_radius`; a point with none in reach counts as beyond it.
+/// The early-game access probe: from `o.access_points` random land points (between the caps), how
+/// far a player must range to gather `o.access_need` ore-equivalent (a raw block counts nine) of
+/// each of [`ACCESS_MATERIALS`] from the top `o.access_depth` blocks under the ground: square rings
+/// of chunks around the point's chunk are added until their ore, deposits (`shallow`) and scatter
+/// together, reaches the need; the distance is the last ring's half-width in blocks (ring r:
+/// 16·r + 8). The same for scatter alone. A point that does not reach the need within
+/// `o.access_radius` chunks counts as beyond it. It assumes every such block is found, so it
+/// compares worlds; it is not a time to find ore.
 fn access_probe(
     o: &Options,
     m: &mut Model<'_>,
@@ -879,11 +882,10 @@ fn access_probe(
         let mut scatter_only = Vec::new();
         for &(x, z) in &points {
             let (pcx, pcz) = (x.div_euclid(16), z.div_euclid(16));
-            let mut best: [Option<f64>; 2] = [None, None];
+            let mut got = [0.0f64; 2];
+            let mut reach: [Option<f64>; 2] = [None, None];
             for r in 0..=o.access_radius {
-                // Every chunk of this ring is at least (r − 1) chunks away.
-                let near = ((r - 1).max(0) * 16) as f64;
-                if best.iter().all(|b| b.is_some_and(|d| d <= near)) {
+                if reach.iter().all(Option::is_some) {
                     break;
                 }
                 for dz in -r..=r {
@@ -911,19 +913,18 @@ fn access_probe(
                             .and_then(|b| b.get(mat))
                             .copied()
                             .unwrap_or(0.0);
-                        let ddx = ((pcx + dx) * 16 + 8 - x) as f64;
-                        let ddz = ((pcz + dz) * 16 + 8 - z) as f64;
-                        let d = ddx.hypot(ddz);
-                        for (k, have) in [(0, sc + dep), (1, sc)] {
-                            if have >= o.access_min && best[k].is_none_or(|b| d < b) {
-                                best[k] = Some(d);
-                            }
-                        }
+                        got[0] += sc + dep;
+                        got[1] += sc;
+                    }
+                }
+                for k in 0..2 {
+                    if reach[k].is_none() && got[k] >= o.access_need {
+                        reach[k] = Some((r * 16 + 8) as f64);
                     }
                 }
             }
-            both.push(best[0]);
-            scatter_only.push(best[1]);
+            both.push(reach[0]);
+            scatter_only.push(reach[1]);
         }
         let stats = |v: &[Option<f64>]| {
             let mut found: Vec<f64> = v.iter().flatten().copied().collect();
@@ -943,9 +944,9 @@ fn access_probe(
     }
     m.forget();
     json!({
-        "points": points.len(), "depth_blocks": o.access_depth, "min_ore_equivalent": o.access_min,
+        "points": points.len(), "depth_blocks": o.access_depth, "need_ore_equivalent": o.access_need,
         "radius_blocks": o.access_radius * 16, "by_material": out,
-        "note": "blocks from a random land point to the centre of the nearest chunk with that much ore-equivalent (a raw block counts 9) within the depth under the top solid block",
+        "note": "half-width in blocks of the square of chunks around a random land point that holds the need in ore-equivalent (a raw block counts 9) within the depth under the top solid block",
     })
 }
 
@@ -1039,8 +1040,8 @@ pub fn table(report: &Value) -> String {
     if !report["access"].is_null() {
         let a = &report["access"];
         out.push_str(&format!(
-            "\nEarly-game access ({} land points): blocks to the nearest chunk with ≥ {} ore-equivalent within {} blocks under the ground (radius {}).\n\n| material | p10 | p50 | p90 | beyond | scatter only p50 | p90 | beyond |\n|---|---|---|---|---|---|---|---|\n",
-            a["points"], a["min_ore_equivalent"], a["depth_blocks"], a["radius_blocks"]
+            "\nEarly-game access ({} land points): blocks a player ranges (half-width of the square of chunks) to gather {} ore-equivalent from the top {} blocks under the ground (radius {}).\n\n| material | p10 | p50 | p90 | beyond | scatter only p50 | p90 | beyond |\n|---|---|---|---|---|---|---|---|\n",
+            a["points"], a["need_ore_equivalent"], a["depth_blocks"], a["radius_blocks"]
         ));
         for (k, v) in a["by_material"].as_object().into_iter().flatten() {
             let (b, s) = (&v["deposits_and_scatter"], &v["scatter_only"]);

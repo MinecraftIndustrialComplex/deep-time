@@ -2048,6 +2048,10 @@ impl DepositStage {
             "scatter_mult": self.params.scatter_mult,
             "inherited_bif_share": self.params.inherited_bif_share,
             "bif_basin_km2": self.params.bif_basin_km2,
+            // What the surface stage dealt (`bif_basins`): basins, and their share of the stable
+            // continental interiors at the first step.
+            "bif_basins": world.globals.get(crate::surface::BIF_BASINS_GLOBAL),
+            "bif_basin_share": world.globals.get(crate::surface::BIF_BASIN_SHARE_GLOBAL),
             "province": self.params.province.name(),
             "province_km": self.params.province_km,
             "provinces": provinces.count,
