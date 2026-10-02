@@ -615,15 +615,15 @@ pub struct Coherence {
     pub speck_share: f64,
 }
 
-/// [`Coherence`] of a `provinces` layer on a W × H grid (rows from the north pole).
-pub fn coherence(classes: &[f32], w: usize, h: usize) -> Coherence {
+/// [`Coherence`] of a `provinces` layer on a W × H grid (rows from the north pole) whose rows
+/// weigh `row_weight` each by true area (`GridDesc::row_weights`).
+pub fn coherence(classes: &[f32], w: usize, h: usize, row_weight: &[f64]) -> Coherence {
     let continental = |v: f32| v.is_finite() && (v as u8) <= EXTENDED;
     let mut c = Coherence::default();
     let mut area = 0.0;
     let (mut pairs, mut differ) = (0usize, 0usize);
     for j in 0..h {
-        let lat = std::f64::consts::PI * (0.5 - (j as f64 + 0.5) / h as f64);
-        let wgt = lat.cos();
+        let wgt = row_weight[j];
         for i in 0..w {
             let v = classes[j * w + i];
             if !continental(v) {
@@ -695,7 +695,7 @@ pub fn coherence_line_with(world: &WorldState, r: &Rules) -> Option<String> {
     if w * h != f.data.len() {
         return None;
     }
-    let c = coherence(&f.data, w, h);
+    let c = coherence(&f.data, w, h, &f.grid.row_weights());
     let why = orogen_reasons_with(world, r).unwrap_or_default();
     let of = |k: usize| why[k] as f64 / why[3].max(1) as f64;
     Some(format!(
@@ -1114,7 +1114,7 @@ mod tests {
             f32::from(SHIELD),
             "a landmass at the feature size stays"
         );
-        let co = coherence(&d, w, h);
+        let co = coherence(&d, w, h, &vec![1.0; h]);
         assert_eq!(co.continental_cells, 12);
         assert!((co.shares[SHIELD as usize] - 1.0).abs() < 1e-12);
         assert_eq!(co.edge_density, 0.0);
