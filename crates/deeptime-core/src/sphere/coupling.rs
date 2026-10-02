@@ -32,7 +32,9 @@ use super::{SampleTree, SphereMesh};
 
 /// The unit vector at latitude `lat_deg` and longitude `lon_deg` (degrees).
 pub fn unit_from_lat_lon_deg(lat_deg: f64, lon_deg: f64) -> DVec3 {
-    DVec3::from_array(deeptime_format::projection::unit_of_lat_lon(lat_deg, lon_deg))
+    DVec3::from_array(deeptime_format::projection::unit_of_lat_lon(
+        lat_deg, lon_deg,
+    ))
 }
 
 /// Latitude in [−90°, 90°] and longitude in [0°, 360°) of the direction `v` (any length > 0).
