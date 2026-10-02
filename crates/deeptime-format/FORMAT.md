@@ -520,8 +520,8 @@ schist on shale; Phase 1 has no thrusts that could put it there):
 | 61440–65535 | the mantle |
 
 Bands are the formation temperatures of the regional metamorphic classes: 1 from 250 °C (slate),
-2 from 300 (quartzite, marble, greenstone), 3 from 350 (phyllite), 4 from 450 (schist), 5 from
-500 (amphibolite), 6 from 650 (gneiss). A unit's band is that of the hottest formation
+2 from 300 (quartzite, marble, greenstone), 3 from 350 (phyllite), 4 from 500 (amphibolite), 5 from
+525 (schist, the garnet zone), 6 from 650 (gneiss). A unit's band is that of the hottest formation
 temperature at or above it in its own column (so a column's bands never decrease downwards);
 plutonic pool units (granite, granodiorite, gabbro) are always in band 6, with the gneiss: the
 crystalline basement. In a band's strata log a layer spans the ages from the base of the layer
