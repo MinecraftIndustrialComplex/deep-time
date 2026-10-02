@@ -72,9 +72,19 @@ public final class BiomeCensus {
     /**
      * A Köppen family and biomes it must not land on (the share of its columns that do is bounded);
      * {@code glaciated} limits the family to its columns under the ice cover ({@code true}), or to
-     * those without ({@code false}); null is either.
+     * those without ({@code false}); null is either. {@code colderThan} limits the family to the columns
+     * whose baked temperature parameter is below it (null: any), for a class that is only wrong in part of
+     * its range (a cold desert, not a hot one).
      */
-    public record Forbid(String name, String classes, IntPredicate koppen, Boolean glaciated, java.util.Set<String> biomes) {}
+    public record Forbid(String name, String classes, IntPredicate koppen, Boolean glaciated, Double colderThan,
+                         java.util.Set<String> biomes) {
+        public Forbid(String name, String classes, IntPredicate koppen, Boolean glaciated, java.util.Set<String> biomes) {
+            this(name, classes, koppen, glaciated, null, biomes);
+        }
+    }
+
+    /** Vanilla's cold | temperate temperature edge (the band coordinate 2): colder is the cold band or frozen. */
+    static final double COLD_BAND_TOP = -0.15;
 
     /**
      * EF is ice cap where the glacier model puts ice and barren frozen ground elsewhere (Ben, 2026-09-29,
@@ -87,7 +97,14 @@ public final class BiomeCensus {
             // Packed-ice canyons only where the ice model says ice (Ben, 2026-09-30, "Fix both").
             new Forbid("EF:no_chasm_on_barren", "EF without ice", k -> k == 30, false, java.util.Set.of("terralith:glacial_chasm")),
             // Cherry groves are positive-weirdness variants: ice caps are steered off them.
-            new Forbid("EF:no_cherry", "EF", k -> k == 30, null, java.util.Set.of("terralith:snowy_cherry_grove", "minecraft:cherry_grove")));
+            new Forbid("EF:no_cherry", "EF", k -> k == 30, null, java.util.Set.of("terralith:snowy_cherry_grove", "minecraft:cherry_grove")),
+            // Cold deserts (Ben, 2026-10-02): a BWk with a mean under 10 degC is in the frozen or cold band
+            // (the placement's cold_desert and polar_ice ramps) and is not drawn as sand desert or badlands.
+            new Forbid("BWk:cold_not_sand", "BWk colder than the cold band's top", k -> k == 5, null, COLD_BAND_TOP,
+                    java.util.Set.of("minecraft:desert", "minecraft:badlands", "minecraft:eroded_badlands", "minecraft:wooded_badlands",
+                            "terralith:ancient_sands", "terralith:desert_canyon", "terralith:desert_spires", "terralith:lush_desert",
+                            "terralith:red_oasis", "terralith:desert_oasis", "terralith:white_mesa", "terralith:warped_mesa",
+                            "terralith:savanna_badlands", "terralith:hot_shrubland")));
 
     public static final String[] KOPPEN = {"Af", "Am", "Aw", "As", "BWh", "BWk", "BSh", "BSk", "Csa", "Csb", "Csc", "Cwa", "Cwb",
             "Cwc", "Cfa", "Cfb", "Cfc", "Dsa", "Dsb", "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb", "Dfc", "Dfd", "ET", "EF",
@@ -203,6 +220,8 @@ public final class BiomeCensus {
                         if (!f.koppen().test(k))
                             continue;
                         if (f.glaciated() != null && f.glaciated() != (iceLayer != null && iceLayer.nearest(x, z) > 0))
+                            continue;
+                        if (f.colderThan() != null && !(t.raster("climate/temperature", x, z) < f.colderThan()))
                             continue;
                         int[] n = forbidden.get(f.name());
                         n[1]++;
