@@ -15,13 +15,15 @@ Climate decides temperature, rain, ice and sea level through the planet's histor
 | [CLM](ledger/CLM.md) | land ice and sea ice | CLM-092 to CLM-112, CLM-135 (22) |
 | [CLM](ledger/CLM.md) | mountain glaciers | CLM-113 to CLM-118 (6) |
 | [CLM](ledger/CLM.md) | moisture (design only) | CLM-139 to CLM-146 (8) |
+| [CLM](ledger/CLM.md) | ice branch: the flowing-sheet switch, present-day climate, supply-limited and seafloor weathering (merged 2026-10-02) | CLM-147 to CLM-162 (16) |
+| [GLA](ledger/GLA.md) | the flowing ice sheet (`climate/sheet.rs`, off by default) and the ice mass balance for the hydrology; on the glacial page | GLA-067 to GLA-076 (10) |
 | [MOI](ledger/MOI.md) | wind and rain belts | MOI-001 to MOI-033 (33) |
 | [MOI](ledger/MOI.md) | orographic rain | MOI-034 to MOI-050 (17) |
 | [MOI](ledger/MOI.md) | lapse rate | MOI-051 to MOI-053 (3) |
 | [MOI](ledger/MOI.md) | seasons | MOI-054 to MOI-060 (7) |
 | [MOI](ledger/MOI.md) | climate snapshot | MOI-061 to MOI-076 (16) |
 
-Rows by status: `cited-unverified` 63, `from-memory` 5, `calibrated` 13, `game-choice` 33, `uncited` 108; `pending-rewrite` 194; `not-yet-coded` 28.
+Rows by status (CLM and MOI): `cited-unverified` 72, `from-memory` 5, `calibrated` 14, `game-choice` 36, `uncited` 111; `pending-rewrite` 209; `not-yet-coded` 28.
 
 ## Material for the stage 2 writer
 
@@ -34,6 +36,6 @@ Rows by status: `cited-unverified` 63, `from-memory` 5, `calibrated` 13, `game-c
 
 - Land ice thickness uses a hard-coded gravity of 9.81 m/s2, so it ignores the planet's gravity setting (extraction notes CLM, flag 1).
 - Earth-like runs end near 210 to 220 ppm CO2, not the 280 ppm the carbon cycle is balanced for (flag 7).
-- Ice sheets overgrow on the banded climate; whether they are on by default is held open (decisions log 2026-10-01, "Keep holding").
+- Ice sheets overgrow on the banded climate (47 to 52 % of the land under ice on three 500-Myr Earth-like planets, build log 2026-10-01 "Climate ice branch"), so the flowing sheets (`climate.ice_dynamics`, CLM-147, GLA-067 to GLA-076) are off by default and in every built-in preset (decisions log 2026-10-02, "Merge with ice sheets off"); they are turned on once the per-cell climate (P1-26) fixes the cold bias. See "The ice branch, merged 2026-10-02" below.
 - Stage 1 spot checks: the CO2 forcing fit (Byrne & Goldblatt 2014) is stated valid for 200 to 10,000 ppm and is used up to 1,000,000 ppm; a snowball state ends at 0.55 bar of CO2 where Hoffman and others 2017 give 0.01 to 0.1 bar; the code's Earth mean temperature of 15.6 degC is above any long-term mean (Berkeley Earth: 14.1 degC for 1951 to 1980).
 - The energy-balance constants are a mix: A, B and D attributed to North, Cahalan & Coakley 1981 (not readable: a scan), albedos from two different climlab classes that climlab does not combine.

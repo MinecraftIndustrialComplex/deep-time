@@ -381,16 +381,16 @@ impl Default for ClimateParams {
             weathering_temp_per_k: 0.09,
             runoff_temp_per_k: 0.038,
             weathering_co2_exponent: 0.3,
-            weathering_supply: true,
-            weathering_rock_mol_kg: 1.26,
-            weathering_min_denudation_m_myr: 2.0,
-            weathering_supply_scale: 2.0,
-            seafloor_weathering_share: 0.2,
+            weathering_supply: true, // ledger: CLM-152
+            weathering_rock_mol_kg: 1.26, // ledger: CLM-153
+            weathering_min_denudation_m_myr: 2.0, // ledger: CLM-155
+            weathering_supply_scale: 2.0, // ledger: CLM-156
+            seafloor_weathering_share: 0.2, // ledger: CLM-158
             solar_brightening: true,
             present_age_gyr: 4.57,
             hydro_sensitivity_per_k: 0.02,
             hydro_ref_c: 15.0,
-            carbon_step_kyr: 200.0,
+            carbon_step_kyr: 200.0, // ledger: CLM-082
             ebm_clock_years: 10,
             snowball_on_frac: 0.95,
             snowball_off_frac: 0.5,
@@ -402,19 +402,19 @@ impl Default for ClimateParams {
             ice_max_thickness_m: 3000.0,
             ice_response_kyr: 17.0,
             ice_dynamics: false, // ledger: CLM-147
-            present_climate: PresentClimate::Temperate,
-            present_adjust_kyr: 100.0,
-            present_ramp_kyr: 10.0,
-            present_interglacial_ice_frac: 0.15,
-            present_glacial_ice_frac: 0.25,
-            ice_flow_a: 1.0e-16,
-            ice_accumulation_gradient: 0.005,
-            ice_ablation_gradient: 0.01,
-            ice_accumulation_max_m_yr: 0.5,
-            ice_isostasy_kyr: 3.0,
-            ice_calving_m_yr: 20.0,
-            ice_grid_cells: 256,
-            ice_relax_kyr: 30.0,
+            present_climate: PresentClimate::Temperate, // ledger: CLM-148
+            present_adjust_kyr: 100.0, // ledger: CLM-149
+            present_ramp_kyr: 10.0, // ledger: CLM-149
+            present_interglacial_ice_frac: 0.15, // ledger: CLM-150
+            present_glacial_ice_frac: 0.25, // ledger: CLM-150
+            ice_flow_a: 1.0e-16, // ledger: GLA-068
+            ice_accumulation_gradient: 0.005, // ledger: GLA-069
+            ice_ablation_gradient: 0.01, // ledger: GLA-069
+            ice_accumulation_max_m_yr: 0.5, // ledger: GLA-070
+            ice_isostasy_kyr: 3.0, // ledger: GLA-071
+            ice_calving_m_yr: 20.0, // ledger: GLA-072
+            ice_grid_cells: 256, // ledger: GLA-073
+            ice_relax_kyr: 30.0, // ledger: GLA-074
             glacio_eustasy: 1.0,
             ice_reference_km3: 1.0e7,
         }

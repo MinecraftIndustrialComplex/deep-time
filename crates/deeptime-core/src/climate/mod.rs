@@ -176,7 +176,7 @@ pub const HOTHOUSE: &str = "deeptime:hothouse";
 pub const ICE_MIN_M: f32 = 1.0;
 /// How far an interglacial's warm summers lift the equilibrium line above its mean, m (about
 /// 2 °C of summer warmth; Earth's early Holocene), in the deep-time sheet's relaxation.
-pub const INTERGLACIAL_RISE_M: f32 = 300.0;
+pub const INTERGLACIAL_RISE_M: f32 = 300.0; // ledger: GLA-074
 
 /// What the stage keeps between steps (and in a checkpoint taken inside the group).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -1036,6 +1036,7 @@ impl ClimateStage {
                     let mut lo = 0.0;
                     let mut best: Option<Trial> = None;
                     for m in [0.35, 0.7, 1.4, 2.8, 5.6, 9.2] {
+                        // ledger: CLM-151
                         let t = trial(dir * m);
                         trials += 1;
                         if reach(&t) {
