@@ -408,7 +408,10 @@ glaciated ground regardless of biome. The contract between the climate and that 
 
 ## Grids
 
-Equirectangular in block space (plan §5.2). A grid has `w` × `h` cells with `w = C / r`,
+Equirectangular in block space (plan §5.2). The projection's formulas (block ↔ latitude and
+longitude, the grids' extent, map pictures) are in one place per side: Rust
+`deeptime_format::projection`, Java `worlddata/Projection` (and the pages' `projection.js`);
+`docs/design/equal-area-projection.md` is the plan for changing it. A grid has `w` × `h` cells with `w = C / r`,
 `h = w / 2`, `r` blocks per cell, origin `(−C/2, −C/4)`.
 
 - Cell `(i, j)` is the **point sample** at block `x = origin_block_x + i·r`,
