@@ -44,27 +44,23 @@
 //! | the contact closes: no overlap for `contact_timeout_steps`, or a plate died (`closed`) | `subduction::close_contacts` | a `PartingRec` |
 //! | the run ends (`open`) | `subduction::close_contacts` | a `PartingRec` |
 //!
-//! # What fires the transfer or weld (interim, until tasks 3 and 4)
-//! [`advance`] hands a contact to `collision::collide` once its count has reached
-//! `tectonics.collision_threshold_km`. Which count is `tectonics.collision_on_shortening`:
+//! # What ends it in a transfer or weld (tasks 3 and 4)
+//! While the state lives, `belts.rs` stacks each step's shortened crust into a belt and a wedge,
+//! and the belt resists the convergence inside the speed law (`belts::resist`). [`advance`] hands
+//! a contact to `collision::collide` when
 //!
-//! - **off (every built-in preset today):** the count used before task 2
-//!   (`Contact::speed_count_km`): relative speed at the overlap's centroid × time, over the steps
-//!   with at least [`MIN_CONTACT`] continental samples of the subducting plate under the
-//!   overriding one; those samples seed the terrane. The worlds are then the ones the model made
-//!   before task 2, and the collision state only measures.
-//! - **on:** the collision's real shortening. The terrane's seeds are the continental samples
-//!   under the overriding plate and those standing at the front ([`Front::crust`]); at least
-//!   [`MIN_CONTACT`] are needed.
+//! - its convergence across the front has stayed below `tectonics.weld_speed_mm_yr` for
+//!   `tectonics.weld_after_myr` (the collision has **stalled**): a continent of
+//!   `collision_suture_frac` or more welds its plate to the other one, the larger plate keeping
+//!   its id; a smaller terrane moves alone;
+//! - or its shortening has reached `tectonics.collision_threshold_km`: a terrane smaller than
+//!   `collision_suture_frac` moves to the overriding plate (Cortial's transfer, on real
+//!   shortening); a continent does not (it goes on converging until it stalls).
 //!
-//! Why off: with it off the planets are master's. With it on (measured on `earthlike_quick_16k`,
-//! docs/design/plate-check-baseline.md, task 2) the measures move both ways and differ between
-//! master before and after flexure: before flexure one plate stood above half the planet in 32 %
-//! of steps instead of 59 % but kept less continental crust (0.38 against 0.42); with flexure
-//! the mega-plate share rose (45 % against 41 %, two seeds) and the crust grew (0.36 against
-//! 0.29). The collisions still end in the one-step surge. Task 3 (the belt) and task 4
-//! (resistance, welding on stalled convergence) are what make it physical; task 4 removes the old
-//! count and the setting, and keeps the threshold on real shortening for terrane transfers.
+//! The terrane's seeds are the continental samples of the subducting plate under the overriding
+//! plate and those standing at the front ([`Front::crust`]); at least [`MIN_CONTACT`] are needed.
+//! The count used before task 2 (relative speed × time from the first overlap) and the switch
+//! between the two counts (`collision_on_shortening`) were removed with tasks 3 and 4.
 
 use std::collections::BTreeMap;
 
@@ -76,7 +72,7 @@ use super::dynamics;
 use super::geometry::{Geo, Tree};
 use super::kinematics::{quat, tangent};
 use super::state::{CONTINENTAL, Collision, PlateState};
-use super::subduction::{CONFIRM_MM_YR, MIN_CONTACT, locked};
+use super::subduction::{CONFIRM_MM_YR, MIN_CONTACT, locked_against};
 
 /// A collision begins only where its front converges at least this fast, mm/yr: the rate a
 /// contact needs to become a subduction zone (`subduction::CONFIRM_MM_YR`). Slower contact is a
@@ -154,6 +150,8 @@ pub struct Front {
     pub position_sum: DVec3,
     /// The subducting plate's continental samples standing at the front, sorted, each once.
     pub crust: Vec<u32>,
+    /// The overriding plate's edge samples on the front, in sample order (the belt's sources).
+    pub edge: Vec<u32>,
 }
 
 impl Front {
@@ -222,6 +220,12 @@ pub fn fronts(
     if pair.is_empty() {
         return BTreeMap::new();
     }
+    // A collision's own belt and wedge are stamped each step; they stay its front.
+    let own: Vec<Option<f64>> = state
+        .contacts
+        .iter()
+        .map(|c| c.collision.as_ref().map(|col| col.onset_myr))
+        .collect();
     let reach = ADJACENT_SPACINGS * norm.spacing_rad();
     // Squared chord of the reach (the tree's distances are squared chords).
     let reach2 = (2.0 * (0.5 * reach).sin()).powi(2);
@@ -246,7 +250,7 @@ pub fn fronts(
             let pu = plate_of[j as usize];
             let &contact = pair.get(&(pu, pv))?;
             let sj = &samples[j as usize];
-            if sj.kind != CONTINENTAL || locked(sj, env.t_myr, env) {
+            if sj.kind != CONTINENTAL || locked_against(sj, env.t_myr, env, own[contact]) {
                 return None;
             }
             let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
@@ -283,6 +287,7 @@ pub fn fronts(
             e.edge_km += p.edge_km;
             e.position_sum += pos[v];
             e.crust.push(p.crust);
+            e.edge.push(v as u32);
         }
     }
     for f in fronts.values_mut() {
@@ -306,12 +311,14 @@ pub enum Change {
     Parted,
 }
 
-/// The step a collision is advanced by: its number, the time at its end and its length.
+/// The step a collision is advanced by: its number, the time at its end and its length, and the
+/// convergence below which the collision counts as stalled (`weld_speed_mm_yr`).
 #[derive(Clone, Copy, Debug)]
 pub struct StepClock {
     pub step: u64,
     pub t_myr: f64,
     pub dt_myr: f64,
+    pub stall_mm_yr: f64,
 }
 
 /// Advances one contact's collision state by a step: `front` is its collision front this step (if
@@ -356,6 +363,11 @@ pub fn step_collision(
             centroid: [0.0; 3],
             normal: [0.0; 3],
             continental_over: 0.0,
+            stalled_since_myr: None,
+            belt: super::state::Belt {
+                frame: [0.0, 0.0, 0.0, 1.0],
+                ..Default::default()
+            },
         });
     }
     let c = collision.as_mut().expect("set above");
@@ -377,6 +389,12 @@ pub fn step_collision(
     c.centroid = f.centroid().to_array();
     c.normal = f.normal().to_array();
     c.continental_over = f64::from(f.continental_over) / f64::from(f.samples);
+    // ledger: PLT-233 (the stall that welds: below `weld_speed_mm_yr`, timed from its first step).
+    if conv < clock.stall_mm_yr {
+        c.stalled_since_myr.get_or_insert(clock.t_myr);
+    } else {
+        c.stalled_since_myr = None;
+    }
     if began {
         Change::Began
     } else {
@@ -384,10 +402,19 @@ pub fn step_collision(
     }
 }
 
-/// Advances every contact's collision state and its pre-task-2 count by this step and returns
-/// the contacts whose transfer or weld fires now (see the module docs), with the terrane's seeds:
-/// the subducting plate's continental samples in the overlap (`seeds`, per contact, from
-/// `subduction::resolve`) and, when real shortening fires, those at the front.
+/// A contact whose transfer or weld may fire this step ([`advance`]): its index, the terrane's
+/// seeds, and whether the collision has stalled long enough to weld.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Fired {
+    pub contact: usize,
+    pub seeds: Vec<u32>,
+    pub stalled: bool,
+}
+
+/// Advances every contact's collision state by this step. Returns this step's fronts (by contact
+/// index; the belts are stacked on them) and the contacts whose transfer or weld may fire now (see
+/// the module docs), with the terrane's seeds: the subducting plate's continental samples in the
+/// overlap (`seeds`, per contact, from `subduction::resolve`) and those at the front.
 pub fn advance(
     state: &mut PlateState,
     geo: &Geo,
@@ -395,12 +422,13 @@ pub fn advance(
     tree: &Tree,
     env: &Env,
     mut seeds: BTreeMap<usize, Vec<u32>>,
-) -> Vec<(usize, Vec<u32>)> {
+) -> (BTreeMap<usize, Front>, Vec<Fired>) {
     let fronts = fronts(state, geo, pos, tree, env);
     let clock = StepClock {
         step: env.step,
         t_myr: env.t_myr,
         dt_myr: env.dt_myr,
+        stall_mm_yr: env.k.weld_speed_mm_yr,
     };
     for k in 0..state.contacts.len() {
         let live = state.contacts[k].last_step == env.step;
@@ -416,38 +444,15 @@ pub fn advance(
             Change::None | Change::Continued => {}
         }
     }
-    // The count used before task 2, kept exactly: relative speed × time over the steps with at
-    // least MIN_CONTACT continental samples in the overlap.
-    for (&k, list) in &seeds {
-        if (list.len() as u32) < MIN_CONTACT {
-            continue;
-        }
-        let c = &state.contacts[k];
-        let speed = env.norm.speed_mm_yr(
-            DVec3::from_array(state.plates[c.under as usize].omega)
-                - DVec3::from_array(state.plates[c.over as usize].omega),
-            DVec3::from_array(c.centroid),
-        );
-        // mm/yr × Myr = km.
-        state.contacts[k].speed_count_km += speed * env.dt_myr;
-    }
-    // ledger: PLT-068 (the threshold and the pre-task-2 count), PLT-227 (which count fires).
+    // ledger: PLT-068 (the threshold, for terrane transfers), PLT-233 (the weld on stall).
     let threshold = env.k.collision_threshold_km;
     let mut fired = Vec::new();
-    if !env.k.collision_on_shortening {
-        for (k, list) in seeds {
-            if list.len() as u32 >= MIN_CONTACT && state.contacts[k].speed_count_km >= threshold {
-                fired.push((k, list));
-            }
-        }
-        return fired;
-    }
     for (k, c) in state.contacts.iter().enumerate() {
-        if !c
-            .collision
-            .as_ref()
-            .is_some_and(|col| col.shortening_km >= threshold)
-        {
+        let Some(col) = &c.collision else { continue };
+        let stalled = col
+            .stalled_since_myr
+            .is_some_and(|t0| env.t_myr - t0 >= env.k.weld_after_myr - 1e-9);
+        if !stalled && col.shortening_km < threshold {
             continue;
         }
         let mut list = seeds.remove(&k).unwrap_or_default();
@@ -457,10 +462,14 @@ pub fn advance(
         list.sort_unstable();
         list.dedup();
         if list.len() as u32 >= MIN_CONTACT {
-            fired.push((k, list));
+            fired.push(Fired {
+                contact: k,
+                seeds: list,
+                stalled,
+            });
         }
     }
-    fired
+    (fronts, fired)
 }
 
 /// Ends contact `k`'s collision (if it is in one) without a transfer or weld, recording why.
@@ -555,7 +564,6 @@ mod tests {
                 last_step: 1,
                 samples: 3,
                 collision: None,
-                speed_count_km: 0.0,
                 max_uplift_mm_yr: 0.0,
                 andean: false,
                 centroid: [0.0, 1.0, 0.0],
@@ -584,9 +592,7 @@ mod tests {
 
     impl Fixture {
         fn new() -> Fixture {
-            let mut preset = preset();
-            // These tests are about real shortening as the trigger.
-            preset.tectonics.collision_on_shortening = true;
+            let preset = preset();
             let norm = Norm::new(preset.tectonics.model_radius_km, 6371.0, N);
             Fixture {
                 geo: Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap(),
@@ -690,7 +696,7 @@ mod tests {
         let tree = Tree::over(&pos, |_| true);
         for step in 1..=10 {
             st.contacts[0].last_step = step;
-            let fired = advance(
+            let (_, fired) = advance(
                 &mut st,
                 &fx.geo,
                 &pos,
@@ -829,6 +835,7 @@ mod tests {
             step,
             t_myr: 2.0 * step as f64,
             dt_myr: 2.0,
+            stall_mm_yr: 5.0,
         }
     }
 
@@ -978,46 +985,54 @@ mod tests {
         assert_eq!(c.onset_convergence_mm_yr, 50.0);
     }
 
-    /// With `collision_on_shortening` off the count used before task 2 fires: relative speed ×
-    /// time over the steps with three or more continental samples in the overlap, whichever way
-    /// the plates move, on the overlap's samples alone. The collision state is kept all the same.
+    /// A collision stalls when its convergence stays below `weld_speed_mm_yr`: the clock starts at
+    /// the first slow step, a faster step resets it, a step with no front leaves it; `advance`
+    /// hands the contact over as stalled once it has lasted `weld_after_myr`, whatever its
+    /// shortening, and a strike-slip contact neither shortens nor stalls into a weld.
     #[test]
-    fn the_old_count_fires_while_the_setting_is_off() {
+    fn a_stalled_collision_fires_as_stalled() {
+        let mut col: Option<Collision> = None;
+        step_collision(&mut col, Some(&front(10, 50.0)), true, clock(1));
+        assert_eq!(col.as_ref().unwrap().stalled_since_myr, None);
+        step_collision(&mut col, Some(&front(10, 3.0)), true, clock(2));
+        assert_eq!(col.as_ref().unwrap().stalled_since_myr, Some(4.0));
+        step_collision(&mut col, None, true, clock(3));
+        step_collision(&mut col, Some(&front(10, -1.0)), true, clock(4));
+        assert_eq!(col.as_ref().unwrap().stalled_since_myr, Some(4.0));
+        step_collision(&mut col, Some(&front(10, 12.0)), true, clock(5));
+        assert_eq!(col.as_ref().unwrap().stalled_since_myr, None);
+
         let mut fx = Fixture::new();
-        fx.preset.tectonics.collision_on_shortening = false;
-        fx.preset.tectonics.collision_threshold_km = 300.0;
-        let v = 60.0;
-        // Strike-slip: no shortening at all, 120 km of sliding a step.
-        let mut st = two_plates(&fx.geo, DVec3::X * fx.rate(v), arc);
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        fx.preset.tectonics.weld_speed_mm_yr = 5.0;
+        fx.preset.tectonics.weld_after_myr = 10.0;
+        // Head-on at 20 mm/yr: a collision begins; then the plates stop.
+        let mut st = two_plates(&fx.geo, DVec3::Z * fx.rate(20.0), arc);
         let pos = crate::plates::geometry::positions(&st, &fx.geo);
         let tree = Tree::over(&pos, |_| true);
-        let overlap = || BTreeMap::from([(0usize, vec![5u32, 6, 7])]);
-        for step in 1..=3 {
+        st.contacts[0].last_step = 1;
+        let (fronts, fired) = advance(&mut st, &fx.geo, &pos, &tree, &fx.env(1), BTreeMap::new());
+        assert!(fronts.contains_key(&0) && fired.is_empty());
+        st.plates[1].omega = [0.0; 3];
+        // Stalled from step 2 (4 Myr): handed over at step 7 (14 Myr), 10 Myr later.
+        for step in 2..=7 {
+            let (_, fired) = advance(&mut st, &fx.geo, &pos, &tree, &fx.env(step), BTreeMap::new());
+            let c = st.contacts[0].collision.as_ref().unwrap();
+            assert_eq!(c.stalled_since_myr, Some(4.0), "step {step}");
+            assert_eq!(fired.is_empty(), step < 7, "step {step}");
+            if let Some(f) = fired.first() {
+                assert!(f.stalled && f.contact == 0 && f.seeds.len() >= MIN_CONTACT as usize);
+            }
+        }
+        // Strike-slip: no collision begins, so nothing stalls and nothing fires.
+        let mut st = two_plates(&fx.geo, DVec3::X * fx.rate(60.0), arc);
+        for step in 1..=10 {
             st.contacts[0].last_step = step;
-            // A step with too few samples in the overlap counts nothing.
-            let seeds = if step == 2 {
-                BTreeMap::from([(0usize, vec![5u32, 6])])
-            } else {
-                overlap()
-            };
-            let fired = advance(&mut st, &fx.geo, &pos, &tree, &fx.env(step), seeds);
+            let (_, fired) =
+                advance(&mut st, &fx.geo, &pos, &tree, &fx.env(step), BTreeMap::new());
             assert!(fired.is_empty(), "step {step}");
         }
-        assert!((st.contacts[0].speed_count_km - 2.0 * v * 2.0).abs() < 1e-6);
-        st.contacts[0].last_step = 4;
-        let fired = advance(&mut st, &fx.geo, &pos, &tree, &fx.env(4), overlap());
-        assert_eq!(fired, vec![(0, vec![5, 6, 7])]);
-        assert!((st.contacts[0].speed_count_km - 3.0 * v * 2.0).abs() < 1e-6);
-        // Real shortening stayed at nothing, and with the setting on nothing would have fired.
-        let shortening = st.contacts[0]
-            .collision
-            .as_ref()
-            .map_or(0.0, |c| c.shortening_km);
-        assert!(shortening < 0.02 * 3.0 * v * 2.0, "{shortening}");
-        fx.preset.tectonics.collision_on_shortening = true;
-        st.contacts[0].last_step = 5;
-        let fired = advance(&mut st, &fx.geo, &pos, &tree, &fx.env(5), overlap());
-        assert!(fired.is_empty());
+        assert!(st.contacts[0].collision.is_none());
     }
 
     /// `advance` fires a contact once its shortening has reached the threshold and the terrane
@@ -1040,19 +1055,20 @@ mod tests {
         let seeds = || BTreeMap::from([(0usize, vec![extra, at_front[0]])]);
         for step in 1..=need {
             st.contacts[0].last_step = step;
-            let fired = advance(&mut st, &fx.geo, &pos, &tree, &fx.env(step), seeds());
+            let (_, fired) = advance(&mut st, &fx.geo, &pos, &tree, &fx.env(step), seeds());
             assert_eq!(!fired.is_empty(), step == need, "step {step} of {need}");
-            if let Some((k, list)) = fired.first() {
+            if let Some(f) = fired.first() {
                 // The terrane's seeds: the overlap's and the crust at the front, each once.
-                assert_eq!(*k, 0);
-                assert_eq!(list.len(), at_front.len() + 1);
-                assert!(list.contains(&extra) && list.windows(2).all(|w| w[0] < w[1]));
+                assert_eq!(f.contact, 0);
+                assert!(!f.stalled);
+                assert_eq!(f.seeds.len(), at_front.len() + 1);
+                assert!(f.seeds.contains(&extra) && f.seeds.windows(2).all(|w| w[0] < w[1]));
             }
         }
         // It fires again while the state stands (the stage's `collide` ends it), on the front's
         // crust alone.
         st.contacts[0].last_step = need + 1;
-        let fired = advance(
+        let (_, fired) = advance(
             &mut st,
             &fx.geo,
             &pos,
@@ -1060,7 +1076,14 @@ mod tests {
             &fx.env(need + 1),
             BTreeMap::new(),
         );
-        assert_eq!(fired, vec![(0, at_front.clone())]);
+        assert_eq!(
+            fired,
+            vec![Fired {
+                contact: 0,
+                seeds: at_front.clone(),
+                stalled: false
+            }]
+        );
         let shortening = st.contacts[0].collision.as_ref().unwrap().shortening_km;
         assert!(shortening >= threshold);
 

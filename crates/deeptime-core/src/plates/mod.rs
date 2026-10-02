@@ -13,12 +13,15 @@
 //!    subducting plate's crust inside the overriding one;
 //! 2. uplifts the overriding plate within r_s of its fronts (Cortial's u_0·f(d)·g(v)·h(z̃)), builds
 //!    arcs, trenches and the deposit accumulators, and turns subducting plates by slab pull;
-//! 3. keeps each contact's collision state and real shortening (`shortening.rs`) and fires a
-//!    collision where the shortening has reached the threshold, moving the terrane to the other
-//!    plate with a surge of uplift (`collision.rs`);
+//! 3. keeps each contact's collision state and real shortening (`shortening.rs`), stacks the
+//!    crust each collision shortened into a belt and a wedge (`belts.rs`), and welds two plates
+//!    whose collision has stalled, or moves a small terrane to the other plate once it has
+//!    shortened by the threshold (`collision.rs`);
 //! 4. runs hotspots and large igneous provinces (`hotspots.rs`);
 //! 5. applies continental erosion, oceanic dampening and trench accretion, and the rock-pool
 //!    processes (`pools.rs`);
+//!    The next step's motion relaxes towards the speed law's target, less what the collision
+//!    belts resist (`belts::resist`).
 //! 6. draws Poisson rifts that split plates into 2–4 fragments, and subduction initiations that
 //!    split old oceanic crust off to sink (`rifting.rs`);
 //! 7. every 10–60 steps resamples the crust onto a fresh lattice, making oceanic crust in the gaps
@@ -36,6 +39,7 @@
 //! and randomness comes from one seeded generator in the state, so a run (and a run resumed from
 //! a checkpoint) is reproducible.
 
+pub mod belts;
 pub mod check;
 pub mod collision;
 pub mod dynamics;
@@ -190,6 +194,13 @@ impl PlatesStage {
         let env = self.env(&tectonics, step);
         let k = env.k;
         self.apply_surface_feedback(st, world, &env)?;
+        // The surface's flexure under the samples, for the foreland basins of the collisions'
+        // record (`belts.rs`); measurement only.
+        let flexure = if st.contacts.iter().any(|c| c.collision.is_some()) {
+            self.sample_flexure(world)
+        } else {
+            None
+        };
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
 
         // Motion, then interactions at the new positions.
@@ -200,14 +211,18 @@ impl PlatesStage {
         let tree = Tree::over(&pos, |_| true);
         let overlaps = subduction::detect(st, &cache.geo, &pos, &tree);
         let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
-        let fired = shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
+        let (fronts, fired) =
+            shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
+        belts::stack(st, &cache.geo, &pos, &env, &fronts, flexure.as_deref());
         let pull = subduction::fronts_and_uplift(st, &cache.geo, &pos, &env);
         let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
         let mut sutured = false;
-        for (c, seeds) in &fired {
-            let under = st.contacts[*c].under;
-            let done = collision::collide(st, world, &cache.geo, &pos, &env, *c, seeds)?;
+        for f in &fired {
+            let under = st.contacts[f.contact].under;
+            let done = collision::collide(
+                st, world, &cache.geo, &pos, &env, f.contact, &f.seeds, f.stalled,
+            )?;
             if let Some(ev) = done.event {
                 causes.insert(under, ev);
             }
@@ -218,14 +233,20 @@ impl PlatesStage {
         finish_samples(st, &cache.geo, &z0, &env);
         let arcs = dynamics::arc_heights(st);
 
-        // Motion for the next step: slab pull (axis and speed), the random walk, the speed cap.
+        // Motion for the next step: slab pull (axis and speed), the random walk, the collision
+        // resistance, the speed cap.
         let relax = 1.0 - (-env.dt_myr / k.slab_pull_relax_myr.max(1e-9)).exp();
         let base = 0.5 * (k.plate_speed_mm_yr[0] + k.plate_speed_mm_yr[1]);
+        let mut omega: Vec<DVec3> = st
+            .plates
+            .iter()
+            .map(|p| DVec3::from_array(p.omega))
+            .collect();
         for p in 0..st.plates.len() {
             if !st.plates[p].alive {
                 continue;
             }
-            let mut w = DVec3::from_array(st.plates[p].omega);
+            let mut w = omega[p];
             w = kinematics::pull_axis(
                 w,
                 pull.axis[p] * k.slab_pull_rad_per_1000km_myr * env.dt_myr,
@@ -239,9 +260,14 @@ impl PlatesStage {
                     * (1.0 - (1.0 - k.continental_speed_factor) * st.plates[p].continental_frac);
                 w *= (v + (target - v) * relax) / v;
             }
-            w = kinematics::jitter(&mut st.rng, w, k.motion_jitter_per_sqrt_myr, env.dt_myr);
-            st.plates[p].omega =
-                kinematics::cap_speed(w, &env.norm, k.max_plate_speed_mm_yr).to_array();
+            omega[p] = kinematics::jitter(&mut st.rng, w, k.motion_jitter_per_sqrt_myr, env.dt_myr);
+        }
+        belts::resist(st, &mut omega, &env, relax);
+        for (p, w) in omega.into_iter().enumerate() {
+            if st.plates[p].alive {
+                st.plates[p].omega =
+                    kinematics::cap_speed(w, &env.norm, k.max_plate_speed_mm_yr).to_array();
+            }
         }
         rifting::maybe_rift(st, world, &cache.geo, &pos, &env)?;
         rifting::maybe_initiate_subduction(st, world, &cache.geo, &pos, &env)?;
@@ -428,6 +454,40 @@ impl PlatesStage {
             },
         );
         Ok(())
+    }
+
+    /// The surface's flexure (`surface/flexure_m`) per sample, through the last L1 sampling's
+    /// links as [`Self::apply_surface_feedback`] spreads the feedback (NaN for a sample no cell
+    /// sees); `None` without the field or the links.
+    fn sample_flexure(&self, world: &WorldState) -> Option<Vec<f64>> {
+        let field = world.fields.get(crate::surface::flexure::field::FLEXURE)?;
+        let cache = self.cache.as_ref()?;
+        let coupling = cache.coupling.as_ref()?;
+        let tris = cache.geo.mesh.triangles();
+        let n = cache.geo.points().len();
+        if coupling.links().len() != field.data.len() {
+            return None;
+        }
+        let mut wsum = vec![0.0f64; n];
+        let mut sum = vec![0.0f64; n];
+        for (c, l) in coupling.links().iter().enumerate() {
+            let x = f64::from(field.data[c]);
+            if !x.is_finite() {
+                continue;
+            }
+            for (&v, &w) in tris[l.tri as usize].iter().zip(l.w.iter()) {
+                let w = f64::from(w);
+                if w > 0.0 && (v as usize) < n {
+                    wsum[v as usize] += w;
+                    sum[v as usize] += w * x;
+                }
+            }
+        }
+        Some(
+            (0..n)
+                .map(|v| if wsum[v] > 0.0 { sum[v] / wsum[v] } else { f64::NAN })
+                .collect(),
+        )
     }
 
     fn write_l1(

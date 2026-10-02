@@ -251,12 +251,6 @@ pub struct Contact {
     /// The collision this contact is in, while continental crust of the subducting plate stands
     /// at the front (`shortening.rs`).
     pub collision: Option<Collision>,
-    /// The count used before plate-motion task 2, km: relative speed at the overlap's centroid ×
-    /// time, over the steps with at least three continental samples of the subducting plate in
-    /// the overlap, since the contact began, reversed or last fired. It is not shortening (plates
-    /// sliding past each other count in full). It fires the transfer or weld while
-    /// `tectonics.collision_on_shortening` is off; task 4 removes both.
-    pub speed_count_km: f64,
     /// Largest uplift rate seen on the overriding plate, mm/yr.
     pub max_uplift_mm_yr: f64,
     /// Whether the overriding plate's continental crust was uplifted (an Andean orogeny).
@@ -274,9 +268,9 @@ pub struct Contact {
 /// transferred or welded, the two part, or the contact closes or reverses (`shortening.rs`; design
 /// `docs/design/plate-force-balance.md`, task 2). Lengths are Earth-normalized km.
 ///
-/// Later tasks read and extend it: the belt stacks `area_km2`'s growth each step behind `centroid`
-/// along `normal` (task 3), the resistance and the weld on stall read `convergence_mm_yr` (task 4),
-/// and the slab's break-off counts from `onset_myr` (task 5).
+/// The belt (`belts.rs`, task 3) stacks each step's crust behind the front and keeps its state in
+/// `belt`; the resistance and the weld on stall read `convergence_mm_yr`, `belt` and
+/// `stalled_since_myr` (task 4); the slab's break-off is to count from `onset_myr` (task 5).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Collision {
     /// End of the first step of the collision, Myr, and that step.
@@ -310,6 +304,51 @@ pub struct Collision {
     pub normal: [f64; 3],
     /// Share of the front where the overriding plate's crust is continental too.
     pub continental_over: f64,
+    /// Since when the convergence across the front has stayed below `weld_speed_mm_yr`, Myr (the
+    /// first such step's end); `None` while it converges faster. Steps with no front leave it.
+    pub stalled_since_myr: Option<f64>,
+    /// The belt this collision has built (`belts.rs`).
+    pub belt: Belt,
+}
+
+/// A collision's belt: what the stacking of `belts.rs` has built so far, in Earth-normalized km
+/// and real metres.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Belt {
+    /// Mean height above sea level of the overriding plate within half the belt's width of the
+    /// front, m, as of the last step with a front: the height the resistance reads.
+    pub height_m: f64,
+    /// The highest `height_m` so far, and the step it was reached.
+    pub peak_height_m: f64,
+    pub peak_step: u64,
+    /// Width of the wedge on the incoming plate, km: how far from the front its profile meets the
+    /// ground (last step with a front, and at the peak).
+    pub wedge_km: f64,
+    pub peak_wedge_km: f64,
+    /// The foreland basin in front of the wedge at the peak, read from the surface's flexure
+    /// (`surface/flexure_m`): width, km, and depth, m. `None` when there was no flexure field.
+    pub foredeep_km: Option<f64>,
+    pub foredeep_m: Option<f64>,
+    /// Crust stacked so far (belt and wedge): volume, km² × m (Earth-normalized area, real
+    /// thickness), and the share the wedge took.
+    pub stacked_km2_m: f64,
+    pub wedge_km2_m: f64,
+    /// The uplift at the front summed over the steps (the largest uplift of each step), m: the
+    /// most any ground has risen by the collision.
+    pub uplift_m: f64,
+    /// The most samples one step raised by more than 10 m and by more than 100 m, and the most
+    /// it raised from below the sea datum to above it.
+    pub lifted10: u32,
+    pub lifted100: u32,
+    pub emerged: u32,
+    /// The overriding plate's rotation since the onset (`[x, y, z, w]`): the belt's own frame, in
+    /// which it stands still.
+    pub frame: [f64; 4],
+    /// Uplift-weighted moments of where the belt and wedge rose, in that frame (unit vectors):
+    /// total weight, Σ w·p and Σ w·(xx, yy, zz, xy, xz, yz).
+    pub weight: f64,
+    pub sum: [f64; 3],
+    pub second: [f64; 6],
 }
 
 /// A mantle-fixed hotspot (Cortial §7.5's suggested extension).
