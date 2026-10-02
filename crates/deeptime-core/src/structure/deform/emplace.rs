@@ -861,7 +861,10 @@ pub(crate) mod tests {
         let close = |u: f64, v: f64| (u - v).abs() <= 1e-4 * v.abs().max(1.0);
         let (mut folds, mut faults) = (0, 0);
         for (a, b) in a.iter().zip(&b) {
-            assert_eq!((a.x, a.z, a.kind, a.wavelength), (b.x, b.z, b.kind, b.wavelength));
+            assert_eq!(
+                (a.x, a.z, a.kind, a.wavelength),
+                (b.x, b.z, b.kind, b.wavelength)
+            );
             match a.kind {
                 Kind::FoldTrain => {
                     folds += 1;
