@@ -55,6 +55,7 @@
     "province": "strong",
     "province_km": 800.0,
     "brine_flow_km": 600.0,
+    "inherited_bif_share": 0.0,
     "types": [],
     "essentials": []
   },
