@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.mixin;
 
 import net.neoforged.fml.loading.LoadingModList;
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -11,8 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
-import org.spongepowered.asm.service.MixinService;
 
+import java.io.InputStream;
 import java.util.List;
 import java.util.Set;
 
@@ -72,11 +73,16 @@ public class TwDhGuardMixinPlugin implements IMixinConfigPlugin {
             if (mods.getModFileById("distanthorizons") == null)
                 return "Distant Horizons is not installed";
         }
-        ClassNode node;
-        try {
-            node = MixinService.getService().getBytecodeProvider().getClassNode(TARGET, false);
+        // The class file as a resource, untransformed (ModLauncher's bytecode provider gives no
+        // untransformed bytecode, and a transformed read here would run Mixin inside its own prepare).
+        ClassNode node = new ClassNode();
+        String resource = TARGET.replace('.', '/') + ".class";
+        try (InputStream in = open(resource)) {
+            if (in == null)
+                return TARGET + " was not found in this Toroidal World; its guard may have moved";
+            new ClassReader(in).accept(node, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
         } catch (Exception e) {
-            return TARGET + " was not found in this Toroidal World (" + e + "); its guard may have moved";
+            return TARGET + " could not be read (" + e + ")";
         }
         for (MethodNode m : node.methods) {
             if (m.name.equals(METHOD) && m.desc.equals(DESCRIPTOR) && (m.access & Opcodes.ACC_STATIC) != 0)
@@ -84,6 +90,21 @@ public class TwDhGuardMixinPlugin implements IMixinConfigPlugin {
         }
         return "this Toroidal World has no static " + METHOD + DESCRIPTOR + " in " + TARGET
                 + "; its guard changed, so Deep Time leaves it alone (far terrain is off on wrapped levels until the patch follows)";
+    }
+
+    /** A class file of Toroidal World's jar: from its mod file, else through this mod's loader or the context loader. */
+    private static InputStream open(String resource) throws java.io.IOException {
+        LoadingModList mods = LoadingModList.get();
+        var tw = mods == null ? null : mods.getModFileById("toroidal_world");
+        if (tw != null) {
+            java.nio.file.Path p = tw.getFile().findResource(resource.split("/"));
+            if (p != null && java.nio.file.Files.isRegularFile(p))
+                return java.nio.file.Files.newInputStream(p);
+        }
+        InputStream in = TwDhGuardMixinPlugin.class.getClassLoader().getResourceAsStream(resource);
+        if (in == null && Thread.currentThread().getContextClassLoader() != null)
+            in = Thread.currentThread().getContextClassLoader().getResourceAsStream(resource);
+        return in;
     }
 
     @Override
