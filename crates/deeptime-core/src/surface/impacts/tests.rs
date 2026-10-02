@@ -113,6 +113,23 @@ fn crater(d_km: f64, age_myr: f64) -> Crater {
     }
 }
 
+/// Ben, 2026-10-02: "Go for a 3x default". The default is a game choice (Earth's rate is 1), and
+/// every built-in preset that runs the stage states the same rate.
+#[test]
+fn the_default_rate_is_three_times_earths_in_every_builtin_preset() {
+    assert_eq!(ImpactParams::default().flux, 3.0);
+    let mut seen = 0;
+    for (name, json) in crate::preset::BUILTIN
+        .iter()
+        .chain(crate::params::PIPELINE_BUILTIN.iter())
+    {
+        let v: serde_json::Value = serde_json::from_str(json).unwrap();
+        assert_eq!(v["impacts"]["flux"].as_f64(), Some(3.0), "{name}");
+        seen += 1;
+    }
+    assert_eq!(seen, 8);
+}
+
 #[test]
 fn size_classes_and_the_expected_rate() {
     assert_eq!(size_class(2.0), 0);
@@ -129,7 +146,11 @@ fn size_classes_and_the_expected_rate() {
     // A 16,384-block planet at 300 m per block: 7.7 million km², 1.5 % of Earth's surface.
     let area = planet_area_km2(&preset);
     assert!((area / 7.69e6 - 1.0).abs() < 0.01, "{area}");
-    let p = ImpactParams::default();
+    // Earth's own rate (flux 1); the default is 3 times it (the test above).
+    let p = ImpactParams {
+        flux: 1.0,
+        ..ImpactParams::default()
+    };
     // Craters of 2 km and more: 3.7 times the rate at 20 km (the record's shape below 20 km,
     // Hughes 2000), 0.158 per Myr on this planet; of 20 km and more, 5.6e-15 per km² per year, one
     // every 23 Myr. (The first coded rate carried the 1.8 slope down to 2 km: 2.7 per Myr.)
