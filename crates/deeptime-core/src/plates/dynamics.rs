@@ -1168,12 +1168,8 @@ pub fn record_step(
         arc_oceanic: seen.arcs[0],
         arc_continental: seen.arcs[1],
         forces: seen.forces.map(|f| f.forces.clone()).unwrap_or_default(),
-        slabs_km: seen
-            .forces
-            .map(|f| f.slabs_km.clone())
-            .unwrap_or_default(),
+        slabs_km: seen.forces.map(|f| f.slabs_km.clone()).unwrap_or_default(),
         breakoffs: seen.forces.map_or(0, |f| f.breakoffs),
-        ..StepRec::default()
     });
 
     let every = (AGE_EVERY_MYR / env.dt_myr).round().max(1.0) as u64;

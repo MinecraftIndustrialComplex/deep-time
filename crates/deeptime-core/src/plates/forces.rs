@@ -475,7 +475,10 @@ impl Balance {
         // A tiny ridge on the diagonal: a plate of a few samples has almost no drag against
         // spinning about its own centroid.
         for i in 0..m {
-            let tr = (0..3).map(|r| mat[(3 * i + r) * dim + 3 * i + r]).sum::<f64>() / 3.0;
+            let tr = (0..3)
+                .map(|r| mat[(3 * i + r) * dim + 3 * i + r])
+                .sum::<f64>()
+                / 3.0;
             for r in 0..3 {
                 mat[(3 * i + r) * dim + 3 * i + r] += 1.0e-9 * tr;
             }
@@ -492,8 +495,11 @@ impl Balance {
     pub fn answers(&self, w: &[DVec3]) -> Vec<Option<PlateAnswer>> {
         let r = self.c.radius_m;
         let np = self.acc.len();
-        let (mut t_slab, mut t_bnd, mut t_col) =
-            (vec![DVec3::ZERO; np], vec![DVec3::ZERO; np], vec![DVec3::ZERO; np]);
+        let (mut t_slab, mut t_bnd, mut t_col) = (
+            vec![DVec3::ZERO; np],
+            vec![DVec3::ZERO; np],
+            vec![DVec3::ZERO; np],
+        );
         let mut moment: Vec<f64> = self.acc.iter().map(|a| a.moment).collect();
         let wof = |p: u32| -> DVec3 {
             if p == MANTLE {
@@ -859,7 +865,9 @@ fn balance_step(
     let mut bal = Balance::new(c, &centroids);
     // Basal drag and the plates' mean column energy, in fixed chunks (a reproducible sum).
     const CHUNK: usize = 4096;
-    let parts: Vec<(Vec<Acc>, Vec<(f64, u32)>)> = (0..n.div_ceil(CHUNK))
+    // Per chunk: each plate's sums, and its column energies' sum and count.
+    type Chunk = (Vec<Acc>, Vec<(f64, u32)>);
+    let parts: Vec<Chunk> = (0..n.div_ceil(CHUNK))
         .into_par_iter()
         .map(|b| {
             let mut acc = vec![Acc::default(); np];
@@ -1030,10 +1038,9 @@ mod tests {
         let mut pts = Vec::new();
         let mut colat = 0.5 * step;
         while colat < r_deg {
-            let ring = (2.0 * std::f64::consts::PI * colat.to_radians().sin()
-                / step.to_radians())
-            .round()
-            .max(1.0) as usize;
+            let ring = (2.0 * std::f64::consts::PI * colat.to_radians().sin() / step.to_radians())
+                .round()
+                .max(1.0) as usize;
             for j in 0..ring {
                 pts.push(on_sphere(360.0 * j as f64 / ring as f64, 90.0 - colat));
             }
@@ -1170,7 +1177,10 @@ mod tests {
         assert!(v.x > 0.0 && v.x.abs() > 5.0 * v.y.abs(), "{v:?}");
         // Torque direction: slab pull's torque is about the axis Z × X = +Y.
         let t = bal.acc[0].t_pull;
-        assert!(t.y > 0.0 && t.y.abs() > 10.0 * t.x.abs().max(t.z.abs()), "{t:?}");
+        assert!(
+            t.y > 0.0 && t.y.abs() > 10.0 * t.x.abs().max(t.z.abs()),
+            "{t:?}"
+        );
         // Magnitude order: F L R, about 3e13 N/m × 3e6 m × 6.4e6 m = 5.7e26 N m.
         let expect = c.pull_n_m * trench_m * c.radius_m;
         assert!(
@@ -1291,7 +1301,10 @@ mod tests {
             let ans = bal.answers(&w);
             let (a0, a1) = (ans[0].unwrap(), ans[1].unwrap());
             for a in [a0, a1] {
-                assert!(a.speed_mm_yr.is_finite() && a.stress_mpa.is_finite(), "{a:?}");
+                assert!(
+                    a.speed_mm_yr.is_finite() && a.stress_mpa.is_finite(),
+                    "{a:?}"
+                );
                 assert!(a.residual < 1e-6, "residual {} at {sr} {br}", a.residual);
             }
             assert!(a0.speed_mm_yr > 1.0, "{a0:?}");
