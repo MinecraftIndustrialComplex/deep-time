@@ -12,7 +12,7 @@
 #      the override registers through Toroidal World's guard (Deep Time's patch, TwDhGuard).
 #   3. the far-terrain GameTests alone (far terrain against generated chunks on the real test planet).
 #
-#   tools/review/p3-04-dh.sh [dh] [dh-next] [gametest] [gametest-mic] [mic]     (default: dh dh-next gametest)
+#   tools/review/p3-04-dh.sh [dh] [dh-next] [gametest] [gametest-mic] [mic] [client]     (default: dh dh-next gametest)
 #
 # `mic` runs step 1 on the whole MIC pack instead (Terralith's surface rules, C2ME, TerraBlender).
 # Each step's result is printed at the end; the reports are smoke/<profile>/report.md and
@@ -39,6 +39,11 @@ for step in "${STEPS[@]}"; do
             ./gametest.sh "${extra[@]}" -PgametestOnly=farterrainmatchesgeneratedchunks,farterrainmatchesgeneratedchunksacrosstheseam,farterrainwrapsandfillsthecolumn,farterrainsectionsarecheapandthreadsafe,farterrainhasdistanthorizonswhenexpected
             RESULT[$step]=$?
             grep -a -e "\[gametest\] farTerrain" -e "Distant Horizons expected" -e "left out of this dev run" neoforge/build/gametest.log || true ;;
+        client)
+            # A real client joins the dh set's server (install it with the dh step first): its
+            # Distant Horizons requests must reach Deep Time's generator on both sides of the seam.
+            tools/client/dh-client-check.sh dh
+            RESULT[$step]=$? ;;
         *) echo "p3-04-dh.sh: unknown step '$step'" >&2; exit 2 ;;
     esac
 done
