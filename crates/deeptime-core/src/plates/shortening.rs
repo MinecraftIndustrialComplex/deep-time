@@ -74,8 +74,15 @@ use super::dynamics;
 use super::geometry::{Geo, Tree};
 use super::kinematics::{quat, tangent};
 use super::state::{CONTINENTAL, Collision, PlateState};
-use super::subduction::{MIN_CONTACT, locked};
+use super::subduction::{CONFIRM_MM_YR, MIN_CONTACT, locked};
 
+/// A collision begins only where its front converges at least this fast, mm/yr: the rate a
+/// contact needs to become a subduction zone (`subduction::CONFIRM_MM_YR`). Slower contact is a
+/// front that only touches, or slides more than it closes; counted from there, the onset
+/// convergence of the check's "convergence 20 Myr after onset ÷ at onset" was a few mm/yr and the
+/// ratio a median 3-8 (2026-10-02). Once begun, every converging step counts, however slow.
+// ledger: PLT-215 (game-choice: the existing subduction-confirmation rate).
+pub const BEGIN_MM_YR: f64 = CONFIRM_MM_YR;
 /// A collision lives through this many steps without a front before it counts as parted.
 // ledger: PLT-216 (game-choice: long enough for an overlap to come back after a resampling).
 pub const GRACE_STEPS: u64 = 3;
@@ -307,7 +314,8 @@ pub struct StepClock {
 
 /// Advances one contact's collision state by a step: `front` is its collision front this step (if
 /// any), `live` whether the contact's overlap was seen this step. A collision begins only on a
-/// live contact whose front has at least [`MIN_CONTACT`] samples and converges; once begun it
+/// live contact whose front has at least [`MIN_CONTACT`] samples and converges at
+/// [`BEGIN_MM_YR`] or more; once begun it
 /// accumulates the convergence of every step that has a front (parting steps add nothing).
 pub fn step_collision(
     collision: &mut Option<Collision>,
@@ -327,7 +335,7 @@ pub fn step_collision(
     let conv = f.convergence_mm_yr();
     let began = collision.is_none();
     if began {
-        if !live || conv <= 0.0 {
+        if !live || conv < BEGIN_MM_YR {
             return Change::None;
         }
         *collision = Some(Collision {
@@ -868,6 +876,16 @@ mod tests {
         );
         assert_eq!(
             step_collision(&mut col, Some(&front(10, -5.0)), true, clock(1)),
+            Change::None
+        );
+        // Converging, but slower than a subduction zone needs: a front that only touches.
+        assert_eq!(
+            step_collision(
+                &mut col,
+                Some(&front(10, 0.9 * BEGIN_MM_YR)),
+                true,
+                clock(1)
+            ),
             Change::None
         );
         assert_eq!(step_collision(&mut col, None, true, clock(1)), Change::None);
