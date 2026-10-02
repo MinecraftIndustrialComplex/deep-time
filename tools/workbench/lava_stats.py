@@ -7,7 +7,7 @@
 Prints lava, cave air and water per depth band, then the connected lava bodies (6-neighbour):
 size, y range, extent, how many of their faces touch water or air, and how many lie open to the
 sky. It is the measurement behind the lava rules of GeologicChunkGenerator (the build-log entry
-"Lava floods" in STATUS.md). Standard library only; a 256 x 256 x 992 box takes about a minute.
+"Lava floods" in STATUS.md). Standard library only; a 256 x 256 x 1152 box takes about a minute.
 """
 import array
 import collections
@@ -16,7 +16,7 @@ import json
 import struct
 import sys
 
-BANDS = [(-352, -300), (-300, -250), (-250, -200), (-200, -150), (-150, -100), (-100, -54),
+BANDS = [(-512, -460), (-460, -400), (-400, -352), (-352, -300), (-300, -250), (-250, -200), (-200, -150), (-150, -100), (-100, -54),
          (-54, -10), (-10, 30), (30, 55), (55, 64), (64, 80), (80, 640)]
 
 
@@ -127,7 +127,7 @@ def main():
               f"{b['z'][0]:5d}..{b['z'][1]:<5d} {b['water_faces']:6d} {b['air_faces']:6d} {b['open_sky']:5d}")
     high = [b for b in bodies if b["y"][1] >= 40]
     print(f"bodies reaching y >= 40: {len(high)}, {sum(b['blocks'] for b in high):,} blocks")
-    hist = collections.Counter((b["y"][1] + 352) // 50 * 50 - 352 for b in bodies)
+    hist = collections.Counter((b["y"][1] + 512) // 50 * 50 - 512 for b in bodies)
     print("bodies by top y (50-block bins):", sorted(hist.items()))
     if out_json:
         with open(out_json, "w") as f:

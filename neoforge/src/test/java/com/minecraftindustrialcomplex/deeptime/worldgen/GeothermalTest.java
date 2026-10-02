@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class GeothermalTest {
 
-    private static final int C = 8192, SEA = 63, LAVA_FLOOR = -342;
+    private static final int C = 8192, SEA = 63, LAVA_FLOOR = -502;
     private static final double MH = 300.0, MV = 20.0;
 
     private static final Geothermal.Env WET_WARM = env(1200, 15, false, false);

@@ -108,7 +108,7 @@ manifest last. The synthetic worlds have none of these.
   "preset_hash": null,
   "planet": {"radius_m": 48892.96},
   "scale": {"circumference_blocks": 1024, "m_per_block_h": 300.0, "m_per_block_v": 20.0,
-            "min_y": -352, "max_y": 639, "sea_level_y": 63},
+            "min_y": -512, "max_y": 639, "sea_level_y": 63},
   "grids": {"L3": {"name": "L3", "w": 512, "h": 256, "r": 2, "wraps_x": true,
                    "origin_block_x": -512, "origin_block_z": -256}, "...": {}},
   "layers": [{"name": "elevation", "path": "rasters/elevation.dtr", "grid": "L3",
@@ -865,7 +865,7 @@ has none): `{"lava_floor_blocks": 10, "lava_lake_blocks": 54, "magma_chamber_dep
 "magma_chamber_size": 1.0, "crater_lake_share": 0.25, "remove_lava_features": true}`. No layer holds
 lava; the game reads the first two numbers when it generates chunks (Java `worldgen/LavaRules`, `LavaFluids`,
 `density/LavaLakesDensity`), and a world without the note uses the defaults. With `min_y` the floor
-of the noise settings (−352) and cover = 8:
+of the noise settings (−512) and cover = 8:
 
 - **The lava floor.** Open space with y < `min_y + lava_floor_blocks` (never above sea level) is lava.
   In a column whose terrain height H is that low, the limit is `min(that, ⌊H⌋ − cover)`: lava stays
@@ -875,8 +875,8 @@ of the noise settings (−352) and cover = 8:
   blocks of the cell's centre. 0: no lava lakes.
 
 Both are vanilla's rules (lava below y −54, lava lakes at y −10 and lower, in a world whose floor is
-y −64) measured from the floor instead of from y 0. Vanilla's own constants flood the lowest 298
-blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −352.
+y −64) measured from the floor instead of from y 0. Vanilla's own constants flood the lowest 458
+blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −512.
 Carver lava in the bottom eight blocks is vanilla's and not covered by these rules.
 
 ### Impact craters (`impacts/craters.json`)

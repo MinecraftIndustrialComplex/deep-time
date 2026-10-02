@@ -55,6 +55,7 @@ pub fn bake(
     let (raised, max_raise, limit) = raise_tops(
         &mut hz,
         terrain,
+        p.scale.min_y,
         p.scale.max_y,
         p.scale.sea_level_y,
         p.scale.build_fit().knee_y,
@@ -78,7 +79,7 @@ pub fn bake(
         "mean_horizons": mean,
         "top_raised_cells": raised,
         "top_raise_blocks_max": max_raise,
-        "build_limit": limit.note(p.scale.max_y, p.scale.build_fit()),
+        "build_limit": limit.note(p.scale.min_y, p.scale.max_y, p.scale.build_fit()),
         "realism": {
             "cells": census.columns,
             "grade_inversion": census.share(census.with_inversion),
@@ -114,7 +115,19 @@ pub struct BuildLimit {
     pub land_cells: u64,
     /// The highest elevation, blocks (y); −∞ when no cell has a value.
     pub highest_y: f64,
+    /// L3 cells whose elevation is below `min_y`: the game cuts such sea floor flat at the world's
+    /// floor (2026-10-02: the floor is y −512 so the deepest trenches fit; this counts any that
+    /// still do not, at extreme settings).
+    pub cells_below: u64,
+    /// L3 cells in the bottom [`FLOOR_SLIDE_BLOCKS`] above `min_y`, where the router's density
+    /// slide flattens the terrain.
+    pub cells_in_slide: u64,
+    /// The lowest elevation, blocks (y); +∞ when no cell has a value.
+    pub lowest_y: f64,
 }
+
+/// The height above the world's floor of the router's bottom density slide (`planet.json`).
+pub const FLOOR_SLIDE_BLOCKS: f64 = 24.0;
 
 impl BuildLimit {
     const NONE: BuildLimit = BuildLimit {
@@ -122,6 +135,9 @@ impl BuildLimit {
         cells_compressed: 0,
         land_cells: 0,
         highest_y: f64::NEG_INFINITY,
+        cells_below: 0,
+        cells_in_slide: 0,
+        lowest_y: f64::INFINITY,
     };
 
     fn merge(self, o: BuildLimit) -> BuildLimit {
@@ -130,10 +146,13 @@ impl BuildLimit {
             cells_compressed: self.cells_compressed + o.cells_compressed,
             land_cells: self.land_cells + o.land_cells,
             highest_y: self.highest_y.max(o.highest_y),
+            cells_below: self.cells_below + o.cells_below,
+            cells_in_slide: self.cells_in_slide + o.cells_in_slide,
+            lowest_y: self.lowest_y.min(o.lowest_y),
         }
     }
 
-    pub fn note(&self, max_y: i32, fit: crate::params::BuildFit) -> Value {
+    pub fn note(&self, min_y: i32, max_y: i32, fit: crate::params::BuildFit) -> Value {
         let share = if self.land_cells == 0 {
             0.0
         } else {
@@ -150,6 +169,11 @@ impl BuildLimit {
             "share_of_land": share,
             "highest_y": if self.highest_y.is_finite() { json!(self.highest_y) } else { Value::Null },
             "rule": "elevation cells above max_y (the detail term not counted); the game ends such ground at max_y",
+            "min_y": min_y,
+            "cells_below_min_y": self.cells_below,
+            "cells_in_floor_slide": self.cells_in_slide,
+            "lowest_y": if self.lowest_y.is_finite() { json!(self.lowest_y) } else { Value::Null },
+            "rule_floor": "elevation cells below min_y: the game cuts such sea floor flat at the world's floor; cells_in_floor_slide are within 24 blocks above min_y, where the density slide flattens the terrain",
         })
     }
 }
@@ -160,6 +184,7 @@ impl BuildLimit {
 fn raise_tops(
     hz: &mut Horizons,
     t: &Terrain,
+    min_y: i32,
     max_y: i32,
     sea_level_y: i32,
     knee_y: f64,
@@ -177,6 +202,7 @@ fn raise_tops(
     // Highest elevation and highest amplitude of the L3 cells in each L1 cell's square
     // [x1, x1 + r1) × [z1, z1 + r1), in blocks.
     let (limit_y, sea_y) = (f64::from(max_y), f64::from(sea_level_y));
+    let (floor_y, slide_y) = (f64::from(min_y), f64::from(min_y) + FLOOR_SLIDE_BLOCKS);
     type Tile = (usize, usize, usize, Vec<f64>, BuildLimit);
     let square = |path: &std::path::Path| -> Result<(Vec<f64>, BuildLimit), CoreError> {
         let r = TilePackReader::open(path)?;
@@ -210,6 +236,9 @@ fn raise_tops(
                             limit.cells_compressed += u64::from(v > knee_y);
                             limit.land_cells += u64::from(v >= sea_y);
                             limit.highest_y = limit.highest_y.max(v);
+                            limit.cells_below += u64::from(v < floor_y);
+                            limit.cells_in_slide += u64::from(v >= floor_y && v < slide_y);
+                            limit.lowest_y = limit.lowest_y.min(v);
                         }
                     }
                 }

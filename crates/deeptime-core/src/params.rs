@@ -164,7 +164,7 @@ fn d_m_per_block_v() -> f64 {
     20.0
 }
 fn d_min_y() -> i32 {
-    -352
+    -512
 }
 fn d_max_y() -> i32 {
     639
@@ -1306,6 +1306,27 @@ mod tests {
         );
     }
 
+    /// The world's floor (Ben, decisions log 2026-10-02, "Lower min_y to -512"): every built-in
+    /// preset's deepest trench, plate model's trench elevation at the vertical scale, stands above
+    /// the floor and clear of the router's bottom density slide (24 blocks), and the floor is the
+    /// default of an absent key. With the old floor (−352) the trench of −10 km (y −437) was cut.
+    #[test]
+    fn the_floor_holds_the_deepest_trench() {
+        assert_eq!(d_min_y(), -512);
+        assert_eq!((d_min_y() + 1152 - 1, d_max_y()), (639, 639), "height 1152 ends at the top 639");
+        for (name, json) in crate::preset::BUILTIN.iter().chain(PIPELINE_BUILTIN.iter()) {
+            let p = planet(json);
+            assert_eq!(p.scale.min_y, -512, "{name}");
+            let trench_y = f64::from(p.scale.sea_level_y)
+                + p.tectonics.trench_elevation_m / p.scale.m_per_block_v;
+            assert!(
+                trench_y > f64::from(p.scale.min_y) + 24.0,
+                "{name}: the trench at y {trench_y} is not clear of the floor {}",
+                p.scale.min_y
+            );
+        }
+    }
+
     /// The build-limit compression (2026-10-01): as simulated below the knee, increasing and
     /// smooth through it, never at the top however high the terrain; and a band too thin is refused.
     #[test]
@@ -1314,7 +1335,7 @@ mod tests {
         let fit = p.scale.build_fit();
         assert_eq!((fit.knee_y, fit.top_y), (575.0, 623.0));
         assert_eq!(p.scale.uncompressed_height_m(), 10_240.0);
-        for y in [-352.0, 63.0, 574.9, 575.0] {
+        for y in [-512.0, 63.0, 574.9, 575.0] {
             assert_eq!(fit.compress(y), y);
         }
         let mut last = 575.0;
