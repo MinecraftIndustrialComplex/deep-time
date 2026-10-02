@@ -190,46 +190,46 @@ pub struct DeformationParams {
 impl Default for DeformationParams {
     fn default() -> Self {
         DeformationParams {
-            strength: 1.0,                        // ledger: DEF-012
-            density: 1.0,                         // ledger: DEF-012
-            size: 1.0,                            // ledger: DEF-012
+            strength: 1.0,                         // ledger: DEF-012
+            density: 1.0,                          // ledger: DEF-012
+            size: 1.0,                             // ledger: DEF-012
             fold_wavelength_km: [16.0, 8.0, 32.0], // ledger: DEF-001
-            fold_wavelength_sigma: 0.35,          // ledger: DEF-001
-            fold_train_waves: [2.0, 5.0],         // ledger: DEF-003
-            fold_length_ratio: [5.0, 12.0],       // ledger: DEF-004
-            fold_shortening: [0.08, 0.30],        // ledger: DEF-005
-            fold_rate_km2_myr: 6.0e-6,            // ledger: DEF-008
-            fault_length_km: [40.0, 15.0, 150.0], // ledger: DEF-013
-            fault_length_sigma: 0.5,              // ledger: DEF-013
-            fault_reach_ratio: 0.4,               // ledger: DEF-014
-            normal_slip_ratio: 0.05,              // ledger: DEF-016
-            thrust_slip_ratio: 0.08,              // ledger: DEF-017
-            strike_slip_ratio: 0.05,              // ledger: DEF-018
-            normal_dip_deg: [55.0, 70.0],         // ledger: DEF-019
-            thrust_dip_deg: [20.0, 40.0],         // ledger: DEF-020
-            thrust_rate_km2_myr: 2.0e-5,          // ledger: DEF-022
-            normal_rate_km2_myr: 4.0e-5,          // ledger: DEF-022
-            strike_slip_rate_km2_myr: 4.0e-6,     // ledger: DEF-022
-            foreland_km: 250.0,                   // ledger: DEF-027
-            arc_uplift_mm_yr: 0.1,                // ledger: DEF-026
-            max_overlap: 3,                       // ledger: DEF-032
-            overprint_myr: 30.0,                  // ledger: DEF-033
-            trend_scatter_deg: 12.0,              // ledger: DEF-009
-            max_structures: 60_000,               // ledger: DEF-034
-            relief: 1.0,                          // ledger: DEF-054
-            relief_age_myr: 10.0,                 // ledger: DEF-055
-            relief_wear: 5.0,                     // ledger: DEF-056
-            fold_relief: 0.5,                     // ledger: DEF-058
-            footwall_share: 0.2,                  // ledger: DEF-059
-            intrusions: 1.0,                      // ledger: DEF-040
-            stock_rate_km2_myr: 2.0e-5,           // ledger: DEF-041
-            stock_radius_km: [4.0, 2.0, 10.0],    // ledger: DEF-042
-            stock_top_depth_blocks: [-4.0, 60.0], // ledger: DEF-044
-            dyke_rate_km2_myr: 8.0e-5,            // ledger: DEF-046
-            dyke_length_km: [15.0, 5.0, 50.0],    // ledger: DEF-047
-            dyke_half_width_blocks: [1.0, 2.5],   // ledger: DEF-048
-            plug_radius_share: 0.08,              // ledger: DEF-049
-            plug_radius_blocks: [2.5, 8.0],       // ledger: DEF-049
+            fold_wavelength_sigma: 0.35,           // ledger: DEF-001
+            fold_train_waves: [2.0, 5.0],          // ledger: DEF-003
+            fold_length_ratio: [5.0, 12.0],        // ledger: DEF-004
+            fold_shortening: [0.08, 0.30],         // ledger: DEF-005
+            fold_rate_km2_myr: 6.0e-6,             // ledger: DEF-008
+            fault_length_km: [40.0, 15.0, 150.0],  // ledger: DEF-013
+            fault_length_sigma: 0.5,               // ledger: DEF-013
+            fault_reach_ratio: 0.4,                // ledger: DEF-014
+            normal_slip_ratio: 0.05,               // ledger: DEF-016
+            thrust_slip_ratio: 0.08,               // ledger: DEF-017
+            strike_slip_ratio: 0.05,               // ledger: DEF-018
+            normal_dip_deg: [55.0, 70.0],          // ledger: DEF-019
+            thrust_dip_deg: [20.0, 40.0],          // ledger: DEF-020
+            thrust_rate_km2_myr: 2.0e-5,           // ledger: DEF-022
+            normal_rate_km2_myr: 4.0e-5,           // ledger: DEF-022
+            strike_slip_rate_km2_myr: 4.0e-6,      // ledger: DEF-022
+            foreland_km: 250.0,                    // ledger: DEF-027
+            arc_uplift_mm_yr: 0.1,                 // ledger: DEF-026
+            max_overlap: 3,                        // ledger: DEF-032
+            overprint_myr: 30.0,                   // ledger: DEF-033
+            trend_scatter_deg: 12.0,               // ledger: DEF-009
+            max_structures: 60_000,                // ledger: DEF-034
+            relief: 1.0,                           // ledger: DEF-054
+            relief_age_myr: 10.0,                  // ledger: DEF-055
+            relief_wear: 5.0,                      // ledger: DEF-056
+            fold_relief: 0.5,                      // ledger: DEF-058
+            footwall_share: 0.2,                   // ledger: DEF-059
+            intrusions: 1.0,                       // ledger: DEF-040
+            stock_rate_km2_myr: 2.0e-5,            // ledger: DEF-041
+            stock_radius_km: [4.0, 2.0, 10.0],     // ledger: DEF-042
+            stock_top_depth_blocks: [-4.0, 60.0],  // ledger: DEF-044
+            dyke_rate_km2_myr: 8.0e-5,             // ledger: DEF-046
+            dyke_length_km: [15.0, 5.0, 50.0],     // ledger: DEF-047
+            dyke_half_width_blocks: [1.0, 2.5],    // ledger: DEF-048
+            plug_radius_share: 0.08,               // ledger: DEF-049
+            plug_radius_blocks: [2.5, 8.0],        // ledger: DEF-049
         }
     }
 }
