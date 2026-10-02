@@ -420,6 +420,118 @@ fn no_column_holds_rock_that_was_never_as_hot_as_the_rock_above_it() {
     );
 }
 
+/// P1-23: the smoothing's sample lattice does not show. The samples of a cell are the lattice
+/// points in its window; whatever the cell's place between them, their weighted mean position is
+/// the cell (so a tilted bed stays a plane instead of stepping with the lattice's period), their
+/// spread is the same, and a sample at the window's edge weighs nothing (so one entering or
+/// leaving changes nothing). The cut-off Gaussian this replaced fails all three: its mean swung
+/// 0.23 cells at σ 10 and 0.68 at σ 20, and an edge sample held 2 % of the weight.
+#[test]
+fn the_smoothing_lattice_leaves_no_period() {
+    use bake_horizons::{SMOOTH_RADIUS_SAMPLES, smooth_axis_weight, smooth_stride};
+    for sigma in [2.5, 5.0, 10.0, 20.0, 37.0] {
+        let step = smooth_stride(sigma);
+        let reach = step * SMOOTH_RADIUS_SAMPLES;
+        let mut widths = Vec::new();
+        for a in 0..step {
+            // The lattice points (multiples of step) in the window of the cell at `a`.
+            let pts: Vec<f64> = (-2 * SMOOTH_RADIUS_SAMPLES..=2 * SMOOTH_RADIUS_SAMPLES)
+                .map(|l| (l * step - a) as f64)
+                .filter(|d| d.abs() <= reach as f64)
+                .collect();
+            let w: Vec<f64> = pts.iter().map(|&d| smooth_axis_weight(d, sigma)).collect();
+            let sum: f64 = w.iter().sum();
+            assert!(sum > 0.0);
+            let mean: f64 = pts.iter().zip(&w).map(|(d, w)| d * w).sum::<f64>() / sum;
+            let var: f64 = pts.iter().zip(&w).map(|(d, w)| d * d * w).sum::<f64>() / sum;
+            assert!(
+                mean.abs() < 0.01 * step as f64 / 4.0 + 0.005,
+                "sigma {sigma}, cell {a}: the samples' mean lies {mean} cells off the cell"
+            );
+            widths.push(var.sqrt());
+            for (d, w) in pts.iter().zip(&w) {
+                if d.abs() >= reach as f64 {
+                    assert_eq!(*w, 0.0, "sigma {sigma}: a sample at the edge has weight");
+                }
+                assert!(*w >= 0.0);
+            }
+            // Nothing outside the window, and the weight falls away from the cell.
+            assert_eq!(smooth_axis_weight(reach as f64 + 1.0, sigma), 0.0);
+            assert!(smooth_axis_weight(0.0, sigma) > smooth_axis_weight(step as f64, sigma));
+        }
+        let (lo, hi) = widths
+            .iter()
+            .fold((f64::MAX, f64::MIN), |(lo, hi), &x| (lo.min(x), hi.max(x)));
+        assert!(
+            hi / lo < 1.03,
+            "sigma {sigma}: the width changes {lo}..{hi} with the cell"
+        );
+        assert!(
+            (0.7..=1.0).contains(&(lo / sigma)),
+            "sigma {sigma}: effective width {lo}"
+        );
+    }
+}
+
+/// P1-23, the same on stacks: a bed whose base is a plane tilted across the grid keeps a plane
+/// base after smoothing, with no step every lattice period.
+#[test]
+fn a_tilted_bed_stays_a_plane_under_smoothing() {
+    let tables = Tables::get();
+    let p = StructureParams::default();
+    let grid = deeptime_format::GridDesc::for_planet("L1", 4096, 16).unwrap();
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    let k = 4usize;
+    let n = w * h;
+    let mut tops = vec![bake_horizons::NO_TOP; n * k];
+    let mut classes = vec![bake_horizons::NO_CLASS; n * k];
+    let mut keys = vec![[bake_horizons::NO_KEY; 2]; n * k];
+    let (sandstone, granite) = (tables.cls.sandstone as u8, tables.cls.granite as u8);
+    // The surface is level at y 200; the sandstone's base falls 2 blocks a cell eastwards over
+    // the middle of the grid (far from the seam, where a plane cannot wrap).
+    let base = |i: usize| 100 - 2 * (i as i32 - w as i32 / 2);
+    for c in 0..n {
+        let i = c % w;
+        tops[c * k] = 200 * 16;
+        classes[c * k] = sandstone;
+        keys[c * k] = [5000, 6000];
+        tops[c * k + 1] = (base(i).clamp(-300, 180) * 16) as i16;
+        classes[c * k + 1] = granite;
+        keys[c * k + 1] = [59_700, 59_900];
+    }
+    let hz = bake_horizons::Horizons {
+        grid,
+        k: k as u32,
+        min_y: -352,
+        tops,
+        classes,
+        keys,
+        tongues: bake_horizons::tongue_params(&p),
+        min_blocks: Vec::new(),
+    }
+    .smoothed(10.0, &tables);
+    // Along a middle row, where the base is a plane within the window: the smoothed base's
+    // second difference is rounding, at every phase of the four-cell lattice.
+    let j = h / 2;
+    let top = |i: usize| f64::from(hz.cell(j * w + i).0[1]) / 16.0;
+    let mut worst = 0.0f64;
+    for i in w / 2 - 20..w / 2 + 20 {
+        assert_eq!(hz.cell(j * w + i).0.len(), 2, "two horizons at cell {i}");
+        let d2 = top(i - 1) - 2.0 * top(i) + top(i + 1);
+        worst = worst.max(d2.abs());
+        assert!(
+            (top(i) - f64::from(base(i))).abs() < 0.25,
+            "cell {i}: {} {}",
+            top(i),
+            base(i)
+        );
+    }
+    assert!(
+        worst < 0.2,
+        "the base bends by {worst} blocks between neighbours"
+    );
+}
+
 /// A small planet's L1 grid of provinces, each a random cell (so a metamorphic belt lies beside
 /// a basin, an ocean beside a craton), baked like the bake does.
 fn random_horizons(seed: u64, sigma: f64) -> bake_horizons::Horizons {

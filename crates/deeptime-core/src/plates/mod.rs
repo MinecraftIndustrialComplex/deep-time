@@ -35,7 +35,9 @@
 //! and randomness comes from one seeded generator in the state, so a run (and a run resumed from
 //! a checkpoint) is reproducible.
 
+pub mod check;
 pub mod collision;
+pub mod dynamics;
 pub mod events;
 pub mod geometry;
 pub mod hotspots;
@@ -111,6 +113,9 @@ pub struct PlatesStage {
     /// The next keyframe time, on the session's grid (plan §6.1).
     next_output_years: f64,
     cache: Option<Cache>,
+    /// Whether to record the plate dynamics (`dynamics.rs`). On, unless `DEEPTIME_NO_PLATE_DYNAMICS`
+    /// is set (to time what it costs); the tests that show recording changes nothing turn it off.
+    record_dynamics: bool,
 }
 
 impl PlatesStage {
@@ -123,7 +128,14 @@ impl PlatesStage {
             done: 0,
             next_output_years,
             cache: None,
+            record_dynamics: std::env::var_os(dynamics::OFF_ENV).is_none(),
         }
+    }
+
+    /// The same stage without the dynamics record (`dynamics.rs`): the world it makes is the same.
+    pub fn without_dynamics(mut self) -> PlatesStage {
+        self.record_dynamics = false;
+        self
     }
 
     fn dt_myr(&self) -> f64 {
@@ -256,6 +268,7 @@ impl PlatesStage {
             };
         }
 
+        dynamics::record_step(st, world, &cache.geo, &pull.front_km, &env, final_step);
         self.done = step;
         // How often the elevation cap binds: visible samples standing at `max_elevation_m` after
         // the step, and visible continental samples, summed over the steps (2026-10-01: the cap is
@@ -460,6 +473,12 @@ fn record_margins(st: &PlateState, world: &mut WorldState, pos: &[DVec3], env: &
     }
     if let (Some(list), Ok(v)) = (note["margins"].as_array_mut(), serde_json::to_value(&m)) {
         list.push(v);
+    }
+    // The dynamics record goes into the same note (`dynamics.rs`), as of now.
+    if let Some(d) = &st.dynamics
+        && let Ok(v) = serde_json::to_value(d)
+    {
+        note["dynamics"] = v;
     }
     world.notes.insert(STAGE_NAME.to_owned(), note.to_string());
 }
@@ -671,7 +690,10 @@ impl Stage for PlatesStage {
                 ctx.reserve(self.estimate().bytes)?;
                 let tectonics = self.preset.tectonics.clone();
                 let env = self.env(&tectonics, 0);
-                let (state, geo) = init::initial_state(&self.preset, &env)?;
+                let (mut state, geo) = init::initial_state(&self.preset, &env)?;
+                if self.record_dynamics {
+                    state.dynamics = Some(dynamics::Dynamics::start(&state, world, &env));
+                }
                 world.plates = Some(state);
                 self.cache = Some(Cache {
                     geo,

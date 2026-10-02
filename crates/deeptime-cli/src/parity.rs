@@ -12,6 +12,9 @@
 //! without bodies gets random columns instead. A world with a river network (P1-22) also gets 10 %
 //! on and beside random river vertices (channel, banks) and 5 % around the mouths of rivers that end
 //! in lakes; a world with lakes 5 % around random shore cells of `water_level` (lake water, shores, banks).
+//! A world with folds and faults (P2-01) gets 25 % inside the windows of random structural events,
+//! half of them within a few blocks of the event's centre line (a fault's trace), and the
+//! fixture says how many of its columns the events change (`deformed_columns`).
 
 use std::path::Path;
 
@@ -53,6 +56,24 @@ pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
         let z =
             i64::from(lo[2]) + rng.below((i64::from(hi[2]) - i64::from(lo[2]) + 1) as u64) as i64;
         out.push((x, z));
+    }
+    // Folds and faults (P2-01): inside random events' windows; every other one near the centre
+    // line, where a fault's plane cuts the column inside the world's height.
+    if let Some(d) = w.structure() {
+        let events = &d.structure.events;
+        for k in 0..n / 4 {
+            let e = &events[rng.below(events.len() as u64) as usize].window;
+            let unit = |rng: &mut SplitMix| rng.below(2001) as f64 / 1000.0 - 1.0;
+            let a = unit(&mut rng) * e.half_along;
+            let b = if k % 2 == 0 {
+                unit(&mut rng) * e.half_across
+            } else {
+                unit(&mut rng) * 24.0
+            };
+            let x = e.centre[0] + a * e.along[0] + b * e.across[0];
+            let z = e.centre[1] + a * e.along[1] + b * e.across[1];
+            out.push((x.round() as i64, z.round() as i64));
+        }
     }
     // Lake shores (P1-22): around random wet cells of `water_level`.
     let wet = wet_cells(w);
@@ -137,6 +158,17 @@ pub fn run(world: &Path, out: &Path, n: usize, seed: u64) -> Result<(usize, usiz
         .into_iter()
         .map(|(x, z)| w.sample(x, z).to_json())
         .collect();
+    // Columns the folds and faults change (the Java reader must find the same number).
+    let (mut plain, mut bent) = (Vec::new(), Vec::new());
+    let mut scratch = deeptime_format::structure::DeformScratch::default();
+    let mut deformed = 0usize;
+    if w.structure().is_some() {
+        for (x, z) in pick(&w, n, seed) {
+            w.plain_stack(x, z, &mut plain);
+            w.stack(x, z, &mut scratch, &mut bent);
+            deformed += usize::from(plain != bent);
+        }
+    }
     let through = columns
         .iter()
         .filter(|c| c["bodies"].as_array().is_some_and(|b| !b.is_empty()))
@@ -149,6 +181,8 @@ pub fn run(world: &Path, out: &Path, n: usize, seed: u64) -> Result<(usize, usiz
         "max_y": w.max_y,
         "seed": seed.to_string(),
         "classes": w.classes,
+        "structure_events": w.structure().map_or(0, |d| d.structure.events.len()),
+        "deformed_columns": deformed,
         "columns": columns,
     });
     let bytes = serde_json::to_vec(&doc).map_err(|e| FormatError::Invalid(e.to_string()))?;

@@ -275,6 +275,34 @@ pub fn bake(
     note.insert("strata".into(), strata);
     millis.insert("strata".into(), json!(ms(t)));
 
+    // The folds and faults the strata are read through (P2-01).
+    if let Some(st) = world.structure.as_ref().filter(|s| !s.events.is_empty()) {
+        let rel = deeptime_format::structure::STRUCTURE_PATH;
+        let (bytes, crc32) = deeptime_format::structure::write_structure(out.dir, st)?;
+        out.m.files.retain(|f| f.path != rel);
+        out.m.files.push(FileEntry {
+            path: rel.to_owned(),
+            bytes,
+            crc32,
+        });
+        out.bytes += bytes;
+        use deeptime_format::structure::Shape;
+        let count = |pick: fn(&Shape) -> bool| st.events.iter().filter(|e| pick(&e.shape)).count();
+        let folds = count(|s| matches!(s, Shape::Fold { .. }));
+        let intrusions = count(|s| matches!(s, Shape::Intrusion { .. }));
+        note.insert(
+            "structure".into(),
+            json!({
+                "events": st.events.len(),
+                "folds": folds,
+                "faults": st.events.len() - folds - intrusions,
+                "intrusions": intrusions,
+                "margin_blocks": st.margin,
+                "bytes": bytes,
+            }),
+        );
+    }
+
     let t = Instant::now();
     note.insert(
         "climate".into(),

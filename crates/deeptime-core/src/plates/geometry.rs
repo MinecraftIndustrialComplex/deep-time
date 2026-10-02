@@ -489,6 +489,7 @@ mod tests {
             resample_myr: 0.0,
             a0_km2: 1.0,
             counters: Default::default(),
+            dynamics: None,
         };
         let all: Vec<u32> = (0..n as u32).collect();
         let coast = (0..n)

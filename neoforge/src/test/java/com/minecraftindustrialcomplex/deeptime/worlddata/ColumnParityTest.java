@@ -135,6 +135,42 @@ class ColumnParityTest {
         return out;
     }
 
+    /**
+     * The fixture's world has folds and faults (P2-01), the Java reader reads them, and they change
+     * exactly the columns Rust says they change: a good share of the fixture, so the deformed column
+     * rule ({@link Structure#deformedStack}) is what {@link #everyColumnOfTheFixtureIsEqual} compares.
+     */
+    @Test
+    void foldsAndFaultsChangeTheSameColumns() throws IOException {
+        JsonObject doc = fixture();
+        int events = doc.get("structure_events").getAsInt();
+        assertTrue(events > 0, "the test planet has no structural events");
+        WorldData wd = WorldData.open(world());
+        {
+            Structure st = wd.structure();
+            assertTrue(st != null && st.size() == events, "Java reads " + (st == null ? 0 : st.size()) + " of " + events + " events");
+            RasterSampler strata = wd.layer(WorldData.HORIZONS);
+            Columns.Stack plain = new Columns.Stack(strata.stackDepth()), bent = new Columns.Stack(strata.stackDepth());
+            Structure.Scratch scratch = new Structure.Scratch();
+            int deformed = 0;
+            JsonArray columns = doc.getAsJsonArray("columns");
+            for (JsonElement e : columns) {
+                JsonObject c = e.getAsJsonObject();
+                int x = c.get("x").getAsInt(), z = c.get("z").getAsInt();
+                Columns.stack(wd, strata, x, z, plain);
+                Columns.deformedStack(wd, strata, x, z, bent, scratch);
+                boolean same = plain.count == bent.count;
+                for (int h = 0; same && h < plain.count; h++)
+                    same = plain.tops[h] == bent.tops[h] && plain.classes[h] == bent.classes[h]
+                            && plain.units[h] == bent.units[h];
+                if (!same)
+                    deformed++;
+            }
+            assertEquals(doc.get("deformed_columns").getAsInt(), deformed, "columns the events change");
+            assertTrue(deformed * 10 >= columns.size(), deformed + " of " + columns.size() + " columns are deformed");
+        }
+    }
+
     @Test
     void everyColumnOfTheFixtureIsEqual() throws IOException {
         JsonObject doc = fixture();

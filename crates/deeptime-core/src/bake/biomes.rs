@@ -447,50 +447,84 @@ pub fn fill_nearest(v: &mut [f32], src: &[bool], w: usize, h: usize) -> bool {
     true
 }
 
-/// Distance to the nearest cell of the other medium (land ↔ sea), in cells, by a two-pass chamfer
-/// (x wraps). Cells of the target medium get 0.
+/// Distance to the nearest cell of the other medium (land ↔ sea), in cells (x wraps). Cells of
+/// the target medium get 0; every cell gets infinity when there is none.
+///
+/// The exact Euclidean distance (P1-23). It was a two-pass 3 × 3 chamfer (steps 1 and √2), whose
+/// lines of equal distance are octagons: up to 8 % too far at 22.5° off the axes, so that the
+/// inland bands of the continentalness ran in straight segments along the axes and the diagonals.
+/// Two separable passes: along each row the distance to the row's nearest source (wrapping), then
+/// down each column the lower envelope of the parabolas (j − j′)² + row(j′)² (Felzenszwalb and
+/// Huttenlocher's distance transform of a sampled function, written from the paper's description).
 pub fn distance_cells(land: &[bool], w: usize, h: usize, to_sea: bool) -> Vec<f32> {
     let src: Vec<bool> = land.iter().map(|&l| l != to_sea).collect();
-    let mut idx: Vec<f32> = vec![0.0; land.len()];
-    let inf = f32::INFINITY;
     if !src.iter().any(|&s| s) {
-        idx.iter_mut().for_each(|d| *d = inf);
-        return idx;
+        return vec![f32::INFINITY; land.len()];
     }
-    let mut d: Vec<f32> = src.iter().map(|&s| if s { 0.0 } else { inf }).collect();
-    let (a, b) = (1.0f32, std::f32::consts::SQRT_2);
-    for _ in 0..2 {
-        for j in 0..h {
-            for i in 0..w {
-                let c = j * w + i;
-                let il = (i + w - 1) % w;
-                let mut m = d[c].min(d[j * w + il] + a);
-                if j > 0 {
-                    let up = (j - 1) * w;
-                    m = m.min(d[up + i] + a);
-                    m = m.min(d[up + il] + b);
-                    m = m.min(d[up + (i + 1) % w] + b);
-                }
-                d[c] = m;
+    // Along the rows, wrapping: two sweeps over the row laid out twice.
+    let mut row = vec![f64::INFINITY; land.len()];
+    row.par_chunks_mut(w)
+        .zip(src.par_chunks(w))
+        .for_each(|(d, s)| {
+            let mut since = f64::INFINITY;
+            for k in 0..2 * w {
+                let i = k % w;
+                since = if s[i] { 0.0 } else { since + 1.0 };
+                d[i] = d[i].min(since);
             }
-        }
-        for j in (0..h).rev() {
-            for i in (0..w).rev() {
-                let c = j * w + i;
-                let ir = (i + 1) % w;
-                let mut m = d[c].min(d[j * w + ir] + a);
-                if j + 1 < h {
-                    let dn = (j + 1) * w;
-                    m = m.min(d[dn + i] + a);
-                    m = m.min(d[dn + ir] + b);
-                    m = m.min(d[dn + (i + w - 1) % w] + b);
-                }
-                d[c] = m;
+            let mut since = f64::INFINITY;
+            for k in (0..2 * w).rev() {
+                let i = k % w;
+                since = if s[i] { 0.0 } else { since + 1.0 };
+                d[i] = d[i].min(since);
             }
+        });
+    // Down the columns: the lower envelope of the rows' parabolas.
+    let cols: Vec<Vec<f32>> = (0..w)
+        .into_par_iter()
+        .map(|i| {
+            let g: Vec<f64> = (0..h).map(|j| row[j * w + i] * row[j * w + i]).collect();
+            // v: the rows whose parabolas make the envelope; z[k]: where v[k]'s part begins.
+            let mut v: Vec<usize> = Vec::with_capacity(h);
+            let mut z: Vec<f64> = Vec::with_capacity(h + 1);
+            for q in (0..h).filter(|&q| g[q].is_finite()) {
+                loop {
+                    let Some(&p) = v.last() else {
+                        v.push(q);
+                        z.push(f64::NEG_INFINITY);
+                        break;
+                    };
+                    let (qf, pf) = (q as f64, p as f64);
+                    let s = ((g[q] + qf * qf) - (g[p] + pf * pf)) / (2.0 * (qf - pf));
+                    if s <= z[v.len() - 1] {
+                        v.pop();
+                        z.pop();
+                    } else {
+                        v.push(q);
+                        z.push(s);
+                        break;
+                    }
+                }
+            }
+            let mut k = 0;
+            (0..h)
+                .map(|j| {
+                    while k + 1 < v.len() && z[k + 1] < j as f64 {
+                        k += 1;
+                    }
+                    let dj = j as f64 - v[k] as f64;
+                    (dj * dj + g[v[k]]).sqrt() as f32
+                })
+                .collect()
+        })
+        .collect();
+    let mut out = vec![0f32; land.len()];
+    out.par_chunks_mut(w).enumerate().for_each(|(j, r)| {
+        for (i, o) in r.iter_mut().enumerate() {
+            *o = cols[i][j];
         }
-    }
-    idx.copy_from_slice(&d);
-    idx
+    });
+    out
 }
 
 /// The extreme (max or min) of `line` over the window [i − k, i + k]: wrapping or clipped at the
@@ -1175,6 +1209,74 @@ mod tests {
         let src: Vec<bool> = (0..w * h).map(|c| c % w == 0).collect();
         assert!(fill_nearest(&mut v, &src, w, h));
         assert!(v.iter().all(|&x| x == 7.0));
+    }
+
+    /// P1-23: the distance to the sea has no grid in it. Round a single sea cell the lines of
+    /// equal distance are circles (the chamfer this replaced made octagons, 8 % out at 22.5°),
+    /// across the seam too, and on a random coast no cell is further from the brute-force answer
+    /// than rounding.
+    #[test]
+    fn distance_to_the_sea_is_euclidean() {
+        let (w, h) = (96usize, 81usize);
+        for &(si, sj) in &[(48usize, 40usize), (0, 40), (95, 3)] {
+            let land: Vec<bool> = (0..w * h).map(|c| c != sj * w + si).collect();
+            let d = distance_cells(&land, w, h, true);
+            let mut worst = 0.0f64;
+            for j in 0..h {
+                for i in 0..w {
+                    let dx = (i as f64 - si as f64).abs();
+                    let dx = dx.min(w as f64 - dx);
+                    let want = dx.hypot(j as f64 - sj as f64);
+                    worst = worst.max((f64::from(d[j * w + i]) - want).abs());
+                }
+            }
+            assert!(worst < 1e-4, "source ({si}, {sj}): off by {worst} cells");
+        }
+        // The direction of the gradient is not held to the grid's eight: on a ring 30 cells from
+        // the source the distance is 30 everywhere, not 30 on the axes and 32.5 between them.
+        let land: Vec<bool> = (0..w * h).map(|c| c != 40 * w + 48).collect();
+        let d = distance_cells(&land, w, h, true);
+        let at = |a: f64| {
+            let (i, j) = (48.0 + 30.0 * a.cos(), 40.0 + 30.0 * a.sin());
+            let (i, j) = (i.round(), j.round());
+            (
+                f64::from(d[j as usize * w + i as usize]),
+                (i - 48.0).hypot(j - 40.0),
+            )
+        };
+        for k in 0..64 {
+            let (got, want) = at(k as f64 * std::f64::consts::TAU / 64.0);
+            assert!((got - want).abs() < 1e-4, "{got} {want}");
+        }
+        // A random coast against brute force.
+        let mut rng = crate::synth::SplitMix(23);
+        let land: Vec<bool> = (0..w * h).map(|_| rng.below(40) != 0).collect();
+        let d = distance_cells(&land, w, h, true);
+        let seas: Vec<(i64, i64)> = (0..w * h)
+            .filter(|&c| !land[c])
+            .map(|c| ((c % w) as i64, (c / w) as i64))
+            .collect();
+        for c in (0..w * h).step_by(7) {
+            let (i, j) = ((c % w) as i64, (c / w) as i64);
+            let want = seas
+                .iter()
+                .map(|&(si, sj)| {
+                    let dx = (i - si).abs().min(w as i64 - (i - si).abs()) as f64;
+                    dx.hypot((j - sj) as f64)
+                })
+                .fold(f64::INFINITY, f64::min);
+            assert!(
+                (f64::from(d[c]) - want).abs() < 1e-4,
+                "cell {c}: {} {want}",
+                d[c]
+            );
+        }
+        // No sea at all: infinitely far.
+        assert!(
+            distance_cells(&[true; 12], 4, 3, true)
+                .iter()
+                .all(|x| x.is_infinite())
+        );
     }
 
     /// A small planet: 64 x 32 L1 cells, L2 twice as fine; land in the middle rows with an Af, a
