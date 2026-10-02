@@ -11,6 +11,8 @@
 #       (<name>-audit.md and .json, with the early-game access probe); log <name>.log.
 #   tools/remote/mac.sh -- tools/review/deposit-richness-runs.sh audit <name> [deposit-audit args…]
 #       the audit again on an existing <name>-world/ with this tree's CLI (no new run), detached.
+#   tools/remote/mac.sh -- tools/review/deposit-richness-runs.sh census <x0,z0,x1,z1> <name>...
+#       real blocks of the box on the standalone set for each world (server lock; detached).
 #   tools/remote/mac.sh --no-sync -- tools/review/deposit-richness-runs.sh status
 #   tools/remote/mac.sh --no-sync -- tools/review/deposit-richness-runs.sh clean
 set -euo pipefail
@@ -43,6 +45,18 @@ case "${1:-}" in
             --json '$RUNS/$name-audit.json' $args > '$RUNS/$name-audit.md' 2>&1; echo AUDIT-DONE >> '$RUNS/$name-audit.md'" \
             > /dev/null 2>&1 < /dev/null &
         echo "audit started pid $! -> $RUNS/$name-audit.md"
+        ;;
+    census)
+        # Real blocks of one box on the standalone set, for each named world, one after the other
+        # (deposit-audit-detached.sh takes the server lock for each); results box-<name>-standalone.json.
+        box="$2"; shift 2
+        cmd=""
+        for name in "$@"; do
+            cmd="$cmd BOX_TAG=$name SKIP_VANILLA=1 PROFILES=standalone tools/review/deposit-audit-detached.sh '$RUNS/$name-world' '$box';"
+            cmd="$cmd cp review/out/deposit-audit/previews.log '$RUNS/previews-$name.log'; cp review/out/deposit-audit/box-$name-standalone.json '$RUNS/';"
+        done
+        setsid nohup sh -c "$cmd echo CENSUS-DONE > '$RUNS/census.done'" > /dev/null 2>&1 < /dev/null &
+        echo "census started pid $!"
         ;;
     status)
         for l in "$RUNS"/*.log; do [ -e "$l" ] && { echo "== $l"; tail -3 "$l"; }; done
