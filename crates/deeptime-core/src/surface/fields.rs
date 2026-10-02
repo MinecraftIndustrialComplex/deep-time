@@ -14,7 +14,7 @@
 //! | `rift_subsidence_m_myr` | plates | minus the plate model's uplift where it is negative on continental crust |
 //! | `heat_flow_mw_m2` | plates | the sample's heat-flow proxy |
 //! | `dist_litho_step_km` | plates | at each frame: distance (km, block metric) to the nearest edge between craton and non-craton regime cells |
-//! | `inherited_bif` | — | 0: the plate model does not date its crust beyond the run, so no Paleoproterozoic basement exists (P1-07 may add it) |
+//! | `inherited_bif` | plates + timeline | the frame's craton share × the share of the BIF acme before the run's start (`deposits::clocks`; plan §8.6: inherited cratonic basement where the timeline starts after the acme) |
 //! | `elevation_m` | surface (P1-04) | above sea level of the time |
 //! | `erosion_rate_m_myr`, `deposition_rate_m_myr` | surface | the step's net erosion or deposition |
 //! | `topographic_gradient_m_km` | surface | at each frame: gradient of the frame-mean land elevation smoothed over ~50 km |
@@ -26,7 +26,7 @@
 //! | `reservoir_quality`, `seal` | surface | reservoir-tagged rock above the source layer (/ 50 m, capped at 1); seal-tagged rock above the topmost reservoir (/ 20 m) |
 //! | `water_table_depth_m` | surface + climate | land: 5 m + 150 m·(1 − min(1, P/PET)) + 5 % of the local relief; sea: 0 |
 //! | `precip_mm`, `t_mean_c` | climate (P1-05, `crate::climate`), read through `climate.rs`; the zonal stand-in without a `climate` section | the climate the surface step ran with |
-//! | clocks `oxygenated_oceans`, `land_plants`, `bif_acme` | stand-in | 1, 1, 0 (a Phanerozoic Earth) until the preset carries `planet.atmosphere` |
+//! | clocks `oxygenated_oceans`, `land_plants`, `bif_acme` | timeline | the share of the frame inside each clock's window of Earth's history, by the planet's age (`deposits::clocks`; stage 2 WP-9/10 replaced the fixed stand-ins 1, 1, 0) |
 //!
 //! `trap_structure` and the `host/<class>` fractions come from the structure stage (P1-07,
 //! `structure/traps.rs`, `structure/hosts.rs`), which adds them to each frame after this stage
@@ -40,6 +40,7 @@ use serde::{Deserialize, Serialize};
 use super::grid::{Dims, box_blur};
 use super::lithology::{Classes, has_tag};
 use super::strata_log::StrataLog;
+use crate::deposits::clocks::Epoch;
 use crate::deposits::fields::{FieldFrame, NO_ORIGIN, ORIGIN_FIELDS, lat_of_row};
 use crate::plates::state::{ARC, CONTINENTAL, SUBDUCTION_ZONE, regime};
 
@@ -84,12 +85,6 @@ pub const FRAME_FIELDS: [&str; 3] = [
     "deeptime:topographic_gradient_m_km",
 ];
 
-/// The stand-in clocks.
-pub const CLOCKS: [(&str, f32); 3] = [
-    ("deeptime:clock/oxygenated_oceans", 1.0),
-    ("deeptime:clock/land_plants", 1.0),
-    ("deeptime:clock/bif_acme", 0.0),
-];
 
 /// Time-weighted sums of the step fields since the frame began.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -422,7 +417,7 @@ pub fn regional_gradient(d: &Dims, elev: &[f32]) -> Vec<f32> {
 }
 
 /// Closes the frame: averages, the per-frame fields and the clocks.
-pub fn flush(acc: &mut FrameAcc, d: &Dims, t_end_years: f64) -> FieldFrame {
+pub fn flush(acc: &mut FrameAcc, d: &Dims, t_end_years: f64, epoch: &Epoch) -> FieldFrame {
     let span = acc.span_years.max(1e-9);
     let mut fields: BTreeMap<String, Vec<f32>> = BTreeMap::new();
     let mut craton = Vec::new();
@@ -438,10 +433,16 @@ pub fn flush(acc: &mut FrameAcc, d: &Dims, t_end_years: f64) -> FieldFrame {
         }
     }
     let n = d.cells();
+    let bif_share = epoch.inherited_bif_share() as f32;
     if craton.len() == n {
         fields.insert(FRAME_FIELDS[0].into(), dist_to_edge(d, &craton));
+        fields.insert(
+            FRAME_FIELDS[1].into(),
+            craton.iter().map(|&k| k * bif_share).collect(),
+        );
+    } else {
+        fields.insert(FRAME_FIELDS[1].into(), vec![0.0; n]);
     }
-    fields.insert(FRAME_FIELDS[1].into(), vec![0.0; n]);
     if let Some(e) = fields.get(&format!("{P}elevation_m")) {
         let g = regional_gradient(d, e);
         fields.insert(FRAME_FIELDS[2].into(), g);
@@ -479,7 +480,11 @@ pub fn flush(acc: &mut FrameAcc, d: &Dims, t_end_years: f64) -> FieldFrame {
         t_years: t_end_years,
         dt_years: acc.span_years,
         fields,
-        clocks: CLOCKS.iter().map(|&(k, v)| (k.to_owned(), v)).collect(),
+        clocks: epoch
+            .clocks(t_end_years - acc.span_years, t_end_years)
+            .iter()
+            .map(|&(k, v)| (k.to_owned(), v))
+            .collect(),
     };
     acc.t_start_years = t_end_years;
     acc.span_years = 0.0;
@@ -489,4 +494,46 @@ pub fn flush(acc: &mut FrameAcc, d: &Dims, t_end_years: f64) -> FieldFrame {
 /// Latitude of row `j` of the planet grid.
 pub fn row_lat(grid: &deeptime_format::GridDesc, j: usize) -> f64 {
     lat_of_row(grid, j as u32)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A frame of `span_myr` ending at `t_end_myr` with one craton cell of four.
+    fn frame_at(t_end_myr: f64, span_myr: f64, epoch: &Epoch) -> FieldFrame {
+        let d = Dims::new(2, 2, 1000.0, true);
+        let mut acc = FrameAcc::default();
+        let dt = span_myr * 1.0e6;
+        acc.add("surface:craton", &[1.0, 0.0, 0.0, 0.0], dt);
+        acc.span_years = dt;
+        flush(&mut acc, &d, t_end_myr * 1.0e6, epoch)
+    }
+
+    /// Stage 1 found the clocks fixed at 1, 1, 0 and `inherited_bif` at 0 on every recorded
+    /// history (ledger ORE-017, ORE-020): no BIF could form and coal had no date limit. The frames
+    /// now carry Earth's dates for the planet's age.
+    #[test]
+    fn frames_carry_dated_clocks_and_inherited_bif() {
+        let earth = |start_myr: f64| Epoch {
+            present_age_gyr: crate::deposits::clocks::EARTH_AGE_GYR,
+            run_start_years: -start_myr * 1.0e6,
+        };
+        // A 1,000 Myr run: a Neoproterozoic frame has no coal-forming plants, a Carboniferous one has.
+        let e = earth(1000.0);
+        let old = frame_at(-900.0, 50.0, &e);
+        assert_eq!(old.clocks["deeptime:clock/land_plants"], 0.0);
+        assert_eq!(old.clocks["deeptime:clock/oxygenated_oceans"], 1.0);
+        assert_eq!(old.clocks["deeptime:clock/bif_acme"], 0.0);
+        let young = frame_at(-300.0, 50.0, &e);
+        assert_eq!(young.clocks["deeptime:clock/land_plants"], 1.0);
+        // The run starts after the acme: the craton cell inherits BIF, the others do not.
+        assert_eq!(old.fields["deeptime:inherited_bif"], vec![1.0, 0.0, 0.0, 0.0]);
+        // A 3,000 Myr run holds the acme: its frames there carry the clock, no inherited BIF.
+        let e = earth(3000.0);
+        let acme = frame_at(-2300.0, 50.0, &e);
+        assert_eq!(acme.clocks["deeptime:clock/bif_acme"], 1.0);
+        assert_eq!(acme.clocks["deeptime:clock/oxygenated_oceans"], 0.0);
+        assert_eq!(acme.fields["deeptime:inherited_bif"], vec![0.0; 4]);
+    }
 }
