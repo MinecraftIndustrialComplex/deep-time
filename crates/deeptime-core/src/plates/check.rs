@@ -71,7 +71,7 @@ const fn waits(
     }
 }
 
-const WAITS_COLLISION: &str = "the collision state and belts (design tasks 2-3)";
+const WAITS_COLLISION: &str = "the collision belts (design tasks 3-4)";
 const WAITS_FORCES: &str = "the force balance (design task 5)";
 const WAITS_MIX: &str = "a run recorded with the boundary mix and arc heights (dynamics version 3)";
 
@@ -388,7 +388,7 @@ pub const MEASURES: &[MeasureDef] = &[
     // Waiting for physics: reported as "no data" until the record is filled (see `waits`).
     waits(
         "collision_convergence_ratio_20myr",
-        "Convergence 20 Myr after a collision's onset ÷ at onset, median (needs the collision state)",
+        "Convergence 20 Myr after a collision's onset ÷ at onset, median",
         "ratio",
         Some(0.2),
         Some(0.6),
@@ -396,7 +396,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "wedge_width_km_p50",
-        "Wedge on the incoming side, width, median (needs the belts)",
+        "Wedge on the incoming side, width when the belt stood highest, median",
         "km",
         Some(100.0),
         Some(350.0),
@@ -404,7 +404,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "foredeep_width_km_p50",
-        "Foredeep width, median (needs the belts)",
+        "Foredeep width in front of a belt above 3 km, median",
         "km",
         Some(150.0),
         Some(450.0),
@@ -412,7 +412,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     waits(
         "foredeep_depth_m_p50",
-        "Foredeep depth of fill, median (needs the belts)",
+        "Foredeep depth below local isostasy in front of a belt above 3 km, median",
         "m",
         Some(2000.0),
         Some(7000.0),
