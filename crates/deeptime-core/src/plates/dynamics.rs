@@ -459,6 +459,9 @@ pub struct CollisionRec {
     /// With a weld, the plate that died (the smaller: the larger keeps its id).
     #[serde(default)]
     pub died: Option<u32>,
+    /// It ended because its convergence had stalled (else: a terrane transfer on shortening).
+    #[serde(default)]
+    pub stalled: bool,
     /// First and last step of the collision state, Myr: when continental crust first converged
     /// at the front, and when the terrane was transferred or the plates welded.
     pub start_myr: f64,
@@ -539,6 +542,11 @@ pub struct PartingRec {
     /// The longest its front was, km, and its fastest convergence across it, mm/yr.
     pub front_km: f64,
     pub peak_convergence_mm_yr: f64,
+    /// Its belt's highest mean height, m, and the crust it stacked, km² × m (`belts.rs`).
+    #[serde(default)]
+    pub peak_height_m: f64,
+    #[serde(default)]
+    pub stacked_km2_m: f64,
     /// [`PARTED`], [`REVERSED`], [`CLOSED`], [`EMPTIED`] or [`OPEN`].
     pub reason: String,
 }
@@ -562,6 +570,8 @@ pub fn record_parting(
             area_km2: col.area_km2,
             front_km: col.peak_front_km,
             peak_convergence_mm_yr: col.peak_convergence_mm_yr,
+            peak_height_m: col.belt.peak_height_m,
+            stacked_km2_m: col.belt.stacked_km2_m,
             reason: reason.to_owned(),
         });
     }

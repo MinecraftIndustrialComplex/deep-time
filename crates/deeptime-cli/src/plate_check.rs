@@ -25,6 +25,8 @@ use crate::run::CliResult;
 pub struct Options<'a> {
     pub runs: &'a [PathBuf],
     pub json: Option<&'a Path>,
+    /// Where to write the first run's dynamics record as JSON.
+    pub record: Option<&'a Path>,
     pub targets: Option<&'a Path>,
     /// `name=value` settings of the check's definitions (`check::Params`).
     pub params: &'a [String],
@@ -117,6 +119,10 @@ pub fn run(o: &Options<'_>) -> CliResult<ExitCode> {
         .iter()
         .map(|p| load(p))
         .collect::<CliResult<Vec<_>>>()?;
+    if let Some(out) = o.record {
+        let text = serde_json::to_string(&runs[0].dynamics).map_err(|e| e.to_string())?;
+        std::fs::write(out, text).map_err(|e| format!("{}: {e}", out.display()))?;
+    }
     let rows = check::evaluate(&runs, &targets);
     let names: Vec<String> = runs.iter().map(|r| r.name.clone()).collect();
     println!(

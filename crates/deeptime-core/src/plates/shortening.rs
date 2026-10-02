@@ -827,6 +827,7 @@ mod tests {
             edge_km: length,
             position_sum: DVec3::Y * f64::from(samples),
             crust: Vec::new(),
+            edge: Vec::new(),
         }
     }
 
