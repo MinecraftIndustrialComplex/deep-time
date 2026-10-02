@@ -10,10 +10,12 @@ mod heightmap;
 mod hydro;
 mod margins_view;
 mod parity;
+mod plate_check;
 mod provinces;
 mod run;
 mod satellite_view;
 mod strata_check;
+mod structure_sections;
 mod structure_view;
 mod synth;
 mod volcano_view;
@@ -329,6 +331,26 @@ enum Command {
         #[arg(long = "column", value_name = "X,Z", allow_hyphen_values = true)]
         column: Vec<String>,
     },
+    /// Cross-sections of a baked world through its folds and faults (P2-01), each drawn as the
+    /// layers were laid down and as the structures left them: across the largest collision belt,
+    /// arc and rift of the world's event log, and along any `--line`.
+    StructureSections {
+        /// World-data folder (a run's `--out`).
+        #[arg(long)]
+        world_data: PathBuf,
+        /// Folder to write the PNGs, `sections.json` and `index.html` into.
+        #[arg(long)]
+        out: PathBuf,
+        /// A line of your own, `TITLE:x0,z0,x1,z1` in blocks (repeatable).
+        #[arg(long = "line", allow_hyphen_values = true)]
+        line: Vec<String>,
+        /// Half the length of a suggested section, blocks.
+        #[arg(long, default_value_t = 320.0)]
+        half: f64,
+        /// Pixels a block.
+        #[arg(long, default_value_t = 2)]
+        px: u32,
+    },
     /// How a baked planet's deposits come out in blocks, per deposit type, beside the background
     /// scatter and vanilla's ore density (no Minecraft server: the bake evaluated as the mod's
     /// deposit and scatter features do). Prints a table; --json writes every site's row.
@@ -414,6 +436,10 @@ enum Command {
         /// More layers to sample (nearest), comma-separated.
         #[arg(long, value_delimiter = ',')]
         layers: Vec<String>,
+        /// Also what the column evaluator decides: rock classes at four depths, the horizon
+        /// count, the second horizon's top and the water kind.
+        #[arg(long)]
+        columns: bool,
         /// The .npy file to write (and <out>.json).
         #[arg(long)]
         out: PathBuf,
@@ -440,6 +466,25 @@ enum Command {
         /// Field names (comma-separated); default every field.
         #[arg(long, value_delimiter = ',')]
         fields: Vec<String>,
+    },
+    /// The plate dynamics of finished runs against the acceptance targets of
+    /// docs/design/plate-collisions-and-welding.md §6: largest plate, plate lifetimes and fates,
+    /// land gained per step, what each collision lifted, collisions per 100 Myr, continental
+    /// crust, active margins, sea-floor age. Prints one table (measure, value, target range, pass
+    /// or fail) and exits non-zero when a measure is outside its range. With several runs the
+    /// value is their mean.
+    PlateCheck {
+        /// A run: a checkpoint (`stage --out`), a world-data folder or its manifest.json, or a
+        /// JSON file holding the plates note. Repeatable.
+        #[arg(long = "run")]
+        runs: Vec<PathBuf>,
+        /// Also write the table as JSON here.
+        #[arg(long)]
+        json: Option<PathBuf>,
+        /// JSON file moving target ranges: {"measure_key": [lo, hi]}, null for an open end or for
+        /// no range at all (the measure is then only reported).
+        #[arg(long)]
+        targets: Option<PathBuf>,
     },
     /// Draw the continental margins of a checkpoint's plate model by tectonic setting (P1-27:
     /// passive, Andean, subducting, collision, other plate boundary) over the sea floor by age,
@@ -788,6 +833,33 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::StructureSections {
+            world_data,
+            out,
+            line,
+            half,
+            px,
+        }) => match structure_sections::run(&world_data, &out, &line, half, px.clamp(1, 8)) {
+            Ok(v) => {
+                for s in v["sections"].as_array().into_iter().flatten() {
+                    println!(
+                        "deeptime structure-sections: {} from {} to {} ({:.0} km), {} of {} columns changed -> {}",
+                        s["title"].as_str().unwrap_or(""),
+                        s["from"],
+                        s["to"],
+                        s["km"].as_f64().unwrap_or(0.0),
+                        s["columns_changed"],
+                        s["columns"],
+                        out.join(s["structure"].as_str().unwrap_or("")).display()
+                    );
+                }
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("deeptime structure-sections: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some(Command::StrataCheck {
             world_data,
             checkpoint,
@@ -922,6 +994,7 @@ fn main() -> ExitCode {
             area,
             step,
             layers,
+            columns,
             out,
         }) => {
             let b = heightmap::Box2 {
@@ -930,7 +1003,7 @@ fn main() -> ExitCode {
                 x1: area[2],
                 z1: area[3],
             };
-            match heightmap::run(&world_data, &b, step, &layers, &out) {
+            match heightmap::run(&world_data, &b, step, &layers, columns, &out) {
                 Ok((rows, cols)) => {
                     println!("deeptime heightmap: {rows} x {cols} -> {}", out.display());
                     ExitCode::SUCCESS
@@ -941,6 +1014,21 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Some(Command::PlateCheck {
+            runs,
+            json,
+            targets,
+        }) => match plate_check::run(&plate_check::Options {
+            runs: &runs,
+            json: json.as_deref(),
+            targets: targets.as_deref(),
+        }) {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("deeptime plate-check: {e}");
+                ExitCode::from(2)
+            }
+        },
         Some(Command::Margins { input, out }) => match margins_view::run(&input, &out) {
             Ok(m) => {
                 println!(
@@ -1889,7 +1977,7 @@ mod tests {
         })
         .unwrap();
         let m = deeptime_format::Manifest::read(&dir.join("world")).unwrap();
-        assert_eq!(m.format_version, "0.2");
+        assert_eq!(m.format_version, "0.3");
         assert_eq!(m.notes["bake"]["baked"], true);
         // The bake says how much of its terrain stands above the build limit (whatever the planet).
         let limit = &m.notes["bake"]["terrain"]["build_limit"];
