@@ -678,12 +678,12 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: de Bremond d'Ars, J., Jaupart, C. and Sparks, R. S. J. (1995). Distribution of volcanoes in active margins. Journal of Geophysical Research 100(B10): 20421-20432.
 - DOI or URL: 10.1029/95JB02153 (https://agupubs.onlinelibrary.wiley.com/doi/10.1029/95JB02153). No open copy found.
 - Cited as: "de Bremond d'Ars, Jaupart & Sparks 1995, JGR 100(B10):20421"
-- Ledger ids: VOL-009, VOL-039, VOL-040; notes: and indirectly VOL-009, VOL-040
-- Access: paywalled (abstract only)
+- Ledger ids: VOL-039 (the code no longer cites it for a value: the comment now quotes its abstract); HNT-058
+- Access: free to read at the publisher (OpenAlex: bronze open access), but the publisher refuses scripted fetches (HTTP 403, retried WP-2 2026-10-02)
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Substitute: none found.
 - Read so far (by the project): not stated
-- Read in this pass: abstract fetched (Crossref and OpenAlex)
+- Read in this pass: abstract fetched (Crossref and OpenAlex). WP-2 (2026-10-02): abstract re-read in full from OpenAlex: "There is no characteristic spacing between volcanoes. In each arc, the distribution of volcano spacing is best represented by a Gamma distribution which corresponds to randomly generated points"; 16 margins, 479 volcanic systems. The per-arc mean spacings are in Hildreth 2007 instead.
 - Reference check: authors, year, journal, volume, issue and first page are right (the pages are 20421-20432). The content does NOT obviously match the attribution. The abstract says the study covers 16 active margins and 479 volcanic systems, arcs are ribbons about 10 times longer than wide, and "Volcano spacing follows a random distribution" (Gamma distribution, "no characteristic spacing" in the search summary), explained by gravitational instability in layered fluids. The code comment attributes to it "Real volcanic fronts space their centres 50-70 km apart (the Andes, Cascades, Aleutians, Japan)". The abstract gives no mean spacing and names none of those four arcs. The full text (which may tabulate mean spacings per margin) could not be read. #### Part 1b: sources found for the uncited Earth figures (not cited by the code; added by this pass)
 
 ### Szabo1986
@@ -701,7 +701,9 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Access: open access (agency report)
 - Library (the project's source library, not distributed): fetched (PDF, 56 pages, text layer, 214,729 characters). From: https://pubs.usgs.gov/pp/1801/downloads/pp1801_Chap5_Poland.pdf. Text file: Poland2014.txt.
 - Read in this pass: abstract fetched (USGS publication page). The chapter text with reservoir depths was not readable.
-- Used for: Kilauea reservoir depths (MAG-002). The abstract gives the deep rift zone at about 3 km to 9 km depth and supply of about 0.1 km3/yr, not the summit reservoir depth.
+- Read in WP-2 (2026-10-02), full text from the library copy: a reservoir 1-2 km beneath the centre of Kilauea's caldera and another, "a few cubic kilometers at 2-4 km beneath the summit", under its south part (p. 194); InSAR fits "a sill-like source at 3-km depth" (fig. 14 caption, p. 199).
+- Ledger ids: MAG-002, MAG-003, MAG-004; HNT-081
+- Used for: Kilauea reservoir depths (MAG-002), size (MAG-003) and shape (MAG-004).
 
 ### Przeor2022
 - Reference: Przeor, M., D'Auria, L., Pepe, S. et al. (2022). Elastic interaction between Mauna Loa and Kilauea evidenced by independent component analysis. Scientific Reports.
@@ -729,6 +731,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Merged keys: Courtillot2003
 - Read in this pass: abstract fetched
 - Used for: flood-basalt frequency (VOL-052 and run-review "one per 20-30 Myr").
+- Read in WP-2 (2026-10-02), library text: the Deccan section is 2,500 m thick, at least 1,800 m of it erupted in well under 1 Myr; "a typical duration of 1 million years for the bulk of trap eruption"; no individual flow thicknesses (VOL-036, VOL-052).
 
 ### Bryan2008
 - Reference: Bryan, S. E. and Ernst, R. E. (2008). Revised definition of Large Igneous Provinces (LIPs). Earth-Science Reviews 86(1-4): 175-202 (OpenAlex dates it 2007, online first).
@@ -745,6 +748,78 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Access: open access (agency report)
 - Library (the project's source library, not distributed): fetched (PDF, 136 pages, text layer, 526,357 characters). From: https://pubs.usgs.gov/pp/pp1744/pp1744.pdf. Text file: Hildreth2007.txt.
 - Read in this pass: abstract fetched; it has no lifetime or spacing figures. Stage-2 candidate for stratovolcano lifetimes and vent spacing.
+- Read in WP-2 (2026-10-02), full text from the library copy: p. 56, "The oft-repeated old myth of evenly spaced arc volcanoes 40 to 70 km apart ... doesn't bear scrutiny in any arc"; table 4 (p. 58), spacings of the 17 largest Cascade centres 35-170 km, mean 87 km, s.d. 45 km (54 and 56 km with lesser or mafic centres added); table 10 (p. 76), mean spacing of large centres 42 km in the Cascades (30 pairs, s.d. 37), 27 km on the Alaska Peninsula (44 pairs, s.d. 23), 42 km in the Andean Southern Volcanic Zone (35 pairs, s.d. 22), and large centres on the volcanic front 12 of 26, 45 of 45 and 36 of 65; p. 64, "most of the large evolved centers have lifespans in the range 0.1 to 1 Myr".
+- Ledger ids: VOL-004, VOL-038, VOL-039; HNT-058
+
+### Grosse2014
+- Reference: Grosse, P., Euillades, P. A., Euillades, L. D. and van Wyk de Vries, B. (2014). A global database of composite volcano morphometry. Bulletin of Volcanology 76: 784 (16 pages; online 2013).
+- DOI or URL: 10.1007/s00445-013-0784-4
+- Cited as: "Grosse et al. 2014" (added by WP-2 in comments of `volcanoes/params.rs`, `volcanoes/shape.rs` and `volcanoes/mod.rs`)
+- Ledger ids: VOL-016, VOL-017, VOL-019, VOL-020, VOL-026, VOL-029, VOL-030; HNT-016
+- Access: free to read at the publisher (bronze); the publisher returned a page, not the PDF; the authors' submitted version is in the CONICET repository
+- Library (the project's source library, not distributed): fetched WP-2 2026-10-02 (PDF, 23 pages, text layer). From: https://ri.conicet.gov.ar/handle/11336/7280 (submitted version; the pages carry the journal's running heads). Text file: Grosse2014.txt.
+- Read in WP-2 (2026-10-02), full text: 759 composite volcanoes from the 90-m SRTM model (those of the Global Volcanism Program list it covers, with a basal width over 2 km). Table 1 (p. 7): stratovolcanoes (n = 512): basal width median 7.9 km (range 2.0-65.9), height median 1.02 km, mean 1.13, s.d. 0.55 (range 0.17-4.57), height/basal width median 0.13 (0.02-0.30), mean flank slope 17.7 degrees, main flank 21.5, steepest average slope 27.7 degrees at 0.79 of the height; shields (n = 89): basal width median 15.3 km, height 0.81 km, height/width 0.06, flank slope 8.1 degrees. p. 8: crater and caldera data only for 104 large ones: 0.6-11 km across, median 2.2 km; depth under 100 to 860 m, median 240 m. Subaerial parts only.
+
+### ClagueSherrod2014
+- Reference: Clague, D. A. and Sherrod, D. R. (2014). Growth and degradation of Hawaiian volcanoes. Chapter 3 in Poland, M. P., Takahashi, T. J. and Landowski, C. M. (eds), Characteristics of Hawaiian Volcanoes, U.S. Geological Survey Professional Paper 1801, pp. 97-146.
+- DOI or URL: 10.3133/pp18013; https://pubs.usgs.gov/pp/1801/downloads/pp1801_Chap3_Clague.pdf
+- Cited as: "Clague & Sherrod 2014" (added by WP-2 in comments)
+- Ledger ids: VOL-007, VOL-009, VOL-017, VOL-021, VOL-041, VOL-048, VOL-058, MAG-002
+- Access: open access (agency report)
+- Library: fetched WP-2 2026-10-02 (PDF, text layer, 343,082 characters). Text file: ClagueSherrod2014.txt.
+- Read in WP-2 (2026-10-02), full text: abstract (p. 97): "Principal growth occurs in the first 1-2 million years"; "Shallow magma reservoirs (1-7-km depth)" of shield-stage volcanoes, "smaller reservoirs at 20-30-km depth persist". p. 99: "The sizes and spacing of the volcanoes are nonuniform"; only eight volcanoes northwest of the main islands grew to 1,500 m or more above sea level. p. 114: lava flows on a shield dip 2-10 degrees, submarine slopes are steeper. pp. 130-131: subsidence under the growing volcano's load "lasts perhaps 1 m.y." and sinks shorelines "by more than 1 km" (2.6 m/kyr off the Island of Hawaii); thermal subsidence of the plate along much of the chain "~0.01 m/k.y."; reefs drown about 33 Myr after their volcano formed. Mauna Loa's summit 4,169 m.
+
+### Christiansen2001
+- Reference: Christiansen, R. L. (2001). The Quaternary and Pliocene Yellowstone Plateau volcanic field of Wyoming, Idaho, and Montana. U.S. Geological Survey Professional Paper 729-G.
+- DOI or URL: 10.3133/pp729G; https://pubs.usgs.gov/pp/pp729g/pp729g.pdf
+- Cited as: "Christiansen 2001" (added by WP-2 in comments and hints)
+- Ledger ids: VOL-006, VOL-023, VOL-027, VOL-029, VOL-045, VOL-046; HNT-060, HNT-063
+- Access: open access (agency report)
+- Library: fetched WP-2 2026-10-02 (PDF, 37.7 MB, text layer, 1.13 million characters). Text file: Christiansen2001.txt.
+- Read in WP-2 (2026-10-02), the summary (pp. G1-G2), physiography (p. G6) and the cycle chronology: caldera-forming eruptions at 2.1 Ma (Huckleberry Ridge Tuff, more than 2,450 km3 over 15,500 km2, caldera more than 75 km long), 1.3 Ma (Mesa Falls Tuff, more than 280 km3) and 0.64 Ma (Lava Creek Tuff, more than 1,000 km3 over more than 7,500 km2); the Yellowstone caldera is a basin 85 by 45 km. The plateau's average elevation is about 2,400 m; Island Park and the eastern Snake River Plain lie at about 1,600-1,900 m.
+
+### Rasmussen2022
+- Reference: Rasmussen, D. J., Plank, T. A., Roman, D. C. and Zimmer, M. M. (2022). Magmatic water content controls the pre-eruptive depth of arc magmas. Science 375(6585): 1169-1172.
+- DOI or URL: 10.1126/science.abm5174
+- Ledger ids: MAG-002; HNT-081
+- Access: paywalled; no open copy found (OpenAlex)
+- Library: not fetched
+- Read in WP-2 (2026-10-02): abstract only (OpenAlex): magma storage depths under active arc volcanoes "vary widely (~0 to 20 kilometers)"; "geophysically observed magma depths (6 +/- 3 kilometers)".
+
+### ChaussardAmelung2014
+- Reference: Chaussard, E. and Amelung, F. (2014). Regional controls on magma ascent and storage in volcanic arcs. Geochemistry, Geophysics, Geosystems 15(4): 1407-1418.
+- DOI or URL: 10.1002/2013GC005216
+- Ledger ids: MAG-002, VOL-005
+- Access: free to read at the publisher (bronze), but the publisher refuses scripted fetches
+- Library: not fetched
+- Read in WP-2 (2026-10-02): abstract only (OpenAlex): 70 volcanoes in 15 regions; shallow reservoirs (under 5 km) are 52 % more common in young than in Precambrian crust, 42 % more common in thin (under 25 km) than in thick (over 45 km) crust, and 33-69 % more common under extension or strike-slip than under compression.
+
+### TenBrink1991
+- Reference: ten Brink, U. (1991). Volcano spacing and plate rigidity. Geology 19(4): 397-400.
+- DOI or URL: 10.1130/0091-7613(1991)019<0397:VSAPR>2.3.CO;2
+- Ledger ids: VOL-007
+- Access: paywalled
+- Library: not fetched
+- Read in WP-2 (2026-10-02): abstract only (publisher page via OpenAlex): spacing of hotspot volcanoes (seven oceanic groups, seven East African) correlates with the plate's elastic thickness, as the distance to the flexural inflection point, proportional to Te^(3/4); spacing in island arcs "is fairly uniform and is much larger" than that distance. No values in the abstract.
+
+### Lev2019
+- Reference: Lev, E., Ruprecht, P., Oppenheimer, C., Peters, N., Patrick, M. R., Hernandez, P. A. et al. (2019). A global synthesis of lava lake dynamics. Journal of Volcanology and Geothermal Research 381: 16-31.
+- DOI or URL: 10.1016/j.jvolgeores.2019.04.010
+- Ledger ids: MAG-020 (the source the count of persistent lava lakes should rest on)
+- Access: free to read at the publisher (bronze, accepted version per OpenAlex), but the publisher refused a scripted fetch (HTTP 403, WP-2 2026-10-02); OpenAlex holds no abstract
+- Library: not fetched
+- Read: not read
+
+### USGS-MaunaLoa, USGS-ActiveVolcanoesFAQ
+- Reference: U.S. Geological Survey, Volcano Hazards Program pages "Mauna Loa" (https://www.usgs.gov/volcanoes/mauna-loa) and "How many active volcanoes are there on Earth?" (https://www.usgs.gov/faqs/how-many-active-volcanoes-are-there-earth).
+- Ledger ids: VOL-021, VOL-022; MAG-020; HNT-016, HNT-059
+- Library: fetched WP-2 2026-10-02 (HTML; text files USGS-MaunaLoa.txt, USGS-ActiveVolcanoesFAQ.txt).
+- Read in WP-2 (2026-10-02): Mauna Loa rises "to more than 4 km" above sea level, its submarine flanks descend "an additional 5 km" to the sea floor, which its mass depresses "another 8 km"; its subaerial part extends about 120 km from the island's southern tip to the summit caldera. "There are about 1,350 potentially active volcanoes worldwide, aside from the continuous belts of volcanoes on the ocean floor at spreading centers"; about 500 have erupted in historical time.
+
+### MinecraftSources
+- Reference: Minecraft 1.21.1 (Mojang) as decompiled in the NeoForge 21.1.249 sources jar (`neoforge/build/moddev/artifacts/neoforge-21.1.249-sources.jar`, made by any Gradle build). Not a scientific source: it is where the vanilla lava rules the mod replaces are defined.
+- Ledger ids: MAG-028, MAG-029, MAG-030, MAG-031
+- Read in WP-2 (2026-10-02): `NoiseBasedChunkGenerator.createFluidPicker` (lava below min(-54, sea level)); `Aquifer.NoiseBasedAquifer.computeSubstance` (asks the global picker first), `computeFluidType` (lava where the surface level is at or below -10 and the lava noise exceeds 0.3 in magnitude), `computeRandomizedFluidSurfaceLevel` (40-block cells centred at 40 cellY + 20, spread noise x 10 quantised to 3).
 
 ### Web references used (secondary): Wikipedia pages Mount Fuji, Mauna Loa, Mauna Kea, Hawaiian-Emperor seamount chain, Ojos del Salado, Crater Lake, Yellowstone hotspot, Mount St. Helens, Mount Rainier, Mount Shasta, Cotopaxi, Lava lake, Large igneous province, Deccan Traps, Siberian Traps, Altiplano-Puna volcanic complex; USGS pages "How many active volcanoes are there on Earth?", Mauna Loa, Long Valley caldera. Their own cited references are named in the spot checks.
 
