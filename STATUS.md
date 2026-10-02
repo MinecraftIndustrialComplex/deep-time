@@ -111,7 +111,6 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
-<<<<<<< HEAD
 ### 2026-10-02 — Flexure follow-up: the margin zigzag and the polar stripes, causes and fixes (agent worktree agent-afae960b6db068f94, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Asked.** The coordinator, after flexure landed (5ce5af4): find the cause of the cell-to-cell alternation along
   active margins and the rise in land roughness (99th percentile 294 → 391 m in one pair), and of the stripes near
@@ -234,7 +233,6 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   run (the mix is one more pass over the lattice edges, like the fronts').
 - **Next.** The force-balance and belt tasks are judged on `boundary_subduction_pct` (and the arc rows). A strike-slip
   tolerance for the mix (the +-20 degree rule) would make the transform row comparable with Bird's.
-=======
 ### 2026-10-02 — Volcano decisions: stratovolcano heights, island subsidence, continental hotspot calderas (agent worktree agent-a131f01c22943a1ff, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What.** Ben's four answers of 2026-10-02 (decisions log, last four rows): (1) stratovolcanoes `arc_height_km`
   [1.2, 3.0] → **[0.6, 2.0]** and `arc_radius_km` 14 → **10** (VOL-019, VOL-020); (2) `island_subsidence_m_myr` 25 → **0**,
@@ -288,7 +286,6 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Next step.** The coordinator merges the branch; the hypsometry recalibration (decisions log 2026-10-01) now starts
   from land above 2 km 0.077 and median land height 559 m.
 
->>>>>>> worktree-agent-a131f01c22943a1ff
 ### 2026-10-02 — Science documentation, stage 2, WP-2: volcanoes and magma checked against sources (agent worktree agent-a44828926d2eaecb7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What.** Every VOL and MAG row's source and status revised (`docs/science/ledger/VOL.md`, `MAG.md`); the page
   `docs/science/volcanoes-and-magma.md` rewritten for stage 2; ten volcano and magma hints corrected
