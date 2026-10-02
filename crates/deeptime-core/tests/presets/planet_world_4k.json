@@ -126,6 +126,7 @@
     "terrane_event_min_frac": 0.005,
     "collision_min_frac": 0.1,
     "collision_suture_frac": 0.1,
+    "collision_on_shortening": false,
     "subduction_initiation_age_myr": 150.0,
     "subduction_initiation_rate": 0.3,
     "subduction_initiation_clearance_km": 1000.0,
