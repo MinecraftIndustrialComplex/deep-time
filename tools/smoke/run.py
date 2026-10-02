@@ -481,7 +481,7 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
         if share >= 0.95:
             break
     seam_land, sz = best
-    radius_seam = 16
+    radius_seam = 32   # /dh pregen takes at least 32 chunks
     steps.record("dh seam: area checked", f"x = {half} (C = {circumference}), z = {sz} ({100 * seam_land:.0f} % land either side), "
                                           f"pregen radius {radius_seam} chunks centred on the seam")
     before = sections
