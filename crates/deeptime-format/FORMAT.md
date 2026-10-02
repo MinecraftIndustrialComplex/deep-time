@@ -132,7 +132,7 @@ plate's `parent`, `origin` `initial`/`rift`/`subduction_initiation`, `born_myr`,
 transfer: times, plates, `shortening_km`, `peak_uplift_m`, the `lifted10`, `lifted100` and `emerged`
 footprints as `{samples, length_km, width_km}`) and `ages` (the sea-floor age histogram every
 10 Myr, 41 bins of 10 Myr). Lengths are Earth-normalized km, speeds mm/yr, times Myr relative to
-world creation. A 1000 Myr run on the quick 16k planet adds about 0.5 MB to the manifest.
+world creation. A 1000 Myr run on the quick 16k planet (500 steps) adds about 0.9 MB to the manifest.
 
 ## The bake (a planet run, P1-08)
 

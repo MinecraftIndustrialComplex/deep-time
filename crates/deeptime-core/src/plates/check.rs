@@ -207,6 +207,13 @@ pub const MEASURES: &[MeasureDef] = &[
         None,
     ),
     m(
+        "megaplate_regrow_myr_p50",
+        "After a rift splits a plate above half the planet: until one is above half again, median",
+        "Myr",
+        None,
+        None,
+    ),
+    m(
         "rift_life_p50_myr",
         "Rift-born plates that died: median lifetime",
         "Myr",
@@ -1149,6 +1156,9 @@ mod tests {
         let keys: BTreeSet<&str> = MEASURES.iter().map(|d| d.key).collect();
         assert_eq!(keys.len(), MEASURES.len(), "duplicate keys");
         let m = measures(&Dynamics::default(), &[]);
+        for k in m.keys() {
+            assert!(keys.contains(k), "{k} is computed but not in MEASURES");
+        }
         for d in MEASURES {
             assert!(m.contains_key(d.key), "{} is never computed", d.key);
         }
