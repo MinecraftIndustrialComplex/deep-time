@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks).
 
-Rows: 84. By status (after WP-15, 2026-10-02): `verified` 10, `cited-unverified` 13, `abstract-only` 2, `from-memory` 2, `calibrated` 6, `game-choice` 34, `uncited` 17. Before: `cited-unverified` 14, `from-memory` 2, `calibrated` 6, `game-choice` 33, `uncited` 29.
+Rows: 84. By status (after WP-15 and WP-2, merged 2026-10-02): `verified` 11, `cited-unverified` 12, `abstract-only` 2, `from-memory` 2, `calibrated` 6, `game-choice` 36, `uncited` 15. WP-2 revised the volcano and magma rows (HNT-015 to -017, -058 to -060, -062, -063, -081, -082) to describe the merged hints. Before: `cited-unverified` 14, `from-memory` 2, `calibrated` 6, `game-choice` 33, `uncited` 29.
 
 WP-15 (2026-10-02) changed the hint texts that disagreed with the code or the sources (claims.md fixes 27 to 32 and the geothermal hints, GEO-047 to GEO-051), kept the hint text in one place (`crates/deeptime-viewer/assets/editor_fields.json`, which the browser workbench and the in-game editor both read; the lang file holds only labels and tooltips without figures, except HNT-084), and recorded in each row what was changed under "before WP-15" in the status cell. The earlier statuses are kept in square brackets. Code was not changed except comments (the "15 times taller than wide" wording and the geothermal comments), so no GameTest was needed. Hints in other work packages' areas (plate, impact, volcano, deposit, climate values) were corrected only where the hint contradicted the code or a source already read; the values behind them stay with their packages (WP-1, WP-2, WP-5, WP-9, WP-13, WP-14).
 
