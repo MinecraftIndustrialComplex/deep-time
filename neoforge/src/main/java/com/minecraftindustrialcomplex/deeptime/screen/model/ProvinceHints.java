@@ -109,6 +109,10 @@ public final class ProvinceHints {
             case "deeptime:mvt_zn_pb" -> 0x1a9850;
             case "deeptime:sedex_zn_pb" -> 0x66c2a5;
             case "deeptime:petroleum_trap" -> 0x8073ac;
+            case "deeptime:impact_ni_cu_pge" -> 0x7a9a3a;
+            case "deeptime:impact_hydrothermal_cu_zn_au" -> 0x2aa7b8;
+            case "deeptime:impact_diamond" -> 0x7df9ff;
+            case "deeptime:impact_basin_u" -> 0xa4d233;
             default -> 0xffb000;
         };
     }

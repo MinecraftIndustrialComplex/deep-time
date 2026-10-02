@@ -75,6 +75,30 @@ pub const BUILTIN: &[(&str, &str)] = &[
             "../../../../neoforge/src/main/resources/data/deeptime/deeptime/deposit_type/petroleum_trap.json"
         ),
     ),
+    (
+        "deeptime:impact_ni_cu_pge",
+        include_str!(
+            "../../../../neoforge/src/main/resources/data/deeptime/deeptime/deposit_type/impact_ni_cu_pge.json"
+        ),
+    ),
+    (
+        "deeptime:impact_hydrothermal_cu_zn_au",
+        include_str!(
+            "../../../../neoforge/src/main/resources/data/deeptime/deeptime/deposit_type/impact_hydrothermal_cu_zn_au.json"
+        ),
+    ),
+    (
+        "deeptime:impact_diamond",
+        include_str!(
+            "../../../../neoforge/src/main/resources/data/deeptime/deeptime/deposit_type/impact_diamond.json"
+        ),
+    ),
+    (
+        "deeptime:impact_basin_u",
+        include_str!(
+            "../../../../neoforge/src/main/resources/data/deeptime/deeptime/deposit_type/impact_basin_u.json"
+        ),
+    ),
 ];
 
 /// How a deposit's formation time is chosen.

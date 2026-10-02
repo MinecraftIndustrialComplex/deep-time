@@ -1,0 +1,179 @@
+{
+  "id": "deeptime:impact_hydrothermal_cu_zn_au",
+  "family": "impact",
+  "site_kind": "deposit",
+  "description": "Impact-hydrothermal copper-zinc-gold: sulphide lenses and veins left in a crater's breccia and melt rock by the hot water the melt sheet and the central uplift kept circulating after the impact.",
+  "products": [
+    {
+      "material": "c:zinc",
+      "grade_key": "zn_pct",
+      "role": "primary"
+    },
+    {
+      "material": "c:copper",
+      "grade_key": "cu_pct",
+      "role": "coproduct"
+    },
+    {
+      "material": "c:gold",
+      "grade_key": "au_gpt",
+      "role": "byproduct"
+    }
+  ],
+  "components": {
+    "combine": "product",
+    "source": [
+      {
+        "field": "deeptime:impact_hydrothermal",
+        "curve": [
+          [
+            0.1,
+            0
+          ],
+          [
+            0.6,
+            1
+          ]
+        ],
+        "note": "the heat of the melt and the uplift: systems last 10^4-10^6 yr and grow with the crater (Abramov & Kring 2004; Osinski et al. 2013). Thresholds are design: craters from about 8 km, full at about 25 km."
+      }
+    ],
+    "driver": [],
+    "pathway": [],
+    "trap": []
+  },
+  "clock_gates": [],
+  "integration_myr": 1,
+  "formation_time": "peak",
+  "hosts": {
+    "any_of": [
+      "impact_breccia",
+      "impact_melt"
+    ],
+    "full_at": 0.02
+  },
+  "causes": {
+    "source": [
+      "deeptime:impact_crater"
+    ],
+    "preservation": [
+      "deeptime:erosion_pulse",
+      "deeptime:orogeny_phase"
+    ]
+  },
+  "cause_radius_km": 150,
+  "sizing": {
+    "grade_tonnage": "impact_structures",
+    "tonnage_mt": {
+      "p90": 0.1,
+      "p50": 1.0,
+      "p10": 10.0
+    },
+    "grades": {
+      "zn_pct": {
+        "p90": 1.5,
+        "p50": 4.0,
+        "p10": 8.0,
+        "presence": 1.0
+      },
+      "cu_pct": {
+        "p90": 0.5,
+        "p50": 1.3,
+        "p10": 3.0,
+        "presence": 1.0
+      },
+      "au_gpt": {
+        "p90": 0.0,
+        "p50": 0.8,
+        "p10": 3.0,
+        "presence": 0.6
+      }
+    },
+    "correlations": [],
+    "ore_density_t_m3": 3.2,
+    "density_per_1e5km2": {
+      "p90": 30,
+      "p50": 100,
+      "p10": 300
+    },
+    "density_basis": "estimate",
+    "min_separation_m": 1000,
+    "tract_threshold": 0.2,
+    "clustering": {
+      "model": "thomas",
+      "camp_spacing_km": 15,
+      "cluster_radius_km": 5
+    }
+  },
+  "geometry": {
+    "shape": "lens",
+    "aspect": [
+      1.0,
+      0.3,
+      0.6
+    ],
+    "dip_deg": [
+      0,
+      30
+    ],
+    "zoning": [
+      {
+        "zone": "core_cu",
+        "d": [
+          0.0,
+          0.5
+        ],
+        "material": "c:copper",
+        "grade_mult": 1.2,
+        "density": 0.25
+      },
+      {
+        "zone": "core_au",
+        "d": [
+          0.0,
+          0.5
+        ],
+        "material": "c:gold",
+        "grade_mult": 1.2,
+        "density": 0.03
+      },
+      {
+        "zone": "outer_zn",
+        "d": [
+          0.3,
+          1.0
+        ],
+        "material": "c:zinc",
+        "grade_mult": 1.1,
+        "density": 0.3
+      }
+    ],
+    "extra_bodies": [],
+    "children": []
+  },
+  "preservation": {
+    "formation_depth_m": 150,
+    "vertical_extent_m": 100,
+    "erosion_behavior": "truncate",
+    "resistates": [
+      "c:gold"
+    ]
+  },
+  "minecraft": {
+    "coe_vein": "createoreexcavation:ore_vein_type/zinc",
+    "cdg_reservoir": false,
+    "ore_block_policy": "ev_then_vanilla"
+  },
+  "balance": {
+    "count_mult": 1.0,
+    "size_mult_h": 12.0,
+    "size_mult_v": 4.0,
+    "richness_mult": 1.0
+  },
+  "requires_fields": {},
+  "notes": [
+    "P2-08 (meteor impacts). Examples: the Errington and Vermilion Zn-Cu-Pb deposits in the crater fill of the Sudbury structure (Ames, Watkinson & Parrish 1998, Geology 26:447-450), the sulphide and carbonate veins of Haughton and the Ries (Osinski et al. 2013, Icarus 224:347-363); Grieve & Masaitis 1994 (The economic potential of terrestrial impact craters, Int. Geol. Rev. 36(2):105-151).",
+    "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, deposit density, separation, clustering, geometry and the curves' thresholds.",
+    "The hosts are the crater's own breccia and melt rock in the strata log, so the type forms in craters cut into the deep-time surface (at least two L1 cells across)."
+  ]
+}

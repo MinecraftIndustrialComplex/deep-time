@@ -198,12 +198,7 @@ pub fn crater(s: &Setting, l: f64, water_m: f64) -> Option<Crater> {
         // plus the rim less the lens: about D / 5.
         let v_br = 0.032 * d.powi(3);
         let t_br = 2.8 * v_br * (transient_depth + rim) / (transient_depth * d * d);
-        (
-            Morphology::Simple,
-            transient_depth + rim - t_br,
-            t_br,
-            0.0,
-        )
+        (Morphology::Simple, transient_depth + rim - t_br, t_br, 0.0)
     } else {
         // Complex depth (eq. 28): 0.294 D^0.301 in km at Earth's gravity; at the transition it
         // is continued from the simple crater's D / 5, and it scales with the transition (∝ 1/g).
@@ -313,11 +308,7 @@ mod tests {
         };
         let b = crater(&iron, 40.0, 0.0).unwrap();
         assert_eq!(b.morphology, Morphology::Simple);
-        assert!(
-            (800.0..1800.0).contains(&b.diameter_m),
-            "{}",
-            b.diameter_m
-        );
+        assert!((800.0..1800.0).contains(&b.diameter_m), "{}", b.diameter_m);
     }
 
     #[test]
@@ -361,14 +352,8 @@ mod tests {
     #[test]
     fn the_transition_scales_inversely_with_gravity() {
         let e = earth();
-        let moon = Setting {
-            gravity: 1.62,
-            ..e
-        };
-        let mars = Setting {
-            gravity: 3.71,
-            ..e
-        };
+        let moon = Setting { gravity: 1.62, ..e };
+        let mars = Setting { gravity: 3.71, ..e };
         assert!((e.transition_m() - 3200.0).abs() < 1e-9);
         // The Moon's transition is 15–20 km, Mars's 6–9 km (Pike 1980).
         assert!((15_000.0..22_000.0).contains(&moon.transition_m()));
@@ -408,7 +393,11 @@ mod tests {
         let c = crater(&earth(), 1000.0, 0.0).unwrap();
         let r = 0.5 * c.diameter_m;
         let at_rim = ejecta_m(&c, r);
-        assert!((at_rim / c.rim_m - 1.0).abs() < 0.05, "{at_rim} vs {}", c.rim_m);
+        assert!(
+            (at_rim / c.rim_m - 1.0).abs() < 0.05,
+            "{at_rim} vs {}",
+            c.rim_m
+        );
         assert!((ejecta_m(&c, 2.0 * r) / at_rim - 0.125).abs() < 1e-9);
         assert!(ejecta_m(&c, 5.0 * r) < 0.01 * at_rim);
     }
@@ -440,7 +429,10 @@ mod tests {
         assert!(draw_diameter_m(1.0 - 1e-12, lo, hi, 1.8) <= hi);
         // Half of the draws are below lo · 2^(1/1.8) ≈ 1.47 lo.
         let median = draw_diameter_m(0.5, lo, hi, 1.8);
-        assert!((median / lo - 2f64.powf(1.0 / 1.8)).abs() < 0.01, "{median}");
+        assert!(
+            (median / lo - 2f64.powf(1.0 / 1.8)).abs() < 0.01,
+            "{median}"
+        );
         let mut last = 0.0;
         for k in 0..100 {
             let d = draw_diameter_m(f64::from(k) / 100.0, lo, hi, 1.8);

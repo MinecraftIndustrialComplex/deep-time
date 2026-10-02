@@ -14,6 +14,7 @@ use crate::checkpoint::Checkpoint;
 use crate::params::planet_builtin;
 use crate::preset::with_timeline;
 use crate::session::{AdvanceStatus, NoGauge, Session, SessionOptions};
+use deeptime_format::ParamValue;
 
 fn pipeline_json(n: u32, myr: f64, seed: u64, impacts: Option<serde_json::Value>) -> String {
     let json = with_timeline(
@@ -147,7 +148,10 @@ fn a_crater_fades_by_cover_wear_and_age() {
     let fresh = crater(3.0, 0.0);
     let (relief, fate) = fresh.state();
     assert_eq!(fate, Fate::Fresh);
-    assert!((relief / fresh.profile.depth_m - 1.0).abs() < 0.06, "{relief}");
+    assert!(
+        (relief / fresh.profile.depth_m - 1.0).abs() < 0.06,
+        "{relief}"
+    );
     // Half filled: degraded, half the relief.
     let mut filled = fresh.clone();
     filled.cover_m = 0.5 * fresh.profile.depth_m;
@@ -209,8 +213,16 @@ fn fields_map_and_bodies_come_from_the_catalogue() {
     // Everything formed after −5 Myr is new to this frame: the two young craters.
     let f = frame_fields(&grid, mh, &craters, -5.0);
     let melt = &f[FIELD_MELT];
-    assert!(at(melt, 0.0, 0.0) > 200.0, "a melt sheet: {}", at(melt, 0.0, 0.0));
-    assert_eq!(at(melt, 150.0, 0.0), 0.0, "none outside the floor (45 km out)");
+    assert!(
+        at(melt, 0.0, 0.0) > 200.0,
+        "a melt sheet: {}",
+        at(melt, 0.0, 0.0)
+    );
+    assert_eq!(
+        at(melt, 150.0, 0.0),
+        0.0,
+        "none outside the floor (45 km out)"
+    );
     assert_eq!(at(melt, 2000.0, 0.0), 0.0, "a small bowl has no sheet");
     let hydro = &f[FIELD_HYDROTHERMAL];
     assert_eq!(at(hydro, 0.0, 0.0), 1.0);
@@ -278,7 +290,14 @@ fn the_pipeline_makes_craters_at_the_rate_and_ages_them() {
     let s = session(&json, &dir, 2);
     assert_eq!(
         s.stage_names(),
-        ["plates", "climate", "surface", "volcanoes", "impacts", "structure"]
+        [
+            "plates",
+            "climate",
+            "surface",
+            "volcanoes",
+            "impacts",
+            "structure"
+        ]
     );
     finish(&s);
     let world = s.checkpoint().unwrap().world;
@@ -295,7 +314,10 @@ fn the_pipeline_makes_craters_at_the_rate_and_ages_them() {
         c.impactors
     );
     // Many small craters for each large one, on land and in all.
-    assert!(c.formed[0] > c.formed[2] && c.formed[1] > c.formed[3], "{c:?}");
+    assert!(
+        c.formed[0] > c.formed[2] && c.formed[1] > c.formed[3],
+        "{c:?}"
+    );
     let all = |k: usize| c.formed[k] + c.stopped_by_sea[k];
     assert!(all(0) > 3 * all(2), "{c:?}");
     // The sea stops small impactors far more often than large ones.
@@ -344,7 +366,12 @@ fn the_pipeline_makes_craters_at_the_rate_and_ages_them() {
         .filter(|cr| cr.relief_m >= VISIBLE_RELIEF_M)
         .count() as u64;
     assert!(visible > 0 && visible < formed, "{visible} of {formed}");
-    let gone: u64 = c.eroded.iter().chain(&c.subducted).chain(&c.overprinted).sum();
+    let gone: u64 = c
+        .eroded
+        .iter()
+        .chain(&c.subducted)
+        .chain(&c.overprinted)
+        .sum();
     assert_eq!(formed, gone + st.craters.len() as u64);
 
     // Large craters are cut into the surface and lay breccia in the strata log.
@@ -380,7 +407,10 @@ fn the_pipeline_makes_craters_at_the_rate_and_ages_them() {
     assert_eq!(events.len() as u64, st.events_emitted);
     let craters_events = events.iter().filter(|e| e.kind == kind::CRATER).count() as u64;
     let big_formed: u64 = c.formed[1..].iter().sum();
-    assert!(craters_events >= big_formed, "{craters_events} vs {big_formed}");
+    assert!(
+        craters_events >= big_formed,
+        "{craters_events} vs {big_formed}"
+    );
     let t0 = -120.0e6;
     for e in &events {
         assert!(e.t_start >= t0 - 1.0 && e.t_start <= 1.0, "{}", e.t_start);
@@ -416,18 +446,17 @@ fn the_pipeline_makes_craters_at_the_rate_and_ages_them() {
         let Place::Point { lat, lon } = e.place else {
             unreachable!()
         };
-        let (x, z) = (frame.x_of_lon(f64::from(lon)), frame.z_of_lat(f64::from(lat)));
+        let (x, z) = (
+            frame.x_of_lon(f64::from(lon)),
+            frame.z_of_lat(f64::from(lat)),
+        );
         assert!(
             frame.wrap_x(x - cr.x).abs() < 2.0 && (z - cr.z).abs() < 2.0,
             "event at ({x}, {z}), crater at ({}, {})",
             cr.x,
             cr.z
         );
-        assert_eq!(
-            e.params.get("standing"),
-            Some(&ParamValue::Int(1)),
-            "{e:?}"
-        );
+        assert_eq!(e.params.get("standing"), Some(&ParamValue::Int(1)), "{e:?}");
     }
 
     // The layers and the summary.

@@ -45,12 +45,12 @@
 //!    impact deposit types read, and it keeps `impacts/trap` for the structure stage's
 //!    `trap_structure` (rim anticlines and central uplifts are petroleum traps).
 //!
-//! Events (`deeptime:impact_crater`, `deeptime:impact_ocean`; `EVENTS.md`) are written when the
-//! impact happens, for craters of at least [`EVENT_MIN_KM`], and completed at the end with what
-//! became of each (and where its crust has carried it); a smaller crater that still shows at the
-//! end gets its event then. Every draw comes from a stream seeded by the preset seed and the step,
-//! and every loop runs in catalogue order, so a run is the same on any thread count and after a
-//! resume.
+//! Events (`deeptime:impact_crater`, `deeptime:impact_ocean`; `EVENTS.md`) are written at the end
+//! of the coupled group, as the volcanoes' are, in time order: one for every crater of at least
+//! [`EVENT_MIN_KM`] the run made, with what became of it (and, for one still in the catalogue,
+//! where its crust has carried it), and one for every smaller crater that still shows. Every draw
+//! comes from a stream seeded by the preset seed and the step, and every loop runs in catalogue
+//! order, so a run is the same on any thread count and after a resume.
 
 pub mod params;
 pub mod scaling;
@@ -63,7 +63,7 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 
 use deeptime_format::bodies::NO_CLIP;
-use deeptime_format::{Body, EventId, GridDesc, ParamValue, Place, Shape, Zone};
+use deeptime_format::{Body, EventId, GridDesc, Place, Shape, Zone};
 use glam::DVec3;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -103,7 +103,7 @@ pub mod kind {
 pub mod field {
     /// Where the craters are (codes, NaN elsewhere): 1 a fresh crater, 2 a degraded one, 3 a
     /// buried one, 4 the eroded roots of one.
-    pub const MAP: &str = "impacts/map";
+    pub const MAP: &str = "impacts/craters";
     /// 0–1: structural closure at craters (rim anticlines, central uplifts), which the structure
     /// stage folds into `deeptime:trap_structure`.
     pub const TRAP: &str = "impacts/trap";
@@ -292,6 +292,19 @@ impl Crater {
     }
 }
 
+/// A large impact the sea stopped (its event is written at the end).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OceanImpact {
+    pub t_myr: f64,
+    pub lat: f32,
+    pub lon: f32,
+    pub impactor_m: f64,
+    pub energy_j: f64,
+    pub water_m: f64,
+    /// The crater the same body would have made on Earth's land, m.
+    pub crater_on_land_m: f64,
+}
+
 /// Counters for the summary, by size class ([`SIZE_LABELS`]).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -317,8 +330,10 @@ pub struct Counts {
 pub struct ImpactState {
     /// Craters in the catalogue, in id order.
     pub craters: Vec<Crater>,
-    /// Craters with an event that left the catalogue (their events are completed at the end).
+    /// Craters of at least [`EVENT_MIN_KM`] that left the catalogue (for their events).
     pub gone: Vec<Crater>,
+    /// Large impacts the sea stopped (for their events).
+    pub ocean: Vec<OceanImpact>,
     pub next_id: u32,
     /// Every plate's Ω at the end of the last step.
     pub omega: Vec<[f64; 3]>,
@@ -502,7 +517,9 @@ pub fn frame_fields(
             footprint(grid, mh, c, r, |cell| hydro[cell] = hydro[cell].max(h));
         }
         let s = (d_km / 100.0).clamp(0.0, 1.0) as f32;
-        footprint(grid, mh, c, 0.7 * r, |cell| shock[cell] = shock[cell].max(s));
+        footprint(grid, mh, c, 0.7 * r, |cell| {
+            shock[cell] = shock[cell].max(s)
+        });
     }
     BTreeMap::from([
         (FIELD_MELT.to_owned(), melt),
@@ -794,8 +811,6 @@ impl ImpactStage {
         let mut delta = vec![0.0f32; n];
         // Log changes: (cell, thickness (negative = remove), class) in order.
         let mut log_ops: Vec<(usize, f32, u16)> = Vec::new();
-        // Events to write: (index into the catalogue or None for an ocean impact, event).
-        let mut ocean_events = Vec::new();
         for _ in 0..count {
             st.counts.impactors += 1;
             let d_earth = scaling::draw_diameter_m(
@@ -817,7 +832,15 @@ impl ImpactStage {
             let Some(made) = made else {
                 st.counts.stopped_by_sea[size_class(d_earth / 1000.0)] += 1;
                 if d_earth >= OCEAN_EVENT_MIN_KM * 1000.0 {
-                    ocean_events.push((when, lat, lon, l, d_earth, water));
+                    st.ocean.push(OceanImpact {
+                        t_myr: when,
+                        lat: lat as f32,
+                        lon: lon as f32,
+                        impactor_m: l,
+                        energy_j: set.energy_j(l),
+                        water_m: water,
+                        crater_on_land_m: d_earth,
+                    });
                 }
                 continue;
             };
@@ -831,7 +854,7 @@ impl ImpactStage {
             let cell = cell_of(&grid, x, z);
             let continental = crust[cell] as u8 == CONTINENTAL;
             let imprinted = made.diameter_m >= 2.0 * cell_m;
-            let mut c = Crater {
+            let c = Crater {
                 id: st.next_id,
                 x,
                 z,
@@ -909,26 +932,7 @@ impl ImpactStage {
                     }
                 });
             }
-            if made.diameter_m >= EVENT_MIN_KM * 1000.0 {
-                c.event = Some(self.crater_event(world, &c)?);
-                st.events_emitted += 1;
-            }
             st.craters.push(c);
-        }
-        for (when, lat, lon, l, d_earth, water) in ocean_events {
-            let e = world
-                .event(when * 1.0e6, kind::OCEAN, SOURCE)
-                .at(Place::Point {
-                    lat: lat as f32,
-                    lon: lon as f32,
-                })
-                .magnitude((d_earth / 100_000.0).min(1.0) as f32)
-                .param("impactor_m", l.round())
-                .param("energy_mt", megatons(set.energy_j(l)))
-                .param("water_depth_m", water.round())
-                .param("crater_on_land_km", (d_earth / 100.0).round() / 10.0);
-            world.emit(e)?;
-            st.events_emitted += 1;
         }
         self.time("impacts", started);
 
@@ -1012,7 +1016,7 @@ impl ImpactStage {
         self.time("frame_fields", started);
 
         for c in gone_now {
-            if c.event.is_some() {
+            if c.diameter_m >= EVENT_MIN_KM * 1000.0 {
                 st.gone.push(c);
             }
         }
@@ -1032,47 +1036,55 @@ impl ImpactStage {
         Ok(())
     }
 
-    /// The event of a crater as it forms.
+    /// The event of a crater: where it struck and what it was, what became of it (`fate`), and,
+    /// for one still in the catalogue (`standing`), where its crust has carried it.
     fn crater_event(
         &self,
         world: &mut WorldState,
         c: &Crater,
+        fate: &str,
+        standing: bool,
     ) -> Result<EventId, CoreError> {
-        let e = world
-            .event(c.t_myr * 1.0e6, kind::CRATER, SOURCE)
-            .at(Place::Point {
+        let frame = BlockFrame::new(self.preset.scale.circumference_blocks);
+        let place = if standing {
+            Place::Point {
+                lat: frame.lat_deg(c.z) as f32,
+                lon: frame.lon_deg(c.x) as f32,
+            }
+        } else {
+            Place::Point {
                 lat: c.lat0,
                 lon: c.lon0,
-            })
+            }
+        };
+        let e = world
+            .event(c.t_myr * 1.0e6, kind::CRATER, SOURCE)
+            .at(place)
             .magnitude((c.diameter_m / 100_000.0).min(1.0) as f32)
             .param("crater", i64::from(c.id))
             .param("diameter_km", (c.diameter_m / 100.0).round() / 10.0)
+            .param("radius_km", (c.diameter_m / 200.0).round() / 10.0)
             .param("morphology", c.profile.morphology.name())
             .param("depth_m", c.profile.depth_m.round())
             .param("rim_m", c.profile.rim_m.round())
             .param("impactor_m", c.impactor_m.round())
             .param("energy_mt", megatons(c.energy_j))
-            .param(
-                "target",
-                if c.water_m > 0.0 {
-                    "sea_floor"
-                } else {
-                    "land"
-                },
-            )
+            .param("target", if c.water_m > 0.0 { "sea_floor" } else { "land" })
             .param("water_depth_m", c.water_m.round())
             .param("melt_km3", (c.melt_km3 * 10.0).round() / 10.0)
             .param("melt_sheet_m", c.melt_real_m.round())
             .param("impact_lat", f64::from(c.lat0))
             .param("impact_lon", f64::from(c.lon0))
             .param("plate", i64::from(c.plate))
-            .param("fate", Fate::Fresh.name())
-            .param("relief_m", c.profile.depth_m.round());
+            .param("fate", fate)
+            .param("relief_m", if standing { c.relief_m.round() } else { 0.0 })
+            .param("cover_m", c.cover_m.round())
+            .param("standing", i64::from(standing));
         world.emit(e)
     }
 
-    /// The end of the run: every event completed with what became of its crater, an event for
-    /// each small crater that still shows, and the bodies of the craters L1 does not hold.
+    /// The end of the run: the events, in time order, and the bodies of the craters L1 does not
+    /// hold.
     fn finish(
         &self,
         world: &mut WorldState,
@@ -1080,55 +1092,54 @@ impl ImpactStage {
         grid: &GridDesc,
     ) -> Result<(), CoreError> {
         let s = &self.preset.scale;
-        let frame = BlockFrame::new(s.circumference_blocks);
-        // Small craters that still show get their event now.
-        for k in 0..st.craters.len() {
-            if st.craters[k].event.is_none() && st.craters[k].relief_m >= VISIBLE_RELIEF_M {
-                let id = self.crater_event(world, &st.craters[k])?;
-                st.craters[k].event = Some(id);
-                st.events_emitted += 1;
+        // What to write: (time, 0 = a crater in the catalogue, 1 = one that left it, 2 = an ocean
+        // impact, its index there).
+        let mut order: Vec<(f64, u8, usize)> = Vec::new();
+        for (k, c) in st.craters.iter().enumerate() {
+            if c.diameter_m >= EVENT_MIN_KM * 1000.0 || c.relief_m >= VISIBLE_RELIEF_M {
+                order.push((c.t_myr, 0, k));
             }
         }
-        let by_id: BTreeMap<EventId, usize> = world
-            .events
-            .iter()
-            .enumerate()
-            .filter(|(_, e)| e.source == SOURCE)
-            .map(|(i, e)| (e.id, i))
-            .collect();
-        let set = |world: &mut WorldState, c: &Crater, fate: &str, standing: bool| {
-            let Some(&ix) = c.event.and_then(|id| by_id.get(&id)) else {
-                return;
-            };
-            let e = &mut world.events[ix];
-            e.params
-                .insert("fate".into(), ParamValue::Str(fate.to_owned()));
-            e.params
-                .insert("relief_m".into(), ParamValue::Float(c.relief_m.round()));
-            e.params
-                .insert("cover_m".into(), ParamValue::Float(c.cover_m.round()));
-            e.params
-                .insert("standing".into(), ParamValue::Int(i64::from(standing)));
-            if standing {
-                // Where its crust has carried it.
-                e.place = Place::Point {
-                    lat: frame.lat_deg(c.z) as f32,
-                    lon: frame.lon_deg(c.x) as f32,
-                };
+        order.extend(st.gone.iter().enumerate().map(|(k, c)| (c.t_myr, 1, k)));
+        order.extend(st.ocean.iter().enumerate().map(|(k, o)| (o.t_myr, 2, k)));
+        order.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+        for (_, what, k) in order {
+            match what {
+                0 => {
+                    let c = st.craters[k].clone();
+                    let id = self.crater_event(world, &c, c.fate.name(), true)?;
+                    st.craters[k].event = Some(id);
+                }
+                1 => {
+                    let c = st.gone[k].clone();
+                    let fate = match c.gone {
+                        Some(Gone::Subducted) => "subducted",
+                        Some(Gone::Overprinted) => "overprinted",
+                        _ => "eroded",
+                    };
+                    let id = self.crater_event(world, &c, fate, false)?;
+                    st.gone[k].event = Some(id);
+                }
+                _ => {
+                    let o = &st.ocean[k];
+                    let e = world
+                        .event(o.t_myr * 1.0e6, kind::OCEAN, SOURCE)
+                        .at(Place::Point {
+                            lat: o.lat,
+                            lon: o.lon,
+                        })
+                        .magnitude((o.crater_on_land_m / 100_000.0).min(1.0) as f32)
+                        .param("impactor_m", o.impactor_m.round())
+                        .param("energy_mt", megatons(o.energy_j))
+                        .param("water_depth_m", o.water_m.round())
+                        .param(
+                            "crater_on_land_km",
+                            (o.crater_on_land_m / 100.0).round() / 10.0,
+                        );
+                    world.emit(e)?;
+                }
             }
-        };
-        for c in &st.craters {
-            set(world, c, c.fate.name(), true);
-        }
-        for c in &st.gone {
-            let fate = match c.gone {
-                Some(Gone::Subducted) => "subducted",
-                Some(Gone::Overprinted) => "overprinted",
-                _ => "eroded",
-            };
-            let mut c = c.clone();
-            c.relief_m = 0.0;
-            set(world, &c, fate, false);
+            st.events_emitted += 1;
         }
         // Bodies: the lens and melt of the craters too small for the strata log's cells.
         let surf = world.surface.as_ref().expect("checked by the caller");

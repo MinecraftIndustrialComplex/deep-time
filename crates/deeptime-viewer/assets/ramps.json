@@ -213,7 +213,11 @@
         [5, "#9e9e9e"],
         [6, "#1a9850"],
         [7, "#66c2a5"],
-        [8, "#8073ac"]
+        [8, "#8073ac"],
+        [9, "#7a9a3a"],
+        [10, "#2aa7b8"],
+        [11, "#7df9ff"],
+        [12, "#a4d233"]
       ]
     },
     "plates": {
@@ -292,6 +296,19 @@
         [6.999, "#ff79c6"],
         [7, "#9a8a7a"],
         [7.999, "#9a8a7a"]
+      ]
+    },
+    "impacts": {
+      "_comment": "Impact crater map codes 1-4 (surface/impacts): a fresh crater, a degraded one, a buried one, the eroded roots of one; NaN elsewhere.",
+      "stops": [
+        [1, "#7df9ff"],
+        [1.999, "#7df9ff"],
+        [2, "#3f9fc4"],
+        [2.999, "#3f9fc4"],
+        [3, "#b9a26a"],
+        [3.999, "#b9a26a"],
+        [4, "#b07078"],
+        [4.999, "#b07078"]
       ]
     },
     "regime": {
@@ -633,6 +650,8 @@
     "regime": "regime",
     "volcanoes/map": "volcanoes",
     "volcanoes/flood_basalt": "unit",
+    "impacts/craters": "impacts",
+    "impacts/trap": "unit",
     "surface/erosion_m_myr": "erosion",
     "surface/deposition_m_myr": "deposition",
     "surface/sediment_m": "sediment",
