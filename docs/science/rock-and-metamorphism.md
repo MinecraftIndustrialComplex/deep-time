@@ -111,6 +111,37 @@ T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of t
 Run below: `earthlike_quick_16k`, start `scattered_continents`, 500 Myr, default seed, 2 threads, `deeptime run` and
 `deeptime strata-check --columns 20000`, test machine, 2026-10-02; before is master 9e84fcf and after is this branch (commit 5cb328c3). The pluton thickness fix lowered the surviving pluton bodies by 12 of 230 (5 %) and raised the eroded ones from 616 to 628; nothing else in the run changed (emplaced 1,034, subducted 104, metamorphosed volume 4.058e7 km3, deformed share 0.4805), and `strata-check` is identical (see [strata.md](strata.md)).
 
+### Schist at 525 degC instead of 450 (Ben, 2026-10-02)
+
+Ben answered the first open question of the stage-2 review with "Move schist to 500-550 degC". The coded value is
+now 525 degC, the middle of the 500-550 degC in which the garnet of the Barrovian type locality grew (Baxter et al.
+2002); amphibolite stays at 500 and gneiss at 650, so the order along the pelitic path is slate 250, phyllite 350,
+schist 525, gneiss 650, and the key bands of the strata (RCK-052) are 0, 250, 300, 350, 500, 525 and 650 degC, each
+still a formation temperature. Phyllite now covers 350 to 525 degC instead of 350 to 450. A unit test fails on the old
+value (`the_grade_order_and_the_key_bands_follow_the_formation_temperatures`).
+
+Measured on `earthlike_quick_16k` (scattered continents, 500 Myr, 2 threads, `strata-check --columns 20000`, test
+machine, 2026-10-02), before and after, on two seeds. The worlds are not the same planet before and after (a rock class
+changes the erodibility the surface stage reads, so the runs diverge: the shares below move on both seeds by amounts
+that are not all the schist's doing); read them as two samples each.
+
+| Share of | Seed 1 before | Seed 1 after | Seed 2 before | Seed 2 after |
+|---|---|---|---|---|
+| columns holding schist | 35.8 % | 27.4 % | 31.4 % | 14.0 % |
+| all rock blocks that are schist | 5.33 % | 5.49 % | 5.80 % | 1.60 % |
+| all rock blocks that are phyllite | 0.90 % | 1.31 % | 0.85 % | 1.02 % |
+| all rock blocks that are gneiss | 15.6 % | 14.2 % | 13.1 % | 16.8 % |
+| columns with a grade inversion | 0.14 % | 0.18 % | 0.08 % | 0.10 % |
+| stored cell stacks with a grade inversion | 0 | 0 | 0 | 0 |
+| columns without folds and faults with an inversion | 0 | 0 | 0 | 0 |
+
+Schist is made two ways: by the temperature (shale and its kin stepping to schist) and directly, as the metamorphic
+pool of a young Himalayan-type orogen (RCK-018), which the threshold does not touch; that is why seed 1's schist volume
+did not fall while its column share did. Raising the threshold moved rock from schist into phyllite (and, on seed 2, the
+planet's own changes put more into gneiss). The inversions that exist are all made by the structure stage (thrusts and
+dykes put a hotter rock over a colder one, as in the Himalaya: Mottram et al. 2014), none by the stored stacks or by the
+columns before folds are applied; a wider phyllite band (350 to 525) makes more pairs such as gneiss over phyllite.
+
 ## Simplifications and limits
 
 - **Temperature only.** No pressure and no time. Blueschist and eclogite (high pressure, low temperature) are never formed

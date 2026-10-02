@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [biomes.md](../biomes.md). Extraction notes with flags: [extraction-notes/MOI.md](../extraction-notes/MOI.md).
 
-Rows: 100 (BIO-100 added in WP-11). By status: `verified` 24, `abstract-only` 3, `cited-unverified` 2, `calibrated` 1, `game-choice` 69, `uncited` 1.
+Rows: 103 (BIO-100 added in WP-11, BIO-101 to BIO-103 for the cold deserts, 2026-10-02). By status: `verified` 24, `abstract-only` 3, `cited-unverified` 2, `calibrated` 1, `game-choice` 72, `uncited` 1.
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent; checked against sources in stage 2, work package WP-11 (2026-10-02): the Koppen rows and the vanilla band edges were read in their sources, and two Koppen departures were fixed (BIO-002, BIO-013; BIO-015 made literal). Paths are relative to the repository root; line numbers are left out on purpose.
 
