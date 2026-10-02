@@ -256,7 +256,7 @@ fn a_planet_of_structures_evaluates_on_a_lattice() {
     assert!(stats.faulted > 100 && stats.faulted <= stats.deformed);
     assert!(stats.max_candidates >= 2 && stats.max_segments >= 2);
     // (Bounds at 1:1, times the vertical scale that heights are drawn at.)
-    let x = sp.deformation.vertical_scale;
+    let x = sp.deformation.block_stretch(300.0, p.m_per_block_v);
     assert!(
         stats.max_shift > 2.0 && stats.max_shift < 80.0 * x,
         "{}",
@@ -427,11 +427,11 @@ fn a_place_with_more_structures_than_one_noddy_history_holds() {
 }
 
 /// The column rule (what the strata pass, far terrain, inspect and sections all read) offsets the
-/// beds by the vertical scale: a normal fault drawn 4 times taller restores the hanging wall's
+/// beds by the stretch: a normal fault drawn 4 times taller restores the hanging wall's
 /// rock from 4 times as far up and from as far to the side, and a fold 4 times taller shifts the
 /// column 4 times as far.
 #[test]
-fn the_column_rule_offsets_beds_by_the_vertical_scale() {
+fn the_column_rule_offsets_beds_by_the_stretch() {
     let fault = |x: f64| {
         let (dip, slip) = super::emplace::stretch(60.0, 10.0, x);
         Feature {
@@ -494,16 +494,16 @@ fn the_column_rule_offsets_beds_by_the_vertical_scale() {
 
 /// The ground keeps its relief at the default: a structure drawn 4 times taller with a quarter
 /// of the relief share moves the ground as far, and wears off it as fast, as one at 1:1 with
-/// the full share.
+/// the full share; and the default share on blocks 35 m high moves it as many metres.
 #[test]
 fn the_default_relief_keeps_the_ground_as_at_one_to_one() {
     let mut one = super::params::DeformationParams {
-        vertical_scale: 1.0,
+        true_height_share: 20.0 / 300.0,
         relief: 1.0,
         ..Default::default()
     };
     let four = super::params::DeformationParams::default();
-    assert_eq!((four.vertical_scale, four.relief), (4.0, 0.25));
+    assert_eq!((four.block_stretch(300.0, 20.0), four.relief), (4.0, 0.25));
     let mut f1 = Feature {
         id: 0,
         kind: Kind::Normal,
@@ -533,13 +533,24 @@ fn the_default_relief_keeps_the_ground_as_at_one_to_one() {
         amplitude: 24.0,
         ..f1.clone()
     };
+    // The default share on a 300 m by 35 m block.
+    let x35 = four.block_stretch(300.0, 35.0);
+    let (dip, slip) = super::emplace::stretch(60.0, 10.0, x35);
+    let mut f35 = Feature {
+        dip_deg: dip as f32,
+        slip: slip as f32,
+        amplitude: (6.0 * x35) as f32,
+        ..f1.clone()
+    };
     let throw = |f: &Feature| f64::from(f.slip) * f64::from(f.dip_deg).to_radians().sin();
     for (wear, now) in [(0.0, -9.0), (300.0, -8.0), (900.0, -5.0), (5_000.0, -9.5)] {
         f1.wear_m = wear;
         f4.wear_m = wear;
+        f35.wear_m = wear;
         for kind in [Kind::Normal, Kind::FoldTrain] {
             f1.kind = kind;
             f4.kind = kind;
+            f35.kind = kind;
             let height = |f: &Feature| match kind {
                 Kind::FoldTrain => f64::from(f.amplitude),
                 _ => throw(f),
@@ -549,6 +560,13 @@ fn the_default_relief_keeps_the_ground_as_at_one_to_one() {
             assert!(
                 (g1 - g4).abs() < 1e-4 * g1.abs().max(1e-3),
                 "{kind:?} {wear}: {g1} vs {g4}"
+            );
+            // The same share on blocks 35 m high: the ground moves as many metres.
+            let g35 = f64::from(relief_left(&f35, now, &four, 35.0)) * height(&f35) * 35.0;
+            assert!(
+                (g35 - 20.0 * g4).abs() < 1e-4 * (20.0 * g4).abs().max(1e-3),
+                "{kind:?} {wear} at 35 m: {g35} m vs {} m",
+                20.0 * g4
             );
         }
     }

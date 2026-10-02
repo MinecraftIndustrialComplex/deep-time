@@ -320,7 +320,7 @@
       "strength": 1.0,
       "density": 1.0,
       "size": 1.0,
-      "vertical_scale": 4.0,
+      "true_height_share": 0.26666666666666666,
       "fold_wavelength_km": [
         16.0,
         8.0,

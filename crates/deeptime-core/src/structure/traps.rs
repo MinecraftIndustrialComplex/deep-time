@@ -65,8 +65,8 @@ pub fn orogen_distance_km(d: &Dims, regime_f: &[f32], crust: &[f32], flags: &[f3
 /// The share of structural closure the world's folds and faults give each cell of `grid` (L1),
 /// 0–1: the largest over the structures whose window holds the cell's centre of
 /// - a fold train: how tight it is, amplitude / wavelength over 0.1 (10 % of the wavelength is a
-///   fold shortened by about a tenth), at most 1, the amplitude taken before `vertical_scale`
-///   (`deform::DeformationParams`) stretched it;
+///   fold shortened by about a tenth), at most 1, the amplitude taken before the world's folds were
+///   stretched `stretch` times upwards (`deform::DeformationParams::block_stretch`);
 /// - a thrust: 0.8 over its hanging wall (the ramp anticline), 0.4 over its foot wall;
 /// - a normal fault: 0.6 (a tilted block against the fault);
 /// - a strike-slip fault: 0.3;
@@ -75,7 +75,7 @@ pub fn orogen_distance_km(d: &Dims, regime_f: &[f32], crust: &[f32], flags: &[f3
 pub fn structural(
     features: &[super::deform::Feature],
     grid: &deeptime_format::GridDesc,
-    vertical_scale: f64,
+    stretch: f64,
 ) -> Vec<f32> {
     use super::deform::Kind;
     let mut out = vec![0.0f32; grid.cells()];
@@ -86,7 +86,7 @@ pub fn structural(
     for f in features {
         let share = match f.kind {
             Kind::FoldTrain => {
-                let amplitude = f64::from(f.amplitude) / vertical_scale.max(1e-9);
+                let amplitude = f64::from(f.amplitude) / stretch.max(1e-9);
                 (amplitude / f64::from(f.wavelength).max(1e-9) / 0.1).min(1.0)
             }
             Kind::Thrust => 0.8,
