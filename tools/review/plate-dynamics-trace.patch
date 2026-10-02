@@ -221,7 +221,7 @@ index 3badc3e..3b0a6ef 100644
  
  /// A mantle-fixed hotspot (Cortial §7.5's suggested extension).
 diff --git a/crates/deeptime-core/src/plates/subduction.rs b/crates/deeptime-core/src/plates/subduction.rs
-index 5cf6a9d..a4105ae 100644
+index 5cf6a9d..cedba32 100644
 --- a/crates/deeptime-core/src/plates/subduction.rs
 +++ b/crates/deeptime-core/src/plates/subduction.rs
 @@ -131,6 +131,7 @@ pub fn resolve(
@@ -259,3 +259,109 @@ index 5cf6a9d..a4105ae 100644
      c.max_uplift_mm_yr = 0.0;
      c.andean = false;
      state.counters.reversals += 1;
+@@ -459,6 +466,10 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env:
+         divergent: bool,
+         trench: bool,
+         front: Option<(u32, usize, DVec3, DVec3)>,
++        /// Measurement only: a neighbour on another plate; the summed outward directions of the
++        /// diverging neighbours.
++        edge: bool,
++        div_out: DVec3,
+     }
+     let samples = &state.samples;
+     let boundary: Vec<Boundary> = (0..n)
+@@ -469,6 +480,8 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env:
+                 divergent: false,
+                 trench: false,
+                 front: None,
++                edge: false,
++                div_out: DVec3::ZERO,
+             };
+             if sv.is_hidden() {
+                 return b;
+@@ -489,7 +502,9 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env:
+                 let out = tangent(x, rot * (pts[u as usize] - pts[v])).normalize_or_zero();
+                 let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
+                 let along = rel.dot(out);
++                b.edge = true;
+                 if along > 0.0 {
++                    b.div_out += out;
+                     b.divergent = true;
+                 } else if let Some(&c) = active.get(&(pu, pv))
+                     && -along > best
+@@ -545,6 +560,75 @@ pub fn fronts_and_uplift(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env:
+             }
+         }
+     }
++    if std::env::var_os("DEEPTIME_PLATE_TRACE").is_some() {
++        // Open-loop force diagnostics: what a torque balance would be given, per plate.
++        let np = state.plates.len();
++        let z3 = || vec![DVec3::ZERO; np];
++        let (mut t_slab, mut t_slab_age, mut t_suck, mut t_ridge, mut t_col_u, mut t_col_o) =
++            (z3(), z3(), z3(), z3(), z3(), z3());
++        let mut len = vec![[0.0f64; 6]; np]; // slab, slab*sqrt(age), over, ridge, collision under, edge
++        let mut drag = vec![[0.0f64; 12]; np];
++        let mut cnt = vec![[0u32; 2]; np];
++        for (v, b) in boundary.iter().enumerate() {
++            let pv = plate_of[v] as usize;
++            let x = pos[v];
++            let sv = &state.samples[v];
++            if !sv.is_hidden() {
++                let c = usize::from(sv.kind == CONTINENTAL);
++                cnt[pv][c] += 1;
++                let d = &mut drag[pv];
++                let o = 6 * c;
++                d[o] += 1.0 - x.x * x.x;
++                d[o + 1] += 1.0 - x.y * x.y;
++                d[o + 2] += 1.0 - x.z * x.z;
++                d[o + 3] -= x.x * x.y;
++                d[o + 4] -= x.x * x.z;
++                d[o + 5] -= x.y * x.z;
++            }
++            if b.edge && !sv.is_hidden() {
++                len[pv][5] += 1.0;
++            }
++            if b.divergent && !sv.is_hidden() {
++                let o = b.div_out.normalize_or_zero();
++                t_ridge[pv] += x.cross(-o);
++                len[pv][3] += 1.0;
++            }
++            if let Some((u, c, _rel, out)) = b.front {
++                let su = &state.samples[u as usize];
++                let under = state.contacts[c].under as usize;
++                let arm = x.cross(-out);
++                if su.kind == CONTINENTAL {
++                    t_col_u[under] += arm;
++                    t_col_o[pv] -= arm;
++                    len[under][4] += 1.0;
++                } else {
++                    let w = (su.age_myr(t_myr).max(0.0) / 80.0).sqrt().min(1.5);
++                    t_slab[under] += arm;
++                    t_slab_age[under] += arm * w;
++                    t_suck[pv] -= arm;
++                    len[under][0] += 1.0;
++                    len[under][1] += w;
++                    len[pv][2] += 1.0;
++                }
++            }
++        }
++        let v3 = |a: DVec3| format!("[{:.4},{:.4},{:.4}]", a.x, a.y, a.z);
++        let mut rows = Vec::new();
++        for p in state.plates.iter().filter(|p| p.alive) {
++            let i = p.id as usize;
++            let w = omega[i] * 1.0e9;
++            rows.push(format!(
++                "{{\"id\":{},\"n\":{:?},\"len\":{:?},\"drag\":{:?},\"w\":{},\"slab\":{},\"slab_age\":{},\"suck\":{},\"ridge\":{},\"col_u\":{},\"col_o\":{}}}",
++                p.id, cnt[i], len[i], drag[i], v3(w), v3(t_slab[i]), v3(t_slab_age[i]),
++                v3(t_suck[i]), v3(t_ridge[i]), v3(t_col_u[i]), v3(t_col_o[i])
++            ));
++        }
++        super::trace(&format!(
++            "{{\"k\":\"forces\",\"t\":{},\"plates\":[{}]}}",
++            t_myr,
++            rows.join(",")
++        ));
++    }
+     let rs = norm.rad(k.subduction_distance_km);
+     let (dist, label) = if sources.is_empty() {
+         (vec![f64::INFINITY; n], vec![u32::MAX; n])
