@@ -19,9 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
 
-use super::dynamics::{
-    BeltRec, Dynamics, MIX_CLASSES, PlateForces, PlateLife, PlateStep, StepRec,
-};
+use super::dynamics::{BeltRec, Dynamics, MIX_CLASSES, PlateForces, PlateLife, PlateStep, StepRec};
 use super::stats::Margins;
 
 /// One measure: its key, label, unit, range (inclusive; `None` is open) and how it is taken.
@@ -2401,7 +2399,10 @@ fn balance(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, f64
         }
     };
     put("balance_over_150_pct", share_over(params.fast_mm_yr));
-    put("balance_over_250_pct", share_over(params.balance_guard_mm_yr));
+    put(
+        "balance_over_250_pct",
+        share_over(params.balance_guard_mm_yr),
+    );
     let med = |sel: &dyn Fn(&PlateStep) -> bool| {
         median(
             &pairs
@@ -3674,7 +3675,10 @@ mod tests {
         assert!(near(get(&m, "slab_breakoffs_per_100myr"), 25.0));
         assert_eq!(get(&m, "slab_length_km_p50"), 100.0);
         // A record without the balance has no data, and the rows wait.
-        let none = measures(&dynamics(vec![step_of(2.0, vec![moving(0, 400, 0, 80.0, 0.0)])]), &[]);
+        let none = measures(
+            &dynamics(vec![step_of(2.0, vec![moving(0, 400, 0, 80.0, 0.0)])]),
+            &[],
+        );
         assert!(get(&none, "balance_p50_mm_yr").is_nan());
         assert!(get(&none, "slab_breakoffs_per_100myr").is_nan());
     }
