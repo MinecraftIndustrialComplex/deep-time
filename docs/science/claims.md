@@ -13,7 +13,7 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,220 active rows in 28 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02). The ledgers hold 2,398 ids: stage 1 left 2,069 rows; stage 2 package WP-0
+2,226 active rows in 28 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02; plate-motion task 2 added PLT-222 to PLT-227 the same day). The ledgers hold 2,404 ids: stage 1 left 2,069 rows; stage 2 package WP-0
 (2026-10-02) retired 193 of them as duplicates (`merged`, not counted) and added 301 rows for code stage 1
 had not covered (51 in GEO, 74 in PRS, 84 in HNT, 35 in CRE, 57 in CHK). The flexure feature (ISO-040 to
 ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 from its follow-up) is included.
@@ -39,7 +39,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [MAG](ledger/MAG.md) | magma and lava | 42 | 2 | 1 | 0 | 1 | 0 | 37 | 1 | 0 | 0 | 0 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 0 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
 | [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 182 | 0 | 59 | 2 | 10 | 0 | 40 | 71 | 0 | 0 | 75 |
-| [PLT](ledger/PLT.md) | plate tectonics | 201 | 17 | 45 | 4 | 13 | 13 | 64 | 45 | 163 | 25 | 20 |
+| [PLT](ledger/PLT.md) | plate tectonics | 207 | 17 | 45 | 4 | 14 | 13 | 68 | 46 | 163 | 25 | 20 |
 | [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 | 0 |
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 74 | 0 | 9 | 0 | 0 | 2 | 54 | 9 | 16 | 0 | 0 |
 | [PRV](ledger/PRV.md) | geologic provinces | 31 | 0 | 0 | 0 | 5 | 4 | 10 | 12 | 0 | 0 | 0 |
@@ -48,14 +48,14 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [STR](ledger/STR.md) | strata, traps, hosts | 44 | 0 | 4 | 0 | 0 | 2 | 34 | 4 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
-| **all** | | **2,225** | **55** | **491** | **54** | **67** | **79** | **875** | **604** | **359** | **58** | **193** |
+| **all** | | **2,231** | **55** | **491** | **54** | **68** | **79** | **879** | **605** | **359** | **58** | **193** |
 
 53 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, and WP-13a): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and eleven HNT rows (WP-15, WP-16, WP-2),
 and 15 PLT and 19 CHK rows (WP-13a: the force-balance constants and the plate-check targets).
-In plain terms, of the 2,220 active rows: 870 (39 %) are deliberate game or implementation choices; 607 (27 %)
+In plain terms, of the 2,226 active rows: 874 (39 %) are deliberate game or implementation choices; 608 (27 %)
 state something about the physical world with no source at all; 491 (22 %) name a source that nobody is recorded
-as having read; 121 (5 %) were written from memory or from an abstract and say so; 78 (4 %) were tuned to a target;
+as having read; 122 (5 %) were written from memory or from an abstract and say so; 78 (4 %) were tuned to a target;
 53 (2 %) were read in their sources.
 
 A low `from-memory` count does not mean a subsystem was written with its sources open. It means

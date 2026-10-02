@@ -1,6 +1,7 @@
 # Force-balance plate motion: design
 
-Status: **design for review, nothing built** (2026-10-02). It extends
+Status: **design approved 2026-10-02; task 2 built** (see "As built: task 2" at the end of
+section 9). It extends
 `docs/design/plate-collisions-and-welding.md` (the "collisions design" below) after Ben's decisions
 of 2026-10-02: full force-balance motion; nothing designed for the mega-plate yet; both sides of a
 suture rise, with a foreland basin; the start-up land jump is a separate small task afterwards.
@@ -497,6 +498,47 @@ full working session with its gates.
   in sequence per calendar day it is about 7–8 days.
 - Calibration is the uncertain part: each ensemble is 4–6 runs of 18 minutes, and five families of
   targets interact. If it goes as the hypsometry did (three passes), add 3–4 days.
+
+### As built: task 2 (2026-10-02)
+
+Branch of the plate-motion task 2 agent; `plates/shortening.rs`, `state::Collision`. Where it
+departs from the plan above and from the collisions design's task 2:
+
+- **What is counted.** Not "continental area that went under ÷ front length" (the collisions
+  design's wording) but the convergence across the front, integrated: the flux of the relative
+  velocity through the overriding plate's edge (Voronoi edges of the lattice) divided by the
+  front's length. On a straight front the two are the same quantity; the flux form needs no count
+  of hidden samples (which a resampling consumes) and gives exactly zero for strike-slip on the
+  lattice's jagged edges. A first version, the velocity along each edge sample's mean normal, read
+  19 % of a strike-slip speed as convergence: the Fibonacci lattice's normals lean one way.
+- **The front** is where continental crust of the subducting plate stands at the overriding
+  plate's edge (within 1.75 spacings), not where it lies in the overlap: the overlap is consumed at
+  every resampling and comes back over a few steps. A state begins where the front converges at
+  10 mm/yr or more (the subduction-confirmation rate; from above zero the onset convergence was a
+  few mm/yr and the 20-Myr slowdown ratio a meaningless 3–8) and survives 3 steps with no front.
+- **The state** carries onset, last step, shortening, crust crossed (km²), convergence now, at
+  onset, peak and 20 Myr after onset, front length and peak, centroid and outward normal, and the
+  share of the front that is continental on the overriding side. It ends in a transfer or weld
+  (`CollisionRec`, whose `start_myr` is now the state's onset), or with no transfer (a new
+  `PartingRec`: parted, reversed, closed, emptied, open). `collide` writes a `BeltRec` with the
+  convergence at onset and 20 Myr later; task 3 adds the wedge and foredeep to it.
+- **The interim trigger.** The plan said "welding still at the threshold in this task, so its
+  effect is measured alone". Measured on `earthlike_quick_16k` (supercontinent, 1000 Myr) with real
+  shortening at 300 km. On master before flexure (38ca6b0, 4 seeds): one plate above half the
+  planet in 32 % of steps instead of 59 %, rift-born plates welded back 26 % instead of 42 %, but
+  continental crust ends at 0.38 of the planet instead of 0.42. On master with flexure (1eac09f,
+  2 seeds) the mega-plate share does not improve (45 % against 41 %), while crust (0.36 against
+  0.29), collisions per 100 Myr (7.4 against 11.3) and the largest land jump (1.5 % against 2.3 %)
+  do. Thresholds of 100–250 km (before flexure) do not help the mega-plate (53–72 % of steps).
+  Every collision still ends in the one-step surge. Mixed results with nothing stacking or
+  resisting are not a state to land. So the trigger is a setting, `tectonics.collision_on_shortening`,
+  **off in every built-in preset**: the old count (relative speed × time, kept exactly as
+  `Contact::speed_count_km`) fires transfers and welds and the planets are those of master; the
+  collision state runs beside it and is recorded. Task 4 removes the setting and the old count.
+- **Hooks for tasks 3–5.** Task 3 stacks each step's `area_km2` growth behind `centroid` along
+  `normal`, on both plates, and fills `BeltRec`'s wedge and foredeep. Task 4 reads
+  `convergence_mm_yr` for the stall and the resistance, and replaces `shortening::advance`'s
+  trigger. Task 5 starts a slab's break-off clock at `onset_myr` on the stretch `front_km` long.
 
 ## 10. Risks
 
