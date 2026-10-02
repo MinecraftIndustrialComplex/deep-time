@@ -88,16 +88,14 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 |---|---|---|---|
 | 2026-10-02 | science WP-8 | **Folds and faults in blocks or in metres?** (DEF-011, DEF-019, DEF-020; docs/science/folds-faults-intrusions.md "Open questions" 1; pictures: `review/out/wp8/index.html`, three sections each drawn three ways, not committed.) The strata, plutons and terrain are true metres at 20 m a block up and 300 m across (15× vertical stretch); folds and faults alone are drawn undistorted in blocks, so in metres they are 15 times too low: Anderson's 60° and 30° dips are 6.6° and 2.2°, folds 100 m high where Zagros folds of the same 16 km wavelength are 500–1,000 m, a 38 km normal fault throws beds 120 m where a real one throws them about 1 km. Same world (quick 16k, 500 Myr, seed 1) with only this changed: today (stretch 1) bed offsets median 2 blocks (p90 7), grade inversions 0.07 % of columns; stretch 4: offsets 7 (p90 26), folds 21 blocks, normal faults 80–85° and thrusts 56–74° in blocks, inversions 0.33 %; true metres (15): offsets 22 (p90 91), folds 77 blocks, faults near vertical, inversions 0.78 %, granite basement pulled up through thin cover in arcs, and the scarp term (made for small throws) lifts ground up to 5.1 km. Physics says true metres, but only together with fold wavelengths taken from the thickness of the layers being folded (Biot: wavelength 2–16 times the layer, mean 6.5), which is not built. (a, recommended) A `structure.deformation.vertical_scale` setting (1 = today's shapes, 15 = true metres) with default 4 now and the scarp term lowered to match, then a design task for wavelengths from layer thickness, after which the default can move to true metres; (b) true metres now; (c) keep today's shapes as a labelled game choice. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-8 | **Intrusions larger than life** (DEF-048, DEF-049). Dykes are 2–5 blocks wide (600–1,500 m) where real ones are 1–150 m (Ship Rock's 2.3 m, the Mackenzie swarm's mean 30 m), although the comment says a block is the least that can be drawn; plugs are 5–16 blocks (1.5–4.8 km) across where Ship Rock, the type volcanic neck, is 500 m. (a, recommended) the narrowest drawable: `dyke_half_width_blocks` [0.5, 1.0] (1–2 blocks wide) and `plug_radius_blocks` [1, 3] (0.6–1.8 km across); (b) keep, labelled as game choices for visibility (now done in the ledger). | Not asked yet (sub-agent; for the coordinator) |
+| 2026-10-02 | plate-motion task 2 | **Turn real shortening on before tasks 3–4?** `tectonics.collision_on_shortening` is off in every preset, so the planets are master's (build log 2026-10-02, "Plate-motion task 2"). On, on master with flexure (2 seeds): continental crust 0.29 → 0.36 of the planet, collisions per 100 Myr 11.3 → 7.4, plate lifetime 41 → 63 Myr, but one plate above half the planet in 45 % of steps against 41 %, and every collision still ends in the one-step surge. (a, recommended) Keep it off until tasks 3 and 4 land together and remove it; (b) turn it on now as a light interim gain on the crust and collision counts. Not asked through AskUserQuestion (sub-agent); for the coordinator to put to Ben. | coordinator |
+| 2026-10-02 | plate-motion task 2 (found) | **Continental crust on master with flexure:** 1000 Myr `earthlike_quick_16k` runs on 1eac09f end with 0.29 of the planet continental (lowest step 0.28, plate-check target ≥ 0.37); on 38ca6b0 the same runs gave 0.42 (0.40). Not isolated between those commits (flexure, impacts, plate-check 1b). Recommended: bisect with 1–2 seeds before the belt calibration of task 3. | coordinator |
 | 2026-10-02 | science WP-13a | **Slab suction share** (PLT-186; docs/design/plate-force-balance.md section 6 note). The design's `slab_suction_share` 0.3 pulls only the overriding plate; Conrad & Lithgow-Bertelloni 2002 and 2004 (abstracts) have suction act on both plates, at 40 % of the forces against pull's 60 % (30 % with a weak asthenosphere), so their suction ÷ pull is 0.43–0.67. (a) Keep 0.3 as the open-loop starting value and calibrate it in task 8, with 0.43–0.67 noted as the sources' range (recommended: task 5 records forces read-only and the term's meaning differs anyway); (b) set 0.5 now, before task 7; (c) change the design so suction acts on both plates, as in the sources. | not asked (overnight; recorded by the WP-13a agent) |
 | 2026-10-02 | science WP-13a | **The overall speed scale** (PLT-181). `plate_speed_scale` 45 mm/yr was set to "Earth about 40", which is the median of plate-samples. Earth's area-weighted RMS is about 47 mm/yr today and 50–100 over the last 200 Myr (Forsyth & Uyeda 1975 Table 1; Zahirovic et al. 2015); the plate-check target is now 40–100. (a) Keep 45 for task 5 and calibrate it in task 8 against the new target (recommended); (b) raise it to 60 now. | not asked (overnight; recorded by the WP-13a agent) |
 | 2026-10-02 | science WP-13a | **Sea-floor age ceiling** (CHK-019, PLT-161). Today's ocean floor has a 90th percentile age of 133 Myr (Seton et al. 2020 grid, area-weighted); the plate-check ceiling is 230 Myr (master measures 208–269). (a) Keep 230 until the rewrite is measured, then tighten to about 180 in task 8 (recommended); (b) tighten to 180 now (master fails it); (c) keep 230 for good, as a cycle-long allowance. | not asked (overnight; recorded by the WP-13a agent) |
 | 2026-10-02 | science WP-13a | **Collision length target** (CHK-012, PLT-154). The target median is 15–50 Myr; Earth's examples are longer: India–Asia 50 Myr and continuing, the Alleghanian 65 Myr, the Uralian 70–140 Myr (Wikipedia; no statistic exists). (a) Keep 15–50 until the rewrite's collisions are measured, then decide with numbers (recommended: the model's collisions include small terranes); (b) raise the top to 100 Myr now. | not asked (overnight; recorded by the WP-13a agent) |
-| 2026-10-02 | science WP-2 | **Stratovolcano heights** (VOL-019; docs/science/volcanoes-and-magma.md, "Open questions" 1). Earth's 512 stratovolcanoes stand a median 1.02 km above their bases (Grosse et al. 2014, read in full); the default range 1.2–3.0 km gives standing cones a median 1.5 km and live ones 1.8–1.9 km (two 500 Myr runs). With 0.6–2.0 km the standing median is 0.91–0.93 km and the land above 2 km does not change measurably. (a) Lower the range to 0.6–2.0 km and `arc_radius_km` 14 → 10 km, keeping today's proportions (recommended); (b) keep 1.2–3.0 km as a game choice and say so in the hint. | Not asked yet (sub-agent; for the coordinator) |
-| 2026-10-02 | science WP-2 | **Island subsidence counted twice** (VOL-048). Since cones are flexure loads (log 2026-10-02) and the plate model deepens old ocean floor, the extra 25 m/Myr (to 1.5 km) for dead ocean volcanoes repeats both; Clague & Sherrod 2014 give >1 km in ~1 Myr under the load, then ~10 m/Myr. Setting it to 0 changed neither the hypsometry nor the standing shields measurably. (a) Default 0, keep the setting (recommended); (b) keep 25 m/Myr as a game choice. | Not asked yet (sub-agent; for the coordinator) |
-| 2026-10-02 | science WP-2 | **Continental hotspot calderas** (VOL-045). Yellowstone collapsed three times in 1.5 Myr (Christiansen 2001); at 3 × 0.04 = 0.12 per Myr a continental hotspot centre has a 10–30 % chance of one caldera in its life. (a) Give continental hotspot centres about 1 per Myr, arc volcanoes unchanged (recommended; a few places per planet, no hypsometry effect); (b) keep. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-01 | P2-14 | **Where geothermal features come from beyond the volcanoes.** Today only the active volcanoes (the bake's one export of heat); on the 16k quick planet that is 260 sites around 40 of 67 volcanoes, 23 of them hot-spring pools (median 1,422 blocks from a land point to the nearest pool, 837 to any site, 766 to a volcano). Options: **(1, recommended)** export a heat-flow layer (the plate model already computes `heat_flow_mw_m2` per sample: 55 + 35 e^(-t/60) on continents, +40 arc, +40 hotspot, +30 divergent) as an L1 `meta` layer and put fields on continental crust above a threshold (rifts, arcs, young orogens), same site machinery; **(2)** export ridge and rift segments; **(3)** volcanoes only. Rift provinces are in `meta/province` but absorbed at 50,000 km², so none exist on a typical planet. | Not asked yet: for the coordinator to put to Ben |
 | 2026-10-01 | P2-14 | **Default density and the warm-ground signal.** (a) Keep `geothermal_density` 1.0 (recommended; the default is a few fields per volcano, at 2.0 the sites roughly double, not measured) or raise it? (b) `DeepTimeClimate.geothermalWarmthC` (API 3, up to 12 K at a vent) exists but mic-climate does not read it: wire it as a warm refuge only, after the mic-climate connector (recommended), as a heat source for machines too, or leave it unread? (c) Native sulfur and cinnabar are vanilla stand-ins (yellow concrete, red terracotta); MIC has no such blocks, so the pack needs nothing now (recommended), or add blocks to `deeptime:geothermal/sulfur` / `cinnabar` in the pack later. | Not asked yet (sub-agent report) |
-| 2026-10-02 | science WP-16 | **Geothermal rules that are game choices (GEO-007, GEO-019, GEO-020, GEO-027, GEO-044).** (a) Springs need the year's local rain to reach 400 mm: keep (recommended; no source gives a number and real springs are fed from far away, but the rule gives dry places steam vents), or drop the rain test? (b) A mean temperature under 3 degC gives no pools, only because vanilla freezes the top layer of water: keep (recommended) or find a way to keep hot pools open in the cold (Yellowstone and Iceland have them)? (c) Pools are 4 to 10 blocks (1.2 to 3 km) across: keep (recommended; a block is 300 m) or make them smaller and rarer? | Not asked yet (sub-agent report) |
 | 2026-10-01 | deposit audit | **How rich should deposits be, against scatter and vanilla?** Three options with settings and numbers per family (A deposits clearly beat scatter, recommended; B deposits are the only real source; C realistic grades with strong multipliers), in the sub-agent's report and the build log entry "Deposit audit". Also: **a gold-bearing gravel block of Deep Time's own** for packs without Excavated Variants (it would be the mod's first block), or keep `minecraft:gold_ore` in the gravel bed there? No default changes until answered. | to be asked by the coordinator (the sub-agent has no AskUserQuestion) |
 | 2026-10-01 | P1-23 | **Four grid artifacts that need a design change** (build log 2026-10-01, "P1-23 grid-artifact audit"; docs/research/notes/grid-artifact-audit.md, "What is left"). **(1) Lake sediment** builds straight dams across lake plains: fill each lake level, deepest first (recommended, 2–3 days), a delta from each inlet, or hide it in the amplifier? **(2) Rivers and valleys run along eight directions**: route by a direction not bound to eight in the amplifier and the river network (recommended, about 3 days, changes every valley), meander the river lines only (a day), or leave for Phase 2? **(3) Biome borders step with the L1 cells**: decide the Köppen class on L2 inside P1-26 (recommended), jitter the lookup now (half a day), or leave? **(4) The detail noise's octaves share one lattice** (5 % of the block-scale relief): offset each octave when the format next changes (recommended), gradient noise, or leave? | Not asked yet: for the coordinator to put to Ben |
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
@@ -127,6 +125,117 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Scratch**: /Volumes/Graphide/ban/deeptime-runs/wp8/ (three worlds and the noddyverse tarball, 757 MB) deleted 2026-10-02 after the pictures were pulled; `tools/review/wp8-runs.sh world <name> [DEEPTIME_STRUCT_X=…]` remakes a run in 15 minutes (the stretch variable needs the scratch patch described above).
 - **Next step**: the coordinator merges, asks Ben the two WP-8 questions; on (a) for the first, build the setting (emplace.rs: amplitude × X; dip_b = atan(X tan d), slip_b = sqrt((s cos d)² + (X s sin d)²)) and lower `relief` with it, then design wavelengths from layer thickness.
 
+### 2026-10-02 — Plate-motion task 2: real shortening and the collision state (agent worktree agent-aaf46227fde85f19a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What changed in behaviour: nothing in the built-in planets.** Every built-in preset gets
+  `tectonics.collision_on_shortening: false`, which keeps the trigger used before this task, so the worlds are master's.
+  Measured: plate-check on seeds 1–4 gives the same value for every measure that does not depend on when a collision
+  starts, to the last digit, seed by seed. The hypsometry run checked against master is bit-identical too (below).
+  The collision state, the real-shortening count and their records run alongside and decide nothing. Setting the
+  switch to `true` makes real shortening fire transfers and welds.
+- **Real shortening** (`plates/shortening.rs`). A contact's **collision front** is the stretch of the overriding plate's
+  edge where continental crust of the subducting plate stands now (the nearest sample of another plate within 1.75
+  spacings is that plate's, continental, not freshly sutured). The **convergence across it** is the flux of the relative
+  velocity through the edge's Voronoi edges (cotangent lengths), divided by the front's length (the summed length ×
+  outward-normal vector, and at least half the summed edge). On a straight front this is the speed across the boundary.
+  Pure strike-slip gives under 2 % of the speed, an oblique contact its normal part, and a parting one a negative
+  value. A first version used each edge sample's mean normal and read 19 % of a strike-slip speed as convergence,
+  because the Fibonacci lattice's normals lean one way along a boundary. **Shortening** is that convergence integrated
+  over the collision (parting steps add nothing), and the crust crossed is shortening × front length (km²).
+- **The collision state** (`state::Collision`, on `Contact::collision`). It begins on the first step a live contact's
+  front has 3 or more samples and converges at 10 mm/yr or more. That is `subduction::CONFIRM_MM_YR`; counted from
+  above zero, the onset convergence was a few mm/yr and the 20-Myr slowdown ratio a median of 3–8. The state carries
+  its onset, last step, shortening, crust crossed, convergence now, at onset, peak and 20 Myr after onset, the front's
+  length and peak length, its centroid and outward normal, and the share of the front that is continental on the
+  overriding side. It survives 3 steps with no front, since a resampling consumes the overlap and it comes back. It
+  ends in one of five ways. A transfer or weld writes a `CollisionRec`, whose `start_myr` is now the state's onset and
+  `end_myr` the transfer, plus a `BeltRec` with the convergence at onset and 20 Myr later. The other four write a new
+  `PartingRec`: parted (no front for over 3 steps), reversed, closed (the contact timed out or a plate died), emptied
+  (the terrane was gone) or open (the run ended). The `collision` event gains `onset_myr` and `shortening_km` (EVENTS.md).
+  `Counters::collision_onsets` counts states, and the run test checks that every state ends exactly once.
+- **The `depth_km` bug** that the plate-check agent noted is real: it added the *magnitude* of the relative velocity at
+  the overlap's centroid, so sliding plates counted in full. `depth_km` is gone. The real count is above, and the old
+  count is kept on purpose, unchanged, as `Contact::speed_count_km` (it fires while the switch is off). In the default
+  runs it reads 351 km at the transfer or weld while the front had shortened by a median of 167 km (p90 320).
+- **Interim weld and uplift: the old trigger still fires, by measurement.** The new setting is
+  `tectonics.collision_on_shortening` (bool): an editor toggle `collision_on_shortening` and lang key
+  `deeptime.editor.field.collision_on_shortening`, in all 13 presets and the test planet. Task 4 removes it together
+  with the old count. Off is what master did. On fires at 300 km of real shortening: collisions then last 10 Myr
+  instead of one step (p90 21), but the one-step surge still fires at the end. Measured, on master 38ca6b0 (before
+  flexure, 4 seeds): one plate above half the planet in 32 % of steps (59 % today), welded back 26 % (42 %), and
+  continental crust at the end 0.38 (0.42), lowest step 0.37 (0.40). Thresholds of 100–250 km (1–2 seeds each) do not
+  help the mega-plate (53–72 % of steps). On master with flexure (2 seeds) the picture changes; see the table and the
+  pending question.
+- **plate-check and baseline** (`earthlike_quick_16k`, supercontinent, 1000 Myr, `stage volcanoes`, 2 threads; before =
+  master 1eac09f, after = this branch on 1eac09f, on = after with `collision_on_shortening=true`; seeds 1–4, on: 1–2):
+
+  The full table (every measure, per seed) is in docs/design/plate-check-baseline.md, "Task 2". The measures that
+  move, and the main ones (mean of seeds; before = after unless shown):
+
+  | Measure | Before (= after, switch off) | After, where it differs | Switch on (2 seeds) | Target |
+  |---|---|---|---|---|
+  | Largest plate, median share | 0.45 | | 0.46 | 0.15–0.35 |
+  | Steps with one plate above 50 % | 40.8 % | | 44.7 % | ≤ 10 % |
+  | Plates above 5 %, median | 4.25 | | 3.5 | 5–9 |
+  | Median plate lifetime | 41.5 Myr | | 63 Myr | ≥ 80 |
+  | Plates dead within 20 Myr | 34.6 % | | 21.2 % | ≤ 15 % |
+  | Rift-born alive after 50 Myr / welded back within 50 Myr | 24.1 % / 31.8 % | | 23.6 % / 29.6 % | ≥ 60 / ≤ 10 |
+  | Land raised by one collision in a step, most / most land gained in a step | 2.37 % / 2.34 % | | 1.29 % / 1.52 % | ≤ 0.5 / ≤ 1.5 |
+  | Collision belt width / elongation, median | 2,604 km / 2.05 | | 2,519 km / 2.30 | ≤ 800 / ≥ 4 |
+  | Collision length, median / 90th pct | 2 / 2 Myr | 6 / 10.9 Myr | 10 / 20.8 Myr | 15–50 / ≤ 120 |
+  | Convergence 20 Myr after onset ÷ at onset | no data | 1.30 (few collisions last 20 Myr) | 0.69 | 0.2–0.6 |
+  | Collisions per 100 Myr | 11.3 | | 7.4 | 2–6 |
+  | Continental crust, lowest / highest step | 0.28 / 0.45 | | 0.35 / 0.46 | ≥ 0.37 / ≤ 0.45 |
+  | Continental crust at the end | 0.29 | | 0.36 | – |
+  | Active margin share | 0.31 | | 0.34 | 0.25–0.40 |
+  | Sea floor, 90th pct age (mean after 100 Myr) | 194 Myr | | 182 Myr | ≤ 230 |
+  | Plate speed, RMS / median | 59.6 / 72.3 mm/yr | | 57.6 / 72.8 | 35–55 / 30–60 |
+  | Contact age when the collision began, median | 7 Myr | 3.25 Myr | 2 Myr | – |
+  | What fires (old count) at the transfer or weld, median | 351 km | | 568 km | – |
+  | Shortening across the front at the transfer or weld, median / p90 | – | 167 / 320 km | 334 / 386 km | – |
+  | Collisions with no state (no converging continental front) | – | 13.3 % | 0 % | – |
+  | States ending with no transfer, per 100 Myr (parted / reversed / closed) | – | 26.4 (7.3 / 2.7 / 15.9) | 37.6 (17.5 / 3.2 / 15.9) | – |
+
+- **Hypsometry at 500 Myr** (`p1-17-hyps` lines, seeds 1–3 × both starts, mean [min, max]; the same builds):
+
+  | Measure | Before | After (switch off) | Switch on | Target |
+  |---|---|---|---|---|
+  | Land share | 0.295 [0.252, 0.327] | same | 0.315 [0.286, 0.365] | 0.27–0.30 |
+  | Median land height | 687 m [569, 832] | same | 732 m [603, 933] | 430–640 m |
+  | Land above 2 km | 0.124 [0.092, 0.149] | same | 0.119 [0.079, 0.178] | 0.10–0.13 |
+  | Land, 90th percentile | 2,181 m | same | 2,130 m | – |
+  | Continental crust | 0.407 | same | 0.418 | – |
+  | Sea depth, median | 3,903 m | same | 3,814 m | – |
+
+  "same": the after run of seed 1, supercontinent, on the branch merged with master 412d517 printed the same
+  hypsometry, climate and plate lines as master 1eac09f's. The other five were not re-run; plate-check
+  identity on four 1000 Myr seeds covers them. Master's own median land height (687 m) is above the target; that
+  is not this task's. Highest L1 cell and the 99th percentile are not in the summary line and were not taken.
+
+- **Found on the way, not mine:** master with flexure on (1eac09f) ends 1000 Myr runs with continental crust at 0.29
+  of the planet (lowest step 0.28; plate-check fails `continental_min` at 0.37). On 38ca6b0 the same four runs gave
+  0.42 (lowest 0.40). The cause is not isolated between those commits (flexure, impacts, plate-check 1b); flexure
+  lowering young arcs below the sea before they turn continental is a guess. The switch at `true` keeps 0.36.
+  Separately, the structure stage's Noddy-check panic on seed 1 is fixed on master (my own guard was dropped).
+- **Ledger**: PLT-068 rewritten; PLT-222 to PLT-227 new (flux convergence, front rule, state, grace steps, 20-Myr
+  measure, the switch); ids beside the constants; claims.md and plates.md counts.
+- **Gates** (VM, branch at 826b912 with master 412d517): cargo fmt --check clean, clippy -D warnings clean,
+  `cargo test --workspace` 689 passed / 0 failed / 3 ignored, `cargo deny check licenses bans` ok, `./gradlew build
+  test` BUILD SUCCESSFUL, JUnit tests=226 failures=0 skipped=1. No GameTests: the game reads nothing new except the
+  two collision event params and the larger `notes.plates.dynamics`.
+- **Tests added**: `plates::shortening::tests` — normal component; head-on accumulates speed × time (within 2 %);
+  strike-slip accumulates none (under 2 %); oblique counts its normal part; the front rule; the life cycle (onset,
+  persistence through steps with no front, parting steps add nothing, the 10 mm/yr start, the 20-Myr value, parting
+  after the grace steps); the threshold fires on real shortening and a parting is recorded; the old count fires while
+  the switch is off; Voronoi cells close and tile the sphere. `plates::tests`: the life-cycle checks on the 300 Myr
+  recording run (every state ends once, shortening never falls, a belt record per collision with a state), and
+  `collisions_on_real_shortening_fire_at_the_threshold`.
+- **Not verified**: the full presets (250,000 samples); the 1–2-seed sweeps are indicative only. With the switch off
+  the 20-Myr slowdown ratio rests on a handful of collisions per run (most fire within 6–10 Myr), so its value
+  (1.3, spread −0.35 to 2.8) means nothing yet.
+- **Next**: tasks 3 and 4, landed together. Task 3 stacks each step's `area_km2` growth behind the front's `centroid`
+  along its `normal`, on both plates, and fills `BeltRec`'s wedge and foredeep. Task 4 replaces `shortening::advance`'s
+  trigger with welding on stalled convergence (`Collision::convergence_mm_yr`) and removes `collision_on_shortening`
+  and `speed_count_km`. Task 5 starts break-off at `onset_myr`.
 ### 2026-10-02 — Flexure follow-up: the margin zigzag and the polar stripes, causes and fixes (agent worktree agent-afae960b6db068f94, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Asked.** The coordinator, after flexure landed (5ce5af4): find the cause of the cell-to-cell alternation along
   active margins and the rise in land roughness (99th percentile 294 → 391 m in one pair), and of the stripes near
@@ -249,6 +358,59 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   run (the mix is one more pass over the lattice edges, like the fronts').
 - **Next.** The force-balance and belt tasks are judged on `boundary_subduction_pct` (and the arc rows). A strike-slip
   tolerance for the mix (the +-20 degree rule) would make the transform row comparable with Bird's.
+### 2026-10-02 — Volcano decisions: stratovolcano heights, island subsidence, continental hotspot calderas (agent worktree agent-a131f01c22943a1ff, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What.** Ben's four answers of 2026-10-02 (decisions log, last four rows): (1) stratovolcanoes `arc_height_km`
+  [1.2, 3.0] → **[0.6, 2.0]** and `arc_radius_km` 14 → **10** (VOL-019, VOL-020); (2) `island_subsidence_m_myr` 25 → **0**,
+  setting kept (VOL-048); (3) continental hotspot centres collapse at about **1 per Myr**: a new setting
+  `volcanoes.hotspot_caldera_rate_per_myr` = 1.0 replaces the factor 3 on `caldera_rate_per_myr` (0.04, unchanged for arc
+  cones and tall shields; VOL-045, new row VOL-074); (4) geothermal rules (400 mm rain test, no pools under 3 degC,
+  pools of 4 to 10 blocks) kept, no code change, GEO-007, -019, -020, -027, -051 marked owner-confirmed. The four
+  questions are out of "Pending questions" (GEO-044 and the other geothermal questions stay open).
+- **Code.** Defaults in `volcanoes/params.rs` and in all eight built-in presets and the test preset
+  `planet_world_4k.json`; the stage's decisions factored into functions the tests call (`arc_height_km`, `caldera_rate`,
+  `caldera_chance`, `caldera_erupts`, `sink_dead_islands`; draws unchanged); the summary line gained
+  `hotspot_calderas=`. **How the caldera rate is expressed:** a hazard per active centre, `1 - exp(-rate * dt)` a step
+  (so 0.86 per 2-Myr step at rate 1); a collapse ends the centre (as before), and the hotspot builds a new one only
+  once the old has drifted 70 km from the plume, so a track makes about one caldera per centre-life and the rate
+  holds per Myr of an active centre, not per Myr of the hotspot. Editor: new field `hotspot_caldera_rate` (label in
+  the lang file), hints for `arc_height_high`, `arc_radius`, `island_subsidence`, `caldera_rate` and `volcano_size`
+  rewritten, `arc_height_high` minimum 1.2 → 0.6 and `arc_height_low` maximum 3 → 2 (the editor's extremes test sets a
+  knob to its end with the others at their defaults, and the pair must stay ordered).
+- **Tests** (new, `volcanoes/tests.rs`): `stratovolcano_heights_fall_in_earths_range` (a synthetic arc with flux rising
+  from the threshold to 1: the cones' aimed median is inside Earth's mean ± s.d., 0.58-1.68 km, every cone inside
+  0.17-4.57 km, height to basal width inside 0.02-0.30 and within 10 % of the old proportion);
+  `a_continental_hotspot_makes_about_one_caldera_per_myr` (300 Myr of an active centre renewed after each collapse,
+  through the stage's own `caldera_erupts`: 240 to 360 calderas, expected 293; arc rate 0.04 unchanged; a shield under
+  4 km never collapses); `island_subsidence_defaults_to_nothing_and_the_setting_still_works` (default 0 leaves the
+  surface unchanged; 25 m/Myr sinks a dead island to its 1.5 km maximum and spares an active one); the pipeline test
+  also asserts that no volcano of its 120 Myr run has sunk.
+- **Science docs.** `docs/science/volcanoes-and-magma.md` (decisions section replaces open questions 1-3, tables,
+  numbers, new runs table), ledger VOL (VOL-019 `calibrated`, VOL-020 and VOL-048 `game-choice`, VOL-045 reworded,
+  VOL-074 new `game-choice`: VOL 74 rows, calibrated 2, game-choice 47, uncited 24), HNT (HNT-016, -061 revised;
+  HNT-085 to -088 new: 88 rows, verified 13, game-choice 38), GEO rows, `claims.md` totals (2,214 rows, 19 `verified`),
+  bibliography, `preset-coverage.md`. Sources read again on the test VM: Christiansen 2001 (three cycles, each ending
+  in a caldera-forming ash-flow eruption, 2.1, 1.3 and 0.64 Ma: `verified`) and Grosse et al. 2014, table 1
+  (stratovolcanoes, n = 512: height median 1.02 km, mean 1.13, s.d. 0.55, range 0.17-4.57; height/width median 0.13).
+- **Measured** (test VM; `earthlike_quick_16k`, 500 Myr, seeds 1-3, scattered continents and supercontinent, six runs
+  per variant, `deeptime stage volcanoes`, 2 threads, 4 at a time; `tools/review/p1-17-hyps.sh 500 "1 2 3"
+  "scattered_continents supercontinent" new "old:volcanoes.arc_height_km=[1.2,3.0];volcanoes.arc_radius_km=14;
+  volcanoes.island_subsidence_m_myr=25;volcanoes.hotspot_caldera_rate_per_myr=0.12"`; the old variant is master's
+  behaviour and reproduces the WP-2 seed-1 numbers exactly). Means, ranges in brackets. **Standing cones' median height
+  1,484 m (1,389-1,627) → 869 m (764-994)** (Earth 1,020 m); active cones 1,875 → 1,044 m. **Land above 2 km 0.124
+  (0.092-0.149) → 0.077 (0.062-0.097)**, lower in all six pairs (Earth 0.102); median land height 687 → 559 m (Earth
+  427 m); land share 0.295 → 0.266 (Earth 0.289). Calderas formed 512 → 496; at continental hotspot centres 42 (25-68)
+  → 62 (18-102); share of silicic hotspot centres that collapsed 66 % (253 of 382) → 98 % (374 of 380) (WP-2's
+  "10-30 % chance" was low: a centre stays active several Myr); arc calderas 469 → 433; summit calderas 22 → 16;
+  relief built by volcanoes 2.4 × 10⁷ → 1.2 × 10⁷ km³. **Contradicts nothing in the plan, but note:** the lower cones
+  move the land above 2 km from above Earth's to below it; the hypsometry recalibration (decisions log 2026-10-01,
+  "later with the plate work") should expect that. Scratch runs in `/Volumes/Graphide/ban/deeptime-runs/vol-decisions`,
+  deleted.
+- **Gates** (test VM): `cargo fmt --check` clean; `clippy --workspace --all-targets -D warnings` clean; `cargo test
+  --workspace` 682 passed, 0 failed, 3 ignored; `cargo deny check licenses bans` ok; `./gradlew build test` 226 tests,
+  0 failures, 1 skipped; `./gametest.sh` All 68 required tests passed; MIC: `./gametest.sh -PwithMic` (168 mods) All 68 required tests passed; its first run died in mod loading before any test (Registrate's "Found unused register callbacks" in Create's register event, the flake recorded in the P2-08 entry), the same jars loaded on the second.
+- **Next step.** The coordinator merges the branch; the hypsometry recalibration (decisions log 2026-10-01) now starts
+  from land above 2 km 0.077 and median land height 559 m.
+
 ### 2026-10-02 — Science documentation, stage 2, WP-2: volcanoes and magma checked against sources (agent worktree agent-a44828926d2eaecb7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What.** Every VOL and MAG row's source and status revised (`docs/science/ledger/VOL.md`, `MAG.md`); the page
   `docs/science/volcanoes-and-magma.md` rewritten for stage 2; ten volcano and magma hints corrected
@@ -284,7 +446,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Gates** (test VM): `cargo fmt --check` clean; clippy `-D warnings` clean; `cargo test --workspace` 673 passed,
   0 failed, 3 ignored; `cargo deny check licenses bans` ok; `./gradlew build test` 217 tests, 0 failures, 1
   skipped. GameTests not run: nothing the game reads changed (comments, hints and a summary line only).
-- **Next step.** Ben's answers to the three questions; then the value changes (with tests) in one small branch.
+- **Next step.** Done: Ben answered the three questions on 2026-10-02 and the value changes landed in the entry "Volcano decisions" above.
   Left for others: the arc-flux law is coded three times (VOL-003, RCK-059, the deposit engine).
 - **Merged with master a7ea05d** (WP-15/16, P1-10): where both packages corrected the same text, the version that
   agrees with the primary sources read was kept (volcano comments and the flanks, spacing and largest-caldera hints
