@@ -18,8 +18,8 @@ Run through tools/review/vertical-scale.sh on the test VM (numpy, scipy, matplot
     strata  --work W --planet N --world-data WD --bin deeptime --out F.json
                                                   rock-layer thickness in blocks down sampled land columns (the
                                                   column evaluator), and what falls under one block at each scale
-    charts  --stats F.json --out DIR              the comparison charts
-    page    --stats F.json --pictures DIR/pictures.json --out DIR    index.html
+    charts  --stats F.json [--more G.json=Label]… --out DIR              the comparison charts
+    page    --stats F.json --pictures DIR/pictures.json [--more …] [--strata S.json] --out DIR    index.html
 
 A vertical scale other than the bake's is applied to the baked terrain height H (blocks, the game's
 density zero) as H' = sea + (H - sea) * mv0 / mv: the same planet in metres, drawn at mv metres per
@@ -305,6 +305,11 @@ def warp_named(name):
     return f
 
 
+def warp_label(name):
+    kind, a, b, h0, w = name.split(":")
+    return f"non-linear, {a} m per block below about {float(h0) / 1000:g} km and {b} m above"
+
+
 def stats(a):
     pl = Planet(a.work, a.planet)
     res = {"planet": {"name": a.planet, "meta": pl.meta}, "scales": {}, "warps": {}, "refs": {}}
@@ -514,7 +519,7 @@ def places(a):
     cells[:, -2:] = 0
     i = np.unravel_index(np.argmax(cells), cells.shape)
     x, z = world(i[0] * 128 + 64 + q0, i[1] * 128 + 64)
-    out["valley"] = {"x": x, "z": z, "what": "river valley", "deep_columns": int(cells[i]),
+    out["valley"] = {"x": x, "z": z, "what": "incised valleys", "deep_columns": int(cells[i]),
                      "deepest_blocks": int(depth[i[0] * 128:(i[0] + 1) * 128, i[1] * 128:(i[1] + 1) * 128].max())}
     json.dump(out, open(a.out, "w"), indent=1)
     print(json.dumps(out, indent=1))
@@ -660,7 +665,8 @@ def render(a):
             entry["views"].append({"variant": name, "file": f, **nums})
             prof[name] = {"terrain": t[row].tolist(), "surface": v[row].tolist()}
             print(f"render: {f} {nums}", flush=True)
-        profiles[key] = {"row_z": z - half + row, "x0": x - half, "lines": prof, "sea_top": sea_top, "what": p["what"]}
+        profiles[key] = {"row_z": z - half + row, "x0": x - half, "lines": prof, "sea_top": sea_top, "what": p["what"],
+                         "through": "its highest point" if row != half else "the middle of the box"}
         pictures["places"].append(entry)
     for spec in a.ref or []:
         name, label = spec.split("=", 1)
@@ -753,7 +759,9 @@ def profile_charts(profiles, scales, out):
                 colour = RAMP[min(len(RAMP) - 1, [str(s) for s in scales].index(name))]
                 label = f"{name} m"
             elif name.startswith("knee"):
-                colour, label = ORANGE, "non-linear"
+                kn = [n for n in names if n.startswith("knee")].index(name)
+                colour = (ORANGE, "#b0431a")[kn % 2]
+                label = "{1}→{2} m".format(*name.split(":"))
             else:
                 colour, label = INK2, name
             y = np.array(lines[name]["terrain"], float) + 1
@@ -766,9 +774,8 @@ def profile_charts(profiles, scales, out):
         ax.set_ylim(ymin, ymax + 12)
         ax.set_xlabel("blocks along the section (west to east)", fontsize=8, color=INK2)
         ax.set_ylabel("y", fontsize=8, color=INK2)
-        ax.set_title(f"{p['what']}: the section through its highest point, one block = one block", fontsize=9, color=INK, loc="left")
-        if len(names) > 1:
-            ax.legend(fontsize=7, frameon=False, ncol=len(names), loc="upper right", labelcolor=INK2)
+        ax.set_title(f"{p['what']}: the west to east section through {p.get('through', 'its highest point')}, drawn one block = one block",
+                     fontsize=9, color=INK, loc="left")
         f = f"profile-{key}.png"
         fig.savefig(os.path.join(out, f), bbox_inches="tight", facecolor=SURFACE)
         plt.close(fig)
@@ -777,10 +784,10 @@ def profile_charts(profiles, scales, out):
 
 
 METRICS = [
-    ("slope", "p90_deg", "Slope, steepest tenth of the land (90th percentile)", "degrees"),
-    ("slope", "p99_deg", "Slope, steepest hundredth (99th percentile)", "degrees"),
-    ("slope", "share_over_45", "Land steeper than 45°", "% of land columns"),
-    ("step", "share_ge4", "Land columns beside a drop of 4 blocks or more", "% of land columns"),
+    ("slope", "share_over_45", "Land steeper than 45° between neighbouring columns", "% of land columns"),
+    ("slope", "share_over_60", "Land steeper than 60°", "% of land columns"),
+    ("hillside", "median_deg", "Hillside slope over 16 blocks, median", "degrees"),
+    ("hillside", "p90_deg", "Hillside slope over 16 blocks, steepest tenth (90th percentile)", "degrees"),
     ("relief64", "p90", "Relief within 64 blocks (90th percentile)", "blocks"),
     ("relief256", "p90", "Relief within 256 blocks (90th percentile)", "blocks"),
     ("coast", "cliff_p90", "Coast: highest ground within 8 blocks of the shore (90th percentile)", "blocks above the sea"),
@@ -788,11 +795,21 @@ METRICS = [
 ]
 
 
+def load_more(specs):
+    """--more F.json=Label: other planets' stats files."""
+    out = []
+    for spec in specs or []:
+        f, label = spec.split("=", 1)
+        out.append((label, json.load(open(f))))
+    return out
+
+
 def charts(a):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     st = json.load(open(a.stats))
+    more = load_more(a.more)
     os.makedirs(a.out, exist_ok=True)
     scales = sorted(st["scales"], key=float)
     xs = [float(s) for s in scales]
@@ -803,9 +820,15 @@ def charts(a):
         style(ax)
         mul = 100.0 if key.startswith("share") else 1.0
         ys = [st["scales"][s][grp][key] * mul for s in scales]
-        ax.plot(xs, ys, color=BLUE, linewidth=2, marker="o", markersize=5, label="Deep Time at this vertical scale")
+        ax.plot(xs, ys, color=BLUE, linewidth=2, marker="o", markersize=5, label=a.label)
         for x, y in zip(xs, ys):
             ax.annotate(f"{y:.3g}", (x, y), xytext=(0, 6), textcoords="offset points", ha="center", fontsize=7, color=INK2)
+        for label, other in more:
+            ys2 = [other["scales"][s][grp][key] * mul for s in scales if s in other["scales"]]
+            xs2 = [float(s) for s in scales if s in other["scales"]]
+            ax.plot(xs2, ys2, color="#104281", linewidth=1.6, marker="s", markersize=4, label=label)
+            for x, y in zip(xs2, ys2):
+                ax.annotate(f"{y:.3g}", (x, y), xytext=(0, -11), textcoords="offset points", ha="center", fontsize=7, color=INK2)
         for i, (name, r) in enumerate(refs):
             y = r[grp][key] * mul
             ax.axhline(y, color=REF_COLOURS[i % 3], linewidth=1.6, linestyle=(0, (5, 2)) if i else "-", label=r["label"])
@@ -852,10 +875,10 @@ def fmt(v, d=1):
     return "–" if v is None or (isinstance(v, float) and math.isnan(v)) else f"{v:.{d}f}"
 
 
-def stats_table(st):
+def stats_table(st, label="Deep Time", more=()):
     rows = []
     head = ("<tr><th>World</th><th>Exaggeration</th><th>Slope median</th><th>p90</th><th>p99</th><th>&gt;30°</th><th>&gt;45°</th><th>&gt;60°</th><th>&gt;75°</th>"
-            "<th>Hillside p90</th><th>Drop ≥2</th><th>≥4</th><th>≥8</th><th>Relief 16 med / p90 / p99</th><th>Relief 64</th><th>Relief 256</th>"
+            "<th>Hillside median</th><th>Hillside p90</th><th>Level with all four neighbours</th><th>Drop ≥2</th><th>≥4</th><th>≥8</th><th>Relief 16 med / p90 / p99</th><th>Relief 64</th><th>Relief 256</th>"
             "<th>Coast cliff med / p90 / p99</th><th>Land height med / p90 / p99 / max</th></tr>")
 
     def row(label, r, cls="", ex=""):
@@ -864,46 +887,86 @@ def stats_table(st):
         c, hg = r["coast"], r["height"]
         return (f"<tr class='{cls}'><td>{label}</td><td>{ex}</td><td>{fmt(s['median_deg'])}°</td><td>{fmt(s['p90_deg'])}°</td><td>{fmt(s['p99_deg'])}°</td>"
                 f"<td>{fmt(100 * s['share_over_30'])}%</td><td>{fmt(100 * s['share_over_45'])}%</td><td>{fmt(100 * s['share_over_60'], 2)}%</td><td>{fmt(100 * s['share_over_75'], 2)}%</td>"
-                f"<td>{fmt(h['p90_deg'])}°</td><td>{fmt(100 * t['share_ge2'])}%</td><td>{fmt(100 * t['share_ge4'])}%</td><td>{fmt(100 * t['share_ge8'], 2)}%</td>"
+                f"<td>{fmt(h['median_deg'])}°</td><td>{fmt(h['p90_deg'])}°</td><td>{fmt(100 * t['share_flat'])}%</td><td>{fmt(100 * t['share_ge2'])}%</td><td>{fmt(100 * t['share_ge4'])}%</td><td>{fmt(100 * t['share_ge8'], 2)}%</td>"
                 f"<td>{rel('relief16')}</td><td>{rel('relief64')}</td><td>{rel('relief256')}</td>"
                 f"<td>{fmt(c['cliff_median'], 0)} / {fmt(c['cliff_p90'], 0)} / {fmt(c['cliff_p99'], 0)}</td>"
                 f"<td>{fmt(hg['median'], 0)} / {fmt(hg['p90'], 0)} / {fmt(hg['p99'], 0)} / {fmt(hg['max'], 0)}</td></tr>")
     mh = st["planet"]["meta"]["scale"]["m_per_block_h"]
     mv0 = st["planet"]["meta"]["scale"]["m_per_block_v"]
-    for s in sorted(st["scales"], key=float):
-        rows.append(row(f"Deep Time, {s} m per block", st["scales"][s], "now" if float(s) == mv0 else "", f"{mh / float(s):.3g}×"))
-    for w, r in st.get("warps", {}).items():
-        rows.append(row(f"Deep Time, non-linear ({w})", r, "", "varies"))
+    for name, one in [(label, st)] + list(more):
+        for s in sorted(one["scales"], key=float):
+            rows.append(row(f"{name}, {s} m per block", one["scales"][s], "now" if float(s) == mv0 else "", f"{mh / float(s):.3g}×"))
+        for w, r in one.get("warps", {}).items():
+            rows.append(row(f"{name}, {warp_label(w)}", r, "", "varies"))
     for name, r in st["refs"].items():
         rows.append(row(r["label"], r, "ref", "1×"))
     return "<div class='wide'><table>" + head + "".join(rows) + "</table></div>"
 
 
+def costs_table(st, strata):
+    """What a real height or thickness is in blocks at each scale, and what a real angle is drawn as."""
+    sc = st["planet"]["meta"]["scale"]
+    mh, sea = sc["m_per_block_h"], sc["sea_level_y"]
+    top = st["planet"]["meta"]["notes_surface"]["max_elevation_m"]
+    scales = [float(x) for x in sorted(st["scales"], key=float)]
+    drawn = lambda real, mv: math.degrees(math.atan(mh / mv * math.tan(math.radians(real))))
+    lines = [
+        ("Vertical exaggeration", lambda mv: f"{mh / mv:.3g}×"),
+        ("Mount Everest, 8,849 m: blocks above the sea", lambda mv: f"{8849 / mv:.0f}"),
+        (f"This planet's highest point, {top:,.0f} m: blocks above the sea (y)", lambda mv: f"{top / mv:.0f} (y {sea + top / mv:.0f})"),
+        ("A 3 km volcano: blocks tall", lambda mv: f"{3000 / mv:.0f}"),
+        ("A 1 km deep canyon: blocks deep", lambda mv: f"{1000 / mv:.0f}"),
+        ("A 100 m river valley: blocks deep", lambda mv: f"{100 / mv:.1f}"),
+        ("A 100 m rock layer: blocks thick", lambda mv: f"{100 / mv:.1f}"),
+        ("Ore 1.5 km down: blocks below the surface", lambda mv: f"{1500 / mv:.0f}"),
+        ("Abyssal plain, 4 km deep: y", lambda mv: f"{sea - 4000 / mv:.0f}"),
+        ("Trench, 10 km deep: y", lambda mv: f"{sea - 10000 / mv:.0f}"),
+        ("A real 6° volcano flank is drawn at", lambda mv: f"{drawn(6, mv):.0f}°"),
+        ("A real 18° slope is drawn at", lambda mv: f"{drawn(18, mv):.0f}°"),
+        ("A real 30° scree slope is drawn at", lambda mv: f"{drawn(30, mv):.0f}°"),
+        ("The real slope that is drawn at 45°", lambda mv: f"{math.degrees(math.atan(mv / mh)):.1f}°"),
+    ]
+    if strata:
+        lines.append(("Rock layers under one block thick (sampled land columns)",
+                      lambda mv: f"{100 * strata['scales'][f'{mv:.0f}']['share_under_1']:.0f}%" if f"{mv:.0f}" in strata["scales"] else "–"))
+        lines.append(("Median rock layer: blocks thick",
+                      lambda mv: f"{strata['scales'][f'{mv:.0f}']['median_blocks']:.1f}" if f"{mv:.0f}" in strata["scales"] else "–"))
+    head = "<tr><th>At this many metres per block</th>" + "".join(f"<th>{mv:.0f}</th>" for mv in scales) + "</tr>"
+    body = "".join("<tr><td>" + name + "</td>" + "".join(f"<td>{f(mv)}</td>" for mv in scales) + "</tr>" for name, f in lines)
+    return "<div class='wide'><table>" + head + body + "</table></div>"
+
+
 def page(a):
     st = json.load(open(a.stats))
+    more = load_more(a.more)
+    strata = json.load(open(a.strata)) if a.strata else None
     pics = json.load(open(a.pictures))
     pf = json.load(open(os.path.join(os.path.dirname(a.pictures), "profile-files.json")))
     mh = st["planet"]["meta"]["scale"]["m_per_block_h"]
     out = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
            f"<title>Vertical scale study</title><style>{CSS}</style></head><body><main>",
            "<h1>Vertical scale: how tall should a block be?</h1>",
-           f"<p>The same baked planet ({st['planet']['meta'].get('source')}, {mh:.0f} m per block across) drawn at each candidate vertical scale, "
-           "beside vanilla's terrain and the pack's own. Every picture is drawn from the heightmap with one renderer (an oblique view from the south, "
-           "one pillar per block column), so shapes compare directly; colours follow real elevation, not block height. "
+           f"<p>One baked planet ({a.label}; {mh:.0f} m per block across, baked at {st['planet']['meta']['scale']['m_per_block_v']:.0f} m per block up) "
+           "drawn at each candidate vertical scale, beside vanilla's terrain and the pack's own. Every picture is drawn from the heightmap with one "
+           "renderer (an oblique view from the south, one pillar per block column, no trees), so shapes compare directly; colours follow real "
+           "elevation, not block height, and each place keeps one frame so the pictures of a row line up. "
            "The study and its reasoning: docs/research/notes/vertical-scale-study.md.</p>",
            "<h2>Where each scale sits against vanilla and the pack</h2>",
            "<img class='chart' src='chart-scales.png' alt='Deep Time statistics at each vertical scale against the reference worlds'>",
            "<h2>The numbers</h2>",
-           "<p>Slopes are angles in block space on dry land (run of 2 blocks; “hillside” a run of 16). “Drop” is the largest height difference to a "
-           "neighbouring column. Relief is highest minus lowest visible surface in a square of that many blocks. Coast cliff is the highest ground within "
-           "8 blocks of a shoreline column, above the water. Heights are blocks above the sea.</p>",
-           stats_table(st)]
+           "<p>Slopes are angles in block space on dry land (between neighbouring columns: a run of 2 blocks, so the angles come in steps; "
+           "“hillside”: a run of 16). “Drop” is the largest height difference to a neighbouring column. Relief is highest minus lowest visible "
+           "surface in a square of that many blocks. Coast cliff is the highest ground within 8 blocks of a column on the open sea's shore, above "
+           "the water. Heights are blocks above the sea. The highlighted row is the scale the planet was baked at; the green rows are the references.</p>",
+           stats_table(st, a.label, more),
+           "<h2>What a real size becomes</h2>",
+           costs_table(st, strata)]
     for p in pics["places"]:
         out.append(f"<h2>{p['what'].capitalize()} <span class='note'>x {p['x']}, z {p['z']}; {pics['side']} blocks ({p['km']:.0f} km) across</span></h2>")
         out.append("<div class='row'>")
         for v in p["views"]:
             name = v["variant"]
-            title = f"{name} m per block ({mh / float(name):.3g}×)" if name.replace('.', '').isdigit() else "non-linear"
+            title = f"{name} m per block ({mh / float(name):.3g}×)" if name.replace('.', '').isdigit() else warp_label(name).capitalize()
             extra = f"; flank {v['flank_deg']:.0f}°" if "flank_deg" in v else ""
             out.append(f"<figure><img loading='lazy' src='{v['file']}' alt='{p['what']} at {name}'><figcaption><b>{title}</b><br>"
                        f"highest point {v['peak_above_sea']} blocks above the sea; relief {v['relief']} blocks{extra}<br>"
@@ -962,8 +1025,10 @@ def main():
     p.add_argument("--out", required=True)
     p = sub.add_parser("charts")
     p.add_argument("--stats", required=True); p.add_argument("--out", required=True)
+    p.add_argument("--label", default="Deep Time"); p.add_argument("--more", action="append")
     p = sub.add_parser("page")
     p.add_argument("--stats", required=True); p.add_argument("--pictures", required=True); p.add_argument("--out", required=True)
+    p.add_argument("--label", default="Deep Time"); p.add_argument("--more", action="append"); p.add_argument("--strata")
     a = ap.parse_args()
     {"join": join, "refjoin": refjoin, "stats": stats, "compare": compare, "places": places, "strata": strata, "render": render, "charts": charts, "page": page}[a.cmd](a)
 
