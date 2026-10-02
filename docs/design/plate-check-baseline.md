@@ -623,7 +623,8 @@ plates read; it only saves time). Each cell is the mean, with the runs in bracke
   little through the coupled stages). This is the column to compare with.
 - **After** is the branch on 2c60ca3f, with the built-in preset (the light calibration below
   included). Master 5c4d2ed3 (task 5, the forces recorded and not applied) was merged afterwards;
-  it changes nothing a run computes.
+  it changes nothing a run computes: seeds 1 and 2 re-run on the branch merged with master
+  00ef214c give the same table, all 121 rows identical.
 
 The before columns are read by each master's own `plate-check` (the branch cannot read their
 checkpoints: the plate state changed). Three measures changed their definition with the belts, so
