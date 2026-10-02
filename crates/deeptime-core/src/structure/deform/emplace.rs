@@ -76,7 +76,7 @@ pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
     let reg = x.regime[c] as u8;
     let flags = x.flags[c] as u32 as u8;
     let conv = f64::from(x.convergence[c].max(0.0));
-    let speed = (conv / 80.0).min(1.0);
+    let speed = (conv / 80.0).min(1.0); // ledger: DEF-026
     let p = &sp.deformation;
     let shortening = if reg == regime::COLLISION {
         1.0
@@ -85,14 +85,14 @@ pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
         // reaches the whole subduction distance inland, most of it undeformed.
         let andean = if flags & ARC != 0 || reg == regime::ARC || reg == regime::BACK_ARC {
             let lift = f64::from(x.uplift[c].max(0.0)) / p.arc_uplift_mm_yr.max(1e-9);
-            0.5 * speed * lift.min(1.0)
+            0.5 * speed * lift.min(1.0) // ledger: DEF-026
         } else {
             0.0
         };
         let d = f64::from(x.orogen_km[c]) * 1000.0 / x.m_per_block_h;
         let belt = p.foreland_km * x.blocks_per_model_km;
         let foreland = if d > 0.0 && d < belt {
-            0.6 * (1.0 - d / belt)
+            0.6 * (1.0 - d / belt) // ledger: DEF-027
         } else {
             0.0
         };
@@ -104,7 +104,7 @@ pub fn strain(x: &Inputs<'_>, c: usize, sp: &StructureParams) -> Strain {
     // strike-slip faults in the arc (the Sumatran fault), where the margin is being lifted.
     let shear = if flags & SUBDUCTION_ZONE != 0 && obliquity > 30.0 {
         let lift = f64::from(x.uplift[c].max(0.0)) / p.arc_uplift_mm_yr.max(1e-9);
-        ((obliquity - 30.0) / 45.0).min(1.0) * speed * lift.min(1.0)
+        ((obliquity - 30.0) / 45.0).min(1.0) * speed * lift.min(1.0) // ledger: DEF-029
     } else {
         0.0
     };
@@ -195,6 +195,7 @@ fn trend_near(x: &Inputs<'_>, c: usize) -> Option<f64> {
     let w = x.grid.w as i64;
     let (i, j) = ((c as i64) % w, (c as i64) / w);
     for ring in 0..=3i64 {
+        // ledger: DEF-009 (three rings of cells)
         for dj in -ring..=ring {
             for di in -ring..=ring {
                 if di.abs().max(dj.abs()) != ring {
@@ -355,6 +356,7 @@ pub fn emplace(
                     // less where the strain is weaker (forelands).
                     let [e_lo, e_hi] = p.fold_shortening;
                     let thick = f64::from(x.thickness[c]).max(1.0);
+                    // ledger: DEF-006
                     let e_crust = (1.0 - sp.reference_crust_m / thick).clamp(e_lo, e_hi);
                     let e = e_lo + (e_crust - e_lo) * s.shortening.min(1.0);
                     f.azimuth_deg = (trend + scatter).rem_euclid(360.0) as f32;
@@ -387,7 +389,7 @@ pub fn emplace(
                     f.dip_deg = lerp(p.thrust_dip_deg, u[0]) as f32;
                     f.half_along = (0.5 * length) as f32;
                     f.half_across = (p.fault_reach_ratio * length) as f32;
-                    let grow = 0.5 + 0.5 * s.shortening.min(1.0);
+                    let grow = 0.5 + 0.5 * s.shortening.min(1.0); // ledger: DEF-017
                     f.slip = -(p.strength * p.thrust_slip_ratio * length * grow) as f32;
                 }
                 Kind::Normal => {
@@ -406,6 +408,7 @@ pub fn emplace(
                         side > 0.0
                     };
                     if synthetic == (u[3] < 0.25) {
+                        // ledger: DEF-031
                         az += 180.0;
                     }
                     f.azimuth_deg = az.rem_euclid(360.0) as f32;
@@ -417,7 +420,7 @@ pub fn emplace(
                 Kind::StrikeSlip => {
                     let trend = trend_near(x, c).unwrap_or(random_trend);
                     f.azimuth_deg = (trend + scatter).rem_euclid(360.0) as f32;
-                    f.dip_deg = 90.0;
+                    f.dip_deg = 90.0; // ledger: DEF-021
                     f.half_along = (0.5 * length) as f32;
                     f.half_across = (p.fault_reach_ratio * length) as f32;
                     let sense = if flip < 0.5 { -1.0 } else { 1.0 };

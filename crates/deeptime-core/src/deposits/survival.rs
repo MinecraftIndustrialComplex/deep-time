@@ -11,8 +11,9 @@
 //!
 //! 1. **Target.** A type's expected survivors on the planet are N* = count_mult · ρ/10⁵ · Σ A_i
 //!    over its permissive tracts (the USGS three-part method: density × permissive area; ρ the
-//!    type's P50 density, count_mult the preset's times the type's `balance.count_mult`, both 1 by
-//!    default).
+//!    type's density: the mean of a measured distribution, else its P50,
+//!    `Sizing::density_target`; count_mult the preset's times the type's `balance.count_mult`,
+//!    both 1 by default).
 //! 2. **Where deposits form.** Tract i receives formation in proportion to φ_i = A_i · F̄_i · E_i
 //!    (area, mean favourability, province endowment: the plan's ρ·A·F·E without ρ), a deposit's
 //!    position within the tract ∝ its cell's favourability × endowment (`cluster.rs`), and its

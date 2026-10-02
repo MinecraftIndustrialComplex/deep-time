@@ -164,17 +164,19 @@ no geothermal behaviour was changed.
 All numbers in the table above whose status is `game-choice`, decided by the P2-14 sub-agent (build
 log P2-14, 2026-10-01) unless stated. Ben accepted the feature (decisions log 2026-10-01, "Geothermal
 features"; and "Feel free to start now", on its own branch, GEO-011) but was not asked about any
-number. The default density and the use of the warm-ground signal are open questions in
-`STATUS.md` (Pending). The block stand-ins (calcite for sinter, yellow concrete for sulfur, red
+number at the time. On 2026-10-02 he confirmed three of the rules as game choices (decisions log,
+"Keep all three (Recommended)"): the 400 mm rain test for springs (GEO-007, GEO-019), no pools
+under a 3 degC mean (GEO-020) and pools 4 to 10 blocks across (GEO-027). The default density and
+the use of the warm-ground signal are open questions in `STATUS.md` (Pending). The block stand-ins (calcite for sinter, yellow concrete for sulfur, red
 terracotta for cinnabar) are vanilla choices; Deep Time adds no block.
 
 ## Open questions
 
 - Should fields also come from rifts, ridges and a heat-flow layer (GEO-013; Pending question,
   recommended: yes, via a heat-flow layer in the bake)?
-- Is 400 mm (GEO-007) a sensible default, and should springs depend on the year's rain at all?
-- Should a cold field (mean under 3 degC) have hot pools? The game-side reason is vanilla's freezing
-  (GEO-020).
+- Settled by Ben on 2026-10-02 (kept as game choices): 400 mm of rain for springs (GEO-007), no
+  pools under a 3 degC mean, whose reason is vanilla's freezing (GEO-020), and pools 4 to 10 blocks
+  across (GEO-027).
 - Should the cinnabar stain stay (GEO-041), and be tied to a silicic volcano?
 - Should geysers be added (periodic eruptions of a pool)? None of the sources read says how many a
   planet of this size would have; Yellowstone has more than 500 (NPS).
