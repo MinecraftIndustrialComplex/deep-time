@@ -344,6 +344,19 @@ pub fn bake(
     }
     note.insert("underground".into(), underground);
 
+    // Impact craters at the present (`surface::impacts`): where they are and what is left of them.
+    if let Some(st) = world.impacts.as_ref() {
+        let list = crate::surface::impacts::present_craters(st);
+        note.insert(
+            "impacts".into(),
+            json!({
+                "craters": list["craters"].as_array().map_or(0, Vec::len),
+                "craters_file": crate::surface::impacts::CRATERS_PATH,
+            }),
+        );
+        out.json(crate::surface::impacts::CRATERS_PATH, &list)?;
+    }
+
     millis.insert("total".into(), json!(ms(started)));
     note.insert("millis".into(), Value::Object(millis));
     note.insert("bytes".into(), json!(out.bytes));

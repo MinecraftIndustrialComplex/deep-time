@@ -49,6 +49,10 @@
     { key: 'mvt_zn_pb', label: 'MVT Zn-Pb', plural: 'MVT Zn-Pb', colour: '#3987e5', shape: 'hexagon' },
     { key: 'sedex_zn_pb', label: 'SEDEX Zn-Pb', plural: 'SEDEX Zn-Pb', colour: '#d55181', shape: 'square' },
     { key: 'bif_fe', label: 'Banded iron formation', plural: 'Banded iron formations', colour: '#e66767', shape: 'diamond' },
+    { key: 'impact_ni_cu_pge', label: 'Impact Ni-Cu-PGE', plural: 'Impact Ni-Cu-PGE', colour: '#7a9a3a', shape: 'up' },
+    { key: 'impact_hydrothermal_cu_zn_au', label: 'Impact hydrothermal Cu-Zn-Au', plural: 'Impact hydrothermal Cu-Zn-Au', colour: '#2aa7b8', shape: 'hexagon' },
+    { key: 'impact_diamond', label: 'Impact diamonds', plural: 'Impact diamonds', colour: '#7df9ff', shape: 'diamond' },
+    { key: 'impact_basin_u', label: 'Crater-basin uranium', plural: 'Crater-basin uranium', colour: '#a4d233', shape: 'square' },
   ];
   const BY_KEY = new Map(FAMILIES.map(f => [f.key, f]));
   const extra = new Map();   // a datapack's own types: a colour from the name, a circle

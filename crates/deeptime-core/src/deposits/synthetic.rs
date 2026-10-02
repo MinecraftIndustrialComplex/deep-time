@@ -561,6 +561,15 @@ impl SyntheticHistory {
             "deeptime:trap_structure",
             self.map(|c| g(&s.anticline, c) * smoothstep(-258.0, -250.0, t)),
         );
+        // The synthetic history has no impacts (P2-08): the impact types run and find nothing.
+        for name in [
+            "deeptime:impact_melt_m",
+            "deeptime:impact_hydrothermal",
+            "deeptime:impact_shock",
+            "deeptime:impact_basin",
+        ] {
+            put(&mut f, name, self.map(|_| 0.0));
+        }
         let precip = |c: usize| {
             let lat = g(&s.lat, c).abs();
             // Wet equator, dry subtropics at 20–30°, moister mid-latitudes, dry poles.

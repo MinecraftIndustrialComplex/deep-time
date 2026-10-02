@@ -72,6 +72,7 @@ reader needs to know.
   strata/classes.json           class index → rock class name
   spawn/candidates.json         land cells for spawn selection
   volcanoes/active.json         the volcanoes active at the present ("Lava")
+  impacts/craters.json          the impact craters at the present ("Impact craters")
   climate_mapping.json          written by the game at the world's first start (P1-09, plan §7.2; not listed
                                 in the manifest): the tables from the baked biome inputs to the pack's
                                 (see "The climate mapping")
@@ -846,6 +847,32 @@ y −64) measured from the floor instead of from y 0. Vanilla's own constants fl
 blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −352.
 Carver lava in the bottom eight blocks is vanilla's and not covered by these rules.
 
+### Impact craters (`impacts/craters.json`)
+
+The bake lists the craters the impact stage (P2-08, `surface/impacts`) leaves in its catalogue at the
+present: those that still show, the buried ones and the eroded roots (craters worn through their
+breccia, subducted or overprinted are not listed; a world without the impact stage has no file):
+
+```json
+{"version": 1, "t_myr": 0.0, "craters": [
+  {"id": 73, "x": 2410.5, "z": -1033.0, "diameter_m": 6300, "morphology": "complex", "age_myr": 12.4,
+   "depth_m": 255, "rim_m": 91, "relief_m": 180, "fate": "degraded", "breccia_m": 255, "melt_m": 0,
+   "cover_m": 12, "in_surface": false}]}
+```
+
+`x`, `z` are the centre's block position (x in [−C/2, C/2)); `diameter_m` is rim to rim; `morphology`
+is `simple`, `complex` or `peak_ring`; `depth_m` (rim crest to floor) and `rim_m` (rim above the
+ground it struck) are the fresh crater's in game metres (the physical ones × `impacts.depth_scale`),
+and `relief_m` is what erosion, burial and soil creep have left of `depth_m`; `fate` is `fresh`,
+`degraded`, `buried` or `eroded_to_roots`; `breccia_m` and `melt_m` are the thickness of the breccia
+lens and the melt sheet; `cover_m` the sediment over the floor; `in_surface` says the crater was large
+enough (two L1 cells) to be cut into the deep-time surface and laid in the strata log, rather than
+drawn by the amplifier and given a body. `notes.bake.impacts` records `craters` (the count) and
+`craters_file`. The game does not read the file to build anything: the craters are in `elevation`,
+their rock in the horizon stacks and in bodies of role `impact_breccia` (rock class `impact_breccia`,
+with a zone `melt_sheet` of rock class `impact_melt` on the floor of a crater that has one). It is
+there for tools, and Java's `worlddata/Craters` reads it for the GameTest that checks a crater in the placed world.
+
 ### Active volcanoes (`volcanoes/active.json`) and their magma
 
 The bake lists the volcanoes the volcano stage leaves **active at the present** (dead ones and those
@@ -958,7 +985,8 @@ climate's temperature, at most 12 (vent) / 10 (pool) / 6 (patch) at a site's hea
 
 `{"classes": ["sandstone", "red_bed", "granite"]}` — index → rock class id (plan §5.4.1,
 `deeptime:rock/<class>` tags). The vocabulary is the rock-tag README's 60 classes (`diamictite`,
-lithified till, added 2026-09-30); a reader maps indices through this file, never through a fixed
+lithified till, added 2026-09-30) plus `impact_breccia` and `impact_melt` (the rocks of meteorite
+impacts, added for P2-08 on 2026-10-01), 62 in all; a reader maps indices through this file, never through a fixed
 list, so a class added to the vocabulary changes no bytes a reader depends on.
 
 ## `spawn/candidates.json`
@@ -1396,9 +1424,9 @@ survives in, the finished folder. The manifest's `notes.run.history` reports wha
   (or the content bundle's) essentials. `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json`
   are the GameTest and smoke worlds.
 - All: a three-horizon strata placeholder on L1 (`notes.strata`); with `--strata every-class`
-  (P1-12) eight horizons 10 blocks apart holding all 60 rock classes, horizon h of L1 cell column
-  i having class (6·i + h) mod 60, so any ten neighbouring cell columns show every class at
-  h ≥ 2 (`notes.strata.class_rule`). Horizon h spans the keys 4096·h … 4096·h + 4095 in every
+  (P1-12) eight horizons 10 blocks apart holding all 62 rock classes, horizon h of L1 cell column
+  i having class (6·i + h) mod 62, so any eleven neighbouring cell columns show every class at
+  h ≥ 2 (six consecutive classes per column; 11 × 6 = 66 ≥ 62) (`notes.strata.class_rule`). Horizon h spans the keys 4096·h … 4096·h + 4095 in every
   cell, so the column rule correlates the synthetic stacks by index (and mixes the neighbouring
   cell columns' classes in as thin tongues). `--strata basin`: a readable sedimentary basin, the
   same in every cell — sandstone, shale, sandstone, mudstone, limestone, shale, sandstone and shale

@@ -61,6 +61,7 @@ pub mod facies;
 pub mod fields;
 pub mod glacial;
 pub mod grid;
+pub mod impacts;
 pub mod lithology;
 pub mod marine;
 pub mod oracle;

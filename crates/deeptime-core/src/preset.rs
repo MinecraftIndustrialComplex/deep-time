@@ -394,6 +394,13 @@ impl Preset {
                             (**p).clone(),
                         )));
                     }
+                    if p.impacts.is_some() {
+                        // Coupled too: craters are cut into the surface and laid in the strata
+                        // log before the structure stage reads it (P2-08).
+                        stages.push(Box::new(crate::surface::impacts::ImpactStage::new(
+                            (**p).clone(),
+                        )));
+                    }
                     // Column strata and metamorphism on the surface's strata log (P1-07).
                     stages.push(Box::new(crate::structure::StructureStage::new(
                         (**p).clone(),
@@ -675,6 +682,7 @@ mod tests {
                     "climate",
                     "surface",
                     "volcanoes",
+                    "impacts",
                     "structure",
                     "deposits",
                     "young",
