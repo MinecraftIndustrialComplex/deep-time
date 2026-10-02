@@ -13,11 +13,11 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,097 rows.
+2,106 rows.
 
 | Ledger | Subject | Rows | `cited-unverified` | `from-memory` | `abstract-only` | `calibrated` | `game-choice` | `uncited` | of which `pending-rewrite` | of which `not-yet-coded` |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [PLT](ledger/PLT.md) | plate tectonics | 212 | 51 | 6 | 20 | 19 | 63 | 53 | 183 | 29 |
+| [PLT](ledger/PLT.md) | plate tectonics | 221 | 51 | 8 | 22 | 19 | 66 | 53 | 183 | 29 |
 | [CLM](ledger/CLM.md) | climate physics | 146 | 43 | 5 | 0 | 13 | 23 | 62 | 118 | 28 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 76 | 20 | 0 | 0 | 0 | 10 | 46 | 76 | 0 |
 | [BIO](ledger/BIO.md) | Köppen classes and biomes | 99 | 24 | 0 | 0 | 1 | 66 | 8 | 0 | 0 |
@@ -41,9 +41,9 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 | [BAK](ledger/BAK.md) | the bake, satellite view | 40 | 0 | 0 | 0 | 1 | 34 | 5 | 0 | 0 |
 | [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 |
 | [GEO](ledger/GEO.md) | geothermal features | 0 | – | – | – | – | – | – | – | – |
-| **all** | | **2,097** | **522** | **53** | **66** | **76** | **731** | **646** | **377** | **57** |
+| **all** | | **2,106** | **522** | **55** | **68** | **76** | **734** | **646** | **377** | **57** |
 
-Three rows are `verified` (ISO-041, ISO-042, ISO-048, added with the flexure feature on 2026-10-02; the table has no column for them). The percentages below are those of stage 1's 2,069 rows. In plain terms: 723 rows (35 %) are deliberate game or implementation
+Five rows are `verified` (ISO-041, ISO-042, ISO-048, added with the flexure feature on 2026-10-02, and PLT-213 and PLT-218, added with the plate-check boundary mix and arc heights on 2026-10-02; the table has no column for them). The percentages below are those of stage 1's 2,069 rows. In plain terms: 723 rows (35 %) are deliberate game or implementation
 choices; 635 (31 %) state something about the physical world with no source at all; 522 (25 %)
 name a source that nobody is recorded as having read; 113 (5 %) were written from memory or from
 an abstract and say so; 76 (4 %) were tuned to a target.
