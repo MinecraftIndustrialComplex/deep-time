@@ -41,7 +41,7 @@ the amplified terrain ("The P1-08 bake"); and the column evaluator both sides im
 Every other file's bytes are as in 0.1.
 
 **0.3** over 0.2 (P2-01, folds and faults): every header's minor is 3. A baked planet may hold
-`structure/events.dtst` (`DTST`), the folds and faults its tectonic history left, and the horizon
+`structure/events.dtst` (`DTST`), the folds, faults and small intrusions its tectonic history left, and the horizon
 stack a column shows is then the 0.2 column rule's stack read through those events ("Structural
 events", the deformed column rule; `horizons` and `rock` in "Columns" are the deformed ones). A
 folder without the file is read as before. The `elevation` of such a world already carries the
@@ -1127,7 +1127,8 @@ normal and strike-slip faults whose slip dies out along the trace and away from 
 (kind 2: stocks in orogens, dykes along rifts, plugs under extinct volcanoes), each dated to
 the plate step that made it; the key is `structure::columns::key::of_age(0, age, span)`, the
 unmetamorphosed strata log's key of that age, so basement and metamorphic units (larger keys) are
-deformed by every event; a fault's `y` is the ground at its centre. `notes.bake.structure` records
+deformed by every event; a fault's `y` is the ground at its centre; an intrusion's `y` is the
+world's floor (it is rooted there and narrows upwards to its top). `notes.bake.structure` records
 the counts and the margin, `notes.structure.deformation` what the run made.
 
 ## Keyframes (`keyframes/index.json`, `keyframes/kf-<n>.dtk`)

@@ -293,3 +293,52 @@ fn a_planet_of_structures_evaluates_on_a_lattice() {
     let e = features[0].to_noddy(0.0, 0.0, 4096.0, 70.0, &profile);
     assert!(matches!(e, Some(noddy::Event::Windowed(_))));
 }
+
+#[test]
+fn structures_are_grouped_by_what_made_them() {
+    let mut features = scatter(120, 9);
+    // Three causes and some structures with none (grouped by their plate).
+    for (k, f) in features.iter_mut().enumerate() {
+        f.cause = [0, 11, 12, 13][k % 4];
+        f.plate = (k % 3) as u32;
+    }
+    let groups = groups(&features, 4096.0, 300.0, 20.0);
+    // Every structure is in exactly one group of its own kind of setting.
+    let count = |g: &Group| -> f64 {
+        g.params
+            .iter()
+            .filter(|(k, _)| ["fold_trains", "thrusts", "stocks", "faults", "dykes"].contains(k))
+            .map(|(_, v)| *v)
+            .sum()
+    };
+    assert_eq!(
+        groups.iter().map(count).sum::<f64>() as usize,
+        features.len()
+    );
+    for g in &groups {
+        assert!(g.kind == "deeptime:fold_belt" || g.kind == "deeptime:fault_system");
+        assert_eq!(g.kind == "deeptime:fold_belt", g.setting == "orogen");
+        assert!(g.t_start <= g.t_end && g.magnitude > 0.0 && g.magnitude <= 1.0);
+        assert!((-90.0..=90.0).contains(&g.lat) && (0.0..360.0).contains(&g.lon));
+        // Ungrouped ones say which plate; every group says where its strongest structure is.
+        let has = |k: &str| g.params.iter().any(|(p, _)| *p == k);
+        assert_eq!(g.cause == 0, has("plate"));
+        assert!(has("strongest_x") && has("strongest_z") && has("strongest_azimuth_deg"));
+        let x = g
+            .params
+            .iter()
+            .find(|(p, _)| *p == "strongest_x")
+            .unwrap()
+            .1;
+        assert!(
+            features.iter().any(|f| f.x.round() == x),
+            "a member is the strongest"
+        );
+    }
+    // The same structures, the same groups.
+    assert_eq!(groups, super::groups(&features, 4096.0, 300.0, 20.0));
+    // Plugs belong to their volcanoes: no group.
+    let mut plug = features[0].clone();
+    plug.kind = Kind::Plug;
+    assert!(super::groups(&[plug], 4096.0, 300.0, 20.0).is_empty());
+}

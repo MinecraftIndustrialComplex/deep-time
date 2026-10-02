@@ -286,17 +286,17 @@ pub fn bake(
             crc32,
         });
         out.bytes += bytes;
-        let folds = st
-            .events
-            .iter()
-            .filter(|e| matches!(e.shape, deeptime_format::structure::Shape::Fold { .. }))
-            .count();
+        use deeptime_format::structure::Shape;
+        let count = |pick: fn(&Shape) -> bool| st.events.iter().filter(|e| pick(&e.shape)).count();
+        let folds = count(|s| matches!(s, Shape::Fold { .. }));
+        let intrusions = count(|s| matches!(s, Shape::Intrusion { .. }));
         note.insert(
             "structure".into(),
             json!({
                 "events": st.events.len(),
                 "folds": folds,
-                "faults": st.events.len() - folds,
+                "faults": st.events.len() - folds - intrusions,
+                "intrusions": intrusions,
                 "margin_blocks": st.margin,
                 "bytes": bytes,
             }),
