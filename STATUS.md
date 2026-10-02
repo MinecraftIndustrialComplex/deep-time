@@ -179,7 +179,9 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Merged with master d6bde03 and 026725e.** master's STATUS.md carried committed conflict markers (three lines around
   the flexure follow-up and plate-check entries); removed here, every entry kept. `claims.md` table recounted with
   `tools/review/claims_counts.py --write` (2,226 active rows, 130 `verified`), prose updated.
-- **Gates after the setting and the merges:** GATES2
+- **Gates after the setting and the merges:** `cargo fmt --check` clean; clippy `-D warnings` clean; `cargo test --workspace` 693
+  passed, 0 failed, 3 ignored; `cargo deny check licenses bans` ok; `./gradlew build test` 226 tests, 0 failures, 1 skipped;
+  `./gametest.sh`, `-PwithMic` (168 mods, set reinstalled) and `-PwithEv`: all 68 required tests passed in each.
 - **Next step.** The owner answers the BIF question; then set the default of `deposits.inherited_bif_share` (or replace it
   with a patch field for answer (a)) and re-measure on the same preset.
 ### 2026-10-02 — Flexure follow-up: the margin zigzag and the polar stripes, causes and fixes (agent worktree agent-afae960b6db068f94, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
