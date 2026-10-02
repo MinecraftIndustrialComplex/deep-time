@@ -14,7 +14,7 @@
 //! | `rift_subsidence_m_myr` | plates | minus the plate model's uplift where it is negative on continental crust |
 //! | `heat_flow_mw_m2` | plates | the sample's heat-flow proxy |
 //! | `dist_litho_step_km` | plates | at each frame: distance (km, block metric) to the nearest edge between craton and non-craton regime cells |
-//! | `inherited_bif` | plates + timeline | the frame's craton share × the share of the BIF acme before the run's start (`deposits::clocks`; plan §8.6: inherited cratonic basement where the timeline starts after the acme) |
+//! | `inherited_bif` | plates + timeline | the frame's share of time the cell was an inherited iron-formation basin under a stable interior (`deposits::bif_basins`, carried with the crust) × the share of the BIF acme before the run's start (`deposits::clocks`; plan §8.6: inherited cratonic basement where the timeline starts after the acme) |
 //! | `elevation_m` | surface (P1-04) | above sea level of the time |
 //! | `erosion_rate_m_myr`, `deposition_rate_m_myr` | surface | the step's net erosion or deposition |
 //! | `topographic_gradient_m_km` | surface | at each frame: gradient of the frame-mean land elevation smoothed over ~50 km |
@@ -77,6 +77,11 @@ pub const STEP_FIELDS: [&str; 26] = [
     // Used for the frame's regime-based fields; not a deposit field itself.
     "surface:craton",
 ];
+
+/// The step field of the inherited iron-formation basins under a stable interior (1 in a basin
+/// whose crust is a craton this step; `deposits::bif_basins`); `flush` turns its frame mean into
+/// `deeptime:inherited_bif`. Accumulated only in runs that inherit basins.
+pub const BIF_BASIN_STEP: &str = "surface:bif_basin";
 
 /// Fields computed once per frame.
 pub const FRAME_FIELDS: [&str; 3] = [
@@ -420,6 +425,7 @@ pub fn flush(acc: &mut FrameAcc, d: &Dims, t_end_years: f64, epoch: &Epoch) -> F
     let span = acc.span_years.max(1e-9);
     let mut fields: BTreeMap<String, Vec<f32>> = BTreeMap::new();
     let mut craton = Vec::new();
+    let mut basin = Vec::new();
     for (name, sum) in std::mem::take(&mut acc.sums) {
         let mean: Vec<f32> = sum
             .par_iter()
@@ -427,21 +433,27 @@ pub fn flush(acc: &mut FrameAcc, d: &Dims, t_end_years: f64, epoch: &Epoch) -> F
             .collect();
         if name == "surface:craton" {
             craton = mean;
+        } else if name == BIF_BASIN_STEP {
+            basin = mean;
         } else {
             fields.insert(name, mean);
         }
     }
     let n = d.cells();
-    let bif_share = epoch.inherited_bif_share() as f32; // ledger: ORE-020
+    let window = epoch.inherited_bif_window() as f32; // ledger: ORE-020
     if craton.len() == n {
         fields.insert(FRAME_FIELDS[0].into(), dist_to_edge(d, &craton));
-        fields.insert(
-            FRAME_FIELDS[1].into(),
-            craton.iter().map(|&k| k * bif_share).collect(),
-        );
-    } else {
-        fields.insert(FRAME_FIELDS[1].into(), vec![0.0; n]);
     }
+    // Inherited BIF: the basins under a stable interior (`deposits::bif_basins`), × the share of
+    // the acme before the run.
+    fields.insert(
+        FRAME_FIELDS[1].into(),
+        if basin.len() == n {
+            basin.iter().map(|&b| b * window).collect()
+        } else {
+            vec![0.0; n]
+        },
+    );
     if let Some(e) = fields.get(&format!("{P}elevation_m")) {
         let g = regional_gradient(d, e);
         fields.insert(FRAME_FIELDS[2].into(), g);
@@ -499,12 +511,16 @@ pub fn row_lat(grid: &deeptime_format::GridDesc, j: usize) -> f64 {
 mod tests {
     use super::*;
 
-    /// A frame of `span_myr` ending at `t_end_myr` with one craton cell of four.
+    /// A frame of `span_myr` ending at `t_end_myr` with two craton cells of four, the first of
+    /// them in an inherited iron-formation basin (`deposits::bif_basins`).
     fn frame_at(t_end_myr: f64, span_myr: f64, epoch: &Epoch) -> FieldFrame {
         let d = Dims::new(2, 2, 1000.0, true);
         let mut acc = FrameAcc::default();
         let dt = span_myr * 1.0e6;
-        acc.add("surface:craton", &[1.0, 0.0, 0.0, 0.0], dt);
+        acc.add("surface:craton", &[1.0, 1.0, 0.0, 0.0], dt);
+        if epoch.inherits_bif() {
+            acc.add(BIF_BASIN_STEP, &[1.0, 0.0, 0.0, 0.0], dt);
+        }
         acc.span_years = dt;
         flush(&mut acc, &d, t_end_myr * 1.0e6, epoch)
     }
@@ -527,7 +543,8 @@ mod tests {
         assert_eq!(old.clocks["deeptime:clock/bif_acme"], 0.0);
         let young = frame_at(-300.0, 50.0, &e);
         assert_eq!(young.clocks["deeptime:clock/land_plants"], 1.0);
-        // The run starts after the acme: the craton cell inherits BIF, the others do not.
+        // The run starts after the acme: the craton cell in a basin inherits BIF; the other craton
+        // cell does not (before the patch field, Ben 2026-10-02, every craton cell did).
         assert_eq!(
             old.fields["deeptime:inherited_bif"],
             vec![1.0, 0.0, 0.0, 0.0]

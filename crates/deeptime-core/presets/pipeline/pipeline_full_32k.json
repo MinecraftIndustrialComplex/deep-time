@@ -52,10 +52,12 @@
     "count_mult": 1.0,
     "size_mult": 1.0,
     "richness_mult": 1.0,
+    "scatter_mult": 0.5,
     "province": "strong",
     "province_km": 800.0,
     "brine_flow_km": 600.0,
-    "inherited_bif_share": 0.0,
+    "inherited_bif_share": 0.014,
+    "bif_basin_km2": 100000.0,
     "types": [],
     "essentials": []
   },

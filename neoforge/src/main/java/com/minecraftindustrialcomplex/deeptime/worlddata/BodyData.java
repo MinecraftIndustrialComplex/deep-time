@@ -65,7 +65,7 @@ public final class BodyData {
                         s.optString(strings, zones.getInt(e + 4), "zone material"),
                         s.optString(strings, zones.getInt(e + 8), "zone rock class"),
                         zones.getFloat(e + 12), zones.getFloat(e + 16), zones.getFloat(e + 20), zones.getFloat(e + 24),
-                        zones.getFloat(e + 28), zones.getFloat(e + 32)));
+                        zones.getFloat(e + 28), zones.getFloat(e + 32), zones.getFloat(e + 36)));
             }
             Body b = new Body(id, recs.getInt(a + 4), shape, s.string(strings, recs.getInt(a + 12), "role"),
                     new double[]{recs.getDouble(a + 16), recs.getDouble(a + 24), recs.getDouble(a + 32)},
