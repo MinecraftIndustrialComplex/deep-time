@@ -368,8 +368,11 @@ def places(a):
         cand.append((round(peak - float(ring.max()), 1), e["height_m"], x, z, e.get("radius_m"), round(peak - float(np.median(ring)), 1)))
     cand.sort(reverse=True)
     out["volcano_candidates"] = cand[:8]
-    if cand:
-        out["volcano"] = {"x": cand[0][2], "z": cand[0][3], "what": "stratovolcano", "height_m": cand[0][1], "radius_m": cand[0][4]}
+    for key, c in zip(("volcano", "volcano_b"), cand):
+        out[key] = {
+            "x": c[2], "z": c[3], "height_m": c[1], "radius_m": c[4],
+            "what": "stratovolcano" if key == "volcano" else "a second stratovolcano",
+        }
     vmask = np.zeros(h.shape, bool)
     for e in vs:
         x, z = int(round(e["x"])), int(round(e["z"]))
@@ -401,18 +404,6 @@ def places(a):
     i = np.unravel_index(np.argmax(cells), cells.shape)
     x, z = world(i[0] * 128 + 64, i[1] * 128 + 64)
     out["coast"] = {"x": x, "z": z, "what": "steep coast and continental margin", "cliff_columns": int(cells[i])}
-    # … and an ordinary coast: the cell whose shoreline count is highest among cells with no cliff column.
-    shore = land & near_sea
-    cs = block_sum(shore, 128).astype(np.float64)
-    cs[cells > 0] = 0
-    cs[:2] = 0
-    cs[-2:] = 0
-    cs[:, :2] = 0
-    cs[:, -2:] = 0
-    i = np.unravel_index(np.argmax(cs), cs.shape)
-    x, z = world(i[0] * 128 + 64, i[1] * 128 + 64)
-    out["low_coast"] = {"x": x, "z": z, "what": "low coast"}
-
     # Valley: deepest narrow hollows on land (closing over 33 blocks minus the surface), within 45 degrees.
     q0, q1 = pl.lat_rows(45.0)
     q0, q1 = q0 - r0, q1 - r0
@@ -545,7 +536,7 @@ def render(a):
     sea_top = pl.sea_y - 1
     pictures = {"scales": a.scales, "places": [], "refs": [], "side": a.side, "warps": a.warp or []}
     profiles = {}
-    for key in ("volcano", "range", "coast", "valley"):
+    for key in ("volcano", "volcano_b", "range", "coast", "valley"):
         if key not in plc:
             continue
         p = plc[key]
@@ -558,7 +549,7 @@ def render(a):
         base = min(int(s[1].min()) for s in surf.values()) - 2
         top = max(int(s[1].max()) for s in surf.values())
         row = half
-        if key in ("volcano", "range"):
+        if key in ("volcano", "volcano_b", "range"):
             row = int(np.unravel_index(np.argmax(h), h.shape)[0])
         prof = {}
         for name, mv, warp in variants:
@@ -568,7 +559,7 @@ def render(a):
             f = f"{key}-{name.replace(':', '_')}.png"
             Image.fromarray(img).save(os.path.join(a.out, f), optimize=True)
             nums = box_numbers(v, wet, sea_top)
-            if key == "volcano":
+            if key.startswith("volcano"):
                 nums["flank_deg"] = flank_angle(v[row].astype(np.float32))
             entry["views"].append({"variant": name, "file": f, **nums})
             prof[name] = {"terrain": t[row].tolist(), "surface": v[row].tolist()}
