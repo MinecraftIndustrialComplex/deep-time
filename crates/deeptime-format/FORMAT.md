@@ -120,6 +120,20 @@ A run's manifest (P1-01) has `source` `run:<preset name>` (`run:dummy` until P1-
 final `t_years` and the event, site and keyframe counts. (P0-07's session wrote an ad-hoc manifest
 with `writer`, `preset` and `created_unix_ms`; from P1-01 the session writes this one.)
 
+`notes.plates` (runs with the plates stage) holds two series the game never reads, written every
+10 Myr and at the end: `margins`, one record per 10 Myr of the continental margins by tectonic
+setting (P1-27, `plates::stats::Margins`), and `dynamics`, the plate dynamics record that
+`deeptime plate-check` judges a run by (`plates::dynamics`, whose module documentation is the
+format): `version`, `t0_myr`, `dt_myr`, `samples`, then `steps` (per step: `t`, `visible`, `land`,
+`continental` in L0 samples, `collisions`, `transfers`, and `plates`, one array
+`[id, visible, continental, speed_mm_yr, front_km, boundary_km]` per plate alive), `plates` (each
+plate's `parent`, `origin` `initial`/`rift`/`subduction_initiation`, `born_myr`, `died_myr`, `fate`
+`sutured`/`absorbed`/`consumed`, `into`, `share_at_death`), `collisions` (one record per terrane
+transfer: times, plates, `shortening_km`, `peak_uplift_m`, the `lifted10`, `lifted100` and `emerged`
+footprints as `{samples, length_km, width_km}`) and `ages` (the sea-floor age histogram every
+10 Myr, 41 bins of 10 Myr). Lengths are Earth-normalized km, speeds mm/yr, times Myr relative to
+world creation. A 1000 Myr run on the quick 16k planet adds about 0.5 MB to the manifest.
+
 ## The bake (a planet run, P1-08)
 
 `Session::finalize_write` bakes every planet preset (`deeptime_core::bake`; plan §5.3, §8.8) after
