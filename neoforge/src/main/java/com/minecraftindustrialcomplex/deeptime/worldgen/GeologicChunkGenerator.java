@@ -120,6 +120,8 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
             StrataPass.apply(chunk, w.data());
             WaterBodies.apply(chunk, w.data(), waterReach());  // lakes, rivers, banks (plan §7.9, P1-22)
             PlayaPass.apply(chunk, w.data());                  // salt on the floors of basins too dry for a lake
+            // Vanilla's carvers keep a wall of rock between a cave and the open sea beside a cliff.
+            SeaCliffGuard.apply(chunk, w::height, sourceSettings.value().seaLevel(), w.cliffRules());
             // Magma under and in the active volcanoes, after the water so a river's cut counts as ground.
             var settings = sourceSettings.value();
             MagmaPass.apply(chunk, w.magma(waterReach(), settings.noiseSettings().minY(), settings.seaLevel()));
