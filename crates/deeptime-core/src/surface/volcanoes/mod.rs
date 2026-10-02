@@ -340,7 +340,7 @@ pub struct ArcBase {
 }
 
 /// The arc bases are recorded this often, Myr.
-const ARC_BASE_EVERY_MYR: f64 = 10.0;
+const ARC_BASE_EVERY_MYR: f64 = 10.0; // ledger: VOL-071
 
 /// Per L1 cell: continental crust (`plates/crust_type`) in a connected landmass of at least
 /// `min_km2` (4-neighbour, x wraps).
@@ -487,6 +487,7 @@ pub fn arc_flux(flags: f32, convergence: f32, crust: f32) -> f64 {
         return 0.0;
     }
     let cont = crust as u8 == CONTINENTAL;
+    // ledger: VOL-003
     f64::from((convergence / 80.0).clamp(0.0, 1.0)) * if cont { 1.0 } else { 0.7 }
 }
 
@@ -512,10 +513,10 @@ impl Rocks {
     /// (class, share) pairs, bottom first, of a volcano's growth.
     fn of(&self, v: &Volcano) -> [(u16, f32); 2] {
         match (v.kind, v.silicic) {
-            (Kind::Strato, false) => [(self.tuff, 0.35), (self.andesite, 0.65)],
+            (Kind::Strato, false) => [(self.tuff, 0.35), (self.andesite, 0.65)], // ledger: VOL-056
             (Kind::Strato, true) => [(self.tuff, 0.45), (self.rhyolite, 0.55)],
-            (Kind::Shield, _) => [(self.basalt, 1.0), (self.basalt, 0.0)],
-            (Kind::Silicic, _) => [(self.tuff, 0.5), (self.rhyolite, 0.5)],
+            (Kind::Shield, _) => [(self.basalt, 1.0), (self.basalt, 0.0)], // ledger: VOL-058
+            (Kind::Silicic, _) => [(self.tuff, 0.5), (self.rhyolite, 0.5)], // ledger: VOL-059
         }
     }
 }
@@ -804,7 +805,7 @@ impl VolcanoStage {
                     mh,
                     v.x,
                     v.z,
-                    1.3 * v.radius_m + cell_m,
+                    1.3 * v.radius_m + cell_m, // ledger: VOL-033
                     |c, dx, dz| {
                         cells.push((c, shape::cell_weight(&prof, dx, dz, cell_m, v.radius_m)));
                     },
@@ -835,7 +836,7 @@ impl VolcanoStage {
         // The plate model clears its flags on crust it resamples (every 10–60 steps, and at the
         // last step): a step with a fifth of the last one's arc cells or fewer says nothing about
         // the arcs, so the stratovolcanoes keep their state and none are born.
-        let flux_valid = flagged > 0 && flagged * 5 > st.last_flagged;
+        let flux_valid = flagged > 0 && flagged * 5 > st.last_flagged; // ledger: VOL-011
         if flux_valid || st.last_flagged == 0 {
             st.last_flagged = flagged;
         } else {
@@ -887,6 +888,7 @@ impl VolcanoStage {
                         }
                     }
                     // One step without flux is forgiven (the arc band is a few L0 samples wide).
+                    // ledger: VOL-010
                     if t < v.dies_myr && v.missed < 2 {
                         v.flux_myr += v.flux_last * dt;
                         v.active_myr += dt;
@@ -916,7 +918,7 @@ impl VolcanoStage {
         // Vents that plate motion brought within half the arc spacing of each other merge: the
         // lower (or, as high, the younger) dies, the other takes the magma.
         if p.density > 0.0 {
-            let half = 0.5 * p.arc_spacing_km * 1000.0 / p.density;
+            let half = 0.5 * p.arc_spacing_km * 1000.0 / p.density; // ledger: VOL-009
             let live: Vec<usize> = (0..st.volcanoes.len())
                 .filter(|&k| st.volcanoes[k].kind == Kind::Strato && st.volcanoes[k].active())
                 .collect();
@@ -950,7 +952,7 @@ impl VolcanoStage {
                 }
                 let c = cell_of(&grid, px, pz);
                 let continental = crust[c] as u8 == CONTINENTAL;
-                let strength = ((uplift / hotspot_ref - 0.6) / 0.8).clamp(0.0, 1.0);
+                let strength = ((uplift / hotspot_ref - 0.6) / 0.8).clamp(0.0, 1.0); // ledger: VOL-008
                 let (kind, height, radius) = if continental {
                     (
                         Kind::Silicic,
@@ -960,7 +962,7 @@ impl VolcanoStage {
                 } else {
                     let hk = p.shield_height_km[0]
                         + (p.shield_height_km[1] - p.shield_height_km[0]) * strength;
-                    let r = p.shield_radius_km * (hk / p.shield_height_km[1]).powf(0.8);
+                    let r = p.shield_radius_km * (hk / p.shield_height_km[1]).powf(0.8); // ledger: VOL-022
                     (Kind::Shield, hk, r * 1000.0 * p.size / p.flank_steepness)
                 };
                 let chain = st.chains.entry(hid).or_insert(0);
@@ -1006,7 +1008,7 @@ impl VolcanoStage {
         // Arc births.
         if p.density > 0.0 && flux_valid {
             let spacing = p.arc_spacing_km * 1000.0 / p.density;
-            let recent = p.arc_lifetime_myr[0];
+            let recent = p.arc_lifetime_myr[0]; // ledger: VOL-040
             let mut occupied: Vec<(f64, f64)> = st
                 .volcanoes
                 .iter()
@@ -1015,6 +1017,7 @@ impl VolcanoStage {
                     // still standing at half their height.
                     v.kind == Kind::Strato
                         && (v.extinct_myr.is_none_or(|e| t - e < recent)
+                            // ledger: VOL-040
                             || v.height_m >= 0.5 * v.peak_m)
                 })
                 .map(|v| (v.x, v.z))
@@ -1043,6 +1046,7 @@ impl VolcanoStage {
                 let s01 = ((f - p.arc_min_flux) / (1.0 - p.arc_min_flux).max(1e-9)).clamp(0.0, 1.0);
                 let hk = p.arc_height_km[0] + (p.arc_height_km[1] - p.arc_height_km[0]) * s01;
                 let radius =
+                    // ledger: VOL-020
                     p.arc_radius_km * (hk / p.arc_height_km[1]).powf(0.8) * 1000.0 * p.size
                         / p.flank_steepness;
                 let continental = crust[c] as u8 == CONTINENTAL;
@@ -1054,8 +1058,12 @@ impl VolcanoStage {
                     .filter(|(over, _, _)| *over == plate)
                     .min_by(|a, b| a.1.angle_between(here).total_cmp(&b.1.angle_between(here)))
                     .map(|&(_, _, e)| e);
-                // A crater a few blocks across at 300 m per block (real ones are 0.3–1 km).
-                let crater_rho = (1000.0 * p.size).max(0.07 * radius) / radius;
+                // A summit crater at least 2 km across, about 7 blocks at 300 m per block, so it
+                // shows: a game choice (VOL-026). Real summit craters are mostly under 1 km across
+                // (Fuji's 780 m); the large craters and calderas Grosse et al. (2014) could
+                // measure on composite volcanoes are 0.6–11 km across, median 2.2 km, and 240 m
+                // deep (median). The 0.07 of the doubled basal radius gives 4 km at a 3-km cone.
+                let crater_rho = (1000.0 * p.size).max(0.07 * radius) / radius; // ledger: VOL-026
                 st.volcanoes.push(Volcano {
                     id: st.next_id,
                     kind: Kind::Strato,
@@ -1082,7 +1090,7 @@ impl VolcanoStage {
                     active_myr: 0.0,
                     depression: Some(Depression {
                         rho: crater_rho,
-                        depth: 0.06,
+                        depth: 0.06, // ledger: VOL-026
                         caldera: false,
                     }),
                     caldera: None,
@@ -1125,7 +1133,7 @@ impl VolcanoStage {
             .preset
             .tectonics
             .strength_height_m(self.preset.planet.gravity_m_s2)
-            / (140.0e6 / (crate::params::CRUST_DENSITY_KG_M3 * 9.81));
+            / (140.0e6 / (crate::params::CRUST_DENSITY_KG_M3 * 9.81)); // ledger: VOL-034
         let cell_km2 = cell_m * cell_m / 1.0e6;
         let every = (ARC_BASE_EVERY_MYR / dt).round().max(1.0) as u64;
         let record_bases = (self.done + 1).is_multiple_of(every) || last;
@@ -1180,7 +1188,7 @@ impl VolcanoStage {
             // with the strength height: 6.8 km on Earth, 17.9 km at Mars's gravity.
             let ceiling = strength_scale
                 * match v.kind {
-                    Kind::Shield => 0.65 * p.max_elevation_km * 1000.0,
+                    Kind::Shield => 0.65 * p.max_elevation_km * 1000.0, // ledger: VOL-032
                     _ => p.max_elevation_km * 1000.0,
                 };
             let target = target.min((sea + ceiling - base).max(0.0));
@@ -1243,6 +1251,7 @@ impl VolcanoStage {
                 base_p25_m: q(0.25),
                 base_p50_m: q(0.5),
                 base_p75_m: q(0.75),
+                // ledger: VOL-071
                 low_share: bases.iter().filter(|&&b| b < 500.0).count() as f64
                     / bases.len().max(1) as f64,
             });
@@ -1267,8 +1276,8 @@ impl VolcanoStage {
             }
             let (rate, summit) = match v.kind {
                 Kind::Strato if v.silicic => (p.caldera_rate_per_myr, false),
-                Kind::Silicic => (3.0 * p.caldera_rate_per_myr, false),
-                Kind::Shield if v.height_m >= 4000.0 * p.size => (p.caldera_rate_per_myr, true),
+                Kind::Silicic => (3.0 * p.caldera_rate_per_myr, false), // ledger: VOL-045
+                Kind::Shield if v.height_m >= 4000.0 * p.size => (p.caldera_rate_per_myr, true), // ledger: VOL-031
                 _ => (0.0, false),
             };
             let u = rng.uniform();
@@ -1277,13 +1286,15 @@ impl VolcanoStage {
             }
             let before = v.shape();
             let (rc, depth_m) = if summit {
-                let rc = 0.08 * v.radius_m;
+                let rc = 0.08 * v.radius_m; // ledger: VOL-031
+                // ledger: VOL-031
                 (rc, (0.04 * v.height_m).min(250.0))
             } else {
                 let rc = (range(&mut rng, p.caldera_radius_km[0], p.caldera_radius_km[1])
                     * 1000.0
                     * p.size)
                     .min(0.6 * v.radius_m);
+                // ledger: VOL-030
                 (rc, (0.5 * v.height_m).min(400.0 + 0.05 * rc))
             };
             v.depression = Some(Depression {
@@ -1304,7 +1315,7 @@ impl VolcanoStage {
             let removed_m3 = removed * cell_m * cell_m + std::f64::consts::PI * rc * rc * depth_m;
             if !summit {
                 // The ignimbrite sheet to four rim radii (half the erupted volume) …
-                let big = 4.0 * rc;
+                let big = 4.0 * rc; // ledger: VOL-046
                 let span = big - rc;
                 let t0 = (0.5 * removed_m3 / (std::f64::consts::PI * span * (span / 3.0 + rc)))
                     .min(250.0);
@@ -1354,7 +1365,7 @@ impl VolcanoStage {
                 let sink =
                     (p.island_subsidence_m_myr * dt).min(p.island_subsidence_max_m - v.sunk_m);
                 let kern = |r: f64| {
-                    let x = r / 1.6;
+                    let x = r / 1.6; // ledger: VOL-048
                     if x >= 1.0 { 0.0 } else { (1.0 - x * x).powi(2) }
                 };
                 for (c, wgt) in l1.render(v.x, v.z, v.radius_m, 1.6, &kern) {
@@ -1387,7 +1398,7 @@ impl VolcanoStage {
             let z = frame.z_of_lat(f64::from(lat));
             let c = cell_of(&grid, x, z);
             let flows = p.flood_basalt_flows;
-            let plateau = |r: f64| 1.0 - smooth(0.6, 1.0, r);
+            let plateau = |r: f64| 1.0 - smooth(0.6, 1.0, r); // ledger: VOL-035
             let dome = |r: f64| if r >= 1.0 { 0.0 } else { (1.0 - r * r).powi(2) };
             for_cells(&grid, mh, x, z, lip_radius_m, |cc, dx, dz| {
                 let r = dx.hypot(dz) / lip_radius_m;
@@ -1397,7 +1408,7 @@ impl VolcanoStage {
                 }
                 let per = (pile / f64::from(flows)) as f32;
                 for _ in 0..flows {
-                    log_ops.push((cc, per * 0.88, rocks.basalt));
+                    log_ops.push((cc, per * 0.88, rocks.basalt)); // ledger: VOL-060
                     log_ops.push((cc, per * 0.12, rocks.tuff));
                 }
                 l1.delta[cc] += ((th / 3.0) * (plateau(r) - dome(r))) as f32;
@@ -1422,6 +1433,7 @@ impl VolcanoStage {
         let mut kept = Vec::with_capacity(st.volcanoes.len());
         for mut v in std::mem::take(&mut st.volcanoes) {
             let dead_for = v.extinct_myr.map_or(0.0, |e| t - e);
+            // ledger: VOL-049
             if !v.active() && ((dead_for > 5.0 && v.height_m < 0.1 * v.peak_m) || dead_for > 250.0)
             {
                 v.gone = Some(Gone::Eroded);
@@ -1481,6 +1493,7 @@ impl VolcanoStage {
                     continue;
                 }
                 // Lava over regolith buries it as a palaeosol.
+                // ledger: VOL-061
                 if surf.regolith_m[c] >= 0.5 && th >= 1.0 {
                     let rk = match surf.regolith_kind[c] {
                         crate::surface::weathering::SAPROLITE => sap,
@@ -1606,6 +1619,7 @@ impl VolcanoStage {
                     if first.is_finite() {
                         pile += 1;
                     }
+                    // ledger: VOL-062
                     if first.is_finite() && first <= 150.0 && left >= 30.0 {
                         let wv = (left / 300.0).min(1.0) as f32;
                         fb[c] = fb[c].max(wv);
@@ -1914,6 +1928,7 @@ impl VolcanoStage {
             let Some(cal) = &v.caldera else {
                 continue;
             };
+            // ledger: VOL-014
             if !(standing(v) || cal.radius_m >= 3000.0 * size) {
                 continue;
             }
@@ -1997,6 +2012,25 @@ impl VolcanoStage {
             .fields
             .get(field::FLOOD_BASALT)
             .map_or(0, |f| f.data.iter().filter(|&&x| x > 0.0).count());
+        // Height distributions for the comparison with Earth's composite volcanoes (science page
+        // `volcanoes-and-magma.md`, VOL-019): the 10th, 50th and 90th percentiles, m.
+        let pct = |mut xs: Vec<f64>| -> serde_json::Value {
+            if xs.is_empty() {
+                return json!(null);
+            }
+            xs.sort_by(f64::total_cmp);
+            let q = |f: f64| xs[((xs.len() - 1) as f64 * f).round() as usize].round();
+            json!([q(0.1), q(0.5), q(0.9)])
+        };
+        let heights = |pick: &dyn Fn(&Volcano) -> bool| {
+            pct(st
+                .volcanoes
+                .iter()
+                .filter(|v| pick(v))
+                .map(|v| v.height_m)
+                .collect())
+        };
+        let is_standing = |v: &Volcano| v.height_m >= (0.25 * v.peak_m).max(300.0);
         json!({
             "steps": st.steps,
             "counts": st.counts,
@@ -2012,6 +2046,11 @@ impl VolcanoStage {
                 "caldera_complex": active(Kind::Silicic),
             },
             "tallest_m": peak.round(),
+            "height_pcts_m": {
+                "active_stratovolcano": heights(&|v| v.kind == Kind::Strato && v.active()),
+                "standing_stratovolcano": heights(&|v| v.kind == Kind::Strato && is_standing(v)),
+                "standing_shield": heights(&|v| v.kind == Kind::Shield && is_standing(v)),
+            },
             "flood_basalt_outcrop_cells": fb_on,
             "events": st.events_emitted,
             "events_by_kind": st.events_by_kind,
@@ -2102,10 +2141,10 @@ pub fn fit_change(cells: &[(usize, f64)], m: &[f32]) -> f64 {
 
 /// An arc segment that built fewer cones than this is a count on its subduction onset event, not an
 /// event of its own (Ben, 2026-09-30, "Count small ones").
-pub const SMALL_SEGMENT: u32 = 3;
+pub const SMALL_SEGMENT: u32 = 3; // ledger: VOL-015
 
 /// Arc crust deeper than this below the sea makes no volcano (a trench, not an arc), m.
-pub const FRONT_MAX_DEPTH_M: f64 = 4000.0;
+pub const FRONT_MAX_DEPTH_M: f64 = 4000.0; // ledger: VOL-004
 
 /// The volcanic front of the arcs: the medial line of the cells with at least `min_flux` (and
 /// not deeper than [`FRONT_MAX_DEPTH_M`]). The plate model flags as arc a band a few L0 samples
@@ -2237,12 +2276,24 @@ pub fn summary_line(v: &serde_json::Value) -> String {
         xs.iter().sum::<f64>() / xs.len().max(1) as f64
     };
     let last_of = |k: &str| bases.last().and_then(|b| b[k].as_f64()).unwrap_or(f64::NAN);
+    let pcts = |k: &str| {
+        v["height_pcts_m"][k].as_array().map_or_else(
+            || "-".to_string(),
+            |a| {
+                a.iter()
+                    .map(|x| format!("{}", x.as_f64().unwrap_or(f64::NAN)))
+                    .collect::<Vec<_>>()
+                    .join("/")
+            },
+        )
+    };
     format!(
         "volcanoes_final={} strato_born={} shield_born={} caldera_complex_born={} \
          standing_strato={} standing_shield={} standing_caldera_complex={} active_strato={} \
          active_shield={} calderas={} summit_calderas={} flood_basalts={} eroded={} subducted={} \
          built_km3={:.3e} tallest_m={} flood_basalt_outcrop_cells={} events={} \
-         arc_base_p50_mean_m={:.0} arc_base_low_share_mean={:.3} arc_base_p50_final_m={:.0}",
+         arc_base_p50_mean_m={:.0} arc_base_low_share_mean={:.3} arc_base_p50_final_m={:.0} \
+         height_p10_p50_p90_m: active_strato={} standing_strato={} standing_shield={}",
         v["steps"],
         c["strato_born"],
         c["shield_born"],
@@ -2264,6 +2315,9 @@ pub fn summary_line(v: &serde_json::Value) -> String {
         mean_of("base_p50_m"),
         mean_of("low_share"),
         last_of("base_p50_m"),
+        pcts("active_stratovolcano"),
+        pcts("standing_stratovolcano"),
+        pcts("standing_shield"),
     )
 }
 

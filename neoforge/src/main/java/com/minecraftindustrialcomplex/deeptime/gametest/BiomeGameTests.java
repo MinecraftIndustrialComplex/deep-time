@@ -165,6 +165,30 @@ public final class BiomeGameTests {
             Map.entry("D", 0.88), Map.entry("Dsub", 0.38), Map.entry("E", 0.82), Map.entry("sea", 0.95),
             Map.entry("BW:desert", 0.37), Map.entry("Af:jungle", 0.41), Map.entry("Dfc:taiga", 0.33), Map.entry("E:snow", 0.72));
     static final int MIN_COLUMNS = 40;
+
+    // The -PwithTerraBlender profile (2026-10-02, P1-10). Biomes O' Plenty's biomes carry few of the c:
+    // tags the families count, and since TerraBlender's regions follow the geologic provinces they fill
+    // whole provinces, so which provinces drew a BOP region decided the shares: the shares over all columns,
+    // on planets 11-15 (master without the province regions / this branch), were C 0.27-0.69 / 0.14-0.68,
+    // E:snow 0.28-0.84 / 0.13-0.95, D 0.50-0.97 / 0.86-1.0, BW:desert 0.26-0.67 / 0.28-0.68: a check of
+    // BOP's tags, not of the mapping (and 0.681 against 0.558 on planet 11 was which provinces got the mod's
+    // regions, not an improvement: planet 12 went 0.644 -> 0.27 the other way). The census therefore leaves
+    // BOP's columns out of the tag checks (BiomeCensus untaggedNamespaces) and judges the rest, which are
+    // vanilla biomes through the same mapping. That leaves 40-60 % of the columns, so a family needs
+    // MIN_COLUMNS_TB of them to be asserted, and two floors sit lower than the standalone and MIC ones.
+    // Measured on planets 11-15 (BOP columns out), lowest-highest over the families with at least
+    // MIN_COLUMNS_TB columns (A and Af:jungle on one planet only): A 0.758, Af 1.0, BW 0.739-0.776,
+    // BS 0.496-0.659, C 0.850-0.970, D 0.989-1.0, Dsub 0.914-0.951, E 0.964-1.0, sea 1.0,
+    // BW:desert 0.568-0.616, Af:jungle 0.585, Dfc:taiga 0.57-0.92, E:snow 0.776-0.988. Floors are 0.1 under the lowest of these or the standalone
+    // floor, whichever is lower: BS 0.39, E:snow 0.67.
+    // Re-measured after the merge with meteor impacts and the grid audit (the planets changed again; planets
+    // 11-17, families with at least MIN_COLUMNS_TB columns, lowest-highest): A 0.717-0.98, Af 0.985-1.0,
+    // BW 0.756-0.758, BS 0.527-0.733, C 0.848-0.97, D 1.0, Dsub 0.797-0.934, E 0.953-1.0, sea 1.0,
+    // BW:desert 0.569-0.605, Af:jungle 0.489, Dfc:taiga 0.65, E:snow 0.751-0.957. Two of them came within 0.1 of a
+    // floor, so with the first set's lowest taken in too: E:snow 0.65 (lowest 0.751) and Af:jungle 0.39
+    // (lowest 0.489); BS keeps 0.39 (lowest 0.496 of the first set).
+    static final int MIN_COLUMNS_TB = 100;
+    static final Map<String, Double> FLOORS_TB = Map.of("BS", 0.39, "E:snow", 0.65, "Af:jungle", 0.39);
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
 
@@ -180,8 +204,18 @@ public final class BiomeGameTests {
         var t = RealPlanetGameTests.terrain(helper, level);
         helper.assertTrue(!t.mapping().isIdentity(), "the real planet has a climate mapping (climate_mapping.json)");
         BiomeCensus.Result r;
+        boolean bop = ModList.get().isLoaded("biomesoplenty");
+        int minColumns = bop ? MIN_COLUMNS_TB : MIN_COLUMNS;
         try {
-            r = BiomeCensus.run(level, t.circumference() / 256, 32, null);
+            // Biomes O' Plenty's biomes carry few of the c: tags the checks count, and with TerraBlender they
+            // fill whole provinces (P1-10): which provinces got its regions would decide the shares, not the
+            // mapping. They are left out of the checks (counted in "skipped_untagged"); the census over all
+            // columns is logged beside it.
+            java.util.Set<String> untagged = bop ? java.util.Set.of("biomesoplenty") : java.util.Set.of();
+            if (bop)
+                DeepTime.LOGGER.info("[gametest] climateConsistent (all columns, BOP included, not asserted) {}",
+                        BiomeCensus.run(level, t.circumference() / 256, 32, null).json());
+            r = BiomeCensus.run(level, t.circumference() / 256, 32, null, untagged);
         } catch (java.io.IOException e) {
             helper.fail(e.toString());
             return;
@@ -190,9 +224,9 @@ public final class BiomeGameTests {
         StringBuilder low = new StringBuilder();
         for (var ch : BiomeCensus.CHECKS) {
             double share = r.share(ch.name());
-            if (r.total(ch.name()) < MIN_COLUMNS)
+            if (r.total(ch.name()) < minColumns)
                 continue;
-            double floor = FLOORS.getOrDefault(ch.name(), 0.0);
+            double floor = (bop ? FLOORS_TB : Map.<String, Double>of()).getOrDefault(ch.name(), FLOORS.getOrDefault(ch.name(), 0.0));
             if (share < floor)
                 low.append(String.format(java.util.Locale.ROOT, " %s %.3f < %.3f (%d columns)", ch.name(), share, floor, r.total(ch.name())));
         }
@@ -202,7 +236,7 @@ public final class BiomeGameTests {
         for (var f : BiomeCensus.FORBIDDEN) {
             double share = r.forbiddenShare(f.name());
             DeepTime.LOGGER.info("[gametest] climateConsistent {} {} of {} columns", f.name(), share, r.forbiddenTotal(f.name()));
-            if (r.forbiddenTotal(f.name()) >= MIN_COLUMNS && share > FORBIDDEN_CEILING)
+            if (r.forbiddenTotal(f.name()) >= minColumns && share > FORBIDDEN_CEILING)
                 red.append(String.format(java.util.Locale.ROOT, " %s %.3f > %.3f (%d columns)", f.name(), share, FORBIDDEN_CEILING,
                         r.forbiddenTotal(f.name())));
         }
