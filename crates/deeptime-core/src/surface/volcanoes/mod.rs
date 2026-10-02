@@ -267,6 +267,8 @@ pub struct Counts {
     pub shield_born: u64,
     pub silicic_born: u64,
     pub calderas: u64,
+    /// Of `calderas`, the collapses of continental hotspot centres.
+    pub hotspot_calderas: u64,
     pub summit_calderas: u64,
     pub flood_basalts: u64,
     pub eroded: u64,
@@ -1327,6 +1329,9 @@ impl VolcanoStage {
                 });
                 v.extinct_myr = Some(t);
                 st.counts.calderas += 1;
+                if v.kind == Kind::Silicic {
+                    st.counts.hotspot_calderas += 1;
+                }
                 if let Some(seg) = st.arcs.get_mut(&v.segment) {
                     seg.calderas += 1;
                 }
@@ -2323,7 +2328,7 @@ pub fn summary_line(v: &serde_json::Value) -> String {
     format!(
         "volcanoes_final={} strato_born={} shield_born={} caldera_complex_born={} \
          standing_strato={} standing_shield={} standing_caldera_complex={} active_strato={} \
-         active_shield={} calderas={} summit_calderas={} flood_basalts={} eroded={} subducted={} \
+         active_shield={} calderas={} hotspot_calderas={} summit_calderas={} flood_basalts={} eroded={} subducted={} \
          built_km3={:.3e} tallest_m={} flood_basalt_outcrop_cells={} events={} \
          arc_base_p50_mean_m={:.0} arc_base_low_share_mean={:.3} arc_base_p50_final_m={:.0} \
          height_p10_p50_p90_m: active_strato={} standing_strato={} standing_shield={}",
@@ -2337,6 +2342,7 @@ pub fn summary_line(v: &serde_json::Value) -> String {
         v["active"]["stratovolcano"],
         v["active"]["shield"],
         c["calderas"],
+        c["hotspot_calderas"],
         c["summit_calderas"],
         c["flood_basalts"],
         c["eroded"],
