@@ -858,7 +858,7 @@ fn access_probe(
     let w = m.w;
     let c = w.c;
     let sea = w.manifest.scale.sea_level_y;
-    let mut rng = SplitMix(o.seed ^ 0xACCE_55);
+    let mut rng = SplitMix(o.seed ^ 0x00AC_CE55);
     let mut points = Vec::new();
     let mut tries = 0;
     let span = c / 2 * 7 / 8;
