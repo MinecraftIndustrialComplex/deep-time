@@ -10,6 +10,8 @@
 //!    and move with the plates like every other layer.
 //! 2. **Plutons** (`plutons.rs`): the existing ones ride their plates and are unroofed; arc and
 //!    collision magmatism emplaces new ones.
+//!    2b. **Folds and faults** (`deform/`, P2-01): the existing ones ride their plates; the step's
+//!    shortening, rifting and oblique convergence start new ones.
 //! 3. **The deposit engine's fields** (P1-14's interface): whenever the surface has closed a frame
 //!    of the recorded history this step, the stage adds `deeptime:trap_structure` (`traps.rs`) and
 //!    the host-rock fractions `deeptime:host/<class>` (`hosts.rs`) to it, from the columns at the
@@ -17,7 +19,8 @@
 //! 4. **Keyframe layers** at the keyframe times: `structure/rock` (the rock at the surface: the
 //!    top horizon of the baked column, where no pluton crops out), `structure/log_grade` (the
 //!    highest metamorphic grade in the strata log), `structure/trap_structure`.
-//! 5. At the end: the plutons become bodies (`WorldState::bodies`), and the run's summary
+//! 5. At the end: the plutons become bodies (`WorldState::bodies`), the folds and faults the
+//!    world's structural events (`WorldState::structure`), and the run's summary
 //!    (`notes.structure`) records them, the metamorphosed volume and the baked stacks' shape.
 //!
 //! The horizon stacks themselves are baked on demand from the final world
@@ -26,6 +29,7 @@
 
 pub mod bake_horizons;
 pub mod columns;
+pub mod deform;
 pub mod hosts;
 pub mod metamorphism;
 pub mod params;
@@ -334,6 +338,10 @@ pub struct StructureState {
     pub counts: Counts,
     /// Strata-log volume that changed class, km³ (block metric).
     pub metamorphosed_km3: f64,
+    /// Folds and faults (P2-01), riding their plates.
+    pub features: Vec<deform::Feature>,
+    pub next_feature: u32,
+    pub deform_counts: deform::Counts,
 }
 
 /// The structure stage.
@@ -413,6 +421,8 @@ impl StructureStage {
             fields,
             surface,
             history,
+            events,
+            volcanoes,
             ..
         } = world;
         let surface = surface.as_mut().ok_or_else(|| {
@@ -553,6 +563,85 @@ impl StructureStage {
         self.st.plutons.extend(born);
         add_time(&mut self.timings, "plutons", started);
 
+        // 2b. Folds and faults: carried, then started where the crust is strained.
+        let started = Instant::now();
+        if p.deformation.enabled() {
+            deform::advance(
+                &mut self.st.features,
+                &grid,
+                &omega_of,
+                dt_myr * 1.0e6,
+                plate_id,
+                crust,
+                &mut self.st.deform_counts,
+            );
+            if let Some(m) = material {
+                deform::wear(&mut self.st.features, &grid, m);
+            }
+            let flags = field_of(fields, "plates/flags", n)?;
+            let orogen_km = traps::orogen_distance_km(&d, reg, crust, flags);
+            let inputs = deform::Inputs {
+                grid: &grid,
+                m_per_block_h: s.m_per_block_h,
+                regime: reg,
+                crust_type: crust,
+                flags,
+                convergence: field_of(fields, "plates/convergence_mm_yr", n)?,
+                obliquity: field_of(fields, "plates/obliquity_deg", n)?,
+                thickness: thick,
+                fold_trend: field_of(fields, "plates/fold_trend_deg", n)?,
+                plate_id,
+                uplift: field_of(fields, "plates/uplift_mm_yr", n)?,
+                elevation: &src.surface.elevation_m,
+                orogen_km: &orogen_km,
+                blocks_per_model_km: f64::from(s.circumference_blocks)
+                    / (std::f64::consts::TAU * self.preset.tectonics.model_radius_km),
+            };
+            let mut rng = Rng::stream(
+                step_seed(self.preset.seed, self.st.done),
+                "structure/deform",
+            );
+            let cause = |kind: deform::Kind, x: f64, z: f64| {
+                deform::cause_of(
+                    events,
+                    kind,
+                    x,
+                    z,
+                    s.circumference_blocks,
+                    t_end_myr * 1.0e6,
+                )
+            };
+            deform::emplace(
+                &inputs,
+                p,
+                &mut self.st.features,
+                dt_myr,
+                t_end_myr,
+                &mut rng,
+                &mut self.st.next_feature,
+                &mut self.st.deform_counts,
+                &cause,
+            );
+            // Stocks and dykes, on a random stream of their own (the folds and faults keep
+            // theirs whatever the intrusion settings).
+            let mut rng = Rng::stream(
+                step_seed(self.preset.seed, self.st.done),
+                "structure/intrude",
+            );
+            deform::intrude::emplace(
+                &inputs,
+                p,
+                &mut self.st.features,
+                dt_myr,
+                t_end_myr,
+                &mut rng,
+                &mut self.st.next_feature,
+                &mut self.st.deform_counts,
+                &cause,
+            );
+        }
+        add_time(&mut self.timings, "deformation", started);
+
         // 3. The deposit engine's fields for frames the surface closed this step.
         let started = Instant::now();
         let frames = history.as_ref().map_or(0, |h| h.frame_count() as u64);
@@ -594,6 +683,7 @@ impl StructureStage {
         } else {
             None
         };
+        let trap_shares = last.then(|| self.trap_shares(&src, &d, fields));
         add_time(&mut self.timings, "outputs", started);
         let surface_y: Vec<f64> = if last {
             self.st
@@ -603,6 +693,65 @@ impl StructureStage {
                 .collect()
         } else {
             Vec::new()
+        };
+        // The folds and faults as the world's structural events, with a lattice evaluation of
+        // the whole planet (what it finds, and what it costs).
+        let structure = if last {
+            let started = Instant::now();
+            // Everything the run left, with the plugs of the volcanoes that have died (made
+            // here, from the catalogue as it stands: they are not kept in the stage's state).
+            let mut all = self.st.features.clone();
+            let plugs = deform::intrude::plugs(
+                volcanoes
+                    .as_ref()
+                    .map_or(&[][..], |v| v.volcanoes.as_slice()),
+                &p.deformation,
+                s.m_per_block_h,
+                self.st.next_feature,
+            );
+            self.st.deform_counts.plugs = plugs.len() as u64;
+            all.extend(plugs);
+            deform::undo_order(&mut all);
+            let span = (src.now_myr - self.preset.t_start_years() / 1.0e6).max(1.0);
+            let now = src.now_myr;
+            let mut st = deform::finish(
+                &all,
+                |x, z| src.surface_y(plutons::cell_of(&grid, x, z), &s),
+                |f| columns::key::of_age(0, now - f64::from(f.t_myr), span),
+                f64::from(s.min_y),
+            );
+            let relief: Vec<f32> = all
+                .iter()
+                .map(|f| deform::relief_left(f, now, &p.deformation, s.m_per_block_v))
+                .collect();
+            let report = deform::report(
+                &all,
+                &mut st,
+                &self.preset,
+                &self.st.deform_counts,
+                src.regime,
+                src.crust,
+            )?;
+            add_time(&mut self.timings, "deformation_lattice", started);
+            let mut report = report;
+            if let Some(serde_json::Value::Object(timing)) =
+                report.as_object_mut().and_then(|o| o.remove("timing"))
+            {
+                for (key, name) in [
+                    ("lattice_s", "deformation_columns_s"),
+                    ("threads", "deformation_threads"),
+                    ("noddy_ns_point", "deformation_noddy_ns_point"),
+                    ("column_ns_point", "deformation_column_ns_point"),
+                    ("noddy_planet_s", "deformation_noddy_planet_s"),
+                ] {
+                    if let Some(v) = timing.get(key).and_then(serde_json::Value::as_f64) {
+                        self.timings.insert(name, v);
+                    }
+                }
+            }
+            Some((st, report, relief, all))
+        } else {
+            None
         };
         drop(src);
         for (name, data) in outputs {
@@ -636,6 +785,42 @@ impl StructureStage {
             }
             self.st.plutons = plutons;
             let (mean_horizons, check) = summary.expect("baked on the last step");
+            let (structure, mut deformation, relief, all) =
+                structure.expect("finished on the last step");
+            // The event log's entries: one per fold belt and fault system.
+            let groups = deform::groups(
+                &all,
+                f64::from(s.circumference_blocks),
+                s.m_per_block_h,
+                s.m_per_block_v,
+            );
+            deformation["events"] = json!(groups.len());
+            for g in groups {
+                let mut e = world
+                    .event(g.t_start, g.kind, deform::SOURCE)
+                    .until(g.t_end)
+                    .at(deeptime_format::Place::Point {
+                        lat: g.lat,
+                        lon: g.lon,
+                    })
+                    .magnitude(g.magnitude)
+                    .param("setting", g.setting);
+                for (k, v) in g.params {
+                    e = e.param(k, v);
+                }
+                if g.cause != 0 && world.events.iter().any(|x| x.id.0 == g.cause) {
+                    e = e.caused_by(deeptime_format::EventId(g.cause));
+                }
+                world.emit(e)?;
+            }
+            deformation["with_relief"] = json!(relief.iter().filter(|r| **r > 0.01).count());
+            deformation["traps"] = trap_shares.unwrap_or_default();
+            world.structure = Some(structure);
+            world.structure_relief = relief;
+            ctx.log.push(
+                crate::log::Level::Info,
+                format!("structure deformation: {deformation}"),
+            );
             let note = json!({
                 "steps": self.st.done + 1,
                 "plutons": {
@@ -646,6 +831,7 @@ impl StructureStage {
                     "bodies": bodies,
                 },
                 "metamorphosed_km3": self.st.metamorphosed_km3,
+                "deformation": deformation,
                 "frames_published": self.st.frames_seen,
                 "host_classes": self.host_classes.iter().map(|&k| EVERY_CLASS[usize::from(k)]).collect::<Vec<_>>(),
                 "horizons": {
@@ -720,6 +906,45 @@ impl StructureStage {
         d: &Dims,
         fields: &BTreeMap<String, Field>,
     ) -> Vec<f32> {
+        self.trap_field_as(src, d, fields, TrapSource::Configured)
+    }
+
+    /// The share of continental cells whose structural closure is at least a half, three ways:
+    /// as the world has it, from the regime rule alone, and from the regime rule with the belt
+    /// width on the block metric (what Phase 1 did; `fold_belt_km` was read as block-km).
+    fn trap_shares(
+        &self,
+        src: &CellSource<'_>,
+        d: &Dims,
+        fields: &BTreeMap<String, Field>,
+    ) -> serde_json::Value {
+        let n = src.grid.cells();
+        let land = (0..n).filter(|&c| src.continental(c)).count().max(1) as f64;
+        let share = |from: TrapSource| {
+            let t = self.trap_field_as(src, d, fields, from);
+            let (mut half, mut sum) = (0u64, 0.0f64);
+            for (c, &v) in t.iter().enumerate() {
+                if src.continental(c) {
+                    half += u64::from(v >= 0.5);
+                    sum += f64::from(v);
+                }
+            }
+            json!({"closure_at_least_half": half as f64 / land, "mean": sum / land})
+        };
+        json!({
+            "world": share(TrapSource::Configured),
+            "regime_rule": share(TrapSource::Regime),
+            "regime_rule_block_km": share(TrapSource::RegimeBlockKm),
+        })
+    }
+
+    fn trap_field_as(
+        &self,
+        src: &CellSource<'_>,
+        d: &Dims,
+        fields: &BTreeMap<String, Field>,
+        from: TrapSource,
+    ) -> Vec<f32> {
         let n = src.grid.cells();
         let flags = fields
             .get("plates/flags")
@@ -730,6 +955,21 @@ impl StructureStage {
         let dist = traps::orogen_distance_km(d, src.regime, src.crust, flags);
         let halite = self.tables.halite;
         let p = &self.p;
+        // The world's own folds and faults, where it has any (P2-01).
+        let structural = (from == TrapSource::Configured && p.deformation.enabled())
+            .then(|| traps::structural(&self.st.features, &src.grid));
+        // Distances on the plate model's Earth-sized sphere, as `fold_belt_km` is given: the
+        // orogen distance is km on the block metric (300 m a block), and a planet 16,384 blocks
+        // round is about an eighth of the Earth's size on it.
+        let s = &self.preset.scale;
+        let model_km_per_block_km = if from == TrapSource::RegimeBlockKm {
+            1.0
+        } else {
+            1000.0
+                / s.m_per_block_h
+                / (f64::from(s.circumference_blocks)
+                    / (std::f64::consts::TAU * self.preset.tectonics.model_radius_km))
+        };
         (0..n)
             .into_par_iter()
             .map(|c| {
@@ -739,7 +979,8 @@ impl StructureStage {
                     halite,
                     src.continental(c),
                     src.regime(c),
-                    f64::from(dist[c]),
+                    f64::from(dist[c]) * model_km_per_block_km,
+                    structural.as_ref().map(|v| v[c]),
                     p,
                 )
             })
@@ -805,6 +1046,17 @@ impl StructureStage {
     }
 }
 
+/// Where a trap field's fold and fault closure comes from.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TrapSource {
+    /// The world's own structures when it has any, else the regime rule.
+    Configured,
+    /// The regime rule (belts within `fold_belt_km` of an orogen, rifts).
+    Regime,
+    /// The regime rule with the belt width in km on the block metric (Phase 1's reading).
+    RegimeBlockKm,
+}
+
 fn add_time(timings: &mut BTreeMap<&'static str, f64>, what: &'static str, since: Instant) {
     *timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
 }
@@ -818,10 +1070,54 @@ fn step_seed(seed: u64, step: u64) -> u64 {
 pub fn summary_line(note: &serde_json::Value) -> String {
     let pl = &note["plutons"];
     let hz = &note["horizons"];
+    let df = &note["deformation"];
+    let kinds = &df["structures"];
+    let deformation = format!(
+        " fold_trains={} thrusts={} normal_faults={} strike_slip_faults={} \
+         stocks={} dykes={} plugs={} \
+         deformed_frac={:.4} faulted_frac={:.4} max_candidates={} max_shift_blocks={:.1} \
+         lattice_s={:.2} noddy_worst={:.1e} noddy_ns_point={:.0} column_ns_point={:.1} \
+         covered_craton={:.3} covered_collision={:.3} covered_rift={:.3} covered_passive_margin={:.3} \
+         deform_steps_s={:.2} deform_report_s={:.2}",
+        kinds["fold_train"].as_u64().unwrap_or(0),
+        kinds["thrust"].as_u64().unwrap_or(0),
+        kinds["normal_fault"].as_u64().unwrap_or(0),
+        kinds["strike_slip_fault"].as_u64().unwrap_or(0),
+        kinds["stock"].as_u64().unwrap_or(0),
+        kinds["dyke"].as_u64().unwrap_or(0),
+        kinds["plug"].as_u64().unwrap_or(0),
+        df["lattice"]["deformed_frac"].as_f64().unwrap_or(0.0),
+        df["lattice"]["faulted_frac"].as_f64().unwrap_or(0.0),
+        df["lattice"]["max_candidates"].as_u64().unwrap_or(0),
+        df["lattice"]["max_shift_blocks"].as_f64().unwrap_or(0.0),
+        note["millis"]["deformation_columns_s"]
+            .as_f64()
+            .unwrap_or(0.0),
+        df["noddy_check"]["worst"].as_f64().unwrap_or(0.0),
+        note["millis"]["deformation_noddy_ns_point"]
+            .as_f64()
+            .unwrap_or(0.0),
+        note["millis"]["deformation_column_ns_point"]
+            .as_f64()
+            .unwrap_or(0.0),
+        df["coverage"]["craton"]["covered"].as_f64().unwrap_or(0.0),
+        df["coverage"]["collision"]["covered"]
+            .as_f64()
+            .unwrap_or(0.0),
+        df["coverage"]["rift"]["covered"].as_f64().unwrap_or(0.0),
+        df["coverage"]["passive_margin"]["covered"]
+            .as_f64()
+            .unwrap_or(0.0),
+        note["millis"]["deformation"].as_f64().unwrap_or(0.0) / 1000.0,
+        note["millis"]["deformation_lattice"]
+            .as_f64()
+            .unwrap_or(0.0)
+            / 1000.0,
+    );
     format!(
         "structure_final={} plutons_emplaced={} plutons_alive={} plutons_eroded={} \
          plutons_subducted={} pluton_bodies={} metamorphosed_km3={:.3e} frames_published={} \
-         horizons_k={} mean_horizons={:.2} horizon_check={}",
+         horizons_k={} mean_horizons={:.2} horizon_check={}{deformation}",
         note["steps"],
         pl["emplaced"],
         pl["alive"],

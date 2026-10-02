@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
-# Deep Time world-data format 0.2
+# Deep Time world-data format 0.3
 
 The contract between the Rust writer (`crates/deeptime-format`) and the Java reader
 (`neoforge/src/main/java/com/minecraftindustrialcomplex/deeptime/worlddata`). Plan §5.3 and §5.7
@@ -40,6 +40,14 @@ the amplified terrain ("The P1-08 bake"); and the column evaluator both sides im
   ("Lake ice"), and the new layer `playa` holds the salt of basins too dry for a lake ("Playas").
 Every other file's bytes are as in 0.1.
 
+**0.3** over 0.2 (P2-01, folds and faults): every header's minor is 3. A baked planet may hold
+`structure/events.dtst` (`DTST`), the folds, faults and small intrusions its tectonic history left, and the horizon
+stack a column shows is then the 0.2 column rule's stack read through those events ("Structural
+events", the deformed column rule; `horizons` and `rock` in "Columns" are the deformed ones). A
+folder without the file is read as before. The `elevation` of such a world already carries the
+young structures' relief (fault scarps, rift valleys, fold ridges: the amplifier adds it); no
+reader needs to know.
+
 ## Folder layout
 
 ```text
@@ -75,6 +83,7 @@ Every other file's bytes are as in 0.1.
   sites/sites.dtsr              the site registry's records
   sites/index.dtsi              512-block grid → site ids
   bodies/bodies.dtb             deposit bodies (P1-14): parametric primitives with zones
+  structure/events.dtst         optional: folds and faults (P2-01, "Structural events")
   keyframes/index.json          the timelapse frames
   keyframes/kf-<n>.dtk          one frame: RGBA8 per layer, LZ4
   checkpoints/<i>-<stage>.dtcp  optional stage checkpoints (dev and CLI only; never needed to play)
@@ -373,7 +382,7 @@ Equirectangular in block space (plan §5.2). A grid has `w` × `h` cells with `w
 offset        size  field
 0             4     magic "DTR1" (0x44 0x54 0x52 0x31)
 4             4     u32 header_len = 16 + json_len (bytes from file start to the end of the JSON)
-8             2     u16 format_minor (2 for "0.2")
+8             2     u16 format_minor (3 for "0.3")
 10            2     u16 flags, reserved, 0
 12            4     u32 CRC32 of bytes 0..12 followed by the JSON bytes
 16            json  LayerDesc, UTF-8 JSON, no BOM
@@ -628,8 +637,9 @@ answers for every column (`ColumnParityTest`):
    detail term), `surface` = H = E + A·N (E alone without a detail term); `top_y` = ⌈H⌉ − 1 clamped
    to [min_y − 1, max_y] (min_y − 1 when H is not finite).
 2. `water` = the `water_level` layer's nearest cell at (wx, z), null where nodata or absent.
-3. `horizons` = the stack at (x, z) by the column rule of "`horizon_stack` cells": `[top y, class
-   index, unit key]`, top-down.
+3. `horizons` = the stack at (x, z) by the column rule of "`horizon_stack` cells", read through the
+   world's folds and faults where it has any ("Structural events", the deformed column rule):
+   `[top y, class index, unit key]`, top-down.
 4. `bodies`: every body whose AABB footprint holds (wx, z) (z inside [min z, max z]; wx inside the x
    span with wrap), ascending id; for each, y from min(aabb max y, max_y) down to max(aabb min y,
    min_y) located at block (wx, y, z) ("Bodies", step 1–3); each maximal run of inside blocks is
@@ -1087,6 +1097,107 @@ expected_formed, expected (the survivors expected; = target unless capped), draw
 formed), tracts, permissive_km2, mean_f, buried, truncated, eroded, too_deep, children, guaranteed,
 dropped_separation`, plus `province`, `provinces`, `count_mult`, `max_formed_per_survivor`,
 `brine_flow_km`, `sites`, `bodies`. A forming event's `p_survive` is its cell's survival chance.
+
+## Structural events (`structure/events.dtst`, P2-01, format 0.3)
+
+The folds and faults of a baked planet, and the rule that reads a column's horizon stack through
+them. Code: `crates/deeptime-format/src/structure.rs` (`Structure`, `StructIndex`,
+`Structure::deformed_stack`); Java `worlddata/Structure.java`. `DTST` fixed fields (16 bytes):
+`u32 N events, u32 P profiles, f64 margin (blocks)`. Sections: 0 the N event records of 136 bytes,
+**youngest first** (keys never decrease); 1 the P fold profiles, 629 × f32 each.
+
+```text
+event record
+0    4   u32 id
+4    1   u8 kind: 0 fold, 1 fault, 2 intrusion
+5    1   u8 profile (folds: index into section 1; faults: 0; intrusions: their rock class index)
+6    2   u16 key: the event's age as a stratigraphic key of `strata/horizons`
+8    8   f64 t, years relative to world creation (for people; the rule reads the key)
+16   16  f64 × 2 window centre, block (x, z)
+32   16  f64 × 2 along: unit vector along the structure (a fold's axis, a fault's strike), (x, z)
+48   16  f64 × 2 across: unit vector across it (a fault: towards its hanging wall), (x, z)
+64   8   f64 half_along, blocks
+72   8   f64 half_across, blocks
+80   56  f64 × 7: a fold: wavelength, amplitude, offset (blocks), 0, 0, 0, 0
+                  a fault: y of the plane at the centre, pole (x, y, z; y > 0), slip (x, y, z)
+                  an intrusion: y of its centre, half_height (blocks, > 0), 0, 0, 0, 0, 0
+```
+
+All arithmetic below is IEEE-754 double `+ − × /`, `√` (correctly rounded), comparisons, `floor`
+and `ceil`, in the order written; both sides must give equal answers (`ColumnParityTest`). TAU is the constant 6.2831853
+(Noddy's seven-decimal 2π, part of the contract).
+
+**Window.** `bump(t) = (1 − t²)²` for −1 < t < 1, else 0. For a block position (x, z):
+`dx = x − centre x; dx −= floor(dx/C + 0.5)·C; dz = z − centre z`; `a = dx·along x + dz·along z`,
+`b = dx·across x + dz·across z`; the weight is `wa = bump(a / half_along)`, 0 if that is 0, else
+`wa · bump(b / half_across)`.
+
+**Profile.** `profile(table, p)`, p ≥ 0: `d = (p / TAU) · 628`, `f = floor(d)`, `i1 = f mod 628`,
+`i2 = ceil(d) mod 628`, both clamped to [0, 627]; `v1 = table[i1] / 100`, `v2 = table[i2] / 100`;
+the value is `v1 + (d − f)·(v2 − v1)`. For p < 0 (the bake keeps `offset ≤ −half_across`, so it
+does not occur inside a window): the same with `d` from −p and `i = 628 − (… mod 628)`. This is
+Noddy's `calcProfile` (Loop3D/noddyverse, MIT); the one profile a bake writes is its sine table,
+`table[i] = (f32)(100·sin(2π·i/628))`.
+
+**Candidates.** Event e is a candidate for the column at block (x, z) when |dx| and |dz| (dx
+wrapped as above) are both at most `√(half_along² + half_across²) + margin`. The candidates are
+undone in file order (youngest first). The margin is at least the furthest any chain of faults
+moves rock sideways in this world (the bake measures it), so every piece below meets every event
+that could touch it; it is part of the rule, not only a shortcut.
+
+**The deformed column rule** for block column (x, z), with S(x′, z′) the 0.2 column rule's stack
+at a block column (integer tops T_h, classes, unit keys, top-down):
+
+1. S₀ = S(x, z). No candidates, or S₀ empty: the answer is S₀.
+2. One *piece* covers every height: `lo = −∞, hi = +∞`, source position (x, z) as doubles,
+   `dy = 0`, `key = 0`, not finished, source stack S₀. For each candidate e in order, for each
+   piece in order (bottom-up; pieces e itself creates are not revisited by e) that is not finished
+   and at whose source position e's weight w is not 0:
+   - **Cover.** h = the first horizon of the piece's source stack with unit key ≥ e's key. None:
+     the piece is finished. If h > 0: `cut = (T_h + 1) − dy`; if `cut ≤ lo` the piece is finished;
+     else if `cut < hi` the piece is split at `cut` and the upper part, [cut, hi), is finished.
+     (Rock laid down after e is not moved by e, nor by anything older.)
+   - **Fold:** `dy ← dy − w·(amplitude · profile(table, (b − offset)·TAU / wavelength))`,
+     `key ← e's key`.
+   - **Fault:** with `dx′ = a·along x + b·across x`, `dz′ = a·along z + b·across z`:
+     `plane = y − (dx′·pole x + dz′·pole z) / pole y`, `cut = plane − dy`. If `cut < hi`, the part
+     [max(cut, lo), hi) (the whole piece when `cut ≤ lo`, else split off above the rest) becomes
+     the hanging wall: source position `(sx − w·slip x, sz − w·slip z)`, `dy ← dy − w·slip y`,
+     `key ← e's key`, not finished, source stack S(⌊sx⌋, ⌊sz⌋) of the new position.
+   - **Intrusion:** `r² = (a / half_along)² + (b / half_across)²`. If `r² < 1`:
+     `hh = half_height · √(1 − r²)`, `l = max((y − hh) − dy, lo)`, `u = min((y + hh) − dy, hi)`;
+     if `l < u` the part [l, u) of the piece is split off as the intrusion's rock (its class, unit
+     key = e's key) and is finished; what is left of the piece below and above goes on unchanged.
+     (An intrusion moves nothing. It is read at the piece's source position, so the faults and
+     folds younger than it have moved it with the rock, and it cuts the ones older than it.)
+3. The pieces top-down. A piece holds blocks `y_min … y_max`: `y_max = min(T₀ of S₀, ⌈hi − ½⌉ − 1)`
+   (T₀ of S₀ for hi = +∞), `y_min = max(min_y, ⌈lo − ½⌉)` (min_y for lo = −∞); skipped when
+   `y_max < y_min`. With `d = ⌊dy + ½⌋` and the piece's source stack (an intrusion's piece is instead the one horizon
+   `(y_max, its class, its key)`, appended unless the last appended has the same class): its horizon h covers
+   `top = y_max` for h = 0, else `min(y_max, T_h − d)`, down to `bottom = max(y_min, T_{h+1} + 1 − d)`
+   (y_min for the last); skipped when `top < bottom`. Its class and unit key are those of horizon
+   g: g = h, and if g's unit key is below the piece's key (the shift reached up into rock younger
+   than the event that moved the piece), g is advanced while the *next* horizon's key is also
+   below the piece's key and there is a next one: the lowest bed of that cover stands in, as the
+   bed laid on the deformed surface fills its lows.
+   `(top, class, unit)` is appended unless the last appended has the same
+   class.
+
+So a column no event touches reads as in 0.2; under a fold the beds older than it move up and down
+beneath a cover whose own beds are flat and whose lowest bed fills the troughs (an angular
+unconformity); above a fault's plane the column is the hanging
+wall's, read from where it came from, so a normal fault drops beds and a thrust repeats them.
+Bodies are painted over the result where they are, undeformed.
+
+**What a bake writes** (`deeptime_core::structure::deform`): fold trains (kind 0: an upright sine
+fold under a window a few wavelengths across and several long) and fault segments (kind 1: thrusts,
+normal and strike-slip faults whose slip dies out along the trace and away from it) and intrusions
+(kind 2: stocks in orogens, dykes along rifts, plugs under extinct volcanoes), each dated to
+the plate step that made it; the key is `structure::columns::key::of_age(0, age, span)`, the
+unmetamorphosed strata log's key of that age, so basement and metamorphic units (larger keys) are
+deformed by every event; a fault's `y` is the ground at its centre; an intrusion's `y` is the
+world's floor (it is rooted there and narrows upwards to its top). `notes.bake.structure` records
+the counts and the margin, `notes.structure.deformation` what the run made.
 
 ## Keyframes (`keyframes/index.json`, `keyframes/kf-<n>.dtk`)
 
