@@ -1,6 +1,6 @@
 # Force-balance plate motion: design
 
-Status: **design for review, nothing built** (2026-10-02). It extends
+Status: **design approved (decisions log 2026-10-02); tasks 1, 1b and 5 built** (task 5, the forces recorded and not applied: section 13, "As built"). It extends
 `docs/design/plate-collisions-and-welding.md` (the "collisions design" below) after Ben's decisions
 of 2026-10-02: full force-balance motion; nothing designed for the mega-plate yet; both sides of a
 suture rise, with a foreland basin; the start-up land jump is a separate small task afterwards.
@@ -550,3 +550,60 @@ text.
 - Buck 2004, in Karner et al. (eds), *Rheology and Deformation of the Lithosphere at Continental
   Margins*, 1–30; Bialas, Buck & Qin 2010, *Earth Planet. Sci. Lett.* (volume not confirmed).
 - From memory, not checked: Davis, Suppe & Dahlen 1983, *J. Geophys. Res.* 88:1153–1172.
+
+## 13. As built
+
+### Task 5: the forces, recorded and not applied (2026-10-02)
+
+`crates/deeptime-core/src/plates/forces.rs`, called by the plates step right after the fronts are
+found (beside the boundary mix), only while the dynamics record is on; it writes record version 4
+(`StepRec::forces`, `slabs_km`, `breakoffs`; `Dynamics::slabs`, `prev_balance`) and nothing a plate
+rule reads. Science page `docs/science/plate-forces.md`; ledger FRC and PLT-181 to PLT-191;
+measured on four seeds in `docs/design/plate-check-baseline.md`, "Added 2026-10-02: the force
+balance". Where it differs from or adds to sections 3 and 6:
+
+- **Units.** The balance is solved in SI on the Earth-normalized sphere. The reference slab pull is
+  3 × 10¹³ N/m at Earth's gravity (section 3.2's gross figure), scaled with the planet's gravity.
+- **`plate_speed_scale` is `plate_speed_scale_mm_yr`, and fixed.** Instead of normalising each
+  step's answer to an RMS (section 4's method), it defines the basal drag coefficient: a reference
+  oceanic plate (the average starting plate's area, a straight 3,000 km trench of a full-length
+  80-Myr slab, its neighbours at rest) moves at 45 mm/yr. The balance therefore has one fixed
+  scale, and a planet whose slabs vanish slows down. `plate-check` reports both the raw answer and
+  the answer scaled per step to 45 mm/yr, for comparison with section 4.
+- **Edge energy for the sea floor.** "The same from its depth" with an Airy column under water gives
+  a ridge push of 0.6 × 10¹² N/m, five times below section 3.2's own anchor. The sea floor uses
+  Turcotte & Schubert's ridge push written in terms of the half-space subsidence instead,
+  `−C d²` (4.0 × 10¹² N/m for 3.5 km of subsidence; from memory), with a ridge crest and continental
+  crust at sea level at the same energy. `edge_energy` 0.1 is the energy as computed (a ridge then
+  pushes with 0.11 of the reference pull). Ground deeper than the old floor (trenches) takes the old
+  floor's energy.
+- **Edge energy and collision resistance are one term,** as section 1 says: at a collision front the
+  belt's energy over the incoming crust's is the collision drag (plastic, linearised with this
+  step's convergence, floor 5 mm/yr in place of `weld_speed_mm_yr`), and there is no edge push.
+- **Mantle flow.** A degree-2 flow away from two antipodal upwellings (the surface gradient of a
+  second-degree harmonic), peak `mantle_flow_mm_yr`, axis drawn from the seed and fixed for the
+  run. Section 3.2 asks for "slowly changing"; it does not change yet (a question for task 7).
+- **Boundary resistance** couples each plate to its real neighbour (section 10, risk 2), half from
+  each side of the boundary; slab resistance acts per front sample on the speed towards the trench
+  (not the trench's summed arm).
+- **Slabs.** One length per contact (option 5.3a), kept in the record (`Dynamics::slabs`, keyed by
+  the contact's plates and onset step) rather than on `Contact`, so `subduction.rs`, under work by
+  task 2, is untouched; the switch moves it onto the contact. A contact's trench is blocked when
+  continental crust holds at least half of its front samples.
+- **Stress.** The mean in-plane stress is the mean-stress theorem on a flat plate, edge forces and
+  basal drag at the answer, over a 100 km lithosphere. Tension positive.
+- **The settings of section 6** (`plate_speed_scale_mm_yr`, `slab_pull`, `slab_depth_km`,
+  `slab_breakoff_myr`, `slab_resistance`, `slab_suction_share`, `edge_energy`, `keel_drag`,
+  `boundary_resistance`, `mantle_flow_mm_yr`, `motion_relax_myr`) are in every built-in preset and
+  the test planet, in the editor (Advanced, Plates and crust; each hint says it is not active yet)
+  with lang keys. `motion_relax_myr` is read by nothing until the switch.
+- **Cost.** Not measurable against the plates stage on the shared test VM (build log 2026-10-02);
+  the record grows from about 1.05 to 1.7-2.0 MB of JSON per 1000 Myr run.
+
+What the open-loop numbers say against section 4: the spread of speeds and both contrasts land inside
+the section 7 targets at the default settings (RMS 38 mm/yr, percentiles 11 / 48 / 94, oceanic over
+continental 3.9, slab over free 3.2, no plate-step above 250 mm/yr); the speed follows the slab share
+less (rank correlation 0.44 against 0.69-0.77) and the answer is noisier (rotation change 26 % / 85 %
+against 16-18 % / 62-70 %); a plate above 40 % of the planet is near neutral (median -0.5 MPa,
+tension in 46 % of its steps).
+
