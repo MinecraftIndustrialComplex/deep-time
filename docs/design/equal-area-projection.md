@@ -58,8 +58,10 @@ One module per language, with the same formulas in the same order:
 - Rust: `deeptime_format::projection`, in the format crate. `GridDesc`, the event and site readers
   and every crate need it.
 - Java: `worlddata/Projection`.
-- JS: `DT.proj` in `workbench.js` and the same few lines in `viewer.js`. It is fed the
-  projection's parameters by the workbench API, so JS never derives them itself.
+- JS: `window.DTProj` in `crates/deeptime-viewer/assets/projection.js`, loaded first by the
+  workbench and by the viewer bundle (as built; the first plan was a `DT.proj` in `workbench.js`
+  and a copy in `viewer.js`). It takes C from the run, so the pages never derive the layout
+  themselves.
 
 Core's `BlockFrame` keeps its `glam` API and delegates to the module. Every other site in §3 calls
 one of the functions below.
@@ -419,12 +421,40 @@ this; it is on the WIP branch.
 
 1. **Projection-neutral refactor, equirect kept.** *Built 2026-10-02 (branch
    `worktree-agent-a3186d42ee9449d3d`): Rust `deeptime_format::projection` with the `GridDesc`
-   helpers, Java `worlddata/Projection`, the pages' `projection.js` (`window.DTProj`); the
-   sites of §3 call them, except the spatial-index frames (S), which stay fixed (the module's
-   documentation says why) and the synthetic test terrain's analytic latitude (its own formula,
-   twinned in Java). `tools/review/projection-identity.sh` shows the outputs bit-identical to
-   master (359 files: synthetic worlds, the test planet's bake, keyframes, satellite picture,
-   parity fixtures, deposit world).* Write the module of §2 with the equirectangular
+   helpers, Java `worlddata/Projection`, the pages' `projection.js` (`window.DTProj`).
+   `tools/review/projection-identity.sh` shows the outputs bit-identical to master (355 files:
+   synthetic worlds, the test planet's bake, keyframes, satellite picture, parity fixtures,
+   deposit world).*
+
+   *What the module holds, as built:* `lat_deg`, `lon_deg`, `z_of_lat`, `x_of_lon`, `block_of`,
+   `lat_lon`, `unit` (forward and inverse); `pole_z`, `extent`, `on_planet`, `inside_poles`,
+   `clamp_z`, `grid_origin_z`, `grid_rows` (the extent); `scale_ew`, `scale_ns`, `metric`,
+   `area_scale`, `north`, `great_circle_blocks`, and `GridDesc::cell_area_km2`, `true_cell_m`,
+   `band_weight`, `row_weights` (the metric and the areas); `wrap_col`, `clamp_row`,
+   `neighbour` (the topology: `GridDesc::wrap_i`/`clamp_j`, the surface kernels'
+   `Dims::neighbour` and Java's `GridDesc.wrapI`/`clampJ` call them); `index_origin`,
+   `index_span` (the frame of the river tiles, the structure buckets, the site index and the
+   playability regions, class S of §3); `picture_*` (map pictures, both axes).
+
+   *Not routed yet, for whoever builds step 2 or 3:*
+   - the kernels that wrap x or stop at the rows inline, about 35 Rust files (`box_blur`,
+     flexure's FFT and DCT, the orographic FFT, `advect`, the amplifier's windows, the
+     deposits' regional windows, the ice distance transform, the river network's outlet rows):
+     the fold of §5.3 item 3 is a design pass, not a call-site change;
+   - the x seam written as `c / 2` (block x wrapped into [−C/2, C/2)) at its many sites;
+   - the climate's assumption that rows are parallels (§5.3 item 1): its geometry takes
+     `true_cell_m` and the row weights from the module, the marches along rows stay;
+   - the synthetic test terrain's analytic latitude (`synth/terrain.rs`, Java
+     `AnalyticTestTerrain`: its own formula, twinned) and the CLI's Earth DEM reader
+     (`climate_dem.rs`: the input file's own equirectangular layout);
+   - preset data: every preset's `keyframes.size` (1024 × 512) and `keyframes::DEFAULT_SIZE`;
+   - the workbench globe's texture lookup (u = longitude / 360 in its pixel loop), Java's
+     `ProvinceHints` (a latitude/longitude lattice by definition);
+   - review scripts: `tools/review/grid_audit.py`, `glacial_views.py`, `p2-01-report.py`, the
+     `seams` and `wrap` pages;
+   - the plan's §5.1–5.2 and the POL ledger rows (step 4, with the pick).
+
+   Write the module of §2 with the equirectangular
    projection as its first implementation. Route every site of §3 through it, and add the parity
    fixture's projection block.
    - Output stays bit-identical: same bakes, same pictures, same tests.

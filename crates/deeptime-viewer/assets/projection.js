@@ -7,7 +7,8 @@
 // Equirectangular: longitude λ = 360°·(x + C/2)/C (the seam x = −C/2 is 0°), latitude
 // φ = −360°·z/C (north is −z), the poles at z = ∓C/4, one block 360°/C both ways. A map picture
 // (a keyframe) is 2 : 1: x linear in longitude from the seam, y linear in latitude from the north
-// pole. Whichever projection is picked replaces these bodies.
+// pole. The projection is a game choice (ledger: SCL-049); whichever is picked replaces these
+// bodies.
 (function (root) {
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   root.DTProj = {
