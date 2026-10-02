@@ -208,6 +208,11 @@ public final class Structure {
         boolean[] done = new boolean[16];
         int np;
         // The stacks of the source columns met.
+        /**
+         * Whether source columns are read as their nearest strata cell's stored stack
+         * ({@link FarColumn#cellStack}: far terrain's wide columns) instead of by the column rule.
+         */
+        boolean cell;
         Columns.Stack[] stacks = new Columns.Stack[4];
         int[] stackX = new int[4], stackZ = new int[4];
         int ns;
@@ -261,7 +266,10 @@ public final class Structure {
             }
             if (stacks[ns] == null)
                 stacks[ns] = new Columns.Stack(strata.stackDepth());
-            Columns.stack(wd, strata, x, z, stacks[ns]);
+            if (cell)
+                FarColumn.cellStack(strata, x, z, stacks[ns]);
+            else
+                Columns.stack(wd, strata, x, z, stacks[ns]);
             stackX[ns] = x;
             stackZ[ns] = z;
             return ns++;
@@ -292,6 +300,18 @@ public final class Structure {
      * and faults: Rust {@code Structure::deformed_stack}, which documents the rule.
      */
     public void deformedStack(WorldData wd, RasterSampler strata, int x, int z, Columns.Stack out, Scratch s) {
+        deformedStack(wd, strata, x, z, out, s, false);
+    }
+
+    /**
+     * As {@link #deformedStack(WorldData, RasterSampler, int, int, Columns.Stack, Scratch)}; with
+     * {@code cell} the undeformed stacks the rule reads (the column's own and every fault's source
+     * column) are their nearest strata cells' stored stacks, not the column rule's: the same events,
+     * undone the same way, over the cheap stacks far terrain's wide columns use.
+     */
+    public void deformedStack(WorldData wd, RasterSampler strata, int x, int z, Columns.Stack out, Scratch s,
+                              boolean cell) {
+        s.cell = cell;
         out.count = 0;
         s.ns = 0;
         s.np = 0;

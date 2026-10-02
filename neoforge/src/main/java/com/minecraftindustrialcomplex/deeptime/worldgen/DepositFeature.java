@@ -93,6 +93,13 @@ public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
                         RockPalette.Host kind = palette.host(host);
                         if (kind == RockPalette.Host.NONE || (kind == RockPalette.Host.LOOSE && !loose))
                             continue;
+                        // In a loose body the ore sits in the body's own rock (a placer's gravel),
+                        // whatever loose block is there (the soil the surface rules left over it).
+                        if (loose && kind == RockPalette.Host.LOOSE) {
+                            BlockState own = palette.block(b.rockClass(), StrataPass.bodyKey(b.id()));
+                            if (own != null)
+                                host = own;
+                        }
                         BlockState ore = ores.resolve(material(material), host, y);
                         if (ore == null)
                             continue;

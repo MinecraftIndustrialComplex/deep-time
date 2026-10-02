@@ -52,6 +52,10 @@ public final class DeepTime {
         PoleCap.init();
         // COE and CDG hooks (P1-16): their mixins' targets load now, so a drifted signature fails the boot.
         CompatHooks.preloadTargets();
+        // Distant Horizons far terrain (P3-04): LODs from the world data; nothing without Distant Horizons.
+        com.minecraftindustrialcomplex.deeptime.compat.dh.DhFarTerrain.init();
+        NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class,
+                e -> com.minecraftindustrialcomplex.deeptime.server.FarTerrainCommand.register(e.getDispatcher()));
         // The F3 line and the polar storm; never loaded on a dedicated server.
         if (FMLEnvironment.dist == Dist.CLIENT)
             com.minecraftindustrialcomplex.deeptime.client.DeepTimeClient.init(modBus);

@@ -1,0 +1,8 @@
+# As dh, with the newest Distant Horizons checked instead of the pack's pin (P3-04): from 3.3.1 the
+# API has its published names, Toroidal World 0.19.3's Distant Horizons mixins apply, and one of
+# them refuses every world generator that is not Distant Horizons' own on a wrapped level. This
+# set shows what a pack update to it does (run.py --dh records the refusal). Keep the id equal to
+# dh_next_version in neoforge/gradle.properties; install.sh's warning that the pack pins another
+# version is expected here.
+@include standalone
+distanthorizons     9w34y8ai   # 3.3.3-1.21.1 (LGPL-3.0; API 7.2.0)

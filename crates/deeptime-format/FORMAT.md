@@ -71,6 +71,7 @@ reader needs to know.
                                 --strata every-class, 32 in a baked run)
   strata/classes.json           class index → rock class name
   spawn/candidates.json         land cells for spawn selection
+  volcanoes/active.json         the volcanoes active at the present ("Lava")
   climate_mapping.json          written by the game at the world's first start (P1-09, plan §7.2; not listed
                                 in the manifest): the tables from the baked biome inputs to the pack's
                                 (see "The climate mapping")
@@ -811,8 +812,9 @@ through the water like any other block.
 ## Lava (game side, `notes.bake.underground`)
 
 `notes.bake.underground.params` is the preset's `underground` section (its defaults when the preset
-has none): `{"lava_floor_blocks": 10, "lava_lake_blocks": 54}`. No layer holds lava; the game reads
-the two numbers when it generates chunks (Java `worldgen/LavaRules`, `LavaFluids`,
+has none): `{"lava_floor_blocks": 10, "lava_lake_blocks": 54, "magma_chamber_depth_km": 3.0,
+"magma_chamber_size": 1.0, "crater_lake_share": 0.25, "remove_lava_features": true}`. No layer holds
+lava; the game reads the first two numbers when it generates chunks (Java `worldgen/LavaRules`, `LavaFluids`,
 `density/LavaLakesDensity`), and a world without the note uses the defaults. With `min_y` the floor
 of the noise settings (−352) and cover = 8:
 
@@ -826,8 +828,58 @@ of the noise settings (−352) and cover = 8:
 Both are vanilla's rules (lava below y −54, lava lakes at y −10 and lower, in a world whose floor is
 y −64) measured from the floor instead of from y 0. Vanilla's own constants flood the lowest 298
 blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −352.
-Lava that features and carvers place (lava lakes and springs of the pack's biomes, carver lava in
-the bottom eight blocks) is not covered by these rules.
+Carver lava in the bottom eight blocks is vanilla's and not covered by these rules.
+
+### Active volcanoes (`volcanoes/active.json`) and their magma
+
+The bake lists the volcanoes the volcano stage leaves **active at the present** (dead ones and those
+eroded or subducted are not listed; a world without the volcano stage has no file):
+
+```json
+{"version": 1, "t_myr": 0.0, "volcanoes": [
+  {"id": 412, "kind": "stratovolcano", "x": -6120.5, "z": 233.0, "radius_m": 21000, "height_m": 2300,
+   "activity": 0.62, "oceanic": false, "silicic": false, "age_myr": 3.0,
+   "crater": {"radius_m": 1700, "depth_m": 180, "caldera": false}}]}
+```
+
+`kind` is `stratovolcano` (arc), `shield` (oceanic hotspot) or `caldera_complex` (continental
+hotspot). `x`, `z` are the summit's block position (x in [−C/2, C/2)); `radius_m` the basal radius;
+`height_m` the edifice's relief; `activity` 0–1 (an arc volcano's magma flux at its last step, a
+hotspot volcano's mean nearness to its plume); `crater` its summit crater or caldera, or null.
+`notes.bake.underground` records `active_volcanoes` (the count) and `volcanoes_file`. Spreading
+ridges and rifts are not exported.
+
+The game builds each volcano's magma from the list, the terrain height H and four more settings of
+`notes.bake.underground.params` (Java `worldgen/Magma`, placed by `worldgen/MagmaPass` in the surface
+step after the water pass). With `mH`, `mV` the metres per block, (cx, cz) the summit column rounded,
+`floor` = ⌈H(cx, cz)⌉ − 1 and `lava_floor` the lava floor's y:
+
+- **Chamber**: an ellipsoid of lava. Horizontal radius `rh` = clamp(0.1 · `radius_m`, 1200, 4500) ·
+  `magma_chamber_size` / mH blocks (at least 2); half-height `rv` = 0.2 · that radius in metres / mV
+  (at least 4). Its top is `magma_chamber_depth_km` under `floor`. It is raised to stay 8 blocks
+  above `lava_floor`, squeezed to stay 24 blocks under `floor`, and dropped (the volcano gets no magma)
+  when less than 3 blocks of half-height are left. No chamber block becomes lava within 8 blocks of
+  its column's ground (the sea bed under the sea). `magma_chamber_size` 0: no magma anywhere.
+- **Conduit**: the centre column and its four neighbours, lava from the chamber's centre to
+  `floor − 6`, then magma blocks: up to the surface on land, to `floor − 3` under water.
+- **Crater lava lake**: of the volcanoes that can hold one, the `crater_lake_share` most active
+  (ties by id; ⌈share · n⌉ of n). Radius r = clamp(half the crater's radius in blocks, 2, 10); its
+  surface is one block under the lowest ground of the ring r < d ≤ r + 2; lava from there down to two
+  blocks under the lower of that and `floor` (at most 10 deep), the ground above the surface removed,
+  the conduit opening into its floor. A volcano cannot hold one when its summit is at or under sea
+  level + 2, when any column of the lake or its ring holds or borders water (the sea, a lake, a river,
+  a bank), when the surface would lie more than 12 blocks under `floor`, or when it stands beyond
+  the pole cap's line (|z| > C/4 · `pole_cap_deg`/90: nobody reaches it).
+- **Seal**: every open block (air, water) within 1.5 blocks of a chamber, two columns of a conduit or
+  two columns of a lake becomes smooth basalt, so lava never touches water or hangs over a cave.
+
+`remove_lava_features` (on by default): placed features whose configuration places lava (a block or
+fluid state named `minecraft:lava`: vanilla's `lake_lava_surface`, `lake_lava_underground`,
+`spring_lava`, `spring_lava_frozen`, Terralith's `volcano/lava_lakes`, `volcano/lava_flow`,
+`volcano/spring_lava`, `cave/mantle/lava_drip`, any other mod's; also Terralith's
+`cave/frostfire/lava_remover`, which turns lava sources into deepslate and would eat a chamber) are
+not placed in a Deep Time level
+(Java `worldgen/LavaFeatures`); other dimensions keep them.
 
 ## `strata/classes.json`
 
@@ -951,6 +1003,22 @@ Deposit sites (P1-14):
   `SiteChunks.footprint` sums them; the deposit feature and the strata pass already loop over every
   body). Nothing in the file layout changed, so the format version stays: a reader that handled a
   site's several bodies before handles a stack.
+  A **placer** of a planet run (a world with a river network, `rivers/rivers.dtrv`) also has
+  **several ore bodies**: after the bake it is laid where the finished world has its gravel
+  (`deeptime_core::deposits::placer_channels`, `notes.bake.placers`). With a river channel within
+  its type's `placer.river_reach_km` it becomes gravel bars along the channel: one `channel` body
+  per straight piece of the centre line (at most 24 blocks; downstream through confluences), its
+  local x along the piece and 1.2 times its length, so neighbouring bars overlap a little, its
+  half-width the channel's plus 2 blocks, and its blocks from the water's top block down to three
+  blocks (or the ribbon's thickness, if more) under the bed at the channel's centre. Without one it
+  becomes a bench: the ribbon in pieces of at most 24 blocks along its direction, each with its top
+  block at the terrain's top solid block (the bed under water) at the piece's centre. Either way
+  the bodies have consecutive ids from `body`, the type's rock class (gravel) and zones (the pay
+  streak in the lower half), and the site's `center` is the channel vertex it settled at (y the
+  bed) or its own place (y the ground). A placer's bars overlap, so a block may lie in two of the
+  site's bodies: the deposit feature draws once per body, lowest id first, and a block already
+  turned to ore hosts nothing more; `SiteChunks.footprint` counts the overlap twice (a share of a
+  chunk, never the ore). A synthetic world's placer (no river network) stays one ribbon.
 - `amount_base` = `tonnage_t`; `coe_vein` is the deposit type's `minecraft.coe_vein`
   (`createoreexcavation:ore_vein_type/copper`, …); `cdg_charge_mb` (reservoirs) is the oil tonnage
   / 0.85 t/m³ · 1000 mB/m³. The records keep these physical values; the game scales them at run time

@@ -27,9 +27,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * <ol>
  *   <li><b>Excavated Variants</b> ({@link EvBridge}, only when EV is loaded): the variant of an EV
  *       ore whose base blocks are in {@code #c:ores/<material>} in the host's EV stone.</li>
- *   <li>Otherwise, or where EV has no variant for that host: a block of {@code #c:ores/<material>}
- *       that is also in {@code #c:ores_in_ground/deepslate} below y = 0, else in
- *       {@code #c:ores_in_ground/stone}.</li>
+ *   <li>Otherwise, or where EV has no variant for that host, and the host is neither stone nor
+ *       deepslate: a block of {@code #c:ores/<material>} that is also in
+ *       {@code #c:ores_in_ground/<the host block's path>} ({@code gravel}, {@code sand}, …), so a
+ *       pack can give a placer its own gold-bearing gravel without Excavated Variants.</li>
+ *   <li>Otherwise a block of {@code #c:ores/<material>} that is also in
+ *       {@code #c:ores_in_ground/deepslate} below y = 0, else in {@code #c:ores_in_ground/stone}.</li>
  *   <li>Otherwise any block of {@code #c:ores/<material>}.</li>
  * </ol>
  *
@@ -82,6 +85,12 @@ public final class OreBlockResolver {
     static final TagKey<Block> IN_STONE = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("c", "ores_in_ground/stone"));
     static final TagKey<Block> IN_DEEPSLATE = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("c", "ores_in_ground/deepslate"));
 
+    /** {@code #c:ores_in_ground/<path of the host block's id>}: the ores a pack made for that host. */
+    public static TagKey<Block> inGround(BlockState host) {
+        String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(host.getBlock()).getPath();
+        return TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("c", "ores_in_ground/" + path));
+    }
+
     /** The blocks of {@code #c:ores/<material>} in tag order (empty when the tag is absent). */
     public List<BlockState> blocks(ResourceLocation material) {
         if (access == null)
@@ -119,6 +128,12 @@ public final class OreBlockResolver {
             BlockState v = ev.get().variant(ores, host);
             if (v != null)
                 return v;
+        }
+        if (!host.is(net.minecraft.world.level.block.Blocks.STONE) && !host.is(net.minecraft.world.level.block.Blocks.DEEPSLATE)) {
+            TagKey<Block> own = inGround(host);
+            for (BlockState b : ores)
+                if (b.is(own))
+                    return b;
         }
         TagKey<Block> ground = deep ? IN_DEEPSLATE : IN_STONE;
         for (BlockState b : ores)

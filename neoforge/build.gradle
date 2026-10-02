@@ -82,6 +82,30 @@ def extractSableCompanion = tasks.register('extractSableCompanion', Copy) {
     into sableCompanionDir
 }
 
+// ---------------------------------------------------------------------------
+// Distant Horizons (LGPL-3.0; P3-04): never on a compile or run classpath. compat/dh binds its API
+// by name at run time, because the API classes have two names (DhApiBinding); the two jars here
+// are only opened by DhApiBindingTest, each in its own class loader, to prove the binding against
+// the real class files: the MIC pack's pin and the newest version checked.
+// ---------------------------------------------------------------------------
+// One configuration per version: two versions of one module in one configuration resolve to one.
+configurations {
+    dhPinJar {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = false
+    }
+    dhNextJar {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = false
+    }
+}
+dependencies {
+    dhPinJar "maven.modrinth:distanthorizons:${dh_version}"
+    dhNextJar "maven.modrinth:distanthorizons:${dh_next_version}"
+}
+
 dependencies {
     compileOnly files(twInnerDir.map { it.file(tw_inner_jar) }).builtBy(extractToroidalWorld)
     compileOnly("maven.modrinth:sable:${sable_version}") { transitive = false }
@@ -560,6 +584,13 @@ tasks.named('test', Test) {
     forkEvery = 1
     systemProperty 'deeptime.test.version', cargoVersion
     systemProperty 'deeptime.test.formatVersion', formatVersion
+    // DhApiBindingTest: "<Modrinth version id>=<jar>" per Distant Horizons jar (P3-04).
+    inputs.files(configurations.dhPinJar, configurations.dhNextJar)
+    doFirst {
+        systemProperty 'deeptime.test.dhJars',
+                ["pin-${dh_version}=${configurations.dhPinJar.singleFile.absolutePath}",
+                 "next-${dh_next_version}=${configurations.dhNextJar.singleFile.absolutePath}"].join(File.pathSeparator)
+    }
     testLogging { events 'passed', 'failed'; exceptionFormat 'full' }
 }
 

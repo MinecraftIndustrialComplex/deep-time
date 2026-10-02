@@ -4,7 +4,7 @@
 # Installs one of Deep Time's server sets into smoke/<profile>/server/ (plan §9.5).
 # Adapted from mic-climate's smoke/install.sh.
 #
-#   tools/smoke/install.sh <standalone|mic|mic-ev|terrablender|ev|ev-client>
+#   tools/smoke/install.sh <standalone|mic|mic-ev|terrablender|ev|ev-client|dh|dh-next>
 #       [--size 16384|32768]      world circumference -> level-type deeptime:planet[_32k]
 #       [--synth <kind>]          write synthetic world data before the first start (P0-09+)
 #       [--strata <kind>]         the synthetic horizons: placeholder (default), every-class (P1-12) or basin
@@ -31,6 +31,8 @@
 # mic-ev is the mic set plus Excavated Variants and Dynamic Asset Generator (profiles/ev.txt's pins),
 # for the plan Q10 comparison; ev-client is the ev set plus Create, the smallest set a client needs to
 # generate EV's variant textures for every ore and stone the MIC pack has (tools/client/ev-assets.sh).
+# dh is the standalone set plus Distant Horizons at the pack's pin, dh-next the same with the newest
+# Distant Horizons checked (P3-04: far terrain from the world data; run.py --dh).
 #
 # install.json records the Deep Time jar's sha256 and the source it was built from (jarstate.py). The
 # jar copy goes stale as soon as the sources change; tools/workbench/preview.py refreshes it itself
@@ -80,8 +82,8 @@ while [ $# -gt 0 ]; do
     esac
 done
 case "$PROFILE" in
-    standalone|mic|mic-ev|terrablender|ev|ev-client) ;;
-    *) echo "usage: install.sh <standalone|mic|mic-ev|terrablender|ev|ev-client> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--seed N] [--clean]" >&2; exit 2 ;;
+    standalone|mic|mic-ev|terrablender|ev|ev-client|dh|dh-next) ;;
+    *) echo "usage: install.sh <standalone|mic|mic-ev|terrablender|ev|ev-client|dh|dh-next> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--seed N] [--clean]" >&2; exit 2 ;;
 esac
 # The sets installed from the MIC pack (packwiz-installer); the others are their pin files alone.
 case "$PROFILE" in mic|mic-ev) FROM_PACK=1 ;; *) FROM_PACK=0 ;; esac

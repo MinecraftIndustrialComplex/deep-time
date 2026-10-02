@@ -47,6 +47,17 @@ description = '''${mod_description}'''
     ordering     = "NONE"
     side         = "BOTH"
 
+# Distant Horizons: its far terrain comes from Deep Time's world data (compat/dh, P3-04; plan §10.5).
+# Optional, and any version loads: the API is bound by name at run time (3.3.0's merged names and
+# the published names of 3.3.1+ were checked), and a version it cannot bind is left to generate
+# its own LODs.
+[[dependencies.${mod_id}]]
+    modId        = "distanthorizons"
+    type         = "optional"
+    versionRange = "[0,)"
+    ordering     = "NONE"
+    side         = "BOTH"
+
 # Create Ore Excavation and Create: Diesel Generators: veins and oil come from Deep Time's sites
 # (mixin/compat/createoreexcavation, mixin/compat/createdieselgenerators; P1-16, plan §7.14).
 # Optional: the mixins apply only when the mod is installed. The ranges start at the versions whose

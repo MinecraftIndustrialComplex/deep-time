@@ -1459,7 +1459,7 @@ public final class GeologicChunkGenerator extends NoiseBasedChunkGenerator {   /
 | Router field | Value |
 |---|---|
 | `barrier`, `fluid_level_floodedness`, `fluid_level_spread` | the vanilla `minecraft:overworld/…` aquifer functions, by reference |
-| `lava` | *As built (2026-10-01):* `deeptime:lava_lakes` × vanilla's `aquifer_lava` noise: lava cave lakes only near the world's floor. Vanilla's two lava heights (everything open below y −54 is lava, from `NoiseBasedChunkGenerator.createFluidPicker`; lava lakes at y −10 and lower, from `Aquifer.computeFluidType`) are hard-coded for a floor at y −64 and flooded the lowest 298 blocks of this world, the deep sea included. The generator therefore also replaces the global fluid picker (`worldgen/LavaFluids`); both distances are the preset's `underground` settings (`worldgen/LavaRules`, FORMAT.md "Lava") |
+| `lava` | *As built (2026-10-01):* `deeptime:lava_lakes` × vanilla's `aquifer_lava` noise: lava cave lakes only near the world's floor. Vanilla's two lava heights (everything open below y −54 is lava, from `NoiseBasedChunkGenerator.createFluidPicker`; lava lakes at y −10 and lower, from `Aquifer.computeFluidType`) are hard-coded for a floor at y −64 and flooded the lowest 298 blocks of this world, the deep sea included. The generator therefore also replaces the global fluid picker (`worldgen/LavaFluids`); both distances are the preset's `underground` settings (`worldgen/LavaRules`, FORMAT.md "Lava"). Lava above that zone is the magma of the bake's active volcanoes (`volcanoes/active.json`, `worldgen/Magma`, `MagmaPass`: chambers, conduits, crater lakes), and the biomes' random lava lakes and springs are not placed in Deep Time levels (`worldgen/LavaFeatures`; decisions log 2026-10-01, "Volcanoes is a go ahead") |
 | `temperature`, `vegetation`, `continents`, `erosion`, `ridges` | `flat_cache(deeptime:raster{layer: "climate/<name>"})` |
 | `depth` | `deeptime:depth` = (H(x,z) − y) / 128, zero at the terrain surface, as vanilla's surface biome points expect (P1-09's biome tests would expose a wrong offset). Vanilla's `overworld/depth` falls 3.0 over 384 blocks (1.5 at y = −64 to −1.5 at y = 320), i.e. 1/128 per block; keeping that slope keeps biome `depth` bands meaningful |
 | `initial_density_without_jaggedness` | `deeptime:terrain{mode: "initial"}` |
@@ -1658,6 +1658,15 @@ stone from its neighbours with chunk-edge bookkeeping, so a regenerated deposit 
 1,406 ore blocks. Deep Time turns it off per level with a compat mixin
 (`mixin/compat/excavated_variants/OreReplacerMixin`), so other levels of the pack keep it; the
 config stays untouched.)
+
+*Ore in loose hosts (2026-10-01, the deposit audit).* A placer's ore sits in gravel or sand, for
+which neither vanilla nor the `c` tags have an ore block, so it came out as the stone ore
+(`minecraft:gold_ore` in a gravel bar). Two additions: Deep Time ships EV stone configs for
+`minecraft:gravel` and `minecraft:sand` beside the four stand-ins, so with EV a placer places EV's
+gold ore in gravel; and the resolver, before the stone/deepslate step and for hosts other than
+stone and deepslate, takes a block of `#c:ores/<material>` that is also in
+`#c:ores_in_ground/<the host block's path>` (`gravel`, `sand`), so a pack can supply its own
+gold-bearing gravel without EV. Without either, the stone ore stays (decisions file, "Ore blocks").
 
 ### 7.7 Ore claiming
 
@@ -2658,6 +2667,17 @@ regional MVT driver"):*
   (carbonate classes, `hosts.full_at` 0.05: a ~100 m unit in the 2 km window counts fully). Windows
   are octagons of the disk's area, exact under east–west shifts. The schema gains `hosts.full_at`
   (default 1; Java ignores it).
+- **Placers settle after the bake** (2026-10-01, the deposit audit; `deposits/placer_channels.rs`).
+  Step 6 places a placer on the coarse grid's ground before the amplifier and the bake's rivers
+  exist, as one flat ribbon; in the finished world that ribbon was in the air or buried (centre
+  77–121 blocks under the real ground at the 10th percentile, 37–66 over it at the 90th, on two
+  16k planets) and more than half of the placers placed no ore. Once the folder is complete, every
+  placer is laid again from its site record: into the nearest baked river channel within the
+  type's `placer.river_reach_km` (30 km: 100 blocks) as gravel bars along the channel, from the
+  water down to three blocks under the bed, downstream through confluences; or, with no channel in
+  reach, as a bench in pieces on the finished ground (FORMAT.md, "Sites"). `deeptime hydro` settles
+  them again after re-making the channels. Nothing in the adapter changed for it: the strata pass
+  paints the gravel, the water pass cuts the channel, the deposit feature places the pay streak.
 
 ### 8.7 Fantasy processes — `core::fantasy` (Phase 3)
 
@@ -4056,6 +4076,33 @@ exists anywhere, so visual credibility at block scale is unknown; hydrology cost
   `IDhApiWorldGeneratorOverrideRegister.registerWorldGeneratorOverride`. The DH API is LGPL-3.0.
   MIC ships DH 3.3.0 while TW compiles against 3.3.1 and folds DH through internal mixins, so the
   exact DH version matters.
+
+  *As built (P3-04, 2026-10-01, ahead of the rest of Phase 3; STATUS.md has the measurements):*
+  - **Columns.** `worlddata/FarColumn` (plain Java) turns the column rule into layers: the ground
+    the generator draws (`Water.cellSurface`), the lake, sea or river over it with its bed, banks,
+    the ice cover on the top blocks, strata bed by bed where a side shows them, water ice and the
+    snow layer where the biome freezes, air to the top. `farterrain/FarTerrain` adds the biome
+    (the level's biome source at the quart cell a chunk stores), the soil (a datapack table,
+    `data/deeptime/deeptime/far_terrain/surface.json`: the pack's surface rules need a generated
+    chunk, so far terrain's top blocks come from a table by biome) and the blocks (rock palette,
+    the strata pass's member choice). No trees, features, caves or bodies.
+  - **Detail.** DH asks 64 × 64 columns of 2^d blocks, d = 0…12. One- and two-block columns get the
+    full column rules (the strata rule only where rock shows); wider ones are sampled at their
+    centre, without banks, with the nearest strata cell's stack.
+  - **Binding.** `compat/dh` binds the API by name at run time, not `compileOnly`: DH 3.3.0's merged
+    jar renames every NeoForge class `<Class>_neoforge`, the API included, and 3.3.1+ has the
+    published names (API 7.1.0 / 7.2.0; "API 4.0.0" above is stale). `DhApiBindingTest` opens the
+    real 3.3.0 and 3.3.3 jars. The generator is a `Proxy` of `IDhApiWorldGenerator` returning
+    `API_DATA_SOURCES`; data point y counts from the level's bottom; columns are written with
+    step `LIGHT`. Registered at `LevelEvent.Load` (lowest priority, after DH's own listener).
+  - **Toroidal World.** TW 0.19.3 refuses every non-DH generator on a wrapped level
+    (`WorldGeneratorInjectorMixin`). With DH 3.3.0 TW's DH mixins target classes NeoForge never
+    loads, so they are inert and the override registers; from 3.3.1 they apply and the override
+    is refused (logged, DH generates from real chunks). Not worked around: STATUS.md, pending
+    questions.
+  - **Checks.** `FarColumnTest` (the exit test), `FarTerrainGameTests`, and
+    `tools/smoke/run.py --profile dh --dh`, which drives DH's server-side `/dh pregen` and compares
+    what DH stores with far terrain and with the chunks generated afterwards.
 
 **Exit test.** Sections through sky islands show strata from their source crust; `probe column`
 at island tops returns Terralith skylands biomes, and skylands biomes do not appear on open ocean
