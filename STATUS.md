@@ -177,7 +177,9 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   (task 5 records only). `R=<scratch> BIN=<binary> tools/review/plate-check.sh 1000 1,2,3,4
   supercontinent base:structure.deformation.density=0`. Targets met: **28 of 45** (master 14 of 42).
   Re-run on the branch merged with master 00ef214c (b14023a3): seeds 1 and 2 give the same
-  plate-check table, all 121 rows identical, so the merged task 5 changes nothing a run computes.
+  plate-check table, all 121 rows identical, so the merged task 5 changes nothing a run computes;
+  master 60bbbea8 (deposits) merged after that is inert too (150 Myr, seed 1, same table and
+  hypsometry before and after merging it).
 
   | Measure | Master | After | Target | |
   |---|---|---|---|---|
