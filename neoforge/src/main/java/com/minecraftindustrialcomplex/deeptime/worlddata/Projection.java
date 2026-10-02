@@ -62,6 +62,74 @@ public final class Projection {
         return wrapX(circumference, l / 360.0 * circumference - 0.5 * circumference);
     }
 
+    /** Whether block z is on the planet: between the poles (x wraps, so every x is). */
+    public static boolean onPlanet(double circumference, double z) {
+        return Math.abs(z) <= poleZ(circumference);
+    }
+
+    /** Blocks of planet per block east–west at block z: cos φ (the metric's x scale; 0 at the poles). */
+    public static double scaleEw(double circumference, double z) {
+        return Math.max(0.0, Math.cos(Math.toRadians(latitudeDeg(circumference, z))));
+    }
+
+    /** Blocks of planet per block north–south at block z: 1 everywhere. */
+    public static double scaleNs(double circumference, double z) {
+        return 1.0;
+    }
+
+    /** Area of planet per block of block space at block z: cos φ. */
+    public static double areaScale(double circumference, double z) {
+        return scaleEw(circumference, z) * scaleNs(circumference, z);
+    }
+
+    /** The raster's topology in x: wraps a column index into [0, w). */
+    public static int wrapColumn(long i, int w) {
+        return (int) Math.floorMod(i, (long) w);
+    }
+
+    /** The raster's topology in z: clamps a row index into [0, h − 1] (the rows stop at the poles). */
+    public static int clampRow(long j, int h) {
+        return (int) Math.max(0, Math.min(h - 1L, j));
+    }
+
+    /**
+     * Block x of the first cell of the world data's spatial indexes (river tiles, structure buckets,
+     * site index): −C/2, the seam. Lookup frames, not geography; Rust {@code Projection::index_origin}.
+     */
+    public static double indexOriginX(double circumference) {
+        return -circumference / 2.0;
+    }
+
+    /** Block z of the first cell of the spatial indexes: −C/4. */
+    public static double indexOriginZ(double circumference) {
+        return -circumference / 4.0;
+    }
+
+    /** Blocks the spatial indexes span north–south: C/2. */
+    public static double indexSpanZ(double circumference) {
+        return circumference / 2.0;
+    }
+
+    /** {@link #indexOriginX} in whole blocks. */
+    public static long indexOriginBlockX(long circumference) {
+        return -(circumference / 2);
+    }
+
+    /** {@link #indexOriginZ} in whole blocks. */
+    public static long indexOriginBlockZ(long circumference) {
+        return -(circumference / 4);
+    }
+
+    /** Longitude, degrees (not wrapped), at column coordinate x of a map picture w columns wide (x = 0 the seam). */
+    public static double pictureLongitudeDeg(double x, int w) {
+        return 360.0 * x / w;
+    }
+
+    /** Column coordinate of a longitude in [0°, 360°) in a map picture w columns wide. */
+    public static double pictureXOfLongitude(double lonDeg, int w) {
+        return lonDeg / 360.0 * w;
+    }
+
     /** Latitude, degrees, at row coordinate y of a map picture h rows high (y = 0 the north pole). */
     public static double pictureLatitudeDeg(double y, int h) {
         return 90.0 - y / h * 180.0;

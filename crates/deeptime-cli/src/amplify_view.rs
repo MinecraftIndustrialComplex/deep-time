@@ -89,7 +89,7 @@ fn quantise(y: f32) -> f32 {
 /// Cell (i, j) of L3 to a longitude and latitude (the L3 grid read as the planet's map picture).
 fn lonlat(gw: usize, gh: usize, i: f64, j: f64) -> (f64, f64) {
     (
-        (360.0 * i / gw as f64).rem_euclid(360.0),
+        deeptime_format::Projection::picture_lon_deg(i, gw as u32).rem_euclid(360.0),
         deeptime_format::Projection::picture_lat_deg(j, gh as u32),
     )
 }

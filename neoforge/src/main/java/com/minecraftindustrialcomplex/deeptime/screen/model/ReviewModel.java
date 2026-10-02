@@ -98,7 +98,7 @@ public final class ReviewModel {
         for (int y = 0; y < MAP_H; y++) {
             double lat = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureLatitudeDeg(y, MAP_H);
             for (int x = 0; x < MAP_W; x++) {
-                double lon = 360.0 * x / MAP_W;
+                double lon = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureLongitudeDeg(x, MAP_W);
                 GlobeProjection.block(lat, lon, circumference, b);
                 px[y * MAP_W + x] = ramp.abgr(wd.height(b[0], b[1]));
             }

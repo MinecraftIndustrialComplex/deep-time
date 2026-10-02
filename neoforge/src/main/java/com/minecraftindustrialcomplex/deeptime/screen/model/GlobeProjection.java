@@ -84,7 +84,7 @@ public final class GlobeProjection {
                     dst[at] = 0;
                     continue;
                 }
-                int px = (int) Math.round(ll[1] / 360.0 * w) % w;
+                int px = (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureXOfLongitude(ll[1], w)) % w;
                 int py = (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureYOfLatitude(ll[0], h));
                 py = Math.max(0, Math.min(h - 1, py));
                 int c = src[py * w + px];
@@ -105,7 +105,7 @@ public final class GlobeProjection {
 
     /** Map pixel of (lat, lon) in a {@code w × h} map picture, as fractional coordinates of its centre. */
     public static double[] mapPixel(double latDeg, double lonDeg, int w, int h, double[] out) {
-        out[0] = wrapLon(lonDeg) / 360.0 * w + 0.5;
+        out[0] = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureXOfLongitude(wrapLon(lonDeg), w) + 0.5;
         out[1] = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureYOfLatitude(latDeg, h) + 0.5;
         return out;
     }

@@ -644,7 +644,7 @@
     for (const p of panes) {
       let h = '';
       for (const lat of [60, 30, 0, -30, -60]) h += `<span class="lat" style="top:${proj.yOfLat(lat, 100)}%">${lat === 0 ? '0°' : `${Math.abs(lat)}°${lat > 0 ? 'N' : 'S'}`}</span>`;
-      for (let lon = 0; lon <= 360; lon += 60) h += `<span class="lon${lon % 360 === 0 ? ' seam' : ''}" style="left:${lon / 360 * 100}%">${lon % 360 === 0 ? 'seam' : `${lon}°`}</span>`;
+      for (let lon = 0; lon <= 360; lon += 60) h += `<span class="lon${lon % 360 === 0 ? ' seam' : ''}" style="left:${proj.xOfLonPic(lon, 100)}%">${lon % 360 === 0 ? 'seam' : `${lon}°`}</span>`;
       p.axes.innerHTML = h;
     }
   }
@@ -673,11 +673,11 @@
   // projection gives row py (proj.yOfLat).
   function mapXY(lat, lon, f, W) {
     const s = W / f.w;
-    return [(((lon % 360) + 360) % 360 / 360 * f.w + 0.5) * s, (proj.yOfLat(lat, f.h) + 0.5) * s];
+    return [(proj.xOfLonPic(proj.wrapLon(lon), f.w) + 0.5) * s, (proj.yOfLat(lat, f.h) + 0.5) * s];
   }
-  function llToCanvas(p, lat, lon) { return [(((lon % 360) + 360) % 360) / 360 * p.canvas.width, proj.yOfLat(lat, p.canvas.height)]; }
+  function llToCanvas(p, lat, lon) { return [proj.xOfLonPic(proj.wrapLon(lon), p.canvas.width), proj.yOfLat(lat, p.canvas.height)]; }
   function mapLatLon(p, x, y) {
-    return [clamp(proj.latOfY(y, p.canvas.height), -90, 90), ((x / p.canvas.width * 360) % 360 + 360) % 360];
+    return [clamp(proj.latOfY(y, p.canvas.height), -90, 90), proj.wrapLon(proj.lonOfPicX(x, p.canvas.width))];
   }
   // Block coordinates of a point (the projection; the static viewer's inspect): x from the seam
   // at −C/2; north is −z.
@@ -802,7 +802,7 @@
     }
     ctx.strokeStyle = 'rgba(255,255,255,.09)';
     for (let lon = 30; lon < 360; lon += 30) {
-      const x = Math.round(lon / 360 * W) + 0.5;
+      const x = Math.round(proj.xOfLonPic(lon, W)) + 0.5;
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
     }
     // The seam (world x = ±C/2) is the map's left and right edge.
@@ -878,7 +878,7 @@
     if (!pix) return null;
     const dn = displayIndex(r, p.cur), f = r.frames[dn];
     const li = r.layerIndex(f), name = f.layers[li], info = rampInfo(f.ramps && f.ramps[li]);
-    const px = Math.min(pix.w - 1, Math.floor((((lon % 360) + 360) % 360) / 360 * pix.w));
+    const px = Math.min(pix.w - 1, Math.floor(proj.xOfLonPic(proj.wrapLon(lon), pix.w)));
     const py = clamp(Math.floor(proj.yOfLat(lat, pix.h)), 0, pix.h - 1);
     const q = (py * pix.w + px) * 4;
     const rgb = [pix.d[q], pix.d[q + 1], pix.d[q + 2]];
@@ -901,7 +901,7 @@
     if (!ready(img) || !rinfo) return null;
     if (p.lakeImg !== img) { p.lakePix = pixels(img); p.lakeImg = img; }
     const pix = p.lakePix;
-    const px = Math.min(pix.w - 1, Math.floor((((lon % 360) + 360) % 360) / 360 * pix.w));
+    const px = Math.min(pix.w - 1, Math.floor(proj.xOfLonPic(proj.wrapLon(lon), pix.w)));
     const py = clamp(Math.floor(proj.yOfLat(lat, pix.h)), 0, pix.h - 1), q = (py * pix.w + px) * 4;
     return pix.d[q + 3] === 0 ? null : lakeKind(rinfo, [pix.d[q], pix.d[q + 1], pix.d[q + 2]], 150);
   }
@@ -1078,7 +1078,7 @@
   // The map's pixels for a lat/lon, as the event markers use them.
   function depView(p, f) {
     const c = p.canvas;
-    return { project: (lat, lon) => mapXY(lat, lon, f, c.width), ppdx: c.width / 360, ppdy: proj.yOfLat(0, c.height) - proj.yOfLat(1, c.height), worldW: c.width, dpr: window.devicePixelRatio || 1 };
+    return { project: (lat, lon) => mapXY(lat, lon, f, c.width), ppdx: proj.xOfLonPic(1, c.width), ppdy: proj.yOfLat(0, c.height) - proj.yOfLat(1, c.height), worldW: c.width, dpr: window.devicePixelRatio || 1 };
   }
   // The site whose forming event the inspector shows is the selected one.
   const depSelected = (p, r) => { const s = p.i === focus && selectedEvent ? r.deposits.byEvent.get(selectedEvent) : null; return s ? s.id : null; };

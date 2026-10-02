@@ -183,6 +183,15 @@ class ColumnParityTest {
         JsonObject p = doc.getAsJsonObject("projection");
         int c = doc.get("circumference").getAsInt();
         assertEquals(p.get("pole_z").getAsDouble(), Projection.poleZ(c), 1e-9, "the z of the poles");
+        // The extent and the spatial indexes' frame (river tiles, structure buckets, site index).
+        assertEquals(p.getAsJsonArray("extent").get(1).getAsDouble(), 2 * Projection.poleZ(c), 1e-9, "pole to pole");
+        assertTrue(Projection.onPlanet(c, Projection.poleZ(c)) && !Projection.onPlanet(c, Projection.poleZ(c) + 1), "the planet ends at the poles");
+        JsonArray origin = p.getAsJsonArray("index_origin");
+        assertEquals(origin.get(0).getAsDouble(), Projection.indexOriginX(c), 0.0, "index origin x");
+        assertEquals(origin.get(1).getAsDouble(), Projection.indexOriginZ(c), 0.0, "index origin z");
+        assertEquals(origin.get(0).getAsDouble(), (double) Projection.indexOriginBlockX(c), 0.0, "index origin x, blocks");
+        assertEquals(origin.get(1).getAsDouble(), (double) Projection.indexOriginBlockZ(c), 0.0, "index origin z, blocks");
+        assertEquals(p.getAsJsonArray("index_span").get(1).getAsDouble(), Projection.indexSpanZ(c), 0.0, "index span z");
         JsonArray points = p.getAsJsonArray("points");
         assertTrue(points.size() >= 100, points.size() + " points");
         for (JsonElement e : points) {
@@ -191,6 +200,7 @@ class ColumnParityTest {
             assertEquals(q.get(2).getAsDouble(), Projection.latitudeDeg(c, z), 1e-9, "latitude at " + q);
             double dl = Math.abs(q.get(3).getAsDouble() - Projection.longitudeDeg(c, x));
             assertTrue(Math.min(dl, 360 - dl) < 1e-9, "longitude at " + q + ": " + Projection.longitudeDeg(c, x));
+            assertEquals(q.get(4).getAsDouble(), Projection.areaScale(c, z), 1e-9, "area scale at " + q);
         }
         for (JsonElement e : p.getAsJsonArray("latitudes")) {
             JsonArray q = e.getAsJsonArray();
