@@ -476,3 +476,42 @@ Regime: unlike `plates/flags`, the regime field is populated on the last step of
 a resampling step (checked on a checkpoint); along margins its code changes in a cell-scale
 zigzag in about 1 % of cells. Its flicker from step to step was not measured on its own; a
 stiffness that drops shows in the released-moment share above.
+
+**Measured on the merged tree** (this branch merged with master 412d517; `earthlike_quick_16k`,
+test VM, 2 threads).
+
+Artifacts, 200 Myr, seeds 1–2 × both starts, mean [min, max] (`S=… LEN=200 tools/review/
+flexure-ensemble.sh off=…:surface.flexure.strength=0 fin=…`):
+
+| | elevation zigzag at margins | interior | polar band | land roughness p99 | sea roughness p99 |
+|---|---|---|---|---|---|
+| flexure off | 11.1 % [8.5, 12.9] | 1.15 % | 1.48 % [1.16, 1.77] | 237 m [177, 332] | 1,507 m |
+| first build (one planet; off there: 10.8 %, 1.50 %) | 19.3 % | 2.2 % | 1.57 % | 308 m | 2,109 m |
+| fixes 1 only (incremental), same ensemble | 12.8 % [10.4, 13.7] | 1.6 % | 3.45 % [1.43, 5.04] | 250 m | 1,796 m |
+| final (fixes 1–3) | 13.1 % [10.4, 15.0] | 1.54 % | 0.87 % [0.49, 1.27] | 274 m [123, 338] | 1,636 m |
+
+**The roughness, explained** (the 500 Myr pair below, the planet of the first complaint, 294 →
+391 m then): land roughness p99 289 m without, 372 m with. Away from coasts flexure makes the land
+smoother: land whose four neighbours are land has p99 271 m without and 225 m with (at margins
+563 → 451 m). The rise is all coast: coast cells within three cells of a plate boundary double
+(1,378 → 2,830), because arcs held up by the stiff plate's edge emerge as islands, and an island
+cell beside deep water reads as rough. 85 % of the roughest 1 % of land cells lie at margins with
+flexure (19 % without); a tenth of them zigzag. That is a change in where land is, not noise.
+
+**Run time**, the same planet with and without, side by side (500 Myr, supercontinent, seed 1):
+557 → 576 s, **+3.3 %**. The flexure step is 56 s (10 % of the run without it; 85–107 s before
+the fixes), 9.3 iterations a solve (20–24 before), none at the limit; the old isostasy (6 s) and
+most of the spreading solve (24 → 4 s) fall away.
+
+**Hypsometry**, 500 Myr, seeds 1–2 × both starts (`tools/review/p1-17-hyps.sh`), not recalibrated:
+
+| | land | median, m | p90, m | above 2 km | sea median, m | shelf share of sea | highest 1 % of land | highest cell |
+|---|---|---|---|---|---|---|---|---|
+| Earth | 0.289 | 427 | 2,022 | 0.102 | 4,062 | | | |
+| without | 0.299 [0.271, 0.340] | 578 [409, 724] | 1,927 | 0.097 | 3,408 [3,217, 3,925] | 0.115 | 4.0–4.8 km | 6.8 km |
+| with | 0.290 [0.252, 0.331] | 636 [598, 712] | 1,997 | 0.102 | 4,053 [3,755, 4,718] | 0.059 | 3.0–3.4 km | 5.0–5.3 km |
+
+**Not explained:** a few cells per planet stand far below their local-isostatic level (−11.8 km
+at one polar trench in the final build; the first build had −6.2 and −8.8 km on its planets). The
+share of the planet more than 500 m below is 0.55 % (first build 0.71 %).
+
