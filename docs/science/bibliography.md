@@ -3637,11 +3637,12 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Forsyth & Uyeda 1975, Geophys. J. R. Astron. Soc. 43:163-200".
 - Ledger ids: PLT-023, PLT-030, PLT-162, PLT-182, PLT-185, PLT-189, PLT-199
 - Access: paywalled (abstract only).
-- Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
+- Library (the project's source library, not distributed): fetched in WP-13a (publisher's free PDF, 38 pages, text layer). From: https://academic.oup.com/gji/article-pdf/43/1/163/1576393/43-1-163.pdf. Text file: ForsythUyeda1975.txt.
 - Substitute: none found.
 - Read so far (by the project): abstract only / secondary pages.
 - Read in this pass: abstract fetched (publisher page).
 - Reference check: citation correct. The journal title "Geophysical Journal of the Royal Astronomical Society" is the 1975 name (now Geophysical Journal International). The abstract does NOT contain the "3 to 4" speed ratio or any factor of 8 (see Part 2); those must come from the body or from another paper.
+- Read in WP-13a (2026-10-02): full text. Slab-attached plates 6-9 cm/yr, others 0-4 cm/yr, terminal velocity (p. 178); "no obvious relation between velocity and area" (p. 177, Fig. 5); slab pull and resistance an order of magnitude above the rest, drag under continents "approximately eight times" that under oceans (p. 189, Tables 5 and 6); continental viscosity "about eight times larger" (p. 194); Table 1 (areas, speeds, trench lengths) used to compute Earth statistics. Ledger: PLT-162, PLT-181 to PLT-189, PLT-197 to PLT-199, CHK-020 to CHK-027, CHK-056. The "3 to 4" is not a sentence of the paper (fix 18).
 
 ### Shepard1963
 - Reference: Shepard, F. P. (1963). Submarine Geology, 2nd ed. Harper & Row, New York.
@@ -3755,10 +3756,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: (PLT) "Bird 2003, G3 4(3):1027" (52 plates; Pacific 103.3 million km2; seven largest about 92 percent); editor hint "Earth: about 14". (CLM) "Bird 2003" (no title or journal in the code; I assigned this paper because the claim concerns subduction-zone length and rate)
 - Ledger ids: CLM-054, PLT-143, PLT-145, PLT-203
 - Access: open access (G3 is open), not fetched as full text here. [other sections: paywalled (Unpaywall closed)]
-- Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
+- Library (the project's source library, not distributed): fetched in WP-13a (full text PDF, author's site). From: http://peterbird.name/publications/2003_PB2002/2001GC000252.pdf. Text file: Bird2003.txt.
 - Read so far (by the project): (PLT) "confirmed from abstract or secondary pages"; areas from Wikipedia. (CLM) not stated; no title or journal given
 - Read in this pass: (PLT) abstract fetched (OpenAlex reconstruction). (CLM) search result snippet only (the citing passages returned were about regional plate boundaries and did not mention 51,000 km or 62 mm/yr)
 - Reference check: (PLT) correct. The abstract gives "14 large plates ... plus 38 small plates ... for a total of 52 plates". The area numbers and "seven largest 92 percent" are not in the abstract. (CLM) IDENTIFICATION UNCERTAIN. Bird 2003 is the PB2002 plate-boundary model; a total subduction length of 51,000 km at 62 mm/yr is plausible from it but I could not confirm it is in that paper.
+- Read in WP-13a (2026-10-02): Table 1 (areas in steradians): Pacific 2.57685 sr, 20.5 % of the sphere; seven plates above 5 %, together 81 % (not 92 %); Table 3 re-read: subduction 51,310 of 260,487 km (19.7 %). PLT-143, PLT-145, PLT-213, CHK-001, CHK-003.
 
 ### Morra2013
 - Reference: Morra, G., Seton, M., Quevedo, L., Müller, R. D. (2013). Organization of the tectonic plates in the last 200 Myr. Earth and Planetary Science Letters 373:93-101.
@@ -3806,6 +3808,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): abstract-only status in the ledger.
 - Read in this pass: full text fetched (targeted at cycle length and supercontinent dates).
 - Reference check: title/author/journal not named in the code; now identified.
+- Read in WP-13a (2026-10-02): full text again: "intervals of ca. 500 m.y."; Pangea c. 325-200 Ma, Rodinia c. 950-800 Ma, Pannotia c. 620-580 Ma. PLT-201, CHK-036.
 
 ### Mitchell2021
 - Reference: Mitchell, R. N., Zhang, N., Salminen, J., Liu, Y., Spencer, C. J., Steinberger, B., Murphy, J. B., Li, Z.-X. (2021). The supercontinent cycle. Nature Reviews Earth & Environment 2(5):358-374.
@@ -3813,10 +3816,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Mitchell et al. 2021, Nat. Rev. Earth Environ. 2:358-374".
 - Ledger ids: PLT-148, PLT-201
 - Access: paywalled.
-- Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://gfzpublic.gfz-potsdam.de/pubman/item/item_5006495. File: Mitchell2021.txt.
+- Library (the project's source library, not distributed): fetched in WP-13a (accepted manuscript, Curtin University; the landing page is kept as Mitchell2021_landing.txt). From: https://curate.curtin.edu.au/ndownloader/files/62792113. Text file: Mitchell2021.txt.
 - Read so far (by the project): abstract-only status.
 - Read in this pass: metadata only.
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): full text (accepted manuscript): a cycle "often considered to last 400-800 million years", ~600 Myr dominant; tenures "between 100 and 300 Myr". PLT-201, CHK-035, CHK-036.
 
 ### Copley2010
 - Reference: Copley, A., Avouac, J.-P., Royer, J.-Y. (2010). India-Asia collision and the Cenozoic slowdown of the Indian plate: implications for the forces driving plate motions. Journal of Geophysical Research 115(B3):B03410.
@@ -3829,6 +3833,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): not stated beyond section 3 remark.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: correct, and the abstract also contains the force magnitudes used elsewhere in the designs (Part 2).
+- Read in WP-13a (2026-10-02): abstract again: convergence "dropping from ~15 to ~4 cm/yr" between 50 and 35 Ma; Himalaya-Tibet resistance ~5-6 x 10^12 N/m; ridge push ~2.5 x 10^12 N/m; crustal thickening "the dominant cause". The Cambridge and HAL copies were not reachable or hold no file. PLT-154, PLT-177, PLT-187, PLT-200, CHK-037.
 
 ### DaviesvonBlanckenburg1995
 - Reference: Davies, J. H., von Blanckenburg, F. (1995). Slab breakoff: a model of lithosphere detachment and its test in the magmatism and deformation of collisional orogens. Earth and Planetary Science Letters 129(1-4):85-102.
@@ -3924,6 +3929,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): abstract-only status.
 - Read in this pass: abstract fetched (Crossref).
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): full text: uplift "reaching ~2.5 mm/yr in the northwestern Alps" (abstract); nothing on the Himalaya. PLT-180.
 
 ### Tremblay2015
 - Reference: Tremblay, M. M., Fox, M., Schmidt, J. L., Tripathy-Lang, A., Wielicki, M. M., Harrison, T. M., Zeitler, P. K., Shuster, D. L. (2015). Erosion in southern Tibet shut down at ~10 Ma due to enhanced rock uplift within the Himalaya. Proceedings of the National Academy of Sciences 112(39):12030-12035.
@@ -3935,6 +3941,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): abstract-only status.
 - Read in this pass: abstract fetched.
 - Reference check: identified by volume and first page; the paper is about erosion rates falling, while the design cites it for "exhumation above 1 mm/yr at 17-12 Ma" (not verifiable from the abstract).
+- Read in WP-13a (2026-10-02): full text: "rapid exhumation exceeding 1 km/Ma from 17-16 to 12-11 Ma" in southern Tibet. PLT-180.
 
 ### Schellart2004
 - Reference: Schellart, W. P. (2004). Quantifying the net slab pull force as a driving mechanism for plate tectonics. Geophysical Research Letters 31(7):L07611.
@@ -3947,6 +3954,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): abstract in full.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): abstract again (OpenAlex): net slab pull up to ~8-12 % of the slab's buoyancy, "up to twice as large as the ridge push force". Full text not obtainable (Wiley refuses scripts; the ANU record holds only a deposit record). PLT-182.
 
 ### ConradLB2002
 - Reference: Conrad, C. P., Lithgow-Bertelloni, C. (2002). How mantle slabs drive plate tectonics. Science 298(5591):207-209.
@@ -3959,6 +3967,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract.
 - Read in this pass: abstract fetched.
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): abstract again: upper-mantle slab pull "about half of the total driving force". No open copy found (UCL Discovery records 404, the lab page has no file). PLT-186.
 
 ### ConradLB2004
 - Reference: Conrad, C. P., Lithgow-Bertelloni, C. (2004). The temporal evolution of plate driving forces: importance of "slab suction" versus "slab pull" during the Cenozoic. Journal of Geophysical Research 109(B10):B10407.
@@ -3971,6 +3980,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract.
 - Read in this pass: abstract fetched (OpenAlex; reconstruction partly garbled, key sentence legible).
 - Reference check: correct. This abstract, not Forsyth & Uyeda, contains the "about 4 times faster" statement (Part 2).
+- Read in WP-13a (2026-10-02): abstract again: subducting plates "currently move ~4 times faster"; suction and pull about 40 and 60 % of the forces, suction ~30 % with a low-viscosity asthenosphere. Full text not obtainable (Wiley; Deep Blue refuses scripts). PLT-162, PLT-186, CHK-025, CHK-056.
 
 ### ConradLB2006
 - Reference: Conrad, C. P., Lithgow-Bertelloni, C. (2006). Influence of continental roots and asthenosphere on plate-mantle coupling. Geophysical Research Letters 33(5):L05312.
@@ -3978,10 +3988,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Conrad & Lithgow-Bertelloni 2006, GRL 33:L05312".
 - Ledger ids: PLT-188
 - Access: open copy at Wiley (bronze), abstract read here.
-- Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
+- Library (the project's source library, not distributed): fetched in WP-13a (4 pages, text layer). From: https://discovery.ucl.ac.uk/id/eprint/146995/1/2005GL025621.pdf. Text file: ConradLB2006.txt.
 - Read so far (by the project): from abstract.
 - Read in this pass: abstract fetched.
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): full text: continental roots "increase traction magnitudes by a factor of 2-5 compared to 100 km thick lithosphere" (abstract and section 3). PLT-188 verified.
 
 ### LithgowBertelloniRichards1998
 - Reference: Lithgow-Bertelloni, C., Richards, M. A. (1998). The dynamics of Cenozoic and Mesozoic plate motions. Reviews of Geophysics 36(1):27-78.
@@ -3989,11 +4000,12 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Lithgow-Bertelloni & Richards 1998, Rev. Geophys. 36:27-78".
 - Ledger ids: PLT-187
 - Access: paywalled (abstract).
-- Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
+- Library (the project's source library, not distributed): fetched in WP-13a (52 pages, text layer). From: https://discovery.ucl.ac.uk/id/eprint/125253/1/97RG02282.pdf. Text file: LithgowBertelloniRichards1998.txt.
 - Substitute: none found.
 - Read so far (by the project): from abstract.
 - Read in this pass: abstract fetched (Crossref JSON).
 - Reference check: correct. (The 1995 GRL paper 22:1317-1320, same authors, has the same ">90 % slabs, <10 % lithospheric thickening" statement.)
+- Read in WP-13a (2026-10-02): full text: slabs "in excess of 90 %" of the driving forces, lithospheric thickening "of the order of 10 %" (abstract and conclusions). PLT-187.
 
 ### Carlson1983
 - Reference: Carlson, R. L., Hilde, T. W. C., Uyeda, S. (1983). The driving mechanism of plate tectonics: relation to age of the lithosphere at trenches. Geophysical Research Letters 10(4):297-300.
@@ -4006,6 +4018,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract.
 - Read in this pass: abstract fetched (Crossref).
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): abstract again (OpenAlex): speed against age at the trench, r^2 0.98 over 15 trenches; ridge push "just sufficient to overcome drag". Full text not obtainable. PLT-182.
 
 ### ParsonsRichter1980
 - Reference: Parsons, B., Richter, F. M. (1980). A relation between the driving force and geoid anomaly associated with mid-ocean ridges. Earth and Planetary Science Letters 51(2):445-450.
@@ -4018,6 +4031,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract.
 - Read in this pass: metadata only.
 - Reference check: title now identified; correct.
+- Read in WP-13a (2026-10-02): not obtainable (no abstract, no open copy). Its 3 x 10^12 N/m stays unread; Copley et al. 2010's abstract gives ridge push ~2.5 x 10^12 N/m (PLT-187).
 
 ### vanHunenAllen2011
 - Reference: van Hunen, J., Allen, M. B. (2011). Continental collision and slab break-off: a comparison of 3-D numerical models with observations. Earth and Planetary Science Letters 302(1-2):27-37.
@@ -4030,6 +4044,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract.
 - Read in this pass: metadata only.
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): text not obtainable (Durham's repository refuses scripts). The break-off times are read in the same group's EGU 2011 abstract (vanHunen2011EGU, below). PLT-184.
 
 ### Zahirovic2015
 - Reference: Zahirovic, S., Müller, R. D., Seton, M., Flament, N. (2015). Tectonic speed limits from plate kinematic reconstructions. Earth and Planetary Science Letters 418:40-52.
@@ -4037,10 +4052,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: "Zahirovic et al. 2015, EPSL 418:40-52".
 - Ledger ids: PLT-025, PLT-198
 - Access: paywalled (closed; OpenAlex has no open URL and no abstract).
-- Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://www.earthbyte.org/tectonic-speed-limits-from-plate-kinematic-reconstructions/. File: Zahirovic2015.txt.
+- Library (the project's source library, not distributed): fetched in WP-13a (accepted manuscript, 39 pages, text layer; the landing page is kept as Zahirovic2015_landing.txt). From: https://ro.uow.edu.au/ndownloader/files/50501994. Text file: Zahirovic2015.txt.
 - Read so far (by the project): link given.
 - Read in this pass: metadata only (Crossref). Speed numbers could not be read.
 - Reference check: correct.
+- Read in WP-13a (2026-10-02): full text (accepted manuscript): median RMS plate speed ~4 cm/yr over 200 Myr, 4.2 over 3,952 samples; global RMS ~5-10 cm/yr (section 3.2); category medians: no subduction 2.6, over 25 % subducting 7.9, over 50 % continental 2.8, under 25 % continental 8.1 cm/yr (section 3.5); oceanic plates "2-3 times faster" (abstract); present RMS Antarctica 1.1, Africa 2.0, Pacific 7.9 cm/yr. PLT-181, PLT-190, PLT-197 to PLT-199, CHK-020 to CHK-025.
 
 ### DeCellesGiles1996
 - Reference: DeCelles, P. G., Giles, K. A. (1996). Foreland basin systems. Basin Research 8(2):105-123.
@@ -4053,6 +4069,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): (PLT) via a secondary source. (ISO) full text by a Sonnet sub-agent of the flexure agent on 2026-10-02: "Foredeep depozones are typically 100-300 km wide and 2-8 km thick"; forebulges 60-470 km wide and a few tens to a few hundred metres high, as a flexural prediction.
 - Read in this pass: (PLT) abstract fetched (Crossref, first part). (ISO) not part of stage 1; see "Read so far".
 - Reference check: (PLT) correct. The visible part of the abstract defines depozones; the 100-300 km and 2-8 km figures were not seen. (ISO) correct; this settles what stage 1 could not see.
+- Read in WP-13a (2026-10-02): full text again: foredeeps "typically 100-300 km wide and 2-8 km thick"; forebulges "of the order of 60-470 km wide". PLT-194, CHK-039, CHK-040.
 
 ### TurcotteSchubert_Geodynamics
 - Reference: Turcotte, D. L., Schubert, G. Geodynamics. Cambridge University Press (editions 1982, 2002, 2014).
@@ -4064,6 +4081,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): not read; gross slab pull "not confirmed in Turcotte & Schubert itself". For the flexure feature (2026-10-02) a sub-agent read chapter 3 as a PDF (https://sseh.uchicago.edu/doc/Geodynamics_Turcotte_Schubert_ch_3.pdf: E = 70 GPa and ν = 0.25 in the periodic-loading example, 100 GPa elsewhere) and the flexure formulas in lecture notes on the chapter (https://topex.ucsd.edu/geodynamics/12flexure.pdf); the edition of that PDF was not recorded.
 - Read in this pass: not fetched; a 2024 paper that cites it was read (see Li2024).
 - Reference check: edition not stated anywhere in the code or designs; the numbers depend on the edition and chapter.
+- Read in WP-13a (2026-10-02): not read. Its slab-pull law is read as Faccenna et al. 2012's eq. 1, which follows Turcotte & Schubert 1982 (PLT-182, PLT-183). A course directory's copy of a chapter was found and not used: it is not an author's or publisher's copy.
 
 ### Buck2004
 - Reference: Buck, W. R. (2004). Consequences of asthenospheric variability on continental rifting. In: Karner, G. D., Taylor, B., Driscoll, N. W., Kohlstedt, D. L. (eds.), Rheology and Deformation of the Lithosphere at Continental Margins, Columbia University Press, pp. 1-30.
@@ -4121,6 +4139,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from abstract.
 - Read in this pass: abstract fetched (Crossref).
 - Reference check: correct. The abstract does give "extensional stress of 20-50 MPa in its interior" for a homogeneous supercontinent, matching the design.
+- Read in WP-13a (2026-10-02): no full text (the Curtin record has no file; Wiley refuses scripts). PLT-196 stays abstract-only.
 
 ### DavisSuppeDahlen1983
 - Reference: Davis, D., Suppe, J., Dahlen, F. A. (1983). Mechanics of fold-and-thrust belts and accretionary wedges. Journal of Geophysical Research 88(B2):1153-1172.
@@ -4133,6 +4152,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): from memory, not checked.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: the citation is correct (authors, year, volume, pages; issue B2). The paper's title was missing in the design. The abstract concerns critical taper and gives no taper angle in degrees.
+- Read in WP-13a (2026-10-02): abstract (OpenAlex): a critical wedge "slides stably, continuing to grow at constant taper"; Taiwan's surface slope and basal dip are in the body, not read (Wiley). Dahlen 1990 (Annu. Rev. Earth Planet. Sci. 18:55-99) is closed too. The Himalayan figures come from DeCelles & Carrapa 2021 instead. PLT-192.
 
 ### Christensen_Mooney1995
 - Reference: Christensen, N. I., Mooney, W. D. (1995). Seismic velocity structure and composition of the continental crust: a global view. Journal of Geophysical Research 100(B6):9761-9788.
@@ -4152,10 +4172,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Cited as: not cited by the project; the earth file's "mean 64 Myr" for sea-floor age needs a source.
 - Ledger ids: (supports 201 and the run review); notes: supports 201 and the run review
 - Access: open access.
-- Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
+- Library (the project's source library, not distributed): fetched in WP-13a as data: the GMT remote server's grid earth_age_06m_p.grd (6 arc-minute, "EarthByte Earth Seafloor Age [Seton et al., 2020]") with the server's listing earth_age_server.txt. From: https://oceania.generic-mapping-tools.org/server/earth/earth_age/. Folder: Seton2020_earth_age.
 - Read so far (by the project): not read.
 - Read in this pass: abstract fetched (Crossref, full).
 - Reference check: n/a.
+- Read in WP-13a (2026-10-02): the grid, area-weighted by cos(latitude) over the 58 % of the sphere it covers (computed): median 55.4 Myr, mean 64.1, 90th percentile 133, 99th 173, oldest 339 Myr; 0.61 % older than 180 Myr and 0.06 % older than 250. Ledger: PLT-161, PLT-201, CHK-019, CHK-032 to CHK-034. The paper itself was not read.
 
 ### SyracuseAbers2006
 - Reference: Syracuse, E. M., Abers, G. A. (2006). Global compilation of variations in slab depth beneath arc volcanoes and implications. Geochemistry, Geophysics, Geosystems 7(5):Q05017.
@@ -4936,6 +4957,41 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read so far (by the project): full text by a Sonnet sub-agent of the flexure agent on 2026-10-02: "Foredeep depozones are typically 100-300 km wide and 2-8 km thick"; forebulges 60-470 km wide and a few tens to a few hundred metres high, as a flexural prediction.
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct; this settles what stage 1 could not see.
+
+
+## Force-balance plate motion: sources added in WP-13a (2026-10-02)
+
+### FaccennaBecker2012
+- Reference: Faccenna, C., Becker, T. W., Lallemand, S., Steinberger, B. (2012). On the role of slab pull in the Cenozoic motion of the Pacific plate. Geophysical Research Letters 39(3):L03305.
+- DOI or URL: 10.1029/2011GL050155; author's preprint https://twb.ig.utexas.edu/preprints/fbls11.pdf.
+- Ledger ids: PLT-182, PLT-183, PLT-184.
+- Access: open copy (author's preprint, the published layout).
+- Library (the project's source library, not distributed): fetched (PDF, text layer). Text file: FaccennaBecker2012.txt.
+- Read in WP-13a (2026-10-02): eq. 1, F_sp = 0.25 drho g l 2.32 (kappa A)^(1/2) "following Turcotte and Schubert [1982]", slab length l "assumed constant at 700 km", drho 70 kg/m3, g about 10 m/s2, kappa 1e-6 m2/s, the 0.25 for the slab's heating after Carlson et al. 1983.
+
+### DeCellesCarrapa2021
+- Reference: DeCelles, P. G., Carrapa, B. (2021). Coupled rapid erosion and foreland sedimentation control orogenic wedge kinematics in the Himalayan thrust belt of central Nepal. Journal of Geophysical Research: Solid Earth 126(5):e2020JB021256.
+- DOI or URL: 10.1029/2020JB021256; NSF public access copy https://par.nsf.gov/servlets/purl/10229963.
+- Ledger ids: PLT-192.
+- Access: open copy (NSF Public Access Repository).
+- Library (the project's source library, not distributed): fetched (PDF, text layer). Text file: DeCellesCarrapa2021.txt.
+- Read in WP-13a (2026-10-02): section 2.4.1 and the conclusions: Lesser Himalayan surface slopes about 0.4-1.6 deg, total taper 6-7.5 deg; foredeep total taper 2.6-3.1 deg; Greater Himalaya surface slopes 5.3-15.8 deg.
+
+### vanHunen2011EGU
+- Reference: van Hunen, J., Faccenna, C., Allen, M. (2011). Slab break-off and applications to Tethys subduction. Geophysical Research Abstracts 13, EGU2011-6298 (EGU General Assembly 2011).
+- DOI or URL: https://meetingorganizer.copernicus.org/EGU2011/EGU2011-6298.pdf.
+- Ledger ids: PLT-184.
+- Access: open (conference abstract).
+- Library (the project's source library, not distributed): fetched (PDF, text layer). Text file: vanHunen2011EGU.txt.
+- Read in WP-13a (2026-10-02): the whole abstract: an old, strong slab breaks off "at 20-25 Myr after the first onset of continental collision", young or weak slabs "already 10 Myr after"; slabs rest on the mantle's "viscosity increase across 660 km". It stands in for van Hunen & Allen 2011 (EPSL), whose text could not be obtained.
+
+### SchmalholzMancktelow2016
+- Reference: Schmalholz, S. M., Mancktelow, N. S. (2016). Folding and necking across the scales: a review of theoretical and experimental results and their applications. Solid Earth 7:1417-1465.
+- DOI or URL: 10.5194/se-7-1417-2016 (open access, CC BY 3.0).
+- Ledger ids: PLT-187 (secondary for Molnar & Lyon-Caen 1988).
+- Access: open access.
+- Library (the project's source library, not distributed): already present under the key Schmalholz2016 (added by another package). Text file: Schmalholz2016.txt.
+- Read in WP-13a (2026-10-02): the passage citing Molnar & Lyon-Caen 1988 for a horizontal driving force "of ~7 x 10^12 N m-1" in Tibet.
 
 ## Plate-check boundary mix and arc heights (PLT-213 to PLT-221)
 
