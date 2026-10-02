@@ -124,6 +124,18 @@ public final class BiomeCensus {
      *                JSON with base64 arrays, or null
      */
     public static Result run(ServerLevel level, int step, int poleMargin, Path mapFile) throws IOException {
+        return run(level, step, poleMargin, mapFile, java.util.Set.of());
+    }
+
+    /**
+     * As {@link #run(ServerLevel, int, int, Path)}, leaving out of the tag checks the columns whose biome
+     * belongs to one of {@code untaggedNamespaces}: a mod whose biomes do not carry the {@code c:} climate
+     * and vegetation tags the checks count (Biomes O' Plenty's regions follow the geologic provinces since
+     * P1-10, so which provinces hold its biomes decides these shares, not Deep Time's mapping). The
+     * columns are counted under {@code skipped_untagged} in the census.
+     */
+    public static Result run(ServerLevel level, int step, int poleMargin, Path mapFile, java.util.Set<String> untaggedNamespaces)
+            throws IOException {
         if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g) || !(g.terrain() instanceof WorldDataTerrain t))
             throw new IllegalStateException(level.dimension().location() + " is not a Deep Time level on world data");
         WorldData wd = t.data();
@@ -145,6 +157,7 @@ public final class BiomeCensus {
         for (Forbid f : FORBIDDEN)
             forbidden.put(f.name(), new int[2]);
         Map<Integer, Map<Integer, Integer>> classBiomes = new HashMap<>();
+        int skippedUntagged = 0;
         for (int j = 0; j < h; j++) {
             int z = -c / 4 + step / 2 + j * step;
             for (int i = 0; i < w; i++) {
@@ -170,7 +183,11 @@ public final class BiomeCensus {
                 height[cell] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(y)));
                 if (Math.abs(z) > c / 4 - poleMargin)
                     continue;
-                if (k == 31 ? y < sea - 4 : land) {
+                boolean untagged = !untaggedNamespaces.isEmpty()
+                        && untaggedNamespaces.contains(b.unwrapKey().map(key -> key.location().getNamespace()).orElse("?"));
+                if (untagged && (k == 31 ? y < sea - 4 : land))
+                    skippedUntagged++;
+                if (!untagged && (k == 31 ? y < sea - 4 : land)) {
                     for (Check ch : CHECKS) {
                         if (!ch.koppen().test(k))
                             continue;
@@ -247,6 +264,7 @@ public final class BiomeCensus {
         }
         o.add("by_koppen", top);
         o.addProperty("biomes", palette.size());
+        o.addProperty("skipped_untagged", skippedUntagged);
         if (mapFile != null) {
             JsonObject map = new JsonObject();
             map.addProperty("schema", 1);

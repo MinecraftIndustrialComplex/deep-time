@@ -14,7 +14,7 @@ The crust floats on the denser mantle: thick or light crust stands high, thin or
 | [ISO](ledger/ISO.md) | sea level | ISO-033 to ISO-039 (7) |
 | [ISO](ledger/ISO.md) | lithospheric flexure (its own page: [flexure.md](flexure.md)) | ISO-040 to ISO-068 (29) |
 
-Rows by status: `verified` 3, `cited-unverified` 8, `abstract-only` 6, `calibrated` 6, `game-choice` 15, `uncited` 30.
+Rows by status (66 active, 2 `merged`): `verified` 3, `cited-unverified` 8, `abstract-only` 6, `calibrated` 6, `game-choice` 13, `uncited` 30.
 
 ## Material for the stage 2 writer
 

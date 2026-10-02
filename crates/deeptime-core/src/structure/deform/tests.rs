@@ -342,3 +342,82 @@ fn structures_are_grouped_by_what_made_them() {
     plug.kind = Kind::Plug;
     assert!(super::groups(&[plug], 4096.0, 300.0, 20.0).is_empty());
 }
+
+/// The densest case: hundreds of folds and faults over one place (a belt that stayed active for
+/// the whole history). One Noddy history holds 127 events; the check undoes such a column as a
+/// chain of histories and still agrees with the column rule, and the column rule itself has no
+/// limit.
+#[test]
+fn a_place_with_more_structures_than_one_noddy_history_holds() {
+    let mut rng = Rng::stream(77, "structure/deform/tests/dense");
+    let mut features: Vec<Feature> = (0..420u32)
+        .map(|id| {
+            let fold = id % 3 == 0;
+            let length = 90.0 + 120.0 * rng.uniform();
+            Feature {
+                id,
+                kind: if fold {
+                    Kind::FoldTrain
+                } else if id % 3 == 1 {
+                    Kind::Thrust
+                } else {
+                    Kind::Normal
+                },
+                x: -30.0 + 60.0 * rng.uniform(),
+                z: -30.0 + 60.0 * rng.uniform(),
+                plate: 0,
+                t_myr: -(900.0 * rng.uniform()) as f32,
+                azimuth_deg: (360.0 * rng.uniform()) as f32,
+                half_along: if fold { 260.0 } else { (0.5 * length) as f32 },
+                half_across: if fold { 120.0 } else { (0.4 * length) as f32 },
+                wavelength: 60.0,
+                amplitude: if fold { 2.0 } else { 0.0 },
+                phase: rng.uniform() as f32,
+                dip_deg: if id % 3 == 1 { 30.0 } else { 60.0 },
+                slip: if fold {
+                    0.0
+                } else if id % 3 == 1 {
+                    -1.5
+                } else {
+                    1.5
+                },
+                cause: 0,
+                adrift: 0,
+                wear_m: 0.0,
+                rise: 0.0,
+                depth: 0.0,
+                rock: 0,
+            }
+        })
+        .collect();
+    undo_order(&mut features);
+    let st = finish(&features, |_, _| 70.0, test_key, -64.0);
+    let index = StructIndex::new(&st, 4096);
+    let sample: Vec<(f64, f64)> = (0..25)
+        .map(|k| (f64::from(k % 5) * 9.0 - 18.0, f64::from(k / 5) * 9.0 - 18.0))
+        .collect();
+    let check = lattice::noddy_check(&features, &st, &index, &sample, -352.0, 640.0, 16.0);
+    assert_eq!(check.columns_with_events, 25);
+    assert_eq!(check.max_history, 420, "every structure reaches the middle");
+    assert_eq!(check.long_histories, 25);
+    assert!(check.worst < 1e-4, "{check:?}");
+    assert!(check.side_flips * 1000 < check.points, "{check:?}");
+    // The column rule on the same columns: every structure a candidate, the column in pieces,
+    // each piece's rock from somewhere finite.
+    let (mut cand, mut segs) = (Vec::new(), Vec::new());
+    for &(x, z) in &sample {
+        index.candidates(&st, x, z, &mut cand);
+        assert_eq!(cand.len(), 420);
+        st.column(&cand, x, z, 4096.0, &mut segs);
+        assert!(
+            segs.len() > 1 && segs.len() < 2000,
+            "{} segments",
+            segs.len()
+        );
+        assert!(segs.windows(2).all(|w| w[0].y_hi == w[1].y_lo));
+        assert!(
+            segs.iter()
+                .all(|g| g.dy.is_finite() && g.x.is_finite() && g.z.is_finite())
+        );
+    }
+}
