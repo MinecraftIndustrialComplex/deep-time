@@ -181,8 +181,14 @@ public final class BiomeGameTests {
     // BS 0.496-0.659, C 0.850-0.970, D 0.989-1.0, Dsub 0.914-0.951, E 0.964-1.0, sea 1.0,
     // BW:desert 0.568-0.616, Af:jungle 0.585, Dfc:taiga 0.57-0.92, E:snow 0.776-0.988. Floors are 0.1 under the lowest of these or the standalone
     // floor, whichever is lower: BS 0.39, E:snow 0.67.
+    // Re-measured after the merge with meteor impacts and the grid audit (the planets changed again; planets
+    // 11-17, families with at least MIN_COLUMNS_TB columns, lowest-highest): A 0.717-0.98, Af 0.985-1.0,
+    // BW 0.756-0.758, BS 0.527-0.733, C 0.848-0.97, D 1.0, Dsub 0.797-0.934, E 0.953-1.0, sea 1.0,
+    // BW:desert 0.569-0.605, Af:jungle 0.489, Dfc:taiga 0.65, E:snow 0.751-0.957. Two of them came within 0.1 of a
+    // floor, so with the first set's lowest taken in too: E:snow 0.65 (lowest 0.751) and Af:jungle 0.39
+    // (lowest 0.489); BS keeps 0.39 (lowest 0.496 of the first set).
     static final int MIN_COLUMNS_TB = 100;
-    static final Map<String, Double> FLOORS_TB = Map.of("BS", 0.39, "E:snow", 0.67);
+    static final Map<String, Double> FLOORS_TB = Map.of("BS", 0.39, "E:snow", 0.65, "Af:jungle", 0.39);
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
 

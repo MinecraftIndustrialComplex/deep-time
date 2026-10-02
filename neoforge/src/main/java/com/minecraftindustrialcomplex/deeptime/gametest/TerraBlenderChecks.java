@@ -36,7 +36,7 @@ final class TerraBlenderChecks {
     /** What one run over a level found. */
     record Result(int samples, int provincesSeen, int regionsSeen, int outsideItsRegion, int perProvinceMismatch,
                   int landSamplesInModRegions, Map<String, Integer> landByNamespace, Map<Integer, Integer> provincesByRegion,
-                  String firstProblem) {}
+                  String firstProblem, int chunkSamples, int chunkOutside, int chunkModBiomes) {}
 
     /**
      * Samples a {@code cols × rows} grid of surface columns. For each: the province, the region its
@@ -117,7 +117,27 @@ final class TerraBlenderChecks {
                     first = "province " + e.getKey() + " names region " + name + " (index " + want + ") but the source says " + e.getValue();
             }
         }
+        // The biomes a chunk stores when it is generated (its own climate sampler, built from the registry
+        // settings unless RegionChunkBiomesMixin hands it the level's) are offered by their column's region.
+        int chunkSamples = 0, chunkOutside = 0, chunkMod = 0;
+        int minY = level.getMinBuildHeight(), maxY = level.getMaxBuildHeight() - 1;
+        for (int k = 0; k < 64; k++) {
+            int x = -c / 2 + (int) ((k + 0.5) * c / 64.0);
+            int z = -c / 4 + (int) ((((k * 29) % 64) + 0.5) * (c / 2.0) / 64.0);
+            int y = (int) Math.max(minY, Math.min(maxY, Math.floor(t.height(x, z))));
+            var chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, net.minecraft.world.level.chunk.status.ChunkStatus.BIOMES, true);
+            var key = chunk.getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z)).unwrapKey().orElseThrow();
+            int region = src.regionAt(x, z);
+            chunkSamples++;
+            if (!key.location().getNamespace().equals("minecraft"))
+                chunkMod++;
+            if (!offered.getOrDefault(region, vanilla).contains(key) && !vanilla.contains(key)) {
+                chunkOutside++;
+                if (first == null)
+                    first = "generated chunk biome " + key.location() + " at (" + x + "," + z + ") is not offered by region " + region;
+            }
+        }
         return new Result(samples, regionOfProvince.size(), provincesByRegion.size(), outside, mismatch, land, byNamespace,
-                provincesByRegion, first);
+                provincesByRegion, first, chunkSamples, chunkOutside, chunkMod);
     }
 }
