@@ -94,6 +94,66 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P3-04 | **The switch.** Far terrain is on whenever Distant Horizons is installed; off with `-Ddeeptime.dh=false`. Make it a setting (server config or the editor), and on or off by default? Recommended: on by default, a server config key when the config file next changes. | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-02 — `plate-check`: the additions that need no new physics (task 1b of the force-balance design; agent worktree agent-ae6e5f954f5374acc, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What.** Measurement only; no plate, collision or surface rule changed. `plates/dynamics.rs` (record version 2) now keeps,
+  per plate and step: the change of the rotation vector since the previous step (`|Ω−Ω_prev|/|Ω_prev|`), whether the pole
+  lies on the plate (the visible sample nearest to either end of the axis is the plate's), whether it lies within 30° of
+  the plate's centroid (spinning), and whether the speed guard holds the plate (rotation at the cap; `PlateStep` is now the
+  array `[id, visible, continental, speed, front, boundary, rot_change, flags]`). Per step: the sea floor's median and
+  90th-percentile age and the counts older than 180 and 250 Myr (**every step**: one sort of the oceanic ages, no
+  measurable cost; the histogram stays at 10 Myr), and the sizes of the 16 largest connected pieces of continental crust
+  (lattice edges whose ends are still within 2 sample spacings, so a rift's fragments stop being one piece within a few
+  steps). `record_step` takes the samples' positions (the only change outside the record, the check and the CLI: `mod.rs` passes `&pos`).
+  `plates/check.rs`: 17 new ranged measures with the force-balance design's section 7 targets (area-weighted RMS speed;
+  speed 10th/50th/90th percentile; oceanic ÷ continental and on-slab ÷ free median speed; Spearman rank correlation of speed
+  with slab share and with area; plate-steps above 150 mm/yr; steps on which the guard binds (target 0, so the check fails
+  whenever it binds); rotation change median and 90th percentile; sea-floor median age and share older than 180 and 250 Myr;
+  supercontinent tenure and assembly-to-assembly period), 15 reported ones (spinning and pole-inside shares, continental
+  pieces and largest share, assemblies and time assembled, rifts of a plate above 40 %, how long it stayed so, and whether the
+  fragments are still apart 50 Myr later, strict and lenient, the continental extremes over all steps, the guard's plate-steps)
+  and 8 placeholder rows for physics not built (`MeasureDef::pending`, `Status::Pending`, "no data", never fails): convergence
+  20 Myr after onset ÷ at onset (0.2-0.6), wedge width (100-350 km), foredeep width (150-450 km) and depth (2-7 km), pull share
+  of the driving torque, mean in-plane stress and tension share of a plate above 40 %, slab length per contact. They read empty
+  record fields that the later tasks fill (`StepRec::forces: Vec<PlateForces>`, `StepRec::slabs_km`, `Dynamics::belts:
+  Vec<BeltRec>`; a test fills them and the rows light up and are judged). The definitions are `check::Params` (assembled 70 %,
+  dispersed under 50 %, mega-plate 40 %, plates of 30+ samples, 150 mm/yr, warm-up 100 Myr, start-up 10 Myr, piece 1 %, rift
+  window 50 Myr), set by `plate-check --param name=value` (repeatable), `PARAMS="…"` in `plate-check.sh`, or a `"params"` object
+  in the targets file; the table prints them. The checkpoint's postcard cannot skip fields, so the empty vectors are written.
+- **The three open readings, settled** (docs/design/plate-check-baseline.md): continental crust judged on the lowest and
+  highest step after the first 10 Myr (extremes over all steps reported; the start-up is not the cause, highest step is 0.48
+  either way); ocean-floor age judged as the mean over the run after 100 Myr of the per-step 90th percentile (the last step's
+  value reported; the snapshot is noisy, 208-269 across seeds); collision length first step to last step inclusive, not from
+  contact onset, and `CollisionRec::start_myr`/`end_myr` documented as first and last step (`collision.rs`/`subduction.rs`
+  not touched).
+- **Baseline** (master 38ca6b0 + 1 + 1b; `earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1-4, `stage volcanoes`):
+  docs/design/plate-check-baseline.md. 10 of 36 ranged targets met (collisions design 4 of 19, force-balance additions 6 of
+  17), 8 rows wait for physics. Every figure of the first baseline reproduces to the digit; the new rows agree with the
+  force-balance design's "Now" for speed percentiles (40/73/85), the oceanic/continental and slab/free speed ratios (1.64,
+  1.61), rotation change (4.9 %/9.0 %), sea-floor age and the old-floor shares. New findings: the speed guard (100 mm/yr on a
+  plate's fastest point) binds in 369 of 500 steps; the supercontinent (70 %/50 %) lasts a median 45 Myr and comes back after
+  76 Myr, ten assemblies a run; a plate above 40 % of the planet is split by a rift after 18 Myr, 19 times a run, and 94 % of
+  those rifts see a fragment rejoin within 50 Myr.
+- **Cost.** The same 300 Myr run with and without the record (`DEEPTIME_NO_PLATE_DYNAMICS=1`), run at the same time on the
+  test VM: wall 341.9 vs 343.0 s and CPU 539.3 vs 542.2 s (seed 1), 310.4 vs 309.3 s and 488.3 vs 488.8 s (seed 2): within
+  0.5 %. (A first attempt with different seeds side by side differed by 15 %: the machine is shared.) Record 0.95-1.09 MB of
+  JSON per 1000 Myr run (task 1: 0.9), kept in `manifest.json`.
+- **Seed 1 and the structure stage.** On master `stage volcanoes` seed 1, supercontinent, 1000 Myr panics in the structure
+  stage ("a history holds at most 128 events, the base stratigraphy included", `deeptime-noddy/src/history.rs:108`; P2-01 stage
+  B). Not fixed here. The baseline's seed 1 ran with `structure.deformation.density=0`, which cannot change the plate record
+  (nothing the plates read comes from the structure stage; seed 2 gives an identical `plate-check --json` with and without it).
+- **Tooling.** `tools/remote/detach.sh start` no longer keeps the calling `mac.sh` waiting for the job: the job inherited the
+  ssh session's descriptors (a nix lock file and a socket); the job's shell now closes descriptors 3-9 first (a 45 s job: the
+  call returns in 6 s instead of 49 s).
+- **Gates** (VM): cargo fmt --check clean, clippy --workspace --all-targets -D warnings clean, `cargo test --workspace`
+  642 passed / 0 failed / 3 ignored, `cargo deny check licenses bans` ok, `./gradlew build test` BUILD SUCCESSFUL, JUnit tests=200 failures=0 skipped=1. No GameTests (nothing the game reads
+  changed except the size of `notes.plates.dynamics` in the manifest).
+- **Not verified.** The pole test is a nearest-sample test, checked on synthetic inputs and for consistency with the state, not
+  against an independent trace; the design's "0.5-2 % turning about a pole near themselves" has no definition, so the
+  spinning share (6.3 %) is not compared with it. The review's 360 and 650 Myr supercontinent figures have no definition
+  either. Full presets (250,000 samples) were not run: the pole scan is 2 × plates dot products per sample and the pieces are one
+  pass over the lattice edges, a few ms a step by estimate.
+- **Next.** Task 2 (real shortening and the collision state) keeps `CollisionRec`'s `start_myr`/`end_myr` as first and last
+  step and may fill `Dynamics::belts`; task 5 fills `StepRec::forces` and `slabs_km`. Someone owns the structure-stage panic.
 ### 2026-10-02 — Force-balance plate motion: design (agent worktree agent-a4560e6e131ce6cbd, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; design only, nothing built)
 - **Why.** Ben's decisions of 2026-10-02 on the collisions design: full force-balance motion; nothing designed for the
   mega-plate yet; both sides of a suture rise, with a foreland basin; the start-up land jump is a separate task.

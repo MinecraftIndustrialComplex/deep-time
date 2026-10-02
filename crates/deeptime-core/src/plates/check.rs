@@ -605,6 +605,13 @@ pub const MEASURES: &[MeasureDef] = &[
         None,
     ),
     m(
+        "spinning_pct",
+        "Plate-steps turning about a pole within 30° of their own centroid (design: near themselves)",
+        "%",
+        None,
+        None,
+    ),
+    m(
         "continent_pieces_p50",
         "Connected pieces of continental crust (of 1 % or more of it), median over steps",
         "pieces",
@@ -655,7 +662,14 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "megaplate_rift_apart_50_pct",
-        "Rifts of such a plate whose fragments are all still separate 50 Myr later",
+        "Rifts of such a plate whose fragments are all still separate 50 Myr later (strict)",
+        "%",
+        None,
+        None,
+    ),
+    m(
+        "megaplate_rift_split_50_pct",
+        "Rifts of such a plate not healed whole: two plates or more still hold its crust 50 Myr later",
         "%",
         None,
         None,
@@ -1498,6 +1512,14 @@ fn plate_motion(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str
     put("rot_change_p50_pct", pct(&change, 0.5));
     put("rot_change_p90_pct", pct(&change, 0.9));
     put(
+        "spinning_pct",
+        if big.is_empty() {
+            f64::NAN
+        } else {
+            100.0 * big.iter().filter(|p| p.spinning).count() as f64 / big.len() as f64
+        },
+    );
+    put(
         "pole_inside_pct",
         if big.is_empty() {
             f64::NAN
@@ -1640,9 +1662,12 @@ pub struct MegaRift {
     /// How long it had been above the share, Myr (from the start of the first step above it, or
     /// of the run, to the rift).
     pub held_myr: f64,
-    /// Whether its fragments were all still separate `window_myr` later (`None`: the run ends
-    /// before that).
+    /// Whether its fragments were all still separate `window_myr` later: none had welded into
+    /// another (`None`: the run ends before that). The strict reading.
     pub apart: Option<bool>,
+    /// Whether at least two plates still held its crust `window_myr` later: the rift was not
+    /// healed whole, though some fragments may have rejoined. The lenient reading.
+    pub split: Option<bool>,
 }
 
 /// The rifts of plates above `mega_share` of the visible planet, with how long each plate had
@@ -1717,11 +1742,27 @@ pub fn mega_rifts(d: &Dynamics, mega_share: f64, window_myr: f64) -> Vec<MegaRif
                     })
                 })
             });
+            // Plates that hold the family's crust at the end of the window; a fragment that was
+            // subducted away holds nothing.
+            let split = (t + window_myr <= end_t + 1e-9).then(|| {
+                let at = t + window_myr;
+                let holders: BTreeSet<u32> = family
+                    .iter()
+                    .filter(|&&m| {
+                        lives.get(&m).is_none_or(|l| {
+                            l.died_myr.is_none_or(|died| died > at) || l.into.is_some()
+                        })
+                    })
+                    .map(|&m| holder_at(m, at))
+                    .collect();
+                holders.len() >= 2
+            });
             out.push(MegaRift {
                 parent: x,
                 t_myr: t,
                 held_myr: held,
                 apart,
+                split,
             });
         }
     }
@@ -1734,6 +1775,7 @@ fn megaplates(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, 
             "megaplate_rifts",
             "megaplate_tenure_p50_myr",
             "megaplate_rift_apart_50_pct",
+            "megaplate_rift_split_50_pct",
         ] {
             put(k, f64::NAN);
         }
@@ -1745,14 +1787,20 @@ fn megaplates(d: &Dynamics, params: &Params, put: &mut impl FnMut(&'static str, 
         "megaplate_tenure_p50_myr",
         median(&rifts.iter().map(|r| r.held_myr).collect::<Vec<_>>()),
     );
-    let judged: Vec<bool> = rifts.iter().filter_map(|r| r.apart).collect();
-    put(
-        "megaplate_rift_apart_50_pct",
-        if judged.is_empty() {
+    let share_of = |verdicts: Vec<bool>| {
+        if verdicts.is_empty() {
             f64::NAN
         } else {
-            100.0 * judged.iter().filter(|&&a| a).count() as f64 / judged.len() as f64
-        },
+            100.0 * verdicts.iter().filter(|&&a| a).count() as f64 / verdicts.len() as f64
+        }
+    };
+    put(
+        "megaplate_rift_apart_50_pct",
+        share_of(rifts.iter().filter_map(|r| r.apart).collect()),
+    );
+    put(
+        "megaplate_rift_split_50_pct",
+        share_of(rifts.iter().filter_map(|r| r.split).collect()),
     );
 }
 
@@ -2634,6 +2682,7 @@ mod tests {
                     rot_change: change,
                     rot_known: known,
                     pole_inside: inside,
+                    spinning: change > 0.1,
                     ..moving(0, 100, 0, 50.0, 0.0)
                 }],
             )
@@ -2649,6 +2698,8 @@ mod tests {
         assert!(near(get(&m, "rot_change_p90_pct"), 11.2));
         // Two of the four plate-steps have the pole on the plate.
         assert!(near(get(&m, "pole_inside_pct"), 50.0));
+        // One of the four (the 12 % change, standing for a pole at the centroid) is spinning.
+        assert!(near(get(&m, "spinning_pct"), 25.0));
         // Nothing known: no data.
         let first = dynamics(vec![mk(2.0, 0.0, false, false)]);
         assert!(get(&measures(&first, &[]), "rot_change_p50_pct").is_nan());
@@ -2871,13 +2922,15 @@ mod tests {
                 parent: 0,
                 t_myr: 8.0,
                 held_myr: 8.0,
-                apart: Some(true)
+                apart: Some(true),
+                split: Some(true)
             }]
         );
         let m = measures(&d, &[]);
         assert_eq!(get(&m, "megaplate_rifts"), 1.0);
         assert_eq!(get(&m, "megaplate_tenure_p50_myr"), 8.0);
         assert_eq!(get(&m, "megaplate_rift_apart_50_pct"), 100.0);
+        assert_eq!(get(&m, "megaplate_rift_split_50_pct"), 100.0);
         // The share is a parameter: above 35 % plate 1 counts too, but it did not rift.
         assert_eq!(mega_rifts(&d, 0.35, 50.0).len(), 1);
         // And above 70 % nothing is a mega-plate: no rifts, no data.
@@ -2900,9 +2953,12 @@ mod tests {
         let mut d = megaplate_run(vec![]);
         d.plates[2] = dies(life(2, Some(0), "rift", 8.0), 28.0, "sutured", Some(0));
         assert_eq!(mega_rifts(&d, 0.4, 50.0)[0].apart, Some(false));
+        // The only fragment rejoined, so one plate holds it all: not split either.
+        assert_eq!(mega_rifts(&d, 0.4, 50.0)[0].split, Some(false));
         // After the window it is apart.
         d.plates[2] = dies(life(2, Some(0), "rift", 8.0), 80.0, "sutured", Some(0));
         assert_eq!(mega_rifts(&d, 0.4, 50.0)[0].apart, Some(true));
+        assert_eq!(mega_rifts(&d, 0.4, 50.0)[0].split, Some(true));
         // Into a stranger within the window: the rift still holds.
         d.plates[2] = dies(life(2, Some(0), "rift", 8.0), 28.0, "sutured", Some(1));
         assert_eq!(mega_rifts(&d, 0.4, 50.0)[0].apart, Some(true));
@@ -2911,11 +2967,23 @@ mod tests {
         d.plates[2] = dies(life(2, Some(0), "rift", 8.0), 30.0, "sutured", Some(5));
         d.plates.push(life(5, None, "initial", 0.0));
         assert_eq!(mega_rifts(&d, 0.4, 50.0)[0].apart, Some(false));
+        // A rift into three: one fragment rejoins the parent, the other stays. Not "all apart",
+        // but split.
+        let mut three = megaplate_run(vec![life(3, Some(0), "rift", 8.0)]);
+        three.plates[2] = dies(life(2, Some(0), "rift", 8.0), 28.0, "sutured", Some(0));
+        let r = mega_rifts(&three, 0.4, 50.0);
+        assert_eq!((r[0].apart, r[0].split), (Some(false), Some(true)));
+        // A fragment subducted away holds nothing: the parent alone is not a split.
+        let mut gone = megaplate_run(vec![]);
+        gone.plates[2] = dies(life(2, Some(0), "rift", 8.0), 28.0, "consumed", None);
+        let r = mega_rifts(&gone, 0.4, 50.0);
+        assert_eq!((r[0].apart, r[0].split), (Some(true), Some(false)));
         // A rift too close to the end of the run to judge: no verdict, and no data.
         let mut short = megaplate_run(vec![]);
         short.steps.pop();
         assert_eq!(mega_rifts(&short, 0.4, 50.0)[0].apart, None);
         assert!(get(&measures(&short, &[]), "megaplate_rift_apart_50_pct").is_nan());
+        assert!(get(&measures(&short, &[]), "megaplate_rift_split_50_pct").is_nan());
     }
 
     #[test]

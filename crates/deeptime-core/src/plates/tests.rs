@@ -668,6 +668,13 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
                 _ => assert_eq!(q.rot_change, 0.0),
             }
             assert_eq!(q.guard, w.length() >= cap * (1.0 - 1e-9), "{q:?}");
+            let c = glam::DVec3::from_array(st.plates[q.id as usize].centroid);
+            assert_eq!(
+                q.spinning,
+                w.length() > 0.0
+                    && w.normalize().dot(c).abs() >= dynamics::SPIN_ANGLE_DEG.to_radians().cos(),
+                "{q:?}"
+            );
         }
         prev_omega = st
             .alive()
