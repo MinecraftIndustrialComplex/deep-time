@@ -594,6 +594,7 @@ Keys that appeared in more than one section and were simply combined (same key, 
 - Read so far (by the project): (IMP) no statement (ORE) not stated.
 - Read in this pass: (IMP) not fetched (ORE) not fetched (Crossref metadata only).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Osinski2013/Osinski2013.txt, the paragraph on the duration of impact hydrothermal systems.
 
 ### Masaitis1998
 - Reference: Masaitis, V. L. (1998). Popigai crater: Origin and distribution of diamond-bearing impactites. Meteoritics & Planetary Science 33(2):349-359.
@@ -1938,6 +1939,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) in full (table, figure and PDF page of each number recorded in data file); figure intercepts read from rendered pages; data file counted. (ORE) "Fig. 24, digitised".
 - Read in this pass: (DEP) full text fetched (whole 45 p. text layer, including Table 1, the text labels of Figs. 1-26, rules, correlations); companion data file fetched and recounted (see spot check S3). (ORE) abstract fetched (the 2 km same-deposit rule is not in the abstract).
 - Reference check: (DEP) matches (authors, year, series, title). The PDF page numbers in the ledger run one lower than the order of text streams I extracted (Table 1 is on the page after the correlation paragraph); that is a page-count convention, not a content problem. Note the data file I downloaded has 427 records with a tonnage, the report says 422. (ORE) matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Singer2008a/of1155.txt: rules (PDF pp. 3-6), Table 1 (PDF p. 9), correlations (p. 8), the text layer of Figs. 1-26 (every intercept label), and the companion database PorCuTX2008.txt parsed to recount presence counts, subtypes, correlations, areas and the sulfide-area regression (all reproduced). Rows verified: DEP-001 to DEP-009, DEP-013, DEP-017, DEP-029 to DEP-032 and others.
 
 ### Singer2005
 - Reference: Singer, D.A., Berger, V.I., Menzie, W.D., and Berger, B.R., 2005, Porphyry copper deposit density: Economic Geology 100(3):491-514.
@@ -1949,6 +1951,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract only. (ORE) via the USGS record, not stated whether full text.
 - Read in this pass: (DEP) abstract fetched (full abstract from the USGS Publications Warehouse API). Full text not obtainable (GeoScienceWorld 403). (ORE) not fetched (Crossref metadata only).
 - Reference check: (DEP) matches. Crossref lists the issue date as 2005-05-01 (issue 3 is May 2005). Important content point: the abstract defines the densities as deposits AND prospects (286) per 100,000 km2 of EXPOSED permissive rock in 19 control areas, and says density is inversely related to exposed permissive area (regression given for estimating the number in a tract). The code's "17.8 mean" is not in the paper (see S10). (ORE) the code drops the fourth author (B. R. Berger).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the USGS record abstract only (Singer2005/Singer2005.txt): 4 / 15 / 35 per 100,000 km2 of exposed permissive rock, range 2 to 128, 286 deposits and prospects, 19 control areas, density inversely related to permissive area. Full text paywalled.
 
 ### Singer2008b
 - Reference: Singer, D.A., 2008, Mineral deposit densities for estimating mineral resources: Mathematical Geosciences 40(1):33-46.
@@ -1960,6 +1963,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): not stated (not cited).
 - Read in this pass: abstract fetched; a search-result snippet gave "deposit densities of 0.14 Area^-0.61 for porphyry copper" (equation not seen in the fetched abstract; units not seen).
 - Reference check: n/a.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the USGS record abstract only (Singer2008b/Singer2008b.txt): tract size predicts the number of deposits; the equation is not in the abstract.
 
 ### SingerMenzie2010
 - Reference: Singer, D.A., and Menzie, W.D., 2010, Quantitative mineral resource assessments: an integrated approach: New York, Oxford University Press (chapter "Estimating the Number of Undiscovered Deposits", doi 10.1093/oso/9780195399592.003.0011).
@@ -1982,6 +1986,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) printed pages cited (pp. 4, 25, 28, 65-68, 120); text searched for density with no numeric value found. (ORE) page numbers cited (PDF opened).
 - Read in this pass: (DEP) full text fetched (text layer; searched for every number in the ledger rows; Table E1 itself not extracted, its summary sentences were). (ORE) abstract fetched (USGS page; two different fetches listed the authors in different orders; the series page lists David A. John first as editor).
 - Reference check: (DEP) the USGS catalogue lists David A. John as editor and Ayuso et al. as chapter authors; "John et al. 2010" is the usual short form but strictly John is the series editor. (ORE) matches "John et al. 2010". The report is a descriptive model; the median ore area 0.6 km2 and the 1-1.5 km height could not be read.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): John2010/sir5070b.txt printed pp. 4, 25, 28 (Table E1), 65-68, 120: ore and alteration areas, hypogene ore height, supergene thicknesses, grades and enrichment factors, the 10 cm/yr passage and its context.
 
 ### SillitoeMcKee1996
 - Reference: Sillitoe, R.H., and McKee, E.H., 1996, Age of supergene oxidation and enrichment in the Chilean porphyry copper province: Economic Geology 91(1):164-179.
@@ -1995,6 +2000,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract only. (ORE) via the USGS record, not stated whether full text.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) not fetched (Crossref metadata only).
 - Reference check: (DEP) matches. (ORE) matches. This paper concerns the Chilean province only.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): USGS Publications Warehouse record 70018070 abstract, new library folder SillitoeMcKee1996/ (abstract only).
 
 ### OrrisBliss1986
 - Reference: Orris, G.J., and Bliss, J.D., 1986, Grade and tonnage model of placer Au-PGE (model 39a), in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 261-264 (with descriptive model by Yeend, W.E., p. 261).
@@ -2006,6 +2012,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): figure intercepts read at 400 dpi, text pp. 261-262.
 - Read in this pass: full text fetched (text layer for pp. 261-262; Figs. 196 and 197 decoded from the scan and read).
 - Reference check: matches (Bulletin text says "By Greta J. Orris and James D. Bliss", reference to Orris and Bliss 1985). Figure numbers and pages match (Fig. 196 p. 263, Fig. 197 p. 264).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the same file as Cox1986 (same md5); see Cox1986.
 
 ### OrrisBliss1985
 - Reference: Orris, G.J., and Bliss, J.D., 1985, Geologic and grade-volume data on 330 gold placer deposits: U.S. Geological Survey Open-File Report 85-213, 172 p.
@@ -2017,6 +2024,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): caveat 1 p. 2 cited.
 - Read in this pass: not fetched (catalogue record only; the USGS catalogue says 173 p.).
 - Reference check: matches Bulletin 1693's own reference list entry.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): OrrisBliss1985.txt printed p. 2 (caveat 1).
 
 ### Bliss1992
 - Reference: Bliss, J.D., ed., 1992, Developments in mineral deposit modeling: U.S. Geological Survey Bulletin 2004, 168 p.
@@ -2028,6 +2036,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): p. 2 overview paragraph.
 - Read in this pass: not fetched. Title and 168 p. confirmed only from the reference list of OFR 2008-1155 ("Developments in deposit modeling").
 - Reference check: OFR 2008-1155 lists the title as "Developments in deposit modeling"; the project writes "Developments in mineral deposit modeling". Minor title difference; check against the Bulletin cover.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): new library folder Bliss1992/ (USGS Bulletin 2004, b2004.pdf and b2004.txt); printed p. 2 read.
 
 ### Schmidt2007
 - Reference: Schmidt, J.M., Light, T.D., Drew, L.J., Wilson, F.H., Miller, M.L., and Saltus, R.W., 2007, Undiscovered locatable mineral resources in the Bay Resource Management Plan Area, southwestern Alaska: a probabilistic assessment: U.S. Geological Survey Scientific Investigations Report 2007-5039, vi + 50 p.
@@ -2039,6 +2048,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): p. 28 and Table 1.
 - Read in this pass: full text fetched (tract table row for PLACER1 read, see S29).
 - Reference check: matches. The USGS catalogue gives authors as Schmidt, Light, Drew, Wilson, Miller, Saltus.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Schmidt2007/sir5039.txt printed p. 28 and Table 1 (PLACER1 tract, 55,350 km2, 1 / 2 / 7 deposits).
 
 ### MosierSinger1986
 - Reference: Mosier, D.L., and Singer, D.A., 1986, Grade and tonnage model of Superior Fe and Algoma Fe deposits (model 34a), in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 228-230.
@@ -2050,6 +2060,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): figure intercepts read from the printed arrows at 300 dpi.
 - Read in this pass: full text fetched (Figs. 172-174 decoded from the scan and read).
 - Reference check: matches. The Bulletin says Algoma and Superior are combined "because they are not significantly different in tonnage or grades" (Algoma has its own descriptive model 28b, Superior 34a).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the same file as Cox1986 (byte-identical); see Cox1986.
 
 ### Cannon1986
 - Reference: Cannon, W.F., 1986, Descriptive model of Superior Fe (model 34a, p. 228) and of Algoma Fe (model 28b, p. 198), in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693.
@@ -2061,6 +2072,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): not stated.
 - Read in this pass: full text fetched (model headings only: "Model 28b DESCRIPTIVE MODEL OF ALGOMA Fe By William F. Cannon", "Model 34a DESCRIPTIVE MODEL OF SUPERIOR Fe By William F. Cannon").
 - Reference check: matches (model numbers 28b and 34a confirmed).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the same file as Cox1986 (byte-identical); see Cox1986.
 
 ### Cannon1995
 - Reference: Cannon, W.F., Hadley, D.G., and Horton, R.J., 1995, Superior Fe deposits (model 34a) and Algoma Fe deposits (model 28b), in du Bray, E.A., ed., Preliminary compilation of descriptive geoenvironmental mineral deposit models: U.S. Geological Survey Open-File Report 95-831, 272 p.
@@ -2072,6 +2084,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): pp. 209-212, 252-255.
 - Read in this pass: full text fetched (searched for deposit size statements; see S20, S25).
 - Reference check: not checked author list of the two chapters (the PDF text I searched did not expose the chapter by-lines).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): ofr95831.txt (identical to duBray1995): Superior Fe printed pp. 252-254, Algoma Fe pp. 209-210.
 
 ### Singer2009
 - Reference: Singer, D.A., Berger, V.I., and Moring, B.C., 2009, Sediment-hosted zinc-lead deposits of the world: database and grade and tonnage models: U.S. Geological Survey Open-File Report 2009-1252, v + 62 p.
@@ -2083,6 +2096,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) Table 2 (printed pp. 9-10), text p. 8, p. 2; n_reported counted from the database. (ORE) page cited.
 - Read in this pass: (DEP) full text fetched (Table 2, correlation paragraph, two-kilometer rule). (ORE) abstract fetched (the 2 km rule is not in the abstract).
 - Reference check: (DEP) matches the project's citation; the task prompt's "Mosier, Berger & Singer" is a misattribution. (ORE) matches. The report mixes MVT and sedex under "sediment-hosted zinc-lead".
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Singer2009/of1252.txt: spatial rules (p. 2), deposit types (pp. 3-5), Tables 2 and 3 (pp. 9-11); the report's database SedZn-PbTX.txt and its metadata were added to the folder and reproduce the presence counts and correlations.
 
 ### Leach2010a
 - Reference: Leach, D.L., Taylor, R.D., Fey, D.L., Diehl, S.F., and Saltus, R.W., 2010, A deposit model for Mississippi Valley-type lead-zinc ores, chap. A of Mineral deposit models for resource assessment: U.S. Geological Survey Scientific Investigations Report 2010-5070-A, viii + 43 p.
@@ -2094,6 +2108,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) printed pp. 3-5, 8, 19, 27. (ORE) not stated; quoted as a phrase.
 - Read in this pass: (DEP) full text fetched (Table 1, vertical extent, fluid temperature and salinity, the 600 km criterion, district areas). (ORE) abstract fetched (USGS page). The PDF is COULD NOT READ.
 - Reference check: (DEP) matches. "Leach et al. 2010" in the code is used for two different papers (this one and Leach2010b); the 2.02 Ga claim belongs to Leach2010b. (ORE) matches. Important: the code uses "Leach et al. 2010" for two different papers (this report, and Leach2010b below, Economic Geology 105:593). The authors differ.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Leach2010a/sir5070a.txt: Table 1 (printed p. 4) and text pp. 3, 5-8, 10-11, 19, 25, 27 (600 km tract guide, fluid temperatures and salinities, Pine Point, ore-event durations). It has no 2.02 Ga statement: that is Leach2010b.
 
 ### MosierBriskey1986
 - Reference: Mosier, D.L., and Briskey, J.A., 1986, Grade and tonnage model of southeast Missouri Pb-Zn and Appalachian Zn deposits (models 32a and 32b), in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 224-226.
@@ -2105,6 +2120,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): figure intercepts.
 - Read in this pass: full text fetched (Figs. 168-171 decoded from the scan and read).
 - Reference check: matches (Bulletin contents: "Grade and tonnage model of southeast Missouri Pb-Zn and Appalachian Zn deposits, by Dan L. Mosier and Joseph A. Briskey").
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the same file as Cox1986 (byte-identical); see Cox1986.
 
 ### Emsbo2016
 - Reference: Emsbo, P., Seal, R.R., Breit, G.N., Diehl, S.F., and Shah, A.K., 2016, Sedimentary exhalative (sedex) zinc-lead-silver deposit model: U.S. Geological Survey Scientific Investigations Report 2010-5070-N, 57 p.
@@ -2116,6 +2132,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) printed pp. 2, 27, 28, 36, 39. (ORE) in full (printed pp. 2, 28 cited).
 - Read in this pass: (DEP) full text fetched (searched for each number in the ledger rows). (ORE) abstract fetched (USGS page; no temperatures or gradients in it).
 - Reference check: (DEP) matches (chapter N published 2016 in a 2010 series). (ORE) matches exactly (authors, year, title, report number, 57 p.).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Emsbo2016/sir5070n.txt printed pp. 2, 8, 27, 28, 30, 32, 37, 39 (brine temperatures and salinities, 'absence of deposits older than 1.8 Ga', basin fill, sandstone density).
 
 ### MenzieMosier1986
 - Reference: Menzie, W.D., and Mosier, D.L., 1986, Grade and tonnage model of sedimentary exhalative Zn-Pb (model 31a), in Cox, D.P., and Singer, D.A., eds., Mineral deposit models: U.S. Geological Survey Bulletin 1693, p. 212-215; descriptive model by Briskey, J.A., 1986, p. 211-212.
@@ -2127,6 +2144,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): figure intercepts Figs. 159-163.
 - Read in this pass: full text fetched (Figs. 159-163 decoded from the scan and read).
 - Reference check: matches (Fig. 159 p. 213, Figs. 160-161 p. 214, Figs. 162-163 p. 215; "by W. David Menzie and Dan L. Mosier").
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the same file as Cox1986 (byte-identical); see Cox1986.
 
 ### duBray1995
 - Reference: du Bray, E.A., ed., 1995, Preliminary compilation of descriptive geoenvironmental mineral deposit models: U.S. Geological Survey Open-File Report 95-831, ii + 272 p.
@@ -2138,6 +2156,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): see Cannon1995.
 - Read in this pass: full text fetched; it also restates Menzie and Mosier 1986 (sedex "1.7 (90th percentile) to 130 (10th percentile) million tons; median ... 15") and Mosier and Singer 1986 (median 170 Mt).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): identical file to Cannon1995; see there.
 
 ### Singer2001
 - Reference: Singer, D.A., Menzie, W.D., Sutphin, D.M., Mosier, D.L., and Bliss, J.D., 2001, Mineral deposit density: an update, in Singer, D.A., ed., Contributions to global mineral resource assessment research: U.S. Geological Survey Professional Paper 1640, chap. A, p. A1-A13.
@@ -2149,6 +2168,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): Table 1 (13 deposit types, no Zn-Pb, no iron formation) searched.
 - Read in this pass: full text fetched (abstract and contents; Table 1 body not extracted, abstract lists its densities).
 - Reference check: the PDF title page reads "By Donald A. Singer, W. David Menzie, David M. Sutphin, Dan L. Mosier, and James D. Bliss", which matches the project. The USGS catalogue and Crossref list different authors for this DOI (Menzie, Sutphin, Mosier, Bliss, Schulz; editor Singer). Cataloguing discrepancy; follow the PDF.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Singer2001/pp1640a.txt: abstract (printed p. A1), Table 1 and the porphyry copper passage (printed p. A8): Nevada 0.00015 and Arizona 0.00071 and 0.0012 deposits per km2; no Zn-Pb, sedex or iron-formation density.
 
 ### USGS2000a
 - Reference: U.S. Geological Survey National Mineral Resource Assessment Team, 2000, 1998 assessment of undiscovered deposits of gold, silver, copper, lead, and zinc in the United States: U.S. Geological Survey Circular 1178, 21 p. plus CD-ROM.
@@ -2161,6 +2181,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): not read (page cited from memory of an agent; no data file records it).
 - Read in this pass: full text fetched (the 1 km rule located; see S12).
 - Reference check: the content is right but the page is wrong: the rule is on printed p. 5 (and the 1 km definition in the introduction), not p. 15.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): USGS2000a/c1178.txt printed p. 5 (PDF p. 11): the 1 km assessment depth and the whole-deposit rule (the code cited p. 15; corrected).
 
 ### NMRA1998data
 - Reference: U.S. Geological Survey, National Mineral Resource Assessment 1998, permissive tract shapefiles and attributes (tracts with estimated numbers of undiscovered deposits at 90, 50 and 10 percent): USGS Mineral Resources Online Spatial Data.
@@ -2172,6 +2193,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): research by a Sonnet sub-agent, no read statement.
 - Read in this pass: dataset fetched (three sedex shapefile attribute tables parsed; see S28).
 - Reference check: n/a (dataset).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the three sedex shapefile attribute tables in nmra.zip parsed on the test machine: 12 tracts with estimates, 207,508 km2, sums 2 / 10 / 26 (DEP-107 reproduced).
 
 ### Wood1983
 - Reference: Wood, G.H., Jr., Kehn, T.M., Carter, M.D., and Culbertson, W.C., 1983, Coal resource classification system of the U.S. Geological Survey: U.S. Geological Survey Circular 891, vii + 65 p.
@@ -2183,6 +2205,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) Table 2 p. 22, Table 3 p. 24, text pp. 25-27 (lignite row read from the rendered page). (ORE) in full (page-level quotations; lignite row read from the rendered page).
 - Read in this pass: (DEP) full text fetched (Tables 2 and 3, reliability definitions). (ORE) not fetched (citation page only; the USGS record prints the third and fourth authors as "Carter, M.D., and Culbertson, W.").
 - Reference check: (DEP) matches. coal_seam.json says "Table 3 p. 14" in one note; the report's own list of tables puts Table 3 on p. 24. (ORE) matches. Arithmetic only: 6,000 ft is 1,828.8 m (the circular's "(1,800 m)" is a rounding); 1,800 short tons per acre-foot is 1.324 t/m3.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Wood1983/circ891.txt: glossary (printed p. 8: coal field, region, province), Table 1 (p. 17), Table 2 (p. 22, re-extracted with layout), Table 3 (p. 24), text pp. 24-27 (reliability radii).
 
 ### Ellis1999
 - Reference: Ellis, M.S., Gunther, G.L., Ochs, A.M., Roberts, S.B., Wilde, E.M., Schuenemeyer, J.H., Power, H.C., Stricker, G.D., and Blake, D., 1999, Coal resources, Powder River Basin, chap. PN; Ellis, M.S., Flores, R.M., Ochs, A.M., Stricker, G.D., Gunther, G.L., Rossi, G.S., Bader, L.R., Schuenemeyer, J.H., and Power, H.C., 1999, Gillette coalfield, Powder River Basin: geology, coal quality, and coal resources, chap. PG; both in Fort Union Coal Assessment Team, 1999 resource assessment of selected Tertiary coal beds and zones in the northern Rocky Mountains and Great Plains region: U.S. Geological Survey Professional Paper 1625-A. Chapter PS (Fort Union, Powder River) also used.
@@ -2194,6 +2217,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) tables PN-1, PG-2 cited. (ORE) in full (chapter PDFs, PDF pages quoted).
 - Read in this pass: (DEP) full text fetched for PN, PG, PS (three numbers checked, S41). (ORE) not fetched (chapter list read; PDFs unreadable).
 - Reference check: (DEP) the by-lines come from the project's data file; the catalogue lists the volume's author as "Fort Union Coal Assessment Team and USGS Energy Resources Team". I did not see the by-lines of the PDFs. (ORE) MISMATCH in attribution. "Ellis et al. 1999" is right for PN and PG only. Chapter PS (the Fort Union 22,000 mi2 figure) is Flores and Bader, not Ellis et al. The volume is credited to the Fort Union Coal Assessment Team.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): chapter PS (by-line Flores and Bader: Fort Union 22,000 mi2, PS-3; named coal fields), chapter PN (Wyodak-Anderson resource area 21,911 km2, Tables PN-1 and PN-6), chapter PG (Gillette study area 1,026,000 acres, PG-16; Table PG-2).
 
 ### Nuccio1994
 - Reference: Nuccio, V.F., 1994, Vitrinite reflectance data for the Paleocene Fort Union and Eocene Wind River Formations, and burial history of a drill hole located in central Wind River Basin, Wyoming: U.S. Geological Survey Open-File Report 94-220, 43 p.
@@ -2205,6 +2229,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) Methods PDF p. 2 (Waples 1985 thresholds as cited there). (ORE) in full (PDF p. 2 and Fig. 2 cited).
 - Read in this pass: (DEP) not fetched (catalogue record only). (ORE) not fetched (PDF unreadable by WebFetch; citation page only).
 - Reference check: (DEP) title matches. (ORE) matches (the USGS page prints the author as "Nuccio, V.").
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Nuccio1994/Nuccio1994.txt, Methods (PDF p. 2).
 
 ### Higley2005
 - Reference: Higley, D.K., and Cox, D.O., 2005, Oil and gas exploration and development along the Front Range in the Denver Basin of Colorado, Nebraska, and Wyoming, chap. B of Energy resource studies, northern Front Range, Colorado: U.S. Geological Survey Professional Paper 1698 (162 p.).
@@ -2216,6 +2241,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) pages cited in the data file (pp. 22, 26). (ORE) in full (PDF cited by page).
 - Read in this pass: (DEP) not fetched (only the series record resolved; chapter B record not found by search). (ORE) not fetched (the USGS page gave the volume citation only; chapter title and authors taken from the project's sources file, not confirmed).
 - Reference check: (DEP) full title taken from the project's data file; not independently confirmed. (ORE) volume and editor confirmed; chapter B authorship and title not confirmed.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): new library folder Higley2005/ (USGS PP 1698, P1698.pdf and text); printed pp. 22 and 26 read (TTI 10 onset, Ro 1.35 after Waples 1980).
 
 ### Spencer1988
 - Reference: Spencer, C.W., and Wilson, R.J., 1988, Petroleum geology and principal exploration plays in the Uinta-Piceance-Eagle Basins Province, Utah and Colorado: U.S. Geological Survey Open-File Report 88-450-G, 35 p.
@@ -2227,6 +2253,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) PDF p. 10. (ORE) in full (PDF pages cited).
 - Read in this pass: (DEP) not fetched (catalogue record confirms title and authors). (ORE) not fetched (citation page only; no abstract on it).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Spencer1988/Spencer1988.txt, 'Thermal maturation and burial history' (printed p. 10).
 
 ### Nuccio2003
 - Reference: Nuccio, V.F., and Roberts, L.N.R., 2003, Thermal maturity and oil and gas generation history of petroleum systems in the Uinta-Piceance Province, Utah and Colorado, chap. 4 of USGS Uinta-Piceance Assessment Team, Petroleum systems and geologic assessment of oil and gas in the Uinta-Piceance Province, Utah and Colorado: U.S. Geological Survey Digital Data Series DDS-69-B.
@@ -2238,6 +2265,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) p. 6. (ORE) in full (printed p. 6 cited).
 - Read in this pass: (DEP) not fetched. (ORE) not fetched (volume page only; chapter title and chapter-author pairing not confirmed).
 - Reference check: (DEP) not checked (title from the project's data file). (ORE) volume title and series confirmed; chapter pairing unconfirmed.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the folder Nuccio2003 holds a different item (a well-log plate); chapter 4 of DDS-69-B was fetched into a new folder Nuccio2003_DDS69B_ch4/ and printed p. 6 read (Ro thresholds).
 
 ### Dubiel2003
 - Reference: Dubiel, R.F., 2003, Geology, depositional models, and oil and gas assessment of the Green River Total Petroleum System, Uinta-Piceance Province, eastern Utah and western Colorado, chap. 5 of U.S. Geological Survey Digital Data Series DDS-69-B.
@@ -2249,6 +2277,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) p. 36. (ORE) in full (Appendix B printed p. 36 cited).
 - Read in this pass: (DEP) not fetched. (ORE) not fetched (volume page only).
 - Reference check: (DEP) not checked. (ORE) volume confirmed; chapter pairing unconfirmed. #### Coal
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the folder Dubiel2003 holds chapter 14 (Nelson), not chapter 5; chapter 5 was fetched into a new folder Dubiel2003_DDS69B_ch5/ and its Appendix B data form (printed p. 36) and p. 27 read.
 
 ### Moore2003
 - Reference: Moore, T.E., and Potter, C.J., 2003, Structural plays in Ellesmerian sequence and correlative strata of the National Petroleum Reserve, Alaska: U.S. Geological Survey Open-File Report 2003-253, 40 p.
@@ -2260,6 +2289,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) p. 8. (ORE) in full (printed p. 8 cited).
 - Read in this pass: (DEP) full text fetched (oil window sentence located, S46). (ORE) abstract fetched (USGS page). The abstract says hydrocarbon generation and migration "occurred primarily by sedimentary burial principally between 100-90 Ma"; it does not state an 80-120 degC oil window.
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Moore2003/ofr03253.txt, executive summary (printed p. 8: oil window 80-120 C at about 30 C/km) and the TOC passages.
 
 ### Tuttle2000
 - Reference: Tuttle, M.L., Brownfield, M.E., and Charpentier, R.R. (assessment geologists), 2000, Agbada Reservoirs, assessment unit 71920101 (Niger Delta Province 7192), assessment-unit summary and data form, in U.S. Geological Survey World Energy Assessment Team, U.S. Geological Survey World Petroleum Assessment 2000: description and results: U.S. Geological Survey Digital Data Series DDS-60 (file reg7/P7/tps/AU/au719211.pdf in regions/reg7.zip). Related chapters: Ahlbrandt et al. (AR), Charpentier and Klett (MC), Schmoker and Klett (AM, also Bulletin 2165), Klett et al. (GL), all 2000.
@@ -2271,6 +2301,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) data form p50 printed; p90 and p10 measured off the histogram at 250 dpi. (ORE) in full (data form read, histogram digitised by the project).
 - Read in this pass: (DEP) data form fetched and text read (size and number tables, assessment geologists); histogram bar heights not readable from the text layer. (ORE) not fetched. The authors on the AU form could not be confirmed (the DDS-60 index lists only the chapter authors).
 - Reference check: (DEP) matches (assessment geologists "M.L. Tuttle, M.E. Brownfield and R.R. Charpentier", date 5/28/98). (ORE) authorship of the AU form unconfirmed; the three-name author list may belong to the Niger Delta Province geology report rather than the AU form.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Tuttle2000/au719211.txt, the whole data form (median 12 MMBO, min 1, max 1500; field counts) and the field-size bar chart re-measured from the PDF's vector geometry: p90 2.36, p50 12.04, p10 89.6 MMBO by log-linear interpolation (a figure reading, no printed percentile).
 
 ### Ofr9950H
 - Reference: Tuttle, M.L., Charpentier, R.R., and Brownfield, M.E., 1999 (catalogue form of the names), The Niger Delta petroleum system: Niger Delta Province, Nigeria, Cameroon, and Equatorial Guinea, Africa: U.S. Geological Survey Open-File Report 99-50-H, 65 p.
@@ -2282,6 +2313,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): not stated.
 - Read in this pass: catalogue record only.
 - Reference check: n/a.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Ofr9950H/Ofr9950H.txt: 'Mean API used = 35 (0.85 g/cm3)' for Niger Delta oil (corroborates the 0.85 t/m3 crude density; not cited by the code).
 
 ### Waples1980
 - Reference: Waples, D.W., 1980, Time and temperature in petroleum formation: application of Lopatin's method to petroleum exploration: AAPG Bulletin 64(6):916-926.
@@ -2293,6 +2325,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract via OSTI 6845191. (ORE) abstract only (OSTI record).
 - Read in this pass: (DEP) abstract fetched (OSTI API record, full abstract). (ORE) abstract fetched (OSTI, quoted verbatim in spot checks below). Full text not fetched (AAPG/Datapages returned 403).
 - Reference check: (DEP) matches. (ORE) matches (author, year, volume, issue, pages). The abstract contains the three oil-window thresholds, the doubling rule and the four preservation deadlines. It contains no TTI-to-Ro table and no statement of the temperature interval at which n = 0. The abstract is written "approx. 500 40 degree oil preservation deadline" with the degree sign garbled as "40/sup 0/", which the project read as API gravity; the abstract itself does not say "API".
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the OSTI abstract only (Waples1980/Waples1980.txt): TTI 15 / 75 / 160 and the preservation deadlines.
 
 ### Newell1997
 - Reference: Newell, K.D., 1997 (web version 1998), Comparison of maturation data and fluid-inclusion homogenization temperatures to simple thermal models: implications for thermal history and fluid flow in the midcontinent, part 3 "TTI modeling for localities in central Kansas", Table 1: Kansas Geological Survey, Current Research in Earth Sciences, Bulletin 240, part 2.
@@ -2304,6 +2337,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) web page; Waples' own table not opened. (ORE) secondary source (web page, flagged non-USGS).
 - Read in this pass: (DEP) full text fetched (Table 1 read, S45). Author is K. David Newell (part 1 of the same article gives the by-line); the project wrote "initials not shown". (ORE) full text fetched (the section page: Table 1 rows and the doubling sentence; article front page for title and author). The page does not print a reference list, so what "Waples 1981" is cannot be read from it. The text says "Waples (1980, 1981)".
 - Reference check: (DEP) Table 1 is attributed to Waples (1981) for TTI to Ro, so it is not Waples 1980. (ORE) author is K. David Newell (the sources file lacked the initials). Title and the "1997" year: the URL path says 1997, web version dated 1998-03-16. The "Waples 1981" it credits is probably Waples's 1981 book (Organic Geochemistry for Exploration Geologists), but I could not confirm that from the page; treat as unidentified.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Newell1997/Newell1997.txt, the procedure paragraph and Table 1 (TTI to Ro after Waples 1981).
 
 ### Dyman2002
 - Reference: Dyman, T.S., Crovelli, R.A., Bartberger, C.E., and Takahashi, K.I., 2002, Worldwide estimates of deep natural gas resources based on the U.S. Geological Survey World Petroleum Assessment 2000: Natural Resources Research 11(3):207-218.
@@ -2328,6 +2362,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) OpenAlex/Semantic Scholar abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) not fetched (Crossref metadata only).
 - Reference check: (DEP) matches. It is a 4-page paper (919-922). (ORE) matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only (167 / 158 / 63 m per Myr).
 
 ### Kesler2008
 - Reference: Kesler, S.E., and Wilkinson, B.H., 2008, Earth's copper resources estimated from tectonic diffusion of porphyry copper deposits: Geology 36(3):255-258.
@@ -2340,6 +2375,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract-level. (ORE) not stated. (SCL, PRV, POL, BAK) not stated; DOI linked
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) not fetched (Crossref metadata only; last page 258 from the usual form, not confirmed). (SCL, PRV, POL, BAK) abstract fetched (OpenAlex record; the abstract text is the tool's reconstruction from the index)
 - Reference check: (DEP) matches. (ORE) probable match for "2008"; the code's phrasing "(exhumation)" fits the 2006 paper better than this one. #### Found in this pass, not cited by the code (SCL, PRV, POL, BAK) citation matches. What it is cited for ("deposits above 3.3 km are within mining reach") is NOT in the abstract; the abstract is about estimating the number of porphyry copper deposits formed (about 125,895 in the Phanerozoic), preserved (about 47,789), and total copper (about 1.7 x 10^11 t in preserved porphyry deposits, 3 x 10^11 t all resources). The 3.3 km figure may be in the body; unverified.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only (125,895 formed, 47,789 remain, 3.3 km).
 
 ### Singer1993
 - Reference: Singer, D.A., 1993, Basic concepts in three-part quantitative assessments of undiscovered mineral resources: Nonrenewable Resources 2(2):69-81.
@@ -2351,6 +2387,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract in the research note.
 - Read in this pass: abstract fetched (USGS record, full abstract).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the USGS record abstract (Singer1993/Singer1993.txt): three-part method; permissive boundaries leave 'less than 1 in 100,000 to 1,000,000' outside.
 
 ### Root1992
 - Reference: Root, D.H., Menzie, W.D., and Scott, W.A., 1992, Computer Monte Carlo simulation in quantitative resource estimation: Nonrenewable Resources 1(2):125-138.
@@ -2363,6 +2400,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): no read statement.
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: title and venue found by search; the project gave only a parenthetical description.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): not readable: no abstract in OpenAlex, paywalled.
 
 ### Skirrow2019
 - Reference: Skirrow, R.G., Murr, J., Schofield, A., Huston, D.L., van der Wielen, S., Czarnota, K., and others, 2019, Mapping iron oxide Cu-Au (IOCG) mineral potential in Australia using a knowledge-driven mineral systems-based approach: Ore Geology Reviews 113:103011.
@@ -2375,6 +2413,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: probable identification (the project gives no title). It is an IOCG case study, so it is a weak authority for a general "components are multiplied" rule.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only.
 
 ### McCuaig2010
 - Reference: McCuaig, T.C., Beresford, S., and Hronsky, J., 2010, Translating the mineral systems approach into an effective exploration targeting system: Ore Geology Reviews 38(3):128-138.
@@ -2387,6 +2426,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only.
 
 ### Hronsky2008
 - Reference: Hronsky, J.M.A., and Groves, D.I., 2008, Science of targeting: definition, strategies, targeting and performance measurement: Australian Journal of Earth Sciences 55(1):3-12.
@@ -2399,6 +2439,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only.
 
 ### Agterberg1995
 - Reference: Agterberg, F.P., 1995, Multifractal modeling of the sizes and grades of giant and supergiant deposits: International Geology Review 37(1):1-8.
@@ -2411,6 +2452,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: probable identification (project gives only author and year); title concerns multifractal, not "lognormal with Pareto tail" per se.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only (lognormal body, hyperbolic tail).
 
 ### Singer1995
 - Reference: Singer, D.A., 1995, World class base and precious metal deposits: a quantitative analysis: Economic Geology 90(1):88-104.
@@ -2423,6 +2465,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: abstract fetched (USGS record).
 - Reference check: matches ("between 47 and 79 percent of metal contained in the largest 10 percent of deposits").
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only (47 to 79 % of each metal in the largest 10 % of deposits).
 
 ### Robert2005
 - Reference: Robert, F., Poulsen, K.H., Cassidy, K.F., and Hodgson, C.J., 2005, Gold metallogeny of the Superior and Yilgarn cratons, in One Hundredth Anniversary Volume (Economic Geology): Society of Economic Geologists, p. 1001-1033.
@@ -2435,6 +2478,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) not fetched (Crossref metadata only; the 30-50 km figure could not be checked). (ORE) not fetched (Crossref metadata only).
 - Reference check: (DEP) probable identification (project gives only author and year). (ORE) identified; the 30-50 km spacing is unverified. The paper is about the Superior and Yilgarn cratons.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Crossref abstract, new library folder Robert2005/ (abstract only).
 
 ### Butterworth2016
 - Reference: Butterworth, N.P., Steinberg, D., Müller, R.D., Williams, S.E., Merdith, A.S., and Hardy, S., 2016, Tectonic environments of South American porphyry copper magmatism through time revealed by spatiotemporal data mining: Tectonics 35(12):2847-2862.
@@ -2447,6 +2491,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) not fetched (OpenAlex metadata only).
 - Reference check: (DEP) matches. (ORE) matches. The paper covers South American porphyry copper only; the code applies its convergence-rate, obliquity and slab-age peaks to all porphyries.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): only a web-search summary of the abstract (the publisher page refused the fetch); rows ORE-032 to ORE-034 say so.
 
 ### Richards2003
 - Reference: Richards, J.P., 2003, Tectono-magmatic precursors for porphyry Cu-(Mo-Au) deposit formation: Economic Geology 98(8):1515-1533.
@@ -2459,6 +2504,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) not fetched (OpenAlex metadata only).
 - Reference check: (DEP) matches (abstract covers oxidised, hydrous magmas and fault-controlled ascent). (ORE) matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): OpenAlex abstract, new library folder Richards2003/ (abstract only).
 
 ### Cooke2005
 - Reference: Cooke, D.R., Hollings, P., and Walshe, J.L., 2005, Giant porphyry deposits: characteristics, distribution, and tectonic controls: Economic Geology 100(5):801-818.
@@ -2470,6 +2516,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex); the figshare copy was not opened. (ORE) not fetched (OpenAlex metadata only).
 - Reference check: (DEP) matches ("compressive tectonic environments, thickened continental crust"). (ORE) matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the author's copy deposited on figshare, added to Cooke2005/ as Cooke2005.pdf and Cooke2005_fulltext.txt; abstract and the compression and crustal-thickening passages read (PDF pp. 1, 8-10, 15).
 
 ### Bekker2010
 - Reference: Bekker, A., Slack, J.F., Planavsky, N., Krapež, B., Hofmann, A., Konhauser, K.O., and Rouxel, O.J., 2010, Iron formation: the sedimentary product of a complex interplay among mantle, tectonic, oceanic, and biospheric processes: Economic Geology 105(3):467-508.
@@ -2482,6 +2529,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched but cut off before the age statement (OpenAlex); the 2.65-1.85 Ga window not seen. (ORE) abstract fetched in part (OpenAlex; the stored index ends at "Secular changes in deposition, identified more than 20 years ago,", so the dates are cut off).
 - Reference check: (DEP) title and journal match; age window unverified. (ORE) matches (authors, year, volume, pages).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract only (University of Johannesburg repository page), new library folder Bekker2010/: Superior-type BIF first appeared 'ca. 2.6 Ga', giant BIF 2.6-2.4 Ga, iron formations 'generally disappeared at ca. 1.85 Ga'. No open full text found. The code's acme was changed from 2.65 to 2.6 Ga on this reading.
 
 ### Bohacs1997
 - Reference: Bohacs, K., and Suter, J., 1997, Sequence stratigraphic distribution of coaly rocks: fundamental controls and paralic examples: AAPG Bulletin 81(10):1612-1639.
@@ -2494,6 +2542,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) abstract fetched (Crossref abstract, verbatim).
 - Reference check: (DEP) matches ("significant volumes of terrigenous organic matter can be preserved to form coals only when and where the overall increase in accommodation approximately equals the production rate of peat"). (ORE) matches (authors, year, volume, issue, pages, DOI).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Crossref abstract only, new library folder BohacsSuter1997/.
 
 ### Nelsen2016
 - Reference: Nelsen, M.P., DiMichele, W.A., Peters, S.E., and Boyce, C.K., 2016, Delayed fungal evolution did not cause the Paleozoic peak in coal production: Proceedings of the National Academy of Sciences 113(9):2442-2447.
@@ -2505,6 +2554,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) not fetched (Crossref metadata only). (ORE) full text fetched (PMC; the introduction's statement on the first appearance of coal and the Carboniferous-Permian peak).
 - Reference check: (DEP) probable identification only: the project gives author and year, and this is the 2016 Nelsen et al. paper on coal production. (ORE) the DOI and authors are right, but the paper is about the Carboniferous-Permian coal peak and fungi, not about when coal formation began. It does contain the sentence "Coal deposits occur by the Early Devonian", so it supports the code's land-plant gate only indirectly. #### Ore genesis and drivers
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): full text (PMC4780611), new library folder Nelsen2016/ (html and text): Introduction 'Coal deposits occur by the Early Devonian'; Discussion lignin origin '~420 Ma'.
 
 ### Hoggard2020
 - Reference: Hoggard, M.J., Czarnota, K., Richards, F.D., Huston, D.L., Jaques, A.L., and Ghelichkhan, S., 2020, Global distribution of sediment-hosted metals controlled by craton edge stability: Nature Geoscience 13(7):504-510.
@@ -2516,6 +2566,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (Semantic Scholar). (ORE) abstract fetched (OSF API record of the preprint).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Hoggard2020/Hoggard2020.txt, the abstract only (85 % within 200 km of the thick-thin transition).
 
 ### Leach2001
 - Reference: Leach, D.L., Bradley, D.C., Lewchuk, M.T., Symons, D.T.A., de Marsily, G., and Brannon, J., 2001, Mississippi Valley-type lead-zinc deposits through geological time: implications from recent age-dating research: Mineralium Deposita 36(8):711-740.
@@ -2564,6 +2615,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) not stated; probably via the research note. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (OpenAlex). (ORE) abstract fetched (OpenAlex inverted index; the rebuilt text is word-order scrambled in places, so quote only the intact phrases).
 - Reference check: (DEP) this is the paper that carries the 2.02 Ga statement (see S33). The project has conflated it with Leach2010a. (ORE) matches (authors, year, volume, pages). The abstract divides the deposits into clastic-dominated (which includes what were called SEDEX) and MVT; the code applies the 2.02 Ga gate to both.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract only (OpenAlex), new library folder Leach2010b/: clastic-dominated and MVT deposits first appear at 2.02 Ga; only clastic-dominated deposits were important until the late Neoproterozoic.
 
 ### Garven1984
 - Reference: Garven, G., and Freeze, R.A., 1984, Theoretical analysis of the role of groundwater flow in the genesis of stratabound ore deposits: 1. Mathematical and numerical model, American Journal of Science 284(10):1085-1124; 2. Quantitative results, American Journal of Science 284(10):1125-1174.
@@ -2576,6 +2628,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) no read statement. (ORE) not stated.
 - Read in this pass: (DEP) abstracts of both parts fetched (OpenAlex); the base case numbers are not in either abstract. (ORE) abstract fetched (OpenAlex, both parts). Neither abstract mentions the 1 km over 300 km base case.
 - Reference check: (DEP) the paper is two parts; the code does not say which. The base case is probably in part 2. (ORE) the code does not say which part; the base case is most likely in part 2 (quantitative results). Unconfirmed.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract of part 1 only (OpenAlex), new library folder GarvenFreeze1984/; the base case (1 km over 300 km) is not in it; part 2 not obtained.
 
 ### Garven1985
 - Reference: Garven, G., 1985, The role of regional fluid flow in the genesis of the Pine Point deposit, Western Canada sedimentary basin: Economic Geology 80(2):307-324.
@@ -2588,6 +2641,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract (research note). (ORE) not stated.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: (DEP) matches. (ORE) matches. The abstract contains both the 60-100 degC and the 0.5-5.0 Myr values.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract only (OpenAlex), new library folder Garven1985/: Pine Point model 60-100 C, 0.5-5.0 Myr.
 
 ### Bethke1990
 - Reference: Bethke, C.M., and Marshak, S., 1990, Brine migrations across North America: the plate tectonics of groundwater: Annual Review of Earth and Planetary Sciences 18:287-315.
@@ -2624,6 +2678,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): (DEP) abstract in the research note; the data file says "typically 3-9 Myr" was not found in any USGS document. (ORE) not stated.
 - Read in this pass: (DEP) abstract fetched (Crossref, full abstract). (ORE) not fetched (Crossref metadata only).
 - Reference check: (DEP) matches. The abstract itself contains both "at least 0.5 m.y." and "typically minima of 3 to 9 m.y." (S13). (ORE) matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Crossref abstract (full), new library folder Sillitoe2005/Sillitoe2005.txt (abstract only; chapter paywalled): 'at least 0.5 m.y. but typically minima of 3 to 9 m.y.'; 'two or three times the hypogene tenor'.
 
 ### Titley1995
 - Reference: Titley, S.R., and Marozas, D.C., 1995, Processes and products of supergene copper enrichment, in Pierce, F.W., and Bolm, J.G., eds., Porphyry copper deposits of the American Cordillera: Arizona Geological Society Digest 20, p. 156-168.
@@ -2671,6 +2726,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: matches (abstract says stocks "vertically elongate (>3 km)", pluton paleodepths 5 to 15 km, life spans ~100,000 to several million years).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only.
 
 ### Seedorff2005
 - Reference: Seedorff, E., Dilles, J.H., Proffett, J.M., Einaudi, M.T., Zurcher, L., Stavast, W.J.A., and others, 2005, Porphyry deposits: characteristics and origin of hypogene features, in One Hundredth Anniversary Volume (Economic Geology): Society of Economic Geologists, p. 251-298.
@@ -2683,6 +2739,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): abstract.
 - Read in this pass: not fetched (Crossref metadata only; the Crossref listing shows the first six authors; the full author list was not retrieved).
 - Reference check: probable identification.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): abstract via OpenAlex only (first 2,500 characters).
 
 ### Heckel1986
 - Reference: Heckel, P.H., 1986, Sea-level curve for Pennsylvanian eustatic marine transgressive-regressive depositional cycles along midcontinent outcrop belt, North America: Geology 14(4):330 (end page not seen).
@@ -2718,6 +2775,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): "the constants of the paper".
 - Read in this pass: not fetched (Crossref metadata only).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Blackman2021/Blackman2021.txt (arXiv v3): Fig. 4 (xoshiro256 code), Tables 2 and 3, the SplitMix seeding advice.
 
 ### Marsaglia1964
 - Reference: Marsaglia, G., and Bray, T.A., 1964, A convenient method for generating normal variables: SIAM Review 6(3):260-264.
@@ -2742,6 +2800,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): "the constants of the paper".
 - Read in this pass: not fetched; the constants were checked against NumPy's implementation of the algorithm (S50).
 - Reference check: matches.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the library file is Hormann's April 1992 preprint of the same method; Algorithm PTRS and its constants read on rendered pages (printed pp. 6-7); they match the code. The 1993 journal article remains unread.
 
 ### AbramowitzStegun1964
 - Reference: Abramowitz, M., and Stegun, I.A., eds., 1964, Handbook of mathematical functions with formulas, graphs, and mathematical tables: National Bureau of Standards Applied Mathematics Series 55, formula 7.1.26.
@@ -2753,6 +2812,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): no read statement.
 - Read in this pass: not fetched.
 - Reference check: the edition year (1964) is the standard first edition; not checked here.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): new library folder AbramowitzStegun1964/ (scanned, no text layer); formulas 7.1.25 to 7.1.28, printed p. 299, read on a rendered page.
 
 ### Acklam
 - Reference: Acklam, P.J., An algorithm for computing the inverse normal cumulative distribution function (web note, undated, around 2000-2003).
@@ -2764,6 +2824,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Read so far (by the project): no read statement.
 - Read in this pass: full text fetched (relative error and the 0.02425 split read, S50).
 - Reference check: matches the algorithm; undated web note, not a publication.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Acklam/acklam3.txt, the coefficient listing, break-points and error statement (all match the code).
 
 ### Software
 - Reference: Ellefsen, K.J., 2017, User's guide for MapMark4: an R package for the probability calculations in three-part mineral resource assessments: U.S. Geological Survey Techniques and Methods, book 7, chap. C14 (doi 10.3133/tm7c14); Duval, J.S., 2012, Version 3.0 of EMINERS, Economic Mineral Resource Simulator: U.S. Geological Survey Open-File Report 2004-1344 (doi 10.3133/ofr20041344); EIS Toolkit (EUPL-1.2, offline calibration only): Reference: UNIDENTIFIED (no citation given; not searched).
@@ -2830,6 +2891,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): in full (pages cited).
 - Read in this pass: not fetched (index page only; PDFs unreadable). The Bulletin 2165 page https://pubs.usgs.gov/bul/2165/ returned 404.
 - Reference check: chapter titles and authors match the project's description; the 1,000-1,500 MMBO and 6,000 cf/bbl values were not checked.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the folder held only the landing page; chapters AM, AR, MC and GL of DDS-60 were fetched into a new folder USGS2000b_DDS60chapters/ and the minimum-field-size and fractile passages read.
 
 ### Averitt1975
 - Reference: Averitt, Paul, 1975, Coal resources of the United States, January 1, 1974: U.S. Geological Survey Bulletin 1412, vi, 131 p.
@@ -2841,6 +2903,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): not stated beyond the research sub-agent.
 - Read in this pass: not fetched (citation page only).
 - Reference check: matches. The "458,600 mi2 = 13 %" and Mammoth bed figures were not checked.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Averitt1975/Averitt1975.txt: Table 1 (printed p. 7, coal-bearing area by state), the number-of-beds table (p. 8), Tables 2 and 6, the Mammoth zone (pp. 63-64), the No. 5 and Herrin beds (pp. 68-69).
 
 ### Trippi2011
 - Reference: Trippi, Michael H., and Tewalt, Susan J., 2011, Geographic information system (GIS) representation of coal-bearing areas in India and Bangladesh: U.S. Geological Survey Open-File Report 2011-1296, iii, 23 p.
@@ -2852,6 +2915,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): not stated.
 - Read in this pass: abstract fetched (shapefiles of coalfields; no counts or areas in it).
 - Reference check: authors were not given in the project's citation; now resolved. The "113 coalfields" and "34.7 thousand km2" were not checked.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): the full report added to Trippi2011/ (OFR2011-1296.pdf and text); printed pp. 1-14 read: 34.7 thousand km2 of coalfield in 3.29 million km2 of land; Table 1 lists about 150 coalfield and lignite names and no per-field areas.
 
 ### BAP2018
 - Reference: Bioregional Assessments Programme, 2018 (finalised), Context statement for the Sydney Basin bioregion (Product 1.1), Australian Government.
@@ -2863,6 +2927,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): not stated.
 - Read in this pass: full text fetched in part (landing page; two targeted questions). See ORE-121 spot check: the page gives different numbers from the ledger.
 - Reference check: no authors printed; date from page footer.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): nine context-statement and resource-assessment pages added to BAP2018/ (Commonwealth open content) and read: 36,000 km2 onshore basin, five coalfields named by the Coalfield Geology Council of NSW, Southern Coalfield seam thicknesses.
 
 ### Hatch2002
 - Reference: Hatch, Joseph R., and Affolter, Ronald H., 2002, Resource assessment of the Springfield, Herrin, Danville, and Baker coals in the Illinois Basin: U.S. Geological Survey Professional Paper 1625-D.
@@ -2874,6 +2939,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): "several are the research's own arithmetic".
 - Read in this pass: not fetched (USGS page only).
 - Reference check: identified from the report number. This is the Illinois Basin volume and is the likely home of any Illinois Basin coal-area figure.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Hatch2002/Hatch2002.txt, Executive Summary pp. A1-A5, Introduction p. B1, p. D9: the Illinois Basin's coal-bearing area is 36,800 mi2 in Illinois, 6,500 in Indiana and 6,400 in western Kentucky (the 36,800 used by the coal type before stage 2 is Illinois alone).
 
 ### Ruppert2014
 - Reference: Ruppert, Leslie F., and Ryder, Robert T., eds., 2014, Coal and petroleum resources in the Appalachian basin: distribution, geologic framework, and geochemical character: U.S. Geological Survey Professional Paper 1708. Chapter D.1: Coal and coalbed-methane resources in the Appalachian and Black Warrior basins: maps showing the distribution of coal fields, coal beds, and coalbed-methane fields.
@@ -2885,6 +2951,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): research's own arithmetic in part.
 - Read in this pass: not fetched (USGS page only; chapter authors not shown).
 - Reference check: identified from the report number.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Ruppert2014/Ruppert2014.txt, 'Coal Regions and Fields' (p. 1): 23 named Appalachian coal fields; no thickness or area tables.
 
 ### NMET-Jharia
 - Reference: UNIDENTIFIED. "NMET Jharia proposal" (National Mineral Exploration Trust, India). I did not search for it (no search tool); no bibliographic form was available.
@@ -2909,6 +2976,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): listed as NOT verified.
 - Read in this pass: not fetched.
 - Reference check: cannot identify.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): SAIMM-coalfields/SAIMM-coalfields.txt: p. 95 ('19 coalfields'), Tables I and III. No coalfield areas.
 
 ### Hampson1999
 - Reference: probable identification: Hampson, Gary, Stollhofen, Harald, and Flint, Steve, 1999, A sequence stratigraphic model for the Lower Coal Measures (Upper Carboniferous) of the Ruhr district, north-west Germany: Sedimentology, v. 46, no. 6, p. 1199-1231. The code gives only "Hampson 1999"; this is the only 1999 Hampson paper on coal cycles I found by Crossref.
@@ -2956,6 +3024,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): listed as NOT verified.
 - Read in this pass: full text fetched (the area sentence).
 - Reference check: page found and the figure matches (see ORE-126 spot check).
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): GABowen/GABowen.txt: the Bowen Basin occupies about 160,000 km2, its southern half under the Surat Basin; no coalfield list.
 
 ### Ryer1980
 - Reference: Ryer, Thomas A., and Langer, Anna W., 1980, Thickness change involved in the peat-to-coal transformation for a bituminous coal of Cretaceous age in central Utah: Journal of Sedimentary Petrology, v. 50, no. 3, p. 987-992 (OpenAlex names the journal Journal of Sedimentary Research, the same SEPM journal).
@@ -2968,6 +3037,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): not stated; not used by the code.
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: matches. The paper is a single Utah case; the abstract says "approximately 11:1".
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Crossref abstract only, new library folder RyerLanger1980/ (peat:coal about 11:1 for one Cretaceous bed).
 
 ### Cox1986
 - Reference: Cox, Dennis P., and Singer, Donald A., eds., 1986, Mineral deposit models: U.S. Geological Survey Bulletin 1693, xiii, 379 p. (DEP covers the grade-tonnage models.) Descriptive models used: 39a placer Au-PGE (Warren E. Yeend); sedimentary exhalative Zn-Pb; alluvial placer Sn; diamond placers.
@@ -2979,6 +3049,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): "figure intercepts and page numbers cited".
 - Read in this pass: full text fetched (the five HTML pages above).
 - Reference check: matches. Notes: the USGS series page prints "Originally published 1996; Version 1.0 posted 1998" (the print volume is 1986). The HTML pages do not print the model numbers 31a, 39d, 39e in the text I received, so the mapping of those numbers to sedex, alluvial tin and diamond placers rests on the ledger. The p. 262 page number for the gravel density could not be checked.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Cox1986/b1693.txt (MosierSinger1986, MenzieMosier1986, MosierBriskey1986, Cannon1986 and OrrisBliss1986 are byte-identical copies of this file): models 39a (placer Au), 34a (Superior Fe), 28b (Algoma Fe), 32a/32b (MVT), 31a (sedex) text; the grade-tonnage arrow labels are not in the OCR layer and were read on rendered page images (PDF page = printed + 16).
 
 ### Thomas1949
 - Reference: Thomas, Marjorie, 1949, A generalization of Poisson's binomial limit for use in ecology: Biometrika, v. 36, no. 1-2, p. 18-25.
@@ -3003,6 +3074,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Read so far (by the project): not read; the note says full text is needed.
 - Read in this pass: not fetched (OpenAlex metadata only).
 - Reference check: identified. This is the review that would carry any placer-efficiency or transport-distance figures; it is the first paper to get through a library.
+- Read in stage 2 (WP-9/10, 2026-10-02, by sub-agents in the source library): Crossref abstract, new library folder Garnett2005/ (abstract only): transport 'from less than a kilometer to hundreds of kilometers'.
 
 ### Lehmann2020
 - Reference: Lehmann, Bernd, 2021 (online 2020), Formation of tin ore deposits: a reassessment: Lithos, v. 402-403, article 105756.
@@ -3040,6 +3112,34 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Reference check: n/a. Not bibliographic: Excavated Variants; Create Ore Excavation (COE); Create: Diesel Generators (CDG) and its default thresholds; Create ore stones; vanilla 1.21.1 ore-density measurement (tools/review/deposit-audit.sh); deposit audit tool; project documents (docs/deeptime-design-decisions.md, docs/research/notes/ore_genesis_modeling.md, plan sections, surface_processes_climate.md section 4, build log STATUS.md); Wikipedia pages (Upper Silesia, Indian field areas, Bowen Basin), listed in the project as weak secondary sources.
 
 ---
+
+
+### Smolinski2014
+- Reference: Smolinski, A., Rompalski, P., Cybulski, K., Checko, J., and Howaniec, N., 2014, Chemometric study of trace elements in hard coals of the Upper Silesian Coal Basin, Poland: The Scientific World Journal 2014, article 234204.
+- DOI or URL: 10.1155/2014/234204 ; https://pmc.ncbi.nlm.nih.gov/articles/PMC4055605/
+- Cited as: (stage 2) the Upper Silesian Coal Basin's area and documented deposits in the coal type's notes.
+- Ledger ids: ORE-122
+- Access: open access (CC BY).
+- Library (the project's source library, not distributed): fetched in stage 2 (Europe PMC full-text XML), folder Smolinski2014/, text file Smolinski2014.txt.
+- Read in stage 2 (WP-9/10, 2026-10-02): the geological setting: basin 5,600 km2, documented area 3,295 km2, 120 documented deposits; the coal series and their seam counts.
+
+### Hancox2014
+- Reference: Hancox, P.J., and Götz, A.E., 2014, South Africa's coalfields - a 2014 perspective: International Journal of Coal Geology 132:170-254.
+- DOI or URL: 10.1016/j.coal.2014.06.019 ; author-accepted manuscript at https://repository.up.ac.za/bitstream/handle/2263/58453/Hancox_South_2014.pdf
+- Cited as: (stage 2) the South African coalfield areas in the coal type's notes.
+- Ledger ids: ORE-126
+- Access: paywalled; author-accepted manuscript in the University of Pretoria repository.
+- Library (the project's source library, not distributed): fetched in stage 2, folder Hancox2014/, text file Hancox2014.txt (some digits garbled in the text layer; those statements are not relied on).
+- Read in stage 2 (WP-9/10, 2026-10-02): section 4, the coalfield location paragraphs: 19 coalfields over some 9.7 million ha; Witbank over 568,000 ha, Highveld about 700,000 ha, Waterberg about 360,000 ha.
+
+### ICS2023
+- Reference: International Commission on Stratigraphy, 2023, International Chronostratigraphic Chart, v2023/09.
+- DOI or URL: https://stratigraphy.org/ICSchart/ChronostratChart2023-09.pdf
+- Cited as: (stage 2) the base of the Devonian, 419.2 +/- 3.2 Ma, for the land-plants clock (deposits/clocks.rs LAND_PLANTS_GA).
+- Ledger ids: ORE-015
+- Access: open.
+- Library (the project's source library, not distributed): fetched in stage 2, folder ICS2023/, text file ChronostratChart2023-09.txt.
+- Read in stage 2 (WP-9/10, 2026-10-02): the Devonian base, '419.2 +/-3.2' Ma, read by the WP-9/10 agent.
 
 ## Moisture, Köppen classes and biomes (MOI, BIO)
 
