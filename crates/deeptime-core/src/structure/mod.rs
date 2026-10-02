@@ -955,6 +955,11 @@ impl StructureStage {
         let dist = traps::orogen_distance_km(d, src.regime, src.crust, flags);
         let halite = self.tables.halite;
         let p = &self.p;
+        // Impact structures (P2-08): the closure the impact stage found at its craters.
+        let craters = fields
+            .get(crate::surface::impacts::field::TRAP)
+            .map(|f| f.data.as_slice())
+            .filter(|v| v.len() == n);
         // The world's own folds and faults, where it has any (P2-01).
         let structural = (from == TrapSource::Configured && p.deformation.enabled())
             .then(|| traps::structural(&self.st.features, &src.grid));
@@ -983,6 +988,7 @@ impl StructureStage {
                     structural.as_ref().map(|v| v[c]),
                     p,
                 )
+                .max(craters.map_or(0.0, |v| v[c]))
             })
             .collect()
     }
