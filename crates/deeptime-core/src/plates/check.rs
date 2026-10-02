@@ -3622,16 +3622,36 @@ mod tests {
             // Area-weighted RMS: today, from Forsyth & Uyeda 1975 Table 1; the last 200 Myr's
             // range of global RMS, Zahirovic et al. 2015 §3.2.
             ("speed_rms_mm_yr", 47.1, "Forsyth & Uyeda 1975 Table 1"),
-            ("speed_rms_mm_yr", 50.0, "Zahirovic et al. 2015 §3.2, low end"),
-            ("speed_rms_mm_yr", 100.0, "Zahirovic et al. 2015 §3.2, high end"),
+            (
+                "speed_rms_mm_yr",
+                50.0,
+                "Zahirovic et al. 2015 §3.2, low end",
+            ),
+            (
+                "speed_rms_mm_yr",
+                100.0,
+                "Zahirovic et al. 2015 §3.2, high end",
+            ),
             ("speed_big_p10_mm_yr", 11.0, "Forsyth & Uyeda 1975 Table 1"),
             ("speed_big_p50_mm_yr", 42.0, "Zahirovic et al. 2015 §3.5"),
             ("speed_big_p90_mm_yr", 80.0, "Forsyth & Uyeda 1975 Table 1"),
-            ("speed_oceanic_over_continental", 2.9, "Zahirovic et al. 2015 §3.5"),
+            (
+                "speed_oceanic_over_continental",
+                2.9,
+                "Zahirovic et al. 2015 §3.5",
+            ),
             ("speed_slab_over_free", 3.0, "Zahirovic et al. 2015 §3.5"),
-            ("speed_slab_over_free", 4.0, "Conrad & Lithgow-Bertelloni 2004"),
+            (
+                "speed_slab_over_free",
+                4.0,
+                "Conrad & Lithgow-Bertelloni 2004",
+            ),
             ("speed_slab_rank_corr", 0.71, "Forsyth & Uyeda 1975 Table 1"),
-            ("speed_area_rank_corr", -0.34, "Forsyth & Uyeda 1975 Table 1"),
+            (
+                "speed_area_rank_corr",
+                -0.34,
+                "Forsyth & Uyeda 1975 Table 1",
+            ),
             ("ocean_age_p50_myr", 55.4, "Seton et al. 2020 grid"),
             ("ocean_age_p90_mean_myr", 133.0, "Seton et al. 2020 grid"),
             ("ocean_old180_pct", 0.61, "Seton et al. 2020 grid"),
@@ -3645,7 +3665,11 @@ mod tests {
             ("largest_share_p50", 0.205, "Bird 2003 Table 1"),
             ("plates_over_5pct_p50", 7.0, "Bird 2003 Table 1"),
             ("boundary_subduction_pct", 19.7, "Bird 2003 Table 3"),
-            ("collision_convergence_ratio_20myr", 0.27, "Copley et al. 2010"),
+            (
+                "collision_convergence_ratio_20myr",
+                0.27,
+                "Copley et al. 2010",
+            ),
         ];
         for &(key, v, src) in earth {
             assert!(MEASURES.iter().any(|d| d.key == key), "{key}");
