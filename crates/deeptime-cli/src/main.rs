@@ -10,6 +10,7 @@ mod heightmap;
 mod hydro;
 mod margins_view;
 mod parity;
+mod plate_check;
 mod provinces;
 mod run;
 mod satellite_view;
@@ -440,6 +441,25 @@ enum Command {
         /// Field names (comma-separated); default every field.
         #[arg(long, value_delimiter = ',')]
         fields: Vec<String>,
+    },
+    /// The plate dynamics of finished runs against the acceptance targets of
+    /// docs/design/plate-collisions-and-welding.md §6: largest plate, plate lifetimes and fates,
+    /// land gained per step, what each collision lifted, collisions per 100 Myr, continental
+    /// crust, active margins, sea-floor age. Prints one table (measure, value, target range, pass
+    /// or fail) and exits non-zero when a measure is outside its range. With several runs the
+    /// value is their mean.
+    PlateCheck {
+        /// A run: a checkpoint (`stage --out`), a world-data folder or its manifest.json, or a
+        /// JSON file holding the plates note. Repeatable.
+        #[arg(long = "run")]
+        runs: Vec<PathBuf>,
+        /// Also write the table as JSON here.
+        #[arg(long)]
+        json: Option<PathBuf>,
+        /// JSON file moving target ranges: {"measure_key": [lo, hi]}, null for an open end or for
+        /// no range at all (the measure is then only reported).
+        #[arg(long)]
+        targets: Option<PathBuf>,
     },
     /// Draw the continental margins of a checkpoint's plate model by tectonic setting (P1-27:
     /// passive, Andean, subducting, collision, other plate boundary) over the sea floor by age,
@@ -941,6 +961,21 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Some(Command::PlateCheck {
+            runs,
+            json,
+            targets,
+        }) => match plate_check::run(&plate_check::Options {
+            runs: &runs,
+            json: json.as_deref(),
+            targets: targets.as_deref(),
+        }) {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("deeptime plate-check: {e}");
+                ExitCode::from(2)
+            }
+        },
         Some(Command::Margins { input, out }) => match margins_view::run(&input, &out) {
             Ok(m) => {
                 println!(
