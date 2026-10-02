@@ -1743,6 +1743,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated (the quoted phrase is in quotation marks in the comment)
 - Read in this pass: abstract fetched (OpenAlex, full abstract)
 - Reference check: author list, year, journal, volume and issue match; "TC5006" article number is not shown in the OpenAlex record (not verified). The abstract contains both numbers the code attributes to it (see spot checks DEF-001, DEF-005).
+- Read in WP-8 (2026-10-02): full text, fetched from the HAL open copy (hal-00634887) through the web archive; library Mouthereau2007.pdf, Mouthereau2007_raw.txt (article page = PDF page - 1). Fig. 5 caption: 149 anticlines, "Zagros folds have a dominant wavelength of 15.8 ± 5.3 km"; §[55]: 11 km near the Surmeh fault to 30 km in the High Zagros; art. p. 5: maximum fold amplitudes 500-1,000 m; §[7]: "a 200-kmwide arcuate folded belt", sedimentary pile up to 12 km, axial lengths often over 100 km; abstract and §[18]: 65-78 km (16-19 %) across the whole Zagros, only about 15 km of it across the Folded Belt (§[70]); §[53]-[54]: buckling, 2πH(ηl/6ηm)^(1/3) with a 2 km layer (DEF-001, DEF-002, DEF-004, DEF-005, DEF-007, DEF-027).
 
 ### Biot1961
 - Reference: Biot, M. A. (1961). Theory of folding of stratified viscoelastic media and its implications in tectonics and orogenesis. Geological Society of America Bulletin 72(11):1595-1620.
@@ -1755,6 +1756,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: metadata only
 - Reference check: authors, year, volume, issue, pages match.
+- WP-8 (2026-10-02): not obtained. The dominant-wavelength relation is now cited to Schmalholz & Mancktelow 2016 (eq. 13), which credits Biot 1957 and Ramberg 1962 (DEF-002).
 
 ### Sherwin1968
 - Reference: Sherwin, J.-A. & Chapple, W. M. (1968). Wavelengths of single layer folds: a comparison between theory and observation. American Journal of Science 266(3):167-179.
@@ -1767,6 +1769,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex summary)
 - Reference check: authors, year, volume, pages match. The paper compares Biot's theory with 818 fold wavelengths from six sites (quartz veins in slate and phyllite), so "tested on natural folds" is correct; it found the viscosity ratios needed were low and Biot's theory could not be applied directly.
+- WP-8 (2026-10-02): not obtained; no longer cited by the code as read (DEF-002).
 
 ### Blanc2003
 - Reference: Blanc, E. J.-P., Allen, M. B., Inger, S. & Hassani, H. (2003). Structural styles in the Zagros Simple Folded Zone, Iran. Journal of the Geological Society 160(3):401-412.
@@ -1779,6 +1782,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex summary)
 - Reference check: authors, year, volume, issue, pages match. The abstract is about a balanced cross-section with about 49 km of shortening over 5 Myr and several decollement horizons; it gives no fold length-to-wavelength ratio.
+- WP-8 (2026-10-02): not obtained; the code now cites Alavi 2007 (read in full) for the fold length ratio (DEF-004).
 
 ### McQuarrie2004
 - Reference: McQuarrie, N. (2004). Crustal scale geometry of the Zagros fold-thrust belt, Iran. Journal of Structural Geology 26(3):519-535.
@@ -1790,6 +1794,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: metadata only (OpenAlex dates it 15 Oct 2003 online; volume 26 is 2004)
 - Reference check: title, journal, volume, pages match. The title the code gives is only "McQuarrie 2004" (no title). The "about 20 %" figure is not confirmed.
+- WP-8 (2026-10-02): the Caltech Authors record (1k507-wsf19) holds metadata only, files restricted; abstract read (McQuarrie2004_abstract_only.txt): "Total shortening in the Zagros fold–thrust belt is 70±20 km, which corresponds to ~20% shortening of the Arabian block" (DEF-005, abstract only).
 
 ### Gawthorpe2000
 - Reference: Gawthorpe, R. L. & Leeder, M. R. (2000). Tectono-sedimentary evolution of active extensional basins. Basin Research 12(3-4):195-218.
@@ -1801,6 +1806,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: metadata only
 - Reference check: authors, year, volume, issue, pages match. "Segments of some tens of km" is unconfirmed.
+- WP-8 (2026-10-02): not obtained (the publisher refuses scripted access; the UEA record 32628 has no full text; no archived copy). DEF-013 is labelled a design value and the comment says the source was not read.
 
 ### Cowie1992a
 - Reference: Cowie, P. A. & Scholz, C. H. (1992). Displacement-length scaling relationship for faults: data synthesis and discussion. Journal of Structural Geology 14(10):1149-1156.
@@ -1813,6 +1819,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex)
 - Reference check: the pages 1149-1156 are the "data synthesis and discussion" paper, and it is the right one for a data-compilation citation. A companion paper by the same authors (Cowie & Scholz 1992, "Physical explanation for the displacement-length relationship of faults using a post-yield fracture mechanics model", JSG 14(10):1133-1148, DOI 10.1016/0191-8141(92)90065-5) is the theoretical one; the code does not cite it. The abstract of the cited paper gives no value of gamma.
+- WP-8 (2026-10-02): not obtained; no longer cited by the code (DEF-015 cites Schlische et al. 1996 through Lathrop et al. 2022).
 
 ### Schlische1996
 - Reference: Schlische, R. W., Young, S. S., Ackermann, R. V. & Gupta, A. (1996). Geometry and scaling relations of a population of very small rift-related normal faults. Geology 24(8):683-686.
@@ -1825,6 +1832,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex summary); the 0.03 comes from a secondary review (Lathrop2022)
 - Reference check: authors, year, volume, pages match. The abstract says displacement scales linearly with length across eight orders of magnitude and gives no number; the review below quotes the paper's best fit as D = 0.03 L^1.06.
+- WP-8 (2026-10-02): abstract read from an archived journal page (Schlische1996_abstract_page.txt): "the maximum observed displacement scales linearly with fault length ... no significant change in displacement geometry and the linear length-displacement scaling relation between small and large faults". The 0.03 is read in Lathrop et al. 2022 (DEF-015).
 
 ### Lathrop2022
 - Reference: Lathrop, B. A., Jackson, C. A.-L., Bell, R. E. & Rotevatn, A. (2022). Displacement/length scaling relationships for normal faults; a review, critique, and revised compilation. Frontiers in Earth Science 10:907543.
@@ -1836,6 +1844,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not applicable
 - Read in this pass: full text fetched (via WebFetch summary of the full page; passages on Schlische 1996, Cowie & Scholz 1992a and the typical gamma range)
 - Reference check: not applicable.
+- Read in WP-8 (2026-10-02): full text (new reading-order extraction Lathrop2022_raw.txt). p. 2: c "typically fall[s] between 0.001 and 0.1"; p. 4: strike-slip D/L "as high as 1:1", normal faults at most 1:2 (citing Kim & Sanderson 2005); p. 7: Schlische et al. 1996 "D = 0.03L1.06" from 201 Dan River faults and 346 others; p. 6 and table 1: the review's own fit Dmax = 0.03 L^0.92. No separate value for reverse or strike-slip faults (DEF-015 to DEF-018).
 
 ### Kim2005
 - Reference: Kim, Y.-S. & Sanderson, D. J. (2005). The relationship between displacement and length of faults: a review. Earth-Science Reviews 68(3-4):317-334.
@@ -1848,6 +1857,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: metadata only
 - Reference check: authors, volume, issue, pages match. OpenAlex dates it 2004 (online); the issue is January 2005 per my recall, so "2005" is acceptable but may be cited as 2004 elsewhere. The "order-of-magnitude spread" is not confirmed from this paper.
+- WP-8 (2026-10-02): not obtained (Southampton eprints 52991 has no PDF; no archived copy). Its findings are cited only as Lathrop et al. 2022 report them.
 
 ### Anderson1951
 - Reference: Anderson, E. M. (1951). The Dynamics of Faulting and Dyke Formation with Applications to Britain, 2nd ed., revised. Oliver and Boyd, Edinburgh. 206 pp.
@@ -1859,6 +1869,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: not fetched (secondary sources only)
 - Reference check: the code's title is shortened; the full title includes "and Dyke Formation with Applications to Britain". The edition (2nd, 1951) matches. The first edition is 1942 (Wikipedia gives 1905 for the theory's first publication).
+- WP-8 (2026-10-02): the book was not obtained; the code now cites Anderson 1905 (read in full), the paper that first set out the theory (DEF-019 to DEF-021).
 
 ### Weissel1989
 - Reference: Weissel, J. K. & Karner, G. D. (1989). Flexural uplift of rift flanks due to mechanical unloading of the lithosphere during extension. Journal of Geophysical Research 94(B10):13919-13950.
@@ -1871,7 +1882,125 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: abstract fetched (OpenAlex summary)
 - Reference check: authors, year, volume, pages match.
+- WP-8 (2026-10-02): not obtained; DEF-059 stays `abstract-only` on stage 1's abstract.
 
+
+### Schmalholz2016
+- Reference: Schmalholz, S. M. & Mancktelow, N. S. (2016). Folding and necking across the scales: a review of theoretical and experimental results and their applications. Solid Earth 7:1417-1465.
+- DOI or URL: 10.5194/se-7-1417-2016 (open access)
+- Cited as: "Schmalholz & Mancktelow 2016, Solid Earth 7:1417-1465, eq. 13" (added to the code in WP-8)
+- Ledger ids: DEF-002
+- Access: open access
+- Library: fetched WP-8 2026-10-02 (PDF, 49 pages, text layer). Text files: Schmalholz2016.txt, Schmalholz2016_raw.txt (printed page = PDF page + 1416).
+- Read in WP-8 (2026-10-02): full text for the passages used. Eq. (13), p. 1422: "Ld = 2π H (R/6)^(1/3) ... the dominant wavelength is directly proportional to the layer thickness ... first derived by Biot (1957)", Ramberg 1962 identical (p. 1423); p. 1425: lower limit of wavelength to thickness about 4; p. 1442: "common wavelength to thickness ratios are between 2 and 16 with a mean value at ∼ 6.5 (e.g. Hudleston and Treagus, 2010)"; p. 1434: a multilayer of m equal layers raises the wavelength by m^(1/3) (Biot 1961); eq. (32), p. 1436: Ld = 1.9 √(H Htot); pp. 1430-1433: linear theory good to about 20 % shortening and 25° limbs.
+
+### Elliott1976
+- Reference: Elliott, D. (1976). The energy balance and deformation mechanisms of thrust sheets. Philosophical Transactions of the Royal Society of London A 283:289-312.
+- DOI or URL: 10.1098/rsta.1976.0086
+- Cited as: "Elliott 1976, Phil. Trans. R. Soc. A 283:289-312, p. 297" (added to the code in WP-8)
+- Ledger ids: DEF-013, DEF-015, DEF-017
+- Access: free to read at the publisher (fetched through the web archive; the live site refuses scripted access)
+- Library: fetched WP-8 2026-10-02 (PDF, 26 pages, text layer). Text files: Elliott1976.txt, Elliott1976_raw.txt (printed page = PDF page + 288).
+- Read in WP-8 (2026-10-02): p. 297 and fig. 3: for 20 thrusts of the Canadian Rockies foothills and front ranges "a roughly linear relation between strike length l on the map and displacement u = Kl (9) where K ~ 7 %" (the "=" read through OCR); fig. 4, p. 298: the McConnell thrust "has a strike length of 410 km".
+
+### Anderson1905
+- Reference: Anderson, E. M. (1905). The dynamics of faulting. Transactions of the Edinburgh Geological Society 8:387-402.
+- DOI or URL: open scan at Zenodo record 1650397 (CC0), https://zenodo.org/records/1650397
+- Cited as: "Anderson 1905, Trans. Edinb. Geol. Soc. 8:387-402, pp. 389 and 402" (added to the code in WP-8)
+- Ledger ids: DEF-019, DEF-020, DEF-021, DEF-024
+- Access: open (public domain by age; CC0 scan)
+- Library: fetched WP-8 2026-10-02 (PDF scan with OCR, 16 pages). Text files: Anderson1905.txt, Anderson1905_raw.txt (printed page = PDF page + 386; letter-spaced OCR).
+- Read in WP-8 (2026-10-02): p. 389: tan 2θ = 1/μ, "θ = 45° for μ = 0; θ = 30° for μ = 1/√3 or ·577; θ = 22½° for μ = 1", θ the angle between the fault plane and the greatest pressure; p. 402 (summary): thrusts form when the greatest pressure is horizontal and the least vertical and "dip ... at angles of less than 45°"; normal faults when the greatest pressure is vertical, "at angles of more than 45°"; wrench planes when the greatest and least are horizontal, "their hade is theoretically vertical". Anderson does not state 60° and 30° as such.
+
+### WaldronSnyder2020
+- Reference: Waldron, J. W. F. & Snyder, M. (2020). Geological Structures: a Practical Introduction. University of Alberta, open textbook (CC BY-NC).
+- DOI or URL: https://pressbooks.openeducationalberta.ca/introductorystructuralgeology/
+- Cited as: in the ledger and the page only (WP-8)
+- Ledger ids: DEF-019, DEF-021, DEF-024, DEF-031
+- Access: open access
+- Library: fetched WP-8 2026-10-02 (PDF, 225 pages, text layer). Text files: WaldronSnyder2020.txt, WaldronSnyder2020_raw.txt (printed page = PDF page - 12).
+- Read in WP-8 (2026-10-02): p. 151: Anderson's gravity, thrust and wrench regimes; p. 152: normal faults "dipping towards and away from each other with dips around 60°, at least near the surface"; p. 158: "Most major strike-slip faults are found to dip steeply, confirming Anderson's prediction".
+
+### CollettiniSibson2001
+- Reference: Collettini, C. & Sibson, R. H. (2001). Normal faults, normal friction? Geology 29(10):927-930.
+- DOI or URL: 10.1130/0091-7613(2001)029<0927:NFNF>2.0.CO;2
+- Cited as: "Collettini & Sibson 2001, Geology 29:927-930, abstract" (added to the code in WP-8)
+- Ledger ids: DEF-019, DEF-020
+- Access: paywalled (abstract only)
+- Library: archived abstract page, CollettiniSibson2001_abstract_page.txt (WP-8 2026-10-02).
+- Read in WP-8 (2026-10-02): abstract only: normal-slip earthquake ruptures (n = 25) dip from 65° to 30°; reverse ruptures (n = 33) show "a dominant 30° ± 5° peak"; both consistent with a friction coefficient of about 0.6.
+
+### Herail1990
+- Reference: Hérail, G., Baby, P., López, M., Oller, J., López, O., Salinas, R., Sempéré, T., Beccar, G. & Toledo, H. Structure and kinematic evolution of Subandean thrust system of Bolivia. ORSTOM symposium paper (IRD Horizon document 31021). The year is the library key, not read on the scan.
+- DOI or URL: https://horizon.documentation.ird.fr/exl-doc/pleins_textes/pleins_textes_4/colloques/31021.pdf
+- Cited as: "Hérail et al., ORSTOM symposium paper, pp. 179-180, a poor scan" (added to the code in WP-8)
+- Ledger ids: DEF-027
+- Access: open (institutional repository)
+- Library: fetched WP-8 2026-10-02 (PDF scan with poor OCR). Text file: Herail1990.txt.
+- Read in WP-8 (2026-10-02): pp. 179-180: the northern Subandean zone is "60 to GO. km-wide" (second figure unreadable), shortening 136 km (51 %); the southern zone "100 to 140 km-wide", shortening 70 km (33 %) to 139 km (53 %).
+
+### DelaneyPollard1981
+- Reference: Delaney, P. T. & Pollard, D. D. (1981). Deformation of host rocks and flow of magma during growth of minette dikes and breccia-bearing intrusions near Ship Rock, New Mexico. U.S. Geological Survey Professional Paper 1202.
+- DOI or URL: https://pubs.usgs.gov/pp/1202/report.pdf
+- Cited as: "Delaney & Pollard 1981, USGS PP 1202" (added to the code in WP-8)
+- Ledger ids: DEF-047, DEF-048, DEF-049
+- Access: open (government report)
+- Library: fetched WP-8 2026-10-02 (PDF, 69 pages, text layer). Text files: DelaneyPollard1981.txt, DelaneyPollard1981_raw.txt.
+- Read in WP-8 (2026-10-02): abstract (PDF p. 6): seven dikes radiate from Ship Rock; the northeastern dike is about 2,900 m long, "an average thickness of 2.3 m, and a maximum thickness of 7.2 m", in 35 segments; three plugs "smaller than 30 m in diameter"; PDF p. 12: "The largest of these dikes are 9, 4, and 3 km long"; PDF p. 15: segments 0.6 to 4.6 m in average thickness.
+
+### Krumbholz2014
+- Reference: Krumbholz, M., Hieronymus, C. F., Burchardt, S., Troll, V. R., Tanner, D. C. & Friese, N. (2014). Weibull-distributed dyke thickness reflects probabilistic character of host-rock strength. Nature Communications 5:3272.
+- DOI or URL: 10.1038/ncomms4272 (open access)
+- Cited as: in the ledger and the page only (WP-8)
+- Ledger ids: DEF-047, DEF-048
+- Access: open access
+- Library: fetched WP-8 2026-10-02 (PDF, 7 pages, text layer). Text files: Krumbholz2014.txt, Krumbholz2014_raw.txt.
+- Read in WP-8 (2026-10-02): p. 2: dykes are penny-shaped "with a thickness-to-length ratio of 0.01–0.0001", their "thickness in nature ranges from centimetres to hundreds of metres"; fig. 1: 487 to 1,918 thickness measurements per locality in Iceland and the Canary Islands. The summary statistics are in the supplement, not read.
+
+### Bunger2013
+- Reference: Bunger, A. P., Menand, T., Cruden, A. R., Zhang, X. & Halls, H. (2013). Analytical predictions for a natural spacing within dyke swarms. Earth and Planetary Science Letters 375:270-279.
+- DOI or URL: 10.1016/j.epsl.2013.05.044; author manuscript HAL hal-00855272
+- Cited as: "Bunger, Menand, Cruden, Zhang & Halls 2013, Earth Planet. Sci. Lett. 375:270-279" (added to the code in WP-8)
+- Ledger ids: DEF-046, DEF-047, DEF-048
+- Access: open copy (author manuscript, fetched through the web archive)
+- Library: fetched WP-8 2026-10-02 (manuscript PDF, 50 pages, text layer). Text files: Bunger2013.txt, Bunger2013_raw.txt.
+- Read in WP-8 (2026-10-02): fig. 1 caption: the Mackenzie dykes "extend over more than 2,000 km with an average thickness of 30 m"; manuscript lines 523-542: thickness 1 to 150 m, mean 30 m; mean spacing about 6.7 km 500 km from the centre to about 25 km 2,100 km out, the most continuous distal dykes 35 to 65 km apart; lines 555-573: Matachewan dykes 10 to 20 m on average.
+
+### NMT_Shiprock
+- Reference: New Mexico Bureau of Geology and Mineral Resources. Ship Rock (Virtual Geologic Tour of New Mexico), web page.
+- DOI or URL: https://geoinfo.nmt.edu/tour/landmarks/shiprock/home.html
+- Cited as: "Ship Rock 500 m, New Mexico Bureau of Geology" (added to the code in WP-8)
+- Ledger ids: DEF-049
+- Access: open (agency page)
+- Library: saved page, NMT_Shiprock (WP-8 2026-10-02).
+- Read in WP-8 (2026-10-02): "The main part of the landform is 600 meters high, and 500 meters in diameter ... Ship Rock ... is a volcanic neck, or the central feeder pipe".
+
+### Latutrie2020
+- Reference: Latutrie, B. (2020). Volcanology of two maar-diatremes: Round Butte and Twin Peaks, Hopi Buttes volcanic field, Navajo Nation, Arizona. PhD thesis, Institut national de la recherche scientifique (INRS), Centre Eau Terre Environnement, Québec.
+- DOI or URL: https://espace.inrs.ca/id/eprint/10410/1/T956.pdf
+- Cited as: in the ledger only (WP-8)
+- Ledger ids: DEF-049
+- Access: open (institutional repository)
+- Library: fetched WP-8 2026-10-02 (PDF, 231 pages, text layer). Text files: Latutrie2020.txt, Latutrie2020_raw.txt.
+- Read in WP-8 (2026-10-02): PDF p. 49: Round Butte, "a diatreme 170-190 m in diameter".
+
+### Earle2019
+- Reference: Earle, S. (2019). Physical Geology, 2nd edition. BCcampus Open Education, Victoria, B.C. (CC BY).
+- DOI or URL: https://opentextbc.ca/physicalgeology2ed/ (chapter pages read through the web archive)
+- Cited as: "Earle 2019, Physical Geology 2nd ed., §3.5" (added to the code in WP-8)
+- Ledger ids: DEF-042; the page's craton comparison
+- Access: open access
+- Library: saved chapter pages §3.5, §21.1, §21.2 (Earle2019*.txt), WP-8 2026-10-02.
+- Read in WP-8 (2026-10-02): §3.5: "if the body has an exposed surface area greater than 100 square kilometres (km2), then it's a batholith; smaller than 100 km2 and it's a stock. Batholiths are typically formed only when a number of stocks coalesce beneath the surface"; §21.1-21.2: the Canadian Shield is where the ancient rocks of the craton are exposed, "typically strongly metamorphosed", elsewhere "covered with younger rocks".
+
+### WikipediaCraton
+- Reference: Wikipedia, "Craton" (secondary source).
+- DOI or URL: https://en.wikipedia.org/wiki/Craton
+- Cited as: in the page only (WP-8)
+- Ledger ids: none (the page's craton comparison)
+- Access: open (encyclopedia)
+- Library: saved page, WikipediaCraton (WP-8 2026-10-02).
+- Read in WP-8 (2026-10-02): cratons have "the cratonic basement of metamorphosed crystalline and metamorphic rocks and the platform, which is a younger, weakly deformed sedimentary cover".
 ### Jessell1981
 - Reference: Jessell, M. W. (1981). "Noddy": an interactive map creation package. Unpublished MSc thesis, Imperial College of Science and Technology, University of London (Royal School of Mines, Department of Geology), September 1981.
 - DOI or URL: https://tectonique.net/noddy/jessell_msc_1981.pdf (open copy; listed in a search result, not fetched or read)
@@ -1882,6 +2011,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: search result snippet only
 - Reference check: tectonique.net states "For publications using Noddy, the foundational reference is: Jessell, M., 1981. NODDY - An interactive map creation package".
+- Read in WP-8 (2026-10-02): full text (Jessell1981.txt). §3 preamble: the pitch convention ("zero results in a plunge direction of the dip direction of the plane minus 90 degrees, with positive amplitudes resulting in displacements in the direction of the pitch"); §3.2: the fold W' = W + A Fr(U) Fe(V), the profile normalised to 2π, Fe equal to 0.5 at V = n (so 0.693147 is ln 2), the amplitude "the largest positive digitised amplitude"; §3.6: the translation fault X' = X + αS (DEF-010, DEF-038, DEF-066).
 
 ### Jessell1996
 - Reference: Jessell, M. W. & Valenta, R. K. (1996). Structural geophysics: integrated structural and geophysical modelling. In: De Paor, D. G. (ed.), Structural Geology and Personal Computers, Computer Methods in the Geosciences 15. Pergamon, Oxford, pp. 303-324.
@@ -1893,6 +2023,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: search result snippet only
 - Reference check: a search snippet gives "Computer Methods in the Geosciences, volume 15, pages 303-324, 1996", consistent with the code. Whether the fold sine table (629 values) or fault geometry is described in this chapter is not checked.
+- WP-8 (2026-10-02): not obtained (no lawful full text found); the conventions it would document are read in Jessell 1981 and the source code.
 
 ### Jessell2022
 - Reference: Jessell, M., Guo, J., Li, Y., Lindsay, M., Scalzo, R., Giraud, J., Pirot, G., Cripps, E. & Ogarko, V. (2022). Into the Noddyverse: a massive data store of 3D geological models for machine learning and inversion applications. Earth System Science Data 14(1):381-392.
@@ -1904,6 +2035,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not stated
 - Read in this pass: full text fetched (via WebFetch of the article page; passages on timing and code licence)
 - Reference check: year, journal, volume, pages match. Authors and title now supplied in full. The code's "Jessell et al. 2022" is correct.
+- Read in WP-8 (2026-10-02): full text (Jessell2022.txt). p. 383: Noddy unravels the kinematics point by point, "taking under 15 s to generate 200 × 200 × 200 voxel models with both geological and geophysical representations combined using an Intel® Xeon® Gold 6254 CPU"; p. 390: "All codes and data are released under the MIT License" and the 4 km model dimensions (DEF-063, DEF-070, DEF-073).
 
 ### Wellmann2016
 - Reference: Wellmann, J. F., Thiele, S. T., Lindsay, M. D. & Jessell, M. W. (2016). pynoddy 1.0: an experimental platform for automated 3-D kinematic and potential field modelling. Geoscientific Model Development 9(3):1019-1035.
@@ -1926,6 +2058,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): licence "checked in its LICENSE" (STATUS.md)
 - Read in this pass: full text fetched (LICENSE file, repo front page, src/ listing, unEvents.c first 40 lines)
 - Reference check: licence matches what the code says, see spot check DEF-063. The LICENSE title line is "MIT License", copyright line "Copyright (c) 2021 Loop3D". The fetched unEvents.c header has no copyright or licence comment. The repository carries a src/Licence.h that is a registration-ID stub (not a licence text). Other published releases of the same program carry different licences, see Noddy licence history under spot check DEF-063.
+- Read in WP-8 (2026-10-02): the source tree at commit 6a21b2374516f8506c19cabcbe3ead00be9cc45d, downloaded as that commit's tarball onto the test machine (scratch, deleted with the package; not in the library). Read: unEvents.c (TOLERANCE 0.001, the constants 0.693147, 6.2831853 and 3.1415927, unbiot's commented-out call), utils.c (TOLERANCE 0.01, rotset and its clamp, 3.1415926535), getEvent.c (dip 90 stored as 89.999), nodStruc.h (X_PROFILE_RESOLUTION 628, Y_PROFILE_RESOLUTION 100, ARRAY_LENGTH_OF_STRAT_CODE 64), proflib.c (calcProfile, getArrayForProfile), nodLib3.c (initGraphPoints: the default sine profile of 21 points), matrix.c (rotateX), taste.c and which.c (the functions DEF-064 names) (DEF-010, DEF-063 to DEF-069).
 
 ### NoddyOriginal (software, other releases)
 - Reference: Noddy, Jessell, M. W. (Imperial College 1981-82; Monash University 1994; University of Western Australia). Distributions: tectonique.net Windows release and GitHub; SourceForge project "Noddy"; pynoddy (Wellmann et al.).
@@ -1984,6 +2117,7 @@ Catmull-Rom interpolation (named only), the design-decisions log entries (Ben), 
 - Read so far (by the project): not applicable
 - Read in this pass: abstract fetched (OpenAlex)
 - Reference check: not applicable.
+- Read in WP-8 (2026-10-02): full text (Alavi2007.txt). Abstract (p. 1064): cover 7-12 km thick, "a ⬃200 to 300 km-wide zone", minimum shortening 16-30 %; p. 1068: average width about 300 km, anticlines "long (up to ⬃150 –200 km)"; p. 1077: SW-verging (foreland-verging) asymmetric folds, interlimb angles 0-70° in the NE, 110-140° further SW, about 170° at the front, aspect ratios (axial length to half wavelength) typically over 10; table 1 (p. 1084): shortening 16.1 to 30.2 % on six sections (DEF-004, DEF-005, DEF-027, DEF-030).
 
 ### Pollack1993
 - Reference: Pollack, H. N., Hurter, S. J. & Johnson, J. R. (1993). Heat flow from the Earth's interior: analysis of the global data set. Reviews of Geophysics 31(3):267-280.
