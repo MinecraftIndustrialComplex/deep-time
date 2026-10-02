@@ -99,6 +99,7 @@ def main():
         stack = [start]
         seen[start] = 1
         n = sea_open = sky_open = 0
+        mouth = [0, 0, 0]
         lo = [10 ** 9] * 3
         hi = [-10 ** 9] * 3
         med = collections.Counter()
@@ -125,11 +126,16 @@ def main():
                     if top[zz * w + ii] < yy:
                         if grid[r] == 2:
                             sea_open += 1
+                            mouth[0] += i
+                            mouth[1] += y
+                            mouth[2] += z
                         else:
                             sky_open += 1
         bodies.append({"blocks": n, "y": [lo[1] + y0, hi[1] + y0], "x": [lo[0] + h["box"]["x0"], hi[0] + h["box"]["x0"]],
                        "z": [lo[2] + h["box"]["z0"], hi[2] + h["box"]["z0"]], "air": med[1], "water": med[2],
-                       "sea_faces": sea_open, "sky_faces": sky_open})
+                       "sea_faces": sea_open, "sky_faces": sky_open,
+                       "mouth": [h["box"]["x0"] + mouth[0] // max(1, sea_open), mouth[1] // max(1, sea_open) + y0,
+                                 h["box"]["z0"] + mouth[2] // max(1, sea_open)] if sea_open else None})
     bodies.sort(key=lambda b: -b["blocks"])
     to_sea = [b for b in bodies if b["sea_faces"]]
     to_sky = [b for b in bodies if b["sky_faces"]]
@@ -139,6 +145,9 @@ def main():
     for b in bodies[:20]:
         print(f"{b['blocks']:9,d} {b['air']:8,d} {b['water']:9,d}  {b['y'][0]:5d}..{b['y'][1]:<5d} {b['x'][0]:7d}..{b['x'][1]:<7d} "
               f"{b['z'][0]:6d}..{b['z'][1]:<6d} {b['sea_faces']:7d} {b['sky_faces']:7d}")
+    print("largest sea mouths (centre of the faces on the open sea):")
+    for b in sorted(to_sea, key=lambda b: -b["sea_faces"])[:12]:
+        print(f"  faces {b['sea_faces']:6d}  body {b['blocks']:7,d}  mouth at x {b['mouth'][0]} y {b['mouth'][1]} z {b['mouth'][2]}")
     # Submarine: void under the sea whose neighbouring open water column is the sea (an arch).
     arch = 0
     for c in range(w * dep):
