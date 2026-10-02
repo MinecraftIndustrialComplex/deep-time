@@ -364,7 +364,7 @@ button.chip[aria-pressed="true"] { border-color: var(--accent-line); background:
     if (end) {
       // The shorter way round in longitude, as the server cuts it; drawn again a lap to each side
       // so a line across the seam is seen leaving one edge and entering the other.
-      const bx = ax + shortDLon(end.lon - S.a.lon) / 360 * cw, by = proj.yOfLat(end.lat, ch);
+      const bx = ax + proj.xOfLonPic(shortDLon(end.lon - S.a.lon), cw), by = proj.yOfLat(end.lat, ch);
       ctx.setLineDash(S.state === 'pickB' ? [6 * dpr, 4 * dpr] : []);
       for (const [col, w] of [['rgba(6,9,14,.85)', 4.5 * dpr], ['#fff', 2 * dpr]]) {
         ctx.strokeStyle = col; ctx.lineWidth = w;

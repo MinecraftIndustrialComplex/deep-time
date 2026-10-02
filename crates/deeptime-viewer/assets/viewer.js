@@ -456,7 +456,7 @@
     // latitude the projection gives row py (proj.yOfLat).
     function toCanvas(lat, lon, f) {
       const s = canvas.width / f.w;
-      const px = ((lon % 360) + 360) % 360 / 360 * f.w;
+      const px = proj.xOfLonPic(proj.wrapLon(lon), f.w);
       const py = proj.yOfLat(lat, f.h);
       return [(px + 0.5) * s, (py + 0.5) * s];
     }

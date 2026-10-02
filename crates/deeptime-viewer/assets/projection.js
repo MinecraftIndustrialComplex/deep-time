@@ -7,7 +7,7 @@
 // Equirectangular: longitude λ = 360°·(x + C/2)/C (the seam x = −C/2 is 0°), latitude
 // φ = −360°·z/C (north is −z), the poles at z = ∓C/4, one block 360°/C both ways. A map picture
 // (a keyframe) is 2 : 1: x linear in longitude from the seam, y linear in latitude from the north
-// pole. Whichever projection Ben picks replaces these bodies.
+// pole. Whichever projection is picked replaces these bodies.
 (function (root) {
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   root.DTProj = {
@@ -27,6 +27,15 @@
     /** Blocks a step of (dlon, dlat) degrees spans at latitude `lat`. */
     dxOfDLon: (C, dlon, lat) => dlon / 360 * C,
     dzOfDLat: (C, dlat, lat) => -dlat / 360 * C,
+    /** Whether block z is on the planet (between the poles; x wraps, so every x is). */
+    onPlanet: (C, z) => Math.abs(z) <= C / 4,
+    /** Wraps a longitude into [0, 360). */
+    wrapLon: lon => ((lon % 360) + 360) % 360,
+    /** Column coordinate of a longitude (as given, not wrapped) in a map picture `w` columns wide
+     *  (x = 0 the seam). */
+    xOfLonPic: (lon, w) => lon / 360 * w,
+    /** Longitude (not wrapped) at column coordinate x of a map picture `w` columns wide. */
+    lonOfPicX: (x, w) => x / w * 360,
     /** Row coordinate of a latitude in a map picture `h` rows high (y = 0 the north pole). */
     yOfLat: (lat, h) => (90 - lat) / 180 * h,
     /** Latitude at row coordinate y of a map picture `h` rows high. */

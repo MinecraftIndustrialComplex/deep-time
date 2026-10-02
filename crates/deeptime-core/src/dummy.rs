@@ -408,7 +408,9 @@ impl DummyStage {
                 .for_each(|(j, row)| {
                     let lat = deeptime_format::Projection::picture_lat_deg(j as f64, gh as u32);
                     for (i, v) in row.iter_mut().enumerate() {
-                        let lon = 360.0 * i as f64 / gw as f64; // plan §5.2: the seam is 0°
+                        // The seam is 0°.
+                        let lon =
+                            deeptime_format::Projection::picture_lon_deg(i as f64, gw as u32);
                         *v = continent.elevation(lat, lon) as f32;
                     }
                 });

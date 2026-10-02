@@ -146,18 +146,21 @@ impl GridDesc {
     /// r × r block square times the projection's area scale at the row's point sample.
     pub fn cell_area_km2(&self, j: u32, m_per_block: f64) -> f64 {
         let side_km = f64::from(self.r) * m_per_block / 1000.0;
-        side_km * side_km * self.lat_of_row(j).to_radians().cos().max(0.0)
+        side_km * side_km
+            * self
+                .projection()
+                .area_scale(self.block_z(i64::from(j)) as f64)
     }
 
     /// The area weight of the band from row `j` to row `j + 1` (rows from the north pole), at its
     /// middle: the weight true-area shares and means of whole rows use.
     pub fn band_weight(&self, j: u32) -> f64 {
-        (std::f64::consts::PI * (0.5 - (f64::from(j) + 0.5) / f64::from(self.h))).cos()
+        Projection::band_weight(j, self.h)
     }
 
     /// The latitude, degrees, in the middle of the band from row `j` to row `j + 1`.
     pub fn band_lat_deg(&self, j: u32) -> f64 {
-        90.0 - 180.0 * (f64::from(j) + 0.5) / f64::from(self.h)
+        Projection::band_lat_deg(j, self.h)
     }
 
     /// [`GridDesc::band_weight`] of every row.
@@ -205,12 +208,12 @@ impl GridDesc {
 
     /// Wraps a column index into [0, W).
     pub fn wrap_i(&self, i: i64) -> u32 {
-        i.rem_euclid(i64::from(self.w)) as u32
+        crate::projection::wrap_col(i, i64::from(self.w)) as u32
     }
 
     /// Clamps a row index into [0, H − 1].
     pub fn clamp_j(&self, j: i64) -> u32 {
-        j.clamp(0, i64::from(self.h) - 1) as u32
+        crate::projection::clamp_row(j, i64::from(self.h)) as u32
     }
 
     /// Cells in the raster.

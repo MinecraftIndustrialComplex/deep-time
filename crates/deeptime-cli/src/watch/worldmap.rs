@@ -1586,11 +1586,11 @@ impl BakeMap {
         } else {
             ("land", None)
         };
-        let radians = |v: f64| v / f64::from(self.meta.c) * 360.0;
+        let proj = deeptime_format::Projection::new(self.meta.c);
         let mut o = json!({
             "x": wx, "z": z,
-            "lat": -radians(bz),
-            "lon": radians(bx + f64::from(self.meta.c) / 2.0),
+            "lat": proj.lat_deg(bz),
+            "lon": proj.lon_deg(bx),
             "terrain_y": (h * 10.0).round() / 10.0,
             "height_m": ((h - sea) * mv).round(),
             "surface": kind,
