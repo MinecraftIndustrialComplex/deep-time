@@ -227,7 +227,6 @@ impl Rivers {
                 chain_of[v as usize] = k as u32;
             }
         }
-        let c = f64::from(self.c);
         let (x0, z0) = Projection::new(self.c).index_origin();
         let tile = f64::from(self.tile);
         let mut lists: Vec<Vec<u32>> = vec![Vec::new(); n_tiles];
