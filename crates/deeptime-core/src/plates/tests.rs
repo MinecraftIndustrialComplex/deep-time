@@ -1022,3 +1022,112 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     };
     same_world(&strip(with), &strip(without));
 }
+
+/// Two plates on the preset's planet: the northern hemisphere continental (plate 0), the southern
+/// oceanic (plate 1), the southern turned by `turn` radians about the x axis since the last
+/// resampling, so it runs under the continent where y > 0 and opens a gap where y < 0. Overlaps
+/// are resolved (the ocean subducts, its crust hidden) as a step would.
+fn two_plates(p: &PlanetPreset, env: &Env<'_>, turn: f64) -> (PlateState, Geo, Vec<DVec3>) {
+    let (mut st, geo) = init::initial_state(p, env).unwrap();
+    let pts = geo.points();
+    for (i, s) in st.samples.iter_mut().enumerate() {
+        let north = pts[i].z > 0.0;
+        *s = state::Sample::blank(u32::from(!north));
+        if north {
+            s.kind = CONTINENTAL;
+            s.pools = pools::continental_column();
+            s.elevation_m = 400.0;
+        } else {
+            s.pools = pools::oceanic_column();
+            s.elevation_m = -4000.0;
+            s.formed_myr = (env.t_myr - 60.0) as f32;
+        }
+        s.thickness_m = pools::thickness(&s.pools);
+    }
+    let q = glam::DQuat::from_rotation_x(turn);
+    st.groups = vec![
+        state::Group {
+            plate: 0,
+            rot: [0.0, 0.0, 0.0, 1.0],
+        },
+        state::Group {
+            plate: 1,
+            rot: [q.x, q.y, q.z, q.w],
+        },
+    ];
+    for (k, pl) in st.plates.iter_mut().enumerate() {
+        pl.alive = k < 2;
+        pl.omega = [0.0; 3];
+    }
+    st.contacts.clear();
+    st.ridges.clear();
+    st.rift_links.clear();
+    let pos = geometry::positions(&st, &geo);
+    st.recount(&pos);
+    let tree = Tree::over(&pos, |_| true);
+    let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    subduction::resolve(&mut st, &mut world, &overlaps, &pos, env).unwrap();
+    (st, geo, pos)
+}
+
+/// Continental area (visible continental samples × sample area) of the two-plate planet before a
+/// resampling, and after it on `tries` lattices turned at random.
+fn continental_area_through_resampling(turn: f64, tries: u64) -> (PlateState, f64, Vec<f64>) {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (st, geo, pos) = two_plates(&p, &env, turn);
+    let area = env.norm.sample_area_km2();
+    let continental = |st: &PlateState| {
+        st.samples
+            .iter()
+            .filter(|s| !s.is_hidden() && s.kind == CONTINENTAL)
+            .count() as f64
+            * area
+    };
+    let before = continental(&st);
+    let after = (0..tries)
+        .map(|k| {
+            let mut s2 = st.clone();
+            s2.rng = crate::sphere::SplitMix64::new(1000 + k);
+            let mut world = WorldState::new(1, 16_384, p.t_start_years());
+            ridges::resample(&mut s2, &mut world, &pos, &geo, &env).unwrap();
+            continental(&s2)
+        })
+        .collect();
+    (st, before, after)
+}
+
+/// A resampling moves the crust onto a new lattice and must neither make nor destroy continental
+/// area beyond the lattice's own noise: on a static planet, and where an ocean runs under a
+/// continent (before 2026-10-02 the continent's outer half-spacing went to the subducting plate at
+/// every resampling; build log "resampling crust loss"). Tolerance: the mean change over six
+/// lattices within 0.2 % of the continental area (on this 20k planet one resampling's noise is
+/// about ±0.15 %, and the old loss at the converging margin about 0.6 %).
+#[test]
+fn resampling_conserves_continental_area() {
+    for (turn, label) in [(0.0, "static"), (0.1, "converging")] {
+        let (st, before, after) = continental_area_through_resampling(turn, 6);
+        if turn > 0.0 {
+            assert_eq!(
+                st.contacts.len(),
+                1,
+                "the ocean subducts under the continent"
+            );
+            assert_eq!((st.contacts[0].under, st.contacts[0].over), (1, 0));
+            assert!(st.samples.iter().filter(|s| s.is_hidden()).count() > 100);
+        }
+        let mean = after.iter().sum::<f64>() / after.len() as f64;
+        let change = (mean - before) / before;
+        eprintln!(
+            "{label}: continental area {before:.0} km², after {after:?} ({:+.3} %)",
+            change * 100.0
+        );
+        assert!(
+            change.abs() < 0.002,
+            "{label}: continental area {before:.0} km² → mean {mean:.0} km² ({:+.3} %)",
+            change * 100.0
+        );
+    }
+}
