@@ -12,19 +12,22 @@
 //! already scaled by `depth_scale`):
 //! - simple: a parabolic bowl, h − d (1 − x²) (Melosh 1989, fig. 8.1: the apparent crater of a
 //!   simple crater is close to a paraboloid);
-//! - complex: a flat floor at h − d out to 0.55 R, then terraced walls rising to the rim (a
-//!   smooth wall with the crest rounded), and a central peak 0.22 R in radius (Pike 1985: peak
-//!   diameter 0.22 D);
-//! - peak ring: the same floor and walls with a ring of peaks at 0.5 R (Wood & Head 1976) instead
-//!   of the central peak;
-//! - outside the rim: the uplifted rim and ejecta, h x⁻³ (McGetchin, Settle & Head 1973), tapered
-//!   to nothing between 0.7 E and E.
+//! - complex: a flat floor at h − d out to 0.55 R (a design value, IMP-051), then terraced walls
+//!   rising to the rim (a smooth wall with the crest rounded; design, IMP-129), and a central peak
+//!   0.22 R in radius (Pike 1985: the base of the central peak is 20–25 % of the rim diameter in
+//!   small complex craters, read in its abstract);
+//! - peak ring: the same floor and walls with a ring of peaks at 0.5 R (Pike 1985: the inner ring
+//!   of a two-ring structure is 0.5 times the outer's diameter) instead of the central peak;
+//! - outside the rim: the uplifted rim and ejecta, h x⁻³ (CMM05 eq. 43, after McGetchin, Settle &
+//!   Head 1973: "a good approximation of data from explosion experiments … the power can vary
+//!   between 2.5 and 3.5"), tapered to nothing between 0.7 E and E (design, IMP-135).
 //!
 //! **Ageing.** Hillslope diffusion of a landform for a time t is its convolution with a Gaussian
-//! of variance 2 κ t (Culling 1960, J. Geol. 68:336–344; crater degradation as diffusion: Soderblom
-//! 1970, JGR 75:2655–2661; Fassett & Thomson 2014, JGR Planets 119:2255–2271). `aged` blurs the
-//! profile with a tent of the same variance (half-width √(12 κ t)): the rim rounds and lowers, the
-//! bowl shallows and widens, and a small crater fades long before a large one.
+//! of variance 2 κ t (the Green's function of the linear diffusion equation; Culling 1960 and
+//! Soderblom 1970, not read; crater degradation as diffusion: Fassett & Thomson 2014, abstract
+//! read; ledger IMP-072). `aged` blurs the profile with a tent of the same variance (half-width
+//! √(12 κ t); IMP-073): the rim rounds and lowers, the bowl shallows and widens, and a small crater
+//! fades long before a large one. The diffusivity itself is unsourced (IMP-074).
 
 use serde::{Deserialize, Serialize};
 
@@ -32,12 +35,12 @@ use super::scaling::Morphology;
 use crate::surface::volcanoes::shape::{Radial, blurred};
 
 /// Floor radius of a complex crater, as a share of the rim radius.
-pub const FLOOR_RHO: f64 = 0.55;
+pub const FLOOR_RHO: f64 = 0.55; // ledger: IMP-051 (design value, uncited)
 /// Central peak radius, as a share of the rim radius (Pike 1985: peak diameter 0.22 D).
-pub const PEAK_RHO: f64 = 0.22;
+pub const PEAK_RHO: f64 = 0.22; // ledger: IMP-048
 /// Peak ring radius and half-width, as shares of the rim radius.
-pub const RING_RHO: f64 = 0.5;
-pub const RING_HALF: f64 = 0.1;
+pub const RING_RHO: f64 = 0.5; // ledger: IMP-046
+pub const RING_HALF: f64 = 0.1; // ledger: IMP-047 (design value, uncited)
 
 /// A crater's fresh shape, in game metres.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]

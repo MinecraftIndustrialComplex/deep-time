@@ -22,43 +22,59 @@ use crate::error::CoreError;
 pub struct ImpactParams {
     /// How often impactors arrive, as a multiple of Earth's rate over the last few hundred
     /// million years: 5.6 × 10⁻¹⁵ craters of 20 km or more per km² per year (Grieve & Shoemaker
-    /// 1994). 0 = no impacts.
+    /// 1994, as quoted by Hughes 2000; the other published estimates are 2.6 to 5.4), and the
+    /// observed record's shallower rise towards smaller craters below 20 km (`scaling.rs`).
+    /// 0 = no impacts. Ledger IMP-001, IMP-006 (game choice: Ben, decisions log 2026-09-29).
     pub flux: f64,
-    /// The cumulative size-frequency slope b of N(≥ D) ∝ D⁻ᵇ (1.8: Grieve & Shoemaker 1994). A
-    /// steeper slope means more small craters for each large one.
+    /// The cumulative size-frequency slope b of N(≥ D) ∝ D⁻ᵇ for craters of 20 km and more (1.8:
+    /// Grieve 1987, section on the terrestrial record, "for large diameters the distribution approximates the relation
+    /// N ∝ D⁻¹·⁸"). A steeper slope means more small craters for each large one. Below 20 km the
+    /// record is flatter and the production function follows it, whatever this is (ledger
+    /// IMP-003, IMP-004).
     pub size_slope: f64,
     /// The smallest crater simulated, km across (as it would form on Earth's land). The default
     /// 2 km is seven blocks, three cells of the finest terrain grid: a smaller bowl cannot be
-    /// drawn, and Earth's atmosphere breaks up most of the stony bodies that would make one
-    /// (Bland & Artemieva 2006, Meteoritics & Planet. Sci. 41:607–631).
+    /// drawn. Game choice (ledger IMP-013; the coding agent, build log 2026-10-01). Earth's
+    /// atmosphere also breaks up the stony bodies that would make craters under a few hundred
+    /// metres across (Bland & Artemieva 2006), which is why the rate falls off there.
     pub min_crater_km: f64,
-    /// The largest crater a run may make, km across (as on Earth's land). 300 km is the largest
-    /// known on Earth (Vredefort, 2.02 Gyr). Larger impacts melt and resurface a large share of a
-    /// planet this size, which the stage does not model.
+    /// The largest crater a run may make, km across (as on Earth's land). Game choice (ledger
+    /// IMP-015; the coding agent, build log 2026-10-01; Ben has not been asked): larger impacts
+    /// melt and resurface a large share of a planet this size, which the stage does not model.
+    /// 300 km is the upper estimate for Vredefort (Pike 1985 lists 150 ± 10 km; other estimates
+    /// reach 300), the largest known structure on Earth.
     pub max_crater_km: f64,
-    /// Impact speed, km/s (asteroids strike Earth at about 20 km/s on average: Collins, Melosh &
-    /// Marcus 2005; Le Feuvre & Wieczorek 2011, Icarus 214:1–20).
+    /// Impact speed, km/s. Asteroids strike Earth at 12–20 km/s (Collins, Melosh & Marcus 2005,
+    /// p. 819); the mean of fireball and asteroid data is about 18 (Bland & Artemieva 2006 use
+    /// 18 and cite estimates from 17.3 to 20.2; Davison & Collins 2007 use 18). 20 is the top of
+    /// that range and the paper's worked examples' speed (ledger IMP-020).
     pub speed_km_s: f64,
-    /// Impactor density, kg/m³ (stony asteroids: 3,000; iron 7,800; comets ~1,000).
+    /// Impactor density, kg/m³ (stony asteroids 2,000–3,000, iron about 8,000, comets 500–1,500:
+    /// Collins, Melosh & Marcus 2005, p. 819; the defaults take 3,000 and 7,800 for iron).
     pub impactor_density_kg_m3: f64,
     /// How deep craters are, as a share of the real depth: every vertical measure of a crater
     /// (floor depth, rim, central peak, breccia lens) is its physical one times this. The world is
     /// 15 times taller than wide (20 m against 300 m per block), so a bowl of real proportions (1)
     /// is a shaft three times deeper than wide in blocks; the default 0.5 follows the volcanoes'
-    /// `flank_steepness` (Ben, 2026-09-30: "Setting, gentler default").
+    /// `flank_steepness` (Ben, 2026-09-30: "Setting, gentler default"). Game choice (ledger
+    /// IMP-130): the agent reused Ben's answer for volcanoes; the question for craters is open.
     pub depth_scale: f64,
     /// How far the ejecta blanket reaches, in rim radii from the centre. The continuous blanket
-    /// of lunar craters ends about 2.3 radii out (Moore, Hodges & Scott 1974, Proc. Lunar Sci.
-    /// Conf. 5:71–100); at 3 radii it is 1/27 of its thickness at the rim.
+    /// of lunar craters ends 2.35 radii out (Moore, Hodges & Scott 1974, eq. 1: R_ce = 2.348 R,
+    /// craters of 0.65–218 km); at 3 radii the r⁻³ blanket is 1/27 of its thickness at the rim.
+    /// The 3 is a game choice (ledger IMP-056, IMP-057).
     pub ejecta_radii: f64,
-    /// Water deeper than this many impactor diameters stops the impactor before the sea floor:
-    /// no crater (6.3, fitted to Davison & Collins 2007; `scaling::sea_floor_factor`).
+    /// Water deeper than this many impactor diameters leaves no crater in the sea floor: 8
+    /// (Davison & Collins 2007, "at water thicknesses in excess of ~8 L, no crater forms"; see
+    /// `scaling::sea_floor_factor` for the rest of their rule). Ledger IMP-066.
     pub sea_cutoff_ratio: f64,
     /// Hillslope diffusivity that rounds a crater's rim and fills its bowl between the grid
-    /// cells of the deep-time surface, m²/yr, multiplied by the rock's `diffusivity`. Soil-mantled
-    /// hillslopes measure 0.003–0.05 m²/yr (Fernandes & Dietrich 1997, Water Resour. Res.
-    /// 33:1307–1318; Roering, Kirchner & Dietrich 1999). The deep-time surface's own erosion and
-    /// deposition wear a crater down as well, whatever this is.
+    /// cells of the deep-time surface, m²/yr, multiplied by the rock's `diffusivity`. Not sourced
+    /// (ledger IMP-074, `uncited`): the coding agent chose it from the range it remembered for
+    /// soil-mantled hillslopes (0.003–0.05 m²/yr, attributed to Fernandes & Dietrich 1997 and
+    /// Roering et al. 1999, neither read). The one diffusivity read is lunar and about 1,800
+    /// times smaller (Fassett & Thomson 2014: 5.5 m²/Myr, abstract). The deep-time surface's own
+    /// erosion and deposition wear a crater down as well, whatever this is.
     pub diffusivity_m2_yr: f64,
     /// Multiplies how fast the deep-time surface's erosion and deposition and the diffusion
     /// above wear a crater down (0 = craters never fade).
