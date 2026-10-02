@@ -25,8 +25,8 @@ pub struct VolcanoParams {
     /// How big: multiplies every edifice's height and radius (and a caldera's).
     pub size: f64,
     /// How steep volcano flanks are, as a share of the real profile: every edifice's basal radius is
-    /// its physical one divided by this, the height unchanged. The world is 15 times taller than
-    /// wide (20 m against 300 m per block), so a cone of real proportions (1) is a steep spire in
+    /// its physical one divided by this, the height unchanged. Heights are stretched 15 times
+    /// against widths (20 m against 300 m per block), so a cone of real proportions (1) is a steep spire in
     /// blocks; the default 0.5 doubles the radius (Ben, 2026-09-30: "Setting, gentler default"),
     /// broad enough to read as a volcano while cones 60 km apart along an arc still stand apart.
     pub flank_steepness: f64,
