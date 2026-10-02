@@ -4,11 +4,12 @@
 //! viewer show it at every time step, like the USGS map "Geologic provinces of the world" (shield,
 //! platform, orogen, basin, large igneous province, extended crust, oceanic crust by age).
 //!
-//! **View only.** The layer is derived from fields the stages already wrote, at render time, into
-//! a scratch field: nothing is written to `WorldState`, so a run's world files (the bake, its
-//! `meta/province`, the deposits) are what they were. The bake's own provinces
-//! (`bake/meta.rs`: settings of the plate regime, which drive TerraBlender's regions) are a
-//! different thing and stay as they are.
+//! **The view derives, the bake bakes.** The layer is derived from fields the stages already wrote,
+//! at render time, into a scratch field: nothing is written to `WorldState`. Since P1-10 (decisions
+//! log 2026-09-29, "Switch the world's own provinces to the USGS classes? Yes, for P1-10") the bake
+//! runs the same classifier ([`derive_with`], with the preset's [`ProvinceParams`]) and cuts its
+//! classes into contiguous provinces (`bake/meta.rs`, `meta/province`), which drive TerraBlender's
+//! regions in the game. The view always uses the default thresholds.
 //!
 //! # Rules (plan §8.1 note; the first that applies wins)
 //! 1. **Large igneous province**: a pile of mafic volcanic rock (`plates/pool/mafic_volcanic_m`)
@@ -49,7 +50,9 @@
 use deeptime_format::ParamValue;
 
 use deeptime_format::GridDesc;
+use serde::{Deserialize, Serialize};
 
+use crate::error::CoreError;
 use crate::plates::state::regime;
 use crate::world::{Field, WorldState};
 
@@ -130,22 +133,89 @@ pub struct Rules {
 impl Default for Rules {
     fn default() -> Rules {
         Rules {
-            ocean_young_myr: 20.0,
-            ocean_mid_myr: 65.0,
-            island_arc_min_thickness_m: 9_000.0,
-            orogen_max_age_myr: 500.0,
-            andean_max_age_myr: 50.0,
-            andean_min_elevation_m: 1500.0,
-            thinned_crust_m: 20_000.0,
-            rifted_margin_deg: 1.35,
-            feature_deg: 1.35,
-            basin_cover_m: 3_000.0,
-            subsiding_mm_yr: 0.03,
-            subsiding_cover_m: 1_000.0,
-            shield_cover_m: 200.0,
-            lip_fraction: 0.2,
+            ocean_young_myr: 20.0,               // ledger: PRV-002 (abstract-only)
+            ocean_mid_myr: 65.0,                 // ledger: PRV-003 (abstract-only)
+            island_arc_min_thickness_m: 9_000.0, // ledger: PRV-005 (calibrated)
+            orogen_max_age_myr: 500.0,           // ledger: PRV-011 (uncited)
+            andean_max_age_myr: 50.0,            // ledger: PRV-012 (calibrated)
+            andean_min_elevation_m: 1500.0,      // ledger: PRV-012
+            thinned_crust_m: 20_000.0,           // ledger: PRV-013 (calibrated)
+            rifted_margin_deg: 1.35,             // ledger: PRV-014 (uncited)
+            feature_deg: 1.35,                   // ledger: PRV-021 (abstract-only)
+            basin_cover_m: 3_000.0,              // ledger: PRV-016 (uncited)
+            subsiding_mm_yr: 0.03,               // ledger: PRV-017 (uncited)
+            subsiding_cover_m: 1_000.0,          // ledger: PRV-017
+            shield_cover_m: 200.0,               // ledger: PRV-018 (uncited)
+            lip_fraction: 0.2,                   // ledger: PRV-006 (uncited)
             oceanic_basalt_m: crate::plates::pools::oceanic_column()
                 [crate::plates::state::pool::MAFIC_VOLCANIC],
+        }
+    }
+}
+
+/// The `provinces` section of a preset (every key optional): what the bake's provinces are, and so
+/// how big the areas are that one TerraBlender region covers. The defaults are the view layer's
+/// rules and the bake's minimum of before P1-10.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct ProvinceParams {
+    /// A province is at least this large, km²: smaller connected regions of one class are absorbed
+    /// by the nearest larger one. Bigger values give fewer, larger biome regions.
+    pub min_area_km2: f64,
+    /// Continental crust a collision touched within this many Myr stays an orogen after it stops
+    /// rising (the Appalachians, the Urals). The plate model collides continents about twice as
+    /// often as the Earth did, so lowering this brings the orogen share (0.40 of the continents,
+    /// the Earth's about 0.17) down.
+    pub orogen_max_age_myr: f64,
+    /// An Andean (subduction) range counts as an orogen while it was lifted within this many Myr …
+    pub andean_max_age_myr: f64,
+    /// … and stands at least this high, m.
+    pub andean_min_elevation_m: f64,
+}
+
+impl Default for ProvinceParams {
+    fn default() -> Self {
+        let r = Rules::default();
+        ProvinceParams {
+            min_area_km2: 50_000.0, // ledger: PRV-029 (game-choice)
+            orogen_max_age_myr: f64::from(r.orogen_max_age_myr), // ledger: PRV-011 (uncited)
+            andean_max_age_myr: f64::from(r.andean_max_age_myr), // ledger: PRV-012 (calibrated)
+            andean_min_elevation_m: f64::from(r.andean_min_elevation_m), // ledger: PRV-012 (calibrated)
+        }
+    }
+}
+
+impl ProvinceParams {
+    /// Range checks, each naming its key.
+    pub fn validate(&self) -> Result<(), CoreError> {
+        for (v, lo, hi, key) in [
+            (self.min_area_km2, 1_000.0, 5_000_000.0, "min_area_km2"),
+            (self.orogen_max_age_myr, 0.0, 4_000.0, "orogen_max_age_myr"),
+            (self.andean_max_age_myr, 0.0, 4_000.0, "andean_max_age_myr"),
+            (
+                self.andean_min_elevation_m,
+                0.0,
+                9_000.0,
+                "andean_min_elevation_m",
+            ),
+        ] {
+            if !(v.is_finite() && (lo..=hi).contains(&v)) {
+                return Err(CoreError::preset(
+                    format!("$.provinces.{key}"),
+                    format!("must be in [{lo}, {hi}]"),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// The classifier's thresholds with these settings.
+    pub fn rules(&self) -> Rules {
+        Rules {
+            orogen_max_age_myr: self.orogen_max_age_myr as f32,
+            andean_max_age_myr: self.andean_max_age_myr as f32,
+            andean_min_elevation_m: self.andean_min_elevation_m as f32,
+            ..Rules::default()
         }
     }
 }
@@ -270,11 +340,15 @@ pub fn lip_min_m(world: &WorldState, r: &Rules) -> Option<f32> {
 /// The layer for `world`'s current state, on the plate model's L1 grid; `None` when the plate
 /// model's crust type, regime and age are not there yet.
 pub fn derive(world: &WorldState) -> Option<Field> {
-    let r = Rules::default();
-    let (cells, lip, grid) = cells(world, &r)?;
+    derive_with(world, &Rules::default())
+}
+
+/// [`derive`] with the thresholds of `r` (the bake's, from the preset's `provinces` section).
+pub fn derive_with(world: &WorldState, r: &Rules) -> Option<Field> {
+    let (cells, lip, grid) = cells(world, r)?;
     let raw: Vec<f32> = cells
         .iter()
-        .map(|c| c.map_or(f32::NAN, |c| f32::from(classify(&c, lip, &r))))
+        .map(|c| c.map_or(f32::NAN, |c| f32::from(classify(&c, lip, r))))
         .collect();
     let (w, h) = (grid.w as usize, grid.h as usize);
     if w * h != raw.len() {
@@ -501,12 +575,16 @@ fn cells(world: &WorldState, r: &Rules) -> Option<(Vec<Option<Cell>>, Option<f32
 /// them one: an active arc or collision (`regime`), a collision belt from the last
 /// `orogen_max_age_myr`, an Andean range; and how many continental cells there are.
 pub fn orogen_reasons(world: &WorldState) -> Option<[usize; 4]> {
-    let r = Rules::default();
-    let (cells, lip, _) = cells(world, &r)?;
+    orogen_reasons_with(world, &Rules::default())
+}
+
+/// [`orogen_reasons`] with the thresholds of `r`.
+pub fn orogen_reasons_with(world: &WorldState, r: &Rules) -> Option<[usize; 4]> {
+    let (cells, lip, _) = cells(world, r)?;
     let mut out = [0usize; 4];
     for c in cells.iter().flatten().filter(|c| c.continental) {
         out[3] += 1;
-        if classify(c, lip, &r) != OROGEN {
+        if classify(c, lip, r) != OROGEN {
             continue;
         }
         if c.regime == regime::COLLISION || c.regime == regime::ARC {
@@ -607,13 +685,18 @@ pub fn coherence(classes: &[f32], w: usize, h: usize) -> Coherence {
 
 /// The coherence line of a world's provinces now (`None` without the plate fields).
 pub fn coherence_line(world: &WorldState) -> Option<String> {
-    let f = derive(world)?;
+    coherence_line_with(world, &Rules::default())
+}
+
+/// [`coherence_line`] with the thresholds of `r`.
+pub fn coherence_line_with(world: &WorldState, r: &Rules) -> Option<String> {
+    let f = derive_with(world, r)?;
     let (w, h) = (f.grid.w as usize, f.grid.h as usize);
     if w * h != f.data.len() {
         return None;
     }
     let c = coherence(&f.data, w, h);
-    let why = orogen_reasons(world).unwrap_or_default();
+    let why = orogen_reasons_with(world, r).unwrap_or_default();
     let of = |k: usize| why[k] as f64 / why[3].max(1) as f64;
     Some(format!(
         "provinces shield={:.3} platform={:.3} orogen={:.3} basin={:.3} lip={:.3} extended={:.3} \
@@ -663,6 +746,52 @@ mod tests {
             elevation_m: -4000.0,
             thickness_m: 7_000.0,
             ..land()
+        }
+    }
+
+    #[test]
+    fn province_params_are_the_rules_and_the_builtins_carry_the_defaults() {
+        let d = ProvinceParams::default();
+        assert!(d.validate().is_ok());
+        assert_eq!(
+            d.rules(),
+            Rules::default(),
+            "the defaults are the view's rules"
+        );
+        let r = ProvinceParams {
+            orogen_max_age_myr: 200.0,
+            andean_max_age_myr: 25.0,
+            andean_min_elevation_m: 2500.0,
+            ..d
+        }
+        .rules();
+        assert_eq!(
+            (
+                r.orogen_max_age_myr,
+                r.andean_max_age_myr,
+                r.andean_min_elevation_m
+            ),
+            (200.0, 25.0, 2500.0)
+        );
+        // Out-of-range values and unknown keys are refused, naming the key.
+        let bad = ProvinceParams {
+            min_area_km2: 10.0,
+            ..d
+        };
+        assert!(
+            bad.validate()
+                .unwrap_err()
+                .to_string()
+                .contains("min_area_km2")
+        );
+        assert!(serde_json::from_str::<ProvinceParams>("{\"min_area\": 1}").is_err());
+        // Every built-in preset names the defaults, so the editor shows them.
+        for json in [
+            crate::preset::builtin("earthlike_quick_16k"),
+            crate::params::planet_builtin("pipeline_full_32k"),
+        ] {
+            let v: serde_json::Value = serde_json::from_str(json.expect("a built-in")).unwrap();
+            assert_eq!(v["provinces"], serde_json::to_value(d).unwrap());
         }
     }
 

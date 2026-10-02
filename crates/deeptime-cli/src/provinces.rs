@@ -10,10 +10,14 @@ use deeptime_core::provinces::{self, CLASSES};
 use deeptime_core::world::WorldState;
 use deeptime_format::Ramps;
 
-pub fn run(input: &Path, out: &Path) -> Result<Vec<(String, f64)>, Box<dyn std::error::Error>> {
+pub fn run(
+    input: &Path,
+    out: &Path,
+    rules: provinces::Rules,
+) -> Result<Vec<(String, f64)>, Box<dyn std::error::Error>> {
     let ck = Checkpoint::read(input)?;
     let world = ck.world;
-    let field = provinces::derive(&world).ok_or(
+    let field = provinces::derive_with(&world, &rules).ok_or(
         "the checkpoint's world has no plate fields (regime, crust_age, plates/crust_type)",
     )?;
     if std::env::var_os("DEEPTIME_PROVINCE_STATS").is_some()
@@ -43,7 +47,7 @@ pub fn run(input: &Path, out: &Path) -> Result<Vec<(String, f64)>, Box<dyn std::
         deeptime_core::keyframes::DEFAULT_SIZE,
     )
     .ok_or("nothing to draw")?;
-    if let Some(line) = provinces::coherence_line(&world) {
+    if let Some(line) = provinces::coherence_line_with(&world, &rules) {
         println!("{line}");
     }
     let png = deeptime_viewer::encode_png(frame.w, frame.h, &frame.layers[0].1)?;

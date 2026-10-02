@@ -53,16 +53,17 @@ pub struct ImpactParams {
     /// Collins, Melosh & Marcus 2005, p. 819; the defaults take 3,000 and 7,800 for iron).
     pub impactor_density_kg_m3: f64,
     /// How deep craters are, as a share of the real depth: every vertical measure of a crater
-    /// (floor depth, rim, central peak, breccia lens) is its physical one times this. The world is
-    /// 15 times taller than wide (20 m against 300 m per block), so a bowl of real proportions (1)
+    /// (floor depth, rim, central peak, breccia lens) is its physical one times this. Heights are stretched 15 times
+    /// against widths (20 m high against 300 m wide per block), so a bowl of real proportions (1)
     /// is a shaft three times deeper than wide in blocks; the default 0.5 follows the volcanoes'
     /// `flank_steepness` (Ben, 2026-09-30: "Setting, gentler default"). Game choice (ledger
     /// IMP-130): the agent reused Ben's answer for volcanoes; the question for craters is open.
     pub depth_scale: f64,
     /// How far the ejecta blanket reaches, in rim radii from the centre. The continuous blanket
     /// of lunar craters ends 2.35 radii out (Moore, Hodges & Scott 1974, eq. 1: R_ce = 2.348 R,
-    /// craters of 0.65–218 km); at 3 radii the r⁻³ blanket is 1/27 of its thickness at the rim.
-    /// The 3 is a game choice (ledger IMP-056, IMP-057).
+    /// craters of 0.65–218 km). The cubic law gives 1/27 of the rim thickness at 3 radii, but the
+    /// drawn blanket is tapered to zero over its outer 30 %, so it ends at this reach. The 3 is a
+    /// game choice (ledger IMP-056, IMP-057).
     pub ejecta_radii: f64,
     /// Water deeper than this many impactor diameters leaves no crater in the sea floor: 8
     /// (Davison & Collins 2007, "at water thicknesses in excess of ~8 L, no crater forms"; see
