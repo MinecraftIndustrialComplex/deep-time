@@ -7,12 +7,17 @@ Run through tools/review/vertical-scale.sh on the test VM (numpy, scipy, matplot
     join    --work W --name N --world-data WD     strips of `deeptime heightmap` -> W/N.h16.npy (terrain
                                                   height H x 16, int16), W/N.wl16.npy (lake level x 16),
                                                   W/N.json (the manifest's scale)
+    refjoin --work W --name N TILE.npy…           squares of `deeptime-inspect heights` -> W/N.ref.npy, side by
+                                                  side with a no-data column between them
     stats   --work W --planet N [--scales …] [--ref name=label]… --out F.json
                                                   slope, relief and coast statistics of the planet at each
                                                   vertical scale and of each reference world (W/<name>.ref.npy)
     places  --work W --planet N --world-data WD --out F.json    the places the pictures show
     render  --work W --planet N --places F.json [--ref name=label]… --out DIR
                                                   oblique views and profiles of each place at each scale
+    strata  --work W --planet N --world-data WD --bin deeptime --out F.json
+                                                  rock-layer thickness in blocks down sampled land columns (the
+                                                  column evaluator), and what falls under one block at each scale
     charts  --stats F.json --out DIR              the comparison charts
     page    --stats F.json --pictures DIR/pictures.json --out DIR    index.html
 
@@ -30,8 +35,9 @@ Definitions (every world, in block space):
   same over a run of 16 blocks.
 - step: the largest difference of V to the four neighbours.
 - relief within w: max - min of V in the w x w square around a column.
-- coast: land columns touching the sea; their cliff height is the highest V within 8 blocks, above
-  the sea surface.
+- coast: land columns touching the open sea (sea-level water after an opening with a 15-block square,
+  so rivers and creeks at sea level are not coast); their cliff height is the highest V within 8
+  blocks, above the sea surface.
 """
 
 import argparse
@@ -70,6 +76,20 @@ def join(a):
             "young": m.get("notes", {}).get("young", {}).get("after")}
     json.dump(meta, open(os.path.join(a.work, a.name + ".json"), "w"), indent=1)
     print(f"join: {h} x {c} -> {a.name}.h16.npy")
+
+
+def refjoin(a):
+    tiles = [np.load(t) for t in a.tiles]
+    rows = max(t.shape[0] for t in tiles)
+    cols = sum(t.shape[1] for t in tiles) + len(tiles) - 1
+    out = np.full((rows, cols, 2), NODATA, np.int16)
+    c = 0
+    for t in tiles:
+        out[:t.shape[0], c:c + t.shape[1]] = t
+        c += t.shape[1] + 1
+    np.save(os.path.join(a.work, a.name + ".ref.npy"), out)
+    full = int((out[:, :, 0] != NODATA).sum())
+    print(f"refjoin: {len(tiles)} squares, {full} columns with terrain -> {a.name}.ref.npy")
 
 
 class Planet:
@@ -186,9 +206,10 @@ def measure(v, land, sea, valid, sea_top, wrap):
         m = land & interior(run)
         gv = g[m]
         del g
-        p = pct(gv)
+        p = pct(gv, (50, 90, 99, 75, 95))
         out[key] = {
             "median_deg": deg(p[0]), "p90_deg": deg(p[1]), "p99_deg": deg(p[2]),
+            "p75_deg": deg(p[3]), "p95_deg": deg(p[4]),
             "mean_rise_per_block": float(gv.mean()) if gv.size else float("nan"),
             "share_over_30": float((gv > math.tan(math.radians(30))).mean()),
             "share_over_45": float((gv > 1.0).mean()),
@@ -225,7 +246,11 @@ def measure(v, land, sea, valid, sea_top, wrap):
         del rv
 
     # Coast.
-    near_sea = ndimage.maximum_filter(sea.view(np.uint8), size=3, mode=("nearest", mode)) > 0
+    open_sea = ndimage.maximum_filter(ndimage.minimum_filter(sea.view(np.uint8), size=15, mode=("nearest", mode)),
+                                      size=15, mode=("nearest", mode))
+    open_sea &= sea.view(np.uint8)
+    near_sea = ndimage.maximum_filter(open_sea, size=3, mode=("nearest", mode)) > 0
+    del open_sea
     shore = land & near_sea & interior(8)
     hi = ndimage.maximum_filter(v, size=(17, 17), mode=("nearest", mode))
     cv = (hi[shore] - sea_top).astype(np.int32)
@@ -237,6 +262,7 @@ def measure(v, land, sea, valid, sea_top, wrap):
         "share_ge8": float((cv >= 8).mean()) if cv.size else float("nan"),
         "share_ge16": float((cv >= 16).mean()) if cv.size else float("nan"),
         "share_ge32": float((cv >= 32).mean()) if cv.size else float("nan"),
+        "cliff_mean": float(cv.mean()) if cv.size else float("nan"),
     }
     # Height of the land above the sea surface, blocks.
     hv = (v[land] - sea_top).astype(np.int32)
@@ -282,10 +308,18 @@ def warp_named(name):
 def stats(a):
     pl = Planet(a.work, a.planet)
     res = {"planet": {"name": a.planet, "meta": pl.meta}, "scales": {}, "warps": {}, "refs": {}}
+    # --reuse: the planet's rows of an earlier output (they take minutes; the references are quick).
+    old = json.load(open(a.reuse)) if a.reuse else {"scales": {}, "warps": {}}
     for mv in a.scales:
+        if str(mv) in old["scales"]:
+            res["scales"][str(mv)] = old["scales"][str(mv)]
+            continue
         print(f"stats: planet at {mv} m per block", flush=True)
         res["scales"][str(mv)] = planet_measure(pl, mv)
     for w in a.warp or []:
+        if w in old["warps"]:
+            res["warps"][w] = old["warps"][w]
+            continue
         print(f"stats: planet through {w}", flush=True)
         res["warps"][w] = planet_measure(pl, pl.mv0, warp_named(w))
     for spec in a.ref or []:
@@ -321,6 +355,68 @@ def compare(a):
     }
     json.dump(res, open(a.out, "w"), indent=1)
     print(json.dumps(res["difference_blocks"], indent=1))
+
+
+# ----------------------------------------------------------------------------------------------
+# Rock layers
+# ----------------------------------------------------------------------------------------------
+
+def strata(a):
+    """Thickness in blocks of the rock units down sampled land columns (the part of each unit between
+    the top block and the world floor), and the share under one block at each scale."""
+    import subprocess
+    from concurrent.futures import ThreadPoolExecutor
+    pl = Planet(a.work, a.planet)
+    r0, r1 = pl.lat_rows()
+    rng = np.random.default_rng(7)
+    cols = []
+    while len(cols) < a.n:
+        r = int(rng.integers(r0, r1))
+        c = int(rng.integers(0, pl.c))
+        if pl.h16[r, c] / 16.0 >= pl.sea_y + 1:
+            cols.append((c - pl.c // 2, r - pl.rows // 2))
+
+    def one(xz):
+        o = subprocess.run([a.bin, "inspect-column", "--world-data", a.world_data, str(xz[0]), str(xz[1])],
+                           capture_output=True, text=True)
+        return json.loads(o.stdout) if o.returncode == 0 else None
+
+    with ThreadPoolExecutor(4) as ex:
+        res = [r for r in ex.map(one, cols) if r]
+    floor = pl.meta["scale"]["min_y"]
+    thick, cls, per_col, depth_top = [], [], [], []
+    for d in res:
+        top_y = d["top_y"]
+        n = 0
+        for u in d["strata"]:
+            t, b = min(u["top"], top_y), max(u["bottom"], floor)
+            if t < b:
+                continue
+            thick.append(t - b + 1)
+            cls.append(u["class"])
+            depth_top.append(top_y - t)
+            n += 1
+        per_col.append(n)
+    thick = np.array(thick, float)
+    depth_top = np.array(depth_top, float)
+    out = {"columns": len(res), "units": int(thick.size), "units_per_column": pct(np.array(per_col), (50, 90, 100)),
+           "thickness_blocks": pct(thick, (10, 25, 50, 75, 90)), "scales": {}}
+    near = depth_top <= 64
+    for mv in a.scales:
+        t = thick * pl.mv0 / mv
+        out["scales"][str(mv)] = {
+            "median_blocks": float(np.median(t)),
+            "share_under_1": float((t < 1).mean()), "share_under_2": float((t < 2).mean()),
+            "share_under_half": float((t < 0.5).mean()),
+            "near_surface_share_under_1": float((t[near] < 1).mean()) if near.any() else float("nan"),
+        }
+    by = {}
+    for t, k in zip(thick, cls):
+        by.setdefault(k, []).append(t)
+    out["by_class"] = {k: {"units": len(v), "median_blocks": float(np.median(v)), "p10_blocks": float(np.percentile(v, 10))}
+                       for k, v in sorted(by.items(), key=lambda kv: np.median(kv[1]))}
+    json.dump(out, open(a.out, "w"), indent=1)
+    print(json.dumps(out, indent=1))
 
 
 # ----------------------------------------------------------------------------------------------
@@ -573,13 +669,14 @@ def render(a):
         from scipy import ndimage
         land = valid & ~wet
         k = 64
-        # The highest ground, and the highest coast, of the reference area.
+        # The highest ground, and the highest coast, of the reference area (boxes wholly inside one square).
         picks = []
+        inside = ndimage.minimum_filter(valid.view(np.uint8), size=a.side + 2, mode="constant", cval=0) > 0
+        nr, nc = v.shape[0] // k, v.shape[1] // k
+        inside = inside[k // 2::k, k // 2::k][:nr, :nc]
         hm = np.where(land, v, 0)
         cells = block_sum(hm, k) / (k * k)
-        e = max(1, half // k)
-        cells[:e] = cells[-e:] = 0
-        cells[:, :e] = cells[:, -e:] = 0
+        cells[~inside] = 0
         i = np.unravel_index(np.argmax(cells), cells.shape)
         picks.append(("mountains", "its highest ground", i[0] * k + k // 2, i[1] * k + k // 2))
         sea = wet & (v == 62)
@@ -840,10 +937,13 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("join")
     p.add_argument("--work", required=True); p.add_argument("--name", required=True); p.add_argument("--world-data", required=True)
+    p = sub.add_parser("refjoin")
+    p.add_argument("--work", required=True); p.add_argument("--name", required=True); p.add_argument("tiles", nargs="+")
     p = sub.add_parser("stats")
     p.add_argument("--work", required=True); p.add_argument("--planet", required=True)
     p.add_argument("--scales", type=lambda s: [float(x) if "." in x else int(x) for x in s.split(",")], default=SCALES)
     p.add_argument("--ref", action="append"); p.add_argument("--warp", action="append"); p.add_argument("--out", required=True)
+    p.add_argument("--reuse")
     p = sub.add_parser("compare")
     p.add_argument("--work", required=True); p.add_argument("--planet", required=True); p.add_argument("--other", required=True)
     p.add_argument("--out", required=True)
@@ -855,12 +955,17 @@ def main():
     p.add_argument("--scales", type=lambda s: [int(x) for x in s.split(",")], default=[20, 30, 40, 50, 60, 80])
     p.add_argument("--ref", action="append"); p.add_argument("--warp", action="append")
     p.add_argument("--side", type=int, default=320); p.add_argument("--px", type=int, default=2); p.add_argument("--out", required=True)
+    p = sub.add_parser("strata")
+    p.add_argument("--work", required=True); p.add_argument("--planet", required=True); p.add_argument("--world-data", required=True)
+    p.add_argument("--bin", required=True); p.add_argument("--n", type=int, default=1500)
+    p.add_argument("--scales", type=lambda s: [int(x) for x in s.split(",")], default=[20, 30, 40, 50, 60, 80])
+    p.add_argument("--out", required=True)
     p = sub.add_parser("charts")
     p.add_argument("--stats", required=True); p.add_argument("--out", required=True)
     p = sub.add_parser("page")
     p.add_argument("--stats", required=True); p.add_argument("--pictures", required=True); p.add_argument("--out", required=True)
     a = ap.parse_args()
-    {"join": join, "stats": stats, "compare": compare, "places": places, "render": render, "charts": charts, "page": page}[a.cmd](a)
+    {"join": join, "refjoin": refjoin, "stats": stats, "compare": compare, "places": places, "strata": strata, "render": render, "charts": charts, "page": page}[a.cmd](a)
 
 
 if __name__ == "__main__":
