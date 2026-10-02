@@ -7,8 +7,8 @@
 //!
 //! **Profiles** (ρ = r / R, R the basal radius; the body is 1 at the summit and 0 at the foot):
 //! - stratovolcano: (1 − ρ)^1.5, a concave cone (Fuji: a third of its relief at 0.55 of its radius;
-//!   upper flanks ~20° at 2.5 km over R = 14 km, steep in the world, which is 15 times taller than
-//!   wide at 300 by 20 m per block);
+//!   upper flanks ~20° at 2.5 km over R = 14 km, steep in the world, whose heights are stretched
+//!   15 times against widths at 300 m wide by 20 m high per block);
 //! - shield: (1 − ρ²)^1.5, broad and convex with flanks under ~10°;
 //! - silicic centre (a continental hotspot): (1 − ρ²)², low and broad.
 //!

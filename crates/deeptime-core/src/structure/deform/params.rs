@@ -10,7 +10,7 @@
 //! **Sizes are true in block space.** A fold's wavelength and a fault's length are given in km on
 //! the planet's horizontal block scale (300 m a block in the built-in presets), and amplitudes and
 //! slips are that many *blocks* times the shape's own ratio (amplitude over wavelength, slip over
-//! length), not metres at the vertical scale: the world is drawn 15 times taller than wide, and a
+//! length), not metres at the vertical scale: heights are stretched 15 times against widths (20 m against 300 m per block), and a
 //! fold drawn with its true amplitude in metres would have vertical limbs. What is kept is the
 //! shape a geologist would draw in a cross-section at 1:1.
 
