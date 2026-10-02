@@ -31,8 +31,8 @@ ISO-067, added to master the same day by its own agent) is included.
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
 | [AMP](ledger/AMP.md) | the amplifier | 71 | 0 | 8 | 0 | 0 | 1 | 53 | 9 | 0 | 0 | 0 |
 | [GLA](ledger/GLA.md) | glacial erosion and landforms | 64 | 0 | 20 | 1 | 0 | 1 | 25 | 17 | 0 | 0 | 2 |
-| [VOL](ledger/VOL.md) | volcanoes | 73 | 0 | 1 | 0 | 0 | 1 | 16 | 55 | 0 | 0 | 0 |
-| [MAG](ledger/MAG.md) | magma and lava | 42 | 0 | 3 | 0 | 0 | 0 | 31 | 8 | 0 | 0 | 0 |
+| [VOL](ledger/VOL.md) | volcanoes | 73 | 0 | 0 | 0 | 1 | 1 | 44 | 27 | 0 | 0 | 0 |
+| [MAG](ledger/MAG.md) | magma and lava | 42 | 2 | 1 | 0 | 1 | 0 | 37 | 1 | 0 | 0 | 0 |
 | [IMP](ledger/IMP.md) | meteor impacts | 135 | 0 | 14 | 34 | 3 | 0 | 42 | 42 | 0 | 0 | 6 |
 | [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 73 | 0 | 16 | 0 | 0 | 1 | 24 | 32 | 0 | 0 | 11 |
 | [STR](ledger/STR.md) | strata, traps, hosts | 44 | 0 | 4 | 0 | 0 | 2 | 34 | 4 | 0 | 0 | 4 |
@@ -45,15 +45,17 @@ ISO-067, added to master the same day by its own agent) is included.
 | [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 | 0 |
 | [GEO](ledger/GEO.md) | geothermal features | 51 | 1 | 0 | 0 | 0 | 0 | 47 | 3 | 0 | 1 | 0 |
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 74 | 0 | 9 | 0 | 0 | 2 | 54 | 9 | 16 | 0 | 0 |
-| [HNT](ledger/HNT.md) | editor hint texts | 84 | 10 | 13 | 2 | 2 | 6 | 34 | 17 | 0 | 0 | 0 |
+| [HNT](ledger/HNT.md) | editor hint texts | 84 | 11 | 12 | 2 | 2 | 6 | 36 | 15 | 0 | 0 | 0 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
 | [CHK](ledger/CHK.md) | plate-check target ranges | 57 | 0 | 10 | 2 | 7 | 0 | 9 | 29 | 3 | 4 | 0 |
-| **all** | | **2,209** | **3** | **503** | **57** | **70** | **76** | **819** | **681** | **359** | **62** | **193** |
+| **all** | | **2,209** | **17** | **498** | **57** | **74** | **76** | **863** | **624** | **359** | **62** | **193** |
 
-3 rows are `verified`: ISO-041, ISO-042 and ISO-048, read in their sources by the flexure agent. In plain terms,
-of the 2,205 active rows: 815 (37 %) are deliberate game or implementation choices; 681 (31 %) state something about
-the physical world with no source at all; 508 (23 %) name a source that nobody is recorded as having read; 122 (6 %)
-were written from memory or from an abstract and say so; 76 (3 %) were tuned to a target.
+17 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16, 2026-10-02): ISO-041, ISO-042
+and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and eleven HNT rows (WP-15, WP-16, WP-2).
+In plain terms, of the 2,209 active rows: 863 (39 %) are deliberate game or implementation choices; 624 (28 %)
+state something about the physical world with no source at all; 498 (23 %) name a source that nobody is recorded
+as having read; 131 (6 %) were written from memory or from an abstract and say so; 76 (3 %) were tuned to a target;
+17 (1 %) were read in their sources.
 
 A low `from-memory` count does not mean a subsystem was written with its sources open. It means
 its agent did not say. The impacts agent was candid, and so has 34 such rows; most `cited-unverified`
@@ -217,8 +219,8 @@ code). "Evidence" says how strong the finding is.
 | 8 | ERO-003; `SurfaceParams::default` | `k_spl` is 2e-9 in the Rust default and its comment, 3e-9 in all eight presets. | code reading |
 | 9 | IMP-018 | Editor hint: "one crater of 20 km or more per 180 million km² per year". The coded rate is one per 1.8 × 10¹⁴ km² per year: a factor of a million. | arithmetic |
 | 10 | IMP-038, IMP-054, IMP-062 | Equation numbers of Collins et al. 2005 cited in comments are wrong (rim height is eq. 48, ejecta eq. 47, melt eq. 30). Values are right. | primary full text (sub-agent) |
-| 11 | VOL-039 | The 60 km spacing of arc volcanoes cites de Bremond d'Ars et al. 1995, whose abstract says spacing is random with no characteristic value. | primary abstract |
-| 12 | VOL-016, VOL-026, VOL-029, VOL-048 | Comments disagree with the code they sit on (flank angle, crater size, caldera "across" against radius, subsidence rate). | arithmetic by the extraction agent |
+| 11 | VOL-039 | The 60 km spacing of arc volcanoes cites de Bremond d'Ars et al. 1995, whose abstract says spacing is random with no characteristic value. | primary abstract **Settled in WP-2 (2026-10-02):** the citation now quotes the abstract; the mean spacings are from Hildreth 2007 (27 to 87 km); 60 km is labelled a game choice. |
+| 12 | VOL-016, VOL-026, VOL-029, VOL-048 | Comments disagree with the code they sit on (flank angle, crater size, caldera "across" against radius, subsidence rate). | arithmetic by the extraction agent **Settled in WP-2 (2026-10-02):** comments rewritten from the arithmetic and the sources read; the caldera comment's numbers were radii, so flag 4's reading was wrong; the subsidence rate itself is a question for Ben (it now counts flexure and cooling twice). |
 | 13 | DEF-016 to DEF-018 | Fault slip ratios are coded 0.05, 0.08, 0.05 beside a cited 0.03. | secondary (a review quoting Schlische) |
 | 14 | DEF-019, DEF-020 | Fault dips from Anderson 1951 are applied in block space, which is stretched 15 times vertically: real dips become about 6.6° and 2.2°. A design question, not a typo. | arithmetic from the build log's own formula |
 | 15 | DEF-042, RCK-061 | A "stock" is coded larger than the definition quoted beside it; the pluton thickness law cited to Cruden 1998 is not in that paper's abstract. | secondary; primary abstract |
@@ -240,10 +242,10 @@ Read from code and documents by the extraction agents; nothing here was checked 
 
 | # | Ledger | What is wrong or unsettled | Evidence |
 |---|---|---|---|
-| 27 | HNT-017, HNT-019 (and the comment in `volcanoes/params.rs`) | The hints say blocks are "15 times taller than wide". It is the other way round: a block is 300 m wide and 20 m tall, so heights are drawn 15 times larger against widths. | arithmetic from the scale rows **Fixed in WP-15: the hints and the code comments now say heights are stretched 15 times against widths.** |
+| 27 | HNT-017, HNT-019 (and the comment in `volcanoes/params.rs`) | The hints say blocks are "15 times taller than wide". It is the other way round: a block is 300 m wide and 20 m tall, so heights are drawn 15 times larger against widths. | arithmetic from the scale rows **Fixed in WP-15: the hints and the code comments now say heights are stretched 15 times against widths.** **WP-2 (2026-10-02):** in the volcano files (`params.rs`, `shape.rs`, `Magma.java`) and the volcano_flanks hint the merged text is WP-2's "heights are drawn 15 times larger than widths (a block is 300 m across and 20 m tall)". |
 | 28 | HNT-057 | The ice-sheet hint says 50 kPa "matches Antarctica". `ice.rs` and CLM-102 give about 32 kPa for Antarctica and about 80 kPa for Greenland. | code comment against hint **Fixed in WP-15: the hint now says 32 kPa fits Antarctica and 80 kPa Greenland, and that the default 50 was chosen to meet targets.** |
-| 29 | HNT-062, HNT-063 | The caldera hints give Crater Lake's radius as about 4 km (the code comment says 4 to 5 km across) and Yellowstone's as 20 km, while the preset's largest caldera radius is 9 km. | code against hint **Fixed in WP-15 (hints): Crater Lake 8 to 10 km across (radius 4 to 5 km), Yellowstone 48 by 72 km across; the preset's 9 km maximum is a design range (WP-2).** |
-| 30 | HNT (volcano_size, shield_height_high, volcano_density, arc_spacing) | Shield heights: hints say "up to 6 km" and "Hawaii: 5 to 9 km", the coded range is 3.5 to 6.5 km. Arc spacing "real arcs: 50 to 70 km" repeats the 60 km that VOL-039 shows is not in the cited paper. | code against hint; fix 11 **Fixed in WP-15 (hints): shield and stratovolcano heights and Mauna Loa stated; "Earth's spacing" removed. The spacing figure itself stays with fix 11 (WP-2).** |
+| 29 | HNT-062, HNT-063 | The caldera hints give Crater Lake's radius as about 4 km (the code comment says 4 to 5 km across) and Yellowstone's as 20 km, while the preset's largest caldera radius is 9 km. | code against hint **Fixed in WP-15 (hints): Crater Lake 8 to 10 km across (radius 4 to 5 km), Yellowstone 48 by 72 km across; the preset's 9 km maximum is a design range (WP-2).** **WP-2 (2026-10-02):** the caldera_radius_max hint now uses the primary USGS figure, Yellowstone a basin 45 by 85 km (Christiansen 2001), with Long Valley 16 by 32 km. |
+| 30 | HNT (volcano_size, shield_height_high, volcano_density, arc_spacing) | Shield heights: hints say "up to 6 km" and "Hawaii: 5 to 9 km", the coded range is 3.5 to 6.5 km. Arc spacing "real arcs: 50 to 70 km" repeats the 60 km that VOL-039 shows is not in the cited paper. | code against hint; fix 11 **Fixed in WP-15 (hints): shield and stratovolcano heights and Mauna Loa stated; "Earth's spacing" removed. The spacing figure itself stays with fix 11 (WP-2).** **WP-2 (2026-10-02):** the volcano_size hint adds Earth's median stratovolcano height (1.02 km, Grosse et al. 2014); arc_spacing gives Hildreth 2007's mean spacings of large centres, 27 to 87 km. |
 | 31 | HNT (ejecta_reach, feature_deposits, star_age, ocean_fraction) | "1/27 at 3 radii" while the coded taper is zero there; "1 is the true deposit size" while each deposit type enlarges its body 6 to 12 times (and richness reaches no blocks, fix 3); "a younger star is fainter" while the Gough law is normalised to 1 at the end of the history; the ocean-fraction slider minimum 0.31 is not the real bound and the presets ship 0.7, not the 0.71 the hint calls Earth. | code against hint **Fixed in WP-15 (hints): ejecta taper, deposit drawing size, star age and ocean fraction now say what the code does. The richness setting still reaches no block (fix 3, WP-9).** |
 | 32 | HNT (river_width, river_depth, pet_per_degree, day_length, lake_freeze, thrust_slip) | Unit and wording problems: "blocks" for quantities that are blocks per root of discharge; PET per degree without "per year"; "one rotation" for a solar day; "ice more than half the year" where a symmetric cycle gives exactly half; "about 11 blocks" is the maximum of the slip law. | arithmetic **Fixed in WP-15: units and wording corrected.** |
 | 33 | PLT-204 to PLT-208 (hints, already ledgered) | `cordillera_width_km` is a half-width in the code but the hint treats it as the width of the range; the "Abyssal plain depth" label sets `oceanic_floor_elevation_m`, not the unused `abyssal_elevation_m`; the hint uses 180 Myr for two different things. | code against hint **Part fixed in WP-15: the arc_range_width hint now says the setting is a gaussian scale. The other plate hints wait for the plate rewrite (WP-13).** |
@@ -371,6 +373,7 @@ Produced by WP-0 (2026-10-02). The library is a folder on the test machine with 
 #### WP-2: 115 rows; 1 source
 
 - **Not readable** : `Bremond1995` (paywalled, no substitute found).
+- **Added and read in WP-2 (2026-10-02)** (text files in the folder named by the key): `Grosse2014` (Grosse2014.txt); `ClagueSherrod2014` (ClagueSherrod2014.txt); `Christiansen2001` (Christiansen2001.txt); `USGS-MaunaLoa` (USGS-MaunaLoa.txt); `USGS-ActiveVolcanoesFAQ` (USGS-ActiveVolcanoesFAQ.txt); and, already in the library, `Hildreth2007`, `Poland2014`, `Courtillot2003a`. Abstracts only: `Bremond1995` (free to read, refused to scripts), `Rasmussen2022`, `ChaussardAmelung2014`, `TenBrink1991`. Not obtained: `Lev2019`; `ClagueDalrymple1987` was fetched but is a scan without text.
 
 #### WP-3: 156 rows; 14 sources
 

@@ -17,10 +17,11 @@ import java.util.List;
  * <ul>
  *   <li>a <b>magma chamber</b>: an ellipsoid of lava whose top lies {@code magma_chamber_depth_km}
  *       under the crater floor. Its radius is a tenth of the volcano's basal radius (1.2 to 4.5 km)
- *       times {@code magma_chamber_size}, its half-height a fifth of that radius. Heights are stretched 15
- *       times against widths, so in blocks a chamber is a tall lens (7 across and 40 high for a
- *       2-km chamber). A chamber that would reach the lava floor is raised, and squeezed where the
- *       ground is too thin for it;</li>
+ *       times {@code magma_chamber_size}, its half-height a fifth of that radius. Heights are drawn
+ *       15 times larger than widths (300 m across, 20 m up a block), so in blocks a chamber is a
+ *       tall lens (a 2-km chamber is 7 blocks in radius, 13 to 15 across, and 40 high). A chamber
+ *       that would reach the lava floor is raised, and squeezed where the ground is too thin for
+ *       it (ledger MAG-002 to MAG-009);</li>
  *   <li>a <b>conduit</b>: a plus-shaped column of lava from the chamber's centre up to six blocks
  *       under the crater floor, under a plug of magma blocks. On land the plug reaches the
  *       surface (hot ground in the crater); under water it stops three blocks under the bed;</li>
@@ -38,21 +39,21 @@ import java.util.List;
 public final class Magma {
 
     /** No chamber lava within this many blocks of the ground above it (the pass checks the column). */
-    public static final int COVER = 8;
+    public static final int COVER = 8; // ledger: MAG-010
     /** The plug: the conduit's lava stops this far under the crater floor. */
-    public static final int PLUG = 6;
+    public static final int PLUG = 6; // ledger: MAG-016
     /** Under water the plug stops this far under the bed. */
-    public static final int BURIED = 3;
+    public static final int BURIED = 3; // ledger: MAG-017
     /** A crater lake's radius, blocks: half the crater's, within these bounds. */
-    public static final int LAKE_MIN_RADIUS = 2, LAKE_MAX_RADIUS = 10;
+    public static final int LAKE_MIN_RADIUS = 2, LAKE_MAX_RADIUS = 10; // ledger: MAG-021
     /** The most ground a crater lake may cut away to sit level, blocks; a steeper summit keeps its plug. */
-    public static final int LAKE_MAX_CUT = 12;
+    public static final int LAKE_MAX_CUT = 12; // ledger: MAG-023
     /** A crater lake is at most this deep, blocks. */
-    public static final int LAKE_MAX_DEPTH = 10;
+    public static final int LAKE_MAX_DEPTH = 10; // ledger: MAG-022
     /** Ground above a lake's surface is opened up to this far above it. */
-    public static final int LAKE_CLEAR = 24;
+    public static final int LAKE_CLEAR = 24; // ledger: MAG-022
     /** Blocks kept between a chamber's bottom and the lava floor. */
-    public static final int FLOOR_GAP = 8;
+    public static final int FLOOR_GAP = 8; // ledger: MAG-007
 
     /** Terrain height H(x, z), blocks. */
     @FunctionalInterface
@@ -227,9 +228,9 @@ public final class Magma {
             if (circumference > 0)
                 x = Math.floorMod(x + circumference / 2, circumference) - circumference / 2;
             int floorY = top(heights.at(x, z));
-            double rhM = Math.clamp(0.1 * v.radiusM(), 1200.0, 4500.0) * rules.chamberSize();
+            double rhM = Math.clamp(0.1 * v.radiusM(), 1200.0, 4500.0) * rules.chamberSize(); // ledger: MAG-003
             int rh = Math.max(2, (int) Math.round(rhM / mH));
-            int rv = Math.max(4, (int) Math.round(0.2 * rhM / mV));
+            int rv = Math.max(4, (int) Math.round(0.2 * rhM / mV)); // ledger: MAG-004
             int cy = floorY - (int) Math.round(rules.chamberDepthKm() * 1000.0 / mV) - rv;
             int low = lavaFloorY + FLOOR_GAP, high = floorY - 3 * COVER;
             if (cy - rv < low)
