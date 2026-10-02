@@ -623,8 +623,34 @@ plates read; it only saves time). Each cell is the mean, with the runs in bracke
   little through the coupled stages). This is the column to compare with.
 - **After** is the branch on 2c60ca3f, with the built-in preset (the light calibration below
   included). Master 5c4d2ed3 (task 5, the forces recorded and not applied) was merged afterwards;
-  it changes nothing a run computes: seeds 1 and 2 re-run on the branch merged with master
-  00ef214c give the same table, all 121 rows identical.
+  it changes nothing a run computes: the four seeds re-run on the branch merged with master
+  00ef214c (b14023a3) give every measure of the table below unchanged in every run; only task 5's
+  force rows gain values (next section). Master 60bbbea8 (deposits), merged after, is inert for
+  the plates too (150 Myr, seed 1: the same table and hypsometry).
+
+**The force balance on these planets** (task 5's rows, recorded and not applied; the merged
+head, the same four runs, mean and runs):
+
+| Measure | After (merged head) | Target |
+|---|---|---|
+| Share of a plate's driving torque that is slab pull, median | 0.86 (0.84 0.87 0.88 0.86) | – |
+| Mean in-plane stress of a plate above 40 %, median (tension positive) | 1.83 MPa (−0.80 4.11 1.95 2.05) | – |
+| Steps in which a plate above 40 % is in tension | 69 % (36 80 81 80) | – |
+| Slab length per subducting contact, median | 700 km (all four) | – |
+| Slab break-offs per 100 Myr | 5.1 (7.0 5.1 4.0 4.4) | – |
+| Balance: speed RMS | 46.4 mm/yr | 40–100 |
+| Balance: speed 10th / 50th / 90th percentile | 13.9 / 54.8 / 97.8 mm/yr | ≤ 20 / 30–60 / 70–110 |
+| Balance: oceanic ÷ continental plates, median speed | 2.76 | ≥ 2 |
+| Balance: slab-attached ÷ slab-free plates, median speed | 2.85 | ≥ 2.5 |
+| Balance: speed against slab share, rank correlation | 0.57 | ≥ 0.65 |
+| Balance: speed against area, rank correlation | −0.41 | −0.4 to 0.2 |
+| Balance: plate-steps above 150 / 250 mm/yr | 0.017 % / 0 | ≤ 0.5 % / 0 |
+| Balance: change of rotation per step, median / 90th percentile | 17.8 % / 69.8 % | ≤ 8 / ≤ 20 |
+
+On the belts' planets the open-loop balance meets its speed-distribution and speed-ratio targets,
+not the slab correlation (0.57), and its rotation changes from step to step are large (the
+balance is not applied, so it answers a plate geometry it does not shape; task 7's relaxation is
+for this).
 
 The before columns are read by each master's own `plate-check` (the branch cannot read their
 checkpoints: the plate state changed). Three measures changed their definition with the belts, so
