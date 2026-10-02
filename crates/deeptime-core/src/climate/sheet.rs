@@ -35,11 +35,11 @@ use serde::{Deserialize, Serialize};
 use super::ice::{G, RHO_ICE, RHO_SEA};
 
 /// Density of the mantle, kg/m³ (isostasy).
-pub const RHO_MANTLE: f64 = 3300.0;
+pub const RHO_MANTLE: f64 = 3300.0; // ledger: GLA-071
 /// Glen's exponent (the flux below is written out for n = 3: D = Γ·H⁵·|∇s|²).
-pub const GLEN_N: f64 = 3.0;
+pub const GLEN_N: f64 = 3.0; // ledger: GLA-067
 /// The shortest explicit step the flow is allowed to ask for, years (see `State::step`).
-pub const MIN_STEP_YEARS: f64 = 10.0;
+pub const MIN_STEP_YEARS: f64 = 10.0; // ledger: GLA-073
 
 /// The coarse grid.
 #[derive(Clone, Debug, PartialEq)]

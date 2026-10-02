@@ -393,7 +393,7 @@ pub fn run(
             let t_global = st.t_global;
             // Under sea ice the ocean is sealed from the air: the sea floor's sink draws on the
             // ocean, and the atmosphere feels only the open share of it.
-            let open = (1.0 - st.sea_ice).clamp(0.0, 1.0);
+            let open = (1.0 - st.sea_ice).clamp(0.0, 1.0); // ledger: CLM-162
             let w_of = |ppm: f64| -> f64 {
                 let ppm = ppm * fac;
                 let shift = lambda * (ppm.max(1e-9) / ppm_before.max(1e-9)).ln();

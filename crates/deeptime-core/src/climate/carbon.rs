@@ -268,7 +268,7 @@ pub struct Kernel {
 }
 
 /// Density of the eroded rock, kg/m³.
-pub const ROCK_KG_M3: f64 = 2700.0;
+pub const ROCK_KG_M3: f64 = 2700.0; // ledger: CLM-154
 
 /// The supply of one land cell, mol C/yr: true area (km², Earth-normalized) × denudation (m/Myr,
 /// at least `min_m_myr`) × ρ_rock × `mol_kg` (the Ca + Mg of the rock, each ion finally burying
@@ -289,15 +289,15 @@ pub fn supply_limited(kin: f64, s: f64) -> f64 {
 }
 
 /// Activation energy of seafloor (basalt) weathering, J/mol (Krissansen-Totton & Catling 2017).
-pub const SEAFLOOR_EA_J_MOL: f64 = 75_000.0;
+pub const SEAFLOOR_EA_J_MOL: f64 = 75_000.0; // ledger: CLM-159
 /// CO₂ dependence of seafloor weathering, (CO₂/280 ppm)^this (Krissansen-Totton & Catling 2017).
-pub const SEAFLOOR_CO2_EXPONENT: f64 = 0.23;
+pub const SEAFLOOR_CO2_EXPONENT: f64 = 0.23; // ledger: CLM-159
 
 /// Bottom-water temperature for a global mean `t_global`, °C: 2 °C today, following the surface
 /// one for one (Hansen et al. 2013, "Climate sensitivity, sea level and atmospheric carbon
 /// dioxide", Phil. Trans. R. Soc. A 371: 20120294), never below sea water's freezing point.
 pub fn deep_ocean_c(t_global: f64) -> f64 {
-    (2.0 + (t_global - 15.0)).max(-1.8)
+    (2.0 + (t_global - 15.0)).max(-1.8) // ledger: CLM-160
 }
 
 /// Weathering parameters.
@@ -317,7 +317,7 @@ pub struct Weathering {
 /// the Ca + Mg of the upper 500 m of new crust (3.4 km²/yr × 500 m × 2,900 kg/m³ × ~5.5 mol/kg)
 /// would take ~4× today's degassing; the most carbonated old crust drilled (Mesozoic, ~3 wt % CO₂
 /// in the upper 300 m; Coogan & Gillis 2013, G³ 14: 1771–1786) took ~0.3×. 1 lies between.
-pub const SEAFLOOR_SUPPLY_REL: f64 = 1.0;
+pub const SEAFLOOR_SUPPLY_REL: f64 = 1.0; // ledger: CLM-161
 
 impl Weathering {
     pub fn from(p: &super::ClimateParams) -> Weathering {
@@ -391,6 +391,7 @@ impl Weathering {
                     // supply follows GEOCARB's runoff term, 1 + k_r·ΔT (×2.5 at +40 K), not the
                     // kinetics' exponential.
                     Some(&s) => {
+                        // ledger: CLM-157
                         supply_limited(kin, s * free * (1.0 + self.k_r * dt).clamp(0.1, 10.0))
                     }
                     None => kin,
