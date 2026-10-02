@@ -1063,7 +1063,8 @@ impl VolcanoStage {
                 // shows: a game choice (VOL-026). Real summit craters are mostly under 1 km across
                 // (Fuji's 780 m); the large craters and calderas Grosse et al. (2014) could
                 // measure on composite volcanoes are 0.6–11 km across, median 2.2 km, and 240 m
-                // deep (median). The 0.07 of the doubled basal radius gives 4 km at a 3-km cone.
+                // deep (median). The 0.07 of the doubled basal radius gives 2.8 km across at a
+                // 2-km cone.
                 let crater_rho = (1000.0 * p.size).max(0.07 * radius) / radius; // ledger: VOL-026
                 st.volcanoes.push(Volcano {
                     id: st.next_id,

@@ -755,7 +755,8 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Grosse, P., Euillades, P. A., Euillades, L. D. and van Wyk de Vries, B. (2014). A global database of composite volcano morphometry. Bulletin of Volcanology 76: 784 (16 pages; online 2013).
 - DOI or URL: 10.1007/s00445-013-0784-4
 - Cited as: "Grosse et al. 2014" (added by WP-2 in comments of `volcanoes/params.rs`, `volcanoes/shape.rs` and `volcanoes/mod.rs`)
-- Ledger ids: VOL-016, VOL-017, VOL-019, VOL-020, VOL-026, VOL-029, VOL-030; HNT-016
+- Ledger ids: VOL-016, VOL-017, VOL-019, VOL-020, VOL-026, VOL-029, VOL-030; HNT-016, HNT-085, HNT-086
+- Also used 2026-10-02 (volcano decisions): table 1 re-read for the target of VOL-019 (stratovolcano height median 1.02 km, mean 1.13, s.d. 0.55, range 0.17-4.57) and VOL-020 (height/basal width median 0.13, range 0.02-0.30; basal width median 7.9 km).
 - Access: free to read at the publisher (bronze); the publisher returned a page, not the PDF; the authors' submitted version is in the CONICET repository
 - Library (the project's source library, not distributed): fetched WP-2 2026-10-02 (PDF, 23 pages, text layer). From: https://ri.conicet.gov.ar/handle/11336/7280 (submitted version; the pages carry the journal's running heads). Text file: Grosse2014.txt.
 - Read in WP-2 (2026-10-02), full text: 759 composite volcanoes from the 90-m SRTM model (those of the Global Volcanism Program list it covers, with a basal width over 2 km). Table 1 (p. 7): stratovolcanoes (n = 512): basal width median 7.9 km (range 2.0-65.9), height median 1.02 km, mean 1.13, s.d. 0.55 (range 0.17-4.57), height/basal width median 0.13 (0.02-0.30), mean flank slope 17.7 degrees, main flank 21.5, steepest average slope 27.7 degrees at 0.79 of the height; shields (n = 89): basal width median 15.3 km, height 0.81 km, height/width 0.06, flank slope 8.1 degrees. p. 8: crater and caldera data only for 104 large ones: 0.6-11 km across, median 2.2 km; depth under 100 to 860 m, median 240 m. Subaerial parts only.
@@ -764,7 +765,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Clague, D. A. and Sherrod, D. R. (2014). Growth and degradation of Hawaiian volcanoes. Chapter 3 in Poland, M. P., Takahashi, T. J. and Landowski, C. M. (eds), Characteristics of Hawaiian Volcanoes, U.S. Geological Survey Professional Paper 1801, pp. 97-146.
 - DOI or URL: 10.3133/pp18013; https://pubs.usgs.gov/pp/1801/downloads/pp1801_Chap3_Clague.pdf
 - Cited as: "Clague & Sherrod 2014" (added by WP-2 in comments)
-- Ledger ids: VOL-007, VOL-009, VOL-017, VOL-021, VOL-041, VOL-048, VOL-058, MAG-002
+- Ledger ids: VOL-007, VOL-009, VOL-017, VOL-021, VOL-041, VOL-048, VOL-058, MAG-002; HNT-087
 - Access: open access (agency report)
 - Library: fetched WP-2 2026-10-02 (PDF, text layer, 343,082 characters). Text file: ClagueSherrod2014.txt.
 - Read in WP-2 (2026-10-02), full text: abstract (p. 97): "Principal growth occurs in the first 1-2 million years"; "Shallow magma reservoirs (1-7-km depth)" of shield-stage volcanoes, "smaller reservoirs at 20-30-km depth persist". p. 99: "The sizes and spacing of the volcanoes are nonuniform"; only eight volcanoes northwest of the main islands grew to 1,500 m or more above sea level. p. 114: lava flows on a shield dip 2-10 degrees, submarine slopes are steeper. pp. 130-131: subsidence under the growing volcano's load "lasts perhaps 1 m.y." and sinks shorelines "by more than 1 km" (2.6 m/kyr off the Island of Hawaii); thermal subsidence of the plate along much of the chain "~0.01 m/k.y."; reefs drown about 33 Myr after their volcano formed. Mauna Loa's summit 4,169 m.
@@ -773,7 +774,8 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Christiansen, R. L. (2001). The Quaternary and Pliocene Yellowstone Plateau volcanic field of Wyoming, Idaho, and Montana. U.S. Geological Survey Professional Paper 729-G.
 - DOI or URL: 10.3133/pp729G; https://pubs.usgs.gov/pp/pp729g/pp729g.pdf
 - Cited as: "Christiansen 2001" (added by WP-2 in comments and hints)
-- Ledger ids: VOL-006, VOL-023, VOL-027, VOL-029, VOL-045, VOL-046; HNT-060, HNT-063
+- Ledger ids: VOL-006, VOL-023, VOL-027, VOL-029, VOL-045, VOL-046, VOL-074; HNT-060, HNT-063, HNT-088
+- Also read 2026-10-02 (volcano decisions), the summary and the first sections: the field has three volcanic cycles, each climaxed by a caldera-forming ash-flow eruption: the Huckleberry Ridge Tuff at 2.1 Ma (more than 2,450 km3 over 15,500 km2, a caldera more than 75 km long), the Mesa Falls Tuff at 1.3 Ma (more than 280 km3, a caldera about 16 km across) and the Lava Creek Tuff at 640 ka (more than 1,000 km3, the Yellowstone caldera): three in about 1.5 Myr (VOL-074).
 - Access: open access (agency report)
 - Library: fetched WP-2 2026-10-02 (PDF, 37.7 MB, text layer, 1.13 million characters). Text file: Christiansen2001.txt.
 - Read in WP-2 (2026-10-02), the summary (pp. G1-G2), physiography (p. G6) and the cycle chronology: caldera-forming eruptions at 2.1 Ma (Huckleberry Ridge Tuff, more than 2,450 km3 over 15,500 km2, caldera more than 75 km long), 1.3 Ma (Mesa Falls Tuff, more than 280 km3) and 0.64 Ma (Lava Creek Tuff, more than 1,000 km3 over more than 7,500 km2); the Yellowstone caldera is a basin 85 by 45 km. The plateau's average elevation is about 2,400 m; Island Park and the eastern Snake River Plain lie at about 1,600-1,900 m.
