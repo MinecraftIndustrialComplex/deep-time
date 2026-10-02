@@ -25,7 +25,7 @@ q "$BIN" synth --kind lake-test --size 1024 --out lake1024 --dump-samples lake10
 q "$BIN" parity --world-data lake1024 --columns 300
 q "$BIN" run --preset "$P/planet_world_4k.json" --out planet4k --viewer planet4k-viewer --checkpoints
 q "$BIN" parity --world-data planet4k --columns 500
-last=$(ls planet4k/checkpoints/*.dtck | sort | tail -1)
+last=$(ls planet4k/checkpoints/*.dtcp | sort -V | tail -1)
 q "$BIN" satellite --in "$last" --out planet4k-satellite.png --width 512
 q "$BIN" run --preset "$P/deposits_world_4k.json" --out deposits4k
 q "$BIN" dump-deposits --world deposits4k --out deposits4k-samples.json
