@@ -82,7 +82,7 @@ pub use events::{
     Dyke, DykeKind, Event, Fault, FaultGeometry, FaultKind, Fold, Movement, Plug, PlugShape,
     Strain, Tilt, Unconformity,
 };
-pub use history::{History, Restored, Rock, Stratigraphy};
+pub use history::{Chain, History, Restored, Rock, Stratigraphy};
 pub use profile::Profile;
 pub use taste::{Code, Sequence};
 pub use windowed::{Window, Windowed};

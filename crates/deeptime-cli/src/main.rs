@@ -513,6 +513,17 @@ enum Command {
         /// PNG to write.
         #[arg(long)]
         out: PathBuf,
+        /// The preset's `provinces` section: a collision belt stays an orogen this many Myr
+        /// (default 500) …
+        #[arg(long)]
+        orogen_max_age_myr: Option<f64>,
+        /// … an Andean range while lifted within this many Myr (default 50) …
+        #[arg(long)]
+        andean_max_age_myr: Option<f64>,
+        /// … and standing at least this high, m (default 1500). They change the class shares
+        /// printed and the PNG; the in-game view layer always uses the defaults.
+        #[arg(long)]
+        andean_min_elevation_m: Option<f64>,
     },
     /// Draw the satellite view layer (true colour: land cover from the climate, snow and glacier
     /// ice, the sea by depth, sea ice, hill shading, the rivers and lakes of the terrain) of a
@@ -1067,7 +1078,25 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
-        Some(Command::Provinces { input, out }) => match provinces::run(&input, &out) {
+        Some(Command::Provinces {
+            input,
+            out,
+            orogen_max_age_myr,
+            andean_max_age_myr,
+            andean_min_elevation_m,
+        }) => match provinces::run(
+            &input,
+            &out,
+            {
+                let mut p = deeptime_core::provinces::ProvinceParams::default();
+                p.orogen_max_age_myr = orogen_max_age_myr.unwrap_or(p.orogen_max_age_myr);
+                p.andean_max_age_myr = andean_max_age_myr.unwrap_or(p.andean_max_age_myr);
+                p.andean_min_elevation_m =
+                    andean_min_elevation_m.unwrap_or(p.andean_min_elevation_m);
+                p
+            }
+            .rules(),
+        ) {
             Ok(shares) => {
                 for (name, pct) in shares {
                     println!("{pct:6.2} %  {name}");
