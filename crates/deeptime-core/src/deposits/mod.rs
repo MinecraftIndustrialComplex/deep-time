@@ -157,6 +157,14 @@ pub struct DepositParams {
     /// orogen's head act ([`regional`]; MVT's driver).
     #[serde(default = "brine_flow_km")]
     pub brine_flow_km: f64,
+    /// Inherited banded iron formation (`deposits::clocks`, plan §8.6): the share of a stable
+    /// continental interior's basement that holds BIF inherited from before the run, when the run
+    /// starts after the 2.6–1.85 Ga window (0–1; it multiplies the craton share). 0 = none, the
+    /// built-in presets' interim default (stage 2 WP-9/10, 2026-10-02: at 1 every stable interior
+    /// is permissive and a 1,000 Myr quick 16k planet holds 412 BIF sites; the extent is the
+    /// owner's question). ledger: ORE-261
+    #[serde(default)]
+    pub inherited_bif_share: f64,
     /// Regional specialisation (decisions file: default strong).
     #[serde(default)]
     pub province: Province,
@@ -179,6 +187,7 @@ impl Default for DepositParams {
             richness_mult: 1.0,
             max_formed_per_survivor: max_formed_per_survivor(),
             brine_flow_km: brine_flow_km(),
+            inherited_bif_share: 0.0,
             province: Province::Strong,
             province_km: province_km(),
             types: Vec::new(),
@@ -420,6 +429,12 @@ impl DepositParams {
                 path,
                 "count_mult ≥ 0, province_km > 0, max_formed_per_survivor ≥ 1 and brine_flow_km > 0 \
                  are required",
+            ));
+        }
+        if !(0.0..=1.0).contains(&self.inherited_bif_share) {
+            return Err(CoreError::preset(
+                format!("{path}.inherited_bif_share"),
+                "must be in [0, 1]",
             ));
         }
         for (v, key) in [

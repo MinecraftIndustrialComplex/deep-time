@@ -205,6 +205,7 @@
   "deeptime.editor.field.crater_degradation": "Crater fading speed",
   "deeptime.editor.field.province_size": "Ore province size",
   "deeptime.editor.field.brine_reach": "Brine flow reach",
+  "deeptime.editor.field.inherited_bif": "Inherited iron formation",
   "deeptime.editor.field.inland_mid": "Mid-inland distance",
   "deeptime.editor.field.inland_far": "Far-inland distance",
   "deeptime.editor.field.inland_interior": "Continental interior distance",

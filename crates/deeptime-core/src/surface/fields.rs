@@ -517,6 +517,7 @@ mod tests {
         let earth = |start_myr: f64| Epoch {
             present_age_gyr: crate::deposits::clocks::EARTH_AGE_GYR,
             run_start_years: -start_myr * 1.0e6,
+            inherited_bif: 1.0,
         };
         // A 1,000 Myr run: a Neoproterozoic frame has no coal-forming plants, a Carboniferous one has.
         let e = earth(1000.0);
