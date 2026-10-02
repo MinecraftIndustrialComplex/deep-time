@@ -129,6 +129,10 @@ pub struct NoddyCheck {
     pub worst: f64,
     /// Points the two put on different sides of a fault (within rounding of its plane).
     pub side_flips: u64,
+    /// The longest history (events) of a sampled column, and the columns whose history did not
+    /// fit one Noddy history (127 events) and was undone as a chain of them.
+    pub max_history: u64,
+    pub long_histories: u64,
     /// Events undone per point by the Noddy port, on average.
     pub events_per_point: f64,
     /// Seconds in the Noddy port's `restore` and in the column rule over the same points (one
@@ -182,8 +186,11 @@ pub fn noddy_check(
             continue;
         }
         out.columns_with_events += 1;
-        // The history, oldest first, in a frame centred on the column.
-        let mut history = noddy::History::new(noddy::Stratigraphy::single());
+        // The history, oldest first, in a frame centred on the column. A chain, not one Noddy
+        // history: a history holds 127 events (the original's sequence code) and a column of a
+        // long-lived belt has more candidates than that; a chain undoes them in runs, to the
+        // same position.
+        let mut history = noddy::Chain::new();
         for &n in cand.iter().rev() {
             let y = match st.events[n as usize].shape {
                 Shape::Fault { y, .. } => y,
@@ -196,9 +203,11 @@ pub fn noddy_check(
         }
         let t = Instant::now();
         for (k, &y) in heights.iter().enumerate() {
-            restored[k] = history.restore([0.0, 0.0, y]).point;
+            restored[k] = history.restore([0.0, 0.0, y]);
         }
         out.seconds_noddy += t.elapsed().as_secs_f64();
+        out.max_history = out.max_history.max(history.count() as u64);
+        out.long_histories += u64::from(history.parts().len() > 1);
         undone += (cand.len() * heights.len()) as u64;
 
         let t = Instant::now();
