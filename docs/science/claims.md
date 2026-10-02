@@ -27,18 +27,18 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [CLM](ledger/CLM.md) | climate physics | 134 | 0 | 40 | 5 | 0 | 13 | 21 | 55 | 106 | 28 | 12 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
 | [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 17 | 0 | 0 | 1 | 0 | 56 | 0 | 0 | 0 | 0 |
-| [DEP](ledger/DEP.md) | deposit models, counts, sizes | 164 | 0 | 74 | 0 | 15 | 0 | 49 | 26 | 0 | 0 | 40 |
+| [DEP](ledger/DEP.md) | deposit models, counts, sizes | 165 | 53 | 3 | 0 | 20 | 0 | 62 | 27 | 0 | 0 | 40 |
 | [ERO](ledger/ERO.md) | erosion, sediment, facies | 156 | 0 | 83 | 2 | 3 | 6 | 4 | 58 | 0 | 0 | 11 |
 | [GEO](ledger/GEO.md) | geothermal features | 51 | 1 | 0 | 0 | 0 | 0 | 47 | 3 | 0 | 1 | 0 |
 | [GLA](ledger/GLA.md) | glacial erosion and landforms | 64 | 0 | 20 | 1 | 0 | 1 | 25 | 17 | 0 | 0 | 2 |
-| [HNT](ledger/HNT.md) | editor hint texts | 88 | 13 | 12 | 2 | 2 | 6 | 38 | 15 | 0 | 0 | 0 |
+| [HNT](ledger/HNT.md) | editor hint texts | 89 | 13 | 12 | 2 | 2 | 6 | 39 | 15 | 0 | 0 | 0 |
 | [HYD](ledger/HYD.md) | rivers, lakes, runoff | 75 | 0 | 14 | 3 | 0 | 1 | 36 | 21 | 0 | 0 | 1 |
 | [HYP](ledger/HYP.md) | hypsometry and calibration targets | 34 | 0 | 10 | 0 | 1 | 18 | 1 | 4 | 0 | 0 | 0 |
 | [IMP](ledger/IMP.md) | meteor impacts | 135 | 43 | 9 | 6 | 6 | 0 | 56 | 15 | 0 | 0 | 6 |
 | [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 67 | 3 | 8 | 0 | 6 | 6 | 14 | 30 | 0 | 0 | 2 |
 | [MAG](ledger/MAG.md) | magma and lava | 42 | 2 | 1 | 0 | 1 | 0 | 37 | 1 | 0 | 0 | 0 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 70 | 0 | 17 | 0 | 0 | 0 | 8 | 45 | 70 | 0 | 6 |
-| [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 182 | 0 | 59 | 2 | 10 | 0 | 40 | 71 | 0 | 0 | 75 |
+| [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 186 | 24 | 17 | 0 | 17 | 0 | 59 | 69 | 0 | 0 | 75 |
 | [PLT](ledger/PLT.md) | plate tectonics | 207 | 17 | 45 | 4 | 14 | 13 | 68 | 46 | 163 | 25 | 20 |
 | [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 | 0 |
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 74 | 0 | 9 | 0 | 0 | 2 | 54 | 9 | 16 | 0 | 0 |
@@ -48,7 +48,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [STR](ledger/STR.md) | strata, traps, hosts | 44 | 0 | 4 | 0 | 0 | 2 | 34 | 4 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
-| **all** | | **2,231** | **115** | **470** | **26** | **72** | **79** | **895** | **574** | **359** | **58** | **193** |
+| **all** | | **2,237** | **192** | **357** | **24** | **84** | **79** | **928** | **573** | **359** | **58** | **193** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),
@@ -231,9 +231,9 @@ code). "Evidence" says how strong the finding is.
 | 18 | PLT, plate-check and the force-balance design | "Slab-attached plates move 3 to 4 times faster" is attributed to Forsyth & Uyeda 1975; the statement found is in Conrad & Lithgow-Bertelloni 2004. Correct the attribution before the force balance is calibrated to it. | primary abstracts **Settled in WP-13a (2026-10-02):** Forsyth & Uyeda 1975 was read in full. They give slab-attached plates at 6-9 cm/yr and the others at 0-4 cm/yr (p. 178), and their Table 1 gives a ratio of means of 3.8; the words "~4 times faster" are Conrad & Lithgow-Bertelloni 2004's. The designs, PLT-162 and CHK-056 now say so. |
 | 19 | SCL (`pole_cap_deg`), preset | The preset's pole-cap latitude is read by nothing; the game uses its own value from the world preset file. | code reading |
 | 20 | SCL-039 and the timeline range | A run may be 4,600 Myr long while the planet's age defaults to 4.57 Gyr. | arithmetic |
-| 21 | DEP (MVT and sedex time gate) | The 2.02 Ga limit comes from Leach et al. 2010 in Economic Geology, not from the USGS report of the same authors and year that is also cited; that paper does not support putting MVT deposits on the same clock as sedex. Moot until fix 2. | primary abstract |
-| 22 | DEP (supergene copper) | The data file says Sillitoe 2005's "3 to 9 Myr" was not found; the abstract has it ("at least 0.5 m.y. but typically minima of 3 to 9 m.y."). The engine uses only the 0.5. The 100 mm/yr rainfall floor is stricter than the sources. | primary abstract |
-| 23 | DEP ("Circular 1178 p. 15") | The 1 km assessment depth is on printed page 5. The rule itself is right. | primary full text (sub-agent) |
+| 21 | DEP (MVT and sedex time gate) | The 2.02 Ga limit comes from Leach et al. 2010 in Economic Geology, not from the USGS report of the same authors and year that is also cited; that paper does not support putting MVT deposits on the same clock as sedex. Moot until fix 2. | primary abstract; **Stage 2 (WP-9/10):** the ledger now names the Economic Geology paper (ORE-014); the shared gate is unchanged and listed as an open question. |
+| 22 | DEP (supergene copper) | The data file says Sillitoe 2005's "3 to 9 Myr" was not found; the abstract has it ("at least 0.5 m.y. but typically minima of 3 to 9 m.y."). The engine uses only the 0.5. The 100 mm/yr rainfall floor is stricter than the sources. | primary abstract; **Stage 2 (WP-9/10): data note corrected**; the 100 mm/yr floor and the 0.5 Myr minimum are open questions on [deposits.md](deposits.md). |
+| 23 | DEP ("Circular 1178 p. 15") | The 1 km assessment depth is on printed page 5. The rule itself is right. | primary full text (sub-agent); **Stage 2 (WP-9/10): corrected** in the porphyry type note and the ledger. |
 | 24 | MOI-073, CLM (weathering) | The runoff sensitivity 0.038 per K is GEOCARB II's (Berner 1994); the cited Berner & Kothavala 2001 uses 0.045 and 0.025. | primary full text (sub-agent) |
 | 25 | GLA-002 | Glacial erosion constant 1e-5 with exponent 1; the published pairs are 1e-4 with exponent 1 and 1e-5 with exponent 2. Glacial erosion may be ten times too slow, or the exponent wrong. | primary abstract and a citing paper |
 | 26 | AMP-034, AMP-038 | The thermal slope values attributed to Schott et al. are read differently from Schott's shader: 0.9 and 1.4 there are absolute tangents, not multipliers of 0.57. | Schott's shader source (sub-agent) |
