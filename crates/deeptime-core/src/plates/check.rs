@@ -3662,9 +3662,10 @@ mod tests {
         assert!(near(get(&m, "balance_p50_mm_yr"), 40.0));
         assert!(near(get(&m, "balance_norm_p50_mm_yr"), 40.0 * 45.0 / rms));
         assert_eq!(get(&m, "balance_over_150_pct"), 0.0);
-        // Oceanic (0, 2: median 65) over continental (1: 20); slab (0: 90) over free (2: 40).
+        // Oceanic (0, 2: median 65) over continental (1: 20); slab (0: 90) over free (1 and 2:
+        // median 30).
         assert!(near(get(&m, "balance_oceanic_over_continental"), 3.25));
-        assert!(near(get(&m, "balance_slab_over_free"), 2.25));
+        assert!(near(get(&m, "balance_slab_over_free"), 3.0));
         assert!(near(get(&m, "balance_slab_rank_corr"), 1.0));
         assert!(near(get(&m, "balance_vs_motion_rank_corr"), 1.0));
         assert!(near(get(&m, "balance_over_motion_p50"), 40.0 / 60.0));
