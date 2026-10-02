@@ -104,7 +104,7 @@ public final class FarTerrainGameTests {
      * equator to mid-latitudes. Each side must meet the planet-wide test's properties on its own.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
-    public static void farTerrainMatchesGeneratedChunksAcrossTheSeam(GameTestHelper helper) {
+    public static void farTerrainMatchesGeneratedChunksAcrossTheSeam(GameTestHelper helper) {   // ledger: BAK-042
         FarTerrain far = far(helper);
         ServerLevel level = far.level();
         int c = far.data().circumference();
