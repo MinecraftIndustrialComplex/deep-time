@@ -13,7 +13,12 @@
 # bundle (the keyframe pictures), its column and climate parity fixtures and a satellite picture
 # of its last checkpoint; the deposit world (deposits_world_4k) and its dump. On the test VM via
 # tools/remote/mac.sh; the output folder is deleted by the caller.
+#
+#   tools/review/projection-identity.sh --hash <output folder>   # hash an existing folder again
 set -euo pipefail
+if [ "$1" = --hash ]; then
+    cd "$2"
+else
 BIN=$(realpath "$1"); OUT=$2
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 P=$REPO/crates/deeptime-core/tests/presets
@@ -31,9 +36,11 @@ q "$BIN" run --preset "$P/deposits_world_4k.json" --out deposits4k
 q "$BIN" dump-deposits --world deposits4k --out deposits4k-samples.json
 # Checkpoints carry the stages' timings; their pictures and the bake are what is compared.
 rm -rf planet4k/checkpoints
+fi
 python3 - <<'EOF'
 import hashlib, json, os, re
-SKIP = re.compile(r"(millis|_ms|seconds|_secs|elapsed|created_utc|^time$|timing|wall)", re.I)
+# The clock and the run's timings and memory peaks, which differ from run to run of one build.
+SKIP = re.compile(r"(millis|_ms$|^passes$|seconds|_secs|_s$|_ns_point|elapsed|created_utc|^time$|timing|^wall|reserved.*bytes)", re.I)
 def clean(v):
     if isinstance(v, dict):
         return {k: clean(x) for k, x in v.items() if not SKIP.search(k)}
@@ -46,6 +53,9 @@ for root, _, files in os.walk("."):
         if f == "log.txt":
             continue
         b = open(p, "rb").read()
+        if f == "bundle.js" and b.startswith(b"window.DT_BUNDLE = "):
+            b = b.split(b"= ", 1)[1].rstrip().rstrip(b";")
+            f = "bundle.json"
         if f.endswith(".json"):
             try:
                 b = json.dumps(clean(json.loads(b)), sort_keys=True).encode()
