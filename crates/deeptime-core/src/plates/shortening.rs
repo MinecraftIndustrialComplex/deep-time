@@ -1017,7 +1017,14 @@ mod tests {
         st.plates[1].omega = [0.0; 3];
         // Stalled from step 2 (4 Myr): handed over at step 7 (14 Myr), 10 Myr later.
         for step in 2..=7 {
-            let (_, fired) = advance(&mut st, &fx.geo, &pos, &tree, &fx.env(step), BTreeMap::new());
+            let (_, fired) = advance(
+                &mut st,
+                &fx.geo,
+                &pos,
+                &tree,
+                &fx.env(step),
+                BTreeMap::new(),
+            );
             let c = st.contacts[0].collision.as_ref().unwrap();
             assert_eq!(c.stalled_since_myr, Some(4.0), "step {step}");
             assert_eq!(fired.is_empty(), step < 7, "step {step}");
@@ -1029,8 +1036,14 @@ mod tests {
         let mut st = two_plates(&fx.geo, DVec3::X * fx.rate(60.0), arc);
         for step in 1..=10 {
             st.contacts[0].last_step = step;
-            let (_, fired) =
-                advance(&mut st, &fx.geo, &pos, &tree, &fx.env(step), BTreeMap::new());
+            let (_, fired) = advance(
+                &mut st,
+                &fx.geo,
+                &pos,
+                &tree,
+                &fx.env(step),
+                BTreeMap::new(),
+            );
             assert!(fired.is_empty(), "step {step}");
         }
         assert!(st.contacts[0].collision.is_none());

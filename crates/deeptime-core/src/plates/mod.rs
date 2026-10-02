@@ -485,7 +485,13 @@ impl PlatesStage {
         }
         Some(
             (0..n)
-                .map(|v| if wsum[v] > 0.0 { sum[v] / wsum[v] } else { f64::NAN })
+                .map(|v| {
+                    if wsum[v] > 0.0 {
+                        sum[v] / wsum[v]
+                    } else {
+                        f64::NAN
+                    }
+                })
                 .collect(),
         )
     }
