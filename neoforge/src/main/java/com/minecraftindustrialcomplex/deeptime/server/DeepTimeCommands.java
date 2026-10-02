@@ -5,6 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.climate.BiomeCensus;
+import com.minecraftindustrialcomplex.deeptime.climate.RegionCensus;
 import com.minecraftindustrialcomplex.deeptime.compat.sable.SableTestOps;
 import com.minecraftindustrialcomplex.deeptime.gametest.DeepTimeTestReporter;
 import com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport;
@@ -70,6 +71,11 @@ public final class DeepTimeCommands {
                         .executes(c -> probeBiomes(c.getSource(), 16))
                         .then(Commands.argument("step", IntegerArgumentType.integer(4, 4096))
                                 .executes(c -> probeBiomes(c.getSource(), IntegerArgumentType.getInteger(c, "step")))))
+                // P1-10: TerraBlender's regions over the provinces; the grid goes to deeptime-probe/regionmap.json.
+                .then(Commands.literal("regions")
+                        .executes(c -> probeRegions(c.getSource(), 16))
+                        .then(Commands.argument("step", IntegerArgumentType.integer(4, 4096))
+                                .executes(c -> probeRegions(c.getSource(), IntegerArgumentType.getInteger(c, "step")))))
                 // P1-16: what Deep Time and COE / CDG hold for a chunk (work without the mods too).
                 .then(Commands.literal("coe")
                         .then(Commands.argument("chunkX", IntegerArgumentType.integer())
@@ -337,6 +343,21 @@ public final class DeepTimeCommands {
             o.addProperty("error", e.toString());
         }
         o.addProperty("probe", "biomes");
+        return emit(source, o);
+    }
+
+    private static int probeRegions(CommandSourceStack source, int step) {
+        ServerLevel level = source.getServer().overworld();
+        JsonObject o;
+        try {
+            long t0 = System.nanoTime();
+            o = RegionCensus.run(level, step, source.getServer().getServerDirectory().resolve("deeptime-probe").resolve("regionmap.json"));
+            o.addProperty("seconds", Math.round((System.nanoTime() - t0) / 1e7) / 100.0);
+        } catch (Exception e) {
+            o = new JsonObject();
+            o.addProperty("error", e.toString());
+        }
+        o.addProperty("probe", "regions");
         return emit(source, o);
     }
 

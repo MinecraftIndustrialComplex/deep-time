@@ -660,3 +660,68 @@ fn baked_stacks_and_blended_columns_have_no_grade_inversion_and_no_sliver() {
         );
     }
 }
+
+/// Whatever the seed and the start, and however busy the belts, the stage ends without a panic
+/// and its end-of-run check holds: histories longer than one Noddy history (127 events) are
+/// undone as chains, and the Noddy port still agrees with the column rule on every sampled
+/// point. (The settings here make far more structures than any preset: the longest history a
+/// sampled column meets must pass one Noddy history in at least one of the runs, or the test
+/// is not testing the case that used to panic.)
+#[test]
+fn the_stage_never_panics_however_dense_the_structures() {
+    let mut longest = 0u64;
+    let mut long_columns = 0u64;
+    for (seed, start) in [
+        (1u64, "supercontinent"),
+        (2, "supercontinent"),
+        (3, "scattered_continents"),
+        (4, "scattered_continents"),
+    ] {
+        let json = with_timeline(
+            planet_builtin("pipeline_quick_16k").unwrap(),
+            Some(start),
+            Some(50.0),
+        )
+        .unwrap();
+        let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        v["resolution"]["l0_samples"] = serde_json::json!(3000);
+        v["resolution"]["l1_r"] = serde_json::json!(64);
+        v["keyframes"]["size"] = serde_json::json!([128, 64]);
+        v["keyframes"]["every_myr"] = serde_json::json!(40.0);
+        v["seed"] = serde_json::json!(seed);
+        v["structure"] = serde_json::json!({"deformation": {
+            "density": 10.0, "intrusions": 10.0, "max_overlap": 16, "overprint_myr": 1000.0,
+            "fault_length_km": [150.0, 100.0, 150.0], "fold_wavelength_km": [32.0, 30.0, 32.0]
+        }});
+        for stage in ["deposits", "young", "amplify"] {
+            v.as_object_mut().unwrap().remove(stage);
+        }
+        let dir = temp_dir(&format!("dense-{seed}"));
+        let s = session(&v.to_string(), &dir, 2);
+        finish(&s);
+        let world = s.checkpoint().unwrap().world;
+        let note: serde_json::Value =
+            serde_json::from_str(world.notes.get(STAGE_NAME).expect("the stage's note")).unwrap();
+        let check = &note["deformation"]["noddy_check"];
+        assert!(
+            check["points"].as_u64().unwrap() > 0,
+            "{start} {seed}: {check}"
+        );
+        assert!(
+            check["worst"].as_f64().unwrap() < 1e-4,
+            "{start} {seed}: {check}"
+        );
+        let st = world.structure.as_ref().expect("the world's structure");
+        assert!(
+            st.events.windows(2).all(|w| w[0].key <= w[1].key),
+            "youngest first"
+        );
+        longest = longest.max(check["max_history"].as_u64().unwrap());
+        long_columns += check["long_histories"].as_u64().unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+    assert!(
+        longest > 127 && long_columns > 0,
+        "the longest history met was {longest}: not past one Noddy history"
+    );
+}
