@@ -185,11 +185,15 @@ their abstracts or from secondary pages.
 - 52 plates in Bird's model. The Pacific is 103.3 million km², 20 % of the Earth. The seven largest
   (Pacific, North America, Eurasia, Africa, Antarctica, Indo-Australia, South America) cover about
   92 %. P. Bird 2003, *Geochem. Geophys. Geosyst.* 4(3):1027; areas from
-  <https://en.wikipedia.org/wiki/List_of_tectonic_plates>.
+  <https://en.wikipedia.org/wiki/List_of_tectonic_plates>. *Checked in WP-13a against Bird's own
+  Table 1 (areas in steradians, full text): the Pacific is 2.577 sr, 20.5 % of the sphere; exactly
+  seven plates hold over 5 % (Pacific, Africa, Antarctica, North America, Eurasia, Australia,
+  South America); those seven cover 81 %, not 92 % (Bird splits India, Somalia and others off).*
 - About seven large plates and many small ones for the last 200 Myr: Morra et al. 2013, *EPSL*
   373:93–101; Mallard et al. 2016, *Nature* 535:140–143 (slabs set the layout of the large
   plates). Whether the two groups are distinct populations is disputed
-  (<https://www.geosociety.org/gsa-today/june-2018/broken-sheetson-the-numbers-and-areas-of-tectonic-plates>).
+  (<https://www.geosociety.org/gsa-today/june-2018/broken-sheetson-the-numbers-and-areas-of-tectonic-plates>:
+  the areas cannot be shown to come from more than one size distribution; read in WP-13a).
 - No source gives the largest plate's share through a supercontinent's life. From memory: the
   plate carrying Pangaea was well under half the planet, with several oceanic plates in the
   surrounding ocean.
@@ -198,25 +202,36 @@ their abstracts or from secondary pages.
 190 Ma and still exists; the Farallon plate subducted from the Early Jurassic and split about
 23 Ma (Lonsdale 2005, *Tectonophysics* 404:237–264); Izanagi was gone by about 55 Ma and Kula by
 about 48 Ma (<https://en.wikipedia.org/wiki/Pacific_plate>, `/Izanagi_plate`, `/Kula_plate`). So
-large plates last 100–200 Myr or more, small ones tens of Myr.
+large plates last 100–200 Myr or more, small ones tens of Myr. *The three Wikipedia figures
+(190, 55, 48 Ma) were re-read in WP-13a; Lonsdale 2005 was not read.*
 
 **The supercontinent and Wilson cycles.**
 - Period about 300–500 Myr (<https://en.wikipedia.org/wiki/Supercontinent_cycle>; Nance 2022,
   <https://pmc.ncbi.nlm.nih.gov/articles/PMC9796656/>). A supercontinent lasts 100–300 Myr
   (Mitchell et al. 2021, *Nat. Rev. Earth Environ.* 2:358–374). Pangaea assembled about
-  335–325 Ma and began to break up about 200–175 Ma.
+  335–325 Ma and began to break up about 200–175 Ma. *Checked in WP-13a: 300–500 is the
+  Wikipedia page's figure only. Nance 2022 (read) gives "intervals of ca. 500 m.y." and Pangaea's
+  tenure as c. 325–200 Ma; Mitchell et al. 2021 (accepted manuscript, read) give a cycle "often
+  considered to last 400–800" Myr with about 600 Myr dominant, and tenures of 100–300 Myr.
+  Wikipedia gives Pangaea's assembly as about 335 Ma and its break-up from about 175 Ma.*
 - Oceans open for 100–200 Myr before they close: the Iapetus from about 600 to 420 Ma
   (<https://en.wikipedia.org/wiki/Iapetus_Ocean>); the Atlantic has been opening for about
-  175–180 Myr. J. T. Wilson 1966, *Nature* 211:676–681.
+  175–180 Myr. J. T. Wilson 1966, *Nature* 211:676–681. *Checked in WP-13a (Wikipedia only):
+  the Iapetus opened in phases between 750 and 520 Ma and was gone by about 420 Ma; the
+  Atlantic's opening is dated 200–170 Ma. Wilson 1966 was not read.*
 
 **Collisions.**
 - India and Asia met 59–50 Ma. Convergence fell from about 150 to about 40 mm/yr between 50 and
   35 Ma, **and the thickening of Tibet's crust was the main cause of the slowdown** (Copley,
-  Avouac & Royer 2010, *J. Geophys. Res.* 115:B03410). It still continues, 50 Myr on.
+  Avouac & Royer 2010, *J. Geophys. Res.* 115:B03410). It still continues, 50 Myr on. *The
+  abstract (read in WP-13a) gives "∼15 to ∼4 cm/yr" and "crustal thickening in the Tibetan
+  Plateau was the dominant cause".*
 - Other collisions: Alleghanian about 325–260 Ma (65 Myr); Uralian about 70–90 Myr
   (<https://en.wikipedia.org/wiki/Alleghanian_orogeny>, `/Uralian_orogeny`). So a collision
-  builds its range over tens of Myr.
-- Shape: the Himalaya is 2,400 km long and 150–350 km wide; the Alps 1,200 × 250 km; the Urals
+  builds its range over tens of Myr. *Checked in WP-13a: the Alleghanian page gives 325–260 Ma;
+  the Uralian page gives no length, only a start in the Late Carboniferous (from c. 323 Ma) and an
+  end in the Triassic to Early Jurassic, about 70–140 Myr.*
+- Shape: the Himalaya is 2,400 km long and 150–350 km wide (151–350 on the page); the Alps 1,200 × 250 km; the Urals
   2,500 km long. Tibet, behind the Himalaya, is 2,500 × 1,000 km at a mean above 4,500 m
   (Wikipedia pages of each). So young belts are 5–15 times longer than wide, and a long-lived
   collision grows a plateau behind the belt.
@@ -228,7 +243,10 @@ large plates last 100–200 Myr or more, small ones tens of Myr.
 **What happens to the plates.**
 - Slab pull is the main driving force; plates attached to slabs move 3–4 times faster than the
   others, and continents add drag (Forsyth & Uyeda 1975, *Geophys. J. R. Astron. Soc.*
-  43:163–200, from its abstract).
+  43:163–200, from its abstract). *Corrected in WP-13a (claims.md fix 18), full text read:
+  Forsyth & Uyeda give two groups, slab-attached plates at 6–9 cm/yr and the others at 0–4 cm/yr
+  (p. 178); their Table 1 gives a ratio of mean speeds of 3.8. The words "∼4 times faster" are
+  Conrad & Lithgow-Bertelloni 2004's (abstract).*
 - The buoyant continent resists going down; the slab can break off (Davies & von Blanckenburg
   1995, *EPSL* 129:85–102).
 - Two plates are one plate when they no longer move relative to each other. This is the
@@ -394,6 +412,12 @@ on the mean of the four runs; the chaos between seeds is the bracketed range in 
 | Continental crust, share of the planet, every step | 0.38–0.45 at the end (the review: 0.37–0.45 through its run) | 0.37–0.45 |
 | Active share of the continental margin (P1-27) | 0.30 [0.28–0.32] | 0.25–0.40 |
 | Ocean floor, 90th percentile age | 208–269 Myr | at most 230 Myr |
+
+Earth, checked in WP-13a (2026-10-02; rows CHK-001 to CHK-019 of `docs/science/ledger/CHK.md`):
+the largest plate is 20.5 % of the sphere and seven plates hold over 5 % (Bird 2003, Table 1);
+today's ocean floor has a 90th percentile age of 133 Myr, a median of 55 Myr and 0.6 % older than
+180 Myr (Seton et al. 2020 age grid, area-weighted, computed). The 230 Myr ceiling is therefore
+lenient by about 100 Myr; it stays until the plate rewrite is measured (question in STATUS.md).
 
 Hypsometry, unchanged from the 2026-10-01 recalibration: `tools/review/p1-17-hyps.sh`, 500 Myr,
 seeds 1–3 × both starts, mean of six:
