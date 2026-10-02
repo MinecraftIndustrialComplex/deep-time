@@ -58,6 +58,22 @@ case "${1:-}" in
         setsid nohup sh -c "$cmd echo CENSUS-DONE > '$RUNS/census.done'" > /dev/null 2>&1 < /dev/null &
         echo "census started pid $!"
         ;;
+    gates)
+        # fmt, clippy, deny, the workspace tests and Gradle, detached; log gates.log, then gates.done.
+        rm -f "$RUNS/gates.done"
+        setsid nohup bash -c "
+            export CARGO_BUILD_JOBS=8
+            { cargo fmt --all -- --check && echo FMT_OK
+              cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tail -3; echo CLIPPY_EXIT=\${PIPESTATUS[0]}
+              cargo deny check licenses bans 2>&1 | tail -2
+              cargo test --workspace 2>&1 | grep -E 'test result|FAILED|panicked'; echo TEST_EXIT=\${PIPESTATUS[0]}
+              (cd neoforge && ./gradlew build test --console=plain > '$RUNS/gradle.log' 2>&1; echo GRADLE_EXIT=\$?
+               python3 ../tools/ci/junit-summary.py build/test-results/test | tail -3)
+            } > '$RUNS/gates.log' 2>&1
+            echo done > '$RUNS/gates.done'
+        " > /dev/null 2>&1 < /dev/null &
+        echo "gates started pid $!"
+        ;;
     gametests)
         # ./gametest.sh, -PwithMic (the MIC set reinstalled first) and -PwithEv, detached, under the
         # server lock (mac.sh's protocol); logs gametest-{plain,mic,ev}.log, then gametests.done.
