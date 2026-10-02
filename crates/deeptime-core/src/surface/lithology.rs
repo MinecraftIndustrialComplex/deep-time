@@ -26,7 +26,7 @@ macro_rules! class_files {
 }
 
 /// The class files, in `EVERY_CLASS` order.
-const FILES: [(&str, &str); 60] = class_files!(
+const FILES: [(&str, &str); 62] = class_files!(
     "granite",
     "granodiorite",
     "diorite",
@@ -76,6 +76,8 @@ const FILES: [(&str, &str); 60] = class_files!(
     "carbonatite",
     "pegmatite",
     "greisen",
+    "impact_breccia",
+    "impact_melt",
     "soil",
     "saprolite",
     "laterite",
@@ -272,7 +274,7 @@ mod tests {
     #[test]
     fn the_table_is_the_rock_class_data() {
         let t = table();
-        assert_eq!(t.len(), 60);
+        assert_eq!(t.len(), 62);
         // Buried till is diamictite (Ben, 2026-09-30), whose young, shallow part shows as till.
         assert_eq!(
             t[usize::from(index("till"))].lithifies_to,

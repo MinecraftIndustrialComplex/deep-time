@@ -251,6 +251,12 @@ pub struct Contact {
     /// The collision this contact is in, while continental crust of the subducting plate stands
     /// at the front (`shortening.rs`).
     pub collision: Option<Collision>,
+    /// The count used before plate-motion task 2, km: relative speed at the overlap's centroid ×
+    /// time, over the steps with at least three continental samples of the subducting plate in
+    /// the overlap, since the contact began, reversed or last fired. It is not shortening (plates
+    /// sliding past each other count in full). It fires the transfer or weld while
+    /// `tectonics.collision_on_shortening` is off; task 4 removes both.
+    pub speed_count_km: f64,
     /// Largest uplift rate seen on the overriding plate, mm/yr.
     pub max_uplift_mm_yr: f64,
     /// Whether the overriding plate's continental crust was uplifted (an Andean orogeny).
@@ -290,6 +296,9 @@ pub struct Collision {
     pub convergence_mm_yr: f64,
     pub onset_convergence_mm_yr: f64,
     pub peak_convergence_mm_yr: f64,
+    /// Convergence across the front `shortening::SLOWDOWN_AFTER_MYR` after the onset (the first
+    /// step with a front from then on); `None` while the collision is younger.
+    pub later_convergence_mm_yr: Option<f64>,
     /// Length of the front in the last step it was seen, km (the straight distance between the
     /// ends of the stretch of the overriding plate's edge that continental crust of the subducting
     /// plate stands at), and the longest it has been.

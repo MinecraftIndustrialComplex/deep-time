@@ -72,6 +72,7 @@ reader needs to know.
   strata/classes.json           class index → rock class name
   spawn/candidates.json         land cells for spawn selection
   volcanoes/active.json         the volcanoes active at the present ("Lava")
+  impacts/craters.json          the impact craters at the present ("Impact craters")
   climate_mapping.json          written by the game at the world's first start (P1-09, plan §7.2; not listed
                                 in the manifest): the tables from the baked biome inputs to the pack's
                                 (see "The climate mapping")
@@ -846,6 +847,32 @@ y −64) measured from the floor instead of from y 0. Vanilla's own constants fl
 blocks of every cave, and of every sea deeper than 117 blocks, of a world whose floor is y −352.
 Carver lava in the bottom eight blocks is vanilla's and not covered by these rules.
 
+### Impact craters (`impacts/craters.json`)
+
+The bake lists the craters the impact stage (P2-08, `surface/impacts`) leaves in its catalogue at the
+present: those that still show, the buried ones and the eroded roots (craters worn through their
+breccia, subducted or overprinted are not listed; a world without the impact stage has no file):
+
+```json
+{"version": 1, "t_myr": 0.0, "craters": [
+  {"id": 73, "x": 2410.5, "z": -1033.0, "diameter_m": 6300, "morphology": "complex", "age_myr": 12.4,
+   "depth_m": 255, "rim_m": 91, "relief_m": 180, "fate": "degraded", "breccia_m": 255, "melt_m": 0,
+   "cover_m": 12, "in_surface": false}]}
+```
+
+`x`, `z` are the centre's block position (x in [−C/2, C/2)); `diameter_m` is rim to rim; `morphology`
+is `simple`, `complex` or `peak_ring`; `depth_m` (rim crest to floor) and `rim_m` (rim above the
+ground it struck) are the fresh crater's in game metres (the physical ones × `impacts.depth_scale`),
+and `relief_m` is what erosion, burial and soil creep have left of `depth_m`; `fate` is `fresh`,
+`degraded`, `buried` or `eroded_to_roots`; `breccia_m` and `melt_m` are the thickness of the breccia
+lens and the melt sheet; `cover_m` the sediment over the floor; `in_surface` says the crater was large
+enough (two L1 cells) to be cut into the deep-time surface and laid in the strata log, rather than
+drawn by the amplifier and given a body. `notes.bake.impacts` records `craters` (the count) and
+`craters_file`. The game does not read the file to build anything: the craters are in `elevation`,
+their rock in the horizon stacks and in bodies of role `impact_breccia` (rock class `impact_breccia`,
+with a zone `melt_sheet` of rock class `impact_melt` on the floor of a crater that has one). It is
+there for tools, and Java's `worlddata/Craters` reads it for the GameTest that checks a crater in the placed world.
+
 ### Active volcanoes (`volcanoes/active.json`) and their magma
 
 The bake lists the volcanoes the volcano stage leaves **active at the present** (dead ones and those
@@ -897,11 +924,69 @@ fluid state named `minecraft:lava`: vanilla's `lake_lava_surface`, `lake_lava_un
 not placed in a Deep Time level
 (Java `worldgen/LavaFeatures`); other dimensions keep them.
 
+### Geothermal features (P2-14) and their settings
+
+Hot springs, sinter and travertine terraces, fumaroles with native sulfur and bare altered ground
+sit around the active volcanoes. No file and no layer holds them: the game builds the sites from
+`volcanoes/active.json`, the terrain height, the water columns and four more keys of
+`notes.bake.underground.params` (defaults in brackets; Java `worldgen/Geothermal`, placed by
+`worldgen/GeothermalPass` in the surface step after the magma and before the ice):
+`geothermal_density` (1.0, 0 to 4; **0: no geothermal features**), `geothermal_reach` (1.0, 0.25 to 3),
+`geothermal_size` (1.0, 0.5 to 3), `geothermal_spring_min_precip_mm` (400, 0 to 4000).
+
+**The heat sources are the active volcanoes and nothing else.** The bake does not export the plate
+model's heat flow, its spreading ridges or its rifts, so nothing is placed on them. (The `meta/province`
+layer does have a `rift` setting, but regions under 50,000 km² are absorbed by their neighbours and a
+planet's rifts seldom survive; a 16k, 500 Myr planet baked on 2026-10-01 had none.)
+
+With R the volcano's basal radius in blocks (`radius_m` / `m_per_block_h`, at least 6), a the activity
+(0.05 to 1), a volcano gets ⌊d · (0.7 + 2.3 a) · clamp(√(R / 45), 0.6, 2.2) + u⌋ **fields** (d =
+`geothermal_density`, u a uniform draw from the volcano's own seed, a hash of its id and position).
+The first field lies 0.08 to 0.35 R · `geothermal_reach` from the summit, the others 0.25 to 1.0 R ·
+`geothermal_reach`, in any direction, on the first of twelve draws that is dry land (3 blocks above
+the sea, no water column, no ice cover). A field is **hot springs** when it is at least 0.35 R from the summit,
+the baked `climate/p_mm` there reaches `geothermal_spring_min_precip_mm`, and `climate/t_mean_c` is at
+least 3 °C (a world without those layers counts as warm and wet); else it is a **fumarole field**.
+
+- A hot-spring field has a main pool (mean radius round((2.4 + 2.2 u) · `geothermal_size`), 2 to 9
+  blocks), one to three smaller ones (1.6 to 3 times the size, 2 to 6), in a chain down the slope half
+  the time (a terrace), and now and then a vent or a patch of altered ground. A pool's outline wobbles
+  (`1 + 0.16 sin 3θ + 0.09 sin 5θ`). Its **level** is the mean ground top (⌈H⌉ − 1) of its pool and rim
+  columns; it is refused where any column's ground is more than 6 blocks above the level (cut away) or
+  more than 6 below it (built up as a dam: rim and bed fill down to the ground). Water fills the level
+  and, in the middle 75 % of the radius, the block under it; the bed below is sinter (the site's terrace rock) in the heart (45 % of the radius), yellow
+  mat, then orange mat towards the edge; the ground above the level is cut to air. The **rim** (every
+  column that touches the pool, else out to 1.5 blocks) is solid at the level and one block under it. The
+  **apron** around it, out to the site's `apron` radius, wears the terrace rock on its top block (a
+  fifth the other rock), a tenth of it stained yellow.
+- A fumarole field has two to four **vents** (radius 1 or 2: a core of magma blocks two blocks deep, a
+  crust of native sulfur around it, bleached and yellow-stained ground out to 3 to 10 blocks) and one or
+  two **patches** of altered ground (3 to 11 blocks). At silicic volcanoes 6 % of the altered ground is cinnabar.
+- A terrace is **sinter** (white, siliceous) unless carbonate rock (limestone, dolostone, chalk, marble
+  or travertine) lies within 150 blocks under the site in the strata horizons: then **travertine**.
+- Refused: a site on ground under 3 blocks above the sea; with a water column (the sea, a lake, a
+  river or a bank: `Water.column`, as for the magma), ice cover or anything of another site's hard part
+  (pool and rim, vent and crust) in its footprint; within 3 blocks + its hard radius of an open crater lake or the plug of a
+  magma body. Two sites that claim a column: the higher priority wins (pool, rim, vent, sulfur,
+  terrace, altered ground), so a pool's walls are never overwritten.
+- **Blocks** are roles resolved like rock classes: the blocks of `#deeptime:geothermal/<role>`, else the first entry of
+  `#deeptime:geothermal_fallback/<role>`, else the vanilla block: `sinter` (calcite), `altered`
+  (white terracotta), `stain` (yellow terracotta), `mat` (orange terracotta), `sulfur` (yellow
+  concrete), `cinnabar` (red terracotta), `vent` (magma block); travertine is the rock class of
+  that name (`#deeptime:rock/travertine`, dripstone block in vanilla). Deep Time adds no block.
+- **Water safety.** Bed, water and rim are in the chunk's carving masks. A vent's magma block never has
+  water over it and no site touches lava. Columns with a fluid on top are left alone.
+
+`DeepTimeClimate.geothermalWarmthC(x, y, z)` (API 3) is the warm-ground signal: kelvin over the
+climate's temperature, at most 12 (vent) / 10 (pool) / 6 (patch) at a site's heart, falling linearly to
+0 a few blocks beyond its altered ground, within 10 blocks under and 6 over its ground.
+
 ## `strata/classes.json`
 
 `{"classes": ["sandstone", "red_bed", "granite"]}` — index → rock class id (plan §5.4.1,
 `deeptime:rock/<class>` tags). The vocabulary is the rock-tag README's 60 classes (`diamictite`,
-lithified till, added 2026-09-30); a reader maps indices through this file, never through a fixed
+lithified till, added 2026-09-30) plus `impact_breccia` and `impact_melt` (the rocks of meteorite
+impacts, added for P2-08 on 2026-10-01), 62 in all; a reader maps indices through this file, never through a fixed
 list, so a class added to the vocabulary changes no bytes a reader depends on.
 
 ## `spawn/candidates.json`
@@ -1339,9 +1424,9 @@ survives in, the finished folder. The manifest's `notes.run.history` reports wha
   (or the content bundle's) essentials. `crates/deeptime-core/tests/presets/deposits_world_{4k,16k}.json`
   are the GameTest and smoke worlds.
 - All: a three-horizon strata placeholder on L1 (`notes.strata`); with `--strata every-class`
-  (P1-12) eight horizons 10 blocks apart holding all 60 rock classes, horizon h of L1 cell column
-  i having class (6·i + h) mod 60, so any ten neighbouring cell columns show every class at
-  h ≥ 2 (`notes.strata.class_rule`). Horizon h spans the keys 4096·h … 4096·h + 4095 in every
+  (P1-12) eight horizons 10 blocks apart holding all 62 rock classes, horizon h of L1 cell column
+  i having class (6·i + h) mod 62, so any eleven neighbouring cell columns show every class at
+  h ≥ 2 (six consecutive classes per column; 11 × 6 = 66 ≥ 62) (`notes.strata.class_rule`). Horizon h spans the keys 4096·h … 4096·h + 4095 in every
   cell, so the column rule correlates the synthetic stacks by index (and mixes the neighbouring
   cell columns' classes in as thin tongues). `--strata basin`: a readable sedimentary basin, the
   same in every cell — sandstone, shale, sandstone, mudstone, limestone, shale, sandstone and shale

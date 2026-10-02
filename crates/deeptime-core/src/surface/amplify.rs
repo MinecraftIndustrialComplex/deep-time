@@ -39,6 +39,7 @@
 
 pub mod character;
 pub mod glacial;
+pub mod impact;
 pub mod kernels;
 pub mod resample;
 pub mod structure;
@@ -861,6 +862,9 @@ impl AmplifyStage {
             let g2 = GridDesc::for_planet("L2", c, r.l2_r)?;
             volcano_cells = sh.sharpen_level(&mut level, &g2);
         }
+        // Impact craters (P2-08): what L1 does not hold of them, on L3 after the last flood (the
+        // sink below).
+        let craters = impact::Shaper::from_world(world, &self.preset);
         // Fault scarps, rift valleys and fold ridges (P2-01): the young structures' relief, put on
         // the young landscape before the erosion passes work on it.
         let relief_stats = match structure::Relief::from_world(world, &self.preset) {
@@ -899,31 +903,36 @@ impl AmplifyStage {
         let setup_ms = started.elapsed().as_secs_f64() * 1000.0;
         let cancelled = || ctx.cancelled();
         let character = cfg.character(&fields);
-        let mut out = match &shaper {
-            Some(sh) => {
-                let mut shaped = volcano::Sink {
-                    inner: &mut sink,
+        // A tile passes through the craters' sink, then the volcanoes', then into the pack.
+        let mut out = {
+            let (mut shaped_v, mut shaped_c);
+            let mut target: &mut dyn TileSink = &mut sink;
+            if let Some(sh) = &shaper {
+                shaped_v = volcano::Sink {
+                    inner: target,
                     shaper: sh,
                     grid: l3.clone(),
                 };
-                run(
-                    level,
-                    n_dbl,
-                    &cfg,
-                    character,
-                    plan,
-                    &mut shaped,
-                    &cancelled,
-                    &reserve,
-                )?
+                target = &mut shaped_v;
             }
-            None => run(
-                level, n_dbl, &cfg, character, plan, &mut sink, &cancelled, &reserve,
-            )?,
+            if let Some(sh) = &craters {
+                shaped_c = impact::Sink {
+                    inner: target,
+                    shaper: sh,
+                    grid: l3.clone(),
+                };
+                target = &mut shaped_c;
+            }
+            run(
+                level, n_dbl, &cfg, character, plan, target, &cancelled, &reserve,
+            )?
         };
         let files = sink.finish()?;
+        let (pw, ps) = (out.preview.w, out.preview.stride);
+        if let Some(sh) = &craters {
+            sh.shape_block(&l3, 0, 0, pw, ps, &mut out.preview.z_m);
+        }
         if let Some(sh) = &shaper {
-            let (pw, ps) = (out.preview.w, out.preview.stride);
             sh.shape_block(&l3, 0, 0, pw, ps, &mut out.preview.z_m);
         }
 
@@ -1047,6 +1056,9 @@ impl AmplifyStage {
             "volcanoes": {
                 "shaped": shaper.as_ref().map_or(0, volcano::Shaper::len),
                 "l2_cells": volcano_cells,
+            },
+            "craters": {
+                "shaped": craters.as_ref().map_or(0, impact::Shaper::len),
             },
         });
         world.notes.insert(STAGE_NAME.into(), note.to_string());

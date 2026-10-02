@@ -21,6 +21,8 @@
 # earthlike_quick_16k), STAGE (default volcanoes; on a pipeline preset `plates` runs the same coupled
 # group, so it is no faster), J (runs at once, default 2), T (threads per run, default 2), BIN (a
 # built binary: skips the build), TARGETS (a file moving target ranges, plate-check --targets),
+# PARAMS (space-separated name=value definitions for the check, e.g. "assembled_share=0.6
+# mega_plate_share=0.35": plate-check --param, which lists the names),
 # DEEPTIME_NO_PLATE_DYNAMICS (set: the runs record nothing, to time what recording costs).
 # Delete $R when done: the checkpoints are large.
 set -euo pipefail
@@ -66,6 +68,7 @@ if [ ${#jobs[@]} -gt 0 ]; then
 fi
 tgt=()
 if [ -n "${TARGETS:-}" ]; then tgt=(--targets "$TARGETS"); fi
+for x in ${PARAMS:-}; do tgt+=(--param "$x"); done
 for v in "$@"; do
     label=${v%%:*}
     for start in $STARTS; do

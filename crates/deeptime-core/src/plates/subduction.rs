@@ -238,6 +238,7 @@ pub fn resolve(
                     last_step: step,
                     samples: agg.count,
                     collision: None,
+                    speed_count_km: 0.0,
                     max_uplift_mm_yr: 0.0,
                     andean: false,
                     centroid: centroid.to_array(),
@@ -370,6 +371,7 @@ fn reverse(
     c.onset_step = env.step;
     c.onset_event = None;
     c.setting = 1;
+    c.speed_count_km = 0.0;
     c.cont_in = 0;
     c.max_uplift_mm_yr = 0.0;
     c.andean = false;

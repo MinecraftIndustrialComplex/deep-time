@@ -271,7 +271,15 @@ impl PlatesStage {
             };
         }
 
-        dynamics::record_step(st, world, &cache.geo, &pull.front_km, &env, final_step);
+        dynamics::record_step(
+            st,
+            world,
+            &cache.geo,
+            &pos,
+            &pull.front_km,
+            &env,
+            final_step,
+        );
         self.done = step;
         // How often the elevation cap binds: visible samples standing at `max_elevation_m` after
         // the step, and visible continental samples, summed over the steps (2026-10-01: the cap is
