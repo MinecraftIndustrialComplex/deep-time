@@ -14,7 +14,29 @@ against a source. **[I]** my inference, with the reasoning given.
 
 ## 0. The answer in plain words
 
-@@ANSWER@@
+- **The stretch is real and measurable.** At 20 m per block (15× exaggeration), 42 % of the land of
+  a planet baked on today's code is drawn steeper than 45° and 23 % steeper than 60°. Vanilla 1.21.1
+  has 15 % and 7 %; the MIC pack (Terralith with Tectonic) 15 % and 6 %. The bake Ben watched was
+  gentler (25 % and 11 %), so today's code is steeper than what he saw. Every real slope over 3.8° is
+  drawn steeper than 45°.
+- **What the references have instead.** The pack's drama is height and broad relief at vanilla's
+  slopes: land up to 209 blocks above the sea, relief of 137 blocks within 256 at the 90th
+  percentile, coasts with mountains on them. Vanilla's is local cliffs.
+- **Where the scales land** (today's code): 30 m per block keeps the pack's relief with 1.7 times
+  its steep land; **35 m matches the references' share of land over 60° (7 %), keeps relief near
+  vanilla's (108 against 115 within 256 blocks) and puts the highest ground 158 blocks above the sea**;
+  40 m matches their share over 45° exactly but has less relief than either. The bake Ben saw would
+  match at 30 m. A re-bake at 40 m agrees with redrawing the 20 m bake to within 0.9 blocks RMS, so
+  these numbers stand for real worlds.
+- **Recommendation: 35 m per block (8.6×)**, with 40 m as the calmer alternative. It needs no change
+  to the world's height range or to the simulation; the costs are flatter lowlands (median land 17
+  blocks above the sea instead of 32), rock layers 43 % thinner in blocks (14 % of today's thinnest
+  layers merge away), ore bodies shorter, and a look at four settings that were tuned to fight the 15×
+  stretch. A non-linear mapping is not worth it: it leaves coasts as steep as today. Changing the
+  horizontal scale instead would shrink the planet.
+- **Not fixed by any scale:** planet B's continental margins are steep in metres (63 % of the steep
+  coast's box is over 45° even at 40 m), and both bakes carry one-block-wide needle spires. Both are
+  simulation questions.
 
 ---
 
@@ -125,6 +147,7 @@ coast: the highest ground within 8 blocks of a column on the open sea's shore.
 | A, 20 (15×), today | 25.1 % | 11.3 % | 1.8 % | 20.8° / 55.8° | 90 | 146 | 20 / 62 | 143 / 281 |
 | A, 25 (12×) | 18.4 % | 7.2 % | 0.9 % | 17.4° / 49.6° | 72 | 117 | 15 / 49 | 114 / 225 |
 | A, 30 (10×) | 13.7 % | 4.8 % | 0.5 % | 14.0° / 44.1° | 59 | 98 | 12 / 41 | 95 / 188 |
+| A, 35 (8.6×) | 10.4 % | 3.2 % | 0.2 % | 11.2° / 39.4° | 51 | 84 | 9 / 35 | 81 / 161 |
 | A, 40 (7.5×) | 8.0 % | 2.2 % | 0.1 % | 10.6° / 35.5° | 44 | 73 | 7 / 30 | 71 / 141 |
 | A, 50 (6×) | 4.9 % | 1.1 % | 0.04 % | 8.0° / 29.5° | 35 | 59 | 4 / 24 | 56 / 113 |
 | A, 60 (5×) | 3.1 % | 0.6 % | 0.01 % | 7.1° / 24.5° | 29 | 49 | 3 / 20 | 47 / 94 |
@@ -132,6 +155,7 @@ coast: the highest ground within 8 blocks of a column on the open sea's shore.
 | B, 20 (15×), today | 42.1 % | 22.6 % | 3.9 % | 34.6° / 65.7° | 128 | 190 | 24 / 67 | 179 / 276 |
 | B, 25 (12×) | 33.1 % | 15.3 % | 1.8 % | 28.3° / 60.4° | 102 | 152 | 19 / 54 | 143 / 221 |
 | B, 30 (10×) | 26.0 % | 10.4 % | 0.9 % | 23.8° / 55.6° | 85 | 126 | 15 / 45 | 119 / 184 |
+| B, 35 (8.6×) | 20.6 % | 7.1 % | 0.4 % | 20.6° / 51.1° | 72 | 108 | 12 / 38 | 102 / 158 |
 | B, 40 (7.5×) | 16.4 % | 4.9 % | 0.2 % | 17.4° / 46.9° | 63 | 95 | 10 / 33 | 89 / 138 |
 | B, 40, re-baked | 17.7 % | 5.7 % | 0.5 % | 17.4° / 47.9° | 65 | 99 | 10 / 35 | 89 / 143 |
 | B, 50 (6×) | 10.4 % | 2.4 % | 0.1 % | 14.0° / 40.4° | 50 | 75 | 7 / 27 | 71 / 111 |
@@ -162,7 +186,10 @@ than a planet does; the statistics are over land only.
 | World | Land > 45° | > 60° | > 75° | Hillside median / p90 | Relief 64 (p90) | Relief 256 (p90) | Coast within 8 blocks (p90 / p99) | Land height p99 / max | Drops ≥ 8 blocks |
 |---|---|---|---|---|---|---|---|---|---|
 | Vanilla 1.21.1 | 15.1 % | 7.0 % | 1.7 % | 14.5° / 41.6° | 54 | 115 | 14 / 44 | 75 / 137 | 0.99 % |
-@@MICROW@@| Planet A at 30 m | 13.7 % | 4.8 % | 0.5 % | 14.0° / 44.1° | 59 | 98 | 12 / 41 | 95 / 188 | 0.03 % |
+| The MIC pack (Terralith + Tectonic) | 14.8 % | 6.4 % | 1.4 % | 12.7° / 41.8° | 53 | 137 | 41 / 163 | 161 / 209 | 0.59 % |
+| Planet A at 35 m | 10.4 % | 3.2 % | 0.2 % | 11.2° / 39.4° | 51 | 84 | 9 / 35 | 81 / 161 | 0.01 % |
+| Planet B at 35 m | 20.6 % | 7.1 % | 0.4 % | 20.6° / 51.1° | 72 | 108 | 12 / 38 | 102 / 158 | 0.02 % |
+| Planet A at 30 m | 13.7 % | 4.8 % | 0.5 % | 14.0° / 44.1° | 59 | 98 | 12 / 41 | 95 / 188 | 0.03 % |
 | Planet B at 40 m | 16.4 % | 4.9 % | 0.2 % | 17.4° / 46.9° | 63 | 95 | 10 / 33 | 89 / 138 | 0.01 % |
 | Planet B at 20 m (today) | 42.1 % | 22.6 % | 3.9 % | 34.6° / 65.7° | 128 | 190 | 24 / 67 | 179 / 276 | 0.37 % |
 
@@ -170,7 +197,26 @@ The charts on the review page plot every measure against the scale with the refe
 
 **Where Deep Time sits.**
 
-@@WHERE@@
+- **Slopes.** Vanilla and the pack agree almost exactly on how steep their land is: 15 % of land
+  steeper than 45°, 6.4 to 7 % steeper than 60°, hillsides of 13 to 15° at the median and 42° at the
+  90th percentile. Today's planet B is 2.8 times vanilla on the 45° share and 3.2 times on the 60°
+  share; planet A, the one Ben saw, 1.7 and 1.6 times. Planet B comes down to the references at
+  40 m per block (16.4 %, or 17.7 % re-baked; 4.9 %); planet A at 30 m (13.7 %, 4.8 %). At 35 m
+  they straddle them: A 10.4 % and B 20.6 % over 45°, A 3.2 % and B 7.1 % over 60°.
+- **Relief and height.** The pack is where the drama is: relief within 256 blocks of 137 at the 90th
+  percentile (vanilla 115), coasts with ground 41 blocks above the sea within 8 blocks at the 90th
+  percentile and 163 at the 99th (Tectonic's coastal mountains; vanilla 14 and 44), land up to 209
+  blocks above the sea (vanilla 137). It gets that height with the same slopes as vanilla, so its
+  mountains are broad. Planet B at 40 m has relief 95 and a highest point 138 blocks above the sea
+  (vanilla's 137); at 35 m 108 and 158; at 30 m 126 and 184, near the pack's relief but with 1.8
+  times its steep land.
+- **Mountain regions.** The highest 96 km box of each reference has 35 % (vanilla, peak 134 blocks
+  above the sea) and 29 % (the pack, peak 209) of its ground steeper than 45°. Planet B's range box
+  has 61 % at 20 m, 34 % at 30 m, 24 % at 35 m and 18 % at 40 m (peaks 239, 159, 137 and 120 blocks).
+  So for the mountains alone, 30 to 35 m matches the references, and 40 m is gentler than their
+  mountains.
+- **Coasts.** Every Deep Time scale from 30 m up has lower coasts than the pack (whose coasts are
+  dramatic by design) and from 35 m up lower than vanilla at the 90th percentile.
 
 **A difference in kind.** Vanilla's drama is local: 1 % of its land is beside a drop of 8 blocks or
 more (cliff faces, jagged peaks, river banks) against 0.01 to 0.4 % for Deep Time at any scale, and
@@ -183,7 +229,7 @@ independent of the scale.
 ## 4. Pictures [C]
 
 `review/out/vertical-scale/index.html` (planet B, with the references) and `a/index.html` (planet A),
-not committed. For each planet the same five places at 20, 30, 40, 50, 60 and 80 m per block and
+not committed. For each planet the same five places at 20, 30, 35, 40, 50, 60 and 80 m per block and
 through the two non-linear mappings of §6.2, side by side, each an oblique view from the south of a
 320 × 320-block box (96 km), one pillar per column, colours by real elevation, with the numbers
 beside each picture; and a west-to-east section of each place drawn one block to one block, every
@@ -198,21 +244,24 @@ scale on one plot. The places, chosen by `vertical_scale.py places`:
 
 The flanks, as the steeper side of the section between 20 % and 80 % of the height:
 
-| Place | 20 m | 30 m | 40 m | 50 m | 60 m | 80 m |
-|---|---|---|---|---|---|---|
-| A, stratovolcano on a high base (peak 281 blocks above the sea at 20 m) | 79° | 73° | 68° | 63° | 59° | 52° |
-| A, second stratovolcano (133 blocks) | 51° | 40° | 32° | 27° | 23° | 17° |
-| B, stratovolcano (197 blocks) | 74° | 67° | 60° | 54° | 50° | 41° |
-| B, second stratovolcano (157 blocks) | 55° | 44° | 36° | 30° | 26° | 20° |
+| Place | 20 m | 30 m | 35 m | 40 m | 50 m | 60 m | 80 m |
+|---|---|---|---|---|---|---|---|
+| A, stratovolcano on a high base (peak 281 blocks above the sea at 20 m) | 79° | 73° | 71° | 68° | 63° | 59° | 52° |
+| A, second stratovolcano (133 blocks) | 51° | 40° | 36° | 32° | 27° | 23° | 17° |
+| B, stratovolcano (197 blocks) | 74° | 67° | 63° | 60° | 54° | 50° | 41° |
+| B, second stratovolcano (157 blocks) | 55° | 44° | 40° | 36° | 30° | 26° | 20° |
 
 And the share of each 96 km box steeper than 45°:
 
-| Place | 20 m | 30 m | 40 m | 50 m | 60 m | 80 m |
-|---|---|---|---|---|---|---|
-| B, range (peak 239 blocks at 20 m) | 61 % | 34 % | 18 % | 10 % | 6 % | 2 % |
-| B, steep coast and margin | 84 % | 74 % | 63 % | 52 % | 41 % | 24 % |
-| B, incised valleys | 52 % | 34 % | 23 % | 16 % | 11 % | 5 % |
-| A, steep coast and margin | 70 % | 50 % | 30 % | 20 % | 20 % | 10 % |
+| Place | 20 m | 30 m | 35 m | 40 m | 50 m | 60 m | 80 m |
+|---|---|---|---|---|---|---|---|
+| B, range (peak 239 blocks at 20 m) | 61 % | 34 % | 24 % | 18 % | 10 % | 6 % | 2 % |
+| B, steep coast and margin | 84 % | 74 % | 68 % | 63 % | 52 % | 41 % | 24 % |
+| B, incised valleys | 52 % | 34 % | 28 % | 23 % | 16 % | 11 % | 5 % |
+| A, range | 54 % | 39 % | 34 % | 31 % | 25 % | 20 % | 13 % |
+| A, steep coast and margin | 71 % | 50 % | 41 % | 35 % | 25 % | 18 % | 10 % |
+| Vanilla, its highest box (peak 134) | 35 % | | | | | | |
+| The pack, its highest box (peak 209) | 29 % | | | | | | |
 
 Two things the pictures show that the statistics do not. First, the steep coast of planet B stays a
 wall at every scale: 63 % of its box is steeper than 45° even at 40 m. Its margin is steep in metres
@@ -223,23 +272,24 @@ They look like an amplifier artefact and are worth a separate look.
 
 ## 5. What each choice costs [C, from §1 and the baked rock layers]
 
-| At m per block | 20 | 30 | 40 | 50 | 60 | 80 |
-|---|---|---|---|---|---|---|
-| Vertical exaggeration | 15× | 10× | 7.5× | 6× | 5× | 3.75× |
-| Mount Everest, 8,849 m: blocks above the sea | 442 | 295 | 221 | 177 | 147 | 111 |
-| Planet A's highest point, 7.0 km (y) | 351 (y 414) | 234 (297) | 176 (239) | 141 (204) | 117 (180) | 88 (151) |
-| A 3 km volcano: blocks tall | 150 | 100 | 75 | 60 | 50 | 38 |
-| A real 6° volcano flank is drawn at | 58° | 46° | 38° | 32° | 28° | 21° |
-| A real 18° slope is drawn at | 78° | 73° | 68° | 63° | 58° | 51° |
-| A 1 km canyon: blocks deep | 50 | 33 | 25 | 20 | 17 | 12.5 |
-| A 100 m river valley: blocks deep | 5 | 3.3 | 2.5 | 2 | 1.7 | 1.2 |
-| A 100 m rock layer: blocks thick | 5 | 3.3 | 2.5 | 2 | 1.7 | 1.2 |
-| Baked rock units under one block (sampled) | 0 % | 14 % | 14 % | 27 % | 27 % | 34 % |
-| Median baked rock unit: blocks thick | 9 | 6 | 4.5 | 3.6 | 3 | 2.3 |
-| Ore 1.5 km down: blocks below the surface | 75 | 50 | 38 | 30 | 25 | 19 |
-| Abyssal plain, 4 km deep (y) | −137 | −70 | −37 | −17 | −4 | 13 |
-| Trench, 10 km deep (y) | −437 | −270 | −187 | −137 | −104 | −62 |
-| Depth from sea level to the floor at y −352 | 8.3 km | 12.5 km | 16.6 km | 20.8 km | 24.9 km | 33.2 km |
+| At m per block | 20 | 30 | 35 | 40 | 50 | 60 | 80 |
+|---|---|---|---|---|---|---|---|
+| Vertical exaggeration | 15× | 10× | 8.6× | 7.5× | 6× | 5× | 3.75× |
+| Mount Everest, 8,849 m: blocks above the sea | 442 | 295 | 253 | 221 | 177 | 147 | 111 |
+| Planet A's highest point, 7.0 km (y) | 351 (y 414) | 234 (297) | 201 (264) | 176 (239) | 141 (204) | 117 (180) | 88 (151) |
+| A 3 km volcano: blocks tall | 150 | 100 | 86 | 75 | 60 | 50 | 38 |
+| A real 6° volcano flank is drawn at | 58° | 46° | 42° | 38° | 32° | 28° | 21° |
+| A real 18° slope is drawn at | 78° | 73° | 70° | 68° | 63° | 58° | 51° |
+| The real slope drawn at 45° | 3.8° | 5.7° | 6.7° | 7.6° | 9.5° | 11.3° | 14.9° |
+| A 1 km canyon: blocks deep | 50 | 33 | 29 | 25 | 20 | 17 | 12.5 |
+| A 100 m river valley: blocks deep | 5 | 3.3 | 2.9 | 2.5 | 2 | 1.7 | 1.2 |
+| A 100 m rock layer: blocks thick | 5 | 3.3 | 2.9 | 2.5 | 2 | 1.7 | 1.2 |
+| Baked rock units under one block (sampled) | 0 % | 14 % | 14 % | 14 % | 27 % | 27 % | 34 % |
+| Median baked rock unit: blocks thick | 9 | 6 | 5.1 | 4.5 | 3.6 | 3 | 2.3 |
+| Ore 1.5 km down: blocks below the surface | 75 | 50 | 43 | 38 | 30 | 25 | 19 |
+| Abyssal plain, 4 km deep (y) | −137 | −70 | −51 | −37 | −17 | −4 | 13 |
+| Trench, 10 km deep (y) | −437 | −270 | −223 | −187 | −137 | −104 | −62 |
+| Depth from sea level to the floor at y −352 | 8.3 km | 12.5 km | 14.5 km | 16.6 km | 20.8 km | 24.9 km | 33.2 km |
 
 **World height.** Nothing needs to change. The range is fixed at y −352 to 639 until 1.0 (decision
 table); every scale from 30 m up fits the tallest Earth-like terrain far under the top and the deepest
@@ -328,7 +378,46 @@ a simulation question for the margin and flexure work, not for the drawing.
 
 ## 7. Options for Ben
 
-@@OPTIONS@@
+Each option changes `scale.m_per_block_v` in the presets and the code default, nothing else
+until the follow-ups below; the world range stays y −352 to 639.
+
+1. **35 m per block (8.6×). Recommended.** On today's code (planet B) the share of land steeper than
+   60° equals the references' (7.1 % against 6.4 to 7.0 %), relief within 256 blocks is near
+   vanilla's (108 against 115), mountain regions are a little gentler than the references' mountains
+   (24 % of the range box over 45°, against 29 to 35 %), and the highest ground stands 158 blocks above
+   the sea (vanilla 137, the pack 209). The share over 45° is still 1.4 times the references'
+   (20.6 %, about 22 % re-baked): the land stays a little steeper than vanilla, which is the drama
+   Ben asked to keep. Planet A, the bake he saw, lands just under the references at 35 m, so the
+   scale is right for both bakes the code has produced, not only one. Everest would be 253 blocks
+   tall; a 3 km volcano 86.
+2. **40 m per block (7.5×).** The calmest that still matches: planet B's slopes then equal the
+   references' planet-wide (16.4 %, 17.7 % re-baked, against 15 %), but its relief (95) and its
+   mountain regions (18 % of the range box over 45°) are below both references, and planet A becomes
+   clearly tamer than vanilla (8 % of land over 45°). Choose this if 35 m still reads stretched in the
+   game.
+3. **30 m per block (10×).** Relief and peak heights like the pack's (126 and 184 on planet B), but
+   1.7 times the references' steep land and 1.5 times their land over 60°. The mountains alone match
+   the references best here (34 % of the range box), so this is the dramatic end; it is still
+   noticeably stretched on today's code.
+4. **Keep 20 m and fix features one at a time** (wider cones, wider glacial valleys, lower folds).
+   Leaves ranges, valleys and margins stretched: 42 % of planet B's land over 45°, three times the
+   references. Not recommended.
+5. **A non-linear mapping** (§6.2). Not recommended: it leaves coasts as steep as today, draws cones
+   upside down in profile, and touches every metres-to-blocks conversion.
+
+**The honest trade-off.** A larger number makes the lowlands flatter (the median land column 32
+blocks above the sea today on planet B, 17 at 35 m), river valleys and canyons shallower, rock layers
+thinner (14 % of today's units fall under a block at 30 to 40 m and merge away) and ore bodies
+shorter; and the two planets show that the right number moves with the code: planet B, two code
+revisions after planet A, needs about 10 m more per block for the same slopes. A scale picked now
+will want one more look when the plate and margin work lands.
+
+**Follow-ups if the scale moves** (none done here): look again at the settings tuned against 15×
+(`volcanoes.flank_steepness` 0.5, impacts `depth_scale` 0.5, `surface.glacial.valley_width` 3, the
+folds' `vertical_scale` 4 still to be built) and at `VISIBLE_RELIEF_M`; decide whether rock layers
+follow the scale or keep today's thickness through `scale.feature_scale.strata`; the floor at −512
+is not needed from 30 m up; the editor's hint for the slider; and two problems the scale does not
+fix, the steep margins (§6.4) and the needle spires (§4).
 
 ## 8. Method and reproduction
 
