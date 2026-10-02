@@ -27,7 +27,7 @@ from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm  # noqa: E40
 # Two hues and a neutral middle: below local isostasy (basins, moats) blue, above it red.
 DIVERGING = LinearSegmentedColormap.from_list("flex", ["#1f4e8c", "#7fa6d6", "#d9d9d9", "#e39a7a", "#a8321e"])
 INK = "#333333"
-HOTSPOT, COLLISION = 8, 5
+HOTSPOT, COLLISION = 7, 5  # regime codes (plates/state.rs)
 
 
 def load(folder: Path) -> dict:
@@ -68,7 +68,7 @@ def close_up(f: dict, z: np.ndarray, j: int, i: int, half: int, km: float, title
         a.axhline(0, color="#999999", linewidth=0.8)
         a.plot(x, zs / 1000, color="#8c5a2b", linewidth=2, label="ground")
         a.plot(x, (zs - fs) / 1000, color="#8c5a2b", linewidth=1.2, linestyle=":", label="ground under local isostasy")
-        a.plot(x, -ds / 1000, color="#1f4e8c", linewidth=2, label="sinking of the plate")
+        a.plot(x, -ds / 1000, color="#1f4e8c", linewidth=2, label="the plate since the start: down (−), up (+)")
         a.set_title(f"{name} section", color=INK)
         a.set_xlabel("km (plate kilometres: Earth-normalized)")
         a.set_ylabel("km")
@@ -98,6 +98,8 @@ def main() -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     f = load(args.fields)
     z = f["surface/elevation_m"] - args.sea
+    for name in ("surface/flexure_m", "surface/deflection_m", "surface/elastic_thickness_km"):
+        f.setdefault(name, np.zeros_like(z))  # a run without flexure: only the ground is drawn
     flex, te = f["surface/flexure_m"], f["surface/elastic_thickness_km"]
     h, w = z.shape
     km = 2 * np.pi * args.model_radius_km / w
@@ -107,7 +109,7 @@ def main() -> int:
     ext = [-180, 180, -90, 90]
     ax[0].imshow(relief(z), extent=ext, interpolation="nearest")
     ax[0].set_title(f"{args.label} ground at the end of the run (land brown, sea blue)", color=INK)
-    span = float(np.percentile(np.abs(flex), 99.5))
+    span = max(1.0, float(np.percentile(np.abs(flex), 99.5)))
     im = ax[1].imshow(flex, extent=ext, cmap=DIVERGING, norm=TwoSlopeNorm(0, -span, span), interpolation="nearest")
     fig.colorbar(im, ax=ax[1], shrink=0.7, label="m above (+) or below (−) local isostasy")
     ax[1].contour(np.linspace(-180, 180, w), np.linspace(90, -90, h), z, levels=[0], colors=INK, linewidths=0.3)
@@ -125,11 +127,15 @@ def main() -> int:
     lat = 90 - (np.arange(h) + 0.5) * 180 / h
     inner = (np.abs(lat) < 70)[:, None]
     ocean = f["plates/crust_type"] < 0.5
-    hot = (f["plates/flags"].astype(np.int32) & HOTSPOT) != 0
+    hot = np.abs(f["regime"] - HOTSPOT) < 0.5
+    # A hotspot's load inside a plate: stiff floor all round it, not an arc at a plate's weak edge.
     cand = np.where(ocean & hot & inner, flex, -np.inf)
-    if not np.isfinite(cand.max()):
-        cand = np.where(ocean & inner, flex, -np.inf)
     j, i = np.unravel_index(int(np.argmax(cand)), cand.shape)
+    for flat in np.argsort(cand, axis=None)[::-1][:400]:
+        jj, ii = np.unravel_index(int(flat), cand.shape)
+        if np.isfinite(cand[jj, ii]) and window(te, jj, ii, 6).min() > 12 and window(ocean, jj, ii, 6).all():
+            j, i = jj, ii
+            break
     half = 16
     sec = close_up(f, z, j, i, half, km,
                    f"{args.label} The largest volcanic load on ocean floor (cell {i}, {j}; Te {te[j, i]:.0f} km)",
@@ -148,6 +154,12 @@ def main() -> int:
                        args.out / "belt.png")
         numbers["belt"] = {"cell": [int(i), int(j)], "peak_m": float(z[j, i]),
                            "deepest_basin_m": float(window(flex, j, i, half).min()), **sec}
+    # Roughness of the ground: how far a cell stands from the mean of its four neighbours.
+    mean4 = (np.roll(z, 1, 1) + np.roll(z, -1, 1) + np.vstack([z[:1], z[:-1]]) + np.vstack([z[1:], z[-1:]])) / 4
+    dev = np.abs(z - mean4)
+    for name, mask in (("land", (z > 0) & inner), ("sea", (z <= 0) & inner)):
+        numbers[f"roughness_{name}_p50_m"] = float(np.median(dev[mask]))
+        numbers[f"roughness_{name}_p99_m"] = float(np.percentile(dev[mask], 99))
     # How much of the planet is off local isostasy, and by how much.
     wgt = np.cos(np.radians(lat))[:, None] * np.ones((1, w))
     for name, mask in (("below_100m", flex < -100), ("below_500m", flex < -500), ("above_100m", flex > 100),

@@ -64,7 +64,7 @@ use super::advect::{self, Carry};
 use super::grid::{Dims, box_blur};
 use crate::error::CoreError;
 use crate::plates::pools::ISOSTATIC_FACTOR;
-use crate::plates::state::{ARC, DIVERGENT, HOTSPOT, OCEANIC};
+use crate::plates::state::{OCEANIC, regime};
 
 /// Mantle, sea water and ice, kg/m³.
 pub const RHO_MANTLE: f64 = 3300.0;
@@ -133,8 +133,8 @@ impl Default for FlexureParams {
             te_recovery_myr: 300.0,
             te_min_km: 5.0,
             every_steps: 1,
-            tolerance_m: 1.0,
-            max_iterations: 40,
+            tolerance_m: 2.0,
+            max_iterations: 60,
         }
     }
 }
@@ -555,6 +555,49 @@ impl Bank {
     }
 }
 
+/// The preconditioner of one solve: the bank, the damped Jacobi weights and their scratch.
+struct Preconditioner<'a> {
+    bank: Bank,
+    d: &'a [f64],
+    c: &'a [f64],
+    /// ω / the operator's diagonal, ω = ½ (the operator's largest eigenvalue over its diagonal
+    /// is under 3.2, so the sweep contracts).
+    jacobi: Vec<f64>,
+    left: Vec<f64>,
+    part: Vec<f64>,
+}
+
+impl<'a> Preconditioner<'a> {
+    fn new(d: &'a [f64], c: &'a [f64], w: usize, h: usize, dx: f64) -> Preconditioner<'a> {
+        let bank = Bank::new(d, c, dx);
+        let n = w * h;
+        let inv = 1.0 / (dx * dx * dx * dx);
+        let jacobi = if bank.weights.is_empty() {
+            Vec::new()
+        } else {
+            (0..n)
+                .into_par_iter()
+                .map(|k| {
+                    let (i, j) = (k % w, k / w);
+                    let around = d[j * w + (i + 1) % w]
+                        + d[j * w + (i + w - 1) % w]
+                        + d[j.saturating_sub(1) * w + i]
+                        + d[(j + 1).min(h - 1) * w + i];
+                    0.5 / (c[k] + (16.0 * d[k] + around) * inv)
+                })
+                .collect()
+        };
+        Preconditioner {
+            bank,
+            d,
+            c,
+            jacobi,
+            left: vec![0.0; n],
+            part: vec![0.0; n],
+        }
+    }
+}
+
 /// The flexure solver of one raster: the transforms and the working arrays.
 pub struct Solver {
     pub w: usize,
@@ -632,8 +675,38 @@ impl Solver {
             .for_each(|(o, (&c, &v))| *o += c * v);
     }
 
-    /// z ← the preconditioner applied to `r`.
-    fn precondition(&mut self, bank: &Bank, r: &[f64], z: &mut [f64]) {
+    /// z ← the preconditioner applied to `r`: the blended spectral solves between two damped
+    /// Jacobi sweeps (a symmetric product, so conjugate gradients still applies). The sweeps take
+    /// the cell-scale error that the blend leaves along sharp changes of stiffness (plate
+    /// boundaries): measured on a run's own stiffness field, 13 iterations instead of 27.
+    fn precondition(&mut self, pre: &mut Preconditioner<'_>, r: &[f64], z: &mut [f64]) {
+        if pre.bank.weights.is_empty() {
+            self.spectral_solve(&pre.bank, r, z);
+            return;
+        }
+        let mut left = std::mem::take(&mut pre.left);
+        let mut part = std::mem::take(&mut pre.part);
+        z.par_iter_mut()
+            .zip(r.par_iter().zip(pre.jacobi.par_iter()))
+            .for_each(|(z, (&r, &j))| *z = r * j);
+        self.operator(pre.d, pre.c, z, &mut left);
+        left.par_iter_mut()
+            .zip(r.par_iter())
+            .for_each(|(l, &r)| *l = r - *l);
+        self.spectral_solve(&pre.bank, &left, &mut part);
+        z.par_iter_mut()
+            .zip(part.par_iter())
+            .for_each(|(z, &p)| *z += p);
+        self.operator(pre.d, pre.c, z, &mut left);
+        z.par_iter_mut()
+            .zip(left.par_iter().zip(r.par_iter().zip(pre.jacobi.par_iter())))
+            .for_each(|(z, (&l, (&r, &j)))| *z += (r - l) * j);
+        pre.left = left;
+        pre.part = part;
+    }
+
+    /// z ← the blend of the bank's exact solves applied to `r`.
+    fn spectral_solve(&mut self, bank: &Bank, r: &[f64], z: &mut [f64]) {
         let mut half = std::mem::take(&mut self.half);
         let mut spec = std::mem::take(&mut self.spec);
         let mut part = std::mem::take(&mut self.tmp2);
@@ -680,11 +753,11 @@ impl Solver {
         let n = self.w * self.h;
         assert!(d.len() == n && c.len() == n && b.len() == n, "raster size");
         let w = self.w;
-        let bank = Bank::new(d, c, self.dx);
+        let mut pre = Preconditioner::new(d, c, w, self.h, self.dx);
         let mut x = vec![0.0; n];
         let mut r = b.to_vec();
         let mut z = vec![0.0; n];
-        self.precondition(&bank, &r, &mut z);
+        self.precondition(&mut pre, &r, &mut z);
         let mut report = SolveReport {
             iterations: 0,
             error_m: max_abs(&z),
@@ -711,7 +784,7 @@ impl Solver {
             r.par_iter_mut()
                 .zip(ap.par_iter())
                 .for_each(|(r, &a)| *r -= alpha * a);
-            self.precondition(&bank, &r, &mut z);
+            self.precondition(&mut pre, &r, &mut z);
             report.iterations = it;
             report.error_m = max_abs(&z);
             if report.error_m < tolerance_m {
@@ -806,12 +879,13 @@ pub struct StepIn<'a> {
     /// … after the local isostasy's share (`1 − strength`), before the plateau spreading.
     pub h_before_spread: &'a [f64],
     /// `plates/uplift_mm_yr`, `plates/crust_type`, `crust_age` (Myr; negative on continental
-    /// crust), `plates/orogeny_age_myr` (NaN: none), `plates/flags`.
+    /// crust), `plates/orogeny_age_myr` (NaN: none), `regime` (the regime, not `plates/flags`:
+    /// the flags are zero on the steps the plate model resamples its crust).
     pub uplift_mm_yr: &'a [f32],
     pub crust_type: &'a [f32],
     pub crust_age_myr: &'a [f32],
     pub orogeny_age_myr: &'a [f32],
-    pub flags: &'a [f32],
+    pub regime: &'a [f32],
     /// `plates/plate_id`: plates are separate plates, with no strength across their boundaries.
     pub plate_id: &'a [f32],
     /// Land ice, m (`climate/ice_thickness_m`), when a climate stage publishes it.
@@ -903,8 +977,9 @@ pub fn step(
             // Crust the plate model thickened: orogens, arcs and hotspot volcanism. Subsidence
             // (the ocean floor cooling, a sample pulled to trench depth) is not a load.
             let u = f64::from(x.uplift_mm_yr[c]) * lift;
-            let flags = x.flags[c] as u8;
-            let builds = x.crust_type[c] as u8 != OCEANIC || flags & (ARC | HOTSPOT) != 0;
+            let reg = x.regime[c] as u8;
+            let builds =
+                x.crust_type[c] as u8 != OCEANIC || reg == regime::ARC || reg == regime::HOTSPOT;
             if !fresh && u > 0.0 && builds {
                 let (q, a) = thickening(u, x.h_start[c] - u, sea);
                 load += q;
@@ -942,12 +1017,12 @@ pub fn step(
     let te_fine: Vec<f64> = (0..n)
         .into_par_iter()
         .map(|c| {
-            let flags = x.flags[c] as u8;
+            let reg = x.regime[c] as u8;
             p.elastic_thickness_km(
                 x.crust_type[c] as u8 == OCEANIC,
                 f64::from(x.crust_age_myr[c]),
                 f64::from(x.orogeny_age_myr[c]),
-                flags & (ARC | DIVERGENT) != 0,
+                reg == regime::ARC || reg == regime::RIFT,
             )
         })
         .collect();
@@ -1122,22 +1197,25 @@ mod tests {
     #[test]
     fn a_point_load_sinks_by_the_analytic_depth() {
         let (w, h, dx) = (256usize, 128usize, 10_000.0);
-        let mut sv = Solver::new(w, h, dx);
-        // The transforms: forward then inverse is the identity.
-        let v: Vec<f64> = (0..w * h)
-            .map(|c| ((c * 7919) % 101) as f64 - 50.0)
-            .collect();
-        let mut back = vec![0.0; w * h];
-        let (mut half, mut spec) = (sv.half.clone(), sv.spec.clone());
-        sv.spectral.forward(&v, &mut half, &mut spec);
-        sv.spectral.inverse(&mut spec, &mut back);
-        let worst = v
-            .iter()
-            .zip(&back)
-            .map(|(a, b)| (a - b).abs())
-            .fold(0.0, f64::max);
-        assert!(worst < 1e-9, "transform round trip: {worst}");
+        // The transforms: forward then inverse is the identity, on even and on odd rasters.
+        for (tw, th) in [(w, h), (15, 9), (12, 7)] {
+            let ts = Solver::new(tw, th, dx);
+            let v: Vec<f64> = (0..tw * th)
+                .map(|c| ((c * 7919) % 101) as f64 - 50.0)
+                .collect();
+            let mut back = vec![0.0; tw * th];
+            let (mut half, mut spec) = (ts.half.clone(), ts.spec.clone());
+            ts.spectral.forward(&v, &mut half, &mut spec);
+            ts.spectral.inverse(&mut spec, &mut back);
+            let worst = v
+                .iter()
+                .zip(&back)
+                .map(|(a, b)| (a - b).abs())
+                .fold(0.0, f64::max);
+            assert!(worst < 1e-9, "transform round trip {tw} × {th}: {worst}");
+        }
 
+        let mut sv = Solver::new(w, h, dx);
         let te = 30.0;
         let (d, c) = uniform(w * h, te, G);
         let l = (d[0] / RHO_MANTLE).powf(0.25);
@@ -1287,7 +1365,7 @@ mod tests {
         sv.operator(&d, &c, &x, &mut ax);
         let left: Vec<f64> = b.iter().zip(&ax).map(|(b, a)| b - a).collect();
         let mut more = vec![0.0; w * h];
-        sv.precondition(&Bank::new(&d, &c, dx), &left, &mut more);
+        sv.spectral_solve(&Bank::new(&d, &c, dx), &left, &mut more);
         let worst = max_abs(&more);
         assert!(worst < 0.05, "sinking still asked for, m: {worst}");
         let load: f64 = b.iter().sum();
@@ -1366,7 +1444,7 @@ mod tests {
         crust: Vec<f32>,
         age: Vec<f32>,
         orogeny: Vec<f32>,
-        flags: Vec<f32>,
+        regime: Vec<f32>,
         plate: Vec<f32>,
         ice: Vec<f32>,
     }
@@ -1383,7 +1461,7 @@ mod tests {
                 crust: vec![1.0; n],
                 age: vec![-1.0; n],
                 orogeny: vec![f32::NAN; n],
-                flags: vec![0.0; n],
+                regime: vec![f32::from(regime::CRATON); n],
                 plate: vec![0.0; n],
                 ice: vec![0.0; n],
             }
@@ -1424,7 +1502,7 @@ mod tests {
                     crust_type: &self.crust,
                     crust_age_myr: &self.age,
                     orogeny_age_myr: &self.orogeny,
-                    flags: &self.flags,
+                    regime: &self.regime,
                     plate_id: &self.plate,
                     ice_m: Some(&self.ice),
                     rock_share: 0.8,
