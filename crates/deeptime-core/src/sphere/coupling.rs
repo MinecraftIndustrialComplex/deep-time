@@ -2,6 +2,8 @@
 //! Block space ↔ sphere, and the L0 → raster coupling (plan §5.2).
 //!
 //! # Conventions
+//! The projection is `deeptime_format::projection` (equirectangular), which [`BlockFrame`] wraps
+//! with `glam` vectors:
 //! - **Longitude** λ = 360°·(x + C/2)/C, in [0°, 360°): block column x = −C/2 (the seam) is λ = 0,
 //!   x = 0 is λ = 180°, and x wraps with period C, so x = C/2 is the seam again.
 //! - **Latitude** φ = −360°·z/C, north positive; north is −z, as in Minecraft. z ∈ [−C/4, C/4]
@@ -24,79 +26,78 @@
 use glam::DVec3;
 use rayon::prelude::*;
 
-use deeptime_format::GridDesc;
+use deeptime_format::{GridDesc, Projection};
 
 use super::{SampleTree, SphereMesh};
 
 /// The unit vector at latitude `lat_deg` and longitude `lon_deg` (degrees).
 pub fn unit_from_lat_lon_deg(lat_deg: f64, lon_deg: f64) -> DVec3 {
-    let (sp, cp) = lat_deg.to_radians().sin_cos();
-    let (sl, cl) = lon_deg.to_radians().sin_cos();
-    DVec3::new(cp * cl, cp * sl, sp)
+    DVec3::from_array(deeptime_format::projection::unit_of_lat_lon(lat_deg, lon_deg))
 }
 
 /// Latitude in [−90°, 90°] and longitude in [0°, 360°) of the direction `v` (any length > 0).
 /// At the poles the longitude is 0.
 pub fn lat_lon_deg(v: DVec3) -> (f64, f64) {
     let lat = v.z.atan2(v.x.hypot(v.y)).to_degrees();
-    (lat, wrap_deg(v.y.atan2(v.x).to_degrees()))
+    (
+        lat,
+        deeptime_format::projection::wrap_deg(v.y.atan2(v.x).to_degrees()),
+    )
 }
 
-/// Wraps an angle into [0°, 360°).
-fn wrap_deg(a: f64) -> f64 {
-    let w = a.rem_euclid(360.0);
-    if w >= 360.0 { 0.0 } else { w }
-}
-
-/// The equirectangular mapping between a planet's block space and its sphere, for circumference
-/// C blocks (plan §5.1–§5.2).
+/// The mapping between a planet's block space and its sphere, for circumference C blocks: the
+/// planet's projection (`deeptime_format::projection`) with `glam` vectors.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BlockFrame {
-    c: f64,
+    p: Projection,
 }
 
 impl BlockFrame {
     /// The frame of a planet `circumference` blocks around.
     pub fn new(circumference: u32) -> BlockFrame {
         BlockFrame {
-            c: f64::from(circumference),
+            p: Projection::new(circumference),
         }
+    }
+
+    /// The projection it wraps.
+    pub fn projection(&self) -> Projection {
+        self.p
     }
 
     /// C, in blocks.
     pub fn circumference(&self) -> f64 {
-        self.c
+        self.p.circumference()
     }
 
     /// Wraps block x into [−C/2, C/2).
     pub fn wrap_x(&self, x: f64) -> f64 {
-        let t = (x + 0.5 * self.c).rem_euclid(self.c);
-        (if t >= self.c { 0.0 } else { t }) - 0.5 * self.c
+        self.p.wrap_x(x)
     }
 
     /// Longitude of block x, in [0°, 360°).
     pub fn lon_deg(&self, x: f64) -> f64 {
-        wrap_deg(360.0 * (self.wrap_x(x) + 0.5 * self.c) / self.c)
+        self.p.lon_deg(x)
     }
 
     /// Latitude of block z, in [−90°, 90°] (north is −z).
     pub fn lat_deg(&self, z: f64) -> f64 {
-        (-360.0 * z / self.c).clamp(-90.0, 90.0)
+        self.p.lat_deg(z)
     }
 
     /// Block x of a longitude, in [−C/2, C/2).
     pub fn x_of_lon(&self, lon_deg: f64) -> f64 {
-        self.wrap_x(wrap_deg(lon_deg) / 360.0 * self.c - 0.5 * self.c)
+        self.p.x_of_lon(lon_deg)
     }
 
-    /// Block z of a latitude, in [−C/4, C/4].
+    /// Block z of a latitude (the poles at ∓`Projection::pole_z`).
     pub fn z_of_lat(&self, lat_deg: f64) -> f64 {
-        -lat_deg.clamp(-90.0, 90.0) / 360.0 * self.c
+        self.p.z_of_lat(lat_deg)
     }
 
     /// The unit vector of block (x, z).
     pub fn unit(&self, x: f64, z: f64) -> DVec3 {
-        unit_from_lat_lon_deg(self.lat_deg(z), self.lon_deg(x))
+        DVec3::from_array(self.p.unit(x, z))
     }
 
     /// Block (x, z) of the direction `v`, x in [−C/2, C/2).

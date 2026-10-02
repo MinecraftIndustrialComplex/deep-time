@@ -633,7 +633,7 @@ fn an_upstream_lake_that_does_not_spill_feeds_nothing_downstream() {
     // reaches them.
     let p = HydroParams::default();
     let c = f64::from(C);
-    let north = |z: i64| (z as f64) < -c / 4.0 + 200.0;
+    let north = |z: i64| (z as f64) < -deeptime_format::Projection::of(c).pole_z() + 200.0;
     let wet = run_rough(&|_, _| Climate::steady(1200.0, 15.0), &p);
     let split = run_rough(
         &|_, z| {

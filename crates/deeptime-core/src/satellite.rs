@@ -537,8 +537,9 @@ fn bare(c: &Cell, pal: &Palette) -> [f32; 3] {
 
 /// The cell of `f` nearest pixel (px, py) of a `w × h` picture (keyframe pixel centres).
 pub(crate) fn nearest(f: &Field, px: usize, py: usize, w: usize, h: usize) -> f32 {
-    let i = (px as f64 * f64::from(f.grid.w) / w as f64).round() as i64;
-    let j = (py as f64 * f64::from(f.grid.h) / h as f64).round() as i64;
+    let (i, j) = f
+        .grid
+        .picture_cell(px as f64, py as f64, w as u32, h as u32);
     f.get(i, j)
 }
 
@@ -621,8 +622,9 @@ fn mean(f: &Field, px: usize, py: usize, w: usize, h: usize) -> f32 {
     if kx < 2 && ky < 2 {
         return nearest(f, px, py, w, h);
     }
-    let ci = (px as f64 * f64::from(f.grid.w) / w as f64).round() as i64;
-    let cj = (py as f64 * f64::from(f.grid.h) / h as f64).round() as i64;
+    let (ci, cj) = f
+        .grid
+        .picture_cell(px as f64, py as f64, w as u32, h as u32);
     let (rx, ry) = ((kx / 2) as i64, (ky / 2) as i64);
     let (mut sum, mut n) = (0.0f64, 0u32);
     for j in cj - ry..=cj + ry {
@@ -706,7 +708,7 @@ pub fn hillshade(z: &[f32], w: usize, h: usize, radius_m: f64, look: &Look) -> V
     };
     let mut out = vec![1.0f32; w * h];
     for j in 0..h {
-        let lat = (90.0 - 180.0 * j as f64 / h as f64).to_radians();
+        let lat = deeptime_format::Projection::picture_lat_deg(j as f64, h as u32).to_radians();
         let dx = 2.0 * std::f64::consts::PI * radius_m * lat.cos().max(0.15) / w as f64;
         let (jn, js) = (j.saturating_sub(1), (j + 1).min(h - 1));
         for i in 0..w {

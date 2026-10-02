@@ -296,7 +296,8 @@ fn parse_world(v: &Value) -> Result<DummyWorld, CoreError> {
             ),
         ));
     }
-    let (gw, gh) = (circumference / grid_r, circumference / grid_r / 2);
+    let gw = circumference / grid_r;
+    let gh = deeptime_format::Projection::picture_height(gw);
     if gw > 8192 {
         return Err(preset_err(
             &format!("{path}.grid_r"),
@@ -405,7 +406,7 @@ impl DummyStage {
                 .par_chunks_mut(gw)
                 .enumerate()
                 .for_each(|(j, row)| {
-                    let lat = 90.0 - 180.0 * j as f64 / gh as f64;
+                    let lat = deeptime_format::Projection::picture_lat_deg(j as f64, gh as u32);
                     for (i, v) in row.iter_mut().enumerate() {
                         let lon = 360.0 * i as f64 / gw as f64; // plan §5.2: the seam is 0°
                         *v = continent.elevation(lat, lon) as f32;

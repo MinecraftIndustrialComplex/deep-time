@@ -174,8 +174,7 @@ pub fn cause_of(
         let deeptime_format::Place::Point { lat, lon } = e.place else {
             continue;
         };
-        let ex = f64::from(lon) / 360.0 * c - c / 2.0;
-        let ez = -f64::from(lat) / 90.0 * c / 4.0;
+        let (ex, ez) = deeptime_format::Projection::of(c).block_of(f64::from(lat), f64::from(lon));
         let mut dx = x - ex;
         dx -= (dx / c + 0.5).floor() * c;
         let d = dx.hypot(z - ez);
@@ -245,8 +244,7 @@ pub fn groups(features: &[Feature], c: f64, m_per_block_h: f64, m_per_block_v: f
         }
         let x = sx.atan2(cx) / std::f64::consts::TAU * c;
         let z = sz / fs.len() as f64;
-        let lon = ((x + c / 2.0) / c * 360.0).rem_euclid(360.0);
-        let lat = (-z / (c / 4.0) * 90.0).clamp(-90.0, 90.0);
+        let (lat, lon) = deeptime_format::Projection::of(c).lat_lon(x, z);
         let t0 = fs.iter().map(|f| f.t_myr).fold(f32::INFINITY, f32::min);
         let t1 = fs.iter().map(|f| f.t_myr).fold(f32::NEG_INFINITY, f32::max);
         let throw_m = |f: &Feature| {
