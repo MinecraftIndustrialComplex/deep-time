@@ -85,7 +85,6 @@ pub const FRAME_FIELDS: [&str; 3] = [
     "deeptime:topographic_gradient_m_km",
 ];
 
-
 /// Time-weighted sums of the step fields since the frame began.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct FrameAcc {
@@ -528,7 +527,10 @@ mod tests {
         let young = frame_at(-300.0, 50.0, &e);
         assert_eq!(young.clocks["deeptime:clock/land_plants"], 1.0);
         // The run starts after the acme: the craton cell inherits BIF, the others do not.
-        assert_eq!(old.fields["deeptime:inherited_bif"], vec![1.0, 0.0, 0.0, 0.0]);
+        assert_eq!(
+            old.fields["deeptime:inherited_bif"],
+            vec![1.0, 0.0, 0.0, 0.0]
+        );
         // A 3,000 Myr run holds the acme: its frames there carry the clock, no inherited BIF.
         let e = earth(3000.0);
         let acme = frame_at(-2300.0, 50.0, &e);

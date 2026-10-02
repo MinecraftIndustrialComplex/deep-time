@@ -103,8 +103,56 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P2-08 impacts | **May a run make a giant crater?** `impacts.max_crater_km` is 300 (the largest known on Earth, Vredefort): a crater of 200–300 km, 700–1,000 blocks across, has about a 1 in 6 chance in a 500-Myr run at 16k; anything larger would melt and resurface much of so small a planet and is not simulated. (a) Keep 300 (recommended); (b) cap lower on the 16k presets (for example 150 km); (c) no cap, with the planet-wide effects modelled as a later task. | Not asked yet |
 | 2026-10-01 | P2-08 impacts | **Two new rock classes and their stand-ins.** `impact_breccia` (stand-in cobblestone) and `impact_melt` (stand-in smooth basalt) are the 61st and 62nd classes; the MIC rock tags need their rows (listed in the build log). (a) Keep both with these stand-ins (recommended); (b) other blocks from the pack; (c) fold melt rock into an existing class and keep only the breccia. | Not asked yet |
 | 2026-10-01 | P2-08 impacts | **Impact deposits do not claim their materials.** Diamonds, nickel, platinum and uranium are products of the impact deposit types, and a claimed material loses its scattered ore in a Deep Time world; impact deposits are far too rare to be the only source, so the four types carry `minecraft.claims_scatter: false` and vanilla diamonds and the pack's nickel, platinum and uranium ores keep generating. (a) Keep it so (recommended); (b) claim them and add background scatter for each. Their tonnages, grades and densities are design values (no USGS model exists) and belong to the deposit audit's richness question. | Not asked yet |
+| 2026-10-02 | science stage 2, WP-9/10 | **How much banded iron formation.** Before stage 2 none ever formed (the clocks were stand-ins). The fix puts inherited BIF in the basement of every stable continental interior when a run starts after the 2.6-1.85 Ga window (plan §8.6), and on the 1,000 Myr quick 16k planet that is 412 BIF sites (165 within 1 km; 2.4 million km² permissive; target 97, capped) against 17 porphyries: iron everywhere. The model's 'craton' is any stable interior; the plate model does not date crust. Options: **(a, recommended)** limit inherited BIF to a share of the stable interiors like Earth's Paleoproterozoic iron-formation basins (a patch field, share to be measured to give a handful to a few tens of sites per planet); (b) keep every stable interior; (c) inherited BIF off until the plate model dates its crust (BIF absent again). | Not asked yet (sub-agent report) |
+| 2026-10-02 | science stage 2, WP-9/10 | **Deposit values a source contradicts or narrows (judgement, would change worlds).** (1) Supergene blankets need at least 100 mm/yr of rain, from one sentence on one Andean stage; the same source says enrichment happens from tropical to hyper-arid climates: drop the floor to 0 (recommended) or keep. (2) Supergene minimum stable time 0.5 Myr is Sillitoe 2005's floor; his typical minimum is 3 to 9 Myr: keep 0.5 (recommended, blankets are rare already) or raise to 3. (3) Porphyry density is one value for every tract, though it falls with tract size (Singer et al. 2005): keep flat (recommended until the regression coefficients are read) or use an area law. (4) Coal field area P10 3,000 km² is below several real named fields (Gillette 4,150, Witbank 5,680, Highveld 7,000 km²): raise P10 to about 6,000 km² (recommended; coal tonnage per field grows) or keep. (5) MVT shares sedex's 2.02 Ga clock though MVT was minor until the late Neoproterozoic: keep (recommended; only runs over 2 Gyr see it). | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-02 — Science documentation, stage 2, WP-9/10: deposit models and formation checked against their sources; secular clocks dated (agent worktree agent-a64f0e1f572896222, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Ask.** Verify the DEP and ORE ledgers (346 rows) against their sources, fix clear errors with tests, redo the coal-field
+  derivation, extend the grade-tonnage check to every type, write `docs/science/deposits.md`. Five Sonnet sub-agents read the
+  library texts per family (porphyry/supergene/placer, BIF/MVT/sedex/drivers, petroleum, density/survival/rules, coal); this agent
+  merged their rows, fixed the code and wrote the page.
+- **Rows.** DEP 165 (DEP-205 split from DEP-047): `verified` 53, `abstract-only` 20, `cited-unverified` 3, `game-choice` 62,
+  `uncited` 27 (was 74 / 15 abstract / 49 / 26). ORE 185 (ORE-258 to ORE-260 new): `verified` 24, `abstract-only` 17,
+  `cited-unverified` 17, `game-choice` 58, `uncited` 69 (was 59 cited / 2 from-memory / 10 abstract / 40 / 71). Every number in
+  the nine USGS data files was read in its source (grade-tonnage arrow labels of Bulletin 1693 on rendered pages; presence counts
+  and correlations recounted from the reports' databases): no data-file number contradicts its source.
+- **Code fixed.** (1) The secular clocks (`deposits/clocks.rs`, new): the recorded pipeline published stand-ins 1, 1, 0 on every
+  frame, so no BIF formed and coal and sediment-hosted Zn–Pb had no date limit. Frames now carry the share of their span inside
+  each window of Earth's history by the planet's age (`climate.present_age_gyr`): Zn–Pb after 2.02 Ga, coal-forming plants after
+  0.419 Ga (base of the Devonian, ICS 2023/09; Nelsen et al. 2016 "by the Early Devonian"), BIF 2.6–1.85 Ga. The surface stage's
+  peat-mire rule asks the same land-plant date (it passed `true`). Inherited BIF (plan §8.6): craton share × the share of the
+  window before the run, and the structure stage counts that share of the basement in the host window as BIF host. Tests:
+  `deposits::clocks::tests` (3), `surface::fields::tests::frames_carry_dated_clocks_and_inherited_bif`,
+  `structure::hosts::tests::inherited_bif_is_hosted_by_the_basement`; the first two fail on the stand-ins. (2) BIF window start
+  2.65 → 2.6 Ga (Bekker et al. 2010 abstract: Superior-type BIF "first appeared at ca. 2.6 Ga"). (3) Text: Circular 1178's 1 km
+  rule is on printed p. 5 (porphyry note said p. 15); Circular 891 Table 3 is on p. 24 (coal note said p. 14); Sillitoe 2005's
+  "typically 3 to 9 m.y." is in its abstract (supergene data note said not found); the density comments in `count.rs`,
+  `survival.rs`, the porphyry note and the CLI census line said ρ is the P50 (it is the mean for porphyry).
+- **Coal derivation redone** (coal_seam.json notes; no coded value changed). The Illinois Basin's coal-bearing area is 49,700 mi²
+  = 128,723 km² (Hatch & Affolter 2002, p. A1); the 36,800 mi² used before is Illinois alone. Named fields per 100,000 km² of
+  coal-bearing area: Powder River 21.1 (12 fields named in PP 1625-A), Sydney 13.9, Appalachian 13.3 (23 fields, PP 1708 D.1),
+  South Africa 19.6, Illinois Basin 2.3; median 13.9, so the P50 14 stands. Median tonnage is 19.8 Mt/km², not the 15 the note
+  said. Upper Silesia's "three coal areas", the Indian per-field areas (Wikipedia) and "75 named Illinois seams" are in no source
+  read and are removed. The four coal estimate rows are now `uncited` (no source states them).
+- **Measured** (`deeptime run --preset earthlike_quick_16k --start scattered_continents --length-myr 1000 --threads 4`, test
+  machine, master 29d493f against this branch; sites before → after): porphyry 14 → 17, placer 31 → 97, **BIF 0 → 412** (165
+  counted within 1 km; 2,428,339 km² permissive; target 97.1, capped at 20 formed per survivor, 41.1 expected), **coal 79 → 53**
+  (permissive 422,047 → 272,509 km², target 59.1 → 38.2), MVT 107 → 93, sedex 2 → 6, petroleum 10 → 10; impact types (untouched)
+  hydrothermal 22 → 44, basin U 17 → 25. The histories differ (the fix changes the strata, and runs are not bit-reproducible),
+  so only BIF and coal's permissive area are the fixes' own. The BIF count is far above anything Earth-like: pending question.
+- **Not fixed (owner or other packages).** `richness_mult` still reaches no block (confirmed on master; owner question of
+  2026-10-01). Judgement items are a new pending question (supergene rain floor and time, porphyry density vs tract size, coal
+  field size, MVT on the Zn–Pb clock). Elsewhere: "Circular 1178 p. 15" also stands in the plan §8.6 and an older STATUS
+  entry; `geometry.rs` sizes the median porphyry at 2.6 t/m³ in its comment and test, the type uses 2.7 (no source states
+  either); claims.md's "all" row and the "3 rows are verified" sentence need the coordinator's recount.
+- **Library** (test machine): new folders Nelsen2016, Bekker2010 (abstract), Leach2010b (abstract), Garven1985,
+  GarvenFreeze1984, Sillitoe2005, SillitoeMcKee1996, Robert2005, Garnett2005, Richards2003, Bliss1992, Higley2005,
+  Nuccio2003_DDS69B_ch4, Dubiel2003_DDS69B_ch5, USGS2000b_DDS60chapters, AbramowitzStegun1964, Smolinski2014, Hancox2014,
+  BohacsSuter1997, RyerLanger1980, ICS2023; files added to Singer2009 (the report's database), Cooke2005 (author's copy),
+  BAP2018 (nine pages), Trippi2011 (the full report).
+- **Gates** (test machine): GATES_LINE
+- **Next step.** The owner answers the BIF question; then set the inherited-BIF extent and re-measure on the same preset.
 ### 2026-10-02 — Science documentation, stage 2, WP-0: source library, de-duplicated bibliography and ledger, coverage gaps (agent worktree agent-a024f62a028c56ca4, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; docs only)
 - **Ask.** Prepare the ground for the verification packages: readable sources, one entry per work, one row per claim, the stage 1
   coverage gaps filled. No simulation or game code, presets or tests changed; no claim status changed except by retiring duplicates.
