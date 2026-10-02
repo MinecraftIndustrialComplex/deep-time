@@ -256,6 +256,10 @@ pub struct Contact {
     pub andean: bool,
     /// Unit centroid of the overlap, as last seen.
     pub centroid: [f64; 3],
+    /// Measurement only (`dynamics.rs`; no rule reads it): continental samples of the subducting
+    /// plate that went under since the contact began or last collided, each counted once, when
+    /// it is first hidden. Counted only while the dynamics record is on.
+    pub cont_in: u32,
 }
 
 /// A mantle-fixed hotspot (Cortial §7.5's suggested extension).
@@ -347,6 +351,8 @@ pub struct PlateState {
     /// A_0: the average initial plate area, km² (Earth-normalized), for rifting and collisions.
     pub a0_km2: f64,
     pub counters: Counters,
+    /// The dynamics record (`dynamics.rs`): measurement only, absent when switched off.
+    pub dynamics: Option<super::dynamics::Dynamics>,
 }
 
 impl PlateState {

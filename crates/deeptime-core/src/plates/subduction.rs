@@ -131,6 +131,11 @@ pub fn resolve(
     env: &Env,
 ) -> Result<Resolved, CoreError> {
     let (step, t_myr) = (env.step, env.t_myr);
+    // Measurement only: which samples were already hidden last step (for `Contact::cont_in`).
+    let was_hidden: Option<Vec<bool>> = state
+        .dynamics
+        .is_some()
+        .then(|| state.samples.iter().map(|s| s.is_hidden()).collect());
     for s in &mut state.samples {
         s.flags &= !(HIDDEN | TRENCH | ARC | HOTSPOT | DIVERGENT | SUBDUCTION_ZONE | EMERGED);
     }
@@ -230,6 +235,7 @@ pub fn resolve(
                     max_uplift_mm_yr: 0.0,
                     andean: false,
                     centroid: centroid.to_array(),
+                    cont_in: 0,
                 });
                 let k = state.contacts.len() - 1;
                 index.insert((lo, hi), k);
@@ -268,6 +274,13 @@ pub fn resolve(
         if a == state.contacts[k].under {
             let s = &mut state.samples[o.i as usize];
             s.flags |= HIDDEN;
+            if let Some(was) = &was_hidden
+                && s.kind == CONTINENTAL
+                && !was[o.i as usize]
+            {
+                state.contacts[k].cont_in += 1;
+            }
+            let s = &state.samples[o.i as usize];
             if s.kind == CONTINENTAL && !locked(s, t_myr, env) {
                 seeds.entry(k).or_default().push(o.i);
             }
@@ -365,6 +378,7 @@ fn reverse(
     c.onset_event = None;
     c.setting = 1;
     c.depth_km = 0.0;
+    c.cont_in = 0;
     c.max_uplift_mm_yr = 0.0;
     c.andean = false;
     state.counters.reversals += 1;
