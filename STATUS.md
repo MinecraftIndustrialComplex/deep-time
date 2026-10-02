@@ -174,13 +174,13 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   85.0/77.6 s (a slow run: every stage 5-8 % slower), 90.2/88.2 s (seed 2); user CPU 623.2/624.1 and 757.2/756.5 s. 0-2 % of
   the plates stage, nothing measurable of a run. Record 1.7-2.0 MB of JSON per 1000 Myr (was 1.05).
 - **Gates** (VM, after merging master 2c60ca3f): cargo fmt --check clean, clippy -D warnings clean, `cargo test --workspace`
-  719 passed / 0 failed / 3 ignored (new: torque direction and size for one plate with one slab, a plate ringed by trenches
+  726 passed / 0 failed / 3 ignored on the final head (master 7a48b9aa merged; 719 on 2c60ca3f) (new: torque direction and size for one plate with one slab, a plate ringed by trenches
   in tension and at rest, the solve finite and balanced from the weakest to the stiffest settings, slab growth and break-off,
   column energies against the design's figures, the flow field, the check's balance rows; the no-change test now also checks
   a balance every step and a growing slab), `cargo deny check licenses bans` ok, `./gradlew build test` JUnit tests=226
   failures=0 skipped=1. No GameTests.
 - **Next.** Task 7 (the switch) on these numbers: persistent slabs first, then relaxation, then calibrate the scale (RMS 37
-  against 40-100). Scratch `/Volumes/Graphide/ban/deeptime-runs/force-balance-t5/` to delete when this lands.
+  against 40-100). Scratch runs deleted.
 
 ### 2026-10-02 — Science documentation, stage 2, WP-7: rock classes, metamorphism, plutons and strata checked against sources (agent worktree agent-aaa29a70b2b182869, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What.** The RCK and STR ledgers revised row by row (RCK 73 → 79 active rows, STR 44 → 46); the pages
