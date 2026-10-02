@@ -151,7 +151,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Merged with master a7ea05d** (WP-15/16, P1-10): where both packages corrected the same text, the version that
   agrees with the primary sources read was kept (volcano comments and the flanks, spacing and largest-caldera hints
   from WP-2; Crater Lake, Mauna Loa and the impact hints from WP-15); the HNT rows describe the merged hints;
-  `claims.md` counts recomputed from the ledger files (17 `verified` in all). Re-gated after the merge (see report).
+  `claims.md` counts recomputed from the ledger files (17 `verified` in all). Re-gated after the merge: fmt and clippy
+  clean, `cargo test --workspace` 679 passed, 0 failed, 3 ignored, deny ok, `./gradlew build test` 226 tests, 0 failures.
 
 ### 2026-10-02 — Science stage 2, WP-15 and WP-16: editor hints and geothermal features (agent worktree agent-a800766534f3bdb2b, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Hints.** `editor_fields.json` (the only copy of the hint texts; the lang file holds labels) corrected: impact rate (a factor of a million), "15 times taller than wide" (heights are stretched 15 times against widths; comments in five source files reworded), ice yield stress (32 kPa Antarctica, 80 kPa Greenland, 50 chosen), caldera and shield figures (Crater Lake, Yellowstone, Mauna Loa read in USGS and NPS pages), ejecta taper, river units, PET factor 58.93 (Holdridge read), dyke width, thrust slip, lake freezing, day length, star age, the arc-range width scale, and the four geothermal hints (fields per volcano none to seven, pool size, reach, 3 degC). `editor.rs`'s hint test (length over 20) is the only test that reads them. No behaviour changed.
