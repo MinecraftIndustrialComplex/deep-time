@@ -429,9 +429,10 @@ pub struct TectonicParams {
     pub wedge_slope_deg: f64,
     /// Collision resistance (task 4 of `docs/design/plate-force-balance.md`): the convergence
     /// across a collision front, mm/yr, that a belt at the strength height
-    /// (`strength_height_m`) along a front of `slab_pull_front_km` or more cancels. It grows
-    /// with the belt's height and the front's length and acts inside the speed law, over its
-    /// relaxation time; it can stop two plates but never push them apart.
+    /// (`strength_height_m`) cancels along a front as long as the oceanic slab front that pulls
+    /// the incoming plate (or any front, for a plate no slab pulls). It grows with the belt's
+    /// height and acts inside the speed law, over its relaxation time; it can stop two plates
+    /// but never push them apart (`plates/belts.rs`).
     pub collision_resistance_mm_yr: f64,
     /// Two plates in collision weld into one when the convergence across their front has stayed
     /// below this, mm/yr …
