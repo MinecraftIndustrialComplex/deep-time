@@ -46,6 +46,7 @@ public final class DeepTime {
         WorldDataBinder.init();
         SpawnHandler.init();
         RockPalette.init();
+        com.minecraftindustrialcomplex.deeptime.worldgen.GeothermalPalette.init();
         OreBlockResolver.init();
         GameTestSupport.init(modBus);
         DeepTimeNetwork.init(modBus);
