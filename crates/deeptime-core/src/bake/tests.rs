@@ -100,9 +100,39 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
         "surface/class_top",
         "meta/plate_id",
         "meta/crust_age_myr",
+        "meta/heat_flow_mw_m2",
         "meta/province",
     ] {
         assert!(m.layer(name).is_some(), "{name} is listed");
+    }
+    // The plate model's heat flow (2026-10-02): continental cells only, every one between the
+    // model's floor (55 mW/m²) and its largest sum (90 + 40 arc + 40 hotspot + 30 divergent), and
+    // nodata on oceanic crust (where the crust-age layer has data; a continental cell has none).
+    {
+        let load = |n: &str| {
+            deeptime_format::TilePackReader::open(&dir.join(format!("rasters/{n}.dtr")))
+                .unwrap()
+                .load()
+                .unwrap()
+        };
+        let q = load("meta/heat_flow_mw_m2");
+        let age = load("meta/crust_age_myr");
+        assert_eq!(q.desc.grid.w, age.desc.grid.w);
+        let (mut hot, mut cold) = (0u32, 0u32);
+        for j in 0..q.desc.grid.h {
+            for i in 0..q.desc.grid.w {
+                let (i, j) = (i64::from(i), i64::from(j));
+                let (v, a) = (q.get(i, j), age.get(i, j));
+                if v.is_nan() {
+                    cold += 1;
+                } else {
+                    assert!((54.9..=200.1).contains(&v), "({i}, {j}) heat flow {v}");
+                    assert!(a.is_nan(), "({i}, {j}) has an age and a continental flow");
+                    hot += 1;
+                }
+            }
+        }
+        assert!(hot > 0 && cold > 0, "continents {hot}, ocean {cold}");
     }
     for f in [
         "strata/classes.json",

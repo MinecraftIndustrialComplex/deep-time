@@ -83,6 +83,15 @@ pub struct UndergroundParams {
     /// climate) reaches this much and the mean temperature is at least 3 °C; drier or colder ground gets
     /// fumaroles and bare altered ground instead. 400 mm is a game choice (ledger: GEO-007).
     pub geothermal_spring_min_precip_mm: f64,
+    /// Continental ground whose baked heat flow (`meta/heat_flow_mw_m2`, the plate model's, mW/m²)
+    /// reaches this takes geothermal fields beyond the volcanoes: rifts, arcs, hotspot swells and
+    /// the young belts the model makes hot. 100 is the mean of Cenozoic extended crust, the
+    /// geothermal provinces' ground (102.4 mW/m², Davies & Davies 2010, Table 3; the continents'
+    /// mean is 70.9); a game choice informed by it (ledger: GEO-052).
+    pub geothermal_heat_flow_min_mw_m2: f64,
+    /// How many fields such hot ground takes, as a multiple of the default of one for each 10,000 km²
+    /// of it (ledger: GEO-053, GEO-054, game-choice). 0: none beyond the volcanoes'.
+    pub geothermal_heat_density: f64,
 }
 
 impl Default for UndergroundParams {
@@ -98,6 +107,8 @@ impl Default for UndergroundParams {
             geothermal_reach: 1.0,                  // ledger: GEO-003 (game-choice)
             geothermal_size: 1.0,                   // ledger: GEO-005 (game-choice)
             geothermal_spring_min_precip_mm: 400.0, // ledger: GEO-007 (game-choice)
+            geothermal_heat_flow_min_mw_m2: 100.0,  // ledger: GEO-052 (game-choice)
+            geothermal_heat_density: 1.0,           // ledger: GEO-054 (game-choice)
         }
     }
 }
@@ -133,6 +144,18 @@ impl UndergroundParams {
                 0.0,
                 4000.0,
                 "geothermal_spring_min_precip_mm",
+            ),
+            (
+                self.geothermal_heat_flow_min_mw_m2,
+                50.0,
+                400.0,
+                "geothermal_heat_flow_min_mw_m2",
+            ),
+            (
+                self.geothermal_heat_density,
+                0.0,
+                4.0,
+                "geothermal_heat_density",
             ),
         ] {
             if !(v.is_finite() && (lo..=hi).contains(&v)) {
@@ -322,6 +345,19 @@ mod tests {
         let none: UndergroundParams = serde_json::from_str(r#"{"geothermal_density": 0}"#).unwrap();
         none.validate().unwrap();
         assert_eq!(none.geothermal_reach, 1.0);
+        assert_eq!(none.geothermal_heat_flow_min_mw_m2, 100.0);
+        assert_eq!(none.geothermal_heat_density, 1.0);
+        let e = UndergroundParams {
+            geothermal_heat_flow_min_mw_m2: 20.0,
+            ..UndergroundParams::default()
+        }
+        .validate()
+        .unwrap_err();
+        assert!(
+            e.to_string()
+                .contains("$.underground.geothermal_heat_flow_min_mw_m2"),
+            "{e}"
+        );
         let e = UndergroundParams {
             crater_lake_share: 1.5,
             ..UndergroundParams::default()

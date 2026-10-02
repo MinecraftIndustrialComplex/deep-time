@@ -175,10 +175,22 @@ pub fn sample(
     let oxidation = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].oxidation));
     let heat = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].heat_flow_mw_m2));
     let thick = coupling.interpolate(mesh, |v| f64::from(samples[v as usize].thickness_m));
+    // The continental heat flow alone (the bake's `meta/heat_flow_mw_m2`): interpolated over the
+    // continental corners only, so a coast cell does not mix in the sea floor's age law (up to
+    // 300 mW/m²) from an oceanic corner of its triangle.
+    let continental = |v: u32| samples[v as usize].kind == CONTINENTAL;
+    let cont_weight = coupling.interpolate(mesh, |v| if continental(v) { 1.0 } else { 0.0 });
+    let cont_heat = coupling.interpolate(mesh, |v| {
+        if continental(v) {
+            f64::from(samples[v as usize].heat_flow_mw_m2)
+        } else {
+            0.0
+        }
+    });
     let cells = links.len();
     // The deposit engine's inputs and the surface's basement (P1-04): the nearest sample's flags,
     // top rock pool and trench values; the rest interpolated.
-    let extra: Vec<[f32; 9]> = (0..cells)
+    let extra: Vec<[f32; 10]> = (0..cells)
         .into_par_iter()
         .map(|c| {
             let s = &samples[links[c].nearest as usize];
@@ -194,6 +206,7 @@ pub fn sample(
                     super::pools::ocean_heat_flow(age) as f32,
                     7000.0,
                     s.group as f32,
+                    f32::NAN,
                 ];
             }
             let top = TOP_ORDER
@@ -211,6 +224,11 @@ pub fn sample(
                 heat[c] as f32,
                 thick[c] as f32,
                 s.group as f32,
+                if s.kind == CONTINENTAL && cont_weight[c] > 1.0e-6 {
+                    (cont_heat[c] / cont_weight[c]) as f32
+                } else {
+                    f32::NAN
+                },
             ]
         })
         .collect();
@@ -310,7 +328,7 @@ pub fn sample(
         "plates/fold_trend_deg",
         "plates/plate_id",
     ];
-    let extra_names: [&'static str; 9] = [
+    let extra_names: [&'static str; 10] = [
         "plates/flags",
         "plates/top_pool",
         "plates/oxidation",
@@ -323,6 +341,8 @@ pub fn sample(
         // group keeps its number when a collision hands it to another plate, so the surface stage
         // can tell crust that changed plate from another plate's crust arriving (`surface/advect.rs`).
         "plates/group_id",
+        // The heat flow of continental crust alone, NaN on oceanic crust and in gaps (above).
+        "plates/continental_heat_flow_mw_m2",
     ];
     names
         .iter()

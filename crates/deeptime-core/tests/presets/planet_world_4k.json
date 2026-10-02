@@ -304,5 +304,8 @@
     "sea_cutoff_ratio": 8.0,
     "diffusivity_m2_yr": 0.01,
     "degradation": 1.0
+  },
+  "underground": {
+    "geothermal_heat_flow_min_mw_m2": 60.0
   }
 }
