@@ -1,7 +1,7 @@
 # Force-balance plate motion: design
 
-Status: **design approved 2026-10-02; task 2 built** (see "As built: task 2" at the end of
-section 9). It extends
+Status: **design approved 2026-10-02; tasks 2, 3 and 4 built** (see "As built: task 2" and
+"As built: tasks 3 and 4" at the end of section 9). It extends
 `docs/design/plate-collisions-and-welding.md` (the "collisions design" below) after Ben's decisions
 of 2026-10-02: full force-balance motion; nothing designed for the mega-plate yet; both sides of a
 suture rise, with a foreland basin; the start-up land jump is a separate small task afterwards.
@@ -336,7 +336,7 @@ in `editor_fields.json` and a lang key `deeptime.editor.field.<id>`).
 | `boundary_resistance` | 3 | `boundary_resistance` |
 | `mantle_flow_mm_yr` | 5 | `mantle_flow` |
 | `motion_relax_myr` | 6 | `motion_relax` |
-| `wedge_taper_deg` | 1.5 | `wedge_taper` |
+| `wedge_slope_deg` (built as WP-13a asked; `wedge_taper_deg` in the design) | 1.5 | `wedge_slope` |
 | ~~`foreland_elastic_km`~~ | ~~50~~ | superseded by the general flexure (decisions log 2026-10-02; `docs/design/flexure.md`) |
 | `weld_speed_mm_yr`, `weld_after_myr`, `collision_belt_km`, `collision_stacking_share` | as the collisions design | as there |
 
@@ -539,6 +539,72 @@ departs from the plan above and from the collisions design's task 2:
   `normal`, on both plates, and fills `BeltRec`'s wedge and foredeep. Task 4 reads
   `convergence_mm_yr` for the stall and the resistance, and replaces `shortening::advance`'s
   trigger. Task 5 starts a slab's break-off clock at `onset_myr` on the stretch `front_km` long.
+
+### As built: tasks 3 and 4 (2026-10-02)
+
+Branch of the plate tasks 3 and 4 agent; new module `plates/belts.rs`, changes in `shortening.rs`,
+`collision.rs`, `subduction.rs`, `pools.rs`, `rifting.rs`, `mod.rs`, `state.rs`, `dynamics.rs` and
+`check.rs`. Ledger PLT-228 to PLT-240; science page `docs/science/plates.md`, section "Collision
+belts, the wedge and the weld". Where it departs from section 3.5 above and from the collisions
+design (4.1 1C, 4.2 2B):
+
+- **Stacking** is as designed: each step `share × s × L × H / 5.5` of ground to raise, with `H` the
+  incoming crust's own thickness at the front (not a constant), the wedge filled first, the belt
+  the rest with the profile `1 − (d/W)²`. The rock stacked is the consumed crust's own pools, its
+  sediments metamorphosed, so the volume added is the volume that crossed times the share (a test).
+  Where the overriding plate is a sliver narrower than half the belt, each sample takes what a
+  full belt would give it and the rest goes down with the slab.
+- **The wedge** is the profile `z_front − d tan α` filled up from the ground, with `z_front` the
+  overriding plate's edge. Its width is resolved in steps of a sample spacing (71 km on the quick
+  preset): at 1.5° a wedge one row wide needs the belt's edge about 1.9 km above the foreland.
+- **The setting is `wedge_slope_deg`**, as WP-13a asked (a surface slope, not a taper).
+- **The foreland basin** is the surface stage's flexure, as decided; the record reads it back from
+  `surface/flexure_m` (PLT-236). No `plates/foreland_m` or `plates/shortening` L1 field was added:
+  the structure stage reads the belt through the `collision` regime (stamped belt and wedge), and
+  its foreland rule and fold tightness from the real shortening are left for task 6 (below).
+- **Resistance** (2B) is a plastic cut inside the present speed law: each step the convergence
+  across the front loses up to `relax × r`, never below zero, shared by area, so against the speed
+  law it settles at `v_free − r` or stops. Three departures, all measured:
+  1. The front-length factor is `min(1, L / min(F, slab_pull_front_km))` with `F` the incoming
+     plate's slab front this step, not `min(1, L / slab_pull_front_km)`. Collision fronts are a
+     median 400 km long; with the design's factor a plate with no other slab needed a belt tens of
+     km high to stop, and continents were consumed whole (0.13 of the sphere's area crossed
+     collision fronts in a 300 Myr plate-only run).
+  2. The height is the belt's height above sea level or its relief over the ground it was built
+     on, whichever is larger (a belt raised from a submarine edge resists too).
+  3. `collision_resistance_mm_yr` is 200, not 100 (light calibration: at 100, collisions on a
+     1000 Myr run of seed 1 consumed 0.53 of the sphere's area in continental crust and kept 0.25
+     of the planet continental at the lowest step; at 200, 0.31 and 0.32, master 0.31 on that seed).
+- **Slab pull counts oceanic slabs only** (section 3.3's rule, brought forward): a continent at a
+  front no longer pulls its own plate into the collision. And the trench pull-down of the plate
+  model's surface processes no longer drags continental crust at a collision front towards the
+  trench depth. Both were needed for collisions to stop.
+- **The weld** is on stall alone (no shortening threshold), as section 3.4 says; `collision_threshold_km`
+  now only moves small terranes, and is 100 km of real shortening instead of 300 (the old count of
+  300 km fired at a median 88 km of real shortening; at 300 km small terranes were consumed
+  before they could accrete). The larger plate keeps its id.
+- **Contacts in collision are kept** while their front lives, so two plates that stopped overlapping
+  can still weld; a collision's own belt and wedge are not "locked" against it (the lock that keeps
+  freshly sutured crust from being forced under again would otherwise end every collision); a
+  subduction initiation no longer splits off old floor that is mostly an enclosed continent.
+- **Cortial's subduction uplift** `h(z̃)` acts at oceanic slabs only; where continental crust comes
+  in, the belt builds the relief.
+- **Measures.** A belt's width is √(12 × variance) of where it rose across the front, weighted by
+  the uplift (both sides), its length the front's; the 3-D second moments read a long curved
+  front's sagitta as width (880 km for 60° of arc). "Land raised by one collision in one step" and
+  the lifted counts are per step. Foredeeps are kept for belts that reached 3 km, as the target
+  says. `plate-check --record` writes the whole dynamics record; `tools/review/belts-record.py`
+  summarises its collisions.
+
+**Left for task 6 (structure stage):** the regime field carries the belt and the wedge as
+`collision` (stamped each step they rise by 5 m/Myr or more), so fold trains and thrusts follow the
+suture on both sides with no change there. Not read yet: the shortening strength from the step's
+convergence, fold tightness from the real shortening (a `plates/shortening` field), and the
+foreland from the flexural basin (`surface/flexure_m` below about −100 m beside a collision) instead
+of `foreland_km` all round.
+
+**Measured** (the tables are in `docs/design/plate-check-baseline.md`, section "Tasks 3 and 4"):
+MEASURED_SUMMARY
 
 ## 10. Risks
 

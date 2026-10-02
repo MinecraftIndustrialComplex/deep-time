@@ -2,6 +2,12 @@
 
 Status: **design, nothing built** (2026-10-01). Ben chose "Design, then fix".
 
+**Built 2026-10-02:** the collision state and real shortening (task 2), the belt, resistance and
+weld on stall (tasks 3 and 4, as the force-balance design's stage 1). What was built and where it
+departs from 4.1 (1C) and 4.2 (2B) is in `docs/design/plate-force-balance.md`, "As built: task 2"
+and "As built: tasks 3 and 4"; the settings of section 5 are built except
+`supercontinent_heating_myr` (3B, not needed: see the measurements there).
+
 **Decided 2026-10-02** (decisions log): question 1 → full force-balance motion; question 2 → decide
 about the mega-plate when measured; question 3 → both sides of the suture rise, with a foreland
 basin; question 4 → the start-up jump is a separate small task afterwards. The extension is
