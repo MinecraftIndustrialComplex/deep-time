@@ -30,7 +30,8 @@ import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
  * lava; cave lakes at y −10 or lower may be). This generator measures them from the world's floor:
  * the global fluid picker is {@link LavaFluids}'s, and the router's {@code lava} function carries
  * the {@code deeptime:lava_lakes} gate. {@link LavaRules} has the rules and their settings.
- * Lava above that is the magma of the world's active volcanoes ({@link Magma}, {@link MagmaPass}).
+ * Lava above that is the magma of the world's active volcanoes ({@link Magma}, {@link MagmaPass}), and
+ * around them lie their hot springs and fumaroles ({@link Geothermal}, {@link GeothermalPass}).
  */
 public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
 
@@ -118,6 +119,8 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
             // Magma under and in the active volcanoes, after the water so a river's cut counts as ground.
             var settings = sourceSettings.value();
             MagmaPass.apply(chunk, w.magma(waterReach(), settings.noiseSettings().minY(), settings.seaLevel()));
+            // Hot springs, terraces, fumaroles and altered ground around the same volcanoes (P2-14).
+            GeothermalPass.apply(chunk, w.geothermal(waterReach(), settings.noiseSettings().minY(), settings.seaLevel()));
             IcePass.apply(chunk, w.data());                    // snow and ice over glaciated ground, whatever the biome
         }
     }

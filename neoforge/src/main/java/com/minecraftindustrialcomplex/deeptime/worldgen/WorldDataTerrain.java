@@ -19,6 +19,8 @@ public final class WorldDataTerrain implements TerrainSource {
     private volatile LavaRules lava;
     private volatile Magma magma;
     private volatile MagmaRules magmaRules;
+    private volatile Geothermal geothermal;
+    private volatile GeothermalRules geothermalRules;
 
     public WorldDataTerrain(WorldDataRef ref) {
         this.ref = ref;
@@ -97,6 +99,48 @@ public final class WorldDataTerrain implements TerrainSource {
             }
         }
         return m;
+    }
+
+    /** The world's settings for geothermal features. */
+    public GeothermalRules geothermalRules() {
+        GeothermalRules r = geothermalRules;
+        if (r == null) {
+            r = GeothermalRules.of(data().manifest().notes());
+            geothermalRules = r;
+        }
+        return r;
+    }
+
+    /**
+     * The geothermal sites of the world's active volcanoes, built on first use from the same list,
+     * terrain height and water columns as the magma (so every chunk sees the same sites).
+     *
+     * @param cell   the generator's noise cell width (the water rule's reach)
+     * @param minY   the level's floor, {@code seaLevel} its sea level
+     */
+    public Geothermal geothermal(int cell, int minY, int seaLevel) {
+        Geothermal g = geothermal;
+        if (g == null) {
+            synchronized (this) {
+                if (geothermal == null) {
+                    WorldData wd = data();
+                    Magma m = magma(cell, minY, seaLevel);
+                    var spec = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Spec.of(wd, cell);
+                    var none = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Kind.NONE;
+                    long t0 = System.nanoTime();
+                    geothermal = Geothermal.build(wd.volcanoes().list(), geothermalRules(), m, (x, z) -> wd.height(wrapX(x), z),
+                            (x, z) -> com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, wrapX(x), z).kind() != none,
+                            new GeothermalEnv(wd), wd.circumference(), seaLevel, wd.manifest().mPerBlockH());
+                    int[] n = geothermal.counts();
+                    com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(
+                            "[deeptime] geothermal: {} sites from {} active volcanoes: {} pools, {} vents, {} patches of altered ground ({} ms; {})",
+                            geothermal.sites().size(), wd.volcanoes().list().size(), n[0], n[1], n[2],
+                            (System.nanoTime() - t0) / 1_000_000L, geothermalRules());
+                }
+                g = geothermal;
+            }
+        }
+        return g;
     }
 
     @Override
