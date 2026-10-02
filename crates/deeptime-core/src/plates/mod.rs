@@ -242,6 +242,7 @@ impl PlatesStage {
             .iter()
             .map(|p| DVec3::from_array(p.omega))
             .collect();
+        #[allow(clippy::needless_range_loop)] // `p` indexes the plates, the pull and `omega`.
         for p in 0..st.plates.len() {
             if !st.plates[p].alive {
                 continue;
