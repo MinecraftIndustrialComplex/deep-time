@@ -5290,6 +5290,76 @@ Works read for the geothermal page and the hint figure table (2026-10-02). Not c
 - White, D.E. 1967, mercury deposits and hot springs; the Steamboat Springs and Sulphur Bank deposits (GEO-041).
 - Etheridge et al. 1996 (HNT-050); U.S. Standard Atmosphere 1976, NASA TM-X-74335 (HNT-043); Bouvier and Wadhwa 2010, Nature Geoscience 3:637 (HNT-054).
 
+## Inherited iron-formation basins and richer deposits (ORE-261 to ORE-266)
+
+Added 2026-10-02 for the owner's answers "Earth-like patch field" (inherited banded iron formation)
+and "Rich Deposits, Thinner Scatter, Also make deposits use some of the vanilla ore vein features".
+A research sub-agent (Sonnet) fetched the texts into the source library on the test machine; the
+quotes below are what was read. The counts table at the top of this file was not recounted for
+these entries.
+
+### WAEPA1974_HamersleyIronProvince
+- Reference: Conservation Through Reserves Committee, 1974, Report to the Environmental Protection Authority (Western Australia), Section Two, Systems Eight-Twelve, p. 8-1/8-2.
+- DOI or URL: https://library.dbca.wa.gov.au/static/Journals/080500/080500-03.02.pdf
+- Ledger ids: ORE-261, ORE-263
+- Access: open (government report).
+- Library: `WAEPA1974_HamersleyIronProvince/` (excerpt of the OCR text). Read: "The Hamersley Iron Province is broadly an ovoid depositional basin some 100,000 km2 in area".
+
+### MarshSchlinger1980
+- Reference: Marsh, B.D. and Schlinger, C.M., 1980, Petrologic and geophysical study of the source of long wavelength crustal magnetic anomalies. Final report, NASA CR-175168, Johns Hopkins University.
+- DOI or URL: https://ntrs.nasa.gov/api/citations/19840012878/downloads/19840012878.pdf
+- Ledger ids: ORE-261, ORE-263
+- Access: open.
+- Library: `MarshSchlinger1980/` (full text, a secondary compilation). Read: "The Hammersley group may have once extended over 150,000 km2 with average thickness of 1000 m (Trendall, 1973)"; "the Caue itabirite is thought to have once covered 100,000 km2 ... (Dorr, 1973)".
+
+### Beukes1987
+- Reference: Beukes, N.J., 1987, Facies relations, depositional environments and diagenesis in a major early Proterozoic stromatolitic carbonate platform to basinal sequence, Campbellrand Subgroup, Transvaal Supergroup, Southern Africa. Sedimentary Geology 54:1-46.
+- Ledger ids: ORE-261, ORE-263
+- Access: paywalled (abstract read).
+- Library: `Beukes1987/` (abstract, University of Johannesburg repository). Read: the platform "covers an area of approximately 190,000 km2 on the Kaapvaal craton. The original depository probably extended across the entire 600,000 km2 surface area of the craton and beyond." (the carbonate platform under the Kuruman and Penge iron formations, not the iron formation alone).
+
+### Pufahl1996
+- Reference: Pufahl, P.K., 1996, MSc thesis, Lakehead University (Gunflint and Biwabik iron formations, Animikie Basin), citing Morey 1983.
+- DOI or URL: https://knowledgecommons.lakeheadu.ca/bitstream/handle/2453/2470/PufahlP1996m-1b.pdf
+- Ledger ids: ORE-261, ORE-263
+- Access: open.
+- Library: `Pufahl1996/` (full text, OCR). Read: the Lake Superior iron formations crop out "as an oval shaped region encompassing 220 000 km2 (Morey, 1983)" (the region enclosing the iron ranges).
+
+### Bunting1986
+- Reference: Bunting, J.A., 1986, Geology of the eastern part of the Nabberu Basin, Western Australia. Geological Survey of Western Australia Bulletin 131.
+- DOI or URL: https://library.dbca.wa.gov.au/static/Journals/080326/080326-131.pdf
+- Ledger ids: ORE-261, ORE-263
+- Access: open (government report).
+- Library: `Bunting1986/` (excerpts of the text). Read: "The Nabberu Basin is exposed over an area of approximately 60 000 km2 and is 600 km long by 120 km wide"; "None of the present boundaries represents the original depositional extent of the basin."
+
+### WikipediaKurskMagneticAnomaly, WikipediaIronQuadrangle, LabradorTrough_dimensions (secondary)
+- References: Wikipedia, "Kursk Magnetic Anomaly" and "Iron Quadrangle" (fetched 2026-10-02); Quebec geological survey lexicon, Kaniapiskau Supergroup (https://gq.mines.gouv.qc.ca/lexique-stratigraphique/province-de-churchill/supergroupe-de-kaniapiskau_en/).
+- Ledger ids: ORE-261, ORE-263
+- Library: the three folders of these keys. Read: the Kursk ores "are spread over an area estimated at 120,000 km2"; the Quadrilátero Ferrífero covers "about 7,000 square kilometres"; the Labrador Trough "forms a narrow strip up to 160 km wide that extends for 850 km" (no published area: the project's estimate is about 50,000 km², 850 km by about 60 km).
+
+### Hasterok2022
+- Reference: Hasterok, D., Halpin, J.A., Hand, M., Collins, A.S., Kreemer, C., Gard, M.G. and Glorie, S., 2022, New maps of global geological provinces and tectonic plates. Earth-Science Reviews 231:104069.
+- DOI or URL: 10.1016/j.earscirev.2022.104069; data https://github.com/dhasterok/global_tectonics
+- Ledger ids: ORE-261
+- Access: open data (the paper not read).
+- Library: `Hasterok2022/` (the research sub-agent's areas computed from the open shapefiles in an equal-area projection; a derived analysis, not source text). Read: continental crust 172.7 million km²; provinces typed shield (34.4) and craton (19.1), overlap removed, 53.5 million km²; the cratons layer (Archean basement) 40.8 million km².
+
+### Abbott2000
+- Reference: Abbott, D., Sparks, D., Herzberg, C., Mooney, W., Nikishin, A. and Zhang, Y.S., 2000, Quantifying Precambrian crustal extraction: the root is the answer. Tectonophysics 322:163-190.
+- DOI or URL: https://escweb.wr.usgs.gov/share/mooney/2000_Tecton_PrecambExtraction.pdf
+- Ledger ids: ORE-261
+- Access: open copy (USGS author page).
+- Library: `Abbott2000/` (full text). Read, Table 1: surface area of Archean crust 36.8 / 40.9 / 45.0 million km² (min / mean / max), Early Proterozoic 29.3 / 32.5 / 35.7 (the mean printed as 132.5, corrected from a later table).
+
+### Klein2005
+- Reference: Klein, C., 2005, Some Precambrian banded iron-formations (BIFs) from around the world: their age, geologic setting, mineralogy, metamorphism, geochemistry, and origin. American Mineralogist 90:1473-1499.
+- DOI or URL: 10.2138/am.2005.1871
+- Ledger ids: none (asked for; holds no area figure)
+- Access: paywalled (abstract read).
+- Library: `Klein2005/` (abstract). No basin area is stated in the abstract.
+
+### MinecraftSources: OreVeinifier (ORE-266)
+- See MinecraftSources above. Read 2026-10-02 for ORE-266: `net.minecraft.world.level.levelgen.OreVeinifier`: inside a vein a block is ore with probability 0.1 to 0.3 (`MIN_RICHNESS`, `MAX_RICHNESS`) of the 0.7 that are solid (`VEIN_SOLIDNESS`), and an ore block is the raw-ore block with `CHANCE_OF_RAW_ORE_BLOCK` = 0.02; the rest is filler (granite in copper veins, tuff in iron veins).
 
 ## Rock classes, metamorphism, plutons and strata: sources read in WP-7 (RCK, STR)
 
