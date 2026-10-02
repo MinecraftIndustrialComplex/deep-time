@@ -693,10 +693,15 @@ fn sig4(x: f64) -> f64 {
     (x / s).round() * s
 }
 
+/// Set this environment variable and the dynamics record leaves the force balance out (to time
+/// what it costs).
+pub const OFF_ENV: &str = "DEEPTIME_NO_PLATE_FORCES";
+
 /// The step's slab lengths and force balance, on the positions `pos` and the motion the step's
 /// fronts were found with (call it after `subduction::fronts_and_uplift`, before the motion is
 /// updated). Updates the slab tracks in the dynamics record and returns what to record; does
-/// nothing (and returns `None`) when the record is off. Reads nothing else it changes.
+/// nothing (and returns `None`) when the record is off or [`OFF_ENV`] is set. Reads nothing else
+/// it changes.
 pub fn record(
     st: &mut PlateState,
     geo: &Geo,
@@ -704,6 +709,10 @@ pub fn record(
     env: &Env<'_>,
     flow: DVec3,
 ) -> Option<Recorded> {
+    static OFF: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if *OFF.get_or_init(|| std::env::var_os(OFF_ENV).is_some()) {
+        return None;
+    }
     let mut d = st.dynamics.take()?;
     let out = balance_step(st, geo, pos, env, flow, &mut d.slabs, &mut d.prev_balance);
     st.dynamics = Some(d);
