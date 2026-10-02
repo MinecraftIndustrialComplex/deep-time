@@ -98,7 +98,7 @@ pub fn planet_builtin(name: &str) -> Option<&'static str> {
 }
 
 /// The top-level keys a planet preset adds to the header's.
-pub const PLANET_KEYS: [&str; 15] = [
+pub const PLANET_KEYS: [&str; 16] = [
     "seed",
     "planet",
     "keyframes",
@@ -114,6 +114,7 @@ pub const PLANET_KEYS: [&str; 15] = [
     "hydro",
     "volcanoes",
     "underground",
+    "impacts",
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
@@ -409,7 +410,8 @@ pub struct TectonicParams {
     pub sediment_accretion_mm_yr: f64,
     /// u_0 (0.6 mm/yr).
     pub subduction_uplift_mm_yr: f64,
-    /// Interpenetration that triggers a collision (Cortial §6: 300 km).
+    /// What a contact's collision count must reach to transfer its terrane or weld its plates
+    /// (Cortial §6: 300 km of interpenetration). What is counted is `collision_on_shortening`.
     pub collision_threshold_km: f64,
 
     /// Where the subduction distance transfer f(d) peaks (design choice).
@@ -535,6 +537,15 @@ pub struct TectonicParams {
     /// left its passive margins facing an ocean that kept converging, so they all turned
     /// active); a smaller terrane moves alone (an island arc or microcontinent accretes).
     pub collision_suture_frac: f64,
+    /// What `collision_threshold_km` is compared with (`plates/shortening.rs`). `true`: the
+    /// collision's real shortening, the convergence across its front integrated since continental
+    /// crust first converged there. `false`: the count used before plate-motion task 2, relative
+    /// speed × time over the steps with three or more continental samples in the overlap, which
+    /// also counts plates sliding past each other. An interim setting: `false` in every built-in
+    /// preset until the belt and the weld on stalled convergence land (tasks 3 and 4 of
+    /// `docs/design/plate-force-balance.md`), because real shortening alone costs about 0.05 of
+    /// the planet in continental crust (STATUS.md, 2026-10-02). Task 4 removes it.
+    pub collision_on_shortening: bool,
     /// Oceanic crust older than this, on a plate that subducts nowhere, can start subducting on
     /// its own (Wilson cycle), Myr.
     pub subduction_initiation_age_myr: f64,
@@ -625,6 +636,7 @@ impl Default for TectonicParams {
             terrane_event_min_frac: 0.005,
             collision_min_frac: 0.1,
             collision_suture_frac: 0.1,
+            collision_on_shortening: false,
             subduction_initiation_age_myr: 150.0,
             subduction_initiation_rate: 0.3,
             subduction_initiation_clearance_km: 1000.0,
@@ -666,6 +678,8 @@ pub struct PlanetPreset {
     pub amplify: Option<crate::surface::amplify::AmplifyParams>,
     /// Volcanoes as landforms (P1-21); `None` makes none. It needs a `surface` section.
     pub volcanoes: Option<crate::surface::volcanoes::VolcanoParams>,
+    /// Meteor impacts (P2-08); `None` makes none. It needs a `surface` section.
+    pub impacts: Option<crate::surface::impacts::ImpactParams>,
     /// The knobs of the climate → biome-input mapping (P1-09, plan §7.2); the bake uses the
     /// defaults when the section is absent.
     pub biomes: Option<crate::bake::biomes::BiomeParams>,
@@ -726,6 +740,7 @@ impl PlanetPreset {
             section(obj, "volcanoes")?;
         let underground: Option<crate::underground::UndergroundParams> =
             section(obj, "underground")?;
+        let impacts: Option<crate::surface::impacts::ImpactParams> = section(obj, "impacts")?;
         let missing = |what: &str| CoreError::preset("$", format!("missing section {what}"));
         let seed = match obj.get("seed") {
             None => 1,
@@ -749,6 +764,7 @@ impl PlanetPreset {
             young,
             amplify,
             volcanoes,
+            impacts,
             biomes,
             hydro,
             underground,
@@ -1060,6 +1076,14 @@ impl PlanetPreset {
                 "needs a surface section: volcanoes build on the deep-time surface",
             )?;
         }
+        if let Some(i) = &self.impacts {
+            i.validate()?;
+            check(
+                self.surface.is_some(),
+                "$.impacts",
+                "needs a surface section: craters are cut into the deep-time surface",
+            )?;
+        }
         Ok(())
     }
 
@@ -1103,6 +1127,9 @@ impl PlanetPreset {
         }
         if let Some(u) = &self.underground {
             v["underground"] = json!(u);
+        }
+        if let Some(i) = &self.impacts {
+            v["impacts"] = json!(i);
         }
         v
     }

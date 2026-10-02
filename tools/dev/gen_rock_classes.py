@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""Generate Deep Time's 60 rock-class definitions (plan §5.4.1) from the table below.
+"""Generate Deep Time's 62 rock-class definitions (plan §5.4.1) from the table below.
 
     tools/dev/gen_rock_classes.py [<output dir>]
 
@@ -11,7 +11,9 @@ the whole table validates.
 
 The vocabulary (class names, families, groups, stand-ins) is MIC's rock-tag README,
 /home/greencheetah/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags/README.md: CLASSES follows
-its Classes table in order, GROUPS its Groups table. `vanilla_fallback` is the class's vanilla member
+its Classes table in order, GROUPS its Groups table. `impact_breccia` and `impact_melt` (P2-08,
+2026-10-01) are Deep Time additions newer than the README, like `diamictite` (2026-09-30) before the
+README took it in; the MIC pack's rock tags do not name them yet. `vanilla_fallback` is the class's vanilla member
 there, or the last entry of its fallback list, except for the classes in CRUST_STAND_INS (P1-28,
 Ben, decisions log 2026-10-01), which use plain stone or deepslate: the common rocks should be the
 two blocks players know, and mining them drops vanilla's cobblestone and cobbled deepslate.
@@ -33,7 +35,7 @@ class along; the temperature of each step is the structure stage's (metamorphism
 dolomitisation, evaporite_basin, euxinic_basin, marine_shelf_mud, floodplain, alluvial_fan,
 peat_swamp (surface/facies.rs), pedogenesis, deep_weathering, tropical_weathering
 (surface/weathering.rs), regional_metamorphism (structure/metamorphism.rs), arc_plutonism, batholith,
-contact_aureole, contact_metasomatism (structure/plutons.rs). The others name settings later stages
+contact_aureole, contact_metasomatism (structure/plutons.rs), impact (surface/impacts). The others name settings later stages
 may simulate; the core does not read the key.
 """
 import glob
@@ -61,8 +63,8 @@ FAMILIES = (
 GROUPS = (
     ("intrusive", "granite granodiorite diorite gabbro anorthosite peridotite"),
     ("volcanic", "rhyolite andesite basalt tuff obsidian scoria pumice"),
-    ("special", "kimberlite carbonatite pegmatite greisen"),
-    ("igneous", "#intrusive #volcanic kimberlite carbonatite pegmatite"),
+    ("special", "kimberlite carbonatite pegmatite greisen impact_breccia impact_melt"),
+    ("igneous", "#intrusive #volcanic kimberlite carbonatite pegmatite impact_melt"),
     ("clastic", "conglomerate diamictite sandstone red_bed mudstone shale black_shale"),
     ("chemical", "limestone dolostone chalk chert travertine halite gypsum anhydrite coal ironstone "
                  "banded_iron_formation phosphorite"),
@@ -523,6 +525,33 @@ CLASSES = [
          vf="minecraft:diorite", vf_from="fallback",
          notes="Greisen: quartz-mica altered granite cupola hosting tin and tungsten. Also in the "
                "metamorphic group (metasomatised granite)."),
+    # P2-08 (2026-10-01): the two rocks of meteorite impacts, formed by surface/impacts.
+    dict(name="impact_breccia", family="special_host", rho=2300,
+         rho_src="judgment: suevite and polymict lithic breccia are porous, about 2000-2500 kg/m3 "
+                 "(Ries suevite, Popigai)",
+         k=1.6, k_why="a clast-rich, weakly welded breccia with altered glass: weaker than sandstone's "
+                      "well-cemented beds but with strong clasts",
+         d=1.4, d_why="friable matrix that breaks down to a stony, clayey regolith",
+         path=["schist", "gneiss"], wx="clay", facies="impact", tags=["reservoir", "porous", "ore_host"],
+         vf="minecraft:cobblestone", vf_from="fallback",
+         tuned="set with the impact craters (P2-08, 2026-10-01)",
+         notes="Impact breccia: suevite (melt-bearing polymict breccia) and lithic breccia filling and "
+               "surrounding impact craters, and their proximal ejecta (the Ries suevite, long mapped as "
+               "a volcanic tuff; the Onaping Formation at Sudbury). Porous and fractured, so a petroleum "
+               "reservoir where sealed (Ames, Red Wing Creek). Stand-in: cobblestone, angular fragments "
+               "in a matrix."),
+    dict(name="impact_melt", family="special_host", rho=2600,
+         rho_src="judgment: clast-poor impact melt rock, from glassy and vesicular (about 2400) to "
+                 "crystalline melt sheets (Sudbury norite about 2800)",
+         k=0.7, k_why="a fine crystalline to glassy sheet, as strong as a lava",
+         d=0.7, d_why="massive fine-grained rock that makes thin soils",
+         path=["gneiss"], wx="saprolite", facies="impact", tags=["ore_host"],
+         vf="minecraft:smooth_basalt", vf_from="fallback",
+         tuned="set with the impact craters (P2-08, 2026-10-01)",
+         notes="Impact melt rock: the coherent sheet of shock-melted target rock on the floor of a "
+               "complex crater (Manicouagan, Morokweng, the Sudbury Igneous Complex, which differentiated "
+               "into norite and granophyre and hosts Ni-Cu-PGE sulphides at its base). Stand-in: smooth "
+               "basalt, a dark fine-grained crystalline rock."),
     # ---- Unconsolidated and regolith
     dict(name="soil", family="unconsolidated", rho=1300,
          rho_src="judgment: typical dry bulk density of mineral topsoil",
@@ -660,8 +689,8 @@ def validate(groups):
                 errors.append(f"{what}: unknown class {k}")
     names = [r["name"] for r in CLASSES]
     known = set(names)
-    if len(CLASSES) != 60:
-        errors.append(f"expected 60 classes, got {len(CLASSES)}")
+    if len(CLASSES) != 62:
+        errors.append(f"expected 62 classes, got {len(CLASSES)}")
     if len(known) != len(names):
         errors.append("duplicate class names")
     if len(GROUPS) != 17:

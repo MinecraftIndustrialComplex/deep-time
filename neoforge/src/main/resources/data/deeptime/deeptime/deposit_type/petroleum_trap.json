@@ -13,7 +13,7 @@
   "hosts": {"any_of": ["sandstone", "#deeptime:rock/carbonate"], "host_bias": {}},
   "causes": {
     "source": ["deeptime:basin_subsidence", "deeptime:rift_onset"],
-    "trap": ["deeptime:orogeny_phase", "deeptime:collision"],
+    "trap": ["deeptime:orogeny_phase", "deeptime:collision", "deeptime:impact_crater"],
     "preservation": ["deeptime:erosion_pulse"]
   },
   "cause_radius_km": 600,

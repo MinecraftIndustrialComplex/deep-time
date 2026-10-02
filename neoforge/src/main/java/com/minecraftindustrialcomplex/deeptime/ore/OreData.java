@@ -48,15 +48,19 @@ public final class OreData {
      * The {@code minecraft} section: how the type's ore reaches the world. {@code coeVein} and
      * {@code cdgScale} are read at run time by the COE and CDG hooks (P1-16, plan §7.14), so a pack
      * that overrides the type's file in a datapack remaps the vein or rescales the oil of worlds
-     * that already exist.
+     * that already exist. {@code claimsScatter} (default true) says whether the type's products are
+     * claimed ({@link #claimedMaterials}): false for a type too rare to be a world's only source of
+     * them (the impact types, P2-08).
      */
-    public record MinecraftDef(String oreBlockPolicy, Optional<String> coeVein, boolean cdgReservoir, double cdgScale) {
-        static final MinecraftDef DEFAULT = new MinecraftDef("ev_then_vanilla", Optional.empty(), false, 1.0);
+    public record MinecraftDef(String oreBlockPolicy, Optional<String> coeVein, boolean cdgReservoir, double cdgScale,
+                               boolean claimsScatter) {
+        static final MinecraftDef DEFAULT = new MinecraftDef("ev_then_vanilla", Optional.empty(), false, 1.0, true);
         static final Codec<MinecraftDef> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.STRING.optionalFieldOf("ore_block_policy", "ev_then_vanilla").forGetter(MinecraftDef::oreBlockPolicy),
                 Codec.STRING.lenientOptionalFieldOf("coe_vein").forGetter(MinecraftDef::coeVein),
                 Codec.BOOL.optionalFieldOf("cdg_reservoir", false).forGetter(MinecraftDef::cdgReservoir),
-                Codec.doubleRange(0, Double.MAX_VALUE).optionalFieldOf("cdg_scale", 1.0).forGetter(MinecraftDef::cdgScale)
+                Codec.doubleRange(0, Double.MAX_VALUE).optionalFieldOf("cdg_scale", 1.0).forGetter(MinecraftDef::cdgScale),
+                Codec.BOOL.optionalFieldOf("claims_scatter", true).forGetter(MinecraftDef::claimsScatter)
         ).apply(i, MinecraftDef::new));
     }
 
@@ -213,15 +217,19 @@ public final class OreData {
     }
 
     /**
-     * The materials Deep Time claims (plan §7.7): every product of the loaded deposit types plus
-     * every background-scatter material, sorted. {@code c:crude_oil} is among them and has no ore
-     * blocks; it claims nothing.
+     * The materials Deep Time claims (plan §7.7): every product of the loaded deposit types that
+     * claim their products ({@code minecraft.claims_scatter}, true unless the type says otherwise)
+     * plus every background-scatter material, sorted. {@code c:crude_oil} is among them and has no
+     * ore blocks; it claims nothing.
      */
     public static List<ResourceLocation> claimedMaterials(RegistryAccess access) {
         TreeSet<ResourceLocation> out = new TreeSet<>();
-        for (var e : entries(access, DEPOSIT_TYPE))
+        for (var e : entries(access, DEPOSIT_TYPE)) {
+            if (!e.getValue().minecraft().claimsScatter())
+                continue;
             for (ProductDef p : e.getValue().products())
                 out.add(p.material());
+        }
         for (var e : entries(access, SCATTER))
             out.add(e.getValue().material());
         return List.copyOf(out);

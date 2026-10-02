@@ -16,6 +16,8 @@
     'deeptime:porphyry_cu_mo_au': '#d7301f', 'deeptime:supergene_cu_blanket': '#fdae61',
     'deeptime:placer_au': '#ffd700', 'deeptime:bif_fe': '#a6611a', 'deeptime:coal_seam': '#9e9e9e',
     'deeptime:mvt_zn_pb': '#1a9850', 'deeptime:sedex_zn_pb': '#66c2a5', 'deeptime:petroleum_trap': '#8073ac',
+    'deeptime:impact_ni_cu_pge': '#7a9a3a', 'deeptime:impact_hydrothermal_cu_zn_au': '#2aa7b8',
+    'deeptime:impact_diamond': '#7df9ff', 'deeptime:impact_basin_u': '#a4d233',
   };
 
   function decode(b64) {

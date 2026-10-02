@@ -17,6 +17,10 @@
 //! already drew. The game builds the bodies from [`active_volcanoes`]'s list and these settings;
 //! FORMAT.md ("Lava") has the geometry. The random lava lakes and lava springs of vanilla's and
 //! the pack's biomes are removed from Deep Time worlds (`remove_lava_features`).
+//!
+//! **Geothermal features** (P2-14) sit around the same list: hot springs and terraces where the
+//! baked climate has groundwater, fumaroles and altered ground where it is dry or frozen. Four
+//! settings here shape them; the game places them (Java `worldgen/Geothermal`).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -60,6 +64,21 @@ pub struct UndergroundParams {
     /// Whether the random lava lakes and lava springs of vanilla's and the pack's biomes are taken
     /// out of a Deep Time world, so lava is found at the volcanoes and at the world's floor only.
     pub remove_lava_features: bool,
+    /// How many geothermal fields (hot springs, sinter and travertine terraces, fumaroles,
+    /// altered ground) each active volcano gets, as a multiple of the default (P2-14): the
+    /// default is one to four fields, more at the more active and larger volcanoes. 0: no
+    /// geothermal features anywhere.
+    pub geothermal_density: f64,
+    /// How far from a volcano's summit its fields may lie, in basal radii. The fields cluster
+    /// toward the summit and the lower flanks; 1 keeps them on the edifice.
+    pub geothermal_reach: f64,
+    /// Multiplies the size of every geothermal feature (a pool's radius, the terrace around it,
+    /// a fumarole's field of altered ground).
+    pub geothermal_size: f64,
+    /// A field is a field of hot springs only where the year's rain (mm, from the baked
+    /// climate) reaches this much and the mean temperature stays above freezing; drier or colder
+    /// ground gets fumaroles and bare altered ground instead.
+    pub geothermal_spring_min_precip_mm: f64,
 }
 
 impl Default for UndergroundParams {
@@ -71,6 +90,10 @@ impl Default for UndergroundParams {
             magma_chamber_size: 1.0,
             crater_lake_share: 0.25,
             remove_lava_features: true,
+            geothermal_density: 1.0,
+            geothermal_reach: 1.0,
+            geothermal_size: 1.0,
+            geothermal_spring_min_precip_mm: 400.0,
         }
     }
 }
@@ -98,6 +121,15 @@ impl UndergroundParams {
             ),
             (self.magma_chamber_size, 0.0, 4.0, "magma_chamber_size"),
             (self.crater_lake_share, 0.0, 1.0, "crater_lake_share"),
+            (self.geothermal_density, 0.0, 4.0, "geothermal_density"),
+            (self.geothermal_reach, 0.25, 3.0, "geothermal_reach"),
+            (self.geothermal_size, 0.5, 3.0, "geothermal_size"),
+            (
+                self.geothermal_spring_min_precip_mm,
+                0.0,
+                4000.0,
+                "geothermal_spring_min_precip_mm",
+            ),
         ] {
             if !(v.is_finite() && (lo..=hi).contains(&v)) {
                 return Err(CoreError::preset(
@@ -273,6 +305,19 @@ mod tests {
             e.to_string().contains("$.underground.lava_floor_blocks"),
             "{e}"
         );
+        let e = UndergroundParams {
+            geothermal_density: -0.5,
+            ..UndergroundParams::default()
+        }
+        .validate()
+        .unwrap_err();
+        assert!(
+            e.to_string().contains("$.underground.geothermal_density"),
+            "{e}"
+        );
+        let none: UndergroundParams = serde_json::from_str(r#"{"geothermal_density": 0}"#).unwrap();
+        none.validate().unwrap();
+        assert_eq!(none.geothermal_reach, 1.0);
         let e = UndergroundParams {
             crater_lake_share: 1.5,
             ..UndergroundParams::default()
