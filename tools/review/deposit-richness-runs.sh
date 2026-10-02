@@ -10,7 +10,7 @@
 #       (scattered_continents, 1000 Myr, 4 threads) into <name>-world/, then `deposit-audit`
 #       (<name>-audit.md and .json, with the early-game access probe); log <name>.log.
 #   tools/remote/mac.sh -- tools/review/deposit-richness-runs.sh audit <name> [deposit-audit args…]
-#       the audit again on an existing <name>-world/ with this tree's CLI (no new run).
+#       the audit again on an existing <name>-world/ with this tree's CLI (no new run), detached.
 #   tools/remote/mac.sh --no-sync -- tools/review/deposit-richness-runs.sh status
 #   tools/remote/mac.sh --no-sync -- tools/review/deposit-richness-runs.sh clean
 set -euo pipefail
@@ -37,9 +37,12 @@ case "${1:-}" in
     audit)
         name="$2"; shift 2
         cargo build -q --release -p deeptime-cli
-        ./target/release/deeptime deposit-audit --world-data "$RUNS/$name-world" \
-            --json "$RUNS/$name-audit.json" "$@" > "$RUNS/$name-audit.md"
-        cat "$RUNS/$name-audit.md"
+        cp target/release/deeptime "$RUNS/deeptime-audit-$name"
+        args=""; for a in "$@"; do args="$args '$a'"; done
+        setsid nohup sh -c "'$RUNS/deeptime-audit-$name' deposit-audit --world-data '$RUNS/$name-world' \
+            --json '$RUNS/$name-audit.json' $args > '$RUNS/$name-audit.md' 2>&1; echo AUDIT-DONE >> '$RUNS/$name-audit.md'" \
+            > /dev/null 2>&1 < /dev/null &
+        echo "audit started pid $! -> $RUNS/$name-audit.md"
         ;;
     status)
         for l in "$RUNS"/*.log; do [ -e "$l" ] && { echo "== $l"; tail -3 "$l"; }; done
