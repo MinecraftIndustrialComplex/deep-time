@@ -11,7 +11,13 @@ package com.minecraftindustrialcomplex.deeptime.worlddata;
  * [0°, 360°) (the seam x = −C/2 is 0°), latitude φ = −360°·z/C (north is −z), the poles at
  * z = ∓C/4, one block 360°/C both ways; φ clamps to ±90° past the poles. A map picture of the whole
  * planet is 2 : 1, x linear in longitude from the seam, y linear in latitude from the north pole.
- * Ben reopened the choice on 2026-10-02; whichever projection he picks replaces these bodies.
+ * The projection is a game choice (ledger: SCL-049), reopened on 2026-10-02; whichever projection is
+ * picked replaces these bodies.
+ *
+ * <p>Besides the conversions the class holds the planet's extent ({@link #poleZ}, {@link #onPlanet}),
+ * the local metric ({@link #scaleEw}, {@link #scaleNs}, {@link #areaScale}), the rasters' topology
+ * ({@link #wrapColumn}, {@link #clampRow}, which {@link GridDesc} calls) and the frame of the spatial
+ * indexes ({@link #indexOriginX}, {@link #indexOriginZ}: river tiles, structure buckets, site index).
  */
 public final class Projection {
 
