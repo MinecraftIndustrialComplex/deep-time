@@ -1267,6 +1267,12 @@ impl SurfaceStage {
                         * self.preset.tectonics.model_radius_km
                         * 1000.0
                         / w as f64,
+                    // The plate model's mean sample spacing on its sphere.
+                    plate_spacing_m: (4.0
+                        * std::f64::consts::PI
+                        * (self.preset.tectonics.model_radius_km * 1000.0).powi(2)
+                        / f64::from(self.preset.resolution.l0_samples))
+                    .sqrt(),
                     gravity_m_s2: gravity,
                     sea_level_m: sea,
                     dt_myr,
