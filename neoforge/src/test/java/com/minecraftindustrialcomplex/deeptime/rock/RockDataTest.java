@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * P1-12: the data Deep Time ships in its jar. The 60 {@code rock_class} definitions (plan §5.4.1),
+ * P1-12: the data Deep Time ships in its jar. The 62 {@code rock_class} definitions (plan §5.4.1),
  * the vanilla member tags, and no fallback tags at all (plan §7.5, Q15). The game parses the same
  * files with {@link RockClass#CODEC}; this test checks the rules the codec cannot.
  */
@@ -61,9 +61,9 @@ class RockDataTest {
     }
 
     @Test
-    void sixtyClassesWithTheirFields() throws IOException {
+    void sixtyTwoClassesWithTheirFields() throws IOException {
         Map<String, JsonObject> classes = classes();
-        assertEquals(60, classes.size());
+        assertEquals(62, classes.size());
         List<String> bad = new ArrayList<>();
         classes.forEach((name, o) -> {
             if (!name.equals(o.get("class").getAsString()))
@@ -108,6 +108,11 @@ class RockDataTest {
         assertEquals("till", classes.get("diamictite").get("loose_equivalent").getAsString());
         assertEquals("clastic_sedimentary", classes.get("diamictite").get("family").getAsString());
         assertEquals("minecraft:cobbled_deepslate", classes.get("diamictite").get("vanilla_fallback").getAsString());
+        // The impact rocks (P2-08, 2026-10-01): special hosts with their own stand-ins.
+        assertEquals("special_host", classes.get("impact_breccia").get("family").getAsString());
+        assertEquals("minecraft:cobblestone", classes.get("impact_breccia").get("vanilla_fallback").getAsString());
+        assertEquals("special_host", classes.get("impact_melt").get("family").getAsString());
+        assertEquals("minecraft:smooth_basalt", classes.get("impact_melt").get("vanilla_fallback").getAsString());
     }
 
     @Test

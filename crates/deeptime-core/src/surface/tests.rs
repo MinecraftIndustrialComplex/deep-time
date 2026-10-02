@@ -398,7 +398,14 @@ fn the_coupled_pipeline_runs_and_resumes() {
     let s = session(&json, &dir);
     assert_eq!(
         s.stage_names(),
-        ["plates", "climate", "surface", "volcanoes", "structure"]
+        [
+            "plates",
+            "climate",
+            "surface",
+            "volcanoes",
+            "impacts",
+            "structure"
+        ]
     );
     finish(&s);
     let world = s.checkpoint().unwrap().world;

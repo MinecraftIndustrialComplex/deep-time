@@ -198,6 +198,8 @@ kind; until then a kind is reserved with its intended meaning. Source ids name t
 | `deeptime:volcano_caldera_complex` | a continental hotspot's silicic centre | volcanoes (P1-21) | see "The volcanoes' events" |
 | `deeptime:volcano_caldera` | a caldera collapse | volcanoes (P1-21) | see "The volcanoes' events" |
 | `deeptime:volcano_flood_basalt` | a flood-basalt plateau (a large igneous province's lava pile) | volcanoes (P1-21) | see "The volcanoes' events" |
+| `deeptime:impact_crater` | a meteor impact that left a crater | impacts (P2-08) | see "The impacts' events" |
+| `deeptime:impact_ocean` | a large meteor impact into deep water that left no crater | impacts (P2-08) | see "The impacts' events" |
 | `deeptime:fold_belt` | the folds, thrusts and stocks one orogeny left in the rock | structure (P2-01) | see "The structures' events" |
 | `deeptime:fault_system` | the faults (and dykes) of one rift, or of one oblique margin | structure (P2-01) | see "The structures' events" |
 | `deeptime:basin_subsidence` | a sedimentary basin subsides | surface (P1-04) | see "The surface's events" |
@@ -266,6 +268,25 @@ Places are points: the region's centroid in its strongest frame. Areas and volum
 
 Place of a transgression or regression: the centroid of the continental cells flooded at its end and
 not at its start (regression: the reverse); global when there are none.
+
+### The impacts' events (source `deeptime:impacts`, P2-08)
+
+Written by `crates/deeptime-core/src/surface/impacts/` at the end of the coupled group (after the
+last plate step, like the volcanoes'), in time order: one event for every impact that left a crater
+at least 5 km across (`EVENT_MIN_KM`), whatever became of the crater, and one for every smaller
+crater that still shows at the end (at least 40 m of relief). Most small craters are gone within a
+few tens of Myr; they are counted in `notes.impacts` and not listed. The event of a crater still in
+the catalogue is placed where its plate has carried it (where it struck is in `impact_lat`,
+`impact_lon`). Impacts have no cause in the log.
+
+| Kind | Time | Place | Params | Magnitude |
+|---|---|---|---|---|
+| `impact_crater` | the impact (an instant inside its step) | the crater now; where it struck for a crater that is gone | `crater` (catalogue id), `diameter_km` (rim to rim), `radius_km`, `morphology` (`simple`, `complex`, `peak_ring`), `depth_m` and `rim_m` (fresh, in game metres: the physical ones × `impacts.depth_scale`), `impactor_m`, `energy_mt` (megatons of TNT), `target` (`land`, `sea_floor`), `water_depth_m`, `melt_km3`, `melt_sheet_m` (0 without a sheet), `impact_lat`, `impact_lon`, `plate`, `fate` (`fresh`, `degraded`, `buried`, `eroded_to_roots` for a crater in the catalogue; `eroded`, `subducted`, `overprinted` for one that left it), `relief_m` (what is left of `depth_m`), `cover_m` (sediment over its floor), `standing` (1 in the catalogue, 0 gone) | diameter / 100 km, at most 1 |
+| `impact_ocean` | the impact | where it struck | `impactor_m`, `energy_mt`, `water_depth_m`, `crater_on_land_km` (the crater the same body would have made on land, at least 20 km) | that diameter / 100 km, at most 1 |
+
+The deposit engine reads `impact_crater` as a cause of the impact deposit types (`impact_ni_cu_pge`,
+`impact_hydrothermal_cu_zn_au`, `impact_diamond`, `impact_basin_u`) and of petroleum traps in impact
+structures.
 
 ### The volcanoes' events (source `deeptime:volcanoes`, P1-21)
 

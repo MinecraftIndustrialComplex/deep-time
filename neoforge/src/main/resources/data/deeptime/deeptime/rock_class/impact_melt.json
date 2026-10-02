@@ -1,0 +1,27 @@
+{
+  "class": "impact_melt",
+  "family": "special_host",
+  "groups": [
+    "deeptime:rock/special",
+    "deeptime:rock/igneous"
+  ],
+  "density_kg_m3": 2600,
+  "erodibility": 0.7,
+  "diffusivity": 0.7,
+  "metamorphic_path": [
+    "gneiss"
+  ],
+  "weathers_to": "saprolite",
+  "facies_rule": "impact",
+  "tags": [
+    "ore_host"
+  ],
+  "vanilla_fallback": "minecraft:smooth_basalt",
+  "sources": {
+    "density_kg_m3": "judgment: clast-poor impact melt rock, from glassy and vesicular (about 2400) to crystalline melt sheets (Sudbury norite about 2800); rounded to 10 kg/m³; set with the impact craters (P2-08, 2026-10-01)",
+    "erodibility": "judgment, relative to granite: a fine crystalline to glassy sheet, as strong as a lava; bedrock ranked by rock strength: river incision scales roughly with tensile strength^-2 (Sklar & Dietrich 2001, Geology 29(12):1087–1090) and lithologic K contrasts span orders of magnitude (Stock & Montgomery 1999, JGR 104(B3):4983–4993); the strength-based contrast is compressed to its square root, so bedrock spans about 0.3–4; set with the impact craters (P2-08, 2026-10-01)",
+    "diffusivity": "judgment, relative to granite: massive fine-grained rock that makes thin soils; hillslope transport coefficient D of Roering, Kirchner & Dietrich 1999 (WRR 35(3):853–870), used as a linear creep multiplier and scaled by how readily the rock makes mobile soil (soil production function, Heimsath et al. 1997, Nature 388:358–361): loose and friable classes 2–5, soft sedimentary 1.2–2, crystalline 0.5–1; set with the impact craters (P2-08, 2026-10-01)",
+    "vanilla_fallback": "last fallback entry (MIC rock-tag README, Fallbacks table)"
+  },
+  "notes": "Impact melt rock: the coherent sheet of shock-melted target rock on the floor of a complex crater (Manicouagan, Morokweng, the Sudbury Igneous Complex, which differentiated into norite and granophyre and hosts Ni-Cu-PGE sulphides at its base). Stand-in: smooth basalt, a dark fine-grained crystalline rock."
+}
