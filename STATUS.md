@@ -86,6 +86,9 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-02 | science WP-2 | **Stratovolcano heights** (VOL-019; docs/science/volcanoes-and-magma.md, "Open questions" 1). Earth's 512 stratovolcanoes stand a median 1.02 km above their bases (Grosse et al. 2014, read in full); the default range 1.2–3.0 km gives standing cones a median 1.5 km and live ones 1.8–1.9 km (two 500 Myr runs). With 0.6–2.0 km the standing median is 0.91–0.93 km and the land above 2 km does not change measurably. (a) Lower the range to 0.6–2.0 km and `arc_radius_km` 14 → 10 km, keeping today's proportions (recommended); (b) keep 1.2–3.0 km as a game choice and say so in the hint. | Not asked yet (sub-agent; for the coordinator) |
+| 2026-10-02 | science WP-2 | **Island subsidence counted twice** (VOL-048). Since cones are flexure loads (log 2026-10-02) and the plate model deepens old ocean floor, the extra 25 m/Myr (to 1.5 km) for dead ocean volcanoes repeats both; Clague & Sherrod 2014 give >1 km in ~1 Myr under the load, then ~10 m/Myr. Setting it to 0 changed neither the hypsometry nor the standing shields measurably. (a) Default 0, keep the setting (recommended); (b) keep 25 m/Myr as a game choice. | Not asked yet (sub-agent; for the coordinator) |
+| 2026-10-02 | science WP-2 | **Continental hotspot calderas** (VOL-045). Yellowstone collapsed three times in 1.5 Myr (Christiansen 2001); at 3 × 0.04 = 0.12 per Myr a continental hotspot centre has a 10–30 % chance of one caldera in its life. (a) Give continental hotspot centres about 1 per Myr, arc volcanoes unchanged (recommended; a few places per planet, no hypsometry effect); (b) keep. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-01 | P2-14 | **Where geothermal features come from beyond the volcanoes.** Today only the active volcanoes (the bake's one export of heat); on the 16k quick planet that is 260 sites around 40 of 67 volcanoes, 23 of them hot-spring pools (median 1,422 blocks from a land point to the nearest pool, 837 to any site, 766 to a volcano). Options: **(1, recommended)** export a heat-flow layer (the plate model already computes `heat_flow_mw_m2` per sample: 55 + 35 e^(-t/60) on continents, +40 arc, +40 hotspot, +30 divergent) as an L1 `meta` layer and put fields on continental crust above a threshold (rifts, arcs, young orogens), same site machinery; **(2)** export ridge and rift segments; **(3)** volcanoes only. Rift provinces are in `meta/province` but absorbed at 50,000 km², so none exist on a typical planet. | Not asked yet: for the coordinator to put to Ben |
 | 2026-10-01 | P2-14 | **Default density and the warm-ground signal.** (a) Keep `geothermal_density` 1.0 (recommended; the default is a few fields per volcano, at 2.0 the sites roughly double, not measured) or raise it? (b) `DeepTimeClimate.geothermalWarmthC` (API 3, up to 12 K at a vent) exists but mic-climate does not read it: wire it as a warm refuge only, after the mic-climate connector (recommended), as a heat source for machines too, or leave it unread? (c) Native sulfur and cinnabar are vanilla stand-ins (yellow concrete, red terracotta); MIC has no such blocks, so the pack needs nothing now (recommended), or add blocks to `deeptime:geothermal/sulfur` / `cinnabar` in the pack later. | Not asked yet (sub-agent report) |
 | 2026-10-01 | deposit audit | **How rich should deposits be, against scatter and vanilla?** Three options with settings and numbers per family (A deposits clearly beat scatter, recommended; B deposits are the only real source; C realistic grades with strong multipliers), in the sub-agent's report and the build log entry "Deposit audit". Also: **a gold-bearing gravel block of Deep Time's own** for packs without Excavated Variants (it would be the mod's first block), or keep `minecraft:gold_ore` in the gravel bed there? No default changes until answered. | to be asked by the coordinator (the sub-agent has no AskUserQuestion) |
@@ -105,6 +108,44 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P2-08 impacts | **Impact deposits do not claim their materials.** Diamonds, nickel, platinum and uranium are products of the impact deposit types, and a claimed material loses its scattered ore in a Deep Time world; impact deposits are far too rare to be the only source, so the four types carry `minecraft.claims_scatter: false` and vanilla diamonds and the pack's nickel, platinum and uranium ores keep generating. (a) Keep it so (recommended); (b) claim them and add background scatter for each. Their tonnages, grades and densities are design values (no USGS model exists) and belong to the deposit audit's richness question. | Not asked yet |
 
 ## Build log
+### 2026-10-02 — Science documentation, stage 2, WP-2: volcanoes and magma checked against sources (agent worktree agent-a44828926d2eaecb7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What.** Every VOL and MAG row's source and status revised (`docs/science/ledger/VOL.md`, `MAG.md`); the page
+  `docs/science/volcanoes-and-magma.md` rewritten for stage 2; ten volcano and magma hints corrected
+  (`editor_fields.json`; HNT-015 to -017, -058 to -060, -062, -063, -081, -082); code comments in
+  `volcanoes/{params,shape,mod}.rs`, `underground.rs` and `Magma.java` rewritten from the sources read, with
+  `// ledger:` ids beside the constants; nine bibliography entries added, four updated. Fixes 11, 12, 30 and flag 27
+  (HNT-017 and the params comment) settled. **No value in the code changed.** The volcano summary line now reports
+  cone height percentiles (`height_p10_p50_p90_m`).
+- **Rows.** VOL: `cited-unverified` 1, `calibrated` 1, `game-choice` 16, `uncited` 55 → `abstract-only` 1,
+  `calibrated` 1, `game-choice` 44, `uncited` 27. MAG: `cited-unverified` 3, `game-choice` 31, `uncited` 8 →
+  `verified` 2 (vanilla's lava rules, read in the Minecraft source), `abstract-only` 1, `cited-unverified` 1,
+  `game-choice` 37, `uncited` 1. Most new `game-choice` rows are implementation and display rules labelled as such.
+- **Sources read in full** (library, test VM): Grosse et al. 2014 (global composite-volcano morphometry, CONICET
+  repository copy), Hildreth 2007, Clague & Sherrod 2014, Poland et al. 2014, Christiansen 2001, Courtillot & Renne
+  2003; USGS Mauna Loa and FAQ pages. Abstracts only: de Bremond d'Ars et al. 1995 (the publisher refuses scripted
+  fetches of its free PDF), Rasmussen et al. 2022, Chaussard & Amelung 2014, ten Brink 1991. Not obtained: Lev et
+  al. 2019 (lava lakes), the Global Volcanism Program page, Geyer & Martí 2008 (repository behind a bot check).
+- **Findings.** The arc spacing citation was wrong (the paper finds no characteristic spacing; mean spacings of
+  large centres are 27–87 km, Hildreth 2007): 60 km is now a labelled game choice. Stratovolcanoes are taller than
+  Earth's (above). Dead ocean volcanoes are sunk twice since flexure landed (above). Continental hotspot calderas
+  are about ten times rarer than Yellowstone's (above). Comments corrected: flank slopes (the strato profile is
+  18° at the summit for 3 km over 14 km, not 20° at 2.5 km), crater sizes, caldera radii (the comment's
+  Crater Lake and Long Valley numbers were radii; extraction flag 4 misread them), chamber depths, the lava-lake
+  count (USGS: 1,350 potentially active volcanoes, not 1,400). Three questions under "Pending questions".
+- **Measured** (test VM, `earthlike_quick_16k`, 500 Myr, seed 1, both starts, `deeptime stage volcanoes`,
+  2 threads; `tools/review/p1-17-hyps.sh 500 "1" "scattered_continents supercontinent" base
+  "h:volcanoes.arc_height_km=[0.6,2.0]" "sub0:volcanoes.island_subsidence_m_myr=0"`, built from 360b2ed = master
+  29d493f + the height report; scattered / supercontinent): defaults land 0.252 / 0.284, median 569 / 650 m, above
+  2 km 0.092 / 0.149, standing cones' median height 1,471 / 1,524 m, live 1,869 / 1,831 m; cones 0.6–2.0 km
+  (radius unchanged): land 0.246 / 0.266, above 2 km 0.079 / 0.156, standing cones 929 / 914 m; island subsidence 0:
+  land 0.285 / 0.280, above 2 km 0.091 / 0.134, standing shields 7 / 11 (defaults 5 / 14). Every difference is
+  inside the run-to-run scatter (0.092–0.149 above 2 km over four runs, flexure build log).
+- **Gates** (test VM): `cargo fmt --check` clean; clippy `-D warnings` clean; `cargo test --workspace` 673 passed,
+  0 failed, 3 ignored; `cargo deny check licenses bans` ok; `./gradlew build test` 217 tests, 0 failures, 1
+  skipped. GameTests not run: nothing the game reads changed (comments, hints and a summary line only).
+- **Next step.** Ben's answers to the three questions; then the value changes (with tests) in one small branch.
+  Left for others: the arc-flux law is coded three times (VOL-003, RCK-059, the deposit engine); HNT-019 (impacts)
+  keeps the reversed "15 times taller than wide" wording.
 ### 2026-10-02 — Science documentation, stage 2, WP-0: source library, de-duplicated bibliography and ledger, coverage gaps (agent worktree agent-a024f62a028c56ca4, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; docs only)
 - **Ask.** Prepare the ground for the verification packages: readable sources, one entry per work, one row per claim, the stage 1
   coverage gaps filled. No simulation or game code, presets or tests changed; no claim status changed except by retiring duplicates.
