@@ -111,6 +111,80 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-02 — Flexure follow-up: the margin zigzag and the polar stripes, causes and fixes (agent worktree agent-afae960b6db068f94, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Asked.** The coordinator, after flexure landed (5ce5af4): find the cause of the cell-to-cell alternation along
+  active margins and the rise in land roughness (99th percentile 294 → 391 m in one pair), and of the stripes near
+  the poles, show each with a controlled test, fix it there, re-measure on the merged tree. Ben's answers to the
+  five flexure questions are in the decisions log (2026-10-02, logged in 4918af3).
+- **Measured how.** A temporary diagnostic split each step's flexure response linearly by source (solving the same
+  operator for each part of the residual) and counted cell-scale zigzags (a cell and its next neighbour both strict
+  extrema of opposite kind, by more than 5 m a step) at margins (within three cells of a plate boundary) and
+  elsewhere; `tools/review/flexure_artifacts.py` does the same on a run's final fields (20 m threshold, margins,
+  interiors, poleward of 70°). Design note `docs/design/flexure.md` section 13 has the whole account.
+- **Cause 1, the main one: the carried state acted as a force.** Every step re-solved the whole load against the
+  deflection and frozen moment carried from the last step. Carrying them on the raster interpolates them (near the
+  pole a plate's rotation shifts rows by many cells); new crust and arriving crust restart at zero beside cells that
+  carry kilometres. In a whole-load solve that mismatch is a residual, and the solve moved the ground to remove it:
+  **up to 4.6–6.2 km in a step from the carried state alone** (200 Myr, scattered seed 1), split about equally
+  between restarted crust, cells whose stiffness jumped fourfold, and interpolation. Controlled test
+  `carrying_a_bent_plate_moves_nothing`: the old formulation moves a carried, unloaded bent plate by 1.15 m a step,
+  the new one by under 1 cm. **Fix:** each step solves only for the step's load increments; the carried plate is in
+  equilibrium; the solve's unfinished residual is carried and solved with the next step; the plate carries its
+  bending moment (kept when it stiffens, released as a force when it weakens). Ledger ISO-068, ISO-056 changed.
+- **Cause 2: the plate-boundary break was a staircase.** Applied after the stiffness smoothing, it stepped with the
+  raster. Controlled test `a_moving_margin_bends_smoothly` (an ocean plate moving 0.37 cells a step under a craton
+  advancing 0.23 cells a step along a wavy boundary, a sediment fan, an arc): with the staircase the deflection
+  zigzags beside the boundary by 3–70 m; fixed, nowhere by more than 10 m. It was the polar artifact: polar-band
+  zigzag 3.5 % [1.4, 5.0] with the staircase, 0.87 % [0.49, 1.27] fixed, 1.48 % with flexure off (four planets).
+  **Fix:** the boundary cells are blurred and the stiffness share taken from that (0 on the boundary rows, then 0.17,
+  0.72). Ledger ISO-055 changed.
+- **Cause 3: the plate model's sample lattice reached the ground.** Its uplift is interpolated from samples 71
+  Earth-normalized km apart onto 39 km cells; the uplift field itself zigzags in 4.8 % of margin cells by more than
+  5 m a step (aliasing). Local isostasy passed that at its own height; a stiff plate passed the thickening behind
+  it, 5.5 times higher. Controlled test `the_plate_models_sample_lattice_is_not_a_load`: a 500 m column-by-column
+  uplift on a craton now steps the ground by 500 m (over 1,500 m unfiltered). **Fix:** only the part of the plate
+  model's root that it resolves bends the plate (binomial (1,2,1)/4 passes set by the sample spacing, two on the
+  quick presets); erosion, deposition and spreading are not filtered. Per step, the uplift part's margin zigzag fell
+  from 4.2–6.0 % to 1.3–3.6 %. Ledger ISO-069 (new), `StepIn::plate_spacing_m`.
+- **Ruled out:** the preconditioner's leftover residual (its response zigzags in under 0.1 % of cells); latitude
+  terms in the operator or preconditioner (none: block metric throughout; a ring load bends the plate the same at
+  every longitude, tested). The regime field is populated on resampling steps, unlike `plates/flags`.
+- **What remains at margins** (per step, final code): erosion and deposition 1.6–4.1 % of margin cells (marine
+  fill of kilometres in trench cells: real at this resolution), uplift with water and ice 1.3–3.6 %, moment released
+  where a moving boundary weakens the plate 1.0–3.1 %. On the final fields the worst margin window of each planet,
+  with and without flexure, is old ocean floor whose own local-isostatic level wiggles by ±50 m.
+- **Re-measured on the merged tree** (master 412d517; quick preset, test VM):
+  - Artifacts, 200 Myr, seeds 1–2 × both starts: elevation zigzag at margins 11.1 % off, 13.1 % final (first build,
+    one planet, 19.3 % against 10.8 % off); polar band 1.48 % off, 0.87 % final; land roughness p99 237 m off,
+    274 m final.
+  - **Roughness:** on the pair of the first complaint (500 Myr, supercontinent seed 1) land p99 289 → 372 m, but land
+    away from coasts gets smoother (271 → 225 m; at margins 563 → 451 m). The rise is coast: coast cells at plate
+    boundaries double (1,378 → 2,830) because arcs held up by the stiff plate edge emerge as islands; 85 % of the
+    roughest 1 % of land cells lie at margins (19 % without), a tenth of them zigzag.
+  - **Run time** (that pair, side by side): 557 → 576 s, **+3.3 %**; flexure step 56 s, 9.3 iterations a solve (was
+    85–107 s, 20–24), none at the limit.
+  - **Hypsometry** (500 Myr, seeds 1–2 × both starts, `tools/review/p1-17-hyps.sh`): without / with: land 0.299 /
+    0.290, median 578 / 636 m, p90 1,927 / 1,997 m, above 2 km 0.097 / 0.102, sea median 3,408 / 4,053 m (Earth
+    4,062), shelf share of the sea 0.115 / 0.059, highest 1 % of land 4.0–4.8 / 3.0–3.4 km, highest cell 6.8 /
+    5.0–5.3 km. Not recalibrated.
+- **Which oceanic law:** every measurement in this entry used 2.7 km/√Myr (ISO-048, verified). The first build's
+  timing pairs, the 1,000 Myr pair and its island and foredeep pictures used 3.0; its final hypsometry ensemble 2.7.
+- **Not explained:** a few cells per planet stand kilometres below their local-isostatic level (−11.8 km at one
+  polar trench in the final build; −6.2 and −8.8 km on the first build's planets); share of the planet more than
+  500 m below: 0.55 % final, 0.71 % first build.
+- **Pictures** (`review/out/flexure/`, not committed; `tools/review/flexure-views.sh`): `scattered-200-old` (first
+  build) and `scattered-200-final`, `super-500-on` and `super-500-off`, each with `planet`, `pole`, `margin`
+  (the window with most zigzag cells along a plate boundary), `moat`, `belt` and `numbers.json`. The first build's
+  pole shows swept arcs of ±50–100 m across the polar continent (the carried state rotating about the pole); the
+  final one has none, only bands along coasts and trenches.
+- **Tools:** `tools/review/flexure_artifacts.py`, `flexure-compare.sh`, `flexure-ensemble.sh`; `flexure_views.py` gains
+  `pole.png` and `margin.png`.
+- **Gates** (VM, the merged tree): `cargo fmt --all -- --check` (after formatting), `cargo clippy --workspace
+  --all-targets -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --no-fail-fast` all
+  pass (core 481 + 3 ignored, cli 54); `./gradlew build test` tests=226 failures=0 skipped=1. No GameTests.
+- **Next.** The calibration task after the plate work (hypsometry moved as above). The deep negative cells at
+  trenches, if they matter in the game.
+
 ### 2026-10-02 — Science documentation, stage 2, WP-2: volcanoes and magma checked against sources (agent worktree agent-a44828926d2eaecb7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What.** Every VOL and MAG row's source and status revised (`docs/science/ledger/VOL.md`, `MAG.md`); the page
   `docs/science/volcanoes-and-magma.md` rewritten for stage 2; ten volcano and magma hints corrected
