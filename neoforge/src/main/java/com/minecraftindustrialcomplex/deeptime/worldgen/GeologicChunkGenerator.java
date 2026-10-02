@@ -31,6 +31,10 @@ import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
  * the global fluid picker is {@link LavaFluids}'s, and the router's {@code lava} function carries
  * the {@code deeptime:lava_lakes} gate. {@link LavaRules} has the rules and their settings.
  * Lava above that is the magma of the world's active volcanoes ({@link Magma}, {@link MagmaPass}).
+ *
+ * <p><b>TerraBlender's regions</b> follow the world's geologic provinces (P1-10): the bound settings'
+ * spawn-target list carries the level's {@link RegionSource} ({@link RegionSpawnTarget}), which
+ * {@code mixin.compat.terrablender.RegionBiomeSourceMixin} finds on the level's climate sampler.
  */
 public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
 
@@ -103,7 +107,7 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         DeepTime.LOGGER.info("Bound {} Deep Time density functions to {} (C = {})", count[0],
                 terrain.getClass().getSimpleName(), terrain.circumference());
         return new NoiseGeneratorSettings(s.noiseSettings(), s.defaultBlock(), s.defaultFluid(), router,
-                s.surfaceRule(), s.spawnTarget(), s.seaLevel(), s.disableMobGeneration(), s.aquifersEnabled(),
+                s.surfaceRule(), RegionSpawnTarget.wrap(s.spawnTarget(), terrain), s.seaLevel(), s.disableMobGeneration(), s.aquifersEnabled(),
                 s.oreVeinsEnabled(), s.useLegacyRandomSource());
     }
 
