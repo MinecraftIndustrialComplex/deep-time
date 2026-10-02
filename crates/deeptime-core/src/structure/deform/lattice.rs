@@ -181,6 +181,13 @@ pub fn noddy_check(
         if cand.is_empty() {
             continue;
         }
+        // The reference engine holds a fixed number of events (its sequence code's size); a
+        // column under more structures than that is left out of the comparison. (Until
+        // 2026-10-02 it panicked there and took the run with it: a 500 Myr quick planet with
+        // more than 126 overlapping structures at one sampled column.)
+        if cand.len() + 1 >= noddy::taste::MAX_EVENTS {
+            continue;
+        }
         out.columns_with_events += 1;
         // The history, oldest first, in a frame centred on the column.
         let mut history = noddy::History::new(noddy::Stratigraphy::single());

@@ -104,6 +104,110 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P2-08 impacts | **Impact deposits do not claim their materials.** Diamonds, nickel, platinum and uranium are products of the impact deposit types, and a claimed material loses its scattered ore in a Deep Time world; impact deposits are far too rare to be the only source, so the four types carry `minecraft.claims_scatter: false` and vanilla diamonds and the pack's nickel, platinum and uranium ores keep generating. (a) Keep it so (recommended); (b) claim them and add background scatter for each. Their tonnages, grades and densities are design values (no USGS model exists) and belong to the deposit audit's richness question. | Not asked yet |
 
 ## Build log
+### 2026-10-02 — General lithospheric flexure in the surface stage (agent worktree agent-afae960b6db068f94, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Why.** Ben, decisions log 2026-10-02: "General flexure everywhere": every load bends the crust (belts, volcanic
+  islands, ice, sediment), not only collision forelands. Design and measurements: `docs/design/flexure.md` (written
+  and committed before the code; its section 12 is what was measured). Science page `docs/science/flexure.md`,
+  ledger ISO-040 to ISO-067, 13 bibliography entries.
+- **The model** (`surface/flexure.rs`, step 5c of the surface stage, after the plateau spreading). A thin elastic
+  plate over a fluid mantle, L(D L w) + C w = load, on the L1 raster in block metric. The stage keeps the load since
+  the start of the run and the plate's sinking with the crust (`SurfaceState::flexure`, carried by the same
+  same-crust rule as the elevation, `advect::carried_fields`). Loads each step: crust the plate model thickened
+  (positive uplift on continental crust, or on oceanic crust in an arc or hotspot regime, turned back into the
+  thickening behind its Airy elevation), crust moved by spreading, erosion and deposition, rock later stages laid on
+  the surface (the volcano stage's cones), the sea over the cell, and land ice (`climate/ice_thickness_m`). The
+  elevation changes by the solved sinking less the Airy root already in it, so nothing is compensated twice; with no
+  stiffness the result is the old local isostasy without its blur.
+- **Stiffness.** Oceanic Te = 2.7 km × √age (Calmant et al. 1990, full text read), at most 40 km; continental Te =
+  80 km × (1 − e^(−t/300 Myr)) with t the time since the last orogeny; arcs, rifts and everything else at least 5 km;
+  smoothed over 80 plate km. Rigidity gained as crust cools joins stress-free (a frozen bending moment per cell), so
+  an old belt's local root does not become relief. **A plate boundary is a break** (found by the first runs: the
+  subducting plate held arcs 10 km above their floating level across the trench).
+- **Lengths are Earth-normalized** (the solve's cell is the L1 cell's share of the model sphere: 39 km on the quick
+  presets), so a basin is as wide against its belt as on Earth. Gravity enters through the flexural parameter
+  (`α ∝ g^−¼`). Question 1 below.
+- **Solver.** Conjugate gradients; preconditioner: exact spectral solves (Fourier in x, cosine in y, `rustfft`) at
+  three uniform stiffnesses, blended, between two damped Jacobi sweeps. Finer L1 rasters (the full presets) solve on
+  L1 coarsened to about 39 km and interpolate. Options tried on prototypes (diagonal preconditioner, one spectral
+  solve, the blend alone, more levels) are in the design note's section 5 with their iteration counts.
+- **Settings.** `surface.flexure.{strength, elastic_thickness_scale}` in the four pipeline presets and built-ins
+  (1.0, 1.0; the struct's default strength is 0, so plate-only presets and the GameTest planet are unchanged);
+  editor fields `flexure` ("Plate bending", 0–1) and `plate_stiffness` ("Plate stiffness", 0.25–3) with lang keys;
+  preset-only: the Te law's five numbers, `every_steps`, `tolerance_m` (2), `max_iterations` (60). New L1 fields each
+  step: `surface/flexure_m` (how far the ground stands from local isostasy), `surface/deflection_m`,
+  `surface/elastic_thickness_km`. `surface_final` prints `flexure_solves`, `flexure_iterations_per_solve`,
+  `flexure_unconverged`; the surface timings have `flexure`.
+- **Tests** (`surface::flexure::tests`, 10, and `surface::tests::flexure_off_changes_nothing_and_on_bends_the_plate`):
+  a point load sinks by P l²/8D within 3 % and the load is compensated to 1e-9; a line load gives T&S's depth within
+  1 %, its zero at 3πα/4 within 2 % and its bulge at πα with e^(−π) of the depth; the width goes as Te^¾ and as
+  g^(−¼); a thousandfold patchy stiffness converges and compensates to 1e-3, under water too; the editor's extremes
+  and beyond (Te 0.1 to 500 km) converge and compensate; no stiffness is local isostasy (erosion rebounds 0.8, 0.56
+  under water, uplift untouched, 3 km of ice sinks 834 m and rebounds); a belt on a craton stands above its Airy
+  height with a basin and a bulge, and rebounds when eroded; a plate that stiffens does not move; a plate boundary
+  is a break; a coarsened solve agrees with the direct one; strength 0 is the same planet as a preset without the
+  section, with no state and no fields.
+- **Measured** (test VM, `earthlike_quick_16k`, 500 Myr, `deeptime stage volcanoes`, 2 threads;
+  `BIN=… R=… J=4 T=2 tools/review/p1-17-hyps.sh 500 "1 2" "scattered_continents supercontinent"
+  on:surface.flexure.strength=1 off:surface.flexure.strength=0`; mean [min, max] of 4):
+
+  | | land | median, m | p90, m | above 2 km | above 3 km | sea median, m | shelf share of sea | highest cell, km |
+  |---|---|---|---|---|---|---|---|---|
+  | Earth | 0.289 | 427 | 2,022 | 0.102 | | 4,062 | | |
+  | without | 0.299 [0.271, 0.340] | 578 [409, 724] | 1,927 [1,637, 2,377] | 0.097 [0.068, 0.142] | 0.035 | 3,408 [3,217, 3,925] | 0.115 | 6.8 (all four) |
+  | with | 0.287 [0.252, 0.315] | 676 [569, 753] | 2,219 [1,925, 2,392] | 0.130 [0.092, 0.149] | 0.030 | 3,843 [3,654, 4,175] | 0.061 | 5.3–6.8 |
+
+  Two earlier ensembles of the day (before the merge with master 1aa0579, oceanic law 3.0) gave, with flexure, land
+  0.266 and 0.297, median 774 and 638 m, sea 4,096 and 3,798 m, against 0.274, 578 m and 3,437 m without. So the land
+  share stays inside the noise (±0.02, ±100 m for 4 runs), the median rises 60–200 m, the sea is 360–690 m deeper,
+  shelves are about half as wide, the highest 1 % of land cells is at 3.1–3.8 km instead of 4.0–5.3 km, and the
+  plateau spreading moves 5–10 thousand km³ a run instead of 160–400 thousand. 1,000 Myr supercontinent seed 1 (one
+  pair, law 3.0): land 0.225 → 0.305, median 502 → 774 m, sea 2,998 → 3,751 m. **Not recalibrated**, as instructed.
+- **Run time** (same seed with and without, side by side, 2 threads): scattered 1: 547 → 584 s (+6.7 %);
+  supercontinent 1: 534 → 579 s (+8.4 %); 1,000 Myr supercontinent 1: 1,177 → 1,295 s (+10.0 %). The flexure step
+  itself is 85–107 s a 500 Myr run (15–18 % of the run without it), 20–24 iterations a solve, 0–2 solves of 250 at
+  the limit; the run grows by less because the old isostasy (6 s) and most of the spreading solve (30 → 4 s) go.
+  **So the gross cost is above the 5–10 % promised; the net is inside it on 500 Myr and at its edge on 1,000 Myr.**
+  One run each: tolerance 5 m saves one iteration; at most 12 iterations cuts the step by a third (177 of 250
+  solves then finish in later steps); every second step halves it. Question 2 below.
+- **Pictures** (`review/out/flexure/{scattered-1-on, supercontinent-1-on, supercontinent-1-off}/{planet,moat,belt}.png`,
+  `numbers.json`; `tools/review/flexure-views.sh <checkpoint> <name> "<label>"`): the ground is more than 100 m off
+  local isostasy on 14 % of the planet and more than 500 m on 1.6 % (extremes −3.3 and +2.4 km), nearly all of it
+  as paired bands a few cells wide along active margins and arcs, and round volcanic loads on old ocean floor (an
+  island held up by 600 m with a ring up to 480 m low). Belt interiors are at local isostasy. In front of the
+  largest collision belt there are bands of about 100 m: **no foredeep of the acceptance table's 2–7 km**, as
+  expected from today's one-step, 2,000 km wide uplift. Along margins the result alternates from cell to cell; the
+  land's cell-to-cell roughness is higher (median 8.7 → 10.2 m, 99th percentile 294 → 391 m, one pair). Stripes
+  near the poles, outside the pole cap. The supercontinent pictures are from the build before the regime change
+  below and carry an older legend wording.
+- **For the belt work** (task 3 of the force-balance design): raise the ground (the wedge on the incoming plate, the
+  stack on the overriding one) as uplift; the basin and bulge follow from the incoming plate's Te. Until the two
+  plates weld their boundary is a break, so the wedge must sit on the incoming plate's own cells. The foreland for
+  the structure stage is `surface/flexure_m` below about −100 m; `foreland_elastic_km` is not needed.
+- **For the ice branch:** `flexure::StepIn::ice_m` takes any thickness field; the surface stage passes
+  `climate/ice_thickness_m` (the ice at the step's end) when it exists. `climate/ice_balance_m_yr` is not needed.
+  Ice is not kept in the carried load, so the ground comes back at the first solve after it melts.
+- **Found on the way, outside this task.** (1) `structure/deform/lattice.rs` `noddy_check` panicked the whole run
+  when a sampled column lay under more than 126 structures (the reference engine's limit): hit on a 500 Myr quick
+  planet; such a column is now left out of the comparison (five lines; the only change outside the surface stage).
+  (2) **`plates/flags` is all zero on every step where the plate model resamples its crust** (`ridges.rs` sets
+  `flags = 0`, and the resampling runs after `finish_samples` and before the L1 sampling): about a fifth of the
+  steps and always the last one. The deposit engine's arc flux and the volcano stage read that field. Not touched
+  (plate code); flexure reads `regime` instead.
+- **Gates** (VM, the branch merged with master 1aa0579): `cargo fmt --all -- --check`, `cargo clippy --workspace
+  --all-targets -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --no-fail-fast` all
+  pass (673: core 473 + 3 ignored, cli 54); `./gradlew build test` tests=203 failures=0 skipped=1.
+  `tools/dev/knob_extremes.py --only flexure,plate_stiffness --length-myr 100 --stage volcanoes`: four runs ok. No
+  GameTests (coordinator).
+- **Not verified.** That strength 0 is bit-identical to the build before this work (same code path, and a test
+  holds it equal to a preset without the section; the old binary was not run). The full presets on a planet (the
+  coarsened solve is unit-tested only). Other gravities and strength between 0 and 1 on a planet. Which load causes
+  which hypsometry change. The merged tree's with/without run time (the pairs above are from before the merge).
+- **Housekeeping.** Scratch folder `/Volumes/Graphide/ban/deeptime-runs/flexure/` deleted. The memory estimate of
+  the surface stage grows by 120 B per L1 cell with flexure on.
+- **Next.** Ben's answers; the hypsometry in the calibration task after the plate work; the belt work's wedge, then
+  the foredeep measured against 150–450 km and 2–7 km; if the cost matters, single-precision transforms or a
+  multigrid preconditioner.
+
 ### 2026-10-02 — Science documentation, stage 1: every claim in the code ledgered, sources resolved, two pages written (agent worktree agent-a33b33f9ecaf3af1a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; docs only)
 - **Ask.** Ben, decisions log 2026-10-02: the mod "as backed by science as possible", Markdown in the repo, "Check everything,
   fix the code". Stage 1 changes no simulation or game code, presets or tests: it makes the unchecked visible. Stage 2

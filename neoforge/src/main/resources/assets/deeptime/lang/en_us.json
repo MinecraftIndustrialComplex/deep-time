@@ -113,6 +113,8 @@
   "deeptime.editor.field.arc_maturity": "Island-arc maturity",
   "deeptime.editor.field.erosion_strength": "Erosion strength",
   "deeptime.editor.field.isostasy": "Isostatic rebound",
+  "deeptime.editor.field.flexure": "Plate bending",
+  "deeptime.editor.field.plate_stiffness": "Plate stiffness",
   "deeptime.editor.field.hillslope_creep": "Hillslope creep",
   "deeptime.editor.field.coastal_erosion": "Coastal erosion",
   "deeptime.editor.field.wave_base": "Wave base depth",

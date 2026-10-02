@@ -43,6 +43,9 @@
 //!    `isostasy` (0.7 of it under water).
 //!    Then crust that stands higher than its strength holds spreads sideways (`spread.rs`:
 //!    lower-crustal flow; the height of plateaus, and its dependence on gravity, come from here).
+//!    With `flexure.strength` > 0 the plate has stiffness (`flexure.rs`): every load of the step
+//!    (the plate model's thickening, erosion and deposition, the spreading, volcanic edifices,
+//!    water, ice) bends it, and the solve takes the place of that share of the local isostasy.
 //! 6. Keyframe fields, the plate feedback, the deposit engine's frame (`fields.rs`) and, every
 //!    frame, the events (`events.rs`).
 //!
@@ -59,6 +62,7 @@ pub mod diffusion;
 pub mod events;
 pub mod facies;
 pub mod fields;
+pub mod flexure;
 pub mod glacial;
 pub mod grid;
 pub mod impacts;
@@ -194,6 +198,8 @@ pub struct SurfaceState {
     pub totals: Totals,
     /// Sea level of the last step, m.
     pub sea_level_m: f64,
+    /// The plate's load and deflection (`flexure.rs`); None while `flexure.strength` is 0.
+    pub flexure: Option<flexure::FlexState>,
 }
 
 /// Working arrays (rebuilt after a resume, never saved).
@@ -259,6 +265,8 @@ pub struct SurfaceStage {
     diffu: Vec<f64>,
     fam: Vec<u8>,
     scratch: Option<Scratch>,
+    /// The flexure solver's transforms and working arrays (rebuilt after a resume).
+    flex_solver: Option<flexure::Solver>,
     /// Milliseconds per process in this session.
     timings: BTreeMap<&'static str, f64>,
 }
@@ -458,7 +466,11 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         + 30 * 4 // fields
         + (fields::STEP_FIELDS.len() as u64) * 4 // the frame accumulator
         + 24 // mix, weights, kinds
-        + 21 * 8; // the glaciers' ice state, loads and passes (`glacial.rs`)
+        + 21 * 8 // the glaciers' ice state, loads and passes (`glacial.rs`)
+        // The plate's state (`flexure.rs`) and its solver's transforms, which stay; the solve's
+        // own vectors (some 30 more per cell) live only inside a surface step, far under the
+        // later stages' peak that this estimate is added to.
+        + if s.flexure.active() { 6 * 4 + 12 * 8 } else { 0 };
     let frames = (p.length_myr() / s.frame_every_myr).ceil().max(1.0) as u64;
     let history = frames * cells * 12; // packed frames, ~12 B/cell after LZ4 (measured in P1-04)
     let steps = p.plate_steps() as f64 * f64::from(s.substeps);
@@ -484,6 +496,7 @@ impl SurfaceStage {
             diffu: lithology::diffusivity(),
             fam: table.iter().map(|c| c.source_family).collect(),
             scratch: None,
+            flex_solver: None,
             timings: BTreeMap::new(),
         }
     }
@@ -557,7 +570,7 @@ impl SurfaceStage {
                         .filter(|f| f.data.len() == n)
                         .map(|f| f.data.as_slice())
                 };
-                let (carried, foreign) = advect::carried_elevation(&advect::Carry {
+                let carry = advect::Carry {
                     w,
                     h: hgt,
                     src: &src,
@@ -571,7 +584,16 @@ impl SurfaceStage {
                     parents: &parents,
                     known_plates: st.omega.len(),
                     dt_yr: dt,
-                });
+                };
+                let (carried, foreign) = advect::carried_elevation(&carry);
+                // The plate's load and deflection move with the same crust.
+                if p.flexure.active() {
+                    st.flexure
+                        .get_or_insert_default()
+                        .carry(&carry, &st.elevation_m);
+                } else {
+                    st.flexure = None;
+                }
                 foreign_cells = foreign;
                 st.offset_m = carried
                     .par_iter()
@@ -640,6 +662,7 @@ impl SurfaceStage {
                     events: events::EventState::default(),
                     totals: Totals::default(),
                     sea_level_m: p.sea_level.at(t_end_myr - dt_myr),
+                    flexure: None,
                 }
             }
         };
@@ -1171,21 +1194,27 @@ impl SurfaceStage {
         }
         self.time("strata", started);
 
-        // 5. Isostasy.
+        // 5. Isostasy: local, for the share the flexure solve (5c) does not take.
         let started = Instant::now();
-        let mut load: Vec<f64> = (0..n)
-            .map(|c| {
-                let r = if sc.h[c] <= sea { 0.7 } else { 1.0 };
-                net[c] * r * p.isostasy
-            })
-            .collect();
-        let radius = (p.isostasy_radius_km * 1000.0 / dx).round() as usize;
-        box_blur(&d, &mut load, radius, 3);
+        let flex_on = p.flexure.active();
+        let local_share = 1.0 - p.flexure.strength;
+        let h_eroded = flex_on.then(|| sc.h.clone());
         let mut iso = 0.0;
-        for (z, l) in sc.h.iter_mut().zip(&load) {
-            *z -= l;
-            iso -= l;
+        if local_share > 0.0 {
+            let mut load: Vec<f64> = (0..n)
+                .map(|c| {
+                    let r = if sc.h[c] <= sea { 0.7 } else { 1.0 };
+                    net[c] * r * p.isostasy * local_share
+                })
+                .collect();
+            let radius = (p.isostasy_radius_km * 1000.0 / dx).round() as usize;
+            box_blur(&d, &mut load, radius, 3);
+            for (z, l) in sc.h.iter_mut().zip(&load) {
+                *z -= l;
+                iso -= l;
+            }
         }
+        let h_before_spread = flex_on.then(|| sc.h.clone());
         self.time("isostasy", started);
 
         // 5b. Crust over its strength spreads (`spread.rs`): it moves crust, not surface rock, so
@@ -1211,6 +1240,57 @@ impl SurfaceStage {
                 .or_insert(0.0) += flow.moved_m * a / 1.0e9;
         }
         self.time("spread", started);
+
+        // 5c. Flexure (`flexure.rs`): the plate bends under the step's loads.
+        let mut flexed = None;
+        if let (Some(h_eroded), Some(h_before_spread)) = (&h_eroded, &h_before_spread) {
+            let started = Instant::now();
+            let ice: Option<Vec<f32>> = world
+                .fields
+                .get(crate::climate::field::ICE_THICKNESS)
+                .filter(|f| f.data.len() == n)
+                .map(|f| f.data.clone());
+            let out = flexure::step(
+                &p.flexure,
+                &mut self.flex_solver,
+                &mut st.flexure,
+                &flexure::StepIn {
+                    dims: &d,
+                    norm_dx_m: std::f64::consts::TAU
+                        * self.preset.tectonics.model_radius_km
+                        * 1000.0
+                        / w as f64,
+                    gravity_m_s2: gravity,
+                    sea_level_m: sea,
+                    dt_myr,
+                    h_start: &h_start,
+                    h_eroded,
+                    h_before_spread,
+                    uplift_mm_yr: &pf.uplift,
+                    crust_type: &pf.crust_type,
+                    crust_age_myr: &pf.crust_age,
+                    orogeny_age_myr: &pf.orogeny_age,
+                    regime: &pf.regime,
+                    plate_id: &pf.plate_id,
+                    ice_m: ice.as_deref(),
+                    rock_share: p.isostasy,
+                },
+                &mut sc.h,
+            )?;
+            iso += out.sum_change_m;
+            if let Some(rep) = out.solve {
+                let mut count = |name: &str, by: f64| {
+                    *world.globals.entry(name.to_owned()).or_insert(0.0) += by;
+                };
+                count(flexure::SOLVES_GLOBAL, 1.0);
+                count(flexure::ITERATIONS_GLOBAL, f64::from(rep.iterations));
+                if !rep.converged {
+                    count(flexure::UNCONVERGED_GLOBAL, 1.0);
+                }
+            }
+            flexed = Some(out);
+            self.time("flexure", started);
+        }
 
         // 6. Outputs.
         let started = Instant::now();
@@ -1334,6 +1414,26 @@ impl SurfaceStage {
             }
         }
         put(world, field::GLACIAL_EROSION, g_rate);
+        match flexed {
+            Some(out) => {
+                put(world, flexure::field::FLEXURE, out.flexure_m);
+                put(world, flexure::field::DEFLECTION, out.deflection_m);
+                put(
+                    world,
+                    flexure::field::ELASTIC_THICKNESS,
+                    out.elastic_thickness_km,
+                );
+            }
+            None => {
+                for name in [
+                    flexure::field::FLEXURE,
+                    flexure::field::DEFLECTION,
+                    flexure::field::ELASTIC_THICKNESS,
+                ] {
+                    world.fields.remove(name);
+                }
+            }
+        }
         *world
             .globals
             .entry(FOREIGN_CRUST_GLOBAL.to_owned())
@@ -1541,6 +1641,7 @@ impl Stage for SurfaceStage {
         let s: Saved = from_state(bytes)?;
         self.done = s.done;
         self.scratch = None;
+        self.flex_solver = None;
         Ok(())
     }
 }
