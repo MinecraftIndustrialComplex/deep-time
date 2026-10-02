@@ -495,3 +495,97 @@ fn the_coupled_pipeline_runs_and_resumes() {
         let _ = std::fs::remove_dir_all(d);
     }
 }
+
+/// Flexure in the coupled pipeline (`flexure.rs`). With `flexure.strength` 0 the stage is the one
+/// it was: no state, no fields, and the same planet as a preset without the section. With it on,
+/// every step is solved and converges, the plate carries loads its cells did not make (basins and
+/// bulges), the buoyancy of the sinking balances the load, and surface processes still conserve
+/// mass.
+#[test]
+fn flexure_off_changes_nothing_and_on_bends_the_plate() {
+    let run = |edit: &dyn Fn(&mut serde_json::Value), name: &str| {
+        let mut v: serde_json::Value = serde_json::from_str(&pipeline_json(3000, 40.0, 7)).unwrap();
+        edit(&mut v);
+        let dir = temp_dir(name);
+        let s = session(&v.to_string(), &dir);
+        finish(&s);
+        let world = s.checkpoint().unwrap().world;
+        let _ = std::fs::remove_dir_all(dir);
+        world
+    };
+    let off = run(
+        &|v| v["surface"]["flexure"]["strength"] = serde_json::json!(0.0),
+        "flex-off",
+    );
+    let absent = run(
+        &|v| {
+            v["surface"].as_object_mut().unwrap().remove("flexure");
+        },
+        "flex-absent",
+    );
+    let on = run(
+        &|v| v["surface"]["flexure"]["strength"] = serde_json::json!(1.0),
+        "flex-on",
+    );
+    let (a, b, c) = (
+        off.surface.as_ref().unwrap(),
+        absent.surface.as_ref().unwrap(),
+        on.surface.as_ref().unwrap(),
+    );
+    assert!(a.flexure.is_none() && b.flexure.is_none());
+    assert_eq!(
+        a.elevation_m, b.elevation_m,
+        "strength 0 is not the old stage"
+    );
+    assert_eq!(a.log, b.log);
+    for name in [
+        flexure::field::FLEXURE,
+        flexure::field::DEFLECTION,
+        flexure::field::ELASTIC_THICKNESS,
+    ] {
+        assert!(!off.fields.contains_key(name), "{name} without flexure");
+        assert!(on.fields.contains_key(name), "{name}");
+    }
+    assert!(!off.globals.contains_key(flexure::SOLVES_GLOBAL));
+    assert_eq!(on.globals[flexure::SOLVES_GLOBAL], 20.0);
+    assert!(!on.globals.contains_key(flexure::UNCONVERGED_GLOBAL));
+    let fs = c.flexure.as_ref().expect("the plate's state");
+    assert!(c.elevation_m.iter().all(|z| z.is_finite()));
+    assert_ne!(a.elevation_m, c.elevation_m);
+    let moved = c.totals.eroded_km3.max(1.0);
+    assert!(c.totals.mass_residual_km3.abs() < 1e-6 * moved);
+    // Stiff and soft crust both exist, and the stiff crust carries load regionally: some cells
+    // stand well below local isostasy (basins, moats) and some above (loads held up, bulges).
+    let te = &on.fields[flexure::field::ELASTIC_THICKNESS].data;
+    let (te_min, te_max) = te
+        .iter()
+        .fold((f32::MAX, f32::MIN), |m, &t| (m.0.min(t), m.1.max(t)));
+    assert!(te_min < 10.0 && te_max > 40.0, "Te {te_min}–{te_max} km");
+    let flex = &on.fields[flexure::field::FLEXURE].data;
+    let below = flex.iter().filter(|&&f| f < -50.0).count();
+    let above = flex.iter().filter(|&&f| f > 50.0).count();
+    assert!(
+        below > 20 && above > 20,
+        "{below} cells below, {above} above"
+    );
+    // Compensation: the mantle displaced (ρ_m·w) weighs what the load does (rock and the sea
+    // over it, ρ_m·Q, plus the ice of the last step), to the solve's tolerance.
+    let ice = on
+        .fields
+        .get(crate::climate::field::ICE_THICKNESS)
+        .map(|f| f.data.clone())
+        .unwrap_or_else(|| vec![0.0; flex.len()]);
+    let load: f64 = fs
+        .load_m
+        .iter()
+        .zip(&ice)
+        .map(|(&q, &i)| f64::from(q) + flexure::RHO_ICE / flexure::RHO_MANTLE * f64::from(i))
+        .sum();
+    let sunk: f64 = fs.deflection_m.iter().map(|&w| f64::from(w)).sum();
+    let scale: f64 = fs.load_m.iter().map(|&q| f64::from(q).abs()).sum();
+    assert!(scale > 1.0e4, "there are loads: {scale}");
+    assert!(
+        (sunk - load).abs() < 0.02 * scale,
+        "sinking {sunk} against load {load} (of {scale})"
+    );
+}

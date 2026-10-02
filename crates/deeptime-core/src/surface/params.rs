@@ -156,6 +156,8 @@ pub struct SurfaceParams {
     pub drama: f64,
     /// Glacial erosion, till and fjords (`glacial.rs`; Ben, 2026-09-29).
     pub glacial: super::glacial::GlacialParams,
+    /// The plate's stiffness (`flexure.rs`; Ben, 2026-10-02: "General flexure everywhere").
+    pub flexure: super::flexure::FlexureParams,
 }
 
 impl Default for SurfaceParams {
@@ -195,6 +197,7 @@ impl Default for SurfaceParams {
             spl_max_iter: 6,
             drama: 1.0,
             glacial: super::glacial::GlacialParams::default(),
+            flexure: super::flexure::FlexureParams::default(),
         }
     }
 }
@@ -278,6 +281,7 @@ impl SurfaceParams {
             "must be in [0, 2]",
         )?;
         self.glacial.validate()?;
+        self.flexure.validate()?;
         for c in &self.sea_level.cycles {
             check(
                 c.amplitude_m.is_finite() && c.period_myr > 0.0,
