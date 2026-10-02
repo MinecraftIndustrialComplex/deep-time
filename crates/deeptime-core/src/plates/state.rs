@@ -347,14 +347,13 @@ pub struct Belt {
     pub lifted10: u32,
     pub lifted100: u32,
     pub emerged: u32,
-    /// The overriding plate's rotation since the onset (`[x, y, z, w]`): the belt's own frame, in
-    /// which it stands still.
-    pub frame: [f64; 4],
-    /// Uplift-weighted moments of where the belt and wedge rose, in that frame (unit vectors):
-    /// total weight, Σ w·p and Σ w·(xx, yy, zz, xy, xz, yz).
+    /// Where the belt and wedge rose across the front, weighted by the uplift: Σ dz, Σ dz·x and
+    /// Σ dz·x², with x the distance from the front, km (negative behind it on the overriding
+    /// plate, positive in front of it on the incoming one). The belt's width is √(12·variance) of
+    /// x (exact for a uniform strip, and blind to how the front curves).
     pub weight: f64,
-    pub sum: [f64; 3],
-    pub second: [f64; 6],
+    pub across_sum: f64,
+    pub across_sq: f64,
 }
 
 /// A mantle-fixed hotspot (Cortial §7.5's suggested extension).
