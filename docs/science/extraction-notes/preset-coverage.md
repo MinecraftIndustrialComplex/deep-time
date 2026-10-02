@@ -4,6 +4,8 @@ Source files read: `crates/deeptime-core/presets/earthlike_quick_16k.json` (447 
 
 The four presets are the "pipeline" presets under their game names (`earthlike_quick_16k` = `pipeline_quick_16k` and so on; only name and description differ; plan §5.1 "As built in P1-08"; `tools/dev/sync_builtin_presets.py` writes them; test `builtins_are_the_pipeline_presets` keeps them equal). Their `description` says "calibrated 2026-10-01, P1-17".
 
+**Changed since this note was taken (plate tasks 3 and 4, 2026-10-02):** `tectonics.collision_distance_km`, `collision_coefficient_per_km`, `collision_uplift_max_m`, `collision_orogen_core` and `collision_on_shortening` are gone; `collision_belt_km` (400), `collision_stacking_share` (0.8), `wedge_slope_deg` (1.5), `collision_resistance_mm_yr` (200), `weld_speed_mm_yr` (5) and `weld_after_myr` (10) are new; `collision_threshold_km` is 100 (was 300) and `subduction_uplift_mm_yr` 0.55 on the quick presets and 0.45 on the full ones (were 0.42 and 0.34). The tables below are the snapshot as taken. Ledger: PLT-228 to PLT-240, PLT-039, PLT-068.
+
 ## Top-level sections and leaf counts (earthlike_quick_16k)
 
 | section | leaves | subsystem | what it is |
