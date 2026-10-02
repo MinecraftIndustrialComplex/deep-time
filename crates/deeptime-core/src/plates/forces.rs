@@ -147,7 +147,8 @@ pub fn ridge_coefficient(gravity: f64) -> f64 {
 ///   6.7 × 10¹² N/m (Tibet is quoted at 6–7 × 10¹²).
 pub fn column_energy(z_m: f64, continental: bool, ridge_m: f64, floor_m: f64, g: f64) -> f64 {
     if continental {
-        let rho = if z_m >= 0.0 { // ledger: FRC-006, FRC-014
+        let rho = if z_m >= 0.0 {
+            // ledger: FRC-006, FRC-014
             RHO_CRUST
         } else {
             RHO_CRUST - RHO_WATER
@@ -666,7 +667,8 @@ pub fn grow_slab(
         let conv = f.conv_sum / f64::from(f.oceanic);
         s.km = (s.km + conv * dt_myr).min(depth_km); // ledger: FRC-020
     }
-    if f.continental > 0 && f.continental >= f.oceanic { // ledger: FRC-019
+    if f.continental > 0 && f.continental >= f.oceanic {
+        // ledger: FRC-019
         s.blocked_myr += dt_myr;
         if s.blocked_myr >= breakoff_myr - 1e-9 {
             s.km = 0.0;
