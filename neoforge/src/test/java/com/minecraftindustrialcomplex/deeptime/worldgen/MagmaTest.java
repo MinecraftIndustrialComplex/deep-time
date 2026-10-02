@@ -12,6 +12,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -226,6 +228,210 @@ class MagmaTest {
         assertEquals(0.0, v.list().get(1).craterRadiusM());
         assertThrows(RuntimeException.class, () -> Volcanoes.parse(JsonParser.parseString("{\"version\": 2, \"volcanoes\": []}")
                 .getAsJsonObject(), "test"));
+    }
+
+    // ---- the crust-deep column (Ben, decisions log 2026-10-02) ------------------------------------------------
+
+    private static final MagmaRules NO_COLUMN = new MagmaRules(3.0, 1.0, 0.0, true).withoutColumn();
+    private static final MagmaRules COLUMN = new MagmaRules(3.0, 1.0, 0.0, true);
+
+    private static Magma kindOf(String kind, boolean silicic, double radiusM, double activity, MagmaRules rules, int lavaFloor, int minY) {
+        var v = new Volcanoes.Volcano(1, kind, 100, 50, radiusM, 2_000, activity, "shield".equals(kind), silicic, 3_600, 120, false);
+        return Magma.build(List.of(v), rules, cone(100, 50, 182, 70), DRY, C, SEA, lavaFloor, minY, MH, MV, C / 4);
+    }
+
+    /** Molten blocks of a body, by enumerating its box (before the cover rule of the pass). */
+    private static long molten(Magma.Body b) {
+        long n = 0;
+        for (int dx = -b.reach(); dx <= b.reach(); dx++)
+            for (int dz = -b.reach(); dz <= b.reach(); dz++)
+                for (int y = b.minY(); y <= b.maxY(); y++)
+                    if (b.at(dx, dz, y).molten())
+                        n++;
+        return n;
+    }
+
+    @Test
+    void aColumnOfStackedLensesRunsFromTheChamberToTheLavaFloor() {
+        Magma.Body b = one(cone(100, 50, 182, 70), DRY, COLUMN).bodies().get(0);
+        Magma.Deep d = b.deep();
+        assertNotNull(d, "an active volcano with room under it gets the column");
+        int[][] lenses = d.lenses();   // {y, radius, half-height, offset x, offset z}
+        assertTrue(lenses.length >= 8, "lenses " + lenses.length);
+        assertEquals(b.lensCount(), lenses.length);
+        for (int k = 0; k < lenses.length; k++) {
+            int[] l = lenses[k];
+            assertTrue(l[1] >= 2 * l[2] + 1, "wider than tall: radius " + l[1] + ", half-height " + l[2]);
+            assertTrue(2 * l[2] + 1 <= 11, "a few blocks thick");
+            if (k > 0) {
+                int gap = lenses[k - 1][0] - l[0];
+                assertTrue(gap >= 12 && gap <= 45, "tens of blocks apart: " + gap);
+            }
+        }
+        // Every lens lies under the chamber and the column grows wider with depth.
+        assertTrue(lenses[0][0] + lenses[0][2] + 1 < b.chamberY() - b.chamberRv(), "the first lens is under the chamber");
+        assertTrue(lenses[lenses.length - 1][1] > lenses[0][1] * 1.8, "the lowest lens is much wider than the highest");
+        // The basal lens straddles the lava floor, above the bedrock.
+        int[] basal = lenses[lenses.length - 1];
+        assertTrue(basal[0] - basal[2] <= LAVA_FLOOR && basal[0] + basal[2] > LAVA_FLOOR, "the basal lens meets the lava floor");
+        assertTrue(basal[0] - basal[2] >= LAVA_FLOOR - 10 + Magma.BEDROCK_GAP, "and stays off the bedrock");
+        assertEquals(Magma.Part.LENS, b.at(basal[3], basal[4], basal[0]));
+        assertTrue(b.minY() <= basal[0] - basal[2] - 2, "the body reaches the basal lens's shell");
+    }
+
+    @Test
+    void theColumnIsOneConnectedBodyOfLava() {
+        Magma.Body b = one(cone(100, 50, 182, 70), DRY, COLUMN).bodies().get(0);
+        int r = b.reach(), w = 2 * r + 1, y0 = b.minY(), h = b.maxY() - y0 + 1;
+        boolean[] lava = new boolean[w * w * h], seen = new boolean[w * w * h];
+        long total = 0;
+        for (int dx = -r; dx <= r; dx++)
+            for (int dz = -r; dz <= r; dz++)
+                for (int y = y0; y <= b.maxY(); y++)
+                    if (b.at(dx, dz, y).molten()) {
+                        lava[((dx + r) * w + dz + r) * h + y - y0] = true;
+                        total++;
+                    }
+        java.util.ArrayDeque<int[]> q = new java.util.ArrayDeque<>();
+        q.add(new int[]{r, r, b.chamberY() - y0});
+        seen[(r * w + r) * h + b.chamberY() - y0] = true;
+        long reached = 0;
+        int[][] n6 = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+        while (!q.isEmpty()) {
+            int[] c = q.poll();
+            reached++;
+            for (int[] d : n6) {
+                int a = c[0] + d[0], z = c[1] + d[1], y = c[2] + d[2];
+                if (a < 0 || z < 0 || a >= w || z >= w || y < 0 || y >= h)
+                    continue;
+                int i = (a * w + z) * h + y;
+                if (lava[i] && !seen[i]) {
+                    seen[i] = true;
+                    q.add(new int[]{a, z, y});
+                }
+            }
+        }
+        assertEquals(total, reached, "the chamber, the conduit, every lens and every segment are one body of lava");
+    }
+
+    @Test
+    void theColumnGivesSeveralTimesTheLava() {
+        for (double radiusM : new double[]{14_000, 28_000}) {
+            long before = molten(kindOf("stratovolcano", false, radiusM, 0.9, NO_COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0));
+            long after = molten(kindOf("stratovolcano", false, radiusM, 0.9, COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0));
+            assertTrue(after >= 3 * before, "a " + radiusM / 1000 + "-km arc volcano: " + before + " -> " + after);
+        }
+        long shieldBefore = molten(kindOf("shield", false, 60_000, 0.9, NO_COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0));
+        long shieldAfter = molten(kindOf("shield", false, 60_000, 0.9, COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0));
+        assertTrue(shieldAfter >= 3 * shieldBefore, "the shield: " + shieldBefore + " -> " + shieldAfter);
+    }
+
+    @Test
+    void theColumnFollowsTheWorldsFloorNotANumber() {
+        // The floor moves from y -352 to y -512: the lava floor from -342 to -502. The column goes to it.
+        Magma.Body high = kindOf("stratovolcano", false, 14_000, 0.9, COLUMN, -342, -352).bodies().get(0);
+        Magma.Body low = kindOf("stratovolcano", false, 14_000, 0.9, COLUMN, -502, -512).bodies().get(0);
+        int[][] a = high.deep().lenses(), z = low.deep().lenses();
+        assertTrue(z.length > a.length, "a deeper world has more lenses: " + a.length + " -> " + z.length);
+        assertTrue(a[a.length - 1][0] > -342 && a[a.length - 1][0] < -330, "basal lens at the -342 floor");
+        assertTrue(z[z.length - 1][0] > -502 && z[z.length - 1][0] < -490, "basal lens at the -502 floor");
+        assertTrue(low.minY() >= -512 + Magma.BEDROCK_GAP - 2, "nothing within the bedrock");
+        // The same spacing: about as many lenses per block of depth.
+        assertEquals((double) (a[0][0] - a[a.length - 1][0]) / (a.length - 1), (double) (z[0][0] - z[z.length - 1][0]) / (z.length - 1), 6.0);
+        // The chunk-generation bounds: the whole body lies in minY..maxY.
+        for (int[] l : z)
+            assertTrue(l[0] - l[2] - 2 >= low.minY() && l[0] + l[2] + 2 <= low.maxY());
+        // With no lava floor (lava_floor_blocks 0) the column still stops short of the bedrock.
+        Magma.Body bare = kindOf("stratovolcano", false, 14_000, 0.9, COLUMN, -512, -512).bodies().get(0);
+        assertTrue(bare.minY() >= -512 + Magma.BEDROCK_GAP - 2, "bottom " + bare.minY());
+    }
+
+    @Test
+    void kindRadiusAndActivityScaleTheSystem() {
+        Magma.Body arc = kindOf("stratovolcano", false, 14_000, 1.0, COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0);
+        Magma.Body quiet = kindOf("stratovolcano", false, 14_000, 0.0, COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0);
+        Magma.Body silicic = kindOf("stratovolcano", true, 14_000, 1.0, COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0);
+        Magma.Body shield = kindOf("shield", false, 14_000, 1.0, COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0);
+        Magma.Body big = kindOf("stratovolcano", false, 40_000, 1.0, COLUMN, LAVA_FLOOR, LAVA_FLOOR - 10).bodies().get(0);
+        assertTrue(silicic.chamberRh() > arc.chamberRh() * 1.4, "silicic centres hold larger shallow chambers");
+        assertTrue(shield.deep().lenses()[0][1] > arc.deep().lenses()[0][1] * 1.2, "shield lenses are broader");
+        assertTrue(quiet.deep().lenses()[0][1] <= arc.deep().lenses()[0][1], "quiet volcanoes' lenses are not wider");
+        assertTrue(big.deep().lenses()[0][1] > arc.deep().lenses()[0][1], "a bigger volcano has wider lenses");
+        assertTrue(big.reach() > arc.reach());
+    }
+
+    @Test
+    void theColumnSettingsAreSettings() {
+        Magma.Body base = one(cone(100, 50, 182, 70), DRY, COLUMN).bodies().get(0);
+        long baseLava = molten(base);
+        MagmaRules few = new MagmaRules(3.0, 1.0, 0.0, true, 3, 28.0, 1.0, 1.0);
+        Magma.Body fewer = one(cone(100, 50, 182, 70), DRY, few).bodies().get(0);
+        assertEquals(3, fewer.lensCount());
+        int[][] fl = fewer.deep().lenses();
+        assertTrue(fl[fl.length - 1][0] < LAVA_FLOOR + 10, "a capped count widens the spacing: the column still reaches the floor");
+        MagmaRules wide = new MagmaRules(3.0, 1.0, 0.0, true, 24, 28.0, 2.0, 1.0);
+        assertTrue(molten(one(cone(100, 50, 182, 70), DRY, wide).bodies().get(0)) > 2 * baseLava, "twice the width, much more lava");
+        MagmaRules sparse = new MagmaRules(3.0, 1.0, 0.0, true, 24, 56.0, 1.0, 1.0);
+        Magma.Body sp = one(cone(100, 50, 182, 70), DRY, sparse).bodies().get(0);
+        assertTrue(sp.lensCount() < base.lensCount() * 0.6 && sp.lensCount() >= 2, base.lensCount() + " -> " + sp.lensCount());
+        assertNull(one(cone(100, 50, 182, 70), DRY, NO_COLUMN).bodies().get(0).deep());
+        assertNull(one(cone(100, 50, 182, 70), DRY, new MagmaRules(3.0, 1.0, 0.0, true, 24, 28.0, 0.0, 1.0)).bodies().get(0).deep());
+        // Read from the world's notes; absent keys keep the defaults.
+        JsonObject notes = JsonParser.parseString("{\"bake\": {\"underground\": {\"params\": {\"magma_lens_count\": 7, "
+                + "\"magma_lens_spacing_blocks\": 40, \"magma_lens_width\": 1.5, \"magma_mush_width\": 0}}}}").getAsJsonObject();
+        MagmaRules r = MagmaRules.of(notes);
+        assertEquals(7, r.lensCount());
+        assertEquals(40.0, r.lensSpacingBlocks());
+        assertEquals(1.5, r.lensWidth());
+        assertEquals(0.0, r.mushWidth());
+        assertEquals(3.0, r.chamberDepthKm());
+        assertEquals(24, MagmaRules.DEFAULT.lensCount());
+        assertEquals(28.0, MagmaRules.DEFAULT.lensSpacingBlocks());
+        assertTrue(MagmaRules.DEFAULT.hasColumn());
+        assertFalse(NO_COLUMN.hasColumn());
+    }
+
+    @Test
+    void theColumnSitsInABodyOfAlteredHotRock() {
+        Magma.Body b = one(cone(100, 50, 182, 70), DRY, COLUMN).bodies().get(0);
+        int[][] lenses = b.deep().lenses();
+        for (int[] l : lenses) {
+            // Every lens is inside the mush: its centre and its rim.
+            assertTrue(b.mush(l[3], l[4], l[0]), "mush at a lens centre");
+            assertTrue(b.mush(l[3] + l[1] - 1, l[4], l[0]), "mush at a lens's rim");
+        }
+        // Between two lenses the mush is there too; none above the chamber's equator.
+        int mid = (lenses[3][0] + lenses[4][0]) / 2;
+        assertTrue(b.mush(0, 0, mid));
+        assertTrue(b.mush(lenses[3][1], 0, lenses[3][0]));
+        assertFalse(b.mush(0, 0, b.chamberY() + 1));
+        assertFalse(b.mush(b.reach() + 1, 0, lenses[3][0]), "beyond the reach");
+        assertFalse(b.mush(0, 0, b.minY() - 1));
+        // It wraps the lava: no molten block outside it.
+        for (int dx = -b.reach(); dx <= b.reach(); dx += 1)
+            for (int y = b.minY(); y <= b.chamberY(); y++)
+                if (b.at(dx, 0, y).molten())
+                    assertTrue(b.mush(dx, 0, y), "lava at " + dx + ", " + y + " outside the mush");
+        // The setting: wider mush, none.
+        Magma.Body wide = one(cone(100, 50, 182, 70), DRY, new MagmaRules(3.0, 1.0, 0.0, true, 24, 28.0, 1.0, 2.0)).bodies().get(0);
+        assertTrue(wide.reach() > b.reach());
+        Magma.Body none = one(cone(100, 50, 182, 70), DRY, new MagmaRules(3.0, 1.0, 0.0, true, 24, 28.0, 1.0, 0.0)).bodies().get(0);
+        assertFalse(none.mush(0, 0, lenses[3][0]));
+        assertNotNull(none.deep());
+        // Without the column there is no mush at all.
+        assertFalse(one(cone(100, 50, 182, 70), DRY, NO_COLUMN).bodies().get(0).mush(0, 0, b.chamberY() - 5));
+    }
+
+    @Test
+    void aChamberAtTheFloorHasNoColumnAndAThinOneHasFewLenses() {
+        Magma.Body deepSea = one(cone(100, 50, -200, -330), DRY, COLUMN).bodies().get(0);
+        assertTrue(deepSea.chamberRh() > 0);
+        assertTrue(deepSea.deep() == null || deepSea.lensCount() <= 4, "a chamber near the floor: " + deepSea.lensCount());
+        // Whatever it has stays between the chamber and the floor.
+        assertTrue(deepSea.minY() >= LAVA_FLOOR - 10 + Magma.BEDROCK_GAP - 2);
+        Magma.Body mid = one(cone(100, 50, -50, -120), DRY, COLUMN).bodies().get(0);
+        Magma.Body tall = one(cone(100, 50, 182, 70), DRY, COLUMN).bodies().get(0);
+        assertTrue(mid.lensCount() < tall.lensCount());
     }
 
     @Test

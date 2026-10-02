@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
+import com.minecraftindustrialcomplex.deeptime.rock.PaletteRules;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 
 import java.util.ArrayList;
@@ -15,6 +16,12 @@ import java.util.List;
  *
  * <p>Each active volcano gets (FORMAT.md, "Lava"):
  * <ul>
+ *   <li>a <b>crust-deep column</b> below the chamber (Ben, decisions log 2026-10-02, "Crust-deep magma
+ *       system"; the transcrustal picture of Cashman, Sparks and Blundy 2017): lava <b>lenses</b>, wider
+ *       than tall and a few blocks thick, stacked tens of blocks apart and growing with depth, joined by
+ *       dike-like conduit segments, down to a basal lens that straddles the lava floor; set in a body of
+ *       altered hot rock (the <b>mush</b>, {@link Body#mush}). Sizes follow the volcano's kind, basal
+ *       radius and activity (ledger MAG-043 to MAG-062);</li>
  *   <li>a <b>magma chamber</b>: an ellipsoid of lava whose top lies {@code magma_chamber_depth_km}
  *       under the crater floor. Its radius is a tenth of the volcano's basal radius (1.2 to 4.5 km)
  *       times {@code magma_chamber_size}, its half-height a fifth of that radius. Heights are drawn
@@ -55,6 +62,35 @@ public final class Magma {
     /** Blocks kept between a chamber's bottom and the lava floor. */
     public static final int FLOOR_GAP = 8; // ledger: MAG-007
 
+    /** Silicic centres hold larger shallow chambers: the chamber radius times this. */
+    public static final double SILICIC_CHAMBER = 1.6; // ledger: MAG-050
+    /** Lens radius at the top of the column, as a share of the chamber's radius, by kind. */
+    public static final double LENS_SHARE_ARC = 1.0, LENS_SHARE_SILICIC = 0.9, LENS_SHARE_SHIELD = 1.4; // ledger: MAG-045
+    /** An inactive volcano's lenses are this share of an active one's; the factor runs from here to 1 with activity. */
+    public static final double LENS_MIN_ACTIVITY = 0.7; // ledger: MAG-046
+    /** The lowest lens is this many times wider than the highest. */
+    public static final double LENS_GROWTH = 2.2; // ledger: MAG-047
+    /** Smallest and largest lens radius, blocks. */
+    public static final int LENS_MIN_RADIUS = 5, LENS_MAX_RADIUS = 90; // ledger: MAG-048
+    /** A lens's half-height is this share of its radius, within 2 to 5 blocks: wider than tall, a few blocks thick. */
+    public static final double LENS_FLATNESS = 0.2; // ledger: MAG-044
+    public static final int LENS_MIN_HALF = 2, LENS_MAX_HALF = 5;
+    /** The first lens lies this share of the spacing under the chamber's bottom. */
+    public static final double FIRST_GAP = 0.8; // ledger: MAG-049
+    /** A lens's centre may lie this share of its radius off the column's axis (the conduits follow). */
+    public static final double LENS_OFFSET = 0.15; // ledger: MAG-049
+    /** Each lens's radius is drawn between these shares of the column's radius at its depth. */
+    public static final double LENS_JITTER_LO = 0.9, LENS_JITTER_HI = 1.05; // ledger: MAG-049
+    /** Each middle lens may lie this share of the spacing off its even position. */
+    public static final double LENS_SPREAD = 0.2; // ledger: MAG-049
+    /** The basal lens's centre lies this far above the lava floor (blocks), never closer than {@link #BEDROCK_GAP} to the world's floor. */
+    public static final int BASAL_RISE = 2, BEDROCK_GAP = 6; // ledger: MAG-053
+    /** The mush's radius: this times the column's radius, plus 3 blocks, rising to the second at a lens. */
+    public static final double MUSH_BASE = 1.25, MUSH_BULGE = 0.25; // ledger: MAG-054
+    public static final int MUSH_RIM = 3;
+    /** Where the shield, and where the silicic share of the column differ: the mush is this much broader under a shield. */
+    public static final double MUSH_SHIELD = 1.1; // ledger: MAG-054
+
     /** Terrain height H(x, z), blocks. */
     @FunctionalInterface
     public interface Heights {
@@ -69,11 +105,11 @@ public final class Magma {
 
     /** What a block of a body is. */
     public enum Part {
-        NONE, CHAMBER, CHAMBER_SHELL, CONDUIT, CONDUIT_SHELL, PLUG, LAKE, LAKE_SHELL, LAKE_AIR;
+        NONE, CHAMBER, CHAMBER_SHELL, CONDUIT, CONDUIT_SHELL, PLUG, LAKE, LAKE_SHELL, LAKE_AIR, LENS, LENS_SHELL;
 
         /** Lava. */
         public boolean molten() {
-            return this == CHAMBER || this == CONDUIT || this == LAKE;
+            return this == CHAMBER || this == CONDUIT || this == LAKE || this == LENS;
         }
     }
 
@@ -91,10 +127,12 @@ public final class Magma {
      * @param lake       it holds a crater lava lake …
      * @param lakeRadius … of this radius, lava from {@code lakeBottom} to {@code lakeTop}
      * @param reach      horizontal radius that holds everything, blocks
+     * @param deep       the crust-deep column under the chamber (stacked lenses, conduits and the body of
+     *                   altered hot rock around them); null: the volcano has none
      */
     public record Body(int id, String kind, double activity, int x, int z, int floorY, int chamberY, int chamberRh,
                        int chamberRv, int conduitTop, int plugTop, boolean submerged, boolean lake, int lakeRadius,
-                       int lakeTop, int lakeBottom, int reach) {
+                       int lakeTop, int lakeBottom, int reach, Deep deep) {
 
         /** What the block at offset (dx, dz) from the centre column and height y is. */
         public Part at(int dx, int dz, int y) {
@@ -117,8 +155,11 @@ public final class Magma {
             double qy = (double) (y - chamberY) / chamberRv;
             if ((double) d2 / ((double) chamberRh * chamberRh) + qy * qy <= 1.0)
                 return Part.CHAMBER;
+            Part deepPart = deep == null ? Part.NONE : deep.at(dx, dz, y);
+            if (deepPart.molten())
+                return deepPart;
             int cheb = Math.max(Math.abs(dx), Math.abs(dz));
-            if (cheb <= 2 && y >= chamberY) {
+            if (cheb <= 2 && y >= (deep == null ? chamberY : deep.axisBottom)) {
                 if (Math.abs(dx) + Math.abs(dz) <= 1) {
                     if (y <= conduitTop)
                         return Part.CONDUIT;
@@ -131,12 +172,17 @@ public final class Magma {
             double sh = chamberRh + 1.5, sv = chamberRv + 1.5, sy = (y - chamberY) / sv;
             if (d2 / (sh * sh) + sy * sy <= 1.0)
                 return Part.CHAMBER_SHELL;
-            return Part.NONE;
+            return deepPart;
+        }
+
+        /** Whether the block at offset (dx, dz) and height y lies in the body of altered hot rock around the column. */
+        public boolean mush(int dx, int dz, int y) {
+            return chamberRh > 0 && deep != null && deep.mush(dx, dz, y);
         }
 
         /** The lowest and highest y any part of the body may occupy. */
         public int minY() {
-            return chamberY - chamberRv - 2;
+            return deep != null ? Math.min(chamberY - chamberRv - 2, deep.bottom) : chamberY - chamberRv - 2;
         }
 
         public int maxY() {
@@ -146,6 +192,126 @@ public final class Magma {
         /** Lava blocks of the chamber (the ellipsoid's volume), for reports. */
         public long chamberBlocks() {
             return Math.round(4.0 / 3.0 * Math.PI * chamberRh * chamberRh * chamberRv);
+        }
+
+        /** Lava blocks of the column's lenses and conduit segments (volumes, before the cover rule), for reports. */
+        public long columnBlocks() {
+            return deep == null ? 0 : deep.moltenBlocks();
+        }
+
+        /** Number of lenses in the column. */
+        public int lensCount() {
+            return deep == null ? 0 : deep.n;
+        }
+    }
+
+    /**
+     * The crust-deep column under a chamber: {@code n} lava lenses from the highest to the basal one,
+     * joined by dike-like conduit segments, and the body of altered hot rock around them. Immutable.
+     * Arrays are indexed from the highest lens (index 0) to the lowest.
+     */
+    public static final class Deep {
+        final int n;
+        final int[] ly, lox, loz, lrh, lrv;
+        /** Lowest y of any part; the highest y of a lens or segment part. */
+        final int bottom, top;
+        /** The main axis (the chamber's conduit) runs down to this y: the highest lens's centre. */
+        final int axisBottom;
+        /** The mush: highest and lowest y, and the squared radius at each (negative: none). */
+        final int mushTop, mushBottom;
+        final long[] mushR2;
+        final int reach;
+
+        Deep(int[] ly, int[] lox, int[] loz, int[] lrh, int[] lrv, int mushTop, int mushBottom, long[] mushR2, int mushReach) {
+            this.n = ly.length;
+            this.ly = ly;
+            this.lox = lox;
+            this.loz = loz;
+            this.lrh = lrh;
+            this.lrv = lrv;
+            this.axisBottom = ly[0];
+            int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE, rc = 0;
+            for (int k = 0; k < n; k++) {
+                lo = Math.min(lo, ly[k] - lrv[k] - 2);
+                hi = Math.max(hi, ly[k] + lrv[k] + 2);
+                rc = Math.max(rc, Math.max(Math.abs(lox[k]), Math.abs(loz[k])) + lrh[k] + 2);
+            }
+            this.mushTop = mushTop;
+            this.mushBottom = mushBottom;
+            this.mushR2 = mushR2;
+            this.bottom = mushR2 == null ? lo : Math.min(lo, mushBottom);
+            this.top = hi;
+            this.reach = Math.max(rc, mushR2 == null ? 0 : mushReach);
+        }
+
+        /** Index of the first lens whose centre is at or below y (n when none). */
+        private int first(int y) {
+            int lo = 0, hi = n;
+            while (lo < hi) {
+                int mid = (lo + hi) >>> 1;
+                if (ly[mid] <= y)
+                    hi = mid;
+                else
+                    lo = mid + 1;
+            }
+            return lo;
+        }
+
+        /** The lens or conduit part at an offset from the body's centre column, or NONE (the mush is {@link #mush}). */
+        Part at(int dx, int dz, int y) {
+            if (y > top || y < bottom)
+                return Part.NONE;
+            int k0 = first(y);
+            Part best = Part.NONE;
+            for (int k = Math.max(0, k0 - 4), e = Math.min(n - 1, k0 + 3); k <= e; k++) {
+                int ddy = y - ly[k];
+                if (Math.abs(ddy) > lrv[k] + 2)
+                    continue;
+                long ex = dx - lox[k], ez = dz - loz[k], d2 = ex * ex + ez * ez;
+                double q = (double) ddy / lrv[k];
+                if ((double) d2 / ((double) lrh[k] * lrh[k]) + q * q <= 1.0)
+                    return Part.LENS;
+                double sh = lrh[k] + 1.5, sv = lrv[k] + 1.5, sy = ddy / sv;
+                if (d2 / (sh * sh) + sy * sy <= 1.0)
+                    best = Part.LENS_SHELL;
+            }
+            for (int k = Math.max(0, k0 - 5), e = Math.min(n - 2, k0 + 3); k <= e; k++) {
+                if (y > ly[k] + 1 || y < ly[k + 1] - 1)
+                    continue;
+                int ex = dx - lox[k], ez = dz - loz[k];
+                if (Math.abs(ex) > 2 || Math.abs(ez) > 2)
+                    continue;
+                if (Math.abs(ex) + Math.abs(ez) <= 1 && y <= ly[k] && y >= ly[k + 1])
+                    return Part.CONDUIT;
+                if (best == Part.NONE)
+                    best = Part.CONDUIT_SHELL;
+            }
+            return best;
+        }
+
+        boolean mush(int dx, int dz, int y) {
+            if (mushR2 == null || y > mushTop || y < mushBottom)
+                return false;
+            return (long) dx * dx + (long) dz * dz <= mushR2[y - mushBottom];
+        }
+
+        /** Volume of the lenses plus the conduit segments between them, blocks (before the cover rule). */
+        long moltenBlocks() {
+            double v = 0;
+            for (int k = 0; k < n; k++) {
+                v += 4.0 / 3.0 * Math.PI * lrh[k] * lrh[k] * lrv[k];
+                if (k + 1 < n)
+                    v += 5.0 * Math.max(0, ly[k] - ly[k + 1]);
+            }
+            return Math.round(v);
+        }
+
+        /** The lenses' (y, radius, half-height), for reports. */
+        public int[][] lenses() {
+            int[][] out = new int[n][];
+            for (int k = 0; k < n; k++)
+                out[k] = new int[]{ly[k], lrh[k], lrv[k], lox[k], loz[k]};
+            return out;
         }
     }
 
@@ -207,19 +373,109 @@ public final class Magma {
         return (int) Math.ceil(h) - 1;
     }
 
+    private static double unit(long seed, int k, int salt) {
+        return (PaletteRules.mix(seed ^ ((long) k << 8) ^ salt) >>> 11) / (double) (1L << 53);
+    }
+
+    private static int lensHalf(int r) {
+        return (int) Math.clamp(Math.round(LENS_FLATNESS * r), LENS_MIN_HALF, LENS_MAX_HALF);
+    }
+
+    /**
+     * The crust-deep column of one volcano: lenses from {@code FIRST_GAP} spacings under the chamber's
+     * bottom to a basal lens just above the lava floor, evenly spread (each a little off its place and
+     * its axis), wider with depth, with the conduit segments between them and the mush around; null where
+     * the chamber already sits at the floor.
+     */
+    private static Deep buildDeep(Volcanoes.Volcano v, MagmaRules rules, int cy, int rh, int rv, int lavaFloorY, int minY) {
+        double share = "shield".equals(v.kind()) ? LENS_SHARE_SHIELD : v.silicic() ? LENS_SHARE_SILICIC : LENS_SHARE_ARC;
+        double act = LENS_MIN_ACTIVITY + (1.0 - LENS_MIN_ACTIVITY) * Math.clamp(v.activity(), 0.0, 1.0);
+        double f = rules.lensWidth() * share * act;
+        int rTop = (int) Math.clamp(Math.round(rh * f), LENS_MIN_RADIUS, LENS_MAX_RADIUS);
+        int rBot = (int) Math.clamp(Math.round(rTop * LENS_GROWTH), rTop, LENS_MAX_RADIUS);
+        int basalY = Math.max(lavaFloorY + BASAL_RISE, minY + BEDROCK_GAP + lensHalf(rBot));
+        double spacing = rules.lensSpacingBlocks();
+        int yFirst = cy - rv - (int) Math.round(FIRST_GAP * spacing);
+        int span = yFirst - basalY;
+        int n;
+        if (cy - rv - 3 <= basalY + lensHalf(rBot) + 2)
+            return null;                      // no room under the chamber
+        if (span < 6 || rules.lensCount() == 1) {
+            n = 1;
+            yFirst = basalY;
+            span = 0;
+        } else {
+            n = (int) Math.clamp(Math.round(span / spacing) + 1, 2, rules.lensCount());
+        }
+        double sa = n > 1 ? (double) span / (n - 1) : 0.0;
+        long seed = PaletteRules.mix(0x6D61676D614C6E73L ^ ((long) v.id() << 20));
+        int[] ly = new int[n], lox = new int[n], loz = new int[n], lrh = new int[n], lrv = new int[n];
+        for (int k = 0; k < n; k++) {
+            double t = n == 1 ? 1.0 : (double) k / (n - 1);
+            int y = k == 0 || k == n - 1 ? (k == 0 && n > 1 ? yFirst : basalY)
+                    : (int) Math.round(yFirst - t * span + (unit(seed, k, 1) - 0.5) * 2.0 * LENS_SPREAD * sa);
+            if (k > 0)
+                y = Math.min(y, ly[k - 1] - 2);
+            ly[k] = y;
+            double env = rTop + (rBot - rTop) * t;
+            int r = k == n - 1 ? rBot : k == 0 ? rTop
+                    : Math.max(LENS_MIN_RADIUS, (int) Math.round(env * (LENS_JITTER_LO + (LENS_JITTER_HI - LENS_JITTER_LO) * unit(seed, k, 2))));
+            lrh[k] = r;
+            lrv[k] = lensHalf(r);
+            if (k > 0) {
+                double a = 2.0 * Math.PI * unit(seed, k, 3), m = LENS_OFFSET * r * unit(seed, k, 4);
+                lox[k] = (int) Math.round(Math.cos(a) * m);
+                loz[k] = (int) Math.round(Math.sin(a) * m);
+            }
+        }
+        // The body of altered hot rock: from the chamber's equator down to just under the basal lens.
+        long[] mush = null;
+        int mushTop = cy, mushBottom = ly[n - 1] - lrv[n - 1] - 2, mushReach = 0;
+        double mw = rules.mushWidth();
+        if (mw > 0.0 && mushTop > mushBottom) {
+            mush = new long[mushTop - mushBottom + 1];
+            double kind = "shield".equals(v.kind()) ? MUSH_SHIELD : 1.0;
+            double yTop = ly[0];
+            int step = Math.max(1, n > 1 ? (int) Math.round(sa) : 8);
+            for (int y = mushBottom; y <= mushTop; y++) {
+                double env;
+                if (y >= yTop)
+                    env = rTop + (rh - rTop) * Math.min(1.0, (y - yTop) / Math.max(1.0, cy - yTop));
+                else
+                    env = rTop + (rBot - rTop) * Math.min(1.0, (yTop - y) / Math.max(1.0, (double) span));
+                double near = Double.MAX_VALUE;
+                for (int k = 0; k < n; k++)
+                    near = Math.min(near, Math.abs(y - ly[k]));
+                double bump = Math.max(0.0, 1.0 - near / (0.5 * step));
+                double dome = Math.sqrt(Math.clamp((cy - y) / (double) Math.max(2, rv), 0.0, 1.0));
+                double rad = mw * kind * ((MUSH_BASE + MUSH_BULGE * bump) * env + MUSH_RIM) * dome;
+                mush[y - mushBottom] = (long) (rad * rad);
+                mushReach = Math.max(mushReach, (int) Math.ceil(rad) + 1);
+            }
+        }
+        return new Deep(ly, lox, loz, lrh, lrv, mushTop, mushBottom, mush, mushReach);
+    }
+
     private record Draft(Volcanoes.Volcano v, int x, int z, int floorY, int cy, int rh, int rv, boolean submerged,
-                         int lakeRadius, int lakeTop, boolean lakeFits) {}
+                         int lakeRadius, int lakeTop, boolean lakeFits, Deep deep) {}
 
     /**
      * Builds the world's bodies.
      *
      * @param lavaFloorY open space below this is the lava floor ({@link LavaRules#floodY})
+     * @param minY       the world's floor (the level's {@code min_y}): the column stops short of its bedrock
      * @param mH         metres per block across, {@code mV} up
      * @param lakeMaxAbsZ crater lakes only at volcanoes with |z| up to this (the pole cap's line: nobody
      *                   reaches a volcano beyond it)
      */
     public static Magma build(List<Volcanoes.Volcano> volcanoes, MagmaRules rules, Heights heights, Wet wet, int circumference,
                               int seaLevel, int lavaFloorY, double mH, double mV, int lakeMaxAbsZ) {
+        return build(volcanoes, rules, heights, wet, circumference, seaLevel, lavaFloorY, lavaFloorY - 10, mH, mV, lakeMaxAbsZ);
+    }
+
+    /** As {@link #build(List, MagmaRules, Heights, Wet, int, int, int, double, double, int)} with the world's floor given. */
+    public static Magma build(List<Volcanoes.Volcano> volcanoes, MagmaRules rules, Heights heights, Wet wet, int circumference,
+                              int seaLevel, int lavaFloorY, int minY, double mH, double mV, int lakeMaxAbsZ) {
         if (rules.chamberSize() <= 0.0 || volcanoes.isEmpty())
             return new Magma(List.of(), circumference);
         List<Draft> drafts = new ArrayList<>();
@@ -228,7 +484,8 @@ public final class Magma {
             if (circumference > 0)
                 x = Math.floorMod(x + circumference / 2, circumference) - circumference / 2;
             int floorY = top(heights.at(x, z));
-            double rhM = Math.clamp(0.1 * v.radiusM(), 1200.0, 4500.0) * rules.chamberSize(); // ledger: MAG-003
+            double rhM = Math.clamp(0.1 * v.radiusM(), 1200.0, 4500.0) * rules.chamberSize()
+                    * (v.silicic() ? SILICIC_CHAMBER : 1.0); // ledger: MAG-003, MAG-050
             int rh = Math.max(2, (int) Math.round(rhM / mH));
             int rv = Math.max(4, (int) Math.round(0.2 * rhM / mV)); // ledger: MAG-004
             int cy = floorY - (int) Math.round(rules.chamberDepthKm() * 1000.0 / mV) - rv;
@@ -261,7 +518,8 @@ public final class Magma {
                         lakeTop = Math.min(lakeTop, top(heights.at(x + dx, z + dz)) - 1);
                 }
             fits = fits && lakeTop != Integer.MAX_VALUE && lakeTop > seaLevel + 2 && floorY - lakeTop <= LAKE_MAX_CUT;
-            drafts.add(new Draft(v, x, z, floorY, cy, rh, rv, submerged, r, lakeTop, fits));
+            Deep deep = rh > 0 && rules.hasColumn() ? buildDeep(v, rules, cy, rh, rv, lavaFloorY, minY) : null;
+            drafts.add(new Draft(v, x, z, floorY, cy, rh, rv, submerged, r, lakeTop, fits, deep));
         }
         // The most active volcanoes that can hold a lake get one.
         List<Draft> able = new ArrayList<>(drafts.stream().filter(Draft::lakeFits).toList());
@@ -281,8 +539,10 @@ public final class Magma {
                 plugTop = d.submerged ? d.floorY - BURIED : d.floorY + 4;
             }
             int reach = Math.max(d.rh + 2, lake ? d.lakeRadius + 2 : 2);
+            if (d.deep != null)
+                reach = Math.max(reach, d.deep.reach);
             out.add(new Body(d.v.id(), d.v.kind(), d.v.activity(), d.x, d.z, d.floorY, d.cy, d.rh, d.rv, conduitTop, plugTop,
-                    d.submerged, lake, d.lakeRadius, lake ? d.lakeTop : 0, lakeBottom, reach));
+                    d.submerged, lake, d.lakeRadius, lake ? d.lakeTop : 0, lakeBottom, reach, d.deep));
         }
         return new Magma(out, circumference);
     }
