@@ -19,7 +19,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173 (31) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-202 (29) |
 
-Rows by status: `cited-unverified` 51, `from-memory` 6, `abstract-only` 21, `calibrated` 19, `game-choice` 67, `uncited` 54; `pending-rewrite` 183; `not-yet-coded` 29.
+Rows by status: `cited-unverified` 45, `from-memory` 6, `abstract-only` 21, `calibrated` 11, `game-choice` 63, `uncited` 52 (198 rows; 20 more `merged`).
 
 ## Material for the stage 2 writer
 
