@@ -535,7 +535,7 @@ enum Command {
         /// PNG to write.
         #[arg(long)]
         out: PathBuf,
-        /// Width in pixels (the height is half of it).
+        /// Width in pixels (the height follows the projection's aspect: half of it).
         #[arg(long, default_value_t = 1024)]
         width: u32,
         /// Draw on this elevation field only (`elevation`: the deep-time surface's L1 frame;
@@ -769,7 +769,7 @@ fn main() -> ExitCode {
             climate_dem::run(&climate_dem::Options {
                 dem,
                 w: width,
-                h: width / 2,
+                h: deeptime_format::Projection::picture_height(width),
                 preset,
                 circumference_km,
                 viewer,

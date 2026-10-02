@@ -150,6 +150,11 @@ impl Projection {
         90.0 - 180.0 * y / f64::from(h.max(1))
     }
 
+    /// The row coordinate of latitude `lat_deg` in a map picture `h` rows high.
+    pub fn picture_y_of_lat(lat_deg: f64, h: u32) -> f64 {
+        (90.0 - lat_deg) / 180.0 * f64::from(h)
+    }
+
     /// The height of a map picture `w` pixels wide at the projection's aspect (2 : 1).
     pub fn picture_height(w: u32) -> u32 {
         (w / 2).max(1)

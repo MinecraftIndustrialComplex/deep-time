@@ -306,7 +306,12 @@ fn slice_reply(run: &Run, query: &str) -> Reply {
         Err(e) => return Reply::error(500, e),
     };
     let t = Instant::now();
-    let slice = world.slice(depth, w, w / 2, threads());
+    let slice = world.slice(
+        depth,
+        w,
+        deeptime_format::Projection::picture_height(w),
+        threads(),
+    );
     let png = match deeptime_viewer::encode_png(slice.w, slice.h, &slice.rgba(&world.colours)) {
         Ok(p) => p,
         Err(e) => return Reply::error(500, format!("encoding the slice: {e}")),

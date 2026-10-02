@@ -30,22 +30,20 @@ pub const DEFAULT_SEED: u64 = 0x5EED_0C01_0B0E;
 /// The columns to sample.
 pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
     let c = w.c;
+    // The z of the poles (the planet's projection).
+    let zp = deeptime_format::Projection::of(c as f64).pole_z() as i64;
     let mut rng = SplitMix(seed);
     let mut out = Vec::with_capacity(n);
     let (seam, poles, bodies) = (n / 10, n / 10, if w.bodies.is_empty() { 0 } else { n / 5 });
     for _ in 0..seam {
         let dx = rng.below(80) as i64 - 40;
-        let z = rng.below((c / 2) as u64) as i64 - c / 4;
+        let z = rng.below(2 * zp as u64) as i64 - zp;
         out.push((c / 2 + dx, z));
     }
     for k in 0..poles {
         let x = rng.below(c as u64) as i64 - c / 2;
         let d = rng.below(96) as i64 - 32;
-        let z = if k % 2 == 0 {
-            -c / 4 + d
-        } else {
-            c / 4 - 1 - d
-        };
+        let z = if k % 2 == 0 { -zp + d } else { zp - 1 - d };
         out.push((x, z));
     }
     for _ in 0..bodies {
@@ -118,7 +116,7 @@ pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
     }
     while out.len() < n {
         let x = rng.below(2 * c as u64) as i64 - c;
-        let z = rng.below((c / 2) as u64) as i64 - c / 4;
+        let z = rng.below(2 * zp as u64) as i64 - zp;
         out.push((x, z));
     }
     out

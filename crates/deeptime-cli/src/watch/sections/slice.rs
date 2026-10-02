@@ -49,7 +49,8 @@ pub struct Slice {
 /// The block (x, z) of pixel (px, py) on a w × h map.
 pub fn pixel_block(c: i64, w: u32, h: u32, px: u32, py: u32) -> (i64, i64) {
     let x = -c / 2 + c * i64::from(px) / i64::from(w);
-    let z = -c / 4 + c * i64::from(py) / (2 * i64::from(h));
+    let p = deeptime_format::Projection::of(c as f64);
+    let z = p.picture_z(f64::from(py), h).floor() as i64;
     (x, z)
 }
 
