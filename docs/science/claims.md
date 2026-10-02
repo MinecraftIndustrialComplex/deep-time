@@ -50,13 +50,14 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [YNG](ledger/YNG.md) | the young landscape | 19 | 0 | 0 | 0 | 0 | 0 | 9 | 10 | 0 | 0 | 2 |
 | **all** | | **2,220** | **70** | **475** | **54** | **68** | **78** | **872** | **603** | **359** | **58** | **193** |
 
-53 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, and WP-13a): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
+70 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and eleven HNT rows (WP-15, WP-16, WP-2),
-and 15 PLT and 19 CHK rows (WP-13a: the force-balance constants and the plate-check targets).
-In plain terms, of the 2,220 active rows: 870 (39 %) are deliberate game or implementation choices; 607 (27 %)
-state something about the physical world with no source at all; 491 (22 %) name a source that nobody is recorded
-as having read; 121 (5 %) were written from memory or from an abstract and say so; 78 (4 %) were tuned to a target;
-53 (2 %) were read in their sources.
+15 PLT and 19 CHK rows (WP-13a: the force-balance constants and the plate-check targets) and 17 DEF rows (WP-8: folds,
+faults and the Noddy port).
+In plain terms, of the 2,220 active rows: 872 (39 %) are deliberate game or implementation choices; 603 (27 %)
+state something about the physical world with no source at all; 475 (21 %) name a source that nobody is recorded
+as having read; 122 (5 %) were written from memory or from an abstract and say so; 78 (4 %) were tuned to a target;
+70 (3 %) were read in their sources.
 
 A low `from-memory` count does not mean a subsystem was written with its sources open. It means
 its agent did not say. The impacts agent was candid, and so has 34 such rows; most `cited-unverified`
