@@ -1273,34 +1273,6 @@ pub fn step(
             ));
         }
         out.solve = Some(report);
-        if std::env::var_os("DEEPTIME_FLEX_DIAG").is_some() {
-            // DIAG (temporary): the step's response split by source, its cell-scale zigzag at
-            // margins (within 3 cells of a plate boundary) and elsewhere.
-            let unsolved = pick(&|c| carried(c, &st.unsolved_m));
-            let ero = pick(&|c| {
-                let dm = x.h_eroded[c] - x.h_start[c];
-                dm * if x.h_eroded[c] <= sea { rock_sea } else { rock_land }
-            });
-            let r_ero: Vec<f64> = ero.iter().map(|&v| RHO_MANTLE * v).collect();
-            let r_un: Vec<f64> = unsolved.iter().map(|&v| RHO_MANTLE * v).collect();
-            let r_rest: Vec<f64> = (0..ws * hs)
-                .map(|c| r[c] - r_ero[c] - r_un[c] - l_released[c])
-                .collect();
-            let edge_c = restrict(&edge.iter().map(|&e| if e { 1.0 } else { 0.0 }).collect::<Vec<_>>(), w, f);
-            let mut near = edge_c.clone();
-            box_blur(&ds, &mut near, 3, 1);
-            let margin = |c: usize| near[c] > 0.0;
-            let mut line = String::new();
-            for (name, rr) in [("ero_dep", &r_ero), ("uplift_water_ice", &r_rest), ("released", &l_released), ("unsolved", &r_un)] {
-                let (xx, _) = sv.solve(&d_now, &c_rest, rr, p.tolerance_m, p.max_iterations);
-                let zm = cell_scale_zigzag(&xx, ws, hs, 5.0, margin);
-                let zi = cell_scale_zigzag(&xx, ws, hs, 5.0, |c| !margin(c));
-                let big = xx.iter().fold(0.0f64, |a, &v| a.max(v.abs()));
-                line += &format!(" {name}[zz_margin={zm:.4} zz_else={zi:.4} max={big:.0}m]");
-            }
-            let zt = cell_scale_zigzag(&dw, ws, hs, 5.0, margin);
-            eprintln!("FLEXDIAG2 total[zz_margin={zt:.4}]{line}");
-        }
         let mut adw = vec![0.0; ws * hs];
         sv.operator(&d_now, &c_rest, &dw, &mut adw);
         let left: Vec<f64> = r
