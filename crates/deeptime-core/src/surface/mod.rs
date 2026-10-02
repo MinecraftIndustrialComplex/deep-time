@@ -1083,7 +1083,7 @@ impl SurfaceStage {
         let started = Instant::now();
         let t_mid = (t_end_myr - 0.5 * dt_myr) as f32;
         // The coal facies needs land plants (the atmosphere clock, `deposits::clocks`).
-        let land_plants = self.epoch().land_plants_at(f64::from(t_mid) * 1.0e6);
+        let land_plants = self.epoch().land_plants_at(f64::from(t_mid) * 1.0e6); // ledger: ORE-018
         let slope: Vec<f32> = (0..n)
             .map(|c| {
                 let r = sc.routing.rcv[c] as usize;

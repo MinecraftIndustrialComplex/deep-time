@@ -433,7 +433,7 @@ pub fn flush(acc: &mut FrameAcc, d: &Dims, t_end_years: f64, epoch: &Epoch) -> F
         }
     }
     let n = d.cells();
-    let bif_share = epoch.inherited_bif_share() as f32;
+    let bif_share = epoch.inherited_bif_share() as f32; // ledger: ORE-020
     if craton.len() == n {
         fields.insert(FRAME_FIELDS[0].into(), dist_to_edge(d, &craton));
         fields.insert(

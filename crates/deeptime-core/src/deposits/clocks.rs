@@ -61,6 +61,7 @@ impl Epoch {
 
     /// Earth's "Ga before present" matching time `t_years` of this planet.
     pub fn ga(&self, t_years: f64) -> f64 {
+        // ledger: ORE-259
         EARTH_AGE_GYR - (self.present_age_gyr + t_years / 1.0e9)
     }
 
@@ -72,6 +73,7 @@ impl Epoch {
     /// The three clocks over the frame [`t0_years`, `t1_years`]: each the share of the frame's
     /// span inside its window (the instant's value when the span is empty).
     pub fn clocks(&self, t0_years: f64, t1_years: f64) -> [(&'static str, f32); 3] {
+        // ledger: ORE-260
         let (a, b) = (self.ga(t1_years), self.ga(t0_years)); // a ≤ b: younger, older
         let share = |lo: f64, hi: f64| -> f32 {
             if b - a <= 0.0 {
@@ -89,6 +91,7 @@ impl Epoch {
     /// The share of the BIF acme that lies before the run's start: 1 when the run starts after the
     /// acme, 0 when it starts before it (the run then has the acme in its own clock).
     pub fn inherited_bif_share(&self) -> f64 {
+        // ledger: ORE-020
         let start = self.ga(self.run_start_years);
         let (old, young) = BIF_ACME_GA;
         ((old - start.max(young)).max(0.0) / (old - young)).min(1.0)
