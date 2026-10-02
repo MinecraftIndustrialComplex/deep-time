@@ -40,8 +40,8 @@
     "dip_deg": [0, 0],
     "rock_class": "gravel",
     "zoning": [
-      {"zone": "pay_streak", "v": [0.5, 1.0], "material": "c:gold", "grade_mult": 2.0, "density": 0.08},
-      {"zone": "pay_streak_ag", "v": [0.5, 1.0], "material": "c:silver", "grade_mult": 1.0, "density": 0.01}
+      {"zone": "pay_streak", "v": [0.5, 1.0], "material": "c:gold", "grade_mult": 2.0, "density": 0.25},
+      {"zone": "pay_streak_ag", "v": [0.5, 1.0], "material": "c:silver", "grade_mult": 1.0, "density": 0.02}
     ],
     "extra_bodies": [],
     "children": []

@@ -603,6 +603,7 @@ pub fn to_body(
             v: [0.5, (0.5 + melt / (2.0 * b)).min(1.0) as f32],
             grade: 0.0,
             density: 0.0,
+            raw: 0.0,
         });
     }
     Some(body)

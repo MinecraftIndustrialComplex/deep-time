@@ -53,8 +53,8 @@
     "dip_deg": [5, 40],
     "rock_class": "banded_iron_formation",
     "zoning": [
-      {"zone": "ore", "d": [0.0, 0.8], "material": "c:iron", "grade_mult": 1.0, "density": 0.35},
-      {"zone": "margin", "d": [0.8, 1.0], "material": "c:iron", "grade_mult": 0.8, "density": 0.15}
+      {"zone": "ore", "d": [0.0, 0.8], "material": "c:iron", "grade_mult": 1.0, "density": 0.6, "raw_share": 0.04},
+      {"zone": "margin", "d": [0.8, 1.0], "material": "c:iron", "grade_mult": 0.8, "density": 0.25}
     ],
     "extra_bodies": [],
     "children": []

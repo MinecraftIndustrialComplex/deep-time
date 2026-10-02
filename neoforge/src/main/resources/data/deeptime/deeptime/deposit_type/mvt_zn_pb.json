@@ -64,10 +64,10 @@
     "dip_deg": [0, 5],
     "rock_class": "dolostone",
     "zoning": [
-      {"zone": "core_zn", "d": [0.0, 0.55], "material": "c:zinc", "grade_mult": 1.2, "density": 0.35},
-      {"zone": "core_pb", "d": [0.0, 0.55], "material": "c:lead", "grade_mult": 1.0, "density": 0.1},
+      {"zone": "core_zn", "d": [0.0, 0.55], "material": "c:zinc", "grade_mult": 1.2, "density": 0.55, "raw_share": 0.04},
+      {"zone": "core_pb", "d": [0.0, 0.55], "material": "c:lead", "grade_mult": 1.0, "density": 0.15},
       {"zone": "core_ag", "d": [0.0, 0.55], "material": "c:silver", "grade_mult": 1.0, "density": 0.02},
-      {"zone": "fringe_zn", "d": [0.55, 1.0], "material": "c:zinc", "grade_mult": 0.7, "density": 0.15}
+      {"zone": "fringe_zn", "d": [0.55, 1.0], "material": "c:zinc", "grade_mult": 0.7, "density": 0.25}
     ],
     "extra_bodies": [],
     "children": []

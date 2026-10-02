@@ -65,7 +65,19 @@ pub fn to_blocks(semi_m: [f64; 3], t: &DepositType, sc: &Scales) -> [f32; 3] {
 /// Grade of `material` at this site as a mass fraction (0 when absent).
 pub type Grades = BTreeMap<String, f64>;
 
-fn zone(def: &ZoneDef, grades: &Grades, richness: f64) -> Zone {
+/// A zone's ore density never exceeds this, however rich the deposit: a tenth of the host stays
+/// rock, so a body still reads as ore in rock (vanilla's ore veins leave filler between their ore).
+/// game-choice (deposit richness, Ben 2026-10-02 "Rich Deposits, Thinner Scatter"). ledger: ORE-262
+pub const DENSITY_CAP: f64 = 0.9;
+
+/// A zone's raw-ore share never exceeds this. game-choice (as [`DENSITY_CAP`]). ledger: ORE-262
+pub const RAW_CAP: f64 = 0.5;
+
+/// A body zone from the type's zone: the site's grade × the zone's `grade_mult` × `richness`
+/// (at most 1); the ore density and the raw-ore share × `richness` (at most [`DENSITY_CAP`] and
+/// [`RAW_CAP`]), so the richness settings reach the blocks (Ben, 2026-10-02: before, `richness`
+/// changed the listed grade only). ledger: ORE-262
+pub(crate) fn zone(def: &ZoneDef, grades: &Grades, richness: f64) -> Zone {
     let grade = def
         .material
         .as_ref()
@@ -79,7 +91,16 @@ fn zone(def: &ZoneDef, grades: &Grades, richness: f64) -> Zone {
         d: def.d,
         v: def.v,
         grade: grade as f32,
-        density: if present { def.density as f32 } else { 0.0 },
+        density: if present {
+            (def.density * richness).min(DENSITY_CAP.max(def.density)) as f32
+        } else {
+            0.0
+        },
+        raw: if present {
+            (def.raw_share * richness).min(RAW_CAP.max(def.raw_share)) as f32
+        } else {
+            0.0
+        },
     }
 }
 
@@ -462,6 +483,61 @@ mod tests {
     use super::*;
     use crate::deposits::types::builtin;
 
+    /// The deposit audit (2026-10-01) and WP-9/10 found the richness settings reached no block:
+    /// only the listed grade. Now a body zone's ore density and raw-ore share follow the richness
+    /// (Ben, 2026-10-02), up to their caps, and the bodies of a site carry them.
+    #[test]
+    fn richness_reaches_the_ore_density_and_the_raw_blocks() {
+        let types = builtin().unwrap();
+        let t = types
+            .iter()
+            .find(|t| t.id == "deeptime:porphyry_cu_mo_au")
+            .unwrap();
+        let core = t
+            .geometry
+            .zoning
+            .iter()
+            .find(|z| z.zone == "potassic_core")
+            .unwrap();
+        assert!(core.raw_share > 0.0, "a rich core carries raw-ore blocks");
+        let grades: Grades = [("c:copper".to_owned(), 0.005)].into_iter().collect();
+        let at = |r: f64| zone(core, &grades, r);
+        assert!((f64::from(at(1.0).density) - core.density).abs() < 1e-6);
+        assert!((f64::from(at(1.0).raw) - core.raw_share).abs() < 1e-6);
+        assert!(at(1.2).density > at(1.0).density);
+        assert!(at(0.5).density < at(1.0).density);
+        assert!((f64::from(at(0.5).density) - 0.5 * core.density).abs() < 1e-6);
+        assert!(at(2.0).raw > at(1.0).raw);
+        // Saturation: never more than the caps.
+        assert!((f64::from(at(10.0).density) - DENSITY_CAP).abs() < 1e-6);
+        assert!((f64::from(at(100.0).raw) - RAW_CAP).abs() < 1e-6);
+        // A zone without its material at the site places nothing, raw or not.
+        let none = zone(core, &Grades::new(), 2.0);
+        assert_eq!((none.density, none.raw), (0.0, 0.0));
+        // Through the bodies of a site.
+        let mut id = 0;
+        let mut next = || {
+            id += 1;
+            id
+        };
+        let place = Placement {
+            x: 0.0,
+            z: 0.0,
+            surface_y: 80.0,
+            centre_depth_m: 600.0,
+            yaw: 0.0,
+            dip: 0.0,
+            truncated: false,
+        };
+        let mut rich = t.clone();
+        rich.balance.richness_mult *= 1.5;
+        let sc = Scales::default();
+        let b1 = bodies_for(t, 1, 240.0e6, &grades, &place, &sc, &mut next);
+        let b2 = bodies_for(&rich, 1, 240.0e6, &grades, &place, &sc, &mut next);
+        let d = |b: &[Body]| b[0].zones.iter().find(|z| z.name == "potassic_core").unwrap().density;
+        assert!(d(&b2) > d(&b1));
+    }
+
     /// Plan §8.6: a median porphyry, 240 Mt at 2.6 t/m³, is a ≈452 m cube: ≈1.5 blocks wide at
     /// 300 m per block and ≈22.6 blocks tall at 20 m per block before multipliers.
     #[test]
@@ -709,12 +785,14 @@ mod tests {
         let area = std::f64::consts::PI * a_km * c_km;
         assert!((800.0..1200.0).contains(&area), "{area} km²");
         assert!((20.0..100.0).contains(&(2.0 * c_km)), "{c_km} km semi-axis");
-        // P90 and P10 span 300 to 3,000 km² within a factor 1.5.
+        // P90 and P10 span 300 to 6,000 km² within a factor 1.5 (the P10 was 3,000 km² until
+        // the owner's answer of 2026-10-02, "Apply all": named fields such as Witbank, 5,680 km²,
+        // and Highveld, 7,000 km², are larger).
         let ar = |mt: f64| {
             let [a, c] = footprint_blocks(&t, mt * 1.0e6, &sc);
             std::f64::consts::PI * a * c * (sc.m_per_block_h / 1000.0).powi(2)
         };
-        assert!((200.0..500.0).contains(&ar(t.sizing.tonnage_mt.p90)));
-        assert!((2000.0..4500.0).contains(&ar(t.sizing.tonnage_mt.p10)));
+        assert!((200.0..450.0).contains(&ar(t.sizing.tonnage_mt.p90)));
+        assert!((4000.0..9000.0).contains(&ar(t.sizing.tonnage_mt.p10)));
     }
 }
