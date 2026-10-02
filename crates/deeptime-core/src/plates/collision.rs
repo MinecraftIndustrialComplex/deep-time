@@ -178,7 +178,7 @@ pub fn collide(
         let rot = quat(state.groups[state.samples[i].group as usize].rot);
         let s = &mut state.samples[i];
         let z = f64::from(s.elevation_m);
-        let dz = dz_max * w * ceiling(z, p.max_elevation_m);
+        let dz = dz_max * w * ceiling(z, p.uplift_ceiling_m);
         s.elevation_m = (z + dz).min(p.max_elevation_m) as f32;
         // The orogen proper is the core of the surge, where the crust thickened most (P1-27:
         // stamping everything the surge lifted by 10 m made belts 4,000 km wide, and most of

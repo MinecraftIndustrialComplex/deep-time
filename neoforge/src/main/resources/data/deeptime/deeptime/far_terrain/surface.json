@@ -1,0 +1,85 @@
+{
+  "_comment": [
+    "Far terrain's surface table (P3-04): the top blocks a biome's far columns show, where the real",
+    "chunk's are decided by the pack's surface rules (which need a generated chunk to run).",
+    "A pack overrides this file at data/deeptime/deeptime/far_terrain/surface.json.",
+    "The first rule whose `biomes` holds the column's biome wins; entries are biome ids or #tags,",
+    "and an id or tag that does not exist is skipped. Fields a rule leaves out come from `default`.",
+    "top: the surface block. under: the blocks below it. depth: blocks of soil, the top included.",
+    "sea_bed: the top block under the sea. bare: no soil at all, the rock is the surface."
+  ],
+  "default": {
+    "top": "minecraft:grass_block",
+    "under": "minecraft:dirt",
+    "depth": 4,
+    "sea_bed": "minecraft:gravel",
+    "bare": false
+  },
+  "rules": [
+    {
+      "biomes": ["minecraft:stony_peaks", "minecraft:stony_shore", "#c:is_stony_shores"],
+      "bare": true
+    },
+    {
+      "biomes": ["minecraft:jagged_peaks", "minecraft:frozen_peaks"],
+      "top": "minecraft:snow_block",
+      "under": "minecraft:stone",
+      "depth": 2,
+      "sea_bed": "minecraft:stone"
+    },
+    {
+      "biomes": ["minecraft:snowy_slopes", "minecraft:grove", "minecraft:ice_spikes"],
+      "top": "minecraft:snow_block",
+      "under": "minecraft:dirt",
+      "depth": 4
+    },
+    {
+      "biomes": ["#minecraft:is_badlands", "#c:is_badlands"],
+      "top": "minecraft:red_sand",
+      "under": "minecraft:terracotta",
+      "depth": 12,
+      "sea_bed": "minecraft:red_sand"
+    },
+    {
+      "biomes": ["minecraft:desert", "#c:is_desert"],
+      "top": "minecraft:sand",
+      "under": "minecraft:sandstone",
+      "depth": 6,
+      "sea_bed": "minecraft:sand"
+    },
+    {
+      "biomes": ["#minecraft:is_beach", "#c:is_beach"],
+      "top": "minecraft:sand",
+      "under": "minecraft:sandstone",
+      "depth": 4,
+      "sea_bed": "minecraft:sand"
+    },
+    {
+      "biomes": ["minecraft:warm_ocean", "minecraft:lukewarm_ocean", "minecraft:deep_lukewarm_ocean"],
+      "top": "minecraft:sand",
+      "under": "minecraft:sandstone",
+      "depth": 4,
+      "sea_bed": "minecraft:sand"
+    },
+    {
+      "biomes": ["minecraft:windswept_gravelly_hills"],
+      "top": "minecraft:gravel",
+      "under": "minecraft:stone",
+      "depth": 2
+    },
+    {
+      "biomes": ["minecraft:mushroom_fields"],
+      "top": "minecraft:mycelium"
+    },
+    {
+      "biomes": ["minecraft:old_growth_pine_taiga", "minecraft:old_growth_spruce_taiga"],
+      "top": "minecraft:podzol"
+    },
+    {
+      "biomes": ["minecraft:mangrove_swamp"],
+      "top": "minecraft:mud",
+      "under": "minecraft:mud",
+      "sea_bed": "minecraft:mud"
+    }
+  ]
+}

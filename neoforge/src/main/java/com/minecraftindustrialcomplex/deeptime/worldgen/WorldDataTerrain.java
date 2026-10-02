@@ -17,6 +17,8 @@ public final class WorldDataTerrain implements TerrainSource {
     private volatile WorldData data;
     private volatile ClimateMapping mapping;
     private volatile LavaRules lava;
+    private volatile Magma magma;
+    private volatile MagmaRules magmaRules;
 
     public WorldDataTerrain(WorldDataRef ref) {
         this.ref = ref;
@@ -54,6 +56,47 @@ public final class WorldDataTerrain implements TerrainSource {
             lava = l;
         }
         return l;
+    }
+
+    /** The world's settings for lava at its volcanoes. */
+    public MagmaRules magmaRules() {
+        MagmaRules r = magmaRules;
+        if (r == null) {
+            r = MagmaRules.of(data().manifest().notes());
+            magmaRules = r;
+        }
+        return r;
+    }
+
+    /**
+     * The magma under and in the world's active volcanoes, built on first use from the baked list,
+     * the terrain height and the water columns (so every chunk sees the same bodies).
+     *
+     * @param cell   the generator's noise cell width (the water rule's reach)
+     * @param minY   the level's floor, {@code seaLevel} its sea level
+     */
+    public Magma magma(int cell, int minY, int seaLevel) {
+        Magma m = magma;
+        if (m == null) {
+            synchronized (this) {
+                if (magma == null) {
+                    WorldData wd = data();
+                    var spec = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Spec.of(wd, cell);
+                    var none = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Kind.NONE;
+                    magma = Magma.build(wd.volcanoes().list(), magmaRules(), (x, z) -> wd.height(wrapX(x), z),
+                            (x, z) -> com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, wrapX(x), z).kind() != none,
+                            wd.circumference(), seaLevel, lava().floodY(minY, seaLevel), wd.manifest().mPerBlockH(),
+                            wd.manifest().mPerBlockV(), (int) (wd.circumference() / 4.0 * ref.poleCapDeg() / 90.0));
+                    long lakes = magma.bodies().stream().filter(Magma.Body::lake).count();
+                    long molten = magma.bodies().stream().filter(b -> b.chamberRh() > 0).count();
+                    com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(
+                            "[deeptime] magma: {} active volcanoes, {} with a chamber, {} with a crater lava lake ({})",
+                            wd.volcanoes().list().size(), molten, lakes, magmaRules());
+                }
+                m = magma;
+            }
+        }
+        return m;
     }
 
     @Override

@@ -51,6 +51,7 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-26 | Per-cell climate: 2-D energy balance, sea ice, moisture (log 2026-09-30) | doing | 2026-09-30 | | Design approved 2026-10-01 (docs/design/p1-26-per-cell-climate.md, recommended answers); tasks T1–T11 start after the climate agent's ice-sheet branch (worktree-agent-adc924860a859865c-ice) lands. |
 | P1-27 | Plate margins and coherent continents (logs 2026-09-29, 2026-09-30) | done | 2026-09-30 | | Branch worktree-agent-ad3b417fd428c1ac2 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. Cause: a collision moved the continent alone to the overriding plate, leaving its passive margins facing an ocean that kept converging (collisions cut 295,000–455,000 km of margin off its ocean per 750-Myr run; rifts ~2,000, initiations < 300). Fixed by sutures, initiation anywhere clear of trenches (rate 0.3), arc cordilleras, collision orogen cores, arc maturity; provinces view generalised to the USGS map's 150 km. Mac, 6 pipeline runs × 400 Myr before → after: active margin 0.67 → 0.31 (Earth ~0.3, Bradley 2008), passive 0.30 → 0.63, floor beside passive margins 50 → 102 Myr, ground under arc cones 307 → 812 m, provinces orogen 0.51 → 0.40, shield+platform 0.17 → 0.29, edge density 0.078 → 0.060; land 0.398 → 0.391, median 1,350 → 1,030 m, ocean p90 108 → 194 Myr. cargo test/clippy/fmt/deny clean, JUnit 155/0; evidence review/out/p1-27/ (not committed); see build log |
 | P1-28 | Stone and deepslate for the common rocks (log 2026-10-01; first the hardness tiers, replaced the same day) | done | 2026-10-01 | | Branch worktree-agent-a72907749021691b5 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. `minecraft:stone` is the `vanilla_fallback` of shale and mudstone, `minecraft:deepslate` of slate, phyllite, schist and gneiss (`CRUST_STAND_INS` in `tools/dev/gen_rock_classes.py`); no recipe, item tag or drop touched. Stone or deepslate share of the placed rock, top 64 blocks / whole column: 0.0 % → 47.8 % / 55.3 % (12 generated boxes, standalone), census of the whole planet 0.1 % → 56.2 % / 0.0 % → 56.0 %. Gates: cargo fmt/clippy/test/deny clean, gradlew build test 161/0, `./gametest.sh` and `-PwithMic` All 58 passed. MIC rows are in the build log; see the entry. |
+| P3-04 | Distant Horizons far terrain (asked for ahead of Phase 3, Ben 2026-10-01) | done | 2026-10-01 | — | Branch worktree-agent-a6e8592da3ce000d8, not merged. DH LODs from the world data through a world-generator override bound by name (DH 3.3.0's merged `_neoforge` API and 3.3.1+'s published one). VM: JUnit 180/0 (`FarColumnTest` 14, `DhApiBindingTest` 4 on the real 3.3.0 and 3.3.3 jars); `FarTerrainGameTests` 3 of 3 (ground within a block 117 of 119, water and biome 119 of 119); smoke `dh` (`run.py --dh`): registered, DH's server-side pregen fed 257 sections with no failure, what DH stores has far terrain's surface in 400 of 400 columns, far terrain 9.6–11.1 ms a section; smoke `dh-next` (DH 3.3.3): Toroidal World refuses the override (pending question). Looks unverified (no client). See build log |
 
 | P2-01 | Fold-and-fault engine (Noddy evaluator; pulled forward, log 2026-10-01) | doing | 2026-10-01 | | Branch worktree-agent-a49703993341aa701 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), **not merged: waits for the coordinator's merge and GameTest batch**. Stage A (the port, bit-exact against the original C) and **stage B** are built: format 0.3 with `structure/events.dtst`, the deformed column rule in Rust and Java (`ColumnParityTest` over deformed columns, 173 JUnit tests, 0 failures), unconformities by age key, stocks, dykes and plugs as intrusion events, traps from the world's own structures, fault scarps and rift valleys in the amplifier, grouped `fold_belt` / `fault_system` events, `deeptime structure-sections` and the structure census of `strata-check`. `earthlike_quick_16k`, 500 Myr: 12,657 events (1,081 fold trains, 3,848 thrusts, 1,256 normal and 261 strike-slip faults, 2,760 stocks, 2,647 dykes, 804 plugs); they change 52 % of land columns, none of 20,000 malformed; the column rule costs 0.60 ms a chunk through them against 0.44 without (Java, one thread); land share 0.2770 with the relief and without, land median 661.1 m against 661.0. cargo fmt, clippy -D warnings, test --workspace, deny and `gradlew build test` clean after merging master 84163c3. GameTests on the branch (allowed for this task): `./gametest.sh` and `./gametest.sh -PwithMic` (168 MIC mods): all 60 required tests passed in each. See the build log. |
 ## Review pages
@@ -81,9 +82,14 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-01 | deposit audit | **How rich should deposits be, against scatter and vanilla?** Three options with settings and numbers per family (A deposits clearly beat scatter, recommended; B deposits are the only real source; C realistic grades with strong multipliers), in the sub-agent's report and the build log entry "Deposit audit". Also: **a gold-bearing gravel block of Deep Time's own** for packs without Excavated Variants (it would be the mod's first block), or keep `minecraft:gold_ore` in the gravel bed there? No default changes until answered. | to be asked by the coordinator (the sub-agent has no AskUserQuestion) |
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
-| 2026-10-01 | surface / plates | **The emergent height limit (stage 2).** Stage 1 (build log 2026-10-01, "Terrain above the build limit, stage 1") removed the bookkeeping that built 13–20 km and added the compression band; Earth-like 16k worlds now peak at 9.0–11.2 km on L1, held by the plate model's uplift ceiling, not by physics. Build stage 2 (crust over its strength spreads: σ = ρ·g·h against `crust_strength_mpa`, plateaus at about 5 km on Earth, 13 km at 0.38 g)? And inside it: drop the plate model's 10 km uplift ceiling to a 30 km guard and recalibrate uplift with the hypsometry work (recommended), or keep it and let the spreading act under it? Also: keep squeezing a world too short for its mountains (now), or raise the vertical-scale slider's minimum to 19.6 m and refuse? | Not asked yet: for the coordinator to put to Ben |
-| 2026-10-01 | lava | **Where lava should be, beyond the fix** (build log 2026-10-01, "Lava floods"). The fix makes the generator's own lava vanilla's, measured from the world's floor: a lava floor in the lowest 10 blocks and lava cave lakes below about y −288. What is left above that is the pack's and vanilla's **lava-lake features** (80 to 140 blocks each, anywhere from deep caves to a mountain's flank: 3 in the coast box, 7 to 9 in the mountain box, standalone and MIC alike) and single-block lava springs. Options: **(1, recommended)** keep the fix as the default and take the random lava-lake features and springs out of Deep Time worlds (a biome modifier like `deeptime:claim_ores`, with a setting), then put lava back where the simulation says it belongs: crater lakes and shallow magma under the volcanoes the run marks active (101 in Ben's run), which needs the bake to write the active volcanoes for the game, so it is its own task; (2) keep the fix and leave the features alone: vanilla's amount of lava, a few small lakes per 256 × 256 blocks at any depth; (3) no lava from the generator at all (`underground.lava_floor_blocks` and `lava_lake_blocks` 0) until the volcano task exists; (4) a deeper or shallower lava zone (the two settings; each default is vanilla's distance from the floor). | Not asked yet: for the coordinator to put to Ben |
+| 2026-10-01 | world height / mountains | After stage 2 (build log 2026-10-01, "The height limit, stage 2"): **(1) the bottom:** default trenches reach y −412 to −472 against `min_y` −352: lower `min_y` to −512 (+16 % sections; recommended), squeeze the bottom band only, or leave flat trench floors? **(2) summits:** Earth-like worlds top out at 6.0–6.9 km (plateaus at 5–5.7 km, little summit relief above them): give the amplifier summit relief over plateaus (recommended) or raise `crust_strength_mpa` to ~190? **(3) light planets** get taller volcanoes but not taller fold belts, since erosion and uplift do not know gravity: leave, or make them? **(4) the top** stays at y 639 (default worlds end 166 blocks under the compression knee) unless Mars-like worlds matter now (then `max_y` 1023, +39 % sections). | Not asked yet: for the coordinator to put to Ben |
+| 2026-10-01 | lava | **How far a player is from lava** (build log 2026-10-01, "Magma under active volcanoes"). With lava only at active volcanoes and the world's floor, on the 16k quick planet measured (123 active volcanoes, 100 on land, 16 crater lakes) a land point is a median 658 blocks (p90 1,309) from the nearest active volcano on land, where lava lies six blocks under the crater's magma plug, a median 1,178 blocks (p90 2,251) from the nearest open crater lake, and 438 blocks (p90 510) straight down from the lava floor. Vanilla has lava within about 100 blocks of anywhere. Options: **(1, recommended)** keep it: lava is a place to travel to, which is what the decision asked for (what MIC's early recipes need lava for was not checked); **(2)** a crater lake at every active volcano on land (`crater_lake_share` 1: about 62 of the 100 can hold one, four times today's 16); **(3)** a second, shallower source: lava in the deep cave aquifers again (`lava_lake_blocks` raised, e.g. 150: lava lakes in caves below about y -200); **(4)** keep the biomes' random lava (`remove_lava_features` off): vanilla's amount, geologically arbitrary. Also open: **the lava floor** at the bottom of the world (`lava_floor_blocks` 10; Ben has not decided whether to keep it), and **spreading ridges and rifts**, which the bake does not export (no lava there yet). | Not asked yet: for the coordinator to put to Ben |
+| 2026-10-01 | P3-04 | **Toroidal World refuses Deep Time's Distant Horizons generator from DH 3.3.1 on** (it works with MIC's 3.3.0 only because TW's DH mixins miss that jar's renamed classes). (a) Keep MIC on DH 3.3.0 for now and ask TW's author for a way to declare a seam-aware generator before any DH update (recommended); (b) a Deep Time mixin into TW's `DhGenerators.requireOwn` that lets our generator through (works today, breaks when TW changes, and overrides a guard TW put there on purpose); (c) accept that a DH update turns far terrain off and DH generates from real chunks. | Not asked yet (sub-agent report) |
+| 2026-10-01 | P3-04 | **Far terrain's top blocks.** A table by biome gives 85–96 % of ground blocks right on vanilla biomes and 55 % in MIC (Terralith). (a) A MIC table for Terralith's biomes on the pack's deep-time branch, measured with `probe dh check` (recommended: cheap, pack-side); (b) run the pack's real surface rules over a throwaway chunk per far chunk (exact soil, est. 5–15 ms more a section, touches vanilla chunk classes other mods mix into); (c) leave it. | Not asked yet (sub-agent report) |
+| 2026-10-01 | P3-04 | **Trees in far terrain.** Far terrain has none, so a forest reads as grass until real chunks replace the LODs. (a) Leave it until a client can show how it looks (recommended); (b) add a canopy layer by biome (leaf block, cover share and height in the surface table). | Not asked yet (sub-agent report) |
+| 2026-10-01 | P3-04 | **The switch.** Far terrain is on whenever Distant Horizons is installed; off with `-Ddeeptime.dh=false`. Make it a setting (server config or the editor), and on or off by default? Recommended: on by default, a server config key when the config file next changes. | Not asked yet (sub-agent report) |
 
 ## Build log
 ### 2026-10-01 — P2-01 stage B: folds, faults and intrusions in the game's columns, and on the ground (agent worktree agent-a49703993341aa701, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
@@ -296,6 +302,197 @@ Stage A is the part with no dependence on other branches; stage B puts it into t
   as bodies; (5) trap structure from the real folds and faults, deposits otherwise untouched; (6) `deeptime
   strata-check` and the workbench sections before and after through a collision belt, an arc and a rift; grouped
   `deeptime:fold_belt` and `deeptime:fault_system` events.
+
+### 2026-10-01 — Magma under active volcanoes; the biomes' random lava removed (agent worktree agent-a04fab824846efbfc, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Ask.** Ben, decisions log 2026-10-01, "Volcanoes is a go ahead": lava where the simulation has it. Branch
+  `worktree-agent-a04fab824846efbfc`, master merged in, not merged to master, not pushed.
+- **The bake** writes `volcanoes/active.json`: the volcanoes the volcano stage leaves active at the present (id, kind,
+  summit x and z, basal radius, height, activity 0–1, oceanic, silicic, age, crater radius and depth), in id order
+  (`crate::underground::active_volcanoes`; FORMAT.md, "Lava"). Dead, eroded and subducted ones are not listed.
+  **Spreading ridges and rifts are not exported**: they are plate-boundary geometry, not cheap, and nothing draws them yet.
+- **In the world** (`worldgen/Magma` decides every block from the list, the settings and the terrain height, once per
+  level; `worldgen/MagmaPass` places it in the surface step after the water pass).
+  - **Chamber**: an ellipsoid of lava whose top is `magma_chamber_depth_km` (3 km = 150 blocks) under the crater floor;
+    radius a tenth of the volcano's basal radius (1.2 to 4.5 km), half-height a fifth of that. In blocks it is a tall lens,
+    because the world is 15 times taller than wide: 19 across and 57 high (9,500 blocks) under a 28-km arc cone, 31 across
+    and 91 high (42,400 blocks) under the shield. Raised to stay 8 blocks over the lava floor, squeezed under thin ground.
+  - **Conduit**: a plus-shaped column of lava from the chamber's centre to six blocks under the crater floor, then a plug
+    of magma blocks: to the surface on land, buried three blocks under the bed under water.
+  - **Crater lava lake** at the `crater_lake_share` (0.25) most active volcanoes that can hold one: radius half the
+    crater's (2 to 10 blocks), lava up to one block under the lowest ground around it, the ground above opened to the sky.
+    Not under or beside water, not beyond the pole cap's line, not where the summit is too sharp (a cut over 12 blocks).
+  - **Sealed.** Open space within a block or two of magma becomes smooth basalt, and every block of a body and its
+    shell is in the carving masks, so lava never touches the sea, a lake, a river, an aquifer or a cave. A volcano
+    **under the sea or at the coast** keeps its chamber and conduit under at least 8 blocks of rock, gets no lava lake,
+    and its plug stays buried. Dead volcanoes get nothing.
+- **Random lava removed** (`underground.remove_lava_features`, on by default). Traced first, in the 168-mod MIC set and
+  vanilla: `minecraft:lake_lava_surface`, `lake_lava_underground`, `spring_lava`, `spring_lava_frozen` (in nearly every
+  overworld biome, Terralith's included) and Terralith's `volcano/lava_lakes`, `volcano/lava_flow`, `volcano/spring_lava`,
+  `cave/mantle/lava_drip`. `worldgen/LavaFeatures` refuses any placed feature whose configuration holds a lava block or
+  fluid state, where it is placed (`PlacedFeature.placeWithContext`, one small mixin), for Deep Time generators only.
+  Not a biome modifier: those run once per server, before a new world's data is in place, and for every dimension.
+  - **Terralith's `cave/frostfire/lava_remover` is refused too.** It turns lava sources into deepslate, 300 blobs of
+    radius 10 to 12 per chunk below y 30 in frostfire caves, and ate the chamber of a submarine volcano under such a
+    cave (4,226 of 4,521 blocks became deepslate in MIC; standalone kept all). It also explains the deepslate seen in
+    the flooded zone in the first lava entry.
+- **Settings** (preset section `underground`, all eight presets; editor section "Advanced · Lava and magma"):
+  `magma_chamber_depth_km` (3.0), `magma_chamber_size` (1.0; 0 = no magma), `crater_lake_share` (0.25),
+  `remove_lava_features` (true). `lava_floor_blocks` and `lava_lake_blocks` are unchanged (10, 54).
+- **Evidence** (a fresh 16k quick planet, supercontinent, 500 Myr, baked by this branch: 123 active volcanoes, 119 arc
+  stratovolcanoes, 3 caldera complexes, 1 shield; `tools/workbench/preview.py run`, seed 20261001, three 256 × 256 × 992
+  boxes per profile; screenshots, censuses and the probes in `review/out/lava-volcano/`).
+
+  | Box | MIC | Standalone | What the lava is |
+  |---|---|---|---|
+  | arc stratovolcano 12529 (crater lake, summit y 190) | 10,300 | 10,300 | one body of 10,239 from y −16 to 182 (chamber, conduit, lake); 29 faces open to the sky, the lake's surface; 61 blocks at the lava floor |
+  | shield 12523 (summit 81 blocks under the sea) | 43,188 | 45,677 | one body of 43,051 from y −258 to −24, 0 faces on water; the rest lava floor and lava-lake aquifers below y −300 |
+  | oceanic arc volcano 12565 (summit at y −91, under frostfire caves in MIC) | 5,709 | 6,747 | one body of 5,181 from y −285 to −97, 0 faces on water; the rest below y −300 |
+
+  Lava above y −288 that is not a volcano's: 0 blocks in all six boxes. Lava touching water: 0 faces. The bodies are
+  block-for-block the same in both profiles.
+  - **What it means for a player** (`/deeptime probe magma`: 4,000 land points drawn evenly inside the pole cap). On
+    this planet 100 of the 123 active volcanoes stand on land and 16 hold a crater lake.
+
+    | From a random land point | p10 | median | p90 |
+    |---|---|---|---|
+    | to the nearest active volcano on land (lava six blocks under the plug in its crater) | 169 | 658 | 1,309 blocks |
+    | to the nearest open crater lava lake | 380 | 1,178 | 2,251 blocks |
+    | straight down to the lava floor (y −342) | 411 | 438 | 510 blocks |
+
+    Vanilla has lava within about 100 blocks of anywhere. That gap is the pending question above.
+- **Tests.**
+  - JUnit `MagmaTest` (8, cones in closed form, no planet): chamber, conduit and plug where the rule puts them; the most
+    active volcanoes get the lakes and the ring holds them; **every molten block's six neighbours belong to the body**
+    (only a lake's surface faces air); under or beside water no lake and a buried plug; chambers stay between the ground
+    and the lava floor; bodies across the seam; the settings and the list; what makes a lava feature.
+  - Rust `underground::tests` (3): only the volcanoes active at the present are listed.
+  - GameTest `magmaUnderActiveVolcanoes` (the level with caves and aquifers): up to four of the planet's bodies read
+    back block by block at the surface step: the molten blocks are lava, no lava outside a body above the lava-lake
+    zone, no lava face on water or on air except a lake's surface, the lake open to the sky. A planet without an active
+    volcano passes with a line saying so.
+  - GameTest `lavaFeaturesStayOut`: every placed feature is asked; vanilla's four are refused for the Deep Time level and
+    placed for any other; water springs, ores and trees are untouched; with Terralith, its four and the lava remover.
+  - `lavaStaysAtTheFloor`, `riversHold`, `carversSpareWater`: in the suites below.
+- **Gates** (VM, master merged in, tree 2e49b4d): `cargo fmt --check`, `clippy -D warnings`, `cargo deny` ok; `cargo test
+  --workspace` 533 passed, 0 failed, 3 ignored; `./gradlew build test` → tests=180 failures=0; `./gametest.sh` → All 62
+  required tests passed (544 s); `./gametest.sh -PwithMic` → All 62 required tests passed (the MIC set is a copy of the
+  workbench's, pack 790e116). In both, `magmaUnderActiveVolcanoes` read three shields of the test planet (a crater lake,
+  one under water, one on land): 43,075 / 42,881 / 43,051 molten blocks, all lava, `stray=0 wetFaces=0 airFaces=0`; with
+  MIC `lavaFeaturesStayOut` refused 14 of 932 placed features (vanilla's and Terralith's, the lava remover included).
+  After the carving-mask change the lake volcano was generated again (MIC): the only lava faces on air are the 29 of
+  the lake's surface (before it, a carver left 41 more at the chamber's side).
+- **Also seen, not changed.**
+  - **Baked summits are not bowls.** At every lake volcano the ground three to five blocks from the listed summit lies
+    1 to 11 blocks below it, and in the section through 12529 the cone's highest point stands beside the listed column.
+    So the lake sits in a pit the pass cuts, beside the peak, and a summit too sharp for that gets no lake (about 62 of
+    the 100 land volcanoes can hold one). The amplifier's crater and the catalogue's position should be compared at L3.
+  - Activity saturates at 1.0 for most arc volcanoes, so the lakes go to the lowest ids among them.
+  - 13 of the first 20 lakes stood within 160 blocks of the pole edge (an arc along the edge of the map) and 2 more
+    beyond the pole cap, which is why lakes now stop at the cap's line.
+- **Contradicts the plan:** nothing in the plan places lava; §7.1 keeps vanilla's aquifer and features.
+- **Next step.** Ben's answer to the lava question above.
+### 2026-10-01 — The height limit, stage 2: crust over its strength spreads; the plate model's cap is a guard (agent worktree agent-ac2a33b7f51fa4bf8, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Why.** Ben (decisions log 2026-10-01): "Build it out": the height limit and its dependence on gravity come from
+  the simulation, not from a number in the plate model; the world's height may rise if the model needs it.
+- **The mechanism** (`surface/spread.rs`, step 5b of the surface stage, after isostasy). Where the weight of the land
+  above the sea, ρ_c·g·h (ρ_c 2,800 kg/m³), passes the crust's strength S, the surface relaxes sideways as the lower
+  crust flows out from under it: ∂h/∂t = ∇·(D ∇h), D = D₀·min(x, 2)³, x = max(0, ρ_c·g·h/S − 1). Conservative
+  and implicit (the surface's own diffusion solver), solved only when some cell is over the threshold. It moves
+  crust, not surface rock: strata log and mass residual untouched; the plate model takes it through the feedback.
+  Nothing is clamped. Settings: `tectonics.crust_strength_mpa` (140: 5.1 km at 1 g) and `tectonics.crust_flow_km2_myr`
+  (D₀ at twice the strength height; 30,000), both in the editor (Advanced · Plates, `crust_strength`, `crust_flow`)
+  with lang keys.
+- **The plate model's cap is demoted.** `tectonics.max_elevation_m` is 30 km in the pipeline presets, a guard that
+  bound 0 continental sample-steps in every run below. The uplift ceiling (uplift × (1 − z/10 km), which did the
+  work before) is its own setting, `uplift_ceiling_m`, and 0 (none) in the pipeline presets; Cortial's z_c as the
+  scale of the subduction transfer function is `uplift_reference_m` (10 km, a scale only). The struct's defaults and
+  the plate-only presets keep the old behaviour (10 km, ceiling on, no spreading): they have no surface stage.
+- **Volcanoes.** The ceiling (`volcanoes.max_elevation_km`, 6.8) is now that height times the planet's strength
+  height over Earth's with the default crust: unchanged at 1 g and 140 MPa, 17.9 km at 0.38 g, 3.4 km at 2 g.
+- **Recalibration.** Without the uplift ceiling the land ran high with strong spreading alone (land 0.317, median
+  768 m, above 2 km 0.163, n = 4), so `subduction_uplift_mm_yr` 0.6 → 0.42 and `collision_uplift_max_m` 2000 → 1400
+  (×0.7) in the four pipeline presets and the built-ins (and the test planet, 4000 → 2800). `tools/review/p1-17-hyps.sh`,
+  500 Myr, `earthlike_quick_16k`, area-weighted, mean [min, max]:
+
+  | | n | land | median, m | p90, m | above 2 km |
+  |---|---|---|---|---|---|
+  | Earth | | 0.289 | 427 | 2,022 | 0.102 |
+  | targets (recalibration 8600e03) | | ≈ 0.29 | 430–640 | | 0.10–0.13 |
+  | before: stage 1 + recalibrated presets | 6 | 0.292 [0.283, 0.307] | 695 [604, 800] | 2,444 | 0.151 [0.115, 0.198] |
+  | no ceiling, D₀ 3,000 | 4 | 0.277 [0.243, 0.318] | 601 [481, 803] | 2,423 | 0.139 [0.095, 0.187] |
+  | no ceiling, D₀ 30,000 | 4 | 0.317 [0.248, 0.396] | 768 [513, 1001] | 2,496 | 0.163 [0.101, 0.225] |
+  | **the presets now: D₀ 30,000, uplift × 0.7** | 6 | 0.273 [0.234, 0.310] | 547 [436, 701] | 2,102 [1,789, 2,392] | 0.114 [0.085, 0.152] |
+
+  Histories are chaotic: with n = 4–6 a mean moves by about ±0.02 in land and ±100 m in the median between batches.
+- **Heights, deep-time surface on L1** (same runs; seeds 1–3 × both starts, "before" has seeds 1, 2 from the first
+  batch and seed 3 with the old settings on the new binary):
+
+  | | max, km | p99 land (cells), km | cap bound |
+  |---|---|---|---|
+  | before | 6.4–7.8 | 4.3–5.1 | 0 |
+  | now | 5.7–6.8 | 4.2–5.5 | 0 |
+  | now, 0.38 g (n = 4) | 9.5–11.0 | 3.4–5.7 | 0 |
+  | now, 2 g (n = 4) | 3.42–3.43 | 2.9–3.1 | 0 |
+
+  At 2 g everything above 2.55 km spreads (2–3 million km³ moved per run against 0.2–0.7 million at 1 g) and the
+  highest ground is the volcanoes at their 3.4 km ceiling. At 0.38 g the strength height is 13.4 km and **no cell
+  ever reached it** (spread 0): ranges there are limited by how fast uplift feeds them against erosion, which does
+  not depend on gravity in this model, so their p99 is the Earth-like one; the 9.5–11 km summits are volcanoes under
+  their higher ceiling. So gravity lowers mountains on heavy planets and frees volcanoes on light ones, but a light
+  planet's fold belts are not markedly taller: that would need erosion (or uplift) to know gravity. For Ben.
+- **Plateaus** (`deeptime stage volcanoes … --out`, seed 1, supercontinent; `review/out/height-stage2/map-{old,new,g038}.png`,
+  sections through the highest cell, km per L1 cell of 4.8 km). Before: a dome, `… 4.2 5.1 5.6 5.9 6.1 6.3 6.3 6.4 6.3
+  6.2 6.1 6.0 5.9 …`. Now: a table with steep edges, `0.8 1.0 2.3 3.2 4.5 5.4 5.6 5.6 5.6 5.7 5.7 5.7 5.7 5.6 5.6 5.6 5.5
+  5.3 5.1 4.8 …` (1 km to 5.4 km in five cells, then 13 cells within 0.2 km). Land above 5 km: 0.30 % → 0.42 %,
+  nothing above 6 km. At 0.38 g the highest ground is a cone, `… 5.9 7.1 8.2 9.1 9.4 9.2 8.6 7.7 …`.
+- **The finished world** (`deeptime run`, amplifier and bake included, the six default runs; H every 8th block):
+  highest terrain y 365–409 = **6.0–6.9 km** (6.92, 6.17, 6.14, 6.03, 6.43, 6.45), p99.9 5.2–6.2 km, p99 4.0–5.6 km;
+  0 cells above the compression knee (y 575), 0 compressed, in all six. The amplifier adds at most a few hundred
+  metres to the L1 maxima. **So the compression band does not shape Earth-like worlds, and the world height does not
+  need to rise for them**: the highest block is 166 blocks under the knee.
+- **Run time.** The spreading solve is 22–35 s of a 190–240 s surface stage over 250 steps (about 13 %, 4–5 % of
+  the 500-Myr run of ~580 s at 2 threads); more than the few per cent I estimated, because the solve runs over the
+  whole grid. Restricting it to the cells over the threshold and their surroundings is the obvious saving.
+- **World height, the numbers asked for.** Minecraft allows a dimension from y −2032 to 2031 (`min_y` and `height`
+  multiples of 16, height ≤ 4064); NeoForge adds no limit. Deep Time's `planet_overworld` is −352..639 (62
+  sections). Not needed for default worlds (above). It is needed for what low gravity can build: at 0.38 g volcanoes
+  reach 11 km on L1 (ceiling 17.9 km = y 958), which today is squeezed into the 48-block band under y 623.
+  Options: **(A, recommended) leave 639** and let the band take low-gravity summits until someone wants Mars-like
+  worlds; (B) `max_y` 1023 (86 sections, +39 %): holds 19.2 km, costs every world's noise fill, lighting and
+  heightmaps in proportion to the extra 24 empty-air sections per chunk (not measured; the dimension type and noise
+  settings are one JSON each, the format already carries `max_y`, existing test worlds would need regenerating);
+  (C) a per-preset height (the dimension type chosen from the preset's gravity): only tall planets pay, but the
+  dimension type becomes dynamic, which Toroidal World and the client-info channel would have to follow.
+- **The bottom** (the lava work found seabeds under the world's floor). In the six default runs the deepest finished
+  sea floor is y −412 to −472, 9.5–10.7 km under the sea (`tectonics.trench_elevation_m` is −10 km), against `min_y`
+  −352 (8.3 km): 0.01–0.08 % of the sea's cells are below the floor and 0.14–0.49 % in its lowest 32 blocks, the
+  router's bottom slide. Nothing squeezes the bottom as the band does the top. Options: **(A, recommended) `min_y`
+  −512** (72 sections instead of 62, +16 %: 11.5 km of sea, real trenches fit with the slide), with the same
+  smooth squeeze above the floor as a net for deeper settings; (B) the squeeze only, at −352: no cost, trenches
+  flatten gently at 8 km; (C) leave it: flat trench floors at bedrock in under 0.1 % of the sea. Either way existing
+  test worlds are regenerated; the format already carries `min_y`.
+- **The full preset** (`earthlike_full_16k`: 250,000 samples, L1 r 8; the ensemble Ben approved, 2 seeds × 2 starts,
+  500 Myr, 2,600 s a run at 2 threads): land 0.327 [0.266, 0.359], median 746 m [652, 861], p90 2,491 m, above 2 km
+  0.148 [0.099, 0.168]; L1 max 6.6–6.8 km, cap bound 0. Still high (one run before all of today's changes had land
+  0.38, median 1,013 m). With uplift × 0.8 on top (`subduction_uplift_mm_yr` 0.34, `collision_uplift_max_m` 1100; n = 4): land 0.292 [0.257, 0.319], median 630 m [577, 675], p90 2,049 m, above 2 km 0.106 [0.082, 0.131], L1 max 5.7–6.8 km: inside the targets, so the two full presets carry these values (the quick ones keep 0.42 and 1400).
+- **Not in these runs:** the folds-and-faults term (worktree-agent-a49703993341aa701), which is on its own branch
+  and switchable; the combined effect is to be re-checked after both land.
+- **Tests.** `surface::spread` (a 9 km block on a plain sinks to between the strength height and 7.5 km and widens,
+  volume kept, nothing moves at 0.38 g or with the flow off), the editor's catalogue test covers the two new
+  settings in every pipeline preset. `riverBiomes` failed on seed 16's new planet (12 river of 37 wide-channel
+  samples, 21 of them swamp): vanilla's own valley slice is swamp on the flattest, wettest ground, so swamp and
+  mangrove swamp count with river.
+- **Measured** (VM `deeptime-test`, x86_64 Linux, `mac.sh` default caps): on the tree merged with master e6a7af0 (load average 13–25): `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --locked` all pass (533: cli 52, core 374 + 3 ignored); `./gradlew build test` tests=168 failures=0 errors=0 skipped=1; `./gametest.sh` All 59 required tests passed (wall 455 s, bake `above_max_y=0cells compressed=0cells highest_y=280`); `tools/smoke/install.sh mic`, `./gametest.sh -PwithMic` All 59 passed (89 s). The nine real-planet tests on other planets (`DEEPTIME_TEST_PLANET_SET="seed=N"`), one merge earlier: seeds 12–15 standalone All 9 passed, seed 16 failed `riverBiomes` (above) and passed after the fix, seed 13 again All 9. A MIC run one merge earlier failed `firstInstalledFallback` (shale and gneiss): master's own fix 13b8657, in the final tree. After the gates only the two full presets' uplift values changed; `cargo test` and `./gradlew build test` were run again on that (all pass, 168/0). The laptop's address changed twice during the runs and the VM was unreachable for minutes at a time; the detached jobs were not affected. x86_64 Linux only.
+- **For Ben.** (1) Earth-like summits are 6.0–6.9 km in the finished world, under the 8–10 km he expected: the
+  plateau level is where Tibet's is and the highest ground is plateau, not peaks, because neither the surface stage
+  nor the amplifier puts 3 km of summit relief on a plateau. Options: **leave it and give the amplifier summit
+  relief over high plateaus (recommended; the mountain-character work)**, or raise `crust_strength_mpa` to about
+  190 (plateaus near 7 km, summits 8–9 km, less like Earth below the summits). (2) Light planets: taller volcanoes
+  but not taller fold belts (above); making erosion or uplift depend on gravity is its own piece of work.
+  (3) The world's bottom, options above. (4) The top stays at 639 unless Mars-like worlds matter now.
+- **Next.** The full preset's own uplift factor (one more ensemble); the spreading solve restricted to the cells
+  that need it; the hypsometry and folds branches re-checked on this base.
+
 ### 2026-10-01 — Rock columns: grade rises downwards, no metamorphic or plutonic slivers; `deeptime strata-check` (agent worktree agent-a4c7bf65d55bc4810, branch worktree-agent-a4c7bf65d55bc4810, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Ask.** Ben, 2026-10-01 ("Investigate and fix"), on the workbench run `1a0f6e918c9` (`earthlike_quick_16k`, supercontinent,
   1000 Myr): at x −6901, z −128 schist lies on unmetamorphosed shale (and again deeper), gneiss is a 3-block sheet between
@@ -549,6 +746,77 @@ Ben's answers of 2026-10-01 to the first report ("Are the physics correct, if so
 - **Gates** (test VM): cargo fmt, clippy `-D warnings`, `cargo test --workspace` (core 363 passed), deny ok; `./gradlew build test` tests=164 failures=0. GameTests (after merging master d4e876c; `./gradlew build test` again: BUILD SUCCESSFUL, tests=165 failures=0, `LakeGameTests` compiled): `./gametest.sh` all 59 required tests passed, all mixins bound (the default 4k planet has no lakes, so `lakeIceAndSaltFollowTheClimate` checked nothing there). `DEEPTIME_TEST_PLANET_SET=seed=21` with `-PgametestOnly=lakeIceAndSaltFollowTheClimate,riversHold`: 2 of 2 (24 frozen lake columns, ice read on 22; 9 open, water on 9; wrong 0). `seed=12`: 2 of 2 (10 frozen, ice on 5, 4 of them in a biome too warm to freeze; 10 open, water on 10; 1 playa column, salt read as `minecraft:calcite`, the halite class's vanilla block; wrong 0). `-PwithMic` with seed 21: 2 of 2 (ice on 22, 6 of them in a warm biome; wrong 0). **The full `-PwithMic` suite has not passed**: its one run died in mod loading before any test ("Found unused register callbacks", unbound `artifacts:generic.attack_burning_duration`: another mod's registration, and the MIC seed-21 run minutes later loaded the same set), and the re-run was still waiting for the server lock when SSH to the VM was lost again. No sampled open lake lay in a cold biome, so the mixin's "stays open" answer was never the deciding one in a test; it is bound and did not break generation. Scratch is still on the VM under /Volumes/Graphide/ban/deeptime-runs/lakes/ (SSH lost before it could be deleted).
 - **Deferred by Ben:** dry land below sea level (a terminal basin below sea level stands at sea level).
 - **Open for Ben:** whether the hydrology should read the climate's land ice (no runoff from under an ice sheet, no lake where ice stands); the 200 mm base loss decides close polar cases.
+### 2026-10-01 — Deposit audit: every type measured in blocks; placers moved into the rivers; richness options for Ben (agent worktree agent-a797e24e4a8e91f36, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+Ben, 2026-10-01, on a 3D preview: "This gold placer feels pathetic"; decision "Audit all types, then tune". On branch `worktree-agent-a797e24e4a8e91f36` (local master 94c54c2 with P1-28 merged in), not merged, not pushed. **No default richness changed.** The three options are a pending question.
+
+**The tool (re-run after any tuning).** `deeptime deposit-audit --world-data <dir> [--box X0 Z0 X1 Z1] [--only <type>] [--chunks N] [--scatter-dir <dir>] [--json <file>]` (`crates/deeptime-cli/src/deposit_audit.rs`); on the VM `tools/review/deposit-audit.sh audit <world-data>`. No server: it ports `DepositFeature.materialAt` and `BackgroundScatterFeature.plan` bit for bit and models the host check from the column evaluator. Checked against a real MIC box (256 chunks): the placer 75 modelled vs 71 real ore blocks, scatter 3.5–7 % high (caves, lava and aquifers are not modelled). Per type: sites, body blocks, ore per site p10/p50/p90, ore per chunk in the body, scatter per chunk, vanilla per chunk, the median deposit in scatter chunks, rock dug for 640 ore; per material the planet's ore in deposits against its scatter. Real blocks: `tools/review/deposit-audit-detached.sh <world-data> <box>` (takes the server lock itself, survives SSH drops; runs `deposit-audit.sh vanilla`, then the box on the standalone and mic-ev sets; results in review/out/deposit-audit/).
+
+**Measured** (two planets of today's `earthlike_quick_16k`, 1000 Myr, seed 1: workbench runs 1a0f88578b3 "random" and 1a0f6e918c9 "supercontinent"; values are the two planets'; ore = blocks of every product; placers after the fix below).
+
+| type | sites | body blocks p50 | ore per site p10 / p50 / p90 | ore per chunk in body | median deposit = chunks of the same scatter | of the planet's ore blocks |
+|---|---|---|---|---|---|---|
+| porphyry Cu-Mo-Au | 11 / 6 | 9,462 / 16,683 | 192 / 453 / 2,531 and 93 / 836 / 5,870 | 76 / 104 | 60 / 110 | copper 1 % |
+| placer Au | 67 / 43 | 810 / 1,368 | 5 / 32 / 122 and 4 / 55 / 434 | 7 / 11 | 29 / 52 | gold 3–6 % |
+| MVT Zn-Pb | 167 / 87 | 986 / 796 | 6 / 166 / 2,485 and 4 / 135 / 943 | 47 / 40 | 78 / 64 | zinc 11–35 % (with SEDEX) |
+| SEDEX Zn-Pb | 2 / 2 | 10,426 / 8,195 | 2,628–3,939 and 2,217–3,123 | 303 / 240 | 1,857 / 1,486 | |
+| coal seam field | 84 / 47 | 187,493 / 184,099 | 21,300 / 99,899 / 429,767 and 23,210 / 85,655 / 451,634 | 1,773 / 1,518 | 11,444 / 11,264 | coal 85–94 % |
+| petroleum trap | 29 / 8 | 1,278 / 2,986 | no blocks (CDG) | | | |
+| BIF, supergene blanket | 0 / 0 | | none formed on either planet (computed from the type: about 1,050 iron and 1,070 copper ore at the median) | | | iron 0 % |
+
+Scatter, real blocks per chunk (box of 256 chunks, master with P1-28): coal 9.8, copper 6.7, gold 1.06, iron 9.5, zinc 1.7 on the standalone set; 9.1, 6.6, 0.77, 7.8, 1.7 on MIC + EV. Per km² of blocks ×3,906 (iron 37,000). 640 ore from scatter = every block of 67 chunks (iron), 95 (copper), 65 (coal), 375 (zinc), 600 (gold). Inside a median body 640 ore take 10,000–16,500 blocks of rock (porphyry; one whole median deposit holds 400–450 copper ore), 12,000 (placer; a median placer holds 30–55), 3,200 (MVT), 1,700 (SEDEX), 1,070 (coal).
+**Vanilla reference** (measured: 1,024 chunks around 0,0, seed 20261001, standalone set with level-type `minecraft:normal`): coal 101 per chunk, iron 77, gold 25.6, copper 293 (one sample; 92 % of it above y 0, so likely `ore_copper_large` under dripstone caves; treat as an upper figure), Create's zinc 76, redstone 36, lapis 25, diamond 24. Deep Time's scatter is 10 % of vanilla for coal, 12 % for iron, 4 % for gold, 2 % for zinc.
+**P1-28 and who places ore in a Deep Time dimension** (the same box, real blocks): Deep Time's `claim_ores` removes the features of claimed materials (vanilla coal, iron, gold, copper; Create zinc; Create Nuclear lead; Ice and Fire silver; Terralith's extra coal) and its own scatter replaces them; P1-28 leaves that scatter where it was (MIC before: coal 2,599, copper 1,830, gold 268, iron 2,496, zinc 488 in the box; after, standalone: 2,514 / 1,714 / 271 / 2,435 / 438; MIC + EV: 2,323 / 1,696 / 198 / 1,984 / 432 — the MIC + EV iron and gold are 20–26 % lower and that is not explained), because the scatter hosts in any rock block and never depended on stone. Everything unclaimed is the pack's own features, which target stone and deepslate and so gained host rock: per chunk on MIC + EV uranium 35 (was 2.1 before P1-28), nickel 26 (was 2.0), fluorite 15 (was 1.2), platinum 13.6 (13.8), lapis 13.1 (6.8), redstone 17.7 (20.2), diamond 8.3 (7.6), infected diamond 2.4, emerald 0.2, Cobblemon stones 1.6 together; standalone: redstone 19.6, diamond 14.9, lapis 13.6. In ore blocks per chunk MIC went from 84 to 159. Excavated Variants changes looks only: 4,732 of the box's 40,813 ore blocks are EV ids; amounts follow the same draws.
+
+**Where the richness goes** (tonnage and grade to blocks). (1) Volume = tonnage / density; at 300 m × 20 m a block is 1.8 million m³, so a median porphyry (240 Mt) is 49 blocks; `balance.size_mult_h²·size_mult_v` enlarges it (porphyry 144×, placer 1,440×, MVT 432×, SEDEX 576×, BIF 144×, coal 20×). (2) Only part of the body is ore zone (a porphyry's outer 58 % is barren halo; a placer's upper half). (3) In a zone a host block becomes ore with the zone's `density`, a constant of the type (porphyry 0.35–0.45 in the core, 0.2 phyllic; placer 0.08 + 0.01; MVT 0.35–0.47; coal 0.6). **The grade never reaches the blocks**: `Zone.grade` is stored and nothing reads it, so `deposits.richness_mult` and a type's `balance.richness_mult` change the site's listed grade and no block; the editor's "Deposit richness" is a no-op in the world. So block counts follow volume, not metal: a porphyry holding 1.2 Mt of copper and a placer holding 0.2 t of gold differ by 13× in ore blocks. `deposits.size_mult` scales tonnage, so ore scales with it; `scale.feature_scale.deposits` scales the three axes, so ore scales with its cube; `deposits.count_mult` scales the number of sites.
+**COE and CDG.** COE: every chunk an ore body reaches is one vein of the type's recipe; the site's tonnage quantile only sets `randomMul`, which matters only for finite veins (gold 2,000–4,000 items, copper and iron 10,000–30,000, coal 15,000–40,000, zinc 8,000–24,000 per chunk at `finiteAmountBase` 1000). MIC ships `defaultInfinite = true`, so each of a median porphyry's 6 chunks, a placer's 4–5 and a coal field's 53–61 is an infinite vein, against 76–104, 7–11 and 1,500–1,800 placed ore blocks per chunk. The drilling value is not consistent with what is placed: one drill out-yields the whole placed deposit, for every family; the blocks are a signpost and a pre-drill supply. The parked question (finite veins?) decides whether deposit size matters to COE at all. CDG: per chunk `charge × 0.02 × the chunk's share`: 2.5 / 4.2 / 19 million mB (p10 / p50 / p90) and 3.7 / 7.1 / 10.8; 6 of 29 and 3 of 8 traps average above CDG's 10 million mB infinite threshold. Consistent with CDG's own scale (its high chunks start at 4 million).
+
+**The placer bug** (Ben's site 56; preview job 20261001-180014-jz2m is of run 1a0f88578b3, not 1a0f6e918c9). Its box holds 71 gold ore in the placer and 268 gold scatter blocks (not 960). The deposit stage lays a placer on the coarse grid's ground before the amplifier and the bake's rivers exist, as one flat ribbon: its centre was a median 0–7 blocks from the real ground but 77–121 under it at p10 and 37–66 over it at p90, 39 of 67 and 22 of 43 placers placed no ore, and site 56 lay 13 blocks inside a hillside: gravel painted into the shale, `minecraft:gold_ore` in it (no gravel ore block exists without EV), no water anywhere near.
+**The fix** (`deposits/placer_channels.rs`, called once the folder is complete, and by `deeptime hydro`): each placer is laid again from its site record, into the nearest baked river channel within `placer.river_reach_km` (new type key, 30 km = 100 blocks) as gravel bars along the channel (water's top block down to 3 blocks under the bed, the channel's width + 2, downstream through confluences; one `channel` body per straight piece), or with no channel in reach as a bench in pieces on the finished ground. Java: `OreBlockResolver` takes `#c:ores_in_ground/<host>` for hosts other than stone and deepslate; EV stone configs for gravel and sand; in a loose body `DepositFeature` resolves the ore against the body's own rock (so soil over the gravel also gives gravel ore) — that last line is compiled and unit-tested by the build only, not yet seen in a world.
+Before / after: placers with ore 28 → 66 of 67 and 21 → 43 of 43; median ore 0 → 32 and 0 → 55; all placer gold on the planet 3,128 → 4,928 and 6,776 → 11,267 blocks; in channels 28 and 25, benches 39 and 18 (most benches of the first planet are old placers now under the sea). Site 56 in real blocks: before, 71 `gold_ore` under soil in a hillside; after (standalone), 93 ore in 5 bars along the river 60 blocks east, 34 of its 84 ore columns under river water and the rest under the gravel and soil of the banks, 1,122 gravel + 156 sand + 159 water blocks in the bodies; after (MIC + EV), 78 ore, 59 of them `excavated_variants:…minecraft_gold_ore__deeptime__gravel` and 19 `gold_ore` where the host was soil (what the DepositFeature line above addresses).
+Still true: without EV (pack master, the workbench's `mic` profile) the ore block is `minecraft:gold_ore`, now in a gravel bed under a river. A gold-bearing gravel block of Deep Time's own would be the mod's first block: asked below.
+
+**Gates** (VM, tree merged with master 94c54c2): `cargo fmt --check` ok; clippy `-D warnings` clean; `cargo test --workspace` ok (core 369, format 54, cli 52, inspect 31, …; 8 new tests); `cargo deny` ok; `./gradlew build test` 161 tests, 0 failures. GameTests not run (batch rule); `./gametest.sh -PwithEv` should run with the batch (EV now has gravel and sand stones). After the last full run only the audit's vanilla constants and the `DepositFeature` line changed: fmt, clippy and the CLI crate's tests were re-run for the first, `./gradlew build test` for the second.
+**Next step:** Ben picks a richness option (pending question); then make `richness_mult` act on zone density, add `deposits.scatter_mult` (preset field, editor field, lang key; Java reads it from the manifest), set the chosen values, re-run `deposit-audit.sh audit` on two planets.
+### 2026-10-01 — P3-04 Distant Horizons far terrain: LODs from the world data (agent worktree agent-a6e8592da3ce000d8, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+Ben asked for it ahead of the rest of Phase 3. On branch `worktree-agent-a6e8592da3ce000d8` (master 83aaa51 merged in), not merged, not pushed.
+
+- **What it does.** With Distant Horizons installed, every Deep Time level that generates from world data registers a world generator with DH, and DH's level-of-detail data comes from the baked rasters instead of from real chunks generated far away. Without DH nothing runs; `-Ddeeptime.dh=false` switches it off.
+- **Verified API surface** (`javap` and a decompile of the real jars on the VM; `DhApiBindingTest` opens 3.3.0 and 3.3.3):
+  - Versions: 3.3.0 and 3.3.1 are API 7.1.0, 3.3.3 is API 7.2.0. The plan's "API 4.0.0 renamed methods" is stale. The members used are identical in the three.
+  - `DhApi.worldGenOverrides.registerWorldGeneratorOverride(IDhApiLevelWrapper, IDhApiWorldGenerator)` → `DhApiResult` (`success`, `message`).
+  - `IDhApiWorldGenerator`: `getReturnType()` = `API_DATA_SOURCES`; `generateLod(chunkPosMinX, chunkPosMinZ, lodPosX, lodPosZ, byte detailLevel, IDhApiFullDataSource, EDhApiDistantGeneratorMode, ExecutorService, Consumer)`; `getSmallest/LargestDataDetailLevel()`; `runApiValidation()`; `preGeneratorTaskStart()`; `close()`; `getPriority()` (10).
+  - `IDhApiFullDataSource.setApiDataPointColumn(relX, relZ, EDhApiWorldGenerationStep, List<DhApiTerrainDataPoint>)`, 64 × 64 columns of 2^detail blocks; `DhApiTerrainDataPoint.create(detail 0, blockLight, skyLight, bottomY, topY, block, biome)`.
+  - **Three traps found in the class files.**
+    1. *3.3.0's jar (the MIC pin) renames every NeoForge class `<Class>_neoforge`, the API included.* The unsuffixed `DhApi` in that jar is the Fabric copy, which nothing on NeoForge reads: a mod compiled against the published API registers into a dead object. 3.3.1 fixed the packaging (only the Minecraft-facing `common` classes keep the suffix). So `compat/dh` binds by name at run time and takes whichever naming the jar has; nothing is `compileOnly`.
+    2. *Data-source y counts from the level's bottom* (`setApiDataPointColumn` packs with offset 0; DH's own generator subtracts `getMinHeight()`), and a release build does not validate the range.
+    3. *Columns must be written with step `LIGHT`*, or DH queues the section again for its own chunk generation.
+- **Toroidal World: a conflict, not worked around.** TW 0.19.3's `WorldGeneratorInjectorMixin` wraps `WorldGeneratorInjector.bind` and throws for any generator whose class is not in `com.seibel.distanthorizons.` on a level it wraps.
+  - With DH 3.3.0 TW's DH mixins (all but `ChunkWrapperMixin`) target the unsuffixed classes, which NeoForge never loads: they are inert, TW does not fold DH's keys at all, and the override registers. **This is what MIC runs today.**
+  - With DH 3.3.1+ they apply and the override is refused: `smoke dh-next` (3.3.3) logs TW's message and DH generates from real chunks. So a pack update to DH ≥ 3.3.1 turns far terrain off until TW lets a seam-aware generator through. Options are under "Pending questions".
+  - Wrapping itself needs nothing from TW: every sample folds x into the canonical lap, so a section on any lap or across the seam is the planet's terrain (GameTest and JUnit). Past the pole edge the rasters clamp, as the real generator reads them (`deeptime:beyond_pole` exists but the shipped router does not use it; plan §7.11's "ice-sheet ocean" is not what real chunks do, and far terrain follows the chunks).
+- **What a far column is** (`worlddata/FarColumn`, `farterrain/FarTerrain`).
+  - Ground: the bilinear height between noise-cell corners (`Water.cellSurface`, detail term included), i.e. what the generator draws. Water: `Water.column` — lake, sea, river with its cut bed, banks raised and lowered. Ice cover on the top blocks (`IceCover`). All shared code, called, not copied.
+  - Biome: the level's biome source and sampler at the quart cell a chunk stores. Frozen: `Biome.coldEnoughToSnow` → ice on water (so frozen lakes, as vanilla's `freeze_top_layer` makes them), a snow layer on ground.
+  - Soil: a datapack table by biome (`data/deeptime/deeptime/far_terrain/surface.json`, pack-overridable). The pack's surface rules run over a generated chunk, which far terrain does not have.
+  - Rock: the strata column rule bed by bed down to the drop to the lowest neighbour (+8, capped at 256), so cliffs show their strata; one run below. Blocks through the rock palette with the strata pass's member choice (so P1-28's stone and deepslate come through).
+  - **Level of detail chosen.** One- and two-block columns: every rule in full, the strata rule only where rock shows (bare biome, or a side dropping below the soil), because it is 85 % of such a column's cost. Wider columns (detail ≥ 2): sampled at the centre, no bank rule (a bank is one block), nearest strata cell's stack as stored. That path reads the horizons itself, so a rule added to `Columns.stack` (folds, faults) must be added there too.
+  - Not in far terrain: trees and every other feature, caves, bodies, icebergs, the pack's exact surface rules.
+- **A bug found on the way: the tile cache never kept strata tiles on a 32-core machine.** `TileCache` gave Guava one segment per processor; at 32 that is 8 MiB a segment, a `strata/horizons` tile is 14.7 MiB, and Guava drops an entry heavier than its segment. Every sample leaving a thread's last tile decoded it again. Real chunks at a strata tile's edge paid it too. Now segments hold at least 64 MiB (4 for the default 256 MiB). On a 16k planet a far section at a tile edge went from 566 ms to 34 ms; coarse sections in the game from 161 ms (detail 3) and 1,248 ms (detail 6) to 7–10 ms.
+- **Measured** (VM, load average 20–50, so upper bounds).
+  - `tools/review/p3-04-dh.sh`, smoke `dh` (standalone + DH 3.3.0, `earthlike_quick_16k`, scattered continents, 200 Myr, 98 % land beside the spawn): DH's own server-side `/dh pregen start minecraft:overworld <x z> 32` asked the override for 257 sections (4,112 chunks of area) and finished within the harness's first 5 s poll; no failed section; DH's validation on. Inside DH, cold and several threads at once: 37–44 ms a section, 4.92 data points a column.
+  - `/deeptime probe far bench`, one thread, warm, no DH: **9.6–11.1 ms a section at detail 0, 6.9–7.9 ms at detail 3, 8.5–10.7 ms at detail 6** (a detail-6 section is 4,096 blocks wide). For scale: P1-08 measured 441 real chunks in 19 s on a first start, 0.7 s for a section's 16 chunks.
+  - JUnit `FarColumnTest.sectionTime` (4k planet, no biome): 13.7 ms at step 1 (geometry 1.8, strata rule 11.6), 4.9–6.2 ms at steps 4–64.
+  - GameTest on the real test planet (pack surface rules and features, no caves), 119 columns over the planet: ground exact 112, within one block 117, water 119 of 119 (top exact 97 of 97), biome 119 of 119, snow layer 119 of 119, ground block 101 (85 %); 7 iceberg columns set aside. Sections there: 4.0 ms (detail 0), 9.2 ms (detail 3); four threads agree with one.
+  - Smoke `dh`, 400 columns, far terrain against the chunks generated afterwards (vanilla caves and carvers on): water 400 of 400, biome 399–400, ground block 85–99 %, ground within one block 75–94 % and within two 78–96 % over four planets (the area is a mountain range; worst cases are cave mouths and steep faces, 26–128 blocks).
+  - Smoke `mic` (the whole pack, DH 3.3.0, Terralith, C2ME): registers, 257 sections, no failure, 52 ms a section in DH; ground within one block 96 %, water and biome 400 of 400, snow layer 95 %; **ground block 55 %** — the built-in table knows vanilla's biomes, not Terralith's (51× grass where Terralith's gravel desert has gravel, 25× coarse dirt in its birch taiga, podzol either way).
+  - What DH stores: all 400 columns held; its default world compression (`VISUALLY_EQUAL`) merges blocks no side shows into the block above when it saves (45 of 400 came back layer for layer; the dirt under grass becomes grass, the soil under a snow layer snow), so the check compares the top block, its height and the water top: 400 of 400 in the final run (`smoke/dh/report.md`, PASS).
+- **Tests.** JUnit 180 / 0 failures (`./gradlew build test`): `FarColumnTest` 14 (the plan's exit test: geometry = `Water.column`, rock = `Columns.stack`, gap-free layers, the seam on three laps, past the pole edge, coarse columns, hand-made columns for ice cover, frozen water, river beds, bare rock, six threads) and `DhApiBindingTest` 4 (binds under each jar's naming; `generateLod` called through each jar's own interface fills 2 × 4,096 columns DH's rules accept). GameTests `FarTerrainGameTests` 3 of 3 (`./gametest.sh -PgametestOnly=…`); the whole suite and `-PwithMic` are the coordinator's batch run. cargo fmt, clippy `-D warnings`, test, deny: clean (no Rust changed).
+- **Verified / not verified.**
+  - Verified: the binding against the real jars; registration on a dedicated server with DH 3.3.0 (standalone and MIC) and the refusal with 3.3.3; DH's server-side generation path end to end (its queue, its threads, its validation, its store) without a player; the data against real chunks; the seam and the pole; thread safety; time per section.
+  - **Not verified: how it looks.** No client ran (no GPU on the VM, the Mac is off limits): colours, the light on cliff sides (buried rock is sent dark, exposed runs lit; DH lights a side from the air beside it, read in `ColumnBox` but not seen), the hand-over when real chunks replace LODs, trees popping in, pop-in at the seam. Also not exercised: DH sending LODs to a connected client (its network path), singleplayer (the same server code inside the client), and DH's quad tree across the seam on a client.
+- **New tools.** `tools/smoke/profiles/dh.txt` and `dh-next.txt` (the latter without Chunky: DH 3.3.3's Chunky hook crashes the boot, "Chunky is not loaded"); `run.py --dh`; `/deeptime probe far <x> <z>`, `probe far land`, `probe far bench`, `probe dh`, `probe dh check`; `tools/review/p3-04-dh.sh`; `tools/remote/detach.sh` (jobs that outlive the ssh session; the laptop's address changed twice today and both times the detached jobs survived).
+- **Next step.** Ben's answers below; then either the pack-side table for Terralith's biomes on the MIC deep-time branch, or the exact-surface option. When P2-01's folds and faults land, give `FarColumn.rock`'s wide-column path the same rule.
+
 
 ### 2026-10-01 — P1-22b lakes sized by the climate, and frozen (agent worktree agent-a2195c5c858c73075, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 Ben's decision of 2026-10-01, "Both: freeze them and size them by climate". On branch `worktree-agent-a2195c5c858c73075`, not merged, not pushed.
@@ -6612,11 +6880,11 @@ Ben: "Inspector view on the workbench is a bit small, can you add a 'fullscreen'
   `[gametest] native version=… format=… target=… selftest=…`); then P0-08.
 
 ## Known issues and open questions
-- **Terrain above the build limit (2026-10-01): fixed in two parts, the third pending.** The 13–20 km
-  "mountains" were bookkeeping (the surface's offset added to whatever crust a cell read next; fixed, build log
-  2026-10-01 stage 1), and the stored elevation is compressed into a band under `max_y`, so nothing is cut flat
-  (`scale.build_limit_band_blocks`; the GameTest fails on any cell above the limit). The height limit itself is still
-  the plate model's uplift ceiling, not an emergent one: stage 2, pending question above.
+- **Mountain heights (2026-10-01).** The 13–20 km "mountains" were bookkeeping (fixed, stage 1); the height limit is
+  now crust spreading over its strength (stage 2, `surface/spread.rs`), with the plate model's cap a 30 km guard that
+  never binds; the stored elevation is squeezed under `max_y` only for extreme settings. Open: sea floors below
+  `min_y` in under 0.1 % of the sea, summits at 6–7 km, the full preset's land still high (pending question above;
+  build log 2026-10-01 stage 2).
 - **One preset, one planet per platform (2026-10-01).** The simulation is not bit-identical across platforms (the
   platform's libm); it is across runs and thread counts on one machine. Ben does not want it otherwise. Tests on a
   simulated planet assert properties and floors measured over several planets (`DEEPTIME_TEST_PLANET_SET="seed=N"

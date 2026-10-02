@@ -235,7 +235,8 @@
       "properties": {
         "transport_km": {"type": "number", "minimum": 0},
         "capture_fraction": {"$ref": "#/$defs/unit"},
-        "flatten_gradient_m_km": {"type": "number", "minimum": 0}
+        "flatten_gradient_m_km": {"type": "number", "minimum": 0},
+        "river_reach_km": {"type": "number", "minimum": 0, "default": 30, "description": "how far the placer looks for a baked river channel to lie in; 0 leaves it where the deposit stage put it"}
       }
     },
     "petroleum": {

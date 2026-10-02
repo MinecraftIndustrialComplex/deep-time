@@ -1,23 +1,39 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! The `underground` section of a preset: what the game puts in the open space below ground.
-//! Nothing here is simulated; the bake records the section in `notes.bake.underground.params` and
-//! the game reads it back when it generates chunks (Java `worldgen/LavaRules`).
+//! The `underground` section of a preset: where the game has lava. The bake records the section in
+//! `notes.bake.underground.params` and writes the active volcanoes to `volcanoes/active.json`; the
+//! game reads both when it generates chunks (Java `worldgen/LavaRules`, `worldgen/MagmaPass`).
 //!
-//! **Lava.** Vanilla fills every open block below y −54 with lava and lets a cave lake at y −10
-//! or lower be lava. Both heights are hard-coded for a world whose floor is y −64: they are
-//! floor + 10 and floor + 54. In a Deep Time world (floor y −352 by default) they would flood the
-//! lowest 298 blocks of every cave and of every stretch of sea deeper than 117 blocks, so the two
-//! distances are settings here and the game measures them from the world's floor.
+//! **The lava floor and lava lakes.** Vanilla fills every open block below y −54 with lava and
+//! lets a cave lake at y −10 or lower be lava. Both heights are hard-coded for a world whose floor
+//! is y −64: they are floor + 10 and floor + 54. In a Deep Time world (floor y −352 by default)
+//! they would flood the lowest 298 blocks of every cave and of every stretch of sea deeper than
+//! 117 blocks, so the two distances are settings here and the game measures them from the world's
+//! floor.
+//!
+//! **Lava where the simulation has it** (Ben, decisions log 2026-10-01, "Volcanoes is a go
+//! ahead"). Every volcano the volcano stage leaves active at the present gets a magma chamber
+//! under it, a conduit up to its crater and, at the most active ones standing on land, a crater
+//! lava lake. A dead volcano gets nothing: its chamber froze into the plutons the structure stage
+//! already drew. The game builds the bodies from [`active_volcanoes`]'s list and these settings;
+//! FORMAT.md ("Lava") has the geometry. The random lava lakes and lava springs of vanilla's and
+//! the pack's biomes are removed from Deep Time worlds (`remove_lava_features`).
 
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 
 use crate::error::CoreError;
+use crate::surface::volcanoes::VolcanoState;
 
 /// The largest distance accepted, blocks (the default build range is 992 blocks tall).
 pub const MAX_BLOCKS: u32 = 992;
 
+/// The world-data file of the active volcanoes.
+pub const VOLCANOES_PATH: &str = "volcanoes/active.json";
+/// The version of that file.
+pub const VOLCANOES_VERSION: u32 = 1;
+
 /// The `underground` section of a preset (every key optional).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct UndergroundParams {
     /// Caves and any other open space less than this many blocks above the world's floor are
@@ -28,6 +44,22 @@ pub struct UndergroundParams {
     /// blocks above the world's floor (vanilla: 54); higher lakes are always water. 0: no lava
     /// lakes.
     pub lava_lake_blocks: u32,
+    /// Depth of the top of an active volcano's magma chamber below its crater floor, km. Real
+    /// shallow chambers sit 2–6 km under the summit (Kīlauea's about 2–4 km, Mount St Helens'
+    /// from 5 km, Vesuvius' shallow one about 4–5 km). At 20 m per block 3 km is 150 blocks. The
+    /// game raises a chamber that would reach the lava floor.
+    pub magma_chamber_depth_km: f64,
+    /// Multiplies every magma chamber's size (its radius is a tenth of the volcano's basal
+    /// radius, between 1.2 and 4.5 km, and its half-height a fifth of that radius). 0: no magma
+    /// under volcanoes at all (no chambers, conduits or crater lakes).
+    pub magma_chamber_size: f64,
+    /// The share of the active volcanoes standing on land that hold a crater lava lake, the most
+    /// active first. Persistent lava lakes are rare on Earth (about eight of some 1,400 active
+    /// volcanoes); the default is far above that, because a player should be able to find one.
+    pub crater_lake_share: f64,
+    /// Whether the random lava lakes and lava springs of vanilla's and the pack's biomes are taken
+    /// out of a Deep Time world, so lava is found at the volcanoes and at the world's floor only.
+    pub remove_lava_features: bool,
 }
 
 impl Default for UndergroundParams {
@@ -35,6 +67,10 @@ impl Default for UndergroundParams {
         UndergroundParams {
             lava_floor_blocks: 10,
             lava_lake_blocks: 54,
+            magma_chamber_depth_km: 3.0,
+            magma_chamber_size: 1.0,
+            crater_lake_share: 0.25,
+            remove_lava_features: true,
         }
     }
 }
@@ -53,13 +89,93 @@ impl UndergroundParams {
                 ));
             }
         }
+        for (v, lo, hi, key) in [
+            (
+                self.magma_chamber_depth_km,
+                0.5,
+                15.0,
+                "magma_chamber_depth_km",
+            ),
+            (self.magma_chamber_size, 0.0, 4.0, "magma_chamber_size"),
+            (self.crater_lake_share, 0.0, 1.0, "crater_lake_share"),
+        ] {
+            if !(v.is_finite() && (lo..=hi).contains(&v)) {
+                return Err(CoreError::preset(
+                    format!("$.underground.{key}"),
+                    format!("must be in [{lo}, {hi}]"),
+                ));
+            }
+        }
         Ok(())
     }
+}
+
+/// A volcano's activity, 0–1: the arc magma flux of an arc volcano's last step, the mean plume
+/// proximity of a hotspot's.
+fn activity(v: &crate::surface::volcanoes::Volcano) -> f64 {
+    let a = if v.hotspot.is_some() {
+        if v.active_myr > 0.0 {
+            v.flux_myr / v.active_myr
+        } else {
+            0.5
+        }
+    } else {
+        v.flux_last
+    };
+    if a.is_finite() {
+        a.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+/// `volcanoes/active.json`: the volcanoes active at the present, in id order (FORMAT.md, "Lava").
+/// Dead volcanoes and those that left the catalogue are not listed.
+pub fn active_volcanoes(st: &VolcanoState) -> Value {
+    let r3 = |v: f64| (v * 1000.0).round() / 1000.0;
+    let mut list: Vec<&crate::surface::volcanoes::Volcano> = st
+        .volcanoes
+        .iter()
+        .filter(|v| v.active() && v.gone.is_none() && v.radius_m > 0.0)
+        .collect();
+    list.sort_by_key(|v| v.id);
+    let volcanoes: Vec<Value> = list
+        .iter()
+        .map(|v| {
+            let crater = v.depression.map(|d| {
+                json!({
+                    "radius_m": (d.rho * v.radius_m).round(),
+                    "depth_m": (d.depth * v.height_m).round(),
+                    "caldera": d.caldera,
+                })
+            });
+            json!({
+                "id": v.id,
+                "kind": v.kind.name(),
+                "x": r3(v.x),
+                "z": r3(v.z),
+                "radius_m": v.radius_m.round(),
+                "height_m": v.height_m.round(),
+                "activity": r3(activity(v)),
+                "oceanic": v.oceanic,
+                "silicic": v.silicic,
+                "age_myr": r3((st.t_myr - v.born_myr).max(0.0)),
+                "crater": crater,
+            })
+        })
+        .collect();
+    json!({
+        "version": VOLCANOES_VERSION,
+        "t_myr": st.t_myr,
+        "volcanoes": volcanoes,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::surface::volcanoes::shape::{Depression, Kind};
+    use crate::surface::volcanoes::{Gone, Volcano};
 
     #[test]
     fn defaults_are_vanillas_heights_above_the_floor() {
@@ -70,21 +186,101 @@ mod tests {
         d.validate().unwrap();
     }
 
+    fn volcano(id: u32, kind: Kind) -> Volcano {
+        Volcano {
+            id,
+            kind,
+            x: -100.5,
+            z: 42.25,
+            plate: 1,
+            oceanic: kind == Kind::Shield,
+            silicic: false,
+            hotspot: (kind != Kind::Strato).then_some(3),
+            chain: 0,
+            born_myr: -4.0,
+            dies_myr: f64::INFINITY,
+            extinct_myr: None,
+            radius_m: 20_000.0,
+            height_m: 2_000.0,
+            peak_m: 2_000.0,
+            built_m: 2_000.0,
+            sunk_m: 0.0,
+            kept_m: 2_000.0,
+            target_m: 2_000.0,
+            flux_last: 0.6,
+            missed: 0,
+            flux_myr: 3.0,
+            active_myr: 4.0,
+            depression: Some(Depression {
+                rho: 0.07,
+                depth: 0.06,
+                caldera: false,
+            }),
+            caldera: None,
+            cause: None,
+            segment: 0,
+            gone: None,
+        }
+    }
+
+    #[test]
+    fn only_the_volcanoes_active_at_the_present_are_listed() {
+        let mut dead = volcano(2, Kind::Strato);
+        dead.extinct_myr = Some(-1.0);
+        let mut eroded = volcano(3, Kind::Strato);
+        eroded.gone = Some(Gone::Eroded);
+        let mut plain = volcano(1, Kind::Shield);
+        plain.depression = None;
+        let st = VolcanoState {
+            volcanoes: vec![volcano(7, Kind::Strato), dead, eroded, plain],
+            t_myr: 0.0,
+            ..VolcanoState::default()
+        };
+        let v = active_volcanoes(&st);
+        assert_eq!(v["version"], VOLCANOES_VERSION);
+        let list = v["volcanoes"].as_array().unwrap();
+        let ids: Vec<u64> = list.iter().map(|e| e["id"].as_u64().unwrap()).collect();
+        assert_eq!(ids, [1, 7], "in id order, the dead and the eroded left out");
+        // The shield: a hotspot's activity is its mean plume proximity (3 / 4), and it has no crater.
+        assert_eq!(list[0]["kind"], "shield");
+        assert_eq!(list[0]["activity"], 0.75);
+        assert!(list[0]["crater"].is_null());
+        assert_eq!(list[0]["oceanic"], true);
+        // The arc volcano: its last flux, and its crater in metres (7 % of 20 km, 6 % of 2 km).
+        assert_eq!(list[1]["kind"], "stratovolcano");
+        assert_eq!(list[1]["activity"], 0.6);
+        assert_eq!(list[1]["x"], -100.5);
+        assert_eq!(list[1]["crater"]["radius_m"], 1400.0);
+        assert_eq!(list[1]["crater"]["depth_m"], 120.0);
+        assert_eq!(list[1]["age_myr"], 4.0);
+    }
+
     #[test]
     fn a_section_may_set_one_key_and_rejects_unknown_ones() {
         let p: UndergroundParams = serde_json::from_str(r#"{"lava_lake_blocks": 0}"#).unwrap();
         assert_eq!(p.lava_floor_blocks, 10);
         assert_eq!(p.lava_lake_blocks, 0);
+        assert!(p.remove_lava_features);
         assert!(serde_json::from_str::<UndergroundParams>(r#"{"lava": 1}"#).is_err());
         assert!(serde_json::from_str::<UndergroundParams>(r#"{"lava_floor_blocks": -1}"#).is_err());
         let e = UndergroundParams {
             lava_floor_blocks: 993,
-            lava_lake_blocks: 54,
+            ..UndergroundParams::default()
         }
         .validate()
         .unwrap_err();
         assert!(
             e.to_string().contains("$.underground.lava_floor_blocks"),
+            "{e}"
+        );
+        let e = UndergroundParams {
+            crater_lake_share: 1.5,
+            ..UndergroundParams::default()
+        }
+        .validate()
+        .unwrap_err();
+        assert!(
+            e.to_string().contains("$.underground.crater_lake_share"),
             "{e}"
         );
     }

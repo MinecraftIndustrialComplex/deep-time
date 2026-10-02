@@ -14,6 +14,21 @@ and contribute no code.
 | [MultiScaleErosion](https://github.com/H-Schott/MultiScaleErosion) by H-Schott (Schott et al. 2024, "Terrain Amplification using Multi-scale Erosion", ACM TOG 43(4)) — `data/shaders/{erosion,thermal,deposition}.glsl` and the "Result" sequences of `src/code/src/main.cpp` (commit 964a3d5), read on 2026-09-29 | [MIT](https://github.com/H-Schott/MultiScaleErosion/blob/main/LICENSE), Copyright (c) 2023 Schott | The amplifier's passes (P1-06): the multiple-flow drainage area (a cell sends its area to each lower neighbour in proportion to slope^p and takes what its neighbours send, one hop per iteration), the stream-power lowering k·A^m·S^n clamped to the receiver's height, the thermal pass (a neighbour more than tan θ below takes matter, more than tan θ above gives it; the threshold angle carries smooth noise) and the deposition pass (sediment travels along the same weights and settles where the flow's capacity is below the load), and the workflow erosion → thermal → deposition alternated with ×2 upsampling (ported as equations, not line by line; adapted: SI units and an incision length at a reference area and slope, a coarse-level drainage-area prior refined instead of started from zero, pairwise excess-proportional thermal transfer, deposition of the eroded load with a half-gap cap, Priority-Flood repair, tiles with halos on the CPU) | `crates/deeptime-core/src/surface/{amplify.rs, amplify/kernels.rs, thermal.rs}` |
 | [Noddy](https://github.com/Loop3D/noddyverse) as published in Loop3D/noddyverse (Jessell & Valenta 1996; Jessell et al. 2022, Earth Syst. Sci. Data 14:381–392) — `src/unEvents.c`, `src/taste.c`, `src/matrix.c`, and the helpers those three call: `src/utils.c` (`convrt`, `rotset`, `irotate`, `matmlt`, `paxis`, `plane`, `polcar`), `src/ellFault.c`, `src/proflib.c` (`calcProfile`), `src/which.c` (`whichRock`, `whichLayer`), the orientation set-up of each event in `src/getEvent.c` and the constants of `src/nodStruc.h` (commit 6a21b2374516f8506c19cabcbe3ead00be9cc45d) | [MIT](https://github.com/Loop3D/noddyverse/blob/main/LICENSE), Copyright (c) 2021 Loop3D (the code is Mark Jessell's, Imperial College 1981–82, Monash University 1994, UWA; `matrix.c` (c) Ewen Christopher and Monash University 1994) | The fold-and-fault engine (P2-01): the inverse kinematics of folds, faults (translation, rotation, elliptical, curved, ring), shear zones, kinks, unconformities, dykes, plugs, tilts and homogeneous strain, the sequence codes and `taste`, the layer lookup, and the 4 × 4 transformation matrices (ported function by function with the original's arithmetic and constants, checked bit for bit against the C by `tools/validation/noddy/`; adapted: no global state, an exact sine beside the sampled profile, `rotset`'s out-of-range `acos` clamped, `rotateX` fixed; not ported: DXF surfaces, imported blocks, Biot folds, alteration zones, geophysics) | `crates/deeptime-noddy/src/*.rs` (the reference fixture `crates/deeptime-noddy/tests/data/reference.txt` is the original's output) |
 
+## APIs called (nothing ported, nothing shipped)
+
+- **Distant Horizons** by James Seibel and the Distant Horizons team
+  (https://gitlab.com/distant-horizons-team/distant-horizons), LGPL-3.0. When it is installed, Deep
+  Time registers a world generator through its public API (`com.seibel.distanthorizons.api`:
+  `DhApi.worldGenOverrides`, `IDhApiWorldGenerator.generateLod`, `IDhApiFullDataSource`,
+  `DhApiTerrainDataPoint`, `IDhApiWrapperFactory`, `IDhApiWorldProxy`, `IDhApiTerrainDataRepo`), so
+  its far terrain comes from Deep Time's world data (P3-04). The API is bound by name at run time
+  (`neoforge/src/main/java/.../compat/dh/DhApiBinding.java`); no Distant Horizons class is compiled
+  against, copied or included in Deep Time's jar. What the API expects of a generator (the y of a
+  data point counted from the level's bottom, air up to the top of the level, the generation step
+  of a finished column) was read from the class files of Distant Horizons 3.3.0, 3.3.1 and 3.3.3
+  with `javap` and a decompiler; no code was taken. The tests download the 3.3.0 and 3.3.3 jars
+  from Modrinth and open them (`DhApiBindingTest`); they are never redistributed.
+
 ## Data
 
 - **U.S. Geological Survey grade–tonnage models and reports** (public domain, works of the U.S.
