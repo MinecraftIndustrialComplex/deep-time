@@ -5,6 +5,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.compat.dh.DhApiBinding;
 import com.minecraftindustrialcomplex.deeptime.compat.dh.DhFarTerrain;
+import com.minecraftindustrialcomplex.deeptime.compat.dh.TwDhGuard;
+import com.minecraftindustrialcomplex.deeptime.compat.dh.TwDhGuardRule;
 import com.minecraftindustrialcomplex.deeptime.farterrain.FarTerrain;
 import com.minecraftindustrialcomplex.deeptime.farterrain.FarTerrainCheck;
 import com.mojang.brigadier.CommandDispatcher;
@@ -196,6 +198,9 @@ public final class FarTerrainCommand {
         o.add("spawn", spawn);   // the smoke harness checks an area beside the spawn chunks
         o.addProperty("installed", DhFarTerrain.installed());
         o.addProperty("enabled", DhFarTerrain.enabled());
+        // Deep Time's patch to Toroidal World's guard: applied, pending, skipped (and why) or failed
+        // (TwDhGuardMixinPlugin sets it; a class of the mixin package cannot be read from here).
+        o.addProperty("tw_guard_patch", System.getProperty("deeptime.twDhGuard", "not configured"));
         if (DhFarTerrain.installed() && DhFarTerrain.enabled()) {
             Optional<DhApiBinding> api = DhFarTerrain.api();
             o.addProperty("api_bound", api.isPresent());
@@ -213,6 +218,12 @@ public final class FarTerrainCommand {
                 l.addProperty("registered", b.registered());
                 if (!b.registered())
                     l.addProperty("message", b.message());
+                l.addProperty("circumference", b.terrain().data().circumference());
+                // Toroidal World's guard (TwDhGuard): passed, left to TW (and why), or never asked.
+                TwDhGuardRule.Verdict guard = TwDhGuard.seen(key.location().toString());
+                l.addProperty("tw_guard", guard == null ? "not asked" : !guard.guarded() ? "not needed" : guard.pass() ? "passed" : "left to Toroidal World");
+                if (guard != null)
+                    l.addProperty("tw_guard_reason", guard.reason());
                 if (b.generator() != null) {
                     l.addProperty("max_detail", b.generator().maxDetail());
                     l.addProperty("sections", b.generator().sections());

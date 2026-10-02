@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.gametest;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.compat.dh.DhFarTerrain;
 import com.minecraftindustrialcomplex.deeptime.farterrain.FarTerrain;
 import com.minecraftindustrialcomplex.deeptime.farterrain.FarTerrainCheck;
 import com.minecraftindustrialcomplex.deeptime.worlddata.FarColumn;
@@ -23,7 +24,7 @@ import java.util.List;
  * Far terrain against generated chunks (plan §10.5 P3-04), on the real baked planet
  * ({@code deeptime:test_planet_real}: every pipeline stage, the pack's biomes, surface rules and
  * features). Far terrain is built without a chunk; these tests then generate the chunk and compare
- * the same columns. Distant Horizons is not needed and not loaded here (it cannot run on the
+ * the same columns. Distant Horizons is not needed here and no GameTest-server run loads it (it cannot run on the
  * GameTest server); what Distant Horizons stores of these columns is the smoke check's
  * ({@code tools/smoke/run.py --dh}).
  *
@@ -73,22 +74,86 @@ public final class FarTerrainGameTests {
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] farTerrainMatchesGeneratedChunks {}", tally);
-            helper.assertTrue(tally.columns >= 64, "only " + tally.columns + " columns compared");
-            helper.assertTrue(tally.share(tally.heightWithin1) >= 0.90,
-                    "the ground is within a block in only " + tally.heightWithin1 + " of " + tally.columns + " columns; worst " + tally.worstHeight);
-            helper.assertTrue(tally.share(tally.heightWithin2) >= 0.95,
-                    "the ground is within two blocks in only " + tally.heightWithin2 + " of " + tally.columns + " columns; worst " + tally.worstHeight);
-            helper.assertTrue(tally.share(tally.waterAgree) >= 0.95,
-                    "water or dry agrees in only " + tally.waterAgree + " of " + tally.columns + " columns");
-            helper.assertTrue(tally.waterBoth == 0 || tally.waterTopExact >= 0.9 * tally.waterBoth,
-                    "the water's top agrees in only " + tally.waterTopExact + " of " + tally.waterBoth + " water columns");
-            helper.assertTrue(tally.share(tally.biomeSame) >= 0.95,
-                    "the biome agrees in only " + tally.biomeSame + " of " + tally.columns + " columns: " + tally.toJson().get("biome_differences"));
-            helper.assertTrue(tally.share(tally.groundBlockSame) >= 0.4,
-                    "the ground block agrees in only " + tally.groundBlockSame + " of " + tally.columns + " columns: "
-                            + tally.toJson().get("ground_block_differences"));
+            assertAgrees(helper, tally, 64, "");
             helper.succeed();
         });
+    }
+
+    /** The properties far terrain must meet against generated chunks (see the class comment). */
+    static void assertAgrees(GameTestHelper helper, FarTerrainCheck.Tally tally, int minColumns, String where) {
+        helper.assertTrue(tally.columns >= minColumns, where + "only " + tally.columns + " columns compared");
+        helper.assertTrue(tally.share(tally.heightWithin1) >= 0.90,
+                where + "the ground is within a block in only " + tally.heightWithin1 + " of " + tally.columns + " columns; worst " + tally.worstHeight);
+        helper.assertTrue(tally.share(tally.heightWithin2) >= 0.95,
+                where + "the ground is within two blocks in only " + tally.heightWithin2 + " of " + tally.columns + " columns; worst " + tally.worstHeight);
+        helper.assertTrue(tally.share(tally.waterAgree) >= 0.95,
+                where + "water or dry agrees in only " + tally.waterAgree + " of " + tally.columns + " columns");
+        helper.assertTrue(tally.waterBoth == 0 || tally.waterTopExact >= 0.9 * tally.waterBoth,
+                where + "the water's top agrees in only " + tally.waterTopExact + " of " + tally.waterBoth + " water columns");
+        helper.assertTrue(tally.share(tally.biomeSame) >= 0.95,
+                where + "the biome agrees in only " + tally.biomeSame + " of " + tally.columns + " columns: " + tally.toJson().get("biome_differences"));
+        helper.assertTrue(tally.share(tally.groundBlockSame) >= 0.4,
+                where + "the ground block agrees in only " + tally.groundBlockSame + " of " + tally.columns + " columns: "
+                        + tally.toJson().get("ground_block_differences"));
+    }
+
+    /**
+     * Far terrain against generated chunks on both sides of the seam (Ben, 2026-10-02, with the patch
+     * that lets this generator through Toroidal World's guard): the 64 blocks west of x = C/2 and the
+     * 64 blocks east of it (x = −C/2 on, the planet's westernmost columns), on four rows from the
+     * equator to mid-latitudes. Each side must meet the planet-wide test's properties on its own.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
+    public static void farTerrainMatchesGeneratedChunksAcrossTheSeam(GameTestHelper helper) {
+        FarTerrain far = far(helper);
+        ServerLevel level = far.level();
+        int c = far.data().circumference();
+        int[] rows = {7, c / 16 + 7, -c / 16 + 7, c / 8 + 7};
+        FarTerrainCheck.Tally west = new FarTerrainCheck.Tally(), east = new FarTerrainCheck.Tally();
+        ChunkSampling.forEach(helper, 2 * 16 * rows.length, i -> {
+            boolean eastSide = (i & 1) == 1;
+            int k = (i >> 1) % 16, row = rows[(i >> 1) / 16];
+            int x = eastSide ? -c / 2 + 4 * k + 1 : c / 2 - 64 + 4 * k + 2;
+            FarTerrain.Column column = far.column(x, row);
+            if (column.ground() < level.getMinBuildHeight() + 32)
+                return false;
+            ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, row >> 4, ChunkStatus.FEATURES, true);
+            (eastSide ? east : west).add(column, FarTerrainCheck.real(chunk, x, row));
+            return true;
+        }, () -> {
+            DeepTime.LOGGER.info("[gametest] farTerrainMatchesGeneratedChunksAcrossTheSeam C={} west {} east {}", c, west, east);
+            assertAgrees(helper, west, 32, "west of the seam: ");
+            assertAgrees(helper, east, 32, "east of the seam: ");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Distant Horizons is loaded when the run's mods include it ({@code -Ddeeptime.dh.expected},
+     * set by neoforge/build.gradle from the server set and its GameTest exclusions), and then far
+     * terrain is bound to it: the API resolves and the real test planet's override registered. A
+     * run that expects it and lacks it fails here, rather than every far-terrain test passing
+     * without Distant Horizons. Today no GameTest-server run has it: Distant Horizons 3.3.1 (as
+     * 3.3.0) casts the server to {@code DedicatedServer} at start, which NeoForge's GameTest server is
+     * not (tools/smoke/profiles/mic.gametest-excluded), so its path is the smoke check's
+     * ({@code tools/smoke/run.py --dh}) on a dedicated server.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 200)
+    public static void farTerrainHasDistantHorizonsWhenExpected(GameTestHelper helper) {
+        boolean expected = Boolean.getBoolean("deeptime.dh.expected");
+        boolean installed = DhFarTerrain.installed();
+        DeepTime.LOGGER.info("[gametest] farTerrainHasDistantHorizonsWhenExpected expected={} installed={} twGuardPatch={}",
+                expected, installed, System.getProperty("deeptime.twDhGuard", "not configured"));
+        helper.assertTrue(installed || !expected,
+                "this run's mods include Distant Horizons (-Ddeeptime.dh.expected=true) but it is not loaded");
+        if (installed && DhFarTerrain.enabled()) {
+            helper.assertTrue(DhFarTerrain.api().isPresent(), "Distant Horizons is loaded but its API did not bind: " + DhFarTerrain.unavailable());
+            ServerLevel level = RealPlanetGameTests.level(helper);
+            DhFarTerrain.Bound bound = DhFarTerrain.bound(level.dimension());
+            helper.assertTrue(bound != null && bound.registered(), "far terrain is not registered with Distant Horizons for "
+                    + level.dimension().location() + (bound == null ? "" : ": " + bound.message()));
+        }
+        helper.succeed();
     }
 
     private record Layer(int bottom, int top, BlockState block, int light) {}

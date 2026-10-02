@@ -22,6 +22,7 @@ import java.util.jar.JarFile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -156,6 +157,13 @@ class DhApiBindingTest {
                 assertTrue(api.worldGenerator.isInstance(proxy));
                 // Toroidal World's guard looks at the class name: this must not look like Distant Horizons' own.
                 assertFalse(proxy.getClass().getName().startsWith("com.seibel.distanthorizons."), proxy.getClass().getName());
+                // ...so Deep Time's patch to that guard (TwDhGuard) recognises it by its handler, and nothing else.
+                assertSame(generator, DhLodGenerator.of(proxy));
+                assertEquals("test", generator.levelName());
+                assertNull(DhLodGenerator.of(new Object()));
+                assertNull(DhLodGenerator.of(null));
+                assertNull(DhLodGenerator.of(java.lang.reflect.Proxy.newProxyInstance(api.worldGenerator.getClassLoader(),
+                        new Class<?>[]{api.worldGenerator}, (self, m, a) -> null)), "another mod's proxy generator");
 
                 assertSame(api.returnTypeDataSources, api.worldGenerator.getMethod("getReturnType").invoke(proxy));
                 assertEquals("API_DATA_SOURCES", String.valueOf(api.returnTypeDataSources));

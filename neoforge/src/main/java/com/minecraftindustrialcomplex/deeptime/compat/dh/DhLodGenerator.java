@@ -95,6 +95,22 @@ public final class DhLodGenerator implements InvocationHandler {
         return proxy;
     }
 
+    /**
+     * The Deep Time generator behind {@code generator} when it is one of {@link #proxy()}'s
+     * objects, else null. Toroidal World's guard sees only the proxy ({@code TwDhGuard}).
+     */
+    public static DhLodGenerator of(Object generator) {
+        if (generator != null && Proxy.isProxyClass(generator.getClass())
+                && Proxy.getInvocationHandler(generator) instanceof DhLodGenerator g)
+            return g;
+        return null;
+    }
+
+    /** The level this generator was made for ({@code minecraft:overworld}). */
+    public String levelName() {
+        return name;
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     public Object invoke(Object self, Method method, Object[] args) throws Throwable {
