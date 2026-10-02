@@ -13,7 +13,7 @@ The rows are in `ledger/`, one file per subsystem, because one file would be too
 
 ## Counts
 
-2,205 active rows in 28 ledgers. The ledgers hold 2,398 ids: stage 1 left 2,069 rows; stage 2 package WP-0
+2,209 active rows in 28 ledgers (P1-10 added PRV-028 to PRV-031 and re-marked PRV rows, 2026-10-02). The ledgers hold 2,398 ids: stage 1 left 2,069 rows; stage 2 package WP-0
 (2026-10-02) retired 193 of them as duplicates (`merged`, not counted) and added 301 rows for code stage 1
 had not covered (51 in GEO, 74 in PRS, 84 in HNT, 35 in CRE, 57 in CHK). The flexure feature (ISO-040 to
 ISO-067, added to master the same day by its own agent) is included.
@@ -39,21 +39,23 @@ ISO-067, added to master the same day by its own agent) is included.
 | [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 0 | 16 | 0 | 0 | 0 | 54 | 4 | 0 | 0 | 0 |
 | [DEP](ledger/DEP.md) | deposit models, counts, sizes | 164 | 0 | 74 | 0 | 15 | 0 | 49 | 26 | 0 | 0 | 40 |
 | [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 182 | 0 | 59 | 2 | 10 | 0 | 40 | 71 | 0 | 0 | 75 |
-| [PRV](ledger/PRV.md) | geologic provinces | 27 | 0 | 5 | 0 | 0 | 4 | 6 | 12 | 0 | 0 | 0 |
+| [PRV](ledger/PRV.md) | geologic provinces | 31 | 0 | 0 | 0 | 5 | 4 | 10 | 12 | 0 | 0 | 0 |
 | [SCL](ledger/SCL.md) | world scale, planet constants | 50 | 0 | 6 | 0 | 0 | 1 | 37 | 6 | 0 | 0 | 1 |
 | [BAK](ledger/BAK.md) | the bake, satellite view | 40 | 0 | 0 | 0 | 0 | 1 | 34 | 5 | 0 | 0 | 0 |
 | [POL](ledger/POL.md) | the pole cap | 21 | 0 | 0 | 0 | 0 | 0 | 18 | 3 | 0 | 0 | 0 |
-| [GEO](ledger/GEO.md) | geothermal features | 51 | 0 | 0 | 0 | 0 | 0 | 40 | 11 | 0 | 1 | 0 |
+| [GEO](ledger/GEO.md) | geothermal features | 51 | 1 | 0 | 0 | 0 | 0 | 47 | 3 | 0 | 1 | 0 |
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 74 | 0 | 9 | 0 | 0 | 2 | 54 | 9 | 16 | 0 | 0 |
-| [HNT](ledger/HNT.md) | editor hint texts | 84 | 0 | 12 | 2 | 0 | 6 | 36 | 28 | 0 | 0 | 0 |
+| [HNT](ledger/HNT.md) | editor hint texts | 84 | 11 | 12 | 2 | 2 | 6 | 36 | 15 | 0 | 0 | 0 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
 | [CHK](ledger/CHK.md) | plate-check target ranges | 57 | 0 | 10 | 2 | 7 | 0 | 9 | 29 | 3 | 4 | 0 |
-| **all** | | **2,205** | **3** | **508** | **57** | **65** | **76** | **815** | **681** | **359** | **62** | **193** |
+| **all** | | **2,209** | **17** | **498** | **57** | **74** | **76** | **863** | **624** | **359** | **62** | **193** |
 
-3 rows are `verified`: ISO-041, ISO-042 and ISO-048, read in their sources by the flexure agent. In plain terms,
-of the 2,205 active rows: 815 (37 %) are deliberate game or implementation choices; 681 (31 %) state something about
-the physical world with no source at all; 508 (23 %) name a source that nobody is recorded as having read; 122 (6 %)
-were written from memory or from an abstract and say so; 76 (3 %) were tuned to a target.
+17 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16, 2026-10-02): ISO-041, ISO-042
+and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and eleven HNT rows (WP-15, WP-16, WP-2).
+In plain terms, of the 2,209 active rows: 863 (39 %) are deliberate game or implementation choices; 624 (28 %)
+state something about the physical world with no source at all; 498 (23 %) name a source that nobody is recorded
+as having read; 131 (6 %) were written from memory or from an abstract and say so; 76 (3 %) were tuned to a target;
+17 (1 %) were read in their sources.
 
 A low `from-memory` count does not mean a subsystem was written with its sources open. It means
 its agent did not say. The impacts agent was candid, and so has 34 such rows; most `cited-unverified`
@@ -240,13 +242,13 @@ Read from code and documents by the extraction agents; nothing here was checked 
 
 | # | Ledger | What is wrong or unsettled | Evidence |
 |---|---|---|---|
-| 27 | HNT-017, HNT-019 (and the comment in `volcanoes/params.rs`) | The hints say blocks are "15 times taller than wide". It is the other way round: a block is 300 m wide and 20 m tall, so heights are drawn 15 times larger against widths. | arithmetic from the scale rows **HNT-017 and the params.rs comment fixed in WP-2 (2026-10-02);** HNT-019 is the impacts package's. |
-| 28 | HNT-057 | The ice-sheet hint says 50 kPa "matches Antarctica". `ice.rs` and CLM-102 give about 32 kPa for Antarctica and about 80 kPa for Greenland. | code comment against hint |
-| 29 | HNT-062, HNT-063 | The caldera hints give Crater Lake's radius as about 4 km (the code comment says 4 to 5 km across) and Yellowstone's as 20 km, while the preset's largest caldera radius is 9 km. | code against hint |
-| 30 | HNT (volcano_size, shield_height_high, volcano_density, arc_spacing) | Shield heights: hints say "up to 6 km" and "Hawaii: 5 to 9 km", the coded range is 3.5 to 6.5 km. Arc spacing "real arcs: 50 to 70 km" repeats the 60 km that VOL-039 shows is not in the cited paper. | code against hint; fix 11 **Fixed in WP-2 (2026-10-02):** the hints now give read figures (Grosse et al. 2014, USGS, Hildreth 2007). |
-| 31 | HNT (ejecta_reach, feature_deposits, star_age, ocean_fraction) | "1/27 at 3 radii" while the coded taper is zero there; "1 is the true deposit size" while each deposit type enlarges its body 6 to 12 times (and richness reaches no blocks, fix 3); "a younger star is fainter" while the Gough law is normalised to 1 at the end of the history; the ocean-fraction slider minimum 0.31 is not the real bound and the presets ship 0.7, not the 0.71 the hint calls Earth. | code against hint |
-| 32 | HNT (river_width, river_depth, pet_per_degree, day_length, lake_freeze, thrust_slip) | Unit and wording problems: "blocks" for quantities that are blocks per root of discharge; PET per degree without "per year"; "one rotation" for a solar day; "ice more than half the year" where a symmetric cycle gives exactly half; "about 11 blocks" is the maximum of the slip law. | arithmetic |
-| 33 | PLT-204 to PLT-208 (hints, already ledgered) | `cordillera_width_km` is a half-width in the code but the hint treats it as the width of the range; the "Abyssal plain depth" label sets `oceanic_floor_elevation_m`, not the unused `abyssal_elevation_m`; the hint uses 180 Myr for two different things. | code against hint |
+| 27 | HNT-017, HNT-019 (and the comment in `volcanoes/params.rs`) | The hints say blocks are "15 times taller than wide". It is the other way round: a block is 300 m wide and 20 m tall, so heights are drawn 15 times larger against widths. | arithmetic from the scale rows **Fixed in WP-15: the hints and the code comments now say heights are stretched 15 times against widths.** **WP-2 (2026-10-02):** in the volcano files (`params.rs`, `shape.rs`, `Magma.java`) and the volcano_flanks hint the merged text is WP-2's "heights are drawn 15 times larger than widths (a block is 300 m across and 20 m tall)". |
+| 28 | HNT-057 | The ice-sheet hint says 50 kPa "matches Antarctica". `ice.rs` and CLM-102 give about 32 kPa for Antarctica and about 80 kPa for Greenland. | code comment against hint **Fixed in WP-15: the hint now says 32 kPa fits Antarctica and 80 kPa Greenland, and that the default 50 was chosen to meet targets.** |
+| 29 | HNT-062, HNT-063 | The caldera hints give Crater Lake's radius as about 4 km (the code comment says 4 to 5 km across) and Yellowstone's as 20 km, while the preset's largest caldera radius is 9 km. | code against hint **Fixed in WP-15 (hints): Crater Lake 8 to 10 km across (radius 4 to 5 km), Yellowstone 48 by 72 km across; the preset's 9 km maximum is a design range (WP-2).** **WP-2 (2026-10-02):** the caldera_radius_max hint now uses the primary USGS figure, Yellowstone a basin 45 by 85 km (Christiansen 2001), with Long Valley 16 by 32 km. |
+| 30 | HNT (volcano_size, shield_height_high, volcano_density, arc_spacing) | Shield heights: hints say "up to 6 km" and "Hawaii: 5 to 9 km", the coded range is 3.5 to 6.5 km. Arc spacing "real arcs: 50 to 70 km" repeats the 60 km that VOL-039 shows is not in the cited paper. | code against hint; fix 11 **Fixed in WP-15 (hints): shield and stratovolcano heights and Mauna Loa stated; "Earth's spacing" removed. The spacing figure itself stays with fix 11 (WP-2).** **WP-2 (2026-10-02):** the volcano_size hint adds Earth's median stratovolcano height (1.02 km, Grosse et al. 2014); arc_spacing gives Hildreth 2007's mean spacings of large centres, 27 to 87 km. |
+| 31 | HNT (ejecta_reach, feature_deposits, star_age, ocean_fraction) | "1/27 at 3 radii" while the coded taper is zero there; "1 is the true deposit size" while each deposit type enlarges its body 6 to 12 times (and richness reaches no blocks, fix 3); "a younger star is fainter" while the Gough law is normalised to 1 at the end of the history; the ocean-fraction slider minimum 0.31 is not the real bound and the presets ship 0.7, not the 0.71 the hint calls Earth. | code against hint **Fixed in WP-15 (hints): ejecta taper, deposit drawing size, star age and ocean fraction now say what the code does. The richness setting still reaches no block (fix 3, WP-9).** |
+| 32 | HNT (river_width, river_depth, pet_per_degree, day_length, lake_freeze, thrust_slip) | Unit and wording problems: "blocks" for quantities that are blocks per root of discharge; PET per degree without "per year"; "one rotation" for a solar day; "ice more than half the year" where a symmetric cycle gives exactly half; "about 11 blocks" is the maximum of the slip law. | arithmetic **Fixed in WP-15: units and wording corrected.** |
+| 33 | PLT-204 to PLT-208 (hints, already ledgered) | `cordillera_width_km` is a half-width in the code but the hint treats it as the width of the range; the "Abyssal plain depth" label sets `oceanic_floor_elevation_m`, not the unused `abyssal_elevation_m`; the hint uses 180 Myr for two different things. | code against hint **Part fixed in WP-15: the arc_range_width hint now says the setting is a gaussian scale. The other plate hints wait for the plate rewrite (WP-13).** |
 | 34 | PRS-022, PRS-035 to PRS-042 | `planet_world_4k.json` says it uses "the calibrated parameters of pipeline_quick_16k" but twelve keys differ (older tectonic and erosion values kept on purpose, not stated in the preset). The 4,096-block test planet is about 196 km in radius and has Earth's gravity (PRS-029). | preset diff |
 | 35 | PRS-001 to PRS-003, HYP-019 | The full presets take uplift times 0.8 on top of the quick presets' times 0.7; HYP-019 describes one factor of 0.7. The 32k presets reuse the 16k tuning; only `quick_32k` was run, once. | preset diff; build log |
 | 36 | PRS-057 to PRS-059 | The four shipped essentials files (`neoforge/src/main/resources/data/deeptime/essentials/*.json`: iron, coal, copper, gold) have no ledger row, and the test essentials differ from them in region size, exposure and spawn limit. | grep of the ledgers |
@@ -257,11 +259,11 @@ Read from code and documents by the extraction agents; nothing here was checked 
 | 41 | PLT-143 to PLT-161, CHK-001 to CHK-019 | The collision targets are all marked `pending-rewrite`, but the force-balance design (section 7) says they stand as the acceptance test of the rewrite. | design against ledger |
 | 42 | CRE-014 | `pool::CONSERVED = 5` is documented as the "felsic-family" pools but covers pools 0 to 4, which include sediment, sedimentary and metamorphic rock. | code reading |
 | 43 | CRE-034 | The plan says the column rule and the Noddy port agree to 1e-5 block; the code counts a point as a side flip above 1e-3 block when it lies within 1e-6 of a fault plane and leaves flipped points out of the worst case. | plan against code |
-| 44 | GEO-014, GEO-048 to GEO-050, GEO-017, GEO-035, GEO-046 | Geothermal hints and format notes disagree with the code: "one to four" fields per volcano against a formula that gives 0 to 7; "2 to 5 blocks across" is the pool radius (4 to 10 across); FORMAT.md says a tenth of a terrace is stained (code: 7 %) and a field is drawn from 3 blocks above sea level (code: 5). | code against documents |
-| 45 | GEO-012, GEO-026, GEO-040, GEO-041 | The plan says heat comes "from the heat flow already modelled"; the code uses only active volcanoes. Nothing in code, hints or decisions mentions geysers, boiling or temperatures, and spring water is plain water; the plan's epithermal cinnabar is a 6 % stain. | code against plan |
-| 46 | GEO-007, GEO-019, GEO-020 | The 400 mm rainfall threshold has no source; the 3 degC rule is a vanilla freezing rule, not geology. | none cited |
+| 44 | GEO-014, GEO-048 to GEO-050, GEO-017, GEO-035, GEO-046 | Geothermal hints and format notes disagree with the code: "one to four" fields per volcano against a formula that gives 0 to 7; "2 to 5 blocks across" is the pool radius (4 to 10 across); FORMAT.md says a tenth of a terrace is stained (code: 7 %) and a field is drawn from 3 blocks above sea level (code: 5). | code against documents **Fixed in WP-16: hints, FORMAT.md and comments now agree with the code.** |
+| 45 | GEO-012, GEO-026, GEO-040, GEO-041 | The plan says heat comes "from the heat flow already modelled"; the code uses only active volcanoes. Nothing in code, hints or decisions mentions geysers, boiling or temperatures, and spring water is plain water; the plan's epithermal cinnabar is a 6 % stain. | code against plan **Part fixed in WP-16: geysers, heat sources and cinnabar are now stated plainly in the hints, FORMAT.md and the page; the plan's wording is a decision for Ben (Pending).** |
+| 46 | GEO-007, GEO-019, GEO-020 | The 400 mm rainfall threshold has no source; the 3 degC rule is a vanilla freezing rule, not geology. | none cited **Part fixed in WP-16: the 400 mm and 3 degC rules are marked `game-choice` with the qualitative sources found (NPS, Paulson and Ingebritsen 1991); no source gives either number.** |
 | 47 | SCL-009 (absorbing ISO-030) | Sea level 63 is called an agent choice in SCL-009 and Ben's design choice in the retired ISO-030, whose text SCL-009 now carries. | ledger rows |
-| 48 | master `STATUS.md` | The P2-14 build-log entry lost its heading and first paragraphs in the merge to master; its remaining bullets sit at the end of the P1-10 entry. | read by the GEO extraction agent |
+| 48 | master `STATUS.md` | The P2-14 build-log entry lost its heading and first paragraphs in the merge to master; its remaining bullets sit at the end of the P1-10 entry. | read by the GEO extraction agent **Fixed in WP-16: the heading and first bullets are restored (reconstructed; the original text survives nowhere in the history).** |
 
 Further mismatches and partial results, with quotations, are in [spot-checks.md](spot-checks.md);
 further flags are in `extraction-notes/`.

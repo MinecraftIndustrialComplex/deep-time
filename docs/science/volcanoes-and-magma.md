@@ -187,7 +187,7 @@ Earth, from the sources read in stage 2:
 | Hawaiian growth | principal growth in the first 1–2 Myr | Clague & Sherrod 2014, abstract | growth time constant 1 Myr; activity window 0.7–2.8 Myr at 25–100 mm/yr |
 | Subsidence of Hawaiian volcanoes | more than 1 km in about 1 Myr under the growing load (2.6 m/kyr off Hawaii), then about 10 m/Myr as the plate cools | Clague & Sherrod 2014, pp. 130–131 | flexure under the load (since 2026-10-02), the plate model's ocean floor, and 25 m/Myr more after death |
 | Yellowstone | plateau about 2,400 m against 1,600–1,900 m beside it; caldera 45 by 85 km; caldera-forming eruptions at 2.1, 1.3 and 0.64 Ma | Christiansen 2001, full text | silicic centre 0.9 km tall; caldera radius at most 9 km; 0.12 calderas per Myr |
-| Caldera sizes | Crater Lake 8.0 by 9.7 km; Long Valley 16 by 32 km | Wikipedia (secondary); USGS Long Valley page (stage 1) | 6–18 km across |
+| Caldera sizes | Crater Lake a basin 8 by 10 km across; Long Valley 16 by 32 km | USGS "Geology of Crater Lake National Park" (read by WP-15); USGS Long Valley page (stage 1) | 6–18 km across |
 | Shallow magma storage | Hawaiian shields 1–7 km; Kilauea 1–2 km under the caldera centre, 2–4 km under its south part; arc volcanoes 6 ± 3 km | Clague & Sherrod 2014, abstract; Poland et al. 2014, p. 194; Rasmussen et al. 2022, abstract only | 3 km under every crater |
 | Kilauea's reservoir | "a few cubic kilometers", sill-like | Poland et al. 2014, pp. 194, 199 | 1.4–18 km³ (1.2–2.8 km radius, half-height 0.2 of it) |
 | Potentially active volcanoes | about 1,350, besides the spreading ridges | USGS FAQ, fetched | – |
