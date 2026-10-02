@@ -138,7 +138,8 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
     public void applyCarvers(net.minecraft.server.level.WorldGenRegion region, long seed, net.minecraft.world.level.levelgen.RandomState random,
                              net.minecraft.world.level.biome.BiomeManager biomes, net.minecraft.world.level.StructureManager structures,
                              net.minecraft.world.level.chunk.ChunkAccess chunk, net.minecraft.world.level.levelgen.GenerationStep.Carving step) {
-        super.applyCarvers(region, seed, random, biomes, structures, chunk, step);
+        if (!Boolean.getBoolean("deeptime.diag.noCarvers"))   // DIAG, remove
+            super.applyCarvers(region, seed, random, biomes, structures, chunk, step);
         if (step == net.minecraft.world.level.levelgen.GenerationStep.Carving.AIR && terrain() instanceof WorldDataTerrain w)
             WaterBodies.wake(chunk, w.data(), waterReach());
     }
