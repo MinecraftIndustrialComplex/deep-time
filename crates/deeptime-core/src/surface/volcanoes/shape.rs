@@ -6,8 +6,8 @@
 //! volcano is round in the world whatever its latitude, like the plutons (`structure/plutons.rs`).
 //!
 //! **Profiles** (ρ = r / R, R the basal radius; the body is 1 at the summit and 0 at the foot):
-//! - stratovolcano: (1 − ρ)^1.5, a concave cone, steepest at the summit (1.5 H/R: 18° for 3 km
-//!   over R = 14 km, 9° at the default doubled radius; its mean slope is 0.8 H/R). Ledger VOL-016,
+//! - stratovolcano: (1 − ρ)^1.5, a concave cone, steepest at the summit (1.5 H/R: 17° for 2 km
+//!   over R = 10 km, 8.5° at the default doubled radius; its mean slope is 0.8 H/R). Ledger VOL-016,
 //!   uncited: Earth's stratovolcanoes have mean flank slopes of 17.7° and steepest average slopes
 //!   of 27.7° (medians of 512; Grosse et al. 2014, Bull. Volcanol. 76:784, table 1), reached at
 //!   0.79 of the height, below the summit. In blocks every slope is drawn 15 times steeper

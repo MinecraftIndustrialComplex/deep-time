@@ -38,13 +38,14 @@
 //!    continental crust. It builds while within that distance of the plume, more the closer it
 //!    is, toward a height set by the plume's strength (`shield_height_km`), so the chain ages
 //!    away from the plume: the youngest volcano over it, older ones extinct, eroding and (on
-//!    oceanic crust) subsiding by `island_subsidence_m_myr` until they drown as seamounts.
+//!    oceanic crust) sinking with the flexure and the ageing ocean floor until they drown as
+//!    seamounts (and, if `island_subsidence_m_myr` is set above its default 0, by that much more).
 //! 5. **Build.** An active volcano grows by (target − height)·(1 − e^(−Δt/`build_myr`)), capped
 //!    so no summit passes `max_elevation_km` above the sea; the growth is laid on the strata log
 //!    as its rock (stratovolcano: tuff under andesite, rhyolite when silicic; shield: basalt;
 //!    silicic centre: tuff and rhyolite), burying the regolith as a palaeosol.
 //! 6. **Calderas.** A silicic stratovolcano collapses at `caldera_rate_per_myr` (a continental
-//!    hotspot's centre at three times it): its summit inside the rim radius is removed and the
+//!    hotspot's centre at its own `hotspot_caldera_rate_per_myr`, about 1 per Myr): its summit inside the rim radius is removed and the
 //!    erupted volume is laid out as an ignimbrite (tuff) sheet to four rim radii and a tuff fill
 //!    in the caldera; it then dies. A shield past 4 km opens a small summit caldera.
 //! 7. **Flood basalts.** Each new `large_igneous_province` event of the plate model becomes a
@@ -266,6 +267,8 @@ pub struct Counts {
     pub shield_born: u64,
     pub silicic_born: u64,
     pub calderas: u64,
+    /// Of `calderas`, the collapses of continental hotspot centres.
+    pub hotspot_calderas: u64,
     pub summit_calderas: u64,
     pub flood_basalts: u64,
     pub eroded: u64,
@@ -1042,9 +1045,7 @@ impl VolcanoStage {
                 &mut rng,
             );
             for (bx, bz, c) in born {
-                let f = front_flux[c];
-                let s01 = ((f - p.arc_min_flux) / (1.0 - p.arc_min_flux).max(1e-9)).clamp(0.0, 1.0);
-                let hk = p.arc_height_km[0] + (p.arc_height_km[1] - p.arc_height_km[0]) * s01;
+                let hk = arc_height_km(&p, front_flux[c]);
                 let radius =
                     // ledger: VOL-020
                     p.arc_radius_km * (hk / p.arc_height_km[1]).powf(0.8) * 1000.0 * p.size
@@ -1062,7 +1063,8 @@ impl VolcanoStage {
                 // shows: a game choice (VOL-026). Real summit craters are mostly under 1 km across
                 // (Fuji's 780 m); the large craters and calderas Grosse et al. (2014) could
                 // measure on composite volcanoes are 0.6–11 km across, median 2.2 km, and 240 m
-                // deep (median). The 0.07 of the doubled basal radius gives 4 km at a 3-km cone.
+                // deep (median). The 0.07 of the doubled basal radius gives 2.8 km across at a
+                // 2-km cone.
                 let crater_rho = (1000.0 * p.size).max(0.07 * radius) / radius; // ledger: VOL-026
                 st.volcanoes.push(Volcano {
                     id: st.next_id,
@@ -1084,7 +1086,7 @@ impl VolcanoStage {
                     sunk_m: 0.0,
                     kept_m: 0.0,
                     target_m: hk * 1000.0 * p.size,
-                    flux_last: f,
+                    flux_last: front_flux[c],
                     missed: 0,
                     flux_myr: 0.0,
                     active_myr: 0.0,
@@ -1165,10 +1167,7 @@ impl VolcanoStage {
             }
             let target = match v.kind {
                 Kind::Strato => {
-                    let f = v.flux_last;
-                    let s01 =
-                        ((f - p.arc_min_flux) / (1.0 - p.arc_min_flux).max(1e-9)).clamp(0.0, 1.0);
-                    let hk = p.arc_height_km[0] + (p.arc_height_km[1] - p.arc_height_km[0]) * s01;
+                    let hk = arc_height_km(&p, v.flux_last);
                     // A cone never outgrows the height (and radius) it was born with.
                     (hk * 1000.0 * p.size).min(v.target_m)
                 }
@@ -1274,16 +1273,9 @@ impl VolcanoStage {
             if !v.active() || v.caldera.is_some() {
                 continue;
             }
-            let (rate, summit) = match v.kind {
-                Kind::Strato if v.silicic => (p.caldera_rate_per_myr, false),
-                Kind::Silicic => (3.0 * p.caldera_rate_per_myr, false), // ledger: VOL-045
-                Kind::Shield if v.height_m >= 4000.0 * p.size => (p.caldera_rate_per_myr, true), // ledger: VOL-031
-                _ => (0.0, false),
-            };
-            let u = rng.uniform();
-            if rate <= 0.0 || u >= 1.0 - (-rate * dt).exp() || v.height_m < 300.0 {
+            let Some(summit) = caldera_erupts(v, &p, dt, &mut rng) else {
                 continue;
-            }
+            };
             let before = v.shape();
             let (rc, depth_m) = if summit {
                 let rc = 0.08 * v.radius_m; // ledger: VOL-031
@@ -1338,6 +1330,9 @@ impl VolcanoStage {
                 });
                 v.extinct_myr = Some(t);
                 st.counts.calderas += 1;
+                if v.kind == Kind::Silicic {
+                    st.counts.hotspot_calderas += 1;
+                }
                 if let Some(seg) = st.arcs.get_mut(&v.segment) {
                     seg.calderas += 1;
                 }
@@ -1357,23 +1352,7 @@ impl VolcanoStage {
 
         // 7. Subsidence of dead oceanic volcanoes.
         let started = Instant::now();
-        if p.island_subsidence_m_myr > 0.0 {
-            for v in &mut st.volcanoes {
-                if v.active() || !v.oceanic || v.sunk_m >= p.island_subsidence_max_m {
-                    continue;
-                }
-                let sink =
-                    (p.island_subsidence_m_myr * dt).min(p.island_subsidence_max_m - v.sunk_m);
-                let kern = |r: f64| {
-                    let x = r / 1.6; // ledger: VOL-048
-                    if x >= 1.0 { 0.0 } else { (1.0 - x * x).powi(2) }
-                };
-                for (c, wgt) in l1.render(v.x, v.z, v.radius_m, 1.6, &kern) {
-                    l1.delta[c] -= (sink * wgt) as f32;
-                }
-                v.sunk_m += sink;
-            }
-        }
+        sink_dead_islands(&mut st.volcanoes, &mut l1, &p, dt);
         self.time("subsidence", started);
 
         // 8. Flood basalts from the plate model's new large igneous provinces.
@@ -2241,6 +2220,66 @@ fn shuffle<T>(rng: &mut Rng, v: &mut [T]) {
     }
 }
 
+/// Step 7: extinct volcanoes on oceanic crust sink by `island_subsidence_m_myr` · Δt, up to
+/// `island_subsidence_max_m` in all, over 1.6 basal radii. The default rate is 0 (Ben,
+/// 2026-10-02): the plate's flexure under the cone and the ageing ocean floor already sink an
+/// island, so the volcano stage adds nothing and leaves its height to them. Ledger VOL-048.
+fn sink_dead_islands(volcanoes: &mut [Volcano], l1: &mut L1, p: &VolcanoParams, dt: f64) {
+    if p.island_subsidence_m_myr <= 0.0 {
+        return;
+    }
+    for v in volcanoes {
+        if v.active() || !v.oceanic || v.sunk_m >= p.island_subsidence_max_m {
+            continue;
+        }
+        let sink = (p.island_subsidence_m_myr * dt).min(p.island_subsidence_max_m - v.sunk_m);
+        let kern = |r: f64| {
+            let x = r / 1.6; // ledger: VOL-048
+            if x >= 1.0 { 0.0 } else { (1.0 - x * x).powi(2) }
+        };
+        for (c, wgt) in l1.render(v.x, v.z, v.radius_m, 1.6, &kern) {
+            l1.delta[c] -= (sink * wgt) as f32;
+        }
+        v.sunk_m += sink;
+    }
+}
+
+/// The height a stratovolcano aims at on an arc of the given flux (0–1), km, before the size
+/// setting: the flux at `arc_min_flux` gives the low end of `arc_height_km`, flux 1 the high end
+/// (ledger VOL-019).
+fn arc_height_km(p: &VolcanoParams, flux: f64) -> f64 {
+    let s01 = ((flux - p.arc_min_flux) / (1.0 - p.arc_min_flux).max(1e-9)).clamp(0.0, 1.0);
+    p.arc_height_km[0] + (p.arc_height_km[1] - p.arc_height_km[0]) * s01
+}
+
+/// The caldera rate of an active volcano, per Myr, and whether the collapse is a small summit
+/// caldera (a tall shield) rather than a rim-and-ignimbrite one. A silicic stratovolcano and a
+/// tall shield use `caldera_rate_per_myr`, a continental hotspot's silicic centre
+/// `hotspot_caldera_rate_per_myr` (about 1 per Myr, Ben 2026-10-02); the rest do not collapse.
+fn caldera_rate(v: &Volcano, p: &VolcanoParams) -> (f64, bool) {
+    match v.kind {
+        Kind::Strato if v.silicic => (p.caldera_rate_per_myr, false),
+        Kind::Silicic => (p.hotspot_caldera_rate_per_myr, false), // ledger: VOL-045
+        Kind::Shield if v.height_m >= 4000.0 * p.size => (p.caldera_rate_per_myr, true), // ledger: VOL-031
+        _ => (0.0, false),
+    }
+}
+
+/// Whether an active volcano collapses into a caldera during a step of `dt` Myr: `Some(true)`
+/// for a small summit caldera (a tall shield), `Some(false)` for a rim-and-ignimbrite one. One
+/// draw of `rng` per call, whatever the answer, so a run's streams do not shift with the rates.
+fn caldera_erupts(v: &Volcano, p: &VolcanoParams, dt: f64, rng: &mut Rng) -> Option<bool> {
+    let (rate, summit) = caldera_rate(v, p);
+    let u = rng.uniform();
+    (rate > 0.0 && u < caldera_chance(rate, dt) && v.height_m >= 300.0).then_some(summit)
+}
+
+/// The chance that a volcano of the given caldera rate (per Myr) collapses during a step of `dt`
+/// Myr: the rate is a Poisson hazard, ledger VOL-045.
+fn caldera_chance(rate: f64, dt: f64) -> f64 {
+    1.0 - (-rate * dt).exp()
+}
+
 /// Uniform in [lo, hi).
 fn range(rng: &mut Rng, lo: f64, hi: f64) -> f64 {
     lo + (hi - lo) * rng.uniform()
@@ -2290,7 +2329,7 @@ pub fn summary_line(v: &serde_json::Value) -> String {
     format!(
         "volcanoes_final={} strato_born={} shield_born={} caldera_complex_born={} \
          standing_strato={} standing_shield={} standing_caldera_complex={} active_strato={} \
-         active_shield={} calderas={} summit_calderas={} flood_basalts={} eroded={} subducted={} \
+         active_shield={} calderas={} hotspot_calderas={} summit_calderas={} flood_basalts={} eroded={} subducted={} \
          built_km3={:.3e} tallest_m={} flood_basalt_outcrop_cells={} events={} \
          arc_base_p50_mean_m={:.0} arc_base_low_share_mean={:.3} arc_base_p50_final_m={:.0} \
          height_p10_p50_p90_m: active_strato={} standing_strato={} standing_shield={}",
@@ -2304,6 +2343,7 @@ pub fn summary_line(v: &serde_json::Value) -> String {
         v["active"]["stratovolcano"],
         v["active"]["shield"],
         c["calderas"],
+        c["hotspot_calderas"],
         c["summit_calderas"],
         c["flood_basalts"],
         c["eroded"],
