@@ -154,6 +154,27 @@ def main() -> int:
                        args.out / "belt.png")
         numbers["belt"] = {"cell": [int(i), int(j)], "peak_m": float(z[j, i]),
                            "deepest_basin_m": float(window(flex, j, i, half).min()), **sec}
+    # The worst margin: the window along a plate boundary with the most cells that zigzag (the
+    # flexure follow-up, tools/review/flexure_artifacts.py), ground and flexure with sections.
+    if "plates/plate_id" in f:
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from flexure_artifacts import zigzag  # noqa: E402
+        pid = f["plates/plate_id"]
+        edge = (pid != np.roll(pid, 1, 1)) | (pid != np.roll(pid, -1, 1))
+        edge[1:] |= pid[1:] != pid[:-1]
+        zz = (zigzag(z) & ~np.repeat((np.abs(lat) > 70)[:, None], w, 1)).astype(float)
+        dens = zz.copy()
+        for _ in range(9):
+            dens = (dens + np.roll(dens, 1, 1) + np.roll(dens, -1, 1)) / 3
+            dens[1:-1] = (dens[:-2] + dens[1:-1] + dens[2:]) / 3
+        dens[~edge] = 0
+        j, i = np.unravel_index(int(np.argmax(dens)), dens.shape)
+        half = 9
+        sec = close_up(f, z, j, i, half, km, f"{args.label} The margin with the most cell-scale zigzag (cell {i}, {j})",
+                       args.out / "margin.png")
+        numbers["margin"] = {"cell": [int(i), int(j)], "zigzag_cells_in_window": int(window(zz, j, i, half).sum()),
+                             **sec}
     # The north polar band: ground and flexure, and a section along the meridian through the
     # strongest flexure there (the stripes of the first build ran east-west near the pole).
     band = int(h * 20 / 180)
@@ -191,7 +212,7 @@ def main() -> int:
     numbers["flexure_min_m"], numbers["flexure_max_m"] = float(flex.min()), float(flex.max())
     (args.out / "numbers.json").write_text(json.dumps(numbers, indent=1))
     print(json.dumps({k: v for k, v in numbers.items() if not isinstance(v, dict)}))
-    for k in ("moat", "belt"):
+    for k in ("moat", "belt", "margin"):
         if k in numbers:
             print(k, {a: b for a, b in numbers[k].items() if not isinstance(b, list)})
     return 0
