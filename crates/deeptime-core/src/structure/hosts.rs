@@ -12,7 +12,7 @@ use crate::deposits::types::DepositType;
 use crate::surface::lithology::index;
 use crate::synth::EVERY_CLASS;
 
-use super::columns::Unit;
+use super::columns::{Source, Unit};
 
 /// The classes `types` name as hosts, sorted by class index.
 pub fn host_classes(types: &[DepositType]) -> Vec<u16> {
@@ -41,16 +41,37 @@ pub fn field_name(k: u16) -> String {
 /// Adds each unit's share of the window [0, `window_m`] to `out[slot[class]]` (slot `usize::MAX`
 /// for classes not published).
 pub fn fractions(units: &[Unit], window_m: f64, slot: &[usize], out: &mut [f32]) {
+    fractions_inherited(units, window_m, slot, None, out);
+}
+
+/// [`fractions`], with `inherited = Some((s, share))` giving `share` of every basement unit's part
+/// to slot `s` instead of its own class: banded iron formation inherited in a craton's basement
+/// (`deeptime:inherited_bif`, `deposits::clocks`) is the BIF type's host where the basement is
+/// within the window.
+pub fn fractions_inherited(
+    units: &[Unit],
+    window_m: f64,
+    slot: &[usize],
+    inherited: Option<(usize, f32)>,
+    out: &mut [f32],
+) {
     let mut top = 0.0f64;
     for u in units {
         if top >= window_m {
             break;
         }
         let bottom = top + f64::from(u.thickness_m);
-        let part = bottom.min(window_m) - top;
+        let part = ((bottom.min(window_m) - top) / window_m) as f32;
         let s = slot[usize::from(u.class)];
+        let moved = match (inherited, u.source) {
+            (Some((to, share)), Source::Basement(_)) if part > 0.0 => {
+                out[to] += part * share;
+                part * share
+            }
+            _ => 0.0,
+        };
         if s != usize::MAX && part > 0.0 {
-            out[s] += (part / window_m) as f32;
+            out[s] += part - moved;
         }
         top = bottom;
     }
@@ -59,7 +80,6 @@ pub fn fractions(units: &[Unit], window_m: f64, slot: &[usize], out: &mut [f32])
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::structure::columns::Source;
 
     #[test]
     fn host_fractions_cover_the_window() {
@@ -103,5 +123,40 @@ mod tests {
         assert!((at("granite") - 0.1).abs() < 1e-6);
         assert!(out.iter().sum::<f32>() <= 1.0 + 1e-6);
         assert_eq!(field_name(index("dolostone")), "deeptime:host/dolostone");
+    }
+
+    /// Inherited BIF takes its share of the basement's part of the window, and nothing else.
+    #[test]
+    fn inherited_bif_is_hosted_by_the_basement() {
+        let types = crate::deposits::types::builtin().unwrap();
+        let classes = host_classes(&types);
+        let mut slot = vec![usize::MAX; EVERY_CLASS.len()];
+        for (s, &k) in classes.iter().enumerate() {
+            slot[usize::from(k)] = s;
+        }
+        let bif = slot[usize::from(index("banded_iron_formation"))];
+        let units = [
+            Unit {
+                class: index("sandstone"),
+                thickness_m: 500.0,
+                source: Source::Log,
+                key: [0, 1],
+            },
+            Unit {
+                class: index("granite"),
+                thickness_m: 5000.0,
+                source: Source::Basement(0),
+                key: [2, 3],
+            },
+        ];
+        let mut out = vec![0.0f32; classes.len()];
+        fractions_inherited(&units, 2000.0, &slot, Some((bif, 0.5)), &mut out);
+        let at = |name: &str| out[slot[usize::from(index(name))]];
+        assert!((at("sandstone") - 0.25).abs() < 1e-6);
+        assert!((at("banded_iron_formation") - 0.375).abs() < 1e-6);
+        assert!((at("granite") - 0.375).abs() < 1e-6);
+        let mut plain = vec![0.0f32; classes.len()];
+        fractions(&units, 2000.0, &slot, &mut plain);
+        assert_eq!(plain[bif], 0.0);
     }
 }

@@ -93,7 +93,7 @@ pub type V3 = [f64; 3];
 pub type M3 = [[f64; 3]; 3];
 
 /// The commit of Loop3D/noddyverse the port was made from.
-pub const NODDYVERSE_COMMIT: &str = "6a21b2374516f8506c19cabcbe3ead00be9cc45d";
+pub const NODDYVERSE_COMMIT: &str = "6a21b2374516f8506c19cabcbe3ead00be9cc45d"; // ledger: DEF-063
 
 /// `unEvents.c`'s tolerance for "zero": a wavelength, cycle or cylindrical index below it is off.
-pub const TOLERANCE: f64 = 0.001;
+pub const TOLERANCE: f64 = 0.001; // ledger: DEF-067

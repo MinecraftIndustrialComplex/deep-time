@@ -126,10 +126,10 @@ pub struct Feature {
 
 /// A structure that has had no continental crust under or beside it for this many plate steps is
 /// lost (its crust went under another plate).
-pub const LOST_AFTER_STEPS: u8 = 10;
+pub const LOST_AFTER_STEPS: u8 = 10; // ledger: DEF-035
 
 /// How far (L1 cells) a structure over oceanic crust looks for its continent's edge.
-const EDGE_CELLS: i64 = 3;
+const EDGE_CELLS: i64 = 3; // ledger: DEF-035
 
 /// Counters for the run summary.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -313,7 +313,7 @@ impl Feature {
                 y: floor_y,
                 half_height: ((surface_y - floor_y).max(0.0) * (1.0 + f64::from(self.rise))
                     - f64::from(self.depth))
-                .max(8.0),
+                .max(8.0), // ledger: DEF-052
                 class: self.rock as u8,
             },
         };
@@ -362,7 +362,7 @@ pub fn advance(
             let rot = rotation(DVec3::from_array(om), dt_yr);
             // A second point a little way along the axis carries the azimuth.
             let d = direction(f64::from(f.azimuth_deg));
-            let step = 8.0;
+            let step = 8.0; // ledger: DEF-037
             let z2 = (f.z + step * d[1]).clamp(-c / 4.0, c / 4.0);
             let (x1, z1) = frame.block(rot * frame.unit(f.x, f.z));
             let (x2, z2) = frame.block(rot * frame.unit(f.x + step * d[0], z2));

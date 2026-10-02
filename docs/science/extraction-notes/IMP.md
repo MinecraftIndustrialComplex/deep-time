@@ -1,6 +1,8 @@
 # Extraction notes: meteor impacts
 
 Written by the stage-1 extraction agent for this subsystem (2026-10-01/02) while it built the ledger. It holds the measured Earth-against-mod numbers found in the build log, the simplifications and game choices the code or documents state, and flags: admissions of unchecked values, contradictions between comments, code and documents, and things that looked wrong. **Nothing here is verified.** A line marked "suspicion" or "my arithmetic" is the extraction agent's own reading, to be checked in stage 2. See [claims.md](../claims.md).
+**Stage 2 (WP-1, 2026-10-02) has resolved most flags below; see [../ledger/IMP.md](../ledger/IMP.md) and [../impacts.md](../impacts.md). This file stays as the stage 1 record: its statements about the code describe the code before stage 2 (for example the production function, the ocean rule and the complex-crater depth law have since changed).**
+
 Everything below is from the repo at W (the worktree) as read on 2026-10-01. Row ids refer to ledger/IMP.md. Where I computed something myself from the coded formulas it is marked "my arithmetic"; those are not verified against any paper.
 
 ## Earth against the mod

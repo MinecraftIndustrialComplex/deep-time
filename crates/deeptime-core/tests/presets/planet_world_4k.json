@@ -294,7 +294,7 @@
     "min_area_km2": 1500.0
   },
   "impacts": {
-    "flux": 40.0,
+    "flux": 700.0,
     "size_slope": 1.8,
     "min_crater_km": 2.0,
     "max_crater_km": 40.0,
@@ -302,7 +302,7 @@
     "impactor_density_kg_m3": 3000.0,
     "depth_scale": 0.5,
     "ejecta_radii": 3.0,
-    "sea_cutoff_ratio": 6.3,
+    "sea_cutoff_ratio": 8.0,
     "diffusivity_m2_yr": 0.01,
     "degradation": 1.0
   }
