@@ -1242,7 +1242,7 @@ aabb, rock_class, zones [{name, material, rock_class, d, v, grade, density, raw}
 expected_formed, expected (the survivors expected; = target unless capped), drawn (deposits
 formed), tracts, permissive_km2, mean_f, buried, truncated, eroded, too_deep, children, guaranteed,
 dropped_separation`, plus `province`, `provinces`, `count_mult`, `max_formed_per_survivor`,
-`brine_flow_km`, `sites`, `bodies`. A forming event's `p_survive` is its cell's survival chance.
+`brine_flow_km`, `sites`, `bodies`, `richness_mult`, `scatter_mult` (the game multiplies every background-scatter rule by it), `inherited_bif_share`, `bif_basin_km2`, and `bif_basins`, `bif_basin_share` (the inherited iron-formation basins the surface stage dealt). A forming event's `p_survive` is its cell's survival chance.
 
 ## Structural events (`structure/events.dtst`, P2-01, format 0.3)
 
