@@ -128,8 +128,9 @@ def orient_field(f, mask, s=1, weight="mag", tile=256, min_mag=0.0):
 # ---------------------------------------------------------------- phase
 
 
-def phase_test(f, mask, periods=(2, 4, 8, 16, 32, 3, 5, 7), origin=(0, 0)):
-    """max/min − 1 of the mean |Δ| and |Δ²| by index mod p, along x and along z."""
+def phase_test(f, mask, periods=(2, 4, 8, 16, 32, 3, 5, 7), origin=(0, 0), wrap=True):
+    """max/min − 1 of the mean |Δ| and |Δ²| by index mod p, along x and along z. wrap: the array
+    is the whole planet (x wraps); a box does not."""
     f = f.astype(np.float64)
     out = {}
     h, w = f.shape
@@ -142,6 +143,10 @@ def phase_test(f, mask, periods=(2, 4, 8, 16, 32, 3, 5, 7), origin=(0, 0)):
             m1[-1] = False
             m2[-1] = False
             m2[0] = False
+        elif not wrap:
+            m1[:, -1] = False
+            m2[:, -1] = False
+            m2[:, 0] = False
         n = f.shape[axis]
         idx = np.arange(n)
         for p in periods:
@@ -530,6 +535,7 @@ def part_elevation(P, out):
     pt = phase_test(E, land & play)
     put("elevation/phase", pt)
     put("elevation/phase_summary", phase_summary(pt))
+    put("elevation/phase_max_at", {k: [v["d2"]["max_phase"], rnd(v["d2"]["excess"])] for k, v in pt.items()})
     say("  phase excess (max/min − 1) by period in L3 cells:", json.dumps(phase_summary(pt)))
     sp = spectrum_bands(E, land & play, 2)
     put("elevation/spectrum", rnd(sp, 5))
@@ -553,6 +559,11 @@ def part_elevation(P, out):
         put(f"coast/orientation/step{s * 2}blocks", rnd(st, 5))
         say(f"  coast normal, step {s * 2:3d} blocks: a4 {st['a4']:+.4f} a8 {st['a8']:+.4f} "
             f"axis±2° {st['axis_pm2']:.4f} (N-S lines {st['ns_lines_pm2']:.4f}, E-W lines {st['ew_lines_pm2']:.4f}) diag±2° {st['diag_pm2']:.4f} n {st['n']}")
+    for lo, hi in ((0, 30), (30, 60), (60, 75)):
+        st = orient_field(E, coast & (lat >= lo) & (lat < hi), 16, weight="one", min_mag=2.0)
+        if st:
+            put(f"coast/orientation_step32blocks_by_latitude/{lo}-{hi}", rnd(st, 5))
+            say(f"  coast normal over 32 blocks, |lat| {lo}-{hi}: a4 {st['a4']:+.4f} a8 {st['a8']:+.4f} N-S lines {st['ns_lines_pm2']:.4f} E-W lines {st['ew_lines_pm2']:.4f} (isotropic 0.0222 each) n {st['n']}")
     ct = cat_test(land.astype(np.float32)[::1, ::1][1024:3072, :4096], np.ones((2048, 4096), bool), wrap=False)
     put("coast/land_sea_map_L3", rnd(ct, 5))
     say("  land/sea map (L3 cells) straight runs:", json.dumps(rnd(ct, 4)))
@@ -701,6 +712,13 @@ def part_climate(P, out):
         put(f"biome_inputs/{name}", {"phase_summary": phase_summary(pt), "phase": pt, "orientation": rnd(st, 5), "latitude_r2": r2, "distinct_values": int(vals), "seam": rnd(seam_step(f), 5)})
         say(f"  {name}: phase excess {json.dumps(phase_summary(pt))}")
         say(f"      orientation a4 {st['a4']:+.4f} a8 {st['a8']:+.4f} axis±2° {st['axis_pm2']:.4f} (N-S lines {st['ns_lines_pm2']:.4f}, E-W lines {st['ew_lines_pm2']:.4f}); latitude explains R² {r2 if r2 is None else round(r2, 3)}; distinct values {vals}; seam ratio {seam_step(f)['ratio']:.2f}")
+    # Continentalness away from the coast (beyond 12 L2 cells, 96 blocks): the distance to the
+    # sea alone, without the steps of the land mask's own cells.
+    inland = ndimage.binary_erosion(land2, structure=np.ones((3, 3), bool), iterations=12) & play
+    st = orient_field(P.ch("climate/continents", 4), inland, 2)
+    if st:
+        put("biome_inputs/continents_inland", rnd(st, 5))
+        say(f"  continents beyond 96 blocks from the sea: a4 {st['a4']:+.4f} a8 {st['a8']:+.4f} axis±2° {st['axis_pm2']:.4f} diag±2° {st['diag_pm2']:.4f} n {st['n']}")
     ice = P.ch("climate/ice_cover", 4)
     icy = ice > 0
     put("ice/land_share", float((icy & land2).sum() / max(land2.sum(), 1)))
@@ -858,9 +876,10 @@ def part_boxes(P, out):
         if land.mean() > 0.2:
             # Phases in absolute block coordinates: 16 = L1, 8 = L2, 32 = the detail lattice.
             org = (x0 + P.C // 2, z0 + P.C // 4)
-            pt = phase_test(H, land, periods=(2, 4, 8, 16, 32, 3, 5, 7), origin=org)
+            pt = phase_test(H, land, periods=(2, 4, 8, 16, 32, 3, 5, 7), origin=org, wrap=False)
             res["H_phase"] = phase_summary(pt)
-            pt = phase_test(AN, land & (np.abs(AN) > 0), periods=(8, 16, 32, 5, 7), origin=org)
+            res["H_phase_max_at"] = {k: [v["d2"]["max_phase"], rnd(v["d2"]["excess"])] for k, v in pt.items()}
+            pt = phase_test(AN, land & (np.abs(AN) > 0), periods=(8, 16, 32, 5, 7), origin=org, wrap=False)
             res["AN_phase"] = phase_summary(pt)
             st = orient_field(H, land, 1)
             res["H_orientation"] = rnd(st, 5)
@@ -936,6 +955,12 @@ def part_stages(P, out):
         say(f"  {label:13s} slope a4 {a['a4']:+.4f} a8 {a['a8']:+.4f} axis±2° {a['axis_pm2']:.4f} | coast a4 {c['a4']:+.4f} a8 {c['a8']:+.4f} axis±2° {c['axis_pm2']:.4f} diag±2° {c['diag_pm2']:.4f} | "
             f"land/sea runs ≥ 8: {ct['map']['run_ge8']:.3f} (control {ct['control']['run_ge8']:.3f}, blocky {ct['blocky_control']['run_ge8']:.3f})")
         say(f"                phase {json.dumps(res['phase'])}")
+    # What the erosion reads of the rock (L2): is it constant inside an L1 cell?
+    f, r = load_field(P, amp, "young/erodibility")
+    z, _ = load_field(P, amp, "young/elevation_m")
+    pt = phase_summary(phase_test(f, z > sea_m, periods=(2, 4, 3, 5)))
+    put("stages/young_erodibility_phase", pt)
+    say(f"  young/erodibility phase {json.dumps(pt)}")
     # The final terrain, subsampled to the L1 and L2 points: what the amplifier kept of them.
     E = P.ch("elevation")
     for sub, label in ((8, "final at the L1 points"), (4, "final at the L2 points")):
@@ -974,6 +999,10 @@ def part_pick(P, out):
     play = tlat < 70
 
     def best(score, ok, tile_blocks=2 * T):
+        for relax in (0, 1, 2):
+            if ok.any():
+                break
+            ok = play & (tl > 0.5 - 0.2 * relax)
         sc = np.where(ok, score, -np.inf)
         j, i = np.unravel_index(np.argmax(sc), sc.shape)
         x0, z0 = -C // 2 + i * tile_blocks, -C // 4 + j * tile_blocks
@@ -982,7 +1011,7 @@ def part_pick(P, out):
     boxes["mountain"] = best(ts, play & (tl > 0.95))
     boxes["plain"] = best(-ts, play & (tl > 0.98) & (tlat < 45))
     boxes["coast"] = best(-np.abs(tl - 0.5), play & (tlat < 50))
-    boxes["highlat"] = best(ts, (tlat > 62) & (tlat < 72) & (tl > 0.8))
+    boxes["highlat"] = best(ts, (tlat > 60) & (tlat < 74) & (tl > 0.3))
     # The seam: a row with land at the first and last columns.
     seam_land = land[:, 0] & land[:, -1] & (lat < 70)
     if seam_land.any():
@@ -1081,6 +1110,57 @@ def part_pick(P, out):
     save_cat(os.path.join(d, "koppen.png"), P.ch("climate/koppen", 4))
 
 
+def part_probe(P, out):
+    """One box through the stages (GRID_PROBE=name:x0,z0,x1,z1): the terrain of the plate model, the
+    deep-time surface, the young landscape and the amplifier, side by side at one scale."""
+    spec = os.environ.get("GRID_PROBE", "")
+    if not spec:
+        say("probe: set GRID_PROBE=name:x0,z0,x1,z1")
+        return
+    name, box = spec.split(":")
+    x0, z0, x1, z1 = (int(v) for v in box.split(","))
+    C = P.C
+    sea_m = P.manifest["notes"]["surface"]["sea_level_m"]
+    mv = P.manifest["scale"]["m_per_block_v"]
+    amp = [f for f in os.listdir(P.arrays) if f.startswith("fields-") and "amplify" in f][0]
+    d = os.path.join(out, "probe")
+    os.makedirs(d, exist_ok=True)
+    say(f"== probe {name} [{x0},{z0},{x1},{z1}]")
+    for label, fname in (("1-plates", "plates/elevation_m"), ("2-surface", "surface/elevation_m"),
+                         ("3-young", "young/elevation_m"), ("3-young-lake", "young/lake_m"),
+                         ("3-young-area", "young/area_m2"), ("2-surface-sediment", "surface/sediment_m"),
+                         ("2-surface-deposition", "surface/deposition_m_myr"), ("3-young-ice", "young/ice_thickness_m"),
+                         ("3-young-till", "young/till_m"), ("3-young-glacial", "young/glacial_erosion_m"),
+                         ("3-young-class", "young/class"), ("3-young-erodibility", "young/erodibility")):
+        try:
+            f, r = load_field(P, amp, fname)
+        except KeyError:
+            continue
+        i0, i1 = (x0 + C // 2) // r, (x1 + C // 2) // r
+        j0, j1 = (z0 + C // 4) // r, (z1 + C // 4) // r
+        sub = f[j0:j1, np.arange(i0, i1) % f.shape[1]].astype(np.float64)
+        say(f"  {label}: min {np.nanmin(sub):.1f} max {np.nanmax(sub):.1f} mean {np.nanmean(sub):.1f}")
+        if "elevation" in fname:
+            # Blocks, at the final picture's scale (2 px a block).
+            hb = np.repeat(np.repeat(sub / mv, r, axis=0), r, axis=1)
+            save_shade(os.path.join(d, f"{name}-{label}.png"), hb, sea_m / mv, scale=2)
+        elif fname.endswith("/class"):
+            save_cat(os.path.join(d, f"{name}-{label}.png"), np.repeat(np.repeat(sub, r, axis=0), r, axis=1), scale=2)
+        else:
+            v = np.log10(np.maximum(sub, 1.0)) if "area" in fname else sub
+            save_gray(os.path.join(d, f"{name}-{label}.png"), np.repeat(np.repeat(v, r, axis=0), r, axis=1), scale=2)
+    E = P.ch("elevation")
+    i0, i1 = (x0 + C // 2) // 2, (x1 + C // 2) // 2
+    j0, j1 = (z0 + C // 4) // 2, (z1 + C // 4) // 2
+    sub = E[j0:j1, np.arange(i0, i1) % E.shape[1]].astype(np.float64)
+    save_shade(os.path.join(d, f"{name}-4-final.png"), np.repeat(np.repeat(sub, 2, axis=0), 2, axis=1), P.sea, scale=2)
+    # Relief of the final terrain against a 33-cell (66-block) median: how tall the lines are.
+    resid = sub - ndimage.median_filter(sub, size=33)
+    say(f"  final − 66-block median, blocks: p1 {np.percentile(resid, 1):.2f} p5 {np.percentile(resid, 5):.2f} p95 {np.percentile(resid, 95):.2f} p99 {np.percentile(resid, 99):.2f}")
+    save_gray(os.path.join(d, f"{name}-4-final-residual.png"), np.repeat(np.repeat(resid, 2, axis=0), 2, axis=1), -4, 4, scale=2)
+    np.save(os.path.join(d, f"{name}-final.npy"), sub.astype(np.float32))
+
+
 PARTS = {
     "elevation": part_elevation,
     "detail": part_detail,
@@ -1090,6 +1170,7 @@ PARTS = {
     "points": part_points,
     "stages": part_stages,
     "pick": part_pick,
+    "probe": part_probe,
     "boxes": part_boxes,
 }
 
@@ -1103,7 +1184,7 @@ def main():
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     P = Planet(a.arrays, a.world)
-    parts = a.parts or [p for p in PARTS if p not in ("boxes", "pick")]
+    parts = a.parts or [p for p in PARTS if p not in ("boxes", "pick", "probe")]
     path = os.path.join(a.out, "results.json")
     if os.path.exists(path):
         R.update(json.load(open(path)))

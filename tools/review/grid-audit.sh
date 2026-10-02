@@ -37,7 +37,7 @@ case "$verb" in
         cargo build --release -q -p deeptime-cli
         # A copy, so a later build does not swap the binary under the run.
         cp target/release/deeptime "$S/deeptime-$W"
-        rm -rf "${S:?}/$W"
+        rm -rf "${S:?}/$W" "${S:?}/$W-arrays"
         setsid nohup bash -c "/usr/bin/time -v '$S/deeptime-$W' run --preset '$PRESET' --start '$START' \
             --length-myr '$MYR' --out '$S/$W' --checkpoints; echo EXIT=\$?" > "$S/$W.log" 2>&1 < /dev/null &
         echo "grid-audit: bake of $W started (pid $!), log $S/$W.log"
@@ -55,7 +55,7 @@ case "$verb" in
         C=$(python3 -c "import json;print(json.load(open('$S/$W/manifest.json'))['scale']['circumference_blocks'])")
         H=$((C / 2)); Q=$((C / 4))
         # The whole planet on the L3 points (every second block): E, A·N and the layers the game reads.
-        [ -s "$D/planet.npy" ] || nice -n 10 $B heightmap --world-data "$S/$W" --box="-$H,-$Q,$H,$Q" --step 2 \
+        [ "$D/planet.npy" -nt "$S/$W/manifest.json" ] || nice -n 10 $B heightmap --world-data "$S/$W" --box="-$H,-$Q,$H,$Q" --step 2 \
             --layers water_level,detail/amplitude,climate/ice_cover,climate/temperature,climate/vegetation,climate/continents,climate/erosion,climate/ridges,surface/class_top,meta/province,meta/plate_id,climate/koppen,climate/t_mean_c,climate/p_mm,playa \
             --out "$D/planet.npy"
         # The rock and the water the column evaluator decides, every eighth block.
@@ -93,6 +93,14 @@ EOF
     py)
         # Any other analysis script with the same Python: grid-audit.sh py <script> [args...]
         "${PY[@]}" "$@"
+        ;;
+    gates)
+        # The branch gates (CLAUDE.md): cargo fmt, clippy, test, deny; Gradle build and tests.
+        cargo fmt --all -- --check && echo "FMT ok"
+        cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tail -3
+        cargo test --workspace 2>&1 | grep -E "^test result|FAILED|failed|panicked|^error" || true
+        cargo deny check licenses bans 2>&1 | tail -2
+        (cd neoforge && ./gradlew build test 2>&1 | tail -6 && python3 ../tools/ci/junit-summary.py build/test-results/test)
         ;;
     clean)
         rm -rf "$S"
