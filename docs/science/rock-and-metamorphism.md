@@ -101,15 +101,15 @@ T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of t
 | Thickness of a 56-km pluton | 4.5 km observed (Lucerne); 6.7 km predicted by the law | Cruden 2008, Fig. 2-4 and eq. 1 | 56 km round: 6.7 km | arithmetic; unit test |
 | Thickness of a 4.5-km pluton | 1.6 km observed (Gasborn); 1.5 predicted | same | 1.48 km | unit test |
 | Median pluton in the mod | - | - | length 25 km, width 0.5-1 of it: D = 21.7 km, thickness 3.8 km (4.1 km before the fix) | arithmetic |
-| Coastal Batholith of Peru | length 1,600 km; "up to" 1,000 plutons; 100-37 Ma; width not found | Williams slides; Wikipedia (secondary); the primary papers are closed | 1,034 plutons emplaced in 500 Myr on the whole 16k planet, 230 alive as bodies at the end | MODRUN |
+| Coastal Batholith of Peru | length 1,600 km; "up to" 1,000 plutons; 100-37 Ma; width not found | Williams slides; Wikipedia (secondary); the primary papers are closed | 1,034 plutons emplaced in 500 Myr on the whole 16k planet, 230 alive as bodies at the end | Run below |
 | Tuolumne Intrusive Complex | about 1,100 km2, 95-85 Ma, 6-10 km deep | Ardill et al. 2020 (full text) | median pluton about 370 km2 (D 21.7 km); roof 2-6 km | - |
 | Large Sierra plutons | width / length 0.17 (Lamarck), 0.21 (Mount Givens), 0.4 (Cathedral Peak) | Bateman 1992 (full text); Wikipedia | 0.5-1, mean 0.75 | - |
 | Crust thickness | mean 41.1 km; orogens 46.3 km; never over about 75 km | Christensen and Mooney 1995 abstract; Hacker part 14 | 35 km reference; burial factor up to 2 (70 km) | - |
-| Columns holding some metamorphic rock | not counted | - | MODMETA | MODRUN |
-| Grade inversions, thin metamorphic slivers, plutonic sheets | zero by construction of the check | - | STRATA_SHORT | MODRUN |
+| Columns holding some metamorphic rock | not counted | - | 67.4 % of 20,000 random columns; 97.8 % of land columns | run below |
+| Grade inversions, thin metamorphic slivers, plutonic sheets | zero by construction of the check | - | 0.07 % grade inversions, 0.25 % thin metamorphic slivers, 0.05 % plutonic sheets (20,000 columns); none in the stored stacks | run below |
 
-MODRUN: `earthlike_quick_16k`, start `scattered_continents`, 500 Myr, default seed, 2 threads, `deeptime run` and
-`deeptime strata-check --columns 20000`, test machine, 2026-10-02; before is master 9e84fcf and after is this branch.
+Run below: `earthlike_quick_16k`, start `scattered_continents`, 500 Myr, default seed, 2 threads, `deeptime run` and
+`deeptime strata-check --columns 20000`, test machine, 2026-10-02; before is master 9e84fcf and after is this branch (commit 5cb328c3). The pluton thickness fix lowered the surviving pluton bodies by 12 of 230 (5 %) and raised the eroded ones from 616 to 628; nothing else in the run changed (emplaced 1,034, subducted 104, metamorphosed volume 4.058e7 km3, deformed share 0.4805), and `strata-check` is identical (see [strata.md](strata.md)).
 
 ## Simplifications and limits
 
@@ -127,6 +127,9 @@ MODRUN: `earthlike_quick_16k`, start `scattered_continents`, 500 Myr, default se
 - **Aureoles have no distance.** They are a fixed outer shell, not a temperature field, and exist only on soft hosts.
 - **Plutons are rounder than the big real ones** (width over length 0.5 to 1 against 0.17 to 0.4), and sit shallower
   than the Sierra's 3.5 to 10 km.
+- **Nothing reads a class's density.** The 62 densities are loaded from the rock-class files into the Rust table and the
+  Java record, and nothing else reads them (a search of the code on 2026-10-02 found no use), so a density that is off
+  changes nothing a player sees.
 - **Densities are of fresh rock.** Weathered and porous rock is lighter (the New Zealand database runs down to 1500-2000 kg/m3
   for igneous rock); the table is for unweathered crust.
 - **One CCD** of 4,500 m for every ocean, the Pacific value.

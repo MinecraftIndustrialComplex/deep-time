@@ -99,13 +99,27 @@ min(1, halite / 200 m) x min(1, overburden / 1,000 m) (salt); 0.8 x min(1, (sedi
 | Accumulation rate of pelagic sediment | calcareous ooze 3-50 m/Myr, siliceous ooze 2-10, red clay 1-5; platform carbonate up to about 1,000 m/Myr | Rothwell 2005 via Wikipedia; Schlager 1981 via Wikipedia (secondary) | a one-block bed is 20 m, so 0.4-20 Myr of pelagic sediment | arithmetic |
 | Niger Delta wedge | a clastic wedge 12 km thick over 75,000 km2, growth faults detached on overpressured shale | Sanuade and Kaka 2017, Geol. Q. 61(1) (secondary review) | growth-fault threshold 1,500 m (no source) | not measured |
 | Dip of beds under lowland | none given | - | median 18.6 degrees in block space, 1.3 degrees real-equivalent at sigma 10 | `dips.py` on 1,500 columns, `earthlike_quick_16k`, scattered, 500 Myr, seed 1, 2026-09-30 (build log) |
-| Columns with a grade inversion, a thin metamorphic sliver, a plutonic sheet | none counted; inverted sequences are real but rare in a given column | - | WP-7_BEFORE_AFTER_STRATA | see below |
+| Columns with a grade inversion, a thin metamorphic sliver, a plutonic sheet | none counted; inverted sequences are real but rare in a given column | - | 0.07 % of columns have a grade inversion, 0.25 % a metamorphic sliver, 0.05 % a plutonic sheet (20,000 columns) | see below |
 
 Strata-check on a 16k quick planet (preset `earthlike_quick_16k`, start `scattered_continents`, 500 Myr, 2 threads,
 seed default, `deeptime run` then `deeptime strata-check --world-data … --columns 20000`, test machine, 2026-10-02;
 before is master 9e84fcf, after is this branch with the pluton thickness fix):
 
-STRATA_CHECK_TABLE
+| Share of columns | all 20,000 sampled, before | after | land (4,581), before | after | stored stacks (524,288 cells), before and after |
+|---|---|---|---|---|---|
+| holding some metamorphic rock | 67.42 % | 67.42 % | 97.82 % | 97.82 % | 69.04 % |
+| grade inversion | 0.070 % | 0.070 % | 0.131 % | 0.131 % | 0 |
+| metamorphic sliver (under 8 blocks) | 0.245 % | 0.245 % | 0.546 % | 0.546 % | 0 |
+| high-grade sliver | 0.140 % | 0.140 % | 0.371 % | 0.371 % | 0 |
+| plutonic sheet (under 16 blocks) | 0.045 % | 0.045 % | 0.044 % | 0.044 % | 0 |
+| plutonic rock with a floor | 0.080 % | 0.080 % | 0.087 % | 0.087 % | 0 |
+| mean horizons a column | 9.69 | 9.69 | 13.47 | 13.47 | 9.85 |
+
+Before and after agree to every digit: the pluton thickness is a body property, and the checks read the
+stacks and the columns under the bodies. The structure census is also unchanged (12,174 events; 29.5 % of
+columns changed by a structure, 49.1 % of land columns; 120 columns meet a bed twice; 0 malformed columns).
+The grade inversions, slivers and sheets that remain are the ones folds and faults introduce (the
+stored stacks, which have no structures, show none).
 
 ## Simplifications and limits
 
