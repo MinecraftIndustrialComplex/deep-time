@@ -322,7 +322,9 @@ In code about to be rewritten, to be carried into the new designs: the CO₂ for
 hundred times beyond its stated range; snowball escape at 0.55 bar against a published 0.01 to
 0.1 bar; the energy-balance constants as a mix of two climlab classes and a paper that could not be
 read; the weathering runoff coefficient from an older GEOCARB than the one cited. And in the plate
-design: gross slab pull, the factor of 8 for continental drag, and the wedge taper, none confirmed.
+design: gross slab pull, the factor of 8 for continental drag, and the wedge taper, none confirmed
+until WP-13a, which settled all three (see the flags above); its open item is the slab suction share,
+which is not the quantity its sources give.
 
 ### Work packages
 
@@ -438,6 +440,7 @@ Produced by WP-0 (2026-10-02). The library is a folder on the test machine with 
 #### WP-13a: 86 rows; 32 sources
 
 - **Readable in the library** (text file names are in the folder named by the key): `Coltice2019` (Coltice2019.txt); `DeCellesGiles1996` (DeCellesGiles1996.txt); `Nance2022` (Nance2022.txt); `Nocquet2016` (Nocquet2016.txt); `Tremblay2015` (Tremblay2015.txt).
+- **Added in WP-13a** (2026-10-02, lawful open copies): `ForsythUyeda1975` (publisher's free PDF); `LithgowBertelloniRichards1998` and `ConradLB2006` (UCL Discovery); `Zahirovic2015` (accepted manuscript, Wollongong; the landing page kept as Zahirovic2015_landing.txt); `Mitchell2021` (accepted manuscript, Curtin; landing page kept as Mitchell2021_landing.txt); `Bird2003` (author's site); `FaccennaBecker2012` (author's preprint); `DeCellesCarrapa2021` (NSF public access copy); `vanHunen2011EGU` (EGU abstract); `Seton2020_earth_age` (the GMT server's 6 arc-minute sea-floor age grid). Still not readable: Schellart 2004, Conrad & Lithgow-Bertelloni 2002 and 2004, Davis, Suppe & Dahlen 1983, Dahlen 1990, Carlson et al. 1983, Copley et al. 2010 (Wiley and Durham refuse scripted access), van Hunen & Allen 2011, Parsons & Richter 1980, Turcotte & Schubert.
 - **Landing page only** (the paper itself was not obtained): `Huang2019` (open copy); `Mitchell2021` (paywalled); `Zahirovic2015` (paywalled).
 - **Not readable** : `BercoviciLong2014` (paywalled, no substitute found); `Bialas2010` (paywalled, no substitute found); `Buck2004` (book); `Carlson1983` (paywalled, no substitute found); `Coltice2007` (paywalled, no substitute found); `ConradLB2002` (paywalled, no substitute found); `ConradLB2004` (paywalled, no substitute found); `ConradLB2006` (open copy); `Copley2010` (paywalled, no substitute found); `DalZilio2018` (paywalled, no substitute found); `DaviesvonBlanckenburg1995` (paywalled, no substitute found); `DavisSuppeDahlen1983` (paywalled, no substitute found); `ForsythUyeda1975` (paywalled, no substitute found); `Gurnis1988` (paywalled, no substitute found); `HeronLowman2011` (paywalled, no substitute found); `Lenardic2011` (paywalled, no substitute found); `LithgowBertelloniRichards1998` (paywalled, no substitute found); `MolnarLyonCaen1988` (book); `ParsonsRichter1980` (paywalled, no substitute found); `RoyerGordon1997` (paywalled, no substitute found); `Schellart2004` (paywalled, no substitute found); `TurcotteSchubert_Geodynamics` (book); `vanHunenAllen2011` (paywalled, no substitute found); `Zhang2018` (open access).
 
