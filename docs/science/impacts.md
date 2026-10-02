@@ -2,9 +2,10 @@
 
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02)`.
 
-Ledger ids on this page: `IMP-001` to `IMP-141` ([ledger/IMP.md](ledger/IMP.md)). Of these 141 rows,
-43 are `verified`, 6 `abstract-only`, 9 `cited-unverified`, 6 `from-memory`, 65 `game-choice` and
-12 `uncited`. At the start of stage 2 none was `verified`.
+Ledger ids on this page: `IMP-001` to `IMP-141` ([ledger/IMP.md](ledger/IMP.md)). Of the 135 active
+rows (6 more were merged into rows of other ledgers by WP-0), 43 are `verified`, 6 `abstract-only`,
+9 `cited-unverified`, 6 `from-memory`, 56 `game-choice` and 15 `uncited`. At the start of stage 2 none
+was `verified`.
 
 **How far this has been checked.** Every crater-shape equation in the code was read in its source,
 Collins, Melosh & Marcus 2005 (called CMM05 below): the transient crater, the simple and complex
