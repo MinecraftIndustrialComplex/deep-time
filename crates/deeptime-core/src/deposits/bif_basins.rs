@@ -55,7 +55,7 @@ pub fn deal(d: &Dims, eligible: &[bool], share: f64, basin_km2: f64, seed: u64) 
     let cells: Vec<usize> = (0..n).filter(|&c| eligible[c]).collect();
     let total_km2 = cells.len() as f64 * cell_km2;
     let target = share.clamp(0.0, 1.0) * total_km2;
-    if cells.is_empty() || target <= 0.0 || !(basin_km2 > 0.0) {
+    if cells.is_empty() || target <= 0.0 || basin_km2.is_nan() || basin_km2 <= 0.0 {
         return Basins {
             mask,
             count: 0,
@@ -106,7 +106,10 @@ pub fn deal(d: &Dims, eligible: &[bool], share: f64, basin_km2: f64, seed: u64) 
                 if !eligible[k] || mask[k] > 0.0 {
                     continue;
                 }
-                let (x, z) = (di as f64 * c + dj as f64 * s, -(di as f64) * s + dj as f64 * c);
+                let (x, z) = (
+                    di as f64 * c + dj as f64 * s,
+                    -(di as f64) * s + dj as f64 * c,
+                );
                 let dist = ((x / a).powi(2) + (z / b).powi(2)).sqrt();
                 if dist <= 1.0 + EDGE_WARP * noise[k] / sd {
                     mask[k] = 1.0;
@@ -182,7 +185,10 @@ mod tests {
         for seed in 1..6 {
             let b = deal(&d, &eligible, 0.05, 100_000.0, seed);
             // The share, never beyond one basin's worth.
-            assert!(b.share > 0.035 && b.share < 0.05 + 2.0 * 100_000.0 / interior_km2, "{b:?}");
+            assert!(
+                b.share > 0.035 && b.share < 0.05 + 2.0 * 100_000.0 / interior_km2,
+                "{b:?}"
+            );
             assert!(b.mask.iter().zip(&eligible).all(|(&m, &e)| m == 0.0 || e));
             let sizes = patches(&d, &b.mask);
             let km2: Vec<f64> = sizes.iter().map(|&s| s as f64 * 23.04).collect();

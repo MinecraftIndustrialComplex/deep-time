@@ -509,7 +509,9 @@ pub fn run(o: &Options) -> CliResult<Value> {
     let (sites, _) = read_sites(&o.world_data)?.ok_or("the world data has no sites")?;
     let types: Vec<DepositType> = types::builtin()?;
     let rules = scatter_rules(o.scatter_dir.as_deref())?;
-    let mult = o.scatter_mult.unwrap_or_else(|| world_scatter_mult(&w.manifest.notes));
+    let mult = o
+        .scatter_mult
+        .unwrap_or_else(|| world_scatter_mult(&w.manifest.notes));
     let mut m = Model::new(&w, o.soil);
     let c = w.c;
 

@@ -203,7 +203,10 @@ mod tests {
             .iter()
             .find(|t| t.id == "deeptime:supergene_cu_blanket")
             .unwrap();
-        let w = t.weathering.as_ref().expect("the blanket's weathering rules");
+        let w = t
+            .weathering
+            .as_ref()
+            .expect("the blanket's weathering rules");
         assert_eq!(w.precip_mm[0], 0.0);
         let dry: Vec<ColumnSample> = (0..4)
             .map(|k| sample_at(-30.0 + 10.0 * f64::from(k), 10.0, 200.0, 20.0))

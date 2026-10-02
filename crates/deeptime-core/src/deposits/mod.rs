@@ -467,7 +467,8 @@ impl DepositParams {
                 "must be in [0, 1]",
             ));
         }
-        if !(self.bif_basin_km2.is_finite() && (1000.0..=10_000_000.0).contains(&self.bif_basin_km2))
+        if !(self.bif_basin_km2.is_finite()
+            && (1000.0..=10_000_000.0).contains(&self.bif_basin_km2))
         {
             return Err(CoreError::preset(
                 format!("{path}.bif_basin_km2"),
