@@ -237,6 +237,102 @@ pub fn run(o: &Options) -> CliResult<()> {
             thick.iter().cloned().fold(0.0f32, f32::max)
         );
     }
+    // The flowing ice sheets (`climate::sheet`) on this relief under this climate's equilibrium
+    // line: grown from bare ground at the present line, through a glacial lowering of the line and
+    // back — the sheet's Earth check (Earth: ~10 % of the land under ice today, ~25 % at the last
+    // glacial maximum, and the northern sheets gone again 10 kyr after it).
+    if p.ice_dynamics {
+        use deeptime_core::climate::sheet;
+        let es = planet.earth_scale;
+        let sx: Vec<f64> = lat
+            .iter()
+            .map(|l| cell_m * l.to_radians().cos().max(0.0) / es)
+            .collect();
+        let land: Vec<bool> = z.iter().map(|&x| x > 0.0).collect();
+        // Tuning overrides (dev): DT_ISO kyr, DT_CALV m/yr, DT_ABL and DT_ACC per m, DT_CELLS.
+        let env = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<f64>().ok());
+        let cells = env("DT_CELLS").map_or(p.ice_grid_cells as usize, |x| x as usize);
+        let sg = sheet::Grid::new(w, h, &sx, cell_m / es, cells);
+        let mut sp = sheet::Params::from(&p);
+        if let Some(x) = env("DT_ISO") {
+            sp.isostasy_years = x * 1000.0;
+        }
+        if let Some(x) = env("DT_CALV") {
+            sp.calving = x;
+        }
+        if let Some(x) = env("DT_ABL") {
+            sp.beta_abl = x;
+        }
+        if let Some(x) = env("DT_ACC") {
+            sp.beta_acc = x;
+        }
+        println!("deeptime climate-dem: sheet parameters {sp:?}");
+        let bed: Vec<f32> = z.iter().map(|&x| x as f32).collect();
+        let ela: Vec<f32> = s
+            .ela
+            .iter()
+            .map(|&e| if e.is_finite() { e } else { 1.0e6 })
+            .collect();
+        let precip: Vec<f32> = s.precip.iter().map(|&x| x / 1000.0).collect();
+        let bed_c = sg.coarsen(&bed, &|_| true);
+        let ela_c = sg.coarsen(&ela, &|c| land[c]);
+        let precip_c = sg.coarsen(&precip, &|c| land[c]);
+        let mut st = sheet::State::default();
+        for (label, shift, kyr) in [
+            ("the present line, from bare ground", 0.0f32, 100.0),
+            ("the line 500 m lower", -500.0, 60.0),
+            ("the line 1000 m lower", -1000.0, 60.0),
+            (
+                "the line 300 m higher (an early-interglacial summer), 10 kyr",
+                300.0,
+                10.0,
+            ),
+            ("the present line again, 30 kyr", 0.0, 30.0),
+            ("a second glacial, the line 1000 m lower", -1000.0, 60.0),
+            ("the present line at once, 10 kyr", 0.0, 10.0),
+            ("the present line, 100 kyr more", 0.0, 100.0),
+        ] {
+            let t0 = Instant::now();
+            let ela_now: Vec<f32> = ela_c.iter().map(|e| e + shift).collect();
+            let steps = st.step(
+                &sg,
+                &sheet::Forcing {
+                    bed: &bed_c,
+                    ela: &ela_now,
+                    precip: &precip_c,
+                },
+                &sp,
+                kyr * 1000.0,
+            );
+            let fine = sg.refine(&st.thick);
+            let (mut all, mut ice, mut north_all, mut north_ice) = (0.0, 0.0, 0.0, 0.0);
+            for j in 0..h {
+                let wgt = lat[j].to_radians().cos();
+                for i in 0..w {
+                    let c = j * w + i;
+                    if !land[c] {
+                        continue;
+                    }
+                    let on = if fine[c] >= 1.0 { wgt } else { 0.0 };
+                    all += wgt;
+                    ice += on;
+                    if lat[j] > 0.0 {
+                        north_all += wgt;
+                        north_ice += on;
+                    }
+                }
+            }
+            println!(
+                "deeptime climate-dem: sheet, {label}: {:.3} of the land under ice ({:.3} of the \
+                 north's), {:.3e} km³, peak {:.0} m, {steps} steps, {:.1}s",
+                ice / all,
+                north_ice / north_all,
+                st.volume_m3(&sg) / 1.0e9,
+                st.thick.iter().cloned().fold(0.0f32, f32::max),
+                t0.elapsed().as_secs_f64()
+            );
+        }
+    }
     // The printed check: the class at each known place, and whether its group matches.
     let (mut same, mut group) = (0, 0);
     for (name, la, lo, want) in PLACES {

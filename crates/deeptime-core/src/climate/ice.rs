@@ -14,7 +14,12 @@
 //!   level is Earth's for that ice. The distance is a separable exact Euclidean distance transform
 //!   (Felzenszwalb & Huttenlocher 2012, "Distance transforms of sampled functions", Theory of
 //!   Computing 8: 415–428; implemented from the paper), rows first (wrapping in x) then columns.
-//! - **Lag** (the recent ice-age window only): the ice relaxes toward that equilibrium as in
+//! - **Ice sheets** (`ice_dynamics`, off by default: decisions log 2026-10-02): the flowing sheets of
+//!   `sheet.rs` (shallow-ice flow, elevation feedback, isostasy, calving) on a coarse grid; the ice
+//!   of a cell is the sheet's or this equilibrium profile's, whichever is thicker (the equilibrium
+//!   keeps the valley and plateau glaciers the coarse grid cannot see).
+//! - **Lag** (`ice_dynamics` off, the default; the recent ice-age window only): the ice relaxes toward that
+//!   equilibrium as in
 //!   Imbrie & Imbrie (1980, "Modeling the climatic response to orbital variations", Science 207:
 //!   943–953): dH/dt = (H_eq − H)/τ with τ = τ_m/(1 − b) while the ice grows and τ_m/(1 + b) while
 //!   it shrinks (τ_m = `ice_response_kyr`, 17 kyr; b = 0.6): slow build-up, fast terminations.
