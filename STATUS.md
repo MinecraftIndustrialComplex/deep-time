@@ -86,6 +86,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-02 | plate-motion task 2 | **Turn real shortening on before tasks 3–4?** `tectonics.collision_on_shortening` is off in every preset, so the planets are master's (build log 2026-10-02, "Plate-motion task 2"). On, on master with flexure (2 seeds): continental crust 0.29 → 0.36 of the planet, collisions per 100 Myr 11.3 → 7.4, plate lifetime 41 → 63 Myr, but one plate above half the planet in 45 % of steps against 41 %, and every collision still ends in the one-step surge. (a, recommended) Keep it off until tasks 3 and 4 land together and remove it; (b) turn it on now as a light interim gain on the crust and collision counts. Not asked through AskUserQuestion (sub-agent); for the coordinator to put to Ben. | coordinator |
+| 2026-10-02 | plate-motion task 2 (found) | **Continental crust on master with flexure:** 1000 Myr `earthlike_quick_16k` runs on 1eac09f end with 0.29 of the planet continental (lowest step 0.28, plate-check target ≥ 0.37); on 38ca6b0 the same runs gave 0.42 (0.40). Not isolated between those commits (flexure, impacts, plate-check 1b). Recommended: bisect with 1–2 seeds before the belt calibration of task 3. | coordinator |
 | 2026-10-02 | science WP-2 | **Stratovolcano heights** (VOL-019; docs/science/volcanoes-and-magma.md, "Open questions" 1). Earth's 512 stratovolcanoes stand a median 1.02 km above their bases (Grosse et al. 2014, read in full); the default range 1.2–3.0 km gives standing cones a median 1.5 km and live ones 1.8–1.9 km (two 500 Myr runs). With 0.6–2.0 km the standing median is 0.91–0.93 km and the land above 2 km does not change measurably. (a) Lower the range to 0.6–2.0 km and `arc_radius_km` 14 → 10 km, keeping today's proportions (recommended); (b) keep 1.2–3.0 km as a game choice and say so in the hint. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-2 | **Island subsidence counted twice** (VOL-048). Since cones are flexure loads (log 2026-10-02) and the plate model deepens old ocean floor, the extra 25 m/Myr (to 1.5 km) for dead ocean volcanoes repeats both; Clague & Sherrod 2014 give >1 km in ~1 Myr under the load, then ~10 m/Myr. Setting it to 0 changed neither the hypsometry nor the standing shields measurably. (a) Default 0, keep the setting (recommended); (b) keep 25 m/Myr as a game choice. | Not asked yet (sub-agent; for the coordinator) |
 | 2026-10-02 | science WP-2 | **Continental hotspot calderas** (VOL-045). Yellowstone collapsed three times in 1.5 Myr (Christiansen 2001); at 3 × 0.04 = 0.12 per Myr a continental hotspot centre has a 10–30 % chance of one caldera in its life. (a) Give continental hotspot centres about 1 per Myr, arc volcanoes unchanged (recommended; a few places per planet, no hypsometry effect); (b) keep. | Not asked yet (sub-agent; for the coordinator) |
@@ -111,6 +113,117 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-02 — Plate-motion task 2: real shortening and the collision state (agent worktree agent-aaf46227fde85f19a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What changed in behaviour: nothing in the built-in planets.** Every built-in preset gets
+  `tectonics.collision_on_shortening: false`, which keeps the trigger used before this task, so the worlds are master's.
+  Measured: plate-check on seeds 1–4 gives the same value for every measure that does not depend on when a collision
+  starts, to the last digit, seed by seed. The hypsometry run checked against master is bit-identical too (below).
+  The collision state, the real-shortening count and their records run alongside and decide nothing. Setting the
+  switch to `true` makes real shortening fire transfers and welds.
+- **Real shortening** (`plates/shortening.rs`). A contact's **collision front** is the stretch of the overriding plate's
+  edge where continental crust of the subducting plate stands now (the nearest sample of another plate within 1.75
+  spacings is that plate's, continental, not freshly sutured). The **convergence across it** is the flux of the relative
+  velocity through the edge's Voronoi edges (cotangent lengths), divided by the front's length (the summed length ×
+  outward-normal vector, and at least half the summed edge). On a straight front this is the speed across the boundary.
+  Pure strike-slip gives under 2 % of the speed, an oblique contact its normal part, and a parting one a negative
+  value. A first version used each edge sample's mean normal and read 19 % of a strike-slip speed as convergence,
+  because the Fibonacci lattice's normals lean one way along a boundary. **Shortening** is that convergence integrated
+  over the collision (parting steps add nothing), and the crust crossed is shortening × front length (km²).
+- **The collision state** (`state::Collision`, on `Contact::collision`). It begins on the first step a live contact's
+  front has 3 or more samples and converges at 10 mm/yr or more. That is `subduction::CONFIRM_MM_YR`; counted from
+  above zero, the onset convergence was a few mm/yr and the 20-Myr slowdown ratio a median of 3–8. The state carries
+  its onset, last step, shortening, crust crossed, convergence now, at onset, peak and 20 Myr after onset, the front's
+  length and peak length, its centroid and outward normal, and the share of the front that is continental on the
+  overriding side. It survives 3 steps with no front, since a resampling consumes the overlap and it comes back. It
+  ends in one of five ways. A transfer or weld writes a `CollisionRec`, whose `start_myr` is now the state's onset and
+  `end_myr` the transfer, plus a `BeltRec` with the convergence at onset and 20 Myr later. The other four write a new
+  `PartingRec`: parted (no front for over 3 steps), reversed, closed (the contact timed out or a plate died), emptied
+  (the terrane was gone) or open (the run ended). The `collision` event gains `onset_myr` and `shortening_km` (EVENTS.md).
+  `Counters::collision_onsets` counts states, and the run test checks that every state ends exactly once.
+- **The `depth_km` bug** that the plate-check agent noted is real: it added the *magnitude* of the relative velocity at
+  the overlap's centroid, so sliding plates counted in full. `depth_km` is gone. The real count is above, and the old
+  count is kept on purpose, unchanged, as `Contact::speed_count_km` (it fires while the switch is off). In the default
+  runs it reads 351 km at the transfer or weld while the front had shortened by a median of 167 km (p90 320).
+- **Interim weld and uplift: the old trigger still fires, by measurement.** The new setting is
+  `tectonics.collision_on_shortening` (bool): an editor toggle `collision_on_shortening` and lang key
+  `deeptime.editor.field.collision_on_shortening`, in all 13 presets and the test planet. Task 4 removes it together
+  with the old count. Off is what master did. On fires at 300 km of real shortening: collisions then last 10 Myr
+  instead of one step (p90 21), but the one-step surge still fires at the end. Measured, on master 38ca6b0 (before
+  flexure, 4 seeds): one plate above half the planet in 32 % of steps (59 % today), welded back 26 % (42 %), and
+  continental crust at the end 0.38 (0.42), lowest step 0.37 (0.40). Thresholds of 100–250 km (1–2 seeds each) do not
+  help the mega-plate (53–72 % of steps). On master with flexure (2 seeds) the picture changes; see the table and the
+  pending question.
+- **plate-check and baseline** (`earthlike_quick_16k`, supercontinent, 1000 Myr, `stage volcanoes`, 2 threads; before =
+  master 1eac09f, after = this branch on 1eac09f, on = after with `collision_on_shortening=true`; seeds 1–4, on: 1–2):
+
+  The full table (every measure, per seed) is in docs/design/plate-check-baseline.md, "Task 2". The measures that
+  move, and the main ones (mean of seeds; before = after unless shown):
+
+  | Measure | Before (= after, switch off) | After, where it differs | Switch on (2 seeds) | Target |
+  |---|---|---|---|---|
+  | Largest plate, median share | 0.45 | | 0.46 | 0.15–0.35 |
+  | Steps with one plate above 50 % | 40.8 % | | 44.7 % | ≤ 10 % |
+  | Plates above 5 %, median | 4.25 | | 3.5 | 5–9 |
+  | Median plate lifetime | 41.5 Myr | | 63 Myr | ≥ 80 |
+  | Plates dead within 20 Myr | 34.6 % | | 21.2 % | ≤ 15 % |
+  | Rift-born alive after 50 Myr / welded back within 50 Myr | 24.1 % / 31.8 % | | 23.6 % / 29.6 % | ≥ 60 / ≤ 10 |
+  | Land raised by one collision in a step, most / most land gained in a step | 2.37 % / 2.34 % | | 1.29 % / 1.52 % | ≤ 0.5 / ≤ 1.5 |
+  | Collision belt width / elongation, median | 2,604 km / 2.05 | | 2,519 km / 2.30 | ≤ 800 / ≥ 4 |
+  | Collision length, median / 90th pct | 2 / 2 Myr | 6 / 10.9 Myr | 10 / 20.8 Myr | 15–50 / ≤ 120 |
+  | Convergence 20 Myr after onset ÷ at onset | no data | 1.30 (few collisions last 20 Myr) | 0.69 | 0.2–0.6 |
+  | Collisions per 100 Myr | 11.3 | | 7.4 | 2–6 |
+  | Continental crust, lowest / highest step | 0.28 / 0.45 | | 0.35 / 0.46 | ≥ 0.37 / ≤ 0.45 |
+  | Continental crust at the end | 0.29 | | 0.36 | – |
+  | Active margin share | 0.31 | | 0.34 | 0.25–0.40 |
+  | Sea floor, 90th pct age (mean after 100 Myr) | 194 Myr | | 182 Myr | ≤ 230 |
+  | Plate speed, RMS / median | 59.6 / 72.3 mm/yr | | 57.6 / 72.8 | 35–55 / 30–60 |
+  | Contact age when the collision began, median | 7 Myr | 3.25 Myr | 2 Myr | – |
+  | What fires (old count) at the transfer or weld, median | 351 km | | 568 km | – |
+  | Shortening across the front at the transfer or weld, median / p90 | – | 167 / 320 km | 334 / 386 km | – |
+  | Collisions with no state (no converging continental front) | – | 13.3 % | 0 % | – |
+  | States ending with no transfer, per 100 Myr (parted / reversed / closed) | – | 26.4 (7.3 / 2.7 / 15.9) | 37.6 (17.5 / 3.2 / 15.9) | – |
+
+- **Hypsometry at 500 Myr** (`p1-17-hyps` lines, seeds 1–3 × both starts, mean [min, max]; the same builds):
+
+  | Measure | Before | After (switch off) | Switch on | Target |
+  |---|---|---|---|---|
+  | Land share | 0.295 [0.252, 0.327] | same | 0.315 [0.286, 0.365] | 0.27–0.30 |
+  | Median land height | 687 m [569, 832] | same | 732 m [603, 933] | 430–640 m |
+  | Land above 2 km | 0.124 [0.092, 0.149] | same | 0.119 [0.079, 0.178] | 0.10–0.13 |
+  | Land, 90th percentile | 2,181 m | same | 2,130 m | – |
+  | Continental crust | 0.407 | same | 0.418 | – |
+  | Sea depth, median | 3,903 m | same | 3,814 m | – |
+
+  "same": the after run of seed 1, supercontinent, on the branch merged with master 412d517 printed the same
+  hypsometry, climate and plate lines as master 1eac09f's. The other five were not re-run; plate-check
+  identity on four 1000 Myr seeds covers them. Master's own median land height (687 m) is above the target; that
+  is not this task's. Highest L1 cell and the 99th percentile are not in the summary line and were not taken.
+
+- **Found on the way, not mine:** master with flexure on (1eac09f) ends 1000 Myr runs with continental crust at 0.29
+  of the planet (lowest step 0.28; plate-check fails `continental_min` at 0.37). On 38ca6b0 the same four runs gave
+  0.42 (lowest 0.40). The cause is not isolated between those commits (flexure, impacts, plate-check 1b); flexure
+  lowering young arcs below the sea before they turn continental is a guess. The switch at `true` keeps 0.36.
+  Separately, the structure stage's Noddy-check panic on seed 1 is fixed on master (my own guard was dropped).
+- **Ledger**: PLT-068 rewritten; PLT-213 to PLT-218 new (flux convergence, front rule, state, grace steps, 20-Myr
+  measure, the switch); ids beside the constants; claims.md and plates.md counts.
+- **Gates** (VM, branch at 826b912 with master 412d517): cargo fmt --check clean, clippy -D warnings clean,
+  `cargo test --workspace` 689 passed / 0 failed / 3 ignored, `cargo deny check licenses bans` ok, `./gradlew build
+  test` BUILD SUCCESSFUL, JUnit tests=226 failures=0 skipped=1. No GameTests: the game reads nothing new except the
+  two collision event params and the larger `notes.plates.dynamics`.
+- **Tests added**: `plates::shortening::tests` — normal component; head-on accumulates speed × time (within 2 %);
+  strike-slip accumulates none (under 2 %); oblique counts its normal part; the front rule; the life cycle (onset,
+  persistence through steps with no front, parting steps add nothing, the 10 mm/yr start, the 20-Myr value, parting
+  after the grace steps); the threshold fires on real shortening and a parting is recorded; the old count fires while
+  the switch is off; Voronoi cells close and tile the sphere. `plates::tests`: the life-cycle checks on the 300 Myr
+  recording run (every state ends once, shortening never falls, a belt record per collision with a state), and
+  `collisions_on_real_shortening_fire_at_the_threshold`.
+- **Not verified**: the full presets (250,000 samples); the 1–2-seed sweeps are indicative only. With the switch off
+  the 20-Myr slowdown ratio rests on a handful of collisions per run (most fire within 6–10 Myr), so its value
+  (1.3, spread −0.35 to 2.8) means nothing yet.
+- **Next**: tasks 3 and 4, landed together. Task 3 stacks each step's `area_km2` growth behind the front's `centroid`
+  along its `normal`, on both plates, and fills `BeltRec`'s wedge and foredeep. Task 4 replaces `shortening::advance`'s
+  trigger with welding on stalled convergence (`Collision::convergence_mm_yr`) and removes `collision_on_shortening`
+  and `speed_count_km`. Task 5 starts break-off at `onset_myr`.
 ### 2026-10-02 — Science documentation, stage 2, WP-2: volcanoes and magma checked against sources (agent worktree agent-a44828926d2eaecb7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What.** Every VOL and MAG row's source and status revised (`docs/science/ledger/VOL.md`, `MAG.md`); the page
   `docs/science/volcanoes-and-magma.md` rewritten for stage 2; ten volcano and magma hints corrected

@@ -57,12 +57,14 @@
 //!   under the overriding plate and those standing at the front ([`Front::crust`]); at least
 //!   [`MIN_CONTACT`] are needed.
 //!
-//! Why off: measured on `earthlike_quick_16k` (STATUS.md, 2026-10-02), real shortening at 300 km
-//! halves the time one plate covers half the planet, but swallows continental crust (0.42 → 0.37
-//! of the planet at the end of 1000 Myr) because nothing yet stacks or resists; at 100 km plates
-//! weld faster than today. Task 3 (the belt) and task 4 (resistance, welding on stalled
-//! convergence) are what make it usable; task 4 removes the old count and the setting, and keeps
-//! the threshold on real shortening for terrane transfers.
+//! Why off: with it off the planets are master's. With it on (measured on `earthlike_quick_16k`,
+//! docs/design/plate-check-baseline.md, task 2) the measures move both ways and differ between
+//! master before and after flexure: before flexure one plate stood above half the planet in 32 %
+//! of steps instead of 59 % but kept less continental crust (0.38 against 0.42); with flexure
+//! the mega-plate share rose (45 % against 41 %, two seeds) and the crust grew (0.36 against
+//! 0.29). The collisions still end in the one-step surge. Task 3 (the belt) and task 4
+//! (resistance, welding on stalled convergence) are what make it physical; task 4 removes the old
+//! count and the setting, and keeps the threshold on real shortening for terrane transfers.
 
 use std::collections::BTreeMap;
 
