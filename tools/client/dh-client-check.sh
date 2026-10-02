@@ -14,10 +14,12 @@
 # what x extent: with no /dh pregen, every section asked is a client's request. Then the player is
 # moved beside the seam (x = C/2 - 100) and the extent must reach both ends of the lap (the
 # client's requests past the seam reach the generator folded into the planet's lap). The
-# client's own Distant Horizons database is sized at the end. Nothing is rendered or judged by eye.
+# client's own Distant Horizons database is then read: it must hold sections further from the
+# client than any chunk it loaded, on both sides of the seam (they can only have been sent by the
+# server). Nothing is rendered or judged by eye.
 #
 # Output: smoke/<profile>/client-check.txt (the probe lines and the verdicts); exit 0 when the
-# client's requests reached the generator on both sides of the seam.
+# client's requests reached the generator on both sides of the seam and the sections arrived.
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 REPO="$PWD"
@@ -111,5 +113,55 @@ lo=${ext%..*}; hi=${ext#*..}
 if [ "$ext" = none ] || [ "$lo" -gt $(( -C / 2 + 2048 )) ] || [ "$hi" -lt $(( C / 2 - 64 )) ]; then
     say "FAIL: the sections asked do not reach both ends of the lap (east of the seam is x = $(( -C / 2 )) on)"; ok=1
 fi
-[ $ok = 0 ] && say "PASS: the client's requests reached Deep Time's generator on both sides of the seam"
+
+# 5. What arrived: the sections in the client's own database (a copy, so the running client's
+# write-ahead log is read too). The client has loaded chunks only within the server's view distance
+# of its two positions; a section further than 512 blocks from both can only have been sent by
+# the server, and the server's only source is Deep Time's generator (no chunk exists out there).
+MAIN=$(find "$CL/game" -path '*Distant_Horizons*' -name '*.sqlite' -printf '%s %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)
+if [ -n "$MAIN" ]; then
+    rm -rf "$CL/dbcopy"; mkdir -p "$CL/dbcopy"; cp "$MAIN"* "$CL/dbcopy/" 2>/dev/null
+    SPAWN=$(python3 -c 'import json,sys; print(*json.loads(sys.argv[1]).get("spawn",[0,0]))' "$S0")
+    python3 - "$CL/dbcopy/$(basename "$MAIN")" "$C" "$X" $SPAWN <<'PY' | tee -a "$OUT"
+import sqlite3, sys
+db, c, seam_post_x, spawn_x, spawn_z = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+con = sqlite3.connect(db)
+cols = [r[1] for r in con.execute("pragma table_info(FullData)")]
+if not {"DetailLevel", "PosX", "PosZ"} <= set(cols):
+    print("client database: no FullData(DetailLevel, PosX, PosZ) table; tables:",
+          [r[0] for r in con.execute("select name from sqlite_master where type='table'")])
+    print("RECEIVED far=0 west=0 east=0")
+    sys.exit(0)
+rows = con.execute("select DetailLevel, PosX, PosZ from FullData").fetchall()
+half = c // 2
+base = 6 if rows and min(r[0] for r in rows) >= 6 else 0   # stored from 0 (a 64-block section) or as the section's own level
+far = west = east = 0
+by = {}
+for d, px, pz in rows:
+    d -= base
+    w = 64 << d
+    x0, z0 = px * w, pz * w
+    xf = (x0 + half) % c - half   # folded into the lap, whichever way the client keys it
+    lo, hi = by.get(d, (x0, x0 + w)); by[d] = (min(lo, x0), max(hi, x0 + w))
+    def clear(cx, cz):   # further than 512 blocks from a position, measured through the seam
+        dx = min(abs((x0 + w // 2 - cx) % c), c - abs((x0 + w // 2 - cx) % c))
+        return max(dx, abs(z0 + w // 2 - cz)) - w // 2 > 512
+    if clear(spawn_x, spawn_z) and clear(seam_post_x, 0):
+        far += 1
+        if d == 0 and half - 2048 <= xf < half: west += 1
+        if d == 0 and -half <= xf < -half + 2048: east += 1
+print(f"client database: {len(rows)} sections; x extent by detail level (blocks): "
+      + "; ".join(f"{d}: {lo}..{hi}" for d, (lo, hi) in sorted(by.items())))
+print(f"client database: {far} sections further than 512 blocks from both of the client's positions "
+      f"(sent by the server); of the 64-block ones, {west} in the 2048 blocks west of the seam and {east} in the 2048 blocks east of it")
+print(f"RECEIVED far={far} west={west} east={east}")
+PY
+    R=$(grep -a '^RECEIVED ' "$OUT" | tail -1)
+    far=$(echo "$R" | sed -n 's/.*far=\([0-9]*\).*/\1/p'); west=$(echo "$R" | sed -n 's/.*west=\([0-9]*\).*/\1/p'); east=$(echo "$R" | sed -n 's/.*east=\([0-9]*\).*/\1/p')
+    [ "${far:-0}" -gt 0 ] || { say "FAIL: the client's database holds no section beyond its own loaded chunks (nothing was sent)"; ok=1; }
+    { [ "${west:-0}" -gt 0 ] && [ "${east:-0}" -gt 0 ]; } || { say "FAIL: the client's database lacks sent sections on one side of the seam (west $west, east $east)"; ok=1; }
+else
+    say "FAIL: the client has no Distant Horizons database"; ok=1
+fi
+[ $ok = 0 ] && say "PASS: the client's requests reached Deep Time's generator on both sides of the seam, and the sections arrived in the client's database"
 exit $ok
