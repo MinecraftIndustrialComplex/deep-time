@@ -25,9 +25,18 @@ public final class TileCache {
     private final Cache<Key, Tile> cache;
     private final long maxBytes;
 
+    /**
+     * A segment must hold several of the largest tiles (a 256 × 256 tile of 32-horizon stacks is
+     * 14.7 MiB decoded), or Guava drops such a tile as soon as it is loaded and every miss on a
+     * thread's own last tiles decodes it again: at most one segment per {@link #SEGMENT_BYTES}
+     * of budget (4 for the default), however many processors there are.
+     */
     public TileCache(long maxBytes) {
-        this(maxBytes, Math.max(4, Runtime.getRuntime().availableProcessors()));
+        this(maxBytes, (int) Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(), maxBytes / SEGMENT_BYTES)));
     }
+
+    /** The least budget of one cache segment. */
+    static final long SEGMENT_BYTES = 64L << 20;
 
     /**
      * @param concurrency Guava's concurrency level. Guava splits the budget across that many

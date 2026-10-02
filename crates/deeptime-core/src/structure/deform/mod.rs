@@ -308,8 +308,8 @@ pub fn groups(features: &[Feature], c: f64, m_per_block_h: f64, m_per_block_v: f
             params.push(("plate", f64::from(plate)));
         }
         // Where to look: the structure that moved the rock furthest up or down (a strike-slip
-        // system's longest), and the azimuth of its long axis (a section across it runs at
-        // right angles to that).
+        // system's longest) among the group's younger ones, and the azimuth of its long axis (a
+        // section across it runs at right angles to that).
         let height = |f: &Feature| match f.kind {
             Kind::FoldTrain => f64::from(f.amplitude),
             Kind::Thrust | Kind::Normal => {
@@ -318,9 +318,12 @@ pub fn groups(features: &[Feature], c: f64, m_per_block_h: f64, m_per_block_v: f
             Kind::StrikeSlip => f64::from(f.half_along) * 1e-3,
             Kind::Stock | Kind::Dyke | Kind::Plug => 0.0,
         };
+        // (A young one counts for up to four times an old one: it cuts more of the rock.)
+        let score =
+            |f: &Feature| height(f) * (0.25 + 0.75 * (-f64::from(t1 - f.t_myr) / 60.0).exp());
         if let Some(best) = fs
             .iter()
-            .max_by(|a, b| height(a).total_cmp(&height(b)).then(b.id.cmp(&a.id)))
+            .max_by(|a, b| score(a).total_cmp(&score(b)).then(b.id.cmp(&a.id)))
         {
             params.push(("strongest_x", best.x.round()));
             params.push(("strongest_z", best.z.round()));

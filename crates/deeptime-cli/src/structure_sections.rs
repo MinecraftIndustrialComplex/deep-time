@@ -22,6 +22,8 @@ use crate::run::CliResult;
 
 const AIR: [u8; 4] = [18, 20, 26, 255];
 const SEA: [u8; 4] = [46, 104, 170, 255];
+/// A fault plane, where it cuts rock older than the fault.
+const FAULT: [u8; 4] = [235, 40, 40, 255];
 
 /// One line to cut along.
 struct Line {
@@ -77,7 +79,9 @@ fn across(e: &Event, title: &str, half: f64, cause: Option<&Event>) -> Option<Li
 }
 
 /// The lines the event log suggests: a collision belt, an arc and a rift.
-fn suggested(log: &EventLog, half: f64) -> Vec<Line> {
+/// (Of the groups of a kind, the largest whose strongest structure lies within 60° of the
+/// equator, where the map is least stretched; the largest anywhere when there is none.)
+fn suggested(log: &EventLog, half: f64, circumference: f64) -> Vec<Line> {
     let size = |e: &Event| {
         ["fold_trains", "thrusts", "faults"]
             .iter()
@@ -86,10 +90,16 @@ fn suggested(log: &EventLog, half: f64) -> Vec<Line> {
     };
     let cause = |e: &Event| e.causes.first().and_then(|&c| log.get(c));
     let best = |pick: &dyn Fn(&Event) -> bool| {
-        log.events()
-            .iter()
-            .filter(|e| pick(e) && num(e, "strongest_x").is_some())
-            .max_by(|a, b| size(a).total_cmp(&size(b)).then(a.id.0.cmp(&b.id.0)))
+        let largest = |mid: bool| {
+            log.events()
+                .iter()
+                .filter(|e| pick(e) && num(e, "strongest_x").is_some())
+                .filter(|e| {
+                    !mid || num(e, "strongest_z").is_some_and(|z| z.abs() < circumference / 6.0)
+                })
+                .max_by(|a, b| size(a).total_cmp(&size(b)).then(a.id.0.cmp(&b.id.0)))
+        };
+        largest(true).or_else(|| largest(false))
     };
     let belt = |kinds: &'static [&'static str]| {
         move |e: &Event| {
@@ -168,6 +178,7 @@ fn draw(
     let c = w.manifest.scale.circumference_blocks;
     let mut scratch = DeformScratch::default();
     let mut stack = Vec::new();
+    let (mut cands, mut segs) = (Vec::new(), Vec::new());
     for (k, &ground) in grounds.iter().enumerate() {
         let (x, z) = at(k);
         if deformed {
@@ -216,6 +227,35 @@ fn draw(
                 }
             }
         }
+        // The fault planes that cut this column, one pixel thick, where the rock at the plane
+        // is old enough to have been cut (a fault ends upwards at the first bed laid over it).
+        if let (true, Some(d)) = (deformed, w.structure()) {
+            let (fx, fz) = (x as f64, z as f64);
+            d.index.candidates(&d.structure, fx, fz, &mut cands);
+            d.structure.column(&cands, fx, fz, f64::from(c), &mut segs);
+            for pair in segs.windows(2) {
+                let plane = pair[0].y_hi;
+                let y = plane.floor() as i32;
+                if !(plane.is_finite() && y >= y0 && y <= y1 && y <= ground) || stack.is_empty() {
+                    continue;
+                }
+                let Some(&e) = cands.get(pair[1].block as usize) else {
+                    continue;
+                };
+                let mut h = 0;
+                while h + 1 < stack.len() && y <= stack[h + 1].0 {
+                    h += 1;
+                }
+                if stack[h].2 < d.structure.events[e as usize].key {
+                    continue;
+                }
+                let row = (y1 - y) as u32 * px + px / 2;
+                for dx in 0..px {
+                    let i = ((row * width + k as u32 * px + dx) * 4) as usize;
+                    rgba[i..i + 4].copy_from_slice(&FAULT);
+                }
+            }
+        }
     }
     (width, height, y0, y1, rgba)
 }
@@ -245,7 +285,7 @@ pub fn run(world: &Path, out: &Path, lines: &[String], half: f64, px: u32) -> Cl
         return Err(format!("{}: no strata/horizons layer", world.display()).into());
     }
     let log = EventLog::load(world)?;
-    let mut all = suggested(&log, half);
+    let mut all = suggested(&log, half, f64::from(w.manifest.scale.circumference_blocks));
     for l in lines {
         all.push(parse_line(l)?);
     }
@@ -270,6 +310,7 @@ pub fn run(world: &Path, out: &Path, lines: &[String], half: f64, px: u32) -> Cl
          <h1>Sections through folds and faults</h1>\
          <p>Each section is drawn twice in block space (one block is one square, so this is what a cliff or a mine shaft shows): \
          first the layers as they were laid down, then as the world's folds, faults and intrusions left them. \
+         Red lines are fault planes, drawn where they cut rock older than the fault. \
          Rock younger than a structure lies undisturbed across it.</p>",
     );
     for (n, line) in all.iter().enumerate() {

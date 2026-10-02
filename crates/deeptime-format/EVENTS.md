@@ -303,7 +303,7 @@ structures one tectonic event made (the nearest collision, orogeny phase, terran
 subduction onset in the 150 Myr before a fold or thrust; the rift onset before a normal fault or
 a dyke; the subduction onset behind a strike-slip fault); structures with no such event are
 grouped by the plate they ride (`plate`). Lengths are km on the block metric, heights m. Plugs
-belong to their volcanoes' events. Every group also names the structure that moved its rock furthest
+belong to their volcanoes' events. Every group also names the structure that moved its rock furthest (its younger ones counting for more)
 (`strongest_x`, `strongest_z`: its centre, block coordinates; `strongest_azimuth_deg`: its long
 axis, clockwise from north), which is where `deeptime structure-sections` cuts its section.
 
