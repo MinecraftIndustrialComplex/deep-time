@@ -509,6 +509,11 @@ impl SurfaceStage {
         )?)
     }
 
+    /// Where the run sits in Earth's history (the secular clocks of the deposit types).
+    fn epoch(&self) -> crate::deposits::clocks::Epoch {
+        crate::deposits::clocks::Epoch::of_preset(&self.preset)
+    }
+
     fn time(&mut self, what: &'static str, since: Instant) {
         *self.timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
     }
@@ -1077,6 +1082,8 @@ impl SurfaceStage {
         // 4. Strata log, regolith and weathering.
         let started = Instant::now();
         let t_mid = (t_end_myr - 0.5 * dt_myr) as f32;
+        // The coal facies needs land plants (the atmosphere clock, `deposits::clocks`).
+        let land_plants = self.epoch().land_plants_at(f64::from(t_mid) * 1.0e6); // ledger: ORE-018
         let slope: Vec<f32> = (0..n)
             .map(|c| {
                 let r = sc.routing.rcv[c] as usize;
@@ -1123,7 +1130,7 @@ impl SurfaceStage {
                         evaporite: f64::from(parts.evaporite[c]),
                         glacial: f64::from(parts.till[c]),
                         rate_m_myr: dm / dt_myr,
-                        land_plants: true,
+                        land_plants,
                     };
                     if dm > 0.0 {
                         if *reg >= 0.5 {
@@ -1516,7 +1523,7 @@ impl SurfaceStage {
             let ero = get(&st.acc, "deeptime:erosion_rate_m_myr");
             let dep = get(&st.acc, "deeptime:deposition_rate_m_myr");
             let elev = get(&st.acc, "deeptime:elevation_m");
-            let frame = fields::flush(&mut st.acc, &d, t_end_years);
+            let frame = fields::flush(&mut st.acc, &d, t_end_years, &self.epoch());
             let history = world
                 .history
                 .get_or_insert_with(|| RecordedHistory::new(grid.clone()));

@@ -14,7 +14,7 @@ use crate::{M3, V3};
 
 /// `utils.c`'s tolerance (0.01; `unEvents.c` has its own, 0.001): a pitch whose cosine is below
 /// it is taken as 90°.
-pub const PITCH_TOLERANCE: f64 = 0.01;
+pub const PITCH_TOLERANCE: f64 = 0.01; // ledger: DEF-067
 
 /// Row vector times matrix, `r[m] = Σ_j p[j] · M[j][m]`, summed in the original's order
 /// (`matmlt` with one row).
@@ -133,7 +133,7 @@ pub fn rotset(dip: f64, dipdir: f64, pitch: f64) -> Rotation {
     // The original's literal, not π: the frame is built with `acos` of values at or next to 1,
     // where the last bit of an intermediate moves the angle by 1e-8, so matching the reference
     // closely needs the same constants.
-    const PI: f64 = 3.1415926535;
+    const PI: f64 = 3.1415926535; // ledger: DEF-066
     let rad = PI / 2.0;
     let rad_deg = rad_per_deg();
     let dip = dip * rad_deg;

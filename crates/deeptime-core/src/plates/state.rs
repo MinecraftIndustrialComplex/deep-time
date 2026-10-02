@@ -248,8 +248,15 @@ pub struct Contact {
     pub last_step: u64,
     /// Samples in the overlap at `last_step`.
     pub samples: u32,
-    /// Continental interpenetration accumulated since the last collision, km.
-    pub depth_km: f64,
+    /// The collision this contact is in, while continental crust of the subducting plate stands
+    /// at the front (`shortening.rs`).
+    pub collision: Option<Collision>,
+    /// The count used before plate-motion task 2, km: relative speed at the overlap's centroid ×
+    /// time, over the steps with at least three continental samples of the subducting plate in
+    /// the overlap, since the contact began, reversed or last fired. It is not shortening (plates
+    /// sliding past each other count in full). It fires the transfer or weld while
+    /// `tectonics.collision_on_shortening` is off; task 4 removes both.
+    pub speed_count_km: f64,
     /// Largest uplift rate seen on the overriding plate, mm/yr.
     pub max_uplift_mm_yr: f64,
     /// Whether the overriding plate's continental crust was uplifted (an Andean orogeny).
@@ -260,6 +267,49 @@ pub struct Contact {
     /// plate that went under since the contact began or last collided, each counted once, when
     /// it is first hidden. Counted only while the dynamics record is on.
     pub cont_in: u32,
+}
+
+/// A collision: the state of a [`Contact`] from the step continental crust of the subducting
+/// plate first stands at the overriding plate's edge and converges on it, until the crust is
+/// transferred or welded, the two part, or the contact closes or reverses (`shortening.rs`; design
+/// `docs/design/plate-force-balance.md`, task 2). Lengths are Earth-normalized km.
+///
+/// Later tasks read and extend it: the belt stacks `area_km2`'s growth each step behind `centroid`
+/// along `normal` (task 3), the resistance and the weld on stall read `convergence_mm_yr` (task 4),
+/// and the slab's break-off counts from `onset_myr` (task 5).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Collision {
+    /// End of the first step of the collision, Myr, and that step.
+    pub onset_myr: f64,
+    pub onset_step: u64,
+    /// The last step continental crust stood at the front, and its time, Myr.
+    pub last_step: u64,
+    pub last_myr: f64,
+    /// Shortening so far, km: the convergence across the front (the flux of the relative velocity
+    /// through the front over the front's length; parting steps add nothing), integrated over the
+    /// collision.
+    pub shortening_km: f64,
+    /// Crust that crossed the front so far, km²: each step's shortening times its front length.
+    pub area_km2: f64,
+    /// Convergence across the front in the last step it was seen, mm/yr (negative: parting), at
+    /// the onset, and the largest.
+    pub convergence_mm_yr: f64,
+    pub onset_convergence_mm_yr: f64,
+    pub peak_convergence_mm_yr: f64,
+    /// Convergence across the front `shortening::SLOWDOWN_AFTER_MYR` after the onset (the first
+    /// step with a front from then on); `None` while the collision is younger.
+    pub later_convergence_mm_yr: Option<f64>,
+    /// Length of the front in the last step it was seen, km (the straight distance between the
+    /// ends of the stretch of the overriding plate's edge that continental crust of the subducting
+    /// plate stands at), and the longest it has been.
+    pub front_km: f64,
+    pub peak_front_km: f64,
+    /// The front's unit centroid, and its mean outward normal there: a unit tangent pointing from
+    /// the overriding plate towards the subducting one.
+    pub centroid: [f64; 3],
+    pub normal: [f64; 3],
+    /// Share of the front where the overriding plate's crust is continental too.
+    pub continental_over: f64,
 }
 
 /// A mantle-fixed hotspot (Cortial §7.5's suggested extension).
@@ -308,6 +358,9 @@ pub struct Counters {
     pub plate_deaths: u32,
     pub subduction_onsets: u32,
     pub collisions: u32,
+    /// Collision states begun (`shortening.rs`): each ends in a transfer or weld, a parting, or
+    /// is open at the end of the run.
+    pub collision_onsets: u32,
     /// Terrane transfers of every size (collisions included).
     pub accretions: u32,
     /// Subduction initiations at old oceanic lithosphere.

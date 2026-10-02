@@ -78,7 +78,7 @@ impl Relief {
             .events
             .iter()
             .zip(&world.structure_relief)
-            .filter(|(_, r)| **r > 0.01)
+            .filter(|(_, r)| **r > 0.01) // ledger: DEF-061
             .map(|(e, r)| (*e, f64::from(*r)))
             .collect();
         if items.is_empty() {
@@ -164,7 +164,7 @@ impl Relief {
             }
         }
         let sea = sea_m as f32;
-        let floor = sea + 1.0;
+        let floor = sea + 1.0; // ledger: DEF-061
         let mut stats = ReliefStats {
             structures: self.items.len(),
             ..ReliefStats::default()

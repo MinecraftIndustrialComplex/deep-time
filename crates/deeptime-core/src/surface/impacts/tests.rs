@@ -130,10 +130,17 @@ fn size_classes_and_the_expected_rate() {
     let area = planet_area_km2(&preset);
     assert!((area / 7.69e6 - 1.0).abs() < 0.01, "{area}");
     let p = ImpactParams::default();
-    // Craters of 2 km and more: 5.6e-15 × 10^1.8 per km² per year, 2.7 per Myr on this planet;
-    // of 20 km and more, one every 23 Myr.
+    // Craters of 2 km and more: 3.7 times the rate at 20 km (the record's shape below 20 km,
+    // Hughes 2000), 0.158 per Myr on this planet; of 20 km and more, 5.6e-15 per km² per year, one
+    // every 23 Myr. (The first coded rate carried the 1.8 slope down to 2 km: 2.7 per Myr.)
     let per_myr = impactors_per_myr(&preset, &p);
-    assert!((per_myr - 2.72).abs() < 0.05, "{per_myr}");
+    assert!((per_myr - 0.158).abs() < 0.003, "{per_myr}");
+    let big = ImpactParams {
+        min_crater_km: 20.0,
+        ..p.clone()
+    };
+    let one_in = 1.0 / impactors_per_myr(&preset, &big);
+    assert!((one_in - 23.2).abs() < 0.5, "{one_in} Myr");
     let twice = ImpactParams {
         flux: 2.0,
         ..p.clone()
@@ -284,8 +291,9 @@ fn fields_map_and_bodies_come_from_the_catalogue() {
 
 #[test]
 fn the_pipeline_makes_craters_at_the_rate_and_ages_them() {
-    // Thirty times Earth's rate, so that 120 Myr on this small planet hold thousands of craters.
-    let json = pipeline_json(20_000, 120.0, 11, Some(json!({"flux": 30.0})));
+    // Five hundred times Earth's rate, so that 120 Myr on this small planet hold thousands of
+    // craters (Earth's rate gives it a few dozen in 500 Myr).
+    let json = pipeline_json(20_000, 120.0, 11, Some(json!({"flux": 500.0})));
     let dir = temp_dir("rate");
     let s = session(&json, &dir, 2);
     assert_eq!(
@@ -307,19 +315,20 @@ fn the_pipeline_makes_craters_at_the_rate_and_ages_them() {
     let stopped: u64 = c.stopped_by_sea.iter().sum();
     assert_eq!(c.impactors, formed + stopped);
     // The count is a Poisson draw about rate × area × time.
-    let expected = 30.0 * 2.72 * 120.0;
+    let expected = 500.0 * 0.158 * 120.0;
     assert!(
         (c.impactors as f64 - expected).abs() < 6.0 * expected.sqrt(),
         "{} impactors, {expected} expected",
         c.impactors
     );
-    // Many small craters for each large one, on land and in all.
+    // More craters under 20 km than over it (the production function: 2.7 to 1 before the sea
+    // shrinks any), and fewer of each size class above 20 km than the one below.
+    let all = |k: usize| c.formed[k] + c.stopped_by_sea[k];
     assert!(
-        c.formed[0] > c.formed[2] && c.formed[1] > c.formed[3],
+        all(0) + all(1) + all(2) > 2 * (all(3) + all(4) + all(5)),
         "{c:?}"
     );
-    let all = |k: usize| c.formed[k] + c.stopped_by_sea[k];
-    assert!(all(0) > 3 * all(2), "{c:?}");
+    assert!(all(3) > 3 * all(4), "{c:?}");
     // The sea stops small impactors far more often than large ones.
     assert!(c.stopped_by_sea[0] > 0, "{c:?}");
     let share = |k: usize| c.stopped_by_sea[k] as f64 / all(k).max(1) as f64;
@@ -511,7 +520,7 @@ fn no_flux_no_impacts() {
 
 #[test]
 fn threads_and_a_resume_leave_the_craters_unchanged() {
-    let json = pipeline_json(12_000, 40.0, 4, Some(json!({"flux": 40.0})));
+    let json = pipeline_json(12_000, 40.0, 4, Some(json!({"flux": 680.0})));
     let dir = temp_dir("one");
     let s = session(&json, &dir, 1);
     finish(&s);

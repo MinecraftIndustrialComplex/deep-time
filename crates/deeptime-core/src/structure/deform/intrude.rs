@@ -29,7 +29,7 @@ use crate::surface::volcanoes::{Kind as VolcanoKind, Volcano};
 /// height above the world's floor: the ellipsoid then cuts the ground where
 /// (a / half_along)² + (b / half_across)² < 1 − 1 / (1 + RISE)² = 0.36, the middle 60 % of its
 /// length and width, with walls that are nearly upright.
-const RISE: f32 = 0.25;
+const RISE: f32 = 0.25; // ledger: DEF-051
 
 /// A feature of `kind` with nothing set but where and when.
 fn blank(id: u32, kind: Kind, x: f64, z: f64, plate: u32, t_myr: f64) -> Feature {
@@ -126,11 +126,13 @@ pub fn emplace(
             let mut f = blank(*next_id, kind, bx, bz, x.plate_id[c].max(0.0) as u32, t_myr);
             f.cause = cause(kind, bx, bz);
             if kind == Kind::Stock {
+                // ledger: DEF-042 (sigma 0.4)
                 let radius = length_blocks(p.stock_radius_km, 0.4, km_to_blocks, rng);
                 f.azimuth_deg = random_trend as f32;
                 f.half_across = radius as f32;
-                f.half_along = (radius * (1.0 + 0.6 * u[0])) as f32;
+                f.half_along = (radius * (1.0 + 0.6 * u[0])) as f32; // ledger: DEF-043
                 f.depth = lerp(p.stock_top_depth_blocks, u[1]) as f32;
+                // ledger: DEF-045
                 f.rock = if x.regime[c] as u8 == regime::COLLISION {
                     index("granite")
                 } else if u[2] < 0.5 {
@@ -139,6 +141,7 @@ pub fn emplace(
                     index("diorite")
                 };
             } else {
+                // ledger: DEF-047 (sigma 0.5)
                 let length = length_blocks(p.dyke_length_km, 0.5, km_to_blocks, rng);
                 let rift = |k: usize| {
                     x.regime[k] as u8 == regime::RIFT && x.crust_type[k] as u8 == CONTINENTAL
@@ -194,6 +197,7 @@ pub fn plugs(
         f.half_along = radius as f32;
         f.half_across = radius as f32;
         f.rise = RISE;
+        // ledger: DEF-050
         f.rock = if v.silicic || v.kind == VolcanoKind::Silicic {
             index("rhyolite")
         } else if v.kind == VolcanoKind::Strato {

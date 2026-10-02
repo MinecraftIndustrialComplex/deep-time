@@ -22,7 +22,7 @@ The four presets are the "pipeline" presets under their game names (`earthlike_q
 | `deposits` | 8 | deposits | ore count, size, richness, province strength, essentials |
 | `young` | 0 (empty object) | young | young landscape (L2), all defaults |
 | `amplify` | 4 | amplify | incision cap, glacial shape, ruggedness |
-| `volcanoes` | 23 | volcanoes | arc and hotspot volcano shapes, calderas, flood basalt, height ceiling |
+| `volcanoes` | 24 | volcanoes | arc and hotspot volcano shapes, calderas, flood basalt, height ceiling |
 | `impacts` | 11 | impacts | meteor crater flux and scaling |
 | `hydro` | 23 | hydro | rivers, lakes, lake freezing, carver protection |
 | `biomes` | 12 | other (bake: climate to biome inputs) | the knobs of the climate-to-biome mapping |
@@ -309,17 +309,18 @@ Keys the code accepts but the preset leaves at their defaults (not exhaustive: I
 | `volcanoes.flank_steepness` | `0.5` | volcanoes |
 | `volcanoes.arc_spacing_km` | `60.0` | volcanoes |
 | `volcanoes.arc_min_flux` | `0.25` | volcanoes |
-| `volcanoes.arc_height_km` | `[1.2,3.0]` | volcanoes |
-| `volcanoes.arc_radius_km` | `14.0` | volcanoes |
+| `volcanoes.arc_height_km` | `[0.6,2.0]` | volcanoes |
+| `volcanoes.arc_radius_km` | `10.0` | volcanoes |
 | `volcanoes.arc_lifetime_myr` | `[2.0,8.0]` | volcanoes |
 | `volcanoes.hotspot_spacing_km` | `70.0` | volcanoes |
 | `volcanoes.shield_height_km` | `[3.5,6.5]` | volcanoes |
 | `volcanoes.shield_radius_km` | `40.0` | volcanoes |
 | `volcanoes.silicic_height_km` | `0.9` | volcanoes |
 | `volcanoes.silicic_radius_km` | `35.0` | volcanoes |
-| `volcanoes.island_subsidence_m_myr` | `25.0` | volcanoes |
+| `volcanoes.island_subsidence_m_myr` | `0.0` | volcanoes |
 | `volcanoes.island_subsidence_max_m` | `1500.0` | volcanoes |
 | `volcanoes.caldera_rate_per_myr` | `0.04` | volcanoes |
+| `volcanoes.hotspot_caldera_rate_per_myr` | `1.0` | volcanoes |
 | `volcanoes.caldera_radius_km` | `[3.0,9.0]` | volcanoes |
 | `volcanoes.silicic_crust_km` | `42.0` | volcanoes |
 | `volcanoes.flood_basalt_flows` | `8` | volcanoes |
