@@ -12,7 +12,8 @@ Ben's decisions of 2026-10-02 changed three defaults and added one setting (see 
 number and sorted the rows: 81 are rules or values with no Earth counterpart, or deliberate
 departures from Earth, and are now labelled as such; 28 are physical values for which no source
 was found or the source read does not give the number. No volcano size in the code comes from a
-measurement of Earth's volcanoes. Where a source was read, this page says how the code compares
+measurement of Earth's volcanoes, except the stratovolcano height range, which Ben set to Earth's
+median on 2026-10-02 (VOL-019). Where a source was read, this page says how the code compares
 with it. The one paper the code cited, for the spacing of arc volcanoes, says in its abstract that
 there is no characteristic spacing; the citation is corrected. Two departures from Earth that shaped
 worlds were settled by Ben on 2026-10-02 (see "Decisions of 2026-10-02"): stratovolcanoes stood about
