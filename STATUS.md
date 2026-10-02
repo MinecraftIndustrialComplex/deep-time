@@ -146,11 +146,27 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   - The pages: `crates/deeptime-viewer/assets/projection.js` (`window.DTProj`, loaded first by the workbench and the
     viewer bundle, served at `/projection.js`); `workbench.js`, `worldmap.js`, `sections.js`, `deposits.js` and
     `viewer.js` convert through it. `tools/workbench/preview.py` has `pole_z`.
-  - Left as they were, on purpose (the module's doc says why): the spatial-index frames from z = −C/4 (river tiles,
-    structure buckets, site index, playability regions; lookups, not geography, and they cover any projection whose
-    poles lie within ±C/4), and the synthetic test terrain's analytic latitude (its own formula, twinned in Java).
-  - Parity: `deeptime parity` writes a `projection` block (each picked column's latitude and longitude, the z of every
-    5° of latitude); JUnit `ColumnParityTest.theProjectionIsRusts` checks Java against it (1e-9).
+  - **Second pass (a fresh agent took the branch over, same day).** The module now also holds: the neighbour rule
+    (`projection::wrap_col`, `clamp_row`, `neighbour`; `GridDesc::wrap_i`/`clamp_j`, the surface kernels'
+    `Dims::neighbour` and Java's `GridDesc.wrapI`/`clampJ` call it); the extent (`extent`, `on_planet`,
+    `inside_poles`, `clamp_z`); the metric (`metric`, `area_scale`, `north`; `GridDesc::cell_area_km2` takes
+    `area_scale`, the band weights and latitudes moved from `GridDesc` into the module); the spatial indexes' frame
+    (`index_origin`, `index_span` and their whole-block forms: the river tiles, the structure buckets, the site
+    index and the playability regions take their origin and span from it, in Rust and in Java's `Rivers`,
+    `Structure`, `SiteData`; the first pass had left them at a hand-written −C/4, which a square map would not
+    fit); picture longitudes (`picture_lon_deg`, `picture_x_of_lon`, Java `pictureLongitudeDeg`/
+    `pictureXOfLongitude`, JS `xOfLonPic`/`lonOfPicX`/`wrapLon`: the dummy stage, `amplify_view`, the workbench's
+    inspect readout, `MapWidget`, `GlobeProjection`, `ReviewModel` and nine page sites).
+  - **Not routed yet** (listed in the design note §8 step 1): the kernels that wrap x or stop at the rows inline
+    (about 35 Rust files: blurs, flexure's FFT/DCT, the orographic FFT, advection, the amplifier's windows, the
+    regional windows, the ice distance transform, the outlet rows), which is the fold design pass of §5.3 and not a
+    call-site change; the x seam written `c / 2`; the climate's rows-are-parallels marches; the synthetic test
+    terrain's analytic latitude (its own formula, twinned in Java) and the Earth DEM reader; the presets'
+    `keyframes.size`; the workbench globe's texture loop and `ProvinceHints` (a latitude/longitude lattice); the
+    review scripts `grid_audit.py`, `glacial_views.py`, `p2-01-report.py`.
+  - Parity: `deeptime parity` writes a `projection` block (each picked column's latitude, longitude and area scale,
+    the z of every 5° of latitude, the extent, the index frame); JUnit `ColumnParityTest.theProjectionIsRusts`
+    checks Java against it (1e-9; the frame exactly).
 - **Identity, measured.** `tools/review/projection-identity.sh <binary> <dir>` runs a build over the JUnit fixtures'
   worlds (wrap-test and lake-test synth at C 1,024 with sample dumps and lake parity, the real test planet
   planet_world_4k: run, bake, viewer bundle with keyframes, column and climate parity fixtures, a satellite picture of
