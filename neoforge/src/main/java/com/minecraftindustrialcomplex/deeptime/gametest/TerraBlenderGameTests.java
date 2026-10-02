@@ -49,6 +49,9 @@ public final class TerraBlenderGameTests {
                         + "landUnderModRegions={} landByNamespace={} outside={} mismatch={}",
                 r.samples(), r.provincesSeen(), r.regionsSeen(), r.provincesByRegion(), r.landSamplesInModRegions(),
                 r.landByNamespace(), r.outsideItsRegion(), r.perProvinceMismatch());
+        DeepTime.LOGGER.info("[gametest] regionsFollowProvinces generated chunks: {} sampled, {} with a mod biome, {} outside their region",
+                r.chunkSamples(), r.chunkModBiomes(), r.chunkOutside());
+        helper.assertTrue(r.chunkOutside() == 0, "a generated chunk's biome is outside its province's region: " + r.firstProblem());
         helper.assertTrue(r.perProvinceMismatch() == 0, "regions differ inside a province: " + r.firstProblem());
         helper.assertTrue(r.outsideItsRegion() == 0, "a biome outside its province's region: " + r.firstProblem());
         helper.assertTrue(r.provincesSeen() >= 3, "only " + r.provincesSeen() + " provinces sampled");

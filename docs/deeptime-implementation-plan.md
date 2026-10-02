@@ -3666,7 +3666,7 @@ a smoke benchmark and again at the end.
   ReTerraForged is used; `NOTICE.md` unchanged). TerraBlender picks a region in
   `MixinMultiNoiseBiomeSource.getNoiseBiome` (HEAD, cancellable) from `IExtendedParameterList.
   getUniqueness(x, y, z)`, a layered noise of (x, z) alone, on a parameter list that every level on the
-  overworld preset shares. Deep Time's one mixin, `mixin/compat/terrablender/RegionBiomeSourceMixin`
+  overworld preset shares. Deep Time's mixin `mixin/compat/terrablender/RegionBiomeSourceMixin`
   (priority 900, so its handler runs before TerraBlender's), answers first for a Deep Time level's
   sampler only: the noise settings the generator binds (`GeologicChunkGenerator.bindSettings`) carry a
   `worldgen/RegionSpawnTarget`, a list wrapping the real spawn target and the level's
@@ -3685,7 +3685,11 @@ a smoke benchmark and again at the end.
   plate model's active collision and arc regime (0.125), which no threshold moves; the thresholds only
   take it to ~0.24–0.33 (STATUS, P1-10 build log). The test is `TerraBlenderGameTests.
   regionsFollowProvinces` (+ `TerraBlenderChecks`); `/deeptime probe regions [step]` writes the grid for
-  `tools/review/region_map.py` (smoke: `tools/review/p1-10-smoke.sh`).
+  `tools/review/region_map.py` (smoke: `tools/review/p1-10-smoke.sh`). A second mixin, `RegionChunkBiomesMixin`,
+  hands the bound spawn-target list to the sampler a *generated chunk* builds: `NoiseBasedChunkGenerator.
+  doCreateBiomes` passes `this.settings.value().spawnTarget()`, the registry's list, so without it chunks
+  were still drawn from TerraBlender's own regions while queries and far terrain followed the provinces
+  (`regionsFollowProvinces` reads the stored biomes of 64 generated chunks).
 
 #### P1-11 Customize editor, timelapse and staging
 - **Goal.** §7.12's screens, backed by a client-free model that GameTests can drive.
