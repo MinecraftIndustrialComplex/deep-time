@@ -10,6 +10,13 @@ about how the source was read; "not stated" is common.
 Sources the code relies on are in [bibliography.md](bibliography.md), with full references. Where a
 source appears in both, the entry there is the one to trust.
 
+**Stage 2, WP-0 (2026-10-02).** Each mention below now ends with `[= Key]` when it is the same work as an entry of
+[bibliography.md](bibliography.md) (171 of the 676 mentions; the key is the entry's heading there, where the
+library status and the reference are) or `[unresolved]` when it is not (505: tools, mods, blogs, web pages,
+and papers that no ledger row relies on). Matching was by DOI, URL or authors, year and title, strictly: a
+different edition, a software port of a paper, or a different paper by the same authors is left unresolved. The
+mentions themselves were not changed.
+
 The engineering notes (Minecraft integration, mod compatibility, wrapped worlds, runtime packaging,
 the Rust bridge, player demand) cite mod sources, jars and web pages, not science; their sources
 are in the notes themselves and are not repeated here. See [`../research/README.md`](../research/README.md).

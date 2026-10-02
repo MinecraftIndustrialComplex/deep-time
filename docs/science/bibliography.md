@@ -678,7 +678,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: de Bremond d'Ars, J., Jaupart, C. and Sparks, R. S. J. (1995). Distribution of volcanoes in active margins. Journal of Geophysical Research 100(B10): 20421-20432.
 - DOI or URL: 10.1029/95JB02153 (https://agupubs.onlinelibrary.wiley.com/doi/10.1029/95JB02153). No open copy found.
 - Cited as: "de Bremond d'Ars, Jaupart & Sparks 1995, JGR 100(B10):20421"
-- Ledger ids: VOL-039; notes: and indirectly VOL-009, VOL-040
+- Ledger ids: VOL-009, VOL-039, VOL-040; notes: and indirectly VOL-009, VOL-040
 - Access: paywalled (abstract only)
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Substitute: none found.
@@ -757,7 +757,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Braun, J. and Willett, S. D. (2013). A very efficient O(n), implicit and parallel method to solve the stream power equation governing fluvial incision and landscape evolution. Geomorphology 180-181:170-179.
 - DOI or URL: 10.1016/j.geomorph.2012.10.008. Green copy listed at GFZ Potsdam pubman (https://gfzpublic.gfz.de/pubman/item/item_1945954); the page is a JavaScript application, no file link retrievable by script.
 - Cited as: "Braun & Willett 2013 (Geomorphology 180-181:170-179)", "Braun & Willett" (spl.rs, routing.rs, params.rs k_spl).
-- Ledger ids: ERO-001, ERO-078, ERO-079, HYP-030; notes: also the units of ERO-003/004
+- Ledger ids: ERO-001, ERO-003, ERO-078, ERO-079, HYP-030; notes: also the units of ERO-003/004
 - Access: paywalled (abstract elided in Semantic Scholar and OpenAlex); GFZ green copy exists but not retrievable here.
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://gfzpublic.gfz.de/pubman/item/item_1945954. File: Braun2013.txt.
 - Read so far (by the project): abstract only (via ResearchGate); code says "implemented from the paper".
@@ -932,7 +932,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Beaumont, C., Jamieson, R. A., Nguyen, M. H. and Lee, B. (2001). Himalayan tectonics explained by extrusion of a low-viscosity crustal channel coupled to focused surface denudation. Nature 414(6865):738-742.
 - DOI or URL: 10.1038/414738a.
 - Cited as: (ERO, ISO, HYP) "Beaumont et al. 2001 (channel flow coupled to erosion), Nature 414:738" (build log only). (PLT) "Beaumont et al. 2001 (Nature 414:738)".
-- Ledger ids: ISO-020; none directly (design background for ISO-018); notes: design background for ISO-018
+- Ledger ids: ISO-018, ISO-020; notes: design background for ISO-018
 - Access: paywalled; not fetched. [other sections: paywalled.]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -944,7 +944,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Cortial, Y., Peytavie, A., Galin, E. and Guerin, E. (2019). Procedural tectonic planets. Computer Graphics Forum 38(2):1-11 (Eurographics 2019).
 - DOI or URL: (ERO, ISO, HYP) 10.1111/cgf.13614; open copy https://hal.science/hal-02136820 (Anubis blocks scripted access). (SCL, PRV, POL, BAK) 10.1111/cgf.13614 ; author copy https://perso.liris.cnrs.fr/eric.galin/Articles/2019-planets.pdf (PLT) 10.1111/cgf.13614; open copies https://perso.liris.cnrs.fr/eric.galin/Articles/2019-planets.pdf and https://hal.science/hal-02136820v1/file/2019-Procedural-Tectonic-Planets.pdf (HAL blocked WebFetch with an Anubis page; the LIRIS copy downloaded fine with curl).
 - Cited as: (ERO, ISO, HYP) "Cortial et al. 2019 (procedural tectonic planets; oceanic dampening z -= (1 - z / z_t) eps_o dt, z_r, z_a, z_t, z_c, section 4.5)". (SCL, PRV, POL, BAK) "Cortial, Peytavie, Galin & Guerin 2019, Procedural Tectonic Planets, Appendix A, Table 3"; "Cortial: 2 My"; "Cortial: 6,370 km" (PLT) "Cortial, Peytavie, Galin & Guerin 2019", "Cortial Appendix A, Table 3", "Table 2", sections 3, 4.1-4.5, 6, 7.5.
-- Ledger ids: HYP-015, ISO-008, ISO-011, ISO-013 to ISO-015, ISO-025 to ISO-027, PLT-019 to PLT-022, PLT-028, PLT-029, PLT-036, PLT-041, PLT-052, PLT-055, PLT-056, PLT-068, PLT-070, PLT-073, PLT-081, PLT-085, PLT-093, PLT-098, PLT-100, PLT-101, PLT-119, PLT-130, SCL-029, SCL-034, SCL-042 to SCL-044; notes: context SCL-030; from the sources file
+- Ledger ids: HYP-015, ISO-008, ISO-011, ISO-013 to ISO-015, ISO-025 to ISO-027, PLT-019 to PLT-022, PLT-028, PLT-029, PLT-036, PLT-041, PLT-052, PLT-055, PLT-056, PLT-068, PLT-070, PLT-073, PLT-081, PLT-085, PLT-093, PLT-098, PLT-100, PLT-101, PLT-119, PLT-130, SCL-029, SCL-030, SCL-034, SCL-042 to SCL-044; notes: context SCL-030; from the sources file
 - Access: open copy at https://hal.science/hal-02136820 (not retrievable by script here). [other sections: open copy (author PDF) at the URL above; Wiley page returned 403 / open copy at the LIRIS URL above.]
 - Library (the project's source library, not distributed): fetched (PDF, 11 pages, text layer, 46,531 characters). From: https://perso.liris.cnrs.fr/eric.galin/Articles/2019-planets.pdf. Text file: Cortial2019.txt.
 - Read so far (by the project): (ERO, ISO, HYP) the plate model is ported "from the paper" per other documents; not assessed here. (SCL, PRV, POL, BAK) research note says read from the PDF in a 2026-09-27 session; Appendix A coverage not stated (PLT) in full per P1-03 log ("implemented from Cortial"), no statement of constant-by-constant verification.
@@ -1005,7 +1005,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Peel, M. C., Finlayson, B. L. and McMahon, T. A. (2007). Updated world map of the Koeppen-Geiger climate classification. Hydrology and Earth System Sciences 11(5):1633-1644.
 - DOI or URL: (ERO, ISO, HYP) 10.5194/hess-11-1633-2007; open access https://hess.copernicus.org/articles/11/1633/2007/. (HYD, YNG) https://doi.org/10.5194/hess-11-1633-2007 (open access) ; https://hess.copernicus.org/articles/11/1633/2007/hess-11-1633-2007.pdf (MOI, BIO) https://doi.org/10.5194/hess-11-1633-2007 ; PDF https://hess.copernicus.org/articles/11/1633/2007/hess-11-1633-2007.pdf ; the author's page with the same table https://people.eng.unimelb.edu.au/mpeel/koppen.html (SCL, PRV, POL, BAK) 10.5194/hess-11-1633-2007 ; https://hess.copernicus.org/articles/11/1633/2007/ (CLM) 10.5194/hess-11-1633-2007
 - Cited as: (ERO, ISO, HYP) "Peel, Finlayson & McMahon 2007 (HESS 11:1633)". (MOI, BIO) "Peel, Finlayson & McMahon 2007, Table 1" (koppen.rs header "the rules the research note cites"; plan §8.3; STATUS P1-05, P1-17) (SCL, PRV, POL, BAK) not cited ("Koppen's dryness threshold (20 T + 140 mm)", no year)
-- Ledger ids: BAK-020, BIO-001 to BIO-016, HYD-046, HYP-025; none (comparison only); notes: BIO-017 is a game-choice about the summer half; and BIO-001 to BIO-016; comparison only; supporting source found in this pass
+- Ledger ids: BAK-020, BIO-001 to BIO-017, HYD-046, HYP-025; none (comparison only); notes: BIO-017 is a game-choice about the summer half; and BIO-001 to BIO-016; comparison only; supporting source found in this pass
 - Access: open access. [other sections: open access (gold)]
 - Library (the project's source library, not distributed): fetched (PDF, 12 pages, text layer, 46,987 characters). From: https://hess.copernicus.org/articles/11/1633/2007/hess-11-1633-2007.pdf. Text file: Peel2007.txt.
 - Merged keys: Peel2007 (Koppen-Geiger)
@@ -1144,7 +1144,7 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Leopold, Luna B. and Maddock, Thomas, Jr. 1953. The hydraulic geometry of stream channels and some physiographic implications. U.S. Geological Survey Professional Paper 252, 57 p.
 - DOI or URL: https://doi.org/10.3133/pp252 ; open PDF https://pubs.usgs.gov/pp/0252/report.pdf
 - Cited as: "Leopold & Maddock 1953: width ∝ Q^0.5, depth ∝ Q^0.4" (hydro/mod.rs comment; plan §8.4)
-- Ledger ids: HYD-001, HYD-002; notes: HYD-003, HYD-004 are the project's own coefficients
+- Ledger ids: HYD-001 to HYD-004; notes: HYD-003, HYD-004 are the project's own coefficients
 - Access: open access (USGS Publications Warehouse, scanned PDF)
 - Library (the project's source library, not distributed): fetched (PDF, 64 pages, text layer, 190,737 characters). From: https://pubs.usgs.gov/pp/0252/report.pdf. Text file: Leopold1953.txt.
 - Read so far (by the project): nothing says the paper was read
@@ -1954,7 +1954,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Reference: Singer, D.A., 2008, Mineral deposit densities for estimating mineral resources: Mathematical Geosciences 40(1):33-46.
 - DOI or URL: 10.1007/s11004-007-9127-3 ; https://pubs.usgs.gov/publication/70197201
 - Cited as: not cited by the project (found in this pass; it is the follow-up to Singer2005 and contains the area-density regression).
-- Ledger ids: none (relevant to DEP-011, 147, 153); notes: relevant to DEP-011, 147, 153
+- Ledger ids: DEP-011; notes: relevant to DEP-011, 147, 153
 - Access: paywalled (abstract only); abstract open at the USGS record.
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://pubs.usgs.gov/publication/70197201. File: Singer2008b.txt.
 - Read so far (by the project): not stated (not cited).
@@ -2033,7 +2033,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Reference: Schmidt, J.M., Light, T.D., Drew, L.J., Wilson, F.H., Miller, M.L., and Saltus, R.W., 2007, Undiscovered locatable mineral resources in the Bay Resource Management Plan Area, southwestern Alaska: a probabilistic assessment: U.S. Geological Survey Scientific Investigations Report 2007-5039, vi + 50 p.
 - DOI or URL: 10.3133/sir20075039 ; https://pubs.usgs.gov/sir/2007/5039/pdf/sir20075039.pdf
 - Cited as: "Schmidt et al. 2007, SIR 2007-5039 p. 28 and Table 1".
-- Ledger ids: DEP-056, DEP-061; notes: also restated in DEP-051
+- Ledger ids: DEP-051, DEP-056, DEP-061; notes: also restated in DEP-051
 - Access: open copy (agency report) at https://pubs.usgs.gov/sir/2007/5039/pdf/sir20075039.pdf
 - Library (the project's source library, not distributed): fetched (PDF, 60 pages, text layer). From: https://pubs.usgs.gov/sir/2007/5039/pdf/sir20075039.pdf. Text file: sir5039.txt.
 - Read so far (by the project): p. 28 and Table 1.
@@ -2088,7 +2088,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Reference: Leach, D.L., Taylor, R.D., Fey, D.L., Diehl, S.F., and Saltus, R.W., 2010, A deposit model for Mississippi Valley-type lead-zinc ores, chap. A of Mineral deposit models for resource assessment: U.S. Geological Survey Scientific Investigations Report 2010-5070-A, viii + 43 p.
 - DOI or URL: (DEP) 10.3133/sir20105070A ; https://pubs.usgs.gov/sir/2010/5070/a/pdf/SIR10-5070A.pdf (ORE) https://pubs.usgs.gov/sir/2010/5070/a/ ; PDF https://pubs.usgs.gov/sir/2010/5070/a/pdf/SIR10-5070A.pdf (6.3 MB; binary to WebFetch). Note the PDF name is SIR10-5070A.pdf.
 - Cited as: (DEP) "Leach et al. 2010", "SIR 2010-5070-A (printed pp. 3-5, 8, 19, 27)". (ORE) "USGS SIR 2010-5070-A (the MVT deposit model)"; also called "Leach et al. 2010" in places.
-- Ledger ids: DEP-081, DEP-090, DEP-091, DEP-100, ORE-001; notes: also cited in DEP-084, 085, 086, 095; and the MVT notes in ORE-003
+- Ledger ids: DEP-081, DEP-090, DEP-091, DEP-100, ORE-001, ORE-003, ORE-008, ORE-009; notes: also cited in DEP-084, 085, 086, 095; and the MVT notes in ORE-003
 - Access: open access (agency report). [other sections: open copy (agency report) at https://pubs.usgs.gov/sir/2010/5070/a/pdf/SIR10-5070A.pdf]
 - Library (the project's source library, not distributed): fetched (PDF, 64 pages, text layer). From: https://pubs.usgs.gov/sir/2010/5070/a/pdf/SIR10-5070A.pdf. Text file: sir5070a.txt.
 - Read so far (by the project): (DEP) printed pp. 3-5, 8, 19, 27. (ORE) not stated; quoted as a phrase.
@@ -2664,7 +2664,7 @@ Minecraft mod and game material: MIC rock-tag README (outside the repo); FORMAT.
 - Reference: Sillitoe, R.H., 2010, Porphyry copper systems: Economic Geology 105(1):3-41.
 - DOI or URL: 10.2113/gsecongeo.105.1.3
 - Cited as: "Sillitoe 2010".
-- Ledger ids: DEP-190; notes: also DEP-021, 188
+- Ledger ids: DEP-021, DEP-190; notes: also DEP-021, 188
 - Access: paywalled (abstract only)
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -2800,7 +2800,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Reference: Lopatin, N. V., 1971, Temperature and geologic time factors in coalification (in Russian): Akademiya Nauk SSSR, Izvestiya, Seriya Geologicheskaya, v. 3, p. 95-106.
 - DOI or URL: none found. Cited by the AAPG Wiki article "Petroleum source rocks" (https://wiki.aapg.org/Petroleum_source_rocks).
 - Cited as: not cited by the code; the code credits "Lopatin's method" via Waples.
-- Ledger ids: (none; background for ORE-158); notes: none; background for ORE-158
+- Ledger ids: ORE-158; notes: none; background for ORE-158
 - Access: not found (Russian journal, not online).
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://wiki.aapg.org/Petroleum_source_rocks. File: Lopatin1971_related_not_cited_by_the_code.txt.
 - Identification (stage 2, WP-0): Russian journal, not online; the method is documented in Waples1980 (paywalled) and in the USGS reports in the library.
@@ -3020,7 +3020,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Reference: Basuki, N. I. (Crossref lists this author only; a co-author may exist), 2002, A review of fluid inclusion temperatures and salinities in Mississippi Valley-type Zn-Pb deposits: identifying thresholds for metal transport: Exploration and Mining Geology, v. 11, no. 1-4, p. 1-17.
 - DOI or URL: 10.2113/11.1-4.1
 - Cited as: not cited.
-- Ledger ids: (supports ORE-003, 004); notes: supports ORE-003, 004
+- Ledger ids: ORE-003; notes: supports ORE-003, 004
 - Access: paywalled (abstract only).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -3032,7 +3032,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Reference: Gumsley, Ashley P., Chamberlain, Kevin R., Bleeker, Wouter, Soderlund, Ulf, de Kock, Michiel O., Larsson, Emilie R., and Bekker, Andrey, 2017, Timing and tempo of the Great Oxidation Event: Proceedings of the National Academy of Sciences, v. 114, no. 8, p. 1811-1816.
 - DOI or URL: 10.1073/pnas.1608824114 ; open copy https://www.pnas.org/content/pnas/114/8/1811.full.pdf
 - Cited as: not cited (it is the reference behind the Wikipedia GOE dates).
-- Ledger ids: (Earth reference for ORE-014, 016, 017); notes: Earth reference for ORE-014, 016, 017
+- Ledger ids: ORE-014; notes: Earth reference for ORE-014, 016, 017
 - Access: open access.
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): not read.
@@ -3080,7 +3080,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Reference: Smith, Ronald B. and Barstad, Idar. 2004. A linear theory of orographic precipitation. Journal of the Atmospheric Sciences 61(12):1377-1391.
 - DOI or URL: https://doi.org/10.1175/1520-0469(2004)061<1377:ALTOOP>2.0.CO;2
 - Cited as: "Smith & Barstad 2004, eq. 49 (J. Atmos. Sci. 61, 1377)"
-- Ledger ids: MOI-034, MOI-035; notes: and MOI-036 to MOI-040 through the software
+- Ledger ids: MOI-034 to MOI-036, MOI-040; notes: and MOI-036 to MOI-040 through the software
 - Access: only the record was reachable (the AMS page returned 403); open-access status not checked
 - Library (the project's source library, not distributed): not fetched. Reason: no copy could be fetched: HTTP 404 text/html;charset=utf-8.
 - Read so far (by the project): nothing stated; formula taken from the Python port
@@ -3102,7 +3102,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Reference: Held, Isaac M. and Soden, Brian J. 2006. Robust responses of the hydrological cycle to global warming. Journal of Climate 19(21):5686-5699.
 - DOI or URL: (MOI, BIO) https://doi.org/10.1175/JCLI3990.1 ; open copy https://www.gfdl.noaa.gov/bibliography/related_files/ih0601.pdf (CLM) 10.1175/JCLI3990.1
 - Cited as: (MOI, BIO) "Held & Soden 2006 (about 2 percent per kelvin)" (CLM) "Held & Soden 2006" (journal not named in the code)
-- Ledger ids: CLM-079, MOI-064; notes: and the 0.07/K relatives MOI-042, MOI-063
+- Ledger ids: CLM-079, MOI-042, MOI-063, MOI-064; notes: and the 0.07/K relatives MOI-042, MOI-063
 - Access: open copy (GFDL host) [other sections: paywalled (Unpaywall closed)]
 - Library (the project's source library, not distributed): fetched (PDF, 14 pages, text layer, 41,683 characters). From: https://www.gfdl.noaa.gov/bibliography/related_files/ih0601.pdf. Text file: HeldSoden2006.txt.
 - Merged keys: Held2006
@@ -3114,7 +3114,7 @@ docs/deeptime-design-decisions.md (Ben's decisions and its log entries); docs/de
 - Reference: Thornthwaite, C. W. 1948. An approach toward a rational classification of climate. Geographical Review 38(1):55-94. (The end page 94 is from my recollection; OpenAlex lists only the first page.)
 - DOI or URL: https://doi.org/10.2307/210739
 - Cited as: "Thornthwaite 1948" (snapshot.rs thornthwaite doc)
-- Ledger ids: MOI-065, MOI-066; notes: and BIO-038 through the aridity index
+- Ledger ids: BIO-038, MOI-065, MOI-066; notes: and BIO-038 through the aridity index
 - Access: paywalled (closed per OpenAlex)
 - Library (the project's source library, not distributed): not fetched. Reason: no copy could be fetched: html not the work (title match 0.00, 190 chars).
 - Substitute: none found.
@@ -3274,7 +3274,7 @@ Vanilla's OverworldBiomeBuilder, Terralith, Tectonic (game and mod data), rustff
 - Reference: U.S. Geological Survey, Earthquake Hazards Program, crustal-structure maps page, "map of world geologic provinces" (legend: Shield; Platform; Phanerozoic orogen; Foreland or intracratonic basin; Large igneous province; Extended continental crust; Oceanic crust 0-20 Ma, 20-65 Ma, >65 Ma). Author named only as "USGS". It is the map reproduced as `World_geologic_provinces.jpg` (Wikipedia/Commons, uploaded 22 April 2005, the figure in the Wikipedia "Craton" article). The map is a companion to the USGS global seismic-refraction crustal database (the Mooney crust programme); I did not find a named compiler, a dated report, or an OFR number for the map itself. NOT USGS Open-File Report 97-470: that series (World Energy Project, e.g. OFR 97-470F, "Maps showing geology, oil and gas fields, and geologic provinces of the Asia Pacific Region", Steinshouer, Qiang, McCabe & Ryder, 1999, fetched at https://pubs.usgs.gov/publication/ofr97470F) maps petroleum geologic provinces by region and has a different scheme.
 - DOI or URL: original page https://earthquake.usgs.gov/data/crust/maps.php (now HTTP 404; Commons records it and an archive.org copy, snapshot 2020-06-03, `web.archive.org/web/20200603051545/https://earthquake.usgs.gov/data/crust/maps.php`, which the tool cannot fetch). Image: https://upload.wikimedia.org/wikipedia/commons/a/a9/World_geologic_provinces.jpg ; file page https://commons.wikimedia.org/wiki/File:World_geologic_provinces.jpg
 - Cited as: "USGS map 'Geologic provinces of the world'", "USGS: 20 Ma", "USGS: 65 Ma", "the USGS map's 150 km"
-- Ledger ids: PRV-001 to PRV-004, PRV-021; notes: context for PRV-010 to PRV-020, PRV-022, BAK-010
+- Ledger ids: BAK-010, PRV-001 to PRV-004, PRV-010, PRV-020 to PRV-022; notes: context for PRV-010 to PRV-020, PRV-022, BAK-010
 - Access: open copy (image, public domain) at the URLs above; the explanatory page is gone from usgs.gov and only on the Internet Archive
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://commons.wikimedia.org/wiki/File:World_geologic_provinces.jpg. File: USGS-geologic-provinces-map_no_author_no_year_key_USGSprov.txt.
 - Read so far (by the project): not stated ("by eye against the USGS map")
@@ -4591,7 +4591,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Watts, A. B. (1978). An analysis of isostasy in the world's oceans 1. Hawaiian-Emperor Seamount Chain. Journal of Geophysical Research 83(B12):5989-6004.
 - DOI or URL: 10.1029/JB083iB12p05989
 - Cited as: "Watts 1978"
-- Ledger ids: ISO-056; notes: and the comment of ISO-048
+- Ledger ids: ISO-048, ISO-056; notes: and the comment of ISO-048
 - Access: paywalled (abstract visible).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -4615,7 +4615,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Wessel, P. (1993). A reexamination of the flexural deformation beneath the Hawaiian Islands. Journal of Geophysical Research 98(B7):12177-12190.
 - DOI or URL: 10.1029/93JB00523
 - Cited as: docs/design/flexure.md section 11
-- Ledger ids: none (context for ISO-049); notes: context for ISO-049
+- Ledger ids: ISO-049; notes: context for ISO-049
 - Access: paywalled (abstract visible).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -4639,7 +4639,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Pérez-Gussinyé, M., Watts, A. B. (2005). The long-term strength of Europe and its implications for plate-forming processes. Nature 436:381-384.
 - DOI or URL: 10.1038/nature03854
 - Cited as: docs/design/flexure.md section 11
-- Ledger ids: none (context for ISO-050); notes: context for ISO-050
+- Ledger ids: ISO-050; notes: context for ISO-050
 - Access: paywalled (abstract on Europe PMC).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -4663,7 +4663,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Karner, G. D., Watts, A. B. (1983). Gravity anomalies and flexure of the lithosphere at mountain ranges. Journal of Geophysical Research 88(B12):10449-10477.
 - DOI or URL: 10.1029/JB088iB12p10449
 - Cited as: docs/design/flexure.md section 11
-- Ledger ids: none (context for ISO-050, ISO-055); notes: context for ISO-050, ISO-055
+- Ledger ids: ISO-050, ISO-055; notes: context for ISO-050, ISO-055
 - Access: paywalled (abstract visible).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
