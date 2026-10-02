@@ -4103,6 +4103,18 @@ on this machine.
 - **P2-14 Geothermal features** (Ben, 2026-10-01): hot springs and travertine terraces, fumaroles with
   native sulfur, cinnabar in epithermal settings, from the heat flow already modelled; a warm-ground
   signal for mic-climate. Ties to P2-10.
+
+  *As built (2026-10-01, on its own branch; STATUS.md has the measurements):* the heat sources are the
+  **active volcanoes** of `volcanoes/active.json`, the bake's only export of heat: the plate model's heat
+  flow, its ridges and its rifts are not exported (a rift `meta/province` is absorbed by its neighbours
+  below 50,000 km²), so nothing sits on them. Each volcano gets fields of hot-spring pools with sinter
+  (travertine over carbonate rock) terraces where the baked rain and temperature allow standing water,
+  and fumarole fields (magma-block vents ringed with native sulfur, altered ground) where it is dry,
+  frozen or near the summit; none in water, under ice or near a crater's lava. Vanilla blocks behind
+  `deeptime:geothermal/<role>` tags with `geothermal_fallback` tags, travertine through the rock class.
+  Four `underground` settings (`geothermal_density`, 0 = none). Cinnabar is a stain in the altered ground
+  of silicic volcanoes, not yet tied to P2-10's epithermal deposits (that family does not exist yet).
+  `DeepTimeClimate.geothermalWarmthC` is the warm-ground signal (API 3); mic-climate does not read it yet.
 - **P2-15 Rock-aware soils and biomes** (Ben, 2026-10-01): soil and biome nudges from parent rock plus
   climate, relief and age (calcareous grassland and karst pavement on limestone, serpentine barrens,
   laterite on old warm wet surfaces, loess). With P2-05 and P1-10.

@@ -485,6 +485,13 @@ enum Command {
         /// no range at all (the measure is then only reported).
         #[arg(long)]
         targets: Option<PathBuf>,
+        /// Sets one of the check's definitions, as name=value (repeatable): assembled_share,
+        /// dispersed_share (a supercontinent is assembled when the largest piece of continental
+        /// crust holds the first share of it, until it holds under the second), mega_plate_share,
+        /// min_plate_samples, fast_mm_yr, warmup_myr, start_up_myr, min_piece_share,
+        /// rift_window_myr. A "params" object in the targets file does the same.
+        #[arg(long = "param")]
+        params: Vec<String>,
     },
     /// Draw the continental margins of a checkpoint's plate model by tectonic setting (P1-27:
     /// passive, Andean, subducting, collision, other plate boundary) over the sea floor by age,
@@ -1029,10 +1036,12 @@ fn main() -> ExitCode {
             runs,
             json,
             targets,
+            params,
         }) => match plate_check::run(&plate_check::Options {
             runs: &runs,
             json: json.as_deref(),
             targets: targets.as_deref(),
+            params: &params,
         }) {
             Ok(code) => code,
             Err(e) => {

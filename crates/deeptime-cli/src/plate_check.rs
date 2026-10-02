@@ -26,6 +26,8 @@ pub struct Options<'a> {
     pub runs: &'a [PathBuf],
     pub json: Option<&'a Path>,
     pub targets: Option<&'a Path>,
+    /// `name=value` settings of the check's definitions (`check::Params`).
+    pub params: &'a [String],
 }
 
 /// The plates note's dynamics and margins out of its JSON.
@@ -107,6 +109,9 @@ pub fn run(o: &Options<'_>) -> CliResult<ExitCode> {
         let text = std::fs::read_to_string(file).map_err(|e| format!("{}: {e}", file.display()))?;
         targets.apply_json(&text)?;
     }
+    for p in o.params {
+        targets.params.set_text(p)?;
+    }
     let runs = o
         .runs
         .iter()
@@ -115,29 +120,40 @@ pub fn run(o: &Options<'_>) -> CliResult<ExitCode> {
     let rows = check::evaluate(&runs, &targets);
     let names: Vec<String> = runs.iter().map(|r| r.name.clone()).collect();
     println!(
-        "deeptime plate-check: {} run(s); the first has {} steps of {} Myr",
+        "deeptime plate-check: {} run(s); the first has {} steps of {} Myr, its record is {} KB of JSON",
         runs.len(),
         runs[0].dynamics.steps.len(),
-        runs[0].dynamics.dt_myr
+        runs[0].dynamics.dt_myr,
+        serde_json::to_string(&runs[0].dynamics).map_or(0, |s| s.len() / 1000)
     );
+    println!("definitions: {}", targets.params.describe());
     print!("{}", check::render(&rows));
     if let Some(out) = o.json {
-        let v = check::to_json(&rows, &names);
+        let v = check::to_json(&rows, &names, &targets.params);
         std::fs::write(
             out,
             serde_json::to_string_pretty(&v).expect("a table serialises"),
         )
         .map_err(|e| format!("{}: {e}", out.display()))?;
     }
+    let waiting = rows
+        .iter()
+        .filter(|r| r.status == check::Status::Pending)
+        .count();
     let ranged = rows
         .iter()
-        .filter(|r| r.lo.is_some() || r.hi.is_some())
+        .filter(|r| (r.lo.is_some() || r.hi.is_some()) && r.status != check::Status::Pending)
         .count();
     let bad = rows.iter().filter(|r| r.status.failed()).count();
     println!(
-        "deeptime plate-check: {} of {ranged} targets met{}",
+        "deeptime plate-check: {} of {ranged} targets met{}{}",
         ranged - bad,
-        if bad == 0 { "" } else { "; FAILED" }
+        if bad == 0 { "" } else { "; FAILED" },
+        if waiting == 0 {
+            String::new()
+        } else {
+            format!(" ({waiting} more wait for physics not built yet: no data)")
+        }
     );
     Ok(if bad == 0 {
         ExitCode::SUCCESS

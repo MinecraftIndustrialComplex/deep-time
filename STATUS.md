@@ -1,6 +1,6 @@
 # Deep Time — status
 
-Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · P1-10 TerraBlender regions follow provinces done on its branch (worktree-agent-a7e713f9fdd326fb4) · Next: deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · P1-27 plate margins (sutures, initiation clear of trenches, arc cordilleras) + coherent provinces done on its branch (worktree-agent-ad3b417fd428c1ac2) · Rivers & lakes on the workbench maps (view-only; satellite overlay + a `rivers` layer) done on its branch (worktree-agent-a3d4fadfe3e053b77) · P1-28 stone and deepslate for the common rocks done on its branch (worktree-agent-a72907749021691b5) · Updated: 2026-10-01 (session f981c0d3-5144-49ec-8686-2946d755872c)
+Phase: 1 (Phase 0 exit passed 2026-09-28) · Landed 2026-09-29: P1-05 climate, P1-06 young landscape + amplification, P1-07 rock/strata, P1-14 deposits on the recorded history, P1-17 partials (parallel SPL, calibration with real climate), P1-20 workbench stages 1–2 + dark UI, settings audit (world-shaping knobs as editor settings) · In flight: diffusion loop fusion · P1-22 rivers and lakes done on its branch (worktree-agent-ad204cf8d55ef26f5) · Coal capped to the sedimentary cover + rock-layer settings (σ 10 default) done on its branch (strata-coal-settings) · Continuous strata (format 0.2) done on its branch (worktree-agent-aacd864d2709d52dd) · P1-08 bake + format 0.1 landed (built-ins are real planets) · History spill to the SSD done on its branch (worktree-agent-a33c2dc374c0ccd2f) · P1-09 climate mapping done on its branch (worktree-agent-a116e3d557a130679) · P1-21 volcanoes done on its branch (worktree-agent-a348bd3bf6e50dd72) · Next: P1-10 TerraBlender regions, deposit formula (survivors) + MVT regional driver · Sub-agents: Sonnet 5.5 for well-specified work, Opus for hard work (Ben, 2026-09-29) · MIC GameTest heap stall fixed on its branch (worktree-agent-a11ef8b35a6ebb8ee; `-PwithMic` 5 of 5) · EF ice cap vs barren frozen ground (placement `glaciated` block, `weirdness`) done on its branch (worktree-agent-adda9513719f24370) · Satellite view (true colour, the default layer of the workbench, viewer and timelapse) done on its branch (worktree-agent-a7ca2a0e875263a86) · P1-27 plate margins (sutures, initiation clear of trenches, arc cordilleras) + coherent provinces done on its branch (worktree-agent-ad3b417fd428c1ac2) · Rivers & lakes on the workbench maps (view-only; satellite overlay + a `rivers` layer) done on its branch (worktree-agent-a3d4fadfe3e053b77) · P1-28 stone and deepslate for the common rocks done on its branch (worktree-agent-a72907749021691b5) · Updated: 2026-10-01 (session f981c0d3-5144-49ec-8686-2946d755872c)
 Plan revision: see `git log -1 --format=%h -- docs/deeptime-implementation-plan.md`
 MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues)
 
@@ -53,8 +53,10 @@ MIC pack tested against: 303fd89 (snapshot of HEAD, re-indexed; see known issues
 | P1-28 | Stone and deepslate for the common rocks (log 2026-10-01; first the hardness tiers, replaced the same day) | done | 2026-10-01 | | Branch worktree-agent-a72907749021691b5 (session f981c0d3-5144-49ec-8686-2946d755872c), not merged. `minecraft:stone` is the `vanilla_fallback` of shale and mudstone, `minecraft:deepslate` of slate, phyllite, schist and gneiss (`CRUST_STAND_INS` in `tools/dev/gen_rock_classes.py`); no recipe, item tag or drop touched. Stone or deepslate share of the placed rock, top 64 blocks / whole column: 0.0 % → 47.8 % / 55.3 % (12 generated boxes, standalone), census of the whole planet 0.1 % → 56.2 % / 0.0 % → 56.0 %. Gates: cargo fmt/clippy/test/deny clean, gradlew build test 161/0, `./gametest.sh` and `-PwithMic` All 58 passed. MIC rows are in the build log; see the entry. |
 | P2-08 | Meteor impacts (log 2026-09-29; started on a branch, log 2026-10-01) | done | 2026-10-01 | | Branch worktree-agent-a24e90e955a5a64d3 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), master 38ca6b0 merged in, not merged to master, not pushed. Coupled `impacts` stage, craters in the amplifier, `impact_breccia` and `impact_melt` (62 classes), four impact deposit types, events, workbench layers, eleven settings. Quick 16k, 500 Myr: 1,302 impactors, 567 craters formed (448/81/28/5/4/1 by size), 735 stopped by the sea, 439 eroded, 57 subducted, 71 in the catalogue, 19 showing (17 on continental crust). Build log 2026-10-01, "Meteor impacts". |
 | P3-04 | Distant Horizons far terrain (asked for ahead of Phase 3, Ben 2026-10-01) | done | 2026-10-01 | — | Branch worktree-agent-a6e8592da3ce000d8, not merged. DH LODs from the world data through a world-generator override bound by name (DH 3.3.0's merged `_neoforge` API and 3.3.1+'s published one). VM: JUnit 180/0 (`FarColumnTest` 14, `DhApiBindingTest` 4 on the real 3.3.0 and 3.3.3 jars); `FarTerrainGameTests` 3 of 3 (ground within a block 117 of 119, water and biome 119 of 119); smoke `dh` (`run.py --dh`): registered, DH's server-side pregen fed 257 sections with no failure, what DH stores has far terrain's surface in 400 of 400 columns, far terrain 9.6–11.1 ms a section; smoke `dh-next` (DH 3.3.3): Toroidal World refuses the override (pending question). Looks unverified (no client). See build log |
+| P2-14 | Geothermal features (log 2026-10-01; started ahead of Phase 2 on its own branch, Ben approved) | done | 2026-10-01 | | Branch worktree-agent-abbb227c962473b98 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), master e8668ca merged in, not merged to master. Hot springs and sinter/travertine terraces where groundwater is available, fumaroles with native sulfur and altered ground where it is dry, around the active volcanoes of `volcanoes/active.json` (the only heat the bake exports). 16k quick planet: 260 sites, 23 pools, 142 vents, 95 patches around 40 of 67 volcanoes; JUnit `GeothermalTest` 14; `./gametest.sh` and `-PwithMic` 66 of 66; block census on the real generator: 0 leaks, 0 water on lava, standalone = MIC site for site. Build-log entry "P2-14 Geothermal features". Four `underground` settings, density 0 = none; `DeepTimeClimate.geothermalWarmthC` (API 3). |
 
 | P2-01 | Fold-and-fault engine (Noddy evaluator; pulled forward, log 2026-10-01) | doing | 2026-10-01 | | Branch worktree-agent-a49703993341aa701 (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), **not merged: waits for the coordinator's merge and GameTest batch**. Stage A (the port, bit-exact against the original C) and **stage B** are built: format 0.3 with `structure/events.dtst`, the deformed column rule in Rust and Java (`ColumnParityTest` over deformed columns, 173 JUnit tests, 0 failures), unconformities by age key, stocks, dykes and plugs as intrusion events, traps from the world's own structures, fault scarps and rift valleys in the amplifier, grouped `fold_belt` / `fault_system` events, `deeptime structure-sections` and the structure census of `strata-check`. `earthlike_quick_16k`, 500 Myr: 12,657 events (1,081 fold trains, 3,848 thrusts, 1,256 normal and 261 strike-slip faults, 2,760 stocks, 2,647 dykes, 804 plugs); they change 52 % of land columns, none of 20,000 malformed; the column rule costs 0.60 ms a chunk through them against 0.44 without (Java, one thread); land share 0.2770 with the relief and without, land median 661.1 m against 661.0. cargo fmt, clippy -D warnings, test --workspace, deny and `gradlew build test` clean after merging master ea40d3b (200 JUnit tests, GameTests 65 of 65 default and MIC). GameTests on the branch (allowed for this task): `./gametest.sh` and `./gametest.sh -PwithMic` (168 MIC mods): all 60 required tests passed in each. See the build log. |
+| SCI-1 | Science documentation, stage 1: the claims ledger, bibliography, feature pages (log 2026-10-02) | done | 2026-10-02 | | Branch worktree-agent-a33b33f9ecaf3af1a (sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c), not merged, not pushed. Docs only: `docs/science/` (README, claims.md with 2,069 ledger rows in `ledger/`, bibliography with 475 entries, 403 spot checks, two full pages, 17 stubs), `docs/research/README.md`, seven session notes, the standing rule in CLAUDE.md. No row is `verified`. One coded constant found wrong against its own citation (IMP-042, complex crater depth). Stage 2 work packages are at the end of `docs/science/claims.md`. |
 ## Review pages
 | Name | URL | Version label | Date |
 |---|---|---|---|
@@ -83,6 +85,8 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-01 | P2-14 | **Where geothermal features come from beyond the volcanoes.** Today only the active volcanoes (the bake's one export of heat); on the 16k quick planet that is 260 sites around 40 of 67 volcanoes, 23 of them hot-spring pools (median 1,422 blocks from a land point to the nearest pool, 837 to any site, 766 to a volcano). Options: **(1, recommended)** export a heat-flow layer (the plate model already computes `heat_flow_mw_m2` per sample: 55 + 35 e^(-t/60) on continents, +40 arc, +40 hotspot, +30 divergent) as an L1 `meta` layer and put fields on continental crust above a threshold (rifts, arcs, young orogens), same site machinery; **(2)** export ridge and rift segments; **(3)** volcanoes only. Rift provinces are in `meta/province` but absorbed at 50,000 km², so none exist on a typical planet. | Not asked yet: for the coordinator to put to Ben |
+| 2026-10-01 | P2-14 | **Default density and the warm-ground signal.** (a) Keep `geothermal_density` 1.0 (recommended; the default is a few fields per volcano, at 2.0 the sites roughly double, not measured) or raise it? (b) `DeepTimeClimate.geothermalWarmthC` (API 3, up to 12 K at a vent) exists but mic-climate does not read it: wire it as a warm refuge only, after the mic-climate connector (recommended), as a heat source for machines too, or leave it unread? (c) Native sulfur and cinnabar are vanilla stand-ins (yellow concrete, red terracotta); MIC has no such blocks, so the pack needs nothing now (recommended), or add blocks to `deeptime:geothermal/sulfur` / `cinnabar` in the pack later. | Not asked yet (sub-agent report) |
 | 2026-10-01 | deposit audit | **How rich should deposits be, against scatter and vanilla?** Three options with settings and numbers per family (A deposits clearly beat scatter, recommended; B deposits are the only real source; C realistic grades with strong multipliers), in the sub-agent's report and the build log entry "Deposit audit". Also: **a gold-bearing gravel block of Deep Time's own** for packs without Excavated Variants (it would be the mod's first block), or keep `minecraft:gold_ore` in the gravel bed there? No default changes until answered. | to be asked by the coordinator (the sub-agent has no AskUserQuestion) |
 | 2026-10-01 | P1-23 | **Four grid artifacts that need a design change** (build log 2026-10-01, "P1-23 grid-artifact audit"; docs/research/notes/grid-artifact-audit.md, "What is left"). **(1) Lake sediment** builds straight dams across lake plains: fill each lake level, deepest first (recommended, 2–3 days), a delta from each inlet, or hide it in the amplifier? **(2) Rivers and valleys run along eight directions**: route by a direction not bound to eight in the amplifier and the river network (recommended, about 3 days, changes every valley), meander the river lines only (a day), or leave for Phase 2? **(3) Biome borders step with the L1 cells**: decide the Köppen class on L2 inside P1-26 (recommended), jitter the lookup now (half a day), or leave? **(4) The detail noise's octaves share one lattice** (5 % of the block-scale relief): offset each octave when the format next changes (recommended), gradient noise, or leave? | Not asked yet: for the coordinator to put to Ben |
 | 2026-09-28 | P1-16 | **COE vein size:** finite, tonnage-sized veins (`defaultInfinite = false` on MIC's deep-time pack branch) or keep COE's infinite default? Ben (log 2026-09-28): decide later, after P1-08, with numbers from the real presets. | AskUserQuestion, answered "Decide later" |
@@ -93,13 +97,14 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P3-04 | **Trees in far terrain.** Far terrain has none, so a forest reads as grass until real chunks replace the LODs. (a) Leave it until a client can show how it looks (recommended); (b) add a canopy layer by biome (leaf block, cover share and height in the surface table). | Not asked yet (sub-agent report) |
 | 2026-10-02 | force-balance plate motion (design) | Design: docs/design/plate-force-balance.md (build log 2026-10-02, "Force-balance plate motion: design"); the four questions of the collisions design were answered on 2026-10-02 (decisions log). **(1) What moves a plate nothing pulls, and a planet that starts with no slabs?** (a, recommended) ridge push, suction and neighbours plus a weak mantle flow (5 mm/yr, a setting, a stand-in) and slabs planted by subduction initiation; (b) no mantle flow: such plates stand still; (c) keep a base speed. **(2) The speed guard:** (a, recommended) keep `max_plate_speed_mm_yr` at 250 as a reported guard that must never bind; (b) remove it. **(3) How the work lands:** (a, recommended) two stages: collisions and belts on the present speed law first (a usable state and the fallback), then the switch to the balance; (b) one stage, no fallback, two days saved. **(4) Flexure:** (a, recommended) the line-load profile in front of collision wedges only; (b) a general flexure solve in the surface stage now (5–10 % of run time, 3–4 more days). **(5) Calibration:** (a, recommended) the built-in planets change twice, with a light calibration at the first; (b) full calibration at both points (3 more days); (c) hold everything on a branch until calibrated. Nothing is built beyond task 1 (`plate-check`) until answered. | Not asked yet: for the coordinator to put to Ben |
 | 2026-10-01 | P3-04 | **The switch.** Far terrain is on whenever Distant Horizons is installed; off with `-Ddeeptime.dh=false`. Make it a setting (server config or the editor), and on or off by default? Recommended: on by default, a server config key when the config file next changes. | Not asked yet (sub-agent report) |
-| 2026-10-01 | P1-10 | **The orogen share (Ben: "revisit the orogen share in P1-10").** On `earthlike_quick_16k` (500 Myr, scattered start, seed 1, this tree) the USGS rules class 0.42 of the continents as orogen (Earth ~0.17: orogens 12 % + arcs 5 %). 0.125 of it is the plate model's own active collision and arc regime (its 800-km back-arc halo), which no province threshold moves; the rest is collision belts touched in the last 500 Myr (0.166) and Andean ranges (0.134). Options: (a) keep the thresholds (500 / 50 Myr, 1,500 m) and treat the share as the plate model's, to fix with collision frequency and the regime halo in a P1-27 follow-up (recommended: the provinces then show what the model produced, and nothing changes for existing presets); (b) set `provinces.orogen_max_age_myr` 200, `andean_max_age_myr` 25, `andean_min_elevation_m` 2,500 in the built-in presets (share 0.33, a quarter fewer orogen provinces, no plate-model change); (c) 50 Myr / 10 Myr (0.24). Table: `tools/review/p1-10-orogen.sh`, build log P1-10. | Not asked yet (sub-agent report) |
-| 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 | 2026-10-01 | P2-08 impacts | **How often should meteors strike by default?** (build log 2026-10-01, "Meteor impacts"). At Earth's rate on the planet's own area (`impacts.flux` 1), the quick 16k planet forms 567 craters in 500 Myr and shows 19 at the present, 7 of them dry bowls on land, on 8,192 × 16,384 blocks: a player may never meet one. (a) Keep Earth's rate, which is what the decision asked for (recommended; the editor's Terrain section has the slider, "Heavy" is 10); (b) default to about 5 so every continent has a few craters. | Not asked yet (sub-agent report) |
 | 2026-10-01 | P2-08 impacts | **How deep should craters be drawn?** Blocks are 15 times taller than wide, so a real 2-km bowl is 7 blocks across and 21 deep. `impacts.depth_scale` defaults to 0.5 (11 blocks), following "Setting, gentler default" for volcano flanks (log 2026-09-30). (a) Keep 0.5 (recommended); (b) physical depth (1); (c) gentler still (0.35). | Not asked yet |
 | 2026-10-01 | P2-08 impacts | **May a run make a giant crater?** `impacts.max_crater_km` is 300 (the largest known on Earth, Vredefort): a crater of 200–300 km, 700–1,000 blocks across, has about a 1 in 6 chance in a 500-Myr run at 16k; anything larger would melt and resurface much of so small a planet and is not simulated. (a) Keep 300 (recommended); (b) cap lower on the 16k presets (for example 150 km); (c) no cap, with the planet-wide effects modelled as a later task. | Not asked yet |
 | 2026-10-01 | P2-08 impacts | **Two new rock classes and their stand-ins.** `impact_breccia` (stand-in cobblestone) and `impact_melt` (stand-in smooth basalt) are the 61st and 62nd classes; the MIC rock tags need their rows (listed in the build log). (a) Keep both with these stand-ins (recommended); (b) other blocks from the pack; (c) fold melt rock into an existing class and keep only the breccia. | Not asked yet |
 | 2026-10-01 | P2-08 impacts | **Impact deposits do not claim their materials.** Diamonds, nickel, platinum and uranium are products of the impact deposit types, and a claimed material loses its scattered ore in a Deep Time world; impact deposits are far too rare to be the only source, so the four types carry `minecraft.claims_scatter: false` and vanilla diamonds and the pack's nickel, platinum and uranium ores keep generating. (a) Keep it so (recommended); (b) claim them and add background scatter for each. Their tonnages, grades and densities are design values (no USGS model exists) and belong to the deposit audit's richness question. | Not asked yet |
+| 2026-10-02 | general flexure | Build log 2026-10-02, "General lithospheric flexure"; design `docs/design/flexure.md`. **(1) Which kilometres does the plate bend in?** (a, recommended, built) Earth-normalized, as the plate model's: a basin is as wide against its belt as on Earth; (b) real map metres: right for features the surface draws at real size (volcano cones), eight times too wide for everything the plate model builds. **(2) The cost.** The flexure step is 15–18 % of a run, the run grows by 7–10 %. (a, recommended) accept it now and spend a day or two later on single-precision transforms or a multigrid preconditioner; (b) cap the solve at 12 iterations (a third cheaper; most solves then finish over the following steps); (c) solve every second step (half; loads wait a step). **(3) On by default?** (a, recommended, built) on in the four built-in presets, hypsometry recalibrated in the calibration task after the plate work (it moved: median +60–200 m, sea 360–690 m deeper, shelves half as wide, less land above 3 km); (b) off until then. The GameTest planet has it off: turn it on with the calibration? **(4) Ice load:** (a, recommended, built) the ice standing at the step's end; (b) the time-mean over the step (`ice_time_share` × thickness). **(5) Volcano cones** now sink into the plate like any load; a cone keeps its own height and its summit is lower by the sinking. Keep (recommended), or leave cones out of the load? | Not asked yet (sub-agent report) |
+| 2026-10-01 | P1-10 | **The orogen share (Ben: "revisit the orogen share in P1-10").** On `earthlike_quick_16k` (500 Myr, scattered start, seed 1, this tree) the USGS rules class 0.42 of the continents as orogen (Earth ~0.17: orogens 12 % + arcs 5 %). 0.125 of it is the plate model's own active collision and arc regime (its 800-km back-arc halo), which no province threshold moves; the rest is collision belts touched in the last 500 Myr (0.166) and Andean ranges (0.134). Options: (a) keep the thresholds (500 / 50 Myr, 1,500 m) and treat the share as the plate model's, to fix with collision frequency and the regime halo in a P1-27 follow-up (recommended: the provinces then show what the model produced, and nothing changes for existing presets); (b) set `provinces.orogen_max_age_myr` 200, `andean_max_age_myr` 25, `andean_min_elevation_m` 2,500 in the built-in presets (share 0.33, a quarter fewer orogen provinces, no plate-model change); (c) 50 Myr / 10 Myr (0.24). Table: `tools/review/p1-10-orogen.sh`, build log P1-10. | Not asked yet (sub-agent report) |
+| 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
 ### 2026-10-01 — P1-10 TerraBlender regions follow provinces (agent worktree agent-a7e713f9fdd326fb4, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
@@ -130,6 +135,185 @@ Branch `worktree-agent-a7e713f9fdd326fb4`, master e8668ca merged in (then 5e601d
   - *Not done:* `docs/science` (the science-documentation rule is in master's CLAUDE.md after this merge's base, 2e53ad2 has no `docs/science/`); the province thresholds (orogen 500/50 Myr, 1,500 m, 50,000 km²) are ledger rows to add when it lands.
 - **Next.** Ben's answers on the orogen thresholds and region size (Pending); P1-11's review page could show province names; the plate model's collision frequency and back-arc halo are the real orogen-share lever (P1-27 follow-up).
 
+### 2026-10-02 — General lithospheric flexure in the surface stage (agent worktree agent-afae960b6db068f94, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Why.** Ben, decisions log 2026-10-02: "General flexure everywhere": every load bends the crust (belts, volcanic
+  islands, ice, sediment), not only collision forelands. Design and measurements: `docs/design/flexure.md` (written
+  and committed before the code; its section 12 is what was measured). Science page `docs/science/flexure.md`,
+  ledger ISO-040 to ISO-067, 13 bibliography entries.
+- **The model** (`surface/flexure.rs`, step 5c of the surface stage, after the plateau spreading). A thin elastic
+  plate over a fluid mantle, L(D L w) + C w = load, on the L1 raster in block metric. The stage keeps the load since
+  the start of the run and the plate's sinking with the crust (`SurfaceState::flexure`, carried by the same
+  same-crust rule as the elevation, `advect::carried_fields`). Loads each step: crust the plate model thickened
+  (positive uplift on continental crust, or on oceanic crust in an arc or hotspot regime, turned back into the
+  thickening behind its Airy elevation), crust moved by spreading, erosion and deposition, rock later stages laid on
+  the surface (the volcano stage's cones), the sea over the cell, and land ice (`climate/ice_thickness_m`). The
+  elevation changes by the solved sinking less the Airy root already in it, so nothing is compensated twice; with no
+  stiffness the result is the old local isostasy without its blur.
+- **Stiffness.** Oceanic Te = 2.7 km × √age (Calmant et al. 1990, full text read), at most 40 km; continental Te =
+  80 km × (1 − e^(−t/300 Myr)) with t the time since the last orogeny; arcs, rifts and everything else at least 5 km;
+  smoothed over 80 plate km. Rigidity gained as crust cools joins stress-free (a frozen bending moment per cell), so
+  an old belt's local root does not become relief. **A plate boundary is a break** (found by the first runs: the
+  subducting plate held arcs 10 km above their floating level across the trench).
+- **Lengths are Earth-normalized** (the solve's cell is the L1 cell's share of the model sphere: 39 km on the quick
+  presets), so a basin is as wide against its belt as on Earth. Gravity enters through the flexural parameter
+  (`α ∝ g^−¼`). Question 1 below.
+- **Solver.** Conjugate gradients; preconditioner: exact spectral solves (Fourier in x, cosine in y, `rustfft`) at
+  three uniform stiffnesses, blended, between two damped Jacobi sweeps. Finer L1 rasters (the full presets) solve on
+  L1 coarsened to about 39 km and interpolate. Options tried on prototypes (diagonal preconditioner, one spectral
+  solve, the blend alone, more levels) are in the design note's section 5 with their iteration counts.
+- **Settings.** `surface.flexure.{strength, elastic_thickness_scale}` in the four pipeline presets and built-ins
+  (1.0, 1.0; the struct's default strength is 0, so plate-only presets and the GameTest planet are unchanged);
+  editor fields `flexure` ("Plate bending", 0–1) and `plate_stiffness` ("Plate stiffness", 0.25–3) with lang keys;
+  preset-only: the Te law's five numbers, `every_steps`, `tolerance_m` (2), `max_iterations` (60). New L1 fields each
+  step: `surface/flexure_m` (how far the ground stands from local isostasy), `surface/deflection_m`,
+  `surface/elastic_thickness_km`. `surface_final` prints `flexure_solves`, `flexure_iterations_per_solve`,
+  `flexure_unconverged`; the surface timings have `flexure`.
+- **Tests** (`surface::flexure::tests`, 10, and `surface::tests::flexure_off_changes_nothing_and_on_bends_the_plate`):
+  a point load sinks by P l²/8D within 3 % and the load is compensated to 1e-9; a line load gives T&S's depth within
+  1 %, its zero at 3πα/4 within 2 % and its bulge at πα with e^(−π) of the depth; the width goes as Te^¾ and as
+  g^(−¼); a thousandfold patchy stiffness converges and compensates to 1e-3, under water too; the editor's extremes
+  and beyond (Te 0.1 to 500 km) converge and compensate; no stiffness is local isostasy (erosion rebounds 0.8, 0.56
+  under water, uplift untouched, 3 km of ice sinks 834 m and rebounds); a belt on a craton stands above its Airy
+  height with a basin and a bulge, and rebounds when eroded; a plate that stiffens does not move; a plate boundary
+  is a break; a coarsened solve agrees with the direct one; strength 0 is the same planet as a preset without the
+  section, with no state and no fields.
+- **Measured** (test VM, `earthlike_quick_16k`, 500 Myr, `deeptime stage volcanoes`, 2 threads;
+  `BIN=… R=… J=4 T=2 tools/review/p1-17-hyps.sh 500 "1 2" "scattered_continents supercontinent"
+  on:surface.flexure.strength=1 off:surface.flexure.strength=0`; mean [min, max] of 4):
+
+  | | land | median, m | p90, m | above 2 km | above 3 km | sea median, m | shelf share of sea | highest cell, km |
+  |---|---|---|---|---|---|---|---|---|
+  | Earth | 0.289 | 427 | 2,022 | 0.102 | | 4,062 | | |
+  | without | 0.299 [0.271, 0.340] | 578 [409, 724] | 1,927 [1,637, 2,377] | 0.097 [0.068, 0.142] | 0.035 | 3,408 [3,217, 3,925] | 0.115 | 6.8 (all four) |
+  | with | 0.287 [0.252, 0.315] | 676 [569, 753] | 2,219 [1,925, 2,392] | 0.130 [0.092, 0.149] | 0.030 | 3,843 [3,654, 4,175] | 0.061 | 5.3–6.8 |
+
+  Two earlier ensembles of the day (before the merge with master 1aa0579, oceanic law 3.0) gave, with flexure, land
+  0.266 and 0.297, median 774 and 638 m, sea 4,096 and 3,798 m, against 0.274, 578 m and 3,437 m without. So the land
+  share stays inside the noise (±0.02, ±100 m for 4 runs), the median rises 60–200 m, the sea is 360–690 m deeper,
+  shelves are about half as wide, the highest 1 % of land cells is at 3.1–3.8 km instead of 4.0–5.3 km, and the
+  plateau spreading moves 5–10 thousand km³ a run instead of 160–400 thousand. 1,000 Myr supercontinent seed 1 (one
+  pair, law 3.0): land 0.225 → 0.305, median 502 → 774 m, sea 2,998 → 3,751 m. **Not recalibrated**, as instructed.
+- **Run time** (same seed with and without, side by side, 2 threads): scattered 1: 547 → 584 s (+6.7 %);
+  supercontinent 1: 534 → 579 s (+8.4 %); 1,000 Myr supercontinent 1: 1,177 → 1,295 s (+10.0 %). The flexure step
+  itself is 85–107 s a 500 Myr run (15–18 % of the run without it), 20–24 iterations a solve, 0–2 solves of 250 at
+  the limit; the run grows by less because the old isostasy (6 s) and most of the spreading solve (30 → 4 s) go.
+  **So the gross cost is above the 5–10 % promised; the net is inside it on 500 Myr and at its edge on 1,000 Myr.**
+  One run each: tolerance 5 m saves one iteration; at most 12 iterations cuts the step by a third (177 of 250
+  solves then finish in later steps); every second step halves it. Question 2 below.
+- **Pictures** (`review/out/flexure/{scattered-1-on, supercontinent-1-on, supercontinent-1-off}/{planet,moat,belt}.png`,
+  `numbers.json`; `tools/review/flexure-views.sh <checkpoint> <name> "<label>"`): the ground is more than 100 m off
+  local isostasy on 14 % of the planet and more than 500 m on 1.6 % (extremes −3.3 and +2.4 km), nearly all of it
+  as paired bands a few cells wide along active margins and arcs, and round volcanic loads on old ocean floor (an
+  island held up by 600 m with a ring up to 480 m low). Belt interiors are at local isostasy. In front of the
+  largest collision belt there are bands of about 100 m: **no foredeep of the acceptance table's 2–7 km**, as
+  expected from today's one-step, 2,000 km wide uplift. Along margins the result alternates from cell to cell; the
+  land's cell-to-cell roughness is higher (median 8.7 → 10.2 m, 99th percentile 294 → 391 m, one pair). Stripes
+  near the poles, outside the pole cap. The supercontinent pictures are from the build before the regime change
+  below and carry an older legend wording.
+- **For the belt work** (task 3 of the force-balance design): raise the ground (the wedge on the incoming plate, the
+  stack on the overriding one) as uplift; the basin and bulge follow from the incoming plate's Te. Until the two
+  plates weld their boundary is a break, so the wedge must sit on the incoming plate's own cells. The foreland for
+  the structure stage is `surface/flexure_m` below about −100 m; `foreland_elastic_km` is not needed.
+- **For the ice branch:** `flexure::StepIn::ice_m` takes any thickness field; the surface stage passes
+  `climate/ice_thickness_m` (the ice at the step's end) when it exists. `climate/ice_balance_m_yr` is not needed.
+  Ice is not kept in the carried load, so the ground comes back at the first solve after it melts.
+- **Found on the way, outside this task.** (1) `structure/deform/lattice.rs` `noddy_check` panicked the whole run
+  when a sampled column lay under more than 126 structures (the reference engine's limit): hit on a 500 Myr quick
+  planet; such a column is now left out of the comparison (five lines; the only change outside the surface stage).
+  (2) **`plates/flags` is all zero on every step where the plate model resamples its crust** (`ridges.rs` sets
+  `flags = 0`, and the resampling runs after `finish_samples` and before the L1 sampling): about a fifth of the
+  steps and always the last one. The deposit engine's arc flux and the volcano stage read that field. Not touched
+  (plate code); flexure reads `regime` instead.
+- **Gates** (VM, the branch merged with master 1aa0579): `cargo fmt --all -- --check`, `cargo clippy --workspace
+  --all-targets -- -D warnings`, `cargo deny check licenses bans` clean; `cargo test --workspace --no-fail-fast` all
+  pass (673: core 473 + 3 ignored, cli 54); `./gradlew build test` tests=203 failures=0 skipped=1.
+  `tools/dev/knob_extremes.py --only flexure,plate_stiffness --length-myr 100 --stage volcanoes`: four runs ok. No
+  GameTests (coordinator).
+- **Not verified.** That strength 0 is bit-identical to the build before this work (same code path, and a test
+  holds it equal to a preset without the section; the old binary was not run). The full presets on a planet (the
+  coarsened solve is unit-tested only). Other gravities and strength between 0 and 1 on a planet. Which load causes
+  which hypsometry change. The merged tree's with/without run time (the pairs above are from before the merge).
+- **Housekeeping.** Scratch folder `/Volumes/Graphide/ban/deeptime-runs/flexure/` deleted. The memory estimate of
+  the surface stage grows by 120 B per L1 cell with flexure on.
+- **Next.** Ben's answers; the hypsometry in the calibration task after the plate work; the belt work's wedge, then
+  the foredeep measured against 150–450 km and 2–7 km; if the cost matters, single-precision transforms or a
+  multigrid preconditioner.
+
+### 2026-10-02 — Science documentation, stage 1: every claim in the code ledgered, sources resolved, two pages written (agent worktree agent-a33b33f9ecaf3af1a, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; docs only)
+- **Ask.** Ben, decisions log 2026-10-02: the mod "as backed by science as possible", Markdown in the repo, "Check everything,
+  fix the code". Stage 1 changes no simulation or game code, presets or tests: it makes the unchecked visible. Stage 2
+  verifies each row and fixes the code. Branch `worktree-agent-a33b33f9ecaf3af1a`, master 60fc341 merged in, not merged,
+  not pushed.
+- **What is new** (all under `docs/`, plus CLAUDE.md and this file):
+  - `docs/science/README.md`: what the mod simulates, the pipeline, the page list, the status marks, the standing limits.
+  - `docs/science/claims.md`: the ledger's front (counts, column and status definitions, known gaps, the verification
+    plan). The rows are in `docs/science/ledger/<PREFIX>.md`, 24 files, because one file would be about 940 KB.
+  - `docs/science/bibliography.md` (sources the code relies on, full references, access, how read),
+    `bibliography-research-notes.md` (the further sources the report, notes and designs cite, as they write them) and
+    `spot-checks.md` (values the bibliography pass tried to read in their sources, with the passage quoted).
+  - `docs/science/_template.md`, two full pages (`impacts.md`, `volcanoes-and-magma.md`) and 17 stub pages.
+  - `docs/science/extraction-notes/`: per subsystem, the measured Earth-against-mod numbers found in this build log, the
+    stated simplifications, and flags; and `preset-coverage.md` (all 342 leaves of `earthlike_quick_16k` with their owner).
+  - `docs/research/README.md` (index of every note and design with its date) and seven `docs/research/notes/session-*.md`
+    notes recovered from the coordinator's conversation (Rust against Java, GPU against CPU, lava realism, the mountain
+    height limit, polar climate bands, supercontinent heating, the Distant Horizons version).
+  - CLAUDE.md: the rule "Science documentation is part of done", and `docs/science/` in the authority list.
+- **Counts.** 2,069 ledger rows: `game-choice` 723, `uncited` 635, `cited-unverified` 522, `calibrated` 76,
+  `abstract-only` 60, `from-memory` 53, `verified` 0; 377 of them `pending-rewrite` (today's plate motion and banded
+  climate) and 57 `not-yet-coded` (constants of the two approved designs). By ledger: PLT 212, CLM 146, MOI 76, BIO 99,
+  ERO 167, ISO 39, HYP 34, HYD 76, YNG 21, AMP 71, GLA 66, VOL 73, MAG 42, IMP 141, RCK 84, STR 48, DEF 74, DEP 204,
+  ORE 257, PRV 27, SCL 51, BAK 40, POL 21, GEO 0 (geothermal features are not on master). Bibliography: 475 entries
+  (a work cited in two subsystems counted twice; 94 known duplicate keys): 206 paywalled, 108 open access, 70 open
+  copy, 40 books, 15 not found, 7 unidentified; read in this pass: 74 in full text, 119 abstract, 29 secondary or
+  snippet, 228 not fetched. Spot checks: 403 (176 match, 134 partial, 19 mismatch, 74 could not read).
+- **How it was made.** Fourteen Sonnet sub-agents, one per subsystem, read the code, the presets, the data files and this
+  build log and wrote ledger rows, source lists and flags; ten more resolved the references by web lookup and tried to
+  read the most important values in their sources; one recovered the session notes from the transcript. The lead (Opus)
+  assembled, normalised the statuses, removed machine names and paths, read the impacts and volcano material in full and
+  wrote the pages, the README, the ledger front and the plan. No cargo, Gradle or test run: nothing executable changed.
+- **Found (nothing fixed; all in `docs/science/claims.md`, "Found in stage 1: fix first").** (1) IMP-042: complex crater
+  depth is coded 0.294 D^0.301 km citing Collins et al. 2005 eq. 28, which reads 0.4 D^0.3 km (read in the paper's text by
+  the lead): craters over 3.2 km are about 27 % too shallow, as the impacts agent suspected. (2) The deposit time windows
+  are not applied on real histories (the BIF, oxygen and land-plant clocks are hard-coded), so no BIF ever forms. (3) The
+  richness setting does not reach the blocks. (4) Köppen tests the polar group before the dry group, against Peel et al.
+  2007. (5) Holdridge biotemperature lacks its 30 degC upper limit. (6) Soil-production depth scale 5 m against about
+  0.25 to 0.5 m in secondary sources. (7) `k_spl` 2e-9 in the Rust default, 3e-9 in the presets. (8) An editor hint for the
+  impact rate is wrong by a factor of a million. (9) The one paper the volcano code cites says, in its abstract, that arc
+  volcano spacing has no characteristic value. (10) The "3 to 4 times faster" plate-speed ratio is attributed to Forsyth
+  & Uyeda 1975 and found in Conrad & Lithgow-Bertelloni 2004. Twenty-six such items are listed. Confirmed correct, from
+  the sources: every Table 3 constant of Cortial et al. 2019; the USGS grade and tonnage tables of the metal deposit
+  families; every Köppen threshold of Peel et al. 2007; the Landlab carbonate and marine constants; the other Collins et al.
+  2005 crater laws.
+- **Against the task or the rules.** The ledger is split into `ledger/*.md` files with `claims.md` as its front, not one
+  file. `spot-checks.md`, `extraction-notes/` and `bibliography-research-notes.md` were not asked for. No row is marked
+  `verified`: the spot checks were made by sub-agents, and only IMP-042 was re-read by the lead. The CLAUDE.md step
+  "set your task to doing and push" was not done (the task forbids pushing).
+- **Not covered.** Test modules; `plates/dynamics.rs`, `geometry.rs`, `noise.rs`, `state.rs`; `structure/deform/lattice.rs`;
+  solver internals; the Java twins of Rust code; the editor hint texts as a whole; presets other than
+  `earthlike_quick_16k` beyond a diff; the test presets. Duplicate rows between ledgers (ocean age-depth in PLT and ISO,
+  rock erodibility in ERO and RCK, coal and petroleum in DEP and ORE, the equilibrium-line rule in CLM, GLA and HYD) are
+  not merged. Bibliography keys are not de-duplicated across sections. The 676 source mentions of the research notes are
+  listed as written, not resolved. The stub pages hold a paragraph, ids and known problems, no model text.
+- **For the coordinator.** The older documents hold private details that should go before the repository is public
+  (machine and host names, home-directory paths, a full name, account handles, prices): the research-index sub-agent
+  listed them by file and line; the list is in this agent's report, not in the repo. The new files were scanned for them.
+- **Next step.** Ben reads `docs/science/README.md`, `impacts.md` and the fix list. Then stage 2 by work package
+  (`claims.md`, "Work packages"): WP-0 first (a way to read PDF text on the test machine: stage 1 lost most of its
+  time to PDFs the fetch tool cannot read and a web-search budget that ran out), WP-13a and WP-14a before the force
+  balance and the per-cell climate are built, the rest in parallel.
+
+### 2026-10-01 — P2-14 Geothermal features (header restored in the P1-10 merge; the original entry's header and first bullets were overwritten by a copy of the P1-10 entry when STATUS.md was merged on master, so only the tail survives below)
+- **Gates** (VM, master fa09e8b merged in; after the second merge of master the cargo and Gradle gates again: cargo test 622 passed, 0 failed, 3 ignored, JUnit tests=214 failures=0; merged again with master 2e53ad2 (P2-08 impacts, the craters are in `elevation`, so the terrain height the sites read already holds them; no new Java pass): fmt, clippy, deny ok, cargo test 642 passed, 0 failed, 3 ignored, JUnit tests=217 failures=0, `./gametest.sh` and `-PwithMic` All 67 required tests passed (the test planet then had 35 sites, 4 pools; the earlier GameTest runs are before that merge, which brought docs, tools and the P2-01 work, nothing of this task's files): `cargo fmt --check`, `clippy --workspace --all-targets -D warnings` ok; `cargo test --workspace` 542
+  passed, 0 failed, 3 ignored; `./gradlew build test` -> tests=214 failures=0 skipped=2; `./gametest.sh` -> All 66 required tests passed (518 s) and `./gametest.sh -PwithMic` -> All 66 required tests passed (MIC set of pack 790e116); in both, `geothermalAroundActiveVolcanoes` read 4 of the test planet's 53 sites (4 oceanic shields, 2 pools, 34 vents, 17 patches): the pool 46/46 water blocks, 30/30 beds, 35/35 rim columns, 0 leaks, 0 lava near, 28/28 ground columns; the vent and two patches 80/80, 71/71 and 172/172 ground columns.
+- **Also seen, not changed.**
+  - A volcano's field lands mostly in a forest or a snowfield; vegetation features then put trees on grass beside altered ground and
+    their canopy overhangs it. Cold fields (mean under 3 C) have vents only, because vanilla's `freeze_top_layer` would put ice on
+    a hot pool; hot-spring water is plain water (no steam or heat, vanilla has none).
+  - Distant Horizons far terrain (P3-04) draws none of these: they are a few blocks wide.
+  - Travertine is rare near volcanoes (1 of 23 pools): limestone seldom lies under the arcs; sinter is the usual terrace.
+- **Contradicts the plan:** "from the heat flow already modelled": the heat flow is not exported (only volcanoes), so it is not used.
+  Cinnabar is a stain at silicic volcanoes, not an epithermal deposit (P2-10 does not exist).
+- **Next step.** Ben's answers to the questions below; then export a heat-flow layer and a rift/ridge source if wanted.
 ### 2026-10-01 — Meteor impacts (P2-08): craters that form, age and are buried; breccia, melt and impact deposits (agent worktree agent-a24e90e955a5a64d3, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
 - **Ask.** Ben, decisions log 2026-09-29 ("Yes, in full … not in v1, but before phase 3") and 2026-10-01 ("Feel free to start
   now, it can always just stay on a separate branch"). Branch `worktree-agent-a24e90e955a5a64d3`, master 38ca6b0 (with
@@ -266,6 +450,66 @@ Branch `worktree-agent-a7e713f9fdd326fb4`, master e8668ca merged in (then 5e601d
 - **Next step.** Ben's answers to the five questions above; then the coordinator merges the branch after v1 lands, applies
   the MIC rock-tag rows, and runs both GameTest suites on master.
 
+### 2026-10-02 — `plate-check`: the additions that need no new physics (task 1b of the force-balance design; agent worktree agent-ae6e5f954f5374acc, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What.** Measurement only; no plate, collision or surface rule changed. `plates/dynamics.rs` (record version 2) now keeps,
+  per plate and step: the change of the rotation vector since the previous step (`|Ω−Ω_prev|/|Ω_prev|`), whether the pole
+  lies on the plate (the visible sample nearest to either end of the axis is the plate's), whether it lies within 30° of
+  the plate's centroid (spinning), and whether the speed guard holds the plate (rotation at the cap; `PlateStep` is now the
+  array `[id, visible, continental, speed, front, boundary, rot_change, flags]`). Per step: the sea floor's median and
+  90th-percentile age and the counts older than 180 and 250 Myr (**every step**: one sort of the oceanic ages, no
+  measurable cost; the histogram stays at 10 Myr), and the sizes of the 16 largest connected pieces of continental crust
+  (lattice edges whose ends are still within 2 sample spacings, so a rift's fragments stop being one piece within a few
+  steps). `record_step` takes the samples' positions (the only change outside the record, the check and the CLI: `mod.rs` passes `&pos`).
+  `plates/check.rs`: 17 new ranged measures with the force-balance design's section 7 targets (area-weighted RMS speed;
+  speed 10th/50th/90th percentile; oceanic ÷ continental and on-slab ÷ free median speed; Spearman rank correlation of speed
+  with slab share and with area; plate-steps above 150 mm/yr; steps on which the guard binds (target 0, so the check fails
+  whenever it binds); rotation change median and 90th percentile; sea-floor median age and share older than 180 and 250 Myr;
+  supercontinent tenure and assembly-to-assembly period), 15 reported ones (spinning and pole-inside shares, continental
+  pieces and largest share, assemblies and time assembled, rifts of a plate above 40 %, how long it stayed so, and whether the
+  fragments are still apart 50 Myr later, strict and lenient, the continental extremes over all steps, the guard's plate-steps)
+  and 8 placeholder rows for physics not built (`MeasureDef::pending`, `Status::Pending`, "no data", never fails): convergence
+  20 Myr after onset ÷ at onset (0.2-0.6), wedge width (100-350 km), foredeep width (150-450 km) and depth (2-7 km), pull share
+  of the driving torque, mean in-plane stress and tension share of a plate above 40 %, slab length per contact. They read empty
+  record fields that the later tasks fill (`StepRec::forces: Vec<PlateForces>`, `StepRec::slabs_km`, `Dynamics::belts:
+  Vec<BeltRec>`; a test fills them and the rows light up and are judged). The definitions are `check::Params` (assembled 70 %,
+  dispersed under 50 %, mega-plate 40 %, plates of 30+ samples, 150 mm/yr, warm-up 100 Myr, start-up 10 Myr, piece 1 %, rift
+  window 50 Myr), set by `plate-check --param name=value` (repeatable), `PARAMS="…"` in `plate-check.sh`, or a `"params"` object
+  in the targets file; the table prints them. The checkpoint's postcard cannot skip fields, so the empty vectors are written.
+- **The three open readings, settled** (docs/design/plate-check-baseline.md): continental crust judged on the lowest and
+  highest step after the first 10 Myr (extremes over all steps reported; the start-up is not the cause, highest step is 0.48
+  either way); ocean-floor age judged as the mean over the run after 100 Myr of the per-step 90th percentile (the last step's
+  value reported; the snapshot is noisy, 208-269 across seeds); collision length first step to last step inclusive, not from
+  contact onset, and `CollisionRec::start_myr`/`end_myr` documented as first and last step (`collision.rs`/`subduction.rs`
+  not touched).
+- **Baseline** (master 38ca6b0 + 1 + 1b; `earthlike_quick_16k`, supercontinent, 1000 Myr, seeds 1-4, `stage volcanoes`):
+  docs/design/plate-check-baseline.md. 10 of 36 ranged targets met (collisions design 4 of 19, force-balance additions 6 of
+  17), 8 rows wait for physics. Every figure of the first baseline reproduces to the digit; the new rows agree with the
+  force-balance design's "Now" for speed percentiles (40/73/85), the oceanic/continental and slab/free speed ratios (1.64,
+  1.61), rotation change (4.9 %/9.0 %), sea-floor age and the old-floor shares. New findings: the speed guard (100 mm/yr on a
+  plate's fastest point) binds in 369 of 500 steps; the supercontinent (70 %/50 %) lasts a median 45 Myr and comes back after
+  76 Myr, ten assemblies a run; a plate above 40 % of the planet is split by a rift after 18 Myr, 19 times a run, and 94 % of
+  those rifts see a fragment rejoin within 50 Myr.
+- **Cost.** The same 300 Myr run with and without the record (`DEEPTIME_NO_PLATE_DYNAMICS=1`), run at the same time on the
+  test VM: wall 341.9 vs 343.0 s and CPU 539.3 vs 542.2 s (seed 1), 310.4 vs 309.3 s and 488.3 vs 488.8 s (seed 2): within
+  0.5 %. (A first attempt with different seeds side by side differed by 15 %: the machine is shared.) Record 0.95-1.09 MB of
+  JSON per 1000 Myr run (task 1: 0.9), kept in `manifest.json`.
+- **Seed 1 and the structure stage.** On master `stage volcanoes` seed 1, supercontinent, 1000 Myr panics in the structure
+  stage ("a history holds at most 128 events, the base stratigraphy included", `deeptime-noddy/src/history.rs:108`; P2-01 stage
+  B). Not fixed here. The baseline's seed 1 ran with `structure.deformation.density=0`, which cannot change the plate record
+  (nothing the plates read comes from the structure stage; seed 2 gives an identical `plate-check --json` with and without it).
+- **Tooling.** `tools/remote/detach.sh start` no longer keeps the calling `mac.sh` waiting for the job: the job inherited the
+  ssh session's descriptors (a nix lock file and a socket); the job's shell now closes descriptors 3-9 first (a 45 s job: the
+  call returns in 6 s instead of 49 s).
+- **Gates** (VM): cargo fmt --check clean, clippy --workspace --all-targets -D warnings clean, `cargo test --workspace`
+  642 passed / 0 failed / 3 ignored, `cargo deny check licenses bans` ok, `./gradlew build test` BUILD SUCCESSFUL, JUnit tests=200 failures=0 skipped=1. No GameTests (nothing the game reads
+  changed except the size of `notes.plates.dynamics` in the manifest).
+- **Not verified.** The pole test is a nearest-sample test, checked on synthetic inputs and for consistency with the state, not
+  against an independent trace; the design's "0.5-2 % turning about a pole near themselves" has no definition, so the
+  spinning share (6.3 %) is not compared with it. The review's 360 and 650 Myr supercontinent figures have no definition
+  either. Full presets (250,000 samples) were not run: the pole scan is 2 × plates dot products per sample and the pieces are one
+  pass over the lattice edges, a few ms a step by estimate.
+- **Next.** Task 2 (real shortening and the collision state) keeps `CollisionRec`'s `start_myr`/`end_myr` as first and last
+  step and may fill `Dynamics::belts`; task 5 fills `StepRec::forces` and `slabs_km`. Someone owns the structure-stage panic.
 ### 2026-10-02 — Force-balance plate motion: design (agent worktree agent-a4560e6e131ce6cbd, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; design only, nothing built)
 - **Why.** Ben's decisions of 2026-10-02 on the collisions design: full force-balance motion; nothing designed for the
   mega-plate yet; both sides of a suture rise, with a foreland basin; the start-up land jump is a separate task.
