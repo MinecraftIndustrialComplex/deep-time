@@ -88,15 +88,15 @@ pub struct UndergroundParams {
 impl Default for UndergroundParams {
     fn default() -> Self {
         UndergroundParams {
-            lava_floor_blocks: 10,       // ledger: MAG-027
-            lava_lake_blocks: 54,        // ledger: MAG-030
-            magma_chamber_depth_km: 3.0, // ledger: MAG-002
-            magma_chamber_size: 1.0,     // ledger: MAG-006
-            crater_lake_share: 0.25,     // ledger: MAG-019
-            remove_lava_features: true,  // ledger: MAG-034
-            geothermal_density: 1.0, // ledger: GEO-001 (game-choice)
-            geothermal_reach: 1.0,   // ledger: GEO-003 (game-choice)
-            geothermal_size: 1.0,    // ledger: GEO-005 (game-choice)
+            lava_floor_blocks: 10,                  // ledger: MAG-027
+            lava_lake_blocks: 54,                   // ledger: MAG-030
+            magma_chamber_depth_km: 3.0,            // ledger: MAG-002
+            magma_chamber_size: 1.0,                // ledger: MAG-006
+            crater_lake_share: 0.25,                // ledger: MAG-019
+            remove_lava_features: true,             // ledger: MAG-034
+            geothermal_density: 1.0,                // ledger: GEO-001 (game-choice)
+            geothermal_reach: 1.0,                  // ledger: GEO-003 (game-choice)
+            geothermal_size: 1.0,                   // ledger: GEO-005 (game-choice)
             geothermal_spring_min_precip_mm: 400.0, // ledger: GEO-007 (game-choice)
         }
     }
