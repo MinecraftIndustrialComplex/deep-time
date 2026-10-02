@@ -262,7 +262,7 @@ impl PlatesStage {
             }
             omega[p] = kinematics::jitter(&mut st.rng, w, k.motion_jitter_per_sqrt_myr, env.dt_myr);
         }
-        belts::resist(st, &mut omega, &env, relax);
+        belts::resist(st, &mut omega, &env, relax, &pull.front_km);
         for (p, w) in omega.into_iter().enumerate() {
             if st.plates[p].alive {
                 st.plates[p].omega =

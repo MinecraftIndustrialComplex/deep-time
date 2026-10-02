@@ -27,7 +27,9 @@
 //!    it and under the front: a critical wedge "continu[es] to grow at constant taper as additional
 //!    material is encountered at the toe" (Davis, Suppe & Dahlen 1983).
 //! 2. **The belt** on the overriding plate takes the rest, over `collision_belt_km` behind the
-//!    front with the profile `1 − (d/W)²` (highest at the front). Nothing caps it: crust above the
+//!    front with the profile `1 − (d/W)²` (highest at the front). Where the overriding plate is
+//!    narrower than the belt (a sliver, an island arc), each sample takes what a full belt would
+//!    give it and the rest goes down with the slab. Nothing caps it: crust above the
 //!    strength height spreads in the surface stage (`surface::spread`) and widens it into a
 //!    plateau, and erosion wears it down. (The plate-only presets keep their isostatic ceiling,
 //!    `uplift_ceiling_m`.)
@@ -45,11 +47,18 @@
 //! # Resistance inside the speed law
 //! A collision resists convergence across its front with
 //!
-//!   r = collision_resistance_mm_yr × (h_belt / h_s) × min(1, L / slab_pull_front_km),
+//!   r = collision_resistance_mm_yr × (h_belt / h_s) × min(1, L / L_drive),
+//!   L_drive = min(F, slab_pull_front_km),
 //!
 //! `h_belt` the belt's height (its mean above sea level within half its width of the front), `h_s`
 //! the strength height the crust spreading uses (`crust_strength_mpa / (ρ_c g)`, so gravity and
-//! crust strength enter here too) and `L` the front's length. It acts like the speed law's own
+//! crust strength enter here too), `L` the front's length and `F` the subduction front the speed
+//! law pulls the incoming plate by this step (`subduction::Pull::front_km`, the collision's own
+//! front included). The collisions design wrote `min(1, L / slab_pull_front_km)`, which holds for
+//! a plate pulled by a full slab; measured, collision fronts are a median 400 km long, so a plate
+//! with no other slab would need a belt tens of km high to stop. Against the plate's own drive, a
+//! plate with no slab elsewhere stalls once its belt is about 2 km high (the Alps, the Urals) and
+//! one pulled by a long slab keeps converging (India), as the design describes. It acts like the speed law's own
 //! relaxation: each step the convergence across the front loses `relax · r` (`relax` the speed
 //! law's `1 − e^(−δt/τ)`, τ = `slab_pull_relax_myr`), never more than it has. Against the speed
 //! law's pull back towards each plate's target speed this settles at a convergence of
@@ -315,7 +324,12 @@ fn stack_front(
         .map(|i| (i, 1.0 - (d_over[i] / w_rad).powi(2)))
         .filter(|&(_, w)| w > 0.0)
         .collect();
-    let belt_weight: f64 = belt.iter().map(|&(_, w)| w).sum::<f64>() * area;
+    // Spread over the belt a front of this length has behind it (∫(1 − x²) = 2/3 of its width):
+    // where the overriding plate is narrower than the belt (a sliver, an arc), the stack does not
+    // pile onto the few samples there (below half the belt's area); what has no room goes down
+    // with the slab.
+    let belt_weight: f64 = (belt.iter().map(|&(_, w)| w).sum::<f64>() * area)
+        .max(0.5 * 2.0 / 3.0 * belt_km * f.length_km());
 
     // The rock that stays: the consumed crust's own mix, its sediments buried and metamorphosed.
     // ledger: PLT-235.
@@ -488,7 +502,9 @@ fn foredeep(d_rad: &[f64], flexure: &[f64], wedge_km: f64, bins: &Bins) -> Fored
 /// convergence across its front by `relax · r`, never below none, sharing the cut between the two
 /// plates by area. `omega` holds every plate's rotation after the speed law's update this step
 /// and is changed in place; the caller caps the speeds after.
-pub fn resist(state: &PlateState, omega: &mut [DVec3], env: &Env, relax: f64) {
+///
+/// `front_km` is each plate's subduction front this step (`subduction::Pull::front_km`).
+pub fn resist(state: &PlateState, omega: &mut [DVec3], env: &Env, relax: f64, front_km: &[f64]) {
     let k = env.k;
     let h_s = k.strength_height_m(env.gravity);
     let unit = env.norm.omega_of_speed(1.0);
@@ -499,9 +515,17 @@ pub fn resist(state: &PlateState, omega: &mut [DVec3], env: &Env, relax: f64) {
             continue;
         }
         // ledger: PLT-232 (the resistance law).
-        let r = k.collision_resistance_mm_yr
-            * (col.belt.height_m.max(0.0) / h_s)
-            * (col.front_km / k.slab_pull_front_km).min(1.0);
+        let drive_km = front_km
+            .get(u)
+            .copied()
+            .unwrap_or(0.0)
+            .min(k.slab_pull_front_km);
+        let reach = if drive_km > 0.0 {
+            (col.front_km / drive_km).min(1.0)
+        } else {
+            1.0
+        };
+        let r = k.collision_resistance_mm_yr * (col.belt.height_m.max(0.0) / h_s) * reach;
         let (at, normal) = (DVec3::from_array(col.centroid), DVec3::from_array(col.normal));
         if r <= 0.0 || normal == DVec3::ZERO {
             continue;
@@ -524,7 +548,10 @@ pub fn resist(state: &PlateState, omega: &mut [DVec3], env: &Env, relax: f64) {
 }
 
 /// The belt's extent from its uplift-weighted moments, km on a sphere of `radius_km`: length and
-/// width as `dynamics::Moments` gives them (exact for a uniform strip).
+/// width as `dynamics::Moments` gives them (exact for a uniform strip), but from the spread in the
+/// plane tangent to the sphere at the belt's mean position. In three dimensions a long belt that
+/// follows the sphere's curve also spreads towards the centre (its sagitta: 880 km for a belt of
+/// 60° of arc), which would read as width.
 pub fn footprint(b: &Belt, radius_km: f64) -> super::dynamics::Footprint {
     let mut f = super::dynamics::Footprint {
         samples: 0,
@@ -543,10 +570,484 @@ pub fn footprint(b: &Belt, radius_km: f64) -> super::dynamics::Footprint {
         b.second[4] / w - mu[0] * mu[2],
         b.second[5] / w - mu[1] * mu[2],
     ];
-    let [l1, l2, _] = super::dynamics::eigenvalues(c);
+    let cov = glam::DMat3::from_cols(
+        DVec3::new(c[0], c[3], c[4]),
+        DVec3::new(c[3], c[1], c[5]),
+        DVec3::new(c[4], c[5], c[2]),
+    );
+    let m = DVec3::from_array(mu).normalize_or_zero();
+    let p = glam::DMat3::IDENTITY - glam::DMat3::from_cols(m * m.x, m * m.y, m * m.z);
+    let t = p * cov * p;
+    let [l1, l2, _] = super::dynamics::eigenvalues([
+        t.x_axis.x, t.y_axis.y, t.z_axis.z, t.y_axis.x, t.z_axis.x, t.z_axis.y,
+    ]);
     if l2 > 0.0 {
         f.length_km = (12.0 * l1).sqrt() * radius_km;
         f.width_km = (12.0 * l2).sqrt() * radius_km;
     }
     f
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::params::{PlanetPreset, plates_builtin};
+    use crate::plates::geometry::{Tree, positions};
+    use crate::plates::normalise::Norm;
+    use crate::plates::pools::continental_column;
+    use crate::plates::shortening::{self, Fired};
+    use crate::plates::state::{Contact, Group, Plate, Sample};
+    use crate::preset::{Preset, PresetBody, with_timeline};
+
+    const N: usize = 16_000;
+
+    fn preset() -> PlanetPreset {
+        let json = with_timeline(
+            plates_builtin("plates_quick_16k").unwrap(),
+            Some("supercontinent"),
+            Some(100.0),
+        )
+        .unwrap();
+        match Preset::from_json(&json).unwrap().body {
+            PresetBody::Planet(p) => {
+                let mut p = *p;
+                // The pipeline's choices: no isostatic ceiling (the surface spreads over-thick
+                // crust), a guard far above anything here.
+                p.tectonics.uplift_ceiling_m = 0.0;
+                p.tectonics.max_elevation_m = 30_000.0;
+                p
+            }
+            other => panic!("not a planet preset: {other:?}"),
+        }
+    }
+
+    fn plate(id: u32, omega: DVec3, centroid: DVec3) -> Plate {
+        Plate {
+            id,
+            alive: true,
+            omega: omega.to_array(),
+            born_myr: 0.0,
+            died_myr: None,
+            birth_event: None,
+            parent: None,
+            lip_until_myr: 0.0,
+            lip_event: None,
+            samples: 0,
+            centroid: centroid.to_array(),
+            continental_frac: 1.0,
+        }
+    }
+
+    /// The continental part of the planet: a cap within 30° of +y, so the boundary's continental
+    /// stretch is where a rotation about z is close to head-on. Continental lowland 35.1 km thick
+    /// at 300 m; the rest ocean floor at −4 km.
+    fn arc(p: DVec3) -> bool {
+        p.y > 0.866
+    }
+
+    /// Two plates split by the plane x = `split`: plate 0 (x < split) overrides, plate 1 comes
+    /// in with angular velocity `omega` (rad/yr).
+    fn two_plates(geo: &Geo, split: f64, omega: DVec3) -> PlateState {
+        let samples: Vec<Sample> = geo
+            .points()
+            .iter()
+            .map(|&p| {
+                let mut s = Sample::blank(u32::from(p.x >= split));
+                if arc(p) {
+                    s.kind = CONTINENTAL;
+                    s.pools = continental_column();
+                    s.thickness_m = s.pools.iter().sum();
+                    s.elevation_m = 300.0;
+                } else {
+                    s.elevation_m = -4000.0;
+                }
+                s
+            })
+            .collect();
+        let ident = [0.0, 0.0, 0.0, 1.0];
+        let mut st = PlateState {
+            n: N as u32,
+            lattice: ident,
+            samples,
+            groups: vec![
+                Group {
+                    plate: 0,
+                    rot: ident,
+                },
+                Group {
+                    plate: 1,
+                    rot: ident,
+                },
+            ],
+            plates: vec![
+                plate(0, DVec3::ZERO, DVec3::NEG_X),
+                plate(1, omega, DVec3::X),
+            ],
+            contacts: vec![Contact {
+                under: 1,
+                over: 0,
+                onset_myr: 0.0,
+                onset_step: 1,
+                onset_event: None,
+                onset_slab_age_myr: 0.0,
+                onset_convergence_mm_yr: 0.0,
+                setting: 2,
+                last_step: 1,
+                samples: 3,
+                collision: None,
+                max_uplift_mm_yr: 0.0,
+                andean: false,
+                centroid: [0.0, 1.0, 0.0],
+                cont_in: 0,
+            }],
+            hotspots: Vec::new(),
+            ridges: Vec::new(),
+            rift_links: Vec::new(),
+            rng: crate::sphere::SplitMix64::new(1),
+            step: 0,
+            t_myr: 0.0,
+            start_myr: 0.0,
+            resample_step: 0,
+            resample_myr: 0.0,
+            a0_km2: 1.0,
+            counters: Default::default(),
+            dynamics: None,
+        };
+        let pos = positions(&st, geo);
+        st.recount(&pos);
+        st
+    }
+
+    struct Fixture {
+        preset: PlanetPreset,
+        geo: Geo,
+        norm: Norm,
+    }
+
+    impl Fixture {
+        fn new() -> Fixture {
+            let preset = preset();
+            let norm = Norm::new(preset.tectonics.model_radius_km, 6371.0, N);
+            Fixture {
+                geo: Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap(),
+                preset,
+                norm,
+            }
+        }
+
+        fn env(&self, step: u64) -> Env<'_> {
+            Env {
+                k: &self.preset.tectonics,
+                norm: self.norm,
+                dt_myr: 2.0,
+                dt_yr: 2.0e6,
+                gravity: 9.81,
+                step,
+                t_myr: 2.0 * step as f64,
+            }
+        }
+
+        /// Angular speed (rad/yr) that moves a point 90° from the pole at `mm_yr`.
+        fn rate(&self, mm_yr: f64) -> f64 {
+            self.norm.omega_of_speed(mm_yr)
+        }
+
+        /// One step on fixed positions: the collision state, then the stacking.
+        fn step(
+            &self,
+            st: &mut PlateState,
+            step: u64,
+            flexure: Option<&[f64]>,
+        ) -> (BTreeMap<usize, Stacked>, Vec<Fired>) {
+            let pos = positions(st, &self.geo);
+            let tree = Tree::over(&pos, |_| true);
+            st.contacts[0].last_step = step;
+            let env = self.env(step);
+            let (fronts, fired) =
+                shortening::advance(st, &self.geo, &pos, &tree, &env, BTreeMap::new());
+            let stacked = stack(st, &self.geo, &pos, &env, &fronts, flexure);
+            (stacked, fired)
+        }
+    }
+
+    /// Σ crust thickness × area over the visible samples, km² × m.
+    fn crust_km2_m(st: &PlateState, area: f64) -> f64 {
+        st.samples
+            .iter()
+            .filter(|s| !s.is_hidden())
+            .map(|s| f64::from(s.thickness_m) * area)
+            .sum()
+    }
+
+    /// A head-on continental collision builds its belt over many steps, not in one: the belt
+    /// rises step by step on the overriding plate behind the front, the incoming plate grows a
+    /// wedge whose surface slopes at `wedge_slope_deg` up to the belt, and the whole is long along
+    /// the front and narrow across it. Nothing beyond the belt and the wedge moves.
+    #[test]
+    fn a_head_on_collision_builds_a_belt_over_many_steps() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+        let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+        let mut heights = Vec::new();
+        for step in 1..=12 {
+            let (stacked, fired) = fx.step(&mut st, step, None);
+            assert!(fired.is_empty());
+            let s = &stacked[&0];
+            // The crust coming in is the continent's 35.1 km, thickened by the wedge once it
+            // reaches the front.
+            assert!(s.crossed_km2 > 0.0 && s.thickness_m >= 35_099.0, "{s:?}");
+            heights.push(s.height_m);
+        }
+        // Step by step: every step adds, and the first step built a small part of it.
+        assert!(heights.windows(2).all(|w| w[1] > w[0]), "{heights:?}");
+        assert!(heights[0] < 0.15 * heights[11], "{heights:?}");
+        let belt = &st.contacts[0].collision.as_ref().unwrap().belt;
+        assert!(belt.peak_height_m > 1500.0, "{}", belt.peak_height_m);
+        // The shape: along the front (6,670 km of it) and narrow across it.
+        let f = footprint(belt, fx.norm.model_km);
+        assert!(f.length_km > 4000.0, "{f:?}");
+        assert!(f.width_km < 800.0, "{f:?}");
+        assert!(f.elongation() > 6.0, "{f:?}");
+        // The wedge: the incoming plate's ground rises towards the front, at the set slope, up
+        // to the belt's height at the front; it is as wide as that height over the slope.
+        let tan = fx.preset.tectonics.wedge_slope_deg.to_radians().tan();
+        assert!(belt.wedge_km > 0.0, "no wedge");
+        let pts = fx.geo.points();
+        let km = |p: DVec3| fx.norm.km(p.x.asin());
+        let spacing = fx.norm.km(fx.norm.spacing_rad());
+        let mut wedge_rise = 0.0f64;
+        for (i, s) in st.samples.iter().enumerate() {
+            let p = pts[i];
+            let dz = f64::from(s.elevation_m - z0[i]);
+            if !arc(p) || p.y < 0.95 {
+                // Away from the cap's corners only.
+                continue;
+            }
+            let x = km(p);
+            if x >= 0.0 {
+                // Incoming: the wedge, and nothing beyond its toe.
+                if x > belt.wedge_km + 2.0 * spacing {
+                    assert!(dz.abs() < 1e-3, "ground beyond the wedge rose {dz} at {x} km");
+                } else {
+                    wedge_rise = wedge_rise.max(dz);
+                }
+            } else if -x > fx.preset.tectonics.collision_belt_km + 2.0 * spacing {
+                assert!(dz.abs() < 1e-3, "ground behind the belt rose {dz} at {x} km");
+            }
+        }
+        assert!(wedge_rise > 100.0, "the wedge rose {wedge_rise} m");
+        let expect = (belt.height_m - 300.0) / (1000.0 * tan);
+        assert!(
+            (belt.wedge_km - expect).abs() < 0.5 * expect + 2.0 * spacing,
+            "wedge {} km for a belt {} m high",
+            belt.wedge_km,
+            belt.height_m
+        );
+        // Stamped as a collision orogeny.
+        let stamped = st
+            .samples
+            .iter()
+            .filter(|s| s.orogeny == OROGENY_HIMALAYAN)
+            .count();
+        assert!(stamped > 50, "{stamped}");
+    }
+
+    /// The crust that stacks is the crust that crossed the front: the volume added is the
+    /// volume consumed times `collision_stacking_share` (all of it at 1), with the consumed
+    /// crust's rock (its sediments metamorphosed). Nothing changes kind, so the continental area
+    /// is untouched by the stacking.
+    #[test]
+    fn stacking_moves_crust_and_creates_none() {
+        for share in [1.0, 0.5] {
+            let mut fx = Fixture::new();
+            fx.preset.tectonics.collision_threshold_km = 1.0e9;
+            fx.preset.tectonics.collision_stacking_share = share;
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(40.0));
+            let area = fx.norm.sample_area_km2();
+            let kinds: Vec<u8> = st.samples.iter().map(|s| s.kind).collect();
+            let mut consumed = 0.0;
+            let pool_sum = |st: &PlateState, p: usize| -> f64 {
+                st.samples.iter().map(|s| f64::from(s.pools[p])).sum()
+            };
+            let sediments = |st: &PlateState| pool_sum(st, pool::SEDIMENT) + pool_sum(st, pool::SEDIMENTARY);
+            let (sed0, meta0) = (sediments(&st), pool_sum(&st, pool::METAMORPHIC));
+            for step in 1..=6 {
+                let before = crust_km2_m(&st, area);
+                let (stacked, _) = fx.step(&mut st, step, None);
+                let s = &stacked[&0];
+                let added = crust_km2_m(&st, area) - before;
+                assert!(
+                    (added - (s.belt_km2_m + s.wedge_km2_m)).abs() < 1e-4 * added.max(1.0),
+                    "the record is the crust added: {added} vs {}",
+                    s.belt_km2_m + s.wedge_km2_m
+                );
+                let crossed = s.crossed_km2 * s.thickness_m;
+                assert!(
+                    (added - share * crossed).abs() < 1e-4 * crossed,
+                    "share {share}: added {added:.4e} for {crossed:.4e} crossed"
+                );
+                consumed += crossed;
+            }
+            assert!(consumed > 0.0);
+            // The rock: the buried sediments come back metamorphosed (at least the column's
+            // 8.1 km of 35.1 that were sediment, sedimentary or metamorphic rock), none as
+            // sediment.
+            assert!((sediments(&st) - sed0).abs() < 1e-3 * sed0);
+            let meta = pool_sum(&st, pool::METAMORPHIC) - meta0;
+            let least = share * consumed / area * (8100.0 / 35_100.0);
+            assert!(
+                meta >= 0.999 * least,
+                "metamorphic rock added {meta} m, at least {least} m expected"
+            );
+            assert!(st.samples.iter().map(|s| s.kind).eq(kinds.iter().copied()));
+            let b = &st.contacts[0].collision.as_ref().unwrap().belt;
+            assert!((b.stacked_km2_m - share * consumed).abs() < 1e-4 * consumed);
+        }
+    }
+
+    /// Plates sliding past each other shorten nothing, so no collision begins and nothing is
+    /// built.
+    #[test]
+    fn a_strike_slip_contact_builds_nothing() {
+        let fx = Fixture::new();
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::X * fx.rate(60.0));
+        let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+        for step in 1..=10 {
+            let (stacked, fired) = fx.step(&mut st, step, None);
+            assert!(stacked.is_empty() && fired.is_empty(), "step {step}");
+        }
+        assert!(st.contacts[0].collision.is_none());
+        assert!(st.samples.iter().zip(&z0).all(|(s, &z)| s.elevation_m == z));
+    }
+
+    /// The resistance inside the speed law: the incoming plate is pulled towards a fixed motion
+    /// (the speed law's relaxation), the belt grows and holds it back, the convergence falls as
+    /// the belt rises, and the collision is handed over to weld only after it has stayed below
+    /// the weld speed for the weld wait.
+    #[test]
+    fn convergence_slows_as_the_belt_grows_and_stalls() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        let k = fx.preset.tectonics.clone();
+        let free = DVec3::Z * fx.rate(40.0);
+        let mut st = two_plates(&fx.geo, 0.0, free);
+        let relax = 1.0 - (-2.0 / k.slab_pull_relax_myr).exp();
+        let (mut conv, mut height) = (Vec::new(), Vec::new());
+        let mut fired_at = None;
+        for step in 1..=80u64 {
+            // The speed law: the plate relaxes towards its target motion.
+            let w = DVec3::from_array(st.plates[1].omega);
+            st.plates[1].omega = (w + (free - w) * relax).to_array();
+            let (_, fired) = fx.step(&mut st, step, None);
+            if let Some(f) = fired.first() {
+                assert!(f.stalled);
+                fired_at = Some(step);
+                break;
+            }
+            let col = st.contacts[0].collision.clone().expect("in collision");
+            conv.push(col.convergence_mm_yr);
+            height.push(col.belt.height_m);
+            let mut omega: Vec<DVec3> = st
+                .plates
+                .iter()
+                .map(|p| DVec3::from_array(p.omega))
+                .collect();
+            // The plate's only front is the collision's.
+            let front = st.contacts[0].collision.as_ref().map_or(0.0, |c| c.front_km);
+            resist(&st, &mut omega, &fx.env(step), relax, &[0.0, front]);
+            for (p, w) in st.plates.iter_mut().zip(omega) {
+                p.omega = w.to_array();
+            }
+        }
+        let fired_at = fired_at.expect("the collision never stalled into a weld");
+        // The convergence fell as the belt rose, and the hand-over came after the stall.
+        assert!(conv[0] > 35.0, "{conv:?}");
+        assert!(height.windows(2).all(|w| w[1] >= w[0] - 1e-6), "{height:?}");
+        let slow = conv
+            .iter()
+            .position(|&v| v < k.weld_speed_mm_yr)
+            .expect("it stalled");
+        assert!(slow >= 3, "stalled after {slow} steps: {conv:?}");
+        assert!(
+            conv[..slow].windows(2).all(|w| w[1] <= w[0] + 1e-9),
+            "{conv:?}"
+        );
+        let waited = 2.0 * (fired_at as usize - 1 - slow) as f64;
+        assert!(
+            (waited - k.weld_after_myr).abs() <= 2.0,
+            "fired {waited} Myr after the stall"
+        );
+        // The belt that stopped it: at least the height at which it cancels 40 mm/yr on a long
+        // front (h_s × 40 / collision_resistance_mm_yr), and more by what it grew while the
+        // convergence relaxed over the speed law's 20 Myr (the plates here neither erode nor
+        // spread the belt).
+        let h_stop = k.strength_height_m(9.81) * 40.0 / k.collision_resistance_mm_yr;
+        let h = height[slow];
+        assert!(
+            h > 0.8 * h_stop && h < 3.0 * h_stop,
+            "{h} m against {h_stop} m"
+        );
+    }
+
+    /// The foreland basin is read beyond the wedge's toe: the stretch of bins below −100 m that
+    /// starts within two bins of the toe, its width and its deepest point.
+    #[test]
+    fn the_foredeep_is_read_beyond_the_wedge() {
+        let bins = Bins {
+            model_km: 1000.0,
+            bin_km: 50.0,
+        };
+        // One sample per 50 km bin: the wedge sinks (−800 m) under 0–100 km, then the basin
+        // −50, −400, −300, −150 m, a bulge, and something deep far away.
+        let flex = [
+            -800.0, -800.0, -50.0, -400.0, -300.0, -150.0, 40.0, 30.0, -500.0,
+        ];
+        let d: Vec<f64> = (0..flex.len()).map(|b| (b as f64 + 0.5) * 0.05).collect();
+        let f = foredeep(&d, &flex, 100.0, &bins);
+        assert_eq!(f.width_km, 150.0);
+        assert_eq!(f.depth_m, 400.0);
+        // No basin: the deepest beyond the toe, and no width.
+        let flat = [-800.0, -800.0, 10.0, 20.0, -50.0, 0.0];
+        let d: Vec<f64> = (0..flat.len()).map(|b| (b as f64 + 0.5) * 0.05).collect();
+        let f = foredeep(&d, &flat, 100.0, &bins);
+        assert_eq!((f.width_km, f.depth_m), (0.0, 50.0));
+    }
+
+    /// A continent welds only once its collision has stalled, and the larger plate keeps its
+    /// id.
+    #[test]
+    fn a_continent_welds_only_after_stalling_and_the_larger_keeps_its_id() {
+        let fx = Fixture::new();
+        // The incoming plate (1) is the larger: the boundary is at x = −0.3.
+        let mut st = two_plates(&fx.geo, -0.3, DVec3::Z * fx.rate(30.0));
+        let (n0, n1) = (st.plates[0].samples, st.plates[1].samples);
+        assert!(n1 > n0);
+        let mut world = crate::world::WorldState::new(1, 16_384, 0.0);
+        fx.step(&mut st, 1, None);
+        assert!(st.contacts[0].collision.is_some());
+        let pos = positions(&st, &fx.geo);
+        let seeds: Vec<u32> = (0..N as u32)
+            .filter(|&i| st.plate_of(i as usize) == 1 && st.samples[i as usize].is_continental())
+            .take(5)
+            .collect();
+        let env = fx.env(1);
+        let not_yet = crate::plates::collision::collide(
+            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, false,
+        )
+        .unwrap();
+        assert!(not_yet.deferred && !not_yet.sutured);
+        assert!(st.plates.iter().all(|p| p.alive) && st.contacts[0].collision.is_some());
+        let done = crate::plates::collision::collide(
+            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, true,
+        )
+        .unwrap();
+        assert!(done.sutured && !done.deferred);
+        assert!(
+            st.plates[1].alive && !st.plates[0].alive,
+            "the larger keeps its id"
+        );
+        assert!(st.groups.iter().all(|g| g.plate == 1));
+        assert_eq!(st.counters.sutures, 1);
+    }
 }

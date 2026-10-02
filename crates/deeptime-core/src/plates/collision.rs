@@ -278,6 +278,7 @@ pub fn collide(
             collision: frac >= p.collision_min_frac,
             sutured: suture,
             died: suture.then_some(die),
+            stalled,
             start_myr: collision_onset_myr,
             end_myr: t_myr,
             contact_onset_myr,

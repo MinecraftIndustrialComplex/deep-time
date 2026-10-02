@@ -407,6 +407,16 @@ fn initiate(
     if split.len() < 32 || members.len() - split.len() < 32 {
         return Ok(());
     }
+    // Old floor that encloses a continent (a terrane stranded in the ocean, which since plate
+    // tasks 3 and 4 is no longer carried off at the first contact) carries it along whole; a
+    // split that would be mostly continent is not old floor starting to sink.
+    let continental = split
+        .iter()
+        .filter(|&&i| state.samples[i as usize].kind == CONTINENTAL)
+        .count();
+    if 2 * continental > split.len() {
+        return Ok(());
+    }
     let new_id = state.plates.len() as u32;
     let parent = state.plates[id as usize].clone();
     let mut twin: BTreeMap<u32, u32> = BTreeMap::new();

@@ -481,6 +481,10 @@ enum Command {
         /// Also write the table as JSON here.
         #[arg(long)]
         json: Option<PathBuf>,
+        /// Also write the first run's whole dynamics record (`notes.plates.dynamics`: steps,
+        /// collisions, partings, belts) as JSON here, for analysis beyond the table.
+        #[arg(long)]
+        record: Option<PathBuf>,
         /// JSON file moving target ranges: {"measure_key": [lo, hi]}, null for an open end or for
         /// no range at all (the measure is then only reported).
         #[arg(long)]
@@ -1035,11 +1039,13 @@ fn main() -> ExitCode {
         Some(Command::PlateCheck {
             runs,
             json,
+            record,
             targets,
             params,
         }) => match plate_check::run(&plate_check::Options {
             runs: &runs,
             json: json.as_deref(),
+            record: record.as_deref(),
             targets: targets.as_deref(),
             params: &params,
         }) {
