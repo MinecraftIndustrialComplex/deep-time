@@ -1,6 +1,7 @@
 # Lithospheric flexure in the surface stage: design
 
-Status: **design, written before the code** (2026-10-02). Ben's decision of 2026-10-02 (decisions
+Status: **built** (2026-10-02; sections 1–11 are the design as written before the code, corrected
+where the build changed it; section 12 is what was measured). Ben's decision of 2026-10-02 (decisions
 log): "General flexure everywhere": every load bends the crust, not only collision belts. This note
 replaces option 5.6 (a) of `docs/design/plate-force-balance.md` (the line-load profile in the plate
 model) and is what its task 3 (the two-sided belt) relies on for the foreland basin.
@@ -22,7 +23,8 @@ code) or **inferred**.
 - Stiffness varies: young ocean floor, arcs, rifts and young orogens are weak, old ocean floor and
   cratons are stiff. A plate that stiffens keeps the shape it has.
 - Method: the plate equation on the L1 raster, solved by conjugate gradients with a spectral
-  preconditioner. A prototype needs 4 to 10 iterations.
+  preconditioner. A prototype needed 4 to 10 iterations; the built solver needs about 20 on a
+  real planet (section 12).
 - Two editor settings: how strongly flexure replaces local isostasy (0 = today's behaviour), and
   a scale on the elastic thickness.
 
@@ -65,7 +67,7 @@ of the run: the starting planet is taken to be in equilibrium as it stands, so i
 
 | Load | Source | Counted as |
 |---|---|---|
-| Crust thickened by the plate model | `plates/uplift_mm_yr` where it is positive, on continental crust, or on oceanic crust flagged arc or hotspot | Uplift `u` is Airy elevation: the thickening is `u / (1 − k)`, `k` = ρ_c/ρ_m on land, (ρ_c − ρ_w)/(ρ_m − ρ_w) under water |
+| Crust thickened by the plate model | `plates/uplift_mm_yr` where it is positive, on continental crust, or on oceanic crust in an arc or hotspot regime | Uplift `u` is Airy elevation: the thickening is `u / (1 − k)`, `k` = ρ_c/ρ_m on land, (ρ_c − ρ_w)/(ρ_m − ρ_w) under water |
 | Crust moved by plateau spreading | the elevation change of `spread.rs` | the same conversion, both signs |
 | Erosion and deposition | the step's net change `dm` | ρ = `isostasy` × ρ_m on land; under water the density that today's 0.7 factor implies (2,300 kg/m³: sediment) |
 | Volcanic edifices | what later stages added to the surface since the last step (the volcano stage's cones) | rock at ρ_c, no root yet |
@@ -120,10 +122,15 @@ From the plate model's own thermal state, on L1 each step:
 |---|---|---|
 | Oceanic | `Te = te_ocean_km_sqrt_myr × √age`, at most `te_ocean_max_km` | 3.0 km/√Myr, 40 km: 9.5 km at 10 Myr, 30 km at 100 Myr |
 | Continental | `Te = te_craton_km × (1 − e^(−t/te_recovery_myr))`, `t` the time since the last orogeny there (never: a craton) | 80 km, 300 Myr: 23 km at 100 Myr, 51 at 300, 77 at 1,000 |
-| Arcs and rifts (`ARC`, `DIVERGENT` flags), and everything else at least | `te_min_km` | 5 km |
+| Arcs and rifts (the `regime` field), and everything else at least | `te_min_km` | 5 km |
 
 - Then smoothed over about 80 km (two box passes of two solve cells): heat spreads sideways, and
   the solver converges far better on a smooth field (measured, section 5).
+- **A plate boundary is a break** (added while building). Cells along a boundary between two
+  plates are at `te_min_km`, the next row half way to it. Without it the first runs had the old,
+  stiff subducting plate holding up the arc across the trench: arcs 10 km above their isostatic
+  level, a 5 km hole on the other side (measured). A collision front between two plates is a
+  break too, until the plates weld; then the basin forms through the continuous plate.
 - All of it times the editor's `elastic_thickness_scale`.
 - Sources (section 11): oceanic `Te` follows the depth of the 450 ± 150 °C isotherm of the cooling
   plate, 2.7 km × √Myr measured under seamounts; continental `Te` is 10–20 km at the low end and
@@ -185,17 +192,20 @@ with continents, cratons and ocean ages, 40 disc loads; iterations to a relative
   already a dependency), and recombine with the same weights. It is symmetric, so conjugate
   gradients converges for any `Te` field; where `Te` is uniform it is the exact inverse and one
   iteration suffices.
+- As built, the blend sits between two damped Jacobi sweeps (a symmetric product). The sweeps take
+  the cell-scale error the blend leaves along plate boundaries: 13 iterations instead of 27 on a
+  run's own stiffness field (measured in the prototype).
 - Stops when the preconditioned residual, an estimate of the error in metres, is under
-  `tolerance_m` (1 m; a block is 20 m), or after `max_iterations` (40), reported.
+  `tolerance_m` (2 m; a block is 20 m), or after `max_iterations` (60), reported.
 - **Solve grid.** At most about 40 Earth-normalized km per cell is needed (`α` is never below
   18 km). Presets with finer L1 cells (the full presets: 19.5 km) solve on L1 coarsened by two
   and interpolate the deflection, so the solve is 1,024 × 512 for every built-in preset.
 
 ## 6. Cadence and cost
 
-- **Every step.** The deflection of the last step is the starting guess, so a step costs the few
-  iterations its changes need. A setting `every_steps` allows less often; loads between solves
-  are then carried by local isostasy until the next solve.
+- **Every step.** The deflection carried from the last step is the starting point, so only the
+  step's changes are solved for. A setting `every_steps` allows less often; loads between solves
+  then wait, uncompensated, for the next solve.
 - Why not relax slowly instead: the mantle answers in thousands of years, a step is 2 Myr. The
   equilibrium is the physical answer.
 - **Estimate** (inferred from the prototype): one iteration is three forward and three inverse
@@ -242,7 +252,7 @@ Task 3 of the force-balance design planned `plates/foreland_m` from a line-load 
 | `strength`: 0 = local isostasy as before, 1 = the solve, between: a blend of the two corrections | 0 in the struct, 1 in the pipeline presets | `flexure` (Advanced · Surface) |
 | `elastic_thickness_scale` | 1 | `plate_stiffness`, 0.25–3 |
 | `te_ocean_km_sqrt_myr`, `te_ocean_max_km`, `te_craton_km`, `te_recovery_myr`, `te_min_km` | 3, 40, 80, 300, 5 | preset only |
-| `every_steps`, `tolerance_m`, `max_iterations` | 1, 1, 40 | preset only |
+| `every_steps`, `tolerance_m`, `max_iterations` | 1, 2, 60 | preset only |
 
 Tests (properties, not planets):
 - A point load: depth under it against `P / (8 ρ_m g l²)`, `l = (D / ρ_m g)^¼`.
@@ -324,3 +334,67 @@ abstract; "full text" where the paper itself was read. Figures quoted are from t
 - A. D. Wickert 2016, "Open-source modular solutions for flexural isostasy: gFlex v1.0", *Geosci.
   Model Dev.* 9(3):997–1017. The usual open flexure code, and GPL-3: its source was not opened and
   nothing is ported. The solver here is written from the equation.
+
+## 12. As built and measured (2026-10-02)
+
+`earthlike_quick_16k`, 500 Myr, `deeptime stage volcanoes`, two threads, the test VM (x86_64);
+`tools/review/p1-17-hyps.sh` with `surface.flexure.strength` 0 and 1. The commands are in the
+build log entry.
+
+**Run time** (the same seed with and without, side by side on the same machine load):
+
+| Run | Without | With | |
+|---|---|---|---|
+| scattered, seed 1 | 547 s | 584 s | +6.7 % |
+| supercontinent, seed 1 | 534 s | 579 s | +8.4 % |
+
+- The flexure step itself is 85–107 s a run, 15–16 % of the run without it: over the 5–10 %
+  promised. The run grows by less because the old isostasy (6 s) and most of the plateau
+  spreading (30 → 4 s: far less crust stands above its strength height) fall away.
+- 20–24 iterations a solve, not the prototype's 4–10: plate boundaries are sharp breaks in the
+  stiffness. 0–1 solves of 250 stop at the iteration limit.
+- One run each: a tolerance of 5 m saves one iteration (nothing); at most 12 iterations a solve
+  cuts the step by a third and leaves 177 of 250 solves unfinished (the rest is solved in the
+  following steps); a solve every second step halves it.
+- What would cut it properly: single-precision transforms (about a quarter), or a real multigrid.
+
+**Hypsometry** (seeds 1, 2 × both starts; mean [min, max]; not recalibrated):
+
+| | land | median, m | p90, m | above 2 km | above 3 km | sea median, m | shelf share of the sea |
+|---|---|---|---|---|---|---|---|
+| Earth | 0.289 | 427 | 2,022 | 0.102 | | 4,062 | |
+| without | 0.274 [0.261, 0.295] | 578 [439, 701] | 2,159 [1,789, 2,392] | 0.122 [0.085, 0.152] | 0.045 [0.035, 0.052] | 3,437 [3,248, 3,654] | 0.108 [0.089, 0.130] |
+| with | 0.266 [0.257, 0.282] | 774 [738, 819] | 2,164 [2,021, 2,344] | 0.126 [0.103, 0.159] | 0.028 [0.018, 0.035] | 4,096 [3,385, 4,562] | 0.058 [0.040, 0.068] |
+
+- An earlier build of the same day (loads read from the plate flags, which are empty on a fifth of
+  the steps; same solver) gave land 0.297, median 638 m, p90 2,001 m, above 2 km 0.102, sea
+  3,798 m. Four chaotic runs move a mean by about ±0.02 and ±100 m, so of the land figures only
+  the median's rise (60–200 m) is outside the noise.
+- Clear changes: the sea is 360–660 m deeper and the shelves half as wide; land above 3 km is
+  about half; the highest 1 % of land cells is at 3.3–3.8 km instead of 4.4–5.3 km; the plateau
+  spreading moves 5–10 thousand km³ a run instead of 190–400 thousand. The highest cell is
+  4.9–6.8 km (5.7–6.8 km without).
+- Why, as far as it was looked at (not isolated by experiment): rebound from erosion is local in
+  weak belts instead of spread over 400 plate km; volcano cones now sink; the shelf's sediment and
+  the sea's own weight load the margins.
+
+**What the pictures show** (`review/out/flexure/`, `tools/review/flexure-views.sh`):
+
+- The ground stands more than 100 m off local isostasy on 14 % of the planet (half above, half
+  below) and more than 500 m on 1.6 %; the extremes of one planet are −3.3 and +2.4 km.
+- Nearly all of it lies along active margins and island arcs, as narrow paired bands a few cells
+  wide, and round volcanic loads on old ocean floor: an island held up by 600 m with a ring up to
+  480 m low round it.
+- Belt interiors are at local isostasy (weak crust, as designed). In front of the largest
+  collision belt the continent shows bands of about 100 m: today's one-step, 2,000 km wide uplift
+  makes no foredeep of the 2–7 km in the acceptance table. That needs the belt work's wedge.
+- Along margins the pattern alternates from cell to cell. Cell-to-cell roughness of the land rises:
+  median 8.7 → 10.2 m, 99th percentile 294 → 391 m (one pair of runs).
+- Stripes within 10° of the poles, where the raster's block metric stretches the plates' motion.
+  They are outside the playable band (pole cap at 75°).
+
+**Not verified.** That `strength` 0 is bit-identical to the build before this work (it is the same
+code path, and a test holds it equal to a preset without the section; no run of the old binary was
+compared). The full presets (the coarsened solve is unit-tested only). Other gravities and
+`strength` between 0 and 1 on a planet. GameTests.
+

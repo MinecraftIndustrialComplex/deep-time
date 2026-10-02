@@ -466,7 +466,10 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         + (fields::STEP_FIELDS.len() as u64) * 4 // the frame accumulator
         + 24 // mix, weights, kinds
         + 21 * 8 // the glaciers' ice state, loads and passes (`glacial.rs`)
-        + if s.flexure.active() { 6 * 4 + 30 * 8 } else { 0 }; // the plate's state and its solve
+        // The plate's state (`flexure.rs`) and its solver's transforms, which stay; the solve's
+        // own vectors (some 30 more per cell) live only inside a surface step, far under the
+        // later stages' peak that this estimate is added to.
+        + if s.flexure.active() { 6 * 4 + 12 * 8 } else { 0 };
     let frames = (p.length_myr() / s.frame_every_myr).ceil().max(1.0) as u64;
     let history = frames * cells * 12; // packed frames, ~12 B/cell after LZ4 (measured in P1-04)
     let steps = p.plate_steps() as f64 * f64::from(s.substeps);
@@ -1266,7 +1269,7 @@ impl SurfaceStage {
                     crust_type: &pf.crust_type,
                     crust_age_myr: &pf.crust_age,
                     orogeny_age_myr: &pf.orogeny_age,
-                    flags: &pf.flags,
+                    regime: &pf.regime,
                     plate_id: &pf.plate_id,
                     ice_m: ice.as_deref(),
                     rock_share: p.isostasy,
