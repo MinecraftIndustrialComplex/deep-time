@@ -207,6 +207,10 @@
       "strength": 1.0,
       "young_ela_drop_m": 500.0,
       "valley_width": 3.0
+    },
+    "flexure": {
+      "strength": 1.0,
+      "elastic_thickness_scale": 1.0
     }
   },
   "climate": {

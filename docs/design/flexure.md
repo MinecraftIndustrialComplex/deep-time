@@ -107,7 +107,7 @@ The model: per cell, the rigidity `D` and a frozen bending moment `M₀` are kep
 The bending moment is `D ∇²w − M₀`. When `D` grows, the step is solved with the old `D` and then
 `M₀ += ΔD · ∇²w`; when it falls (reheating), `M₀` shrinks in proportion. Loads applied after the
 stiffening meet the stiff plate. This is the observed rule that a load records the plate's
-strength at the time of loading (Watts 1978).
+strength at the time of loading (Watts 1978: seamounts built on young floor keep a low `Te`).
 
 **Water** is a load that depends on the answer (a basin that sinks takes more water). The solve
 handles its own share exactly: cells under the sea get the restoring density ρ_m − ρ_w.
@@ -125,9 +125,11 @@ From the plate model's own thermal state, on L1 each step:
 - Then smoothed over about 80 km (two box passes of two solve cells): heat spreads sideways, and
   the solver converges far better on a smooth field (measured, section 5).
 - All of it times the editor's `elastic_thickness_scale`.
-- Sources: oceanic `Te` follows the depth of the 300–600 °C isotherm of the cooling plate;
-  continental `Te` is 5–20 km in young orogens and rifts and 60–100 km and more in cratons, and
-  grows with thermal age (section 11).
+- Sources (section 11): oceanic `Te` follows the depth of the 450 ± 150 °C isotherm of the cooling
+  plate, 2.7 km × √Myr measured under seamounts; continental `Te` is 10–20 km at the low end and
+  70–90 km in cratons, and is governed by the time since the last orogeny. Real continental `Te`
+  also depends on whether crust and mantle are coupled and on how sharply the plate is bent;
+  neither is modelled.
 
 ### 3.5 Which kilometres
 
@@ -278,25 +280,47 @@ Questions for Ben, recommendation first:
 
 ## 11. Sources
 
-Verified online on 2026-10-02 by a sub-agent unless marked; see the list at the end of the build
-log entry for what was only seen in an abstract.
+Checked online on 2026-10-02 by a sub-agent against the publisher's record (Crossref) and the
+abstract; "full text" where the paper itself was read. Figures quoted are from those.
 
-- D. L. Turcotte & G. Schubert, *Geodynamics* (flexure: rigidity, the flexural parameter, the
-  line-load profile, `E` 70 GPa, `ν` 0.25).
-- J. F. Brotchie & R. Silvester 1969, "On crustal flexure", *J. Geophys. Res.* 74:5240–5252 (the
-  point-load response).
+- D. L. Turcotte & G. Schubert, *Geodynamics*, chapter 3: `D = E h³ / (12 (1 − ν²))`,
+  `α = (4D / Δρ g)^¼`, the line-load profile `w₀ e^(−x/α) (cos + sin)` with `w₀ = V α³ / 8D`
+  and its zero at `3πα/4` (checked in lecture notes on the chapter; the bulge at `πα` with
+  `e^(−π)` = 4.3 % of the depth follows from the profile). `E` 70 GPa and `ν` 0.25 are the values
+  of its worked example; other examples there use 100 GPa.
+- J. F. Brotchie & R. Silvester 1969, "On crustal flexure", *J. Geophys. Res.* 74(22):5240–5252:
+  the point-load response `w = (P l² / 2πD) kei(r/l)`, `l = (D / Δρ g)^¼`, so `P l² / 8D` under
+  the load (as quoted in Wickert 2016, eq. 5–6).
 - A. B. Watts 1978, "An analysis of isostasy in the world's oceans 1. Hawaiian-Emperor Seamount
-  Chain", *J. Geophys. Res.* 83:5989–6004; A. B. Watts 2001, *Isostasy and Flexure of the
-  Lithosphere*, Cambridge University Press (oceanic `Te` and the isotherm; `Te` at the time of
-  loading).
-- S. Calmant, J. Francheteau & A. Cazenave 1990, *Geophys. J. Int.* 100:59–67 (oceanic `Te`
-  against the square root of age).
+  Chain", *J. Geophys. Res.* 83(B12):5989–6004: oceanic `Te` "corresponds closely to the
+  450 ± 150 °C isotherm" at the time of loading; 20–30 km along the chain.
+- S. Calmant, J. Francheteau & A. Cazenave 1990, "Elastic layer thickening with age of the oceanic
+  lithosphere", *Geophys. J. Int.* 100(1):59–67 (full text): `Te (km) = (2.7 ± 0.15) √t (Ma)` from
+  38 seamounts; olivine rheology predicts 3.3–4.3. The default 3.0 lies between.
+- A. B. Watts & U. S. ten Brink 1989, *J. Geophys. Res.* 94(B8):10473–10500: `Te` 40 km under
+  Hawaii; P. Wessel 1993, *J. Geophys. Res.* 98(B7):12177–12190: 25–35 km. A sinking of about 5 km
+  under Oahu is quoted from these by Bianco et al. 2005. The arch's distance and height were not
+  confirmed in a primary source.
 - E. B. Burov & M. Diament 1995, "The effective elastic thickness (Te) of continental
-  lithosphere: What does it really mean?", *J. Geophys. Res.* 100(B3):3905–3927.
-- G. D. Karner & A. B. Watts 1983, "Gravity anomalies and flexure of the lithosphere at mountain
-  ranges", *J. Geophys. Res.* 88:10449–10477; H. Lyon-Caen & P. Molnar 1983, *J. Geophys. Res.*
-  88:8171–8191 (the Himalaya held up by the Indian plate).
-- P. G. DeCelles & K. A. Giles 1996, "Foreland basin systems", *Basin Research* 8:105–123.
+  lithosphere: What does it really mean?", *J. Geophys. Res.* 100(B3):3905–3927: 70–90 km for
+  cratons, 10–20 km at the low end; thermal age is one of three controls (with crust-mantle
+  decoupling and plate curvature), which this model does not have.
+- M. Pérez-Gussinyé & A. B. Watts 2005, *Nature* 436:381–384: mean `Te` above 60 km for lithosphere
+  older than 1.5 Gyr, under 30 km for younger.
+- Z. Lu, P. Audet, C.-F. Li, J. Zhang & S. Li 2024, "Strength of continental lithosphere governed
+  by the time since the last orogeny", *Earth Planet. Sci. Lett.* 643:118894 (abstract):
+  continental `Te` 5 to about 140 km, mean 50 km, set by the time since the last orogeny. The
+  recovery law here (80 km, 300 Myr) has that form; its two numbers are this note's choice, not
+  the paper's.
+- G. D. Karner & A. B. Watts 1983, *J. Geophys. Res.* 88(B12):10449–10477: `Te` 80–100 km for the
+  Himalayan foreland, 25–50 km for the Alps. H. Lyon-Caen & P. Molnar 1983, *J. Geophys. Res.*
+  88(B10):8171–8191: rigidity 0.7 × 10²⁵ N m under the Ganga basin (about 100 km), a hundred
+  times less under the Greater Himalaya: stiff foreland, weak belt.
+- P. G. DeCelles & K. A. Giles 1996, "Foreland basin systems", *Basin Research* 8(2):105–123 (full
+  text): "Foredeep depozones are typically 100–300 km wide and 2–8 km thick"; forebulges 60–470 km
+  wide and tens to a few hundred metres high (the flexural prediction, not a survey).
+- K. Wieczerkowski, J. X. Mitrovica & D. Wolf 1999, *Geophys. J. Int.* 139(1):69–86: postglacial
+  relaxation times of 3–5 kyr in Fennoscandia. A 2 Myr step is the equilibrium.
 - A. D. Wickert 2016, "Open-source modular solutions for flexural isostasy: gFlex v1.0", *Geosci.
-  Model Dev.* 9:997–1017. The usual open flexure code, and GPL: its source was not opened and
+  Model Dev.* 9(3):997–1017. The usual open flexure code, and GPL-3: its source was not opened and
   nothing is ported. The solver here is written from the equation.

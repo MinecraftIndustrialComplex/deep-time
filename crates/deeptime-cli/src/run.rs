@@ -368,7 +368,8 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
          evaporite_km3={:.3e} to_sea_km3={:.3e} mass_residual_km3={:.3e} mean_log_layers={:.2} \
          spl_iterations_per_step={:.2} cg_iterations_per_step={:.1} sinks={} erosion_pulses={} basins={} sea_events={} frames={} \
          history_mib={:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_z_p99_m={:.0} plate_cap_bound_share={:.5} \
-         foreign_crust_cell_steps={:.0} spread_cell_steps={:.0} spread_km3={:.3e}",
+         foreign_crust_cell_steps={:.0} spread_cell_steps={:.0} spread_km3={:.3e} \
+         flexure_solves={:.0} flexure_iterations_per_solve={:.2} flexure_unconverged={:.0}",
         t.steps,
         land / n,
         peak,
@@ -398,6 +399,10 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         global(deeptime_core::surface::FOREIGN_CRUST_GLOBAL),
         global(deeptime_core::surface::spread::CELLS_GLOBAL),
         global(deeptime_core::surface::spread::MOVED_GLOBAL),
+        global(deeptime_core::surface::flexure::SOLVES_GLOBAL),
+        global(deeptime_core::surface::flexure::ITERATIONS_GLOBAL)
+            / global(deeptime_core::surface::flexure::SOLVES_GLOBAL).max(1.0),
+        global(deeptime_core::surface::flexure::UNCONVERGED_GLOBAL),
     ))
 }
 
