@@ -550,8 +550,10 @@ Plutons are bodies (role `pluton`, below), not horizons.
 
 **The 0.2 bake** smooths the stacks laterally before writing them, because the strata log is
 carried cell by cell and neighbouring cells' stacks differ more than the rocks would: each cell's
-new stack is the Gaussian-weighted mean (σ = `structure.strata_smoothing_cells` L1 cells, default
-10; x wraps, z clamps) of its neighbours' height functions, cut at every key top and base any of
+new stack is the weighted mean (σ = `structure.strata_smoothing_cells` L1 cells, default
+10; x wraps, z clamps; per axis a Gaussian of 1.5 σ lowered by its value at the window's edge, so a
+sample at the edge weighs nothing and the sample lattice leaves no period, P1-23; effective width
+0.85 σ) of its neighbours' height functions, cut at every key top and base any of
 them has; each interval takes the class holding the largest weighted thickness there, equal
 neighbours of one key domain join; the cell's own surface stays its first top: the regolith and
 the loose sediment on top (the unconsolidated classes) lie on it with their mean thickness,
