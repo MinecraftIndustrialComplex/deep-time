@@ -193,7 +193,7 @@
     "P2-08 (meteor impacts). The only known example is the Sudbury Igneous Complex (1.85 Gyr; a 200-250 km crater): about 1,650 Mt of ore at ~1.2 % Ni, ~1.1 % Cu and ~0.8 g/t Pt + Pd in some ninety deposits along the base of the melt sheet (contact and sublayer ores), in its footwall (Cu-PGE veins) and in the offset dykes (Naldrett 2004, Magmatic Sulfide Deposits; Lightfoot 2016; Grieve & Masaitis 1994 (The economic potential of terrestrial impact craters, Int. Geol. Rev. 36(2):105-151)).",
     "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, deposit density, separation, clustering, geometry and the curves' thresholds.",
     "The ore body's host becomes gabbro (the norite sublayer). Nickel and platinum have no ore block in every pack: the ore-block resolver places nothing for a material the pack does not have.",
-    "Rarity is the point: on a 16,384-block planet at Earth's rate a crater large enough (about 170 km and more) forms once in a few hundred Myr and must survive; impacts.flux raises the odds.",
+    "Rarity is the point: on a 16,384-block planet at Earth's rate a crater large enough (about 110 km for a 500 m melt sheet, 210 km for full ore) forms about once in 500 Myr and must survive; impacts.flux raises the odds.",
     "minecraft.claims_scatter is false: impact deposits are too rare to be a world's only source of their products, so the game leaves the pack's own scatter of these materials in place (a material another type claims, such as copper, zinc or gold, stays claimed)."
   ]
 }
