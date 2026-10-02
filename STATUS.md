@@ -132,6 +132,40 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
   anti-robot pages saved as small PDFs; a sweep (`pdfinfo`, size per page) caught and removed them. OpenAlex's free allowance ran
   out after about 300 lookups. `plates/dynamics.rs` is still not covered. A peer's `_incoming` folder in the library was not touched.
 - **Next step.** The verification packages read the text files named in `claims.md` ("Sources in the library, by work package").
+### 2026-10-02 — P2-01 fix: the structure stage panicked on long-lived belts (agent worktree agent-a49703993341aa701, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Bug.** `earthlike_quick_16k`, supercontinent, 1000 Myr, seed 1 panicked: "a history holds at most 128 events"
+  (`deeptime-noddy/src/history.rs`). **Cause:** only the end-of-run check (`deform/lattice.rs` `noddy_check`, which
+  compares the column rule with the Noddy port on every 53rd L2 column) built a Noddy history, one per sampled column
+  from all its candidate structures; the port keeps the original's limit of 127 events a history (its 4-bit-per-event
+  sequence code), and a belt active for most of 1,000 Myr puts more structures over one place. The column rule the
+  game runs (Rust and Java) never had a limit, so nothing the game reads changed. Master's interim guard (5ce5af4)
+  skipped such columns silently.
+- **Fix.** `noddy::Chain`: any number of events undone as a run of histories of at most 127 each, youngest first; the
+  same restored position exactly (unit test against undoing event by event). The check uses it, skips no column, and
+  the note carries `noddy_check.max_history` and `noddy_check.long_histories` (sampled columns that needed a chain).
+  `History::is_full` lets a caller ask before `push`. The density itself (option c) was left alone: `max_overlap` 3 per
+  kind with overprinting already bounds each kind, and 218–340 candidates over a column is what three kinds over
+  1,000 Myr of belts give; nothing showed it to be wrong in the rock.
+- **Tests.** `a_place_with_more_structures_than_one_noddy_history_holds` (420 structures over one place: panicked on
+  the old code, skipped every column with the guard), `the_stage_never_panics_however_dense_the_structures` (seeds 1–4,
+  both starts, dense settings; asserts the longest history met passes 127), `a_full_history_says_so_and_a_chain_takes_any_number`.
+- **Measured** (`tools/review/p2-01-planet.sh world sN earthlike_quick_16k supercontinent 1000 --set seed=N`, then
+  `tools/review/p2-01-dense.py`): s1–s4 on fd66131 (before the flexure merge), h1 = seed 1 on a62824d (with flexure).
+  All five ran through the bake, strata-check, sections and parity with exit 0.
+
+  | run | events | max candidates | max history | chained columns | changed land | malformed | bed offset p90 | grade inversions |
+  |---|---|---|---|---|---|---|---|---|
+  | s1 | 27,461 | 266 | 120 | 0 | 66.5 % | 0 | 8 | 0.145 % |
+  | s2 | 30,976 | 340 | 175 | 94 | 62.8 % | 0 | 8 | 0.245 % |
+  | s3 | 20,261 | 126 | 75 | 0 | 72.9 % | 0 | 8 | 0.115 % |
+  | s4 | 24,187 | 243 | 135 | 3 | 68.0 % | 0 | 8 | 0.235 % |
+  | h1 | 21,442 | 218 | 111 | 0 | 69.3 % | 0 | 9 | 0.095 % |
+
+  Noddy against the column rule: worst 1.5e-5 block, 0 side flips, in every run. Cost on the densest (s2, Java
+  `ColumnRuleBenchTest` with `DEEPTIME_BENCH_WORLD`, one thread): 1.117 ms a chunk through the structures against
+  0.558 plain; slowest chunk 91 ms.
+- **Gates** (a62824d): fmt, clippy -D warnings, `cargo test --workspace` 0 failed (core 475), deny ok, `gradlew build
+  test` 217 tests 0 failures. GameTests not re-run: nothing the game reads changed.
 
 ### 2026-10-02 — General lithospheric flexure in the surface stage (agent worktree agent-afae960b6db068f94, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Why.** Ben, decisions log 2026-10-02: "General flexure everywhere": every load bends the crust (belts, volcanic
