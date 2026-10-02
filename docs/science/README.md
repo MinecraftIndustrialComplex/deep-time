@@ -67,7 +67,7 @@ them in from [_template.md](_template.md).
 | [rock-and-metamorphism.md](rock-and-metamorphism.md) | stub | RCK |
 | [strata.md](strata.md) | stub | STR |
 | [folds-faults-intrusions.md](folds-faults-intrusions.md) | stub | DEF |
-| [deposits.md](deposits.md) | stub | DEP, ORE |
+| [deposits.md](deposits.md) | stage 2 (checked against sources 2026-10-02) | DEP, ORE |
 | [provinces.md](provinces.md) | stub | PRV |
 | [world-scale-and-bake.md](world-scale-and-bake.md) | stub | SCL, BAK |
 | [pole-cap.md](pole-cap.md) | stub | POL |

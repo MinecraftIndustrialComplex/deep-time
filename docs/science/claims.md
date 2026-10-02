@@ -37,8 +37,8 @@ ISO-067, added to master the same day by its own agent) is included.
 | [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 73 | 0 | 16 | 0 | 0 | 1 | 24 | 32 | 0 | 0 | 11 |
 | [STR](ledger/STR.md) | strata, traps, hosts | 44 | 0 | 4 | 0 | 0 | 2 | 34 | 4 | 0 | 0 | 4 |
 | [DEF](ledger/DEF.md) | folds, faults, intrusions | 74 | 0 | 16 | 0 | 0 | 0 | 54 | 4 | 0 | 0 | 0 |
-| [DEP](ledger/DEP.md) | deposit models, counts, sizes | 164 | 0 | 74 | 0 | 15 | 0 | 49 | 26 | 0 | 0 | 40 |
-| [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 182 | 0 | 59 | 2 | 10 | 0 | 40 | 71 | 0 | 0 | 75 |
+| [DEP](ledger/DEP.md) | deposit models, counts, sizes | 165 | 53 | 3 | 0 | 20 | 0 | 62 | 27 | 0 | 0 | 40 |
+| [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 185 | 24 | 17 | 0 | 17 | 0 | 58 | 69 | 0 | 0 | 75 |
 | [PRV](ledger/PRV.md) | geologic provinces | 27 | 0 | 5 | 0 | 0 | 4 | 6 | 12 | 0 | 0 | 0 |
 | [SCL](ledger/SCL.md) | world scale, planet constants | 50 | 0 | 6 | 0 | 0 | 1 | 37 | 6 | 0 | 0 | 1 |
 | [BAK](ledger/BAK.md) | the bake, satellite view | 40 | 0 | 0 | 0 | 0 | 1 | 34 | 5 | 0 | 0 | 0 |
@@ -208,8 +208,8 @@ code). "Evidence" says how strong the finding is.
 | # | Ledger | What is wrong | Evidence |
 |---|---|---|---|
 | 1 | IMP-042 | Complex crater depth is coded 0.294 D^0.301 km and cites Collins et al. 2005, eq. 28. That equation is 0.4 D^0.3 km. Craters over 3.2 km are about 27 % too shallow. | primary full text, re-read by the stage 1 lead |
-| 2 | ORE-001 and following; `surface/fields.rs`, `surface/mod.rs` | The time windows are not applied on real histories: the banded-iron, oxygenated-ocean and land-plant clocks are hard-coded. No BIF ever forms; coal and sediment-hosted zinc-lead are not limited in time. | code reading by the extraction agent; the deposit audit found no BIF on either planet |
-| 3 | DEP (the `richness_mult` setting) | The richness setting is documented as scaling grade, and grade never reaches a block. | deposit audit, build log 2026-10-01 |
+| 2 | ORE-001 and following; `surface/fields.rs`, `surface/mod.rs` | The time windows are not applied on real histories: the banded-iron, oxygenated-ocean and land-plant clocks are hard-coded. No BIF ever forms; coal and sediment-hosted zinc-lead are not limited in time. | code reading by the extraction agent; the deposit audit found no BIF on either planet; **Stage 2 (WP-9/10, 2026-10-02): fixed.** The clocks are dated by the planet's age (`deposits/clocks.rs`), the coal facies asks the land-plant date, and inherited BIF fills the stable interiors when the run starts after the window; tests fail on the old stand-ins. See [deposits.md](deposits.md). |
+| 3 | DEP (the `richness_mult` setting) | The richness setting is documented as scaling grade, and grade never reaches a block. | deposit audit, build log 2026-10-01; **Stage 2 (WP-9/10): confirmed, not fixed**: still a no-op on master; the richness question is the owner's (pending since 2026-10-01). |
 | 4 | BIO-002 | Köppen: the code tests the polar group before the dry group. Peel et al. 2007 says "the B climates must be identified first". Cold dry land is classed tundra or ice cap instead of desert or steppe. | primary full text (sub-agent) |
 | 5 | HYD-030 | Holdridge biotemperature counts temperatures above 30 °C as zero as well as those below 0 °C. The code applies only the lower limit, with Holdridge's coefficient. Evaporation is overestimated in hot deserts. | primary full text, scan (sub-agent) |
 | 6 | ERO-070 | Soil production depth scale is 5 m. Secondary sources give 0.25 to 0.5 m for Heimsath's law. A possible factor of 10 to 20. | secondary only; Heimsath et al. 1997 not readable |
@@ -227,9 +227,9 @@ code). "Evidence" says how strong the finding is.
 | 18 | PLT, plate-check and the force-balance design | "Slab-attached plates move 3 to 4 times faster" is attributed to Forsyth & Uyeda 1975; the statement found is in Conrad & Lithgow-Bertelloni 2004. Correct the attribution before the force balance is calibrated to it. | primary abstracts |
 | 19 | SCL (`pole_cap_deg`), preset | The preset's pole-cap latitude is read by nothing; the game uses its own value from the world preset file. | code reading |
 | 20 | SCL-039 and the timeline range | A run may be 4,600 Myr long while the planet's age defaults to 4.57 Gyr. | arithmetic |
-| 21 | DEP (MVT and sedex time gate) | The 2.02 Ga limit comes from Leach et al. 2010 in Economic Geology, not from the USGS report of the same authors and year that is also cited; that paper does not support putting MVT deposits on the same clock as sedex. Moot until fix 2. | primary abstract |
-| 22 | DEP (supergene copper) | The data file says Sillitoe 2005's "3 to 9 Myr" was not found; the abstract has it ("at least 0.5 m.y. but typically minima of 3 to 9 m.y."). The engine uses only the 0.5. The 100 mm/yr rainfall floor is stricter than the sources. | primary abstract |
-| 23 | DEP ("Circular 1178 p. 15") | The 1 km assessment depth is on printed page 5. The rule itself is right. | primary full text (sub-agent) |
+| 21 | DEP (MVT and sedex time gate) | The 2.02 Ga limit comes from Leach et al. 2010 in Economic Geology, not from the USGS report of the same authors and year that is also cited; that paper does not support putting MVT deposits on the same clock as sedex. Moot until fix 2. | primary abstract; **Stage 2 (WP-9/10):** the ledger now names the Economic Geology paper (ORE-014); the shared gate is unchanged and listed as an open question. |
+| 22 | DEP (supergene copper) | The data file says Sillitoe 2005's "3 to 9 Myr" was not found; the abstract has it ("at least 0.5 m.y. but typically minima of 3 to 9 m.y."). The engine uses only the 0.5. The 100 mm/yr rainfall floor is stricter than the sources. | primary abstract; **Stage 2 (WP-9/10): data note corrected**; the 100 mm/yr floor and the 0.5 Myr minimum are open questions on [deposits.md](deposits.md). |
+| 23 | DEP ("Circular 1178 p. 15") | The 1 km assessment depth is on printed page 5. The rule itself is right. | primary full text (sub-agent); **Stage 2 (WP-9/10): corrected** in the porphyry type note and the ledger. |
 | 24 | MOI-073, CLM (weathering) | The runoff sensitivity 0.038 per K is GEOCARB II's (Berner 1994); the cited Berner & Kothavala 2001 uses 0.045 and 0.025. | primary full text (sub-agent) |
 | 25 | GLA-002 | Glacial erosion constant 1e-5 with exponent 1; the published pairs are 1e-4 with exponent 1 and 1e-5 with exponent 2. Glacial erosion may be ten times too slow, or the exponent wrong. | primary abstract and a citing paper |
 | 26 | AMP-034, AMP-038 | The thermal slope values attributed to Schott et al. are read differently from Schott's shader: 0.9 and 1.4 there are absolute tangents, not multipliers of 0.57. | Schott's shader source (sub-agent) |
