@@ -107,6 +107,59 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 | 2026-10-01 | P1-10 | **Region size and when a world gets its regions.** (1) Provinces are at least 50,000 km² (the earlier bake minimum, kept; `provinces.min_area_km2`): the 16k planet has 40 provinces of 68,000 to 2,200,000 km² (about 870 to 4,900 blocks across), TerraBlender's own regions being about 1,000 to 3,000 blocks; smaller values give more, smaller regions (recommended: keep). (2) A world's province → region table is dealt once, at the first start with TerraBlender installed, and kept: a biome mod added later brings its regions to new worlds only, and one removed falls back to the vanilla region for its provinces (recommended; the alternative re-deals for unexplored chunks and shifts biomes at the border of explored ones). | Not asked yet (sub-agent report) |
 
 ## Build log
+### 2026-10-02 — Volcano decisions: stratovolcano heights, island subsidence, continental hotspot calderas (agent worktree agent-a131f01c22943a1ff, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What.** Ben's four answers of 2026-10-02 (decisions log, last four rows): (1) stratovolcanoes `arc_height_km`
+  [1.2, 3.0] → **[0.6, 2.0]** and `arc_radius_km` 14 → **10** (VOL-019, VOL-020); (2) `island_subsidence_m_myr` 25 → **0**,
+  setting kept (VOL-048); (3) continental hotspot centres collapse at about **1 per Myr**: a new setting
+  `volcanoes.hotspot_caldera_rate_per_myr` = 1.0 replaces the factor 3 on `caldera_rate_per_myr` (0.04, unchanged for arc
+  cones and tall shields; VOL-045, new row VOL-074); (4) geothermal rules (400 mm rain test, no pools under 3 degC,
+  pools of 4 to 10 blocks) kept, no code change, GEO-007, -019, -020, -027, -051 marked owner-confirmed. The four
+  questions are out of "Pending questions" (GEO-044 and the other geothermal questions stay open).
+- **Code.** Defaults in `volcanoes/params.rs` and in all eight built-in presets and the test preset
+  `planet_world_4k.json`; the stage's decisions factored into functions the tests call (`arc_height_km`, `caldera_rate`,
+  `caldera_chance`, `caldera_erupts`, `sink_dead_islands`; draws unchanged); the summary line gained
+  `hotspot_calderas=`. **How the caldera rate is expressed:** a hazard per active centre, `1 - exp(-rate * dt)` a step
+  (so 0.86 per 2-Myr step at rate 1); a collapse ends the centre (as before), and the hotspot builds a new one only
+  once the old has drifted 70 km from the plume, so a track makes about one caldera per centre-life and the rate
+  holds per Myr of an active centre, not per Myr of the hotspot. Editor: new field `hotspot_caldera_rate` (label in
+  the lang file), hints for `arc_height_high`, `arc_radius`, `island_subsidence`, `caldera_rate` and `volcano_size`
+  rewritten, `arc_height_high` minimum 1.2 → 0.6 and `arc_height_low` maximum 3 → 2 (the editor's extremes test sets a
+  knob to its end with the others at their defaults, and the pair must stay ordered).
+- **Tests** (new, `volcanoes/tests.rs`): `stratovolcano_heights_fall_in_earths_range` (a synthetic arc with flux rising
+  from the threshold to 1: the cones' aimed median is inside Earth's mean ± s.d., 0.58-1.68 km, every cone inside
+  0.17-4.57 km, height to basal width inside 0.02-0.30 and within 10 % of the old proportion);
+  `a_continental_hotspot_makes_about_one_caldera_per_myr` (300 Myr of an active centre renewed after each collapse,
+  through the stage's own `caldera_erupts`: 240 to 360 calderas, expected 293; arc rate 0.04 unchanged; a shield under
+  4 km never collapses); `island_subsidence_defaults_to_nothing_and_the_setting_still_works` (default 0 leaves the
+  surface unchanged; 25 m/Myr sinks a dead island to its 1.5 km maximum and spares an active one); the pipeline test
+  also asserts that no volcano of its 120 Myr run has sunk.
+- **Science docs.** `docs/science/volcanoes-and-magma.md` (decisions section replaces open questions 1-3, tables,
+  numbers, new runs table), ledger VOL (VOL-019 `calibrated`, VOL-020 and VOL-048 `game-choice`, VOL-045 reworded,
+  VOL-074 new `game-choice`: VOL 74 rows, calibrated 2, game-choice 47, uncited 24), HNT (HNT-016, -061 revised;
+  HNT-085 to -088 new: 88 rows, verified 13, game-choice 38), GEO rows, `claims.md` totals (2,214 rows, 19 `verified`),
+  bibliography, `preset-coverage.md`. Sources read again on the test VM: Christiansen 2001 (three cycles, each ending
+  in a caldera-forming ash-flow eruption, 2.1, 1.3 and 0.64 Ma: `verified`) and Grosse et al. 2014, table 1
+  (stratovolcanoes, n = 512: height median 1.02 km, mean 1.13, s.d. 0.55, range 0.17-4.57; height/width median 0.13).
+- **Measured** (test VM; `earthlike_quick_16k`, 500 Myr, seeds 1-3, scattered continents and supercontinent, six runs
+  per variant, `deeptime stage volcanoes`, 2 threads, 4 at a time; `tools/review/p1-17-hyps.sh 500 "1 2 3"
+  "scattered_continents supercontinent" new "old:volcanoes.arc_height_km=[1.2,3.0];volcanoes.arc_radius_km=14;
+  volcanoes.island_subsidence_m_myr=25;volcanoes.hotspot_caldera_rate_per_myr=0.12"`; the old variant is master's
+  behaviour and reproduces the WP-2 seed-1 numbers exactly). Means, ranges in brackets. **Standing cones' median height
+  1,484 m (1,389-1,627) → 869 m (764-994)** (Earth 1,020 m); active cones 1,875 → 1,044 m. **Land above 2 km 0.124
+  (0.092-0.149) → 0.077 (0.062-0.097)**, lower in all six pairs (Earth 0.102); median land height 687 → 559 m (Earth
+  427 m); land share 0.295 → 0.266 (Earth 0.289). Calderas formed 512 → 496; at continental hotspot centres 42 (25-68)
+  → 62 (18-102); share of silicic hotspot centres that collapsed 66 % (253 of 382) → 98 % (374 of 380) (WP-2's
+  "10-30 % chance" was low: a centre stays active several Myr); arc calderas 469 → 433; summit calderas 22 → 16;
+  relief built by volcanoes 2.4 × 10⁷ → 1.2 × 10⁷ km³. **Contradicts nothing in the plan, but note:** the lower cones
+  move the land above 2 km from above Earth's to below it; the hypsometry recalibration (decisions log 2026-10-01,
+  "later with the plate work") should expect that. Scratch runs in `/Volumes/Graphide/ban/deeptime-runs/vol-decisions`,
+  deleted.
+- **Gates** (test VM): `cargo fmt --check` clean; `clippy --workspace --all-targets -D warnings` clean; `cargo test
+  --workspace` 682 passed, 0 failed, 3 ignored; `cargo deny check licenses bans` ok; `./gradlew build test` 226 tests,
+  0 failures, 1 skipped; `./gametest.sh` All 68 required tests passed; MIC: `./gametest.sh -PwithMic` (168 mods) All 68 required tests passed; its first run died in mod loading before any test (Registrate's "Found unused register callbacks" in Create's register event, the flake recorded in the P2-08 entry), the same jars loaded on the second.
+- **Next step.** The coordinator merges the branch; the hypsometry recalibration (decisions log 2026-10-01) now starts
+  from land above 2 km 0.077 and median land height 559 m.
+
 ### 2026-10-02 — Science documentation, stage 2, WP-2: volcanoes and magma checked against sources (agent worktree agent-a44828926d2eaecb7, sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What.** Every VOL and MAG row's source and status revised (`docs/science/ledger/VOL.md`, `MAG.md`); the page
   `docs/science/volcanoes-and-magma.md` rewritten for stage 2; ten volcano and magma hints corrected
@@ -142,7 +195,7 @@ Questions asked of Ben and not yet answered. Answers go into the decisions file'
 - **Gates** (test VM): `cargo fmt --check` clean; clippy `-D warnings` clean; `cargo test --workspace` 673 passed,
   0 failed, 3 ignored; `cargo deny check licenses bans` ok; `./gradlew build test` 217 tests, 0 failures, 1
   skipped. GameTests not run: nothing the game reads changed (comments, hints and a summary line only).
-- **Next step.** Ben's answers to the three questions; then the value changes (with tests) in one small branch.
+- **Next step.** Done: Ben answered the three questions on 2026-10-02 and the value changes landed in the entry "Volcano decisions" above.
   Left for others: the arc-flux law is coded three times (VOL-003, RCK-059, the deposit engine).
 - **Merged with master a7ea05d** (WP-15/16, P1-10): where both packages corrected the same text, the version that
   agrees with the primary sources read was kept (volcano comments and the flanks, spacing and largest-caldera hints
