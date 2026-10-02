@@ -12,10 +12,12 @@ Ledger ids on this page: `DEP-001` to `DEP-205` ([ledger/DEP.md](ledger/DEP.md))
 
 ## What you see in the world
 
-Ore in a Deep Time world comes in two kinds. Most blocks of ore belong to **deposits**: bodies of a
-known size and shape placed where the simulated history made the conditions for them. A thin
-**background scatter** of the same ores fills the rest of the rock at about a tenth of vanilla's
-amounts (build log 2026-10-01, "Deposit audit").
+Ore in a Deep Time world comes in two kinds. **Deposits** are bodies of a known size and shape
+placed where the simulated history made the conditions for them. A thin **background scatter** of
+the same ores fills the rest of the rock at about a tenth of vanilla's amounts. On the two planets
+the deposit audit measured, deposits held 85 to 94 % of the coal blocks, 11 to 35 % of the zinc,
+3 to 6 % of the gold and 1 % of the copper; the rest is scatter (build log 2026-10-01, "Deposit
+audit"; before the stage 2 fixes, when no iron deposit formed).
 
 The deposit families are:
 
@@ -69,8 +71,9 @@ host rock in the top 2 km) and three global clocks.
    tracts by area, favourability and province endowment, and in time by the hazard. Each formed
    deposit is replayed through the history of its column: buried by sediment, uplifted and eroded.
    A deposit eroded away is lost (a porphyry leaves placer gold downstream); one cut into is
-   truncated; one too deep is kept as a site that counts no survivor. The formation rate is chosen
-   so that the expected survivors equal N\*.
+   truncated; one buried below the build range is dropped; one deeper than the assessment depth
+   but inside the build range is placed but not counted. The formation rate is chosen so that the
+   expected counted survivors equal N\*.
 5. **Positions.** Within a tract, deposits are drawn in clusters (a Thomas process: camps of
    deposits) at least the USGS same-deposit distance apart (2 km for porphyry). Coal fields instead
    tile a basin, touching but not overlapping.
@@ -193,7 +196,7 @@ Myr of the run: its permissive area falls by a third and its target from 59 to 3
 | MVT district | Pine Point: 60 ore bodies in 1,600 km²; ore events 50 to 250 kyr | SIR 2010-5070-A (full text) |
 | Iron formation | Superior-type first at ca. 2.6 Ga, giant BIF 2.6–2.4 Ga, gone at ca. 1.85 Ga; primary iron formation 30 to 35 % Fe | Bekker et al. 2010 abstract; OFR 95-831 pp. 210, 254 |
 | Coal fields per area | Powder River 21, Sydney 14, Appalachian 13, South Africa 20, Illinois Basin 2.3 named fields per 100,000 km² of coal-bearing area | USGS PP 1625-A, PP 1625-D, PP 1708 D.1, Averitt 1975, Bioregional Assessments, Hancox & Götz 2014 (full texts; counts and areas read, arithmetic the project's) |
-| Coal per area | Powder River Wyodak-Anderson about 23 Mt/km²; Illinois about 1.5 to 1.9 | PP 1625-A chap. PN; Averitt 1975 (full text) |
+| Coal per area | Powder River Wyodak-Anderson about 23 Mt/km²; Illinois about 1.4 to 1.9 | PP 1625-A chap. PN; Averitt 1975 (full text) |
 | Oil fields | Niger Delta unit: undiscovered fields 1 / 12 / 1,500 MMBO (min / median / max); world units: about 45 % have a median undiscovered field of 1 to 10 MMBO | USGS DDS-60 data form and chapter AR (full text) |
 
 ## Simplifications and limits
