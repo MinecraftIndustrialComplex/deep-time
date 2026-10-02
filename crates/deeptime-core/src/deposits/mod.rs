@@ -52,6 +52,7 @@
 //! opinion", [`rules`]), and the census says so (`fallbacks`). When a field appears in the history
 //! the type comes back with no other change.
 
+pub mod bif_basins;
 pub mod children;
 pub mod clocks;
 pub mod cluster;
@@ -130,6 +131,26 @@ fn max_formed_per_survivor() -> f64 {
     20.0
 }
 
+/// Earth's 2.6–1.8 Ga iron-formation basins cover about 1.4 % of its shields and cratons (0.75
+/// million km² of 53.5 million: `bif_basins`). ledger: ORE-261
+fn inherited_bif_share() -> f64 {
+    0.014
+}
+
+/// The median of Earth's iron-formation basin areas (Hamersley about 100,000 km²; `bif_basins`).
+/// ledger: ORE-263
+fn bif_basin_km2() -> f64 {
+    100_000.0
+}
+
+/// Background scatter at half the scatter rules' amounts (Ben, 2026-10-02, "Rich Deposits,
+/// Thinner Scatter"; the targets in docs/science/deposits.md). game-choice. ledger: ORE-265
+pub const SCATTER_MULT: f64 = 0.5;
+
+fn scatter_mult() -> f64 {
+    SCATTER_MULT
+}
+
 /// The preset's `deposits` section (plan §5.1 `DepositParams`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -143,11 +164,16 @@ pub struct DepositParams {
     /// grades stay. 1 = the USGS models.
     #[serde(default = "one")]
     pub size_mult: f64,
-    /// Global grade multiplier (the editor's "Deposit richness"): multiplies every type's
-    /// `balance.richness_mult`, the zone grades of the bodies and the metal each site holds
-    /// (grades stay at most 1). 1 = the USGS models.
+    /// Global richness multiplier (the editor's "Deposit richness"): multiplies every type's
+    /// `balance.richness_mult`, which scales the zones' ore density and raw-ore share in the
+    /// world (`geometry::zone`, capped there), the zone grades and the metal each site holds
+    /// (grades stay at most 1). 1 = the types' own densities. ledger: ORE-262
     #[serde(default = "one")]
     pub richness_mult: f64,
+    /// Multiplies the background scatter of every scatter rule (the game reads it from the
+    /// manifest's `notes.deposits.scatter_mult`; `BackgroundScatterFeature`). ledger: ORE-265
+    #[serde(default = "scatter_mult")]
+    pub scatter_mult: f64,
     /// At most this many deposits form per expected survivor (the survivor formula's cap,
     /// [`survival`]): a type the planet barely preserves forms this multiple of its target and
     /// falls short, rather than forming without bound.
@@ -157,14 +183,16 @@ pub struct DepositParams {
     /// orogen's head act ([`regional`]; MVT's driver).
     #[serde(default = "brine_flow_km")]
     pub brine_flow_km: f64,
-    /// Inherited banded iron formation (`deposits::clocks`, plan §8.6): the share of a stable
-    /// continental interior's basement that holds BIF inherited from before the run, when the run
-    /// starts after the 2.6–1.85 Ga window (0–1; it multiplies the craton share). 0 = none, the
-    /// built-in presets' interim default (stage 2 WP-9/10, 2026-10-02: at 1 every stable interior
-    /// is permissive and a 1,000 Myr quick 16k planet holds 412 BIF sites; the extent is the
-    /// owner's question). ledger: ORE-261
-    #[serde(default)]
+    /// Inherited banded iron formation (`deposits::clocks`, `bif_basins`, plan §8.6): the share of
+    /// the stable continental interiors that are iron-formation basins inherited from before the
+    /// run, when the run starts after the 2.6–1.85 Ga window (0–1; Ben, 2026-10-02, "Earth-like
+    /// patch field"). 0 = none; 1 = every stable interior (412 BIF sites on a 1,000 Myr quick 16k
+    /// planet). ledger: ORE-261
+    #[serde(default = "inherited_bif_share")]
     pub inherited_bif_share: f64,
+    /// The typical area of one inherited iron-formation basin, km² (`bif_basins`). ledger: ORE-263
+    #[serde(default = "bif_basin_km2")]
+    pub bif_basin_km2: f64,
     /// Regional specialisation (decisions file: default strong).
     #[serde(default)]
     pub province: Province,
@@ -185,9 +213,11 @@ impl Default for DepositParams {
             count_mult: 1.0,
             size_mult: 1.0,
             richness_mult: 1.0,
+            scatter_mult: scatter_mult(),
             max_formed_per_survivor: max_formed_per_survivor(),
             brine_flow_km: brine_flow_km(),
-            inherited_bif_share: 0.0,
+            inherited_bif_share: inherited_bif_share(),
+            bif_basin_km2: bif_basin_km2(),
             province: Province::Strong,
             province_km: province_km(),
             types: Vec::new(),
@@ -435,6 +465,20 @@ impl DepositParams {
             return Err(CoreError::preset(
                 format!("{path}.inherited_bif_share"),
                 "must be in [0, 1]",
+            ));
+        }
+        if !(self.bif_basin_km2.is_finite()
+            && (1000.0..=10_000_000.0).contains(&self.bif_basin_km2))
+        {
+            return Err(CoreError::preset(
+                format!("{path}.bif_basin_km2"),
+                "must be in [1000, 1e7]",
+            ));
+        }
+        if !(self.scatter_mult.is_finite() && (0.0..=10.0).contains(&self.scatter_mult)) {
+            return Err(CoreError::preset(
+                format!("{path}.scatter_mult"),
+                "must be in [0, 10]",
             ));
         }
         for (v, key) in [
@@ -1999,6 +2043,15 @@ impl DepositStage {
             "fallbacks": self.state.fallbacks,
             "petroleum": petroleum_note,
             "count_mult": self.params.count_mult,
+            "richness_mult": self.params.richness_mult,
+            // The game's background scatter multiplier (`BackgroundScatterFeature.scatterMult`).
+            "scatter_mult": self.params.scatter_mult,
+            "inherited_bif_share": self.params.inherited_bif_share,
+            "bif_basin_km2": self.params.bif_basin_km2,
+            // What the surface stage dealt (`bif_basins`): basins, and their share of the stable
+            // continental interiors at the first step.
+            "bif_basins": world.globals.get(crate::surface::BIF_BASINS_GLOBAL),
+            "bif_basin_share": world.globals.get(crate::surface::BIF_BASIN_SHARE_GLOBAL),
             "province": self.params.province.name(),
             "province_km": self.params.province_km,
             "provinces": provinces.count,

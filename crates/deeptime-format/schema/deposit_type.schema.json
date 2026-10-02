@@ -59,7 +59,8 @@
         "material": {"type": ["string", "null"], "description": "a product's material"},
         "rock_class": {"type": ["string", "null"], "description": "the rock class the zone's host becomes"},
         "grade_mult": {"type": "number", "minimum": 0, "default": 1},
-        "density": {"$ref": "#/$defs/unit", "default": 0}
+        "density": {"$ref": "#/$defs/unit", "default": 0},
+        "raw_share": {"$ref": "#/$defs/unit", "default": 0}
       }
     },
     "shape": {"enum": ["ellipsoid", "stockwork_shell", "lens", "pod", "sheet", "dyke", "pipe", "blanket", "seam", "channel", "dome"]}

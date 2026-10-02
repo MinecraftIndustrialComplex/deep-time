@@ -193,6 +193,27 @@ mod tests {
         assert!((t * g - leached * 0.005).abs() < 1e-3);
     }
 
+    /// The shipped blanket enriches under a hyper-arid climate too: John et al. (2010, SIR
+    /// 2010-5070-B) find enrichment from tropical to hyper-arid climates, and the 100 mm/yr floor
+    /// came from one Andean stage (owner's answer 2026-10-02, "Apply all": floor 0; DEP-040).
+    #[test]
+    fn the_shipped_blanket_enriches_in_a_hyper_arid_climate() {
+        let types = crate::deposits::types::builtin().unwrap();
+        let t = types
+            .iter()
+            .find(|t| t.id == "deeptime:supergene_cu_blanket")
+            .unwrap();
+        let w = t
+            .weathering
+            .as_ref()
+            .expect("the blanket's weathering rules");
+        assert_eq!(w.precip_mm[0], 0.0);
+        let dry: Vec<ColumnSample> = (0..4)
+            .map(|k| sample_at(-30.0 + 10.0 * f64::from(k), 10.0, 200.0, 20.0))
+            .collect();
+        assert!(supergene_window(w, 100.0, &dry).is_some(), "20 mm/yr");
+    }
+
     #[test]
     fn placers_follow_the_drainage_until_it_flattens() {
         let grid = GridDesc::for_planet("L1", 512, 16).unwrap(); // 32 × 16, 4.8 km cells
